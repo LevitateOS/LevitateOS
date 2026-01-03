@@ -130,9 +130,17 @@ irq_entry:
 
 #[unsafe(no_mangle)]
 pub extern "C" fn handle_sync_exception(esr: u64, elr: u64) {
-    println!("\n*** KERNEL EXCEPTION: Synchronous ***");
-    print!("ESR: {:#x}\n", esr);
-    print!("ELR: {:#x}\n", elr);
+    // raw prints to avoid core::fmt
+    use core::fmt::Write;
+    use levitate_hal::console;
+    let _ = console::WRITER
+        .lock()
+        .write_str("\n*** KERNEL EXCEPTION: Synchronous ***\n");
+    let _ = console::WRITER.lock().write_str("ESR: ");
+    console::print_hex(esr);
+    let _ = console::WRITER.lock().write_str("\nELR: ");
+    console::print_hex(elr);
+    let _ = console::WRITER.lock().write_str("\n");
 }
 
 /// Handle IRQs.

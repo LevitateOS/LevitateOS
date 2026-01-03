@@ -1,4 +1,4 @@
-#![no_std]
+#![cfg_attr(not(feature = "std"), no_std)]
 
 use core::cell::UnsafeCell;
 use core::marker::{Send, Sync};
@@ -101,5 +101,56 @@ impl<const N: usize> RingBuffer<N> {
 
     pub fn is_empty(&self) -> bool {
         !self.full && self.head == self.tail
+    }
+}
+
+// ============================================================================
+// Unit Tests
+// ============================================================================
+
+#[cfg(all(test, feature = "std"))]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_spinlock_basic() {
+        let lock = Spinlock::new(42);
+        {
+            let mut guard = lock.lock();
+            assert_eq!(*guard, 42);
+            *guard = 43;
+        }
+        assert_eq!(*lock.lock(), 43);
+    }
+
+    #[test]
+    fn test_ring_buffer_fifo() {
+        let mut rb = RingBuffer::<4>::new();
+        assert!(rb.is_empty());
+
+        assert!(rb.push(1));
+        assert!(rb.push(2));
+        assert!(rb.push(3));
+        assert!(rb.push(4));
+        assert!(!rb.push(5)); // Full
+
+        assert_eq!(rb.pop(), Some(1));
+        assert_eq!(rb.pop(), Some(2));
+        assert_eq!(rb.pop(), Some(3));
+        assert_eq!(rb.pop(), Some(4));
+        assert_eq!(rb.pop(), None);
+        assert!(rb.is_empty());
+    }
+
+    #[test]
+    fn test_ring_buffer_wrap_around() {
+        let mut rb = RingBuffer::<2>::new();
+        rb.push(1);
+        rb.push(2);
+        rb.pop();
+        rb.push(3);
+        assert_eq!(rb.pop(), Some(2));
+        assert_eq!(rb.pop(), Some(3));
+        assert!(rb.is_empty());
     }
 }

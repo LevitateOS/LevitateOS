@@ -53,6 +53,7 @@ pub trait Timer {
 /// Implementation of the AArch64 Generic Physical Timer.
 pub struct AArch64Timer;
 
+#[cfg(target_arch = "aarch64")]
 impl Timer for AArch64Timer {
     fn read_counter(&self) -> u64 {
         let val: u64;
@@ -91,6 +92,21 @@ impl Timer for AArch64Timer {
     }
 }
 
+#[cfg(not(target_arch = "aarch64"))]
+impl Timer for AArch64Timer {
+    fn read_counter(&self) -> u64 {
+        0
+    }
+    fn read_frequency(&self) -> u64 {
+        1
+    } // Avoid div by zero
+    fn set_timeout(&self, _ticks: u64) {}
+    fn configure(&self, _flags: TimerCtrlFlags) {}
+    fn is_pending(&self) -> bool {
+        false
+    }
+}
+
 /// Global instance of the AArch64 physical timer.
 pub static API: AArch64Timer = AArch64Timer;
 
@@ -109,7 +125,8 @@ pub fn delay_cycles(cycles: u64) {
     }
 }
 
-#[cfg(test)]
+// Run tests with: cargo test -p levitate-hal --features std
+#[cfg(all(test, feature = "std"))]
 mod tests {
     use super::*;
 

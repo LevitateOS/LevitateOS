@@ -5,7 +5,7 @@ use levitate_utils::RingBuffer;
 
 pub const UART0_BASE: usize = 0x0900_0000;
 
-static WRITER: IrqSafeLock<Pl011Uart> = IrqSafeLock::new(Pl011Uart::new(UART0_BASE));
+pub static WRITER: IrqSafeLock<Pl011Uart> = IrqSafeLock::new(Pl011Uart::new(UART0_BASE));
 static RX_BUFFER: IrqSafeLock<RingBuffer<1024>> = IrqSafeLock::new(RingBuffer::new());
 
 pub fn init() {

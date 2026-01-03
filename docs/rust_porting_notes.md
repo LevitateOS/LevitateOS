@@ -29,3 +29,21 @@ To verify graphics and input without a display:
 2. Use `-monitor stdio` to interact with QEMU.
 3. Inject input via monitor: `sendkey a`.
 4. Verify via serial logs: check for "Input Event" or cursor update logs.
+
+## Kernel Implementation Findings
+
+### 5. `core::fmt` Hang on AArch64
+**Issue**: Using `println!` or `format!` with pointer (`{:p}`) or hex (`{:x}`) formatting for large values can cause the kernel to hang during early boot/exception handling.
+**Cause**: Likely related to stack alignment requirements or floating-point registers being used by the `core::fmt` machinery on AArch64 `no_std` targets.
+**Workaround**:
+- Avoid complex formatting in critical early-boot code.
+- Use raw `write_str` and custom integer-printing functions (like `print_hex`) for low-level debugging.
+
+### 6. MMU Block Mappings
+**Optimization**: Mapping the 128MB kernel range with 4KB pages requires ~67 page tables, often exhausting static pools.
+**Solution**: Use 2MB block mappings (L2 entries) where possible. This reduces table usage to ~4 tables.
+**Implementation**: Check alignment (`addr & 0x1FFFFF == 0`) and block size availability before falling back to 4KB pages.
+
+### 7. Strict Alignment
+**Requirement**: AArch64 hardware requires strict alignment for memory accesses.
+**Rust Config**: Ensure code is compiled with an appropriate target or flags (e.g., `-C target-feature=+strict-align`) if you are manually handling raw pointers or packed structs.

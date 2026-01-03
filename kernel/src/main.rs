@@ -111,8 +111,48 @@ pub extern "C" fn kmain() -> ! {
     println!("\n*** ClaudeOS Rust Kernel ***");
     println!("Heap initialized.");
 
+    // 1.5 Initialize MMU (TEAM_020)
+    {
+        use levitate_hal::mmu;
+        mmu::init();
+
+        let root = unsafe {
+            static mut ROOT_PT: mmu::PageTable = mmu::PageTable::new();
+            &mut *core::ptr::addr_of_mut!(ROOT_PT)
+        };
+
+        // Map Kernel (128MB) - RWX (no PXN) to allow execution and data access
+        let kernel_flags = mmu::PageFlags::KERNEL_DATA.difference(mmu::PageFlags::PXN);
+
+        mmu::identity_map_range_optimized(
+            root,
+            mmu::KERNEL_PHYS_START,
+            mmu::KERNEL_PHYS_END,
+            kernel_flags,
+        )
+        .expect("Failed to map kernel");
+
+        // Map Devices
+        mmu::identity_map_range_optimized(root, 0x0900_0000, 0x0900_1000, mmu::PageFlags::DEVICE)
+            .unwrap(); // UART
+        mmu::identity_map_range_optimized(root, 0x0800_0000, 0x0802_0000, mmu::PageFlags::DEVICE)
+            .unwrap(); // GIC
+        mmu::identity_map_range_optimized(root, 0x0a00_0000, 0x0a10_0000, mmu::PageFlags::DEVICE)
+            .unwrap(); // VirtIO
+
+        // Enable MMU
+        mmu::tlb_flush_all();
+        let root_phys = root as *const _ as usize;
+        unsafe {
+            mmu::enable_mmu(root_phys);
+        }
+        println!("MMU initialized and enabled (identity mapped).");
+    }
+
     // 2. Initialize Core Drivers
     exceptions::init();
+    println!("Exceptions initialized.");
+    levitate_hal::console::init();
     gic::API.init();
 
     // TEAM_015: Register IRQ handlers using typed IrqId
@@ -122,7 +162,6 @@ pub extern "C" fn kmain() -> ! {
     gic::API.enable_irq(gic::IrqId::Uart.irq_number());
 
     println!("Core drivers initialized.");
-    levitate_hal::console::init();
 
     // 3. Initialize Timer (Phase 2)
     println!("Initializing Timer...");

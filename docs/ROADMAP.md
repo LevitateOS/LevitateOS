@@ -20,10 +20,10 @@ This document outlines the planned development phases for LevitateOS, following 
   - [x] **GICv2/v3**: Expand GIC support to handle specific IRQ routing cleanly. (TEAM_015)
   - [x] **Safety**: Ensure all MMIO operations use `volatile` correctly and wrapper structs prevent unsafe state. (TEAM_017 — HAL Hardening)
 
-## 🔮 Phase 3: Memory Management (MMU)
+## 🚧 Phase 3: Memory Management (MMU)
 - **Objective**: Enable virtual memory and isolation.
 - **Tasks**:
-  - [ ] **Page Tables**: Implement AArch64 page table walking and modification.
+  - [/] **Page Tables**: Implement AArch64 page table walking and modification. (TEAM_018 — module complete, integration pending)
   - [ ] **Identity Mapping**: Map kernel identically to physical memory initially.
   - [ ] **Higher-Half Kernel**: Move kernel to higher virtual address space (optional but standard).
   - [ ] **Heap**: Switch allocator to use dynamic page mapping instead of fixed static heap if possible.

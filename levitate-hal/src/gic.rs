@@ -112,6 +112,7 @@ impl Gic {
         }
     }
 
+    #[cfg(target_arch = "aarch64")]
     unsafe fn gicd_write(&self, offset: usize, value: u32) {
         unsafe {
             write_volatile((self.dist_base + offset) as *mut u32, value);
@@ -119,6 +120,14 @@ impl Gic {
         }
     }
 
+    #[cfg(not(target_arch = "aarch64"))]
+    unsafe fn gicd_write(&self, offset: usize, value: u32) {
+        unsafe {
+            write_volatile((self.dist_base + offset) as *mut u32, value);
+        }
+    }
+
+    #[cfg(target_arch = "aarch64")]
     unsafe fn gicd_read(&self, offset: usize) -> u32 {
         unsafe {
             let val = read_volatile((self.dist_base + offset) as *const u32);
@@ -127,6 +136,12 @@ impl Gic {
         }
     }
 
+    #[cfg(not(target_arch = "aarch64"))]
+    unsafe fn gicd_read(&self, offset: usize) -> u32 {
+        unsafe { read_volatile((self.dist_base + offset) as *const u32) }
+    }
+
+    #[cfg(target_arch = "aarch64")]
     unsafe fn gicc_write(&self, offset: usize, value: u32) {
         unsafe {
             write_volatile((self.cpu_base + offset) as *mut u32, value);
@@ -134,12 +149,25 @@ impl Gic {
         }
     }
 
+    #[cfg(not(target_arch = "aarch64"))]
+    unsafe fn gicc_write(&self, offset: usize, value: u32) {
+        unsafe {
+            write_volatile((self.cpu_base + offset) as *mut u32, value);
+        }
+    }
+
+    #[cfg(target_arch = "aarch64")]
     unsafe fn gicc_read(&self, offset: usize) -> u32 {
         unsafe {
             let val = read_volatile((self.cpu_base + offset) as *const u32);
             core::arch::asm!("dmb sy");
             val
         }
+    }
+
+    #[cfg(not(target_arch = "aarch64"))]
+    unsafe fn gicc_read(&self, offset: usize) -> u32 {
+        unsafe { read_volatile((self.cpu_base + offset) as *const u32) }
     }
 
     pub fn init(&self) {
@@ -227,5 +255,54 @@ impl Gic {
         unsafe {
             self.gicd_write(GICD_ICENABLER + (reg as usize * 4), 1 << bit);
         }
+    }
+}
+
+// ============================================================================
+// Unit Tests
+// ============================================================================
+
+#[cfg(all(test, feature = "std"))]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_irq_id_mapping() {
+        assert_eq!(IrqId::VirtualTimer.irq_number(), 27);
+        assert_eq!(IrqId::Uart.irq_number(), 33);
+
+        assert_eq!(IrqId::from_irq_number(27), Some(IrqId::VirtualTimer));
+        assert_eq!(IrqId::from_irq_number(33), Some(IrqId::Uart));
+        assert_eq!(IrqId::from_irq_number(100), None);
+    }
+
+    #[test]
+    fn test_handler_registration_and_dispatch() {
+        static mut CALLED: bool = false;
+        fn test_handler() {
+            unsafe {
+                CALLED = true;
+            }
+        }
+
+        register_handler(IrqId::Uart, test_handler);
+
+        let handled = dispatch(33);
+        assert!(handled);
+        unsafe {
+            assert!(CALLED);
+        }
+
+        let handled_none = dispatch(27);
+        assert!(!handled_none);
+    }
+
+    #[test]
+    fn test_spurious_check() {
+        assert!(Gic::is_spurious(1023));
+        assert!(Gic::is_spurious(1022));
+        assert!(Gic::is_spurious(1021));
+        assert!(Gic::is_spurious(1020));
+        assert!(!Gic::is_spurious(33));
     }
 }

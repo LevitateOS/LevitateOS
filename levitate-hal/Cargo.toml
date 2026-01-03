@@ -3,6 +3,11 @@ name = "levitate-hal"
 version = "0.1.0"
 edition = "2024"
 
+[features]
+default = []
+# Enable std for running tests on host
+std = ["levitate-utils/std"]
+
 [dependencies]
 levitate-utils = { path = "../levitate-utils" }
 bitflags = "2.4"
