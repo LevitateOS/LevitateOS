@@ -36,4 +36,6 @@ qemu-system-aarch64 \
     -drive file=tinyos_disk.img,format=raw,if=none,id=hd0 \
     -device virtio-blk-device,drive=hd0 \
     -serial stdio \
+    -d in_asm,int \
+    -D qemu.log \
     -no-reboot

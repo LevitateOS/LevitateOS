@@ -43,26 +43,49 @@ const MAIR_ATTR_DEVICE: u64 = 0x04; // Device-nGnRE
 const MAIR_VALUE: u64 = MAIR_ATTR_NORMAL | (MAIR_ATTR_DEVICE << 8);
 
 // TCR_EL1 configuration
-// T0SZ = 16  => 48-bit VA
+// T0SZ = 16  => 48-bit VA (User/Identity)
+// T1SZ = 16  => 48-bit VA (Kernel High)
 // TG0 = 0b00 => 4KB granule
-// IPS = 0b101 => 48-bit PA (TEAM_020: Use 48-bit for maximum compatibility)
-// SH0 = 0b11 => Inner Shareable
+// TG1 = 0b10 => 4KB granule
+// IPS = 0b101 => 48-bit PA
+// SH0 = 0b11 => Inner Shareable (TTBR0)
+// SH1 = 0b11 => Inner Shareable (TTBR1)
 // ORGN0/IRGN0 = 0b01 => Write-Back Read-Allocate Write-Allocate Cacheable
+// ORGN1/IRGN1 = 0b01 => Write-Back Read-Allocate Write-Allocate Cacheable
 #[allow(dead_code)]
 const TCR_T0SZ: u64 = 16;
 #[allow(dead_code)]
+const TCR_T1SZ: u64 = 16 << 16;
+#[allow(dead_code)]
 const TCR_TG0_4KB: u64 = 0b00 << 14;
+#[allow(dead_code)]
+const TCR_TG1_4KB: u64 = 0b10 << 30;
 #[allow(dead_code)]
 const TCR_IPS_48BIT: u64 = 0b101 << 32;
 #[allow(dead_code)]
 const TCR_SH0_INNER: u64 = 0b11 << 12;
 #[allow(dead_code)]
+const TCR_SH1_INNER: u64 = 0b11 << 28;
+#[allow(dead_code)]
 const TCR_ORGN0_WB_WA: u64 = 0b01 << 10;
 #[allow(dead_code)]
 const TCR_IRGN0_WB_WA: u64 = 0b01 << 8;
+#[allow(dead_code)]
+const TCR_ORGN1_WB_WA: u64 = 0b01 << 26;
+#[allow(dead_code)]
+const TCR_IRGN1_WB_WA: u64 = 0b01 << 24;
 
-const TCR_VALUE: u64 =
-    TCR_T0SZ | TCR_TG0_4KB | TCR_IPS_48BIT | TCR_SH0_INNER | TCR_ORGN0_WB_WA | TCR_IRGN0_WB_WA;
+const TCR_VALUE: u64 = TCR_T0SZ
+    | TCR_T1SZ
+    | TCR_TG0_4KB
+    | TCR_TG1_4KB
+    | TCR_IPS_48BIT
+    | TCR_SH0_INNER
+    | TCR_SH1_INNER
+    | TCR_ORGN0_WB_WA
+    | TCR_IRGN0_WB_WA
+    | TCR_ORGN1_WB_WA
+    | TCR_IRGN1_WB_WA;
 
 // ============================================================================
 // Page Table Entry

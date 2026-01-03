@@ -3,6 +3,7 @@
 use core::cell::UnsafeCell;
 use core::marker::{Send, Sync};
 use core::ops::{Deref, DerefMut, Drop};
+use core::option::Option::{self, None, Some};
 use core::sync::atomic::{AtomicBool, Ordering};
 
 pub struct Spinlock<T> {

@@ -23,9 +23,13 @@ This document outlines the planned development phases for LevitateOS, following 
 ## 🚧 Phase 3: Memory Management (MMU)
 - **Objective**: Enable virtual memory and isolation.
 - **Tasks**:
-  - [/] **Page Tables**: Implement AArch64 page table walking and modification. (TEAM_018 — module complete, integration pending)
-  - [ ] **Identity Mapping**: Map kernel identically to physical memory initially.
-  - [ ] **Higher-Half Kernel**: Move kernel to higher virtual address space (optional but standard).
+  - [x] **Page Tables**: Implement AArch64 page table walking and modification. (TEAM_018 — module complete)
+  - [x] **Identity Mapping**: Map kernel identically to physical memory. (Working in current kernel)
+  - [🔴] **Higher-Half Kernel**: Move kernel to higher virtual address space. **BLOCKED** — See `docs/planning/higher-half-kernel/`
+    - TEAM_024: Identified root cause (missing TTBR1 mappings in original attempt)
+    - TEAM_025: Attempted TTBR0 approach, hit execute permission issue
+    - **Bug:** Data reads from high VA work, but code execution fails
+    - **Next:** Debug with QEMU `-d int,mmu` logging
   - [ ] **Heap**: Switch allocator to use dynamic page mapping instead of fixed static heap if possible.
 
 ## 🔮 Phase 4: VirtIO Ecosystem

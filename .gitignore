@@ -4,3 +4,14 @@ Cargo.lock
 output.txt
 serial.log
 tinyos_disk.img
+
+# TEAM_025: Kernel Development Artifacts
+*.bin
+*.log
+debug_out.txt
+qemu_higher_half_debug.log
+
+# IDE and OS transient files
+.vscode/
+.DS_Store
+*.swp
