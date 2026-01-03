@@ -1,7 +1,5 @@
 use core::arch::global_asm;
-use core::fmt::Write;
-use crate::gic::Gic;
-use crate::Uart;
+use levitate_hal::gic;
 
 // Exception Vector Table
 // 16 entries, each 128 bytes (0x80)
@@ -132,27 +130,21 @@ irq_entry:
 
 #[unsafe(no_mangle)]
 pub extern "C" fn handle_sync_exception(esr: u64, elr: u64) {
-    let mut uart = Uart;
-    let _ = uart.write_str("\nEXCEPTION: Synchronous\n");
-    let _ = uart.write_str("ESR: ");
-    crate::print_hex(esr);
-    let _ = uart.write_str("\nELR: ");
-    crate::print_hex(elr);
-    let _ = uart.write_str("\n");
+    crate::println!("\n*** KERNEL EXCEPTION: Synchronous ***");
+    crate::print!("ESR: ");
+    crate::console::print_hex(esr);
+    crate::print!("\nELR: ");
+    crate::console::print_hex(elr);
+    crate::println!();
 }
 
 #[unsafe(no_mangle)]
 pub extern "C" fn handle_irq() {
-    unsafe {
-        let irq = Gic::acknowledge();
-        if irq < 1020 {
-            let mut uart = Uart;
-            // let _ = uart.write_str("\nIRQ Received: ");
-            // crate::print_hex(irq as u64);
-            // let _ = uart.write_str("\n");
-        }
-        Gic::end_interrupt(irq);
+    let irq = crate::gic::API.acknowledge();
+    if irq < 1020 {
+        // crate::println!("IRQ Received: {}", irq);
     }
+    crate::gic::API.end_interrupt(irq);
 }
 
 pub fn init() {

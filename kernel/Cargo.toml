@@ -1,0 +1,12 @@
+[package]
+name = "levitate-kernel"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+levitate-hal = { path = "../levitate-hal" }
+levitate-utils = { path = "../levitate-utils" }
+linked_list_allocator = "0.10.5"
+virtio-drivers = "0.7.4"
+embedded-graphics = "0.8.1"
+log = "0.4"

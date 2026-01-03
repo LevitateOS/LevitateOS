@@ -1,0 +1,17 @@
+{
+    "rust-analyzer.linkedProjects": [
+        "./Cargo.toml"
+    ],
+    "rust-analyzer.files.excludeDirs": [
+        ".external-kernels"
+    ],
+    "files.watcherExclude": {
+        "**/.external-kernels/**": true,
+        "**/target/**": true
+    },
+    "rust-analyzer.server.extraEnv": {
+        "RUST_SRC_PATH": "/home/vince/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library"
+    },
+    "rust-analyzer.cargo.sysroot": "/home/vince/.rustup/toolchains/stable-x86_64-unknown-linux-gnu",
+    "rust-analyzer.rustc.source": "/home/vince/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library"
+}

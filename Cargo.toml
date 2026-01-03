@@ -1,10 +1,12 @@
-[package]
-name = "claudeos-rust"
-version = "0.1.0"
-edition = "2024"
+[workspace]
+members = [
+    "kernel",
+    "levitate-hal",
+    "levitate-utils",
+]
+resolver = "2"
 
-[dependencies]
-linked_list_allocator = "0.10"
-virtio-drivers = "0.7.4"
-embedded-graphics = "0.8.1"
-log = "0.4"
+[profile.release]
+panic = "abort"
+lto = true
+codegen-units = 1

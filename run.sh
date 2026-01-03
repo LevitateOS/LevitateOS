@@ -8,7 +8,7 @@ echo "Building ClaudeOS Rust kernel..."
 cargo build --release
 
 # Path to the compiled ELF
-ELF="target/aarch64-unknown-none/release/claudeos-rust"
+ELF="target/aarch64-unknown-none/release/levitate-kernel"
 BIN="kernel64_rust.bin"
 
 echo "Converting to raw binary..."

@@ -1,10 +1,10 @@
+use crate::gpu::Display;
 use embedded_graphics::{
     pixelcolor::Rgb888,
     prelude::*,
-    primitives::{Rectangle, PrimitiveStyle},
+    primitives::{PrimitiveStyle, Rectangle},
 };
-use crate::gpu::Display;
-use crate::sync::Spinlock;
+use levitate_utils::Spinlock;
 
 struct CursorState {
     x: i32,
