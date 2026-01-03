@@ -47,6 +47,10 @@ bitflags! {
     }
 }
 
+// TEAM_017: FIFO interrupt level configuration
+const IFLS_RX4_8: u32 = 2 << 3; // RX FIFO becomes 4/8 full
+const IFLS_TX4_8: u32 = 2 << 0; // TX FIFO becomes 4/8 empty
+
 #[repr(transparent)]
 struct Reg<T>(T);
 
@@ -96,26 +100,38 @@ impl Pl011Uart {
     }
 
     pub fn init(&mut self) {
-        let r = self.regs_mut();
-
         // 1. Disable UART
-        r.cr.write(0);
+        self.regs_mut().cr.write(0);
 
         // 2. Clear interrupts
-        r.icr.write(0x7FF);
+        self.regs_mut().icr.write(0x7FF);
 
-        /*
-        // 3. Set Baud Rate (Example for 115200 at 24MHz)
-        r.ibrd.write(13);
-        r.fbrd.write(1);
-        */
+        // 3. Configure FIFO interrupt levels (TEAM_017)
+        self.regs_mut().ifls.write(IFLS_RX4_8 | IFLS_TX4_8);
 
         // 4. Line Control (8n1, FIFOs enabled)
-        r.lcr_h
+        self.regs_mut()
+            .lcr_h
             .write((LineControlFlags::WLEN_8 | LineControlFlags::FEN).bits());
 
         // 5. Enable UART, TX, RX
-        r.cr.write((ControlFlags::UARTEN | ControlFlags::TXE | ControlFlags::RXE).bits());
+        self.regs_mut()
+            .cr
+            .write((ControlFlags::UARTEN | ControlFlags::TXE | ControlFlags::RXE).bits());
+
+        // 6. Drain stale data from RX FIFO (TEAM_017)
+        self.drain_fifo();
+    }
+
+    /// Drain any stale bytes from the RX FIFO.
+    /// TEAM_017: Matches Redox drain_fifo() behavior.
+    pub fn drain_fifo(&mut self) {
+        for _ in 0..32 {
+            if FlagFlags::from_bits_truncate(self.regs().fr.read()).contains(FlagFlags::RXFE) {
+                break;
+            }
+            let _ = self.regs().dr.read();
+        }
     }
 
     pub fn write_byte(&mut self, byte: u8) {

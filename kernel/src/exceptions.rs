@@ -1,5 +1,4 @@
 use core::arch::global_asm;
-use levitate_hal::timer::Timer;
 use levitate_hal::{print, println};
 
 // Exception Vector Table
@@ -143,15 +142,17 @@ pub extern "C" fn handle_sync_exception(esr: u64, elr: u64) {
 #[unsafe(no_mangle)]
 pub extern "C" fn handle_irq() {
     let irq = levitate_hal::gic::API.acknowledge();
-    if irq == 27 {
-        // Reload timer for next interrupt (1 second)
-        let freq = levitate_hal::timer::API.read_frequency();
-        levitate_hal::timer::API.set_timeout(freq);
-    } else if irq == 33 {
-        levitate_hal::console::handle_interrupt();
-    } else if irq < 1020 {
-        println!("IRQ Received: {}", irq);
+
+    // TEAM_017: Skip spurious interrupts (no EOI needed)
+    if levitate_hal::gic::Gic::is_spurious(irq) {
+        return;
     }
+
+    // TEAM_015: Use gic::dispatch() instead of hardcoded IRQ numbers
+    if !levitate_hal::gic::dispatch(irq) {
+        println!("Unhandled IRQ: {}", irq);
+    }
+
     levitate_hal::gic::API.end_interrupt(irq);
 }
 pub fn init() {

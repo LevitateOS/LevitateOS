@@ -40,6 +40,14 @@ pub trait Timer {
 
     /// Check if the timer interrupt is pending.
     fn is_pending(&self) -> bool;
+
+    /// Clear the timer interrupt by temporarily masking it.
+    /// TEAM_017: Matches Redox explicit IRQ clearing pattern.
+    fn clear_irq(&self) {
+        if self.is_pending() {
+            self.configure(TimerCtrlFlags::ENABLE | TimerCtrlFlags::IMASK);
+        }
+    }
 }
 
 /// Implementation of the AArch64 Generic Physical Timer.

@@ -22,6 +22,78 @@ const GICC_EOIR: usize = 0x010;
 pub const GIC_MAX_IRQ: u32 = 256;
 pub const GIC_SPI_START: u32 = 32;
 
+// TEAM_015: Typed IRQ identifiers and handler registry
+// ======================================================
+
+/// Known IRQ sources in LevitateOS.
+/// Maps symbolic names to hardware IRQ numbers for the QEMU virt machine.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[repr(u8)]
+pub enum IrqId {
+    /// Virtual Timer (PPI, IRQ 27)
+    VirtualTimer = 0,
+    /// PL011 UART (SPI, IRQ 33)
+    Uart = 1,
+    // Future: VirtioGpu, VirtioInput, VirtioBlk, VirtioNet
+}
+
+/// Maximum number of registered handlers (must match IrqId variant count)
+const MAX_HANDLERS: usize = 16;
+
+impl IrqId {
+    /// Hardware IRQ number for this source (QEMU virt machine).
+    #[inline]
+    pub const fn irq_number(self) -> u32 {
+        match self {
+            IrqId::VirtualTimer => 27,
+            IrqId::Uart => 33,
+        }
+    }
+
+    /// Try to convert a raw IRQ number to a typed IrqId.
+    #[inline]
+    pub fn from_irq_number(irq: u32) -> Option<Self> {
+        match irq {
+            27 => Some(IrqId::VirtualTimer),
+            33 => Some(IrqId::Uart),
+            _ => None,
+        }
+    }
+}
+
+/// IRQ handler function type.
+pub type IrqHandler = fn();
+
+/// Static handler table (single-core assumption, set at boot).
+static mut HANDLERS: [Option<IrqHandler>; MAX_HANDLERS] = [None; MAX_HANDLERS];
+
+/// Register a handler for an IRQ.
+///
+/// # Safety
+/// Must be called before interrupts are enabled. Not thread-safe.
+pub fn register_handler(irq: IrqId, handler: IrqHandler) {
+    let idx = irq as usize;
+    unsafe {
+        HANDLERS[idx] = Some(handler);
+    }
+}
+
+/// Dispatch an IRQ to its registered handler.
+///
+/// Returns `true` if a handler was found and called, `false` otherwise.
+pub fn dispatch(irq_num: u32) -> bool {
+    if let Some(irq_id) = IrqId::from_irq_number(irq_num) {
+        let idx = irq_id as usize;
+        unsafe {
+            if let Some(handler) = HANDLERS[idx] {
+                handler();
+                return true;
+            }
+        }
+    }
+    false
+}
+
 pub struct Gic {
     dist_base: usize,
     cpu_base: usize,
@@ -108,8 +180,8 @@ impl Gic {
                 self.gicd_write(GICD_ICFGR + (i as usize * 4), 0);
             }
 
-            // Enable distributor
-            self.gicd_write(GICD_CTLR, 1);
+            // TEAM_016: Enable Group0 and Group1 non-secure distribution
+            self.gicd_write(GICD_CTLR, 0x3);
 
             // CPU Interface init
             self.gicc_write(GICC_PMR, 0xFF);
@@ -117,8 +189,16 @@ impl Gic {
         }
     }
 
+    /// Acknowledge an IRQ.
+    /// Returns 1023 for spurious interrupts (caller should skip processing).
     pub fn acknowledge(&self) -> u32 {
         unsafe { self.gicc_read(GICC_IAR) & 0x3FF }
+    }
+
+    /// Check if an IRQ is spurious (1023 or 1022).
+    #[inline]
+    pub fn is_spurious(irq: u32) -> bool {
+        irq >= 1020
     }
 
     pub fn end_interrupt(&self, irq: u32) {

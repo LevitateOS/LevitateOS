@@ -82,6 +82,17 @@ use linked_list_allocator::LockedHeap;
 #[global_allocator]
 static ALLOCATOR: LockedHeap = LockedHeap::empty();
 
+// TEAM_015: IRQ handler functions registered via gic::register_handler
+fn timer_irq_handler() {
+    // Reload timer for next interrupt (1 second)
+    let freq = timer::API.read_frequency();
+    timer::API.set_timeout(freq);
+}
+
+fn uart_irq_handler() {
+    levitate_hal::console::handle_interrupt();
+}
+
 #[unsafe(no_mangle)]
 pub extern "C" fn kmain() -> ! {
     // 1. Initialize heap
@@ -103,8 +114,12 @@ pub extern "C" fn kmain() -> ! {
     // 2. Initialize Core Drivers
     exceptions::init();
     gic::API.init();
-    gic::API.enable_irq(27); // Virtual Timer
-    gic::API.enable_irq(33); // UART
+
+    // TEAM_015: Register IRQ handlers using typed IrqId
+    gic::register_handler(gic::IrqId::VirtualTimer, timer_irq_handler);
+    gic::register_handler(gic::IrqId::Uart, uart_irq_handler);
+    gic::API.enable_irq(gic::IrqId::VirtualTimer.irq_number());
+    gic::API.enable_irq(gic::IrqId::Uart.irq_number());
 
     println!("Core drivers initialized.");
     levitate_hal::console::init();
