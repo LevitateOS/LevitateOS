@@ -11,12 +11,10 @@ mod cursor;
 mod exceptions;
 mod gpu;
 mod input;
-mod timer;
 mod virtio;
 
-use crate::gpu::Display;
-use levitate_hal::console;
 use levitate_hal::gic;
+use levitate_hal::timer::{self, Timer};
 use levitate_hal::{print, println};
 
 global_asm!(
@@ -102,20 +100,32 @@ pub extern "C" fn kmain() -> ! {
     println!("\n*** ClaudeOS Rust Kernel ***");
     println!("Heap initialized.");
 
-    // 2. Initialize Core Drivers (Phase 2)
+    // 2. Initialize Core Drivers
+    exceptions::init();
     gic::API.init();
-    gic::API.enable_irq(30); // Timer?
+    gic::API.enable_irq(27); // Virtual Timer
     gic::API.enable_irq(33); // UART
 
-    exceptions::init();
+    println!("Core drivers initialized.");
 
-    // 3. Initialize VirtIO (Phase 3)
+    // 3. Initialize Timer (Phase 2)
+    println!("Initializing Timer...");
+    let freq = timer::API.read_frequency();
+    print!("Timer frequency (hex): ");
+    levitate_hal::console::print_hex(freq);
+    println!("");
+    timer::API.set_timeout(freq);
+    timer::API.enable();
+    println!("Timer initialized.");
+
+    // 4. Initialize VirtIO (Phase 3)
     virtio::init();
 
-    // Enable IRQs
+    // 5. Enable interrupts
     unsafe {
         core::arch::asm!("msr daifclr, #2");
     }
+    println!("Interrupts enabled.");
 
     // Verify Graphics
     use embedded_graphics::{

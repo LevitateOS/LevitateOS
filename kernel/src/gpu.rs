@@ -1,5 +1,5 @@
 use crate::virtio::VirtioHal;
-use core::slice;
+// No imports needed
 use embedded_graphics::{pixelcolor::Rgb888, prelude::*};
 use levitate_utils::Spinlock;
 use virtio_drivers::{device::gpu::VirtIOGpu, transport::mmio::MmioTransport};

@@ -1,5 +1,6 @@
 use core::arch::global_asm;
-use levitate_hal::gic;
+use levitate_hal::timer::Timer;
+use levitate_hal::{print, println};
 
 // Exception Vector Table
 // 16 entries, each 128 bytes (0x80)
@@ -130,23 +131,23 @@ irq_entry:
 
 #[unsafe(no_mangle)]
 pub extern "C" fn handle_sync_exception(esr: u64, elr: u64) {
-    crate::println!("\n*** KERNEL EXCEPTION: Synchronous ***");
-    crate::print!("ESR: ");
-    crate::console::print_hex(esr);
-    crate::print!("\nELR: ");
-    crate::console::print_hex(elr);
-    crate::println!();
+    println!("\n*** KERNEL EXCEPTION: Synchronous ***");
+    print!("ESR: {:#x}\n", esr);
+    print!("ELR: {:#x}\n", elr);
 }
 
 #[unsafe(no_mangle)]
 pub extern "C" fn handle_irq() {
-    let irq = crate::gic::API.acknowledge();
-    if irq < 1020 {
-        // crate::println!("IRQ Received: {}", irq);
+    let irq = levitate_hal::gic::API.acknowledge();
+    if irq == 27 {
+        // Reload timer for next interrupt (1 second)
+        let freq = levitate_hal::timer::API.read_frequency();
+        levitate_hal::timer::API.set_timeout(freq);
+    } else if irq < 1020 {
+        println!("IRQ Received: {}", irq);
     }
-    crate::gic::API.end_interrupt(irq);
+    levitate_hal::gic::API.end_interrupt(irq);
 }
-
 pub fn init() {
     unsafe extern "C" {
         static vectors: u8;

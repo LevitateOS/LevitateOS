@@ -5,3 +5,4 @@ edition = "2024"
 
 [dependencies]
 levitate-utils = { path = "../levitate-utils" }
+bitflags = "2.4"
