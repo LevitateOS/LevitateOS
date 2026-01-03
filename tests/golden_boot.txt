@@ -1,7 +1,7 @@
 
 *** ClaudeOS Rust Kernel ***
 Heap initialized.
-MMU initialized and enabled (identity mapped).
+MMU re-initialized (Higher-Half + Identity).
 Exceptions initialized.
 Core drivers initialized.
 Initializing Timer...

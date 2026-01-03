@@ -10,7 +10,7 @@ cd "$PROJECT_ROOT"
 TEST_DIR="tests"
 GOLDEN_FILE="$TEST_DIR/golden_boot.txt"
 ACTUAL_FILE="$TEST_DIR/actual_boot.txt"
-KERNEL_BIN="kernel64_rust.bin"
+KERNEL_ELF="target/aarch64-unknown-none/release/levitate-kernel"
 
 # Ensure clean state
 pkill -f qemu-system-aarch64 || true
@@ -19,7 +19,6 @@ mkdir -p "$TEST_DIR"
 
 echo "Building kernel..."
 cargo build --release --quiet
-aarch64-linux-gnu-objcopy -O binary target/aarch64-unknown-none/release/levitate-kernel "$KERNEL_BIN"
 
 echo "Running QEMU (Headless)..."
 # Run QEMU for 5 seconds, capture serial output to ACTUAL_FILE
@@ -27,7 +26,7 @@ timeout 5s qemu-system-aarch64 \
     -M virt \
     -cpu cortex-a53 \
     -m 512M \
-    -kernel "$KERNEL_BIN" \
+    -kernel "$KERNEL_ELF" \
     -display none \
     -serial file:"$ACTUAL_FILE" \
     -device virtio-gpu-device \
