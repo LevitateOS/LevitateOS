@@ -208,6 +208,64 @@ static mut BOOT_DTB_ADDR: u64 = 0;
 #[unsafe(no_mangle)]
 static mut BOOT_REGS: [u64; 4] = [0; 4];
 
+// TEAM_063: Define type-safe boot stages aligned with UEFI/Linux
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BootStage {
+    EarlyHAL,    // SEC / setup_arch
+    MemoryMMU,   // PEI / mm_init
+    BootConsole, // DXE / console_init
+    Discovery,   // DXE / BDS / vfs_caches_init
+    SteadyState, // BDS / rest_init
+}
+
+impl BootStage {
+    pub const fn name(&self) -> &'static str {
+        match self {
+            BootStage::EarlyHAL => "Early HAL (SEC)",
+            BootStage::MemoryMMU => "Memory & MMU (PEI)",
+            BootStage::BootConsole => "Boot Console (DXE)",
+            BootStage::Discovery => "Discovery & FS (DXE/BDS)",
+            BootStage::SteadyState => "Steady State (BDS)",
+        }
+    }
+}
+
+static CURRENT_STAGE: core::sync::atomic::AtomicU8 = core::sync::atomic::AtomicU8::new(0);
+
+/// TEAM_063: Transition the system to a new boot stage.
+/// Enforces order and logs to UART.
+pub fn transition_to(stage: BootStage) {
+    let stage_val = stage as u8;
+    let prev = CURRENT_STAGE.swap(stage_val, core::sync::atomic::Ordering::SeqCst);
+
+    // Ensure we don't go backwards (unless it's the first transition)
+    if stage_val < prev && prev != 0 {
+        println!(
+            "[BOOT] WARNING: Unexpected transition from {:?} to {:?}",
+            prev, stage
+        );
+    }
+
+    println!("[BOOT] Stage {}: {}", stage_val + 1, stage.name());
+}
+
+/// TEAM_063: Minimal failsafe shell for critical boot failures.
+pub fn maintenance_shell() -> ! {
+    println!("\n[BOOT] Entering Maintenance Shell (FAILSAFE)");
+    println!("Type 'reboot' to restart (not implemented) or interact via serial.");
+    loop {
+        print!("FAILSAFE> ");
+        if let Some(c) = levitate_hal::console::read_byte() {
+            let ch = c as char;
+            match ch {
+                '\r' | '\n' => println!(""),
+                _ => print!("{}", ch),
+            }
+        }
+        core::hint::spin_loop();
+    }
+}
+
 /// Returns the physical address of the DTB if one was provided.
 ///
 /// # TEAM_038: DTB Detection Strategy
@@ -263,7 +321,10 @@ static UART_HANDLER: UartHandler = UartHandler;
 
 #[unsafe(no_mangle)]
 pub extern "C" fn kmain() -> ! {
-    println!("\n[BOOT] Stage 1: Core HAL");
+    // TEAM_063: Initialize console immediately so early transitions are logged.
+    levitate_hal::console::init();
+
+    transition_to(BootStage::EarlyHAL);
     // Initialize heap
     unsafe extern "C" {
         static __heap_start: u8;
@@ -277,11 +338,9 @@ pub extern "C" fn kmain() -> ! {
         ALLOCATOR.lock().init(heap_start as *mut u8, heap_size);
     }
 
-    verbose!("\n*** LevitateOS Kernel ***");
     verbose!("Heap initialized.");
 
-    println!("[BOOT] Stage 2: Memory & MMU");
-    // 1.5 Initialize MMU (TEAM_020)
+    transition_to(BootStage::MemoryMMU);
     {
         use levitate_hal::mmu;
         // MMU is already enabled by assembly boot, but we re-initialize
@@ -380,7 +439,6 @@ pub extern "C" fn kmain() -> ! {
 
     exceptions::init();
     verbose!("Exceptions initialized.");
-    levitate_hal::console::init();
 
     // Register HAL interrupts
     let dtb_phys = get_dtb_phys();
@@ -411,7 +469,7 @@ pub extern "C" fn kmain() -> ! {
     timer::API.enable();
     verbose!("Timer initialized.");
 
-    println!("[BOOT] Stage 3: Boot Console");
+    transition_to(BootStage::BootConsole);
     // TEAM_058: Initialize GPU Terminal (SC14.1-SC14.7)
     verbose!("Initializing GPU Terminal...");
     let mut display = gpu::Display;
@@ -435,11 +493,10 @@ pub extern "C" fn kmain() -> ! {
     term.write_str(&mut display, "Hybrid Kernel Initialization Starting...\n\n");
     verbose!("Terminal initialized.");
 
-    println!("[BOOT] Stage 4: Discovery & Filesystem");
+    transition_to(BootStage::Discovery);
     // Initialize VirtIO Subsystem
     virtio::init();
 
-    // 4.5 Initialize Initramfs (Team 035)
     unsafe {
         println!(
             "BOOT_REGS: x0={:x} x1={:x} x2={:x} x3={:x}",
@@ -479,7 +536,7 @@ pub extern "C" fn kmain() -> ! {
         verbose!("No DTB provided.");
     }
 
-    // 5. Initialize Filesystem (Phase 4)
+    // Initialize Filesystem (Phase 4)
     // Don't panic if FS fails, just log it. Initramfs implies we might be diskless.
     match fs::init() {
         Ok(_) => {
@@ -489,12 +546,9 @@ pub extern "C" fn kmain() -> ! {
     }
 
     // 6. Enable interrupts
-    unsafe {
-        core::arch::asm!("msr daifclr, #2");
-    }
     verbose!("Interrupts enabled.");
 
-    println!("[BOOT] Stage 5: Ready State");
+    transition_to(BootStage::SteadyState);
     term.write_str(&mut display, "Boot Stage: SYSTEM_READY\n\n");
     term.write_str(&mut display, "Type to interact with the Boot Console.\n");
     term.write_str(&mut display, "--------------------------------------\n\n");

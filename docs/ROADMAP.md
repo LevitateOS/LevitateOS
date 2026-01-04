@@ -69,7 +69,7 @@ This document outlines the planned development phases for LevitateOS. Each compl
 - **Tasks**:
   - [x] **VirtIO Net**: Basic network packet transmission/reception (`virtio-net`). (TEAM_057)
 - [x] **GPU Refinement**: Text rendering on GPU framebuffer. (TEAM_058, TEAM_059)
-  - [/] **Hybrid Boot Specification**: Formalize boot stages and interactive console behavior. (TEAM_061: PLANNING)
+  - [x] **Hybrid Boot Specification**: Formalize boot stages and interactive console behavior. (TEAM_061: PLANNING, TEAM_063: EXECUTION)
   - [ ] **Keyboard Support**: Direct input from QEMU window via `virtio-keyboard`. (Planned: Task 6.4)
   - [ ] **9P Filesystem**: Mount host directories via `virtio-9p`. (Deferred — see `docs/planning/virtio-ecosystem-phase6/task-6.3-9p-filesystem.md`)
 
@@ -105,7 +105,7 @@ This document outlines the planned development phases for LevitateOS. Each compl
 - **Next Step**: **Raspberry Pi 4/5** (Standard AArch64, widely documented, accessible UART).
 - **Moonshot**: **Pixel 6 (Tensor GS101)**.
   - *Challenges*: Proprietary boot chain (pBL/sBL/ABL).
-  - *Strategy*: Align LevitateOS stages (EarlyHAL, Memory, Console) with GS101 hardware (UART via SBU pins, SimpleFB) to ensure "Pixel-ready" architecture. (TEAM_061)
+  - *Strategy*: Align LevitateOS stages (EarlyHAL, Memory, Console) with GS101 hardware (UART via SBU pins, SimpleFB) to ensure "Pixel-ready" architecture. (TEAM_061, TEAM_063)
 
 ---
 

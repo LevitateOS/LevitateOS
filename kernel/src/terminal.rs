@@ -66,6 +66,14 @@ pub struct Terminal {
     last_blink: u64,
     saved_pixels: [[Rgb888; 10]; 20],
     has_saved: bool,
+    ansi_state: AnsiState, // TEAM_063: Track escape sequences
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum AnsiState {
+    None,
+    Esc,
+    CSI,
 }
 
 impl Terminal {
@@ -100,6 +108,7 @@ impl Terminal {
             last_blink: 0,
             saved_pixels: [[Rgb888::BLACK; 10]; 20],
             has_saved: false,
+            ansi_state: AnsiState::None,
         }
     }
 
@@ -116,15 +125,39 @@ impl Terminal {
     /// [TERM1] [TERM2] Write single character at cursor position
     pub fn write_char(&mut self, display: &mut Display, c: char) {
         self.hide_cursor(display);
+
+        // TEAM_063: Basic ANSI VT100 state machine
+        match self.ansi_state {
+            AnsiState::None => {
+                if c == '\x1b' {
+                    self.ansi_state = AnsiState::Esc;
+                    return;
+                }
+            }
+            AnsiState::Esc => {
+                if c == '[' {
+                    self.ansi_state = AnsiState::CSI;
+                } else {
+                    self.ansi_state = AnsiState::None;
+                }
+                return;
+            }
+            AnsiState::CSI => {
+                // Currently only support 'J' (Clear Screen) for VT100 compatibility
+                if c == 'J' {
+                    self.clear(display);
+                }
+                // Transition back after any command or if we hit a non-parameter char
+                if (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') {
+                    self.ansi_state = AnsiState::None;
+                }
+                return;
+            }
+        }
+
         match c {
             '\n' => {
                 // [TERM3] - SC6.1, SC6.2
-                crate::println!(
-                    "[TERM] newline at col={}, row={} -> col=0, row={}",
-                    self.cursor_col,
-                    self.cursor_row,
-                    self.cursor_row + 1
-                );
                 self.newline(display);
 
                 // TEAM_059: Force flush after newline
@@ -142,17 +175,12 @@ impl Terminal {
                 self.tab(display);
             }
             '\x08' => {
-                // [TERM8] - SC12.1, SC12.2
+                // [TERM8] [SPEC-3] Interactive destructive backspace
                 self.backspace(display);
             }
             c if c >= ' ' => {
                 // [TERM2] Check if we need to wrap - SC8.2
                 if self.cursor_col >= self.cols {
-                    crate::println!(
-                        "[TERM] line_wrap triggered at col={} (cols={})",
-                        self.cursor_col,
-                        self.cols
-                    );
                     self.newline(display);
                 }
 
@@ -161,18 +189,6 @@ impl Terminal {
                 let cur_col = self.cursor_col;
                 let x = (cur_col * FONT_WIDTH) as i32;
                 let y = (cur_row * (FONT_HEIGHT + LINE_SPACING)) as i32;
-
-                // Log every 20th character to avoid flooding UART
-                if cur_col % 20 == 0 || c == 'A' {
-                    crate::println!(
-                        "[TERM] write_char('{}') at col={}, row={}, pixel=({}, {})",
-                        c,
-                        cur_col,
-                        cur_row,
-                        x,
-                        y + FONT_HEIGHT as i32
-                    );
-                }
 
                 let style = MonoTextStyle::new(&FONT_10X20, self.config.fg_color);
                 let mut buf = [0u8; 4];
@@ -241,21 +257,10 @@ impl Terminal {
     /// [TERM6] Tab to next 8-column boundary - SC9.1-SC9.5
     fn tab(&mut self, display: &mut Display) {
         self.hide_cursor(display);
-        let old_col = self.cursor_col;
+        let _old_col = self.cursor_col;
         let next_tab = ((self.cursor_col / 8) + 1) * 8;
 
-        if next_tab >= self.cols {
-            crate::println!(
-                "[TERM] tab from col={} -> wrap (next_tab={} >= cols={})",
-                old_col,
-                next_tab,
-                self.cols
-            );
-            self.newline(display);
-        } else {
-            crate::println!("[TERM] tab from col={} -> col={}", old_col, next_tab);
-            self.cursor_col = next_tab;
-        }
+        self.cursor_col = next_tab;
 
         // TEAM_059: Force flush after tab
         let mut guard = GPU.lock();
@@ -279,11 +284,6 @@ impl Terminal {
             self.cursor_row -= 1;
             self.cursor_col = self.cols - 1;
             changed = true;
-            crate::println!(
-                "[TERM] backspace wrap to row={}, col={}",
-                self.cursor_row,
-                self.cursor_col
-            );
         }
 
         if changed {

@@ -41,11 +41,11 @@ To ensure "Pixel-ready" behavior, the LevitateOS boot stages map to GS101 hardwa
 
 | Stage | GS101 Component | Implementation Notes |
 | :--- | :--- | :--- |
-| **Stage 1** | **GS101 UART** | Managed via USB-C SBU pins. 115200 8N1 @ 1.8V. |
-| **Stage 2** | **Low-Power DDR** | RAM region detected via DTB (typically 0x80000000+). |
-| **Stage 3** | **SimpleFB** | Early console uses `simple-framebuffer` node in DTB. |
-| **Stage 4** | **UFS / Exynos-DW** | Block discovery shifts from VirtIO to UFS storage. |
-| **Stage 5** | **TrustZone (EL1/EL0)** | Final state transitions to secure userland processes. |
+| **Stage 1** | **GS101 UART** | GS101 USI UART. Routed to USB-C SBU pins (SBU1: TX, SBU2: RX). 1.8V TTL. |
+| **Stage 2** | **Low-Power DDR** | RAM region detected via DTB (0x80000000+). MMU maps 4K pages. |
+| **Stage 3** | **SimpleFB** | Early console uses `simple-framebuffer` node in `chosen` node of DTB. |
+| **Stage 4** | **UFS / Exynos-DW** | Block discovery shifts from VirtIO to Universal Flash Storage (UFS). |
+| **Stage 5** | **TrustZone (EL1/EL0)** | Transition to secure userland; MMU enforced isolation. |
 
 > [!NOTE]
 > **SimpleFB Compatibility**: Our current Stage 3 `terminal.rs` is compatible with the Pixel 6 simple-framebuffer protocol, as it only requires a linear memory buffer and resolution parameters provided by the bootloader (ABL).

@@ -19,3 +19,7 @@ Refactor `kernel/src/main.rs` and `kernel/src/terminal.rs` to enforce the Boot S
 ### Step 3: Stage Transitions and Logging
 - **UoW 1**: Add explicit `[BOOT] Stage X` UART logs (COMPLETED by TEAM_061 - verify in Phase 4).
 - **UoW 2**: Ensure "SYSTEM_READY" is the final transition.
+
+### Step 4: Cleanup and Handoff
+- **UoW 1**: Remove legacy stage comments and redundant initialization logic from `main.rs`.
+- **UoW 2**: Update `TODO.md` with remaining GS101-specific driver gaps identified in Phase 1.
