@@ -126,6 +126,22 @@ fn build_kernel_with_features(features: &[&str]) -> Result<()> {
     if !status.success() {
         bail!("Kernel build failed");
     }
+
+    // Convert to binary for boot protocol support (Rule 38)
+    println!("Converting to raw binary...");
+    let objcopy_status = Command::new("aarch64-linux-gnu-objcopy")
+        .args([
+            "-O", "binary",
+            "target/aarch64-unknown-none/release/levitate-kernel",
+            "kernel64_rust.bin",
+        ])
+        .status()
+        .context("Failed to run objcopy - is aarch64-linux-gnu-objcopy installed?")?;
+
+    if !objcopy_status.success() {
+        bail!("objcopy failed");
+    }
+
     Ok(())
 }
 
@@ -191,14 +207,14 @@ impl QemuProfile {
 }
 
 pub fn run_qemu(profile: QemuProfile, headless: bool) -> Result<std::process::Output> {
-    let kernel_elf = "target/aarch64-unknown-none/release/levitate-kernel";
+    let kernel_bin = "kernel64_rust.bin";
 
     let machine = profile.machine();
     let mut args = vec![
         "-M", machine.as_str(),
         "-cpu", profile.cpu(),
         "-m", profile.memory(),
-        "-kernel", kernel_elf,
+        "-kernel", kernel_bin,
         "-device", "virtio-gpu-device",
         "-device", "virtio-keyboard-device",
         "-device", "virtio-tablet-device",
@@ -206,6 +222,7 @@ pub fn run_qemu(profile: QemuProfile, headless: bool) -> Result<std::process::Ou
         "-netdev", "user,id=net0",
         "-drive", "file=tinyos_disk.img,format=raw,if=none,id=hd0",
         "-device", "virtio-blk-device,drive=hd0",
+        "-initrd", "initramfs.cpio",
         "-no-reboot",
     ];
 

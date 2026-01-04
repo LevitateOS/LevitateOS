@@ -14,7 +14,7 @@ use crate::QemuProfile;
 
 const GOLDEN_FILE: &str = "tests/golden_boot.txt";
 const ACTUAL_FILE: &str = "tests/actual_boot.txt";
-const KERNEL_ELF: &str = "target/aarch64-unknown-none/release/levitate-kernel";
+const KERNEL_BIN: &str = "kernel64_rust.bin";
 const TIMEOUT_SECS: u64 = 5;
 
 pub fn run() -> Result<()> {
@@ -59,7 +59,7 @@ fn run_with_profile(profile: QemuProfile) -> Result<()> {
         "-M".to_string(), profile.machine().to_string(),
         "-cpu".to_string(), profile.cpu().to_string(),
         "-m".to_string(), profile.memory().to_string(),
-        "-kernel".to_string(), KERNEL_ELF.to_string(),
+        "-kernel".to_string(), KERNEL_BIN.to_string(),
         "-display".to_string(), "none".to_string(),
         "-serial".to_string(), format!("file:{}", ACTUAL_FILE),
         "-device".to_string(), "virtio-gpu-device".to_string(),
@@ -69,6 +69,7 @@ fn run_with_profile(profile: QemuProfile) -> Result<()> {
         "-netdev".to_string(), "user,id=net0".to_string(),
         "-drive".to_string(), "file=tinyos_disk.img,format=raw,if=none,id=hd0".to_string(),
         "-device".to_string(), "virtio-blk-device,drive=hd0".to_string(),
+        "-initrd".to_string(), "initramfs.cpio".to_string(),
         "-no-reboot".to_string(),
     ];
 

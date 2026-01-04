@@ -15,7 +15,7 @@
 
 use crate::gpu::{Display, GPU};
 use embedded_graphics::{
-    mono_font::{ascii::FONT_10X20, MonoTextStyle},
+    mono_font::{MonoTextStyle, ascii::FONT_10X20},
     pixelcolor::Rgb888,
     prelude::*,
     primitives::{PrimitiveStyle, Rectangle},
@@ -26,10 +26,32 @@ use embedded_graphics::{
 const FONT_WIDTH: u32 = 10;
 const FONT_HEIGHT: u32 = 20;
 const LINE_SPACING: u32 = 2;
+const CHARACTER_SPACING: u32 = 0;
 
 /// Default terminal colors - SC4.5, SC4.6
 pub const DEFAULT_FG: Rgb888 = Rgb888::new(204, 204, 204); // Light gray
 pub const DEFAULT_BG: Rgb888 = Rgb888::new(0, 0, 0); // Black
+
+/// Terminal configuration (compile-time or runtime)
+pub struct TerminalConfig {
+    pub font_width: u32,
+    pub font_height: u32,
+    pub line_spacing: u32,
+    pub fg_color: Rgb888,
+    pub bg_color: Rgb888,
+}
+
+impl Default for TerminalConfig {
+    fn default() -> Self {
+        Self {
+            font_width: FONT_WIDTH,
+            font_height: FONT_HEIGHT,
+            line_spacing: LINE_SPACING,
+            fg_color: DEFAULT_FG,
+            bg_color: DEFAULT_BG,
+        }
+    }
+}
 
 /// Terminal emulator state - SC3.2
 pub struct Terminal {
@@ -37,10 +59,13 @@ pub struct Terminal {
     cursor_row: u32,
     cols: u32,
     rows: u32,
-    fg_color: Rgb888,
-    bg_color: Rgb888,
-    screen_width: u32,
-    screen_height: u32,
+    config: TerminalConfig,
+    screen_width: u32,  // pixels
+    screen_height: u32, // pixels
+    cursor_visible: bool,
+    last_blink: u64,
+    saved_pixels: [[Rgb888; 10]; 20],
+    has_saved: bool,
 }
 
 impl Terminal {
@@ -68,10 +93,13 @@ impl Terminal {
             cursor_row: 0,
             cols,
             rows,
-            fg_color: DEFAULT_FG,
-            bg_color: DEFAULT_BG,
+            config: TerminalConfig::default(),
             screen_width,
             screen_height,
+            cursor_visible: false,
+            last_blink: 0,
+            saved_pixels: [[Rgb888::BLACK; 10]; 20],
+            has_saved: false,
         }
     }
 
@@ -87,6 +115,7 @@ impl Terminal {
 
     /// [TERM1] [TERM2] Write single character at cursor position
     pub fn write_char(&mut self, display: &mut Display, c: char) {
+        self.hide_cursor(display);
         match c {
             '\n' => {
                 // [TERM3] - SC6.1, SC6.2
@@ -114,7 +143,7 @@ impl Terminal {
             }
             '\x08' => {
                 // [TERM8] - SC12.1, SC12.2
-                self.backspace();
+                self.backspace(display);
             }
             c if c >= ' ' => {
                 // [TERM2] Check if we need to wrap - SC8.2
@@ -145,7 +174,7 @@ impl Terminal {
                     );
                 }
 
-                let style = MonoTextStyle::new(&FONT_10X20, self.fg_color);
+                let style = MonoTextStyle::new(&FONT_10X20, self.config.fg_color);
                 let mut buf = [0u8; 4];
                 let s = c.encode_utf8(&mut buf);
 
@@ -163,6 +192,7 @@ impl Terminal {
             }
             _ => {} // Ignore other control characters
         }
+        self.show_cursor(display);
     }
 
     /// Write string to terminal
@@ -173,10 +203,8 @@ impl Terminal {
     }
 
     /// [TERM3] [TERM4] Move to next line, scroll if needed - SC6.1, SC6.2
-    /// TEAM_058 BREADCRUMB: SUSPECT - Newline visually doesn't work
-    /// Characters after Enter overlap previous line. UART logs show correct state
-    /// but display shows wrong position. Investigate Y coordinate calculation.
     pub fn newline(&mut self, display: &mut Display) {
+        self.hide_cursor(display);
         self.cursor_col = 0;
         self.cursor_row += 1;
 
@@ -194,6 +222,7 @@ impl Terminal {
 
     // [TERM5] - SC7.1, SC7.2
     pub fn carriage_return(&mut self, _display: &mut Display) {
+        self.hide_cursor(_display);
         crate::println!(
             "[TERM] carriage_return at col={}, row={} -> col=0",
             self.cursor_col,
@@ -206,10 +235,12 @@ impl Terminal {
         if let Some(state) = guard.as_mut() {
             state.flush();
         }
+        self.show_cursor(_display);
     }
 
     /// [TERM6] Tab to next 8-column boundary - SC9.1-SC9.5
     fn tab(&mut self, display: &mut Display) {
+        self.hide_cursor(display);
         let old_col = self.cursor_col;
         let next_tab = ((self.cursor_col / 8) + 1) * 8;
 
@@ -231,10 +262,12 @@ impl Terminal {
         if let Some(state) = guard.as_mut() {
             state.flush();
         }
+        self.show_cursor(display);
     }
 
     /// [TERM8] Move cursor left (no erase) - SC12.1, SC12.2
-    fn backspace(&mut self) {
+    fn backspace(&mut self, display: &mut Display) {
+        self.hide_cursor(display);
         if self.cursor_col > 0 {
             self.cursor_col -= 1;
             crate::println!("[TERM] backspace -> col={}", self.cursor_col);
@@ -247,10 +280,12 @@ impl Terminal {
         if let Some(state) = guard.as_mut() {
             state.flush();
         }
+        self.show_cursor(display);
     }
 
     /// [TERM7] Clear screen and reset cursor - SC10.1-SC10.5
     pub fn clear(&mut self, display: &mut Display) {
+        self.hide_cursor(display);
         crate::println!(
             "[TERM] clear() - filling {}x{} with bg color",
             self.screen_width,
@@ -261,17 +296,19 @@ impl Terminal {
             Point::zero(),
             Size::new(self.screen_width, self.screen_height),
         )
-        .into_styled(PrimitiveStyle::with_fill(self.bg_color))
+        .into_styled(PrimitiveStyle::with_fill(self.config.bg_color))
         .draw(display);
 
         self.cursor_col = 0;
         self.cursor_row = 0;
 
         crate::println!("[TERM] clear() complete, cursor at (0, 0)");
+        self.show_cursor(display);
     }
 
     /// [TERM4] Scroll screen up by one line - SC11.3-SC11.8
     fn scroll_up(&mut self, _display: &mut Display) {
+        self.hide_cursor(_display);
         let line_height = FONT_HEIGHT + LINE_SPACING;
 
         crate::println!(
@@ -294,9 +331,9 @@ impl Terminal {
                 // SC11.5: Clear bottom line with background color
                 let clear_start = fb.len() - scroll_bytes;
                 for i in (clear_start..fb.len()).step_by(4) {
-                    fb[i] = self.bg_color.r();
-                    fb[i + 1] = self.bg_color.g();
-                    fb[i + 2] = self.bg_color.b();
+                    fb[i] = self.config.bg_color.r();
+                    fb[i + 1] = self.config.bg_color.g();
+                    fb[i + 2] = self.config.bg_color.b();
                     fb[i + 3] = 255;
                 }
 
@@ -309,15 +346,101 @@ impl Terminal {
             // TEAM_058: Use public flush method
             state.flush();
         }
+        self.show_cursor(_display);
     }
 
     /// Set foreground color
     pub fn set_fg(&mut self, color: Rgb888) {
-        self.fg_color = color;
+        self.config.fg_color = color;
     }
 
     /// Set background color
     pub fn set_bg(&mut self, color: Rgb888) {
-        self.bg_color = color;
+        self.config.bg_color = color;
+    }
+
+    /// [TEAM_060] Toggle cursor visibility based on timer
+    pub fn check_blink(&mut self, display: &mut Display) {
+        let now = crate::timer::uptime_seconds();
+        if now != self.last_blink {
+            self.last_blink = now;
+            if self.cursor_visible {
+                self.hide_cursor(display);
+            } else {
+                self.show_cursor(display);
+            }
+        }
+    }
+
+    fn show_cursor(&mut self, display: &mut Display) {
+        if self.cursor_visible {
+            return;
+        }
+
+        let x = self.cursor_col * (FONT_WIDTH + CHARACTER_SPACING);
+        let y = self.cursor_row * (FONT_HEIGHT + LINE_SPACING);
+
+        // Save pixels
+        let mut guard = crate::gpu::GPU.lock();
+        if let Some(gpu) = guard.as_mut() {
+            let fb = gpu.framebuffer();
+            let width = self.screen_width as usize;
+
+            for dy in 0..20 {
+                for dx in 0..10 {
+                    let py = (y + dy) as usize;
+                    let px = (x + dx) as usize;
+                    if py < self.screen_height as usize && px < self.screen_width as usize {
+                        let idx = (py * width + px) * 4;
+                        self.saved_pixels[dy as usize][dx as usize] =
+                            Rgb888::new(fb[idx], fb[idx + 1], fb[idx + 2]);
+                    }
+                }
+            }
+            self.has_saved = true;
+        }
+        drop(guard);
+
+        // Draw block
+        let _ = Rectangle::new(Point::new(x as i32, y as i32), Size::new(10, 20))
+            .into_styled(PrimitiveStyle::with_fill(self.config.fg_color))
+            .draw(display);
+
+        self.cursor_visible = true;
+    }
+
+    fn hide_cursor(&mut self, _display: &mut Display) {
+        if !self.cursor_visible || !self.has_saved {
+            self.cursor_visible = false;
+            return;
+        }
+
+        let x = self.cursor_col * (FONT_WIDTH + CHARACTER_SPACING);
+        let y = self.cursor_row * (FONT_HEIGHT + LINE_SPACING);
+
+        // Restore pixels
+        let mut guard = crate::gpu::GPU.lock();
+        if let Some(gpu) = guard.as_mut() {
+            let fb = gpu.framebuffer();
+            let width = self.screen_width as usize;
+
+            for dy in 0..20 {
+                for dx in 0..10 {
+                    let py = (y + dy) as usize;
+                    let px = (x + dx) as usize;
+                    if py < self.screen_height as usize && px < self.screen_width as usize {
+                        let idx = (py * width + px) * 4;
+                        let color = self.saved_pixels[dy as usize][dx as usize];
+                        fb[idx] = color.r();
+                        fb[idx + 1] = color.g();
+                        fb[idx + 2] = color.b();
+                        fb[idx + 3] = 255;
+                    }
+                }
+            }
+            gpu.flush();
+        }
+
+        self.cursor_visible = false;
     }
 }

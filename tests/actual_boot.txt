@@ -1,25 +1,70 @@
 
+[BOOT] Stage 1: Core HAL
+
 *** LevitateOS Kernel ***
 Heap initialized.
+[BOOT] Stage 2: Memory & MMU
 MMU re-initialized (Higher-Half + Identity).
 Exceptions initialized.
-Detected GIC version: V3
+DTB address from x0: 0x48200000
+Detected GIC version: V2
+Buddy Allocator initialized with DTB memory map.
 Core drivers initialized.
-Initializing Timer...
-Timer frequency (hex): 0x0000000003b9aca0
 Timer initialized.
+[BOOT] Stage 3: Boot Console
+Initializing GPU Terminal...
+[TERM] GPU resolution: 1280x800
+[TERM] Terminal::new(1280x800) -> 128x36 chars (font 10x20, spacing 2)
+[TERM] Terminal size: 128x36 characters
+[TERM] clear() - filling 1280x800 with bg color
+[TERM] clear() complete, cursor at (0, 0)
+[TERM] write_char('L') at col=0, row=0, pixel=(0, 20)
+[TERM] write_char('v') at col=20, row=0, pixel=(200, 20)
+[TERM] newline at col=24, row=0 -> col=0, row=1
+[TERM] write_char('=') at col=0, row=1, pixel=(0, 42)
+[TERM] write_char('=') at col=20, row=1, pixel=(200, 42)
+[TERM] newline at col=24, row=1 -> col=0, row=2
+[TERM] newline at col=0, row=2 -> col=0, row=3
+[TERM] write_char('B') at col=0, row=3, pixel=(0, 86)
+[TERM] write_char('R') at col=20, row=3, pixel=(200, 86)
+[TERM] write_char('A') at col=22, row=3, pixel=(220, 86)
+[TERM] newline at col=25, row=3 -> col=0, row=4
+[TERM] write_char('H') at col=0, row=4, pixel=(0, 108)
+[TERM] write_char('l') at col=20, row=4, pixel=(200, 108)
+[TERM] newline at col=40, row=4 -> col=0, row=5
+[TERM] newline at col=0, row=5 -> col=0, row=6
+Terminal initialized.
+[BOOT] Stage 4: Discovery & Filesystem
 Scanning VirtIO MMIO bus...
 Initializing Block device...
 VirtIO Block initialized successfully.
+Initializing Network device...
+VirtIO Net: MAC=52:54:00:12:34:56
 Initializing Input...
 VirtIO Input initialized successfully.
 Initializing Input...
 VirtIO Input initialized successfully.
-BOOT_REGS: x0=0 x1=0 x2=0 x3=0
+BOOT_REGS: x0=48200000 x1=0 x2=0 x3=0
 Detecting Initramfs...
-No DTB provided.
+Initramfs found at 0x48000000 - 0x48000400 (1024 bytes)
+Files in initramfs:
+ - .
+ - hello.txt
+   Content: Hello from initramfs!
+ - test.txt
 FAT32 mounted. Root contains 0 entries.
 Filesystem initialized.
 Interrupts enabled.
-Drawing test pattern...
-Drawing complete.
+[BOOT] Stage 5: Ready State
+[TERM] write_char('B') at col=0, row=6, pixel=(0, 152)
+[TERM] write_char('E') at col=20, row=6, pixel=(200, 152)
+[TERM] write_char('A') at col=21, row=6, pixel=(210, 152)
+[TERM] newline at col=24, row=6 -> col=0, row=7
+[TERM] newline at col=0, row=7 -> col=0, row=8
+[TERM] write_char('T') at col=0, row=8, pixel=(0, 196)
+[TERM] write_char('h') at col=20, row=8, pixel=(200, 196)
+[TERM] newline at col=39, row=8 -> col=0, row=9
+[TERM] write_char('-') at col=0, row=9, pixel=(0, 218)
+[TERM] write_char('-') at col=20, row=9, pixel=(200, 218)
+[TERM] newline at col=38, row=9 -> col=0, row=10
+[TERM] newline at col=0, row=10 -> col=0, row=11

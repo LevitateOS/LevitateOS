@@ -9,7 +9,7 @@ pub use levitate_utils::hex::{format_hex, nibble_to_hex};
 pub const UART0_BASE: usize = 0x0900_0000;
 
 pub static WRITER: IrqSafeLock<Pl011Uart> = IrqSafeLock::new(Pl011Uart::new(UART0_BASE));
-static RX_BUFFER: IrqSafeLock<RingBuffer<1024>> = IrqSafeLock::new(RingBuffer::new());
+static RX_BUFFER: IrqSafeLock<RingBuffer<u8, 1024>> = IrqSafeLock::new(RingBuffer::new(0));
 
 pub fn init() {
     let mut uart = WRITER.lock();

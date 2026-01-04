@@ -263,7 +263,8 @@ static UART_HANDLER: UartHandler = UartHandler;
 
 #[unsafe(no_mangle)]
 pub extern "C" fn kmain() -> ! {
-    // 1. Initialize heap
+    println!("\n[BOOT] Stage 1: Core HAL");
+    // Initialize heap
     unsafe extern "C" {
         static __heap_start: u8;
         static __heap_end: u8;
@@ -279,6 +280,7 @@ pub extern "C" fn kmain() -> ! {
     verbose!("\n*** LevitateOS Kernel ***");
     verbose!("Heap initialized.");
 
+    println!("[BOOT] Stage 2: Memory & MMU");
     // 1.5 Initialize MMU (TEAM_020)
     {
         use levitate_hal::mmu;
@@ -376,12 +378,11 @@ pub extern "C" fn kmain() -> ! {
         verbose!("MMU re-initialized (Higher-Half + Identity).");
     }
 
-    // 2. Initialize Core Drivers
     exceptions::init();
     verbose!("Exceptions initialized.");
     levitate_hal::console::init();
 
-    // TEAM_045: Reliable GIC discovery using FDT
+    // Register HAL interrupts
     let dtb_phys = get_dtb_phys();
     let dtb_slice = dtb_phys.map(|phys| {
         let ptr = phys as *const u8;
@@ -394,6 +395,11 @@ pub extern "C" fn kmain() -> ! {
     verbose!("Detected GIC version: {:?}", gic_api.version());
     gic_api.init();
 
+    // TEAM_047: Initialize physical memory management (Buddy Allocator)
+    if let Some(slice) = dtb_slice {
+        memory::init(slice);
+    }
+
     // TEAM_045: Register IRQ handlers using trait objects
     gic::register_handler(gic::IrqId::VirtualTimer, &TIMER_HANDLER);
     gic::register_handler(gic::IrqId::Uart, &UART_HANDLER);
@@ -402,22 +408,35 @@ pub extern "C" fn kmain() -> ! {
 
     verbose!("Core drivers initialized.");
 
-    // TEAM_047: Initialize physical memory management (Buddy Allocator)
-    if let Some(slice) = dtb_slice {
-        memory::init(slice);
-    }
-
-    // 3. Initialize Timer (Phase 2)
-    verbose!("Initializing Timer...");
-    let freq = timer::API.read_frequency();
-    print!("Timer frequency (hex): ");
-    levitate_hal::console::print_hex(freq);
-    verbose!("");
-    timer::API.set_timeout(freq);
     timer::API.enable();
     verbose!("Timer initialized.");
 
-    // 4. Initialize VirtIO (Phase 3)
+    println!("[BOOT] Stage 3: Boot Console");
+    // TEAM_058: Initialize GPU Terminal (SC14.1-SC14.7)
+    verbose!("Initializing GPU Terminal...");
+    let mut display = gpu::Display;
+
+    // SC2.2, SC2.3: Get resolution from GPU
+    let (width, height) = gpu::get_resolution().unwrap_or((1280, 800));
+    println!("[TERM] GPU resolution: {}x{}", width, height);
+
+    // SC3.3: Create terminal
+    let mut term = terminal::Terminal::new(width, height);
+    let (cols, rows) = term.size();
+
+    // SC14.2: Print dimensions to UART
+    println!("[TERM] Terminal size: {}x{} characters", cols, rows);
+
+    // SC10.1-SC10.5, SC14.1: Clear and show boot banner
+    term.clear(&mut display);
+    term.write_str(&mut display, "LevitateOS Terminal v0.1\n");
+    term.write_str(&mut display, "========================\n\n");
+    term.write_str(&mut display, "Boot Stage: CONSOLE_READY\n");
+    term.write_str(&mut display, "Hybrid Kernel Initialization Starting...\n\n");
+    verbose!("Terminal initialized.");
+
+    println!("[BOOT] Stage 4: Discovery & Filesystem");
+    // Initialize VirtIO Subsystem
     virtio::init();
 
     // 4.5 Initialize Initramfs (Team 035)
@@ -475,30 +494,15 @@ pub extern "C" fn kmain() -> ! {
     }
     verbose!("Interrupts enabled.");
 
-    // TEAM_058: Initialize GPU Terminal (SC14.1-SC14.7)
-    verbose!("Initializing GPU Terminal...");
-    let mut display = gpu::Display;
-    
-    // SC2.2, SC2.3: Get resolution from GPU
-    let (width, height) = gpu::get_resolution().unwrap_or((1280, 800));
-    println!("[TERM] GPU resolution: {}x{}", width, height);
-    
-    // SC3.3: Create terminal
-    let mut term = terminal::Terminal::new(width, height);
-    let (cols, rows) = term.size();
-    
-    // SC14.2: Print dimensions to UART
-    println!("[TERM] Terminal size: {}x{} characters", cols, rows);
-    
-    // SC10.1-SC10.5, SC14.1: Clear and show boot banner
-    term.clear(&mut display);
-    term.write_str(&mut display, "LevitateOS Terminal v0.1\n");
-    term.write_str(&mut display, "========================\n\n");
-    term.write_str(&mut display, "Type to see characters on GPU display.\n");
-    term.write_str(&mut display, "Press Enter for newline.\n\n");
-    verbose!("Terminal initialized.");
+    println!("[BOOT] Stage 5: Ready State");
+    term.write_str(&mut display, "Boot Stage: SYSTEM_READY\n\n");
+    term.write_str(&mut display, "Type to interact with the Boot Console.\n");
+    term.write_str(&mut display, "--------------------------------------\n\n");
 
     loop {
+        // [TEAM_060] Blinking cursor feedback
+        term.check_blink(&mut display);
+
         // SC14.6: Keep existing cursor tracking
         if input::poll() {
             cursor::draw(&mut display);
@@ -506,19 +510,33 @@ pub extern "C" fn kmain() -> ! {
 
         // SC14.3, SC14.4, SC14.5: Echo UART input to both serial AND GPU terminal
         if let Some(c) = levitate_hal::console::read_byte() {
-            match c {
-                b'\r' => {
+            let ch = c as char;
+            match ch {
+                '\r' => {
                     print!("\r\n"); // Serial needs CRLF
                     term.write_char(&mut display, '\n');
                 }
-                b'\n' => {
-                    // Ignore or handle if terminal expects \n
+                '\n' => {
                     print!("\r\n");
                     term.write_char(&mut display, '\n');
                 }
                 _ => {
-                    print!("{}", c as char);  // Echo to UART
-                    term.write_char(&mut display, c as char);  // Echo to GPU
+                    print!("{}", ch); // Echo to UART
+                    term.write_char(&mut display, ch); // Echo to GPU
+                }
+            }
+        }
+
+        // TEAM_060: Echo VirtIO Keyboard input to terminal
+        if let Some(ch) = input::read_char() {
+            match ch {
+                '\n' => {
+                    print!("\r\n"); // Serial needs CRLF
+                    term.write_char(&mut display, '\n');
+                }
+                _ => {
+                    print!("{}", ch); // Echo to UART
+                    term.write_char(&mut display, ch); // Echo to GPU
                 }
             }
         }

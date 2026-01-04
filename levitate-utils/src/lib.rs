@@ -67,25 +67,25 @@ impl<T> DerefMut for SpinlockGuard<'_, T> {
     }
 }
 
-pub struct RingBuffer<const N: usize> {
-    buffer: [u8; N],
+pub struct RingBuffer<T: Copy, const N: usize> {
+    buffer: [T; N],
     head: usize,
     tail: usize,
     full: bool,
 }
 
-impl<const N: usize> Default for RingBuffer<N> {
+impl<T: Copy + Default, const N: usize> Default for RingBuffer<T, N> {
     fn default() -> Self {
-        Self::new()
+        Self::new(T::default())
     }
 }
 
-impl<const N: usize> RingBuffer<N> {
+impl<T: Copy, const N: usize> RingBuffer<T, N> {
     /// [R1] New buffer is empty
     #[must_use]
-    pub const fn new() -> Self {
+    pub const fn new(default_val: T) -> Self {
         Self {
-            buffer: [0; N],
+            buffer: [default_val; N],
             head: 0,
             tail: 0,
             full: false,
@@ -93,27 +93,27 @@ impl<const N: usize> RingBuffer<N> {
     }
 
     /// [R2] Push adds element, [R4] returns false when full
-    pub fn push(&mut self, byte: u8) -> bool {
+    pub fn push(&mut self, item: T) -> bool {
         if self.full {
             return false; // [R4]
         }
 
-        self.buffer[self.head] = byte; // [R2]
+        self.buffer[self.head] = item; // [R2]
         self.head = (self.head + 1) % N; // [R6] wrap around
         self.full = self.head == self.tail;
         true
     }
 
     /// [R3] Pop removes oldest (FIFO), [R5] returns None when empty
-    pub fn pop(&mut self) -> Option<u8> {
+    pub fn pop(&mut self) -> Option<T> {
         if !self.full && self.head == self.tail {
             return None; // [R5]
         }
 
-        let byte = self.buffer[self.tail]; // [R3] FIFO order
+        let item = self.buffer[self.tail]; // [R3] FIFO order
         self.tail = (self.tail + 1) % N; // [R6] wrap around
         self.full = false;
-        Some(byte)
+        Some(item)
     }
 
     /// [R7] returns true when empty, [R8] returns false when has data
@@ -175,7 +175,7 @@ mod tests {
     /// Tests: [R1] new empty, [R2] push, [R3] FIFO, [R4] full, [R5] empty pop, [R7] is_empty true
     #[test]
     fn test_ring_buffer_fifo() {
-        let mut rb = RingBuffer::<4>::new();
+        let mut rb = RingBuffer::<u8, 4>::new(0);
         assert!(rb.is_empty()); // [R1] new is empty
 
         assert!(rb.push(1)); // [R2] push adds
@@ -195,7 +195,7 @@ mod tests {
     /// Tests: [R6] wrap around
     #[test]
     fn test_ring_buffer_wrap_around() {
-        let mut rb = RingBuffer::<2>::new();
+        let mut rb = RingBuffer::<u8, 2>::new(0);
         rb.push(1);
         rb.push(2);
         rb.pop();
@@ -208,7 +208,7 @@ mod tests {
     /// Tests: [R8] is_empty returns false when has data
     #[test]
     fn test_ring_buffer_is_empty_false_when_has_data() {
-        let mut rb = RingBuffer::<4>::new();
+        let mut rb = RingBuffer::<u8, 4>::new(0);
         assert!(rb.is_empty());
         rb.push(42);
         assert!(!rb.is_empty()); // [R8] false when has data
