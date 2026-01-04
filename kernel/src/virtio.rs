@@ -15,7 +15,8 @@ use core::ptr::NonNull;
 use virtio_drivers::transport::Transport;
 use virtio_drivers::{Hal, PhysAddr};
 
-pub const VIRTIO_MMIO_START: usize = 0x0a000000;
+// TEAM_078: Use high VA for VirtIO MMIO (accessible via TTBR1 regardless of TTBR0 state)
+pub const VIRTIO_MMIO_START: usize = levitate_hal::mmu::VIRTIO_MMIO_VA;
 pub const VIRTIO_MMIO_SIZE: usize = 0x200;
 pub const VIRTIO_MMIO_COUNT: usize = 32;
 

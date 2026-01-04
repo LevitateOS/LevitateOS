@@ -51,6 +51,21 @@ pub const KERNEL_PHYS_END: usize = 0x41F0_0000;
 /// Kernel virtual start address (Higher-half base)
 pub const KERNEL_VIRT_START: usize = 0xFFFF_8000_0000_0000;
 
+// TEAM_078: Device virtual addresses (mapped via TTBR1)
+// These allow device access regardless of TTBR0 state (critical for userspace)
+/// Device virtual address base (same as kernel base for simplicity)
+pub const DEVICE_VIRT_BASE: usize = KERNEL_VIRT_START;
+/// UART PL011 virtual address (PA: 0x0900_0000)
+pub const UART_VA: usize = DEVICE_VIRT_BASE + 0x0900_0000;
+/// VirtIO MMIO base virtual address (PA: 0x0A00_0000)
+pub const VIRTIO_MMIO_VA: usize = DEVICE_VIRT_BASE + 0x0A00_0000;
+/// GIC Distributor virtual address (PA: 0x0800_0000)
+pub const GIC_DIST_VA: usize = DEVICE_VIRT_BASE + 0x0800_0000;
+/// GIC CPU Interface virtual address (PA: 0x0801_0000)
+pub const GIC_CPU_VA: usize = DEVICE_VIRT_BASE + 0x0801_0000;
+/// GIC Redistributor virtual address (PA: 0x080A_0000)
+pub const GIC_REDIST_VA: usize = DEVICE_VIRT_BASE + 0x080A_0000;
+
 /// [M19] Converts high VA to PA, [M21] identity for low addresses
 #[inline]
 pub fn virt_to_phys(va: usize) -> usize {
@@ -66,7 +81,9 @@ pub fn virt_to_phys(va: usize) -> usize {
     }
 }
 
-/// [M20] Converts PA to high VA, [M22] identity for device addresses
+/// [M20] Converts PA to high VA
+/// TEAM_078: Now maps ALL physical addresses to high VA (including devices)
+/// This ensures devices are accessible via TTBR1 regardless of TTBR0 state.
 #[inline]
 pub fn phys_to_virt(pa: usize) -> usize {
     #[cfg(not(target_arch = "aarch64"))]
@@ -74,10 +91,8 @@ pub fn phys_to_virt(pa: usize) -> usize {
         pa
     }
     #[cfg(target_arch = "aarch64")]
-    if pa >= 0x4000_0000 {
-        pa + KERNEL_VIRT_START // [M20] PA to high VA
-    } else {
-        pa // [M22] identity for device addresses
+    {
+        pa + KERNEL_VIRT_START // [M20] All PA to high VA
     }
 }
 
@@ -1054,13 +1069,14 @@ mod tests {
         assert_eq!(pa, va); // Identity: already physical
     }
 
-    // M22: phys_to_virt identity for device addresses
+    // TEAM_078: phys_to_virt now maps ALL addresses to high VA (including devices)
     #[test]
-    fn test_phys_to_virt_device_identity() {
-        // Device addresses (< 0x4000_0000) use identity mapping
+    #[cfg(target_arch = "aarch64")]
+    fn test_phys_to_virt_device_high_va() {
+        // Device addresses now also use high VA mapping
         let pa = 0x0900_0000; // UART address
         let va = phys_to_virt(pa);
-        assert_eq!(va, pa); // Identity: device region
+        assert_eq!(va, KERNEL_VIRT_START + pa); // High VA for devices
     }
 
     // === Dynamic Page Allocation Tests (M23-M27) ===

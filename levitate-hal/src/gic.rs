@@ -6,9 +6,10 @@ use core::sync::atomic::{AtomicPtr, Ordering};
 // GICv3 uses system registers (ICC_*_EL1) and adds Redistributor (GICR)
 // TEAM_045: FDT-based detection implemented for reliable version discovery
 
-pub const GICD_BASE: usize = 0x0800_0000;
-pub const GICC_BASE: usize = 0x0801_0000; // GICv2 CPU interface
-pub const GICR_BASE: usize = 0x080A_0000; // GICv3 Redistributor (QEMU virt)
+// TEAM_078: Use high VA for GIC (accessible via TTBR1 regardless of TTBR0 state)
+pub const GICD_BASE: usize = crate::mmu::GIC_DIST_VA;
+pub const GICC_BASE: usize = crate::mmu::GIC_CPU_VA; // GICv2 CPU interface
+pub const GICR_BASE: usize = crate::mmu::GIC_REDIST_VA; // GICv3 Redistributor (QEMU virt)
 
 // Distributor registers (shared between v2 and v3)
 const GICD_CTLR: usize = 0x000;

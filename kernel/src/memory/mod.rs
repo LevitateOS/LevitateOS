@@ -49,6 +49,8 @@ pub fn init(dtb: &[u8]) {
 
     // Add software-defined reserved regions
     // TEAM_075: Use max of _kernel_end and __heap_end to ensure heap is reserved
+    // SAFETY: These are linker-defined symbols whose addresses represent memory bounds.
+    // We take their address (not dereference) to get the virtual address value.
     let kernel_start = mmu::virt_to_phys(unsafe { &_kernel_virt_start as *const _ as usize });
     let kernel_end_symbol = mmu::virt_to_phys(unsafe { &_kernel_end as *const _ as usize });
     let heap_end_symbol = mmu::virt_to_phys(unsafe { &__heap_end as *const _ as usize });
@@ -58,12 +60,6 @@ pub fn init(dtb: &[u8]) {
         &mut res_count,
         kernel_start,
         kernel_end,
-    );
-    crate::println!(
-        "[MEMORY] Reserved Kernel: 0x{:x} - 0x{:x} (heap_end: 0x{:x})",
-        kernel_start,
-        kernel_end,
-        heap_end_symbol
     );
 
     // Initrd
@@ -149,14 +145,11 @@ pub fn init(dtb: &[u8]) {
         mem_map_pa,
         mem_map_pa + mem_map_size,
     );
-    crate::println!(
-        "[MEMORY] Allocated mem_map at PA 0x{:x} (Size {} bytes)",
-        mem_map_pa,
-        mem_map_size
-    );
 
     // 3. Initialize mem_map
     let mem_map_va = mmu::phys_to_virt(mem_map_pa);
+    // SAFETY: mem_map_pa was validated to be within RAM and not overlapping reserved regions.
+    // The size (total_pages) was computed from the discovered physical memory range.
     let mem_map = unsafe { core::slice::from_raw_parts_mut(mem_map_va as *mut Page, total_pages) };
     for page in mem_map.iter_mut() {
         *page = Page::new();
@@ -164,6 +157,8 @@ pub fn init(dtb: &[u8]) {
 
     // 4. Initialize Allocator
     let mut allocator = FRAME_ALLOCATOR.0.lock();
+    // SAFETY: mem_map is valid and will outlive the allocator (static lifetime).
+    // phys_min is the base physical address corresponding to mem_map[0].
     unsafe {
         allocator.init(mem_map, phys_min);
     }
@@ -215,6 +210,8 @@ fn add_range_with_holes(
 
         if next_idx >= reserved.len() {
             // No more reserved regions to check
+            // SAFETY: The range (ram.0, ram.1) has been validated against all reserved
+            // regions and is within discovered RAM bounds.
             unsafe {
                 allocator.add_range(ram.0, ram.1);
             }

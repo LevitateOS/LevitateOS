@@ -144,9 +144,15 @@ bss_done:
     orr     x1, x1, #0x3
     str     x1, [x0, #256*8]
 
-    /* L1_high[1] -> 0x40000000 (1GB Block matching 0x40000000 physical) */
+    /* TEAM_078: L1_high[0] -> 0x00000000 (1GB Device Block for UART, GIC, VirtIO) */
+    /* This enables device access via TTBR1 high VA before kmain() */
     ldr     x0, =boot_pt_l1_high
     sub     x0, x0, x4
+    mov     x1, #0x00000000
+    add     x1, x1, #0x405      /* Block + AF + Attr1 (Device) */
+    str     x1, [x0]            /* Index 0 for 0x00000000 */
+
+    /* L1_high[1] -> 0x40000000 (1GB Block matching 0x40000000 physical) */
     mov     x1, #0x40000000
     add     x1, x1, #0x401      /* Block + AF + Attr0 (Normal) */
     str     x1, [x0, #8]        /* Index 1 for 0x40000000 */
@@ -396,14 +402,18 @@ pub extern "C" fn kmain() -> ! {
             )
             .expect("Failed to map boot RAM to higher half");
 
-            // Map Devices (Identity mapped for now)
-            mmu::identity_map_range_optimized(
+            // TEAM_078: Map Devices to HIGH VA (via TTBR1) instead of identity mapping
+            // This ensures devices remain accessible when TTBR0 is switched for userspace
+            
+            // UART (PA: 0x0900_0000 -> VA: KERNEL_VIRT_START + 0x0900_0000)
+            mmu::map_range(
                 root,
+                mmu::UART_VA,
                 0x0900_0000,
-                0x0900_1000,
+                0x1000,
                 mmu::PageFlags::DEVICE,
             )
-            .unwrap(); // UART
+            .unwrap();
 
             // TEAM_042: GIC mapping extended for GICv3 support
             // QEMU virt GIC layout:
@@ -411,21 +421,24 @@ pub extern "C" fn kmain() -> ! {
             //   GICC: 0x0801_0000 - 0x0802_0000 (64KB) - GICv2 only
             //   GICR: 0x080A_0000 - 0x080C_0000 (128KB per CPU, 8 CPUs = 1MB)
             // Map 0x0800_0000 - 0x0820_0000 to cover all GIC components
-            mmu::identity_map_range_optimized(
+            mmu::map_range(
                 root,
+                mmu::GIC_DIST_VA,
                 0x0800_0000,
-                0x0820_0000,
+                0x20_0000, // 2MB covers GICD + GICC + GICR
                 mmu::PageFlags::DEVICE,
             )
-            .unwrap(); // GIC (GICD + GICC + GICR)
+            .unwrap();
 
-            mmu::identity_map_range_optimized(
+            // VirtIO MMIO (PA: 0x0A00_0000 -> VA: KERNEL_VIRT_START + 0x0A00_0000)
+            mmu::map_range(
                 root,
+                mmu::VIRTIO_MMIO_VA,
                 0x0a00_0000,
-                0x0a10_0000,
+                0x10_0000, // 1MB for VirtIO devices
                 mmu::PageFlags::DEVICE,
             )
-            .unwrap(); // VirtIO
+            .unwrap();
 
             // Map Boot RAM including DTB/initrd region (QEMU places DTB after kernel)
             // DTB is at ~0x4820_0000 for a ~100KB kernel + initrd

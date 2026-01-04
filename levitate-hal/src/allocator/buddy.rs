@@ -62,7 +62,6 @@ impl BuddyAllocator {
 
     /// Allocate a block of memory of the given order.
     pub fn alloc(&mut self, order: usize) -> Option<usize> {
-        crate::println!("[BUDDY] alloc order {}", order);
         if order >= MAX_ORDER {
             return None;
         }
@@ -70,8 +69,9 @@ impl BuddyAllocator {
         // 1. Find the smallest free block of order >= requested
         for i in order..MAX_ORDER {
             if let Some(mut page_ptr) = self.free_lists[i] {
-                crate::println!("[BUDDY] Found block at order {} ptr {:p}", i, page_ptr);
                 // Found a block! Remove it from the list.
+                // SAFETY: page_ptr is a valid NonNull obtained from free_lists,
+                // which only contains pointers to valid Page structs in mem_map.
                 let page = unsafe { page_ptr.as_mut() };
                 self.remove_from_list(i, page);
 
@@ -140,6 +140,8 @@ impl BuddyAllocator {
         let mem_map = self.mem_map.as_mut()?;
         let index = (pa - self.phys_base) / PAGE_SIZE;
         if index < mem_map.len() {
+            // SAFETY: index is bounds-checked above. mem_map is a valid slice.
+            // The returned reference has 'static lifetime as mem_map is 'static.
             unsafe {
                 let ptr = mem_map.as_mut_ptr();
                 Some(&mut *ptr.add(index))
@@ -161,6 +163,7 @@ impl BuddyAllocator {
         page.next = self.free_lists[order];
         page.prev = None;
         if let Some(mut next_ptr) = self.free_lists[order] {
+            // SAFETY: next_ptr is from free_lists which only contains valid Page pointers.
             unsafe { next_ptr.as_mut().prev = Some(NonNull::from(&mut *page)) };
         }
         self.free_lists[order] = Some(NonNull::from(&mut *page));
@@ -168,12 +171,14 @@ impl BuddyAllocator {
 
     fn remove_from_list(&mut self, order: usize, page: &mut Page) {
         if let Some(mut prev_ptr) = page.prev {
+            // SAFETY: prev_ptr is from the page's linked list, containing valid Page pointers.
             unsafe { prev_ptr.as_mut().next = page.next };
         } else {
             self.free_lists[order] = page.next;
         }
 
         if let Some(mut next_ptr) = page.next {
+            // SAFETY: next_ptr is from the page's linked list, containing valid Page pointers.
             unsafe { next_ptr.as_mut().prev = page.prev };
         }
 

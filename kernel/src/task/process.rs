@@ -72,6 +72,8 @@ pub fn spawn_from_elf(elf_data: &[u8]) -> Result<UserTask, SpawnError> {
 /// - The task's page table must be valid and mapped
 /// - TTBR0 will be switched to the task's page table
 pub unsafe fn enter_user_task(task: &UserTask) -> ! {
+    // TEAM_078: Device MMIO now mapped via TTBR1 (high VA) - safe to switch TTBR0
+    
     // 1. Switch TTBR0 to user page table
     unsafe {
         levitate_hal::mmu::switch_ttbr0(task.ttbr0);

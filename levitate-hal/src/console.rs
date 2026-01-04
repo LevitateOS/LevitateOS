@@ -1,4 +1,5 @@
 use crate::IrqSafeLock;
+use crate::mmu;
 use crate::uart_pl011::Pl011Uart;
 use core::fmt::{self, Write};
 use levitate_utils::RingBuffer;
@@ -6,7 +7,8 @@ use levitate_utils::RingBuffer;
 // TEAM_039: Re-export hex utilities from levitate-utils
 pub use levitate_utils::hex::{format_hex, nibble_to_hex};
 
-pub const UART0_BASE: usize = 0x0900_0000;
+// TEAM_078: Use high VA for UART (accessible via TTBR1 regardless of TTBR0 state)
+pub const UART0_BASE: usize = mmu::UART_VA;
 
 pub static WRITER: IrqSafeLock<Pl011Uart> = IrqSafeLock::new(Pl011Uart::new(UART0_BASE));
 static RX_BUFFER: IrqSafeLock<RingBuffer<u8, 1024>> = IrqSafeLock::new(RingBuffer::new(0));
