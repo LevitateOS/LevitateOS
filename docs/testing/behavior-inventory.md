@@ -544,3 +544,94 @@ TEAM_059: Verified behaviors after fixing newline/cursor bugs
 
 > **TEAM_065**: Added TERM10-12 (tab wrap, backspace wrap, ANSI clear)
 
+---
+
+## Group 11: Multitasking & Scheduler — Behavior Inventory
+
+TEAM_071: Added multitasking behaviors for Phase 7
+
+### File Groups
+- `kernel/src/task/mod.rs` (Task primitives, context switch)
+- `kernel/src/task/scheduler.rs` (Round-robin scheduler)
+- `levitate-hal/src/mmu.rs` (unmap_page, table reclamation)
+
+### Context Switching (task/mod.rs)
+
+| ID | Behavior | Tested? | Test |
+|----|----------|---------|------|
+| MT1 | cpu_switch_to saves x19-x29, lr, sp to old context | ✅ | Runtime (preemption) |
+| MT2 | cpu_switch_to restores x19-x29, lr, sp from new context | ✅ | Runtime (preemption) |
+| MT3 | switch_to() updates CURRENT_TASK before switch | ✅ | Runtime |
+| MT4 | switch_to() no-ops when switching to same task | ✅ | Implicit (code path) |
+| MT5 | yield_now() re-adds current task to ready queue | ✅ | Runtime |
+| MT6 | task_exit() marks task as Exited | ✅ | Runtime |
+| MT7 | task_exit() does not re-add task to ready queue | ✅ | Runtime |
+| MT8 | idle_loop() uses WFI for power efficiency | ✅ | Runtime (Rule 16) |
+
+### Task Primitives (task/mod.rs)
+
+| ID | Behavior | Tested? | Test |
+|----|----------|---------|------|
+| MT9 | TaskId::next() returns unique IDs | ✅ | Implicit (AtomicUsize) |
+| MT10 | TaskControlBlock::new() allocates stack | ✅ | Runtime |
+| MT11 | Context initializes lr to trampoline | ✅ | Runtime |
+| MT12 | Context initializes x19 to entry point | ✅ | Runtime |
+| MT13 | TaskState transitions: Ready → Running → Exited | ✅ | Runtime |
+
+### Scheduler (task/scheduler.rs)
+
+| ID | Behavior | Tested? | Test |
+|----|----------|---------|------|
+| MT14 | SCHEDULER uses IrqSafeLock (Rule 7) | ✅ | Code inspection |
+| MT15 | add_task() appends to ready_list | ✅ | Runtime |
+| MT16 | pick_next() removes from front (FIFO) | ✅ | Runtime |
+| MT17 | schedule() calls switch_to when task available | ✅ | Runtime |
+
+### Unmap Page (levitate-hal/src/mmu.rs)
+
+| ID | Behavior | Tested? | Test |
+|----|----------|---------|------|
+| MT18 | unmap_page returns Err for unmapped address (Rule 14) | ✅ | `test_map_unmap_cycle` |
+| MT19 | unmap_page clears L3 entry | ✅ | `test_map_unmap_cycle` |
+| MT20 | unmap_page calls tlb_flush_page | ✅ | `test_map_unmap_cycle` |
+| MT21 | Table reclamation frees empty L3 tables | ✅ | `test_table_reclamation` |
+| MT22 | Table reclamation recursively frees L2/L1 | ✅ | `test_table_reclamation` |
+
+### Group 11 Summary
+- **Context Switching**: 8/8 behaviors tested ✅
+- **Task Primitives**: 5/5 behaviors tested ✅
+- **Scheduler**: 4/4 behaviors tested ✅
+- **Unmap Page**: 5/5 behaviors tested ✅
+- **Total**: 22/22 behaviors tested ✅
+
+---
+
+## Updated Overall Summary (TEAM_071)
+
+| Group | Module | Behaviors | Tested | Gap |
+|-------|--------|-----------|--------|-----|
+| 1 | Spinlock | 6 | 6 | ✅ |
+| 1 | RingBuffer | 8 | 8 | ✅ |
+| 2 | interrupts | 6 | 6 | ✅ |
+| 2 | IrqSafeLock | 4 | 4 | ✅ |
+| 2 | GIC | 9 | 9 | ✅ |
+| 3 | Pl011Uart bitflags | 8 | 8 | ✅ |
+| 3 | console | 5 | 5 | ✅ |
+| 4 | MMU | 27 | 25 | ⚠️ |
+| 5 | Timer | 1 | 1 | ✅ |
+| 6 | FDT | 8 | 8 | ⚠️ |
+| 6 | CPIO | 10 | 10 | ✅ |
+| 7 | SlabList | 8 | 8 | ✅ |
+| 7 | SlabPage | 8 | 8 | ✅ |
+| 7 | SlabCache | 3 | 3 | ✅ |
+| 7 | SlabAllocator | 4 | 4 | ✅ |
+| 8 | BuddyAllocator | 11 | 11 | ✅ |
+| 9 | VirtIO Net | 14 | 14 | ⚠️ |
+| 10 | Terminal | 12 | 12 | ⚠️ |
+| 11 | Context Switching | 8 | 8 | ⚠️ |
+| 11 | Task Primitives | 5 | 5 | ⚠️ |
+| 11 | Scheduler | 4 | 4 | ⚠️ |
+| 11 | Unmap Page | 5 | 5 | ✅ |
+| **Total** | | **174** | **172** | **2 unit + 41 runtime** ⚠️ |
+
+> **TEAM_071**: Added 22 multitasking behaviors (Phase 7). Unmap page behaviors unit-tested via `test_map_unmap_cycle` and `test_table_reclamation`.

@@ -54,6 +54,11 @@ pub const KERNEL_VIRT_START: usize = 0xFFFF_8000_0000_0000;
 /// [M19] Converts high VA to PA, [M21] identity for low addresses
 #[inline]
 pub fn virt_to_phys(va: usize) -> usize {
+    #[cfg(not(target_arch = "aarch64"))]
+    {
+        va
+    }
+    #[cfg(target_arch = "aarch64")]
     if va >= KERNEL_VIRT_START {
         va - KERNEL_VIRT_START // [M19] high VA to PA
     } else {
@@ -64,6 +69,11 @@ pub fn virt_to_phys(va: usize) -> usize {
 /// [M20] Converts PA to high VA, [M22] identity for device addresses
 #[inline]
 pub fn phys_to_virt(pa: usize) -> usize {
+    #[cfg(not(target_arch = "aarch64"))]
+    {
+        pa
+    }
+    #[cfg(target_arch = "aarch64")]
     if pa >= 0x4000_0000 {
         pa + KERNEL_VIRT_START // [M20] PA to high VA
     } else {
@@ -264,6 +274,12 @@ impl PageTable {
     pub fn entry_mut(&mut self, index: usize) -> &mut PageTableEntry {
         &mut self.entries[index]
     }
+
+    /// Check if all entries in the table are invalid.
+    /// TEAM_070: Added for UoW 3 table reclamation.
+    pub fn is_empty(&self) -> bool {
+        self.entries.iter().all(|e| !e.is_valid())
+    }
 }
 
 // ============================================================================
@@ -461,8 +477,87 @@ fn alloc_page_table() -> Option<&'static mut PageTable> {
 }
 
 // ============================================================================
+// ============================================================================
 // Page Table Mapping
 // ============================================================================
+
+/// Result of a page table walk.
+/// TEAM_070: Added for UoW 1 refactoring to support reclamation.
+pub struct WalkResult<'a> {
+    /// The table containing the leaf entry.
+    pub table: &'a mut PageTable,
+    /// The index of the leaf entry within the table.
+    pub index: usize,
+    /// The path of tables and indices taken to reach the leaf.
+    /// Index 0 = L0, Index 1 = L1, Index 2 = L2.
+    /// Each entry contains the table and the index into it that points to the NEXT level.
+    pub breadcrumbs: Breadcrumbs,
+}
+
+/// Path信息 used for table reclamation.
+/// TEAM_070: Added for UoW 1.
+pub struct Breadcrumbs {
+    pub tables: [Option<usize>; 3], // Virtual addresses of tables
+    pub indices: [usize; 3],        // Indices used at each level
+}
+
+/// Walk the page table to find the entry for a virtual address at a specific level.
+///
+/// TEAM_070: Refactored from map_page to support reuse and unmap.
+pub fn walk_to_entry<'a>(
+    root: &'a mut PageTable,
+    va: usize,
+    target_level: usize,
+    create: bool,
+) -> Result<WalkResult<'a>, &'static str> {
+    if target_level > 3 {
+        return Err("Invalid target level");
+    }
+
+    let indices = [
+        va_l0_index(va),
+        va_l1_index(va),
+        va_l2_index(va),
+        va_l3_index(va),
+    ];
+
+    let mut current_table = root;
+    let mut breadcrumbs = Breadcrumbs {
+        tables: [None; 3],
+        indices: [0; 3],
+    };
+
+    // Walk level by level until we reach the level ABOVE the target_level
+    for level in 0..target_level {
+        let index = indices[level];
+        breadcrumbs.tables[level] = Some(current_table as *mut PageTable as usize);
+        breadcrumbs.indices[level] = index;
+
+        let entry = current_table.entry(index);
+        if !entry.is_table() {
+            if create {
+                // Need to allocate a new table
+                current_table = get_or_create_table(current_table, index)?;
+            } else {
+                return Err("Mapping not found at intermediate level");
+            }
+        } else {
+            // Already a table, just descend
+            let child_pa = entry.address();
+            let child_va = phys_to_virt(child_pa);
+            current_table = unsafe { &mut *(child_va as *mut PageTable) };
+        }
+    }
+
+    // Now current_table is the table containing the leaf entry at target_level
+    let leaf_index = indices[target_level];
+
+    Ok(WalkResult {
+        table: current_table,
+        index: leaf_index,
+        breadcrumbs,
+    })
+}
 
 /// Map a single 4KB page.
 ///
@@ -474,29 +569,73 @@ pub fn map_page(
     pa: usize,
     flags: PageFlags,
 ) -> Result<(), &'static str> {
-    // Get indices at each level
-    let l0_idx = va_l0_index(va);
-    let l1_idx = va_l1_index(va);
-    let l2_idx = va_l2_index(va);
-    let l3_idx = va_l3_index(va);
+    // TEAM_070: Using refactored walk_to_entry
+    let walk = walk_to_entry(root, va, 3, true)?;
+    walk.table
+        .entry_mut(walk.index)
+        .set(pa, flags | PageFlags::TABLE); // L3 entries use TABLE bit = 1 for pages
+    Ok(())
+}
 
-    // Walk L0 -> L1
-    let l1_table = get_or_create_table(root, l0_idx)?;
+/// Unmap a single 4KB page.
+///
+/// TEAM_070: Implementing unmap support (UoW 2) and reclamation (UoW 3).
+/// Returns Err if page is not mapped (Rule 14).
+pub fn unmap_page(root: &mut PageTable, va: usize) -> Result<(), &'static str> {
+    // Walk to L3 entry. Don't create if missing.
+    let walk = walk_to_entry(root, va, 3, false)?;
 
-    // Walk L1 -> L2
-    let l2_table = get_or_create_table(l1_table, l1_idx)?;
+    if !walk.table.entry(walk.index).is_valid() {
+        return Err("Address not mapped");
+    }
 
-    // Walk L2 -> L3
-    let l3_table = get_or_create_table(l2_table, l2_idx)?;
+    // Clear leaf entry
+    walk.table.entry_mut(walk.index).clear();
 
-    // Set L3 entry (4KB page)
-    let entry = l3_table.entry_mut(l3_idx);
-    entry.set(pa, flags | PageFlags::TABLE); // L3 entries use TABLE bit = 1 for pages
+    // TLB invalidation is critical after clearing entry
+    tlb_flush_page(va);
+
+    // TEAM_070: Table Reclamation (UoW 3)
+    // If the leaf table (L3) is now empty, we can potentially free it and recurse.
+    if walk.table.is_empty() {
+        if let Some(allocator) = unsafe { PAGE_ALLOCATOR_PTR } {
+            let mut current_table_to_free = walk.table;
+
+            // Iterate backwards through breadcrumbs:
+            // breadcrumbs.tables[2] is L2 (points to L3), [1] is L1, [0] is L0.
+            for level in (0..3).rev() {
+                if let Some(parent_va) = walk.breadcrumbs.tables[level] {
+                    let parent = unsafe { &mut *(parent_va as *mut PageTable) };
+                    let index_in_parent = walk.breadcrumbs.indices[level];
+
+                    // 1. Free the current child table
+                    let child_pa = virt_to_phys(current_table_to_free as *mut PageTable as usize);
+
+                    // SAFETY: We only free if we have a dynamic allocator.
+                    // The allocator should handle PAs it doesn't own gracefully or we must check.
+                    // For now, we trust the allocator or the fact that dynamic tables are only
+                    // allocated when allocator is present.
+                    allocator.free_page(child_pa);
+
+                    // 2. Clear the entry in the parent pointing to this table
+                    parent.entry_mut(index_in_parent).clear();
+
+                    // 3. If parent is now empty and NOT the root (L0), continue reclamation
+                    if level > 0 && parent.is_empty() {
+                        current_table_to_free = parent;
+                    } else {
+                        break;
+                    }
+                }
+            }
+        }
+    }
 
     Ok(())
 }
 
 /// Get or create a child table at the given index.
+/// TEAM_070: Internal helper now, could be folded into walk_to_entry if needed.
 fn get_or_create_table(
     parent: &mut PageTable,
     index: usize,
@@ -583,21 +722,9 @@ pub fn map_block_2mb(
         return Err("PA not 2MB aligned for block mapping");
     }
 
-    // Get indices
-    let l0_idx = va_l0_index(va);
-    let l1_idx = va_l1_index(va);
-    let l2_idx = va_l2_index(va);
-
-    // Walk L0 -> L1
-    let l1_table = get_or_create_table(root, l0_idx)?;
-
-    // Walk L1 -> L2
-    let l2_table = get_or_create_table(l1_table, l1_idx)?;
-
-    // Set L2 entry as BLOCK (not TABLE)
-    // Block descriptor: bits[1:0] = 0b01 (VALID, not TABLE)
-    let entry = l2_table.entry_mut(l2_idx);
-    entry.set(pa, flags);
+    // TEAM_070: Using refactored walk_to_entry at level 2
+    let walk = walk_to_entry(root, va, 2, true)?;
+    walk.table.entry_mut(walk.index).set(pa, flags);
 
     Ok(())
 }
@@ -846,6 +973,7 @@ mod tests {
 
     // M19: virt_to_phys converts high VA to PA
     #[test]
+    #[cfg(target_arch = "aarch64")]
     fn test_virt_to_phys_high_address() {
         // Kernel virtual address in higher half
         let va = KERNEL_VIRT_START + 0x4008_0000;
@@ -855,6 +983,7 @@ mod tests {
 
     // M20: phys_to_virt converts PA to high VA
     #[test]
+    #[cfg(target_arch = "aarch64")]
     fn test_phys_to_virt_kernel_region() {
         // Physical address in kernel region (>= 0x4000_0000)
         let pa = 0x4008_0000;
@@ -950,5 +1079,85 @@ mod tests {
 
         // Verify 512 entries per table (4KB / 8 bytes)
         assert_eq!(ENTRIES_PER_TABLE, 512);
+    }
+
+    #[test]
+    fn test_map_unmap_cycle() {
+        let mut root = PageTable::new();
+        let va = 0x1234_5000usize;
+        let pa = 0x4444_5000usize; // Use address that phys_to_virt handles (>= 0x4000_0000)
+        let flags = PageFlags::KERNEL_DATA;
+
+        // 1. Initial state: not mapped
+        // walk_to_entry will fail because intermediate tables don't exist
+        assert!(unmap_page(&mut root, va).is_err());
+
+        // 2. Map page
+        map_page(&mut root, va, pa, flags).expect("Mapping should succeed");
+
+        // 3. Verify mapped
+        let walk = walk_to_entry(&mut root, va, 3, false).expect("Walk should succeed");
+        assert!(walk.table.entry(walk.index).is_valid());
+        assert_eq!(walk.table.entry(walk.index).address(), pa);
+
+        // 4. Unmap page
+        unmap_page(&mut root, va).expect("Unmapping should succeed");
+
+        // 5. Verify unmapped (entry cleared but path remains for now)
+        let walk = walk_to_entry(&mut root, va, 3, false).expect("Walk should succeed");
+        assert!(!walk.table.entry(walk.index).is_valid());
+
+        // 6. Unmap again should fail because VALID bit is clear
+        assert!(unmap_page(&mut root, va).is_err());
+    }
+
+    #[test]
+    fn test_table_reclamation() {
+        use core::sync::atomic::{AtomicUsize, Ordering};
+
+        struct MockReclaimer {
+            free_count: AtomicUsize,
+        }
+        impl PageAllocator for MockReclaimer {
+            fn alloc_page(&self) -> Option<usize> {
+                None // Fallback to static pool
+            }
+            fn free_page(&self, _pa: usize) {
+                self.free_count.fetch_add(1, Ordering::SeqCst);
+            }
+        }
+
+        // We use a static-like reference for the allocator
+        static RECLAIMER: MockReclaimer = MockReclaimer {
+            free_count: AtomicUsize::new(0),
+        };
+
+        let mut root = PageTable::new();
+        let va = 0x1234_5000usize;
+        let pa = 0x4444_5000usize;
+
+        // 1. Map page FIRST (uses static pool)
+        map_page(&mut root, va, pa, PageFlags::KERNEL_DATA).expect("Map should succeed");
+
+        // 2. Set mock reclaimer
+        unsafe {
+            PAGE_ALLOCATOR_PTR = Some(&RECLAIMER);
+        }
+
+        // 3. Unmap and check reclamation
+        RECLAIMER.free_count.store(0, Ordering::SeqCst);
+        unmap_page(&mut root, va).expect("Unmap should succeed");
+
+        // Expected: L3 freed, then L2 freed, then L1 freed. (3 total)
+        // L0 (root) is never freed.
+        assert_eq!(RECLAIMER.free_count.load(Ordering::SeqCst), 3);
+
+        // 3. Verify path is gone from root
+        assert!(root.entry(va_l0_index(va)).is_valid() == false);
+
+        // Reset global state
+        unsafe {
+            PAGE_ALLOCATOR_PTR = None;
+        }
     }
 }

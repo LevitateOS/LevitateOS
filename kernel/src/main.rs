@@ -30,6 +30,7 @@ mod gpu;
 mod input;
 mod memory;
 mod net;
+mod task;
 mod terminal;
 mod virtio;
 
@@ -303,9 +304,12 @@ pub fn get_dtb_phys() -> Option<usize> {
 struct TimerHandler;
 impl gic::InterruptHandler for TimerHandler {
     fn handle(&self, _irq: u32) {
-        // Reload timer for next interrupt (1 second)
+        // Reload timer for next interrupt (10ms @ 100Hz)
         let freq = timer::API.read_frequency();
-        timer::API.set_timeout(freq);
+        timer::API.set_timeout(freq / 100);
+
+        // TEAM_070: Preemptive scheduling
+        crate::task::yield_now();
     }
 }
 
@@ -466,6 +470,25 @@ pub extern "C" fn kmain() -> ! {
 
     verbose!("Core drivers initialized.");
 
+    // TEAM_070: Initialize multitasking
+    let bootstrap_task = alloc::sync::Arc::new(task::TaskControlBlock::new_bootstrap());
+    unsafe {
+        task::set_current_task(bootstrap_task);
+    }
+
+    // TEAM_071: Demo tasks gated behind feature to not break behavior tests
+    #[cfg(feature = "multitask-demo")]
+    {
+        task::scheduler::SCHEDULER.add_task(alloc::sync::Arc::new(task::TaskControlBlock::new(
+            task1 as *const () as usize,
+        )));
+        task::scheduler::SCHEDULER.add_task(alloc::sync::Arc::new(task::TaskControlBlock::new(
+            task2 as *const () as usize,
+        )));
+    }
+
+    // Set initial timer timeout
+    timer::API.set_timeout(timer::API.read_frequency() / 100);
     timer::API.enable();
     verbose!("Timer initialized.");
 
@@ -583,6 +606,7 @@ pub extern "C" fn kmain() -> ! {
     }
 
     // 6. Enable interrupts
+    unsafe { levitate_hal::interrupts::enable() };
     verbose!("Interrupts enabled.");
 
     transition_to(BootStage::SteadyState);
@@ -640,4 +664,26 @@ pub extern "C" fn kmain() -> ! {
 fn panic(info: &PanicInfo) -> ! {
     println!("KERNEL PANIC: {}", info);
     loop {}
+}
+
+// TEAM_071: Demo tasks for preemption verification
+// Gated behind feature flag to not break behavior tests
+#[cfg(feature = "multitask-demo")]
+fn task1() {
+    loop {
+        println!("[TASK1] Hello from task 1!");
+        for _ in 0..5000000 {
+            core::hint::spin_loop();
+        }
+    }
+}
+
+#[cfg(feature = "multitask-demo")]
+fn task2() {
+    loop {
+        println!("[TASK2] Hello from task 2!");
+        for _ in 0..5000000 {
+            core::hint::spin_loop();
+        }
+    }
 }
