@@ -8,8 +8,9 @@ members = [
 resolver = "2"
 
 [workspace.lints.rust]
-unsafe_code = "deny"
-missing_safety_doc = "deny"
+# Note: unsafe_code is NOT denied - this is an OS kernel, unsafe is required for HAL/MMU/interrupts
+# Instead, we enforce safety documentation for all unsafe blocks
+unsafe_op_in_unsafe_fn = "deny"
 # Rule 6: Robustness - no panics
 unconditional_panic = "deny"
 

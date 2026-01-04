@@ -7,6 +7,7 @@ pub mod mmu;
 pub mod timer;
 pub mod uart_pl011;
 
+use core::mem::ManuallyDrop;
 use levitate_utils::{Spinlock, SpinlockGuard};
 
 /// IRQ-safe lock that disables interrupts while held.
@@ -27,34 +28,35 @@ impl<T> IrqSafeLock<T> {
         let state = interrupts::disable();  // [L1] disable before acquire
         let guard = self.inner.lock();
         IrqSafeLockGuard {
-            guard: Some(guard),             // [L4] data access
+            guard: ManuallyDrop::new(guard), // [L4] data access
             state,
         }
     }
 }
 
 pub struct IrqSafeLockGuard<'a, T> {
-    guard: Option<SpinlockGuard<'a, T>>,
+    guard: ManuallyDrop<SpinlockGuard<'a, T>>,
     state: u64,
 }
 
-impl<'a, T> core::ops::Deref for IrqSafeLockGuard<'a, T> {
+impl<T> core::ops::Deref for IrqSafeLockGuard<'_, T> {
     type Target = T;
     fn deref(&self) -> &T {
-        self.guard.as_ref().unwrap()
+        &self.guard
     }
 }
 
-impl<'a, T> core::ops::DerefMut for IrqSafeLockGuard<'a, T> {
+impl<T> core::ops::DerefMut for IrqSafeLockGuard<'_, T> {
     fn deref_mut(&mut self) -> &mut T {
-        self.guard.as_mut().unwrap()
+        &mut self.guard
     }
 }
 
-impl<'a, T> Drop for IrqSafeLockGuard<'a, T> {
+impl<T> Drop for IrqSafeLockGuard<'_, T> {
     /// [L2] Restores interrupts after releasing
     fn drop(&mut self) {
-        self.guard.take();
+        // SAFETY: guard is only dropped once, here in Drop, before restoring interrupts
+        unsafe { ManuallyDrop::drop(&mut self.guard) };
         interrupts::restore(self.state);    // [L2] restore on drop
     }
 }

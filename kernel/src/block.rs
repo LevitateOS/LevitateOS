@@ -3,6 +3,9 @@
 //! TEAM_032: Updated for virtio-drivers v0.12.0
 //! - Uses StaticMmioTransport for 'static lifetime compatibility
 
+// Block I/O failures are unrecoverable at kernel level - panic is correct behavior
+#![allow(clippy::panic)]
+
 use crate::virtio::{StaticMmioTransport, VirtioHal};
 use levitate_utils::Spinlock;
 use virtio_drivers::device::blk::VirtIOBlk;

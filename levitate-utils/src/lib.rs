@@ -44,21 +44,21 @@ impl<T> Spinlock<T> {
     }
 }
 
-impl<'a, T> Drop for SpinlockGuard<'a, T> {
+impl<T> Drop for SpinlockGuard<'_, T> {
     /// [S3] Guard releases lock on drop
     fn drop(&mut self) {
         self.lock.lock.store(false, Ordering::Release);
     }
 }
 
-impl<'a, T> Deref for SpinlockGuard<'a, T> {
+impl<T> Deref for SpinlockGuard<'_, T> {
     type Target = T;
     fn deref(&self) -> &T {
         self.data
     }
 }
 
-impl<'a, T> DerefMut for SpinlockGuard<'a, T> {
+impl<T> DerefMut for SpinlockGuard<'_, T> {
     fn deref_mut(&mut self) -> &mut T {
         self.data
     }
@@ -71,8 +71,15 @@ pub struct RingBuffer<const N: usize> {
     full: bool,
 }
 
+impl<const N: usize> Default for RingBuffer<N> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<const N: usize> RingBuffer<N> {
     /// [R1] New buffer is empty
+    #[must_use]
     pub const fn new() -> Self {
         Self {
             buffer: [0; N],

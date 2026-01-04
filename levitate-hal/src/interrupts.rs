@@ -1,6 +1,6 @@
 /// AArch64 interrupt control.
 /// Behaviors: [I1]-[I6] interrupt enable/disable/restore cycle
-
+///
 /// [I1] Disables interrupts, [I2] returns previous state
 #[cfg(target_arch = "aarch64")]
 #[inline(always)]

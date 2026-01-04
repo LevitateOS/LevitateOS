@@ -220,32 +220,36 @@ pub extern "C" fn kmain() -> ! {
         // We map it to BOTH identity and higher-half for a smooth transition.
         let kernel_flags = mmu::PageFlags::KERNEL_DATA.difference(mmu::PageFlags::PXN);
 
-        // Identity map for early access (until we fully switch to high VA for everything)
-        mmu::identity_map_range_optimized(
-            root,
-            mmu::KERNEL_PHYS_START,
-            mmu::KERNEL_PHYS_END,
-            kernel_flags,
-        )
-        .expect("Failed to identity map kernel");
+        // Critical boot mappings - system cannot continue if these fail
+        #[allow(clippy::expect_used, clippy::unwrap_used)]
+        {
+            // Identity map for early access (until we fully switch to high VA for everything)
+            mmu::identity_map_range_optimized(
+                root,
+                mmu::KERNEL_PHYS_START,
+                mmu::KERNEL_PHYS_END,
+                kernel_flags,
+            )
+            .expect("Failed to identity map kernel");
 
-        // Higher-half map kernel
-        mmu::map_range(
-            root,
-            mmu::KERNEL_VIRT_START + mmu::KERNEL_PHYS_START,
-            mmu::KERNEL_PHYS_START,
-            mmu::KERNEL_PHYS_END - mmu::KERNEL_PHYS_START,
-            kernel_flags,
-        )
-        .expect("Failed to higher-half map kernel");
+            // Higher-half map kernel
+            mmu::map_range(
+                root,
+                mmu::KERNEL_VIRT_START + mmu::KERNEL_PHYS_START,
+                mmu::KERNEL_PHYS_START,
+                mmu::KERNEL_PHYS_END - mmu::KERNEL_PHYS_START,
+                kernel_flags,
+            )
+            .expect("Failed to higher-half map kernel");
 
-        // Map Devices (Identity mapped for now)
-        mmu::identity_map_range_optimized(root, 0x0900_0000, 0x0900_1000, mmu::PageFlags::DEVICE)
-            .unwrap(); // UART
-        mmu::identity_map_range_optimized(root, 0x0800_0000, 0x0802_0000, mmu::PageFlags::DEVICE)
-            .unwrap(); // GIC
-        mmu::identity_map_range_optimized(root, 0x0a00_0000, 0x0a10_0000, mmu::PageFlags::DEVICE)
-            .unwrap(); // VirtIO
+            // Map Devices (Identity mapped for now)
+            mmu::identity_map_range_optimized(root, 0x0900_0000, 0x0900_1000, mmu::PageFlags::DEVICE)
+                .unwrap(); // UART
+            mmu::identity_map_range_optimized(root, 0x0800_0000, 0x0802_0000, mmu::PageFlags::DEVICE)
+                .unwrap(); // GIC
+            mmu::identity_map_range_optimized(root, 0x0a00_0000, 0x0a10_0000, mmu::PageFlags::DEVICE)
+                .unwrap(); // VirtIO
+        }
 
         // Enable MMU with both TTBR0 and TTBR1
         mmu::tlb_flush_all();

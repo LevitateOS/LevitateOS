@@ -1,7 +1,7 @@
 use core::ptr::{read_volatile, write_volatile};
 
-pub const GICD_BASE: usize = 0x08000000;
-pub const GICC_BASE: usize = 0x08010000;
+pub const GICD_BASE: usize = 0x0800_0000;
+pub const GICC_BASE: usize = 0x0801_0000;
 
 // Distributor registers
 const GICD_CTLR: usize = 0x000;
@@ -185,22 +185,22 @@ impl Gic {
 
             // Disable all interrupts
             for i in 0..(num_irqs / 32) {
-                self.gicd_write(GICD_ICENABLER + (i as usize * 4), 0xFFFFFFFF);
+                self.gicd_write(GICD_ICENABLER + (i as usize * 4), 0xFFFF_FFFF);
             }
 
             // Clear all pending
             for i in 0..(num_irqs / 32) {
-                self.gicd_write(GICD_ICPENDR + (i as usize * 4), 0xFFFFFFFF);
+                self.gicd_write(GICD_ICPENDR + (i as usize * 4), 0xFFFF_FFFF);
             }
 
             // Set priority to lowest
             for i in 0..(num_irqs / 4) {
-                self.gicd_write(GICD_IPRIORITYR + (i as usize * 4), 0xA0A0A0A0);
+                self.gicd_write(GICD_IPRIORITYR + (i as usize * 4), 0xA0A0_A0A0);
             }
 
             // Target SPIs to CPU0
             for i in (GIC_SPI_START / 4)..(num_irqs / 4) {
-                self.gicd_write(GICD_ITARGETSR + (i as usize * 4), 0x01010101);
+                self.gicd_write(GICD_ITARGETSR + (i as usize * 4), 0x0101_0101);
             }
 
             // Configure level-triggered

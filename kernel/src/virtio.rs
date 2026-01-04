@@ -5,6 +5,10 @@
 //! - MmioTransport::new() requires mmio_size argument
 //! - MmioTransport has lifetime parameter
 
+// Allow unwrap/panic in HAL trait impls - these are low-level allocators where
+// failure to allocate is unrecoverable (system cannot continue)
+#![allow(clippy::unwrap_used, clippy::panic)]
+
 extern crate alloc;
 
 use core::ptr::NonNull;

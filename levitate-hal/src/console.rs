@@ -27,7 +27,8 @@ pub fn read_byte() -> Option<u8> {
 }
 
 pub fn _print(args: fmt::Arguments) {
-    WRITER.lock().write_fmt(args).unwrap();
+    // write_fmt cannot fail for Pl011Uart (write_str always returns Ok)
+    let _ = WRITER.lock().write_fmt(args);
 }
 
 impl Write for Pl011Uart {
@@ -68,7 +69,8 @@ pub fn format_hex(val: u64, buf: &mut [u8; 18]) -> &str {
         let nibble = ((val >> ((15 - i) * 4)) & 0xf) as u8;
         buf[2 + i] = nibble_to_hex(nibble) as u8;  // [C1][C2][C3]
     }
-    core::str::from_utf8(&buf[..]).unwrap()
+    // SAFETY: buf contains only ASCII hex chars ('0'-'9', 'a'-'f', 'x'), always valid UTF-8
+    unsafe { core::str::from_utf8_unchecked(&buf[..]) }
 }
 
 pub fn print_hex(val: u64) {

@@ -3,15 +3,18 @@
         "./Cargo.toml"
     ],
     "rust-analyzer.files.excludeDirs": [
-        ".external-kernels"
+        ".external-kernels",
+        "xtask"
     ],
     "files.watcherExclude": {
         "**/.external-kernels/**": true,
         "**/target/**": true
     },
+    "rust-analyzer.cargo.target": "aarch64-unknown-none",
+    "rust-analyzer.cargo.buildScripts.enable": true,
+    "rust-analyzer.check.allTargets": false,
     "rust-analyzer.server.extraEnv": {
-        "RUST_SRC_PATH": "/home/vince/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library"
+        "RUSTUP_TOOLCHAIN": "nightly"
     },
-    "rust-analyzer.cargo.sysroot": "/home/vince/.rustup/toolchains/stable-x86_64-unknown-linux-gnu",
-    "rust-analyzer.rustc.source": "/home/vince/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library"
+    "rust-analyzer.cargo.sysrootSrc": "/home/vince/.rustup/toolchains/nightly-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library"
 }
