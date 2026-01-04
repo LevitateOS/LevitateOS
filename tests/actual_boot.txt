@@ -3,7 +3,7 @@
 Heap initialized.
 MMU re-initialized (Higher-Half + Identity).
 Exceptions initialized.
-Detected GIC version: V2
+Detected GIC version: V3
 Core drivers initialized.
 Initializing Timer...
 Timer frequency (hex): 0x0000000003b9aca0

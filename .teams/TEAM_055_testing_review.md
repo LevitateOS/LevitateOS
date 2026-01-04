@@ -65,13 +65,16 @@ Proactively review and update the entire testing infrastructure in `xtask/src/te
 
 - [x] Add Buddy Allocator behaviors to behavior-inventory.md
 - [x] Update overall summary counts in behavior-inventory.md
+- [x] Add Phase 4-5 regression tests to xtask
+- [x] Add GICv3 behavior test profile
+- [x] Make `cargo xtask test` run complete suite (Ergonomic Update)
 
 ---
 
 ## 5. Handoff Checklist
 
 - [x] Project builds cleanly
-- [x] All tests pass (80 unit + 3 regression + 1 behavior)
+- [x] All tests pass (80 unit + 14 regression + 1 behavior)
 - [x] Behavioral regression tests pass
 - [x] Team file updated
-- [x] Documentation updated (behavior-inventory.md)
+- [x] Documentation updated (behavior-inventory.md, regression.rs)

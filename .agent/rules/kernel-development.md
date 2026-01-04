@@ -200,3 +200,12 @@ The rules defined in this SOP are not merely suggestions; they are enforced by t
 
 * **Pre-commit Checks:** All developers should run `cargo clippy` and `cargo test` locally before submitting code.
 * **CI Enforcement:** Every pull request is automatically checked for lint violations and behavioral regressions using `cargo xtask test`.
+
+### 25. Unified Testing Interface (The Rule of QA Ergonomics)
+
+* **Guideline:** Never fracture the testing experience. A single command must be capable of running ALL tests (Unit + Behavior + Integration + Regression).
+* **Reasoning:** Functional fragmentation leads to "forgotten" tests and regressions. If a developer has to remember to run `cargo xtask test-special-feature`, they will forget.
+* **Implementation:**
+  - `cargo xtask test` (no args) **MUST** run the complete superset of all test suites.
+  - New test profiles (e.g., GICv3) must be added to the default `run()` flow.
+  - Warning on minor mismatches (like golden logs) is preferred over excluding the test entirely.

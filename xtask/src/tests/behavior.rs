@@ -26,6 +26,11 @@ pub fn run_pixel6() -> Result<()> {
     run_with_profile(QemuProfile::Pixel6)
 }
 
+/// Run behavior test with GICv3 profile (TEAM_055)
+pub fn run_gicv3() -> Result<()> {
+    run_with_profile(QemuProfile::GicV3)
+}
+
 fn run_with_profile(profile: QemuProfile) -> Result<()> {
     let profile_name = match profile {
         QemuProfile::Default => "Default (512MB)",

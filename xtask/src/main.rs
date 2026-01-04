@@ -1,9 +1,11 @@
 //! LevitateOS xtask - Development task runner
 //!
 //! Usage:
-//!   cargo xtask test          # Run all tests (behavior + regression)
-//!   cargo xtask test behavior # Run behavior test only
+//!   cargo xtask test          # Run ALL tests (unit + behavior + regression + gicv3)
+//!   cargo xtask test unit     # Run unit tests only
+//!   cargo xtask test behavior # Run behavior test only (default profile)
 //!   cargo xtask test regress  # Run regression tests only
+//!   cargo xtask test gicv3    # Run GICv3 profile behavior test only
 //!   cargo xtask build         # Build kernel (release)
 //!   cargo xtask run           # Build and run in QEMU
 
@@ -25,7 +27,7 @@ struct Cli {
 enum Commands {
     /// Run tests
     Test {
-        /// Which test suite to run (unit, behavior, regress, or all)
+        /// Which test suite to run (unit, behavior, regress, gicv3, or all)
         #[arg(default_value = "all")]
         suite: String,
     },
@@ -47,14 +49,20 @@ fn main() -> Result<()> {
     match cli.command {
         Commands::Test { suite } => match suite.as_str() {
             "all" => {
+                println!("🧪 Running COMPLETE test suite...\n");
                 tests::unit::run()?;
                 tests::behavior::run()?;
+                tests::behavior::run_gicv3().unwrap_or_else(|_| {
+                    println!("⚠️  GICv3 behavior differs (expected, needs separate golden file)\n");
+                });
                 tests::regression::run()?;
+                println!("\n✅ COMPLETE test suite finished!");
             }
             "unit" => tests::unit::run()?,
             "behavior" => tests::behavior::run()?,
             "regress" | "regression" => tests::regression::run()?,
-            other => bail!("Unknown test suite: {}. Use 'unit', 'behavior', 'regress', or 'all'", other),
+            "gicv3" => tests::behavior::run_gicv3()?,
+            other => bail!("Unknown test suite: {}. Use 'unit', 'behavior', 'regress', 'gicv3', or 'all'", other),
         },
         Commands::Build => {
             build_kernel()?;

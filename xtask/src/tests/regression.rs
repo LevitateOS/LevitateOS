@@ -44,14 +44,29 @@ pub fn run() -> Result<()> {
 
     let mut results = TestResults::new();
 
-    // API Consistency
+    // Phase 3: API Consistency
     test_enable_mmu_signature(&mut results);
 
-    // Constant Synchronization
+    // Phase 3: Constant Synchronization
     test_kernel_phys_end(&mut results);
 
-    // Code Patterns
+    // Phase 3: Code Patterns
     test_input_dimensions(&mut results);
+
+    // Phase 4: VirtIO Block Driver (TEAM_029)
+    test_virtio_block_driver(&mut results);
+
+    // Phase 4: FAT32 Integration (TEAM_032)
+    test_fat32_integration(&mut results);
+
+    // Phase 4: Initramfs Parser (TEAM_035)
+    test_initramfs_parser(&mut results);
+
+    // Phase 5: GICv3 Support (TEAM_048)
+    test_gicv3_support(&mut results);
+
+    // Phase 5: Buddy Allocator (TEAM_047)
+    test_buddy_allocator_integration(&mut results);
 
     println!();
     if results.summary() {
@@ -189,3 +204,166 @@ fn extract_hex_from_line(line: &str) -> Option<u64> {
     let hex_str = rest[..end].replace('_', "");
     u64::from_str_radix(&hex_str, 16).ok()
 }
+
+// =============================================================================
+// TEAM_055: Phase 4-5 Regression Tests
+// =============================================================================
+
+/// Phase 4: VirtIO Block driver exists and is properly integrated
+fn test_virtio_block_driver(results: &mut TestResults) {
+    println!("Phase 4: VirtIO Block driver integration");
+
+    let block_rs = match fs::read_to_string("kernel/src/block.rs") {
+        Ok(c) => c,
+        Err(_) => {
+            results.fail("Could not read kernel/src/block.rs");
+            return;
+        }
+    };
+
+    // Verify VirtIOBlk is used
+    if block_rs.contains("VirtIOBlk") {
+        results.pass("block.rs uses VirtIOBlk driver");
+    } else {
+        results.fail("block.rs missing VirtIOBlk driver");
+    }
+
+    // Verify init function exists
+    if block_rs.contains("pub fn init") {
+        results.pass("block.rs has init() function");
+    } else {
+        results.fail("block.rs missing init() function");
+    }
+}
+
+/// Phase 4: FAT32 filesystem integration with embedded-sdmmc
+fn test_fat32_integration(results: &mut TestResults) {
+    println!("Phase 4: FAT32 filesystem integration");
+
+    let fat_rs = match fs::read_to_string("kernel/src/fs/fat.rs") {
+        Ok(c) => c,
+        Err(_) => {
+            results.fail("Could not read kernel/src/fs/fat.rs");
+            return;
+        }
+    };
+
+    // Verify embedded-sdmmc integration
+    if fat_rs.contains("VolumeManager") && fat_rs.contains("embedded_sdmmc") {
+        results.pass("fat.rs uses embedded-sdmmc VolumeManager");
+    } else {
+        results.fail("fat.rs missing embedded-sdmmc integration");
+    }
+
+    // Verify FAT32 mounting
+    if fat_rs.contains("open_volume") {
+        results.pass("fat.rs implements volume mounting");
+    } else {
+        results.fail("fat.rs missing volume mounting");
+    }
+}
+
+/// Phase 4: Initramfs CPIO parser integration
+fn test_initramfs_parser(results: &mut TestResults) {
+    println!("Phase 4: Initramfs CPIO parser integration");
+
+    let main_rs = match fs::read_to_string("kernel/src/main.rs") {
+        Ok(c) => c,
+        Err(_) => {
+            results.fail("Could not read kernel/src/main.rs");
+            return;
+        }
+    };
+
+    // Verify CpioArchive is used
+    if main_rs.contains("CpioArchive") {
+        results.pass("main.rs uses CpioArchive for initramfs");
+    } else {
+        results.fail("main.rs missing CpioArchive usage");
+    }
+
+    // Verify FDT initrd range discovery
+    if main_rs.contains("get_initrd_range") {
+        results.pass("main.rs discovers initrd via FDT");
+    } else {
+        results.fail("main.rs missing get_initrd_range() call");
+    }
+}
+
+/// Phase 5: GICv3 support exists in driver code
+fn test_gicv3_support(results: &mut TestResults) {
+    println!("Phase 5: GICv3 driver support");
+
+    let gic_rs = match fs::read_to_string("levitate-hal/src/gic.rs") {
+        Ok(c) => c,
+        Err(_) => {
+            results.fail("Could not read levitate-hal/src/gic.rs");
+            return;
+        }
+    };
+
+    // Verify GicVersion enum has V3 variant
+    if gic_rs.contains("V3") && gic_rs.contains("GicVersion") {
+        results.pass("gic.rs defines GicVersion::V3");
+    } else {
+        results.fail("gic.rs missing GicVersion::V3 variant");
+    }
+
+    // Verify GICv3 compatible string is searched
+    if gic_rs.contains("arm,gic-v3") {
+        results.pass("gic.rs detects arm,gic-v3 compatible");
+    } else {
+        results.fail("gic.rs missing GICv3 FDT detection");
+    }
+
+    // Verify xtask has GicV3 profile
+    let xtask_main = match fs::read_to_string("xtask/src/main.rs") {
+        Ok(c) => c,
+        Err(_) => {
+            results.fail("Could not read xtask/src/main.rs");
+            return;
+        }
+    };
+
+    if xtask_main.contains("GicV3") && xtask_main.contains("gic-version=3") {
+        results.pass("xtask defines GicV3 QEMU profile");
+    } else {
+        results.fail("xtask missing GicV3 QEMU profile");
+    }
+}
+
+/// Phase 5: Buddy Allocator integration in kernel
+fn test_buddy_allocator_integration(results: &mut TestResults) {
+    println!("Phase 5: Buddy Allocator integration");
+
+    let memory_mod = match fs::read_to_string("kernel/src/memory/mod.rs") {
+        Ok(c) => c,
+        Err(_) => {
+            results.fail("Could not read kernel/src/memory/mod.rs");
+            return;
+        }
+    };
+
+    // Verify BuddyAllocator is used
+    if memory_mod.contains("BuddyAllocator") {
+        results.pass("memory/mod.rs uses BuddyAllocator");
+    } else {
+        results.fail("memory/mod.rs missing BuddyAllocator");
+    }
+
+    // Verify memory::init is called in main.rs
+    let main_rs = match fs::read_to_string("kernel/src/main.rs") {
+        Ok(c) => c,
+        Err(_) => {
+            results.fail("Could not read kernel/src/main.rs");
+            return;
+        }
+    };
+
+    if main_rs.contains("memory::init") {
+        results.pass("main.rs calls memory::init()");
+    } else {
+        results.fail("main.rs missing memory::init() call");
+    }
+}
+
