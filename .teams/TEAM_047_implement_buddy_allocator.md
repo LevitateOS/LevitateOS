@@ -2,7 +2,7 @@
 
 **Team ID:** 47
 **Objective:** Implement Buddy Allocator (Phase 5: Memory Management II)
-**Status:** [/] IN PROGRESS
+**Status:** [x] COMPLETED
 **Start Date:** 2026-01-04
 
 ## Progress Summary
@@ -17,5 +17,7 @@
 - [x] Create `kernel/src/memory/page.rs` with `Page` descriptor and bitflags.
 - Registered `memory` module in `kernel/src/main.rs`.
 
-## Status: [/] Phase 2: DTB Memory Parsing
-Next step is to extend `levitate-hal/src/fdt.rs` to support memory region discovery.
+## Status: [x] Phase 3: Verification & Refactoring
+- [x] Moved `BuddyAllocator` to `levitate-hal/src/allocator` for better testability.
+- [x] Implemented unit tests for `BuddyAllocator` (splitting, coalescing).
+- [x] Verified all tests pass.

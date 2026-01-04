@@ -1,5 +1,6 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
+pub mod allocator;
 pub mod console;
 pub mod fdt;
 pub mod gic;

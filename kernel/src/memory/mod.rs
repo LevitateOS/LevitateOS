@@ -2,11 +2,11 @@ use levitate_hal::fdt;
 use levitate_hal::mmu::{self, PageAllocator};
 use levitate_utils::Spinlock;
 
-pub mod buddy;
-pub mod page;
+// pub mod buddy; // Moved to HAL
+// pub mod page; // Moved to HAL
 
-pub use buddy::BuddyAllocator;
-pub use page::Page;
+pub use levitate_hal::allocator::BuddyAllocator;
+pub use levitate_hal::allocator::Page;
 
 /// Global Frame Allocator
 pub struct FrameAllocator(Spinlock<BuddyAllocator>);
@@ -87,9 +87,53 @@ pub fn init(dtb: &[u8]) {
     let total_pages = (phys_max - phys_min) / 4096;
     let mem_map_size = total_pages * core::mem::size_of::<Page>();
 
-    // Choose a safe location for mem_map (e.g., 0x4200_0000 on QEMU)
-    // and add it to reserved regions.
-    let mem_map_pa = 0x4200_0000;
+    // Find a safe location for mem_map (size calculated above)
+    // TEAM_048: Dynamic placement instead of hardcoded 0x4200_0000
+    let mut mem_map_pa = 0;
+
+    // Simple first-fit allocator to find a hole in RAM
+    'outer: for ram in ram_regions.iter().flatten() {
+        let mut check_start = ram.0;
+        // Align to 2MB to be nice (though 4KB is sufficient)
+        check_start = (check_start + 0x1FFFFF) & !0x1FFFFF;
+
+        loop {
+            let check_end = check_start + mem_map_size;
+            if check_end > ram.1 {
+                break; // Try next RAM region
+            }
+
+            let mut overlaps = false;
+            let mut next_candidate = 0;
+
+            for res in reserved_regions.iter().flatten() {
+                if check_start < res.1 && check_end > res.0 {
+                    overlaps = true;
+                    // Move start to end of overlapping region, aligned
+                    next_candidate = (res.1 + 0x1FFFFF) & !0x1FFFFF;
+                    // Optimization: if new candidate is smaller, don't go backwards
+                    if next_candidate < check_start {
+                        next_candidate = check_start + 0x200000;
+                    }
+                    break;
+                }
+            }
+
+            if overlaps {
+                check_start = next_candidate;
+            } else {
+                // Found a valid hole!
+                mem_map_pa = check_start;
+                break 'outer;
+            }
+        }
+    }
+
+    if mem_map_pa == 0 {
+        // Fallback or panic? Panic is appropriate here as we can't boot without mem_map
+        panic!("Failed to allocate physical memory for mem_map!");
+    }
+
     add_reserved(
         &mut reserved_regions,
         &mut res_count,

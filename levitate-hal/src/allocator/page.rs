@@ -25,6 +25,7 @@ bitflags! {
 /// This allows tracking ownership and buddy state without touching
 /// the physical memory itself (safe for device memory or uncached regions).
 #[repr(C)]
+#[derive(Clone, Copy)]
 pub struct Page {
     pub flags: PhysPageFlags,
     /// Order of allocation (only valid if HEAD is set)

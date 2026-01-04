@@ -166,3 +166,13 @@ description:
 
 * **Guideline:** Provide a mechanism to enable verbose output for development and verification without modifying code.
 * **Rationale:** Ensures that "Golden Reference" tests have enough data to verify behavior while maintaining production silence.
+
+## VII. Roadmap Synchronization
+
+### 17. Update Roadmap After Behavior Check
+
+* **Guideline:** After updating `docs/testing/behavior-inventory.md` with new behaviors or test coverage, verify the `docs/ROADMAP.md`.
+* **Process:**
+  1. Identify the Phase and Task corresponding to the implemented behaviors.
+  2. Mark the task as completed (`[x]`) if all associated behaviors are tested.
+  3. Ensure the responsible Team ID is recorded in the Roadmap.

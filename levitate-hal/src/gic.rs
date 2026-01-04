@@ -1,4 +1,5 @@
 use core::ptr::{read_volatile, write_volatile};
+use core::sync::atomic::{AtomicPtr, Ordering};
 
 // TEAM_042: GICv2 and GICv3 support for Pixel 6 compatibility
 // GICv2 uses memory-mapped GICC registers
@@ -260,23 +261,30 @@ pub static API_V3: Gic = Gic::new_v3(GICD_BASE, GICR_BASE);
 
 /// Currently active GIC instance.
 /// Defaults to GICv2 for backward compatibility.
-static mut ACTIVE_GIC_PTR: *const Gic = &API as *const Gic;
+static ACTIVE_GIC_PTR: AtomicPtr<Gic> = AtomicPtr::new(&API as *const Gic as *mut Gic);
 
 /// Set the active GIC instance.
 pub fn set_active_api(gic: &'static Gic) {
-    unsafe {
-        ACTIVE_GIC_PTR = gic as *const Gic;
-    }
+    ACTIVE_GIC_PTR.store(gic as *const Gic as *mut Gic, Ordering::Release);
 }
 
 /// Get the appropriate GIC API based on runtime hardware detection.
 /// TEAM_045: Uses FDT for reliable discovery if available.
+/// [G9] Prioritizes FDT discovery of GICv3/v2
 pub fn get_api(fdt: Option<&fdt::Fdt>) -> &'static Gic {
     let api = if let Some(fdt) = fdt {
-        if crate::fdt::find_node_by_compatible(fdt, "arm,gic-v3").is_some() {
+        // TEAM_048: Try to find GICv3 node first
+        if let Some(node) = crate::fdt::find_node_by_compatible(fdt, "arm,gic-v3") {
+            // Found GICv3! Try to read register addresses
+            // reg: <dist_base size redist_base size ...>
+            // Note: GICv3 reg property usually has Distributor then Redistributors.
+            // We need to parse robustly. For now we just detect presence.
             &API_V3
+        } else if let Some(node) = crate::fdt::find_node_by_compatible(fdt, "arm,cortex-a15-gic") {
+            // Found GICv2!
+            &API
         } else {
-            // Fallback to register-based detection or default to v2
+            // Fallback to register-based detection
             let version = detect_gic_version(GICD_BASE);
             match version {
                 GicVersion::V3 => &API_V3,
@@ -297,8 +305,9 @@ pub fn get_api(fdt: Option<&fdt::Fdt>) -> &'static Gic {
 }
 
 /// Get the currently active GIC API.
+/// [G8] Returns thread-safe reference to active GIC
 pub fn active_api() -> &'static Gic {
-    unsafe { &*ACTIVE_GIC_PTR }
+    unsafe { &*ACTIVE_GIC_PTR.load(Ordering::Acquire) }
 }
 
 impl Gic {

@@ -23,8 +23,8 @@ This document outlines the planned development phases for LevitateOS. Each compl
 - **Tasks**:
   - [x] **Timer**: AArch64 Generic Timer driver. (TEAM_010, TEAM_011)
   - [x] **PL011 UART**: Full PL011 driver with interrupt handling (RX/TX buffers). (TEAM_012, TEAM_014)
-  - [x] **GICv2/v3**: Expanded GIC support with typed IRQ routing. (TEAM_015)
-  - [x] **Safety**: All MMIO uses `volatile`, wrapper structs prevent unsafe state. (TEAM_016, TEAM_017)
+  - [x] **GICv2/v3**: Expanded GIC support with typed IRQ routing and FDT discovery. (TEAM_015, TEAM_048)
+  - [x] **Safety**: All MMIO uses `volatile`, wrapper structs prevent unsafe state. (TEAM_016, TEAM_017, TEAM_048)
 
 ---
 
@@ -57,7 +57,7 @@ This document outlines the planned development phases for LevitateOS. Each compl
 
 - **Objective**: Replace the static heap with scalable kernel allocators.
 - **Tasks**:
-  - [ ] **Buddy Allocator**: Physical page allocator for large allocations.
+  - [x] **Buddy Allocator**: Physical page allocator for large allocations. (TEAM_048: Dynamic Map)
   - [ ] **Slab Allocator**: Fast allocation for fixed-size kernel objects (tasks, file handles).
   - [ ] **Page Frame Allocator**: Integration with MMU for on-demand mapping.
 
@@ -114,3 +114,4 @@ This document outlines the planned development phases for LevitateOS. Each compl
 | 2 | 010-017 | Timer, UART, GIC, HAL Hardening |
 | 3 | 018-028 | MMU, Higher-Half Kernel, Audit |
 | 4 | 029-039 | VirtIO Block, FAT32, Initramfs |
+| 2/5 | 048 | GIC Hardening, FDT Discovery, Dynamic Memory Map |

@@ -1,4 +1,4 @@
-use crate::memory::page::Page;
+use super::page::Page;
 use core::ptr::NonNull;
 
 // TEAM_047: Buddy Allocator implementation
@@ -177,5 +177,107 @@ impl BuddyAllocator {
 
         page.next = None;
         page.prev = None;
+    }
+}
+
+#[cfg(all(test, feature = "std"))]
+mod tests {
+    use super::*;
+    extern crate std;
+    use std::boxed::Box;
+    use std::vec;
+
+    fn create_allocator(pages: usize) -> BuddyAllocator {
+        let mem_map_storage = vec![Page::new(); pages].into_boxed_slice();
+        let mem_map = Box::leak(mem_map_storage);
+        let mut allocator = BuddyAllocator::new();
+        unsafe {
+            allocator.init(mem_map, 0);
+            allocator.add_range(0, pages * PAGE_SIZE);
+        }
+        allocator
+    }
+
+    #[test]
+    fn test_alloc_order_0() {
+        let mut allocator = create_allocator(1); // 1 page
+
+        let addr = allocator.alloc(0);
+        assert!(addr.is_some());
+        assert_eq!(addr.unwrap(), 0);
+
+        let addr2 = allocator.alloc(0);
+        assert!(addr2.is_none()); // OOM
+    }
+
+    #[test]
+    fn test_alloc_large() {
+        let mut allocator = create_allocator(4); // 4 pages
+
+        // alloc order 2 (4 pages)
+        let addr = allocator.alloc(2);
+        assert!(addr.is_some());
+        assert_eq!(addr.unwrap(), 0);
+
+        // alloc order 0 should fail
+        assert!(allocator.alloc(0).is_none());
+    }
+
+    #[test]
+    fn test_splitting() {
+        let mut allocator = create_allocator(4); // 4 pages
+
+        // Request order 0 (1 page). Should split order 2 -> order 1 -> order 0
+        let addr1 = allocator.alloc(0);
+        assert!(addr1.is_some());
+        assert_eq!(addr1.unwrap(), 0);
+
+        // Remaining: Order 0 (at 4K), Order 1 (at 8K)
+        let addr2 = allocator.alloc(0);
+        assert!(addr2.is_some());
+        assert_eq!(addr2.unwrap(), 4096);
+
+        let addr3 = allocator.alloc(1);
+        assert!(addr3.is_some());
+        assert_eq!(addr3.unwrap(), 8192);
+
+        assert!(allocator.alloc(0).is_none());
+    }
+
+    #[test]
+    fn test_coalescing() {
+        let mut allocator = create_allocator(4);
+
+        let addr1 = allocator.alloc(0).unwrap(); // 0
+        let addr2 = allocator.alloc(0).unwrap(); // 4096
+        let addr3 = allocator.alloc(1).unwrap(); // 8192
+
+        // Free in reverse order to test coalescing
+        allocator.free(addr1, 0);
+        allocator.free(addr2, 0);
+        // Should have coalesced into Order 1 at 0
+
+        allocator.free(addr3, 1);
+        // Should have coalesced into Order 2 at 0
+
+        // Attempt to allocate Order 2 again
+        let addr_big = allocator.alloc(2);
+        assert!(addr_big.is_some());
+        assert_eq!(addr_big.unwrap(), 0);
+    }
+
+    #[test]
+    fn test_alloc_unaligned_range() {
+        // Test adding a range that isn't power-of-two aligned
+        // 5 pages. 0-16K (Order 2), 16K-20K (Order 0)
+        let mut allocator = create_allocator(5);
+
+        let addr1 = allocator.alloc(2); // Should get the 0-16K block
+        assert!(addr1.is_some());
+
+        // The remaining 4KB (page 4) should be free as Order 0
+        let addr2 = allocator.alloc(0);
+        assert!(addr2.is_some());
+        assert_eq!(addr2.unwrap(), 16384);
     }
 }
