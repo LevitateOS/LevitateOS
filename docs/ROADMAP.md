@@ -58,8 +58,8 @@ This document outlines the planned development phases for LevitateOS. Each compl
 - **Objective**: Replace the static heap with scalable kernel allocators.
 - **Tasks**:
   - [x] **Buddy Allocator**: Physical page allocator for large allocations. (TEAM_048: Dynamic Map)
-  - [ ] **Slab Allocator**: Fast allocation for fixed-size kernel objects (tasks, file handles).
-  - [ ] **Page Frame Allocator**: Integration with MMU for on-demand mapping.
+  - [x] **Slab Allocator**: Fast allocation for fixed-size kernel objects (tasks, file handles). (TEAM_051: Complete)
+  - [x] **Page Frame Allocator**: Integration with MMU for on-demand mapping. (TEAM_054: Complete)
 
 ---
 
@@ -77,6 +77,7 @@ This document outlines the planned development phases for LevitateOS. Each compl
 
 - **Objective**: Run multiple tasks concurrently.
 - **Tasks**:
+  - [ ] **Virtual Memory Reclamation**: Implement `unmap_page()` with TLB invalidation for task cleanup.
   - [ ] **Context Switching**: Save/Restore CPU state (registers) in assembly.
   - [ ] **Scheduler**: Cooperative (yield) or Preemptive (timer-based) Round-Robin scheduler.
   - [ ] **Task Primitives**: Define `Task` struct and `TaskControlBlock`.

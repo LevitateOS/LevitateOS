@@ -167,8 +167,21 @@ TEAM_030: Behavior-driven test inventory
 | M21 | virt_to_phys identity for low addresses | ✅ | `test_virt_to_phys_low_address_identity` |
 | M22 | phys_to_virt identity for device addresses | ✅ | `test_phys_to_virt_device_identity` |
 
+### Dynamic Page Table Allocation (TEAM_054)
+
+| ID | Behavior | Tested? | Test |
+|----|----------|---------|------|
+| M23 | PageAllocator trait defines alloc_page() | ✅ | `test_page_allocator_trait_interface` |
+| M24 | PageAllocator trait defines free_page() | ✅ | `test_page_allocator_trait_interface` |
+| M25 | set_page_allocator() accepts &'static dyn PageAllocator | ✅ | `test_set_page_allocator_signature` |
+| M26 | get_or_create_table() uses dynamic allocator if set | ⚠️ | Behavior test (boot) |
+| M27 | get_or_create_table() falls back to static pool | ⚠️ | Implicit (early boot) |
+
 ### Group 4 Summary
-- **MMU**: 22/22 behaviors tested ✅
+- **MMU**: 27/27 behaviors documented
+- **Unit tested**: 25/27 ✅
+- **Runtime verified**: 2/27 ⚠️ (M26, M27 verified via kernel boot)
+
 
 ---
 
@@ -357,7 +370,36 @@ TEAM_051: Added slab allocator for fixed-size object allocation
 
 ---
 
-## Updated Overall Summary (TEAM_051)
+## Group 8: Buddy Allocator — Behavior Inventory
+
+TEAM_055: Added buddy allocator for physical page frame management
+
+### File Groups
+- `levitate-hal/src/allocator/buddy.rs` (Buddy allocator core)
+- `levitate-hal/src/allocator/page.rs` (Page descriptor struct)
+
+### BuddyAllocator (physical frame allocator)
+
+| ID | Behavior | Tested? | Test |
+|----|----------|---------|------|
+| B1 | Allocator starts with empty free lists | ✅ | `test_alloc_order_0` |
+| B2 | alloc(order=0) returns single page address | ✅ | `test_alloc_order_0` |
+| B3 | OOM returns None when pool exhausted | ✅ | `test_alloc_order_0` |
+| B4 | alloc(order=N) allocates 2^N contiguous pages | ✅ | `test_alloc_large` |
+| B5 | Large allocation consumes entire pool | ✅ | `test_alloc_large` |
+| B6 | Block splitting creates buddy pairs | ✅ | `test_splitting` |
+| B7 | Sequential allocs get sequential addresses | ✅ | `test_splitting` |
+| B8 | Free blocks are coalesced with buddies | ✅ | `test_coalescing` |
+| B9 | Coalesced blocks can be reallocated | ✅ | `test_coalescing` |
+| B10 | Non-power-of-two ranges are handled | ✅ | `test_alloc_unaligned_range` |
+| B11 | Leftover pages added to appropriate order | ✅ | `test_alloc_unaligned_range` |
+
+### Group 8 Summary
+- **BuddyAllocator**: 11/11 behaviors tested ✅
+
+---
+
+## Updated Overall Summary (TEAM_055)
 
 | Group | Module | Behaviors | Tested | Gap |
 |-------|--------|-----------|--------|-----|
@@ -368,7 +410,7 @@ TEAM_051: Added slab allocator for fixed-size object allocation
 | 2 | GIC | 9 | 9 | ✅ |
 | 3 | Pl011Uart bitflags | 8 | 8 | ✅ |
 | 3 | console | 5 | 5 | ✅ |
-| 4 | MMU | 22 | 22 | ✅ |
+| 4 | MMU | 27 | 25 | ⚠️ |
 | 5 | Timer | 1 | 1 | ✅ |
 | 6 | FDT | 8 | 8 | ⚠️ |
 | 6 | CPIO | 10 | 10 | ✅ |
@@ -376,5 +418,8 @@ TEAM_051: Added slab allocator for fixed-size object allocation
 | 7 | SlabPage | 8 | 8 | ✅ |
 | 7 | SlabCache | 3 | 3 | ✅ |
 | 7 | SlabAllocator | 4 | 4 | ✅ |
-| **Total** | | **110** | **110** | **0 gaps** ✅ |
+| 8 | BuddyAllocator | 11 | 11 | ✅ |
+| **Total** | | **126** | **124** | **2 runtime-verified** ⚠️ |
+
+> **Note:** M26 and M27 are runtime-verified through kernel boot tests. FDT tests are skipped due to mock issues.
 
