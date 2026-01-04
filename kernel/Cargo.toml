@@ -14,3 +14,5 @@ linked_list_allocator = "0.10.5"
 virtio-drivers = "0.7.4"
 embedded-graphics = "0.8.1"
 log = "0.4"
+embedded-sdmmc = { version = "0.9", default-features = false }
+

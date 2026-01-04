@@ -25,6 +25,7 @@ use core::panic::PanicInfo;
 mod block;
 mod cursor;
 mod exceptions;
+mod fs;
 mod gpu;
 mod input;
 mod virtio;
@@ -284,7 +285,12 @@ pub extern "C" fn kmain() -> ! {
     // 4. Initialize VirtIO (Phase 3)
     virtio::init();
 
-    // 5. Enable interrupts
+    // 5. Initialize Filesystem (Phase 4)
+    if let Err(e) = fs::init() {
+        verbose!("Filesystem init skipped: {}", e);
+    }
+
+    // 6. Enable interrupts
     unsafe {
         core::arch::asm!("msr daifclr, #2");
     }

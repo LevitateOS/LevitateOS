@@ -45,11 +45,11 @@ This document outlines the planned development phases for LevitateOS. Each compl
 - **Objective**: Persistent storage and basic filesystem access.
 - **Tasks**:
   - [x] **VirtIO Block**: Disk driver for QEMU `virtio-blk`. (TEAM_029, TEAM_030)
-  - [ ] **Filesystem**: Basic FAT32 or ext2 reader to load initial programs.
+  - [x] **Filesystem**: FAT32 filesystem using `embedded-sdmmc`. (TEAM_032)
   - [ ] **Initramfs**: Load an initial ramdisk for early userspace.
 
 > [!NOTE]
-> **Current Focus:** Filesystem implementation. VirtIO Block is functional, verified with sector write/read-back test.
+> **Current Focus:** Initramfs implementation. Block driver and filesystem are complete.
 
 ---
 
