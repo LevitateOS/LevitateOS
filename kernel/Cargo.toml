@@ -19,4 +19,5 @@ embedded-graphics = "0.8.1"
 log = "0.4"
 embedded-sdmmc = { version = "0.9", default-features = false }
 ext4-view = { version = "0.9", default-features = false }
+bitflags = "2.10.0"
 

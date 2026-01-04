@@ -9,6 +9,26 @@
 
 use bitflags::bitflags;
 
+/// Trait for physical page allocation, to be implemented by a Buddy Allocator.
+/// [M23] Allows MMU to request pages for dynamic page tables.
+pub trait PageAllocator: Send + Sync {
+    /// Allocate a 4KB physical page.
+    fn alloc_page(&self) -> Option<usize>;
+    /// Free a 4KB physical page.
+    fn free_page(&self, pa: usize);
+}
+
+/// Pointer to the dynamic page allocator, set once during boot.
+static mut PAGE_ALLOCATOR_PTR: Option<&'static dyn PageAllocator> = None;
+
+/// Set the global page allocator for MMU use.
+pub fn set_page_allocator(allocator: &'static dyn PageAllocator) {
+    // SAFETY: Single-threaded boot context
+    unsafe {
+        PAGE_ALLOCATOR_PTR = Some(allocator);
+    }
+}
+
 // ============================================================================
 // Constants
 // ============================================================================
@@ -33,7 +53,7 @@ pub const KERNEL_VIRT_START: usize = 0xFFFF_8000_0000_0000;
 #[inline]
 pub fn virt_to_phys(va: usize) -> usize {
     if va >= KERNEL_VIRT_START {
-        va - KERNEL_VIRT_START  // [M19] high VA to PA
+        va - KERNEL_VIRT_START // [M19] high VA to PA
     } else {
         va // [M21] identity for low addresses
     }
@@ -43,7 +63,7 @@ pub fn virt_to_phys(va: usize) -> usize {
 #[inline]
 pub fn phys_to_virt(pa: usize) -> usize {
     if pa >= 0x4000_0000 {
-        pa + KERNEL_VIRT_START  // [M20] PA to high VA
+        pa + KERNEL_VIRT_START // [M20] PA to high VA
     } else {
         pa // [M22] identity for device addresses
     }
@@ -304,25 +324,25 @@ impl PageTable {
 /// [M7] Extract L0 index from virtual address (bits [47:39])
 #[inline]
 pub fn va_l0_index(va: usize) -> usize {
-    (va >> 39) & 0x1FF  // [M7]
+    (va >> 39) & 0x1FF // [M7]
 }
 
 /// [M8] Extract L1 index from virtual address (bits [38:30])
 #[inline]
 pub fn va_l1_index(va: usize) -> usize {
-    (va >> 30) & 0x1FF  // [M8]
+    (va >> 30) & 0x1FF // [M8]
 }
 
 /// [M9] Extract L2 index from virtual address (bits [29:21])
 #[inline]
 pub fn va_l2_index(va: usize) -> usize {
-    (va >> 21) & 0x1FF  // [M9]
+    (va >> 21) & 0x1FF // [M9]
 }
 
 /// [M10] Extract L3 index from virtual address (bits [20:12])
 #[inline]
 pub fn va_l3_index(va: usize) -> usize {
-    (va >> 12) & 0x1FF  // [M10]
+    (va >> 12) & 0x1FF // [M10]
 }
 
 // ============================================================================
@@ -548,7 +568,20 @@ fn get_or_create_table(
         unsafe { Ok(&mut *(child_va as *mut PageTable)) }
     } else {
         // Need to allocate a new table
-        let new_table = alloc_page_table().ok_or("Page table pool exhausted")?;
+        // Try dynamic allocator first, fallback to static pool
+        let new_table = if let Some(allocator) = unsafe { PAGE_ALLOCATOR_PTR } {
+            allocator.alloc_page().map(|pa| {
+                // crate::verbose!("MMU: Allocated dynamic page table at 0x{:x}", pa);
+                let va = phys_to_virt(pa);
+                let pt = unsafe { &mut *(va as *mut PageTable) };
+                pt.zero();
+                pt
+            })
+        } else {
+            alloc_page_table()
+        }
+        .ok_or("Page table allocation failed")?;
+
         let new_va = new_table as *mut PageTable as usize;
         let new_pa = virt_to_phys(new_va);
 

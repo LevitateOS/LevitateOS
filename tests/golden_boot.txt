@@ -3,6 +3,7 @@
 Heap initialized.
 MMU re-initialized (Higher-Half + Identity).
 Exceptions initialized.
+Detected GIC version: V2
 Core drivers initialized.
 Initializing Timer...
 Timer frequency (hex): 0x0000000003b9aca0
@@ -16,8 +17,6 @@ Initializing Input...
 VirtIO Input initialized successfully.
 BOOT_REGS: x0=0 x1=0 x2=0 x3=0
 Detecting Initramfs...
-Scanning for DTB magic in 0x40000000..0x49000000
-No DTB found in scanned memory region
 No DTB provided.
 FAT32 mounted. Root contains 0 entries.
 Filesystem initialized.

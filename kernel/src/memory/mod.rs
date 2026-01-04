@@ -1,0 +1,192 @@
+use levitate_hal::fdt;
+use levitate_hal::mmu::{self, PageAllocator};
+use levitate_utils::Spinlock;
+
+pub mod buddy;
+pub mod page;
+
+pub use buddy::BuddyAllocator;
+pub use page::Page;
+
+/// Global Frame Allocator
+pub struct FrameAllocator(Spinlock<BuddyAllocator>);
+
+impl PageAllocator for FrameAllocator {
+    fn alloc_page(&self) -> Option<usize> {
+        self.0.lock().alloc(0)
+    }
+    fn free_page(&self, pa: usize) {
+        self.0.lock().free(pa, 0)
+    }
+}
+
+pub static FRAME_ALLOCATOR: FrameAllocator = FrameAllocator(Spinlock::new(BuddyAllocator::new()));
+
+/// Initialize physical memory management.
+pub fn init(dtb: &[u8]) {
+    let fdt = fdt::Fdt::new(dtb).expect("Invalid DTB for memory init");
+
+    // 1. Discover RAM and Reserved regions
+    let mut ram_regions: [Option<(usize, usize)>; 16] = [None; 16];
+    let mut ram_count = 0;
+    fdt::for_each_memory_region(&fdt, |r| {
+        if ram_count < 16 {
+            ram_regions[ram_count] = Some((r.start, r.end));
+            ram_count += 1;
+        }
+    });
+
+    let mut reserved_regions: [Option<(usize, usize)>; 32] = [None; 32];
+    let mut res_count = 0;
+
+    // Add regions from DTB
+    fdt::for_each_reserved_region(&fdt, |r| {
+        if res_count < 32 {
+            reserved_regions[res_count] = Some((r.start, r.end));
+            res_count += 1;
+        }
+    });
+
+    // Add software-defined reserved regions
+    let kernel_start = mmu::virt_to_phys(unsafe { &_kernel_virt_start as *const _ as usize });
+    let kernel_end = mmu::virt_to_phys(unsafe { &_kernel_end as *const _ as usize });
+    add_reserved(
+        &mut reserved_regions,
+        &mut res_count,
+        kernel_start,
+        kernel_end,
+    );
+
+    // Initrd
+    if let Ok((start, end)) = fdt::get_initrd_range(dtb) {
+        add_reserved(&mut reserved_regions, &mut res_count, start, end);
+    }
+
+    // DTB itself
+    let dtb_start = dtb.as_ptr() as usize;
+    let dtb_end = dtb_start + dtb.len();
+    add_reserved(&mut reserved_regions, &mut res_count, dtb_start, dtb_end);
+
+    // 2. Determine phys_min and phys_max for mem_map sizing
+    let mut phys_min = !0;
+    let mut phys_max = 0;
+    for r in ram_regions.iter().flatten() {
+        if r.0 < phys_min {
+            phys_min = r.0;
+        }
+        if r.1 > phys_max {
+            phys_max = r.1;
+        }
+    }
+
+    if phys_min == !0 {
+        crate::verbose!("No RAM discovered in DTB!");
+        return;
+    }
+
+    let total_pages = (phys_max - phys_min) / 4096;
+    let mem_map_size = total_pages * core::mem::size_of::<Page>();
+
+    // Choose a safe location for mem_map (e.g., 0x4200_0000 on QEMU)
+    // and add it to reserved regions.
+    let mem_map_pa = 0x4200_0000;
+    add_reserved(
+        &mut reserved_regions,
+        &mut res_count,
+        mem_map_pa,
+        mem_map_pa + mem_map_size,
+    );
+
+    // 3. Initialize mem_map
+    let mem_map_va = mmu::phys_to_virt(mem_map_pa);
+    let mem_map = unsafe { core::slice::from_raw_parts_mut(mem_map_va as *mut Page, total_pages) };
+    for page in mem_map.iter_mut() {
+        *page = Page::new();
+    }
+
+    // 4. Initialize Allocator
+    let mut allocator = FRAME_ALLOCATOR.0.lock();
+    unsafe {
+        allocator.init(mem_map, phys_min);
+    }
+
+    // 5. Add RAM regions, skipping reserved ones
+    for ram in ram_regions.iter().flatten() {
+        add_range_with_holes(&mut allocator, *ram, &reserved_regions);
+    }
+
+    // 6. Register with MMU
+    drop(allocator);
+    mmu::set_page_allocator(&FRAME_ALLOCATOR);
+
+    crate::verbose!("Buddy Allocator initialized with DTB memory map.");
+}
+
+fn add_reserved(
+    regions: &mut [Option<(usize, usize)>],
+    count: &mut usize,
+    start: usize,
+    end: usize,
+) {
+    if *count < regions.len() {
+        regions[*count] = Some((start & !4095, (end + 4095) & !4095));
+        *count += 1;
+    }
+}
+
+fn add_range_with_holes(
+    allocator: &mut buddy::BuddyAllocator,
+    ram: (usize, usize),
+    reserved: &[Option<(usize, usize)>],
+) {
+    fn add_split(
+        allocator: &mut buddy::BuddyAllocator,
+        ram: (usize, usize),
+        reserved: &[Option<(usize, usize)>],
+        idx: usize,
+    ) {
+        if ram.0 >= ram.1 {
+            return;
+        }
+
+        // Find next valid reserved region
+        let mut next_idx = idx;
+        while next_idx < reserved.len() && reserved[next_idx].is_none() {
+            next_idx += 1;
+        }
+
+        if next_idx >= reserved.len() {
+            // No more reserved regions to check
+            unsafe {
+                allocator.add_range(ram.0, ram.1);
+            }
+            return;
+        }
+
+        let res = reserved[next_idx].as_ref().expect("Checked None above");
+
+        // Check for overlap
+        if ram.0 < res.1 && ram.1 > res.0 {
+            // Overlap! Split RAM into pieces that don't overlap with THIS reserved range
+            // 1. Portion before reserved
+            if ram.0 < res.0 {
+                add_split(allocator, (ram.0, res.0), reserved, next_idx + 1);
+            }
+            // 2. Portion after reserved
+            if ram.1 > res.1 {
+                add_split(allocator, (res.1, ram.1), reserved, next_idx + 1);
+            }
+            // Portion inside is skipped
+        } else {
+            // No overlap with this one, try next reserved
+            add_split(allocator, ram, reserved, next_idx + 1);
+        }
+    }
+
+    add_split(allocator, ram, reserved, 0);
+}
+
+unsafe extern "C" {
+    static _kernel_virt_start: u8;
+    static _kernel_end: u8;
+}

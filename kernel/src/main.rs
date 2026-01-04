@@ -28,6 +28,7 @@ mod exceptions;
 mod fs;
 mod gpu;
 mod input;
+mod memory;
 mod virtio;
 
 use levitate_hal::fdt;
@@ -226,12 +227,6 @@ pub fn get_dtb_phys() -> Option<usize> {
     let scan_start = 0x4000_0000usize;
     let scan_end = 0x4900_0000usize; // Scan first ~144MB of RAM
 
-    verbose!(
-        "Scanning for DTB magic in 0x{:x}..0x{:x}",
-        scan_start,
-        scan_end
-    );
-
     // Scan page-aligned addresses (DTB must be 8-byte aligned per spec)
     for addr in (scan_start..scan_end).step_by(0x1000) {
         let magic = unsafe { core::ptr::read_volatile(addr as *const u32) };
@@ -241,7 +236,6 @@ pub fn get_dtb_phys() -> Option<usize> {
         }
     }
 
-    verbose!("No DTB found in scanned memory region");
     None
 }
 
@@ -321,6 +315,17 @@ pub extern "C" fn kmain() -> ! {
             )
             .expect("Failed to higher-half map kernel");
 
+            // Higher-half map all boot RAM (0x4000_0000 to 0x5000_0000)
+            // to support access to DTB, initrd, and mem_map.
+            mmu::map_range(
+                root,
+                mmu::KERNEL_VIRT_START + 0x4000_0000,
+                0x4000_0000,
+                0x1000_0000, // 256 MB
+                kernel_flags,
+            )
+            .expect("Failed to map boot RAM to higher half");
+
             // Map Devices (Identity mapped for now)
             mmu::identity_map_range_optimized(
                 root,
@@ -394,6 +399,11 @@ pub extern "C" fn kmain() -> ! {
     gic_api.enable_irq(gic::IrqId::Uart.irq_number());
 
     verbose!("Core drivers initialized.");
+
+    // TEAM_047: Initialize physical memory management (Buddy Allocator)
+    if let Some(slice) = dtb_slice {
+        memory::init(slice);
+    }
 
     // 3. Initialize Timer (Phase 2)
     verbose!("Initializing Timer...");

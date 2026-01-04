@@ -5,6 +5,7 @@ SECTIONS
     /* Physical Load Address */
     . = 0x40080000;
     _kernel_phys_start = .;
+    __executable_start = .;
 
     /* Boot code that runs before MMU or in identity map */
     .text.head : {
@@ -14,6 +15,7 @@ SECTIONS
     /* Higher-Half Virtual Address Base */
     _kernel_virt_base = 0xFFFF800000000000;
     . += _kernel_virt_base;
+    _kernel_virt_start = .;
 
     .text : AT(ADDR(.text) - _kernel_virt_base) {
         KEEP(*(.text.boot))
@@ -45,6 +47,7 @@ SECTIONS
     . = ALIGN(16);
     __heap_start = .;
     __heap_end = _kernel_virt_base + 0x41F00000;
+    _kernel_end = .;
 
     _kernel_size = . - _kernel_virt_base - 0x40080000;
 }

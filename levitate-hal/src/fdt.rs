@@ -1,5 +1,44 @@
+use core::ops::Range;
 pub use fdt::Fdt;
 pub use fdt::node::FdtNode;
+
+/// Retrieve the physical RAM regions from the DTB.
+/// [FD9] Implementation of memory region discovery
+pub fn for_each_memory_region<F>(fdt: &Fdt, mut f: F)
+where
+    F: FnMut(Range<usize>),
+{
+    for r in fdt.memory().regions() {
+        let start = r.starting_address as usize;
+        let size = r.size.unwrap_or(0);
+        f(start..(start + size));
+    }
+}
+
+/// Retrieve the reserved memory regions from the DTB.
+/// [FD10] Includes both rsvmap and /reserved-memory node
+pub fn for_each_reserved_region<F>(fdt: &Fdt, mut f: F)
+where
+    F: FnMut(Range<usize>),
+{
+    // 1. Memory reservation block (rsvmap)
+    for r in fdt.memory_reservations() {
+        let start = r.address() as usize;
+        let size = r.size();
+        f(start..(start + size));
+    }
+
+    // 2. /reserved-memory node and its children
+    if let Some(reserved_node) = fdt.find_node("/reserved-memory") {
+        for n in reserved_node.children() {
+            if let Some(reg) = n.reg().and_then(|mut r| r.next()) {
+                let start = reg.starting_address as usize;
+                let size = reg.size.unwrap_or(0);
+                f(start..(start + size));
+            }
+        }
+    }
+}
 
 /// Errors that can occur during FDT parsing
 /// [FD1] InvalidHeader - DTB header is malformed

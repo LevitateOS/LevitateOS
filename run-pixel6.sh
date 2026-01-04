@@ -37,7 +37,7 @@ echo "GIC:    v2 (v3 TODO - kernel driver needed)"
 echo "=========================================="
 
 echo "Building kernel..."
-cargo build --release
+cargo build --release -p levitate-kernel --features verbose --target aarch64-unknown-none
 
 # Path to the compiled ELF
 ELF="target/aarch64-unknown-none/release/levitate-kernel"

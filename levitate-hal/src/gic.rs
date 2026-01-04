@@ -229,13 +229,22 @@ unsafe impl Sync for Gic {}
 // TEAM_042: Detect GIC version at runtime based on GICD_PIDR2
 // Read from the distributor's peripheral ID register
 fn detect_gic_version(dist_base: usize) -> GicVersion {
-    const GICD_PIDR2: usize = 0xFFE8;
+    // GIC ID registers are in the last 4KB of the peripheral region.
+    // GICv2 Distributor is 4KB, so PIDR2 is at 0x0FE8.
+    // GICv3 Distributor is 64KB+, so PIDR2 is at 0xFFE8.
 
-    // Read PIDR2 from distributor (always memory-mapped)
-    let pidr2 = unsafe { read_volatile((dist_base + GICD_PIDR2) as *const u32) };
-    let arch_rev = (pidr2 >> 4) & 0xF;
+    // Try GICv2 offset first
+    let pidr2_v2 = unsafe { read_volatile((dist_base + 0x0FE8) as *const u32) };
+    let arch_rev = (pidr2_v2 >> 4) & 0xF;
+    if arch_rev == 2 {
+        return GicVersion::V2;
+    }
 
-    // ArchRev: 1/2 = GICv1/v2, 3 = GICv3, 4 = GICv4
+    // Try GICv3 offset (CAUTION: might crash if region is only 4KB)
+    // However, if it wasn't v2, we hope it's v3 or larger.
+    let pidr2_v3 = unsafe { read_volatile((dist_base + 0xFFE8) as *const u32) };
+    let arch_rev = (pidr2_v3 >> 4) & 0xF;
+
     if arch_rev >= 3 {
         GicVersion::V3
     } else {
