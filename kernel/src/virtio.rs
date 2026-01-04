@@ -73,6 +73,36 @@ unsafe impl Hal for VirtioHal {
 /// This works because MMIO addresses are fixed hardware addresses
 pub type StaticMmioTransport = virtio_drivers::transport::mmio::MmioTransport<'static>;
 
+/// TEAM_065: Initialize GPU device only (Stage 3 - BootConsole)
+/// GPU must be available before terminal operations.
+/// Returns true if GPU was found and initialized.
+pub fn init_gpu() -> bool {
+    crate::verbose!("Scanning VirtIO MMIO bus for GPU...");
+    for i in 0..VIRTIO_MMIO_COUNT {
+        let addr = VIRTIO_MMIO_START + i * VIRTIO_MMIO_SIZE;
+        let header =
+            core::ptr::NonNull::new(addr as *mut virtio_drivers::transport::mmio::VirtIOHeader)
+                .unwrap();
+
+        match unsafe {
+            virtio_drivers::transport::mmio::MmioTransport::new(header, VIRTIO_MMIO_SIZE)
+        } {
+            Ok(transport) => {
+                if transport.device_type() == virtio_drivers::transport::DeviceType::GPU {
+                    crate::gpu::init(transport);
+                    return true;
+                }
+            }
+            Err(_) => {
+                // Not a valid VirtIO device at this address
+            }
+        }
+    }
+    false
+}
+
+/// TEAM_065: Initialize non-GPU VirtIO devices (Stage 4 - Discovery)
+/// Block, Network, Input devices are initialized here.
 pub fn init() {
     crate::verbose!("Scanning VirtIO MMIO bus...");
     for i in 0..VIRTIO_MMIO_COUNT {
@@ -88,9 +118,8 @@ pub fn init() {
             Ok(transport) => {
                 let device_type = transport.device_type();
                 match device_type {
-                    virtio_drivers::transport::DeviceType::GPU => {
-                        crate::gpu::init(transport);
-                    }
+                    // GPU already initialized in Stage 3 via init_gpu()
+                    virtio_drivers::transport::DeviceType::GPU => {}
                     virtio_drivers::transport::DeviceType::Input => {
                         crate::input::init(transport);
                     }

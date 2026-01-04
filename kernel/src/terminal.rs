@@ -255,12 +255,17 @@ impl Terminal {
     }
 
     /// [TERM6] Tab to next 8-column boundary - SC9.1-SC9.5
+    /// TEAM_065: Fixed to handle wrap-around when tab exceeds columns
     fn tab(&mut self, display: &mut Display) {
         self.hide_cursor(display);
-        let _old_col = self.cursor_col;
         let next_tab = ((self.cursor_col / 8) + 1) * 8;
 
-        self.cursor_col = next_tab;
+        // TEAM_065: Handle wrap-around if tab would exceed line width
+        if next_tab >= self.cols {
+            self.newline(display);
+        } else {
+            self.cursor_col = next_tab;
+        }
 
         // TEAM_059: Force flush after tab
         let mut guard = GPU.lock();

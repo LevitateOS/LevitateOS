@@ -2,11 +2,24 @@
 //!
 //! TEAM_032: Updated for virtio-drivers v0.12.0
 //! - Uses StaticMmioTransport for 'static lifetime compatibility
+//!
+//! TEAM_065: Fixed error handling per Rule 14 (Fail Loud, Fail Fast)
+//! - GPU errors are logged, not silently swallowed
+//! - DrawTarget uses GpuError instead of Infallible
 
 use crate::virtio::{StaticMmioTransport, VirtioHal};
 use embedded_graphics::{pixelcolor::Rgb888, prelude::*};
 use levitate_utils::Spinlock;
 use virtio_drivers::device::gpu::VirtIOGpu;
+
+/// TEAM_065: GPU error type for proper error propagation (Rule 6)
+#[derive(Debug, Clone, Copy)]
+pub enum GpuError {
+    /// GPU not initialized
+    NotInitialized,
+    /// Flush operation failed
+    FlushFailed,
+}
 
 // TEAM_032: Use StaticMmioTransport (MmioTransport<'static>) for static storage
 pub struct GpuState {
@@ -62,9 +75,12 @@ impl GpuState {
         (self.width, self.height)
     }
 
-    /// TEAM_059: Flush framebuffer to display
+    /// TEAM_065: Flush framebuffer to display with error logging (Rule 14)
     pub fn flush(&mut self) {
-        self.gpu.flush().ok();
+        if let Err(_e) = self.gpu.flush() {
+            // Rule 14: Fail Loud - log GPU errors
+            crate::println!("[GPU] ERROR: Flush failed");
+        }
     }
 }
 
@@ -77,37 +93,40 @@ pub fn get_resolution() -> Option<(u32, u32)> {
 
 pub struct Display;
 
+/// TEAM_065: DrawTarget with proper error type (Rule 6)
 impl DrawTarget for Display {
     type Color = Rgb888;
-    type Error = core::convert::Infallible;
+    type Error = GpuError;
 
     fn draw_iter<I>(&mut self, pixels: I) -> Result<(), Self::Error>
     where
         I: IntoIterator<Item = Pixel<Self::Color>>,
     {
         let mut guard = GPU.lock();
-        if let Some(state) = guard.as_mut() {
-            let width = state.width;
-            let height = state.height;
-            let fb = state.framebuffer();
+        let state = guard.as_mut().ok_or(GpuError::NotInitialized)?;
 
-            let mut updated = false;
-            for Pixel(point, color) in pixels {
-                if point.x >= 0 && point.x < width as i32 && point.y >= 0 && point.y < height as i32
-                {
-                    let idx = (point.y as usize * width as usize + point.x as usize) * 4;
-                    if idx + 3 < fb.len() {
-                        fb[idx] = color.r();
-                        fb[idx + 1] = color.g();
-                        fb[idx + 2] = color.b();
-                        fb[idx + 3] = 255; // Alpha
-                        updated = true;
-                    }
+        let width = state.width;
+        let height = state.height;
+        let fb = state.framebuffer();
+
+        let mut updated = false;
+        for Pixel(point, color) in pixels {
+            if point.x >= 0 && point.x < width as i32 && point.y >= 0 && point.y < height as i32
+            {
+                let idx = (point.y as usize * width as usize + point.x as usize) * 4;
+                if idx + 3 < fb.len() {
+                    fb[idx] = color.r();
+                    fb[idx + 1] = color.g();
+                    fb[idx + 2] = color.b();
+                    fb[idx + 3] = 255; // Alpha
+                    updated = true;
                 }
             }
-            // Flush only if we actually drew something
-            if updated {
-                state.gpu.flush().ok();
+        }
+        // Flush only if we actually drew something
+        if updated {
+            if state.gpu.flush().is_err() {
+                return Err(GpuError::FlushFailed);
             }
         }
         Ok(())

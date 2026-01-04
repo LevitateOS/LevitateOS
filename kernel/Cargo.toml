@@ -8,7 +8,8 @@ workspace = true
 
 [features]
 default = []
-verbose = []  # Enable verbose boot messages for golden file testing
+verbose = []    # Enable verbose boot messages for golden file testing
+diskless = []   # TEAM_065: Skip initrd requirement for diskless boot scenarios
 
 [dependencies]
 levitate-hal = { path = "../levitate-hal" }

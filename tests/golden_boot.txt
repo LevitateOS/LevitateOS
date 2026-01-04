@@ -4,12 +4,13 @@ Heap initialized.
 MMU re-initialized (Higher-Half + Identity).
 Exceptions initialized.
 DTB address from x0: 0x48200000
-Detected GIC version: V2
+Detected GIC version: V3
 Buddy Allocator initialized with DTB memory map.
 Core drivers initialized.
 Timer initialized.
 [BOOT] Stage 3: Boot Console (DXE)
-Initializing GPU Terminal...
+Scanning VirtIO MMIO bus for GPU...
+GPU initialized successfully.
 [TERM] GPU resolution: 1280x800
 [TERM] Terminal::new(1280x800) -> 128x36 chars (font 10x20, spacing 2)
 [TERM] Terminal size: 128x36 characters

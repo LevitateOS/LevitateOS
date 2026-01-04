@@ -68,6 +68,12 @@ pub fn run() -> Result<()> {
     // Phase 5: Buddy Allocator (TEAM_047)
     test_buddy_allocator_integration(&mut results);
 
+    // TEAM_065: Hybrid Boot Fixes
+    test_gpu_stage3_init(&mut results);
+    test_spec4_enforcement(&mut results);
+    test_gpu_error_handling(&mut results);
+    test_boot_stage_enum(&mut results);
+
     println!();
     if results.summary() {
         println!("\n✅ All regression tests passed\n");
@@ -364,6 +370,134 @@ fn test_buddy_allocator_integration(results: &mut TestResults) {
         results.pass("main.rs calls memory::init()");
     } else {
         results.fail("main.rs missing memory::init() call");
+    }
+}
+
+// =============================================================================
+// TEAM_065: Hybrid Boot Architecture Fixes
+// =============================================================================
+
+/// TEAM_065: GPU initialization split to Stage 3
+fn test_gpu_stage3_init(results: &mut TestResults) {
+    println!("TEAM_065: GPU initialization in Stage 3");
+
+    let virtio_rs = match fs::read_to_string("kernel/src/virtio.rs") {
+        Ok(c) => c,
+        Err(_) => {
+            results.fail("Could not read kernel/src/virtio.rs");
+            return;
+        }
+    };
+
+    // Verify init_gpu() function exists
+    if virtio_rs.contains("pub fn init_gpu()") {
+        results.pass("virtio.rs has init_gpu() function");
+    } else {
+        results.fail("virtio.rs missing init_gpu() - GPU not split to Stage 3");
+    }
+
+    let main_rs = match fs::read_to_string("kernel/src/main.rs") {
+        Ok(c) => c,
+        Err(_) => {
+            results.fail("Could not read kernel/src/main.rs");
+            return;
+        }
+    };
+
+    // Verify init_gpu() is called before terminal operations
+    if main_rs.contains("virtio::init_gpu()") {
+        results.pass("main.rs calls virtio::init_gpu() in Stage 3");
+    } else {
+        results.fail("main.rs missing virtio::init_gpu() call");
+    }
+}
+
+/// TEAM_065: SPEC-4 enforcement - maintenance_shell on initrd failure
+fn test_spec4_enforcement(results: &mut TestResults) {
+    println!("TEAM_065: SPEC-4 initrd failure handling");
+
+    let main_rs = match fs::read_to_string("kernel/src/main.rs") {
+        Ok(c) => c,
+        Err(_) => {
+            results.fail("Could not read kernel/src/main.rs");
+            return;
+        }
+    };
+
+    // Verify maintenance_shell is called when initrd not found
+    if main_rs.contains("maintenance_shell()") && main_rs.contains("!initrd_found") {
+        results.pass("SPEC-4: maintenance_shell() called on initrd failure");
+    } else {
+        results.fail("SPEC-4 violated: maintenance_shell() not called on initrd failure");
+    }
+
+    // Verify diskless feature flag exists
+    if main_rs.contains("feature = \"diskless\"") {
+        results.pass("diskless feature flag available for opt-out");
+    } else {
+        results.fail("diskless feature flag missing");
+    }
+}
+
+/// TEAM_065: GPU error handling with GpuError enum
+fn test_gpu_error_handling(results: &mut TestResults) {
+    println!("TEAM_065: GPU error handling");
+
+    let gpu_rs = match fs::read_to_string("kernel/src/gpu.rs") {
+        Ok(c) => c,
+        Err(_) => {
+            results.fail("Could not read kernel/src/gpu.rs");
+            return;
+        }
+    };
+
+    // Verify GpuError enum exists (Rule 6 compliance)
+    if gpu_rs.contains("pub enum GpuError") {
+        results.pass("GpuError enum defined for proper error handling");
+    } else {
+        results.fail("GpuError enum missing - violates Rule 6");
+    }
+
+    // Verify DrawTarget uses GpuError, not Infallible
+    if gpu_rs.contains("type Error = GpuError") {
+        results.pass("DrawTarget uses GpuError (not Infallible)");
+    } else if gpu_rs.contains("type Error = core::convert::Infallible") {
+        results.fail("DrawTarget still uses Infallible - errors hidden");
+    } else {
+        results.fail("Could not determine DrawTarget error type");
+    }
+}
+
+/// TEAM_065: BootStage enum and state machine
+fn test_boot_stage_enum(results: &mut TestResults) {
+    println!("TEAM_065: BootStage state machine");
+
+    let main_rs = match fs::read_to_string("kernel/src/main.rs") {
+        Ok(c) => c,
+        Err(_) => {
+            results.fail("Could not read kernel/src/main.rs");
+            return;
+        }
+    };
+
+    // Verify BootStage enum with all 5 stages
+    let has_all_stages = main_rs.contains("EarlyHAL")
+        && main_rs.contains("MemoryMMU")
+        && main_rs.contains("BootConsole")
+        && main_rs.contains("Discovery")
+        && main_rs.contains("SteadyState");
+
+    if has_all_stages {
+        results.pass("BootStage enum has all 5 stages");
+    } else {
+        results.fail("BootStage enum missing stages");
+    }
+
+    // Verify transition_to function exists
+    if main_rs.contains("pub fn transition_to") {
+        results.pass("transition_to() state machine helper exists");
+    } else {
+        results.fail("transition_to() function missing");
     }
 }
 

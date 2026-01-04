@@ -470,13 +470,31 @@ pub extern "C" fn kmain() -> ! {
     verbose!("Timer initialized.");
 
     transition_to(BootStage::BootConsole);
-    // TEAM_058: Initialize GPU Terminal (SC14.1-SC14.7)
-    verbose!("Initializing GPU Terminal...");
+    // TEAM_065: Initialize GPU FIRST (Stage 3 requirement)
+    // GPU must be available before terminal operations per SPEC-1.
+    let gpu_available = virtio::init_gpu();
+
+    if gpu_available {
+        verbose!("GPU initialized successfully.");
+    } else {
+        // SPEC-1: Explicit fallback to serial-only mode
+        println!("[BOOT] SPEC-1: No GPU found, using serial-only console");
+    }
+
     let mut display = gpu::Display;
 
     // SC2.2, SC2.3: Get resolution from GPU
-    let (width, height) = gpu::get_resolution().unwrap_or((1280, 800));
-    println!("[TERM] GPU resolution: {}x{}", width, height);
+    let (width, height) = match gpu::get_resolution() {
+        Some((w, h)) => {
+            println!("[TERM] GPU resolution: {}x{}", w, h);
+            (w, h)
+        }
+        None => {
+            // SPEC-1: Fallback resolution for terminal sizing only
+            println!("[TERM] SPEC-1: Using fallback resolution 1280x800 (serial mode)");
+            (1280, 800)
+        }
+    };
 
     // SC3.3: Create terminal
     let mut term = terminal::Terminal::new(width, height);
@@ -503,8 +521,9 @@ pub extern "C" fn kmain() -> ! {
             BOOT_REGS[0], BOOT_REGS[1], BOOT_REGS[2], BOOT_REGS[3]
         );
     }
+    // TEAM_065: SPEC-4 Initrd Discovery with Fail-Fast (Rule 14)
     println!("Detecting Initramfs...");
-    if let Some(slice) = dtb_slice {
+    let initrd_found = if let Some(slice) = dtb_slice {
         // TEAM_045: Use already created DTB slice
         match fdt::get_initrd_range(slice) {
             Ok((start, end)) => {
@@ -527,13 +546,31 @@ pub extern "C" fn kmain() -> ! {
                         }
                     }
                 }
+                true
             }
-            Err(_e) => {
-                verbose!("No initramfs found in DTB: {:?}", _e);
+            Err(e) => {
+                println!("[BOOT] ERROR: No initramfs in DTB: {:?}", e);
+                false
             }
         }
     } else {
-        verbose!("No DTB provided.");
+        println!("[BOOT] ERROR: No DTB provided - cannot locate initramfs");
+        false
+    };
+
+    // TEAM_065: SPEC-4 enforcement per Rule 14 (Fail Loud, Fail Fast)
+    // If initrd is required but missing, drop to maintenance shell
+    #[cfg(not(feature = "diskless"))]
+    if !initrd_found {
+        println!("[BOOT] SPEC-4: Initrd required but not found.");
+        term.write_str(&mut display, "\n[ERROR] Initramfs not found!\n");
+        term.write_str(&mut display, "Dropping to maintenance shell...\n");
+        maintenance_shell();
+    }
+
+    #[cfg(feature = "diskless")]
+    if !initrd_found {
+        verbose!("Diskless mode: continuing without initrd");
     }
 
     // Initialize Filesystem (Phase 4)

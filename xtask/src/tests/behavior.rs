@@ -99,6 +99,13 @@ fn run_with_profile(profile: QemuProfile) -> Result<()> {
     let golden = golden.replace("\r\n", "\n");
     let actual = actual.replace("\r\n", "\n");
 
+    // TEAM_065: Normalize GIC version differences (environment-dependent)
+    // GIC version (V2 vs V3) depends on QEMU version/config, not code
+    let golden = golden.replace("Detected GIC version: V2", "Detected GIC version: V*");
+    let golden = golden.replace("Detected GIC version: V3", "Detected GIC version: V*");
+    let actual = actual.replace("Detected GIC version: V2", "Detected GIC version: V*");
+    let actual = actual.replace("Detected GIC version: V3", "Detected GIC version: V*");
+
     // Compare
     if golden.trim() == actual.trim() {
         println!("✅ SUCCESS: Current behavior matches Golden Log.\n");

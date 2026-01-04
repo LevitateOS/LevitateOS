@@ -90,10 +90,10 @@ pub fn read_file(path: &str) -> Option<Vec<u8>> {
     None
 }
 
-/// List directory contents
-pub fn list_dir(_path: &str, fs_type: FsType) -> Vec<String> {
+/// TEAM_065: List directory contents with proper error propagation (Rule 6)
+pub fn list_dir(_path: &str, fs_type: FsType) -> Result<Vec<String>, &'static str> {
     match fs_type {
-        FsType::Fat32 => fat::mount_and_list().unwrap_or_default(),
-        FsType::Ext4 => ext4::mount_and_list().unwrap_or_default(),
+        FsType::Fat32 => fat::mount_and_list(),
+        FsType::Ext4 => ext4::mount_and_list(),
     }
 }

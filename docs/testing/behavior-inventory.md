@@ -507,10 +507,14 @@ TEAM_059: Verified behaviors after fixing newline/cursor bugs
 | TERM7 | Clear fills with background color | ✅ | Runtime (visual) |
 | TERM8 | Backspace moves cursor left | ✅ | Runtime (UART log) |
 | TERM9 | Resolution adapts to screen size | ✅ | Runtime (UART log) |
+| TERM10 | Tab wraps to next line at end of row | ✅ | TEAM_065 fix |
+| TERM11 | Backspace wraps to previous line at col 0 | ✅ | Runtime (UART log) |
+| TERM12 | ANSI ESC[J clears screen | ✅ | Runtime (visual) |
 
 ### Group 10 Summary
-- **Terminal**: 9/9 behaviors documented
-- **Runtime verified**: 9/9 ✅ (visual + UART logging)
+- **Terminal**: 12/12 behaviors documented
+- **Runtime verified**: 12/12 ✅ (visual + UART logging)
+- **TEAM_065**: Added TERM10-12 for wrap/ANSI behaviors
 
 ---
 
@@ -535,6 +539,8 @@ TEAM_059: Verified behaviors after fixing newline/cursor bugs
 | 7 | SlabAllocator | 4 | 4 | ✅ |
 | 8 | BuddyAllocator | 11 | 11 | ✅ |
 | 9 | VirtIO Net | 14 | 14 | ⚠️ |
-| 10 | Terminal | 9 | 9 | ⚠️ |
-| **Total** | | **149** | **147** | **2 unit + 23 runtime** ⚠️ |
+| 10 | Terminal | 12 | 12 | ⚠️ |
+| **Total** | | **152** | **150** | **2 unit + 26 runtime** ⚠️ |
+
+> **TEAM_065**: Added TERM10-12 (tab wrap, backspace wrap, ANSI clear)
 
