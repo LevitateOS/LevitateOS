@@ -335,26 +335,19 @@ pub fn tlb_flush_page(_va: usize) {
 // ============================================================================
 
 /// Initialize MMU registers (MAIR, TCR). Does NOT enable MMU.
+/// 
+/// # TEAM_052: Stubbed Function
+/// This function is a no-op because MAIR_EL1 and TCR_EL1 are configured
+/// in the assembly bootstrap code (kernel/src/main.rs lines 148-165).
+/// The assembly configuration matches the values that were previously defined here
+/// (see commit 88c75b0 which removed the constants).
+///
+/// **Why this exists:** Called from kmain() for compatibility. Could be removed
+/// if all initialization is moved to assembly permanently.
 #[cfg(target_arch = "aarch64")]
 pub fn init() {
-    unsafe {
-        // Configure MAIR_EL1
-        core::arch::asm!(
-            "msr mair_el1, {}",
-            in(reg) MAIR_VALUE,
-            options(nostack)
-        );
-
-        // Configure TCR_EL1
-        core::arch::asm!(
-            "msr tcr_el1, {}",
-            in(reg) TCR_VALUE,
-            options(nostack)
-        );
-
-        // Barrier
-        core::arch::asm!("isb", options(nostack));
-    }
+    // MMU registers already configured by assembly bootstrap
+    // See kernel/src/main.rs:148-165 for MAIR_EL1/TCR_EL1 setup
 }
 
 #[cfg(not(target_arch = "aarch64"))]

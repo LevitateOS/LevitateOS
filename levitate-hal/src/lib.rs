@@ -5,6 +5,7 @@ pub mod console;
 pub mod fdt;
 pub mod gic;
 pub mod interrupts;
+pub mod memory; // TEAM_051: Frame allocator
 pub mod mmu;
 pub mod timer;
 pub mod uart_pl011;

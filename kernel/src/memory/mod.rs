@@ -179,12 +179,12 @@ fn add_reserved(
 }
 
 fn add_range_with_holes(
-    allocator: &mut buddy::BuddyAllocator,
+    allocator: &mut BuddyAllocator,
     ram: (usize, usize),
     reserved: &[Option<(usize, usize)>],
 ) {
     fn add_split(
-        allocator: &mut buddy::BuddyAllocator,
+        allocator: &mut BuddyAllocator,
         ram: (usize, usize),
         reserved: &[Option<(usize, usize)>],
         idx: usize,
