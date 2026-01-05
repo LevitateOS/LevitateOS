@@ -65,10 +65,25 @@
 
 ## Test Plan
 
-### Existing Tests
+### Required Test Commands
+
+After **each implementation step**, run:
+
+```bash
+# 1. Unit tests (must pass)
+cargo xtask test unit
+
+# 2. Regression tests (check for new regressions only)
+cargo xtask test regress
+
+# 3. Behavior tests (golden file verification)
+cargo xtask test behavior
+```
+
+### Pass Criteria
 - All existing tests must pass after each step
-- `cargo test --all-targets`
-- Behavior tests in `tests/golden_boot.txt`
+- No NEW regressions introduced (pre-existing failures are documented)
+- Behavior tests in `tests/golden_boot.txt` must match
 
 ### New Tests
 

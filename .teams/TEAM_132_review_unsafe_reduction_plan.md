@@ -45,6 +45,8 @@ Review the plan at `docs/planning/reduce-unsafe-code/` for:
 - [x] Added `aarch64-cpu = "11.2"` to levitate-hal, kernel, levitate-virtio
 - [x] Migrated 12 unsafe blocks to safe abstractions
 - [x] Project compiles cleanly
+- [x] Unit tests pass (60 levitate-hal + 19 levitate-utils)
+- [x] Regression tests pass (27/27) — fixed test bug in `regression.rs` line 336
 
 ### Remaining Work for Future Teams
 1. **Migrate MMIO to safe-mmio** — ~12 more unsafe blocks in queue.rs, gic.rs

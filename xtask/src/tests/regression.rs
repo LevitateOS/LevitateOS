@@ -7,6 +7,19 @@
 //! - API Consistency: Function signatures match across cfg targets
 //! - Constant Synchronization: Values match between files (mmu.rs <-> linker.ld)
 //! - Code Patterns: Correct API usage (e.g., dimensions() not hardcoded values)
+//!
+//! # CRITICAL: Test Failure Handling (TEAM_132)
+//!
+//! **ALL TESTS MUST PASS. NO EXCEPTIONS.**
+//!
+//! When a regression test fails after your changes:
+//! 1. **STOP** — Do not proceed with other work.
+//! 2. **INVESTIGATE** — Read what the test checks. Don't assume "pre-existing."
+//! 3. **FIX IT** — Whether your code or the test itself is buggy.
+//! 4. **VERIFY** — Run full test suite again.
+//!
+//! **NEVER dismiss a failing test as "pre-existing" without investigation.**
+//! The purpose of regression tests is to catch when changes to A break Z.
 
 use anyhow::{bail, Result};
 use std::fs;
@@ -332,15 +345,16 @@ fn test_gicv3_support(results: &mut TestResults) {
     }
 
     // Verify xtask has GicV3 profile
-    let xtask_main = match fs::read_to_string("xtask/src/main.rs") {
+    // TEAM_132: Fix regression test - GicV3 profile is defined in run.rs, not main.rs
+    let xtask_run = match fs::read_to_string("xtask/src/run.rs") {
         Ok(c) => c,
         Err(_) => {
-            results.fail("Could not read xtask/src/main.rs");
+            results.fail("Could not read xtask/src/run.rs");
             return;
         }
     };
 
-    if xtask_main.contains("GicV3") && xtask_main.contains("gic-version=3") {
+    if xtask_run.contains("GicV3") && xtask_run.contains("gic-version=3") {
         results.pass("xtask defines GicV3 QEMU profile");
     } else {
         results.fail("xtask missing GicV3 QEMU profile");

@@ -136,12 +136,56 @@ description: When a new behavior is added to the kernel, it must be documented i
   3. Update the reference files with the new baseline.
   4. Document the rationale for the change in the commit history.
 
-### 13. Test Failure Response
+### 13. Test Failure Response — CRITICAL RULE
 
-* **Guideline:** When tests fail:
-  1. **Unit test fails:** Bug in implementation. Fix the code.
-  2. **Behavior test fails:** Either bug OR golden file needs update. Investigate.
-  3. **Regression test fails:** Previously-fixed bug has returned. Root cause analysis required.
+**⚠️ ALL TESTS MUST PASS BEFORE COMPLETING ANY WORK. NO EXCEPTIONS.**
+
+**NEVER dismiss a failing test as "pre-existing" without investigation.**
+
+When tests fail after your changes:
+
+1. **STOP** — Do not proceed with other work.
+2. **INVESTIGATE** — Read the test code. What is it checking?
+3. **DETERMINE ROOT CAUSE:**
+   - Did YOUR changes cause it? → Fix your code.
+   - Is the TEST buggy? → Fix the test.
+   - Is it truly unrelated? → PROVE IT by checking git blame / last modification.
+4. **FIX IT** — Whatever the cause, the test must pass.
+5. **VERIFY** — Run the full test suite again.
+
+**Why This Matters:**
+
+The whole point of regression tests is to catch when changes to A unexpectedly break Z.
+If you dismiss failures as "pre-existing," you defeat the purpose of testing.
+
+**Specific Guidelines by Test Type:**
+
+| Test Type | Failure Meaning | Action |
+|-----------|-----------------|--------|
+| **Unit test** | Bug in implementation | Fix the code |
+| **Behavior test** | Output changed | Investigate: bug OR intentional change |
+| **Regression test** | Cross-file invariant broken | Root cause analysis required |
+
+**The Cost of Dismissal:**
+
+- A "pre-existing" failure that you ignore may be YOUR bug.
+- The user NEVER continues without ALL tests passing.
+- Dismissal is costly — you will be asked to redo the work.
+
+**Example of WRONG behavior:**
+```
+❌ "The test fails but it's pre-existing, so I'll ignore it."
+```
+
+**Example of CORRECT behavior:**
+```
+✅ "The test fails. Let me investigate:
+    - The test checks X in file Y
+    - I modified file Z, not Y
+    - Git blame shows file Y was last modified 3 weeks ago
+    - The test itself has a bug: it reads main.rs but the code is in run.rs
+    → I will fix the test."
+```
 
 ### 14. Standard Test Interface
 
