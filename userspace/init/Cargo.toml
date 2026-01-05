@@ -1,0 +1,15 @@
+[package]
+name = "init"
+version = "0.1.0"
+edition = "2021"
+description = "PID 1 process for LevitateOS"
+
+[lints]
+workspace = true
+
+[[bin]]
+name = "init"
+path = "src/main.rs"
+
+[dependencies]
+libsyscall = { path = "../libsyscall" }

@@ -15,7 +15,7 @@ macro_rules! verbose {
 #[cfg(not(feature = "verbose"))]
 #[macro_export]
 macro_rules! verbose {
-    ($($arg:tt)*) => { $crate::println!($($arg)*) };
+    ($($arg:tt)*) => {};
 }
 
 // use core::alloc::Layout;
@@ -327,7 +327,7 @@ impl gic::InterruptHandler for TimerHandler {
             verbose!("[TICK] count={}", count);
         }
 
-        if count % 10 == 0 {
+        if count % 5 == 0 {
             if let Some(mut guard) = gpu::GPU.try_lock() {
                 if let Some(gpu_state) = guard.as_mut() {
                     let _ = gpu_state.flush();
@@ -623,17 +623,41 @@ pub extern "C" fn kmain() -> ! {
                     }
                 }
 
-                // TEAM_083 BREADCRUMB: RULED_OUT - Hijack removed to allow kernel interactive loop
-                // The system should continue to the main loop which handles
-                // keyboard input and displays the interactive prompt.
+                // TEAM_120: Store initramfs globally for syscalls
+                {
+                    let mut global_archive = crate::fs::INITRAMFS.lock();
+                    *global_archive = Some(archive);
+                }
+
                 // ================================================================
-                // TEAM_090: Run shell from initramfs
-                println!("[BOOT] Starting shell from initramfs...");
+                // TEAM_120: Run init from initramfs
+                println!("[BOOT] Starting init from initramfs...");
                 // Enable interrupts (required for syscall handling)
                 unsafe { levitate_hal::interrupts::enable() };
 
-                // Run "hello" (demo shell) from initramfs - does not return
-                task::process::run_from_initramfs("shell", &archive);
+                // Get copy of archive to avoid holding the lock
+                let archive = {
+                    let archive_lock = crate::fs::INITRAMFS.lock();
+                    *archive_lock.as_ref().unwrap()
+                };
+
+                // TEAM_121: Spawn init and let the scheduler take over.
+                // This ensures init has a proper PID (1) and kmain can become the idle/background task.
+                match task::process::spawn_from_elf(
+                    archive.iter().find(|e| e.name == "init").unwrap().data,
+                ) {
+                    Ok(task) => {
+                        let tcb = alloc::sync::Arc::new(task::TaskControlBlock::from(task));
+                        task::scheduler::SCHEDULER.add_task(tcb);
+                        println!("[BOOT] Init process scheduled. Starting scheduler...");
+                        // TEAM_121: Return true to indicate initrd was processed
+                        true
+                    }
+                    Err(e) => {
+                        println!("[BOOT] ERROR: Failed to spawn init: {:?}", e);
+                        false
+                    }
+                }
 
                 // This line should never be reached
             }

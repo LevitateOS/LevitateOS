@@ -191,7 +191,7 @@ pub struct UserTask {
 
     /// Kernel stack for this process (used during syscalls/exceptions)
     #[allow(dead_code)]
-    kernel_stack: Box<[u64]>,
+    pub kernel_stack: Box<[u64]>,
 
     /// Top of kernel stack
     #[allow(dead_code)]
@@ -247,8 +247,10 @@ impl UserTask {
     #[allow(dead_code)]
     pub fn exit(&self, _code: i32) {
         // SAFETY: AtomicU8 store is safe
-        self.state
-            .store(ProcessState::Exited as u8, core::sync::atomic::Ordering::Release);
+        self.state.store(
+            ProcessState::Exited as u8,
+            core::sync::atomic::Ordering::Release,
+        );
         // Note: exit_code is not atomic, but should only be set once at exit
         // A proper implementation would use interior mutability or atomic
     }

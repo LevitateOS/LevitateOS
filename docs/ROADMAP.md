@@ -132,6 +132,20 @@ This document outlines the planned development phases for LevitateOS. Each compl
 
 ---
 
+## ✅ Phase 8d: Process Management (Completed)
+
+- **Objective**: Implement multi-process management and process lifecycle.
+- **Achievements**:
+  - [x] **Init Process (PID 1)**: Established proper userspace boot sequence. (TEAM_120)
+  - [x] **Spawn Syscall**: Kernel support for launching programs from initramfs. (TEAM_120)
+  - [x] **Linter Sync**: Synchronize userspace lints with kernel's strict rules. (TEAM_120)
+  - [x] **Build Integration**: Standardized userspace build in `xtask`. (TEAM_120)
+
+> [!NOTE]
+> **Milestone:** Boot → `init` starts → `init` spawns `shell` → shell is interactive.
+
+---
+
 ## 📱 Phase 9: Hardware Targets
 
 - **Current**: QEMU (`virt` machine, AArch64).
@@ -154,5 +168,6 @@ This document outlines the planned development phases for LevitateOS. Each compl
 | 6 | 056-066 | VirtIO Ecosystem (Net, GPU, Input), Hybrid Boot Spec |
 | 7 | 067-071 | Multitasking, Scheduler, Context Switching |
 | 8a | 072-079 | Userspace Foundation (EL0, Syscalls, ELF) |
-| 8b | 080+ | Interactive Shell & Coreutils (Current) |
+| 8b | 080+ | Interactive Shell & Coreutils |
 | 8c | 118+ | Userspace Architecture Refactor |
+| 8d | 120+ | Process Management (Init, Spawn) |

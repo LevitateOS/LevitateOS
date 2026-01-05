@@ -1,5 +1,5 @@
 [workspace]
-members = ["libsyscall", "shell"]
+members = ["init","libsyscall", "shell"]
 resolver = "2"
 
 [workspace.lints.rust]

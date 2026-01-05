@@ -43,8 +43,6 @@ pub fn write_str(s: &str) {
             // TEAM_100: Use Display wrapper for DrawTarget
             let mut display = crate::gpu::Display::new(gpu_state);
             term.write_str(&mut display, s);
-            // TEAM_115: Flush immediately so output is visible
-            let _ = gpu_state.flush();
         }
     }
 }

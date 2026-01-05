@@ -20,6 +20,8 @@ pub const SYS_WRITE: u64 = 1;
 pub const SYS_EXIT: u64 = 2;
 pub const SYS_GETPID: u64 = 3;
 pub const SYS_SBRK: u64 = 4;
+pub const SYS_SPAWN: u64 = 5;
+pub const SYS_EXEC: u64 = 6;
 
 // ============================================================================
 // Syscall Wrappers
@@ -120,6 +122,52 @@ pub fn sbrk(increment: isize) -> i64 {
         );
     }
     ret
+}
+
+/// Spawn a new process from a path.
+///
+/// # Arguments
+/// * `path` - Path to the executable
+///
+/// # Returns
+/// PID of the new process, or negative error code.
+#[inline]
+pub fn spawn(path: &str) -> isize {
+    let ret: i64;
+    unsafe {
+        core::arch::asm!(
+            "svc #0",
+            in("x8") SYS_SPAWN,
+            in("x0") path.as_ptr(),
+            in("x1") path.len(),
+            lateout("x0") ret,
+            options(nostack)
+        );
+    }
+    ret as isize
+}
+
+/// Replace current process with a new one from a path.
+///
+/// # Arguments
+/// * `path` - Path to the executable
+///
+/// # Returns
+/// Does not return on success. Negative error code on failure.
+#[inline]
+pub fn exec(path: &str) -> isize {
+    let ret: i64;
+    unsafe {
+        core::arch::asm!(
+            "svc #0",
+            in("x8") SYS_EXEC,
+            in("x0") path.as_ptr(),
+            in("x1") path.len(),
+            lateout("x0") ret,
+            options(nostack)
+        );
+    }
+    ret as isize
 }
 
 // ============================================================================

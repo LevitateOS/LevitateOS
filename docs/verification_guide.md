@@ -63,7 +63,26 @@ Interrupts enabled.
 
 ---
 
-## 3. Debugging Tips
+---
 
-- **Raw Printing**: Use `levitate_hal::console::print_hex()` or `write_str()` in exception handlers. Avoid `println!` if the system is unstable.
-- **Headless Mode**: Use `scripts/verify_headless.sh` (if available) or `run.sh` with `-display none -serial mon:stdio` to debug via text only.
+## 4. Agentic Verification (Log Capture) (TEAM_120)
+
+When verifying the system in an automated or agentic environment where a real-time serial terminal might not be available or persistent, use the "Background Capture" technique.
+
+### Technique: Capturing Boot Logs
+This technique runs the system in the background, waits for a sufficient time (e.g., 10 seconds), and captures all output to a file for later analysis.
+
+**Command:**
+```bash
+cargo xtask run > boot_output.txt 2>&1 & sleep 10 && kill $! || true
+```
+
+**Validation:**
+1. Check `boot_output.txt` for the expected milestones (e.g., `Starting init`, `LevitateOS Shell`).
+2. This allows for precise string-based verification of the boot sequence without manual observation.
+
+### Artifact Verification
+Always check updated `tests/golden_boot.txt` after making changes to the boot sequence or log format. Run behavior tests to ensure regressions are caught:
+```bash
+cargo xtask test behavior
+```

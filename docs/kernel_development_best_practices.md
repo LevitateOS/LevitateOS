@@ -40,7 +40,34 @@ GPU memory flushes are extremely expensive.
 
 ---
 
-## 4. Team Attribution
+---
+
+## 5. Task Lifecycle & Transitions (TEAM_120)
+
+### The Trampoline Pattern
+When creating a new task, it must start in a kernel-controlled "trampoline" to ensure proper CPU state initialization (like `post_switch_hook`).
+
+**Pattern:**
+1. **`task_entry_trampoline`** (ASM): Calls `post_switch_hook`, then jumps to `x19`.
+2. **`user_task_entry_wrapper`** (Rust): The function in `x19`. Configures `TTBR0` (user page tables) and calls `enter_user_mode`.
+
+### `From<UserTask>` for `TaskControlBlock`
+Always provide a conversion from high-level `UserTask` (which has ELF info) to the scheduler's `TaskControlBlock`. This ensures the TCB's `context` is correctly initialized with the trampoline and entry wrapper.
+
+---
+
+## 6. Global Resource Lifetime (TEAM_120)
+
+### `'static` & `Copy/Clone` for Archives
+Structures like `CpioArchive` that wrap kernel slices (e.g., initramfs) and are stored in global `static` variables **must**:
+1. Use the `'static` lifetime if possible.
+2. Implement/Derive `Copy` and `Clone`.
+
+**Why**: This allows the structure to be moved out of a `Spinlock` or `IrqSafeLock` via copying, preventing the lock from being held during long operations (like userspace execution) which would otherwise cause a deadlock.
+
+---
+
+## 7. Team Attribution
 When documenting fixes or gotchas in code, always include your Team ID:
 ```rust
 // TEAM_083: Use serial_println! to avoid recursive deadlock in dual-console path

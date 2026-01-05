@@ -123,46 +123,26 @@ fn project_root() -> Result<PathBuf> {
 
 
 fn build_userspace() -> Result<()> {
-    println!("Building userspace/hello...");
+    println!("Building userspace workspace...");
     
-    // TEAM_073: Isolate build in /tmp to avoid parent .cargo/config.toml inheritance
-    let build_dir = PathBuf::from("/tmp/levitate_hello_build");
-    if build_dir.exists() {
-        std::fs::remove_dir_all(&build_dir)?;
-    }
-    std::fs::create_dir_all(&build_dir)?;
-    
-    // Copy source
-    let status = Command::new("cp")
-        .args(["-r", "userspace/hello/.", "/tmp/levitate_hello_build/"])
-        .status()?;
-    if !status.success() {
-        bail!("Failed to copy source to tmp");
-    }
-
-    // Build in isolation
+    // TEAM_120: Build the entire userspace workspace
+    // We build in-place now as the workspace isolation issues should be resolved
+    // by individual build.rs scripts and correct linker arguments.
     let status = Command::new("cargo")
-        .current_dir(&build_dir)
+        .current_dir("userspace")
         .args([
             "build",
             "--release",
+            "--workspace",
             "--target", "aarch64-unknown-none",
         ])
         .status()
-        .context("Failed to build userspace/hello")?;
+        .context("Failed to build userspace workspace")?;
 
     if !status.success() {
-        bail!("Userspace build failed");
+        bail!("Userspace workspace build failed");
     }
 
-    // Copy artifact back
-    let target_dir = PathBuf::from("userspace/hello/target/aarch64-unknown-none/release");
-    std::fs::create_dir_all(&target_dir)?;
-    std::fs::copy(
-        build_dir.join("target/aarch64-unknown-none/release/hello"),
-        target_dir.join("hello")
-    )?;
-    
     Ok(())
 }
 
@@ -176,13 +156,16 @@ fn create_initramfs() -> Result<()> {
     // 1. Create content
     std::fs::write(root.join("hello.txt"), "Hello from initramfs!\n")?;
     
-    // 2. Copy userspace binary
-    let hello_src = PathBuf::from("userspace/hello/target/aarch64-unknown-none/release/hello");
-    if hello_src.exists() {
-        std::fs::copy(hello_src, root.join("hello"))?;
-        println!("  - Added 'hello' binary");
-    } else {
-        println!("  - WARNING: userspace/hello binary not found, skipping");
+    // 2. Copy userspace binaries
+    let binaries = ["init", "shell"];
+    for bin in binaries {
+        let src = PathBuf::from(format!("userspace/target/aarch64-unknown-none/release/{}", bin));
+        if src.exists() {
+            std::fs::copy(&src, root.join(bin))?;
+            println!("  - Added '{}' binary", bin);
+        } else {
+            println!("  - WARNING: userspace binary '{}' not found, skipping", bin);
+        }
     }
 
     // 3. Create CPIO archive
@@ -328,7 +311,37 @@ impl QemuProfile {
     }
 }
 
+fn ensure_disk_image() -> Result<()> {
+    let disk_path = "tinyos_disk.img";
+    if std::path::Path::new(disk_path).exists() {
+        return Ok(());
+    }
+
+    println!("💿 Creating default 16MB FAT32 disk image ({})...", disk_path);
+    
+    // Create blank file
+    let status = Command::new("dd")
+        .args(["if=/dev/zero", &format!("of={}", disk_path), "bs=1M", "count=16"])
+        .status()
+        .context("Failed to run dd")?;
+    if !status.success() {
+        bail!("dd failed to create disk image");
+    }
+
+    // Format as FAT32
+    let status = Command::new("mkfs.vfat")
+        .args(["-F", "32", "-n", "LEVITATE", disk_path])
+        .status()
+        .context("Failed to run mkfs.vfat")?;
+    if !status.success() {
+        bail!("mkfs.vfat failed to format disk image");
+    }
+
+    Ok(())
+}
+
 pub fn run_qemu(profile: QemuProfile, headless: bool) -> Result<()> {
+    ensure_disk_image()?;
     let kernel_bin = "kernel64_rust.bin";
 
     let machine = profile.machine();
@@ -390,6 +403,7 @@ pub fn run_qemu(profile: QemuProfile, headless: bool) -> Result<()> {
 pub fn run_qemu_vnc() -> Result<()> {
     println!("🖥️  Starting QEMU with VNC for browser-based display verification...\n");
     
+    ensure_disk_image()?;
     // Build kernel first
     build_kernel()?;
     

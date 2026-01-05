@@ -6,19 +6,10 @@ This document captures non-obvious issues that future teams should know about.
 
 ## Critical Issues
 
-### 1. Boot Hijack Prevents Interactive Mode (TEAM_081)
+### 1. Boot Hijack Prevents Interactive Mode (TEAM_081) **[RESOLVED]**
 
-**Location:** `kernel/src/main.rs:612`
-
-**Problem:** TEAM_073 added code to demo userspace execution that runs immediately and never returns. This prevents the kernel from reaching its main loop where keyboard input is processed.
-
-**Symptom:** System boots, shows messages, then appears frozen. No typing works.
-
-**Fix:**
-```rust
-// Comment out this line:
-// task::process::run_from_initramfs("hello", &archive);
-```
+**Status:** Fixed by TEAM_120 (Userspace Exec & Init)
+**Resolution:** The kernel now boots to a proper `init` process (PID 1) from initramfs, which spawns the shell. The hardcoded hijack has been replaced with a formal process management lifecycle.
 
 ---
 
@@ -387,6 +378,27 @@ The terminal implementation (`levitate-terminal`) may be:
 - `.teams/TEAM_114_review_plan_virtio_pci.md`
 - `levitate-gpu/` - GPU wrapper (working)
 - `levitate-pci/` - PCI subsystem (working)
+
+---
+
+### 18. Recursive Deadlock: Holding Kernel Locks during Userspace Jump (TEAM_120)
+
+**Location:** `kernel/src/main.rs:run_from_initramfs`
+
+**Problem:** If you hold a `Spinlock` (e.g., `INITRAMFS.lock()`) while starting the first user process or performing a context switch that doesn't return, you create a permanent lock-out. 
+If that process later triggers a syscall that needs the same lock, it will deadlock. Even worse, if you context switch *away* without releasing, no other task can ever acquire it.
+
+**Symptom:** The first process starts fine, but its first syscall (e.g., `spawn`) hangs the system.
+
+**Fix:** Always release the lock or copy/clone the data out of the lock before transitioning to userspace or yielding.
+```rust
+// TEAM_120: Correct pattern
+let archive = {
+    let lock = crate::fs::INITRAMFS.lock();
+    *lock.as_ref().unwrap() // Copy/Clone here
+}; // Lock released here
+task::process::run_from_initramfs("init", &archive);
+```
 
 ---
 

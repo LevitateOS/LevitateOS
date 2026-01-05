@@ -53,6 +53,7 @@ pub fn parse_hex(bytes: &[u8]) -> usize {
 }
 
 /// CPIO archive wrapper for iterating over entries
+#[derive(Debug, Clone, Copy)]
 pub struct CpioArchive<'a> {
     data: &'a [u8],
 }

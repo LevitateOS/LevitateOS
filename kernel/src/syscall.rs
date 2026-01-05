@@ -42,6 +42,10 @@ pub enum SyscallNumber {
     GetPid = 3,
     /// Adjust program break (heap)
     Sbrk = 4,
+    /// Spawn a new process
+    Spawn = 5,
+    /// Replace current process
+    Exec = 6,
 }
 
 impl SyscallNumber {
@@ -53,6 +57,8 @@ impl SyscallNumber {
             2 => Some(Self::Exit),
             3 => Some(Self::GetPid),
             4 => Some(Self::Sbrk),
+            5 => Some(Self::Spawn),
+            6 => Some(Self::Exec),
             _ => None,
         }
     }
@@ -154,6 +160,14 @@ pub fn syscall_dispatch(frame: &mut SyscallFrame) {
         Some(SyscallNumber::Exit) => sys_exit(frame.arg0() as i32),
         Some(SyscallNumber::GetPid) => sys_getpid(),
         Some(SyscallNumber::Sbrk) => sys_sbrk(frame.arg0() as isize),
+        Some(SyscallNumber::Spawn) => sys_spawn(
+            frame.arg0() as usize, // path
+            frame.arg1() as usize, // path_len
+        ),
+        Some(SyscallNumber::Exec) => sys_exec(
+            frame.arg0() as usize, // path
+            frame.arg1() as usize, // path_len
+        ),
         None => {
             // TEAM_073: Unknown syscall - return ENOSYS (Rule 14: Fail Fast, but don't crash)
             println!("[SYSCALL] Unknown syscall number: {}", nr);
@@ -292,32 +306,126 @@ fn sys_write(fd: usize, buf: usize, len: usize) -> i64 {
 fn sys_exit(code: i32) -> i64 {
     println!("[SYSCALL] exit({})", code);
 
-    // Mark current task as exited
-    // TODO(TEAM_073): Integrate with scheduler to actually terminate
-    // For now, just loop forever (will be fixed in Step 5 integration)
-
-    // TEAM_073: This should call task_exit() but we need proper integration first
-    loop {
-        #[cfg(target_arch = "aarch64")]
-        unsafe {
-            core::arch::asm!("wfi", options(nomem, nostack));
-        }
-        #[cfg(not(target_arch = "aarch64"))]
-        core::hint::spin_loop();
-    }
+    // TEAM_121: Call task_exit() to properly terminate and reschedule
+    crate::task::task_exit();
 }
 
 /// TEAM_073: sys_getpid - Get process ID.
 fn sys_getpid() -> i64 {
-    // TODO(TEAM_073): Return actual PID from current UserTask
-    // For now, return 1 (first user process)
-    1
+    // TEAM_121: Return actual PID from current task
+    crate::task::current_task().id.0 as i64
 }
 
 /// TEAM_073: sys_sbrk - Adjust program break (heap allocation).
 fn sys_sbrk(_increment: isize) -> i64 {
     // TODO(TEAM_073): Implement heap management
     println!("[SYSCALL] sbrk({}) - not implemented", _increment);
+    errno::ENOSYS
+}
+
+/// TEAM_120: sys_spawn - Spawn a new process from initramfs.
+fn sys_spawn(path_ptr: usize, path_len: usize) -> i64 {
+    // Validate path pointer
+    if path_ptr >= 0x0000_8000_0000_0000 {
+        return errno::EFAULT;
+    }
+
+    // Safety check: limit maximum path length
+    let path_len = path_len.min(256);
+
+    // SAFETY: We've validated the pointer is in user space.
+    let path_bytes = unsafe { core::slice::from_raw_parts(path_ptr as *const u8, path_len) };
+    let path = match core::str::from_utf8(path_bytes) {
+        Ok(s) => s,
+        Err(_) => return errno::EINVAL,
+    };
+
+    println!("[SYSCALL] spawn('{}')", path);
+
+    // Get initramfs
+    let archive_lock = crate::fs::INITRAMFS.lock();
+    let archive = match archive_lock.as_ref() {
+        Some(a) => a,
+        None => return errno::ENOSYS,
+    };
+
+    // Find file in initramfs
+    let mut elf_data = None;
+    for entry in archive.iter() {
+        if entry.name == path {
+            elf_data = Some(entry.data);
+            break;
+        }
+    }
+
+    let elf_data = match elf_data {
+        Some(d) => d,
+        None => return errno::EBADF, // Or ENOENT if we had it
+    };
+
+    // Spawn process
+    match crate::task::process::spawn_from_elf(elf_data) {
+        Ok(task) => {
+            let pid = task.pid.0 as i64;
+            // Add to scheduler
+            crate::task::scheduler::SCHEDULER.add_task(alloc::sync::Arc::new(task.into()));
+            pid
+        }
+        Err(e) => {
+            println!("[SYSCALL] spawn failed: {:?}", e);
+            -1
+        }
+    }
+}
+
+/// TEAM_120: sys_exec - Replace current process with one from initramfs.
+fn sys_exec(path_ptr: usize, path_len: usize) -> i64 {
+    // Validate path pointer
+    if path_ptr >= 0x0000_8000_0000_0000 {
+        return errno::EFAULT;
+    }
+
+    // Safety check: limit maximum path length
+    let path_len = path_len.min(256);
+
+    // SAFETY: We've validated the pointer is in user space.
+    let path_bytes = unsafe { core::slice::from_raw_parts(path_ptr as *const u8, path_len) };
+    let path = match core::str::from_utf8(path_bytes) {
+        Ok(s) => s,
+        Err(_) => return errno::EINVAL,
+    };
+
+    println!("[SYSCALL] exec('{}')", path);
+
+    // Get initramfs
+    let archive_lock = crate::fs::INITRAMFS.lock();
+    let archive = match archive_lock.as_ref() {
+        Some(a) => a,
+        None => return errno::ENOSYS,
+    };
+
+    // Find file in initramfs
+    let mut elf_data = None;
+    for entry in archive.iter() {
+        if entry.name == path {
+            elf_data = Some(entry.data);
+            break;
+        }
+    }
+
+    let _elf_data = match elf_data {
+        Some(d) => d,
+        None => return errno::EBADF,
+    };
+
+    // TEAM_120: Re-load ELF into CURRENT page tables
+    // This requires clearing existing user mappings first.
+    // Since we don't have a full VMM yet that can wipe and reload easily,
+    // we'll implement a simple version that uses the existing ELF loader.
+
+    // For now, sys_exec is a "TODO" because it requires more VMM plumbing
+    // than a simple spawn. Let's return ENOSYS for now.
+    println!("[SYSCALL] exec is currently a stub");
     errno::ENOSYS
 }
 

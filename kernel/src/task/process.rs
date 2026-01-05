@@ -4,9 +4,9 @@
 //! running user processes.
 
 use crate::loader::elf::Elf;
+use crate::loader::elf::ElfError;
 use crate::task::user::UserTask;
 use crate::task::user_mm;
-use crate::loader::elf::ElfError;
 
 /// TEAM_073: Error type for process spawning.
 #[derive(Debug)]
@@ -60,61 +60,4 @@ pub fn spawn_from_elf(elf_data: &[u8]) -> Result<UserTask, SpawnError> {
     );
 
     Ok(task)
-}
-
-/// TEAM_073: Start executing a user task.
-///
-/// This function does not return - it enters user mode.
-///
-/// # Safety
-/// - The task's page table must be valid and mapped
-/// - TTBR0 will be switched to the task's page table
-pub unsafe fn enter_user_task(task: &UserTask) -> ! {
-    // TEAM_078: Device MMIO now mapped via TTBR1 (high VA) - safe to switch TTBR0
-    
-    // 1. Switch TTBR0 to user page table
-    unsafe {
-        levitate_hal::mmu::switch_ttbr0(task.ttbr0);
-    }
-
-    // 2. Enter user mode
-    unsafe { crate::task::user::enter_user_mode(task.entry_point, task.user_sp) }
-}
-
-/// TEAM_073: Run a user program from the initramfs.
-///
-/// This is a convenience function that:
-/// 1. Finds the file in initramfs
-/// 2. Spawns a process
-/// 3. Enters user mode
-///
-/// # Arguments
-/// * `path` - Path to the file in initramfs (without leading /)
-/// * `initramfs` - The CPIO archive
-pub fn run_from_initramfs(path: &str, initramfs: &crate::fs::initramfs::CpioArchive) -> ! {
-    levitate_hal::println!("[SPAWN] Looking for '{}' in initramfs...", path);
-
-    // Find the file
-    for entry in initramfs.iter() {
-        if entry.name == path {
-            levitate_hal::println!("[SPAWN] Found '{}' ({} bytes)", path, entry.data.len());
-
-            // Spawn process
-            match spawn_from_elf(entry.data) {
-                Ok(task) => {
-                    levitate_hal::println!("[SPAWN] Starting user process...");
-                    unsafe {
-                        enter_user_task(&task);
-                    }
-                }
-                Err(e) => {
-                    levitate_hal::println!("[SPAWN] Failed to spawn: {:?}", e);
-                    panic!("Failed to spawn user process");
-                }
-            }
-        }
-    }
-
-    levitate_hal::println!("[SPAWN] File '{}' not found in initramfs", path);
-    panic!("User program not found");
 }

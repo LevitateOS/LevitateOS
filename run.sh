@@ -4,6 +4,13 @@
 # Exit on any error
 set -e
 
+# Ensure disk image exists
+if [ ! -f tinyos_disk.img ]; then
+    echo "💿 Creating default 16MB FAT32 disk image (tinyos_disk.img)..."
+    dd if=/dev/zero of=tinyos_disk.img bs=1M count=16
+    mkfs.vfat -F 32 -n LEVITATE tinyos_disk.img
+fi
+
 echo "Building LevitateOS kernel (verbose)..."
 cargo build -p levitate-kernel --release --target aarch64-unknown-none --features verbose
 

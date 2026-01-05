@@ -4,6 +4,7 @@ pub mod user; // TEAM_073: Userspace support (Phase 8)
 pub mod user_mm; // TEAM_073: User memory management (Phase 8) // TEAM_073: Process spawning (Phase 8)
 
 extern crate alloc;
+use crate::println;
 use alloc::boxed::Box;
 use core::arch::global_asm;
 use core::sync::atomic::{AtomicU8, Ordering};
@@ -47,6 +48,8 @@ task_entry_trampoline:
 unsafe extern "C" {
     /// TEAM_070: Assembly helper to switch CPU context.
     pub fn cpu_switch_to(old: *mut Context, new: *const Context);
+    /// ASM entry point for new tasks
+    pub fn task_entry_trampoline();
 }
 
 /// TEAM_070: Hook called immediately after a context switch.
@@ -130,8 +133,7 @@ pub fn yield_now() {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct TaskId(pub usize);
 
-impl TaskId {
-}
+impl TaskId {}
 
 /// TEAM_070: Possible states of a task in the system.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -190,6 +192,10 @@ pub struct TaskControlBlock {
     /// Physical address of the task's L0 page table.
     #[allow(dead_code)]
     pub ttbr0: usize,
+    /// User stack pointer (SP_EL0)
+    pub user_sp: usize,
+    /// User entry point
+    pub user_entry: usize,
 }
 
 impl TaskControlBlock {
@@ -210,6 +216,53 @@ impl TaskControlBlock {
             stack_top: 0,
             stack_size: 0,
             ttbr0: 0,
+            user_sp: 0,
+            user_entry: 0,
         }
+    }
+}
+
+use crate::task::user::UserTask;
+
+impl From<UserTask> for TaskControlBlock {
+    fn from(user: UserTask) -> Self {
+        let stack_top = user.kernel_stack_top;
+        let ttbr0 = user.ttbr0;
+        let user_sp = user.user_sp;
+        let user_entry = user.entry_point;
+
+        // Set up context for first switch
+        let mut context = Context::default();
+        context.sp = stack_top as u64;
+        context.lr = task_entry_trampoline as *const () as u64;
+        context.x19 = user_task_entry_wrapper as *const () as u64;
+
+        Self {
+            id: TaskId(user.pid.0 as usize),
+            state: AtomicU8::new(TaskState::Ready as u8),
+            context,
+            stack: Some(user.kernel_stack),
+            stack_top,
+            stack_size: 16384, // Standard user kernel stack size
+            ttbr0,
+            user_sp,
+            user_entry,
+        }
+    }
+}
+
+/// Helper function called when a user task is first scheduled.
+fn user_task_entry_wrapper() -> ! {
+    let task = current_task();
+    println!(
+        "[TASK] Entering user task PID={} at 0x{:x}",
+        task.id.0, task.user_entry
+    );
+
+    unsafe {
+        // Switch TTBR0
+        levitate_hal::mmu::switch_ttbr0(task.ttbr0);
+        // Enter EL0
+        crate::task::user::enter_user_mode(task.user_entry, task.user_sp);
     }
 }
