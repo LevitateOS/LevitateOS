@@ -2,6 +2,30 @@
 
 pub mod allocator;
 pub mod console;
+// TEAM_112: Export cache maintenance for DMA
+pub fn cache_clean_range(start_va: usize, size: usize) {
+    #[cfg(target_arch = "aarch64")]
+    unsafe {
+        use core::arch::asm;
+        // Clean data cache by VA to PoC (Point of Coherency)
+        let line_size = 64; // Assume 64-byte blocks for AArch64 (CTR_EL0 can be read to be sure but 64 is safe min)
+        let start = start_va & !(line_size - 1);
+        let end = start_va + size;
+
+        let mut addr = start;
+        while addr < end {
+            asm!("dc cvac, {}", in(reg) addr, options(nostack));
+            addr += line_size;
+        }
+        asm!("dsb sy", options(nostack));
+    }
+
+    #[cfg(not(target_arch = "aarch64"))]
+    {
+        // No-op for host tests
+        let _ = (start_va, size);
+    }
+}
 pub mod fdt;
 pub mod gic;
 pub mod interrupts;

@@ -243,10 +243,31 @@ impl<H: VirtioHal> VirtioGpu<H> {
         // Step 5: SET_SCANOUT
         let resp = {
             let cmd = self.driver.build_set_scanout();
+
             let cmd_copy = alloc::vec::Vec::from(cmd);
             self.send_command(&cmd_copy, CtrlHeader::SIZE)?
         };
         self.driver.handle_set_scanout_response(&resp)?;
+
+        // TEAM_112: Draw a test pattern (White/Purple) to prove visibility
+        // And FLUSH the framebuffer memory from cache!
+        if let Some(mut fb_ptr) = self.fb_ptr {
+            let fb = unsafe { core::slice::from_raw_parts_mut(fb_ptr.as_ptr(), self.fb_size) };
+            // Fill with purple (0xFF00FFFF: A=FF, R=FF, G=00, B=FF in Little Endian u32? No bytes)
+            // BGRA: B=FF, G=00, R=FF, A=FF.
+            for i in (0..fb.len()).step_by(4) {
+                fb[i] = 0xFF; // B
+                fb[i + 1] = 0x00; // G
+                fb[i + 2] = 0xFF; // R
+                fb[i + 3] = 0xFF; // A (Opaque)
+            }
+
+            // Critical: Flush FB from cache to RAM so device sees the colors!
+            levitate_hal::cache_clean_range(fb_ptr.as_ptr() as usize, self.fb_size);
+        }
+
+        // TEAM_112: Force an initial flush to ensure the display is marked active
+        self.flush()?;
 
         Ok(())
     }
@@ -330,6 +351,9 @@ impl<H: VirtioHal> VirtioGpu<H> {
         let cmd_slice = &cmd_buf[..cmd.len()];
         let resp_slice = &mut resp_buf[..resp_size];
 
+        // TEAM_112: Flush command buffer from cache to RAM so device sees it!
+        levitate_hal::cache_clean_range(cmd_buf.as_ptr() as usize, cmd_buf.len());
+
         let _head = self
             .control_queue()
             .add_buffer(&[cmd_slice], &mut [resp_slice], H::virt_to_phys)
@@ -337,6 +361,11 @@ impl<H: VirtioHal> VirtioGpu<H> {
                 VirtQueueError::QueueFull => GpuError::TransportError,
                 _ => GpuError::TransportError,
             })?;
+
+        // TEAM_112: Flush the VirtQueue itself (Descriptors + Avail Ring)
+        // This ensures the device sees the new descriptor pointing to our command!
+        let queue_size_bytes = core::mem::size_of::<VirtQueue<QUEUE_SIZE>>();
+        levitate_hal::cache_clean_range(self.control_queue_ptr.as_ptr() as usize, queue_size_bytes);
 
         // Notify device
         self.transport.queue_notify(CONTROLQ);

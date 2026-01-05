@@ -10,8 +10,8 @@
 use crate::command::{GpuRequest, GpuResponse, HeaderOnlyResponse};
 use crate::protocol::{
     CmdGetDisplayInfo, CmdResourceAttachBacking, CmdResourceCreate2d, CmdResourceFlush,
-    CmdSetScanout, CmdTransferToHost2d, CtrlHeader, DisplayOne, Format, GpuError,
-    MemEntry, Rect, ResourceId, RespDisplayInfo,
+    CmdSetScanout, CmdTransferToHost2d, CtrlHeader, DisplayOne, Format, GpuError, MemEntry, Rect,
+    ResourceId, RespDisplayInfo,
 };
 
 /// Driver state machine states.
@@ -201,14 +201,16 @@ impl GpuDriver {
         if header.is_err() {
             self.state = DriverState::Failed;
             return Err(GpuError::DeviceError(
-                header.ctrl_type().unwrap_or(crate::protocol::CtrlType::ErrUnspec),
+                header
+                    .ctrl_type()
+                    .unwrap_or(crate::protocol::CtrlType::ErrUnspec),
             ));
         }
 
         // Parse display info
         let resp = unsafe { &*(response.as_ptr().cast::<RespDisplayInfo>()) };
         let scanout = &resp.pmodes[self.config.scanout_id as usize];
-        
+
         self.display_info = DisplayInfo::from(scanout);
         self.fb_rect = Rect::from_size(self.display_info.width, self.display_info.height);
         self.state = DriverState::CreatingResource;
@@ -291,6 +293,17 @@ impl GpuDriver {
         &self.cmd_buffer[..len]
     }
 
+    /// Build a SET_SCANOUT command to disable the scanout (id=0, res_id=0).
+    /// Used for resetting display state.
+    pub fn build_disable_scanout(&mut self) -> &[u8] {
+        let cmd = CmdSetScanout::disable(self.config.scanout_id);
+        let bytes = cmd.as_bytes();
+        let len = bytes.len();
+        self.cmd_buffer[..len].copy_from_slice(bytes);
+        self.telemetry.commands_sent += 1;
+        &self.cmd_buffer[..len]
+    }
+
     /// Handle SET_SCANOUT response.
     pub fn handle_set_scanout_response(&mut self, response: &[u8]) -> Result<(), GpuError> {
         self.check_ok_nodata_response(response)?;
@@ -343,7 +356,9 @@ impl GpuDriver {
         if header.is_err() {
             self.telemetry.errors += 1;
             return Err(GpuError::DeviceError(
-                header.ctrl_type().unwrap_or(crate::protocol::CtrlType::ErrUnspec),
+                header
+                    .ctrl_type()
+                    .unwrap_or(crate::protocol::CtrlType::ErrUnspec),
             ));
         }
 

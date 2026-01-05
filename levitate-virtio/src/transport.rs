@@ -186,6 +186,11 @@ impl MmioTransport {
         // SAFETY: Caller guarantees base is valid MMIO address.
         unsafe { write_volatile((self.base + offset) as *mut u32, value) }
     }
+
+    /// TEAM_112: Get transport version for debugging
+    pub fn version(&self) -> u32 {
+        self.version
+    }
 }
 
 impl Transport for MmioTransport {
