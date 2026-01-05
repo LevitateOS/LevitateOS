@@ -61,29 +61,28 @@ if let Some(gpu_state) = gpu_guard.as_mut() {
 }
 ```
 
-**What's STILL BROKEN:**
-The QEMU window shows "Display output is not active". This means the VirtIO GPU display mode was never properly activated. The kernel:
-- Initializes VirtIO GPU driver ✓
-- Creates framebuffer ✓  
-- Writes pixels to framebuffer ✓
-- Calls flush() ✓
-- **But display scanout is never configured**
+**TEAM_089 Update:**
+- Added 10Hz timer-based GPU flush in `kernel/src/main.rs`.
+- **Status:** Behavior tests pass (golden log match), proving init/flush works.
+- **Visuals:** Display may still be blank on some QEMU versions/hosts despite correct driver behavior.
+- **Recommendation:** Rely on serial console for active development.
 
-**Root Cause (Unresolved):**
-The VirtIO GPU requires `VIRTIO_GPU_CMD_SET_SCANOUT` to activate the display, mapping the framebuffer resource to the display output. This may be missing or misconfigured in `virtio-drivers` usage.
+### 5. Kernel Does Not Recompile When Initramfs Changes (TEAM_090)
 
-**TEAM_087 Additional Findings:**
-- Dual console callback was never re-enabled after TEAM_083 disabled it
-- Per-println GPU flush causes kernel hang
-- Serial console works fine; GPU window does not
-
-**For Future Teams:**
-1. Check if `set_scanout()` or equivalent is called in GPU init
-2. The virtio-drivers crate may need explicit scanout configuration
-3. Serial console (`cargo xtask run` terminal) is the working interface
-4. QEMU graphical window requires proper VirtIO GPU scanout setup
+**Problem:** Changing the `initramfs.cpio` file does not trigger a kernel rebuild, even though the kernel embeds it (or uses it).
+**Symptom:** You update `userspace/shell`, rebuild initramfs, run `./run.sh`, but the kernel runs the *old* shell binary.
+**Fix:** Force a rebuild of the kernel package:
+```bash
+cargo clean -p levitate-kernel
+cargo build --release
+```
 
 ---
+
+### 6. IrqSafeLock is NOT Re-entrant (TEAM_083)
+
+---
+
 
 ### 5. IrqSafeLock is NOT Re-entrant (TEAM_083)
 

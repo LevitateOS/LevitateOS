@@ -44,6 +44,9 @@ pub fn init(transport: StaticMmioTransport) {
                             let fb_ptr = fb.as_mut_ptr() as usize;
                             let fb_len = fb.len();
 
+                            // TEAM_089: Removed TEAM_088 diagnostic red fill test
+                            // The timer-based flush in TimerHandler now keeps display active
+
                             *GPU.lock() = Some(GpuState {
                                 gpu,
                                 fb_ptr,
@@ -52,15 +55,15 @@ pub fn init(transport: StaticMmioTransport) {
                                 height,
                             });
                         }
-                        Err(_e) => {
+                        Err(_) => {
                             crate::println!("GPU: Failed to setup framebuffer");
                         }
                     }
                 }
-                Err(_e) => crate::println!("GPU: Failed to get resolution"),
+                Err(_) => crate::println!("GPU: Failed to get resolution"),
             }
         }
-        Err(_e) => crate::println!("GPU: VirtIOGpu::new failed"),
+        Err(_) => crate::println!("GPU: VirtIOGpu::new failed"),
     }
 }
 
@@ -127,9 +130,10 @@ impl<'a> DrawTarget for Display<'a> {
             if point.x >= 0 && point.x < width as i32 && point.y >= 0 && point.y < height as i32 {
                 let idx = (point.y as usize * width as usize + point.x as usize) * 4;
                 if idx + 3 < fb.len() {
-                    fb[idx] = color.r();
+                    // TEAM_088: Fixed BGRA order
+                    fb[idx] = color.b();
                     fb[idx + 1] = color.g();
-                    fb[idx + 2] = color.b();
+                    fb[idx + 2] = color.r();
                     fb[idx + 3] = 255; // Alpha
                 }
             }

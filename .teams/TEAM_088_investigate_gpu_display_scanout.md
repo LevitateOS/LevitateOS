@@ -1,29 +1,85 @@
 # Team Log - TEAM_088
 
-## Bug: GPU Display Not Active
+## Bug: VirtIO GPU "Display output is not active"
 
-### Root Cause
-**File:** `console_gpu.rs:78-82`
+### Status: 🔴 UNRESOLVED - Documented for Future Teams
 
-```rust
-// TEAM_087: Removed flush per-call... (WRONG - this was the bug!)
+---
+
+## Key Finding: Display Pipeline WORKS
+
+**Proof:** Red screen flash appears during boot, then immediately goes inactive.
+
+This confirms:
+- ✅ `VirtIOGpu::new()` succeeds
+- ✅ `setup_framebuffer()` succeeds (includes `set_scanout()`)
+- ✅ Framebuffer fill works (red pixels visible)
+- ✅ `gpu.flush()` works (content transfers to host)
+
+**The VirtIO GPU driver is correctly implemented.**
+
+---
+
+## Root Cause: Unknown - Something Resets Scanout
+
+Something in the boot sequence AFTER `gpu::init()` is disabling/resetting the scanout.
+
+### Ruled Out
+- ❌ `console_gpu::clear()` - disabled, still flashes
+- ❌ `set_secondary_output()` - disabled, still flashes
+- ❌ Missing flush - flush is called and succeeds
+- ❌ Pixel format - red appears correctly
+
+### Remaining Suspects
+1. **Another VirtIO device init** - Block/Net/Input devices might affect GPU
+2. **Timer or interrupt initialization** - GIC/timer setup might reset GPU
+3. **QEMU internal behavior** - Possible QEMU bug with virtio-gpu-device on virt machine
+4. **Memory mapping conflict** - DMA memory might be reclaimed
+
+---
+
+## Reproduction
+
+```bash
+./run.sh
+# Observe: Brief red flash, then "Display output is not active"
 ```
 
-The `write_str()` wrote pixels but **never flushed to host**.
+### Test Code Location
+`kernel/src/gpu.rs` - init() fills screen red and flushes at line ~46-62
 
-### Fix Applied
-Re-enabled flush after pixel writes:
-```rust
-if let Err(_) = gpu_state.gpu.flush() {
-    levitate_hal::serial_println!("[GPU] flush error");
-}
+---
+
+## BREADCRUMBS Left in Code
+
+```
+// TEAM_088: Fill with BRIGHT RED to test display pipeline
 ```
 
-### Evidence
-All VirtIO GPU commands succeed:
-- `VirtIOGpu::new()` ✓
-- `resolution()` ✓  
-- `setup_framebuffer()` ✓ (includes `set_scanout()`)
-- `flush()` ✓
+---
 
-### Status: ✅ FIXED
+## Recommended Next Steps
+
+1. **Add delay after red fill** - Test if timing issue
+2. **Disable other VirtIO devices** - Test if Block/Net/Input affect GPU
+3. **Try `virtio-vga` instead of `virtio-gpu-device`**
+4. **Check QEMU source** for when "Display output is not active" is set
+5. **Add more tracing** around interrupt/timer init
+
+---
+
+## Files Modified
+
+| File | Change |
+|------|--------|
+| `kernel/src/gpu.rs` | Added red fill test, fixed BGRA pixel order |
+| `kernel/src/main.rs` | Temporarily disabled clear() and secondary callback |
+
+---
+
+## Handoff Checklist
+
+- [x] Team file updated with findings
+- [x] Breadcrumbs in code
+- [ ] Issue NOT resolved
+- [x] Next steps documented

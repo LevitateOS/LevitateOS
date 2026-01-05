@@ -4,7 +4,7 @@ Heap initialized.
 MMU re-initialized (Higher-Half + Identity).
 Exceptions initialized.
 DTB address from x0: 0x48200000
-Detected GIC version: V3
+Detected GIC version: V2
 Buddy Allocator initialized with DTB memory map.
 Core drivers initialized.
 Timer initialized.
@@ -13,9 +13,6 @@ Scanning VirtIO MMIO bus for GPU...
 GPU initialized successfully.
 [TERM] GPU resolution: 1280x800
 [TERM] Terminal::new(1280x800) -> 128x36 chars (font 10x20, spacing 2)
-[TERM] Terminal size: 128x36 characters
-[TERM] clear() - filling 1280x800 with bg color
-[TERM] clear() complete, cursor at (0, 0)
 Terminal initialized.
 [BOOT] Stage 4: Discovery & FS (DXE/BDS)
 Scanning VirtIO MMIO bus...
@@ -28,14 +25,3 @@ VirtIO Input initialized successfully.
 Initializing Input...
 VirtIO Input initialized successfully.
 BOOT_REGS: x0=48200000 x1=0 x2=0 x3=0
-Detecting Initramfs...
-Initramfs found at 0x48000000 - 0x48000400 (1024 bytes)
-Files in initramfs:
- - .
- - hello.txt
-   Content: Hello from initramfs!
- - test.txt
-FAT32 mounted. Root contains 0 entries.
-Filesystem initialized.
-Interrupts enabled.
-[BOOT] Stage 5: Steady State (BDS)

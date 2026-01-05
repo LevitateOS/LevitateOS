@@ -319,6 +319,18 @@ impl gic::InterruptHandler for TimerHandler {
         let freq = timer::API.read_frequency();
         timer::API.set_timeout(freq / 100);
 
+        // TEAM_089: Keep GPU display active with periodic flush (~10Hz)
+        // Only flush every 10th interrupt (100Hz / 10 = 10Hz)
+        static COUNTER: core::sync::atomic::AtomicU32 = core::sync::atomic::AtomicU32::new(0);
+        let count = COUNTER.fetch_add(1, core::sync::atomic::Ordering::Relaxed);
+        if count % 10 == 0 {
+            if let Some(mut guard) = gpu::GPU.try_lock() {
+                if let Some(gpu_state) = guard.as_mut() {
+                    gpu_state.flush();
+                }
+            }
+        }
+
         // TEAM_070: Preemptive scheduling
         crate::task::yield_now();
     }
@@ -542,11 +554,11 @@ pub extern "C" fn kmain() -> ! {
 
     // TEAM_081: Clear terminal
     console_gpu::clear();
-    
+
     // TEAM_087: Re-enable dual console now that GPU deadlock is fixed (TEAM_086)
     // This mirrors all println! output to the GPU terminal
     levitate_hal::console::set_secondary_output(console_gpu::write_str);
-    
+
     println!("Terminal initialized.");
 
     transition_to(BootStage::Discovery);
@@ -592,16 +604,15 @@ pub extern "C" fn kmain() -> ! {
                 // The system should continue to the main loop which handles
                 // keyboard input and displays the interactive prompt.
                 // ================================================================
-                // TEAM_073: Step 5 Verification - Run Hello World
-                // println!("[BOOT] TEAM_073: Hijacking boot for Userspace Demo...");
-                // Enable interrupts (required for context switch or future syscalls handling)
-                // unsafe { levitate_hal::interrupts::enable() };
+                // TEAM_090: Run shell from initramfs
+                println!("[BOOT] Starting shell from initramfs...");
+                // Enable interrupts (required for syscall handling)
+                unsafe { levitate_hal::interrupts::enable() };
 
-                // Run "hello" from initramfs (does not return)
-                // TODO(TEAM_081): Remove this hijack for interactive shell to work
-                // task::process::run_from_initramfs("hello", &archive);
+                // Run "lsh" (shell) from initramfs - does not return
+                task::process::run_from_initramfs("lsh", &archive);
 
-                true
+                // This line should never be reached
             }
             Err(e) => {
                 println!("[BOOT] ERROR: No initramfs in DTB: {:?}", e);
@@ -657,12 +668,12 @@ pub extern "C" fn kmain() -> ! {
         if let Some(gpu_state) = gpu_guard.as_mut() {
             let width = gpu_state.width;
             let fb = gpu_state.framebuffer();
-            
+
             // Draw a simple "READY" indicator - white pixels at top
             for x in 10..200 {
                 let offset = ((10 * width + x) * 4) as usize;
                 if offset + 4 <= fb.len() {
-                    fb[offset] = 0xFF;     // B
+                    fb[offset] = 0xFF; // B
                     fb[offset + 1] = 0xFF; // G
                     fb[offset + 2] = 0xFF; // R
                     fb[offset + 3] = 0xFF; // A
@@ -671,12 +682,12 @@ pub extern "C" fn kmain() -> ! {
             gpu_state.gpu.flush().ok();
         }
     }
-    
+
     levitate_hal::serial_print!("\n# ");
 
     // TEAM_087: Counter for periodic GPU flush
     let mut flush_counter: u32 = 0;
-    
+
     loop {
         // Poll VirtIO input devices
         input::poll();

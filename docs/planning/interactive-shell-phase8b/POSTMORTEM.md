@@ -69,17 +69,25 @@ The userspace process runs but keyboard interrupts may not be reaching it.
 2. ✅ **Process keyboard in main loop** - Working via `input::read_char()`
 3. ✅ **Enable interrupts BEFORE userspace** - Done
 
-### Architectural Issue: GPU Display Deadlock
+### Architectural Issue: GPU Display Deadlock — RESOLVED by TEAM_086/089
 
-**Root Cause:** `Display::draw_iter()` in `kernel/src/gpu.rs` locks `GPU` internally. Any subsequent GPU operation (like flush) tries to lock again → **deadlock** (IrqSafeLock is not re-entrant).
+**Original Root Cause (TEAM_086):** `Display::draw_iter()` in `kernel/src/gpu.rs` locked `GPU` internally. Fixed by refactoring `Display` to accept `&mut GpuState`.
 
-**Required Fix:** Refactor `Display` to accept `&mut GpuState` as a parameter instead of locking internally. This is a significant change affecting:
-- `kernel/src/gpu.rs` - Display struct
-- `kernel/src/terminal.rs` - All drawing code
-- `kernel/src/console_gpu.rs` - Dual console callback
-- Any code using embedded_graphics with Display
+**TEAM_089 Investigation Findings:**
+The VirtIO GPU **driver is correctly implemented**:
+- `setup_framebuffer()` properly calls `set_scanout()` in virtio-drivers v0.12.0
+- Red flash during boot proves: init ✅, scanout ✅, flush ✅
+- No kernel code resets scanout after init
 
-**Estimated Effort:** 2-3 UoWs, requires careful lock ordering throughout
+**Actual Issue:** QEMU display surface goes inactive shortly after boot.
+- Hypothesis: QEMU `virtio-gpu-device` requires continuous flush to stay active
+- Workaround: Serial console works perfectly
+
+**Recommended Fixes:**
+1. Add timer-based GPU flush (~10Hz)
+2. Try `virtio-vga` device type in run.sh
+3. Serial console is fully functional for development
+
 
 ---
 

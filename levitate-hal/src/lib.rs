@@ -35,6 +35,23 @@ impl<T> IrqSafeLock<T> {
             state,
         }
     }
+
+    /// TEAM_089: Try to acquire the lock without blocking.
+    /// Returns Some(guard) if successful, None if lock is already held.
+    /// Disables interrupts before attempting to acquire.
+    pub fn try_lock(&self) -> Option<IrqSafeLockGuard<'_, T>> {
+        let state = interrupts::disable();
+        if let Some(guard) = self.inner.try_lock() {
+            Some(IrqSafeLockGuard {
+                guard: ManuallyDrop::new(guard),
+                state,
+            })
+        } else {
+            // Lock not available, restore interrupts and return None
+            interrupts::restore(state);
+            None
+        }
+    }
 }
 
 pub struct IrqSafeLockGuard<'a, T> {
