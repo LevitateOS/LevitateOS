@@ -40,8 +40,9 @@ impl Default for TerminalConfig {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 enum AnsiState {
+    #[default]
     None,
     Esc,
     CSI,
@@ -56,9 +57,6 @@ pub struct Terminal {
     screen_width: u32,
     screen_height: u32,
     cursor_visible: bool,
-    last_blink: u64,
-    saved_pixels: [[Rgb888; 10]; 20],
-    has_saved: bool,
     ansi_state: AnsiState,
 }
 
@@ -76,9 +74,6 @@ impl Terminal {
             screen_width,
             screen_height,
             cursor_visible: false,
-            last_blink: 0,
-            saved_pixels: [[Rgb888::BLACK; 10]; 20],
-            has_saved: false,
             ansi_state: AnsiState::None,
         }
     }

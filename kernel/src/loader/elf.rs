@@ -31,7 +31,9 @@ pub const PT_LOAD: u32 = 1;
 
 /// Segment Flags
 pub const PF_X: u32 = 1; // Execute
+#[allow(dead_code)]
 pub const PF_W: u32 = 2; // Write
+#[allow(dead_code)]
 pub const PF_R: u32 = 4; // Read
 
 /// TEAM_073: ELF parsing errors.
@@ -50,6 +52,7 @@ pub enum ElfError {
     /// Not for AArch64
     WrongArchitecture,
     /// Invalid program header offset
+    #[allow(dead_code)]
     InvalidProgramHeader,
     /// Failed to allocate memory for segment
     AllocationFailed,

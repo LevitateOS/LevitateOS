@@ -331,12 +331,7 @@ impl gic::InterruptHandler for TimerHandler {
         if count % 10 == 0 {
             if let Some(mut guard) = gpu::GPU.try_lock() {
                 if let Some(gpu_state) = guard.as_mut() {
-                    gpu_state.flush();
-
-                    // TEAM_092: Heartbeat telemetry every 10 flushes (1Hz)
-                    if (count / 10) % 10 == 0 {
-                        gpu_state.heartbeat();
-                    }
+                    let _ = gpu_state.flush();
                 }
             }
         }
@@ -547,7 +542,7 @@ pub extern "C" fn kmain() -> ! {
     // TEAM_086: Removed unused Display variable - Display now requires &mut GpuState
 
     // SC2.2, SC2.3: Get resolution from GPU
-    let (width, height) = match gpu::get_resolution() {
+    let (_width, _height) = match gpu::get_resolution() {
         Some((w, h)) => {
             println!("[TERM] GPU resolution: {}x{}", w, h);
             (w, h)
@@ -673,20 +668,21 @@ pub extern "C" fn kmain() -> ! {
     {
         let mut gpu_guard = gpu::GPU.lock();
         if let Some(gpu_state) = gpu_guard.as_mut() {
-            let width = gpu_state.width;
-            let fb = gpu_state.framebuffer();
-
-            // Draw a simple "READY" indicator - white pixels at top
-            for x in 10..200 {
-                let offset = ((10 * width + x) * 4) as usize;
-                if offset + 4 <= fb.len() {
-                    fb[offset] = 0xFF; // B
-                    fb[offset + 1] = 0xFF; // G
-                    fb[offset + 2] = 0xFF; // R
-                    fb[offset + 3] = 0xFF; // A
+            let (width, _height) = gpu_state.resolution();
+            
+            if let Some(fb) = gpu_state.framebuffer() {
+                // Draw a simple "READY" indicator - white pixels at top
+                for x in 10..200 {
+                    let offset = ((10 * width + x) * 4) as usize;
+                    if offset + 4 <= fb.len() {
+                        fb[offset] = 0xFF; // B
+                        fb[offset + 1] = 0xFF; // G
+                        fb[offset + 2] = 0xFF; // R
+                        fb[offset + 3] = 0xFF; // A
+                    }
                 }
             }
-            gpu_state.gpu.flush().ok();
+            let _ = gpu_state.flush();
         }
     }
 
@@ -721,7 +717,7 @@ pub extern "C" fn kmain() -> ! {
         if flush_counter % 10000 == 0 {
             let mut gpu_guard = gpu::GPU.lock();
             if let Some(gpu_state) = gpu_guard.as_mut() {
-                gpu_state.flush();
+                let _ = gpu_state.flush();
             }
         }
 

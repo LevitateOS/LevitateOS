@@ -7,6 +7,7 @@ description = "VirtIO GPU driver for LevitateOS"
 [dependencies]
 levitate-virtio = { path = "../levitate-virtio" }
 bitflags = "2.10.0"
+embedded-graphics = "0.8.1"
 
 [lints]
 workspace = true

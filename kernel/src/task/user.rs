@@ -92,6 +92,10 @@ pub unsafe fn enter_user_mode(entry_point: usize, user_sp: usize) -> ! {
             options(noreturn)
         );
     }
+    #[allow(unreachable_code)]
+    loop {
+        core::hint::spin_loop();
+    }
 }
 
 /// TEAM_073: Stub for non-aarch64 builds (test compilation).
@@ -111,20 +115,17 @@ use core::sync::atomic::{AtomicU8, Ordering};
 extern crate alloc;
 
 /// TEAM_073: Default stack size for user tasks (64KB).
+#[allow(dead_code)]
 pub const USER_STACK_SIZE: usize = 65536;
 
 /// TEAM_073: User address space layout constants.
 pub mod layout {
     /// User code starts after NULL guard page
+    #[allow(dead_code)]
     pub const USER_CODE_START: usize = 0x0000_0000_0001_0000; // 64KB
 
-    /// User stack top (grows down from here)
-    pub const USER_STACK_TOP: usize = 0x0000_7FFF_FFFF_0000;
-
-    /// User stack bottom (stack guard below this)
-    pub const USER_STACK_BOTTOM: usize = USER_STACK_TOP - super::USER_STACK_SIZE;
-
     /// User heap starts after code/data (set by ELF loader)
+    #[allow(dead_code)]
     pub const USER_HEAP_START: usize = 0x0000_0000_1000_0000; // 256MB (placeholder)
 }
 
@@ -146,12 +147,16 @@ impl Pid {
 #[repr(u8)]
 pub enum ProcessState {
     /// Ready to run
+    #[allow(dead_code)]
     Ready = 0,
     /// Currently executing
+    #[allow(dead_code)]
     Running = 1,
     /// Waiting for I/O or event
+    #[allow(dead_code)]
     Blocked = 2,
     /// Process has terminated
+    #[allow(dead_code)]
     Exited = 3,
 }
 
@@ -164,6 +169,7 @@ pub struct UserTask {
     pub pid: Pid,
 
     /// Process state (atomic for safe mutation from syscall handlers)
+    #[allow(dead_code)]
     state: AtomicU8,
 
     /// Physical address of L0 page table (for TTBR0_EL1)
@@ -176,15 +182,19 @@ pub struct UserTask {
     pub entry_point: usize,
 
     /// Program break (end of heap, for sbrk syscall)
+    #[allow(dead_code)]
     pub brk: usize,
 
     /// Exit code (set by exit syscall)
+    #[allow(dead_code)]
     pub exit_code: i32,
 
     /// Kernel stack for this process (used during syscalls/exceptions)
+    #[allow(dead_code)]
     kernel_stack: Box<[u64]>,
 
     /// Top of kernel stack
+    #[allow(dead_code)]
     pub kernel_stack_top: usize,
 }
 
@@ -217,6 +227,7 @@ impl UserTask {
     }
 
     /// Get the current state of the process.
+    #[allow(dead_code)]
     pub fn state(&self) -> ProcessState {
         match self.state.load(Ordering::Acquire) {
             0 => ProcessState::Ready,
@@ -227,15 +238,17 @@ impl UserTask {
     }
 
     /// Set the state of the process.
+    #[allow(dead_code)]
     pub fn set_state(&self, state: ProcessState) {
         self.state.store(state as u8, Ordering::Release);
     }
 
     /// Mark the process as exited with the given code.
-    pub fn exit(&self, code: i32) {
+    #[allow(dead_code)]
+    pub fn exit(&self, _code: i32) {
         // SAFETY: AtomicU8 store is safe
         self.state
-            .store(ProcessState::Exited as u8, Ordering::Release);
+            .store(ProcessState::Exited as u8, core::sync::atomic::Ordering::Release);
         // Note: exit_code is not atomic, but should only be set once at exit
         // A proper implementation would use interior mutability or atomic
     }

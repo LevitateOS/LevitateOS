@@ -1,5 +1,5 @@
 // TEAM_070: Scheduler implementation.
-use crate::task::{TaskControlBlock, TaskId};
+use crate::task::TaskControlBlock;
 use alloc::collections::VecDeque;
 use alloc::sync::Arc;
 use levitate_hal::IrqSafeLock;

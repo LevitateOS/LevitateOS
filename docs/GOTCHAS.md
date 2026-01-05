@@ -42,31 +42,53 @@ This document captures non-obvious issues that future teams should know about.
 
 ---
 
-### 4. GPU Display API Pattern (PARTIAL FIX by TEAM_086)
+### 4. GPU Display API Pattern (FIXED by TEAM_099)
 
-**Location:** `kernel/src/gpu.rs` - `Display` struct
+**Location:** `kernel/src/gpu.rs`
 
-**Status:** ⚠️ API FIXED, but GPU display still not working
+**Status:** ✅ FIXED
 
-**What TEAM_086 Fixed:**
-The `Display` struct was refactored to accept `&mut GpuState` instead of locking internally. This eliminates the internal deadlock:
+**What TEAM_099 Fixed:**
+The legacy `virtio-drivers` and its associated `GpuState` wrapper have been replaced by a custom, integrated driver stack (`levitate-virtio-gpu`). 
+
+- **No more `Display` wrapper**: `VirtioGpu` now implements `DrawTarget` directly.
+- **Locking**: Access the global `GPU` static via `IrqSafeLock`.
+- **Flushing**: Use `gpu.flush()` after drawing to update the host display.
 
 ```rust
-// CORRECT PATTERN:
+// NEW PATTERN:
 let mut gpu_guard = gpu::GPU.lock();
-if let Some(gpu_state) = gpu_guard.as_mut() {
-    let mut display = Display::new(gpu_state);
-    Text::new("Hello", Point::new(10, 30), style).draw(&mut display).ok();
-    gpu_state.flush();  // Safe - still holding the same lock
+if let Some(gpu) = gpu_guard.as_mut() {
+    Text::new("Hello", Point::new(10, 30), style).draw(gpu).ok();
+    gpu.flush().ok();
 }
 ```
 
-**TEAM_089 Update:**
-- Added 10Hz timer-based GPU flush in `kernel/src/main.rs`.
-- **Status:** Behavior tests pass (golden log match), proving init/flush works.
-- **Visuals:** Display may still be blank on some QEMU versions/hosts despite correct driver behavior.
-- **Verification:** Always use `cargo xtask gpu-dump` to verify if pixels are being modified in RAM before assuming the driver is failing.
-- **Recommendation:** Rely on serial console for active development.
+---
+
+### 8. Diverging Functions and `asm!` (TEAM_099)
+
+**Location:** `kernel/src/task/user.rs` (`enter_user_mode`)
+
+**Problem:** Functions marked with `-> !` (diverging) that use `asm!(..., options(noreturn))` can sometimes fail to compile if the Rust compiler doesn't "see" the divergence clearly.
+
+**Fix:** Ensure the `asm!` block is the last expression in the function or append an explicit `loop { core::hint::spin_loop(); }` (marked `#[allow(unreachable_code)]`) to satisfy the type system.
+
+---
+
+### 9. Console Mirroring Setup (TEAM_099)
+
+**Location:** `kernel/src/terminal.rs`
+
+**Note:** Dual console output (UART + GPU) is enabled by `levitate_hal::console::set_secondary_output(terminal::write_str)`. This happens late in boot (Stage 3). If you don't see GPU output, check if the GPU initialization succeeded in the serial logs.
+
+---
+
+### 10. Consolidate Layout Constants (TEAM_099)
+
+**Location:** `kernel/src/task/user_mm.rs`
+
+**Rule:** Always keep address space layout constants (e.g., `STACK_TOP`, `USER_SPACE_END`) in `user_mm.rs`. Other modules like `user.rs` or `process.rs` should import them from there to avoid "unused constant" warnings and maintain a single source of truth.
 
 ### 5. Kernel Does Not Recompile When Initramfs Changes (TEAM_090)
 

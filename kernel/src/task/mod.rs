@@ -5,9 +5,8 @@ pub mod user_mm; // TEAM_073: User memory management (Phase 8) // TEAM_073: Proc
 
 extern crate alloc;
 use alloc::boxed::Box;
-use alloc::vec;
 use core::arch::global_asm;
-use core::sync::atomic::{AtomicU8, AtomicUsize, Ordering};
+use core::sync::atomic::{AtomicU8, Ordering};
 
 global_asm!(
     r#"
@@ -48,8 +47,6 @@ task_entry_trampoline:
 unsafe extern "C" {
     /// TEAM_070: Assembly helper to switch CPU context.
     pub fn cpu_switch_to(old: *mut Context, new: *const Context);
-    /// TEAM_070: Private entry point for new tasks.
-    fn task_entry_trampoline();
 }
 
 /// TEAM_070: Hook called immediately after a context switch.
@@ -72,13 +69,6 @@ pub extern "C" fn task_exit() -> ! {
     scheduler::SCHEDULER.schedule();
 
     // If we return here, no other tasks are ready - enter idle
-    idle_loop();
-}
-
-/// TEAM_071: Idle task loop for power efficiency (Design Q3, Rule 16).
-/// Uses WFI (Wait For Interrupt) to put CPU in low-power state.
-#[inline(never)]
-fn idle_loop() -> ! {
     loop {
         #[cfg(target_arch = "aarch64")]
         unsafe {
@@ -141,18 +131,16 @@ pub fn yield_now() {
 pub struct TaskId(pub usize);
 
 impl TaskId {
-    pub fn next() -> Self {
-        static NEXT_ID: AtomicUsize = AtomicUsize::new(0);
-        TaskId(NEXT_ID.fetch_add(1, Ordering::SeqCst))
-    }
 }
 
 /// TEAM_070: Possible states of a task in the system.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
 pub enum TaskState {
+    #[allow(dead_code)]
     Ready = 0,
     Running = 1,
+    #[allow(dead_code)]
     Blocked = 2,
     Exited = 3,
 }
@@ -179,36 +167,32 @@ pub struct Context {
 }
 
 /// TEAM_070: Default stack size for kernel tasks (64KB).
+#[allow(dead_code)]
 pub const DEFAULT_STACK_SIZE: usize = 65536;
 
 /// TEAM_070: Task Control Block (TCB).
 /// Stores all information about a task.
 /// TEAM_071: State uses AtomicU8 for safe mutation from task_exit.
 pub struct TaskControlBlock {
+    #[allow(dead_code)]
     pub id: TaskId,
     /// TEAM_071: Atomic state for safe mutation without &mut self.
     state: AtomicU8,
     pub context: Context,
     /// The kernel stack for this task.
     /// None for the bootstrap task (which uses the boot stack).
+    #[allow(dead_code)]
     stack: Option<Box<[u64]>>,
+    #[allow(dead_code)]
     pub stack_top: usize,
+    #[allow(dead_code)]
     pub stack_size: usize,
     /// Physical address of the task's L0 page table.
+    #[allow(dead_code)]
     pub ttbr0: usize,
 }
 
 impl TaskControlBlock {
-    /// Get the current state of the task.
-    pub fn state(&self) -> TaskState {
-        match self.state.load(Ordering::Acquire) {
-            0 => TaskState::Ready,
-            1 => TaskState::Running,
-            2 => TaskState::Blocked,
-            _ => TaskState::Exited,
-        }
-    }
-
     /// Set the state of the task.
     pub fn set_state(&self, state: TaskState) {
         self.state.store(state as u8, Ordering::Release);
@@ -216,27 +200,6 @@ impl TaskControlBlock {
 }
 
 impl TaskControlBlock {
-    /// Create a new kernel task with its own stack.
-    pub fn new(entry_point: usize) -> Self {
-        let mut stack = vec![0u64; DEFAULT_STACK_SIZE / 8];
-        let stack_top = stack.as_mut_ptr() as usize + DEFAULT_STACK_SIZE;
-
-        let mut context = Context::default();
-        context.lr = task_entry_trampoline as *const () as u64;
-        context.sp = stack_top as u64;
-        context.x19 = entry_point as u64;
-
-        Self {
-            id: TaskId::next(),
-            state: AtomicU8::new(TaskState::Ready as u8),
-            context,
-            stack: Some(stack.into_boxed_slice()),
-            stack_top,
-            stack_size: DEFAULT_STACK_SIZE,
-            ttbr0: 0, // Kernel-only task
-        }
-    }
-
     /// Create a TCB for the current (bootstrap) task.
     pub fn new_bootstrap() -> Self {
         Self {

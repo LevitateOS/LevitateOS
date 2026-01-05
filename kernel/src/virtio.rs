@@ -11,7 +11,6 @@
 
 extern crate alloc;
 
-use core::ptr::NonNull;
 pub use levitate_hal::virtio::{StaticMmioTransport, VirtioHal};
 use virtio_drivers::transport::Transport;
 
@@ -36,7 +35,7 @@ pub fn init_gpu() -> bool {
         } {
             Ok(transport) => {
                 if transport.device_type() == virtio_drivers::transport::DeviceType::GPU {
-                    crate::gpu::init(transport);
+                    crate::gpu::init(addr);
                     return true;
                 }
             }

@@ -113,7 +113,6 @@ mod mmio_regs {
     pub const MAGIC: usize = 0x000;
     pub const VERSION: usize = 0x004;
     pub const DEVICE_ID: usize = 0x008;
-    pub const VENDOR_ID: usize = 0x00c;
     pub const DEVICE_FEATURES: usize = 0x010;
     pub const DEVICE_FEATURES_SEL: usize = 0x014;
     pub const DRIVER_FEATURES: usize = 0x020;

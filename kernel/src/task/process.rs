@@ -3,27 +3,25 @@
 //! This module provides the high-level interface for creating and
 //! running user processes.
 
-use crate::loader::elf::{Elf, ElfError};
-use crate::task::user::{Pid, ProcessState, UserTask};
+use crate::loader::elf::Elf;
+use crate::task::user::UserTask;
 use crate::task::user_mm;
-use levitate_hal::mmu::PageFlags;
+use crate::loader::elf::ElfError;
 
 /// TEAM_073: Error type for process spawning.
 #[derive(Debug)]
 pub enum SpawnError {
     /// Failed to parse ELF
-    ElfError(ElfError),
+    ElfError,
     /// Failed to create page table
     PageTableCreation,
     /// Failed to set up stack
     StackSetup,
-    /// File not found
-    NotFound,
 }
 
 impl From<ElfError> for SpawnError {
-    fn from(e: ElfError) -> Self {
-        SpawnError::ElfError(e)
+    fn from(_e: ElfError) -> Self {
+        SpawnError::ElfError
     }
 }
 

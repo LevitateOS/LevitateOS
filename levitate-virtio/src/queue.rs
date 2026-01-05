@@ -51,14 +51,6 @@ pub struct Descriptor {
     pub next: u16,
 }
 
-/// Available ring entry.
-#[repr(C)]
-#[derive(Debug, Clone, Copy, Default)]
-struct AvailRingEntry {
-    flags: u16,
-    idx: u16,
-}
-
 /// Used ring entry.
 #[repr(C)]
 #[derive(Debug, Clone, Copy, Default)]

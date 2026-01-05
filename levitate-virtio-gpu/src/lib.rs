@@ -12,11 +12,15 @@
 
 #![no_std]
 
+extern crate alloc;
+
 pub mod command;
+pub mod device;
 pub mod driver;
 pub mod protocol;
 
 pub use command::{CommandFuture, CommandState, GpuRequest, GpuResponse, HeaderOnlyResponse, PendingCommand};
+pub use device::VirtioGpu;
 pub use driver::{DisplayInfo, DriverConfig, DriverState, DriverTelemetry, GpuDriver};
 pub use protocol::{
     CtrlHeader, CtrlType, Format, GpuError, Rect, ResourceId,

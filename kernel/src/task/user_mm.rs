@@ -10,27 +10,12 @@ use levitate_hal::mmu::{self, PAGE_SIZE, PageAllocator, PageFlags, PageTable};
 
 /// TEAM_073: User address space layout constants.
 pub mod layout {
-    /// NULL guard page - unmapped to catch null pointer derefs
-    pub const NULL_GUARD_END: usize = 0x0000_0000_0000_1000;
-
-    /// User code starts after NULL guard (64KB for safety)
-    pub const CODE_START: usize = 0x0000_0000_0001_0000;
-
-    /// User heap starts after code/data (placeholder, set by ELF loader)
-    pub const HEAP_START_DEFAULT: usize = 0x0000_0000_1000_0000; // 256MB
-
     /// User stack top (grows down from here)
     /// Max user address for 48-bit VA with TTBR0
     pub const STACK_TOP: usize = 0x0000_7FFF_FFFF_0000;
 
     /// User stack size (64KB default)
     pub const STACK_SIZE: usize = 65536;
-
-    /// User stack bottom
-    pub const STACK_BOTTOM: usize = STACK_TOP - STACK_SIZE;
-
-    /// Stack guard page (unmapped) below stack
-    pub const STACK_GUARD: usize = STACK_BOTTOM - 0x1000;
 
     /// End of user address space (bit 47 clear = TTBR0)
     pub const USER_SPACE_END: usize = 0x0000_8000_0000_0000;
@@ -100,6 +85,7 @@ pub unsafe fn map_user_page(
 /// * `phys_start` - Starting physical address (page-aligned)
 /// * `len` - Length in bytes to map
 /// * `flags` - Page flags
+#[allow(dead_code)]
 pub unsafe fn map_user_range(
     ttbr0_phys: usize,
     user_va_start: usize,
@@ -175,18 +161,7 @@ pub unsafe fn setup_user_stack(
 }
 
 /// TEAM_073: Allocate physical pages and map them for user code/data.
-///
-/// Allocates physical pages and maps a contiguous range in user space.
-/// Used for ELF segment loading.
-///
-/// # Arguments
-/// * `ttbr0_phys` - Physical address of user L0 page table
-/// * `user_va_start` - Starting virtual address (will be page-aligned)
-/// * `len` - Length in bytes to allocate and map
-/// * `flags` - Page flags
-///
-/// # Returns
-/// The physical address of the first allocated page.
+#[allow(dead_code)]
 pub unsafe fn alloc_and_map_user_range(
     ttbr0_phys: usize,
     user_va_start: usize,
@@ -230,13 +205,7 @@ pub unsafe fn alloc_and_map_user_range(
 }
 
 /// TEAM_073: Free a user page table and all its mappings.
-///
-/// Walks the page table, frees all mapped pages, and frees the table pages.
-/// Should be called when a process exits.
-///
-/// # Safety
-/// - `ttbr0_phys` must point to a valid L0 page table
-/// - The page table must not be in use (not in TTBR0_EL1)
+#[allow(dead_code)]
 pub unsafe fn destroy_user_page_table(_ttbr0_phys: usize) -> Result<(), &'static str> {
     // TODO(TEAM_073): Implement full page table teardown
     // For now, we leak the pages - will be fixed when process cleanup is added

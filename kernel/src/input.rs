@@ -54,7 +54,7 @@ pub fn poll() -> bool {
     let (screen_width, screen_height) = {
         let gpu = crate::gpu::GPU.lock();
         if let Some(state) = gpu.as_ref() {
-            let (w, h) = state.dimensions();
+            let (w, h) = state.resolution();
             (w as i32, h as i32)
         } else {
             (1024, 768) // Fallback if GPU not initialized

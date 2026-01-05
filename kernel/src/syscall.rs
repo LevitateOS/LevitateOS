@@ -21,6 +21,7 @@ pub mod errno {
     /// Bad address (invalid user pointer)
     pub const EFAULT: i64 = -3;
     /// Invalid argument
+    #[allow(dead_code)]
     pub const EINVAL: i64 = -4;
 }
 
@@ -101,18 +102,21 @@ impl SyscallFrame {
 
     /// Get syscall argument 3 (x3)
     #[inline]
+    #[allow(dead_code)]
     pub fn arg3(&self) -> u64 {
         self.regs[3]
     }
 
     /// Get syscall argument 4 (x4)
     #[inline]
+    #[allow(dead_code)]
     pub fn arg4(&self) -> u64 {
         self.regs[4]
     }
 
     /// Get syscall argument 5 (x5)
     #[inline]
+    #[allow(dead_code)]
     pub fn arg5(&self) -> u64 {
         self.regs[5]
     }
