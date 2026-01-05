@@ -42,6 +42,52 @@ This document captures non-obvious issues that future teams should know about.
 
 ---
 
+### 4. GPU Display API Pattern (RESOLVED by TEAM_086)
+
+**Location:** `kernel/src/gpu.rs` - `Display` struct
+
+**Status:** ✅ FIXED
+
+**Original Problem:** The `Display` struct locked `GPU` internally on every draw operation, causing deadlock when flush was called afterward.
+
+**Solution:** TEAM_086 refactored `Display` to accept `&mut GpuState` instead of locking internally:
+
+```rust
+// CORRECT PATTERN:
+let mut gpu_guard = gpu::GPU.lock();
+if let Some(gpu_state) = gpu_guard.as_mut() {
+    let mut display = Display::new(gpu_state);
+    Text::new("Hello", Point::new(10, 30), style).draw(&mut display).ok();
+    gpu_state.flush();  // Safe - still holding the same lock
+}
+```
+
+**Key Points:**
+- `Display::new()` now requires `&mut GpuState`
+- All draw operations and flush happen within the same lock scope
+- No more deadlock potential
+
+---
+
+### 5. IrqSafeLock is NOT Re-entrant (TEAM_083)
+
+**Location:** `levitate-hal/src/lib.rs`
+
+**Problem:** `IrqSafeLock` wraps a `Spinlock` and disables interrupts. It does NOT support re-entrant locking. If you hold the lock and try to lock again from the same context, you will deadlock.
+
+**Affects:**
+- GPU operations (Display + flush)
+- Any nested lock scenarios
+- Timer/interrupt handlers that try to print (if they use the same locks)
+
+**Pattern to avoid:**
+```rust
+let guard1 = SOME_LOCK.lock();
+let guard2 = SOME_LOCK.lock();  // DEADLOCK!
+```
+
+---
+
 ## Build Gotchas
 
 ### Userspace Binaries Need Separate Build

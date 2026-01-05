@@ -1,7 +1,9 @@
 # Phase 8b Postmortem: UX Failure
 
 **Date:** 2026-01-05  
-**Teams:** TEAM_080 (Review), TEAM_081 (Implementation), TEAM_082 (Bugfix)
+**Teams:** TEAM_080 (Review), TEAM_081 (Implementation), TEAM_082 (Bugfix), TEAM_083 (Investigation)
+
+**Status:** PARTIAL RESOLUTION — Serial console works, GPU display has architectural issues
 
 ---
 
@@ -55,17 +57,29 @@ The userspace process runs but keyboard interrupts may not be reaching it.
 
 ## What Would Actually Fix This
 
-### Immediate (Must Do)
+### Immediate (Must Do) — DONE by TEAM_083
 
-1. **Remove the boot hijack** - Let boot complete to the interactive loop
-2. **Echo typed characters** - Users need to see what they're typing
-3. **Clear "READY" indicator** - Print something obvious when boot is done
+1. ✅ **Remove the boot hijack** - Let boot complete to the interactive loop
+2. ✅ **Echo typed characters** - Users see typing in serial console
+3. ✅ **Clear "READY" indicator** - "[SUCCESS] LevitateOS System Ready"
 
-### Short-Term
+### Short-Term — BLOCKED by GPU Architecture
 
-1. **Show shell prompt on GPU** - The `# ` needs to appear visually
-2. **Process keyboard in main loop** - Currently handled but not passed to userspace
-3. **Enable interrupts BEFORE userspace** - Ensure keyboard works
+1. ❌ **Show shell prompt on GPU** - Blocked by Display deadlock (see below)
+2. ✅ **Process keyboard in main loop** - Working via `input::read_char()`
+3. ✅ **Enable interrupts BEFORE userspace** - Done
+
+### Architectural Issue: GPU Display Deadlock
+
+**Root Cause:** `Display::draw_iter()` in `kernel/src/gpu.rs` locks `GPU` internally. Any subsequent GPU operation (like flush) tries to lock again → **deadlock** (IrqSafeLock is not re-entrant).
+
+**Required Fix:** Refactor `Display` to accept `&mut GpuState` as a parameter instead of locking internally. This is a significant change affecting:
+- `kernel/src/gpu.rs` - Display struct
+- `kernel/src/terminal.rs` - All drawing code
+- `kernel/src/console_gpu.rs` - Dual console callback
+- Any code using embedded_graphics with Display
+
+**Estimated Effort:** 2-3 UoWs, requires careful lock ordering throughout
 
 ---
 

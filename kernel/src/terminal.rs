@@ -13,7 +13,8 @@
 //! - [TERM8] Backspace moves cursor left (no erase)
 //! - [TERM9] Resolution adapts to screen dimensions
 
-use crate::gpu::{Display, GPU};
+// TEAM_086: Import GpuState for new Display API
+use crate::gpu::{Display, GPU, GpuState};
 use embedded_graphics::{
     mono_font::{MonoTextStyle, ascii::FONT_10X20},
     pixelcolor::Rgb888,
@@ -57,11 +58,12 @@ impl Default for TerminalConfig {
 }
 
 /// Terminal emulator state - SC3.2
+/// TEAM_083: Made cursor fields public for direct GPU write access
 pub struct Terminal {
-    cursor_col: u32,
-    cursor_row: u32,
-    cols: u32,
-    rows: u32,
+    pub cursor_col: u32,
+    pub cursor_row: u32,
+    pub cols: u32,
+    pub rows: u32,
     config: TerminalConfig,
     screen_width: u32,  // pixels
     screen_height: u32, // pixels
@@ -127,8 +129,9 @@ impl Terminal {
     }
 
     /// [TERM1] [TERM2] Write single character at cursor position
-    pub fn write_char(&mut self, display: &mut Display, c: char) {
-        self.hide_cursor(display);
+    /// TEAM_086: Changed to accept &mut GpuState instead of &mut Display
+    pub fn write_char(&mut self, gpu_state: &mut GpuState, c: char) {
+        self.hide_cursor(gpu_state);
 
         // TEAM_063: Basic ANSI VT100 state machine
         match self.ansi_state {
@@ -149,7 +152,7 @@ impl Terminal {
             AnsiState::CSI => {
                 // Currently only support 'J' (Clear Screen) for VT100 compatibility
                 if c == 'J' {
-                    self.clear(display);
+                    self.clear(gpu_state);
                 }
                 // Transition back after any command or if we hit a non-parameter char
                 if (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') {
@@ -162,24 +165,24 @@ impl Terminal {
         match c {
             '\n' => {
                 // [TERM3] - SC6.1, SC6.2
-                self.newline(display);
+                self.newline(gpu_state);
             }
             '\r' => {
                 // [TERM5] - SC7.1, SC7.2
-                self.carriage_return(display);
+                self.carriage_return(gpu_state);
             }
             '\t' => {
                 // [TERM6] - SC9.1
-                self.tab(display);
+                self.tab(gpu_state);
             }
             '\x08' => {
                 // [TERM8] [SPEC-3] Interactive destructive backspace
-                self.backspace(display);
+                self.backspace(gpu_state);
             }
             c if c >= ' ' => {
                 // [TERM2] Check if we need to wrap - SC8.2
                 if self.cursor_col >= self.cols {
-                    self.newline(display);
+                    self.newline(gpu_state);
                 }
 
                 // [TERM1] Render character - SC4.3, SC5.1, SC5.2
@@ -192,62 +195,69 @@ impl Terminal {
                 let mut buf = [0u8; 4];
                 let s = c.encode_utf8(&mut buf);
 
+                // TEAM_086: Create Display from borrowed GpuState
+                let mut display = Display::new(gpu_state);
                 // Text baseline is at bottom of character
-                let _ = Text::new(s, Point::new(x, y + FONT_HEIGHT as i32), style).draw(display);
+                let _ = Text::new(s, Point::new(x, y + FONT_HEIGHT as i32), style).draw(&mut display);
 
                 // [TERM2] Advance cursor - SC5.3
                 self.cursor_col += 1;
             }
             _ => {} // Ignore other control characters
         }
-        self.show_cursor(display);
+        self.show_cursor(gpu_state);
     }
 
     /// Write string to terminal
-    pub fn write_str(&mut self, display: &mut Display, s: &str) {
+    /// TEAM_086: Changed to accept &mut GpuState
+    pub fn write_str(&mut self, gpu_state: &mut GpuState, s: &str) {
         for c in s.chars() {
-            self.write_char(display, c);
+            self.write_char(gpu_state, c);
         }
     }
 
     /// [TERM3] [TERM4] Move to next line, scroll if needed - SC6.1, SC6.2
-    pub fn newline(&mut self, display: &mut Display) {
-        self.hide_cursor(display);
+    /// TEAM_086: Changed to accept &mut GpuState
+    pub fn newline(&mut self, gpu_state: &mut GpuState) {
+        self.hide_cursor(gpu_state);
         self.cursor_col = 0;
         self.cursor_row += 1;
 
         // [TERM4] Scroll if we've exceeded screen - SC11.2
         if self.cursor_row >= self.rows {
-            self.scroll_up(display);
+            self.scroll_up(gpu_state);
             self.cursor_row = self.rows - 1; // SC11.6
         }
     }
 
     // [TERM5] - SC7.1, SC7.2
-    pub fn carriage_return(&mut self, _display: &mut Display) {
-        self.hide_cursor(_display);
+    /// TEAM_086: Changed to accept &mut GpuState
+    pub fn carriage_return(&mut self, gpu_state: &mut GpuState) {
+        self.hide_cursor(gpu_state);
         self.cursor_col = 0;
-        self.show_cursor(_display);
+        self.show_cursor(gpu_state);
     }
 
     /// [TERM6] Tab to next 8-column boundary - SC9.1-SC9.5
     /// TEAM_065: Fixed to handle wrap-around when tab exceeds columns
-    fn tab(&mut self, display: &mut Display) {
-        self.hide_cursor(display);
+    /// TEAM_086: Changed to accept &mut GpuState
+    fn tab(&mut self, gpu_state: &mut GpuState) {
+        self.hide_cursor(gpu_state);
         let next_tab = ((self.cursor_col / 8) + 1) * 8;
 
         // TEAM_065: Handle wrap-around if tab would exceed line width
         if next_tab >= self.cols {
-            self.newline(display);
+            self.newline(gpu_state);
         } else {
             self.cursor_col = next_tab;
         }
-        self.show_cursor(display);
+        self.show_cursor(gpu_state);
     }
 
     /// [SPEC-2] Destructive backspace (0x08)
-    fn backspace(&mut self, display: &mut Display) {
-        self.hide_cursor(display);
+    /// TEAM_086: Changed to accept &mut GpuState
+    fn backspace(&mut self, gpu_state: &mut GpuState) {
+        self.hide_cursor(gpu_state);
 
         let mut changed = false;
         if self.cursor_col > 0 {
@@ -266,61 +276,64 @@ impl Terminal {
             let x = self.cursor_col * (FONT_WIDTH + CHARACTER_SPACING);
             let y = self.cursor_row * (FONT_HEIGHT + LINE_SPACING);
 
+            // TEAM_086: Create Display from borrowed GpuState
+            let mut display = Display::new(gpu_state);
             let _ = Rectangle::new(
                 Point::new(x as i32, y as i32),
                 Size::new(FONT_WIDTH, FONT_HEIGHT + LINE_SPACING),
             )
             .into_styled(PrimitiveStyle::with_fill(self.config.bg_color))
-            .draw(display);
+            .draw(&mut display);
         }
-        self.show_cursor(display);
+        self.show_cursor(gpu_state);
     }
 
     /// [TERM7] Clear screen and reset cursor - SC10.1-SC10.5
-    pub fn clear(&mut self, display: &mut Display) {
-        self.hide_cursor(display);
+    /// TEAM_086: Changed to accept &mut GpuState
+    pub fn clear(&mut self, gpu_state: &mut GpuState) {
+        self.hide_cursor(gpu_state);
 
+        // TEAM_086: Create Display from borrowed GpuState
+        let mut display = Display::new(gpu_state);
         let _ = Rectangle::new(
             Point::zero(),
             Size::new(self.screen_width, self.screen_height),
         )
         .into_styled(PrimitiveStyle::with_fill(self.config.bg_color))
-        .draw(display);
+        .draw(&mut display);
 
         self.cursor_col = 0;
         self.cursor_row = 0;
 
-        self.show_cursor(display);
+        self.show_cursor(gpu_state);
     }
 
     /// [TERM4] Scroll screen up by one line - SC11.3-SC11.8
-    fn scroll_up(&mut self, _display: &mut Display) {
-        self.hide_cursor(_display);
+    /// TEAM_086: Changed to accept &mut GpuState - no internal locking needed
+    fn scroll_up(&mut self, gpu_state: &mut GpuState) {
+        self.hide_cursor(gpu_state);
         let line_height = FONT_HEIGHT + LINE_SPACING;
 
-        // Access framebuffer directly for efficient scroll
-        let mut guard = GPU.lock();
-        if let Some(state) = guard.as_mut() {
-            let fb = state.framebuffer();
-            let bytes_per_pixel = 4; // RGBA
-            let row_bytes = self.screen_width as usize * bytes_per_pixel;
-            let scroll_bytes = line_height as usize * row_bytes;
+        // TEAM_086: Use provided gpu_state directly - no lock needed
+        let fb = gpu_state.framebuffer();
+        let bytes_per_pixel = 4; // RGBA
+        let row_bytes = self.screen_width as usize * bytes_per_pixel;
+        let scroll_bytes = line_height as usize * row_bytes;
 
-            // SC11.4: Copy everything up by one line
-            if scroll_bytes < fb.len() {
-                fb.copy_within(scroll_bytes.., 0);
+        // SC11.4: Copy everything up by one line
+        if scroll_bytes < fb.len() {
+            fb.copy_within(scroll_bytes.., 0);
 
-                // SC11.5: Clear bottom line with background color
-                let clear_start = fb.len() - scroll_bytes;
-                for i in (clear_start..fb.len()).step_by(4) {
-                    fb[i] = self.config.bg_color.r();
-                    fb[i + 1] = self.config.bg_color.g();
-                    fb[i + 2] = self.config.bg_color.b();
-                    fb[i + 3] = 255;
-                }
+            // SC11.5: Clear bottom line with background color
+            let clear_start = fb.len() - scroll_bytes;
+            for i in (clear_start..fb.len()).step_by(4) {
+                fb[i] = self.config.bg_color.r();
+                fb[i + 1] = self.config.bg_color.g();
+                fb[i + 2] = self.config.bg_color.b();
+                fb[i + 3] = 255;
             }
         }
-        self.show_cursor(_display);
+        self.show_cursor(gpu_state);
     }
 
     /// Set foreground color
@@ -336,19 +349,21 @@ impl Terminal {
     }
 
     /// [TEAM_060] Toggle cursor visibility based on timer
-    pub fn check_blink(&mut self, display: &mut Display) {
+    /// TEAM_086: Changed to accept &mut GpuState
+    pub fn check_blink(&mut self, gpu_state: &mut GpuState) {
         let now = crate::timer::uptime_seconds();
         if now != self.last_blink {
             self.last_blink = now;
             if self.cursor_visible {
-                self.hide_cursor(display);
+                self.hide_cursor(gpu_state);
             } else {
-                self.show_cursor(display);
+                self.show_cursor(gpu_state);
             }
         }
     }
 
-    fn show_cursor(&mut self, display: &mut Display) {
+    /// TEAM_086: Changed to accept &mut GpuState - no internal locking needed
+    fn show_cursor(&mut self, gpu_state: &mut GpuState) {
         if self.cursor_visible {
             return;
         }
@@ -356,36 +371,34 @@ impl Terminal {
         let x = self.cursor_col * (FONT_WIDTH + CHARACTER_SPACING);
         let y = self.cursor_row * (FONT_HEIGHT + LINE_SPACING);
 
-        // Save pixels
-        let mut guard = crate::gpu::GPU.lock();
-        if let Some(gpu) = guard.as_mut() {
-            let fb = gpu.framebuffer();
-            let width = self.screen_width as usize;
+        // TEAM_086: Save pixels using provided gpu_state directly
+        let fb = gpu_state.framebuffer();
+        let width = self.screen_width as usize;
 
-            for dy in 0..20 {
-                for dx in 0..10 {
-                    let py = (y + dy) as usize;
-                    let px = (x + dx) as usize;
-                    if py < self.screen_height as usize && px < self.screen_width as usize {
-                        let idx = (py * width + px) * 4;
-                        self.saved_pixels[dy as usize][dx as usize] =
-                            Rgb888::new(fb[idx], fb[idx + 1], fb[idx + 2]);
-                    }
+        for dy in 0..20 {
+            for dx in 0..10 {
+                let py = (y + dy) as usize;
+                let px = (x + dx) as usize;
+                if py < self.screen_height as usize && px < self.screen_width as usize {
+                    let idx = (py * width + px) * 4;
+                    self.saved_pixels[dy as usize][dx as usize] =
+                        Rgb888::new(fb[idx], fb[idx + 1], fb[idx + 2]);
                 }
             }
-            self.has_saved = true;
         }
-        drop(guard);
+        self.has_saved = true;
 
-        // Draw block
+        // TEAM_086: Create Display from borrowed GpuState and draw block
+        let mut display = Display::new(gpu_state);
         let _ = Rectangle::new(Point::new(x as i32, y as i32), Size::new(10, 20))
             .into_styled(PrimitiveStyle::with_fill(self.config.fg_color))
-            .draw(display);
+            .draw(&mut display);
 
         self.cursor_visible = true;
     }
 
-    fn hide_cursor(&mut self, _display: &mut Display) {
+    /// TEAM_086: Changed to accept &mut GpuState - no internal locking needed
+    fn hide_cursor(&mut self, gpu_state: &mut GpuState) {
         if !self.cursor_visible || !self.has_saved {
             self.cursor_visible = false;
             return;
@@ -394,28 +407,25 @@ impl Terminal {
         let x = self.cursor_col * (FONT_WIDTH + CHARACTER_SPACING);
         let y = self.cursor_row * (FONT_HEIGHT + LINE_SPACING);
 
-        // Restore pixels
-        let mut guard = crate::gpu::GPU.lock();
-        if let Some(gpu) = guard.as_mut() {
-            let fb = gpu.framebuffer();
-            let width = self.screen_width as usize;
+        // TEAM_086: Restore pixels using provided gpu_state directly
+        let fb = gpu_state.framebuffer();
+        let width = self.screen_width as usize;
 
-            for dy in 0..20 {
-                for dx in 0..10 {
-                    let py = (y + dy) as usize;
-                    let px = (x + dx) as usize;
-                    if py < self.screen_height as usize && px < self.screen_width as usize {
-                        let idx = (py * width + px) * 4;
-                        let color = self.saved_pixels[dy as usize][dx as usize];
-                        fb[idx] = color.r();
-                        fb[idx + 1] = color.g();
-                        fb[idx + 2] = color.b();
-                        fb[idx + 3] = 255;
-                    }
+        for dy in 0..20 {
+            for dx in 0..10 {
+                let py = (y + dy) as usize;
+                let px = (x + dx) as usize;
+                if py < self.screen_height as usize && px < self.screen_width as usize {
+                    let idx = (py * width + px) * 4;
+                    let color = self.saved_pixels[dy as usize][dx as usize];
+                    fb[idx] = color.r();
+                    fb[idx + 1] = color.g();
+                    fb[idx + 2] = color.b();
+                    fb[idx + 3] = 255;
                 }
             }
-            gpu.flush();
         }
+        // TEAM_086: Note - flush is now caller's responsibility
 
         self.cursor_visible = false;
     }

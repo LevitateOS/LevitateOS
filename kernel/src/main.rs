@@ -522,7 +522,7 @@ pub extern "C" fn kmain() -> ! {
         println!("[BOOT] SPEC-1: No GPU found, using serial-only console");
     }
 
-    let mut display = gpu::Display;
+    // TEAM_086: Removed unused Display variable - Display now requires &mut GpuState
 
     // SC2.2, SC2.3: Get resolution from GPU
     let (width, height) = match gpu::get_resolution() {
@@ -642,49 +642,51 @@ pub extern "C" fn kmain() -> ! {
     println!("\n[SUCCESS] LevitateOS System Ready.");
     println!("--------------------------------------");
 
-    // TEAM_081: Mirroring disabled due to instability in GPU rendering path
-    // if gpu_available {
-    //     levitate_hal::console::set_secondary_output(console_gpu::write_str);
-    //     println!("Dual console active (UART + GPU)");
-    // }
-
     println!("Interactive kernel console active.");
-    println!("Type characters to see them echoed on screen.");
-    println!("--------------------------------------\n");
+    println!("Type in QEMU window or this terminal.");
+
+    // TEAM_083: Write initial prompt by directly manipulating framebuffer
+    // Avoid Display struct which has internal GPU lock that causes deadlock
+    {
+        let mut gpu_guard = gpu::GPU.lock();
+        if let Some(gpu_state) = gpu_guard.as_mut() {
+            let width = gpu_state.width;
+            let fb = gpu_state.framebuffer();
+            
+            // Draw a simple "READY" indicator - white pixels at top
+            for x in 10..200 {
+                let offset = ((10 * width + x) * 4) as usize;
+                if offset + 4 <= fb.len() {
+                    fb[offset] = 0xFF;     // B
+                    fb[offset + 1] = 0xFF; // G
+                    fb[offset + 2] = 0xFF; // R
+                    fb[offset + 3] = 0xFF; // A
+                }
+            }
+            gpu_state.gpu.flush().ok();
+        }
+    }
+    
+    levitate_hal::serial_print!("\n# ");
 
     loop {
-        // TEAM_081: Blinking cursor feedback via global terminal
-        console_gpu::check_blink();
+        // Poll VirtIO input devices
+        input::poll();
 
-        // SC14.6: Keep existing cursor tracking
-        if let Some(ref mut gpu_state) = *gpu::GPU.lock() {
-            if input::poll() {
-                cursor::draw(&mut gpu::Display);
+        // Echo VirtIO Keyboard input to UART
+        if let Some(ch) = input::read_char() {
+            levitate_hal::serial_print!("{}", ch);
+            if ch == '\n' {
+                levitate_hal::serial_print!("# ");
             }
         }
 
-        // TEAM_081: Echo UART input - println! now handles both UART and GPU
+        // Echo UART input (from terminal running QEMU)
         if let Some(c) = levitate_hal::console::read_byte() {
             let ch = c as char;
-            match ch {
-                '\r' | '\n' => {
-                    println!(); // Dual console newline
-                }
-                _ => {
-                    print!("{}", ch); // Dual console character
-                }
-            }
-        }
-
-        // TEAM_081: Echo VirtIO Keyboard input - println! now handles both
-        if let Some(ch) = input::read_char() {
-            match ch {
-                '\n' => {
-                    println!(); // Dual console newline
-                }
-                _ => {
-                    print!("{}", ch); // Dual console character
-                }
+            levitate_hal::serial_print!("{}", ch);
+            if ch == '\r' || ch == '\n' {
+                levitate_hal::serial_print!("\n# ");
             }
         }
 

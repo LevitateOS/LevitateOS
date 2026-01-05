@@ -22,12 +22,13 @@ pub enum GpuError {
 }
 
 // TEAM_032: Use StaticMmioTransport (MmioTransport<'static>) for static storage
+// TEAM_083: Made width/height/gpu public for direct console access
 pub struct GpuState {
-    gpu: VirtIOGpu<VirtioHal, StaticMmioTransport>,
+    pub gpu: VirtIOGpu<VirtioHal, StaticMmioTransport>,
     fb_ptr: usize,
     fb_len: usize,
-    width: u32,
-    height: u32,
+    pub width: u32,
+    pub height: u32,
 }
 
 pub static GPU: IrqSafeLock<Option<GpuState>> = IrqSafeLock::new(None);
@@ -92,25 +93,36 @@ pub fn get_resolution() -> Option<(u32, u32)> {
     GPU.lock().as_ref().map(|s| (s.width, s.height))
 }
 
-pub struct Display;
+// TEAM_086: Refactored Display to accept &mut GpuState instead of locking internally.
+// This fixes the deadlock issue where Display::draw_iter() would lock GPU, then callers
+// would try to lock again for flush(). See docs/planning/gpu-display-deadlock-fix/PLAN.md
+pub struct Display<'a> {
+    state: &'a mut GpuState,
+}
+
+impl<'a> Display<'a> {
+    /// Create a new Display wrapper around a borrowed GpuState.
+    /// Caller must hold the GPU lock for the lifetime of this Display.
+    pub fn new(state: &'a mut GpuState) -> Self {
+        Self { state }
+    }
+}
 
 /// TEAM_065: DrawTarget with proper error type (Rule 6)
-impl DrawTarget for Display {
+/// TEAM_086: Refactored to use borrowed state instead of internal locking
+impl<'a> DrawTarget for Display<'a> {
     type Color = Rgb888;
-    type Error = GpuError;
+    type Error = core::convert::Infallible; // TEAM_086: Can't fail - we have guaranteed access
 
     fn draw_iter<I>(&mut self, pixels: I) -> Result<(), Self::Error>
     where
         I: IntoIterator<Item = Pixel<Self::Color>>,
     {
-        let mut guard = GPU.lock();
-        let state = guard.as_mut().ok_or(GpuError::NotInitialized)?;
+        // TEAM_086: No lock needed - caller already holds GpuState
+        let width = self.state.width;
+        let height = self.state.height;
+        let fb = self.state.framebuffer();
 
-        let width = state.width;
-        let height = state.height;
-        let fb = state.framebuffer();
-
-        let mut updated = false;
         for Pixel(point, color) in pixels {
             if point.x >= 0 && point.x < width as i32 && point.y >= 0 && point.y < height as i32 {
                 let idx = (point.y as usize * width as usize + point.x as usize) * 4;
@@ -119,23 +131,16 @@ impl DrawTarget for Display {
                     fb[idx + 1] = color.g();
                     fb[idx + 2] = color.b();
                     fb[idx + 3] = 255; // Alpha
-                    updated = true;
                 }
             }
         }
-        // TEAM_083: Removed automatic flush in draw_iter to improve performance.
-        // Callers must call GPU.lock().unwrap().flush() explicitly.
         Ok(())
     }
 }
 
-impl OriginDimensions for Display {
+impl<'a> OriginDimensions for Display<'a> {
     fn size(&self) -> Size {
-        let guard = GPU.lock();
-        if let Some(state) = guard.as_ref() {
-            Size::new(state.width, state.height)
-        } else {
-            Size::new(0, 0)
-        }
+        // TEAM_086: Direct access to state - no lock needed
+        Size::new(self.state.width, self.state.height)
     }
 }
