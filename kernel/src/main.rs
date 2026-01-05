@@ -314,7 +314,7 @@ pub fn get_dtb_phys() -> Option<usize> {
 struct TimerHandler;
 impl gic::InterruptHandler for TimerHandler {
     fn handle(&self, _irq: u32) {
-        levitate_hal::serial_println!("T");
+        // TEAM_083: Removed debug "T" output - was flooding console
         // Reload timer for next interrupt (10ms @ 100Hz)
         let freq = timer::API.read_frequency();
         timer::API.set_timeout(freq / 100);
@@ -657,9 +657,9 @@ pub extern "C" fn kmain() -> ! {
         console_gpu::check_blink();
 
         // SC14.6: Keep existing cursor tracking
-        if let Some(mut display) = GPU.lock().as_mut() {
+        if let Some(ref mut gpu_state) = *gpu::GPU.lock() {
             if input::poll() {
-                cursor::draw(&mut display);
+                cursor::draw(&mut gpu::Display);
             }
         }
 
