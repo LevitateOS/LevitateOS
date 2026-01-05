@@ -122,13 +122,17 @@ impl<H: VirtioHal> VirtioGpu<H> {
             return Err(GpuError::TransportError);
         }
 
-        let (desc_addr, avail_addr, used_addr) = control_queue.addresses();
+        // TEAM_100: Convert virtual addresses to physical for MMIO transport
+        let (desc_vaddr, avail_vaddr, used_vaddr) = control_queue.addresses();
+        let desc_paddr = H::virt_to_phys(desc_vaddr);
+        let avail_paddr = H::virt_to_phys(avail_vaddr);
+        let used_paddr = H::virt_to_phys(used_vaddr);
         transport.queue_set(
             CONTROLQ,
             QUEUE_SIZE as u16,
-            desc_addr,
-            avail_addr,
-            used_addr,
+            desc_paddr,
+            avail_paddr,
+            used_paddr,
         );
 
         // Set DRIVER_OK
@@ -257,9 +261,9 @@ impl<H: VirtioHal> VirtioGpu<H> {
         // Allocate response buffer
         let mut resp = vec![0u8; resp_size];
 
-        // Add to virtqueue
+        // Add to virtqueue with physical address translation
         let _head = self.control_queue
-            .add_buffer(&[cmd], &mut [resp.as_mut_slice()])
+            .add_buffer(&[cmd], &mut [resp.as_mut_slice()], H::virt_to_phys)
             .map_err(|e| match e {
                 VirtQueueError::QueueFull => GpuError::TransportError,
                 _ => GpuError::TransportError,

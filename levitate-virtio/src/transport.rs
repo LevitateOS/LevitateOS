@@ -157,9 +157,10 @@ impl MmioTransport {
             return Err(TransportError::NotFound);
         }
 
-        // Verify version (must be 2 for modern VirtIO)
+        // TEAM_100: Accept both legacy (1) and modern (2) VirtIO MMIO
+        // QEMU's virt machine uses version 2, but be lenient
         let version = transport.read_reg(mmio_regs::VERSION);
-        if version != 2 {
+        if version == 0 || version > 2 {
             return Err(TransportError::InvalidConfig);
         }
 

@@ -23,7 +23,6 @@ use core::arch::global_asm;
 use core::panic::PanicInfo;
 
 mod block;
-mod cursor;
 mod exceptions;
 mod fs;
 mod gpu;
@@ -668,21 +667,22 @@ pub extern "C" fn kmain() -> ! {
     {
         let mut gpu_guard = gpu::GPU.lock();
         if let Some(gpu_state) = gpu_guard.as_mut() {
-            let (width, _height) = gpu_state.resolution();
+            // TEAM_100: Use dimensions() for old GpuState API
+            let (width, _height) = gpu_state.dimensions();
             
-            if let Some(fb) = gpu_state.framebuffer() {
-                // Draw a simple "READY" indicator - white pixels at top
-                for x in 10..200 {
-                    let offset = ((10 * width + x) * 4) as usize;
-                    if offset + 4 <= fb.len() {
-                        fb[offset] = 0xFF; // B
-                        fb[offset + 1] = 0xFF; // G
-                        fb[offset + 2] = 0xFF; // R
-                        fb[offset + 3] = 0xFF; // A
-                    }
+            // TEAM_100: framebuffer() returns &mut [u8] directly
+            let fb = gpu_state.framebuffer();
+            // Draw a simple "READY" indicator - white pixels at top
+            for x in 10..200 {
+                let offset = ((10 * width + x) * 4) as usize;
+                if offset + 4 <= fb.len() {
+                    fb[offset] = 0xFF; // B
+                    fb[offset + 1] = 0xFF; // G
+                    fb[offset + 2] = 0xFF; // R
+                    fb[offset + 3] = 0xFF; // A
                 }
             }
-            let _ = gpu_state.flush();
+            gpu_state.flush();
         }
     }
 

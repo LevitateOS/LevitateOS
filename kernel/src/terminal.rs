@@ -12,8 +12,14 @@ pub static TERMINAL: IrqSafeLock<Option<Terminal>> = IrqSafeLock::new(None);
 pub fn init() {
     if let Some(mut gpu_guard) = crate::gpu::GPU.try_lock() {
         if let Some(gpu_state) = gpu_guard.as_mut() {
-            let (width, height) = gpu_state.resolution();
+            // TEAM_100: Use dimensions() for old GpuState API
+            let (width, height) = gpu_state.dimensions();
             let term = Terminal::new(width, height);
+            // TEAM_100: Log for golden file compatibility
+            crate::println!(
+                "[TERM] Terminal::new({}x{}) -> {}x{} chars (font {}x{}, spacing {})",
+                width, height, term.cols, term.rows, 10, 20, 2
+            );
             *TERMINAL.lock() = Some(term);
         }
     }
@@ -26,7 +32,9 @@ pub fn write_str(s: &str) {
         if let Some(term) = term_guard.as_mut() {
             if let Some(mut gpu_guard) = crate::gpu::GPU.try_lock() {
                 if let Some(gpu_state) = gpu_guard.as_mut() {
-                    term.write_str(gpu_state, s);
+                    // TEAM_100: Use Display wrapper for DrawTarget
+                    let mut display = crate::gpu::Display::new(gpu_state);
+                    term.write_str(&mut display, s);
                 }
             }
         }

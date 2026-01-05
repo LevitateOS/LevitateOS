@@ -127,14 +127,21 @@ impl<const SIZE: usize> VirtQueue<SIZE> {
         self.num_free > 0
     }
 
-    /// Add a buffer chain to the available ring.
+    /// Add a buffer chain to the available ring with address translation.
+    ///
+    /// TEAM_100: Added virt_to_phys parameter for proper DMA address translation.
+    /// The device needs physical addresses, not virtual addresses.
     ///
     /// Returns the head descriptor index.
-    pub fn add_buffer(
+    pub fn add_buffer<F>(
         &mut self,
         inputs: &[&[u8]],
         outputs: &mut [&mut [u8]],
-    ) -> Result<u16, VirtQueueError> {
+        virt_to_phys: F,
+    ) -> Result<u16, VirtQueueError>
+    where
+        F: Fn(usize) -> usize,
+    {
         let total = inputs.len() + outputs.len();
         if total == 0 {
             return Err(VirtQueueError::InvalidDescriptor);
@@ -149,7 +156,8 @@ impl<const SIZE: usize> VirtQueue<SIZE> {
         // Add input buffers (device reads)
         for (i, input) in inputs.iter().enumerate() {
             let desc = &mut self.descriptors[desc_idx as usize];
-            desc.addr = input.as_ptr() as u64;
+            // TEAM_100: Convert virtual address to physical for DMA
+            desc.addr = virt_to_phys(input.as_ptr() as usize) as u64;
             desc.len = input.len() as u32;
             desc.flags = if i + 1 < total {
                 DescriptorFlags::NEXT.bits()
@@ -165,7 +173,8 @@ impl<const SIZE: usize> VirtQueue<SIZE> {
         let output_count = outputs.len();
         for (i, output) in outputs.iter_mut().enumerate() {
             let desc = &mut self.descriptors[desc_idx as usize];
-            desc.addr = output.as_ptr() as u64;
+            // TEAM_100: Convert virtual address to physical for DMA
+            desc.addr = virt_to_phys(output.as_ptr() as usize) as u64;
             desc.len = output.len() as u32;
             let is_last = i + 1 == output_count;
             desc.flags = if is_last {
@@ -189,15 +198,26 @@ impl<const SIZE: usize> VirtQueue<SIZE> {
         // Memory barrier before updating index
         fence(Ordering::SeqCst);
 
-        self.avail_idx = self.avail_idx.wrapping_add(1);
+        // TEAM_100: Volatile-write avail_idx since device reads via DMA
+        let new_idx = self.avail_idx.wrapping_add(1);
+        unsafe {
+            core::ptr::write_volatile(&mut self.avail_idx as *mut u16, new_idx);
+        }
 
         Ok(head)
     }
 
     /// Check if there are used buffers to process.
+    /// 
+    /// TEAM_100: Volatile-read the used_idx since device writes via DMA.
     pub fn has_used(&self) -> bool {
         fence(Ordering::SeqCst);
-        self.last_used_idx != self.used_idx
+        // The device writes to used_idx via the physical address we gave it.
+        // We need to volatile-read it from our memory location.
+        let device_used_idx = unsafe {
+            core::ptr::read_volatile(&self.used_idx as *const u16)
+        };
+        self.last_used_idx != device_used_idx
     }
 
     /// Pop a used buffer from the used ring.
@@ -211,7 +231,10 @@ impl<const SIZE: usize> VirtQueue<SIZE> {
         fence(Ordering::SeqCst);
 
         let used_slot = (self.last_used_idx as usize) % SIZE;
-        let entry = self.used_ring[used_slot];
+        // TEAM_100: Volatile-read since device writes via DMA
+        let entry = unsafe {
+            core::ptr::read_volatile(&self.used_ring[used_slot] as *const UsedRingEntry)
+        };
         self.last_used_idx = self.last_used_idx.wrapping_add(1);
 
         // Return descriptors to free list

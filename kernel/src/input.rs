@@ -37,8 +37,6 @@ pub fn read_char() -> Option<char> {
 
 pub const EV_KEY: u16 = 1;
 pub const EV_ABS: u16 = 3;
-pub const ABS_X: u16 = 0;
-pub const ABS_Y: u16 = 1;
 
 pub const KEY_LEFTSHIFT: u16 = 42;
 pub const KEY_RIGHTSHIFT: u16 = 54;
@@ -48,13 +46,14 @@ pub const KEY_SPACE: u16 = 57;
 pub const KEY_TAB: u16 = 15;
 
 pub fn poll() -> bool {
-    let mut dirty = false;
+    let dirty = false;
 
     // TEAM_030: Get actual screen dimensions from GPU instead of hardcoding
     let (screen_width, screen_height) = {
         let gpu = crate::gpu::GPU.lock();
         if let Some(state) = gpu.as_ref() {
-            let (w, h) = state.resolution();
+            // TEAM_100: Use dimensions() for old GpuState API
+            let (w, h) = state.dimensions();
             (w as i32, h as i32)
         } else {
             (1024, 768) // Fallback if GPU not initialized
@@ -67,19 +66,11 @@ pub fn poll() -> bool {
         while let Some(event) = input.pop_pending_event() {
             let event: virtio_drivers::device::input::InputEvent = event;
             match event.event_type {
-                EV_ABS => match event.code {
-                    ABS_X => {
-                        let x = (event.value as i32 * screen_width) / 32768;
-                        crate::cursor::set_x(x);
-                        dirty = true;
-                    }
-                    ABS_Y => {
-                        let y = (event.value as i32 * screen_height) / 32768;
-                        crate::cursor::set_y(y);
-                        dirty = true;
-                    }
-                    _ => {}
-                },
+                EV_ABS => {
+                    // TEAM_100: Mouse cursor support removed (dead code cleanup)
+                    // Future: Re-implement when VirtIO GPU cursor support is added
+                    let _ = (screen_width, screen_height, event.code, event.value);
+                }
                 EV_KEY => {
                     let pressed = event.value != 0;
                     match event.code {
