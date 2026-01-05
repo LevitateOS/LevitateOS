@@ -10,10 +10,27 @@ tinyos_disk.img
 *.log
 *.o
 *.elf
+*.cpio
 repro.*
 linker_repro.ld
 debug_out.txt
 qemu_higher_half_debug.log
+
+# TEAM_093: Extra discovery/build artifacts
+*.png
+*.txt
+!docs/**/*.txt
+!tests/golden_*.txt
+dtb*
+Image
+qmp.sock
+test_copy.bin
+test_dtb.dtb
+qemu.log
+qemu_int.log
+qemu_repro.log
+build_warnings*.txt
+actual_*.txt
 
 # IDE and OS transient files
 .vscode/
@@ -27,3 +44,6 @@ tests/gicv3_*.txt
 
 # Temporary files
 tmp/
+initrd_root/hello
+initrd_root/test.txt
+initrd_root/hello.txt
