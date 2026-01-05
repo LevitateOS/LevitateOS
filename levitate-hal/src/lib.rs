@@ -3,9 +3,11 @@
 pub mod allocator;
 pub mod console;
 // TEAM_112: Export cache maintenance for DMA
+// TEAM_132: Migrate barriers to aarch64-cpu
 pub fn cache_clean_range(start_va: usize, size: usize) {
     #[cfg(target_arch = "aarch64")]
-    unsafe {
+    {
+        use aarch64_cpu::asm::barrier;
         use core::arch::asm;
         // Clean data cache by VA to PoC (Point of Coherency)
         let line_size = 64; // Assume 64-byte blocks for AArch64 (CTR_EL0 can be read to be sure but 64 is safe min)
@@ -14,10 +16,11 @@ pub fn cache_clean_range(start_va: usize, size: usize) {
 
         let mut addr = start;
         while addr < end {
-            asm!("dc cvac, {}", in(reg) addr, options(nostack));
+            // SAFETY: dc cvac is a cache maintenance instruction, safe with valid VA
+            unsafe { asm!("dc cvac, {}", in(reg) addr, options(nostack)) };
             addr += line_size;
         }
-        asm!("dsb sy", options(nostack));
+        barrier::dsb(barrier::SY);
     }
 
     #[cfg(not(target_arch = "aarch64"))]

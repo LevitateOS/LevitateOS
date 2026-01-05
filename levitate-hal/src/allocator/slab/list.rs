@@ -96,8 +96,10 @@ impl<T: ListNode> SlabList<T> {
     pub fn pop_front(&mut self) -> Option<NonNull<T>> {
         let head = self.head?;
 
+        // SAFETY: head is a valid NonNull from self.head, so as_ptr() returns valid pointer.
+        // The pointer is non-null by NonNull invariant, so as_mut() cannot return None.
         unsafe {
-            let head_ref = head.as_ptr().as_mut().unwrap();
+            let head_ref = head.as_ptr().as_mut().expect("TEAM_130: NonNull pointer was null - impossible");
             self.remove(head_ref);
         }
 

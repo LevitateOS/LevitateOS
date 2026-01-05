@@ -1,15 +1,15 @@
 /// AArch64 interrupt control.
 /// Behaviors: [I1]-[I6] interrupt enable/disable/restore cycle
+/// TEAM_132: Migrate DAIF to aarch64-cpu
 ///
 /// [I1] Disables interrupts, [I2] returns previous state
 #[cfg(target_arch = "aarch64")]
 #[inline(always)]
 pub fn disable() -> u64 {
-    let state: u64;
-    unsafe {
-        core::arch::asm!("mrs {}, daif", out(reg) state); // [I2] capture prev state
-        core::arch::asm!("msr daifset, #2"); // [I1] disable
-    }
+    use aarch64_cpu::registers::{Readable, DAIF};
+    let state = DAIF.get(); // [I2] capture prev state
+    // SAFETY: daifset is a special immediate-only instruction not provided by aarch64-cpu
+    unsafe { core::arch::asm!("msr daifset, #2") }; // [I1] disable
     state
 }
 
@@ -17,9 +17,8 @@ pub fn disable() -> u64 {
 #[cfg(target_arch = "aarch64")]
 #[inline(always)]
 pub unsafe fn enable() {
-    unsafe {
-        core::arch::asm!("msr daifclr, #2");
-    }
+    // SAFETY: daifclr is a special immediate-only instruction not provided by aarch64-cpu
+    unsafe { core::arch::asm!("msr daifclr, #2") };
 }
 
 #[cfg(not(target_arch = "aarch64"))]
@@ -62,24 +61,22 @@ pub fn restore(_state: u64) {
 }
 
 /// [I3] Restores previous interrupt state
+/// TEAM_132: Migrate DAIF to aarch64-cpu
 #[cfg(target_arch = "aarch64")]
 #[inline(always)]
 pub fn restore(state: u64) {
-    unsafe {
-        core::arch::asm!("msr daif, {}", in(reg) state); // [I3] restore
-    }
+    use aarch64_cpu::registers::{Writeable, DAIF};
+    DAIF.set(state); // [I3] restore
 }
 
 /// [I4] Returns true when enabled, [I5] returns false when disabled
+/// TEAM_132: Migrate DAIF to aarch64-cpu
 #[cfg(target_arch = "aarch64")]
 #[inline(always)]
 pub fn is_enabled() -> bool {
-    let state: u64;
-    unsafe {
-        core::arch::asm!("mrs {}, daif", out(reg) state);
-    }
+    use aarch64_cpu::registers::{Readable, DAIF};
     // IRQ is bit 7 (zero-indexed)
-    (state & (1 << 7)) == 0 // [I4][I5] check enabled state
+    (DAIF.get() & (1 << 7)) == 0 // [I4][I5] check enabled state
 }
 
 /// [I4] Returns true when enabled, [I5] returns false when disabled (mock impl)

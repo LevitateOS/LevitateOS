@@ -378,9 +378,15 @@ pub fn va_l3_index(va: usize) -> usize {
 /// Flush all TLB entries.
 #[cfg(target_arch = "aarch64")]
 pub fn tlb_flush_all() {
+    use aarch64_cpu::asm::barrier;
+    // SAFETY: TLB flush is always safe - it only invalidates cached translations.
+    // The system will re-walk page tables on next access.
+    // TEAM_132: Migrate barriers to aarch64-cpu, keep tlbi as raw asm (not in crate)
     unsafe {
-        core::arch::asm!("tlbi vmalle1", "dsb sy", "isb", options(nostack));
+        core::arch::asm!("tlbi vmalle1", options(nostack));
     }
+    barrier::dsb(barrier::SY);
+    barrier::isb(barrier::SY);
 }
 
 #[cfg(not(target_arch = "aarch64"))]
@@ -391,16 +397,15 @@ pub fn tlb_flush_all() {
 /// Flush TLB entry for a specific virtual address.
 #[cfg(target_arch = "aarch64")]
 pub fn tlb_flush_page(va: usize) {
+    use aarch64_cpu::asm::barrier;
+    // SAFETY: TLB flush for a single VA is always safe - invalidates one cached translation.
+    // TEAM_132: Migrate barriers to aarch64-cpu
     unsafe {
         let value = va >> 12;
-        core::arch::asm!(
-            "tlbi vae1, {}",
-            "dsb sy",
-            "isb",
-            in(reg) value,
-            options(nostack)
-        );
+        core::arch::asm!("tlbi vae1, {}", in(reg) value, options(nostack));
     }
+    barrier::dsb(barrier::SY);
+    barrier::isb(barrier::SY);
 }
 
 #[cfg(not(target_arch = "aarch64"))]
@@ -439,6 +444,8 @@ pub fn init() {
 /// - `ttbr0_phys` and `ttbr1_phys` must point to valid page tables.
 #[cfg(target_arch = "aarch64")]
 pub unsafe fn enable_mmu(ttbr0_phys: usize, ttbr1_phys: usize) {
+    // SAFETY: Caller guarantees ttbr0_phys and ttbr1_phys point to valid page tables.
+    // The asm! blocks modify system registers - this is the core purpose of this function.
     unsafe {
         // Load TTBR0_EL1 and TTBR1_EL1
         core::arch::asm!(
@@ -479,6 +486,8 @@ pub unsafe fn enable_mmu(_ttbr0_phys: usize, _ttbr1_phys: usize) {
 /// Disable the MMU.
 #[cfg(target_arch = "aarch64")]
 pub unsafe fn disable_mmu() {
+    // SAFETY: Disabling MMU requires identity-mapped code to be executing.
+    // Caller must ensure current PC is identity-mapped before calling.
     unsafe {
         let mut sctlr: u64;
         core::arch::asm!(

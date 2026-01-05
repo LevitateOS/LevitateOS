@@ -3,6 +3,10 @@ use core::ptr::NonNull;
 
 // TEAM_047: Buddy Allocator implementation
 // Handles physical frame allocation and freeing with coalescing.
+//
+// TEAM_130: This allocator uses expect() in critical paths where failure
+// indicates corrupted internal state (invariant violations). Per Rule 14
+// (Fail Loud, Fail Fast), panicking is correct for broken invariants.
 
 pub const MAX_ORDER: usize = 21; // Up to 8GB (2^21 * 4KB)
 pub const PAGE_SIZE: usize = 4096;
@@ -78,9 +82,11 @@ impl BuddyAllocator {
                 // 2. Split the block if it's larger than needed
                 for j in (order..i).rev() {
                     let buddy_pa = self.page_to_pa(page) + (1 << j) * PAGE_SIZE;
+                    // TEAM_130: Buddy page must exist - this is an invariant of the allocator.
+                    // If it doesn't exist, the free_lists are corrupted.
                     let buddy_page = self
                         .pa_to_page_mut(buddy_pa)
-                        .expect("Buddy page must exist");
+                        .expect("TEAM_130: Buddy page must exist - corrupted allocator state");
 
                     buddy_page.reset();
                     buddy_page.order = j as u8;
@@ -128,7 +134,8 @@ impl BuddyAllocator {
         }
 
         // Add the (possibly coalesced) block to the free list
-        let page = self.pa_to_page_mut(curr_pa).expect("Page must exist");
+        // TEAM_130: Page must exist - caller passed valid PA from prior allocation
+        let page = self.pa_to_page_mut(curr_pa).expect("TEAM_130: Page must exist - invalid PA passed to free");
         page.reset();
         page.mark_free();
         page.order = curr_order as u8;
@@ -153,7 +160,8 @@ impl BuddyAllocator {
 
     // Helper: Convert Page descriptor to Physical Address
     fn page_to_pa(&self, page: &Page) -> usize {
-        let mem_map = self.mem_map.as_ref().expect("mem_map must be set");
+        // TEAM_130: mem_map must be set - allocator is unusable if not initialized
+        let mem_map = self.mem_map.as_ref().expect("TEAM_130: mem_map must be set - allocator not initialized");
         let offset = page as *const Page as usize - mem_map.as_ptr() as usize;
         let index = offset / core::mem::size_of::<Page>();
         self.phys_base + index * PAGE_SIZE

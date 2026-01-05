@@ -282,11 +282,10 @@ pub extern "C" fn handle_sync_lower_el(frame: *mut SyscallFrame) {
 
         // TODO(TEAM_073): Integrate with task/process management to properly terminate
         // For now, just loop (will be fixed in Step 5 integration)
+        // TEAM_132: Migrate wfi to aarch64-cpu
         loop {
             #[cfg(target_arch = "aarch64")]
-            unsafe {
-                core::arch::asm!("wfi", options(nomem, nostack));
-            }
+            aarch64_cpu::asm::wfi();
             #[cfg(not(target_arch = "aarch64"))]
             core::hint::spin_loop();
         }

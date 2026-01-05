@@ -68,6 +68,7 @@ pub const GIC_MAX_IRQ: u32 = 256;
 #[cfg(target_arch = "aarch64")]
 mod sysreg {
     /// Read ICC_SRE_EL1 - System Register Enable
+    /// NOTE: ICC_* registers are not in aarch64-cpu, keeping raw asm
     #[inline]
     pub fn icc_sre_el1_read() -> u64 {
         let val: u64;
@@ -108,9 +109,10 @@ mod sysreg {
     }
 
     /// Issue ISB barrier
+    /// TEAM_132: Migrate to aarch64-cpu
     #[inline]
     pub fn isb() {
-        unsafe { core::arch::asm!("isb") };
+        aarch64_cpu::asm::barrier::isb(aarch64_cpu::asm::barrier::SY);
     }
 }
 
@@ -342,12 +344,14 @@ impl Gic {
         self.version
     }
 
+    // TEAM_132: Migrate dmb to aarch64-cpu
     #[cfg(target_arch = "aarch64")]
     unsafe fn gicd_write(&self, offset: usize, value: u32) {
+        use aarch64_cpu::asm::barrier;
         unsafe {
             write_volatile((self.dist_base + offset) as *mut u32, value);
-            core::arch::asm!("dmb sy");
         }
+        barrier::dmb(barrier::SY);
     }
 
     #[cfg(not(target_arch = "aarch64"))]
@@ -357,13 +361,13 @@ impl Gic {
         }
     }
 
+    // TEAM_132: Migrate dmb to aarch64-cpu
     #[cfg(target_arch = "aarch64")]
     unsafe fn gicd_read(&self, offset: usize) -> u32 {
-        unsafe {
-            let val = read_volatile((self.dist_base + offset) as *const u32);
-            core::arch::asm!("dmb sy");
-            val
-        }
+        use aarch64_cpu::asm::barrier;
+        let val = unsafe { read_volatile((self.dist_base + offset) as *const u32) };
+        barrier::dmb(barrier::SY);
+        val
     }
 
     #[cfg(not(target_arch = "aarch64"))]
@@ -371,12 +375,14 @@ impl Gic {
         unsafe { read_volatile((self.dist_base + offset) as *const u32) }
     }
 
+    // TEAM_132: Migrate dmb to aarch64-cpu
     #[cfg(target_arch = "aarch64")]
     unsafe fn gicc_write(&self, offset: usize, value: u32) {
+        use aarch64_cpu::asm::barrier;
         unsafe {
             write_volatile((self.cpu_base + offset) as *mut u32, value);
-            core::arch::asm!("dmb sy");
         }
+        barrier::dmb(barrier::SY);
     }
 
     #[cfg(not(target_arch = "aarch64"))]
@@ -386,13 +392,13 @@ impl Gic {
         }
     }
 
+    // TEAM_132: Migrate dmb to aarch64-cpu
     #[cfg(target_arch = "aarch64")]
     unsafe fn gicc_read(&self, offset: usize) -> u32 {
-        unsafe {
-            let val = read_volatile((self.cpu_base + offset) as *const u32);
-            core::arch::asm!("dmb sy");
-            val
-        }
+        use aarch64_cpu::asm::barrier;
+        let val = unsafe { read_volatile((self.cpu_base + offset) as *const u32) };
+        barrier::dmb(barrier::SY);
+        val
     }
 
     #[cfg(not(target_arch = "aarch64"))]

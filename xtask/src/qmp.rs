@@ -10,7 +10,10 @@ struct QmpCommand {
     arguments: Option<serde_json::Value>,
 }
 
+// TEAM_130: Fields event and greeting are used for serde deserialization
+// of QMP protocol responses, even if not explicitly read in code.
 #[derive(Deserialize, Debug)]
+#[allow(dead_code)]
 struct QmpResponse {
     #[serde(rename = "return")]
     return_: Option<serde_json::Value>,

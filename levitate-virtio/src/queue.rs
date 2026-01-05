@@ -178,8 +178,11 @@ impl<const SIZE: usize> VirtQueue<SIZE> {
         // TEAM_109: Use volatile writes - device reads descriptors via DMA
         for (i, input) in inputs.iter().enumerate() {
             let desc_ptr = &mut self.descriptors[desc_idx as usize] as *mut Descriptor;
+            // SAFETY: desc_idx is bounds-checked by num_free check above, desc_ptr is valid
             let next_idx = unsafe { (*desc_ptr).next };
             // TEAM_100: Convert virtual address to physical for DMA
+            // SAFETY: desc_ptr points to valid Descriptor in self.descriptors array,
+            // volatile writes ensure device sees updates via DMA
             unsafe {
                 core::ptr::write_volatile(
                     &mut (*desc_ptr).addr,
@@ -205,9 +208,11 @@ impl<const SIZE: usize> VirtQueue<SIZE> {
         let output_count = outputs.len();
         for (i, output) in outputs.iter_mut().enumerate() {
             let desc_ptr = &mut self.descriptors[desc_idx as usize] as *mut Descriptor;
+            // SAFETY: desc_idx is valid from free list chain, desc_ptr is valid
             let next_idx = unsafe { (*desc_ptr).next };
             // TEAM_100: Convert virtual address to physical for DMA
             let is_last = i + 1 == output_count;
+            // SAFETY: desc_ptr points to valid Descriptor, volatile writes for DMA visibility
             unsafe {
                 core::ptr::write_volatile(
                     &mut (*desc_ptr).addr,
@@ -235,6 +240,7 @@ impl<const SIZE: usize> VirtQueue<SIZE> {
         // Add to available ring
         // TEAM_109: Volatile write - device reads avail_ring via DMA
         let avail_slot = (self.avail_idx as usize) % SIZE;
+        // SAFETY: avail_slot is bounded by SIZE via modulo, avail_ring is valid array
         unsafe {
             core::ptr::write_volatile(&mut self.avail_ring[avail_slot], head);
         }
@@ -244,6 +250,7 @@ impl<const SIZE: usize> VirtQueue<SIZE> {
 
         // TEAM_100: Volatile-write avail_idx since device reads via DMA
         let new_idx = self.avail_idx.wrapping_add(1);
+        // SAFETY: self.avail_idx is a valid u16 field, volatile write for DMA
         unsafe {
             core::ptr::write_volatile(&mut self.avail_idx as *mut u16, new_idx);
         }
@@ -251,9 +258,11 @@ impl<const SIZE: usize> VirtQueue<SIZE> {
         // TEAM_109: ARM DSB to ensure writes are visible to device
         // The fence above orders CPU memory accesses, but DSB ensures
         // completion of all memory writes before device sees them via DMA.
+        // TEAM_132: Migrate to aarch64-cpu
         #[cfg(target_arch = "aarch64")]
-        unsafe {
-            core::arch::asm!("dsb sy", options(nostack, preserves_flags));
+        {
+            use aarch64_cpu::asm::barrier;
+            barrier::dsb(barrier::SY);
         }
 
         Ok(head)
@@ -266,6 +275,7 @@ impl<const SIZE: usize> VirtQueue<SIZE> {
         fence(Ordering::SeqCst);
         // The device writes to used_idx via the physical address we gave it.
         // We need to volatile-read it from our memory location.
+        // SAFETY: self.used_idx is a valid u16 field, volatile read for DMA coherence
         let device_used_idx = unsafe { core::ptr::read_volatile(&self.used_idx as *const u16) };
         self.last_used_idx != device_used_idx
     }
@@ -282,6 +292,7 @@ impl<const SIZE: usize> VirtQueue<SIZE> {
 
         let used_slot = (self.last_used_idx as usize) % SIZE;
         // TEAM_100: Volatile-read since device writes via DMA
+        // SAFETY: used_slot is bounded by SIZE via modulo, used_ring is valid array
         let entry =
             unsafe { core::ptr::read_volatile(&self.used_ring[used_slot] as *const UsedRingEntry) };
         self.last_used_idx = self.last_used_idx.wrapping_add(1);

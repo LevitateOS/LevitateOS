@@ -27,4 +27,6 @@ log = "0.4"
 embedded-sdmmc = { version = "0.9", default-features = false }
 ext4-view = { version = "0.9", default-features = false }
 bitflags = "2.10.0"
+# TEAM_132: Add aarch64-cpu for safe wfi/barrier abstractions
+aarch64-cpu = "11.2"
 
