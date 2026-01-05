@@ -2,26 +2,45 @@
 description: how to verify GPU display state when QEMU window is blank
 ---
 
-# Verifying GPU State via QMP
+# Verifying GPU State via Browser VNC
 
-When the QEMU graphical window reports "Display output is not active", follow these steps to verify if the kernel is actually rendering.
+When the QEMU graphical window reports "Display output is not active", use the browser-based VNC viewer to verify.
 
-## 1. Prerequisites
-- QEMU must be running with the QMP socket enabled (enabled by default in `run.sh` via `TEAM_092`).
-- The `qmp.sock` file should be present in the project root.
+## Recommended: Using `cargo xtask run-vnc`
 
-## 2. Capture a Framebuffer Dump
-Run the following command from the project root:
+// turbo-all
 
 ```bash
+# 1. Start QEMU with VNC
+cargo xtask run-vnc
+```
+
+```
+# 2. Open browser to http://localhost:6080/vnc.html
+# 3. Click "Connect" button
+# 4. Observe the display:
+#    - "Display output is not active" = GPU is BROKEN ❌
+#    - Terminal text visible = GPU is WORKING ✅
+```
+
+## Alternative: GPU Dump via QMP
+
+If QEMU is already running with QMP enabled (default in `run.sh`):
+
+```bash
+# Capture framebuffer to PNG
 cargo xtask gpu-dump screenshot.png
 ```
 
-## 3. Analyze the Results
-- **If `screenshot.png` has contents (e.g., text, terminal):** The kernel-side driver is WORKING. The issue is likely a QEMU surface timing issue or a "heartbeat" flush rate problem.
-- **If `screenshot.png` is all black/red:** The kernel is not correctly rendering into the framebuffer, or the VirtIO GPU scanout is not pointing to the correct memory.
+### Analyze Results
+- **If `screenshot.png` has contents (text, terminal):** Kernel-side driver is WORKING.
+- **If `screenshot.png` is all black/red:** GPU scanout is not configured correctly.
 
-## 4. Check Internal Heartbeats
-Monitor the serial console for `[GPU-HB]` logs. 
-- These report `total_flushes` and `failed_flushes`.
-- If `failed_flushes` is increasing, the VirtIO queue is entering an error state.
+## Current Status (TEAM_111)
+
+> **⚠️ GPU is BROKEN as of 2026-01-05**
+> 
+> Serial output says "GPU initialized successfully" but display shows "Display output is not active".
+> This is a FALSE POSITIVE in the test suite.
+
+See `.teams/TEAM_111_investigate_desired_behaviors_and_qemu_vnc.md` for full investigation.

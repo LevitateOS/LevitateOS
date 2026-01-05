@@ -309,28 +309,42 @@ struct VirtQueue<H, SIZE> {
 
 ---
 
-### 16. Two GPU Crates Exist — BOTH ARE BROKEN (TEAM_109)
+### 16. GPU Display Still Broken - Use VNC to Verify (TEAM_111)
 
-**Location:** `levitate-gpu/` and `levitate-drivers-gpu/`
+**Location:** `levitate-drivers-gpu/`
 
-**⚠️ CRITICAL WARNING:**
-- `levitate-gpu`: Uses external `virtio-drivers`. **GIVES FALSE POSITIVE TESTS.** Tests pass but GPU display doesn't actually work.
-- `levitate-drivers-gpu`: Custom implementation. Times out on commands.
+**⚠️ CRITICAL: GPU GIVES FALSE POSITIVE TESTS**
 
-**Why This Matters:**
-The reason `levitate-drivers-gpu` was created is because `levitate-gpu` (virtio-drivers) **never actually worked**. It passes tests because the test harness doesn't verify actual display output — it only checks that the driver initializes without crashing.
+Serial output says "GPU initialized successfully" but QEMU window shows **"Display output is not active"**.
 
-**DO NOT:**
-- ❌ Trust "passing tests" with `levitate-gpu` — they are false positives
-- ❌ Fall back to `levitate-gpu` thinking it "works" — it doesn't
-- ❌ Consider the GPU "fixed" just because tests pass
+**Current Status (2026-01-05):**
+- ❌ QEMU display shows nothing
+- ✅ Serial console works (boots to shell prompt)
+- ⚠️ Tests pass but are misleading
 
-**DO:**
-- ✅ Verify actual display output in QEMU window
-- ✅ Fix `levitate-drivers-gpu` properly
-- ✅ Use `cargo xtask gpu-dump` to verify pixel data
+**How to Verify GPU State:**
+```bash
+# Start QEMU with VNC
+cargo xtask run-vnc
 
-**History:** See `.teams/TEAM_108_investigate_gpu_crate_alignment.md` and `.teams/TEAM_109_fix_gpu_driver_no_fallback.md` for full context.
+# Open browser to http://localhost:6080/vnc.html
+# Click "Connect"
+# 
+# "Display output is not active" = BROKEN
+# Terminal text visible = WORKING
+```
+
+**Root Cause:** VirtIO GPU SET_SCANOUT command not working properly.
+
+**Fix Required:** Make `levitate-drivers-gpu` correctly send:
+1. SET_SCANOUT - link framebuffer to display
+2. TRANSFER_TO_HOST_2D - copy pixels
+3. RESOURCE_FLUSH - refresh display
+
+**References:**
+- `docs/handoffs/TEAM_111_gpu_display_fix_handoff.md` - Full fix instructions
+- `.agent/workflows/fix-gpu-display.md` - Debug workflow
+- `.teams/TEAM_111_investigate_desired_behaviors_and_qemu_vnc.md` - Investigation
 
 ---
 
@@ -340,3 +354,4 @@ When you discover a non-obvious issue:
 1. Add it to this file with your TEAM_XXX
 2. Include: Location, Problem, Symptom, Fix
 3. Leave breadcrumbs in the code too
+
