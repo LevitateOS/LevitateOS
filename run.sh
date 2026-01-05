@@ -26,7 +26,7 @@ qemu-system-aarch64 \
     -m 1G \
     -kernel "$BIN" \
     -display gtk,zoom-to-fit=off \
-    -device virtio-gpu-device,xres=1280,yres=800 \
+    -device virtio-gpu-pci,xres=1280,yres=800 \
     -device virtio-keyboard-device \
     -device virtio-tablet-device \
     -device virtio-net-device,netdev=net0 \

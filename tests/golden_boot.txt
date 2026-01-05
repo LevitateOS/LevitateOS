@@ -4,12 +4,17 @@ Heap initialized.
 MMU re-initialized (Higher-Half + Identity).
 Exceptions initialized.
 DTB address from x0: 0x48200000
-Detected GIC version: V3
+Detected GIC version: V2
 Buddy Allocator initialized with DTB memory map.
 Core drivers initialized.
 Timer initialized.
 [BOOT] Stage 3: Boot Console (DXE)
-Scanning VirtIO MMIO bus for GPU...
+[GPU] Initializing via PCI...
+[PCI] Scanning Bus 0 for GPU...
+[PCI] Found VirtIO GPU at 00:01.0
+[PCI] PciTransport created successfully
+[GPU] Resolution: 1280x800
+[GPU] Initialized via PCI transport
 GPU initialized successfully.
 [TERM] GPU resolution: 1280x800
 [TERM] Terminal::new(1280x800) -> 128x36 chars (font 10x20, spacing 2)
@@ -34,10 +39,11 @@ Files in initramfs:
  - test.txt
  - hello
 [BOOT] Starting shell from initramfs...
+[TICK] count=0
 [SPAWN] Looking for 'hello' in initramfs...
 [SPAWN] Found 'hello' (77328 bytes)
 [SPAWN] Parsing ELF header... data len 77328
-ELF Header e_ident on stack at 0xffff8000400c27a0
+ELF Header e_ident on stack at 0xffff8000400c53d0
 [MMU] Creating user page table...
 [MMU] Allocated L0 table at phys 0x48014000
 [MMU] Zeroing L0 table at va 0xffff800048014000

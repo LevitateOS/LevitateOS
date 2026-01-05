@@ -337,7 +337,7 @@ pub fn run_qemu(profile: QemuProfile, headless: bool) -> Result<()> {
         "-cpu", profile.cpu(),
         "-m", profile.memory(),
         "-kernel", kernel_bin,
-        "-device", "virtio-gpu-device",
+        "-device", "virtio-gpu-pci", // TEAM_114: PCI transport for GPU
         "-device", "virtio-keyboard-device",
         "-device", "virtio-tablet-device",
         "-device", "virtio-net-device,netdev=net0",
@@ -468,7 +468,7 @@ pub fn run_qemu_vnc() -> Result<()> {
         "-kernel", kernel_bin,
         "-display", "none",
         "-vnc", ":0",
-        "-device", "virtio-gpu-device,xres=1280,yres=800",
+        "-device", "virtio-gpu-pci,xres=1280,yres=800", // TEAM_114: PCI transport
         "-device", "virtio-keyboard-device",
         "-device", "virtio-tablet-device",
         "-device", "virtio-net-device,netdev=net0",

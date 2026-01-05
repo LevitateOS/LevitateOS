@@ -458,6 +458,28 @@ pub extern "C" fn kmain() -> ! {
             )
             .unwrap();
 
+            // TEAM_114: PCI ECAM for VirtIO PCI transport
+            // ECAM is at 0x4010_0000_0000 (256MB for 256 buses)
+            // Map just enough for bus 0 scanning (1MB)
+            mmu::map_range(
+                root,
+                mmu::ECAM_VA,
+                mmu::ECAM_PA,
+                0x10_0000, // 1MB for bus 0
+                mmu::PageFlags::DEVICE,
+            )
+            .unwrap();
+
+            // TEAM_114: PCI 32-bit memory region for BAR allocation
+            mmu::map_range(
+                root,
+                mmu::PCI_MEM32_VA,
+                mmu::PCI_MEM32_PA,
+                mmu::PCI_MEM32_SIZE,
+                mmu::PageFlags::DEVICE,
+            )
+            .unwrap();
+
             // Map Boot RAM including DTB/initrd region (QEMU places DTB after kernel)
             // DTB is at ~0x4820_0000 for a ~100KB kernel + initrd
             mmu::identity_map_range_optimized(root, 0x4000_0000, 0x5000_0000, kernel_flags)
@@ -682,7 +704,7 @@ pub extern "C" fn kmain() -> ! {
                     fb[offset + 3] = 0xFF; // A
                 }
             }
-            gpu_state.flush();
+            let _ = gpu_state.flush(); // TEAM_114: Ignore Result
         }
     }
 

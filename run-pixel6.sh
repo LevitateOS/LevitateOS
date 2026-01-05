@@ -54,7 +54,7 @@ qemu-system-aarch64 \
     -m "$QEMU_MEMORY" \
     -kernel "$BIN" \
     -display gtk,zoom-to-fit=off \
-    -device virtio-gpu-device,xres=2400,yres=1080 \
+    -device virtio-gpu-pci,xres=2400,yres=1080 \
     -device virtio-keyboard-device \
     -device virtio-tablet-device \
     -device virtio-net-device,netdev=net0 \

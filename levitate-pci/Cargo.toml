@@ -1,0 +1,11 @@
+[package]
+name = "levitate-pci"
+version = "0.1.0"
+edition = "2024"
+
+[lints]
+workspace = true
+
+[dependencies]
+levitate-hal = { path = "../levitate-hal" }
+virtio-drivers = "0.12"

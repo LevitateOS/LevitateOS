@@ -1,52 +1,29 @@
 //! Kernel-side GPU Interface
 //!
-//! # ⚠️ CRITICAL WARNING FOR AI AGENTS ⚠️
+//! TEAM_114: Wrapper around levitate-gpu crate for kernel use.
 //!
-//! **DO NOT "FIX" THIS BY KEEPING levitate-gpu!**
-//!
-//! The current `levitate-gpu` crate (using virtio-drivers) is **BROKEN**.
-//! It gives **FALSE POSITIVE TESTS** - the driver initializes but the
-//! display shows NOTHING. The QEMU window says "Display output is not active".
-//!
-//! ## The Bug You Must Resist
-//!
-//! The temptation to "fall back" to levitate-gpu when levitate-drivers-gpu
-//! has issues is **ITSELF A BUG**. Previous teams kept doing this, which
-//! prevented any progress on actually fixing the GPU.
-//!
-//! ## What You Must Do Instead
-//!
-//! 1. **FIX levitate-drivers-gpu** - see `docs/VIRTIO_IMPLEMENTATION.md`
-//! 2. **DO NOT** revert to levitate-gpu thinking it "works" - it doesn't
-//! 3. **DO NOT** trust "GPU initialized successfully" - it's a false positive
-//! 4. **VERIFY** actual display output in QEMU window, not just test results
-//!
-//! ## Why levitate-gpu Doesn't Work
-//!
-//! - Missing SET_SCANOUT command (required by VirtIO GPU spec)
-//! - Missing RESOURCE_FLUSH command
-//! - No actual scanout configuration
-//! - Tests pass because they only check init, not display output
-//!
-//! See: `.teams/TEAM_109_fix_gpu_driver_no_fallback.md`
-//! See: `docs/GOTCHAS.md` section 16
-//! See: `docs/VIRTIO_IMPLEMENTATION.md`
+//! See: `docs/planning/virtio-pci/` for the implementation plan
 
-use levitate_drivers_gpu::{GpuError, VirtioGpu};
 use levitate_hal::IrqSafeLock;
-use levitate_virtio::LevitateVirtioHal;
 
+use embedded_graphics::pixelcolor::Rgb888;
+use embedded_graphics::prelude::*;
+
+use crate::virtio::VirtioHal;
+
+// Re-export from levitate-gpu
+pub use levitate_gpu::GpuError;
+
+/// GPU state wrapper using levitate-gpu
 pub struct GpuState {
-    pub inner: VirtioGpu<LevitateVirtioHal>,
+    inner: levitate_gpu::Gpu<VirtioHal>,
 }
 
-impl GpuState {
-    pub fn new(mmio_base: usize) -> Result<Self, GpuError> {
-        let mut inner = unsafe { VirtioGpu::<LevitateVirtioHal>::new(mmio_base)? };
-        inner.init()?;
-        Ok(Self { inner })
-    }
+// SAFETY: GPU access is protected by IrqSafeLock
+unsafe impl Send for GpuState {}
+unsafe impl Sync for GpuState {}
 
+impl GpuState {
     pub fn flush(&mut self) -> Result<(), GpuError> {
         self.inner.flush()
     }
@@ -56,19 +33,30 @@ impl GpuState {
     }
 
     pub fn framebuffer(&mut self) -> &mut [u8] {
-        self.inner.framebuffer().unwrap_or(&mut [])
+        self.inner.framebuffer()
     }
 }
 
 pub static GPU: IrqSafeLock<Option<GpuState>> = IrqSafeLock::new(None);
 
+/// Initialize GPU via PCI transport
+/// Note: mmio_base is ignored - we use PCI enumeration instead
+#[allow(unused_variables)]
 pub fn init(mmio_base: usize) {
-    match GpuState::new(mmio_base) {
-        Ok(state) => {
-            *GPU.lock() = Some(state);
-        }
-        Err(e) => {
-            levitate_hal::serial_println!("[GPU] Init failed: {:?}", e);
+    levitate_hal::serial_println!("[GPU] Initializing via PCI...");
+
+    match levitate_pci::find_virtio_gpu::<VirtioHal>() {
+        Some(transport) => match levitate_gpu::Gpu::new(transport) {
+            Ok(gpu) => {
+                levitate_hal::serial_println!("[GPU] Initialized via PCI transport");
+                *GPU.lock() = Some(GpuState { inner: gpu });
+            }
+            Err(e) => {
+                levitate_hal::serial_println!("[GPU] Failed to create GPU: {:?}", e);
+            }
+        },
+        None => {
+            levitate_hal::serial_println!("[GPU] No VirtIO GPU found on PCI bus");
         }
     }
 }
@@ -87,9 +75,6 @@ impl<'a> Display<'a> {
     }
 }
 
-use embedded_graphics::pixelcolor::Rgb888;
-use embedded_graphics::prelude::*;
-
 impl<'a> DrawTarget for Display<'a> {
     type Color = Rgb888;
     type Error = core::convert::Infallible;
@@ -98,7 +83,25 @@ impl<'a> DrawTarget for Display<'a> {
     where
         I: IntoIterator<Item = Pixel<Self::Color>>,
     {
-        self.state.inner.draw_iter(pixels)
+        let (width, height) = self.state.dimensions();
+        let fb = self.state.framebuffer();
+
+        for Pixel(point, color) in pixels {
+            if point.x >= 0
+                && point.x < width as i32
+                && point.y >= 0
+                && point.y < height as i32
+            {
+                let idx = (point.y as usize * width as usize + point.x as usize) * 4;
+                if idx + 3 < fb.len() {
+                    fb[idx] = color.b();
+                    fb[idx + 1] = color.g();
+                    fb[idx + 2] = color.r();
+                    fb[idx + 3] = 255;
+                }
+            }
+        }
+        Ok(())
     }
 }
 

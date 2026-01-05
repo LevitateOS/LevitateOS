@@ -70,7 +70,7 @@ qemu-system-aarch64 \
     -kernel "$BIN" \
     -display none \
     -vnc :0 \
-    -device virtio-gpu-device,xres=1280,yres=800 \
+    -device virtio-gpu-pci,xres=1280,yres=800 \
     -device virtio-keyboard-device \
     -device virtio-tablet-device \
     -device virtio-net-device,netdev=net0 \

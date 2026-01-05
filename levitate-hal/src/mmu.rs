@@ -66,6 +66,24 @@ pub const GIC_CPU_VA: usize = DEVICE_VIRT_BASE + 0x0801_0000;
 /// GIC Redistributor virtual address (PA: 0x080A_0000)
 pub const GIC_REDIST_VA: usize = DEVICE_VIRT_BASE + 0x080A_0000;
 
+// TEAM_114: PCI ECAM (Enhanced Configuration Access Mechanism) for VirtIO PCI
+/// PCI ECAM base physical address (QEMU virt machine Highmem PCIe)
+/// From DTB: reg = <0x40 0x10000000 0x00 0x10000000> = PA 0x4010000000, size 256MB
+pub const ECAM_PA: usize = 0x40_1000_0000;
+/// PCI ECAM virtual address (high half mapping)
+/// Note: This creates a VA in the upper 48-bit space
+pub const ECAM_VA: usize = KERNEL_VIRT_START + ECAM_PA;
+/// ECAM size: 256MB for 256 buses (1MB per bus)
+pub const ECAM_SIZE: usize = 256 * 1024 * 1024;
+
+// TEAM_114: PCI 32-bit memory region for BAR allocation (from QEMU virt DTB)
+/// PCI 32-bit MMIO base physical address
+pub const PCI_MEM32_PA: usize = 0x1000_0000;
+/// PCI 32-bit MMIO size
+pub const PCI_MEM32_SIZE: usize = 0x2EFF_0000;
+/// PCI 32-bit MMIO virtual address
+pub const PCI_MEM32_VA: usize = KERNEL_VIRT_START + PCI_MEM32_PA;
+
 /// [M19] Converts high VA to PA, [M21] identity for low addresses
 #[inline]
 pub fn virt_to_phys(va: usize) -> usize {

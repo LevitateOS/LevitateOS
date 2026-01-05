@@ -5,8 +5,9 @@ members = [
     "levitate-utils",
     "levitate-terminal",
     "levitate-virtio",
-    # TEAM_103: Renamed from levitate-virtio-gpu
-    "levitate-drivers-gpu",
+    # TEAM_114: PCI and GPU as separate crates
+    "levitate-pci",
+    "levitate-gpu",
     "xtask",
 ]
 default-members = ["levitate-hal", "levitate-utils", "xtask"]

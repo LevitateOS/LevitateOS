@@ -5,15 +5,11 @@
 //! - MmioTransport::new() requires mmio_size argument
 //! - MmioTransport has lifetime parameter
 //!
-//! # ⚠️ WARNING: GPU INITIALIZATION IS BROKEN ⚠️
+//! # TEAM_114: GPU Migration to PCI
 //!
-//! The `init_gpu()` function below uses `levitate-gpu` which gives **FALSE POSITIVES**.
-//! The GPU driver initializes successfully but the display shows NOTHING.
-//!
-//! **DO NOT** think this code is correct just because tests pass.
-//! **DO NOT** revert to this approach when fixing levitate-drivers-gpu.
-//!
-//! The real fix is in `levitate-drivers-gpu` - see `docs/VIRTIO_IMPLEMENTATION.md`
+//! GPU initialization via MMIO is temporarily disabled.
+//! The plan is to switch to VirtIO PCI transport for GPU.
+//! See: `docs/planning/virtio-pci/` for implementation plan.
 
 // Allow unwrap/panic in HAL trait impls - these are low-level allocators where
 // failure to allocate is unrecoverable (system cannot continue)
@@ -32,29 +28,14 @@ pub const VIRTIO_MMIO_COUNT: usize = 32;
 /// TEAM_065: Initialize GPU device only (Stage 3 - BootConsole)
 /// GPU must be available before terminal operations.
 /// Returns true if GPU was found and initialized.
+/// TEAM_114: Now uses PCI transport instead of MMIO
 pub fn init_gpu() -> bool {
-    crate::verbose!("Scanning VirtIO MMIO bus for GPU...");
-    for i in 0..VIRTIO_MMIO_COUNT {
-        let addr = VIRTIO_MMIO_START + i * VIRTIO_MMIO_SIZE;
-        let header =
-            core::ptr::NonNull::new(addr as *mut virtio_drivers::transport::mmio::VirtIOHeader)
-                .unwrap();
-
-        match unsafe {
-            virtio_drivers::transport::mmio::MmioTransport::new(header, VIRTIO_MMIO_SIZE)
-        } {
-            Ok(transport) => {
-                if transport.device_type() == virtio_drivers::transport::DeviceType::GPU {
-                    crate::gpu::init(addr);
-                    return true;
-                }
-            }
-            Err(_) => {
-                // Not a valid VirtIO device at this address
-            }
-        }
-    }
-    false
+    // TEAM_114: GPU is now on PCI bus, not MMIO
+    // Call gpu::init which handles PCI enumeration
+    crate::gpu::init(0); // mmio_base is ignored for PCI
+    
+    // Check if GPU was successfully initialized
+    crate::gpu::get_resolution().is_some()
 }
 
 /// TEAM_065: Initialize non-GPU VirtIO devices (Stage 4 - Discovery)

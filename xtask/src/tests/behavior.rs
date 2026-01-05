@@ -63,7 +63,7 @@ fn run_with_profile(profile: QemuProfile) -> Result<()> {
         "-kernel".to_string(), KERNEL_BIN.to_string(),
         "-display".to_string(), "none".to_string(),
         "-serial".to_string(), format!("file:{}", ACTUAL_FILE),
-        "-device".to_string(), "virtio-gpu-device".to_string(),
+        "-device".to_string(), "virtio-gpu-pci".to_string(), // TEAM_114: PCI transport
         "-device".to_string(), "virtio-keyboard-device".to_string(),
         "-device".to_string(), "virtio-tablet-device".to_string(),
         "-device".to_string(), "virtio-net-device,netdev=net0".to_string(),

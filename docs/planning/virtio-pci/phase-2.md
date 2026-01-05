@@ -1,58 +1,84 @@
 # Phase 2: Design - VirtIO PCI Migration
 
 **Feature:** VirtIO PCI Transport for GPU
-**Team:** TEAM_113
+**Team:** TEAM_113 (created), TEAM_114 (revised)
 
-## 1. Proposed Solution
-Migrate the GPU driver from `MmioTransport` to `PciTransport`.
-This involves three main components:
-1.  **Memory Mapping:** Map the PCI ECAM (Enhanced Configuration Access Mechanism) region in the kernel's address space. memory attributes: `Device-nGnRE` (Uncached).
-2.  **PCI Enumeration:** Implement a simple scanner to walk the PCI bus (Bus 0, Devices 0-31, Functions 0-7) via ECAM, looking for the VirtIO GPU device (Vendor 0x1AF4, Device 0x1050).
-3.  **Driver Initialization:** Instantiate `VirtioGpu` using the `PciTransport` provided by `virtio-drivers`.
+## 1. Proposed Solution (Revised by TEAM_114)
+Migrate GPU from MMIO to PCI transport using `virtio-drivers` APIs directly.
 
-## 2. API Design
+**Key Components:**
+1. **ECAM Mapping:** Map PCI config space at `0x4010000000` as Device memory
+2. **PCI Subsystem:** Use `virtio_drivers::transport::pci::bus` module:
+   - `MmioCam` for ECAM access
+   - `PciRoot` for bus enumeration
+   - BAR allocation for device memory
+3. **GPU Driver:** Use `virtio_drivers::device::gpu::VirtIOGpu<HalImpl, PciTransport>`
+
+## 2. API Design (Revised by TEAM_114)
+
 ### New Module: `kernel/src/pci.rs`
 ```rust
-pub struct PciConfigRegion {
-    base: usize, // Virtual address of ECAM base
-}
+use virtio_drivers::transport::pci::bus::{MmioCam, PciRoot, Cam, Command};
+use virtio_drivers::transport::pci::PciTransport;
 
-impl PciConfigRegion {
-    pub fn new(base: usize) -> Self;
-    pub fn read(&self, bus: u8, dev: u8, func: u8, offset: u16) -> u32;
-    pub fn write(&self, bus: u8, dev: u8, func: u8, offset: u16, value: u32);
-}
+/// ECAM base address for QEMU virt machine (Highmem)
+pub const ECAM_BASE_PA: usize = 0x4010_0000_0000;
+pub const ECAM_SIZE: usize = 256 * 1024 * 1024; // 256MB for 256 buses
 
-// Simple scanner
-pub fn find_device(vendor: u16, device: u16) -> Option<PciTransport>;
+/// PCI memory region for BAR allocation (from DTB ranges)
+pub const PCI_MEM32_BASE: u32 = 0x1000_0000;
+pub const PCI_MEM32_SIZE: u32 = 0x2eff_0000;
+
+/// Initialize PCI subsystem and find VirtIO GPU
+pub fn init_gpu() -> Option<VirtIOGpu<HalImpl, PciTransport>>;
 ```
 
-### Refactored `levitate-drivers-gpu`
-We need to change `VirtioGpu` to accept a generic Transport or specifically `PciTransport`.
-Given we might want to keep MMIO valid (e.g. for non-AArch64?), making it generic is best.
-`pub struct VirtioGpu<H: VirtioHal, T: Transport>`
+### Using virtio-drivers API correctly:
+```rust
+// 1. Create MmioCam for ECAM access
+let cam = unsafe { MmioCam::new(ecam_va as *mut u8, Cam::Ecam) };
+
+// 2. Create PciRoot for enumeration
+let mut pci_root = PciRoot::new(cam);
+
+// 3. Enumerate bus 0, find GPU
+for (device_function, info) in pci_root.enumerate_bus(0) {
+    if virtio_device_type(&info) == Some(DeviceType::GPU) {
+        // 4. Allocate BARs
+        allocate_bars(&mut pci_root, device_function, &mut allocator);
+        
+        // 5. Enable device
+        pci_root.set_command(device_function, 
+            Command::MEMORY_SPACE | Command::BUS_MASTER);
+        
+        // 6. Create PciTransport
+        let transport = PciTransport::new::<HalImpl, _>(&mut pci_root, device_function)?;
+        
+        // 7. Create GPU driver
+        return Some(VirtIOGpu::new(transport)?);
+    }
+}
+```
 
 ## 3. Data Model Changes
-- **ECAM Address:** For QEMU `virt` machine (AArch64), Highmem ECAM is at `0x4010000000`. Size is 256MB (covering Bus 0-255).
+- **ECAM Address:** `0x4010_0000_0000` (Highmem ECAM for QEMU virt)
+- **PCI Memory:** `0x1000_0000` - `0x3eff_ffff` (32-bit MMIO for BARs)
 - **MMU Mapping:**
-  - Need to add `ECAM_VA` constant.
-  - Map `0x4010000000` -> `ECAM_VA` with `PageFlags::DEVICE` attributes (Uncached).
+  - Map ECAM region with `PageFlags::DEVICE`
+  - BAR regions will be mapped dynamically
 
 ## 4. Behavioral Decisions
-- **Error Handling:** If PCI device not found, fail gracefully (log warning) but don't panic.
-- **Interrupts:** PCI Modern interrupts can be MSI-X or INTx. `PciTransport` handles the configuration, but we need to supply the mapped BARs. The interrupt number (INTx) comes from the configuration space. We'll need to route that to the GIC.
-    - *Simplification:* Run in polling mode initially? `VirtioGpu` currently polls `has_used()` in `send_command`, so interrupts are not strictly required for the *synchronous* flush loop we use. We can defer IRQ setup.
+- **Polling Mode:** GPU uses polling, no IRQ setup needed initially
+- **Error Handling:** Log and continue if GPU not found
+- **BAR Allocation:** Simple bump allocator for 32-bit memory region
 
-## 5. Open Questions
-- **Q1:** Does `virtio-drivers` PciTransport handle BAR mapping?
-    - *Answer:* No, `PciTransport` usually expects you to provide the header and handle BAR mapping yourself, or it reads BARs and expects you to provide a function to map them.
-    - *Refinement:* I need to check `virtio_drivers::transport::pci::PciTransport` signature. It typically takes a `PciRoot` structure.
+## 5. Resolved Questions (TEAM_114)
+- **Q1 (BAR mapping):** Must allocate BARs ourselves using PciRoot methods
+- **Q2 (ECAM base):** `0x4010_0000_0000` confirmed for Highmem
 
-- **Q2:** What is the exact ECAM base for `virt`?
-    - *Answer:* `0x40_1000_0000` (Highmem) or `0x3f00_0000` (Lowmem). QEMU `virt` usually exposes Highmem ECAM. I will assume Highmem.
-
-## 6. Implementation Steps
-1.  **Refactor GPU Driver:** Make `VirtioGpu` generic over `T: Transport`.
-2.  **Enable Feature:** Add `pci` to `virtio-drivers` keys.
-3.  **Implement PCI Scan:** Add `kernel/src/pci.rs`.
-4.  **Update Boot:** In `kernel/src/main.rs`, init PCI instead of MMIO scan.
+## 6. Implementation Steps (Revised)
+1. Add ECAM constants to `levitate-hal/src/mmu.rs`
+2. Map ECAM region in MMU initialization
+3. Create `kernel/src/pci.rs` with proper virtio-drivers API usage
+4. Update `kernel/src/gpu.rs` to use PCI GPU
+5. Update QEMU flags in xtask and shell scripts

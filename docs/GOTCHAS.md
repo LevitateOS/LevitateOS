@@ -348,6 +348,47 @@ cargo xtask run-vnc
 
 ---
 
+### 17. PCI GPU Works But Terminal Rendering Is Broken (TEAM_114)
+
+**Location:** `levitate-terminal/src/lib.rs`, `kernel/src/terminal.rs`
+
+**Status:** 🔴 OPEN
+
+**What Works:**
+- ✅ VirtIO GPU via PCI transport initializes successfully
+- ✅ Framebuffer is mapped and writable
+- ✅ Purple test pattern is visible
+- ✅ Text can be drawn to framebuffer
+
+**What's Broken:**
+- ❌ Terminal renders as raw text with black per-line backgrounds
+- ❌ No proper terminal grid/buffer
+- ❌ Not a real terminal UI - just println output with black boxes
+
+**Screenshot Evidence:** Each boot message appears as a black rectangle on purple background. This is NOT a terminal - it's just text with per-character background fills.
+
+**Root Cause (suspected):**
+The terminal implementation (`levitate-terminal`) may be:
+1. Just printing text character-by-character with background fills
+2. Not maintaining a proper terminal buffer/grid
+3. Not clearing/managing a terminal viewport area
+
+**What Future Teams Should Do:**
+1. Review `levitate-terminal/src/lib.rs` for how text is rendered
+2. Implement a proper terminal with:
+   - Fixed terminal area (black background rectangle)
+   - Character grid (rows × columns)
+   - Scrolling support
+   - Cursor position tracking
+3. The GPU/PCI layer is working - this is a terminal layer issue
+
+**References:**
+- `.teams/TEAM_114_review_plan_virtio_pci.md`
+- `levitate-gpu/` - GPU wrapper (working)
+- `levitate-pci/` - PCI subsystem (working)
+
+---
+
 ## Adding New Gotchas
 
 When you discover a non-obvious issue:
