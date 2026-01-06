@@ -41,6 +41,26 @@ impl From<ElfError> for SpawnError {
 /// # Returns
 /// A `UserTask` ready to be scheduled, or an error.
 pub fn spawn_from_elf(elf_data: &[u8]) -> Result<UserTask, SpawnError> {
+    // TEAM_169: Delegate to spawn_from_elf_with_args with empty args
+    spawn_from_elf_with_args(elf_data, &[], &[])
+}
+
+/// TEAM_169: Spawn a user process with arguments.
+///
+/// Per Phase 2 Q5 decision: Stack-based argument passing (Linux ABI compatible).
+///
+/// # Arguments
+/// * `elf_data` - Raw ELF file contents
+/// * `args` - Command line arguments (argv)
+/// * `envs` - Environment variables (envp)
+///
+/// # Returns
+/// A `UserTask` ready to be scheduled, or an error.
+pub fn spawn_from_elf_with_args(
+    elf_data: &[u8],
+    args: &[&str],
+    envs: &[&str],
+) -> Result<UserTask, SpawnError> {
     los_hal::println!("[SPAWN] Parsing ELF header ({} bytes)...", elf_data.len());
     // 1. Parse ELF
     let elf = Elf::parse(elf_data)?;
@@ -58,8 +78,17 @@ pub fn spawn_from_elf(elf_data: &[u8]) -> Result<UserTask, SpawnError> {
     // 4. Set up user stack
     los_hal::println!("[SPAWN] Setting up stack...");
     let stack_pages = user_mm::layout::STACK_SIZE / los_hal::mmu::PAGE_SIZE;
-    let user_sp =
+    let stack_top =
         unsafe { user_mm::setup_user_stack(ttbr0_phys, stack_pages).map_err(SpawnError::Stack)? };
+
+    // TEAM_169: Set up argc/argv/envp on stack
+    let user_sp = if args.is_empty() && envs.is_empty() {
+        stack_top
+    } else {
+        los_hal::println!("[SPAWN] Setting up args: argc={}", args.len());
+        user_mm::setup_stack_args(ttbr0_phys, stack_top, args, envs)
+            .map_err(SpawnError::Stack)?
+    };
 
     // 5. Create UserTask
     let task = UserTask::new(entry_point, user_sp, ttbr0_phys, brk);

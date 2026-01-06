@@ -1,0 +1,84 @@
+//! TEAM_171: Time-related system calls.
+
+use crate::syscall::{Timespec, errno};
+
+/// TEAM_170: Read the ARM generic timer counter.
+#[inline]
+fn read_timer_counter() -> u64 {
+    let cnt: u64;
+    unsafe {
+        core::arch::asm!("mrs {}, CNTVCT_EL0", out(reg) cnt);
+    }
+    cnt
+}
+
+/// TEAM_170: Read the ARM generic timer frequency.
+#[inline]
+fn read_timer_frequency() -> u64 {
+    let freq: u64;
+    unsafe {
+        core::arch::asm!("mrs {}, CNTFRQ_EL0", out(reg) freq);
+    }
+    freq
+}
+
+/// TEAM_170: sys_nanosleep - Sleep for specified duration.
+pub fn sys_nanosleep(seconds: u64, nanoseconds: u64) -> i64 {
+    let freq = read_timer_frequency();
+    if freq == 0 {
+        for _ in 0..((seconds * 1000 + nanoseconds / 1_000_000) as usize) {
+            crate::task::yield_now();
+        }
+        return 0;
+    }
+
+    let start = read_timer_counter();
+    let total_ns = seconds * 1_000_000_000 + nanoseconds;
+    let ticks_to_wait = (total_ns * freq) / 1_000_000_000;
+    let target = start.saturating_add(ticks_to_wait);
+
+    while read_timer_counter() < target {
+        crate::task::yield_now();
+    }
+
+    0
+}
+
+/// TEAM_170: sys_clock_gettime - Get current monotonic time.
+pub fn sys_clock_gettime(timespec_buf: usize) -> i64 {
+    let task = crate::task::current_task();
+    let ts_size = core::mem::size_of::<Timespec>();
+    if crate::task::user_mm::validate_user_buffer(task.ttbr0, timespec_buf, ts_size, true).is_err()
+    {
+        return errno::EFAULT;
+    }
+
+    let freq = read_timer_frequency();
+    let counter = read_timer_counter();
+
+    let ts = if freq > 0 {
+        let seconds = counter / freq;
+        let remainder = counter % freq;
+        let nanoseconds = (remainder * 1_000_000_000) / freq;
+        Timespec {
+            tv_sec: seconds,
+            tv_nsec: nanoseconds,
+        }
+    } else {
+        Timespec::default()
+    };
+
+    let ts_bytes =
+        unsafe { core::slice::from_raw_parts(&ts as *const Timespec as *const u8, ts_size) };
+
+    for (i, &byte) in ts_bytes.iter().enumerate() {
+        if let Some(ptr) = crate::task::user_mm::user_va_to_kernel_ptr(task.ttbr0, timespec_buf + i)
+        {
+            unsafe { *ptr = byte };
+        } else {
+            return errno::EFAULT;
+        }
+    }
+
+    0
+}

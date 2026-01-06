@@ -26,12 +26,27 @@ rustflags = ["-C", "link-arg=-Tlink.ld"]
 
 ## 2. Syscall ABI
 
-LevitateOS uses a custom syscall ABI (not Linux-compatible).
+> [!WARNING]
+> **Legacy ABI Note**: The current kernel (Phase 8/9) implementation uses a simple custom syscall ABI (Read=0, Write=1, etc.). This is considered **DEPRECATED** and is being replaced by the Linux-compatible ABI in Phase 10.
 
+For the finalized target ABI, see [userspace-abi.md](file:///home/vince/Projects/LevitateOS/docs/specs/userspace-abi.md).
+
+### Legacy ABI (Current MVP)
 - **Instruction:** `svc #0`
-- **Syscall Number:** `x8` register (see `kernel/src/syscall.rs`)
+- **Syscall Number:** `x8` register
 - **Arguments:** `x0` - `x5`
 - **Return Value:** `x0`
+
+| Syscall | NR | Description |
+|---------|----|-------------|
+| Read | 0 | Read from fd 0 |
+| Write | 1 | Write to fd 1/2 |
+| Exit | 2 | Terminate process |
+| GetPid | 3 | Get current PID |
+| Sbrk | 4 | Adjust heap |
+| Spawn | 5 | Spawn program |
+| Exec | 6 | Replace process |
+| Yield | 7 | Yield CPU |
 
 ### Implementation Example
 ```rust

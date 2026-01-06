@@ -25,6 +25,16 @@ pub const SYS_EXEC: u64 = 6;
 pub const SYS_YIELD: u64 = 7;
 /// TEAM_142: Graceful system shutdown
 pub const SYS_SHUTDOWN: u64 = 8;
+/// TEAM_168: Open file
+pub const SYS_OPENAT: u64 = 9;
+/// TEAM_168: Close file descriptor
+pub const SYS_CLOSE: u64 = 10;
+/// TEAM_168: Get file status
+pub const SYS_FSTAT: u64 = 11;
+/// TEAM_170: Sleep for nanoseconds
+pub const SYS_NANOSLEEP: u64 = 12;
+/// TEAM_170: Get monotonic time
+pub const SYS_CLOCK_GETTIME: u64 = 13;
 
 /// TEAM_142: Shutdown flags
 pub mod shutdown_flags {
@@ -214,6 +224,153 @@ pub fn shutdown(flags: u32) -> ! {
             options(noreturn, nostack)
         );
     }
+}
+
+// ============================================================================
+// File Syscalls (TEAM_168: Phase 10 Step 3)
+// ============================================================================
+
+/// TEAM_168: Open a file.
+///
+/// # Arguments
+/// * `path` - Path to the file
+/// * `flags` - Open flags (0 for read-only)
+///
+/// # Returns
+/// File descriptor on success, or negative error code.
+#[inline]
+pub fn openat(path: &str, flags: u32) -> isize {
+    let ret: i64;
+    unsafe {
+        core::arch::asm!(
+            "svc #0",
+            in("x8") SYS_OPENAT,
+            in("x0") path.as_ptr(),
+            in("x1") path.len(),
+            in("x2") flags,
+            lateout("x0") ret,
+            options(nostack)
+        );
+    }
+    ret as isize
+}
+
+/// TEAM_168: Close a file descriptor.
+///
+/// # Arguments
+/// * `fd` - File descriptor to close
+///
+/// # Returns
+/// 0 on success, or negative error code.
+#[inline]
+pub fn close(fd: usize) -> isize {
+    let ret: i64;
+    unsafe {
+        core::arch::asm!(
+            "svc #0",
+            in("x8") SYS_CLOSE,
+            in("x0") fd,
+            lateout("x0") ret,
+            options(nostack)
+        );
+    }
+    ret as isize
+}
+
+/// TEAM_168: Stat structure for fstat.
+#[repr(C)]
+#[derive(Debug, Clone, Copy, Default)]
+pub struct Stat {
+    /// File size in bytes
+    pub st_size: u64,
+    /// File type (1 = regular, 2 = char device)
+    pub st_mode: u32,
+    /// Padding
+    pub _pad: u32,
+}
+
+/// TEAM_168: Get file status.
+///
+/// # Arguments
+/// * `fd` - File descriptor
+/// * `stat` - Output buffer for file status
+///
+/// # Returns
+/// 0 on success, or negative error code.
+#[inline]
+pub fn fstat(fd: usize, stat: &mut Stat) -> isize {
+    let ret: i64;
+    unsafe {
+        core::arch::asm!(
+            "svc #0",
+            in("x8") SYS_FSTAT,
+            in("x0") fd,
+            in("x1") stat as *mut Stat,
+            lateout("x0") ret,
+            options(nostack)
+        );
+    }
+    ret as isize
+}
+
+// ============================================================================
+// Time Syscalls (TEAM_170: Phase 10 Step 7)
+// ============================================================================
+
+/// TEAM_170: Timespec structure for time syscalls.
+#[repr(C)]
+#[derive(Debug, Clone, Copy, Default)]
+pub struct Timespec {
+    /// Seconds
+    pub tv_sec: u64,
+    /// Nanoseconds
+    pub tv_nsec: u64,
+}
+
+/// TEAM_170: Sleep for specified duration.
+///
+/// # Arguments
+/// * `seconds` - Number of seconds to sleep
+/// * `nanoseconds` - Additional nanoseconds to sleep
+///
+/// # Returns
+/// 0 on success, or negative error code.
+#[inline]
+pub fn nanosleep(seconds: u64, nanoseconds: u64) -> isize {
+    let ret: i64;
+    unsafe {
+        core::arch::asm!(
+            "svc #0",
+            in("x8") SYS_NANOSLEEP,
+            in("x0") seconds,
+            in("x1") nanoseconds,
+            lateout("x0") ret,
+            options(nostack)
+        );
+    }
+    ret as isize
+}
+
+/// TEAM_170: Get current monotonic time.
+///
+/// # Arguments
+/// * `ts` - Output buffer for timespec
+///
+/// # Returns
+/// 0 on success, or negative error code.
+#[inline]
+pub fn clock_gettime(ts: &mut Timespec) -> isize {
+    let ret: i64;
+    unsafe {
+        core::arch::asm!(
+            "svc #0",
+            in("x8") SYS_CLOCK_GETTIME,
+            in("x0") ts as *mut Timespec,
+            lateout("x0") ret,
+            options(nostack)
+        );
+    }
+    ret as isize
 }
 
 // ============================================================================

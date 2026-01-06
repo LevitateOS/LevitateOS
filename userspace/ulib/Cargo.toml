@@ -1,0 +1,13 @@
+# TEAM_166: Userspace Standard Library for LevitateOS
+[package]
+name = "ulib"
+version = "0.1.0"
+edition = "2021"
+authors = ["LevitateOS Contributors"]
+description = "Userspace standard library for LevitateOS"
+
+[dependencies]
+libsyscall = { path = "../libsyscall" }
+
+[lints]
+workspace = true

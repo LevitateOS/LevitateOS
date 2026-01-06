@@ -1,0 +1,31 @@
+//! TEAM_171: Memory management system calls.
+
+// Memory management system calls.
+
+/// TEAM_166: sys_sbrk - Adjust program break (heap allocation).
+pub fn sys_sbrk(increment: isize) -> i64 {
+    let task = crate::task::current_task();
+    let mut heap = task.heap.lock();
+
+    match heap.grow(increment) {
+        Ok(old_break) => {
+            if increment > 0 {
+                let new_break = heap.current;
+                let old_page = old_break / los_hal::mmu::PAGE_SIZE;
+                let new_page = (new_break + los_hal::mmu::PAGE_SIZE - 1) / los_hal::mmu::PAGE_SIZE;
+
+                for page in old_page..new_page {
+                    let va = page * los_hal::mmu::PAGE_SIZE;
+                    if crate::task::user_mm::user_va_to_kernel_ptr(task.ttbr0, va).is_none() {
+                        if crate::task::user_mm::alloc_and_map_heap_page(task.ttbr0, va).is_err() {
+                            heap.current = old_break;
+                            return 0; // null
+                        }
+                    }
+                }
+            }
+            old_break as i64
+        }
+        Err(()) => 0,
+    }
+}

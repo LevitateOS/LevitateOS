@@ -1,6 +1,6 @@
 # LevitateOS Roadmap
 
-**Last Updated:** 2026-01-04 (TEAM_072)
+**Last Updated:** 2026-01-06 (TEAM_164)
 
 This document outlines the planned development phases for LevitateOS. Each completed item includes the responsible team for traceability.
 
@@ -160,7 +160,10 @@ This document outlines the planned development phases for LevitateOS. Each compl
 
 The goal of Part II is to build a rich, POSIX-like userspace environment on top of the Phase 8 foundations.
 
-### ⏳ Phase 10: The Userspace Standard Library (`ulib`)
+### 📋 Phase 10: The Userspace Standard Library (`ulib`) — PLANNED
+
+> **Planning:** See `docs/planning/ulib-phase10/`  
+> **Questions:** See `.questions/TEAM_164_ulib_design.md` (7 questions awaiting answers)
 
 - **Objective**: Create a robust `std`-like library to support complex applications.
 - **Specification**: See [`docs/specs/userspace-abi.md`](file:///home/vince/Projects/LevitateOS/docs/specs/userspace-abi.md)
@@ -260,3 +263,4 @@ Once the userspace foundation is solid, we move to secure multi-user support.
 | 8b | 080+ | Interactive Shell & Coreutils |
 | 8c | 118+ | Userspace Architecture Refactor |
 | 8d | 120+ | Process Management (Init, Spawn) |
+| Maintenance | 121-163 | Bug fixes, refactors, architecture improvements |

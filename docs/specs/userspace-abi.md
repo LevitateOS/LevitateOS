@@ -1,11 +1,22 @@
 # LevitateOS Userspace ABI Specification
 
-**Status:** DRAFT (Phase 10 Planning)
-**Version:** 0.2.0 (Deep Dive Update)
+**Status:** FINALIZED (Target)
+**Version:** 1.0.0 (Phase 10)
 **Architecture:** AArch64 (ARM64)
 **Compatibility Target:** Linux Generic (AArch64)
 
-This document defines the strict Application Binary Interface (ABI) for LevitateOS userspace. To enable "Platform Support" (compiling standard Rust apps), LevitateOS adheres to the **Linux AArch64 System Call ABI**. This allows us to potentially reuse `libc` implementations or the Rust `std::sys::unix` backend in the future.
+This document defines the strict Application Binary Interface (ABI) for LevitateOS userspace. To enable "Platform Support" (compiling standard Rust apps), LevitateOS adheres to the **Linux AArch64 System Call ABI**. This allows us to reuse `libc` implementations and the Rust `std::sys::unix` backend.
+
+## 0. Calling Convention (Procedure Call Standard)
+
+LevitateOS follows the **AAPCS64** (Procedure Call Standard for the Arm 64-bit Architecture).
+
+- **Arguments**: `x0`-`x7`.
+- **Return Value**: `x0` (and `x1` if 128-bit).
+- **Callee-saved**: `x19`-`x28`.
+- **Frame Pointer**: `x29` (FP).
+- **Link Register**: `x30` (LR).
+- **Stack Pointer**: `x31` (SP). Must be 16-byte aligned.
 
 ## 1. System Call Interface
 

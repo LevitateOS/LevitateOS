@@ -1,5 +1,6 @@
 //! TEAM_158: Behavior IDs [MT1]-[MT17] for multitasking traceability.
 
+pub mod fd_table; // TEAM_168: File descriptor table (Phase 10)
 pub mod process;
 pub mod scheduler;
 pub mod user; // TEAM_073: Userspace support (Phase 8)
@@ -142,6 +143,10 @@ pub struct TaskControlBlock {
     pub user_sp: usize,
     /// User entry point
     pub user_entry: usize,
+    /// TEAM_166: Process heap state for sbrk syscall
+    pub heap: IrqSafeLock<ProcessHeap>,
+    /// TEAM_168: File descriptor table
+    pub fd_table: fd_table::SharedFdTable,
 }
 
 impl TaskControlBlock {
@@ -164,11 +169,15 @@ impl TaskControlBlock {
             ttbr0: 0,
             user_sp: 0,
             user_entry: 0,
+            // TEAM_166: Bootstrap task has no heap (kernel task)
+            heap: IrqSafeLock::new(ProcessHeap::new(0)),
+            // TEAM_168: Bootstrap task has minimal fd table (kernel task)
+            fd_table: fd_table::new_shared_fd_table(),
         }
     }
 }
 
-use crate::task::user::UserTask;
+use crate::task::user::{ProcessHeap, UserTask};
 
 impl From<UserTask> for TaskControlBlock {
     fn from(user: UserTask) -> Self {
@@ -176,6 +185,7 @@ impl From<UserTask> for TaskControlBlock {
         let ttbr0 = user.ttbr0;
         let user_sp = user.user_sp;
         let user_entry = user.entry_point;
+        let heap = user.heap; // TEAM_166: Preserve heap state
 
         // Set up context for first switch
         let mut context = Context::default();
@@ -193,6 +203,8 @@ impl From<UserTask> for TaskControlBlock {
             ttbr0,
             user_sp,
             user_entry,
+            heap: IrqSafeLock::new(heap), // TEAM_166: Wrap in lock for syscall access
+            fd_table: fd_table::new_shared_fd_table(), // TEAM_168: Fresh fd table for user process
         }
     }
 }
