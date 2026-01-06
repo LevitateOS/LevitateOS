@@ -1,6 +1,8 @@
 use bitflags::bitflags;
 use core::ptr::NonNull;
 
+use super::intrusive_list::ListNode;
+
 // TEAM_047: Page descriptor for physical frame tracking
 // Part of Buddy Allocator implementation (Phase 5)
 
@@ -78,5 +80,28 @@ impl Page {
     pub fn mark_allocated(&mut self) {
         self.flags.insert(PhysPageFlags::ALLOCATED);
         self.flags.remove(PhysPageFlags::FREE);
+    }
+}
+
+// TEAM_135: Implement ListNode trait for Page to enable use with IntrusiveList
+impl ListNode for Page {
+    #[inline]
+    fn next(&self) -> Option<NonNull<Self>> {
+        self.next
+    }
+
+    #[inline]
+    fn prev(&self) -> Option<NonNull<Self>> {
+        self.prev
+    }
+
+    #[inline]
+    fn set_next(&mut self, next: Option<NonNull<Self>>) {
+        self.next = next;
+    }
+
+    #[inline]
+    fn set_prev(&mut self, prev: Option<NonNull<Self>>) {
+        self.prev = prev;
     }
 }

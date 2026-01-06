@@ -1,5 +1,5 @@
+use super::intrusive_list::IntrusiveList;
 use super::page::Page;
-use core::ptr::NonNull;
 
 // TEAM_047: Buddy Allocator implementation
 // Handles physical frame allocation and freeing with coalescing.
@@ -12,9 +12,10 @@ pub const MAX_ORDER: usize = 21; // Up to 8GB (2^21 * 4KB)
 pub const PAGE_SIZE: usize = 4096;
 
 pub struct BuddyAllocator {
+    // TEAM_135: Use IntrusiveList instead of raw NonNull pointers
     /// Free lists for each order.
-    /// free_lists[i] stores head of a doubly-linked list of free blocks of order i.
-    free_lists: [Option<NonNull<Page>>; MAX_ORDER],
+    /// free_lists[i] stores a doubly-linked list of free blocks of order i.
+    free_lists: [IntrusiveList<Page>; MAX_ORDER],
 
     /// Pointer to the global memory map (array of Page structs).
     mem_map: Option<&'static mut [Page]>,
@@ -29,9 +30,10 @@ unsafe impl Sync for BuddyAllocator {}
 
 impl BuddyAllocator {
     /// Create a new, uninitialized Buddy Allocator.
+    // TEAM_135: IntrusiveList::new() is const, so this remains const-compatible
     pub const fn new() -> Self {
         Self {
-            free_lists: [None; MAX_ORDER],
+            free_lists: [const { IntrusiveList::new() }; MAX_ORDER],
             mem_map: None,
             phys_base: 0,
         }
@@ -65,6 +67,7 @@ impl BuddyAllocator {
     }
 
     /// Allocate a block of memory of the given order.
+    // TEAM_135: Refactored to use IntrusiveList API - eliminates unsafe in alloc path
     pub fn alloc(&mut self, order: usize) -> Option<usize> {
         if order >= MAX_ORDER {
             return None;
@@ -72,18 +75,18 @@ impl BuddyAllocator {
 
         // 1. Find the smallest free block of order >= requested
         for i in order..MAX_ORDER {
-            if let Some(mut page_ptr) = self.free_lists[i] {
-                // Found a block! Remove it from the list.
-                // SAFETY: page_ptr is a valid NonNull obtained from free_lists,
-                // which only contains pointers to valid Page structs in mem_map.
-                let page = unsafe { page_ptr.as_mut() };
-                self.remove_from_list(i, page);
+            if !self.free_lists[i].is_empty() {
+                // Found a block! Pop it from the list.
+                let page_ptr = self.free_lists[i].pop_front()
+                    .expect("TEAM_135: List was not empty but pop_front failed");
+                
+                // SAFETY: page_ptr comes from our mem_map via add_to_list
+                let page = unsafe { &mut *page_ptr.as_ptr() };
 
                 // 2. Split the block if it's larger than needed
                 for j in (order..i).rev() {
                     let buddy_pa = self.page_to_pa(page) + (1 << j) * PAGE_SIZE;
                     // TEAM_130: Buddy page must exist - this is an invariant of the allocator.
-                    // If it doesn't exist, the free_lists are corrupted.
                     let buddy_page = self
                         .pa_to_page_mut(buddy_pa)
                         .expect("TEAM_130: Buddy page must exist - corrupted allocator state");
@@ -167,31 +170,14 @@ impl BuddyAllocator {
         self.phys_base + index * PAGE_SIZE
     }
 
+    // TEAM_135: Simplified using IntrusiveList - no unsafe needed
     fn add_to_list(&mut self, order: usize, page: &'static mut Page) {
-        page.next = self.free_lists[order];
-        page.prev = None;
-        if let Some(mut next_ptr) = self.free_lists[order] {
-            // SAFETY: next_ptr is from free_lists which only contains valid Page pointers.
-            unsafe { next_ptr.as_mut().prev = Some(NonNull::from(&mut *page)) };
-        }
-        self.free_lists[order] = Some(NonNull::from(&mut *page));
+        self.free_lists[order].push_front(page);
     }
 
+    // TEAM_135: Simplified using IntrusiveList - no unsafe needed
     fn remove_from_list(&mut self, order: usize, page: &mut Page) {
-        if let Some(mut prev_ptr) = page.prev {
-            // SAFETY: prev_ptr is from the page's linked list, containing valid Page pointers.
-            unsafe { prev_ptr.as_mut().next = page.next };
-        } else {
-            self.free_lists[order] = page.next;
-        }
-
-        if let Some(mut next_ptr) = page.next {
-            // SAFETY: next_ptr is from the page's linked list, containing valid Page pointers.
-            unsafe { next_ptr.as_mut().prev = page.prev };
-        }
-
-        page.next = None;
-        page.prev = None;
+        self.free_lists[order].remove(page);
     }
 }
 

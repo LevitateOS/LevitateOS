@@ -2,7 +2,7 @@
 // See docs/planning/slab-allocator/phase-2.md for design
 
 mod cache;
-mod list;
+// TEAM_135: Removed mod list - now using shared intrusive_list module
 mod page;
 
 pub use cache::{SIZE_CLASSES, SlabCache};

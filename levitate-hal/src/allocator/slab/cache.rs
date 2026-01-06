@@ -1,7 +1,8 @@
 // TEAM_051: Slab Allocator - Cache (Per-Size-Class)
 // See docs/planning/slab-allocator/phase-2.md behavioral contracts [S1]-[S6]
 
-use super::list::SlabList;
+// TEAM_135: Use shared IntrusiveList instead of slab-local SlabList
+use super::super::intrusive_list::IntrusiveList;
 use super::page::SlabPage;
 use core::ptr::NonNull;
 
@@ -52,14 +53,15 @@ pub struct SlabCache {
     /// Size class index (0-5).
     pub(super) class_index: usize,
 
+    // TEAM_135: Use shared IntrusiveList instead of SlabList
     /// Pages with some free objects (allocation target).
-    partial: SlabList<SlabPage>,
+    partial: IntrusiveList<SlabPage>,
 
     /// Pages with all objects allocated (skip during alloc).
-    full: SlabList<SlabPage>,
+    full: IntrusiveList<SlabPage>,
 
     /// Pages with no objects allocated (can return to Buddy).
-    empty: SlabList<SlabPage>,
+    empty: IntrusiveList<SlabPage>,
 
     /// Statistics.
     total_allocs: usize,
@@ -68,12 +70,13 @@ pub struct SlabCache {
 
 impl SlabCache {
     /// Create a new slab cache for the given size class.
+    // TEAM_135: IntrusiveList::new() is const, so this remains const-compatible
     pub const fn new(class_index: usize) -> Self {
         Self {
             class_index,
-            partial: SlabList::new(),
-            full: SlabList::new(),
-            empty: SlabList::new(),
+            partial: IntrusiveList::new(),
+            full: IntrusiveList::new(),
+            empty: IntrusiveList::new(),
             total_allocs: 0,
             total_frees: 0,
         }

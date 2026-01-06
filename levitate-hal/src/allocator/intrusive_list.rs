@@ -1,10 +1,11 @@
-// TEAM_051: Slab Allocator - Intrusive Linked List
-// See docs/planning/slab-allocator/phase-2.md for design
+// TEAM_135: Shared intrusive linked list implementation
+// Generalized from slab/list.rs for use by both buddy and slab allocators.
+// This encapsulates unsafe pointer operations in a safe abstraction.
 
 use core::ptr::NonNull;
 
 /// Intrusive list node trait.
-/// Types stored in SlabList must implement this to provide list pointers.
+/// Types stored in IntrusiveList must implement this to provide list pointers.
 pub trait ListNode: Sized {
     fn next(&self) -> Option<NonNull<Self>>;
     fn prev(&self) -> Option<NonNull<Self>>;
@@ -12,19 +13,23 @@ pub trait ListNode: Sized {
     fn set_prev(&mut self, prev: Option<NonNull<Self>>);
 }
 
-/// Intrusive doubly-linked list for slab page management.
+/// Intrusive doubly-linked list for kernel data structures.
 ///
 /// # Invariants
 /// - All nodes maintain valid prev/next pointers
 /// - head.prev is None
 /// - Empty list has head = None and count = 0
-pub struct SlabList<T: ListNode> {
+///
+/// # Safety
+/// This structure encapsulates all unsafe pointer operations internally,
+/// providing a safe interface to consumers.
+pub struct IntrusiveList<T: ListNode> {
     head: Option<NonNull<T>>,
     count: usize,
 }
 
-impl<T: ListNode> SlabList<T> {
-    /// Create an empty list.
+impl<T: ListNode> IntrusiveList<T> {
+    /// Create an empty list. Const-compatible for static initialization.
     pub const fn new() -> Self {
         Self {
             head: None,
@@ -34,7 +39,7 @@ impl<T: ListNode> SlabList<T> {
 
     /// Insert node at the front of the list. O(1).
     ///
-    /// # Safety
+    /// # Safety Contract
     /// - `node` must be a valid mutable reference
     /// - `node` must not already be in this or another list
     pub fn push_front(&mut self, node: &mut T) {
@@ -46,6 +51,8 @@ impl<T: ListNode> SlabList<T> {
 
         // Update old head's prev pointer
         if let Some(mut old_head) = self.head {
+            // SAFETY: old_head is from self.head which only contains valid pointers
+            // to nodes that were previously inserted via push_front.
             unsafe {
                 old_head.as_mut().set_prev(Some(new_node));
             }
@@ -58,7 +65,7 @@ impl<T: ListNode> SlabList<T> {
 
     /// Remove a specific node from the list. O(1).
     ///
-    /// # Safety
+    /// # Safety Contract
     /// - `node` must be in this list
     pub fn remove(&mut self, node: &mut T) {
         let prev = node.prev();
@@ -67,7 +74,7 @@ impl<T: ListNode> SlabList<T> {
         // Update previous node's next pointer (or head)
         match prev {
             Some(mut prev_node) => {
-                // SAFETY: prev_node is valid and within this list
+                // SAFETY: prev_node is valid and within this list (came from node.prev())
                 unsafe {
                     prev_node.as_mut().set_next(next);
                 }
@@ -80,6 +87,7 @@ impl<T: ListNode> SlabList<T> {
 
         // Update next node's prev pointer
         if let Some(mut next_node) = next {
+            // SAFETY: next_node is valid and within this list (came from node.next())
             unsafe {
                 next_node.as_mut().set_prev(prev);
             }
@@ -96,10 +104,10 @@ impl<T: ListNode> SlabList<T> {
     pub fn pop_front(&mut self) -> Option<NonNull<T>> {
         let head = self.head?;
 
-        // SAFETY: head is a valid NonNull from self.head, so as_ptr() returns valid pointer.
-        // The pointer is non-null by NonNull invariant, so as_mut() cannot return None.
+        // SAFETY: head is a valid NonNull from self.head.
+        // The pointer is non-null by NonNull invariant.
         unsafe {
-            let head_ref = head.as_ptr().as_mut().expect("TEAM_130: NonNull pointer was null - impossible");
+            let head_ref = head.as_ptr().as_mut().expect("TEAM_135: NonNull was null - impossible");
             self.remove(head_ref);
         }
 
@@ -107,18 +115,21 @@ impl<T: ListNode> SlabList<T> {
     }
 
     /// Check if the list is empty.
+    #[inline]
     pub fn is_empty(&self) -> bool {
         self.head.is_none()
     }
 
     /// Get the number of nodes in the list.
     #[allow(dead_code)]
+    #[inline]
     pub fn len(&self) -> usize {
         self.count
     }
 
     /// Get head of the list without removing it.
-    pub(super) fn head(&self) -> Option<NonNull<T>> {
+    #[inline]
+    pub fn head(&self) -> Option<NonNull<T>> {
         self.head
     }
 }
@@ -161,14 +172,14 @@ mod tests {
 
     #[test]
     fn test_new_list_is_empty() {
-        let list: SlabList<TestNode> = SlabList::new();
+        let list: IntrusiveList<TestNode> = IntrusiveList::new();
         assert!(list.is_empty());
         assert_eq!(list.len(), 0);
     }
 
     #[test]
     fn test_push_front_adds_to_head() {
-        let mut list = SlabList::new();
+        let mut list = IntrusiveList::new();
         let mut node1 = TestNode::new(1);
         let mut node2 = TestNode::new(2);
 
@@ -188,7 +199,7 @@ mod tests {
 
     #[test]
     fn test_pop_front_returns_head() {
-        let mut list = SlabList::new();
+        let mut list = IntrusiveList::new();
         let mut node1 = TestNode::new(1);
         let mut node2 = TestNode::new(2);
 
@@ -211,7 +222,7 @@ mod tests {
 
     #[test]
     fn test_remove_from_middle() {
-        let mut list = SlabList::new();
+        let mut list = IntrusiveList::new();
         let mut node1 = TestNode::new(1);
         let mut node2 = TestNode::new(2);
         let mut node3 = TestNode::new(3);
@@ -235,7 +246,7 @@ mod tests {
 
     #[test]
     fn test_remove_head() {
-        let mut list = SlabList::new();
+        let mut list = IntrusiveList::new();
         let mut node1 = TestNode::new(1);
         let mut node2 = TestNode::new(2);
 
@@ -253,7 +264,7 @@ mod tests {
 
     #[test]
     fn test_empty_list_pop() {
-        let mut list: SlabList<TestNode> = SlabList::new();
+        let mut list: IntrusiveList<TestNode> = IntrusiveList::new();
         assert!(list.pop_front().is_none());
     }
 }

@@ -156,6 +156,71 @@ This document outlines the planned development phases for LevitateOS. Each compl
 
 ---
 
+## 🏗️ PART II: USERSPACE EXPANSION & APPS
+
+The goal of Part II is to build a rich, POSIX-like userspace environment on top of the Phase 8 foundations.
+
+### ⏳ Phase 10: The Userspace Standard Library (`ulib`)
+
+- **Objective**: Create a robust `std`-like library to support complex applications.
+- **Specification**: See [`docs/specs/userspace-abi.md`](file:///home/vince/Projects/LevitateOS/docs/specs/userspace-abi.md)
+- **Units of Work**:
+  - [ ] **Global Allocator**: Implement a userspace heap allocator (`dlmalloc` or `linked_list_allocator`) backed by `sbrk`.
+  - [ ] **File Abstractions**: `File`, `OpenOptions`, `Metadata` structs wrapping raw syscalls.
+  - [ ] **Directory Iteration**: `ReadDir` iterator (requires `sys_getdents`).
+  - [ ] **Buffered I/O**: `BufReader` and `BufWriter` for performance.
+  - [ ] **Environment**: `std::env::args()` and `std::env::vars()` parsing from stack.
+  - [ ] **Time**: `sys_time` and `sys_sleep` for `std::time::Instant` and `Duration`.
+  - [ ] **Error Handling**: Standard `io::Error` and `Result` types.
+
+### 🛠️ Phase 11: Core Utilities (The "Busybox" Phase)
+
+- **Objective**: Implement essential file management and text tools.
+- **Units of Work**:
+  - [ ] **`ls`**: List directory contents (flags: `-l`, `-a`, color output).
+  - [ ] **`cat`**: Concatenate and print files to stdout.
+  - [ ] **`touch`**: Create files or update timestamps.
+  - [ ] **`mkdir`** / **`rmdir`**: Directory creation/removal.
+  - [ ] **`rm`**: File removal (flag: `-r` for recursive).
+  - [ ] **`cp`** / **`mv`**: Copy and move files.
+  - [ ] **`pwd`**: Print working directory.
+  - [ ] **`ln`**: Hard and soft links (requires FS support).
+
+### 🚦 Phase 12: Process & System Management
+
+- **Objective**: Tools to monitor and control the operating system.
+- **Units of Work**:
+  - [ ] **Process Info**: `sys_info` or `/proc` virtual filesystem to expose kernel stats.
+  - [ ] **`ps`**: List running processes (PID, State, Name, Memory).
+  - [ ] **`kill`**: `sys_kill` syscall for signaling/terminating processes.
+  - [ ] **`top`**: Dynamic real-time view of running tasks.
+  - [ ] **`free`**: Memory usage statistics.
+  - [ ] **`shutdown` / `reboot`**: ACPI/PSCI integration for system power control.
+  - [ ] **`uptime`**: System uptime display.
+
+### 📝 Phase 13: Text Editing & Interaction
+
+- **Objective**: Productive text manipulation within the OS.
+- **Units of Work**:
+  - [ ] **Terminal Raw Mode**: `sys_ioctl` (or similar) to control TTY driver behavior.
+  - [ ] **`grep`**: Basic pattern matching.
+  - [ ] **`more`** / **`less`**: Paging through long text.
+  - [ ] **`vi` (micro)**: A tiny screen-oriented text editor.
+    - Buffer management
+    - Cursor movement
+    - Insert/Normal modes
+    - File saving
+
+### 📦 Phase 14: Package Management & Self-Hosting (Long Term)
+
+- **Objective**: The path to self-compilation.
+- **Units of Work**:
+  - [ ] **Dynamic Linking**: Support for `.so`/`.dll` loading (long term).
+  - [ ] **Interpreter**: Port `lua` or write a basic BASIC interpreter userspace.
+  - [ ] **Assembler**: A simple AArch64 assembler.
+
+---
+
 ## Team Registry Summary
 
 | Phase | Teams | Description |

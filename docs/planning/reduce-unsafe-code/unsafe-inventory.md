@@ -2,7 +2,31 @@
 
 **TEAM_131** | Generated for review and refactoring decisions
 
-**Total unsafe usages:** 171
+**Last Updated:** TEAM_135 (2026-01-06)
+
+**Total unsafe usages:** ~130 (down from 171 baseline)
+
+---
+
+## Progress Tracking
+
+| Team | Work Done | Unsafe Δ |
+|------|-----------|----------|
+| TEAM_131 | Initial inventory | Baseline: 171 |
+| TEAM_132 | Barriers + DAIF migration to aarch64-cpu | -15 |
+| TEAM_133 | ESR/ELR/VBAR migration | -3 |
+| TEAM_135 | Buddy allocator → IntrusiveList | -3 |
+| TEAM_135 | Slab allocator → IntrusiveList, removed SlabList | -9 |
+
+### Available Abstractions
+
+| Pattern | Crate | Status |
+|---------|-------|--------|
+| Memory barriers (dsb, isb, dmb) | `aarch64-cpu` | ✅ In use |
+| Standard sysregs (DAIF, ESR, ELR, VBAR, SCTLR) | `aarch64-cpu` | ✅ In use |
+| GICv3 sysregs (ICC_*) | N/A | ❌ Not in aarch64-cpu |
+| Volatile MMIO | `safe-mmio` | ⏳ Available, not migrated |
+| Intrusive linked lists | `IntrusiveList` (internal) | ✅ In use (buddy, slab) |
 
 ---
 
@@ -13,13 +37,13 @@
 | `levitate-hal/src/gic.rs` | 26 | asm!, volatile MMIO |
 | `levitate-hal/src/mmu.rs` | 14 | asm!, page table ops |
 | `kernel/src/main.rs` | 12 | init, ptr ops |
-| `levitate-hal/src/allocator/slab/list.rs` | 9 | linked list |
+| `levitate-hal/src/allocator/slab/list.rs` | 0 | DELETED - TEAM_135 migrated to IntrusiveList |
 | `levitate-hal/src/allocator/slab/page.rs` | 6 | slab allocator |
 | `kernel/src/task/user_mm.rs` | 6 | user page tables |
 | `levitate-virtio/src/queue.rs` | 9 | DMA volatile ops |
 | `levitate-hal/src/timer.rs` | 6 | asm! timer regs |
 | `kernel/src/loader/elf.rs` | 6 | ELF loading |
-| `levitate-hal/src/allocator/buddy.rs` | 7 | buddy allocator |
+| `levitate-hal/src/allocator/buddy.rs` | 3 | buddy allocator (TEAM_135: reduced via IntrusiveList) |
 | `levitate-hal/src/allocator/slab/cache.rs` | 5 | slab cache |
 | `kernel/src/syscall.rs` | 4 | user slice creation |
 | `levitate-hal/src/uart_pl011.rs` | 4 | UART MMIO |

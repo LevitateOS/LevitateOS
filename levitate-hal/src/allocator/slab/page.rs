@@ -2,7 +2,8 @@
 // Layout: [data: 4032 bytes][metadata: 64 bytes]
 // See docs/planning/slab-allocator/phase-2.md for design
 
-use super::list::ListNode;
+// TEAM_135: Use shared IntrusiveList module instead of slab-local SlabList
+use super::super::intrusive_list::ListNode;
 use core::ptr::NonNull;
 use core::sync::atomic::{AtomicU64, Ordering};
 
