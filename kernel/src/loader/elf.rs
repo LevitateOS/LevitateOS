@@ -37,28 +37,69 @@ pub const PF_W: u32 = 2; // Write
 pub const PF_R: u32 = 4; // Read
 
 /// TEAM_073: ELF parsing errors.
+/// TEAM_152: Added error codes (0x02xx) per unified error system plan.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ElfError {
-    /// Data too short to contain header
+    /// Data too short to contain header (0x0201)
     TooShort,
-    /// Invalid ELF magic number
+    /// Invalid ELF magic number (0x0202)
     InvalidMagic,
-    /// Not a 64-bit ELF
+    /// Not a 64-bit ELF (0x0203)
     Not64Bit,
-    /// Not little-endian
+    /// Not little-endian (0x0204)
     NotLittleEndian,
-    /// Not an executable file
+    /// Not an executable file (0x0205)
     NotExecutable,
-    /// Not for AArch64
+    /// Not for AArch64 (0x0206)
     WrongArchitecture,
-    /// Invalid program header offset
+    /// Invalid program header offset (0x0207)
     #[allow(dead_code)]
     InvalidProgramHeader,
-    /// Failed to allocate memory for segment
+    /// Failed to allocate memory for segment (0x0208)
     AllocationFailed,
-    /// Failed to map memory
+    /// Failed to map memory (0x0209)
     MappingFailed,
 }
+
+impl ElfError {
+    /// TEAM_152: Get numeric error code for debugging
+    pub const fn code(&self) -> u16 {
+        match self {
+            Self::TooShort => 0x0201,
+            Self::InvalidMagic => 0x0202,
+            Self::Not64Bit => 0x0203,
+            Self::NotLittleEndian => 0x0204,
+            Self::NotExecutable => 0x0205,
+            Self::WrongArchitecture => 0x0206,
+            Self::InvalidProgramHeader => 0x0207,
+            Self::AllocationFailed => 0x0208,
+            Self::MappingFailed => 0x0209,
+        }
+    }
+
+    /// TEAM_152: Get error name for logging
+    pub const fn name(&self) -> &'static str {
+        match self {
+            Self::TooShort => "ELF data too short",
+            Self::InvalidMagic => "Invalid ELF magic number",
+            Self::Not64Bit => "Not a 64-bit ELF",
+            Self::NotLittleEndian => "Not little-endian",
+            Self::NotExecutable => "Not an executable file",
+            Self::WrongArchitecture => "Wrong architecture (not AArch64)",
+            Self::InvalidProgramHeader => "Invalid program header",
+            Self::AllocationFailed => "Memory allocation failed",
+            Self::MappingFailed => "Memory mapping failed",
+        }
+    }
+}
+
+impl core::fmt::Display for ElfError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "E{:04X}: {}", self.code(), self.name())
+    }
+}
+
+impl core::error::Error for ElfError {}
 
 /// TEAM_073: ELF64 File Header.
 ///

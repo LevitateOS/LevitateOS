@@ -6,7 +6,7 @@
 //! - Address space layout for user processes
 
 use crate::memory::FRAME_ALLOCATOR;
-use levitate_hal::mmu::{self, PAGE_SIZE, PageAllocator, PageFlags, PageTable};
+use levitate_hal::mmu::{self, MmuError, PAGE_SIZE, PageAllocator, PageFlags, PageTable};
 
 /// TEAM_073: User address space layout constants.
 pub mod layout {
@@ -63,10 +63,11 @@ pub unsafe fn map_user_page(
     user_va: usize,
     phys: usize,
     flags: PageFlags,
-) -> Result<(), &'static str> {
+) -> Result<(), MmuError> {
+    // TEAM_152: Updated to use MmuError
     // Validate user address
     if user_va >= layout::USER_SPACE_END {
-        return Err("Virtual address not in user space");
+        return Err(MmuError::InvalidVirtualAddress);
     }
 
     // Get the L0 table
@@ -92,13 +93,14 @@ pub unsafe fn map_user_range(
     phys_start: usize,
     len: usize,
     flags: PageFlags,
-) -> Result<(), &'static str> {
+) -> Result<(), MmuError> {
+    // TEAM_152: Updated to use MmuError
     // Validate user address
     if user_va_start >= layout::USER_SPACE_END {
-        return Err("Virtual address not in user space");
+        return Err(MmuError::InvalidVirtualAddress);
     }
     if user_va_start.saturating_add(len) > layout::USER_SPACE_END {
-        return Err("Mapping extends beyond user space");
+        return Err(MmuError::InvalidVirtualAddress);
     }
 
     let l0_va = mmu::phys_to_virt(ttbr0_phys);
@@ -131,7 +133,7 @@ pub unsafe fn map_user_range(
 pub unsafe fn setup_user_stack(
     ttbr0_phys: usize,
     stack_pages: usize,
-) -> Result<usize, &'static str> {
+) -> Result<usize, MmuError> {
     let stack_size = stack_pages * PAGE_SIZE;
     let stack_bottom = layout::STACK_TOP - stack_size;
 
@@ -142,7 +144,7 @@ pub unsafe fn setup_user_stack(
         // Allocate physical page
         let phys = FRAME_ALLOCATOR
             .alloc_page()
-            .ok_or("Failed to allocate stack page")?;
+            .ok_or(MmuError::AllocationFailed)?;
 
         // Zero the stack page for security
         let page_ptr = mmu::phys_to_virt(phys) as *mut u8;
@@ -167,9 +169,10 @@ pub unsafe fn alloc_and_map_user_range(
     user_va_start: usize,
     len: usize,
     flags: PageFlags,
-) -> Result<usize, &'static str> {
+) -> Result<usize, MmuError> {
+    // TEAM_152: Updated to use MmuError
     if len == 0 {
-        return Err("Cannot allocate zero bytes");
+        return Err(MmuError::InvalidVirtualAddress);
     }
 
     let va_start = user_va_start & !0xFFF;
@@ -183,7 +186,7 @@ pub unsafe fn alloc_and_map_user_range(
         // Allocate physical page
         let phys = FRAME_ALLOCATOR
             .alloc_page()
-            .ok_or("Failed to allocate user page")?;
+            .ok_or(MmuError::AllocationFailed)?;
 
         if i == 0 {
             first_phys = phys;
@@ -206,7 +209,7 @@ pub unsafe fn alloc_and_map_user_range(
 
 /// TEAM_073: Free a user page table and all its mappings.
 #[allow(dead_code)]
-pub unsafe fn destroy_user_page_table(_ttbr0_phys: usize) -> Result<(), &'static str> {
+pub unsafe fn destroy_user_page_table(_ttbr0_phys: usize) -> Result<(), MmuError> {
     // TODO(TEAM_073): Implement full page table teardown
     // For now, we leak the pages - will be fixed when process cleanup is added
     Ok(())
@@ -219,18 +222,19 @@ pub fn validate_user_buffer(
     ptr: usize,
     len: usize,
     writable: bool,
-) -> Result<(), &'static str> {
+) -> Result<(), MmuError> {
+    // TEAM_152: Updated to use MmuError
     // 1. Check user address space bounds
     if ptr >= layout::USER_SPACE_END {
-        return Err("Pointer not in user space");
+        return Err(MmuError::InvalidVirtualAddress);
     }
     // Check for overflow or exceeding user space
     if let Some(end) = ptr.checked_add(len) {
         if end > layout::USER_SPACE_END {
-            return Err("Range exceeds user space");
+            return Err(MmuError::InvalidVirtualAddress);
         }
     } else {
-        return Err("Pointer range overflow");
+        return Err(MmuError::InvalidVirtualAddress);
     }
 
     if len == 0 {
@@ -252,7 +256,7 @@ pub fn validate_user_buffer(
             Some((_pa, flags)) => {
                 // Check VALID bit (implicit in translate, but good to be explicit)
                 if !flags.contains(PageFlags::VALID) {
-                    return Err("Page not valid");
+                    return Err(MmuError::NotMapped);
                 }
 
                 // Check User Accessibility (AP bit 6 must be set)
@@ -264,7 +268,7 @@ pub fn validate_user_buffer(
                 let is_user = (ap_bits & 0b01) != 0;
 
                 if !is_user {
-                    return Err("Page not accessible to user");
+                    return Err(MmuError::NotMapped);
                 }
 
                 // Check Write Permission if requested
@@ -277,11 +281,11 @@ pub fn validate_user_buffer(
                     // So we must ensure Bit 7 is 0.
                     let is_readonly = (ap_bits & 0b10) != 0;
                     if is_readonly {
-                        return Err("Page not writable");
+                        return Err(MmuError::NotMapped);
                     }
                 }
             }
-            None => return Err("Page not mapped"),
+            None => return Err(MmuError::NotMapped),
         }
 
         // Move to next page boundary

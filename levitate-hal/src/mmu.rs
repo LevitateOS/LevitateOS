@@ -9,6 +9,53 @@
 
 use bitflags::bitflags;
 
+/// TEAM_152: MMU error type with error codes (0x01xx) per unified error system plan.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MmuError {
+    /// Page table allocation failed (0x0101)
+    AllocationFailed,
+    /// Address not mapped (0x0102)
+    NotMapped,
+    /// Invalid virtual address or target level (0x0103)
+    InvalidVirtualAddress,
+    /// Address not properly aligned (0x0104)
+    Misaligned,
+    /// Page table walk failed at intermediate level (0x0105)
+    WalkFailed,
+}
+
+impl MmuError {
+    /// TEAM_152: Get numeric error code for debugging
+    pub const fn code(&self) -> u16 {
+        match self {
+            Self::AllocationFailed => 0x0101,
+            Self::NotMapped => 0x0102,
+            Self::InvalidVirtualAddress => 0x0103,
+            Self::Misaligned => 0x0104,
+            Self::WalkFailed => 0x0105,
+        }
+    }
+
+    /// TEAM_152: Get error name for logging
+    pub const fn name(&self) -> &'static str {
+        match self {
+            Self::AllocationFailed => "Page table allocation failed",
+            Self::NotMapped => "Address not mapped",
+            Self::InvalidVirtualAddress => "Invalid virtual address",
+            Self::Misaligned => "Address not properly aligned",
+            Self::WalkFailed => "Page table walk failed",
+        }
+    }
+}
+
+impl core::fmt::Display for MmuError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "E{:04X}: {}", self.code(), self.name())
+    }
+}
+
+impl core::error::Error for MmuError {}
+
 /// [M23] Trait for physical page allocation, to be implemented by a Buddy Allocator.
 /// Allows MMU to request pages for dynamic page tables.
 /// TEAM_054: Added behavior traceability
@@ -611,9 +658,9 @@ pub fn walk_to_entry<'a>(
     va: usize,
     target_level: usize,
     create: bool,
-) -> Result<WalkResult<'a>, &'static str> {
+) -> Result<WalkResult<'a>, MmuError> {
     if target_level > 3 {
-        return Err("Invalid target level");
+        return Err(MmuError::InvalidVirtualAddress);
     }
 
     let indices = [
@@ -641,7 +688,7 @@ pub fn walk_to_entry<'a>(
                 // Need to allocate a new table
                 current_table = get_or_create_table(current_table, index)?;
             } else {
-                return Err("Mapping not found at intermediate level");
+                return Err(MmuError::WalkFailed);
             }
         } else {
             // Already a table, just descend
@@ -729,7 +776,7 @@ pub fn map_page(
     va: usize,
     pa: usize,
     flags: PageFlags,
-) -> Result<(), &'static str> {
+) -> Result<(), MmuError> {
     // TEAM_070: Using refactored walk_to_entry
     let walk = walk_to_entry(root, va, 3, true)?;
     walk.table
@@ -742,12 +789,12 @@ pub fn map_page(
 ///
 /// TEAM_070: Implementing unmap support (UoW 2) and reclamation (UoW 3).
 /// Returns Err if page is not mapped (Rule 14).
-pub fn unmap_page(root: &mut PageTable, va: usize) -> Result<(), &'static str> {
+pub fn unmap_page(root: &mut PageTable, va: usize) -> Result<(), MmuError> {
     // Walk to L3 entry. Don't create if missing.
     let walk = walk_to_entry(root, va, 3, false)?;
 
     if !walk.table.entry(walk.index).is_valid() {
-        return Err("Address not mapped");
+        return Err(MmuError::NotMapped);
     }
 
     // Clear leaf entry
@@ -800,7 +847,7 @@ pub fn unmap_page(root: &mut PageTable, va: usize) -> Result<(), &'static str> {
 fn get_or_create_table(
     parent: &mut PageTable,
     index: usize,
-) -> Result<&'static mut PageTable, &'static str> {
+) -> Result<&'static mut PageTable, MmuError> {
     let entry = parent.entry(index);
 
     if entry.is_table() {
@@ -823,7 +870,7 @@ fn get_or_create_table(
         } else {
             alloc_page_table()
         }
-        .ok_or("Page table allocation failed")?;
+        .ok_or(MmuError::AllocationFailed)?;
 
         let new_va = new_table as *mut PageTable as usize;
         let new_pa = virt_to_phys(new_va);
@@ -843,7 +890,7 @@ pub fn identity_map_range(
     start: usize,
     end: usize,
     flags: PageFlags,
-) -> Result<(), &'static str> {
+) -> Result<(), MmuError> {
     let start_page = start & !0xFFF;
     let end_page = (end + 0xFFF) & !0xFFF;
 
@@ -874,13 +921,13 @@ pub fn map_block_2mb(
     va: usize,
     pa: usize,
     flags: PageFlags,
-) -> Result<(), &'static str> {
+) -> Result<(), MmuError> {
     // Verify 2MB alignment
     if (va & BLOCK_2MB_MASK) != 0 {
-        return Err("VA not 2MB aligned for block mapping");
+        return Err(MmuError::Misaligned);
     }
     if (pa & BLOCK_2MB_MASK) != 0 {
-        return Err("PA not 2MB aligned for block mapping");
+        return Err(MmuError::Misaligned);
     }
 
     // TEAM_070: Using refactored walk_to_entry at level 2
@@ -897,7 +944,7 @@ pub fn map_range(
     pa_start: usize,
     len: usize,
     flags: PageFlags,
-) -> Result<MappingStats, &'static str> {
+) -> Result<MappingStats, MmuError> {
     let mut va = va_start & !0xFFF;
     let mut pa = pa_start & !0xFFF;
     let end_va = (va_start + len + 0xFFF) & !0xFFF;
@@ -936,7 +983,7 @@ pub fn identity_map_range_optimized(
     start: usize,
     end: usize,
     flags: PageFlags,
-) -> Result<MappingStats, &'static str> {
+) -> Result<MappingStats, MmuError> {
     map_range(root, start, start, end - start, flags)
 }
 

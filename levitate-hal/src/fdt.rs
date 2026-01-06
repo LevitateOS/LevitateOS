@@ -43,13 +43,40 @@ where
 /// Errors that can occur during FDT parsing
 /// [FD1] InvalidHeader - DTB header is malformed
 /// [FD2] InitrdMissing - No initrd properties found
-#[derive(Debug)]
+/// TEAM_152: Added error codes (0x09xx) per unified error system plan.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FdtError {
-    /// [FD1] Invalid DTB header
+    /// [FD1] Invalid DTB header (0x0901)
     InvalidHeader,
-    /// [FD2] Missing initrd properties, [FD5] Both start and end must exist
+    /// [FD2] Missing initrd properties, [FD5] Both start and end must exist (0x0902)
     InitrdMissing,
 }
+
+impl FdtError {
+    /// TEAM_152: Get numeric error code for debugging
+    pub const fn code(&self) -> u16 {
+        match self {
+            Self::InvalidHeader => 0x0901,
+            Self::InitrdMissing => 0x0902,
+        }
+    }
+
+    /// TEAM_152: Get error name for logging
+    pub const fn name(&self) -> &'static str {
+        match self {
+            Self::InvalidHeader => "Invalid DTB header",
+            Self::InitrdMissing => "Initrd properties missing in DTB",
+        }
+    }
+}
+
+impl core::fmt::Display for FdtError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "E{:04X}: {}", self.code(), self.name())
+    }
+}
+
+impl core::error::Error for FdtError {}
 
 /// Retrieve the physical address range of the initrd from the DTB.
 /// [FD3] Parses 32-bit addresses, [FD4] Parses 64-bit addresses, [FD6] Handles big-endian

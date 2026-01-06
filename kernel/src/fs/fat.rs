@@ -74,19 +74,22 @@ impl TimeSource for DummyTimeSource {
 /// FAT32 disk size (16MB)
 const DISK_SIZE_BYTES: u64 = 16 * 1024 * 1024;
 
+use super::FsError;
+
 /// Try to mount and list directory on FAT32
-pub fn mount_and_list() -> Result<Vec<String>, &'static str> {
+/// TEAM_152: Updated to use FsError
+pub fn mount_and_list() -> Result<Vec<String>, FsError> {
     let block_device = VirtioBlockDevice::new(DISK_SIZE_BYTES);
     let time_source = DummyTimeSource;
     let volume_mgr = VolumeManager::<_, _, 4, 4, 1>::new(block_device, time_source);
 
     let volume = volume_mgr
         .open_volume(VolumeIdx(0))
-        .map_err(|_| "Failed to open FAT volume")?;
+        .map_err(|_| FsError::VolumeOpen)?;
 
     let root_dir = volume
         .open_root_dir()
-        .map_err(|_| "Failed to open root dir")?;
+        .map_err(|_| FsError::DirOpen)?;
 
     let mut entries = Vec::new();
     let _ = root_dir.iterate_dir(|entry| {

@@ -32,16 +32,44 @@ static NET_DEVICE: Spinlock<Option<VirtIONet<VirtioHal, StaticMmioTransport, QUE
     Spinlock::new(None);
 
 /// Network driver error types
-#[allow(dead_code)]
-#[derive(Debug)]
+/// TEAM_152: Added error codes (0x07xx) per unified error system plan.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum NetError {
-    /// Device not initialized
+    /// Device not initialized (0x0701)
     NotInitialized,
-    /// TX queue is full
+    /// TX queue is full (0x0702)
     DeviceBusy,
-    /// Transmission failed
+    /// Transmission failed (0x0703)
     SendFailed,
 }
+
+impl NetError {
+    /// TEAM_152: Get numeric error code for debugging
+    pub const fn code(&self) -> u16 {
+        match self {
+            Self::NotInitialized => 0x0701,
+            Self::DeviceBusy => 0x0702,
+            Self::SendFailed => 0x0703,
+        }
+    }
+
+    /// TEAM_152: Get error name for logging
+    pub const fn name(&self) -> &'static str {
+        match self {
+            Self::NotInitialized => "Network device not initialized",
+            Self::DeviceBusy => "TX queue full",
+            Self::SendFailed => "Transmission failed",
+        }
+    }
+}
+
+impl core::fmt::Display for NetError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "E{:04X}: {}", self.code(), self.name())
+    }
+}
+
+impl core::error::Error for NetError {}
 
 /// [NET1] Initialize network device from VirtIO transport
 /// [NET2] Reads MAC address from device configuration

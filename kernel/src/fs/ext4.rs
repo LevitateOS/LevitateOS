@@ -66,12 +66,15 @@ impl Ext4Read for Ext4BlockDevice {
 /// ext4 disk size (32MB - larger for root filesystem)
 const EXT4_DISK_SIZE_BYTES: u64 = 32 * 1024 * 1024;
 
+use super::FsError;
+
 /// Try to mount ext4 filesystem and list root directory
-pub fn mount_and_list() -> Result<Vec<String>, &'static str> {
+/// TEAM_152: Updated to use FsError
+pub fn mount_and_list() -> Result<Vec<String>, FsError> {
     let block_device = Ext4BlockDevice::new(EXT4_DISK_SIZE_BYTES);
 
     // Box the device for Ext4::load
-    let fs = Ext4::load(Box::new(block_device)).map_err(|_| "Failed to load ext4 filesystem")?;
+    let fs = Ext4::load(Box::new(block_device)).map_err(|_| FsError::VolumeOpen)?;
 
     let mut entries = Vec::new();
     if let Ok(dir) = fs.read_dir("/") {
