@@ -12,21 +12,27 @@ use los_hal::println;
 /// TEAM_073: Error codes for syscalls.
 pub mod errno {
     pub const ENOSYS: i64 = -1;
-    pub const EBADF: i64 = -2;
-    pub const EFAULT: i64 = -3;
-    pub const EINVAL: i64 = -4;
-    /// TEAM_192: Read-only file system
+    pub const ENOENT: i64 = -2;
+    pub const EBADF: i64 = -9;
+    pub const EFAULT: i64 = -14;
+    pub const EINVAL: i64 = -22;
     pub const EROFS: i64 = -30;
+    #[allow(dead_code)]
+    pub const EEXIST: i64 = -17;
+    #[allow(dead_code)]
+    pub const EIO: i64 = -5;
 }
 
-/// TEAM_168: Additional errno values for file operations.
 pub mod errno_file {
-    /// No such file or directory
-    pub const ENOENT: i64 = -5;
-    /// Too many open files
-    pub const EMFILE: i64 = -6;
-    /// TEAM_176: Not a directory
-    pub const ENOTDIR: i64 = -7;
+    pub const ENOENT: i64 = -2;
+    pub const EMFILE: i64 = -24;
+    pub const ENOTDIR: i64 = -20;
+    #[allow(dead_code)]
+    pub const EACCES: i64 = -13;
+    #[allow(dead_code)]
+    pub const EEXIST: i64 = -17;
+    #[allow(dead_code)]
+    pub const EIO: i64 = -5;
 }
 
 #[repr(u64)]
@@ -64,6 +70,8 @@ pub enum SyscallNumber {
     Utimensat = 88,
     /// TEAM_198: Create symbolic link
     Symlinkat = 36,
+    /// TEAM_204: Read value of a symbolic link
+    Readlinkat = 37,
 }
 
 impl SyscallNumber {
@@ -92,6 +100,7 @@ impl SyscallNumber {
             38 => Some(Self::Renameat),
             88 => Some(Self::Utimensat),
             36 => Some(Self::Symlinkat),
+            37 => Some(Self::Readlinkat),
             _ => None,
         }
     }
@@ -231,6 +240,13 @@ pub fn syscall_dispatch(frame: &mut SyscallFrame) {
             frame.arg0() as usize,
             frame.arg1() as usize,
             frame.arg2() as i32,
+            frame.arg3() as usize,
+            frame.arg4() as usize,
+        ),
+        Some(SyscallNumber::Readlinkat) => fs::sys_readlinkat(
+            frame.arg0() as i32,
+            frame.arg1() as usize,
+            frame.arg2() as usize,
             frame.arg3() as usize,
             frame.arg4() as usize,
         ),

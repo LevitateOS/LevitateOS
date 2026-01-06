@@ -11,7 +11,7 @@
 |-------|--------|------|-------------|
 | 12 | ✅ DONE | TEAM_201 | VFS Foundation (Prerequisites) |
 | 13 | ✅ DONE | TEAM_202 | Core VFS Implementation |
-| 14 | 🔴 TODO | TBD | Filesystem Migration |
+| 14 | 🟢 DOING | TEAM_203 | Filesystem Migration |
 
 ---
 
@@ -44,7 +44,18 @@
 
 ## 🟡 DOING — In Progress
 
-Nothing currently in progress. Phase 14 is ready to start.
+### Phase 14: Filesystem Migration (TEAM_203)
+
+Currently migrating existing filesystems to VFS. Tmpfs is complete.
+
+| Step | Component | Status | Description |
+|------|-----------|--------|-------------|
+| 1 | **Tmpfs** | ✅ DONE | InodeOps + Superblock for Tmpfs |
+| 2 | **Initramfs**| 🔴 TODO | Transition CPIO to VFS |
+| 3 | **FdTable** | 🟡 DOING | Replace legacy variants with VfsFile |
+| 4 | **Syscalls** | 🟡 DOING | Migrate all FS syscalls to VFS |
+| 5 | **Mount** | 🔴 TODO | Implement sys_mount/sys_umount |
+| 6 | **Boot** | 🟡 DOING | VFS-based boot initialization |
 
 ---
 
@@ -58,13 +69,14 @@ Nothing currently in progress. Phase 14 is ready to start.
 ```
 Location: kernel/src/fs/tmpfs.rs
 Task: Implement InodeOps + Superblock for TmpfsNode
-Status: 🔴 TODO
+Status: ✅ DONE (TEAM_203)
 ```
 
-- [ ] Create `TmpfsSuperblock` implementing `Superblock` trait
-- [ ] Create `TmpfsInodeOps` implementing `InodeOps` trait
-- [ ] Wire up existing `TmpfsNode` as the `private` data in `Inode`
-- [ ] Create root inode and register with dentry cache
+- [x] Create `TmpfsSuperblock` implementing `Superblock` trait
+- [x] Create `TmpfsInodeOps` implementing `InodeOps` trait
+- [x] Wire up existing `TmpfsNode` as the `private` data in `Inode`
+- [x] Create root inode and register with dentry cache
+- [x] **Robustness (TEAM_204)**: Added parent pointers and rename cycle checks
 
 #### Step 2: Initramfs Migration
 ```

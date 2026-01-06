@@ -376,7 +376,6 @@ fn init_filesystem() {
 
     // TEAM_195: Initialize tmpfs for writable /tmp
     crate::fs::tmpfs::init();
-    println!("[BOOT] Tmpfs initialized at /tmp");
 }
 
 /// TEAM_129: GPU regression test verification.

@@ -1,12 +1,11 @@
-//! TEAM_171: File system system calls.
-
-use alloc::sync::Arc;
-use crate::fs::tmpfs::{self, TmpfsError, TMPFS};
+use crate::fs::tmpfs::{self};
+use crate::fs::vfs::dispatch::*;
+use crate::fs::vfs::error::VfsError;
+use crate::fs::vfs::file::OpenFlags;
 use crate::syscall::{Stat, errno, errno_file, write_to_user_buf};
 use crate::task::fd_table::FdType;
 use los_hal::print;
 use los_utils::cpio::CpioEntryType;
-use los_utils::Spinlock;
 
 /// TEAM_081: sys_read - Read from a file descriptor.
 /// TEAM_178: Refactored to dispatch by fd type, added InitramfsFile support.
@@ -32,60 +31,26 @@ pub fn sys_read(fd: usize, buf: usize, len: usize) -> i64 {
         FdType::InitramfsFile { file_index, offset } => {
             read_initramfs_file(fd, file_index, offset, buf, len, ttbr0)
         }
-        // TEAM_194: Read from tmpfs file
-        FdType::TmpfsFile { ref node, offset } => {
-            read_tmpfs_file(fd, node, offset, buf, len, ttbr0)
+        FdType::VfsFile(ref file) => {
+            if crate::task::user_mm::validate_user_buffer(ttbr0, buf, len, true).is_err() {
+                return errno::EFAULT;
+            }
+            let mut kbuf = alloc::vec![0u8; len];
+            match vfs_read(file, &mut kbuf) {
+                Ok(n) => {
+                    for i in 0..n {
+                        if !write_to_user_buf(ttbr0, buf, i, kbuf[i]) {
+                            return errno::EFAULT;
+                        }
+                    }
+                    n as i64
+                }
+                Err(VfsError::BadFd) => errno::EBADF,
+                Err(_) => errno::EIO,
+            }
         }
-        // Q3/Q4: stdout, stderr, and directories return EBADF for read
         _ => errno::EBADF,
     }
-}
-
-/// TEAM_194: Read from a tmpfs file.
-fn read_tmpfs_file(
-    fd: usize,
-    node: &Arc<Spinlock<crate::fs::tmpfs::TmpfsNode>>,
-    offset: usize,
-    buf: usize,
-    len: usize,
-    ttbr0: usize,
-) -> i64 {
-    if crate::task::user_mm::validate_user_buffer(ttbr0, buf, len, true).is_err() {
-        return errno::EFAULT;
-    }
-
-    let tmpfs_guard = TMPFS.lock();
-    let tmpfs = match tmpfs_guard.as_ref() {
-        Some(t) => t,
-        None => return errno::EBADF,
-    };
-
-    let data = match tmpfs.read_file(node, offset, len) {
-        Ok(d) => d,
-        Err(_) => return errno::EBADF,
-    };
-
-    drop(tmpfs_guard);
-
-    let to_read = data.len();
-
-    // Copy data to userspace
-    for (i, &byte) in data.iter().enumerate() {
-        if !write_to_user_buf(ttbr0, buf, i, byte) {
-            return errno::EFAULT;
-        }
-    }
-
-    // Update offset in fd table
-    let task = crate::task::current_task();
-    let mut fd_table = task.fd_table.lock();
-    if let Some(fd_entry) = fd_table.get_mut(fd) {
-        if let FdType::TmpfsFile { offset: ref mut off, .. } = fd_entry.fd_type {
-            *off = offset + to_read;
-        }
-    }
-
-    to_read as i64
 }
 
 /// TEAM_178: Read from stdin (keyboard/console input).
@@ -216,7 +181,7 @@ fn poll_input_devices(ttbr0: usize, user_buf: usize, bytes_read: &mut usize, max
 pub fn sys_write(fd: usize, buf: usize, len: usize) -> i64 {
     let len = len.min(4096);
     let task = crate::task::current_task();
-    
+
     // TEAM_194: Look up fd type and dispatch accordingly
     let fd_table = task.fd_table.lock();
     let entry = match fd_table.get(fd) {
@@ -243,70 +208,28 @@ pub fn sys_write(fd: usize, buf: usize, len: usize) -> i64 {
             }
             len as i64
         }
-        // TEAM_194: Write to tmpfs file
-        FdType::TmpfsFile { ref node, offset } => {
-            write_tmpfs_file(fd, node, offset, buf, len, ttbr0)
+        FdType::VfsFile(ref file) => {
+            if crate::task::user_mm::validate_user_buffer(ttbr0, buf, len, false).is_err() {
+                return errno::EFAULT;
+            }
+            let mut kbuf = alloc::vec![0u8; len];
+            for i in 0..len {
+                if let Some(ptr) = crate::task::user_mm::user_va_to_kernel_ptr(ttbr0, buf + i) {
+                    kbuf[i] = unsafe { *ptr };
+                } else {
+                    return errno::EFAULT;
+                }
+            }
+            match vfs_write(file, &kbuf) {
+                Ok(n) => n as i64,
+                Err(VfsError::NoSpace) => -28,      // ENOSPC
+                Err(VfsError::FileTooLarge) => -27, // EFBIG
+                Err(_) => errno::EIO,
+            }
         }
-        // Other fd types don't support write
         _ => errno::EBADF,
     }
 }
-
-/// TEAM_194: Write to a tmpfs file.
-fn write_tmpfs_file(
-    fd: usize,
-    node: &Arc<Spinlock<crate::fs::tmpfs::TmpfsNode>>,
-    offset: usize,
-    buf: usize,
-    len: usize,
-    ttbr0: usize,
-) -> i64 {
-    if crate::task::user_mm::validate_user_buffer(ttbr0, buf, len, false).is_err() {
-        return errno::EFAULT;
-    }
-
-    // Read data from userspace
-    let mut data = alloc::vec![0u8; len];
-    for i in 0..len {
-        if let Some(ptr) = crate::task::user_mm::user_va_to_kernel_ptr(ttbr0, buf + i) {
-            data[i] = unsafe { *ptr };
-        } else {
-            return errno::EFAULT;
-        }
-    }
-
-    let tmpfs_guard = TMPFS.lock();
-    let tmpfs = match tmpfs_guard.as_ref() {
-        Some(t) => t,
-        None => return errno::EBADF,
-    };
-
-    let written = match tmpfs.write_file(node, offset, &data) {
-        Ok(n) => n,
-        Err(TmpfsError::NoSpace) => return -28, // ENOSPC
-        Err(TmpfsError::FileTooLarge) => return -27, // EFBIG
-        Err(_) => return errno::EBADF,
-    };
-
-    drop(tmpfs_guard);
-
-    // Update offset in fd table
-    let task = crate::task::current_task();
-    let mut fd_table = task.fd_table.lock();
-    if let Some(fd_entry) = fd_table.get_mut(fd) {
-        if let FdType::TmpfsFile { offset: ref mut off, .. } = fd_entry.fd_type {
-            *off = offset + written;
-        }
-    }
-
-    written as i64
-}
-
-/// TEAM_194: Open flags
-const O_CREAT: u32 = 0o100;
-const O_TRUNC: u32 = 0o1000;
-const O_WRONLY: u32 = 0o1;
-const O_RDWR: u32 = 0o2;
 
 /// TEAM_168: sys_openat - Open a file from initramfs.
 /// TEAM_176: Updated to support opening directories for getdents.
@@ -337,7 +260,20 @@ pub fn sys_openat(path: usize, path_len: usize, flags: u32) -> i64 {
 
     // TEAM_194: Check if path is under /tmp - route to tmpfs
     if tmpfs::is_tmpfs_path(path_str) {
-        return open_tmpfs(path_str, flags);
+        let vfs_flags = OpenFlags::new(flags);
+        match vfs_open(path_str, vfs_flags, 0o666) {
+            Ok(file) => {
+                let mut fd_table = task.fd_table.lock();
+                return match fd_table.alloc(FdType::VfsFile(file)) {
+                    Some(fd) => fd as i64,
+                    None => errno_file::EMFILE,
+                };
+            }
+            Err(VfsError::NotFound) => return errno_file::ENOENT,
+            Err(VfsError::AlreadyExists) => return errno_file::EEXIST,
+            Err(VfsError::NotADirectory) => return errno_file::ENOTDIR,
+            Err(_) => return errno_file::EIO,
+        }
     }
 
     let lookup_path = path_str.trim_start_matches('/');
@@ -394,90 +330,6 @@ pub fn sys_openat(path: usize, path_len: usize, flags: u32) -> i64 {
     };
 
     match fd_table.alloc(fd_type) {
-        Some(fd) => fd as i64,
-        None => errno_file::EMFILE,
-    }
-}
-
-/// TEAM_194: Open a file in tmpfs
-fn open_tmpfs(path_str: &str, flags: u32) -> i64 {
-    let tmpfs_path = tmpfs::strip_tmp_prefix(path_str);
-    
-    let tmpfs_guard = TMPFS.lock();
-    let tmpfs = match tmpfs_guard.as_ref() {
-        Some(t) => t,
-        None => return errno_file::ENOENT,
-    };
-
-    // Check if opening /tmp directory itself
-    if tmpfs_path.is_empty() {
-        let root = tmpfs.lookup("").unwrap();
-        drop(tmpfs_guard);
-        
-        let task = crate::task::current_task();
-        let mut fd_table = task.fd_table.lock();
-        return match fd_table.alloc(FdType::TmpfsDir {
-            node: root,
-            offset: 0,
-        }) {
-            Some(fd) => fd as i64,
-            None => errno_file::EMFILE,
-        };
-    }
-
-    // Try to lookup existing node
-    let existing = tmpfs.lookup(tmpfs_path);
-    
-    let node = match existing {
-        Some(n) => {
-            // Node exists
-            let node_guard = n.lock();
-            if node_guard.is_dir() {
-                drop(node_guard);
-                drop(tmpfs_guard);
-                
-                let task = crate::task::current_task();
-                let mut fd_table = task.fd_table.lock();
-                return match fd_table.alloc(FdType::TmpfsDir {
-                    node: n,
-                    offset: 0,
-                }) {
-                    Some(fd) => fd as i64,
-                    None => errno_file::EMFILE,
-                };
-            }
-            drop(node_guard);
-            
-            // It's a file - handle O_TRUNC
-            if (flags & O_TRUNC) != 0 && ((flags & O_WRONLY) != 0 || (flags & O_RDWR) != 0) {
-                let _ = tmpfs.truncate(&n);
-            }
-            n
-        }
-        None => {
-            // Node doesn't exist
-            if (flags & O_CREAT) == 0 {
-                return errno_file::ENOENT;
-            }
-            
-            // Create new file
-            match tmpfs.create_file(tmpfs_path) {
-                Ok(node) => node,
-                Err(TmpfsError::NotADirectory) => return errno_file::ENOTDIR,
-                Err(TmpfsError::InvalidPath) => return errno::EINVAL,
-                Err(_) => return errno_file::ENOENT,
-            }
-        }
-    };
-
-    drop(tmpfs_guard);
-
-    let task = crate::task::current_task();
-    let mut fd_table = task.fd_table.lock();
-    match fd_table.alloc(FdType::TmpfsFile {
-        node,
-        offset: 0,
-    }) {
         Some(fd) => fd as i64,
         None => errno_file::EMFILE,
     }
@@ -584,55 +436,10 @@ pub fn sys_fstat(fd: usize, stat_buf: usize) -> i64 {
             st_ctime: 0,
             st_ctime_nsec: 0,
         },
-        // TEAM_195: Tmpfs file fd
-        // TEAM_198: Added timestamp support
-        // TEAM_201: Updated to use extended Stat struct
-        FdType::TmpfsFile { ref node, .. } => {
-            let node_guard = node.lock();
-            let size = node_guard.size() as u64;
-            Stat {
-                st_dev: 1, // tmpfs device
-                st_ino: node_guard.ino,
-                st_mode: crate::fs::mode::S_IFREG | 0o644,
-                st_nlink: 1,
-                st_uid: 0,
-                st_gid: 0,
-                st_rdev: 0,
-                st_size: size,
-                st_blksize: 4096,
-                st_blocks: ((size + 511) / 512),
-                st_atime: node_guard.atime,
-                st_atime_nsec: 0,
-                st_mtime: node_guard.mtime,
-                st_mtime_nsec: 0,
-                st_ctime: node_guard.ctime,
-                st_ctime_nsec: 0,
-            }
-        }
-        // TEAM_195: Tmpfs directory fd
-        // TEAM_198: Added timestamp support
-        // TEAM_201: Updated to use extended Stat struct
-        FdType::TmpfsDir { ref node, .. } => {
-            let node_guard = node.lock();
-            Stat {
-                st_dev: 1, // tmpfs device
-                st_ino: node_guard.ino,
-                st_mode: crate::fs::mode::S_IFDIR | 0o755,
-                st_nlink: 2,
-                st_uid: 0,
-                st_gid: 0,
-                st_rdev: 0,
-                st_size: 0,
-                st_blksize: 4096,
-                st_blocks: 0,
-                st_atime: node_guard.atime,
-                st_atime_nsec: 0,
-                st_mtime: node_guard.mtime,
-                st_mtime_nsec: 0,
-                st_ctime: node_guard.ctime,
-                st_ctime_nsec: 0,
-            }
-        }
+        FdType::VfsFile(ref file) => match vfs_fstat(file) {
+            Ok(s) => s,
+            Err(_) => return errno::EBADF,
+        },
     };
 
     let stat_bytes =
@@ -649,8 +456,8 @@ pub fn sys_fstat(fd: usize, stat_buf: usize) -> i64 {
     0
 }
 
-/// TEAM_176: Dirent64 structure for getdents syscall.
-/// Matches Linux ABI layout.
+// TEAM_176: Dirent64 structure for getdents syscall.
+// Matches Linux ABI layout.
 #[repr(C, packed)]
 struct Dirent64 {
     d_ino: u64,    // Inode number
@@ -660,25 +467,6 @@ struct Dirent64 {
                    // d_name follows (null-terminated)
 }
 
-/// TEAM_176: File type constants for d_type
-mod d_type {
-    pub const DT_UNKNOWN: u8 = 0;
-    pub const DT_DIR: u8 = 4;
-    pub const DT_REG: u8 = 8;
-    pub const DT_LNK: u8 = 10;
-}
-
-/// TEAM_176: sys_getdents - Read directory entries.
-///
-/// # Arguments
-/// * `fd` - Directory file descriptor
-/// * `buf` - User buffer to write Dirent64 records
-/// * `buf_len` - Size of buffer in bytes
-///
-/// # Returns
-/// * `> 0` - Number of bytes written
-/// * `0` - End of directory
-/// * `< 0` - Error code
 pub fn sys_getdents(fd: usize, buf: usize, buf_len: usize) -> i64 {
     if buf_len == 0 {
         return 0;
@@ -689,175 +477,102 @@ pub fn sys_getdents(fd: usize, buf: usize, buf_len: usize) -> i64 {
         return errno::EFAULT;
     }
 
-    // Get fd entry and check if it's a directory
     let fd_table = task.fd_table.lock();
     let entry = match fd_table.get(fd) {
         Some(e) => e.clone(),
         None => return errno::EBADF,
     };
-
-    let (dir_offset, is_root) = match entry.fd_type {
-        crate::task::fd_table::FdType::InitramfsDir { dir_index, offset } => {
-            (offset, dir_index == 0)
-        }
-        _ => return errno_file::ENOTDIR,
-    };
     drop(fd_table);
 
-    // Get initramfs
-    let initramfs_guard = crate::fs::INITRAMFS.lock();
-    let initramfs = match initramfs_guard.as_ref() {
-        Some(i) => i,
-        None => return errno::EBADF,
-    };
+    match entry.fd_type {
+        FdType::VfsFile(ref file) => {
+            let mut bytes_written = 0usize;
+            loop {
+                let offset = file.tell() as usize;
+                match vfs_readdir(file, offset) {
+                    Ok(Some(entry)) => {
+                        let name_bytes = entry.name.as_bytes();
+                        let name_len = name_bytes.len();
+                        let reclen = ((19 + name_len + 1 + 7) / 8) * 8;
 
-    // Collect directory entries (skip . and .. per Q2 decision)
-    let entries: alloc::vec::Vec<_> = if is_root {
-        // Root directory: entries without '/' in name
-        initramfs
-            .iter()
-            .filter(|e| {
-                let name = e.name;
-                name != "." && name != ".." && !name.contains('/')
-            })
-            .collect()
-    } else {
-        // Non-root: would need path tracking, for now just return empty
-        // TODO(TEAM_176): Support non-root directories
-        alloc::vec::Vec::new()
-    };
+                        if bytes_written + reclen > buf_len {
+                            break;
+                        }
 
-    drop(initramfs_guard);
+                        let dtype = match entry.file_type {
+                            crate::fs::mode::S_IFDIR => 4,
+                            crate::fs::mode::S_IFREG => 8,
+                            crate::fs::mode::S_IFLNK => 10,
+                            _ => 0,
+                        };
 
-    // Skip already-read entries
-    let remaining_entries = entries.iter().skip(dir_offset);
+                        let dirent = Dirent64 {
+                            d_ino: entry.ino,
+                            d_off: (offset + 1) as i64,
+                            d_reclen: reclen as u16,
+                            d_type: dtype,
+                        };
 
-    let mut bytes_written = 0usize;
-    let mut entries_written = 0usize;
+                        let dirent_bytes = unsafe {
+                            core::slice::from_raw_parts(
+                                &dirent as *const Dirent64 as *const u8,
+                                core::mem::size_of::<Dirent64>(),
+                            )
+                        };
 
-    for entry in remaining_entries {
-        let name_bytes = entry.name.as_bytes();
-        let name_len = name_bytes.len();
+                        for (i, &byte) in dirent_bytes.iter().enumerate() {
+                            if !write_to_user_buf(task.ttbr0, buf, bytes_written + i, byte) {
+                                return errno::EFAULT;
+                            }
+                        }
 
-        // TEAM_183: Record size with checked arithmetic to prevent overflow
-        // Header (19 bytes) + name + null + padding to 8-byte alignment
-        let reclen = match (19usize)
-            .checked_add(name_len)
-            .and_then(|n| n.checked_add(1))
-            .and_then(|n| n.checked_add(7))
-            .map(|n| (n / 8) * 8)
-        {
-            Some(r) if r <= u16::MAX as usize => r,
-            _ => continue, // Skip entry if reclen overflows or exceeds u16::MAX
-        };
+                        let name_offset = bytes_written + core::mem::size_of::<Dirent64>();
+                        for (i, &byte) in name_bytes.iter().enumerate() {
+                            if !write_to_user_buf(task.ttbr0, buf, name_offset + i, byte) {
+                                return errno::EFAULT;
+                            }
+                        }
 
-        if bytes_written + reclen > buf_len {
-            break; // Buffer full
-        }
+                        if !write_to_user_buf(task.ttbr0, buf, name_offset + name_len, 0) {
+                            return errno::EFAULT;
+                        }
 
-        // Determine d_type from entry type
-        let dtype = match entry.entry_type {
-            CpioEntryType::File => d_type::DT_REG,
-            CpioEntryType::Directory => d_type::DT_DIR,
-            CpioEntryType::Symlink => d_type::DT_LNK,
-            CpioEntryType::Other => d_type::DT_UNKNOWN,
-        };
-
-        // Write dirent64 header
-        let dirent = Dirent64 {
-            d_ino: entry.ino,
-            d_off: (dir_offset + entries_written + 1) as i64,
-            d_reclen: reclen as u16,
-            d_type: dtype,
-        };
-
-        let dirent_bytes = unsafe {
-            core::slice::from_raw_parts(
-                &dirent as *const Dirent64 as *const u8,
-                core::mem::size_of::<Dirent64>(),
-            )
-        };
-
-        // Write header
-        for (i, &byte) in dirent_bytes.iter().enumerate() {
-            if !write_to_user_buf(task.ttbr0, buf, bytes_written + i, byte) {
-                return errno::EFAULT;
+                        let _ =
+                            file.seek((offset + 1) as i64, crate::fs::vfs::ops::SeekWhence::Set);
+                        bytes_written += reclen;
+                    }
+                    Ok(None) => break,
+                    Err(_) => return errno::EBADF,
+                }
             }
+            bytes_written as i64
         }
-
-        // Write name
-        let name_offset = bytes_written + core::mem::size_of::<Dirent64>();
-        for (i, &byte) in name_bytes.iter().enumerate() {
-            if !write_to_user_buf(task.ttbr0, buf, name_offset + i, byte) {
-                return errno::EFAULT;
-            }
-        }
-
-        // Write null terminator
-        if !write_to_user_buf(task.ttbr0, buf, name_offset + name_len, 0) {
-            return errno::EFAULT;
-        }
-
-        // Zero-fill padding
-        for i in (name_offset + name_len + 1)..(bytes_written + reclen) {
-            if !write_to_user_buf(task.ttbr0, buf, i, 0) {
-                return errno::EFAULT;
-            }
-        }
-
-        bytes_written += reclen;
-        entries_written += 1;
+        _ => errno_file::ENOTDIR,
     }
-
-    // Update offset in fd table
-    let mut fd_table = task.fd_table.lock();
-    if let Some(fd_entry) = fd_table.get_mut(fd) {
-        if let crate::task::fd_table::FdType::InitramfsDir { offset, .. } = &mut fd_entry.fd_type {
-            *offset = dir_offset + entries_written;
-        }
-    }
-
-    bytes_written as i64
 }
 
-/// TEAM_192: sys_getcwd - Get current working directory.
-///
-/// # Arguments
-/// * `buf` - User buffer to write CWD string
-/// * `size` - Size of the buffer in bytes
-///
-/// # Returns
-/// * Length of the CWD string (including NUL) on success
-/// * `< 0` - Error code
 pub fn sys_getcwd(buf: usize, size: usize) -> i64 {
     let task = crate::task::current_task();
-    let cwd = task.cwd.lock();
-    let cwd_bytes = cwd.as_bytes();
-    let len = cwd_bytes.len();
-
-    // Linux getcwd(2) returns ERANGE if buffer is too small
-    if size < len + 1 {
-        // We need a specific errno for ERANGE if we follow Linux.
-        // For now, let's use EINVAL or add ERANGE.
-        return errno::EINVAL;
-    }
-
-    if crate::task::user_mm::validate_user_buffer(task.ttbr0, buf, len + 1, true).is_err() {
+    if crate::task::user_mm::validate_user_buffer(task.ttbr0, buf, size, true).is_err() {
         return errno::EFAULT;
     }
 
-    for i in 0..len {
-        if !write_to_user_buf(task.ttbr0, buf, i, cwd_bytes[i]) {
+    let path = "/";
+    let path_len = path.len();
+    if size < path_len + 1 {
+        return -34; // ERANGE
+    }
+
+    for (i, &byte) in path.as_bytes().iter().enumerate() {
+        if !write_to_user_buf(task.ttbr0, buf, i, byte) {
             return errno::EFAULT;
         }
     }
-
-    // Write null terminator
-    if !write_to_user_buf(task.ttbr0, buf, len, 0) {
+    if !write_to_user_buf(task.ttbr0, buf, path_len, 0) {
         return errno::EFAULT;
     }
 
-    (len + 1) as i64
+    (path_len + 1) as i64
 }
 
 /// TEAM_192: sys_mkdirat - Create directory.
@@ -881,30 +596,16 @@ pub fn sys_mkdirat(_dfd: i32, path: usize, path_len: usize, _mode: u32) -> i64 {
             return errno::EFAULT;
         }
     }
-
     let path_str = match core::str::from_utf8(&path_buf[..path_len]) {
         Ok(s) => s,
         Err(_) => return errno::EINVAL,
     };
 
-    // TEAM_194: Check if path is under /tmp
-    if !tmpfs::is_tmpfs_path(path_str) {
-        return errno::EROFS; // Initramfs is read-only
-    }
-
-    let tmpfs_path = tmpfs::strip_tmp_prefix(path_str);
-    
-    let tmpfs_guard = TMPFS.lock();
-    let tmpfs = match tmpfs_guard.as_ref() {
-        Some(t) => t,
-        None => return errno::EROFS,
-    };
-
-    match tmpfs.create_dir(tmpfs_path) {
-        Ok(_) => 0,
-        Err(TmpfsError::AlreadyExists) => -17, // EEXIST
-        Err(TmpfsError::NotFound) => errno_file::ENOENT,
-        Err(TmpfsError::NotADirectory) => errno_file::ENOTDIR,
+    match vfs_mkdir(path_str, _mode) {
+        Ok(()) => 0,
+        Err(VfsError::AlreadyExists) => -17, // EEXIST
+        Err(VfsError::NotFound) => errno_file::ENOENT,
+        Err(VfsError::NotADirectory) => errno_file::ENOTDIR,
         Err(_) => errno::EINVAL,
     }
 }
@@ -939,26 +640,17 @@ pub fn sys_unlinkat(_dfd: i32, path: usize, path_len: usize, flags: u32) -> i64 
         Err(_) => return errno::EINVAL,
     };
 
-    // TEAM_194: Check if path is under /tmp
-    if !tmpfs::is_tmpfs_path(path_str) {
-        return errno::EROFS; // Initramfs is read-only
-    }
-
-    let tmpfs_path = tmpfs::strip_tmp_prefix(path_str);
-    let remove_dir = (flags & AT_REMOVEDIR) != 0;
-    
-    let tmpfs_guard = TMPFS.lock();
-    let tmpfs = match tmpfs_guard.as_ref() {
-        Some(t) => t,
-        None => return errno::EROFS,
+    let res = if (flags & AT_REMOVEDIR) != 0 {
+        vfs_rmdir(path_str)
+    } else {
+        vfs_unlink(path_str)
     };
 
-    match tmpfs.remove(tmpfs_path, remove_dir) {
+    match res {
         Ok(()) => 0,
-        Err(TmpfsError::NotFound) => errno_file::ENOENT,
-        Err(TmpfsError::NotEmpty) => -39, // ENOTEMPTY
-        Err(TmpfsError::NotADirectory) => errno_file::ENOTDIR,
-        Err(TmpfsError::NotAFile) => -21, // EISDIR
+        Err(VfsError::NotFound) => errno_file::ENOENT,
+        Err(VfsError::NotADirectory) => errno_file::ENOTDIR,
+        Err(VfsError::DirectoryNotEmpty) => -39, // ENOTEMPTY
         Err(_) => errno::EINVAL,
     }
 }
@@ -978,9 +670,11 @@ pub fn sys_renameat(
     }
 
     let task = crate::task::current_task();
-    
+
     // Validate and read old path
-    if crate::task::user_mm::validate_user_buffer(task.ttbr0, old_path, old_path_len, false).is_err() {
+    if crate::task::user_mm::validate_user_buffer(task.ttbr0, old_path, old_path_len, false)
+        .is_err()
+    {
         return errno::EFAULT;
     }
     let mut old_path_buf = [0u8; 256];
@@ -997,7 +691,9 @@ pub fn sys_renameat(
     };
 
     // Validate and read new path
-    if crate::task::user_mm::validate_user_buffer(task.ttbr0, new_path, new_path_len, false).is_err() {
+    if crate::task::user_mm::validate_user_buffer(task.ttbr0, new_path, new_path_len, false)
+        .is_err()
+    {
         return errno::EFAULT;
     }
     let mut new_path_buf = [0u8; 256];
@@ -1013,30 +709,11 @@ pub fn sys_renameat(
         Err(_) => return errno::EINVAL,
     };
 
-    // TEAM_194: Both paths must be under /tmp for rename to work
-    let old_is_tmpfs = tmpfs::is_tmpfs_path(old_path_str);
-    let new_is_tmpfs = tmpfs::is_tmpfs_path(new_path_str);
-
-    if !old_is_tmpfs && !new_is_tmpfs {
-        return errno::EROFS; // Both in initramfs
-    }
-    if old_is_tmpfs != new_is_tmpfs {
-        return -18; // EXDEV - cross-device link
-    }
-
-    let old_tmpfs_path = tmpfs::strip_tmp_prefix(old_path_str);
-    let new_tmpfs_path = tmpfs::strip_tmp_prefix(new_path_str);
-    
-    let tmpfs_guard = TMPFS.lock();
-    let tmpfs = match tmpfs_guard.as_ref() {
-        Some(t) => t,
-        None => return errno::EROFS,
-    };
-
-    match tmpfs.rename(old_tmpfs_path, new_tmpfs_path) {
+    match vfs_rename(old_path_str, new_path_str) {
         Ok(()) => 0,
-        Err(TmpfsError::NotFound) => errno_file::ENOENT,
-        Err(TmpfsError::NotADirectory) => errno_file::ENOTDIR,
+        Err(VfsError::NotFound) => errno_file::ENOENT,
+        Err(VfsError::NotADirectory) => errno_file::ENOTDIR,
+        Err(VfsError::CrossDevice) => -18, // EXDEV
         Err(_) => errno::EINVAL,
     }
 }
@@ -1055,13 +732,7 @@ const UTIME_OMIT: u64 = 0x3FFFFFFE;
 /// * `times` - Pointer to [atime, mtime] timespec array (0 = use current time)
 /// * `_flags` - AT_SYMLINK_NOFOLLOW - currently ignored
 pub fn sys_utimensat(_dirfd: i32, path: usize, path_len: usize, times: usize, _flags: u32) -> i64 {
-    if path_len == 0 || path_len > 256 {
-        return errno::EINVAL;
-    }
-
     let task = crate::task::current_task();
-
-    // Read path from userspace
     let mut path_buf = [0u8; 256];
     for i in 0..path_len {
         if let Some(ptr) = crate::task::user_mm::user_va_to_kernel_ptr(task.ttbr0, path + i) {
@@ -1075,99 +746,49 @@ pub fn sys_utimensat(_dirfd: i32, path: usize, path_len: usize, times: usize, _f
         Err(_) => return errno::EINVAL,
     };
 
-    // Only tmpfs paths are writable
-    if !tmpfs::is_tmpfs_path(path_str) {
-        return errno::EROFS;
-    }
-
-    let tmpfs_path = tmpfs::strip_tmp_prefix(path_str);
-
-    let tmpfs_guard = TMPFS.lock();
-    let tmpfs = match tmpfs_guard.as_ref() {
-        Some(t) => t,
-        None => return errno::EROFS,
-    };
-
-    // Lookup the node
-    let node = match tmpfs.lookup(tmpfs_path) {
-        Some(n) => n,
-        None => return errno_file::ENOENT,
-    };
-
     // Get current time
     let now = crate::syscall::time::uptime_seconds();
 
     // Determine new atime and mtime
-    let (new_atime, new_mtime) = if times == 0 {
-        // NULL times means set both to current time
+    let (atime, mtime) = if times == 0 {
         (Some(now), Some(now))
     } else {
-        // Read timespec array from userspace
         // struct timespec { u64 tv_sec; u64 tv_nsec; }
-        // times[0] = atime, times[1] = mtime
-        let timespec_size = 16; // 2 x u64
-        
-        let mut atime_sec: u64 = 0;
-        let mut atime_nsec: u64 = 0;
-        let mut mtime_sec: u64 = 0;
-        let mut mtime_nsec: u64 = 0;
-
-        // Read atime
-        for i in 0..8 {
-            if let Some(ptr) = crate::task::user_mm::user_va_to_kernel_ptr(task.ttbr0, times + i) {
-                atime_sec |= (unsafe { *ptr } as u64) << (i * 8);
-            } else {
-                return errno::EFAULT;
+        let mut times_data = [0u64; 4]; // [atime_sec, atime_nsec, mtime_sec, mtime_nsec]
+        for i in 0..4 {
+            let mut val = 0u64;
+            for j in 0..8 {
+                if let Some(ptr) =
+                    crate::task::user_mm::user_va_to_kernel_ptr(task.ttbr0, times + i * 16 + j)
+                {
+                    val |= (unsafe { *ptr } as u64) << (j * 8);
+                } else {
+                    return errno::EFAULT;
+                }
             }
-        }
-        for i in 0..8 {
-            if let Some(ptr) = crate::task::user_mm::user_va_to_kernel_ptr(task.ttbr0, times + 8 + i) {
-                atime_nsec |= (unsafe { *ptr } as u64) << (i * 8);
-            } else {
-                return errno::EFAULT;
-            }
-        }
-        // Read mtime
-        for i in 0..8 {
-            if let Some(ptr) = crate::task::user_mm::user_va_to_kernel_ptr(task.ttbr0, times + timespec_size + i) {
-                mtime_sec |= (unsafe { *ptr } as u64) << (i * 8);
-            } else {
-                return errno::EFAULT;
-            }
-        }
-        for i in 0..8 {
-            if let Some(ptr) = crate::task::user_mm::user_va_to_kernel_ptr(task.ttbr0, times + timespec_size + 8 + i) {
-                mtime_nsec |= (unsafe { *ptr } as u64) << (i * 8);
-            } else {
-                return errno::EFAULT;
-            }
+            times_data[i] = val;
         }
 
-        // Handle UTIME_NOW and UTIME_OMIT
-        let new_atime = if atime_nsec == UTIME_OMIT {
+        let atime = if times_data[1] == UTIME_OMIT {
             None
-        } else if atime_nsec == UTIME_NOW {
+        } else if times_data[1] == UTIME_NOW {
             Some(now)
         } else {
-            Some(atime_sec)
+            Some(times_data[0])
         };
-
-        let new_mtime = if mtime_nsec == UTIME_OMIT {
+        let mtime = if times_data[3] == UTIME_OMIT {
             None
-        } else if mtime_nsec == UTIME_NOW {
+        } else if times_data[3] == UTIME_NOW {
             Some(now)
         } else {
-            Some(mtime_sec)
+            Some(times_data[2])
         };
-
-        (new_atime, new_mtime)
+        (atime, mtime)
     };
 
-    // Update timestamps
-    match tmpfs.update_timestamps(&node, new_atime, new_mtime) {
-        Ok(()) => 0,
-        Err(_) => errno::EINVAL,
-    }
+    vfs_utimes(path_str, atime, mtime)
+        .map(|_| 0)
+        .unwrap_or_else(|e| e.to_errno())
 }
 
 /// TEAM_198: sys_symlinkat - Create a symbolic link.
@@ -1185,13 +806,7 @@ pub fn sys_symlinkat(
     linkpath: usize,
     linkpath_len: usize,
 ) -> i64 {
-    if target_len == 0 || target_len > 256 || linkpath_len == 0 || linkpath_len > 256 {
-        return errno::EINVAL;
-    }
-
     let task = crate::task::current_task();
-
-    // Read target from userspace
     let mut target_buf = [0u8; 256];
     for i in 0..target_len {
         if let Some(ptr) = crate::task::user_mm::user_va_to_kernel_ptr(task.ttbr0, target + i) {
@@ -1205,7 +820,6 @@ pub fn sys_symlinkat(
         Err(_) => return errno::EINVAL,
     };
 
-    // Read linkpath from userspace
     let mut linkpath_buf = [0u8; 256];
     for i in 0..linkpath_len {
         if let Some(ptr) = crate::task::user_mm::user_va_to_kernel_ptr(task.ttbr0, linkpath + i) {
@@ -1219,24 +833,48 @@ pub fn sys_symlinkat(
         Err(_) => return errno::EINVAL,
     };
 
-    // Only tmpfs paths are writable
-    if !tmpfs::is_tmpfs_path(linkpath_str) {
-        return errno::EROFS;
+    match vfs_symlink(target_str, linkpath_str) {
+        Ok(()) => 0,
+        Err(VfsError::AlreadyExists) => -17, // EEXIST
+        Err(VfsError::NotFound) => errno_file::ENOENT,
+        Err(VfsError::NotADirectory) => errno_file::ENOTDIR,
+        Err(_) => errno::EINVAL,
+    }
+}
+
+/// TEAM_204: sys_readlinkat - Read value of a symbolic link.
+pub fn sys_readlinkat(dirfd: i32, path: usize, path_len: usize, buf: usize, buf_len: usize) -> i64 {
+    if dirfd != -100 {
+        // AT_FDCWD
+        return errno::ENOSYS;
     }
 
-    let tmpfs_path = tmpfs::strip_tmp_prefix(linkpath_str);
-
-    let tmpfs_guard = TMPFS.lock();
-    let tmpfs = match tmpfs_guard.as_ref() {
-        Some(t) => t,
-        None => return errno::EROFS,
+    let task = crate::task::current_task();
+    let mut path_buf = [0u8; 256];
+    for i in 0..path_len.min(256) {
+        if let Some(ptr) = crate::task::user_mm::user_va_to_kernel_ptr(task.ttbr0, path + i) {
+            path_buf[i] = unsafe { *ptr };
+        } else {
+            return errno::EFAULT;
+        }
+    }
+    let path_str = match core::str::from_utf8(&path_buf[..path_len.min(256)]) {
+        Ok(s) => s,
+        Err(_) => return errno::EINVAL,
     };
 
-    match tmpfs.create_symlink(tmpfs_path, target_str) {
-        Ok(_) => 0,
-        Err(TmpfsError::AlreadyExists) => -17, // EEXIST
-        Err(TmpfsError::NotFound) => errno_file::ENOENT,
-        Err(TmpfsError::NotADirectory) => errno_file::ENOTDIR,
-        Err(_) => errno::EINVAL,
+    match vfs_readlink(path_str) {
+        Ok(target) => {
+            let n = target.len().min(buf_len);
+            let target_bytes = target.as_bytes();
+            for i in 0..n {
+                if !write_to_user_buf(task.ttbr0, buf, i, target_bytes[i]) {
+                    return errno::EFAULT;
+                }
+            }
+            n as i64
+        }
+        Err(VfsError::NotFound) => errno_file::ENOENT,
+        Err(_) => errno::EIO,
     }
 }

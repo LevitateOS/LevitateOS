@@ -181,7 +181,7 @@ impl MountTable {
     /// Uses longest-prefix matching: returns the mount with the longest
     /// mountpoint that is a prefix of the given path.
     /// Returns (mount, relative_path_str) where relative_path_str is the path within the mount.
-    pub fn lookup<'a>(&'a self, path: &str) -> Option<(&'a Mount, &str)> {
+    pub fn lookup<'a>(&'a self, path: &'a str) -> Option<(&'a Mount, &'a str)> {
         for mount in &self.mounts {
             let mountpoint_str = mount.mountpoint.as_str();
 
@@ -286,12 +286,7 @@ pub fn init() {
     let mut table = mounts_mut();
 
     // Mount tmpfs at /tmp
-    let _ = table.mount(
-        Path::new("/tmp"),
-        FsType::Tmpfs,
-        MountFlags::new(),
-        "none",
-    );
+    let _ = table.mount(Path::new("/tmp"), FsType::Tmpfs, MountFlags::new(), "none");
 
     // Mount initramfs at root
     let _ = table.mount(

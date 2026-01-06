@@ -27,9 +27,9 @@ pub type WeakDentryRef = Weak<Dentry>;
 /// Dentries form a tree structure that mirrors the directory hierarchy.
 pub struct Dentry {
     /// Name of this entry (e.g., "foo" in "/bar/foo")
-    pub name: String,
+    pub name: RwLock<String>,
     /// Parent dentry (None for root)
-    pub parent: Option<WeakDentryRef>,
+    pub parent: RwLock<Option<WeakDentryRef>>,
     /// Inode this dentry points to (None = negative dentry)
     pub inode: RwLock<Option<Arc<Inode>>>,
     /// Child dentries
@@ -42,8 +42,8 @@ impl Dentry {
     /// TEAM_202: Create a new dentry
     pub fn new(name: String, parent: Option<WeakDentryRef>, inode: Option<Arc<Inode>>) -> Self {
         Self {
-            name,
-            parent,
+            name: RwLock::new(name),
+            parent: RwLock::new(parent),
             inode: RwLock::new(inode),
             children: RwLock::new(BTreeMap::new()),
             mounted: RwLock::new(None),
@@ -81,7 +81,8 @@ impl Dentry {
 
     /// TEAM_202: Add a child dentry
     pub fn add_child(&self, child: Arc<Dentry>) {
-        self.children.write().insert(child.name.clone(), child);
+        let child_name = child.name.read().clone();
+        self.children.write().insert(child_name, child);
     }
 
     /// TEAM_202: Remove a child dentry
@@ -92,30 +93,31 @@ impl Dentry {
     /// TEAM_202: Get the full path from root
     pub fn path(&self) -> String {
         let mut components = alloc::vec::Vec::new();
-        let mut current: Option<Arc<Dentry>> = None;
-        
+
         // Walk up to root, collecting names
         // First, handle self
-        if self.name != "/" {
-            components.push(self.name.clone());
+        let my_name = self.name.read().clone();
+        if my_name != "/" {
+            components.push(my_name);
         }
-        
+
         // Then walk up parents
-        let mut parent_weak = self.parent.clone();
+        let mut parent_weak = self.parent.read().clone();
         while let Some(ref weak) = parent_weak {
             if let Some(parent) = weak.upgrade() {
-                if parent.name != "/" {
-                    components.push(parent.name.clone());
+                let p_name = parent.name.read().clone();
+                if p_name != "/" {
+                    components.push(p_name);
                 }
-                parent_weak = parent.parent.clone();
+                parent_weak = parent.parent.read().clone();
             } else {
                 break;
             }
         }
-        
+
         // Reverse to get root-to-leaf order
         components.reverse();
-        
+
         if components.is_empty() {
             String::from("/")
         } else {
@@ -154,7 +156,7 @@ impl Dentry {
 impl core::fmt::Debug for Dentry {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("Dentry")
-            .field("name", &self.name)
+            .field("name", &*self.name.read())
             .field("is_negative", &self.is_negative())
             .field("is_mountpoint", &self.is_mountpoint())
             .finish()
@@ -194,7 +196,7 @@ impl DentryCache {
     /// Returns the final dentry and any remaining path that couldn't be resolved.
     pub fn lookup(&self, path: &str) -> VfsResult<Arc<Dentry>> {
         let root = self.root().ok_or(VfsError::NotFound)?;
-        
+
         if path == "/" || path.is_empty() {
             return Ok(root);
         }
@@ -209,8 +211,10 @@ impl DentryCache {
 
             if component == ".." {
                 // Go to parent
-                if let Some(ref parent) = current.parent {
-                    if let Some(p) = parent.upgrade() {
+                let parent_lock = current.parent.read();
+                if let Some(ref weak) = *parent_lock {
+                    if let Some(p) = weak.upgrade() {
+                        drop(parent_lock);
                         current = p;
                         continue;
                     }
@@ -222,13 +226,12 @@ impl DentryCache {
             // Look up in cache first
             if let Some(child) = current.lookup_child(component) {
                 // Handle mount points
-                if child.is_mountpoint() {
-                    if let Some(ref sb) = *child.mounted.read() {
-                        // Create/get the root dentry of the mounted filesystem
-                        // For now, just continue with the child
-                        current = child;
-                        continue;
-                    }
+                let is_mp = child.mounted.read().is_some();
+                if is_mp {
+                    // Create/get the root dentry of the mounted filesystem
+                    // For now, just continue with the child
+                    current = child;
+                    continue;
                 }
                 current = child;
                 continue;
@@ -236,7 +239,7 @@ impl DentryCache {
 
             // Not in cache - need to look up in filesystem
             let inode = current.get_inode().ok_or(VfsError::NotFound)?;
-            
+
             if !inode.is_dir() {
                 return Err(VfsError::NotADirectory);
             }
@@ -259,9 +262,9 @@ impl DentryCache {
     }
 
     /// TEAM_202: Look up parent directory and final component name
-    pub fn lookup_parent(&self, path: &str) -> VfsResult<(Arc<Dentry>, &str)> {
+    pub fn lookup_parent<'a>(&self, path: &'a str) -> VfsResult<(Arc<Dentry>, &'a str)> {
         let path = path.trim_end_matches('/');
-        
+
         if path.is_empty() || path == "/" {
             return Err(VfsError::InvalidArgument);
         }

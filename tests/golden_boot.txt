@@ -31,7 +31,7 @@ Initializing Input...
 VirtIO Input initialized successfully.
 BOOT_REGS: x0=48200000 x1=0 x2=0 x3=0
 Detecting Initramfs...
-Initramfs found at 0x48000000 - 0x4805cc00 (379904 bytes)
+Initramfs found at 0x48000000 - 0x48124400 (1197056 bytes)
 Files in initramfs:
  - .
  - hello.txt
@@ -41,6 +41,15 @@ Files in initramfs:
  - repro_crash
  - repro
  - cat
+ - ls
+ - pwd
+ - mkdir
+ - rmdir
+ - rm
+ - mv
+ - cp
+ - touch
+ - ln
 [BOOT] spawning init task...
 [SPAWN] Parsing ELF header (75488 bytes)...
 ELF Header e_ident verified
@@ -60,7 +69,7 @@ ELF Header e_ident verified
 Mounting filesystems...
 FAT32 mounted. Root contains 0 entries.
 [BOOT] Filesystem initialized successfully.
-[GPU_TEST] Flush count: 43
+[GPU_TEST] Flush count: 52
 [GPU_TEST] Framebuffer: 400 non-black pixels of 1024000 total
 
 [SUCCESS] LevitateOS System Ready.

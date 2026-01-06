@@ -55,6 +55,8 @@ pub enum VfsError {
     NameTooLong,
     /// Stale file handle (ESTALE = 116)
     StaleHandle,
+    /// Invalid cross-device link (EXDEV = 18)
+    CrossDevice,
 }
 
 impl VfsError {
@@ -84,6 +86,7 @@ impl VfsError {
             VfsError::NotSupported => -95,
             VfsError::NameTooLong => -36,
             VfsError::StaleHandle => -116,
+            VfsError::CrossDevice => -18,
         }
     }
 
@@ -113,6 +116,7 @@ impl VfsError {
             VfsError::NotSupported => "EOPNOTSUPP",
             VfsError::NameTooLong => "ENAMETOOLONG",
             VfsError::StaleHandle => "ESTALE",
+            VfsError::CrossDevice => "EXDEV",
         }
     }
 }
@@ -143,6 +147,7 @@ impl fmt::Display for VfsError {
             VfsError::NotSupported => "Operation not supported",
             VfsError::NameTooLong => "File name too long",
             VfsError::StaleHandle => "Stale file handle",
+            VfsError::CrossDevice => "Invalid cross-device link",
         };
         write!(f, "{} ({})", msg, self.name())
     }

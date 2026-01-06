@@ -8,11 +8,11 @@ extern crate alloc;
 
 use alloc::sync::Arc;
 
-use super::dentry::{dcache, Dentry, DentryRef};
+use super::dentry::{Dentry, DentryRef, dcache};
 use super::error::{VfsError, VfsResult};
 use super::file::{File, FileRef, OpenFlags};
 use super::inode::Inode;
-use super::ops::DirEntry;
+use super::ops::{DirEntry, SetAttr};
 use crate::fs::mode;
 use crate::fs::path::Path;
 use crate::syscall::Stat;
@@ -103,8 +103,7 @@ pub fn vfs_write(file: &File, buf: &[u8]) -> VfsResult<usize> {
 
 /// TEAM_202: Seek in an open file
 pub fn vfs_seek(file: &File, offset: i64, whence: u32) -> VfsResult<u64> {
-    let whence = super::ops::SeekWhence::from_u32(whence)
-        .ok_or(VfsError::InvalidArgument)?;
+    let whence = super::ops::SeekWhence::from_u32(whence).ok_or(VfsError::InvalidArgument)?;
     file.seek(offset, whence)
 }
 
@@ -209,16 +208,14 @@ pub fn vfs_rename(old_path: &str, new_path: &str) -> VfsResult<()> {
     let new_parent_inode = new_parent_dentry.get_inode().ok_or(VfsError::NotFound)?;
 
     // Perform the rename in the filesystem
-    old_parent_inode.ops.rename(
-        &old_parent_inode,
-        old_name,
-        &new_parent_inode,
-        new_name,
-    )?;
+    old_parent_inode
+        .ops
+        .rename(&old_parent_inode, old_name, &new_parent_inode, new_name)?;
 
     // Update dentry cache
     if let Some(dentry) = old_parent_dentry.remove_child(old_name) {
-        // TODO: Update dentry name and parent
+        *dentry.name.write() = alloc::string::String::from(new_name);
+        *dentry.parent.write() = Some(Arc::downgrade(&new_parent_dentry));
         new_parent_dentry.add_child(dentry);
     }
 
@@ -282,11 +279,28 @@ pub fn vfs_truncate(path: &str, size: u64) -> VfsResult<()> {
 }
 
 /// TEAM_202: Check file access permissions
-pub fn vfs_access(path: &str, mode: u32) -> VfsResult<()> {
+pub fn vfs_access(path: &str, _mode: u32) -> VfsResult<()> {
     let dentry = dcache().lookup(path)?;
     let _inode = dentry.get_inode().ok_or(VfsError::NotFound)?;
 
     // TODO: Implement proper permission checking based on uid/gid/mode
     // For now, just check existence
     Ok(())
+}
+
+/// TEAM_204: Set file attributes
+pub fn vfs_setattr(path: &str, attr: &SetAttr) -> VfsResult<()> {
+    let dentry = dcache().lookup(path)?;
+    let inode = dentry.get_inode().ok_or(VfsError::NotFound)?;
+    inode.ops.setattr(&inode, attr)
+}
+
+/// TEAM_204: Set file timestamps
+pub fn vfs_utimes(path: &str, atime: Option<u64>, mtime: Option<u64>) -> VfsResult<()> {
+    let attr = SetAttr {
+        atime,
+        mtime,
+        ..Default::default()
+    };
+    vfs_setattr(path, &attr)
 }
