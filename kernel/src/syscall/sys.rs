@@ -62,3 +62,26 @@ pub fn sys_shutdown(flags: u32) -> i64 {
         );
     }
 }
+
+/// TEAM_206: Read null-terminated string from user memory
+pub fn read_user_string(
+    ttbr0: usize,
+    ptr: usize,
+    max_len: usize,
+) -> Result<alloc::string::String, ()> {
+    let mut s = alloc::string::String::new();
+    for i in 0..max_len {
+        let va = ptr + i;
+        if let Some(kptr) = crate::task::user_mm::user_va_to_kernel_ptr(ttbr0, va) {
+            let byte = unsafe { *kptr };
+            if byte == 0 {
+                return Ok(s);
+            }
+            s.push(byte as char);
+        } else {
+            return Err(());
+        }
+    }
+    // Truncated or too long
+    Err(())
+}

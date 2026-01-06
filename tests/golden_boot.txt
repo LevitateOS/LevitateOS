@@ -69,7 +69,8 @@ ELF Header e_ident verified
 Mounting filesystems...
 FAT32 mounted. Root contains 0 entries.
 [BOOT] Filesystem initialized successfully.
-[GPU_TEST] Flush count: 52
+[BOOT] Mounted tmpfs at /tmp
+[GPU_TEST] Flush count: 53
 [GPU_TEST] Framebuffer: 400 non-black pixels of 1024000 total
 
 [SUCCESS] LevitateOS System Ready.

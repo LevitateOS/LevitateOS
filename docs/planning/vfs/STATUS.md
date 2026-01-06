@@ -1,7 +1,7 @@
 # VFS Implementation Status
 
 **Last Updated:** 2026-01-06  
-**Teams:** TEAM_200 (planning), TEAM_201 (Phase 12), TEAM_202 (Phase 13), TEAM_203 (Phase 14-1), TEAM_204 (Phase 14-2), TEAM_205 (Phase 14-3)
+**Teams:** TEAM_200 (planning), TEAM_201 (Phase 12), TEAM_202 (Phase 13), TEAM_203 (Phase 14-1), TEAM_204 (Phase 14-2), TEAM_205 (Phase 14-3), TEAM_206 (Phase 14-4)
 
 ---
 
@@ -51,11 +51,11 @@ Currently migrating existing filesystems to VFS. Tmpfs is complete.
 | Step | Component | Status | Description |
 |------|-----------|--------|-------------|
 | 1 | **Tmpfs** | ✅ DONE | InodeOps + Superblock for Tmpfs |
-| 2 | **Initramfs**| 🔴 TODO | Transition CPIO to VFS |
-| 3 | **FdTable** | 🟡 DOING | Replace legacy variants with VfsFile |
-| 4 | **Syscalls** | 🟡 DOING | Migrate all FS syscalls to VFS |
-| 5 | **Mount** | 🔴 TODO | Implement sys_mount/sys_umount |
-| 6 | **Boot** | 🟡 DOING | VFS-based boot initialization |
+| 2 | **Initramfs**| ✅ DONE | Transition CPIO to VFS |
+| 3 | **FdTable** | ✅ DONE | Replace legacy variants with VfsFile |
+| 4 | **Syscalls** | ✅ DONE | Migrate all FS syscalls to VFS |
+| 5 | **Mount** | ✅ DONE | TEAM_206 | Implement sys_mount/sys_umount |
+| 6 | **Boot** | ✅ DONE | TEAM_207 | VFS-based boot initialization |
 
 ---
 
@@ -82,19 +82,20 @@ Status: ✅ DONE (TEAM_203)
 ```
 Location: kernel/src/fs/initramfs (new module)
 Task: Implement InodeOps + Superblock for initramfs
-Status: 🔴 TODO
+Task: Implement InodeOps + Superblock for initramfs
+Status: ✅ DONE (TEAM_205)
 ```
 
-- [ ] Create `InitramfsSuperblock` implementing `Superblock` trait
-- [ ] Create `InitramfsInodeOps` implementing `InodeOps` (read-only)
-- [ ] Create inodes from CPIO entries
-- [ ] Mount at `/` during boot
+- [x] Create `InitramfsSuperblock` implementing `Superblock` trait
+- [x] Create `InitramfsInodeOps` implementing `InodeOps` (read-only)
+- [x] Create inodes from CPIO entries
+- [x] Mount at `/` during boot
 
 #### Step 3: FdType Simplification
 ```
 Location: kernel/src/task/fd_table.rs
 Task: Replace per-fs FdType variants with Arc<File>
-Status: 🔴 TODO
+Status: ✅ DONE (TEAM_203/TEAM_205)
 ```
 
 **Before:**
@@ -124,41 +125,25 @@ pub enum FdType {
 ```
 Location: kernel/src/syscall/fs.rs
 Task: Update syscalls to use VFS dispatch
-Status: 🔴 TODO
-```
-
-- [ ] `sys_openat` → `vfs_open`
-- [ ] `sys_read` → `vfs_read`
-- [ ] `sys_write` → `vfs_write`
-- [ ] `sys_fstat` → `vfs_fstat`
-- [ ] `sys_getdents` → `vfs_readdir`
-- [ ] `sys_mkdirat` → `vfs_mkdir`
-- [ ] `sys_unlinkat` → `vfs_unlink` / `vfs_rmdir`
-- [ ] `sys_renameat` → `vfs_rename`
-- [ ] `sys_symlinkat` → `vfs_symlink`
-
-#### Step 5: Mount/Umount Syscalls
-```
-Location: kernel/src/syscall/fs.rs
 Task: Add mount/umount syscalls
-Status: 🔴 TODO
+Status: ✅ DONE (TEAM_206)
 ```
 
-- [ ] Add `sys_mount(source, target, fstype, flags)`
-- [ ] Add `sys_umount(target, flags)`
-- [ ] Wire up to mount table
+- [x] Add `sys_mount(source, target, fstype, flags)`
+- [x] Add `sys_umount(target, flags)`
+- [x] Wire up to mount table
 
 #### Step 6: Boot Initialization
 ```
 Location: kernel/src/init.rs
 Task: Initialize VFS during boot
-Status: 🔴 TODO
+Status: ✅ DONE (TEAM_207)
 ```
 
-- [ ] Create initramfs superblock
-- [ ] Create root dentry with initramfs root inode
-- [ ] Mount tmpfs at `/tmp`
-- [ ] Set dcache root
+- [x] Create initramfs superblock
+- [x] Create root dentry with initramfs root inode
+- [x] Mount tmpfs at `/tmp`
+- [x] Set dcache root
 
 ---
 
@@ -334,6 +319,26 @@ pub struct Inode {
 }
 ```
 
+### Pattern 5: String to FsType Conversion
+
+Use `TryFrom<&str>` to parse filesystem types safely:
+
+```rust
+impl core::convert::TryFrom<&str> for FsType {
+    type Error = MountError;
+    fn try_from(s: &str) -> Result<Self, Self::Error> {
+        match s {
+            "tmpfs" => Ok(FsType::Tmpfs),
+            _ => Err(MountError::UnsupportedFsType),
+        }
+    }
+}
+```
+
+### Gotcha 5: Static InodeOps Visibility
+
+Because `InodeOps` are often static, ensure they are visible to the module that creates the inodes. If `make_inode` is in the same file as the static `OPS`, everything works. If you split them, `OPS` might need to be `pub(crate) static`.
+
 ---
 
 ## Gotchas & Warnings
@@ -400,7 +405,8 @@ Before marking Phase 14 complete:
 | TEAM_200 | Planning | Created VFS plan, analyzed reference kernels |
 | TEAM_201 | 12 | Implemented RwLock, Path, Mount, Stat, Mode |
 | TEAM_202 | 13 | Implemented VFS core (Inode, File, Dentry, dispatch) |
-| TBD | 14 | Filesystem migration (TODO) |
+| TEAM_206 | 14 | Implemented sys_mount/sys_umount syscalls |
+| TEAM_207 | 14 | Completed VFS boot initialization (Step 6) |
 
 ---
 

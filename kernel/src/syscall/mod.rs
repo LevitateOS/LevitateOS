@@ -72,6 +72,10 @@ pub enum SyscallNumber {
     Symlinkat = 36,
     /// TEAM_204: Read value of a symbolic link
     Readlinkat = 37,
+    /// TEAM_206: Unmount filesystem
+    Umount = 39,
+    /// TEAM_206: Mount filesystem
+    Mount = 40,
 }
 
 impl SyscallNumber {
@@ -101,6 +105,8 @@ impl SyscallNumber {
             88 => Some(Self::Utimensat),
             36 => Some(Self::Symlinkat),
             37 => Some(Self::Readlinkat),
+            39 => Some(Self::Umount),
+            40 => Some(Self::Mount),
             _ => None,
         }
     }
@@ -250,6 +256,15 @@ pub fn syscall_dispatch(frame: &mut SyscallFrame) {
             frame.arg3() as usize,
             frame.arg4() as usize,
         ),
+        // TEAM_206: Mount/Umount
+        Some(SyscallNumber::Mount) => fs::sys_mount(
+            frame.arg0() as usize,
+            frame.arg1() as usize,
+            frame.arg2() as usize,
+            frame.arg3() as usize,
+            frame.arg4() as usize,
+        ),
+        Some(SyscallNumber::Umount) => fs::sys_umount(frame.arg0() as usize, frame.arg1() as usize),
         None => {
             println!("[SYSCALL] Unknown syscall number: {}", nr);
             errno::ENOSYS
