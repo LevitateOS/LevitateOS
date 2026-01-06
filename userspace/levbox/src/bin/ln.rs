@@ -93,7 +93,7 @@ pub extern "C" fn _start() -> ! {
 
     let mut symbolic = false;
     let mut force = false;
-    let mut paths: Vec<&str> = Vec::new();
+    let mut paths: Vec<alloc::string::String> = Vec::new();
 
     for arg in ulib::env::args().skip(1) {
         if arg == "--help" {
@@ -121,7 +121,7 @@ pub extern "C" fn _start() -> ! {
                 }
             }
         } else {
-            paths.push(arg);
+            paths.push(alloc::string::String::from(arg));
         }
     }
 
@@ -136,8 +136,8 @@ pub extern "C" fn _start() -> ! {
         libsyscall::exit(1);
     }
 
-    let target = paths[0];
-    let linkpath = paths[1];
+    let target = &paths[0];
+    let linkpath = &paths[1];
 
     if create_link(target, linkpath, symbolic, force) {
         libsyscall::exit(0);

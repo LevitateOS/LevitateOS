@@ -14,7 +14,7 @@ cp "$RELEASE_DIR/init" initrd_root/
 cp "$RELEASE_DIR/shell" initrd_root/
 
 # TEAM_198: Copy levbox utilities
-LEVBOX_UTILS="cat ls pwd mkdir rmdir rm mv cp"
+LEVBOX_UTILS="cat ls pwd mkdir rmdir rm mv cp touch ln"
 for util in $LEVBOX_UTILS; do
     if [ -f "$RELEASE_DIR/$util" ]; then
         cp "$RELEASE_DIR/$util" initrd_root/

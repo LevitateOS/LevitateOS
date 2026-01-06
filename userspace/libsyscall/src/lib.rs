@@ -372,15 +372,22 @@ pub fn close(fd: usize) -> isize {
 }
 
 /// TEAM_168: Stat structure for fstat.
+/// TEAM_199: Added timestamp fields to match kernel Stat struct.
 #[repr(C)]
 #[derive(Debug, Clone, Copy, Default)]
 pub struct Stat {
     /// File size in bytes
     pub st_size: u64,
-    /// File type (1 = regular, 2 = char device)
+    /// File type (1 = regular, 2 = char device/directory)
     pub st_mode: u32,
     /// Padding
     pub _pad: u32,
+    /// Access time (seconds since boot for tmpfs)
+    pub st_atime: u64,
+    /// Modification time (seconds since boot for tmpfs)
+    pub st_mtime: u64,
+    /// Creation time (seconds since boot for tmpfs)
+    pub st_ctime: u64,
 }
 
 /// TEAM_168: Get file status.
@@ -632,14 +639,6 @@ pub fn symlinkat(target: &str, linkdirfd: i32, linkpath: &str) -> isize {
         );
     }
     ret as isize
-}
-
-/// TEAM_198: Timespec structure for utimensat.
-#[repr(C)]
-#[derive(Clone, Copy)]
-pub struct Timespec {
-    pub tv_sec: u64,
-    pub tv_nsec: u64,
 }
 
 /// TEAM_198: UTIME_NOW - set to current time

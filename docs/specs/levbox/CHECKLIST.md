@@ -18,9 +18,9 @@ These syscalls are required by the utilities below. Status tracks kernel support
 | `mkdirat` | mkdir, cp | 🟢 | 🟢 | Works for `/tmp/*` paths (tmpfs) |
 | `unlinkat` | rmdir, rm | 🟢 | 🟢 | Works for `/tmp/*` paths (tmpfs) |
 | `renameat` | mv | 🟢 | 🟢 | Works for `/tmp/*` paths (tmpfs) |
-| `linkat` | ln | 🔴 | 🔴 | **BLOCKER**: Full implementation needed |
-| `symlinkat` | ln | 🔴 | 🔴 | **BLOCKER**: Full implementation needed |
-| `utimensat` | touch | 🔴 | 🔴 | **BLOCKER**: Full implementation needed |
+| `linkat` | ln | 🔴 | 🔴 | Deferred - hard links complex |
+| `symlinkat` | ln | 🟢 | 🟢 | TEAM_198: Implemented |
+| `utimensat` | touch | 🟢 | 🟢 | TEAM_198: Implemented |
 
 ---
 
@@ -74,14 +74,15 @@ These syscalls are required by the utilities below. Status tracks kernel support
 - [x] Logical path (`-L`)
 - [x] Help and Version
 
-### [touch](touch.md) (🔴 Planned)
-- [ ] Create empty file
-- [ ] Update access time (`-a`)
-- [ ] Do not create file (`-c`)
-- [ ] Update modification time (`-m`)
-- [ ] Reference file timestamps (`-r`)
-- [ ] Specific timestamp (`-t`)
-- [ ] Help and Version
+### [touch](touch.md) (🟢 Complete)
+- [x] Create empty file
+- [x] Update access time (`-a`)
+- [x] Do not create file (`-c`)
+- [x] Update modification time (`-m`)
+- [x] Reference file timestamps (`-r`)
+- [x] Specific timestamp (`-t [[CC]YY]MMDDhhmm[.SS]`)
+- [x] Date string (`-d "YYYY-MM-DD HH:MM:SS"`)
+- [x] Help and Version
 
 ### [cp](cp.md) (� In Progress)
 - [ ] Copy files
@@ -97,11 +98,11 @@ These syscalls are required by the utilities below. Status tracks kernel support
 - [ ] Interactive move (`-i`) - not implemented
 - [x] Help and Version
 
-### [ln](ln.md) (🔴 Planned)
-- [ ] Create hard links
-- [ ] Create symbolic links (`-s`)
-- [ ] Force link (`-f`)
-- [ ] Help and Version
+### [ln](ln.md) (🟡 In Progress)
+- [ ] Create hard links - deferred
+- [x] Create symbolic links (`-s`)
+- [x] Force link (`-f`)
+- [x] Help and Version
 
 ---
 

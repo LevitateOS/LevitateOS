@@ -10,8 +10,9 @@ LevitateOS follows a structured sequence inspired by the **UEFI PI (Platform Ini
 | **Stage 1: Core HAL** | SEC (Security) | `setup_arch()` | CPU initialization, GIC/Interrupt setup, and early UART. |
 | **Stage 2: Memory & MMU** | PEI (Pre-EFI) | `mm_init()` | RAM detection, Page Table establishment, and Stack setup. |
 | **Stage 3: Boot Console** | DXE (Console Init) | `console_init()` | GPU Terminal / Framebuffer initialization for visual feedback. |
-| **Stage 4: Discovery** | DXE / BDS | `vfs_caches_init()` | VirtIO scanning, initrd extraction, and FS mounting. |
-| **Stage 5: Ready State** | BDS (Boot Device) | `rest_init()` / `init` | Kernel steady state; transition to scheduler or userland. |
+| **Stage 4: Provisioning** | DXE (Provisioning) | N/A | TEAM_200: Disk preparation, hierarchy creation, and `/etc/fstab` generation. |
+| **Stage 5: Discovery** | DXE / BDS | `vfs_caches_init()` | VirtIO scanning, initrd extraction, and FS mounting. |
+| **Stage 6: Ready State** | BDS (Boot Device) | `rest_init()` / `init` | Kernel steady state; transition to scheduler or userland. |
 
 ## 2. Terminal Interaction Standard
 LevitateOS aims for **ANSI VT100 / XTerm** compatibility for its Boot Console, with the following rigorous definitions for non-userspace interaction.
@@ -44,8 +45,8 @@ To ensure "Pixel-ready" behavior, the LevitateOS boot stages map to GS101 hardwa
 | **Stage 1** | **GS101 UART** | GS101 USI UART. Routed to USB-C SBU pins (SBU1: TX, SBU2: RX). 1.8V TTL. |
 | **Stage 2** | **Low-Power DDR** | RAM region detected via DTB (0x80000000+). MMU maps 4K pages. |
 | **Stage 3** | **SimpleFB** | Early console uses `simple-framebuffer` node in `chosen` node of DTB. |
-| **Stage 4** | **UFS / Exynos-DW** | Block discovery shifts from VirtIO to Universal Flash Storage (UFS). |
-| **Stage 5** | **TrustZone (EL1/EL0)** | Transition to secure userland; MMU enforced isolation. |
+| **Stage 5** | **UFS / Exynos-DW** | Block discovery shifts from VirtIO to Universal Flash Storage (UFS). |
+| **Stage 6** | **TrustZone (EL1/EL0)** | Transition to secure userland; MMU enforced isolation. |
 
 > [!NOTE]
 > **SimpleFB Compatibility**: Our current Stage 3 `terminal.rs` is compatible with the Pixel 6 simple-framebuffer protocol, as it only requires a linear memory buffer and resolution parameters provided by the bootloader (ABL).
