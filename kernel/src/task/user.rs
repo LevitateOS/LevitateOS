@@ -9,8 +9,6 @@
 //!
 //! Reference: ARM Architecture Reference Manual, Exception Levels
 
-use core::arch::asm;
-
 /// [PROC3] Enter user mode (EL0) at the specified entry point.
 /// [PROC4] User TTBR0 must be set before calling this.
 ///

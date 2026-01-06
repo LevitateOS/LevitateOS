@@ -35,5 +35,4 @@ fn main() {
 #[panic_handler]
 fn panic(_info: &core::panic::PanicInfo) -> ! {
     exit(1);
-    loop {}
 }

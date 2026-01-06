@@ -5,8 +5,6 @@ pub mod task;
 pub use self::boot::*;
 pub use self::task::*;
 
-use crate::arch::EarlyConsole;
-
 /// TEAM_162: Saved user context during syscall.
 #[repr(C)]
 #[derive(Debug, Clone, Copy, Default)]
@@ -31,12 +29,16 @@ impl SyscallFrame {
     pub fn arg2(&self) -> u64 {
         self.regs[2]
     }
+    // TEAM_163: Part of complete syscall ABI (supports up to 6 args per docs)
+    #[allow(dead_code)]
     pub fn arg3(&self) -> u64 {
         self.regs[3]
     }
+    #[allow(dead_code)]
     pub fn arg4(&self) -> u64 {
         self.regs[4]
     }
+    #[allow(dead_code)]
     pub fn arg5(&self) -> u64 {
         self.regs[5]
     }
@@ -44,18 +46,4 @@ impl SyscallFrame {
         self.regs[0] = value as u64;
     }
 }
-
-pub struct AArch64EarlyConsole;
-
-impl EarlyConsole for AArch64EarlyConsole {
-    fn write_str(&self, s: &str) {
-        los_hal::print!("{}", s);
-    }
-}
-
-static EARLY_CONSOLE: AArch64EarlyConsole = AArch64EarlyConsole;
-
-#[unsafe(no_mangle)]
-pub fn get_early_console() -> Option<&'static dyn EarlyConsole> {
-    Some(&EARLY_CONSOLE)
-}
+// TEAM_163: Removed dead AArch64EarlyConsole (Rule 6: No Dead Code)
