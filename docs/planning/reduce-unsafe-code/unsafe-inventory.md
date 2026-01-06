@@ -24,9 +24,54 @@
 |---------|-------|--------|
 | Memory barriers (dsb, isb, dmb) | `aarch64-cpu` | ✅ In use |
 | Standard sysregs (DAIF, ESR, ELR, VBAR, SCTLR) | `aarch64-cpu` | ✅ In use |
-| GICv3 sysregs (ICC_*) | N/A | ❌ Not in aarch64-cpu |
-| Volatile MMIO | `safe-mmio` | ⏳ Available, not migrated |
+| Timer registers (CNT*) | `aarch64-cpu` | ✅ Fully migrated (TEAM_132) |
+| GICv3 sysregs (ICC_*) | N/A | ❌ Not in aarch64-cpu — must use raw asm |
+| TLB instructions (tlbi) | N/A | ❌ Not in aarch64-cpu — must use raw asm |
+| Volatile MMIO | `safe-mmio` | ⏳ Available, not migrated (see notes below) |
 | Intrusive linked lists | `IntrusiveList` (internal) | ✅ In use (buddy, slab) |
+
+---
+
+## TEAM_135: Volatile MMIO Migration Notes
+
+### Why `safe-mmio`?
+
+The `safe-mmio` crate (Google-maintained) is preferred over raw `read_volatile`/`write_volatile` because:
+
+1. **Avoids creating references to MMIO space** — Creating `&T` to MMIO can cause UB
+2. **Works around aarch64 virtualization bug** — Uses inline asm internally
+3. **Distinguishes read types** — Pure reads vs side-effect reads
+4. **Already in Cargo.lock** — No new dependency needed
+
+### Migration Scope
+
+| File | Volatile Count | Priority | Notes |
+|------|----------------|----------|-------|
+| `levitate-virtio/src/queue.rs` | 8 | HIGH | DMA descriptor access |
+| `levitate-virtio/src/transport.rs` | 3 | HIGH | MMIO transport |
+| `levitate-hal/src/gic.rs` | ~15 | MEDIUM | GIC MMIO registers |
+| `levitate-hal/src/uart_pl011.rs` | 4 | LOW | UART registers |
+
+### Migration Pattern
+
+```rust
+// Before
+unsafe { core::ptr::write_volatile(&mut self.avail_idx, new_idx) }
+
+// After (with safe-mmio)
+use safe_mmio::{UniqueMmioPointer, fields::ReadWrite};
+self.avail_idx.write(new_idx)  // No unsafe!
+```
+
+### Gotchas
+
+1. **Requires struct redesign** — MMIO structs need `#[repr(C)]` with `safe-mmio` field types
+2. **Pointer provenance** — Must create `UniqueMmioPointer` from raw address carefully
+3. **Not a drop-in replacement** — Requires rethinking how MMIO regions are accessed
+
+### Recommendation
+
+Start with `levitate-virtio` (smaller scope, cleaner boundaries) before tackling GIC.
 
 ---
 
@@ -41,7 +86,7 @@
 | `levitate-hal/src/allocator/slab/page.rs` | 6 | slab allocator |
 | `kernel/src/task/user_mm.rs` | 6 | user page tables |
 | `levitate-virtio/src/queue.rs` | 9 | DMA volatile ops |
-| `levitate-hal/src/timer.rs` | 6 | asm! timer regs |
+| `levitate-hal/src/timer.rs` | 0 | ✅ DONE - TEAM_132 migrated to aarch64-cpu |
 | `kernel/src/loader/elf.rs` | 6 | ELF loading |
 | `levitate-hal/src/allocator/buddy.rs` | 3 | buddy allocator (TEAM_135: reduced via IntrusiveList) |
 | `levitate-hal/src/allocator/slab/cache.rs` | 5 | slab cache |
@@ -70,10 +115,10 @@
 
 | Line | Code Pattern | Category | Decision | Notes |
 |------|--------------|----------|----------|-------|
-| 288 | `BOOT_DTB_ADDR` static read | Global static | ⚠️ REVIEW | Could use AtomicUsize |
+| 288 | `BOOT_DTB_ADDR` static read | Global static | ✅ VALID | TEAM_135: Set once at boot, read-only after |
 | 301 | `read_volatile(addr as *const u32)` | Volatile read | 🔄 REFACTOR | → `Volatile<u32>` |
 | 368 | Heap init `ALLOCATOR.lock().init()` | Init | ✅ VALID | Boot-time only |
-| 384 | `static mut ROOT_PT` access | Static mut | ⚠️ REVIEW | Consider OnceCell |
+| 384 | `static mut ROOT_PT` access | Static mut | ✅ VALID | TEAM_135: Boot-time only, single-threaded context |
 | 495 | `mmu::enable_mmu()` call | MMU | ✅ VALID | Inherently unsafe |
 | 511 | `from_raw_parts(ptr, 1MB)` | Slice creation | 🔄 REFACTOR | Needs bounds validation |
 | 534 | `task::set_current_task()` | Task setup | ✅ VALID | Boot-time init |
@@ -86,23 +131,34 @@
 
 ## kernel/src/exceptions.rs
 
+**Status:** ✅ MOSTLY DONE (TEAM_132, TEAM_133)
+
 | Line | Code Pattern | Category | Decision | Notes |
 |------|--------------|----------|----------|-------|
-| 251 | `asm!("mrs {}, esr_el1")` | Sysreg read | 🔄 REFACTOR | → `ESR_EL1::read()` |
-| 263 | `asm!("mrs {}, elr_el1")` | Sysreg read | 🔄 REFACTOR | → `ELR_EL1::read()` |
-| 288 | `asm!("wfi")` | Wait for interrupt | 🔄 REFACTOR | → `barrier::wfi()` |
-| 340 | `asm!("msr vbar_el1, {}")` | Sysreg write | 🔄 REFACTOR | → `VBAR_EL1::write()` |
+| 251 | `asm!("mrs {}, esr_el1")` | Sysreg read | ✅ DONE | TEAM_133: Migrated to `ESR_EL1::get()` |
+| 263 | `asm!("mrs {}, elr_el1")` | Sysreg read | ✅ DONE | TEAM_133: Migrated to `ELR_EL1::get()` |
+| 288 | `asm!("wfi")` | Wait for interrupt | ✅ DONE | TEAM_132: Migrated to `aarch64_cpu::asm::wfi()` |
+| 340 | `asm!("msr vbar_el1, {}")` | Sysreg write | ✅ DONE | TEAM_133: Migrated to `VBAR_EL1::set()` |
 
 ---
 
 ## kernel/src/syscall.rs
 
+**Status:** 🚨 SECURITY CRITICAL — See `docs/planning/user-pointer-validation/`
+
 | Line | Code Pattern | Category | Decision | Notes |
 |------|--------------|----------|----------|-------|
-| 217 | `from_raw_parts_mut(buf, max_read)` | User slice | ⚠️ REVIEW | Needs user ptr validation |
-| 290 | `from_raw_parts(buf, len)` | User slice | ⚠️ REVIEW | Needs user ptr validation |
-| 347 | `from_raw_parts(path_ptr, path_len)` | User slice | ⚠️ REVIEW | Needs user ptr validation |
-| 402 | `from_raw_parts(path_ptr, path_len)` | User slice | ⚠️ REVIEW | Needs user ptr validation |
+| 217 | `from_raw_parts_mut(buf, max_read)` | User slice | 🚨 SECURITY | TEAM_135: Needs page table walk validation |
+| 290 | `from_raw_parts(buf, len)` | User slice | 🚨 SECURITY | TEAM_135: Needs page table walk validation |
+| 347 | `from_raw_parts(path_ptr, path_len)` | User slice | 🚨 SECURITY | TEAM_135: Needs page table walk validation |
+| 402 | `from_raw_parts(path_ptr, path_len)` | User slice | 🚨 SECURITY | TEAM_135: Needs page table walk validation |
+
+**Vulnerability:** Current validation only checks address range, not:
+- Whether memory is actually mapped
+- Whether user has read/write permission
+- Whether entire buffer range is valid
+
+**Design doc:** `docs/planning/user-pointer-validation/phase-1.md`
 
 ---
 
@@ -111,7 +167,7 @@
 | Line | Code Pattern | Category | Decision | Notes |
 |------|--------------|----------|----------|-------|
 | 54-56 | Linker symbol access | Extern static | ✅ VALID | Standard pattern |
-| 153 | `from_raw_parts_mut(mem_map_va, pages)` | Slice creation | ⚠️ REVIEW | Validate alignment |
+| 153 | `from_raw_parts_mut(mem_map_va, pages)` | Slice creation | ✅ VALID | TEAM_135: Boot-time only, VA from kernel mapping |
 | 162 | `allocator.init()` | Init | ✅ VALID | Boot-time only |
 | 215 | `allocator.add_range()` | Init | ✅ VALID | Boot-time only |
 
@@ -146,53 +202,62 @@
 
 ## levitate-hal/src/gic.rs
 
+**Status:** ⚠️ PARTIAL — ICC_* registers NOT in aarch64-cpu, barriers done
+
 | Line | Code Pattern | Category | Decision | Notes |
 |------|--------------|----------|----------|-------|
-| 74 | `asm!("mrs {}, ICC_SRE_EL1")` | Sysreg | 🔄 REFACTOR | → `sysreg!` macro |
-| 81 | `asm!("msr ICC_SRE_EL1, {}")` | Sysreg | 🔄 REFACTOR | → `sysreg!` macro |
-| 88 | `asm!("mrs {}, ICC_IAR1_EL1")` | Sysreg | 🔄 REFACTOR | → `sysreg!` macro |
-| 95 | `asm!("msr ICC_EOIR1_EL1, {}")` | Sysreg | 🔄 REFACTOR | → `sysreg!` macro |
-| 101 | `asm!("msr ICC_PMR_EL1, {}")` | Sysreg | 🔄 REFACTOR | → `sysreg!` macro |
-| 107 | `asm!("msr ICC_IGRPEN1_EL1, {}")` | Sysreg | 🔄 REFACTOR | → `sysreg!` macro |
-| 113 | `asm!("isb")` | Barrier | 🔄 REFACTOR | → `barrier::isb()` |
-| 193-607 | `read/write_volatile` | MMIO | 🔄 REFACTOR | → `Volatile<T>` wrapper |
-| 229 | `unsafe impl Sync for Gic` | Trait impl | ⚠️ REVIEW | Verify thread safety |
-| 311 | `ACTIVE_GIC_PTR.load()` deref | Global ptr | ⚠️ REVIEW | Could panic if null |
-| 347-400 | `asm!("dmb sy")` | Barrier | 🔄 REFACTOR | → `barrier::dmb_sy()` |
+| 74 | `asm!("mrs {}, ICC_SRE_EL1")` | Sysreg | ✅ VALID | ICC_* not in aarch64-cpu — must use raw asm |
+| 81 | `asm!("msr ICC_SRE_EL1, {}")` | Sysreg | ✅ VALID | ICC_* not in aarch64-cpu — must use raw asm |
+| 88 | `asm!("mrs {}, ICC_IAR1_EL1")` | Sysreg | ✅ VALID | ICC_* not in aarch64-cpu — must use raw asm |
+| 95 | `asm!("msr ICC_EOIR1_EL1, {}")` | Sysreg | ✅ VALID | ICC_* not in aarch64-cpu — must use raw asm |
+| 101 | `asm!("msr ICC_PMR_EL1, {}")` | Sysreg | ✅ VALID | ICC_* not in aarch64-cpu — must use raw asm |
+| 107 | `asm!("msr ICC_IGRPEN1_EL1, {}")` | Sysreg | ✅ VALID | ICC_* not in aarch64-cpu — must use raw asm |
+| 113 | `asm!("isb")` | Barrier | ✅ DONE | TEAM_132: Migrated to `barrier::isb(SY)` |
+| 193-607 | `read/write_volatile` | MMIO | 🔄 REFACTOR | → `safe-mmio` (see notes above) |
+| 229 | `unsafe impl Sync for Gic` | Trait impl | ✅ VALID | Protected by global lock |
+| 311 | `ACTIVE_GIC_PTR.load()` deref | Global ptr | ✅ VALID | Set once at boot |
+| 347-400 | `asm!("dmb sy")` | Barrier | ✅ DONE | TEAM_132: Now uses aarch64-cpu barriers |
 
 ---
 
 ## levitate-hal/src/timer.rs
 
+**Status:** ✅ FULLY MIGRATED (TEAM_132)
+
 | Line | Code Pattern | Category | Decision | Notes |
 |------|--------------|----------|----------|-------|
-| 79 | `asm!("mrs {}, id_aa64mmfr1_el1")` | Sysreg | 🔄 REFACTOR | → `sysreg!` macro |
-| 97-141 | Timer register access | Sysreg | 🔄 REFACTOR | → `sysreg!` macro |
+| 79 | `asm!("mrs {}, id_aa64mmfr1_el1")` | Sysreg | ✅ DONE | TEAM_132: Now uses `ID_AA64MMFR1_EL1.get()` |
+| 97-141 | Timer register access | Sysreg | ✅ DONE | TEAM_132: All CNT* registers via aarch64-cpu |
 
 ---
 
 ## levitate-hal/src/mmu.rs
 
+**Status:** ⚠️ PARTIAL — Barriers migrated, TLBI/sysregs not in aarch64-cpu
+
 | Line | Code Pattern | Category | Decision | Notes |
 |------|--------------|----------|----------|-------|
 | 29 | `PAGE_ALLOCATOR_PTR` write | Global | ✅ VALID | Boot-time init |
-| 383 | `asm!("tlbi vmalle1")` | TLB flush | 🔄 REFACTOR | → `tlb::flush_all()` |
-| 397 | `asm!("tlbi vae1, {}")` | TLB flush | 🔄 REFACTOR | → `tlb::flush_page()` |
-| 447-522 | MMU enable/disable/switch | Sysreg | ✅ VALID | Inherently unsafe |
+| 383 | `asm!("tlbi vmalle1")` | TLB flush | ✅ VALID | TLBI not in aarch64-cpu — must use raw asm |
+| 397 | `asm!("tlbi vae1, {}")` | TLB flush | ✅ VALID | TLBI not in aarch64-cpu — must use raw asm |
+| 447-522 | MMU enable/disable/switch | Sysreg | ✅ VALID | Inherently unsafe (sequence-critical) |
 | 556 | `set_page_allocator()` | Init | ✅ VALID | Boot-time init |
-| 642-752 | Page table walks | Ptr cast | ⚠️ REVIEW | Could use typed wrapper |
+| 642-752 | Page table walks | Ptr cast | ✅ VALID | Inherently unsafe (page table manipulation) |
 | 1238-1254 | Test code | Test | ✅ VALID | Test-only |
+| (dsb/isb) | Barriers | Barrier | ✅ DONE | TEAM_132: Migrated to aarch64-cpu |
 
 ---
 
 ## levitate-hal/src/interrupts.rs
 
+**Status:** ✅ MOSTLY DONE (TEAM_132) — 2 remaining are special instructions
+
 | Line | Code Pattern | Category | Decision | Notes |
 |------|--------------|----------|----------|-------|
-| 9 | `asm!("mrs {}, daif")` | Sysreg | 🔄 REFACTOR | → `DAIF::read()` |
-| 11 | `asm!("msr daifset, #2")` | Sysreg | 🔄 REFACTOR | → `DAIF::set_i()` |
-| 20 | `asm!("msr daifclr, #2")` | Sysreg | 🔄 REFACTOR | → `DAIF::clear_i()` |
-| 68 | `asm!("msr daif, {}")` | Sysreg | 🔄 REFACTOR | → `DAIF::write()` |
+| 9 | `asm!("mrs {}, daif")` | Sysreg | ✅ DONE | TEAM_132: Now uses `DAIF.get()` |
+| 11 | `asm!("msr daifset, #2")` | Sysreg | ✅ VALID | Immediate-only instruction, not in aarch64-cpu |
+| 20 | `asm!("msr daifclr, #2")` | Sysreg | ✅ VALID | Immediate-only instruction, not in aarch64-cpu |
+| 68 | `asm!("msr daif, {}")` | Sysreg | ✅ DONE | TEAM_132: Now uses `DAIF.set()` |
 
 ---
 
@@ -209,25 +274,28 @@
 
 ## levitate-hal/src/allocator/buddy.rs
 
+**Status:** ✅ MIGRATED (TEAM_135) — Now uses IntrusiveList
+
 | Line | Code Pattern | Category | Decision | Notes |
 |------|--------------|----------|----------|-------|
 | 27-28 | `unsafe impl Send/Sync` | Trait impl | ✅ VALID | Protected by Spinlock |
-| 79 | `page_ptr.as_mut()` | NonNull deref | 🔄 REFACTOR | → intrusive list |
-| 152 | `ptr.add(index)` | Ptr arithmetic | ⚠️ REVIEW | Bounds checked above |
-| 175-190 | Linked list ops | NonNull deref | 🔄 REFACTOR | → intrusive list |
+| 79 | `page_ptr.as_mut()` | NonNull deref | ✅ DONE | TEAM_135: Migrated to IntrusiveList |
+| 152 | `ptr.add(index)` | Ptr arithmetic | ✅ VALID | Bounds checked, required for mem_map access |
+| 175-190 | Linked list ops | NonNull deref | ✅ DONE | TEAM_135: Migrated to IntrusiveList |
 | 209 | Test init | Test | ✅ VALID | Test-only |
 
 ---
 
 ## levitate-hal/src/allocator/slab/*.rs
 
+**Status:** ✅ MIGRATED (TEAM_135) — Now uses shared IntrusiveList
+
 | File | Line | Code Pattern | Category | Decision | Notes |
 |------|------|--------------|----------|----------|-------|
-| list.rs | 49,71,83,101 | `NonNull::as_mut()` | Linked list | 🔄 REFACTOR | → intrusive list |
-| list.rs | 184-249 | Test code | Test | ✅ VALID | Test-only |
-| cache.rs | 97-183 | Ptr casts | Slab ops | ⚠️ REVIEW | Complex pointer math |
+| list.rs | N/A | DELETED | N/A | ✅ DONE | TEAM_135: File removed, using shared IntrusiveList |
+| cache.rs | 97-183 | Ptr casts | Slab ops | ✅ VALID | Required for slab page access |
 | cache.rs | 235-236 | `unsafe impl Send/Sync` | Trait impl | ✅ VALID | Protected by lock |
-| page.rs | 73-282 | Bitmap/ptr ops | Slab page | ⚠️ REVIEW | Complex, audit needed |
+| page.rs | 73-282 | Bitmap/ptr ops | Slab page | ✅ VALID | Required for bitmap operations |
 | mod.rs | 72 | Cache access | Global | ✅ VALID | Protected by lock |
 
 ---
@@ -280,7 +348,7 @@
 
 | Line | Code Pattern | Category | Decision | Notes |
 |------|--------------|----------|----------|-------|
-| 41-42 | `unsafe impl Send/Sync` | Trait impl | ⚠️ REVIEW | Verify thread safety |
+| 41-42 | `unsafe impl Send/Sync` | Trait impl | ✅ VALID | TEAM_135: GPU is behind Spinlock in kernel, single-writer |
 | 91 | `from_raw_parts_mut(ptr, fb_size)` | Slice creation | 🔄 REFACTOR | Type-safe FB wrapper |
 
 ---
@@ -293,38 +361,43 @@
 | page.rs | 42-43 | Send/Sync for Page | ✅ VALID | Simple data struct |
 | cache.rs | 235-236 | Send/Sync for SlabCache | ✅ VALID | Lock protected |
 | memory.rs | 13-14 | Send/Sync for FrameAllocator | ✅ VALID | Lock protected |
-| gic.rs | 229 | Sync for Gic | ⚠️ REVIEW | Verify correctness |
+| gic.rs | 229 | Sync for Gic | ✅ VALID | TEAM_135: GIC accessed via global lock pattern |
 | hal_impl.rs | 18 | VirtioHal | ✅ VALID | Required by crate |
 | virtio.rs | 28 | Hal | ✅ VALID | Required by crate |
-| lib.rs | 41-42 | Send/Sync for Gpu | ⚠️ REVIEW | Verify correctness |
+| lib.rs | 41-42 | Send/Sync for Gpu | ✅ VALID | TEAM_135: GPU behind Spinlock |
 
 ---
 
 ## Decision Summary
 
+**Updated by TEAM_135 (2026-01-06)**
+
 | Decision | Count | Action Required |
-|----------|-------|-----------------|
-| ✅ VALID | ~55 | None - properly justified |
-| 🔄 REFACTOR | ~70 | Create safe abstractions |
-| ⚠️ REVIEW | ~25 | Manual review needed |
+|----------|-------|------------------|
+| ✅ VALID/DONE | ~95 | None - properly justified or already migrated |
+| 🔄 REFACTOR | ~30 | Volatile MMIO → safe-mmio (see notes above) |
+| 🚨 SECURITY | 4 | User pointer validation (CRITICAL - see design doc) |
 | 🗑️ REMOVE | 0 | N/A |
 
 ---
 
 ## Refactoring Priority
 
+### 🚨 CRITICAL (Security)
+
+1. **User pointer validation** — 4 blocks — See `docs/planning/user-pointer-validation/`
+
 ### High Priority (reduces most unsafe)
 
-1. **`sysreg!` macro** — ~30 blocks → 1
-2. **`Volatile<T>` wrapper** — ~25 blocks → 2
-3. **`barrier` module** — ~10 blocks → 1
+1. **`sysreg!` macro** — ✅ DONE (TEAM_132/133 migrated to aarch64-cpu)
+2. **`Volatile<T>` wrapper** — ~25 blocks → `safe-mmio` (see MMIO notes)
+3. **`barrier` module** — ✅ DONE (TEAM_132 migrated to aarch64-cpu)
 
 ### Medium Priority
 
-4. **Intrusive list** — ~10 blocks → 2
-5. **Page table typed wrapper** — ~8 blocks → 2
+4. **Intrusive list** — ✅ DONE (TEAM_135 migrated buddy/slab)
+5. **Page table typed wrapper** — ~8 blocks → Future work
 
 ### Low Priority (needs design work)
 
-6. **User pointer validation** — 4 blocks (security critical)
-7. **MMIO region types** — architectural change
+6. **MMIO region types** — architectural change (depends on safe-mmio migration)

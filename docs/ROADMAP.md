@@ -221,6 +221,30 @@ The goal of Part II is to build a rich, POSIX-like userspace environment on top 
 
 ---
 
+## 🔐 PART III: MULTI-USER SECURITY & AUTHENTICATION (Future)
+
+Once the userspace foundation is solid, we move to secure multi-user support.
+
+### 🛡️ Phase 15: Identity & Authentication
+
+- **Objective**: Identify users and protect resources.
+- **Units of Work**:
+  - [ ] **User Database**: Implement `/etc/passwd` and `/etc/group` logic.
+  - [ ] **Secret Management**: Implement `/etc/shadow` with Argon2 hashing.
+  - [ ] **`login`**: The gatekeeper program (replacing direct shell spawn).
+  - [ ] **`su`**: Switch User functionality.
+
+### 🔑 Phase 16: Privilege Escalation & Access Control
+
+- **Objective**: Controlled administration access.
+- **Units of Work**:
+  - [ ] **`doas`**: A minimal, config-based privilege escalation tool (simpler than `sudo`).
+  - [ ] **Permission Enforcement**: Kernel-level check of UID/GID against file modes (`rwx`).
+  - [ ] **Capabilities**: Fine-grained permissions (e.g., `CAP_NET_ADMIN`) to avoid full root requirements.
+  - [ ] **Session Management**: Session IDs and Process Groups (for shell job control).
+
+---
+
 ## Team Registry Summary
 
 | Phase | Teams | Description |
