@@ -1,0 +1,21 @@
+[package]
+name = "los_hal"
+version = "0.1.0"
+edition = "2024"
+
+[lints]
+workspace = true
+
+[features]
+default = []
+# Enable std for running tests on host
+std = ["los_utils/std"]
+
+[dependencies]
+los_utils = { path = "../utils" }
+los_error = { path = "../error" }
+bitflags = { workspace = true }
+fdt = { version = "0.1.5", default-features = false }
+virtio-drivers.workspace = true
+aarch64-cpu.workspace = true
+intrusive-collections = "0.10"

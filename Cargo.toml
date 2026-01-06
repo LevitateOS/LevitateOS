@@ -1,21 +1,19 @@
 [workspace]
 members = [
     "kernel",
-    "levitate-hal",
-    "levitate-utils",
-    "levitate-terminal",
-    "levitate-virtio",
-    # TEAM_114: PCI and GPU as separate crates
-    "levitate-pci",
-    "levitate-gpu",
-    "levitate-error",
+    "crates/hal",
+    "crates/utils",
+    "crates/term",
+    "crates/virtio",
+    "crates/pci",
+    "crates/gpu",
+    "crates/error",
     "xtask",
 ]
 exclude = [
     "userspace",
-    "levitate-drivers", # Legacy, moving to levitate-hal traits
 ]
-default-members = ["levitate-hal", "levitate-utils", "xtask"]
+default-members = ["crates/hal", "crates/utils", "xtask"]
 resolver = "2"
 
 [workspace.lints.rust]

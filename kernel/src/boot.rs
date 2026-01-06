@@ -10,8 +10,8 @@
 
 use core::arch::global_asm;
 
-use levitate_hal::mmu;
-use levitate_hal::println;
+use los_hal::mmu;
+use los_hal::println;
 use linked_list_allocator::LockedHeap;
 
 // =============================================================================

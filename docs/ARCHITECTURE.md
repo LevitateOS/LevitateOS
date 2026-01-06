@@ -16,32 +16,36 @@ The project root defines the workspace members in `Cargo.toml`:
 [workspace]
 members = [
     "kernel",
-    "levitate-hal",
-    "levitate-utils",
+    "crates/hal",
+    "crates/utils",
+    "crates/term",
+    "crates/virtio",
+    "crates/pci",
+    "crates/gpu",
+    "crates/error",
+    "xtask",
 ]
 ```
 
 ### 1. Core Kernel (`levitate-kernel`)
 - **Location**: `kernel/`
 - **Purpose**: High-level OS logic, task scheduling, memory management, and device coordination.
-- **Dependencies**: Depends on `levitate-hal` and `levitate-utils`.
+- **Dependencies**: Depends on `los_hal`, `los_utils`, and other `los_*` crates.
 - **Note**: This is the binary crate (`main.rs`) that produces the kernel executable.
 
-### 2. Hardware Abstraction Layer (`levitate-hal`)
-- **Location**: `levitate-hal/`
-- **Purpose**: Low-level drivers and hardware interfacing.
-- **Components**:
-  - `console`: UART (PL011) interaction.
-  - `gic`: Generic Interrupt Controller management.
-  - `timer`: AArch64 Generic Timer driver.
-- **Design Rule**: Code here should handle `unsafe` MMIO but expose safe APIs to the kernel.
+### 2. Library Crates (`crates/`)
 
-### 3. Utilities (`levitate-utils`)
-- **Location**: `levitate-utils/`
-- **Purpose**: Shared, hardware-agnostic primitives.
-- **Components**:
-  - `Spinlock`: Synchronization primitive required by both Kernel and HAL.
-- **Design Rule**: Must be `#![no_std]` and mostly dependencies-free.
+All library crates use the `los_` prefix:
+
+| Crate | Location | Purpose |
+|-------|----------|----------|
+| `los_hal` | `crates/hal/` | Hardware abstraction (GIC, MMU, Timer, UART, VirtIO HAL) |
+| `los_utils` | `crates/utils/` | Shared primitives (Spinlock, RingBuffer, CPIO) |
+| `los_term` | `crates/term/` | ANSI terminal emulator |
+| `los_virtio` | `crates/virtio/` | VirtIO transport layer |
+| `los_pci` | `crates/pci/` | PCI bus enumeration |
+| `los_gpu` | `crates/gpu/` | VirtIO GPU driver |
+| `los_error` | `crates/error/` | Error handling macros |
 
 ## Build System
 
@@ -67,7 +71,7 @@ LevitateOS uses typed error enums with numeric codes for debugging.
 Use the `define_kernel_error!` macro for error types:
 
 ```rust
-use levitate_error::define_kernel_error;
+use los_error::define_kernel_error;
 
 define_kernel_error! {
     /// My subsystem errors (0x10xx)

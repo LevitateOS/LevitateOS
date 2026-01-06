@@ -6,7 +6,7 @@
 //! - Address space layout for user processes
 
 use crate::memory::FRAME_ALLOCATOR;
-use levitate_hal::mmu::{self, MmuError, PAGE_SIZE, PageAllocator, PageFlags, PageTable};
+use los_hal::mmu::{self, MmuError, PAGE_SIZE, PageAllocator, PageFlags, PageTable};
 
 /// TEAM_073: User address space layout constants.
 pub mod layout {
@@ -29,15 +29,15 @@ pub mod layout {
 /// # Returns
 /// Physical address of the new L0 page table, or None if allocation fails.
 pub fn create_user_page_table() -> Option<usize> {
-    levitate_hal::println!("[MMU] Creating user page table...");
+    los_hal::println!("[MMU] Creating user page table...");
     // Allocate a page for L0 table
     let l0_phys = FRAME_ALLOCATOR.alloc_page()?;
 
-    levitate_hal::println!("[MMU] Allocated L0 table at phys [MASKED]");
+    los_hal::println!("[MMU] Allocated L0 table at phys [MASKED]");
 
     // Zero the table
     let l0_va = mmu::phys_to_virt(l0_phys);
-    levitate_hal::println!("[MMU] Zeroing L0 table at va [MASKED]");
+    los_hal::println!("[MMU] Zeroing L0 table at va [MASKED]");
     let l0 = unsafe { &mut *(l0_va as *mut PageTable) };
     l0.zero();
 

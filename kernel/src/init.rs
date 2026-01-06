@@ -12,11 +12,11 @@ extern crate alloc;
 
 use alloc::sync::Arc;
 
-use levitate_hal::fdt::{self, Fdt};
-use levitate_hal::gic;
-use levitate_hal::mmu;
-use levitate_hal::timer::{self, Timer};
-use levitate_hal::{print, println};
+use los_hal::fdt::{self, Fdt};
+use los_hal::gic;
+use los_hal::mmu;
+use los_hal::timer::{self, Timer};
+use los_hal::{print, println};
 
 use crate::boot;
 use crate::task;
@@ -72,7 +72,7 @@ pub fn maintenance_shell() -> ! {
     println!("Type 'reboot' to restart (not implemented) or interact via serial.");
     loop {
         print!("FAILSAFE> ");
-        if let Some(c) = levitate_hal::console::read_byte() {
+        if let Some(c) = los_hal::console::read_byte() {
             let ch = c as char;
             match ch {
                 '\r' | '\n' => println!(""),
@@ -129,7 +129,7 @@ impl gic::InterruptHandler for UartHandler {
     fn handle(&self, _irq: u32) {
         // TEAM_139: Note - UART RX interrupts may not fire when QEMU stdin is piped
         // Direct UART polling is used as fallback in console::read_byte()
-        levitate_hal::console::handle_interrupt();
+        los_hal::console::handle_interrupt();
     }
 }
 
@@ -237,7 +237,7 @@ pub fn run() -> ! {
     // TEAM_146: Enable interrupts and exit bootstrap task.
     // Note: verbose! calls removed here due to race condition - timer interrupt
     // can fire immediately after enable() and preempt before verbose! executes.
-    unsafe { levitate_hal::interrupts::enable() };
+    unsafe { los_hal::interrupts::enable() };
     crate::task::task_exit();
 }
 
@@ -274,7 +274,7 @@ fn init_display() {
     crate::terminal::init();
 
     // TEAM_087: Re-enable dual console now that GPU deadlock is fixed (TEAM_086)
-    levitate_hal::console::set_secondary_output(crate::terminal::write_str);
+    los_hal::console::set_secondary_output(crate::terminal::write_str);
 
     println!("Terminal initialized.");
 }

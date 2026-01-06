@@ -1,0 +1,12 @@
+[package]
+name = "los_pci"
+version = "0.1.0"
+edition = "2024"
+
+[lints]
+workspace = true
+
+[dependencies]
+los_hal = { path = "../hal" }
+# TEAM_141: Use workspace dependencies for version consistency
+virtio-drivers.workspace = true

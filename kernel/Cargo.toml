@@ -13,15 +13,13 @@ diskless = []       # TEAM_065: Skip initrd requirement for diskless boot scenar
 multitask-demo = [] # TEAM_071: Enable demo tasks for preemption verification
 
 [dependencies]
-levitate-hal = { path = "../levitate-hal" }
-levitate-utils = { path = "../levitate-utils" }
-levitate-error = { path = "../levitate-error" }
-# TEAM_141: Removed hal-impl feature - committing to virtio-drivers (Option A)
-levitate-virtio = { path = "../levitate-virtio" }
-levitate-terminal = { path = "../levitate-terminal" }
-# TEAM_114: PCI and GPU as separate crates
-levitate-pci = { path = "../levitate-pci" }
-levitate-gpu = { path = "../levitate-gpu" }
+los_hal = { path = "../crates/hal" }
+los_utils = { path = "../crates/utils" }
+los_error = { path = "../crates/error" }
+los_virtio = { path = "../crates/virtio" }
+los_term = { path = "../crates/term" }
+los_pci = { path = "../crates/pci" }
+los_gpu = { path = "../crates/gpu" }
 linked_list_allocator = "0.10.5"
 # TEAM_141: Use workspace dependencies for version consistency
 virtio-drivers.workspace = true

@@ -2,7 +2,7 @@
 use crate::task::TaskControlBlock;
 use alloc::collections::VecDeque;
 use alloc::sync::Arc;
-use levitate_hal::IrqSafeLock;
+use los_hal::IrqSafeLock;
 
 /// TEAM_070: Global scheduler state.
 pub struct Scheduler {

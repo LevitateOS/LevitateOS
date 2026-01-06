@@ -14,7 +14,7 @@ extern crate alloc;
 
 use core::panic::PanicInfo;
 
-use levitate_hal::println;
+use los_hal::println;
 
 // =============================================================================
 // Kernel Modules
@@ -66,7 +66,7 @@ macro_rules! verbose {
 #[unsafe(no_mangle)]
 pub extern "C" fn kmain() -> ! {
     // Stage 1: Early HAL - Console must be first for debug output
-    levitate_hal::console::init();
+    los_hal::console::init();
     init::transition_to(init::BootStage::EarlyHAL);
 
     // Initialize heap (required for alloc)

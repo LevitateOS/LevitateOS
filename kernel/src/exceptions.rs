@@ -1,5 +1,5 @@
 use core::arch::global_asm;
-use levitate_hal::println;
+use los_hal::println;
 
 // TEAM_073: Import syscall handling
 use crate::syscall::{self, SyscallFrame};
@@ -316,7 +316,7 @@ pub extern "C" fn handle_sync_lower_el(frame: *mut SyscallFrame) {
 pub extern "C" fn handle_sync_exception(esr: u64, elr: u64) {
     // raw prints to avoid core::fmt
     use core::fmt::Write;
-    use levitate_hal::console;
+    use los_hal::console;
     let _ = console::WRITER
         .lock()
         .write_str("\n*** KERNEL EXCEPTION: Synchronous ***\n");
@@ -334,16 +334,16 @@ pub extern "C" fn handle_sync_exception(esr: u64, elr: u64) {
 #[unsafe(no_mangle)]
 pub extern "C" fn handle_irq() {
     // TEAM_045: Use detected active GIC API
-    let gic = levitate_hal::gic::active_api();
+    let gic = los_hal::gic::active_api();
     let irq = gic.acknowledge();
 
     // TEAM_017: Skip spurious interrupts (no EOI needed)
-    if levitate_hal::gic::Gic::is_spurious(irq) {
+    if los_hal::gic::Gic::is_spurious(irq) {
         return;
     }
 
     // TEAM_015: Use gic::dispatch() instead of hardcoded IRQ numbers
-    if !levitate_hal::gic::dispatch(irq) {
+    if !los_hal::gic::dispatch(irq) {
         println!("Unhandled IRQ: {}", irq);
     }
 

@@ -1,21 +1,21 @@
 //! Kernel-side GPU Interface
 //!
 //! TEAM_114: Wrapper around levitate-gpu crate for kernel use.
-//! TEAM_141: Removed duplicate Display type - use levitate_gpu::Display via as_display()
+//! TEAM_141: Removed duplicate Display type - use los_gpu::Display via as_display()
 //!
 //! See: `docs/planning/virtio-pci/` for the implementation plan
 
-use levitate_hal::IrqSafeLock;
+use los_hal::IrqSafeLock;
 use core::sync::atomic::{AtomicU32, Ordering};
 
 use crate::virtio::VirtioHal;
 
 // Re-export from levitate-gpu
-pub use levitate_gpu::{Display, GpuError};
+pub use los_gpu::{Display, GpuError};
 
 /// GPU state wrapper using levitate-gpu
 pub struct GpuState {
-    inner: levitate_gpu::Gpu<VirtioHal>,
+    inner: los_gpu::Gpu<VirtioHal>,
 }
 
 // SAFETY: GPU access is protected by IrqSafeLock
@@ -38,7 +38,7 @@ impl GpuState {
     }
 
     /// TEAM_141: Get a Display adapter for embedded-graphics DrawTarget
-    /// Uses levitate_gpu::Display instead of duplicate kernel implementation
+    /// Uses los_gpu::Display instead of duplicate kernel implementation
     pub fn as_display(&mut self) -> Display<'_, VirtioHal> {
         Display::new(&mut self.inner)
     }
@@ -81,20 +81,20 @@ pub fn framebuffer_has_content() -> Option<(usize, usize)> {
 /// Note: mmio_base is ignored - we use PCI enumeration instead
 #[allow(unused_variables)]
 pub fn init(mmio_base: usize) {
-    levitate_hal::serial_println!("[GPU] Initializing via PCI...");
+    los_hal::serial_println!("[GPU] Initializing via PCI...");
 
-    match levitate_pci::find_virtio_gpu::<VirtioHal>() {
-        Some(transport) => match levitate_gpu::Gpu::new(transport) {
+    match los_pci::find_virtio_gpu::<VirtioHal>() {
+        Some(transport) => match los_gpu::Gpu::new(transport) {
             Ok(gpu) => {
-                levitate_hal::serial_println!("[GPU] Initialized via PCI transport");
+                los_hal::serial_println!("[GPU] Initialized via PCI transport");
                 *GPU.lock() = Some(GpuState { inner: gpu });
             }
             Err(e) => {
-                levitate_hal::serial_println!("[GPU] Failed to create GPU: {:?}", e);
+                los_hal::serial_println!("[GPU] Failed to create GPU: {:?}", e);
             }
         },
         None => {
-            levitate_hal::serial_println!("[GPU] No VirtIO GPU found on PCI bus");
+            los_hal::serial_println!("[GPU] No VirtIO GPU found on PCI bus");
         }
     }
 }
@@ -103,4 +103,4 @@ pub fn get_resolution() -> Option<(u32, u32)> {
     GPU.lock().as_ref().map(|s| s.dimensions())
 }
 
-// TEAM_141: Removed duplicate Display type - use levitate_gpu::Display via GpuState::as_display()
+// TEAM_141: Removed duplicate Display type - use los_gpu::Display via GpuState::as_display()

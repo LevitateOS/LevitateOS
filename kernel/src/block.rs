@@ -6,10 +6,10 @@
 //! TEAM_150: Converted panics to Result types for proper error handling
 
 use crate::virtio::{StaticMmioTransport, VirtioHal};
-use levitate_utils::Spinlock;
+use los_utils::Spinlock;
 use virtio_drivers::device::blk::VirtIOBlk;
 
-use levitate_error::define_kernel_error;
+use los_error::define_kernel_error;
 
 define_kernel_error! {
     /// TEAM_150: Block device error type with error codes.

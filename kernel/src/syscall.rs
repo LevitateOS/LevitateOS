@@ -9,7 +9,7 @@
 //! - Return value in `x0`
 //! - Invoked via `svc #0` instruction from EL0
 
-use levitate_hal::{print, println};
+use los_hal::{print, println};
 
 /// TEAM_073: Error codes for syscalls.
 /// Using negative values like POSIX, but custom numbering.
@@ -236,7 +236,7 @@ fn poll_input_devices(ttbr0: usize, user_buf: usize, bytes_read: &mut usize, max
 
     // Also check UART input
     if *bytes_read < max_read {
-        while let Some(byte) = levitate_hal::console::read_byte() {
+        while let Some(byte) = los_hal::console::read_byte() {
             // Convert CR to LF for consistency
             let byte = if byte == b'\r' { b'\n' } else { byte };
             if !write_to_user_buf(ttbr0, user_buf, *bytes_read, byte) {
@@ -304,9 +304,9 @@ fn sys_read(fd: usize, buf: usize, len: usize) -> i64 {
         // Syscalls enter with PSTATE.I=1 (Masked). If we don't unmask, no IRQs
         // ever fire, starving input.
         unsafe {
-            levitate_hal::interrupts::enable();
+            los_hal::interrupts::enable();
         }
-        let _ = levitate_hal::interrupts::disable();
+        let _ = los_hal::interrupts::disable();
 
         crate::task::yield_now();
     }
@@ -458,7 +458,7 @@ fn sys_shutdown(flags: u32) -> i64 {
     }
 
     // Phase 4: Disable interrupts (AFTER all output)
-    levitate_hal::interrupts::disable();
+    los_hal::interrupts::disable();
 
     // Phase 5: Power off using PSCI SYSTEM_OFF
     // PSCI is the ARM Power State Coordination Interface

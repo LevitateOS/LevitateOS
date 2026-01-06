@@ -1,13 +1,14 @@
-//! PCI Subsystem for VirtIO PCI Transport
+//! PCI Subsystem for LevitateOS
 //!
-//! TEAM_114: Implements PCI enumeration and BAR allocation using virtio-drivers.
+//! TEAM_114: Provides PCI enumeration and BAR allocation using virtio-drivers.
 //!
-//! This module provides:
+//! This crate provides:
 //! - ECAM (Enhanced Configuration Access Mechanism) access
 //! - PCI bus enumeration
 //! - BAR allocation for VirtIO devices
-//! - PciTransport creation for VirtIO GPU
+//! - PciTransport creation for VirtIO devices
 
+#![no_std]
 #![allow(clippy::unwrap_used)]
 
 use los_hal::mmu::{ECAM_VA, PCI_MEM32_PA, PCI_MEM32_SIZE};
@@ -15,10 +16,12 @@ use los_hal::serial_println;
 use virtio_drivers::transport::pci::bus::{
     BarInfo, Cam, Command, DeviceFunction, MemoryBarType, MmioCam, PciRoot,
 };
-use virtio_drivers::transport::pci::{virtio_device_type, PciTransport};
-use virtio_drivers::transport::DeviceType;
+use virtio_drivers::transport::pci::virtio_device_type;
+use virtio_drivers::Hal;
 
-use crate::virtio::VirtioHal;
+// Re-export useful types
+pub use virtio_drivers::transport::pci::PciTransport;
+pub use virtio_drivers::transport::DeviceType;
 
 /// Simple bump allocator for PCI 32-bit memory region
 struct PciMemoryAllocator {
@@ -60,7 +63,6 @@ fn allocate_bars<C: virtio_drivers::transport::pci::bus::ConfigurationAccess>(
     device_function: DeviceFunction,
     allocator: &mut PciMemoryAllocator,
 ) {
-    // TEAM_114: Iterate through all BARs and allocate memory for them
     if let Ok(bars) = root.bars(device_function) {
         for (bar_index, bar_info) in bars.into_iter().enumerate() {
             let Some(info) = bar_info else { continue };
@@ -96,13 +98,13 @@ fn allocate_bars<C: virtio_drivers::transport::pci::bus::ConfigurationAccess>(
     root.set_command(device_function, Command::MEMORY_SPACE | Command::BUS_MASTER);
 }
 
-/// Initialize PCI subsystem and find VirtIO GPU
+/// Find a VirtIO device of the specified type on the PCI bus
 ///
-/// Returns a PciTransport for the GPU if found, None otherwise.
-pub fn find_virtio_gpu() -> Option<PciTransport> {
-    serial_println!("[PCI] Scanning Bus 0...");
+/// Returns a PciTransport for the device if found, None otherwise.
+pub fn find_virtio_device<H: Hal>(device_type: DeviceType) -> Option<PciTransport> {
+    serial_println!("[PCI] Scanning Bus 0 for {:?}...", device_type);
 
-    // TEAM_114: Create MmioCam for ECAM access
+    // Create MmioCam for ECAM access
     // SAFETY: ECAM_VA must be mapped as Device memory before calling this
     let cam = unsafe { MmioCam::new(ECAM_VA as *mut u8, Cam::Ecam) };
 
@@ -111,16 +113,16 @@ pub fn find_virtio_gpu() -> Option<PciTransport> {
 
     // Enumerate bus 0 (QEMU virt puts devices on bus 0)
     for (device_function, info) in pci_root.enumerate_bus(0) {
-        // Check if this is a VirtIO device
+        // Check if this is a VirtIO device of the requested type
         if let Some(virtio_type) = virtio_device_type(&info) {
-            if virtio_type == DeviceType::GPU {
-                serial_println!("[PCI] Found VirtIO GPU at {}", device_function);
+            if virtio_type == device_type {
+                serial_println!("[PCI] Found VirtIO {:?} at {}", device_type, device_function);
 
                 // Allocate BARs
                 allocate_bars(&mut pci_root, device_function, &mut allocator);
 
                 // Create PciTransport
-                match PciTransport::new::<VirtioHal, _>(&mut pci_root, device_function) {
+                match PciTransport::new::<H, _>(&mut pci_root, device_function) {
                     Ok(transport) => {
                         serial_println!("[PCI] PciTransport created successfully");
                         return Some(transport);
@@ -133,6 +135,14 @@ pub fn find_virtio_gpu() -> Option<PciTransport> {
         }
     }
 
-    serial_println!("[PCI] No VirtIO GPU found");
+    serial_println!("[PCI] No VirtIO {:?} found", device_type);
     None
 }
+
+/// Find VirtIO GPU on PCI bus
+///
+/// Convenience function that calls `find_virtio_device` with GPU type.
+pub fn find_virtio_gpu<H: Hal>() -> Option<PciTransport> {
+    find_virtio_device::<H>(DeviceType::GPU)
+}
+

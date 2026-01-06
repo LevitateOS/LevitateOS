@@ -1,12 +1,12 @@
-use levitate_hal::fdt;
-use levitate_hal::mmu::{self, PageAllocator};
-use levitate_utils::Spinlock;
+use los_hal::fdt;
+use los_hal::mmu::{self, PageAllocator};
+use los_utils::Spinlock;
 
 // pub mod buddy; // Moved to HAL
 // pub mod page; // Moved to HAL
 
-pub use levitate_hal::allocator::BuddyAllocator;
-pub use levitate_hal::allocator::Page;
+pub use los_hal::allocator::BuddyAllocator;
+pub use los_hal::allocator::Page;
 
 /// Global Frame Allocator
 pub struct FrameAllocator(Spinlock<BuddyAllocator>);

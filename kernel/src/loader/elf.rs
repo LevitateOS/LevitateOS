@@ -9,7 +9,7 @@
 //! - AArch64 Machine Type: EM_AARCH64 = 183
 
 use crate::task::user_mm;
-use levitate_hal::mmu::{self, PAGE_SIZE, PageFlags};
+use los_hal::mmu::{self, PAGE_SIZE, PageFlags};
 
 /// ELF Magic Number: 0x7F 'E' 'L' 'F'
 pub const ELF_MAGIC: [u8; 4] = [0x7F, b'E', b'L', b'F'];
@@ -36,7 +36,7 @@ pub const PF_W: u32 = 2; // Write
 #[allow(dead_code)]
 pub const PF_R: u32 = 4; // Read
 
-use levitate_error::define_kernel_error;
+use los_error::define_kernel_error;
 
 define_kernel_error! {
     /// TEAM_073: ELF parsing errors.
@@ -114,7 +114,7 @@ impl Elf64Header {
 
         // Manually parse fields to avoid alignment/pointer issues
         let e_ident: [u8; 16] = data[0..16].try_into().unwrap(); // Infallible due to size check
-        levitate_hal::println!("ELF Header e_ident verified");
+        los_hal::println!("ELF Header e_ident verified");
         let e_type = u16::from_le_bytes(data[16..18].try_into().unwrap());
         let e_machine = u16::from_le_bytes(data[18..20].try_into().unwrap());
         let e_version = u32::from_le_bytes(data[20..24].try_into().unwrap());
@@ -369,7 +369,7 @@ impl<'a> Elf<'a> {
 
                     // DEBUG: Print first byte copy attempt
                     if i == 0 {
-                        levitate_hal::println!(
+                        los_hal::println!(
                             "[ELF] Copying segment: src[0]={:x} to VA {:x}",
                             *byte,
                             dst_va
@@ -391,7 +391,7 @@ impl<'a> Elf<'a> {
                         let dst = mmu::phys_to_virt(dst_phys) as *mut u8;
 
                         if i == 0 {
-                            levitate_hal::println!(
+                            los_hal::println!(
                                 "[ELF] Resolved PA [MASKED] -> Kernel VA [MASKED]"
                             );
                         }
@@ -413,7 +413,7 @@ impl<'a> Elf<'a> {
     }
 }
 
-use levitate_hal::mmu::PageAllocator;
+use los_hal::mmu::PageAllocator;
 
 #[cfg(test)]
 mod tests {

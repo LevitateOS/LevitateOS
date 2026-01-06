@@ -11,12 +11,12 @@ extern crate alloc;
 
 use alloc::string::String;
 use alloc::vec::Vec;
-use levitate_utils::Spinlock;
+use los_utils::Spinlock;
 
 pub mod ext4;
 pub mod fat;
 
-use levitate_error::define_kernel_error;
+use los_error::define_kernel_error;
 
 define_kernel_error! {
     /// TEAM_152: Filesystem error type with error codes (0x05xx) per unified error system plan.

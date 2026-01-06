@@ -22,7 +22,7 @@ extern crate alloc;
 
 use crate::virtio::{StaticMmioTransport, VirtioHal};
 use alloc::vec::Vec;
-use levitate_utils::Spinlock;
+use los_utils::Spinlock;
 use virtio_drivers::device::net::VirtIONet;
 
 const QUEUE_SIZE: usize = 16;
@@ -31,7 +31,7 @@ const RX_BUFFER_LEN: usize = 2048;
 static NET_DEVICE: Spinlock<Option<VirtIONet<VirtioHal, StaticMmioTransport, QUEUE_SIZE>>> =
     Spinlock::new(None);
 
-use levitate_error::define_kernel_error;
+use los_error::define_kernel_error;
 
 define_kernel_error! {
     /// Network driver error types

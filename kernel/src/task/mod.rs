@@ -82,7 +82,7 @@ pub extern "C" fn task_exit() -> ! {
 }
 
 use alloc::sync::Arc;
-use levitate_hal::IrqSafeLock;
+use los_hal::IrqSafeLock;
 
 /// TEAM_070: Pointer to the currently running task.
 static CURRENT_TASK: IrqSafeLock<Option<Arc<TaskControlBlock>>> = IrqSafeLock::new(None);
@@ -116,14 +116,14 @@ pub fn switch_to(new_task: Arc<TaskControlBlock>) {
 
         // TEAM_127: Fix Race Condition - Interrupts MUST be disabled during context switch
         // to prevent recursive scheduling or state corruption.
-        let flags = levitate_hal::interrupts::disable();
+        let flags = los_hal::interrupts::disable();
 
         // Update current task pointer
         set_current_task(new_task);
 
         cpu_switch_to(old_ctx, new_ctx);
 
-        levitate_hal::interrupts::restore(flags);
+        los_hal::interrupts::restore(flags);
     }
 }
 
@@ -269,7 +269,7 @@ fn user_task_entry_wrapper() -> ! {
 
     unsafe {
         // Switch TTBR0
-        levitate_hal::mmu::switch_ttbr0(task.ttbr0);
+        los_hal::mmu::switch_ttbr0(task.ttbr0);
         // Enter EL0
         crate::task::user::enter_user_mode(task.user_entry, task.user_sp);
     }

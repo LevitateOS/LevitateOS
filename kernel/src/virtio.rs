@@ -17,11 +17,11 @@
 
 extern crate alloc;
 
-pub use levitate_hal::virtio::{StaticMmioTransport, VirtioHal};
+pub use los_hal::virtio::{StaticMmioTransport, VirtioHal};
 use virtio_drivers::transport::Transport;
 
 // TEAM_078: Use high VA for VirtIO MMIO (accessible via TTBR1 regardless of TTBR0 state)
-pub const VIRTIO_MMIO_START: usize = levitate_hal::mmu::VIRTIO_MMIO_VA;
+pub const VIRTIO_MMIO_START: usize = los_hal::mmu::VIRTIO_MMIO_VA;
 pub const VIRTIO_MMIO_SIZE: usize = 0x200;
 pub const VIRTIO_MMIO_COUNT: usize = 32;
 

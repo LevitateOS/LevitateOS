@@ -15,27 +15,22 @@ An AArch64 operating system kernel written in Rust, targeting the QEMU `virt` ma
 ## 🏗️ Architecture
 
 ```
-├── levitate-gpu/     # VirtIO GPU Library
-│   └── src/
-│       ├── lib.rs        # Graphics exports & errors
-│       └── gpu.rs        # Driver & DrawTarget impl
-│
-├── levitate-terminal/ # ANSI Terminal Emulator
-│   └── src/
-│       └── lib.rs        # Platform-agnostic rendering
-│
-├── levitate-hal/     # Hardware Abstraction Layer
-│   └── src/
-│       ├── gic.rs        # GicV2/GicV3 auto-detection
-│       ├── mmu.rs        # Page tables & translation
-│       ├── virtio.rs     # VirtIO HAL & transport
-│       └── ...           # Console, Timer, FDT
-│
-├── levitate-utils/   # Core utilities (no_std)
-│   └── src/
-│       ├── lib.rs        # Spinlock, RingBuffer
-│       ├── cpio.rs       # CPIO archive parser
-│       └── hex.rs        # Hex formatting
+├── crates/
+│   ├── gpu/          # VirtIO GPU Library (los_gpu)
+│   ├── term/         # ANSI Terminal Emulator (los_term)
+│   ├── hal/          # Hardware Abstraction Layer (los_hal)
+│   │   └── src/
+│   │       ├── gic.rs        # GicV2/GicV3 auto-detection
+│   │       ├── mmu.rs        # Page tables & translation
+│   │       └── ...           # Console, Timer, FDT, VirtIO
+│   ├── utils/        # Core utilities (los_utils)
+│   │   └── src/
+│   │       ├── lib.rs        # Spinlock, RingBuffer
+│   │       ├── cpio.rs       # CPIO archive parser
+│   │       └── hex.rs        # Hex formatting
+│   ├── pci/          # PCI bus support (los_pci)
+│   ├── virtio/       # VirtIO transport (los_virtio)
+│   └── error/        # Error handling (los_error)
 │
 ├── xtask/            # Development task runner
 │   └── src/
@@ -73,7 +68,7 @@ cargo xtask run-pixel6         # Boot with Pixel 6 profile (8GB, 8 cores, GICv3)
 
 ```bash
 cargo xtask test               # Run all tests
-cargo xtask test unit          # Host-side unit tests (levitate-hal, levitate-utils)
+cargo xtask test unit          # Host-side unit tests (los_hal, los_utils)
 cargo xtask test behavior      # Golden log comparison (kernel boot output)
 cargo xtask test regress       # Static analysis (API consistency, constant sync)
 ```
@@ -83,10 +78,13 @@ cargo xtask test regress       # Static analysis (API consistency, constant sync
 | Crate | Purpose |
 |-------|---------|
 | **[kernel](kernel/README.md)** | Main kernel binary — boot sequence, device drivers, main loop |
-| **[levitate-gpu](levitate-gpu/README.md)** | VirtIO GPU driver and graphics abstraction |
-| **[levitate-terminal](levitate-terminal/README.md)** | Platform-agnostic ANSI terminal emulator |
-| **[levitate-hal](levitate-hal/README.md)** | Hardware abstraction — GIC, MMU, Timer, UART, VirtIO HAL |
-| **[levitate-utils](levitate-utils/README.md)** | Core utilities — Spinlock, RingBuffer, CPIO parser, hex formatting |
+| **[los_gpu](crates/gpu/README.md)** | VirtIO GPU driver and graphics abstraction |
+| **[los_term](crates/term/README.md)** | Platform-agnostic ANSI terminal emulator |
+| **[los_hal](crates/hal/README.md)** | Hardware abstraction — GIC, MMU, Timer, UART, VirtIO HAL |
+| **[los_utils](crates/utils/README.md)** | Core utilities — Spinlock, RingBuffer, CPIO parser, hex formatting |
+| **[los_pci](crates/pci/README.md)** | PCI bus enumeration and configuration |
+| **[los_virtio](crates/virtio/README.md)** | VirtIO transport layer |
+| **[los_error](crates/error/README.md)** | Error handling infrastructure |
 | **[xtask](xtask/README.md)** | Development task runner — build, run, test commands |
 
 ## 🔧 Boot Sequence
