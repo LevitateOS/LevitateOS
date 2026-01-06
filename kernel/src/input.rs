@@ -19,6 +19,8 @@ static KEYBOARD_BUFFER: Mutex<los_utils::RingBuffer<char, 1024>> =
 
 /// Track shift key state
 static SHIFT_PRESSED: Mutex<bool> = Mutex::new(false);
+/// Track control key state
+static CTRL_PRESSED: Mutex<bool> = Mutex::new(false);
 
 pub fn init(transport: StaticMmioTransport) {
     crate::verbose!("Initializing Input...");
@@ -45,6 +47,9 @@ pub const KEY_ENTER: u16 = 28;
 pub const KEY_BACKSPACE: u16 = 14;
 pub const KEY_SPACE: u16 = 57;
 pub const KEY_TAB: u16 = 15;
+pub const KEY_LEFTCTRL: u16 = 29;
+pub const KEY_RIGHTCTRL: u16 = 97;
+pub const KEY_C: u16 = 46;
 
 pub fn poll() -> bool {
     let dirty = false;
@@ -78,8 +83,16 @@ pub fn poll() -> bool {
                         KEY_LEFTSHIFT | KEY_RIGHTSHIFT => {
                             *SHIFT_PRESSED.lock() = pressed;
                         }
+                        KEY_LEFTCTRL | KEY_RIGHTCTRL => {
+                            *CTRL_PRESSED.lock() = pressed;
+                        }
                         code if pressed => {
-                            if let Some(c) = linux_code_to_ascii(code, *SHIFT_PRESSED.lock()) {
+                            if *CTRL_PRESSED.lock() && code == KEY_C {
+                                if !KEYBOARD_BUFFER.lock().push('\x03') {
+                                    crate::verbose!("KEYBOARD_BUFFER overflow, Ctrl+C dropped");
+                                }
+                            } else if let Some(c) = linux_code_to_ascii(code, *SHIFT_PRESSED.lock())
+                            {
                                 // TEAM_156: Don't silently drop - log overflow
                                 if !KEYBOARD_BUFFER.lock().push(c) {
                                     crate::verbose!("KEYBOARD_BUFFER overflow, char dropped");

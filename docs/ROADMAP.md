@@ -1,8 +1,19 @@
 # LevitateOS Roadmap
 
-**Last Updated:** 2026-01-06 (TEAM_208)
+**Last Updated:** 2026-01-06 (TEAM_217)
 
 This document outlines the planned development phases for LevitateOS. Each completed item includes the responsible team for traceability.
+
+---
+
+## 🗺️ Strategy: Linux ABI Compatibility
+
+To maximize technical ROI and enable the Rust `std` ecosystem, LevitateOS prioritizes **Linux Binary Compatibility** over a custom ABI. 
+
+**Core Decisions (TEAM_217):**
+1. **Userland Support**: Implement the Linux Syscall interface to allow standard Rust applications to run with minimal modifications.
+2. **Storage Strategy**: Delay physical Ext4/NVMe driver development. Use VFS and `tmpfs` as the primary test bench to stabilize the syscall layer.
+3. **Application Target**: Sprint toward running a static Rust binary using `std` (e.g., `uutils` utilities).
 
 ---
 
@@ -421,6 +432,7 @@ pub trait SuperblockOps: Send + Sync {
 
 - **Objective**: Migrate existing filesystems to VFS layer.
 - **Completed**: tmpfs, initramfs, mount/umount syscalls (TEAM_206)
+- **Storage Strategy**: Delaying full Ext4/NVMe implementation (low ROI) in favor of stabilizing the VFS/Syscall interface using `tmpfs`. (TEAM_217)
 
 #### Migrations
 
@@ -441,10 +453,11 @@ pub trait SuperblockOps: Send + Sync {
 
 ---
 
-### 🚦 Phase 15: Process & System Management
+### 🚦 Phase 15: Linux ABI & System Management
 
-- **Objective**: Full POSIX process lifecycle, signals, and shell pipeline support.
-- **Critical for**: Shell job control, multi-process applications, uutils compatibility.
+- **Objective**: Full POSIX/Linux process lifecycle, signals, and shell pipeline support.
+- **Priority**: **HIGH (TEAM_217)** - This is the primary sprint target to unlock the Rust ecosystem.
+- **Critical for**: Shell job control, multi-process applications, `std` compatibility.
 
 #### Kernel Syscalls Required (Phase 15)
 

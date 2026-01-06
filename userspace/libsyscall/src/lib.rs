@@ -60,6 +60,7 @@ pub const SYS_SHUTDOWN: u64 = 142; // reboot
 // Custom LevitateOS (temporary, until clone/execve work)
 pub const SYS_SPAWN: u64 = 1000;
 pub const SYS_SPAWN_ARGS: u64 = 1001;
+pub const SYS_SET_FOREGROUND: u64 = 1002;
 
 /// TEAM_208: Futex operations
 pub mod futex_ops {
@@ -338,6 +339,10 @@ pub fn shutdown(flags: u32) -> ! {
 // ============================================================================
 // Signal Syscalls (TEAM_216)
 // ============================================================================
+
+pub const SIGINT: i32 = 2;
+pub const SIGKILL: i32 = 9;
+pub const SIGCHLD: i32 = 17;
 
 /// TEAM_216: Send a signal to a process.
 #[inline]
@@ -843,6 +848,26 @@ pub fn futex(addr: *const u32, op: usize, val: u32) -> isize {
             in("x2") val as usize,
             in("x3") 0usize, // timeout (unused)
             in("x4") 0usize, // addr2 (unused)
+            lateout("x0") ret,
+            options(nostack)
+        );
+    }
+    ret as isize
+}
+
+// ============================================================================
+// Process Control (TEAM_220)
+// ============================================================================
+
+/// TEAM_220: Set the foreground process for shell control.
+#[inline]
+pub fn set_foreground(pid: usize) -> isize {
+    let ret: i64;
+    unsafe {
+        core::arch::asm!(
+            "svc #0",
+            in("x8") SYS_SET_FOREGROUND,
+            in("x0") pid,
             lateout("x0") ret,
             options(nostack)
         );

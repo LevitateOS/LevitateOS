@@ -175,10 +175,7 @@ pub fn sys_spawn_args(path_ptr: usize, path_len: usize, argv_ptr: usize, argc: u
         Some(size) => size,
         None => return errno::EINVAL,
     };
-    if argc > 0
-        && mm_user::validate_user_buffer(task.ttbr0, argv_ptr, argv_size, false)
-            .is_err()
-    {
+    if argc > 0 && mm_user::validate_user_buffer(task.ttbr0, argv_ptr, argv_size, false).is_err() {
         return errno::EFAULT;
     }
 
@@ -204,9 +201,7 @@ pub fn sys_spawn_args(path_ptr: usize, path_len: usize, argv_ptr: usize, argc: u
 
         // Validate arg string
         let arg_len = entry.len.min(MAX_ARG_LEN);
-        if mm_user::validate_user_buffer(task.ttbr0, entry.ptr, arg_len, false)
-            .is_err()
-        {
+        if mm_user::validate_user_buffer(task.ttbr0, entry.ptr, arg_len, false).is_err() {
             return errno::EFAULT;
         }
 
@@ -293,12 +288,8 @@ pub fn sys_waitpid(pid: i32, status_ptr: usize) -> i64 {
         // Write exit code to user if requested
         if status_ptr != 0 {
             // Validate and write
-            if mm_user::validate_user_buffer(current.ttbr0, status_ptr, 4, true)
-                .is_ok()
-            {
-                if let Some(ptr) =
-                    mm_user::user_va_to_kernel_ptr(current.ttbr0, status_ptr)
-                {
+            if mm_user::validate_user_buffer(current.ttbr0, status_ptr, 4, true).is_ok() {
+                if let Some(ptr) = mm_user::user_va_to_kernel_ptr(current.ttbr0, status_ptr) {
                     unsafe {
                         *(ptr as *mut i32) = exit_code;
                     }
@@ -322,12 +313,8 @@ pub fn sys_waitpid(pid: i32, status_ptr: usize) -> i64 {
     // Woken up - child exited
     if let Some(exit_code) = crate::task::process_table::try_wait(pid) {
         if status_ptr != 0 {
-            if mm_user::validate_user_buffer(current.ttbr0, status_ptr, 4, true)
-                .is_ok()
-            {
-                if let Some(ptr) =
-                    mm_user::user_va_to_kernel_ptr(current.ttbr0, status_ptr)
-                {
+            if mm_user::validate_user_buffer(current.ttbr0, status_ptr, 4, true).is_ok() {
+                if let Some(ptr) = mm_user::user_va_to_kernel_ptr(current.ttbr0, status_ptr) {
                     unsafe {
                         *(ptr as *mut i32) = exit_code;
                     }
@@ -339,4 +326,10 @@ pub fn sys_waitpid(pid: i32, status_ptr: usize) -> i64 {
     }
 
     ECHILD
+}
+
+/// TEAM_220: sys_set_foreground - Set the foreground process for shell control.
+pub fn sys_set_foreground(pid: usize) -> i64 {
+    *crate::task::FOREGROUND_PID.lock() = pid;
+    0
 }

@@ -127,7 +127,8 @@ fn deliver_signal(frame: &mut crate::arch::SyscallFrame, sig: i32) -> bool {
     if handler == 0 {
         // Default action: many signals terminate the process
         // SIGKILL (9) is always fatal. SIGCHLD (17) is ignored.
-        if sig == 9 || (sig != 17 && sig != 18) {
+        use crate::syscall::signal::*;
+        if sig == SIGKILL || (sig != SIGCHLD && sig != SIGCONT) {
             crate::println!("[SIGNAL] PID={} terminated by signal {}", task.id.0, sig);
             crate::task::task_exit(); // This never returns
         }

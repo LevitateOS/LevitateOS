@@ -79,6 +79,12 @@ fn poll_input_devices(ttbr0: usize, user_buf: usize, bytes_read: &mut usize, max
 
     while *bytes_read < max_read {
         if let Some(ch) = crate::input::read_char() {
+            if ch == '\x03' {
+                // Ctrl+C received - signal foreground process
+                crate::syscall::signal::signal_foreground_process(crate::syscall::signal::SIGINT);
+                // Don't write to buffer, don't return to user
+                continue;
+            }
             if !write_to_user_buf(ttbr0, user_buf, *bytes_read, ch as u8) {
                 return;
             }

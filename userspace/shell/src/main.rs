@@ -155,8 +155,15 @@ fn execute(line: &[u8]) {
                 // Process spawned successfully with PID = result
                 // TEAM_188: Wait for child process to complete
                 let child_pid = result as i32;
+
+                // TEAM_220: Set child as foreground
+                libsyscall::set_foreground(child_pid as usize);
+
                 let mut status: i32 = 0;
                 libsyscall::waitpid(child_pid, Some(&mut status));
+
+                // TEAM_220: Restore shell as foreground
+                libsyscall::set_foreground(libsyscall::getpid() as usize);
                 return;
             }
         }
@@ -209,6 +216,16 @@ pub extern "C" fn _start() -> ! {
     println!("LevitateOS Shell (lsh) v0.1");
     println!("Type 'help' for commands.");
     println!();
+
+    // TEAM_220: Ignore Ctrl+C in shell itself
+    extern "C" fn sigint_handler(_sig: i32) {
+        // Just print a newline and a new prompt if we're idle?
+        // For now, doing nothing is better than exiting.
+    }
+    libsyscall::sigaction(libsyscall::SIGINT, sigint_handler as *const () as usize, 0);
+
+    // TEAM_220: Set shell as foreground on startup
+    libsyscall::set_foreground(libsyscall::getpid() as usize);
 
     let mut buf = [0u8; 256];
 

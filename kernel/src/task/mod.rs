@@ -170,6 +170,9 @@ pub struct TaskControlBlock {
     pub signal_trampoline: AtomicUsize,
 }
 
+/// TEAM_220: Global tracking of the foreground process for shell control.
+pub static FOREGROUND_PID: IrqSafeLock<usize> = IrqSafeLock::new(0);
+
 impl TaskControlBlock {
     /// Set the state of the task.
     pub fn set_state(&self, state: TaskState) {

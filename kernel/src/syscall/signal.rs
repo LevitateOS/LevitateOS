@@ -6,6 +6,12 @@ use crate::syscall::errno;
 use crate::task::{TaskState, current_task, scheduler};
 use core::sync::atomic::Ordering;
 
+/// TEAM_220: Signal constants
+pub const SIGINT: i32 = 2;
+pub const SIGKILL: i32 = 9;
+pub const SIGCHLD: i32 = 17;
+pub const SIGCONT: i32 = 18;
+
 /// TEAM_216: Send a signal to a process.
 pub fn sys_kill(pid: i32, sig: i32) -> i64 {
     if sig < 0 || sig >= 32 {
@@ -27,6 +33,14 @@ pub fn sys_kill(pid: i32, sig: i32) -> i64 {
         }
     }
     errno::ENOENT
+}
+
+/// TEAM_220: Send a signal to the current foreground process.
+pub fn signal_foreground_process(sig: i32) {
+    let fg_pid = *crate::task::FOREGROUND_PID.lock();
+    if fg_pid != 0 {
+        sys_kill(fg_pid as i32, sig);
+    }
 }
 
 /// TEAM_216: Wait for any signal to arrive.

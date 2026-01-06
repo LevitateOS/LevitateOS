@@ -80,6 +80,8 @@ pub enum SyscallNumber {
     Spawn = 1000,
     /// TEAM_186: Spawn with args (custom, will be replaced by clone+execve)
     SpawnArgs = 1001,
+    /// TEAM_220: Set foreground process (custom)
+    SetForeground = 1002,
 }
 
 impl SyscallNumber {
@@ -120,6 +122,7 @@ impl SyscallNumber {
             // Custom LevitateOS
             1000 => Some(Self::Spawn),
             1001 => Some(Self::SpawnArgs),
+            1002 => Some(Self::SetForeground),
             _ => None,
         }
     }
@@ -310,6 +313,7 @@ pub fn syscall_dispatch(frame: &mut SyscallFrame) {
             frame.arg1() as usize,
             frame.arg2() as usize,
         ),
+        Some(SyscallNumber::SetForeground) => process::sys_set_foreground(frame.arg0() as usize),
         None => {
             println!("[SYSCALL] Unknown syscall number: {}", nr);
             errno::ENOSYS
