@@ -23,6 +23,8 @@ pub mod errno_file {
     pub const ENOENT: i64 = -5;
     /// Too many open files
     pub const EMFILE: i64 = -6;
+    /// TEAM_176: Not a directory
+    pub const ENOTDIR: i64 = -7;
 }
 
 #[repr(u64)]
@@ -42,6 +44,8 @@ pub enum SyscallNumber {
     Fstat = 11,
     Nanosleep = 12,
     ClockGettime = 13,
+    /// TEAM_176: Read directory entries
+    Getdents = 14,
 }
 
 impl SyscallNumber {
@@ -61,6 +65,7 @@ impl SyscallNumber {
             11 => Some(Self::Fstat),
             12 => Some(Self::Nanosleep),
             13 => Some(Self::ClockGettime),
+            14 => Some(Self::Getdents),
             _ => None,
         }
     }
@@ -118,6 +123,12 @@ pub fn syscall_dispatch(frame: &mut SyscallFrame) {
             time::sys_nanosleep(frame.arg0() as u64, frame.arg1() as u64)
         }
         Some(SyscallNumber::ClockGettime) => time::sys_clock_gettime(frame.arg0() as usize),
+        // TEAM_176: Directory listing syscall
+        Some(SyscallNumber::Getdents) => fs::sys_getdents(
+            frame.arg0() as usize,
+            frame.arg1() as usize,
+            frame.arg2() as usize,
+        ),
         None => {
             println!("[SYSCALL] Unknown syscall number: {}", nr);
             errno::ENOSYS

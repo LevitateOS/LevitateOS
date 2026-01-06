@@ -170,20 +170,76 @@ Rust `std` requires Thread Local Storage.
 
 ---
 
+## 6. uutils-coreutils Compatibility Gap
 
-## 6. References & Prior Art
+> [!IMPORTANT]
+> **End Goal**: Run unmodified [uutils-coreutils](https://github.com/uutils/coreutils) binaries on LevitateOS.
+
+Running uutils requires a full Rust `std` port, which in turn requires these syscalls:
+
+### 6.1 Gap Analysis
+
+| Category | Syscall | Nr | Status | Required For |
+|----------|---------|----|---------| -------------|
+| **Memory** | | | | |
+| | `mmap` | 222 | 🔴 | Allocator, file mapping |
+| | `munmap` | 215 | 🔴 | Memory cleanup |
+| | `mprotect` | 226 | 🔴 | Guard pages |
+| | `brk` | 214 | 🟢 | Heap allocation |
+| **Threading** | | | | |
+| | `clone` | 220 | 🔴 | Thread creation |
+| | `futex` | 98 | 🔴 | Mutex, condvar |
+| | `set_tid_address` | 96 | 🔴 | Thread ID mgmt |
+| | TLS (`TPIDR_EL0`) | — | 🔴 | Thread-local storage |
+| **Signals** | | | | |
+| | `rt_sigaction` | 134 | 🔴 | Signal handlers |
+| | `rt_sigprocmask` | 135 | 🔴 | Signal masking |
+| | `rt_sigreturn` | 139 | 🔴 | Signal return |
+| | `kill` | 129 | 🔴 | Send signals |
+| **Process** | | | | |
+| | `fork` / `clone` | 220 | 🔴 | Process creation |
+| | `execve` | 221 | 🟡 | Program execution (have spawn) |
+| | `wait4` | 260 | 🔴 | Child reaping |
+| | `getpid` | 172 | 🟢 | Process IDs |
+| | `getppid` | 173 | 🔴 | Parent PID |
+| **I/O** | | | | |
+| | `pipe2` | 59 | 🔴 | Shell pipelines |
+| | `dup` / `dup3` | 23/24 | 🔴 | FD duplication |
+| | `ioctl` | 29 | 🔴 | TTY control |
+| | `poll` | 73 | 🔴 | I/O multiplexing |
+| **Filesystem** | | | | |
+| | `openat` | 56 | 🟢 | Open files |
+| | `read` / `write` | 63/64 | 🟢 | Basic I/O |
+| | `fstat` | 80 | 🟢 | File metadata |
+| | `getdents64` | 61 | 🟢 | Read directory |
+
+Legend: 🟢 Implemented | 🟡 Partial | 🔴 Not Started
+
+### 6.2 Implementation Strategy
+
+1. **Phase 11 (Busybox)**: Validate basic syscalls with hand-written coreutils
+2. **Phase 12 (Signals)**: Add process/signal infrastructure
+3. **Phase 14 (std port)**: Implement threading, mmap, full syscall set
+4. **Graduation**: Cross-compile & run uutils
+
+See [ROADMAP.md](file:///home/vince/Projects/LevitateOS/docs/ROADMAP.md) for detailed phase planning.
+
+---
+
+## 7. References & Prior Art
 
 We stand on the shoulders of giants. The following projects provide the reference implementations and specs we are targeting.
 
-### 6.1 Rust Ecosystem
+### 7.1 Rust Ecosystem
 - **[coreutils (uutils)](https://github.com/uutils/coreutils)**: The Rust reimplementation of GNU coreutils. This is our target payload.
 - **[rust-lang/libc](https://github.com/rust-lang/libc)**: Raw FFI bindings to platform libraries. See `src/unix/linux_like/linux/gnu/b64/aarch64` for exact struct layouts.
 - **[redox-os/relibc](https://github.com/redox-os/relibc)**: A POSIX C library written in Rust. Excellent reference for implementing `libc` functions on top of syscalls.
 
-### 6.2 System Call Tables
+### 7.2 System Call Tables
 - **[Linux AArch64 Syscall Table](https://chromium.googlesource.com/chromiumos/docs/+/master/constants/syscalls.md#arm64-64_bit)**: Authoritative list of syscall numbers.
 - **[Musl Libc AArch64](https://git.musl-libc.org/cgit/musl/tree/arch/aarch64)**: Minimal, clean, standards-compliant libc implementation source.
 
-### 6.3 Standards
+### 7.3 Standards
 - **[POSIX.1-2017 (OpenGroup)](https://pubs.opengroup.org/onlinepubs/9699919799/)**: The official specification for `ls`, `cat`, standards, and behavior.
 - **[System V ABI - AArch64](https://github.com/ARM-software/abi-aa/releases)**: Processor-specific Application Binary Interface.
+

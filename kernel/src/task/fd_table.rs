@@ -25,6 +25,14 @@ pub enum FdType {
         /// Current read position
         offset: usize,
     },
+    /// TEAM_176: Directory from initramfs for getdents
+    InitramfsDir {
+        /// Directory path (stored as index into a path for simplicity)
+        /// 0 = root directory
+        dir_index: usize,
+        /// Current entry offset for iteration
+        offset: usize,
+    },
 }
 
 /// TEAM_168: A single file descriptor entry.

@@ -1,7 +1,12 @@
 //! TEAM_168: I/O abstractions for LevitateOS userspace.
 //!
 //! Provides error types, traits, and common I/O functionality.
+//! TEAM_180: Added BufReader and BufWriter for buffered I/O.
 
+extern crate alloc;
+
+use alloc::string::String;
+use alloc::vec::Vec;
 use core::fmt;
 
 /// TEAM_168: Error codes from syscalls.
@@ -127,5 +132,276 @@ pub trait Write {
             offset += n;
         }
         Ok(())
+    }
+}
+
+// ============================================================================
+// Buffered I/O (TEAM_180)
+// ============================================================================
+
+/// TEAM_180: Default buffer size for BufReader and BufWriter (Q1 decision: 8 KB).
+pub const DEFAULT_BUF_CAPACITY: usize = 8192;
+
+/// TEAM_180: Buffered reader wrapper.
+///
+/// Wraps any `Read` implementor with an internal buffer to reduce syscall overhead.
+///
+/// # Example
+/// ```rust
+/// use ulib::fs::File;
+/// use ulib::io::{BufReader, Read};
+///
+/// let file = File::open("/config.txt")?;
+/// let mut reader = BufReader::new(file);
+/// let mut line = String::new();
+/// reader.read_line(&mut line)?;
+/// ```
+pub struct BufReader<R> {
+    inner: R,
+    buf: Vec<u8>,
+    pos: usize,  // Next byte to read from buffer
+    cap: usize,  // Valid bytes in buffer (buf[0..cap] is valid data)
+}
+
+impl<R: Read> BufReader<R> {
+    /// TEAM_180: Create a new BufReader with default buffer capacity.
+    pub fn new(inner: R) -> Self {
+        Self::with_capacity(DEFAULT_BUF_CAPACITY, inner)
+    }
+
+    /// TEAM_180: Create a new BufReader with custom buffer capacity.
+    pub fn with_capacity(capacity: usize, inner: R) -> Self {
+        let mut buf = Vec::with_capacity(capacity);
+        buf.resize(capacity, 0);
+        Self {
+            inner,
+            buf,
+            pos: 0,
+            cap: 0,
+        }
+    }
+
+    /// TEAM_180: Get reference to underlying reader.
+    pub fn get_ref(&self) -> &R {
+        &self.inner
+    }
+
+    /// TEAM_180: Get mutable reference to underlying reader.
+    pub fn get_mut(&mut self) -> &mut R {
+        &mut self.inner
+    }
+
+    /// TEAM_180: Consume and return underlying reader.
+    pub fn into_inner(self) -> R {
+        self.inner
+    }
+
+    /// TEAM_180: Returns currently buffered data without consuming.
+    pub fn buffer(&self) -> &[u8] {
+        &self.buf[self.pos..self.cap]
+    }
+
+    /// TEAM_180: Fill the internal buffer from the underlying reader.
+    fn fill_buf(&mut self) -> Result<&[u8]> {
+        if self.pos >= self.cap {
+            // Buffer exhausted, refill
+            self.cap = self.inner.read(&mut self.buf)?;
+            self.pos = 0;
+        }
+        Ok(&self.buf[self.pos..self.cap])
+    }
+
+    /// TEAM_180: Consume n bytes from the buffer.
+    fn consume(&mut self, amt: usize) {
+        self.pos = (self.pos + amt).min(self.cap);
+    }
+
+    /// TEAM_180: Read a line into the provided String (Q5: includes newline, Q7: appends).
+    ///
+    /// Returns bytes read (including newline), or 0 at EOF.
+    /// Q6: For binary files without newlines, reads up to buffer size.
+    pub fn read_line(&mut self, buf: &mut String) -> Result<usize> {
+        let mut total_read = 0;
+
+        loop {
+            let available = self.fill_buf()?;
+            if available.is_empty() {
+                // EOF reached
+                return Ok(total_read);
+            }
+
+            // Look for newline in available data
+            let newline_pos = available.iter().position(|&b| b == b'\n');
+
+            match newline_pos {
+                Some(pos) => {
+                    // Found newline - read up to and including it (Q5)
+                    let to_read = pos + 1;
+                    let slice = &available[..to_read];
+                    
+                    // Convert to string and append (Q7: don't clear)
+                    match core::str::from_utf8(slice) {
+                        Ok(s) => buf.push_str(s),
+                        Err(_) => return Err(Error::new(ErrorKind::InvalidArgument)),
+                    }
+                    
+                    self.consume(to_read);
+                    total_read += to_read;
+                    return Ok(total_read);
+                }
+                None => {
+                    // No newline found - read all available (Q6: up to buffer size)
+                    let to_read = available.len();
+                    
+                    match core::str::from_utf8(available) {
+                        Ok(s) => buf.push_str(s),
+                        Err(_) => return Err(Error::new(ErrorKind::InvalidArgument)),
+                    }
+                    
+                    self.consume(to_read);
+                    total_read += to_read;
+                    
+                    // Q6: If we've read a full buffer without newline, return
+                    // to avoid infinite loop on binary files
+                    if to_read >= self.buf.len() {
+                        return Ok(total_read);
+                    }
+                    // Otherwise continue looking for newline
+                }
+            }
+        }
+    }
+}
+
+impl<R: Read> Read for BufReader<R> {
+    fn read(&mut self, buf: &mut [u8]) -> Result<usize> {
+        // Q2: Return buffered data immediately if available
+        let available = self.fill_buf()?;
+        if available.is_empty() {
+            return Ok(0);
+        }
+
+        let to_copy = buf.len().min(available.len());
+        buf[..to_copy].copy_from_slice(&available[..to_copy]);
+        self.consume(to_copy);
+        Ok(to_copy)
+    }
+}
+
+/// TEAM_180: Buffered writer wrapper.
+///
+/// Wraps any `Write` implementor with an internal buffer to reduce syscall overhead.
+/// Automatically flushes when buffer is full (Q3) and on drop (Q4: best-effort).
+///
+/// # Example
+/// ```rust
+/// use ulib::io::{BufWriter, Write};
+///
+/// let mut writer = BufWriter::new(stdout);
+/// writer.write_all(b"Hello, buffered world!\n")?;
+/// // Auto-flushed when writer drops
+/// ```
+pub struct BufWriter<W: Write> {
+    inner: Option<W>,  // Option for take() in drop
+    buf: Vec<u8>,
+}
+
+impl<W: Write> BufWriter<W> {
+    /// TEAM_180: Create a new BufWriter with default buffer capacity.
+    pub fn new(inner: W) -> Self {
+        Self::with_capacity(DEFAULT_BUF_CAPACITY, inner)
+    }
+
+    /// TEAM_180: Create a new BufWriter with custom buffer capacity.
+    pub fn with_capacity(capacity: usize, inner: W) -> Self {
+        Self {
+            inner: Some(inner),
+            buf: Vec::with_capacity(capacity),
+        }
+    }
+
+    /// TEAM_180: Get reference to underlying writer.
+    pub fn get_ref(&self) -> Option<&W> {
+        self.inner.as_ref()
+    }
+
+    /// TEAM_180: Get mutable reference to underlying writer.
+    pub fn get_mut(&mut self) -> Option<&mut W> {
+        self.inner.as_mut()
+    }
+
+    /// TEAM_180: Consume, flush, and return underlying writer.
+    pub fn into_inner(mut self) -> Result<W> {
+        self.flush_buf()?;
+        Ok(self.inner.take().unwrap())
+    }
+
+    /// TEAM_180: Returns buffered data waiting to be written.
+    pub fn buffer(&self) -> &[u8] {
+        &self.buf
+    }
+
+    /// TEAM_180: Flush internal buffer to underlying writer.
+    fn flush_buf(&mut self) -> Result<()> {
+        if self.buf.is_empty() {
+            return Ok(());
+        }
+
+        let inner = match self.inner.as_mut() {
+            Some(w) => w,
+            None => return Err(Error::new(ErrorKind::BadFd)),
+        };
+
+        let mut written = 0;
+        while written < self.buf.len() {
+            let n = inner.write(&self.buf[written..])?;
+            if n == 0 {
+                return Err(Error::new(ErrorKind::Unknown));
+            }
+            written += n;
+        }
+        self.buf.clear();
+        Ok(())
+    }
+}
+
+impl<W: Write> Write for BufWriter<W> {
+    fn write(&mut self, buf: &[u8]) -> Result<usize> {
+        let capacity = self.buf.capacity();
+        
+        // Q3: Flush when buffer would overflow
+        if self.buf.len() + buf.len() > capacity {
+            self.flush_buf()?;
+        }
+
+        // If input is larger than buffer capacity, write directly
+        if buf.len() >= capacity {
+            let inner = match self.inner.as_mut() {
+                Some(w) => w,
+                None => return Err(Error::new(ErrorKind::BadFd)),
+            };
+            return inner.write(buf);
+        }
+
+        // Q8: Buffer the data, return bytes actually buffered
+        let space_available = capacity - self.buf.len();
+        let to_buffer = buf.len().min(space_available);
+        self.buf.extend_from_slice(&buf[..to_buffer]);
+        Ok(to_buffer)
+    }
+
+    fn flush(&mut self) -> Result<()> {
+        self.flush_buf()?;
+        if let Some(inner) = self.inner.as_mut() {
+            inner.flush()?;
+        }
+        Ok(())
+    }
+}
+
+impl<W: Write> Drop for BufWriter<W> {
+    fn drop(&mut self) {
+        // Q4: Best-effort flush, ignore errors (can't propagate from Drop)
+        let _ = self.flush_buf();
     }
 }

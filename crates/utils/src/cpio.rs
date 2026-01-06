@@ -43,6 +43,24 @@ impl CpioHeader {
     pub fn namesize(&self) -> usize {
         parse_hex(&self.c_namesize)
     }
+
+    /// TEAM_176: Get the file mode (permissions + type).
+    #[must_use]
+    pub fn mode(&self) -> u32 {
+        parse_hex(&self.c_mode) as u32
+    }
+
+    /// TEAM_176: Get the inode number.
+    #[must_use]
+    pub fn ino(&self) -> u64 {
+        parse_hex(&self.c_ino) as u64
+    }
+
+    /// TEAM_176: Get the entry type from mode.
+    #[must_use]
+    pub fn entry_type(&self) -> CpioEntryType {
+        CpioEntryType::from_mode(self.mode())
+    }
 }
 
 /// [CP4] Converts hex string to usize, [CP5] Returns 0 for invalid input
@@ -84,12 +102,117 @@ impl<'a> CpioArchive<'a> {
         }
         None // [CP9]
     }
+
+    /// TEAM_176: List entries in a directory.
+    ///
+    /// Returns an iterator over entries whose parent directory matches `dir_path`.
+    /// For root directory, use "" or "/".
+    ///
+    /// # Example
+    /// ```ignore
+    /// for entry in archive.list_directory("subdir") {
+    ///     println!("{}: {:?}", entry.name, entry.entry_type);
+    /// }
+    /// ```
+    pub fn list_directory(&self, dir_path: &str) -> impl Iterator<Item = CpioEntry<'a>> {
+        let normalized = Self::normalize_dir_path(dir_path);
+        let prefix_len = normalized.len();
+
+        self.iter().filter(move |entry| {
+            // Skip . and .. per Q2 decision
+            let name = entry.name;
+            if name == "." || name == ".." {
+                return false;
+            }
+
+            // Root directory: entries without '/' or with single component
+            if normalized.is_empty() {
+                // Entry is in root if it has no '/' or only trailing '/'
+                !name.contains('/') || (name.ends_with('/') && !name[..name.len()-1].contains('/'))
+            } else {
+                // Entry must start with prefix and have no additional '/' after
+                if !name.starts_with(&normalized) {
+                    return false;
+                }
+                let rest = &name[prefix_len..];
+                // Must have content after prefix and no additional directory separator
+                !rest.is_empty() && !rest.contains('/')
+            }
+        })
+    }
+
+    /// TEAM_176: Check if a path is a directory.
+    #[must_use]
+    pub fn is_directory(&self, path: &str) -> bool {
+        for entry in self.iter() {
+            // Check exact match or with trailing slash
+            let name_matches = entry.name == path
+                || (entry.name.len() == path.len() + 1
+                    && entry.name.starts_with(path)
+                    && entry.name.ends_with('/'));
+            if name_matches {
+                return entry.entry_type == CpioEntryType::Directory;
+            }
+        }
+        false
+    }
+
+    /// TEAM_176: Normalize directory path for prefix matching.
+    fn normalize_dir_path(path: &str) -> &str {
+        let path = path.trim_start_matches('/');
+        if path.is_empty() || path == "." {
+            ""
+        } else if path.ends_with('/') {
+            path
+        } else {
+            path // Caller will add '/' when needed
+        }
+    }
+}
+
+/// TEAM_176: File type in CPIO archive.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CpioEntryType {
+    /// Regular file
+    File,
+    /// Directory
+    Directory,
+    /// Symbolic link
+    Symlink,
+    /// Other (char device, block device, fifo, socket)
+    Other,
+}
+
+impl CpioEntryType {
+    /// TEAM_176: Parse entry type from POSIX mode bits.
+    /// S_IFMT = 0o170000 (file type mask)
+    /// S_IFREG = 0o100000 (regular file)
+    /// S_IFDIR = 0o040000 (directory)
+    /// S_IFLNK = 0o120000 (symbolic link)
+    #[must_use]
+    pub fn from_mode(mode: u32) -> Self {
+        const S_IFMT: u32 = 0o170000;
+        const S_IFREG: u32 = 0o100000;
+        const S_IFDIR: u32 = 0o040000;
+        const S_IFLNK: u32 = 0o120000;
+
+        match mode & S_IFMT {
+            S_IFREG => Self::File,
+            S_IFDIR => Self::Directory,
+            S_IFLNK => Self::Symlink,
+            _ => Self::Other,
+        }
+    }
 }
 
 /// An entry in a CPIO archive
 pub struct CpioEntry<'a> {
     pub name: &'a str,
     pub data: &'a [u8],
+    /// TEAM_176: Entry type (file, directory, etc.)
+    pub entry_type: CpioEntryType,
+    /// TEAM_176: Inode number
+    pub ino: u64,
 }
 
 /// Iterator over CPIO archive entries
@@ -162,9 +285,15 @@ impl<'a> Iterator for CpioIterator<'a> {
         }
         self.offset = next_header;
 
+        // TEAM_176: Extract entry type and inode from header
+        let entry_type = header.entry_type();
+        let ino = header.ino();
+
         Some(CpioEntry {
             name,
             data: file_data,
+            entry_type,
+            ino,
         })
     }
 }

@@ -374,6 +374,66 @@ pub fn clock_gettime(ts: &mut Timespec) -> isize {
 }
 
 // ============================================================================
+// Directory Syscalls (TEAM_176: Directory Iteration)
+// ============================================================================
+
+/// TEAM_176: Syscall number for getdents.
+pub const SYS_GETDENTS: u64 = 14;
+
+/// TEAM_176: Dirent64 structure for directory entries.
+/// Matches Linux ABI layout.
+#[repr(C, packed)]
+#[derive(Debug, Clone, Copy)]
+pub struct Dirent64 {
+    /// Inode number
+    pub d_ino: u64,
+    /// Offset to next entry
+    pub d_off: i64,
+    /// Length of this record
+    pub d_reclen: u16,
+    /// File type
+    pub d_type: u8,
+    // d_name follows (null-terminated, variable length)
+}
+
+/// TEAM_176: File type constants for d_type field.
+pub mod d_type {
+    pub const DT_UNKNOWN: u8 = 0;
+    pub const DT_FIFO: u8 = 1;
+    pub const DT_CHR: u8 = 2;
+    pub const DT_DIR: u8 = 4;
+    pub const DT_BLK: u8 = 6;
+    pub const DT_REG: u8 = 8;
+    pub const DT_LNK: u8 = 10;
+    pub const DT_SOCK: u8 = 12;
+}
+
+/// TEAM_176: Read directory entries.
+///
+/// # Arguments
+/// * `fd` - Directory file descriptor
+/// * `buf` - Buffer to read entries into
+///
+/// # Returns
+/// Number of bytes read on success, 0 at end of directory, or negative error code.
+#[inline]
+pub fn getdents(fd: usize, buf: &mut [u8]) -> isize {
+    let ret: i64;
+    unsafe {
+        core::arch::asm!(
+            "svc #0",
+            in("x8") SYS_GETDENTS,
+            in("x0") fd,
+            in("x1") buf.as_mut_ptr(),
+            in("x2") buf.len(),
+            lateout("x0") ret,
+            options(nostack)
+        );
+    }
+    ret as isize
+}
+
+// ============================================================================
 // Panic Handler (shared logic)
 // ============================================================================
 

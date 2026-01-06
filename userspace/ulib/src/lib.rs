@@ -32,7 +32,11 @@ pub mod time;
 // Re-export commonly used items
 pub use alloc::LosAllocator;
 pub use fs::File;
+// TEAM_176: Re-export directory iteration types
+pub use fs::{DirEntry, FileType, ReadDir, read_dir};
 pub use io::{Error, ErrorKind, Read, Result, Write};
+// TEAM_180: Re-export buffered I/O types
+pub use io::{BufReader, BufWriter};
 
 // Re-export libsyscall for convenience
 pub use libsyscall;
