@@ -18,7 +18,9 @@ Implemented full signal handling lifecycle. Verified via `signal_test` demonstra
 3. Userspace handler execution on AArch64
 4. `sys_sigreturn` context restoration
 5. `sys_pause` blocking and wakeup
-6. Support for signals from both syscalls and interrupts
+6. `sys_sigprocmask` with `oldset_addr` support
+7. `abort()` using `SIGABRT`
+8. Support for signals from both syscalls and interrupts
 
 **Critical Fixes:**
 - Ensured user stack always has `argc=0` to prevent unmapped top access.

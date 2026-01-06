@@ -123,7 +123,10 @@ pub fn exit(code: i32) -> ! {
 ///
 /// Does NOT run atexit handlers.
 pub fn abort() -> ! {
-    // TODO: Send SIGABRT to self when signals are implemented
+    // TEAM_216: Send SIGABRT to self
+    raise(Signal::SIGABRT);
+
+    // In case signal is ignored (shouldn't be for SIGABRT), exit anyway
     libsyscall::exit(134) // 128 + 6 (SIGABRT)
 }
 

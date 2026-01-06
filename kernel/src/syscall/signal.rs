@@ -96,12 +96,22 @@ pub fn sys_sigreturn(frame: &mut SyscallFrame) -> i64 {
 }
 
 /// TEAM_216: Examine and change blocked signals.
-pub fn sys_sigprocmask(how: i32, set_addr: usize, _oldset_addr: usize) -> i64 {
+pub fn sys_sigprocmask(how: i32, set_addr: usize, oldset_addr: usize) -> i64 {
     let task = current_task();
     let ttbr0 = task.ttbr0;
 
-    // TODO: support oldset_addr if provided
+    // 1. If oldset_addr is provided, return the current mask
+    if oldset_addr != 0 {
+        let current_mask = task.blocked_signals.load(Ordering::Acquire);
+        for i in 0..4 {
+            let byte = (current_mask >> (i * 8)) as u8;
+            if !crate::syscall::write_to_user_buf(ttbr0, oldset_addr, i, byte) {
+                return errno::EFAULT;
+            }
+        }
+    }
 
+    // 2. If set_addr is provided, update the mask
     if set_addr != 0 {
         // Read 32-bit mask from userspace
         let mut mask: u32 = 0;

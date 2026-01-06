@@ -31,7 +31,7 @@ Initializing Input...
 VirtIO Input initialized successfully.
 BOOT_REGS: x0=48200000 x1=0 x2=0 x3=0
 Detecting Initramfs...
-Initramfs found at 0x48000000 - 0x48132000 (1253376 bytes)
+Initramfs found at 0x48000000 - 0x4814d600 (1365504 bytes)
 Files in initramfs:
  - .
  - hello.txt
@@ -50,8 +50,9 @@ Files in initramfs:
  - cp
  - touch
  - ln
+ - signal_test
 [BOOT] spawning init task...
-[SPAWN] Parsing ELF header (75488 bytes)...
+[SPAWN] Parsing ELF header (75808 bytes)...
 ELF Header e_ident verified
 [SPAWN] ELF parsed.
 [SPAWN] Creating user page table...
@@ -64,13 +65,14 @@ ELF Header e_ident verified
 [ELF] Copying segment: src[0]=0 to VA 11378
 [ELF] Resolved PA [MASKED] -> Kernel VA [MASKED]
 [SPAWN] Setting up stack...
-[SPAWN] Success: PID=1 entry=0x10000 sp=0x7fffffff0000
+[SPAWN] Setting up stack arguments...
+[SPAWN] Success: PID=1 entry=0x10000 sp=0x7ffffffeffe0
 [BOOT] Init process scheduled.
 Mounting filesystems...
 FAT32 mounted. Root contains 0 entries.
 [BOOT] Filesystem initialized successfully.
 [BOOT] Mounted tmpfs at /tmp
-[GPU_TEST] Flush count: 53
+[GPU_TEST] Flush count: 55
 [GPU_TEST] Framebuffer: 400 non-black pixels of 1024000 total
 
 [SUCCESS] LevitateOS System Ready.
@@ -92,7 +94,8 @@ ELF Header e_ident verified
 [ELF] Copying segment: src[0]=c0 to VA 12448
 [ELF] Resolved PA [MASKED] -> Kernel VA [MASKED]
 [SPAWN] Setting up stack...
-[SPAWN] Success: PID=2 entry=0x10000 sp=0x7fffffff0000
+[SPAWN] Setting up stack arguments...
+[SPAWN] Success: PID=2 entry=0x10000 sp=0x7ffffffeffe0
 [INIT] Shell spawned as PID 2
 [TASK] Entering user task PID=2 at 0x10000
 
