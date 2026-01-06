@@ -90,6 +90,10 @@ pub fn run() -> Result<()> {
     // TEAM_109: GPU Display Verification (catches false positives!)
     test_gpu_display_actually_works(&mut results);
 
+    // TEAM_139: QEMU Configuration
+    test_qemu_serial_multiplexing(&mut results);
+    test_qemu_window_size(&mut results);
+
     println!();
     if results.summary() {
         println!("\n✅ All regression tests passed\n");
@@ -607,3 +611,67 @@ fn test_gpu_display_actually_works(results: &mut TestResults) {
 }
 
 
+// =============================================================================
+// TEAM_139: QEMU Configuration Regression Tests
+// =============================================================================
+
+/// TEAM_139: Verify QEMU uses mon:stdio for serial+monitor multiplexing
+/// This allows user to switch between serial console and QEMU monitor with Ctrl+A C
+fn test_qemu_serial_multiplexing(results: &mut TestResults) {
+    println!("TEAM_139: QEMU serial multiplexing");
+
+    let run_rs = match fs::read_to_string("xtask/src/run.rs") {
+        Ok(c) => c,
+        Err(_) => {
+            results.fail("Could not read xtask/src/run.rs");
+            return;
+        }
+    };
+
+    // Must use mon:stdio for monitor+serial multiplexing
+    if run_rs.contains("mon:stdio") {
+        results.pass("QEMU uses mon:stdio for input multiplexing");
+    } else {
+        results.fail("QEMU NOT using mon:stdio - can't switch to monitor with Ctrl+A C!");
+    }
+
+    // Must NOT have plain -serial stdio (regression)
+    let plain_stdio = run_rs
+        .lines()
+        .filter(|l| !l.trim().starts_with("//"))
+        .any(|l| l.contains("\"-serial\", \"stdio\""));
+
+    if plain_stdio {
+        results.fail("QEMU has plain -serial stdio (input not multiplexed)");
+    } else {
+        results.pass("No plain -serial stdio found");
+    }
+}
+
+/// TEAM_139: Verify QEMU has explicit display configuration for proper window sizing
+fn test_qemu_window_size(results: &mut TestResults) {
+    println!("TEAM_139: QEMU window size configuration");
+
+    let run_rs = match fs::read_to_string("xtask/src/run.rs") {
+        Ok(c) => c,
+        Err(_) => {
+            results.fail("Could not read xtask/src/run.rs");
+            return;
+        }
+    };
+
+    // Must have explicit display configuration for non-headless
+    // GTK backend provides proper window sizing and controls
+    if run_rs.contains("-display") && run_rs.contains("gtk") {
+        results.pass("QEMU has explicit GTK display configuration");
+    } else {
+        results.fail("QEMU missing GTK display config - window size may be wrong!");
+    }
+
+    // Verify window-close=off to prevent accidental closure
+    if run_rs.contains("window-close=off") {
+        results.pass("QEMU window-close=off prevents accidental closure");
+    } else {
+        results.fail("QEMU missing window-close=off");
+    }
+}

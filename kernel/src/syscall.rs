@@ -198,8 +198,12 @@ fn sys_read(fd: usize, buf: usize, len: usize) -> i64 {
         return errno::EBADF;
     }
 
-    // Validate buffer pointer (must be in user address space)
-    if buf >= 0x0000_8000_0000_0000 {
+    // Safety limit
+    let max_read = len.min(4096);
+
+    // TEAM_137: Validate user buffer (must be mapped and writable)
+    let task = crate::task::current_task();
+    if crate::task::user_mm::validate_user_buffer(task.ttbr0, buf, max_read, true).is_err() {
         return errno::EFAULT;
     }
 
@@ -211,9 +215,8 @@ fn sys_read(fd: usize, buf: usize, len: usize) -> i64 {
     // Try VirtIO keyboard first, then UART
     // Block until at least one character is available
     let mut bytes_read = 0usize;
-    let max_read = len.min(4096); // Safety limit
 
-    // SAFETY: We've validated the buffer is in user address space.
+    // SAFETY: We've validated mapping and permissions.
     let user_buf = unsafe { core::slice::from_raw_parts_mut(buf as *mut u8, max_read) };
 
     // Block until we get at least one character
@@ -274,19 +277,18 @@ fn sys_write(fd: usize, buf: usize, len: usize) -> i64 {
         return errno::EBADF;
     }
 
-    // Validate buffer pointer (must be in user address space)
-    // User space is 0x0000_0000_0000_0000 to 0x0000_7FFF_FFFF_FFFF
-    if buf >= 0x0000_8000_0000_0000 {
-        println!("[SYSCALL] write: buffer 0x{:x} not in user space", buf);
-        return errno::EFAULT;
-    }
-
     // Safety check: limit maximum write size
     let len = len.min(4096);
 
-    // SAFETY: We've validated the buffer is in user address space.
-    // The user's page tables should have this region mapped.
-    // If not, we'll get a page fault (handled by exception handler).
+    // TEAM_137: Validate user buffer (must be mapped and readable)
+    let task = crate::task::current_task();
+    // writable=false because we are reading FROM user space
+    if crate::task::user_mm::validate_user_buffer(task.ttbr0, buf, len, false).is_err() {
+        // println!("[SYSCALL] write: buffer validation failed"); // Noisy
+        return errno::EFAULT;
+    }
+
+    // SAFETY: We've validated mapping and permissions.
     let slice = unsafe { core::slice::from_raw_parts(buf as *const u8, len) };
 
     // Convert to string if valid UTF-8, otherwise print as hex
@@ -335,15 +337,16 @@ fn sys_yield() -> i64 {
 
 /// TEAM_120: sys_spawn - Spawn a new process from initramfs.
 fn sys_spawn(path_ptr: usize, path_len: usize) -> i64 {
-    // Validate path pointer
-    if path_ptr >= 0x0000_8000_0000_0000 {
-        return errno::EFAULT;
-    }
-
     // Safety check: limit maximum path length
     let path_len = path_len.min(256);
 
-    // SAFETY: We've validated the pointer is in user space.
+    // TEAM_137: Validate path pointer
+    let task = crate::task::current_task();
+    if crate::task::user_mm::validate_user_buffer(task.ttbr0, path_ptr, path_len, false).is_err() {
+        return errno::EFAULT;
+    }
+
+    // SAFETY: We've validated mapping and permissions.
     let path_bytes = unsafe { core::slice::from_raw_parts(path_ptr as *const u8, path_len) };
     let path = match core::str::from_utf8(path_bytes) {
         Ok(s) => s,
@@ -390,15 +393,16 @@ fn sys_spawn(path_ptr: usize, path_len: usize) -> i64 {
 
 /// TEAM_120: sys_exec - Replace current process with one from initramfs.
 fn sys_exec(path_ptr: usize, path_len: usize) -> i64 {
-    // Validate path pointer
-    if path_ptr >= 0x0000_8000_0000_0000 {
-        return errno::EFAULT;
-    }
-
     // Safety check: limit maximum path length
     let path_len = path_len.min(256);
 
-    // SAFETY: We've validated the pointer is in user space.
+    // TEAM_137: Validate path pointer
+    let task = crate::task::current_task();
+    if crate::task::user_mm::validate_user_buffer(task.ttbr0, path_ptr, path_len, false).is_err() {
+        return errno::EFAULT;
+    }
+
+    // SAFETY: We've validated mapping and permissions.
     let path_bytes = unsafe { core::slice::from_raw_parts(path_ptr as *const u8, path_len) };
     let path = match core::str::from_utf8(path_bytes) {
         Ok(s) => s,

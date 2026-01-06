@@ -211,3 +211,86 @@ pub unsafe fn destroy_user_page_table(_ttbr0_phys: usize) -> Result<(), &'static
     // For now, we leak the pages - will be fixed when process cleanup is added
     Ok(())
 }
+
+/// TEAM_137: Validate a user buffer range.
+/// Checks that all pages in the range are mapped and have correct permissions for EL0.
+pub fn validate_user_buffer(
+    ttbr0_phys: usize,
+    ptr: usize,
+    len: usize,
+    writable: bool,
+) -> Result<(), &'static str> {
+    // 1. Check user address space bounds
+    if ptr >= layout::USER_SPACE_END {
+        return Err("Pointer not in user space");
+    }
+    // Check for overflow or exceeding user space
+    if let Some(end) = ptr.checked_add(len) {
+        if end > layout::USER_SPACE_END {
+            return Err("Range exceeds user space");
+        }
+    } else {
+        return Err("Pointer range overflow");
+    }
+
+    if len == 0 {
+        return Ok(());
+    }
+
+    // 2. Get L0 table (Read-Only access pattern)
+    let l0_va = mmu::phys_to_virt(ttbr0_phys);
+    // SAFETY: ttbr0_phys is guaranteed to be a valid page table by caller (process struct)
+    let l0 = unsafe { &*(l0_va as *const PageTable) };
+
+    // 3. Iterate over every page touched by the buffer
+    let mut current = ptr;
+    let end = ptr + len;
+
+    while current < end {
+        // Translate VA -> PA + Flags
+        match mmu::translate(l0, current) {
+            Some((_pa, flags)) => {
+                // Check VALID bit (implicit in translate, but good to be explicit)
+                if !flags.contains(PageFlags::VALID) {
+                    return Err("Page not valid");
+                }
+
+                // Check User Accessibility (AP bit 6 must be set)
+                // 00 (RW_EL1) -> Bit 6=0
+                // 10 (RO_EL1) -> Bit 6=0
+                // 01 (RW_ALL) -> Bit 6=1
+                // 11 (RO_ALL) -> Bit 6=1
+                let ap_bits = (flags.bits() >> 6) & 0b11;
+                let is_user = (ap_bits & 0b01) != 0;
+
+                if !is_user {
+                    return Err("Page not accessible to user");
+                }
+
+                // Check Write Permission if requested
+                if writable {
+                    // Must be RW_ALL (01)
+                    // If it is RO_ALL (11), then write is denied.
+                    // 01 & 11 -> 01 (Bit 7 is the difference)
+                    // RW_ALL: 01 (Bit 6=1, Bit 7=0)
+                    // RO_ALL: 11 (Bit 6=1, Bit 7=1)
+                    // So we must ensure Bit 7 is 0.
+                    let is_readonly = (ap_bits & 0b10) != 0;
+                    if is_readonly {
+                        return Err("Page not writable");
+                    }
+                }
+            }
+            None => return Err("Page not mapped"),
+        }
+
+        // Move to next page boundary
+        // If current is 0x1000, next is 0x2000.
+        // If current is 0x1005, next is 0x2000.
+        // Formula: (current & !0xFFF) + 0x1000
+        let next_page = (current & !0xFFF) + PAGE_SIZE;
+        current = next_page;
+    }
+
+    Ok(())
+}

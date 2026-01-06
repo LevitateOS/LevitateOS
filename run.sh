@@ -19,12 +19,16 @@ echo "Launching QEMU..."
 # Cleanup QMP socket if it exists
 rm -f ./qmp.sock
 
+
+# TEAM_139: Use GTK display instead of SDL
+# SDL grabs keyboard input for the window, preventing serial input from host terminal
+# GTK allows keyboard input to go to serial (mon:stdio) while still showing GPU display
 qemu-system-aarch64 \
     -M virt \
     -cpu cortex-a72 \
     -m 1G \
     -kernel "$BIN" \
-    -display sdl \
+    -display gtk,zoom-to-fit=off,window-close=off \
     -device virtio-gpu-pci,xres=1280,yres=800 \
     -device virtio-keyboard-device \
     -device virtio-tablet-device \
@@ -36,3 +40,4 @@ qemu-system-aarch64 \
     -serial mon:stdio \
     -qmp unix:./qmp.sock,server,nowait \
     -no-reboot
+

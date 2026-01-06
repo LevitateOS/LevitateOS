@@ -88,10 +88,13 @@ pub fn run_qemu(profile: QemuProfile, headless: bool) -> Result<()> {
         args.extend(["-smp", smp]);
     }
 
+    // TEAM_139: Use mon:stdio for serial+monitor multiplexing
+    // User can switch with Ctrl+A C, exit with Ctrl+A X
     if headless {
-        args.extend(["-display", "none", "-serial", "stdio"]);
+        args.extend(["-display", "none", "-serial", "mon:stdio"]);
     } else {
-        args.extend(["-serial", "stdio"]);
+        // TEAM_139: Explicit GTK display for proper window sizing
+        args.extend(["-display", "gtk,zoom-to-fit=off,window-close=off", "-serial", "mon:stdio"]);
     }
 
     Command::new("qemu-system-aarch64")

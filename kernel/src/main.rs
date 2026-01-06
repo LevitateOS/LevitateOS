@@ -704,17 +704,23 @@ pub extern "C" fn kmain() -> ! {
                 let _ = gpu_state.flush();
             }
         }
-        
+
         let flush_count = gpu::flush_count();
         verbose!("[GPU_TEST] Flush count: {}", flush_count);
         if flush_count == 0 {
             verbose!("[GPU_TEST] WARNING: GPU flush count is 0 - display may be black!");
         }
-        
+
         if let Some((_total, non_black)) = gpu::framebuffer_has_content() {
-            verbose!("[GPU_TEST] Framebuffer: {} non-black pixels of {} total", non_black, _total);
+            verbose!(
+                "[GPU_TEST] Framebuffer: {} non-black pixels of {} total",
+                non_black,
+                _total
+            );
             if non_black == 0 {
-                verbose!("[GPU_TEST] WARNING: Framebuffer is entirely black - no content rendered!");
+                verbose!(
+                    "[GPU_TEST] WARNING: Framebuffer is entirely black - no content rendered!"
+                );
             }
         }
     }

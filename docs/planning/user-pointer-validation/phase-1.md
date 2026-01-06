@@ -9,9 +9,24 @@
 **Severity:** **CRITICAL (Security)**
 
 **Impact:**
-- Malicious userspace can crash kernel via page fault on unmapped addresses
 - Potential information disclosure if kernel reads from wrong memory
 - Potential privilege escalation if kernel writes to unexpected locations
+
+## Reproduction Status
+
+**Reproducible:** Yes via `userspace/repro_crash`
+
+**Reproduction Steps:**
+1. Build `userspace/repro_crash`.
+2. Run kernel with initramfs containing `repro_crash`.
+3. Execute `repro_crash`.
+
+**Expected Behavior:** `sys_write` returns `-EFAULT` or process is killed with invalid memory access signal.
+**Actual Behavior:** Kernel panic (Synchronous Exception: Data Abort) due to unhandled page fault in kernel mode.
+
+**Reproduction Artifact:**
+- App: `userspace/repro_crash`
+- Exploit: Passes strict `0xdeadbeef` pointer to `sys_write`.
 
 ## Current State
 
@@ -158,6 +173,13 @@ For LevitateOS's current stage, **Option A (page table walk)** is the best balan
 - Security (proper validation)
 - Simplicity (no exception handler changes)
 - Performance (acceptable for current workload)
+
+## Constraints
+
+1. **Performance**: Validation happens on every syscall involving pointers (hot path). Page table walks are expensive (memory accesses).
+2. **Concurrency**: Page tables might change if we implement threading/SMP (future). Validation must be atomic relative to use, or use a lock.
+3. **Compatibility**: Must support existing userspace ABI.
+4. **Complexity**: Should avoid deep changes to the exception handler (Assembly) if possible (Option A > Option C).
 
 ## Open Questions
 

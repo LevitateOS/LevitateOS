@@ -165,6 +165,12 @@ impl PageTableEntry {
         self.0 = ((addr as u64) & 0x0000_FFFF_FFFF_F000) | flags.bits();
     }
 
+    /// Get flags from the entry.
+    #[inline]
+    pub fn flags(&self) -> PageFlags {
+        PageFlags::from_bits_truncate(self.0)
+    }
+
     /// Clear the entry.
     #[inline]
     pub fn clear(&mut self) {
@@ -653,6 +659,65 @@ pub fn walk_to_entry<'a>(
         index: leaf_index,
         breadcrumbs,
     })
+}
+
+/// Translate a virtual address to physical address and flags.
+/// Returns None if not mapped.
+pub fn translate(root: &PageTable, va: usize) -> Option<(usize, PageFlags)> {
+    let indices = [
+        va_l0_index(va),
+        va_l1_index(va),
+        va_l2_index(va),
+        va_l3_index(va),
+    ];
+
+    let mut current_table = root;
+
+    // Walk L0 -> L1 -> L2
+    for level in 0..3 {
+        let index = indices[level];
+        let entry = current_table.entry(index);
+
+        if !entry.is_valid() {
+            return None;
+        }
+
+        if !entry.is_table() {
+            // Block mapping (L1 1GB or L2 2MB)
+            let block_pa = entry.address();
+            let flags = entry.flags();
+
+            // Calculate offset based on level
+            let (mask, _size) = if level == 1 {
+                (0x3FFF_FFFF, BLOCK_1GB_SIZE) // L1 = 1GB
+            } else if level == 2 {
+                (0x1F_FFFF, BLOCK_2MB_SIZE) // L2 = 2MB
+            } else {
+                return None; // L0 blocks not supported on 4KB granule
+            };
+
+            let offset = va & mask;
+            return Some((block_pa + offset, flags));
+        }
+
+        let child_pa = entry.address();
+        let child_va = phys_to_virt(child_pa);
+        // SAFETY: We are just reading. The PA is valid RAM.
+        current_table = unsafe { &*(child_va as *const PageTable) };
+    }
+
+    // L3 (Leaf Page)
+    let index = indices[3];
+    let entry = current_table.entry(index);
+    if !entry.is_valid() {
+        return None;
+    }
+
+    let pa = entry.address();
+    let offset = va & 0xFFF;
+    let flags = entry.flags();
+
+    Some((pa + offset, flags))
 }
 
 /// Map a single 4KB page.
