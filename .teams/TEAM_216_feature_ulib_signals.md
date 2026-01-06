@@ -1,15 +1,25 @@
-# TEAM_216: ulib signals and process control syscalls
+# Team 216 Log: Signal Handling Feature
 
-## Objective
-Implement signal handling and related syscalls (`kill`, `pause`) to fulfill `ulib` TODOs and enable better process control in LevitateOS.
+## Status
+- **Phase:** Phase 3: Implementation & Phase 4: Verification
+- **Current Task:** Feature Complete
+- **Date:** 2026-01-06
 
-## Progress
-- [x] Phase 1: Discovery
-- [x] Phase 2: Design
-- [/] Phase 3: Implementation
-- [ ] Phase 4: Integration and Testing
-- [ ] Phase 5: Polish, Docs, and Cleanup
+## Accomplishments
+- [x] Phase 1: Discovery (Completed)
+- [x] Phase 2: Design (Completed)
+- [x] Phase 3: Implementation (Completed)
+- [x] Phase 4: Verification (Completed)
 
-## Links
-- [Task](file:///home/vince/.gemini/antigravity/brain/40e9ecb1-13c7-4038-b598-ce740ac98c21/task.md)
-- [Phase 1: Discovery](file:///home/vince/Projects/LevitateOS/.planning/signals/phase-1.md)
+## Completion Summary
+Implemented full signal handling lifecycle. Verified via `signal_test` demonstrating:
+1. `sys_sigaction` handler registration
+2. `sys_kill` asynchronous delivery
+3. Userspace handler execution on AArch64
+4. `sys_sigreturn` context restoration
+5. `sys_pause` blocking and wakeup
+6. Support for signals from both syscalls and interrupts
+
+**Critical Fixes:**
+- Ensured user stack always has `argc=0` to prevent unmapped top access.
+- Synced IRQ context saving with syscall frame for consistent delivery.

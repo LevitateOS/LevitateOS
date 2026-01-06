@@ -137,8 +137,8 @@ sync_lower_el_entry:
 
 /* TEAM_073: IRQ from lower EL - save user context and return */
 irq_lower_el_entry:
-    /* Save context */
-    sub     sp, sp, #256
+    /* Save full user context to stack */
+    sub     sp, sp, #280
     stp     x0, x1, [sp, #0]
     stp     x2, x3, [sp, #16]
     stp     x4, x5, [sp, #32]
@@ -155,11 +155,37 @@ irq_lower_el_entry:
     stp     x26, x27, [sp, #208]
     stp     x28, x29, [sp, #224]
     str     x30, [sp, #240]
-
-    /* Call Rust handler */
+    
+    /* Save SP_EL0, ELR_EL1, SPSR_EL1, TTBR0_EL1 */
+    mrs     x0, sp_el0
+    str     x0, [sp, #248]
+    mrs     x0, elr_el1
+    str     x0, [sp, #256]
+    mrs     x0, spsr_el1
+    str     x0, [sp, #264]
+    mrs     x0, ttbr0_el1
+    str     x0, [sp, #272]
+    
+    /* Pass stack pointer as syscall frame */
+    mov     x0, sp
     bl      handle_irq
-
-    /* Restore context */
+    
+    /* Restore TTBR0 */
+    ldr     x0, [sp, #272]
+    msr     ttbr0_el1, x0
+    tlbi    vmalle1
+    dsb     sy
+    isb
+    
+    /* Restore SPSR and ELR */
+    ldr     x0, [sp, #264]
+    msr     spsr_el1, x0
+    ldr     x0, [sp, #256]
+    msr     elr_el1, x0
+    ldr     x0, [sp, #248]
+    msr     sp_el0, x0
+    
+    /* Restore user registers */
     ldp     x0, x1, [sp, #0]
     ldp     x2, x3, [sp, #16]
     ldp     x4, x5, [sp, #32]
@@ -176,7 +202,7 @@ irq_lower_el_entry:
     ldp     x26, x27, [sp, #208]
     ldp     x28, x29, [sp, #224]
     ldr     x30, [sp, #240]
-    add     sp, sp, #256
+    add     sp, sp, #280
 
     eret
 

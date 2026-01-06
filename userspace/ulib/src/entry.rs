@@ -234,7 +234,7 @@ pub enum Signal {
 }
 
 /// Signal handler function type
-pub type SignalHandler = fn(Signal);
+pub type SignalHandler = extern "C" fn(i32);
 
 /// Default signal handler (does nothing)
 pub const SIG_DFL: Option<SignalHandler> = None;
@@ -243,36 +243,42 @@ pub const SIG_DFL: Option<SignalHandler> = None;
 pub const SIG_IGN: Option<SignalHandler> = None;
 
 /// Register a signal handler.
-///
-/// STUB: Not yet implemented - signals require kernel support.
-pub fn signal(_sig: Signal, _handler: Option<SignalHandler>) -> Option<SignalHandler> {
-    // TODO: Implement when kernel has signal support
-    // For now, just return the default
+pub fn signal(sig: Signal, handler: Option<SignalHandler>) -> Option<SignalHandler> {
+    let handler_addr = match handler {
+        Some(f) => f as usize,
+        None => 0,
+    };
+
+    // TEAM_216: Call sigaction with the handler and our default trampoline
+    libsyscall::sigaction(
+        sig as i32,
+        handler_addr,
+        sigreturn_trampoline as *const () as usize,
+    );
     None
 }
 
 /// Send a signal to a process.
-///
-/// STUB: Not yet implemented - signals require kernel support.
-pub fn kill(_pid: i32, _sig: Signal) -> i32 {
-    // TODO: Implement sys_kill syscall
-    -1 // ENOSYS
+pub fn kill(pid: i32, sig: Signal) -> i32 {
+    libsyscall::kill(pid, sig as i32) as i32
 }
 
 /// Send a signal to self.
-///
-/// STUB: Not yet implemented.
-pub fn raise(_sig: Signal) -> i32 {
-    // TODO: kill(getpid(), sig)
-    -1
+pub fn raise(sig: Signal) -> i32 {
+    let pid = libsyscall::getpid() as i32;
+    libsyscall::kill(pid, sig as i32) as i32
 }
 
 /// Wait for a signal.
-///
-/// STUB: Not yet implemented.
 pub fn pause() -> i32 {
-    // TODO: Implement sys_pause syscall
-    -1
+    libsyscall::pause() as i32
+}
+
+/// TEAM_216: Signal trampoline called by the kernel after handler returns.
+/// Registered in sigaction.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn sigreturn_trampoline() {
+    libsyscall::sigreturn();
 }
 
 // ============================================================================

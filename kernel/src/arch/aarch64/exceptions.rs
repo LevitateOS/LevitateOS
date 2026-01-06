@@ -16,6 +16,9 @@ pub extern "C" fn handle_sync_lower_el(frame: *mut crate::arch::SyscallFrame) {
         // SVC exception - this is a syscall
         let frame = unsafe { &mut *frame };
         crate::syscall::syscall_dispatch(frame);
+
+        // TEAM_216: Check for signals before returning to EL0
+        check_signals(frame);
     } else {
         // Other exception from user mode - kill process
         use aarch64_cpu::registers::{ELR_EL1, FAR_EL1};
@@ -63,7 +66,7 @@ pub extern "C" fn handle_sync_exception(esr: u64, elr: u64) {
 
 /// Handle IRQs.
 #[unsafe(no_mangle)]
-pub extern "C" fn handle_irq() {
+pub extern "C" fn handle_irq(frame: *mut crate::arch::SyscallFrame) {
     let gic = los_hal::gic::active_api();
     let irq = gic.acknowledge();
 
@@ -76,6 +79,97 @@ pub extern "C" fn handle_irq() {
     }
 
     gic.end_interrupt(irq);
+
+    // TEAM_216: If IRQ came from userspace, check for signals
+    if !frame.is_null() {
+        let frame = unsafe { &mut *frame };
+        check_signals(frame);
+    }
+}
+
+/// TEAM_216: Check for pending unmasked signals and deliver them.
+pub fn check_signals(frame: &mut crate::arch::SyscallFrame) {
+    use crate::task::current_task;
+    use core::sync::atomic::Ordering;
+
+    let task = current_task();
+    let pending = task.pending_signals.load(Ordering::Acquire);
+    let blocked = task.blocked_signals.load(Ordering::Acquire);
+    let unmasked = pending & !blocked;
+
+    if unmasked == 0 {
+        return;
+    }
+
+    // Find the first unmasked signal (simple priority: 0 to 31)
+    for sig in 0..32 {
+        if unmasked & (1 << sig) != 0 {
+            // Found a signal to deliver
+            if deliver_signal(frame, sig as i32) {
+                // Clear the signal (since we don't have queueing)
+                task.pending_signals
+                    .fetch_and(!(1 << sig), Ordering::Release);
+                break;
+            }
+        }
+    }
+}
+
+/// TEAM_216: Set up userspace stack for signal handler execution.
+fn deliver_signal(frame: &mut crate::arch::SyscallFrame, sig: i32) -> bool {
+    use crate::task::current_task;
+    use core::sync::atomic::Ordering;
+
+    let task = current_task();
+    let handlers = task.signal_handlers.lock();
+    let handler = handlers[sig as usize];
+
+    if handler == 0 {
+        // Default action: many signals terminate the process
+        // SIGKILL (9) is always fatal. SIGCHLD (17) is ignored.
+        if sig == 9 || (sig != 17 && sig != 18) {
+            crate::println!("[SIGNAL] PID={} terminated by signal {}", task.id.0, sig);
+            crate::task::task_exit(); // This never returns
+        }
+        return false;
+    }
+
+    // Prepare trampoline delivery
+    let trampoline = task.signal_trampoline.load(Ordering::Acquire);
+    if trampoline == 0 {
+        return false; // Can't deliver without trampoline
+    }
+
+    // 1. Save current frame to user stack (Signal Frame)
+    let user_sp = frame.sp;
+    let sig_frame_size = core::mem::size_of::<crate::arch::SyscallFrame>();
+    let new_user_sp = (user_sp - sig_frame_size as u64) & !15; // Align 16
+
+    // Copy kernel's current frame to user stack
+    let frame_slice = unsafe {
+        core::slice::from_raw_parts(
+            (frame as *const crate::arch::SyscallFrame) as *const u8,
+            sig_frame_size,
+        )
+    };
+
+    for (i, &byte) in frame_slice.iter().enumerate() {
+        if !crate::syscall::write_to_user_buf(task.ttbr0, new_user_sp as usize, i, byte) {
+            crate::println!(
+                "[SIGNAL] PID={} ERROR: Failed to write signal frame to user stack",
+                task.id.0
+            );
+            return false;
+        }
+    }
+
+    // 2. Redirect user execution to handler
+    frame.sp = new_user_sp;
+    frame.pc = handler as u64;
+    frame.regs[0] = sig as u64; // arg0 = signal number
+    frame.regs[30] = trampoline as u64; // LR = trampoline
+
+    true
 }
 
 pub fn init() {

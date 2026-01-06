@@ -12,7 +12,7 @@ use crate::arch::{Context, cpu_switch_to, task_entry_trampoline};
 use crate::println;
 use alloc::boxed::Box;
 use alloc::string::String;
-use core::sync::atomic::{AtomicU8, Ordering};
+use core::sync::atomic::{AtomicU8, AtomicU32, AtomicUsize, Ordering};
 
 /// TEAM_070: Hook called immediately after a context switch.
 /// Used to release scheduler locks or perform cleanup.
@@ -160,6 +160,14 @@ pub struct TaskControlBlock {
     pub fd_table: fd_table::SharedFdTable,
     /// TEAM_192: Current working directory
     pub cwd: IrqSafeLock<String>,
+    /// TEAM_216: Pending signals bitmask
+    pub pending_signals: AtomicU32,
+    /// TEAM_216: Blocked signals bitmask
+    pub blocked_signals: AtomicU32,
+    /// TEAM_216: Signal handlers (userspace addresses)
+    pub signal_handlers: IrqSafeLock<[usize; 32]>,
+    /// TEAM_216: Signal trampoline address (in userspace)
+    pub signal_trampoline: AtomicUsize,
 }
 
 impl TaskControlBlock {
@@ -199,6 +207,11 @@ impl TaskControlBlock {
             fd_table: fd_table::new_shared_fd_table(),
             // TEAM_192: Bootstrap task starts in root
             cwd: IrqSafeLock::new(String::from("/")),
+            // TEAM_216: Kernel tasks have no signals
+            pending_signals: AtomicU32::new(0),
+            blocked_signals: AtomicU32::new(0),
+            signal_handlers: IrqSafeLock::new([0; 32]),
+            signal_trampoline: AtomicUsize::new(0),
         }
     }
 }
@@ -236,6 +249,11 @@ impl From<UserTask> for TaskControlBlock {
             // TEAM_192: New user processes start in root for now
             // TODO: Inherit from parent once fork/spawn inherit TCB fields
             cwd: IrqSafeLock::new(String::from("/")),
+            // TEAM_216: Initialize signal state for new process
+            pending_signals: AtomicU32::new(0),
+            blocked_signals: AtomicU32::new(0),
+            signal_handlers: IrqSafeLock::new([0; 32]),
+            signal_trampoline: AtomicUsize::new(0),
         }
     }
 }

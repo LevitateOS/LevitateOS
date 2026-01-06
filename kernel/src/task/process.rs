@@ -7,8 +7,8 @@
 
 use crate::loader::elf::Elf;
 use crate::loader::elf::ElfError;
-use crate::task::user::UserTask;
 use crate::memory::user as mm_user;
+use crate::task::user::UserTask;
 use los_hal::mmu::MmuError;
 
 use los_error::define_kernel_error;
@@ -81,14 +81,11 @@ pub fn spawn_from_elf_with_args(
     let stack_top =
         unsafe { mm_user::setup_user_stack(ttbr0_phys, stack_pages).map_err(SpawnError::Stack)? };
 
-    // TEAM_169: Set up argc/argv/envp on stack
-    let user_sp = if args.is_empty() && envs.is_empty() {
-        stack_top
-    } else {
-        los_hal::println!("[SPAWN] Setting up args: argc={}", args.len());
-        mm_user::setup_stack_args(ttbr0_phys, stack_top, args, envs)
-            .map_err(SpawnError::Stack)?
-    };
+    // TEAM_216: Always set up argc/argv/envp on stack.
+    // Even if empty, this ensures SP is moved into a mapped page (Rule 4).
+    los_hal::println!("[SPAWN] Setting up stack arguments...");
+    let user_sp =
+        mm_user::setup_stack_args(ttbr0_phys, stack_top, args, envs).map_err(SpawnError::Stack)?;
 
     // 5. Create UserTask
     let task = UserTask::new(entry_point, user_sp, ttbr0_phys, brk);

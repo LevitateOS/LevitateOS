@@ -3,6 +3,7 @@ use crate::memory::user as mm_user;
 pub mod fs;
 pub mod mm;
 pub mod process;
+pub mod signal;
 pub mod sync;
 pub mod sys;
 pub mod time;
@@ -64,10 +65,15 @@ pub enum SyscallNumber {
     ClockGettime = 113,
     Yield = 124,    // sched_yield
     Shutdown = 142, // reboot
+    Kill = 129,
+    SigAction = 134,
+    SigProcMask = 135,
+    SigReturn = 139,
     GetPid = 172,
     Sbrk = 214,    // brk
     Exec = 221,    // execve
     Waitpid = 260, // wait4
+    Pause = 236,
 
     // === Custom LevitateOS syscalls (temporary, until clone/execve work) ===
     /// TEAM_120: Spawn process (custom, will be replaced by clone+execve)
@@ -102,7 +108,12 @@ impl SyscallNumber {
             113 => Some(Self::ClockGettime),
             124 => Some(Self::Yield),
             142 => Some(Self::Shutdown),
+            129 => Some(Self::Kill),
+            134 => Some(Self::SigAction),
+            135 => Some(Self::SigProcMask),
+            139 => Some(Self::SigReturn),
             172 => Some(Self::GetPid),
+            236 => Some(Self::Pause),
             214 => Some(Self::Sbrk),
             221 => Some(Self::Exec),
             260 => Some(Self::Waitpid),
@@ -285,6 +296,20 @@ pub fn syscall_dispatch(frame: &mut SyscallFrame) {
             frame.arg5() as usize,
             frame.arg6() as u32,
         ),
+        // TEAM_216: Signal Handling syscalls
+        Some(SyscallNumber::Kill) => signal::sys_kill(frame.arg0() as i32, frame.arg1() as i32),
+        Some(SyscallNumber::Pause) => signal::sys_pause(),
+        Some(SyscallNumber::SigAction) => signal::sys_sigaction(
+            frame.arg0() as i32,
+            frame.arg1() as usize,
+            frame.arg2() as usize,
+        ),
+        Some(SyscallNumber::SigReturn) => signal::sys_sigreturn(frame),
+        Some(SyscallNumber::SigProcMask) => signal::sys_sigprocmask(
+            frame.arg0() as i32,
+            frame.arg1() as usize,
+            frame.arg2() as usize,
+        ),
         None => {
             println!("[SYSCALL] Unknown syscall number: {}", nr);
             errno::ENOSYS
@@ -320,5 +345,13 @@ pub(crate) fn write_to_user_buf(
         true
     } else {
         false
+    }
+}
+
+pub(crate) fn read_from_user(ttbr0: usize, user_va: usize) -> Option<u8> {
+    if let Some(kernel_ptr) = mm_user::user_va_to_kernel_ptr(ttbr0, user_va) {
+        Some(unsafe { *kernel_ptr })
+    } else {
+        None
     }
 }
