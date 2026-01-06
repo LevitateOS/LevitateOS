@@ -40,43 +40,20 @@ where
     }
 }
 
-/// Errors that can occur during FDT parsing
-/// [FD1] InvalidHeader - DTB header is malformed
-/// [FD2] InitrdMissing - No initrd properties found
-/// TEAM_152: Added error codes (0x09xx) per unified error system plan.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum FdtError {
-    /// [FD1] Invalid DTB header (0x0901)
-    InvalidHeader,
-    /// [FD2] Missing initrd properties, [FD5] Both start and end must exist (0x0902)
-    InitrdMissing,
-}
+use levitate_error::define_kernel_error;
 
-impl FdtError {
-    /// TEAM_152: Get numeric error code for debugging
-    pub const fn code(&self) -> u16 {
-        match self {
-            Self::InvalidHeader => 0x0901,
-            Self::InitrdMissing => 0x0902,
-        }
-    }
-
-    /// TEAM_152: Get error name for logging
-    pub const fn name(&self) -> &'static str {
-        match self {
-            Self::InvalidHeader => "Invalid DTB header",
-            Self::InitrdMissing => "Initrd properties missing in DTB",
-        }
+define_kernel_error! {
+    /// Errors that can occur during FDT parsing
+    /// [FD1] InvalidHeader - DTB header is malformed
+    /// [FD2] InitrdMissing - No initrd properties found
+    /// TEAM_155: Migrated to define_kernel_error! macro.
+    pub enum FdtError(0x09) {
+        /// [FD1] Invalid DTB header
+        InvalidHeader = 0x01 => "Invalid DTB header",
+        /// [FD2] Missing initrd properties, [FD5] Both start and end must exist
+        InitrdMissing = 0x02 => "Initrd properties missing in DTB",
     }
 }
-
-impl core::fmt::Display for FdtError {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        write!(f, "E{:04X}: {}", self.code(), self.name())
-    }
-}
-
-impl core::error::Error for FdtError {}
 
 /// Retrieve the physical address range of the initrd from the DTB.
 /// [FD3] Parses 32-bit addresses, [FD4] Parses 64-bit addresses, [FD6] Handles big-endian
@@ -187,8 +164,8 @@ pub fn get_node_reg(node: &fdt::node::FdtNode) -> Option<(usize, usize)> {
 #[cfg(test)]
 mod tests {
     extern crate std;
-    use std::vec::Vec;
     use super::*;
+    use std::vec::Vec;
 
     // Minimal DTB with /chosen node and 32-bit initrd properties
     // This is a pre-compiled DTB blob created from:
@@ -358,7 +335,7 @@ mod tests {
     #[test]
     fn test_fdt_discovery() {
         let fdt = Fdt::new(VALID_DTB).expect("Invalid DTB");
-        
+
         // [FD7] find_node_by_compatible searches all nodes
         let node = find_node_by_compatible(&fdt, "test-dev").expect("Node not found");
         assert_eq!(node.name, "test@1234");
@@ -373,7 +350,7 @@ mod tests {
     #[test]
     fn test_fdt_memory_regions() {
         let fdt = Fdt::new(VALID_DTB).expect("Invalid DTB");
-        
+
         let mut regions = Vec::new();
         for_each_memory_region(&fdt, |range| {
             regions.push(range);
@@ -389,7 +366,7 @@ mod tests {
     #[test]
     fn test_fdt_reserved_regions() {
         let fdt = Fdt::new(VALID_DTB).expect("Invalid DTB");
-        
+
         let mut regions = Vec::new();
         for_each_reserved_region(&fdt, |range| {
             regions.push(range);
@@ -397,7 +374,13 @@ mod tests {
 
         // [FD10] Should find reserved@48000000 with size 0x100000
         assert!(regions.len() >= 1);
-        let found = regions.iter().any(|r| r.start == 0x48000000 && r.end == 0x48100000);
-        assert!(found, "Expected reserved region at 0x48000000..0x48100000, got {:?}", regions);
+        let found = regions
+            .iter()
+            .any(|r| r.start == 0x48000000 && r.end == 0x48100000);
+        assert!(
+            found,
+            "Expected reserved region at 0x48000000..0x48100000, got {:?}",
+            regions
+        );
     }
 }

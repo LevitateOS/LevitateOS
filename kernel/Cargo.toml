@@ -15,6 +15,7 @@ multitask-demo = [] # TEAM_071: Enable demo tasks for preemption verification
 [dependencies]
 levitate-hal = { path = "../levitate-hal" }
 levitate-utils = { path = "../levitate-utils" }
+levitate-error = { path = "../levitate-error" }
 # TEAM_141: Removed hal-impl feature - committing to virtio-drivers (Option A)
 levitate-virtio = { path = "../levitate-virtio" }
 levitate-terminal = { path = "../levitate-terminal" }

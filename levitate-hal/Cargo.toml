@@ -13,8 +13,9 @@ std = ["levitate-utils/std"]
 
 [dependencies]
 levitate-utils = { path = "../levitate-utils" }
-# TEAM_141: Use workspace dependencies for version consistency
-bitflags.workspace = true
+# TEAM_141: Use workspace dependencies for version consist
+levitate-error = { path = "../levitate-error" }
+bitflags = { workspace = true }
 fdt = { version = "0.1.5", default-features = false }
 virtio-drivers.workspace = true
 aarch64-cpu.workspace = true

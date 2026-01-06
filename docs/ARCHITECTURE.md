@@ -57,3 +57,37 @@ members = [
 - **Strict Alignment**: AArch64 requires strict alignment. We use `strict-align` target feature (or similar) where possible, but `levitate-utils` may generate warnings about it being unstable.
 - **QEMU Bus**: VirtIO devices in QEMU (legacy/MMIO) are order-sensitive or specific to the command line arguments. Check `run.sh` vs `virtio.rs` scanning logic if devices aren't found.
 - **External Kernels**: Reference implementations are stored in `.external-kernels/` which is excluded from VS Code analysis to improve performance.
+
+## Error Handling
+
+LevitateOS uses typed error enums with numeric codes for debugging.
+
+### Defining New Error Types
+
+Use the `define_kernel_error!` macro for error types:
+
+```rust
+use levitate_error::define_kernel_error;
+
+define_kernel_error! {
+    /// My subsystem errors (0x10xx)
+    pub enum MyError(0x10) {
+        /// Something went wrong
+        SomethingWrong = 0x01 => "Something went wrong",
+        /// Nested error example
+        Other(InnerError) = 0x02 => "Nested error occurred",
+    }
+}
+```
+
+### Error Code Format
+
+```
+0xSSCC where:
+  SS = Subsystem (e.g., 0x01 for MMU, 0x03 for Spawn)
+  CC = Error code within subsystem (01-FF)
+```
+
+### Subsystem Allocation
+
+See `docs/planning/error-macro/phase-1.md` for the current subsystem list.

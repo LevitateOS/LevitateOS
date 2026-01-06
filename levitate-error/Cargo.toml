@@ -1,0 +1,11 @@
+[package]
+name = "levitate-error"
+version = "0.1.0"
+edition = "2021"
+description = "Error handling infrastructure for LevitateOS"
+
+[features]
+default = []
+
+[dependencies]
+# No dependencies - pure macro crate

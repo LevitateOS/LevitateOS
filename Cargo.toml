@@ -8,6 +8,7 @@ members = [
     # TEAM_114: PCI and GPU as separate crates
     "levitate-pci",
     "levitate-gpu",
+    "levitate-error",
     "xtask",
 ]
 exclude = [

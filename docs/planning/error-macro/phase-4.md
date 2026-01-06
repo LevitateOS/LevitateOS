@@ -45,7 +45,7 @@ mod tests {
 
     #[test]
     fn test_display_format() {
-        assert_eq!(format!("{}", TestError::First), "E FF01: First error");
+        assert_eq!(format!("{}", TestError::First), "EFF01: First error");
         assert_eq!(format!("{}", TestError::Second), "EFF02: Second error");
     }
 
@@ -87,6 +87,7 @@ cargo test -p levitate-hal
 
 # Behavior identical
 # (manual inspection of test output)
+cargo xtask test behavior
 ```
 
 ---
@@ -105,7 +106,7 @@ cargo test -p levitate-hal
 | 6 | `SpawnError` | Complex | Has nested errors - manual |
 | 7 | `FsError` | Complex | Has nested errors - manual |
 
-### Nested Error Types (Keep Manual)
+### Nested Error Types
 
 `SpawnError` and `FsError` have variants with inner errors:
 
@@ -117,9 +118,7 @@ pub enum SpawnError {
 }
 ```
 
-These require custom `Display` impls to show inner error. Keep manual implementation for now.
-
-**Future consideration:** Extend macro syntax for nested errors if pattern becomes common.
+The macro in `phase-3.md` supports these via the `variant(Type)` syntax. Migrate these using the extended macro syntax to preserve inner error information in `Display`.
 
 ---
 
