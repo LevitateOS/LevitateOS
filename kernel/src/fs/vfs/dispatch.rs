@@ -8,13 +8,11 @@ extern crate alloc;
 
 use alloc::sync::Arc;
 
-use super::dentry::{Dentry, DentryRef, dcache};
+use super::dentry::{Dentry, dcache};
 use super::error::{VfsError, VfsResult};
 use super::file::{File, FileRef, OpenFlags};
-use super::inode::Inode;
 use super::ops::{DirEntry, SetAttr};
 use crate::fs::mode;
-use crate::fs::path::Path;
 use crate::syscall::Stat;
 
 /// TEAM_202: Open a file by path

@@ -57,6 +57,10 @@ pub enum VfsError {
     StaleHandle,
     /// Invalid cross-device link (EXDEV = 18)
     CrossDevice,
+    /// Not a symbolic link (EINVAL = 22)
+    NotASymlink,
+    /// Internal kernel error (EIO = 5)
+    InternalError,
 }
 
 impl VfsError {
@@ -87,6 +91,8 @@ impl VfsError {
             VfsError::NameTooLong => -36,
             VfsError::StaleHandle => -116,
             VfsError::CrossDevice => -18,
+            VfsError::NotASymlink => -22,
+            VfsError::InternalError => -5,
         }
     }
 
@@ -117,6 +123,8 @@ impl VfsError {
             VfsError::NameTooLong => "ENAMETOOLONG",
             VfsError::StaleHandle => "ESTALE",
             VfsError::CrossDevice => "EXDEV",
+            VfsError::NotASymlink => "EINVAL",
+            VfsError::InternalError => "EIO",
         }
     }
 }
@@ -148,6 +156,8 @@ impl fmt::Display for VfsError {
             VfsError::NameTooLong => "File name too long",
             VfsError::StaleHandle => "Stale file handle",
             VfsError::CrossDevice => "Invalid cross-device link",
+            VfsError::NotASymlink => "Not a symbolic link",
+            VfsError::InternalError => "Internal kernel error",
         };
         write!(f, "{} ({})", msg, self.name())
     }

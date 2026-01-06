@@ -1,11 +1,9 @@
-use crate::fs::tmpfs::{self};
 use crate::fs::vfs::dispatch::*;
 use crate::fs::vfs::error::VfsError;
 use crate::fs::vfs::file::OpenFlags;
 use crate::syscall::{Stat, errno, errno_file, write_to_user_buf};
 use crate::task::fd_table::FdType;
 use los_hal::print;
-use los_utils::cpio::CpioEntryType;
 
 /// TEAM_081: sys_read - Read from a file descriptor.
 /// TEAM_178: Refactored to dispatch by fd type, added InitramfsFile support.
@@ -28,9 +26,6 @@ pub fn sys_read(fd: usize, buf: usize, len: usize) -> i64 {
 
     match entry.fd_type {
         FdType::Stdin => read_stdin(buf, len, ttbr0),
-        FdType::InitramfsFile { file_index, offset } => {
-            read_initramfs_file(fd, file_index, offset, buf, len, ttbr0)
-        }
         FdType::VfsFile(ref file) => {
             if crate::task::user_mm::validate_user_buffer(ttbr0, buf, len, true).is_err() {
                 return errno::EFAULT;
@@ -80,67 +75,7 @@ fn read_stdin(buf: usize, len: usize, ttbr0: usize) -> i64 {
 }
 
 /// TEAM_178: Read from an initramfs file.
-fn read_initramfs_file(
-    fd: usize,
-    file_index: usize,
-    offset: usize,
-    buf: usize,
-    len: usize,
-    ttbr0: usize,
-) -> i64 {
-    // Validate user buffer
-    if crate::task::user_mm::validate_user_buffer(ttbr0, buf, len, true).is_err() {
-        return errno::EFAULT;
-    }
-
-    // Get file data from initramfs
-    let initramfs_guard = crate::fs::INITRAMFS.lock();
-    let initramfs = match initramfs_guard.as_ref() {
-        Some(i) => i,
-        None => return errno::EBADF,
-    };
-
-    // Find the file entry by index
-    let file_data = match initramfs.iter().nth(file_index) {
-        Some(entry) => entry.data,
-        None => return errno::EBADF,
-    };
-
-    let file_size = file_data.len();
-
-    // Q1: If at or past EOF, return 0
-    if offset >= file_size {
-        return 0;
-    }
-
-    // Q2: Calculate bytes to read (partial read returns what's available)
-    let available = file_size - offset;
-    let to_read = len.min(available);
-
-    // Copy data to userspace
-    for i in 0..to_read {
-        if !write_to_user_buf(ttbr0, buf, i, file_data[offset + i]) {
-            return errno::EFAULT;
-        }
-    }
-
-    drop(initramfs_guard);
-
-    // Update offset in fd table
-    let task = crate::task::current_task();
-    let mut fd_table = task.fd_table.lock();
-    if let Some(fd_entry) = fd_table.get_mut(fd) {
-        if let crate::task::fd_table::FdType::InitramfsFile {
-            offset: ref mut off,
-            ..
-        } = fd_entry.fd_type
-        {
-            *off = offset + to_read;
-        }
-    }
-
-    to_read as i64
-}
+// read_initramfs_file REMOVED
 
 fn poll_input_devices(ttbr0: usize, user_buf: usize, bytes_read: &mut usize, max_read: usize) {
     crate::input::poll();
@@ -258,80 +193,29 @@ pub fn sys_openat(path: usize, path_len: usize, flags: u32) -> i64 {
         Err(_) => return errno::EINVAL,
     };
 
-    // TEAM_194: Check if path is under /tmp - route to tmpfs
-    if tmpfs::is_tmpfs_path(path_str) {
-        let vfs_flags = OpenFlags::new(flags);
-        match vfs_open(path_str, vfs_flags, 0o666) {
-            Ok(file) => {
-                let mut fd_table = task.fd_table.lock();
-                return match fd_table.alloc(FdType::VfsFile(file)) {
-                    Some(fd) => fd as i64,
-                    None => errno_file::EMFILE,
-                };
+    // TEAM_205: All paths now go through generic vfs_open
+    let vfs_flags = OpenFlags::new(flags);
+    match vfs_open(path_str, vfs_flags, 0o666) {
+        Ok(file) => {
+            let mut fd_table = task.fd_table.lock();
+            match fd_table.alloc(FdType::VfsFile(file)) {
+                Some(fd) => fd as i64,
+                None => errno_file::EMFILE,
             }
-            Err(VfsError::NotFound) => return errno_file::ENOENT,
-            Err(VfsError::AlreadyExists) => return errno_file::EEXIST,
-            Err(VfsError::NotADirectory) => return errno_file::ENOTDIR,
-            Err(_) => return errno_file::EIO,
         }
-    }
-
-    let lookup_path = path_str.trim_start_matches('/');
-
-    // TEAM_176: Check for root directory open
-    if lookup_path.is_empty() || lookup_path == "." {
-        let mut fd_table = task.fd_table.lock();
-        return match fd_table.alloc(FdType::InitramfsDir {
-            dir_index: 0, // 0 = root
-            offset: 0,
-        }) {
-            Some(fd) => fd as i64,
-            None => errno_file::EMFILE,
-        };
-    }
-
-    let initramfs_guard = crate::fs::INITRAMFS.lock();
-    let initramfs = match initramfs_guard.as_ref() {
-        Some(i) => i,
-        None => return errno_file::ENOENT,
-    };
-
-    let mut found_entry = None;
-    let mut file_index = 0;
-    for (idx, entry) in initramfs.iter().enumerate() {
-        let entry_name = entry.name.trim_start_matches('/');
-        if entry_name == lookup_path {
-            found_entry = Some(entry.entry_type);
-            file_index = idx;
-            break;
+        Err(VfsError::NotFound) => errno_file::ENOENT,
+        Err(VfsError::AlreadyExists) => errno_file::EEXIST,
+        Err(VfsError::NotADirectory) => errno_file::ENOTDIR,
+        Err(VfsError::IsADirectory) => {
+            // If it's a directory, we need to handle it specifically for getdents if needed
+            // Actually vfs_open handles directories if flags allow.
+            // But let's check for O_DIRECTORY or similar if we care.
+            // For now, let's just retry opening as directory if needed.
+            // Wait, vfs_open already returns a File reflecting the directory if it's one.
+            // So we are done.
+            errno_file::EIO // Should not normally happen if vfs_open succeeded
         }
-    }
-
-    let entry_type = match found_entry {
-        Some(t) => t,
-        None => return errno_file::ENOENT,
-    };
-
-    drop(initramfs_guard);
-
-    let mut fd_table = task.fd_table.lock();
-
-    // TEAM_176: Allocate appropriate fd type based on entry type
-    let fd_type = if entry_type == CpioEntryType::Directory {
-        FdType::InitramfsDir {
-            dir_index: file_index,
-            offset: 0,
-        }
-    } else {
-        FdType::InitramfsFile {
-            file_index,
-            offset: 0,
-        }
-    };
-
-    match fd_table.alloc(fd_type) {
-        Some(fd) => fd as i64,
-        None => errno_file::EMFILE,
+        Err(_) => errno_file::EIO,
     }
 }
 
@@ -375,59 +259,6 @@ pub fn sys_fstat(fd: usize, stat_buf: usize) -> i64 {
             st_rdev: 0,
             st_size: 0,
             st_blksize: 0,
-            st_blocks: 0,
-            st_atime: 0,
-            st_atime_nsec: 0,
-            st_mtime: 0,
-            st_mtime_nsec: 0,
-            st_ctime: 0,
-            st_ctime_nsec: 0,
-        },
-        crate::task::fd_table::FdType::InitramfsFile { file_index, .. } => {
-            let initramfs_guard = crate::fs::INITRAMFS.lock();
-            let initramfs = match initramfs_guard.as_ref() {
-                Some(i) => i,
-                None => return errno::EBADF,
-            };
-
-            let file_size = initramfs
-                .iter()
-                .nth(file_index)
-                .map(|e| e.data.len())
-                .unwrap_or(0);
-
-            // TEAM_201: Updated to use extended Stat struct
-            Stat {
-                st_dev: 0,
-                st_ino: file_index as u64,
-                st_mode: crate::fs::mode::S_IFREG | 0o444,
-                st_nlink: 1,
-                st_uid: 0,
-                st_gid: 0,
-                st_rdev: 0,
-                st_size: file_size as u64,
-                st_blksize: 4096,
-                st_blocks: ((file_size + 511) / 512) as u64,
-                st_atime: 0,
-                st_atime_nsec: 0,
-                st_mtime: 0,
-                st_mtime_nsec: 0,
-                st_ctime: 0,
-                st_ctime_nsec: 0,
-            }
-        }
-        // TEAM_176: Directory fd returns directory mode
-        // TEAM_201: Updated to use extended Stat struct
-        crate::task::fd_table::FdType::InitramfsDir { .. } => Stat {
-            st_dev: 0,
-            st_ino: 0,
-            st_mode: crate::fs::mode::S_IFDIR | 0o555,
-            st_nlink: 2,
-            st_uid: 0,
-            st_gid: 0,
-            st_rdev: 0,
-            st_size: 0,
-            st_blksize: 4096,
             st_blocks: 0,
             st_atime: 0,
             st_atime_nsec: 0,

@@ -10,6 +10,7 @@
 extern crate alloc;
 
 use alloc::string::String;
+use alloc::sync::Arc;
 use alloc::vec::Vec;
 use los_utils::Spinlock;
 
@@ -67,7 +68,7 @@ static EXT4_MOUNTED: Spinlock<bool> = Spinlock::new(false);
 /// ext4 root partition is optional and can be mounted later.
 pub mod initramfs;
 
-pub static INITRAMFS: Spinlock<Option<initramfs::CpioArchive<'static>>> = Spinlock::new(None);
+pub static INITRAMFS: Spinlock<Option<Arc<initramfs::InitramfsSuperblock>>> = Spinlock::new(None);
 
 pub fn init() -> Result<(), FsError> {
     // TEAM_152: Updated to use FsError

@@ -19,6 +19,7 @@ use los_hal::timer::{self, Timer};
 use los_hal::{print, println};
 
 use crate::arch;
+use crate::fs::vfs::superblock::Superblock;
 use crate::task;
 
 // =============================================================================
@@ -305,17 +306,23 @@ fn init_userspace(dtb_slice: Option<&[u8]>) -> bool {
             // Initramfs access via High VA (TTBR1) for stability
             let initrd_va = mmu::phys_to_virt(start);
             let initrd_slice = unsafe { core::slice::from_raw_parts(initrd_va as *const u8, size) };
-            let archive = crate::fs::initramfs::CpioArchive::new(initrd_slice);
+
+            // TEAM_205: Initialize Initramfs VFS
+            let sb = crate::fs::initramfs::init_vfs(initrd_slice);
+
+            // Set as root in dcache
+            let root_inode = sb.root();
+            crate::fs::vfs::dcache().set_root(crate::fs::vfs::Dentry::root(root_inode));
 
             println!("Files in initramfs:");
-            for entry in archive.iter() {
+            for entry in sb.archive.iter() {
                 println!(" - {}", entry.name);
             }
 
             // TEAM_120: Store initramfs globally for syscalls
             {
                 let mut global_archive = crate::fs::INITRAMFS.lock();
-                *global_archive = Some(archive);
+                *global_archive = Some(sb);
             }
 
             // Spawn init from initramfs
@@ -337,7 +344,7 @@ fn spawn_init() -> bool {
         let archive_lock = crate::fs::INITRAMFS.lock();
         archive_lock
             .as_ref()
-            .and_then(|a| a.iter().find(|e| e.name == "init"))
+            .and_then(|sb| sb.archive.iter().find(|e| e.name == "init"))
             .map(|e| e.data)
     };
 

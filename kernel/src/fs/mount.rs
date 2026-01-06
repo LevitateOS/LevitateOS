@@ -79,6 +79,20 @@ impl FsType {
     }
 }
 
+impl core::convert::TryFrom<&str> for FsType {
+    type Error = MountError;
+
+    fn try_from(s: &str) -> Result<Self, Self::Error> {
+        match s {
+            "tmpfs" => Ok(FsType::Tmpfs),
+            "initramfs" => Ok(FsType::Initramfs),
+            "fat32" => Ok(FsType::Fat32),
+            "ext4" => Ok(FsType::Ext4),
+            _ => Err(MountError::UnsupportedFsType),
+        }
+    }
+}
+
 /// TEAM_201: A mounted filesystem entry
 ///
 /// Note: The actual superblock/inode references will be added in Phase 13.

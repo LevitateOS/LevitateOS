@@ -65,4 +65,7 @@ pub trait Superblock: Send + Sync {
 
     /// Allocate a new inode number
     fn alloc_ino(&self) -> u64;
+
+    /// Cast to Any for downcasting
+    fn as_any(&self) -> &dyn core::any::Any;
 }

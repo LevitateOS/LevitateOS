@@ -5,7 +5,6 @@
 
 use alloc::vec::Vec;
 use los_hal::IrqSafeLock;
-use los_utils::Spinlock;
 
 /// TEAM_168: Maximum number of open file descriptors per process.
 pub const MAX_FDS: usize = 64;
@@ -24,21 +23,6 @@ pub enum FdType {
     Stdout,
     /// Standard error (console)
     Stderr,
-    /// File from initramfs (read-only)
-    InitramfsFile {
-        /// Index into initramfs file table
-        file_index: usize,
-        /// Current read position
-        offset: usize,
-    },
-    /// TEAM_176: Directory from initramfs for getdents
-    InitramfsDir {
-        /// Directory path (stored as index into a path for simplicity)
-        /// 0 = root directory
-        dir_index: usize,
-        /// Current entry offset for iteration
-        offset: usize,
-    },
     /// TEAM_203: Generic VFS file (used for tmpfs, FAT32, etc.)
     VfsFile(FileRef),
 }

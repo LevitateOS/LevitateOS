@@ -1,7 +1,7 @@
 # VFS Implementation Status
 
 **Last Updated:** 2026-01-06  
-**Teams:** TEAM_200 (planning), TEAM_201 (Phase 12), TEAM_202 (Phase 13)
+**Teams:** TEAM_200 (planning), TEAM_201 (Phase 12), TEAM_202 (Phase 13), TEAM_203 (Phase 14-1), TEAM_204 (Phase 14-2), TEAM_205 (Phase 14-3)
 
 ---
 

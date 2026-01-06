@@ -48,12 +48,12 @@ pub fn sys_spawn(path_ptr: usize, path_len: usize) -> i64 {
 
     let archive_lock = crate::fs::INITRAMFS.lock();
     let archive = match archive_lock.as_ref() {
-        Some(a) => a,
+        Some(sb) => sb,
         None => return errno::ENOSYS,
     };
 
     let mut elf_data = None;
-    for entry in archive.iter() {
+    for entry in archive.archive.iter() {
         if entry.name == path {
             elf_data = Some(entry.data);
             break;
@@ -102,12 +102,12 @@ pub fn sys_exec(path_ptr: usize, path_len: usize) -> i64 {
 
     let archive_lock = crate::fs::INITRAMFS.lock();
     let archive = match archive_lock.as_ref() {
-        Some(a) => a,
+        Some(sb) => sb,
         None => return errno::ENOSYS,
     };
 
     let mut elf_data = None;
-    for entry in archive.iter() {
+    for entry in archive.archive.iter() {
         if entry.name == path {
             elf_data = Some(entry.data);
             break;
@@ -232,7 +232,7 @@ pub fn sys_spawn_args(path_ptr: usize, path_len: usize, argv_ptr: usize, argc: u
         };
 
         let mut elf_data = None;
-        for entry in archive.iter() {
+        for entry in archive.archive.iter() {
             if entry.name == path {
                 elf_data = Some(entry.data);
                 break;

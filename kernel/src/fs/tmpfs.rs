@@ -321,7 +321,11 @@ impl Superblock for Tmpfs {
     }
 
     fn alloc_ino(&self) -> u64 {
-        self.alloc_ino()
+        self.next_ino.fetch_add(1, Ordering::SeqCst)
+    }
+
+    fn as_any(&self) -> &dyn core::any::Any {
+        self
     }
 }
 
