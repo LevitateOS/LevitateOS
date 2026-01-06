@@ -7,13 +7,16 @@ use super::page::Page;
 // TEAM_130: This allocator uses expect() in critical paths where failure
 // indicates corrupted internal state (invariant violations). Per Rule 14
 // (Fail Loud, Fail Fast), panicking is correct for broken invariants.
+// TEAM_158: Added behavior ID traceability [B1]-[B11]
 
 pub const MAX_ORDER: usize = 21; // Up to 8GB (2^21 * 4KB)
 pub const PAGE_SIZE: usize = 4096;
 
+/// [B1] Buddy Allocator for physical frame management.
+/// Allocator starts with empty free lists.
 pub struct BuddyAllocator {
     // TEAM_135: Use IntrusiveList instead of raw NonNull pointers
-    /// Free lists for each order.
+    /// [B1] Free lists for each order (initially empty).
     /// free_lists[i] stores a doubly-linked list of free blocks of order i.
     free_lists: [IntrusiveList<Page>; MAX_ORDER],
 
@@ -66,14 +69,17 @@ impl BuddyAllocator {
         }
     }
 
-    /// Allocate a block of memory of the given order.
+    /// [B2] Allocate a block of memory of the given order.
+    /// [B3] Returns None (OOM) when pool exhausted.
+    /// [B4] alloc(order=N) allocates 2^N contiguous pages.
+    /// [B6] Block splitting creates buddy pairs.
     // TEAM_135: Refactored to use IntrusiveList API - eliminates unsafe in alloc path
     pub fn alloc(&mut self, order: usize) -> Option<usize> {
         if order >= MAX_ORDER {
             return None;
         }
 
-        // 1. Find the smallest free block of order >= requested
+        // [B2][B4] Find the smallest free block of order >= requested
         for i in order..MAX_ORDER {
             if !self.free_lists[i].is_empty() {
                 // Found a block! Pop it from the list.
@@ -83,7 +89,7 @@ impl BuddyAllocator {
                 // SAFETY: page_ptr comes from our mem_map via add_to_list
                 let page = unsafe { &mut *page_ptr.as_ptr() };
 
-                // 2. Split the block if it's larger than needed
+                // [B6] Split the block if it's larger than needed
                 for j in (order..i).rev() {
                     let buddy_pa = self.page_to_pa(page) + (1 << j) * PAGE_SIZE;
                     // TEAM_130: Buddy page must exist - this is an invariant of the allocator.
@@ -99,11 +105,11 @@ impl BuddyAllocator {
 
                 page.mark_allocated();
                 page.order = order as u8;
-                return Some(self.page_to_pa(page));
+                return Some(self.page_to_pa(page)); // [B2][B7] sequential addresses
             }
         }
 
-        None
+        None // [B3] OOM
     }
 
     /// Free a block of memory.
@@ -111,11 +117,12 @@ impl BuddyAllocator {
         self.free_block(pa, order);
     }
 
+    /// [B8] Free blocks are coalesced with buddies.
     fn free_block(&mut self, pa: usize, order: usize) {
         let mut curr_pa = pa;
         let mut curr_order = order;
 
-        // Coalesce with buddy if possible
+        // [B8] Coalesce with buddy if possible
         while curr_order < MAX_ORDER - 1 {
             let buddy_pa = curr_pa ^ ((1 << curr_order) * PAGE_SIZE);
 
@@ -125,11 +132,11 @@ impl BuddyAllocator {
                     // Pull buddy out of its list
                     self.remove_from_list(curr_order, buddy_page);
 
-                    // Coalesce
+                    // [B8] Coalesce
                     if buddy_pa < curr_pa {
                         curr_pa = buddy_pa;
                     }
-                    curr_order += 1;
+                    curr_order += 1; // [B8] merged into larger block
                     continue;
                 }
             }
@@ -199,52 +206,56 @@ mod tests {
         allocator
     }
 
+    /// Tests: [B1] Allocator starts empty, [B2] alloc(order=0) returns single page, [B3] OOM returns None
     #[test]
     fn test_alloc_order_0() {
         let mut allocator = create_allocator(1); // 1 page
 
-        let addr = allocator.alloc(0);
+        let addr = allocator.alloc(0); // [B2]
         assert!(addr.is_some());
-        assert_eq!(addr.unwrap(), 0);
+        assert_eq!(addr.unwrap(), 0); // [B2] single page address
 
         let addr2 = allocator.alloc(0);
-        assert!(addr2.is_none()); // OOM
+        assert!(addr2.is_none()); // [B3] OOM
     }
 
+    /// Tests: [B4] alloc(order=N) allocates 2^N contiguous pages, [B5] Large allocation consumes entire pool
     #[test]
     fn test_alloc_large() {
         let mut allocator = create_allocator(4); // 4 pages
 
-        // alloc order 2 (4 pages)
+        // [B4] alloc order 2 (4 pages)
         let addr = allocator.alloc(2);
         assert!(addr.is_some());
-        assert_eq!(addr.unwrap(), 0);
+        assert_eq!(addr.unwrap(), 0); // [B4] 2^2 = 4 contiguous pages
 
-        // alloc order 0 should fail
-        assert!(allocator.alloc(0).is_none());
+        // [B5] alloc order 0 should fail - pool consumed
+        assert!(allocator.alloc(0).is_none()); // [B5]
     }
 
+    /// Tests: [B6] Block splitting creates buddy pairs, [B7] Sequential allocs get sequential addresses
     #[test]
     fn test_splitting() {
         let mut allocator = create_allocator(4); // 4 pages
 
-        // Request order 0 (1 page). Should split order 2 -> order 1 -> order 0
+        // [B6] Request order 0 (1 page). Should split order 2 -> order 1 -> order 0
         let addr1 = allocator.alloc(0);
         assert!(addr1.is_some());
-        assert_eq!(addr1.unwrap(), 0);
+        assert_eq!(addr1.unwrap(), 0); // [B7] sequential
 
-        // Remaining: Order 0 (at 4K), Order 1 (at 8K)
+        // [B6] Remaining: Order 0 (at 4K), Order 1 (at 8K)
         let addr2 = allocator.alloc(0);
         assert!(addr2.is_some());
-        assert_eq!(addr2.unwrap(), 4096);
+        assert_eq!(addr2.unwrap(), 4096); // [B7] sequential
 
         let addr3 = allocator.alloc(1);
         assert!(addr3.is_some());
-        assert_eq!(addr3.unwrap(), 8192);
+        assert_eq!(addr3.unwrap(), 8192); // [B7] sequential
 
         assert!(allocator.alloc(0).is_none());
     }
 
+    /// Tests: [B8] Free blocks are coalesced with buddies, [B9] Coalesced blocks can be reallocated
     #[test]
     fn test_coalescing() {
         let mut allocator = create_allocator(4);
@@ -253,32 +264,33 @@ mod tests {
         let addr2 = allocator.alloc(0).unwrap(); // 4096
         let addr3 = allocator.alloc(1).unwrap(); // 8192
 
-        // Free in reverse order to test coalescing
+        // [B8] Free in reverse order to test coalescing
         allocator.free(addr1, 0);
         allocator.free(addr2, 0);
-        // Should have coalesced into Order 1 at 0
+        // [B8] Should have coalesced into Order 1 at 0
 
         allocator.free(addr3, 1);
-        // Should have coalesced into Order 2 at 0
+        // [B8] Should have coalesced into Order 2 at 0
 
-        // Attempt to allocate Order 2 again
+        // [B9] Attempt to allocate Order 2 again - coalesced block available
         let addr_big = allocator.alloc(2);
         assert!(addr_big.is_some());
-        assert_eq!(addr_big.unwrap(), 0);
+        assert_eq!(addr_big.unwrap(), 0); // [B9] reallocated
     }
 
+    /// Tests: [B10] Non-power-of-two ranges are handled, [B11] Leftover pages added to appropriate order
     #[test]
     fn test_alloc_unaligned_range() {
-        // Test adding a range that isn't power-of-two aligned
+        // [B10] Test adding a range that isn't power-of-two aligned
         // 5 pages. 0-16K (Order 2), 16K-20K (Order 0)
         let mut allocator = create_allocator(5);
 
         let addr1 = allocator.alloc(2); // Should get the 0-16K block
         assert!(addr1.is_some());
 
-        // The remaining 4KB (page 4) should be free as Order 0
+        // [B11] The remaining 4KB (page 4) should be free as Order 0
         let addr2 = allocator.alloc(0);
         assert!(addr2.is_some());
-        assert_eq!(addr2.unwrap(), 16384);
+        assert_eq!(addr2.unwrap(), 16384); // [B11] leftover page at correct address
     }
 }

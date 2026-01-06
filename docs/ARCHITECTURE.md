@@ -1,8 +1,6 @@
 # LevitateOS Architecture
 
-> ⚠️ **CURRENT STATE (2026-01-05):** System boots but is NOT interactive.  
-> See `docs/planning/interactive-shell-phase8b/POSTMORTEM.md` for details.  
-> **Fix:** Comment out boot hijack at `kernel/src/main.rs:612`
+> ⚠️ **CURRENT STATE (2026-01-05):** System boots to an interactive shell.
 
 **TEAM_009: Workspace Refactoring**
 

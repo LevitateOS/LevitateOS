@@ -5,11 +5,14 @@
 //! - Managing user task state
 //! - User address space management
 //!
+//! TEAM_158: Behavior IDs [PROC3]-[PROC4] for traceability.
+//!
 //! Reference: ARM Architecture Reference Manual, Exception Levels
 
 use core::arch::asm;
 
-/// TEAM_073: Enter user mode (EL0) at the specified entry point.
+/// [PROC3] Enter user mode (EL0) at the specified entry point.
+/// [PROC4] User TTBR0 must be set before calling this.
 ///
 /// This function configures the CPU state for user mode execution and
 /// performs an `eret` (Exception Return) to enter EL0.
@@ -84,8 +87,8 @@ pub unsafe fn enter_user_mode(entry_point: usize, user_sp: usize) -> ! {
             "mov x29, xzr",
             "mov x30, xzr",
 
-            // Exception return to EL0
-            "eret",
+            // [PROC3] Exception return to EL0
+            "eret", // [PROC3] transitions to EL0
 
             entry = in(reg) entry_point,
             sp = in(reg) user_sp,

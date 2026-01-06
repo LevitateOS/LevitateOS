@@ -130,8 +130,17 @@ LevitateOS follows **Rule 4: Silence is Golden** — production builds are silen
 
 ## 🤝 Contributing
 
-See `.agent/rules/` for development guidelines:
+Contributions are welcome! Please read our **[Contributing Guide](CONTRIBUTING.md)** and **[Code of Conduct](CODE_OF_CONDUCT.md)** before submitting pull requests.
+
+For security vulnerabilities, please refer to our **[Security Policy](SECURITY.md)**.
+
+More technical guidelines can be found in `.agent/rules/`:
 - `kernel-development.md`: Rust kernel development SOP
 - `behavior-testing.md`: Testing and traceability SOP
 
 Team logs are tracked in `.teams/` directories.
+
+## 📄 License
+
+LevitateOS is licensed under the **[MIT License](LICENSE)**.
+```

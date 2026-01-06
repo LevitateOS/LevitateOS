@@ -2,6 +2,8 @@
 //!
 //! This module provides the high-level interface for creating and
 //! running user processes.
+//!
+//! TEAM_158: Behavior IDs [PROC1]-[PROC4] for traceability.
 
 use crate::loader::elf::Elf;
 use crate::loader::elf::ElfError;
@@ -30,7 +32,8 @@ impl From<ElfError> for SpawnError {
     }
 }
 
-/// TEAM_073: Spawn a user process from an ELF binary in memory.
+/// [PROC1] Spawn a user process from an ELF binary in memory.
+/// [PROC2] Creates user page table for the new process.
 ///
 /// # Arguments
 /// * `elf_data` - Raw ELF file contents
@@ -43,9 +46,9 @@ pub fn spawn_from_elf(elf_data: &[u8]) -> Result<UserTask, SpawnError> {
     let elf = Elf::parse(elf_data)?;
     los_hal::println!("[SPAWN] ELF parsed.");
 
-    // 2. Create user page table
+    // [PROC2] Create user page table
     los_hal::println!("[SPAWN] Creating user page table...");
-    let ttbr0_phys = user_mm::create_user_page_table()
+    let ttbr0_phys = user_mm::create_user_page_table() // [PROC2]
         .ok_or(SpawnError::PageTable(MmuError::AllocationFailed))?;
 
     // 3. Load ELF segments into user address space

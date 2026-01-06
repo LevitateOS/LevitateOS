@@ -48,7 +48,7 @@ The userspace process runs but keyboard interrupts may not be reaching it.
 
 | Issue | Location | Severity |
 |-------|----------|----------|
-| Boot hijack | `kernel/src/main.rs:597` | CRITICAL |
+| Boot hijack | RESOLVED (Removed) | N/A |
 | No input echo | `userspace/hello/src/main.rs` | HIGH |
 | No boot complete banner | `kernel/src/main.rs` | MEDIUM |
 | Unclear boot stages | Throughout | MEDIUM |

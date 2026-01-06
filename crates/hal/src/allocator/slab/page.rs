@@ -1,12 +1,14 @@
 // TEAM_051: Slab Allocator - Page Structure
 // Layout: [data: 4032 bytes][metadata: 64 bytes]
 // See docs/planning/slab-allocator/phase-2.md for design
+// TEAM_158: Added behavior ID traceability [SP1]-[SP8]
 
 // TEAM_135: Use shared IntrusiveList module instead of slab-local SlabList
 use super::super::intrusive_list::ListNode;
 use core::ptr::NonNull;
 use core::sync::atomic::{AtomicU64, Ordering};
 
+/// [SP1] Page size is 4096 bytes
 pub const PAGE_SIZE: usize = 4096;
 pub const META_SIZE: usize = 64;
 pub const DATA_SIZE: usize = PAGE_SIZE - META_SIZE;
@@ -87,51 +89,52 @@ impl SlabPage {
         }
     }
 
-    /// Allocate one object from this page.
+    /// [SP2] Allocate one object from this page.
+    /// [SP3] Increments allocated_count.
+    /// [SP7] Returns None when full.
     ///
     /// Returns the byte offset within the page to the allocated object,
     /// or None if the page is full.
     ///
-    /// # Behavior [S1]
-    /// - Find first free slot (first zero bit in bitfield)
-    /// - Set bit to mark as allocated
-    /// - Increment allocated_count
-    /// - Return offset = bit_index * object_size
+    /// Behaviors:
+    /// - [SP2] Returns sequential offsets
+    /// - [SP3] Increments allocated_count
+    /// - [SP7] Returns None when full
     pub fn alloc_object(&mut self, object_size: usize, objects_per_page: usize) -> Option<usize> {
-        // Check if we've already allocated the maximum number of objects
+        // [SP7] Check if we've already allocated the maximum number of objects
         if self.meta.allocated_count as usize >= objects_per_page {
-            return None;
+            return None; // [SP7] returns None when full
         }
         
         let slot = self.find_free_slot()?;
 
         self.set_allocated(slot);
-        self.meta.allocated_count += 1;
+        self.meta.allocated_count += 1; // [SP3]
 
-        Some(slot * object_size)
+        Some(slot * object_size) // [SP2] sequential offset
     }
 
-    /// Free an object at the given offset.
+    /// [SP4] Free an object at the given offset.
+    /// [SP5] Allows reallocation of same slot.
     ///
-    /// # Behavior [S4][S5]
-    /// - Compute slot index from offset
-    /// - Clear bit in bitfield
-    /// - Decrement allocated_count
+    /// Behaviors:
+    /// - [SP4] Decrements allocated_count
+    /// - [SP5] Clears bit allowing reallocation
     pub fn free_object(&mut self, offset: usize, object_size: usize) {
         let slot = offset / object_size;
 
-        self.set_free(slot);
-        self.meta.allocated_count = self.meta.allocated_count.saturating_sub(1);
+        self.set_free(slot); // [SP5] allows reallocation
+        self.meta.allocated_count = self.meta.allocated_count.saturating_sub(1); // [SP4]
     }
 
-    /// Check if the page is full.
+    /// [SP6] Check if the page is full.
     pub fn is_full(&self, objects_per_page: usize) -> bool {
-        self.meta.allocated_count as usize >= objects_per_page
+        self.meta.allocated_count as usize >= objects_per_page // [SP6] returns true at capacity
     }
 
-    /// Check if the page is empty (no objects allocated).
+    /// [SP8] Check if the page is empty (no objects allocated).
     pub fn is_empty(&self) -> bool {
-        self.meta.allocated_count == 0
+        self.meta.allocated_count == 0 // [SP8] returns true when all freed
     }
 
     /// Get the base virtual address of this page.
@@ -187,12 +190,13 @@ impl ListNode for SlabPage {
 mod tests {
     use super::*;
 
+    /// Tests: [SP1] Page size is 4096 bytes
     #[test]
     fn test_page_size_constants() {
-        assert_eq!(PAGE_SIZE, 4096);
+        assert_eq!(PAGE_SIZE, 4096); // [SP1]
         assert_eq!(META_SIZE, 64);
         assert_eq!(DATA_SIZE, 4032);
-        assert_eq!(core::mem::size_of::<SlabPage>(), PAGE_SIZE);
+        assert_eq!(core::mem::size_of::<SlabPage>(), PAGE_SIZE); // [SP1]
         assert_eq!(core::mem::size_of::<SlabPageMeta>(), META_SIZE);
     }
 
@@ -212,6 +216,7 @@ mod tests {
         }
     }
 
+    /// Tests: [SP2] alloc_object returns sequential offsets, [SP3] increments allocated_count
     #[test]
     fn test_alloc_object_returns_sequential_offsets() {
         let mut buffer = [0u8; PAGE_SIZE];
@@ -222,19 +227,20 @@ mod tests {
             let page = &mut *(page_ptr as *mut SlabPage);
 
             let offset1 = page.alloc_object(64, 63).unwrap();
-            assert_eq!(offset1, 0);
-            assert_eq!(page.meta.allocated_count, 1);
+            assert_eq!(offset1, 0); // [SP2] sequential
+            assert_eq!(page.meta.allocated_count, 1); // [SP3]
 
             let offset2 = page.alloc_object(64, 63).unwrap();
-            assert_eq!(offset2, 64);
-            assert_eq!(page.meta.allocated_count, 2);
+            assert_eq!(offset2, 64); // [SP2] sequential
+            assert_eq!(page.meta.allocated_count, 2); // [SP3]
 
             let offset3 = page.alloc_object(64, 63).unwrap();
-            assert_eq!(offset3, 128);
-            assert_eq!(page.meta.allocated_count, 3);
+            assert_eq!(offset3, 128); // [SP2] sequential
+            assert_eq!(page.meta.allocated_count, 3); // [SP3]
         }
     }
 
+    /// Tests: [SP4] free_object decrements allocated_count, [SP5] allows reallocation of same slot
     #[test]
     fn test_free_object_clears_bit() {
         let mut buffer = [0u8; PAGE_SIZE];
@@ -248,14 +254,15 @@ mod tests {
             assert_eq!(page.meta.allocated_count, 1);
 
             page.free_object(offset, 64);
-            assert_eq!(page.meta.allocated_count, 0);
+            assert_eq!(page.meta.allocated_count, 0); // [SP4] decremented
 
-            // Should be able to allocate same slot again
+            // [SP5] Should be able to allocate same slot again
             let offset2 = page.alloc_object(64, 63).unwrap();
-            assert_eq!(offset, offset2);
+            assert_eq!(offset, offset2); // [SP5] same slot reused
         }
     }
 
+    /// Tests: [SP6] is_full returns true at capacity, [SP7] alloc_object returns None when full
     #[test]
     fn test_is_full_after_max_allocations() {
         let mut buffer = [0u8; PAGE_SIZE];
@@ -270,11 +277,12 @@ mod tests {
                 page.alloc_object(64, 63).unwrap();
             }
 
-            assert!(page.is_full(63));
-            assert!(page.alloc_object(64, 63).is_none());
+            assert!(page.is_full(63)); // [SP6] full at capacity
+            assert!(page.alloc_object(64, 63).is_none()); // [SP7] returns None when full
         }
     }
 
+    /// Tests: [SP8] is_empty returns true when all freed
     #[test]
     fn test_is_empty_after_freeing_all() {
         let mut buffer = [0u8; PAGE_SIZE];
@@ -292,7 +300,7 @@ mod tests {
             page.free_object(offset1, 64);
             page.free_object(offset2, 64);
 
-            assert!(page.is_empty());
+            assert!(page.is_empty()); // [SP8] empty when all freed
         }
     }
 }

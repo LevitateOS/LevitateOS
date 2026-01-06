@@ -1,5 +1,6 @@
 // TEAM_051: Slab Allocator - Cache (Per-Size-Class)
 // See docs/planning/slab-allocator/phase-2.md behavioral contracts [S1]-[S6]
+// TEAM_158: Added behavior ID traceability [SC1]-[SC3]
 
 // TEAM_135: Use shared IntrusiveList instead of slab-local SlabList
 use super::super::intrusive_list::IntrusiveList;
@@ -12,10 +13,11 @@ pub struct SizeClass {
     pub objects_per_page: usize,
 }
 
-/// Size classes optimized for Google Tensor GS101 (64-byte cache lines).
+/// [SC1] Size classes optimized for Google Tensor GS101 (64-byte cache lines).
+/// 6 size classes: 64B to 2048B
 ///
 /// Uses power-of-two sizes from 64B to 2048B.
-/// Objects per page = floor(DATA_SIZE / object_size)
+/// [SC2] Objects per page = floor(DATA_SIZE / object_size)
 pub const SIZE_CLASSES: [SizeClass; 6] = [
     SizeClass {
         object_size: 64,
@@ -69,14 +71,15 @@ pub struct SlabCache {
 }
 
 impl SlabCache {
-    /// Create a new slab cache for the given size class.
+    /// [SC3] Create a new slab cache for the given size class.
+    /// New cache has empty lists.
     // TEAM_135: IntrusiveList::new() is const, so this remains const-compatible
     pub const fn new(class_index: usize) -> Self {
         Self {
             class_index,
-            partial: IntrusiveList::new(),
-            full: IntrusiveList::new(),
-            empty: IntrusiveList::new(),
+            partial: IntrusiveList::new(), // [SC3] empty
+            full: IntrusiveList::new(),    // [SC3] empty
+            empty: IntrusiveList::new(),   // [SC3] empty
             total_allocs: 0,
             total_frees: 0,
         }
@@ -199,34 +202,36 @@ impl SlabCache {
 mod tests {
     use super::*;
 
+    /// Tests: [SC1] 6 size classes 64B-2048B, [SC2] objects per page calculated correctly
     #[test]
     fn test_size_class_constants() {
         use super::super::page::DATA_SIZE; // TEAM_051: Import for tests
 
-        assert_eq!(SIZE_CLASSES.len(), 6);
+        assert_eq!(SIZE_CLASSES.len(), 6); // [SC1] 6 size classes
 
         // Verify sizes are power-of-two
         for class in &SIZE_CLASSES {
             assert!(class.object_size.is_power_of_two());
         }
 
-        // Verify 64B minimum (cache line)
+        // [SC1] Verify 64B minimum (cache line)
         assert_eq!(SIZE_CLASSES[0].object_size, 64);
 
-        // Verify objects per page calculation
+        // [SC2] Verify objects per page calculation
         for class in &SIZE_CLASSES {
             let actual = DATA_SIZE / class.object_size;
-            assert_eq!(class.objects_per_page, actual);
+            assert_eq!(class.objects_per_page, actual); // [SC2]
         }
     }
 
+    /// Tests: [SC3] New cache has empty lists
     #[test]
     fn test_new_cache() {
         let cache = SlabCache::new(0);
         assert_eq!(cache.class_index, 0);
-        assert!(cache.partial.is_empty());
-        assert!(cache.full.is_empty());
-        assert!(cache.empty.is_empty());
+        assert!(cache.partial.is_empty()); // [SC3] empty
+        assert!(cache.full.is_empty());    // [SC3] empty
+        assert!(cache.empty.is_empty());   // [SC3] empty
         assert_eq!(cache.total_allocs, 0);
         assert_eq!(cache.total_frees, 0);
     }

@@ -21,7 +21,6 @@
 extern crate alloc;
 
 use crate::virtio::{StaticMmioTransport, VirtioHal};
-use alloc::vec::Vec;
 use los_utils::Spinlock;
 use virtio_drivers::device::net::VirtIONet;
 
@@ -69,79 +68,5 @@ pub fn init(transport: StaticMmioTransport) {
             *NET_DEVICE.lock() = Some(net);
         }
         Err(e) => crate::println!("Failed to init VirtIO Net: {:?}", e),
-    }
-}
-
-/// [NET3] Returns MAC address when initialized
-/// [NET4] Returns None when not initialized
-#[allow(dead_code)]
-pub fn mac_address() -> Option<[u8; 6]> {
-    NET_DEVICE
-        .lock()
-        .as_ref()
-        .map(|net: &VirtIONet<VirtioHal, StaticMmioTransport, QUEUE_SIZE>| net.mac_address()) // [NET3], [NET4]
-}
-
-/// [NET5] Returns true when TX queue has space
-/// [NET6] Returns false when not initialized
-#[allow(dead_code)]
-pub fn can_send() -> bool {
-    NET_DEVICE.lock().as_ref().map_or(
-        false,
-        |net: &VirtIONet<VirtioHal, StaticMmioTransport, QUEUE_SIZE>| net.can_send(),
-    ) // [NET5], [NET6]
-}
-
-/// [NET7] Returns true when RX packet available
-/// [NET8] Returns false when not initialized
-#[allow(dead_code)]
-pub fn can_recv() -> bool {
-    NET_DEVICE.lock().as_ref().map_or(
-        false,
-        |net: &VirtIONet<VirtioHal, StaticMmioTransport, QUEUE_SIZE>| net.can_recv(),
-    ) // [NET7], [NET8]
-}
-
-/// [NET9] Transmits packet when device ready
-/// [NET10] Returns NotInitialized when device missing
-/// [NET11] Returns DeviceBusy when queue full
-#[allow(dead_code)]
-pub fn send(data: &[u8]) -> Result<(), NetError> {
-    let mut dev = NET_DEVICE.lock();
-    let net = dev.as_mut().ok_or(NetError::NotInitialized)?; // [NET10]
-
-    if !net.can_send() {
-        return Err(NetError::DeviceBusy); // [NET11]
-    }
-
-    // [NET9] Create TX buffer and send
-    let mut tx_buf = net.new_tx_buffer(data.len());
-    tx_buf.packet_mut().copy_from_slice(data);
-
-    net.send(tx_buf).map_err(|_| NetError::SendFailed)
-}
-
-/// [NET12] Returns packet data when available
-/// [NET13] Returns None when no packet
-/// [NET14] Recycles RX buffer after read
-#[allow(dead_code)]
-pub fn receive() -> Option<Vec<u8>> {
-    let mut dev = NET_DEVICE.lock();
-    let net = dev.as_mut()?; // [NET13] implicit None if not initialized
-
-    if !net.can_recv() {
-        return None; // [NET13]
-    }
-
-    match net.receive() {
-        Ok(rx_buf) => {
-            let rx_buf: virtio_drivers::device::net::RxBuffer = rx_buf;
-            // [NET12] Copy packet data
-            let data = rx_buf.packet().to_vec();
-            // [NET14] Recycle buffer for reuse
-            let _ = net.recycle_rx_buffer(rx_buf);
-            Some(data)
-        }
-        Err(_) => None,
     }
 }

@@ -7,22 +7,22 @@ TEAM_030: Behavior-driven test inventory
 ## File Groups
 
 ### Group 1: Core Primitives
-- `levitate-utils/src/lib.rs` (Spinlock, RingBuffer)
+- `crates/utils/src/lib.rs` (Spinlock, RingBuffer) — `los_utils`
 
 ### Group 2: Interrupt & Synchronization
-- `levitate-hal/src/interrupts.rs`
-- `levitate-hal/src/lib.rs` (IrqSafeLock)
-- `levitate-hal/src/gic.rs`
+- `crates/hal/src/interrupts.rs` — `los_hal`
+- `crates/hal/src/lib.rs` (IrqSafeLock) — `los_hal`
+- `crates/hal/src/gic.rs` — `los_hal`
 
 ### Group 3: Serial I/O
-- `levitate-hal/src/uart_pl011.rs`
-- `levitate-hal/src/console.rs`
+- `crates/hal/src/uart_pl011.rs` — `los_hal`
+- `crates/hal/src/console.rs` — `los_hal`
 
 ### Group 4: Memory Management
-- `levitate-hal/src/mmu.rs`
+- `crates/hal/src/mmu.rs` — `los_hal`
 
 ### Group 5: Timer
-- `levitate-hal/src/timer.rs`
+- `crates/hal/src/timer.rs` — `los_hal`
 
 ### Group 6: Kernel Drivers (runtime-only, no unit tests)
 - `kernel/src/block.rs`
@@ -203,8 +203,6 @@ TEAM_030: Behavior-driven test inventory
 
 | Group | Module | Behaviors | Tested | Gap |
 |-------|--------|-----------|--------|-----|
-| Group | Module | Behaviors | Tested | Gap |
-|-------|--------|-----------|--------|-----|
 | 1 | Spinlock | 6 | 6 | ✅ |
 | 1 | RingBuffer | 8 | 8 | ✅ |
 | 2 | interrupts | 6 | 6 | ✅ |
@@ -248,8 +246,8 @@ None!
 TEAM_039: Added per behavior-testing SOP
 
 ### File Groups
-- `levitate-hal/src/fdt.rs` (FDT parsing)
-- `kernel/src/fs/initramfs.rs` (CPIO parser)
+- `crates/hal/src/fdt.rs` (FDT parsing) — `los_hal`
+- `crates/utils/src/cpio.rs` (CPIO parser) — `los_utils`
 
 ### FDT Module (fdt.rs)
 
@@ -285,14 +283,12 @@ TEAM_039: Added per behavior-testing SOP
 - **FDT**: 10/10 behaviors tested ✅
 - **CPIO**: 10/10 behaviors tested ✅
 - **Total**: 20/20 behaviors documented ✅
-- **Note**: TEAM_039 relocated CPIO to `levitate-utils/src/cpio.rs` - tests run via `cargo test --features std`.
+- **Note**: TEAM_039 relocated CPIO to `crates/utils/src/cpio.rs` (`los_utils`) - tests run via `cargo test -p los_utils --features std`.
 
 ---
 
 ## Updated Overall Summary (TEAM_039)
 
-| Group | Module | Behaviors | Tested | Gap |
-|-------|--------|-----------|--------|-----|
 | Group | Module | Behaviors | Tested | Gap |
 |-------|--------|-----------|--------|-----|
 | 1 | Spinlock | 6 | 6 | ✅ |
@@ -315,10 +311,10 @@ TEAM_039: Added per behavior-testing SOP
 TEAM_051: Added slab allocator for fixed-size object allocation
 
 ### File Groups
-- `levitate-hal/src/allocator/slab/list.rs` (Intrusive linked list)
-- `levitate-hal/src/allocator/slab/page.rs` (Slab page structure)
-- `levitate-hal/src/allocator/slab/cache.rs` (Per-size-class allocator)
-- `levitate-hal/src/allocator/slab/mod.rs` (Top-level slab API)
+- `crates/hal/src/allocator/slab/list.rs` (Intrusive linked list) — `los_hal`
+- `crates/hal/src/allocator/slab/page.rs` (Slab page structure) — `los_hal`
+- `crates/hal/src/allocator/slab/cache.rs` (Per-size-class allocator) — `los_hal`
+- `crates/hal/src/allocator/slab/mod.rs` (Top-level slab API) — `los_hal`
 
 ### SlabList (intrusive linked list)
 
@@ -377,8 +373,8 @@ TEAM_051: Added slab allocator for fixed-size object allocation
 TEAM_055: Added buddy allocator for physical page frame management
 
 ### File Groups
-- `levitate-hal/src/allocator/buddy.rs` (Buddy allocator core)
-- `levitate-hal/src/allocator/page.rs` (Page descriptor struct)
+- `crates/hal/src/allocator/buddy.rs` (Buddy allocator core) — `los_hal`
+- `crates/hal/src/allocator/page.rs` (Page descriptor struct) — `los_hal`
 
 ### BuddyAllocator (physical frame allocator)
 
@@ -554,7 +550,7 @@ TEAM_071: Added multitasking behaviors for Phase 7
 ### File Groups
 - `kernel/src/task/mod.rs` (Task primitives, context switch)
 - `kernel/src/task/scheduler.rs` (Round-robin scheduler)
-- `levitate-hal/src/mmu.rs` (unmap_page, table reclamation)
+- `crates/hal/src/mmu.rs` (unmap_page, table reclamation) — `los_hal`
 
 ### Context Switching (task/mod.rs)
 
@@ -588,7 +584,7 @@ TEAM_071: Added multitasking behaviors for Phase 7
 | MT16 | pick_next() removes from front (FIFO) | ✅ | Runtime |
 | MT17 | schedule() calls switch_to when task available | ✅ | Runtime |
 
-### Unmap Page (levitate-hal/src/mmu.rs)
+### Unmap Page (crates/hal/src/mmu.rs)
 
 | ID | Behavior | Tested? | Test |
 |----|----------|---------|------|
@@ -647,7 +643,7 @@ TEAM_115: Added userspace shell behaviors for Phase 8b
 - `kernel/src/syscall.rs` (System call handlers)
 - `kernel/src/terminal.rs` (Console GPU output)
 - `kernel/src/task/process.rs` (User process spawning)
-- `userspace/hello/src/main.rs` (Interactive shell)
+- `userspace/shell/src/main.rs` (Interactive shell)
 
 ### Syscall Handler (syscall.rs)
 
@@ -774,3 +770,33 @@ TEAM_129: Added GPU display regression tests to prevent black screen issues
 - **Shell output invisible**: write_str not flushing → GPU7 fails
 - **Shell not running**: Init not yielding → SHELL2/SHELL3 fail
 
+---
+
+## Maintenance Log
+
+### TEAM_157: Crate Reorganization Update (2026-01-06)
+
+Updated all file paths to reflect new crate structure:
+- `levitate-utils/` → `crates/utils/` (`los_utils`)
+- `levitate-hal/` → `crates/hal/` (`los_hal`)
+- `levitate-terminal/` → `crates/term/` (`los_term`)
+- `levitate-virtio/` → `crates/virtio/` (`los_virtio`)
+- `levitate-pci/` → `crates/pci/` (`los_pci`)
+- `levitate-gpu/` → `crates/gpu/` (`los_gpu`)
+- `levitate-error/` → `crates/error/` (`los_error`)
+
+Fixed duplicate table headers in summary sections.
+
+### TEAM_158: Traceability Sweep (2026-01-06)
+
+Added behavior ID traceability comments per Rules 4-5:
+- [SL1-SL8] → `crates/hal/src/allocator/intrusive_list.rs`
+- [SP1-SP8] → `crates/hal/src/allocator/slab/page.rs`
+- [SC1-SC3] → `crates/hal/src/allocator/slab/cache.rs`
+- [SA1-SA4] → `crates/hal/src/allocator/slab/mod.rs`
+- [B1-B11] → `crates/hal/src/allocator/buddy.rs`
+
+**34 behaviors now have full source+test traceability.**
+
+Runtime-only behaviors (NET, TERM, MT, SYS, GPU, PROC, SH, SHELL) remain
+acceptable without source traceability per Rule 7 (Test Abstraction Levels).

@@ -4,6 +4,8 @@
 //! Supports builtin commands: `echo`, `help`, `clear`, `exit`
 //!
 //! `TEAM_118`: Refactored to use `libsyscall`.
+//!
+//! TEAM_158: Behavior IDs [SH1]-[SH7] for traceability.
 
 #![no_std]
 #![no_main]
@@ -62,16 +64,16 @@ fn execute(line: &[u8]) {
         return;
     }
 
-    // TEAM_142: Builtin: exit [--verbose]
+    // [SH7] Builtin: exit command terminates shell
     // exit         -> graceful shutdown (minimal output)
     // exit --verbose -> graceful shutdown with golden file output
     if bytes_eq(cmd, b"exit") {
         println!("Goodbye!");
-        libsyscall::shutdown(libsyscall::shutdown_flags::NORMAL);
+        libsyscall::shutdown(libsyscall::shutdown_flags::NORMAL); // [SH7]
     }
     if bytes_eq(cmd, b"exit --verbose") {
         println!("Goodbye! (verbose shutdown for golden file)");
-        libsyscall::shutdown(libsyscall::shutdown_flags::VERBOSE);
+        libsyscall::shutdown(libsyscall::shutdown_flags::VERBOSE); // [SH7]
     }
 
     // Builtin: test (POSIX: exit 0 if no args, used for shell scripting)
@@ -80,7 +82,7 @@ fn execute(line: &[u8]) {
         return;
     }
 
-    // Builtin: help
+    // [SH6] Builtin: help command shows available commands
     if bytes_eq(cmd, b"help") {
         println!("LevitateOS Shell (lsh) v0.1");
         println!("Commands:");
@@ -90,7 +92,7 @@ fn execute(line: &[u8]) {
         println!("  exit           - Shutdown system");
         println!("  exit --verbose - Shutdown with detailed output");
         println!("  test           - Exit 0 (for scripting)");
-        return;
+        return; // [SH6]
     }
 
     // Builtin: clear (ANSI escape)
@@ -99,15 +101,15 @@ fn execute(line: &[u8]) {
         return;
     }
 
-    // Builtin: echo
+    // [SH5] Builtin: echo command outputs text
     if starts_with(cmd, b"echo ") {
         if let Ok(s) = core::str::from_utf8(&cmd[5..]) {
-            println!("{}", s);
+            println!("{}", s); // [SH5] echo outputs text
         }
         return;
     }
     if bytes_eq(cmd, b"echo") {
-        println!();
+        println!(); // [SH5] empty echo
         return;
     }
 
@@ -120,9 +122,12 @@ fn execute(line: &[u8]) {
     }
 }
 
-/// Entry point for the shell.
+/// [SH1] Entry point for the shell - prints banner on startup.
+/// [SH2] Prints # prompt.
+/// [SH3] Reads input line.
 #[no_mangle]
 pub extern "C" fn _start() -> ! {
+    // [SH1] Shell prints banner on startup
     println!();
     println!("LevitateOS Shell (lsh) v0.1");
     println!("Type 'help' for commands.");
@@ -131,8 +136,8 @@ pub extern "C" fn _start() -> ! {
     let mut buf = [0u8; 256];
 
     loop {
-        print!("# ");
-        let mut line_len = 0;
+        print!("# "); // [SH2] Shell prints # prompt
+        let mut line_len = 0; // [SH3] reads input line
         'inner: loop {
             let mut c_buf = [0u8; 1];
             let n = libsyscall::read(0, &mut c_buf);

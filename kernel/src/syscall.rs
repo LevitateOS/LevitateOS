@@ -3,6 +3,8 @@
 //! Implements the syscall dispatch table and individual syscall handlers.
 //! Uses a custom ABI (not Linux-compatible) as decided in Phase 2.
 //!
+//! TEAM_158: Behavior IDs [SYS1]-[SYS9] for traceability.
+//!
 //! ## Syscall ABI
 //! - Syscall number in `x8`
 //! - Arguments in `x0-x5` (up to 6 arguments)
@@ -255,6 +257,8 @@ fn poll_input_devices(ttbr0: usize, user_buf: usize, bytes_read: &mut usize, max
 }
 
 /// TEAM_081: sys_read - Read from a file descriptor.
+/// [SYS6] sys_read(fd=0) reads from keyboard
+/// [SYS7] sys_read blocks until input available
 ///
 /// Supports:
 /// - fd 0 (stdin) -> Keyboard input (VirtIO keyboard + UART)
@@ -287,13 +291,13 @@ fn sys_read(fd: usize, buf: usize, len: usize) -> i64 {
     // TEAM_156: Get ttbr0 for page table translation
     let ttbr0 = task.ttbr0;
 
-    // TEAM_148: Busy-yield loop for input
+    // [SYS7] Busy-yield loop for input (blocking read)
     // NOTE: We cannot use 'wfi' here because we don't have a UART ISR.
     // If 'yield_now' switches to a task with interrupts enabled, the UART IRQ
     // will fire, be marked "Unhandled", and DISABLED by the GIC.
     // Valid 'wfi' wakeups would then cease, causing a hang.
     // Until a proper UART driver with buffering is implemented, we must busy-poll.
-    loop {
+    loop { // [SYS6][SYS7] blocking read from keyboard
         // TEAM_156: Pass ttbr0 and buf address for proper page table translation
         poll_input_devices(ttbr0, buf, &mut bytes_read, max_read);
         if bytes_read > 0 {
@@ -315,6 +319,11 @@ fn sys_read(fd: usize, buf: usize, len: usize) -> i64 {
 }
 
 /// TEAM_073: sys_write - Write to a file descriptor.
+/// [SYS1] sys_write(fd=1) outputs to UART
+/// [SYS2] sys_write(fd=1) outputs to GPU terminal
+/// [SYS3] sys_write(fd=2) outputs to UART
+/// [SYS4] sys_write validates user buffer address
+/// [SYS5] sys_write limits output to 4KB
 ///
 /// Supports:
 /// - fd 1 (stdout) -> UART + GPU terminal
@@ -327,15 +336,15 @@ fn sys_write(fd: usize, buf: usize, len: usize) -> i64 {
         return errno::EBADF;
     }
 
-    // Safety check: limit maximum write size
+    // [SYS5] Safety check: limit maximum write size to 4KB
     let len = len.min(4096);
 
-    // TEAM_137: Validate user buffer (must be mapped and readable)
+    // [SYS4] Validate user buffer (must be mapped and readable)
     let task = crate::task::current_task();
     // writable=false because we are reading FROM user space
     if crate::task::user_mm::validate_user_buffer(task.ttbr0, buf, len, false).is_err() {
         // println!("[SYSCALL] write: buffer validation failed"); // Noisy
-        return errno::EFAULT;
+        return errno::EFAULT; // [SYS4] invalid buffer returns EFAULT
     }
 
     // SAFETY: We've validated mapping and permissions.
@@ -343,9 +352,9 @@ fn sys_write(fd: usize, buf: usize, len: usize) -> i64 {
 
     // Convert to string if valid UTF-8, otherwise print as hex
     if let Ok(s) = core::str::from_utf8(slice) {
-        // TEAM_115: Use print! macro to go through dual console path (UART + GPU)
+        // [SYS1][SYS2][SYS3] Use print! macro to go through dual console path (UART + GPU)
         // Previous code used WRITER.lock().write_str() which bypassed GPU output
-        print!("{}", s);
+        print!("{}", s); // [SYS1][SYS2] outputs to UART and GPU
     } else {
         // Binary data - print hex
         for byte in slice {
@@ -357,18 +366,20 @@ fn sys_write(fd: usize, buf: usize, len: usize) -> i64 {
 }
 
 /// TEAM_073: sys_exit - Terminate the process.
+/// [SYS8] sys_exit terminates current task
 ///
 /// Per Phase 2 decision: Print error and kill process (Option A).
 fn sys_exit(code: i32) -> i64 {
     println!("[SYSCALL] exit({})", code);
 
-    // TEAM_121: Call task_exit() to properly terminate and reschedule
+    // [SYS8] Call task_exit() to properly terminate and reschedule
     crate::task::task_exit();
 }
 
 /// TEAM_073: sys_getpid - Get process ID.
+/// [SYS9] sys_getpid returns task PID
 fn sys_getpid() -> i64 {
-    // TEAM_121: Return actual PID from current task
+    // [SYS9] Return actual PID from current task
     crate::task::current_task().id.0 as i64
 }
 

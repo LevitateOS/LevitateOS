@@ -30,7 +30,6 @@ mod input;
 mod loader;
 mod memory;
 mod net;
-mod pci;
 mod syscall;
 mod task;
 mod terminal;

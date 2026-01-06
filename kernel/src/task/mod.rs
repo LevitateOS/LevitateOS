@@ -1,3 +1,5 @@
+//! TEAM_158: Behavior IDs [MT1]-[MT17] for multitasking traceability.
+
 pub mod process;
 pub mod scheduler;
 pub mod user; // TEAM_073: Userspace support (Phase 8)
@@ -9,11 +11,14 @@ use alloc::boxed::Box;
 use core::arch::global_asm;
 use core::sync::atomic::{AtomicU8, Ordering};
 
+// [MT1] cpu_switch_to saves x19-x29, lr, sp to old context
+// [MT2] cpu_switch_to restores x19-x29, lr, sp from new context
 global_asm!(
     r#"
 .global cpu_switch_to
 cpu_switch_to:
     /* x0 = old_context, x1 = new_context */
+    /* [MT1] Save callee-saved registers to old context */
     mov     x10, sp
     stp     x19, x20, [x0, #16 * 0]
     stp     x21, x22, [x0, #16 * 1]
@@ -23,6 +28,7 @@ cpu_switch_to:
     stp     x29, x30, [x0, #16 * 5]
     str     x10,      [x0, #16 * 6]
 
+    /* [MT2] Restore callee-saved registers from new context */
     ldp     x19, x20, [x1, #16 * 0]
     ldp     x21, x22, [x1, #16 * 1]
     ldp     x23, x24, [x1, #16 * 2]
@@ -101,11 +107,12 @@ pub unsafe fn set_current_task(task: Arc<TaskControlBlock>) {
     *CURRENT_TASK.lock() = Some(task);
 }
 
-/// TEAM_070: Safe wrapper for context switching.
+/// [MT3] switch_to() updates CURRENT_TASK before switch.
+/// [MT4] switch_to() no-ops when switching to same task.
 pub fn switch_to(new_task: Arc<TaskControlBlock>) {
     let old_task = current_task();
     if Arc::ptr_eq(&old_task, &new_task) {
-        return;
+        return; // [MT4] no-op for same task
     }
 
     unsafe {
@@ -118,7 +125,7 @@ pub fn switch_to(new_task: Arc<TaskControlBlock>) {
         // to prevent recursive scheduling or state corruption.
         let flags = los_hal::interrupts::disable();
 
-        // Update current task pointer
+        // [MT3] Update current task pointer before switch
         set_current_task(new_task);
 
         cpu_switch_to(old_ctx, new_ctx);
@@ -127,8 +134,7 @@ pub fn switch_to(new_task: Arc<TaskControlBlock>) {
     }
 }
 
-/// TEAM_070: Voluntarily yield the CPU to another task.
-/// TEAM_143: Optimized to use single lock acquisition instead of two.
+/// [MT5] yield_now() re-adds current task to ready queue.
 pub fn yield_now() {
     let task = current_task();
     // TEAM_143: Single lock acquisition instead of add_task + schedule

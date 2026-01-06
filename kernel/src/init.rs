@@ -32,7 +32,6 @@ pub enum BootStage {
     MemoryMMU,   // PEI / mm_init
     BootConsole, // DXE / console_init
     Discovery,   // DXE / BDS / vfs_caches_init
-    SteadyState, // BDS / rest_init
 }
 
 impl BootStage {
@@ -42,7 +41,6 @@ impl BootStage {
             BootStage::MemoryMMU => "Memory & MMU (PEI)",
             BootStage::BootConsole => "Boot Console (DXE)",
             BootStage::Discovery => "Discovery & FS (DXE/BDS)",
-            BootStage::SteadyState => "Steady State (BDS)",
         }
     }
 }
