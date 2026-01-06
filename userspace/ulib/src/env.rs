@@ -95,7 +95,6 @@ pub unsafe fn init_args(sp: *const usize) {
 pub fn args() -> Args {
     Args {
         inner: unsafe { ARGS.as_ref().map(|v| v.iter()) },
-        index: 0,
     }
 }
 
@@ -112,7 +111,6 @@ pub fn arg(index: usize) -> Option<&'static str> {
 /// TEAM_169: Iterator over command-line arguments.
 pub struct Args {
     inner: Option<core::slice::Iter<'static, String>>,
-    index: usize,
 }
 
 impl Iterator for Args {

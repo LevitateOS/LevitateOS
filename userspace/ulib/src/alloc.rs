@@ -78,20 +78,24 @@ unsafe impl Sync for LosAllocator {}
 unsafe impl GlobalAlloc for LosAllocator {
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
         let head = unsafe { &mut *self.head.get() };
-        let end = unsafe { &*self.end.get() };
+        let end = unsafe { &mut *self.end.get() };
 
         // Align the head pointer
         let align = layout.align();
-        let aligned = (*head + align - 1) & !(align - 1);
-        let new_head = aligned + layout.size();
+        let mut aligned = (*head + align - 1) & !(align - 1);
+        let mut new_head = aligned + layout.size();
 
         // Check if we need to grow
         if new_head > *end {
             let needed = new_head - *end;
             // SAFETY: We are in an unsafe fn, grow is safe to call here
-            if !unsafe { self.grow(needed) } {
+            if unsafe { !self.grow(needed) } {
                 return null_mut(); // OOM - per Q3 decision
             }
+            // TEAM_174: After grow(), head may have been initialized from 0 to old_break.
+            // Re-compute aligned pointer with the updated head value.
+            aligned = (*head + align - 1) & !(align - 1);
+            new_head = aligned + layout.size();
         }
 
         // Bump allocate
