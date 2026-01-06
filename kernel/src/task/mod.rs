@@ -9,7 +9,7 @@ pub mod user; // TEAM_073: Userspace support (Phase 8)
 
 extern crate alloc;
 use crate::arch::{Context, cpu_switch_to, task_entry_trampoline};
-use crate::println;
+
 use alloc::boxed::Box;
 use alloc::string::String;
 use core::sync::atomic::{AtomicU8, AtomicU32, AtomicUsize, Ordering};
@@ -41,6 +41,26 @@ pub extern "C" fn task_exit() -> ! {
         #[cfg(not(target_arch = "aarch64"))]
         core::hint::spin_loop();
     }
+}
+
+/// TEAM_220: Terminate the current task as a result of a fatal signal.
+/// Marks the process as exited in the process table and wakes waiters.
+pub fn terminate_with_signal(sig: i32) -> ! {
+    let task = current_task();
+    let pid = task.id.0;
+
+    // Record exit code as 128 + sig (Unix convention)
+    let exit_code = 128 + sig;
+    let waiters = process_table::mark_exited(pid, exit_code);
+
+    // Wake up parent if waiting
+    for waiter in waiters {
+        waiter.set_state(TaskState::Ready);
+        scheduler::SCHEDULER.add_task(waiter);
+    }
+
+    // Now terminate for real
+    task_exit();
 }
 
 use alloc::sync::Arc;
@@ -264,9 +284,10 @@ impl From<UserTask> for TaskControlBlock {
 /// Helper function called when a user task is first scheduled.
 fn user_task_entry_wrapper() -> ! {
     let task = current_task();
-    println!(
+    log::trace!(
         "[TASK] Entering user task PID={} at 0x{:x}",
-        task.id.0, task.user_entry
+        task.id.0,
+        task.user_entry
     );
 
     unsafe {

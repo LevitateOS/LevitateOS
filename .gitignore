@@ -44,6 +44,4 @@ tests/gicv3_*.txt
 
 # Temporary files
 tmp/
-initrd_root/hello
-initrd_root/test.txt
-initrd_root/hello.txt
+initrd_root/

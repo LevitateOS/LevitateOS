@@ -83,8 +83,8 @@ pub fn sys_clock_gettime(timespec_buf: usize) -> i64 {
         let remainder = counter % freq;
         let nanoseconds = (remainder * 1_000_000_000) / freq;
         Timespec {
-            tv_sec: seconds,
-            tv_nsec: nanoseconds,
+            tv_sec: seconds as i64,
+            tv_nsec: nanoseconds as i64,
         }
     } else {
         Timespec::default()

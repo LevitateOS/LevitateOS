@@ -27,6 +27,7 @@ mod gpu;
 mod init;
 mod input;
 mod loader;
+mod logger;
 mod memory;
 mod net;
 mod syscall;
@@ -65,6 +66,10 @@ macro_rules! verbose {
 pub extern "C" fn kmain() -> ! {
     // Stage 1: Early HAL - Console must be first for debug output
     los_hal::console::init();
+
+    // TEAM_221: Initialize logger (Info level silences Debug/Trace)
+    logger::init(log::LevelFilter::Info);
+
     init::transition_to(init::BootStage::EarlyHAL);
 
     // Initialize heap (required for alloc)

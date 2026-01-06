@@ -1,11 +1,10 @@
 use crate::memory::user as mm_user;
 
 use crate::syscall::errno;
-use los_hal::println;
 
 /// TEAM_073: sys_exit - Terminate the process.
 pub fn sys_exit(code: i32) -> i64 {
-    println!("[SYSCALL] exit({})", code);
+    log::trace!("[SYSCALL] exit({})", code);
 
     // TEAM_188: Wake waiters before exiting
     let task = crate::task::current_task();
@@ -22,6 +21,16 @@ pub fn sys_exit(code: i32) -> i64 {
 /// TEAM_073: sys_getpid - Get process ID.
 pub fn sys_getpid() -> i64 {
     crate::task::current_task().id.0 as i64
+}
+
+/// TEAM_217: sys_getppid - Get parent process ID.
+pub fn sys_getppid() -> i64 {
+    let current = crate::task::current_task();
+    crate::task::process_table::PROCESS_TABLE
+        .lock()
+        .get(&current.id.0)
+        .map(|e| e.parent_pid as i64)
+        .unwrap_or(0)
 }
 
 /// TEAM_129: sys_yield - Voluntarily yield CPU to other tasks.
@@ -44,7 +53,7 @@ pub fn sys_spawn(path_ptr: usize, path_len: usize) -> i64 {
         Err(_) => return errno::EINVAL,
     };
 
-    println!("[SYSCALL] spawn('{}')", path);
+    log::trace!("[SYSCALL] spawn('{}')", path);
 
     let archive_lock = crate::fs::INITRAMFS.lock();
     let archive = match archive_lock.as_ref() {
@@ -78,7 +87,7 @@ pub fn sys_spawn(path_ptr: usize, path_len: usize) -> i64 {
             pid
         }
         Err(e) => {
-            println!("[SYSCALL] spawn failed: {:?}", e);
+            log::debug!("[SYSCALL] spawn failed: {:?}", e);
             -1
         }
     }
@@ -98,7 +107,7 @@ pub fn sys_exec(path_ptr: usize, path_len: usize) -> i64 {
         Err(_) => return errno::EINVAL,
     };
 
-    println!("[SYSCALL] exec('{}')", path);
+    log::trace!("[SYSCALL] exec('{}')", path);
 
     let archive_lock = crate::fs::INITRAMFS.lock();
     let archive = match archive_lock.as_ref() {
@@ -119,7 +128,7 @@ pub fn sys_exec(path_ptr: usize, path_len: usize) -> i64 {
         None => return errno::EBADF,
     };
 
-    println!("[SYSCALL] exec is currently a stub");
+    log::warn!("[SYSCALL] exec is currently a stub");
     errno::ENOSYS
 }
 
@@ -164,8 +173,11 @@ pub fn sys_spawn_args(path_ptr: usize, path_len: usize, argv_ptr: usize, argc: u
     }
     let path_bytes = unsafe { core::slice::from_raw_parts(path_ptr as *const u8, path_len) };
     let path = match core::str::from_utf8(path_bytes) {
-        Ok(s) => s,
-        Err(_) => return errno::EINVAL,
+        Ok(s) => alloc::string::String::from(s),
+        Err(_) => {
+            log::debug!("[SYSCALL] spawn_args: Invalid UTF-8 in path");
+            return errno::EINVAL;
+        }
     };
 
     // 3. Validate and read argv entries
@@ -212,9 +224,9 @@ pub fn sys_spawn_args(path_ptr: usize, path_len: usize, argv_ptr: usize, argc: u
         }
     }
 
-    println!("[SYSCALL] spawn_args('{}', argc={})", path, argc);
+    log::trace!("[SYSCALL] spawn_args('{}', argc={})", path, argc);
     for (i, arg) in args.iter().enumerate() {
-        println!("[SYSCALL]   argv[{}] = '{}'", i, arg);
+        log::trace!("[SYSCALL]   argv[{}] = '{}'", i, arg);
     }
 
     // 5. Find executable and copy ELF data
@@ -223,12 +235,15 @@ pub fn sys_spawn_args(path_ptr: usize, path_len: usize, argv_ptr: usize, argc: u
         let archive_lock = crate::fs::INITRAMFS.lock();
         let archive = match archive_lock.as_ref() {
             Some(a) => a,
-            None => return errno::ENOSYS,
+            None => {
+                log::debug!("[SYSCALL] spawn_args: INITRAMFS not available");
+                return errno::ENOSYS;
+            }
         };
 
         let mut elf_data = None;
         // TEAM_212: Strip leading '/' for initramfs lookup
-        let lookup_name = path.strip_prefix('/').unwrap_or(path);
+        let lookup_name = path.strip_prefix('/').unwrap_or(&path);
         for entry in archive.archive.iter() {
             if entry.name == lookup_name {
                 elf_data = Some(entry.data);
@@ -238,7 +253,10 @@ pub fn sys_spawn_args(path_ptr: usize, path_len: usize, argv_ptr: usize, argc: u
 
         match elf_data {
             Some(d) => alloc::vec::Vec::from(d),
-            None => return crate::syscall::errno_file::ENOENT,
+            None => {
+                log::debug!("[SYSCALL] spawn_args: '{}' not found in initramfs", path);
+                return crate::syscall::errno_file::ENOENT;
+            }
         }
         // Lock released here
     };
@@ -260,7 +278,11 @@ pub fn sys_spawn_args(path_ptr: usize, path_len: usize, argv_ptr: usize, argc: u
             pid
         }
         Err(e) => {
-            println!("[SYSCALL] spawn_args failed: {:?}", e);
+            log::debug!(
+                "[SYSCALL] spawn_args: spawn_from_elf_with_args failed for '{}': {:?}",
+                path,
+                e
+            );
             -1
         }
     }

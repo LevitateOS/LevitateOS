@@ -1,22 +1,22 @@
 # LevitateOS Userspace ABI Specification
 
-**Status:** FINALIZED (Target)
-**Version:** 1.0.0 (Phase 10)
+**Status:** FINALIZED (Implementation Aligned with Linux AArch64)
+**Version:** 1.1.0 (Phase 15 Sprint)
 **Architecture:** AArch64 (ARM64)
 **Compatibility Target:** Linux Generic (AArch64)
 
-This document defines the strict Application Binary Interface (ABI) for LevitateOS userspace. To enable "Platform Support" (compiling standard Rust apps), LevitateOS adheres to the **Linux AArch64 System Call ABI**. This allows us to reuse `libc` implementations and the Rust `std::sys::unix` backend.
+This document defines the strict Application Binary Interface (ABI) for LevitateOS userspace. LevitateOS adheres to the **Linux AArch64 System Call ABI** to enable unmodified Rust `std` support.
 
-## 0. Calling Convention (Procedure Call Standard)
+---
 
-LevitateOS follows the **AAPCS64** (Procedure Call Standard for the Arm 64-bit Architecture).
+## 0. Calling Convention (AAPCS64)
+
+LevitateOS follows the **Procedure Call Standard for the Arm 64-bit Architecture**.
 
 - **Arguments**: `x0`-`x7`.
-- **Return Value**: `x0` (and `x1` if 128-bit).
-- **Callee-saved**: `x19`-`x28`.
-- **Frame Pointer**: `x29` (FP).
-- **Link Register**: `x30` (LR).
-- **Stack Pointer**: `x31` (SP). Must be 16-byte aligned.
+- **Return Value**: `x0`.
+- **Syscall Number**: `x8`.
+- **TLS Pointer**: `TPIDR_EL0` (Must be context-switched by kernel).
 
 ## 1. System Call Interface
 
@@ -59,11 +59,11 @@ Based on `asm-generic/unistd.h`.
 Standard layouts required by Rust `libc` / code expecting Linux layout.
 
 ### 2.1 `Stat64` (struct stat)
-Size: 128 bytes (approx, verify padding).
+Size: 128 bytes. Matches Linux AArch64 `asm-generic/stat.h`.
 
 ```rust
 #[repr(C)]
-pub struct Stat64 {
+pub struct Stat {
     pub st_dev: u64,
     pub st_ino: u64,
     pub st_mode: u32,
@@ -77,12 +77,12 @@ pub struct Stat64 {
     pub __pad2: i32,
     pub st_blocks: i64,
     pub st_atime: i64,
-    pub st_atime_nsec: i64,
+    pub st_atime_nsec: u64,
     pub st_mtime: i64,
-    pub st_mtime_nsec: i64,
+    pub st_mtime_nsec: u64,
     pub st_ctime: i64,
-    pub st_ctime_nsec: i64,
-    pub __unused: [i32; 2],
+    pub st_ctime_nsec: u64,
+    pub __unused: [u32; 2],
 }
 ```
 
@@ -177,7 +177,7 @@ Rust `std` requires Thread Local Storage.
 
 Running uutils requires a full Rust `std` port, which in turn requires these syscalls:
 
-### 6.1 Gap Analysis
+### 6.1 Gap Analysis (Updated Jan 2026)
 
 | Category | Syscall | Nr | Status | Required For |
 |----------|---------|----|---------| -------------|
@@ -188,23 +188,24 @@ Running uutils requires a full Rust `std` port, which in turn requires these sys
 | | `brk` | 214 | 🟢 | Heap allocation |
 | **Threading** | | | | |
 | | `clone` | 220 | 🔴 | Thread creation |
-| | `futex` | 98 | 🔴 | Mutex, condvar |
+| | `futex` | 98 | 🟢 | Mutex, condvar (Basic) |
 | | `set_tid_address` | 96 | 🔴 | Thread ID mgmt |
-| | TLS (`TPIDR_EL0`) | — | 🔴 | Thread-local storage |
+| | TLS (`TPIDR_EL0`) | — | 🟢 | Thread-local storage (Context Switched) |
 | **Signals** | | | | |
-| | `rt_sigaction` | 134 | 🔴 | Signal handlers |
-| | `rt_sigprocmask` | 135 | 🔴 | Signal masking |
-| | `rt_sigreturn` | 139 | 🔴 | Signal return |
-| | `kill` | 129 | 🔴 | Send signals |
+| | `rt_sigaction` | 134 | 🟢 | Signal handlers |
+| | `rt_sigprocmask` | 135 | 🟢 | Signal masking |
+| | `rt_sigreturn` | 139 | 🟡 | Signal return (Custom frame) |
+| | `kill` | 129 | 🟢 | Send signals |
 | **Process** | | | | |
 | | `fork` / `clone` | 220 | 🔴 | Process creation |
 | | `execve` | 221 | 🟡 | Program execution (have spawn) |
-| | `wait4` | 260 | 🔴 | Child reaping |
+| | `wait4` | 260 | 🟢 | Child reaping |
 | | `getpid` | 172 | 🟢 | Process IDs |
-| | `getppid` | 173 | 🔴 | Parent PID |
+| | `getppid` | 173 | 🟢 | Parent PID |
 | **I/O** | | | | |
+| | `writev` / `readv` | 66/65 | 🟢 | println!, efficiency |
 | | `pipe2` | 59 | 🔴 | Shell pipelines |
-| | `dup` / `dup3` | 23/24 | 🔴 | FD duplication |
+| | `dup` / `dup2` / `dup3` | 23/24 | 🔴 | FD duplication |
 | | `ioctl` | 29 | 🔴 | TTY control |
 | | `poll` | 73 | 🔴 | I/O multiplexing |
 | **Filesystem** | | | | |

@@ -6,6 +6,60 @@ use crate::syscall::errno;
 use crate::task::fd_table::FdType;
 use los_hal::print;
 
+/// TEAM_217: struct iovec for writev/readv
+#[repr(C)]
+#[derive(Clone, Copy)]
+struct UserIoVec {
+    base: usize,
+    len: usize,
+}
+
+/// TEAM_217: sys_writev - Vectored write.
+/// Required for standard Rust println! efficiency.
+pub fn sys_writev(fd: usize, iov_ptr: usize, count: usize) -> i64 {
+    if count == 0 {
+        return 0;
+    }
+    if count > 1024 {
+        return errno::EINVAL;
+    }
+
+    let task = crate::task::current_task();
+    let ttbr0 = task.ttbr0;
+
+    // Validate iovec array
+    let iov_size = count * core::mem::size_of::<UserIoVec>();
+    if mm_user::validate_user_buffer(ttbr0, iov_ptr, iov_size, false).is_err() {
+        return errno::EFAULT;
+    }
+
+    let mut total_written: i64 = 0;
+
+    for i in 0..count {
+        let entry_addr = iov_ptr + i * core::mem::size_of::<UserIoVec>();
+        let iov = unsafe {
+            let kptr = mm_user::user_va_to_kernel_ptr(ttbr0, entry_addr).unwrap();
+            *(kptr as *const UserIoVec)
+        };
+
+        if iov.len == 0 {
+            continue;
+        }
+
+        let res = sys_write(fd, iov.base, iov.len);
+        if res < 0 {
+            if total_written == 0 {
+                return res;
+            } else {
+                return total_written;
+            }
+        }
+        total_written += res;
+    }
+
+    total_written
+}
+
 /// TEAM_073: sys_write - Write to a file descriptor.
 /// TEAM_194: Updated to support writing to tmpfs files.
 pub fn sys_write(fd: usize, buf: usize, len: usize) -> i64 {

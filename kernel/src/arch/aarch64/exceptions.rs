@@ -130,7 +130,7 @@ fn deliver_signal(frame: &mut crate::arch::SyscallFrame, sig: i32) -> bool {
         use crate::syscall::signal::*;
         if sig == SIGKILL || (sig != SIGCHLD && sig != SIGCONT) {
             crate::println!("[SIGNAL] PID={} terminated by signal {}", task.id.0, sig);
-            crate::task::task_exit(); // This never returns
+            crate::task::terminate_with_signal(sig); // This never returns
         }
         return false;
     }

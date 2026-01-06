@@ -15,6 +15,7 @@ pub struct Context {
     pub x29: u64, // Frame Pointer
     pub lr: u64,  // Link Register (x30)
     pub sp: u64,  // Stack Pointer
+    pub tpidr_el0: u64, // TEAM_217: Thread Local Storage pointer
 }
 
 /// TEAM_162: Enter user mode at the specified entry point.

@@ -96,4 +96,8 @@ See `docs/planning/error-macro/phase-1.md` for the current subsystem list.
 
 ## Userspace & ABI
 
-LevitateOS is transitioning from a minimal custom syscall ABI to full **Linux AArch64 ABI Compatibility** (Phase 10). This strategy enables the use of the standard Rust library (`std`) and existing UNIX toolchains. For the definitive target specification, see [userspace-abi.md](file:///home/vince/Projects/LevitateOS/docs/specs/userspace-abi.md).
+LevitateOS is transitioning from a minimal custom syscall ABI to full **Linux AArch64 ABI Compatibility** (Phase 10). This strategy enables the use of the standard Rust library (`std`) and existing UNIX toolchains. 
+
+For implementation details and common pitfalls, see:
+- [Linux ABI Compatibility Guide](file:///home/vince/Projects/LevitateOS/docs/specs/LINUX_ABI_GUIDE.md) — Critical knowledge for future teams.
+- [Userspace ABI Specification](file:///home/vince/Projects/LevitateOS/docs/specs/userspace-abi.md) — Definitive target spec.

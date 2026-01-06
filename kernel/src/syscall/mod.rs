@@ -13,16 +13,12 @@ use los_hal::println;
 
 /// TEAM_073: Error codes for syscalls.
 pub mod errno {
-    pub const ENOSYS: i64 = -1;
     pub const ENOENT: i64 = -2;
     pub const EBADF: i64 = -9;
     pub const EFAULT: i64 = -14;
-    pub const EINVAL: i64 = -22;
-    #[allow(dead_code)]
-    pub const EROFS: i64 = -30;
-    #[allow(dead_code)]
     pub const EEXIST: i64 = -17;
-    #[allow(dead_code)]
+    pub const EINVAL: i64 = -22;
+    pub const ENOSYS: i64 = -38;
     pub const EIO: i64 = -5;
 }
 
@@ -70,10 +66,13 @@ pub enum SyscallNumber {
     SigProcMask = 135,
     SigReturn = 139,
     GetPid = 172,
+    GetPpid = 173,  // TEAM_217: Added standard Linux syscall
     Sbrk = 214,    // brk
     Exec = 221,    // execve
     Waitpid = 260, // wait4
     Pause = 236,
+    Writev = 66,   // TEAM_217: Added for std println!
+    Readv = 65,    // TEAM_217: Added for completeness
 
     // === Custom LevitateOS syscalls (temporary, until clone/execve work) ===
     /// TEAM_120: Spawn process (custom, will be replaced by clone+execve)
@@ -115,10 +114,13 @@ impl SyscallNumber {
             135 => Some(Self::SigProcMask),
             139 => Some(Self::SigReturn),
             172 => Some(Self::GetPid),
+            173 => Some(Self::GetPpid),
             236 => Some(Self::Pause),
             214 => Some(Self::Sbrk),
             221 => Some(Self::Exec),
             260 => Some(Self::Waitpid),
+            66 => Some(Self::Writev),
+            65 => Some(Self::Readv),
             // Custom LevitateOS
             1000 => Some(Self::Spawn),
             1001 => Some(Self::SpawnArgs),
@@ -128,9 +130,8 @@ impl SyscallNumber {
     }
 }
 
-/// TEAM_168: Stat structure returned by fstat.
-/// TEAM_198: Added timestamp fields (atime, mtime, ctime).
-/// TEAM_201: Extended to full POSIX-like stat for VFS support.
+/// TEAM_217: Linux-compatible Stat structure (128 bytes).
+/// Matches AArch64 asm-generic layout used by Rust std and musl/glibc.
 #[repr(C)]
 #[derive(Debug, Clone, Copy, Default)]
 pub struct Stat {
@@ -148,32 +149,38 @@ pub struct Stat {
     pub st_gid: u32,
     /// Device ID (if special file)
     pub st_rdev: u64,
+    /// Padding for alignment
+    pub __pad1: u64,
     /// File size in bytes
-    pub st_size: u64,
+    pub st_size: i64,
     /// Block size for filesystem I/O
-    pub st_blksize: u64,
+    pub st_blksize: i32,
+    /// Padding for alignment
+    pub __pad2: i32,
     /// Number of 512-byte blocks allocated
-    pub st_blocks: u64,
+    pub st_blocks: i64,
     /// Access time (seconds)
-    pub st_atime: u64,
+    pub st_atime: i64,
     /// Access time (nanoseconds)
     pub st_atime_nsec: u64,
     /// Modification time (seconds)
-    pub st_mtime: u64,
+    pub st_mtime: i64,
     /// Modification time (nanoseconds)
     pub st_mtime_nsec: u64,
     /// Status change time (seconds)
-    pub st_ctime: u64,
+    pub st_ctime: i64,
     /// Status change time (nanoseconds)
     pub st_ctime_nsec: u64,
+    /// Unused padding
+    pub __unused: [u32; 2],
 }
 
-/// TEAM_170: Timespec structure for clock_gettime.
+/// TEAM_217: Linux-compatible Timespec.
 #[repr(C)]
 #[derive(Debug, Clone, Copy, Default)]
 pub struct Timespec {
-    pub tv_sec: u64,
-    pub tv_nsec: u64,
+    pub tv_sec: i64,
+    pub tv_nsec: i64,
 }
 
 pub fn syscall_dispatch(frame: &mut SyscallFrame) {
@@ -290,6 +297,17 @@ pub fn syscall_dispatch(frame: &mut SyscallFrame) {
             let addr2 = frame.arg4() as usize;
             crate::syscall::sync::sys_futex(addr, op, val, timeout, addr2)
         }
+        Some(SyscallNumber::GetPpid) => process::sys_getppid(),
+        Some(SyscallNumber::Writev) => fs::sys_writev(
+            frame.arg0() as usize,
+            frame.arg1() as usize,
+            frame.arg2() as usize,
+        ),
+        Some(SyscallNumber::Readv) => fs::sys_readv(
+            frame.arg0() as usize,
+            frame.arg1() as usize,
+            frame.arg2() as usize,
+        ),
         Some(SyscallNumber::Linkat) => fs::sys_linkat(
             frame.arg0() as i32,
             frame.arg1() as usize,

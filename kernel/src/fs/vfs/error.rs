@@ -4,6 +4,9 @@
 
 use core::fmt;
 
+use crate::block::BlockError;
+use crate::fs::FsError;
+
 /// TEAM_202: VFS Error codes
 ///
 /// These map to standard POSIX errno values for userspace compatibility.
@@ -160,6 +163,34 @@ impl fmt::Display for VfsError {
             VfsError::InternalError => "Internal kernel error",
         };
         write!(f, "{} ({})", msg, self.name())
+    }
+}
+
+// TEAM_219: Error Mappings
+impl From<BlockError> for VfsError {
+    fn from(err: BlockError) -> Self {
+        match err {
+            BlockError::NotInitialized => VfsError::IoError,
+            BlockError::ReadFailed => VfsError::IoError,
+            BlockError::WriteFailed => VfsError::IoError,
+            BlockError::InvalidBufferSize => VfsError::InternalError,
+        }
+    }
+}
+
+impl From<FsError> for VfsError {
+    fn from(err: FsError) -> Self {
+        match err {
+            // General FS errors
+            FsError::VolumeOpen => VfsError::IoError,
+            FsError::DirOpen => VfsError::IoError,
+            FsError::FileOpen => VfsError::NotFound,
+            FsError::ReadError => VfsError::IoError,
+            FsError::WriteError => VfsError::IoError,
+            FsError::NotMounted => VfsError::IoError,
+            // Wrap inner BlockError
+            FsError::BlockError(e) => e.into(),
+        }
     }
 }
 

@@ -263,7 +263,7 @@ fn get_reference_times(ref_path: &str) -> Option<(u64, u64)> {
     }
 
     // Return access time and modification time from stat
-    Some((stat.st_atime, stat.st_mtime))
+    Some((stat.st_atime as u64, stat.st_mtime as u64))
 }
 
 // ============================================================================
@@ -298,22 +298,30 @@ fn touch_file(
         TimeSource::Now => {
             let atime = Timespec {
                 tv_sec: 0,
-                tv_nsec: if mtime_only { UTIME_OMIT } else { UTIME_NOW },
+                tv_nsec: if mtime_only {
+                    UTIME_OMIT as i64
+                } else {
+                    UTIME_NOW as i64
+                },
             };
             let mtime = Timespec {
                 tv_sec: 0,
-                tv_nsec: if atime_only { UTIME_OMIT } else { UTIME_NOW },
+                tv_nsec: if atime_only {
+                    UTIME_OMIT as i64
+                } else {
+                    UTIME_NOW as i64
+                },
             };
             (atime, mtime)
         }
         TimeSource::Epoch(epoch_secs) => {
             let atime = Timespec {
-                tv_sec: if mtime_only { 0 } else { *epoch_secs },
-                tv_nsec: if mtime_only { UTIME_OMIT } else { 0 },
+                tv_sec: if mtime_only { 0 } else { *epoch_secs as i64 },
+                tv_nsec: if mtime_only { UTIME_OMIT as i64 } else { 0 },
             };
             let mtime = Timespec {
-                tv_sec: if atime_only { 0 } else { *epoch_secs },
-                tv_nsec: if atime_only { UTIME_OMIT } else { 0 },
+                tv_sec: if atime_only { 0 } else { *epoch_secs as i64 },
+                tv_nsec: if atime_only { UTIME_OMIT as i64 } else { 0 },
             };
             (atime, mtime)
         }
@@ -321,12 +329,12 @@ fn touch_file(
             // Try to get times from reference file
             if let Some((ref_atime, ref_mtime)) = get_reference_times(ref_path) {
                 let atime = Timespec {
-                    tv_sec: if mtime_only { 0 } else { ref_atime },
-                    tv_nsec: if mtime_only { UTIME_OMIT } else { 0 },
+                    tv_sec: if mtime_only { 0 } else { ref_atime as i64 },
+                    tv_nsec: if mtime_only { UTIME_OMIT as i64 } else { 0 },
                 };
                 let mtime = Timespec {
-                    tv_sec: if atime_only { 0 } else { ref_mtime },
-                    tv_nsec: if atime_only { UTIME_OMIT } else { 0 },
+                    tv_sec: if atime_only { 0 } else { ref_mtime as i64 },
+                    tv_nsec: if atime_only { UTIME_OMIT as i64 } else { 0 },
                 };
                 (atime, mtime)
             } else {

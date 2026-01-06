@@ -54,7 +54,7 @@ impl File {
             return Err(Error::from_errno(ret));
         }
         Ok(Metadata {
-            size: stat.st_size,
+            size: stat.st_size as u64,
             mode: stat.st_mode,
         })
     }

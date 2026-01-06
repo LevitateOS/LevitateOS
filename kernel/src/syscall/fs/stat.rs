@@ -28,8 +28,10 @@ pub fn sys_fstat(fd: usize, stat_buf: usize) -> i64 {
             st_uid: 0,
             st_gid: 0,
             st_rdev: 0,
+            __pad1: 0,
             st_size: 0,
             st_blksize: 0,
+            __pad2: 0,
             st_blocks: 0,
             st_atime: 0,
             st_atime_nsec: 0,
@@ -37,6 +39,7 @@ pub fn sys_fstat(fd: usize, stat_buf: usize) -> i64 {
             st_mtime_nsec: 0,
             st_ctime: 0,
             st_ctime_nsec: 0,
+            __unused: [0; 2],
         },
         FdType::VfsFile(ref file) => match vfs_fstat(file) {
             Ok(s) => s,

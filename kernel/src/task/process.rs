@@ -61,36 +61,52 @@ pub fn spawn_from_elf_with_args(
     args: &[&str],
     envs: &[&str],
 ) -> Result<UserTask, SpawnError> {
-    los_hal::println!("[SPAWN] Parsing ELF header ({} bytes)...", elf_data.len());
+    log::debug!("[SPAWN] Parsing ELF header ({} bytes)...", elf_data.len());
     // 1. Parse ELF
     let elf = Elf::parse(elf_data)?;
-    los_hal::println!("[SPAWN] ELF parsed.");
+    log::debug!("[SPAWN] ELF parsed.");
 
     // [PROC2] Create user page table
-    los_hal::println!("[SPAWN] Creating user page table...");
+    log::debug!("[SPAWN] Creating user page table...");
     let ttbr0_phys = mm_user::create_user_page_table() // [PROC2]
         .ok_or(SpawnError::PageTable(MmuError::AllocationFailed))?;
 
     // 3. Load ELF segments into user address space
-    los_hal::println!("[SPAWN] Loading segments...");
+    log::debug!("[SPAWN] Loading segments...");
     let (entry_point, brk) = elf.load(ttbr0_phys)?;
 
     // 4. Set up user stack
-    los_hal::println!("[SPAWN] Setting up stack...");
+    log::debug!("[SPAWN] Setting up stack...");
     let stack_pages = mm_user::layout::STACK_SIZE / los_hal::mmu::PAGE_SIZE;
     let stack_top =
         unsafe { mm_user::setup_user_stack(ttbr0_phys, stack_pages).map_err(SpawnError::Stack)? };
 
     // TEAM_216: Always set up argc/argv/envp on stack.
     // Even if empty, this ensures SP is moved into a mapped page (Rule 4).
-    los_hal::println!("[SPAWN] Setting up stack arguments...");
-    let user_sp =
-        mm_user::setup_stack_args(ttbr0_phys, stack_top, args, envs).map_err(SpawnError::Stack)?;
+    log::debug!("[SPAWN] Setting up stack arguments...");
+
+    // TEAM_217: Collect ELF info for auxv
+    let mut auxv = alloc::vec::Vec::new();
+    auxv.push(crate::memory::user::AuxEntry {
+        a_type: crate::memory::user::AT_PHDR,
+        a_val: elf.program_headers_offset() + elf.load_base(),
+    });
+    auxv.push(crate::memory::user::AuxEntry {
+        a_type: crate::memory::user::AT_PHENT,
+        a_val: crate::loader::elf::Elf64ProgramHeader::SIZE,
+    });
+    auxv.push(crate::memory::user::AuxEntry {
+        a_type: crate::memory::user::AT_PHNUM,
+        a_val: elf.program_headers_count(),
+    });
+
+    let user_sp = mm_user::setup_stack_args(ttbr0_phys, stack_top, args, envs, &auxv)
+        .map_err(SpawnError::Stack)?;
 
     // 5. Create UserTask
     let task = UserTask::new(entry_point, user_sp, ttbr0_phys, brk);
 
-    los_hal::println!(
+    log::debug!(
         "[SPAWN] Success: PID={} entry=0x{:x} sp=0x{:x}",
         task.pid.0,
         entry_point,

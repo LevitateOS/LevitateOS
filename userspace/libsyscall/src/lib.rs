@@ -37,6 +37,7 @@ pub const SYS_UTIMENSAT: u64 = 88;
 // Process
 pub const SYS_EXIT: u64 = 93;
 pub const SYS_GETPID: u64 = 172;
+pub const SYS_GETPPID: u64 = 173; // TEAM_217: Added standard Linux syscall
 pub const SYS_SBRK: u64 = 214; // brk
 pub const SYS_EXEC: u64 = 221; // execve
 pub const SYS_WAITPID: u64 = 260; // wait4
@@ -52,9 +53,7 @@ pub const SYS_FUTEX: u64 = 98;
 // Time
 pub const SYS_NANOSLEEP: u64 = 101;
 pub const SYS_CLOCK_GETTIME: u64 = 113;
-
-// Scheduling
-pub const SYS_YIELD: u64 = 124; // sched_yield
+pub const SYS_SCHED_YIELD: u64 = 124; // TEAM_217: Renamed to match Linux
 pub const SYS_SHUTDOWN: u64 = 142; // reboot
 
 // Custom LevitateOS (temporary, until clone/execve work)
@@ -68,17 +67,94 @@ pub mod futex_ops {
     pub const FUTEX_WAKE: usize = 1;
 }
 
-/// TEAM_142: Shutdown flags
-pub mod shutdown_flags {
-    /// Normal shutdown (minimal output)
-    pub const NORMAL: u32 = 0;
-    /// Verbose shutdown (for golden file testing)
-    pub const VERBOSE: u32 = 1;
+pub mod errno {
+    pub const EPERM: i64 = -1;
+    pub const ENOENT: i64 = -2;
+    pub const ESRCH: i64 = -3;
+    pub const EINTR: i64 = -4;
+    pub const EIO: i64 = -5;
+    pub const ENXIO: i64 = -6;
+    pub const E2BIG: i64 = -7;
+    pub const ENOEXEC: i64 = -8;
+    pub const EBADF: i64 = -9;
+    pub const ECHILD: i64 = -10;
+    pub const EAGAIN: i64 = -11;
+    pub const ENOMEM: i64 = -12;
+    pub const EACCES: i64 = -13;
+    pub const EFAULT: i64 = -14;
+    pub const EBUSY: i64 = -16;
+    pub const EEXIST: i64 = -17;
+    pub const EXDEV: i64 = -18;
+    pub const ENODEV: i64 = -19;
+    pub const ENOTDIR: i64 = -20;
+    pub const EISDIR: i64 = -21;
+    pub const EINVAL: i64 = -22;
+    pub const ENFILE: i64 = -23;
+    pub const EMFILE: i64 = -24;
+    pub const ENOTTY: i64 = -25;
+    pub const ETXTBSY: i64 = -26;
+    pub const EFBIG: i64 = -27;
+    pub const ENOSPC: i64 = -28;
+    pub const ESPIPE: i64 = -29;
+    pub const EROFS: i64 = -30;
+    pub const EMLINK: i64 = -31;
+    pub const EPIPE: i64 = -32;
+    pub const ENOSYS: i64 = -38;
+    pub const ENOTEMPTY: i64 = -39;
+    pub const ELOOP: i64 = -40;
 }
 
 // ============================================================================
 // Syscall Wrappers
 // ============================================================================
+
+/// TEAM_217: Vectored write.
+#[inline]
+pub fn writev(fd: usize, iov: &[IoVec]) -> isize {
+    let ret: i64;
+    unsafe {
+        core::arch::asm!(
+            "svc #0",
+            in("x8") SYS_WRITEV,
+            in("x0") fd,
+            in("x1") iov.as_ptr(),
+            in("x2") iov.len(),
+            lateout("x0") ret,
+            options(nostack)
+        );
+    }
+    ret as isize
+}
+
+/// TEAM_217: Vectored read.
+#[inline]
+pub fn readv(fd: usize, iov: &mut [IoVec]) -> isize {
+    let ret: i64;
+    unsafe {
+        core::arch::asm!(
+            "svc #0",
+            in("x8") SYS_READV,
+            in("x0") fd,
+            in("x1") iov.as_mut_ptr(),
+            in("x2") iov.len(),
+            lateout("x0") ret,
+            options(nostack)
+        );
+    }
+    ret as isize
+}
+
+/// TEAM_217: sys_writev constant
+pub const SYS_WRITEV: u64 = 66;
+/// TEAM_217: sys_readv constant
+pub const SYS_READV: u64 = 65;
+
+/// TEAM_217: struct iovec for writev/readv
+#[repr(C)]
+pub struct IoVec {
+    pub base: *const u8,
+    pub len: usize,
+}
 
 /// Read from a file descriptor.
 ///
@@ -301,15 +377,35 @@ pub fn waitpid(pid: i32, status: Option<&mut i32>) -> isize {
     ret as isize
 }
 
-/// Yield CPU to other tasks.
-///
-/// TEAM_129: Added to allow cooperative scheduling.
+/// TEAM_217: Get parent process ID.
+#[inline]
+pub fn getppid() -> i64 {
+    let ret: i64;
+    unsafe {
+        core::arch::asm!(
+            "svc #0",
+            in("x8") SYS_GETPPID,
+            lateout("x0") ret,
+            options(nostack)
+        );
+    }
+    ret
+}
+
+/// TEAM_142: Shutdown flags
+pub mod shutdown_flags {
+    /// Normal shutdown (minimal output)
+    pub const NORMAL: u32 = 0;
+    /// Verbose shutdown (for golden file testing)
+    pub const VERBOSE: u32 = 1;
+}
+
 #[inline]
 pub fn yield_cpu() {
     unsafe {
         core::arch::asm!(
             "svc #0",
-            in("x8") SYS_YIELD,
+            in("x8") SYS_SCHED_YIELD,
             options(nostack)
         );
     }
@@ -475,9 +571,8 @@ pub fn close(fd: usize) -> isize {
     ret as isize
 }
 
-/// TEAM_168: Stat structure for fstat.
-/// TEAM_199: Added timestamp fields to match kernel Stat struct.
-/// TEAM_201: Extended to full POSIX-like stat for VFS support.
+/// TEAM_217: Linux-compatible Stat structure (128 bytes).
+/// Matches AArch64 asm-generic layout used by Rust std and musl/glibc.
 #[repr(C)]
 #[derive(Debug, Clone, Copy, Default)]
 pub struct Stat {
@@ -495,24 +590,30 @@ pub struct Stat {
     pub st_gid: u32,
     /// Device ID (if special file)
     pub st_rdev: u64,
+    /// Padding for alignment
+    pub __pad1: u64,
     /// File size in bytes
-    pub st_size: u64,
+    pub st_size: i64,
     /// Block size for filesystem I/O
-    pub st_blksize: u64,
+    pub st_blksize: i32,
+    /// Padding for alignment
+    pub __pad2: i32,
     /// Number of 512-byte blocks allocated
-    pub st_blocks: u64,
+    pub st_blocks: i64,
     /// Access time (seconds)
-    pub st_atime: u64,
+    pub st_atime: i64,
     /// Access time (nanoseconds)
     pub st_atime_nsec: u64,
     /// Modification time (seconds)
-    pub st_mtime: u64,
+    pub st_mtime: i64,
     /// Modification time (nanoseconds)
     pub st_mtime_nsec: u64,
     /// Status change time (seconds)
-    pub st_ctime: u64,
+    pub st_ctime: i64,
     /// Status change time (nanoseconds)
     pub st_ctime_nsec: u64,
+    /// Unused padding
+    pub __unused: [u32; 2],
 }
 
 /// TEAM_168: Get file status.
@@ -543,14 +644,14 @@ pub fn fstat(fd: usize, stat: &mut Stat) -> isize {
 // Time Syscalls (TEAM_170: Phase 10 Step 7)
 // ============================================================================
 
-/// TEAM_170: Timespec structure for time syscalls.
+/// TEAM_217: Linux-compatible Timespec.
 #[repr(C)]
 #[derive(Debug, Clone, Copy, Default)]
 pub struct Timespec {
     /// Seconds
-    pub tv_sec: u64,
+    pub tv_sec: i64,
     /// Nanoseconds
-    pub tv_nsec: u64,
+    pub tv_nsec: i64,
 }
 
 /// TEAM_170: Sleep for specified duration.

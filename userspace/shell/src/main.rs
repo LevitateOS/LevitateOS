@@ -115,6 +115,7 @@ fn execute(line: &[u8]) {
 
     // [SH8] External command execution with argument passing
     // TEAM_186: Parse command line and spawn with arguments
+    let mut result = -1isize;
     let (parts, argc) = split_args(cmd);
     if argc > 0 {
         // Convert parts to str slices
@@ -150,7 +151,7 @@ fn execute(line: &[u8]) {
             };
 
             // Spawn with all arguments
-            let result = libsyscall::spawn_args(path, &argv_strs[..argc]);
+            result = libsyscall::spawn_args(path, &argv_strs[..argc]);
             if result >= 0 {
                 // Process spawned successfully with PID = result
                 // TEAM_188: Wait for child process to complete
@@ -172,9 +173,9 @@ fn execute(line: &[u8]) {
     // Unknown command
     print!("Unknown: ");
     if let Ok(s) = core::str::from_utf8(cmd) {
-        println!("{}", s);
+        println!("{} (err={})", s, result);
     } else {
-        println!("<invalid utf8>");
+        println!("<invalid utf8> (err={})", result);
     }
 }
 

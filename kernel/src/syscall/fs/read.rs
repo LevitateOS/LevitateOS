@@ -5,6 +5,63 @@ use crate::fs::vfs::error::VfsError;
 use crate::syscall::{errno, write_to_user_buf};
 use crate::task::fd_table::FdType;
 
+/// TEAM_217: sys_readv - Vectored read.
+pub fn sys_readv(fd: usize, iov_ptr: usize, count: usize) -> i64 {
+    if count == 0 {
+        return 0;
+    }
+    if count > 1024 {
+        return errno::EINVAL;
+    }
+
+    let task = crate::task::current_task();
+    let ttbr0 = task.ttbr0;
+
+    // Validate iovec array
+    let iov_size = count * core::mem::size_of::<UserIoVec>();
+    if mm_user::validate_user_buffer(ttbr0, iov_ptr, iov_size, false).is_err() {
+        return errno::EFAULT;
+    }
+
+    let mut total_read: i64 = 0;
+
+    for i in 0..count {
+        let entry_addr = iov_ptr + i * core::mem::size_of::<UserIoVec>();
+        let iov = unsafe {
+            let kptr = mm_user::user_va_to_kernel_ptr(ttbr0, entry_addr).unwrap();
+            *(kptr as *const UserIoVec)
+        };
+
+        if iov.len == 0 {
+            continue;
+        }
+
+        let res = sys_read(fd, iov.base, iov.len);
+        if res < 0 {
+            if total_read == 0 {
+                return res;
+            } else {
+                return total_read;
+            }
+        }
+        total_read += res;
+        if res < iov.len as i64 {
+            // Short read, stop here
+            break;
+        }
+    }
+
+    total_read
+}
+
+/// TEAM_217: struct iovec for writev/readv
+#[repr(C)]
+#[derive(Clone, Copy)]
+struct UserIoVec {
+    base: usize,
+    len: usize,
+}
+
 /// TEAM_081: sys_read - Read from a file descriptor.
 /// TEAM_178: Refactored to dispatch by fd type, added InitramfsFile support.
 pub fn sys_read(fd: usize, buf: usize, len: usize) -> i64 {

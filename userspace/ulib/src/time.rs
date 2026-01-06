@@ -149,7 +149,7 @@ impl Instant {
             return Self { secs: 0, nanos: 0 };
         }
         Self {
-            secs: ts.tv_sec,
+            secs: ts.tv_sec as u64,
             // TEAM_186: Clamp tv_nsec to valid range in case of corruption
             nanos: (ts.tv_nsec.min(999_999_999)) as u32,
         }

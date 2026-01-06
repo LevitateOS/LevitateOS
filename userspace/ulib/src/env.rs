@@ -30,6 +30,9 @@ static ARGS: spin::Once<Vec<String>> = spin::Once::new();
 /// TEAM_213: Cached environment variables (parsed once at startup).
 static ENV_VARS: spin::Once<Vec<String>> = spin::Once::new();
 
+/// TEAM_217: Cached auxiliary vector (parsed once at startup).
+static AUXV: spin::Once<Vec<(usize, usize)>> = spin::Once::new();
+
 /// TEAM_169: Initialize arguments from the stack pointer.
 ///
 /// This should be called once at the very start of _start,
@@ -47,6 +50,7 @@ pub unsafe fn init_args(sp: *const usize) {
 
     let mut args = Vec::new();
     let mut envs = Vec::new();
+    let mut auxv = Vec::new();
 
     // Read argc
     let argc = unsafe { *sp };
@@ -82,8 +86,38 @@ pub unsafe fn init_args(sp: *const usize) {
         env_idx += 1;
     }
 
+    // TEAM_217: Read auxiliary vector (starts after envp NULL terminator)
+    let auxv_base = unsafe { envp_base.add(env_idx + 1) };
+    let mut aux_idx = 0;
+    const MAX_AUXV: usize = 64;
+    while aux_idx < MAX_AUXV {
+        let type_ptr = unsafe { auxv_base.add(aux_idx * 2) };
+        let val_ptr = unsafe { auxv_base.add(aux_idx * 2 + 1) };
+        let a_type = unsafe { *type_ptr };
+        let a_val = unsafe { *val_ptr };
+        
+        if a_type == 0 { // AT_NULL
+            break;
+        }
+        auxv.push((a_type, a_val));
+        aux_idx += 1;
+    }
+
     ARGS.call_once(|| args);
     ENV_VARS.call_once(|| envs);
+    AUXV.call_once(|| auxv);
+}
+
+/// TEAM_217: Get an auxiliary vector entry by type.
+pub fn get_auxv(a_type: usize) -> Option<usize> {
+    AUXV.get().and_then(|v| {
+        for (t, val) in v {
+            if *t == a_type {
+                return Some(*val);
+            }
+        }
+        None
+    })
 }
 
 /// TEAM_169: Get command-line arguments.

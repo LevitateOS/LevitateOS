@@ -114,7 +114,7 @@ impl Elf64Header {
 
         // Manually parse fields to avoid alignment/pointer issues
         let e_ident: [u8; 16] = data[0..16].try_into().unwrap(); // Infallible due to size check
-        los_hal::println!("ELF Header e_ident verified");
+        log::trace!("ELF Header e_ident verified");
         let e_type = u16::from_le_bytes(data[16..18].try_into().unwrap());
         let e_machine = u16::from_le_bytes(data[18..20].try_into().unwrap());
         let e_version = u32::from_le_bytes(data[20..24].try_into().unwrap());
@@ -265,6 +265,22 @@ impl<'a> Elf<'a> {
         self.header.entry_point()
     }
 
+    /// TEAM_217: Get the offset of the program headers.
+    pub fn program_headers_offset(&self) -> usize {
+        self.header.e_phoff as usize
+    }
+
+    /// TEAM_217: Get the number of program headers.
+    pub fn program_headers_count(&self) -> usize {
+        self.header.e_phnum as usize
+    }
+
+    /// TEAM_217: Get the base address where the ELF is loaded.
+    /// For statically linked ET_EXEC binaries, this is 0 (relative to VAs in headers).
+    pub fn load_base(&self) -> usize {
+        0
+    }
+
     /// Iterate over program headers.
     pub fn program_headers(&self) -> impl Iterator<Item = Elf64ProgramHeader> + 'a {
         let phoff = self.header.e_phoff as usize;
@@ -387,7 +403,7 @@ impl<'a> Elf<'a> {
 
                     // DEBUG: Print first byte copy attempt
                     if i == 0 {
-                        los_hal::println!(
+                        log::trace!(
                             "[ELF] Copying segment: src[0]={:x} to VA {:x}",
                             *byte,
                             dst_va
@@ -409,7 +425,7 @@ impl<'a> Elf<'a> {
                         let dst = mmu::phys_to_virt(dst_phys) as *mut u8;
 
                         if i == 0 {
-                            los_hal::println!(
+                            log::trace!(
                                 "[ELF] Resolved PA [MASKED] -> Kernel VA [MASKED]"
                             );
                         }

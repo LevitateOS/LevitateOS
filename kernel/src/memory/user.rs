@@ -29,15 +29,15 @@ pub mod layout {
 /// # Returns
 /// Physical address of the new L0 page table, or None if allocation fails.
 pub fn create_user_page_table() -> Option<usize> {
-    los_hal::println!("[MMU] Creating user page table...");
+    log::trace!("[MMU] Creating user page table...");
     // Allocate a page for L0 table
     let l0_phys = FRAME_ALLOCATOR.alloc_page()?;
 
-    los_hal::println!("[MMU] Allocated L0 table at phys [MASKED]");
+    log::trace!("[MMU] Allocated L0 table at phys [MASKED]");
 
     // Zero the table
     let l0_va = mmu::phys_to_virt(l0_phys);
-    los_hal::println!("[MMU] Zeroing L0 table at va [MASKED]");
+    log::trace!("[MMU] Zeroing L0 table at va [MASKED]");
     let l0 = unsafe { &mut *(l0_va as *mut PageTable) };
     l0.zero();
 
@@ -130,10 +130,7 @@ pub unsafe fn map_user_range(
 ///
 /// # Returns
 /// Initial stack pointer (top of stack) on success.
-pub unsafe fn setup_user_stack(
-    ttbr0_phys: usize,
-    stack_pages: usize,
-) -> Result<usize, MmuError> {
+pub unsafe fn setup_user_stack(ttbr0_phys: usize, stack_pages: usize) -> Result<usize, MmuError> {
     let stack_size = stack_pages * PAGE_SIZE;
     let stack_bottom = layout::STACK_TOP - stack_size;
 
@@ -162,7 +159,23 @@ pub unsafe fn setup_user_stack(
     Ok(layout::STACK_TOP)
 }
 
-/// TEAM_169: Set up user stack with argc/argv/envp.
+/// TEAM_217: Auxiliary Vector entry type.
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct AuxEntry {
+    pub a_type: usize,
+    pub a_val: usize,
+}
+
+pub const AT_NULL: usize = 0;
+pub const AT_PHDR: usize = 3;
+pub const AT_PHENT: usize = 4;
+pub const AT_PHNUM: usize = 5;
+pub const AT_PAGESZ: usize = 6;
+pub const AT_HWCAP: usize = 16;
+pub const AT_RANDOM: usize = 25;
+
+/// TEAM_169: Set up user stack with argc/argv/envp/auxv.
 ///
 /// Per Phase 2 Q5 decision: Stack-based argument passing (Linux ABI compatible).
 ///
@@ -170,8 +183,13 @@ pub unsafe fn setup_user_stack(
 /// ```text
 /// High addresses
 ///   +---------------+
+///   | random data   |  <- 16 bytes for AT_RANDOM
 ///   | env strings   |  <- Environment variable strings
 ///   | arg strings   |  <- Argument strings  
+///   | AT_NULL       |  <- auxv terminator
+///   | auxv[n]       |  <- Auxiliary vector entries
+///   | ...           |
+///   | auxv[0]       |
 ///   | NULL          |  <- envp terminator
 ///   | envp[n-1]     |  <- Environment pointers
 ///   | ...           |
@@ -190,6 +208,7 @@ pub unsafe fn setup_user_stack(
 /// * `stack_top` - Top of the allocated stack
 /// * `args` - Argument strings
 /// * `envs` - Environment variable strings
+/// * `auxv` - Auxiliary vector entries
 ///
 /// # Returns
 /// New stack pointer after setting up arguments.
@@ -198,14 +217,27 @@ pub fn setup_stack_args(
     stack_top: usize,
     args: &[&str],
     envs: &[&str],
+    auxv: &[AuxEntry],
 ) -> Result<usize, MmuError> {
     let mut sp = stack_top;
+
+    // Helper to write raw bytes to user stack
+    let write_bytes = |sp: &mut usize, bytes: &[u8]| -> Result<(), MmuError> {
+        *sp -= bytes.len();
+        for (i, &byte) in bytes.iter().enumerate() {
+            let ptr = user_va_to_kernel_ptr(ttbr0_phys, *sp + i)
+                .ok_or(MmuError::InvalidVirtualAddress)?;
+            unsafe {
+                *ptr = byte;
+            }
+        }
+        Ok(())
+    };
 
     // Helper to write a usize to user stack
     let write_usize = |sp: &mut usize, val: usize| -> Result<(), MmuError> {
         *sp -= core::mem::size_of::<usize>();
-        let ptr = user_va_to_kernel_ptr(ttbr0_phys, *sp)
-            .ok_or(MmuError::InvalidVirtualAddress)?;
+        let ptr = user_va_to_kernel_ptr(ttbr0_phys, *sp).ok_or(MmuError::InvalidVirtualAddress)?;
         unsafe {
             *(ptr as *mut usize) = val;
         }
@@ -218,19 +250,32 @@ pub fn setup_stack_args(
         *sp -= len;
         *sp &= !7; // Align to 8 bytes
         let str_ptr = *sp;
-        
+
         for (i, byte) in s.bytes().enumerate() {
             let ptr = user_va_to_kernel_ptr(ttbr0_phys, str_ptr + i)
                 .ok_or(MmuError::InvalidVirtualAddress)?;
-            unsafe { *ptr = byte; }
+            unsafe {
+                *ptr = byte;
+            }
         }
         // Null terminator
         let ptr = user_va_to_kernel_ptr(ttbr0_phys, str_ptr + s.len())
             .ok_or(MmuError::InvalidVirtualAddress)?;
-        unsafe { *ptr = 0; }
-        
+        unsafe {
+            *ptr = 0;
+        }
+
         Ok(str_ptr)
     };
+
+    // 0. Write random data for AT_RANDOM
+    let mut random_bytes = [0u8; 16];
+    // TODO: Use actual entropy
+    for i in 0..16 {
+        random_bytes[i] = (i * 7) as u8;
+    }
+    write_bytes(&mut sp, &random_bytes)?;
+    let random_ptr = sp;
 
     // 1. Write all strings to stack (env first, then args)
     let mut env_ptrs = alloc::vec::Vec::new();
@@ -247,32 +292,48 @@ pub fn setup_stack_args(
     }
     arg_ptrs.reverse();
 
-    // TEAM_212: Structure must be contiguous with argc at a 16-byte aligned address
-    let argc = args.len();
-    let envc = envs.len();
-    let num_entries = argc + envc + 3;
-    
-    // Align sp to 16 bytes
+    // Align sp to 16 bytes for the array structures
     sp &= !15;
-    
-    // If odd number of entries, add 8-byte padding so argc ends up 16-byte aligned
-    if num_entries % 2 == 1 {
-        write_usize(&mut sp, 0)?;
+
+    // 2. Write Auxiliary Vector (auxv)
+    // Add mandatory entries
+    let mut final_auxv = alloc::vec::Vec::from(auxv);
+    final_auxv.push(AuxEntry {
+        a_type: AT_PAGESZ,
+        a_val: PAGE_SIZE,
+    });
+    final_auxv.push(AuxEntry {
+        a_type: AT_HWCAP,
+        a_val: 0,
+    }); // TODO: Pass actual HWCAP
+    final_auxv.push(AuxEntry {
+        a_type: AT_RANDOM,
+        a_val: random_ptr,
+    });
+    final_auxv.push(AuxEntry {
+        a_type: AT_NULL,
+        a_val: 0,
+    });
+
+    for entry in final_auxv.iter().rev() {
+        write_usize(&mut sp, entry.a_val)?;
+        write_usize(&mut sp, entry.a_type)?;
     }
-    
-    // 2. Write envp[] array (NULL terminated)
+
+    // 3. Write envp[] array (NULL terminated)
     write_usize(&mut sp, 0)?;
     for ptr in env_ptrs.iter().rev() {
         write_usize(&mut sp, *ptr)?;
     }
 
-    // 3. Write argv[] array (NULL terminated)  
+    // 4. Write argv[] array (NULL terminated)
     write_usize(&mut sp, 0)?;
     for ptr in arg_ptrs.iter().rev() {
         write_usize(&mut sp, *ptr)?;
     }
 
-    // 4. Write argc
+    // 5. Write argc
+    let argc = args.len();
     write_usize(&mut sp, argc)?;
 
     Ok(sp)
