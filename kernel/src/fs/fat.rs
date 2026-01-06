@@ -12,9 +12,8 @@ use embedded_sdmmc::{
 
 use crate::block;
 
-/// Error type for block device
-#[derive(Debug, Clone, Copy)]
-pub struct BlockError;
+/// TEAM_150: Re-export BlockError for embedded-sdmmc compatibility
+pub use crate::block::BlockError;
 
 /// Adapter implementing embedded-sdmmc BlockDevice over our block driver
 pub struct VirtioBlockDevice {
@@ -33,18 +32,20 @@ impl VirtioBlockDevice {
 impl BlockDevice for VirtioBlockDevice {
     type Error = BlockError;
 
+    // TEAM_150: Propagate block errors instead of panicking
     fn read(&self, blocks: &mut [Block], start_block_idx: BlockIdx) -> Result<(), Self::Error> {
         for (i, block) in blocks.iter_mut().enumerate() {
             let block_id = start_block_idx.0 as usize + i;
-            block::read_block(block_id, &mut block.contents);
+            block::read_block(block_id, &mut block.contents)?;
         }
         Ok(())
     }
 
+    // TEAM_150: Propagate block errors instead of panicking
     fn write(&self, blocks: &[Block], start_block_idx: BlockIdx) -> Result<(), Self::Error> {
         for (i, block) in blocks.iter().enumerate() {
             let block_id = start_block_idx.0 as usize + i;
-            block::write_block(block_id, &block.contents);
+            block::write_block(block_id, &block.contents)?;
         }
         Ok(())
     }

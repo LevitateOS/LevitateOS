@@ -118,7 +118,9 @@ impl gic::InterruptHandler for TimerHandler {
         }
 
         // TEAM_070: Preemptive scheduling
-        crate::task::yield_now();
+        // TEAM_148: Disabled preemption from IRQ context to prevent corruption.
+        // IRQ handlers must NOT yield. We rely on cooperative yielding in init/shell.
+        // crate::task::yield_now();
     }
 }
 

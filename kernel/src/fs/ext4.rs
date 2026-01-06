@@ -45,7 +45,9 @@ impl Ext4Read for Ext4BlockDevice {
         let mut block_offset = offset_in_block;
 
         while remaining > 0 {
-            block::read_block(current_block as usize, &mut buf);
+            // TEAM_150: Propagate block errors instead of panicking
+            block::read_block(current_block as usize, &mut buf)
+                .map_err(|e| alloc::boxed::Box::new(e) as Box<dyn core::error::Error + Send + Sync>)?;
 
             let bytes_to_copy = (512 - block_offset).min(remaining);
             data[data_offset..data_offset + bytes_to_copy]
