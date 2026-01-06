@@ -99,15 +99,42 @@ impl SyscallNumber {
 
 /// TEAM_168: Stat structure returned by fstat.
 /// TEAM_198: Added timestamp fields (atime, mtime, ctime).
+/// TEAM_201: Extended to full POSIX-like stat for VFS support.
 #[repr(C)]
 #[derive(Debug, Clone, Copy, Default)]
 pub struct Stat {
-    pub st_size: u64,
+    /// Device ID containing file
+    pub st_dev: u64,
+    /// Inode number
+    pub st_ino: u64,
+    /// File type and permissions (S_IFMT | mode bits)
     pub st_mode: u32,
-    pub _pad: u32,
+    /// Number of hard links
+    pub st_nlink: u32,
+    /// Owner user ID
+    pub st_uid: u32,
+    /// Owner group ID
+    pub st_gid: u32,
+    /// Device ID (if special file)
+    pub st_rdev: u64,
+    /// File size in bytes
+    pub st_size: u64,
+    /// Block size for filesystem I/O
+    pub st_blksize: u64,
+    /// Number of 512-byte blocks allocated
+    pub st_blocks: u64,
+    /// Access time (seconds)
     pub st_atime: u64,
+    /// Access time (nanoseconds)
+    pub st_atime_nsec: u64,
+    /// Modification time (seconds)
     pub st_mtime: u64,
+    /// Modification time (nanoseconds)
+    pub st_mtime_nsec: u64,
+    /// Status change time (seconds)
     pub st_ctime: u64,
+    /// Status change time (nanoseconds)
+    pub st_ctime_nsec: u64,
 }
 
 /// TEAM_170: Timespec structure for clock_gettime.

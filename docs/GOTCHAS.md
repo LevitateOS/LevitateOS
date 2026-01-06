@@ -433,3 +433,113 @@ loop {
 
 **Rule:** **IRQ Handlers Should NOT Yield.** Use `scheduler::SCHEDULER.schedule()` only at the *end* of the exception handler (in assembly return path), or rely on cooperative multitasking until full preemption is implemented safely.
 
+---
+
+## VFS Gotchas (TEAM_201, TEAM_202)
+
+### 21. Dentry Cache vs Filesystem State (TEAM_202)
+
+**Location:** `kernel/src/fs/vfs/dentry.rs`
+
+**Problem:** The dentry cache is a **cache**, not the source of truth. If you modify filesystem state directly (e.g., create a file in tmpfs), you must also update the dentry cache.
+
+**Symptom:** File exists in filesystem but `vfs_open` returns NotFound. Or file was deleted but still appears.
+
+**Fix:** Always update both:
+```rust
+// After creating in filesystem:
+parent_dentry.add_child(new_dentry);
+
+// After deleting from filesystem:
+parent_dentry.remove_child(name);
+dcache().invalidate(path);
+```
+
+---
+
+### 22. Kernel and Userspace Stat Must Match (TEAM_201)
+
+**Location:** `kernel/src/syscall/mod.rs` and `userspace/libsyscall/src/lib.rs`
+
+**Problem:** Kernel `Stat` and userspace `Stat` structs must be identical (`#[repr(C)]`). If they differ in size or field order, fstat will corrupt memory.
+
+**Symptom:** Garbage values in stat fields. Random crashes in userspace.
+
+**Fix:** When adding fields to Stat, add to BOTH files with identical layout:
+- `kernel/src/syscall/mod.rs` — kernel Stat
+- `userspace/libsyscall/src/lib.rs` — userspace Stat
+
+---
+
+### 23. InodeOps Must Be Static References (TEAM_202)
+
+**Location:** `kernel/src/fs/vfs/inode.rs`
+
+**Problem:** `Inode.ops` is `&'static dyn InodeOps` because Inodes have unbounded lifetime. You cannot pass owned or borrowed InodeOps.
+
+**Symptom:** Compile error about lifetime requirements.
+
+**Fix:** Create a static instance:
+```rust
+// Good: static instance
+static TMPFS_INODE_OPS: TmpfsInodeOps = TmpfsInodeOps;
+let inode = Inode::new(..., &TMPFS_INODE_OPS, ...);
+
+// Bad: owned instance (won't compile)
+let inode = Inode::new(..., &TmpfsInodeOps {}, ...);
+```
+
+---
+
+### 24. Weak References for Parent Pointers (TEAM_202)
+
+**Location:** `kernel/src/fs/vfs/dentry.rs`, `kernel/src/fs/vfs/inode.rs`
+
+**Problem:** Parent pointers (dentry→parent, inode→superblock) must use `Weak<T>` to avoid reference cycles that prevent deallocation.
+
+**Symptom:** Memory leaks. Objects never freed.
+
+**Pattern:**
+```rust
+pub struct Dentry {
+    parent: Option<Weak<Dentry>>,  // Weak!
+}
+
+pub struct Inode {
+    sb: Weak<dyn Superblock>,  // Weak!
+}
+```
+
+---
+
+### 25. FdType Migration Order Matters (TEAM_202)
+
+**Location:** `kernel/src/task/fd_table.rs`
+
+**Problem:** `FdType` enum currently has per-filesystem variants. Changing to `FdType::File(Arc<vfs::File>)` requires ALL filesystems to implement VFS first.
+
+**Fix Order:**
+1. Implement InodeOps for tmpfs
+2. Implement InodeOps for initramfs
+3. THEN change FdType
+4. THEN update syscalls
+
+**Don't:** Change FdType before filesystems are migrated - syscalls will break.
+
+---
+
+### 26. VFS Boot Initialization Order (TEAM_202)
+
+**Location:** `kernel/src/init.rs` (future)
+
+**Problem:** VFS components must be initialized in correct order during boot.
+
+**Required Order:**
+1. Mount table init (`fs::mount::init()`)
+2. Initramfs superblock creation
+3. Root dentry creation with initramfs root inode
+4. Set dcache root
+5. Mount tmpfs at /tmp
+
+**Symptom:** "NotFound" errors for `/` or `/tmp` paths.
+

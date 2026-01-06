@@ -510,15 +510,26 @@ pub fn sys_fstat(fd: usize, stat_buf: usize) -> i64 {
     };
 
     let stat = match entry.fd_type {
+        // TEAM_201: Updated to use extended Stat struct
         crate::task::fd_table::FdType::Stdin
         | crate::task::fd_table::FdType::Stdout
         | crate::task::fd_table::FdType::Stderr => Stat {
+            st_dev: 0,
+            st_ino: 0,
+            st_mode: crate::fs::mode::S_IFCHR | 0o666,
+            st_nlink: 1,
+            st_uid: 0,
+            st_gid: 0,
+            st_rdev: 0,
             st_size: 0,
-            st_mode: 2,
-            _pad: 0,
+            st_blksize: 0,
+            st_blocks: 0,
             st_atime: 0,
+            st_atime_nsec: 0,
             st_mtime: 0,
+            st_mtime_nsec: 0,
             st_ctime: 0,
+            st_ctime_nsec: 0,
         },
         crate::task::fd_table::FdType::InitramfsFile { file_index, .. } => {
             let initramfs_guard = crate::fs::INITRAMFS.lock();
@@ -533,48 +544,93 @@ pub fn sys_fstat(fd: usize, stat_buf: usize) -> i64 {
                 .map(|e| e.data.len())
                 .unwrap_or(0);
 
+            // TEAM_201: Updated to use extended Stat struct
             Stat {
+                st_dev: 0,
+                st_ino: file_index as u64,
+                st_mode: crate::fs::mode::S_IFREG | 0o444,
+                st_nlink: 1,
+                st_uid: 0,
+                st_gid: 0,
+                st_rdev: 0,
                 st_size: file_size as u64,
-                st_mode: 1, // Regular file
-                _pad: 0,
+                st_blksize: 4096,
+                st_blocks: ((file_size + 511) / 512) as u64,
                 st_atime: 0,
+                st_atime_nsec: 0,
                 st_mtime: 0,
+                st_mtime_nsec: 0,
                 st_ctime: 0,
+                st_ctime_nsec: 0,
             }
         }
         // TEAM_176: Directory fd returns directory mode
+        // TEAM_201: Updated to use extended Stat struct
         crate::task::fd_table::FdType::InitramfsDir { .. } => Stat {
+            st_dev: 0,
+            st_ino: 0,
+            st_mode: crate::fs::mode::S_IFDIR | 0o555,
+            st_nlink: 2,
+            st_uid: 0,
+            st_gid: 0,
+            st_rdev: 0,
             st_size: 0,
-            st_mode: 2, // Directory
-            _pad: 0,
+            st_blksize: 4096,
+            st_blocks: 0,
             st_atime: 0,
+            st_atime_nsec: 0,
             st_mtime: 0,
+            st_mtime_nsec: 0,
             st_ctime: 0,
+            st_ctime_nsec: 0,
         },
         // TEAM_195: Tmpfs file fd
         // TEAM_198: Added timestamp support
+        // TEAM_201: Updated to use extended Stat struct
         FdType::TmpfsFile { ref node, .. } => {
             let node_guard = node.lock();
+            let size = node_guard.size() as u64;
             Stat {
-                st_size: node_guard.size() as u64,
-                st_mode: 1, // Regular file
-                _pad: 0,
+                st_dev: 1, // tmpfs device
+                st_ino: node_guard.ino,
+                st_mode: crate::fs::mode::S_IFREG | 0o644,
+                st_nlink: 1,
+                st_uid: 0,
+                st_gid: 0,
+                st_rdev: 0,
+                st_size: size,
+                st_blksize: 4096,
+                st_blocks: ((size + 511) / 512),
                 st_atime: node_guard.atime,
+                st_atime_nsec: 0,
                 st_mtime: node_guard.mtime,
+                st_mtime_nsec: 0,
                 st_ctime: node_guard.ctime,
+                st_ctime_nsec: 0,
             }
         }
         // TEAM_195: Tmpfs directory fd
         // TEAM_198: Added timestamp support
+        // TEAM_201: Updated to use extended Stat struct
         FdType::TmpfsDir { ref node, .. } => {
             let node_guard = node.lock();
             Stat {
+                st_dev: 1, // tmpfs device
+                st_ino: node_guard.ino,
+                st_mode: crate::fs::mode::S_IFDIR | 0o755,
+                st_nlink: 2,
+                st_uid: 0,
+                st_gid: 0,
+                st_rdev: 0,
                 st_size: 0,
-                st_mode: 2, // Directory
-                _pad: 0,
+                st_blksize: 4096,
+                st_blocks: 0,
                 st_atime: node_guard.atime,
+                st_atime_nsec: 0,
                 st_mtime: node_guard.mtime,
+                st_mtime_nsec: 0,
                 st_ctime: node_guard.ctime,
+                st_ctime_nsec: 0,
             }
         }
     };

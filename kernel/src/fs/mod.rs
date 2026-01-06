@@ -15,7 +15,11 @@ use los_utils::Spinlock;
 
 pub mod ext4;
 pub mod fat;
+pub mod mode;
+pub mod mount;
+pub mod path;
 pub mod tmpfs;
+pub mod vfs;
 
 use los_error::define_kernel_error;
 

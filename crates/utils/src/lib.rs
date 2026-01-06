@@ -2,6 +2,10 @@
 
 pub mod cpio;
 pub mod hex;
+pub mod rwlock;
+
+// TEAM_201: Re-export RwLock at crate root for convenience
+pub use rwlock::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 
 use core::cell::UnsafeCell;
 use core::marker::{Send, Sync};
