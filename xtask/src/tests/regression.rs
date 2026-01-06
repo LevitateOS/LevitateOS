@@ -94,6 +94,10 @@ pub fn run() -> Result<()> {
     test_qemu_serial_multiplexing(&mut results);
     test_qemu_window_size(&mut results);
 
+    // TEAM_142: Shell Input & Graceful Shutdown
+    test_shell_backspace(&mut results);
+    test_graceful_shutdown(&mut results);
+
     println!();
     if results.summary() {
         println!("\n✅ All regression tests passed\n");
@@ -673,5 +677,87 @@ fn test_qemu_window_size(results: &mut TestResults) {
         results.pass("QEMU window-close=off prevents accidental closure");
     } else {
         results.fail("QEMU missing window-close=off");
+    }
+}
+
+// =============================================================================
+// TEAM_142: Graceful Shutdown Regression Tests
+// =============================================================================
+
+/// TEAM_142: Verify shell backspace handling
+fn test_shell_backspace(results: &mut TestResults) {
+    println!("TEAM_142: Shell backspace handling");
+
+    let shell_main = fs::read_to_string("userspace/shell/src/main.rs").unwrap_or_default();
+    
+    // Must handle both backspace codes (0x08 and 0x7f)
+    if shell_main.contains("0x08") && shell_main.contains("0x7f") {
+        results.pass("Shell handles both backspace codes (0x08, 0x7f)");
+    } else {
+        results.fail("Shell missing backspace code handling");
+    }
+    
+    // Must use proper terminal erase sequence (back, space, back)
+    if shell_main.contains(r#"b"\x08 \x08""#) || shell_main.contains(r#"\x08 \x08"#) {
+        results.pass("Shell uses proper erase sequence (\\x08 \\x08)");
+    } else {
+        results.fail("Shell missing proper erase sequence - backspace won't work visually");
+    }
+    
+    // Must NOT echo before checking character type (avoid echoing raw backspace)
+    // Check that write happens AFTER the if/else branches, not before
+    let has_echo_after_check = shell_main.contains("} else if line_len < buf.len()") 
+        && shell_main.contains("libsyscall::write(1, &c_buf");
+    if has_echo_after_check {
+        results.pass("Shell echoes characters after type check (not raw)");
+    } else {
+        results.fail("Shell may echo raw backspace - check input handling order");
+    }
+}
+
+/// TEAM_142: Verify graceful shutdown syscall implementation
+fn test_graceful_shutdown(results: &mut TestResults) {
+    println!("TEAM_142: Graceful shutdown implementation");
+
+    // Check kernel syscall
+    let syscall_rs = fs::read_to_string("kernel/src/syscall.rs").unwrap_or_default();
+    
+    // Must have Shutdown syscall number
+    if syscall_rs.contains("Shutdown = 8") {
+        results.pass("Shutdown syscall number defined (8)");
+    } else {
+        results.fail("Shutdown syscall number missing or wrong");
+    }
+    
+    // Must have sys_shutdown function with shutdown phases
+    if syscall_rs.contains("fn sys_shutdown") && syscall_rs.contains("[SHUTDOWN]") {
+        results.pass("sys_shutdown function with logging exists");
+    } else {
+        results.fail("sys_shutdown function missing");
+    }
+    
+    // Must have verbose flag support
+    if syscall_rs.contains("shutdown_flags") && syscall_rs.contains("VERBOSE") {
+        results.pass("Shutdown verbose flag for golden file testing");
+    } else {
+        results.fail("Shutdown verbose flag missing");
+    }
+
+    // Check libsyscall wrapper
+    let libsyscall = fs::read_to_string("userspace/libsyscall/src/lib.rs").unwrap_or_default();
+    
+    if libsyscall.contains("SYS_SHUTDOWN") && libsyscall.contains("pub fn shutdown") {
+        results.pass("libsyscall has shutdown() wrapper");
+    } else {
+        results.fail("libsyscall missing shutdown() wrapper");
+    }
+
+    // Check shell exit command
+    let shell_main = fs::read_to_string("userspace/shell/src/main.rs").unwrap_or_default();
+    
+    if shell_main.contains("exit --verbose") && shell_main.contains("shutdown") {
+        results.pass("Shell 'exit --verbose' triggers shutdown");
+    } else {
+        results.fail("Shell exit command not connected to shutdown");
     }
 }

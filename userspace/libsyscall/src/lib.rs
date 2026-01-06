@@ -23,6 +23,16 @@ pub const SYS_SBRK: u64 = 4;
 pub const SYS_SPAWN: u64 = 5;
 pub const SYS_EXEC: u64 = 6;
 pub const SYS_YIELD: u64 = 7;
+/// TEAM_142: Graceful system shutdown
+pub const SYS_SHUTDOWN: u64 = 8;
+
+/// TEAM_142: Shutdown flags
+pub mod shutdown_flags {
+    /// Normal shutdown (minimal output)
+    pub const NORMAL: u32 = 0;
+    /// Verbose shutdown (for golden file testing)
+    pub const VERBOSE: u32 = 1;
+}
 
 // ============================================================================
 // Syscall Wrappers
@@ -181,6 +191,27 @@ pub fn yield_cpu() {
             "svc #0",
             in("x8") SYS_YIELD,
             options(nostack)
+        );
+    }
+}
+
+/// TEAM_142: Graceful system shutdown.
+///
+/// # Arguments
+/// * `flags` - Shutdown flags (see `shutdown_flags` module)
+///   - `NORMAL` (0): Minimal output
+///   - `VERBOSE` (1): Detailed output for golden file testing
+///
+/// # Returns
+/// Does not return on success. Halts the system.
+#[inline]
+pub fn shutdown(flags: u32) -> ! {
+    unsafe {
+        core::arch::asm!(
+            "svc #0",
+            in("x8") SYS_SHUTDOWN,
+            in("x0") flags,
+            options(noreturn, nostack)
         );
     }
 }

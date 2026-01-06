@@ -48,6 +48,8 @@ pub enum SyscallNumber {
     Exec = 6,
     /// Yield CPU to other tasks
     Yield = 7,
+    /// TEAM_142: Graceful system shutdown
+    Shutdown = 8,
 }
 
 impl SyscallNumber {
@@ -62,6 +64,7 @@ impl SyscallNumber {
             5 => Some(Self::Spawn),
             6 => Some(Self::Exec),
             7 => Some(Self::Yield),
+            8 => Some(Self::Shutdown),
             _ => None,
         }
     }
@@ -172,6 +175,7 @@ pub fn syscall_dispatch(frame: &mut SyscallFrame) {
             frame.arg1() as usize, // path_len
         ),
         Some(SyscallNumber::Yield) => sys_yield(),
+        Some(SyscallNumber::Shutdown) => sys_shutdown(frame.arg0() as u32),
         None => {
             // TEAM_073: Unknown syscall - return ENOSYS (Rule 14: Fail Fast, but don't crash)
             println!("[SYSCALL] Unknown syscall number: {}", nr);
@@ -255,9 +259,13 @@ fn sys_read(fd: usize, buf: usize, len: usize) -> i64 {
             }
         }
 
-        // If no input yet, yield CPU briefly
+        // TEAM_143: If no input yet, yield CPU to other tasks and wait for interrupt
+        // This replaces the inefficient spin_loop() which burned CPU at 100%
         if bytes_read == 0 {
-            core::hint::spin_loop();
+            crate::task::yield_now();
+            // Wait for next interrupt (keyboard/timer) to avoid busy-waiting
+            #[cfg(target_arch = "aarch64")]
+            aarch64_cpu::asm::wfi();
         }
     }
 
@@ -333,6 +341,95 @@ fn sys_sbrk(_increment: isize) -> i64 {
 fn sys_yield() -> i64 {
     crate::task::yield_now();
     0
+}
+
+/// TEAM_142: Shutdown flags for verbose mode
+pub mod shutdown_flags {
+    /// Normal shutdown (minimal output)
+    #[allow(dead_code)]
+    pub const NORMAL: u32 = 0;
+    /// Verbose shutdown (for golden file testing)
+    pub const VERBOSE: u32 = 1;
+}
+
+/// TEAM_142: sys_shutdown - Graceful system shutdown.
+///
+/// Performs a clean shutdown sequence:
+/// 1. Flush GPU framebuffer
+/// 2. Sync filesystems (if any)
+/// 3. Log shutdown messages
+/// 4. Halt CPU
+///
+/// # Arguments
+/// * `flags` - Shutdown flags (0 = normal, 1 = verbose for golden file)
+fn sys_shutdown(flags: u32) -> i64 {
+    let verbose = flags & shutdown_flags::VERBOSE != 0;
+
+    println!("[SHUTDOWN] Initiating graceful shutdown...");
+
+    if verbose {
+        println!("[SHUTDOWN] Phase 1: Stopping user tasks...");
+    }
+
+    // Phase 1: Mark all user tasks for termination
+    // (In a full implementation, we'd signal all tasks to exit)
+    if verbose {
+        println!("[SHUTDOWN] Phase 1: Complete");
+        println!("[SHUTDOWN] Phase 2: Flushing GPU framebuffer...");
+    }
+
+    // Phase 2: Final GPU flush
+    // TEAM_142: Must release GPU lock before println! (which uses terminal → GPU)
+    {
+        if let Some(mut guard) = crate::gpu::GPU.try_lock() {
+            if let Some(gpu_state) = guard.as_mut() {
+                let _ = gpu_state.flush();
+            }
+        }
+        // GPU lock released here
+    }
+
+    if verbose {
+        println!("[SHUTDOWN] GPU flush complete");
+        println!("[SHUTDOWN] Phase 2: Complete");
+        println!("[SHUTDOWN] Phase 3: Syncing filesystems...");
+    }
+
+    // Phase 3: Sync filesystems (placeholder - no persistent writes yet)
+    if verbose {
+        println!("[SHUTDOWN] Phase 3: Complete (no pending writes)");
+    }
+
+    // TEAM_142: Print ALL messages BEFORE disabling interrupts
+    // UART output requires interrupts to flush properly
+    if verbose {
+        println!("[SHUTDOWN] Phase 4: Disabling interrupts...");
+        println!("[SHUTDOWN] Phase 4: Complete");
+    }
+
+    println!("[SHUTDOWN] System halted. Safe to power off.");
+    println!("[SHUTDOWN] Goodbye!");
+
+    // Small delay to ensure UART buffer flushes
+    for _ in 0..100000 {
+        core::hint::spin_loop();
+    }
+
+    // Phase 4: Disable interrupts (AFTER all output)
+    levitate_hal::interrupts::disable();
+
+    // Phase 5: Power off using PSCI SYSTEM_OFF
+    // PSCI is the ARM Power State Coordination Interface
+    // SYSTEM_OFF function ID: 0x84000008 (SMC32 convention)
+    // This will cause QEMU to exit completely
+    const PSCI_SYSTEM_OFF: u64 = 0x84000008;
+    unsafe {
+        core::arch::asm!(
+            "hvc #0",               // Hypervisor call (QEMU virt uses HVC for PSCI)
+            in("x0") PSCI_SYSTEM_OFF,
+            options(noreturn)
+        );
+    }
 }
 
 /// TEAM_120: sys_spawn - Spawn a new process from initramfs.

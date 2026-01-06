@@ -128,10 +128,13 @@ pub fn switch_to(new_task: Arc<TaskControlBlock>) {
 }
 
 /// TEAM_070: Voluntarily yield the CPU to another task.
+/// TEAM_143: Optimized to use single lock acquisition instead of two.
 pub fn yield_now() {
     let task = current_task();
-    scheduler::SCHEDULER.add_task(task);
-    scheduler::SCHEDULER.schedule();
+    // TEAM_143: Single lock acquisition instead of add_task + schedule
+    if let Some(next) = scheduler::SCHEDULER.yield_and_reschedule(task) {
+        switch_to(next);
+    }
 }
 
 /// TEAM_070: Unique identifier for a task.

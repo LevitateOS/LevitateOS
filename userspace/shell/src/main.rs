@@ -62,10 +62,16 @@ fn execute(line: &[u8]) {
         return;
     }
 
-    // Builtin: exit
+    // TEAM_142: Builtin: exit [--verbose]
+    // exit         -> graceful shutdown (minimal output)
+    // exit --verbose -> graceful shutdown with golden file output
     if bytes_eq(cmd, b"exit") {
         println!("Goodbye!");
-        libsyscall::exit(0);
+        libsyscall::shutdown(libsyscall::shutdown_flags::NORMAL);
+    }
+    if bytes_eq(cmd, b"exit --verbose") {
+        println!("Goodbye! (verbose shutdown for golden file)");
+        libsyscall::shutdown(libsyscall::shutdown_flags::VERBOSE);
     }
 
     // Builtin: test (POSIX: exit 0 if no args, used for shell scripting)
@@ -77,7 +83,13 @@ fn execute(line: &[u8]) {
     // Builtin: help
     if bytes_eq(cmd, b"help") {
         println!("LevitateOS Shell (lsh) v0.1");
-        println!("Commands: echo <text>, help, clear, exit, test");
+        println!("Commands:");
+        println!("  echo <text>    - Print text");
+        println!("  help           - Show this help");
+        println!("  clear          - Clear screen");
+        println!("  exit           - Shutdown system");
+        println!("  exit --verbose - Shutdown with detailed output");
+        println!("  test           - Exit 0 (for scripting)");
         return;
     }
 
@@ -125,23 +137,27 @@ pub extern "C" fn _start() -> ! {
             let mut c_buf = [0u8; 1];
             let n = libsyscall::read(0, &mut c_buf);
             if n > 0 {
-                let bytes = &c_buf[..n as usize];
-                // Echo back to user
-                libsyscall::write(1, bytes);
-
-                for &b in bytes {
-                    if b == b'\n' || b == b'\r' {
-                        if line_len > 0 {
-                            execute(&buf[..line_len]);
-                        }
-                        break 'inner;
-                    } else if b == 0x08 || b == 0x7f {
-                        // Backspace
-                        line_len = line_len.saturating_sub(1);
-                    } else if line_len < buf.len() {
-                        buf[line_len] = b;
-                        line_len += 1;
+                let b = c_buf[0];
+                
+                if b == b'\n' || b == b'\r' {
+                    // Echo newline and execute
+                    libsyscall::write(1, b"\n");
+                    if line_len > 0 {
+                        execute(&buf[..line_len]);
                     }
+                    break 'inner;
+                } else if b == 0x08 || b == 0x7f {
+                    // Backspace: erase character from buffer and screen
+                    if line_len > 0 {
+                        line_len -= 1;
+                        // Move back, overwrite with space, move back again
+                        libsyscall::write(1, b"\x08 \x08");
+                    }
+                } else if line_len < buf.len() {
+                    // Normal character: add to buffer and echo
+                    buf[line_len] = b;
+                    line_len += 1;
+                    libsyscall::write(1, &c_buf[..1]);
                 }
             }
         }

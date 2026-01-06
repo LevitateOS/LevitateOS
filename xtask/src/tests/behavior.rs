@@ -2,6 +2,7 @@
 //!
 //! TEAM_030: Migrated from scripts/test_behavior.sh
 //! TEAM_042: Added Pixel 6 profile support
+//! TEAM_142: Added graceful shutdown testing with exit --verbose
 //!
 //! Note: Uses --features verbose to enable boot messages.
 //! Production builds are silent (Rule 4: Silence is Golden).

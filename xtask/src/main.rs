@@ -71,14 +71,17 @@ fn main() -> Result<()> {
                     println!("⚠️  GICv3 behavior differs (expected, needs separate golden file)\n");
                 });
                 tests::regression::run()?;
+                // TEAM_142: Shutdown test is interactive, run separately
                 println!("\n✅ COMPLETE test suite finished!");
+                println!("ℹ️  Run 'cargo xtask test shutdown' separately for shutdown golden file test");
             }
             "unit" => tests::unit::run()?,
             "behavior" => tests::behavior::run()?,
             "regress" | "regression" => tests::regression::run()?,
             "gicv3" => tests::behavior::run_gicv3()?,
             "serial" => tests::serial_input::run()?,
-            other => bail!("Unknown test suite: {}. Use 'unit', 'behavior', 'regress', 'gicv3', 'serial', or 'all'", other),
+            "shutdown" => tests::shutdown::run()?,
+            other => bail!("Unknown test suite: {}. Use 'unit', 'behavior', 'regress', 'gicv3', 'serial', 'shutdown', or 'all'", other),
         },
         Commands::Clean => {
             clean::clean()?;

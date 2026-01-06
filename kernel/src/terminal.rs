@@ -34,7 +34,7 @@ pub fn init() {
 /// Mirror console output to the GPU terminal.
 /// Called via the secondary output callback in levitate-hal.
 /// TEAM_115: Changed from try_lock to lock to ensure output is never lost.
-/// TEAM_129: Added explicit flush after write to make output immediately visible.
+/// TEAM_143: Only flush on newline for performance. Timer provides 20Hz flush for responsiveness.
 pub fn write_str(s: &str) {
     let mut term_guard = TERMINAL.lock();
     if let Some(term) = term_guard.as_mut() {
@@ -43,9 +43,11 @@ pub fn write_str(s: &str) {
             // TEAM_141: Use as_display() instead of duplicate Display type
             let mut display = gpu_state.as_display();
             term.write_str(&mut display, s);
-            // TEAM_129: Flush GPU after every write to ensure output is visible
-            // The timer-based flush uses try_lock which fails when we hold the lock
-            let _ = gpu_state.flush();
+            // TEAM_143: Only flush on newline for performance
+            // Timer interrupt flushes at 20Hz for responsiveness between newlines
+            if s.contains('\n') {
+                let _ = gpu_state.flush();
+            }
         }
     }
 }

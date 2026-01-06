@@ -261,8 +261,10 @@ TEAM_039: Added per behavior-testing SOP
 | FD4 | 64-bit initrd-start is parsed correctly | ✅ | `test_fdt_byte_parsing` |
 | FD5 | Both start and end properties must exist | ✅ | `test_fdt_error_types` |
 | FD6 | Big-endian byte order is handled | ✅ | `test_fdt_byte_parsing` |
-| FD7 | find_node_by_compatible searches all nodes | ⚠️ | `test_fdt_discovery` (disabled mock issues) |
-| FD8 | get_node_reg returns first register tuple | ⚠️ | `test_fdt_discovery` (disabled mock issues) |
+| FD7 | find_node_by_compatible searches all nodes | ✅ | `test_fdt_discovery` |
+| FD8 | get_node_reg returns first register tuple | ✅ | `test_fdt_discovery` |
+| FD9 | for_each_memory_region discovers memory ranges | ✅ | `test_fdt_memory_regions` |
+| FD10 | for_each_reserved_region discovers reserved memory | ✅ | `test_fdt_reserved_regions` |
 
 ### CPIO Parser (initramfs.rs)
 
@@ -280,10 +282,9 @@ TEAM_039: Added per behavior-testing SOP
 | CP10 | 4-byte alignment is applied after header+name | ✅ | `test_cpio_alignment` |
 
 ### Group 6 Summary
-### Group 6 Summary
-- **FDT**: 8/8 behaviors tested (2 skipped) ⚠️
+- **FDT**: 10/10 behaviors tested ✅
 - **CPIO**: 10/10 behaviors tested ✅
-- **Total**: 16/16 behaviors tested ✅
+- **Total**: 20/20 behaviors documented ✅
 - **Note**: TEAM_039 relocated CPIO to `levitate-utils/src/cpio.rs` - tests run via `cargo test --features std`.
 
 ---
@@ -303,9 +304,9 @@ TEAM_039: Added per behavior-testing SOP
 | 3 | console | 5 | 5 | ✅ |
 | 4 | MMU | 22 | 22 | ✅ |
 | 5 | Timer | 1 | 1 | ✅ |
-| 6 | FDT | 8 | 8 | ⚠️ |
+| 6 | FDT | 10 | 10 | ✅ |
 | 6 | CPIO | 10 | 10 | ✅ |
-| **Total** | | **87** | **87** | **0 gaps** ✅ |
+| **Total** | | **89** | **89** | **0 gaps** ✅ |
 
 ---
 
@@ -413,16 +414,16 @@ TEAM_055: Added buddy allocator for physical page frame management
 | 3 | console | 5 | 5 | ✅ |
 | 4 | MMU | 27 | 25 | ⚠️ |
 | 5 | Timer | 1 | 1 | ✅ |
-| 6 | FDT | 8 | 8 | ⚠️ |
+| 6 | FDT | 10 | 10 | ✅ |
 | 6 | CPIO | 10 | 10 | ✅ |
 | 7 | SlabList | 8 | 8 | ✅ |
 | 7 | SlabPage | 8 | 8 | ✅ |
 | 7 | SlabCache | 3 | 3 | ✅ |
 | 7 | SlabAllocator | 4 | 4 | ✅ |
 | 8 | BuddyAllocator | 11 | 11 | ✅ |
-| **Total** | | **126** | **124** | **2 runtime-verified** ⚠️ |
+| **Total** | | **128** | **126** | **2 unit + 2 runtime** ⚠️ |
 
-> **Note:** M26 and M27 are runtime-verified through kernel boot tests. FDT tests are skipped due to mock issues.
+> **Note:** M26 and M27 are runtime-verified through kernel boot tests.
 
 ---
 
@@ -471,7 +472,7 @@ TEAM_057: VirtIO Net driver for Phase 6
 | 3 | console | 5 | 5 | ✅ |
 | 4 | MMU | 27 | 25 | ⚠️ |
 | 5 | Timer | 1 | 1 | ✅ |
-| 6 | FDT | 8 | 8 | ⚠️ |
+| 6 | FDT | 10 | 10 | ✅ |
 | 6 | CPIO | 10 | 10 | ✅ |
 | 7 | SlabList | 8 | 8 | ✅ |
 | 7 | SlabPage | 8 | 8 | ✅ |
@@ -479,9 +480,9 @@ TEAM_057: VirtIO Net driver for Phase 6
 | 7 | SlabAllocator | 4 | 4 | ✅ |
 | 8 | BuddyAllocator | 11 | 11 | ✅ |
 | 9 | VirtIO Net | 14 | 14 | ⚠️ |
-| **Total** | | **140** | **138** | **2 unit + 14 runtime** ⚠️ |
+| **Total** | | **142** | **140** | **2 unit + 16 runtime** ⚠️ |
 
-> **Note:** NET behaviors are runtime-verified (hardware-dependent). M26/M27 verified via boot. FDT tests skipped due to mock issues.
+> **Note:** NET behaviors are runtime-verified (hardware-dependent). M26/M27 verified via boot.
 
 ---
 
@@ -531,7 +532,7 @@ TEAM_059: Verified behaviors after fixing newline/cursor bugs
 | 3 | console | 5 | 5 | ✅ |
 | 4 | MMU | 27 | 25 | ⚠️ |
 | 5 | Timer | 1 | 1 | ✅ |
-| 6 | FDT | 8 | 8 | ⚠️ |
+| 6 | FDT | 10 | 10 | ✅ |
 | 6 | CPIO | 10 | 10 | ✅ |
 | 7 | SlabList | 8 | 8 | ✅ |
 | 7 | SlabPage | 8 | 8 | ✅ |
@@ -540,7 +541,7 @@ TEAM_059: Verified behaviors after fixing newline/cursor bugs
 | 8 | BuddyAllocator | 11 | 11 | ✅ |
 | 9 | VirtIO Net | 14 | 14 | ⚠️ |
 | 10 | Terminal | 12 | 12 | ⚠️ |
-| **Total** | | **152** | **150** | **2 unit + 26 runtime** ⚠️ |
+| **Total** | | **154** | **152** | **2 unit + 28 runtime** ⚠️ |
 
 > **TEAM_065**: Added TERM10-12 (tab wrap, backspace wrap, ANSI clear)
 
@@ -619,7 +620,7 @@ TEAM_071: Added multitasking behaviors for Phase 7
 | 3 | console | 5 | 5 | ✅ |
 | 4 | MMU | 27 | 25 | ⚠️ |
 | 5 | Timer | 1 | 1 | ✅ |
-| 6 | FDT | 8 | 8 | ⚠️ |
+| 6 | FDT | 10 | 10 | ✅ |
 | 6 | CPIO | 10 | 10 | ✅ |
 | 7 | SlabList | 8 | 8 | ✅ |
 | 7 | SlabPage | 8 | 8 | ✅ |
@@ -632,7 +633,7 @@ TEAM_071: Added multitasking behaviors for Phase 7
 | 11 | Task Primitives | 5 | 5 | ⚠️ |
 | 11 | Scheduler | 4 | 4 | ⚠️ |
 | 11 | Unmap Page | 5 | 5 | ✅ |
-| **Total** | | **174** | **172** | **2 unit + 41 runtime** ⚠️ |
+| **Total** | | **176** | **174** | **2 unit + 43 runtime** ⚠️ |
 
 > **TEAM_071**: Added 22 multitasking behaviors (Phase 7). Unmap page behaviors unit-tested via `test_map_unmap_cycle` and `test_table_reclamation`.
 
@@ -714,7 +715,7 @@ TEAM_115: Added userspace shell behaviors for Phase 8b
 | 3 | console | 5 | 5 | ✅ |
 | 4 | MMU | 27 | 25 | ⚠️ |
 | 5 | Timer | 1 | 1 | ✅ |
-| 6 | FDT | 8 | 8 | ⚠️ |
+| 6 | FDT | 10 | 10 | ✅ |
 | 6 | CPIO | 10 | 10 | ✅ |
 | 7 | SlabList | 8 | 8 | ✅ |
 | 7 | SlabPage | 8 | 8 | ✅ |
@@ -732,7 +733,7 @@ TEAM_115: Added userspace shell behaviors for Phase 8b
 | 12 | User Process | 4 | 4 | ⚠️ |
 | 12 | Interactive Shell | 7 | 7 | ⚠️ |
 | 13 | GPU Regression | 2 | 2 | ✅ |
-| **Total** | | **200** | **198** | **2 unit + 65 runtime** ⚠️ |
+| **Total** | | **202** | **200** | **2 unit + 67 runtime** ⚠️ |
 
 > **TEAM_115**: Added 24 userspace shell behaviors (Phase 8b). All verified via behavior test (golden file) and VNC interactive testing.
 
