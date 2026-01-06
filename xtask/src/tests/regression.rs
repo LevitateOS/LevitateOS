@@ -300,29 +300,30 @@ fn test_fat32_integration(results: &mut TestResults) {
 }
 
 /// Phase 4: Initramfs CPIO parser integration
+/// TEAM_146: Refactored - initramfs code moved to init.rs
 fn test_initramfs_parser(results: &mut TestResults) {
     println!("Phase 4: Initramfs CPIO parser integration");
 
-    let main_rs = match fs::read_to_string("kernel/src/main.rs") {
+    let init_rs = match fs::read_to_string("kernel/src/init.rs") {
         Ok(c) => c,
         Err(_) => {
-            results.fail("Could not read kernel/src/main.rs");
+            results.fail("Could not read kernel/src/init.rs");
             return;
         }
     };
 
     // Verify CpioArchive is used
-    if main_rs.contains("CpioArchive") {
-        results.pass("main.rs uses CpioArchive for initramfs");
+    if init_rs.contains("CpioArchive") {
+        results.pass("init.rs uses CpioArchive for initramfs");
     } else {
-        results.fail("main.rs missing CpioArchive usage");
+        results.fail("init.rs missing CpioArchive usage");
     }
 
     // Verify FDT initrd range discovery
-    if main_rs.contains("get_initrd_range") {
-        results.pass("main.rs discovers initrd via FDT");
+    if init_rs.contains("get_initrd_range") {
+        results.pass("init.rs discovers initrd via FDT");
     } else {
-        results.fail("main.rs missing get_initrd_range() call");
+        results.fail("init.rs missing get_initrd_range() call");
     }
 }
 
@@ -388,19 +389,19 @@ fn test_buddy_allocator_integration(results: &mut TestResults) {
         results.fail("memory/mod.rs missing BuddyAllocator");
     }
 
-    // Verify memory::init is called in main.rs
-    let main_rs = match fs::read_to_string("kernel/src/main.rs") {
+    // TEAM_146: Verify memory::init is called in init.rs (refactored from main.rs)
+    let init_rs = match fs::read_to_string("kernel/src/init.rs") {
         Ok(c) => c,
         Err(_) => {
-            results.fail("Could not read kernel/src/main.rs");
+            results.fail("Could not read kernel/src/init.rs");
             return;
         }
     };
 
-    if main_rs.contains("memory::init") {
-        results.pass("main.rs calls memory::init()");
+    if init_rs.contains("memory::init") {
+        results.pass("init.rs calls memory::init()");
     } else {
-        results.fail("main.rs missing memory::init() call");
+        results.fail("init.rs missing memory::init() call");
     }
 }
 
@@ -409,6 +410,7 @@ fn test_buddy_allocator_integration(results: &mut TestResults) {
 // =============================================================================
 
 /// TEAM_065: GPU initialization split to Stage 3
+/// TEAM_146: Refactored - GPU init moved to init.rs
 fn test_gpu_stage3_init(results: &mut TestResults) {
     println!("TEAM_065: GPU initialization in Stage 3");
 
@@ -427,43 +429,44 @@ fn test_gpu_stage3_init(results: &mut TestResults) {
         results.fail("virtio.rs missing init_gpu() - GPU not split to Stage 3");
     }
 
-    let main_rs = match fs::read_to_string("kernel/src/main.rs") {
+    let init_rs = match fs::read_to_string("kernel/src/init.rs") {
         Ok(c) => c,
         Err(_) => {
-            results.fail("Could not read kernel/src/main.rs");
+            results.fail("Could not read kernel/src/init.rs");
             return;
         }
     };
 
     // Verify init_gpu() is called before terminal operations
-    if main_rs.contains("virtio::init_gpu()") {
-        results.pass("main.rs calls virtio::init_gpu() in Stage 3");
+    if init_rs.contains("init_gpu()") {
+        results.pass("init.rs calls init_gpu() in Stage 3");
     } else {
-        results.fail("main.rs missing virtio::init_gpu() call");
+        results.fail("init.rs missing init_gpu() call");
     }
 }
 
 /// TEAM_065: SPEC-4 enforcement - maintenance_shell on initrd failure
+/// TEAM_146: Refactored - SPEC-4 code moved to init.rs
 fn test_spec4_enforcement(results: &mut TestResults) {
     println!("TEAM_065: SPEC-4 initrd failure handling");
 
-    let main_rs = match fs::read_to_string("kernel/src/main.rs") {
+    let init_rs = match fs::read_to_string("kernel/src/init.rs") {
         Ok(c) => c,
         Err(_) => {
-            results.fail("Could not read kernel/src/main.rs");
+            results.fail("Could not read kernel/src/init.rs");
             return;
         }
     };
 
     // Verify maintenance_shell is called when initrd not found
-    if main_rs.contains("maintenance_shell()") && main_rs.contains("!initrd_found") {
+    if init_rs.contains("maintenance_shell()") && init_rs.contains("!initrd_found") {
         results.pass("SPEC-4: maintenance_shell() called on initrd failure");
     } else {
         results.fail("SPEC-4 violated: maintenance_shell() not called on initrd failure");
     }
 
     // Verify diskless feature flag exists
-    if main_rs.contains("feature = \"diskless\"") {
+    if init_rs.contains("feature = \"diskless\"") {
         results.pass("diskless feature flag available for opt-out");
     } else {
         results.fail("diskless feature flag missing");
@@ -504,23 +507,24 @@ fn test_gpu_error_handling(results: &mut TestResults) {
 }
 
 /// TEAM_065: BootStage enum and state machine
+/// TEAM_146: Refactored - BootStage moved to init.rs
 fn test_boot_stage_enum(results: &mut TestResults) {
     println!("TEAM_065: BootStage state machine");
 
-    let main_rs = match fs::read_to_string("kernel/src/main.rs") {
+    let init_rs = match fs::read_to_string("kernel/src/init.rs") {
         Ok(c) => c,
         Err(_) => {
-            results.fail("Could not read kernel/src/main.rs");
+            results.fail("Could not read kernel/src/init.rs");
             return;
         }
     };
 
     // Verify BootStage enum with all 5 stages
-    let has_all_stages = main_rs.contains("EarlyHAL")
-        && main_rs.contains("MemoryMMU")
-        && main_rs.contains("BootConsole")
-        && main_rs.contains("Discovery")
-        && main_rs.contains("SteadyState");
+    let has_all_stages = init_rs.contains("EarlyHAL")
+        && init_rs.contains("MemoryMMU")
+        && init_rs.contains("BootConsole")
+        && init_rs.contains("Discovery")
+        && init_rs.contains("SteadyState");
 
     if has_all_stages {
         results.pass("BootStage enum has all 5 stages");
@@ -529,7 +533,7 @@ fn test_boot_stage_enum(results: &mut TestResults) {
     }
 
     // Verify transition_to function exists
-    if main_rs.contains("pub fn transition_to") {
+    if init_rs.contains("pub fn transition_to") {
         results.pass("transition_to() state machine helper exists");
     } else {
         results.fail("transition_to() function missing");

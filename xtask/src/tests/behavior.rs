@@ -126,6 +126,23 @@ fn run_with_profile(profile: QemuProfile) -> Result<()> {
     // TEAM_115/129: Normalization logic removed in favor of kernel-side masking (Rule 18)
     // The kernel strict masking ensures "way better" golden file stability.
 
+    // TEAM_143: Check for USER EXCEPTION FIRST - crashes are always a bug
+    // This runs before golden file comparison so we catch crashes even if output differs
+    if actual_raw.contains("*** USER EXCEPTION ***") {
+        // Extract exception details for debugging
+        let exception_lines: Vec<&str> = actual_raw.lines()
+            .skip_while(|l| !l.contains("*** USER EXCEPTION ***"))
+            .take(6)
+            .collect();
+        println!("❌ FAILURE: User process crashed with exception!\n");
+        println!("--- Exception Details ---");
+        for line in &exception_lines {
+            println!("{}", line);
+        }
+        println!();
+        bail!("Userspace crashed - this is a bug that needs to be fixed! See TODO.md for debugging steps.");
+    }
+
     // Compare
     if golden.trim() == actual.trim() {
         println!("✅ SUCCESS: Current behavior matches Golden Log.\n");
@@ -180,6 +197,10 @@ fn run_with_profile(profile: QemuProfile) -> Result<()> {
            !actual_raw.contains("WARNING: Framebuffer is entirely black") {
             println!("✅ VERIFIED: Framebuffer has rendered content.");
         }
+
+        // TEAM_143: USER EXCEPTION check is now done BEFORE golden file comparison
+        // so it runs unconditionally and reports crashes even if output differs
+        println!("✅ VERIFIED: No userspace crashes detected.");
 
         Ok(())
     } else {

@@ -44,5 +44,6 @@ Implemented performance fixes across the LevitateOS kernel:
 
 ## Testing
 - ✅ `cargo check` passes
-- ✅ `cargo xtask test behavior` passes
-- ✅ Golden file updated to reflect optimizations
+- ⚠️ `cargo xtask test behavior` now properly detects shell crash (tracked in TODO.md)
+- ✅ Golden file no longer contains USER EXCEPTION (it's a bug, not expected)
+- ✅ Added USER EXCEPTION detection to xtask (runs BEFORE golden file comparison)

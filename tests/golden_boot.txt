@@ -64,7 +64,6 @@ FAT32 mounted. Root contains 0 entries.
 
 [SUCCESS] LevitateOS System Ready.
 --------------------------------------
-[TICK] count=0
 [TASK] Entering user task PID=1 at 0x10000
 [INIT] PID 1 starting...
 [INIT] Spawning shell...
@@ -90,9 +89,3 @@ LevitateOS Shell (lsh) v0.1
 Type 'help' for commands.
 
 # 
-*** USER EXCEPTION ***
-Exception Class: 0x24
-ESR: 0x0000000092000047
-ELR (fault address): 0x00000000000100ac
-Type: Data Abort
-Terminating user process.

@@ -31,7 +31,6 @@ Global tracking of incomplete tasks per Rule 11.
 
 ---
 
-
 ## High Priority
 
 *None*
@@ -63,3 +62,4 @@ Global tracking of incomplete tasks per Rule 11.
 - [x] TEAM_086: GPU Display Deadlock API — Refactored Display to accept `&mut GpuState`
 - [x] TEAM_087: Enabled dual console callback (but GPU display still not active)
 - [x] TEAM_087: Fixed per-println flush causing kernel hang
+- [x] TEAM_145: Shell crash (Data Abort) — yield_now() in sys_read broke TTBR0 on syscall return

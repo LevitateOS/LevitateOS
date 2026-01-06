@@ -259,11 +259,10 @@ fn sys_read(fd: usize, buf: usize, len: usize) -> i64 {
             }
         }
 
-        // TEAM_143: If no input yet, yield CPU to other tasks and wait for interrupt
-        // This replaces the inefficient spin_loop() which burned CPU at 100%
+        // TEAM_143: If no input yet, wait for interrupt (keyboard/timer)
+        // TEAM_145: Removed yield_now() - yielding from syscall breaks TTBR0 on return
+        // wfi alone is sufficient: waits for interrupt, then continues polling
         if bytes_read == 0 {
-            crate::task::yield_now();
-            // Wait for next interrupt (keyboard/timer) to avoid busy-waiting
             #[cfg(target_arch = "aarch64")]
             aarch64_cpu::asm::wfi();
         }
