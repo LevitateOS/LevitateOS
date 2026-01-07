@@ -75,6 +75,11 @@ path = "src/bin/test/pipe_test.rs"
 name = "signal_test"
 path = "src/bin/test/signal_test.rs"
 
+# TEAM_244: TTY/Terminal tests (TDD)
+[[bin]]
+name = "tty_test"
+path = "src/bin/test/tty_test.rs"
+
 [dependencies]
 libsyscall = { path = "../libsyscall" }
 ulib = { path = "../ulib", features = ["entry"] }

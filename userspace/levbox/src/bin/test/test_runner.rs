@@ -19,6 +19,7 @@ const TESTS: &[&str] = &[
     "signal_test",
     "clone_test",
     "interrupt_test",  // TEAM_244: Tests external SIGINT (Ctrl+C simulation)
+    "tty_test",        // TEAM_244: TTY/Terminal tests (TDD)
 ];
 
 #[no_mangle]

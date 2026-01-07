@@ -1,6 +1,6 @@
 # LevitateOS Roadmap
 
-**Last Updated:** 2026-01-06 (TEAM_217)
+**Last Updated:** 2026-01-07 (TEAM_244)
 
 This document outlines the planned development phases for LevitateOS. Each completed item includes the responsible team for traceability.
 
@@ -490,18 +490,83 @@ pub trait SuperblockOps: Send + Sync {
 
 ---
 
-### 📝 Phase 16: Text Editing & Interaction
+### 📝 Phase 16: TTY/Terminal & Text Editing
 
-- **Objective**: Productive text manipulation within the OS.
-- **Units of Work**:
-  - [ ] **Terminal Raw Mode**: `sys_ioctl` (or similar) to control TTY driver behavior.
-  - [ ] **`grep`**: Basic pattern matching.
-  - [ ] **`more`** / **`less`**: Paging through long text.
-  - [ ] **`vi` (micro)**: A tiny screen-oriented text editor.
-    - Buffer management
-    - Cursor movement
-    - Insert/Normal modes
-    - File saving
+> **Planning:** See `docs/planning/terminal-spec/POSIX_TERMINAL_SPEC.md`  
+> **TDD Tests:** See `userspace/levbox/src/bin/test/tty_test.rs`  
+> **Team:** TEAM_244+
+
+- **Objective**: Implement POSIX-compliant terminal (TTY) subsystem and text tools.
+- **Reference**: POSIX.1-2008 Chapter 11, termios(3)
+
+#### 16a: TTY Syscalls & Infrastructure
+
+| Task | Syscall/Feature | Status | Notes |
+|------|-----------------|--------|-------|
+| `ioctl` with TCGETS | Get termios struct | 🔴 Missing | Returns terminal attributes |
+| `ioctl` with TCSETS/W/F | Set termios struct | 🔴 Missing | TCSANOW, TCSADRAIN, TCSAFLUSH |
+| `isatty` | Check if fd is TTY | 🟢 Done | TEAM_244 |
+| `get_foreground` | Get foreground PID | 🟢 Done | TEAM_244 |
+
+#### 16b: Line Discipline (Canonical Mode)
+
+| Task | Feature | Status | Notes |
+|------|---------|--------|-------|
+| ICANON flag | Line-buffered input | 🔴 Missing | Read returns after newline |
+| VERASE (Backspace) | Delete previous char | 🔴 Missing | Default: 0x7F (DEL) or 0x08 (BS) |
+| VKILL (Ctrl+U) | Kill entire line | 🔴 Missing | Default: 0x15 (NAK) |
+| VEOF (Ctrl+D) | End of file | 🔴 Missing | Default: 0x04 (EOT) |
+| VWERASE (Ctrl+W) | Delete word | 🔴 Missing | Optional |
+| VLNEXT (Ctrl+V) | Literal next | 🔴 Missing | Optional |
+
+#### 16c: Special Characters & Signals
+
+| Task | Feature | Status | Notes |
+|------|---------|--------|-------|
+| VINTR (Ctrl+C) | Generate SIGINT | 🟢 Done | 0x03 → SIGINT(2) |
+| VQUIT (Ctrl+\\) | Generate SIGQUIT | 🟢 Done | 0x1C → SIGQUIT(3) |
+| VSUSP (Ctrl+Z) | Generate SIGTSTP | 🟢 Done | 0x1A → SIGTSTP(20) |
+| VSTOP (Ctrl+S) | XON/XOFF flow control | 🔴 Missing | Stop output |
+| VSTART (Ctrl+Q) | XON/XOFF flow control | 🔴 Missing | Resume output |
+
+#### 16d: I/O Processing Flags
+
+| Task | Flag | Status | Notes |
+|------|------|--------|-------|
+| ECHO | Echo input chars | 🔴 Missing | c_lflag |
+| ECHOE | Echo ERASE as BS-SP-BS | 🔴 Missing | Visual backspace |
+| ECHOK | Echo KILL with newline | 🔴 Missing | |
+| ICRNL | CR → NL on input | 🔴 Missing | c_iflag default |
+| ONLCR | NL → CR-NL on output | 🔴 Missing | c_oflag default |
+| OPOST | Enable output processing | 🔴 Missing | c_oflag |
+
+#### 16e: Non-Canonical (Raw) Mode
+
+| Task | Feature | Status | Notes |
+|------|---------|--------|-------|
+| Raw mode | Disable ICANON | 🔴 Missing | Char-by-char input |
+| VMIN/VTIME | Read control | 🔴 Missing | MIN chars, TIME timeout |
+| cfmakeraw() | Helper function | 🔴 Missing | Convenience wrapper |
+
+#### 16f: Text Utilities
+
+- [ ] **`grep`**: Basic pattern matching
+- [ ] **`more`** / **`less`**: Paging through long text
+- [ ] **`vi` (micro)**: Tiny screen-oriented text editor
+  - Buffer management
+  - Cursor movement
+  - Insert/Normal modes
+  - File saving
+
+#### Implementation Order (Recommended)
+
+1. **ioctl + termios struct** — Foundation for everything
+2. **ECHO flag** — Visual feedback for typing
+3. **Canonical mode (ICANON)** — Line editing
+4. **VERASE/VKILL** — Backspace and kill-line
+5. **ICRNL/ONLCR** — CR/NL translation
+6. **Raw mode** — For editors like vi
+7. **VMIN/VTIME** — Advanced read control
 
 ### 📦 Phase 17: Rust `std` Port & uutils-levbox (The Graduation)
 

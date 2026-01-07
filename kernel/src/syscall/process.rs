@@ -349,6 +349,11 @@ pub fn sys_set_foreground(pid: usize) -> i64 {
     0
 }
 
+/// TEAM_244: sys_get_foreground - Get the foreground process PID.
+pub fn sys_get_foreground() -> i64 {
+    *crate::task::FOREGROUND_PID.lock() as i64
+}
+
 // ============================================================================
 // TEAM_228: Threading syscalls for std support
 // ============================================================================

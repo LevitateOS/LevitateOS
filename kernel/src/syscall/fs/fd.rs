@@ -98,3 +98,24 @@ pub fn sys_pipe2(pipefd_ptr: usize, _flags: u32) -> i64 {
     );
     0
 }
+
+/// TEAM_244: sys_isatty - Check if fd refers to a terminal.
+///
+/// Returns 1 if tty, 0 if not, negative errno on error.
+pub fn sys_isatty(fd: i32) -> i64 {
+    // In LevitateOS, stdin (0), stdout (1), stderr (2) are always TTYs
+    // connected to the console
+    match fd {
+        0 | 1 | 2 => 1, // stdin, stdout, stderr are TTYs
+        _ => {
+            // Check if fd is valid
+            let task = current_task();
+            let fd_table = task.fd_table.lock();
+            if fd_table.get(fd as usize).is_some() {
+                0 // Valid fd but not a TTY
+            } else {
+                errno::EBADF // Invalid fd
+            }
+        }
+    }
+}

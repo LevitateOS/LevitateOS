@@ -93,6 +93,10 @@ pub enum SyscallNumber {
     SpawnArgs = 1001,
     /// TEAM_220: Set foreground process (custom)
     SetForeground = 1002,
+    /// TEAM_244: Get foreground process (custom)
+    GetForeground = 1003,
+    /// TEAM_244: Check if fd is a terminal (custom)
+    Isatty = 1010,
 }
 
 impl SyscallNumber {
@@ -148,6 +152,8 @@ impl SyscallNumber {
             1000 => Some(Self::Spawn),
             1001 => Some(Self::SpawnArgs),
             1002 => Some(Self::SetForeground),
+            1003 => Some(Self::GetForeground),
+            1010 => Some(Self::Isatty),
             _ => None,
         }
     }
@@ -355,6 +361,8 @@ pub fn syscall_dispatch(frame: &mut SyscallFrame) {
             frame.arg2() as usize,
         ),
         Some(SyscallNumber::SetForeground) => process::sys_set_foreground(frame.arg0() as usize),
+        Some(SyscallNumber::GetForeground) => process::sys_get_foreground(),
+        Some(SyscallNumber::Isatty) => fs::sys_isatty(frame.arg0() as i32),
         // TEAM_228: Memory management syscalls
         Some(SyscallNumber::Mmap) => mm::sys_mmap(
             frame.arg0() as usize,
