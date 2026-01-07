@@ -53,14 +53,7 @@ pub fn sys_shutdown(flags: u32) -> i64 {
 
     los_hal::interrupts::disable();
 
-    const PSCI_SYSTEM_OFF: u64 = 0x84000008;
-    unsafe {
-        core::arch::asm!(
-            "hvc #0",
-            in("x0") PSCI_SYSTEM_OFF,
-            options(noreturn)
-        );
-    }
+    crate::arch::power::system_off();
 }
 
 /// TEAM_206: Read null-terminated string from user memory

@@ -12,10 +12,20 @@ pub struct Context {
     pub x26: u64,
     pub x27: u64,
     pub x28: u64,
-    pub x29: u64, // Frame Pointer
-    pub lr: u64,  // Link Register (x30)
-    pub sp: u64,  // Stack Pointer
+    pub x29: u64,       // Frame Pointer
+    pub lr: u64,        // Link Register (x30)
+    pub sp: u64,        // Stack Pointer
     pub tpidr_el0: u64, // TEAM_217: Thread Local Storage pointer
+}
+
+impl Context {
+    pub fn new(stack_top: usize, entry_wrapper: usize) -> Self {
+        let mut ctx = Self::default();
+        ctx.sp = stack_top as u64;
+        ctx.lr = task_entry_trampoline as *const () as u64;
+        ctx.x19 = entry_wrapper as u64;
+        ctx
+    }
 }
 
 /// TEAM_162: Enter user mode at the specified entry point.

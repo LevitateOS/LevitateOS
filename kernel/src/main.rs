@@ -86,8 +86,5 @@ pub extern "C" fn kmain() -> ! {
 #[panic_handler]
 fn panic(info: &PanicInfo) -> ! {
     println!("KERNEL PANIC: {}", info);
-    loop {
-        #[cfg(target_arch = "aarch64")]
-        aarch64_cpu::asm::wfe();
-    }
+    crate::arch::cpu::halt();
 }

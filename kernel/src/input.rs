@@ -133,10 +133,44 @@ fn linux_code_to_ascii(code: u16, shift: bool) -> Option<char> {
             let chars = if shift { "ZXCVBNM" } else { "zxcvbnm" };
             chars.chars().nth(code as usize - 44)
         }
+        // Symbols
+        12 => Some(if shift { '_' } else { '-' }),
+        13 => Some(if shift { '+' } else { '=' }),
+        26 => Some(if shift { '{' } else { '[' }),
+        27 => Some(if shift { '}' } else { ']' }),
+        39 => Some(if shift { ':' } else { ';' }),
+        40 => Some(if shift { '"' } else { '\'' }),
+        41 => Some(if shift { '~' } else { '`' }),
+        43 => Some(if shift { '|' } else { '\\' }),
+        51 => Some(if shift { '<' } else { ',' }),
+        52 => Some(if shift { '>' } else { '.' }),
+        53 => Some(if shift { '?' } else { '/' }),
+
         KEY_SPACE => Some(' '),
         KEY_ENTER => Some('\n'),
         KEY_BACKSPACE => Some('\x08'),
         KEY_TAB => Some('\t'),
         _ => None,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_linux_code_to_ascii_symbols() {
+        // [IN1] Regression test for shell input bug
+        // Verify that dot and dash are correctly mapped
+        assert_eq!(linux_code_to_ascii(52, false), Some('.')); // dot
+        assert_eq!(linux_code_to_ascii(12, false), Some('-')); // dash
+
+        // Verify shift variants
+        assert_eq!(linux_code_to_ascii(52, true), Some('>')); // greater
+        assert_eq!(linux_code_to_ascii(12, true), Some('_')); // underscore
+
+        // Verify other symbols
+        assert_eq!(linux_code_to_ascii(53, false), Some('/'));
+        assert_eq!(linux_code_to_ascii(53, true), Some('?'));
     }
 }

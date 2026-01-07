@@ -14,21 +14,13 @@ pub fn uptime_seconds() -> u64 {
 /// TEAM_170: Read the ARM generic timer counter.
 #[inline]
 fn read_timer_counter() -> u64 {
-    let cnt: u64;
-    unsafe {
-        core::arch::asm!("mrs {}, CNTVCT_EL0", out(reg) cnt);
-    }
-    cnt
+    crate::arch::time::read_timer_counter()
 }
 
 /// TEAM_170: Read the ARM generic timer frequency.
 #[inline]
 fn read_timer_frequency() -> u64 {
-    let freq: u64;
-    unsafe {
-        core::arch::asm!("mrs {}, CNTFRQ_EL0", out(reg) freq);
-    }
-    freq
+    crate::arch::time::read_timer_frequency()
 }
 
 /// TEAM_170: sys_nanosleep - Sleep for specified duration.
@@ -41,7 +33,9 @@ pub fn sys_nanosleep(seconds: u64, nanoseconds: u64) -> i64 {
     let freq = read_timer_frequency();
     if freq == 0 {
         // TEAM_186: Use saturating arithmetic for fallback path
-        let millis = total_secs.saturating_mul(1000).saturating_add(norm_nanos / 1_000_000);
+        let millis = total_secs
+            .saturating_mul(1000)
+            .saturating_add(norm_nanos / 1_000_000);
         for _ in 0..(millis.min(u64::MAX as u64) as usize).min(1_000_000) {
             crate::task::yield_now();
         }
@@ -49,14 +43,14 @@ pub fn sys_nanosleep(seconds: u64, nanoseconds: u64) -> i64 {
     }
 
     let start = read_timer_counter();
-    
+
     // TEAM_186: Calculate ticks with overflow protection
     // ticks = seconds * freq + (nanoseconds * freq) / 1e9
     // Split calculation to avoid overflow
     let ticks_from_secs = total_secs.saturating_mul(freq);
     let ticks_from_nanos = (norm_nanos as u128 * freq as u128 / 1_000_000_000) as u64;
     let ticks_to_wait = ticks_from_secs.saturating_add(ticks_from_nanos);
-    
+
     let target = start.saturating_add(ticks_to_wait);
 
     while read_timer_counter() < target {
@@ -70,8 +64,7 @@ pub fn sys_nanosleep(seconds: u64, nanoseconds: u64) -> i64 {
 pub fn sys_clock_gettime(timespec_buf: usize) -> i64 {
     let task = crate::task::current_task();
     let ts_size = core::mem::size_of::<Timespec>();
-    if mm_user::validate_user_buffer(task.ttbr0, timespec_buf, ts_size, true).is_err()
-    {
+    if mm_user::validate_user_buffer(task.ttbr0, timespec_buf, ts_size, true).is_err() {
         return errno::EFAULT;
     }
 
@@ -94,8 +87,7 @@ pub fn sys_clock_gettime(timespec_buf: usize) -> i64 {
         unsafe { core::slice::from_raw_parts(&ts as *const Timespec as *const u8, ts_size) };
 
     for (i, &byte) in ts_bytes.iter().enumerate() {
-        if let Some(ptr) = mm_user::user_va_to_kernel_ptr(task.ttbr0, timespec_buf + i)
-        {
+        if let Some(ptr) = mm_user::user_va_to_kernel_ptr(task.ttbr0, timespec_buf + i) {
             unsafe { *ptr = byte };
         } else {
             return errno::EFAULT;

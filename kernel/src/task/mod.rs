@@ -8,7 +8,7 @@ pub mod user; // TEAM_073: Userspace support (Phase 8)
 // TEAM_208: user_mm moved to crate::memory::user
 
 extern crate alloc;
-use crate::arch::{Context, cpu_switch_to, task_entry_trampoline};
+use crate::arch::{Context, cpu_switch_to};
 
 use alloc::boxed::Box;
 use alloc::string::String;
@@ -252,10 +252,7 @@ impl From<UserTask> for TaskControlBlock {
         let heap = user.heap; // TEAM_166: Preserve heap state
 
         // Set up context for first switch
-        let mut context = Context::default();
-        context.sp = stack_top as u64;
-        context.lr = task_entry_trampoline as *const () as u64;
-        context.x19 = user_task_entry_wrapper as *const () as u64;
+        let context = Context::new(stack_top, user_task_entry_wrapper as *const () as usize);
 
         Self {
             id: TaskId(user.pid.0 as usize),

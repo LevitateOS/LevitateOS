@@ -2,38 +2,52 @@
 //!
 //! This module provides stubs for x86_64 to verify the architecture abstraction.
 
-use crate::arch::EarlyConsole;
+pub mod boot;
+pub mod cpu;
+pub mod exceptions;
+pub mod power;
+pub mod task;
+pub mod time;
 
-pub struct x86EarlyConsole;
-
-impl EarlyConsole for x86EarlyConsole {
-    fn write_str(&self, _s: &str) {
-        // unimplemented!("x86_64 early console")
-    }
-}
-
-static EARLY_CONSOLE: x86EarlyConsole = x86EarlyConsole;
-
-#[no_mangle]
-pub fn get_early_console() -> Option<&'static dyn EarlyConsole> {
-    Some(&EARLY_CONSOLE)
-}
+// Re-export Context and other items from task
+pub use self::boot::*;
+pub use self::exceptions::*;
+pub use self::task::*;
 
 // TEAM_162: Stubs for types that need to be provided by the architecture
 #[repr(C)]
 #[derive(Debug, Clone, Copy, Default)]
 pub struct SyscallFrame {
-    // x86_64 registers would go here
+    pub regs: [u64; 31],
+    pub sp: u64,
 }
 
-#[repr(C)]
-#[derive(Debug, Clone, Copy, Default)]
-pub struct Context {
-    // x86_64 context would go here
-}
-
-pub unsafe fn enter_user_mode(_entry_point: usize, _user_sp: usize) -> ! {
-    unimplemented!("x86_64 enter_user_mode")
+impl SyscallFrame {
+    pub fn syscall_number(&self) -> u64 {
+        0
+    }
+    pub fn arg0(&self) -> u64 {
+        0
+    }
+    pub fn arg1(&self) -> u64 {
+        0
+    }
+    pub fn arg2(&self) -> u64 {
+        0
+    }
+    pub fn arg3(&self) -> u64 {
+        0
+    }
+    pub fn arg4(&self) -> u64 {
+        0
+    }
+    pub fn arg5(&self) -> u64 {
+        0
+    }
+    pub fn arg6(&self) -> u64 {
+        0
+    }
+    pub fn set_return(&mut self, _value: i64) {}
 }
 
 pub unsafe fn switch_mmu_config(_config_phys: usize) {

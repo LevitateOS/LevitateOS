@@ -1,6 +1,9 @@
 pub mod boot;
+pub mod cpu;
 pub mod exceptions;
+pub mod power;
 pub mod task;
+pub mod time;
 
 pub use self::boot::*;
 pub use self::task::*;
