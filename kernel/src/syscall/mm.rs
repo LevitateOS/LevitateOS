@@ -20,6 +20,65 @@ pub const MAP_ANONYMOUS: u32 = 0x20;
 const ENOMEM: i64 = -12;
 const EINVAL: i64 = -22;
 
+/// TEAM_238: RAII guard for mmap allocation cleanup.
+///
+/// Tracks pages allocated during mmap. On drop, frees all unless committed.
+/// This ensures partial allocations are cleaned up on failure.
+struct MmapGuard {
+    /// (virtual_address, physical_address) pairs
+    allocated: alloc::vec::Vec<(usize, usize)>,
+    /// User page table physical address
+    ttbr0: usize,
+    /// Set to true when allocation succeeds
+    committed: bool,
+}
+
+impl MmapGuard {
+    /// Create a new guard for the given user page table.
+    fn new(ttbr0: usize) -> Self {
+        Self {
+            allocated: alloc::vec::Vec::new(),
+            ttbr0,
+            committed: false,
+        }
+    }
+
+    /// Track an allocated page.
+    fn track(&mut self, va: usize, phys: usize) {
+        self.allocated.push((va, phys));
+    }
+
+    /// Commit the allocation - pages will NOT be freed on drop.
+    fn commit(mut self) {
+        self.committed = true;
+    }
+}
+
+impl Drop for MmapGuard {
+    fn drop(&mut self) {
+        if self.committed {
+            return; // Success path - keep pages
+        }
+
+        // Failure path - clean up all allocated pages
+        use los_hal::mmu::{phys_to_virt, PageTable, tlb_flush_page};
+
+        let l0_va = phys_to_virt(self.ttbr0);
+        let l0 = unsafe { &mut *(l0_va as *mut PageTable) };
+
+        for &(va, phys) in &self.allocated {
+            // 1. Unmap the page (clear PTE)
+            if let Ok(walk) = mmu::walk_to_entry(l0, va, 3, false) {
+                walk.table.entry_mut(walk.index).clear();
+                tlb_flush_page(va);
+            }
+
+            // 2. Free the physical page
+            FRAME_ALLOCATOR.free_page(phys);
+        }
+    }
+}
+
 /// TEAM_166: sys_sbrk - Adjust program break (heap allocation).
 pub fn sys_sbrk(increment: isize) -> i64 {
     let task = crate::task::current_task();
@@ -92,6 +151,9 @@ pub fn sys_mmap(addr: usize, len: usize, prot: u32, flags: u32, fd: i32, offset:
     let task = crate::task::current_task();
     let ttbr0 = task.ttbr0;
 
+    // TEAM_238: Create RAII guard for cleanup on failure
+    let mut guard = MmapGuard::new(ttbr0);
+
     // Round up length to page boundary
     let pages_needed = (len + PAGE_SIZE - 1) / PAGE_SIZE;
     let alloc_len = pages_needed * PAGE_SIZE;
@@ -125,7 +187,7 @@ pub fn sys_mmap(addr: usize, len: usize, prot: u32, flags: u32, fd: i32, offset:
         let phys = match FRAME_ALLOCATOR.alloc_page() {
             Some(p) => p,
             None => {
-                // TODO: Unmap previously allocated pages on failure
+                // TEAM_238: Guard will clean up on drop
                 return ENOMEM;
             }
         };
@@ -138,9 +200,35 @@ pub fn sys_mmap(addr: usize, len: usize, prot: u32, flags: u32, fd: i32, offset:
 
         // Map into user address space
         if unsafe { mm_user::map_user_page(ttbr0, va, phys, page_flags) }.is_err() {
-            // TODO: Free physical pages and unmap on failure
+            // TEAM_238: Free this page (not tracked yet) and let guard clean up rest
+            FRAME_ALLOCATOR.free_page(phys);
             return ENOMEM;
         }
+
+        // TEAM_238: Track successful allocation
+        guard.track(va, phys);
+    }
+
+    // TEAM_238: Success - commit the guard (pages kept)
+    guard.commit();
+
+    // TEAM_238: Record the VMA
+    {
+        use crate::memory::vma::{Vma, VmaFlags};
+        let mut vma_flags = VmaFlags::empty();
+        if prot & PROT_READ != 0 {
+            vma_flags |= VmaFlags::READ;
+        }
+        if prot & PROT_WRITE != 0 {
+            vma_flags |= VmaFlags::WRITE;
+        }
+        if prot & PROT_EXEC != 0 {
+            vma_flags |= VmaFlags::EXEC;
+        }
+        let vma = Vma::new(base_addr, base_addr + alloc_len, vma_flags);
+        let mut vmas = task.vmas.lock();
+        // Ignore error if overlapping (shouldn't happen with proper mmap)
+        let _ = vmas.insert(vma);
     }
 
     log::trace!(
@@ -154,6 +242,7 @@ pub fn sys_mmap(addr: usize, len: usize, prot: u32, flags: u32, fd: i32, offset:
 }
 
 /// TEAM_228: sys_munmap - Unmap memory from process address space.
+/// TEAM_238: Implemented proper VMA tracking and page unmapping.
 ///
 /// # Arguments
 /// * `addr` - Start address of mapping (must be page-aligned)
@@ -162,24 +251,67 @@ pub fn sys_mmap(addr: usize, len: usize, prot: u32, flags: u32, fd: i32, offset:
 /// # Returns
 /// 0 on success, negative error code on failure.
 pub fn sys_munmap(addr: usize, len: usize) -> i64 {
-    if addr & (PAGE_SIZE - 1) != 0 || len == 0 {
+    use los_hal::mmu::{phys_to_virt, PageTable, tlb_flush_page};
+
+    // Validate alignment
+    if addr & 0xFFF != 0 {
         return EINVAL;
     }
 
-    // TEAM_228: For MVP, we don't track VMAs, so we can't properly validate.
-    // Just mark as success - the pages will remain mapped but unusable from
-    // userspace perspective. A full implementation would:
-    // 1. Look up VMA for this range
-    // 2. Unmap pages from page table
-    // 3. Free physical pages
-    // 4. Remove/split VMA
+    if len == 0 {
+        return EINVAL;
+    }
 
-    // TODO(TEAM_228): Implement proper VMA tracking and page unmapping
+    // Page-align length
+    let aligned_len = (len + PAGE_SIZE - 1) & !(PAGE_SIZE - 1);
+    let end = match addr.checked_add(aligned_len) {
+        Some(e) => e,
+        None => return EINVAL, // Overflow
+    };
 
-    log::trace!("[MUNMAP] Request to unmap 0x{:x} len={}", addr, len);
+    let task = crate::task::current_task();
+    let ttbr0 = task.ttbr0;
 
-    // For now, return success - allocator will treat this memory as freed
-    0
+    // 1. Remove VMA(s) from tracking
+    {
+        let mut vmas = task.vmas.lock();
+        if vmas.remove(addr, end).is_err() {
+            // No VMA found - per POSIX, this is not necessarily an error
+            // but we'll return success anyway (Linux behavior)
+            log::trace!("[MUNMAP] No VMA found for 0x{:x}-0x{:x}", addr, end);
+        }
+    }
+
+    // 2. Unmap and free pages
+    let l0_va = phys_to_virt(ttbr0);
+    let l0 = unsafe { &mut *(l0_va as *mut PageTable) };
+
+    let mut current = addr;
+    while current < end {
+        // Try to find the page mapping
+        if let Ok(walk) = mmu::walk_to_entry(l0, current, 3, false) {
+            let entry = walk.table.entry(walk.index);
+            if entry.is_valid() {
+                // Get physical address before clearing
+                let phys = entry.address();
+
+                // Clear the entry
+                walk.table.entry_mut(walk.index).clear();
+
+                // Flush TLB for this page
+                tlb_flush_page(current);
+
+                // Free the physical page
+                FRAME_ALLOCATOR.free_page(phys);
+            }
+        }
+
+        current += PAGE_SIZE;
+    }
+
+    log::trace!("[MUNMAP] Unmapped 0x{:x}-0x{:x}", addr, end);
+
+    0 // Success
 }
 
 /// TEAM_228: sys_mprotect - Change protection on memory region.

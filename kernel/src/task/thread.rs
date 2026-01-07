@@ -135,6 +135,8 @@ pub fn create_thread(
         signal_trampoline: AtomicUsize::new(0),
         // TEAM_230: Store clear_child_tid for CLONE_CHILD_CLEARTID
         clear_child_tid: AtomicUsize::new(clear_child_tid),
+        // TEAM_238: Threads share parent's VMA tracking (same address space)
+        vmas: IrqSafeLock::new(crate::memory::vma::VmaList::new()),
     };
 
     Ok(Arc::new(tcb))

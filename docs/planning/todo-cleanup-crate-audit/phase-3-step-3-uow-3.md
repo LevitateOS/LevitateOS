@@ -65,12 +65,13 @@ vmas: IrqSafeLock::new(VmaList::new()),
 
 ## Files to Check
 
-The constructors may be in:
-- `kernel/src/task/mod.rs`
-- `kernel/src/task/process.rs`
-- `kernel/src/task/thread.rs`
+**Verified TCB construction sites (3 total):**
 
-Search for `TaskControlBlock {` or `Self {` to find all construction sites.
+1. **`kernel/src/task/mod.rs:236`** - `new_bootstrap()` method
+2. **`kernel/src/task/mod.rs:278`** - `From<UserTask>` impl
+3. **`kernel/src/task/thread.rs:111`** - direct construction in `clone_thread()`
+
+All three must have `vmas: IrqSafeLock::new(VmaList::new()),` added.
 
 ---
 

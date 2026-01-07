@@ -207,6 +207,8 @@ pub struct TaskControlBlock {
     pub signal_trampoline: AtomicUsize,
     /// TEAM_228: Address to clear and wake on thread exit (for CLONE_CHILD_CLEARTID)
     pub clear_child_tid: AtomicUsize,
+    /// TEAM_238: Virtual memory area tracking for munmap support
+    pub vmas: IrqSafeLock<crate::memory::vma::VmaList>,
 }
 
 /// TEAM_220: Global tracking of the foreground process for shell control.
@@ -256,6 +258,8 @@ impl TaskControlBlock {
             signal_trampoline: AtomicUsize::new(0),
             // TEAM_228: No clear-on-exit TID for kernel tasks
             clear_child_tid: AtomicUsize::new(0),
+            // TEAM_238: Kernel tasks have no VMAs
+            vmas: IrqSafeLock::new(crate::memory::vma::VmaList::new()),
         }
     }
 }
@@ -297,6 +301,8 @@ impl From<UserTask> for TaskControlBlock {
             signal_trampoline: AtomicUsize::new(0),
             // TEAM_228: No clear-on-exit TID for spawned processes
             clear_child_tid: AtomicUsize::new(0),
+            // TEAM_238: New user processes start with empty VMA list
+            vmas: IrqSafeLock::new(crate::memory::vma::VmaList::new()),
         }
     }
 }
