@@ -12,10 +12,14 @@ ENTRY(_start)
 
 SECTIONS
 {
-    /* Multiboot2 header must be in first 32KB of the file */
+    /* Multiboot1 header must be in first 8KB - for QEMU -kernel */
     . = 0x100000;  /* Physical load address: 1MB */
 
-    /* Multiboot2 header section - must come first */
+    .multiboot1 ALIGN(4) : {
+        KEEP(*(.multiboot1))
+    }
+
+    /* Multiboot2 header must be in first 32KB of the file - for GRUB */
     .multiboot2 ALIGN(8) : {
         KEEP(*(.multiboot2))
     }

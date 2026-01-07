@@ -3,6 +3,9 @@
 #
 # TEAM_111: Created to enable browser-based QEMU display debugging
 #
+# Flags:
+#   --aarch64  - Run on AArch64 instead of x86_64 (default)
+#
 # Usage:
 #   1. Run this script: ./run-vnc.sh
 #   2. Open browser to http://localhost:6080/vnc.html
@@ -14,20 +17,36 @@
 
 set -e
 
+# Default to x86_64, use --aarch64 for AArch64
+ARCH="x86_64"
+for arg in "$@"; do
+    case $arg in
+        --aarch64) ARCH="aarch64" ;;
+    esac
+done
+
 NOVNC_PATH="/tmp/novnc"
 
-echo "=== LevitateOS VNC Mode ==="
+echo "=== LevitateOS VNC Mode ($ARCH) ==="
 echo "Building kernel..."
-cargo build -p levitate-kernel --release --target aarch64-unknown-none --features verbose
 
-ELF="target/aarch64-unknown-none/release/levitate-kernel"
-BIN="kernel64_rust.bin"
-
-echo "Converting to raw binary..."
-aarch64-linux-gnu-objcopy -O binary "$ELF" "$BIN"
+if [ "$ARCH" = "aarch64" ]; then
+    cargo build -p levitate-kernel --release --target aarch64-unknown-none --features verbose
+    ELF="target/aarch64-unknown-none/release/levitate-kernel"
+    BIN="kernel64_rust.bin"
+    echo "Converting to raw binary..."
+    aarch64-linux-gnu-objcopy -O binary "$ELF" "$BIN"
+else
+    cargo build -p levitate-kernel --release --target x86_64-unknown-none --features verbose
+    ELF="target/x86_64-unknown-none/release/levitate-kernel"
+    BIN="kernel64_x86.bin"
+    echo "Converting to raw binary..."
+    x86_64-linux-gnu-objcopy -O binary "$ELF" "$BIN"
+fi
 
 # Kill any existing QEMU and websockify
 pkill -f "qemu-system-aarch64" 2>/dev/null || true
+pkill -f "qemu-system-x86_64" 2>/dev/null || true
 pkill -f "websockify" 2>/dev/null || true
 sleep 0.5
 
@@ -65,23 +84,44 @@ trap cleanup EXIT
 echo "Launching QEMU with VNC on :5900..."
 # Ensure disk image exists
 # TEAM_121: Use xtask to ensure disk image is correctly partitioned and populated
-cargo xtask build
+cargo xtask build --arch "$ARCH"
 
-qemu-system-aarch64 \
-    -M virt \
-    -cpu cortex-a72 \
-    -m 1G \
-    -kernel "$BIN" \
-    -display none \
-    -vnc :0 \
-    -device virtio-gpu-pci,xres=1280,yres=800 \
-    -device virtio-keyboard-device \
-    -device virtio-tablet-device \
-    -device virtio-net-device,netdev=net0 \
-    -netdev user,id=net0 \
-    -drive file=tinyos_disk.img,format=raw,if=none,id=hd0 \
-    -device virtio-blk-device,drive=hd0 \
-    -initrd initramfs.cpio \
-    -serial mon:stdio \
-    -qmp unix:./qmp.sock,server,nowait \
-    -no-reboot
+if [ "$ARCH" = "aarch64" ]; then
+    qemu-system-aarch64 \
+        -M virt \
+        -cpu cortex-a72 \
+        -m 1G \
+        -kernel "$BIN" \
+        -display none \
+        -vnc :0 \
+        -device virtio-gpu-pci,xres=1280,yres=800 \
+        -device virtio-keyboard-device \
+        -device virtio-tablet-device \
+        -device virtio-net-device,netdev=net0 \
+        -netdev user,id=net0 \
+        -drive file=tinyos_disk.img,format=raw,if=none,id=hd0 \
+        -device virtio-blk-device,drive=hd0 \
+        -initrd initramfs.cpio \
+        -serial mon:stdio \
+        -qmp unix:./qmp.sock,server,nowait \
+        -no-reboot
+else
+    qemu-system-x86_64 \
+        -M q35 \
+        -cpu qemu64 \
+        -m 1G \
+        -kernel "$BIN" \
+        -display none \
+        -vnc :0 \
+        -device virtio-gpu-pci,xres=1280,yres=800 \
+        -device virtio-keyboard-pci \
+        -device virtio-tablet-pci \
+        -device virtio-net-pci,netdev=net0 \
+        -netdev user,id=net0 \
+        -drive file=tinyos_disk.img,format=raw,if=none,id=hd0 \
+        -device virtio-blk-pci,drive=hd0 \
+        -initrd initramfs.cpio \
+        -serial mon:stdio \
+        -qmp unix:./qmp.sock,server,nowait \
+        -no-reboot
+fi

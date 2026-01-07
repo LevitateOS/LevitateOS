@@ -26,7 +26,7 @@ struct Cli {
     command: Commands,
 
     /// Target architecture
-    #[arg(long, global = true, default_value = "aarch64")]
+    #[arg(long, global = true, default_value = "x86_64")]
     arch: String,
 }
 

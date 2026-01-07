@@ -11,7 +11,34 @@
 .intel_syntax noprefix
 
 /* ============================================================================
- * Multiboot2 Header (UoW 2.2)
+ * Multiboot1 Header (for QEMU -kernel direct loading)
+ * QEMU's -kernel option requires multiboot1, not multiboot2
+ * Must be in first 8KB, 4-byte aligned
+ * Using AOUT_KLUDGE to provide explicit load addresses for 64-bit ELF
+ * ============================================================================ */
+.section .multiboot1, "a"
+.align 4
+
+multiboot1_header_start:
+MULTIBOOT_MAGIC     = 0x1BADB002
+MULTIBOOT_PAGE_ALIGN = (1 << 0)
+MULTIBOOT_MEMORY_INFO = (1 << 1)
+MULTIBOOT_AOUT_KLUDGE = (1 << 16)  /* We provide load addresses */
+MULTIBOOT_FLAGS     = MULTIBOOT_PAGE_ALIGN | MULTIBOOT_MEMORY_INFO | MULTIBOOT_AOUT_KLUDGE
+MULTIBOOT_CHECKSUM  = -(MULTIBOOT_MAGIC + MULTIBOOT_FLAGS)
+    .long MULTIBOOT_MAGIC
+    .long MULTIBOOT_FLAGS
+    .long MULTIBOOT_CHECKSUM
+    /* AOUT_KLUDGE address fields */
+    .long multiboot1_header_start  /* header_addr: where this header is */
+    .long 0x100000                 /* load_addr: where to load (1MB) */
+    .long 0                        /* load_end_addr: 0 = load entire file */
+    .long 0                        /* bss_end_addr: 0 = no BSS */
+    .long _start                   /* entry_addr: entry point */
+multiboot1_header_end:
+
+/* ============================================================================
+ * Multiboot2 Header (for GRUB2)
  * Must be in first 32KB, 8-byte aligned
  * ============================================================================ */
 .section .multiboot2, "a"
@@ -50,22 +77,38 @@ _start:
     /* Disable interrupts */
     cli
 
-    /* Save Multiboot2 magic and info pointer */
+    /* Save multiboot magic and info pointer */
     mov edi, eax                        /* Magic in EDI */
-    mov esi, ebx                        /* Multiboot2 info pointer in ESI */
+    mov esi, ebx                        /* Multiboot info pointer in ESI */
 
-    /* Check Multiboot2 magic */
+    /* Check for multiboot2 magic */
     cmp eax, 0x36D76289
-    jne .hang
+    je .magic_ok
 
+    /* Check for multiboot1 magic (QEMU -kernel) */
+    cmp eax, 0x2BADB002
+    je .magic_ok
+
+    /* Unknown magic - hang */
+    jmp .hang
+
+.magic_ok:
     /* Set up stack (in low memory .data.boot) */
     mov esp, offset boot_stack_top
+
+    /* TEAM_278: Save multiboot args to stack BEFORE setup_early_page_tables (clobbers EDI) */
+    push esi                            /* Save info ptr */
+    push edi                            /* Save magic */
 
     /* Load GDT64 */
     lgdt [GDT64.Pointer]
 
     /* Setup page tables */
     call setup_early_page_tables
+
+    /* TEAM_278: Restore multiboot args after page table setup */
+    pop edi                             /* Restore magic */
+    pop esi                             /* Restore info ptr */
 
     /* Enable PAE (Physical Address Extension) in CR4 */
     mov eax, cr4
@@ -118,6 +161,10 @@ long_mode_start:
     /* stack_top is a symbol whose address is in the higher-half (linker script) */
     mov rsp, offset stack_top
 
+    /* TEAM_278: Save multiboot args before BSS zeroing (rep stosq clobbers RDI) */
+    mov r12d, edi                       /* Save magic to R12 (callee-saved) */
+    mov r13d, esi                       /* Save info ptr to R13 (callee-saved) */
+
     /* Zero out BSS */
     /* Use immediate load for absolute symbols */
     mov rdi, offset __bss_start
@@ -128,11 +175,9 @@ long_mode_start:
     rep stosq
 
     /* Prepare arguments for kernel_main */
-    /* RDI = Multiboot2 magic (from EDI) */
-    /* RSI = Multiboot2 info pointer (from ESI) */
-    /* Zero extend to 64-bit */
-    mov edi, edi
-    mov esi, esi
+    /* RDI = Multiboot magic, RSI = Multiboot info pointer */
+    mov edi, r12d                       /* Restore magic from R12 */
+    mov esi, r13d                       /* Restore info ptr from R13 */
 
     /* Call Rust kernel_main */
     /* kernel_main is also in higher-half */
@@ -198,6 +243,10 @@ early_pmo_pd:
 early_pd:
     .skip 4096
 
+/* TEAM_278: PD for APIC identity mapping (4th GB) */
+early_pd_apic:
+    .skip 4096
+
 /* Stack (16KB) - placed in .data.boot to be accessible during boot */
 .align 16
 boot_stack_bottom:
@@ -211,10 +260,10 @@ boot_stack_top:
 .code32
 
 setup_early_page_tables:
-    /* Clear page table memory (6 pages: early_pml4, early_pdpt, early_pdpt_high, early_pmo_pdpt, early_pmo_pd, early_pd) */
+    /* Clear page table memory (7 pages: early_pml4, early_pdpt, early_pdpt_high, early_pmo_pdpt, early_pmo_pd, early_pd, early_pd_apic) */
     mov edi, offset early_pml4
     xor eax, eax
-    mov ecx, 4096 * 6 / 4
+    mov ecx, 4096 * 7 / 4
     rep stosd
 
     /* Restore EDI to early_pml4 base */
@@ -252,6 +301,18 @@ setup_early_page_tables:
     mov eax, offset early_pmo_pd
     or eax, 0x03
     mov dword ptr [edi], eax
+
+    /* TEAM_278: PDPT[3] -> early_pd_apic (for APIC at 0xFEE00000 in 4th GB) */
+    mov edi, offset early_pdpt
+    mov eax, offset early_pd_apic
+    or eax, 0x03
+    mov dword ptr [edi + 3 * 8], eax
+
+    /* TEAM_278: Map APIC region (2MB huge page at 0xFEC00000) */
+    /* PD index for 0xFEE00000: (0xFEE00000 >> 21) & 0x1FF = 503 (0x1F7) */
+    mov edi, offset early_pd_apic
+    mov eax, 0xFEC00083                 /* 0xFEC00000 | Present | Writable | Huge */
+    mov dword ptr [edi + 503 * 8], eax
 
     /* PD[0-7] -> 2MB huge pages at physical 0x0..0xE00000 (16MB total) */
     /* This covers the EARLY_ALLOCATOR range (8MB-16MB) */

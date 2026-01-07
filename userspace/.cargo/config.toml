@@ -1,3 +1,5 @@
+# TEAM_274: Updated to support both architectures
+
 [build]
 target = "aarch64-unknown-none"
 

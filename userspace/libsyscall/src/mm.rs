@@ -1,4 +1,7 @@
-//! memory management
+//! Memory management
+//! TEAM_275: Refactored to use arch::syscallN
+
+use crate::arch;
 use crate::sysno::{SYS_MMAP, SYS_MPROTECT, SYS_MUNMAP, SYS_SBRK};
 
 // TEAM_228: mmap protection flags
@@ -16,17 +19,7 @@ pub const MAP_ANONYMOUS: u32 = 0x20;
 /// Adjust program break (heap allocation).
 #[inline]
 pub fn sbrk(increment: isize) -> i64 {
-    let ret: i64;
-    unsafe {
-        core::arch::asm!(
-            "svc #0",
-            in("x8") SYS_SBRK,
-            in("x0") increment,
-            lateout("x0") ret,
-            options(nostack)
-        );
-    }
-    ret
+    arch::syscall1(SYS_SBRK, increment as u64)
 }
 
 /// TEAM_228: Map memory into process address space.
@@ -43,22 +36,15 @@ pub fn sbrk(increment: isize) -> i64 {
 /// * Virtual address of mapping, or negative error code.
 #[inline]
 pub fn mmap(addr: usize, len: usize, prot: u32, flags: u32, fd: i32, offset: usize) -> isize {
-    let ret: i64;
-    unsafe {
-        core::arch::asm!(
-            "svc #0",
-            in("x8") SYS_MMAP,
-            in("x0") addr,
-            in("x1") len,
-            in("x2") prot,
-            in("x3") flags,
-            in("x4") fd,
-            in("x5") offset,
-            lateout("x0") ret,
-            options(nostack)
-        );
-    }
-    ret as isize
+    arch::syscall6(
+        SYS_MMAP,
+        addr as u64,
+        len as u64,
+        prot as u64,
+        flags as u64,
+        fd as u64,
+        offset as u64,
+    ) as isize
 }
 
 /// TEAM_228: Unmap memory from process address space.
@@ -71,18 +57,7 @@ pub fn mmap(addr: usize, len: usize, prot: u32, flags: u32, fd: i32, offset: usi
 /// * 0 on success, negative error code on failure.
 #[inline]
 pub fn munmap(addr: usize, len: usize) -> isize {
-    let ret: i64;
-    unsafe {
-        core::arch::asm!(
-            "svc #0",
-            in("x8") SYS_MUNMAP,
-            in("x0") addr,
-            in("x1") len,
-            lateout("x0") ret,
-            options(nostack)
-        );
-    }
-    ret as isize
+    arch::syscall2(SYS_MUNMAP, addr as u64, len as u64) as isize
 }
 
 /// TEAM_228: Change protection on memory region.
@@ -96,17 +71,5 @@ pub fn munmap(addr: usize, len: usize) -> isize {
 /// * 0 on success, negative error code on failure.
 #[inline]
 pub fn mprotect(addr: usize, len: usize, prot: u32) -> isize {
-    let ret: i64;
-    unsafe {
-        core::arch::asm!(
-            "svc #0",
-            in("x8") SYS_MPROTECT,
-            in("x0") addr,
-            in("x1") len,
-            in("x2") prot,
-            lateout("x0") ret,
-            options(nostack)
-        );
-    }
-    ret as isize
+    arch::syscall3(SYS_MPROTECT, addr as u64, len as u64, prot as u64) as isize
 }

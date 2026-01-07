@@ -7,6 +7,7 @@ pub mod boot;
 pub mod cpu;
 pub mod exceptions;
 pub mod power;
+pub mod syscall;
 pub mod task;
 pub mod time;
 
@@ -357,43 +358,65 @@ pub const TIOCSPTLCK: u64 = 0x40045431;
 pub const TIOCGWINSZ: u64 = 0x5413;
 pub const TIOCSWINSZ: u64 = 0x5414;
 
-// TEAM_258: Stubs for types that need to be provided by the architecture
+// TEAM_277: x86_64 SyscallFrame - matches layout pushed by syscall_entry
 #[repr(C)]
 #[derive(Debug, Clone, Copy, Default)]
 pub struct SyscallFrame {
-    pub regs: [u64; 31],
-    pub sp: u64,
-    pub pc: u64,     // Added for compatibility with AArch64 code
-    pub pstate: u64, // Added for compatibility
-    pub ttbr0: u64,  // Added for compatibility
+    // Pushed by syscall_entry in this order (stack grows down, so first push is at highest address)
+    pub rax: u64,   // syscall number / return value
+    pub rdi: u64,   // arg0
+    pub rsi: u64,   // arg1
+    pub rdx: u64,   // arg2
+    pub r10: u64,   // arg3
+    pub r8: u64,    // arg4
+    pub r9: u64,    // arg5
+    pub rcx: u64,   // return address (saved by syscall)
+    pub r11: u64,   // saved RFLAGS (saved by syscall)
+    pub rbx: u64,   // callee-saved
+    pub rbp: u64,   // callee-saved
+    pub r12: u64,   // callee-saved
+    pub r13: u64,   // callee-saved
+    pub r14: u64,   // callee-saved
+    pub r15: u64,   // callee-saved
+    pub rsp: u64,   // user stack pointer
+    pub ttbr0: u64, // CR3 placeholder for compatibility
+    // Compatibility with AArch64 API
+    pub pc: u64,     // Alias for rcx (return address)
+    pub sp: u64,     // Alias for rsp
+    pub pstate: u64, // Alias for r11 (RFLAGS)
+    // Padding to match regs array access pattern
+    pub regs: [u64; 31], // For compatibility with AArch64 code
 }
 
 impl SyscallFrame {
     pub fn syscall_number(&self) -> u64 {
-        0
+        self.rax
     }
     pub fn arg0(&self) -> u64 {
-        0
+        self.rdi
     }
     pub fn arg1(&self) -> u64 {
-        0
+        self.rsi
     }
     pub fn arg2(&self) -> u64 {
-        0
+        self.rdx
     }
     pub fn arg3(&self) -> u64 {
-        0
+        self.r10
     }
     pub fn arg4(&self) -> u64 {
-        0
+        self.r8
     }
     pub fn arg5(&self) -> u64 {
-        0
+        self.r9
     }
     pub fn arg6(&self) -> u64 {
+        // x86_64 only supports 6 args, return 0 for 7th
         0
     }
-    pub fn set_return(&mut self, _value: i64) {}
+    pub fn set_return(&mut self, value: i64) {
+        self.rax = value as u64;
+    }
 }
 
 pub unsafe fn switch_mmu_config(_config_phys: usize) {
@@ -429,7 +452,8 @@ pub extern "C" fn kernel_main(multiboot_magic: usize, multiboot_info: usize) -> 
     // 4. Now safe to use println!
     los_hal::println!("[BOOT] x86_64 kernel starting...");
 
-    // 5. Validate multiboot2 magic and parse boot info
+    // 5. Validate multiboot magic and parse boot info
+    const MULTIBOOT1_MAGIC: usize = 0x2BADB002;
     if multiboot_magic == los_hal::x86_64::multiboot2::MULTIBOOT2_BOOTLOADER_MAGIC as usize {
         unsafe {
             los_hal::x86_64::multiboot2::init(multiboot_info);
@@ -439,9 +463,20 @@ pub extern "C" fn kernel_main(multiboot_magic: usize, multiboot_info: usize) -> 
         // Report memory info
         let total_ram = los_hal::x86_64::multiboot2::total_ram();
         let phys_max = los_hal::x86_64::multiboot2::phys_max();
-        los_hal::println!("[BOOT] Total RAM: {} MB, Max PA: 0x{:x}", total_ram / (1024 * 1024), phys_max);
+        los_hal::println!(
+            "[BOOT] Total RAM: {} MB, Max PA: 0x{:x}",
+            total_ram / (1024 * 1024),
+            phys_max
+        );
+    } else if multiboot_magic == MULTIBOOT1_MAGIC {
+        // TEAM_277: Multiboot1 boot (from QEMU -kernel)
+        los_hal::println!("[BOOT] Booted via Multiboot1 (QEMU)");
+        // TODO: Parse multiboot1 info structure for memory map
     } else {
-        los_hal::println!("[BOOT] WARNING: Invalid Multiboot2 magic: 0x{:x}", multiboot_magic);
+        los_hal::println!(
+            "[BOOT] WARNING: Unknown boot magic: 0x{:x}",
+            multiboot_magic
+        );
     }
 
     // 6. Expand PMO mapping to cover all RAM
@@ -461,6 +496,11 @@ pub extern "C" fn kernel_main(multiboot_magic: usize, multiboot_info: usize) -> 
 
     // 7. Initialize physical memory management (buddy allocator)
     crate::memory::init_x86_64();
+
+    // 8. TEAM_277: Initialize syscall infrastructure
+    unsafe {
+        syscall::init();
+    }
 
     los_hal::println!("[BOOT] x86_64 kernel initialized");
 

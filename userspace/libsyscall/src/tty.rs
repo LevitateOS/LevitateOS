@@ -1,4 +1,7 @@
 //! TTY and Terminal operations
+//! TEAM_275: Refactored to use arch::syscallN
+
+use crate::arch;
 use crate::sysno::{SYS_IOCTL, SYS_ISATTY};
 
 // TEAM_244: ioctl requests for TTY
@@ -11,19 +14,7 @@ pub const TCSETSF: u64 = 0x5404; // tcsetattr TCSAFLUSH
 /// Returns 0 on success, negative error on failure.
 #[inline]
 pub fn tcgetattr(fd: i32, termios_p: *mut u8) -> isize {
-    let ret: i64;
-    unsafe {
-        core::arch::asm!(
-            "svc #0",
-            in("x8") SYS_IOCTL,
-            in("x0") fd,
-            in("x1") TCGETS,
-            in("x2") termios_p,
-            lateout("x0") ret,
-            options(nostack)
-        );
-    }
-    ret as isize
+    arch::syscall3(SYS_IOCTL, fd as u64, TCGETS, termios_p as u64) as isize
 }
 
 /// TEAM_244: Set terminal attributes (POSIX tcsetattr).
@@ -36,34 +27,12 @@ pub fn tcsetattr(fd: i32, optional_actions: i32, termios_p: *const u8) -> isize 
         2 => TCSETSF, // TCSAFLUSH
         _ => TCSETS,
     };
-    let ret: i64;
-    unsafe {
-        core::arch::asm!(
-            "svc #0",
-            in("x8") SYS_IOCTL,
-            in("x0") fd,
-            in("x1") request,
-            in("x2") termios_p,
-            lateout("x0") ret,
-            options(nostack)
-        );
-    }
-    ret as isize
+    arch::syscall3(SYS_IOCTL, fd as u64, request, termios_p as u64) as isize
 }
 
 /// TEAM_244: Check if fd refers to a terminal.
 /// Returns 1 if tty, 0 if not, negative error on failure.
 #[inline]
 pub fn isatty(fd: i32) -> isize {
-    let ret: i64;
-    unsafe {
-        core::arch::asm!(
-            "svc #0",
-            in("x8") SYS_ISATTY,
-            in("x0") fd,
-            lateout("x0") ret,
-            options(nostack)
-        );
-    }
-    ret as isize
+    arch::syscall1(SYS_ISATTY, fd as u64) as isize
 }

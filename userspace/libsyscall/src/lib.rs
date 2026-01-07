@@ -12,6 +12,9 @@
 
 use core::panic::PanicInfo;
 
+// TEAM_275: Architecture-specific syscall primitives
+mod arch;
+
 // Modules
 pub mod errno;
 pub mod fs;

@@ -1,4 +1,7 @@
 //! Filesystem operations
+//! TEAM_275: Refactored to use arch::syscallN
+
+use crate::arch;
 use crate::sysno::{
     SYS_DUP, SYS_DUP3, SYS_FSTAT, SYS_GETCWD, SYS_GETDENTS, SYS_LINKAT, SYS_MKDIRAT, SYS_OPENAT,
     SYS_PIPE2, SYS_READLINKAT, SYS_RENAMEAT, SYS_SYMLINKAT, SYS_UNLINKAT, SYS_UTIMENSAT,
@@ -66,192 +69,114 @@ pub mod d_type {
 /// TEAM_168: Open a file.
 #[inline]
 pub fn openat(path: &str, flags: u32) -> isize {
-    let ret: i64;
-    unsafe {
-        core::arch::asm!(
-            "svc #0",
-            in("x8") SYS_OPENAT,
-            in("x0") path.as_ptr(),
-            in("x1") path.len(),
-            in("x2") flags,
-            lateout("x0") ret,
-            options(nostack)
-        );
-    }
-    ret as isize
+    arch::syscall3(
+        SYS_OPENAT,
+        path.as_ptr() as u64,
+        path.len() as u64,
+        flags as u64,
+    ) as isize
 }
 
 /// TEAM_168: Get file status.
 #[inline]
 pub fn fstat(fd: usize, stat: &mut Stat) -> isize {
-    let ret: i64;
-    unsafe {
-        core::arch::asm!(
-            "svc #0",
-            in("x8") SYS_FSTAT,
-            in("x0") fd,
-            in("x1") stat as *mut Stat,
-            lateout("x0") ret,
-            options(nostack)
-        );
-    }
-    ret as isize
+    arch::syscall2(SYS_FSTAT, fd as u64, stat as *mut Stat as u64) as isize
 }
 
 /// TEAM_176: Read directory entries.
 #[inline]
 pub fn getdents(fd: usize, buf: &mut [u8]) -> isize {
-    let ret: i64;
-    unsafe {
-        core::arch::asm!(
-            "svc #0",
-            in("x8") SYS_GETDENTS,
-            in("x0") fd,
-            in("x1") buf.as_mut_ptr(),
-            in("x2") buf.len(),
-            lateout("x0") ret,
-            options(nostack)
-        );
-    }
-    ret as isize
+    arch::syscall3(
+        SYS_GETDENTS,
+        fd as u64,
+        buf.as_mut_ptr() as u64,
+        buf.len() as u64,
+    ) as isize
 }
 
 /// TEAM_192: Get current working directory.
 #[inline]
 pub fn getcwd(buf: &mut [u8]) -> isize {
-    let ret: i64;
-    unsafe {
-        core::arch::asm!(
-            "svc #0",
-            in("x8") SYS_GETCWD,
-            in("x0") buf.as_mut_ptr(),
-            in("x1") buf.len(),
-            lateout("x0") ret,
-            options(nostack)
-        );
-    }
-    ret as isize
+    arch::syscall2(SYS_GETCWD, buf.as_mut_ptr() as u64, buf.len() as u64) as isize
 }
 
 /// TEAM_192: Create directory.
 #[inline]
 pub fn mkdirat(dfd: i32, path: &str, mode: u32) -> isize {
-    let ret: i64;
-    unsafe {
-        core::arch::asm!(
-            "svc #0",
-            in("x8") SYS_MKDIRAT,
-            in("x0") dfd,
-            in("x1") path.as_ptr(),
-            in("x2") path.len(),
-            in("x3") mode,
-            lateout("x0") ret,
-            options(nostack)
-        );
-    }
-    ret as isize
+    arch::syscall4(
+        SYS_MKDIRAT,
+        dfd as u64,
+        path.as_ptr() as u64,
+        path.len() as u64,
+        mode as u64,
+    ) as isize
 }
 
 /// TEAM_192: Remove file or directory.
 #[inline]
 pub fn unlinkat(dfd: i32, path: &str, flags: u32) -> isize {
-    let ret: i64;
-    unsafe {
-        core::arch::asm!(
-            "svc #0",
-            in("x8") SYS_UNLINKAT,
-            in("x0") dfd,
-            in("x1") path.as_ptr(),
-            in("x2") path.len(),
-            in("x3") flags,
-            lateout("x0") ret,
-            options(nostack)
-        );
-    }
-    ret as isize
+    arch::syscall4(
+        SYS_UNLINKAT,
+        dfd as u64,
+        path.as_ptr() as u64,
+        path.len() as u64,
+        flags as u64,
+    ) as isize
 }
 
 /// TEAM_192: Rename/move file or directory.
 #[inline]
 pub fn renameat(old_dfd: i32, old_path: &str, new_dfd: i32, new_path: &str) -> isize {
-    let ret: i64;
-    unsafe {
-        core::arch::asm!(
-            "svc #0",
-            in("x8") SYS_RENAMEAT,
-            in("x0") old_dfd,
-            in("x1") old_path.as_ptr(),
-            in("x2") old_path.len(),
-            in("x3") new_dfd,
-            in("x4") new_path.as_ptr(),
-            in("x5") new_path.len(),
-            lateout("x0") ret,
-            options(nostack)
-        );
-    }
-    ret as isize
+    arch::syscall6(
+        SYS_RENAMEAT,
+        old_dfd as u64,
+        old_path.as_ptr() as u64,
+        old_path.len() as u64,
+        new_dfd as u64,
+        new_path.as_ptr() as u64,
+        new_path.len() as u64,
+    ) as isize
 }
 
 /// TEAM_198: Create a symbolic link.
 #[inline]
 pub fn symlinkat(target: &str, linkdirfd: i32, linkpath: &str) -> isize {
-    let ret: i64;
-    unsafe {
-        core::arch::asm!(
-            "svc #0",
-            in("x8") SYS_SYMLINKAT,
-            in("x0") target.as_ptr(),
-            in("x1") target.len(),
-            in("x2") linkdirfd,
-            in("x3") linkpath.as_ptr(),
-            in("x4") linkpath.len(),
-            lateout("x0") ret,
-            options(nostack)
-        );
-    }
-    ret as isize
+    arch::syscall5(
+        SYS_SYMLINKAT,
+        target.as_ptr() as u64,
+        target.len() as u64,
+        linkdirfd as u64,
+        linkpath.as_ptr() as u64,
+        linkpath.len() as u64,
+    ) as isize
 }
 
 /// TEAM_253: Read value of a symbolic link.
 #[inline]
 pub fn readlinkat(dirfd: i32, path: &str, buf: &mut [u8]) -> isize {
-    let ret: i64;
-    unsafe {
-        core::arch::asm!(
-            "svc #0",
-            in("x8") SYS_READLINKAT,
-            in("x0") dirfd,
-            in("x1") path.as_ptr(),
-            in("x2") path.len(),
-            in("x3") buf.as_mut_ptr(),
-            in("x4") buf.len(),
-            lateout("x0") ret,
-            options(nostack)
-        );
-    }
-    ret as isize
+    arch::syscall5(
+        SYS_READLINKAT,
+        dirfd as u64,
+        path.as_ptr() as u64,
+        path.len() as u64,
+        buf.as_mut_ptr() as u64,
+        buf.len() as u64,
+    ) as isize
 }
 
 /// TEAM_209: Create a hard link.
 #[inline]
 pub fn linkat(olddfd: i32, oldpath: &str, newdfd: i32, newpath: &str, flags: u32) -> isize {
-    let ret: i64;
-    unsafe {
-        core::arch::asm!(
-            "svc #0",
-            in("x8") SYS_LINKAT,
-            in("x0") olddfd,
-            in("x1") oldpath.as_ptr(),
-            in("x2") oldpath.len(),
-            in("x3") newdfd,
-            in("x4") newpath.as_ptr(),
-            in("x5") newpath.len(),
-            in("x6") flags,
-            lateout("x0") ret,
-            options(nostack)
-        );
-    }
-    ret as isize
+    arch::syscall7(
+        SYS_LINKAT,
+        olddfd as u64,
+        oldpath.as_ptr() as u64,
+        oldpath.len() as u64,
+        newdfd as u64,
+        newpath.as_ptr() as u64,
+        newpath.len() as u64,
+        flags as u64,
+    ) as isize
 }
 
 /// TEAM_198: UTIME_NOW - set to current time
@@ -262,58 +187,30 @@ pub const UTIME_OMIT: u64 = 0x3FFFFFFE;
 /// TEAM_198: Set file access and modification times.
 #[inline]
 pub fn utimensat(dirfd: i32, path: &str, times: Option<&[Timespec; 2]>, flags: u32) -> isize {
-    let ret: i64;
     let times_ptr = match times {
-        Some(t) => t.as_ptr() as usize,
+        Some(t) => t.as_ptr() as u64,
         None => 0,
     };
-    unsafe {
-        core::arch::asm!(
-            "svc #0",
-            in("x8") SYS_UTIMENSAT,
-            in("x0") dirfd,
-            in("x1") path.as_ptr(),
-            in("x2") path.len(),
-            in("x3") times_ptr,
-            in("x4") flags,
-            lateout("x0") ret,
-            options(nostack)
-        );
-    }
-    ret as isize
+    arch::syscall5(
+        SYS_UTIMENSAT,
+        dirfd as u64,
+        path.as_ptr() as u64,
+        path.len() as u64,
+        times_ptr,
+        flags as u64,
+    ) as isize
 }
 
 /// TEAM_233: Create a pipe.
 #[inline]
 pub fn pipe2(pipefd: &mut [i32; 2], flags: u32) -> isize {
-    let ret: i64;
-    unsafe {
-        core::arch::asm!(
-            "svc #0",
-            in("x8") SYS_PIPE2,
-            in("x0") pipefd.as_mut_ptr(),
-            in("x1") flags,
-            lateout("x0") ret,
-            options(nostack)
-        );
-    }
-    ret as isize
+    arch::syscall2(SYS_PIPE2, pipefd.as_mut_ptr() as u64, flags as u64) as isize
 }
 
 /// TEAM_233: Duplicate a file descriptor to lowest available.
 #[inline]
 pub fn dup(oldfd: usize) -> isize {
-    let ret: i64;
-    unsafe {
-        core::arch::asm!(
-            "svc #0",
-            in("x8") SYS_DUP,
-            in("x0") oldfd,
-            lateout("x0") ret,
-            options(nostack)
-        );
-    }
-    ret as isize
+    arch::syscall1(SYS_DUP, oldfd as u64) as isize
 }
 
 /// TEAM_233: Duplicate a file descriptor to a specific number.
@@ -325,17 +222,5 @@ pub fn dup2(oldfd: usize, newfd: usize) -> isize {
 /// TEAM_233: Duplicate a file descriptor with flags.
 #[inline]
 pub fn dup3(oldfd: usize, newfd: usize, flags: u32) -> isize {
-    let ret: i64;
-    unsafe {
-        core::arch::asm!(
-            "svc #0",
-            in("x8") SYS_DUP3,
-            in("x0") oldfd,
-            in("x1") newfd,
-            in("x2") flags,
-            lateout("x0") ret,
-            options(nostack)
-        );
-    }
-    ret as isize
+    arch::syscall3(SYS_DUP3, oldfd as u64, newfd as u64, flags as u64) as isize
 }

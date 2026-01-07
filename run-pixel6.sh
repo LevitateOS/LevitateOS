@@ -3,6 +3,8 @@
 #
 # TEAM_042: Pixel 6 Emulation Profile (Updated with mitigations)
 #
+# NOTE: This script is AArch64-only (Pixel 6 is an ARM device)
+#
 # Pixel 6 Tensor SoC:
 # - 2x Cortex-X1 @ 2.80 GHz (big)
 # - 2x Cortex-A76 @ 2.25 GHz (medium)
@@ -49,7 +51,7 @@ aarch64-linux-gnu-objcopy -O binary "$ELF" "$BIN"
 echo "Launching QEMU (Pixel 6 profile)..."
 # Ensure disk image exists
 # TEAM_121: Use xtask to ensure disk image is correctly partitioned and populated
-cargo xtask build
+cargo xtask build --arch aarch64
 
 qemu-system-aarch64 \
     -M "$QEMU_MACHINE" \

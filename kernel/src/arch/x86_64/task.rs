@@ -1,5 +1,8 @@
 //! TEAM_162: x86_64 Context Stub
 //! TEAM_258: Added compatible fields for shared code
+//! TEAM_277: Added stub implementations for task switching
+
+use core::arch::global_asm;
 
 #[repr(C)]
 #[derive(Debug, Clone, Copy, Default)]
@@ -22,17 +25,15 @@ pub struct Context {
 }
 
 impl Context {
-    pub fn new(stack_top: usize, _entry_wrapper: usize) -> Self {
+    pub fn new(stack_top: usize, entry_wrapper: usize) -> Self {
         Self {
             sp: stack_top as u64,
-            lr: task_entry_trampoline as *const () as u64,
-            x19: _entry_wrapper as u64,
+            lr: task_entry_trampoline as usize as u64,
+            x19: entry_wrapper as u64,
             ..Default::default()
         }
     }
 
-    // TEAM_258: Abstract TLS setting for architecture independence
-    // On x86_64 this will eventually set FS base via MSR
     pub fn set_tls(&mut self, addr: u64) {
         self.tpidr_el0 = addr;
     }
@@ -42,14 +43,44 @@ pub unsafe fn enter_user_mode(_entry_point: usize, _user_sp: usize) -> ! {
     unimplemented!("x86_64 enter_user_mode")
 }
 
-// Stubs for asm globals
+// TEAM_277: External references that will be defined in global_asm below
 unsafe extern "C" {
     pub fn cpu_switch_to(old: *mut Context, new: *const Context);
-    pub fn task_entry_trampoline();
 }
 
-// Global asm stub if needed, but for now we rely on panic
+// TEAM_277: Task entry trampoline - jumps to saved entry point in x19
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn x86_cpu_switch_to_stub() {
-    unimplemented!("cpu_switch_to");
+pub unsafe extern "C" fn task_entry_trampoline() {
+    // The entry wrapper address is in x19 (rbx in x86_64 convention)
+    // Call it to start the task
+    unimplemented!("task_entry_trampoline - x86_64 task entry not yet implemented")
 }
+
+// TEAM_277: Context switch stub
+// Saves callee-saved registers to old context, restores from new context
+global_asm!(
+    ".global cpu_switch_to",
+    "cpu_switch_to:",
+    // Save callee-saved registers to old context (rdi points to old Context)
+    "mov [rdi + 0], rbx",  // x19 = rbx
+    "mov [rdi + 8], r12",  // x20 = r12
+    "mov [rdi + 16], r13", // x21 = r13
+    "mov [rdi + 24], r14", // x22 = r14
+    "mov [rdi + 32], r15", // x23 = r15
+    "mov [rdi + 40], rbp", // x24 = rbp
+    "mov [rdi + 88], rsp", // sp
+    "lea rax, [rip + 1f]", // Get return address
+    "mov [rdi + 80], rax", // lr = return address
+    // Restore callee-saved registers from new context (rsi points to new Context)
+    "mov rbx, [rsi + 0]",
+    "mov r12, [rsi + 8]",
+    "mov r13, [rsi + 16]",
+    "mov r14, [rsi + 24]",
+    "mov r15, [rsi + 32]",
+    "mov rbp, [rsi + 40]",
+    "mov rsp, [rsi + 88]",
+    "mov rax, [rsi + 80]", // lr = new return address
+    "jmp rax",             // Jump to new task
+    "1:",                  // Return point for context switch back
+    "ret"
+);

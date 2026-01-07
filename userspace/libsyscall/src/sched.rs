@@ -1,16 +1,13 @@
 //! Scheduling
+//! TEAM_275: Refactored to use arch::syscallN
+
+use crate::arch;
 use crate::sysno::SYS_SCHED_YIELD;
 
 /// Yield execution to another thread.
 #[inline]
 pub fn sched_yield() {
-    unsafe {
-        core::arch::asm!(
-            "svc #0",
-            in("x8") SYS_SCHED_YIELD,
-            options(nostack)
-        );
-    }
+    arch::syscall0(SYS_SCHED_YIELD);
 }
 
 #[inline]

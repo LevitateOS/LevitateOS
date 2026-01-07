@@ -1,4 +1,7 @@
 //! Core I/O
+//! TEAM_275: Refactored to use arch::syscallN
+
+use crate::arch;
 use crate::sched::sched_yield;
 use crate::sysno::{SYS_CLOSE, SYS_IOCTL, SYS_READ, SYS_READV, SYS_WRITE, SYS_WRITEV};
 
@@ -12,55 +15,30 @@ pub struct IoVec {
 /// TEAM_217: Vectored write.
 #[inline]
 pub fn writev(fd: usize, iov: &[IoVec]) -> isize {
-    let ret: i64;
-    unsafe {
-        core::arch::asm!(
-            "svc #0",
-            in("x8") SYS_WRITEV,
-            in("x0") fd,
-            in("x1") iov.as_ptr(),
-            in("x2") iov.len(),
-            lateout("x0") ret,
-            options(nostack)
-        );
-    }
-    ret as isize
+    arch::syscall3(SYS_WRITEV, fd as u64, iov.as_ptr() as u64, iov.len() as u64) as isize
 }
 
 /// TEAM_217: Vectored read.
 #[inline]
 pub fn readv(fd: usize, iov: &mut [IoVec]) -> isize {
-    let ret: i64;
-    unsafe {
-        core::arch::asm!(
-            "svc #0",
-            in("x8") SYS_READV,
-            in("x0") fd,
-            in("x1") iov.as_mut_ptr(),
-            in("x2") iov.len(),
-            lateout("x0") ret,
-            options(nostack)
-        );
-    }
-    ret as isize
+    arch::syscall3(
+        SYS_READV,
+        fd as u64,
+        iov.as_mut_ptr() as u64,
+        iov.len() as u64,
+    ) as isize
 }
 
 /// Read from a file descriptor.
 #[inline]
 pub fn read(fd: usize, buf: &mut [u8]) -> isize {
     loop {
-        let ret: i64;
-        unsafe {
-            core::arch::asm!(
-                "svc #0",
-                in("x8") SYS_READ,
-                in("x0") fd,
-                in("x1") buf.as_mut_ptr(),
-                in("x2") buf.len(),
-                lateout("x0") ret,
-                options(nostack)
-            );
-        }
+        let ret = arch::syscall3(
+            SYS_READ,
+            fd as u64,
+            buf.as_mut_ptr() as u64,
+            buf.len() as u64,
+        );
         if ret == -11 {
             // EAGAIN
             sched_yield();
@@ -74,18 +52,7 @@ pub fn read(fd: usize, buf: &mut [u8]) -> isize {
 #[inline]
 pub fn write(fd: usize, buf: &[u8]) -> isize {
     loop {
-        let ret: i64;
-        unsafe {
-            core::arch::asm!(
-                "svc #0",
-                in("x8") SYS_WRITE,
-                in("x0") fd,
-                in("x1") buf.as_ptr(),
-                in("x2") buf.len(),
-                lateout("x0") ret,
-                options(nostack)
-            );
-        }
+        let ret = arch::syscall3(SYS_WRITE, fd as u64, buf.as_ptr() as u64, buf.len() as u64);
         if ret == -11 {
             // EAGAIN
             sched_yield();
@@ -98,33 +65,11 @@ pub fn write(fd: usize, buf: &[u8]) -> isize {
 /// Close a file descriptor.
 #[inline]
 pub fn close(fd: usize) -> isize {
-    let ret: i64;
-    unsafe {
-        core::arch::asm!(
-            "svc #0",
-            in("x8") SYS_CLOSE,
-            in("x0") fd,
-            lateout("x0") ret,
-            options(nostack)
-        );
-    }
-    ret as isize
+    arch::syscall1(SYS_CLOSE, fd as u64) as isize
 }
 
 /// TEAM_247: Generic ioctl wrapper.
 #[inline]
 pub fn ioctl(fd: usize, request: u64, arg: usize) -> isize {
-    let ret: i64;
-    unsafe {
-        core::arch::asm!(
-            "svc #0",
-            in("x8") SYS_IOCTL,
-            in("x0") fd,
-            in("x1") request,
-            in("x2") arg,
-            lateout("x0") ret,
-            options(nostack)
-        );
-    }
-    ret as isize
+    arch::syscall3(SYS_IOCTL, fd as u64, request, arg as u64) as isize
 }

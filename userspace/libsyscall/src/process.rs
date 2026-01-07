@@ -1,4 +1,7 @@
 //! Process management
+//! TEAM_275: Refactored to use arch::syscallN
+
+use crate::arch;
 use crate::sysno::{
     SYS_CLONE, SYS_EXEC, SYS_EXIT, SYS_GETPID, SYS_GETPPID, SYS_GET_FOREGROUND, SYS_SET_FOREGROUND,
     SYS_SET_TID_ADDRESS, SYS_SHUTDOWN, SYS_SPAWN, SYS_SPAWN_ARGS, SYS_WAITPID,
@@ -39,44 +42,19 @@ pub struct ArgvEntry {
 /// * `code` - Exit code (0 = success)
 #[inline]
 pub fn exit(code: i32) -> ! {
-    unsafe {
-        core::arch::asm!(
-            "svc #0",
-            in("x8") SYS_EXIT,
-            in("x0") code,
-            options(noreturn, nostack)
-        );
-    }
+    arch::syscall_exit(SYS_EXIT, code as u64)
 }
 
 /// Get current process ID.
 #[inline]
 pub fn getpid() -> i64 {
-    let ret: i64;
-    unsafe {
-        core::arch::asm!(
-            "svc #0",
-            in("x8") SYS_GETPID,
-            lateout("x0") ret,
-            options(nostack)
-        );
-    }
-    ret
+    arch::syscall0(SYS_GETPID)
 }
 
 /// TEAM_217: Get parent process ID.
 #[inline]
 pub fn getppid() -> i64 {
-    let ret: i64;
-    unsafe {
-        core::arch::asm!(
-            "svc #0",
-            in("x8") SYS_GETPPID,
-            lateout("x0") ret,
-            options(nostack)
-        );
-    }
-    ret
+    arch::syscall0(SYS_GETPPID)
 }
 
 /// TEAM_228: Create a new thread (clone syscall).
@@ -88,54 +66,26 @@ pub fn clone(
     tls: usize,
     child_tid: *mut i32,
 ) -> isize {
-    let ret: i64;
-    unsafe {
-        core::arch::asm!(
-            "svc #0",
-            in("x8") SYS_CLONE,
-            in("x0") flags,
-            in("x1") stack,
-            in("x2") parent_tid,
-            in("x3") tls,
-            in("x4") child_tid,
-            lateout("x0") ret,
-            options(nostack)
-        );
-    }
-    ret as isize
+    arch::syscall5(
+        SYS_CLONE,
+        flags,
+        stack as u64,
+        parent_tid as u64,
+        tls as u64,
+        child_tid as u64,
+    ) as isize
 }
 
 /// TEAM_228: Set pointer to thread ID (cleared on exit).
 #[inline]
 pub fn set_tid_address(tidptr: *mut i32) -> isize {
-    let ret: i64;
-    unsafe {
-        core::arch::asm!(
-            "svc #0",
-            in("x8") SYS_SET_TID_ADDRESS,
-            in("x0") tidptr,
-            lateout("x0") ret,
-            options(nostack)
-        );
-    }
-    ret as isize
+    arch::syscall1(SYS_SET_TID_ADDRESS, tidptr as u64) as isize
 }
 
 /// Spawn a new process from a path.
 #[inline]
 pub fn spawn(path: &str) -> isize {
-    let ret: i64;
-    unsafe {
-        core::arch::asm!(
-            "svc #0",
-            in("x8") SYS_SPAWN,
-            in("x0") path.as_ptr(),
-            in("x1") path.len(),
-            lateout("x0") ret,
-            options(nostack)
-        );
-    }
-    ret as isize
+    arch::syscall2(SYS_SPAWN, path.as_ptr() as u64, path.len() as u64) as isize
 }
 
 /// TEAM_186: Spawn a process with command-line arguments.
@@ -154,101 +104,45 @@ pub fn spawn_args(path: &str, argv: &[&str]) -> isize {
         };
     }
 
-    let ret: i64;
-    unsafe {
-        core::arch::asm!(
-            "svc #0",
-            in("x8") SYS_SPAWN_ARGS,
-            in("x0") path.as_ptr(),
-            in("x1") path.len(),
-            in("x2") entries.as_ptr(),
-            in("x3") argc,
-            lateout("x0") ret,
-            options(nostack)
-        );
-    }
-    ret as isize
+    arch::syscall4(
+        SYS_SPAWN_ARGS,
+        path.as_ptr() as u64,
+        path.len() as u64,
+        entries.as_ptr() as u64,
+        argc as u64,
+    ) as isize
 }
 
 /// Replace current process with a new one from a path.
 #[inline]
 pub fn exec(path: &str) -> isize {
-    let ret: i64;
-    unsafe {
-        core::arch::asm!(
-            "svc #0",
-            in("x8") SYS_EXEC,
-            in("x0") path.as_ptr(),
-            in("x1") path.len(),
-            lateout("x0") ret,
-            options(nostack)
-        );
-    }
-    ret as isize
+    arch::syscall2(SYS_EXEC, path.as_ptr() as u64, path.len() as u64) as isize
 }
 
 /// TEAM_188: Wait for a child process to exit.
 #[inline]
 pub fn waitpid(pid: i32, status: Option<&mut i32>) -> isize {
     let status_ptr = match status {
-        Some(s) => s as *mut i32 as usize,
+        Some(s) => s as *mut i32 as u64,
         None => 0,
     };
-
-    let ret: i64;
-    unsafe {
-        core::arch::asm!(
-            "svc #0",
-            in("x8") SYS_WAITPID,
-            in("x0") pid,
-            in("x1") status_ptr,
-            lateout("x0") ret,
-            options(nostack)
-        );
-    }
-    ret as isize
+    arch::syscall2(SYS_WAITPID, pid as u64, status_ptr) as isize
 }
 
 /// TEAM_220: Set the foreground process for shell control.
 #[inline]
 pub fn set_foreground(pid: usize) -> isize {
-    let ret: i64;
-    unsafe {
-        core::arch::asm!(
-            "svc #0",
-            in("x8") SYS_SET_FOREGROUND,
-            in("x0") pid,
-            lateout("x0") ret,
-            options(nostack)
-        );
-    }
-    ret as isize
+    arch::syscall1(SYS_SET_FOREGROUND, pid as u64) as isize
 }
 
 /// TEAM_244: Get the foreground process PID.
 #[inline]
 pub fn get_foreground() -> isize {
-    let ret: i64;
-    unsafe {
-        core::arch::asm!(
-            "svc #0",
-            in("x8") SYS_GET_FOREGROUND,
-            lateout("x0") ret,
-            options(nostack)
-        );
-    }
-    ret as isize
+    arch::syscall0(SYS_GET_FOREGROUND) as isize
 }
 
 /// TEAM_142: Graceful system shutdown.
 #[inline]
 pub fn shutdown(flags: u32) -> ! {
-    unsafe {
-        core::arch::asm!(
-            "svc #0",
-            in("x8") SYS_SHUTDOWN,
-            in("x0") flags,
-            options(noreturn, nostack)
-        );
-    }
+    arch::syscall_exit(SYS_SHUTDOWN, flags as u64)
 }
