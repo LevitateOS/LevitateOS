@@ -3,6 +3,7 @@
 //! Per-process file descriptor management for syscalls.
 //! Supports stdin/stdout/stderr (fd 0/1/2), initramfs files, and tmpfs files.
 
+use alloc::sync::Arc;
 use alloc::vec::Vec;
 use los_hal::IrqSafeLock;
 
@@ -17,7 +18,6 @@ use crate::fs::vfs::file::FileRef;
 /// TEAM_195: Removed Debug derive since Mutex<TmpfsNode> doesn't implement Debug.
 /// TEAM_203: Added VfsFile variant and removed legacy Tmpfs variants.
 /// TEAM_233: Added PipeRead and PipeWrite variants for pipe support.
-#[derive(Clone)]
 pub enum FdType {
     /// Standard input (keyboard)
     Stdin,
@@ -31,6 +31,41 @@ pub enum FdType {
     PipeRead(PipeRef),
     /// TEAM_233: Write end of a pipe
     PipeWrite(PipeRef),
+    /// TEAM_247: PTY Master side
+    PtyMaster(Arc<crate::fs::tty::pty::PtyPair>),
+    /// TEAM_247: PTY Slave side
+    PtySlave(Arc<crate::fs::tty::pty::PtyPair>),
+}
+
+impl Clone for FdType {
+    fn clone(&self) -> Self {
+        match self {
+            FdType::Stdin => FdType::Stdin,
+            FdType::Stdout => FdType::Stdout,
+            FdType::Stderr => FdType::Stderr,
+            FdType::VfsFile(f) => FdType::VfsFile(f.clone()),
+            FdType::PipeRead(p) => {
+                p.inc_read();
+                FdType::PipeRead(p.clone())
+            }
+            FdType::PipeWrite(p) => {
+                p.inc_write();
+                FdType::PipeWrite(p.clone())
+            }
+            FdType::PtyMaster(p) => FdType::PtyMaster(p.clone()),
+            FdType::PtySlave(p) => FdType::PtySlave(p.clone()),
+        }
+    }
+}
+
+impl Drop for FdType {
+    fn drop(&mut self) {
+        match self {
+            FdType::PipeRead(p) => p.close_read(),
+            FdType::PipeWrite(p) => p.close_write(),
+            _ => {}
+        }
+    }
 }
 
 /// TEAM_168: A single file descriptor entry.
@@ -57,6 +92,7 @@ impl FdEntry {
 
 /// TEAM_168: Per-process file descriptor table.
 /// TEAM_195: Removed Debug derive since FdEntry no longer implements Debug.
+#[derive(Clone)]
 pub struct FdTable {
     /// Sparse array of file descriptors (None = unused slot)
     entries: Vec<Option<FdEntry>>,
@@ -114,17 +150,19 @@ impl FdTable {
     /// Returns true if fd was valid and closed, false otherwise.
     pub fn close(&mut self, fd: usize) -> bool {
         if let Some(slot) = self.entries.get_mut(fd) {
-            if let Some(entry) = slot.take() {
-                // TEAM_240: Notify pipe when closing pipe fds
-                match &entry.fd_type {
-                    FdType::PipeRead(pipe) => pipe.close_read(),
-                    FdType::PipeWrite(pipe) => pipe.close_write(),
-                    _ => {}
-                }
+            if slot.take().is_some() {
+                // Entry dropped -> FdType dropped -> refcount decremented
                 return true;
             }
         }
         false
+    }
+
+    /// TEAM_333: Close all file descriptors (for process exit).
+    pub fn close_all(&mut self) {
+        for slot in self.entries.iter_mut() {
+            slot.take(); // Drops entry -> decrements refcounts
+        }
     }
 
     /// TEAM_168: Check if a file descriptor is valid.
@@ -163,14 +201,8 @@ impl FdTable {
             self.entries.push(None);
         }
 
-        // TEAM_240: Close newfd if open (with proper pipe cleanup)
-        if let Some(entry) = self.entries[newfd].take() {
-            match &entry.fd_type {
-                FdType::PipeRead(pipe) => pipe.close_read(),
-                FdType::PipeWrite(pipe) => pipe.close_write(),
-                _ => {}
-            }
-        }
+        // TEAM_240: Close newfd if open (will trigger Drop and cleanup)
+        let _ = self.entries[newfd].take();
 
         // Set newfd to point to same fd_type
         self.entries[newfd] = Some(FdEntry::new(fd_type));

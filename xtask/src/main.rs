@@ -24,6 +24,10 @@ mod tests;
 struct Cli {
     #[command(subcommand)]
     command: Commands,
+
+    /// Target architecture
+    #[arg(long, global = true, default_value = "aarch64")]
+    arch: String,
 }
 
 #[derive(Subcommand)]
@@ -56,6 +60,11 @@ struct TestArgs {
 
 fn main() -> Result<()> {
     let cli = Cli::parse();
+    let arch = cli.arch.as_str();
+
+    if arch != "aarch64" && arch != "x86_64" {
+        bail!("Unsupported architecture: {}. Use 'aarch64' or 'x86_64'", arch);
+    }
 
     // Ensure we're in project root
     let project_root = project_root()?;
@@ -64,63 +73,73 @@ fn main() -> Result<()> {
     match cli.command {
         Commands::Test(args) => match args.suite.as_str() {
             "all" => {
-                println!("🧪 Running COMPLETE test suite...\n");
+                println!("🧪 Running COMPLETE test suite for {}...\n", arch);
                 tests::unit::run()?;
-                tests::behavior::run()?;
-                tests::behavior::run_gicv3().unwrap_or_else(|_| {
-                    println!("⚠️  GICv3 behavior differs (expected, needs separate golden file)\n");
-                });
+                tests::behavior::run(arch)?;
+                if arch == "aarch64" {
+                    tests::behavior::run_gicv3().unwrap_or_else(|_| {
+                        println!("⚠️  GICv3 behavior differs (expected, needs separate golden file)\n");
+                    });
+                }
                 tests::regression::run()?;
                 // TEAM_142: Shutdown test is interactive, run separately
                 println!("\n✅ COMPLETE test suite finished!");
                 println!("ℹ️  Run 'cargo xtask test shutdown' separately for shutdown golden file test");
             }
             "unit" => tests::unit::run()?,
-            "behavior" => tests::behavior::run()?,
+            "behavior" => tests::behavior::run(arch)?,
             "regress" | "regression" => tests::regression::run()?,
-            "gicv3" => tests::behavior::run_gicv3()?,
-            "serial" => tests::serial_input::run()?,
-            "keyboard" => tests::keyboard_input::run()?,
-            "shutdown" => tests::shutdown::run()?,
+            "gicv3" => {
+                if arch != "aarch64" {
+                    bail!("GICv3 tests only supported on aarch64");
+                }
+                tests::behavior::run_gicv3()?
+            },
+            "serial" => tests::serial_input::run(arch)?,
+            "keyboard" => tests::keyboard_input::run(arch)?,
+            "shutdown" => tests::shutdown::run(arch)?,
             other => bail!("Unknown test suite: {}. Use 'unit', 'behavior', 'regress', 'gicv3', 'serial', 'keyboard', 'shutdown', or 'all'", other),
         },
         Commands::Clean => {
-            clean::clean()?;
+            clean::clean(arch)?;
         },
         Commands::Kill => {
-            clean::kill_qemu()?;
+            clean::kill_qemu(arch)?;
         },
         Commands::Build(cmd) => match cmd {
-            build::BuildCommands::All => build::build_all()?,
-            build::BuildCommands::Kernel => build::build_kernel_only()?,
+            build::BuildCommands::All => build::build_all(arch)?,
+            build::BuildCommands::Kernel => build::build_kernel_only(arch)?,
             build::BuildCommands::Userspace { .. } => {
-                build::build_userspace()?;
-                build::create_initramfs()?;
+                build::build_userspace(arch)?;
+                build::create_initramfs(arch)?;
             }
         },
         Commands::Run(cmd) => match cmd {
             run::RunCommands::Default => {
-                build::build_all()?;
-                run::run_qemu(run::QemuProfile::Default, false)?;
+                build::build_all(arch)?;
+                run::run_qemu(run::QemuProfile::Default, false, arch)?;
             }
             run::RunCommands::Pixel6 => {
+                if arch != "aarch64" {
+                    bail!("Pixel 6 profile only supported on aarch64");
+                }
                 println!("🎯 Running with Pixel 6 profile (8GB RAM, 8 cores)");
-                build::build_all()?;
-                run::run_qemu(run::QemuProfile::Pixel6, false)?;
+                build::build_all(arch)?;
+                run::run_qemu(run::QemuProfile::Pixel6, false, arch)?;
             }
             run::RunCommands::Vnc => {
-                run::run_qemu_vnc()?;
+                run::run_qemu_vnc(arch)?;
             }
             run::RunCommands::Term => {
-                run::run_qemu_term()?;
+                run::run_qemu_term(arch)?;
             }
             run::RunCommands::Test => {
-                run::run_qemu_test()?;
+                run::run_qemu_test(arch)?;
             }
         },
         Commands::Image(cmd) => match cmd {
             image::ImageCommands::Create => image::create_disk_image_if_missing()?,
-            image::ImageCommands::Install => image::install_userspace_to_disk()?,
+            image::ImageCommands::Install => image::install_userspace_to_disk(arch)?,
             image::ImageCommands::Screenshot { output } => {
                 println!("📸 Dumping GPU screen to {}...", output);
                 let mut client = qmp::QmpClient::connect("./qmp.sock")?;
@@ -149,9 +168,14 @@ fn project_root() -> Result<PathBuf> {
     }
 }
 
-pub fn get_binaries() -> Result<Vec<String>> {
+pub fn get_binaries(arch: &str) -> Result<Vec<String>> {
     let mut bins = Vec::new();
-    let release_dir = PathBuf::from("userspace/target/aarch64-unknown-none/release");
+    let target = match arch {
+        "aarch64" => "aarch64-unknown-none",
+        "x86_64" => "x86_64-unknown-none",
+        _ => bail!("Unsupported architecture: {}", arch),
+    };
+    let release_dir = PathBuf::from(format!("userspace/target/{}/release", target));
     if !release_dir.exists() {
         return Ok(bins);
     }

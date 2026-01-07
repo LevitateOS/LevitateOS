@@ -13,21 +13,32 @@ const GOLDEN_SHUTDOWN_FILE: &str = "tests/golden_shutdown.txt";
 const ACTUAL_SHUTDOWN_FILE: &str = "tests/actual_shutdown.txt";
 
 /// Run the shutdown behavior test
-pub fn run() -> Result<()> {
-    println!("=== Shutdown Behavior Test ===\n");
+pub fn run(arch: &str) -> Result<()> {
+    println!("=== Shutdown Behavior Test for {} ===\n", arch);
 
     // Build everything first
-    crate::build::build_kernel_verbose()?;
+    crate::build::build_kernel_verbose(arch)?;
+
+    let qemu_bin = match arch {
+        "aarch64" => "qemu-system-aarch64",
+        "x86_64" => "qemu-system-x86_64",
+        _ => bail!("Unsupported architecture: {}", arch),
+    };
 
     // Kill any existing QEMU
     let _ = Command::new("pkill")
-        .args(["-f", "qemu-system-aarch64"])
+        .args(["-f", qemu_bin])
         .status();
 
-    let kernel_bin = "kernel64_rust.bin";
+    let kernel_bin = if arch == "aarch64" {
+        "kernel64_rust.bin"
+    } else {
+        "target/x86_64-unknown-none/release/levitate-kernel"
+    };
+
     let args = vec![
-        "-M", "virt",
-        "-cpu", "cortex-a72",
+        "-M", if arch == "aarch64" { "virt" } else { "q35" },
+        "-cpu", if arch == "aarch64" { "cortex-a72" } else { "qemu64" },
         "-m", "512M",
         "-kernel", kernel_bin,
         "-nographic",
@@ -44,7 +55,7 @@ pub fn run() -> Result<()> {
     ];
 
     println!("Starting QEMU...");
-    let mut child = Command::new("qemu-system-aarch64")
+    let mut child = Command::new(qemu_bin)
         .args(&args)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())

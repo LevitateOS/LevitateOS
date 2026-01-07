@@ -28,6 +28,8 @@ pub enum QemuProfile {
     Pixel6,
     /// Test: GICv3 on default machine
     GicV3,
+    /// x86_64: 512MB RAM, 1 core, q35
+    X86_64,
 }
 
 impl QemuProfile {
@@ -36,6 +38,7 @@ impl QemuProfile {
             QemuProfile::Default => "virt".to_string(),
             QemuProfile::Pixel6 => "virt,gic-version=3".to_string(),
             QemuProfile::GicV3 => "virt,gic-version=3".to_string(),
+            QemuProfile::X86_64 => "q35".to_string(),
         }
     }
 
@@ -44,6 +47,7 @@ impl QemuProfile {
             QemuProfile::Default => "cortex-a53",
             QemuProfile::Pixel6 => "cortex-a76",
             QemuProfile::GicV3 => "cortex-a53",
+            QemuProfile::X86_64 => "qemu64",
         }
     }
 
@@ -52,6 +56,7 @@ impl QemuProfile {
             QemuProfile::Default => "512M",
             QemuProfile::Pixel6 => "8G",
             QemuProfile::GicV3 => "512M",
+            QemuProfile::X86_64 => "512M",
         }
     }
 
@@ -61,15 +66,27 @@ impl QemuProfile {
             QemuProfile::Default => None,
             QemuProfile::Pixel6 => Some("8"),
             QemuProfile::GicV3 => None,
+            QemuProfile::X86_64 => None,
         }
     }
 }
 
-pub fn run_qemu(profile: QemuProfile, headless: bool) -> Result<()> {
+pub fn run_qemu(profile: QemuProfile, headless: bool, arch: &str) -> Result<()> {
     image::create_disk_image_if_missing()?;
     // Userspace must be installed by build_all before this is called
 
-    let kernel_bin = "kernel64_rust.bin";
+    let kernel_bin = if arch == "aarch64" {
+        "kernel64_rust.bin"
+    } else {
+        // x86_64 uses the ELF binary directly for multiboot2
+        "target/x86_64-unknown-none/release/levitate-kernel"
+    };
+
+    let qemu_bin = match arch {
+        "aarch64" => "qemu-system-aarch64",
+        "x86_64" => "qemu-system-x86_64",
+        _ => bail!("Unsupported architecture: {}", arch),
+    };
 
     let machine = profile.machine();
     let mut args = vec![
@@ -101,7 +118,7 @@ pub fn run_qemu(profile: QemuProfile, headless: bool) -> Result<()> {
         args.extend(["-display", "gtk,zoom-to-fit=off,window-close=off", "-serial", "mon:stdio"]);
     }
 
-    Command::new("qemu-system-aarch64")
+    Command::new(qemu_bin)
         .args(&args)
         .stdout(Stdio::inherit())
         .stderr(Stdio::inherit())
@@ -112,12 +129,12 @@ pub fn run_qemu(profile: QemuProfile, headless: bool) -> Result<()> {
 }
 
 /// Run QEMU with VNC for browser-based GPU display verification.
-pub fn run_qemu_vnc() -> Result<()> {
+pub fn run_qemu_vnc(arch: &str) -> Result<()> {
     println!("🖥️  Starting QEMU with VNC for browser-based display verification...\n");
     
     image::create_disk_image_if_missing()?;
     // Build kernel first (implies userspace build + install)
-    build::build_all()?;
+    build::build_all(arch)?;
     
     // Check for noVNC
     let novnc_path = PathBuf::from("/tmp/novnc");
@@ -185,8 +202,23 @@ pub fn run_qemu_vnc() -> Result<()> {
     }
     
     // Run QEMU with VNC
-    let kernel_bin = "kernel64_rust.bin";
-    let profile = QemuProfile::Default;
+    let kernel_bin = if arch == "aarch64" {
+        "kernel64_rust.bin"
+    } else {
+        "target/x86_64-unknown-none/release/levitate-kernel"
+    };
+
+    let qemu_bin = match arch {
+        "aarch64" => "qemu-system-aarch64",
+        "x86_64" => "qemu-system-x86_64",
+        _ => bail!("Unsupported architecture: {}", arch),
+    };
+
+    let profile = if arch == "aarch64" {
+        QemuProfile::Default
+    } else {
+        QemuProfile::X86_64
+    };
     let machine = profile.machine();
     
     let mut args = vec![
@@ -213,7 +245,7 @@ pub fn run_qemu_vnc() -> Result<()> {
         args.extend(["-smp", smp]);
     }
     
-    let qemu_result = Command::new("qemu-system-aarch64")
+    let qemu_result = Command::new(qemu_bin)
         .args(&args)
         .stdout(Stdio::inherit())
         .stderr(Stdio::inherit())
@@ -268,16 +300,33 @@ fn find_websockify() -> Result<String> {
 
 /// TEAM_243: Run QEMU with test runner for automated OS testing.
 /// Builds test initramfs, runs headless, captures output, reports results.
-pub fn run_qemu_test() -> Result<()> {
-    println!("🧪 Running LevitateOS Internal Tests...\n");
+pub fn run_qemu_test(arch: &str) -> Result<()> {
+    println!("🧪 Running LevitateOS Internal Tests for {}...\n", arch);
 
     // Build everything including test runner
-    build::build_userspace()?;
-    build::create_test_initramfs()?;
-    build::build_kernel_verbose()?;
+    build::build_userspace(arch)?;
+    build::create_test_initramfs(arch)?;
+    build::build_kernel_verbose(arch)?;
     image::create_disk_image_if_missing()?;
 
-    let kernel_bin = "kernel64_rust.bin";
+    let kernel_bin = if arch == "aarch64" {
+        "kernel64_rust.bin"
+    } else {
+        "target/x86_64-unknown-none/release/levitate-kernel"
+    };
+
+    let qemu_bin = match arch {
+        "aarch64" => "qemu-system-aarch64",
+        "x86_64" => "qemu-system-x86_64",
+        _ => bail!("Unsupported architecture: {}", arch),
+    };
+
+    let profile = if arch == "aarch64" {
+        QemuProfile::Default
+    } else {
+        QemuProfile::X86_64
+    };
+
     let timeout_secs: u64 = 60;
 
     println!("Running QEMU (headless, {}s timeout)...\n", timeout_secs);
@@ -285,10 +334,10 @@ pub fn run_qemu_test() -> Result<()> {
     // Build QEMU args - headless, serial to stdout
     let args = vec![
         format!("{}s", timeout_secs),
-        "qemu-system-aarch64".to_string(),
-        "-M".to_string(), "virt".to_string(),
-        "-cpu".to_string(), "cortex-a53".to_string(),
-        "-m".to_string(), "512M".to_string(),
+        qemu_bin.to_string(),
+        "-M".to_string(), profile.machine().to_string(),
+        "-cpu".to_string(), profile.cpu().to_string(),
+        "-m".to_string(), profile.memory().to_string(),
         "-kernel".to_string(), kernel_bin.to_string(),
         "-display".to_string(), "none".to_string(),
         "-serial".to_string(), "stdio".to_string(),
@@ -331,9 +380,9 @@ pub fn run_qemu_test() -> Result<()> {
 /// TEAM_139: Run QEMU in terminal-only mode (WSL-like).
 /// No graphical window - keyboard input goes to terminal stdin.
 /// Ctrl+A X to exit, Ctrl+A C to switch to QEMU monitor.
-pub fn run_qemu_term() -> Result<()> {
+pub fn run_qemu_term(arch: &str) -> Result<()> {
     println!("╔════════════════════════════════════════════════════════════╗");
-    println!("║  LevitateOS Terminal Mode (WSL-like)                       ║");
+    println!("║  LevitateOS Terminal Mode (WSL-like) - {}               ║", arch);
     println!("║                                                            ║");
     println!("║  Type directly here - keyboard goes to VM                  ║");
     println!("║  Ctrl+A X to exit QEMU                                     ║");
@@ -341,13 +390,31 @@ pub fn run_qemu_term() -> Result<()> {
     println!("╚════════════════════════════════════════════════════════════╝\n");
 
     image::create_disk_image_if_missing()?;
-    build::build_all()?;
+    build::build_all(arch)?;
 
-    let kernel_bin = "kernel64_rust.bin";
+    let kernel_bin = if arch == "aarch64" {
+        "kernel64_rust.bin"
+    } else {
+        "target/x86_64-unknown-none/release/levitate-kernel"
+    };
+
+    let qemu_bin = match arch {
+        "aarch64" => "qemu-system-aarch64",
+        "x86_64" => "qemu-system-x86_64",
+        _ => bail!("Unsupported architecture: {}", arch),
+    };
+
+    let profile = if arch == "aarch64" {
+        QemuProfile::Default
+    } else {
+        QemuProfile::X86_64
+    };
+
+    let machine = profile.machine();
     let args = vec![
-        "-M", "virt",
-        "-cpu", "cortex-a72",
-        "-m", "1G",
+        "-M", machine.as_str(),
+        "-cpu", profile.cpu(),
+        "-m", profile.memory(),
         "-kernel", kernel_bin,
         "-nographic",  // No display, stdin goes to serial
         "-device", "virtio-gpu-pci,xres=1280,yres=800",
@@ -366,7 +433,7 @@ pub fn run_qemu_term() -> Result<()> {
     // Clean QMP socket
     let _ = std::fs::remove_file("./qmp.sock");
 
-    Command::new("qemu-system-aarch64")
+    Command::new(qemu_bin)
         .args(&args)
         .stdin(Stdio::inherit())
         .stdout(Stdio::inherit())

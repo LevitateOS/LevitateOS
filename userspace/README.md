@@ -19,7 +19,7 @@ cd userspace
 cargo build --release
 ```
 
-Binaries are output to `target/aarch64-unknown-none/release/`.
+Binaries are output to `target/aarch64-unknown-none/release/` or `target/x86_64-unknown-none/release/`.
 Note: Build relies on `build.rs` in each crate to set linker arguments.
 
 ## Adding to Initramfs

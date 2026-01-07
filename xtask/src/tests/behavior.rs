@@ -15,38 +15,47 @@ use crate::run::QemuProfile;
 
 const GOLDEN_FILE: &str = "tests/golden_boot.txt";
 const ACTUAL_FILE: &str = "tests/actual_boot.txt";
-const KERNEL_BIN: &str = "kernel64_rust.bin";
 const TIMEOUT_SECS: u64 = 15;
 
-pub fn run() -> Result<()> {
-    run_with_profile(QemuProfile::Default)
+pub fn run(arch: &str) -> Result<()> {
+    run_with_profile(QemuProfile::Default, arch)
 }
 
 /// Run behavior test with Pixel 6 profile (8GB, 8 cores)
 #[allow(dead_code)]
-pub fn run_pixel6() -> Result<()> {
-    run_with_profile(QemuProfile::Pixel6)
+pub fn run_pixel6(arch: &str) -> Result<()> {
+    if arch != "aarch64" {
+        bail!("Pixel 6 profile only supported on aarch64");
+    }
+    run_with_profile(QemuProfile::Pixel6, arch)
 }
 
 /// Run behavior test with GICv3 profile (TEAM_055)
 pub fn run_gicv3() -> Result<()> {
-    run_with_profile(QemuProfile::GicV3)
+    run_with_profile(QemuProfile::GicV3, "aarch64")
 }
 
-fn run_with_profile(profile: QemuProfile) -> Result<()> {
+fn run_with_profile(profile: QemuProfile, arch: &str) -> Result<()> {
     let profile_name = match profile {
-        QemuProfile::Default => "Default (512MB)",
+        QemuProfile::Default => "Default",
         QemuProfile::Pixel6 => "Pixel 6 (8GB, 8 cores)",
-        QemuProfile::GicV3 => "GICv3 Test (512MB)",
+        QemuProfile::GicV3 => "GICv3 Test",
+        QemuProfile::X86_64 => "x86_64",
     };
-    println!("=== Behavior Test [{}] ===\n", profile_name);
+    println!("=== Behavior Test [{} on {}] ===\n", profile_name, arch);
 
     // Build kernel with verbose feature for golden file comparison
-    crate::build::build_kernel_verbose()?;
+    crate::build::build_kernel_verbose(arch)?;
+
+    let qemu_bin = match arch {
+        "aarch64" => "qemu-system-aarch64",
+        "x86_64" => "qemu-system-x86_64",
+        _ => bail!("Unsupported architecture: {}", arch),
+    };
 
     // Kill any existing QEMU
     let _ = Command::new("pkill")
-        .args(["-f", "qemu-system-aarch64"])
+        .args(["-f", qemu_bin])
         .status();
 
     // Clean up previous run
@@ -54,14 +63,20 @@ fn run_with_profile(profile: QemuProfile) -> Result<()> {
 
     println!("Running QEMU (headless, {}s timeout)...", TIMEOUT_SECS);
 
+    let kernel_bin = if arch == "aarch64" {
+        "kernel64_rust.bin"
+    } else {
+        "target/x86_64-unknown-none/release/levitate-kernel"
+    };
+
     // Build QEMU args using profile
     let mut args = vec![
         format!("{}s", TIMEOUT_SECS),
-        "qemu-system-aarch64".to_string(),
+        qemu_bin.to_string(),
         "-M".to_string(), profile.machine().to_string(),
         "-cpu".to_string(), profile.cpu().to_string(),
         "-m".to_string(), profile.memory().to_string(),
-        "-kernel".to_string(), KERNEL_BIN.to_string(),
+        "-kernel".to_string(), kernel_bin.to_string(),
         "-display".to_string(), "none".to_string(),
         "-serial".to_string(), format!("file:{}", ACTUAL_FILE),
         "-device".to_string(), "virtio-gpu-pci".to_string(), // TEAM_114: PCI transport

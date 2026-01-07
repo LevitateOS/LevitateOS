@@ -29,6 +29,21 @@ pub fn cache_clean_range(start_va: usize, size: usize) {
         let _ = (start_va, size);
     }
 }
+pub mod traits;
+pub use traits::{InterruptController, MmuInterface, InterruptHandler};
+
+/// Get the active interrupt controller.
+pub fn active_interrupt_controller() -> &'static dyn InterruptController {
+    #[cfg(target_arch = "aarch64")]
+    {
+        gic::active_api()
+    }
+    #[cfg(not(target_arch = "aarch64"))]
+    {
+        unimplemented!("Interrupt controller not implemented for this architecture")
+    }
+}
+
 pub mod fdt;
 pub mod gic;
 pub mod interrupts;

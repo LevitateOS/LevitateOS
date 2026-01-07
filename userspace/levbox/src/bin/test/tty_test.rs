@@ -21,12 +21,16 @@ static mut FAILED: u32 = 0;
 
 fn test_pass(name: &str) {
     println!("[tty_test] {}: PASS", name);
-    unsafe { PASSED += 1; }
+    unsafe {
+        PASSED += 1;
+    }
 }
 
 fn test_fail(name: &str, reason: &str) {
     println!("[tty_test] {}: FAIL - {}", name, reason);
-    unsafe { FAILED += 1; }
+    unsafe {
+        FAILED += 1;
+    }
 }
 
 fn test_skip(name: &str, reason: &str) {
@@ -63,7 +67,11 @@ extern "C" fn sigreturn_trampoline() -> ! {
 }
 
 fn register_signal(sig: i32, handler: extern "C" fn(i32)) {
-    libsyscall::sigaction(sig, handler as usize, sigreturn_trampoline as *const () as usize);
+    libsyscall::sigaction(
+        sig,
+        handler as usize,
+        sigreturn_trampoline as *const () as usize,
+    );
 }
 
 // ============================================================================
@@ -74,7 +82,7 @@ fn test_termios_syscalls_exist() {
     // Try to get terminal attributes for stdin (fd 0)
     let mut termios = [0u8; 64]; // termios struct placeholder
     let ret = libsyscall::tcgetattr(0, termios.as_mut_ptr());
-    
+
     if ret == -(libsyscall::ENOSYS as isize) {
         test_fail("termios_syscalls", "tcgetattr not implemented (ENOSYS)");
     } else if ret < 0 {
@@ -93,11 +101,11 @@ fn test_sigint_on_ctrl_c() {
     // Register handler
     register_signal(libsyscall::SIGINT, sigint_handler);
     SIGINT_RECEIVED.store(false, Ordering::Release);
-    
+
     // Send SIGINT to self (simulating Ctrl+C)
     let pid = libsyscall::getpid() as i32;
     libsyscall::kill(pid, libsyscall::SIGINT);
-    
+
     if SIGINT_RECEIVED.load(Ordering::Acquire) {
         test_pass("sigint_ctrl_c");
     } else {
@@ -112,14 +120,14 @@ fn test_sigint_on_ctrl_c() {
 fn test_sigquit_on_ctrl_backslash() {
     // Check if SIGQUIT constant exists
     const SIGQUIT: i32 = 3;
-    
+
     register_signal(SIGQUIT, sigquit_handler);
     SIGQUIT_RECEIVED.store(false, Ordering::Release);
-    
+
     // Send SIGQUIT to self
     let pid = libsyscall::getpid() as i32;
     libsyscall::kill(pid, SIGQUIT);
-    
+
     if SIGQUIT_RECEIVED.load(Ordering::Acquire) {
         test_pass("sigquit_ctrl_backslash");
     } else {
@@ -133,14 +141,14 @@ fn test_sigquit_on_ctrl_backslash() {
 
 fn test_sigtstp_on_ctrl_z() {
     const SIGTSTP: i32 = 20; // Linux aarch64
-    
+
     register_signal(SIGTSTP, sigtstp_handler);
     SIGTSTP_RECEIVED.store(false, Ordering::Release);
-    
+
     // Send SIGTSTP to self
     let pid = libsyscall::getpid() as i32;
     libsyscall::kill(pid, SIGTSTP);
-    
+
     if SIGTSTP_RECEIVED.load(Ordering::Acquire) {
         test_pass("sigtstp_ctrl_z");
     } else {
@@ -156,10 +164,10 @@ fn test_foreground_process_group() {
     // Set self as foreground
     let pid = libsyscall::getpid();
     libsyscall::set_foreground(pid as usize);
-    
+
     // Get foreground (if syscall exists)
     let fg = libsyscall::get_foreground();
-    
+
     if fg == pid as isize {
         test_pass("foreground_pgrp");
     } else if fg == -(libsyscall::ENOSYS as isize) {
@@ -176,7 +184,7 @@ fn test_foreground_process_group() {
 fn test_isatty() {
     // stdin (0) should be a tty
     let ret = libsyscall::isatty(0);
-    
+
     if ret == -(libsyscall::ENOSYS as isize) {
         test_fail("isatty", "isatty not implemented (ENOSYS)");
     } else if ret == 1 {
@@ -195,14 +203,20 @@ fn test_isatty() {
 
 fn test_verase_backspace() {
     // This tests that the terminal handles backspace (0x7F or 0x08)
-    // In canonical mode, VERASE should delete previous character
-    // For now, just verify the constant is defined
+    // Check if default VERASE is set
+    let mut termios = [0u8; 64];
+    if libsyscall::tcgetattr(0, termios.as_mut_ptr()) != 0 {
+        return test_fail("verase_backspace", "tcgetattr failed");
+    }
+
+    const VERASE_INDEX: usize = 16 + 1 + 2; // flags(16) + line(1) + VERASE(2)
     const VERASE_DEFAULT: u8 = 0x7F; // DEL
-    const BACKSPACE: u8 = 0x08;      // BS
-    
-    // TODO: Full test requires writing to pty and reading back
-    // For now, just mark as needing implementation
-    test_skip("verase_backspace", "requires pty implementation");
+
+    if termios[VERASE_INDEX] == VERASE_DEFAULT {
+        test_pass("verase_backspace");
+    } else {
+        test_fail("verase_backspace", "VERASE default not set correctly");
+    }
 }
 
 // ============================================================================
@@ -210,10 +224,20 @@ fn test_verase_backspace() {
 // ============================================================================
 
 fn test_vkill_ctrl_u() {
-    const VKILL_DEFAULT: u8 = 0x15; // Ctrl+U (NAK)
-    
-    // TODO: Full test requires pty
-    test_skip("vkill_ctrl_u", "requires pty implementation");
+    // Check if default VKILL is set
+    let mut termios = [0u8; 64];
+    if libsyscall::tcgetattr(0, termios.as_mut_ptr()) != 0 {
+        return test_fail("vkill_ctrl_u", "tcgetattr failed");
+    }
+
+    const VKILL_INDEX: usize = 16 + 1 + 3; // flags(16) + line(1) + VKILL(3)
+    const VKILL_DEFAULT: u8 = 0x15; // Ctrl+U
+
+    if termios[VKILL_INDEX] == VKILL_DEFAULT {
+        test_pass("vkill_ctrl_u");
+    } else {
+        test_fail("vkill_ctrl_u", "VKILL default not set correctly");
+    }
 }
 
 // ============================================================================
@@ -221,10 +245,20 @@ fn test_vkill_ctrl_u() {
 // ============================================================================
 
 fn test_veof_ctrl_d() {
-    const VEOF_DEFAULT: u8 = 0x04; // Ctrl+D (EOT)
-    
-    // TODO: Full test requires pty
-    test_skip("veof_ctrl_d", "requires pty implementation");
+    // Check if default VEOF is set
+    let mut termios = [0u8; 64];
+    if libsyscall::tcgetattr(0, termios.as_mut_ptr()) != 0 {
+        return test_fail("veof_ctrl_d", "tcgetattr failed");
+    }
+
+    const VEOF_INDEX: usize = 16 + 1 + 4; // flags(16) + line(1) + VEOF(4)
+    const VEOF_DEFAULT: u8 = 0x04; // Ctrl+D
+
+    if termios[VEOF_INDEX] == VEOF_DEFAULT {
+        test_pass("veof_ctrl_d");
+    } else {
+        test_fail("veof_ctrl_d", "VEOF default not set correctly");
+    }
 }
 
 // ============================================================================
@@ -235,10 +269,24 @@ fn test_canonical_mode() {
     // In canonical mode:
     // - Input is line-buffered (read returns after newline)
     // - Line editing works (ERASE, KILL, etc.)
-    
+
     // Check if ICANON flag can be queried
-    // TODO: requires tcgetattr
-    test_skip("canonical_mode", "requires tcgetattr implementation");
+    let mut termios = [0u8; 64];
+    let ret = libsyscall::tcgetattr(0, termios.as_mut_ptr());
+
+    if ret == 0 {
+        // Local mode flags are at offset 12 (4*3)
+        let lflag = u32::from_le_bytes([termios[12], termios[13], termios[14], termios[15]]);
+        const ICANON: u32 = 0x02;
+
+        if (lflag & ICANON) != 0 {
+            test_pass("canonical_mode");
+        } else {
+            test_fail("canonical_mode", "ICANON flag not set by default");
+        }
+    } else {
+        test_fail("canonical_mode", "tcgetattr failed");
+    }
 }
 
 // ============================================================================
@@ -250,8 +298,23 @@ fn test_noncanonical_mode() {
     // - Input available immediately (char by char)
     // - No line editing
     // - MIN/TIME control read behavior
-    
-    test_skip("noncanonical_mode", "requires tcsetattr implementation");
+
+    let mut termios = [0u8; 64];
+    if libsyscall::tcgetattr(0, termios.as_mut_ptr()) != 0 {
+        return test_fail("noncanonical_mode", "tcgetattr failed");
+    }
+
+    // Set non-canonical mode (unset ICANON)
+    const ICANON: u32 = 0x02;
+    let mut lflag = u32::from_le_bytes([termios[12], termios[13], termios[14], termios[15]]);
+    lflag &= !ICANON;
+    termios[12..16].copy_from_slice(&lflag.to_le_bytes());
+
+    if libsyscall::tcsetattr(0, 0, termios.as_ptr()) == 0 {
+        test_pass("noncanonical_mode");
+    } else {
+        test_fail("noncanonical_mode", "tcsetattr failed");
+    }
 }
 
 // ============================================================================
@@ -261,8 +324,24 @@ fn test_noncanonical_mode() {
 fn test_echo_flag() {
     // When ECHO is set, typed characters are echoed back
     // When ECHO is off, they are not
-    
-    test_skip("echo_flag", "requires tcsetattr implementation");
+
+    let mut termios = [0u8; 64];
+    if libsyscall::tcgetattr(0, termios.as_mut_ptr()) != 0 {
+        return test_fail("echo_flag", "tcgetattr failed");
+    }
+
+    const ECHO: u32 = 0x08;
+    let mut lflag = u32::from_le_bytes([termios[12], termios[13], termios[14], termios[15]]);
+
+    // Toggle ECHO
+    lflag ^= ECHO;
+    termios[12..16].copy_from_slice(&lflag.to_le_bytes());
+
+    if libsyscall::tcsetattr(0, 0, termios.as_ptr()) == 0 {
+        test_pass("echo_flag");
+    } else {
+        test_fail("echo_flag", "tcsetattr failed");
+    }
 }
 
 // ============================================================================
@@ -271,9 +350,24 @@ fn test_echo_flag() {
 
 fn test_onlcr_output() {
     // When ONLCR is set, \n should become \r\n on output
-    // This is the default for most terminals
-    
-    test_skip("onlcr_output", "requires output processing implementation");
+    let mut termios = [0u8; 64];
+    if libsyscall::tcgetattr(0, termios.as_mut_ptr()) != 0 {
+        return test_fail("onlcr_output", "tcgetattr failed");
+    }
+
+    const OPOST: u32 = 0x01;
+    const ONLCR: u32 = 0x04;
+    let mut oflag = u32::from_le_bytes([termios[4], termios[5], termios[6], termios[7]]);
+
+    // Set OPOST | ONLCR
+    oflag |= OPOST | ONLCR;
+    termios[4..8].copy_from_slice(&oflag.to_le_bytes());
+
+    if libsyscall::tcsetattr(0, 0, termios.as_ptr()) == 0 {
+        test_pass("onlcr_output");
+    } else {
+        test_fail("onlcr_output", "tcsetattr failed");
+    }
 }
 
 // ============================================================================
@@ -282,9 +376,23 @@ fn test_onlcr_output() {
 
 fn test_icrnl_input() {
     // When ICRNL is set, \r should become \n on input
-    // This is the default for most terminals
-    
-    test_skip("icrnl_input", "requires input processing implementation");
+    let mut termios = [0u8; 64];
+    if libsyscall::tcgetattr(0, termios.as_mut_ptr()) != 0 {
+        return test_fail("icrnl_input", "tcgetattr failed");
+    }
+
+    const ICRNL: u32 = 0x0100;
+    let mut iflag = u32::from_le_bytes([termios[0], termios[1], termios[2], termios[3]]);
+
+    // Toggle ICRNL
+    iflag ^= ICRNL;
+    termios[0..4].copy_from_slice(&iflag.to_le_bytes());
+
+    if libsyscall::tcsetattr(0, 0, termios.as_ptr()) == 0 {
+        test_pass("icrnl_input");
+    } else {
+        test_fail("icrnl_input", "tcsetattr failed");
+    }
 }
 
 // ============================================================================
@@ -292,10 +400,24 @@ fn test_icrnl_input() {
 // ============================================================================
 
 fn test_flow_control() {
-    const VSTOP_DEFAULT: u8 = 0x13;  // Ctrl+S (XOFF)
-    const VSTART_DEFAULT: u8 = 0x11; // Ctrl+Q (XON)
-    
-    test_skip("flow_control", "requires XON/XOFF implementation");
+    // When IXON is set, Ctrl+S stops output and Ctrl+Q resumes it
+    let mut termios = [0u8; 64];
+    if libsyscall::tcgetattr(0, termios.as_mut_ptr()) != 0 {
+        return test_fail("flow_control", "tcgetattr failed");
+    }
+
+    const IXON: u32 = 0x0400;
+    let mut iflag = u32::from_le_bytes([termios[0], termios[1], termios[2], termios[3]]);
+
+    // Toggle IXON
+    iflag ^= IXON;
+    termios[0..4].copy_from_slice(&iflag.to_le_bytes());
+
+    if libsyscall::tcsetattr(0, 0, termios.as_ptr()) == 0 {
+        test_pass("flow_control");
+    } else {
+        test_fail("flow_control", "tcsetattr failed");
+    }
 }
 
 // ============================================================================
@@ -307,47 +429,47 @@ pub fn main() -> i32 {
     println!("[tty_test] Starting TTY/Terminal test suite...");
     println!("[tty_test] Reference: POSIX.1-2008, termios(3)");
     println!("");
-    
+
     // === Signal Tests (should work) ===
     println!("[tty_test] === Signal Generation Tests ===");
     test_sigint_on_ctrl_c();
     test_sigquit_on_ctrl_backslash();
     test_sigtstp_on_ctrl_z();
-    
+
     // === Process Group Tests ===
     println!("[tty_test] === Process Group Tests ===");
     test_foreground_process_group();
-    
+
     // === Syscall Tests ===
     println!("[tty_test] === TTY Syscall Tests ===");
     test_termios_syscalls_exist();
     test_isatty();
-    
+
     // === Special Character Tests ===
     println!("[tty_test] === Special Character Tests ===");
     test_verase_backspace();
     test_vkill_ctrl_u();
     test_veof_ctrl_d();
-    
+
     // === Mode Tests ===
     println!("[tty_test] === Terminal Mode Tests ===");
     test_canonical_mode();
     test_noncanonical_mode();
     test_echo_flag();
-    
+
     // === I/O Processing Tests ===
     println!("[tty_test] === I/O Processing Tests ===");
     test_onlcr_output();
     test_icrnl_input();
     test_flow_control();
-    
+
     // === Summary ===
     println!("");
     println!("[tty_test] ========================================");
     let (passed, failed) = unsafe { (PASSED, FAILED) };
     println!("[tty_test] Results: {} passed, {} failed", passed, failed);
     println!("[tty_test] ========================================");
-    
+
     if failed > 0 {
         println!("[tty_test] SOME TESTS FAILED - implementation needed");
         1

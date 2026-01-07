@@ -1,5 +1,11 @@
 # Design: x86_64 Support
 
+## Hardware Target: Intel NUC
+- **CPU**: Intel Core i3 (7th Gen)
+- **RAM**: 32GB
+- **Storage**: 1TB NVMe (Requires NVMe driver support)
+- **Interrupts**: Local & I/O APIC
+
 ## Overview
 This document outlines the design for porting LevitateOS to the x86_64 architecture. The design mirrors the existing AArch64 abstraction but adheres to x86_64 specific hardware structures and the System V AMD64 ABI.
 

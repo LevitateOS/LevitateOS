@@ -51,12 +51,8 @@ pub extern "C" fn task_exit() -> ! {
     scheduler::SCHEDULER.schedule();
 
     // If we return here, no other tasks are ready - enter idle
-    // TEAM_132: Migrate wfi to aarch64-cpu
     loop {
-        #[cfg(target_arch = "aarch64")]
-        aarch64_cpu::asm::wfi();
-        #[cfg(not(target_arch = "aarch64"))]
-        core::hint::spin_loop();
+        crate::arch::cpu::wait_for_interrupt();
     }
 }
 
@@ -275,6 +271,7 @@ impl From<UserTask> for TaskControlBlock {
         let user_sp = user.user_sp;
         let user_entry = user.entry_point;
         let heap = user.heap; // TEAM_166: Preserve heap state
+        let fd_table = user.fd_table; // TEAM_250: Preserve inherited FD table
 
         // Set up context for first switch
         let context = Context::new(stack_top, user_task_entry_wrapper as *const () as usize);
@@ -290,7 +287,7 @@ impl From<UserTask> for TaskControlBlock {
             user_sp,
             user_entry,
             heap: IrqSafeLock::new(heap), // TEAM_166: Wrap in lock for syscall access
-            fd_table: fd_table::new_shared_fd_table(), // TEAM_168: Fresh fd table for user process
+            fd_table,                     // TEAM_250: Use inherited fd table
             // TEAM_192: New user processes start in root for now
             // TODO: Inherit from parent once fork/spawn inherit TCB fields
             cwd: IrqSafeLock::new(String::from("/")),

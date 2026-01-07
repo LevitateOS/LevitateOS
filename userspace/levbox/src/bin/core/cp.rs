@@ -12,7 +12,7 @@ extern crate ulib;
 use alloc::vec::Vec;
 use libsyscall::println;
 use ulib::fs::File;
-use ulib::io::Read;
+use ulib::io::{Read, Write};
 
 // ============================================================================
 // Help and Version

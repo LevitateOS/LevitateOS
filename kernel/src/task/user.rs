@@ -61,6 +61,7 @@ pub mod layout {
 }
 
 use crate::memory::heap::ProcessHeap;
+use crate::task::fd_table::SharedFdTable;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Pid(pub u64);
@@ -116,6 +117,9 @@ pub struct UserTask {
     /// TEAM_166: Process heap state for sbrk syscall
     pub heap: ProcessHeap,
 
+    /// TEAM_250: Inherited file descriptor table
+    pub fd_table: SharedFdTable,
+
     /// Exit code (set by exit syscall)
     #[allow(dead_code)]
     pub exit_code: i32,
@@ -137,7 +141,14 @@ impl UserTask {
     /// * `user_sp` - Initial user stack pointer
     /// * `ttbr0` - Physical address of user page table L0
     /// * `brk` - Initial program break (end of loaded segments)
-    pub fn new(entry_point: usize, user_sp: usize, ttbr0: usize, brk: usize) -> Self {
+    /// * `fd_table` - File descriptor table (inherited or new)
+    pub fn new(
+        entry_point: usize,
+        user_sp: usize,
+        ttbr0: usize,
+        brk: usize,
+        fd_table: SharedFdTable,
+    ) -> Self {
         // Allocate kernel stack for syscall handling
         let kernel_stack_size = 16384; // 16KB kernel stack
         let kernel_stack = vec![0u64; kernel_stack_size / 8].into_boxed_slice();
@@ -154,6 +165,7 @@ impl UserTask {
             user_sp,
             entry_point,
             heap, // TEAM_166: Replaces simple brk field
+            fd_table,
             exit_code: 0,
             kernel_stack,
             kernel_stack_top,

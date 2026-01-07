@@ -3,26 +3,38 @@
 //! TEAM_156: Tests that keyboard input is correctly received WITHOUT dropping characters.
 //! This test MUST FAIL if any characters are dropped.
 
+use anyhow::bail;
 use anyhow::{Context, Result};
 use std::io::{Read, Write};
 use std::process::{Command, Stdio};
 use std::time::{Duration, Instant};
 
 /// Test keyboard/serial input by sending characters and verifying EXACT echo
-pub fn run() -> Result<()> {
-    println!("⌨️  Testing keyboard input (strict, no drops allowed)...\n");
+pub fn run(arch: &str) -> Result<()> {
+    println!("⌨️  Testing keyboard input for {} (strict, no drops allowed)...\n", arch);
 
     // First build everything
-    crate::build::build_all()?;
+    crate::build::build_all(arch)?;
     crate::image::create_disk_image_if_missing()?;
 
     // Clean up
     let _ = std::fs::remove_file("./qmp.sock");
 
-    let kernel_bin = "kernel64_rust.bin";
+    let kernel_bin = if arch == "aarch64" {
+        "kernel64_rust.bin"
+    } else {
+        "target/x86_64-unknown-none/release/levitate-kernel"
+    };
+
+    let qemu_bin = match arch {
+        "aarch64" => "qemu-system-aarch64",
+        "x86_64" => "qemu-system-x86_64",
+        _ => bail!("Unsupported architecture: {}", arch),
+    };
+
     let args = vec![
-        "-M", "virt",
-        "-cpu", "cortex-a72",
+        "-M", if arch == "aarch64" { "virt" } else { "q35" },
+        "-cpu", if arch == "aarch64" { "cortex-a72" } else { "qemu64" },
         "-m", "1G",
         "-kernel", kernel_bin,
         "-nographic",
@@ -40,7 +52,7 @@ pub fn run() -> Result<()> {
     ];
 
     println!("  Starting QEMU...");
-    let mut child = Command::new("qemu-system-aarch64")
+    let mut child = Command::new(qemu_bin)
         .args(&args)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())

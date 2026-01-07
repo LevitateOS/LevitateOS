@@ -178,14 +178,7 @@ impl IrqId {
 }
 
 /// IRQ handler trait.
-/// TEAM_045: Replaces raw function pointers with trait objects for better state management.
-pub trait InterruptHandler: Send + Sync {
-    /// Called when interrupt fires
-    fn handle(&self, irq: u32);
-
-    /// Optional: called during registration
-    fn on_register(&self, _irq: u32) {}
-}
+pub use crate::traits::InterruptHandler;
 
 /// Static handler table (single-core assumption, set at boot).
 static mut HANDLERS: [Option<&'static dyn InterruptHandler>; MAX_HANDLERS] = [None; MAX_HANDLERS];
@@ -278,6 +271,40 @@ fn detect_gic_version(dist_base: usize) -> GicVersion {
         GicVersion::V3
     } else {
         GicVersion::V2
+    }
+}
+
+impl crate::traits::InterruptController for Gic {
+    fn init(&self) {
+        self.init();
+    }
+
+    fn enable_irq(&self, irq: u32) {
+        self.enable_irq(irq);
+    }
+
+    fn disable_irq(&self, irq: u32) {
+        self.disable_irq(irq);
+    }
+
+    fn acknowledge(&self) -> u32 {
+        self.acknowledge()
+    }
+
+    fn end_of_interrupt(&self, irq: u32) {
+        self.end_interrupt(irq);
+    }
+
+    fn is_spurious(&self, irq: u32) -> bool {
+        Self::is_spurious(irq)
+    }
+
+    fn register_handler(&self, irq: IrqId, handler: &'static dyn InterruptHandler) {
+        register_handler(irq, handler);
+    }
+
+    fn map_irq(&self, irq: IrqId) -> u32 {
+        irq.irq_number()
     }
 }
 

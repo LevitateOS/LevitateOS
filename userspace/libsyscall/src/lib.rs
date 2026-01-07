@@ -16,6 +16,18 @@ use core::panic::PanicInfo;
 // Reference: https://github.com/torvalds/linux/blob/master/include/uapi/asm-generic/unistd.h
 // ============================================================================
 
+/// Yield execution to another thread.
+#[inline]
+pub fn sched_yield() {
+    unsafe {
+        core::arch::asm!(
+            "svc #0",
+            in("x8") SYS_SCHED_YIELD,
+            options(nostack)
+        );
+    }
+}
+
 // Filesystem
 pub const SYS_GETCWD: u64 = 17;
 pub const SYS_MKDIRAT: u64 = 34;
@@ -98,8 +110,8 @@ pub const SYS_IOCTL: u64 = 29;
 pub const SYS_ISATTY: u64 = 1010; // Custom - Linux uses ioctl
 
 // TEAM_244: ioctl requests for TTY
-pub const TCGETS: u64 = 0x5401;  // tcgetattr
-pub const TCSETS: u64 = 0x5402;  // tcsetattr TCSANOW
+pub const TCGETS: u64 = 0x5401; // tcgetattr
+pub const TCSETS: u64 = 0x5402; // tcsetattr TCSANOW
 pub const TCSETSW: u64 = 0x5403; // tcsetattr TCSADRAIN
 pub const TCSETSF: u64 = 0x5404; // tcsetattr TCSAFLUSH
 
@@ -217,19 +229,26 @@ pub struct IoVec {
 /// Number of bytes read, or negative error code.
 #[inline]
 pub fn read(fd: usize, buf: &mut [u8]) -> isize {
-    let ret: i64;
-    unsafe {
-        core::arch::asm!(
-            "svc #0",
-            in("x8") SYS_READ,
-            in("x0") fd,
-            in("x1") buf.as_mut_ptr(),
-            in("x2") buf.len(),
-            lateout("x0") ret,
-            options(nostack)
-        );
+    loop {
+        let ret: i64;
+        unsafe {
+            core::arch::asm!(
+                "svc #0",
+                in("x8") SYS_READ,
+                in("x0") fd,
+                in("x1") buf.as_mut_ptr(),
+                in("x2") buf.len(),
+                lateout("x0") ret,
+                options(nostack)
+            );
+        }
+        if ret == -11 {
+            // EAGAIN
+            sched_yield();
+            continue;
+        }
+        return ret as isize;
     }
-    ret as isize
 }
 
 /// Write to a file descriptor.
@@ -242,19 +261,26 @@ pub fn read(fd: usize, buf: &mut [u8]) -> isize {
 /// Number of bytes written, or negative error code.
 #[inline]
 pub fn write(fd: usize, buf: &[u8]) -> isize {
-    let ret: i64;
-    unsafe {
-        core::arch::asm!(
-            "svc #0",
-            in("x8") SYS_WRITE,
-            in("x0") fd,
-            in("x1") buf.as_ptr(),
-            in("x2") buf.len(),
-            lateout("x0") ret,
-            options(nostack)
-        );
+    loop {
+        let ret: i64;
+        unsafe {
+            core::arch::asm!(
+                "svc #0",
+                in("x8") SYS_WRITE,
+                in("x0") fd,
+                in("x1") buf.as_ptr(),
+                in("x2") buf.len(),
+                lateout("x0") ret,
+                options(nostack)
+            );
+        }
+        if ret == -11 {
+            // EAGAIN
+            sched_yield();
+            continue;
+        }
+        return ret as isize;
     }
-    ret as isize
 }
 
 /// Exit the process.
@@ -1310,6 +1336,24 @@ pub fn get_foreground() -> isize {
 // TTY Syscalls (TEAM_244)
 // ============================================================================
 
+/// TEAM_247: Generic ioctl wrapper.
+#[inline]
+pub fn ioctl(fd: usize, request: u64, arg: usize) -> isize {
+    let ret: i64;
+    unsafe {
+        core::arch::asm!(
+            "svc #0",
+            in("x8") SYS_IOCTL,
+            in("x0") fd,
+            in("x1") request,
+            in("x2") arg,
+            lateout("x0") ret,
+            options(nostack)
+        );
+    }
+    ret as isize
+}
+
 /// TEAM_244: Get terminal attributes (POSIX tcgetattr).
 /// Returns 0 on success, negative error on failure.
 #[inline]
@@ -1334,9 +1378,9 @@ pub fn tcgetattr(fd: i32, termios_p: *mut u8) -> isize {
 #[inline]
 pub fn tcsetattr(fd: i32, optional_actions: i32, termios_p: *const u8) -> isize {
     let request = match optional_actions {
-        0 => TCSETS,   // TCSANOW
-        1 => TCSETSW,  // TCSADRAIN
-        2 => TCSETSF,  // TCSAFLUSH
+        0 => TCSETS,  // TCSANOW
+        1 => TCSETSW, // TCSADRAIN
+        2 => TCSETSF, // TCSAFLUSH
         _ => TCSETS,
     };
     let ret: i64;
@@ -1427,3 +1471,13 @@ impl core::fmt::Write for Stdout {
         Ok(())
     }
 }
+
+/// TEAM_250: Open flags for suite_test_core
+pub const O_RDONLY: u32 = 0;
+pub const O_WRONLY: u32 = 1;
+pub const O_RDWR: u32 = 2;
+pub const O_CREAT: u32 = 64;
+pub const O_EXCL: u32 = 128;
+pub const O_TRUNC: u32 = 512;
+pub const O_APPEND: u32 = 1024;
+pub const O_CLOEXEC: u32 = 0x80000;

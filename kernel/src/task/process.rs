@@ -8,6 +8,7 @@
 use crate::loader::elf::Elf;
 use crate::loader::elf::ElfError;
 use crate::memory::user as mm_user;
+use crate::task::fd_table::SharedFdTable;
 use crate::task::user::UserTask;
 use los_hal::mmu::MmuError;
 
@@ -37,12 +38,13 @@ impl From<ElfError> for SpawnError {
 ///
 /// # Arguments
 /// * `elf_data` - Raw ELF file contents
+/// * `fd_table` - File descriptor table to use
 ///
 /// # Returns
 /// A `UserTask` ready to be scheduled, or an error.
-pub fn spawn_from_elf(elf_data: &[u8]) -> Result<UserTask, SpawnError> {
+pub fn spawn_from_elf(elf_data: &[u8], fd_table: SharedFdTable) -> Result<UserTask, SpawnError> {
     // TEAM_169: Delegate to spawn_from_elf_with_args with empty args
-    spawn_from_elf_with_args(elf_data, &[], &[])
+    spawn_from_elf_with_args(elf_data, &[], &[], fd_table)
 }
 
 /// TEAM_169: Spawn a user process with arguments.
@@ -53,6 +55,7 @@ pub fn spawn_from_elf(elf_data: &[u8]) -> Result<UserTask, SpawnError> {
 /// * `elf_data` - Raw ELF file contents
 /// * `args` - Command line arguments (argv)
 /// * `envs` - Environment variables (envp)
+/// * `fd_table` - File descriptor table to use
 ///
 /// # Returns
 /// A `UserTask` ready to be scheduled, or an error.
@@ -60,6 +63,7 @@ pub fn spawn_from_elf_with_args(
     elf_data: &[u8],
     args: &[&str],
     envs: &[&str],
+    fd_table: SharedFdTable,
 ) -> Result<UserTask, SpawnError> {
     log::debug!("[SPAWN] Parsing ELF header ({} bytes)...", elf_data.len());
     // 1. Parse ELF
@@ -104,7 +108,7 @@ pub fn spawn_from_elf_with_args(
         .map_err(SpawnError::Stack)?;
 
     // 5. Create UserTask
-    let task = UserTask::new(entry_point, user_sp, ttbr0_phys, brk);
+    let task = UserTask::new(entry_point, user_sp, ttbr0_phys, brk, fd_table);
 
     log::debug!(
         "[SPAWN] Success: PID={} entry=0x{:x} sp=0x{:x}",

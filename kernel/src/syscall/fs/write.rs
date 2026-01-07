@@ -78,11 +78,12 @@ pub fn sys_write(fd: usize, buf: usize, len: usize) -> i64 {
 
     match entry.fd_type {
         FdType::Stdout | FdType::Stderr => {
-            // TEAM_226: Write to console using safe copy
+            write_to_tty(&crate::fs::tty::CONSOLE_TTY, buf, len, ttbr0, true, None)
+        }
+        FdType::PtyMaster(ref pair) => {
             if mm_user::validate_user_buffer(ttbr0, buf, len, false).is_err() {
                 return errno::EFAULT;
             }
-            // Copy bytes through kernel-accessible pointers
             let mut kbuf = alloc::vec![0u8; len];
             for i in 0..len {
                 if let Some(ptr) = mm_user::user_va_to_kernel_ptr(ttbr0, buf + i) {
@@ -91,15 +92,20 @@ pub fn sys_write(fd: usize, buf: usize, len: usize) -> i64 {
                     return errno::EFAULT;
                 }
             }
-            if let Ok(s) = core::str::from_utf8(&kbuf) {
-                print!("{}", s);
-            } else {
-                for byte in &kbuf {
-                    print!("{:02x}", byte);
-                }
+
+            for &byte in &kbuf {
+                pair.tty.lock().process_input(byte);
             }
             len as i64
         }
+        FdType::PtySlave(ref pair) => write_to_tty(
+            &pair.tty,
+            buf,
+            len,
+            ttbr0,
+            false,
+            Some(pair.master_read_buffer.clone()),
+        ),
         FdType::VfsFile(ref file) => {
             if mm_user::validate_user_buffer(ttbr0, buf, len, false).is_err() {
                 return errno::EFAULT;
@@ -140,4 +146,65 @@ pub fn sys_write(fd: usize, buf: usize, len: usize) -> i64 {
         }
         _ => errno::EBADF,
     }
+}
+
+fn write_to_tty(
+    tty_mutex: &los_utils::Mutex<crate::fs::tty::TtyState>,
+    buf: usize,
+    len: usize,
+    ttbr0: usize,
+    is_console: bool,
+    master_buffer: Option<alloc::sync::Arc<los_utils::Mutex<alloc::collections::VecDeque<u8>>>>,
+) -> i64 {
+    use crate::fs::tty::{ONLCR, OPOST};
+
+    if mm_user::validate_user_buffer(ttbr0, buf, len, false).is_err() {
+        return errno::EFAULT;
+    }
+
+    let mut kbuf = alloc::vec![0u8; len];
+    for i in 0..len {
+        if let Some(ptr) = mm_user::user_va_to_kernel_ptr(ttbr0, buf + i) {
+            kbuf[i] = unsafe { *ptr };
+        } else {
+            return errno::EFAULT;
+        }
+    }
+
+    loop {
+        let stopped = tty_mutex.lock().stopped;
+        if !stopped {
+            break;
+        }
+
+        unsafe {
+            los_hal::interrupts::enable();
+        }
+        let _ = los_hal::interrupts::disable();
+        crate::task::yield_now();
+    }
+
+    let tty = tty_mutex.lock();
+    let oflag = tty.termios.c_oflag;
+    drop(tty);
+
+    for &byte in &kbuf {
+        if (oflag & OPOST) != 0 && byte == b'\n' && (oflag & ONLCR) != 0 {
+            if is_console {
+                los_hal::print!("\r\n");
+            } else if let Some(ref buffer) = master_buffer {
+                let mut b = buffer.lock();
+                b.push_back(b'\r');
+                b.push_back(b'\n');
+            }
+        } else {
+            if is_console {
+                los_hal::print!("{}", byte as char);
+            } else if let Some(ref buffer) = master_buffer {
+                buffer.lock().push_back(byte);
+            }
+        }
+    }
+
+    len as i64
 }

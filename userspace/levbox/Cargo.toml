@@ -8,6 +8,10 @@ description = "Levbox - busybox-style utilities for LevitateOS"
 workspace = true
 
 [[bin]]
+name = "suite_test_core"
+path = "src/bin/test/suite_test_core.rs"
+
+[[bin]]
 name = "cat"
 path = "src/bin/core/cat.rs"
 
@@ -79,6 +83,15 @@ path = "src/bin/test/signal_test.rs"
 [[bin]]
 name = "tty_test"
 path = "src/bin/test/tty_test.rs"
+
+# TEAM_247: PTY tests
+[[bin]]
+name = "pty_test"
+path = "src/bin/test/pty_test.rs"
+
+[[bin]]
+name = "pty_interact"
+path = "src/bin/test/pty_interact.rs"
 
 [dependencies]
 libsyscall = { path = "../libsyscall" }

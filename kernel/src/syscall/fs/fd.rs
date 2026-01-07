@@ -2,6 +2,7 @@
 
 use crate::syscall::{errno, errno_file};
 use crate::task::current_task;
+use crate::task::fd_table::FdType;
 
 /// TEAM_233: sys_dup - Duplicate a file descriptor to lowest available.
 ///
@@ -103,19 +104,152 @@ pub fn sys_pipe2(pipefd_ptr: usize, _flags: u32) -> i64 {
 ///
 /// Returns 1 if tty, 0 if not, negative errno on error.
 pub fn sys_isatty(fd: i32) -> i64 {
-    // In LevitateOS, stdin (0), stdout (1), stderr (2) are always TTYs
-    // connected to the console
-    match fd {
-        0 | 1 | 2 => 1, // stdin, stdout, stderr are TTYs
-        _ => {
-            // Check if fd is valid
-            let task = current_task();
-            let fd_table = task.fd_table.lock();
-            if fd_table.get(fd as usize).is_some() {
-                0 // Valid fd but not a TTY
-            } else {
-                errno::EBADF // Invalid fd
+    let task = current_task();
+    let fd_table = task.fd_table.lock();
+    let entry = match fd_table.get(fd as usize) {
+        Some(e) => e,
+        None => return errno::EBADF,
+    };
+
+    match &entry.fd_type {
+        FdType::Stdin | FdType::Stdout | FdType::Stderr | FdType::PtySlave(_) => 1,
+        _ => 0,
+    }
+}
+
+/// TEAM_247: sys_ioctl - Control device.
+///
+/// Returns 0 on success, negative errno on failure.
+pub fn sys_ioctl(fd: usize, request: u64, arg: usize) -> i64 {
+    use crate::fs::tty::{
+        CONSOLE_TTY, TCGETS, TCSETS, TCSETSF, TCSETSW, TIOCGPTN, TIOCSPTLCK, Termios,
+    };
+    use crate::memory::user as mm_user;
+
+    let task = current_task();
+    let fd_table = task.fd_table.lock();
+    let entry = match fd_table.get(fd) {
+        Some(e) => e.clone(),
+        None => return errno::EBADF,
+    };
+    drop(fd_table);
+
+    // For now, we only support ioctls on TTY devices (stdin/stdout/stderr)
+    match &entry.fd_type {
+        FdType::Stdin | FdType::Stdout | FdType::Stderr => {
+            match request {
+                TCGETS => {
+                    // Get terminal attributes
+                    let tty = CONSOLE_TTY.lock();
+                    let termios = tty.termios;
+                    drop(tty);
+
+                    // Copy to user space
+                    let size = core::mem::size_of::<Termios>();
+                    if mm_user::validate_user_buffer(task.ttbr0, arg, size, true).is_err() {
+                        return errno::EFAULT;
+                    }
+
+                    if let Some(ptr) = mm_user::user_va_to_kernel_ptr(task.ttbr0, arg) {
+                        unsafe {
+                            let user_termios = ptr as *mut Termios;
+                            *user_termios = termios;
+                        }
+                        0
+                    } else {
+                        errno::EFAULT
+                    }
+                }
+                TCSETS | TCSETSW | TCSETSF => {
+                    // Set terminal attributes
+                    let size = core::mem::size_of::<Termios>();
+                    if mm_user::validate_user_buffer(task.ttbr0, arg, size, false).is_err() {
+                        return errno::EFAULT;
+                    }
+
+                    if let Some(ptr) = mm_user::user_va_to_kernel_ptr(task.ttbr0, arg) {
+                        let new_termios = unsafe { *(ptr as *const Termios) };
+                        let mut tty = CONSOLE_TTY.lock();
+                        tty.termios = new_termios;
+                        0
+                    } else {
+                        errno::EFAULT
+                    }
+                }
+                _ => errno::EINVAL,
             }
         }
+        FdType::PtyMaster(pair) => match request {
+            TIOCGPTN => {
+                if mm_user::validate_user_buffer(task.ttbr0, arg, core::mem::size_of::<u32>(), true)
+                    .is_err()
+                {
+                    return errno::EFAULT;
+                }
+                if let Some(ptr) = mm_user::user_va_to_kernel_ptr(task.ttbr0, arg) {
+                    unsafe {
+                        *(ptr as *mut u32) = pair.id as u32;
+                    }
+                    0
+                } else {
+                    errno::EFAULT
+                }
+            }
+            TIOCSPTLCK => {
+                if mm_user::validate_user_buffer(
+                    task.ttbr0,
+                    arg,
+                    core::mem::size_of::<u32>(),
+                    false,
+                )
+                .is_err()
+                {
+                    return errno::EFAULT;
+                }
+                if let Some(ptr) = mm_user::user_va_to_kernel_ptr(task.ttbr0, arg) {
+                    let val = unsafe { *(ptr as *const u32) };
+                    *pair.locked.lock() = val != 0;
+                    0
+                } else {
+                    errno::EFAULT
+                }
+            }
+            _ => errno::EINVAL,
+        },
+        FdType::PtySlave(pair) => match request {
+            TCGETS => {
+                let tty = pair.tty.lock();
+                let termios = tty.termios;
+                drop(tty);
+
+                let size = core::mem::size_of::<Termios>();
+                if mm_user::validate_user_buffer(task.ttbr0, arg, size, true).is_err() {
+                    return errno::EFAULT;
+                }
+                if let Some(ptr) = mm_user::user_va_to_kernel_ptr(task.ttbr0, arg) {
+                    unsafe {
+                        *(ptr as *mut Termios) = termios;
+                    }
+                    0
+                } else {
+                    errno::EFAULT
+                }
+            }
+            TCSETS | TCSETSW | TCSETSF => {
+                let size = core::mem::size_of::<Termios>();
+                if mm_user::validate_user_buffer(task.ttbr0, arg, size, false).is_err() {
+                    return errno::EFAULT;
+                }
+                if let Some(ptr) = mm_user::user_va_to_kernel_ptr(task.ttbr0, arg) {
+                    let new_termios = unsafe { *(ptr as *const Termios) };
+                    pair.tty.lock().termios = new_termios;
+                    0
+                } else {
+                    errno::EFAULT
+                }
+            }
+            _ => errno::EINVAL,
+        },
+        _ => errno::ENOTTY,
     }
 }

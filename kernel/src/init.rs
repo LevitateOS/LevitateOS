@@ -13,10 +13,9 @@ extern crate alloc;
 use alloc::sync::Arc;
 
 use los_hal::fdt::{self, Fdt};
-use los_hal::gic;
 use los_hal::mmu;
 use los_hal::timer::{self, Timer};
-use los_hal::{print, println};
+use los_hal::{print, println, InterruptHandler, IrqId};
 
 use crate::arch;
 use crate::fs::vfs::superblock::Superblock;
@@ -162,7 +161,7 @@ pub fn maintenance_shell() -> ! {
 
 // TEAM_045: IRQ handlers refactored to use InterruptHandler trait
 struct TimerHandler;
-impl gic::InterruptHandler for TimerHandler {
+impl InterruptHandler for TimerHandler {
     fn handle(&self, _irq: u32) {
         // TEAM_083: Removed debug "T" output - was flooding console
         // Reload timer for next interrupt (10ms @ 100Hz)
@@ -193,9 +192,7 @@ impl gic::InterruptHandler for TimerHandler {
         // TEAM_244: Poll UART for Ctrl+C as fallback for terminal mode
         // QEMU doesn't trigger UART RX interrupts when stdin is piped
         if los_hal::console::poll_for_ctrl_c() {
-            crate::syscall::signal::signal_foreground_process(
-                crate::syscall::signal::SIGINT,
-            );
+            crate::syscall::signal::signal_foreground_process(crate::syscall::signal::SIGINT);
         }
 
         // TEAM_070: Preemptive scheduling
@@ -206,7 +203,7 @@ impl gic::InterruptHandler for TimerHandler {
 }
 
 struct UartHandler;
-impl gic::InterruptHandler for UartHandler {
+impl InterruptHandler for UartHandler {
     fn handle(&self, _irq: u32) {
         // TEAM_139: Note - UART RX interrupts may not fire when QEMU stdin is piped
         // Direct UART polling is used as fallback in console::read_byte()
@@ -215,9 +212,7 @@ impl gic::InterruptHandler for UartHandler {
         // TEAM_244: Check if Ctrl+C was received and signal foreground process
         // This enables Ctrl+C to work even when no process is reading stdin
         if los_hal::console::check_and_clear_ctrl_c() {
-            crate::syscall::signal::signal_foreground_process(
-                crate::syscall::signal::SIGINT,
-            );
+            crate::syscall::signal::signal_foreground_process(crate::syscall::signal::SIGINT);
         }
     }
 }
@@ -250,20 +245,21 @@ pub fn run() -> ! {
     });
     let fdt = dtb_slice.and_then(|slice| Fdt::new(slice).ok());
 
-    let gic_api = gic::get_api(fdt.as_ref());
-    crate::verbose!("Detected GIC version: {:?}", gic_api.version());
-    gic_api.init();
+    // TEAM_255: Initialize interrupt controller using generic HAL interface
+    let ic = los_hal::active_interrupt_controller();
+    ic.init();
 
     // TEAM_047: Initialize physical memory management (Buddy Allocator)
     if let Some(slice) = dtb_slice {
         crate::memory::init(slice);
     }
 
-    // TEAM_045: Register IRQ handlers using trait objects
-    gic::register_handler(gic::IrqId::VirtualTimer, &TIMER_HANDLER);
-    gic::register_handler(gic::IrqId::Uart, &UART_HANDLER);
-    gic_api.enable_irq(gic::IrqId::VirtualTimer.irq_number());
-    gic_api.enable_irq(gic::IrqId::Uart.irq_number());
+    // TEAM_255: Register IRQ handlers using generic HAL traits
+    let ic = los_hal::active_interrupt_controller();
+    ic.register_handler(IrqId::VirtualTimer, &TIMER_HANDLER);
+    ic.register_handler(IrqId::Uart, &UART_HANDLER);
+    ic.enable_irq(ic.map_irq(IrqId::VirtualTimer));
+    ic.enable_irq(ic.map_irq(IrqId::Uart));
 
     crate::verbose!("Core drivers initialized.");
 
@@ -444,7 +440,7 @@ fn spawn_init() -> bool {
     };
 
     // TEAM_121: Spawn init and let the scheduler take over.
-    match task::process::spawn_from_elf(elf_data) {
+    match task::process::spawn_from_elf(elf_data, task::fd_table::new_shared_fd_table()) {
         Ok(task) => {
             let tcb = Arc::new(task::TaskControlBlock::from(task));
             task::scheduler::SCHEDULER.add_task(tcb);

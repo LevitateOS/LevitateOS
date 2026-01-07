@@ -41,6 +41,17 @@ impl File {
         Ok(Self { fd: fd as usize })
     }
 
+    /// TEAM_193: Create a file (truncate if exists).
+    pub fn create(path: &str) -> Result<Self> {
+        // O_CREAT (64) | O_WRONLY (1) | O_TRUNC (512) = 577
+        let flags = 577; 
+        let fd = libsyscall::openat(path, flags);
+        if fd < 0 {
+            return Err(Error::from_errno(fd));
+        }
+        Ok(Self { fd: fd as usize })
+    }
+
     /// TEAM_168: Get the file descriptor number.
     pub fn as_raw_fd(&self) -> usize {
         self.fd
@@ -69,6 +80,22 @@ impl Read for File {
         } else {
             Ok(ret as usize)
         }
+    }
+}
+
+use crate::io::Write;
+impl Write for File {
+    fn write(&mut self, buf: &[u8]) -> Result<usize> {
+        let ret = libsyscall::write(self.fd, buf);
+        if ret < 0 {
+            Err(Error::from_errno(ret))
+        } else {
+            Ok(ret as usize)
+        }
+    }
+
+    fn flush(&mut self) -> Result<()> {
+        Ok(()) // No-op for now
     }
 }
 

@@ -5,7 +5,7 @@
 extern crate alloc;
 
 use alloc::sync::Arc;
-use core::sync::atomic::{AtomicBool, Ordering};
+use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use los_hal::IrqSafeLock;
 
 /// TEAM_233: Pipe buffer size (one page for simplicity).
@@ -89,15 +89,21 @@ pub struct Pipe {
     read_open: AtomicBool,
     /// Is the write end still open?
     write_open: AtomicBool,
+    /// TEAM_333: Active reader count
+    readers: AtomicUsize,
+    /// TEAM_333: Active writer count
+    writers: AtomicUsize,
 }
 
 impl Pipe {
-    /// Create a new empty pipe.
+    /// Create a new empty pipe (starts with 1 reader, 1 writer).
     pub fn new() -> Arc<Self> {
         Arc::new(Self {
             buffer: IrqSafeLock::new(RingBuffer::new()),
             read_open: AtomicBool::new(true),
             write_open: AtomicBool::new(true),
+            readers: AtomicUsize::new(1),
+            writers: AtomicUsize::new(1),
         })
     }
 
@@ -145,14 +151,30 @@ impl Pipe {
         n as isize
     }
 
-    /// Close the read end.
-    pub fn close_read(&self) {
-        self.read_open.store(false, Ordering::Release);
+    /// Increment reader count (for dup/clone)
+    pub fn inc_read(&self) {
+        self.readers.fetch_add(1, Ordering::Relaxed);
     }
 
-    /// Close the write end.
+    /// Increment writer count (for dup/clone)
+    pub fn inc_write(&self) {
+        self.writers.fetch_add(1, Ordering::Relaxed);
+    }
+
+    /// Close (decrement) the read end.
+    pub fn close_read(&self) {
+        if self.readers.fetch_sub(1, Ordering::Release) == 1 {
+            // Last reader closed
+            self.read_open.store(false, Ordering::Release);
+        }
+    }
+
+    /// Close (decrement) the write end.
     pub fn close_write(&self) {
-        self.write_open.store(false, Ordering::Release);
+        if self.writers.fetch_sub(1, Ordering::Release) == 1 {
+            // Last writer closed
+            self.write_open.store(false, Ordering::Release);
+        }
     }
 
     /// Check if read end is open.

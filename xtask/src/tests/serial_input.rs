@@ -3,30 +3,37 @@
 //! TEAM_139: Automated test for verifying serial console input works.
 //! Starts QEMU with -nographic, pipes input, verifies echo.
 
+use anyhow::bail;
 use anyhow::{Context, Result};
 use std::io::{Read, Write};
 use std::process::{Command, Stdio};
 use std::time::{Duration, Instant};
 
-/// Test serial input by piping to QEMU and checking echo
-pub fn run() -> Result<()> {
-    println!("🔌 Testing serial input...\n");
+pub fn run(arch: &str) -> Result<()> {
+    println!("=== Serial Input Test for {} ===\n", arch);
 
-    // First build everything
-    crate::build::build_all()?;
-    crate::image::create_disk_image_if_missing()?;
+    // Build everything first
+    crate::build::build_kernel_verbose(arch)?;
 
-    // Clean QMP socket
-    let _ = std::fs::remove_file("./qmp.sock");
+    let qemu_bin = match arch {
+        "aarch64" => "qemu-system-aarch64",
+        "x86_64" => "qemu-system-x86_64",
+        _ => bail!("Unsupported architecture: {}", arch),
+    };
 
-    let kernel_bin = "kernel64_rust.bin";
+    let kernel_bin = if arch == "aarch64" {
+        "kernel64_rust.bin"
+    } else {
+        "target/x86_64-unknown-none/release/levitate-kernel"
+    };
+
     let args = vec![
-        "-M", "virt",
-        "-cpu", "cortex-a72",
-        "-m", "1G",
+        "-M", if arch == "aarch64" { "virt" } else { "q35" },
+        "-cpu", if arch == "aarch64" { "cortex-a72" } else { "qemu64" },
+        "-m", "512M",
         "-kernel", kernel_bin,
-        "-nographic",
-        "-device", "virtio-gpu-pci,xres=1280,yres=800",
+        "-nographic", // Critical for serial input
+        "-device", "virtio-gpu-pci",
         "-device", "virtio-keyboard-device",
         "-device", "virtio-tablet-device",
         "-device", "virtio-net-device,netdev=net0",
@@ -35,12 +42,11 @@ pub fn run() -> Result<()> {
         "-device", "virtio-blk-device,drive=hd0",
         "-initrd", "initramfs.cpio",
         "-serial", "mon:stdio",
-        "-qmp", "unix:./qmp.sock,server,nowait",
         "-no-reboot",
     ];
 
-    println!("  Starting QEMU in nographic mode...");
-    let mut child = Command::new("qemu-system-aarch64")
+    println!("Starting QEMU...");
+    let mut child = Command::new(qemu_bin)
         .args(&args)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
@@ -51,95 +57,54 @@ pub fn run() -> Result<()> {
     let mut stdin = child.stdin.take().expect("Failed to get stdin");
     let mut stdout = child.stdout.take().expect("Failed to get stdout");
 
-    // Set stdout to non-blocking
-    use std::os::unix::io::AsRawFd;
-    let fd = stdout.as_raw_fd();
-    unsafe {
-        let flags = libc::fcntl(fd, libc::F_GETFL);
-        libc::fcntl(fd, libc::F_SETFL, flags | libc::O_NONBLOCK);
-    }
-
-    // Accumulate output
-    let mut all_output = String::new();
-    let mut buf = [0u8; 4096];
-
-    // Wait for shell to be ready (look for "# " prompt or "help" text)
-    println!("  Waiting for shell prompt...");
-    let start = Instant::now();
-    let timeout = Duration::from_secs(30);
-
-    while start.elapsed() < timeout {
-        match stdout.read(&mut buf) {
-            Ok(0) => break, // EOF
-            Ok(n) => {
-                let chunk = String::from_utf8_lossy(&buf[..n]);
-                print!("{}", chunk);  // Echo to our stdout
-                all_output.push_str(&chunk);
-                
-                // Check if we have the shell prompt
-                if all_output.contains("# ") || all_output.ends_with("# ") {
-                    println!("\n  [DETECTED] Shell prompt found!");
-                    break;
-                }
-            }
-            Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
-                std::thread::sleep(Duration::from_millis(50));
-            }
-            Err(e) => {
-                eprintln!("  Read error: {}", e);
+    // We need to read stdout non-blocking to check for prompt
+    // For simplicity, we'll spawn a thread to read stdout and print/buffer it
+    let (tx, rx) = std::sync::mpsc::channel();
+    let stdout_thread = std::thread::spawn(move || {
+        let mut buf = [0u8; 128];
+        loop {
+            if let Ok(n) = stdout.read(&mut buf) {
+                if n == 0 { break; }
+                let s = String::from_utf8_lossy(&buf[..n]);
+                print!("{}", s); // Mirror to our stdout
+                let _ = tx.send(s.into_owned());
+            } else {
                 break;
             }
         }
-    }
+    });
 
-    if !all_output.contains("# ") {
-        let _ = child.kill();
-        anyhow::bail!("Shell prompt '# ' not found within timeout.\nOutput:\n{}", all_output);
-    }
-
-    // Send test command
-    let test_input = "echo SERIAL_TEST_MARKER_12345\n";
-    println!("\n  Sending: {:?}", test_input.trim());
-    stdin.write_all(test_input.as_bytes())?;
+    // Send "help" and check for output
+    // Wait a bit for boot
+    std::thread::sleep(Duration::from_secs(5));
+    
+    println!("\nSending 'help' command...");
+    stdin.write_all(b"help\n")?;
     stdin.flush()?;
 
-    // Wait for echo
-    println!("  Waiting for echo...");
-    let echo_start = Instant::now();
-    let echo_timeout = Duration::from_secs(10);
-
-    while echo_start.elapsed() < echo_timeout {
-        match stdout.read(&mut buf) {
-            Ok(0) => break,
-            Ok(n) => {
-                let chunk = String::from_utf8_lossy(&buf[..n]);
-                print!("{}", chunk);
-                all_output.push_str(&chunk);
-                
-                if all_output.contains("SERIAL_TEST_MARKER_12345") {
-                    println!("\n  [DETECTED] Marker found in output!");
-                    break;
-                }
+    // Check captured output for response
+    let start = Instant::now();
+    let mut found = false;
+    let mut buffer = String::new();
+    
+    while start.elapsed() < Duration::from_secs(5) {
+        if let Ok(chunk) = rx.try_recv() {
+            buffer.push_str(&chunk);
+            if buffer.contains("Available commands:") {
+                found = true;
+                break;
             }
-            Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
-                std::thread::sleep(Duration::from_millis(50));
-            }
-            Err(_) => break,
         }
+        std::thread::sleep(Duration::from_millis(100));
     }
 
-    // Cleanup
-    println!("\n  Killing QEMU...");
     let _ = child.kill();
-    let _ = child.wait();
+    let _ = stdout_thread.join();
 
-    if all_output.contains("SERIAL_TEST_MARKER_12345") {
-        println!("\n✅ Serial input test PASSED - input was echoed back!");
+    if found {
+        println!("✅ SUCCESS: Serial input received and echoed!");
         Ok(())
     } else {
-        println!("\n❌ Serial input test FAILED");
-        println!("  Full output:\n{}", all_output);
-        anyhow::bail!("Serial input test FAILED - marker not found in output")
+        bail!("Failed to get expected response from serial input");
     }
 }
-

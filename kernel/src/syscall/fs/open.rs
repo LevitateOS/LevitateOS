@@ -33,6 +33,31 @@ pub fn sys_openat(path: usize, path_len: usize, flags: u32) -> i64 {
         Err(_) => return errno::EINVAL,
     };
 
+    // TEAM_247: Handle PTY devices
+    if path_str == "/dev/ptmx" {
+        if let Some(pair) = crate::fs::tty::pty::allocate_pty() {
+            let mut fd_table = task.fd_table.lock();
+            match fd_table.alloc(FdType::PtyMaster(pair)) {
+                Some(fd) => return fd as i64,
+                None => return errno_file::EMFILE,
+            }
+        }
+        return errno::ENOMEM;
+    }
+
+    if path_str.starts_with("/dev/pts/") {
+        if let Ok(id) = path_str[9..].parse::<usize>() {
+            if let Some(pair) = crate::fs::tty::pty::get_pty(id) {
+                let mut fd_table = task.fd_table.lock();
+                match fd_table.alloc(FdType::PtySlave(pair)) {
+                    Some(fd) => return fd as i64,
+                    None => return errno_file::EMFILE,
+                }
+            }
+        }
+        return errno_file::ENOENT;
+    }
+
     // TEAM_205: All paths now go through generic vfs_open
     let vfs_flags = OpenFlags::new(flags);
     match vfs_open(path_str, vfs_flags, 0o666) {

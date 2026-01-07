@@ -1,6 +1,7 @@
 use crate::memory::user as mm_user;
 
 use crate::syscall::errno;
+use los_hal::IrqSafeLock;
 
 /// TEAM_073: sys_exit - Terminate the process.
 pub fn sys_exit(code: i32) -> i64 {
@@ -14,6 +15,9 @@ pub fn sys_exit(code: i32) -> i64 {
         waiter.set_state(crate::task::TaskState::Ready);
         crate::task::scheduler::SCHEDULER.add_task(waiter);
     }
+
+    // TEAM_333: Close all FDs immediately to unblock parents reading pipes
+    task.fd_table.lock().close_all();
 
     crate::task::task_exit();
 }
@@ -73,7 +77,13 @@ pub fn sys_spawn(path_ptr: usize, path_len: usize) -> i64 {
         None => return errno::EBADF,
     };
 
-    match crate::task::process::spawn_from_elf(elf_data) {
+    // TEAM_250: Clone parent's FD table for inheritance
+    let flags = los_hal::interrupts::disable();
+    let parent_fds = task.fd_table.lock().clone();
+    los_hal::interrupts::restore(flags);
+    let new_fd_table = IrqSafeLock::new(parent_fds);
+
+    match crate::task::process::spawn_from_elf(elf_data, new_fd_table) {
         Ok(new_task) => {
             let pid = new_task.pid.0 as i64;
             // TEAM_188: Register in process table
@@ -258,7 +268,18 @@ pub fn sys_spawn_args(path_ptr: usize, path_len: usize, argv_ptr: usize, argc: u
     let arg_refs: alloc::vec::Vec<&str> = args.iter().map(|s| s.as_str()).collect();
 
     // 7. Spawn with args (lock no longer held)
-    match crate::task::process::spawn_from_elf_with_args(&elf_data_copy, &arg_refs, &[]) {
+    // TEAM_250: Clone parent's FD table for inheritance
+    let flags = los_hal::interrupts::disable();
+    let parent_fds = task.fd_table.lock().clone();
+    los_hal::interrupts::restore(flags);
+    let new_fd_table = IrqSafeLock::new(parent_fds);
+
+    match crate::task::process::spawn_from_elf_with_args(
+        &elf_data_copy,
+        &arg_refs,
+        &[],
+        new_fd_table,
+    ) {
         Ok(new_task) => {
             let pid = new_task.pid.0 as i64;
             // TEAM_188: Register in process table

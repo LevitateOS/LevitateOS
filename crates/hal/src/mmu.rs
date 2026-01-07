@@ -609,6 +609,23 @@ fn alloc_page_table() -> Option<&'static mut PageTable> {
 }
 
 // ============================================================================
+impl crate::traits::MmuInterface for PageTable {
+    fn map_page(&mut self, va: usize, pa: usize, flags: PageFlags) -> Result<(), MmuError> {
+        map_page(self, va, pa, flags)
+    }
+
+    fn unmap_page(&mut self, va: usize) -> Result<(), MmuError> {
+        unmap_page(self, va)
+    }
+
+    fn switch_to(&self) {
+        let pa = virt_to_phys(self as *const PageTable as usize);
+        unsafe {
+            switch_ttbr0(pa);
+        }
+    }
+}
+
 // ============================================================================
 // Page Table Mapping
 // ============================================================================

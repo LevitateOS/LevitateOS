@@ -1,6 +1,11 @@
 # LevitateOS
 
-An AArch64 operating system kernel written in Rust, targeting the QEMU `virt` machine and Pixel 6 hardware.
+An AArch64 and x86_64 operating system kernel written in Rust, targeting the QEMU `virt` machine, Pixel 6 hardware, and Intel NUC (x86_64).
+
+## 🎯 Supported Targets
+
+- **AArch64**: QEMU `virt`, Pixel 6
+- **x86_64**: Intel NUC (7th Gen i3), QEMU `q35` (Experimental)
 
 ## ✨ Features
 
@@ -106,6 +111,7 @@ cargo xtask test regress       # Static analysis (API consistency, constant sync
 |---------|-----|-------|-----|-----|
 | Default | 512MB | 1 | cortex-a53 | v2 |
 | Pixel 6 | 8GB | 8 | cortex-a76 | v3 |
+| Intel NUC | 32GB | 2+ | x86_64 i3 | APIC |
 
 ## 📍 Memory Layout
 

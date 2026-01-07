@@ -101,7 +101,6 @@ pub fn sys_read(fd: usize, buf: usize, len: usize) -> i64 {
                 Err(_) => errno::EIO,
             }
         }
-        // TEAM_233: Read from pipe
         FdType::PipeRead(ref pipe) => {
             if mm_user::validate_user_buffer(ttbr0, buf, len, true).is_err() {
                 return errno::EFAULT;
@@ -119,25 +118,88 @@ pub fn sys_read(fd: usize, buf: usize, len: usize) -> i64 {
             }
             n as i64
         }
+        FdType::PtyMaster(ref pair) => {
+            let mut bytes_read = 0;
+            loop {
+                let mut buffer = pair.master_read_buffer.lock();
+                if let Some(byte) = buffer.pop_front() {
+                    if !write_to_user_buf(ttbr0, buf, bytes_read, byte) {
+                        return errno::EFAULT;
+                    }
+                    bytes_read += 1;
+                    if bytes_read >= len {
+                        return bytes_read as i64;
+                    }
+                    continue; // Check for more
+                }
+
+                if bytes_read > 0 {
+                    return bytes_read as i64;
+                }
+                drop(buffer);
+
+                // Wait for output
+                unsafe {
+                    los_hal::interrupts::enable();
+                }
+                let _ = los_hal::interrupts::disable();
+                crate::task::yield_now();
+            }
+        }
+        FdType::PtySlave(ref pair) => read_from_tty(&pair.tty, buf, len, ttbr0, false),
         _ => errno::EBADF,
     }
 }
 
 /// TEAM_178: Read from stdin (keyboard/console input).
+/// TEAM_247: Refactored to use TTY line discipline.
 fn read_stdin(buf: usize, len: usize, ttbr0: usize) -> i64 {
+    use crate::fs::tty::CONSOLE_TTY;
+    read_from_tty(&CONSOLE_TTY, buf, len, ttbr0, true)
+}
+
+fn read_from_tty(
+    tty_mutex: &los_utils::Mutex<crate::fs::tty::TtyState>,
+    buf: usize,
+    len: usize,
+    ttbr0: usize,
+    is_console: bool,
+) -> i64 {
     let max_read = len.min(4096);
     if mm_user::validate_user_buffer(ttbr0, buf, max_read, true).is_err() {
         return errno::EFAULT;
     }
 
-    let mut bytes_read = 0usize;
-
     loop {
-        poll_input_devices(ttbr0, buf, &mut bytes_read, max_read);
-        if bytes_read > 0 {
-            break;
+        // 1. Feed hardware input into TTY (only for console)
+        if is_console {
+            poll_to_tty();
         }
 
+        // 2. Try to satisfy read from TTY input buffer
+        let mut tty = tty_mutex.lock();
+        if !tty.input_buffer.is_empty() {
+            let mut bytes_read = 0;
+            while bytes_read < max_read {
+                if let Some(byte) = tty.input_buffer.pop_front() {
+                    if !write_to_user_buf(ttbr0, buf, bytes_read, byte) {
+                        return errno::EFAULT;
+                    }
+                    bytes_read += 1;
+
+                    // In canonical mode, read() returns at most one line per call
+                    if (tty.termios.c_lflag & crate::fs::tty::ICANON) != 0 && byte == b'\n' {
+                        return bytes_read as i64;
+                    }
+                } else {
+                    break;
+                }
+            }
+            return bytes_read as i64;
+        }
+        drop(tty);
+
+        // 3. Wait/Yield if nothing available
         unsafe {
             los_hal::interrupts::enable();
         }
@@ -145,46 +207,18 @@ fn read_stdin(buf: usize, len: usize, ttbr0: usize) -> i64 {
 
         crate::task::yield_now();
     }
-
-    bytes_read as i64
 }
 
-fn poll_input_devices(ttbr0: usize, user_buf: usize, bytes_read: &mut usize, max_read: usize) {
+fn poll_to_tty() {
+    use crate::fs::tty::CONSOLE_TTY;
+
     crate::input::poll();
 
-    while *bytes_read < max_read {
-        if let Some(ch) = crate::input::read_char() {
-            if ch == '\x03' {
-                // Ctrl+C received - signal foreground process
-                crate::syscall::signal::signal_foreground_process(crate::syscall::signal::SIGINT);
-                // Don't write to buffer, don't return to user
-                continue;
-            }
-            if !write_to_user_buf(ttbr0, user_buf, *bytes_read, ch as u8) {
-                return;
-            }
-            *bytes_read += 1;
-            if ch == '\n' {
-                return;
-            }
-        } else {
-            break;
-        }
+    while let Some(ch) = crate::input::read_char() {
+        CONSOLE_TTY.lock().process_input(ch as u8);
     }
 
-    if *bytes_read < max_read {
-        while let Some(byte) = los_hal::console::read_byte() {
-            let byte = if byte == b'\r' { b'\n' } else { byte };
-            if !write_to_user_buf(ttbr0, user_buf, *bytes_read, byte) {
-                return;
-            }
-            *bytes_read += 1;
-            if byte == b'\n' {
-                return;
-            }
-            if *bytes_read >= max_read {
-                return;
-            }
-        }
+    while let Some(byte) = los_hal::console::read_byte() {
+        CONSOLE_TTY.lock().process_input(byte);
     }
 }

@@ -9,7 +9,7 @@
 
 use crate::virtio::{StaticMmioTransport, VirtioHal};
 use alloc::vec::Vec;
-use los_hal::gic::{self, InterruptHandler, IrqId};
+use los_hal::{self, InterruptHandler, IrqId};
 use los_utils::Mutex;
 use virtio_drivers::device::input::VirtIOInput;
 
@@ -55,11 +55,12 @@ pub fn init(transport: StaticMmioTransport, slot: usize) {
             crate::println!("VirtIO Input initialized successfully.");
             INPUT_DEVICES.lock().push(input);
 
-            // TEAM_241: Register interrupt handler for async Ctrl+C detection
+            // TEAM_255: Register interrupt handler using generic HAL traits
             let irq_id = IrqId::VirtioInput(slot as u32);
-            gic::register_handler(irq_id, &INPUT_HANDLER);
-            gic::active_api().enable_irq(irq_id.irq_number());
-            crate::println!("VirtIO Input IRQ {} enabled", irq_id.irq_number());
+            let ic = los_hal::active_interrupt_controller();
+            ic.register_handler(irq_id, &INPUT_HANDLER);
+            ic.enable_irq(ic.map_irq(irq_id));
+            crate::println!("VirtIO Input IRQ {} enabled", ic.map_irq(irq_id));
         }
         Err(e) => crate::println!("Failed to init VirtIO Input: {:?}", e),
     }

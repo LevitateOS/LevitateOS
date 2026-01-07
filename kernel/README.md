@@ -4,7 +4,7 @@ The core operating system kernel for LevitateOS.
 
 ## Overview
 
-LevitateOS is an AArch64 higher-half kernel written in Rust. It targets the QEMU `virt` machine and aims for compatibility with Pixel 6 hardware.
+LevitateOS is an AArch64 and x86_64 higher-half kernel written in Rust. It targets the QEMU `virt` machine, Pixel 6 hardware, and Intel NUC (x86_64).
 
 ## Architecture
 

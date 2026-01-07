@@ -10,7 +10,10 @@
 #![no_main]
 
 extern crate ulib;
-use libsyscall::{getpid, kill, println, set_foreground, shutdown, shutdown_flags, spawn, waitpid, yield_cpu, SIGINT};
+use libsyscall::{
+    getpid, kill, println, set_foreground, shutdown, shutdown_flags, spawn, waitpid, yield_cpu,
+    SIGINT,
+};
 
 /// List of test binaries to run (must exist in initramfs)
 const TESTS: &[&str] = &[
@@ -18,8 +21,10 @@ const TESTS: &[&str] = &[
     "pipe_test",
     "signal_test",
     "clone_test",
-    "interrupt_test",  // TEAM_244: Tests external SIGINT (Ctrl+C simulation)
-    "tty_test",        // TEAM_244: TTY/Terminal tests (TDD)
+    "interrupt_test",
+    "tty_test",
+    "pty_test",
+    "suite_test_core",
 ];
 
 #[no_mangle]
@@ -37,7 +42,12 @@ pub fn main() -> i32 {
 
     for (i, test) in TESTS.iter().enumerate() {
         println!("[TEST_RUNNER] ----------------------------------------");
-        println!("[TEST_RUNNER] [{}/{}] Running: {}", i + 1, TESTS.len(), test);
+        println!(
+            "[TEST_RUNNER] [{}/{}] Running: {}",
+            i + 1,
+            TESTS.len(),
+            test
+        );
         println!("[TEST_RUNNER] ----------------------------------------");
 
         let pid = spawn(test);
@@ -70,7 +80,10 @@ pub fn main() -> i32 {
         set_foreground(getpid() as usize);
 
         if wait_result < 0 {
-            println!("[TEST_RUNNER] {}: WAIT_FAILED (error={})", test, wait_result);
+            println!(
+                "[TEST_RUNNER] {}: WAIT_FAILED (error={})",
+                test, wait_result
+            );
             failed += 1;
             results[i] = (false, wait_result as i32);
             continue;
@@ -103,7 +116,11 @@ pub fn main() -> i32 {
     }
 
     println!("[TEST_RUNNER] ----------------------------------------");
-    println!("[TEST_RUNNER] Total: {}/{} tests passed", passed, passed + failed);
+    println!(
+        "[TEST_RUNNER] Total: {}/{} tests passed",
+        passed,
+        passed + failed
+    );
     println!("[TEST_RUNNER] ========================================");
 
     if failed > 0 {

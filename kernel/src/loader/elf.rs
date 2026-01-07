@@ -166,8 +166,8 @@ impl Elf64Header {
             return Err(ElfError::NotExecutable);
         }
 
-        // Validate machine (AArch64)
-        if header.e_machine != EM_AARCH64 {
+        // Validate machine (Architecture-specific)
+        if header.e_machine != crate::arch::ELF_MACHINE {
             return Err(ElfError::WrongArchitecture);
         }
 

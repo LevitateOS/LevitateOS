@@ -21,6 +21,7 @@ pub mod mount;
 pub mod path;
 pub mod pipe;
 pub mod tmpfs;
+pub mod tty;
 pub mod vfs;
 
 use los_error::define_kernel_error;
