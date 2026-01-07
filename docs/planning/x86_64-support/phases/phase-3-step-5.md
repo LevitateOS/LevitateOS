@@ -243,15 +243,15 @@ assert_eq!(core::mem::size_of::<PageTable>(), 4096);
 ---
 
 ## Progress Tracking
-- [ ] UoW 5.1: Page Table Structures
-- [ ] UoW 5.2: Page Walker
-- [ ] UoW 5.3: Page Mapper
-- [ ] UoW 5.4: Page Unmapper
-- [ ] UoW 5.5: Frame Allocator
-- [ ] UoW 5.6: Higher-Half Mappings
-- [ ] UoW 5.7: CR3 Switching
-- [ ] UoW 5.8: MmuInterface Trait
-- [ ] UoW 5.9: Boot Transition
+- [x] UoW 5.1: Page Table Structures
+- [x] UoW 5.2: Page Walker
+- [x] UoW 5.3: Page Mapper
+- [x] UoW 5.4: Page Unmapper
+- [x] UoW 5.5: Frame Allocator
+- [x] UoW 5.6: Higher-Half Mappings
+- [x] UoW 5.7: CR3 Switching
+- [x] UoW 5.8: MmuInterface Trait
+- [x] UoW 5.9: Boot Transition
 
 ## Dependencies Graph
 ```

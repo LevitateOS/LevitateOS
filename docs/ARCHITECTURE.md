@@ -57,7 +57,13 @@ Generic kernel logic interacts with hardware through the `crate::arch` module. E
 - **`Termios`**: Terminal configuration layout.
 - **`cpu::wait_for_interrupt()`**: Idle loop implementation.
 
-### 2. Hardware Abstraction Layer (`los_hal`)
+### 2. Userspace Library Abstraction (`userspace/libsyscall/src/arch/`)
+Similar to the kernel, `libsyscall` abstracts architecture-specific syscall invocation:
+- **`userspace/libsyscall/src/arch/mod.rs`**: Defines the generic `syscall!` interface.
+- **`aarch64.rs`**: Implements `svc #0` with `x8`-`x0` register mapping.
+- **`x86_64.rs`**: Implements `syscall` with `rax`, `rdi`, `rsi`, etc. register mapping.
+
+### 3. Hardware Abstraction Layer (`los_hal`)
 The HAL defines traits in `crates/hal/src/traits.rs` that decouple the kernel from specific interrupt controllers and MMUs:
 - **`InterruptController`**: Generic interface for GIC (ARM) or APIC (x86).
 - **`MmuInterface`**: Generic interface for page table management.

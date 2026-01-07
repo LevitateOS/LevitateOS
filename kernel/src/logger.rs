@@ -19,9 +19,14 @@ impl log::Log for SimpleLogger {
 
     fn log(&self, record: &Record) {
         if self.enabled(record.metadata()) {
-            // TEAM_221: Simple format: [LEVEL] Message
-            // We use println! which goes to serial console
-            println!("[{}] {}", record.level(), record.args());
+            // TEAM_272: Filter out noisy logs from external crates to match golden boot logs
+            let target = record.metadata().target();
+            if target.starts_with("virtio_drivers") {
+                return;
+            }
+
+            // TEAM_272: Remove level prefix to match golden boot logs
+            println!("{}", record.args());
         }
     }
 
@@ -35,5 +40,5 @@ impl log::Log for SimpleLogger {
 pub fn init(max_level: LevelFilter) {
     log::set_logger(&LOGGER).expect("Failed to set logger");
     log::set_max_level(max_level);
-    println!("[KERNEL] Logger initialized with level: {}", max_level);
+    // TEAM_272: Removed initialization message to match golden boot logs
 }

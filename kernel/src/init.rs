@@ -244,6 +244,10 @@ pub fn run() -> ! {
     arch::exceptions::init();
     crate::verbose!("Exceptions initialized.");
 
+    // --- Stage 3: Boot Console (GPU, Terminal) ---
+    transition_to(BootStage::BootConsole);
+    init_display();
+
     // --- GIC and Timer Setup ---
     #[cfg(target_arch = "aarch64")]
     let (dtb_slice, initrd_found) = {

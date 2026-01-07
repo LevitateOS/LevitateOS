@@ -26,6 +26,7 @@ fn main() {
 
 ## Architecture
 
-- `src/syscall.rs`: The raw `svc` instruction wrappers and register management.
+- `src/arch/`: Architecture-specific syscall invocation (e.g., `aarch64.rs`, `x86_64.rs`).
 - `src/lib.rs`: The high-level API exposed to applications.
-- `src/types.rs`: ABI-critical data structures.
+- `src/sysno.rs`: System call number definitions.
+- `src/errno.rs`: Error code definitions.

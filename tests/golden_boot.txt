@@ -3,11 +3,6 @@ Heap initialized.
 [BOOT] Stage 2: Memory & MMU (PEI)
 MMU re-initialized (Higher-Half + Identity).
 Exceptions initialized.
-DTB address from x0: 0x48200000
-Detected GIC version: V2
-Buddy Allocator initialized with DTB memory map.
-Core drivers initialized.
-Timer initialized.
 [BOOT] Stage 3: Boot Console (DXE)
 [GPU] Initializing via PCI...
 [PCI] Scanning Bus 0 for GPU...
@@ -19,40 +14,59 @@ GPU initialized successfully.
 [TERM] GPU resolution: 1280x800
 [TERM] Terminal::new(1280x800) -> 128x36 chars (font 10x20, spacing 2)
 Terminal initialized.
+DTB address from x0: 0x48400000
+Buddy Allocator initialized with DTB memory map.
+Core drivers initialized.
+Timer initialized.
 [BOOT] Stage 4: Discovery & FS (DXE/BDS)
 Scanning VirtIO MMIO bus...
 Initializing Block device...
 VirtIO Block initialized successfully.
 Initializing Network device...
 VirtIO Net: MAC=52:54:00:12:34:56
-Initializing Input...
+Initializing Input (slot 30)...
 VirtIO Input initialized successfully.
-Initializing Input...
+VirtIO Input IRQ 78 enabled
+Initializing Input (slot 31)...
 VirtIO Input initialized successfully.
-BOOT_REGS: x0=48200000 x1=0 x2=0 x3=0
+VirtIO Input IRQ 79 enabled
+BOOT_REGS: x0=48400000 x1=0 x2=0 x3=0
 Detecting Initramfs...
-Initramfs found at 0x48000000 - 0x4814d600 (1365504 bytes)
+Initramfs found at 0x48000000 - 0x4824dc00 (2415616 bytes)
 Files in initramfs:
  - .
  - hello.txt
- - test.txt
- - shell
- - init
- - repro_crash
- - repro
  - cat
- - ls
- - pwd
- - mkdir
- - rmdir
- - rm
- - mv
  - cp
- - touch
+ - init
  - ln
+ - ls
+ - mkdir
+ - mv
+ - pwd
+ - repro
+ - repro_crash
+ - rm
+ - rmdir
+ - shell
  - signal_test
+ - touch
+ - clone_test
+ - mmap_test
+ - pipe_test
+ - test_runner
+ - interrupt_test
+ - tty_test
+ - pty_test
+ - pty_interact
+ - suite_test_core
+ - error_test
+ - link_test
+ - sched_yield_test
+ - stat_test
+ - time_test
 [BOOT] spawning init task...
-[SPAWN] Parsing ELF header (75808 bytes)...
+[SPAWN] Parsing ELF header (75952 bytes)...
 ELF Header e_ident verified
 [SPAWN] ELF parsed.
 [SPAWN] Creating user page table...
@@ -62,17 +76,17 @@ ELF Header e_ident verified
 [SPAWN] Loading segments...
 [ELF] Copying segment: src[0]=ff to VA 10000
 [ELF] Resolved PA [MASKED] -> Kernel VA [MASKED]
-[ELF] Copying segment: src[0]=0 to VA 11378
+[ELF] Copying segment: src[0]=0 to VA 113a8
 [ELF] Resolved PA [MASKED] -> Kernel VA [MASKED]
 [SPAWN] Setting up stack...
 [SPAWN] Setting up stack arguments...
-[SPAWN] Success: PID=1 entry=0x10000 sp=0x7ffffffeffe0
+[SPAWN] Success: PID=1 entry=0x10000 sp=0x7ffffffeff68
 [BOOT] Init process scheduled.
 Mounting filesystems...
 FAT32 mounted. Root contains 0 entries.
 [BOOT] Filesystem initialized successfully.
 [BOOT] Mounted tmpfs at /tmp
-[GPU_TEST] Flush count: 55
+[GPU_TEST] Flush count: 74
 [GPU_TEST] Framebuffer: 400 non-black pixels of 1024000 total
 
 [SUCCESS] LevitateOS System Ready.
@@ -81,7 +95,7 @@ FAT32 mounted. Root contains 0 entries.
 [INIT] PID 1 starting...
 [INIT] Spawning shell...
 [SYSCALL] spawn('shell')
-[SPAWN] Parsing ELF header (82192 bytes)...
+[SPAWN] Parsing ELF header (83136 bytes)...
 ELF Header e_ident verified
 [SPAWN] ELF parsed.
 [SPAWN] Creating user page table...
@@ -91,11 +105,11 @@ ELF Header e_ident verified
 [SPAWN] Loading segments...
 [ELF] Copying segment: src[0]=fd to VA 10000
 [ELF] Resolved PA [MASKED] -> Kernel VA [MASKED]
-[ELF] Copying segment: src[0]=c0 to VA 12448
+[ELF] Copying segment: src[0]=c0 to VA 12598
 [ELF] Resolved PA [MASKED] -> Kernel VA [MASKED]
 [SPAWN] Setting up stack...
 [SPAWN] Setting up stack arguments...
-[SPAWN] Success: PID=2 entry=0x10000 sp=0x7ffffffeffe0
+[SPAWN] Success: PID=2 entry=0x10000 sp=0x7ffffffeff68
 [INIT] Shell spawned as PID 2
 [TASK] Entering user task PID=2 at 0x10000
 

@@ -301,16 +301,16 @@ cargo xtask build --arch x86_64   # New code compiles
 ---
 
 ## Progress Tracking
-- [ ] UoW 4.1: Serial Console
-- [ ] UoW 4.2: VGA Console
-- [ ] UoW 4.3: IDT Structure
-- [ ] UoW 4.4: Exception Handlers
-- [ ] UoW 4.5: IDT Init
-- [ ] UoW 4.6: Local APIC
-- [ ] UoW 4.7: I/O APIC
-- [ ] UoW 4.8: PIT Timer
-- [ ] UoW 4.9: Trait Implementation
-- [ ] UoW 4.10: Module Structure
+- [x] UoW 4.1: Serial Console
+- [x] UoW 4.2: VGA Console
+- [x] UoW 4.3: IDT Structure
+- [x] UoW 4.4: Exception Handlers
+- [x] UoW 4.5: IDT Init
+- [x] UoW 4.6: Local APIC
+- [x] UoW 4.7: I/O APIC
+- [x] UoW 4.8: PIT Timer
+- [x] UoW 4.9: Trait Implementation
+- [x] UoW 4.10: Module Structure
 
 ## Dependencies Graph
 ```

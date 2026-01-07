@@ -33,33 +33,33 @@ This phase covers the initial implementation of the x86_64 architecture support,
 ### Step 4: HAL Implementation (x86_64)
 **Detailed Plan**: [phase-3-step-4.md](phase-3-step-4.md) — 10 UoWs
 
-- [ ] UoW 4.1: Implement Serial Console (COM1)
-- [ ] UoW 4.2: Implement VGA Text Mode Console
-- [ ] UoW 4.3: Implement IDT Structure
-- [ ] UoW 4.4: Implement CPU Exception Handlers
-- [ ] UoW 4.5: Implement IDT Loading and Initialization
-- [ ] UoW 4.6: Detect and Initialize Local APIC
-- [ ] UoW 4.7: Implement I/O APIC for External IRQs
-- [ ] UoW 4.8: Implement PIT Timer
-- [ ] UoW 4.9: Implement InterruptController Trait for APIC
-- [ ] UoW 4.10: Create x86_64 HAL Module Structure
+- [x] UoW 4.1: Implement Serial Console (COM1)
+- [x] UoW 4.2: Implement VGA Text Mode Console
+- [x] UoW 4.3: Implement IDT Structure
+- [x] UoW 4.4: Implement CPU Exception Handlers
+- [x] UoW 4.5: Implement IDT Loading and Initialization
+- [x] UoW 4.6: Detect and Initialize Local APIC
+- [x] UoW 4.7: Implement I/O APIC for External IRQs
+- [x] UoW 4.8: Implement PIT Timer
+- [x] UoW 4.9: Implement InterruptController Trait for APIC
+- [x] UoW 4.10: Create x86_64 HAL Module Structure
 
 ### Step 5: MMU & Higher-Half
 **Detailed Plan**: [phase-3-step-5.md](phase-3-step-5.md) — 9 UoWs
 
-- [ ] UoW 5.1: Define Page Table Entry Structures
-- [ ] UoW 5.2: Implement Page Table Walker
-- [ ] UoW 5.3: Implement 4KB Page Mapper
-- [ ] UoW 5.4: Implement Page Unmapper
-- [ ] UoW 5.5: Implement Frame Allocator Interface
-- [ ] UoW 5.6: Create Higher-Half Kernel Mappings
-- [ ] UoW 5.7: Implement CR3 Switching
-- [ ] UoW 5.8: Implement MmuInterface Trait for PML4
-- [ ] UoW 5.9: Transition to Higher-Half at Boot
+- [x] UoW 5.1: Define Page Table Entry Structures
+- [x] UoW 5.2: Implement Page Table Walker
+- [x] UoW 5.3: Implement 4KB Page Mapper
+- [x] UoW 5.4: Implement Page Unmapper
+- [x] UoW 5.5: Implement Frame Allocator Interface
+- [x] UoW 5.6: Create Higher-Half Kernel Mappings
+- [x] UoW 5.7: Implement CR3 Switching
+- [x] UoW 5.8: Implement MmuInterface Trait for PML4
+- [x] UoW 5.9: Transition to Higher-Half at Boot
 
 ## Progress Tracking
 - [x] Step 1: Toolchain
 - [x] Step 2: Early Boot
 - [/] Step 3: Arch Stubs (stubs exist, not functional)
-- [ ] Step 4: HAL Backends
-- [ ] Step 5: MMU
+- [x] Step 4: HAL Backends
+- [x] Step 5: MMU

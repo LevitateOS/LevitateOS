@@ -576,3 +576,35 @@ cargo xtask run --arch x86_64
 **Location:** `crates/hal/src/traits.rs`
 
 **Gotcha:** When adding support for a new architecture, you must implement the `InterruptController` and `MmuInterface` traits. The kernel depends on `los_hal::active_interrupt_controller()` which uses conditional compilation to return the correct implementation. Failure to provide an implementation for a new target will result in `unimplemented!` panics at runtime.
+
+---
+
+### 30. Log Formatting for Behavior Tests (TEAM_272)
+
+**Location:** `kernel/src/logger.rs`, `kernel/src/main.rs`
+
+**Problem:** Behavior tests (golden boot logs) are extremely sensitive to output format. 
+
+**Gotchas:**
+- **External Crates:** Some crates (e.g., `virtio_drivers`) may log noisy initialization messages that aren't in the golden file. Filter these in `logger.rs`.
+- **Level Prefixes:** Golden logs usually don't include `[INFO]`, `[DEBUG]`, etc. The logger must strip these prefixes.
+- **Verbose Feature:** Behavior tests often require `Trace` level logging. Ensure that `#[cfg(feature = "verbose")]` enables the correct level in `main.rs`.
+
+**Fix Pattern (in `logger.rs`):**
+```rust
+fn log(&self, record: &Record) {
+    let target = record.metadata().target();
+    if target.starts_with("virtio_drivers") { return; } // Filter noisy crate
+    println!("{}", record.args()); // No [LEVEL] prefix
+}
+```
+
+---
+
+### 31. Duplicate Boot Output (TEAM_272)
+
+**Location:** `kernel/src/main.rs`, `kernel/src/init.rs`
+
+**Problem:** Printing the same information (e.g., boot registers) in multiple boot stages will cause behavior test failures if the golden file only expects it once.
+
+**Rule:** Ensure diagnostic information is printed exactly once in the boot sequence. If a function like `print_boot_regs()` is moved or called in multiple stages, audit the call sites to prevent duplicates.

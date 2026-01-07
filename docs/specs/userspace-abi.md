@@ -20,7 +20,9 @@ LevitateOS follows the **Procedure Call Standard for the Arm 64-bit Architecture
 
 ## 1. System Call Interface
 
-### 1.1 Trigger Mechanism
+### 1.1 Trigger Mechanism (Architecture Specific)
+
+#### AArch64 (ARM64)
 - **Instruction**: `svc #0`
 - **Register Convention**:
 
@@ -29,6 +31,21 @@ LevitateOS follows the **Procedure Call Standard for the Arm 64-bit Architecture
 | `x8`     | System Call Number (NR) |
 | `x0` - `x5` | Arguments (up to 6) |
 | `x0`     | Return Value (`-4095` to `-1` indicates error, else success) |
+
+#### x86_64 (AMD64)
+- **Instruction**: `syscall`
+- **Register Convention**:
+
+| Register | Usage |
+|----------|-------|
+| `rax`    | System Call Number (NR) |
+| `rdi`    | Argument 1 |
+| `rsi`    | Argument 2 |
+| `rdx`    | Argument 3 |
+| `r10`    | Argument 4 |
+| `r8`     | Argument 5 |
+| `r9`     | Argument 6 |
+| `rax`    | Return Value (`-4095` to `-1` indicates error, else success) |
 
 ### 1.2 System Call Table (Minimal Compliance)
 Based on `asm-generic/unistd.h`.

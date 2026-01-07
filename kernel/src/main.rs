@@ -48,6 +48,10 @@ pub extern "C" fn kmain() -> ! {
     los_hal::console::init();
 
     // TEAM_221: Initialize logger (Info level silences Debug/Trace)
+    // TEAM_272: Enable Trace level in verbose builds to satisfy behavior tests
+    #[cfg(feature = "verbose")]
+    logger::init(log::LevelFilter::Trace);
+    #[cfg(not(feature = "verbose"))]
     logger::init(log::LevelFilter::Info);
 
     crate::init::transition_to(crate::init::BootStage::EarlyHAL);
@@ -56,7 +60,8 @@ pub extern "C" fn kmain() -> ! {
     crate::arch::init_heap();
 
     // --- Stage 1: CPU & Basic Initialization ---
-    crate::arch::print_boot_regs();
+    // TEAM_272: Removed duplicate print_boot_regs() to match golden boot logs.
+    // It is printed again in init::run() Stage 4.
 
     // TEAM_262: Initialize bootstrap task immediately after heap
     // This satisfies current_task() calls (e.g. from early IRQs)

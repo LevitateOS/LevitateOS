@@ -543,27 +543,31 @@ TEAM_059: Verified behaviors after fixing newline/cursor bugs
 
 ---
 
-## Group 11: Multitasking & Scheduler — Behavior Inventory
+### Group 11: Multitasking & Scheduler — Behavior Inventory
 
 TEAM_071: Added multitasking behaviors for Phase 7
+TEAM_273: Added x86_64 specific context switch behaviors
 
 ### File Groups
 - `kernel/src/task/mod.rs` (Task primitives, context switch)
 - `kernel/src/task/scheduler.rs` (Round-robin scheduler)
 - `crates/hal/src/mmu.rs` (unmap_page, table reclamation) — `los_hal`
+- `kernel/src/arch/x86_64/task.rs` (x86_64 context switching)
 
-### Context Switching (task/mod.rs)
+### Context Switching (task/mod.rs & arch/x86_64)
 
 | ID | Behavior | Tested? | Test |
 |----|----------|---------|------|
-| MT1 | cpu_switch_to saves x19-x29, lr, sp to old context | ✅ | Runtime (preemption) |
-| MT2 | cpu_switch_to restores x19-x29, lr, sp from new context | ✅ | Runtime (preemption) |
+| MT1 | cpu_switch_to saves x19-x29, lr, sp to old context (AArch64) | ✅ | Runtime (preemption) |
+| MT2 | cpu_switch_to restores x19-x29, lr, sp from new context (AArch64) | ✅ | Runtime (preemption) |
+| MT1a | cpu_switch_to saves rbx, rbp, r12-r15 to old context (x86_64) | ⚠️ | Phase 3 Integration |
+| MT2a | cpu_switch_to restores rbx, rbp, r12-r15 from new context (x86_64) | ⚠️ | Phase 3 Integration |
 | MT3 | switch_to() updates CURRENT_TASK before switch | ✅ | Runtime |
 | MT4 | switch_to() no-ops when switching to same task | ✅ | Implicit (code path) |
 | MT5 | yield_now() re-adds current task to ready queue | ✅ | Runtime |
 | MT6 | task_exit() marks task as Exited | ✅ | Runtime |
 | MT7 | task_exit() does not re-add task to ready queue | ✅ | Runtime |
-| MT8 | idle_loop() uses WFI for power efficiency | ✅ | Runtime (Rule 16) |
+| MT8 | idle_loop() uses WFI/HLT for power efficiency | ✅ | Runtime (Rule 16) |
 
 ### Task Primitives (task/mod.rs)
 
