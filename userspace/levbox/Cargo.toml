@@ -93,6 +93,7 @@ path = "src/bin/test/pty_test.rs"
 name = "pty_interact"
 path = "src/bin/test/pty_interact.rs"
 
+
 [dependencies]
 libsyscall = { path = "../libsyscall" }
 ulib = { path = "../ulib", features = ["entry"] }
