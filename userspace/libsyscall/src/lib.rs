@@ -88,6 +88,11 @@ pub const CLONE_PARENT_SETTID: u64 = 0x00100000;
 pub const CLONE_CHILD_CLEARTID: u64 = 0x00200000;
 pub const CLONE_CHILD_SETTID: u64 = 0x01000000;
 
+// TEAM_233: Pipe and dup syscalls
+pub const SYS_DUP: u64 = 23;
+pub const SYS_DUP3: u64 = 24;
+pub const SYS_PIPE2: u64 = 59;
+
 // Custom LevitateOS (temporary, until clone/execve work)
 pub const SYS_SPAWN: u64 = 1000;
 pub const SYS_SPAWN_ARGS: u64 = 1001;
@@ -418,6 +423,91 @@ pub fn set_tid_address(tidptr: *mut i32) -> isize {
             "svc #0",
             in("x8") SYS_SET_TID_ADDRESS,
             in("x0") tidptr,
+            lateout("x0") ret,
+            options(nostack)
+        );
+    }
+    ret as isize
+}
+
+/// TEAM_233: Create a pipe.
+///
+/// # Arguments
+/// * `pipefd` - Array to store read and write fd [read_fd, write_fd]
+/// * `flags` - Pipe flags (O_CLOEXEC, O_NONBLOCK)
+///
+/// # Returns
+/// 0 on success, negative error code on failure.
+#[inline]
+pub fn pipe2(pipefd: &mut [i32; 2], flags: u32) -> isize {
+    let ret: i64;
+    unsafe {
+        core::arch::asm!(
+            "svc #0",
+            in("x8") SYS_PIPE2,
+            in("x0") pipefd.as_mut_ptr(),
+            in("x1") flags,
+            lateout("x0") ret,
+            options(nostack)
+        );
+    }
+    ret as isize
+}
+
+/// TEAM_233: Duplicate a file descriptor to lowest available.
+///
+/// # Arguments
+/// * `oldfd` - File descriptor to duplicate
+///
+/// # Returns
+/// New fd on success, negative error code on failure.
+#[inline]
+pub fn dup(oldfd: usize) -> isize {
+    let ret: i64;
+    unsafe {
+        core::arch::asm!(
+            "svc #0",
+            in("x8") SYS_DUP,
+            in("x0") oldfd,
+            lateout("x0") ret,
+            options(nostack)
+        );
+    }
+    ret as isize
+}
+
+/// TEAM_233: Duplicate a file descriptor to a specific number.
+///
+/// # Arguments
+/// * `oldfd` - File descriptor to duplicate
+/// * `newfd` - Target fd number (closed if already open)
+///
+/// # Returns
+/// newfd on success, negative error code on failure.
+#[inline]
+pub fn dup2(oldfd: usize, newfd: usize) -> isize {
+    dup3(oldfd, newfd, 0)
+}
+
+/// TEAM_233: Duplicate a file descriptor with flags.
+///
+/// # Arguments
+/// * `oldfd` - File descriptor to duplicate
+/// * `newfd` - Target fd number
+/// * `flags` - Flags (O_CLOEXEC)
+///
+/// # Returns
+/// newfd on success, negative error code on failure.
+#[inline]
+pub fn dup3(oldfd: usize, newfd: usize, flags: u32) -> isize {
+    let ret: i64;
+    unsafe {
+        core::arch::asm!(
+            "svc #0",
+            in("x8") SYS_DUP3,
+            in("x0") oldfd,
+            in("x1") newfd,
+            in("x2") flags,
             lateout("x0") ret,
             options(nostack)
         );

@@ -9,12 +9,14 @@ use los_hal::IrqSafeLock;
 /// TEAM_168: Maximum number of open file descriptors per process.
 pub const MAX_FDS: usize = 64;
 
+use crate::fs::pipe::PipeRef;
 use crate::fs::vfs::file::FileRef;
 
 /// TEAM_168: Type of file descriptor entry.
 /// TEAM_194: Removed Copy derive to support Arc<> for tmpfs nodes.
 /// TEAM_195: Removed Debug derive since Mutex<TmpfsNode> doesn't implement Debug.
 /// TEAM_203: Added VfsFile variant and removed legacy Tmpfs variants.
+/// TEAM_233: Added PipeRead and PipeWrite variants for pipe support.
 #[derive(Clone)]
 pub enum FdType {
     /// Standard input (keyboard)
@@ -25,6 +27,10 @@ pub enum FdType {
     Stderr,
     /// TEAM_203: Generic VFS file (used for tmpfs, FAT32, etc.)
     VfsFile(FileRef),
+    /// TEAM_233: Read end of a pipe
+    PipeRead(PipeRef),
+    /// TEAM_233: Write end of a pipe
+    PipeWrite(PipeRef),
 }
 
 /// TEAM_168: A single file descriptor entry.
@@ -119,6 +125,46 @@ impl FdTable {
     #[allow(dead_code)]
     pub fn is_valid(&self, fd: usize) -> bool {
         self.get(fd).is_some()
+    }
+
+    /// TEAM_233: Duplicate a file descriptor to the lowest available slot.
+    ///
+    /// Returns the new fd number on success, or None if oldfd is invalid or table is full.
+    pub fn dup(&mut self, oldfd: usize) -> Option<usize> {
+        // Get the FdType from oldfd
+        let fd_type = self.get(oldfd)?.fd_type.clone();
+        // Allocate a new fd with the same type
+        self.alloc(fd_type)
+    }
+
+    /// TEAM_233: Duplicate a file descriptor to a specific slot.
+    ///
+    /// If newfd is already open, it is closed first.
+    /// Returns newfd on success, or None if oldfd is invalid.
+    pub fn dup_to(&mut self, oldfd: usize, newfd: usize) -> Option<usize> {
+        if oldfd == newfd {
+            return None; // dup3 returns EINVAL for this
+        }
+        if newfd >= MAX_FDS {
+            return None;
+        }
+
+        // Get the FdType from oldfd
+        let fd_type = self.get(oldfd)?.fd_type.clone();
+
+        // Ensure entries vector is large enough
+        while self.entries.len() <= newfd {
+            self.entries.push(None);
+        }
+
+        // Close newfd if open (silently)
+        if self.entries[newfd].is_some() {
+            self.entries[newfd] = None;
+        }
+
+        // Set newfd to point to same fd_type
+        self.entries[newfd] = Some(FdEntry::new(fd_type));
+        Some(newfd)
     }
 }
 

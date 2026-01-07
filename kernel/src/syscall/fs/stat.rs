@@ -45,6 +45,28 @@ pub fn sys_fstat(fd: usize, stat_buf: usize) -> i64 {
             Ok(s) => s,
             Err(_) => return errno::EBADF,
         },
+        // TEAM_233: Pipes are FIFOs
+        FdType::PipeRead(_) | FdType::PipeWrite(_) => Stat {
+            st_dev: 0,
+            st_ino: 0,
+            st_mode: crate::fs::mode::S_IFIFO | 0o600,
+            st_nlink: 1,
+            st_uid: 0,
+            st_gid: 0,
+            st_rdev: 0,
+            __pad1: 0,
+            st_size: 0,
+            st_blksize: crate::fs::pipe::PIPE_BUF_SIZE as i32,
+            __pad2: 0,
+            st_blocks: 0,
+            st_atime: 0,
+            st_atime_nsec: 0,
+            st_mtime: 0,
+            st_mtime_nsec: 0,
+            st_ctime: 0,
+            st_ctime_nsec: 0,
+            __unused: [0; 2],
+        },
     };
 
     let stat_bytes =

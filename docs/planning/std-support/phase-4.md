@@ -2,7 +2,7 @@
 
 **Parent**: `docs/planning/std-support/`  
 **Team**: TEAM_222  
-**Status**: Not Started  
+**Status**: **COMPLETE** (TEAM_230)  
 **Priority**: P1 — Unlocks `std::thread`
 
 ## Purpose

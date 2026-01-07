@@ -81,6 +81,10 @@ pub enum SyscallNumber {
     // TEAM_228: Threading syscalls for std support
     Clone = 220,
     SetTidAddress = 96,
+    // TEAM_233: Pipe and dup syscalls for std support
+    Dup = 23,
+    Dup3 = 24,
+    Pipe2 = 59,
 
     // === Custom LevitateOS syscalls (temporary, until clone/execve work) ===
     /// TEAM_120: Spawn process (custom, will be replaced by clone+execve)
@@ -136,6 +140,10 @@ impl SyscallNumber {
             // TEAM_228: Threading
             220 => Some(Self::Clone),
             96 => Some(Self::SetTidAddress),
+            // TEAM_233: Pipe and dup
+            23 => Some(Self::Dup),
+            24 => Some(Self::Dup3),
+            59 => Some(Self::Pipe2),
             // Custom LevitateOS
             1000 => Some(Self::Spawn),
             1001 => Some(Self::SpawnArgs),
@@ -372,6 +380,14 @@ pub fn syscall_dispatch(frame: &mut SyscallFrame) {
             frame, // TEAM_230: Pass frame to clone registers
         ),
         Some(SyscallNumber::SetTidAddress) => process::sys_set_tid_address(frame.arg0() as usize),
+        // TEAM_233: Pipe and dup syscalls
+        Some(SyscallNumber::Dup) => fs::sys_dup(frame.arg0() as usize),
+        Some(SyscallNumber::Dup3) => fs::sys_dup3(
+            frame.arg0() as usize,
+            frame.arg1() as usize,
+            frame.arg2() as u32,
+        ),
+        Some(SyscallNumber::Pipe2) => fs::sys_pipe2(frame.arg0() as usize, frame.arg1() as u32),
         None => {
             println!("[SYSCALL] Unknown syscall number: {}", nr);
             errno::ENOSYS

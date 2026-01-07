@@ -119,6 +119,25 @@ pub fn sys_write(fd: usize, buf: usize, len: usize) -> i64 {
                 Err(_) => errno::EIO,
             }
         }
+        // TEAM_233: Write to pipe
+        FdType::PipeWrite(ref pipe) => {
+            if mm_user::validate_user_buffer(ttbr0, buf, len, false).is_err() {
+                return errno::EFAULT;
+            }
+            let mut kbuf = alloc::vec![0u8; len];
+            for i in 0..len {
+                if let Some(ptr) = mm_user::user_va_to_kernel_ptr(ttbr0, buf + i) {
+                    kbuf[i] = unsafe { *ptr };
+                } else {
+                    return errno::EFAULT;
+                }
+            }
+            let result = pipe.write(&kbuf);
+            if result < 0 {
+                return result as i64;
+            }
+            result as i64
+        }
         _ => errno::EBADF,
     }
 }

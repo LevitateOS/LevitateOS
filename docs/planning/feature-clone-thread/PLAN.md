@@ -13,10 +13,10 @@ that share address space with the parent. This is required for Rust `std::thread
 
 | Phase | Name | Status |
 |-------|------|--------|
-| 1 | Discovery | In Progress |
-| 2 | Design | Not Started |
-| 3 | Implementation | Not Started |
-| 4 | Testing | Not Started |
+| 1 | Discovery | Complete |
+| 2 | Design | Complete |
+| 3 | Implementation | Complete |
+| 4 | Testing | Complete |
 | 5 | Polish | Not Started |
 
 ## Key Files

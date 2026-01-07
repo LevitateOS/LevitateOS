@@ -15,7 +15,7 @@ This plan implements full Rust `std` compatibility for LevitateOS through 7 phas
 | 1 | Discovery and Safeguards | — | 6 | Not Started |
 | 2 | Auxv Verification | P0 | 1 | **COMPLETE** (TEAM_217) |
 | 3 | mmap/munmap/mprotect | P0 | 9 | **IN PROGRESS** (TEAM_228) |
-| 4 | Threading (clone, TLS) | P1 | 10 | **IN PROGRESS** (TEAM_228) |
+| 4 | Threading (clone, TLS) | P1 | 10 | **COMPLETE** (TEAM_230) |
 | 5 | I/O (writev/readv kernel) | P1 | 0 | **COMPLETE** (TEAM_217) |
 | 6 | Process Orchestration | P2 | 9 | Not Started |
 | 7 | Cleanup and Validation | — | 9 | Not Started |

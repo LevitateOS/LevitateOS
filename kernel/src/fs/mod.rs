@@ -19,6 +19,7 @@ pub mod fat;
 pub mod mode;
 pub mod mount;
 pub mod path;
+pub mod pipe;
 pub mod tmpfs;
 pub mod vfs;
 

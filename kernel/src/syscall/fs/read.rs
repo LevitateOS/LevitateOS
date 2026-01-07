@@ -101,6 +101,24 @@ pub fn sys_read(fd: usize, buf: usize, len: usize) -> i64 {
                 Err(_) => errno::EIO,
             }
         }
+        // TEAM_233: Read from pipe
+        FdType::PipeRead(ref pipe) => {
+            if mm_user::validate_user_buffer(ttbr0, buf, len, true).is_err() {
+                return errno::EFAULT;
+            }
+            let mut kbuf = alloc::vec![0u8; len];
+            let result = pipe.read(&mut kbuf);
+            if result < 0 {
+                return result as i64;
+            }
+            let n = result as usize;
+            for i in 0..n {
+                if !write_to_user_buf(ttbr0, buf, i, kbuf[i]) {
+                    return errno::EFAULT;
+                }
+            }
+            n as i64
+        }
         _ => errno::EBADF,
     }
 }
