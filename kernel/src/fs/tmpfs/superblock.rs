@@ -34,7 +34,7 @@ impl Tmpfs {
     /// TEAM_194: Create a new tmpfs instance
     pub fn new() -> Self {
         Self {
-            root: Arc::new(Mutex::new(TmpfsNode::new_dir(1, ""))),
+            root: Arc::new(Mutex::new(TmpfsNode::new_dir(1))),
             next_ino: AtomicU64::new(2),
             bytes_used: AtomicUsize::new(0),
             vfs_root: Mutex::new(None),

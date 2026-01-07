@@ -51,19 +51,23 @@ pub enum TmpfsNodeType {
     Symlink,
 }
 
+/// TEAM_257: Directory entry in a tmpfs directory
+pub struct TmpfsDirEntry {
+    pub name: String,
+    pub node: Arc<Mutex<TmpfsNode>>,
+}
+
 /// TEAM_194: A node in the tmpfs tree (file or directory)
 /// Note: No Debug derive to avoid Mutex<TmpfsNode> Debug requirement in FdType
 pub struct TmpfsNode {
     /// Unique inode number
     pub ino: u64,
-    /// Node name (not full path)
-    pub name: String,
     /// Node type
     pub node_type: TmpfsNodeType,
     /// File content (for files only)
     pub data: Vec<u8>,
     /// Child nodes (for directories only)
-    pub children: Vec<Arc<Mutex<TmpfsNode>>>,
+    pub children: Vec<TmpfsDirEntry>,
     /// TEAM_198: Access time (seconds since boot)
     pub atime: u64,
     /// TEAM_198: Modification time (seconds since boot)
@@ -80,11 +84,10 @@ impl TmpfsNode {
     /// TEAM_194: Create a new file node
     /// TEAM_198: Added timestamp fields
     /// TEAM_209: Added nlink field
-    pub fn new_file(ino: u64, name: &str) -> Self {
+    pub fn new_file(ino: u64) -> Self {
         let now = crate::syscall::time::uptime_seconds();
         Self {
             ino,
-            name: String::from(name),
             node_type: TmpfsNodeType::File,
             data: Vec::new(),
             children: Vec::new(),
@@ -99,11 +102,10 @@ impl TmpfsNode {
     /// TEAM_194: Create a new directory node
     /// TEAM_198: Added timestamp fields
     /// TEAM_209: Added nlink field
-    pub fn new_dir(ino: u64, name: &str) -> Self {
+    pub fn new_dir(ino: u64) -> Self {
         let now = crate::syscall::time::uptime_seconds();
         Self {
             ino,
-            name: String::from(name),
             node_type: TmpfsNodeType::Directory,
             data: Vec::new(),
             children: Vec::new(),
@@ -117,11 +119,10 @@ impl TmpfsNode {
 
     /// TEAM_198: Create a new symlink node
     /// TEAM_209: Added nlink field
-    pub fn new_symlink(ino: u64, name: &str, target: &str) -> Self {
+    pub fn new_symlink(ino: u64, target: &str) -> Self {
         let now = crate::syscall::time::uptime_seconds();
         Self {
             ino,
-            name: String::from(name),
             node_type: TmpfsNodeType::Symlink,
             data: target.as_bytes().to_vec(), // Store target path in data
             children: Vec::new(),
@@ -184,19 +185,22 @@ impl TmpfsNode {
 /// TEAM_203: Shared logic for creating nodes
 pub(super) fn add_child(
     parent: &Arc<Mutex<TmpfsNode>>,
+    name: &str,
     child: Arc<Mutex<TmpfsNode>>,
 ) -> VfsResult<()> {
     let mut parent_node = parent.lock();
     if !parent_node.is_dir() {
         return Err(VfsError::NotADirectory);
     }
-    let name = child.lock().name.clone();
-    for existing in &parent_node.children {
-        if existing.lock().name == name {
+    for entry in &parent_node.children {
+        if entry.name == name {
             return Err(VfsError::AlreadyExists);
         }
     }
     child.lock().parent = Arc::downgrade(parent);
-    parent_node.children.push(child);
+    parent_node.children.push(TmpfsDirEntry {
+        name: String::from(name),
+        node: child,
+    });
     Ok(())
 }

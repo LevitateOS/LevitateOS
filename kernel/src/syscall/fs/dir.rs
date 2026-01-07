@@ -128,27 +128,11 @@ pub fn sys_getcwd(buf: usize, size: usize) -> i64 {
 /// TEAM_192: sys_mkdirat - Create directory.
 /// TEAM_194: Updated to support tmpfs at /tmp.
 pub fn sys_mkdirat(_dfd: i32, path: usize, path_len: usize, mode: u32) -> i64 {
-    if path_len == 0 || path_len > 256 {
-        return errno::EINVAL;
-    }
-
     let task = crate::task::current_task();
-    if mm_user::validate_user_buffer(task.ttbr0, path, path_len, false).is_err() {
-        return errno::EFAULT;
-    }
-
-    // Read path from userspace
     let mut path_buf = [0u8; 256];
-    for i in 0..path_len {
-        if let Some(ptr) = mm_user::user_va_to_kernel_ptr(task.ttbr0, path + i) {
-            path_buf[i] = unsafe { *ptr };
-        } else {
-            return errno::EFAULT;
-        }
-    }
-    let path_str = match core::str::from_utf8(&path_buf[..path_len]) {
+    let path_str = match crate::syscall::copy_user_string(task.ttbr0, path, path_len, &mut path_buf) {
         Ok(s) => s,
-        Err(_) => return errno::EINVAL,
+        Err(e) => return e,
     };
 
     match vfs_mkdir(path_str, mode) {
@@ -166,28 +150,11 @@ pub fn sys_unlinkat(_dfd: i32, path: usize, path_len: usize, flags: u32) -> i64 
     /// TEAM_194: AT_REMOVEDIR flag for unlinkat
     const AT_REMOVEDIR: u32 = 0x200;
 
-    if path_len == 0 || path_len > 256 {
-        return errno::EINVAL;
-    }
-
     let task = crate::task::current_task();
-    if mm_user::validate_user_buffer(task.ttbr0, path, path_len, false).is_err() {
-        return errno::EFAULT;
-    }
-
-    // Read path from userspace
     let mut path_buf = [0u8; 256];
-    for i in 0..path_len {
-        if let Some(ptr) = mm_user::user_va_to_kernel_ptr(task.ttbr0, path + i) {
-            path_buf[i] = unsafe { *ptr };
-        } else {
-            return errno::EFAULT;
-        }
-    }
-
-    let path_str = match core::str::from_utf8(&path_buf[..path_len]) {
+    let path_str = match crate::syscall::copy_user_string(task.ttbr0, path, path_len, &mut path_buf) {
         Ok(s) => s,
-        Err(_) => return errno::EINVAL,
+        Err(e) => return e,
     };
 
     let res = if (flags & AT_REMOVEDIR) != 0 {
@@ -215,44 +182,20 @@ pub fn sys_renameat(
     new_path: usize,
     new_path_len: usize,
 ) -> i64 {
-    if old_path_len == 0 || old_path_len > 256 || new_path_len == 0 || new_path_len > 256 {
-        return errno::EINVAL;
-    }
-
     let task = crate::task::current_task();
 
-    // Validate and read old path
-    if mm_user::validate_user_buffer(task.ttbr0, old_path, old_path_len, false).is_err() {
-        return errno::EFAULT;
-    }
+    // Resolve old path
     let mut old_path_buf = [0u8; 256];
-    for i in 0..old_path_len {
-        if let Some(ptr) = mm_user::user_va_to_kernel_ptr(task.ttbr0, old_path + i) {
-            old_path_buf[i] = unsafe { *ptr };
-        } else {
-            return errno::EFAULT;
-        }
-    }
-    let old_path_str = match core::str::from_utf8(&old_path_buf[..old_path_len]) {
+    let old_path_str = match crate::syscall::copy_user_string(task.ttbr0, old_path, old_path_len, &mut old_path_buf) {
         Ok(s) => s,
-        Err(_) => return errno::EINVAL,
+        Err(e) => return e,
     };
 
-    // Validate and read new path
-    if mm_user::validate_user_buffer(task.ttbr0, new_path, new_path_len, false).is_err() {
-        return errno::EFAULT;
-    }
+    // Resolve new path
     let mut new_path_buf = [0u8; 256];
-    for i in 0..new_path_len {
-        if let Some(ptr) = mm_user::user_va_to_kernel_ptr(task.ttbr0, new_path + i) {
-            new_path_buf[i] = unsafe { *ptr };
-        } else {
-            return errno::EFAULT;
-        }
-    }
-    let new_path_str = match core::str::from_utf8(&new_path_buf[..new_path_len]) {
+    let new_path_str = match crate::syscall::copy_user_string(task.ttbr0, new_path, new_path_len, &mut new_path_buf) {
         Ok(s) => s,
-        Err(_) => return errno::EINVAL,
+        Err(e) => return e,
     };
 
     match vfs_rename(old_path_str, new_path_str) {

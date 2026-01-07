@@ -89,12 +89,27 @@ fn copy_file(src: &str, dest: &str, _opts: &Options) -> bool {
         }
     }
 
-    // TODO: Write to destination (requires write syscall support)
-    // For now, just report that write is not supported
-    libsyscall::write(2, b"cp: cannot create '");
-    libsyscall::write(2, dest.as_bytes());
-    libsyscall::write(2, b"': Read-only file system\n");
-    false
+    // TEAM_256: Create destination file and write content
+    let mut dest_file = match File::create(dest) {
+        Ok(f) => f,
+        Err(_) => {
+            libsyscall::write(2, b"cp: cannot create '");
+            libsyscall::write(2, dest.as_bytes());
+            libsyscall::write(2, b"': Permission denied\n");
+            return false;
+        }
+    };
+
+    // Write content to destination
+    match dest_file.write(&content) {
+        Ok(_) => true,
+        Err(_) => {
+            libsyscall::write(2, b"cp: error writing '");
+            libsyscall::write(2, dest.as_bytes());
+            libsyscall::write(2, b"'\n");
+            false
+        }
+    }
 }
 
 // ============================================================================

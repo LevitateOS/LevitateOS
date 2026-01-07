@@ -31,13 +31,12 @@ impl InodeOps for TmpfsDirOps {
             return Err(VfsError::NotADirectory);
         }
 
-        for child in &node_inner.children {
-            let child_node = child.lock();
-            if child_node.name == name {
+        for entry in &node_inner.children {
+            if entry.name == name {
                 let sb = inode.sb.upgrade().ok_or(VfsError::IoError)?;
                 let tmpfs_lock = TMPFS.lock();
                 let tmpfs = tmpfs_lock.as_ref().ok_or(VfsError::IoError)?;
-                return Ok(tmpfs.make_inode(Arc::clone(child), Arc::downgrade(&sb)));
+                return Ok(tmpfs.make_inode(Arc::clone(&entry.node), Arc::downgrade(&sb)));
             }
         }
 
@@ -77,11 +76,11 @@ impl InodeOps for TmpfsDirOps {
 
         let child_idx = offset - 2;
         if child_idx < node_inner.children.len() {
-            let child = &node_inner.children[child_idx];
-            let child_node = child.lock();
+            let entry = &node_inner.children[child_idx];
+            let child_node = entry.node.lock();
             let de = DirEntry {
                 ino: child_node.ino,
-                name: child_node.name.clone(),
+                name: entry.name.clone(),
                 file_type: mode::file_type(match child_node.node_type {
                     TmpfsNodeType::File => mode::S_IFREG,
                     TmpfsNodeType::Directory => mode::S_IFDIR,
@@ -104,8 +103,8 @@ impl InodeOps for TmpfsDirOps {
         let tmpfs = tmpfs_lock.as_ref().ok_or(VfsError::IoError)?;
 
         let ino = tmpfs.alloc_ino();
-        let new_node = Arc::new(Mutex::new(TmpfsNode::new_file(ino, name)));
-        add_child(node, Arc::clone(&new_node))?;
+        let new_node = Arc::new(Mutex::new(TmpfsNode::new_file(ino)));
+        add_child(node, name, Arc::clone(&new_node))?;
 
         Ok(tmpfs.make_inode(new_node, Arc::downgrade(&sb)))
     }
@@ -120,8 +119,8 @@ impl InodeOps for TmpfsDirOps {
         let tmpfs = tmpfs_lock.as_ref().ok_or(VfsError::IoError)?;
 
         let ino = tmpfs.alloc_ino();
-        let new_node = Arc::new(Mutex::new(TmpfsNode::new_dir(ino, name)));
-        add_child(node, Arc::clone(&new_node))?;
+        let new_node = Arc::new(Mutex::new(TmpfsNode::new_dir(ino)));
+        add_child(node, name, Arc::clone(&new_node))?;
 
         Ok(tmpfs.make_inode(new_node, Arc::downgrade(&sb)))
     }
@@ -136,8 +135,8 @@ impl InodeOps for TmpfsDirOps {
         let tmpfs = tmpfs_lock.as_ref().ok_or(VfsError::IoError)?;
 
         let ino = tmpfs.alloc_ino();
-        let new_node = Arc::new(Mutex::new(TmpfsNode::new_symlink(ino, name, target)));
-        add_child(node, Arc::clone(&new_node))?;
+        let new_node = Arc::new(Mutex::new(TmpfsNode::new_symlink(ino, target)));
+        add_child(node, name, Arc::clone(&new_node))?;
 
         Ok(tmpfs.make_inode(new_node, Arc::downgrade(&sb)))
     }
@@ -158,14 +157,11 @@ impl InodeOps for TmpfsDirOps {
 
         // TEAM_204: Rename cycle check
         {
-            let old_node_locked = old_dir
-                .private::<Arc<Mutex<TmpfsNode>>>()
-                .ok_or(VfsError::IoError)?
-                .lock();
+            let old_node_locked = old_node.lock();
             let mut to_move = None;
-            for child in &old_node_locked.children {
-                if child.lock().name == old_name {
-                    to_move = Some(child.clone());
+            for entry in &old_node_locked.children {
+                if entry.name == old_name {
+                    to_move = Some(entry.node.clone());
                     break;
                 }
             }
@@ -189,8 +185,8 @@ impl InodeOps for TmpfsDirOps {
             }
 
             let mut found_idx = None;
-            for (idx, child) in locked.children.iter().enumerate() {
-                if child.lock().name == old_name {
+            for (idx, entry) in locked.children.iter().enumerate() {
+                if entry.name == old_name {
                     found_idx = Some(idx);
                     break;
                 }
@@ -199,8 +195,8 @@ impl InodeOps for TmpfsDirOps {
 
             // Check if target exists
             let mut target_idx = None;
-            for (t_idx, child) in locked.children.iter().enumerate() {
-                if child.lock().name == new_name {
+            for (t_idx, entry) in locked.children.iter().enumerate() {
+                if entry.name == new_name {
                     target_idx = Some(t_idx);
                     break;
                 }
@@ -212,27 +208,27 @@ impl InodeOps for TmpfsDirOps {
                     return Ok(());
                 }
                 let existing = locked.children.remove(t_idx);
-                if existing.lock().is_dir() && !existing.lock().children.is_empty() {
+                if existing.node.lock().is_dir() && !existing.node.lock().children.is_empty() {
                     locked.children.insert(t_idx, existing);
                     return Err(VfsError::DirectoryNotEmpty);
                 }
                 // Update bytes_used if it was a file/symlink
                 let tmpfs_lock = TMPFS.lock();
                 let tmpfs = tmpfs_lock.as_ref().ok_or(VfsError::IoError)?;
-                if !existing.lock().is_dir() {
+                if !existing.node.lock().is_dir() {
                     tmpfs
                         .bytes_used
-                        .fetch_sub(existing.lock().data.len(), Ordering::SeqCst);
+                        .fetch_sub(existing.node.lock().data.len(), Ordering::SeqCst);
                 }
 
                 // Adjust index if needed since we removed an element
                 let final_idx = if t_idx < idx { idx - 1 } else { idx };
-                let to_move = locked.children.remove(final_idx);
-                to_move.lock().name = new_name.to_string();
+                let mut to_move = locked.children.remove(final_idx);
+                to_move.name = new_name.to_string();
                 locked.children.insert(t_idx, to_move); // Insert at the target's old position
             } else {
-                let to_move = locked.children.remove(idx);
-                to_move.lock().name = new_name.to_string();
+                let mut to_move = locked.children.remove(idx);
+                to_move.name = new_name.to_string();
                 locked.children.push(to_move);
             }
         } else {
@@ -244,46 +240,47 @@ impl InodeOps for TmpfsDirOps {
             }
 
             let mut found_idx = None;
-            for (idx, child) in old_locked.children.iter().enumerate() {
-                if child.lock().name == old_name {
+            for (idx, entry) in old_locked.children.iter().enumerate() {
+                if entry.name == old_name {
                     found_idx = Some(idx);
                     break;
                 }
             }
-            let to_move_arc = old_locked
+            let mut to_move = old_locked
                 .children
                 .remove(found_idx.ok_or(VfsError::NotFound)?);
 
             // Check if target exists and remove it
             let mut target_idx = None;
-            for (idx, child) in new_locked.children.iter().enumerate() {
-                if child.lock().name == new_name {
+            for (idx, entry) in new_locked.children.iter().enumerate() {
+                if entry.name == new_name {
                     target_idx = Some(idx);
                     break;
                 }
             }
             if let Some(idx) = target_idx {
-                let existing_child = new_locked.children.remove(idx);
+                let existing_entry = new_locked.children.remove(idx);
+                let existing_node = existing_entry.node.clone();
                 // If it's a directory, it must be empty
-                if existing_child.lock().is_dir() && !existing_child.lock().children.is_empty() {
+                if existing_node.lock().is_dir() && !existing_node.lock().children.is_empty() {
                     // Put it back and return error
-                    new_locked.children.insert(idx, existing_child);
-                    old_locked.children.insert(found_idx.unwrap(), to_move_arc); // Put back original
+                    new_locked.children.insert(idx, existing_entry);
+                    old_locked.children.insert(found_idx.unwrap(), to_move); // Put back original
                     return Err(VfsError::DirectoryNotEmpty);
                 }
                 // If it's a file/symlink, or an empty directory, it's replaced.
                 // Update bytes_used if it was a file/symlink
                 let tmpfs_lock = TMPFS.lock();
                 let tmpfs = tmpfs_lock.as_ref().ok_or(VfsError::IoError)?;
-                if !existing_child.lock().is_dir() {
+                if !existing_node.lock().is_dir() {
                     tmpfs
                         .bytes_used
-                        .fetch_sub(existing_child.lock().data.len(), Ordering::SeqCst);
+                        .fetch_sub(existing_node.lock().data.len(), Ordering::SeqCst);
                 }
             }
 
-            to_move_arc.lock().name = new_name.to_string();
-            new_locked.children.push(to_move_arc);
+            to_move.name = new_name.to_string();
+            new_locked.children.push(to_move);
         }
 
         Ok(())
@@ -296,9 +293,9 @@ impl InodeOps for TmpfsDirOps {
 
         let mut parent_node = node.lock();
         let mut found_idx = None;
-        for (idx, child) in parent_node.children.iter().enumerate() {
-            let child_node = (**child).lock();
-            if child_node.name == name {
+        for (idx, entry) in parent_node.children.iter().enumerate() {
+            if entry.name == name {
+                let child_node = entry.node.lock();
                 if child_node.is_dir() {
                     return Err(VfsError::IsADirectory);
                 }
@@ -308,7 +305,8 @@ impl InodeOps for TmpfsDirOps {
         }
 
         if let Some(idx) = found_idx {
-            let child = parent_node.children.remove(idx);
+            let entry = parent_node.children.remove(idx);
+            let child = entry.node;
             
             // Decrement nlink in TmpfsNode
             let mut child_locked = child.lock();
@@ -335,9 +333,9 @@ impl InodeOps for TmpfsDirOps {
 
         let mut parent_node = node.lock();
         let mut found_idx = None;
-        for (idx, child) in parent_node.children.iter().enumerate() {
-            let child_node = (**child).lock();
-            if child_node.name == name {
+        for (idx, entry) in parent_node.children.iter().enumerate() {
+            if entry.name == name {
+                let child_node = entry.node.lock();
                 if !child_node.is_dir() {
                     return Err(VfsError::NotADirectory);
                 }
@@ -350,7 +348,8 @@ impl InodeOps for TmpfsDirOps {
         }
 
         if let Some(idx) = found_idx {
-            let child = parent_node.children.remove(idx);
+            let entry = parent_node.children.remove(idx);
+            let child = entry.node;
             child.lock().nlink -= 1; // self reference
             parent_node.nlink -= 1; // child's .. reference
             Ok(())
@@ -359,7 +358,7 @@ impl InodeOps for TmpfsDirOps {
         }
     }
 
-    fn link(&self, inode: &Inode, _name: &str, target: &Inode) -> VfsResult<()> {
+    fn link(&self, inode: &Inode, name: &str, target: &Inode) -> VfsResult<()> {
         let parent_node_arc = inode
             .private::<Arc<Mutex<TmpfsNode>>>()
             .ok_or(VfsError::IoError)?;
@@ -374,7 +373,7 @@ impl InodeOps for TmpfsDirOps {
         }
 
         // Add child (handles name collision and setting parent weak ref)
-        add_child(parent_node_arc, Arc::clone(target_node_arc))?;
+        add_child(parent_node_arc, name, Arc::clone(target_node_arc))?;
         
         // Increment link count
         target_node_arc.lock().nlink += 1;

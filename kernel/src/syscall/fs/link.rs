@@ -45,7 +45,7 @@ pub fn sys_utimensat(_dirfd: i32, path: usize, path_len: usize, times: usize, _f
             let mut val = 0u64;
             for j in 0..8 {
                 if let Some(ptr) =
-                    mm_user::user_va_to_kernel_ptr(task.ttbr0, times + i * 16 + j)
+                    mm_user::user_va_to_kernel_ptr(task.ttbr0, times + i * 8 + j)
                 {
                     val |= (unsafe { *ptr } as u64) << (j * 8);
                 } else {
@@ -91,30 +91,16 @@ pub fn sys_linkat(
     
     // Resolve oldpath
     let mut old_path_buf = [0u8; 256];
-    for i in 0..oldpath_len.min(256) {
-        if let Some(ptr) = mm_user::user_va_to_kernel_ptr(task.ttbr0, oldpath + i) {
-            old_path_buf[i] = unsafe { *ptr };
-        } else {
-            return errno::EFAULT;
-        }
-    }
-    let old_path_str = match core::str::from_utf8(&old_path_buf[..oldpath_len.min(256)]) {
+    let old_path_str = match crate::syscall::copy_user_string(task.ttbr0, oldpath, oldpath_len, &mut old_path_buf) {
         Ok(s) => s,
-        Err(_) => return errno::EINVAL,
+        Err(e) => return e,
     };
 
     // Resolve newpath
     let mut new_path_buf = [0u8; 256];
-    for i in 0..newpath_len.min(256) {
-        if let Some(ptr) = mm_user::user_va_to_kernel_ptr(task.ttbr0, newpath + i) {
-            new_path_buf[i] = unsafe { *ptr };
-        } else {
-            return errno::EFAULT;
-        }
-    }
-    let new_path_str = match core::str::from_utf8(&new_path_buf[..newpath_len.min(256)]) {
+    let new_path_str = match crate::syscall::copy_user_string(task.ttbr0, newpath, newpath_len, &mut new_path_buf) {
         Ok(s) => s,
-        Err(_) => return errno::EINVAL,
+        Err(e) => return e,
     };
 
     match vfs_link(old_path_str, new_path_str) {
@@ -175,24 +161,12 @@ pub fn sys_symlinkat(
 }
 
 /// TEAM_204: sys_readlinkat - Read value of a symbolic link.
-pub fn sys_readlinkat(dirfd: i32, path: usize, path_len: usize, buf: usize, buf_len: usize) -> i64 {
-    if dirfd != -100 {
-        // AT_FDCWD
-        return errno::ENOSYS;
-    }
-
+pub fn sys_readlinkat(_dirfd: i32, path: usize, path_len: usize, buf: usize, buf_len: usize) -> i64 {
     let task = crate::task::current_task();
     let mut path_buf = [0u8; 256];
-    for i in 0..path_len.min(256) {
-        if let Some(ptr) = mm_user::user_va_to_kernel_ptr(task.ttbr0, path + i) {
-            path_buf[i] = unsafe { *ptr };
-        } else {
-            return errno::EFAULT;
-        }
-    }
-    let path_str = match core::str::from_utf8(&path_buf[..path_len.min(256)]) {
+    let path_str = match crate::syscall::copy_user_string(task.ttbr0, path, path_len, &mut path_buf) {
         Ok(s) => s,
-        Err(_) => return errno::EINVAL,
+        Err(e) => return e,
     };
 
     match vfs_readlink(path_str) {
