@@ -377,3 +377,37 @@ pub(crate) fn read_from_user(ttbr0: usize, user_va: usize) -> Option<u8> {
         None
     }
 }
+
+/// TEAM_226: Copy a string from user space into a kernel buffer.
+///
+/// Validates the user buffer and copies bytes through kernel-accessible pointers.
+/// This is the safe pattern for reading user memory from syscalls.
+///
+/// # Arguments
+/// * `ttbr0` - User page table physical address
+/// * `user_ptr` - User virtual address of string
+/// * `len` - Length of string to copy
+/// * `buf` - Kernel buffer to copy into
+///
+/// # Returns
+/// * `Ok(&str)` - Valid UTF-8 string slice from buffer
+/// * `Err(errno)` - EFAULT if copy fails, EINVAL if not valid UTF-8
+pub fn copy_user_string<'a>(
+    ttbr0: usize,
+    user_ptr: usize,
+    len: usize,
+    buf: &'a mut [u8],
+) -> Result<&'a str, i64> {
+    let len = len.min(buf.len());
+    if mm_user::validate_user_buffer(ttbr0, user_ptr, len, false).is_err() {
+        return Err(errno::EFAULT);
+    }
+    for i in 0..len {
+        if let Some(ptr) = mm_user::user_va_to_kernel_ptr(ttbr0, user_ptr + i) {
+            buf[i] = unsafe { *ptr };
+        } else {
+            return Err(errno::EFAULT);
+        }
+    }
+    core::str::from_utf8(&buf[..len]).map_err(|_| errno::EINVAL)
+}

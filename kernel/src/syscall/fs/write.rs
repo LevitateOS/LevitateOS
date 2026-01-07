@@ -78,15 +78,23 @@ pub fn sys_write(fd: usize, buf: usize, len: usize) -> i64 {
 
     match entry.fd_type {
         FdType::Stdout | FdType::Stderr => {
-            // Write to console
+            // TEAM_226: Write to console using safe copy
             if mm_user::validate_user_buffer(ttbr0, buf, len, false).is_err() {
                 return errno::EFAULT;
             }
-            let slice = unsafe { core::slice::from_raw_parts(buf as *const u8, len) };
-            if let Ok(s) = core::str::from_utf8(slice) {
+            // Copy bytes through kernel-accessible pointers
+            let mut kbuf = alloc::vec![0u8; len];
+            for i in 0..len {
+                if let Some(ptr) = mm_user::user_va_to_kernel_ptr(ttbr0, buf + i) {
+                    kbuf[i] = unsafe { *ptr };
+                } else {
+                    return errno::EFAULT;
+                }
+            }
+            if let Ok(s) = core::str::from_utf8(&kbuf) {
                 print!("{}", s);
             } else {
-                for byte in slice {
+                for byte in &kbuf {
                     print!("{:02x}", byte);
                 }
             }

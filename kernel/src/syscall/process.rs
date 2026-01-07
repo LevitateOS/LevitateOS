@@ -43,14 +43,12 @@ pub fn sys_yield() -> i64 {
 pub fn sys_spawn(path_ptr: usize, path_len: usize) -> i64 {
     let path_len = path_len.min(256);
     let task = crate::task::current_task();
-    if mm_user::validate_user_buffer(task.ttbr0, path_ptr, path_len, false).is_err() {
-        return errno::EFAULT;
-    }
 
-    let path_bytes = unsafe { core::slice::from_raw_parts(path_ptr as *const u8, path_len) };
-    let path = match core::str::from_utf8(path_bytes) {
+    // TEAM_226: Use safe copy through kernel pointers
+    let mut path_buf = [0u8; 256];
+    let path = match crate::syscall::copy_user_string(task.ttbr0, path_ptr, path_len, &mut path_buf) {
         Ok(s) => s,
-        Err(_) => return errno::EINVAL,
+        Err(e) => return e,
     };
 
     log::trace!("[SYSCALL] spawn('{}')", path);
@@ -97,14 +95,12 @@ pub fn sys_spawn(path_ptr: usize, path_len: usize) -> i64 {
 pub fn sys_exec(path_ptr: usize, path_len: usize) -> i64 {
     let path_len = path_len.min(256);
     let task = crate::task::current_task();
-    if mm_user::validate_user_buffer(task.ttbr0, path_ptr, path_len, false).is_err() {
-        return errno::EFAULT;
-    }
 
-    let path_bytes = unsafe { core::slice::from_raw_parts(path_ptr as *const u8, path_len) };
-    let path = match core::str::from_utf8(path_bytes) {
+    // TEAM_226: Use safe copy through kernel pointers
+    let mut path_buf = [0u8; 256];
+    let path = match crate::syscall::copy_user_string(task.ttbr0, path_ptr, path_len, &mut path_buf) {
         Ok(s) => s,
-        Err(_) => return errno::EINVAL,
+        Err(e) => return e,
     };
 
     log::trace!("[SYSCALL] exec('{}')", path);
@@ -166,17 +162,15 @@ pub fn sys_spawn_args(path_ptr: usize, path_len: usize, argv_ptr: usize, argc: u
     }
 
     // 2. Validate and read path
+    // TEAM_226: Use safe copy through kernel pointers
     let path_len = path_len.min(256);
     let task = crate::task::current_task();
-    if mm_user::validate_user_buffer(task.ttbr0, path_ptr, path_len, false).is_err() {
-        return errno::EFAULT;
-    }
-    let path_bytes = unsafe { core::slice::from_raw_parts(path_ptr as *const u8, path_len) };
-    let path = match core::str::from_utf8(path_bytes) {
+    let mut path_buf = [0u8; 256];
+    let path = match crate::syscall::copy_user_string(task.ttbr0, path_ptr, path_len, &mut path_buf) {
         Ok(s) => alloc::string::String::from(s),
-        Err(_) => {
-            log::debug!("[SYSCALL] spawn_args: Invalid UTF-8 in path");
-            return errno::EINVAL;
+        Err(e) => {
+            log::debug!("[SYSCALL] spawn_args: Invalid path: errno={}", e);
+            return e;
         }
     };
 
@@ -211,16 +205,12 @@ pub fn sys_spawn_args(path_ptr: usize, path_len: usize, argv_ptr: usize, argc: u
             }
         };
 
-        // Validate arg string
+        // TEAM_226: Validate and copy arg string safely
         let arg_len = entry.len.min(MAX_ARG_LEN);
-        if mm_user::validate_user_buffer(task.ttbr0, entry.ptr, arg_len, false).is_err() {
-            return errno::EFAULT;
-        }
-
-        let arg_bytes = unsafe { core::slice::from_raw_parts(entry.ptr as *const u8, arg_len) };
-        match core::str::from_utf8(arg_bytes) {
+        let mut arg_buf = [0u8; MAX_ARG_LEN];
+        match crate::syscall::copy_user_string(task.ttbr0, entry.ptr, arg_len, &mut arg_buf) {
             Ok(s) => args.push(alloc::string::String::from(s)),
-            Err(_) => return errno::EINVAL,
+            Err(e) => return e,
         }
     }
 
