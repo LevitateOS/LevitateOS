@@ -10,17 +10,20 @@ This plan implements full Rust `std` compatibility for LevitateOS through 7 phas
 
 ## Phase Summary
 
-| Phase | Name | Priority | UoWs | Blocking |
-|-------|------|----------|------|----------|
-| 1 | Discovery and Safeguards | — | 6 | Nothing |
-| 2 | Auxv Implementation | P0 | 6 | All std binaries |
-| 3 | mmap/munmap/mprotect | P0 | 8 | std allocator |
-| 4 | Threading (clone, TLS) | P1 | 10 | std::thread |
-| 5 | I/O (writev/readv) | P1 | 5 | println! |
-| 6 | Process Orchestration | P2 | 7 | Command, pipes |
-| 7 | Cleanup and Validation | — | 7 | Release |
+| Phase | Name | Priority | UoWs | Status |
+|-------|------|----------|------|--------|
+| 1 | Discovery and Safeguards | — | 6 | Not Started |
+| 2 | Auxv Verification | P0 | 1 | **COMPLETE** (TEAM_217) |
+| 3 | mmap/munmap/mprotect | P0 | 9 | **IN PROGRESS** (TEAM_228) |
+| 4 | Threading (clone, TLS) | P1 | 10 | **IN PROGRESS** (TEAM_228) |
+| 5 | I/O (writev/readv kernel) | P1 | 0 | **COMPLETE** (TEAM_217) |
+| 6 | Process Orchestration | P2 | 9 | Not Started |
+| 7 | Cleanup and Validation | — | 9 | Not Started |
 
-**Total UoWs**: 49
+**Total UoWs**: ~44 (reduced from original due to existing implementations)
+
+> **Note (TEAM_228)**: Phase 2 auxv and Phase 5 writev/readv already implemented by TEAM_217.
+
 
 ---
 
@@ -69,15 +72,13 @@ All phases → Phase 7
 | 1.3.1 | Map Memory Layout | 30 min |
 | 1.3.2 | Map Thread/Process Context | 30 min |
 
-### Phase 2: Auxv Implementation (P0)
+### Phase 2: Auxv Verification (P0) — COMPLETE
 | UoW | Name | Est. Time |
 |-----|------|-----------|
-| 2.1.1 | Add AT_* Constants to Kernel | 15 min |
-| 2.2.1 | Locate Stack Setup Code | 20 min |
-| 2.2.2 | Implement Auxv Push | 45 min |
-| 2.2.3 | Add ELF Header Auxv Entries | 30 min |
-| 2.3.1 | Add Auxv Reader to libsyscall | 20 min |
-| 2.3.2 | Add Auxv Test Program | 30 min |
+| 2.1 | Verify Auxv with std Binary | 30 min |
+
+> **Note (TEAM_228)**: All auxv implementation UoWs removed — already done by TEAM_217.
+
 
 ### Phase 3: mmap/munmap/mprotect (P0)
 | UoW | Name | Est. Time |
@@ -106,16 +107,16 @@ All phases → Phase 7
 | 4.5.1 | Add Clone to libsyscall | 15 min |
 | 4.5.2 | Add Threading Test | 30 min |
 
-### Phase 5: I/O (P1)
+### Phase 5: I/O (P1) — Kernel Handlers Only
 | UoW | Name | Est. Time |
 |-----|------|-----------|
-| 5.1.1 | Add iovec to Kernel | 10 min |
-| 5.2.1 | Implement writev Core Logic | 30 min |
-| 5.2.2 | Wire writev to Syscall Dispatch | 10 min |
-| 5.3.1 | Implement readv Core Logic | 30 min |
-| 5.3.2 | Wire readv to Syscall Dispatch | 10 min |
-| 5.4.1 | Verify libsyscall Wrappers | 15 min |
-| 5.4.2 | Add Vectored I/O Test | 20 min |
+| 5.1.1 | Add IoVec to Kernel | 10 min |
+| 5.2.1 | Implement writev Kernel Handler | 30 min |
+| 5.3.1 | Implement readv Kernel Handler | 30 min |
+| 5.4.1 | Add Vectored I/O Test | 20 min |
+
+> **Note (TEAM_228)**: Userspace wrappers already exist (TEAM_217). Only kernel handlers needed.
+
 
 ### Phase 6: Process Orchestration (P2)
 | UoW | Name | Est. Time |

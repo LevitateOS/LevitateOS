@@ -4,6 +4,7 @@ pub mod fd_table; // TEAM_168: File descriptor table (Phase 10)
 pub mod process;
 pub mod process_table; // TEAM_188: Process table for waitpid
 pub mod scheduler;
+pub mod thread; // TEAM_230: Thread creation for sys_clone
 pub mod user; // TEAM_073: Userspace support (Phase 8)
 // TEAM_208: user_mm moved to crate::memory::user
 
@@ -24,10 +25,26 @@ pub extern "C" fn post_switch_hook() {
 /// TEAM_071: Final exit handler for a task.
 /// Marks the current task as Exited and yields to the scheduler.
 /// The task will not be re-added to the ready queue.
+/// TEAM_230: Added CLONE_CHILD_CLEARTID handling for thread join.
 #[unsafe(no_mangle)]
 pub extern "C" fn task_exit() -> ! {
-    // TEAM_071: Mark task as exited (Design Q2)
     let task = current_task();
+
+    // TEAM_230: Handle CLONE_CHILD_CLEARTID - clear tid and wake futex
+    let clear_tid = task.clear_child_tid.load(Ordering::Acquire);
+    if clear_tid != 0 {
+        // SAFETY: user_va_to_kernel_ptr verified the address is mapped
+        // and belongs to this task's address space (shared via CLONE_VM).
+        if let Some(ptr) = crate::memory::user::user_va_to_kernel_ptr(task.ttbr0, clear_tid) {
+            unsafe {
+                *(ptr as *mut i32) = 0;
+            }
+        }
+        // Wake one waiter on futex(clear_tid) for thread join
+        crate::syscall::sync::futex_wake(clear_tid, 1);
+    }
+
+    // TEAM_071: Mark task as exited (Design Q2)
     task.set_state(TaskState::Exited);
 
     // Yield to next task without re-adding self to ready queue
@@ -188,6 +205,8 @@ pub struct TaskControlBlock {
     pub signal_handlers: IrqSafeLock<[usize; 32]>,
     /// TEAM_216: Signal trampoline address (in userspace)
     pub signal_trampoline: AtomicUsize,
+    /// TEAM_228: Address to clear and wake on thread exit (for CLONE_CHILD_CLEARTID)
+    pub clear_child_tid: AtomicUsize,
 }
 
 /// TEAM_220: Global tracking of the foreground process for shell control.
@@ -235,6 +254,8 @@ impl TaskControlBlock {
             blocked_signals: AtomicU32::new(0),
             signal_handlers: IrqSafeLock::new([0; 32]),
             signal_trampoline: AtomicUsize::new(0),
+            // TEAM_228: No clear-on-exit TID for kernel tasks
+            clear_child_tid: AtomicUsize::new(0),
         }
     }
 }
@@ -274,12 +295,15 @@ impl From<UserTask> for TaskControlBlock {
             blocked_signals: AtomicU32::new(0),
             signal_handlers: IrqSafeLock::new([0; 32]),
             signal_trampoline: AtomicUsize::new(0),
+            // TEAM_228: No clear-on-exit TID for spawned processes
+            clear_child_tid: AtomicUsize::new(0),
         }
     }
 }
 
-/// Helper function called when a user task is first scheduled.
-fn user_task_entry_wrapper() -> ! {
+/// TEAM_230: Helper function called when a user task is first scheduled.
+/// Made public for use by thread creation.
+pub fn user_task_entry_wrapper() -> ! {
     let task = current_task();
     log::trace!(
         "[TASK] Entering user task PID={} at 0x{:x}",

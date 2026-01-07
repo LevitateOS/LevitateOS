@@ -95,7 +95,8 @@ fn futex_wait(addr: usize, expected: u32) -> i64 {
 }
 
 /// TEAM_208: Wake up to `count` tasks waiting on addr
-fn futex_wake(addr: usize, count: usize) -> i64 {
+/// TEAM_230: Made public for CLONE_CHILD_CLEARTID thread exit handling
+pub fn futex_wake(addr: usize, count: usize) -> i64 {
     let mut woken = 0usize;
 
     let mut waiters = FUTEX_WAITERS.lock();

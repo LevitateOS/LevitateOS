@@ -15,6 +15,7 @@ use los_hal::println;
 pub mod errno {
     pub const ENOENT: i64 = -2;
     pub const EBADF: i64 = -9;
+    pub const ENOMEM: i64 = -12; // TEAM_230: Added for thread creation
     pub const EFAULT: i64 = -14;
     pub const EEXIST: i64 = -17;
     pub const EINVAL: i64 = -22;
@@ -66,13 +67,20 @@ pub enum SyscallNumber {
     SigProcMask = 135,
     SigReturn = 139,
     GetPid = 172,
-    GetPpid = 173,  // TEAM_217: Added standard Linux syscall
+    GetPpid = 173, // TEAM_217: Added standard Linux syscall
     Sbrk = 214,    // brk
     Exec = 221,    // execve
     Waitpid = 260, // wait4
     Pause = 236,
-    Writev = 66,   // TEAM_217: Added for std println!
-    Readv = 65,    // TEAM_217: Added for completeness
+    Writev = 66, // TEAM_217: Added for std println!
+    Readv = 65,  // TEAM_217: Added for completeness
+    // TEAM_228: Memory management syscalls for std support
+    Mmap = 222,
+    Munmap = 215,
+    Mprotect = 226,
+    // TEAM_228: Threading syscalls for std support
+    Clone = 220,
+    SetTidAddress = 96,
 
     // === Custom LevitateOS syscalls (temporary, until clone/execve work) ===
     /// TEAM_120: Spawn process (custom, will be replaced by clone+execve)
@@ -121,6 +129,13 @@ impl SyscallNumber {
             260 => Some(Self::Waitpid),
             66 => Some(Self::Writev),
             65 => Some(Self::Readv),
+            // TEAM_228: Memory management
+            222 => Some(Self::Mmap),
+            215 => Some(Self::Munmap),
+            226 => Some(Self::Mprotect),
+            // TEAM_228: Threading
+            220 => Some(Self::Clone),
+            96 => Some(Self::SetTidAddress),
             // Custom LevitateOS
             1000 => Some(Self::Spawn),
             1001 => Some(Self::SpawnArgs),
@@ -332,6 +347,31 @@ pub fn syscall_dispatch(frame: &mut SyscallFrame) {
             frame.arg2() as usize,
         ),
         Some(SyscallNumber::SetForeground) => process::sys_set_foreground(frame.arg0() as usize),
+        // TEAM_228: Memory management syscalls
+        Some(SyscallNumber::Mmap) => mm::sys_mmap(
+            frame.arg0() as usize,
+            frame.arg1() as usize,
+            frame.arg2() as u32,
+            frame.arg3() as u32,
+            frame.arg4() as i32,
+            frame.arg5() as usize,
+        ),
+        Some(SyscallNumber::Munmap) => mm::sys_munmap(frame.arg0() as usize, frame.arg1() as usize),
+        Some(SyscallNumber::Mprotect) => mm::sys_mprotect(
+            frame.arg0() as usize,
+            frame.arg1() as usize,
+            frame.arg2() as u32,
+        ),
+        // TEAM_228: Threading syscalls
+        Some(SyscallNumber::Clone) => process::sys_clone(
+            frame.arg0() as u64,
+            frame.arg1() as usize,
+            frame.arg2() as usize,
+            frame.arg3() as usize,
+            frame.arg4() as usize,
+            frame, // TEAM_230: Pass frame to clone registers
+        ),
+        Some(SyscallNumber::SetTidAddress) => process::sys_set_tid_address(frame.arg0() as usize),
         None => {
             println!("[SYSCALL] Unknown syscall number: {}", nr);
             errno::ENOSYS

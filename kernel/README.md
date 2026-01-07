@@ -10,11 +10,11 @@ LevitateOS is an AArch64 higher-half kernel written in Rust. It targets the QEMU
 
 The kernel is organized into several key subsystems:
 
-- **Boot & Assembly** (`src/arch/aarch64/`): Early boot code, exception vectors, and MMU initialization.
-- **Memory Management** (`src/mm/`): Buddy allocator integration, heap management, and page table control.
-- **Drivers** (`src/drivers/`): High-level driver logic (UART, GIC, Timer, VirtIO devices).
-- **Process & Scheduling** (`src/process/`): Task management, context switching, and syscall handling.
-- **Filesystem** (`src/fs/`): VFS layer, initramfs (CPIO), and FAT32 support.
+- **Boot & Assembly** (`src/arch/`): Early boot code, exception vectors, and MMU initialization.
+- **Memory Management** (`src/mm/`): Buddy and Slab allocator integration, heap management, and page table control.
+- **Drivers** (`src/drivers/`): High-level driver logic (UART, GIC, Timer, VirtIO via PCI).
+- **Process & Scheduling** (`src/task/`, `src/syscall/`): Task management, context switching, and Linux-compatible syscall handling.
+- **Filesystem** (`src/fs/`): VFS layer, mount management, tmpfs, initramfs (CPIO), and FAT32/ext4 support.
 
 ## Feature Flags
 

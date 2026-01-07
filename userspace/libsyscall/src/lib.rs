@@ -56,6 +56,38 @@ pub const SYS_CLOCK_GETTIME: u64 = 113;
 pub const SYS_SCHED_YIELD: u64 = 124; // TEAM_217: Renamed to match Linux
 pub const SYS_SHUTDOWN: u64 = 142; // reboot
 
+// TEAM_228: Memory management syscalls
+pub const SYS_MMAP: u64 = 222;
+pub const SYS_MUNMAP: u64 = 215;
+pub const SYS_MPROTECT: u64 = 226;
+
+// TEAM_228: mmap protection flags
+pub const PROT_NONE: u32 = 0;
+pub const PROT_READ: u32 = 1;
+pub const PROT_WRITE: u32 = 2;
+pub const PROT_EXEC: u32 = 4;
+
+// TEAM_228: mmap flags
+pub const MAP_SHARED: u32 = 0x01;
+pub const MAP_PRIVATE: u32 = 0x02;
+pub const MAP_FIXED: u32 = 0x10;
+pub const MAP_ANONYMOUS: u32 = 0x20;
+
+// TEAM_228: Threading syscalls
+pub const SYS_CLONE: u64 = 220;
+pub const SYS_SET_TID_ADDRESS: u64 = 96;
+
+// TEAM_228: Clone flags
+pub const CLONE_VM: u64 = 0x00000100;
+pub const CLONE_FS: u64 = 0x00000200;
+pub const CLONE_FILES: u64 = 0x00000400;
+pub const CLONE_SIGHAND: u64 = 0x00000800;
+pub const CLONE_THREAD: u64 = 0x00010000;
+pub const CLONE_SETTLS: u64 = 0x00080000;
+pub const CLONE_PARENT_SETTID: u64 = 0x00100000;
+pub const CLONE_CHILD_CLEARTID: u64 = 0x00200000;
+pub const CLONE_CHILD_SETTID: u64 = 0x01000000;
+
 // Custom LevitateOS (temporary, until clone/execve work)
 pub const SYS_SPAWN: u64 = 1000;
 pub const SYS_SPAWN_ARGS: u64 = 1001;
@@ -253,6 +285,146 @@ pub fn sbrk(increment: isize) -> i64 {
     ret
 }
 
+/// TEAM_228: Map memory into process address space.
+///
+/// # Arguments
+/// * `addr` - Hint address (can be 0 for system to choose)
+/// * `len` - Length of mapping
+/// * `prot` - Protection flags (PROT_READ | PROT_WRITE | PROT_EXEC)
+/// * `flags` - Mapping flags (must include MAP_ANONYMOUS | MAP_PRIVATE)
+/// * `fd` - File descriptor (-1 for anonymous)
+/// * `offset` - File offset (0 for anonymous)
+///
+/// # Returns
+/// Virtual address of mapping, or negative error code.
+#[inline]
+pub fn mmap(addr: usize, len: usize, prot: u32, flags: u32, fd: i32, offset: usize) -> isize {
+    let ret: i64;
+    unsafe {
+        core::arch::asm!(
+            "svc #0",
+            in("x8") SYS_MMAP,
+            in("x0") addr,
+            in("x1") len,
+            in("x2") prot,
+            in("x3") flags,
+            in("x4") fd,
+            in("x5") offset,
+            lateout("x0") ret,
+            options(nostack)
+        );
+    }
+    ret as isize
+}
+
+/// TEAM_228: Unmap memory from process address space.
+///
+/// # Arguments
+/// * `addr` - Start address of mapping (must be page-aligned)
+/// * `len` - Length to unmap
+///
+/// # Returns
+/// 0 on success, negative error code on failure.
+#[inline]
+pub fn munmap(addr: usize, len: usize) -> isize {
+    let ret: i64;
+    unsafe {
+        core::arch::asm!(
+            "svc #0",
+            in("x8") SYS_MUNMAP,
+            in("x0") addr,
+            in("x1") len,
+            lateout("x0") ret,
+            options(nostack)
+        );
+    }
+    ret as isize
+}
+
+/// TEAM_228: Change protection on memory region.
+///
+/// # Arguments
+/// * `addr` - Start address (must be page-aligned)
+/// * `len` - Length of region
+/// * `prot` - New protection flags
+///
+/// # Returns
+/// 0 on success, negative error code on failure.
+#[inline]
+pub fn mprotect(addr: usize, len: usize, prot: u32) -> isize {
+    let ret: i64;
+    unsafe {
+        core::arch::asm!(
+            "svc #0",
+            in("x8") SYS_MPROTECT,
+            in("x0") addr,
+            in("x1") len,
+            in("x2") prot,
+            lateout("x0") ret,
+            options(nostack)
+        );
+    }
+    ret as isize
+}
+
+/// TEAM_228: Create a new thread (clone syscall).
+///
+/// # Arguments
+/// * `flags` - Clone flags (CLONE_VM | CLONE_THREAD etc.)
+/// * `stack` - New stack pointer for child
+/// * `parent_tid` - Address to write parent TID
+/// * `tls` - TLS pointer for child
+/// * `child_tid` - Address for child TID operations
+///
+/// # Returns
+/// Child TID to parent, 0 to child, or negative error code.
+#[inline]
+pub fn clone(
+    flags: u64,
+    stack: usize,
+    parent_tid: *mut i32,
+    tls: usize,
+    child_tid: *mut i32,
+) -> isize {
+    let ret: i64;
+    unsafe {
+        core::arch::asm!(
+            "svc #0",
+            in("x8") SYS_CLONE,
+            in("x0") flags,
+            in("x1") stack,
+            in("x2") parent_tid,
+            in("x3") tls,
+            in("x4") child_tid,
+            lateout("x0") ret,
+            options(nostack)
+        );
+    }
+    ret as isize
+}
+
+/// TEAM_228: Set pointer to thread ID (cleared on exit).
+///
+/// # Arguments
+/// * `tidptr` - Address to store TID, cleared when thread exits
+///
+/// # Returns
+/// Current thread ID.
+#[inline]
+pub fn set_tid_address(tidptr: *mut i32) -> isize {
+    let ret: i64;
+    unsafe {
+        core::arch::asm!(
+            "svc #0",
+            in("x8") SYS_SET_TID_ADDRESS,
+            in("x0") tidptr,
+            lateout("x0") ret,
+            options(nostack)
+        );
+    }
+    ret as isize
+}
+
 /// Spawn a new process from a path.
 ///
 /// # Arguments
@@ -430,6 +602,45 @@ pub fn shutdown(flags: u32) -> ! {
             options(noreturn, nostack)
         );
     }
+}
+
+/// TEAM_208: sys_futex syscall wrapper.
+///
+/// # Arguments
+/// * `uaddr` - Address of the futex word
+/// * `op` - Operation (FUTEX_WAIT=0, FUTEX_WAKE=1)
+/// * `val` - Expected value (for WAIT) or number of waiters to wake (for WAKE)
+/// * `timeout` - Timeout (not implemented yet)
+/// * `uaddr2` - Second futex address (not implemented yet)
+/// * `val3` - Third value (not implemented yet)
+///
+/// # Returns
+/// 0 on success, or negative error code.
+#[inline]
+pub fn sys_futex(
+    uaddr: usize,
+    op: i32,
+    val: u32,
+    timeout: usize,
+    uaddr2: usize,
+    val3: u32,
+) -> isize {
+    let ret: i64;
+    unsafe {
+        core::arch::asm!(
+            "svc #0",
+            in("x8") SYS_FUTEX,
+            in("x0") uaddr,
+            in("x1") op,
+            in("x2") val,
+            in("x3") timeout,
+            in("x4") uaddr2,
+            in("x5") val3,
+            lateout("x0") ret,
+            options(nostack)
+        );
+    }
+    ret as isize
 }
 
 // ============================================================================

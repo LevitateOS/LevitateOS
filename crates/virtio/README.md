@@ -1,29 +1,37 @@
-# levitate-virtio
+# los_virtio
 
-General-purpose VirtIO transport layer for LevitateOS.
+Core VirtIO transport and abstraction layer for LevitateOS.
 
 ## Overview
 
-This crate provides the foundational VirtIO abstractions used by device-specific drivers:
-- `VirtQueue` - Split virtqueue implementation
-- `Transport` trait - Abstraction over MMIO/PCI transports
-- Buffer management for DMA transfers
+This crate provides the foundational VirtIO abstractions used by all device drivers in the system. It handles transport-agnostic logic and DMA memory management.
+
+## Features
+
+- **Transport Abstraction**: Unified interface for both Legacy MMIO and modern PCI transports.
+- **DMA Management**: Integration with `los_hal` for safe physical memory allocation.
+- **VirtQueue Support**: Efficient descriptor ring management.
+- **Driver Helpers**: Common initialization patterns for GPU, Block, and Net devices.
 
 ## Architecture
 
 ```
-levitate-virtio           <- This crate (transport layer)
-    │
-    ├── levitate-virtio-gpu   <- GPU driver
-    ├── levitate-virtio-blk   <- Block driver (future)
-    └── levitate-virtio-net   <- Network driver (future)
+los_virtio (Transport Layer)
+├── los_gpu (PCI/MMIO)
+├── los_hal (DMA/Address Translation)
+└── los_pci (Discovery)
 ```
 
 ## Usage
 
-Device drivers implement the `Transport` trait and use `VirtQueue` for command/response handling.
+```rust
+use los_virtio::VirtioHal;
 
-## References
+// Drivers use VirtioHal to satisfy virtio-drivers requirements
+let gpu = VirtIOGpu::<VirtioHal, _>::new(transport)?;
+```
 
-- [VirtIO 1.1 Specification](https://docs.oasis-open.org/virtio/virtio/v1.1/cs01/virtio-v1.1-cs01.html)
-- TEAM_098: Initial implementation
+## Traceability
+
+- **TEAM_098**: Initial transport refactor.
+- **TEAM_114**: Support for PCI transport.

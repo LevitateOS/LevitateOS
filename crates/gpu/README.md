@@ -1,27 +1,40 @@
-# levitate-gpu
+# los_gpu
 
-GPU driver wrapper for LevitateOS.
+VirtIO GPU driver for LevitateOS.
 
 ## Overview
 
-This crate provides a wrapper around `virtio-drivers::VirtIOGpu` with embedded-graphics support.
+This crate provides a robust driver for VirtIO GPU devices, supporting framebuffer management and 2D acceleration primitives. It implements the `embedded-graphics` `DrawTarget` trait for seamless integration with the Rust graphics ecosystem.
 
 ## Features
 
-- VirtIO GPU via PCI transport
-- Framebuffer management
-- embedded-graphics DrawTarget implementation
+- **PCI Transport**: Fully migrated to VirtIO over PCI (TEAM_114).
+- **Framebuffer Management**: Support for multiple scanouts and resource management.
+- **embedded-graphics**: Native support for drawing text, shapes, and images.
+- **Double Buffering**: Support for flushing changes to the host display.
+
+## Architecture
+
+- `Gpu`: Core device driver handling VirtIO protocol.
+- `Display`: A `DrawTarget` implementation for `embedded-graphics`.
+- `VirtioHal`: DMA and memory mapping integration.
 
 ## Usage
 
 ```rust
-use levitate_gpu::Gpu;
+use los_gpu::{Gpu, Display};
 
-let gpu = Gpu::new()?;
+// Initialize with a PCI transport
+let mut gpu = Gpu::new(transport)?;
 let (width, height) = gpu.resolution();
+
+// Use as a DrawTarget
+let mut display = Display::new(&mut gpu);
+// ... draw things ...
 gpu.flush()?;
 ```
 
-## TEAM_114
+## Traceability
 
-Created as part of VirtIO PCI migration. Replaces the archived `levitate-drivers-gpu`.
+- **TEAM_114**: Migrated to PCI transport.
+- **TEAM_098**: Refactored for better resource management.

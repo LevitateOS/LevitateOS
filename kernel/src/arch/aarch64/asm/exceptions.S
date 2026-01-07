@@ -97,6 +97,9 @@ sync_lower_el_entry:
     mov     x0, sp
     bl      handle_sync_lower_el
     
+    /* TEAM_230: Allow returning to user from a trap frame at SP (used by clone) */
+.global exception_return
+exception_return:
     /* TEAM_148: Restore TTBR0 first (before other system regs) */
     /* This ensures correct page tables if we yielded to another task */
     ldr     x0, [sp, #272]

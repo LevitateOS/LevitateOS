@@ -7,9 +7,11 @@ An AArch64 operating system kernel written in Rust, targeting the QEMU `virt` ma
 - **Higher-Half Kernel**: Runs in the top-half of the 48-bit virtual address space (`0xFFFF_8000_0000_0000`)
 - **Standard AArch64 MMU**: Uses TTBR1 for kernel, TTBR0 for identity/userspace, with 2MB block optimization
 - **GICv2/GICv3 Support**: Auto-detected via FDT for broad hardware compatibility
-- **VirtIO Drivers**: GPU (framebuffer), Input (keyboard/tablet), Block (storage), Network
-- **Filesystem Support**: FAT32 boot partition, ext4 root (read-only), CPIO initramfs
-- **Buddy Allocator**: Physical frame allocation with coalescing (4KB–8GB blocks)
+- **VirtIO Drivers**: GPU (framebuffer), Input (keyboard/tablet), Block (storage), Network, PCI transport
+- **Filesystem Support**: VFS layer with mount support, tmpfs, FAT32, ext4 (read-only), CPIO initramfs
+- **Linux ABI Compatibility**: Targeted syscall interface for Rust `std` support
+- **Multitasking**: Preemptive Round-Robin scheduler with context switching
+- **Buddy & Slab Allocators**: Robust physical and kernel object memory management
 - **Micro-kernel Ready**: Modular workspace design with a clean HAL
 
 ## 🏗️ Architecture

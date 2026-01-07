@@ -13,29 +13,18 @@ To support the Rust standard library (`std`), LevitateOS must provide a baseline
 - [x] `argc`
 - [x] `argv[]` (NULL terminated)
 - [x] `envp[]` (NULL terminated)
-- [ ] **Auxiliary Vector (`auxv`)** — **MISSING**
+- [x] **Auxiliary Vector (`auxv`)** — **COMPLETE** (TEAM_217)
 
-### **Requirement**
-The `auxv` follows `envp` and provides critical system info. Without it, `std` initialization fails immediately.
+### **Implementation Reference**
+Implemented in `kernel/src/memory/user.rs`:
+- `setup_stack_args()` pushes all auxv entries
+- `AT_PAGESZ`, `AT_HWCAP`, `AT_RANDOM`, `AT_NULL` added automatically
+- `AT_PHDR`, `AT_PHENT`, `AT_PHNUM` passed from ELF loader
 
-| Entry | Value | Purpose |
-|-------|-------|---------|
-| `AT_PAGESZ` | 4096 | Page size |
-| `AT_PHDR` | ELF phdr addr | Program headers location |
-| `AT_PHENT` | 56 | Size of each phdr entry |
-| `AT_PHNUM` | count | Number of program headers |
-| `AT_RANDOM` | 16-byte ptr | Stack canaries, hash seeds |
-| `AT_HWCAP` | flags | Hardware capabilities |
-| `AT_NULL` | 0 | Terminator |
-
-### **Action**
-Update `setup_stack_args` in `kernel/src/memory/user.rs` to push `auxv` entries.
-
-### **Reference Crate**
-- **`origin`** ([crates.io](https://crates.io/crates/origin)) — `src/program.rs` shows auxv parsing
-- **`linux-raw-sys`** — All `AT_*` constants
+No further action required for auxv.
 
 ---
+
 
 ## **2. Memory Management** — P0
 
@@ -85,13 +74,13 @@ Implement `sys_mmap`, `sys_munmap`, `sys_mprotect` syscalls.
 
 ### **Status**
 - [x] `openat`, `close`, `read`, `write`, `fstat`, `getdents64`
-- [ ] **`writev` / `readv`** — **MISSING** (P1: crucial for `println!`)
+- [~] **`writev` / `readv`** — **PARTIAL** (userspace wrappers done, kernel handlers missing)
 - [ ] **`pipe2`** — **MISSING** (P2: `std::process::Command`)
 - [ ] **`dup` / `dup2` / `dup3`** — **MISSING** (P2: redirection)
 - [ ] **`ioctl`** — **MISSING** (P2: TTY size)
 
 ### **Action**
-1. **P1**: Implement `sys_writev`, `sys_readv`
+1. **P1**: Implement kernel `sys_writev`, `sys_readv` handlers only (wrappers exist in libsyscall)
 2. **P2**: Implement `sys_pipe2`, `sys_dup`, `sys_dup3`, `sys_ioctl`
 
 ### **Reference Crate**

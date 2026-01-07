@@ -5,11 +5,12 @@ It is a standalone Cargo workspace.
 
 ## Structure
 
-- **[libsyscall/](libsyscall/README.md)**: Shared library defining the system call ABI and wrappers.
+- **[libsyscall/](libsyscall/README.md)**: Shared library defining the system call ABI and wrappers (Linux-compatible).
+- **[levbox/](levbox/README.md)**: Busybox-style multicall binary providing core utilities (ls, cat, mkdir, etc.).
 - **[shell/](shell/README.md)**: Interactive shell (lsh) binary.
 - **[init/](init/README.md)**: PID 1 process implementation.
 - **[repro_crash/](repro_crash/README.md)**: Diagnostic crash reproduction tool.
-- **[ulib/](ulib/README.md)**: Userspace standard library effort.
+- **[ulib/](ulib/README.md)**: Userspace standard library effort, providing entry points and basic allocations.
 
 ## Building
 

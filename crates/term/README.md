@@ -1,55 +1,36 @@
-# levitate-terminal
+# los_term
 
-Platform-agnostic ANSI terminal emulator for LevitateOS — handles text rendering, cursor management, and ANSI escape sequences.
+Platform-agnostic ANSI terminal emulator for LevitateOS.
 
-## Purpose
+## Overview
 
-This crate provides a **standalone terminal emulator** that is independent of any specific hardware. It can render to any object that implements the `embedded-graphics` `DrawTarget` trait, making it suitable for both the GPU console and potential future use cases (like a windowing system or serial multiplexer).
-
-## Architecture
-
-```
-levitate-terminal/src/
-└── lib.rs          # Terminal state, rendering logic, and ANSI parsing
-```
-
-## Key Components
-
-### Terminal
-
-The core structure managing the emulator state:
-- **Dimensions**: Calculated based on font metrics and screen size.
-- **Cursor Management**: Tracks position, visibility, and supports "exclusive" cursor rendering (hiding/showing during writes).
-- **ANSI Engine**: A state machine for processing standard ANSI escape sequences (e.g., clearing screen).
-- **Font Support**: Uses `profont` for high-quality, readable text on bare metal.
+This crate provides a standalone terminal emulator that handles text rendering, cursor management, and ANSI escape sequences. It is designed to be hardware-agnostic, rendering to any `embedded-graphics` `DrawTarget`.
 
 ## Features
 
-- **ANSI Support**: Basic CSI sequences (`[J` for clear screen).
-- **Automatic Wrapping**: Handles line breaks and carriage returns.
-- **Platform Agnostic**: Works with any `DrawTarget<Color = Rgb888>`.
-- **Fast Rendering**: Optimized for direct framebuffer access via `embedded-graphics`.
+- **ANSI/VT100 Support**: Full support for common escape sequences (colors, cursor movement, clearing).
+- **Profont Support**: High-readability monospace font for system consoles.
+- **Hardware Agnostic**: Works on any `DrawTarget<Color = Rgb888>`.
+- **Scrolling & Wrapping**: Built-in logic for line management.
+
+## Integration
+
+The terminal is used in the kernel to provide:
+1. **GPU Console**: Direct rendering to the VirtIO GPU framebuffer.
+2. **Dual Console**: Mirroring of UART output to the screen.
+3. **Userspace TTY**: Providing a display target for shell processes.
 
 ## Usage
 
 ```rust
-use levitate_terminal::Terminal;
-use embedded_graphics::prelude::*;
+use los_term::Terminal;
 
-// Create terminal based on screen size
-let mut terminal = Terminal::new(1280, 800);
-
-// Write text to any DrawTarget (like levitate-gpu::Display)
-terminal.write_str(&mut display, "Hello, LevitateOS!\n");
+let mut term = Terminal::new(width, height);
+term.write_str(&mut display, "Hello World\n");
 ```
 
-## Dependencies
+## Traceability
 
-| Crate | Purpose |
-|-------|---------|
-| `embedded-graphics` | Drawing traits and text rendering |
-| `profont` | Embedded-friendly monospace font |
-
-## Integration with LevitateOS
-
-The kernel integrates this crate in `kernel/src/terminal.rs`, where it is paired with `levitate-gpu` to provide the primary boot console. It is also used to mirror UART output to the screen.
+- **TEAM_058**: Initial GPU terminal.
+- **TEAM_081**: Global terminal for dual-output.
+- **TEAM_115**: Fixed userspace rendering.
