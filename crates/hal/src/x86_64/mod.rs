@@ -22,7 +22,13 @@ pub fn init() {
         static mut early_pml4: paging::PageTable;
     }
     unsafe {
-        mmu::init_kernel_mappings(&mut *core::ptr::addr_of_mut!(early_pml4));
+        let root = &mut *core::ptr::addr_of_mut!(early_pml4);
+        mmu::init_kernel_mappings(root);
+        
+        // TEAM_285: Switch to our own page tables now that they are initialized.
+        // This is safer than doing it in assembly because we have verified mappings.
+        let phys = mmu::virt_to_phys(root as *const _ as usize);
+        core::arch::asm!("mov cr3, {}", in(reg) phys);
     }
 
     // 1. Initialize serial for early logging

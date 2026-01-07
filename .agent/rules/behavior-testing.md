@@ -148,9 +148,10 @@ When tests fail after your changes:
 2. **INVESTIGATE** — Read the test code. What is it checking?
 3. **DETERMINE ROOT CAUSE:**
    - Did YOUR changes cause it? → Fix your code.
+   - Is the change an **intentional improvement or refactor**? → **Update the golden logs/baseline data** to reflect the new desired state (e.g., using `cargo xtask test behavior --update`).
    - Is the TEST buggy? → Fix the test.
    - Is it truly unrelated? → PROVE IT by checking git blame / last modification.
-4. **FIX IT** — Whatever the cause, the test must pass.
+4. **FIX OR UPDATE** — Fix the regression, or update the baseline if the change is intentional.
 5. **VERIFY** — Run the full test suite again.
 
 **Why This Matters:**

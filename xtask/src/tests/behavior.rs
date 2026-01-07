@@ -17,13 +17,13 @@ const GOLDEN_FILE: &str = "tests/golden_boot.txt";
 const ACTUAL_FILE: &str = "tests/actual_boot.txt";
 const TIMEOUT_SECS: u64 = 15;
 
-pub fn run(arch: &str) -> Result<()> {
+pub fn run(arch: &str, update: bool) -> Result<()> {
     let profile = if arch == "x86_64" {
         QemuProfile::X86_64
     } else {
         QemuProfile::Default
     };
-    run_with_profile(profile, arch)
+    run_with_profile(profile, arch, update)
 }
 
 /// Run behavior test with Pixel 6 profile (8GB, 8 cores)
@@ -32,15 +32,15 @@ pub fn run_pixel6(arch: &str) -> Result<()> {
     if arch != "aarch64" {
         bail!("Pixel 6 profile only supported on aarch64");
     }
-    run_with_profile(QemuProfile::Pixel6, arch)
+    run_with_profile(QemuProfile::Pixel6, arch, false)
 }
 
 /// Run behavior test with GICv3 profile (TEAM_055)
 pub fn run_gicv3() -> Result<()> {
-    run_with_profile(QemuProfile::GicV3, "aarch64")
+    run_with_profile(QemuProfile::GicV3, "aarch64", false)
 }
 
-fn run_with_profile(profile: QemuProfile, arch: &str) -> Result<()> {
+fn run_with_profile(profile: QemuProfile, arch: &str, update: bool) -> Result<()> {
     let profile_name = match profile {
         QemuProfile::Default => "Default",
         QemuProfile::Pixel6 => "Pixel 6 (8GB, 8 cores)",
@@ -223,10 +223,16 @@ fn run_with_profile(profile: QemuProfile, arch: &str) -> Result<()> {
         println!("✅ VERIFIED: No userspace crashes detected.");
 
         Ok(())
+    } else if update {
+        println!("🔄 UPDATING Golden Log (Rule 4 Refined)...\n");
+        fs::write(GOLDEN_FILE, &actual_raw).context("Failed to update golden boot log")?;
+        println!("✅ Golden Log updated successfully. Re-run tests to verify.");
+        Ok(())
     } else {
         println!("❌ FAILURE: Behavior REGRESSION detected!\n");
         println!("--- Diff ---");
         print_diff(&golden, &actual);
+        println!("\n💡 TIP: If this change is intentional, run with --update to refresh the golden log.");
         bail!("Behavior test failed");
     }
 }

@@ -127,6 +127,8 @@ pub struct ParsedBootInfo {
     pub total_ram: usize,
     /// Highest usable physical address
     pub phys_max: usize,
+    /// Initial ramdisk (if found)
+    pub initrd: Option<MemoryRegion>,
 }
 
 impl ParsedBootInfo {
@@ -136,6 +138,7 @@ impl ParsedBootInfo {
             ram_count: 0,
             total_ram: 0,
             phys_max: 0,
+            initrd: None,
         }
     }
 }
@@ -169,6 +172,11 @@ pub unsafe fn parse(info_addr: usize) -> ParsedBootInfo {
         if tag.typ == TagType::MemoryMap as u32 {
             // SAFETY: Tag is a valid memory map tag
             unsafe { parse_memory_map(info_addr + offset, &mut result) };
+        }
+
+        if tag.typ == TagType::Module as u32 {
+            // SAFETY: Tag is a valid module tag
+            unsafe { parse_module(info_addr + offset, &mut result) };
         }
 
         offset += tag.size as usize;
@@ -211,6 +219,30 @@ unsafe fn parse_memory_map(tag_addr: usize, result: &mut ParsedBootInfo) {
     }
 }
 
+/// Module tag from Multiboot2 specification
+#[repr(C)]
+struct ModuleTag {
+    typ: u32,
+    size: u32,
+    mod_start: u32,
+    mod_end: u32,
+    // String follows...
+}
+
+/// Parse module tag (used for initrd)
+unsafe fn parse_module(tag_addr: usize, result: &mut ParsedBootInfo) {
+    let mod_tag = unsafe { &*(tag_addr as *const ModuleTag) };
+    
+    // We treat the first module as the initrd
+    if result.initrd.is_none() {
+        result.initrd = Some(MemoryRegion {
+            start: mod_tag.mod_start as usize,
+            end: mod_tag.mod_end as usize,
+            typ: MemoryType::Reserved, // Mark as reserved so allocator doesn't use it
+        });
+    }
+}
+
 /// Iterator over memory map entries
 pub struct MemoryMapIter {
     current: usize,
@@ -249,6 +281,7 @@ static mut BOOT_INFO_STORAGE: ParsedBootInfo = ParsedBootInfo {
     ram_count: 0,
     total_ram: 0,
     phys_max: 0,
+    initrd: None,
 };
 
 /// Initialize boot info from multiboot2 structure.

@@ -67,8 +67,33 @@ Structures like `CpioArchive` that wrap kernel slices (e.g., initramfs) and are 
 
 ---
 
-## 7. Team Attribution
+## 7. Multi-Boot & Page Table Transitions (TEAM_285)
+
+### Safe Page Table Switching
+Never perform an immediate `mov cr3` in assembly during the higher-half transition if you can avoid it. 
+- **Pattern**: Stay on the bootloader's page tables (which guaranteed the jump to the kernel worked) until you are inside Rust code.
+- **Benefit**: You can use Rust's type system and verified mapping logic to initialize your own tables before switching. This prevents silent hangs caused by slightly inconsistent mappings between the bootloader and the kernel.
+
+### Dynamic Physical Memory Offset (PMO)
+Limine and other modern bootloaders do not guarantee a fixed higher-half direct map (HHDM) offset.
+- **Rule**: `PHYS_OFFSET` must be a dynamic variable, not a constant. 
+- **Pattern**: Initialize it as early as possible in `kernel_main_unified` from `BootInfo`.
+
+## 8. Recommended Libraries (The "Easy Life" List)
+
+To improve reliability and reduce manual assembly/bit-shifting, future teams should prioritize these industry-standard crates:
+
+| Category | Recommended Crate | Purpose |
+| :--- | :--- | :--- |
+| **Serial** | `uart_16550` | Robust COM1/COM2 handling. |
+| **Interrupts** | `pic8259` | Standard PC PIC handling (if not using APIC). |
+| **Input** | `pc-keyboard` | PS/2 scancode to KeyCode translation. |
+| **CPU** | `raw-cpuid` | Feature detection without manual `asm!`. |
+| **Paging** | `x86_64` (Full) | Use `structures::paging` instead of manual bit-masking. |
+| **Memory** | `buddy_system_allocator` | Often more performant than linked lists for kernel heaps. |
+
+## 9. Team Attribution
 When documenting fixes or gotchas in code, always include your Team ID:
 ```rust
-// TEAM_083: Use serial_println! to avoid recursive deadlock in dual-console path
+// TEAM_XXX: Reason for change
 ```

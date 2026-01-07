@@ -250,15 +250,7 @@ pub fn run() -> ! {
 
     // --- GIC and Timer Setup ---
     #[cfg(target_arch = "aarch64")]
-    let (dtb_slice, initrd_found) = {
-        let dtb_phys = arch::get_dtb_phys();
-        let dtb_slice = dtb_phys.map(|phys| {
-            let ptr = phys as *const u8;
-            // Assume 1MB for early discovery
-            unsafe { core::slice::from_raw_parts(ptr, 1024 * 1024) }
-        });
-        let fdt = dtb_slice.and_then(|slice| Fdt::new(slice).ok());
-
+    {
         // TEAM_255: Initialize interrupt controller using generic HAL interface
         let ic = los_hal::active_interrupt_controller();
         ic.init();
@@ -275,27 +267,14 @@ pub fn run() -> ! {
         timer::API.set_timeout(timer::API.read_frequency() / 100);
         timer::API.enable();
         crate::verbose!("Timer initialized.");
+    }
 
-        // --- Stage 4: Discovery (VirtIO, Filesystem, Init) ---
-        transition_to(BootStage::Discovery);
-        init_devices();
-        arch::print_boot_regs();
+    // --- Stage 4: Discovery (VirtIO, Filesystem, Init) ---
+    transition_to(BootStage::Discovery);
+    init_devices();
+    arch::print_boot_regs();
 
-        (dtb_slice, init_userspace(dtb_slice))
-    };
-
-    #[cfg(target_arch = "x86_64")]
-    let (_dtb_slice, initrd_found) = {
-        // x86_64 HAL init is called in kmain
-        // TODO: Move shared init logic here
-
-        // --- Stage 4: Discovery (VirtIO, Filesystem, Init) ---
-        transition_to(BootStage::Discovery);
-        init_devices();
-        arch::print_boot_regs();
-
-        (None as Option<&[u8]>, false) // TODO: Multiboot2 initrd
-    };
+    let initrd_found = init_userspace();
 
     // TEAM_065: SPEC-4 enforcement per Rule 14 (Fail Loud, Fail Fast)
     #[cfg(not(feature = "diskless"))]
@@ -373,54 +352,50 @@ fn init_devices() {
 /// Initialize userspace: load and spawn init from initramfs.
 ///
 /// Returns true if init was successfully spawned.
-#[cfg(target_arch = "aarch64")]
-fn init_userspace(dtb_slice: Option<&[u8]>) -> bool {
-    // TEAM_121: SPEC-4 Initrd Discovery with Fail-Fast (Rule 14)
+fn init_userspace() -> bool {
+    // TEAM_284: Use unified BootInfo to locate initramfs
+    let boot_info = crate::boot::boot_info().expect("BootInfo must be available for userspace init");
+
     println!("Detecting Initramfs...");
 
-    let Some(slice) = dtb_slice else {
-        println!("[BOOT] ERROR: No DTB provided - cannot locate initramfs");
+    let Some(initrd_region) = boot_info.initramfs else {
+        println!("[BOOT] ERROR: No initramfs provided in BootInfo");
         return false;
     };
 
-    match fdt::get_initrd_range(slice) {
-        Ok((start, end)) => {
-            let size = end - start;
-            println!(
-                "Initramfs found at 0x{:x} - 0x{:x} ({} bytes)",
-                start, end, size
-            );
+    let start = initrd_region.base;
+    let size = initrd_region.size;
+    let end = start + size;
 
-            // Initramfs access via High VA (TTBR1) for stability
-            let initrd_va = mmu::phys_to_virt(start);
-            let initrd_slice = unsafe { core::slice::from_raw_parts(initrd_va as *const u8, size) };
+    println!(
+        "Initramfs found at 0x{:x} - 0x{:x} ({} bytes)",
+        start, end, size
+    );
 
-            // TEAM_205: Initialize Initramfs VFS
-            let sb = crate::fs::initramfs::init_vfs(initrd_slice);
+    // Initramfs access via High VA (PHYS_OFFSET) for stability
+    let initrd_va = los_hal::mmu::phys_to_virt(start);
+    let initrd_slice = unsafe { core::slice::from_raw_parts(initrd_va as *const u8, size) };
 
-            // Set as root in dcache
-            let root_inode = sb.root();
-            crate::fs::vfs::dcache().set_root(crate::fs::vfs::Dentry::root(root_inode));
+    // TEAM_205: Initialize Initramfs VFS
+    let sb = crate::fs::initramfs::init_vfs(initrd_slice);
 
-            println!("Files in initramfs:");
-            for entry in sb.archive.iter() {
-                println!(" - {}", entry.name);
-            }
+    // Set as root in dcache
+    let root_inode = sb.root();
+    crate::fs::vfs::dcache().set_root(crate::fs::vfs::Dentry::root(root_inode));
 
-            // TEAM_120: Store initramfs globally for syscalls
-            {
-                let mut global_archive = crate::fs::INITRAMFS.lock();
-                *global_archive = Some(sb);
-            }
-
-            // Spawn init from initramfs
-            spawn_init()
-        }
-        Err(e) => {
-            println!("[BOOT] ERROR: No initramfs in DTB: {:?}", e);
-            false
-        }
+    println!("Files in initramfs:");
+    for entry in sb.archive.iter() {
+        println!(" - {}", entry.name);
     }
+
+    // TEAM_120: Store initramfs globally for syscalls
+    {
+        let mut global_archive = crate::fs::INITRAMFS.lock();
+        *global_archive = Some(sb);
+    }
+
+    // Spawn init from initramfs
+    spawn_init()
 }
 
 /// Spawn the init process from initramfs.

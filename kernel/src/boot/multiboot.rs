@@ -27,13 +27,24 @@ pub unsafe fn parse_multiboot1(magic: u32, info_ptr: usize) -> BootInfo {
     boot_info.protocol = BootProtocol::Multiboot1;
 
     // Multiboot1 info structure (simplified)
-    // We only parse the memory map if available
     #[repr(C)]
     struct Multiboot1Info {
         flags: u32,
         mem_lower: u32,
         mem_upper: u32,
+        boot_device: u32,
+        cmdline: u32,
+        mods_count: u32,
+        mods_addr: u32,
         // ... more fields we don't need
+    }
+
+    #[repr(C)]
+    struct Multiboot1Module {
+        mod_start: u32,
+        mod_end: u32,
+        string: u32,
+        reserved: u32,
     }
 
     let mb_info = unsafe { &*(info_ptr as *const Multiboot1Info) };
@@ -62,6 +73,23 @@ pub unsafe fn parse_multiboot1(magic: u32, info_ptr: usize) -> BootInfo {
                 MemoryKind::Usable,
             ));
         }
+    }
+
+    // Check if modules info is valid (bit 3 of flags)
+    if mb_info.flags & 0x8 != 0 && mb_info.mods_count > 0 {
+        let mods = unsafe {
+            core::slice::from_raw_parts(
+                mb_info.mods_addr as *const Multiboot1Module,
+                mb_info.mods_count as usize,
+            )
+        };
+        // Treat the first module as initramfs
+        let first_mod = &mods[0];
+        boot_info.initramfs = Some(MemoryRegion::new(
+            first_mod.mod_start as usize,
+            (first_mod.mod_end - first_mod.mod_start) as usize,
+            MemoryKind::Reserved,
+        ));
     }
 
     // No ACPI info from Multiboot1 typically
@@ -106,6 +134,15 @@ pub unsafe fn parse_multiboot2(magic: u32, info_ptr: usize) -> BootInfo {
                 kind,
             ));
         }
+    }
+
+    // TEAM_284: Extract initramfs (module) from multiboot2
+    if let Some(initrd) = parsed.initrd {
+        boot_info.initramfs = Some(MemoryRegion::new(
+            initrd.start,
+            initrd.end - initrd.start,
+            MemoryKind::Reserved, // Keep reserved so allocator doesn't touch it
+        ));
     }
 
     // TODO(TEAM_282): Parse RSDP from multiboot2 ACPI tags

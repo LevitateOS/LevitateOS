@@ -434,18 +434,24 @@ pub unsafe extern "C" fn exception_return() {
 /// Called from boot.S after long mode transition
 #[unsafe(no_mangle)]
 pub extern "C" fn kernel_main(multiboot_magic: usize, multiboot_info: usize) -> ! {
-    // 1. Basic hardware initialization (Serial, VGA, IDT, APIC, PIT)
-    los_hal::x86_64::init();
+    // TEAM_285: Diagnostic 'X' for Arch kernel_main Entry
+    unsafe {
+        core::arch::asm!("mov dx, 0x3f8", "mov al, 'X'", "out dx, al");
+    }
 
-    // 2. Initialize heap (required for alloc)
-    crate::arch::init_heap();
-
-    // 3. Detect and parse boot information
+    // 1. Detect and parse boot information
     let boot_info = if crate::boot::limine::is_limine_boot() {
+        // Diagnostic 'L' for Limine Path
+        unsafe { core::arch::asm!("mov al, 'L'", "out dx, al"); }
         crate::boot::limine::parse()
     } else {
+        // Diagnostic 'M' for Multiboot Path
+        unsafe { core::arch::asm!("mov al, 'M'", "out dx, al"); }
         unsafe { crate::boot::multiboot::parse(multiboot_magic as u32, multiboot_info) }
     };
+
+    // Diagnostic 'P' for Parse Done
+    unsafe { core::arch::asm!("mov al, 'P'", "out dx, al"); }
 
     // Store boot info globally
     unsafe {
@@ -454,39 +460,6 @@ pub extern "C" fn kernel_main(multiboot_magic: usize, multiboot_info: usize) -> 
 
     let boot_info_ref = crate::boot::boot_info().expect("Boot info must be set");
 
-    // 4. Expand PMO mapping to cover all RAM
-    // Limine already sets up a higher-half direct map (HHDM),
-    // but we can still expand internal mappings for consistency.
-    unsafe extern "C" {
-        static mut early_pml4: los_hal::x86_64::paging::PageTable;
-    }
-
-    // Convert BootInfo regions to HAL format for expand_pmo
-    let mut ram_regions: [Option<los_hal::x86_64::multiboot2::MemoryRegion>; 16] = [None; 16];
-    let mut count = 0;
-    for region in boot_info_ref.memory_map.iter() {
-        if region.kind == crate::boot::MemoryKind::Usable && count < 16 {
-            ram_regions[count] = Some(los_hal::x86_64::multiboot2::MemoryRegion {
-                start: region.base,
-                end: region.base + region.size,
-                typ: los_hal::x86_64::multiboot2::MemoryType::Available,
-            });
-            count += 1;
-        }
-    }
-
-    unsafe {
-        los_hal::x86_64::mmu::expand_pmo(&mut *core::ptr::addr_of_mut!(early_pml4), &ram_regions);
-    }
-
-    // 5. Initialize physical memory management (buddy allocator)
-    crate::memory::init(boot_info_ref);
-
-    // 6. Initialize syscall infrastructure
-    unsafe {
-        syscall::init();
-    }
-
-    // 7. Transition to unified main
+    // 2. Transition to unified main (handles HAL init, Heap, Memory, etc.)
     crate::kernel_main_unified(boot_info_ref)
 }

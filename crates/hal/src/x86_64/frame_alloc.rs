@@ -58,4 +58,4 @@ impl PageAllocator for EarlyFrameAllocator {
 /// Global instance for early boot page table allocations.
 /// Initialized with a safe default range (e.g., 8MB to 16MB) until MADT/Memory Map is parsed.
 /// TEAM_258: Kernel is at 1MB+, so 8MB is a safe buffer.
-pub static EARLY_ALLOCATOR: EarlyFrameAllocator = EarlyFrameAllocator::new(0x800000, 0x1000000);
+pub static EARLY_ALLOCATOR: EarlyFrameAllocator = EarlyFrameAllocator::new(0x2000000, 0x4000000);

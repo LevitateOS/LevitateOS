@@ -52,18 +52,36 @@ pub const PAGE_SHIFT: usize = 12;
 // Higher-Half Virtual Address Base for x86_64
 pub const KERNEL_VIRT_BASE: usize = 0xFFFFFFFF80000000;
 
-/// TEAM_266: Physical Memory Offset (PMO) Mapping Base
-/// Maps all physical memory starting at 0 to this virtual address.
-/// Canonical high-half address 0xFFFF800000000000.
-pub const PHYS_OFFSET: usize = 0xFFFF800000000000;
+/// TEAM_285: Physical Memory Offset (PMO) Mapping Base.
+/// This is now dynamic to support Limine's HHDM offset which can vary.
+/// Defaults to the legacy 0xFFFF800000000000.
+pub static mut PHYS_OFFSET: usize = 0xFFFF800000000000;
 
-// TEAM_260: PCI constants for x86_64 (stubs for now)
-pub const ECAM_VA: usize = 0;
-pub const PCI_MEM32_PA: usize = 0;
-pub const PCI_MEM32_SIZE: usize = 0;
+/// TEAM_285: Set the physical memory offset (HHDM offset).
+/// Called during early boot once the offset is known from the bootloader.
+pub fn set_phys_offset(offset: usize) {
+    unsafe {
+        PHYS_OFFSET = offset;
+    }
+}
 
-// TEAM_260: Memory mapping constants for x86_64 (stubs for now)
-pub const VIRTIO_MMIO_VA: usize = 0;
+/// TEAM_285: Get the current physical memory offset.
+pub fn get_phys_offset() -> usize {
+    unsafe { PHYS_OFFSET }
+}
+
+// TEAM_284: PCI constants for x86_64 (QEMU q35)
+pub const ECAM_PA: usize = 0xB0000000;
+pub const ECAM_VA: usize = 0xFFFFFFFF40000000;
+pub const PCI_MEM32_PA: usize = 0xC0000000;
+pub const PCI_MEM32_VA: usize = 0xFFFFFFFF60000000;
+pub const PCI_MEM32_SIZE: usize = 0x20000000;
+
+// TEAM_284: VirtIO MMIO constants for x86_64 (QEMU default)
+pub const VIRTIO_MMIO_PA: usize = 0xFEB00000; // Typical location for MMIO on x86_64 QEMU
+pub const VIRTIO_MMIO_VA: usize = 0xFFFFFFFF80000000 - 0x1000000; // Just below kernel
+pub const VIRTIO_MMIO_SIZE: usize = 0x2000;
+
 pub const GIC_DIST_VA: usize = 0;
 pub const GIC_CPU_VA: usize = 0;
 pub const GIC_REDIST_VA: usize = 0;
@@ -71,16 +89,16 @@ pub const UART_VA: usize = 0;
 
 pub fn virt_to_phys(va: usize) -> usize {
     if va >= KERNEL_VIRT_BASE {
-        va - KERNEL_VIRT_BASE
-    } else if va >= PHYS_OFFSET {
-        va - PHYS_OFFSET
+        va - KERNEL_VIRT_BASE + unsafe { &__kernel_phys_start as *const _ as usize }
+    } else if va >= unsafe { PHYS_OFFSET } {
+        va - unsafe { PHYS_OFFSET }
     } else {
         va
     }
 }
 
 pub fn phys_to_virt(pa: usize) -> usize {
-    pa + PHYS_OFFSET
+    pa + unsafe { PHYS_OFFSET }
 }
 
 pub fn translate(root: &PageTable, va: usize) -> Option<(usize, PageFlags)> {
@@ -143,8 +161,30 @@ pub fn init_kernel_mappings(root: &mut PageTable) {
         let _ = map_page(root, va, pa, PageFlags::KERNEL_DATA);
     }
 
-    // 3. Map VGA and Serial for debugging
+    // 3. Map VGA for debugging and device discovery
     let _ = map_page(root, 0xB8000, 0xB8000, PageFlags::DEVICE);
+
+    // 4. Map APIC and IOAPIC regions (4th GB)
+    // IOAPIC at 0xFEC00000, Local APIC at 0xFEE00000
+    let _ = map_page(root, 0xFEC00000, 0xFEC00000, PageFlags::DEVICE);
+    let _ = map_page(root, 0xFEE00000, 0xFEE00000, PageFlags::DEVICE);
+
+    // 5. Map PCI ECAM for debugging and device discovery
+    // TEAM_284: Map ECAM for PCI discovery (both to specific VA and PHYS_OFFSET)
+    for i in 0..(1024 * 1024 / PAGE_SIZE) {
+        let offset = i * PAGE_SIZE;
+        let pa = ECAM_PA + offset;
+        let _ = map_page(root, ECAM_VA + offset, pa, PageFlags::DEVICE);
+        let _ = map_page(root, phys_to_virt(pa), pa, PageFlags::DEVICE);
+    }
+
+    // 6. Map PCI MMIO space (both to specific VA and PHYS_OFFSET)
+    for i in 0..(PCI_MEM32_SIZE / PAGE_SIZE) {
+        let offset = i * PAGE_SIZE;
+        let pa = PCI_MEM32_PA + offset;
+        let _ = map_page(root, PCI_MEM32_VA + offset, pa, PageFlags::DEVICE);
+        let _ = map_page(root, phys_to_virt(pa), pa, PageFlags::DEVICE);
+    }
 }
 
 impl crate::traits::MmuInterface for PageTable {

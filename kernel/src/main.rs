@@ -51,7 +51,27 @@ pub mod virtio;
 /// Note: The caller must call `boot::set_boot_info()` before calling this
 /// to make boot info available globally.
 pub fn kernel_main_unified(boot_info: &crate::boot::BootInfo) -> ! {
+    // TEAM_285: Diagnostic 'R' for Rust Unified Entry
+    unsafe {
+        core::arch::asm!("mov dx, 0x3f8", "mov al, 'R'", "out dx, al");
+    }
+
+    // TEAM_285: Initialize dynamic PHYS_OFFSET for Limine HHDM
+    if boot_info.protocol == crate::boot::BootProtocol::Limine {
+        if let Some(offset) = crate::boot::limine::hhdm_offset() {
+            los_hal::arch::mmu::set_phys_offset(offset as usize);
+        }
+    }
+
     // Stage 1: Early HAL - Console must be first for debug output
+    // TEAM_284: Initialize arch-specific HAL early
+    los_hal::arch::init();
+
+    // Diagnostic 'K' for Kernel HAL Init Done
+    unsafe {
+        core::arch::asm!("mov dx, 0x3f8", "mov al, 'K'", "out dx, al");
+    }
+    crate::init::transition_to(crate::init::BootStage::EarlyHAL);
     los_hal::console::init();
 
     // TEAM_221: Initialize logger (Info level silences Debug/Trace)
@@ -60,8 +80,6 @@ pub fn kernel_main_unified(boot_info: &crate::boot::BootInfo) -> ! {
     logger::init(log::LevelFilter::Trace);
     #[cfg(not(feature = "verbose"))]
     logger::init(log::LevelFilter::Info);
-
-    crate::init::transition_to(crate::init::BootStage::EarlyHAL);
 
     // Initialize heap (required for alloc)
     crate::arch::init_heap();
@@ -78,7 +96,39 @@ pub fn kernel_main_unified(boot_info: &crate::boot::BootInfo) -> ! {
 
     // Stage 2: Physical Memory Management
     crate::init::transition_to(crate::init::BootStage::MemoryMMU);
+
+    // TEAM_284: x86_64 needs PMO expansion before memory init for higher-half consistency
+    #[cfg(target_arch = "x86_64")]
+    {
+        unsafe extern "C" {
+            static mut early_pml4: los_hal::arch::paging::PageTable;
+        }
+
+        let mut ram_regions: [Option<los_hal::arch::multiboot2::MemoryRegion>; 16] = [None; 16];
+        let mut count = 0;
+        for region in boot_info.memory_map.iter() {
+            if region.kind == crate::boot::MemoryKind::Usable && count < 16 {
+                ram_regions[count] = Some(los_hal::arch::multiboot2::MemoryRegion {
+                    start: region.base,
+                    end: region.base + region.size,
+                    typ: los_hal::arch::multiboot2::MemoryType::Available,
+                });
+                count += 1;
+            }
+        }
+
+        unsafe {
+            los_hal::arch::mmu::expand_pmo(&mut *core::ptr::addr_of_mut!(early_pml4), &ram_regions);
+        }
+    }
+
     crate::memory::init(boot_info);
+
+    // TEAM_284: Initialize x86_64 syscalls after memory/heap
+    #[cfg(target_arch = "x86_64")]
+    unsafe {
+        crate::arch::syscall::init();
+    }
 
     // TEAM_262: Initialize bootstrap task immediately after heap/memory
     let bootstrap = alloc::sync::Arc::new(crate::task::TaskControlBlock::new_bootstrap());

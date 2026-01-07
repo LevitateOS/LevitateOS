@@ -58,3 +58,9 @@ bitflags = "2.10.0"
 aarch64-cpu = "11.2"
 spin = { version = "0.10", default-features = false, features = ["once", "lazy", "barrier", "rwlock", "spin_mutex"] }
 hashbrown = { version = "0.14", default-features = false, features = ["inline-more", "ahash"] }
+# TEAM_284: Critical libraries for x86_64 and hardware support
+x86_64 = "0.15"
+volatile = "0.6"
+bytemuck = { version = "1.21", features = ["derive"] }
+acpi = "5.0"
+aml = "0.16"

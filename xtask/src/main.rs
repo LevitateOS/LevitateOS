@@ -52,10 +52,14 @@ enum Commands {
 }
 
 #[derive(clap::Args)]
-struct TestArgs {
+pub struct TestArgs {
     /// Which test suite to run (unit, behavior, regress, gicv3, or all)
     #[arg(default_value = "all")]
-    suite: String,
+    pub suite: String,
+
+    /// Update golden logs with current output (Rule 4 Refined)
+    #[arg(long)]
+    pub update: bool,
 }
 
 fn main() -> Result<()> {
@@ -75,7 +79,7 @@ fn main() -> Result<()> {
             "all" => {
                 println!("🧪 Running COMPLETE test suite for {}...\n", arch);
                 tests::unit::run()?;
-                tests::behavior::run(arch)?;
+                tests::behavior::run(arch, args.update)?;
                 if arch == "aarch64" {
                     tests::behavior::run_gicv3().unwrap_or_else(|_| {
                         println!("⚠️  GICv3 behavior differs (expected, needs separate golden file)\n");
@@ -87,7 +91,7 @@ fn main() -> Result<()> {
                 println!("ℹ️  Run 'cargo xtask test shutdown' separately for shutdown golden file test");
             }
             "unit" => tests::unit::run()?,
-            "behavior" => tests::behavior::run(arch)?,
+            "behavior" => tests::behavior::run(arch, args.update)?,
             "regress" | "regression" => tests::regression::run()?,
             "gicv3" => {
                 if arch != "aarch64" {

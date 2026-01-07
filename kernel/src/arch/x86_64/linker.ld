@@ -8,84 +8,107 @@
  * Early boot code runs with identity mapping, then transitions to higher-half.
  */
 
-ENTRY(_start)
+ENTRY(_start64)
+
+PHDRS
+{
+    boot_text PT_LOAD FLAGS(5); /* R-X */
+    boot_data PT_LOAD FLAGS(6); /* RW- */
+    text      PT_LOAD FLAGS(5); /* R-X */
+    rodata    PT_LOAD FLAGS(4); /* R-- */
+    data      PT_LOAD FLAGS(6); /* RW- */
+}
 
 SECTIONS
 {
-    /* Multiboot1 header must be in first 8KB - for QEMU -kernel */
-    . = 0x100000;  /* Physical load address: 1MB */
-
-    .multiboot1 ALIGN(4) : {
-        KEEP(*(.multiboot1))
-    }
-
-    /* Multiboot2 header must be in first 32KB of the file - for GRUB */
-    .multiboot2 ALIGN(8) : {
-        KEEP(*(.multiboot2))
-    }
-
-    /* Boot code that runs before paging is set up (identity mapped) */
-    .text.boot : {
-        KEEP(*(.text.boot))
-        KEEP(*(.text.head))
-    }
-
-    /* Boot data (page tables, etc.) - identity mapped */
-    .data.boot : {
-        KEEP(*(.data.boot))
-    }
-
     /* Higher-Half Virtual Address Base for x86_64 */
     _kernel_virt_base = 0xFFFFFFFF80000000;
+    . = _kernel_virt_base;
 
-    /* Main kernel sections at higher-half addresses */
-    . = . + _kernel_virt_base;
     _kernel_virt_start = .;
 
-    /* TEAM_269: Added segment boundary symbols for init_kernel_mappings_refined() */
-    .text ALIGN(4K) : AT(ADDR(.text) - _kernel_virt_base) {
+    /* Physical Load Offset (2MB) to avoid overwriting BIOS/low memory */
+    _phys_offset = 0x200000;
+
+    /* Boot text section - must be early in the file for Multiboot */
+    .boot_text ALIGN(4K) : AT(ADDR(.boot_text) - _kernel_virt_base + _phys_offset) {
+        __boot_text_start = .;
+        KEEP(*(.multiboot1))
+        KEEP(*(.multiboot2))
+        KEEP(*(.text.boot))
+        __boot_text_end = .;
+    } :boot_text
+
+    /* Boot data section - must be writable */
+    .boot_data ALIGN(4K) : AT(ADDR(.boot_data) - _kernel_virt_base + _phys_offset) {
+        __boot_data_start = .;
+        KEEP(*(.requests)) /* Limine requests - MUST be writable for responses */
+        KEEP(*(.data.boot))
+        __boot_data_end = .;
+    } :boot_data
+
+    /* Physical address aliases for 32-bit boot code */
+    multiboot1_header_start_phys = ABSOLUTE(multiboot1_header_start - _kernel_virt_base + _phys_offset);
+    multiboot2_header_start_phys = ABSOLUTE(multiboot2_header_start - _kernel_virt_base + _phys_offset);
+    _start_phys = ABSOLUTE(_start - _kernel_virt_base + _phys_offset);
+    early_pml4_phys = ABSOLUTE(early_pml4 - _kernel_virt_base + _phys_offset);
+    early_pdpt_phys = ABSOLUTE(early_pdpt - _kernel_virt_base + _phys_offset);
+    early_pdpt_high_phys = ABSOLUTE(early_pdpt_high - _kernel_virt_base + _phys_offset);
+    early_pmo_pdpt_phys = ABSOLUTE(early_pmo_pdpt - _kernel_virt_base + _phys_offset);
+    early_pmo_pd_phys = ABSOLUTE(early_pmo_pd - _kernel_virt_base + _phys_offset);
+    early_pd_phys = ABSOLUTE(early_pd - _kernel_virt_base + _phys_offset);
+    early_pd_kernel_phys = ABSOLUTE(early_pd_kernel - _kernel_virt_base + _phys_offset);
+    early_pd_apic_phys = ABSOLUTE(early_pd_apic - _kernel_virt_base + _phys_offset);
+    GDT64_phys = ABSOLUTE(GDT64 - _kernel_virt_base + _phys_offset);
+    GDT64_Pointer_phys = ABSOLUTE(GDT64_Pointer - _kernel_virt_base + _phys_offset);
+    GDT64_Pointer_32_phys = ABSOLUTE(GDT64_Pointer_32 - _kernel_virt_base + _phys_offset);
+    boot_stack_top_phys = ABSOLUTE(boot_stack_top - _kernel_virt_base + _phys_offset);
+    long_mode_start_phys = ABSOLUTE(long_mode_start - _kernel_virt_base + _phys_offset);
+    setup_early_page_tables_phys = ABSOLUTE(setup_early_page_tables - _kernel_virt_base + _phys_offset);
+    setup_early_page_tables_64_phys = ABSOLUTE(setup_early_page_tables_64 - _kernel_virt_base + _phys_offset);
+
+    .text ALIGN(4K) : AT(ADDR(.text) - _kernel_virt_base + _phys_offset) {
         __text_start = .;
         *(.text*)
         __text_end = .;
-    }
+    } :text
 
-    .rodata ALIGN(4K) : AT(ADDR(.rodata) - _kernel_virt_base) {
+    .rodata ALIGN(4K) : AT(ADDR(.rodata) - _kernel_virt_base + _phys_offset) {
         __rodata_start = .;
         *(.rodata*)
         __rodata_end = .;
-    }
+    } :rodata
 
-    .data ALIGN(4K) : AT(ADDR(.data) - _kernel_virt_base) {
+    .data ALIGN(4K) : AT(ADDR(.data) - _kernel_virt_base + _phys_offset) {
         __data_start = .;
         *(.data*)
         __data_end = .;
-    }
+    } :data
 
-    .bss ALIGN(4K) : AT(ADDR(.bss) - _kernel_virt_base) {
+    .bss ALIGN(4K) : AT(ADDR(.bss) - _kernel_virt_base + _phys_offset) {
         __bss_start = .;
         *(.bss*)
         *(COMMON)
-        . = ALIGN(8);
+        . = ALIGN(16);
+        stack_bottom = .;
+        . = . + 0x4000;  /* 16KB stack */
+        stack_top = .;
         __bss_end = .;
-    }
+    } :data
 
-    /* Kernel stack (16KB) */
-    . = ALIGN(16);
-    stack_bottom = .;
-    . = . + 0x4000;  /* 16KB stack */
-    stack_top = .;
-
-    /* Kernel heap */
-    . = ALIGN(4K);
-    __heap_start = .;
-    . = _kernel_virt_base + 0x1000000;  /* 16MB higher-half region */
-    __heap_end = .;
+    /* Kernel heap - must be part of a segment to be mapped by Limine */
+    .heap ALIGN(4K) : AT(ADDR(.heap) - _kernel_virt_base + _phys_offset) {
+        __heap_start = .;
+        . = . + 0x1000000; /* 16MB */
+        __heap_end = .;
+        BYTE(0) /* Force section to have size and be included in segment MemSiz */
+    } :data
 
     _kernel_end = .;
 
-    /* Symbols for boot code */
+    /* Symbols for boot code compatibility */
     __kernel_start = _kernel_virt_start;
-    __kernel_phys_start = 0x100000;
+    __kernel_phys_start = _phys_offset;
     _kernel_size = _kernel_end - _kernel_virt_start;
 
     /* Discard unwanted sections */
