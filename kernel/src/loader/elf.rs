@@ -437,9 +437,11 @@ impl<'a> Elf<'a> {
                             );
                         }
 
+                            /*
                             if dst_va == 0x11fb8 {
                                 log::warn!("[ELF] WRITING GOT ENTRY at {:x}: val={:x}", dst_va, *byte);
                             }
+                            */
                             unsafe {
                                 *dst = *byte;
                             }

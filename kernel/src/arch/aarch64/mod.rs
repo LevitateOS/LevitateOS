@@ -453,4 +453,8 @@ impl SyscallFrame {
     pub fn set_return(&mut self, value: i64) {
         self.regs[0] = value as u64;
     }
+
+    pub fn set_sp(&mut self, val: u64) {
+        self.sp = val;
+    }
 }

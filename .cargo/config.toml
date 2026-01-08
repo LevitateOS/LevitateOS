@@ -6,7 +6,7 @@ rustflags = [
 
 [target.x86_64-unknown-none]
 rustflags = [
-    "-C", "no-red-zone",
+    "-C", "target-feature=-red-zone",
     "-C", "code-model=kernel",
     "-C", "relocation-model=static",
 ]

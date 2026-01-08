@@ -68,11 +68,11 @@ pub fn create_thread(
     // 280 is multiple of 8, so u64 alignment is fine.
 
     let mut child_frame = *tf;
-    // Set return value (x0) to 0 for child
-    child_frame.regs[0] = 0;
+    // Set return value to 0 for child (arch-agnostic via set_return)
+    child_frame.set_return(0);
     // Set child stack pointer (if provided, otherwise inherits parent's SP)
     if child_stack != 0 {
-        child_frame.sp = child_stack as u64;
+        child_frame.set_sp(child_stack as u64);
     }
     // Set TLS
     if child_tls != 0 {
@@ -90,17 +90,8 @@ pub fn create_thread(
     let tid = pid.0 as usize;
 
     // TEAM_230: Set up context for first switch
-    let mut context = Context::default();
-
-    // SP points to the TrapFrame we just pushed
-    context.sp = child_frame_addr as u64;
-
-    // LR points to task_entry_trampoline (standard kernel entry)
-    context.lr = crate::arch::task_entry_trampoline as *const () as u64;
-
-    // x19 holds the function to call after switch (the "entry wrapper")
     // We want to call `exception_return`, which restores from SP and erets.
-    context.x19 = crate::arch::exception_return as *const () as u64;
+    let mut context = Context::new(child_frame_addr, crate::arch::exception_return as *const () as usize);
 
     // TEAM_258: Set TLS in context using abstraction (architecture-independent)
     if child_tls != 0 {

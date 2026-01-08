@@ -181,6 +181,7 @@ pub extern "C" fn syscall_handler(frame: &mut super::SyscallFrame) {
     let pc_before = frame.rcx;
     let nr = frame.rax;
 
+    /*
     // Print entry for syscalls we care about (read=0, write=1)
     if nr <= 1 {
         los_hal::println!("[SYSCALL] ENTER nr={} rcx={:x}", nr, pc_before);
@@ -192,6 +193,7 @@ pub extern "C" fn syscall_handler(frame: &mut super::SyscallFrame) {
             pc_before
         );
     }
+    */
 
     crate::syscall::syscall_dispatch(frame);
 
@@ -205,6 +207,7 @@ pub extern "C" fn syscall_handler(frame: &mut super::SyscallFrame) {
         );
     }
 
+    /*
     // Print exit for syscalls we care about
     if nr <= 1 {
         los_hal::println!(
@@ -214,4 +217,5 @@ pub extern "C" fn syscall_handler(frame: &mut super::SyscallFrame) {
             frame.rax
         );
     }
+    */
 }

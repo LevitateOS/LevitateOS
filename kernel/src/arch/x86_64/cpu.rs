@@ -6,7 +6,7 @@ use core::arch::asm;
 const IA32_GS_BASE: u32 = 0xC000_0101;
 const IA32_KERNEL_GS_BASE: u32 = 0xC000_0102;
 
-use crate::arch::x86_64::gdt::{Gdt, TaskStateSegment};
+use los_hal::arch::gdt::{Gdt, TaskStateSegment};
 use core::mem::offset_of;
 
 /// TEAM_299: Processor Control Region (PCR).
