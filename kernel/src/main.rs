@@ -56,7 +56,7 @@ pub fn kernel_main_unified(boot_info: &crate::boot::BootInfo) -> ! {
     // SAFETY: Writing to serial port 0x3f8 is a standard debugging technique
     // in early x86_64 boot and is safe in this context.
     unsafe {
-        core::arch::asm!("mov dx, 0x3f8", "mov al, 'R'", "out dx, al");
+        core::arch::asm!("mov dx, 0x3f8", "mov al, 'R'", "out dx, al", out("ax") _, out("dx") _);
     }
 
     // TEAM_285: Initialize dynamic PHYS_OFFSET for Limine HHDM
@@ -65,7 +65,7 @@ pub fn kernel_main_unified(boot_info: &crate::boot::BootInfo) -> ! {
         if boot_info.protocol == crate::boot::BootProtocol::Limine {
             // Diagnostic 'i' for Limine
             unsafe {
-                core::arch::asm!("mov al, 'i'", "out dx, al");
+                core::arch::asm!("mov al, 'i'", "out dx, al", out("ax") _, out("dx") _);
             }
             if let Some(offset) = crate::boot::limine::hhdm_offset() {
                 los_hal::mmu::set_phys_offset(offset as usize);
@@ -73,7 +73,7 @@ pub fn kernel_main_unified(boot_info: &crate::boot::BootInfo) -> ! {
         } else {
             // Diagnostic 'j' for Non-Limine
             unsafe {
-                core::arch::asm!("mov al, 'j'", "out dx, al");
+                core::arch::asm!("mov al, 'j'", "out dx, al", out("ax") _, out("dx") _);
             }
         }
     }
@@ -85,7 +85,7 @@ pub fn kernel_main_unified(boot_info: &crate::boot::BootInfo) -> ! {
     {
         // Diagnostic 'k' before HAL Init
         unsafe {
-            core::arch::asm!("mov al, 'k'", "out dx, al");
+            core::arch::asm!("mov al, 'k'", "out dx, al", out("ax") _, out("dx") _);
         }
         let switch_cr3 = boot_info.protocol != crate::boot::BootProtocol::Limine;
         los_hal::arch::init_with_options(switch_cr3);
@@ -166,7 +166,10 @@ pub fn kernel_main_unified(boot_info: &crate::boot::BootInfo) -> ! {
     }
 
     // TEAM_262: Initialize bootstrap task immediately after heap/memory
-    let bootstrap = alloc::sync::Arc::new(crate::task::TaskControlBlock::new_bootstrap());
+    // TEAM_316: Use Box to heap-allocate TCB first to avoid stack overflow
+    // during struct initialization (TCB is large with many fields)
+    let bootstrap_box = alloc::boxed::Box::new(crate::task::TaskControlBlock::new_bootstrap());
+    let bootstrap = alloc::sync::Arc::from(bootstrap_box);
     // SAFETY: Setting the initial task is required for the scheduler to function.
     // This is safe as it's the first task being set during boot.
     unsafe {

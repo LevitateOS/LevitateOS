@@ -467,7 +467,7 @@ pub unsafe extern "C" fn exception_return() {
 pub extern "C" fn kernel_main(multiboot_magic: usize, multiboot_info: usize) -> ! {
     // TEAM_285: Diagnostic 'X' for Arch kernel_main Entry
     unsafe {
-        core::arch::asm!("mov dx, 0x3f8", "mov al, 'X'", "out dx, al");
+        core::arch::asm!("mov dx, 0x3f8", "mov al, 'X'", "out dx, al", out("ax") _, out("dx") _);
     }
 
     // 1. Detect and parse boot information
@@ -477,20 +477,20 @@ pub extern "C" fn kernel_main(multiboot_magic: usize, multiboot_info: usize) -> 
     let boot_info = if is_limine {
         // Diagnostic 'L' for Limine Path
         unsafe {
-            core::arch::asm!("mov al, 'L'", "out dx, al");
+            core::arch::asm!("mov al, 'L'", "out dx, al", out("ax") _, out("dx") _);
         }
         crate::boot::limine::parse()
     } else {
         // Diagnostic 'M' for Multiboot Path
         unsafe {
-            core::arch::asm!("mov al, 'M'", "out dx, al");
+            core::arch::asm!("mov al, 'M'", "out dx, al", out("ax") _, out("dx") _);
         }
         unsafe { crate::boot::multiboot::parse(multiboot_magic as u32, multiboot_info) }
     };
 
     // Diagnostic 'P' for Parse Done
     unsafe {
-        core::arch::asm!("mov al, 'P'", "out dx, al");
+        core::arch::asm!("mov al, 'P'", "out dx, al", out("ax") _, out("dx") _);
     }
 
     // Store boot info globally

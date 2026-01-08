@@ -1,5 +1,5 @@
 use crate::IrqSafeLock;
-use crate::x86_64::serial::SerialPort;
+use super::serial::SerialPort;
 
 const COM1: u16 = 0x3F8;
 

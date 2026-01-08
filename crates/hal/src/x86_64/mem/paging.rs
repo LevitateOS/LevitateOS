@@ -58,7 +58,7 @@ impl PageTableEntry {
         self.0 = (addr as u64) | flags.bits();
     }
 
-    pub fn set(&mut self, addr: usize, flags: crate::x86_64::mmu::PageFlags) {
+    pub fn set(&mut self, addr: usize, flags: super::mmu::PageFlags) {
         self.0 = (addr as u64) | flags.bits();
     }
 
@@ -138,7 +138,7 @@ fn walk(table: &PageTable, index: usize) -> Option<&PageTable> {
     if entry.flags().contains(PageTableFlags::PRESENT) {
         // [TEAM_266]: Use PHYS_OFFSET to access the sub-table.
         let phys = entry.address();
-        let virt = crate::x86_64::mmu::phys_to_virt(phys);
+        let virt = super::mmu::phys_to_virt(phys);
         unsafe { Some(&*(virt as *const PageTable)) }
     } else {
         None
@@ -153,12 +153,12 @@ where
     let entry = table.entries[index];
     if entry.flags().contains(PageTableFlags::PRESENT) {
         let phys = entry.address();
-        let virt = crate::x86_64::mmu::phys_to_virt(phys);
+        let virt = super::mmu::phys_to_virt(phys);
         unsafe { Some(&mut *(virt as *mut PageTable)) }
     } else {
         let new_table_pa = alloc_fn()?;
         // TEAM_266: Use phys_to_virt (PHYS_OFFSET) to access new table.
-        let new_table_va = crate::x86_64::mmu::phys_to_virt(new_table_pa);
+        let new_table_va = super::mmu::phys_to_virt(new_table_pa);
         let new_table = unsafe { &mut *(new_table_va as *mut PageTable) };
         new_table.zero();
 
@@ -264,7 +264,7 @@ pub fn translate_addr_any(pml4: &PageTable, virt: usize) -> Option<usize> {
 
     // Regular 4KB page - continue to PT level
     let phys = pd_entry.address();
-    let virt_pt = crate::x86_64::mmu::phys_to_virt(phys);
+    let virt_pt = super::mmu::phys_to_virt(phys);
     let p1 = unsafe { &*(virt_pt as *const PageTable) };
 
     let pt_entry = p1.entries[pt_index(virt)];

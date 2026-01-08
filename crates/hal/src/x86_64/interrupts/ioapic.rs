@@ -14,8 +14,8 @@ impl IoApic {
 
     #[allow(dead_code)]
     unsafe fn read_reg(&self, reg: u8) -> u32 {
-        let ioregsel = crate::x86_64::mmu::phys_to_virt(self.base_addr) as *mut u32;
-        let iowin = crate::x86_64::mmu::phys_to_virt(self.base_addr + 0x10) as *const u32;
+        let ioregsel = crate::x86_64::mem::mmu::phys_to_virt(self.base_addr) as *mut u32;
+        let iowin = crate::x86_64::mem::mmu::phys_to_virt(self.base_addr + 0x10) as *const u32;
 
         unsafe {
             ioregsel.write_volatile(reg as u32);
@@ -24,8 +24,8 @@ impl IoApic {
     }
 
     unsafe fn write_reg(&self, reg: u8, value: u32) {
-        let ioregsel = crate::x86_64::mmu::phys_to_virt(self.base_addr) as *mut u32;
-        let iowin = crate::x86_64::mmu::phys_to_virt(self.base_addr + 0x10) as *mut u32;
+        let ioregsel = crate::x86_64::mem::mmu::phys_to_virt(self.base_addr) as *mut u32;
+        let iowin = crate::x86_64::mem::mmu::phys_to_virt(self.base_addr + 0x10) as *mut u32;
 
         unsafe {
             ioregsel.write_volatile(reg as u32);

@@ -1,6 +1,6 @@
 use crate::traits::PageAllocator;
-use crate::x86_64::frame_alloc::EARLY_ALLOCATOR;
-pub use crate::x86_64::paging::{
+use super::frame_alloc::EARLY_ALLOCATOR;
+pub use super::paging::{
     self, ENTRIES_PER_TABLE, PageTable, PageTableEntry, PageTableFlags,
 };
 use bitflags::bitflags;
@@ -213,6 +213,7 @@ unsafe extern "C" {
 }
 
 /// TEAM_263: Initialize higher-half mappings for the kernel.
+/// TEAM_316: Simplified - removed APIC/PCI mappings that crash due to 1GB PMO limit
 pub fn init_kernel_mappings(root: &mut PageTable) {
     // 1. Identity map first 1MB for BIOS/Multiboot stability
     for addr in (0..0x100000).step_by(PAGE_SIZE) {
@@ -230,30 +231,14 @@ pub fn init_kernel_mappings(root: &mut PageTable) {
         let _ = map_page(root, va, pa, PageFlags::KERNEL_DATA);
     }
 
-    // 3. Map VGA for debugging and device discovery
+    // 3. Map VGA for debugging
     let _ = map_page(root, 0xB8000, 0xB8000, PageFlags::DEVICE);
 
-    // 4. Map APIC and IOAPIC regions (4th GB)
-    // IOAPIC at 0xFEC00000, Local APIC at 0xFEE00000
-    let _ = map_page(root, 0xFEC00000, 0xFEC00000, PageFlags::DEVICE);
-    let _ = map_page(root, 0xFEE00000, 0xFEE00000, PageFlags::DEVICE);
+    // 4. APIC/IOAPIC - Already mapped by assembly as 2MB huge pages
+    // TEAM_316: Skip - phys_to_virt(0xFEC00000/0xFEE00000) outside 1GB PMO range
 
-    // 5. Map PCI ECAM for debugging and device discovery
-    // TEAM_284: Map ECAM for PCI discovery (both to specific VA and PHYS_OFFSET)
-    for i in 0..(1024 * 1024 / PAGE_SIZE) {
-        let offset = i * PAGE_SIZE;
-        let pa = ECAM_PA + offset;
-        let _ = map_page(root, ECAM_VA + offset, pa, PageFlags::DEVICE);
-        let _ = map_page(root, phys_to_virt(pa), pa, PageFlags::DEVICE);
-    }
-
-    // 6. Map PCI MMIO space (both to specific VA and PHYS_OFFSET)
-    for i in 0..(PCI_MEM32_SIZE / PAGE_SIZE) {
-        let offset = i * PAGE_SIZE;
-        let pa = PCI_MEM32_PA + offset;
-        let _ = map_page(root, PCI_MEM32_VA + offset, pa, PageFlags::DEVICE);
-        let _ = map_page(root, phys_to_virt(pa), pa, PageFlags::DEVICE);
-    }
+    // 5. PCI ECAM/MMIO - Deferred to PCI subsystem init
+    // TEAM_316: Skip - ECAM_PA/PCI_MEM32_PA outside 1GB PMO range
 }
 
 impl crate::traits::MmuInterface for PageTable {
@@ -379,7 +364,7 @@ pub fn set_page_allocator(allocator: &'static dyn PageAllocator) {
 // TEAM_267: PMO Expansion and Kernel Segment Permissions
 // =============================================================================
 
-use crate::x86_64::multiboot2::MemoryRegion;
+use crate::x86_64::boot::multiboot2::MemoryRegion;
 
 /// Expand PMO mapping to cover all available RAM.
 /// Uses 2MB huge pages for efficiency where possible.

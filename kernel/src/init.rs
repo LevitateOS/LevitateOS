@@ -10,11 +10,11 @@
 
 extern crate alloc;
 
+use crate::fs::vfs::superblock::Superblock;
+use crate::task::TaskControlBlock;
+use crate::{arch, task};
 use alloc::sync::Arc;
 use core::sync::atomic::{AtomicUsize, Ordering};
-use crate::{arch, task};
-use crate::task::TaskControlBlock;
-use crate::fs::vfs::superblock::Superblock;
 use los_hal::{InterruptHandler, IrqId, print, println};
 
 #[cfg(target_arch = "aarch64")]
@@ -56,7 +56,8 @@ pub fn transition_to(stage: BootStage) {
     if stage_val < prev && prev != 0 {
         log::warn!(
             "[BOOT] WARNING: Unexpected transition from {:?} to {:?}",
-            prev, stage
+            prev,
+            stage
         );
     }
 
@@ -132,10 +133,7 @@ pub fn maintenance_shell() -> ! {
                 }
                 "info" => {
                     println!("System Status: FAILSAFE MODE");
-                    println!(
-                        "Stage: {:?}",
-                        CURRENT_STAGE.load(Ordering::Relaxed)
-                    );
+                    println!("Stage: {:?}", CURRENT_STAGE.load(Ordering::Relaxed));
                 }
                 "clear" => {
                     // ANSI escape code to clear screen
@@ -237,21 +235,26 @@ pub fn run() -> ! {
 
     // --- Interrupt Controller and Timer Setup ---
     {
-        // TEAM_255: Initialize interrupt controller using generic HAL interface
-        let ic = los_hal::active_interrupt_controller();
-        ic.init();
+        // TEAM_316: x86_64 Multiboot path - skip APIC/IOAPIC init because phys_to_virt()
+        // for APIC addresses (0xFEE00000) fails - outside 1GB PMO range.
+        // PIT still works via I/O ports. Interrupts use legacy PIC mode.
+        #[cfg(not(target_arch = "x86_64"))]
+        {
+            // TEAM_255: Initialize interrupt controller using generic HAL interface
+            let ic = los_hal::active_interrupt_controller();
+            ic.init();
 
-        // TEAM_255/TEAM_303: Register IRQ handlers using generic HAL traits (now arch-agnostic)
-        ic.register_handler(IrqId::VirtualTimer, &TIMER_HANDLER);
-        ic.register_handler(IrqId::Uart, &UART_HANDLER);
-        ic.enable_irq(ic.map_irq(IrqId::VirtualTimer));
-        ic.enable_irq(ic.map_irq(IrqId::Uart));
+            // TEAM_255/TEAM_303: Register IRQ handlers using generic HAL traits
+            ic.register_handler(IrqId::VirtualTimer, &TIMER_HANDLER);
+            ic.register_handler(IrqId::Uart, &UART_HANDLER);
+            ic.enable_irq(ic.map_irq(IrqId::VirtualTimer));
+            ic.enable_irq(ic.map_irq(IrqId::Uart));
+        }
 
         #[cfg(target_arch = "x86_64")]
         {
-            // TEAM_303: Route PIT (legacy IRQ 0) to vector 32
-            los_hal::arch::ioapic::IOAPIC.route_irq(0, 32, 0);
-            // TEAM_303: Initialize PIT for 100Hz
+            // TEAM_316: Skip IOAPIC routing - uses phys_to_virt() which fails
+            // PIT is already initialized in HAL, just ensure it's running
             los_hal::pit::Pit::init(100);
         }
 
@@ -371,7 +374,9 @@ fn init_userspace() -> bool {
 
     log::debug!(
         "Initramfs found at 0x{:x} - 0x{:x} ({} bytes)",
-        start, end, size
+        start,
+        end,
+        size
     );
 
     // TEAM_289: Limine module.addr() returns VA directly (HHDM-mapped).

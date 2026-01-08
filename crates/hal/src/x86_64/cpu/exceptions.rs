@@ -1,6 +1,6 @@
 // TEAM_259: CPU Exception Handlers for x86_64.
 
-use crate::x86_64::idt::IDT;
+use super::idt::IDT;
 use core::arch::{asm, naked_asm};
 
 #[repr(C)]
@@ -275,12 +275,21 @@ extern "C" fn page_fault_handler(frame: &ExceptionStackFrame, error_code: u64) {
 #[unsafe(no_mangle)]
 extern "C" fn irq_dispatch(vector: u64) {
     // 1. Dispatch to registered handler
-    if !crate::x86_64::apic::dispatch(vector as u8) {
+    if !crate::x86_64::interrupts::apic::dispatch(vector as u8) {
         // TEAM_303: Log unhandled IRQs to serial
     }
 
-    // 2. Signal EOI to APIC
-    crate::x86_64::apic::APIC.signal_eoi();
+    // 2. Signal EOI
+    // TEAM_316: APIC.signal_eoi() crashes because phys_to_virt(0xFEE00000) is outside
+    // 1GB PMO range. Use legacy PIC EOI instead since we're using PIT timer.
+    unsafe {
+        // Send EOI to master PIC (port 0x20)
+        core::arch::asm!("mov al, 0x20", "out 0x20, al", out("al") _);
+        // For IRQs 8-15, also send to slave PIC (port 0xA0)
+        if vector >= 40 {
+            core::arch::asm!("mov al, 0x20", "out 0xA0, al", out("al") _);
+        }
+    }
 }
 
 exception_handler!(de_wrapper, divide_error_handler);

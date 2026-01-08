@@ -257,31 +257,33 @@ impl TaskControlBlock {
 
 impl TaskControlBlock {
     /// Create a TCB for the current (bootstrap) task.
+    /// TEAM_316: Minimal version to avoid crash at 0x800200188
     pub fn new_bootstrap() -> Self {
+        // TEAM_316: Use Default trait to let compiler handle initialization
+        Self::default()
+    }
+}
+
+impl Default for TaskControlBlock {
+    fn default() -> Self {
         Self {
-            id: TaskId(0), // Reserve ID 0 for bootstrap
+            id: TaskId(0),
             state: AtomicU8::new(TaskState::Running as u8),
-            context: Context::default(), // Will be populated on first switch out
-            stack: None,                 // Boot stack managed by assembler
+            context: Context::default(),
+            stack: None,
             stack_top: 0,
             stack_size: 0,
             ttbr0: 0,
             user_sp: 0,
             user_entry: 0,
-            // TEAM_166: Bootstrap task has no heap (kernel task)
             heap: IrqSafeLock::new(ProcessHeap::new(0)),
-            // TEAM_168: Bootstrap task has minimal fd table (kernel task)
             fd_table: fd_table::new_shared_fd_table(),
-            // TEAM_192: Bootstrap task starts in root
-            cwd: IrqSafeLock::new(String::from("/")),
-            // TEAM_216: Kernel tasks have no signals
+            cwd: IrqSafeLock::new(String::new()),
             pending_signals: AtomicU32::new(0),
             blocked_signals: AtomicU32::new(0),
-            signal_handlers: IrqSafeLock::new([0; 32]),
+            signal_handlers: IrqSafeLock::new([0usize; 32]),
             signal_trampoline: AtomicUsize::new(0),
-            // TEAM_228: No clear-on-exit TID for kernel tasks
             clear_child_tid: AtomicUsize::new(0),
-            // TEAM_238: Kernel tasks have no VMAs
             vmas: IrqSafeLock::new(crate::memory::vma::VmaList::new()),
         }
     }

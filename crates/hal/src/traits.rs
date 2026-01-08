@@ -5,7 +5,7 @@
 #[cfg(target_arch = "aarch64")]
 use crate::aarch64::mmu::{PageFlags, MmuError};
 #[cfg(target_arch = "x86_64")]
-use crate::x86_64::mmu::{PageFlags, MmuError};
+use crate::x86_64::mem::mmu::{PageFlags, MmuError};
 
 /// Known IRQ sources in LevitateOS.
 /// Maps symbolic names to hardware IRQ numbers.

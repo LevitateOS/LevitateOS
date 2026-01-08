@@ -5,7 +5,7 @@ use core::fmt;
 const VGA_PHYS: usize = 0xB8000;
 
 fn vga_buffer() -> *mut u16 {
-    crate::x86_64::mmu::phys_to_virt(VGA_PHYS) as *mut u16
+    crate::x86_64::mem::mmu::phys_to_virt(VGA_PHYS) as *mut u16
 }
 const BUFFER_HEIGHT: usize = 25;
 const BUFFER_WIDTH: usize = 80;
@@ -34,7 +34,7 @@ pub enum Color {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(transparent)]
-struct ColorCode(u8);
+pub struct ColorCode(u8);
 
 impl ColorCode {
     fn new(foreground: Color, background: Color) -> ColorCode {

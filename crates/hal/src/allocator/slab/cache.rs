@@ -179,7 +179,7 @@ impl SlabCache {
         #[cfg(target_arch = "aarch64")]
         use crate::aarch64::mmu;
         #[cfg(target_arch = "x86_64")]
-        use crate::x86_64::mmu;
+        use crate::x86_64::mem::mmu;
 
         // Get physical page from buddy allocator (order 0 = 4KB)
         let phys_addr = FRAME_ALLOCATOR.0.lock().alloc(0)?;

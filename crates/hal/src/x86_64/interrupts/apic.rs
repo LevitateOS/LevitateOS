@@ -40,14 +40,14 @@ impl ApicController {
 
     /// Read from an APIC register.
     unsafe fn read_reg(&self, reg: u32) -> u32 {
-        let va = crate::x86_64::mmu::phys_to_virt(self.base_addr + reg as usize);
+        let va = crate::x86_64::mem::mmu::phys_to_virt(self.base_addr + reg as usize);
         let ptr = va as *const u32;
         unsafe { ptr.read_volatile() }
     }
 
     /// Write to an APIC register.
     unsafe fn write_reg(&self, reg: u32, value: u32) {
-        let va = crate::x86_64::mmu::phys_to_virt(self.base_addr + reg as usize);
+        let va = crate::x86_64::mem::mmu::phys_to_virt(self.base_addr + reg as usize);
         let ptr = va as *mut u32;
         unsafe { ptr.write_volatile(value) };
     }
