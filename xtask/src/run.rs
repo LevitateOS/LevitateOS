@@ -16,6 +16,12 @@ pub enum RunCommands {
     Pixel6,
     /// Run with VNC for browser verification
     Vnc,
+    /// Run with GDB server enabled (port 1234)
+    Gdb {
+        /// Wait for GDB connection on startup
+        #[arg(long)]
+        wait: bool,
+    },
     /// Run in terminal-only mode (WSL-like, keyboard in terminal)
     Term {
         /// Boot from Limine ISO instead of -kernel
@@ -139,6 +145,65 @@ pub fn run_qemu(profile: QemuProfile, headless: bool, iso: bool, arch: &str) -> 
         .stderr(Stdio::inherit())
         .status()
         .context("Failed to run QEMU")?;
+
+    Ok(())
+}
+
+/// TEAM_116: Run QEMU with GDB server enabled (port 1234).
+pub fn run_qemu_gdb(profile: QemuProfile, wait: bool, arch: &str) -> Result<()> {
+    println!("🐛 Starting QEMU with GDB server on port 1234...");
+    if wait {
+        println!("⏳ Waiting for GDB connection before starting...");
+    }
+
+    image::create_disk_image_if_missing()?;
+
+    let kernel_bin = if arch == "aarch64" {
+        "kernel64_rust.bin"
+    } else {
+        "target/x86_64-unknown-none/release/levitate-kernel"
+    };
+
+    let qemu_bin = match arch {
+        "aarch64" => "qemu-system-aarch64",
+        "x86_64" => "qemu-system-x86_64",
+        _ => bail!("Unsupported architecture: {}", arch),
+    };
+
+    let machine = profile.machine();
+    let mut args = vec![
+        "-M", machine.as_str(),
+        "-cpu", profile.cpu(),
+        "-m", profile.memory(),
+        "-kernel", kernel_bin,
+        "-s", // Shorthand for -gdb tcp::1234
+        "-device", "virtio-gpu-pci,xres=1280,yres=800",
+        "-device", if arch == "x86_64" { "virtio-keyboard-pci" } else { "virtio-keyboard-device" },
+        "-device", if arch == "x86_64" { "virtio-tablet-pci" } else { "virtio-tablet-device" },
+        "-device", if arch == "x86_64" { "virtio-net-pci,netdev=net0" } else { "virtio-net-device,netdev=net0" },
+        "-netdev", "user,id=net0",
+        "-drive", "file=tinyos_disk.img,format=raw,if=none,id=hd0",
+        "-device", if arch == "x86_64" { "virtio-blk-pci,drive=hd0" } else { "virtio-blk-device,drive=hd0" },
+        "-initrd", "initramfs.cpio",
+        "-serial", "mon:stdio",
+        "-qmp", "unix:./qmp.sock,server,nowait",
+        "-no-reboot",
+    ];
+
+    if wait {
+        args.push("-S"); // Freeze CPU at startup
+    }
+
+    if let Some(smp) = profile.smp() {
+        args.extend(["-smp", smp]);
+    }
+
+    Command::new(qemu_bin)
+        .args(&args)
+        .stdout(Stdio::inherit())
+        .stderr(Stdio::inherit())
+        .status()
+        .context("Failed to run QEMU with GDB")?;
 
     Ok(())
 }

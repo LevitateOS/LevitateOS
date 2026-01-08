@@ -10,6 +10,8 @@
 pub fn syscall0(nr: u64) -> i64 {
     let ret: i64;
     unsafe {
+        // TEAM_297 BREADCRUMB: SUSPECT - Syscall instruction might not be restoring specific registers correctly
+        // Checked RCX/R11 clobbers, they look correct.
         core::arch::asm!(
             "syscall",
             inlateout("rax") nr => ret,

@@ -324,6 +324,14 @@ impl PageFlags {
         .union(PageFlags::AP_RW_ALL) // R/W from EL0/EL1
         .union(PageFlags::NG) // Not Global (per-process)
         .union(PageFlags::PXN); // Don't execute in kernel (but allow in user - no UXN)
+
+    pub fn is_user(&self) -> bool {
+        self.contains(PageFlags::AP_RW_ALL) || self.contains(PageFlags::AP_RO_ALL)
+    }
+
+    pub fn is_writable(&self) -> bool {
+        self.contains(PageFlags::AP_RW_ALL) || self.contains(PageFlags::AP_RW_EL1)
+    }
 }
 
 // ============================================================================

@@ -27,14 +27,15 @@ const RFLAGS_IF: u64 = 1 << 9;
 const RFLAGS_TF: u64 = 1 << 8;
 const RFLAGS_DF: u64 = 1 << 10;
 
-/// Static kernel stack for syscalls (16KB)
-#[repr(C, align(16))]
-pub struct SyscallStack {
-    pub data: [u8; 16384],
-}
-
+/// TEAM_296: Per-task kernel stack management for syscalls.
 #[unsafe(no_mangle)]
-pub static mut SYSCALL_STACK: SyscallStack = SyscallStack { data: [0; 16384] };
+pub static mut CURRENT_KERNEL_STACK: usize = 0;
+#[unsafe(no_mangle)]
+pub static mut USER_RSP_SCRATCH: usize = 0;
+#[unsafe(no_mangle)]
+pub static mut USER_PC_SCRATCH: usize = 0;
+#[unsafe(no_mangle)]
+pub static mut USER_RFLAGS_SCRATCH: usize = 0;
 
 /// Initialize syscall/sysret MSRs
 pub unsafe fn init() {
@@ -43,7 +44,7 @@ pub unsafe fn init() {
     // We want: User CS = 0x23 (0x20|3), User SS = 0x1B (0x18|3)
     // So [63:48] = 0x10: CS = 0x10+16|3 = 0x23, SS = 0x10+8|3 = 0x1B ✓
     let star = (0x10_u64 << 48) | (GDT_KERNEL_CODE << 32);
-    let lstar = syscall_entry as usize as u64;
+    let lstar = syscall_entry as *const () as usize as u64;
     let fmask = RFLAGS_IF | RFLAGS_TF | RFLAGS_DF;
 
     unsafe {
@@ -95,19 +96,22 @@ unsafe fn wrmsr(msr: u32, value: u64) {
 #[unsafe(naked)]
 pub unsafe extern "C" fn syscall_entry() {
     naked_asm!(
-        // Save userspace RSP to R15
-        "mov r15, rsp",
+        // 1. Switch to kernel stack (interrupts are disabled by FMASK)
+        "mov [rip + {user_rsp}], rsp",
+        "mov rsp, [rip + {kernel_stack}]",
 
-        // Load kernel stack
-        "lea rsp, [rip + {stack} + 16384]",
+        // 2. Build SyscallFrame (pushed in reverse order of fields)
+        // Space for regs[31] (not used for basic syscalls but kept for compatibility)
+        // TEAM_297 BREADCRUMB: DEAD_END - SyscallFrame layout mismatch.
+        // We carefully verified the push order below against the SyscallFrame struct definition.
+        // They match exactly. Do not reinvestigate stack layout unless struct definition changes.
+        "sub rsp, 31*8",
 
-        // Build SyscallFrame on stack
-        "sub rsp, 31*8",   // regs[31] placeholder
-        "push 0",          // pstate
-        "push r15",        // sp
-        "push rcx",        // pc (return address)
-        "push 0",          // ttbr0
-        "push r15",        // rsp
+        "push 0",                            // pstate
+        "push qword ptr [rip + {user_rsp}]", // sp
+        "push rcx",                          // pc (return address)
+        "push 0",                            // ttbr0
+        "push qword ptr [rip + {user_rsp}]", // rsp
         "push r15",        // r15
         "push r14",
         "push r13",
@@ -138,7 +142,7 @@ pub unsafe extern "C" fn syscall_entry() {
         "pop r10",
         "pop r8",
         "pop r9",
-        "pop rcx",
+        "pop rcx",         // RCX = return address
         "pop r11",
         "pop rbx",
         "pop rbp",
@@ -146,14 +150,16 @@ pub unsafe extern "C" fn syscall_entry() {
         "pop r13",
         "pop r14",
         "pop r15",
-        "add rsp, 8*5",    // skip rsp, ttbr0, pc, sp, pstate
-        "add rsp, 31*8",   // skip regs[31]
 
-        // Restore user stack and return
-        "mov rsp, r15",
+        // After popping R15, RSP points to 'frame.rsp'
+        "mov rsp, [rsp]",
+
+        // TEAM_297 BREADCRUMB: SUSPECT - This instruction may be returning to wrong address.
+        // Observed RIP is -3 bytes from expected return.
         "sysretq",
 
-        stack = sym SYSCALL_STACK,
+        user_rsp = sym USER_RSP_SCRATCH,
+        kernel_stack = sym CURRENT_KERNEL_STACK,
         handler = sym syscall_handler,
     );
 }
@@ -161,5 +167,42 @@ pub unsafe extern "C" fn syscall_entry() {
 /// Rust syscall handler - called from assembly
 #[unsafe(no_mangle)]
 pub extern "C" fn syscall_handler(frame: &mut super::SyscallFrame) {
+    // TEAM_297 BREADCRUMB: INVESTIGATING - Debug trace added but no output seen.
+    // Suspicion: los_hal::println! might fail in syscall context or execution doesn't reach here.
+    let pc_before = frame.rcx;
+    let nr = frame.rax;
+
+    // Print entry for syscalls we care about (read=0, write=1)
+    if nr <= 1 {
+        los_hal::println!("[SYSCALL] ENTER nr={} rcx={:x}", nr, pc_before);
+    }
+
+    if nr == 1 {
+        los_hal::println!(
+            "[SYSCALL] WRITE syscall! rcx={:x} (Expected return)",
+            pc_before
+        );
+    }
+
     crate::syscall::syscall_dispatch(frame);
+
+    // Check if RCX was corrupted
+    if frame.rcx != pc_before {
+        los_hal::println!(
+            "[SYSCALL] WARNING: RCX changed! nr={} before={:x} after={:x}",
+            nr,
+            pc_before,
+            frame.rcx
+        );
+    }
+
+    // Print exit for syscalls we care about
+    if nr <= 1 {
+        los_hal::println!(
+            "[SYSCALL] EXIT nr={} rcx={:x} rax={:x}",
+            nr,
+            frame.rcx,
+            frame.rax
+        );
+    }
 }

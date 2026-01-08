@@ -3,6 +3,8 @@
 //! Usage:
 //!   cargo xtask test                  # Run ALL tests
 //!   cargo xtask build all             # Build everything
+//!   cargo xtask build initramfs       # Build initramfs only
+//!   cargo xtask build iso             # Build bootable Limine ISO
 //!   cargo xtask run default           # Run QEMU default
 //!   cargo xtask run pixel6            # Run QEMU Pixel 6
 //!   cargo xtask image install         # Install userspace to disk
@@ -117,6 +119,7 @@ fn main() -> Result<()> {
                 build::build_userspace(arch)?;
                 build::create_initramfs(arch)?;
             }
+            build::BuildCommands::Initramfs => build::create_initramfs(arch)?,
             build::BuildCommands::Iso => build::build_iso(arch)?,
         },
         Commands::Run(cmd) => match cmd {
@@ -144,6 +147,15 @@ fn main() -> Result<()> {
             run::RunCommands::Vnc => {
                 run::run_qemu_vnc(arch)?;
             }
+            run::RunCommands::Gdb { wait } => {
+                let profile = if arch == "x86_64" {
+                    run::QemuProfile::X86_64
+                } else {
+                    run::QemuProfile::Default
+                };
+                build::build_all(arch)?;
+                run::run_qemu_gdb(profile, wait, arch)?;
+            }
             run::RunCommands::Term { iso } => {
                 run::run_qemu_term(arch, iso)?;
             }
@@ -154,6 +166,7 @@ fn main() -> Result<()> {
         Commands::Image(cmd) => match cmd {
             image::ImageCommands::Create => image::create_disk_image_if_missing()?,
             image::ImageCommands::Install => image::install_userspace_to_disk(arch)?,
+            image::ImageCommands::Status => image::show_disk_status()?,
             image::ImageCommands::Screenshot { output } => {
                 println!("📸 Dumping GPU screen to {}...", output);
                 let mut client = qmp::QmpClient::connect("./qmp.sock")?;

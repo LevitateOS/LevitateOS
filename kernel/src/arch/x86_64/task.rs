@@ -14,7 +14,7 @@ pub struct Context {
     pub x22: u64,       // r14 equivalent
     pub x23: u64,       // r15 equivalent
     pub x24: u64,       // rbp equivalent
-    pub x25: u64,       // spare
+    pub x25: u64,       // kernel_stack_top
     pub x26: u64,       // spare
     pub x27: u64,       // spare
     pub x28: u64,       // spare
@@ -28,7 +28,8 @@ impl Context {
     pub fn new(stack_top: usize, entry_wrapper: usize) -> Self {
         Self {
             sp: stack_top as u64,
-            lr: task_entry_trampoline as usize as u64,
+            x25: stack_top as u64, // kernel_stack_top
+            lr: task_entry_trampoline as *const () as usize as u64,
             x19: entry_wrapper as u64,
             ..Default::default()
         }
@@ -90,10 +91,10 @@ global_asm!(
     "mov [rdi + 16], r13", // x21 = r13
     "mov [rdi + 24], r14", // x22 = r14
     "mov [rdi + 32], r15", // x23 = r15
-    "mov [rdi + 40], rbp", // x24 = rbp
-    "mov [rdi + 88], rsp", // sp
+    "mov [rdi + 40], rbp", // x24 = rbp (AArch64 x29 equivalent)
+    "mov [rdi + 96], rsp", // sp
     "lea rax, [rip + 1f]", // Get return address
-    "mov [rdi + 80], rax", // lr = return address
+    "mov [rdi + 88], rax", // lr = return address
     // Restore callee-saved registers from new context (rsi points to new Context)
     "mov rbx, [rsi + 0]",
     "mov r12, [rsi + 8]",
@@ -101,9 +102,15 @@ global_asm!(
     "mov r14, [rsi + 24]",
     "mov r15, [rsi + 32]",
     "mov rbp, [rsi + 40]",
-    "mov rsp, [rsi + 88]",
-    "mov rax, [rsi + 80]", // lr = new return address
+    "mov rsp, [rsi + 96]",
+    "mov rax, [rsi + 48]", // kernel_stack_top from x25
+    "mov [rip + {kernel_stack}], rax",
+    "lea rdx, [rip + {tss_val}]",
+    "mov [rdx + 4], rax", // TSS.rsp0 offset is 4
+    "mov rax, [rsi + 88]", // lr = new return address
     "jmp rax",             // Jump to new task
     "1:",                  // Return point for context switch back
-    "ret"
+    "ret",
+    kernel_stack = sym super::syscall::CURRENT_KERNEL_STACK,
+    tss_val = sym los_hal::x86_64::tss::TSS,
 );

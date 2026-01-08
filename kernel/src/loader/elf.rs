@@ -310,10 +310,14 @@ impl<'a> Elf<'a> {
     /// # Returns
     /// Tuple of (entry_point, initial_brk) on success.
     pub fn load(&self, ttbr0_phys: usize) -> Result<(usize, usize), ElfError> {
-        let mut max_vaddr = 0usize;
+        let mut max_vaddr = 0;
 
+        // TEAM_297 BREADCRUMB: DEAD_END - Missing GOT/PLT Relocations.
+        // Userspace binaries are statically linked (ET_EXEC).
+        // GOT is pre-populated by linker. No runtime relocations are needed or performed.
+        // If GOT is wrong, it's due to memory corruption (Hypothesis 7), not missing relocations.
         for phdr in self.program_headers() {
-            if !phdr.is_loadable() {
+            if phdr.p_type != program::Type::Load {
                 continue;
             }
 
@@ -354,6 +358,9 @@ impl<'a> Elf<'a> {
                     // TEAM_212: Page already mapped - check if we need to upgrade permissions
                     // If new segment needs RW (USER_DATA) but page was mapped RO (USER_CODE),
                     // we need to upgrade to USER_CODE_DATA (RWX) to allow both execute and write
+                    // TEAM_297 BREADCRUMB: INVESTIGATING - Shared page mapping.
+                    // Crash happens in function called via GOT, and GOT/rodata share a page.
+                    // Verifying if permissions are correctly upgraded and data is preserved.
                     if flags == PageFlags::USER_DATA {
                         let l0_va = mmu::phys_to_virt(ttbr0_phys);
                         if let Ok(walk) = mmu::walk_to_entry(
@@ -430,9 +437,12 @@ impl<'a> Elf<'a> {
                             );
                         }
 
-                        unsafe {
-                            *dst = *byte;
-                        }
+                            if dst_va == 0x11fb8 {
+                                log::warn!("[ELF] WRITING GOT ENTRY at {:x}: val={:x}", dst_va, *byte);
+                            }
+                            unsafe {
+                                *dst = *byte;
+                            }
                     }
                 }
             }

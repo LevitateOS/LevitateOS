@@ -42,6 +42,14 @@ impl PageFlags {
     pub const USER_CODE_DATA: PageFlags = PageFlags::PRESENT
         .union(PageFlags::USER_ACCESSIBLE)
         .union(PageFlags::WRITABLE);
+
+    pub fn is_user(&self) -> bool {
+        self.contains(PageFlags::USER_ACCESSIBLE)
+    }
+
+    pub fn is_writable(&self) -> bool {
+        self.contains(PageFlags::WRITABLE)
+    }
 }
 
 /// Page size: 4KB
@@ -123,9 +131,43 @@ pub fn phys_to_virt(pa: usize) -> usize {
 }
 
 pub fn translate(root: &PageTable, va: usize) -> Option<(usize, PageFlags)> {
-    let pa = paging::translate_addr(root, va)?;
-    // TODO: Recover flags from leaf entry
-    Some((pa as usize, PageFlags::PRESENT))
+    let pml4_idx = paging::pml4_index(va);
+    let pdpt_idx = paging::pdpt_index(va);
+    let pd_idx = paging::pd_index(va);
+    let pt_idx = paging::pt_index(va);
+
+    let pml4_entry = root.entries[pml4_idx];
+    if !pml4_entry.flags().contains(PageTableFlags::PRESENT) {
+        return None;
+    }
+
+    let pdpt = unsafe { &*(phys_to_virt(pml4_entry.address()) as *const PageTable) };
+    let pdpt_entry = pdpt.entries[pdpt_idx];
+    if !pdpt_entry.flags().contains(PageTableFlags::PRESENT) {
+        return None;
+    }
+
+    let pd = unsafe { &*(phys_to_virt(pdpt_entry.address()) as *const PageTable) };
+    let pd_entry = pd.entries[pd_idx];
+    if !pd_entry.flags().contains(PageTableFlags::PRESENT) {
+        return None;
+    }
+
+    if pd_entry.flags().contains(PageTableFlags::HUGE_PAGE) {
+        let pa = pd_entry.address() + (va & 0x1f_ffff);
+        let flags = PageFlags::from_bits_truncate(pd_entry.flags().bits());
+        return Some((pa, flags));
+    }
+
+    let pt = unsafe { &*(phys_to_virt(pd_entry.address()) as *const PageTable) };
+    let pt_entry = pt.entries[pt_idx];
+    if !pt_entry.flags().contains(PageTableFlags::PRESENT) {
+        return None;
+    }
+
+    let pa = pt_entry.address() + (va & 0xfff);
+    let flags = PageFlags::from_bits_truncate(pt_entry.flags().bits());
+    Some((pa, flags))
 }
 
 pub fn map_page(
@@ -287,6 +329,7 @@ pub fn walk_to_entry<'a>(
                 );
                 current_table = unsafe { &mut *new_va };
             } else {
+                // crate::println!("[MMU] Walk failed at level {} (not present)", level);
                 return Err(MmuError::WalkFailed);
             }
         } else {
@@ -297,9 +340,18 @@ pub fn walk_to_entry<'a>(
         }
     }
 
+    let leaf_index = indices[target_level];
+    if !current_table.entries[leaf_index]
+        .flags()
+        .contains(PageTableFlags::PRESENT)
+    {
+        // crate::println!("[MMU] Walk failed: leaf not present at level {}", target_level);
+        return Err(MmuError::WalkFailed);
+    }
+
     Ok(WalkResult {
         table: current_table,
-        index: indices[target_level],
+        index: leaf_index,
         breadcrumbs,
     })
 }

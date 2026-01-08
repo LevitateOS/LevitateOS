@@ -365,33 +365,37 @@ pub const TIOCGWINSZ: u64 = 0x5413;
 pub const TIOCSWINSZ: u64 = 0x5414;
 
 // TEAM_277: x86_64 SyscallFrame - matches layout pushed by syscall_entry
+// TEAM_297 BREADCRUMB: DEAD_END - SyscallFrame layout mismatch.
+// Checked against assembly push order, layout matches exactly.
+// Registers are preserved correctly. Do not reinvestigate unless struct/asm changes.
 #[repr(C)]
 #[derive(Debug, Clone, Copy, Default)]
 pub struct SyscallFrame {
-    // Pushed by syscall_entry in this order (stack grows down, so first push is at highest address)
-    pub rax: u64,   // syscall number / return value
-    pub rdi: u64,   // arg0
-    pub rsi: u64,   // arg1
-    pub rdx: u64,   // arg2
-    pub r10: u64,   // arg3
-    pub r8: u64,    // arg4
-    pub r9: u64,    // arg5
-    pub rcx: u64,   // return address (saved by syscall)
-    pub r11: u64,   // saved RFLAGS (saved by syscall)
-    pub rbx: u64,   // callee-saved
-    pub rbp: u64,   // callee-saved
-    pub r12: u64,   // callee-saved
-    pub r13: u64,   // callee-saved
-    pub r14: u64,   // callee-saved
-    pub r15: u64,   // callee-saved
-    pub rsp: u64,   // user stack pointer
-    pub ttbr0: u64, // CR3 placeholder for compatibility
-    // Compatibility with AArch64 API
-    pub pc: u64,     // Alias for rcx (return address)
-    pub sp: u64,     // Alias for rsp
-    pub pstate: u64, // Alias for r11 (RFLAGS)
-    // Padding to match regs array access pattern
-    pub regs: [u64; 31], // For compatibility with AArch64 code
+    // These must be at the start so that regs[i] works correctly for syscall args
+    // Order matches how we push/pop in assembly (index 0 is first field in bytes)
+    pub rax: u64,    // 0: syscall number / return value
+    pub rdi: u64,    // 1: arg0
+    pub rsi: u64,    // 2: arg1
+    pub rdx: u64,    // 3: arg2
+    pub r10: u64,    // 4: arg3
+    pub r8: u64,     // 5: arg4
+    pub r9: u64,     // 6: arg5
+    pub rcx: u64,    // 7: user pc (return address)
+    pub r11: u64,    // 8: user rflags
+    pub rbx: u64,    // 9
+    pub rbp: u64,    // 10
+    pub r12: u64,    // 11
+    pub r13: u64,    // 12
+    pub r14: u64,    // 13
+    pub r15: u64,    // 14
+    pub rsp: u64,    // 15: user stack
+    pub ttbr0: u64,  // 16: CR3 placeholder
+    pub pc: u64,     // 17: user pc (alias for rcx push in assembly)
+    pub sp: u64,     // 18: user sp (alias for rsp push in assembly)
+    pub pstate: u64, // 19: user rflags (alias for r11 push in assembly)
+
+    // Total regs size for compatibility
+    pub regs: [u64; 31],
 }
 
 impl SyscallFrame {
@@ -416,17 +420,34 @@ impl SyscallFrame {
     pub fn arg5(&self) -> u64 {
         self.r9
     }
-    pub fn arg6(&self) -> u64 {
-        // x86_64 only supports 6 args, return 0 for 7th
-        0
+
+    // TEAM_296: pc/sp aliases for arch-agnostic code
+    pub fn pc(&self) -> u64 {
+        self.rcx
     }
+    pub fn set_pc(&mut self, val: u64) {
+        self.rcx = val;
+    }
+    pub fn sp(&self) -> u64 {
+        self.rsp
+    }
+    pub fn set_sp(&mut self, val: u64) {
+        self.rsp = val;
+    }
+
     pub fn set_return(&mut self, value: i64) {
         self.rax = value as u64;
     }
+    pub fn arg6(&self) -> u64 {
+        // x86_64 only supports 6 args (rdi, rsi, rdx, r10, r8, r9)
+        0
+    }
 }
 
-pub unsafe fn switch_mmu_config(_config_phys: usize) {
-    // unimplemented!("x86_64 switch_mmu_config")
+pub unsafe fn switch_mmu_config(config_phys: usize) {
+    unsafe {
+        core::arch::asm!("mov cr3, {}", in(reg) config_phys);
+    }
 }
 
 // TEAM_258: Stub for exception_return (not used on x86_64, but needed for shared code)

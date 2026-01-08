@@ -36,12 +36,6 @@ if [ "$ARCH" = "aarch64" ]; then
     BIN="kernel64_rust.bin"
     echo "Converting to raw binary..."
     aarch64-linux-gnu-objcopy -O binary "$ELF" "$BIN"
-else
-    cargo build -p levitate-kernel --release --target x86_64-unknown-none --features verbose
-    ELF="target/x86_64-unknown-none/release/levitate-kernel"
-    BIN="kernel64_x86.bin"
-    echo "Converting to raw binary..."
-    x86_64-linux-gnu-objcopy -O binary "$ELF" "$BIN"
 fi
 
 # Kill any existing QEMU and websockify
@@ -106,11 +100,18 @@ if [ "$ARCH" = "aarch64" ]; then
         -qmp unix:./qmp.sock,server,nowait \
         -no-reboot
 else
+    # x86_64 uses Limine ISO boot
+    ISO="levitate.iso"
+    if [ ! -f "$ISO" ]; then
+        echo "Building Limine ISO..."
+        cargo xtask build iso --arch x86_64
+    fi
     qemu-system-x86_64 \
         -M q35 \
         -cpu qemu64 \
         -m 1G \
-        -kernel "$BIN" \
+        -boot d \
+        -cdrom "$ISO" \
         -display none \
         -vnc :0 \
         -device virtio-gpu-pci,xres=1280,yres=800 \
@@ -120,7 +121,6 @@ else
         -netdev user,id=net0 \
         -drive file=tinyos_disk.img,format=raw,if=none,id=hd0 \
         -device virtio-blk-pci,drive=hd0 \
-        -initrd initramfs.cpio \
         -serial mon:stdio \
         -qmp unix:./qmp.sock,server,nowait \
         -no-reboot

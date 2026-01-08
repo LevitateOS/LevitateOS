@@ -75,10 +75,14 @@ pub fn sys_write(fd: usize, buf: usize, len: usize) -> i64 {
     drop(fd_table);
 
     let ttbr0 = task.ttbr0;
-
+    // los_hal::println!("[SYS_WRITE] buf={:x}, len={}", buf, len);
     match entry.fd_type {
         FdType::Stdout | FdType::Stderr => {
-            write_to_tty(&crate::fs::tty::CONSOLE_TTY, buf, len, ttbr0, true, None)
+            let n = write_to_tty(&crate::fs::tty::CONSOLE_TTY, buf, len, ttbr0, true, None);
+            if n < 0 {
+                los_hal::println!("[SYS_WRITE] FAILED: {}", n);
+            }
+            n
         }
         FdType::PtyMaster(ref pair) => {
             if mm_user::validate_user_buffer(ttbr0, buf, len, false).is_err() {

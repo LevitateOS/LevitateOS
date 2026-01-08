@@ -36,11 +36,3 @@ cargo xtask gpu-dump screenshot.png
 - **If `screenshot.png` has contents (text, terminal):** Kernel-side driver is WORKING.
 - **If `screenshot.png` is all black/red:** GPU scanout is not configured correctly.
 
-## Current Status (TEAM_111)
-
-> **⚠️ GPU is BROKEN as of 2026-01-05**
-> 
-> Serial output says "GPU initialized successfully" but display shows "Display output is not active".
-> This is a FALSE POSITIVE in the test suite.
-
-See `.teams/TEAM_111_investigate_desired_behaviors_and_qemu_vnc.md` for full investigation.

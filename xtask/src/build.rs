@@ -16,6 +16,8 @@ pub enum BuildCommands {
         #[arg(long)]
         package: Option<String>,
     },
+    /// Build initramfs only
+    Initramfs,
     /// Build bootable Limine ISO
     Iso,
 }

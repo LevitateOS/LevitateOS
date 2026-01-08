@@ -6,6 +6,10 @@ pub mod apic;
 pub mod console;
 pub mod exceptions;
 pub mod frame_alloc;
+pub mod gdt;
+pub mod tss {
+    pub use crate::x86_64::gdt::*;
+}
 pub mod idt;
 pub mod interrupts;
 pub mod ioapic;
@@ -25,12 +29,12 @@ pub fn init_with_options(switch_cr3: bool) {
     unsafe extern "C" {
         static mut early_pml4: paging::PageTable;
     }
-    
+
     if switch_cr3 {
         unsafe {
             let root = &mut *core::ptr::addr_of_mut!(early_pml4);
             mmu::init_kernel_mappings(root);
-            
+
             // TEAM_285: Switch to our own page tables now that they are initialized.
             // This is safer than doing it in assembly because we have verified mappings.
             let phys = mmu::virt_to_phys(root as *const _ as usize);
@@ -42,10 +46,11 @@ pub fn init_with_options(switch_cr3: bool) {
     // 1. Initialize serial for early logging
     unsafe { console::WRITER.lock().init() };
 
-    // 2. Initialize IDT and exceptions
+    // 2. Initialize GDT, IDT and exceptions
+    unsafe { gdt::init() };
     idt::init();
     exceptions::init();
-    
+
     // 3. Initialize APIC and IOAPIC
     // TEAM_286: Skip for Limine boot - APIC region may not be identity-mapped
     if !is_limine {

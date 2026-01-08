@@ -9,6 +9,8 @@ pub enum ImageCommands {
     Create,
     /// Install userspace apps to disk
     Install,
+    /// Show disk image status and contents
+    Status,
     /// Dump framebuffer to file (QMP)
     Screenshot {
         #[arg(default_value = "screenshot.png")]
@@ -79,6 +81,31 @@ pub fn install_userspace_to_disk(arch: &str) -> Result<()> {
         }
     }
     println!("[DONE] ({} installed)", count);
+
+    Ok(())
+}
+
+/// TEAM_116: Show disk image status and list contents
+pub fn show_disk_status() -> Result<()> {
+    let disk_path = "tinyos_disk.img";
+    if !std::path::Path::new(disk_path).exists() {
+        println!("❌ Disk image {} not found.", disk_path);
+        return Ok(());
+    }
+
+    let metadata = std::fs::metadata(disk_path)?;
+    println!("💾 Disk Image: {}", disk_path);
+    println!("   Size: {} bytes ({:.2} MB)", metadata.len(), metadata.len() as f64 / 1024.0 / 1024.0);
+
+    println!("\n📂 Contents (FAT32 partition):");
+    let status = Command::new("mdir")
+        .args(["-i", &format!("{}@@1M", disk_path), "::/"])
+        .status()
+        .context("Failed to run mdir")?;
+
+    if !status.success() {
+        println!("   (Failed to list contents - partition might be unformatted)");
+    }
 
     Ok(())
 }

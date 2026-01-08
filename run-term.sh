@@ -56,13 +56,18 @@ if [ "$ARCH" = "aarch64" ]; then
         -qmp unix:./qmp.sock,server,nowait \
         -no-reboot
 else
-    # x86_64 uses ELF format with multiboot2 header - QEMU can load directly
-    BIN="target/x86_64-unknown-none/release/levitate-kernel"
+    # x86_64 uses Limine ISO boot
+    ISO="levitate.iso"
+    if [ ! -f "$ISO" ]; then
+        echo "Building Limine ISO..."
+        cargo xtask build iso --arch x86_64
+    fi
     qemu-system-x86_64 \
         -M q35 \
         -cpu qemu64 \
         -m 1G \
-        -kernel "$BIN" \
+        -boot d \
+        -cdrom "$ISO" \
         -nographic \
         -device virtio-gpu-pci,xres=1280,yres=800 \
         -device virtio-keyboard-pci \
@@ -71,7 +76,6 @@ else
         -netdev user,id=net0 \
         -drive file=tinyos_disk.img,format=raw,if=none,id=hd0 \
         -device virtio-blk-pci,drive=hd0 \
-        -initrd initramfs.cpio \
         -serial mon:stdio \
         -qmp unix:./qmp.sock,server,nowait \
         -no-reboot

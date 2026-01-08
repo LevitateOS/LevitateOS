@@ -42,6 +42,21 @@ pub fn create_user_page_table() -> Option<usize> {
     let l0 = unsafe { &mut *(l0_va as *mut PageTable) };
     l0.zero();
 
+    // TEAM_296: Copy kernel higher-half mappings for x86_64
+    // This is required because x86_64 uses a single CR3 for both user and kernel.
+    #[cfg(target_arch = "x86_64")]
+    {
+        let current_root_phys: usize;
+        unsafe {
+            core::arch::asm!("mov {}, cr3", out(reg) current_root_phys);
+        }
+        // Mask out PCID and flags (bits 0-11)
+        let current_root_phys = current_root_phys & !0xFFF;
+        let current_root_va = mmu::phys_to_virt(current_root_phys);
+        let current_root = unsafe { &*(current_root_va as *const PageTable) };
+        mmu::copy_kernel_mappings(l0, current_root);
+    }
+
     // Return physical address for TTBR0
     Some(l0_phys)
 }
@@ -419,12 +434,7 @@ unsafe fn collect_page_table_entries(
         } else if entry.is_table() {
             // Intermediate table descriptor - recurse
             unsafe {
-                collect_page_table_entries(
-                    entry_phys,
-                    level + 1,
-                    pages_to_free,
-                    tables_to_free,
-                );
+                collect_page_table_entries(entry_phys, level + 1, pages_to_free, tables_to_free);
             }
             // Add child table to free list (will be freed after its contents)
             tables_to_free.push(entry_phys);
@@ -601,30 +611,13 @@ pub fn validate_user_buffer(
                     return Err(MmuError::NotMapped);
                 }
 
-                // Check User Accessibility (AP bit 6 must be set)
-                // 00 (RW_EL1) -> Bit 6=0
-                // 10 (RO_EL1) -> Bit 6=0
-                // 01 (RW_ALL) -> Bit 6=1
-                // 11 (RO_ALL) -> Bit 6=1
-                let ap_bits = (flags.bits() >> 6) & 0b11;
-                let is_user = (ap_bits & 0b01) != 0;
-
-                if !is_user {
+                if !flags.is_user() {
                     return Err(MmuError::NotMapped);
                 }
 
                 // Check Write Permission if requested
-                if writable {
-                    // Must be RW_ALL (01)
-                    // If it is RO_ALL (11), then write is denied.
-                    // 01 & 11 -> 01 (Bit 7 is the difference)
-                    // RW_ALL: 01 (Bit 6=1, Bit 7=0)
-                    // RO_ALL: 11 (Bit 6=1, Bit 7=1)
-                    // So we must ensure Bit 7 is 0.
-                    let is_readonly = (ap_bits & 0b10) != 0;
-                    if is_readonly {
-                        return Err(MmuError::NotMapped);
-                    }
+                if writable && !flags.is_writable() {
+                    return Err(MmuError::NotMapped);
                 }
             }
             None => return Err(MmuError::NotMapped),
@@ -668,8 +661,7 @@ mod tests {
 
             // Map it
             unsafe {
-                map_user_page(ttbr0, va, phys, PageFlags::USER_DATA)
-                    .expect("Failed to map page");
+                map_user_page(ttbr0, va, phys, PageFlags::USER_DATA).expect("Failed to map page");
             }
         }
 
