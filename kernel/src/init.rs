@@ -14,8 +14,6 @@ use alloc::sync::Arc;
 
 #[cfg(target_arch = "aarch64")]
 use los_hal::aarch64::fdt::{self, Fdt};
-#[cfg(target_arch = "aarch64")]
-use los_hal::aarch64::timer::{self, Timer};
 use los_hal::mmu;
 use los_hal::{InterruptHandler, IrqId, print, println};
 
@@ -162,15 +160,16 @@ pub fn maintenance_shell() -> ! {
 // =============================================================================
 
 // TEAM_045: IRQ handlers refactored to use InterruptHandler trait
-#[cfg(target_arch = "aarch64")]
 struct TimerHandler;
-#[cfg(target_arch = "aarch64")]
 impl InterruptHandler for TimerHandler {
     fn handle(&self, _irq: u32) {
-        // TEAM_083: Removed debug "T" output - was flooding console
-        // Reload timer for next interrupt (10ms @ 100Hz)
-        let freq = timer::API.read_frequency();
-        timer::API.set_timeout(freq / 100);
+        #[cfg(target_arch = "aarch64")]
+        {
+            // Reload timer for next interrupt (10ms @ 100Hz)
+            use los_hal::aarch64::timer;
+            let freq = timer::API.read_frequency();
+            timer::API.set_timeout(freq / 100);
+        }
 
         // TEAM_089: Keep GPU display active with periodic flush (~10Hz)
         // Only flush every 10th interrupt (100Hz / 10 = 10Hz)
@@ -206,9 +205,7 @@ impl InterruptHandler for TimerHandler {
     }
 }
 
-#[cfg(target_arch = "aarch64")]
 struct UartHandler;
-#[cfg(target_arch = "aarch64")]
 impl InterruptHandler for UartHandler {
     fn handle(&self, _irq: u32) {
         // TEAM_139: Note - UART RX interrupts may not fire when QEMU stdin is piped
@@ -223,9 +220,7 @@ impl InterruptHandler for UartHandler {
     }
 }
 
-#[cfg(target_arch = "aarch64")]
 static TIMER_HANDLER: TimerHandler = TimerHandler;
-#[cfg(target_arch = "aarch64")]
 static UART_HANDLER: UartHandler = UartHandler;
 
 // =============================================================================
@@ -248,24 +243,34 @@ pub fn run() -> ! {
     transition_to(BootStage::BootConsole);
     init_display();
 
-    // --- GIC and Timer Setup ---
-    #[cfg(target_arch = "aarch64")]
+    // --- Interrupt Controller and Timer Setup ---
     {
         // TEAM_255: Initialize interrupt controller using generic HAL interface
         let ic = los_hal::active_interrupt_controller();
         ic.init();
 
-        // TEAM_255: Register IRQ handlers using generic HAL traits
+        // TEAM_255/TEAM_303: Register IRQ handlers using generic HAL traits (now arch-agnostic)
         ic.register_handler(IrqId::VirtualTimer, &TIMER_HANDLER);
         ic.register_handler(IrqId::Uart, &UART_HANDLER);
         ic.enable_irq(ic.map_irq(IrqId::VirtualTimer));
         ic.enable_irq(ic.map_irq(IrqId::Uart));
 
+        #[cfg(target_arch = "x86_64")]
+        {
+            // TEAM_303: Route PIT (legacy IRQ 0) to vector 32
+            los_hal::arch::ioapic::IOAPIC.route_irq(0, 32, 0);
+        }
+
         crate::verbose!("Core drivers initialized.");
 
-        // Set initial timer timeout
-        timer::API.set_timeout(timer::API.read_frequency() / 100);
-        timer::API.enable();
+        #[cfg(target_arch = "aarch64")]
+        {
+            use los_hal::aarch64::timer;
+            // Set initial timer timeout
+            timer::API.set_timeout(timer::API.read_frequency() / 100);
+            timer::API.enable();
+        }
+
         crate::verbose!("Timer initialized.");
     }
 

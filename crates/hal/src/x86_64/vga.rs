@@ -2,7 +2,11 @@ use core::fmt;
 
 // TEAM_259: VGA Text Mode driver for x86_64 visual feedback.
 
-const VGA_BUFFER: *mut u16 = 0xB8000 as *mut u16;
+const VGA_PHYS: usize = 0xB8000;
+
+fn vga_buffer() -> *mut u16 {
+    crate::x86_64::mmu::phys_to_virt(VGA_PHYS) as *mut u16
+}
 const BUFFER_HEIGHT: usize = 25;
 const BUFFER_WIDTH: usize = 80;
 
@@ -64,9 +68,9 @@ impl VgaWriter {
 
                 let color_code = self.color_code;
                 unsafe {
-                    VGA_BUFFER.add(row * BUFFER_WIDTH + col).write_volatile(
-                        u16::from(byte) | (u16::from(color_code.0) << 8)
-                    );
+                    vga_buffer()
+                        .add(row * BUFFER_WIDTH + col)
+                        .write_volatile(u16::from(byte) | (u16::from(color_code.0) << 8));
                 }
                 self.column_position += 1;
             }
@@ -77,8 +81,10 @@ impl VgaWriter {
         for row in 1..BUFFER_HEIGHT {
             for col in 0..BUFFER_WIDTH {
                 unsafe {
-                    let character = VGA_BUFFER.add(row * BUFFER_WIDTH + col).read_volatile();
-                    VGA_BUFFER.add((row - 1) * BUFFER_WIDTH + col).write_volatile(character);
+                    let character = vga_buffer().add(row * BUFFER_WIDTH + col).read_volatile();
+                    vga_buffer()
+                        .add((row - 1) * BUFFER_WIDTH + col)
+                        .write_volatile(character);
                 }
             }
         }
@@ -90,7 +96,9 @@ impl VgaWriter {
         let blank = u16::from(b' ') | (u16::from(self.color_code.0) << 8);
         for col in 0..BUFFER_WIDTH {
             unsafe {
-                VGA_BUFFER.add(row * BUFFER_WIDTH + col).write_volatile(blank);
+                vga_buffer()
+                    .add(row * BUFFER_WIDTH + col)
+                    .write_volatile(blank);
             }
         }
     }

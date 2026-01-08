@@ -126,13 +126,64 @@ macro_rules! exception_handler_err {
                 "pop r9",
                 "pop r8",
                 "pop rdi",
-                "pop rsi",
                 "pop rdx",
                 "pop rcx",
                 "pop rax",
                 "add rsp, 8", // Clean up error code
                 "iretq",
                 handler = sym $handler,
+            );
+        }
+    };
+}
+
+macro_rules! irq_handler {
+    ($name:ident, $vector:expr) => {
+        #[unsafe(naked)]
+        pub unsafe extern "C" fn $name() {
+            naked_asm!(
+                "push rax",
+                "push rcx",
+                "push rdx",
+                "push rsi",
+                "push rdi",
+                "push r8",
+                "push r9",
+                "push r10",
+                "push r11",
+                "push rbp",
+
+                // TEAM_299: Conditional swapgs
+                "test qword ptr [rsp + 88], 3",
+                "jz 1f",
+                "swapgs",
+                "1:",
+
+                "mov rbp, rsp",
+                "and rsp, -16",
+                "mov rdi, {vector}",
+                "call {handler}",
+                "mov rsp, rbp",
+
+                // TEAM_299: Conditional swapgs back
+                "test qword ptr [rsp + 88], 3",
+                "jz 2f",
+                "swapgs",
+                "2:",
+
+                "pop rbp",
+                "pop r11",
+                "pop r10",
+                "pop r9",
+                "pop r8",
+                "pop rdi",
+                "pop rsi",
+                "pop rdx",
+                "pop rcx",
+                "pop rax",
+                "iretq",
+                vector = const $vector,
+                handler = sym irq_dispatch,
             );
         }
     };
@@ -221,6 +272,17 @@ extern "C" fn page_fault_handler(frame: &ExceptionStackFrame, error_code: u64) {
     );
 }
 
+#[unsafe(no_mangle)]
+extern "C" fn irq_dispatch(vector: u64) {
+    // 1. Dispatch to registered handler
+    if !crate::x86_64::apic::dispatch(vector as u8) {
+        // TEAM_303: Log unhandled IRQs to serial
+    }
+
+    // 2. Signal EOI to APIC
+    crate::x86_64::apic::APIC.signal_eoi();
+}
+
 exception_handler!(de_wrapper, divide_error_handler);
 exception_handler!(db_wrapper, debug_handler);
 exception_handler!(bp_wrapper, breakpoint_handler);
@@ -228,6 +290,9 @@ exception_handler!(ud_wrapper, invalid_opcode_handler);
 exception_handler_err!(df_wrapper, double_fault_handler);
 exception_handler_err!(gp_wrapper, general_protection_fault_handler);
 exception_handler_err!(pf_wrapper, page_fault_handler);
+
+irq_handler!(irq32_wrapper, 32); // PIT Timer
+irq_handler!(irq36_wrapper, 36); // COM1 Serial
 
 pub fn init() {
     let mut idt = IDT.lock();
@@ -238,4 +303,8 @@ pub fn init() {
     idt.set_handler(8, df_wrapper as *const () as u64);
     idt.set_handler(13, gp_wrapper as *const () as u64);
     idt.set_handler(14, pf_wrapper as *const () as u64);
+
+    // IRQs
+    idt.set_handler(32, irq32_wrapper as *const () as u64);
+    idt.set_handler(36, irq36_wrapper as *const () as u64);
 }

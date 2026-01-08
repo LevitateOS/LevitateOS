@@ -271,6 +271,14 @@ pub extern "C" fn shell_entry() -> ! {
                     line_len += 1;
                     libsyscall::write(1, &c_buf[..1]);
                 }
+            } else if n == 0 {
+                // [SH7] EOF (Ctrl+D) - exit shell
+                println!("EOF");
+                libsyscall::shutdown(libsyscall::shutdown_flags::NORMAL);
+            } else {
+                // Error reading
+                println!("Read error: {}", n);
+                libsyscall::shutdown(libsyscall::shutdown_flags::NORMAL);
             }
         }
     }

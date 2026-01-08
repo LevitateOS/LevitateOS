@@ -92,11 +92,16 @@ pub fn parse() -> BootInfo {
         // Don't return early - try to parse what we can
     }
 
-    // TEAM_288: Set kernel physical base from Limine if available
+    // TEAM_288: Set kernel physical base and HHDM offset from Limine if available
     // This fixes virt_to_phys() when Limine loads kernel at different PA than linker assumes
     #[cfg(target_arch = "x86_64")]
-    if let Some(addr_response) = KERNEL_ADDRESS_REQUEST.get_response() {
-        los_hal::mmu::set_kernel_phys_base(addr_response.physical_base() as usize);
+    {
+        if let Some(addr_response) = KERNEL_ADDRESS_REQUEST.get_response() {
+            los_hal::mmu::set_kernel_phys_base(addr_response.physical_base() as usize);
+        }
+        if let Some(offset) = hhdm_offset() {
+            los_hal::mmu::set_phys_offset(offset as usize);
+        }
     }
 
     // Parse memory map

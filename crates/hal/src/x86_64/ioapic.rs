@@ -11,8 +11,8 @@ impl IoApic {
     }
 
     unsafe fn read_reg(&self, reg: u8) -> u32 {
-        let ioregsel = self.base_addr as *mut u32;
-        let iowin = (self.base_addr + 0x10) as *const u32;
+        let ioregsel = crate::x86_64::mmu::phys_to_virt(self.base_addr) as *mut u32;
+        let iowin = crate::x86_64::mmu::phys_to_virt(self.base_addr + 0x10) as *const u32;
 
         unsafe {
             ioregsel.write_volatile(reg as u32);
@@ -21,8 +21,8 @@ impl IoApic {
     }
 
     unsafe fn write_reg(&self, reg: u8, value: u32) {
-        let ioregsel = self.base_addr as *mut u32;
-        let iowin = (self.base_addr + 0x10) as *mut u32;
+        let ioregsel = crate::x86_64::mmu::phys_to_virt(self.base_addr) as *mut u32;
+        let iowin = crate::x86_64::mmu::phys_to_virt(self.base_addr + 0x10) as *mut u32;
 
         unsafe {
             ioregsel.write_volatile(reg as u32);
@@ -40,7 +40,7 @@ impl IoApic {
         let low_reg = 0x10 + irq * 2;
         let high_reg = 0x11 + irq * 2;
 
-        // Low 32 bits: vector, delivery mode (000: fixed), dest mode (0: physical), 
+        // Low 32 bits: vector, delivery mode (000: fixed), dest mode (0: physical),
         // pin polarity (0: high active), trigger mode (0: edge), mask (0: unmasked)
         let low_value = vector as u32;
         // High 32 bits: destination APIC ID in bits 56-63 (shifted to top of 32-bit register)

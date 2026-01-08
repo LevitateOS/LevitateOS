@@ -178,79 +178,23 @@ pub unsafe extern "C" fn syscall_entry() {
 pub extern "C" fn syscall_handler(frame: &mut super::SyscallFrame) {
     // TEAM_297 BREADCRUMB: INVESTIGATING - Debug trace added but no output seen.
     // Suspicion: los_hal::println! might fail in syscall context or execution doesn't reach here.
-    let pc_before = frame.rcx;
-    let nr = frame.rax;
+    let _pc_before = frame.rcx;
+    let _nr = frame.rax;
 
     // Print entry for syscalls we care about (read=0, write=1)
     #[cfg(feature = "verbose-syscalls")]
-    if nr <= 1 {
+    if _nr <= 1 {
         let task = crate::task::current_task();
         let pid = task.id.0;
-        let mut cr3: u64;
-        unsafe {
-            core::arch::asm!("mov {}, cr3", out(reg) cr3);
-        }
-        los_hal::println!(
-            "[SYSCALL][{}] ENTER nr={} rcx={:x} ttbr0={:x} cr3={:x}",
-            pid,
-            nr,
-            pc_before,
-            task.ttbr0,
-            cr3
-        );
-    }
-
-    #[cfg(feature = "verbose-syscalls")]
-    if nr == 1 {
-        los_hal::println!(
-            "[SYSCALL] WRITE syscall! rcx={:x} (Expected return)",
-            pc_before
-        );
+        los_hal::println!("[SYSCALL][{}] ENTER nr={} rcx={:x}", pid, _nr, _pc_before,);
     }
 
     crate::syscall::syscall_dispatch(frame);
 
-    // Check for frame corruption
-    if frame.rdi != 0
-        && pc_before == frame.rcx
-        && (frame.rdi == 0 || frame.rsi == 0 || frame.rdx == 0)
-    {
-        // If we had valid args but now have zeros, that's suspicious of corruption if not intended
-    }
-
-    // Explicitly check if arguments were preserved
-    #[cfg(feature = "verbose-syscalls")]
-    if nr <= 1 {
-        // Re-read args from frame to see if they changed
-        los_hal::println!(
-            "[SYSCALL] EXIT nr={} rcx={:x} rax={:x} arg0={:x}",
-            nr,
-            frame.rcx,
-            frame.rax,
-            frame.rdi
-        );
-    }
-
-    // Check if RCX was corrupted
-    if frame.rcx != pc_before {
-        los_hal::println!(
-            "[SYSCALL] WARNING: RCX changed! nr={} before={:x} after={:x}",
-            nr,
-            pc_before,
-            frame.rcx
-        );
-    }
-
     // Print exit for syscalls we care about
     #[cfg(feature = "verbose-syscalls")]
-    if nr <= 1 {
+    if _nr <= 1 {
         let pid = crate::task::current_task().id.0;
-        los_hal::println!(
-            "[SYSCALL][{}] EXIT nr={} rcx={:x} rax={:x}",
-            pid,
-            nr,
-            frame.rcx,
-            frame.rax
-        );
+        los_hal::println!("[SYSCALL][{}] EXIT nr={} rax={:x}", pid, _nr, frame.rax);
     }
 }

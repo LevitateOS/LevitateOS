@@ -1,11 +1,12 @@
 // TEAM_259: Local APIC driver for x86_64.
 // Reference: https://wiki.osdev.org/APIC
 
-use crate::traits::{InterruptController, IrqId, InterruptHandler};
+use crate::traits::{InterruptController, InterruptHandler, IrqId};
 use los_utils::Mutex;
 
 const MAX_HANDLERS: usize = 256;
-static HANDLERS: Mutex<[Option<&'static dyn InterruptHandler>; MAX_HANDLERS]> = Mutex::new([None; MAX_HANDLERS]);
+static HANDLERS: Mutex<[Option<&'static dyn InterruptHandler>; MAX_HANDLERS]> =
+    Mutex::new([None; MAX_HANDLERS]);
 
 pub fn register_handler(vector: u8, handler: &'static dyn InterruptHandler) {
     let mut handlers = HANDLERS.lock();
@@ -41,13 +42,15 @@ impl ApicController {
 
     /// Read from an APIC register.
     unsafe fn read_reg(&self, reg: u32) -> u32 {
-        let ptr = (self.base_addr + reg as usize) as *const u32;
+        let va = crate::x86_64::mmu::phys_to_virt(self.base_addr + reg as usize);
+        let ptr = va as *const u32;
         unsafe { ptr.read_volatile() }
     }
 
     /// Write to an APIC register.
     unsafe fn write_reg(&self, reg: u32, value: u32) {
-        let ptr = (self.base_addr + reg as usize) as *mut u32;
+        let va = crate::x86_64::mmu::phys_to_virt(self.base_addr + reg as usize);
+        let ptr = va as *mut u32;
         unsafe { ptr.write_volatile(value) };
     }
 
