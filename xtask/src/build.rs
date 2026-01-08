@@ -292,11 +292,18 @@ fn build_iso_with_features(features: &[&str], arch: &str) -> Result<()> {
     std::fs::create_dir_all(&boot_dir)?;
 
     // 2. Copy components to ISO root
-    std::fs::copy("target/x86_64-unknown-none/release/levitate-kernel", boot_dir.join("levitate-kernel"))?;
-    if std::path::Path::new("initramfs.cpio").exists() {
-        std::fs::copy("initramfs.cpio", boot_dir.join("initramfs.cpio"))?;
+    let kernel_path = "target/x86_64-unknown-none/release/levitate-kernel";
+    let initramfs_path = "initramfs.cpio";
+    let limine_cfg_path = "limine.cfg";
+
+    std::fs::copy(kernel_path, boot_dir.join("levitate-kernel"))
+        .context("Failed to copy levitate-kernel to ISO boot dir")?;
+    if std::path::Path::new(initramfs_path).exists() {
+        std::fs::copy(initramfs_path, boot_dir.join("initramfs.cpio"))
+            .context("Failed to copy initramfs.cpio to ISO boot dir")?;
     }
-    std::fs::copy("limine.cfg", iso_root.join("limine.cfg"))?;
+    std::fs::copy(limine_cfg_path, iso_root.join("limine.cfg"))
+        .context("Failed to copy limine.cfg - ensure it exists in repo root")?;
 
     // 3. Download/Prepare Limine binaries if needed
     prepare_limine_binaries(&iso_root)?;
@@ -325,30 +332,31 @@ fn build_iso_with_features(features: &[&str], arch: &str) -> Result<()> {
 }
 
 fn prepare_limine_binaries(iso_root: &PathBuf) -> Result<()> {
-    // Check if we have pre-built limine binaries in the project
     let limine_dir = PathBuf::from("limine-bin");
+    let files = [
+        "limine-bios-cd.bin",
+        "limine-uefi-cd.bin",
+        "limine-bios.sys",
+    ];
     
-    // If not present, try to download them (pinning to a reliable version)
-    if !limine_dir.exists() {
+    // TEAM_304: Check if all required files exist, not just directory
+    let all_files_exist = files.iter().all(|f| limine_dir.join(f).exists());
+    
+    if !all_files_exist {
         println!("📥 Downloading Limine binaries (v7.x)...");
         std::fs::create_dir_all(&limine_dir)?;
         
         let base_url = "https://github.com/limine-bootloader/limine/raw/v7.x-binary/";
-        let files = [
-            "limine-bios-cd.bin",
-            "limine-uefi-cd.bin",
-            "limine-bios.sys",
-        ];
 
-        for file in files {
+        for file in &files {
             let url = format!("{}{}", base_url, file);
             let output = limine_dir.join(file);
             println!("  Fetching {}...", file);
             
             let status = Command::new("curl")
-                .args(["-L", "-o", output.to_str().unwrap(), &url])
+                .args(["-L", "-f", "-o", output.to_str().unwrap(), &url])
                 .status()
-                .context(format!("Failed to download {}", file))?;
+                .context(format!("Failed to run curl for {}", file))?;
             
             if !status.success() {
                 bail!("Failed to download {} from {}", file, url);
@@ -357,8 +365,11 @@ fn prepare_limine_binaries(iso_root: &PathBuf) -> Result<()> {
     }
 
     // Copy to ISO root for xorriso
-    for file in ["limine-bios-cd.bin", "limine-uefi-cd.bin", "limine-bios.sys"] {
-        std::fs::copy(limine_dir.join(file), iso_root.join(file))?;
+    for file in &files {
+        let src = limine_dir.join(file);
+        let dst = iso_root.join(file);
+        std::fs::copy(&src, &dst)
+            .with_context(|| format!("Failed to copy {} to {}", src.display(), dst.display()))?;
     }
 
     Ok(())
