@@ -361,58 +361,8 @@ pub fn set_page_allocator(allocator: &'static dyn PageAllocator) {
 }
 
 // =============================================================================
-// TEAM_267: PMO Expansion and Kernel Segment Permissions
+// TEAM_316: Kernel Segment Permissions (Limine-only, PMO handled by bootloader)
 // =============================================================================
-
-use crate::x86_64::boot::multiboot2::MemoryRegion;
-
-/// Expand PMO mapping to cover all available RAM.
-/// Uses 2MB huge pages for efficiency where possible.
-pub fn expand_pmo(root: &mut PageTable, regions: &[Option<MemoryRegion>]) {
-    for region in regions.iter().flatten() {
-        if !region.typ.is_usable() {
-            continue;
-        }
-
-        // Align start up to 2MB boundary, end down
-        let huge_page_size = paging::HUGE_PAGE_SIZE;
-        let start_aligned = (region.start + huge_page_size - 1) & !(huge_page_size - 1);
-        let end_aligned = region.end & !(huge_page_size - 1);
-
-        // Map aligned 2MB regions with huge pages
-        let mut pa = start_aligned;
-        while pa < end_aligned {
-            let va = phys_to_virt(pa);
-            let flags = PageTableFlags::PRESENT | PageTableFlags::WRITABLE | PageTableFlags::GLOBAL;
-            let alloc_fn = || unsafe {
-                if let Some(alloc) = PAGE_ALLOCATOR_PTR {
-                    alloc.alloc_page()
-                } else {
-                    EARLY_ALLOCATOR.alloc_page()
-                }
-            };
-            let _ = paging::map_huge_page(root, va, pa, flags, alloc_fn);
-            pa += huge_page_size;
-        }
-
-        // Map unaligned portions with 4KB pages
-        // Before aligned region
-        let mut pa = region.start;
-        while pa < start_aligned && pa < region.end {
-            let va = phys_to_virt(pa);
-            let _ = map_page(root, va, pa, PageFlags::KERNEL_DATA);
-            pa += PAGE_SIZE;
-        }
-
-        // After aligned region
-        pa = end_aligned;
-        while pa < region.end {
-            let va = phys_to_virt(pa);
-            let _ = map_page(root, va, pa, PageFlags::KERNEL_DATA);
-            pa += PAGE_SIZE;
-        }
-    }
-}
 
 // Linker symbols for kernel segment boundaries
 unsafe extern "C" {

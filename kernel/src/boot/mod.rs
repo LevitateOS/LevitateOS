@@ -29,12 +29,10 @@
 //!               └─────────────┘
 //! ```
 
-// TEAM_282: Protocol-specific parsers
-#[cfg(target_arch = "x86_64")]
-pub mod multiboot;
+// TEAM_316: Protocol-specific parsers (simplified - Limine only for x86_64)
 #[cfg(target_arch = "aarch64")]
 pub mod dtb;
-pub mod limine;  // TEAM_282: Primary boot method for both architectures
+pub mod limine;  // TEAM_316: Primary and only boot method for x86_64
 
 /// Maximum number of memory regions we support.
 /// This is a compile-time limit to avoid dynamic allocation during early boot.
@@ -229,19 +227,13 @@ impl FirmwareInfo {
     }
 }
 
-/// TEAM_282: Boot protocol identifier.
+/// TEAM_316: Boot protocol identifier (simplified).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BootProtocol {
-    /// Limine boot protocol (modern, preferred)
+    /// Limine boot protocol (x86_64 and AArch64)
     Limine,
-    /// Multiboot1 (legacy, QEMU -kernel)
-    Multiboot1,
-    /// Multiboot2 (legacy, GRUB)
-    Multiboot2,
     /// Device Tree boot (AArch64 QEMU)
     DeviceTree,
-    /// Direct QEMU -kernel with no protocol
-    Direct,
     /// Unknown/undetected
     Unknown,
 }

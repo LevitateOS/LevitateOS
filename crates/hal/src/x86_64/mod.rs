@@ -12,6 +12,8 @@
 //!
 //! See the README.md in this directory for architecture diagrams.
 
+use crate::traits::InterruptController;
+
 // === Compartments ===
 pub mod cpu;
 pub mod mem;
@@ -43,51 +45,24 @@ pub use io::serial;
 pub use io::vga;
 pub use io::console;
 
-// Boot
-pub use boot::multiboot2;
+// Boot - TEAM_316: Limine-only, no multiboot re-exports needed
 
-/// TEAM_286: Initialize HAL with optional CR3 switch.
-/// `switch_cr3`: Set to false for Limine boot (Limine's page tables are already correct).
-/// When false, APIC/IOAPIC init is also skipped (Limine may not identity-map APIC region).
-pub fn init_with_options(switch_cr3: bool) {
-    let is_limine = !switch_cr3; // If not switching CR3, we're on Limine
-    // 0. Initialize MMU with higher-half mappings using early_pml4
-    unsafe extern "C" {
-        static mut early_pml4: paging::PageTable;
-    }
-
-    if switch_cr3 {
-        // TEAM_308: Diagnostic 'a' - init_kernel_mappings Start
-        unsafe {
-            core::arch::asm!("mov dx, 0x3f8", "mov al, 'a'", "out dx, al", out("ax") _, out("dx") _);
-        }
-        unsafe {
-            let root = &mut *core::ptr::addr_of_mut!(early_pml4);
-            mmu::init_kernel_mappings(root);
-
-            // TEAM_308: Diagnostic 'b' - init_kernel_mappings Done
-            core::arch::asm!("mov al, 'b'", "out dx, al", out("ax") _, out("dx") _);
-
-            // TEAM_285: Switch to our own page tables now that they are initialized.
-            // This is safer than doing it in assembly because we have verified mappings.
-            let phys = mmu::virt_to_phys(root as *const _ as usize);
-            core::arch::asm!("mov cr3, {}", in(reg) phys);
-
-            // TEAM_308: Diagnostic 'c' - CR3 Switched
-            core::arch::asm!("mov al, 'c'", "out dx, al", out("ax") _, out("dx") _);
-        }
-    }
-    // else: Limine boot - stay on Limine's page tables which have correct HHDM
-
+/// TEAM_316: Initialize HAL for Limine boot (simplified, Unix philosophy).
+///
+/// Limine provides:
+/// - Correct page tables with HHDM mapping
+/// - Memory map
+/// - Framebuffer (optional)
+///
+/// We just need to initialize our CPU structures and drivers.
+pub fn init() {
     // 1. Initialize serial for early logging
-    // TEAM_308: Diagnostic 'd' - Serial Init
     unsafe {
         core::arch::asm!("mov dx, 0x3f8", "mov al, 'd'", "out dx, al", out("ax") _, out("dx") _);
     }
     unsafe { console::WRITER.lock().init() };
 
     // 2. Initialize GDT, IDT and exceptions
-    // TEAM_308: Diagnostic 'e' - GDT/IDT Init
     unsafe {
         core::arch::asm!("mov al, 'e'", "out dx, al", out("ax") _, out("dx") _);
     }
@@ -95,32 +70,23 @@ pub fn init_with_options(switch_cr3: bool) {
     idt::init();
     exceptions::init();
 
-    // 3. Initialize APIC and IOAPIC
-    // TEAM_308: Diagnostic 'f' - APIC Init
+    // 3. APIC/IOAPIC - SKIP for now
+    // TEAM_317: Limine HHDM only maps RAM, not MMIO regions like APIC (0xFEE00000).
+    // phys_to_virt(0xFEE00000) returns unmapped address, causing page fault.
+    // TODO: Map APIC region explicitly before enabling APIC mode.
+    // For now, use legacy PIC mode (PIT timer on IRQ0).
     unsafe {
-        core::arch::asm!("mov dx, 0x3f8", "mov al, 'f'", "out dx, al", out("ax") _, out("dx") _);
+        core::arch::asm!("mov al, 'f'", "out dx, al", out("ax") _, out("dx") _);
     }
-    // TEAM_316: Skip APIC init for now - APIC code uses phys_to_virt() which fails
-    // because 0xFEE00000 is outside the 1GB PMO range. Assembly already identity-maps
-    // APIC region, so basic APIC access works through identity mapping.
-    // TODO: Fix APIC code to use identity-mapped access for Multiboot boot.
-    let _ = is_limine; // Suppress unused warning
 
-    // 4. Initialize PIT
-    // TEAM_308: Diagnostic 'g' - PIT Init
+    // 4. Initialize PIT timer (legacy mode, works without APIC)
     unsafe {
-        core::arch::asm!("mov dx, 0x3f8", "mov al, 'g'", "out dx, al", out("ax") _, out("dx") _);
+        core::arch::asm!("mov al, 'g'", "out dx, al", out("ax") _, out("dx") _);
     }
-    // TEAM_316: Skip PIT init temporarily - timer interrupts may be causing crash
-    // pit::Pit::init(100); // 100Hz
+    pit::Pit::init(100); // 100Hz
 
-    // TEAM_308: Diagnostic 'h' - HAL Init Done
+    // Done
     unsafe {
         core::arch::asm!("mov al, 'h'", "out dx, al", out("ax") _, out("dx") _);
     }
-}
-
-/// TEAM_286: Default init for multiboot boot (switches CR3).
-pub fn init() {
-    init_with_options(true)
 }

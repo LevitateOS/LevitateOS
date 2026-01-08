@@ -462,31 +462,19 @@ pub unsafe extern "C" fn exception_return() {
 }
 
 /// TEAM_282: x86_64 kernel entry point
-/// Called from boot.S after long mode transition
+/// TEAM_316: Simplified to Limine-only (Unix philosophy: do one thing well)
 #[unsafe(no_mangle)]
-pub extern "C" fn kernel_main(multiboot_magic: usize, multiboot_info: usize) -> ! {
-    // TEAM_285: Diagnostic 'X' for Arch kernel_main Entry
+pub extern "C" fn kernel_main(_unused1: usize, _unused2: usize) -> ! {
+    // TEAM_316: Diagnostic 'X' for Arch kernel_main Entry
     unsafe {
         core::arch::asm!("mov dx, 0x3f8", "mov al, 'X'", "out dx, al", out("ax") _, out("dx") _);
     }
 
-    // 1. Detect and parse boot information
-    // TEAM_286: boot.S sets multiboot_magic=0 for Limine path
-    // Use this as primary detection since BASE_REVISION may not be reliable
-    let is_limine = multiboot_magic == 0 || crate::boot::limine::is_limine_boot();
-    let boot_info = if is_limine {
-        // Diagnostic 'L' for Limine Path
-        unsafe {
-            core::arch::asm!("mov al, 'L'", "out dx, al", out("ax") _, out("dx") _);
-        }
-        crate::boot::limine::parse()
-    } else {
-        // Diagnostic 'M' for Multiboot Path
-        unsafe {
-            core::arch::asm!("mov al, 'M'", "out dx, al", out("ax") _, out("dx") _);
-        }
-        unsafe { crate::boot::multiboot::parse(multiboot_magic as u32, multiboot_info) }
-    };
+    // TEAM_316: Limine-only boot path
+    unsafe {
+        core::arch::asm!("mov al, 'L'", "out dx, al", out("ax") _, out("dx") _);
+    }
+    let boot_info = crate::boot::limine::parse();
 
     // Diagnostic 'P' for Parse Done
     unsafe {
@@ -500,6 +488,6 @@ pub extern "C" fn kernel_main(multiboot_magic: usize, multiboot_info: usize) -> 
 
     let boot_info_ref = crate::boot::boot_info().expect("Boot info must be set");
 
-    // 2. Transition to unified main (handles HAL init, Heap, Memory, etc.)
+    // Transition to unified main (handles HAL init, Heap, Memory, etc.)
     crate::kernel_main_unified(boot_info_ref)
 }

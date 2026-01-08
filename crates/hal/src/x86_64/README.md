@@ -10,7 +10,7 @@ x86_64/
 ├── mem/           # Memory management (paging, MMU, frame allocator)
 ├── interrupts/    # Interrupt handling (APIC, IOAPIC, PIT)
 ├── io/            # I/O devices (serial, VGA, console)
-├── boot/          # Boot protocols (Multiboot2)
+├── boot/          # Boot info (Limine-only)
 └── mod.rs         # Main module with init functions
 ```
 
@@ -20,38 +20,28 @@ The following diagram shows the x86_64 boot sequence from BIOS/bootloader to ker
 
 ```mermaid
 flowchart TD
-    subgraph BIOS/Bootloader
-        A[BIOS POST] --> B[GRUB/Multiboot2]
-        B --> C[Load kernel at 0x200000]
-    end
-
-    subgraph boot.S Assembly
-        C --> D[_start: Setup stack]
-        D --> E[Setup GDT 32-bit]
-        E --> F[Enable Long Mode]
-        F --> G[Setup early page tables]
-        G --> H[Jump to 64-bit]
-        H --> I[Call kernel_main]
+    subgraph Limine Bootloader
+        A[UEFI/BIOS] --> B[Limine]
+        B --> C[Load kernel ELF]
+        C --> D[Setup HHDM mapping]
+        D --> E[Jump to kernel entry]
     end
 
     subgraph HAL Init
-        I --> J[init_with_options]
-        J --> K{switch_cr3?}
-        K -->|Yes Multiboot| L[init_kernel_mappings]
-        K -->|No Limine| M[Skip - use Limine tables]
-        L --> N[Switch CR3]
-        N --> O[Serial init]
-        M --> O
-        O --> P[GDT/IDT init]
-        P --> Q[Exceptions init]
-        Q --> R[HAL Ready]
+        E --> F[init]
+        F --> G[Serial init]
+        G --> H[GDT/IDT init]
+        H --> I[Exceptions init]
+        I --> J[APIC/IOAPIC init]
+        J --> K[PIT timer init]
+        K --> L[HAL Ready]
     end
 
     subgraph Kernel Main
-        R --> S[Console init]
-        S --> T[Memory init]
-        T --> U[Task init]
-        U --> V[init::run]
+        L --> M[Console init]
+        M --> N[Memory init]
+        N --> O[Task init]
+        O --> P[init::run]
     end
 ```
 

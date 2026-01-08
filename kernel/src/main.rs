@@ -59,36 +59,25 @@ pub fn kernel_main_unified(boot_info: &crate::boot::BootInfo) -> ! {
         core::arch::asm!("mov dx, 0x3f8", "mov al, 'R'", "out dx, al", out("ax") _, out("dx") _);
     }
 
-    // TEAM_285: Initialize dynamic PHYS_OFFSET for Limine HHDM
+    // TEAM_316: Initialize dynamic PHYS_OFFSET for Limine HHDM (Limine-only now)
     #[cfg(target_arch = "x86_64")]
     {
-        if boot_info.protocol == crate::boot::BootProtocol::Limine {
-            // Diagnostic 'i' for Limine
-            unsafe {
-                core::arch::asm!("mov al, 'i'", "out dx, al", out("ax") _, out("dx") _);
-            }
-            if let Some(offset) = crate::boot::limine::hhdm_offset() {
-                los_hal::mmu::set_phys_offset(offset as usize);
-            }
-        } else {
-            // Diagnostic 'j' for Non-Limine
-            unsafe {
-                core::arch::asm!("mov al, 'j'", "out dx, al", out("ax") _, out("dx") _);
-            }
+        unsafe {
+            core::arch::asm!("mov al, 'i'", "out dx, al", out("ax") _, out("dx") _);
+        }
+        if let Some(offset) = crate::boot::limine::hhdm_offset() {
+            los_hal::mmu::set_phys_offset(offset as usize);
         }
     }
 
     // Stage 1: Early HAL - Console must be first for debug output
-    // TEAM_284: Initialize arch-specific HAL early
-    // TEAM_286: For Limine boot, skip CR3 switch - Limine's page tables are already correct
+    // TEAM_316: Simplified - Limine only, no CR3 switch needed
     #[cfg(target_arch = "x86_64")]
     {
-        // Diagnostic 'k' before HAL Init
         unsafe {
             core::arch::asm!("mov al, 'k'", "out dx, al", out("ax") _, out("dx") _);
         }
-        let switch_cr3 = boot_info.protocol != crate::boot::BootProtocol::Limine;
-        los_hal::arch::init_with_options(switch_cr3);
+        los_hal::arch::init();  // TEAM_316: Simple init, Limine handles page tables
     }
     #[cfg(not(target_arch = "x86_64"))]
     los_hal::arch::init();
@@ -119,34 +108,7 @@ pub fn kernel_main_unified(boot_info: &crate::boot::BootInfo) -> ! {
     // Stage 2: Physical Memory Management
     crate::init::transition_to(crate::init::BootStage::MemoryMMU);
 
-    // TEAM_284: x86_64 needs PMO expansion before memory init for higher-half consistency
-    #[cfg(target_arch = "x86_64")]
-    {
-        unsafe extern "C" {
-            static mut early_pml4: los_hal::arch::paging::PageTable;
-        }
-
-        let mut ram_regions: [Option<los_hal::arch::multiboot2::MemoryRegion>; 16] = [None; 16];
-        let mut count = 0;
-        for region in boot_info.memory_map.iter() {
-            if region.kind == crate::boot::MemoryKind::Usable && count < 16 {
-                ram_regions[count] = Some(los_hal::arch::multiboot2::MemoryRegion {
-                    start: region.base,
-                    end: region.base + region.size,
-                    typ: los_hal::arch::multiboot2::MemoryType::Available,
-                });
-                count += 1;
-            }
-        }
-
-        // SAFETY: early_pml4 is the initial page table defined in assembly.
-        // It is safe to expand it here before the memory manager is initialized
-        // as we are still in single-core boot mode.
-        unsafe {
-            los_hal::arch::mmu::expand_pmo(&mut *core::ptr::addr_of_mut!(early_pml4), &ram_regions);
-        }
-    }
-
+    // TEAM_316: Limine provides complete HHDM mapping, no PMO expansion needed
     crate::memory::init(boot_info);
 
     // TEAM_299: Initialize x86_64 CPU state (PCR, GS base)
