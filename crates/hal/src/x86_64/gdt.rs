@@ -33,47 +33,52 @@ impl TaskStateSegment {
     }
 }
 
-pub static mut TSS: TaskStateSegment = TaskStateSegment::new();
-
 #[repr(C, packed)]
-struct GdtTssEntry {
-    limit_low: u16,
-    base_low: u16,
-    base_mid: u8,
-    access: u8,
-    limit_high_flags: u8,
-    base_high: u8,
-    base_upper: u32,
-    reserved: u32,
+pub struct GdtTssEntry {
+    pub limit_low: u16,
+    pub base_low: u16,
+    pub base_mid: u8,
+    pub access: u8,
+    pub limit_high_flags: u8,
+    pub base_high: u8,
+    pub base_upper: u32,
+    pub reserved: u32,
 }
 
 #[repr(C, align(16))]
-struct Gdt {
-    null: u64,
-    kernel_code: u64,
-    kernel_data: u64,
-    user_data: u64,
-    user_code: u64,
-    tss: GdtTssEntry,
+pub struct Gdt {
+    pub null: u64,
+    pub kernel_code: u64,
+    pub kernel_data: u64,
+    pub user_data: u64,
+    pub user_code: u64,
+    pub tss: GdtTssEntry,
 }
 
-static mut GDT: Gdt = Gdt {
-    null: 0,
-    kernel_code: 0x00AF9A000000FFFF, // Long mode, Present, Exec, Read, DPL=0
-    kernel_data: 0x00CF92000000FFFF, // Present, Write, DPL=0
-    user_data: 0x00CFF2000000FFFF,   // Present, Write, DPL=3
-    user_code: 0x00AFFA000000FFFF,   // Long mode, Present, Exec, Read, DPL=3
-    tss: GdtTssEntry {
-        limit_low: 0,
-        base_low: 0,
-        base_mid: 0,
-        access: 0x89, // Present, Available 64-bit TSS
-        limit_high_flags: 0,
-        base_high: 0,
-        base_upper: 0,
-        reserved: 0,
-    },
-};
+impl Gdt {
+    pub const fn new() -> Self {
+        Self {
+            null: 0,
+            kernel_code: 0x00AF9A000000FFFF, // Long mode, Present, Exec, Read, DPL=0
+            kernel_data: 0x00CF92000000FFFF, // Present, Write, DPL=0
+            user_data: 0x00CFF2000000FFFF,   // Present, Write, DPL=3
+            user_code: 0x00AFFA000000FFFF,   // Long mode, Present, Exec, Read, DPL=3
+            tss: GdtTssEntry {
+                limit_low: 0,
+                base_low: 0,
+                base_mid: 0,
+                access: 0x89, // Present, Available 64-bit TSS
+                limit_high_flags: 0,
+                base_high: 0,
+                base_upper: 0,
+                reserved: 0,
+            },
+        }
+    }
+}
+
+pub static mut TSS: TaskStateSegment = TaskStateSegment::new();
+pub static mut GDT: Gdt = Gdt::new();
 
 #[repr(C, packed)]
 struct GdtPointer {

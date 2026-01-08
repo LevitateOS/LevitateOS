@@ -27,9 +27,39 @@ macro_rules! exception_handler {
                 "push r9",
                 "push r10",
                 "push r11",
-                "mov rdi, rsp",
-                "add rdi, 72", // Point to ExceptionStackFrame
+                "push rbp",     // TEAM_299: Save RBP for alignment trick
+
+                // TEAM_299: Conditional swapgs
+                // Check CS of the interrupted frame. Offset 88 = 10 regs * 8 bytes + RBP.
+                // ExceptionStackFrame starts at [rsp + 88]
+                // CS is at [rsp + 88 + 8] = [rsp + 96]
+                // Wait, let's re-verify:
+                // Pushed: rax, rcx, rdx, rsi, rdi, r8, r9, r10, r11, rbp (10 regs)
+                // RSP + 0  : rbp
+                // RSP + 8  : r11
+                // ...
+                // RSP + 72 : rax
+                // RSP + 80 : ExceptionStackFrame.RIP
+                // RSP + 88 : ExceptionStackFrame.CS
+                "test qword ptr [rsp + 88], 3",
+                "jz 1f",
+                "swapgs",
+                "1:",
+
+                "mov rbp, rsp", // Save stack pointer before alignment
+                "and rsp, -16", // Ensure 16-byte alignment for Rust handler
+                "mov rdi, rbp",
+                "add rdi, 80",  // Point to ExceptionStackFrame (10 regs * 8)
                 "call {handler}",
+                "mov rsp, rbp", // Restore stack pointer
+
+                // TEAM_299: Conditional swapgs back
+                "test qword ptr [rsp + 96], 3",
+                "jz 2f",
+                "swapgs",
+                "2:",
+
+                "pop rbp",
                 "pop r11",
                 "pop r10",
                 "pop r9",
@@ -60,11 +90,37 @@ macro_rules! exception_handler_err {
                 "push r9",
                 "push r10",
                 "push r11",
-                "mov rdi, rsp",
-                "add rdi, 72", // Point to error code
+                "push rbp",     // TEAM_299: Save RBP for alignment trick
+
+                // TEAM_299: Conditional swapgs
+                // Pushed: rax, rcx, rdx, rsi, rdi, r8, r9, r10, r11, rbp (10 regs)
+                // RSP + 0  : rbp
+                // ...
+                // RSP + 72 : rax
+                // RSP + 80 : Error Code
+                // RSP + 88 : ExceptionStackFrame.RIP
+                // RSP + 96 : ExceptionStackFrame.CS
+                "test qword ptr [rsp + 96], 3",
+                "jz 1f",
+                "swapgs",
+                "1:",
+
+                "mov rbp, rsp", // Save stack pointer before alignment
+                "and rsp, -16", // Ensure 16-byte alignment for Rust handler
+                "mov rdi, rbp",
+                "add rdi, 80",  // Point to error code
                 "mov rsi, [rdi]", // Error code
-                "add rdi, 8",  // Point to ExceptionStackFrame
+                "add rdi, 8",   // Point to ExceptionStackFrame
                 "call {handler}",
+                "mov rsp, rbp", // Restore stack pointer
+
+                // TEAM_299: Conditional swapgs back
+                "test qword ptr [rsp + 96], 3",
+                "jz 2f",
+                "swapgs",
+                "2:",
+
+                "pop rbp",
                 "pop r11",
                 "pop r10",
                 "pop r9",

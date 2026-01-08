@@ -317,7 +317,7 @@ impl<'a> Elf<'a> {
         // GOT is pre-populated by linker. No runtime relocations are needed or performed.
         // If GOT is wrong, it's due to memory corruption (Hypothesis 7), not missing relocations.
         for phdr in self.program_headers() {
-            if phdr.p_type != program::Type::Load {
+            if !phdr.is_loadable() {
                 continue;
             }
 

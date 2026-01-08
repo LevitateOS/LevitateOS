@@ -84,6 +84,20 @@ static CURRENT_TASK: IrqSafeLock<Option<Arc<TaskControlBlock>>> = IrqSafeLock::n
 
 /// TEAM_070: Get the currently running task as an Arc.
 pub fn current_task() -> Arc<TaskControlBlock> {
+    #[cfg(target_arch = "x86_64")]
+    unsafe {
+        let pcr = crate::arch::x86_64::cpu::get_pcr();
+        let ptr = pcr.current_task_ptr as *const TaskControlBlock;
+        if !ptr.is_null() {
+            // TEAM_299: We know the Arc is held by the scheduler or CURRENT_TASK global.
+            // Create a new Arc and increment its reference count.
+            let arc = Arc::from_raw(ptr);
+            let cloned = arc.clone();
+            let _ = Arc::into_raw(arc); // Don't drop the original
+            return cloned;
+        }
+    }
+
     CURRENT_TASK
         .lock()
         .as_ref()
@@ -93,6 +107,11 @@ pub fn current_task() -> Arc<TaskControlBlock> {
 
 /// TEAM_070: Internal helper to set the current task.
 pub unsafe fn set_current_task(task: Arc<TaskControlBlock>) {
+    #[cfg(target_arch = "x86_64")]
+    {
+        let pcr = crate::arch::x86_64::cpu::get_pcr();
+        pcr.current_task_ptr = Arc::as_ptr(&task) as usize;
+    }
     *CURRENT_TASK.lock() = Some(task);
 }
 

@@ -27,16 +27,6 @@ const RFLAGS_IF: u64 = 1 << 9;
 const RFLAGS_TF: u64 = 1 << 8;
 const RFLAGS_DF: u64 = 1 << 10;
 
-/// TEAM_296: Per-task kernel stack management for syscalls.
-#[unsafe(no_mangle)]
-pub static mut CURRENT_KERNEL_STACK: usize = 0;
-#[unsafe(no_mangle)]
-pub static mut USER_RSP_SCRATCH: usize = 0;
-#[unsafe(no_mangle)]
-pub static mut USER_PC_SCRATCH: usize = 0;
-#[unsafe(no_mangle)]
-pub static mut USER_RFLAGS_SCRATCH: usize = 0;
-
 /// Initialize syscall/sysret MSRs
 pub unsafe fn init() {
     // TEAM_293: STAR MSR format: [63:48]=SYSRET base, [47:32]=SYSCALL base
@@ -96,37 +86,38 @@ unsafe fn wrmsr(msr: u32, value: u64) {
 #[unsafe(naked)]
 pub unsafe extern "C" fn syscall_entry() {
     naked_asm!(
-        // 1. Switch to kernel stack (interrupts are disabled by FMASK)
-        "mov [rip + {user_rsp}], rsp",
-        "mov rsp, [rip + {kernel_stack}]",
+        "swapgs",                            // Swap user GS with kernel PCR
+        "mov gs:[8], rsp",                   // Save user RSP to PCR.user_rsp_scratch
+        "mov rsp, gs:[16]",                  // Load kernel stack from PCR.kernel_stack
+        "and rsp, -16",                      // TEAM_299: Ensure 16-byte alignment
 
-        // 2. Build SyscallFrame (pushed in reverse order of fields)
-        // Space for regs[31] (not used for basic syscalls but kept for compatibility)
-        // TEAM_297 BREADCRUMB: DEAD_END - SyscallFrame layout mismatch.
-        // We carefully verified the push order below against the SyscallFrame struct definition.
-        // They match exactly. Do not reinvestigate stack layout unless struct definition changes.
+        // 2. Build SyscallFrame (Total size 52 qwords = 416 bytes)
+        // Order must match SyscallFrame struct in mod.rs
+        
+        // Pushes for regs[31] (indexes 21 to 51)
         "sub rsp, 31*8",
-
-        "push 0",                            // pstate
-        "push qword ptr [rip + {user_rsp}]", // sp
-        "push rcx",                          // pc (return address)
-        "push 0",                            // ttbr0
-        "push qword ptr [rip + {user_rsp}]", // rsp
-        "push r15",        // r15
+        
+        "push 0",                            // _padding (index 20)
+        "push 0",                            // pstate (index 19)
+        "push qword ptr gs:[8]",             // sp (index 18)
+        "push rcx",                          // pc (index 17)
+        "push 0",                            // ttbr0 (index 16)
+        "push qword ptr gs:[8]",             // rsp (index 15)
+        "push r15",                          // r15 (index 14)
         "push r14",
         "push r13",
         "push r12",
         "push rbp",
         "push rbx",
-        "push r11",        // RFLAGS
-        "push rcx",        // return address
-        "push r9",
-        "push r8",
-        "push r10",
-        "push rdx",
-        "push rsi",
-        "push rdi",
-        "push rax",
+        "push r11",                          // user rflags (index 8)
+        "push rcx",                          // user pc (index 7)
+        "push r9",                           // arg5 (index 6)
+        "push r8",                           // arg4 (index 5)
+        "push r10",                          // arg3 (index 4)
+        "push rdx",                          // arg2 (index 3)
+        "push rsi",                          // arg1 (index 2)
+        "push rdi",                          // arg0 (index 1)
+        "push rax",                          // syscall_nr (index 0)
 
         // RDI = pointer to SyscallFrame
         "mov rdi, rsp",
@@ -134,7 +125,7 @@ pub unsafe extern "C" fn syscall_entry() {
         // Call Rust handler
         "call {handler}",
 
-        // Restore registers
+        // 3. Restore registers
         "pop rax",
         "pop rdi",
         "pop rsi",
@@ -142,8 +133,8 @@ pub unsafe extern "C" fn syscall_entry() {
         "pop r10",
         "pop r8",
         "pop r9",
-        "pop rcx",         // RCX = return address
-        "pop r11",
+        "pop rcx",                           // RCX = user pc
+        "pop r11",                           // R11 = user rflags
         "pop rbx",
         "pop rbp",
         "pop r12",
@@ -151,15 +142,33 @@ pub unsafe extern "C" fn syscall_entry() {
         "pop r14",
         "pop r15",
 
-        // After popping R15, RSP points to 'frame.rsp'
+        // After popping R15, RSP points to 'frame.rsp' (index 15)
+        // We need to restore User RSP from here
         "mov rsp, [rsp]",
 
-        // TEAM_297 BREADCRUMB: SUSPECT - This instruction may be returning to wrong address.
-        // Observed RIP is -3 bytes from expected return.
+        // TEAM_299: Best Practice - Disable interrupts before swapgs/sysretq
+        "cli",
+
+        // TEAM_299: Best Practice - Sanitize return address (RCX)
+        // sysretq #GP faults if RCX is non-canonical.
+        "mov rax, rcx",
+        "shl rax, 16",
+        "sar rax, 16",
+        "cmp rax, rcx",
+        "jne 3f",                            // Jump to emergency exit if non-canonical
+
+        // TEAM_299: Best Practice - Sanitize RFLAGS (R11)
+        // Ensure user cannot set sensitive bits (IOPL, NT, etc.)
+        // Keep IF (0x200), fixed bit 1 (0x2), and standard user flags
+        "and r11, 0x3C7FD7",                 // Mask out restricted bits
+        "or r11, 0x202",                     // Force IF=1 and bit1=1
+
+        "swapgs",                            // Restore user GS
         "sysretq",
 
-        user_rsp = sym USER_RSP_SCRATCH,
-        kernel_stack = sym CURRENT_KERNEL_STACK,
+        "3:",                                // Emergency exit for non-canonical RCX
+        "ud2",                               // Panic via invalid opcode
+
         handler = sym syscall_handler,
     );
 }

@@ -4,6 +4,13 @@ rustflags = [
     "-C", "link-arg=-Tlinker.ld",
 ]
 
+[target.x86_64-unknown-none]
+rustflags = [
+    "-C", "no-red-zone",
+    "-C", "code-model=kernel",
+    "-C", "relocation-model=static",
+]
+
 # TEAM_274: Removed x86_64 linker script settings from here
 # They are now in kernel/build.rs to avoid applying to userspace builds
 

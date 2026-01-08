@@ -187,6 +187,7 @@ _start64:
 
     /* 4. Set our own stack (virtual address) */
     movabs rsp, offset stack_top
+    and rsp, -16                        /* TEAM_299: Ensure 16-byte alignment */
 
     /* 5. Direct serial output 'H' for 'Higher Half' */
     mov dx, 0x3f8
@@ -253,6 +254,7 @@ long_mode_start:
 
     /* Set up 64-bit stack in higher-half */
     movabs rsp, offset stack_top
+    and rsp, -16                        /* TEAM_299: Ensure 16-byte alignment */
 
     /* TEAM_278: Save multiboot args before BSS zeroing (rep stosq clobbers RDI) */
     mov r12d, edi                       /* Save magic to R12 (callee-saved) */

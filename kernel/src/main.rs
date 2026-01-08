@@ -129,6 +129,12 @@ pub fn kernel_main_unified(boot_info: &crate::boot::BootInfo) -> ! {
 
     crate::memory::init(boot_info);
 
+    // TEAM_299: Initialize x86_64 CPU state (PCR, GS base)
+    #[cfg(target_arch = "x86_64")]
+    unsafe {
+        crate::arch::cpu::init();
+    }
+
     // TEAM_284: Initialize x86_64 syscalls after memory/heap
     #[cfg(target_arch = "x86_64")]
     unsafe {

@@ -19,7 +19,7 @@ use super::{
 use limine::BaseRevision;
 use limine::memory_map::EntryType;
 use limine::request::{
-    FramebufferRequest, HhdmRequest, KernelAddressRequest, MemoryMapRequest, ModuleRequest,
+    ExecutableAddressRequest, FramebufferRequest, HhdmRequest, MemoryMapRequest, ModuleRequest,
     RsdpRequest, StackSizeRequest,
 };
 
@@ -67,7 +67,7 @@ static STACK_SIZE_REQUEST: StackSizeRequest = StackSizeRequest::new().with_size(
 /// Used to get actual physical load address for virt_to_phys calculations.
 #[used]
 #[unsafe(link_section = ".requests")]
-static KERNEL_ADDRESS_REQUEST: KernelAddressRequest = KernelAddressRequest::new();
+static KERNEL_ADDRESS_REQUEST: ExecutableAddressRequest = ExecutableAddressRequest::new();
 
 /// TEAM_282: Get the Higher Half Direct Map offset.
 ///

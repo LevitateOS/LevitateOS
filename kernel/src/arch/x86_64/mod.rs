@@ -394,6 +394,9 @@ pub struct SyscallFrame {
     pub sp: u64,     // 18: user sp (alias for rsp push in assembly)
     pub pstate: u64, // 19: user rflags (alias for r11 push in assembly)
 
+    /// Padding to ensure SyscallFrame is 16-byte aligned (total size 52 * 8 = 416 bytes)
+    pub _padding: u64,
+
     // Total regs size for compatibility
     pub regs: [u64; 31],
 }
