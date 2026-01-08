@@ -210,8 +210,11 @@ fn split_args(cmd: &[u8]) -> ([&[u8]; 16], usize) {
 /// [SH1] Entry point for the shell - prints banner on startup.
 /// [SH2] Prints # prompt.
 /// [SH3] Reads input line.
+/// [SH1] Entry point for the shell - prints banner on startup.
+/// [SH2] Prints # prompt.
+/// [SH3] Reads input line.
 #[no_mangle]
-pub extern "C" fn _start() -> ! {
+pub extern "C" fn shell_entry() -> ! {
     // [SH1] Shell prints banner on startup
     println!();
     println!("LevitateOS Shell (lsh) v0.1");
@@ -271,4 +274,20 @@ pub extern "C" fn _start() -> ! {
             }
         }
     }
+}
+
+/// TEAM_299: Naked entry point to align stack for x86_64.
+/// The kernel might not align the stack to 16 bytes when jumping to userspace.
+/// This trampoline ensures alignment to prevent SIMD/Rust ABI issues.
+#[no_mangle]
+#[unsafe(naked)]
+pub unsafe extern "C" fn _start() -> ! {
+    core::arch::naked_asm!(
+        "xor rbp, rbp",      // Clear frame pointer
+        "mov rdi, rsp",      // Save original stack pointer (ignoring args for now)
+        "and rsp, -16",      // Align stack to 16 bytes
+        "call {entry}",      // Call Rust entry point
+        "ud2",               // Should not return
+        entry = sym shell_entry,
+    )
 }

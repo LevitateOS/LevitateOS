@@ -47,7 +47,8 @@ panic = "abort"
 
 [profile.release]
 panic = "abort"
-lto = true
+lto = false # TEAM_301: Disable LTO for debugging
+debug = true # TEAM_301: Enable debug symbols
 codegen-units = 1
 
 # TEAM_141: Pin shared dependencies to avoid version skew across crates

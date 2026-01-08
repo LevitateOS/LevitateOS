@@ -1,7 +1,7 @@
 // TEAM_259: CPU Exception Handlers for x86_64.
 
-use core::arch::{asm, naked_asm};
 use crate::x86_64::idt::IDT;
+use core::arch::{asm, naked_asm};
 
 #[repr(C)]
 #[derive(Debug)]
@@ -153,15 +153,62 @@ extern "C" fn breakpoint_handler(frame: &ExceptionStackFrame) {
 }
 
 extern "C" fn invalid_opcode_handler(frame: &ExceptionStackFrame) {
-    panic!("EXCEPTION: INVALID OPCODE\n{instruction_pointer:x}", instruction_pointer = frame.instruction_pointer);
+    let rip = frame.instruction_pointer;
+
+    // TEAM_301: Dump bytes around RIP to debug corruption
+    unsafe {
+        crate::println!("EXCEPTION: INVALID OPCODE at {:x}", rip);
+
+        // Dump Code
+        let ptr = rip as *const u8;
+        crate::print!("Code at RIP: ");
+        for i in 0..16 {
+            crate::print!("{:02x} ", *ptr.add(i));
+        }
+        crate::println!();
+
+        if rip > 16 {
+            let ptr_prev = (rip - 16) as *const u8;
+            crate::print!("Code before: ");
+            for i in 0..16 {
+                crate::print!("{:02x} ", *ptr_prev.add(i));
+            }
+            crate::println!();
+        }
+
+        // TEAM_301: Dump Stack (Backtraceish)
+        let rsp = frame.stack_pointer;
+        crate::println!("Stack at {:x}:", rsp);
+        if rsp > 0x1000 && rsp < 0x0000_8000_0000_0000 {
+            let sp_ptr = rsp as *const u64;
+            for i in 0..16 {
+                // Check alignment/validity roughly
+                let val = *sp_ptr.add(i);
+                crate::println!("  SP+{:<2}: {:x}", i * 8, val);
+            }
+        } else {
+            crate::println!("  Invalid RSP/Kernel Stack?");
+        }
+    }
+
+    panic!(
+        "EXCEPTION: INVALID OPCODE\n{instruction_pointer:x}",
+        instruction_pointer = frame.instruction_pointer
+    );
 }
 
 extern "C" fn double_fault_handler(frame: &ExceptionStackFrame, error_code: u64) {
-    panic!("EXCEPTION: DOUBLE FAULT\nError Code: {}\n{:#?}", error_code, frame);
+    panic!(
+        "EXCEPTION: DOUBLE FAULT\nError Code: {}\n{:#?}",
+        error_code, frame
+    );
 }
 
 extern "C" fn general_protection_fault_handler(frame: &ExceptionStackFrame, error_code: u64) {
-    panic!("EXCEPTION: GENERAL PROTECTION FAULT\nError Code: {}\n{:#?}", error_code, frame);
+    panic!(
+        "EXCEPTION: GENERAL PROTECTION FAULT\nError Code: {}\n{:#?}",
+        error_code, frame
+    );
 }
 
 extern "C" fn page_fault_handler(frame: &ExceptionStackFrame, error_code: u64) {
@@ -169,7 +216,9 @@ extern "C" fn page_fault_handler(frame: &ExceptionStackFrame, error_code: u64) {
     unsafe {
         asm!("mov {}, cr2", out(reg) cr2);
     }
-    panic!("EXCEPTION: PAGE FAULT\nAccessed Address: {cr2:x}\nError Code: {error_code:?}\n{frame:#?}");
+    panic!(
+        "EXCEPTION: PAGE FAULT\nAccessed Address: {cr2:x}\nError Code: {error_code:?}\n{frame:#?}"
+    );
 }
 
 exception_handler!(de_wrapper, divide_error_handler);

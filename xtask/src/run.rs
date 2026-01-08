@@ -21,6 +21,9 @@ pub enum RunCommands {
         /// Wait for GDB connection on startup
         #[arg(long)]
         wait: bool,
+        /// Boot from Limine ISO instead of -kernel
+        #[arg(long)]
+        iso: bool,
     },
     /// Run in terminal-only mode (WSL-like, keyboard in terminal)
     Term {
@@ -150,7 +153,7 @@ pub fn run_qemu(profile: QemuProfile, headless: bool, iso: bool, arch: &str) -> 
 }
 
 /// TEAM_116: Run QEMU with GDB server enabled (port 1234).
-pub fn run_qemu_gdb(profile: QemuProfile, wait: bool, arch: &str) -> Result<()> {
+pub fn run_qemu_gdb(profile: QemuProfile, wait: bool, iso: bool, arch: &str) -> Result<()> {
     println!("🐛 Starting QEMU with GDB server on port 1234...");
     if wait {
         println!("⏳ Waiting for GDB connection before starting...");
@@ -189,6 +192,12 @@ pub fn run_qemu_gdb(profile: QemuProfile, wait: bool, arch: &str) -> Result<()> 
         "-qmp", "unix:./qmp.sock,server,nowait",
         "-no-reboot",
     ];
+
+    if iso {
+        // Propagate ISO logic similar to run_qemu
+        args.retain(|&arg| arg != "-kernel" && arg != "-initrd" && arg != kernel_bin && arg != "initramfs.cpio");
+        args.extend(["-cdrom", "levitate.iso", "-boot", "d"]);
+    }
 
     if wait {
         args.push("-S"); // Freeze CPU at startup

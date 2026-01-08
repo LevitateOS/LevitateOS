@@ -1,16 +1,35 @@
 #!/bin/bash
-# run.sh - LevitateOS Quick Launcher
+# run.sh - Canonical LevitateOS Launcher
+# Wraps 'cargo xtask run' to provide a unified entry point.
 #
-# This script provides the default GUI experience.
-# For different modes, use:
-#   ./run-gui.sh  - Opens QEMU window (click window to type)
-#   ./run-term.sh - Terminal only, WSL-like (type in terminal)
+# Usage:
+#   ./run.sh              # Run in GUI mode (Default)
+#   ./run.sh term         # Run in Terminal mode
+#   ./run.sh --iso        # Force ISO boot (x86_64)
+#   ./run.sh clean        # Clean artifacts
 #
-# Flags:
-#   --aarch64  - Run on AArch64 instead of x86_64 (default)
+# This script delegates to the Rust build system (xtask) which handles
+# compiling, image creation, and QEMU invocation correctly.
 
-echo "Starting LevitateOS in GUI mode..."
-echo "  (Use ./run-term.sh for terminal-only/WSL-like mode)"
-echo ""
+set -e
 
-exec bash ./run-gui.sh "$@"
+# Forward 'clean' to xtask clean
+if [ "$1" = "clean" ]; then
+    exec cargo xtask clean
+    exit 0
+fi
+
+# Heuristic: If first arg matches a known subcommand, pass it through.
+# Otherwise, default to 'default' (GUI) mode and pass args as flags.
+case "$1" in
+    default|term|test|gdb|pixel6|vnc)
+        # Explicit subcommand provided
+        exec cargo xtask run "$@"
+        ;;
+    *)
+        # No subcommand, assume default (GUI)
+        # Pass all arguments to 'default' command
+        # Example: ./run.sh --iso -> cargo xtask run default --iso
+        exec cargo xtask run default "$@"
+        ;;
+esac

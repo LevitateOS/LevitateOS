@@ -134,7 +134,13 @@ pub fn switch_to(new_task: Arc<TaskControlBlock>) {
         let flags = los_hal::interrupts::disable();
 
         // [MT3] Update current task pointer before switch
-        set_current_task(new_task);
+        set_current_task(new_task.clone()); // TEAM_299: Clone Arc for set_current_task
+
+        // TEAM_299: Switch Page Tables (CR3/TTBR0)
+        // Critical for process isolation. Without this, new task runs in old task's address space.
+        if new_task.ttbr0 != 0 {
+            crate::arch::switch_mmu_config(new_task.ttbr0);
+        }
 
         cpu_switch_to(old_ctx, new_ctx);
 

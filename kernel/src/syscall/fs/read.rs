@@ -82,8 +82,14 @@ pub fn sys_read(fd: usize, buf: usize, len: usize) -> i64 {
     let ttbr0 = task.ttbr0;
 
     match entry.fd_type {
-        FdType::Stdin => read_stdin(buf, len, ttbr0),
+        FdType::Stdin => {
+            #[cfg(feature = "verbose-syscalls")]
+            los_hal::println!("[SYS_READ] fd={} type=Stdin len={}", fd, len);
+            read_stdin(buf, len, ttbr0)
+        }
         FdType::VfsFile(ref file) => {
+            #[cfg(feature = "verbose-syscalls")]
+            los_hal::println!("[SYS_READ] fd={} type=VfsFile len={}", fd, len);
             if mm_user::validate_user_buffer(ttbr0, buf, len, true).is_err() {
                 return errno::EFAULT;
             }
@@ -102,6 +108,8 @@ pub fn sys_read(fd: usize, buf: usize, len: usize) -> i64 {
             }
         }
         FdType::PipeRead(ref pipe) => {
+            #[cfg(feature = "verbose-syscalls")]
+            los_hal::println!("[SYS_READ] fd={} type=PipeRead len={}", fd, len);
             if mm_user::validate_user_buffer(ttbr0, buf, len, true).is_err() {
                 return errno::EFAULT;
             }
@@ -119,6 +127,8 @@ pub fn sys_read(fd: usize, buf: usize, len: usize) -> i64 {
             n as i64
         }
         FdType::PtyMaster(ref pair) => {
+            #[cfg(feature = "verbose-syscalls")]
+            los_hal::println!("[SYS_READ] fd={} type=PtyMaster len={}", fd, len);
             let mut bytes_read = 0;
             loop {
                 let mut buffer = pair.master_read_buffer.lock();
@@ -146,8 +156,16 @@ pub fn sys_read(fd: usize, buf: usize, len: usize) -> i64 {
                 crate::task::yield_now();
             }
         }
-        FdType::PtySlave(ref pair) => read_from_tty(&pair.tty, buf, len, ttbr0, false),
-        _ => errno::EBADF,
+        FdType::PtySlave(ref pair) => {
+            #[cfg(feature = "verbose-syscalls")]
+            los_hal::println!("[SYS_READ] fd={} type=PtySlave len={}", fd, len);
+            read_from_tty(&pair.tty, buf, len, ttbr0, false)
+        }
+        _ => {
+            #[cfg(feature = "verbose-syscalls")]
+            los_hal::println!("[SYS_READ] fd={} type=Other(EBADF?)", fd);
+            errno::EBADF
+        }
     }
 }
 
@@ -179,6 +197,9 @@ fn read_from_tty(
         // 2. Try to satisfy read from TTY input buffer
         let mut tty = tty_mutex.lock();
         if !tty.input_buffer.is_empty() {
+            #[cfg(feature = "verbose-syscalls")]
+            los_hal::println!("[TTY] Input buffer has {} bytes", tty.input_buffer.len());
+
             let mut bytes_read = 0;
             while bytes_read < max_read {
                 if let Some(byte) = tty.input_buffer.pop_front() {
@@ -200,6 +221,9 @@ fn read_from_tty(
         drop(tty);
 
         // 3. Wait/Yield if nothing available
+        // #[cfg(feature = "verbose-syscalls")]
+        // los_hal::println!("[TTY] Waiting for input..."); // Too noisy for loop
+
         unsafe {
             los_hal::interrupts::enable();
         }

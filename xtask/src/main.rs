@@ -147,14 +147,18 @@ fn main() -> Result<()> {
             run::RunCommands::Vnc => {
                 run::run_qemu_vnc(arch)?;
             }
-            run::RunCommands::Gdb { wait } => {
+            run::RunCommands::Gdb { wait, iso } => {
                 let profile = if arch == "x86_64" {
                     run::QemuProfile::X86_64
                 } else {
                     run::QemuProfile::Default
                 };
-                build::build_all(arch)?;
-                run::run_qemu_gdb(profile, wait, arch)?;
+                if iso {
+                    build::build_iso(arch)?;
+                } else {
+                    build::build_all(arch)?;
+                }
+                run::run_qemu_gdb(profile, wait, iso, arch)?;
             }
             run::RunCommands::Term { iso } => {
                 run::run_qemu_term(arch, iso)?;
