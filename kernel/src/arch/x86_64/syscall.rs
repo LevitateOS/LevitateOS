@@ -146,16 +146,6 @@ pub unsafe extern "C" fn syscall_entry() {
         // We need to restore User RSP from here
         "mov rsp, [rsp]",
 
-        // TEAM_299: Debug Check - Validate RCX (Return Address)
-        // If RCX is 0x100b4 (known corruption value), panic or fix
-        "mov rax, 0x100b4",
-        "cmp rcx, rax",
-        "jne 2f",
-        "mov rcx, 0x101de", // Patch it to continue
-        // Optional: Trigger panic to debug
-        // "ud2",
-        "2:",
-
         // TEAM_299: Best Practice - Disable interrupts before swapgs/sysretq
         "cli",
 

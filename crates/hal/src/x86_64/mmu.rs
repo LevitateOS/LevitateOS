@@ -177,8 +177,14 @@ pub fn map_page(
     flags: PageFlags,
 ) -> Result<(), MmuError> {
     let p_flags = PageTableFlags::from_bits_truncate(flags.bits());
-    paging::map_page(root, va, pa, p_flags, || EARLY_ALLOCATOR.alloc_page())
-        .map_err(|_| MmuError::AllocationFailed)
+    let alloc_fn = || unsafe {
+        if let Some(alloc) = PAGE_ALLOCATOR_PTR {
+            alloc.alloc_page()
+        } else {
+            EARLY_ALLOCATOR.alloc_page()
+        }
+    };
+    paging::map_page(root, va, pa, p_flags, alloc_fn).map_err(|_| MmuError::AllocationFailed)
 }
 
 pub fn unmap_page(root: &mut PageTable, va: usize) -> Result<(), MmuError> {
@@ -314,9 +320,14 @@ pub fn walk_to_entry<'a>(
         let entry = current_table.entries[index];
         if !entry.flags().contains(PageTableFlags::PRESENT) {
             if create {
-                let new_pa = EARLY_ALLOCATOR
-                    .alloc_page()
-                    .ok_or(MmuError::AllocationFailed)?;
+                let new_pa = unsafe {
+                    if let Some(alloc) = PAGE_ALLOCATOR_PTR {
+                        alloc.alloc_page()
+                    } else {
+                        EARLY_ALLOCATOR.alloc_page()
+                    }
+                }
+                .ok_or(MmuError::AllocationFailed)?;
                 // TEAM_266: Use phys_to_virt (PHYS_OFFSET)
                 let new_va = phys_to_virt(new_pa) as *mut PageTable;
                 unsafe { (*new_va).zero() };
@@ -388,7 +399,14 @@ pub fn expand_pmo(root: &mut PageTable, regions: &[Option<MemoryRegion>]) {
         while pa < end_aligned {
             let va = phys_to_virt(pa);
             let flags = PageTableFlags::PRESENT | PageTableFlags::WRITABLE | PageTableFlags::GLOBAL;
-            let _ = paging::map_huge_page(root, va, pa, flags, || EARLY_ALLOCATOR.alloc_page());
+            let alloc_fn = || unsafe {
+                if let Some(alloc) = PAGE_ALLOCATOR_PTR {
+                    alloc.alloc_page()
+                } else {
+                    EARLY_ALLOCATOR.alloc_page()
+                }
+            };
+            let _ = paging::map_huge_page(root, va, pa, flags, alloc_fn);
             pa += huge_page_size;
         }
 

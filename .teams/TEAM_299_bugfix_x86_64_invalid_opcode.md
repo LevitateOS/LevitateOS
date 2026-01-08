@@ -26,8 +26,10 @@ The kernel panics with `EXCEPTION: INVALID OPCODE` at RIP `0x100b4` (originally 
 - **Fix 1 (Infinite Loop)**: `init` was entering an infinite loop because `switch_to` failed to update CR3, causing `init` to execute `shell` code.
   - **Fixed by**: Adding `switch_mmu_config` call in `kernel/src/task/mod.rs`.
 - **New Issue**: System now crashes with `INVALID OPCODE` at `0x101de` (in Shell context).
-  - Code at RIP: `ea 15 4c 01 ca ...` (Mismatched from `cmp` instruction expected at `101de`).
-  - This suggests memory corruption or incorrect physical page mapping (cache issue?).
+  - **Memory Match**: Instruction bytes at `0x101de` match `init` binary exactly (`ea 15 4c 01...`).
+  - **Mappings**: PID 1 uses PA `1d4e0000`, PID 2 uses PA `1fe55000`.
+  - **Analysis**: The `RCX` patch in `syscall_entry` redirects `init` (100b4 -> 101de). `101de` in `init` is an invalid opcode prefix `ea`.
+  - **Current Hypothesis**: ICache staleness or a page table walk aliasing bug.
 
 ## Handover Notes
 - **Critical**: The infinite loop is solved, but the system now crashes with `INVALID OPCODE` inside the shell.

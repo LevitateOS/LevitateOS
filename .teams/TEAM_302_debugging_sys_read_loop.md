@@ -1,13 +1,20 @@
-# Team 302: Debugging Syscall Infinite Loop
+# Team 302: Debugging Syscall Infinite Loop & Invalid Opcode
 
 ## Objective
-Investigate and fix the infinite loop of `sys_read` (syscall 0) returning 0 in the userspace shell.
+Fix the `INVALID OPCODE` crash in `shell` and ensure robust memory isolation.
 
 ## Status
-- [ ] Investigate `sys_read` implementation
-- [ ] Investigate shell `read` loop
-- [ ] Fix the issue
+- [x] Synchronize EARLY_ALLOCATOR ranges (8-16MB)
+- [x] Refactor MMU to use main allocator after boot
+- [x] Remove "Emergency Patch" from `syscall_entry`
+- [x] Verify `shell` prompt arrival
 
-## Notes
-- Userspace `sys_read` returns 0 immediately.
-- Shell loops infinitely on this return.
+## Findings
+- **Memory Collision**: HAL and Kernel disagreed on reserved ranges.
+- **Hardcoding**: MMU was stuck on early allocator.
+- **Unsafe Patch**: A hardcoded jump in assembly was corrupting return addresses.
+
+## TODO
+- [ ] Confirm `init` (PID 1) still functions correctly without the patch.
+- [ ] Cleanup `verbose-syscalls` logging.
+- [ ] Verify interactive shell input (typing 'help').

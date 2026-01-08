@@ -55,7 +55,7 @@ impl PageAllocator for EarlyFrameAllocator {
     }
 }
 
-/// Global instance for early boot page table allocations.
-/// Initialized with a safe default range (e.g., 8MB to 16MB) until MADT/Memory Map is parsed.
-/// TEAM_258: Kernel is at 1MB+, so 8MB is a safe buffer.
-pub static EARLY_ALLOCATOR: EarlyFrameAllocator = EarlyFrameAllocator::new(0x2000000, 0x4000000);
+// TEAM_302: IA32_STAR and early range are critical for syscall/MMU stability.
+// CAUTION: The EARLY_ALLOCATOR range (frame_alloc.rs) must exactly match
+// the reservation in kernel/src/memory/mod.rs to avoid physical memory corruption.
+pub static EARLY_ALLOCATOR: EarlyFrameAllocator = EarlyFrameAllocator::new(0x800000, 0x1000000);
