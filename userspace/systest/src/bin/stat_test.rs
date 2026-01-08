@@ -22,7 +22,7 @@ pub fn main() -> i32 {
     }
 
     // Check fstat
-    let mut st: Stat = Default::default();
+    let mut st: Stat = unsafe { core::mem::zeroed() };
     if fstat(fd as usize, &mut st) < 0 {
         println!("[stat_test] FAIL: fstat failed");
         return 1;

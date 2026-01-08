@@ -9,8 +9,8 @@ use ulib::libsyscall::{clock_gettime, nanosleep, println, Timespec};
 pub fn main() -> i32 {
     println!("[time_test] Starting...");
 
-    let mut start = Timespec::default();
-    let mut end = Timespec::default();
+    let mut start = Timespec { tv_sec: 0, tv_nsec: 0 };
+    let mut end = Timespec { tv_sec: 0, tv_nsec: 0 };
 
     if clock_gettime(&mut start) < 0 {
         println!("[time_test] FAIL: clock_gettime failed");

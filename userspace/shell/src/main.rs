@@ -237,7 +237,7 @@ pub extern "C" fn shell_entry() -> ! {
         libsyscall::sigreturn()
     }
     libsyscall::sigaction(
-        libsyscall::SIGINT,
+        libsyscall::SIGINT as i32,
         sigint_handler as *const () as usize,
         sigreturn_trampoline as *const () as usize,
     );

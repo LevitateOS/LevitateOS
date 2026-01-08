@@ -25,7 +25,8 @@ pub mod shutdown_flags {
     pub use linux_raw_sys::general::{
         LINUX_REBOOT_CMD_HALT, LINUX_REBOOT_CMD_POWER_OFF, LINUX_REBOOT_CMD_RESTART,
     };
-    // TEAM_310: Legacy flag for compatibility
+    // TEAM_310: Legacy flags for compatibility
+    pub const NORMAL: u32 = LINUX_REBOOT_CMD_POWER_OFF;
     pub const VERBOSE: u32 = 0;
 }
 
