@@ -51,8 +51,10 @@ pub mod virtio;
 /// Note: The caller must call `boot::set_boot_info()` before calling this
 /// to make boot info available globally.
 pub fn kernel_main_unified(boot_info: &crate::boot::BootInfo) -> ! {
-    // TEAM_285: Diagnostic 'R' for Rust Unified Entry (x86_64 only)
+    // TEAM_305: Diagnostic 'R' for Rust Unified Entry (x86_64 only)
     #[cfg(target_arch = "x86_64")]
+    // SAFETY: Writing to serial port 0x3f8 is a standard debugging technique
+    // in early x86_64 boot and is safe in this context.
     unsafe {
         core::arch::asm!("mov dx, 0x3f8", "mov al, 'R'", "out dx, al");
     }
@@ -90,9 +92,9 @@ pub fn kernel_main_unified(boot_info: &crate::boot::BootInfo) -> ! {
     crate::arch::init_heap();
 
     // Log boot protocol
-    println!("[BOOT] Protocol: {:?}", boot_info.protocol);
+    log::info!("[BOOT] Protocol: {:?}", boot_info.protocol);
     if !boot_info.memory_map.is_empty() {
-        println!(
+        log::info!(
             "[BOOT] Memory: {} regions, {} MB usable",
             boot_info.memory_map.len(),
             boot_info.memory_map.total_usable() / (1024 * 1024)
@@ -122,6 +124,9 @@ pub fn kernel_main_unified(boot_info: &crate::boot::BootInfo) -> ! {
             }
         }
 
+        // SAFETY: early_pml4 is the initial page table defined in assembly.
+        // It is safe to expand it here before the memory manager is initialized
+        // as we are still in single-core boot mode.
         unsafe {
             los_hal::arch::mmu::expand_pmo(&mut *core::ptr::addr_of_mut!(early_pml4), &ram_regions);
         }
@@ -131,18 +136,24 @@ pub fn kernel_main_unified(boot_info: &crate::boot::BootInfo) -> ! {
 
     // TEAM_299: Initialize x86_64 CPU state (PCR, GS base)
     #[cfg(target_arch = "x86_64")]
+    // SAFETY: Initializing CPU-specific registers (GS base, etc.) is required
+    // for correct kernel operation and is safe during early boot.
     unsafe {
         crate::arch::cpu::init();
     }
 
     // TEAM_284: Initialize x86_64 syscalls after memory/heap
     #[cfg(target_arch = "x86_64")]
+    // SAFETY: Initializing MSRs for syscall handling is a privileged but
+    // necessary operation during kernel startup.
     unsafe {
         crate::arch::syscall::init();
     }
 
     // TEAM_262: Initialize bootstrap task immediately after heap/memory
     let bootstrap = alloc::sync::Arc::new(crate::task::TaskControlBlock::new_bootstrap());
+    // SAFETY: Setting the initial task is required for the scheduler to function.
+    // This is safe as it's the first task being set during boot.
     unsafe {
         crate::task::set_current_task(bootstrap);
     }

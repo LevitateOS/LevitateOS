@@ -3,7 +3,7 @@
 //! Converts Multiboot1/2 boot information to the unified BootInfo format.
 //! This is a transitional module - will be removed once Limine is primary.
 
-use super::{BootInfo, BootProtocol, FirmwareInfo, MemoryKind, MemoryMap, MemoryRegion};
+use super::{BootInfo, BootProtocol, FirmwareInfo, MemoryKind, MemoryRegion};
 
 /// Multiboot1 magic value (from QEMU -kernel)
 pub const MULTIBOOT1_MAGIC: u32 = 0x2BADB002;

@@ -14,8 +14,10 @@
 //! - https://crates.io/crates/limine
 
 use super::{
-    BootInfo, BootProtocol, FirmwareInfo, Framebuffer, MemoryKind, MemoryRegion, PixelFormat,
+    BootInfo, BootProtocol, Framebuffer, MemoryKind, MemoryRegion, PixelFormat,
 };
+#[cfg(target_arch = "x86_64")]
+use super::FirmwareInfo;
 use limine::BaseRevision;
 use limine::memory_map::EntryType;
 use limine::request::{

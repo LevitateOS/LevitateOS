@@ -34,13 +34,13 @@ static BLOCK_DEVICE: Mutex<Option<VirtIOBlk<VirtioHal, StaticMmioTransport>>> =
 pub const BLOCK_SIZE: usize = 512;
 
 pub fn init(transport: StaticMmioTransport) {
-    crate::verbose!("Initializing Block device...");
+    log::info!("Initializing VirtIO Block...");
     match VirtIOBlk::<VirtioHal, StaticMmioTransport>::new(transport) {
         Ok(blk) => {
-            crate::verbose!("VirtIO Block initialized successfully.");
+            log::info!("VirtIO Block initialized successfully.");
             *BLOCK_DEVICE.lock() = Some(blk);
         }
-        Err(e) => crate::println!("Failed to init VirtIO Block: {:?}", e),
+        Err(e) => log::error!("Failed to init VirtIO Block: {:?}", e),
     }
 }
 

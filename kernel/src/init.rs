@@ -11,16 +11,14 @@
 extern crate alloc;
 
 use alloc::sync::Arc;
-
-#[cfg(target_arch = "aarch64")]
-use los_hal::aarch64::fdt::{self, Fdt};
-use los_hal::mmu;
-use los_hal::timer::Timer;
+use core::sync::atomic::{AtomicUsize, Ordering};
+use crate::{arch, task};
+use crate::task::TaskControlBlock;
+use crate::fs::vfs::superblock::Superblock;
 use los_hal::{InterruptHandler, IrqId, print, println};
 
-use crate::arch;
-use crate::fs::vfs::superblock::Superblock;
-use crate::task;
+#[cfg(target_arch = "aarch64")]
+use los_hal::aarch64::timer::Timer;
 
 // =============================================================================
 // Boot Stage Management
@@ -46,23 +44,23 @@ impl BootStage {
     }
 }
 
-static CURRENT_STAGE: core::sync::atomic::AtomicU8 = core::sync::atomic::AtomicU8::new(0);
+static CURRENT_STAGE: AtomicUsize = AtomicUsize::new(0);
 
 /// TEAM_063: Transition the system to a new boot stage.
 /// Enforces order and logs to UART.
 pub fn transition_to(stage: BootStage) {
-    let stage_val = stage as u8;
-    let prev = CURRENT_STAGE.swap(stage_val, core::sync::atomic::Ordering::SeqCst);
+    let stage_val = stage as usize;
+    let prev = CURRENT_STAGE.swap(stage_val, Ordering::SeqCst);
 
     // Ensure we don't go backwards (unless it's the first transition)
     if stage_val < prev && prev != 0 {
-        println!(
+        log::warn!(
             "[BOOT] WARNING: Unexpected transition from {:?} to {:?}",
             prev, stage
         );
     }
 
-    println!("[BOOT] Stage {}: {}", stage_val + 1, stage.name());
+    log::info!("[BOOT] Stage {}: {}", stage_val + 1, stage.name());
 }
 
 /// TEAM_063: Robust failsafe shell for critical boot failures.
@@ -70,8 +68,8 @@ pub fn maintenance_shell() -> ! {
     use alloc::string::String;
     use alloc::vec::Vec;
 
-    println!("\n[BOOT] Entering Maintenance Shell (FAILSAFE)");
-    println!("Type 'help' for available commands.");
+    log::info!("\n[BOOT] Entering Maintenance Shell (FAILSAFE)");
+    log::info!("Type 'help' for available commands.");
 
     let mut buffer = String::new();
 
@@ -136,7 +134,7 @@ pub fn maintenance_shell() -> ! {
                     println!("System Status: FAILSAFE MODE");
                     println!(
                         "Stage: {:?}",
-                        CURRENT_STAGE.load(core::sync::atomic::Ordering::Relaxed)
+                        CURRENT_STAGE.load(Ordering::Relaxed)
                     );
                 }
                 "clear" => {
@@ -174,8 +172,8 @@ impl InterruptHandler for TimerHandler {
 
         // TEAM_089: Keep GPU display active with periodic flush (~10Hz)
         // Only flush every 10th interrupt (100Hz / 10 = 10Hz)
-        static COUNTER: core::sync::atomic::AtomicU32 = core::sync::atomic::AtomicU32::new(0);
-        let count = COUNTER.fetch_add(1, core::sync::atomic::Ordering::Relaxed);
+        static COUNTER: AtomicUsize = AtomicUsize::new(0);
+        let count = COUNTER.fetch_add(1, Ordering::Relaxed);
 
         // TEAM_129: GPU flush was commented out, causing black screen
         if count % 5 == 0 {
@@ -280,9 +278,9 @@ pub fn run() -> ! {
     // TEAM_065: SPEC-4 enforcement per Rule 14 (Fail Loud, Fail Fast)
     #[cfg(not(feature = "diskless"))]
     if !initrd_found {
-        println!("[BOOT] SPEC-4: Initrd required but not found.");
-        println!("\n[ERROR] Initramfs not found!");
-        println!("Dropping to maintenance shell...");
+        log::error!("[BOOT] SPEC-4: Initrd required but not found.");
+        log::error!("\n[ERROR] Initramfs not found!");
+        log::info!("Dropping to maintenance shell...");
         maintenance_shell();
     }
 
@@ -297,12 +295,14 @@ pub fn run() -> ! {
     // GPU regression verification
     verify_gpu_state();
 
-    println!("\n[SUCCESS] LevitateOS System Ready.");
-    println!("--------------------------------------");
+    log::info!("\n[SUCCESS] LevitateOS System Ready.");
+    log::info!("--------------------------------------");
 
     // TEAM_146: Enable interrupts and exit bootstrap task.
     // Note: verbose! calls removed here due to race condition - timer interrupt
     // can fire immediately after enable() and preempt before verbose! executes.
+    // SAFETY: Enabling interrupts is required for multitasking and timer-based
+    // scheduling. This is safe as we have finished core initialization.
     unsafe { los_hal::interrupts::enable() };
     crate::task::task_exit();
 }
@@ -320,18 +320,18 @@ fn init_display() {
         crate::verbose!("GPU initialized successfully.");
     } else {
         // SPEC-1: Explicit fallback to serial-only mode
-        println!("[BOOT] SPEC-1: No GPU found, using serial-only console");
+        log::warn!("[BOOT] SPEC-1: No GPU found, using serial-only console");
     }
 
     // SC2.2, SC2.3: Get resolution from GPU
     let (_width, _height) = match crate::gpu::get_resolution() {
         Some((w, h)) => {
-            println!("[TERM] GPU resolution: {}x{}", w, h);
+            log::info!("[TERM] GPU resolution: {}x{}", w, h);
             (w, h)
         }
         None => {
             // SPEC-1: Fallback resolution for terminal sizing only
-            println!("[TERM] SPEC-1: Using fallback resolution 1280x800 (serial mode)");
+            log::warn!("[TERM] SPEC-1: Using fallback resolution 1280x800 (serial mode)");
             (1280, 800)
         }
     };
@@ -342,7 +342,7 @@ fn init_display() {
     // TEAM_087: Re-enable dual console now that GPU deadlock is fixed (TEAM_086)
     los_hal::console::set_secondary_output(crate::terminal::write_str);
 
-    println!("Terminal initialized.");
+    log::info!("Terminal initialized.");
 }
 
 /// Initialize VirtIO devices (block, network, input).
@@ -358,10 +358,10 @@ fn init_userspace() -> bool {
     let boot_info =
         crate::boot::boot_info().expect("BootInfo must be available for userspace init");
 
-    println!("Detecting Initramfs...");
+    log::info!("Detecting Initramfs...");
 
     let Some(initrd_region) = boot_info.initramfs else {
-        println!("[BOOT] ERROR: No initramfs provided in BootInfo");
+        log::error!("[BOOT] ERROR: No initramfs provided in BootInfo");
         return false;
     };
 
@@ -369,7 +369,7 @@ fn init_userspace() -> bool {
     let size = initrd_region.size;
     let end = start + size;
 
-    println!(
+    log::debug!(
         "Initramfs found at 0x{:x} - 0x{:x} ({} bytes)",
         start, end, size
     );
@@ -384,6 +384,8 @@ fn init_userspace() -> bool {
         // Physical address - translate
         los_hal::mmu::phys_to_virt(start)
     };
+    // SAFETY: The initramfs region is provided by the bootloader and is guaranteed
+    // to be valid and mapped in the HHDM.
     let initrd_slice = unsafe { core::slice::from_raw_parts(initrd_va as *const u8, size) };
 
     // TEAM_205: Initialize Initramfs VFS
@@ -393,9 +395,9 @@ fn init_userspace() -> bool {
     let root_inode = sb.root();
     crate::fs::vfs::dcache().set_root(crate::fs::vfs::Dentry::root(root_inode));
 
-    println!("Files in initramfs:");
+    log::debug!("Files in initramfs:");
     for entry in sb.archive.iter() {
-        println!(" - {}", entry.name);
+        log::trace!(" - {}", entry.name);
     }
 
     // TEAM_120: Store initramfs globally for syscalls
@@ -410,7 +412,7 @@ fn init_userspace() -> bool {
 
 /// Spawn the init process from initramfs.
 fn spawn_init() -> bool {
-    println!("[BOOT] spawning init task...");
+    log::info!("[BOOT] spawning init task...");
 
     // Get copy of archive to avoid holding the lock
     let archive_data = {
@@ -422,20 +424,20 @@ fn spawn_init() -> bool {
     };
 
     let Some(elf_data) = archive_data else {
-        println!("[BOOT] ERROR: init not found in initramfs");
+        log::error!("[BOOT] ERROR: init not found in initramfs");
         return false;
     };
 
     // TEAM_121: Spawn init and let the scheduler take over.
     match task::process::spawn_from_elf(elf_data, task::fd_table::new_shared_fd_table()) {
         Ok(task) => {
-            let tcb = Arc::new(task::TaskControlBlock::from(task));
+            let tcb = Arc::new(TaskControlBlock::from(task));
             task::scheduler::SCHEDULER.add_task(tcb);
-            println!("[BOOT] Init process scheduled.");
+            log::info!("[BOOT] Init process scheduled.");
             true
         }
         Err(e) => {
-            println!("[BOOT] ERROR: Failed to spawn init: {:?}", e);
+            log::error!("[BOOT] ERROR: Failed to spawn init: {:?}", e);
             false
         }
     }
@@ -443,18 +445,18 @@ fn spawn_init() -> bool {
 
 /// Initialize filesystem subsystem.
 fn init_filesystem() {
-    println!("Mounting filesystems...");
+    log::info!("Mounting filesystems...");
 
     // TEAM_207: Initialize mount table (registers / and /tmp entries)
     crate::fs::mount::init();
 
     match crate::fs::init() {
         Ok(_) => {
-            println!("[BOOT] Filesystem initialized successfully.");
+            log::info!("[BOOT] Filesystem initialized successfully.");
         }
         Err(e) => {
-            println!("[BOOT] WARNING: Filesystem mount failed: {}", e);
-            println!("  (Check tinyos_disk.img format/presence)");
+            log::warn!("[BOOT] WARNING: Filesystem mount failed: {}", e);
+            log::warn!("  (Check tinyos_disk.img format/presence)");
         }
     }
 
@@ -468,12 +470,11 @@ fn mount_tmpfs_at_dentry() {
     use crate::fs::vfs::dentry::Dentry;
     use crate::fs::vfs::superblock::Superblock;
     use alloc::string::String;
-    use alloc::sync::Arc;
 
     // Get tmpfs superblock
     let tmpfs_lock = crate::fs::tmpfs::TMPFS.lock();
     let Some(tmpfs) = tmpfs_lock.as_ref() else {
-        println!("[BOOT] WARNING: tmpfs not initialized");
+        log::warn!("[BOOT] WARNING: tmpfs not initialized");
         return;
     };
 
@@ -481,7 +482,7 @@ fn mount_tmpfs_at_dentry() {
     let root = match crate::fs::vfs::dcache().root() {
         Some(r) => r,
         None => {
-            println!("[BOOT] WARNING: No root dentry for tmpfs mount");
+            log::warn!("[BOOT] WARNING: No root dentry for tmpfs mount");
             return;
         }
     };

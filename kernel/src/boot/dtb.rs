@@ -23,6 +23,8 @@ pub unsafe fn parse(dtb_ptr: usize) -> BootInfo {
     boot_info.firmware = FirmwareInfo::DeviceTree { dtb: dtb_ptr };
 
     // Try to parse the DTB
+    // SAFETY: dtb_ptr is provided by the bootloader and is expected to be a valid
+    // pointer to a Device Tree Blob in memory.
     let dtb_slice = unsafe { core::slice::from_raw_parts(dtb_ptr as *const u8, 1024 * 1024) };
 
     if let Ok(fdt_obj) = Fdt::new(dtb_slice) {

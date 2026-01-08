@@ -18,6 +18,7 @@
 extern crate alloc;
 
 pub use los_hal::virtio::{StaticMmioTransport, VirtioHal};
+#[cfg(target_arch = "aarch64")]
 use virtio_drivers::transport::Transport;
 
 // TEAM_078: Use high VA for VirtIO MMIO (accessible via TTBR1 regardless of TTBR0 state)

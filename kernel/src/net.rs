@@ -55,7 +55,7 @@ pub fn init(transport: StaticMmioTransport) {
             // [NET2] Read MAC address from device config
             #[allow(unused_variables)]
             let mac = net.mac_address();
-            crate::verbose!(
+            log::info!(
                 "VirtIO Net: MAC={:02x}:{:02x}:{:02x}:{:02x}:{:02x}:{:02x}",
                 mac[0],
                 mac[1],
@@ -67,6 +67,6 @@ pub fn init(transport: StaticMmioTransport) {
             // [NET1] Store initialized device
             *NET_DEVICE.lock() = Some(net);
         }
-        Err(e) => crate::println!("Failed to init VirtIO Net: {:?}", e),
+        Err(e) => log::error!("Failed to init VirtIO Net: {:?}", e),
     }
 }

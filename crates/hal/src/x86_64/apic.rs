@@ -23,9 +23,7 @@ pub fn dispatch(vector: u8) -> bool {
     }
 }
 
-const IA32_APIC_BASE_MSR: u32 = 0x1B;
 const APIC_REGISTER_ID: u32 = 0x20;
-const APIC_REGISTER_VERSION: u32 = 0x30;
 const APIC_REGISTER_EOI: u32 = 0xB0;
 const APIC_REGISTER_SPURIOUS: u32 = 0xF0;
 

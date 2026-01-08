@@ -4,7 +4,6 @@ use crate::fs::vfs::dispatch::*;
 use crate::fs::vfs::error::VfsError;
 use crate::syscall::errno;
 use crate::task::fd_table::FdType;
-use los_hal::print;
 
 /// TEAM_217: struct iovec for writev/readv
 #[repr(C)]

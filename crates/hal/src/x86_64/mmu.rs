@@ -379,7 +379,7 @@ pub fn set_page_allocator(allocator: &'static dyn PageAllocator) {
 // TEAM_267: PMO Expansion and Kernel Segment Permissions
 // =============================================================================
 
-use crate::x86_64::multiboot2::{self, MemoryRegion};
+use crate::x86_64::multiboot2::MemoryRegion;
 
 /// Expand PMO mapping to cover all available RAM.
 /// Uses 2MB huge pages for efficiency where possible.

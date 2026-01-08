@@ -17,6 +17,7 @@ use std::path::PathBuf;
 mod build;
 mod clean;
 mod image;
+mod preflight;
 mod qmp;
 mod run;
 mod tests;
@@ -37,6 +38,8 @@ enum Commands {
     // === High Level ===
     /// Run tests
     Test(TestArgs),
+    /// Run preflight checks
+    Preflight,
     /// Clean up artifacts and QEMU locks
     Clean,
     /// Kill any running QEMU instances
@@ -79,6 +82,7 @@ fn main() -> Result<()> {
     match cli.command {
         Commands::Test(args) => match args.suite.as_str() {
             "all" => {
+                preflight::check_preflight(arch)?;
                 println!("🧪 Running COMPLETE test suite for {}...\n", arch);
                 tests::unit::run()?;
                 tests::behavior::run(arch, args.update)?;
@@ -109,18 +113,24 @@ fn main() -> Result<()> {
         Commands::Clean => {
             clean::clean(arch)?;
         },
+        Commands::Preflight => {
+            preflight::check_preflight(arch)?;
+        },
         Commands::Kill => {
             clean::kill_qemu(arch)?;
         },
-        Commands::Build(cmd) => match cmd {
-            build::BuildCommands::All => build::build_all(arch)?,
-            build::BuildCommands::Kernel => build::build_kernel_only(arch)?,
-            build::BuildCommands::Userspace { .. } => {
-                build::build_userspace(arch)?;
-                build::create_initramfs(arch)?;
+        Commands::Build(cmd) => {
+            preflight::check_preflight(arch)?;
+            match cmd {
+                build::BuildCommands::All => build::build_all(arch)?,
+                build::BuildCommands::Kernel => build::build_kernel_only(arch)?,
+                build::BuildCommands::Userspace { .. } => {
+                    build::build_userspace(arch)?;
+                    build::create_initramfs(arch)?;
+                }
+                build::BuildCommands::Initramfs => build::create_initramfs(arch)?,
+                build::BuildCommands::Iso => build::build_iso(arch)?,
             }
-            build::BuildCommands::Initramfs => build::create_initramfs(arch)?,
-            build::BuildCommands::Iso => build::build_iso(arch)?,
         },
         Commands::Run(cmd) => match cmd {
             run::RunCommands::Default { iso } => {

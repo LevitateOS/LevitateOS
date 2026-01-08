@@ -9,7 +9,6 @@ pub mod sys;
 pub mod time;
 
 pub use crate::arch::{Stat, SyscallFrame, SyscallNumber, Timespec, is_svc_exception};
-use los_hal::println;
 
 /// TEAM_073: Error codes for syscalls.
 pub mod errno {
@@ -223,7 +222,7 @@ pub fn syscall_dispatch(frame: &mut SyscallFrame) {
             frame.arg2() as usize,
         ),
         None => {
-            println!("[SYSCALL] Unknown syscall number: {}", nr);
+            log::warn!("[SYSCALL] Unknown syscall number: {}", nr);
             errno::ENOSYS
         }
     };
@@ -239,6 +238,7 @@ pub(crate) fn write_to_user_buf(
 ) -> bool {
     let user_va = user_buf_base + offset;
     if let Some(kernel_ptr) = mm_user::user_va_to_kernel_ptr(ttbr0, user_va) {
+        // SAFETY: user_va_to_kernel_ptr ensures the address is mapped and valid.
         unsafe {
             *kernel_ptr = byte;
         }
@@ -250,6 +250,7 @@ pub(crate) fn write_to_user_buf(
 
 pub(crate) fn read_from_user(ttbr0: usize, user_va: usize) -> Option<u8> {
     if let Some(kernel_ptr) = mm_user::user_va_to_kernel_ptr(ttbr0, user_va) {
+        // SAFETY: user_va_to_kernel_ptr ensures the address is mapped and valid.
         Some(unsafe { *kernel_ptr })
     } else {
         None
@@ -282,6 +283,7 @@ pub fn copy_user_string<'a>(
     }
     for i in 0..len {
         if let Some(ptr) = mm_user::user_va_to_kernel_ptr(ttbr0, user_ptr + i) {
+            // SAFETY: user_va_to_kernel_ptr ensures the address is mapped and valid.
             buf[i] = unsafe { *ptr };
         } else {
             return Err(errno::EFAULT);

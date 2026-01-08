@@ -81,20 +81,20 @@ pub fn framebuffer_has_content() -> Option<(usize, usize)> {
 /// Note: mmio_base is ignored - we use PCI enumeration instead
 #[allow(unused_variables)]
 pub fn init(mmio_base: usize) {
-    los_hal::serial_println!("[GPU] Initializing via PCI...");
+    log::info!("[GPU] Initializing via PCI...");
 
     match los_pci::find_virtio_gpu::<VirtioHal>() {
         Some(transport) => match los_gpu::Gpu::new(transport) {
             Ok(gpu) => {
-                los_hal::serial_println!("[GPU] Initialized via PCI transport");
+                log::info!("[GPU] Initialized via PCI transport");
                 *GPU.lock() = Some(GpuState { inner: gpu });
             }
             Err(e) => {
-                los_hal::serial_println!("[GPU] Failed to create GPU: {:?}", e);
+                log::error!("[GPU] Failed to create GPU: {:?}", e);
             }
         },
         None => {
-            los_hal::serial_println!("[GPU] No VirtIO GPU found on PCI bus");
+            log::warn!("[GPU] No VirtIO GPU found on PCI bus");
         }
     }
 }

@@ -7,7 +7,6 @@ const IA32_GS_BASE: u32 = 0xC000_0101;
 const IA32_KERNEL_GS_BASE: u32 = 0xC000_0102;
 
 use los_hal::arch::gdt::{Gdt, TaskStateSegment};
-use core::mem::offset_of;
 
 /// TEAM_299: Processor Control Region (PCR).
 /// This structure is pointed to by the GS segment register in kernel mode.

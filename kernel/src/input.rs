@@ -7,9 +7,10 @@
 //! - Handler registered during init() with slot-based IRQ computation
 //! - Ctrl+C immediately signals foreground process via SIGINT
 
-use crate::virtio::{StaticMmioTransport, VirtioHal};
+use log;
+use los_hal::virtio::StaticMmioTransport;
+use los_hal::{InterruptHandler, IrqId, VirtioHal};
 use alloc::vec::Vec;
-use los_hal::{self, InterruptHandler, IrqId};
 use los_utils::Mutex;
 use virtio_drivers::device::input::VirtIOInput;
 
@@ -49,10 +50,10 @@ static INPUT_HANDLER: InputInterruptHandler = InputInterruptHandler;
 /// * `transport` - MMIO transport for the device
 /// * `slot` - MMIO slot index (used to compute IRQ number: IRQ = 48 + slot)
 pub fn init(transport: StaticMmioTransport, slot: usize) {
-    crate::println!("Initializing Input (slot {})...", slot);
+    log::info!("[INPUT] Initializing Input (slot {})...", slot);
     match VirtIOInput::<VirtioHal, StaticMmioTransport>::new(transport) {
         Ok(input) => {
-            crate::println!("VirtIO Input initialized successfully.");
+            log::info!("[INPUT] VirtIO Input initialized successfully.");
             INPUT_DEVICES.lock().push(input);
 
             // TEAM_255: Register interrupt handler using generic HAL traits
@@ -60,9 +61,9 @@ pub fn init(transport: StaticMmioTransport, slot: usize) {
             let ic = los_hal::active_interrupt_controller();
             ic.register_handler(irq_id, &INPUT_HANDLER);
             ic.enable_irq(ic.map_irq(irq_id));
-            crate::println!("VirtIO Input IRQ {} enabled", ic.map_irq(irq_id));
+            log::debug!("[INPUT] VirtIO Input IRQ {} enabled", ic.map_irq(irq_id));
         }
-        Err(e) => crate::println!("Failed to init VirtIO Input: {:?}", e),
+        Err(e) => log::error!("[INPUT] Failed to init VirtIO Input: {:?}", e),
     }
 }
 

@@ -39,6 +39,8 @@ pub fn create_user_page_table() -> Option<usize> {
     // Zero the table
     let l0_va = mmu::phys_to_virt(l0_phys);
     log::trace!("[MMU] Zeroing L0 table at va [MASKED]");
+    // SAFETY: l0_phys was just allocated and is valid. We are zeroing it to
+    // initialize a new page table.
     let l0 = unsafe { &mut *(l0_va as *mut PageTable) };
     l0.zero();
 
@@ -47,12 +49,15 @@ pub fn create_user_page_table() -> Option<usize> {
     #[cfg(target_arch = "x86_64")]
     {
         let current_root_phys: usize;
+        // SAFETY: Reading CR3 is a standard privileged operation to get the
+        // current page table root.
         unsafe {
             core::arch::asm!("mov {}, cr3", out(reg) current_root_phys);
         }
         // Mask out PCID and flags (bits 0-11)
         let current_root_phys = current_root_phys & !0xFFF;
         let current_root_va = mmu::phys_to_virt(current_root_phys);
+        // SAFETY: current_root_phys is the active page table and is guaranteed to be valid.
         let current_root = unsafe { &*(current_root_va as *const PageTable) };
         mmu::copy_kernel_mappings(l0, current_root);
     }
@@ -88,6 +93,7 @@ pub unsafe fn map_user_page(
 
     // Get the L0 table
     let l0_va = mmu::phys_to_virt(ttbr0_phys);
+    // SAFETY: ttbr0_phys is provided by the caller and must be a valid L0 page table.
     let l0 = unsafe { &mut *(l0_va as *mut PageTable) };
 
     // Use MMU's map_page function
@@ -120,6 +126,7 @@ pub unsafe fn map_user_range(
     }
 
     let l0_va = mmu::phys_to_virt(ttbr0_phys);
+    // SAFETY: ttbr0_phys is provided by the caller and must be a valid L0 page table.
     let l0 = unsafe { &mut *(l0_va as *mut PageTable) };
 
     let mut va = user_va_start & !0xFFF; // Page align
@@ -161,11 +168,14 @@ pub unsafe fn setup_user_stack(ttbr0_phys: usize, stack_pages: usize) -> Result<
 
         // Zero the stack page for security
         let page_ptr = mmu::phys_to_virt(phys) as *mut u8;
+        // SAFETY: phys was just allocated and is valid. We zero it to prevent
+        // information leakage between processes.
         unsafe {
             core::ptr::write_bytes(page_ptr, 0, PAGE_SIZE);
         }
 
         // Map into user address space
+        // SAFETY: ttbr0_phys and page_va are validated by the caller or setup.
         unsafe {
             map_user_page(ttbr0_phys, page_va, phys, PageFlags::USER_STACK)?;
         }
@@ -392,6 +402,7 @@ pub unsafe fn alloc_and_map_user_range(
         }
 
         // Map into user address space
+        // SAFETY: The page was just allocated and the VA is validated.
         unsafe {
             map_user_page(ttbr0_phys, page_va, phys, flags)?;
         }
@@ -417,6 +428,7 @@ unsafe fn collect_page_table_entries(
     tables_to_free: &mut alloc::vec::Vec<usize>,
 ) {
     let table_va = mmu::phys_to_virt(table_phys);
+    // SAFETY: table_phys must be a valid page table at the given level.
     let table = unsafe { &*(table_va as *const PageTable) };
 
     for i in 0..mmu::ENTRIES_PER_TABLE {
@@ -460,6 +472,7 @@ pub unsafe fn destroy_user_page_table(ttbr0_phys: usize) -> Result<(), MmuError>
     let mut tables_to_free = alloc::vec::Vec::new();
 
     // 1. Collect all entries starting from L0
+    // SAFETY: ttbr0_phys must be a valid user L0 page table.
     unsafe {
         collect_page_table_entries(
             ttbr0_phys,
@@ -504,11 +517,13 @@ pub fn alloc_and_map_heap_page(ttbr0_phys: usize, user_va: usize) -> Result<(), 
 
     // Zero the page for security
     let page_ptr = mmu::phys_to_virt(phys) as *mut u8;
+    // SAFETY: The page was just allocated and is valid.
     unsafe {
         core::ptr::write_bytes(page_ptr, 0, PAGE_SIZE);
     }
 
     // Map into user address space with heap flags (RW, user accessible)
+    // SAFETY: ttbr0_phys and user_va are validated.
     unsafe {
         map_user_page_at(ttbr0_phys, user_va, phys, PageFlags::USER_DATA)?;
     }
@@ -531,6 +546,8 @@ unsafe fn map_user_page_at(
 
     // Get the L0 table
     let l0_va = mmu::phys_to_virt(ttbr0_phys);
+    // SAFETY: ttbr0_phys is an internal physical address of a user page table,
+    // guaranteed to be valid by the process management logic.
     let l0 = unsafe { &mut *(l0_va as *mut PageTable) };
 
     // Use MMU's map_page function
@@ -549,6 +566,7 @@ unsafe fn map_user_page_at(
 pub fn user_va_to_kernel_ptr(ttbr0_phys: usize, user_va: usize) -> Option<*mut u8> {
     // Get L0 table
     let l0_va = mmu::phys_to_virt(ttbr0_phys);
+    // SAFETY: ttbr0_phys is a valid page table physical address managed by the process.
     let l0 = unsafe { &mut *(l0_va as *mut PageTable) };
 
     // Walk page tables to find physical address

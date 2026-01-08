@@ -2,10 +2,6 @@
 // Delegates architecture-specific hardware logic to crate::arch::console.
 
 use crate::IrqSafeLock;
-#[cfg(target_arch = "aarch64")]
-use crate::aarch64::serial::Pl011Uart;
-#[cfg(target_arch = "x86_64")]
-use crate::x86_64::serial::SerialPort;
 use core::fmt::{self, Write};
 use core::sync::atomic::{AtomicBool, AtomicPtr, Ordering};
 use los_utils::RingBuffer;

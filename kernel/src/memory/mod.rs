@@ -1,10 +1,9 @@
-#[cfg(target_arch = "aarch64")]
-use los_hal::aarch64::fdt;
-use los_hal::mmu::{self, PageAllocator};
+use los_hal::mmu;
+use los_hal::traits::PageAllocator;
 use los_utils::Mutex;
+use los_hal::allocator::{BuddyAllocator, Page};
 
-pub use los_hal::allocator::BuddyAllocator;
-pub use los_hal::allocator::Page;
+pub use crate::task::TaskControlBlock;
 
 pub mod heap; // TEAM_208: Process heap management
 pub mod user; // TEAM_208: User-space memory management

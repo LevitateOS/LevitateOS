@@ -20,7 +20,7 @@ pub fn init() {
             // [GPU2] Terminal calculates cols/rows from pixel dimensions
             let term = Terminal::new(width, height);
             // TEAM_100: Log for golden file compatibility
-            crate::println!(
+            log::debug!(
                 "[TERM] Terminal::new({}x{}) -> {}x{} chars (font {}x{}, spacing {})",
                 width,
                 height,

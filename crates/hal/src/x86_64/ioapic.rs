@@ -6,10 +6,13 @@ pub struct IoApic {
 }
 
 impl IoApic {
-    pub const fn new(base_addr: usize) -> Self {
-        Self { base_addr }
+    pub const fn new() -> Self {
+        Self {
+            base_addr: 0xFEC00000,
+        }
     }
 
+    #[allow(dead_code)]
     unsafe fn read_reg(&self, reg: u8) -> u32 {
         let ioregsel = crate::x86_64::mmu::phys_to_virt(self.base_addr) as *mut u32;
         let iowin = crate::x86_64::mmu::phys_to_virt(self.base_addr + 0x10) as *const u32;

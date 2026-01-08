@@ -45,7 +45,7 @@ pub unsafe fn init() {
         wrmsr(IA32_EFER, efer | EFER_SCE);
     }
 
-    los_hal::println!(
+    log::info!(
         "[SYSCALL] x86_64 syscall MSRs initialized, LSTAR=0x{:x}",
         lstar
     );
@@ -198,6 +198,6 @@ pub extern "C" fn syscall_handler(frame: &mut super::SyscallFrame) {
     #[cfg(feature = "verbose-syscalls")]
     {
         let pid = crate::task::current_task().id.0;
-        los_hal::println!("[SYSCALL][{}] EXIT nr={} rax={:x}", pid, _nr, frame.rax);
+        log::info!("[SYSCALL][{}] EXIT nr={} rax={:x}", pid, _nr, frame.rax);
     }
 }

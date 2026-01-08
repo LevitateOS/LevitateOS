@@ -292,6 +292,8 @@ impl<'a> Elf<'a> {
             let offset = phoff + i * phentsize;
             if offset + Elf64ProgramHeader::SIZE <= data.len() {
                 // Read using read_unaligned for safety
+                // SAFETY: The offset and size are validated against the data length.
+                // We use read_unaligned because the program header might not be aligned.
                 let phdr = unsafe { 
                     core::ptr::read_unaligned(data.as_ptr().add(offset) as *const Elf64ProgramHeader) 
                 };
@@ -345,6 +347,8 @@ impl<'a> Elf<'a> {
                 // TEAM_079: Check if page is already mapped (segments can share pages)
                 // If already mapped, skip - keeps first mapping's flags (typically executable)
                 let l0_va = mmu::phys_to_virt(ttbr0_phys);
+                // SAFETY: ttbr0_phys is a valid page table root. We are walking it
+                // to check for existing mappings.
                 let already_mapped = mmu::walk_to_entry(
                     unsafe { &mut *(l0_va as *mut mmu::PageTable) },
                     page_va,
@@ -363,6 +367,7 @@ impl<'a> Elf<'a> {
                     // Verifying if permissions are correctly upgraded and data is preserved.
                     if flags == PageFlags::USER_DATA {
                         let l0_va = mmu::phys_to_virt(ttbr0_phys);
+                        // SAFETY: ttbr0_phys is a valid page table root.
                         if let Ok(walk) = mmu::walk_to_entry(
                             unsafe { &mut *(l0_va as *mut mmu::PageTable) },
                             page_va,
@@ -385,12 +390,15 @@ impl<'a> Elf<'a> {
                     .ok_or(ElfError::AllocationFailed)?;
 
                 // Zero the page first
+                // SAFETY: phys is a newly allocated page. We zero it to avoid
+                // leaking data to userspace.
                 unsafe {
                     let page_ptr = mmu::phys_to_virt(phys) as *mut u8;
                     core::ptr::write_bytes(page_ptr, 0, PAGE_SIZE);
                 }
 
                 // Map into user space
+                // SAFETY: The page and addresses are validated during ELF loading.
                 unsafe {
                     mm_user::map_user_page(ttbr0_phys, page_va, phys, flags)
                         .map_err(|_| ElfError::MappingFailed)?;
@@ -421,6 +429,7 @@ impl<'a> Elf<'a> {
                     let l0_va = mmu::phys_to_virt(ttbr0_phys);
 
                     // Walk page tables to find physical address
+                    // SAFETY: ttbr0_phys is a valid page table root.
                     if let Ok(walk) = mmu::walk_to_entry(
                         unsafe { &mut *(l0_va as *mut mmu::PageTable) },
                         page_va,
@@ -442,6 +451,8 @@ impl<'a> Elf<'a> {
                                 log::warn!("[ELF] WRITING GOT ENTRY at {:x}: val={:x}", dst_va, *byte);
                             }
                             */
+                            // SAFETY: dst is a valid pointer within a mapped page
+                            // in the user address space.
                             unsafe {
                                 *dst = *byte;
                             }

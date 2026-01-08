@@ -1,7 +1,5 @@
 use crate::memory::user as mm_user;
 
-use los_hal::println;
-
 /// TEAM_142: Shutdown flags for verbose mode
 pub mod shutdown_flags {
     pub const VERBOSE: u32 = 1;
@@ -10,15 +8,15 @@ pub mod shutdown_flags {
 /// TEAM_142: sys_shutdown - Graceful system shutdown.
 pub fn sys_shutdown(flags: u32) -> i64 {
     let verbose = flags & shutdown_flags::VERBOSE != 0;
-    println!("[SHUTDOWN] Initiating graceful shutdown...");
+    log::info!("[SHUTDOWN] Initiating graceful shutdown...");
 
     if verbose {
-        println!("[SHUTDOWN] Phase 1: Stopping user tasks...");
+        log::info!("[SHUTDOWN] Phase 1: Stopping user tasks...");
     }
 
     if verbose {
-        println!("[SHUTDOWN] Phase 1: Complete");
-        println!("[SHUTDOWN] Phase 2: Flushing GPU framebuffer...");
+        log::info!("[SHUTDOWN] Phase 1: Complete");
+        log::info!("[SHUTDOWN] Phase 2: Flushing GPU framebuffer...");
     }
 
     {
@@ -30,22 +28,22 @@ pub fn sys_shutdown(flags: u32) -> i64 {
     }
 
     if verbose {
-        println!("[SHUTDOWN] GPU flush complete");
-        println!("[SHUTDOWN] Phase 2: Complete");
-        println!("[SHUTDOWN] Phase 3: Syncing filesystems...");
+        log::info!("[SHUTDOWN] GPU flush complete");
+        log::info!("[SHUTDOWN] Phase 2: Complete");
+        log::info!("[SHUTDOWN] Phase 3: Syncing filesystems...");
     }
 
     if verbose {
-        println!("[SHUTDOWN] Phase 3: Complete (no pending writes)");
+        log::info!("[SHUTDOWN] Phase 3: Complete (no pending writes)");
     }
 
     if verbose {
-        println!("[SHUTDOWN] Phase 4: Disabling interrupts...");
-        println!("[SHUTDOWN] Phase 4: Complete");
+        log::info!("[SHUTDOWN] Phase 4: Disabling interrupts...");
+        log::info!("[SHUTDOWN] Phase 4: Complete");
     }
 
-    println!("[SHUTDOWN] System halted. Safe to power off.");
-    println!("[SHUTDOWN] Goodbye!");
+    log::info!("[SHUTDOWN] System halted. Safe to power off.");
+    log::info!("[SHUTDOWN] Goodbye!");
 
     for _ in 0..100000 {
         core::hint::spin_loop();

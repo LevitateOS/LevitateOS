@@ -1,7 +1,6 @@
 //! TEAM_216: Signal-related syscalls for LevitateOS.
 
 use crate::arch::SyscallFrame;
-use crate::println;
 use crate::syscall::errno;
 use crate::task::{TaskState, current_task, scheduler};
 use core::sync::atomic::Ordering;
@@ -38,19 +37,19 @@ pub fn sys_kill(pid: i32, sig: i32) -> i64 {
 /// TEAM_220: Send a signal to the current foreground process.
 pub fn signal_foreground_process(sig: i32) {
     let fg_pid = *crate::task::FOREGROUND_PID.lock();
-    crate::println!("signal_foreground_process: sig={} fg_pid={}", sig, fg_pid);
+    log::debug!("signal_foreground_process: sig={} fg_pid={}", sig, fg_pid);
     if fg_pid != 0 {
         let res = sys_kill(fg_pid as i32, sig);
-        crate::println!("sys_kill result: {}", res);
+        log::debug!("sys_kill result: {}", res);
     } else {
-        crate::println!("No foreground process to signal");
+        log::debug!("No foreground process to signal");
     }
 }
 
 /// TEAM_216: Wait for any signal to arrive.
 pub fn sys_pause() -> i64 {
     let task = current_task();
-    println!("[SIGNAL] pause() for PID={}", task.id.0);
+    log::trace!("[SIGNAL] pause() for PID={}", task.id.0);
 
     // Mark task as blocked and yield.
     // It will be woken up when a signal is delivered via sys_kill.
@@ -97,7 +96,7 @@ pub fn sys_sigreturn(frame: &mut SyscallFrame) -> i64 {
                 *frame_ptr.add(i) = byte;
             }
         } else {
-            crate::println!(
+            log::error!(
                 "[SIGNAL] PID={} ERROR: Failed to read sigreturn frame from user stack",
                 task.id.0
             );
