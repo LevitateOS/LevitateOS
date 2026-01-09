@@ -350,6 +350,9 @@ fn init_display() {
     los_hal::console::set_secondary_output(crate::terminal::write_str);
 
     log::info!("Terminal initialized.");
+    
+    // TEAM_320: Output GPU display status to host shell for debugging
+    crate::gpu::debug_display_status();
 }
 
 /// Initialize VirtIO devices (block, network, input).

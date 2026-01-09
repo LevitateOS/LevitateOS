@@ -133,7 +133,7 @@ fn main() -> Result<()> {
             }
         },
         Commands::Run(cmd) => match cmd {
-            run::RunCommands::Default { iso } => {
+            run::RunCommands::Default { iso, gpu_debug } => {
                 let profile = if arch == "x86_64" {
                     run::QemuProfile::X86_64
                 } else {
@@ -146,7 +146,7 @@ fn main() -> Result<()> {
                 } else {
                     build::build_all(arch)?;
                 }
-                run::run_qemu(profile, false, use_iso, arch)?;
+                run::run_qemu(profile, false, use_iso, arch, gpu_debug)?;
             }
             run::RunCommands::Pixel6 => {
                 if arch != "aarch64" {
@@ -154,7 +154,7 @@ fn main() -> Result<()> {
                 }
                 println!("🎯 Running with Pixel 6 profile (8GB RAM, 8 cores)");
                 build::build_all(arch)?;
-                run::run_qemu(run::QemuProfile::Pixel6, false, false, arch)?;
+                run::run_qemu(run::QemuProfile::Pixel6, false, false, arch, false)?;
             }
             run::RunCommands::Vnc => {
                 run::run_qemu_vnc(arch)?;
@@ -181,6 +181,9 @@ fn main() -> Result<()> {
             }
             run::RunCommands::Test => {
                 run::run_qemu_test(arch)?;
+            }
+            run::RunCommands::VerifyGpu { timeout } => {
+                run::verify_gpu(arch, timeout)?;
             }
         },
         Commands::Image(cmd) => match cmd {

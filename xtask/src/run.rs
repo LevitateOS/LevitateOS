@@ -11,6 +11,9 @@ pub enum RunCommands {
         /// Boot from Limine ISO instead of -kernel
         #[arg(long)]
         iso: bool,
+        /// TEAM_320: Enable QEMU GPU debug tracing
+        #[arg(long)]
+        gpu_debug: bool,
     },
     /// Run Pixel 6 Profile
     Pixel6,
@@ -33,6 +36,12 @@ pub enum RunCommands {
     },
     /// TEAM_243: Run internal OS tests (for AI agent verification)
     Test,
+    /// TEAM_320: Verify GPU display via VNC + Puppeteer (automated black screen detection)
+    VerifyGpu {
+        /// Timeout in seconds to wait for display
+        #[arg(long, default_value = "30")]
+        timeout: u32,
+    },
 }
 
 /// QEMU hardware profiles
@@ -88,7 +97,7 @@ impl QemuProfile {
     }
 }
 
-pub fn run_qemu(profile: QemuProfile, headless: bool, iso: bool, arch: &str) -> Result<()> {
+pub fn run_qemu(profile: QemuProfile, headless: bool, iso: bool, arch: &str, gpu_debug: bool) -> Result<()> {
     image::create_disk_image_if_missing()?;
     // Userspace must be installed by build_all before this is called
 
@@ -174,6 +183,19 @@ pub fn run_qemu(profile: QemuProfile, headless: bool, iso: bool, arch: &str) -> 
             "gtk,zoom-to-fit=off,window-close=off",
             "-serial",
             "mon:stdio",
+        ]);
+    }
+
+    // TEAM_320: GPU debug tracing - shows virtio-gpu operations in QEMU output
+    if gpu_debug {
+        println!("╔══════════════════════════════════════════════════════════╗");
+        println!("║  [QEMU] GPU DEBUG MODE ENABLED                           ║");
+        println!("║  Watch for: virtio_gpu_* trace messages                  ║");
+        println!("║  Kernel will output GPU status to serial console         ║");
+        println!("╚══════════════════════════════════════════════════════════╝");
+        args.extend([
+            "-d", "guest_errors",
+            "-D", "qemu_gpu_debug.log",
         ]);
     }
 
@@ -768,4 +790,135 @@ pub fn find_binary(name: &str) -> Result<String> {
     }
 
     bail!("Binary '{}' not found in PATH or ~/.local/bin", name)
+}
+
+/// TEAM_320: Verify GPU display via VNC + Puppeteer.
+/// Starts QEMU with VNC, runs verification script, reports result.
+pub fn verify_gpu(arch: &str, timeout: u32) -> Result<()> {
+    println!("╔══════════════════════════════════════════════════════════╗");
+    println!("║  [GPU VERIFY] Starting automated GPU verification...     ║");
+    println!("╚══════════════════════════════════════════════════════════╝\n");
+
+    // TEAM_317: x86_64 uses ISO (Limine)
+    let use_iso = arch == "x86_64";
+    
+    image::create_disk_image_if_missing()?;
+    if use_iso {
+        build::build_iso(arch)?;
+    } else {
+        build::build_all(arch)?;
+    }
+
+    // Check for noVNC
+    let novnc_path = PathBuf::from("/tmp/novnc");
+    if !novnc_path.exists() {
+        println!("📥 Downloading noVNC...");
+        let status = Command::new("git")
+            .args(["clone", "--depth", "1", "https://github.com/novnc/noVNC.git", "/tmp/novnc"])
+            .status()
+            .context("Failed to clone noVNC")?;
+        if !status.success() {
+            bail!("Failed to download noVNC");
+        }
+    }
+
+    // Find websockify
+    let websockify_path = find_websockify()?;
+
+    // Kill any existing VNC-related processes
+    println!("🧹 Cleaning up existing processes...");
+    let _ = Command::new("pkill").args(["-f", "websockify.*6080"]).status();
+    let _ = Command::new("pkill").args(["-f", "qemu.*-vnc.*:0"]).status();
+    std::thread::sleep(std::time::Duration::from_millis(500));
+
+    // Start websockify
+    println!("🔌 Starting websockify proxy...");
+    let mut websockify = Command::new(&websockify_path)
+        .args(["--web=/tmp/novnc", "6080", "localhost:5900"])
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn()
+        .context("Failed to start websockify")?;
+
+    std::thread::sleep(std::time::Duration::from_secs(1));
+
+    // Build QEMU args
+    let kernel_bin = if arch == "aarch64" { "kernel64_rust.bin" } else { "target/x86_64-unknown-none/release/levitate-kernel" };
+    let qemu_bin = match arch {
+        "aarch64" => "qemu-system-aarch64",
+        "x86_64" => "qemu-system-x86_64",
+        _ => bail!("Unsupported architecture: {}", arch),
+    };
+    let profile = if arch == "aarch64" { QemuProfile::Default } else { QemuProfile::X86_64 };
+    let machine = profile.machine();
+
+    let mut args = vec![
+        "-M", machine.as_str(),
+        "-cpu", profile.cpu(),
+        "-m", profile.memory(),
+    ];
+
+    if use_iso {
+        args.extend(["-cdrom", "levitate.iso", "-boot", "d"]);
+    } else {
+        args.extend(["-kernel", kernel_bin, "-initrd", "initramfs.cpio"]);
+    }
+
+    args.extend([
+        "-display", "none",
+        "-vnc", ":0",
+        "-device", "virtio-gpu-pci,xres=1920,yres=1080",
+        "-device", if arch == "x86_64" { "virtio-keyboard-pci" } else { "virtio-keyboard-device" },
+        "-device", if arch == "x86_64" { "virtio-tablet-pci" } else { "virtio-tablet-device" },
+        "-device", if arch == "x86_64" { "virtio-net-pci,netdev=net0" } else { "virtio-net-device,netdev=net0" },
+        "-netdev", "user,id=net0",
+        "-drive", "file=tinyos_disk.img,format=raw,if=none,id=hd0",
+        "-device", if arch == "x86_64" { "virtio-blk-pci,drive=hd0" } else { "virtio-blk-device,drive=hd0" },
+        "-serial", "stdio",
+        "-no-reboot",
+    ]);
+
+    // Clean QMP socket
+    let _ = std::fs::remove_file("./qmp.sock");
+
+    println!("🖥️  Starting QEMU with VNC...");
+    let mut qemu = Command::new(qemu_bin)
+        .args(&args)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .context("Failed to start QEMU")?;
+
+    // Wait for QEMU to boot (check serial output for shell prompt)
+    println!("⏳ Waiting for OS to boot...");
+    std::thread::sleep(std::time::Duration::from_secs(10));
+
+    // Run verification script
+    println!("🔍 Running Puppeteer verification...\n");
+    let verify_result = Command::new("node")
+        .args(["scripts/verify-display.js", &format!("--timeout={}", timeout)])
+        .status();
+
+    // Cleanup
+    let _ = qemu.kill();
+    let _ = websockify.kill();
+
+    match verify_result {
+        Ok(status) => {
+            if status.success() {
+                println!("\n✅ GPU VERIFICATION PASSED - Display has content!");
+                Ok(())
+            } else {
+                let code = status.code().unwrap_or(2);
+                if code == 1 {
+                    bail!("❌ GPU VERIFICATION FAILED - Display is BLACK!")
+                } else {
+                    bail!("❌ GPU VERIFICATION ERROR - Could not verify display")
+                }
+            }
+        }
+        Err(e) => {
+            bail!("Failed to run verification script: {}. Install with: npm install -g puppeteer", e)
+        }
+    }
 }

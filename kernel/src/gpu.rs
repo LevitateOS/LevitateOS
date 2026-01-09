@@ -77,6 +77,42 @@ pub fn framebuffer_has_content() -> Option<(usize, usize)> {
     }
 }
 
+/// TEAM_320: Print GPU display status to serial console for host debugging
+/// Outputs a clear indicator whether the screen is black or has content
+pub fn debug_display_status() {
+    use los_hal::serial_println;
+    
+    let guard = GPU.lock();
+    if guard.is_none() {
+        serial_println!("╔══════════════════════════════════════════════════════════╗");
+        serial_println!("║  [GPU DEBUG] STATUS: NO GPU INITIALIZED                  ║");
+        serial_println!("╚══════════════════════════════════════════════════════════╝");
+        return;
+    }
+    drop(guard);
+    
+    match framebuffer_has_content() {
+        Some((total, non_black)) => {
+            let percentage = if total > 0 { (non_black * 100) / total } else { 0 };
+            serial_println!("╔══════════════════════════════════════════════════════════╗");
+            if non_black == 0 {
+                serial_println!("║  [GPU DEBUG] DISPLAY STATUS: BLACK SCREEN ❌             ║");
+                serial_println!("║  Framebuffer is entirely black - no content rendered     ║");
+            } else {
+                serial_println!("║  [GPU DEBUG] DISPLAY STATUS: HAS CONTENT ✅              ║");
+                serial_println!("║  Non-black pixels: {} (~{}% of screen)            ", non_black, percentage);
+            }
+            serial_println!("║  Flush count: {}                                          ", flush_count());
+            serial_println!("╚══════════════════════════════════════════════════════════╝");
+        }
+        None => {
+            serial_println!("╔══════════════════════════════════════════════════════════╗");
+            serial_println!("║  [GPU DEBUG] STATUS: FRAMEBUFFER NOT AVAILABLE           ║");
+            serial_println!("╚══════════════════════════════════════════════════════════╝");
+        }
+    }
+}
+
 /// Initialize GPU via PCI transport
 /// Note: mmio_base is ignored - we use PCI enumeration instead
 #[allow(unused_variables)]
