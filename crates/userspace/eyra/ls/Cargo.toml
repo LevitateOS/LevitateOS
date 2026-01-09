@@ -1,0 +1,20 @@
+# TEAM_363: Eyra-based ls utility for LevitateOS
+[package]
+name = "ls"
+version = "0.1.0"
+edition = "2021"
+description = "List directory contents"
+
+[workspace]
+
+[dependencies]
+eyra = { version = "0.22", features = ["experimental-relocate"] }
+
+[profile.release]
+panic = "abort"
+opt-level = "s"
+lto = true
+strip = true
+
+[unstable]
+build-std-features = ["panic_immediate_abort"]

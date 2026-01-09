@@ -320,8 +320,28 @@ pub fn setup_stack_args(
     }
     arg_ptrs.reverse();
 
-    // Align sp to 16 bytes for the array structures
+    // TEAM_363: Calculate total size of pointer arrays to ensure 16-byte alignment.
+    // The x86-64 ABI requires 16-byte stack alignment at function entry.
+    // We need to pre-calculate the size and add padding if necessary.
+    //
+    // Size calculation:
+    // - auxv: (auxv.len() + 4 mandatory entries) * 16 bytes each
+    // - envp: (envs.len() + 1 NULL) * 8 bytes
+    // - argv: (args.len() + 1 NULL) * 8 bytes  
+    // - argc: 8 bytes
+    let auxv_entries = auxv.len() + 4; // AT_PAGESZ, AT_HWCAP, AT_RANDOM, AT_NULL
+    let total_array_size = 
+        auxv_entries * 16 +           // auxv (each entry is 2 usizes)
+        (envs.len() + 1) * 8 +        // envp + NULL
+        (args.len() + 1) * 8 +        // argv + NULL
+        8;                             // argc
+    
+    // Align sp to 16 bytes, accounting for the total size we'll write
     sp &= !15;
+    // If total size is not 16-byte aligned, we need extra padding
+    if total_array_size % 16 != 0 {
+        sp -= 8; // Add 8 bytes of padding
+    }
 
     // 2. Write Auxiliary Vector (auxv)
     // Add mandatory entries
@@ -363,6 +383,9 @@ pub fn setup_stack_args(
     // 5. Write argc
     let argc = args.len();
     write_usize(&mut sp, argc)?;
+
+    // Verify alignment (should already be aligned due to pre-calculation above)
+    debug_assert!(sp % 16 == 0, "Stack not 16-byte aligned: sp=0x{:x}", sp);
 
     Ok(sp)
 }

@@ -33,7 +33,7 @@ pub fn run(arch: &str) -> Result<()> {
 
 fn build_eyra_binary() -> Result<()> {
     // Check if eyra binary already exists (skip slow rebuild)
-    let binary_path = "userspace/eyra-hello/target/x86_64-unknown-linux-gnu/release/eyra-hello";
+    let binary_path = "crates/userspace/eyra/eyra-hello/target/x86_64-unknown-linux-gnu/release/eyra-hello";
     if Path::new(binary_path).exists() {
         println!("  ✅ Eyra binary already built (using cached)");
         return Ok(());
@@ -49,7 +49,7 @@ fn build_eyra_binary() -> Result<()> {
             "--target", "x86_64-unknown-linux-gnu",
             "-Zbuild-std=std,panic_abort",
         ])
-        .current_dir("userspace/eyra-hello")
+        .current_dir("crates/userspace/eyra/eyra-hello")
         .status()
         .context("Failed to run cargo build for eyra-hello")?;
 
@@ -58,7 +58,7 @@ fn build_eyra_binary() -> Result<()> {
         println!("   1. Missing nightly toolchain: rustup install nightly-2025-04-28");
         println!("   2. Missing rust-src: rustup component add rust-src --toolchain nightly-2025-04-28");
         println!("\nRun manually to see full error:");
-        println!("   cd userspace/eyra-hello && cargo build --release --target x86_64-unknown-linux-gnu -Zbuild-std=std,panic_abort");
+        println!("   cd crates/userspace/eyra/eyra-hello && cargo build --release --target x86_64-unknown-linux-gnu -Zbuild-std=std,panic_abort");
         bail!("Eyra binary build failed");
     }
 
@@ -83,7 +83,7 @@ fn add_to_initramfs(arch: &str) -> Result<()> {
     fs::create_dir_all(&staging_dir)?;
 
     // Copy Eyra binary to userspace staging area
-    let src = "userspace/eyra-hello/target/x86_64-unknown-linux-gnu/release/eyra-hello";
+    let src = "crates/userspace/eyra/eyra-hello/target/x86_64-unknown-linux-gnu/release/eyra-hello";
     let dst = format!("{}/eyra-hello", staging_dir);
     fs::copy(src, &dst).context("Failed to copy Eyra binary to staging")?;
 

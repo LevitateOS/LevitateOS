@@ -108,7 +108,7 @@ pub fn create_initramfs(arch: &str) -> Result<()> {
         "x86_64" => "x86_64-unknown-linux-gnu",
         _ => "",
     };
-    let eyra_src = PathBuf::from(format!("userspace/eyra-hello/target/{}/release/eyra-hello", eyra_target));
+    let eyra_src = PathBuf::from(format!("crates/userspace/eyra/eyra-hello/target/{}/release/eyra-hello", eyra_target));
     if eyra_src.exists() {
         std::fs::copy(&eyra_src, root.join("eyra-hello"))?;
         count += 1;

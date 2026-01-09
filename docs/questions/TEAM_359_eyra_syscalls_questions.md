@@ -52,10 +52,10 @@
 
 | Question | Default Answer | Needs User Input? |
 |----------|---------------|-------------------|
-| Q1: ppoll blocking | Start non-blocking | ⚠️ Confirm OK |
+| Q1: ppoll blocking | Start non-blocking | ✅ Confirmed |
 | Q2: tkill vs tgkill | tkill only | No |
 | Q3: pkey_alloc return | -ENOSYS | No |
 
 ---
 
-**Please confirm Q1** before Phase 3 implementation begins.
+**Q1 confirmed by user (2026-01-09):** Option C — Start non-blocking, enhance later if needed.

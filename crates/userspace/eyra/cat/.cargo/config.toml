@@ -1,0 +1,9 @@
+# TEAM_363: Cross-compilation config for Eyra
+# Static PIE with experimental-relocate (self-relocating binary)
+
+[target.aarch64-unknown-linux-gnu]
+linker = "aarch64-linux-gnu-gcc"
+rustflags = ["-C", "target-feature=+crt-static"]
+
+[target.x86_64-unknown-linux-gnu]
+rustflags = ["-C", "target-feature=+crt-static"]
