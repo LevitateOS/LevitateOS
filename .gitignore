@@ -1,55 +1,37 @@
-target/
-Cargo.lock
-**/*.rs.bk
-output.txt
-serial.log
-tinyos_disk.img
-
-# TEAM_027: Build and Reproduction Artifacts
+# TEAM_326: Build and Test Artifacts
 *.bin
 *.log
 *.o
 *.elf
 *.cpio
+*.img
+*.iso
+*.dtb
+*.asm
+*.png
+actual_*.txt
+vnc_*.txt
 repro.*
 linker_repro.ld
 debug_out.txt
-qemu_higher_half_debug.log
-
-# TEAM_093: Extra discovery/build artifacts
-*.png
-*.txt
-!docs/**/*.txt
-!tests/golden_*.txt
-*.dtb
-Image
-qmp.sock
-test_copy.bin
-test_dtb.dtb
-qemu.log
-qemu_int.log
-qemu_repro.log
+qemu_*.log
 build_warnings*.txt
-actual_*.txt
 
 # IDE and OS transient files
 .vscode/
 .DS_Store
 *.swp
+*.gdb
 
-# Test outputs (keep only golden_*.txt baselines)
-tests/actual_*.txt
-tests/pixel6_*.txt
-tests/gicv3_*.txt
+# Selective exceptions
+!docs/**/*.txt
+!tests/golden_*.txt
 
-# Temporary files
+# Temporary and Output Directories
 tmp/
 initrd_root/
 initrd_test_root/
-# ISO and Boot Artifacts
 iso_root/
-levitate.iso
+target/
 limine-bin/
-test_disk.img
-
-*.gdb
+Cargo.lock
