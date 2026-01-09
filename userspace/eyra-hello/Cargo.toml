@@ -9,8 +9,9 @@ description = "Test binary for Eyra std support on LevitateOS"
 
 # TEAM_351: Eyra replaces std with pure-Rust Linux syscall implementation
 # Using nightly-2025-04-28 as specified by Eyra's rust-toolchain.toml
+# TEAM_354: experimental-relocate enables true static-pie (self-relocating)
 [dependencies]
-eyra = "0.22"
+eyra = { version = "0.22", features = ["experimental-relocate"] }
 
 # Rename eyra to std so it acts as the standard library
 [patch.crates-io]

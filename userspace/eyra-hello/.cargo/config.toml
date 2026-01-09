@@ -1,13 +1,9 @@
 # TEAM_351: Cross-compilation config for Eyra
-# TEAM_354: Static linking - no dynamic linker dependency
+# TEAM_354: Static PIE with experimental-relocate (self-relocating binary)
 
 [target.aarch64-unknown-linux-gnu]
 linker = "aarch64-linux-gnu-gcc"
-rustflags = ["-C", "target-feature=+crt-static", "-C", "relocation-model=static"]
-
-[target.aarch64-unknown-linux-musl]
-linker = "aarch64-linux-gnu-gcc"
-rustflags = ["-C", "target-feature=+crt-static", "-C", "relocation-model=static"]
+rustflags = ["-C", "target-feature=+crt-static"]
 
 [target.x86_64-unknown-linux-gnu]
-rustflags = ["-C", "target-feature=+crt-static", "-C", "relocation-model=static"]
+rustflags = ["-C", "target-feature=+crt-static"]

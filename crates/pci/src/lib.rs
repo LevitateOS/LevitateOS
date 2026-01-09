@@ -13,6 +13,7 @@
 
 use los_hal::mmu::{ECAM_PA, PCI_MEM32_PA, PCI_MEM32_SIZE, phys_to_virt};
 use los_hal::serial_println;
+use core::sync::atomic::{AtomicU32, Ordering};
 use virtio_drivers::transport::pci::bus::{
     BarInfo, Cam, Command, DeviceFunction, MemoryBarType, MmioCam, PciRoot,
 };
@@ -23,45 +24,45 @@ use virtio_drivers::Hal;
 pub use virtio_drivers::transport::pci::PciTransport;
 pub use virtio_drivers::transport::DeviceType;
 
-/// Simple bump allocator for PCI 32-bit memory region
-struct PciMemoryAllocator {
-    next: u32,
-    end: u32,
-}
+/// TEAM_355: Global PCI memory allocator - must persist across device searches
+/// to prevent BAR address conflicts between devices (GPU, Input, etc.)
+static PCI_MEM_NEXT: AtomicU32 = AtomicU32::new(PCI_MEM32_PA as u32);
 
-impl PciMemoryAllocator {
-    /// Create a new allocator for the PCI 32-bit memory region
-    fn new() -> Self {
-        Self {
-            next: PCI_MEM32_PA as u32,
-            end: (PCI_MEM32_PA + PCI_MEM32_SIZE) as u32,
-        }
+/// Allocate a memory region from the PCI 32-bit memory pool
+/// Returns the allocated address, or None if out of space
+/// TEAM_355: Made global/atomic to prevent BAR conflicts between devices
+fn pci_allocate(size: u32) -> Option<u32> {
+    if size == 0 || !size.is_power_of_two() {
+        return None;
     }
 
-    /// Allocate a memory region with the given size (must be power of 2)
-    /// Returns the allocated address, or None if out of space
-    fn allocate(&mut self, size: u32) -> Option<u32> {
-        if size == 0 || !size.is_power_of_two() {
-            return None;
-        }
+    let end = (PCI_MEM32_PA + PCI_MEM32_SIZE) as u32;
 
+    loop {
+        let current = PCI_MEM_NEXT.load(Ordering::Relaxed);
         // Align to size (PCI BARs require alignment = size)
-        let aligned = (self.next + size - 1) & !(size - 1);
+        let aligned = (current + size - 1) & !(size - 1);
 
-        if aligned.checked_add(size)? > self.end {
+        if aligned.checked_add(size)? > end {
             return None;
         }
 
-        self.next = aligned + size;
-        Some(aligned)
+        let new_next = aligned + size;
+        if PCI_MEM_NEXT
+            .compare_exchange(current, new_next, Ordering::SeqCst, Ordering::Relaxed)
+            .is_ok()
+        {
+            return Some(aligned);
+        }
+        // Retry if another allocation happened concurrently
     }
 }
 
 /// Allocate BARs for a PCI device
+/// TEAM_355: Now uses global pci_allocate() to prevent BAR conflicts
 fn allocate_bars<C: virtio_drivers::transport::pci::bus::ConfigurationAccess>(
     root: &mut PciRoot<C>,
     device_function: DeviceFunction,
-    allocator: &mut PciMemoryAllocator,
 ) {
     if let Ok(bars) = root.bars(device_function) {
         for (bar_index, bar_info) in bars.into_iter().enumerate() {
@@ -79,12 +80,12 @@ fn allocate_bars<C: virtio_drivers::transport::pci::bus::ConfigurationAccess>(
 
                 match address_type {
                     MemoryBarType::Width32 => {
-                        if let Some(addr) = allocator.allocate(size) {
+                        if let Some(addr) = pci_allocate(size) {
                             root.set_bar_32(device_function, bar_index as u8, addr);
                         }
                     }
                     MemoryBarType::Width64 => {
-                        if let Some(addr) = allocator.allocate(size) {
+                        if let Some(addr) = pci_allocate(size) {
                             root.set_bar_64(device_function, bar_index as u8, addr as u64);
                         }
                     }
@@ -110,7 +111,6 @@ pub fn find_virtio_device<H: Hal>(device_type: DeviceType) -> Option<PciTranspor
     let cam = unsafe { MmioCam::new(ecam_va as *mut u8, Cam::Ecam) };
 
     let mut pci_root = PciRoot::new(cam);
-    let mut allocator = PciMemoryAllocator::new();
 
     // Enumerate bus 0 (QEMU virt puts devices on bus 0)
     for (device_function, info) in pci_root.enumerate_bus(0) {
@@ -119,8 +119,8 @@ pub fn find_virtio_device<H: Hal>(device_type: DeviceType) -> Option<PciTranspor
             if virtio_type == device_type {
                 serial_println!("[PCI] Found VirtIO {:?} at {}", device_type, device_function);
 
-                // Allocate BARs
-                allocate_bars(&mut pci_root, device_function, &mut allocator);
+                // Allocate BARs (TEAM_355: uses global allocator)
+                allocate_bars(&mut pci_root, device_function);
 
                 // Create PciTransport
                 match PciTransport::new::<H, _>(&mut pci_root, device_function) {

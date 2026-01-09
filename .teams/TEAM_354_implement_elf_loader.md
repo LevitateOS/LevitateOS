@@ -58,24 +58,32 @@ Implement the ELF dynamic loader per Phase 3 plan:
 
 - ✅ Behavior test passes (both architectures)
 - ✅ aarch64 `vm exec "ls"` works - existing ET_EXEC binaries execute correctly
-- ✅ x86_64 static eyra-hello built successfully (ET_EXEC, no PT_INTERP)
-- ❌ x86_64 `vm exec` doesn't reach shell (pre-existing issue, behavior test passes)
-- ❌ aarch64 static build fails: missing `libgcc_eh` for cross-compilation
+- ✅ **x86_64 static-pie eyra-hello built successfully!**
+  - Type: DYN (PIE)
+  - `static-pie linked`
+  - No PT_INTERP (self-relocating)
+- ❌ x86_64 `vm exec` doesn't reach shell (pre-existing issue)
+- ❌ aarch64 static-pie fails: missing `libgcc_eh` for cross-compilation
 
-### eyra-hello Build Fix
+### eyra-hello Build Fix (from Eyra README)
 
-Updated `.cargo/config.toml` with static linking flags:
+Added `experimental-relocate` feature for true static-pie:
 ```toml
-rustflags = ["-C", "target-feature=+crt-static", "-C", "relocation-model=static"]
+# Cargo.toml
+eyra = { version = "0.22", features = ["experimental-relocate"] }
+```
+```toml
+# .cargo/config.toml
+rustflags = ["-C", "target-feature=+crt-static"]
 ```
 
-**x86_64 Result:** Static ET_EXEC binary (works, but can't test due to vm exec shell issue)
-**aarch64 Result:** Fails to link - needs `libgcc_eh` static library installed
+**x86_64 Result:** True static-pie binary ready for testing
+**aarch64 Result:** Blocked by missing `libgcc_eh` (cross-compile toolchain issue)
 
 ### Remaining Issues (NOT ELF loader bugs)
 
-1. **x86_64 vm exec** doesn't reach shell prompt (pre-existing issue)
-2. **aarch64 cross-compile** needs static `libgcc_eh` library
+1. **x86_64 vm exec** doesn't reach shell prompt (pre-existing boot issue)
+2. **aarch64 cross-compile** needs `libgcc_eh` static library (`apt install gcc-aarch64-linux-gnu`?)
 
 ## Handoff Notes
 

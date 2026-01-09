@@ -34,3 +34,99 @@ Timer initialized.
 [PCI] Found VirtIO Input at 00:03.0
 [PCI] PciTransport created successfully
 [INPUT] VirtIO Input initialized via PCI.
+Detecting Initramfs...
+Initramfs found at 0xffff80001d284000 - 0xffff80001d344e00 (790016 bytes)
+Files in initramfs:
+ - .
+ - hello.txt
+ - cat
+ - clone_test
+ - cp
+ - error_test
+ - init
+ - interrupt_test
+ - link_test
+ - ln
+ - ls
+ - mkdir
+ - mmap_test
+ - mv
+ - pipe_test
+ - pty_interact
+ - pty_test
+ - pwd
+ - repro
+ - rm
+ - rmdir
+ - sched_yield_test
+ - shell
+ - signal_test
+ - stat_test
+ - suite_test_core
+ - test_runner
+ - time_test
+ - touch
+ - tty_test
+[BOOT] spawning init task...
+[SPAWN] Parsing ELF header (12616 bytes)...
+ELF Header e_ident verified
+[SPAWN] ELF parsed.
+[SPAWN] Creating user page table...
+[MMU] Creating user page table...
+[MMU] Allocated L0 table at phys [MASKED]
+[MMU] Zeroing L0 table at va [MASKED]
+[SPAWN] Loading segments...
+[ELF] Copying segment: src[0]=53 to VA 10000
+[ELF] Resolved PA [MASKED] -> Kernel VA [MASKED]
+[ELF] Copying segment: src[0]=0 to VA 10db8
+[ELF] Resolved PA [MASKED] -> Kernel VA [MASKED]
+[ELF] Copying segment: src[0]=b6 to VA 10fe0
+[ELF] Resolved PA [MASKED] -> Kernel VA [MASKED]
+[ELF] Copying segment: src[0]=65 to VA 11010
+[ELF] Resolved PA [MASKED] -> Kernel VA [MASKED]
+[SPAWN] Setting up stack...
+[SPAWN] Setting up stack arguments...
+[TASK] UserTask::new: PID=1 Entry=0x10000
+[SPAWN] Success: PID=1 entry=0x10000 sp=0x7ffffffeff68
+[BOOT] Init process scheduled.
+Mounting filesystems...
+ERROR: Failed to mount FAT32: E0501: Failed to open volume
+[BOOT] WARNING: Filesystem mount failed: E0501: Failed to open volume
+  (Check tinyos_disk.img format/presence)
+[BOOT] Mounted tmpfs at /tmp
+[GPU_TEST] Flush count: 67
+[GPU_TEST] Framebuffer: 400 non-black pixels of 1024000 total
+
+[SUCCESS] LevitateOS System Ready.
+--------------------------------------
+[TASK] Entering user task PID=1 at 0x10000
+[INIT] PID 1 starting...
+[INIT] Spawning shell...
+[SYSCALL] spawn('shell')
+[SPAWN] Parsing ELF header (17848 bytes)...
+ELF Header e_ident verified
+[SPAWN] ELF parsed.
+[SPAWN] Creating user page table...
+[MMU] Creating user page table...
+[MMU] Allocated L0 table at phys [MASKED]
+[MMU] Zeroing L0 table at va [MASKED]
+[SPAWN] Loading segments...
+[ELF] Copying segment: src[0]=48 to VA 10000
+[ELF] Resolved PA [MASKED] -> Kernel VA [MASKED]
+[ELF] Copying segment: src[0]=c0 to VA 11bd0
+[ELF] Resolved PA [MASKED] -> Kernel VA [MASKED]
+[ELF] Copying segment: src[0]=11 to VA 12240
+[ELF] Resolved PA [MASKED] -> Kernel VA [MASKED]
+[ELF] Copying segment: src[0]=dd to VA 12280
+[ELF] Resolved PA [MASKED] -> Kernel VA [MASKED]
+[SPAWN] Setting up stack...
+[SPAWN] Setting up stack arguments...
+[TASK] UserTask::new: PID=2 Entry=0x10000
+[SPAWN] Success: PID=2 entry=0x10000 sp=0x7ffffffeff68
+[INIT] Shell spawned as PID 2
+[TASK] Entering user task PID=2 at 0x10000
+
+LevitateOS Shell (lsh) v0.1
+Type 'help' for commands.
+
+# 

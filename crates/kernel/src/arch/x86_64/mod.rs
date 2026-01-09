@@ -463,7 +463,7 @@ impl SyscallFrame {
     }
 
     pub fn set_return(&mut self, value: i64) {
-        log::trace!("[SYSCALL] set_return: rax <- 0x{:x}", value);
+        // TEAM_356: Removed trace! here - fires for every syscall, floods logs
         self.rax = value as u64;
     }
     pub fn arg6(&self) -> u64 {
