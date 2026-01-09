@@ -34,7 +34,7 @@ impl File {
     /// # Returns
     /// The opened file, or an error.
     pub fn open(path: &str) -> Result<Self> {
-        let fd = libsyscall::openat(path, 0); // 0 = read-only
+        let fd = libsyscall::open(path, 0); // 0 = read-only
         if fd < 0 {
             return Err(Error::from_errno(fd));
         }
@@ -45,7 +45,7 @@ impl File {
     pub fn create(path: &str) -> Result<Self> {
         // O_CREAT (64) | O_WRONLY (1) | O_TRUNC (512) = 577
         let flags = 577;
-        let fd = libsyscall::openat(path, flags);
+        let fd = libsyscall::open(path, flags);
         if fd < 0 {
             return Err(Error::from_errno(fd));
         }
@@ -231,7 +231,7 @@ const READDIR_BUF_SIZE: usize = 4096;
 impl ReadDir {
     /// TEAM_176: Open a directory for iteration.
     pub fn open(path: &str) -> Result<Self> {
-        let fd = libsyscall::openat(path, 0);
+        let fd = libsyscall::open(path, 0);
         if fd < 0 {
             return Err(Error::from_errno(fd));
         }

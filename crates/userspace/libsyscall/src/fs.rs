@@ -31,16 +31,34 @@ pub mod d_type {
     };
 }
 
-/// TEAM_168: Open a file.
+/// TEAM_345: Linux ABI - openat(dirfd, pathname, flags, mode)
+/// TEAM_168: Original implementation.
 #[inline]
-pub fn openat(path: &str, flags: u32) -> isize {
-    arch::syscall3(
+pub fn openat(dirfd: i32, path: &str, flags: u32, mode: u32) -> isize {
+    // TEAM_345: Path must be null-terminated for Linux ABI
+    // We create a temporary buffer with null terminator
+    let mut buf = [0u8; 4096];
+    let len = path.len().min(buf.len() - 1);
+    buf[..len].copy_from_slice(&path.as_bytes()[..len]);
+    buf[len] = 0; // Null terminator
+    
+    arch::syscall4(
         __NR_openat as u64,
-        path.as_ptr() as u64,
-        path.len() as u64,
+        dirfd as u64,
+        buf.as_ptr() as u64,
         flags as u64,
+        mode as u64,
     ) as isize
 }
+
+/// TEAM_345: Convenience wrapper using AT_FDCWD
+#[inline]
+pub fn open(path: &str, flags: u32) -> isize {
+    openat(AT_FDCWD, path, flags, 0o666)
+}
+
+/// TEAM_345: AT_FDCWD constant for openat and other *at syscalls
+pub const AT_FDCWD: i32 = -100;
 
 /// TEAM_168: Get file status.
 #[inline]

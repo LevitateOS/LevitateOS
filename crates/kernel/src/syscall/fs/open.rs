@@ -1,37 +1,32 @@
-use crate::memory::user as mm_user;
-
 use crate::fs::vfs::dispatch::*;
 use crate::fs::vfs::error::VfsError;
 use crate::fs::vfs::file::OpenFlags;
-use crate::syscall::errno;
+use crate::syscall::{errno, fcntl, read_user_cstring};
 use crate::task::fd_table::FdType;
 
-/// TEAM_168: sys_openat - Open a file from initramfs.
+/// TEAM_345: sys_openat - Linux ABI compatible.
+/// Signature: openat(dirfd, pathname, flags, mode)
+///
+/// TEAM_168: Original implementation.
 /// TEAM_176: Updated to support opening directories for getdents.
 /// TEAM_194: Updated to support tmpfs at /tmp with O_CREAT and O_TRUNC.
-pub fn sys_openat(path: usize, path_len: usize, flags: u32) -> i64 {
-    if path_len == 0 || path_len > 256 {
-        return errno::EINVAL;
-    }
-
+pub fn sys_openat(dirfd: i32, pathname: usize, flags: u32, _mode: u32) -> i64 {
     let task = crate::task::current_task();
-    if mm_user::validate_user_buffer(task.ttbr0, path, path_len, false).is_err() {
-        return errno::EFAULT;
-    }
 
-    let mut path_buf = [0u8; 256];
-    for i in 0..path_len {
-        if let Some(ptr) = mm_user::user_va_to_kernel_ptr(task.ttbr0, path + i) {
-            path_buf[i] = unsafe { *ptr };
-        } else {
-            return errno::EFAULT;
-        }
-    }
-
-    let path_str = match core::str::from_utf8(&path_buf[..path_len]) {
+    // TEAM_345: Read null-terminated pathname (Linux ABI)
+    let mut path_buf = [0u8; 4096]; // PATH_MAX
+    let path_str = match read_user_cstring(task.ttbr0, pathname, &mut path_buf) {
         Ok(s) => s,
-        Err(_) => return errno::EINVAL,
+        Err(e) => return e,
     };
+
+    // TEAM_345: Handle dirfd (AT_FDCWD means use cwd)
+    // For now, we only support AT_FDCWD - relative paths with other dirfd not yet implemented
+    if dirfd != fcntl::AT_FDCWD && !path_str.starts_with('/') {
+        // TODO(TEAM_345): Implement dirfd-relative path resolution
+        log::warn!("[SYSCALL] openat: dirfd {} not yet supported for relative paths", dirfd);
+        return errno::EBADF;
+    }
 
     // TEAM_247: Handle PTY devices
     if path_str == "/dev/ptmx" {

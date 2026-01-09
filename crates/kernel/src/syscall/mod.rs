@@ -77,10 +77,12 @@ pub fn syscall_dispatch(frame: &mut SyscallFrame) {
         }
         Some(SyscallNumber::Yield) => process::sys_yield(),
         Some(SyscallNumber::Shutdown) => sys::sys_shutdown(frame.arg0() as u32),
+        // TEAM_345: Linux ABI - openat(dirfd, pathname, flags, mode)
         Some(SyscallNumber::Openat) => fs::sys_openat(
-            frame.arg0() as usize,
+            frame.arg0() as i32,
             frame.arg1() as usize,
             frame.arg2() as u32,
+            frame.arg3() as u32,
         ),
         Some(SyscallNumber::Close) => fs::sys_close(frame.arg0() as usize),
         Some(SyscallNumber::Fstat) => fs::sys_fstat(frame.arg0() as usize, frame.arg1() as usize),

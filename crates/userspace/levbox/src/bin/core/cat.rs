@@ -71,7 +71,7 @@ fn cat_stdin() -> bool {
 
 /// [CAT1] Cat a file to stdout
 fn cat_file(path: &str) -> bool {
-    let fd = libsyscall::openat(path, 0); // 0 = read-only
+    let fd = libsyscall::open(path, 0); // 0 = read-only
     if fd < 0 {
         eprint("cat: ");
         eprint(path);

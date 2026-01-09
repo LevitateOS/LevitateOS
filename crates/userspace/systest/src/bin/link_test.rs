@@ -4,7 +4,7 @@
 
 extern crate ulib;
 use ulib::libsyscall::{
-    self, close, linkat, openat, println, read, readlinkat, symlinkat, unlinkat, write, O_CREAT,
+    self, close, linkat, open, println, read, readlinkat, symlinkat, unlinkat, write, O_CREAT,
     O_RDWR,
 };
 
@@ -22,7 +22,7 @@ pub fn main() -> i32 {
     let _ = unlinkat(0, sym, 0);
 
     // Create target
-    let fd = openat(target, O_CREAT | O_RDWR);
+    let fd = open(target, O_CREAT | O_RDWR);
     if fd < 0 {
         println!("[link_test] FAIL: create target failed");
         return 1;
@@ -36,7 +36,7 @@ pub fn main() -> i32 {
         return 1;
     }
 
-    let fd2 = openat(link, 0);
+    let fd2 = open(link, 0);
     if fd2 < 0 {
         println!("[link_test] FAIL: open hardlink failed");
         return 1;

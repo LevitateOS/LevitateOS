@@ -6,7 +6,7 @@
 #![no_main]
 
 extern crate ulib;
-use libsyscall::{close, ioctl, isatty, openat, println, read, write};
+use libsyscall::{close, ioctl, isatty, open, println, read, write};
 
 static mut PASSED: u32 = 0;
 static mut FAILED: u32 = 0;
@@ -33,7 +33,7 @@ pub fn main() -> i32 {
     println!("[pty_test] Starting PTY tests...");
 
     // 1. Open /dev/ptmx
-    let master_fd = openat("/dev/ptmx", 2); // O_RDWR
+    let master_fd = open("/dev/ptmx", 2); // O_RDWR
     if master_fd < 0 {
         test_fail("open_ptmx", "failed to open /dev/ptmx");
         return 1;
@@ -87,7 +87,7 @@ pub fn main() -> i32 {
 
     let slave_path_str = core::str::from_utf8(&slave_path[..idx]).unwrap();
 
-    let slave_fd = openat(slave_path_str, 2); // O_RDWR
+    let slave_fd = open(slave_path_str, 2); // O_RDWR
     if slave_fd < 0 {
         test_fail("open_slave", "failed to open slave pty");
     } else {

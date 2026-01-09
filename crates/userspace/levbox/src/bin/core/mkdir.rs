@@ -73,7 +73,7 @@ fn make_dir(path: &str, mode: u32, parents: bool, verbose: bool) -> bool {
                         // Actually, we don't have exact errno constants exposed easily here?
                         // Let's assume any error other than success is check-worthy.
                         // But if it fails, we check if it exists.
-                        let fd = libsyscall::openat(&p, 0); // O_RDONLY
+                        let fd = libsyscall::open(&p, 0); // O_RDONLY
                         if fd >= 0 {
                             libsyscall::close(fd as usize);
                             // Exists (EEXIST case), continue

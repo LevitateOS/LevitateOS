@@ -3,14 +3,14 @@
 #![no_main]
 
 extern crate ulib;
-use ulib::libsyscall::{openat, println, read, EBADF, ENOENT};
+use ulib::libsyscall::{open, println, read, EBADF, ENOENT};
 
 #[no_mangle]
 pub fn main() -> i32 {
     println!("[error_test] Starting...");
 
     // Test 1: Open non-existent
-    let ret = openat("/this/does/not/exist", 0);
+    let ret = open("/this/does/not/exist", 0);
     if ret != ENOENT as isize {
         println!(
             "[error_test] FAIL: Expected ENOENT ({}), got {}",

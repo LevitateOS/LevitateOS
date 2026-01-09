@@ -4,7 +4,7 @@
 
 extern crate ulib;
 use ulib::libsyscall::{
-    self, close, fstat, openat, println, unlinkat, utimensat, Stat, Timespec, O_CREAT, O_RDWR,
+    self, close, fstat, open, println, unlinkat, utimensat, Stat, Timespec, O_CREAT, O_RDWR,
 };
 
 #[no_mangle]
@@ -15,7 +15,7 @@ pub fn main() -> i32 {
     let _ = unlinkat(0, path, 0); // Cleanup
 
     // Create file
-    let fd = openat(path, O_CREAT | O_RDWR);
+    let fd = open(path, O_CREAT | O_RDWR);
     if fd < 0 {
         println!("[stat_test] FAIL: openat failed");
         return 1;

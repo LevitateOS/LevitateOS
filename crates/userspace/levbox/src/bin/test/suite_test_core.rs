@@ -135,7 +135,7 @@ fn test_mkdir() -> bool {
     }
 
     // Verify it exists
-    let fd = libsyscall::openat("/tmp/test_dir", 0);
+    let fd = libsyscall::open("/tmp/test_dir", 0);
     if fd < 0 {
         println!("FAIL: directory not created");
         return false;
@@ -150,7 +150,7 @@ fn test_mkdir() -> bool {
         return false;
     }
 
-    let fd = libsyscall::openat("/tmp/a/b/c", 0);
+    let fd = libsyscall::open("/tmp/a/b/c", 0);
     if fd < 0 {
         println!("FAIL: nested directory not created");
         return false;
@@ -188,7 +188,7 @@ fn test_cat() -> bool {
     // We can write content using syscalls directly from this test binary.
 
     let path = "/tmp/cat_test.txt";
-    let fd = libsyscall::openat(path, libsyscall::O_CREAT | libsyscall::O_WRONLY);
+    let fd = libsyscall::open(path, libsyscall::O_CREAT | libsyscall::O_WRONLY);
     if fd < 0 {
         println!("FAIL: match setup failed");
         return false;
@@ -226,7 +226,7 @@ fn test_touch() -> bool {
         return false;
     }
 
-    let fd = libsyscall::openat(path, 0);
+    let fd = libsyscall::open(path, 0);
     if fd < 0 {
         println!("FAIL: touch did not create file");
         return false;
@@ -246,7 +246,7 @@ fn test_rm() -> bool {
         return false;
     }
 
-    let fd = libsyscall::openat(path, 0);
+    let fd = libsyscall::open(path, 0);
     if fd >= 0 {
         libsyscall::close(fd as usize);
         println!("FAIL: File still exists");
@@ -266,7 +266,7 @@ fn test_rmdir() -> bool {
         return false;
     }
 
-    let fd = libsyscall::openat(path, 0);
+    let fd = libsyscall::open(path, 0);
     if fd >= 0 {
         libsyscall::close(fd as usize);
         println!("FAIL: Directory still exists");
@@ -282,7 +282,7 @@ fn test_cp() -> bool {
     let dst = "/tmp/cp_dst";
 
     // Setup src
-    let fd = libsyscall::openat(src, libsyscall::O_CREAT | libsyscall::O_WRONLY);
+    let fd = libsyscall::open(src, libsyscall::O_CREAT | libsyscall::O_WRONLY);
     if fd < 0 {
         return false;
     }
@@ -312,7 +312,7 @@ fn test_mv() -> bool {
     let dst = "/tmp/mv_dst";
 
     // Setup src
-    let fd = libsyscall::openat(src, libsyscall::O_CREAT | libsyscall::O_WRONLY);
+    let fd = libsyscall::open(src, libsyscall::O_CREAT | libsyscall::O_WRONLY);
     if fd < 0 {
         return false;
     }
@@ -327,7 +327,7 @@ fn test_mv() -> bool {
     }
 
     // Check src gone
-    let fd_src = libsyscall::openat(src, 0);
+    let fd_src = libsyscall::open(src, 0);
     if fd_src >= 0 {
         libsyscall::close(fd_src as usize);
         println!("FAIL: Source still exists");

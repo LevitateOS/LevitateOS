@@ -6,7 +6,7 @@
 #![no_main]
 
 extern crate ulib;
-use libsyscall::{clone, ioctl, isatty, openat, println, read, write};
+use libsyscall::{clone, ioctl, isatty, open, println, read, write};
 use ulib::exit;
 
 // termios constants (matches kernel/src/fs/tty/mod.rs)
@@ -39,7 +39,7 @@ pub fn main() -> i32 {
     println!("--------------------");
 
     // 1. Open PTY Master
-    let master_fd = openat("/dev/ptmx", 2); // O_RDWR
+    let master_fd = open("/dev/ptmx", 2); // O_RDWR
     if master_fd < 0 {
         println!("Error: Failed to open /dev/ptmx");
         return 1;
@@ -88,7 +88,7 @@ pub fn main() -> i32 {
         }
     }
     let slave_path_str = core::str::from_utf8(&slave_path[..idx]).unwrap();
-    let slave_fd = openat(slave_path_str, 2);
+    let slave_fd = open(slave_path_str, 2);
     if slave_fd < 0 {
         println!("Error: Failed to open slave {}", slave_path_str);
         return 1;

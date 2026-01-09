@@ -12,7 +12,7 @@ extern crate ulib;
 
 use alloc::string::String;
 use alloc::vec::Vec;
-use libsyscall::{openat, println, utimensat, Timespec, UTIME_NOW, UTIME_OMIT};
+use libsyscall::{open, println, utimensat, Timespec, UTIME_NOW, UTIME_OMIT};
 
 // ============================================================================
 // Constants
@@ -248,7 +248,7 @@ fn parse_4digits(s: &str) -> Option<u32> {
 /// TEAM_199: Get timestamps from a reference file
 fn get_reference_times(ref_path: &str) -> Option<(u64, u64)> {
     // Open the reference file
-    let fd = openat(ref_path, 0); // O_RDONLY
+    let fd = open(ref_path, 0); // O_RDONLY
     if fd < 0 {
         return None;
     }
@@ -361,7 +361,7 @@ fn touch_file(
     }
 
     // Try to create the file
-    let ret = openat(path, O_CREAT | O_WRONLY);
+    let ret = open(path, O_CREAT | O_WRONLY);
     if ret < 0 {
         libsyscall::write(2, b"touch: cannot touch '");
         libsyscall::write(2, path.as_bytes());

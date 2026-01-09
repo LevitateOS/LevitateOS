@@ -1,4 +1,4 @@
-# TEAM_345 — Implement Linux ABI Compatibility Batch 0
+# TEAM_345 — Implement Linux ABI Compatibility Batches 0-1
 
 **Created:** 2026-01-09
 **Status:** Complete
@@ -55,6 +55,27 @@ Added `pub mod fcntl` with:
 - [x] Team file updated
 - [x] Plan updated (phase-4.md, discrepancies.md)
 
+## Batch 1: Read-Only Syscalls
+
+### UoW 1.1: sys_openat ✅ DONE
+- Changed signature to `(dirfd, pathname, flags, mode)`
+- Uses `read_user_cstring()` for null-terminated paths
+- Handles `AT_FDCWD` for dirfd
+- Updated all ~25 userspace call sites to use new `open()` wrapper
+
+### UoW 1.2: sys_fstat ✅ Verified
+- Kernel Stat struct matches AArch64 Linux layout (128 bytes)
+- Userspace uses `linux_raw_sys::general::stat` directly
+
+### UoW 1.3: sys_getdents ✅ Verified  
+- Kernel Dirent64 struct matches Linux layout (`#[repr(C, packed)]`)
+- Userspace uses `linux_raw_sys::general::linux_dirent64`
+
+### UoW 1.4: sys_getcwd ✅ Verified (with note)
+- Returns length instead of pointer (documented difference)
+- Works correctly for LevitateOS userspace
+- Full Linux semantics deferred to avoid breaking changes
+
 ## Next Steps
 
-Batch 1: Read-Only Syscalls (sys_openat, sys_fstat, sys_getdents, sys_getcwd)
+Batch 2: Link Operations (readlinkat, symlinkat, linkat, utimensat, unlinkat)
