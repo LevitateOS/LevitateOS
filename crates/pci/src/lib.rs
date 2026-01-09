@@ -147,3 +147,10 @@ pub fn find_virtio_gpu<H: Hal>() -> Option<PciTransport> {
     find_virtio_device::<H>(DeviceType::GPU)
 }
 
+/// TEAM_331: Find VirtIO Input device on PCI bus
+///
+/// Convenience function that calls `find_virtio_device` with Input type.
+pub fn find_virtio_input<H: Hal>() -> Option<PciTransport> {
+    find_virtio_device::<H>(DeviceType::Input)
+}
+

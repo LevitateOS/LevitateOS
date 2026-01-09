@@ -6,17 +6,26 @@
 //! TEAM_241: Added interrupt handler for async Ctrl+C detection
 //! - Handler registered during init() with slot-based IRQ computation
 //! - Ctrl+C immediately signals foreground process via SIGINT
+//!
+//! TEAM_331: Added PCI transport support for x86_64
 
 use log;
+#[cfg(target_arch = "aarch64")]
 use los_hal::virtio::StaticMmioTransport;
 use los_hal::{InterruptHandler, IrqId, VirtioHal};
 use alloc::vec::Vec;
 use los_utils::Mutex;
 use virtio_drivers::device::input::VirtIOInput;
 
-// TEAM_032: Use StaticMmioTransport (MmioTransport<'static>) for static storage
-static INPUT_DEVICES: Mutex<Vec<VirtIOInput<VirtioHal, StaticMmioTransport>>> =
-    Mutex::new(Vec::new());
+/// TEAM_331: Wrapper enum to support both MMIO (aarch64) and PCI (x86_64) transports
+enum InputDevice {
+    #[cfg(target_arch = "aarch64")]
+    Mmio(VirtIOInput<VirtioHal, StaticMmioTransport>),
+    #[cfg(target_arch = "x86_64")]
+    Pci(VirtIOInput<VirtioHal, los_pci::PciTransport>),
+}
+
+static INPUT_DEVICES: Mutex<Vec<InputDevice>> = Mutex::new(Vec::new());
 
 /// Character buffer for keyboard input
 /// TEAM_156: Increased from 256 to 1024 to prevent drops during rapid input
@@ -44,17 +53,18 @@ impl InterruptHandler for InputInterruptHandler {
 /// Static handler instance for GIC registration
 static INPUT_HANDLER: InputInterruptHandler = InputInterruptHandler;
 
-/// Initialize VirtIO Input device.
+/// Initialize VirtIO Input device via MMIO (aarch64).
 ///
 /// # Arguments
 /// * `transport` - MMIO transport for the device
 /// * `slot` - MMIO slot index (used to compute IRQ number: IRQ = 48 + slot)
+#[cfg(target_arch = "aarch64")]
 pub fn init(transport: StaticMmioTransport, slot: usize) {
     log::info!("[INPUT] Initializing Input (slot {})...", slot);
     match VirtIOInput::<VirtioHal, StaticMmioTransport>::new(transport) {
         Ok(input) => {
             log::info!("[INPUT] VirtIO Input initialized successfully.");
-            INPUT_DEVICES.lock().push(input);
+            INPUT_DEVICES.lock().push(InputDevice::Mmio(input));
 
             // TEAM_255: Register interrupt handler using generic HAL traits
             let irq_id = IrqId::VirtioInput(slot as u32);
@@ -64,6 +74,27 @@ pub fn init(transport: StaticMmioTransport, slot: usize) {
             log::debug!("[INPUT] VirtIO Input IRQ {} enabled", ic.map_irq(irq_id));
         }
         Err(e) => log::error!("[INPUT] Failed to init VirtIO Input: {:?}", e),
+    }
+}
+
+/// TEAM_331: Initialize VirtIO Input device via PCI (x86_64).
+#[cfg(target_arch = "x86_64")]
+pub fn init_pci() {
+    log::info!("[INPUT] Initializing Input via PCI...");
+    
+    match los_pci::find_virtio_input::<VirtioHal>() {
+        Some(transport) => {
+            match VirtIOInput::<VirtioHal, los_pci::PciTransport>::new(transport) {
+                Ok(input) => {
+                    log::info!("[INPUT] VirtIO Input initialized via PCI.");
+                    INPUT_DEVICES.lock().push(InputDevice::Pci(input));
+                }
+                Err(e) => log::error!("[INPUT] Failed to create VirtIO Input: {:?}", e),
+            }
+        }
+        None => {
+            log::warn!("[INPUT] No VirtIO Input found on PCI bus");
+        }
     }
 }
 
@@ -101,52 +132,70 @@ pub fn poll() -> bool {
     };
 
     let mut devices = INPUT_DEVICES.lock();
-    for input in devices.iter_mut() {
-        let input: &mut VirtIOInput<VirtioHal, StaticMmioTransport> = input;
-        while let Some(event) = input.pop_pending_event() {
-            let event: virtio_drivers::device::input::InputEvent = event;
-            match event.event_type {
-                EV_ABS => {
-                    // TEAM_100: Mouse cursor support removed (dead code cleanup)
-                    // Future: Re-implement when VirtIO GPU cursor support is added
-                    let _ = (screen_width, screen_height, event.code, event.value);
-                }
-                EV_KEY => {
-                    let pressed = event.value != 0;
-                    match event.code {
-                        KEY_LEFTSHIFT | KEY_RIGHTSHIFT => {
-                            *SHIFT_PRESSED.lock() = pressed;
-                        }
-                        KEY_LEFTCTRL | KEY_RIGHTCTRL => {
-                            *CTRL_PRESSED.lock() = pressed;
-                        }
-                        code if pressed => {
-                            if *CTRL_PRESSED.lock() && code == KEY_C {
-                                if !KEYBOARD_BUFFER.lock().push('\x03') {
-                                    crate::verbose!("KEYBOARD_BUFFER overflow, Ctrl+C dropped");
-                                }
-                                // TEAM_241: Signal foreground process immediately on Ctrl+C
-                                // This ensures signal is delivered even if no one is reading stdin
-                                crate::syscall::signal::signal_foreground_process(
-                                    crate::syscall::signal::SIGINT,
-                                );
-                            } else if let Some(c) = linux_code_to_ascii(code, *SHIFT_PRESSED.lock())
-                            {
-                                // TEAM_156: Don't silently drop - log overflow
-                                if !KEYBOARD_BUFFER.lock().push(c) {
-                                    crate::verbose!("KEYBOARD_BUFFER overflow, char dropped");
-                                }
-                            }
-                        }
-                        _ => {}
-                    }
-                }
-                _ => {}
+    for device in devices.iter_mut() {
+        // TEAM_331: Handle both MMIO and PCI transports
+        match device {
+            #[cfg(target_arch = "aarch64")]
+            InputDevice::Mmio(input) => {
+                poll_input_device(input, screen_width, screen_height);
+            }
+            #[cfg(target_arch = "x86_64")]
+            InputDevice::Pci(input) => {
+                poll_input_device(input, screen_width, screen_height);
             }
         }
-        input.ack_interrupt();
     }
     dirty
+}
+
+/// TEAM_331: Generic input polling for any transport type
+fn poll_input_device<T: virtio_drivers::transport::Transport>(
+    input: &mut VirtIOInput<VirtioHal, T>,
+    screen_width: i32,
+    screen_height: i32,
+) {
+    while let Some(event) = input.pop_pending_event() {
+        let event: virtio_drivers::device::input::InputEvent = event;
+        match event.event_type {
+            EV_ABS => {
+                // TEAM_100: Mouse cursor support removed (dead code cleanup)
+                // Future: Re-implement when VirtIO GPU cursor support is added
+                let _ = (screen_width, screen_height, event.code, event.value);
+            }
+            EV_KEY => {
+                let pressed = event.value != 0;
+                match event.code {
+                    KEY_LEFTSHIFT | KEY_RIGHTSHIFT => {
+                        *SHIFT_PRESSED.lock() = pressed;
+                    }
+                    KEY_LEFTCTRL | KEY_RIGHTCTRL => {
+                        *CTRL_PRESSED.lock() = pressed;
+                    }
+                    code if pressed => {
+                        if *CTRL_PRESSED.lock() && code == KEY_C {
+                            if !KEYBOARD_BUFFER.lock().push('\x03') {
+                                crate::verbose!("KEYBOARD_BUFFER overflow, Ctrl+C dropped");
+                            }
+                            // TEAM_241: Signal foreground process immediately on Ctrl+C
+                            // This ensures signal is delivered even if no one is reading stdin
+                            crate::syscall::signal::signal_foreground_process(
+                                crate::syscall::signal::SIGINT,
+                            );
+                        } else if let Some(c) = linux_code_to_ascii(code, *SHIFT_PRESSED.lock())
+                        {
+                            // TEAM_156: Don't silently drop - log overflow
+                            if !KEYBOARD_BUFFER.lock().push(c) {
+                                crate::verbose!("KEYBOARD_BUFFER overflow, char dropped");
+                            }
+                        }
+                    }
+                    _ => {}
+                }
+            }
+            _ => {}
+        }
+    }
+    input.ack_interrupt();
 }
 
 /// Map Linux key codes to ASCII

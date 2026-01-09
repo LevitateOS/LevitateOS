@@ -84,8 +84,8 @@ pub fn init() {
 
     #[cfg(target_arch = "x86_64")]
     {
-        // x86_64 uses PCI for VirtIO devices, not MMIO
-        // VirtIO devices should be discovered via PCI enumeration
-        crate::verbose!("Skipping VirtIO MMIO scan (x86_64 uses PCI)...");
+        // TEAM_331: x86_64 uses PCI for VirtIO devices, not MMIO
+        // Initialize input device via PCI
+        crate::input::init_pci();
     }
 }

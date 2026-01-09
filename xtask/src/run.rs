@@ -66,7 +66,9 @@ pub fn run_qemu(profile: QemuProfile, headless: bool, iso: bool, arch: &str, gpu
     disk::create_disk_image_if_missing()?;
 
     let arch_enum = Arch::try_from(arch)?;
-    let mut builder = QemuBuilder::new(arch_enum, profile);
+    // TEAM_330: Explicitly set GPU resolution for readable display
+    let mut builder = QemuBuilder::new(arch_enum, profile)
+        .gpu_resolution(1280, 800);
 
     // Boot configuration
     if iso {
@@ -204,7 +206,9 @@ pub fn run_qemu_vnc(arch: &str) -> Result<()> {
     // Build QEMU
     let arch_enum = Arch::try_from(arch)?;
     let profile = profile_for_arch(arch);
+    // TEAM_330: Explicit resolution for VNC display
     let mut builder = QemuBuilder::new(arch_enum, profile)
+        .gpu_resolution(1280, 800)
         .display_vnc()
         .enable_qmp("./qmp.sock");
 
@@ -353,7 +357,9 @@ pub fn run_qemu_term(arch: &str, iso: bool) -> Result<()> {
 
     let arch_enum = Arch::try_from(arch)?;
     let profile = profile_for_arch(arch);
+    // TEAM_330: Explicit resolution for term mode (still needed for GPU init)
     let mut builder = QemuBuilder::new(arch_enum, profile)
+        .gpu_resolution(1280, 800)
         .display_nographic()
         .enable_qmp("./qmp.sock");
 
@@ -424,7 +430,9 @@ pub fn verify_gpu(arch: &str, timeout: u32) -> Result<()> {
     // Start QEMU in background
     let arch_enum = Arch::try_from(arch)?;
     let profile = profile_for_arch(arch);
+    // TEAM_330: Explicit resolution for GPU verification
     let mut builder = QemuBuilder::new(arch_enum, profile)
+        .gpu_resolution(1280, 800)
         .display_vnc()
         .enable_qmp("./qmp.sock");
 

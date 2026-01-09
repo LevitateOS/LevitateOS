@@ -2,6 +2,7 @@
 //!
 //! TEAM_114: Wrapper around levitate-gpu crate for kernel use.
 //! TEAM_141: Removed duplicate Display type - use los_gpu::Display via as_display()
+//! TEAM_331: Added Limine framebuffer fallback for x86_64 when virtio-gpu unavailable
 //!
 //! See: `docs/planning/virtio-pci/` for the implementation plan
 
@@ -13,9 +14,141 @@ use crate::virtio::VirtioHal;
 // Re-export from levitate-gpu
 pub use los_gpu::{Display, GpuError};
 
-/// GPU state wrapper using levitate-gpu
+/// TEAM_331: GPU backend type - either VirtIO or Limine framebuffer
+enum GpuBackend {
+    VirtIO(los_gpu::Gpu<VirtioHal>),
+    Framebuffer(FramebufferGpu),
+}
+
+use embedded_graphics::pixelcolor::Rgb888;
+use embedded_graphics::prelude::*;
+
+/// TEAM_331: Simple framebuffer-based GPU for Limine boot
+struct FramebufferGpu {
+    address: usize,
+    width: u32,
+    height: u32,
+    pitch: u32,
+    bpp: u8,
+    format: crate::boot::PixelFormat,
+}
+
+impl FramebufferGpu {
+    fn new(fb: &crate::boot::Framebuffer) -> Self {
+        Self {
+            address: fb.address,
+            width: fb.width,
+            height: fb.height,
+            pitch: fb.pitch,
+            bpp: fb.bpp,
+            format: fb.format,
+        }
+    }
+
+    fn resolution(&self) -> (u32, u32) {
+        (self.width, self.height)
+    }
+
+    fn framebuffer(&mut self) -> &mut [u8] {
+        let size = (self.pitch as usize) * (self.height as usize);
+        // SAFETY: Limine framebuffer address is valid and mapped by bootloader
+        unsafe { core::slice::from_raw_parts_mut(self.address as *mut u8, size) }
+    }
+
+    fn flush(&mut self) -> Result<(), GpuError> {
+        // Limine framebuffer is directly mapped - no flush needed
+        Ok(())
+    }
+}
+
+/// TEAM_331: DrawTarget wrapper for framebuffer GPU
+pub struct FramebufferDisplay<'a> {
+    gpu: &'a mut FramebufferGpu,
+}
+
+impl<'a> FramebufferDisplay<'a> {
+    fn new(gpu: &'a mut FramebufferGpu) -> Self {
+        Self { gpu }
+    }
+}
+
+impl DrawTarget for FramebufferDisplay<'_> {
+    type Color = Rgb888;
+    type Error = core::convert::Infallible;
+
+    fn draw_iter<I>(&mut self, pixels: I) -> Result<(), Self::Error>
+    where
+        I: IntoIterator<Item = Pixel<Self::Color>>,
+    {
+        let width = self.gpu.width;
+        let height = self.gpu.height;
+        let pitch = self.gpu.pitch as usize;
+        let is_bgr = matches!(self.gpu.format, crate::boot::PixelFormat::Bgr);
+        let fb = self.gpu.framebuffer();
+
+        for Pixel(point, color) in pixels {
+            if point.x >= 0 && point.x < width as i32 && point.y >= 0 && point.y < height as i32 {
+                let offset = (point.y as usize) * pitch + (point.x as usize) * 4;
+                if offset + 3 < fb.len() {
+                    if is_bgr {
+                        fb[offset] = color.b();
+                        fb[offset + 1] = color.g();
+                        fb[offset + 2] = color.r();
+                    } else {
+                        fb[offset] = color.r();
+                        fb[offset + 1] = color.g();
+                        fb[offset + 2] = color.b();
+                    }
+                    fb[offset + 3] = 255; // Alpha
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
+impl OriginDimensions for FramebufferDisplay<'_> {
+    fn size(&self) -> Size {
+        Size::new(self.gpu.width, self.gpu.height)
+    }
+}
+
+/// TEAM_331: Unified display wrapper for both VirtIO and Limine framebuffer
+pub enum UnifiedDisplay<'a> {
+    VirtIO(Display<'a, VirtioHal>),
+    Framebuffer(FramebufferDisplay<'a>),
+}
+
+impl DrawTarget for UnifiedDisplay<'_> {
+    type Color = Rgb888;
+    type Error = core::convert::Infallible;
+
+    fn draw_iter<I>(&mut self, pixels: I) -> Result<(), Self::Error>
+    where
+        I: IntoIterator<Item = Pixel<Self::Color>>,
+    {
+        match self {
+            UnifiedDisplay::VirtIO(d) => {
+                // VirtIO display returns Infallible, so we can unwrap
+                d.draw_iter(pixels).map_err(|_| unreachable!())
+            }
+            UnifiedDisplay::Framebuffer(d) => d.draw_iter(pixels),
+        }
+    }
+}
+
+impl OriginDimensions for UnifiedDisplay<'_> {
+    fn size(&self) -> Size {
+        match self {
+            UnifiedDisplay::VirtIO(d) => d.size(),
+            UnifiedDisplay::Framebuffer(d) => d.size(),
+        }
+    }
+}
+
+/// GPU state wrapper supporting both VirtIO and Limine framebuffer
 pub struct GpuState {
-    inner: los_gpu::Gpu<VirtioHal>,
+    backend: GpuBackend,
 }
 
 // SAFETY: GPU access is protected by IrqSafeLock
@@ -26,21 +159,33 @@ impl GpuState {
     pub fn flush(&mut self) -> Result<(), GpuError> {
         // TEAM_129: Increment flush counter for regression testing
         FLUSH_COUNT.fetch_add(1, Ordering::Relaxed);
-        self.inner.flush()
+        match &mut self.backend {
+            GpuBackend::VirtIO(gpu) => gpu.flush(),
+            GpuBackend::Framebuffer(fb) => fb.flush(),
+        }
     }
 
     pub fn dimensions(&self) -> (u32, u32) {
-        self.inner.resolution()
+        match &self.backend {
+            GpuBackend::VirtIO(gpu) => gpu.resolution(),
+            GpuBackend::Framebuffer(fb) => fb.resolution(),
+        }
     }
 
     pub fn framebuffer(&mut self) -> &mut [u8] {
-        self.inner.framebuffer()
+        match &mut self.backend {
+            GpuBackend::VirtIO(gpu) => gpu.framebuffer(),
+            GpuBackend::Framebuffer(fb) => fb.framebuffer(),
+        }
     }
 
-    /// TEAM_141: Get a Display adapter for embedded-graphics DrawTarget
-    /// Uses los_gpu::Display instead of duplicate kernel implementation
-    pub fn as_display(&mut self) -> Display<'_, VirtioHal> {
-        Display::new(&mut self.inner)
+    /// TEAM_331: Get a unified display adapter for embedded-graphics DrawTarget
+    /// Works for both VirtIO and Limine framebuffer backends
+    pub fn as_display(&mut self) -> UnifiedDisplay<'_> {
+        match &mut self.backend {
+            GpuBackend::VirtIO(gpu) => UnifiedDisplay::VirtIO(Display::new(gpu)),
+            GpuBackend::Framebuffer(fb) => UnifiedDisplay::Framebuffer(FramebufferDisplay::new(fb)),
+        }
     }
 }
 
@@ -113,26 +258,48 @@ pub fn debug_display_status() {
     }
 }
 
-/// Initialize GPU via PCI transport
+/// Initialize GPU via PCI transport, with Limine framebuffer fallback
 /// Note: mmio_base is ignored - we use PCI enumeration instead
 #[allow(unused_variables)]
 pub fn init(mmio_base: usize) {
     log::info!("[GPU] Initializing via PCI...");
 
+    // Try VirtIO GPU first
     match los_pci::find_virtio_gpu::<VirtioHal>() {
         Some(transport) => match los_gpu::Gpu::new(transport) {
             Ok(gpu) => {
-                log::info!("[GPU] Initialized via PCI transport");
-                *GPU.lock() = Some(GpuState { inner: gpu });
+                log::info!("[GPU] Initialized via VirtIO PCI transport");
+                *GPU.lock() = Some(GpuState { backend: GpuBackend::VirtIO(gpu) });
+                return;
             }
             Err(e) => {
-                log::error!("[GPU] Failed to create GPU: {:?}", e);
+                log::error!("[GPU] Failed to create VirtIO GPU: {:?}", e);
             }
         },
         None => {
-            log::warn!("[GPU] No VirtIO GPU found on PCI bus");
+            log::info!("[GPU] No VirtIO GPU found on PCI bus");
         }
     }
+
+    // TEAM_331: Fall back to Limine framebuffer if available
+    if let Some(boot_info) = crate::boot::boot_info() {
+        if let Some(ref fb) = boot_info.framebuffer {
+            log::info!("[GPU] Using Limine framebuffer fallback: {}x{}", fb.width, fb.height);
+            let fb_gpu = FramebufferGpu::new(fb);
+            
+            // Clear framebuffer to black
+            let mut state = GpuState { backend: GpuBackend::Framebuffer(fb_gpu) };
+            let framebuffer = state.framebuffer();
+            for byte in framebuffer.iter_mut() {
+                *byte = 0;
+            }
+            
+            *GPU.lock() = Some(state);
+            return;
+        }
+    }
+
+    log::warn!("[GPU] No GPU available (no VirtIO GPU and no Limine framebuffer)");
 }
 
 pub fn get_resolution() -> Option<(u32, u32)> {

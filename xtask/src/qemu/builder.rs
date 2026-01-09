@@ -84,7 +84,8 @@ pub struct GpuResolution {
 
 impl Default for GpuResolution {
     fn default() -> Self {
-        Self { width: 1920, height: 1080 }
+        // TEAM_330: Use 1280x800 for readable text (128x36 char grid with 10x20 font)
+        Self { width: 1280, height: 800 }
     }
 }
 
@@ -239,11 +240,32 @@ impl QemuBuilder {
         }
 
         // GPU device
-        let gpu_spec = format!(
-            "virtio-gpu-pci,xres={},yres={}",
-            self.gpu_resolution.width, self.gpu_resolution.height
-        );
-        cmd.args(["-device", &gpu_spec]);
+        // TEAM_331: x86_64 display mode:
+        // - GTK/SDL: Use -vga std (Limine framebuffer, proper window size)
+        // - VNC/headless: Use virtio-gpu-pci (proper resolution via edid)
+        match (&self.arch, &self.display) {
+            (Arch::X86_64, DisplayMode::Gtk) => {
+                // Use VGA std - Limine gets framebuffer, GTK shows correct window size
+                cmd.args(["-vga", "std"]);
+            }
+            (Arch::X86_64, _) => {
+                // VNC/headless: use virtio-gpu for proper resolution
+                cmd.args(["-vga", "none"]);
+                let gpu_spec = format!(
+                    "virtio-gpu-pci,xres={},yres={},edid=on",
+                    self.gpu_resolution.width, self.gpu_resolution.height
+                );
+                cmd.args(["-device", &gpu_spec]);
+            }
+            _ => {
+                // aarch64: always use virtio-gpu-pci
+                let gpu_spec = format!(
+                    "virtio-gpu-pci,xres={},yres={}",
+                    self.gpu_resolution.width, self.gpu_resolution.height
+                );
+                cmd.args(["-device", &gpu_spec]);
+            }
+        }
 
         // Input devices (arch-specific suffix)
         let suffix = self.arch.device_suffix();
@@ -264,7 +286,8 @@ impl QemuBuilder {
         // Display
         match self.display {
             DisplayMode::Gtk => {
-                cmd.args(["-display", "gtk,zoom-to-fit=off,window-close=off"]);
+                // TEAM_330: Use SDL instead of GTK - GTK ignores virtio-gpu resolution
+                cmd.args(["-display", "sdl"]);
                 cmd.args(["-serial", "mon:stdio"]);
             }
             DisplayMode::Vnc => {

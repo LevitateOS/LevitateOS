@@ -167,15 +167,25 @@ pub fn run_levitate() -> Result<()> {
     // Build for both architectures
     println!("🔨 Building LevitateOS...");
     build::build_all("aarch64")?;
+    build::build_iso("x86_64")?;
 
     // Test aarch64 (working)
     println!("\n━━━ aarch64 ━━━");
     let aarch64_result = run_levitate_arch("aarch64");
 
+    // Test x86_64 (investigating black screen)
+    println!("\n━━━ x86_64 ━━━");
+    let x86_64_result = run_levitate_arch("x86_64");
+
     // Report
+    println!("\n━━━ Results ━━━");
     match &aarch64_result {
         Ok(_) => println!("  ✅ aarch64: Screenshot captured"),
         Err(e) => println!("  ❌ aarch64: {}", e),
+    }
+    match &x86_64_result {
+        Ok(_) => println!("  ✅ x86_64: Screenshot captured"),
+        Err(e) => println!("  ⚠️  x86_64: {}", e),
     }
 
     aarch64_result
@@ -204,12 +214,27 @@ fn run_levitate_arch(arch: &str) -> Result<()> {
     let _ = fs::remove_file(&qmp_socket);
 
     let png = screenshot.replace(".ppm", ".png");
-    if Path::new(&png).exists() || Path::new(&screenshot).exists() {
-        println!("[{}] ✅ Screenshot captured!", arch);
-        Ok(())
-    } else {
+    let img_path = if Path::new(&png).exists() { &png } else { &screenshot };
+    
+    if !Path::new(img_path).exists() {
         bail!("Screenshot not created")
     }
+    
+    // TEAM_329: Analyze screenshot for black screen detection
+    match analyze_screenshot(img_path) {
+        Ok(ScreenshotContent::Black { brightness }) => {
+            println!("[{}] ⚠️  BLACK SCREEN DETECTED (brightness: {:.1})", arch, brightness);
+            println!("[{}] Screenshot saved but display appears empty", arch);
+        }
+        Ok(ScreenshotContent::HasContent { brightness }) => {
+            println!("[{}] ✅ Screenshot captured (brightness: {:.1} - display working)", arch, brightness);
+        }
+        Err(e) => {
+            println!("[{}] ⚠️  Screenshot captured but analysis failed: {}", arch, e);
+        }
+    }
+    
+    Ok(())
 }
 
 // =============================================================================
@@ -412,4 +437,62 @@ fn take_screenshot(client: &mut QmpClient, output: &str) -> Result<()> {
     }
 
     Ok(())
+}
+
+// =============================================================================
+// TEAM_329: Black Screen Detection
+// =============================================================================
+
+/// Result of screenshot content analysis
+#[derive(Debug)]
+pub enum ScreenshotContent {
+    /// Image has visible content (text, graphics)
+    HasContent { brightness: f32 },
+    /// Image is black or nearly black
+    Black { brightness: f32 },
+}
+
+/// TEAM_329: Analyze a screenshot to detect if it's black/empty
+/// 
+/// Detects black screens by counting bright pixels (for white text on black bg)
+/// Returns Black if less than 0.1% of pixels are bright (> 128)
+pub fn analyze_screenshot(path: &str) -> Result<ScreenshotContent> {
+    use image::GenericImageView;
+    
+    let img = image::open(path)
+        .with_context(|| format!("Failed to open image: {}", path))?;
+    
+    let (width, height) = img.dimensions();
+    let total_pixels = width as u64 * height as u64;
+    
+    if total_pixels == 0 {
+        return Ok(ScreenshotContent::Black { brightness: 0.0 });
+    }
+    
+    // Count bright pixels (text on terminal is bright on dark background)
+    let bright_threshold: u8 = 128;
+    let mut bright_count: u64 = 0;
+    let mut total_luminance: u64 = 0;
+    
+    for pixel in img.pixels() {
+        let [r, g, b, _] = pixel.2.0;
+        // Luminance: 0.299*R + 0.587*G + 0.114*B
+        let luminance = (0.299 * r as f64 + 0.587 * g as f64 + 0.114 * b as f64) as u8;
+        total_luminance += luminance as u64;
+        
+        if luminance > bright_threshold {
+            bright_count += 1;
+        }
+    }
+    
+    let avg_brightness = (total_luminance as f64 / total_pixels as f64) as f32;
+    let bright_percentage = (bright_count as f64 / total_pixels as f64) * 100.0;
+    
+    // Black screen: less than 0.1% of pixels are bright
+    // This catches text terminals (white text on black = ~1-5% bright pixels)
+    if bright_percentage < 0.1 {
+        Ok(ScreenshotContent::Black { brightness: avg_brightness })
+    } else {
+        Ok(ScreenshotContent::HasContent { brightness: avg_brightness })
+    }
 }
