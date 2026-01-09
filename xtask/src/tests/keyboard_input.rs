@@ -15,7 +15,7 @@ pub fn run(arch: &str) -> Result<()> {
 
     // First build everything
     crate::build::build_all(arch)?;
-    crate::image::create_disk_image_if_missing()?;
+    crate::disk::create_disk_image_if_missing()?;
 
     // Clean up
     let _ = std::fs::remove_file("./qmp.sock");

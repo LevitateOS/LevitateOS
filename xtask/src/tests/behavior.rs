@@ -11,7 +11,7 @@ use anyhow::{bail, Context, Result};
 use std::fs;
 use std::process::Command;
 
-use crate::run::QemuProfile;
+use crate::qemu::QemuProfile;
 
 // TEAM_287: Arch-specific golden files
 fn golden_file(arch: &str) -> &'static str {
