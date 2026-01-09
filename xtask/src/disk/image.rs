@@ -3,19 +3,15 @@ use clap::Subcommand;
 use std::process::Command;
 
 
+// TEAM_326: Renamed from ImageCommands to DiskCommands
 #[derive(Subcommand)]
-pub enum ImageCommands {
+pub enum DiskCommands {
     /// Create/Format the disk image
     Create,
     /// Install userspace apps to disk
     Install,
     /// Show disk image status and contents
     Status,
-    /// Dump framebuffer to file (QMP)
-    Screenshot {
-        #[arg(default_value = "screenshot.png")]
-        output: String,
-    },
 }
 
 pub fn create_disk_image_if_missing() -> Result<()> {
