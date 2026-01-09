@@ -1,7 +1,7 @@
 ---
 trigger: model_decision
 glob:
-description: When a new behavior is added to the kernel, it must be documented in the behavior inventory.
+description: When you want to test.
 ---
 
 # Behavior Testing & Traceability SOP
@@ -193,10 +193,30 @@ If you dismiss failures as "pre-existing," you defeat the purpose of testing.
 * **Guideline:** The project must provide a unified interface via `cargo` for executing tests at all levels.
 * **Standard Commands:**
   ```bash
-  cargo test                # Run all isolated unit tests
-  cargo xtask test all      # Run full suite (unit + behavior + regression)
-  cargo xtask test behavior # System-level behavior verification
-  cargo xtask test regress  # Static analysis and regression checks
+  # Unit tests
+  cargo test                    # Run all isolated unit tests
+  
+  # Full test suite
+  cargo xtask test              # Run complete suite (unit + behavior + regression)
+  cargo xtask test unit         # Unit tests only
+  cargo xtask test behavior     # System-level behavior verification
+  cargo xtask test regress      # Static analysis and regression checks
+  
+  # Integration tests
+  cargo xtask test debug        # Debug tools integration tests
+  cargo xtask test serial       # Serial input tests
+  cargo xtask test keyboard     # Keyboard input tests
+  cargo xtask test shutdown     # Shutdown tests
+  
+  # Screenshot tests
+  cargo xtask test screenshot   # Alpine Linux screenshot tests
+  cargo xtask test levitate     # LevitateOS display tests
+  ```
+
+* **Updating Golden Files:**
+  ```bash
+  cargo xtask test behavior --update   # Update behavior golden logs
+  cargo xtask test debug --update      # Update debug tools golden files
   ```
 
 ## VI. Diagnostic Output & System Silence
@@ -212,9 +232,69 @@ If you dismiss failures as "pre-existing," you defeat the purpose of testing.
 * **Guideline:** Provide a mechanism to enable verbose output for development and verification without modifying code.
 * **Rationale:** Ensures that "Golden Reference" tests have enough data to verify behavior while maintaining production silence.
 
-## VII. Roadmap Synchronization
+## VII. xtask Command Reference
 
-### 17. Update Roadmap After Behavior Check
+### 17. Complete xtask Command List
+
+TEAM_326: Refactored command structure for clarity.
+
+**Build Commands:**
+```bash
+cargo xtask build              # Build all (kernel + userspace + initramfs)
+cargo xtask build kernel       # Build kernel only
+cargo xtask build userspace    # Build userspace + initramfs
+cargo xtask build initramfs    # Create initramfs only
+cargo xtask build iso          # Build bootable Limine ISO (x86_64)
+```
+
+**Run Commands (flags instead of subcommands):**
+```bash
+cargo xtask run                # Build + run with GUI (most common)
+cargo xtask run --gdb          # Run with GDB server (port 1234)
+cargo xtask run --gdb --wait   # Wait for GDB connection before starting
+cargo xtask run --term         # Terminal mode (no GUI window)
+cargo xtask run --vnc          # VNC display for browser verification
+cargo xtask run --headless     # No display
+cargo xtask run --iso          # Force ISO boot
+cargo xtask run --profile pixel6  # Pixel 6 profile (aarch64 only)
+cargo xtask run --test         # Run internal OS tests
+cargo xtask run --verify-gpu   # Verify GPU display via VNC
+```
+
+**VM Interaction Commands (merged shell + debug):**
+```bash
+cargo xtask vm start           # Start persistent VM session
+cargo xtask vm stop            # Stop VM session
+cargo xtask vm send "ls"       # Send keystrokes to running VM
+cargo xtask vm exec "ls"       # Execute command in fresh VM (slow)
+cargo xtask vm screenshot      # Take screenshot of running VM
+cargo xtask vm regs            # Dump CPU registers
+cargo xtask vm mem 0x1000      # Dump memory at address
+```
+
+**Disk Management Commands:**
+```bash
+cargo xtask disk create        # Create disk image if missing
+cargo xtask disk install       # Install userspace binaries to disk
+cargo xtask disk status        # Show disk image status
+```
+
+**Utility Commands:**
+```bash
+cargo xtask check              # Run preflight checks
+cargo xtask clean              # Clean artifacts and QEMU locks
+cargo xtask kill               # Kill running QEMU instances
+```
+
+**Architecture Selection:**
+```bash
+cargo xtask --arch aarch64 run    # Run on aarch64
+cargo xtask --arch x86_64 run     # Run on x86_64 (default)
+```
+
+## VIII. Roadmap Synchronization
+
+### 18. Update Roadmap After Behavior Check
 
 * **Guideline:** After updating `docs/testing/behavior-inventory.md` with new behaviors or test coverage, verify the `docs/ROADMAP.md`.
 * **Process:**
