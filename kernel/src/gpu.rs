@@ -3,6 +3,7 @@
 //! TEAM_114: Wrapper around levitate-gpu crate for kernel use.
 //! TEAM_141: Removed duplicate Display type - use los_gpu::Display via as_display()
 //! TEAM_331: Added Limine framebuffer fallback for x86_64 when virtio-gpu unavailable
+//! TEAM_336: Made generic over transport to support both PCI (x86_64) and MMIO (AArch64)
 //!
 //! See: `docs/planning/virtio-pci/` for the implementation plan
 
@@ -12,11 +13,17 @@ use core::sync::atomic::{AtomicU32, Ordering};
 use crate::virtio::VirtioHal;
 
 // Re-export from levitate-gpu
-pub use los_gpu::{Display, GpuError};
+pub use los_gpu::GpuError;
 
-/// TEAM_331: GPU backend type - either VirtIO or Limine framebuffer
+// TEAM_337: GPU uses PCI on BOTH architectures (QEMU uses virtio-gpu-pci for all)
+type GpuTransport = los_pci::PciTransport;
+
+// TEAM_336: Re-export Display with concrete transport type
+pub type Display<'a> = los_gpu::Display<'a, VirtioHal, GpuTransport>;
+
+/// TEAM_336: GPU backend type - either VirtIO or Limine framebuffer
 enum GpuBackend {
-    VirtIO(los_gpu::Gpu<VirtioHal>),
+    VirtIO(los_gpu::Gpu<VirtioHal, GpuTransport>),
     Framebuffer(FramebufferGpu),
 }
 
@@ -114,8 +121,9 @@ impl OriginDimensions for FramebufferDisplay<'_> {
 }
 
 /// TEAM_331: Unified display wrapper for both VirtIO and Limine framebuffer
+/// TEAM_336: Display now uses arch-specific transport via type alias
 pub enum UnifiedDisplay<'a> {
-    VirtIO(Display<'a, VirtioHal>),
+    VirtIO(Display<'a>),
     Framebuffer(FramebufferDisplay<'a>),
 }
 
@@ -258,27 +266,27 @@ pub fn debug_display_status() {
     }
 }
 
-/// Initialize GPU via PCI transport, with Limine framebuffer fallback
-/// Note: mmio_base is ignored - we use PCI enumeration instead
-#[allow(unused_variables)]
-pub fn init(mmio_base: usize) {
-    log::info!("[GPU] Initializing via PCI...");
+/// TEAM_336: Initialize GPU with transport (now accepts Option<GpuTransport>)
+/// For x86_64: Pass PciTransport from PCI scan
+/// For AArch64: Pass MmioTransport from MMIO scan
+pub fn init(transport: Option<GpuTransport>) {
+    log::info!("[GPU] Initializing...");
 
-    // Try VirtIO GPU first
-    match los_pci::find_virtio_gpu::<VirtioHal>() {
-        Some(transport) => match los_gpu::Gpu::new(transport) {
+    // Try VirtIO GPU if transport is provided
+    if let Some(transport) = transport {
+        log::info!("[GPU] Attempting VirtIO GPU initialization...");
+        match los_gpu::Gpu::new(transport) {
             Ok(gpu) => {
-                log::info!("[GPU] Initialized via VirtIO PCI transport");
+                log::info!("[GPU] Initialized via VirtIO transport");
                 *GPU.lock() = Some(GpuState { backend: GpuBackend::VirtIO(gpu) });
                 return;
             }
             Err(e) => {
                 log::error!("[GPU] Failed to create VirtIO GPU: {:?}", e);
             }
-        },
-        None => {
-            log::info!("[GPU] No VirtIO GPU found on PCI bus");
         }
+    } else {
+        log::info!("[GPU] No VirtIO transport provided");
     }
 
     // TEAM_331: Fall back to Limine framebuffer if available

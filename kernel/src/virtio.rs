@@ -29,14 +29,21 @@ pub const VIRTIO_MMIO_COUNT: usize = 32;
 /// TEAM_065: Initialize GPU device only (Stage 3 - BootConsole)
 /// GPU must be available before terminal operations.
 /// Returns true if GPU was found and initialized.
-/// TEAM_114: Now uses PCI transport instead of MMIO
+/// TEAM_336: Now supports both PCI (x86_64) and MMIO (AArch64) transports
 pub fn init_gpu() -> bool {
-    // TEAM_114: GPU is now on PCI bus, not MMIO
-    // Call gpu::init which handles PCI enumeration
-    crate::gpu::init(0); // mmio_base is ignored for PCI
+    // TEAM_336: Detect GPU transport based on architecture
+    let transport = detect_gpu_transport();
+    
+    // Call gpu::init with the detected transport
+    crate::gpu::init(transport);
 
     // Check if GPU was successfully initialized
     crate::gpu::get_resolution().is_some()
+}
+
+/// TEAM_337: GPU uses PCI on both architectures (QEMU uses virtio-gpu-pci for all)
+fn detect_gpu_transport() -> Option<los_pci::PciTransport> {
+    los_pci::find_virtio_gpu::<VirtioHal>()
 }
 
 /// TEAM_065: Initialize non-GPU VirtIO devices (Stage 4 - Discovery)

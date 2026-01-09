@@ -8,7 +8,7 @@ workspace = true
 
 [dependencies]
 los_hal = { path = "../hal" }
-los_pci = { path = "../pci" }
+# TEAM_336: Removed los_pci - now generic over transport type
 # TEAM_141: Use workspace dependencies for version consistency
 virtio-drivers.workspace = true
 embedded-graphics.workspace = true

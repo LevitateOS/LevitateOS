@@ -1,9 +1,10 @@
 //! GPU Driver for LevitateOS
 //!
 //! TEAM_114: Wrapper around virtio-drivers VirtIOGpu with embedded-graphics support.
+//! TEAM_336: Made generic over transport type to support both PCI (x86_64) and MMIO (AArch64).
 //!
 //! This crate provides:
-//! - VirtIO GPU initialization via PCI transport
+//! - VirtIO GPU initialization via any transport (PCI or MMIO)
 //! - Framebuffer management
 //! - embedded-graphics DrawTarget implementation
 
@@ -13,14 +14,14 @@
 use embedded_graphics::pixelcolor::Rgb888;
 use embedded_graphics::prelude::*;
 use los_hal::serial_println;
-use los_pci::PciTransport;
 use virtio_drivers::Hal;
 use virtio_drivers::device::gpu::VirtIOGpu;
+use virtio_drivers::transport::Transport;
 
 /// GPU error type
 #[derive(Debug)]
 pub enum GpuError {
-    /// PCI device not found
+    /// Device not found
     NotFound,
     /// VirtIO driver error
     VirtioError,
@@ -29,8 +30,9 @@ pub enum GpuError {
 }
 
 /// GPU driver wrapper around virtio-drivers VirtIOGpu
-pub struct Gpu<H: Hal> {
-    inner: VirtIOGpu<H, PciTransport>,
+/// TEAM_336: Generic over transport type T to support both PCI and MMIO
+pub struct Gpu<H: Hal, T: Transport> {
+    inner: VirtIOGpu<H, T>,
     width: u32,
     height: u32,
     fb_ptr: Option<*mut u8>,
@@ -38,12 +40,12 @@ pub struct Gpu<H: Hal> {
 }
 
 // SAFETY: GPU access should be protected by a lock at the kernel level
-unsafe impl<H: Hal> Send for Gpu<H> {}
-unsafe impl<H: Hal> Sync for Gpu<H> {}
+unsafe impl<H: Hal, T: Transport> Send for Gpu<H, T> {}
+unsafe impl<H: Hal, T: Transport> Sync for Gpu<H, T> {}
 
-impl<H: Hal> Gpu<H> {
-    /// Create a new GPU driver from a PCI transport
-    pub fn new(transport: PciTransport) -> Result<Self, GpuError> {
+impl<H: Hal, T: Transport> Gpu<H, T> {
+    /// Create a new GPU driver from a transport (PCI or MMIO)
+    pub fn new(transport: T) -> Result<Self, GpuError> {
         let mut gpu = VirtIOGpu::new(transport).map_err(|_| GpuError::VirtioError)?;
 
         let (width, height) = gpu.resolution().map_err(|_| GpuError::VirtioError)?;
@@ -96,18 +98,19 @@ impl<H: Hal> Gpu<H> {
 }
 
 /// Display adapter for embedded-graphics
-pub struct Display<'a, H: Hal> {
-    gpu: &'a mut Gpu<H>,
+/// TEAM_336: Generic over transport type T
+pub struct Display<'a, H: Hal, T: Transport> {
+    gpu: &'a mut Gpu<H, T>,
 }
 
-impl<'a, H: Hal> Display<'a, H> {
+impl<'a, H: Hal, T: Transport> Display<'a, H, T> {
     /// Create a new display adapter
-    pub fn new(gpu: &'a mut Gpu<H>) -> Self {
+    pub fn new(gpu: &'a mut Gpu<H, T>) -> Self {
         Self { gpu }
     }
 }
 
-impl<H: Hal> DrawTarget for Display<'_, H> {
+impl<H: Hal, T: Transport> DrawTarget for Display<'_, H, T> {
     type Color = Rgb888;
     type Error = core::convert::Infallible;
 
@@ -133,7 +136,7 @@ impl<H: Hal> DrawTarget for Display<'_, H> {
     }
 }
 
-impl<H: Hal> OriginDimensions for Display<'_, H> {
+impl<H: Hal, T: Transport> OriginDimensions for Display<'_, H, T> {
     fn size(&self) -> Size {
         let (w, h) = self.gpu.resolution();
         Size::new(w, h)
