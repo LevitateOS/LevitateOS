@@ -1,15 +1,14 @@
-# TEAM_364: uutils-based pwd for LevitateOS
+# TEAM_364: uutils-based mv for LevitateOS
 [package]
-name = "pwd"
-version = "0.2.0"
+name = "mv"
+version = "0.1.0"
 edition = "2021"
-description = "GNU-compatible pwd from uutils-coreutils"
 
 [workspace]
 
 [dependencies]
 eyra = { version = "0.22", features = ["experimental-relocate"] }
-uu_pwd = "0.2"
+uu_mv = "0.2"
 
 [profile.release]
 panic = "abort"

@@ -1,14 +1,15 @@
-# TEAM_363: Eyra-based ls utility for LevitateOS
+# TEAM_364: uutils-based ls for LevitateOS
 [package]
 name = "ls"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
-description = "List directory contents"
+description = "GNU-compatible ls from uutils-coreutils"
 
 [workspace]
 
 [dependencies]
 eyra = { version = "0.22", features = ["experimental-relocate"] }
+uu_ls = "0.2"
 
 [profile.release]
 panic = "abort"

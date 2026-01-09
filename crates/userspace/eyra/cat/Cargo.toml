@@ -1,16 +1,16 @@
-# TEAM_363: Eyra-based cat utility for LevitateOS
+# TEAM_364: uutils-based cat for LevitateOS
 [package]
 name = "cat"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
-description = "Concatenate and print files to standard output"
+description = "GNU-compatible cat from uutils-coreutils"
 
 # Exclude from parent workspace - uses different toolchain
 [workspace]
 
-# Eyra provides std via pure-Rust Linux syscalls
 [dependencies]
 eyra = { version = "0.22", features = ["experimental-relocate"] }
+uu_cat = "0.2.2"
 
 [profile.release]
 panic = "abort"

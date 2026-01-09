@@ -1,15 +1,15 @@
-# TEAM_364: uutils-based pwd for LevitateOS
+# TEAM_366: Minimal echo for LevitateOS
+# Note: uu_echo has hard ICU dependency causing linker conflicts with Eyra
+# Using minimal implementation instead
 [package]
-name = "pwd"
-version = "0.2.0"
+name = "echo"
+version = "0.1.0"
 edition = "2021"
-description = "GNU-compatible pwd from uutils-coreutils"
 
 [workspace]
 
 [dependencies]
 eyra = { version = "0.22", features = ["experimental-relocate"] }
-uu_pwd = "0.2"
 
 [profile.release]
 panic = "abort"
