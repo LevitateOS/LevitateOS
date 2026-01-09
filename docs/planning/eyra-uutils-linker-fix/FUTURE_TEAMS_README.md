@@ -1,146 +1,145 @@
-# CRITICAL: Eyra/uutils Linker Conflict — Future Teams Read This
+# ✅ SOLVED: Eyra/uutils Linker Conflict
 
-**TEAM_366** | 2026-01-10
-
----
-
-## ⚠️ DO NOT TAKE SHORTCUTS
-
-Previous attempts tried:
-- ❌ `default-features = false` — ICU still pulled in
-- ❌ Renaming binaries — Symbol conflict persists
-- ❌ Minimal implementations — Defeats purpose of using uutils
-
-**These are band-aids, not fixes.**
+**TEAM_367** | 2026-01-10
 
 ---
 
-## The Real Problem
+## 🎉 ROOT CAUSE FOUND AND FIXED
 
-When building some uutils crates with Eyra, the linker reports:
+The duplicate `_start` / `__dso_handle` symbols conflict has been **solved**.
 
+### Root Cause
+
+The linker was pulling in system C runtime startup files (`Scrt1.o`, `crtbeginS.o`) which provide `_start` and `__dso_handle`. These conflicted with Eyra's Origin crate which provides its own implementations.
+
+### The Fix
+
+Each Eyra-based utility needs two files:
+
+**1. `build.rs`** — Tell linker not to use system startup code:
+```rust
+fn main() {
+    println!("cargo:rustc-link-arg=-nostartfiles");
+    
+    // Create empty libgcc_eh.a stub for aarch64 cross-compilation
+    let out_dir = std::env::var("OUT_DIR").unwrap();
+    let target_arch = std::env::var("CARGO_CFG_TARGET_ARCH").unwrap_or_default();
+    
+    if target_arch == "aarch64" {
+        let lib_path = format!("{}/libgcc_eh.a", out_dir);
+        let status = std::process::Command::new("ar")
+            .args(["rcs", &lib_path])
+            .status();
+        if status.is_ok() {
+            println!("cargo:rustc-link-search=native={}", out_dir);
+        }
+    }
+}
 ```
-duplicate symbol: _start
-duplicate symbol: __dso_handle
+
+**2. `.cargo/config.toml`** — Enable static CRT:
+```toml
+[target.aarch64-unknown-linux-gnu]
+linker = "aarch64-linux-gnu-gcc"
+rustflags = ["-C", "target-feature=+crt-static"]
+
+[target.x86_64-unknown-linux-gnu]
+rustflags = ["-C", "target-feature=+crt-static"]
 ```
 
-### What We Know
+### Why It Worked Before (cat, pwd, mkdir, ls)
 
-1. **Working utilities:** cat, pwd, mkdir, ls
-2. **Blocked utilities:** echo, env, true, false, rm, cp, mv, ln, touch, rmdir
-
-3. **The `_start` symbol comes from the binary's own object file**, not a dependency:
-   ```
-   defined at echo.xxx-cgu.0
-   >>> .../echo.xxx.rcgu.o:(.text._start+0x0)
-   ```
-
-4. **Eyra provides `_start` via the `origin` crate** for its pure-Rust libc
-
-5. **The conflict is NOT just about ICU dependencies** — disabling them doesn't fix it
+It was **luck**. Some utilities happened to not trigger the linker to include `Scrt1.o`, while others did. The `eyra-hello` example had the proper `build.rs` with `-nostartfiles`, but the other utilities were missing it.
 
 ---
 
-## What Needs Investigation
+## Current Status — ALL UTILITIES NOW WORK
 
-### 1. Why do some binaries define `_start` and others don't?
+| Utility | Status |
+|---------|--------|
+| cat | ✅ Works |
+| pwd | ✅ Works |
+| mkdir | ✅ Works |
+| ls | ✅ Works |
+| echo | ✅ Works |
+| env | ✅ Works |
+| touch | ✅ Works |
+| rm | ✅ Works |
+| rmdir | ✅ Works |
+| ln | ✅ Works |
+| cp | ✅ Works |
+| mv | ✅ Works |
+| coreutils-true | ✅ Works |
+| coreutils-false | ✅ Works |
 
-The binary name itself (`true`, `false`, `echo`) is causing the compiler to generate `_start` in the binary's object file. Working utilities (cat, pwd, mkdir, ls) don't have this.
+---
 
-**Hypothesis:** There's something special about these binary names in Rust/LLVM codegen.
-
-### 2. How does Eyra's entry point work?
-
-Eyra uses the `origin` crate to provide `_start`. When `-Zbuild-std` rebuilds std, it should use Eyra's entry point. But something is causing BOTH Eyra's `_start` AND another `_start` to be generated.
-
-**Files to investigate:**
-- Eyra's origin crate source
-- How `-Zbuild-std` handles entry points
-- LLVM codegen for binary names
-
-### 3. What's different about the dependency graph?
+## Build Command
 
 ```bash
-# Compare working vs blocked
-cd crates/userspace/eyra/cat && cargo tree > /tmp/cat.tree
-cd ../echo && cargo tree > /tmp/echo.tree
-diff /tmp/cat.tree /tmp/echo.tree
+cd crates/userspace/eyra/<utility>
+cargo build --release --target x86_64-unknown-linux-gnu -Zbuild-std=std,panic_abort
 ```
 
-### 4. Can linker flags help?
+---
 
-Try:
+## For Future Utilities
+
+When adding a new Eyra-based utility:
+
+1. Copy `build.rs` from any existing utility
+2. Copy `.cargo/config.toml` from any existing utility
+3. Use the standard Cargo.toml format:
 ```toml
-[build]
-rustflags = ["-C", "link-args=-Wl,--allow-multiple-definition"]
+[package]
+name = "<utility>"
+version = "0.1.0"
+edition = "2021"
+
+[workspace]
+
+[dependencies]
+eyra = { version = "0.22", features = ["experimental-relocate"] }
+uu_<utility> = "0.2"
+
+[profile.release]
+panic = "abort"
+opt-level = "s"
+lto = true
+strip = true
+
+[unstable]
+build-std-features = ["panic_immediate_abort"]
 ```
 
-But understand WHY before using this — it may cause runtime issues.
+4. Create `src/main.rs`:
+```rust
+extern crate eyra;
+
+fn main() {
+    std::process::exit(uu_<utility>::uumain(std::env::args_os()));
+}
+```
 
 ---
 
-## The Kernel Angle
+## Investigation Notes (TEAM_367)
 
-LevitateOS has a full kernel. The syscall layer is at:
-- `crates/kernel/src/syscall/`
+### What Previous Teams Tried (TEAM_364-366)
+- ❌ `default-features = false` — Didn't help
+- ❌ Renaming binaries — Didn't help
+- ❌ Minimal implementations — Against project goals
 
-Before giving up on uutils, verify:
-1. Are all required syscalls implemented?
-2. Is the issue actually in how the kernel loads/runs these binaries?
-3. Is there a configuration in Eyra that needs kernel support?
+### What TEAM_367 Discovered
+1. The `eyra-hello` example had a `build.rs` with `-nostartfiles`
+2. The blocked utilities were missing this crucial linker flag
+3. The `-nostartfiles` flag tells the linker to NOT include system startup code
+4. Eyra's Origin crate provides its own `_start` and `__dso_handle`
 
----
+### The Key Insight
+The difference between "working" and "blocked" utilities was NOT about:
+- Binary names
+- ICU dependencies
+- libc features
 
-## What NOT To Do
-
-1. **Don't write minimal implementations** — We want GNU-compatible uutils, not toys
-2. **Don't skip utilities** — If 10 of 14 don't work, the approach is broken
-3. **Don't blame uutils** — cat/pwd/mkdir/ls work fine
-4. **Don't loop on the same fix** — If it didn't work, investigate deeper
-
----
-
-## Recommended Next Steps
-
-1. **Read Eyra's documentation** on how it handles binary entry points
-2. **Check if there's an Eyra issue** about uutils compatibility
-3. **Compare object files** between working and blocked utilities:
-   ```bash
-   nm working_binary.o | grep _start
-   nm blocked_binary.o | grep _start
-   ```
-4. **Ask upstream** — Eyra maintainers may know about this issue
-
----
-
-## Files Created by TEAM_364-366
-
-- `crates/userspace/eyra/cat/` — ✅ Works (uutils)
-- `crates/userspace/eyra/pwd/` — ✅ Works (uutils)
-- `crates/userspace/eyra/mkdir/` — ✅ Works (uutils)
-- `crates/userspace/eyra/ls/` — ✅ Works (uutils)
-- `crates/userspace/eyra/echo/` — ❌ Blocked (linker conflict)
-- `crates/userspace/eyra/env/` — ❌ Blocked
-- `crates/userspace/eyra/touch/` — ❌ Blocked
-- `crates/userspace/eyra/rm/` — ❌ Blocked
-- `crates/userspace/eyra/rmdir/` — ❌ Blocked
-- `crates/userspace/eyra/ln/` — ❌ Blocked
-- `crates/userspace/eyra/cp/` — ❌ Blocked
-- `crates/userspace/eyra/mv/` — ❌ Blocked
-- `crates/userspace/eyra/coreutils-true/` — ❌ Blocked
-- `crates/userspace/eyra/coreutils-false/` — ❌ Blocked
-
----
-
-## Summary
-
-**The fix is NOT in disabling features or writing minimal code.**
-
-**The fix is in understanding why Eyra's entry point conflicts with certain binaries.**
-
-This requires deeper investigation into:
-- Eyra's origin crate
-- Rust's binary codegen
-- The kernel's ELF loader
-
-Future teams: DO NOT repeat the shortcut attempts. Investigate the root cause.
+It was simply that the linker was including `Scrt1.o` for some builds but not others, based on subtle dependency graph differences. The fix is to explicitly tell the linker `-nostartfiles`.

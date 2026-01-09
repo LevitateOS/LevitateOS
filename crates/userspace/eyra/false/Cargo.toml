@@ -1,7 +1,7 @@
-# TEAM_364: Minimal true for LevitateOS
-# Note: uu_true has linker conflicts with Eyra, so using minimal impl
+# TEAM_367: uutils-based false for LevitateOS
+# Fixed linker conflict by adding build.rs with -nostartfiles
 [package]
-name = "coreutils-true"
+name = "coreutils-false"
 version = "0.1.0"
 edition = "2021"
 
@@ -9,7 +9,9 @@ edition = "2021"
 
 [dependencies]
 eyra = { version = "0.22", features = ["experimental-relocate"] }
+uu_false = "0.2"
 
+# TEAM_367: Fixed - added build.rs with -nostartfiles
 [profile.release]
 panic = "abort"
 opt-level = "s"

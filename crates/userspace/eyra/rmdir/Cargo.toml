@@ -10,6 +10,7 @@ edition = "2021"
 eyra = { version = "0.22", features = ["experimental-relocate"] }
 uu_rmdir = "0.2"
 
+# TEAM_367: Fixed - added build.rs with -nostartfiles
 [profile.release]
 panic = "abort"
 opt-level = "s"

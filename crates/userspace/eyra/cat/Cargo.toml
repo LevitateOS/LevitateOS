@@ -12,6 +12,7 @@ description = "GNU-compatible cat from uutils-coreutils"
 eyra = { version = "0.22", features = ["experimental-relocate"] }
 uu_cat = "0.2.2"
 
+# TEAM_367: Fixed - added build.rs with -nostartfiles
 [profile.release]
 panic = "abort"
 opt-level = "s"
