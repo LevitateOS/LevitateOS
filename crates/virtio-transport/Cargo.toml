@@ -2,6 +2,7 @@
 name = "virtio-transport"
 version = "0.1.0"
 edition = "2021"
+readme = "README.md"
 description = "Unified VirtIO transport abstraction for LevitateOS"
 license = "MIT"
 

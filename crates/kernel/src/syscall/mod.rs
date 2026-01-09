@@ -11,25 +11,30 @@ pub mod time;
 pub use crate::arch::{Stat, SyscallFrame, SyscallNumber, Timespec, is_svc_exception};
 
 /// TEAM_073: Error codes for syscalls.
+/// TEAM_342: Consolidated errno constants - single source of truth.
 pub mod errno {
     pub const ENOENT: i64 = -2;
+    pub const EIO: i64 = -5;
     pub const EBADF: i64 = -9;
-    pub const ENOMEM: i64 = -12; // TEAM_230: Added for thread creation
+    pub const ENOMEM: i64 = -12;
+    pub const EACCES: i64 = -13;
     pub const EFAULT: i64 = -14;
     pub const EEXIST: i64 = -17;
+    pub const EXDEV: i64 = -18;      // Cross-device link
+    pub const ENOTDIR: i64 = -20;
     pub const EINVAL: i64 = -22;
-    pub const ENOSYS: i64 = -38;
-    pub const EIO: i64 = -5;
+    pub const EMFILE: i64 = -24;
     pub const ENOTTY: i64 = -25;
+    pub const ERANGE: i64 = -34;     // Result too large
+    pub const ENAMETOOLONG: i64 = -36;
+    pub const ENOSYS: i64 = -38;
+    pub const ENOTEMPTY: i64 = -39;  // Directory not empty
 }
 
+/// TEAM_342: Deprecated - use errno module instead. Kept for backward compatibility.
+#[deprecated(note = "Use errno module instead")]
 pub mod errno_file {
-    pub const ENOENT: i64 = -2;
-    pub const EMFILE: i64 = -24;
-    pub const ENOTDIR: i64 = -20;
-    pub const EACCES: i64 = -13;
-    pub const EEXIST: i64 = -17;
-    pub const EIO: i64 = -5;
+    pub use super::errno::*;
 }
 
 pub fn syscall_dispatch(frame: &mut SyscallFrame) {

@@ -3,6 +3,7 @@
 name = "ulib"
 version = "0.1.0"
 edition = "2021"
+readme = "README.md"
 authors = ["LevitateOS Contributors"]
 description = "Userspace standard library for LevitateOS"
 

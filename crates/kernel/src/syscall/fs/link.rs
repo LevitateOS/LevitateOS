@@ -2,7 +2,7 @@ use crate::memory::user as mm_user;
 
 use crate::fs::vfs::dispatch::*;
 use crate::fs::vfs::error::VfsError;
-use crate::syscall::{errno, errno_file, write_to_user_buf};
+use crate::syscall::{errno, write_to_user_buf};
 
 /// TEAM_198: UTIME_NOW constant - set time to current time
 const UTIME_NOW: u64 = 0x3FFFFFFF;
@@ -153,9 +153,9 @@ pub fn sys_symlinkat(
 
     match vfs_symlink(target_str, linkpath_str) {
         Ok(()) => 0,
-        Err(VfsError::AlreadyExists) => -17, // EEXIST
-        Err(VfsError::NotFound) => errno_file::ENOENT,
-        Err(VfsError::NotADirectory) => errno_file::ENOTDIR,
+        Err(VfsError::AlreadyExists) => errno::EEXIST,
+        Err(VfsError::NotFound) => errno::ENOENT,
+        Err(VfsError::NotADirectory) => errno::ENOTDIR,
         Err(_) => errno::EINVAL,
     }
 }
@@ -180,7 +180,7 @@ pub fn sys_readlinkat(_dirfd: i32, path: usize, path_len: usize, buf: usize, buf
             }
             n as i64
         }
-        Err(VfsError::NotFound) => errno_file::ENOENT,
+        Err(VfsError::NotFound) => errno::ENOENT,
         Err(_) => errno::EIO,
     }
 }

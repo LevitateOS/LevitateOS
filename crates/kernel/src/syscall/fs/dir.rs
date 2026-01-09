@@ -2,7 +2,7 @@ use crate::memory::user as mm_user;
 
 use crate::fs::vfs::dispatch::*;
 use crate::fs::vfs::error::VfsError;
-use crate::syscall::{errno, errno_file, write_to_user_buf};
+use crate::syscall::{errno, write_to_user_buf};
 use crate::task::fd_table::FdType;
 
 // TEAM_176: Dirent64 structure for getdents syscall.
@@ -96,7 +96,7 @@ pub fn sys_getdents(fd: usize, buf: usize, buf_len: usize) -> i64 {
             }
             bytes_written as i64
         }
-        _ => errno_file::ENOTDIR,
+        _ => errno::ENOTDIR,
     }
 }
 
@@ -110,7 +110,7 @@ pub fn sys_getcwd(buf: usize, size: usize) -> i64 {
     let path = cwd_lock.as_str();
     let path_len = path.len();
     if size < path_len + 1 {
-        return -34; // ERANGE
+        return errno::ERANGE;
     }
 
     for (i, &byte) in path.as_bytes().iter().enumerate() {
@@ -137,9 +137,9 @@ pub fn sys_mkdirat(_dfd: i32, path: usize, path_len: usize, mode: u32) -> i64 {
 
     match vfs_mkdir(path_str, mode) {
         Ok(()) => 0,
-        Err(VfsError::AlreadyExists) => -17, // EEXIST
-        Err(VfsError::NotFound) => errno_file::ENOENT,
-        Err(VfsError::NotADirectory) => errno_file::ENOTDIR,
+        Err(VfsError::AlreadyExists) => errno::EEXIST,
+        Err(VfsError::NotFound) => errno::ENOENT,
+        Err(VfsError::NotADirectory) => errno::ENOTDIR,
         Err(_) => errno::EINVAL,
     }
 }
@@ -165,9 +165,9 @@ pub fn sys_unlinkat(_dfd: i32, path: usize, path_len: usize, flags: u32) -> i64 
 
     match res {
         Ok(()) => 0,
-        Err(VfsError::NotFound) => errno_file::ENOENT,
-        Err(VfsError::NotADirectory) => errno_file::ENOTDIR,
-        Err(VfsError::DirectoryNotEmpty) => -39, // ENOTEMPTY
+        Err(VfsError::NotFound) => errno::ENOENT,
+        Err(VfsError::NotADirectory) => errno::ENOTDIR,
+        Err(VfsError::DirectoryNotEmpty) => errno::ENOTEMPTY,
         Err(_) => errno::EINVAL,
     }
 }
@@ -200,9 +200,9 @@ pub fn sys_renameat(
 
     match vfs_rename(old_path_str, new_path_str) {
         Ok(()) => 0,
-        Err(VfsError::NotFound) => errno_file::ENOENT,
-        Err(VfsError::NotADirectory) => errno_file::ENOTDIR,
-        Err(VfsError::CrossDevice) => -18, // EXDEV
+        Err(VfsError::NotFound) => errno::ENOENT,
+        Err(VfsError::NotADirectory) => errno::ENOTDIR,
+        Err(VfsError::CrossDevice) => errno::EXDEV,
         Err(_) => errno::EINVAL,
     }
 }

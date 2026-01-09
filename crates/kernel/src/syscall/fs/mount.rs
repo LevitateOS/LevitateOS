@@ -1,6 +1,6 @@
 // use crate::memory::user as mm_user;
 
-use crate::syscall::{errno, errno_file};
+use crate::syscall::errno;
 use core::convert::TryFrom;
 
 // TEAM_206: Mount a filesystem
@@ -57,7 +57,7 @@ pub fn sys_mount(
             crate::fs::mount::MountError::NotMounted => errno::EINVAL,
             crate::fs::mount::MountError::InvalidMountpoint => errno::ENOENT,
             crate::fs::mount::MountError::UnsupportedFsType => errno::EINVAL, // or ENODEV
-            crate::fs::mount::MountError::PermissionDenied => errno_file::EACCES,
+            crate::fs::mount::MountError::PermissionDenied => errno::EACCES,
         },
     }
 }

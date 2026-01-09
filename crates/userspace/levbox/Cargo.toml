@@ -2,6 +2,7 @@
 name = "levbox"
 version = "0.1.0"
 edition = "2021"
+readme = "README.md"
 description = "Levbox - busybox-style utilities for LevitateOS"
 
 [lints]

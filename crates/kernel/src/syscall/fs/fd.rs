@@ -1,6 +1,6 @@
 //! TEAM_233: File descriptor duplication syscalls.
 
-use crate::syscall::{errno, errno_file};
+use crate::syscall::errno;
 use crate::task::current_task;
 use crate::task::fd_table::FdType;
 
@@ -62,7 +62,7 @@ pub fn sys_pipe2(pipefd_ptr: usize, _flags: u32) -> i64 {
 
         let read_fd = match fd_table.alloc(FdType::PipeRead(pipe.clone())) {
             Some(fd) => fd,
-            None => return errno_file::EMFILE,
+            None => return errno::EMFILE,
         };
 
         let write_fd = match fd_table.alloc(FdType::PipeWrite(pipe.clone())) {
@@ -70,7 +70,7 @@ pub fn sys_pipe2(pipefd_ptr: usize, _flags: u32) -> i64 {
             None => {
                 // Clean up read fd
                 fd_table.close(read_fd);
-                return errno_file::EMFILE;
+                return errno::EMFILE;
             }
         };
 

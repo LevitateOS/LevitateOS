@@ -2,6 +2,7 @@
 name = "systest"
 version = "0.1.0"
 edition = "2021"
+readme = "README.md"
 description = "System regression tests for LevitateOS"
 
 [lints]

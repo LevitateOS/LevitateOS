@@ -103,10 +103,10 @@ Execute the fix in batched changes, with tests after each batch.
 - Use architecture-conditional logic
 - Add ppoll-based implementation for aarch64
 
-#### UoW 4.2: Consolidate errno definitions
-- Merge `errno` and `errno_file` modules
-- Replace all magic numbers with constants
-- Use `linux_raw_sys::errno` in kernel
+#### UoW 4.2: Consolidate errno definitions ✅ DONE (TEAM_342)
+- ~~Merge `errno` and `errno_file` modules~~ ✅
+- ~~Replace all magic numbers with constants~~ ✅
+- ~~Add ERANGE, ENAMETOOLONG, EXDEV, ENOTEMPTY~~ ✅
 
 #### UoW 4.3: Verify Termios struct
 - Compare kernel Termios to Linux

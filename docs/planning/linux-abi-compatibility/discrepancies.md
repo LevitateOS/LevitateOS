@@ -35,17 +35,20 @@
 
 ## Error Code Issues
 
-| Issue | Location | Problem |
-|-------|----------|---------|
-| Duplicate errno modules | `syscall/mod.rs:14-33` | `errno` and `errno_file` overlap |
-| Magic numbers | Various | `-34` instead of `ERANGE`, etc. |
+| Issue | Location | Problem | Status |
+|-------|----------|---------|--------|
+| Duplicate errno modules | `syscall/mod.rs:14-33` | `errno` and `errno_file` overlap | ✅ Fixed (TEAM_342) |
+| Magic numbers | Various | `-34` instead of `ERANGE`, etc. | ✅ Fixed (TEAM_342) |
 
 ## Missing Linux Constants
 
-| Constant | Value | Needed For |
-|----------|-------|------------|
-| `AT_FDCWD` | -100 | dirfd parameter |
-| `ENAMETOOLONG` | 36 | Path too long error |
+| Constant | Value | Needed For | Status |
+|----------|-------|------------|--------|
+| `AT_FDCWD` | -100 | dirfd parameter | ❌ Still needed |
+| `ENAMETOOLONG` | 36 | Path too long error | ✅ Added (TEAM_342) |
+| `ERANGE` | 34 | getcwd buffer too small | ✅ Added (TEAM_342) |
+| `EXDEV` | 18 | Cross-device link | ✅ Added (TEAM_342) |
+| `ENOTEMPTY` | 39 | Directory not empty | ✅ Added (TEAM_342) |
 
 ## Implementation Order
 

@@ -2,6 +2,7 @@
 name = "virtio-input"
 version = "0.1.0"
 edition = "2021"
+readme = "README.md"
 description = "VirtIO Input driver for LevitateOS"
 license = "MIT"
 

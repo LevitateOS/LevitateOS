@@ -258,7 +258,7 @@ pub fn sys_spawn_args(path_ptr: usize, path_len: usize, argv_ptr: usize, argc: u
             Some(d) => alloc::vec::Vec::from(d),
             None => {
                 log::debug!("[SYSCALL] spawn_args: '{}' not found in initramfs", path);
-                return crate::syscall::errno_file::ENOENT;
+                return crate::syscall::errno::ENOENT;
             }
         }
         // Lock released here

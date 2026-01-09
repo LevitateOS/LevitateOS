@@ -3,7 +3,7 @@ use crate::memory::user as mm_user;
 use crate::fs::vfs::dispatch::*;
 use crate::fs::vfs::error::VfsError;
 use crate::fs::vfs::file::OpenFlags;
-use crate::syscall::{errno, errno_file};
+use crate::syscall::errno;
 use crate::task::fd_table::FdType;
 
 /// TEAM_168: sys_openat - Open a file from initramfs.
@@ -39,7 +39,7 @@ pub fn sys_openat(path: usize, path_len: usize, flags: u32) -> i64 {
             let mut fd_table = task.fd_table.lock();
             match fd_table.alloc(FdType::PtyMaster(pair)) {
                 Some(fd) => return fd as i64,
-                None => return errno_file::EMFILE,
+                None => return errno::EMFILE,
             }
         }
         return errno::ENOMEM;
@@ -51,11 +51,11 @@ pub fn sys_openat(path: usize, path_len: usize, flags: u32) -> i64 {
                 let mut fd_table = task.fd_table.lock();
                 match fd_table.alloc(FdType::PtySlave(pair)) {
                     Some(fd) => return fd as i64,
-                    None => return errno_file::EMFILE,
+                    None => return errno::EMFILE,
                 }
             }
         }
-        return errno_file::ENOENT;
+        return errno::ENOENT;
     }
 
     // TEAM_205: All paths now go through generic vfs_open
@@ -65,16 +65,16 @@ pub fn sys_openat(path: usize, path_len: usize, flags: u32) -> i64 {
             let mut fd_table = task.fd_table.lock();
             match fd_table.alloc(FdType::VfsFile(file)) {
                 Some(fd) => fd as i64,
-                None => errno_file::EMFILE,
+                None => errno::EMFILE,
             }
         }
-        Err(VfsError::NotFound) => errno_file::ENOENT,
-        Err(VfsError::AlreadyExists) => errno_file::EEXIST,
-        Err(VfsError::NotADirectory) => errno_file::ENOTDIR,
+        Err(VfsError::NotFound) => errno::ENOENT,
+        Err(VfsError::AlreadyExists) => errno::EEXIST,
+        Err(VfsError::NotADirectory) => errno::ENOTDIR,
         Err(VfsError::IsADirectory) => {
-            errno_file::EIO // Should not normally happen if vfs_open succeeded
+            errno::EIO // Should not normally happen if vfs_open succeeded
         }
-        Err(_) => errno_file::EIO,
+        Err(_) => errno::EIO,
     }
 }
 
