@@ -10,6 +10,22 @@ pub mod time;
 
 pub use crate::arch::{Stat, SyscallFrame, SyscallNumber, Timespec, is_svc_exception};
 
+/// TEAM_345: Linux file system constants for *at() syscalls.
+pub mod fcntl {
+    /// Special value for dirfd meaning "use current working directory"
+    pub const AT_FDCWD: i32 = -100;
+    /// Don't follow symbolic links
+    pub const AT_SYMLINK_NOFOLLOW: u32 = 0x100;
+    /// Remove directory instead of file
+    pub const AT_REMOVEDIR: u32 = 0x200;
+    /// Follow symbolic links (for linkat)
+    pub const AT_SYMLINK_FOLLOW: u32 = 0x400;
+    /// Suppress terminal automount traversal
+    pub const AT_NO_AUTOMOUNT: u32 = 0x800;
+    /// Allow empty relative pathname
+    pub const AT_EMPTY_PATH: u32 = 0x1000;
+}
+
 /// TEAM_073: Error codes for syscalls.
 /// TEAM_342: Consolidated errno constants - single source of truth.
 pub mod errno {
@@ -295,4 +311,40 @@ pub fn copy_user_string<'a>(
         }
     }
     core::str::from_utf8(&buf[..len]).map_err(|_| errno::EINVAL)
+}
+
+/// TEAM_345: Read a null-terminated C string from user space into a kernel buffer.
+///
+/// This is the Linux ABI-compatible version that scans for null terminator.
+/// Used for syscalls that accept `const char *pathname` arguments.
+///
+/// # Arguments
+/// * `ttbr0` - User page table physical address
+/// * `user_ptr` - User virtual address of null-terminated string
+/// * `buf` - Kernel buffer to copy into (max path length)
+///
+/// # Returns
+/// * `Ok(&str)` - Valid UTF-8 string slice from buffer (without null terminator)
+/// * `Err(errno)` - EFAULT if copy fails, EINVAL if not valid UTF-8, ENAMETOOLONG if no null found
+pub fn read_user_cstring<'a>(
+    ttbr0: usize,
+    user_ptr: usize,
+    buf: &'a mut [u8],
+) -> Result<&'a str, i64> {
+    for i in 0..buf.len() {
+        match mm_user::user_va_to_kernel_ptr(ttbr0, user_ptr + i) {
+            Some(ptr) => {
+                // SAFETY: user_va_to_kernel_ptr ensures the address is mapped and valid.
+                let byte = unsafe { *ptr };
+                if byte == 0 {
+                    // Found null terminator - return the string up to this point
+                    return core::str::from_utf8(&buf[..i]).map_err(|_| errno::EINVAL);
+                }
+                buf[i] = byte;
+            }
+            None => return Err(errno::EFAULT),
+        }
+    }
+    // Buffer full without finding null terminator
+    Err(errno::ENAMETOOLONG)
 }

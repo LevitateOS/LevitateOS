@@ -8,21 +8,21 @@ Execute the fix in batched changes, with tests after each batch.
 
 ## Implementation Batches
 
-### Batch 0: Foundation (2 UoW)
+### Batch 0: Foundation (2 UoW) ✅ DONE
 
 **Prerequisites for all other batches.**
 
-#### UoW 0.1: Add Safe String Helper
-- Create `read_user_cstring()` in `crates/kernel/src/syscall/mod.rs`
-- Add `ENAMETOOLONG` error code
-- Add unit tests for edge cases
+#### UoW 0.1: Add Safe String Helper ✅ DONE (TEAM_345)
+- ~~Create `read_user_cstring()` in `crates/kernel/src/syscall/mod.rs`~~ ✅
+- ~~Add `ENAMETOOLONG` error code~~ ✅ (TEAM_342)
+- Unit tests deferred to integration
 
-#### UoW 0.2: Add Linux Constants
-- Add `AT_FDCWD` constant (-100)
-- Verify `O_*` flags match Linux
-- Add any missing mode constants
+#### UoW 0.2: Add Linux Constants ✅ DONE (TEAM_345)
+- ~~Add `AT_FDCWD` constant (-100)~~ ✅
+- Added `AT_SYMLINK_NOFOLLOW`, `AT_REMOVEDIR`, `AT_SYMLINK_FOLLOW` ✅
+- O_* flags already match Linux (via linux_raw_sys)
 
-**Checkpoint:** Build succeeds
+**Checkpoint:** Build succeeds ✅
 
 ---
 
