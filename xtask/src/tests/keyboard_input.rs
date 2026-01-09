@@ -45,7 +45,8 @@ pub fn run(arch: &str) -> Result<()> {
         "-netdev", "user,id=net0",
         "-drive", "file=tinyos_disk.img,format=raw,if=none,id=hd0",
         "-device", "virtio-blk-device,drive=hd0",
-        "-initrd", "initramfs.cpio",
+        // TEAM_327: Use arch-specific initramfs
+        "-initrd", "initramfs_aarch64.cpio",
         "-serial", "mon:stdio",
         "-qmp", "unix:./qmp.sock,server,nowait",
         "-no-reboot",

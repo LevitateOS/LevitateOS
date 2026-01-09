@@ -104,8 +104,10 @@ pub fn create_initramfs(arch: &str) -> Result<()> {
     println!("[DONE] ({} added)", count);
 
     // 3. Create CPIO archive
-    // usage: find . | cpio -o -H newc > ../initramfs.cpio
-    let cpio_file = std::fs::File::create("initramfs.cpio")?;
+    // TEAM_327: Use arch-specific filename to prevent cross-arch contamination
+    // usage: find . | cpio -o -H newc > ../initramfs_{arch}.cpio
+    let cpio_filename = format!("initramfs_{}.cpio", arch);
+    let cpio_file = std::fs::File::create(&cpio_filename)?;
     
     let find = Command::new("find")
         .current_dir(&root)
@@ -293,14 +295,15 @@ fn build_iso_with_features(features: &[&str], arch: &str) -> Result<()> {
 
     // 2. Copy components to ISO root
     let kernel_path = "target/x86_64-unknown-none/release/levitate-kernel";
-    let initramfs_path = "initramfs.cpio";
+    // TEAM_327: Use arch-specific initramfs path
+    let initramfs_path = format!("initramfs_{}.cpio", arch);
     let limine_cfg_path = "limine.cfg";
 
     std::fs::copy(kernel_path, boot_dir.join("levitate-kernel"))
         .context("Failed to copy levitate-kernel to ISO boot dir")?;
-    if std::path::Path::new(initramfs_path).exists() {
-        std::fs::copy(initramfs_path, boot_dir.join("initramfs.cpio"))
-            .context("Failed to copy initramfs.cpio to ISO boot dir")?;
+    if std::path::Path::new(&initramfs_path).exists() {
+        std::fs::copy(&initramfs_path, boot_dir.join("initramfs.cpio"))
+            .context("Failed to copy initramfs to ISO boot dir")?;
     }
     std::fs::copy(limine_cfg_path, iso_root.join("limine.cfg"))
         .context("Failed to copy limine.cfg - ensure it exists in repo root")?;

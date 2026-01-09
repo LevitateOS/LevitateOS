@@ -185,13 +185,20 @@ fn main() -> Result<()> {
             "serial" => tests::serial_input::run(arch)?,
             "keyboard" => tests::keyboard_input::run(arch)?,
             "shutdown" => tests::shutdown::run(arch)?,
+            // TEAM_327: Backspace regression test
+            "backspace" => tests::backspace::run(arch)?,
             // TEAM_325: Debug tools integration tests (both architectures)
             "debug" => tests::debug_tools::run(args.update)?,
-            // TEAM_325: Alpine Linux screenshot tests
-            "screenshot" | "alpine" => tests::screenshot_alpine::run()?,
-            // TEAM_325: LevitateOS screenshot tests
-            "levitate" | "display" => tests::screenshot_levitate::run()?,
-            other => bail!("Unknown test suite: {}. Use 'unit', 'behavior', 'regress', 'gicv3', 'serial', 'keyboard', 'shutdown', 'debug', 'screenshot', or 'all'", other),
+            // TEAM_327: New unified screenshot tests
+            "screenshot" => tests::screenshot::run(None)?,
+            "screenshot:alpine" => tests::screenshot::run(Some("alpine"))?,
+            "screenshot:levitate" => tests::screenshot::run(Some("levitate"))?,
+            "screenshot:userspace" => tests::screenshot::run(Some("userspace"))?,
+            // Legacy aliases
+            "alpine" => tests::screenshot::run(Some("alpine"))?,
+            "levitate" | "display" => tests::screenshot::run(Some("levitate"))?,
+            "userspace" => tests::screenshot::run(Some("userspace"))?,
+            other => bail!("Unknown test suite: {}. Use 'unit', 'behavior', 'regress', 'gicv3', 'serial', 'keyboard', 'shutdown', 'debug', 'screenshot', 'screenshot:userspace', or 'all'", other),
         },
         // TEAM_326: Refactored command handlers
         Commands::Run(args) => {

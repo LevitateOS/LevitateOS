@@ -81,7 +81,24 @@ impl TtyState {
             }
         }
 
-        // 3. Echoing
+        // TEAM_327: Handle erase characters BEFORE generic echo
+        // This prevents ^H from being echoed before the visual erase
+        if (self.termios.c_lflag & ICANON) != 0 {
+            // Handle both BS (0x08) and DEL (0x7F) as erase characters
+            if byte == self.termios.c_cc[VERASE] || byte == 0x08 || byte == 0x7F {
+                if let Some(_last) = self.canon_buffer.pop_back() {
+                    if (self.termios.c_lflag & ECHOE) != 0 {
+                        // Visual erase: backspace - space - backspace
+                        self.echo(b'\x08');
+                        self.echo(b' ');
+                        self.echo(b'\x08');
+                    }
+                }
+                return false;
+            }
+        }
+
+        // 3. Echoing (after special character handling)
         if (self.termios.c_lflag & ECHO) != 0 {
             if byte == b'\n' {
                 self.echo(b'\r');
@@ -97,17 +114,7 @@ impl TtyState {
 
         // 4. Line Discipline (Canonical vs Non-canonical)
         if (self.termios.c_lflag & ICANON) != 0 {
-            if byte == self.termios.c_cc[VERASE] {
-                if let Some(_last) = self.canon_buffer.pop_back() {
-                    if (self.termios.c_lflag & ECHOE) != 0 {
-                        // Visual erase: backspace - space - backspace
-                        self.echo(b'\x08');
-                        self.echo(b' ');
-                        self.echo(b'\x08');
-                    }
-                }
-                return false;
-            }
+            // Erase already handled above
             if byte == self.termios.c_cc[VKILL] {
                 self.canon_buffer.clear();
                 // TODO: Visual kill

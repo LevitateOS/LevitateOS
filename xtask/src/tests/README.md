@@ -7,6 +7,9 @@ Automated test suites for LevitateOS.
 | File | Description |
 |------|-------------|
 | `mod.rs` | Module exports |
+| `backspace.rs` | **NEW** Backspace regression test (prevents ^H echo bug) |
+| `common.rs` | **NEW** Shared test utilities (QemuSession, etc.) |
+| `screenshot.rs` | **NEW** Unified screenshot tests (userspace, levitate, alpine) |
 | `unit.rs` | Unit tests (cargo test) |
 | `behavior.rs` | Behavior tests with golden file comparison |
 | `regression.rs` | Regression test suite |
@@ -14,8 +17,6 @@ Automated test suites for LevitateOS.
 | `serial_input.rs` | Serial console input tests |
 | `keyboard_input.rs` | Keyboard input tests |
 | `shutdown.rs` | Graceful shutdown tests |
-| `screenshot_alpine.rs` | Alpine Linux screenshot tests |
-| `screenshot_levitate.rs` | LevitateOS display tests |
 
 ## Running Tests
 
@@ -29,8 +30,11 @@ Automated test suites for LevitateOS.
 | `cargo xtask test serial` | Serial input tests |
 | `cargo xtask test keyboard` | Keyboard input tests |
 | `cargo xtask test shutdown` | Shutdown tests |
-| `cargo xtask test screenshot` | Alpine Linux screenshot tests |
+| **`cargo xtask test backspace`** | **Backspace regression test** |
+| **`cargo xtask test screenshot`** | **All screenshot tests** |
+| **`cargo xtask test userspace`** | **Userspace tests + screenshot** |
 | `cargo xtask test levitate` | LevitateOS display tests |
+| `cargo xtask test alpine` | Alpine Linux reference tests |
 
 ## Golden Files
 

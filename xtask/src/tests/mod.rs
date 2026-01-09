@@ -1,3 +1,12 @@
+//! Test modules for LevitateOS
+//!
+//! TEAM_327: Reorganized test structure.
+
+pub mod backspace;
+pub mod common;
+pub mod screenshot;
+
+// Legacy modules (to be consolidated)
 pub mod behavior;
 pub mod debug_tools;
 pub mod keyboard_input;

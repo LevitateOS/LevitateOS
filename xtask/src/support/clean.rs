@@ -30,8 +30,10 @@ pub fn clean(arch: &str) -> Result<()> {
     kill_qemu(arch)?;
 
     // TEAM_294: Remove generated artifacts and staging directories
+    // TEAM_327: Added arch-specific initramfs files
     let artifacts = [
-        "initramfs.cpio",
+        "initramfs_aarch64.cpio",
+        "initramfs_x86_64.cpio",
         "initramfs_test.cpio",
         "tinyos_disk.img",
         "levitate.iso",

@@ -142,10 +142,11 @@ pub fn exec(cmd: &str, timeout_secs: u32, arch: &str) -> Result<String> {
 /// Build QEMU args for shell execution
 fn build_qemu_args(arch: &str) -> Result<Vec<String>> {
     let (machine, cpu, kernel_args, device_suffix) = match arch {
+        // TEAM_327: Use arch-specific initramfs
         "aarch64" => (
             "virt",
             "cortex-a53",
-            vec!["-kernel", "kernel64_rust.bin", "-initrd", "initramfs.cpio"],
+            vec!["-kernel", "kernel64_rust.bin", "-initrd", "initramfs_aarch64.cpio"],
             "device"
         ),
         "x86_64" => (

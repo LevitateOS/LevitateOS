@@ -111,6 +111,11 @@ pub struct QemuBuilder {
 impl QemuBuilder {
     /// Create a new QEMU builder for the given architecture and profile
     pub fn new(arch: Arch, profile: QemuProfile) -> Self {
+        // TEAM_327: Use arch-specific initramfs to prevent cross-arch contamination
+        let initrd_name = match arch {
+            Arch::Aarch64 => "initramfs_aarch64.cpio",
+            Arch::X86_64 => "initramfs_x86_64.cpio",
+        };
         Self {
             arch,
             profile,
@@ -124,7 +129,7 @@ impl QemuBuilder {
             enable_gpu_debug: false,
             no_reboot: true,
             disk_image: Some("tinyos_disk.img".to_string()),
-            initrd: Some("initramfs.cpio".to_string()),
+            initrd: Some(initrd_name.to_string()),
         }
     }
 

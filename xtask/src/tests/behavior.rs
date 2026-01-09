@@ -105,9 +105,10 @@ fn run_with_profile(profile: QemuProfile, arch: &str, update: bool) -> Result<()
             "-boot".to_string(), "d".to_string(),
         ]);
     } else {
+        // TEAM_327: Use arch-specific initramfs
         args.extend([
             "-kernel".to_string(), kernel_bin.to_string(),
-            "-initrd".to_string(), "initramfs.cpio".to_string(),
+            "-initrd".to_string(), format!("initramfs_{}.cpio", arch),
         ]);
     }
 
