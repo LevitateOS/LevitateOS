@@ -78,11 +78,44 @@ Added to each utility:
 
 ---
 
+## Additional Work Done
+
+### Renamed directories
+- `coreutils-true` → `true`
+- `coreutils-false` → `false`
+
+### Created xtask build command
+Added `cargo xtask build eyra` command that:
+- Auto-discovers all utilities in `crates/userspace/eyra/`
+- Builds them all with correct flags
+- Supports `--arch` and `--only` flags
+
+---
+
+## What Next Team Should Do
+
+1. **Test the xtask build command:**
+   ```bash
+   cargo xtask build eyra
+   ```
+
+2. **Integration with initramfs:**
+   - The built Eyra binaries need to be copied into the initramfs
+   - Update `create_initramfs()` in xtask to include Eyra binaries
+
+3. **Test on the actual kernel:**
+   - Boot LevitateOS with Eyra binaries in initramfs
+   - Verify they work with the kernel's syscall layer
+
+---
+
 ## Handoff Checklist
 
 - [x] Root cause identified
 - [x] Fix applied to all blocked utilities
-- [x] rmdir, echo, env, coreutils-true verified building
+- [x] rmdir, echo, env, true verified building
 - [x] Documentation updated
+- [x] xtask build command created
+- [x] Directories renamed (true/false)
 - [x] Team file updated
 

@@ -69,13 +69,21 @@ It was **luck**. Some utilities happened to not trigger the linker to include `S
 | ln | ✅ Works |
 | cp | ✅ Works |
 | mv | ✅ Works |
-| coreutils-true | ✅ Works |
-| coreutils-false | ✅ Works |
+| true | ✅ Works |
+| false | ✅ Works |
 
 ---
 
-## Build Command
+## Build Commands
 
+### Build ALL Eyra utilities at once (recommended):
+```bash
+cargo xtask build eyra
+cargo xtask build eyra --arch aarch64   # For aarch64
+cargo xtask build eyra --only cat       # Build only cat
+```
+
+### Build individually (if needed):
 ```bash
 cd crates/userspace/eyra/<utility>
 cargo build --release --target x86_64-unknown-linux-gnu -Zbuild-std=std,panic_abort
@@ -143,3 +151,33 @@ The difference between "working" and "blocked" utilities was NOT about:
 - libc features
 
 It was simply that the linker was including `Scrt1.o` for some builds but not others, based on subtle dependency graph differences. The fix is to explicitly tell the linker `-nostartfiles`.
+
+---
+
+## What Next Teams Should Do
+
+### 1. Test all utilities build
+```bash
+cargo xtask build eyra
+```
+
+### 2. Integration with initramfs
+The Eyra binaries need to be added to the initramfs. Update `xtask/src/build/commands.rs` `create_initramfs()` to copy Eyra binaries:
+```rust
+// After eyra-hello copying, add all Eyra utilities
+let eyra_utils = ["cat", "pwd", "ls", "mkdir", "echo", "env", ...];
+for util in &eyra_utils {
+    let src = format!("crates/userspace/eyra/{}/target/{}/release/{}", util, eyra_target, util);
+    // copy to initramfs
+}
+```
+
+### 3. Test on actual kernel
+- Boot LevitateOS with Eyra binaries in initramfs
+- Verify they work with the kernel's syscall layer
+- The Eyra binaries use Linux syscalls directly, so the kernel needs to support them
+
+### 4. Known limitations
+- Eyra binaries are **static-pie** Linux binaries
+- They require a working Linux syscall interface
+- Some syscalls may not be implemented in LevitateOS yet

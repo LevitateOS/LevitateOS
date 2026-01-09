@@ -265,6 +265,10 @@ fn main() -> Result<()> {
                 }
                 build::BuildCommands::Initramfs => build::create_initramfs(arch)?,
                 build::BuildCommands::Iso => build::build_iso(arch)?,
+                // TEAM_367: Eyra utilities build command
+                build::BuildCommands::Eyra { arch: eyra_arch, only } => {
+                    build::build_eyra(&eyra_arch, only.as_deref())?;
+                }
             }
         },
         Commands::Vm(cmd) => match cmd {

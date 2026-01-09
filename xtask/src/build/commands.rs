@@ -1,6 +1,7 @@
 use anyhow::{bail, Context, Result};
 use clap::Subcommand;
 use std::path::PathBuf;
+use std::io::Write;
 use std::process::{Command, Stdio};
 use crate::disk;
 
@@ -20,6 +21,16 @@ pub enum BuildCommands {
     Initramfs,
     /// Build bootable Limine ISO
     Iso,
+    /// Build Eyra-based userspace utilities (uutils coreutils)
+    /// TEAM_367: Auto-discovers and builds all utilities in crates/userspace/eyra/
+    Eyra {
+        /// Target architecture (x86_64 or aarch64)
+        #[arg(long, default_value = "x86_64")]
+        arch: String,
+        /// Build only a specific utility
+        #[arg(long)]
+        only: Option<String>,
+    },
 }
 
 pub fn build_all(arch: &str) -> Result<()> {
@@ -344,6 +355,98 @@ fn build_iso_with_features(features: &[&str], arch: &str) -> Result<()> {
     }
 
     println!("✅ ISO created: {}", iso_file);
+    Ok(())
+}
+
+/// TEAM_367: Build Eyra-based userspace utilities (uutils coreutils)
+/// Auto-discovers all utilities in crates/userspace/eyra/ and builds them
+pub fn build_eyra(arch: &str, only: Option<&str>) -> Result<()> {
+    let eyra_dir = PathBuf::from("crates/userspace/eyra");
+    
+    if !eyra_dir.exists() {
+        bail!("Eyra directory not found: {}", eyra_dir.display());
+    }
+    
+    let target = match arch {
+        "x86_64" => "x86_64-unknown-linux-gnu",
+        "aarch64" => "aarch64-unknown-linux-gnu",
+        _ => bail!("Unsupported architecture: {}. Use 'x86_64' or 'aarch64'", arch),
+    };
+    
+    // Discover utilities (directories with Cargo.toml, excluding eyra-hello which is a test)
+    let mut utilities: Vec<String> = Vec::new();
+    for entry in std::fs::read_dir(&eyra_dir)? {
+        let entry = entry?;
+        let path = entry.path();
+        if path.is_dir() {
+            let cargo_toml = path.join("Cargo.toml");
+            let name = path.file_name().unwrap().to_string_lossy().to_string();
+            // Skip non-utility directories
+            if cargo_toml.exists() && name != "eyra-hello" {
+                utilities.push(name);
+            }
+        }
+    }
+    utilities.sort();
+    
+    // Filter if --only was specified
+    let to_build: Vec<&String> = if let Some(name) = only {
+        let matches: Vec<&String> = utilities.iter().filter(|u| *u == name).collect();
+        if matches.is_empty() {
+            bail!("Utility '{}' not found. Available: {}", name, utilities.join(", "));
+        }
+        matches
+    } else {
+        utilities.iter().collect()
+    };
+    
+    println!("🔧 Building {} Eyra utilities for {}...\n", to_build.len(), arch);
+    
+    let mut success = 0;
+    let mut failed = 0;
+    
+    for utility in &to_build {
+        let util_dir = eyra_dir.join(utility);
+        print!("  Building {}... ", utility);
+        std::io::Write::flush(&mut std::io::stdout())?;
+        
+        let output = Command::new("cargo")
+            .current_dir(&util_dir)
+            .args([
+                "build",
+                "--release",
+                "--target", target,
+                "-Zbuild-std=std,panic_abort",
+            ])
+            .output()
+            .context(format!("Failed to run cargo build for {}", utility))?;
+        
+        if output.status.success() {
+            println!("✅");
+            success += 1;
+        } else {
+            println!("❌");
+            failed += 1;
+            // Print first few lines of error
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            for line in stderr.lines().take(5) {
+                println!("    {}", line);
+            }
+        }
+    }
+    
+    println!("\n📊 Results: {} succeeded, {} failed", success, failed);
+    
+    if failed > 0 {
+        bail!("{} utilities failed to build", failed);
+    }
+    
+    // Copy binaries to a common output directory
+    let out_dir = PathBuf::from(format!("crates/userspace/eyra/target/{}/release", target));
+    if out_dir.exists() {
+        println!("\n📁 Binaries available in: {}", out_dir.display());
+    }
+    
     Ok(())
 }
 
