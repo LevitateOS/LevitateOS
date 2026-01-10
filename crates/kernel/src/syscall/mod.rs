@@ -46,6 +46,7 @@ pub mod errno {
     pub const ENAMETOOLONG: i64 = -36;
     pub const ENOSYS: i64 = -38;
     pub const ENOTEMPTY: i64 = -39;  // Directory not empty
+    pub const ELOOP: i64 = -40;       // TEAM_381: Too many symbolic links
 }
 
 /// TEAM_342: Deprecated - use errno module instead. Kept for backward compatibility.

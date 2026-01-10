@@ -2,6 +2,7 @@ use crate::memory::user as mm_user;
 
 use crate::syscall::errno;
 use los_hal::IrqSafeLock;
+use los_utils::cpio::CpioEntryType;
 
 /// TEAM_073: sys_exit - Terminate the process.
 pub fn sys_exit(code: i32) -> i64 {
@@ -64,17 +65,46 @@ pub fn sys_spawn(path_ptr: usize, path_len: usize) -> i64 {
         None => return errno::ENOSYS,
     };
 
+    // TEAM_381: Follow symlinks when resolving executable path
+    let mut lookup_name = alloc::string::String::from(path);
     let mut elf_data = None;
-    for entry in archive.archive.iter() {
-        if entry.name == path {
-            elf_data = Some(entry.data);
-            break;
+    const MAX_SYMLINK_DEPTH: usize = 8;
+
+    for depth in 0..MAX_SYMLINK_DEPTH {
+        let mut found_entry = None;
+        for entry in archive.archive.iter() {
+            if entry.name == lookup_name {
+                found_entry = Some(entry);
+                break;
+            }
+        }
+
+        match found_entry {
+            Some(entry) => {
+                match entry.entry_type {
+                    CpioEntryType::File => {
+                        elf_data = Some(entry.data);
+                        break;
+                    }
+                    CpioEntryType::Symlink => {
+                        match core::str::from_utf8(entry.data) {
+                            Ok(target) => {
+                                log::trace!("[SYSCALL] spawn: {} -> {} (depth {})", lookup_name, target, depth);
+                                lookup_name = alloc::string::String::from(target);
+                            }
+                            Err(_) => return errno::ENOENT,
+                        }
+                    }
+                    _ => return errno::ENOENT,
+                }
+            }
+            None => return errno::EBADF,
         }
     }
 
     let elf_data = match elf_data {
         Some(d) => d,
-        None => return errno::EBADF,
+        None => return errno::ELOOP,
     };
 
     // TEAM_250: Clone parent's FD table for inheritance
@@ -244,21 +274,65 @@ pub fn sys_spawn_args(path_ptr: usize, path_len: usize, argv_ptr: usize, argc: u
             }
         };
 
-        let mut elf_data = None;
         // TEAM_212: Strip leading '/' for initramfs lookup
-        let lookup_name = path.strip_prefix('/').unwrap_or(&path);
-        for entry in archive.archive.iter() {
-            if entry.name == lookup_name {
-                elf_data = Some(entry.data);
-                break;
+        // TEAM_381: Follow symlinks when resolving executable path
+        let mut lookup_name = alloc::string::String::from(path.strip_prefix('/').unwrap_or(&path));
+        let mut elf_data = None;
+        const MAX_SYMLINK_DEPTH: usize = 8;
+
+        for depth in 0..MAX_SYMLINK_DEPTH {
+            let mut found_entry = None;
+            for entry in archive.archive.iter() {
+                if entry.name == lookup_name {
+                    found_entry = Some(entry);
+                    break;
+                }
+            }
+
+            match found_entry {
+                Some(entry) => {
+                    match entry.entry_type {
+                        CpioEntryType::File => {
+                            // Found the actual executable
+                            elf_data = Some(entry.data);
+                            break;
+                        }
+                        CpioEntryType::Symlink => {
+                            // Follow the symlink - data contains target path
+                            match core::str::from_utf8(entry.data) {
+                                Ok(target) => {
+                                    log::trace!(
+                                        "[SYSCALL] spawn_args: {} -> {} (depth {})",
+                                        lookup_name,
+                                        target,
+                                        depth
+                                    );
+                                    lookup_name = alloc::string::String::from(target);
+                                }
+                                Err(_) => {
+                                    log::debug!("[SYSCALL] spawn_args: invalid symlink target");
+                                    return errno::ENOENT;
+                                }
+                            }
+                        }
+                        _ => {
+                            log::debug!("[SYSCALL] spawn_args: '{}' is not executable", lookup_name);
+                            return errno::ENOENT;
+                        }
+                    }
+                }
+                None => {
+                    log::debug!("[SYSCALL] spawn_args: '{}' not found in initramfs", lookup_name);
+                    return errno::ENOENT;
+                }
             }
         }
 
         match elf_data {
             Some(d) => alloc::vec::Vec::from(d),
             None => {
-                log::debug!("[SYSCALL] spawn_args: '{}' not found in initramfs", path);
-                return crate::syscall::errno::ENOENT;
+                log::debug!("[SYSCALL] spawn_args: symlink loop or max depth exceeded");
+                return errno::ELOOP;
             }
         }
         // Lock released here
