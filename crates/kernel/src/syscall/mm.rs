@@ -1,9 +1,11 @@
 //! TEAM_228: Memory management syscalls.
 //! TEAM_415: Refactored with helper functions.
+//! TEAM_418: Use errno SSOT instead of local constants.
 
 use crate::memory::FRAME_ALLOCATOR;
 use crate::memory::user as mm_user;
 use crate::memory::vma::VmaFlags;
+use crate::syscall::errno;
 use los_hal::mmu::{self, PAGE_SIZE, PageAllocator, PageFlags, PageTable, phys_to_virt, tlb_flush_page};
 
 // TEAM_228: mmap protection flags (matching Linux)
@@ -17,10 +19,6 @@ pub const MAP_SHARED: u32 = 0x01;
 pub const MAP_PRIVATE: u32 = 0x02;
 pub const MAP_FIXED: u32 = 0x10;
 pub const MAP_ANONYMOUS: u32 = 0x20;
-
-// TEAM_228: Error codes
-const ENOMEM: i64 = -12;
-const EINVAL: i64 = -22;
 
 // ============================================================================
 // TEAM_415: Helper Functions
@@ -139,7 +137,7 @@ pub fn sys_sbrk(increment: isize) -> i64 {
                             // TEAM_389: Log OOM for debugging (Rule 4: Silence is Golden - use debug level)
                             log::debug!("[OOM] sys_sbrk: failed to allocate page at VA 0x{:x}", va);
                             heap.current = old_break;
-                            return ENOMEM; // TEAM_389: Return error, not null
+                            return errno::ENOMEM; // TEAM_389: Return error, not null
                         }
                     }
                 }
@@ -149,7 +147,7 @@ pub fn sys_sbrk(increment: isize) -> i64 {
         Err(()) => {
             // TEAM_389: Log heap bounds exceeded for debugging
             log::debug!("[OOM] sys_sbrk: heap bounds exceeded (increment={})", increment);
-            ENOMEM // TEAM_389: Return error on heap bounds exceeded
+            errno::ENOMEM // TEAM_389: Return error on heap bounds exceeded
         }
     }
 }
@@ -172,7 +170,7 @@ pub fn sys_sbrk(increment: isize) -> i64 {
 pub fn sys_mmap(addr: usize, len: usize, prot: u32, flags: u32, fd: i32, offset: usize) -> i64 {
     // TEAM_228: Validate arguments
     if len == 0 {
-        return EINVAL;
+        return errno::EINVAL;
     }
 
     // For MVP, only support MAP_ANONYMOUS | MAP_PRIVATE
@@ -181,11 +179,11 @@ pub fn sys_mmap(addr: usize, len: usize, prot: u32, flags: u32, fd: i32, offset:
             "[MMAP] Only MAP_ANONYMOUS supported, got flags=0x{:x}",
             flags
         );
-        return EINVAL;
+        return errno::EINVAL;
     }
     if fd != -1 || offset != 0 {
         log::warn!("[MMAP] File-backed mappings not supported");
-        return EINVAL;
+        return errno::EINVAL;
     }
 
     let task = crate::task::current_task();
@@ -203,7 +201,7 @@ pub fn sys_mmap(addr: usize, len: usize, prot: u32, flags: u32, fd: i32, offset:
     let base_addr = if addr != 0 && flags & MAP_FIXED != 0 {
         // MAP_FIXED: use exact address (must be page-aligned)
         if addr & (PAGE_SIZE - 1) != 0 {
-            return EINVAL;
+            return errno::EINVAL;
         }
         addr
     } else {
@@ -214,7 +212,7 @@ pub fn sys_mmap(addr: usize, len: usize, prot: u32, flags: u32, fd: i32, offset:
 
     if base_addr == 0 {
         log::debug!("[OOM] sys_mmap: no free region for {} bytes", alloc_len);
-        return ENOMEM;
+        return errno::ENOMEM;
     }
 
     // Convert prot to PageFlags
@@ -231,7 +229,7 @@ pub fn sys_mmap(addr: usize, len: usize, prot: u32, flags: u32, fd: i32, offset:
                 // TEAM_389: Log OOM for debugging
                 log::debug!("[OOM] sys_mmap: failed to allocate frame for page {}/{}", i + 1, pages_needed);
                 // TEAM_238: Guard will clean up on drop
-                return ENOMEM;
+                return errno::ENOMEM;
             }
         };
 
@@ -245,7 +243,7 @@ pub fn sys_mmap(addr: usize, len: usize, prot: u32, flags: u32, fd: i32, offset:
         if unsafe { mm_user::map_user_page(ttbr0, va, phys, page_flags) }.is_err() {
             // TEAM_238: Free this page (not tracked yet) and let guard clean up rest
             FRAME_ALLOCATOR.free_page(phys);
-            return ENOMEM;
+            return errno::ENOMEM;
         }
 
         // TEAM_238: Track successful allocation
@@ -280,13 +278,13 @@ pub fn sys_mmap(addr: usize, len: usize, prot: u32, flags: u32, fd: i32, offset:
 pub fn sys_munmap(addr: usize, len: usize) -> i64 {
     // Validate alignment
     if addr & 0xFFF != 0 || len == 0 {
-        return EINVAL;
+        return errno::EINVAL;
     }
 
     let aligned_len = page_align_up(len);
     let end = match addr.checked_add(aligned_len) {
         Some(e) => e,
-        None => return EINVAL,
+        None => return errno::EINVAL,
     };
 
     let task = crate::task::current_task();
@@ -327,13 +325,13 @@ pub fn sys_munmap(addr: usize, len: usize) -> i64 {
 pub fn sys_mprotect(addr: usize, len: usize, prot: u32) -> i64 {
     // Validate alignment
     if addr & (PAGE_SIZE - 1) != 0 || len == 0 {
-        return EINVAL;
+        return errno::EINVAL;
     }
 
     let aligned_len = page_align_up(len);
     let end = match addr.checked_add(aligned_len) {
         Some(e) => e,
-        None => return EINVAL,
+        None => return errno::EINVAL,
     };
 
     let task = crate::task::current_task();

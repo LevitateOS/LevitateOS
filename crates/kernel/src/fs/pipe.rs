@@ -1,12 +1,15 @@
 //! TEAM_233: Pipe implementation for inter-process communication.
 //!
 //! Provides POSIX-like pipes with blocking read/write semantics.
+//! TEAM_418: Use errno SSOT from syscall module.
 
 extern crate alloc;
 
 use alloc::sync::Arc;
 use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use los_hal::IrqSafeLock;
+
+use crate::syscall::errno;
 
 /// TEAM_233: Pipe buffer size (one page for simplicity).
 pub const PIPE_BUF_SIZE: usize = 4096;
@@ -135,7 +138,7 @@ impl Pipe {
 
         // If we couldn't read anything but write end is open, return EAGAIN
         if n == 0 && self.write_open.load(Ordering::Acquire) {
-            return -11; // EAGAIN
+            return errno::EAGAIN as isize;
         }
 
         n as isize
@@ -147,7 +150,7 @@ impl Pipe {
     pub fn write(&self, data: &[u8]) -> isize {
         // If read end is closed, return EPIPE
         if !self.read_open.load(Ordering::Acquire) {
-            return -32; // EPIPE
+            return errno::EPIPE as isize;
         }
 
         let mut ring = self.buffer.lock();
@@ -155,7 +158,7 @@ impl Pipe {
 
         // If we couldn't write anything, return EAGAIN
         if n == 0 {
-            return -11; // EAGAIN
+            return errno::EAGAIN as isize;
         }
 
         n as isize

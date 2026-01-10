@@ -1,11 +1,13 @@
 //! TEAM_202: VFS Error Types
 //!
 //! Defines the error type for all VFS operations.
+//! TEAM_418: Updated to use errno SSOT from syscall module.
 
 use core::fmt;
 
 use crate::block::BlockError;
 use crate::fs::FsError;
+use crate::syscall::errno;
 
 /// TEAM_202: VFS Error codes
 ///
@@ -68,34 +70,35 @@ pub enum VfsError {
 
 impl VfsError {
     /// TEAM_202: Convert to POSIX errno value (negative)
+    /// TEAM_418: Uses errno SSOT from syscall module
     pub fn to_errno(self) -> i64 {
         match self {
-            VfsError::PermissionDenied => -1,
-            VfsError::NotFound => -2,
-            VfsError::IoError => -5,
-            VfsError::BadFd => -9,
-            VfsError::WouldBlock => -11,
-            VfsError::OutOfMemory => -12,
-            VfsError::AccessDenied => -13,
-            VfsError::BadAddress => -14,
-            VfsError::Busy => -16,
-            VfsError::AlreadyExists => -17,
-            VfsError::NotADirectory => -20,
-            VfsError::IsADirectory => -21,
-            VfsError::InvalidArgument => -22,
-            VfsError::TooManyOpenFiles => -23,
-            VfsError::FileTooLarge => -27,
-            VfsError::NoSpace => -28,
-            VfsError::ReadOnlyFs => -30,
-            VfsError::TooManyLinks => -31,
-            VfsError::DirectoryNotEmpty => -39,
-            VfsError::NoData => -61,
-            VfsError::NotSupported => -95,
-            VfsError::NameTooLong => -36,
-            VfsError::StaleHandle => -116,
-            VfsError::CrossDevice => -18,
-            VfsError::NotASymlink => -22,
-            VfsError::InternalError => -5,
+            VfsError::PermissionDenied => errno::EPERM,
+            VfsError::NotFound => errno::ENOENT,
+            VfsError::IoError => errno::EIO,
+            VfsError::BadFd => errno::EBADF,
+            VfsError::WouldBlock => errno::EAGAIN,
+            VfsError::OutOfMemory => errno::ENOMEM,
+            VfsError::AccessDenied => errno::EACCES,
+            VfsError::BadAddress => errno::EFAULT,
+            VfsError::Busy => errno::EBUSY,
+            VfsError::AlreadyExists => errno::EEXIST,
+            VfsError::NotADirectory => errno::ENOTDIR,
+            VfsError::IsADirectory => errno::EISDIR,
+            VfsError::InvalidArgument => errno::EINVAL,
+            VfsError::TooManyOpenFiles => errno::ENFILE,
+            VfsError::FileTooLarge => errno::EFBIG,
+            VfsError::NoSpace => errno::ENOSPC,
+            VfsError::ReadOnlyFs => errno::EROFS,
+            VfsError::TooManyLinks => errno::EMLINK,
+            VfsError::DirectoryNotEmpty => errno::ENOTEMPTY,
+            VfsError::NoData => errno::ENODATA,
+            VfsError::NotSupported => errno::EOPNOTSUPP,
+            VfsError::NameTooLong => errno::ENAMETOOLONG,
+            VfsError::StaleHandle => errno::ESTALE,
+            VfsError::CrossDevice => errno::EXDEV,
+            VfsError::NotASymlink => errno::EINVAL,
+            VfsError::InternalError => errno::EIO,
         }
     }
 

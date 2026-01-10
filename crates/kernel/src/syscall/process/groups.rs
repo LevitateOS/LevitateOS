@@ -95,7 +95,7 @@ pub fn sys_setsid() -> i64 {
     // Cannot create new session if already a process group leader
     // (pgid == pid means we're the leader of our group)
     if current_pgid == pid {
-        return -1; // EPERM
+        return errno::EPERM;
     }
 
     // Create new session: pid becomes both pgid and sid

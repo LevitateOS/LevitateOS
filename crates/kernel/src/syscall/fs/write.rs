@@ -128,8 +128,8 @@ pub fn sys_write(fd: usize, buf: usize, len: usize) -> i64 {
             }
             match vfs_write(file, &kbuf) {
                 Ok(n) => n as i64,
-                Err(VfsError::NoSpace) => -28,      // ENOSPC
-                Err(VfsError::FileTooLarge) => -27, // EFBIG
+                Err(VfsError::NoSpace) => errno::ENOSPC,
+                Err(VfsError::FileTooLarge) => errno::EFBIG,
                 Err(_) => errno::EIO,
             }
         }

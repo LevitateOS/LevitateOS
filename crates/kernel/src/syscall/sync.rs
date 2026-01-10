@@ -91,7 +91,7 @@ fn futex_wait(addr: usize, expected: u32) -> i64 {
 
     // If value doesn't match, return immediately
     if current_val != expected {
-        return -11; // EAGAIN
+        return errno::EAGAIN;
     }
 
     // Add to wait list and block

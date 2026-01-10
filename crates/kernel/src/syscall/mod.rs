@@ -43,31 +43,41 @@ pub mod fcntl {
 
 /// TEAM_073: Error codes for syscalls.
 /// TEAM_342: Consolidated errno constants - single source of truth.
+/// TEAM_418: Added missing errno values for VFS compatibility, sorted by value.
 pub mod errno {
-    pub const ENOENT: i64 = -2;
-    pub const ESRCH: i64 = -3;       // TEAM_360: No such process/thread
-    pub const EIO: i64 = -5;
-    pub const EBADF: i64 = -9;
-    pub const ENOMEM: i64 = -12;
-    pub const EACCES: i64 = -13;
-    pub const EFAULT: i64 = -14;
-    pub const EEXIST: i64 = -17;
-    pub const EXDEV: i64 = -18;      // Cross-device link
-    pub const ENOTDIR: i64 = -20;
-    pub const EINVAL: i64 = -22;
-    pub const EMFILE: i64 = -24;
-    pub const ENOTTY: i64 = -25;
-    pub const ERANGE: i64 = -34;     // Result too large
-    pub const ENAMETOOLONG: i64 = -36;
-    pub const ENOSYS: i64 = -38;
-    pub const ENOTEMPTY: i64 = -39;  // Directory not empty
-    pub const ELOOP: i64 = -40;       // TEAM_381: Too many symbolic links
-    pub const ESPIPE: i64 = -29;      // TEAM_404: Illegal seek
-    // TEAM_410: Additional errno values for truncate support
+    // Sorted by errno value for easy lookup
+    pub const EPERM: i64 = -1;        // Operation not permitted
+    pub const ENOENT: i64 = -2;       // No such file or directory
+    pub const ESRCH: i64 = -3;        // No such process
+    pub const EIO: i64 = -5;          // I/O error
+    pub const EBADF: i64 = -9;        // Bad file descriptor
+    pub const EAGAIN: i64 = -11;      // Resource temporarily unavailable
+    pub const ENOMEM: i64 = -12;      // Out of memory
+    pub const EACCES: i64 = -13;      // Permission denied
+    pub const EFAULT: i64 = -14;      // Bad address
+    pub const EBUSY: i64 = -16;       // Device or resource busy
+    pub const EEXIST: i64 = -17;      // File exists
+    pub const EXDEV: i64 = -18;       // Cross-device link
+    pub const ENOTDIR: i64 = -20;     // Not a directory
     pub const EISDIR: i64 = -21;      // Is a directory
-    pub const ENOSPC: i64 = -28;      // No space left on device
-    pub const EROFS: i64 = -30;       // Read-only file system
+    pub const EINVAL: i64 = -22;      // Invalid argument
+    pub const ENFILE: i64 = -23;      // Too many open files in system
+    pub const EMFILE: i64 = -24;      // Too many open files (per process)
+    pub const ENOTTY: i64 = -25;      // Inappropriate ioctl for device
     pub const EFBIG: i64 = -27;       // File too large
+    pub const ENOSPC: i64 = -28;      // No space left on device
+    pub const ESPIPE: i64 = -29;      // Illegal seek
+    pub const EROFS: i64 = -30;       // Read-only file system
+    pub const EMLINK: i64 = -31;      // Too many links
+    pub const EPIPE: i64 = -32;       // Broken pipe
+    pub const ERANGE: i64 = -34;      // Result too large
+    pub const ENAMETOOLONG: i64 = -36; // File name too long
+    pub const ENOSYS: i64 = -38;      // Function not implemented
+    pub const ENOTEMPTY: i64 = -39;   // Directory not empty
+    pub const ELOOP: i64 = -40;       // Too many symbolic links
+    pub const ENODATA: i64 = -61;     // No data available
+    pub const EOPNOTSUPP: i64 = -95;  // Operation not supported
+    pub const ESTALE: i64 = -116;     // Stale file handle
 }
 
 /// TEAM_342: Deprecated - use errno module instead. Kept for backward compatibility.
