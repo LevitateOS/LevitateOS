@@ -2,8 +2,9 @@
 
 // use los_hal::mmu::PAGE_SIZE;
 
-/// TEAM_166: Maximum heap size per process (64MB)
-pub const USER_HEAP_MAX_SIZE: usize = 64 * 1024 * 1024;
+/// TEAM_389: Maximum heap size per process (256MB)
+/// Increased from 64MB to give userspace programs more headroom.
+pub const USER_HEAP_MAX_SIZE: usize = 256 * 1024 * 1024;
 
 /// TEAM_166: Per-process heap state for sbrk syscall.
 ///

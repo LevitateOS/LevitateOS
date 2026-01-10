@@ -9,6 +9,7 @@
 
 #![no_std]
 #![no_main]
+#![feature(alloc_error_handler)]
 
 extern crate alloc;
 
@@ -162,4 +163,36 @@ pub extern "C" fn kmain() -> ! {
 fn panic(info: &PanicInfo) -> ! {
     println!("KERNEL PANIC: {}", info);
     crate::arch::cpu::halt();
+}
+
+/// TEAM_387: Custom allocation error handler with diagnostic info.
+///
+/// Reports heap state when allocation fails to help diagnose OOM issues.
+#[alloc_error_handler]
+fn alloc_error(layout: core::alloc::Layout) -> ! {
+    // Get heap stats from the allocator
+    let (heap_used, heap_free) = {
+        let allocator = crate::arch::ALLOCATOR.lock();
+        (allocator.used(), allocator.free())
+    };
+    let heap_total = heap_used + heap_free;
+    
+    println!("\n[OOM] ALLOCATION FAILED");
+    println!("  requested: {} bytes (align {})", layout.size(), layout.align());
+    println!("  heap: {}/{} bytes used ({} free)",
+        heap_used, heap_total, heap_free);
+    
+    // Diagnostic hints
+    if layout.size() > heap_free {
+        println!("  cause: insufficient free memory");
+    } else {
+        println!("  cause: likely fragmentation (enough free but not contiguous)");
+    }
+    
+    if layout.size() > 1024 * 1024 {
+        println!("  hint: large allocation ({}MB) - consider chunking",
+            layout.size() / (1024 * 1024));
+    }
+    
+    panic!("out of memory");
 }

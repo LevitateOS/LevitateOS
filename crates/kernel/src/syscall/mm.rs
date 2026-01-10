@@ -102,15 +102,21 @@ pub fn sys_sbrk(increment: isize) -> i64 {
                     let va = page * los_hal::mmu::PAGE_SIZE;
                     if mm_user::user_va_to_kernel_ptr(task.ttbr0, va).is_none() {
                         if mm_user::alloc_and_map_heap_page(task.ttbr0, va).is_err() {
+                            // TEAM_389: Log OOM for debugging (Rule 4: Silence is Golden - use debug level)
+                            log::debug!("[OOM] sys_sbrk: failed to allocate page at VA 0x{:x}", va);
                             heap.current = old_break;
-                            return 0; // null
+                            return ENOMEM; // TEAM_389: Return error, not null
                         }
                     }
                 }
             }
             old_break as i64
         }
-        Err(()) => 0,
+        Err(()) => {
+            // TEAM_389: Log heap bounds exceeded for debugging
+            log::debug!("[OOM] sys_sbrk: heap bounds exceeded (increment={})", increment);
+            ENOMEM // TEAM_389: Return error on heap bounds exceeded
+        }
     }
 }
 
@@ -173,6 +179,7 @@ pub fn sys_mmap(addr: usize, len: usize, prot: u32, flags: u32, fd: i32, offset:
     };
 
     if base_addr == 0 {
+        log::debug!("[OOM] sys_mmap: no free region for {} bytes", alloc_len);
         return ENOMEM;
     }
 
@@ -187,6 +194,8 @@ pub fn sys_mmap(addr: usize, len: usize, prot: u32, flags: u32, fd: i32, offset:
         let phys = match FRAME_ALLOCATOR.alloc_page() {
             Some(p) => p,
             None => {
+                // TEAM_389: Log OOM for debugging
+                log::debug!("[OOM] sys_mmap: failed to allocate frame for page {}/{}", i + 1, pages_needed);
                 // TEAM_238: Guard will clean up on drop
                 return ENOMEM;
             }

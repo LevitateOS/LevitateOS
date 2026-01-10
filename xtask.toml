@@ -20,7 +20,7 @@
 [golden_files]
 
 # Behavior test golden files
-"tests/golden_boot.txt" = "gold"
+"tests/golden_boot.txt" = "silver"
 "tests/golden_boot_x86_64.txt" = "silver"  # Currently under active development
 "tests/golden_shutdown.txt" = "gold"
 

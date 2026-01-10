@@ -2,7 +2,7 @@ limine: Loading kernel `boot:///boot/levitate-kernel`...
 limine: Loading module `boot:///boot/initramfs.cpio`...
 LH123456789CXLRikdHeap initialized.
 [BOOT] Protocol: Limine
-[BOOT] Memory: 19 regions, 466 MB usable
+[BOOT] Memory: 16 regions, 1769 MB usable
 [BOOT] Stage 2: Memory & MMU (PEI)
 [MEM] Buddy Allocator initialized with unified BootInfo
 [CPU] x86_64 PCR initialized at 0xffffffff8005da00
@@ -35,30 +35,21 @@ Timer initialized.
 [PCI] PciTransport created successfully
 [INPUT] VirtIO Input initialized via PCI.
 Detecting Initramfs...
-Initramfs found at 0xffff80001d371000 - 0xffff80001d483600 (1123840 bytes)
+Initramfs found at 0xffff80006eacb000 - 0xffff80006f47ae00 (10157568 bytes)
 Files in initramfs:
  - .
  - hello.txt
- - cat
  - clone_test
- - cp
  - error_test
  - eyra-hello
  - init
  - interrupt_test
  - link_test
- - ln
- - ls
- - mkdir
  - mmap_test
- - mv
  - pipe_test
  - pty_interact
  - pty_test
- - pwd
  - repro
- - rm
- - rmdir
  - sched_yield_test
  - shell
  - signal_test
@@ -66,10 +57,78 @@ Files in initramfs:
  - suite_test_core
  - test_runner
  - time_test
- - touch
  - tty_test
+ - coreutils
+ - cat
+ - cp
+ - dd
+ - ln
+ - ls
+ - mkdir
+ - mv
+ - rm
+ - rmdir
+ - touch
+ - basename
+ - comm
+ - csplit
+ - cut
+ - dirname
+ - echo
+ - expand
+ - fmt
+ - fold
+ - head
+ - join
+ - nl
+ - numfmt
+ - od
+ - paste
+ - pr
+ - printenv
+ - printf
+ - ptx
+ - seq
+ - shuf
+ - sort
+ - split
+ - sum
+ - tac
+ - tail
+ - tr
+ - truncate
+ - tsort
+ - unexpand
+ - uniq
+ - wc
+ - dir
+ - dircolors
+ - df
+ - du
+ - link
+ - mktemp
+ - more
+ - readlink
+ - realpath
+ - shred
+ - sleep
+ - tee
+ - test
+ - unlink
+ - vdir
+ - yes
+ - base32
+ - base64
+ - basenc
+ - cksum
+ - hashsum
+ - env
+ - factor
+ - false
+ - pwd
+ - true
 [BOOT] spawning init task...
-[SPAWN] Parsing ELF header (12616 bytes)...
+[SPAWN] Parsing ELF header (15192 bytes)...
 ELF Header e_ident verified
 [SPAWN] ELF parsed.
 [SPAWN] Creating user page table...
@@ -77,31 +136,32 @@ ELF Header e_ident verified
 [MMU] Allocated L0 table at phys [MASKED]
 [MMU] Zeroing L0 table at va [MASKED]
 [SPAWN] Loading segments...
-[ELF] Copying segment: src[0]=53 to VA 10000
+[ELF] Copying segment: src[0]=55 to VA 10000
 [ELF] Resolved PA [MASKED] -> Kernel VA [MASKED]
-[ELF] Copying segment: src[0]=0 to VA 10db8
+[ELF] Copying segment: src[0]=5b to VA 113b8
 [ELF] Resolved PA [MASKED] -> Kernel VA [MASKED]
-[ELF] Copying segment: src[0]=b6 to VA 10fe0
+[ELF] Copying segment: src[0]=36 to VA 118f0
 [ELF] Resolved PA [MASKED] -> Kernel VA [MASKED]
-[ELF] Copying segment: src[0]=65 to VA 11010
+[ELF] Copying segment: src[0]=ba to VA 11920
 [ELF] Resolved PA [MASKED] -> Kernel VA [MASKED]
 [SPAWN] Setting up stack...
 [SPAWN] Setting up stack arguments...
 [TASK] UserTask::new: PID=1 Entry=0x10000
-[SPAWN] Success: PID=1 entry=0x10000 sp=0x7ffffffeff48
+[SPAWN] Success: PID=1 entry=0x10000 sp=0x7ffffffeff40
 [BOOT] Init process scheduled.
 Mounting filesystems...
 ERROR: Failed to mount FAT32: E0501: Failed to open volume
 [BOOT] WARNING: Filesystem mount failed: E0501: Failed to open volume
   (Check tinyos_disk.img format/presence)
 [BOOT] Mounted tmpfs at /tmp
-[GPU_TEST] Flush count: 68
+[GPU_TEST] Flush count: 127
 [GPU_TEST] Framebuffer: 400 non-black pixels of 1024000 total
 
 [SUCCESS] LevitateOS System Ready.
 --------------------------------------
 [TASK] Entering user task PID=1 at 0x10000
 [INIT] PID 1 starting...
+[SYSCALL] spawn('eyra-test-runner')
 [INIT] Spawning shell...
 [SYSCALL] spawn('shell')
 [SPAWN] Parsing ELF header (17848 bytes)...
@@ -123,7 +183,7 @@ ELF Header e_ident verified
 [SPAWN] Setting up stack...
 [SPAWN] Setting up stack arguments...
 [TASK] UserTask::new: PID=2 Entry=0x10000
-[SPAWN] Success: PID=2 entry=0x10000 sp=0x7ffffffeff48
+[SPAWN] Success: PID=2 entry=0x10000 sp=0x7ffffffeff40
 [INIT] Shell spawned as PID 2
 [TASK] Entering user task PID=2 at 0x10000
 

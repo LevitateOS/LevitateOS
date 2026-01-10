@@ -55,9 +55,10 @@ pub mod layout {
     #[allow(dead_code)]
     pub const USER_HEAP_START: usize = 0x0000_0000_1000_0000; // 256MB (placeholder)
 
-    /// TEAM_166: Maximum heap size per process (64MB)
+    /// TEAM_389: Maximum heap size per process (256MB)
+    /// Increased from 64MB to give userspace programs more headroom.
     #[allow(dead_code)]
-    pub const USER_HEAP_MAX_SIZE: usize = 64 * 1024 * 1024;
+    pub const USER_HEAP_MAX_SIZE: usize = 256 * 1024 * 1024;
 }
 
 use crate::memory::heap::ProcessHeap;
