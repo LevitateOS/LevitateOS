@@ -1,4 +1,4 @@
 [submodule "crates/userspace/eyra/coreutils"]
 	path = crates/userspace/eyra/coreutils
-	url = https://github.com/sunfishcode/coreutils.git
-	branch = mustang
+	url = https://github.com/veighnsche/coreutils.git
+	branch = eyra
