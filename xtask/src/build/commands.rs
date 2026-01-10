@@ -115,49 +115,70 @@ pub fn create_initramfs(arch: &str) -> Result<()> {
         }
     }
     
-    // TEAM_354: Add eyra-hello if it exists (static-pie test binary)
+    // TEAM_380: Add eyra-hello if it exists (static-pie test binary)
     let eyra_target = match arch {
         "aarch64" => "aarch64-unknown-linux-gnu",
         "x86_64" => "x86_64-unknown-linux-gnu",
         _ => "",
     };
-    let eyra_src = PathBuf::from(format!("crates/userspace/eyra/eyra-hello/target/{}/release/eyra-hello", eyra_target));
+    // eyra-hello is now in the eyra workspace target directory
+    let eyra_src = PathBuf::from(format!("crates/userspace/eyra/target/{}/release/eyra-hello", eyra_target));
     if eyra_src.exists() {
         std::fs::copy(&eyra_src, root.join("eyra-hello"))?;
         count += 1;
     }
     
-    // TEAM_369: Always add Eyra coreutils (provides std support)
+    // TEAM_380: Copy coreutils multi-call binary and create symlinks
+    let coreutils_src = PathBuf::from(format!(
+        "crates/userspace/eyra/coreutils/target/{}/release/coreutils",
+        eyra_target
+    ));
+    
+    // Full pure-Rust utility list (excluding expr which needs onig C library)
     let eyra_utils = [
-        "cat", "pwd", "mkdir", "ls", "echo", "env",
-        "touch", "rm", "rmdir", "ln", "cp", "mv",
-        "true", "false"
+        // Basic file operations
+        "cat", "cp", "dd", "ln", "ls", "mkdir", "mv", "rm", "rmdir", "touch",
+        // Text processing (expr excluded - needs onig)
+        "basename", "comm", "csplit", "cut", "dirname", "echo", "expand", 
+        "fmt", "fold", "head", "join", "nl", "numfmt", "od", "paste",
+        "pr", "printenv", "printf", "ptx", "seq", "shuf", "sort", "split",
+        "sum", "tac", "tail", "tr", "truncate", "tsort", "unexpand", "uniq", "wc",
+        // File utilities
+        "dir", "dircolors", "df", "du", "link", "mktemp", "more", "readlink",
+        "realpath", "shred", "sleep", "tee", "test", "unlink", "vdir", "yes",
+        // Encoding
+        "base32", "base64", "basenc",
+        // Checksums
+        "cksum", "hashsum",
+        // Misc
+        "env", "factor", "false", "pwd", "true",
     ];
-    let mut eyra_count = 0;
     
-    // TEAM_371: Eyra utilities are now in a workspace, so they share a target directory
-    let eyra_target_dir = PathBuf::from(format!("crates/userspace/eyra/target/{}/release", eyra_target));
-    
-    for util in &eyra_utils {
-        let src = eyra_target_dir.join(util);
-        if src.exists() {
-            std::fs::copy(&src, root.join(util))?;
-            eyra_count += 1;
-        } else {
-            // Fallback to old path for transition (Rule 5: We should eventually remove this)
-            let legacy_src = PathBuf::from(format!(
-                "crates/userspace/eyra/{}/target/{}/release/{}",
-                util, eyra_target, util
-            ));
-            if legacy_src.exists() {
-                std::fs::copy(&legacy_src, root.join(util))?;
-                eyra_count += 1;
+    if coreutils_src.exists() {
+        // Copy the multi-call binary
+        std::fs::copy(&coreutils_src, root.join("coreutils"))?;
+        count += 1;
+        
+        // Create symlinks for each utility
+        for util in &eyra_utils {
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::symlink;
+                let link_path = root.join(util);
+                // Remove existing file/link if present
+                let _ = std::fs::remove_file(&link_path);
+                symlink("coreutils", &link_path)?;
+            }
+            #[cfg(not(unix))]
+            {
+                // On non-unix, copy the binary instead
+                std::fs::copy(&coreutils_src, root.join(util))?;
             }
         }
-    }
-    if eyra_count > 0 {
-        println!("  📦 Added {} Eyra coreutils", eyra_count);
-        count += eyra_count;
+        println!("  📦 Added coreutils + {} symlinks", eyra_utils.len());
+        // Don't count symlinks as separate binaries for the total
+    } else {
+        println!("  ⚠️  Coreutils not found at {}", coreutils_src.display());
     }
     
     println!("[DONE] ({} added)", count);
@@ -229,30 +250,65 @@ pub fn create_test_initramfs(arch: &str) -> Result<()> {
     // Create hello.txt for cat test
     std::fs::write(root.join("hello.txt"), "Hello from initramfs!\n")?;
 
-    // TEAM_374: Copy Eyra utilities for testing
+    // TEAM_380: Copy coreutils multi-call binary and create symlinks
+    let coreutils_src = PathBuf::from(format!(
+        "crates/userspace/eyra/coreutils/target/{}/release/coreutils",
+        eyra_target
+    ));
+    
+    // Full pure-Rust utility list (excluding expr which needs onig C library)
     let eyra_utils = [
-        "cat", "pwd", "mkdir", "ls", "echo", "env",
-        "touch", "rm", "rmdir", "ln", "cp", "mv",
-        "true", "false", "eyra-test-runner"
+        // Basic file operations
+        "cat", "cp", "dd", "ln", "ls", "mkdir", "mv", "rm", "rmdir", "touch",
+        // Text processing (expr excluded - needs onig)
+        "basename", "comm", "csplit", "cut", "dirname", "echo", "expand", 
+        "fmt", "fold", "head", "join", "nl", "numfmt", "od", "paste",
+        "pr", "printenv", "printf", "ptx", "seq", "shuf", "sort", "split",
+        "sum", "tac", "tail", "tr", "truncate", "tsort", "unexpand", "uniq", "wc",
+        // File utilities
+        "dir", "dircolors", "df", "du", "link", "mktemp", "more", "readlink",
+        "realpath", "shred", "sleep", "tee", "test", "unlink", "vdir", "yes",
+        // Encoding
+        "base32", "base64", "basenc",
+        // Checksums
+        "cksum", "hashsum",
+        // Misc
+        "env", "factor", "false", "pwd", "true",
     ];
     let mut count = 0;
     
-    // TEAM_371: Eyra utilities are now in a workspace
-    let eyra_target_dir = PathBuf::from(format!("crates/userspace/eyra/target/{}/release", eyra_target));
-    
-    for util in &eyra_utils {
-        let src = eyra_target_dir.join(util);
-        if src.exists() {
-            std::fs::copy(&src, root.join(util))?;
-            count += 1;
+    if coreutils_src.exists() {
+        // Copy the multi-call binary
+        std::fs::copy(&coreutils_src, root.join("coreutils"))?;
+        count += 1;
+        
+        // Create symlinks for each utility
+        for util in &eyra_utils {
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::symlink;
+                let link_path = root.join(util);
+                let _ = std::fs::remove_file(&link_path);
+                symlink("coreutils", &link_path)?;
+            }
+            #[cfg(not(unix))]
+            {
+                std::fs::copy(&coreutils_src, root.join(util))?;
+            }
         }
+    } else {
+        bail!("Coreutils not found. Run 'cargo xtask build eyra' first.");
     }
     
-    if count == 0 {
-        bail!("No Eyra utilities found. Run 'cargo xtask build eyra' first.");
+    // Copy eyra-test-runner from the eyra workspace
+    let eyra_target_dir = PathBuf::from(format!("crates/userspace/eyra/target/{}/release", eyra_target));
+    let test_runner_src = eyra_target_dir.join("eyra-test-runner");
+    if test_runner_src.exists() {
+        std::fs::copy(&test_runner_src, root.join("eyra-test-runner"))?;
+        count += 1;
     }
     
-    println!("📦 Test initramfs: {} Eyra utilities + init/shell", count);
+    println!("📦 Test initramfs: coreutils + {} symlinks + init/shell", eyra_utils.len());
 
     // Create CPIO archive
     let cpio_file = std::fs::File::create("initramfs_test.cpio")?;
@@ -424,13 +480,14 @@ fn build_iso_internal(features: &[&str], arch: &str, use_test_initramfs: bool) -
     Ok(())
 }
 
-/// TEAM_367: Build Eyra-based userspace utilities (uutils coreutils)
-/// Auto-discovers all utilities in crates/userspace/eyra/ and builds them
-pub fn build_eyra(arch: &str, only: Option<&str>) -> Result<()> {
+/// TEAM_380: Build Eyra-based userspace utilities
+/// Now uses uutils-coreutils multi-call binary instead of individual wrapper crates
+pub fn build_eyra(arch: &str, _only: Option<&str>) -> Result<()> {
+    let coreutils_dir = PathBuf::from("crates/userspace/eyra/coreutils");
     let eyra_dir = PathBuf::from("crates/userspace/eyra");
     
-    if !eyra_dir.exists() {
-        bail!("Eyra directory not found: {}", eyra_dir.display());
+    if !coreutils_dir.exists() {
+        bail!("Coreutils submodule not found: {}. Run 'git submodule update --init'", coreutils_dir.display());
     }
     
     let target = match arch {
@@ -439,49 +496,54 @@ pub fn build_eyra(arch: &str, only: Option<&str>) -> Result<()> {
         _ => bail!("Unsupported architecture: {}. Use 'x86_64' or 'aarch64'", arch),
     };
     
-    // Discover utilities (directories with Cargo.toml, excluding eyra-hello which is a test)
-    let mut utilities: Vec<String> = Vec::new();
-    for entry in std::fs::read_dir(&eyra_dir)? {
-        let entry = entry?;
-        let path = entry.path();
-        if path.is_dir() {
-            let cargo_toml = path.join("Cargo.toml");
-            let name = path.file_name().unwrap().to_string_lossy().to_string();
-            // Skip non-utility directories
-            if cargo_toml.exists() && name != "eyra-hello" {
-                utilities.push(name);
-            }
-        }
+    println!("🔧 Building uutils-coreutils for {}...", arch);
+    
+    // TEAM_380: Build coreutils multi-call binary with pure-Rust utilities
+    // We use a custom feature list excluding utilities that require C dependencies (onig)
+    // Excluded: expr (requires onig for regex)
+    let features = [
+        // Basic file operations
+        "cat", "cp", "dd", "ln", "ls", "mkdir", "mv", "rm", "rmdir", "touch",
+        // Text processing (excluding expr which needs onig)
+        "basename", "comm", "csplit", "cut", "dirname", "echo", "expand", 
+        "fmt", "fold", "head", "join", "nl", "numfmt", "od", "paste",
+        "pr", "printenv", "printf", "ptx", "seq", "shuf", "sort", "split",
+        "sum", "tac", "tail", "tr", "truncate", "tsort", "unexpand", "uniq", "wc",
+        // File utilities
+        "dir", "dircolors", "df", "du", "link", "mktemp", "more", "readlink",
+        "realpath", "shred", "sleep", "tee", "test", "unlink", "vdir", "yes",
+        // Encoding
+        "base32", "base64", "basenc",
+        // Checksums
+        "cksum", "hashsum",
+        // Misc
+        "env", "factor", "false", "pwd", "true",
+    ].join(",");
+    
+    let status = Command::new("cargo")
+        .current_dir(&coreutils_dir)
+        .arg("+nightly-2025-04-28")
+        .env_remove("RUSTUP_TOOLCHAIN")
+        .args([
+            "build",
+            "--release",
+            "--target", target,
+            "--no-default-features",
+            "--features", &features,
+        ])
+        .status()
+        .context("Failed to build coreutils")?;
+    
+    if !status.success() {
+        bail!("Failed to build coreutils");
     }
-    utilities.sort();
     
-    // TEAM_371: Always let Cargo handle incremental compilation.
-    // Never skip cargo build - Cargo will detect source changes and rebuild only what's needed.
-    // The previous code skipped cargo entirely if binaries existed, which broke rebuild detection.
-    let to_build: Vec<&String> = if let Some(name) = only {
-        let matches: Vec<&String> = utilities.iter().filter(|u| *u == name).collect();
-        if matches.is_empty() {
-            bail!("Utility '{}' not found. Available: {}", name, utilities.join(", "));
-        }
-        matches
-    } else {
-        utilities.iter().collect()
-    };
+    println!("✅ Built coreutils multi-call binary");
     
-    println!("🔧 Checking Eyra utilities for {}...", arch);
-    
-    let mut success = 0;
-    let mut failed = 0;
-    
-    // TEAM_371: Instead of a loop with 15+ separate cargo calls, 
-    // we use a single cargo call with multiple -p arguments.
-    // This allows cargo to handle the entire dependency graph efficiently
-    // and only rebuild what is necessary, while showing full output.
-    // 
-    // IMPORTANT: We must explicitly use the pinned toolchain for Eyra
-    // to avoid conflicts with the host toolchain used by xtask.
-    let mut cmd = Command::new("cargo");
-    cmd.current_dir(&eyra_dir)
+    // TEAM_380: Also build eyra-hello and eyra-test-runner from the eyra workspace
+    println!("🔧 Building eyra-hello and eyra-test-runner...");
+    let status = Command::new("cargo")
+        .current_dir(&eyra_dir)
         .arg("+nightly-2025-04-28")
         .env_remove("RUSTUP_TOOLCHAIN")
         .args([
@@ -489,32 +551,16 @@ pub fn build_eyra(arch: &str, only: Option<&str>) -> Result<()> {
             "--release",
             "--target", target,
             "-Zbuild-std=std,panic_abort",
-        ]);
-    
-    for utility in &to_build {
-        cmd.arg("-p").arg(utility);
-    }
-
-    let status = cmd.status()
-        .context("Failed to run cargo build for Eyra utilities")?;
+        ])
+        .status()
+        .context("Failed to build eyra workspace")?;
     
     if !status.success() {
-        bail!("Failed to build Eyra utilities");
+        bail!("Failed to build eyra workspace");
     }
     
-    success = to_build.len();
-    
-    println!("\n📊 Results: {} succeeded, {} failed", success, failed);
-    
-    if failed > 0 {
-        bail!("{} utilities failed to build", failed);
-    }
-    
-    // Copy binaries to a common output directory
-    let out_dir = PathBuf::from(format!("crates/userspace/eyra/target/{}/release", target));
-    if out_dir.exists() {
-        println!("\n📁 Binaries available in: {}", out_dir.display());
-    }
+    let out_dir = coreutils_dir.join(format!("target/{}/release", target));
+    println!("📁 Coreutils binary: {}/coreutils", out_dir.display());
     
     Ok(())
 }
