@@ -492,3 +492,128 @@ This section maps syscalls to their kernel implementation files.
 ---
 
 ## Total Implemented: 82 syscall functions
+
+---
+
+## Stub Analysis (TEAM_409)
+
+**Audit Date**: 2026-01-10
+
+This section provides a detailed analysis of syscalls that are mapped but not fully implemented, categorized by type.
+
+### Category 1: Returns ENOSYS (6 syscalls)
+
+These syscalls are mapped to handlers that explicitly return `-ENOSYS`:
+
+| Syscall | Location | Work Required |
+|---------|----------|---------------|
+| fchdir | syscall/fs/fd.rs | Implement fd-to-path lookup, validate is directory |
+| pread64 | syscall/fs/fd.rs | Add positioned read using lseek + read atomically |
+| pwrite64 | syscall/fs/fd.rs | Add positioned write using lseek + write atomically |
+| pkey_alloc | syscall/mm.rs | Memory protection keys (hardware-specific) |
+| pkey_mprotect | syscall/mm.rs | Memory protection keys (hardware-specific) |
+
+**Note**: `pkey_*` syscalls require Intel MPK or ARM MTE support.
+
+### Category 2: No-Op by Design (6 syscalls)
+
+These return success but deliberately do nothing (single-user OS, root runs everything):
+
+| Syscall | Location | Current Behavior | Real Implementation |
+|---------|----------|------------------|---------------------|
+| chmod | syscall/fs/permission.rs | Returns 0 | Store mode in inode |
+| fchmod | syscall/fs/permission.rs | Returns 0 | Store mode in inode |
+| fchmodat | syscall/fs/permission.rs | Returns 0 | Store mode in inode |
+| chown | syscall/fs/permission.rs | Returns 0 | Store uid/gid in inode |
+| fchown | syscall/fs/permission.rs | Returns 0 | Store uid/gid in inode |
+| fchownat | syscall/fs/permission.rs | Returns 0 | Store uid/gid in inode |
+
+**Rationale**: LevitateOS currently runs as single-user root. Permissions will be needed for Epic 5 (Users & Permissions).
+
+### Category 3: Stubs Returning Success (10 syscalls)
+
+These accept calls and return success, but ignore some or all parameters:
+
+| Syscall | Location | What's Ignored | Work Required |
+|---------|----------|----------------|---------------|
+| fcntl F_SETFL | syscall/fs/fd.rs | O_NONBLOCK, O_APPEND flags | Hook into VFS file ops |
+| fcntl F_SETFD | syscall/fs/fd.rs | FD_CLOEXEC flag | Track in FD table, apply on exec |
+| fcntl F_GETFL | syscall/fs/fd.rs | Returns 0 always | Return actual file flags |
+| fcntl F_GETFD | syscall/fs/fd.rs | Returns 0 always | Return actual FD flags |
+| ioctl TIOCSCTTY | syscall/fs/fd.rs | Controlling terminal | Implement session/ctty tracking |
+| ioctl TIOCGWINSZ | syscall/fs/fd.rs | Returns fixed 80x24 | Query real terminal size |
+| ftruncate | syscall/fs/fd.rs | All parameters | Implement in VFS File trait |
+| sigaltstack | syscall/signal.rs | All parameters | Allocate/track alt stack per thread |
+| madvise | syscall/mm.rs | All hints | Implement MADV_DONTNEED, WILLNEED |
+
+### Category 4: Partial Implementations (11 syscalls)
+
+These work for common cases but fail on edge cases:
+
+#### 4a. `*at` syscalls ignore dirfd (9 syscalls)
+
+All `*at` syscalls treat paths as absolute or CWD-relative, ignoring the `dirfd` parameter:
+
+| Syscall | Impact | Fix Required |
+|---------|--------|--------------|
+| openat | Low (usually AT_FDCWD) | Resolve path relative to dirfd |
+| mkdirat | Low | Resolve path relative to dirfd |
+| unlinkat | Low | Resolve path relative to dirfd |
+| renameat | Medium | Resolve both paths relative to dirfds |
+| linkat | Medium | Resolve both paths relative to dirfds |
+| symlinkat | Low | Resolve target relative to dirfd |
+| readlinkat | Low | Resolve path relative to dirfd |
+| faccessat | Low | Resolve path relative to dirfd |
+| utimensat | Low | Resolve path relative to dirfd |
+| fstatat | Low | Resolve path relative to dirfd |
+
+**Implementation Note**: Need `fd_to_path()` helper or store dentry in FD table.
+
+#### 4b. mmap file-backed mappings
+
+| Limitation | Current Behavior | Fix Required |
+|------------|------------------|--------------|
+| MAP_PRIVATE file | Returns EINVAL | Implement copy-on-write for file pages |
+| MAP_SHARED file | Returns EINVAL | Implement writeback to file |
+
+**Note**: Anonymous mappings (MAP_ANONYMOUS) work correctly.
+
+#### 4c. chdir validation
+
+| Limitation | Current Behavior | Fix Required |
+|------------|------------------|--------------|
+| Symlink resolution | May not fully resolve | Use VFS resolve_path |
+| Existence check | Weak validation | Verify dentry is directory |
+
+### Category 5: Missing syscall handlers
+
+These syscalls have no handler mapped at all:
+
+| Syscall | Priority | Notes |
+|---------|----------|-------|
+| fork | High | Use clone with CLONE_CHILD |
+| vfork | Medium | Use clone with CLONE_VFORK |
+| clone3 | Medium | Extended clone interface |
+| execveat | Low | execve relative to fd |
+| gettimeofday | Medium | Legacy time interface |
+| prctl | Medium | Process control ops |
+
+### Summary by Priority
+
+**High Priority** (blocking coreutils/shells):
+1. `pread64` / `pwrite64` - Many tools use positioned I/O
+2. `ftruncate` - File editing tools
+3. `fcntl` flags - Proper O_NONBLOCK support
+4. `dirfd` support in `*at` syscalls
+
+**Medium Priority** (full Unix compat):
+1. Permission syscalls (chmod, chown family)
+2. sigaltstack proper implementation
+3. Controlling terminal (TIOCSCTTY)
+
+**Low Priority** (edge cases):
+1. Memory protection keys (pkey_*)
+2. madvise hints
+3. File-backed mmap
+
+---

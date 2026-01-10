@@ -962,3 +962,95 @@ pub fn sys_umask(mask: u32) -> i64 {
     log::trace!("[SYSCALL] umask(0o{:o}) -> 0o{:o}", mask, old);
     old as i64
 }
+
+// ============================================================================
+// TEAM_409: Resource limit syscalls
+// ============================================================================
+
+/// TEAM_409: sys_prlimit64 - Get/set resource limits.
+///
+/// This is a stub implementation that returns sensible defaults.
+/// Full resource limiting is not yet implemented.
+///
+/// # Arguments
+/// * `pid` - Process ID (0 = current process)
+/// * `resource` - Resource type (RLIMIT_*)
+/// * `new_limit` - New limit to set (NULL to only get)
+/// * `old_limit` - Buffer for old limit (NULL to only set)
+///
+/// # Returns
+/// 0 on success, negative errno on failure.
+pub fn sys_prlimit64(pid: i32, resource: u32, new_limit: usize, old_limit: usize) -> i64 {
+    use crate::memory::user as mm_user;
+    use crate::syscall::errno;
+
+    // Resource limit constants
+    const RLIMIT_NOFILE: u32 = 7;   // Max open files
+    const RLIMIT_STACK: u32 = 3;    // Max stack size
+    const RLIMIT_AS: u32 = 9;       // Address space limit
+    const RLIMIT_FSIZE: u32 = 1;    // Max file size
+    const RLIMIT_DATA: u32 = 2;     // Max data segment size
+    const RLIMIT_CORE: u32 = 4;     // Max core file size
+    const RLIMIT_CPU: u32 = 0;      // CPU time limit
+    const RLIMIT_RSS: u32 = 5;      // Max resident set size
+    const RLIMIT_NPROC: u32 = 6;    // Max processes
+    const RLIMIT_MEMLOCK: u32 = 8;  // Max locked memory
+
+    const RLIM_INFINITY: u64 = u64::MAX;
+
+    // rlimit64 struct: { rlim_cur: u64, rlim_max: u64 }
+    #[repr(C)]
+    struct Rlimit64 {
+        rlim_cur: u64,  // Soft limit
+        rlim_max: u64,  // Hard limit
+    }
+
+    let task = crate::task::current_task();
+
+    // Only support current process for now
+    if pid != 0 && pid != task.id.0 as i32 {
+        log::warn!("[SYSCALL] prlimit64: pid {} not supported (only current process)", pid);
+        return errno::ESRCH;
+    }
+
+    // Default limits (sensible values for a simple OS)
+    let default_limit = match resource {
+        RLIMIT_NOFILE => Rlimit64 { rlim_cur: 1024, rlim_max: 4096 },
+        RLIMIT_STACK => Rlimit64 { rlim_cur: 8 * 1024 * 1024, rlim_max: RLIM_INFINITY },
+        RLIMIT_AS => Rlimit64 { rlim_cur: RLIM_INFINITY, rlim_max: RLIM_INFINITY },
+        RLIMIT_FSIZE => Rlimit64 { rlim_cur: RLIM_INFINITY, rlim_max: RLIM_INFINITY },
+        RLIMIT_DATA => Rlimit64 { rlim_cur: RLIM_INFINITY, rlim_max: RLIM_INFINITY },
+        RLIMIT_CORE => Rlimit64 { rlim_cur: 0, rlim_max: RLIM_INFINITY },
+        RLIMIT_CPU => Rlimit64 { rlim_cur: RLIM_INFINITY, rlim_max: RLIM_INFINITY },
+        RLIMIT_RSS => Rlimit64 { rlim_cur: RLIM_INFINITY, rlim_max: RLIM_INFINITY },
+        RLIMIT_NPROC => Rlimit64 { rlim_cur: 1024, rlim_max: 4096 },
+        RLIMIT_MEMLOCK => Rlimit64 { rlim_cur: 64 * 1024, rlim_max: 64 * 1024 },
+        _ => {
+            log::warn!("[SYSCALL] prlimit64: unknown resource {}", resource);
+            return errno::EINVAL;
+        }
+    };
+
+    // Return old limit if requested
+    if old_limit != 0 {
+        let limit_size = core::mem::size_of::<Rlimit64>();
+        if mm_user::validate_user_buffer(task.ttbr0, old_limit, limit_size, true).is_err() {
+            return errno::EFAULT;
+        }
+        let dest = mm_user::user_va_to_kernel_ptr(task.ttbr0, old_limit).unwrap();
+        unsafe {
+            core::ptr::copy_nonoverlapping(
+                &default_limit as *const Rlimit64 as *const u8,
+                dest,
+                limit_size,
+            );
+        }
+    }
+
+    // Setting new limit is a no-op for now (we don't enforce limits)
+    if new_limit != 0 {
+        log::trace!("[SYSCALL] prlimit64: ignoring new_limit for resource {}", resource);
+    }
+
+    0
+}

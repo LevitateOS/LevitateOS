@@ -430,20 +430,101 @@ pub fn sys_fchdir(_fd: usize) -> i64 {
     errno::ENOSYS
 }
 
-/// TEAM_404: sys_ftruncate - Truncate file to specified length.
+/// TEAM_410: sys_truncate - Truncate file by path to specified length.
 ///
-/// Stub: returns 0 (success) for now - full impl needs inode truncate support.
-pub fn sys_ftruncate(fd: usize, _length: i64) -> i64 {
+/// Truncates the file at the given path to the specified length.
+/// If the file is longer, extra data is discarded. If shorter, the file is extended with zeros.
+pub fn sys_truncate(pathname: usize, length: i64) -> i64 {
+    use crate::syscall::read_user_cstring;
+    use crate::fs::vfs::dentry::dcache;
+    use crate::fs::vfs::error::VfsError;
+    
+    // Length must be non-negative
+    if length < 0 {
+        return errno::EINVAL;
+    }
+    
+    let task = current_task();
+    
+    // Read pathname from user space
+    let mut path_buf = [0u8; 4096];
+    let path_str = match read_user_cstring(task.ttbr0, pathname, &mut path_buf) {
+        Ok(s) => s,
+        Err(e) => return e,
+    };
+    
+    // Look up the file in the VFS
+    let dentry = match dcache().lookup(path_str) {
+        Ok(d) => d,
+        Err(VfsError::NotFound) => return errno::ENOENT,
+        Err(_) => return errno::EIO,
+    };
+    
+    let inode = match dentry.get_inode() {
+        Some(i) => i,
+        None => return errno::ENOENT,
+    };
+    
+    // Must be a regular file
+    if !inode.is_file() {
+        return if inode.is_dir() { errno::EISDIR } else { errno::EINVAL };
+    }
+    
+    // TEAM_410: Call the VFS truncate operation
+    match inode.truncate(length as u64) {
+        Ok(()) => 0,
+        Err(VfsError::NotSupported) => errno::EROFS, // Read-only filesystem
+        Err(VfsError::NoSpace) => errno::ENOSPC,
+        Err(VfsError::FileTooLarge) => errno::EFBIG,
+        Err(_) => errno::EIO,
+    }
+}
+
+/// TEAM_410: sys_ftruncate - Truncate file to specified length by fd.
+///
+/// Truncates the file referred to by fd to the specified length.
+/// The file must be open for writing.
+pub fn sys_ftruncate(fd: usize, length: i64) -> i64 {
+    use crate::fs::vfs::error::VfsError;
+    use crate::task::fd_table::FdType;
+    
+    // Length must be non-negative
+    if length < 0 {
+        return errno::EINVAL;
+    }
+    
     let task = current_task();
     let fd_table = task.fd_table.lock();
     
-    // Just verify fd is valid
-    if fd_table.get(fd).is_none() {
-        return errno::EBADF;
-    }
+    let entry = match fd_table.get(fd) {
+        Some(e) => e,
+        None => return errno::EBADF,
+    };
     
-    // TODO: Implement actual truncation
-    0
+    // TEAM_410: Get the inode from the file and truncate
+    match &entry.fd_type {
+        FdType::VfsFile(file) => {
+            // Check if file is open for writing
+            if !file.flags.is_writable() {
+                return errno::EINVAL; // POSIX says EINVAL if not open for writing
+            }
+            
+            // Must be a regular file
+            if !file.inode.is_file() {
+                return if file.inode.is_dir() { errno::EISDIR } else { errno::EINVAL };
+            }
+            
+            match file.inode.truncate(length as u64) {
+                Ok(()) => 0,
+                Err(VfsError::NotSupported) => errno::EROFS,
+                Err(VfsError::NoSpace) => errno::ENOSPC,
+                Err(VfsError::FileTooLarge) => errno::EFBIG,
+                Err(_) => errno::EIO,
+            }
+        }
+        // Other fd types (pipes, stdin/stdout, etc.) cannot be truncated
+        _ => errno::EINVAL,
+    }
 }
 
 /// TEAM_404: sys_pread64 - Read from fd at offset without changing file position.

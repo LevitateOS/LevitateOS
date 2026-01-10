@@ -49,6 +49,11 @@ pub mod errno {
     pub const ENOTEMPTY: i64 = -39;  // Directory not empty
     pub const ELOOP: i64 = -40;       // TEAM_381: Too many symbolic links
     pub const ESPIPE: i64 = -29;      // TEAM_404: Illegal seek
+    // TEAM_410: Additional errno values for truncate support
+    pub const EISDIR: i64 = -21;      // Is a directory
+    pub const ENOSPC: i64 = -28;      // No space left on device
+    pub const EROFS: i64 = -30;       // Read-only file system
+    pub const EFBIG: i64 = -27;       // File too large
 }
 
 /// TEAM_342: Deprecated - use errno module instead. Kept for backward compatibility.
@@ -391,6 +396,24 @@ pub fn syscall_dispatch(frame: &mut SyscallFrame) {
             frame.arg0() as i32,
             frame.arg1() as i32,
             frame.arg2() as usize,
+        ),
+        // TEAM_409: fstatat and prlimit64 for coreutils
+        Some(SyscallNumber::Fstatat) => fs::sys_fstatat(
+            frame.arg0() as i32,
+            frame.arg1() as usize,
+            frame.arg2() as usize,
+            frame.arg3() as i32,
+        ),
+        Some(SyscallNumber::Prlimit64) => process::sys_prlimit64(
+            frame.arg0() as i32,
+            frame.arg1() as u32,
+            frame.arg2() as usize,
+            frame.arg3() as usize,
+        ),
+        // TEAM_409: truncate - truncate file by path
+        Some(SyscallNumber::Truncate) => fs::sys_truncate(
+            frame.arg0() as usize,
+            frame.arg1() as i64,
         ),
         None => {
             log::warn!("[SYSCALL] Unknown syscall number: {}", nr);

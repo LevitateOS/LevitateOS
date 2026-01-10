@@ -66,7 +66,8 @@ pub enum SyscallNumber {
     Chown = 92,     // TEAM_406: Change file owner
     Fchown = 93,    // TEAM_406: Change owner by fd
     Umask = 95,     // TEAM_406: File creation mask
-    Ftruncate = 77, // TEAM_404: Truncate file
+    Truncate = 76,  // TEAM_409: Truncate file by path
+    Ftruncate = 77, // TEAM_404: Truncate file by fd
     Getdents = 78,
     Getcwd = 79,
     Chdir = 80,     // TEAM_404: Change directory
@@ -106,7 +107,7 @@ pub enum SyscallNumber {
     Ppoll = 271,
     Tkill = 200,
     PkeyAlloc = 330,
-    PkeyMprotect = 302,
+    PkeyMprotect = 329,  // TEAM_409: Fixed from 302
     Sigaltstack = 131,
     // TEAM_394: Epoll syscalls for tokio/brush support
     EpollCreate1 = 291,
@@ -120,6 +121,9 @@ pub enum SyscallNumber {
     Setsid = 112,
     // TEAM_394: fcntl for brush (F_SETPIPE_SZ, etc.)
     Fcntl = 72,
+    // TEAM_409: Additional syscalls for coreutils
+    Fstatat = 262,   // newfstatat - stat relative to dirfd
+    Prlimit64 = 302, // get/set resource limits
 
     // === Custom LevitateOS syscalls ===
     Spawn = 1000,
@@ -167,6 +171,7 @@ impl SyscallNumber {
             92 => Some(Self::Chown),     // TEAM_406
             93 => Some(Self::Fchown),    // TEAM_406
             95 => Some(Self::Umask),     // TEAM_406
+            76 => Some(Self::Truncate),  // TEAM_409
             77 => Some(Self::Ftruncate), // TEAM_404
             78 => Some(Self::Getdents),
             79 => Some(Self::Getcwd),
@@ -207,7 +212,8 @@ impl SyscallNumber {
             271 => Some(Self::Ppoll),
             200 => Some(Self::Tkill),
             330 => Some(Self::PkeyAlloc),
-            302 => Some(Self::PkeyMprotect),
+            329 => Some(Self::PkeyMprotect),  // TEAM_409: Fixed - was incorrectly 302
+            302 => Some(Self::Prlimit64),
             131 => Some(Self::Sigaltstack),
             // TEAM_394: Epoll syscalls
             291 => Some(Self::EpollCreate1),
@@ -220,6 +226,8 @@ impl SyscallNumber {
             111 => Some(Self::Getpgrp),
             112 => Some(Self::Setsid),
             72 => Some(Self::Fcntl),
+            // TEAM_409: Additional syscalls for coreutils
+            262 => Some(Self::Fstatat),
             // Custom LevitateOS
             1000 => Some(Self::Spawn),
             1001 => Some(Self::SpawnArgs),

@@ -107,6 +107,10 @@ pub enum SyscallNumber {
     Fchmod = 52,    // aarch64 fchmod
     Chown = 1092,   // TEAM_406: Not in aarch64 Linux, use custom  
     Fchown = 55,    // aarch64 fchown
+    // TEAM_409: Additional syscalls for coreutils
+    Fstatat = 79,    // newfstatat - stat relative to dirfd
+    Truncate = 76,   // truncate file by path
+    Prlimit64 = 261, // get/set resource limits
 
     // === Custom LevitateOS syscalls (temporary, until clone/execve work) ===
     /// TEAM: Spawn process (custom, will be replaced by clone+execve)
@@ -216,6 +220,10 @@ impl SyscallNumber {
             52 => Some(Self::Fchmod),
             1092 => Some(Self::Chown),
             55 => Some(Self::Fchown),
+            // TEAM_409: Additional syscalls for coreutils
+            79 => Some(Self::Fstatat),
+            76 => Some(Self::Truncate),
+            261 => Some(Self::Prlimit64),
             // Custom LevitateOS
             1000 => Some(Self::Spawn),
             1001 => Some(Self::SpawnArgs),
