@@ -1,6 +1,10 @@
 # Contributing to LevitateOS
 
-Thank you for your interest in contributing to LevitateOS! This project aims to build a modern, safe, and efficient AArch64 kernel in Rust.
+Thank you for your interest in contributing to LevitateOS!
+
+**LevitateOS is a General Purpose Unix-Compatible Operating System** — we aim to run any Unix program without modification. This means we prioritize Linux binary compatibility over custom features.
+
+See [docs/VISION.md](docs/VISION.md) for our full mission statement.
 
 ## Getting Started
 

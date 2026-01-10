@@ -116,6 +116,8 @@ This applies to **all binaries** in the workspace automatically.
 
 ## Example: Minimal Eyra Binary
 
+**TEAM_395: Use the official "rename to std" pattern from Eyra README.**
+
 **Cargo.toml:**
 ```toml
 [package]
@@ -124,7 +126,9 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-eyra = { version = "0.22", features = ["experimental-relocate"] }
+# Rename eyra to std - this is the official Eyra pattern
+# See: https://github.com/sunfishcode/eyra#quick-start
+std = { package = "eyra", version = "0.22", features = ["experimental-relocate"] }
 ```
 
 **src/main.rs:**
@@ -134,7 +138,21 @@ fn main() {
 }
 ```
 
-**That's it!** No `build.rs` needed for `-nostartfiles`.
+**That's it!** No `build.rs` needed for `-nostartfiles` (handled by workspace config),
+and no `extern crate eyra;` needed (because we renamed eyra to std).
+
+### IMPORTANT: Library crates should NOT depend on eyra
+
+If you have a `#![no_std]` library crate (like `libsyscall`), do NOT add eyra as a
+dependency. Only BINARY crates should use `std = { package = "eyra" }`.
+
+```
+Binary crates (your app)
+    └── std = { package = "eyra" }  ← Native std support HERE
+    └── your-no_std-library         ← NO eyra dependency
+```
+
+This prevents dependency conflicts when the binary and library both reference eyra.
 
 ---
 

@@ -2,6 +2,21 @@
 
 > ⚠️ **CURRENT STATE (2026-01-05):** System boots to an interactive shell.
 
+## General Purpose Unix-Compatible OS
+
+**LevitateOS is a General Purpose Operating System** that aims to run any Unix program without modification.
+
+| Requirement | Description |
+|-------------|-------------|
+| **No Source Modification** | Programs compiled for Linux just work |
+| **Standard ABI** | Linux syscall interface, not a custom ABI |
+| **libc Compatibility** | Provide libc.so that existing binaries link against |
+| **POSIX Semantics** | fork, exec, pipes, signals, file descriptors work as expected |
+
+**The Test**: Can a user download a Linux binary and run it? If yes, we're general purpose.
+
+## Workspace Structure
+
 **TEAM_009: Workspace Refactoring**
 
 LevitateOS uses a modular **Cargo Workspace** structure, inspired by **Tock OS** and **Redox**. This ensures clear separation of concerns between core kernel logic, hardware abstraction, and shared utilities.
@@ -119,6 +134,22 @@ See `docs/planning/error-macro/phase-1.md` for the current subsystem list.
 ## Userspace & ABI
 
 LevitateOS is transitioning from a minimal custom syscall ABI to full **Linux AArch64 ABI Compatibility** (Phase 10). This strategy enables the use of the standard Rust library (`std`) and existing UNIX toolchains. 
+
+### Path to General Purpose
+
+| Layer | What | Status |
+|-------|------|--------|
+| **Syscall ABI** | Linux syscall numbers + semantics | 🟡 In Progress |
+| **libc** | libc.so.6 via [c-gull](https://github.com/sunfishcode/c-ward) | 🔲 Next Milestone |
+| **Dynamic Linker** | ld-linux.so.2 | 🔲 Future |
+| **POSIX APIs** | open, read, write, fork, exec, mmap, etc. | 🟡 Partial |
+
+**Current (Eyra)**: Apps must be modified to inject Eyra dependency. Not scalable for general purpose.
+
+**Future (c-gull libc)**: 
+```
+Unmodified Linux Binary → libc.so (c-gull) → Linux syscalls → LevitateOS kernel
+```
 
 For implementation details and common pitfalls, see:
 - [Linux ABI Compatibility Guide](file:///home/vince/Projects/LevitateOS/docs/specs/LINUX_ABI_GUIDE.md) — Critical knowledge for future teams.

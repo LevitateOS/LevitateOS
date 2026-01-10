@@ -1,4 +1,5 @@
 # TEAM_380: Integration test runner for libsyscall with std support via Eyra
+# TEAM_395: Use official Eyra pattern - rename eyra to std for native std support
 [package]
 name = "libsyscall-tests"
 version = "0.1.0"
@@ -6,8 +7,12 @@ edition = "2021"
 description = "Integration tests for libsyscall with std support"
 
 [dependencies]
-eyra = { version = "0.22", features = ["experimental-relocate"] }
-libsyscall = { path = "../libsyscall", features = ["std"] }
+# Official Eyra pattern: rename to std for native std support
+# See: https://github.com/sunfishcode/eyra#quick-start
+std = { package = "eyra", version = "0.22", features = ["experimental-relocate"] }
+
+# libsyscall is pure no_std - no feature flags needed
+libsyscall = { path = "../libsyscall" }
 
 [[bin]]
 name = "libsyscall-tests"

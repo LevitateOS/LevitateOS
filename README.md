@@ -1,6 +1,16 @@
 # LevitateOS
 
-An AArch64 and x86_64 operating system kernel written in Rust, targeting the QEMU `virt` machine, Pixel 6 hardware, and Intel NUC (x86_64).
+**A General Purpose Unix-Compatible Operating System**
+
+LevitateOS is a modern OS written in Rust that aims to **run any Unix program without modification**. Built from scratch with memory safety guarantees, it provides Linux binary compatibility so existing programs just work.
+
+| Target | Status |
+|--------|--------|
+| Run unmodified Linux binaries | 🎯 Goal |
+| Linux syscall ABI | 🟡 In Progress |
+| libc compatibility (via c-gull) | 🔲 Next Milestone |
+
+Supports AArch64 and x86_64, targeting QEMU `virt`, Pixel 6, and Intel NUC.
 
 ## 🎯 Supported Targets
 

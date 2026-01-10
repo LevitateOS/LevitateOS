@@ -1,7 +1,29 @@
 # LevitateOS Vision
 
 ## 🎯 Mission Statement
-To build a **modern, secure, and performant** operating system written in Rust that provides **seamless binary compatibility with the Linux ABI**.
+
+**LevitateOS is a General Purpose Unix-Compatible Operating System.**
+
+To build a **modern, secure, and performant** operating system written in Rust that can **run any Unix program without modification**.
+
+### What "General Purpose" Means
+
+A General Purpose OS lets **arbitrary users run arbitrary programs** they didn't write:
+
+| Requirement | Description |
+|-------------|-------------|
+| **No Source Modification** | Programs compiled for Linux just work |
+| **Standard ABI** | Linux syscall interface, not a custom ABI |
+| **libc Compatibility** | Provide libc.so that existing binaries link against |
+| **POSIX Semantics** | fork, exec, pipes, signals, file descriptors work as expected |
+
+**The Test**: Can a user download a Linux binary and run it? If yes, we're general purpose.
+
+### What We Are NOT
+
+- ❌ NOT a hobby/educational OS (we aim for production use)
+- ❌ NOT an embedded/single-purpose OS (we run arbitrary programs)
+- ❌ NOT a research OS (we prioritize compatibility over novelty)
 
 LevitateOS aims to prove that a clean-slate kernel, built with modern language guarantees (Rust), can support the vast existing ecosystem of Linux applications without sacrificing safety or architectural integrity.
 
@@ -15,14 +37,38 @@ LevitateOS aims to prove that a clean-slate kernel, built with modern language g
 6. **Modern Hardware First**: Targets modern architectures (AArch64, x86_64) and hardware (Pixel 6, Intel NUC) with a focus on energy efficiency and scalability.
 
 ## 🚀 Long-Term Goal
-The ultimate milestone for LevitateOS is to **port and run the complete Rust Standard Library (`std`)**, enabling developers to build and run complex, production-grade Rust applications natively on LevitateOS as if they were running on Linux.
+
+**Run any Unix program without modification.**
+
+This breaks down into concrete milestones:
+
+1. ✅ Linux syscall ABI compatibility (in progress)
+2. 🔲 Provide libc.so via [c-ward/c-gull](https://github.com/sunfishcode/c-ward) - enables unmodified Linux binaries
+3. 🔲 Dynamic linker (ld-linux.so equivalent)
+4. 🔲 Full POSIX compliance for common utilities
 
 ## 🛠️ Strategy
-- **Phase 1-14 (Foundation)**: Establish the HAL, MMU, Multitasking, and VFS.
-- **Phase 15-17 (Compatibility)**: Implement the Linux syscall layer and TTY subsystem.
-- **Phase 18-20 (Security & Multi-user)**: Add identity, authentication, and kernel hardening.
-- **Terminal Support (Phase 16)**
-   - Implement `termios` and `ioctl(TCGETS/TCSETS)` for TTY control.
-- **Toolchain & Libc (The Eyra Path)**
-   - Leverage [Eyra](https://github.com/sunfishcode/eyra) as the primary userspace runtime to achieve a pure Rust, C-library-free environment.
-   - Port Rust `std` to `levitateos` target by utilizing Eyra's Linux ABI compatibility layers.
+
+### Path to General Purpose
+
+| Phase | Goal | Status |
+|-------|------|--------|
+| Foundation (1-14) | HAL, MMU, Multitasking, VFS | ✅ Complete |
+| Compatibility (15-17) | Linux syscall layer, TTY | 🟡 In Progress |
+| **libc Layer** | c-gull as libc.so - THE critical milestone | 🔲 Next |
+| Security (18-20) | Identity, authentication, hardening | 🔲 Future |
+
+### The libc Strategy
+
+**Current (Eyra)**: Apps must be modified to inject Eyra. Not scalable.
+
+**Future (c-gull libc)**: 
+```
+Unmodified Linux Binary → libc.so (c-gull) → Linux syscalls → LevitateOS kernel
+```
+
+This is the **key architectural decision** that makes us general purpose:
+- [c-ward](https://github.com/sunfishcode/c-ward) provides a libc implementation in pure Rust
+- [c-gull](https://github.com/sunfishcode/c-ward/tree/main/c-gull) is the "take-charge" mode that handles program startup
+- We build c-gull as `libc.so.6` and ship it with the OS
+- Programs compiled for Linux link against it transparently

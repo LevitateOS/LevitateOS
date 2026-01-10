@@ -1,8 +1,29 @@
 # LevitateOS Roadmap
 
-**Last Updated:** 2026-01-09 (TEAM_348)
+**Last Updated:** 2026-01-10 (TEAM_396)
 
 This document outlines the planned development phases for LevitateOS. Each completed item includes the responsible team for traceability.
+
+---
+
+## 🎯 Mission: General Purpose Unix-Compatible OS
+
+**LevitateOS aims to run any Unix program without modification.**
+
+| Requirement | Description | Status |
+|-------------|-------------|--------|
+| **No Source Modification** | Programs compiled for Linux just work | 🔲 Goal |
+| **Standard ABI** | Linux syscall interface | 🟡 In Progress |
+| **libc Compatibility** | Provide libc.so via c-gull | 🔲 Critical Milestone |
+| **POSIX Semantics** | fork, exec, pipes, signals | 🟡 Partial |
+
+**The Test**: Can a user download a Linux binary and run it? If yes, we're general purpose.
+
+### What We Are NOT
+
+- ❌ NOT a hobby/educational OS (we aim for production use)
+- ❌ NOT an embedded/single-purpose OS (we run arbitrary programs)
+- ❌ NOT a research OS (we prioritize compatibility over novelty)
 
 ---
 
@@ -14,6 +35,27 @@ To maximize technical ROI and enable the Rust `std` ecosystem, LevitateOS priori
 1. **Userland Support**: Implement the Linux Syscall interface to allow standard Rust applications to run with minimal modifications.
 2. **Standard Library**: Target the Rust `std` library graduation (Phase 17) as the primary project goal.
 3. **Application Target**: Sprint toward running a static Rust binary using `std` (e.g., `uutils-levbox`).
+
+### 🚨 Critical Path to General Purpose
+
+```
+Current State (Eyra):
+  App must be modified → Add eyra dependency → Rebuild → Run on LevitateOS
+  ❌ NOT general purpose (requires source modification)
+
+Target State (c-gull libc):
+  Unmodified Linux binary → libc.so (c-gull) → Linux syscalls → LevitateOS
+  ✅ General purpose (no source modification needed)
+```
+
+**The libc milestone is THE critical blocker for general purpose status.**
+
+| Phase | Goal | Status |
+|-------|------|--------|
+| Syscall ABI | Linux syscall numbers + semantics | 🟡 In Progress |
+| **libc.so** | [c-gull](https://github.com/sunfishcode/c-ward) as libc.so.6 | 🔲 **NEXT MILESTONE** |
+| Dynamic Linker | ld-linux.so.2 equivalent | 🔲 Future |
+| Full POSIX | All common syscalls implemented | 🔲 Future |
 
 ---
 

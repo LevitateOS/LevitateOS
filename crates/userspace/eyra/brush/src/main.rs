@@ -1,13 +1,11 @@
 // TEAM_394: Brush shell wrapper for LevitateOS
 //
 // This binary wraps brush-shell to run on LevitateOS via Eyra std support.
+// TEAM_395: Uses rename pattern (std = { package = "eyra" }) for native std support.
 // Brush provides POSIX/Bash-compatible shell functionality including:
 // - Script execution (.sh files)
 // - Variables, loops, conditionals
 // - Tab completion and history (when reedline feature enabled)
-
-// Required for Eyra std replacement
-extern crate eyra;
 
 fn main() {
     // TEAM_394: For now, just print a message to verify the binary loads

@@ -1,6 +1,7 @@
 //! Integration test runner for libsyscall with std support
 //!
 //! TEAM_380: Migrated from libsyscall/tests/ to enable std support via Eyra.
+//! TEAM_395: Uses Eyra for native std support via rename pattern (std = { package = "eyra" })
 //! This binary runs all integration tests and reports results with colored output.
 
 use std::process::exit;

@@ -9,7 +9,8 @@ description = "Brush shell adapted for LevitateOS via Eyra"
 # TEAM_394: brush-shell provides the shell implementation
 # We create a thin wrapper that uses Eyra as std
 [dependencies]
-eyra = { version = "0.22", features = ["experimental-relocate"] }
+# TEAM_395: Official Eyra pattern - rename to std for native std support
+std = { package = "eyra", version = "0.22", features = ["experimental-relocate"] }
 
 # brush-shell with minimal features for initial port
 # Disable reedline initially to reduce complexity

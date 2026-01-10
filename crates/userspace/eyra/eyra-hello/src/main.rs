@@ -1,10 +1,8 @@
 // TEAM_351: Eyra test binary for LevitateOS
 //
 // This binary uses Eyra to provide Rust's std library via direct Linux syscalls.
+// TEAM_395: Uses rename pattern (std = { package = "eyra" }) for native std support.
 // If this runs successfully, LevitateOS has basic std support.
-
-// Required for -Zbuild-std compatibility (see Eyra README)
-extern crate eyra;
 
 use std::time::Instant;
 

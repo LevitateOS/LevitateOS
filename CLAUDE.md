@@ -108,6 +108,23 @@ cargo xtask kill               # Kill running QEMU instances
 
 ## Architecture Overview
 
+**LevitateOS is a General Purpose Unix-Compatible Operating System.**
+
+The goal is to **run any Unix program without modification** - programs compiled for Linux should just work.
+
+### What "General Purpose" Means
+
+| Requirement | Description |
+|-------------|-------------|
+| **No Source Modification** | Programs compiled for Linux just work |
+| **Standard ABI** | Linux syscall interface, not a custom ABI |
+| **libc Compatibility** | Provide libc.so that existing binaries link against |
+| **POSIX Semantics** | fork, exec, pipes, signals, file descriptors work as expected |
+
+**The Test**: Can a user download a Linux binary and run it? If yes, we're general purpose.
+
+### Technical Overview
+
 LevitateOS is a dual-architecture (AArch64 and x86_64) operating system kernel written in Rust. It uses a modular workspace structure with clear separation between kernel, HAL, and utilities.
 
 ### Workspace Structure
@@ -352,13 +369,52 @@ Key considerations:
 - Errno value alignment with Linux (use constants from `kernel/src/syscall/mod.rs::errno`)
 - Vectored I/O for `println!` (`writev`/`readv`)
 
-### Eyra Integration
+### Eyra Integration (CRITICAL - READ THIS)
 
-**Status**: Phase 4 complete - Eyra utilities integrated with `--with-eyra` flag
-- Located in `crates/userspace/eyra/coreutils` (git submodule)
-- Provides `std` support via Eyra origin runtime
-- Build with: `cargo xtask build eyra --arch <arch>`
-- Individual utilities replaced by multi-call binary from uutils-coreutils
+**What is Eyra?** Eyra replaces Rust's `std` with a pure-Rust implementation that makes Linux syscalls directly, without libc. This lets us run Rust programs on LevitateOS without glibc/musl.
+
+**Status**: Eyra utilities integrated via git submodule at `crates/userspace/eyra/coreutils`
+
+#### REQUIRED PATTERN FOR EYRA APPS
+
+When porting any Rust application to use Eyra, you MUST follow this exact pattern:
+
+**1. Cargo.toml - Add Eyra as "std" (rename pattern):**
+```toml
+[dependencies]
+std = { package = "eyra", version = "0.22", features = ["experimental-relocate"] }
+```
+
+**2. build.rs - Add nostartfiles flag:**
+```rust
+fn main() {
+    println!("cargo:rustc-link-arg=-nostartfiles");
+    // ... rest of build.rs
+}
+```
+
+**3. .cargo/config.toml - Static PIE flags:**
+```toml
+[target.x86_64-unknown-linux-gnu]
+rustflags = ["-C", "target-feature=+crt-static", "-C", "relocation-model=pic"]
+
+[target.aarch64-unknown-linux-gnu]
+rustflags = ["-C", "target-feature=+crt-static", "-C", "relocation-model=pic"]
+```
+
+**DO NOT use `extern crate eyra;`** - that's the old pattern. The rename-to-std pattern is cleaner and official.
+
+#### Current Limitation: App Modification Required
+
+Currently, **every app must be modified** to use Eyra. This is NOT scalable for arbitrary user apps.
+
+**Future Solution**: LevitateOS will provide a libc-compatible layer using [c-ward/c-gull](https://github.com/sunfishcode/c-ward) so unmodified Linux binaries can run. This is tracked as a future milestone.
+
+#### Build Commands
+```bash
+cargo xtask build eyra --arch x86_64
+cargo xtask build eyra --arch aarch64
+```
 
 ### Memory Layout
 
