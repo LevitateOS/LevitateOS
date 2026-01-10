@@ -22,6 +22,7 @@ build_warnings*.txt
 .DS_Store
 *.swp
 *.gdb
+.idea
 
 # Selective exceptions
 !docs/**/*.txt

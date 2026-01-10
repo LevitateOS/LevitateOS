@@ -329,6 +329,12 @@ impl QemuBuilder {
             cmd.arg("-no-reboot");
         }
 
+        // TEAM_409: Add isa-debug-exit device for x86_64 to allow proper VM termination
+        // The kernel writes to port 0xf4 to exit QEMU
+        if matches!(self.arch, Arch::X86_64) {
+            cmd.args(["-device", "isa-debug-exit,iobase=0xf4,iosize=0x04"]);
+        }
+
         Ok(cmd)
     }
 }

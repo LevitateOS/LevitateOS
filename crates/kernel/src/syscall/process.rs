@@ -683,9 +683,15 @@ pub fn sys_arch_prctl(code: i32, addr: usize) -> i64 {
                     options(nostack, preserves_flags)
                 );
             }
-            // Store in task for context switch restore
+            // TEAM_409: Store in BOTH task.tls AND context.fs_base for context switch restore
+            // The context switch assembly restores from context.fs_base, not task.tls
             let task = crate::task::current_task();
             task.tls.store(addr, core::sync::atomic::Ordering::Release);
+            // SAFETY: We're modifying our own context which won't be used until we context switch out
+            unsafe {
+                let ctx_ptr = &task.context as *const _ as *mut crate::arch::Context;
+                (*ctx_ptr).set_tls(addr as u64);
+            }
             0
         }
         ARCH_GET_FS => {

@@ -129,10 +129,18 @@ pub extern "C" fn _start() -> ! {
         println!("[INIT] ERROR: Failed to spawn shell: {}", shell_pid);
     } else {
         println!("[INIT] Shell spawned as PID {}", shell_pid);
+        
+        // TEAM_409: Wait for shell to exit and report status
+        let mut status: i32 = 0;
+        let wait_result = libsyscall::waitpid(shell_pid as i32, Some(&mut status));
+        println!("[INIT] Shell exited: wait={}, status={}", wait_result, status);
+        println!("[INIT] System halting...");
+        
+        // Shutdown the system cleanly when shell exits
+        libsyscall::shutdown(0);
     }
 
-    // PID 1 must never exit
-    // TEAM_129: Yield to allow shell to run
+    // Fallback: PID 1 must never exit
     loop {
         yield_cpu();
     }
