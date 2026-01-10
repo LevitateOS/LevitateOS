@@ -1,20 +1,9 @@
+# TEAM_380: Simplified workspace - coreutils is now a submodule with its own workspace
+# Individual utility crates removed in favor of multi-call binary
 [workspace]
 members = [
-    "cat",
-    "cp",
-    "echo",
-    "env",
+    "eyra-hello",
     "eyra-test-runner",
-    "false",
-    "ln",
-    "ls",
-    "mkdir",
-    "mv",
-    "pwd",
-    "rm",
-    "rmdir",
-    "touch",
-    "true",
 ]
 resolver = "2"
 
