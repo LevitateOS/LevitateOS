@@ -2,3 +2,6 @@
 	path = crates/userspace/eyra/coreutils
 	url = https://github.com/veighnsche/coreutils.git
 	branch = eyra-rebased
+[submodule "crates/kernel"]
+	path = crates/kernel
+	url = git@github.com:LevitateOS/kernel.git
