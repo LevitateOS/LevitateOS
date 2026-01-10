@@ -1,7 +1,11 @@
 //! TEAM_233: File descriptor duplication syscalls.
 //! TEAM_404: Added lseek, dup2, chdir, fchdir, ftruncate for coreutils compatibility.
+//! TEAM_413: Updated to use syscall helper abstractions.
 
+use crate::memory::user as mm_user;
 use crate::syscall::errno;
+// TEAM_413: Import new syscall helpers
+use crate::syscall::{get_fd, is_valid_fd};
 use crate::task::current_task;
 use crate::task::fd_table::FdType;
 
@@ -28,15 +32,14 @@ const F_GETPIPE_SZ: i32 = 1032;
 ///
 /// Stub implementation for brush shell compatibility.
 /// Currently supports F_GETFD, F_SETFD, F_GETFL, F_SETFL, F_SETPIPE_SZ, F_GETPIPE_SZ.
+/// TEAM_413: Updated to use is_valid_fd helper.
 pub fn sys_fcntl(fd: i32, cmd: i32, arg: usize) -> i64 {
-    let task = current_task();
-    let fd_table = task.fd_table.lock();
-
-    // Verify fd is valid
-    if fd_table.get(fd as usize).is_none() {
+    // TEAM_413: Use is_valid_fd helper for validation
+    if !is_valid_fd(fd as usize) {
         return errno::EBADF;
     }
-    drop(fd_table);
+
+    let task = current_task();
 
     match cmd {
         F_DUPFD => {
@@ -171,14 +174,14 @@ pub fn sys_pipe2(pipefd_ptr: usize, _flags: u32) -> i64 {
 }
 
 /// TEAM_244: sys_isatty - Check if fd refers to a terminal.
+/// TEAM_413: Updated to use get_fd helper.
 ///
 /// Returns 1 if tty, 0 if not, negative errno on error.
 pub fn sys_isatty(fd: i32) -> i64 {
-    let task = current_task();
-    let fd_table = task.fd_table.lock();
-    let entry = match fd_table.get(fd as usize) {
-        Some(e) => e,
-        None => return errno::EBADF,
+    // TEAM_413: Use get_fd helper
+    let entry = match get_fd(fd as usize) {
+        Ok(e) => e,
+        Err(e) => return e,
     };
 
     match &entry.fd_type {
@@ -188,21 +191,21 @@ pub fn sys_isatty(fd: i32) -> i64 {
 }
 
 /// TEAM_247: sys_ioctl - Control device.
+/// TEAM_413: Updated to use get_fd and struct helpers.
 ///
 /// Returns 0 on success, negative errno on failure.
 pub fn sys_ioctl(fd: usize, request: u64, arg: usize) -> i64 {
     use crate::fs::tty::{
         CONSOLE_TTY, TCGETS, TCSETS, TCSETSF, TCSETSW, TIOCGPTN, TIOCSPTLCK, Termios,
     };
-    use crate::memory::user as mm_user;
+
+    // TEAM_413: Use get_fd helper
+    let entry = match get_fd(fd) {
+        Ok(e) => e,
+        Err(e) => return e,
+    };
 
     let task = current_task();
-    let fd_table = task.fd_table.lock();
-    let entry = match fd_table.get(fd) {
-        Some(e) => e.clone(),
-        None => return errno::EBADF,
-    };
-    drop(fd_table);
 
     // For now, we only support ioctls on TTY devices (stdin/stdout/stderr)
     match &entry.fd_type {
@@ -353,19 +356,18 @@ pub fn sys_ioctl(fd: usize, request: u64, arg: usize) -> i64 {
 }
 
 /// TEAM_404: sys_lseek - Reposition file offset.
+/// TEAM_413: Updated to use get_fd helper.
 ///
 /// Returns new offset on success, negative errno on failure.
 pub fn sys_lseek(fd: usize, offset: i64, whence: i32) -> i64 {
     use crate::fs::vfs::ops::SeekWhence;
-    
-    let task = current_task();
-    let fd_table = task.fd_table.lock();
-    
-    let entry = match fd_table.get(fd) {
-        Some(e) => e,
-        None => return errno::EBADF,
+
+    // TEAM_413: Use get_fd helper
+    let entry = match get_fd(fd) {
+        Ok(e) => e,
+        Err(e) => return e,
     };
-    
+
     match &entry.fd_type {
         FdType::VfsFile(file) => {
             let seek_whence = match whence {
@@ -481,26 +483,24 @@ pub fn sys_truncate(pathname: usize, length: i64) -> i64 {
 }
 
 /// TEAM_410: sys_ftruncate - Truncate file to specified length by fd.
+/// TEAM_413: Updated to use get_fd helper.
 ///
 /// Truncates the file referred to by fd to the specified length.
 /// The file must be open for writing.
 pub fn sys_ftruncate(fd: usize, length: i64) -> i64 {
     use crate::fs::vfs::error::VfsError;
-    use crate::task::fd_table::FdType;
-    
+
     // Length must be non-negative
     if length < 0 {
         return errno::EINVAL;
     }
-    
-    let task = current_task();
-    let fd_table = task.fd_table.lock();
-    
-    let entry = match fd_table.get(fd) {
-        Some(e) => e,
-        None => return errno::EBADF,
+
+    // TEAM_413: Use get_fd helper
+    let entry = match get_fd(fd) {
+        Ok(e) => e,
+        Err(e) => return e,
     };
-    
+
     // TEAM_410: Get the inode from the file and truncate
     match &entry.fd_type {
         FdType::VfsFile(file) => {
@@ -528,6 +528,7 @@ pub fn sys_ftruncate(fd: usize, length: i64) -> i64 {
 }
 
 /// TEAM_409: sys_pread64 - Read from fd at offset without changing file position.
+/// TEAM_413: Updated to use get_fd helper.
 ///
 /// Reads up to `count` bytes from file descriptor `fd` at offset `offset`
 /// into the buffer at `buf_ptr`. The file offset is not changed.
@@ -552,13 +553,12 @@ pub fn sys_pread64(fd: usize, buf_ptr: usize, count: usize, offset: i64) -> i64 
     }
 
     let task = current_task();
-    let fd_table = task.fd_table.lock();
 
-    let entry = match fd_table.get(fd) {
-        Some(e) => e.clone(),
-        None => return errno::EBADF,
+    // TEAM_413: Use get_fd helper
+    let entry = match get_fd(fd) {
+        Ok(e) => e,
+        Err(e) => return e,
     };
-    drop(fd_table);
 
     match &entry.fd_type {
         FdType::VfsFile(file) => {
@@ -596,6 +596,7 @@ pub fn sys_pread64(fd: usize, buf_ptr: usize, count: usize, offset: i64) -> i64 
 }
 
 /// TEAM_409: sys_pwrite64 - Write to fd at offset without changing file position.
+/// TEAM_413: Updated to use get_fd helper.
 ///
 /// Writes up to `count` bytes from the buffer at `buf_ptr` to file descriptor `fd`
 /// at offset `offset`. The file offset is not changed.
@@ -620,13 +621,12 @@ pub fn sys_pwrite64(fd: usize, buf_ptr: usize, count: usize, offset: i64) -> i64
     }
 
     let task = current_task();
-    let fd_table = task.fd_table.lock();
 
-    let entry = match fd_table.get(fd) {
-        Some(e) => e.clone(),
-        None => return errno::EBADF,
+    // TEAM_413: Use get_fd helper
+    let entry = match get_fd(fd) {
+        Ok(e) => e,
+        Err(e) => return e,
     };
-    drop(fd_table);
 
     match &entry.fd_type {
         FdType::VfsFile(file) => {
@@ -686,16 +686,15 @@ pub fn sys_chmod(pathname: usize, _mode: u32) -> i64 {
 }
 
 /// TEAM_406: sys_fchmod - Change file permissions by file descriptor.
+/// TEAM_413: Updated to use is_valid_fd helper.
 ///
 /// No-op implementation for single-user OS (per design decision Q6).
 pub fn sys_fchmod(fd: usize, _mode: u32) -> i64 {
-    let task = current_task();
-    let fd_table = task.fd_table.lock();
-    
-    if fd_table.get(fd).is_none() {
+    // TEAM_413: Use is_valid_fd helper
+    if !is_valid_fd(fd) {
         return errno::EBADF;
     }
-    
+
     0 // Success - no actual mode change (single-user OS)
 }
 
@@ -715,16 +714,15 @@ pub fn sys_chown(pathname: usize, _owner: u32, _group: u32) -> i64 {
 }
 
 /// TEAM_406: sys_fchown - Change file owner and group by file descriptor.
+/// TEAM_413: Updated to use is_valid_fd helper.
 ///
 /// No-op implementation for single-user OS (per design decision Q6).
 pub fn sys_fchown(fd: usize, _owner: u32, _group: u32) -> i64 {
-    let task = current_task();
-    let fd_table = task.fd_table.lock();
-    
-    if fd_table.get(fd).is_none() {
+    // TEAM_413: Use is_valid_fd helper
+    if !is_valid_fd(fd) {
         return errno::EBADF;
     }
-    
+
     0 // Success - no actual ownership change (single-user OS)
 }
 

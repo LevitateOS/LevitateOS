@@ -151,8 +151,6 @@ pub fn futex_wake(addr: usize, count: usize) -> i64 {
 /// # Returns
 /// Number of fds with events, 0 on timeout, or negative error
 pub fn sys_ppoll(fds_ptr: usize, nfds: usize, _tmo_ptr: usize, _sigmask_ptr: usize) -> i64 {
-    use crate::task::fd_table::FdType;
-
     let task = current_task();
     let ttbr0 = task.ttbr0;
 

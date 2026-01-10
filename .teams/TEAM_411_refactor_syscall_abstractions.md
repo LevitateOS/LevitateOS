@@ -26,3 +26,19 @@ Introduce common abstractions to reduce boilerplate and improve consistency acro
 ## Progress Log
 
 - 2026-01-10: Team registered, starting refactor planning
+- 2026-01-10: Completed 5-phase refactor plan in `docs/planning/syscall-abstractions/`
+
+## Plan Files Created
+
+| File | Content |
+|------|---------|
+| `README.md` | Overview and quick reference |
+| `phase-1.md` | Discovery: Linux ABI contracts, current patterns, test baseline |
+| `phase-2.md` | Extraction: New abstractions design (VfsError, UserSlice, get_fd, resolve_at_path) |
+| `phase-3.md` | Migration: Call site inventory and migration order |
+| `phase-4.md` | Cleanup: Dead code removal, visibility tightening |
+| `phase-5.md` | Hardening: Verification, documentation, handoff |
+
+## Status
+
+**Planning complete.** Ready for implementation by future team.

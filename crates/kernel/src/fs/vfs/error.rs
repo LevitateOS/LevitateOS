@@ -196,3 +196,11 @@ impl From<FsError> for VfsError {
 
 /// TEAM_202: Result type for VFS operations
 pub type VfsResult<T> = Result<T, VfsError>;
+
+// TEAM_413: Implement From<VfsError> for i64 to allow `Err(e) => e.into()` pattern
+// This enables cleaner error handling in syscalls without explicit match arms.
+impl From<VfsError> for i64 {
+    fn from(e: VfsError) -> i64 {
+        e.to_errno()
+    }
+}

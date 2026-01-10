@@ -1,6 +1,5 @@
-use crate::memory::user as mm_user;
-
-use crate::syscall::{Timespec, errno};
+// TEAM_413: Use new syscall helpers
+use crate::syscall::{Timespec, errno, write_struct_to_user};
 
 /// TEAM_198: Get uptime in seconds (for tmpfs timestamps).
 pub fn uptime_seconds() -> u64 {
@@ -64,6 +63,7 @@ pub fn sys_nanosleep(seconds: u64, nanoseconds: u64) -> i64 {
 ///
 /// Returns the resolution (precision) of the specified clock.
 /// For CLOCK_MONOTONIC and CLOCK_REALTIME, we report 1 nanosecond.
+/// TEAM_413: Updated to use write_struct_to_user helper.
 pub fn sys_clock_getres(clockid: i32, res_buf: usize) -> i64 {
     // clockid: 0 = CLOCK_REALTIME, 1 = CLOCK_MONOTONIC
     if clockid != 0 && clockid != 1 {
@@ -76,10 +76,6 @@ pub fn sys_clock_getres(clockid: i32, res_buf: usize) -> i64 {
     }
 
     let task = crate::task::current_task();
-    let ts_size = core::mem::size_of::<Timespec>();
-    if mm_user::validate_user_buffer(task.ttbr0, res_buf, ts_size, true).is_err() {
-        return errno::EFAULT;
-    }
 
     // TEAM_350: Report 1 nanosecond resolution
     let ts = Timespec {
@@ -87,19 +83,18 @@ pub fn sys_clock_getres(clockid: i32, res_buf: usize) -> i64 {
         tv_nsec: 1,
     };
 
-    // SAFETY: validate_user_buffer confirmed buffer is accessible
-    let dest = mm_user::user_va_to_kernel_ptr(task.ttbr0, res_buf).unwrap();
-    unsafe {
-        core::ptr::copy_nonoverlapping(&ts as *const Timespec as *const u8, dest, ts_size);
+    // TEAM_413: Use write_struct_to_user helper
+    match write_struct_to_user(task.ttbr0, res_buf, &ts) {
+        Ok(()) => 0,
+        Err(e) => e,
     }
-
-    0
 }
 
 /// TEAM_409: sys_gettimeofday - Get time of day (legacy interface).
 ///
 /// Returns the current time as seconds and microseconds since epoch.
 /// This is the legacy POSIX interface; clock_gettime is preferred.
+/// TEAM_413: Updated to use write_struct_to_user helper.
 ///
 /// # Arguments
 /// * `tv` - User pointer to timeval struct {tv_sec: i64, tv_usec: i64}
@@ -110,6 +105,7 @@ pub fn sys_clock_getres(clockid: i32, res_buf: usize) -> i64 {
 pub fn sys_gettimeofday(tv: usize, _tz: usize) -> i64 {
     // timeval structure: { tv_sec: i64, tv_usec: i64 } = 16 bytes
     #[repr(C)]
+    #[derive(Clone, Copy)]
     struct Timeval {
         tv_sec: i64,
         tv_usec: i64,
@@ -121,11 +117,6 @@ pub fn sys_gettimeofday(tv: usize, _tz: usize) -> i64 {
     }
 
     let task = crate::task::current_task();
-    let tv_size = core::mem::size_of::<Timeval>();
-    if mm_user::validate_user_buffer(task.ttbr0, tv, tv_size, true).is_err() {
-        return errno::EFAULT;
-    }
-
     let freq = read_timer_frequency();
     let counter = read_timer_counter();
 
@@ -142,21 +133,16 @@ pub fn sys_gettimeofday(tv: usize, _tz: usize) -> i64 {
         Timeval { tv_sec: 0, tv_usec: 0 }
     };
 
-    // Copy to user space
-    let dest = mm_user::user_va_to_kernel_ptr(task.ttbr0, tv).unwrap();
-    unsafe {
-        core::ptr::copy_nonoverlapping(
-            &timeval as *const Timeval as *const u8,
-            dest,
-            tv_size,
-        );
+    // TEAM_413: Use write_struct_to_user helper
+    match write_struct_to_user(task.ttbr0, tv, &timeval) {
+        Ok(()) => 0,
+        Err(e) => e,
     }
-
-    0
 }
 
 /// TEAM_170: sys_clock_gettime - Get current monotonic time.
 /// TEAM_360: Fixed to accept clockid as first argument (Linux ABI).
+/// TEAM_413: Updated to use write_struct_to_user helper.
 ///
 /// # Arguments
 /// * `clockid` - Clock to query (CLOCK_REALTIME=0, CLOCK_MONOTONIC=1, etc.)
@@ -165,11 +151,6 @@ pub fn sys_clock_gettime(clockid: i32, timespec_buf: usize) -> i64 {
     // TEAM_360: We ignore clockid and always return monotonic time
     let _ = clockid;
     let task = crate::task::current_task();
-    let ts_size = core::mem::size_of::<Timespec>();
-    if mm_user::validate_user_buffer(task.ttbr0, timespec_buf, ts_size, true).is_err() {
-        return errno::EFAULT;
-    }
-
     let freq = read_timer_frequency();
     let counter = read_timer_counter();
 
@@ -185,11 +166,9 @@ pub fn sys_clock_gettime(clockid: i32, timespec_buf: usize) -> i64 {
         Timespec::default()
     };
 
-    // SAFETY: validate_user_buffer confirmed buffer is accessible
-    let dest = mm_user::user_va_to_kernel_ptr(task.ttbr0, timespec_buf).unwrap();
-    unsafe {
-        core::ptr::copy_nonoverlapping(&ts as *const Timespec as *const u8, dest, ts_size);
+    // TEAM_413: Use write_struct_to_user helper
+    match write_struct_to_user(task.ttbr0, timespec_buf, &ts) {
+        Ok(()) => 0,
+        Err(e) => e,
     }
-
-    0
 }

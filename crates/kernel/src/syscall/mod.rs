@@ -2,12 +2,19 @@ use crate::memory::user as mm_user;
 
 pub mod epoll;
 pub mod fs;
+pub mod helpers; // TEAM_413: Syscall helper abstractions
 pub mod mm;
 pub mod process;
 pub mod signal;
 pub mod sync;
 pub mod sys;
 pub mod time;
+
+// TEAM_413: Re-export commonly used helpers
+pub use helpers::{
+    get_fd, get_vfs_file, is_valid_fd, read_struct_from_user, read_user_path, resolve_at_path,
+    write_struct_to_user, SyscallResultExt, UserPtr, UserSlice,
+};
 
 pub use crate::arch::{Stat, SyscallFrame, SyscallNumber, Timespec, is_svc_exception};
 
