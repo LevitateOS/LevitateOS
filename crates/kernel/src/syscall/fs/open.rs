@@ -14,7 +14,7 @@ pub fn sys_openat(dirfd: i32, pathname: usize, flags: u32, _mode: u32) -> i64 {
     let task = crate::task::current_task();
 
     // TEAM_345: Read null-terminated pathname (Linux ABI)
-    let mut path_buf = [0u8; crate::syscall::constants::PATH_MAX];
+    let mut path_buf = [0u8; linux_raw_sys::general::PATH_MAX as usize];
     let path_str = match read_user_cstring(task.ttbr0, pathname, &mut path_buf) {
         Ok(s) => s,
         Err(e) => return e,
@@ -89,12 +89,9 @@ pub fn sys_close(fd: usize) -> i64 {
 // TEAM_350: faccessat - Check file accessibility
 // ============================================================================
 
-/// TEAM_350: Access mode flags for faccessat
+/// TEAM_419: Access mode flags from linux-raw-sys
 pub mod access_mode {
-    pub const F_OK: i32 = 0; // Test for existence
-    pub const X_OK: i32 = 1; // Test for execute permission
-    pub const W_OK: i32 = 2; // Test for write permission
-    pub const R_OK: i32 = 4; // Test for read permission
+    pub use linux_raw_sys::general::{F_OK, X_OK, W_OK, R_OK};
 }
 
 /// TEAM_350: sys_faccessat - Check file accessibility.
@@ -117,7 +114,7 @@ pub fn sys_faccessat(dirfd: i32, pathname: usize, mode: i32, flags: i32) -> i64 
     let task = crate::task::current_task();
 
     // TEAM_418: Use PATH_MAX from SSOT
-    let mut path_buf = [0u8; crate::syscall::constants::PATH_MAX];
+    let mut path_buf = [0u8; linux_raw_sys::general::PATH_MAX as usize];
     let path_str = match read_user_cstring(task.ttbr0, pathname, &mut path_buf) {
         Ok(s) => s,
         Err(e) => return e,

@@ -365,7 +365,7 @@ pub fn sys_truncate(pathname: usize, length: i64) -> i64 {
     let task = current_task();
     
     // TEAM_418: Use PATH_MAX from SSOT
-    let mut path_buf = [0u8; crate::syscall::constants::PATH_MAX];
+    let mut path_buf = [0u8; linux_raw_sys::general::PATH_MAX as usize];
     let path_str = match read_user_cstring(task.ttbr0, pathname, &mut path_buf) {
         Ok(s) => s,
         Err(e) => return e,

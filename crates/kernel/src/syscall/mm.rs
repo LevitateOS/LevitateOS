@@ -1,24 +1,16 @@
 //! TEAM_228: Memory management syscalls.
 //! TEAM_415: Refactored with helper functions.
-//! TEAM_418: Use errno SSOT instead of local constants.
+//! TEAM_419: Use linux-raw-sys for mmap constants.
 
 use crate::memory::FRAME_ALLOCATOR;
 use crate::memory::user as mm_user;
 use crate::memory::vma::VmaFlags;
 use crate::syscall::errno;
+use linux_raw_sys::general::{
+    PROT_NONE, PROT_READ, PROT_WRITE, PROT_EXEC,
+    MAP_SHARED, MAP_PRIVATE, MAP_FIXED, MAP_ANONYMOUS,
+};
 use los_hal::mmu::{self, PAGE_SIZE, PageAllocator, PageFlags, PageTable, phys_to_virt, tlb_flush_page};
-
-// TEAM_228: mmap protection flags (matching Linux)
-pub const PROT_NONE: u32 = 0;
-pub const PROT_READ: u32 = 1;
-pub const PROT_WRITE: u32 = 2;
-pub const PROT_EXEC: u32 = 4;
-
-// TEAM_228: mmap flags (matching Linux)
-pub const MAP_SHARED: u32 = 0x01;
-pub const MAP_PRIVATE: u32 = 0x02;
-pub const MAP_FIXED: u32 = 0x10;
-pub const MAP_ANONYMOUS: u32 = 0x20;
 
 // ============================================================================
 // TEAM_415: Helper Functions

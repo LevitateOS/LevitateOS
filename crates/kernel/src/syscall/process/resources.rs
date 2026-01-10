@@ -76,11 +76,13 @@ pub fn sys_getrusage(who: i32, usage: usize) -> i64 {
 // TEAM_418: Use RLIMIT_* constants from SSOT
 // ============================================================================
 
-use crate::syscall::constants::{
+// TEAM_419: Resource limit constants from linux-raw-sys
+use linux_raw_sys::general::{
     RLIMIT_CPU, RLIMIT_FSIZE, RLIMIT_DATA, RLIMIT_STACK, RLIMIT_CORE,
     RLIMIT_RSS, RLIMIT_NPROC, RLIMIT_NOFILE, RLIMIT_MEMLOCK, RLIMIT_AS,
-    RLIM_INFINITY,
 };
+// RLIM_INFINITY is -1 as i32 in linux-raw-sys, but we need u64::MAX for the ABI
+const RLIM_INFINITY: u64 = u64::MAX;
 
 /// rlimit64 struct: { rlim_cur: u64, rlim_max: u64 }
 #[repr(C)]

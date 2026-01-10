@@ -16,27 +16,28 @@ use super::ops::{FileOps, SeekWhence};
 pub type FileRef = Arc<File>;
 
 /// TEAM_202: Open file flags
+/// TEAM_419: Constants from linux-raw-sys
 #[derive(Clone, Copy, Debug)]
 pub struct OpenFlags(u32);
 
 impl OpenFlags {
-    // Access modes (mutually exclusive)
-    pub const O_RDONLY: u32 = 0;
-    pub const O_WRONLY: u32 = 1;
-    pub const O_RDWR: u32 = 2;
-    pub const O_ACCMODE: u32 = 3;
+    // TEAM_419: Access modes from linux-raw-sys
+    pub const O_RDONLY: u32 = linux_raw_sys::general::O_RDONLY;
+    pub const O_WRONLY: u32 = linux_raw_sys::general::O_WRONLY;
+    pub const O_RDWR: u32 = linux_raw_sys::general::O_RDWR;
+    pub const O_ACCMODE: u32 = linux_raw_sys::general::O_ACCMODE;
 
     // File creation flags
-    pub const O_CREAT: u32 = 0o100;
-    pub const O_EXCL: u32 = 0o200;
-    pub const O_TRUNC: u32 = 0o1000;
+    pub const O_CREAT: u32 = linux_raw_sys::general::O_CREAT;
+    pub const O_EXCL: u32 = linux_raw_sys::general::O_EXCL;
+    pub const O_TRUNC: u32 = linux_raw_sys::general::O_TRUNC;
 
     // File status flags
-    pub const O_APPEND: u32 = 0o2000;
-    pub const O_NONBLOCK: u32 = 0o4000;
-    pub const O_DIRECTORY: u32 = 0o200000;
-    pub const O_NOFOLLOW: u32 = 0o400000;
-    pub const O_CLOEXEC: u32 = 0o2000000;
+    pub const O_APPEND: u32 = linux_raw_sys::general::O_APPEND;
+    pub const O_NONBLOCK: u32 = linux_raw_sys::general::O_NONBLOCK;
+    pub const O_DIRECTORY: u32 = linux_raw_sys::general::O_DIRECTORY;
+    pub const O_NOFOLLOW: u32 = linux_raw_sys::general::O_NOFOLLOW;
+    pub const O_CLOEXEC: u32 = linux_raw_sys::general::O_CLOEXEC;
 
     pub const fn new(flags: u32) -> Self {
         Self(flags)

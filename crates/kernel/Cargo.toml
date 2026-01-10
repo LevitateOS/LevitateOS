@@ -39,6 +39,8 @@ bytemuck.workspace = true
 acpi.workspace = true
 aml.workspace = true
 # TEAM_414: Removed goblin dependency - PIE binaries self-relocate, no kernel support needed
+# TEAM_419: Linux ABI constants from authoritative source
+linux-raw-sys = { version = "0.9", default-features = false, features = ["general", "errno", "ioctl", "no_std"] }
 
 [build-dependencies]
 cc = "1.0"

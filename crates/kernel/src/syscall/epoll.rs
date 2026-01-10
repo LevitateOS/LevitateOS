@@ -14,31 +14,18 @@ use crate::syscall::errno;
 use crate::task::fd_table::FdType;
 use crate::task::{current_task, yield_now};
 
-// TEAM_394: Epoll operation constants (matching Linux)
-pub const EPOLL_CTL_ADD: i32 = 1;
-pub const EPOLL_CTL_DEL: i32 = 2;
-pub const EPOLL_CTL_MOD: i32 = 3;
-
-// TEAM_394: Epoll event flags (matching Linux)
-pub const EPOLLIN: u32 = 0x001;
-pub const EPOLLPRI: u32 = 0x002;
-pub const EPOLLOUT: u32 = 0x004;
-pub const EPOLLERR: u32 = 0x008;
-pub const EPOLLHUP: u32 = 0x010;
-pub const EPOLLRDNORM: u32 = 0x040;
-pub const EPOLLRDBAND: u32 = 0x080;
-pub const EPOLLWRNORM: u32 = 0x100;
-pub const EPOLLWRBAND: u32 = 0x200;
-pub const EPOLLET: u32 = 1 << 31; // Edge-triggered (we simulate level-triggered)
-pub const EPOLLONESHOT: u32 = 1 << 30;
-
-// TEAM_394: epoll_create1 flags
-pub const EPOLL_CLOEXEC: i32 = 0x80000; // O_CLOEXEC
-
-// TEAM_394: eventfd flags
-pub const EFD_CLOEXEC: u32 = 0x80000;
-pub const EFD_NONBLOCK: u32 = 0x800;
-pub const EFD_SEMAPHORE: u32 = 1;
+// TEAM_419: Epoll constants from linux-raw-sys
+// Note: Some constants need i32 type for syscall ABI, linux-raw-sys uses u32
+pub const EPOLL_CTL_ADD: i32 = linux_raw_sys::general::EPOLL_CTL_ADD as i32;
+pub const EPOLL_CTL_DEL: i32 = linux_raw_sys::general::EPOLL_CTL_DEL as i32;
+pub const EPOLL_CTL_MOD: i32 = linux_raw_sys::general::EPOLL_CTL_MOD as i32;
+pub const EPOLL_CLOEXEC: i32 = linux_raw_sys::general::EPOLL_CLOEXEC as i32;
+pub use linux_raw_sys::general::{
+    EPOLLIN, EPOLLPRI, EPOLLOUT, EPOLLERR, EPOLLHUP,
+    EPOLLRDNORM, EPOLLRDBAND, EPOLLWRNORM, EPOLLWRBAND,
+    EPOLLET, EPOLLONESHOT,
+    EFD_CLOEXEC, EFD_NONBLOCK, EFD_SEMAPHORE,
+};
 
 /// TEAM_394: struct epoll_event (12 bytes on Linux, but we use 16 for alignment)
 #[repr(C)]

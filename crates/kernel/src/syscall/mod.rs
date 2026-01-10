@@ -10,7 +10,6 @@ pub mod sync;
 pub mod sys;
 pub mod time;
 pub mod types; // TEAM_418: SSOT for common syscall types (Timeval, Timespec)
-pub mod constants; // TEAM_418: SSOT for syscall constants (CLONE_*, PATH_MAX, RLIMIT_*)
 
 // TEAM_413: Re-export commonly used helpers
 // TEAM_415: Added ioctl helpers
@@ -25,65 +24,55 @@ pub use crate::arch::{Stat, SyscallFrame, SyscallNumber, is_svc_exception};
 // TEAM_418: Re-export time types from SSOT module
 pub use types::{Timeval, Timespec};
 
-/// TEAM_345: Linux file system constants for *at() syscalls.
-pub mod fcntl {
-    /// Special value for dirfd meaning "use current working directory"
-    pub const AT_FDCWD: i32 = -100;
-    /// Don't follow symbolic links
-    pub const AT_SYMLINK_NOFOLLOW: u32 = 0x100;
-    /// Remove directory instead of file
-    pub const AT_REMOVEDIR: u32 = 0x200;
-    /// Follow symbolic links (for linkat)
-    pub const AT_SYMLINK_FOLLOW: u32 = 0x400;
-    /// Suppress terminal automount traversal
-    pub const AT_NO_AUTOMOUNT: u32 = 0x800;
-    /// Allow empty relative pathname
-    pub const AT_EMPTY_PATH: u32 = 0x1000;
-}
-
-/// TEAM_073: Error codes for syscalls.
-/// TEAM_342: Consolidated errno constants - single source of truth.
-/// TEAM_418: Added missing errno values for VFS compatibility, sorted by value.
+/// TEAM_419: Error codes from linux-raw-sys, negated for syscall returns.
+/// linux-raw-sys provides positive errno values; syscalls return negative.
 pub mod errno {
-    // Sorted by errno value for easy lookup
-    pub const EPERM: i64 = -1;        // Operation not permitted
-    pub const ENOENT: i64 = -2;       // No such file or directory
-    pub const ESRCH: i64 = -3;        // No such process
-    pub const EIO: i64 = -5;          // I/O error
-    pub const EBADF: i64 = -9;        // Bad file descriptor
-    pub const EAGAIN: i64 = -11;      // Resource temporarily unavailable
-    pub const ENOMEM: i64 = -12;      // Out of memory
-    pub const EACCES: i64 = -13;      // Permission denied
-    pub const EFAULT: i64 = -14;      // Bad address
-    pub const EBUSY: i64 = -16;       // Device or resource busy
-    pub const EEXIST: i64 = -17;      // File exists
-    pub const EXDEV: i64 = -18;       // Cross-device link
-    pub const ENOTDIR: i64 = -20;     // Not a directory
-    pub const EISDIR: i64 = -21;      // Is a directory
-    pub const EINVAL: i64 = -22;      // Invalid argument
-    pub const ENFILE: i64 = -23;      // Too many open files in system
-    pub const EMFILE: i64 = -24;      // Too many open files (per process)
-    pub const ENOTTY: i64 = -25;      // Inappropriate ioctl for device
-    pub const EFBIG: i64 = -27;       // File too large
-    pub const ENOSPC: i64 = -28;      // No space left on device
-    pub const ESPIPE: i64 = -29;      // Illegal seek
-    pub const EROFS: i64 = -30;       // Read-only file system
-    pub const EMLINK: i64 = -31;      // Too many links
-    pub const EPIPE: i64 = -32;       // Broken pipe
-    pub const ERANGE: i64 = -34;      // Result too large
-    pub const ENAMETOOLONG: i64 = -36; // File name too long
-    pub const ENOSYS: i64 = -38;      // Function not implemented
-    pub const ENOTEMPTY: i64 = -39;   // Directory not empty
-    pub const ELOOP: i64 = -40;       // Too many symbolic links
-    pub const ENODATA: i64 = -61;     // No data available
-    pub const EOPNOTSUPP: i64 = -95;  // Operation not supported
-    pub const ESTALE: i64 = -116;     // Stale file handle
+    use linux_raw_sys::errno as raw;
+
+    pub const EPERM: i64 = -(raw::EPERM as i64);
+    pub const ENOENT: i64 = -(raw::ENOENT as i64);
+    pub const ESRCH: i64 = -(raw::ESRCH as i64);
+    pub const EIO: i64 = -(raw::EIO as i64);
+    pub const EBADF: i64 = -(raw::EBADF as i64);
+    pub const EAGAIN: i64 = -(raw::EAGAIN as i64);
+    pub const ENOMEM: i64 = -(raw::ENOMEM as i64);
+    pub const EACCES: i64 = -(raw::EACCES as i64);
+    pub const EFAULT: i64 = -(raw::EFAULT as i64);
+    pub const EBUSY: i64 = -(raw::EBUSY as i64);
+    pub const EEXIST: i64 = -(raw::EEXIST as i64);
+    pub const EXDEV: i64 = -(raw::EXDEV as i64);
+    pub const ENOTDIR: i64 = -(raw::ENOTDIR as i64);
+    pub const EISDIR: i64 = -(raw::EISDIR as i64);
+    pub const EINVAL: i64 = -(raw::EINVAL as i64);
+    pub const ENFILE: i64 = -(raw::ENFILE as i64);
+    pub const EMFILE: i64 = -(raw::EMFILE as i64);
+    pub const ENOTTY: i64 = -(raw::ENOTTY as i64);
+    pub const EFBIG: i64 = -(raw::EFBIG as i64);
+    pub const ENOSPC: i64 = -(raw::ENOSPC as i64);
+    pub const ESPIPE: i64 = -(raw::ESPIPE as i64);
+    pub const EROFS: i64 = -(raw::EROFS as i64);
+    pub const EMLINK: i64 = -(raw::EMLINK as i64);
+    pub const EPIPE: i64 = -(raw::EPIPE as i64);
+    pub const ERANGE: i64 = -(raw::ERANGE as i64);
+    pub const ENAMETOOLONG: i64 = -(raw::ENAMETOOLONG as i64);
+    pub const ENOSYS: i64 = -(raw::ENOSYS as i64);
+    pub const ENOTEMPTY: i64 = -(raw::ENOTEMPTY as i64);
+    pub const ELOOP: i64 = -(raw::ELOOP as i64);
+    pub const ENODATA: i64 = -(raw::ENODATA as i64);
+    pub const EOPNOTSUPP: i64 = -(raw::EOPNOTSUPP as i64);
+    pub const ESTALE: i64 = -(raw::ESTALE as i64);
 }
 
-/// TEAM_342: Deprecated - use errno module instead. Kept for backward compatibility.
-#[deprecated(note = "Use errno module instead")]
-pub mod errno_file {
-    pub use super::errno::*;
+/// TEAM_419: AT_* constants from linux-raw-sys
+pub mod fcntl {
+    use linux_raw_sys::general as raw;
+
+    pub const AT_FDCWD: i32 = raw::AT_FDCWD;
+    pub const AT_SYMLINK_NOFOLLOW: u32 = raw::AT_SYMLINK_NOFOLLOW;
+    pub const AT_REMOVEDIR: u32 = raw::AT_REMOVEDIR;
+    pub const AT_SYMLINK_FOLLOW: u32 = raw::AT_SYMLINK_FOLLOW;
+    pub const AT_NO_AUTOMOUNT: u32 = raw::AT_NO_AUTOMOUNT;
+    pub const AT_EMPTY_PATH: u32 = raw::AT_EMPTY_PATH;
 }
 
 pub fn syscall_dispatch(frame: &mut SyscallFrame) {

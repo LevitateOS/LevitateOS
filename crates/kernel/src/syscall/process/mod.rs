@@ -1,7 +1,7 @@
 //! Process management syscalls.
 //!
 //! TEAM_417: Refactored from monolithic process.rs for maintainability.
-//! TEAM_418: Clone flags moved to SSOT (syscall/constants.rs).
+//! TEAM_419: Clone flags from linux-raw-sys.
 //! See `docs/planning/refactor-process-syscalls/` for refactor details.
 
 mod arch_prctl;
@@ -28,8 +28,13 @@ pub use thread::{sys_clone, sys_set_tid_address};
 pub use identity::Utsname;
 pub use resources::{Rusage, Timeval};
 
-// TEAM_418: Re-export clone flags from SSOT for backward compatibility
-pub use crate::syscall::constants::{
-    CLONE_VM, CLONE_FS, CLONE_FILES, CLONE_SIGHAND, CLONE_THREAD,
-    CLONE_SETTLS, CLONE_PARENT_SETTID, CLONE_CHILD_CLEARTID, CLONE_CHILD_SETTID,
-};
+// TEAM_419: Clone flags from linux-raw-sys (cast to u64 for syscall ABI)
+pub const CLONE_VM: u64 = linux_raw_sys::general::CLONE_VM as u64;
+pub const CLONE_FS: u64 = linux_raw_sys::general::CLONE_FS as u64;
+pub const CLONE_FILES: u64 = linux_raw_sys::general::CLONE_FILES as u64;
+pub const CLONE_SIGHAND: u64 = linux_raw_sys::general::CLONE_SIGHAND as u64;
+pub const CLONE_THREAD: u64 = linux_raw_sys::general::CLONE_THREAD as u64;
+pub const CLONE_SETTLS: u64 = linux_raw_sys::general::CLONE_SETTLS as u64;
+pub const CLONE_PARENT_SETTID: u64 = linux_raw_sys::general::CLONE_PARENT_SETTID as u64;
+pub const CLONE_CHILD_CLEARTID: u64 = linux_raw_sys::general::CLONE_CHILD_CLEARTID as u64;
+pub const CLONE_CHILD_SETTID: u64 = linux_raw_sys::general::CLONE_CHILD_SETTID as u64;

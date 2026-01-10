@@ -1,83 +1,17 @@
 //! TEAM_201: POSIX File Mode Constants
 //!
-//! Defines standard POSIX file type and permission bit constants for st_mode.
+//! TEAM_419: Re-exported from linux-raw-sys for authoritative Linux ABI values.
 
-// ============================================================================
-// File Type Constants (high bits of st_mode)
-// ============================================================================
-
-/// TEAM_201: Bit mask for extracting file type
-pub const S_IFMT: u32 = 0o170000;
-
-/// TEAM_201: Socket
-pub const S_IFSOCK: u32 = 0o140000;
-
-/// TEAM_201: Symbolic link
-pub const S_IFLNK: u32 = 0o120000;
-
-/// TEAM_201: Regular file
-pub const S_IFREG: u32 = 0o100000;
-
-/// TEAM_201: Block device
-pub const S_IFBLK: u32 = 0o060000;
-
-/// TEAM_201: Directory
-pub const S_IFDIR: u32 = 0o040000;
-
-/// TEAM_201: Character device
-pub const S_IFCHR: u32 = 0o020000;
-
-/// TEAM_201: FIFO (named pipe)
-pub const S_IFIFO: u32 = 0o010000;
-
-// ============================================================================
-// Permission Bits (low bits of st_mode)
-// ============================================================================
-
-/// TEAM_201: Set user ID on execution
-pub const S_ISUID: u32 = 0o4000;
-
-/// TEAM_201: Set group ID on execution
-pub const S_ISGID: u32 = 0o2000;
-
-/// TEAM_201: Sticky bit
-pub const S_ISVTX: u32 = 0o1000;
-
-/// TEAM_201: Owner read/write/execute
-pub const S_IRWXU: u32 = 0o0700;
-
-/// TEAM_201: Owner read permission
-pub const S_IRUSR: u32 = 0o0400;
-
-/// TEAM_201: Owner write permission
-pub const S_IWUSR: u32 = 0o0200;
-
-/// TEAM_201: Owner execute permission
-pub const S_IXUSR: u32 = 0o0100;
-
-/// TEAM_201: Group read/write/execute
-pub const S_IRWXG: u32 = 0o0070;
-
-/// TEAM_201: Group read permission
-pub const S_IRGRP: u32 = 0o0040;
-
-/// TEAM_201: Group write permission
-pub const S_IWGRP: u32 = 0o0020;
-
-/// TEAM_201: Group execute permission
-pub const S_IXGRP: u32 = 0o0010;
-
-/// TEAM_201: Others read/write/execute
-pub const S_IRWXO: u32 = 0o0007;
-
-/// TEAM_201: Others read permission
-pub const S_IROTH: u32 = 0o0004;
-
-/// TEAM_201: Others write permission
-pub const S_IWOTH: u32 = 0o0002;
-
-/// TEAM_201: Others execute permission
-pub const S_IXOTH: u32 = 0o0001;
+// TEAM_419: File mode constants from linux-raw-sys
+pub use linux_raw_sys::general::{
+    // File type constants
+    S_IFMT, S_IFSOCK, S_IFLNK, S_IFREG, S_IFBLK, S_IFDIR, S_IFCHR, S_IFIFO,
+    // Permission constants
+    S_ISUID, S_ISGID, S_ISVTX,
+    S_IRWXU, S_IRUSR, S_IWUSR, S_IXUSR,
+    S_IRWXG, S_IRGRP, S_IWGRP, S_IXGRP,
+    S_IRWXO, S_IROTH, S_IWOTH, S_IXOTH,
+};
 
 // ============================================================================
 // Helper Functions

@@ -3,12 +3,12 @@
 //! TEAM_228: Threading syscalls for std support.
 //! TEAM_230: sys_clone implementation.
 //! TEAM_417: Extracted from process.rs.
-//! TEAM_418: Import clone flags from SSOT.
+//! TEAM_419: Clone flags from linux-raw-sys.
 
 use crate::memory::user as mm_user;
 use crate::syscall::errno;
-// TEAM_418: Import clone flags from SSOT
-use crate::syscall::constants::{
+// TEAM_419: Clone flags from parent module (typed as u64)
+use super::{
     CLONE_CHILD_CLEARTID, CLONE_CHILD_SETTID, CLONE_PARENT_SETTID, CLONE_SETTLS, CLONE_THREAD,
     CLONE_VM,
 };
