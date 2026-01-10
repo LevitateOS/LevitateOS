@@ -59,6 +59,8 @@ pub enum SyscallNumber {
     Exit = 60,
     Waitpid = 61, // x86: wait4=61
     Kill = 62,
+    Uname = 63,     // TEAM_406: System identification
+    Umask = 95,     // TEAM_406: File creation mask
     Ftruncate = 77, // TEAM_404: Truncate file
     Getdents = 78,
     Getcwd = 79,
@@ -153,6 +155,8 @@ impl SyscallNumber {
             60 => Some(Self::Exit),
             61 => Some(Self::Waitpid),
             62 => Some(Self::Kill),
+            63 => Some(Self::Uname),     // TEAM_406
+            95 => Some(Self::Umask),     // TEAM_406
             77 => Some(Self::Ftruncate), // TEAM_404
             78 => Some(Self::Getdents),
             79 => Some(Self::Getcwd),

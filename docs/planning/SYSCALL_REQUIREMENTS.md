@@ -361,3 +361,134 @@ Based on coreutils and shell requirements:
 3. **fchdir** - Some directory operations
 4. **fsync/fdatasync** - Data integrity
 5. **chmod/fchmod** - Permission management
+
+---
+
+## Implementation Reference
+
+This section maps syscalls to their kernel implementation files.
+
+### Module: `syscall/process.rs` (24 syscalls)
+
+| Syscall | Status | Notes |
+|---------|--------|-------|
+| sys_exit | ✅ | Exit thread |
+| sys_getpid | ✅ | Get PID |
+| sys_getppid | ✅ | Get parent PID |
+| sys_gettid | ✅ | Get thread ID |
+| sys_spawn | ✅ | LevitateOS custom |
+| sys_spawn_args | ✅ | LevitateOS custom |
+| sys_exec | ✅ | execve |
+| sys_yield | ✅ | sched_yield |
+| sys_waitpid | ✅ | wait4 |
+| sys_clone | ✅ | Thread/process creation |
+| sys_set_tid_address | ✅ | Thread ID address |
+| sys_exit_group | ✅ | Exit all threads |
+| sys_getuid | ✅ | Returns 0 (root) |
+| sys_geteuid | ✅ | Returns 0 (root) |
+| sys_getgid | ✅ | Returns 0 (root) |
+| sys_getegid | ✅ | Returns 0 (root) |
+| sys_arch_prctl | ✅ | x86_64 only |
+| sys_setpgid | ✅ | Set process group |
+| sys_getpgid | ✅ | Get process group |
+| sys_getpgrp | ✅ | Get own process group |
+| sys_setsid | ✅ | Create session |
+| sys_set_foreground | ✅ | LevitateOS custom |
+| sys_get_foreground | ✅ | LevitateOS custom |
+
+### Module: `syscall/fs/` (33 syscalls)
+
+| File | Syscall | Status |
+|------|---------|--------|
+| fd.rs | sys_dup | ✅ |
+| fd.rs | sys_dup2 | ✅ |
+| fd.rs | sys_dup3 | ✅ |
+| fd.rs | sys_pipe2 | ✅ |
+| fd.rs | sys_fcntl | ✅ |
+| fd.rs | sys_ioctl | ✅ |
+| fd.rs | sys_isatty | ✅ |
+| fd.rs | sys_lseek | ✅ |
+| fd.rs | sys_chdir | ✅ |
+| fd.rs | sys_fchdir | 🔨 Stub |
+| fd.rs | sys_ftruncate | 🔨 Stub |
+| fd.rs | sys_pread64 | 🔨 Stub |
+| fd.rs | sys_pwrite64 | 🔨 Stub |
+| dir.rs | sys_getcwd | ✅ |
+| dir.rs | sys_getdents | ✅ |
+| dir.rs | sys_mkdirat | ✅ |
+| dir.rs | sys_renameat | ✅ |
+| dir.rs | sys_unlinkat | ✅ |
+| link.rs | sys_linkat | ✅ |
+| link.rs | sys_readlinkat | ✅ |
+| link.rs | sys_symlinkat | ✅ |
+| link.rs | sys_utimensat | ✅ |
+| open.rs | sys_openat | ✅ |
+| open.rs | sys_close | ✅ |
+| open.rs | sys_faccessat | ✅ |
+| read.rs | sys_read | ✅ |
+| read.rs | sys_readv | ✅ |
+| write.rs | sys_write | ✅ |
+| write.rs | sys_writev | ✅ |
+| mount.rs | sys_mount | ✅ |
+| mount.rs | sys_umount | ✅ |
+| stat.rs | sys_fstat | ✅ |
+| statx.rs | sys_statx | ✅ |
+
+### Module: `syscall/mm.rs` (7 syscalls)
+
+| Syscall | Status | Notes |
+|---------|--------|-------|
+| sys_sbrk | ✅ | brk equivalent |
+| sys_mmap | ✅ | Memory mapping |
+| sys_munmap | ✅ | Unmap memory |
+| sys_mprotect | ✅ | Change protection |
+| sys_madvise | ✅ | Memory advice |
+| sys_pkey_alloc | ✅ | Protection keys |
+| sys_pkey_mprotect | ✅ | Protect with key |
+
+### Module: `syscall/signal.rs` (7 syscalls)
+
+| Syscall | Status | Notes |
+|---------|--------|-------|
+| sys_kill | ✅ | Send signal |
+| sys_pause | ✅ | Wait for signal |
+| sys_sigaction | ✅ | Set handler |
+| sys_sigreturn | ✅ | Return from handler |
+| sys_sigprocmask | ✅ | Block signals |
+| sys_tkill | ✅ | Signal to thread |
+| sys_sigaltstack | ✅ | Alternate stack |
+
+### Module: `syscall/epoll.rs` (4 syscalls)
+
+| Syscall | Status | Notes |
+|---------|--------|-------|
+| sys_epoll_create1 | ✅ | Create epoll |
+| sys_epoll_ctl | ✅ | Control epoll |
+| sys_epoll_wait | ✅ | Wait for events |
+| sys_eventfd2 | ✅ | Create eventfd |
+
+### Module: `syscall/sync.rs` (2 syscalls)
+
+| Syscall | Status | Notes |
+|---------|--------|-------|
+| sys_futex | ✅ | Fast mutex |
+| sys_ppoll | ✅ | Poll with timeout |
+
+### Module: `syscall/time.rs` (3 syscalls)
+
+| Syscall | Status | Notes |
+|---------|--------|-------|
+| sys_nanosleep | ✅ | Sleep |
+| sys_clock_getres | ✅ | Clock resolution |
+| sys_clock_gettime | ✅ | Get time |
+
+### Module: `syscall/sys.rs` (2 syscalls)
+
+| Syscall | Status | Notes |
+|---------|--------|-------|
+| sys_shutdown | ✅ | Reboot/shutdown |
+| sys_getrandom | ✅ | Random bytes |
+
+---
+
+## Total Implemented: 82 syscall functions

@@ -91,6 +91,16 @@ pub enum SyscallNumber {
     Setsid = 157,
     // TEAM_394: fcntl for brush (F_SETPIPE_SZ, etc.)
     Fcntl = 25,
+    // TEAM_404: File positioning and fd syscalls
+    Lseek = 62,
+    Pread64 = 67,
+    Pwrite64 = 68,
+    Ftruncate = 46,
+    Chdir = 49,
+    Fchdir = 50,
+    // TEAM_406: System identification
+    Uname = 160,
+    Umask = 166,
 
     // === Custom LevitateOS syscalls (temporary, until clone/execve work) ===
     /// TEAM: Spawn process (custom, will be replaced by clone+execve)
