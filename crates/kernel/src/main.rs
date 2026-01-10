@@ -120,6 +120,14 @@ pub fn kernel_main_unified(boot_info: &crate::boot::BootInfo) -> ! {
         crate::arch::cpu::init();
     }
 
+    // TEAM_409: Initialize AArch64 CPU state (PCR, TPIDR_EL1)
+    #[cfg(target_arch = "aarch64")]
+    // SAFETY: Initializing CPU-specific registers (TPIDR_EL1) is required
+    // for correct kernel operation and is safe during early boot.
+    unsafe {
+        crate::arch::cpu::init_pcr();
+    }
+
     // TEAM_284: Initialize x86_64 syscalls after memory/heap
     #[cfg(target_arch = "x86_64")]
     // SAFETY: Initializing MSRs for syscall handling is a privileged but

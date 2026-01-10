@@ -83,8 +83,9 @@ use los_hal::IrqSafeLock;
 static CURRENT_TASK: IrqSafeLock<Option<Arc<TaskControlBlock>>> = IrqSafeLock::new(None);
 
 /// TEAM_070: Get the currently running task as an Arc.
+/// TEAM_409: Use PCR on both x86_64 and AArch64 for consistent per-CPU access.
 pub fn current_task() -> Arc<TaskControlBlock> {
-    #[cfg(target_arch = "x86_64")]
+    #[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))]
     unsafe {
         let pcr = crate::arch::cpu::get_pcr();
         let ptr = pcr.current_task_ptr as *const TaskControlBlock;
@@ -106,8 +107,9 @@ pub fn current_task() -> Arc<TaskControlBlock> {
 }
 
 /// TEAM_070: Internal helper to set the current task.
+/// TEAM_409: Use PCR on both x86_64 and AArch64.
 pub unsafe fn set_current_task(task: Arc<TaskControlBlock>) {
-    #[cfg(target_arch = "x86_64")]
+    #[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))]
     {
         let pcr = crate::arch::cpu::get_pcr();
         pcr.current_task_ptr = Arc::as_ptr(&task) as usize;

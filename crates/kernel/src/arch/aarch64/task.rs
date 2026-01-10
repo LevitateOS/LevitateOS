@@ -1,21 +1,54 @@
+/// TEAM_409: NEON/FPU state buffer for AArch64.
+/// Contains V0-V31 (32 × 128-bit registers = 512 bytes) plus FPCR/FPSR.
+#[repr(C, align(16))]
+#[derive(Clone, Copy)]
+pub struct FpuState {
+    /// V0-V31: 32 128-bit vector registers
+    pub v_regs: [[u64; 2]; 32], // 512 bytes
+    /// Floating-point Control Register
+    pub fpcr: u32,
+    /// Floating-point Status Register
+    pub fpsr: u32,
+}
+
+impl Default for FpuState {
+    fn default() -> Self {
+        Self {
+            v_regs: [[0u64; 2]; 32],
+            fpcr: 0,
+            fpsr: 0,
+        }
+    }
+}
+
+impl core::fmt::Debug for FpuState {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("FpuState").finish_non_exhaustive()
+    }
+}
+
 /// TEAM_162: Saved CPU context for AArch64.
-#[repr(C)]
+/// TEAM_409: Added NEON/FPU state for floating-point preservation across context switches.
+#[repr(C, align(16))]
 #[derive(Debug, Clone, Copy, Default)]
 pub struct Context {
-    pub x19: u64,
-    pub x20: u64,
-    pub x21: u64,
-    pub x22: u64,
-    pub x23: u64,
-    pub x24: u64,
-    pub x25: u64,
-    pub x26: u64,
-    pub x27: u64,
-    pub x28: u64,
-    pub x29: u64,       // Frame Pointer
-    pub lr: u64,        // Link Register (x30)
-    pub sp: u64,        // Stack Pointer
-    pub tpidr_el0: u64, // TEAM_217: Thread Local Storage pointer
+    // Callee-saved general purpose registers (offsets 0-104)
+    pub x19: u64,       // 0
+    pub x20: u64,       // 8
+    pub x21: u64,       // 16
+    pub x22: u64,       // 24
+    pub x23: u64,       // 32
+    pub x24: u64,       // 40
+    pub x25: u64,       // 48
+    pub x26: u64,       // 56
+    pub x27: u64,       // 64
+    pub x28: u64,       // 72
+    pub x29: u64,       // 80: Frame Pointer
+    pub lr: u64,        // 88: Link Register (x30)
+    pub sp: u64,        // 96: Stack Pointer
+    pub tpidr_el0: u64, // 104: TEAM_217: Thread Local Storage pointer
+    // TEAM_409: NEON/FPU state (offset 112, 520 bytes)
+    pub fpu_state: FpuState,
 }
 
 impl Context {
