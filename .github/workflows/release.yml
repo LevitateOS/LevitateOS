@@ -11,7 +11,42 @@ on:
   workflow_dispatch:
 
 jobs:
+  verify-kernel-ci:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Get kernel submodule commit
+        id: kernel-commit
+        run: |
+          KERNEL_SHA=$(git -C crates/kernel rev-parse HEAD)
+          echo "sha=$KERNEL_SHA" >> $GITHUB_OUTPUT
+          echo "Kernel submodule at commit: $KERNEL_SHA"
+
+      - name: Check kernel CI status
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          KERNEL_SHA="${{ steps.kernel-commit.outputs.sha }}"
+          echo "Checking CI status for kernel commit $KERNEL_SHA..."
+
+          # Get the combined status for the commit
+          STATUS=$(gh api repos/LevitateOS/kernel/commits/$KERNEL_SHA/status --jq '.state')
+
+          echo "Kernel CI status: $STATUS"
+
+          if [ "$STATUS" != "success" ]; then
+            echo "::error::Kernel commit $KERNEL_SHA has not passed CI (status: $STATUS)"
+            echo "::error::Update the kernel submodule to a commit that has passed CI"
+            exit 1
+          fi
+
+          echo "Kernel commit has passed CI"
+
   build-x86_64:
+    needs: verify-kernel-ci
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -58,6 +93,7 @@ jobs:
         run: cargo xtask clean --arch x86_64
 
   build-aarch64:
+    needs: verify-kernel-ci
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
