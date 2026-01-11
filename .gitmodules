@@ -5,3 +5,4 @@
 [submodule "crates/kernel"]
 	path = crates/kernel
 	url = git@github.com:LevitateOS/kernel.git
+	branch = tested
