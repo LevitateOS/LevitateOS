@@ -122,3 +122,60 @@ Full crate extraction (Phase 3) is blocked by circular dependencies:
 
 **Resolution**: Keep `init()` in kernel binary, move only pure memory
 management code to `mm/` crate. Requires further architectural analysis.
+
+### 2026-01-11: Full Kernel Modularization Complete
+
+**Major milestone achieved**: Kernel fully restructured into modular crate workspace.
+
+#### Crates Created/Migrated
+| Crate | Purpose |
+|-------|---------|
+| `los_types` | Shared types (SyscallFrame, Pid, SyscallResult) - breaks cycles |
+| `los_vfs` | Virtual File System |
+| `los_mm` | Memory management |
+| `los_sched` | Task scheduler |
+| `los_syscall` | Syscall dispatch |
+| `los_arch_aarch64` | AArch64 platform code |
+| `los_arch_x86_64` | x86_64 platform code |
+| `los_fs_tmpfs` | tmpfs filesystem |
+| `los_fs_initramfs` | Initramfs filesystem |
+| `los_fs_tty` | TTY subsystem |
+| All drivers | Moved into kernel workspace |
+
+#### Key Architectural Decisions
+1. **Shared Types Crate**: Created `los_types` to break circular dependencies between sched/syscall/mm
+2. **Extern Callbacks**: Architecture crates use `unsafe extern "Rust"` for kernel integration (syscall_dispatch, exception handlers)
+3. **Integration Modules**: Kernel binary (levitate) has bridge modules (fs.rs, memory.rs, process.rs) that tie crates together
+
+#### AArch64 Boot Relocation Fix
+**Problem**: Boot code at physical 0x40080000 used `adrp` (±4GB range) to access higher-half symbols - impossible.
+
+**Solution implemented**:
+1. Two-copy boot data pattern: `BOOT_*_PHYS` in `.bss.boot` (physical), `BOOT_*` in higher-half
+2. Early MMU setup in boot.S:
+   - Set up L0/L1 page tables for identity + higher-half mapping
+   - Configure MAIR, TCR, enable MMU
+   - Jump to Rust at higher-half address
+3. Linker script: Added `.bss.boot` and `.boot_page_tables` sections before virt base jump
+
+#### Build Status
+- ✅ x86_64 builds successfully
+- ✅ aarch64 builds successfully
+
+#### Cleanup Done
+- Removed duplicate crates from main repo (drivers, traits, virtio-transport)
+- Main repo workspace now only contains `xtask`
+- All kernel code lives in `crates/kernel/` submodule
+
+#### Gotchas Documented
+Added to `docs/GOTCHAS.md`:
+- #32: AArch64 boot code cannot use higher-half symbols directly
+- #33: Kernel modular crate dependencies must avoid cycles
+- #34: Architecture crates use extern callbacks for integration
+
+### Remaining Work
+
+- [ ] Run full test suite (`cargo xtask test`) once QEMU environment available
+- [ ] Verify kernel boots on both architectures in QEMU
+- [ ] Clean up unused imports (many warnings in build output)
+- [ ] Consider further file splitting (syscall/fs/fd.rs still 638 lines)

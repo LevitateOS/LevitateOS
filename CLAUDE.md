@@ -471,47 +471,103 @@ cargo xtask build eyra --arch aarch64
 
 ## Team Workflow
 
+### Team Files Are Critical Historical Context
+
+**Team files (`.teams/TEAM_XXX_*.md`) are the primary source of historical context for this project.** Future teams (including future conversations) rely on these files to understand:
+- What was attempted and why
+- What worked and what didn't
+- Key decisions and their rationale
+- Gotchas discovered during implementation
+- Unfinished work and next steps
+
+**You MUST maintain your team file throughout the conversation**, not just at the end.
+
 ### Team Registration
 
 Every distinct AI conversation = one team. Implementation details and decisions are tracked in `.teams/` with TEAM_XXX identifiers.
 
-**Creating a Team**:
-1. Determine highest existing team number in `.teams/`
-2. Your number = highest + 1
-3. Create log file: `.teams/TEAM_XXX_<summary>.md`
+**Creating a Team** (do this EARLY in the conversation):
+1. Check `.teams/` subdirectories (000-099, 100-199, 200-299, 300-399, 400+) for existing teams
+2. Your number = highest existing + 1
+3. Create log file: `.teams/TEAM_XXX_<brief_summary>.md`
 4. Team ID is permanent for the lifetime of the conversation
+
+**Team File Format**:
+```markdown
+# TEAM_XXX: Brief Title
+
+## Objective
+What this team is trying to accomplish.
+
+## Progress Log
+### Session 1 (YYYY-MM-DD)
+- What was done
+- Key decisions made
+- Problems encountered
+
+## Key Decisions
+- Decision 1: Rationale
+- Decision 2: Rationale
+
+## Gotchas Discovered
+- Issue 1: How to avoid/fix
+
+## Remaining Work
+- [ ] Task 1
+- [ ] Task 2
+
+## Handoff Notes
+Summary for the next team.
+```
 
 **Code Comments**: When modifying code, add traceability:
 ```rust
 // TEAM_XXX: Reason for change
 ```
 
+### Continuous Team File Updates
+
+**Update your team file as you work, not just at the end:**
+
+| When | What to Log |
+|------|-------------|
+| Starting work | Objective, initial approach |
+| Making key decisions | Decision + rationale |
+| Hitting a problem | What went wrong, how you solved it |
+| Discovering a gotcha | The issue and how to avoid it |
+| Completing a milestone | What was done, what's next |
+| Finishing | Handoff notes, remaining work |
+
+**Why this matters**: Context gets lost between conversations. A detailed team file lets the next team (or a resumed conversation) pick up exactly where you left off without re-discovering the same issues.
+
 ### Before Starting Work
 
 Every team must:
 1. Read the main project overview
 2. Read the current active phase in `docs/planning/`
-3. Check recent team logs
+3. **Check recent team logs in `.teams/`** - understand what previous teams did
 4. Check open questions in `docs/questions/`
-5. Claim a team number and create a team file
+5. **Claim a team number and create a team file immediately**
 6. Ensure all tests pass before making changes
 7. Only then begin implementation
 
 ### Before Finishing
 
 Every team must:
-- Update their team file with progress
+- **Update their team file with complete progress and handoff notes**
 - Ensure project builds (`cargo xtask build all`)
 - Ensure all tests pass (`cargo xtask test`)
 - Document remaining problems or blockers
-- Write handoff notes
+- Add any discovered gotchas to `docs/GOTCHAS.md`
 
 **Handoff Checklist**:
 - [ ] Project builds cleanly
 - [ ] All tests pass
 - [ ] Behavioral regression tests pass
-- [ ] Team file updated
-- [ ] Remaining TODOs documented
+- [ ] **Team file has complete progress log**
+- [ ] **Remaining TODOs documented in team file**
+- [ ] **Key decisions documented with rationale**
+- [ ] **Any gotchas added to docs/GOTCHAS.md**
 
 ### Questions
 
