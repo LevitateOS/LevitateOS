@@ -1,10 +1,14 @@
 # Build outputs
 sysroot/
 */target/
+coreutils-out/
+brush-out/
 
-# External repos (cloned, not submodules yet)
+# External repos (cloned at build time, not committed)
 c-ward/
+coreutils/
 unmodified-coreutils/
+brush/
 
 # Custom targets (not needed - we use standard Linux target)
 targets/
