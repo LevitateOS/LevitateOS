@@ -7,8 +7,8 @@ description = "VirtIO GPU driver for LevitateOS"
 license = "MIT"
 
 [dependencies]
-los_hal = { path = "../../hal" }
-los_pci = { path = "../../pci" }
+los_hal = { path = "../../kernel/hal" }
+los_pci = { path = "../../kernel/pci" }
 # TEAM_141: Use workspace dependencies for version consistency
 virtio-drivers.workspace = true
 embedded-graphics.workspace = true

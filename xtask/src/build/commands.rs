@@ -358,15 +358,16 @@ fn build_kernel_with_features(features: &[&str], arch: &str) -> Result<()> {
         "-Z".to_string(), "build-std=core,alloc".to_string(),
         "--release".to_string(),
         "--target".to_string(), target.to_string(),
-        "-p".to_string(), "levitate-kernel".to_string(),
     ];
-    
+
     if !features.is_empty() {
         args.push("--features".to_string());
         args.push(features.join(","));
     }
-    
+
+    // Kernel is its own workspace - build from kernel directory
     let status = Command::new("cargo")
+        .current_dir("crates/kernel")
         .args(&args)
         .status()
         .context("Failed to run cargo build")?;
@@ -381,7 +382,7 @@ fn build_kernel_with_features(features: &[&str], arch: &str) -> Result<()> {
         let objcopy_status = Command::new("aarch64-linux-gnu-objcopy")
             .args([
                 "-O", "binary",
-                "target/aarch64-unknown-none/release/levitate-kernel",
+                "crates/kernel/target/aarch64-unknown-none/release/levitate-kernel",
                 "kernel64_rust.bin",
             ])
             .status()
@@ -444,7 +445,7 @@ fn build_iso_internal(features: &[&str], arch: &str, use_test_initramfs: bool) -
     std::fs::create_dir_all(&boot_dir)?;
 
     // 2. Copy components to ISO root
-    let kernel_path = "target/x86_64-unknown-none/release/levitate-kernel";
+    let kernel_path = "crates/kernel/target/x86_64-unknown-none/release/levitate-kernel";
     // TEAM_374: Use test initramfs when in test mode
     let initramfs_path = if use_test_initramfs {
         "initramfs_test.cpio".to_string()

@@ -26,7 +26,7 @@ impl Arch {
     pub fn kernel_path(&self) -> &'static str {
         match self {
             Arch::Aarch64 => "kernel64_rust.bin",
-            Arch::X86_64 => "target/x86_64-unknown-none/release/levitate-kernel",
+            Arch::X86_64 => "crates/kernel/target/x86_64-unknown-none/release/levitate-kernel",
         }
     }
 

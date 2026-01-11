@@ -24,7 +24,7 @@ pub fn run(arch: &str) -> Result<()> {
     let kernel_bin = if arch == "aarch64" {
         "kernel64_rust.bin"
     } else {
-        "target/x86_64-unknown-none/release/levitate-kernel"
+        "crates/kernel/target/x86_64-unknown-none/release/levitate-kernel"
     };
 
     let args = vec![

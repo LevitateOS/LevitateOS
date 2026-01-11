@@ -1,9 +1,0 @@
-[package]
-name = "los_term"
-version = "0.1.0"
-edition = "2024"
-readme = "README.md"
-
-[dependencies]
-los_utils = { path = "../utils" }
-embedded-graphics = "0.8.1"
