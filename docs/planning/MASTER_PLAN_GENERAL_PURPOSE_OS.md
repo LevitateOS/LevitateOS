@@ -63,7 +63,7 @@ $ ./some-linux-binary
 
 ### Deliverables
 
-- [ ] fork() syscall clones process
+- [x] fork() syscall clones process (TEAM_432: implemented 2026-01-11)
 - [ ] execve() loads and runs ELF binaries
 - [ ] wait4() blocks until child exits
 - [ ] Process tree maintained correctly
@@ -286,7 +286,7 @@ $ ./some-linux-binary
 
 ### Phase 1: Foundation (TEAM_400)
 
-1. Implement fork() with eager memory copy
+1. ~~Implement fork() with eager memory copy~~ ✅ TEAM_432
 2. Implement execve() with ELF loading
 3. Implement wait4()/waitpid()
 4. Implement exit_group()

@@ -738,3 +738,56 @@ fn syscall_dispatch(frame: &mut crate::arch::SyscallFrame) {
 - `handle_user_exception` - Called for user-mode faults (AArch64)
 - `handle_irq_dispatch` - Called for IRQ handling (AArch64)
 - `check_and_deliver_signals` - Called before return to userspace
+
+---
+
+### 35. Lock Guards Don't Auto-Deref for Clone (TEAM_432)
+
+**Location:** `crates/kernel/sched/src/fork.rs`, any code cloning locked data
+
+**Problem:** When you have a `LockGuard<T>` where `T: Clone`, calling `.clone()` on the guard tries to clone the guard itself (which doesn't implement Clone), not the inner value.
+
+**Symptom:** Compile error: `no method named 'clone' found for struct 'IrqSafeLockGuard<'_, SomeType>'`
+
+**Incorrect Pattern:**
+```rust
+let cloned = parent.vmas.lock().clone();  // Tries to clone the guard!
+```
+
+**Correct Pattern:**
+```rust
+let cloned = (*parent.vmas.lock()).clone();  // Dereference, then clone inner value
+```
+
+**Why:** Rust's auto-deref doesn't kick in for method resolution on `.clone()` because `LockGuard<T>` doesn't implement `Clone`. You must explicitly dereference to access the inner `T`.
+
+---
+
+### 36. Structs Used by Fork Need Clone Derive (TEAM_432)
+
+**Location:** `crates/kernel/mm/src/vma.rs`, any struct cloned during fork
+
+**Problem:** When implementing `fork()`, many kernel structures need to be cloned to create the child's copies. If `Clone` is missing, compilation fails.
+
+**Affected Types (examples):**
+- `VmaList` - Virtual memory area list
+- `FdTable` - File descriptor table
+- `ProcessHeap` - Heap state
+
+**Pattern:** Add `#[derive(Clone)]` to structs that need cloning:
+```rust
+// Before (missing Clone)
+#[derive(Debug, Default)]
+pub struct VmaList { ... }
+
+// After (TEAM_432: Added Clone for fork support)
+#[derive(Debug, Default, Clone)]
+pub struct VmaList { ... }
+```
+
+**Comment Convention:** When adding Clone for fork support, document it:
+```rust
+/// TEAM_432: Added Clone for fork() support.
+#[derive(Debug, Default, Clone)]
+pub struct VmaList { ... }
+```
