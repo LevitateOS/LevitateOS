@@ -2,11 +2,11 @@ limine: Loading kernel `boot:///boot/levitate-kernel`...
 limine: Loading module `boot:///boot/initramfs.cpio`...
 LH123456789CXLRikdHeap initialized.
 [BOOT] Protocol: Limine
-[BOOT] Memory: 16 regions, 1769 MB usable
+[BOOT] Memory: 16 regions, 1767 MB usable
 [BOOT] Stage 2: Memory & MMU (PEI)
 [MEM] Buddy Allocator initialized with unified BootInfo
-[CPU] x86_64 PCR initialized at 0xffffffff8005da00
-[SYSCALL] x86_64 syscall MSRs initialized, LSTAR=0xffffffff800100b0
+[CPU] x86_64 PCR initialized at 0xffffffff80065a00
+[SYSCALL] x86_64 syscall MSRs initialized, LSTAR=0xffffffff8000f0b0
 [BOOT] Stage 2: Memory & MMU (PEI)
 Exceptions initialized.
 [BOOT] Stage 3: Boot Console (DXE)
@@ -35,29 +35,13 @@ Timer initialized.
 [PCI] PciTransport created successfully
 [INPUT] VirtIO Input initialized via PCI.
 Detecting Initramfs...
-Initramfs found at 0xffff80006eacb000 - 0xffff80006f47ae00 (10157568 bytes)
+Initramfs found at 0xffff80006e860000 - 0xffff80006f3e5800 (12081152 bytes)
 Files in initramfs:
  - .
  - hello.txt
- - clone_test
- - error_test
  - eyra-hello
  - init
- - interrupt_test
- - link_test
- - mmap_test
- - pipe_test
- - pty_interact
- - pty_test
- - repro
- - sched_yield_test
- - shell
- - signal_test
- - stat_test
- - suite_test_core
- - test_runner
- - time_test
- - tty_test
+ - brush
  - coreutils
  - cat
  - cp
@@ -128,7 +112,7 @@ Files in initramfs:
  - pwd
  - true
 [BOOT] spawning init task...
-[SPAWN] Parsing ELF header (15192 bytes)...
+[SPAWN] Parsing ELF header (15368 bytes)...
 ELF Header e_ident verified
 [SPAWN] ELF parsed.
 [SPAWN] Creating user page table...
@@ -138,11 +122,11 @@ ELF Header e_ident verified
 [SPAWN] Loading segments...
 [ELF] Copying segment: src[0]=55 to VA 10000
 [ELF] Resolved PA [MASKED] -> Kernel VA [MASKED]
-[ELF] Copying segment: src[0]=5b to VA 113b8
+[ELF] Copying segment: src[0]=5b to VA 11428
 [ELF] Resolved PA [MASKED] -> Kernel VA [MASKED]
-[ELF] Copying segment: src[0]=36 to VA 118f0
+[ELF] Copying segment: src[0]=a2 to VA 119a8
 [ELF] Resolved PA [MASKED] -> Kernel VA [MASKED]
-[ELF] Copying segment: src[0]=ba to VA 11920
+[ELF] Copying segment: src[0]=54 to VA 119d8
 [ELF] Resolved PA [MASKED] -> Kernel VA [MASKED]
 [SPAWN] Setting up stack...
 [SPAWN] Setting up stack arguments...
@@ -154,7 +138,7 @@ ERROR: Failed to mount FAT32: E0501: Failed to open volume
 [BOOT] WARNING: Filesystem mount failed: E0501: Failed to open volume
   (Check tinyos_disk.img format/presence)
 [BOOT] Mounted tmpfs at /tmp
-[GPU_TEST] Flush count: 127
+[GPU_TEST] Flush count: 111
 [GPU_TEST] Framebuffer: 400 non-black pixels of 1024000 total
 
 [SUCCESS] LevitateOS System Ready.
@@ -163,8 +147,8 @@ ERROR: Failed to mount FAT32: E0501: Failed to open volume
 [INIT] PID 1 starting...
 [SYSCALL] spawn('eyra-test-runner')
 [INIT] Spawning shell...
-[SYSCALL] spawn('shell')
-[SPAWN] Parsing ELF header (17848 bytes)...
+[SYSCALL] spawn('brush')
+[SPAWN] Parsing ELF header (400056 bytes)...
 ELF Header e_ident verified
 [SPAWN] ELF parsed.
 [SPAWN] Creating user page table...
@@ -172,22 +156,29 @@ ELF Header e_ident verified
 [MMU] Allocated L0 table at phys [MASKED]
 [MMU] Zeroing L0 table at va [MASKED]
 [SPAWN] Loading segments...
-[ELF] Copying segment: src[0]=48 to VA 10000
+[ELF] Copying segment: src[0]=7f to VA 10000
 [ELF] Resolved PA [MASKED] -> Kernel VA [MASKED]
-[ELF] Copying segment: src[0]=c0 to VA 11bd0
+[ELF] Copying segment: src[0]=48 to VA 24ea0
 [ELF] Resolved PA [MASKED] -> Kernel VA [MASKED]
-[ELF] Copying segment: src[0]=11 to VA 12240
+[ELF] Copying segment: src[0]=0 to VA 6fe58
 [ELF] Resolved PA [MASKED] -> Kernel VA [MASKED]
-[ELF] Copying segment: src[0]=dd to VA 12280
+[ELF] Copying segment: src[0]=0 to VA 73aa8
 [ELF] Resolved PA [MASKED] -> Kernel VA [MASKED]
+[ELF] PIE binary loaded at base 0x10000, self-relocating
 [SPAWN] Setting up stack...
 [SPAWN] Setting up stack arguments...
-[TASK] UserTask::new: PID=2 Entry=0x10000
-[SPAWN] Success: PID=2 entry=0x10000 sp=0x7ffffffeff40
+[TASK] UserTask::new: PID=2 Entry=0x24ea0
+[SPAWN] Success: PID=2 entry=0x24ea0 sp=0x7ffffffeff40
 [INIT] Shell spawned as PID 2
-[TASK] Entering user task PID=2 at 0x10000
+[TASK] Entering user task PID=2 at 0x24ea0
+[MPROTECT] Changed protection for 4 pages at 0x6f000-0x73000 prot=0x1
+[MMAP] Mapped 1 pages at 0x100000000000 with prot=0x3
+[SYSCALL] arch_prctl(code=0x1002, addr=0x100000000028)
+[SYSCALL] ppoll(nfds=3) -> 0 ready
+[SYSCALL] sigaltstack(ss=0x0, old_ss=0x7ffffffefd30) -> 0
+[MMAP] Mapped 16 pages at 0x100000001000 with prot=0x3
 
-LevitateOS Shell (lsh) v0.1
+LevitateOS Shell v0.2
 Type 'help' for commands.
 
 # 

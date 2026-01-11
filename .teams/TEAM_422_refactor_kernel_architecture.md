@@ -1,6 +1,6 @@
 # TEAM_422: Kernel Architecture Redesign
 
-## Status: Planning
+## Status: In Progress
 
 ## Objective
 
@@ -81,7 +81,7 @@ Each step must leave the kernel in a buildable, testable state.
 
 | File | Lines | Issue |
 |------|-------|-------|
-| `memory/user.rs` | 709 | User memory management sprawl |
+| ~~`memory/user.rs`~~ | ~~709~~ | ✅ DONE - Split into 6 files (max 278 lines) |
 | `syscall/fs/fd.rs` | 638 | FD operations + dup logic |
 | `loader/elf.rs` | 579 | ELF loading + relocation |
 | `init.rs` | 570 | Boot sequence god function |
@@ -101,3 +101,24 @@ Each step must leave the kernel in a buildable, testable state.
 - Documented current architecture issues
 - Defined target workspace structure
 - Established migration order and rollback strategy
+
+### 2026-01-11: Phase 1 & Initial File Splitting
+- Verified baseline: both x86_64 and aarch64 build successfully
+- Updated behavior test golden files
+- Created `mm/` crate scaffold (empty, for future migration)
+- **Split `memory/user.rs` (709 lines) into 6 files:**
+  - `memory/user/auxv.rs` (23 lines) - Auxiliary vector types
+  - `memory/user/layout.rs` (21 lines) - Address space constants
+  - `memory/user/mapping.rs` (278 lines) - Page mapping functions
+  - `memory/user/page_table.rs` (184 lines) - Page table management
+  - `memory/user/stack.rs` (213 lines) - Stack setup
+  - `memory/user/mod.rs` (25 lines) - Re-exports
+- All tests pass on both architectures
+
+### Migration Blocker Identified
+Full crate extraction (Phase 3) is blocked by circular dependencies:
+- `memory/mod.rs::init()` depends on `crate::boot::BootInfo`
+- `memory/mod.rs` re-exports `crate::task::TaskControlBlock`
+
+**Resolution**: Keep `init()` in kernel binary, move only pure memory
+management code to `mm/` crate. Requires further architectural analysis.
