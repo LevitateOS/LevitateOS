@@ -32,13 +32,23 @@ jobs:
           KERNEL_SHA="${{ steps.kernel-commit.outputs.sha }}"
           echo "Checking CI status for kernel commit $KERNEL_SHA..."
 
-          # Get the combined status for the commit
-          STATUS=$(gh api repos/LevitateOS/kernel/commits/$KERNEL_SHA/status --jq '.state')
+          # Get the workflow run for this commit (Actions API, not commit status API)
+          RESULT=$(gh api "repos/LevitateOS/kernel/actions/runs?head_sha=$KERNEL_SHA" \
+            --jq '.workflow_runs[0] | {status: .status, conclusion: .conclusion}')
 
-          echo "Kernel CI status: $STATUS"
+          STATUS=$(echo "$RESULT" | jq -r '.status')
+          CONCLUSION=$(echo "$RESULT" | jq -r '.conclusion')
 
-          if [ "$STATUS" != "success" ]; then
-            echo "::error::Kernel commit $KERNEL_SHA has not passed CI (status: $STATUS)"
+          echo "Kernel CI: status=$STATUS, conclusion=$CONCLUSION"
+
+          if [ "$STATUS" != "completed" ]; then
+            echo "::error::Kernel CI for commit $KERNEL_SHA is still running (status: $STATUS)"
+            echo "::error::Wait for CI to complete or update submodule to a tested commit"
+            exit 1
+          fi
+
+          if [ "$CONCLUSION" != "success" ]; then
+            echo "::error::Kernel commit $KERNEL_SHA failed CI (conclusion: $CONCLUSION)"
             echo "::error::Update the kernel submodule to a commit that has passed CI"
             exit 1
           fi
