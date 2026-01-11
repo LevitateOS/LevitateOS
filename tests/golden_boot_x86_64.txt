@@ -2,12 +2,12 @@ limine: Loading kernel `boot:///boot/levitate-kernel`...
 limine: Loading module `boot:///boot/initramfs.cpio`...
 RikdHeap initialized.
 [BOOT] Protocol: Limine
-[BOOT] Memory: 16 regions, 1776 MB usable
+[BOOT] Memory: 16 regions, 1769 MB usable
 [BOOT] Stage 2: Memory & MMU (PEI)
-[MEM] Physical: 0x50000 - 0x6f145000 (454901 pages, 1776 MB)
+[MEM] Physical: 0x50000 - 0x6ea31000 (453089 pages, 1769 MB)
 [MEM] Frame allocator initialized
-[CPU] x86_64 PCR initialized at 0xffffffff80054a30
-[SYSCALL] x86_64 syscall MSRs initialized, LSTAR=0xffffffff8003d744
+[CPU] x86_64 PCR initialized at 0xffffffff80055a30
+[SYSCALL] x86_64 syscall MSRs initialized, LSTAR=0xffffffff8003f024
 [BOOT] Stage 2: Memory & MMU (PEI)
 Exceptions initialized.
 [BOOT] Stage 3: Boot Console (DXE)
@@ -36,11 +36,12 @@ Timer initialized.
 [PCI] PciTransport created successfully
 [INPUT] VirtIO Input initialized via PCI.
 Detecting Initramfs...
-Initramfs found at 0xffff80006f165000 - 0xffff80006f3b8600 (2438656 bytes)
+Initramfs found at 0xffff80006ea51000 - 0xffff80006f3a2800 (9771008 bytes)
 Files in initramfs:
  - .
  - hello.txt
  - init
+ - shell
  - hello-cgull
  - coreutils
  - cat
@@ -51,6 +52,7 @@ Files in initramfs:
  - rm
  - tail
  - touch
+ - brush
 [BOOT] Process hooks registered
 [BOOT] spawning init task...
 ELF Header e_ident verified
@@ -75,7 +77,7 @@ Mounting filesystems...
 [BOOT] Mounted tmpfs at /tmp
 [DEVTMPFS] Initialized with null, zero, full, urandom devices
 [BOOT] Mounted devtmpfs at /dev
-[GPU_TEST] Flush count: 47
+[GPU_TEST] Flush count: 49
 [GPU_TEST] Framebuffer: 400 non-black pixels of 1024000 total
 
 [SUCCESS] LevitateOS System Ready.
@@ -85,4 +87,44 @@ Mounting filesystems...
 [SYSCALL] spawn('eyra-test-runner')
 [INIT] Spawning shell...
 [SYSCALL] spawn('brush')
-[INIT] ERROR: Failed to spawn shell: -2
+ELF Header e_ident verified
+[MMU] Creating user page table...
+[MMU] Allocated L0 table at phys [MASKED]
+[MMU] Zeroing L0 table at va [MASKED]
+[ELF] Copying segment: src[0]=7f to VA 10000
+[ELF] Resolved PA [MASKED] -> Kernel VA [MASKED]
+[ELF] Copying segment: src[0]=50 to VA fa420
+[ELF] Resolved PA [MASKED] -> Kernel VA [MASKED]
+[ELF] Copying segment: src[0]=8 to VA 6c1a48
+[ELF] Resolved PA [MASKED] -> Kernel VA [MASKED]
+[ELF] Copying segment: src[0]=0 to VA 6fb878
+[ELF] Resolved PA [MASKED] -> Kernel VA [MASKED]
+[ELF] PIE binary loaded at base 0x10000, self-relocating
+[TLS] TEAM_408: Allocated TLS at 0x7ffffffe0000
+[TASK] UserTask::new: PID=2 Entry=0x69d56c
+[SPAWN] Created process PID=2 entry=0x69d56c sp=0x7ffffffeff30 brk=0x701000
+[INIT] Shell spawned as PID 2
+[TASK] Entering user task PID=2 at 0x69d56c
+EXCEPTION: INVALID OPCODE at 6b6555
+Code at RIP: 0f 0b 0f 0b 0f 0b 0f 0b 0f 0b 0f 0b 55 41 57 41 
+Code before: 00 00 00 0f 05 48 85 c0 75 0e 5b 41 5e 41 5f c3 
+Stack at 7ffffffefe90:
+  SP+0 : 7ffffffeff38
+  SP+8 : 7ffffffeff48
+  SP+16: 1
+  SP+24: 6b6038
+  SP+32: 0
+  SP+40: 0
+  SP+48: 0
+  SP+56: 0
+  SP+64: 0
+  SP+72: 0
+  SP+80: 0
+  SP+88: 0
+  SP+96: 0
+  SP+104: ffffffff80b4a1a0
+  SP+112: 0
+  SP+120: 0
+KERNEL PANIC: panicked at lib/hal/src/x86_64/cpu/exceptions.rs:245:5:
+EXCEPTION: INVALID OPCODE
+6b6555

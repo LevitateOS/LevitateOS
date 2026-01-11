@@ -49,6 +49,8 @@ fn clone_brush() -> Result<()> {
 }
 
 /// Get RUSTFLAGS for building against our sysroot
+/// TEAM_435: Use static-pie to produce position-independent static binaries
+/// that the kernel's ELF loader can load at any address (0x10000)
 fn get_sysroot_rustflags() -> String {
     let sysroot_path = std::env::current_dir()
         .map(|p| p.join("toolchain/sysroot"))
@@ -56,8 +58,9 @@ fn get_sysroot_rustflags() -> String {
 
     format!(
         "-C panic=abort \
+         -C relocation-model=pic \
          -C link-arg=-nostartfiles \
-         -C link-arg=-static \
+         -C link-arg=-static-pie \
          -C link-arg=-Wl,--allow-multiple-definition \
          -C link-arg=-L{}/lib",
         sysroot_path.display()

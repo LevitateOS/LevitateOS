@@ -121,9 +121,9 @@ pub extern "C" fn _start() -> ! {
         }
     }
 
-    // TEAM_435: Spawn no_std shell (replaced brush which needs libc)
+    // TEAM_435: Spawn brush shell (POSIX-compatible, built with c-gull)
     println!("[INIT] Spawning shell...");
-    let shell_pid = spawn("shell");
+    let shell_pid = spawn("brush");
 
     if shell_pid < 0 {
         println!("[INIT] ERROR: Failed to spawn shell: {}", shell_pid);
