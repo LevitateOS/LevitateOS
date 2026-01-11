@@ -36,3 +36,6 @@ iso_root/
 target/
 limine-bin/
 Cargo.lock
+
+# External reference kernels (not part of build)
+.external-kernels/
