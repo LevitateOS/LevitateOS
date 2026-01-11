@@ -39,3 +39,6 @@ Cargo.lock
 
 # External reference kernels (not part of build)
 .external-kernels/
+
+# Auto-fetched syscall specs (regenerate with: cargo xtask syscall)
+docs/specs/syscalls/

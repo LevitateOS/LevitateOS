@@ -35,6 +35,7 @@ mod disk;
 mod qemu;
 mod run;
 mod support;
+mod syscall;
 mod tests;
 mod vm;
 
@@ -89,6 +90,10 @@ enum Commands {
     /// Debug calculator for memory/address/bit math
     #[command(subcommand)]
     Calc(calc::CalcCommands),
+
+    /// Fetch syscall specifications from man7.org
+    #[command(subcommand)]
+    Syscall(syscall::SyscallCommands),
 }
 
 // TEAM_326: Simplified run args with flags instead of subcommands
@@ -311,6 +316,20 @@ fn main() -> Result<()> {
         },
         Commands::Calc(cmd) => {
             calc::run(cmd)?;
+        },
+        Commands::Syscall(cmd) => match cmd {
+            syscall::SyscallCommands::Fetch { name, force } => {
+                syscall::fetch(&name, force)?;
+            }
+            syscall::SyscallCommands::Numbers { force } => {
+                syscall::fetch_numbers(force)?;
+            }
+            syscall::SyscallCommands::List => {
+                syscall::list()?;
+            }
+            syscall::SyscallCommands::Show { name } => {
+                syscall::show(&name)?;
+            }
         },
     }
 
