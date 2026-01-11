@@ -125,88 +125,75 @@ Expected output:
 
 ---
 
-## Migration Path: Three Options
+## Migration Path: Pre-built Sysroot
 
-### Option 1: Mustang Targets (Recommended)
+**The only approach that requires ZERO source modifications.**
 
-Use Mustang's build system to create custom targets for LevitateOS.
+See [SYSROOT_BUILD.md](SYSROOT_BUILD.md) for detailed implementation plan.
 
-**Steps:**
-1. Install Mustang: `cargo install mustang`
-2. Set `RUST_TARGET_PATH` to mustang targets directory
-3. Add to coreutils: `mustang::can_run_this!();` (one line)
-4. Build: `cargo build --target=x86_64-mustang-linux-gnu -Z build-std`
+### How It Works
 
-**Pros:**
-- Well-tested approach
-- Minimal source modification (one macro)
-- Works with nightly Rust
+1. **Build c-gull as libc.a** - Static library providing all libc symbols
+2. **Create custom target spec** - `x86_64-levitateos.json` with linker config
+3. **Build std from source** - Using `-Z build-std` against our libc.a
+4. **Package as sysroot** - Distributable directory with pre-compiled std
+5. **Build any program** - Just specify `--target` and `--sysroot`
 
-**Cons:**
-- Requires nightly toolchain
-- Requires `-Z build-std`
-- Still needs that one macro line
+```bash
+# Build UNMODIFIED uutils/coreutils
+git clone https://github.com/uutils/coreutils
+cd coreutils
+cargo +nightly build --release \
+    --target x86_64-levitateos \
+    --sysroot $LEVITATEOS_SYSROOT
 
-### Option 2: Custom LevitateOS Target
+# That's it. No Cargo.toml changes. No macros. Nothing.
+```
 
-Create a custom target JSON that uses c-gull as the libc.
+### Comparison
 
-**Steps:**
-1. Create `x86_64-levitateos.json` target spec
-2. Configure linker to use c-gull static library
-3. Build with `-Z build-std=std,core,alloc`
+| Approach | Source Changes | Build Command Changes |
+|----------|---------------|----------------------|
+| **Eyra** | Cargo.toml modification | None |
+| **Mustang** | One macro in main.rs | `--target`, `-Z build-std` |
+| **Pre-built Sysroot** | **NONE** | `--target`, `--sysroot` |
 
-**Pros:**
-- No source modifications at all
-- Full control over linking
+### How Redox Does It
 
-**Cons:**
-- Complex setup
-- Need to maintain target specs
-- Requires building std from source
+Redox OS uses this exact approach:
+- [relibc](https://github.com/redox-os/relibc) - Their Rust libc implementation
+- `x86_64-unknown-redox` - Official Rust target
+- Programs built for Redox **automatically link against relibc**
 
-### Option 3: Pre-built Sysroot
-
-Build a complete sysroot with std pre-compiled against c-gull.
-
-**Steps:**
-1. Build c-gull as `libc.a`
-2. Build Rust std against this libc
-3. Package as sysroot
-4. Point rustc at this sysroot
-
-**Pros:**
-- True "just works" for any Rust program
-- Fast builds (no build-std)
-
-**Cons:**
-- Complex to set up initially
-- Need to rebuild sysroot for Rust updates
+We're doing the same thing, but with c-gull instead of relibc, and a custom target instead of an upstream one.
 
 ---
 
-## Recommended Path Forward
+## Implementation Phases
 
 ### Phase 1: Verify Syscall Coverage (DONE)
 - [x] cgull-test passes 19/19
 - [x] All Eyra-required syscalls implemented
 
-### Phase 2: Test Mustang Approach
-1. Install Mustang tooling
-2. Test building a simple Rust program with mustang target
-3. Verify it runs on LevitateOS
+### Phase 2: Build c-gull as libc.a
+- [ ] Configure c-gull for staticlib output
+- [ ] Include origin startup code
+- [ ] Test linking a minimal program
 
-### Phase 3: Build Original Coreutils
-1. Clone upstream uutils/coreutils (not sunfishcode's fork)
-2. Add minimal mustang integration
-3. Build for LevitateOS
-4. Test all utilities work
+### Phase 3: Create Target Spec + Sysroot
+- [ ] Write `x86_64-levitateos.json`
+- [ ] Build std with `-Z build-std`
+- [ ] Package sysroot
 
-### Phase 4: Remove Eyra
-1. Switch coreutils submodule to our mustang-integrated fork
-2. Remove sunfishcode/coreutils dependency
-3. Remove Eyra from workspace
-4. Update build system
+### Phase 4: Build Original Coreutils
+- [ ] Clone upstream uutils/coreutils
+- [ ] Build with our sysroot
+- [ ] Test on LevitateOS
+
+### Phase 5: Automation
+- [ ] `cargo xtask build sysroot` command
+- [ ] CI/CD for sysroot builds
+- [ ] Remove Eyra from tree
 
 ---
 
