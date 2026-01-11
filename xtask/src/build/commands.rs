@@ -1,7 +1,6 @@
 use anyhow::{bail, Context, Result};
 use clap::Subcommand;
 use std::path::PathBuf;
-use std::io::Write;
 use std::process::{Command, Stdio};
 use crate::disk;
 
@@ -27,16 +26,16 @@ pub enum BuildCommands {
 }
 
 // TEAM_435: Replaced Eyra with c-gull sysroot approach
+// TEAM_438: Uses apps registry for external app builds
 pub fn build_all(arch: &str) -> Result<()> {
-    // Build sysroot and coreutils if not present
+    // Build sysroot if not present
     if !super::sysroot::sysroot_exists() {
         println!("🔧 Building c-gull sysroot...");
         super::sysroot::build_sysroot(arch)?;
     }
-    if !super::external::coreutils_exists(arch) {
-        println!("🔧 Building coreutils...");
-        super::external::build_coreutils(arch)?;
-    }
+
+    // Build all external apps (coreutils, brush, etc.) if not present
+    super::apps::ensure_all_built(arch)?;
 
     // TEAM_073: Build userspace first
     build_userspace(arch)?;
@@ -118,65 +117,45 @@ pub fn create_initramfs(arch: &str) -> Result<()> {
         }
     }
 
-    // TEAM_435: c-gull target for Linux binaries
-    let linux_target = match arch {
-        "aarch64" => "aarch64-unknown-linux-gnu",
-        "x86_64" => "x86_64-unknown-linux-gnu",
-        _ => "",
-    };
+    // TEAM_438: Use apps registry for external apps - fail fast on required, skip optional
+    for app in super::apps::APPS {
+        if app.required {
+            // Required apps must exist - fail fast with helpful message
+            let src = app.require(arch)?;
+            std::fs::copy(&src, root.join(app.binary))?;
+            count += 1;
 
-    // c-gull libc test binary (built with standalone c-gull sysroot)
-    let hello_cgull_src = PathBuf::from(format!("toolchain/libc-levitateos/test/rust-test/target/{}/release/hello_rust", linux_target));
-    if hello_cgull_src.exists() {
-        std::fs::copy(&hello_cgull_src, root.join("hello-cgull"))?;
-        count += 1;
-        println!("  📦 Added hello-cgull (c-gull libc test)");
-    }
-
-    // TEAM_435: Copy coreutils from new toolchain location
-    let coreutils_src = PathBuf::from(format!(
-        "toolchain/coreutils-out/{}/release/coreutils",
-        linux_target
-    ));
-
-    // Utilities available with current c-gull (limited - missing getpwuid, etc.)
-    let utils = [
-        "cat", "echo", "head", "mkdir", "pwd", "rm", "tail", "touch",
-    ];
-
-    if coreutils_src.exists() {
-        // Copy the multi-call binary
-        std::fs::copy(&coreutils_src, root.join("coreutils"))?;
-        count += 1;
-
-        // Create symlinks for each utility
-        for util in &utils {
-            #[cfg(unix)]
-            {
-                use std::os::unix::fs::symlink;
-                let link_path = root.join(util);
-                // Remove existing file/link if present
-                let _ = std::fs::remove_file(&link_path);
-                symlink("coreutils", &link_path)?;
+            // Create symlinks for multi-call binaries
+            for symlink_name in app.symlinks {
+                #[cfg(unix)]
+                {
+                    use std::os::unix::fs::symlink;
+                    let link_path = root.join(symlink_name);
+                    let _ = std::fs::remove_file(&link_path);
+                    symlink(app.binary, &link_path)?;
+                }
+                #[cfg(not(unix))]
+                {
+                    std::fs::copy(&src, root.join(symlink_name))?;
+                }
             }
-            #[cfg(not(unix))]
-            {
-                // On non-unix, copy the binary instead
-                std::fs::copy(&coreutils_src, root.join(util))?;
+
+            if app.symlinks.is_empty() {
+                println!("  📦 Added {}", app.name);
+            } else {
+                println!("  📦 Added {} + {} symlinks", app.name, app.symlinks.len());
+            }
+        } else {
+            // Optional apps - include if built, otherwise inform user
+            if app.exists(arch) {
+                let src = app.output_path(arch);
+                std::fs::copy(&src, root.join(app.binary))?;
+                count += 1;
+                println!("  📦 Added {} (optional)", app.name);
+            } else {
+                println!("  ℹ️  {} not found (optional). Run 'cargo xtask build {}' to include it.", app.name, app.name);
             }
         }
-        println!("  📦 Added coreutils + {} symlinks", utils.len());
-    } else {
-        println!("  ⚠️  Coreutils not found at {}", coreutils_src.display());
-        println!("      Run 'cargo xtask build coreutils' first");
-    }
-
-    // TEAM_435: Add brush shell if built
-    let brush_src = PathBuf::from(format!("toolchain/brush-out/{}/release/brush", linux_target));
-    if brush_src.exists() {
-        std::fs::copy(&brush_src, root.join("brush"))?;
-        count += 1;
-        println!("  📦 Added brush shell");
     }
 
     println!("[DONE] ({} added)", count);
@@ -211,7 +190,8 @@ pub fn create_initramfs(arch: &str) -> Result<()> {
 }
 
 /// TEAM_435: Create test-specific initramfs with coreutils.
-/// Includes init, shell, and coreutils for testing.
+/// TEAM_438: Uses apps registry for external apps.
+/// Includes init, shell, and required apps for testing.
 pub fn create_test_initramfs(arch: &str) -> Result<()> {
     println!("Creating test initramfs for {}...", arch);
     let root = PathBuf::from("initrd_test_root");
@@ -221,12 +201,6 @@ pub fn create_test_initramfs(arch: &str) -> Result<()> {
         std::fs::remove_dir_all(&root)?;
     }
     std::fs::create_dir(&root)?;
-
-    let linux_target = match arch {
-        "aarch64" => "aarch64-unknown-linux-gnu",
-        "x86_64" => "x86_64-unknown-linux-gnu",
-        _ => bail!("Unsupported architecture: {}", arch),
-    };
 
     let bare_target = match arch {
         "aarch64" => "aarch64-unknown-none",
@@ -248,42 +222,30 @@ pub fn create_test_initramfs(arch: &str) -> Result<()> {
     // Create hello.txt for cat test
     std::fs::write(root.join("hello.txt"), "Hello from initramfs!\n")?;
 
-    // TEAM_435: Copy coreutils from toolchain location
-    let coreutils_src = PathBuf::from(format!(
-        "toolchain/coreutils-out/{}/release/coreutils",
-        linux_target
-    ));
+    // TEAM_438: Use apps registry - only include required apps for test initramfs
+    let mut app_count = 0;
+    for app in super::apps::required_apps() {
+        let src = app.require(arch)?;
+        std::fs::copy(&src, root.join(app.binary))?;
+        app_count += 1;
 
-    // Utilities available with current c-gull
-    let utils = [
-        "cat", "echo", "head", "mkdir", "pwd", "rm", "tail", "touch",
-    ];
-    let mut count = 0;
-
-    if coreutils_src.exists() {
-        // Copy the multi-call binary
-        std::fs::copy(&coreutils_src, root.join("coreutils"))?;
-        count += 1;
-
-        // Create symlinks for each utility
-        for util in &utils {
+        // Create symlinks for multi-call binaries
+        for symlink_name in app.symlinks {
             #[cfg(unix)]
             {
                 use std::os::unix::fs::symlink;
-                let link_path = root.join(util);
+                let link_path = root.join(symlink_name);
                 let _ = std::fs::remove_file(&link_path);
-                symlink("coreutils", &link_path)?;
+                symlink(app.binary, &link_path)?;
             }
             #[cfg(not(unix))]
             {
-                std::fs::copy(&coreutils_src, root.join(util))?;
+                std::fs::copy(&src, root.join(symlink_name))?;
             }
         }
-    } else {
-        bail!("Coreutils not found. Run 'cargo xtask build coreutils' first.");
     }
 
-    println!("📦 Test initramfs: coreutils + {} symlinks + init/shell", utils.len());
+    println!("📦 Test initramfs: {} apps + init/shell", app_count);
 
     // Create CPIO archive
     let cpio_file = std::fs::File::create("initramfs_test.cpio")?;
@@ -390,15 +352,12 @@ fn build_iso_internal(features: &[&str], arch: &str, use_test_initramfs: bool) -
 
     println!("💿 Building Limine ISO for {}...", arch);
 
-    // TEAM_435: Build sysroot and coreutils if not present
+    // TEAM_438: Build sysroot and all external apps if not present
     if !super::sysroot::sysroot_exists() {
         println!("🔧 Building c-gull sysroot...");
         super::sysroot::build_sysroot(arch)?;
     }
-    if !super::external::coreutils_exists(arch) {
-        println!("🔧 Building coreutils...");
-        super::external::build_coreutils(arch)?;
-    }
+    super::apps::ensure_all_built(arch)?;
 
     build_userspace(arch)?;
     if use_test_initramfs {

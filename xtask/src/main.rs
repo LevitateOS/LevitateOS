@@ -268,6 +268,7 @@ fn main() -> Result<()> {
             preflight::check_preflight(arch)?;
             match cmd {
                 // TEAM_435: Removed Eyra, added Sysroot/Coreutils/Brush
+                // TEAM_438: Uses apps registry for external app builds
                 build::BuildCommands::All => build::build_all(arch)?,
                 build::BuildCommands::Kernel => build::build_kernel_only(arch)?,
                 build::BuildCommands::Userspace => {
@@ -277,8 +278,12 @@ fn main() -> Result<()> {
                 build::BuildCommands::Initramfs => build::create_initramfs(arch)?,
                 build::BuildCommands::Iso => build::build_iso(arch)?,
                 build::BuildCommands::Sysroot => build::sysroot::build_sysroot(arch)?,
-                build::BuildCommands::Coreutils => build::external::build_coreutils(arch)?,
-                build::BuildCommands::Brush => build::external::build_brush(arch)?,
+                build::BuildCommands::Coreutils => {
+                    build::apps::get_app("coreutils").unwrap().build(arch)?
+                }
+                build::BuildCommands::Brush => {
+                    build::apps::get_app("brush").unwrap().build(arch)?
+                }
             }
         },
         Commands::Vm(cmd) => match cmd {

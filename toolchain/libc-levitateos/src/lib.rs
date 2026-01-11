@@ -112,3 +112,31 @@ pub unsafe extern "C" fn ttyname_r(
 ) -> c_int {
     ENOENT
 }
+
+// =============================================================================
+// TEAM_438: posix_spawn_file_actions_addchdir (POSIX version)
+// c-gull provides _np (non-portable/BSD) variant, this is the standard POSIX name
+// =============================================================================
+
+// Opaque type - actual struct is in c-gull
+#[repr(C)]
+pub struct PosixSpawnFileActions {
+    _opaque: [u8; 0],
+}
+
+extern "C" {
+    fn posix_spawn_file_actions_addchdir_np(
+        actions: *mut PosixSpawnFileActions,
+        path: *const c_char,
+    ) -> c_int;
+}
+
+/// posix_spawn_file_actions_addchdir - POSIX standard version
+/// Forwards to the _np (non-portable) version provided by c-gull
+#[no_mangle]
+pub unsafe extern "C" fn posix_spawn_file_actions_addchdir(
+    actions: *mut PosixSpawnFileActions,
+    path: *const c_char,
+) -> c_int {
+    posix_spawn_file_actions_addchdir_np(actions, path)
+}
