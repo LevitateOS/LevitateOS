@@ -791,3 +791,107 @@ pub struct VmaList { ... }
 #[derive(Debug, Default, Clone)]
 pub struct VmaList { ... }
 ```
+
+---
+
+### 37. Switching CR3/TTBR0 Requires Updating task.ttbr0 (TEAM_459)
+
+**Location:** `crates/kernel/syscall/src/process/lifecycle.rs`, any code switching page tables
+
+**Problem:** The kernel maintains two representations of the current page table:
+1. **Hardware register** (CR3 on x86_64, TTBR0_EL1 on AArch64) - used by CPU for translation
+2. **task.ttbr0** (AtomicUsize in TCB) - used by syscalls like `mmap` to find free regions
+
+If you switch the hardware register but forget to update `task.ttbr0`, syscalls will scan the WRONG page table.
+
+**Symptom:** After `execve` or similar address space operations:
+- `mmap` returns addresses that appear valid but are actually in the OLD address space
+- User code page faults when accessing mmap'd memory
+- Confusing behavior where pages are mapped to the wrong process
+
+**Example Bug (TEAM_456):**
+```rust
+// execve was doing this:
+unsafe { core::arch::asm!("mov cr3, {}", in(reg) new_ttbr0); }
+// ...but forgot to do this:
+task.ttbr0.store(new_ttbr0, Ordering::Release);  // MISSING!
+
+// Later, mmap scans the OLD page table:
+find_free_mmap_region(task.ttbr0.load(...), ...)  // Wrong table!
+```
+
+**Fix - ALWAYS update both:**
+```rust
+// 1. Switch hardware register
+#[cfg(target_arch = "x86_64")]
+unsafe { core::arch::asm!("mov cr3, {}", in(reg) new_ttbr0); }
+
+#[cfg(target_arch = "aarch64")]
+unsafe {
+    core::arch::asm!(
+        "msr ttbr0_el1, {0}",
+        "isb",
+        "tlbi vmalle1",
+        "dsb sy",
+        in(reg) new_ttbr0
+    );
+}
+
+// 2. TEAM_456: Update task.ttbr0 so syscalls use the correct table
+task.ttbr0.store(new_ttbr0, Ordering::Release);
+```
+
+**Debug Assertion:** In debug builds, the syscall dispatcher verifies `task.ttbr0` matches the actual CR3/TTBR0. If they don't match, you'll get:
+```
+GOTCHA #37: task.ttbr0 (0x...) doesn't match actual CR3/TTBR0 (0x...)!
+```
+
+**Places Where Page Tables Are Switched:**
+- `execve` - Replacing process address space
+- `switch_to` - Context switching between tasks (already correct)
+- Any future shared memory or address space manipulation
+
+**References:**
+- TEAM_456 for the original bug
+- `verify_ttbr0_consistency()` in `syscall/src/lib.rs` for the debug check
+
+---
+
+### 38. map_user_page Does NOT Track VMAs (TEAM_459)
+
+**Location:** `crates/kernel/mm/src/user/mapping.rs`
+
+**Problem:** `map_user_page()` only updates the page table. It does NOT add the mapping to the process's VMA (Virtual Memory Area) list. If callers forget to track VMAs separately:
+- `fork()` won't copy the pages (it iterates over VMAs)
+- `munmap()` won't know about the mapping
+- Memory accounting will be wrong
+
+**Example Bug (TEAM_455):**
+```rust
+// ELF loader was doing this:
+mm_user::map_user_page(ttbr0, va, pa, flags)?;
+// ...but forgot to do this:
+vma_list.insert(Vma::new(start, end, flags));  // MISSING!
+
+// Later, fork() iterates over empty VMA list:
+for vma in vmas.iter() { ... }  // Nothing to copy!
+```
+
+**Pattern - Always Track VMAs:**
+```rust
+// 1. Map the pages
+unsafe { mm_user::map_user_page(ttbr0, va, pa, flags)?; }
+
+// 2. TEAM_455: Record VMA for fork/munmap support
+let vma = Vma::new(page_start, page_end, vma_flags);
+vma_list.insert(vma)?;
+```
+
+**Note:** For anonymous mappings via `mmap` syscall, VMA tracking is already built-in. This gotcha applies to direct `map_user_page` calls in:
+- ELF loader (loading program segments)
+- Stack/TLS setup
+- Any custom mapping code
+
+**References:**
+- TEAM_455 for the original bug
+- `map_user_page()` doc comment for the warning
