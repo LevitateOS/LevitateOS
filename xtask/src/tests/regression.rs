@@ -98,6 +98,15 @@ pub fn run() -> Result<()> {
     test_shell_backspace(&mut results);
     test_graceful_shutdown(&mut results);
 
+    // TEAM_464: linux-raw-sys consolidation tests
+    test_linux_raw_sys_signal_constants(&mut results);
+    test_linux_raw_sys_seek_constants(&mut results);
+    test_linux_raw_sys_fcntl_constants(&mut results);
+    test_linux_raw_sys_poll_constants(&mut results);
+    test_linux_raw_sys_errno_usage(&mut results);
+    test_linux_raw_sys_auxv_constants(&mut results);
+    test_linux_raw_sys_mode_constants(&mut results);
+
     println!();
     if results.summary() {
         println!("\n✅ All regression tests passed\n");
@@ -761,5 +770,251 @@ fn test_graceful_shutdown(results: &mut TestResults) {
         results.pass("Shell exit command connected to shutdown/reboot");
     } else {
         results.fail("Shell exit command not connected to shutdown");
+    }
+}
+
+// =============================================================================
+// TEAM_464: linux-raw-sys Consolidation Regression Tests
+// =============================================================================
+
+/// TEAM_464: Verify signal constants use linux-raw-sys
+///
+/// Signal constants (SIGINT, SIGKILL, etc.) must come from linux_raw_sys::general.
+/// This prevents hardcoded values that could drift from Linux ABI.
+fn test_linux_raw_sys_signal_constants(results: &mut TestResults) {
+    println!("TEAM_464: Signal constants from linux-raw-sys");
+
+    let signal_rs = fs::read_to_string("crates/kernel/syscall/src/signal.rs").unwrap_or_default();
+
+    // Must import signal constants from linux-raw-sys
+    if signal_rs.contains("use linux_raw_sys::general::")
+        && signal_rs.contains("SIGINT")
+        && signal_rs.contains("SIGKILL")
+    {
+        results.pass("signal.rs imports SIGINT/SIGKILL from linux-raw-sys");
+    } else {
+        results.fail("signal.rs not using linux-raw-sys signal constants");
+    }
+
+    // Must import SIG_BLOCK etc from linux-raw-sys
+    if signal_rs.contains("SIG_BLOCK") && signal_rs.contains("SIG_UNBLOCK") {
+        results.pass("signal.rs uses SIG_BLOCK/SIG_UNBLOCK from linux-raw-sys");
+    } else {
+        results.fail("signal.rs missing SIG_BLOCK/SIG_UNBLOCK constants");
+    }
+
+    // Verify no hardcoded signal values (except SIG_DFL=0, SIG_IGN=1 which are pointers)
+    let has_hardcoded_sigint = signal_rs
+        .lines()
+        .filter(|l| !l.trim().starts_with("//"))
+        .any(|l| l.contains("== 2") && l.contains("sig"));
+
+    if has_hardcoded_sigint {
+        results.fail("signal.rs has hardcoded SIGINT (2) - use SIGINT constant");
+    } else {
+        results.pass("signal.rs avoids hardcoded signal numbers");
+    }
+}
+
+/// TEAM_464: Verify SEEK_* constants use linux-raw-sys
+fn test_linux_raw_sys_seek_constants(results: &mut TestResults) {
+    println!("TEAM_464: SEEK_* constants from linux-raw-sys");
+
+    // Check fs module files for seek constants (fd.rs and read.rs handle lseek)
+    let files_to_check = [
+        "crates/kernel/syscall/src/fs/fd.rs",
+        "crates/kernel/syscall/src/fs/read.rs",
+    ];
+
+    let mut found_import = false;
+    let mut found_usage = false;
+
+    for path in &files_to_check {
+        if let Ok(content) = fs::read_to_string(path) {
+            if content.contains("linux_raw_sys") && content.contains("SEEK_") {
+                found_import = true;
+            }
+            if content.contains("SEEK_SET") || content.contains("SEEK_CUR") || content.contains("SEEK_END") {
+                found_usage = true;
+            }
+        }
+    }
+
+    if found_import {
+        results.pass("fs module imports SEEK_* from linux-raw-sys");
+    } else {
+        results.fail("fs module not importing SEEK_* from linux-raw-sys");
+    }
+
+    if found_usage {
+        results.pass("fs module uses SEEK_* constants");
+    } else {
+        results.fail("fs module missing SEEK_* usage");
+    }
+}
+
+/// TEAM_464: Verify F_* (fcntl) constants use linux-raw-sys
+fn test_linux_raw_sys_fcntl_constants(results: &mut TestResults) {
+    println!("TEAM_464: F_* (fcntl) constants from linux-raw-sys");
+
+    // fcntl implementation is in fd.rs
+    let files_to_check = [
+        "crates/kernel/syscall/src/fs/fd.rs",
+    ];
+
+    let mut found_fcntl_import = false;
+
+    for path in &files_to_check {
+        if let Ok(content) = fs::read_to_string(path) {
+            if content.contains("linux_raw_sys")
+                && (content.contains("F_GETFD") || content.contains("F_SETFD") || content.contains("F_GETFL"))
+            {
+                found_fcntl_import = true;
+            }
+        }
+    }
+
+    if found_fcntl_import {
+        results.pass("fs module imports F_* from linux-raw-sys");
+    } else {
+        results.fail("fs module not importing F_* from linux-raw-sys");
+    }
+
+    // Check for close-on-exec handling (F_DUPFD_CLOEXEC or FD_CLOEXEC)
+    let mut found_cloexec = false;
+    for path in &files_to_check {
+        if let Ok(content) = fs::read_to_string(path) {
+            // Accept either F_DUPFD_CLOEXEC (from linux-raw-sys) or FD_CLOEXEC
+            if content.contains("CLOEXEC") {
+                found_cloexec = true;
+            }
+        }
+    }
+
+    if found_cloexec {
+        results.pass("close-on-exec (CLOEXEC) handling present");
+    } else {
+        results.fail("close-on-exec (CLOEXEC) handling missing");
+    }
+}
+
+/// TEAM_464: Verify POLL* constants use linux-raw-sys
+fn test_linux_raw_sys_poll_constants(results: &mut TestResults) {
+    println!("TEAM_464: POLL* constants from linux-raw-sys");
+
+    let sync_rs = fs::read_to_string("crates/kernel/syscall/src/sync.rs").unwrap_or_default();
+
+    // Must import poll constants from linux-raw-sys
+    if sync_rs.contains("use linux_raw_sys::general::")
+        && sync_rs.contains("POLLIN")
+        && sync_rs.contains("POLLOUT")
+    {
+        results.pass("sync.rs imports POLLIN/POLLOUT from linux-raw-sys");
+    } else {
+        results.fail("sync.rs not using linux-raw-sys poll constants");
+    }
+
+    // Check for POLLERR, POLLHUP (important for error handling)
+    if sync_rs.contains("POLLERR") && sync_rs.contains("POLLHUP") {
+        results.pass("sync.rs has POLLERR/POLLHUP constants");
+    } else {
+        results.fail("sync.rs missing POLLERR/POLLHUP constants");
+    }
+}
+
+/// TEAM_464: Verify errno values use linux-raw-sys consistently
+fn test_linux_raw_sys_errno_usage(results: &mut TestResults) {
+    println!("TEAM_464: Errno values from linux-raw-sys");
+
+    // Check key syscall files for linux-raw-sys errno usage
+    let syscall_files = [
+        "crates/kernel/syscall/src/lib.rs",
+        "crates/kernel/syscall/src/signal.rs",
+        "crates/kernel/syscall/src/helpers.rs",
+    ];
+
+    let mut errno_import_count = 0;
+
+    for path in &syscall_files {
+        if let Ok(content) = fs::read_to_string(path) {
+            if content.contains("use linux_raw_sys::errno::") {
+                errno_import_count += 1;
+            }
+        }
+    }
+
+    if errno_import_count >= 2 {
+        results.pass(&format!("{} syscall files import linux_raw_sys::errno", errno_import_count));
+    } else {
+        results.fail("Not enough syscall files using linux_raw_sys::errno");
+    }
+
+    // Check for ENOSYS usage (critical for unimplemented syscalls)
+    let lib_rs = fs::read_to_string("crates/kernel/syscall/src/lib.rs").unwrap_or_default();
+    if lib_rs.contains("linux_raw_sys::errno::ENOSYS") {
+        results.pass("Unimplemented syscalls return linux-raw-sys ENOSYS");
+    } else {
+        results.fail("ENOSYS not from linux-raw-sys in syscall dispatcher");
+    }
+}
+
+/// TEAM_464: Verify AT_* (auxv) constants are correctly defined
+fn test_linux_raw_sys_auxv_constants(results: &mut TestResults) {
+    println!("TEAM_464: AT_* auxiliary vector constants");
+
+    let auxv_rs = fs::read_to_string("crates/kernel/mm/src/user/auxv.rs").unwrap_or_default();
+
+    // Check that AT_* constants are defined (linux-raw-sys auxvec module not available for kernel targets)
+    let has_at_null = auxv_rs.contains("AT_NULL");
+    let has_at_phdr = auxv_rs.contains("AT_PHDR");
+    let has_at_pagesz = auxv_rs.contains("AT_PAGESZ");
+    let has_at_entry = auxv_rs.contains("AT_ENTRY");
+    let has_at_random = auxv_rs.contains("AT_RANDOM");
+
+    if has_at_null && has_at_phdr && has_at_pagesz && has_at_entry && has_at_random {
+        results.pass("auxv.rs defines AT_NULL, AT_PHDR, AT_PAGESZ, AT_ENTRY, AT_RANDOM");
+    } else {
+        results.fail("auxv.rs missing required AT_* constants");
+    }
+
+    // Check that constants are u32 (matching linux-raw-sys type)
+    if auxv_rs.contains("pub const AT_NULL: u32") {
+        results.pass("AT_* constants use u32 type (matches linux-raw-sys)");
+    } else {
+        results.fail("AT_* constants not using u32 type");
+    }
+
+    // Verify TEAM_464 comment indicating values were verified
+    if auxv_rs.contains("TEAM_464") {
+        results.pass("auxv.rs has TEAM_464 traceability comment");
+    } else {
+        results.fail("auxv.rs missing TEAM_464 traceability");
+    }
+}
+
+/// TEAM_464: Verify S_* (mode) constants use linux-raw-sys
+fn test_linux_raw_sys_mode_constants(results: &mut TestResults) {
+    println!("TEAM_464: S_* mode constants from linux-raw-sys");
+
+    let types_lib = fs::read_to_string("crates/kernel/lib/types/src/lib.rs").unwrap_or_default();
+
+    // Check that S_* mode constants are re-exported from linux-raw-sys
+    if types_lib.contains("pub use linux_raw_sys::general::")
+        && types_lib.contains("S_IFMT")
+        && types_lib.contains("S_IFREG")
+        && types_lib.contains("S_IFDIR")
+    {
+        results.pass("los_types re-exports S_* from linux-raw-sys");
+    } else {
+        results.fail("los_types not re-exporting S_* from linux-raw-sys");
+    }
+
+    // Check cpio.rs uses the constants
+    let cpio_rs = fs::read_to_string("crates/kernel/lib/utils/src/cpio.rs").unwrap_or_default();
+
+    if cpio_rs.contains("linux_raw_sys::general::") && cpio_rs.contains("S_IFMT") {
+        results.pass("cpio.rs uses linux-raw-sys S_* constants");
+    } else {
+        results.fail("cpio.rs not using linux-raw-sys S_* constants");
     }
 }
