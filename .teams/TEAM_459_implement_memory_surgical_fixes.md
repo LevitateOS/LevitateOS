@@ -43,9 +43,48 @@ Implement the three surgical fixes recommended by TEAM_458 review to prevent fut
    - GOTCHA #37: Forgetting to update task.ttbr0 after CR3 switch
    - GOTCHA #38: Forgetting to track VMAs when mapping pages
 
+### Session 2 (2026-01-12)
+- Investigated BusyBox ash shell not printing prompt
+- Root cause: Shell stuck in job control loop
+  - Ash calls `setsid()` to become session leader → pgid changes to its own PID
+  - Then checks `TIOCGPGRP` (returns `FOREGROUND_PID=1`) vs `getpgid(0)` (returns 5)
+  - Mismatch causes shell to think it's not in foreground → sends SIGTTOU, loops
+- Fix 1: Set `FOREGROUND_PID` when init spawns (in `init.rs`)
+- Fix 2: Set `FOREGROUND_PID` when process acquires controlling terminal via `TIOCSCTTY`
+  - This is the key fix: when shell calls `setsid()` then `TIOCSCTTY`, we now update
+    `FOREGROUND_PID` to the shell's pgid
+- Also fixed keyboard input routing: characters now fed to `CONSOLE_TTY` from interrupt handler
+- Shell prompt now displays and shell accepts input!
+
+## Files Modified (Session 2)
+
+| File | Change |
+|------|--------|
+| `levitate/src/init.rs` | Set `FOREGROUND_PID` when init spawns |
+| `syscall/src/fs/fd.rs` | Implement `TIOCSCTTY` to set foreground pgid |
+| `levitate/src/input.rs` | Feed keyboard input to `CONSOLE_TTY` from interrupt handler |
+
+## Key Decisions (Session 2)
+
+1. **TIOCSCTTY sets foreground pgid**: When a process acquires the controlling terminal via
+   `TIOCSCTTY`, it becomes the foreground process group. This allows shells that call `setsid()`
+   before checking job control to work correctly.
+
+2. **Keyboard input fed directly to TTY**: Characters are fed to `CONSOLE_TTY` from the VirtIO
+   input interrupt handler, not just buffered in `KEYBOARD_BUFFER`. This ensures TTY receives
+   input even when no process is actively reading.
+
+## Gotchas Discovered
+
+- **Job control and session leaders**: Shells typically call `setsid()` to become session leaders,
+  which changes their pgid. The TTY's foreground pgid must be updated when the shell acquires
+  the controlling terminal, otherwise the shell thinks it's in the background.
+
 ## Handoff Notes
 
-The surgical fixes are complete and both architectures build. Future teams should:
+The surgical fixes are complete and both architectures build. BusyBox ash shell now prints
+prompt and waits for input. Future teams should:
 - Read GOTCHA #37 and #38 before working on memory management
 - Use debug builds to catch ttbr0 desync issues early
 - Check the warning comment on `map_user_page()` before using it directly
+- Understand the TTY/session/pgid relationship when debugging shell issues
