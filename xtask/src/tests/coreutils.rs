@@ -89,15 +89,29 @@ pub fn run(arch: &str, phase: Option<&str>) -> Result<()> {
         bail!("Timed out waiting for shell prompt");
     }
 
-    // Give the shell a moment to be ready
-    std::thread::sleep(Duration::from_millis(500));
+    // TEAM_466: Give the shell extra time to be ready after prompt appears
+    // The shell may still be initializing even after printing the prompt
+    std::thread::sleep(Duration::from_millis(1000));
+
+    // Drain any remaining output before sending command
+    while rx.try_recv().is_ok() {}
 
     // Run the test script with the phase argument
     // TEAM_466: Script at root level (kernel has issues with subdirectory files)
+    // TEAM_466: Send characters slowly to avoid serial input mangling
     let test_cmd = format!("sh /test-core.sh {}\n", phase_arg);
-    println!("\nSending: {}", test_cmd.trim());
-    stdin.write_all(test_cmd.as_bytes())?;
-    stdin.flush()?;
+    let test_cmd_trimmed = test_cmd.trim();
+    println!("\nSending: {}", test_cmd_trimmed);
+
+    // Send character by character with 20ms delays to avoid input dropping
+    // TEAM_466: Increased from 10ms after observing intermittent character loss
+    for byte in test_cmd.bytes() {
+        stdin.write_all(&[byte])?;
+        stdin.flush()?;
+        std::thread::sleep(Duration::from_millis(20));
+    }
+    // Extra delay after newline to ensure command is processed
+    std::thread::sleep(Duration::from_millis(200));
 
     // Wait for test completion
     let start = Instant::now();

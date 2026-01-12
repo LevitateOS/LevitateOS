@@ -895,3 +895,248 @@ vma_list.insert(vma)?;
 **References:**
 - TEAM_455 for the original bug
 - `map_user_page()` doc comment for the warning
+
+---
+
+## Filesystem & Syscall Gotchas (TEAM_466)
+
+### 39. Initramfs Memory Must Be Explicitly Reserved (TEAM_466)
+
+**Location:** `crates/kernel/levitate/src/memory.rs`
+
+**Problem:** Boot info provides `initramfs` start/end addresses separately from `memory_map`. The memory allocator only reserves regions in `memory_map`, so initramfs memory can be allocated over, corrupting filesystem data.
+
+**Symptom:** Files appear then disappear. Content corruption. Random I/O errors from CPIO filesystem.
+
+**Fix:** In `memory::init()`, explicitly reserve initramfs region:
+```rust
+if let Some(initramfs) = boot_info.initramfs {
+    allocator.reserve(initramfs.start, initramfs.size);
+}
+```
+
+---
+
+### 40. Tmpfs Operations Must Use Inode's Superblock (TEAM_466)
+
+**Location:** `crates/kernel/fs/tmpfs/src/dir_ops.rs`
+
+**Problem:** If tmpfs operations use a global `TMPFS` singleton, they will access the wrong filesystem instance when multiple tmpfs mounts exist (e.g., `/tmp` and `/root`).
+
+**Symptom:** Files created in `/tmp` appear in `/root` or vice versa. Wrong inode numbers. Cross-mount confusion.
+
+**Fix:** Always get the correct tmpfs instance from the inode's superblock:
+```rust
+// WRONG: Uses global singleton
+let tmpfs = TMPFS.lock();
+
+// RIGHT: Uses inode's actual superblock
+let sb = inode.sb.upgrade().ok_or(VfsError::IoError)?;
+let tmpfs = sb.as_any().downcast_ref::<Tmpfs>().ok_or(VfsError::IoError)?;
+```
+
+---
+
+### 41. Dentry Cache Must Be Cleared on Mount (TEAM_466)
+
+**Location:** `crates/kernel/vfs/src/dentry.rs`
+
+**Problem:** When mounting a new filesystem at a path, the dentry cache may retain children from the previous filesystem (e.g., initramfs entries under `/root`). Lookups will return stale data.
+
+**Symptom:** After mounting tmpfs at `/root`, `ls /root` shows old initramfs files instead of empty directory.
+
+**Fix:** Clear children cache in `Dentry::mount()`:
+```rust
+pub fn mount(&self, new_inode: Arc<Inode>, new_sb: Arc<dyn Superblock>) {
+    self.children.write().clear();  // TEAM_466: Clear stale entries
+    // ... rest of mount logic
+}
+```
+
+---
+
+### 42. sys_chdir Must Validate Path Exists (TEAM_466)
+
+**Location:** `crates/kernel/syscall/src/fs/fd.rs`
+
+**Problem:** If `sys_chdir` just stores the path string without validation, `cd` to a non-existent directory will "succeed", but subsequent file operations will fail confusingly.
+
+**Symptom:** `cd /nonexistent` succeeds, but `touch file` fails with ENOENT.
+
+**Fix:** Validate path exists and is a directory before updating cwd:
+```rust
+pub fn sys_chdir(path: usize) -> SyscallResult {
+    // ... read path string ...
+
+    // TEAM_466: Validate path exists and is a directory
+    match vfs_lookup(&resolved_path) {
+        Ok(dentry) => {
+            let inode = dentry.get_inode().ok_or(ENOENT)?;
+            if !inode.is_dir() {
+                return Err(ENOTDIR);
+            }
+        }
+        Err(VfsError::NotFound) => return Err(ENOENT),
+        Err(_) => return Err(EIO),
+    }
+
+    *task.cwd.lock() = resolved_path;
+    Ok(0)
+}
+```
+
+---
+
+### 43. All *at() Syscalls Must Resolve Relative Paths Against CWD (TEAM_466)
+
+**Location:** `crates/kernel/syscall/src/fs/*.rs`
+
+**Problem:** Syscalls like `openat`, `mkdirat`, `unlinkat`, `renameat`, `symlinkat` receive relative paths but may not resolve them against the process's current working directory, causing files to be created at the root instead.
+
+**Symptom:** `cd /tmp && touch foo` creates `/foo` instead of `/tmp/foo`.
+
+**Fix Pattern:** Apply to ALL *at syscalls:
+```rust
+let resolved_path = if dirfd == AT_FDCWD && !path_str.starts_with('/') {
+    let cwd = task.cwd.lock();
+    let base = cwd.trim_end_matches('/');
+    if base.is_empty() {
+        alloc::format!("/{}", path_str)
+    } else {
+        alloc::format!("{}/{}", base, path_str)
+    }
+} else if !path_str.starts_with('/') && dirfd != AT_FDCWD {
+    log::warn!("[SYSCALL] *at: dirfd {} not yet supported", dirfd);
+    return Err(EBADF);
+} else {
+    alloc::string::String::from(path_str)
+};
+```
+
+**Affected syscalls:** openat, mkdirat, unlinkat, renameat, symlinkat, readlinkat, fstatat, etc.
+
+---
+
+### 44. Pipe Read Must Block, Not Return EAGAIN (TEAM_466)
+
+**Location:** `crates/kernel/syscall/src/fs/read.rs`
+
+**Problem:** POSIX requires `read()` on a pipe to block until data is available (unless O_NONBLOCK is set). Returning EAGAIN immediately causes shell command substitution to fail.
+
+**Symptom:** `$(cat file)` returns empty string. Shell hangs or behaves incorrectly.
+
+**Fix:** Loop with yield until data available or write end closes:
+```rust
+FdType::PipeRead(ref pipe) => {
+    loop {
+        match pipe.read(&mut kbuf) {
+            Ok(n) => return Ok(n as i64),  // Got data or EOF (n=0)
+            Err(EAGAIN) => los_sched::yield_now(),  // Block
+            Err(e) => return Err(e),
+        }
+    }
+}
+```
+
+---
+
+### 45. x86_64 BusyBox Uses Legacy Syscalls (TEAM_466)
+
+**Location:** `crates/kernel/arch/x86_64/src/lib.rs`, `crates/kernel/syscall/src/lib.rs`
+
+**Problem:** BusyBox binaries use old syscalls (rename=82, rmdir=84, unlink=87, symlink=88) instead of modern *at versions. If these are missing, basic commands like `mv`, `rm`, `ln -s` fail with ENOSYS.
+
+**Symptom:** `mv: Function not implemented`, `rm: Function not implemented`
+
+**Fix:** Map legacy syscalls to *at versions:
+```rust
+// In syscall dispatch:
+Some(SyscallNumber::Unlink) => sys_unlinkat(AT_FDCWD, frame.arg0(), 0),
+Some(SyscallNumber::Rmdir) => sys_unlinkat(AT_FDCWD, frame.arg0(), AT_REMOVEDIR),
+Some(SyscallNumber::Rename) => sys_renameat(AT_FDCWD, frame.arg0(), AT_FDCWD, frame.arg1()),
+Some(SyscallNumber::Symlink) => sys_symlinkat(frame.arg0(), AT_FDCWD, frame.arg1()),
+```
+
+---
+
+### 46. BusyBox rm Prompts for Confirmation (TEAM_466)
+
+**Location:** Shell scripts using `rm`
+
+**Problem:** BusyBox `rm` prompts "remove 'file'?" and `rm -r` prompts "descend into directory?" by default (similar to `-i` behavior). This blocks automated scripts.
+
+**Symptom:** Test scripts hang at `rm` commands waiting for confirmation.
+
+**Fix:** Always use `rm -f` for non-interactive deletion:
+```sh
+rm -f file.txt        # Force delete file
+rm -rf directory/     # Force recursive delete
+```
+
+---
+
+### 47. Serial Input Requires Slow Character-by-Character Sending (TEAM_466)
+
+**Location:** `xtask/src/tests/coreutils.rs`
+
+**Problem:** Sending commands to QEMU serial console too fast causes character dropping/mangling. The serial buffer can overflow or QEMU's emulated UART may miss characters.
+
+**Symptom:** "sh /test-core.sh" becomes "h /test-core.shs" or similar garbled output.
+
+**Fix:** Send characters one at a time with delays:
+```rust
+for byte in command.bytes() {
+    stdin.write_all(&[byte])?;
+    stdin.flush()?;
+    std::thread::sleep(Duration::from_millis(20));
+}
+```
+
+**Recommended delays:**
+- 20ms per character
+- 1000ms after shell prompt before sending command
+- 200ms after newline to ensure command processing
+
+---
+
+### 48. Allow Closing Stdio Fds (TEAM_467)
+
+**Location:** `crates/kernel/syscall/src/fs/open.rs`
+
+**Problem:** Some programs (BusyBox uniq, dash, etc.) close stdin/stdout/stderr (fd 0/1/2) and reopen files at the same fd numbers. This is a valid POSIX pattern used to redirect standard streams.
+
+**Example (BusyBox uniq.c):**
+```c
+if (input_filename) {
+    close(STDIN_FILENO);           // Close fd 0
+    xopen(input_filename, O_RDONLY); // Opens at fd 0 (lowest available)
+}
+// Later reads from stdin which is now the file
+xmalloc_fgetline(stdin);
+```
+
+**Symptom:** Commands that should read from a file hang forever. They're actually blocked reading from the original stdin (keyboard) because close(0) failed silently.
+
+**Bug (before fix):**
+```rust
+pub fn sys_close(fd: usize) -> SyscallResult {
+    if fd < 3 {
+        return Err(EINVAL);  // <-- WRONG! Breaks fd reuse pattern
+    }
+    ...
+}
+```
+
+**Fix:** Allow closing any valid fd. The fd allocator already returns the lowest available fd (POSIX requirement):
+```rust
+pub fn sys_close(fd: usize) -> SyscallResult {
+    // TEAM_467: No special-casing for fd 0/1/2
+    if fd_table.close(fd) {
+        Ok(0)
+    } else {
+        Err(EBADF)
+    }
+}
+```
+
+**Affected Commands:** uniq, wc (with file args), and any command that uses this fd reuse pattern.
