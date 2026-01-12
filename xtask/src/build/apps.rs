@@ -39,25 +39,10 @@ pub struct ExternalApp {
 
 /// Registry of all external Rust applications
 ///
-/// TEAM_444: brush removed - it's for far future. Use built-in shell first
-/// to verify musl works, then add dash (simpler), then brush (complex).
-/// TEAM_459: coreutils no longer required - BusyBox provides all utilities.
+/// TEAM_459: coreutils and brush REMOVED - BusyBox provides everything.
+/// This registry is empty but kept for future Rust apps if needed.
 pub static APPS: &[ExternalApp] = &[
-    ExternalApp {
-        name: "coreutils",
-        repo: "https://github.com/uutils/coreutils",
-        package: "coreutils",
-        binary: "coreutils",
-        // TEAM_444: With musl, we can potentially enable more features
-        // since musl has better libc coverage than c-gull
-        features: "cat,echo,head,mkdir,pwd,rm,tail,touch",
-        // TEAM_459: Not required - BusyBox provides all utilities now.
-        // Can still be built manually with: cargo xtask build coreutils
-        required: false,
-        symlinks: &["cat", "echo", "head", "mkdir", "pwd", "rm", "tail", "touch"],
-    },
-    // NOTE: brush removed from default builds - it's complex and for later.
-    // Shell progression: built-in shell → dash → brush
+    // TEAM_459: All apps removed - BusyBox is the single source of utilities
 ];
 
 impl ExternalApp {
@@ -116,12 +101,19 @@ impl ExternalApp {
     /// - Custom sysroot
     /// - -Z build-std
     /// - Complex RUSTFLAGS
+    /// TEAM_459: Added cross-compiler download for aarch64
     pub fn build(&self, arch: &str) -> Result<()> {
         // Ensure cloned
         self.clone_repo()?;
 
         // Ensure musl target is installed
         ensure_musl_target(arch)?;
+
+        // TEAM_459: For aarch64, ensure cross-compiler is available
+        // (the .cargo/config.toml references it for aarch64-unknown-linux-musl)
+        if arch == "aarch64" {
+            super::busybox::setup_aarch64_cross_compiler()?;
+        }
 
         let target = musl_target(arch);
         println!("🔧 Building {} for {} (musl)...", self.name, arch);
@@ -282,21 +274,10 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_app_paths() {
-        let app = get_app("coreutils").unwrap();
-        assert_eq!(app.clone_dir(), PathBuf::from("toolchain/coreutils"));
-        // TEAM_444: Now uses musl target
-        assert_eq!(
-            app.output_path("x86_64"),
-            PathBuf::from("toolchain/coreutils-out/x86_64-unknown-linux-musl/release/coreutils")
-        );
-    }
-
-    #[test]
-    fn test_required_apps() {
-        let required: Vec<_> = required_apps().collect();
-        assert!(required.iter().any(|a| a.name == "coreutils"));
-        assert!(!required.iter().any(|a| a.name == "brush"));
+    fn test_apps_empty() {
+        // TEAM_459: All apps removed - BusyBox is the single source of utilities
+        assert!(APPS.is_empty());
+        assert!(required_apps().next().is_none());
     }
 
     #[test]

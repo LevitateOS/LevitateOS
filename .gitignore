@@ -42,3 +42,4 @@ Cargo.lock
 
 # Auto-fetched syscall specs (regenerate with: cargo xtask syscall)
 docs/specs/syscalls/
+toolchain

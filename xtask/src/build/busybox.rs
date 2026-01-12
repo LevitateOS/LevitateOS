@@ -67,6 +67,7 @@ pub fn clone_repo() -> Result<()> {
 /// Build BusyBox using distrobox (Alpine container - native musl environment)
 /// TEAM_451: Alpine is built on musl, perfect for static BusyBox builds
 /// TEAM_452: Fixed DNS issue that was blocking container networking
+/// TEAM_459: Added cross-compilation support for aarch64
 pub fn build(arch: &str) -> Result<()> {
     // Ensure cloned
     clone_repo()?;
@@ -78,30 +79,69 @@ pub fn build(arch: &str) -> Result<()> {
     let abs_dir = std::fs::canonicalize(&dir)
         .context("Failed to get absolute path for BusyBox dir")?;
 
-    println!("🐳 Building BusyBox via distrobox (Alpine)...");
-    
+    // TEAM_459: For aarch64, ensure cross-compiler is available
+    if arch == "aarch64" {
+        setup_aarch64_cross_compiler()?;
+    }
+
+    let cross_note = if arch == "aarch64" {
+        "cross-compiling for aarch64"
+    } else {
+        "native build"
+    };
+
+    println!("🐳 Building BusyBox via distrobox (Alpine, {})...", cross_note);
+
     // Build script to run inside Alpine distrobox
     // Alpine is musl-native, so gcc IS musl-gcc
-    let build_script = format!(r#"
+    let build_script = if arch == "aarch64" {
+        // For aarch64, we need to use the downloaded cross-compiler
+        let toolchain_dir = PathBuf::from("toolchain/aarch64-linux-musl-cross");
+        let abs_toolchain = std::fs::canonicalize(&toolchain_dir)
+            .context("Failed to get absolute path for toolchain")?;
+        format!(r#"
 set -e
-cd "{}"
+cd "{abs_dir}"
+export PATH="{toolchain}/bin:$PATH"
 
 echo "🧹 Cleaning BusyBox..."
 make clean 2>/dev/null || true
 
 echo "⚙️  Configuring BusyBox..."
-make defconfig
+make ARCH=arm64 defconfig
 
 # Enable static linking
 sed -i 's/# CONFIG_STATIC is not set/CONFIG_STATIC=y/' .config
 # Disable PIE for static
 sed -i 's/CONFIG_PIE=y/# CONFIG_PIE is not set/' .config
 
-echo "🔨 Building BusyBox (Alpine musl-native)..."
+echo "🔨 Building BusyBox (cross-compiling for aarch64)..."
+make ARCH=arm64 CROSS_COMPILE=aarch64-linux-musl- LDFLAGS=-static -j$(nproc)
+
+echo "✅ BusyBox build complete"
+"#, abs_dir=abs_dir.display(), toolchain=abs_toolchain.display())
+    } else {
+        format!(r#"
+set -e
+cd "{abs_dir}"
+
+echo "🧹 Cleaning BusyBox..."
+make clean 2>/dev/null || true
+
+echo "⚙️  Configuring BusyBox..."
+make ARCH=x86_64 defconfig
+
+# Enable static linking
+sed -i 's/# CONFIG_STATIC is not set/CONFIG_STATIC=y/' .config
+# Disable PIE for static
+sed -i 's/CONFIG_PIE=y/# CONFIG_PIE is not set/' .config
+
+echo "🔨 Building BusyBox (native build)..."
 make LDFLAGS=-static -j$(nproc)
 
 echo "✅ BusyBox build complete"
-"#, abs_dir.display());
+"#, abs_dir=abs_dir.display())
+    };
 
     let status = Command::new("distrobox")
         .args(["enter", "Alpine", "--"])
@@ -231,6 +271,58 @@ pub fn musl_gcc_available() -> bool {
         .output()
         .map(|o| o.status.success())
         .unwrap_or(false)
+}
+
+/// TEAM_459: Download and setup the aarch64-linux-musl cross-compiler from musl.cc
+/// This provides a complete toolchain for cross-compiling to aarch64 with musl libc
+/// Used by both BusyBox (C) and coreutils (Rust with musl target)
+pub fn setup_aarch64_cross_compiler() -> Result<PathBuf> {
+    let toolchain_dir = PathBuf::from("toolchain/aarch64-linux-musl-cross");
+
+    // Check if already extracted
+    if toolchain_dir.join("bin/aarch64-linux-musl-gcc").exists() {
+        return Ok(toolchain_dir);
+    }
+
+    println!("📥 Downloading aarch64-linux-musl cross-compiler...");
+
+    let tarball_path = PathBuf::from("toolchain/aarch64-linux-musl-cross.tgz");
+    std::fs::create_dir_all("toolchain")?;
+
+    // Download from musl.cc - prebuilt cross-compilers
+    // Using the native x86_64 host version
+    let url = "https://musl.cc/aarch64-linux-musl-cross.tgz";
+
+    if !tarball_path.exists() {
+        let status = Command::new("curl")
+            .args(["-L", "-f", "-o", tarball_path.to_str().unwrap_or(""), url])
+            .status()
+            .context("Failed to download cross-compiler")?;
+
+        if !status.success() {
+            bail!("Failed to download aarch64-linux-musl cross-compiler from {}", url);
+        }
+    }
+
+    println!("📦 Extracting cross-compiler...");
+
+    // Extract to toolchain directory
+    let status = Command::new("tar")
+        .args(["-xzf", tarball_path.to_str().unwrap_or(""), "-C", "toolchain"])
+        .status()
+        .context("Failed to extract cross-compiler")?;
+
+    if !status.success() {
+        bail!("Failed to extract cross-compiler tarball");
+    }
+
+    // Verify extraction
+    if !toolchain_dir.join("bin/aarch64-linux-musl-gcc").exists() {
+        bail!("Cross-compiler extraction failed - gcc not found");
+    }
+
+    println!("✅ aarch64-linux-musl cross-compiler ready");
+    Ok(toolchain_dir)
 }
 
 /// Check if distrobox is available and Alpine container exists

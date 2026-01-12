@@ -1,6 +1,11 @@
-[target.aarch64-unknown-none]
-linker = "aarch64-linux-gnu-gcc"
-# Linker script now handled by kernel/build.rs
+# TEAM_459: Removed aarch64-unknown-none linker override from root config.
+# The kernel has its own .cargo/config.toml with this setting.
+# Userspace needs to use the default rust-lld linker for bare-metal targets.
+
+# TEAM_459: Cross-linker for aarch64 musl builds (coreutils, etc.)
+# Uses the musl cross-compiler downloaded by `cargo xtask build busybox --arch aarch64`
+[target.aarch64-unknown-linux-musl]
+linker = "toolchain/aarch64-linux-musl-cross/bin/aarch64-linux-musl-gcc"
 
 [target.x86_64-unknown-none]
 rustflags = [

@@ -271,39 +271,17 @@ fn main() -> Result<()> {
         },
         Commands::Build(cmd) => {
             preflight::check_preflight(arch)?;
+            // TEAM_459: Simplified - BusyBox is the only external app
             match cmd {
-                // TEAM_435: Removed Eyra, added Sysroot/Coreutils/Brush
-                // TEAM_438: Uses apps registry for external app builds
-                // TEAM_444: Migrated to musl, added Dash
                 build::BuildCommands::All => build::build_all(arch)?,
                 build::BuildCommands::Kernel => build::build_kernel_only(arch)?,
                 build::BuildCommands::Userspace => {
                     build::build_userspace(arch)?;
-                    // TEAM_451: Use BusyBox initramfs
                     build::create_busybox_initramfs(arch)?;
                 }
-                // TEAM_451: Use BusyBox initramfs
                 build::BuildCommands::Initramfs => build::create_busybox_initramfs(arch)?,
                 build::BuildCommands::Iso => build::build_iso(arch)?,
-                build::BuildCommands::Sysroot => build::sysroot::build_sysroot(arch)?,
-                build::BuildCommands::Coreutils => {
-                    build::apps::get_app("coreutils").unwrap().build(arch)?
-                }
-                build::BuildCommands::Brush => {
-                    // TEAM_444: brush removed from default builds
-                    // Re-add to APPS registry when ready to support it
-                    bail!("brush is disabled. Shell progression: built-in → dash → brush.\n\
-                           Use the built-in shell first to verify musl works.")
-                }
-                build::BuildCommands::Dash => {
-                    // TEAM_451: dash removed - BusyBox ash is now the shell
-                    bail!("dash is removed. Use BusyBox instead: 'cargo xtask build busybox'\n\
-                           BusyBox ash provides a POSIX-compliant shell.")
-                }
-                // TEAM_451: BusyBox build command
-                build::BuildCommands::Busybox => {
-                    build::busybox::build(arch)?
-                }
+                build::BuildCommands::Busybox => build::busybox::build(arch)?,
             }
         },
         Commands::Vm(cmd) => match cmd {
