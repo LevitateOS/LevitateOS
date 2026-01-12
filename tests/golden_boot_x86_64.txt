@@ -4,10 +4,10 @@ RikdHeap initialized.
 [BOOT] Protocol: Limine
 [BOOT] Memory: 16 regions, 1776 MB usable
 [BOOT] Stage 2: Memory & MMU (PEI)
-[MEM] Physical: 0x50000 - 0x6f0cf000 (454783 pages, 1776 MB)
+[MEM] Physical: 0x50000 - 0x6f0c7000 (454775 pages, 1776 MB)
 [MEM] Frame allocator initialized
 [CPU] x86_64 PCR initialized at 0xffffffff8005fa50
-[SYSCALL] x86_64 syscall MSRs initialized, LSTAR=0xffffffff80044ea4
+[SYSCALL] x86_64 syscall MSRs initialized, LSTAR=0xffffffff80044d34
 [BOOT] Stage 2: Memory & MMU (PEI)
 Exceptions initialized.
 [BOOT] Stage 3: Boot Console (DXE)
@@ -36,7 +36,7 @@ Timer initialized.
 [PCI] PciTransport created successfully
 [INPUT] VirtIO Input initialized via PCI.
 Detecting Initramfs...
-Initramfs found at 0xffff80006f0ef000 - 0xffff80006f340200 (2429440 bytes)
+Initramfs found at 0xffff80006f0e7000 - 0xffff80006f338200 (2429440 bytes)
 Files in initramfs:
  - .
  - bin
@@ -150,10 +150,10 @@ Mounting filesystems...
 --------------------------------------
 [TASK_EXIT] PID 0 marked Exited, calling schedule()
 [SWITCH] old PID=0 -> new PID=1
-[SWITCH] To PID=1: ctx.rsp=0xffffffff80465000, ctx.rip=0xffffffff80044fc8, ctx.rbx=0xffffffff80032e90
+[SWITCH] To PID=1: ctx.rsp=0xffffffff80465000, ctx.rip=0xffffffff80044e58, ctx.rbx=0xffffffff80032d10
 [SWITCH] Frame at rsp: rcx=0x0, rsp=0x0, rax=0x2
 [SWITCH] Raw at offset 56: 0x0, at offset 120: 0x0
-[TASK] Entering user task PID=1 at 0x4015b5 (wrapper fn=0xffffffff80032e90, exception_return=0xffffffff80044f50)
+[TASK] Entering user task PID=1 at 0x4015b5 (wrapper fn=0xffffffff80032d10, exception_return=0xffffffff80044de0)
 [TASK] Setting FS_BASE=0x7ffffffe0000 for PID=1
 [TASK] Calling enter_user_mode(0x4015b5, 0x7ffffffeff30)
 [SYSCALL] PID=1 nr=158 args=[0x1002, 0x526278, 0xe7, 0xffffffff80465c50]
@@ -212,20 +212,20 @@ Mounting filesystems...
 [FORK] VMA 6: 0x100000001000-0x100000002000 flags=VmaFlags(READ | WRITE)
 [FORK] VMA 7: 0x100000002000-0x100000003000 flags=VmaFlags(READ | WRITE)
 [FORK] VMA 8: 0x7ffffff70000-0x7fffffff0000 flags=VmaFlags(READ | WRITE)
-[FORK] Address space copy complete, child_ttbr0=0x6e12c000, 426 pages copied
-[FORK] Copied address space, child_ttbr0=0x6e12c000
+[FORK] Address space copy complete, child_ttbr0=0x6e134000, 426 pages copied
+[FORK] Copied address space, child_ttbr0=0x6e134000
 [FORK] Child frame at 0xffffffff8046a2e8: rcx=0x4d5d54, rsp=0x7ffffffefd10
 [FORK] Frame readback: rcx=0x4d5d54, rsp=0x7ffffffefd10, rax=0x0
 [FORK] Child PID=2
-[FORK] Context setup: rsp=0xffffffff8046a2e8, rip=0xffffffff80044fc8, rbx=0xffffffff80044f50
-[FORK] Created child TCB: PID=2, ttbr0=0x6e12c000, entry=0x4d5d54
-[FORK] refresh_kernel_mappings: current CR3=0x6f0ce000, child=0x6e12c000
-[FORK] PML4[511] after refresh: parent=0x7fe7c000, child=0x7fe7c000
+[FORK] Context setup: rsp=0xffffffff8046a2e8, rip=0xffffffff80044e58, rbx=0xffffffff80044de0
+[FORK] Created child TCB: PID=2, ttbr0=0x6e134000, entry=0x4d5d54
+[FORK] refresh_kernel_mappings: current CR3=0x6f0c6000, child=0x6e134000
+[FORK] PML4[511] after refresh: parent=0x7fe74000, child=0x7fe74000
 [SCHED] add_task: PID=2
 [SYSCALL] clone: forked process PID=2 from parent PID=1
 [SYSCALL] PID=1 nr=61 args=[0xffffffffffffffff, 0x0, 0x0, 0x0]
 [SWITCH] old PID=1 -> new PID=2
-[SWITCH] To PID=2: ctx.rsp=0xffffffff8046a2e8, ctx.rip=0xffffffff80044fc8, ctx.rbx=0xffffffff80044f50
+[SWITCH] To PID=2: ctx.rsp=0xffffffff8046a2e8, ctx.rip=0xffffffff80044e58, ctx.rbx=0xffffffff80044de0
 [SWITCH] Frame at rsp: rcx=0x4d5d54, rsp=0x7ffffffefd10, rax=0x0
 [SWITCH] Raw at offset 56: 0x4d5d54, at offset 120: 0x7ffffffefd10
 [SYSCALL] PID=2 nr=13 args=[0x13, 0x7ffffffefb20, 0x7ffffffefb40, 0x8]
@@ -339,8 +339,8 @@ LevitateOS (BusyBox) starting...
 [SCHED] add_task: PID=1
 [TASK_EXIT] PID 2 marked Exited, calling schedule()
 [SWITCH] old PID=2 -> new PID=1
-[SWITCH] To PID=1: ctx.rsp=0xffffffff80464bf8, ctx.rip=0xffffffff80044ea2, ctx.rbx=0xffffffff8046a5c0
-[SWITCH] Frame at rsp: rcx=0xffffffff8004fd61, rsp=0xffffffff80464cc0, rax=0xffffffff80033726
+[SWITCH] To PID=1: ctx.rsp=0xffffffff80464bf8, ctx.rip=0xffffffff80044d32, ctx.rbx=0xffffffff8046a5c0
+[SWITCH] Frame at rsp: rcx=0xffffffff8004fd61, rsp=0xffffffff80464cc0, rax=0xffffffff800335a6
 [SWITCH] Raw at offset 56: 0xffffffff8004fd61, at offset 120: 0xffffffff80464cc0
 [SYSCALL] PID=1 nr=21 args=[0x5108a6, 0x6, 0x0, 0x0]
 [SYSCALL] faccessat(dirfd=-100, path='/dev/null/utmp', mode=0x6, flags=0x0)
@@ -362,20 +362,20 @@ LevitateOS (BusyBox) starting...
 [FORK] VMA 6: 0x100000001000-0x100000002000 flags=VmaFlags(READ | WRITE)
 [FORK] VMA 7: 0x100000002000-0x100000003000 flags=VmaFlags(READ | WRITE)
 [FORK] VMA 8: 0x7ffffff70000-0x7fffffff0000 flags=VmaFlags(READ | WRITE)
-[FORK] Address space copy complete, child_ttbr0=0x10a3000, 426 pages copied
-[FORK] Copied address space, child_ttbr0=0x10a3000
+[FORK] Address space copy complete, child_ttbr0=0x10ab000, 426 pages copied
+[FORK] Copied address space, child_ttbr0=0x10ab000
 [FORK] Child frame at 0xffffffff8046f228: rcx=0x4d5d54, rsp=0x7ffffffefd10
 [FORK] Frame readback: rcx=0x4d5d54, rsp=0x7ffffffefd10, rax=0x0
 [FORK] Child PID=3
-[FORK] Context setup: rsp=0xffffffff8046f228, rip=0xffffffff80044fc8, rbx=0xffffffff80044f50
-[FORK] Created child TCB: PID=3, ttbr0=0x10a3000, entry=0x4d5d54
-[FORK] refresh_kernel_mappings: current CR3=0x6f0ce000, child=0x10a3000
-[FORK] PML4[511] after refresh: parent=0x7fe7c000, child=0x7fe7c000
+[FORK] Context setup: rsp=0xffffffff8046f228, rip=0xffffffff80044e58, rbx=0xffffffff80044de0
+[FORK] Created child TCB: PID=3, ttbr0=0x10ab000, entry=0x4d5d54
+[FORK] refresh_kernel_mappings: current CR3=0x6f0c6000, child=0x10ab000
+[FORK] PML4[511] after refresh: parent=0x7fe74000, child=0x7fe74000
 [SCHED] add_task: PID=3
 [SYSCALL] clone: forked process PID=3 from parent PID=1
 [SYSCALL] PID=1 nr=61 args=[0xffffffffffffffff, 0x0, 0x0, 0x0]
 [SWITCH] old PID=1 -> new PID=3
-[SWITCH] To PID=3: ctx.rsp=0xffffffff8046f228, ctx.rip=0xffffffff80044fc8, ctx.rbx=0xffffffff80044f50
+[SWITCH] To PID=3: ctx.rsp=0xffffffff8046f228, ctx.rip=0xffffffff80044e58, ctx.rbx=0xffffffff80044de0
 [SWITCH] Frame at rsp: rcx=0x4d5d54, rsp=0x7ffffffefd10, rax=0x0
 [SWITCH] Raw at offset 56: 0x4d5d54, at offset 120: 0x7ffffffefd10
 [SYSCALL] PID=3 nr=13 args=[0x13, 0x7ffffffefb20, 0x7ffffffefb40, 0x8]
@@ -437,8 +437,8 @@ mount: mounting proc on /proc failed: Invalid argument
 [SCHED] add_task: PID=1
 [TASK_EXIT] PID 3 marked Exited, calling schedule()
 [SWITCH] old PID=3 -> new PID=1
-[SWITCH] To PID=1: ctx.rsp=0xffffffff80464bf8, ctx.rip=0xffffffff80044ea2, ctx.rbx=0xffffffff8046f500
-[SWITCH] Frame at rsp: rcx=0xffffffff8004fd61, rsp=0xffffffff80464cc0, rax=0xffffffff80033726
+[SWITCH] To PID=1: ctx.rsp=0xffffffff80464bf8, ctx.rip=0xffffffff80044d32, ctx.rbx=0xffffffff8046f500
+[SWITCH] Frame at rsp: rcx=0xffffffff8004fd61, rsp=0xffffffff80464cc0, rax=0xffffffff800335a6
 [SWITCH] Raw at offset 56: 0xffffffff8004fd61, at offset 120: 0xffffffff80464cc0
 [SYSCALL] PID=1 nr=21 args=[0x5108a6, 0x6, 0x0, 0x0]
 [SYSCALL] faccessat(dirfd=-100, path='/dev/null/utmp', mode=0x6, flags=0x0)
@@ -460,18 +460,9 @@ mount: mounting proc on /proc failed: Invalid argument
 [FORK] VMA 6: 0x100000001000-0x100000002000 flags=VmaFlags(READ | WRITE)
 [FORK] VMA 7: 0x100000002000-0x100000003000 flags=VmaFlags(READ | WRITE)
 [FORK] VMA 8: 0x7ffffff70000-0x7fffffff0000 flags=VmaFlags(READ | WRITE)
-[FORK] Address space copy complete, child_ttbr0=0x1938000, 426 pages copied
-[FORK] Copied address space, child_ttbr0=0x1938000
+[FORK] Address space copy complete, child_ttbr0=0x1940000, 426 pages copied
+[FORK] Copied address space, child_ttbr0=0x1940000
 [FORK] Child frame at 0xffffffff80474290: rcx=0x4d5d54, rsp=0x7ffffffefd10
 [FORK] Frame readback: rcx=0x4d5d54, rsp=0x7ffffffefd10, rax=0x0
 [FORK] Child PID=4
-[FORK] Context setup: rsp=0xffffffff80474290, rip=0xffffffff80044fc8, rbx=0xffffffff80044f50
-[FORK] Created child TCB: PID=4, ttbr0=0x1938000, entry=0x4d5d54
-[FORK] refresh_kernel_mappings: current CR3=0x6f0ce000, child=0x1938000
-[FORK] PML4[511] after refresh: parent=0x7fe7c000, child=0x7fe7c000
-[SCHED] add_task: PID=4
-[SYSCALL] clone: forked process PID=4 from parent PID=1
-[SYSCALL] PID=1 nr=61 args=[0xffffffffffffffff, 0x0, 0x0, 0x0]
-[SWITCH] old PID=1 -> new PID=4
-[SWITCH] To PID=4: ctx.rsp=0xffffffff80474290, ctx.rip=0xffffffff80044fc8, ctx.rbx=0xffffffff80044f50
-[SWITCH] Frame at rsp: rcx=0x4d5d54, rsp=0x7ffffffefd10, rax=0x0
+[FORK] Context setup: rsp=0xffffffff80474290, rip=0xffffffff80044e58, rbx=0xffffffff80044de0
