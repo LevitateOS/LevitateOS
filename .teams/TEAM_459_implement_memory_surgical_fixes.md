@@ -122,15 +122,21 @@ Shell is fully interactive. Remaining issues discovered:
 | `syscall/src/lib.rs` | Wired Stat to sys_fstatat dispatcher |
 
 ### Session 4 (2026-01-12)
-- Fixed "Permission denied" error when running commands like `cat`, `ls`
-- Root cause: `vfs_stat()` wasn't following symlinks
-  - `/bin/cat` is a symlink to `busybox`
-  - stat() returned the symlink's inode (mode=S_IFLNK) instead of target's
-  - Shell interpreted S_IFLNK mode as "not executable" → EACCES
-- Fix: Added `resolve_symlinks()` helper in `vfs/src/dispatch.rs`
-  - Follows symlink chain up to 8 levels deep
+- First fix attempt: Made `vfs_stat()` follow symlinks
+  - Added `resolve_symlinks()` helper
   - Added `VfsError::TooManySymlinks` (ELOOP) for loop detection
   - Added `vfs_lstat()` for cases where symlinks shouldn't be followed
+  - **This was necessary but not sufficient!**
+
+- Actual root cause found: Initramfs hardcoded file permissions!
+  - `make_inode()` used `0o444` for files, `0o555` for dirs
+  - This stripped execute bits from all files including busybox
+  - Shell checked mode for executable bits → no X → EACCES
+
+- Final fix: Preserve actual CPIO permissions
+  - Added `mode` field to `CpioEntry` struct
+  - Store actual mode from CPIO header (including permission bits)
+  - Use `entry.mode` directly instead of hardcoding in `make_inode()`
 
 ## Files Modified (Session 4)
 
@@ -139,12 +145,15 @@ Shell is fully interactive. Remaining issues discovered:
 | `vfs/src/dispatch.rs` | Added `resolve_symlinks()`, modified `vfs_stat()`, added `vfs_lstat()` |
 | `vfs/src/error.rs` | Added `TooManySymlinks` variant |
 | `vfs/src/lib.rs` | Exported `vfs_lstat` |
+| `lib/utils/src/cpio.rs` | Added `mode` field to `CpioEntry` |
+| `fs/initramfs/src/lib.rs` | Use `entry.mode` instead of hardcoded permissions |
+| `syscall/src/fs/open.rs` | Added debug logging to faccessat |
 
 ## Remaining Work
 
 - [x] Implement syscall 4 (`stat` on x86_64) - DONE
 - [x] Investigate why `cat` returns "Function not implemented" - RESOLVED (was stat issue)
-- [x] Fix "Permission denied" for commands - RESOLVED (symlink following in stat)
+- [x] Fix "Permission denied" for commands - RESOLVED (initramfs permissions)
 
 **New issues discovered:**
 - `mount: mounting proc on /proc failed: Invalid argument` - procfs not implemented
