@@ -149,13 +149,41 @@ Shell is fully interactive. Remaining issues discovered:
 | `fs/initramfs/src/lib.rs` | Use `entry.mode` instead of hardcoded permissions |
 | `syscall/src/fs/open.rs` | Added debug logging to faccessat |
 
+### Session 5 (2026-01-12)
+- Implemented missing syscalls for BusyBox commands:
+  - `getdents64` (217): Wired to existing `sys_getdents` (already uses Dirent64 format)
+  - `sendfile` (40): Copies data between file descriptors in kernel space
+  - `lstat` (6): Gets file status without following symlinks
+
+## Files Modified (Session 5)
+
+| File | Change |
+|------|--------|
+| `arch/x86_64/src/lib.rs` | Added Getdents64, Sendfile, Lstat to enum and from_u64() |
+| `syscall/src/lib.rs` | Wired new syscalls to dispatcher |
+| `syscall/src/fs/read.rs` | Implemented sys_sendfile |
+| `syscall/src/fs/stat.rs` | Implemented sys_lstat |
+| `syscall/src/fs/mod.rs` | Exported sys_sendfile, sys_lstat |
+
+## Verification Results (Session 5)
+```
+LevitateOS# ls /
+bin   dev   etc   init  proc  root  sbin  sys   tmp
+
+LevitateOS# cat /root/hello.txt
+Hello from BusyBox initramfs!
+```
+
 ## Remaining Work
 
 - [x] Implement syscall 4 (`stat` on x86_64) - DONE
 - [x] Investigate why `cat` returns "Function not implemented" - RESOLVED (was stat issue)
 - [x] Fix "Permission denied" for commands - RESOLVED (initramfs permissions)
+- [x] Implement syscall 217 (`getdents64`) - DONE
+- [x] Implement syscall 40 (`sendfile`) - DONE
+- [x] Implement syscall 6 (`lstat`) - DONE
 
-**New issues discovered:**
+**Known limitations** (not blocking basic shell usage):
 - `mount: mounting proc on /proc failed: Invalid argument` - procfs not implemented
 - `mount: mounting sysfs on /sys failed: Invalid argument` - sysfs not implemented
 
@@ -164,11 +192,7 @@ Shell is fully interactive. Remaining issues discovered:
 All original objectives complete. **BusyBox ash shell is now fully interactive** with:
 - Prompt displays correctly
 - Keyboard input works
-- External commands like `cat`, `echo`, `ls` should now work (stat syscall fixed)
-
-**Remaining limitations** (not blocking for basic shell usage):
-- procfs/sysfs not implemented (mount fails with EINVAL, but shell works)
-- Some BusyBox commands may still hit missing syscalls
+- External commands like `cat`, `echo`, `ls` work correctly
 
 Future teams should:
 - Read GOTCHA #37 and #38 before working on memory management
