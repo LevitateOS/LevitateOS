@@ -5,9 +5,10 @@ use std::process::{Command, Stdio};
 use crate::disk;
 
 // TEAM_435: Removed Eyra command, added Sysroot and Coreutils
+// TEAM_444: Migrated to musl, added Dash (C shell)
 #[derive(Subcommand)]
 pub enum BuildCommands {
-    /// Build everything (Kernel + Userspace + Disk + Coreutils)
+    /// Build everything (Kernel + Userspace + Disk + Apps)
     All,
     /// Build kernel only
     Kernel,
@@ -15,27 +16,41 @@ pub enum BuildCommands {
     Userspace,
     /// Build initramfs only
     Initramfs,
-    /// Build bootable Limine ISO (includes coreutils)
+    /// Build bootable Limine ISO (includes apps)
     Iso,
-    /// Build c-gull sysroot (libc.a)
+    /// Ensure musl target is installed (legacy, now a no-op)
     Sysroot,
-    /// Build coreutils against sysroot
+    /// Build coreutils (Rust, uses musl target)
     Coreutils,
-    /// Build brush shell against sysroot
+    /// Build brush shell (Rust, uses musl target)
     Brush,
+    /// Build dash shell (C, requires musl-gcc)
+    Dash,
 }
 
 // TEAM_435: Replaced Eyra with c-gull sysroot approach
 // TEAM_438: Uses apps registry for external app builds
+// TEAM_444: Migrated to musl - much simpler now!
 pub fn build_all(arch: &str) -> Result<()> {
-    // Build sysroot if not present
-    if !super::sysroot::sysroot_exists() {
-        println!("🔧 Building c-gull sysroot...");
-        super::sysroot::build_sysroot(arch)?;
-    }
+    // Ensure musl target is installed (replaces sysroot build)
+    super::sysroot::ensure_rust_musl_target(arch)?;
 
-    // Build all external apps (coreutils, brush, etc.) if not present
+    // Build all external Rust apps (coreutils, brush, etc.) if not present
     super::apps::ensure_all_built(arch)?;
+
+    // Build C apps if musl-gcc is available (optional)
+    if super::c_apps::musl_gcc_available() {
+        for app in super::c_apps::C_APPS {
+            if !app.exists(arch) {
+                // Don't fail build_all if C app build fails - it's optional
+                if let Err(e) = app.build(arch) {
+                    println!("⚠️  Optional C app {} failed to build: {}", app.name, e);
+                }
+            }
+        }
+    } else {
+        println!("ℹ️  musl-gcc not found, skipping C apps (dash). Install musl-tools to enable.");
+    }
 
     // TEAM_073: Build userspace first
     build_userspace(arch)?;
@@ -86,6 +101,7 @@ pub fn build_userspace(arch: &str) -> Result<()> {
 }
 
 // TEAM_435: Uses c-gull sysroot binaries instead of Eyra
+// TEAM_444: Migrated to musl - Rust apps use musl target, C apps use musl-gcc
 pub fn create_initramfs(arch: &str) -> Result<()> {
     println!("Creating initramfs for {}...", arch);
     let root = PathBuf::from("initrd_root");
@@ -155,6 +171,20 @@ pub fn create_initramfs(arch: &str) -> Result<()> {
             } else {
                 println!("  ℹ️  {} not found (optional). Run 'cargo xtask build {}' to include it.", app.name, app.name);
             }
+        }
+    }
+
+    // TEAM_444: Include C apps (dash, etc.) if built
+    for app in super::c_apps::C_APPS {
+        if app.exists(arch) {
+            let src = app.output_path(arch);
+            let binary_name = std::path::Path::new(app.binary)
+                .file_name()
+                .map(|s| s.to_string_lossy().to_string())
+                .unwrap_or_else(|| app.name.to_string());
+            std::fs::copy(&src, root.join(&binary_name))?;
+            count += 1;
+            println!("  📦 Added {} (C)", app.name);
         }
     }
 
@@ -331,6 +361,7 @@ fn build_kernel_with_features(features: &[&str], arch: &str) -> Result<()> {
 
 /// TEAM_283: Build a bootable Limine ISO
 // TEAM_435: Replaced Eyra with c-gull sysroot
+// TEAM_444: Migrated to musl
 pub fn build_iso(arch: &str) -> Result<()> {
     build_iso_internal(&[], arch, false)
 }
@@ -353,10 +384,8 @@ fn build_iso_internal(features: &[&str], arch: &str, use_test_initramfs: bool) -
     println!("💿 Building Limine ISO for {}...", arch);
 
     // TEAM_438: Build sysroot and all external apps if not present
-    if !super::sysroot::sysroot_exists() {
-        println!("🔧 Building c-gull sysroot...");
-        super::sysroot::build_sysroot(arch)?;
-    }
+    // TEAM_444: Now just ensures musl target is installed
+    super::sysroot::ensure_rust_musl_target(arch)?;
     super::apps::ensure_all_built(arch)?;
 
     build_userspace(arch)?;

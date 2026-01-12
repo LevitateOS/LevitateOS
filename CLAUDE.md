@@ -16,10 +16,10 @@ cargo xtask build userspace   # Userspace + initramfs
 cargo xtask build initramfs   # Create initramfs only
 cargo xtask build iso         # Bootable Limine ISO (x86_64)
 
-# Build c-gull sysroot and external projects
-cargo xtask build sysroot     # Build libc.a from c-gull
-cargo xtask build coreutils   # Build uutils/coreutils (clones if needed)
-cargo xtask build brush       # Build brush shell (clones if needed)
+# Build external projects (uses musl libc)
+cargo xtask build coreutils   # Build uutils/coreutils (Rust, clones if needed)
+cargo xtask build brush       # Build brush shell (Rust, clones if needed)
+cargo xtask build dash        # Build dash shell (C, requires musl-gcc)
 ```
 
 ### Running
@@ -407,50 +407,78 @@ Key considerations:
 - Errno value alignment with Linux (use constants from `kernel/src/syscall/mod.rs::errno`)
 - Vectored I/O for `println!` (`writev`/`readv`)
 
-### c-gull Sysroot (CRITICAL - READ THIS)
+### Userspace libc: musl
 
-**What is c-gull?** c-gull (from [c-ward](https://github.com/sunfishcode/c-ward)) provides a pure-Rust libc implementation. We build it as a static library (`libc.a`) that any Rust program can link against, enabling **UNMODIFIED** upstream projects to run on LevitateOS.
+**TEAM_444**: Migrated from c-gull to musl for simpler builds and C program support.
 
-**Status**: c-gull sysroot implemented. External projects (coreutils, brush) are cloned at build time.
+LevitateOS userspace uses **musl libc** for all programs:
+- **Rust programs**: Built with `--target x86_64-unknown-linux-musl`
+- **C programs**: Built with `musl-gcc`
 
-#### How It Works
+#### Why musl?
 
-1. **Sysroot**: `toolchain/sysroot/lib/libc.a` - pre-built libc
-2. **External projects**: Cloned to `toolchain/` at build time (gitignored)
-3. **Build**: Projects built with RUSTFLAGS pointing to sysroot
-4. **No source modifications** - upstream repos work as-is
+| Benefit | Description |
+|---------|-------------|
+| Simple builds | Standard Rust target, no custom RUSTFLAGS |
+| C support | Can build C programs (dash, etc.) |
+| Static linking | Default behavior, small binaries |
+| Battle-tested | Used by Alpine Linux |
 
 #### Build Commands
 ```bash
-cargo xtask build sysroot      # Build libc.a from c-gull
-cargo xtask build coreutils    # Clone & build uutils/coreutils
-cargo xtask build brush        # Clone & build brush shell
+cargo xtask build coreutils    # Clone & build uutils/coreutils (Rust)
+cargo xtask build dash         # Clone & build dash shell (C, requires musl-gcc)
 cargo xtask build all          # Everything (auto-builds deps if missing)
+
+# NOTE: brush is disabled for now. Shell progression:
+# 1. Built-in shell (verify basic musl works)
+# 2. dash (simple POSIX shell)
+# 3. brush (full bash - future)
+```
+
+#### Prerequisites
+
+For **Rust** programs (coreutils, brush):
+```bash
+# Auto-installed by xtask if missing
+rustup target add x86_64-unknown-linux-musl
+```
+
+For **C** programs (dash):
+```bash
+# Fedora
+sudo dnf install musl-gcc musl-devel autoconf automake
+
+# Ubuntu/Debian
+sudo apt install musl-tools musl-dev autoconf automake
+
+# Arch
+sudo pacman -S musl autoconf automake
 ```
 
 #### Directory Layout
 ```
 toolchain/
-├── libc-levitateos/     # Our wrapper crate (committed)
-├── c-ward/              # Cloned at build time (gitignored)
 ├── coreutils/           # Cloned at build time (gitignored)
-├── brush/               # Cloned at build time (gitignored)
-├── sysroot/lib/libc.a   # Built output (gitignored)
-└── coreutils-out/       # Built binaries (gitignored)
+├── dash/                # Cloned at build time (gitignored)
+├── coreutils-out/       # Built Rust binaries (gitignored)
+└── dash-out/            # Built C binaries (gitignored)
 ```
+
+#### Shell Progression
+
+| Stage | Shell | Language | Status |
+|-------|-------|----------|--------|
+| 0 | Built-in shell | Rust (no_std) | Current - verify musl works |
+| 1 | dash | C | Next - simple POSIX shell |
+| 2 | brush | Rust | Future - full bash |
+
+Use the simpler shells first to debug kernel issues before moving to complex ones.
 
 #### Current Limitations
 
 - **Static linking only** - no dynamic linker (`ld.so`) yet
-- **Limited utilities** - some coreutils need libc functions c-gull doesn't have yet (e.g., `getpwuid` for `ls`)
-- **x86_64 tested** - aarch64 may need linker flag adjustments
-
-#### Future: Dynamic Linking
-
-Once we implement `ld.so`, we can:
-- Support dynamically linked binaries
-- Download pre-built binaries instead of building from source
-- Full Linux binary compatibility
+- **x86_64 primary** - aarch64 needs musl cross-toolchain
 
 ### Memory Layout
 

@@ -274,6 +274,7 @@ fn main() -> Result<()> {
             match cmd {
                 // TEAM_435: Removed Eyra, added Sysroot/Coreutils/Brush
                 // TEAM_438: Uses apps registry for external app builds
+                // TEAM_444: Migrated to musl, added Dash
                 build::BuildCommands::All => build::build_all(arch)?,
                 build::BuildCommands::Kernel => build::build_kernel_only(arch)?,
                 build::BuildCommands::Userspace => {
@@ -287,7 +288,13 @@ fn main() -> Result<()> {
                     build::apps::get_app("coreutils").unwrap().build(arch)?
                 }
                 build::BuildCommands::Brush => {
-                    build::apps::get_app("brush").unwrap().build(arch)?
+                    // TEAM_444: brush removed from default builds
+                    // Re-add to APPS registry when ready to support it
+                    bail!("brush is disabled. Shell progression: built-in → dash → brush.\n\
+                           Use the built-in shell first to verify musl works.")
+                }
+                build::BuildCommands::Dash => {
+                    build::c_apps::get_c_app("dash").unwrap().build(arch)?
                 }
             }
         },

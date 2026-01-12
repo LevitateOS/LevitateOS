@@ -243,10 +243,20 @@ impl QemuBuilder {
         // TEAM_331: x86_64 display mode:
         // - GTK/SDL: Use -vga std (Limine framebuffer, proper window size)
         // - VNC/headless: Use virtio-gpu-pci (proper resolution via edid)
+        // - Nographic: Use virtio-gpu but no VGA (TEAM_444)
         match (&self.arch, &self.display) {
             (Arch::X86_64, DisplayMode::Gtk) => {
                 // Use VGA std - Limine gets framebuffer, GTK shows correct window size
                 cmd.args(["-vga", "std"]);
+            }
+            (Arch::X86_64, DisplayMode::Nographic) => {
+                // TEAM_444: For nographic, still add virtio-gpu for GPU init but no VGA
+                cmd.args(["-vga", "none"]);
+                let gpu_spec = format!(
+                    "virtio-gpu-pci,xres={},yres={},edid=on",
+                    self.gpu_resolution.width, self.gpu_resolution.height
+                );
+                cmd.args(["-device", &gpu_spec]);
             }
             (Arch::X86_64, _) => {
                 // VNC/headless: use virtio-gpu for proper resolution
@@ -268,9 +278,12 @@ impl QemuBuilder {
         }
 
         // Input devices (arch-specific suffix)
+        // TEAM_444: Skip VirtIO input in nographic mode - use serial for input
         let suffix = self.arch.device_suffix();
-        cmd.args(["-device", &format!("virtio-keyboard-{}", suffix)]);
-        cmd.args(["-device", &format!("virtio-tablet-{}", suffix)]);
+        if !matches!(self.display, DisplayMode::Nographic) {
+            cmd.args(["-device", &format!("virtio-keyboard-{}", suffix)]);
+            cmd.args(["-device", &format!("virtio-tablet-{}", suffix)]);
+        }
 
         // Network
         let net_device = format!("virtio-net-{},netdev=net0", suffix);
@@ -300,8 +313,10 @@ impl QemuBuilder {
                 cmd.args(["-serial", "mon:stdio"]);
             }
             DisplayMode::Nographic => {
-                cmd.args(["-nographic"]);
-                cmd.args(["-serial", "mon:stdio"]);
+                // TEAM_444: Simple serial on stdio without mux
+                // mux=on with monitor causes input to go to monitor by default
+                cmd.args(["-display", "none"]);
+                cmd.args(["-serial", "stdio"]);
             }
         }
 

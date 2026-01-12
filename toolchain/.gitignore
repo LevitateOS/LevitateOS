@@ -3,12 +3,14 @@ sysroot/
 */target/
 coreutils-out/
 brush-out/
+dash-out/
 
 # External repos (cloned at build time, not committed)
 c-ward/
 coreutils/
 unmodified-coreutils/
 brush/
+dash/
 
 # Custom targets (not needed - we use standard Linux target)
 targets/

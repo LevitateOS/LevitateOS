@@ -1,107 +1,69 @@
-//! TEAM_435: c-gull sysroot build commands
+//! Sysroot management (simplified for musl)
 //!
-//! Builds libc.a from c-gull/c-ward for linking userspace programs.
-//! This replaces the Eyra approach with a pre-built sysroot.
+//! TEAM_444: Migrated from c-gull to musl.
+//!
+//! With musl, we use system-installed musl via standard Rust targets.
+//! No need to build our own libc anymore!
+//!
+//! Old approach (c-gull):
+//! - Clone c-ward repo
+//! - Build libc-levitateos wrapper
+//! - Copy libc.a to sysroot
+//! - Use complex RUSTFLAGS
+//!
+//! New approach (musl):
+//! - rustup target add x86_64-unknown-linux-musl
+//! - cargo build --target x86_64-unknown-linux-musl
+//! - That's it!
 
-use anyhow::{bail, Context, Result};
-use std::path::PathBuf;
+use anyhow::{Context, Result};
 use std::process::Command;
 
-const C_WARD_REPO: &str = "https://github.com/sunfishcode/c-ward";
-
-/// Clone c-ward repository if not present (idempotent)
-fn clone_c_ward() -> Result<()> {
-    let dir = PathBuf::from("toolchain/c-ward");
-    if !dir.exists() {
-        println!("📥 Cloning c-ward...");
-        let status = Command::new("git")
-            .args(["clone", "--depth=1", C_WARD_REPO, "toolchain/c-ward"])
-            .status()
-            .context("Failed to clone c-ward")?;
-        if !status.success() {
-            bail!("Failed to clone c-ward repository");
-        }
-    }
-    Ok(())
-}
-
-/// Build libc.a from libc-levitateos wrapper crate
-fn build_libc(arch: &str) -> Result<()> {
+/// Ensure musl target is installed for Rust builds
+pub fn ensure_rust_musl_target(arch: &str) -> Result<()> {
     let target = match arch {
-        "x86_64" => "x86_64-unknown-linux-gnu",
-        "aarch64" => "aarch64-unknown-linux-gnu",
-        _ => bail!("Unsupported architecture: {}", arch),
+        "x86_64" => "x86_64-unknown-linux-musl",
+        "aarch64" => "aarch64-unknown-linux-musl",
+        _ => "x86_64-unknown-linux-musl",
     };
 
-    println!("🔧 Building libc.a for {}...", arch);
+    let output = Command::new("rustup")
+        .args(["target", "list", "--installed"])
+        .output()
+        .context("Failed to run rustup")?;
 
-    let status = Command::new("cargo")
-        .current_dir("toolchain/libc-levitateos")
-        .arg("+nightly-2025-04-28")
-        .env_remove("RUSTUP_TOOLCHAIN")
-        .args([
-            "build",
-            "--release",
-            "--target", target,
-            "-Z", "build-std=std,panic_abort",
-            "-Z", "build-std-features=panic_immediate_abort",
-        ])
+    let installed = String::from_utf8_lossy(&output.stdout);
+    if installed.contains(target) {
+        return Ok(());
+    }
+
+    println!("📥 Installing Rust musl target: {}", target);
+    let status = Command::new("rustup")
+        .args(["target", "add", target])
         .status()
-        .context("Failed to build libc-levitateos")?;
+        .context("Failed to run rustup target add")?;
 
     if !status.success() {
-        bail!("Failed to build libc.a");
+        anyhow::bail!("Failed to install {} target", target);
     }
 
     Ok(())
 }
 
-/// Create sysroot directory structure with libc.a
-fn create_sysroot(arch: &str) -> Result<()> {
-    let target = match arch {
-        "x86_64" => "x86_64-unknown-linux-gnu",
-        "aarch64" => "aarch64-unknown-linux-gnu",
-        _ => bail!("Unsupported architecture: {}", arch),
-    };
-
-    let sysroot_lib = PathBuf::from("toolchain/sysroot/lib");
-    std::fs::create_dir_all(&sysroot_lib)?;
-
-    // Copy the built library to sysroot
-    let src = PathBuf::from(format!(
-        "toolchain/libc-levitateos/target/{}/release/liblibc_levitateos.a",
-        target
-    ));
-    let dst = sysroot_lib.join("libc.a");
-
-    if src.exists() {
-        std::fs::copy(&src, &dst)?;
-        println!("📦 Created sysroot/lib/libc.a");
-    } else {
-        bail!("libc.a not found at {}", src.display());
-    }
-
-    Ok(())
-}
-
-/// Main entry point: build complete c-gull sysroot
-pub fn build_sysroot(arch: &str) -> Result<()> {
-    println!("🔧 Building c-gull sysroot for {}...", arch);
-
-    // 1. Clone c-ward if needed
-    clone_c_ward()?;
-
-    // 2. Build libc.a
-    build_libc(arch)?;
-
-    // 3. Create sysroot structure
-    create_sysroot(arch)?;
-
-    println!("✅ Sysroot ready at toolchain/sysroot/");
-    Ok(())
-}
-
-/// Check if sysroot exists and is valid
+/// Legacy function for backward compatibility
+///
+/// With musl, the "sysroot" is just the system musl, so this always returns true.
+/// Code that checks sysroot_exists() before building will still work.
 pub fn sysroot_exists() -> bool {
-    PathBuf::from("toolchain/sysroot/lib/libc.a").exists()
+    true
+}
+
+/// Legacy function for backward compatibility
+///
+/// Previously built c-gull sysroot. Now just ensures musl target is installed.
+pub fn build_sysroot(arch: &str) -> Result<()> {
+    println!("ℹ️  Using system musl (no custom sysroot build needed)");
+    ensure_rust_musl_target(arch)?;
+    println!("✅ musl target ready for {}", arch);
+    Ok(())
 }

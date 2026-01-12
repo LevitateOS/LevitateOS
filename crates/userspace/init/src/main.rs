@@ -7,7 +7,7 @@
 #![no_main]
 
 use core::panic::PanicInfo;
-use libsyscall::{common_panic_handler, println, spawn, spawn_args, yield_cpu};
+use libsyscall::{common_panic_handler, println, set_foreground, spawn, spawn_args, yield_cpu};
 
 #[panic_handler]
 fn panic(info: &PanicInfo) -> ! {
@@ -121,14 +121,17 @@ pub extern "C" fn _start() -> ! {
         }
     }
 
-    // TEAM_435: Spawn brush shell (POSIX-compatible, built with c-gull)
-    println!("[INIT] Spawning shell...");
-    let shell_pid = spawn("brush");
+    // TEAM_444: Spawn dash shell (musl-linked C program)
+    println!("[INIT] Spawning dash...");
+    let argv: [&str; 2] = ["dash", "-i"];
+    let shell_pid = spawn_args("/dash", &argv);
 
     if shell_pid < 0 {
         println!("[INIT] ERROR: Failed to spawn shell: {}", shell_pid);
     } else {
         println!("[INIT] Shell spawned as PID {}", shell_pid);
+        // TEAM_444: Set shell as foreground process so it can read from tty
+        set_foreground(shell_pid as usize);
         
         // TEAM_409: Wait for shell to exit and report status
         let mut status: i32 = 0;

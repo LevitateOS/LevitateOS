@@ -1,18 +1,24 @@
-//! External application registry and build abstraction
+//! External Rust application registry and build abstraction
 //!
-//! All external apps (coreutils, brush, etc.) follow the same pattern:
+//! TEAM_444: Migrated from c-gull to musl libc.
+//!
+//! All external Rust apps (coreutils, brush, etc.) follow the same pattern:
 //! 1. Clone from git if not present
-//! 2. Build against our c-gull sysroot
+//! 2. Build with --target x86_64-unknown-linux-musl (standard Rust target)
 //! 3. Copy output to toolchain/{name}-out/{target}/release/
 //!
-//! This module provides a uniform interface for all external apps,
-//! ensuring consistent behavior and fail-fast error handling.
+//! This is much simpler than the old c-gull approach which required:
+//! - Custom sysroot build
+//! - -Z build-std flags
+//! - Complex RUSTFLAGS
+//!
+//! With musl, we just use standard Rust targets.
 
 use anyhow::{bail, Context, Result};
 use std::path::PathBuf;
 use std::process::Command;
 
-/// An external application that can be built against our sysroot
+/// An external Rust application that can be built with musl
 #[derive(Debug, Clone)]
 pub struct ExternalApp {
     /// Short name (e.g., "coreutils", "brush")
@@ -31,28 +37,24 @@ pub struct ExternalApp {
     pub symlinks: &'static [&'static str],
 }
 
-/// Registry of all external applications
+/// Registry of all external Rust applications
+///
+/// TEAM_444: brush removed - it's for far future. Use built-in shell first
+/// to verify musl works, then add dash (simpler), then brush (complex).
 pub static APPS: &[ExternalApp] = &[
     ExternalApp {
         name: "coreutils",
         repo: "https://github.com/uutils/coreutils",
         package: "coreutils",
         binary: "coreutils",
-        // Limited feature set - only utilities that work with current c-gull
-        // Missing libc functions: getpwuid, getgrgid (ls), nl_langinfo (date)
+        // TEAM_444: With musl, we can potentially enable more features
+        // since musl has better libc coverage than c-gull
         features: "cat,echo,head,mkdir,pwd,rm,tail,touch",
         required: true,
         symlinks: &["cat", "echo", "head", "mkdir", "pwd", "rm", "tail", "touch"],
     },
-    ExternalApp {
-        name: "brush",
-        repo: "https://github.com/reubeno/brush",
-        package: "brush",
-        binary: "brush",
-        features: "",
-        required: false, // Shell works without brush
-        symlinks: &[],
-    },
+    // NOTE: brush removed from default builds - it's complex and for later.
+    // Shell progression: built-in shell → dash → brush
 ];
 
 impl ExternalApp {
@@ -63,7 +65,7 @@ impl ExternalApp {
 
     /// Get the output directory for built binaries
     pub fn output_dir(&self, arch: &str) -> PathBuf {
-        let target = linux_target(arch);
+        let target = musl_target(arch);
         PathBuf::from(format!("toolchain/{}-out/{}/release", self.name, target))
     }
 
@@ -105,33 +107,28 @@ impl ExternalApp {
         Ok(())
     }
 
-    /// Build the app against our sysroot
+    /// Build the app with musl target
+    ///
+    /// TEAM_444: Simplified from c-gull approach. No more:
+    /// - Custom sysroot
+    /// - -Z build-std
+    /// - Complex RUSTFLAGS
     pub fn build(&self, arch: &str) -> Result<()> {
         // Ensure cloned
         self.clone_repo()?;
 
-        // Ensure sysroot exists
-        if !super::sysroot::sysroot_exists() {
-            bail!(
-                "Sysroot not found. Run 'cargo xtask build sysroot' first."
-            );
-        }
+        // Ensure musl target is installed
+        ensure_musl_target(arch)?;
 
-        let target = linux_target(arch);
-        println!("🔧 Building {} for {}...", self.name, arch);
+        let target = musl_target(arch);
+        println!("🔧 Building {} for {} (musl)...", self.name, arch);
 
-        let rustflags = get_sysroot_rustflags();
-
+        // Simple build command - just use the musl target!
         let mut args = vec![
-            "+nightly-2025-04-28".to_string(),
             "build".to_string(),
             "--release".to_string(),
             "--target".to_string(),
             target.to_string(),
-            "-Z".to_string(),
-            "build-std=std,panic_abort".to_string(),
-            "-Z".to_string(),
-            "build-std-features=panic_immediate_abort".to_string(),
             "-p".to_string(),
             self.package.to_string(),
         ];
@@ -144,8 +141,6 @@ impl ExternalApp {
 
         let status = Command::new("cargo")
             .current_dir(self.clone_dir())
-            .env_remove("RUSTUP_TOOLCHAIN")
-            .env("RUSTFLAGS", &rustflags)
             .args(&args)
             .status()
             .with_context(|| format!("Failed to build {}", self.name))?;
@@ -234,30 +229,47 @@ pub fn require_all(arch: &str) -> Result<()> {
     Ok(())
 }
 
-/// Get RUSTFLAGS for building against our sysroot
-fn get_sysroot_rustflags() -> String {
-    let sysroot_path = std::env::current_dir()
-        .map(|p| p.join("toolchain/sysroot"))
-        .unwrap_or_else(|_| PathBuf::from("toolchain/sysroot"));
-
-    format!(
-        "-C panic=abort \
-         -C relocation-model=pic \
-         -C link-arg=-nostartfiles \
-         -C link-arg=-static-pie \
-         -C link-arg=-Wl,--allow-multiple-definition \
-         -C link-arg=-L{}/lib",
-        sysroot_path.display()
-    )
+/// Convert architecture to musl target triple
+fn musl_target(arch: &str) -> &'static str {
+    match arch {
+        "x86_64" => "x86_64-unknown-linux-musl",
+        "aarch64" => "aarch64-unknown-linux-musl",
+        _ => "x86_64-unknown-linux-musl", // fallback
+    }
 }
 
-/// Convert architecture to Linux target triple
-fn linux_target(arch: &str) -> &'static str {
-    match arch {
-        "x86_64" => "x86_64-unknown-linux-gnu",
-        "aarch64" => "aarch64-unknown-linux-gnu",
-        _ => "x86_64-unknown-linux-gnu", // fallback
+/// Ensure the musl target is installed via rustup
+fn ensure_musl_target(arch: &str) -> Result<()> {
+    let target = musl_target(arch);
+
+    // Check if target is installed
+    let output = Command::new("rustup")
+        .args(["target", "list", "--installed"])
+        .output()
+        .context("Failed to run rustup")?;
+
+    let installed = String::from_utf8_lossy(&output.stdout);
+    if installed.contains(target) {
+        return Ok(());
     }
+
+    // Install the target
+    println!("📥 Installing Rust musl target: {}", target);
+    let status = Command::new("rustup")
+        .args(["target", "add", target])
+        .status()
+        .context("Failed to run rustup target add")?;
+
+    if !status.success() {
+        bail!(
+            "Failed to install {} target.\n\
+             Try running: rustup target add {}",
+            target,
+            target
+        );
+    }
+
+    Ok(())
 }
 
 #[cfg(test)]
@@ -268,9 +280,10 @@ mod tests {
     fn test_app_paths() {
         let app = get_app("coreutils").unwrap();
         assert_eq!(app.clone_dir(), PathBuf::from("toolchain/coreutils"));
+        // TEAM_444: Now uses musl target
         assert_eq!(
             app.output_path("x86_64"),
-            PathBuf::from("toolchain/coreutils-out/x86_64-unknown-linux-gnu/release/coreutils")
+            PathBuf::from("toolchain/coreutils-out/x86_64-unknown-linux-musl/release/coreutils")
         );
     }
 
@@ -279,5 +292,11 @@ mod tests {
         let required: Vec<_> = required_apps().collect();
         assert!(required.iter().any(|a| a.name == "coreutils"));
         assert!(!required.iter().any(|a| a.name == "brush"));
+    }
+
+    #[test]
+    fn test_musl_target() {
+        assert_eq!(musl_target("x86_64"), "x86_64-unknown-linux-musl");
+        assert_eq!(musl_target("aarch64"), "aarch64-unknown-linux-musl");
     }
 }
