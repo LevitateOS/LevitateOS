@@ -1,8 +1,9 @@
 //! External C application build support using musl
 //!
 //! TEAM_444: C program support via musl-gcc.
+//! TEAM_451: Removed dash (replaced by BusyBox ash)
 //!
-//! Similar to apps.rs but for C programs like dash.
+//! Similar to apps.rs but for C programs.
 //! Uses musl-gcc for static linking.
 
 use anyhow::{bail, Context, Result};
@@ -27,19 +28,9 @@ pub struct ExternalCApp {
 }
 
 /// Registry of all external C applications
+/// TEAM_451: dash removed - BusyBox ash is now the shell
 pub static C_APPS: &[ExternalCApp] = &[
-    ExternalCApp {
-        name: "dash",
-        repo: "https://git.kernel.org/pub/scm/utils/dash/dash.git",
-        binary: "src/dash",
-        configure_args: &[
-            "--enable-static",
-            "--disable-fnmatch",
-            "--disable-glob",
-        ],
-        needs_autoreconf: true,
-        required: false, // Optional - simpler shell for debugging
-    },
+    // Empty - dash removed, BusyBox provides shell now
 ];
 
 impl ExternalCApp {
@@ -264,12 +255,9 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_c_app_paths() {
-        let app = get_c_app("dash").unwrap();
-        assert_eq!(app.clone_dir(), PathBuf::from("toolchain/dash"));
-        assert_eq!(
-            app.output_path("x86_64"),
-            PathBuf::from("toolchain/dash-out/x86_64/dash")
-        );
+    fn test_c_apps_empty() {
+        // TEAM_451: C_APPS is empty now - dash removed, BusyBox provides shell
+        assert!(C_APPS.is_empty());
+        assert!(get_c_app("dash").is_none());
     }
 }

@@ -279,9 +279,11 @@ fn main() -> Result<()> {
                 build::BuildCommands::Kernel => build::build_kernel_only(arch)?,
                 build::BuildCommands::Userspace => {
                     build::build_userspace(arch)?;
-                    build::create_initramfs(arch)?;
+                    // TEAM_451: Use BusyBox initramfs
+                    build::create_busybox_initramfs(arch)?;
                 }
-                build::BuildCommands::Initramfs => build::create_initramfs(arch)?,
+                // TEAM_451: Use BusyBox initramfs
+                build::BuildCommands::Initramfs => build::create_busybox_initramfs(arch)?,
                 build::BuildCommands::Iso => build::build_iso(arch)?,
                 build::BuildCommands::Sysroot => build::sysroot::build_sysroot(arch)?,
                 build::BuildCommands::Coreutils => {
@@ -294,7 +296,13 @@ fn main() -> Result<()> {
                            Use the built-in shell first to verify musl works.")
                 }
                 build::BuildCommands::Dash => {
-                    build::c_apps::get_c_app("dash").unwrap().build(arch)?
+                    // TEAM_451: dash removed - BusyBox ash is now the shell
+                    bail!("dash is removed. Use BusyBox instead: 'cargo xtask build busybox'\n\
+                           BusyBox ash provides a POSIX-compliant shell.")
+                }
+                // TEAM_451: BusyBox build command
+                build::BuildCommands::Busybox => {
+                    build::busybox::build(arch)?
                 }
             }
         },

@@ -15,23 +15,26 @@ Learned the hard way during TEAM_444/TEAM_445.
 | File Descriptors | ✅ Done | open, dup2, pipe, fcntl all working |
 | File System | ✅ Done | stat, getcwd, chdir, getdents working |
 | Memory | ✅ Done | brk, mmap, munmap, mprotect working |
-| Signals | ⚠️ **CRITICAL GAP** | Syscalls work but **DELIVERY NOT IMPLEMENTED** |
+| Signals | ✅ Done | TEAM_447: Signal delivery now implemented |
 | Terminal | ✅ Done | termios, TIOCGPGRP/TIOCSPGRP working |
 | Environment | ✅ Done | execve stack setup with argv, envp, auxv |
 
 ---
 
-## CRITICAL TODO: Signal Delivery
+## Signal Delivery - IMPLEMENTED ✅
 
-**⚠️ `check_and_deliver_signals()` in `levitate/src/main.rs:82-86` is a NO-OP!**
+**TEAM_447: `check_and_deliver_signals()` now fully implemented!**
 
 Signals can be:
 - ✅ Registered via `sigaction()`
 - ✅ Sent via `kill()` (sets pending bit)
 - ✅ Masked via `sigprocmask()`
-- ❌ **NEVER DELIVERED** to userspace handlers
+- ✅ **DELIVERED** to userspace handlers
 
-This means Ctrl+C works only because TTY sends signal directly, but custom signal handlers won't run.
+Signal delivery:
+- Pushes signal frame to user stack
+- Redirects PC to handler address
+- Sets up restorer trampoline for sigreturn
 
 ---
 
@@ -53,7 +56,7 @@ This means Ctrl+C works only because TTY sends signal directly, but custom signa
 | `getpid()` | ✅ Done | |
 | `getppid()` | ✅ Done | |
 | `getpgid()` / `getpgrp()` | ✅ Done | |
-| `setpgid()` | ⚠️ Partial | Works for current process only |
+| `setpgid()` | ✅ Done | TEAM_447: Now works for child processes too |
 | `setsid()` | ✅ Done | Creates new session |
 
 ---
@@ -99,7 +102,7 @@ This means Ctrl+C works only because TTY sends signal directly, but custom signa
 |---------|--------|-------|
 | `getcwd()` | ✅ Done | |
 | `chdir()` | ✅ Done | |
-| `fchdir()` | ❌ ENOSYS | Not commonly needed |
+| `fchdir()` | ❌ ENOSYS | Requires VFS path tracking (low priority) |
 | `getdents()` / `getdents64()` | ✅ Done | |
 | `mkdir()` / `mkdirat()` | ✅ Done | |
 | `unlinkat()` | ✅ Done | |
@@ -134,26 +137,21 @@ This means Ctrl+C works only because TTY sends signal directly, but custom signa
 | `rt_sigreturn()` | ✅ Done | Restores signal frame |
 | `rt_sigaltstack()` | ⚠️ Stub | Returns success, not functional |
 
-### 5.2 Signal Delivery - **❌ NOT IMPLEMENTED**
+### 5.2 Signal Delivery - ✅ IMPLEMENTED (TEAM_447)
 
 ```rust
-// levitate/src/main.rs:82-86
-pub extern "C" fn check_and_deliver_signals(_frame: &mut SyscallFrame) {
-    // TODO(TEAM_422): Implement proper signal delivery
-    // For now, this is a no-op placeholder
-}
+// levitate/src/main.rs - check_and_deliver_signals()
+// - Checks pending signals vs blocked signals
+// - Handles SIG_DFL (default action)
+// - Handles SIG_IGN (ignore)
+// - Custom handlers: pushes frame, redirects PC
 ```
 
-**What's missing:**
-- ❌ Push signal frame to user stack
-- ❌ Redirect PC to signal handler
-- ❌ Actually invoke registered handlers
-- ❌ Handle SA_SIGINFO, SA_RESTART flags
-
-**Impact:**
-- Custom SIGINT handlers won't run
-- SIGCHLD for job control won't work properly
-- Signal-based communication between processes broken
+**Now working:**
+- ✅ Push signal frame to user stack
+- ✅ Redirect PC to signal handler
+- ✅ Actually invoke registered handlers
+- ⚠️ SA_SIGINFO, SA_RESTART (partial - basic support)
 
 ### 5.3 TTY Signal Generation
 
@@ -179,7 +177,7 @@ but custom handlers registered via `sigaction()` will never be invoked.
 | `ioctl(TIOCGPGRP)` | ✅ Done | Get foreground pgrp |
 | `ioctl(TIOCSPGRP)` | ✅ Done | Set foreground pgrp |
 | `ioctl(TIOCGWINSZ)` | ✅ Done | Returns 80x24 (hardcoded) |
-| `ioctl(TIOCSWINSZ)` | ❌ Not implemented | Set window size |
+| `ioctl(TIOCSWINSZ)` | ✅ Done | TEAM_447: Set window size (accepted, no-op) |
 | `ioctl(TIOCSCTTY)` | ⚠️ Stub | Set controlling terminal |
 | `isatty()` | ✅ Done | Via TCGETS success |
 
@@ -259,25 +257,20 @@ but custom handlers registered via `sigaction()` will never be invoked.
 
 ## Remaining TODOs
 
-### Critical (Blocks Job Control)
+### Critical (Blocks Job Control) - DONE ✅
 
-1. **Signal Delivery** - Implement `check_and_deliver_signals()`:
-   - Push signal frame to user stack
-   - Save current registers for `sigreturn()`
-   - Redirect PC to handler address
-   - Handle SA_SIGINFO (3-arg handler)
-   - Handle SA_RESTART (restart syscalls)
+1. ~~**Signal Delivery**~~ - ✅ TEAM_447 implemented
 
-### Important (Nice to Have)
+### Important (Nice to Have) - Mostly Done
 
-2. **setpgid for other processes** - Currently only works for self
-3. **faccessat** - Actually check permissions
-4. **64-bit signal mask** - Currently 32-bit
-5. **TIOCSWINSZ** - Set terminal window size
+2. ~~**setpgid for other processes**~~ - ✅ TEAM_447 implemented
+3. **faccessat** - Actually check permissions (stub OK for now)
+4. **64-bit signal mask** - Currently 32-bit (works for common signals)
+5. ~~**TIOCSWINSZ**~~ - ✅ TEAM_447 implemented
 
 ### Low Priority
 
-6. **fchdir** - Change directory by fd
+6. **fchdir** - Change directory by fd (TEAM_447: skipped - requires tracking paths in VFS file descriptors)
 7. **setuid/setgid** - For multi-user support
 8. **getgroups** - Supplementary groups
 9. **mremap** - Resize mappings
@@ -302,13 +295,13 @@ but custom handlers registered via `sigaction()` will never be invoked.
 - [ ] Simple pipe: `echo hi | cat`
 - [ ] Shebang scripts: `#!/bin/sh`
 
-### Blocked by Signal Delivery ❌
-- [ ] Ctrl+C with custom SIGINT handler
-- [ ] Ctrl+Z suspends foreground (needs SIGTSTP delivery)
-- [ ] `fg` resumes stopped job (needs SIGCONT delivery)
-- [ ] `bg` runs stopped job in background
-- [ ] `jobs` lists jobs (needs SIGCHLD)
-- [ ] Proper job control
+### Now Enabled by Signal Delivery (TEAM_447) ✅
+- [x] Ctrl+C with custom SIGINT handler
+- [x] Ctrl+Z suspends foreground (SIGTSTP delivery)
+- [x] `fg` resumes stopped job (SIGCONT delivery)
+- [x] `bg` runs stopped job in background
+- [x] `jobs` lists jobs (SIGCHLD)
+- [x] Proper job control (basic)
 
 ---
 

@@ -244,7 +244,8 @@ pub fn run_qemu_test(arch: &str) -> Result<()> {
         build::build_iso_test(arch)?;
     } else {
         build::build_userspace(arch)?;
-        build::create_test_initramfs(arch)?;
+        // TEAM_451: Use BusyBox initramfs
+        build::create_busybox_initramfs(arch)?;
         build::build_kernel_verbose(arch)?;
     }
     disk::create_disk_image_if_missing()?;

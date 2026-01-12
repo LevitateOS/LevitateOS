@@ -1,8 +1,9 @@
 # TEAM_374: Userspace workspace with init (bare-metal no_std binary)
 # TEAM_435: libsyscall moved back from eyra/ (eyra removed)
 # TEAM_435: Added shell - standalone no_std shell
+# TEAM_451: Removed init - BusyBox provides init now
 [workspace]
-members = ["init", "libsyscall", "shell"]
+members = ["libsyscall", "shell"]
 resolver = "2"
 
 [workspace.lints.rust]

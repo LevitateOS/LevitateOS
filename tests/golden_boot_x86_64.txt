@@ -2,12 +2,12 @@ limine: Loading kernel `boot:///boot/levitate-kernel`...
 limine: Loading module `boot:///boot/initramfs.cpio`...
 RikdHeap initialized.
 [BOOT] Protocol: Limine
-[BOOT] Memory: 16 regions, 1775 MB usable
+[BOOT] Memory: 16 regions, 1776 MB usable
 [BOOT] Stage 2: Memory & MMU (PEI)
-[MEM] Physical: 0x50000 - 0x6efbb000 (454507 pages, 1775 MB)
+[MEM] Physical: 0x50000 - 0x6f105000 (454837 pages, 1776 MB)
 [MEM] Frame allocator initialized
-[CPU] x86_64 PCR initialized at 0xffffffff80056a30
-[SYSCALL] x86_64 syscall MSRs initialized, LSTAR=0xffffffff800400e4
+[CPU] x86_64 PCR initialized at 0xffffffff8005aa30
+[SYSCALL] x86_64 syscall MSRs initialized, LSTAR=0xffffffff800413c4
 [BOOT] Stage 2: Memory & MMU (PEI)
 Exceptions initialized.
 [BOOT] Stage 3: Boot Console (DXE)
@@ -36,80 +36,136 @@ Timer initialized.
 [PCI] PciTransport created successfully
 [INPUT] VirtIO Input initialized via PCI.
 Detecting Initramfs...
-Initramfs found at 0xffff80006efdb000 - 0xffff80006f394200 (3904000 bytes)
+Initramfs found at 0xffff80006f125000 - 0xffff80006f372a00 (2415104 bytes)
 Files in initramfs:
  - .
- - hello.txt
+ - bin
+ - bin/busybox
+ - bin/sh
+ - bin/ash
+ - bin/cat
+ - bin/cp
+ - bin/echo
+ - bin/ls
+ - bin/mkdir
+ - bin/mv
+ - bin/pwd
+ - bin/rm
+ - bin/rmdir
+ - bin/touch
+ - bin/ln
+ - bin/chmod
+ - bin/chown
+ - bin/head
+ - bin/tail
+ - bin/true
+ - bin/false
+ - bin/test
+ - bin/[
+ - bin/stat
+ - bin/wc
+ - bin/grep
+ - bin/sed
+ - bin/awk
+ - bin/sort
+ - bin/uniq
+ - bin/cut
+ - bin/tr
+ - bin/tee
+ - bin/find
+ - bin/xargs
+ - bin/which
+ - bin/tar
+ - bin/gzip
+ - bin/gunzip
+ - bin/zcat
+ - bin/vi
+ - bin/ps
+ - bin/kill
+ - bin/killall
+ - bin/sleep
+ - bin/mount
+ - bin/umount
+ - bin/df
+ - bin/du
+ - bin/date
+ - bin/clear
+ - bin/reset
+ - bin/env
+ - bin/printenv
+ - bin/uname
+ - bin/hostname
+ - bin/id
+ - bin/whoami
+ - sbin
+ - sbin/init
+ - sbin/halt
+ - sbin/poweroff
+ - sbin/reboot
+ - etc
+ - etc/inittab
+ - etc/passwd
+ - etc/group
+ - etc/profile
+ - etc/motd
+ - proc
+ - sys
+ - tmp
+ - dev
+ - root
+ - root/hello.txt
  - init
- - shell
- - coreutils
- - cat
- - echo
- - head
- - mkdir
- - pwd
- - rm
- - tail
- - touch
- - dash
 [BOOT] Process hooks registered
 [BOOT] spawning init task...
 ELF Header e_ident verified
 [MMU] Creating user page table...
 [MMU] Allocated L0 table at phys [MASKED]
 [MMU] Zeroing L0 table at va [MASKED]
-[ELF] Copying segment: src[0]=55 to VA 10000
+[ELF] Copying segment: src[0]=7f to VA 400000
 [ELF] Resolved PA [MASKED] -> Kernel VA [MASKED]
-[ELF] Copying segment: src[0]=5b to VA 11458
+[ELF] Copying segment: src[0]=50 to VA 401000
 [ELF] Resolved PA [MASKED] -> Kernel VA [MASKED]
-[ELF] Copying segment: src[0]=d4 to VA 119d8
+[ELF] Copying segment: src[0]=2 to VA 4ef000
 [ELF] Resolved PA [MASKED] -> Kernel VA [MASKED]
-[ELF] Copying segment: src[0]=88 to VA 11a08
+[ELF] Copying segment: src[0]=f0 to VA 521c10
 [ELF] Resolved PA [MASKED] -> Kernel VA [MASKED]
 [TLS] TEAM_408: Allocated TLS at 0x7ffffffe0000
-[TASK] UserTask::new: PID=1 Entry=0x10000
-[SPAWN] Created process PID=1 entry=0x10000 sp=0x7ffffffeff30 brk=0x12000
+[TASK] UserTask::new: PID=1 Entry=0x4015b5
+[SPAWN] Created process PID=1 entry=0x4015b5 sp=0x7ffffffeff30 brk=0x527000
 [BOOT] Init process scheduled.
 Mounting filesystems...
 [FS] Filesystem subsystem ready
 [BOOT] Filesystem initialized successfully.
 [BOOT] Mounted tmpfs at /tmp
-[DEVTMPFS] Initialized with null, zero, full, urandom devices
+[DEVTMPFS] Initialized with null, zero, full, urandom, console devices
 [BOOT] Mounted devtmpfs at /dev
-[GPU_TEST] Flush count: 48
+[GPU_TEST] Flush count: 111
 [GPU_TEST] Framebuffer: 400 non-black pixels of 1024000 total
 
 [SUCCESS] LevitateOS System Ready.
 --------------------------------------
 [TASK_EXIT] PID 0 marked Exited, calling schedule()
-[TASK] Entering user task PID=1 at 0x10000
+[TASK] Entering user task PID=1 at 0x4015b5
 [TASK] Setting FS_BASE=0x7ffffffe0000 for PID=1
-[INIT] PID 1 starting...
-[SYSCALL] spawn('eyra-test-runner')
-[INIT] Spawning dash...
-[SYSCALL] spawn_args('/dash', argc=2)
-[SYSCALL]   argv[0] = 'dash'
-[SYSCALL]   argv[1] = '-i'
-ELF Header e_ident verified
-[MMU] Creating user page table...
-[MMU] Allocated L0 table at phys [MASKED]
-[MMU] Zeroing L0 table at va [MASKED]
-[ELF] Copying segment: src[0]=7f to VA 400000
-[ELF] Resolved PA [MASKED] -> Kernel VA [MASKED]
-[ELF] Copying segment: src[0]=4 to VA 420000
-[ELF] Resolved PA [MASKED] -> Kernel VA [MASKED]
-[ELF] Copying segment: src[0]=10 to VA 42ded0
-[ELF] Resolved PA [MASKED] -> Kernel VA [MASKED]
-[TLS] TEAM_408: Allocated TLS at 0x7ffffffe0000
-[TASK] UserTask::new: PID=2 Entry=0x400414
-[SPAWN] Created process PID=2 entry=0x400414 sp=0x7ffffffeff30 brk=0x430000
-[INIT] Shell spawned as PID 2
-[TASK] Entering user task PID=2 at 0x400414
-[TASK] Setting FS_BASE=0x7ffffffe0000 for PID=2
-[SYSCALL] arch_prctl(code=0x1002, addr=0x42fc18)
+[SYSCALL] arch_prctl(code=0x1002, addr=0x526278)
+[REBOOT] CAD_OFF - Ctrl+Alt+Del disabled
 [MMAP] Mapped 2 pages at 0x100000000000 with prot=0x0
 [MPROTECT] Changed protection for 1 pages at 0x100000001000-0x100000002000 prot=0x3
 [MMAP] Mapped 1 pages at 0x100000002000 with prot=0x3
-[SYSCALL] getpgid(0) -> 2
-[SYSCALL] setpgid(0, 2) -> 0
-# 
+[MMAP] Mapped 1 pages at 0x100000003000 with prot=0x3
+[MUNMAP] Unmapped 0x100000003000-0x100000004000
+[SYSCALL] clone(flags=0x11, stack=0x0, tls=0x0)
+[SYSCALL] clone: fork mode (no CLONE_VM)
+[FORK] Creating fork of PID=1
+[FORK] Copying user address space...
+[MMU] Creating user page table...
+[MMU] Allocated L0 table at phys [MASKED]
+[MMU] Zeroing L0 table at va [MASKED]
+[FORK] Copying VMA 0x100000000000-0x100000001000 flags=VmaFlags(0x0)
+[FORK] Copying VMA 0x100000001000-0x100000002000 flags=VmaFlags(READ | WRITE)
+[FORK] Copying VMA 0x100000002000-0x100000003000 flags=VmaFlags(READ | WRITE)
+[FORK] Address space copy complete, child_ttbr0=0x6e0f7000
+[FORK] Copied address space, child_ttbr0=0x6e0f7000
+[FORK] Child PID=2
+[FORK] Created child TCB: PID=2, ttbr0=0x6e0f7000, entry=0x4d5d54
+[SYSCALL] clone: forked process PID=2 from parent PID=1
