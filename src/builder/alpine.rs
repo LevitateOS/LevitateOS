@@ -140,27 +140,29 @@ pub const LIB_PACKAGES: &[&str] = &[
     "libxshmfence",
     // JSON for sway
     "json-c",
-    // Internationalization
-    "musl-libintl",
+    // Internationalization (libintl from gettext)
+    "libintl",
     // Mesa/OpenGL dependencies
     "mesa-gles",
     "libdisplay-info",
     // Compression libraries
+    "libbz2",              // bzip2 library
     "brotli-libs",
     "zstd-libs",
     // System utilities
-    "util-linux-libs",     // libmount for gio
+    "libmount",            // from util-linux, for gio
+    "libblkid",            // block device ID library
     // Font/text rendering
     "graphite2",
     // GCC runtime libraries
     "libgcc",
     "libstdc++",
-    // Logind for seat management
-    "elogind-libs",
+    // Logind for seat management (from community repo)
+    "libelogind",
     // BSD compatibility
     "libbsd",
     // ELF handling
-    "elfutils-libelf",
+    "elfutils",            // provides libelf
     // PCI access for DRM
     "libpciaccess",
     // LLVM for Mesa gallium shader compilation

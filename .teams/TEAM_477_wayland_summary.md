@@ -54,31 +54,28 @@ Fixed relative paths in `toolchain/openrc-out/x86_64/lib/rc/sh/gendepends.sh`:
 
 **Note:** This fix is lost if OpenRC is rebuilt from scratch.
 
-## What Still Needs Work
+## Alpine Package Names (IMPORTANT)
 
-### Missing Alpine Libraries
-When running `start-wayland`, sway fails with missing shared libraries:
-- `libintl.so.8` - needs `musl-libintl` or `gettext`
-- `libbz2.so.1` - needs `bzip2-libs` or similar
-- `libmount.so.1` - needs `util-linux-libs`
-- `libelf.so.1` - needs `elfutils-libelf`
-- `libelogind.so.0` - needs `elogind-libs`
+The Alpine package names differ from library names. Correct mappings:
 
-The Alpine package list in `src/builder/alpine.rs` was updated but some packages may have wrong names or not be extracting their .so files correctly.
+| Library | Alpine Package | Repository |
+|---------|---------------|------------|
+| libbz2.so.1 | `libbz2` | main |
+| libintl.so.8 | `libintl` | main |
+| libmount.so.1 | `libmount` | main |
+| libelf.so.1 | `elfutils` | main |
+| libelogind.so.0 | `libelogind` | community |
 
-### Current Package List (in alpine.rs)
+### Current Package List (in alpine.rs LIB_PACKAGES)
 ```rust
-LIB_PACKAGES includes:
-- json-c, musl-libintl, mesa-gles, libdisplay-info
-- brotli-libs, zstd-libs, util-linux-libs
-- graphite2, libgcc, libstdc++, elogind-libs
-- libbsd, elfutils-libelf, libpciaccess, llvm19-libs
+- json-c, libintl, mesa-gles, libdisplay-info
+- libbz2, brotli-libs, zstd-libs
+- libmount, libblkid, graphite2
+- libgcc, libstdc++, libelogind
+- libbsd, elfutils, libpciaccess, llvm19-libs
 ```
 
-### Debug Approach
-1. Check what packages actually downloaded: `ls toolchain/alpine-cache/x86_64/`
-2. Check what .so files were extracted: `find toolchain/alpine-root/x86_64 -name "*.so*"`
-3. The package names may differ from library names - check APKINDEX
+## What Still Needs Testing
 
 ## CLI Commands
 
