@@ -200,9 +200,10 @@ pub fn create_openrc_initramfs(arch: &str) -> Result<PathBuf> {
         archive.add_file("bin/rc-status", &data, 0o755);
     }
 
-    // /init points to openrc-init
-    archive.add_symlink("init", "/sbin/openrc-init");
-    archive.add_symlink("sbin/init", "/sbin/openrc-init");
+    // /init points to BusyBox init (handles inittab, spawns getty)
+    // OpenRC runs as services within BusyBox init's inittab
+    archive.add_symlink("init", "/bin/busybox");
+    archive.add_symlink("sbin/init", "/bin/busybox");
 
     // === Add OpenRC helper binaries from lib/rc/bin and lib/rc/sbin ===
     for subdir in ["bin", "sbin"] {
@@ -323,11 +324,16 @@ tmpfs         /run       tmpfs     rw,mode=0755 0         0
     archive.add_symlink("bin/login", "/bin/busybox");
 
     // /etc/inittab for OpenRC
+    // TEAM_475: Use ttyS0 for serial console (QEMU -nographic mode)
+    // Mount devtmpfs early so /dev/ttyS0 exists for getty
     archive.add_file("etc/inittab", br#"# LevitateOS OpenRC inittab
+# Mount devtmpfs first so /dev/ttyS0 exists
+::sysinit:/bin/mount -t devtmpfs devtmpfs /dev
 ::sysinit:/sbin/openrc sysinit
 ::wait:/sbin/openrc boot
 ::wait:/sbin/openrc default
-tty1::respawn:/sbin/getty 38400 tty1
+# Serial console - spawn shell after runlevels complete
+::respawn:/sbin/getty -n -l /bin/ash 115200 ttyS0 vt100
 ::shutdown:/sbin/openrc shutdown
 ::ctrlaltdel:/sbin/reboot
 "#, 0o644);
