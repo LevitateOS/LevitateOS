@@ -176,6 +176,7 @@ impl QemuBuilder {
     }
 
     /// Set boot mode to kernel with custom initrd
+    #[allow(dead_code)]
     pub fn boot_kernel(mut self, initrd: &str) -> Self {
         self.boot_mode = BootMode::Kernel;
         self.initrd = Some(initrd.to_string());
@@ -276,7 +277,10 @@ impl QemuBuilder {
                 }
                 // TEAM_474: Linux kernel needs command line for console
                 if self.use_linux_kernel {
-                    cmd.args(["-append", "console=ttyS0 earlyprintk=serial,ttyS0,115200 rdinit=/init"]);
+                    cmd.args([
+                        "-append",
+                        "console=ttyS0 earlyprintk=serial,ttyS0,115200 rdinit=/init",
+                    ]);
                 }
             }
             BootMode::Iso => {

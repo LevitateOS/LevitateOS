@@ -6,15 +6,13 @@
 //! Builds initramfs CPIO archives from declarative TOML manifest.
 
 mod builder;
-pub mod cpio;  // TEAM_475: Public for Alpine/OpenRC builder
+pub mod cpio; // TEAM_475: Public for Alpine/OpenRC builder
 mod manifest;
 mod tui;
 
-use anyhow::{bail, Context, Result};
-use std::path::{Path, PathBuf};
+use anyhow::{Context, Result};
 use std::os::unix::fs::PermissionsExt;
-
-pub use builder::BuildEvent;
+use std::path::PathBuf;
 
 /// Build initramfs for the given architecture
 ///
@@ -23,11 +21,7 @@ pub fn build_initramfs(arch: &str) -> Result<PathBuf> {
     let base_dir = PathBuf::from("initramfs");
     let manifest_path = base_dir.join("initramfs.toml");
 
-    let manifest = manifest::Manifest::load(
-        &manifest_path.to_string_lossy(),
-        arch,
-        &base_dir,
-    )?;
+    let manifest = manifest::Manifest::load(&manifest_path.to_string_lossy(), arch, &base_dir)?;
 
     // Validate with helpful error messages
     if let Err(e) = manifest.validate(&base_dir) {
@@ -74,7 +68,10 @@ pub fn create_busybox_initramfs(arch: &str) -> Result<()> {
     std::fs::copy(&output, &legacy_path)?;
 
     let size_kb = std::fs::metadata(&legacy_path)?.len() / 1024;
-    println!("  BusyBox initramfs created: {} ({} KB)", legacy_path, size_kb);
+    println!(
+        "  BusyBox initramfs created: {} ({} KB)",
+        legacy_path, size_kb
+    );
 
     Ok(())
 }
@@ -96,12 +93,34 @@ pub fn create_openrc_initramfs(arch: &str) -> Result<PathBuf> {
 
     // === Create directory structure ===
     let directories = [
-        ".", "bin", "sbin", "dev", "etc", "etc/init.d", "etc/conf.d",
-        "etc/runlevels", "etc/runlevels/sysinit", "etc/runlevels/boot",
-        "etc/runlevels/default", "etc/runlevels/shutdown",
-        "lib", "lib/rc", "lib/rc/bin", "lib/rc/sbin", "lib/rc/sh",
-        "proc", "sys", "tmp", "root", "mnt", "var", "var/log", "var/run",
-        "run", "share", "share/man",
+        ".",
+        "bin",
+        "sbin",
+        "dev",
+        "etc",
+        "etc/init.d",
+        "etc/conf.d",
+        "etc/runlevels",
+        "etc/runlevels/sysinit",
+        "etc/runlevels/boot",
+        "etc/runlevels/default",
+        "etc/runlevels/shutdown",
+        "lib",
+        "lib/rc",
+        "lib/rc/bin",
+        "lib/rc/sbin",
+        "lib/rc/sh",
+        "proc",
+        "sys",
+        "tmp",
+        "root",
+        "mnt",
+        "var",
+        "var/log",
+        "var/run",
+        "run",
+        "share",
+        "share/man",
     ];
     for dir in &directories {
         archive.add_directory(dir, 0o755);
@@ -182,13 +201,21 @@ pub fn create_openrc_initramfs(arch: &str) -> Result<PathBuf> {
 
     // === Add OpenRC binaries ===
     // Main OpenRC executables from sbin/
-    let openrc_sbin = ["openrc", "openrc-init", "openrc-run", "openrc-shutdown",
-                       "rc-service", "rc-update", "start-stop-daemon", "supervise-daemon"];
+    let openrc_sbin = [
+        "openrc",
+        "openrc-init",
+        "openrc-run",
+        "openrc-shutdown",
+        "rc-service",
+        "rc-update",
+        "start-stop-daemon",
+        "supervise-daemon",
+    ];
     for bin in &openrc_sbin {
         let src = openrc_dir.join("sbin").join(bin);
         if src.exists() {
-            let data = std::fs::read(&src)
-                .with_context(|| format!("Failed to read {}", src.display()))?;
+            let data =
+                std::fs::read(&src).with_context(|| format!("Failed to read {}", src.display()))?;
             archive.add_file(&format!("sbin/{}", bin), &data, 0o755);
         }
     }
@@ -282,22 +309,30 @@ pub fn create_openrc_initramfs(arch: &str) -> Result<PathBuf> {
     archive.add_file("etc/group", b"root:x:0:\n", 0o644);
 
     // /etc/profile
-    archive.add_file("etc/profile", br#"# LevitateOS profile
+    archive.add_file(
+        "etc/profile",
+        br#"# LevitateOS profile
 export PATH=/sbin:/bin:/usr/sbin:/usr/bin
 export HOME=/root
 export PS1='levitate# '
 alias ll='ls -la'
-"#, 0o644);
+"#,
+        0o644,
+    );
 
     // /etc/fstab - Required by OpenRC
-    archive.add_file("etc/fstab", br#"# LevitateOS fstab
+    archive.add_file(
+        "etc/fstab",
+        br#"# LevitateOS fstab
 # <device>    <mount>    <type>    <options>    <dump>    <pass>
 devtmpfs      /dev       devtmpfs  rw,mode=0755 0         0
 proc          /proc      proc      rw           0         0
 sysfs         /sys       sysfs     rw           0         0
 tmpfs         /tmp       tmpfs     rw,mode=1777 0         0
 tmpfs         /run       tmpfs     rw,mode=0755 0         0
-"#, 0o644);
+"#,
+        0o644,
+    );
 
     // Add BusyBox applets that OpenRC needs (md5sum, etc)
     archive.add_symlink("bin/md5sum", "/bin/busybox");
@@ -326,7 +361,9 @@ tmpfs         /run       tmpfs     rw,mode=0755 0         0
     // /etc/inittab for OpenRC
     // TEAM_475: Use ttyS0 for serial console (QEMU -nographic mode)
     // Mount devtmpfs early so /dev/ttyS0 exists for getty
-    archive.add_file("etc/inittab", br#"# LevitateOS OpenRC inittab
+    archive.add_file(
+        "etc/inittab",
+        br#"# LevitateOS OpenRC inittab
 # Mount devtmpfs first so /dev/ttyS0 exists
 ::sysinit:/bin/mount -t devtmpfs devtmpfs /dev
 ::sysinit:/sbin/openrc sysinit
@@ -336,10 +373,16 @@ tmpfs         /run       tmpfs     rw,mode=0755 0         0
 ::respawn:/sbin/getty -n -l /bin/ash 115200 ttyS0 vt100
 ::shutdown:/sbin/openrc shutdown
 ::ctrlaltdel:/sbin/reboot
-"#, 0o644);
+"#,
+        0o644,
+    );
 
     // /root/hello.txt - welcome message
-    archive.add_file("root/hello.txt", b"Welcome to LevitateOS with OpenRC!\n", 0o644);
+    archive.add_file(
+        "root/hello.txt",
+        b"Welcome to LevitateOS with OpenRC!\n",
+        0o644,
+    );
 
     // === Create runlevel symlinks ===
     // sysinit runlevel
@@ -379,7 +422,11 @@ tmpfs         /run       tmpfs     rw,mode=0755 0         0
     drop(writer);
 
     let size_kb = bytes / 1024;
-    println!("  OpenRC initramfs created: {} ({} KB)", output_path.display(), size_kb);
+    println!(
+        "  OpenRC initramfs created: {} ({} KB)",
+        output_path.display(),
+        size_kb
+    );
 
     Ok(output_path)
 }

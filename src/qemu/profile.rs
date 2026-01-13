@@ -4,15 +4,16 @@
 
 /// QEMU hardware profiles for different target configurations
 #[derive(Clone, Copy, Debug, Default)]
+#[allow(dead_code)]
 pub enum QemuProfile {
     /// Default: 2GB RAM, 1 core, cortex-a53 (aarch64)
     #[default]
     Default,
-    /// Pixel 6: 8GB RAM, 8 cores, cortex-a76, `GICv3`
+    /// Pixel 6: 8GB RAM, 8 cores, cortex-a76, GICv3
     Pixel6,
-    /// Test: `GICv3` on default machine
+    /// Test: GICv3 on default machine
     GicV3,
-    /// `x86_64`: 2GB RAM, 1 core, q35
+    /// x86_64: 2GB RAM, 1 core, q35
     X86_64,
 }
 

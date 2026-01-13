@@ -2,8 +2,10 @@
 //!
 //! TEAM_474: Event-driven builder for TUI progress reporting.
 
+#![allow(dead_code)]
+
 use super::cpio::CpioArchive;
-use super::manifest::{FileEntry, Manifest, parse_mode};
+use super::manifest::{parse_mode, FileEntry, Manifest};
 use anyhow::{Context, Result};
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
@@ -95,8 +97,13 @@ impl InitramfsBuilder {
         });
         for (name, binary) in &binaries {
             let source_path = PathBuf::from(&binary.source);
-            let data = std::fs::read(&source_path)
-                .with_context(|| format!("Failed to read binary '{}': {}", name, source_path.display()))?;
+            let data = std::fs::read(&source_path).with_context(|| {
+                format!(
+                    "Failed to read binary '{}': {}",
+                    name,
+                    source_path.display()
+                )
+            })?;
             let size = data.len() as u64;
             let mode = parse_mode(&binary.mode);
             archive.add_file(&binary.dest, &data, mode);
@@ -154,11 +161,14 @@ impl InitramfsBuilder {
             let (data, mode) = match entry {
                 FileEntry::FromFile { source, mode } => {
                     let source_path = self.base_dir.join("files").join(source);
-                    let data = std::fs::read(&source_path)
-                        .with_context(|| format!("Failed to read file: {}", source_path.display()))?;
+                    let data = std::fs::read(&source_path).with_context(|| {
+                        format!("Failed to read file: {}", source_path.display())
+                    })?;
                     (data, parse_mode(mode))
                 }
-                FileEntry::Inline { content, mode } => (content.as_bytes().to_vec(), parse_mode(mode)),
+                FileEntry::Inline { content, mode } => {
+                    (content.as_bytes().to_vec(), parse_mode(mode))
+                }
             };
             let size = data.len() as u64;
             archive.add_file(dest, &data, mode);
@@ -173,11 +183,14 @@ impl InitramfsBuilder {
             let (data, mode) = match entry {
                 FileEntry::FromFile { source, mode } => {
                     let source_path = self.base_dir.join(source);
-                    let data = std::fs::read(&source_path)
-                        .with_context(|| format!("Failed to read script: {}", source_path.display()))?;
+                    let data = std::fs::read(&source_path).with_context(|| {
+                        format!("Failed to read script: {}", source_path.display())
+                    })?;
                     (data, parse_mode(mode))
                 }
-                FileEntry::Inline { content, mode } => (content.as_bytes().to_vec(), parse_mode(mode)),
+                FileEntry::Inline { content, mode } => {
+                    (content.as_bytes().to_vec(), parse_mode(mode))
+                }
             };
             let size = data.len() as u64;
             archive.add_file(dest, &data, mode);

@@ -2,6 +2,8 @@
 //!
 //! TEAM_474: Parses `initramfs/initramfs.toml` declarative configuration.
 
+#![allow(dead_code)]
+
 use anyhow::{anyhow, Context, Result};
 use serde::Deserialize;
 use std::collections::HashMap;
@@ -153,7 +155,11 @@ impl Manifest {
     pub fn get_totals(&self) -> ManifestTotals {
         ManifestTotals {
             directories: self.layout.directories.len(),
-            binaries: self.binaries.values().filter(|b| !b.source.is_empty()).count(),
+            binaries: self
+                .binaries
+                .values()
+                .filter(|b| !b.source.is_empty())
+                .count(),
             symlinks: self.symlinks.len(),
             files: self.files.len() + self.scripts.len(),
             devices: self.devices.len(),

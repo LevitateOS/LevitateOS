@@ -35,6 +35,7 @@ pub fn output_dir(arch: &str) -> PathBuf {
 }
 
 /// Check if OpenRC has been built for the given architecture
+#[allow(dead_code)]
 pub fn exists(arch: &str) -> bool {
     output_dir(arch).join("sbin/openrc").exists()
 }
@@ -184,16 +185,16 @@ needs_exe_wrapper = false
             // TEAM_475: Build static libraries to avoid shared object conflicts with -static
             "--default-library=static",
             // Disable optional features for minimal build
-            "-Dpam=false",           // boolean
-            "-Daudit=disabled",      // feature
-            "-Dselinux=disabled",    // feature
-            "-Dbash-completions=false",  // boolean
-            "-Dzsh-completions=false",   // boolean
-            "-Dpkgconfig=false",     // boolean
+            "-Dpam=false",              // boolean
+            "-Daudit=disabled",         // feature
+            "-Dselinux=disabled",       // feature
+            "-Dbash-completions=false", // boolean
+            "-Dzsh-completions=false",  // boolean
+            "-Dpkgconfig=false",        // boolean
             // Use built-in implementations
-            "-Dnewnet=false",        // boolean
-            "-Dsysvinit=false",      // TEAM_475: Disable to avoid agetty service dependencies
-            "-Dos=Linux",            // target OS
+            "-Dnewnet=false",   // boolean
+            "-Dsysvinit=false", // TEAM_475: Disable to avoid agetty service dependencies
+            "-Dos=Linux",       // target OS
         ])
         .status()
         .context("meson setup failed")?;
@@ -229,7 +230,13 @@ needs_exe_wrapper = false
     }
 
     // Verify key binaries exist (rc-status is in bin/, others in sbin/)
-    let binaries = ["sbin/openrc", "sbin/openrc-run", "sbin/rc-service", "sbin/rc-update", "bin/rc-status"];
+    let binaries = [
+        "sbin/openrc",
+        "sbin/openrc-run",
+        "sbin/rc-service",
+        "sbin/rc-update",
+        "bin/rc-status",
+    ];
     for bin in &binaries {
         let path = install_dir.join(bin);
         if !path.exists() {
@@ -253,7 +260,11 @@ needs_exe_wrapper = false
     }
 
     let size = std::fs::metadata(&openrc_bin)?.len();
-    println!("  Built: {} ({:.1} KB)", openrc_bin.display(), size as f64 / 1024.0);
+    println!(
+        "  Built: {} ({:.1} KB)",
+        openrc_bin.display(),
+        size as f64 / 1024.0
+    );
     println!("OpenRC build complete");
 
     Ok(())
@@ -272,6 +283,7 @@ pub fn require(arch: &str) -> Result<PathBuf> {
 }
 
 /// Clean OpenRC build artifacts
+#[allow(dead_code)]
 pub fn clean() -> Result<()> {
     let build = build_dir();
     if build.exists() {

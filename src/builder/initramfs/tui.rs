@@ -4,6 +4,8 @@
 //!
 //! Key design: NO user input. Display-only progress and status.
 
+#![allow(dead_code)]
+
 use super::builder::BuildEvent;
 use super::manifest::ManifestTotals;
 use ratatui::{
@@ -102,7 +104,12 @@ impl Dashboard {
             BuildEvent::SymlinkCreated { link, target } => {
                 self.stats.symlinks_done += 1;
                 self.phase_progress.0 += 1;
-                self.add_activity("→", format!("{} -> {}", link, target), None, ItemStatus::Done);
+                self.add_activity(
+                    "→",
+                    format!("{} -> {}", link, target),
+                    None,
+                    ItemStatus::Done,
+                );
             }
             BuildEvent::FileAdded { path, size } => {
                 self.stats.files_done += 1;
@@ -130,7 +137,13 @@ impl Dashboard {
         }
     }
 
-    fn add_activity(&mut self, icon: &'static str, text: String, size: Option<u64>, status: ItemStatus) {
+    fn add_activity(
+        &mut self,
+        icon: &'static str,
+        text: String,
+        size: Option<u64>,
+        status: ItemStatus,
+    ) {
         if self.activity.len() >= MAX_ACTIVITY_ITEMS {
             self.activity.pop_front();
         }
@@ -148,10 +161,10 @@ impl Dashboard {
 
     pub fn render(&self, frame: &mut Frame) {
         let chunks = Layout::vertical([
-            Constraint::Length(3),  // Header
-            Constraint::Length(3),  // Progress
-            Constraint::Min(8),     // Activity
-            Constraint::Length(5),  // Statistics
+            Constraint::Length(3), // Header
+            Constraint::Length(3), // Progress
+            Constraint::Min(8),    // Activity
+            Constraint::Length(5), // Statistics
         ])
         .split(frame.area());
 
@@ -163,19 +176,32 @@ impl Dashboard {
 
     fn render_header(&self, frame: &mut Frame, area: Rect) {
         let title = if self.error.is_some() {
-            format!("  LEVITATE INITRAMFS BUILDER - ERROR                          {} ", self.arch)
+            format!(
+                "  LEVITATE INITRAMFS BUILDER - ERROR                          {} ",
+                self.arch
+            )
         } else if self.complete {
-            format!("  LEVITATE INITRAMFS BUILDER - COMPLETE                       {} ", self.arch)
+            format!(
+                "  LEVITATE INITRAMFS BUILDER - COMPLETE                       {} ",
+                self.arch
+            )
         } else {
-            format!("  LEVITATE INITRAMFS BUILDER                                  {} ", self.arch)
+            format!(
+                "  LEVITATE INITRAMFS BUILDER                                  {} ",
+                self.arch
+            )
         };
 
         let style = if self.error.is_some() {
             Style::default().fg(Color::Red).add_modifier(Modifier::BOLD)
         } else if self.complete {
-            Style::default().fg(Color::Green).add_modifier(Modifier::BOLD)
+            Style::default()
+                .fg(Color::Green)
+                .add_modifier(Modifier::BOLD)
         } else {
-            Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)
+            Style::default()
+                .fg(Color::Cyan)
+                .add_modifier(Modifier::BOLD)
         };
 
         let header = Paragraph::new(title)
@@ -233,11 +259,8 @@ impl Dashboard {
             })
             .collect();
 
-        let list = List::new(items).block(
-            Block::default()
-                .title(" ACTIVITY ")
-                .borders(Borders::ALL),
-        );
+        let list =
+            List::new(items).block(Block::default().title(" ACTIVITY ").borders(Borders::ALL));
         frame.render_widget(list, area);
     }
 
@@ -270,11 +293,8 @@ impl Dashboard {
             )
         };
 
-        let stats = Paragraph::new(stats_text).block(
-            Block::default()
-                .title(" STATISTICS ")
-                .borders(Borders::ALL),
-        );
+        let stats = Paragraph::new(stats_text)
+            .block(Block::default().title(" STATISTICS ").borders(Borders::ALL));
         frame.render_widget(stats, area);
     }
 }
@@ -327,7 +347,9 @@ pub fn print_simple_event(event: &BuildEvent) {
 pub fn run_build_with_tui(
     arch: &str,
     totals: &ManifestTotals,
-    build_fn: impl FnOnce(Box<dyn Fn(BuildEvent) + Send>) -> anyhow::Result<std::path::PathBuf> + Send + 'static,
+    build_fn: impl FnOnce(Box<dyn Fn(BuildEvent) + Send>) -> anyhow::Result<std::path::PathBuf>
+        + Send
+        + 'static,
 ) -> anyhow::Result<std::path::PathBuf> {
     use std::sync::mpsc;
 

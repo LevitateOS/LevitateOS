@@ -84,7 +84,12 @@ pub fn run_qemu(
 
 /// `TEAM_116`: Run QEMU with GDB server enabled (port 1234)
 /// TEAM_476: Updated to support Linux kernel mode (default)
-pub fn run_qemu_gdb_linux(profile: QemuProfile, wait: bool, arch: &str, openrc: bool) -> Result<()> {
+pub fn run_qemu_gdb_linux(
+    profile: QemuProfile,
+    wait: bool,
+    arch: &str,
+    openrc: bool,
+) -> Result<()> {
     let init_system = if openrc { "OpenRC" } else { "BusyBox" };
     println!("🐛 Starting QEMU with GDB server on port 1234 (Linux + {init_system})...");
     if wait {

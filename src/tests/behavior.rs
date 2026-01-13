@@ -30,6 +30,7 @@ pub fn run(arch: &str, update: bool) -> Result<()> {
 }
 
 /// Run behavior test with GICv3 profile (TEAM_055)
+#[allow(dead_code)]
 pub fn run_gicv3() -> Result<()> {
     run_with_profile(QemuProfile::GicV3, "aarch64", false)
 }

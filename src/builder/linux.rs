@@ -78,12 +78,17 @@ pub fn build_linux_kernel(arch: &str) -> Result<()> {
     }
 
     let size = std::fs::metadata(output_path)?.len();
-    println!("  Built: {} ({:.1} MB)", output_path, size as f64 / 1_000_000.0);
+    println!(
+        "  Built: {} ({:.1} MB)",
+        output_path,
+        size as f64 / 1_000_000.0
+    );
 
     Ok(())
 }
 
 /// Clean Linux kernel build
+#[allow(dead_code)]
 pub fn clean_linux() -> Result<()> {
     let linux_path = Path::new(LINUX_SRC);
 
@@ -107,6 +112,7 @@ pub fn clean_linux() -> Result<()> {
 }
 
 /// Get path to built Linux kernel image
+#[allow(dead_code)]
 pub fn linux_kernel_path(arch: &str) -> &'static str {
     match arch {
         "x86_64" => "linux/arch/x86/boot/bzImage",

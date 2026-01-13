@@ -147,7 +147,7 @@ cargo run -- build all
 - [x] **Phase 1**: Tag and archive custom kernel ✅
 - [x] **Phase 2**: Remove cruft + dead xtask modules ✅
 - [x] **Phase 3**: Move xtask → src, rename build → builder ✅
-- [ ] **Phase 4**: Update docs, review tests
+- [x] **Phase 4**: Update docs, review tests ✅
 - [ ] **Phase 5**: Verify boot, update golden files
 
 ### Session 4 (2026-01-13) - Phase 2 Execution
@@ -277,9 +277,61 @@ src/
 └── calc.rs
 ```
 
+### Session 7 (2026-01-13) - Phase 4 Execution
+
+**Phase 4: Polish - COMPLETED**
+
+1. **Updated CLI help text**:
+   - Changed name from "xtask" to "levitate"
+   - Updated module doc comments
+
+2. **Deleted stale test modules**:
+   - Removed `regression.rs` (custom kernel tests)
+   - Removed `coreutils.rs` (replaced by BusyBox)
+   - Updated `tests/mod.rs` and `main.rs` test handlers
+
+3. **Fixed compiler warnings**:
+   - Added `#![allow(dead_code)]` to initramfs builder modules
+   - Added `#[allow(dead_code)]` to utility functions
+   - Removed unused imports
+
+4. **Updated documentation**:
+   - Rewrote `CLAUDE.md` for new structure
+   - Rewrote `README.md` for distribution builder focus
+
+5. **Code formatting**:
+   - Ran `cargo fmt`
+   - Build compiles with no warnings
+
+### Session 8 (2026-01-13) - Docs Cleanup & Licensing
+
+**Docs Cleanup - COMPLETED**
+
+Removed all obsolete custom kernel documentation:
+- ARCHITECTURE.md, BOOT_SPECIFICATION.md, ROADMAP.md, VISION.md
+- DEBUGGING.md, debugging_memory_corruption.md, GOTCHAS.md
+- kernel_development_best_practices.md, verification_guide.md
+- VIRTIO_*.md, x86_64_*.md, LINUX_ABI_COMPATIBILITY.md
+- docs/development/, docs/handoffs/, docs/questions/
+- docs/releases/, docs/specs/, docs/testing/
+- docs/planning/.archive/ (all archived custom kernel plans)
+
+**Retained**:
+- docs/QEMU_PROFILES.md (still used for running)
+- docs/planning/levitate-v2/ (current refactor plan)
+- docs/planning/levpkg/ (future package manager)
+- docs/planning/refactor-rust-distro-builder/ (current phases)
+
+**Licensing - COMPLETED**
+
+- Updated LICENSE file explaining multi-license situation
+- Created LICENSES/ directory with official SPDX texts:
+  - MIT.txt (build tool, musl)
+  - GPL-2.0.txt (Linux, BusyBox)
+  - BSD-2-Clause.txt (OpenRC)
+
 **Next team should**:
-1. Execute Phase 4: Update CLAUDE.md and docs, fix warnings
-2. Execute Phase 5: Verify boot matches golden file
+1. Execute Phase 5: Verify boot matches golden file
 
 ## References
 

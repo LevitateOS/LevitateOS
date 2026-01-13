@@ -1,21 +1,51 @@
-MIT License
+LevitateOS License Information
+===============================
 
-Copyright (c) 2026 LevitateOS Contributors
+This project contains multiple components with different licenses:
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+1. LEVITATE BUILD TOOL (src/*)
+------------------------------
+License: MIT
+Copyright (c) 2024-2026 LevitateOS Contributors
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+The Rust build tool source code in this repository is licensed under MIT.
+See LICENSES/MIT.txt for the full license text.
+
+
+2. BUILT ARTIFACTS
+------------------
+When you run `cargo run -- build all`, the resulting artifacts contain
+software under different licenses:
+
+  - Linux kernel (linux/)     : GPL-2.0-only
+  - BusyBox (toolchain/)      : GPL-2.0-or-later
+  - OpenRC (toolchain/)       : BSD-2-Clause
+  - musl libc                 : MIT
+
+The GPL-licensed components (Linux, BusyBox) require that source code
+be made available when distributing binaries. This repository satisfies
+that requirement by building everything from source.
+
+
+3. DISTRIBUTION NOTICE
+----------------------
+If you distribute initramfs/ISO images built by this tool, you must:
+
+  a) Include this LICENSE file or equivalent notices
+  b) Provide access to source code for GPL components (Linux, BusyBox)
+  c) Preserve copyright notices in BSD/MIT components
+
+The source code for all components is available:
+  - Linux:   https://kernel.org (or the linux/ submodule)
+  - BusyBox: https://busybox.net
+  - OpenRC:  https://github.com/OpenRC/openrc
+  - musl:    https://musl.libc.org
+
+
+4. FULL LICENSE TEXTS
+---------------------
+See the LICENSES/ directory for complete license texts:
+  - LICENSES/MIT.txt           (levitate build tool, musl)
+  - LICENSES/GPL-2.0.txt       (Linux, BusyBox)
+  - LICENSES/BSD-2-Clause.txt  (OpenRC)

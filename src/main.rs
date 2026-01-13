@@ -1,51 +1,28 @@
-// TEAM_470: Suppress overly pedantic clippy lints for xtask
-#![allow(clippy::ptr_arg)]
-#![allow(clippy::trivially_copy_pass_by_ref)]
+//! # LevitateOS - Rust-native Linux distribution builder
+//!
+//! Build minimal Linux systems from source with type-safe, fast Rust tooling.
+//!
+//! ## Usage
+//!
+//! ```bash
+//! levitate build all           # Build Linux + BusyBox + OpenRC + initramfs
+//! levitate run --term          # Boot in QEMU with serial console
+//! levitate run                 # Boot with GUI
+//! levitate run --gdb           # Boot with GDB server on port 1234
+//! levitate clean               # Clean build artifacts
+//! ```
+//!
+//! ## Components Built
+//!
+//! - **Linux kernel** (6.19-rc5 from submodule)
+//! - **BusyBox** (shell + 300 utilities, static musl)
+//! - **OpenRC** (init system, static musl)
+//! - **initramfs** (CPIO archive)
+
+// Clippy configuration for CLI tool
 #![allow(clippy::struct_excessive_bools)]
 #![allow(clippy::too_many_lines)]
-#![allow(clippy::unnecessary_wraps)]
 #![allow(clippy::doc_lazy_continuation)]
-#![allow(clippy::match_same_arms)]
-#![allow(clippy::manual_strip)]
-#![allow(clippy::unwrap_used)]
-#![allow(clippy::expect_used)]
-#![allow(clippy::verbose_bit_mask)]
-#![allow(clippy::format_push_string)]
-#![allow(clippy::case_sensitive_file_extension_comparisons)]
-#![allow(clippy::manual_flatten)]
-#![allow(clippy::items_after_statements)]
-#![allow(clippy::manual_let_else)]
-#![allow(clippy::while_let_loop)]
-#![allow(clippy::needless_pass_by_value)]
-#![allow(clippy::lines_filter_map_ok)]
-
-//! `LevitateOS` xtask - Development task runner
-//!
-//! `TEAM_326`: Refactored command structure for clarity.
-//! `TEAM_475`: Linux kernel + OpenRC is now the default.
-//! `TEAM_476`: Removed custom kernel path (now Linux-only distribution builder).
-//!
-//! Usage:
-//!   cargo xtask run --term            # Linux + OpenRC (default, most common)
-//!   cargo xtask run --term --minimal  # Linux + BusyBox init (debugging)
-//!   cargo xtask build                 # Build everything
-//!   cargo xtask test                  # Run all tests
-//!
-//!   cargo xtask run --gdb             # Run with GDB server
-//!   cargo xtask run --vnc             # VNC display
-//!   cargo xtask run --profile pixel6  # Pixel 6 profile (aarch64)
-//!
-//!   cargo xtask vm start              # Start persistent VM session
-//!   cargo xtask vm send "ls"          # Send command to VM
-//!   cargo xtask vm screenshot         # Take VM screenshot
-//!   cargo xtask vm regs               # Dump CPU registers
-//!   cargo xtask vm stop               # Stop VM session
-//!
-//!   cargo xtask disk create           # Create disk image
-//!   cargo xtask disk install          # Install userspace to disk
-//!
-//!   cargo xtask check                 # Preflight checks
-//!   cargo xtask clean                 # Clean up artifacts
 
 use anyhow::{bail, Result};
 use clap::{Parser, Subcommand};
@@ -65,7 +42,7 @@ mod vm;
 use support::{clean, preflight};
 
 #[derive(Parser)]
-#[command(name = "xtask", about = "LevitateOS development task runner")]
+#[command(name = "levitate", about = "Rust-native Linux distribution builder")]
 struct Cli {
     #[command(subcommand)]
     command: Commands,
@@ -165,17 +142,13 @@ pub struct RunArgs {
 
 #[derive(clap::Args)]
 pub struct TestArgs {
-    /// Which test suite to run (unit, behavior, regress, gicv3, coreutils, or all)
+    /// Which test suite to run (unit, behavior, serial, keyboard, shutdown, debug, screenshot, or all)
     #[arg(default_value = "all")]
     pub suite: String,
 
-    /// Update golden logs with current output (Rule 4 Refined)
+    /// Update golden logs with current output
     #[arg(long)]
     pub update: bool,
-
-    /// `TEAM_465`: Phase to run for coreutils tests (e.g., "all", "2", "1-5")
-    #[arg(long, default_value = "all")]
-    pub phase: String,
 }
 
 fn main() -> Result<()> {
@@ -194,48 +167,22 @@ fn main() -> Result<()> {
         Commands::Test(args) => match args.suite.as_str() {
             "all" => {
                 preflight::check_preflight(arch)?;
-                println!("🧪 Running COMPLETE test suite for {arch}...\n");
+                println!("🧪 Running test suite for {arch}...\n");
                 tests::unit::run()?;
                 tests::behavior::run(arch, args.update)?;
-                if arch == "aarch64" {
-                    tests::behavior::run_gicv3().unwrap_or_else(|_| {
-                        println!("⚠️  GICv3 behavior differs (expected, needs separate golden file)\n");
-                    });
-                }
-                tests::regression::run()?;
-                // TEAM_142: Shutdown test is interactive, run separately
-                println!("\n✅ COMPLETE test suite finished!");
-                println!("ℹ️  Run 'cargo xtask test shutdown' separately for shutdown golden file test");
+                println!("\n✅ Test suite finished!");
             }
             "unit" => tests::unit::run()?,
             "behavior" => tests::behavior::run(arch, args.update)?,
-            "regress" | "regression" => tests::regression::run()?,
-            "gicv3" => {
-                if arch != "aarch64" {
-                    bail!("GICv3 tests only supported on aarch64");
-                }
-                tests::behavior::run_gicv3()?;
-            },
             "serial" => tests::serial_input::run(arch)?,
             "keyboard" => tests::keyboard_input::run(arch)?,
             "shutdown" => tests::shutdown::run(arch)?,
-            // TEAM_327: Backspace regression test
             "backspace" => tests::backspace::run(arch)?,
-            // TEAM_325: Debug tools integration tests (both architectures)
             "debug" => tests::debug_tools::run(args.update)?,
-            // TEAM_327: New unified screenshot tests
             "screenshot" => tests::screenshot::run(None)?,
             "screenshot:alpine" => tests::screenshot::run(Some("alpine"))?,
             "screenshot:levitate" => tests::screenshot::run(Some("levitate"))?,
-            "screenshot:userspace" => tests::screenshot::run(Some("userspace"))?,
-            // Legacy aliases
-            "alpine" => tests::screenshot::run(Some("alpine"))?,
-            "levitate" | "display" => tests::screenshot::run(Some("levitate"))?,
-            "userspace" => tests::screenshot::run(Some("userspace"))?,
-            // TEAM_465: Coreutils test suite
-            "coreutils" | "core" => tests::coreutils::run(arch, Some(args.phase.as_str()))?,
-            // TEAM_435: Eyra test removed (Eyra replaced by c-gull)
-            other => bail!("Unknown test suite: {other}. Use 'unit', 'behavior', 'regress', 'gicv3', 'coreutils', 'serial', 'keyboard', 'shutdown', 'debug', 'screenshot', or 'all'"),
+            other => bail!("Unknown test suite: {other}. Use 'unit', 'behavior', 'serial', 'keyboard', 'shutdown', 'backspace', 'debug', 'screenshot', or 'all'"),
         },
         // TEAM_326: Refactored command handlers
         Commands::Run(args) => {

@@ -5,6 +5,8 @@
 //! The newc format uses ASCII headers (110 bytes each) followed by
 //! filename and data, with 4-byte alignment.
 
+#![allow(dead_code)]
+
 use std::io::Write;
 
 /// File type constants for mode field (matches POSIX S_IF* values)
@@ -211,19 +213,19 @@ fn format_header(
          {:08X}\
          {:08X}\
          {:08X}",
-        ino,       // c_ino
-        mode,      // c_mode
-        0,         // c_uid (root)
-        0,         // c_gid (root)
-        nlink,     // c_nlink
-        0,         // c_mtime
-        filesize,  // c_filesize
-        dev_major, // c_devmajor
-        dev_minor, // c_devminor
+        ino,        // c_ino
+        mode,       // c_mode
+        0,          // c_uid (root)
+        0,          // c_gid (root)
+        nlink,      // c_nlink
+        0,          // c_mtime
+        filesize,   // c_filesize
+        dev_major,  // c_devmajor
+        dev_minor,  // c_devminor
         rdev_major, // c_rdevmajor
         rdev_minor, // c_rdevminor
-        namesize,  // c_namesize
-        0,         // c_check (always 0 for newc)
+        namesize,   // c_namesize
+        0,          // c_check (always 0 for newc)
     )
 }
 
