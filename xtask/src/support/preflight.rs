@@ -2,11 +2,17 @@ use anyhow::{bail, Context, Result};
 use std::process::Command;
 
 pub fn check_preflight(arch: &str) -> Result<()> {
-    println!("🔍 Running preflight checks for {}...", arch);
+    println!("🔍 Running preflight checks for {arch}...");
 
     let common_tools = ["cargo", "rustup", "find", "cpio", "dd", "curl", "git"];
     let x86_64_tools = ["xorriso", "sfdisk", "mformat", "mcopy", "mdir"];
-    let aarch64_tools = ["aarch64-linux-gnu-objcopy", "sfdisk", "mformat", "mcopy", "mdir"];
+    let aarch64_tools = [
+        "aarch64-linux-gnu-objcopy",
+        "sfdisk",
+        "mformat",
+        "mcopy",
+        "mdir",
+    ];
 
     let mut missing = Vec::new();
 
@@ -33,17 +39,17 @@ pub fn check_preflight(arch: &str) -> Result<()> {
     if !missing.is_empty() {
         println!("\n❌ Preflight FAILED. Missing tools:");
         for tool in &missing {
-            println!("   - {}", tool);
+            println!("   - {tool}");
         }
-        
+
         println!("\n💡 Tip: Install missing dependencies using:");
         if arch == "x86_64" {
             println!("   sudo apt-get install mtools xorriso curl cpio fdisk git");
         } else {
             println!("   sudo apt-get install mtools curl cpio fdisk git gcc-aarch64-linux-gnu");
         }
-        
-        bail!("Missing dependencies for {}", arch);
+
+        bail!("Missing dependencies for {arch}");
     }
 
     // Check Rust targets
@@ -54,9 +60,9 @@ pub fn check_preflight(arch: &str) -> Result<()> {
     };
 
     if !check_rust_target(target)? {
-        println!("\n❌ Preflight FAILED. Missing Rust target: {}", target);
-        println!("💡 Tip: Install it using: rustup target add {}", target);
-        bail!("Missing Rust target: {}", target);
+        println!("\n❌ Preflight FAILED. Missing Rust target: {target}");
+        println!("💡 Tip: Install it using: rustup target add {target}");
+        bail!("Missing Rust target: {target}");
     }
 
     if !check_rust_component("rust-src")? {
@@ -65,7 +71,7 @@ pub fn check_preflight(arch: &str) -> Result<()> {
         bail!("Missing Rust component: rust-src");
     }
 
-    println!("✅ Preflight checks PASSED for {}\n", arch);
+    println!("✅ Preflight checks PASSED for {arch}\n");
     Ok(())
 }
 
@@ -84,7 +90,7 @@ fn check_rust_target(target: &str) -> Result<bool> {
         .args(["target", "list", "--installed"])
         .output()
         .context("Failed to run rustup")?;
-    
+
     let stdout = String::from_utf8_lossy(&output.stdout);
     Ok(stdout.lines().any(|l| l.trim() == target))
 }
@@ -94,7 +100,7 @@ fn check_rust_component(component: &str) -> Result<bool> {
         .args(["component", "list", "--installed"])
         .output()
         .context("Failed to run rustup")?;
-    
+
     let stdout = String::from_utf8_lossy(&output.stdout);
     Ok(stdout.lines().any(|l| l.trim().starts_with(component)))
 }

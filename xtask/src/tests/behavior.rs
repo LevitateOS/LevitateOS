@@ -1,8 +1,8 @@
 //! Behavior test - verifies kernel boot output matches golden log
 //!
-//! TEAM_030: Migrated from scripts/test_behavior.sh
-//! TEAM_042: Added Pixel 6 profile support
-//! TEAM_142: Added graceful shutdown testing with exit --verbose
+//! `TEAM_030`: Migrated from `scripts/test_behavior.sh`
+//! `TEAM_042`: Added Pixel 6 profile support
+//! `TEAM_142`: Added graceful shutdown testing with exit --verbose
 //!
 //! Note: Uses --features verbose to enable boot messages.
 //! Production builds are silent (Rule 4: Silence is Golden).
@@ -42,7 +42,7 @@ pub fn run_pixel6(arch: &str) -> Result<()> {
     run_with_profile(QemuProfile::Pixel6, arch, false)
 }
 
-/// Run behavior test with GICv3 profile (TEAM_055)
+/// Run behavior test with `GICv3` profile (`TEAM_055`)
 pub fn run_gicv3() -> Result<()> {
     run_with_profile(QemuProfile::GicV3, "aarch64", false)
 }
@@ -54,7 +54,7 @@ fn run_with_profile(profile: QemuProfile, arch: &str, update: bool) -> Result<()
         QemuProfile::GicV3 => "GICv3 Test",
         QemuProfile::X86_64 => "x86_64 (ISO)",
     };
-    println!("=== Behavior Test [{} on {}] ===\n", profile_name, arch);
+    println!("=== Behavior Test [{profile_name} on {arch}] ===\n");
 
     // Load config to check golden file rating
     let config = XtaskConfig::load()?;
@@ -75,7 +75,7 @@ fn run_with_profile(profile: QemuProfile, arch: &str, update: bool) -> Result<()
     let qemu_bin = match arch {
         "aarch64" => "qemu-system-aarch64",
         "x86_64" => "qemu-system-x86_64",
-        _ => bail!("Unsupported architecture: {}", arch),
+        _ => bail!("Unsupported architecture: {arch}"),
     };
 
     // Kill any existing QEMU
@@ -84,7 +84,7 @@ fn run_with_profile(profile: QemuProfile, arch: &str, update: bool) -> Result<()
     // Clean up previous run
     let _ = fs::remove_file(ACTUAL_FILE);
 
-    println!("Running QEMU (headless, {}s timeout)...", TIMEOUT_SECS);
+    println!("Running QEMU (headless, {TIMEOUT_SECS}s timeout)...");
 
     let kernel_bin = if arch == "aarch64" {
         "kernel64_rust.bin"
@@ -98,7 +98,7 @@ fn run_with_profile(profile: QemuProfile, arch: &str, update: bool) -> Result<()
         format!("{}s", TIMEOUT_SECS),
         qemu_bin.to_string(),
         "-M".to_string(),
-        profile.machine().to_string(),
+        profile.machine().clone(),
         "-cpu".to_string(),
         profile.cpu().to_string(),
         "-m".to_string(),
@@ -119,7 +119,7 @@ fn run_with_profile(profile: QemuProfile, arch: &str, update: bool) -> Result<()
             "-kernel".to_string(),
             kernel_bin.to_string(),
             "-initrd".to_string(),
-            format!("initramfs_{}.cpio", arch),
+            format!("initramfs_{arch}.cpio"),
         ]);
     }
 
@@ -127,7 +127,7 @@ fn run_with_profile(profile: QemuProfile, arch: &str, update: bool) -> Result<()
         "-display".to_string(),
         "none".to_string(),
         "-serial".to_string(),
-        format!("file:{}", ACTUAL_FILE),
+        format!("file:{ACTUAL_FILE}"),
         "-device".to_string(),
         "virtio-gpu-pci".to_string(), // TEAM_114: PCI transport
         "-device".to_string(),
@@ -177,7 +177,7 @@ fn run_with_profile(profile: QemuProfile, arch: &str, update: bool) -> Result<()
     // TEAM_287: Use arch-specific golden file
     let golden_path = golden_file(arch);
     let golden = fs::read_to_string(golden_path)
-        .context(format!("Failed to read golden boot log: {}", golden_path))?;
+        .context(format!("Failed to read golden boot log: {golden_path}"))?;
     let actual = fs::read_to_string(ACTUAL_FILE).context("Failed to read actual boot output")?;
 
     // Normalize line endings
@@ -223,7 +223,7 @@ fn run_with_profile(profile: QemuProfile, arch: &str, update: bool) -> Result<()
         println!("❌ FAILURE: User process crashed with exception!\n");
         println!("--- Exception Details ---");
         for line in &exception_lines {
-            println!("{}", line);
+            println!("{line}");
         }
         println!();
         bail!("Userspace crashed - this is a bug that needs to be fixed! See TODO.md for debugging steps.");
@@ -235,14 +235,14 @@ fn run_with_profile(profile: QemuProfile, arch: &str, update: bool) -> Result<()
     let should_verify = match rating {
         GoldenRating::Silver => {
             // Silver files: Always auto-update and show diff
-            if !matches {
+            if matches {
+                println!("✅ SILVER MODE: No changes detected.\n");
+            } else {
                 println!("🔄 SILVER MODE: Auto-updating golden file...\n");
                 fs::write(golden_path, &actual_raw).context("Failed to update golden boot log")?;
                 println!("--- Changes Detected (Golden file updated) ---");
                 print_colored_diff(&golden, &actual);
                 println!();
-            } else {
-                println!("✅ SILVER MODE: No changes detected.\n");
             }
             true // Continue to verification
         }
@@ -272,7 +272,12 @@ fn run_with_profile(profile: QemuProfile, arch: &str, update: bool) -> Result<()
         // TEAM_129: Verify shell was spawned AND actually ran (catches scheduling bugs)
         // TEAM_287: Skip userspace checks for x86_64 (currently serial-only, no initramfs in ISO)
 
-        if arch != "x86_64" {
+        if arch == "x86_64" {
+            // x86_64: Just verify basic boot progress (serial-only mode)
+            if actual_raw.contains("[BOOT] Stage 4:") {
+                println!("✅ VERIFIED: x86_64 boot reached Stage 4.");
+            }
+        } else {
             // Check 1: Shell was spawned by init
             if !actual_raw.contains("[INIT] Shell spawned as PID 2") {
                 bail!("❌ FAILURE: Shell was not spawned!");
@@ -309,9 +314,9 @@ fn run_with_profile(profile: QemuProfile, arch: &str, update: bool) -> Result<()
                     .and_then(|s| s.parse::<u32>().ok())
                 {
                     if count < 10 {
-                        bail!("❌ FAILURE: GPU flush count is {} (too low) - shell output may not be visible!", count);
+                        bail!("❌ FAILURE: GPU flush count is {count} (too low) - shell output may not be visible!");
                     }
-                    println!("✅ VERIFIED: GPU flush count is {} (flushes happening during shell execution).", count);
+                    println!("✅ VERIFIED: GPU flush count is {count} (flushes happening during shell execution).");
                 }
             } else if actual_raw.contains("[GPU_TEST] Flush count:") {
                 println!("✅ VERIFIED: GPU flush is being called.");
@@ -326,11 +331,6 @@ fn run_with_profile(profile: QemuProfile, arch: &str, update: bool) -> Result<()
                 && !actual_raw.contains("WARNING: Framebuffer is entirely black")
             {
                 println!("✅ VERIFIED: Framebuffer has rendered content.");
-            }
-        } else {
-            // x86_64: Just verify basic boot progress (serial-only mode)
-            if actual_raw.contains("[BOOT] Stage 4:") {
-                println!("✅ VERIFIED: x86_64 boot reached Stage 4.");
             }
         }
 
@@ -359,18 +359,18 @@ fn print_colored_diff(expected: &str, actual: &str) {
             }
             (Some(e), Some(a)) => {
                 // Lines differ
-                println!("- {}", e);
-                println!("+ {}", a);
+                println!("- {e}");
+                println!("+ {a}");
                 changed += 1;
             }
             (Some(e), None) => {
                 // Line removed
-                println!("- {}", e);
+                println!("- {e}");
                 removed += 1;
             }
             (None, Some(a)) => {
                 // Line added
-                println!("+ {}", a);
+                println!("+ {a}");
                 added += 1;
             }
             (None, None) => unreachable!(),
@@ -379,9 +379,6 @@ fn print_colored_diff(expected: &str, actual: &str) {
 
     // Summary
     if added > 0 || removed > 0 || changed > 0 {
-        println!(
-            "\nSummary: {} added, {} removed, {} changed",
-            added, removed, changed
-        );
+        println!("\nSummary: {added} added, {removed} removed, {changed} changed");
     }
 }

@@ -1,7 +1,7 @@
 //! Coreutils Test Suite
 //!
-//! TEAM_465: Automated test runner for /root/test-core.sh
-//! Boots LevitateOS, runs the coreutils test script, and reports results.
+//! `TEAM_465`: Automated test runner for /root/test-core.sh
+//! Boots `LevitateOS`, runs the coreutils test script, and reports results.
 
 use anyhow::{bail, Context, Result};
 use std::io::{BufRead, BufReader, Write};
@@ -13,11 +13,11 @@ use crate::qemu::{Arch, QemuBuilder, QemuProfile};
 /// Run the coreutils test suite
 ///
 /// # Arguments
-/// * `arch` - Target architecture (x86_64 or aarch64)
+/// * `arch` - Target architecture (`x86_64` or aarch64)
 /// * `phase` - Which phase(s) to run: "all", "1", "2", "1-5", etc.
 pub fn run(arch: &str, phase: Option<&str>) -> Result<()> {
     let phase_arg = phase.unwrap_or("all");
-    println!("=== Coreutils Test Suite for {} (Phase: {}) ===\n", arch, phase_arg);
+    println!("=== Coreutils Test Suite for {arch} (Phase: {phase_arg}) ===\n");
 
     // Build everything first (including ISO for x86_64)
     println!("Building kernel and userspace...");
@@ -34,8 +34,7 @@ pub fn run(arch: &str, phase: Option<&str>) -> Result<()> {
         _ => QemuProfile::Default,
     };
 
-    let mut builder = QemuBuilder::new(qemu_arch, profile)
-        .display_nographic();
+    let mut builder = QemuBuilder::new(qemu_arch, profile).display_nographic();
 
     // x86_64 boots from ISO
     if arch == "x86_64" {
@@ -60,11 +59,9 @@ pub fn run(arch: &str, phase: Option<&str>) -> Result<()> {
     let reader = BufReader::new(stdout);
 
     let stdout_thread = std::thread::spawn(move || {
-        for line in reader.lines() {
-            if let Ok(line) = line {
-                println!("{}", line);
-                let _ = tx.send(line);
-            }
+        for line in reader.lines().flatten() {
+            println!("{line}");
+            let _ = tx.send(line);
         }
     });
 
@@ -75,7 +72,9 @@ pub fn run(arch: &str, phase: Option<&str>) -> Result<()> {
 
     while start.elapsed() < Duration::from_secs(60) {
         if let Ok(line) = rx.try_recv() {
-            if line.contains("LevitateOS#") || (line.contains("SUCCESS") && line.contains("System Ready")) {
+            if line.contains("LevitateOS#")
+                || (line.contains("SUCCESS") && line.contains("System Ready"))
+            {
                 shell_ready = true;
                 break;
             }
@@ -99,9 +98,9 @@ pub fn run(arch: &str, phase: Option<&str>) -> Result<()> {
     // Run the test script with the phase argument
     // TEAM_466: Script at root level (kernel has issues with subdirectory files)
     // TEAM_466: Send characters slowly to avoid serial input mangling
-    let test_cmd = format!("sh /test-core.sh {}\n", phase_arg);
+    let test_cmd = format!("sh /test-core.sh {phase_arg}\n");
     let test_cmd_trimmed = test_cmd.trim();
-    println!("\nSending: {}", test_cmd_trimmed);
+    println!("\nSending: {test_cmd_trimmed}");
 
     // Send character by character with 20ms delays to avoid input dropping
     // TEAM_466: Increased from 10ms after observing intermittent character loss
@@ -151,14 +150,14 @@ pub fn run(arch: &str, phase: Option<&str>) -> Result<()> {
 
     // Report results
     println!("\n=== Test Results ===");
-    println!("Passed: {}", pass_count);
-    println!("Failed: {}", fail_count);
+    println!("Passed: {pass_count}");
+    println!("Failed: {fail_count}");
 
     if test_passed {
         println!("\n✅ SUCCESS: All coreutils tests passed!");
         Ok(())
     } else if test_completed {
-        bail!("❌ FAILED: {} test(s) failed", fail_count);
+        bail!("❌ FAILED: {fail_count} test(s) failed");
     } else {
         bail!("❌ TIMEOUT: Tests did not complete within 120 seconds");
     }

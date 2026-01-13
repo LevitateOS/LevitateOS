@@ -1,7 +1,7 @@
 use anyhow::{Context, Result};
+use serde::{Deserialize, Serialize};
 use std::io::{BufRead, BufReader, Write};
 use std::os::unix::net::UnixStream;
-use serde::{Deserialize, Serialize};
 
 #[derive(Serialize)]
 struct QmpCommand {
@@ -31,9 +31,9 @@ pub struct QmpClient {
 impl QmpClient {
     pub fn connect(path: &str) -> Result<Self> {
         let stream = UnixStream::connect(path)
-            .with_context(|| format!("Failed to connect to QMP socket at {}", path))?;
+            .with_context(|| format!("Failed to connect to QMP socket at {path}"))?;
         let writer = stream.try_clone()?;
-        let mut client = Self { 
+        let mut client = Self {
             reader: BufReader::new(stream),
             writer,
         };
@@ -47,7 +47,11 @@ impl QmpClient {
         Ok(client)
     }
 
-    pub fn execute(&mut self, cmd: &str, args: Option<serde_json::Value>) -> Result<serde_json::Value> {
+    pub fn execute(
+        &mut self,
+        cmd: &str,
+        args: Option<serde_json::Value>,
+    ) -> Result<serde_json::Value> {
         let command = QmpCommand {
             execute: cmd.to_string(),
             arguments: args,
@@ -74,9 +78,9 @@ impl QmpClient {
         if line.is_empty() {
             anyhow::bail!("QMP Connection closed by peer");
         }
-        
+
         let resp: QmpResponse = serde_json::from_str(&line)
-            .with_context(|| format!("Failed to parse QMP response: {}", line))?;
+            .with_context(|| format!("Failed to parse QMP response: {line}"))?;
         Ok(resp)
     }
 }

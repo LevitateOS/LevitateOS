@@ -1,7 +1,8 @@
+#![allow(dead_code)]
 //! External C application build support using musl
 //!
-//! TEAM_444: C program support via musl-gcc.
-//! TEAM_451: Removed dash (replaced by BusyBox ash)
+//! `TEAM_444`: C program support via musl-gcc.
+//! `TEAM_451`: Removed dash (replaced by `BusyBox` ash)
 //!
 //! Similar to apps.rs but for C programs.
 //! Uses musl-gcc for static linking.
@@ -28,7 +29,7 @@ pub struct ExternalCApp {
 }
 
 /// Registry of all external C applications
-/// TEAM_451: dash removed - BusyBox ash is now the shell
+/// `TEAM_451`: dash removed - `BusyBox` ash is now the shell
 pub static C_APPS: &[ExternalCApp] = &[
     // Empty - dash removed, BusyBox provides shell now
 ];
@@ -47,10 +48,10 @@ impl ExternalCApp {
     /// Get the path to the built binary
     pub fn output_path(&self, arch: &str) -> PathBuf {
         // Extract just the filename from the binary path
-        let binary_name = PathBuf::from(self.binary)
-            .file_name()
-            .map(|s| s.to_string_lossy().to_string())
-            .unwrap_or_else(|| self.binary.to_string());
+        let binary_name = PathBuf::from(self.binary).file_name().map_or_else(
+            || self.binary.to_string(),
+            |s| s.to_string_lossy().to_string(),
+        );
         self.output_dir(arch).join(binary_name)
     }
 
@@ -135,9 +136,7 @@ impl ExternalCApp {
             configure.arg(arg);
         }
 
-        let status = configure
-            .status()
-            .context("./configure failed")?;
+        let status = configure.status().context("./configure failed")?;
 
         if !status.success() {
             bail!("configure failed for {}", self.name);
@@ -224,9 +223,7 @@ pub fn required_c_apps() -> impl Iterator<Item = &'static ExternalCApp> {
 
 /// Check if musl-gcc is available
 fn ensure_musl_gcc() -> Result<()> {
-    let output = Command::new("musl-gcc")
-        .arg("--version")
-        .output();
+    let output = Command::new("musl-gcc").arg("--version").output();
 
     if output.is_err() || !output.unwrap().status.success() {
         bail!(

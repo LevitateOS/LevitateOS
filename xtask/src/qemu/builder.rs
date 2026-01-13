@@ -1,6 +1,6 @@
 //! QEMU command builder
 //!
-//! TEAM_322: Builder pattern to eliminate duplicated QEMU arg construction.
+//! `TEAM_322`: Builder pattern to eliminate duplicated QEMU arg construction.
 
 use super::QemuProfile;
 use anyhow::{bail, Result};
@@ -46,7 +46,7 @@ impl TryFrom<&str> for Arch {
         match s {
             "aarch64" => Ok(Arch::Aarch64),
             "x86_64" => Ok(Arch::X86_64),
-            _ => bail!("Unsupported architecture: {}", s),
+            _ => bail!("Unsupported architecture: {s}"),
         }
     }
 }
@@ -85,7 +85,10 @@ pub struct GpuResolution {
 impl Default for GpuResolution {
     fn default() -> Self {
         // TEAM_330: Use 1280x800 for readable text (128x36 char grid with 10x20 font)
-        Self { width: 1280, height: 800 }
+        Self {
+            width: 1280,
+            height: 800,
+        }
     }
 }
 
@@ -200,7 +203,7 @@ impl QemuBuilder {
     /// Set disk image path (None to disable)
     #[allow(dead_code)]
     pub fn disk_image(mut self, path: Option<&str>) -> Self {
-        self.disk_image = path.map(|s| s.to_string());
+        self.disk_image = path.map(std::string::ToString::to_string);
         self
     }
 
@@ -281,19 +284,19 @@ impl QemuBuilder {
         // TEAM_444: Skip VirtIO input in nographic mode - use serial for input
         let suffix = self.arch.device_suffix();
         if !matches!(self.display, DisplayMode::Nographic) {
-            cmd.args(["-device", &format!("virtio-keyboard-{}", suffix)]);
-            cmd.args(["-device", &format!("virtio-tablet-{}", suffix)]);
+            cmd.args(["-device", &format!("virtio-keyboard-{suffix}")]);
+            cmd.args(["-device", &format!("virtio-tablet-{suffix}")]);
         }
 
         // Network
-        let net_device = format!("virtio-net-{},netdev=net0", suffix);
+        let net_device = format!("virtio-net-{suffix},netdev=net0");
         cmd.args(["-device", &net_device]);
         cmd.args(["-netdev", "user,id=net0"]);
 
         // Disk
         if let Some(ref disk) = self.disk_image {
-            cmd.args(["-drive", &format!("file={},format=raw,if=none,id=hd0", disk)]);
-            cmd.args(["-device", &format!("virtio-blk-{},drive=hd0", suffix)]);
+            cmd.args(["-drive", &format!("file={disk},format=raw,if=none,id=hd0")]);
+            cmd.args(["-device", &format!("virtio-blk-{suffix},drive=hd0")]);
         }
 
         // Display
@@ -370,7 +373,7 @@ mod tests {
         let builder = QemuBuilder::new(Arch::X86_64, QemuProfile::X86_64);
         let cmd = builder.build().unwrap();
         let args: Vec<_> = cmd.get_args().collect();
-        
+
         // Should contain machine type
         assert!(args.iter().any(|a| a.to_str() == Some("q35")));
         // Should contain cpu

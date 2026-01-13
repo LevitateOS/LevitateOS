@@ -3,7 +3,7 @@ use std::process::Command;
 
 /// Kill any running QEMU instances
 pub fn kill_qemu(arch: &str) -> Result<()> {
-    println!("🔪 Killing QEMU instances for {}...", arch);
+    println!("🔪 Killing QEMU instances for {arch}...");
     let qemu_bin = match arch {
         "aarch64" => "qemu-system-aarch64",
         "x86_64" => "qemu-system-x86_64",
@@ -26,7 +26,7 @@ pub fn kill_qemu(arch: &str) -> Result<()> {
 }
 
 pub fn clean(arch: &str) -> Result<()> {
-    println!("🧹 Cleaning for {}...", arch);
+    println!("🧹 Cleaning for {arch}...");
     kill_qemu(arch)?;
 
     // TEAM_294: Remove generated artifacts and staging directories
@@ -42,7 +42,7 @@ pub fn clean(arch: &str) -> Result<()> {
     for artifact in artifacts {
         if std::path::Path::new(artifact).exists() {
             let _ = std::fs::remove_file(artifact);
-            println!("✅ Removed {}", artifact);
+            println!("✅ Removed {artifact}");
         }
     }
 
@@ -50,7 +50,7 @@ pub fn clean(arch: &str) -> Result<()> {
     for dir in dirs {
         if std::path::Path::new(dir).exists() {
             let _ = std::fs::remove_dir_all(dir);
-            println!("✅ Removed directory {}", dir);
+            println!("✅ Removed directory {dir}");
         }
     }
 

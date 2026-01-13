@@ -1,7 +1,7 @@
 //! Shutdown Behavior Test
 //!
-//! TEAM_142: Tests graceful shutdown by sending "exit --verbose" to shell
-//! and verifying the output matches golden_shutdown.txt
+//! `TEAM_142`: Tests graceful shutdown by sending "exit --verbose" to shell
+//! and verifying the output matches `golden_shutdown.txt`
 
 use anyhow::{bail, Context, Result};
 use std::fs;
@@ -14,7 +14,7 @@ const ACTUAL_SHUTDOWN_FILE: &str = "tests/actual_shutdown.txt";
 
 /// Run the shutdown behavior test
 pub fn run(arch: &str) -> Result<()> {
-    println!("=== Shutdown Behavior Test for {} ===\n", arch);
+    println!("=== Shutdown Behavior Test for {arch} ===\n");
 
     // Build everything first
     crate::build::build_kernel_verbose(arch)?;
@@ -22,13 +22,11 @@ pub fn run(arch: &str) -> Result<()> {
     let qemu_bin = match arch {
         "aarch64" => "qemu-system-aarch64",
         "x86_64" => "qemu-system-x86_64",
-        _ => bail!("Unsupported architecture: {}", arch),
+        _ => bail!("Unsupported architecture: {arch}"),
     };
 
     // Kill any existing QEMU
-    let _ = Command::new("pkill")
-        .args(["-f", qemu_bin])
-        .status();
+    let _ = Command::new("pkill").args(["-f", qemu_bin]).status();
 
     let kernel_bin = if arch == "aarch64" {
         "kernel64_rust.bin"
@@ -37,21 +35,38 @@ pub fn run(arch: &str) -> Result<()> {
     };
 
     let args = vec![
-        "-M", if arch == "aarch64" { "virt" } else { "q35" },
-        "-cpu", if arch == "aarch64" { "cortex-a72" } else { "qemu64" },
-        "-m", "512M",
-        "-kernel", kernel_bin,
+        "-M",
+        if arch == "aarch64" { "virt" } else { "q35" },
+        "-cpu",
+        if arch == "aarch64" {
+            "cortex-a72"
+        } else {
+            "qemu64"
+        },
+        "-m",
+        "512M",
+        "-kernel",
+        kernel_bin,
         "-nographic",
-        "-device", "virtio-gpu-pci",
-        "-device", "virtio-keyboard-device",
-        "-device", "virtio-tablet-device",
-        "-device", "virtio-net-device,netdev=net0",
-        "-netdev", "user,id=net0",
-        "-drive", "file=tinyos_disk.img,format=raw,if=none,id=hd0",
-        "-device", "virtio-blk-device,drive=hd0",
+        "-device",
+        "virtio-gpu-pci",
+        "-device",
+        "virtio-keyboard-device",
+        "-device",
+        "virtio-tablet-device",
+        "-device",
+        "virtio-net-device,netdev=net0",
+        "-netdev",
+        "user,id=net0",
+        "-drive",
+        "file=tinyos_disk.img,format=raw,if=none,id=hd0",
+        "-device",
+        "virtio-blk-device,drive=hd0",
         // TEAM_327: Use arch-specific initramfs
-        "-initrd", "initramfs_aarch64.cpio",
-        "-serial", "mon:stdio",
+        "-initrd",
+        "initramfs_aarch64.cpio",
+        "-serial",
+        "mon:stdio",
         "-no-reboot",
     ];
 
@@ -89,7 +104,7 @@ pub fn run(arch: &str) -> Result<()> {
             Ok(n) => {
                 let chunk = String::from_utf8_lossy(&buf[..n]);
                 all_output.push_str(&chunk);
-                
+
                 // Look for shell prompt after banner
                 if all_output.contains("# ") && all_output.contains("LevitateOS Shell") {
                     break;
@@ -109,7 +124,7 @@ pub fn run(arch: &str) -> Result<()> {
     }
 
     println!("Shell ready. Sending 'exit --verbose'...");
-    
+
     // Send exit --verbose command
     stdin.write_all(b"exit --verbose\n")?;
     stdin.flush()?;
@@ -127,7 +142,7 @@ pub fn run(arch: &str) -> Result<()> {
                 consecutive_empty = 0;
                 let chunk = String::from_utf8_lossy(&buf[..n]);
                 shutdown_output.push_str(&chunk);
-                
+
                 // Check if shutdown completed
                 if shutdown_output.contains("[SHUTDOWN] Goodbye!") {
                     println!("Shutdown sequence completed.");
@@ -140,7 +155,10 @@ pub fn run(arch: &str) -> Result<()> {
                 consecutive_empty += 1;
                 // If we've had output and now nothing for a while, QEMU might have halted
                 if consecutive_empty > 40 && !shutdown_output.is_empty() {
-                    println!("No more output after {}ms, checking result...", consecutive_empty * 50);
+                    println!(
+                        "No more output after {}ms, checking result...",
+                        consecutive_empty * 50
+                    );
                     break;
                 }
                 std::thread::sleep(Duration::from_millis(50));
@@ -159,33 +177,35 @@ pub fn run(arch: &str) -> Result<()> {
         .context("Failed to write actual shutdown output")?;
 
     // Read golden file
-    let golden = fs::read_to_string(GOLDEN_SHUTDOWN_FILE)
-        .context("Failed to read golden shutdown file")?;
+    let golden =
+        fs::read_to_string(GOLDEN_SHUTDOWN_FILE).context("Failed to read golden shutdown file")?;
 
     // Normalize and compare
-    let golden_lines: Vec<&str> = golden.lines()
+    let golden_lines: Vec<&str> = golden
+        .lines()
         .filter(|l| !l.starts_with('#') && !l.trim().is_empty())
         .collect();
-    
-    let actual_lines: Vec<&str> = shutdown_output.lines()
+
+    let actual_lines: Vec<&str> = shutdown_output
+        .lines()
         .filter(|l| l.contains("exit") || l.contains("Goodbye") || l.contains("[SHUTDOWN]"))
         .collect();
 
     println!("\n--- Expected Shutdown Sequence ---");
     for line in &golden_lines {
-        println!("  {}", line);
+        println!("  {line}");
     }
-    
+
     println!("\n--- Actual Shutdown Output ---");
     for line in &actual_lines {
-        println!("  {}", line);
+        println!("  {line}");
     }
 
     // Check that all golden lines are present in actual output
     let mut all_found = true;
     for expected in &golden_lines {
         if !actual_lines.iter().any(|a| a.contains(expected.trim())) {
-            println!("❌ Missing: {}", expected);
+            println!("❌ Missing: {expected}");
             all_found = false;
         }
     }
@@ -195,7 +215,7 @@ pub fn run(arch: &str) -> Result<()> {
         Ok(())
     } else {
         println!("\n❌ FAILURE: Shutdown sequence mismatch!");
-        println!("\nFull shutdown output:\n{}", shutdown_output);
+        println!("\nFull shutdown output:\n{shutdown_output}");
         bail!("Shutdown behavior test failed")
     }
 }

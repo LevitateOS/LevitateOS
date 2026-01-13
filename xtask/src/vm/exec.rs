@@ -1,7 +1,7 @@
 //! VM exec command
 //!
-//! TEAM_323: Run arbitrary commands inside the VM shell from the host.
-//! TEAM_326: Moved to vm module for unified VM interaction.
+//! `TEAM_323`: Run arbitrary commands inside the VM shell from the host.
+//! `TEAM_326`: Moved to vm module for unified VM interaction.
 //!
 //! This works by:
 //! 1. Starting QEMU headless with stdin/stdout piped
@@ -19,8 +19,8 @@ use std::time::{Duration, Instant};
 
 /// Execute a command in the VM shell and return the output
 pub fn exec(cmd: &str, timeout_secs: u32, arch: &str) -> Result<String> {
-    println!("🐚 Executing in VM: {}", cmd);
-    println!("   Arch: {}, Timeout: {}s", arch, timeout_secs);
+    println!("🐚 Executing in VM: {cmd}");
+    println!("   Arch: {arch}, Timeout: {timeout_secs}s");
     println!();
 
     // Build first
@@ -34,12 +34,12 @@ pub fn exec(cmd: &str, timeout_secs: u32, arch: &str) -> Result<String> {
     // Get QEMU binary
     let arch_enum = Arch::try_from(arch)?;
     let qemu_bin = arch_enum.qemu_binary();
-    
+
     // Build args manually since we need special stdin/stdout handling
     let args = build_qemu_args(arch)?;
 
     println!("🚀 Starting QEMU...");
-    
+
     let mut child = Command::new(qemu_bin)
         .args(&args)
         .stdin(Stdio::piped())
@@ -64,7 +64,7 @@ pub fn exec(cmd: &str, timeout_secs: u32, arch: &str) -> Result<String> {
 
     let mut all_output = String::new();
     let mut buf = [0u8; 4096];
-    let timeout = Duration::from_secs(timeout_secs as u64);
+    let timeout = Duration::from_secs(u64::from(timeout_secs));
     let start = Instant::now();
 
     // Wait for shell prompt
@@ -89,31 +89,34 @@ pub fn exec(cmd: &str, timeout_secs: u32, arch: &str) -> Result<String> {
 
     if !all_output.contains("# ") && !all_output.contains("$ ") {
         let _ = child.kill();
-        bail!("Shell prompt not found within timeout. Partial output:\n{}", all_output);
+        bail!("Shell prompt not found within timeout. Partial output:\n{all_output}");
     }
 
     all_output.clear();
     std::thread::sleep(Duration::from_millis(200));
 
     // Send the command
-    println!("📤 Sending command: {}", cmd);
+    println!("📤 Sending command: {cmd}");
     stdin.write_all(cmd.as_bytes())?;
     stdin.write_all(b"\n")?;
     stdin.flush()?;
 
     // Capture output until we see another prompt
     let cmd_start = Instant::now();
-    let cmd_timeout = Duration::from_secs((timeout_secs / 2).max(5) as u64);
-    
+    let cmd_timeout = Duration::from_secs(u64::from((timeout_secs / 2).max(5)));
+
     while cmd_start.elapsed() < cmd_timeout {
         match stdout.read(&mut buf) {
             Ok(0) => break,
             Ok(n) => {
                 let chunk = String::from_utf8_lossy(&buf[..n]);
                 all_output.push_str(&chunk);
-                if all_output.lines().count() > 1 && 
-                   (all_output.ends_with("# ") || all_output.ends_with("$ ") ||
-                    all_output.contains("\n# ") || all_output.contains("\n$ ")) {
+                if all_output.lines().count() > 1
+                    && (all_output.ends_with("# ")
+                        || all_output.ends_with("$ ")
+                        || all_output.contains("\n# ")
+                        || all_output.contains("\n$ "))
+                {
                     break;
                 }
             }
@@ -133,7 +136,7 @@ pub fn exec(cmd: &str, timeout_secs: u32, arch: &str) -> Result<String> {
     println!();
     println!("📥 Output:");
     println!("────────────────────────────────────────");
-    println!("{}", clean_output);
+    println!("{clean_output}");
     println!("────────────────────────────────────────");
 
     Ok(clean_output)
@@ -146,42 +149,57 @@ fn build_qemu_args(arch: &str) -> Result<Vec<String>> {
         "aarch64" => (
             "virt",
             "cortex-a53",
-            vec!["-kernel", "kernel64_rust.bin", "-initrd", "initramfs_aarch64.cpio"],
-            "device"
+            vec![
+                "-kernel",
+                "kernel64_rust.bin",
+                "-initrd",
+                "initramfs_aarch64.cpio",
+            ],
+            "device",
         ),
         "x86_64" => (
             "q35",
-            "qemu64", 
+            "qemu64",
             vec!["-cdrom", "levitate.iso", "-boot", "d"],
-            "pci"
+            "pci",
         ),
-        _ => bail!("Unsupported architecture: {}", arch),
+        _ => bail!("Unsupported architecture: {arch}"),
     };
 
     let mut args = vec![
-        "-M".to_string(), machine.to_string(),
-        "-cpu".to_string(), cpu.to_string(),
-        "-m".to_string(), "512M".to_string(),
+        "-M".to_string(),
+        machine.to_string(),
+        "-cpu".to_string(),
+        cpu.to_string(),
+        "-m".to_string(),
+        "512M".to_string(),
     ];
-    
+
     for arg in kernel_args {
         args.push(arg.to_string());
     }
 
     args.extend([
         "-nographic".to_string(),
-        "-device".to_string(), "virtio-gpu-pci".to_string(),
-        "-device".to_string(), format!("virtio-keyboard-{}", device_suffix),
-        "-device".to_string(), format!("virtio-net-{},netdev=net0", device_suffix),
-        "-netdev".to_string(), "user,id=net0".to_string(),
-        "-serial".to_string(), "mon:stdio".to_string(),
+        "-device".to_string(),
+        "virtio-gpu-pci".to_string(),
+        "-device".to_string(),
+        format!("virtio-keyboard-{device_suffix}"),
+        "-device".to_string(),
+        format!("virtio-net-{device_suffix},netdev=net0"),
+        "-netdev".to_string(),
+        "user,id=net0".to_string(),
+        "-serial".to_string(),
+        "mon:stdio".to_string(),
         "-no-reboot".to_string(),
     ]);
 
     if std::path::Path::new("tinyos_disk.img").exists() {
         args.extend([
-            "-drive".to_string(), "file=tinyos_disk.img,format=raw,if=none,id=hd0".to_string(),
-            "-device".to_string(), format!("virtio-blk-{},drive=hd0", device_suffix),
+            "-drive".to_string(),
+            "file=tinyos_disk.img,format=raw,if=none,id=hd0".to_string(),
+            "-device".to_string(),
+            format!("virtio-blk-{device_suffix},drive=hd0"),
         ]);
     }
 
@@ -191,28 +209,28 @@ fn build_qemu_args(arch: &str) -> Result<Vec<String>> {
 /// Clean shell output by removing echoed command, prompts, and ANSI codes
 fn clean_shell_output(output: &str, cmd: &str) -> String {
     let lines: Vec<&str> = output.lines().collect();
-    
+
     let mut result = Vec::new();
     let mut skip_first = true;
-    
+
     for line in lines {
         if skip_first && line.contains(cmd) {
             skip_first = false;
             continue;
         }
         skip_first = false;
-        
-        if line.ends_with("# ") || line.ends_with("$ ") || 
-           line.trim() == "#" || line.trim() == "$" {
+
+        if line.ends_with("# ") || line.ends_with("$ ") || line.trim() == "#" || line.trim() == "$"
+        {
             continue;
         }
-        
+
         let clean = strip_ansi(line);
         if !clean.is_empty() {
             result.push(clean);
         }
     }
-    
+
     result.join("\n")
 }
 
@@ -220,7 +238,7 @@ fn clean_shell_output(output: &str, cmd: &str) -> String {
 fn strip_ansi(s: &str) -> String {
     let mut result = String::new();
     let mut in_escape = false;
-    
+
     for c in s.chars() {
         if c == '\x1b' {
             in_escape = true;
@@ -232,6 +250,6 @@ fn strip_ansi(s: &str) -> String {
             result.push(c);
         }
     }
-    
+
     result
 }

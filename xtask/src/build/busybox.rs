@@ -1,42 +1,43 @@
-//! BusyBox build support
+#![allow(dead_code)]
+//! `BusyBox` build support
 //!
-//! TEAM_451: Single binary replaces coreutils + dash + custom init
+//! `TEAM_451`: Single binary replaces coreutils + dash + custom init
 //!
-//! BusyBox provides:
+//! `BusyBox` provides:
 //! - Init system
 //! - Shell (ash)
 //! - 300+ utilities (coreutils, grep, sed, awk, vi, etc.)
 //!
-//! Built statically with musl for LevitateOS.
+//! Built statically with musl for `LevitateOS`.
 
 use anyhow::{bail, Context, Result};
 use std::path::PathBuf;
-use std::process::{Command, Stdio};
+use std::process::Command;
 
-/// Git repository URL for BusyBox
+/// Git repository URL for `BusyBox`
 pub const REPO: &str = "https://git.busybox.net/busybox";
 
-/// Get the clone directory for BusyBox source
+/// Get the clone directory for `BusyBox` source
 pub fn clone_dir() -> PathBuf {
     PathBuf::from("toolchain/busybox")
 }
 
 /// Get the output directory for built binaries
 pub fn output_dir(arch: &str) -> PathBuf {
-    PathBuf::from(format!("toolchain/busybox-out/{}", arch))
+    PathBuf::from(format!("toolchain/busybox-out/{arch}"))
 }
 
-/// Get the path to the built BusyBox binary
+/// Get the path to the built `BusyBox` binary
 pub fn output_path(arch: &str) -> PathBuf {
     output_dir(arch).join("busybox")
 }
 
-/// Check if BusyBox has been built for the given architecture
+/// Check if `BusyBox` has been built for the given architecture
 pub fn exists(arch: &str) -> bool {
     output_path(arch).exists()
 }
 
-/// Clone the BusyBox repository if not present (idempotent)
+/// Clone the `BusyBox` repository if not present (idempotent)
 pub fn clone_repo() -> Result<()> {
     let dir = clone_dir();
     if dir.exists() {
@@ -58,16 +59,16 @@ pub fn clone_repo() -> Result<()> {
         .context("Failed to clone BusyBox")?;
 
     if !status.success() {
-        bail!("Failed to clone BusyBox from {}", REPO);
+        bail!("Failed to clone BusyBox from {REPO}");
     }
 
     Ok(())
 }
 
-/// Build BusyBox using distrobox (Alpine container - native musl environment)
-/// TEAM_451: Alpine is built on musl, perfect for static BusyBox builds
-/// TEAM_452: Fixed DNS issue that was blocking container networking
-/// TEAM_459: Added cross-compilation support for aarch64
+/// Build `BusyBox` using distrobox (Alpine container - native musl environment)
+/// `TEAM_451`: Alpine is built on musl, perfect for static `BusyBox` builds
+/// `TEAM_452`: Fixed DNS issue that was blocking container networking
+/// `TEAM_459`: Added cross-compilation support for aarch64
 pub fn build(arch: &str) -> Result<()> {
     // Ensure cloned
     clone_repo()?;
@@ -76,8 +77,8 @@ pub fn build(arch: &str) -> Result<()> {
     ensure_distrobox()?;
 
     let dir = clone_dir();
-    let abs_dir = std::fs::canonicalize(&dir)
-        .context("Failed to get absolute path for BusyBox dir")?;
+    let abs_dir =
+        std::fs::canonicalize(&dir).context("Failed to get absolute path for BusyBox dir")?;
 
     // TEAM_459: For aarch64, ensure cross-compiler is available
     if arch == "aarch64" {
@@ -90,7 +91,7 @@ pub fn build(arch: &str) -> Result<()> {
         "native build"
     };
 
-    println!("🐳 Building BusyBox via distrobox (Alpine, {})...", cross_note);
+    println!("🐳 Building BusyBox via distrobox (Alpine, {cross_note})...");
 
     // Build script to run inside Alpine distrobox
     // Alpine is musl-native, so gcc IS musl-gcc
@@ -99,7 +100,8 @@ pub fn build(arch: &str) -> Result<()> {
         let toolchain_dir = PathBuf::from("toolchain/aarch64-linux-musl-cross");
         let abs_toolchain = std::fs::canonicalize(&toolchain_dir)
             .context("Failed to get absolute path for toolchain")?;
-        format!(r#"
+        format!(
+            r#"
 set -e
 cd "{abs_dir}"
 export PATH="{toolchain}/bin:$PATH"
@@ -119,9 +121,13 @@ echo "🔨 Building BusyBox (cross-compiling for aarch64)..."
 make ARCH=arm64 CROSS_COMPILE=aarch64-linux-musl- LDFLAGS=-static -j$(nproc)
 
 echo "✅ BusyBox build complete"
-"#, abs_dir=abs_dir.display(), toolchain=abs_toolchain.display())
+"#,
+            abs_dir = abs_dir.display(),
+            toolchain = abs_toolchain.display()
+        )
     } else {
-        format!(r#"
+        format!(
+            r#"
 set -e
 cd "{abs_dir}"
 
@@ -140,7 +146,9 @@ echo "🔨 Building BusyBox (native build)..."
 make LDFLAGS=-static -j$(nproc)
 
 echo "✅ BusyBox build complete"
-"#, abs_dir=abs_dir.display())
+"#,
+            abs_dir = abs_dir.display()
+        )
     };
 
     let status = Command::new("distrobox")
@@ -191,8 +199,7 @@ echo "✅ BusyBox build complete"
 /// Based on Alpine Linux's approach (see .external-kernels/alpine-aports/main/busybox/)
 fn apply_musl_config(dir: &PathBuf, _arch: &str) -> Result<()> {
     let config_path = dir.join(".config");
-    let config = std::fs::read_to_string(&config_path)
-        .context("Failed to read .config")?;
+    let config = std::fs::read_to_string(&config_path).context("Failed to read .config")?;
 
     // TEAM_451: Enable static linking and disable musl-incompatible features
     // Based on Alpine's busyboxconfig with modifications for static build
@@ -203,14 +210,29 @@ fn apply_musl_config(dir: &PathBuf, _arch: &str) -> Result<()> {
         .replace("CONFIG_PIE=y", "# CONFIG_PIE is not set")
         // Disable musl-incompatible features
         .replace("CONFIG_SELINUX=y", "# CONFIG_SELINUX is not set")
-        .replace("CONFIG_FEATURE_HAVE_RPC=y", "# CONFIG_FEATURE_HAVE_RPC is not set")
-        .replace("CONFIG_FEATURE_MOUNT_NFS=y", "# CONFIG_FEATURE_MOUNT_NFS is not set")
-        .replace("CONFIG_FEATURE_INETD_RPC=y", "# CONFIG_FEATURE_INETD_RPC is not set")
+        .replace(
+            "CONFIG_FEATURE_HAVE_RPC=y",
+            "# CONFIG_FEATURE_HAVE_RPC is not set",
+        )
+        .replace(
+            "CONFIG_FEATURE_MOUNT_NFS=y",
+            "# CONFIG_FEATURE_MOUNT_NFS is not set",
+        )
+        .replace(
+            "CONFIG_FEATURE_INETD_RPC=y",
+            "# CONFIG_FEATURE_INETD_RPC is not set",
+        )
         .replace("CONFIG_PAM=y", "# CONFIG_PAM is not set")
-        .replace("CONFIG_FEATURE_SYSTEMD=y", "# CONFIG_FEATURE_SYSTEMD is not set")
+        .replace(
+            "CONFIG_FEATURE_SYSTEMD=y",
+            "# CONFIG_FEATURE_SYSTEMD is not set",
+        )
         // Disable networking utilities that need kernel headers musl doesn't have
         .replace("CONFIG_TC=y", "# CONFIG_TC is not set")
-        .replace("CONFIG_FEATURE_TC_INGRESS=y", "# CONFIG_FEATURE_TC_INGRESS is not set")
+        .replace(
+            "CONFIG_FEATURE_TC_INGRESS=y",
+            "# CONFIG_FEATURE_TC_INGRESS is not set",
+        )
         // Disable other problematic features
         .replace("CONFIG_NSENTER=y", "# CONFIG_NSENTER is not set")
         .replace("CONFIG_UNSHARE=y", "# CONFIG_UNSHARE is not set")
@@ -230,10 +252,12 @@ fn apply_musl_config(dir: &PathBuf, _arch: &str) -> Result<()> {
         .replace("CONFIG_SETLOGCONS=y", "# CONFIG_SETLOGCONS is not set")
         // Ensure CROSS_COMPILER_PREFIX is empty - we pass CC directly
         // Setting a prefix makes BusyBox look for musl-ar, musl-ld etc which don't exist
-        .replace("CONFIG_CROSS_COMPILER_PREFIX=\"musl-\"", "CONFIG_CROSS_COMPILER_PREFIX=\"\"");
+        .replace(
+            "CONFIG_CROSS_COMPILER_PREFIX=\"musl-\"",
+            "CONFIG_CROSS_COMPILER_PREFIX=\"\"",
+        );
 
-    std::fs::write(&config_path, config)
-        .context("Failed to write .config")?;
+    std::fs::write(&config_path, config).context("Failed to write .config")?;
 
     Ok(())
 }
@@ -241,15 +265,13 @@ fn apply_musl_config(dir: &PathBuf, _arch: &str) -> Result<()> {
 /// Get number of CPUs for parallel build
 fn num_cpus() -> usize {
     std::thread::available_parallelism()
-        .map(|p| p.get())
+        .map(std::num::NonZero::get)
         .unwrap_or(4)
 }
 
 /// Check if musl-gcc is available
 fn ensure_musl_gcc() -> Result<()> {
-    let output = Command::new("musl-gcc")
-        .arg("--version")
-        .output();
+    let output = Command::new("musl-gcc").arg("--version").output();
 
     if output.is_err() || !output.unwrap().status.success() {
         bail!(
@@ -273,9 +295,9 @@ pub fn musl_gcc_available() -> bool {
         .unwrap_or(false)
 }
 
-/// TEAM_459: Download and setup the aarch64-linux-musl cross-compiler from musl.cc
+/// `TEAM_459`: Download and setup the aarch64-linux-musl cross-compiler from musl.cc
 /// This provides a complete toolchain for cross-compiling to aarch64 with musl libc
-/// Used by both BusyBox (C) and coreutils (Rust with musl target)
+/// Used by both `BusyBox` (C) and coreutils (Rust with musl target)
 pub fn setup_aarch64_cross_compiler() -> Result<PathBuf> {
     let toolchain_dir = PathBuf::from("toolchain/aarch64-linux-musl-cross");
 
@@ -300,7 +322,7 @@ pub fn setup_aarch64_cross_compiler() -> Result<PathBuf> {
             .context("Failed to download cross-compiler")?;
 
         if !status.success() {
-            bail!("Failed to download aarch64-linux-musl cross-compiler from {}", url);
+            bail!("Failed to download aarch64-linux-musl cross-compiler from {url}");
         }
     }
 
@@ -308,7 +330,12 @@ pub fn setup_aarch64_cross_compiler() -> Result<PathBuf> {
 
     // Extract to toolchain directory
     let status = Command::new("tar")
-        .args(["-xzf", tarball_path.to_str().unwrap_or(""), "-C", "toolchain"])
+        .args([
+            "-xzf",
+            tarball_path.to_str().unwrap_or(""),
+            "-C",
+            "toolchain",
+        ])
         .status()
         .context("Failed to extract cross-compiler")?;
 
@@ -328,9 +355,7 @@ pub fn setup_aarch64_cross_compiler() -> Result<PathBuf> {
 /// Check if distrobox is available and Alpine container exists
 fn ensure_distrobox() -> Result<()> {
     // Check distrobox command exists
-    let output = Command::new("distrobox")
-        .arg("--version")
-        .output();
+    let output = Command::new("distrobox").arg("--version").output();
 
     if output.is_err() || !output.unwrap().status.success() {
         bail!(
@@ -359,7 +384,7 @@ fn ensure_distrobox() -> Result<()> {
     Ok(())
 }
 
-/// Ensure BusyBox is built, building if necessary
+/// Ensure `BusyBox` is built, building if necessary
 pub fn ensure_built(arch: &str) -> Result<()> {
     if !exists(arch) {
         build(arch)?;
@@ -367,7 +392,7 @@ pub fn ensure_built(arch: &str) -> Result<()> {
     Ok(())
 }
 
-/// Require BusyBox to exist, returning path or error with helpful message
+/// Require `BusyBox` to exist, returning path or error with helpful message
 pub fn require(arch: &str) -> Result<PathBuf> {
     let path = output_path(arch);
     if !path.exists() {
@@ -474,8 +499,12 @@ mod tests {
     fn test_applets_not_empty() {
         assert!(!applets().is_empty());
         // Should have init in sbin
-        assert!(applets().iter().any(|(name, dir)| *name == "init" && *dir == "sbin"));
+        assert!(applets()
+            .iter()
+            .any(|(name, dir)| *name == "init" && *dir == "sbin"));
         // Should have sh in bin
-        assert!(applets().iter().any(|(name, dir)| *name == "sh" && *dir == "bin"));
+        assert!(applets()
+            .iter()
+            .any(|(name, dir)| *name == "sh" && *dir == "bin"));
     }
 }

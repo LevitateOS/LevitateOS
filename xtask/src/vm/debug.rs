@@ -1,7 +1,7 @@
 //! VM Debug commands
 //!
-//! TEAM_325: Implements debug tools for inspecting running VMs via QMP.
-//! TEAM_326: Moved to vm module for unified VM interaction.
+//! `TEAM_325`: Implements debug tools for inspecting running VMs via QMP.
+//! `TEAM_326`: Moved to vm module for unified VM interaction.
 //!
 //! Commands:
 //! - regs: Dump CPU registers via QMP human-monitor-command
@@ -21,7 +21,7 @@ fn find_qmp_socket(override_path: Option<&str>) -> Result<String> {
         if Path::new(path).exists() {
             return Ok(path.to_string());
         }
-        anyhow::bail!("QMP socket not found: {}", path);
+        anyhow::bail!("QMP socket not found: {path}");
     }
 
     // Try session socket first, then default
@@ -42,7 +42,7 @@ fn find_qmp_socket(override_path: Option<&str>) -> Result<String> {
 /// Dump CPU registers via QMP human-monitor-command
 pub fn regs(qmp_socket: Option<String>) -> Result<()> {
     let socket = find_qmp_socket(qmp_socket.as_deref())?;
-    println!("🔍 Connecting to QMP socket: {}", socket);
+    println!("🔍 Connecting to QMP socket: {socket}");
 
     let mut client = QmpClient::connect(&socket)?;
 
@@ -58,7 +58,7 @@ pub fn regs(qmp_socket: Option<String>) -> Result<()> {
         println!("║  CPU Registers                                           ║");
         println!("╚══════════════════════════════════════════════════════════╝");
         println!();
-        println!("{}", output);
+        println!("{output}");
     } else {
         println!("📋 Register dump:");
         println!("{}", serde_json::to_string_pretty(&result)?);
@@ -70,8 +70,8 @@ pub fn regs(qmp_socket: Option<String>) -> Result<()> {
 /// Dump memory via QMP memsave
 pub fn mem(addr: u64, len: usize, qmp_socket: Option<String>) -> Result<()> {
     let socket = find_qmp_socket(qmp_socket.as_deref())?;
-    println!("🔍 Connecting to QMP socket: {}", socket);
-    println!("📍 Address: 0x{:x}, Length: {} bytes", addr, len);
+    println!("🔍 Connecting to QMP socket: {socket}");
+    println!("📍 Address: 0x{addr:x}, Length: {len} bytes");
 
     let mut client = QmpClient::connect(&socket)?;
 
@@ -111,10 +111,10 @@ fn hexdump(data: &[u8], base_addr: u64) {
         let offset = i * BYTES_PER_LINE;
         let addr = base_addr + offset as u64;
 
-        print!("0x{:08x}: ", addr);
+        print!("0x{addr:08x}: ");
 
         for (j, byte) in chunk.iter().enumerate() {
-            print!("{:02x} ", byte);
+            print!("{byte:02x} ");
             if j == 7 {
                 print!(" ");
             }

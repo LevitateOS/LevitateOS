@@ -1,19 +1,21 @@
 //! Unit tests - runs cargo test on crates with std feature
 //!
-//! TEAM_030: Tests individual functions in isolation
-//! TEAM_425: Run tests from kernel submodule directory (separate workspace)
+//! `TEAM_030`: Tests individual functions in isolation
+//! `TEAM_425`: Run tests from kernel submodule directory (separate workspace)
 
 use anyhow::{bail, Context, Result};
 use std::process::Command;
 
 /// Run a test for a kernel crate from the kernel submodule directory
 fn run_kernel_test(crate_name: &str, features: Option<&str>) -> Result<()> {
-    println!("Running {} unit tests...", crate_name);
+    println!("Running {crate_name} unit tests...");
 
     let mut args = vec![
         "test",
-        "-p", crate_name,
-        "--target", "x86_64-unknown-linux-gnu",
+        "-p",
+        crate_name,
+        "--target",
+        "x86_64-unknown-linux-gnu",
     ];
 
     if let Some(feat) = features {
@@ -22,13 +24,13 @@ fn run_kernel_test(crate_name: &str, features: Option<&str>) -> Result<()> {
     }
 
     let status = Command::new("cargo")
-        .current_dir("crates/kernel")  // Run from kernel submodule
+        .current_dir("crates/kernel") // Run from kernel submodule
         .args(&args)
         .status()
-        .with_context(|| format!("Failed to run {} tests", crate_name))?;
+        .with_context(|| format!("Failed to run {crate_name} tests"))?;
 
     if !status.success() {
-        bail!("{} unit tests failed", crate_name);
+        bail!("{crate_name} unit tests failed");
     }
     Ok(())
 }

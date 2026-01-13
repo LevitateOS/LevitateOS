@@ -1,6 +1,6 @@
 //! QEMU run commands
 //!
-//! TEAM_322: Refactored to use QemuBuilder pattern.
+//! `TEAM_322`: Refactored to use `QemuBuilder` pattern.
 
 use crate::qemu::{Arch, QemuBuilder};
 use crate::{build, disk};
@@ -23,14 +23,19 @@ fn profile_for_arch(arch: &str) -> QemuProfile {
     }
 }
 
-/// TEAM_322: Run QEMU with default GUI display
-pub fn run_qemu(profile: QemuProfile, headless: bool, iso: bool, arch: &str, gpu_debug: bool) -> Result<()> {
+/// `TEAM_322`: Run QEMU with default GUI display
+pub fn run_qemu(
+    profile: QemuProfile,
+    headless: bool,
+    iso: bool,
+    arch: &str,
+    gpu_debug: bool,
+) -> Result<()> {
     disk::create_disk_image_if_missing()?;
 
     let arch_enum = Arch::try_from(arch)?;
     // TEAM_330: Explicitly set GPU resolution for readable display
-    let mut builder = QemuBuilder::new(arch_enum, profile)
-        .gpu_resolution(1280, 800);
+    let mut builder = QemuBuilder::new(arch_enum, profile).gpu_resolution(1280, 800);
 
     // Boot configuration
     if iso {
@@ -63,7 +68,7 @@ pub fn run_qemu(profile: QemuProfile, headless: bool, iso: bool, arch: &str, gpu
     Ok(())
 }
 
-/// TEAM_116: Run QEMU with GDB server enabled (port 1234)
+/// `TEAM_116`: Run QEMU with GDB server enabled (port 1234)
 pub fn run_qemu_gdb(profile: QemuProfile, wait: bool, iso: bool, arch: &str) -> Result<()> {
     println!("🐛 Starting QEMU with GDB server on port 1234...");
     if wait {
@@ -110,7 +115,13 @@ pub fn run_qemu_vnc(arch: &str) -> Result<()> {
     if !novnc_path.exists() {
         println!("📥 Downloading noVNC...");
         let status = Command::new("git")
-            .args(["clone", "--depth", "1", "https://github.com/novnc/noVNC.git", "/tmp/novnc"])
+            .args([
+                "clone",
+                "--depth",
+                "1",
+                "https://github.com/novnc/noVNC.git",
+                "/tmp/novnc",
+            ])
             .status()
             .context("Failed to clone noVNC")?;
         if !status.success() {
@@ -123,8 +134,12 @@ pub fn run_qemu_vnc(arch: &str) -> Result<()> {
 
     // Kill any existing VNC-related processes
     println!("🧹 Cleaning up existing processes...");
-    let _ = Command::new("pkill").args(["-f", "websockify.*6080"]).status();
-    let _ = Command::new("pkill").args(["-f", "qemu.*-vnc.*:0"]).status();
+    let _ = Command::new("pkill")
+        .args(["-f", "websockify.*6080"])
+        .status();
+    let _ = Command::new("pkill")
+        .args(["-f", "qemu.*-vnc.*:0"])
+        .status();
     std::thread::sleep(std::time::Duration::from_millis(500));
 
     // Start websockify
@@ -141,10 +156,10 @@ pub fn run_qemu_vnc(arch: &str) -> Result<()> {
     // Verify websockify started
     match websockify.try_wait() {
         Ok(Some(status)) => {
-            bail!("websockify exited immediately with status: {}. Port 6080 may be in use.", status);
+            bail!("websockify exited immediately with status: {status}. Port 6080 may be in use.");
         }
         Ok(None) => {} // Still running
-        Err(e) => bail!("Failed to check websockify status: {}", e),
+        Err(e) => bail!("Failed to check websockify status: {e}"),
     }
 
     println!();
@@ -199,7 +214,7 @@ fn find_websockify() -> Result<String> {
         if output.status.success() {
             let path = String::from_utf8_lossy(&output.stdout).trim().to_string();
             if !path.is_empty() {
-                println!("  Found websockify at: {}", path);
+                println!("  Found websockify at: {path}");
                 return Ok(path);
             }
         }
@@ -207,16 +222,16 @@ fn find_websockify() -> Result<String> {
 
     // Check common pip user install location
     let home = std::env::var("HOME").unwrap_or_else(|_| "/home/user".to_string());
-    let pip_path = format!("{}/.local/bin/websockify", home);
+    let pip_path = format!("{home}/.local/bin/websockify");
     if std::path::Path::new(&pip_path).exists() {
-        println!("  Found websockify at: {}", pip_path);
+        println!("  Found websockify at: {pip_path}");
         return Ok(pip_path);
     }
 
     // Check for pipx installation
-    let pipx_path = format!("{}/.local/pipx/venvs/websockify/bin/websockify", home);
+    let pipx_path = format!("{home}/.local/pipx/venvs/websockify/bin/websockify");
     if std::path::Path::new(&pipx_path).exists() {
-        println!("  Found websockify at: {}", pipx_path);
+        println!("  Found websockify at: {pipx_path}");
         return Ok(pipx_path);
     }
 
@@ -231,9 +246,9 @@ fn find_websockify() -> Result<String> {
     )
 }
 
-/// TEAM_374: Run QEMU with test runner for automated OS testing
+/// `TEAM_374`: Run QEMU with test runner for automated OS testing
 pub fn run_qemu_test(arch: &str) -> Result<()> {
-    println!("🧪 Running LevitateOS Internal Tests for {}...\n", arch);
+    println!("🧪 Running LevitateOS Internal Tests for {arch}...\n");
 
     // TEAM_317: x86_64 uses ISO (Limine)
     let use_iso = arch == "x86_64";
@@ -251,12 +266,11 @@ pub fn run_qemu_test(arch: &str) -> Result<()> {
     disk::create_disk_image_if_missing()?;
 
     let timeout_secs: u64 = 60;
-    println!("Running QEMU (headless, {}s timeout)...\n", timeout_secs);
+    println!("Running QEMU (headless, {timeout_secs}s timeout)...\n");
 
     let arch_enum = Arch::try_from(arch)?;
     let profile = profile_for_arch(arch);
-    let mut builder = QemuBuilder::new(arch_enum, profile)
-        .display_headless();
+    let mut builder = QemuBuilder::new(arch_enum, profile).display_headless();
 
     if use_iso {
         builder = builder.boot_iso();
@@ -265,7 +279,10 @@ pub fn run_qemu_test(arch: &str) -> Result<()> {
     }
 
     let base_cmd = builder.build()?;
-    let args: Vec<_> = base_cmd.get_args().map(|a| a.to_string_lossy().to_string()).collect();
+    let args: Vec<_> = base_cmd
+        .get_args()
+        .map(|a| a.to_string_lossy().to_string())
+        .collect();
 
     // Run with timeout
     let mut timeout_args = vec![format!("{}s", timeout_secs)];
@@ -280,10 +297,10 @@ pub fn run_qemu_test(arch: &str) -> Result<()> {
     // Print stdout (serial output)
     let stdout = String::from_utf8_lossy(&output.stdout);
     let stderr = String::from_utf8_lossy(&output.stderr);
-    print!("{}", stdout);
+    print!("{stdout}");
 
     if !output.status.success() && !stderr.is_empty() {
-        eprintln!("\nQEMU Stderr:\n{}", stderr);
+        eprintln!("\nQEMU Stderr:\n{stderr}");
     }
 
     // Check for test results
@@ -299,10 +316,10 @@ pub fn run_qemu_test(arch: &str) -> Result<()> {
     }
 }
 
-/// TEAM_139: Run QEMU in terminal-only mode (WSL-like)
+/// `TEAM_139`: Run QEMU in terminal-only mode (WSL-like)
 pub fn run_qemu_term(arch: &str, iso: bool) -> Result<()> {
     println!("╔════════════════════════════════════════════════════════════╗");
-    println!("║  LevitateOS Terminal Mode - {}                        ║", arch);
+    println!("║  LevitateOS Terminal Mode - {arch}                        ║");
     println!("║                                                            ║");
     println!("║  Type directly here - keyboard goes to VM                  ║");
     println!("║  Ctrl+A X to exit QEMU                                     ║");
@@ -341,7 +358,7 @@ pub fn run_qemu_term(arch: &str, iso: bool) -> Result<()> {
     Ok(())
 }
 
-/// TEAM_320: Verify GPU display via VNC + Puppeteer
+/// `TEAM_320`: Verify GPU display via VNC + Puppeteer
 pub fn verify_gpu(arch: &str, timeout: u32) -> Result<()> {
     println!("╔══════════════════════════════════════════════════════════╗");
     println!("║  [GPU VERIFY] Starting automated GPU verification...     ║");
@@ -362,7 +379,13 @@ pub fn verify_gpu(arch: &str, timeout: u32) -> Result<()> {
     if !novnc_path.exists() {
         println!("📥 Downloading noVNC...");
         let status = Command::new("git")
-            .args(["clone", "--depth", "1", "https://github.com/novnc/noVNC.git", "/tmp/novnc"])
+            .args([
+                "clone",
+                "--depth",
+                "1",
+                "https://github.com/novnc/noVNC.git",
+                "/tmp/novnc",
+            ])
             .status()
             .context("Failed to clone noVNC")?;
         if !status.success() {
@@ -373,8 +396,12 @@ pub fn verify_gpu(arch: &str, timeout: u32) -> Result<()> {
     let websockify_path = find_websockify()?;
 
     // Kill existing processes
-    let _ = Command::new("pkill").args(["-f", "websockify.*6080"]).status();
-    let _ = Command::new("pkill").args(["-f", "qemu.*-vnc.*:0"]).status();
+    let _ = Command::new("pkill")
+        .args(["-f", "websockify.*6080"])
+        .status();
+    let _ = Command::new("pkill")
+        .args(["-f", "qemu.*-vnc.*:0"])
+        .status();
     std::thread::sleep(std::time::Duration::from_millis(500));
 
     // Start websockify
@@ -416,8 +443,8 @@ pub fn verify_gpu(arch: &str, timeout: u32) -> Result<()> {
     std::thread::sleep(std::time::Duration::from_secs(3));
 
     // Wait specified timeout for GPU to initialize
-    println!("⏳ Waiting {}s for GPU display...", timeout);
-    std::thread::sleep(std::time::Duration::from_secs(timeout as u64));
+    println!("⏳ Waiting {timeout}s for GPU display...");
+    std::thread::sleep(std::time::Duration::from_secs(u64::from(timeout)));
 
     // Take screenshot via QMP
     if std::path::Path::new("./qmp.sock").exists() {
@@ -430,7 +457,7 @@ pub fn verify_gpu(arch: &str, timeout: u32) -> Result<()> {
                 }
             }
             Err(e) => {
-                println!("⚠️  Failed to connect to QMP: {}", e);
+                println!("⚠️  Failed to connect to QMP: {e}");
             }
         }
     }
@@ -444,7 +471,10 @@ pub fn verify_gpu(arch: &str, timeout: u32) -> Result<()> {
     if screenshot_path.exists() {
         let metadata = std::fs::metadata(screenshot_path)?;
         if metadata.len() > 1000 {
-            println!("✅ GPU verification: Screenshot captured ({} bytes)", metadata.len());
+            println!(
+                "✅ GPU verification: Screenshot captured ({} bytes)",
+                metadata.len()
+            );
             Ok(())
         } else {
             bail!("❌ GPU verification failed: Screenshot too small (display may be inactive)");

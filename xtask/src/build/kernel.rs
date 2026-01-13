@@ -1,17 +1,17 @@
 //! Kernel build module
 //!
-//! TEAM_466: Extracted from commands.rs during refactor.
+//! `TEAM_466`: Extracted from commands.rs during refactor.
 
 use anyhow::{bail, Context, Result};
 use std::process::Command;
 
 /// Build kernel with specified features.
 pub fn build_kernel_with_features(features: &[&str], arch: &str) -> Result<()> {
-    println!("Building kernel for {}...", arch);
+    println!("Building kernel for {arch}...");
     let target = match arch {
         "aarch64" => "aarch64-unknown-none",
         "x86_64" => "x86_64-unknown-none",
-        _ => bail!("Unsupported architecture: {}", arch),
+        _ => bail!("Unsupported architecture: {arch}"),
     };
 
     let mut args = vec![

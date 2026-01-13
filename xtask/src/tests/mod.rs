@@ -1,8 +1,8 @@
-//! Test modules for LevitateOS
+//! Test modules for `LevitateOS`
 //!
-//! TEAM_327: Reorganized test structure.
-//! TEAM_435: Removed eyra module (Eyra replaced by c-gull)
-//! TEAM_465: Added coreutils test module
+//! `TEAM_327`: Reorganized test structure.
+//! `TEAM_435`: Removed eyra module (Eyra replaced by c-gull)
+//! `TEAM_465`: Added coreutils test module
 
 pub mod backspace;
 pub mod common;

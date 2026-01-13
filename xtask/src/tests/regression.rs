@@ -1,14 +1,14 @@
 //! Regression tests for bugs found in TEAM_025-029 implementations
 //!
-//! TEAM_030: Static analysis tests that verify source code patterns.
+//! `TEAM_030`: Static analysis tests that verify source code patterns.
 //! These catch bugs that can't be caught by unit tests or runtime behavior tests.
 //!
 //! Test Categories:
 //! - API Consistency: Function signatures match across cfg targets
 //! - Constant Synchronization: Values match between files (mmu.rs <-> linker.ld)
-//! - Code Patterns: Correct API usage (e.g., dimensions() not hardcoded values)
+//! - Code Patterns: Correct API usage (e.g., `dimensions()` not hardcoded values)
 //!
-//! # CRITICAL: Test Failure Handling (TEAM_132)
+//! # CRITICAL: Test Failure Handling (`TEAM_132`)
 //!
 //! **ALL TESTS MUST PASS. NO EXCEPTIONS.**
 //!
@@ -31,16 +31,19 @@ struct TestResults {
 
 impl TestResults {
     fn new() -> Self {
-        Self { passed: 0, failed: 0 }
+        Self {
+            passed: 0,
+            failed: 0,
+        }
     }
 
     fn pass(&mut self, msg: &str) {
-        println!("  ✅ {}", msg);
+        println!("  ✅ {msg}");
         self.passed += 1;
     }
 
     fn fail(&mut self, msg: &str) {
-        println!("  ❌ {}", msg);
+        println!("  ❌ {msg}");
         self.failed += 1;
     }
 
@@ -117,14 +120,15 @@ pub fn run() -> Result<()> {
     }
 }
 
-/// API Consistency: enable_mmu exists in arch-specific module
-/// TEAM_342: Updated to check arch-specific files after mmu.rs became delegation-only
-/// TEAM_465: Updated paths after kernel submodule reorganization
+/// API Consistency: `enable_mmu` exists in arch-specific module
+/// `TEAM_342`: Updated to check arch-specific files after mmu.rs became delegation-only
+/// `TEAM_465`: Updated paths after kernel submodule reorganization
 fn test_enable_mmu_signature(results: &mut TestResults) {
     println!("API: enable_mmu stub signature matches real function");
 
     // TEAM_465: HAL is now at crates/kernel/lib/hal/, mmu init is in submodule
-    let aarch64_mmu = fs::read_to_string("crates/kernel/lib/hal/src/aarch64/mmu/init.rs").unwrap_or_default();
+    let aarch64_mmu =
+        fs::read_to_string("crates/kernel/lib/hal/src/aarch64/mmu/init.rs").unwrap_or_default();
     let x86_mmu = fs::read_to_string("crates/kernel/lib/hal/src/x86_64/mmu.rs").unwrap_or_default();
 
     // Check that enable_mmu exists in at least one arch (may be unsafe or not)
@@ -138,27 +142,26 @@ fn test_enable_mmu_signature(results: &mut TestResults) {
     }
 }
 
-/// Constant Sync: KERNEL_PHYS_END matches linker.ld __heap_end
-/// TEAM_342: Updated to check arch-specific mmu files
-/// TEAM_465: Updated paths after kernel submodule reorganization
+/// Constant Sync: `KERNEL_PHYS_END` matches linker.ld __`heap_end`
+/// `TEAM_342`: Updated to check arch-specific mmu files
+/// `TEAM_465`: Updated paths after kernel submodule reorganization
 fn test_kernel_phys_end(results: &mut TestResults) {
     println!("Sync: KERNEL_PHYS_END constant matches linker.ld __heap_end");
 
     // TEAM_465: KERNEL_PHYS_END is now in constants.rs submodule
-    let mmu_rs = match fs::read_to_string("crates/kernel/lib/hal/src/aarch64/mmu/constants.rs") {
-        Ok(c) => c,
-        Err(_) => {
+    let mmu_rs =
+        if let Ok(c) = fs::read_to_string("crates/kernel/lib/hal/src/aarch64/mmu/constants.rs") {
+            c
+        } else {
             results.fail("Could not read crates/kernel/lib/hal/src/aarch64/mmu/constants.rs");
             return;
-        }
-    };
+        };
 
-    let linker_ld = match fs::read_to_string("linker.ld") {
-        Ok(c) => c,
-        Err(_) => {
-            results.fail("Could not read linker.ld");
-            return;
-        }
+    let linker_ld = if let Ok(c) = fs::read_to_string("linker.ld") {
+        c
+    } else {
+        results.fail("Could not read linker.ld");
+        return;
     };
 
     // Extract KERNEL_PHYS_END from mmu.rs
@@ -169,7 +172,7 @@ fn test_kernel_phys_end(results: &mut TestResults) {
     // Look for the line with _kernel_virt_base + hex value and extract the LAST hex value
     let linker_value = linker_ld
         .lines()
-        .find(|l| l.contains("_kernel_virt_base") && l.contains("+") && l.contains("0x"))
+        .find(|l| l.contains("_kernel_virt_base") && l.contains('+') && l.contains("0x"))
         .and_then(|l| {
             // Find the hex value after the '+' sign
             let plus_pos = l.find('+')?;
@@ -180,14 +183,12 @@ fn test_kernel_phys_end(results: &mut TestResults) {
     match (mmu_value, linker_value) {
         (Some(mmu), Some(linker)) if mmu == linker => {
             results.pass(&format!(
-                "KERNEL_PHYS_END ({:#x}) matches linker.ld ({:#x})",
-                mmu, linker
+                "KERNEL_PHYS_END ({mmu:#x}) matches linker.ld ({linker:#x})"
             ));
         }
         (Some(mmu), Some(linker)) => {
             results.fail(&format!(
-                "KERNEL_PHYS_END ({:#x}) does NOT match linker.ld ({:#x})",
-                mmu, linker
+                "KERNEL_PHYS_END ({mmu:#x}) does NOT match linker.ld ({linker:#x})"
             ));
         }
         _ => {
@@ -197,17 +198,16 @@ fn test_kernel_phys_end(results: &mut TestResults) {
 }
 
 /// Code Pattern: Input cursor scaling uses GPU dimensions, not hardcoded values
-/// TEAM_465: Updated paths after kernel submodule reorganization
+/// `TEAM_465`: Updated paths after kernel submodule reorganization
 fn test_input_dimensions(results: &mut TestResults) {
     println!("Pattern: Input cursor scaling uses GPU dimensions");
 
     // TEAM_465: Kernel main code is now in levitate subdir
-    let content = match fs::read_to_string("crates/kernel/levitate/src/input.rs") {
-        Ok(c) => c,
-        Err(_) => {
-            results.fail("Could not read crates/kernel/levitate/src/input.rs");
-            return;
-        }
+    let content = if let Ok(c) = fs::read_to_string("crates/kernel/levitate/src/input.rs") {
+        c
+    } else {
+        results.fail("Could not read crates/kernel/levitate/src/input.rs");
+        return;
     };
 
     if content.contains("dimensions()") {
@@ -238,8 +238,8 @@ fn test_input_dimensions(results: &mut TestResults) {
 fn extract_hex_constant(content: &str, name: &str) -> Option<u64> {
     content
         .lines()
-        .find(|l| l.contains(&format!("const {}", name)))
-        .and_then(|l| extract_hex_from_line(l))
+        .find(|l| l.contains(&format!("const {name}")))
+        .and_then(extract_hex_from_line)
 }
 
 fn extract_hex_from_line(line: &str) -> Option<u64> {
@@ -257,18 +257,17 @@ fn extract_hex_from_line(line: &str) -> Option<u64> {
 // TEAM_055: Phase 4-5 Regression Tests
 // =============================================================================
 
-/// Phase 4: VirtIO Block driver exists and is properly integrated
-/// TEAM_465: Updated paths after kernel submodule reorganization
+/// Phase 4: `VirtIO` Block driver exists and is properly integrated
+/// `TEAM_465`: Updated paths after kernel submodule reorganization
 fn test_virtio_block_driver(results: &mut TestResults) {
     println!("Phase 4: VirtIO Block driver integration");
 
     // TEAM_465: Kernel main code is now in levitate subdir
-    let block_rs = match fs::read_to_string("crates/kernel/levitate/src/block.rs") {
-        Ok(c) => c,
-        Err(_) => {
-            results.fail("Could not read crates/kernel/levitate/src/block.rs");
-            return;
-        }
+    let block_rs = if let Ok(c) = fs::read_to_string("crates/kernel/levitate/src/block.rs") {
+        c
+    } else {
+        results.fail("Could not read crates/kernel/levitate/src/block.rs");
+        return;
     };
 
     // Verify VirtIOBlk is used
@@ -287,17 +286,16 @@ fn test_virtio_block_driver(results: &mut TestResults) {
 }
 
 /// Phase 4: FAT32 filesystem integration with embedded-sdmmc
-/// TEAM_465: Updated paths after kernel submodule reorganization
+/// `TEAM_465`: Updated paths after kernel submodule reorganization
 fn test_fat32_integration(results: &mut TestResults) {
     println!("Phase 4: FAT32 filesystem integration");
 
     // TEAM_465: FAT32 is now in ext4 fs crate (historical naming)
-    let fat_rs = match fs::read_to_string("crates/kernel/fs/ext4/src/fat.rs") {
-        Ok(c) => c,
-        Err(_) => {
-            results.fail("Could not read crates/kernel/fs/ext4/src/fat.rs");
-            return;
-        }
+    let fat_rs = if let Ok(c) = fs::read_to_string("crates/kernel/fs/ext4/src/fat.rs") {
+        c
+    } else {
+        results.fail("Could not read crates/kernel/fs/ext4/src/fat.rs");
+        return;
     };
 
     // Verify embedded-sdmmc integration
@@ -316,51 +314,53 @@ fn test_fat32_integration(results: &mut TestResults) {
 }
 
 /// Phase 4: Initramfs CPIO parser integration
-/// TEAM_342: Updated - initramfs uses INITRAMFS global, not CpioArchive directly in init.rs
-/// TEAM_465: Updated paths after kernel submodule reorganization
+/// `TEAM_342`: Updated - initramfs uses INITRAMFS global, not `CpioArchive` directly in init.rs
+/// `TEAM_465`: Updated paths after kernel submodule reorganization
 fn test_initramfs_parser(results: &mut TestResults) {
     println!("Phase 4: Initramfs CPIO parser integration");
 
     // TEAM_465: Kernel main code is now in levitate subdir
-    let init_rs = match fs::read_to_string("crates/kernel/levitate/src/init.rs") {
-        Ok(c) => c,
-        Err(_) => {
-            results.fail("Could not read crates/kernel/levitate/src/init.rs");
-            return;
-        }
+    let init_rs = if let Ok(c) = fs::read_to_string("crates/kernel/levitate/src/init.rs") {
+        c
+    } else {
+        results.fail("Could not read crates/kernel/levitate/src/init.rs");
+        return;
     };
 
     // TEAM_465: fs.rs is in levitate, not fs/mod.rs
     let fs_mod = fs::read_to_string("crates/kernel/levitate/src/fs.rs").unwrap_or_default();
 
     // Verify initramfs handling exists somewhere
-    if init_rs.contains("INITRAMFS") || init_rs.contains("initramfs") || fs_mod.contains("INITRAMFS") {
+    if init_rs.contains("INITRAMFS")
+        || init_rs.contains("initramfs")
+        || fs_mod.contains("INITRAMFS")
+    {
         results.pass("Initramfs handling exists in kernel");
     } else {
         results.fail("Initramfs handling missing");
     }
 
     // Verify initrd discovery (could be via Limine or FDT)
-    if init_rs.contains("initrd") || init_rs.contains("initramfs") || init_rs.contains("Initramfs") {
+    if init_rs.contains("initrd") || init_rs.contains("initramfs") || init_rs.contains("Initramfs")
+    {
         results.pass("init.rs handles initrd discovery");
     } else {
         results.fail("init.rs missing initrd handling");
     }
 }
 
-/// Phase 5: GICv3 support exists in driver code
-/// TEAM_342: Fixed path - gic.rs is in aarch64 subdir
-/// TEAM_465: Updated paths after kernel submodule reorganization
+/// Phase 5: `GICv3` support exists in driver code
+/// `TEAM_342`: Fixed path - gic.rs is in aarch64 subdir
+/// `TEAM_465`: Updated paths after kernel submodule reorganization
 fn test_gicv3_support(results: &mut TestResults) {
     println!("Phase 5: GICv3 driver support");
 
     // TEAM_465: HAL is now at crates/kernel/lib/hal/
-    let gic_rs = match fs::read_to_string("crates/kernel/lib/hal/src/aarch64/gic.rs") {
-        Ok(c) => c,
-        Err(_) => {
-            results.fail("Could not read crates/kernel/lib/hal/src/aarch64/gic.rs");
-            return;
-        }
+    let gic_rs = if let Ok(c) = fs::read_to_string("crates/kernel/lib/hal/src/aarch64/gic.rs") {
+        c
+    } else {
+        results.fail("Could not read crates/kernel/lib/hal/src/aarch64/gic.rs");
+        return;
     };
 
     // Verify GicVersion enum has V3 variant
@@ -381,7 +381,7 @@ fn test_gicv3_support(results: &mut TestResults) {
     // TEAM_342: GicV3 profile moved to qemu/profile.rs after refactor
     let profile_rs = fs::read_to_string("xtask/src/qemu/profile.rs").unwrap_or_default();
     let run_rs = fs::read_to_string("xtask/src/run.rs").unwrap_or_default();
-    let combined = format!("{}{}", profile_rs, run_rs);
+    let combined = format!("{profile_rs}{run_rs}");
 
     if combined.contains("GicV3") && combined.contains("gic-version=3") {
         results.pass("xtask defines GicV3 QEMU profile");
@@ -391,13 +391,14 @@ fn test_gicv3_support(results: &mut TestResults) {
 }
 
 /// Phase 5: Buddy Allocator integration in kernel
-/// TEAM_465: Updated paths after kernel submodule reorganization
+/// `TEAM_465`: Updated paths after kernel submodule reorganization
 fn test_buddy_allocator_integration(results: &mut TestResults) {
     println!("Phase 5: Buddy Allocator integration");
 
     // TEAM_465: Memory is now split - check los_mm crate and HAL allocator
     let mm_lib = fs::read_to_string("crates/kernel/mm/src/lib.rs").unwrap_or_default();
-    let hal_allocator = fs::read_to_string("crates/kernel/lib/hal/src/allocator/buddy.rs").unwrap_or_default();
+    let hal_allocator =
+        fs::read_to_string("crates/kernel/lib/hal/src/allocator/buddy.rs").unwrap_or_default();
     let memory_rs = fs::read_to_string("crates/kernel/levitate/src/memory.rs").unwrap_or_default();
 
     // Verify BuddyAllocator is used somewhere in memory subsystem
@@ -408,16 +409,18 @@ fn test_buddy_allocator_integration(results: &mut TestResults) {
     }
 
     // TEAM_465: Kernel main code is now in levitate subdir
-    let init_rs = match fs::read_to_string("crates/kernel/levitate/src/init.rs") {
-        Ok(c) => c,
-        Err(_) => {
-            results.fail("Could not read crates/kernel/levitate/src/init.rs");
-            return;
-        }
+    let init_rs = if let Ok(c) = fs::read_to_string("crates/kernel/levitate/src/init.rs") {
+        c
+    } else {
+        results.fail("Could not read crates/kernel/levitate/src/init.rs");
+        return;
     };
 
     // TEAM_465: Check for any memory initialization
-    if init_rs.contains("memory::init") || init_rs.contains("init_mmu") || memory_rs.contains("init") {
+    if init_rs.contains("memory::init")
+        || init_rs.contains("init_mmu")
+        || memory_rs.contains("init")
+    {
         results.pass("Memory subsystem initialization present");
     } else {
         results.fail("Memory initialization missing");
@@ -428,19 +431,18 @@ fn test_buddy_allocator_integration(results: &mut TestResults) {
 // TEAM_065: Hybrid Boot Architecture Fixes
 // =============================================================================
 
-/// TEAM_065: GPU initialization split to Stage 3
-/// TEAM_146: Refactored - GPU init moved to init.rs
-/// TEAM_465: Updated paths after kernel submodule reorganization
+/// `TEAM_065`: GPU initialization split to Stage 3
+/// `TEAM_146`: Refactored - GPU init moved to init.rs
+/// `TEAM_465`: Updated paths after kernel submodule reorganization
 fn test_gpu_stage3_init(results: &mut TestResults) {
     println!("TEAM_065: GPU initialization in Stage 3");
 
     // TEAM_465: Kernel main code is now in levitate subdir
-    let virtio_rs = match fs::read_to_string("crates/kernel/levitate/src/virtio.rs") {
-        Ok(c) => c,
-        Err(_) => {
-            results.fail("Could not read crates/kernel/levitate/src/virtio.rs");
-            return;
-        }
+    let virtio_rs = if let Ok(c) = fs::read_to_string("crates/kernel/levitate/src/virtio.rs") {
+        c
+    } else {
+        results.fail("Could not read crates/kernel/levitate/src/virtio.rs");
+        return;
     };
 
     // Verify init_gpu() function exists
@@ -450,12 +452,11 @@ fn test_gpu_stage3_init(results: &mut TestResults) {
         results.fail("virtio.rs missing init_gpu() - GPU not split to Stage 3");
     }
 
-    let init_rs = match fs::read_to_string("crates/kernel/levitate/src/init.rs") {
-        Ok(c) => c,
-        Err(_) => {
-            results.fail("Could not read crates/kernel/levitate/src/init.rs");
-            return;
-        }
+    let init_rs = if let Ok(c) = fs::read_to_string("crates/kernel/levitate/src/init.rs") {
+        c
+    } else {
+        results.fail("Could not read crates/kernel/levitate/src/init.rs");
+        return;
     };
 
     // Verify init_gpu() is called before terminal operations
@@ -466,19 +467,18 @@ fn test_gpu_stage3_init(results: &mut TestResults) {
     }
 }
 
-/// TEAM_065: SPEC-4 enforcement - maintenance_shell on initrd failure
-/// TEAM_146: Refactored - SPEC-4 code moved to init.rs
-/// TEAM_465: Updated paths after kernel submodule reorganization
+/// `TEAM_065`: SPEC-4 enforcement - `maintenance_shell` on initrd failure
+/// `TEAM_146`: Refactored - SPEC-4 code moved to init.rs
+/// `TEAM_465`: Updated paths after kernel submodule reorganization
 fn test_spec4_enforcement(results: &mut TestResults) {
     println!("TEAM_065: SPEC-4 initrd failure handling");
 
     // TEAM_465: Kernel main code is now in levitate subdir
-    let init_rs = match fs::read_to_string("crates/kernel/levitate/src/init.rs") {
-        Ok(c) => c,
-        Err(_) => {
-            results.fail("Could not read crates/kernel/levitate/src/init.rs");
-            return;
-        }
+    let init_rs = if let Ok(c) = fs::read_to_string("crates/kernel/levitate/src/init.rs") {
+        c
+    } else {
+        results.fail("Could not read crates/kernel/levitate/src/init.rs");
+        return;
     };
 
     // Verify maintenance_shell is called when initrd not found
@@ -496,18 +496,17 @@ fn test_spec4_enforcement(results: &mut TestResults) {
     }
 }
 
-/// TEAM_065: GPU error handling with GpuError enum
-/// TEAM_465: Updated paths after kernel submodule reorganization
+/// `TEAM_065`: GPU error handling with `GpuError` enum
+/// `TEAM_465`: Updated paths after kernel submodule reorganization
 fn test_gpu_error_handling(results: &mut TestResults) {
     println!("TEAM_065: GPU error handling");
 
     // TEAM_465: Kernel main code is now in levitate subdir
-    let gpu_rs = match fs::read_to_string("crates/kernel/levitate/src/gpu.rs") {
-        Ok(c) => c,
-        Err(_) => {
-            results.fail("Could not read crates/kernel/levitate/src/gpu.rs");
-            return;
-        }
+    let gpu_rs = if let Ok(c) = fs::read_to_string("crates/kernel/levitate/src/gpu.rs") {
+        c
+    } else {
+        results.fail("Could not read crates/kernel/levitate/src/gpu.rs");
+        return;
     };
 
     // Verify GpuError enum exists (Rule 6 compliance)
@@ -520,10 +519,13 @@ fn test_gpu_error_handling(results: &mut TestResults) {
 
     // Verify DrawTarget uses GpuError, not Infallible
     // TEAM_465: GPU driver is now at crates/kernel/drivers/gpu/
-    let los_gpu_lib = fs::read_to_string("crates/kernel/drivers/gpu/src/lib.rs").unwrap_or_default();
+    let los_gpu_lib =
+        fs::read_to_string("crates/kernel/drivers/gpu/src/lib.rs").unwrap_or_default();
     if los_gpu_lib.contains("type Error = GpuError") || gpu_rs.contains("type Error = GpuError") {
         results.pass("DrawTarget uses GpuError (not Infallible)");
-    } else if los_gpu_lib.contains("type Error = core::convert::Infallible") || gpu_rs.contains("type Error = core::convert::Infallible") {
+    } else if los_gpu_lib.contains("type Error = core::convert::Infallible")
+        || gpu_rs.contains("type Error = core::convert::Infallible")
+    {
         // Infallible is acceptable for embedded-graphics DrawTarget
         results.pass("DrawTarget uses Infallible (acceptable for no-fail drawing)");
     } else {
@@ -531,19 +533,18 @@ fn test_gpu_error_handling(results: &mut TestResults) {
     }
 }
 
-/// TEAM_065: BootStage enum and state machine
-/// TEAM_146: Refactored - BootStage moved to init.rs
-/// TEAM_465: Updated paths after kernel submodule reorganization
+/// `TEAM_065`: `BootStage` enum and state machine
+/// `TEAM_146`: Refactored - `BootStage` moved to init.rs
+/// `TEAM_465`: Updated paths after kernel submodule reorganization
 fn test_boot_stage_enum(results: &mut TestResults) {
     println!("TEAM_065: BootStage state machine");
 
     // TEAM_465: Kernel main code is now in levitate subdir
-    let init_rs = match fs::read_to_string("crates/kernel/levitate/src/init.rs") {
-        Ok(c) => c,
-        Err(_) => {
-            results.fail("Could not read crates/kernel/levitate/src/init.rs");
-            return;
-        }
+    let init_rs = if let Ok(c) = fs::read_to_string("crates/kernel/levitate/src/init.rs") {
+        c
+    } else {
+        results.fail("Could not read crates/kernel/levitate/src/init.rs");
+        return;
     };
 
     // TEAM_342: BootStage has 4 stages (SteadyState not implemented yet)
@@ -570,28 +571,28 @@ fn test_boot_stage_enum(results: &mut TestResults) {
 // TEAM_109: GPU Display Verification (catches false positives!)
 // =============================================================================
 
-/// TEAM_111: Verify GPU driver implements required display setup
+/// `TEAM_111`: Verify GPU driver implements required display setup
 ///
 /// ⚠️ THIS TEST VERIFIES CODE PATTERNS, NOT ACTUAL DISPLAY OUTPUT!
 ///
 /// To verify actual display: `cargo xtask run-vnc` and check browser
 ///
-/// TEAM_115: Updated for crate reorganization. The GPU now uses virtio-drivers
-/// crate which handles VirtIO GPU commands internally. We verify:
-/// - levitate-gpu wraps VirtIOGpu correctly
-/// - setup_framebuffer is called
+/// `TEAM_115`: Updated for crate reorganization. The GPU now uses virtio-drivers
+/// crate which handles `VirtIO` GPU commands internally. We verify:
+/// - levitate-gpu wraps `VirtIOGpu` correctly
+/// - `setup_framebuffer` is called
 /// - flush is called to update display
-/// TEAM_465: Updated paths after kernel submodule reorganization
+/// `TEAM_465`: Updated paths after kernel submodule reorganization
 fn test_gpu_display_actually_works(results: &mut TestResults) {
     println!("TEAM_111: GPU display - VirtIO command verification");
 
     // TEAM_465: GPU driver is now at crates/kernel/drivers/gpu/
     let gpu_lib = fs::read_to_string("crates/kernel/drivers/gpu/src/lib.rs").unwrap_or_default();
-    
+
     // Check 1: Must use virtio-drivers VirtIOGpu
-    let uses_virtio_drivers = gpu_lib.contains("virtio_drivers::device::gpu::VirtIOGpu")
-        || gpu_lib.contains("VirtIOGpu");
-    
+    let uses_virtio_drivers =
+        gpu_lib.contains("virtio_drivers::device::gpu::VirtIOGpu") || gpu_lib.contains("VirtIOGpu");
+
     if uses_virtio_drivers {
         results.pass("levitate-gpu uses virtio-drivers VirtIOGpu");
     } else {
@@ -600,7 +601,7 @@ fn test_gpu_display_actually_works(results: &mut TestResults) {
 
     // Check 2: Must call setup_framebuffer (replaces manual SET_SCANOUT)
     let has_setup_fb = gpu_lib.contains("setup_framebuffer");
-    
+
     if has_setup_fb {
         results.pass("levitate-gpu calls setup_framebuffer");
     } else {
@@ -609,7 +610,7 @@ fn test_gpu_display_actually_works(results: &mut TestResults) {
 
     // Check 3: Must have flush method (triggers RESOURCE_FLUSH internally)
     let has_flush = gpu_lib.contains("fn flush") || gpu_lib.contains(".flush()");
-    
+
     if has_flush {
         results.pass("levitate-gpu implements flush()");
     } else {
@@ -619,12 +620,13 @@ fn test_gpu_display_actually_works(results: &mut TestResults) {
     // Check 4: Kernel must call flush() after drawing
     // TEAM_465: Kernel main code is now in levitate subdir
     let kernel_gpu = fs::read_to_string("crates/kernel/levitate/src/gpu.rs").unwrap_or_default();
-    let terminal_rs = fs::read_to_string("crates/kernel/levitate/src/terminal.rs").unwrap_or_default();
-    
+    let terminal_rs =
+        fs::read_to_string("crates/kernel/levitate/src/terminal.rs").unwrap_or_default();
+
     let kernel_flushes = kernel_gpu.contains(".flush()")
         || terminal_rs.contains(".flush()")
         || kernel_gpu.contains("flush().ok()");
-    
+
     if kernel_flushes {
         results.pass("Kernel calls flush() after drawing");
     } else {
@@ -632,35 +634,34 @@ fn test_gpu_display_actually_works(results: &mut TestResults) {
     }
 
     // Check 5: Verify we're NOT silently swallowing GPU errors
-    let swallows_errors = kernel_gpu.contains("Ok(())") 
+    let swallows_errors = kernel_gpu.contains("Ok(())")
         && !kernel_gpu.contains("Err(")
         && kernel_gpu.contains("fn init");
-    
+
     if swallows_errors {
         results.fail("GPU init may be swallowing errors (false positive risk)");
     } else {
         results.pass("GPU init propagates errors properly");
     }
-    
+
     // Note for future teams
     println!("    ℹ️  To verify ACTUAL display: cargo xtask run-vnc + check browser");
 }
-
 
 // =============================================================================
 // TEAM_139: QEMU Configuration Regression Tests
 // =============================================================================
 
-/// TEAM_139: Verify QEMU uses mon:stdio for serial+monitor multiplexing
-/// TEAM_342: Updated to check builder.rs (refactored from run.rs)
-/// TEAM_465: Updated to allow plain -serial stdio for Nographic mode (TEAM_444)
+/// `TEAM_139`: Verify QEMU uses mon:stdio for serial+monitor multiplexing
+/// `TEAM_342`: Updated to check builder.rs (refactored from run.rs)
+/// `TEAM_465`: Updated to allow plain -serial stdio for Nographic mode (`TEAM_444`)
 fn test_qemu_serial_multiplexing(results: &mut TestResults) {
     println!("TEAM_139: QEMU serial multiplexing");
 
     // TEAM_342: QEMU config moved to builder.rs
     let builder_rs = fs::read_to_string("xtask/src/qemu/builder.rs").unwrap_or_default();
     let run_rs = fs::read_to_string("xtask/src/run.rs").unwrap_or_default();
-    let combined = format!("{}{}", builder_rs, run_rs);
+    let combined = format!("{builder_rs}{run_rs}");
 
     // Must use mon:stdio for monitor+serial multiplexing
     if combined.contains("mon:stdio") {
@@ -675,7 +676,11 @@ fn test_qemu_serial_multiplexing(results: &mut TestResults) {
     let has_mon_stdio_for_main_modes = builder_rs.contains("DisplayMode::Gtk")
         && builder_rs.contains("DisplayMode::Vnc")
         && builder_rs.contains("DisplayMode::Headless")
-        && builder_rs.lines().filter(|l| l.contains("mon:stdio")).count() >= 3;
+        && builder_rs
+            .lines()
+            .filter(|l| l.contains("mon:stdio"))
+            .count()
+            >= 3;
 
     if has_mon_stdio_for_main_modes {
         results.pass("Main display modes use mon:stdio");
@@ -684,8 +689,8 @@ fn test_qemu_serial_multiplexing(results: &mut TestResults) {
     }
 }
 
-/// TEAM_139: Verify QEMU has explicit display configuration for proper window sizing
-/// TEAM_342: Updated to check builder.rs and accept SDL as alternative to GTK
+/// `TEAM_139`: Verify QEMU has explicit display configuration for proper window sizing
+/// `TEAM_342`: Updated to check builder.rs and accept SDL as alternative to GTK
 fn test_qemu_window_size(results: &mut TestResults) {
     println!("TEAM_139: QEMU window size configuration");
 
@@ -694,7 +699,8 @@ fn test_qemu_window_size(results: &mut TestResults) {
 
     // Must have explicit display configuration for non-headless
     // TEAM_342: Accept SDL or GTK - both provide proper windowing
-    if builder_rs.contains("-display") && (builder_rs.contains("gtk") || builder_rs.contains("sdl")) {
+    if builder_rs.contains("-display") && (builder_rs.contains("gtk") || builder_rs.contains("sdl"))
+    {
         results.pass("QEMU has explicit display configuration (GTK/SDL)");
     } else {
         results.fail("QEMU missing display config - window size may be wrong!");
@@ -712,8 +718,8 @@ fn test_qemu_window_size(results: &mut TestResults) {
 // TEAM_142: Graceful Shutdown Regression Tests
 // =============================================================================
 
-/// TEAM_142: Verify shell backspace handling
-/// TEAM_465: Updated to match new match-based shell implementation
+/// `TEAM_142`: Verify shell backspace handling
+/// `TEAM_465`: Updated to match new match-based shell implementation
 fn test_shell_backspace(results: &mut TestResults) {
     println!("TEAM_142: Shell backspace handling");
 
@@ -727,7 +733,7 @@ fn test_shell_backspace(results: &mut TestResults) {
     }
 
     // Must use proper terminal erase sequence (back, space, back)
-    if shell_main.contains(r#"b"\x08 \x08""#) || shell_main.contains(r#"\x08 \x08"#) {
+    if shell_main.contains(r#"b"\x08 \x08""#) || shell_main.contains(r"\x08 \x08") {
         results.pass("Shell uses proper erase sequence (\\x08 \\x08)");
     } else {
         results.fail("Shell missing proper erase sequence - backspace won't work visually");
@@ -746,9 +752,9 @@ fn test_shell_backspace(results: &mut TestResults) {
     }
 }
 
-/// TEAM_142: Verify graceful shutdown syscall implementation
-/// TEAM_342: Updated paths after syscall module refactor
-/// TEAM_465: Updated paths after kernel submodule reorganization
+/// `TEAM_142`: Verify graceful shutdown syscall implementation
+/// `TEAM_342`: Updated paths after syscall module refactor
+/// `TEAM_465`: Updated paths after kernel submodule reorganization
 fn test_graceful_shutdown(results: &mut TestResults) {
     println!("TEAM_142: Graceful shutdown implementation");
 
@@ -760,7 +766,10 @@ fn test_graceful_shutdown(results: &mut TestResults) {
     let arch_x86 = fs::read_to_string("crates/kernel/arch/x86_64/src/lib.rs").unwrap_or_default();
 
     // Must have Shutdown syscall (could be in arch module or syscall dispatcher)
-    if syscall_mod.contains("Shutdown") || arch_mod.contains("Shutdown") || arch_x86.contains("Shutdown") {
+    if syscall_mod.contains("Shutdown")
+        || arch_mod.contains("Shutdown")
+        || arch_x86.contains("Shutdown")
+    {
         results.pass("Shutdown syscall defined");
     } else {
         results.fail("Shutdown syscall missing");
@@ -781,8 +790,10 @@ fn test_graceful_shutdown(results: &mut TestResults) {
     }
 
     // TEAM_342: Check libsyscall - shutdown wrapper in process.rs
-    let libsyscall_process = fs::read_to_string("crates/userspace/libsyscall/src/process.rs").unwrap_or_default();
-    let libsyscall_lib = fs::read_to_string("crates/userspace/libsyscall/src/lib.rs").unwrap_or_default();
+    let libsyscall_process =
+        fs::read_to_string("crates/userspace/libsyscall/src/process.rs").unwrap_or_default();
+    let libsyscall_lib =
+        fs::read_to_string("crates/userspace/libsyscall/src/lib.rs").unwrap_or_default();
 
     if libsyscall_process.contains("fn shutdown") || libsyscall_lib.contains("shutdown") {
         results.pass("libsyscall has shutdown() wrapper");
@@ -805,9 +816,9 @@ fn test_graceful_shutdown(results: &mut TestResults) {
 // TEAM_464: linux-raw-sys Consolidation Regression Tests
 // =============================================================================
 
-/// TEAM_464: Verify signal constants use linux-raw-sys
+/// `TEAM_464`: Verify signal constants use linux-raw-sys
 ///
-/// Signal constants (SIGINT, SIGKILL, etc.) must come from linux_raw_sys::general.
+/// Signal constants (SIGINT, SIGKILL, etc.) must come from `linux_raw_sys::general`.
 /// This prevents hardcoded values that could drift from Linux ABI.
 fn test_linux_raw_sys_signal_constants(results: &mut TestResults) {
     println!("TEAM_464: Signal constants from linux-raw-sys");
@@ -844,7 +855,7 @@ fn test_linux_raw_sys_signal_constants(results: &mut TestResults) {
     }
 }
 
-/// TEAM_464: Verify SEEK_* constants use linux-raw-sys
+/// `TEAM_464`: Verify SEEK_* constants use linux-raw-sys
 fn test_linux_raw_sys_seek_constants(results: &mut TestResults) {
     println!("TEAM_464: SEEK_* constants from linux-raw-sys");
 
@@ -862,7 +873,10 @@ fn test_linux_raw_sys_seek_constants(results: &mut TestResults) {
             if content.contains("linux_raw_sys") && content.contains("SEEK_") {
                 found_import = true;
             }
-            if content.contains("SEEK_SET") || content.contains("SEEK_CUR") || content.contains("SEEK_END") {
+            if content.contains("SEEK_SET")
+                || content.contains("SEEK_CUR")
+                || content.contains("SEEK_END")
+            {
                 found_usage = true;
             }
         }
@@ -881,21 +895,21 @@ fn test_linux_raw_sys_seek_constants(results: &mut TestResults) {
     }
 }
 
-/// TEAM_464: Verify F_* (fcntl) constants use linux-raw-sys
+/// `TEAM_464`: Verify F_* (fcntl) constants use linux-raw-sys
 fn test_linux_raw_sys_fcntl_constants(results: &mut TestResults) {
     println!("TEAM_464: F_* (fcntl) constants from linux-raw-sys");
 
     // fcntl implementation is in fd.rs
-    let files_to_check = [
-        "crates/kernel/syscall/src/fs/fd.rs",
-    ];
+    let files_to_check = ["crates/kernel/syscall/src/fs/fd.rs"];
 
     let mut found_fcntl_import = false;
 
     for path in &files_to_check {
         if let Ok(content) = fs::read_to_string(path) {
             if content.contains("linux_raw_sys")
-                && (content.contains("F_GETFD") || content.contains("F_SETFD") || content.contains("F_GETFL"))
+                && (content.contains("F_GETFD")
+                    || content.contains("F_SETFD")
+                    || content.contains("F_GETFL"))
             {
                 found_fcntl_import = true;
             }
@@ -926,7 +940,7 @@ fn test_linux_raw_sys_fcntl_constants(results: &mut TestResults) {
     }
 }
 
-/// TEAM_464: Verify POLL* constants use linux-raw-sys
+/// `TEAM_464`: Verify POLL* constants use linux-raw-sys
 fn test_linux_raw_sys_poll_constants(results: &mut TestResults) {
     println!("TEAM_464: POLL* constants from linux-raw-sys");
 
@@ -950,7 +964,7 @@ fn test_linux_raw_sys_poll_constants(results: &mut TestResults) {
     }
 }
 
-/// TEAM_464: Verify errno values use linux-raw-sys consistently
+/// `TEAM_464`: Verify errno values use linux-raw-sys consistently
 fn test_linux_raw_sys_errno_usage(results: &mut TestResults) {
     println!("TEAM_464: Errno values from linux-raw-sys");
 
@@ -972,7 +986,9 @@ fn test_linux_raw_sys_errno_usage(results: &mut TestResults) {
     }
 
     if errno_import_count >= 2 {
-        results.pass(&format!("{} syscall files import linux_raw_sys::errno", errno_import_count));
+        results.pass(&format!(
+            "{errno_import_count} syscall files import linux_raw_sys::errno"
+        ));
     } else {
         results.fail("Not enough syscall files using linux_raw_sys::errno");
     }
@@ -986,7 +1002,7 @@ fn test_linux_raw_sys_errno_usage(results: &mut TestResults) {
     }
 }
 
-/// TEAM_464: Verify AT_* (auxv) constants are correctly defined
+/// `TEAM_464`: Verify AT_* (auxv) constants are correctly defined
 fn test_linux_raw_sys_auxv_constants(results: &mut TestResults) {
     println!("TEAM_464: AT_* auxiliary vector constants");
 
@@ -1020,7 +1036,7 @@ fn test_linux_raw_sys_auxv_constants(results: &mut TestResults) {
     }
 }
 
-/// TEAM_464: Verify S_* (mode) constants use linux-raw-sys
+/// `TEAM_464`: Verify S_* (mode) constants use linux-raw-sys
 fn test_linux_raw_sys_mode_constants(results: &mut TestResults) {
     println!("TEAM_464: S_* mode constants from linux-raw-sys");
 

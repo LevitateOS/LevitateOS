@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 //! Configuration file support for xtask
 //!
 //! Reads xtask.toml from project root to configure test behavior,
@@ -14,21 +15,17 @@ const CONFIG_FILE: &str = "xtask.toml";
 /// Golden file rating determines how test failures are handled
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "lowercase")]
+#[derive(Default)]
 pub enum GoldenRating {
     /// Gold files must match exactly. Test fails on mismatch.
     /// User must explicitly use --update to refresh.
+    #[default]
     Gold,
 
     /// Silver files auto-update on every run.
     /// Test always passes but shows the diff.
     /// Use during active development when behavior changes frequently.
     Silver,
-}
-
-impl Default for GoldenRating {
-    fn default() -> Self {
-        GoldenRating::Gold
-    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -64,16 +61,10 @@ impl Default for TestConfig {
     }
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Default)]
 pub struct BuildConfig {
     #[serde(default)]
     pub verbose: bool,
-}
-
-impl Default for BuildConfig {
-    fn default() -> Self {
-        BuildConfig { verbose: false }
-    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -120,10 +111,10 @@ impl XtaskConfig {
         }
 
         let content =
-            fs::read_to_string(config_path).context(format!("Failed to read {}", CONFIG_FILE))?;
+            fs::read_to_string(config_path).context(format!("Failed to read {CONFIG_FILE}"))?;
 
         let config: XtaskConfig =
-            toml::from_str(&content).context(format!("Failed to parse {}", CONFIG_FILE))?;
+            toml::from_str(&content).context(format!("Failed to parse {CONFIG_FILE}"))?;
 
         Ok(config)
     }

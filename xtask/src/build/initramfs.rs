@@ -1,6 +1,6 @@
 //! Initramfs creation module
 //!
-//! TEAM_466: Extracted from commands.rs during refactor.
+//! `TEAM_466`: Extracted from commands.rs during refactor.
 //! Consolidates all initramfs creation logic with deduplicated CPIO helper.
 
 use anyhow::{bail, Context, Result};
@@ -54,108 +54,10 @@ fn make_executable(_path: &Path) -> Result<()> {
     Ok(())
 }
 
-// TEAM_435: Uses c-gull sysroot binaries instead of Eyra
-// TEAM_444: Migrated to musl - Rust apps use musl target, C apps use musl-gcc
-pub fn create_initramfs(arch: &str) -> Result<()> {
-    println!("Creating initramfs for {}...", arch);
-    let root = PathBuf::from("initrd_root");
-
-    // TEAM_292: Always clean initrd_root to ensure correct arch binaries
-    // Without this, stale binaries from other architectures persist
-    if root.exists() {
-        std::fs::remove_dir_all(&root)?;
-    }
-    std::fs::create_dir(&root)?;
-
-    // 1. Create content
-    std::fs::write(root.join("hello.txt"), "Hello from initramfs!\n")?;
-
-    // 2. Copy userspace binaries (init, shell - bare-metal)
-    let binaries = crate::get_binaries(arch)?;
-    let target = match arch {
-        "aarch64" => "aarch64-unknown-none",
-        "x86_64" => "x86_64-unknown-none",
-        _ => bail!("Unsupported architecture: {}", arch),
-    };
-    print!("📦 Creating initramfs ({} binaries)... ", binaries.len());
-    let mut count = 0;
-    for bin in &binaries {
-        let src = PathBuf::from(format!("crates/userspace/target/{}/release/{}", target, bin));
-        if src.exists() {
-            std::fs::copy(&src, root.join(bin))?;
-            count += 1;
-        }
-    }
-
-    // TEAM_438: Use apps registry for external apps - fail fast on required, skip optional
-    for app in super::apps::APPS {
-        if app.required {
-            // Required apps must exist - fail fast with helpful message
-            let src = app.require(arch)?;
-            std::fs::copy(&src, root.join(app.binary))?;
-            count += 1;
-
-            // Create symlinks for multi-call binaries
-            for symlink_name in app.symlinks {
-                #[cfg(unix)]
-                {
-                    use std::os::unix::fs::symlink;
-                    let link_path = root.join(symlink_name);
-                    let _ = std::fs::remove_file(&link_path);
-                    symlink(app.binary, &link_path)?;
-                }
-                #[cfg(not(unix))]
-                {
-                    std::fs::copy(&src, root.join(symlink_name))?;
-                }
-            }
-
-            if app.symlinks.is_empty() {
-                println!("  📦 Added {}", app.name);
-            } else {
-                println!("  📦 Added {} + {} symlinks", app.name, app.symlinks.len());
-            }
-        } else {
-            // Optional apps - include if built, otherwise inform user
-            if app.exists(arch) {
-                let src = app.output_path(arch);
-                std::fs::copy(&src, root.join(app.binary))?;
-                count += 1;
-                println!("  📦 Added {} (optional)", app.name);
-            } else {
-                println!("  ℹ️  {} not found (optional). Run 'cargo xtask build {}' to include it.", app.name, app.name);
-            }
-        }
-    }
-
-    // TEAM_444: Include C apps (dash, etc.) if built
-    for app in super::c_apps::C_APPS {
-        if app.exists(arch) {
-            let src = app.output_path(arch);
-            let binary_name = std::path::Path::new(app.binary)
-                .file_name()
-                .map(|s| s.to_string_lossy().to_string())
-                .unwrap_or_else(|| app.name.to_string());
-            std::fs::copy(&src, root.join(&binary_name))?;
-            count += 1;
-            println!("  📦 Added {} (C)", app.name);
-        }
-    }
-
-    println!("[DONE] ({} added)", count);
-
-    // 3. Create CPIO archive
-    // TEAM_327: Use arch-specific filename to prevent cross-arch contamination
-    let cpio_filename = format!("initramfs_{}.cpio", arch);
-    create_cpio_archive(&root, &cpio_filename)?;
-
-    Ok(())
-}
-
-/// TEAM_451: Create BusyBox-based initramfs
+/// `TEAM_451`: Create BusyBox-based initramfs
 /// Single binary provides init, shell, and 300+ utilities
 pub fn create_busybox_initramfs(arch: &str) -> Result<()> {
-    println!("📦 Creating BusyBox initramfs for {}...", arch);
+    println!("📦 Creating BusyBox initramfs for {arch}...");
 
     // Require BusyBox to be built
     let busybox_path = super::busybox::require(arch)?;
@@ -237,16 +139,19 @@ pub fn create_busybox_initramfs(arch: &str) -> Result<()> {
     std::fs::write(root.join("etc/group"), group)?;
 
     // Create /etc/profile
-    let profile = r#"export PATH=/bin:/sbin
+    let profile = r"export PATH=/bin:/sbin
 export HOME=/root
 export PS1='LevitateOS# '
 alias ll='ls -la'
-"#;
+";
     std::fs::write(root.join("etc/profile"), profile)?;
 
     // Create sample files
     std::fs::write(root.join("etc/motd"), "Welcome to LevitateOS!\n")?;
-    std::fs::write(root.join("root/hello.txt"), "Hello from BusyBox initramfs!\n")?;
+    std::fs::write(
+        root.join("root/hello.txt"),
+        "Hello from BusyBox initramfs!\n",
+    )?;
 
     // TEAM_459: Test script to verify ash shell works
     // TEAM_466: Now loaded from external file
@@ -262,82 +167,17 @@ alias ll='ls -la'
 
     // Show what we created
     let applet_count = super::busybox::applets().len();
-    println!("  📦 BusyBox binary + {} applet symlinks", applet_count);
+    println!("  📦 BusyBox binary + {applet_count} applet symlinks");
     println!("  📄 /etc/inittab, passwd, group, profile");
 
     // Create CPIO archive
-    let cpio_filename = format!("initramfs_{}.cpio", arch);
+    let cpio_filename = format!("initramfs_{arch}.cpio");
     create_cpio_archive(&root, &cpio_filename)?;
 
     // Show final size
     let metadata = std::fs::metadata(&cpio_filename)?;
     let size_kb = metadata.len() / 1024;
-    println!("✅ BusyBox initramfs created: {} ({} KB)", cpio_filename, size_kb);
+    println!("✅ BusyBox initramfs created: {cpio_filename} ({size_kb} KB)");
 
-    Ok(())
-}
-
-/// TEAM_435: Create test-specific initramfs with coreutils.
-/// TEAM_438: Uses apps registry for external apps.
-/// Includes init, shell, and required apps for testing.
-pub fn create_test_initramfs(arch: &str) -> Result<()> {
-    println!("Creating test initramfs for {}...", arch);
-    let root = PathBuf::from("initrd_test_root");
-
-    // Clean and create directory
-    if root.exists() {
-        std::fs::remove_dir_all(&root)?;
-    }
-    std::fs::create_dir(&root)?;
-
-    let bare_target = match arch {
-        "aarch64" => "aarch64-unknown-none",
-        "x86_64" => "x86_64-unknown-none",
-        _ => bail!("Unsupported architecture: {}", arch),
-    };
-
-    // Copy init and shell for boot
-    let init_src = PathBuf::from(format!("crates/userspace/target/{}/release/init", bare_target));
-    let shell_src = PathBuf::from(format!("crates/userspace/target/{}/release/shell", bare_target));
-
-    if init_src.exists() {
-        std::fs::copy(&init_src, root.join("init"))?;
-    }
-    if shell_src.exists() {
-        std::fs::copy(&shell_src, root.join("shell"))?;
-    }
-
-    // Create hello.txt for cat test
-    std::fs::write(root.join("hello.txt"), "Hello from initramfs!\n")?;
-
-    // TEAM_438: Use apps registry - only include required apps for test initramfs
-    let mut app_count = 0;
-    for app in super::apps::required_apps() {
-        let src = app.require(arch)?;
-        std::fs::copy(&src, root.join(app.binary))?;
-        app_count += 1;
-
-        // Create symlinks for multi-call binaries
-        for symlink_name in app.symlinks {
-            #[cfg(unix)]
-            {
-                use std::os::unix::fs::symlink;
-                let link_path = root.join(symlink_name);
-                let _ = std::fs::remove_file(&link_path);
-                symlink(app.binary, &link_path)?;
-            }
-            #[cfg(not(unix))]
-            {
-                std::fs::copy(&src, root.join(symlink_name))?;
-            }
-        }
-    }
-
-    println!("📦 Test initramfs: {} apps + init/shell", app_count);
-
-    // Create CPIO archive
-    create_cpio_archive(&root, "initramfs_test.cpio")?;
-
-    println!("✅ Created initramfs_test.cpio");
     Ok(())
 }

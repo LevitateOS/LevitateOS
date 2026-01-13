@@ -1,6 +1,7 @@
+#![allow(dead_code)]
 //! Common test utilities
 //!
-//! TEAM_327: Shared infrastructure for all integration tests.
+//! `TEAM_327`: Shared infrastructure for all integration tests.
 //! Eliminates code duplication across test files.
 
 use anyhow::{bail, Context, Result};
@@ -22,7 +23,7 @@ pub struct QemuSession {
 }
 
 impl QemuSession {
-    /// Start a new QEMU session for LevitateOS
+    /// Start a new QEMU session for `LevitateOS`
     pub fn start(arch: &str, with_qmp: bool) -> Result<Self> {
         let arch_enum = Arch::try_from(arch)?;
         let profile = if arch == "x86_64" {
@@ -42,8 +43,7 @@ impl QemuSession {
             let _ = std::fs::remove_file(socket);
         }
 
-        let mut builder = QemuBuilder::new(arch_enum, profile)
-            .display_nographic();
+        let mut builder = QemuBuilder::new(arch_enum, profile).display_nographic();
 
         if let Some(ref socket) = qmp_socket {
             builder = builder.enable_qmp(socket);
@@ -158,7 +158,7 @@ impl QemuSession {
         if output.contains("# ") || output.contains("$ ") {
             Ok(output)
         } else {
-            bail!("Shell prompt not found within {}s. Output:\n{}", timeout_secs, output)
+            bail!("Shell prompt not found within {timeout_secs}s. Output:\n{output}")
         }
     }
 
@@ -214,7 +214,9 @@ impl QemuSession {
 
     /// Get QMP client if QMP is enabled
     pub fn qmp_client(&self) -> Result<QmpClient> {
-        let socket = self.qmp_socket.as_ref()
+        let socket = self
+            .qmp_socket
+            .as_ref()
             .ok_or_else(|| anyhow::anyhow!("QMP not enabled for this session"))?;
         QmpClient::connect(socket)
     }
@@ -276,7 +278,7 @@ pub fn wait_for_qmp_socket(socket: &str, timeout_secs: u64) -> Result<()> {
         std::thread::sleep(Duration::from_millis(250));
     }
 
-    bail!("QMP socket not created within {}s", timeout_secs)
+    bail!("QMP socket not created within {timeout_secs}s")
 }
 
 /// Send keys via QMP human-monitor-command
@@ -284,9 +286,9 @@ pub fn qmp_send_keys(client: &mut QmpClient, text: &str) -> Result<()> {
     for ch in text.chars() {
         let (key, needs_shift) = char_to_qcode(ch);
         let cmd = if needs_shift {
-            format!("sendkey shift-{}", key)
+            format!("sendkey shift-{key}")
         } else {
-            format!("sendkey {}", key)
+            format!("sendkey {key}")
         };
         let args = serde_json::json!({ "command-line": cmd });
         client.execute("human-monitor-command", Some(args))?;
@@ -297,7 +299,7 @@ pub fn qmp_send_keys(client: &mut QmpClient, text: &str) -> Result<()> {
 
 /// Send a single key via QMP
 pub fn qmp_send_key(client: &mut QmpClient, qcode: &str) -> Result<()> {
-    let cmd = format!("sendkey {}", qcode);
+    let cmd = format!("sendkey {qcode}");
     let args = serde_json::json!({ "command-line": cmd });
     client.execute("human-monitor-command", Some(args))?;
     Ok(())
@@ -308,16 +310,18 @@ fn char_to_qcode(ch: char) -> (&'static str, bool) {
     match ch {
         'a'..='z' => {
             let idx = (ch as u8 - b'a') as usize;
-            let keys = ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j",
-                       "k", "l", "m", "n", "o", "p", "q", "r", "s", "t",
-                       "u", "v", "w", "x", "y", "z"];
+            let keys = [
+                "a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p",
+                "q", "r", "s", "t", "u", "v", "w", "x", "y", "z",
+            ];
             (keys[idx], false)
         }
         'A'..='Z' => {
             let idx = (ch as u8 - b'A') as usize;
-            let keys = ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j",
-                       "k", "l", "m", "n", "o", "p", "q", "r", "s", "t",
-                       "u", "v", "w", "x", "y", "z"];
+            let keys = [
+                "a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p",
+                "q", "r", "s", "t", "u", "v", "w", "x", "y", "z",
+            ];
             (keys[idx], true)
         }
         '0'..='9' => {

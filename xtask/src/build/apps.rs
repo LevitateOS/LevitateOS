@@ -1,6 +1,7 @@
+#![allow(dead_code)]
 //! External Rust application registry and build abstraction
 //!
-//! TEAM_444: Migrated from c-gull to musl libc.
+//! `TEAM_444`: Migrated from c-gull to musl libc.
 //!
 //! All external Rust apps (coreutils, brush, etc.) follow the same pattern:
 //! 1. Clone from git if not present
@@ -39,7 +40,7 @@ pub struct ExternalApp {
 
 /// Registry of all external Rust applications
 ///
-/// TEAM_459: coreutils and brush REMOVED - BusyBox provides everything.
+/// `TEAM_459`: coreutils and brush REMOVED - `BusyBox` provides everything.
 /// This registry is empty but kept for future Rust apps if needed.
 pub static APPS: &[ExternalApp] = &[
     // TEAM_459: All apps removed - BusyBox is the single source of utilities
@@ -97,11 +98,11 @@ impl ExternalApp {
 
     /// Build the app with musl target
     ///
-    /// TEAM_444: Simplified from c-gull approach. No more:
+    /// `TEAM_444`: Simplified from c-gull approach. No more:
     /// - Custom sysroot
     /// - -Z build-std
     /// - Complex RUSTFLAGS
-    /// TEAM_459: Added cross-compiler download for aarch64
+    /// `TEAM_459`: Added cross-compiler download for aarch64
     pub fn build(&self, arch: &str) -> Result<()> {
         // Ensure cloned
         self.clone_repo()?;
@@ -208,8 +209,8 @@ pub fn optional_apps() -> impl Iterator<Item = &'static ExternalApp> {
 }
 
 /// Build all apps that aren't already built (for build all/iso)
-/// TEAM_459: Only build required apps (not all apps in registry)
-/// Apps like coreutils are optional now that BusyBox is the primary.
+/// `TEAM_459`: Only build required apps (not all apps in registry)
+/// Apps like coreutils are optional now that `BusyBox` is the primary.
 pub fn ensure_all_built(arch: &str) -> Result<()> {
     for app in required_apps() {
         app.ensure_built(arch)?;
@@ -251,7 +252,7 @@ fn ensure_musl_target(arch: &str) -> Result<()> {
     }
 
     // Install the target
-    println!("📥 Installing Rust musl target: {}", target);
+    println!("📥 Installing Rust musl target: {target}");
     let status = Command::new("rustup")
         .args(["target", "add", target])
         .status()
@@ -259,10 +260,8 @@ fn ensure_musl_target(arch: &str) -> Result<()> {
 
     if !status.success() {
         bail!(
-            "Failed to install {} target.\n\
-             Try running: rustup target add {}",
-            target,
-            target
+            "Failed to install {target} target.\n\
+             Try running: rustup target add {target}"
         );
     }
 

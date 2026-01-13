@@ -1,17 +1,17 @@
 //! Userspace build module
 //!
-//! TEAM_466: Extracted from commands.rs during refactor.
+//! `TEAM_466`: Extracted from commands.rs during refactor.
 
 use anyhow::{bail, Context, Result};
 use std::process::Command;
 
 pub fn build_userspace(arch: &str) -> Result<()> {
-    println!("Building userspace workspace for {}...", arch);
+    println!("Building userspace workspace for {arch}...");
 
     let target = match arch {
         "aarch64" => "aarch64-unknown-none",
         "x86_64" => "x86_64-unknown-none",
-        _ => bail!("Unsupported architecture: {}", arch),
+        _ => bail!("Unsupported architecture: {arch}"),
     };
 
     // TEAM_120: Build the entire userspace workspace

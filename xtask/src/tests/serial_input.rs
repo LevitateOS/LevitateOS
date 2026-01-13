@@ -1,6 +1,6 @@
 //! Serial Input Test
 //!
-//! TEAM_139: Automated test for verifying serial console input works.
+//! `TEAM_139`: Automated test for verifying serial console input works.
 //! Starts QEMU with -nographic, pipes input, verifies echo.
 
 use anyhow::bail;
@@ -10,7 +10,7 @@ use std::process::{Command, Stdio};
 use std::time::{Duration, Instant};
 
 pub fn run(arch: &str) -> Result<()> {
-    println!("=== Serial Input Test for {} ===\n", arch);
+    println!("=== Serial Input Test for {arch} ===\n");
 
     // Build everything first
     crate::build::build_kernel_verbose(arch)?;
@@ -18,7 +18,7 @@ pub fn run(arch: &str) -> Result<()> {
     let qemu_bin = match arch {
         "aarch64" => "qemu-system-aarch64",
         "x86_64" => "qemu-system-x86_64",
-        _ => bail!("Unsupported architecture: {}", arch),
+        _ => bail!("Unsupported architecture: {arch}"),
     };
 
     let kernel_bin = if arch == "aarch64" {
@@ -28,21 +28,38 @@ pub fn run(arch: &str) -> Result<()> {
     };
 
     let args = vec![
-        "-M", if arch == "aarch64" { "virt" } else { "q35" },
-        "-cpu", if arch == "aarch64" { "cortex-a72" } else { "qemu64" },
-        "-m", "512M",
-        "-kernel", kernel_bin,
+        "-M",
+        if arch == "aarch64" { "virt" } else { "q35" },
+        "-cpu",
+        if arch == "aarch64" {
+            "cortex-a72"
+        } else {
+            "qemu64"
+        },
+        "-m",
+        "512M",
+        "-kernel",
+        kernel_bin,
         "-nographic", // Critical for serial input
-        "-device", "virtio-gpu-pci",
-        "-device", "virtio-keyboard-device",
-        "-device", "virtio-tablet-device",
-        "-device", "virtio-net-device,netdev=net0",
-        "-netdev", "user,id=net0",
-        "-drive", "file=tinyos_disk.img,format=raw,if=none,id=hd0",
-        "-device", "virtio-blk-device,drive=hd0",
+        "-device",
+        "virtio-gpu-pci",
+        "-device",
+        "virtio-keyboard-device",
+        "-device",
+        "virtio-tablet-device",
+        "-device",
+        "virtio-net-device,netdev=net0",
+        "-netdev",
+        "user,id=net0",
+        "-drive",
+        "file=tinyos_disk.img,format=raw,if=none,id=hd0",
+        "-device",
+        "virtio-blk-device,drive=hd0",
         // TEAM_327: Use arch-specific initramfs
-        "-initrd", "initramfs_aarch64.cpio",
-        "-serial", "mon:stdio",
+        "-initrd",
+        "initramfs_aarch64.cpio",
+        "-serial",
+        "mon:stdio",
         "-no-reboot",
     ];
 
@@ -65,9 +82,11 @@ pub fn run(arch: &str) -> Result<()> {
         let mut buf = [0u8; 128];
         loop {
             if let Ok(n) = stdout.read(&mut buf) {
-                if n == 0 { break; }
+                if n == 0 {
+                    break;
+                }
                 let s = String::from_utf8_lossy(&buf[..n]);
-                print!("{}", s); // Mirror to our stdout
+                print!("{s}"); // Mirror to our stdout
                 let _ = tx.send(s.into_owned());
             } else {
                 break;
@@ -78,7 +97,7 @@ pub fn run(arch: &str) -> Result<()> {
     // Send "help" and check for output
     // Wait a bit for boot
     std::thread::sleep(Duration::from_secs(5));
-    
+
     println!("\nSending 'help' command...");
     stdin.write_all(b"help\n")?;
     stdin.flush()?;
@@ -87,7 +106,7 @@ pub fn run(arch: &str) -> Result<()> {
     let start = Instant::now();
     let mut found = false;
     let mut buffer = String::new();
-    
+
     while start.elapsed() < Duration::from_secs(5) {
         if let Ok(chunk) = rx.try_recv() {
             buffer.push_str(&chunk);

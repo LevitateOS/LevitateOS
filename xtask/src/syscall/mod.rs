@@ -10,7 +10,7 @@
 //! - musl libc reference implementation
 //!
 //! Usage:
-//!   cargo xtask syscall fetch clone     # Complete spec for clone()
+//!   cargo xtask syscall fetch clone     # Complete spec for `clone()`
 //!   cargo xtask syscall numbers         # All syscall number tables
 
 use anyhow::{bail, Context, Result};
@@ -68,13 +68,13 @@ struct SyscallInfo {
     /// Brief description
     description: &'static str,
     /// Architecture-specific argument order (if different between arches)
-    /// Format: (x86_64_order, aarch64_order) or None if same on all arches
+    /// Format: (`x86_64_order`, `aarch64_order`) or None if same on all arches
     arch_args: Option<ArchArgs>,
 }
 
 /// Architecture-specific argument information
 struct ArchArgs {
-    /// x86_64 argument names in order
+    /// `x86_64` argument names in order
     x86_64: &'static [&'static str],
     /// aarch64 argument names in order
     aarch64: &'static [&'static str],
@@ -790,7 +790,7 @@ fn get_syscall_info(name: &str) -> Option<SyscallInfo> {
 // Calling Conventions
 // =============================================================================
 
-const X86_64_CALLING_CONVENTION: &str = r#"
+const X86_64_CALLING_CONVENTION: &str = r"
 ## x86_64 Calling Convention
 
 Syscall instruction: `syscall`
@@ -808,9 +808,9 @@ Syscall instruction: `syscall`
 
 Return: rax contains result or negative errno on error.
 Clobbered: rcx, r11 (used by syscall instruction)
-"#;
+";
 
-const AARCH64_CALLING_CONVENTION: &str = r#"
+const AARCH64_CALLING_CONVENTION: &str = r"
 ## AArch64 Calling Convention
 
 Syscall instruction: `svc #0`
@@ -827,13 +827,13 @@ Syscall instruction: `svc #0`
 | x0       | Return value      |
 
 Return: x0 contains result or negative errno on error.
-"#;
+";
 
 // =============================================================================
 // Errno Values
 // =============================================================================
 
-const ERRNO_TABLE: &str = r#"
+const ERRNO_TABLE: &str = r"
 ## Error Codes (errno)
 
 Errors are returned as negative values in the return register.
@@ -882,7 +882,7 @@ For example, -EINVAL means the syscall returned -22.
 | ENOTEMPTY     | 39    | Directory not empty                        |
 | ELOOP         | 40    | Too many symbolic links                    |
 | EWOULDBLOCK   | 11    | Same as EAGAIN                             |
-"#;
+";
 
 // =============================================================================
 // Directory and URL helpers
@@ -892,7 +892,7 @@ fn specs_dir() -> PathBuf {
     PathBuf::from("docs/specs/syscalls")
 }
 
-/// Convert snake_case to PascalCase
+/// Convert `snake_case` to `PascalCase`
 fn to_pascal_case(s: &str) -> String {
     s.split('_')
         .map(|word| {
@@ -913,7 +913,7 @@ fn fetch_url(url: &str) -> Result<String> {
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
-        bail!("Failed to fetch {}: {}", url, stderr);
+        bail!("Failed to fetch {url}: {stderr}");
     }
 
     Ok(String::from_utf8_lossy(&output.stdout).to_string())
@@ -981,13 +981,13 @@ fn extract_syscall_impl(source: &str, syscall_name: &str) -> String {
 
     // Patterns that indicate a syscall definition
     let patterns = [
-        format!("SYSCALL_DEFINE"),
-        format!("__do_{}", syscall_name),
-        format!("do_{}", syscall_name),
-        format!("ksys_{}", syscall_name),
-        format!("__x64_sys_{}", syscall_name),
-        format!("__arm64_sys_{}", syscall_name),
-        format!("__se_sys_{}", syscall_name),
+        "SYSCALL_DEFINE".to_string(),
+        format!("__do_{syscall_name}"),
+        format!("do_{syscall_name}"),
+        format!("ksys_{syscall_name}"),
+        format!("__x64_sys_{syscall_name}"),
+        format!("__arm64_sys_{syscall_name}"),
+        format!("__se_sys_{syscall_name}"),
     ];
 
     for line in source.lines() {
@@ -1039,7 +1039,7 @@ pub fn fetch(name: &str, force: bool) -> Result<PathBuf> {
     let specs_dir = specs_dir();
     fs::create_dir_all(&specs_dir)?;
 
-    let spec_path = specs_dir.join(format!("{}.md", name));
+    let spec_path = specs_dir.join(format!("{name}.md"));
 
     if spec_path.exists() && !force {
         println!("Spec already exists: {}", spec_path.display());
@@ -1049,24 +1049,27 @@ pub fn fetch(name: &str, force: bool) -> Result<PathBuf> {
 
     let info = get_syscall_info(name);
     if info.is_none() {
-        println!("Warning: Unknown syscall '{}', will attempt to fetch anyway", name);
+        println!("Warning: Unknown syscall '{name}', will attempt to fetch anyway");
     }
     let info = info.unwrap_or(SyscallInfo {
         kernel_sources: &["kernel/sys.c"],
         kernel_headers: &[],
         musl_sources: &[],
         description: "Unknown syscall",
-            arch_args: None,
+        arch_args: None,
     });
 
-    println!("Fetching complete spec for '{}'...", name);
+    println!("Fetching complete spec for '{name}'...");
 
     let mut content = String::new();
 
     // =================================
     // Header
     // =================================
-    content.push_str(&format!("# {} - Complete Syscall Specification\n\n", name.to_uppercase()));
+    content.push_str(&format!(
+        "# {} - Complete Syscall Specification\n\n",
+        name.to_uppercase()
+    ));
     content.push_str(&format!("**Description**: {}\n\n", info.description));
     content.push_str("---\n\n");
 
@@ -1081,40 +1084,43 @@ pub fn fetch(name: &str, force: bool) -> Result<PathBuf> {
         match load_syscall_numbers() {
             Ok((x86_64, aarch64)) => {
                 if let Some(num) = x86_64.get(name) {
-                    content.push_str(&format!("- **x86_64**: {} (0x{:x})\n", num, num));
+                    content.push_str(&format!("- **x86_64**: {num} (0x{num:x})\n"));
                 } else {
                     content.push_str("- **x86_64**: Not found in table\n");
                 }
                 if let Some(num) = aarch64.get(name) {
-                    content.push_str(&format!("- **aarch64**: {} (0x{:x})\n", num, num));
+                    content.push_str(&format!("- **aarch64**: {num} (0x{num:x})\n"));
                 } else {
                     content.push_str("- **aarch64**: Not found in table\n");
                 }
             }
             Err(_) => {
-                content.push_str("Run `cargo xtask syscall numbers` first to fetch syscall tables.\n");
+                content
+                    .push_str("Run `cargo xtask syscall numbers` first to fetch syscall tables.\n");
             }
         }
     } else {
         content.push_str("Run `cargo xtask syscall numbers` first to fetch syscall tables.\n");
     }
-    content.push_str("\n");
+    content.push('\n');
 
     // =================================
     // Calling Conventions
     // =================================
     content.push_str(X86_64_CALLING_CONVENTION);
-    content.push_str("\n");
+    content.push('\n');
     content.push_str(AARCH64_CALLING_CONVENTION);
-    content.push_str("\n");
+    content.push('\n');
 
     // =================================
     // Architecture-Specific Arguments (if different)
     // =================================
     if let Some(ref arch_args) = info.arch_args {
         content.push_str("## ⚠️ ARCHITECTURE-SPECIFIC ARGUMENT ORDER\n\n");
-        content.push_str("**This syscall has DIFFERENT argument orders on different architectures!**\n\n");
-        
+        content.push_str(
+            "**This syscall has DIFFERENT argument orders on different architectures!**\n\n",
+        );
+
         content.push_str("### x86_64 Argument Order\n\n");
         content.push_str("| Arg # | Register | Parameter |\n");
         content.push_str("|-------|----------|----------|\n");
@@ -1124,7 +1130,7 @@ pub fn fetch(name: &str, force: bool) -> Result<PathBuf> {
                 content.push_str(&format!("| {} | {} | {} |\n", i + 1, x86_regs[i], arg));
             }
         }
-        content.push_str("\n");
+        content.push('\n');
 
         content.push_str("### aarch64 Argument Order\n\n");
         content.push_str("| Arg # | Register | Parameter |\n");
@@ -1132,26 +1138,32 @@ pub fn fetch(name: &str, force: bool) -> Result<PathBuf> {
         for (i, arg) in arch_args.aarch64.iter().enumerate() {
             content.push_str(&format!("| {} | x{} | {} |\n", i + 1, i, arg));
         }
-        content.push_str("\n");
+        content.push('\n');
 
         content.push_str(&format!("**Notes**: {}\n\n", arch_args.notes));
-        
+
         // Add implementation guidance
         content.push_str("### LevitateOS Implementation Pattern\n\n");
         content.push_str("```rust\n");
         content.push_str("// In syscall dispatcher (lib.rs):\n");
         content.push_str("#[cfg(target_arch = \"x86_64\")]\n");
-        content.push_str(&format!("Some(SyscallNumber::{}) => sys_{}(\n", 
-            to_pascal_case(name), name));
+        content.push_str(&format!(
+            "Some(SyscallNumber::{}) => sys_{}(\n",
+            to_pascal_case(name),
+            name
+        ));
         for (i, arg) in arch_args.x86_64.iter().enumerate() {
-            content.push_str(&format!("    frame.arg{}() as _, // {}\n", i, arg));
+            content.push_str(&format!("    frame.arg{i}() as _, // {arg}\n"));
         }
         content.push_str("),\n");
         content.push_str("#[cfg(target_arch = \"aarch64\")]\n");
-        content.push_str(&format!("Some(SyscallNumber::{}) => sys_{}(\n", 
-            to_pascal_case(name), name));
+        content.push_str(&format!(
+            "Some(SyscallNumber::{}) => sys_{}(\n",
+            to_pascal_case(name),
+            name
+        ));
         for (i, arg) in arch_args.aarch64.iter().enumerate() {
-            content.push_str(&format!("    frame.arg{}() as _, // {}\n", i, arg));
+            content.push_str(&format!("    frame.arg{i}() as _, // {arg}\n"));
         }
         content.push_str("),\n");
         content.push_str("```\n\n");
@@ -1171,14 +1183,14 @@ pub fn fetch(name: &str, force: bool) -> Result<PathBuf> {
         content.push_str("## Kernel Headers (Struct Definitions)\n\n");
 
         for header_path in info.kernel_headers {
-            let url = format!("{}/{}", KERNEL_RAW, header_path);
-            print!("  Fetching {}... ", header_path);
+            let url = format!("{KERNEL_RAW}/{header_path}");
+            print!("  Fetching {header_path}... ");
 
             match fetch_url(&url) {
                 Ok(header_content) => {
                     println!("ok");
-                    content.push_str(&format!("### {}\n\n", header_path));
-                    content.push_str(&format!("Source: {}\n\n", url));
+                    content.push_str(&format!("### {header_path}\n\n"));
+                    content.push_str(&format!("Source: {url}\n\n"));
                     content.push_str("```c\n");
                     // Truncate very large headers
                     let lines: Vec<&str> = header_content.lines().collect();
@@ -1187,15 +1199,18 @@ pub fn fetch(name: &str, force: bool) -> Result<PathBuf> {
                             content.push_str(line);
                             content.push('\n');
                         }
-                        content.push_str(&format!("\n// ... truncated ({} more lines)\n", lines.len() - 300));
+                        content.push_str(&format!(
+                            "\n// ... truncated ({} more lines)\n",
+                            lines.len() - 300
+                        ));
                     } else {
                         content.push_str(&header_content);
                     }
                     content.push_str("```\n\n");
                 }
                 Err(e) => {
-                    println!("failed: {}", e);
-                    content.push_str(&format!("### {} (FAILED)\n\n", header_path));
+                    println!("failed: {e}");
+                    content.push_str(&format!("### {header_path} (FAILED)\n\n"));
                 }
             }
         }
@@ -1207,21 +1222,21 @@ pub fn fetch(name: &str, force: bool) -> Result<PathBuf> {
     content.push_str("## Kernel Implementation\n\n");
 
     for source_path in info.kernel_sources {
-        let url = format!("{}/{}", KERNEL_RAW, source_path);
-        print!("  Fetching {}... ", source_path);
+        let url = format!("{KERNEL_RAW}/{source_path}");
+        print!("  Fetching {source_path}... ");
 
         match fetch_url(&url) {
             Ok(source) => {
                 println!("ok");
-                content.push_str(&format!("### {}\n\n", source_path));
-                content.push_str(&format!("Source: {}\n\n", url));
+                content.push_str(&format!("### {source_path}\n\n"));
+                content.push_str(&format!("Source: {url}\n\n"));
                 content.push_str("```c\n");
                 content.push_str(&extract_syscall_impl(&source, name));
                 content.push_str("```\n\n");
             }
             Err(e) => {
-                println!("failed: {}", e);
-                content.push_str(&format!("### {} (FAILED: {})\n\n", source_path, e));
+                println!("failed: {e}");
+                content.push_str(&format!("### {source_path} (FAILED: {e})\n\n"));
             }
         }
     }
@@ -1234,14 +1249,14 @@ pub fn fetch(name: &str, force: bool) -> Result<PathBuf> {
         content.push_str("musl provides clean, readable implementations that show the userspace perspective.\n\n");
 
         for source_path in info.musl_sources {
-            let url = format!("{}/{}", MUSL_RAW, source_path);
-            print!("  Fetching musl {}... ", source_path);
+            let url = format!("{MUSL_RAW}/{source_path}");
+            print!("  Fetching musl {source_path}... ");
 
             match fetch_url(&url) {
                 Ok(source) => {
                     println!("ok");
-                    content.push_str(&format!("### {}\n\n", source_path));
-                    content.push_str(&format!("Source: {}\n\n", url));
+                    content.push_str(&format!("### {source_path}\n\n"));
+                    content.push_str(&format!("Source: {url}\n\n"));
                     content.push_str("```c\n");
                     content.push_str(&source);
                     content.push_str("```\n\n");
@@ -1278,16 +1293,16 @@ pub fn fetch_numbers(force: bool) -> Result<()> {
     // x86_64 syscall table
     let x86_path = specs_dir.join("numbers_x86_64.txt");
     if !x86_path.exists() || force {
-        let url = format!("{}/arch/x86/entry/syscalls/syscall_64.tbl", KERNEL_RAW);
+        let url = format!("{KERNEL_RAW}/arch/x86/entry/syscalls/syscall_64.tbl");
         print!("x86_64: fetching... ");
         match fetch_url(&url) {
             Ok(content) => {
-                let mut output = format!("# Syscall Numbers - x86_64\n# Source: {}\n\n", url);
+                let mut output = format!("# Syscall Numbers - x86_64\n# Source: {url}\n\n");
                 output.push_str(&content);
                 fs::write(&x86_path, &output)?;
                 println!("ok");
             }
-            Err(e) => println!("failed: {}", e),
+            Err(e) => println!("failed: {e}"),
         }
     } else {
         println!("x86_64: exists (use --force to re-download)");
@@ -1296,16 +1311,16 @@ pub fn fetch_numbers(force: bool) -> Result<()> {
     // aarch64 syscall table
     let aarch64_path = specs_dir.join("numbers_aarch64.txt");
     if !aarch64_path.exists() || force {
-        let url = format!("{}/include/uapi/asm-generic/unistd.h", KERNEL_RAW);
+        let url = format!("{KERNEL_RAW}/include/uapi/asm-generic/unistd.h");
         print!("aarch64: fetching... ");
         match fetch_url(&url) {
             Ok(content) => {
-                let mut output = format!("# Syscall Numbers - aarch64\n# Source: {}\n\n", url);
+                let mut output = format!("# Syscall Numbers - aarch64\n# Source: {url}\n\n");
                 output.push_str(&content);
                 fs::write(&aarch64_path, &output)?;
                 println!("ok");
             }
-            Err(e) => println!("failed: {}", e),
+            Err(e) => println!("failed: {e}"),
         }
     } else {
         println!("aarch64: exists (use --force to re-download)");
@@ -1315,8 +1330,8 @@ pub fn fetch_numbers(force: bool) -> Result<()> {
     let errno_path = specs_dir.join("errno.txt");
     if !errno_path.exists() || force {
         print!("errno: fetching... ");
-        let url1 = format!("{}/include/uapi/asm-generic/errno-base.h", KERNEL_RAW);
-        let url2 = format!("{}/include/uapi/asm-generic/errno.h", KERNEL_RAW);
+        let url1 = format!("{KERNEL_RAW}/include/uapi/asm-generic/errno-base.h");
+        let url2 = format!("{KERNEL_RAW}/include/uapi/asm-generic/errno.h");
 
         let mut errno_content = String::from("# Linux Error Numbers\n\n");
 
@@ -1356,11 +1371,11 @@ pub fn list() -> Result<()> {
     }
 
     let mut entries: Vec<_> = fs::read_dir(&specs_dir)?
-        .filter_map(|e| e.ok())
+        .filter_map(std::result::Result::ok)
         .filter(|e| e.path().is_file())
         .collect();
 
-    entries.sort_by_key(|e| e.file_name());
+    entries.sort_by_key(std::fs::DirEntry::file_name);
 
     let mut tables = Vec::new();
     let mut specs = Vec::new();
@@ -1377,7 +1392,7 @@ pub fn list() -> Result<()> {
     if !tables.is_empty() {
         println!("Reference tables:");
         for t in &tables {
-            println!("  {}", t);
+            println!("  {t}");
         }
         println!();
     }
@@ -1385,7 +1400,7 @@ pub fn list() -> Result<()> {
     if !specs.is_empty() {
         println!("Syscall specs ({}):", specs.len());
         for s in &specs {
-            println!("  {}", s);
+            println!("  {s}");
         }
         println!();
     }
@@ -1401,13 +1416,13 @@ pub fn list() -> Result<()> {
 }
 
 pub fn show(name: &str) -> Result<()> {
-    let spec_path = specs_dir().join(format!("{}.md", name));
+    let spec_path = specs_dir().join(format!("{name}.md"));
 
     if !spec_path.exists() {
         fetch(name, false)?;
     }
 
     let content = fs::read_to_string(&spec_path)?;
-    println!("{}", content);
+    println!("{content}");
     Ok(())
 }

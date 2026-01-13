@@ -1,25 +1,25 @@
 //! ISO build module
 //!
-//! TEAM_466: Extracted from commands.rs during refactor.
-//! Handles Limine ISO creation for x86_64.
+//! `TEAM_466`: Extracted from commands.rs during refactor.
+//! Handles Limine ISO creation for `x86_64`.
 
 use anyhow::{bail, Context, Result};
 use std::path::PathBuf;
 use std::process::Command;
 
-/// TEAM_283: Build a bootable Limine ISO
+/// `TEAM_283`: Build a bootable Limine ISO
 // TEAM_435: Replaced Eyra with c-gull sysroot
 // TEAM_444: Migrated to musl
 pub fn build_iso(arch: &str) -> Result<()> {
     build_iso_internal(&[], arch, false)
 }
 
-/// TEAM_286: Build ISO with verbose feature for behavior testing
+/// `TEAM_286`: Build ISO with verbose feature for behavior testing
 pub fn build_iso_verbose(arch: &str) -> Result<()> {
     build_iso_internal(&["verbose"], arch, false)
 }
 
-/// TEAM_374: Build ISO for testing with test initramfs
+/// `TEAM_374`: Build ISO for testing with test initramfs
 pub fn build_iso_test(arch: &str) -> Result<()> {
     build_iso_internal(&["verbose"], arch, true)
 }
@@ -29,7 +29,7 @@ fn build_iso_internal(features: &[&str], arch: &str, use_test_initramfs: bool) -
         bail!("ISO build currently only supported for x86_64");
     }
 
-    println!("💿 Building Limine ISO for {}...", arch);
+    println!("💿 Building Limine ISO for {arch}...");
 
     // TEAM_438: Build sysroot and all external apps if not present
     // TEAM_444: Now just ensures musl target is installed
@@ -57,7 +57,7 @@ fn build_iso_internal(features: &[&str], arch: &str, use_test_initramfs: bool) -
     let initramfs_path = if use_test_initramfs {
         "initramfs_test.cpio".to_string()
     } else {
-        format!("initramfs_{}.cpio", arch)
+        format!("initramfs_{arch}.cpio")
     };
     let limine_cfg_path = "limine.cfg";
 
@@ -101,7 +101,7 @@ fn build_iso_internal(features: &[&str], arch: &str, use_test_initramfs: bool) -
         bail!("xorriso failed to create ISO");
     }
 
-    println!("✅ ISO created: {}", iso_file);
+    println!("✅ ISO created: {iso_file}");
     Ok(())
 }
 
@@ -123,17 +123,17 @@ fn prepare_limine_binaries(iso_root: &PathBuf) -> Result<()> {
         let base_url = "https://github.com/limine-bootloader/limine/raw/v7.x-binary/";
 
         for file in &files {
-            let url = format!("{}{}", base_url, file);
+            let url = format!("{base_url}{file}");
             let output = limine_dir.join(file);
-            println!("  Fetching {}...", file);
+            println!("  Fetching {file}...");
 
             let status = Command::new("curl")
                 .args(["-L", "-f", "-o", output.to_str().unwrap(), &url])
                 .status()
-                .context(format!("Failed to run curl for {}", file))?;
+                .context(format!("Failed to run curl for {file}"))?;
 
             if !status.success() {
-                bail!("Failed to download {} from {}", file, url);
+                bail!("Failed to download {file} from {url}");
             }
         }
     }

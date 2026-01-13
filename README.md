@@ -13,6 +13,8 @@
 >
 > **469+ AI team sessions** have contributed to this codebase. Each session is documented in `.teams/`.
 
+**🔗 Kernel Repository:** [github.com/LevitateOS/kernel](https://github.com/LevitateOS/kernel) — The kernel is maintained as a standalone submodule for independent development.
+
 ---
 
 ## 🎯 The Goal

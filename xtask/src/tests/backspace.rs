@@ -1,6 +1,6 @@
 //! Backspace Regression Test
 //!
-//! TEAM_327: Verifies backspace actually erases characters.
+//! `TEAM_327`: Verifies backspace actually erases characters.
 //!
 //! This test catches the bug where:
 //! - Keyboard sends 0x08 (BS)
@@ -17,7 +17,7 @@
 use anyhow::{bail, Context, Result};
 use std::io::{Read, Write};
 use std::os::unix::io::AsRawFd;
-use std::process::{Command, Stdio};
+use std::process::Stdio;
 use std::time::{Duration, Instant};
 
 use crate::build;
@@ -25,7 +25,7 @@ use crate::qemu::{Arch, QemuBuilder, QemuProfile};
 
 /// Run backspace regression test
 pub fn run(arch: &str) -> Result<()> {
-    println!("🔙 Backspace Regression Test for {}\n", arch);
+    println!("🔙 Backspace Regression Test for {arch}\n");
     println!("   This test verifies backspace actually erases characters.");
     println!("   It will FAIL if backspace is broken (echoes ^H instead of erasing).\n");
 
@@ -39,8 +39,7 @@ pub fn run(arch: &str) -> Result<()> {
         QemuProfile::Default
     };
 
-    let mut builder = QemuBuilder::new(arch_enum, profile)
-        .display_nographic();
+    let mut builder = QemuBuilder::new(arch_enum, profile).display_nographic();
 
     if arch == "x86_64" {
         builder = builder.boot_iso();
@@ -145,11 +144,11 @@ pub fn run(arch: &str) -> Result<()> {
     let _ = child.kill();
     let _ = child.wait();
 
-    println!("📤 Raw output:\n{:?}\n", all_output);
+    println!("📤 Raw output:\n{all_output:?}\n");
 
     // === VERIFICATION ===
     // The echo command should have received "abx" and printed it
-    // If backspace worked: output contains "abx" 
+    // If backspace worked: output contains "abx"
     // If backspace broken: output contains "abc" followed by ^H or similar
 
     let backspace_worked = all_output.contains("abx");
@@ -157,7 +156,7 @@ pub fn run(arch: &str) -> Result<()> {
     let backspace_broken_literal = all_output.contains("abc\x08"); // Literal BS in output
 
     println!("━━━ Results ━━━");
-    
+
     if backspace_worked && !backspace_broken_caret {
         println!("✅ PASS: Backspace works correctly!");
         println!("   Output contains 'abx' - backspace erased 'c' and 'x' replaced it.");
@@ -174,7 +173,7 @@ pub fn run(arch: &str) -> Result<()> {
         bail!("Backspace regression test failed - BS not processed")
     } else {
         println!("⚠️  INCONCLUSIVE: Could not verify backspace behavior.");
-        println!("   Output: {:?}", all_output);
+        println!("   Output: {all_output:?}");
         println!("   Expected to find 'abx' in output.");
         // Don't fail - might be timing issue
         Ok(())

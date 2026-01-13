@@ -1,6 +1,6 @@
 //! Support utilities module
 //!
-//! TEAM_322: Organized into submodule
+//! `TEAM_322`: Organized into submodule
 
 pub mod clean;
 pub mod preflight;

@@ -1,7 +1,7 @@
 //! VM session management
 //!
-//! TEAM_324: Persistent shell session using QMP sendkey.
-//! TEAM_326: Moved to vm module for unified VM interaction.
+//! `TEAM_324`: Persistent shell session using QMP sendkey.
+//! `TEAM_326`: Moved to vm module for unified VM interaction.
 //!
 //! Commands:
 //! - start: Start VM in background
@@ -64,7 +64,7 @@ impl SessionState {
 /// Start a new VM session
 pub fn start(arch: &str) -> Result<()> {
     println!("🚀 Starting persistent VM session...");
-    println!("   Arch: {}", arch);
+    println!("   Arch: {arch}");
 
     // Check for existing session
     if let Some(existing) = SessionState::load()? {
@@ -73,11 +73,10 @@ pub fn start(arch: &str) -> Result<()> {
                 "Session already running (PID {}). Use 'vm stop' first.",
                 existing.pid
             );
-        } else {
-            println!("⚠️  Cleaning up stale session...");
-            SessionState::remove()?;
-            let _ = fs::remove_file(&existing.qmp_socket);
         }
+        println!("⚠️  Cleaning up stale session...");
+        SessionState::remove()?;
+        let _ = fs::remove_file(&existing.qmp_socket);
     }
 
     // Clean up socket
@@ -145,9 +144,9 @@ pub fn start(arch: &str) -> Result<()> {
     println!("╔══════════════════════════════════════════════════════════╗");
     println!("║  ✅ VM session started                                   ║");
     println!("╠══════════════════════════════════════════════════════════╣");
-    println!("║  PID:      {}                                        ", pid);
-    println!("║  Arch:     {}                                       ", arch);
-    println!("║  QMP:      {}                            ", QMP_SOCKET);
+    println!("║  PID:      {pid}                                        ");
+    println!("║  Arch:     {arch}                                       ");
+    println!("║  QMP:      {QMP_SOCKET}                            ");
     println!("║  VNC:      localhost:5900                               ║");
     println!("╠══════════════════════════════════════════════════════════╣");
     println!("║  Commands:                                               ║");
@@ -167,10 +166,13 @@ pub fn send(text: &str) -> Result<()> {
 
     if !state.is_alive() {
         SessionState::remove()?;
-        bail!("Session died (PID {} not running). Use 'vm start' to restart.", state.pid);
+        bail!(
+            "Session died (PID {} not running). Use 'vm start' to restart.",
+            state.pid
+        );
     }
 
-    println!("📤 Sending: {}", text);
+    println!("📤 Sending: {text}");
 
     let mut client = QmpClient::connect(&state.qmp_socket)?;
 
@@ -200,22 +202,22 @@ pub fn screenshot(output: &str) -> Result<()> {
     println!("📸 Taking screenshot...");
 
     let mut client = QmpClient::connect(&state.qmp_socket)?;
-    
+
     // Determine output format
     let ppm_output = if output.ends_with(".png") {
         output.replace(".png", ".ppm")
     } else if output.ends_with(".ppm") {
         output.to_string()
     } else {
-        format!("{}.ppm", output)
+        format!("{output}.ppm")
     };
-    
+
     let abs_path = std::env::current_dir()?.join(&ppm_output);
     let args = serde_json::json!({
         "filename": abs_path.to_string_lossy()
     });
     client.execute("screendump", Some(args))?;
-    
+
     std::thread::sleep(std::time::Duration::from_millis(500));
 
     // Convert to PNG if requested
@@ -226,12 +228,12 @@ pub fn screenshot(output: &str) -> Result<()> {
             .is_ok()
         {
             let _ = fs::remove_file(&ppm_output);
-            println!("✅ Screenshot saved: {}", output);
+            println!("✅ Screenshot saved: {output}");
         } else {
-            println!("✅ Screenshot saved: {} (PPM format)", ppm_output);
+            println!("✅ Screenshot saved: {ppm_output} (PPM format)");
         }
     } else {
-        println!("✅ Screenshot saved: {}", ppm_output);
+        println!("✅ Screenshot saved: {ppm_output}");
     }
 
     Ok(())
@@ -239,8 +241,7 @@ pub fn screenshot(output: &str) -> Result<()> {
 
 /// Stop the running VM session
 pub fn stop() -> Result<()> {
-    let state = SessionState::load()?
-        .ok_or_else(|| anyhow::anyhow!("No session running."))?;
+    let state = SessionState::load()?.ok_or_else(|| anyhow::anyhow!("No session running."))?;
 
     println!("🛑 Stopping session (PID {})...", state.pid);
 
@@ -262,7 +263,7 @@ pub fn stop() -> Result<()> {
 /// Send a single character as a keypress
 fn send_char(client: &mut QmpClient, ch: char) -> Result<()> {
     let (key, needs_shift) = char_to_qcode(ch);
-    
+
     if needs_shift {
         let args = serde_json::json!({
             "keys": [
@@ -274,7 +275,7 @@ fn send_char(client: &mut QmpClient, ch: char) -> Result<()> {
     } else {
         send_key(client, key)?;
     }
-    
+
     Ok(())
 }
 
@@ -292,16 +293,18 @@ fn char_to_qcode(ch: char) -> (&'static str, bool) {
     match ch {
         'a'..='z' => {
             let idx = (ch as u8 - b'a') as usize;
-            let keys = ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j",
-                       "k", "l", "m", "n", "o", "p", "q", "r", "s", "t",
-                       "u", "v", "w", "x", "y", "z"];
+            let keys = [
+                "a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p",
+                "q", "r", "s", "t", "u", "v", "w", "x", "y", "z",
+            ];
             (keys[idx], false)
         }
         'A'..='Z' => {
             let idx = (ch as u8 - b'A') as usize;
-            let keys = ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j",
-                       "k", "l", "m", "n", "o", "p", "q", "r", "s", "t",
-                       "u", "v", "w", "x", "y", "z"];
+            let keys = [
+                "a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p",
+                "q", "r", "s", "t", "u", "v", "w", "x", "y", "z",
+            ];
             (keys[idx], true)
         }
         '0'..='9' => {

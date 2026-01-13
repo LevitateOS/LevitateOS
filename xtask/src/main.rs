@@ -1,6 +1,27 @@
-//! LevitateOS xtask - Development task runner
+// TEAM_470: Suppress overly pedantic clippy lints for xtask
+#![allow(clippy::ptr_arg)]
+#![allow(clippy::trivially_copy_pass_by_ref)]
+#![allow(clippy::struct_excessive_bools)]
+#![allow(clippy::too_many_lines)]
+#![allow(clippy::unnecessary_wraps)]
+#![allow(clippy::doc_lazy_continuation)]
+#![allow(clippy::match_same_arms)]
+#![allow(clippy::manual_strip)]
+#![allow(clippy::unwrap_used)]
+#![allow(clippy::expect_used)]
+#![allow(clippy::verbose_bit_mask)]
+#![allow(clippy::format_push_string)]
+#![allow(clippy::case_sensitive_file_extension_comparisons)]
+#![allow(clippy::manual_flatten)]
+#![allow(clippy::items_after_statements)]
+#![allow(clippy::manual_let_else)]
+#![allow(clippy::while_let_loop)]
+#![allow(clippy::needless_pass_by_value)]
+#![allow(clippy::lines_filter_map_ok)]
+
+//! `LevitateOS` xtask - Development task runner
 //!
-//! TEAM_326: Refactored command structure for clarity.
+//! `TEAM_326`: Refactored command structure for clarity.
 //!
 //! Usage:
 //!   cargo xtask run                   # Build + run with GUI (most common)
@@ -151,7 +172,7 @@ pub struct TestArgs {
     #[arg(long)]
     pub update: bool,
 
-    /// TEAM_465: Phase to run for coreutils tests (e.g., "all", "2", "1-5")
+    /// `TEAM_465`: Phase to run for coreutils tests (e.g., "all", "2", "1-5")
     #[arg(long, default_value = "all")]
     pub phase: String,
 }
@@ -161,10 +182,7 @@ fn main() -> Result<()> {
     let arch = cli.arch.as_str();
 
     if arch != "aarch64" && arch != "x86_64" {
-        bail!(
-            "Unsupported architecture: {}. Use 'aarch64' or 'x86_64'",
-            arch
-        );
+        bail!("Unsupported architecture: {arch}. Use 'aarch64' or 'x86_64'");
     }
 
     // Ensure we're in project root
@@ -175,7 +193,7 @@ fn main() -> Result<()> {
         Commands::Test(args) => match args.suite.as_str() {
             "all" => {
                 preflight::check_preflight(arch)?;
-                println!("🧪 Running COMPLETE test suite for {}...\n", arch);
+                println!("🧪 Running COMPLETE test suite for {arch}...\n");
                 tests::unit::run()?;
                 tests::behavior::run(arch, args.update)?;
                 if arch == "aarch64" {
@@ -195,7 +213,7 @@ fn main() -> Result<()> {
                 if arch != "aarch64" {
                     bail!("GICv3 tests only supported on aarch64");
                 }
-                tests::behavior::run_gicv3()?
+                tests::behavior::run_gicv3()?;
             },
             "serial" => tests::serial_input::run(arch)?,
             "keyboard" => tests::keyboard_input::run(arch)?,
@@ -216,7 +234,7 @@ fn main() -> Result<()> {
             // TEAM_465: Coreutils test suite
             "coreutils" | "core" => tests::coreutils::run(arch, Some(args.phase.as_str()))?,
             // TEAM_435: Eyra test removed (Eyra replaced by c-gull)
-            other => bail!("Unknown test suite: {}. Use 'unit', 'behavior', 'regress', 'gicv3', 'coreutils', 'serial', 'keyboard', 'shutdown', 'debug', 'screenshot', or 'all'", other),
+            other => bail!("Unknown test suite: {other}. Use 'unit', 'behavior', 'regress', 'gicv3', 'coreutils', 'serial', 'keyboard', 'shutdown', 'debug', 'screenshot', or 'all'"),
         },
         // TEAM_326: Refactored command handlers
         Commands::Run(args) => {
@@ -338,11 +356,14 @@ fn main() -> Result<()> {
 fn project_root() -> Result<PathBuf> {
     let manifest_dir = std::env::var("CARGO_MANIFEST_DIR")
         .map(PathBuf::from)
-        .unwrap_or_else(|_| std::env::current_dir().unwrap());
+        .or_else(|_| std::env::current_dir())?;
 
     // If we're in xtask/, go up one level
     if manifest_dir.ends_with("xtask") {
-        Ok(manifest_dir.parent().unwrap().to_path_buf())
+        manifest_dir
+            .parent()
+            .map(std::path::Path::to_path_buf)
+            .ok_or_else(|| anyhow::anyhow!("manifest_dir has no parent"))
     } else {
         Ok(manifest_dir)
     }
@@ -353,9 +374,9 @@ pub fn get_binaries(arch: &str) -> Result<Vec<String>> {
     let target = match arch {
         "aarch64" => "aarch64-unknown-none",
         "x86_64" => "x86_64-unknown-none",
-        _ => bail!("Unsupported architecture: {}", arch),
+        _ => bail!("Unsupported architecture: {arch}"),
     };
-    let release_dir = PathBuf::from(format!("crates/userspace/target/{}/release", target));
+    let release_dir = PathBuf::from(format!("crates/userspace/target/{target}/release"));
     if !release_dir.exists() {
         return Ok(bins);
     }

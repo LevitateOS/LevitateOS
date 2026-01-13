@@ -1,11 +1,11 @@
 //! Debug Tools Integration Tests
 //!
-//! TEAM_325: Automated tests for `debug regs` and `debug mem` commands.
+//! `TEAM_325`: Automated tests for `debug regs` and `debug mem` commands.
 //!
 //! Tests both architectures using golden file comparison for output format.
 //! Uses QEMU with NO guest OS - just tests QMP infrastructure against QEMU's
 //! deterministic initial CPU/memory state. This ensures tests don't break
-//! when the LevitateOS kernel changes.
+//! when the `LevitateOS` kernel changes.
 
 use anyhow::{bail, Context, Result};
 use std::fs;
@@ -81,10 +81,10 @@ fn start_qemu_with_qmp(arch: &str) -> Result<std::process::Child> {
     let qemu_bin = match arch {
         "aarch64" => "qemu-system-aarch64",
         "x86_64" => "qemu-system-x86_64",
-        _ => bail!("Unsupported architecture: {}", arch),
+        _ => bail!("Unsupported architecture: {arch}"),
     };
 
-    let qmp_arg = format!("unix:{},server,nowait", QMP_SOCKET);
+    let qmp_arg = format!("unix:{QMP_SOCKET},server,nowait");
 
     // Minimal QEMU args - NO kernel, NO ISO, NO guest OS
     // This gives us deterministic initial CPU/memory state for testing
@@ -154,7 +154,7 @@ fn test_debug_regs(arch: &str, update: bool) -> Result<()> {
     if update {
         // Update golden file
         fs::write(golden_file, &normalized)?;
-        println!("    ✏️  Updated golden file: {}", golden_file);
+        println!("    ✏️  Updated golden file: {golden_file}");
         return Ok(());
     }
 
@@ -174,7 +174,7 @@ fn test_debug_mem(arch: &str, update: bool) -> Result<()> {
     // aarch64 virt: RAM starts at 0x40000000
     // x86_64 q35: RAM starts at 0x0
     let mem_addr: u64 = if arch == "aarch64" {
-        0x40000000 // Start of physical RAM on virt machine
+        0x4000_0000 // Start of physical RAM on virt machine
     } else {
         0x0 // Start of physical RAM on q35
     };
@@ -206,7 +206,7 @@ fn test_debug_mem(arch: &str, update: bool) -> Result<()> {
     if update {
         // Update golden file
         fs::write(golden_file, &output)?;
-        println!("    ✏️  Updated golden file: {}", golden_file);
+        println!("    ✏️  Updated golden file: {golden_file}");
         return Ok(());
     }
 
@@ -313,11 +313,11 @@ fn format_hexdump(data: &[u8], base_addr: u64) -> String {
         let addr = base_addr + offset as u64;
 
         // Address
-        output.push_str(&format!("0x{:08x}: ", addr));
+        output.push_str(&format!("0x{addr:08x}: "));
 
         // Hex bytes
         for (j, byte) in chunk.iter().enumerate() {
-            output.push_str(&format!("{:02x} ", byte));
+            output.push_str(&format!("{byte:02x} "));
             if j == 7 {
                 output.push(' ');
             }
@@ -357,12 +357,12 @@ fn compare_with_golden(actual: &str, golden_path: &str, test_name: &str) -> Resu
     if !Path::new(golden_path).exists() {
         // Create golden file if it doesn't exist
         fs::write(golden_path, actual)?;
-        println!("    📝 Created new golden file: {}", golden_path);
+        println!("    📝 Created new golden file: {golden_path}");
         return Ok(());
     }
 
     let expected = fs::read_to_string(golden_path)
-        .context(format!("Failed to read golden file: {}", golden_path))?;
+        .context(format!("Failed to read golden file: {golden_path}"))?;
 
     let matches = actual.trim() == expected.trim();
 
@@ -386,15 +386,12 @@ fn compare_with_golden(actual: &str, golden_path: &str, test_name: &str) -> Resu
                 fs::write(&actual_path, actual)?;
 
                 bail!(
-                    "{} output differs from golden file!\n\
-                     Expected: {}\n\
-                     Actual:   {}\n\
+                    "{test_name} output differs from golden file!\n\
+                     Expected: {golden_path}\n\
+                     Actual:   {actual_path}\n\
                      \n\
                      To update golden file, run:\n  \
-                     cargo xtask test debug --update",
-                    test_name,
-                    golden_path,
-                    actual_path
+                     cargo xtask test debug --update"
                 );
             }
         }
@@ -407,23 +404,19 @@ fn print_simple_diff(expected: &str, actual: &str) {
     let actual_lines: Vec<&str> = actual.lines().collect();
 
     let max_len = expected_lines.len().max(actual_lines.len());
-    let mut diff_count = 0;
 
     for i in 0..max_len.min(10) {
         // Show first 10 differences
         match (expected_lines.get(i), actual_lines.get(i)) {
             (Some(e), Some(a)) if e != a => {
-                println!("    - {}", e);
-                println!("    + {}", a);
-                diff_count += 1;
+                println!("    - {e}");
+                println!("    + {a}");
             }
             (Some(e), None) => {
-                println!("    - {}", e);
-                diff_count += 1;
+                println!("    - {e}");
             }
             (None, Some(a)) => {
-                println!("    + {}", a);
-                diff_count += 1;
+                println!("    + {a}");
             }
             _ => {}
         }

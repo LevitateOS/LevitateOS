@@ -1,6 +1,6 @@
 //! Build orchestration module
 //!
-//! TEAM_466: Extracted from commands.rs during refactor.
+//! `TEAM_466`: Extracted from commands.rs during refactor.
 //! High-level build coordination functions.
 
 use anyhow::Result;
