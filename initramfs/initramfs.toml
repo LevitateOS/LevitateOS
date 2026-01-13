@@ -1,0 +1,150 @@
+# LevitateOS Initramfs Manifest
+# Declarative configuration for building the initramfs CPIO archive
+#
+# Variables available:
+#   ${arch}     - Target architecture (x86_64, aarch64)
+#   ${root}     - This directory (initramfs/)
+#   ${toolchain} - toolchain/ directory
+
+[meta]
+version = "1.0"
+description = "LevitateOS BusyBox-based initramfs"
+
+# Directory structure to create
+[layout]
+directories = [
+    "/bin",
+    "/sbin",
+    "/dev",
+    "/etc",
+    "/proc",
+    "/sys",
+    "/tmp",
+    "/root",
+    "/mnt",
+    "/var",
+    "/var/log",
+    "/var/run",
+]
+
+# Binary sources - each gets installed to the specified destination
+[binaries]
+
+[binaries.busybox]
+source = "${toolchain}/busybox-out/${arch}/busybox"
+dest = "/bin/busybox"
+mode = "0755"
+
+# Symlinks - primarily BusyBox applets
+# Format: destination = target
+[symlinks]
+# Init system
+"/init" = "/bin/busybox"
+"/sbin/init" = "/bin/busybox"
+
+# Core utilities
+"/bin/sh" = "/bin/busybox"
+"/bin/ash" = "/bin/busybox"
+"/bin/echo" = "/bin/busybox"
+"/bin/cat" = "/bin/busybox"
+"/bin/ls" = "/bin/busybox"
+"/bin/cp" = "/bin/busybox"
+"/bin/mv" = "/bin/busybox"
+"/bin/rm" = "/bin/busybox"
+"/bin/mkdir" = "/bin/busybox"
+"/bin/rmdir" = "/bin/busybox"
+"/bin/ln" = "/bin/busybox"
+"/bin/pwd" = "/bin/busybox"
+"/bin/cd" = "/bin/busybox"
+"/bin/true" = "/bin/busybox"
+"/bin/false" = "/bin/busybox"
+"/bin/test" = "/bin/busybox"
+"/bin/[" = "/bin/busybox"
+
+# Text processing
+"/bin/head" = "/bin/busybox"
+"/bin/tail" = "/bin/busybox"
+"/bin/grep" = "/bin/busybox"
+"/bin/sed" = "/bin/busybox"
+"/bin/awk" = "/bin/busybox"
+"/bin/cut" = "/bin/busybox"
+"/bin/sort" = "/bin/busybox"
+"/bin/uniq" = "/bin/busybox"
+"/bin/wc" = "/bin/busybox"
+"/bin/tr" = "/bin/busybox"
+"/bin/tee" = "/bin/busybox"
+
+# File inspection
+"/bin/stat" = "/bin/busybox"
+"/bin/file" = "/bin/busybox"
+"/bin/find" = "/bin/busybox"
+"/bin/xargs" = "/bin/busybox"
+"/bin/du" = "/bin/busybox"
+"/bin/df" = "/bin/busybox"
+"/bin/touch" = "/bin/busybox"
+"/bin/chmod" = "/bin/busybox"
+"/bin/chown" = "/bin/busybox"
+
+# Process management
+"/bin/ps" = "/bin/busybox"
+"/bin/kill" = "/bin/busybox"
+"/bin/sleep" = "/bin/busybox"
+"/bin/date" = "/bin/busybox"
+"/bin/uname" = "/bin/busybox"
+"/bin/hostname" = "/bin/busybox"
+"/bin/env" = "/bin/busybox"
+"/bin/which" = "/bin/busybox"
+"/bin/whoami" = "/bin/busybox"
+"/bin/id" = "/bin/busybox"
+
+# Mount/filesystem
+"/bin/mount" = "/bin/busybox"
+"/bin/umount" = "/bin/busybox"
+"/sbin/mount" = "/bin/busybox"
+"/sbin/umount" = "/bin/busybox"
+"/sbin/mdev" = "/bin/busybox"
+
+# System control
+"/sbin/reboot" = "/bin/busybox"
+"/sbin/poweroff" = "/bin/busybox"
+"/sbin/halt" = "/bin/busybox"
+
+# Misc utilities
+"/bin/clear" = "/bin/busybox"
+"/bin/reset" = "/bin/busybox"
+"/bin/printf" = "/bin/busybox"
+"/bin/expr" = "/bin/busybox"
+"/bin/seq" = "/bin/busybox"
+"/bin/yes" = "/bin/busybox"
+"/bin/basename" = "/bin/busybox"
+"/bin/dirname" = "/bin/busybox"
+"/bin/readlink" = "/bin/busybox"
+
+# Archives (optional, but useful)
+"/bin/tar" = "/bin/busybox"
+"/bin/gzip" = "/bin/busybox"
+"/bin/gunzip" = "/bin/busybox"
+
+# Static files to copy into the initramfs
+# Source paths are relative to ${root}/files/
+[files]
+"/etc/inittab" = { source = "etc/inittab", mode = "0644" }
+"/etc/passwd" = { source = "etc/passwd", mode = "0644" }
+"/etc/group" = { source = "etc/group", mode = "0644" }
+"/etc/profile" = { source = "etc/profile", mode = "0644" }
+"/root/hello.txt" = { content = "Hello from LevitateOS!\n", mode = "0644" }
+
+# Test scripts (from ${root}/scripts/)
+[scripts]
+"/root/test.sh" = { source = "scripts/test.sh", mode = "0755" }
+"/root/test-core.sh" = { source = "scripts/test-core.sh", mode = "0755" }
+
+# Device nodes to create
+# Format: path = { type = "c"|"b", major = N, minor = N, mode = "0NNN" }
+[devices]
+"/dev/null" = { type = "c", major = 1, minor = 3, mode = "0666" }
+"/dev/zero" = { type = "c", major = 1, minor = 5, mode = "0666" }
+"/dev/random" = { type = "c", major = 1, minor = 8, mode = "0666" }
+"/dev/urandom" = { type = "c", major = 1, minor = 9, mode = "0666" }
+"/dev/tty" = { type = "c", major = 5, minor = 0, mode = "0666" }
+"/dev/console" = { type = "c", major = 5, minor = 1, mode = "0600" }

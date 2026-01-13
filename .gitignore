@@ -43,3 +43,7 @@ Cargo.lock
 # Auto-fetched syscall specs (regenerate with: cargo xtask syscall)
 docs/specs/syscalls/
 toolchain
+
+# TEAM_474: initramfs build output directory, but NOT source
+/target/initramfs/
+# Legacy initramfs output at root (covered by *.cpio pattern above)

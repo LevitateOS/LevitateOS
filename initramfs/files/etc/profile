@@ -1,0 +1,4 @@
+export PATH=/bin:/sbin
+export HOME=/root
+export PS1='LevitateOS# '
+alias ll='ls -la'

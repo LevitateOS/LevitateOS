@@ -12,6 +12,7 @@
 //!   - userspace.rs: `build_userspace`
 //!   - initramfs.rs: all initramfs creation functions
 //!   - iso.rs: ISO build + Limine
+//! `TEAM_474`: Refactored initramfs to pure Rust with TOML manifest and TUI
 
 mod commands;
 mod initramfs;
@@ -27,6 +28,7 @@ pub mod sysroot;
 
 // Re-export public API (maintains backward compatibility)
 pub use commands::BuildCommands;
+// TEAM_474: Use new initramfs builder with fallback to old
 pub use initramfs::create_busybox_initramfs;
 pub use iso::{build_iso, build_iso_test, build_iso_verbose};
 pub use orchestration::{build_all, build_kernel_only, build_kernel_verbose};
