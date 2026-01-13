@@ -22,16 +22,18 @@
 //! `LevitateOS` xtask - Development task runner
 //!
 //! `TEAM_326`: Refactored command structure for clarity.
+//! `TEAM_475`: Linux kernel + OpenRC is now the default.
 //!
 //! Usage:
-//!   cargo xtask run                   # Build + run with GUI (most common)
+//!   cargo xtask run --term            # Linux + OpenRC (default, most common)
+//!   cargo xtask run --term --minimal  # Linux + BusyBox init (debugging)
+//!   cargo xtask run --custom-kernel   # Use custom LevitateOS kernel
 //!   cargo xtask build                 # Build everything
 //!   cargo xtask test                  # Run all tests
 //!
 //!   cargo xtask run --gdb             # Run with GDB server
-//!   cargo xtask run --term            # Terminal mode (WSL)
 //!   cargo xtask run --vnc             # VNC display
-//!   cargo xtask run --profile pixel6  # Pixel 6 profile
+//!   cargo xtask run --profile pixel6  # Pixel 6 profile (aarch64)
 //!
 //!   cargo xtask vm start              # Start persistent VM session
 //!   cargo xtask vm send "ls"          # Send command to VM
@@ -161,17 +163,13 @@ pub struct RunArgs {
     #[arg(long, default_value = "30")]
     pub timeout: u32,
 
-    /// TEAM_474: Use Linux kernel instead of custom kernel
+    /// TEAM_475: Use custom LevitateOS kernel instead of Linux (for kernel development)
     #[arg(long)]
-    pub linux: bool,
+    pub custom_kernel: bool,
 
-    /// TEAM_475: Use Alpine Linux rootfs (requires --linux, deprecated)
+    /// TEAM_475: Use minimal BusyBox init instead of OpenRC (for debugging)
     #[arg(long)]
-    pub alpine: bool,
-
-    /// TEAM_475: Use OpenRC init system (requires --linux)
-    #[arg(long)]
-    pub openrc: bool,
+    pub minimal: bool,
 }
 
 #[derive(clap::Args)]
@@ -260,21 +258,19 @@ fn main() -> Result<()> {
             } else if args.vnc {
                 run::run_qemu_vnc(arch)?;
             } else if args.term {
-                // TEAM_475: If --linux is specified with --term, use the linux kernel path
-                if args.linux {
-                    // Build the appropriate initramfs
-                    if args.openrc {
-                        build::create_openrc_initramfs(arch)?;
-                    } else if args.alpine {
-                        build::alpine::build_alpine_initramfs(arch)?;
-                    } else {
-                        build::create_busybox_initramfs(arch)?;
-                    }
-                    run::run_qemu_term_linux(arch, args.openrc)?;
-                } else {
-                    // TEAM_370: x86_64 always uses ISO, aarch64 never does
+                // TEAM_475: Linux kernel + OpenRC is the default
+                if args.custom_kernel {
+                    // Custom LevitateOS kernel path
                     let use_iso = arch == "x86_64";
                     run::run_qemu_term(arch, use_iso)?;
+                } else {
+                    // Default: Linux kernel with OpenRC (or BusyBox if --minimal)
+                    if args.minimal {
+                        build::create_busybox_initramfs(arch)?;
+                    } else {
+                        build::create_openrc_initramfs(arch)?;
+                    }
+                    run::run_qemu_term_linux(arch, !args.minimal)?;
                 }
             } else if args.gdb {
                 let profile = match args.profile.as_str() {
@@ -307,26 +303,23 @@ fn main() -> Result<()> {
                     }
                     _ => if arch == "x86_64" { qemu::QemuProfile::X86_64 } else { qemu::QemuProfile::Default }
                 };
-                // TEAM_370: x86_64 always uses ISO, aarch64 never does
-                // TEAM_474: Unless --linux is specified, then use direct kernel boot
-                let use_iso = arch == "x86_64" && !args.linux;
-                // TEAM_369: Eyra is always enabled (provides std support)
-                if args.linux {
-                    // TEAM_474: Linux kernel - just need initramfs, kernel is pre-built
-                    // TEAM_475: Choose initramfs variant
-                    if args.openrc {
-                        build::create_openrc_initramfs(arch)?;
-                    } else if args.alpine {
-                        build::alpine::build_alpine_initramfs(arch)?;
-                    } else {
+                // TEAM_475: Linux kernel + OpenRC is the default
+                let use_linux = !args.custom_kernel;
+                let use_iso = arch == "x86_64" && args.custom_kernel;
+
+                if use_linux {
+                    // Default: Linux kernel with OpenRC (or BusyBox if --minimal)
+                    if args.minimal {
                         build::create_busybox_initramfs(arch)?;
+                    } else {
+                        build::create_openrc_initramfs(arch)?;
                     }
                 } else if use_iso {
                     build::build_iso(arch)?;
                 } else {
                     build::build_all(arch)?;
                 }
-                run::run_qemu(profile, args.headless, use_iso, arch, args.gpu_debug, args.linux, args.openrc)?;
+                run::run_qemu(profile, args.headless, use_iso, arch, args.gpu_debug, use_linux, !args.minimal)?;
             }
         },
         Commands::Build(cmd) => {
@@ -343,7 +336,6 @@ fn main() -> Result<()> {
                 build::BuildCommands::Iso => build::build_iso(arch)?,
                 build::BuildCommands::Busybox => build::busybox::build(arch)?,
                 build::BuildCommands::Linux => build::linux::build_linux_kernel(arch)?,
-                build::BuildCommands::Alpine => { build::alpine::build_alpine_initramfs(arch)?; },
                 build::BuildCommands::Openrc => build::openrc::build(arch)?,
                 build::BuildCommands::OpenrcInitramfs => { build::create_openrc_initramfs(arch)?; },
             }
