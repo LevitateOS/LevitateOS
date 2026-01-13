@@ -20,4 +20,12 @@ pub enum BuildCommands {
     Iso,
     /// Build `BusyBox` - provides init, shell, and 300+ utilities
     Busybox,
+    /// Build Linux kernel (TEAM_474: race mode pivot)
+    Linux,
+    /// Build Alpine Linux rootfs initramfs (TEAM_475: deprecated)
+    Alpine,
+    /// Build OpenRC init system from source (TEAM_475)
+    Openrc,
+    /// Build OpenRC-based initramfs (BusyBox + OpenRC) (TEAM_475)
+    OpenrcInitramfs,
 }

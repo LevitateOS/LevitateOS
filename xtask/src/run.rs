@@ -24,18 +24,32 @@ fn profile_for_arch(arch: &str) -> QemuProfile {
 }
 
 /// `TEAM_322`: Run QEMU with default GUI display
+/// `TEAM_474`: Added linux parameter for Linux kernel support
+/// `TEAM_475`: Added openrc parameter for OpenRC initramfs
 pub fn run_qemu(
     profile: QemuProfile,
     headless: bool,
     iso: bool,
     arch: &str,
     gpu_debug: bool,
+    linux: bool,
+    openrc: bool,
 ) -> Result<()> {
     disk::create_disk_image_if_missing()?;
 
     let arch_enum = Arch::try_from(arch)?;
     // TEAM_330: Explicitly set GPU resolution for readable display
     let mut builder = QemuBuilder::new(arch_enum, profile).gpu_resolution(1280, 800);
+
+    // TEAM_474: Use Linux kernel if requested
+    if linux {
+        builder = builder.linux_kernel();
+        // TEAM_475: Use OpenRC initramfs if requested
+        if openrc {
+            let initrd_path = format!("target/initramfs/{}-openrc.cpio", arch);
+            builder = builder.initrd(&initrd_path);
+        }
+    }
 
     // Boot configuration
     if iso {
@@ -346,6 +360,43 @@ pub fn run_qemu_term(arch: &str, iso: bool) -> Result<()> {
 
     if iso {
         builder = builder.boot_iso();
+    }
+
+    let mut cmd = builder.build()?;
+    cmd.stdin(Stdio::inherit())
+        .stdout(Stdio::inherit())
+        .stderr(Stdio::inherit())
+        .status()
+        .context("Failed to run QEMU")?;
+
+    Ok(())
+}
+
+/// TEAM_475: Run Linux kernel in terminal mode with optional OpenRC
+pub fn run_qemu_term_linux(arch: &str, openrc: bool) -> Result<()> {
+    let init_system = if openrc { "OpenRC" } else { "BusyBox" };
+    println!("╔════════════════════════════════════════════════════════════╗");
+    println!("║  LevitateOS + Linux Kernel ({init_system}) - {arch}         ");
+    println!("║                                                            ║");
+    println!("║  Type directly here - keyboard goes to VM                  ║");
+    println!("║  Ctrl+A X to exit QEMU                                     ║");
+    println!("║  Ctrl+A C to switch to QEMU monitor                        ║");
+    println!("╚════════════════════════════════════════════════════════════╝\n");
+
+    // Clean QMP socket
+    let _ = std::fs::remove_file("./qmp.sock");
+
+    let arch_enum = Arch::try_from(arch)?;
+    let profile = profile_for_arch(arch);
+    let mut builder = QemuBuilder::new(arch_enum, profile)
+        .display_nographic()
+        .enable_qmp("./qmp.sock")
+        .linux_kernel();
+
+    // Use OpenRC initramfs if requested
+    if openrc {
+        let initrd_path = format!("target/initramfs/{}-openrc.cpio", arch);
+        builder = builder.initrd(&initrd_path);
     }
 
     let mut cmd = builder.build()?;

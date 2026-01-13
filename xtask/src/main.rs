@@ -160,6 +160,18 @@ pub struct RunArgs {
     /// Timeout for verify-gpu (seconds)
     #[arg(long, default_value = "30")]
     pub timeout: u32,
+
+    /// TEAM_474: Use Linux kernel instead of custom kernel
+    #[arg(long)]
+    pub linux: bool,
+
+    /// TEAM_475: Use Alpine Linux rootfs (requires --linux, deprecated)
+    #[arg(long)]
+    pub alpine: bool,
+
+    /// TEAM_475: Use OpenRC init system (requires --linux)
+    #[arg(long)]
+    pub openrc: bool,
 }
 
 #[derive(clap::Args)]
@@ -248,9 +260,22 @@ fn main() -> Result<()> {
             } else if args.vnc {
                 run::run_qemu_vnc(arch)?;
             } else if args.term {
-                // TEAM_370: x86_64 always uses ISO, aarch64 never does
-                let use_iso = arch == "x86_64";
-                run::run_qemu_term(arch, use_iso)?;
+                // TEAM_475: If --linux is specified with --term, use the linux kernel path
+                if args.linux {
+                    // Build the appropriate initramfs
+                    if args.openrc {
+                        build::create_openrc_initramfs(arch)?;
+                    } else if args.alpine {
+                        build::alpine::build_alpine_initramfs(arch)?;
+                    } else {
+                        build::create_busybox_initramfs(arch)?;
+                    }
+                    run::run_qemu_term_linux(arch, args.openrc)?;
+                } else {
+                    // TEAM_370: x86_64 always uses ISO, aarch64 never does
+                    let use_iso = arch == "x86_64";
+                    run::run_qemu_term(arch, use_iso)?;
+                }
             } else if args.gdb {
                 let profile = match args.profile.as_str() {
                     "pixel6" => {
@@ -283,14 +308,25 @@ fn main() -> Result<()> {
                     _ => if arch == "x86_64" { qemu::QemuProfile::X86_64 } else { qemu::QemuProfile::Default }
                 };
                 // TEAM_370: x86_64 always uses ISO, aarch64 never does
-                let use_iso = arch == "x86_64";
+                // TEAM_474: Unless --linux is specified, then use direct kernel boot
+                let use_iso = arch == "x86_64" && !args.linux;
                 // TEAM_369: Eyra is always enabled (provides std support)
-                if use_iso {
+                if args.linux {
+                    // TEAM_474: Linux kernel - just need initramfs, kernel is pre-built
+                    // TEAM_475: Choose initramfs variant
+                    if args.openrc {
+                        build::create_openrc_initramfs(arch)?;
+                    } else if args.alpine {
+                        build::alpine::build_alpine_initramfs(arch)?;
+                    } else {
+                        build::create_busybox_initramfs(arch)?;
+                    }
+                } else if use_iso {
                     build::build_iso(arch)?;
                 } else {
                     build::build_all(arch)?;
                 }
-                run::run_qemu(profile, args.headless, use_iso, arch, args.gpu_debug)?;
+                run::run_qemu(profile, args.headless, use_iso, arch, args.gpu_debug, args.linux, args.openrc)?;
             }
         },
         Commands::Build(cmd) => {
@@ -306,6 +342,10 @@ fn main() -> Result<()> {
                 build::BuildCommands::Initramfs => build::create_busybox_initramfs(arch)?,
                 build::BuildCommands::Iso => build::build_iso(arch)?,
                 build::BuildCommands::Busybox => build::busybox::build(arch)?,
+                build::BuildCommands::Linux => build::linux::build_linux_kernel(arch)?,
+                build::BuildCommands::Alpine => { build::alpine::build_alpine_initramfs(arch)?; },
+                build::BuildCommands::Openrc => build::openrc::build(arch)?,
+                build::BuildCommands::OpenrcInitramfs => { build::create_openrc_initramfs(arch)?; },
             }
         },
         Commands::Vm(cmd) => match cmd {

@@ -2,3 +2,6 @@
 	path = crates/kernel
 	url = git@github.com:LevitateOS/kernel.git
 	branch = tested
+[submodule "linux"]
+	path = linux
+	url = https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git

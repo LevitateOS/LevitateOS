@@ -22,11 +22,19 @@ impl Arch {
         }
     }
 
-    /// Returns the kernel binary path for this architecture
+    /// Returns the custom kernel binary path for this architecture
     pub fn kernel_path(&self) -> &'static str {
         match self {
             Arch::Aarch64 => "kernel64_rust.bin",
             Arch::X86_64 => "crates/kernel/target/x86_64-unknown-none/release/levitate-kernel",
+        }
+    }
+
+    /// TEAM_474: Returns the Linux kernel binary path for this architecture
+    pub fn linux_kernel_path(&self) -> &'static str {
+        match self {
+            Arch::Aarch64 => "linux/arch/arm64/boot/Image",
+            Arch::X86_64 => "linux/arch/x86/boot/bzImage",
         }
     }
 
@@ -110,6 +118,8 @@ pub struct QemuBuilder {
     // Disk
     disk_image: Option<String>,
     initrd: Option<String>,
+    // TEAM_474: Linux kernel support
+    use_linux_kernel: bool,
 }
 
 impl QemuBuilder {
@@ -134,7 +144,20 @@ impl QemuBuilder {
             no_reboot: true,
             disk_image: Some("tinyos_disk.img".to_string()),
             initrd: Some(initrd_name.to_string()),
+            use_linux_kernel: false,
         }
+    }
+
+    /// TEAM_474: Use Linux kernel instead of custom kernel
+    pub fn linux_kernel(mut self) -> Self {
+        self.use_linux_kernel = true;
+        self
+    }
+
+    /// TEAM_475: Set custom initramfs path
+    pub fn initrd(mut self, path: &str) -> Self {
+        self.initrd = Some(path.to_string());
+        self
     }
 
     /// Set boot mode to ISO
@@ -232,9 +255,19 @@ impl QemuBuilder {
         // Boot configuration
         match self.boot_mode {
             BootMode::Kernel => {
-                cmd.args(["-kernel", self.arch.kernel_path()]);
+                // TEAM_474: Use Linux or custom kernel based on flag
+                let kernel_path = if self.use_linux_kernel {
+                    self.arch.linux_kernel_path()
+                } else {
+                    self.arch.kernel_path()
+                };
+                cmd.args(["-kernel", kernel_path]);
                 if let Some(ref initrd) = self.initrd {
                     cmd.args(["-initrd", initrd]);
+                }
+                // TEAM_474: Linux kernel needs command line for console
+                if self.use_linux_kernel {
+                    cmd.args(["-append", "console=ttyS0 earlyprintk=serial,ttyS0,115200 rdinit=/init"]);
                 }
             }
             BootMode::Iso => {
