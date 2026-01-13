@@ -65,11 +65,136 @@ pub fn clone_repo() -> Result<()> {
     Ok(())
 }
 
-/// Build `BusyBox` using distrobox (Alpine container - native musl environment)
+/// Build `BusyBox` - tries native build first, falls back to distrobox
 /// `TEAM_451`: Alpine is built on musl, perfect for static `BusyBox` builds
 /// `TEAM_452`: Fixed DNS issue that was blocking container networking
 /// `TEAM_459`: Added cross-compilation support for aarch64
+/// `TEAM_470`: Added native build support for CI (no distrobox required)
 pub fn build(arch: &str) -> Result<()> {
+    // Try native build first (works in CI without distrobox)
+    if can_build_native(arch) {
+        return build_native(arch);
+    }
+
+    // Fall back to distrobox build
+    build_distrobox(arch)
+}
+
+/// Check if we can build natively without distrobox
+fn can_build_native(arch: &str) -> bool {
+    match arch {
+        "x86_64" => musl_gcc_available(),
+        "aarch64" => true, // We can download the cross-compiler
+        _ => false,
+    }
+}
+
+/// Build `BusyBox` natively without containers (CI-compatible)
+/// `TEAM_470`: Added for GitHub Actions compatibility
+fn build_native(arch: &str) -> Result<()> {
+    clone_repo()?;
+
+    let dir = clone_dir();
+    let abs_dir =
+        std::fs::canonicalize(&dir).context("Failed to get absolute path for BusyBox dir")?;
+
+    // For aarch64, download the cross-compiler
+    if arch == "aarch64" {
+        setup_aarch64_cross_compiler()?;
+    }
+
+    let cross_note = if arch == "aarch64" {
+        "cross-compiling for aarch64"
+    } else {
+        "native musl build"
+    };
+
+    println!("🔨 Building BusyBox natively ({cross_note})...");
+
+    // Clean previous build
+    let _ = Command::new("make")
+        .current_dir(&abs_dir)
+        .arg("clean")
+        .status();
+
+    // Configure
+    println!("⚙️  Configuring BusyBox...");
+    let defconfig_arch = if arch == "aarch64" { "arm64" } else { "x86_64" };
+    let status = Command::new("make")
+        .current_dir(&abs_dir)
+        .arg(format!("ARCH={defconfig_arch}"))
+        .arg("defconfig")
+        .status()
+        .context("Failed to run make defconfig")?;
+
+    if !status.success() {
+        bail!("BusyBox defconfig failed");
+    }
+
+    // Apply musl-compatible configuration
+    apply_musl_config(&dir, arch)?;
+
+    // Build
+    println!("🔨 Compiling BusyBox...");
+    let mut cmd = Command::new("sh");
+    cmd.current_dir(&abs_dir);
+
+    let build_cmd = if arch == "aarch64" {
+        let toolchain = PathBuf::from("toolchain/aarch64-linux-musl-cross");
+        let abs_toolchain = std::fs::canonicalize(&toolchain)?;
+        format!(
+            "export PATH=\"{}/bin:$PATH\" && make ARCH=arm64 CROSS_COMPILE=aarch64-linux-musl- LDFLAGS=-static -j{}",
+            abs_toolchain.display(),
+            num_cpus()
+        )
+    } else {
+        format!("make CC=musl-gcc LDFLAGS=-static -j{}", num_cpus())
+    };
+
+    let status = cmd
+        .arg("-c")
+        .arg(&build_cmd)
+        .status()
+        .context("Failed to build BusyBox")?;
+
+    if !status.success() {
+        bail!("BusyBox build failed");
+    }
+
+    // Verify the binary was created
+    let built_binary = dir.join("busybox");
+    if !built_binary.exists() {
+        bail!("BusyBox binary not found after build");
+    }
+
+    // Verify it's statically linked
+    let file_output = Command::new("file")
+        .arg(&built_binary)
+        .output()
+        .context("Failed to run file command")?;
+
+    let file_info = String::from_utf8_lossy(&file_output.stdout);
+    if !file_info.contains("statically linked") {
+        println!("⚠️  Warning: BusyBox may not be statically linked");
+        println!("    file output: {}", file_info.trim());
+    }
+
+    // Copy to output directory
+    let out_dir = output_dir(arch);
+    std::fs::create_dir_all(&out_dir)?;
+    let dst = output_path(arch);
+    std::fs::copy(&built_binary, &dst)?;
+
+    // Show binary size
+    let metadata = std::fs::metadata(&dst)?;
+    let size_mb = metadata.len() as f64 / (1024.0 * 1024.0);
+    println!("✅ BusyBox built: {} ({:.2} MB)", dst.display(), size_mb);
+
+    Ok(())
+}
+
+/// Build `BusyBox` using distrobox (Alpine container - native musl environment)
+fn build_distrobox(arch: &str) -> Result<()> {
     // Ensure cloned
     clone_repo()?;
 

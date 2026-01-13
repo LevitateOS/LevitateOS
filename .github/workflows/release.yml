@@ -1,4 +1,5 @@
 # TEAM_290: Automated Release Workflow
+# TEAM_470: Updated for BusyBox native builds (no distrobox required)
 name: Build and Release
 
 on:
@@ -66,7 +67,8 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y mtools xorriso curl cpio fdisk git
+          sudo apt-get install -y mtools xorriso curl cpio fdisk git \
+            musl-tools musl-dev build-essential linux-headers-generic perl
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@nightly
@@ -79,8 +81,19 @@ jobs:
         with:
           key: x86_64
 
+      - name: Cache BusyBox build
+        uses: actions/cache@v4
+        with:
+          path: |
+            toolchain/busybox
+            toolchain/busybox-out/x86_64
+          key: busybox-x86_64-${{ hashFiles('xtask/src/build/busybox.rs') }}
+
       - name: Run unit tests
         run: cargo xtask test unit --arch x86_64
+
+      - name: Build BusyBox
+        run: cargo xtask build busybox --arch x86_64
 
       - name: Build All
         run: cargo xtask build all --arch x86_64
@@ -113,7 +126,8 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y mtools curl cpio fdisk git gcc-aarch64-linux-gnu
+          sudo apt-get install -y mtools curl cpio fdisk git gcc-aarch64-linux-gnu \
+            build-essential linux-headers-generic perl
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@nightly
@@ -126,8 +140,20 @@ jobs:
         with:
           key: aarch64
 
+      - name: Cache BusyBox build
+        uses: actions/cache@v4
+        with:
+          path: |
+            toolchain/busybox
+            toolchain/busybox-out/aarch64
+            toolchain/aarch64-linux-musl-cross
+          key: busybox-aarch64-${{ hashFiles('xtask/src/build/busybox.rs') }}
+
       - name: Run unit tests
         run: cargo xtask test unit --arch aarch64
+
+      - name: Build BusyBox
+        run: cargo xtask build busybox --arch aarch64
 
       - name: Build All
         run: cargo xtask build all --arch aarch64
