@@ -109,6 +109,14 @@ mode = "0755"
 "/sbin/poweroff" = "/bin/busybox"
 "/sbin/halt" = "/bin/busybox"
 
+# Terminal/login (TEAM_475)
+"/sbin/getty" = "/bin/busybox"
+"/bin/login" = "/bin/busybox"
+"/bin/setsid" = "/bin/busybox"
+"/sbin/cttyhack" = "/bin/busybox"
+"/bin/stty" = "/bin/busybox"
+"/bin/tty" = "/bin/busybox"
+
 # Misc utilities
 "/bin/clear" = "/bin/busybox"
 "/bin/reset" = "/bin/busybox"
