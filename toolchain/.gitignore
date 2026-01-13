@@ -4,6 +4,9 @@ sysroot/
 coreutils-out/
 brush-out/
 dash-out/
+busybox-out/
+openrc-out/
+openrc-build/
 
 # External repos (cloned at build time, not committed)
 c-ward/
@@ -11,6 +14,16 @@ coreutils/
 unmodified-coreutils/
 brush/
 dash/
+busybox/
+openrc/
+alpine/
 
 # Custom targets (not needed - we use standard Linux target)
 targets/
+
+# Cross-compiler toolchains (downloaded at build time)
+aarch64-linux-musl-cross/
+aarch64-linux-musl-cross.tgz
+
+# Legacy build scripts
+build-coreutils.sh

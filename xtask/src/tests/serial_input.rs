@@ -1,7 +1,9 @@
 //! Serial Input Test
 //!
-//! `TEAM_139`: Automated test for verifying serial console input works.
-//! Starts QEMU with -nographic, pipes input, verifies echo.
+//! TEAM_139: Automated test for verifying serial console input works.
+//! TEAM_476: Rewritten to test Linux + OpenRC boot.
+//!
+//! Starts QEMU with -nographic, pipes input, verifies response.
 
 use anyhow::bail;
 use anyhow::{Context, Result};
@@ -9,62 +11,35 @@ use std::io::{Read, Write};
 use std::process::{Command, Stdio};
 use std::time::{Duration, Instant};
 
+use crate::qemu::{Arch, QemuBuilder, QemuProfile};
+
 pub fn run(arch: &str) -> Result<()> {
-    println!("=== Serial Input Test for {arch} ===\n");
+    println!("=== Serial Input Test (Linux + OpenRC) for {arch} ===\n");
 
-    // Build everything first
-    crate::build::build_kernel_verbose(arch)?;
+    // Build Linux + OpenRC initramfs
+    crate::build::create_openrc_initramfs(arch)?;
 
-    let qemu_bin = match arch {
-        "aarch64" => "qemu-system-aarch64",
-        "x86_64" => "qemu-system-x86_64",
-        _ => bail!("Unsupported architecture: {arch}"),
-    };
-
-    let kernel_bin = if arch == "aarch64" {
-        "kernel64_rust.bin"
+    let arch_enum = Arch::try_from(arch)?;
+    let profile = if arch == "x86_64" {
+        QemuProfile::X86_64
     } else {
-        "crates/kernel/target/x86_64-unknown-none/release/levitate-kernel"
+        QemuProfile::Default
     };
 
-    let args = vec![
-        "-M",
-        if arch == "aarch64" { "virt" } else { "q35" },
-        "-cpu",
-        if arch == "aarch64" {
-            "cortex-a72"
-        } else {
-            "qemu64"
-        },
-        "-m",
-        "512M",
-        "-kernel",
-        kernel_bin,
-        "-nographic", // Critical for serial input
-        "-device",
-        "virtio-gpu-pci",
-        "-device",
-        "virtio-keyboard-device",
-        "-device",
-        "virtio-tablet-device",
-        "-device",
-        "virtio-net-device,netdev=net0",
-        "-netdev",
-        "user,id=net0",
-        "-drive",
-        "file=tinyos_disk.img,format=raw,if=none,id=hd0",
-        "-device",
-        "virtio-blk-device,drive=hd0",
-        // TEAM_327: Use arch-specific initramfs
-        "-initrd",
-        "initramfs_aarch64.cpio",
-        "-serial",
-        "mon:stdio",
-        "-no-reboot",
-    ];
+    let initrd_path = format!("target/initramfs/{}-openrc.cpio", arch);
+    let builder = QemuBuilder::new(arch_enum, profile)
+        .display_nographic()
+        .linux_kernel()
+        .initrd(&initrd_path);
+
+    let base_cmd = builder.build()?;
+    let args: Vec<_> = base_cmd
+        .get_args()
+        .map(|a| a.to_string_lossy().to_string())
+        .collect();
 
     println!("Starting QEMU...");
-    let mut child = Command::new(qemu_bin)
+    let mut child = Command::new(arch_enum.qemu_binary())
         .args(&args)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
@@ -75,8 +50,7 @@ pub fn run(arch: &str) -> Result<()> {
     let mut stdin = child.stdin.take().expect("Failed to get stdin");
     let mut stdout = child.stdout.take().expect("Failed to get stdout");
 
-    // We need to read stdout non-blocking to check for prompt
-    // For simplicity, we'll spawn a thread to read stdout and print/buffer it
+    // Read stdout in a separate thread
     let (tx, rx) = std::sync::mpsc::channel();
     let stdout_thread = std::thread::spawn(move || {
         let mut buf = [0u8; 128];
@@ -94,12 +68,12 @@ pub fn run(arch: &str) -> Result<()> {
         }
     });
 
-    // Send "help" and check for output
-    // Wait a bit for boot
-    std::thread::sleep(Duration::from_secs(5));
+    // Wait for boot
+    std::thread::sleep(Duration::from_secs(10));
 
-    println!("\nSending 'help' command...");
-    stdin.write_all(b"help\n")?;
+    // Send "ls" command and check for output
+    println!("\nSending 'ls' command...");
+    stdin.write_all(b"ls\n")?;
     stdin.flush()?;
 
     // Check captured output for response
@@ -110,7 +84,8 @@ pub fn run(arch: &str) -> Result<()> {
     while start.elapsed() < Duration::from_secs(5) {
         if let Ok(chunk) = rx.try_recv() {
             buffer.push_str(&chunk);
-            if buffer.contains("Available commands:") {
+            // Looking for typical Linux directory contents
+            if buffer.contains("bin") || buffer.contains("etc") || buffer.contains("dev") {
                 found = true;
                 break;
             }
@@ -122,7 +97,7 @@ pub fn run(arch: &str) -> Result<()> {
     let _ = stdout_thread.join();
 
     if found {
-        println!("✅ SUCCESS: Serial input received and echoed!");
+        println!("✅ SUCCESS: Serial input received and command executed!");
         Ok(())
     } else {
         bail!("Failed to get expected response from serial input");

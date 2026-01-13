@@ -161,13 +161,13 @@ fn run_command(client: &mut QmpClient, cmd: &str) -> Result<()> {
 // =============================================================================
 
 /// Basic `LevitateOS` display test
+/// TEAM_476: Updated to use Linux + OpenRC
 pub fn run_levitate() -> Result<()> {
-    println!("📸 LevitateOS Display Test\n");
+    println!("📸 LevitateOS Display Test (Linux + OpenRC)\n");
 
-    // Build for both architectures
+    // Build for x86_64 (primary architecture)
     println!("🔨 Building LevitateOS...");
-    build::build_all("aarch64")?;
-    build::build_iso("x86_64")?;
+    build::create_openrc_initramfs("x86_64")?;
 
     // Test aarch64 (working)
     println!("\n━━━ aarch64 ━━━");
@@ -348,6 +348,7 @@ fn run_alpine_arch(arch: &str) -> Result<()> {
 // =============================================================================
 
 /// Start `LevitateOS` with VNC display
+/// TEAM_476: Updated to use Linux kernel instead of ISO
 fn start_levitate_vnc(arch: &str, qmp_socket: &str) -> Result<std::process::Child> {
     let arch_enum = Arch::try_from(arch)?;
     let profile = if arch == "x86_64" {
@@ -356,13 +357,12 @@ fn start_levitate_vnc(arch: &str, qmp_socket: &str) -> Result<std::process::Chil
         QemuProfile::Default
     };
 
-    let mut builder = QemuBuilder::new(arch_enum, profile)
+    let initrd_path = format!("target/initramfs/{}-openrc.cpio", arch);
+    let builder = QemuBuilder::new(arch_enum, profile)
         .display_vnc()
-        .enable_qmp(qmp_socket);
-
-    if arch == "x86_64" {
-        builder = builder.boot_iso();
-    }
+        .enable_qmp(qmp_socket)
+        .linux_kernel()
+        .initrd(&initrd_path);
 
     let mut cmd = builder.build()?;
 

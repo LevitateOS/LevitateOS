@@ -1,7 +1,9 @@
 //! Coreutils Test Suite
 //!
-//! `TEAM_465`: Automated test runner for /root/test-core.sh
-//! Boots `LevitateOS`, runs the coreutils test script, and reports results.
+//! TEAM_465: Automated test runner for coreutils commands.
+//! TEAM_476: Updated to use Linux + OpenRC boot.
+//!
+//! Boots LevitateOS with Linux kernel, runs BusyBox commands, and reports results.
 
 use anyhow::{bail, Context, Result};
 use std::io::{BufRead, BufReader, Write};
@@ -17,15 +19,11 @@ use crate::qemu::{Arch, QemuBuilder, QemuProfile};
 /// * `phase` - Which phase(s) to run: "all", "1", "2", "1-5", etc.
 pub fn run(arch: &str, phase: Option<&str>) -> Result<()> {
     let phase_arg = phase.unwrap_or("all");
-    println!("=== Coreutils Test Suite for {arch} (Phase: {phase_arg}) ===\n");
+    println!("=== Coreutils Test Suite (Linux + OpenRC) for {arch} (Phase: {phase_arg}) ===\n");
 
-    // Build everything first (including ISO for x86_64)
-    println!("Building kernel and userspace...");
-    if arch == "x86_64" {
-        crate::build::build_iso(arch)?;
-    } else {
-        crate::build::build_all(arch)?;
-    }
+    // TEAM_476: Build Linux + OpenRC initramfs
+    println!("Building Linux + OpenRC...");
+    crate::build::create_openrc_initramfs(arch)?;
 
     // Use QemuBuilder for proper configuration
     let qemu_arch = Arch::try_from(arch)?;
@@ -34,12 +32,11 @@ pub fn run(arch: &str, phase: Option<&str>) -> Result<()> {
         _ => QemuProfile::Default,
     };
 
-    let mut builder = QemuBuilder::new(qemu_arch, profile).display_nographic();
-
-    // x86_64 boots from ISO
-    if arch == "x86_64" {
-        builder = builder.boot_iso();
-    }
+    let initrd_path = format!("target/initramfs/{}-openrc.cpio", arch);
+    let builder = QemuBuilder::new(qemu_arch, profile)
+        .display_nographic()
+        .linux_kernel()
+        .initrd(&initrd_path);
 
     let mut cmd = builder.build()?;
 

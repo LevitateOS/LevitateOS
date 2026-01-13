@@ -83,8 +83,10 @@ pub fn run_qemu(
 }
 
 /// `TEAM_116`: Run QEMU with GDB server enabled (port 1234)
-pub fn run_qemu_gdb(profile: QemuProfile, wait: bool, iso: bool, arch: &str) -> Result<()> {
-    println!("🐛 Starting QEMU with GDB server on port 1234...");
+/// TEAM_476: Updated to support Linux kernel mode (default)
+pub fn run_qemu_gdb_linux(profile: QemuProfile, wait: bool, arch: &str, openrc: bool) -> Result<()> {
+    let init_system = if openrc { "OpenRC" } else { "BusyBox" };
+    println!("🐛 Starting QEMU with GDB server on port 1234 (Linux + {init_system})...");
     if wait {
         println!("⏳ Waiting for GDB connection before starting...");
     }
@@ -95,10 +97,13 @@ pub fn run_qemu_gdb(profile: QemuProfile, wait: bool, iso: bool, arch: &str) -> 
     let mut builder = QemuBuilder::new(arch_enum, profile)
         .gpu_resolution(1280, 800)
         .enable_gdb(wait)
-        .enable_qmp("./qmp.sock");
+        .enable_qmp("./qmp.sock")
+        .linux_kernel();
 
-    if iso {
-        builder = builder.boot_iso();
+    // Use OpenRC initramfs if requested
+    if openrc {
+        let initrd_path = format!("target/initramfs/{}-openrc.cpio", arch);
+        builder = builder.initrd(&initrd_path);
     }
 
     let mut cmd = builder.build()?;
@@ -111,18 +116,13 @@ pub fn run_qemu_gdb(profile: QemuProfile, wait: bool, iso: bool, arch: &str) -> 
 }
 
 /// Run QEMU with VNC for browser-based GPU display verification
+/// TEAM_476: Updated to use Linux + OpenRC
 pub fn run_qemu_vnc(arch: &str) -> Result<()> {
     println!("🖥️  Starting QEMU with VNC for browser-based display verification...\n");
 
-    // TEAM_317: x86_64 uses ISO (Limine) since we removed Multiboot support
-    let use_iso = arch == "x86_64";
-
     disk::create_disk_image_if_missing()?;
-    if use_iso {
-        build::build_iso(arch)?;
-    } else {
-        build::build_all(arch)?;
-    }
+    // TEAM_476: Always use Linux + OpenRC
+    build::create_openrc_initramfs(arch)?;
 
     // Setup noVNC
     let novnc_path = PathBuf::from("/tmp/novnc");
@@ -198,14 +198,14 @@ pub fn run_qemu_vnc(arch: &str) -> Result<()> {
     let arch_enum = Arch::try_from(arch)?;
     let profile = profile_for_arch(arch);
     // TEAM_330: Explicit resolution for VNC display
-    let mut builder = QemuBuilder::new(arch_enum, profile)
+    // TEAM_476: Use Linux kernel with OpenRC
+    let initrd_path = format!("target/initramfs/{}-openrc.cpio", arch);
+    let builder = QemuBuilder::new(arch_enum, profile)
         .gpu_resolution(1280, 800)
         .display_vnc()
-        .enable_qmp("./qmp.sock");
-
-    if use_iso {
-        builder = builder.boot_iso();
-    }
+        .enable_qmp("./qmp.sock")
+        .linux_kernel()
+        .initrd(&initrd_path);
 
     let mut cmd = builder.build()?;
     let qemu_result = cmd
@@ -261,22 +261,12 @@ fn find_websockify() -> Result<String> {
 }
 
 /// `TEAM_374`: Run QEMU with test runner for automated OS testing
+/// TEAM_476: Updated to test Linux + OpenRC boot
 pub fn run_qemu_test(arch: &str) -> Result<()> {
-    println!("🧪 Running LevitateOS Internal Tests for {arch}...\n");
+    println!("🧪 Running LevitateOS Boot Test for {arch}...\n");
 
-    // TEAM_317: x86_64 uses ISO (Limine)
-    let use_iso = arch == "x86_64";
-
-    // Build everything including test runner
-    // TEAM_374: Use build_iso_test which includes test initramfs
-    if use_iso {
-        build::build_iso_test(arch)?;
-    } else {
-        build::build_userspace(arch)?;
-        // TEAM_451: Use BusyBox initramfs
-        build::create_busybox_initramfs(arch)?;
-        build::build_kernel_verbose(arch)?;
-    }
+    // Build Linux + OpenRC
+    build::create_openrc_initramfs(arch)?;
     disk::create_disk_image_if_missing()?;
 
     let timeout_secs: u64 = 60;
@@ -284,13 +274,11 @@ pub fn run_qemu_test(arch: &str) -> Result<()> {
 
     let arch_enum = Arch::try_from(arch)?;
     let profile = profile_for_arch(arch);
-    let mut builder = QemuBuilder::new(arch_enum, profile).display_headless();
-
-    if use_iso {
-        builder = builder.boot_iso();
-    } else {
-        builder = builder.boot_kernel("initramfs_test.cpio");
-    }
+    let initrd_path = format!("target/initramfs/{}-openrc.cpio", arch);
+    let builder = QemuBuilder::new(arch_enum, profile)
+        .display_headless()
+        .linux_kernel()
+        .initrd(&initrd_path);
 
     let base_cmd = builder.build()?;
     let args: Vec<_> = base_cmd
@@ -330,49 +318,8 @@ pub fn run_qemu_test(arch: &str) -> Result<()> {
     }
 }
 
-/// `TEAM_139`: Run QEMU in terminal-only mode (WSL-like)
-pub fn run_qemu_term(arch: &str, iso: bool) -> Result<()> {
-    println!("╔════════════════════════════════════════════════════════════╗");
-    println!("║  LevitateOS Terminal Mode - {arch}                        ║");
-    println!("║                                                            ║");
-    println!("║  Type directly here - keyboard goes to VM                  ║");
-    println!("║  Ctrl+A X to exit QEMU                                     ║");
-    println!("║  Ctrl+A C to switch to QEMU monitor                        ║");
-    println!("╚════════════════════════════════════════════════════════════╝\n");
-
-    if iso {
-        build::build_iso(arch)?;
-    } else {
-        disk::create_disk_image_if_missing()?;
-        build::build_all(arch)?;
-    }
-
-    // Clean QMP socket
-    let _ = std::fs::remove_file("./qmp.sock");
-
-    let arch_enum = Arch::try_from(arch)?;
-    let profile = profile_for_arch(arch);
-    // TEAM_330: Explicit resolution for term mode (still needed for GPU init)
-    let mut builder = QemuBuilder::new(arch_enum, profile)
-        .gpu_resolution(1280, 800)
-        .display_nographic()
-        .enable_qmp("./qmp.sock");
-
-    if iso {
-        builder = builder.boot_iso();
-    }
-
-    let mut cmd = builder.build()?;
-    cmd.stdin(Stdio::inherit())
-        .stdout(Stdio::inherit())
-        .stderr(Stdio::inherit())
-        .status()
-        .context("Failed to run QEMU")?;
-
-    Ok(())
-}
-
 /// TEAM_475: Run Linux kernel in terminal mode with optional OpenRC
+/// TEAM_476: This is now the only terminal mode (custom kernel removed)
 pub fn run_qemu_term_linux(arch: &str, openrc: bool) -> Result<()> {
     let init_system = if openrc { "OpenRC" } else { "BusyBox" };
     println!("╔════════════════════════════════════════════════════════════╗");
@@ -410,20 +357,15 @@ pub fn run_qemu_term_linux(arch: &str, openrc: bool) -> Result<()> {
 }
 
 /// `TEAM_320`: Verify GPU display via VNC + Puppeteer
+/// TEAM_476: Updated to use Linux + OpenRC
 pub fn verify_gpu(arch: &str, timeout: u32) -> Result<()> {
     println!("╔══════════════════════════════════════════════════════════╗");
     println!("║  [GPU VERIFY] Starting automated GPU verification...     ║");
     println!("╚══════════════════════════════════════════════════════════╝\n");
 
-    // TEAM_317: x86_64 uses ISO (Limine)
-    let use_iso = arch == "x86_64";
-
     disk::create_disk_image_if_missing()?;
-    if use_iso {
-        build::build_iso(arch)?;
-    } else {
-        build::build_all(arch)?;
-    }
+    // TEAM_476: Always use Linux + OpenRC
+    build::create_openrc_initramfs(arch)?;
 
     // Setup noVNC and websockify similar to run_qemu_vnc
     let novnc_path = PathBuf::from("/tmp/novnc");
@@ -473,14 +415,14 @@ pub fn verify_gpu(arch: &str, timeout: u32) -> Result<()> {
     let arch_enum = Arch::try_from(arch)?;
     let profile = profile_for_arch(arch);
     // TEAM_330: Explicit resolution for GPU verification
-    let mut builder = QemuBuilder::new(arch_enum, profile)
+    // TEAM_476: Use Linux kernel with OpenRC
+    let initrd_path = format!("target/initramfs/{}-openrc.cpio", arch);
+    let builder = QemuBuilder::new(arch_enum, profile)
         .gpu_resolution(1280, 800)
         .display_vnc()
-        .enable_qmp("./qmp.sock");
-
-    if use_iso {
-        builder = builder.boot_iso();
-    }
+        .enable_qmp("./qmp.sock")
+        .linux_kernel()
+        .initrd(&initrd_path);
 
     let mut cmd = builder.build()?;
     let mut qemu = cmd

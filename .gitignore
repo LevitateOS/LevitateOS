@@ -19,10 +19,15 @@ build_warnings*.txt
 
 # IDE and OS transient files
 .vscode/
+.windsurf/
 .DS_Store
 *.swp
 *.gdb
-.idea
+.idea/
+
+# AI assistant configs (local, not shared)
+.claude/
+.agent/
 
 # Selective exceptions
 !docs/**/*.txt

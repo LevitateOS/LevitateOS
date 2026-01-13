@@ -120,6 +120,8 @@ pub struct QemuBuilder {
     initrd: Option<String>,
     // TEAM_474: Linux kernel support
     use_linux_kernel: bool,
+    // TEAM_476: Serial output to file (for behavior tests)
+    serial_file: Option<String>,
 }
 
 impl QemuBuilder {
@@ -145,7 +147,14 @@ impl QemuBuilder {
             disk_image: Some("tinyos_disk.img".to_string()),
             initrd: Some(initrd_name.to_string()),
             use_linux_kernel: false,
+            serial_file: None,
         }
+    }
+
+    /// TEAM_476: Output serial to file (for behavior tests)
+    pub fn serial_file(mut self, path: &str) -> Self {
+        self.serial_file = Some(path.to_string());
+        self
     }
 
     /// TEAM_474: Use Linux kernel instead of custom kernel
@@ -346,7 +355,12 @@ impl QemuBuilder {
             }
             DisplayMode::Headless => {
                 cmd.args(["-display", "none"]);
-                cmd.args(["-serial", "mon:stdio"]);
+                // TEAM_476: Serial to file if set, otherwise stdio
+                if let Some(ref file) = self.serial_file {
+                    cmd.args(["-serial", &format!("file:{}", file)]);
+                } else {
+                    cmd.args(["-serial", "mon:stdio"]);
+                }
             }
             DisplayMode::Nographic => {
                 // TEAM_444: Simple serial on stdio without mux

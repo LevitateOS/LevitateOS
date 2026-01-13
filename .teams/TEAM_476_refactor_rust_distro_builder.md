@@ -145,27 +145,97 @@ cargo run -- build all
 ## Remaining Work
 
 - [x] **Phase 1**: Tag and archive custom kernel ✅
-- [ ] **Phase 2**: Remove cruft + dead xtask modules
+- [x] **Phase 2**: Remove cruft + dead xtask modules ✅
 - [ ] **Phase 3**: Move xtask → src, rename build → builder
 - [ ] **Phase 4**: Update docs, review tests
 - [ ] **Phase 5**: Verify boot, update golden files
 
+### Session 4 (2026-01-13) - Phase 2 Execution
+
+**Phase 2: Remove Cruft + Dead xtask Modules - COMPLETED**
+
+1. **Removed crates/** (~41,000 LOC):
+   - Deleted entire custom kernel and userspace crates
+
+2. **Removed cruft directories**:
+   - `.external-kernels/`, `scripts/`, `qemu/`, `tmp/`
+
+3. **Removed shell wrapper scripts**:
+   - `run*.sh`, `limine.cfg`, `linker*.ld`
+
+4. **Updated .gitignore**:
+   - Added `.vscode/`, `.windsurf/`, `.claude/`, `.agent/`
+
+5. **Removed dead xtask modules**:
+   - `build/kernel.rs`, `build/userspace.rs`, `build/apps.rs`
+   - `build/c_apps.rs`, `build/sysroot.rs`, `build/alpine.rs`
+   - `build/iso.rs` (was broken, referenced deleted modules)
+   - `syscall/` (entire module)
+
+6. **Rewrote modules**:
+   - `orchestration.rs`: Now only builds Linux+BusyBox+OpenRC
+   - `build/mod.rs`: Removed dead module references
+   - `main.rs`: Removed syscall command, --custom-kernel flag
+   - `run.rs`: Removed all ISO and custom kernel paths
+   - All test modules: Updated to use Linux+OpenRC boot
+   - `vm/exec.rs`, `vm/session.rs`: Updated for Linux boot
+
+7. **Updated Cargo.toml**:
+   - Simplified workspace (only xtask member)
+   - Removed kernel-specific dependencies
+   - Updated profiles for CLI tool
+
+8. **Build verification**:
+   - `cargo build -p xtask` compiles successfully
+   - `cargo xtask build openrc-initramfs` works
+
+### Session 5 (2026-01-13) - Final Cleanup
+
+**Context**: Continued from Session 4 after context compaction. Final cleanup of orphaned files.
+
+**Removed orphaned build artifacts**:
+- `initramfs/`, `initrd_root/`, `iso_root/`, `limine-bin/`
+- `levitate.iso`, `tinyos_disk.img`, `kernel64_rust.bin`
+- `initramfs_x86_64.cpio`, `userspace_bins/`
+
+**Removed obsolete test artifacts**:
+- Old golden files (kept only `tests/golden_boot_linux_openrc.txt`)
+- `tests/coreutils/` (orphaned test directory)
+
+**Removed orphaned directories**:
+- `crates/` (only contained `userspace/target/` build cache)
+
+**Removed obsolete docs**:
+- `.agent/rules/kernel-development.md` (custom kernel rules)
+
+**Git cleanup**:
+- Untracked `.agent/` from git (was still tracked despite .gitignore)
+- Verified `.vscode/`, `.windsurf/`, `.claude/` in .gitignore but not deleted from disk
+
+**Build verification**:
+- `cargo build -p xtask` compiles successfully (17 warnings about unused code - minor cleanup for Phase 4)
+
 ## Handoff Notes
 
-This is a **planning and analysis session**. No code changes made yet.
+**Phase 2 is FULLY complete.** The xtask now compiles and builds Linux+OpenRC.
 
 **What was done**:
-- Complete analysis of all xtask modules
-- Identified specific dead code to delete
-- Updated all phase documents with module-level detail
-- Created xtask-analysis.md with full breakdown
+- Removed ~43,000 LOC of dead code (crates/, dead xtask modules)
+- Rewrote all modules that referenced deleted code
+- Updated all test modules for Linux boot
+- Simplified Cargo.toml for distribution builder focus
+- Cleaned up all orphaned build artifacts and test files
+- Untracked IDE/AI config directories from git
+
+**Remaining warnings** (minor, for Phase 4):
+- Unused imports in `initramfs/mod.rs`
+- Dead code in `initramfs/builder.rs`, `initramfs/manifest.rs`, `initramfs/tui.rs`
+- Unused functions in `linux.rs`, `openrc.rs`, `qemu/builder.rs`
 
 **Next team should**:
-1. Review `xtask-analysis.md` for complete module breakdown
-2. Execute Phase 1 (archive) first
-3. Pay special attention to Phase 2 xtask cleanup
-4. Rewrite `orchestration.rs` (it calls dead functions)
-5. Test at each checkpoint
+1. Execute Phase 3: Move xtask → src, rename build → builder
+2. Execute Phase 4: Update CLAUDE.md and docs, fix warnings
+3. Execute Phase 5: Verify boot matches golden file
 
 ## References
 

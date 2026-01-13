@@ -23,11 +23,11 @@
 //!
 //! `TEAM_326`: Refactored command structure for clarity.
 //! `TEAM_475`: Linux kernel + OpenRC is now the default.
+//! `TEAM_476`: Removed custom kernel path (now Linux-only distribution builder).
 //!
 //! Usage:
 //!   cargo xtask run --term            # Linux + OpenRC (default, most common)
 //!   cargo xtask run --term --minimal  # Linux + BusyBox init (debugging)
-//!   cargo xtask run --custom-kernel   # Use custom LevitateOS kernel
 //!   cargo xtask build                 # Build everything
 //!   cargo xtask test                  # Run all tests
 //!
@@ -58,7 +58,6 @@ mod disk;
 mod qemu;
 mod run;
 mod support;
-mod syscall;
 mod tests;
 mod vm;
 
@@ -113,10 +112,6 @@ enum Commands {
     /// Debug calculator for memory/address/bit math
     #[command(subcommand)]
     Calc(calc::CalcCommands),
-
-    /// Fetch syscall specifications from man7.org
-    #[command(subcommand)]
-    Syscall(syscall::SyscallCommands),
 }
 
 // TEAM_326: Simplified run args with flags instead of subcommands
@@ -163,11 +158,7 @@ pub struct RunArgs {
     #[arg(long, default_value = "30")]
     pub timeout: u32,
 
-    /// TEAM_475: Use custom LevitateOS kernel instead of Linux (for kernel development)
-    #[arg(long)]
-    pub custom_kernel: bool,
-
-    /// TEAM_475: Use minimal BusyBox init instead of OpenRC (for debugging)
+    /// TEAM_476: Use minimal BusyBox init instead of OpenRC (for debugging)
     #[arg(long)]
     pub minimal: bool,
 }
@@ -258,20 +249,13 @@ fn main() -> Result<()> {
             } else if args.vnc {
                 run::run_qemu_vnc(arch)?;
             } else if args.term {
-                // TEAM_475: Linux kernel + OpenRC is the default
-                if args.custom_kernel {
-                    // Custom LevitateOS kernel path
-                    let use_iso = arch == "x86_64";
-                    run::run_qemu_term(arch, use_iso)?;
+                // TEAM_476: Linux kernel with OpenRC (or BusyBox if --minimal)
+                if args.minimal {
+                    build::create_busybox_initramfs(arch)?;
                 } else {
-                    // Default: Linux kernel with OpenRC (or BusyBox if --minimal)
-                    if args.minimal {
-                        build::create_busybox_initramfs(arch)?;
-                    } else {
-                        build::create_openrc_initramfs(arch)?;
-                    }
-                    run::run_qemu_term_linux(arch, !args.minimal)?;
+                    build::create_openrc_initramfs(arch)?;
                 }
+                run::run_qemu_term_linux(arch, !args.minimal)?;
             } else if args.gdb {
                 let profile = match args.profile.as_str() {
                     "pixel6" => {
@@ -282,15 +266,13 @@ fn main() -> Result<()> {
                     }
                     _ => if arch == "x86_64" { qemu::QemuProfile::X86_64 } else { qemu::QemuProfile::Default }
                 };
-                // TEAM_370: x86_64 always uses ISO, aarch64 never does
-                let use_iso = arch == "x86_64";
-                // TEAM_369: Eyra is always enabled (provides std support)
-                if use_iso {
-                    build::build_iso(arch)?;
+                // TEAM_476: Build Linux + OpenRC for debugging
+                if args.minimal {
+                    build::create_busybox_initramfs(arch)?;
                 } else {
-                    build::build_all(arch)?;
+                    build::create_openrc_initramfs(arch)?;
                 }
-                run::run_qemu_gdb(profile, args.wait, use_iso, arch)?;
+                run::run_qemu_gdb_linux(profile, args.wait, arch, !args.minimal)?;
             } else {
                 // Default: run with GUI
                 let profile = match args.profile.as_str() {
@@ -303,41 +285,25 @@ fn main() -> Result<()> {
                     }
                     _ => if arch == "x86_64" { qemu::QemuProfile::X86_64 } else { qemu::QemuProfile::Default }
                 };
-                // TEAM_475: Linux kernel + OpenRC is the default
-                let use_linux = !args.custom_kernel;
-                let use_iso = arch == "x86_64" && args.custom_kernel;
-
-                if use_linux {
-                    // Default: Linux kernel with OpenRC (or BusyBox if --minimal)
-                    if args.minimal {
-                        build::create_busybox_initramfs(arch)?;
-                    } else {
-                        build::create_openrc_initramfs(arch)?;
-                    }
-                } else if use_iso {
-                    build::build_iso(arch)?;
+                // TEAM_476: Linux kernel with OpenRC (or BusyBox if --minimal)
+                if args.minimal {
+                    build::create_busybox_initramfs(arch)?;
                 } else {
-                    build::build_all(arch)?;
+                    build::create_openrc_initramfs(arch)?;
                 }
-                run::run_qemu(profile, args.headless, use_iso, arch, args.gpu_debug, use_linux, !args.minimal)?;
+                run::run_qemu(profile, args.headless, false, arch, args.gpu_debug, true, !args.minimal)?;
             }
         },
         Commands::Build(cmd) => {
             preflight::check_preflight(arch)?;
-            // TEAM_459: Simplified - BusyBox is the only external app
+            // TEAM_476: Linux distribution builder - all commands build Linux components
             match cmd {
                 build::BuildCommands::All => build::build_all(arch)?,
-                build::BuildCommands::Kernel => build::build_kernel_only(arch)?,
-                build::BuildCommands::Userspace => {
-                    build::build_userspace(arch)?;
-                    build::create_busybox_initramfs(arch)?;
-                }
                 build::BuildCommands::Initramfs => build::create_busybox_initramfs(arch)?,
-                build::BuildCommands::Iso => build::build_iso(arch)?,
                 build::BuildCommands::Busybox => build::busybox::build(arch)?,
                 build::BuildCommands::Linux => build::linux::build_linux_kernel(arch)?,
                 build::BuildCommands::Openrc => build::openrc::build(arch)?,
-                build::BuildCommands::OpenrcInitramfs => { build::create_openrc_initramfs(arch)?; },
+                build::BuildCommands::OpenrcInitramfs => { build::create_openrc_initramfs(arch)?; }
             }
         },
         Commands::Vm(cmd) => match cmd {
@@ -366,20 +332,6 @@ fn main() -> Result<()> {
         Commands::Calc(cmd) => {
             calc::run(cmd)?;
         },
-        Commands::Syscall(cmd) => match cmd {
-            syscall::SyscallCommands::Fetch { name, force } => {
-                syscall::fetch(&name, force)?;
-            }
-            syscall::SyscallCommands::Numbers { force } => {
-                syscall::fetch_numbers(force)?;
-            }
-            syscall::SyscallCommands::List => {
-                syscall::list()?;
-            }
-            syscall::SyscallCommands::Show { name } => {
-                syscall::show(&name)?;
-            }
-        },
     }
 
     Ok(())
@@ -399,33 +351,4 @@ fn project_root() -> Result<PathBuf> {
     } else {
         Ok(manifest_dir)
     }
-}
-
-pub fn get_binaries(arch: &str) -> Result<Vec<String>> {
-    let mut bins = Vec::new();
-    let target = match arch {
-        "aarch64" => "aarch64-unknown-none",
-        "x86_64" => "x86_64-unknown-none",
-        _ => bail!("Unsupported architecture: {arch}"),
-    };
-    let release_dir = PathBuf::from(format!("crates/userspace/target/{target}/release"));
-    if !release_dir.exists() {
-        return Ok(bins);
-    }
-
-    for entry in std::fs::read_dir(release_dir)? {
-        let entry = entry?;
-        let path = entry.path();
-        if path.is_file() {
-            if let Some(name) = path.file_name().and_then(|s| s.to_str()) {
-                // Binaries in our setup don't have extensions.
-                // We skip common files like .cargo-lock, .fingerprint, etc.
-                if !name.contains('.') && name != "build" {
-                    bins.push(name.to_string());
-                }
-            }
-        }
-    }
-    bins.sort();
-    Ok(bins)
 }

@@ -1,1 +1,0 @@
-/* Empty linker script to satisfy global config */

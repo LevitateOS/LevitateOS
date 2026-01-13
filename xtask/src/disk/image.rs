@@ -56,12 +56,21 @@ pub fn create_disk_image_if_missing() -> Result<()> {
     Ok(())
 }
 
-pub fn install_userspace_to_disk(arch: &str) -> Result<()> {
+/// TEAM_476: This function is a no-op now.
+/// The custom userspace crates were removed. Linux + BusyBox runs from initramfs.
+pub fn install_userspace_to_disk(_arch: &str) -> Result<()> {
+    create_disk_image_if_missing()?;
+    // TEAM_476: No custom binaries to install - we use BusyBox from initramfs
+    println!("💿 Disk ready (no custom binaries to install)");
+    Ok(())
+}
+
+#[allow(dead_code)]
+fn install_userspace_to_disk_legacy(arch: &str) -> Result<()> {
     create_disk_image_if_missing()?;
 
-    // TEAM_121: Install/Update userspace apps on the disk
-    // We do this even if the disk image already exists to ensure binaries reflect latest build
-    let binaries = crate::get_binaries(arch)?;
+    // TEAM_121: Legacy - Install/Update userspace apps on the disk
+    let binaries: Vec<String> = vec![]; // Was: crate::get_binaries(arch)?
     let target = match arch {
         "aarch64" => "aarch64-unknown-none",
         "x86_64" => "x86_64-unknown-none",

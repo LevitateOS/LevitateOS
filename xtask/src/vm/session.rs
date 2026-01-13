@@ -82,13 +82,8 @@ pub fn start(arch: &str) -> Result<()> {
     // Clean up socket
     let _ = fs::remove_file(QMP_SOCKET);
 
-    // Build
-    let use_iso = arch == "x86_64";
-    if use_iso {
-        build::build_iso(arch)?;
-    } else {
-        build::build_all(arch)?;
-    }
+    // TEAM_476: Build Linux + OpenRC
+    build::create_openrc_initramfs(arch)?;
 
     // Build QEMU command
     let arch_enum = Arch::try_from(arch)?;
@@ -98,13 +93,12 @@ pub fn start(arch: &str) -> Result<()> {
         QemuProfile::Default
     };
 
-    let mut builder = QemuBuilder::new(arch_enum, profile)
+    let initrd_path = format!("target/initramfs/{}-openrc.cpio", arch);
+    let builder = QemuBuilder::new(arch_enum, profile)
         .display_vnc()
-        .enable_qmp(QMP_SOCKET);
-
-    if use_iso {
-        builder = builder.boot_iso();
-    }
+        .enable_qmp(QMP_SOCKET)
+        .linux_kernel()
+        .initrd(&initrd_path);
 
     let mut cmd = builder.build()?;
 

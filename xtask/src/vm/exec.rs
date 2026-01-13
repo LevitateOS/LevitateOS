@@ -1,7 +1,8 @@
 //! VM exec command
 //!
-//! `TEAM_323`: Run arbitrary commands inside the VM shell from the host.
-//! `TEAM_326`: Moved to vm module for unified VM interaction.
+//! TEAM_323: Run arbitrary commands inside the VM shell from the host.
+//! TEAM_326: Moved to vm module for unified VM interaction.
+//! TEAM_476: Updated to use Linux + OpenRC boot.
 //!
 //! This works by:
 //! 1. Starting QEMU headless with stdin/stdout piped
@@ -11,7 +12,7 @@
 //! 5. Returning the output
 
 use crate::build;
-use crate::qemu::Arch;
+use crate::qemu::{Arch, QemuBuilder, QemuProfile};
 use anyhow::{bail, Context, Result};
 use std::io::{Read, Write};
 use std::process::{Command, Stdio};
@@ -23,24 +24,32 @@ pub fn exec(cmd: &str, timeout_secs: u32, arch: &str) -> Result<String> {
     println!("   Arch: {arch}, Timeout: {timeout_secs}s");
     println!();
 
-    // Build first
-    let use_iso = arch == "x86_64";
-    if use_iso {
-        build::build_iso(arch)?;
-    } else {
-        build::build_all(arch)?;
-    }
+    // TEAM_476: Build Linux + OpenRC
+    build::create_openrc_initramfs(arch)?;
 
-    // Get QEMU binary
+    // TEAM_476: Use QemuBuilder for Linux + OpenRC
     let arch_enum = Arch::try_from(arch)?;
-    let qemu_bin = arch_enum.qemu_binary();
+    let profile = if arch == "x86_64" {
+        QemuProfile::X86_64
+    } else {
+        QemuProfile::Default
+    };
 
-    // Build args manually since we need special stdin/stdout handling
-    let args = build_qemu_args(arch)?;
+    let initrd_path = format!("target/initramfs/{}-openrc.cpio", arch);
+    let builder = QemuBuilder::new(arch_enum, profile)
+        .display_nographic()
+        .linux_kernel()
+        .initrd(&initrd_path);
+
+    let base_cmd = builder.build()?;
+    let args: Vec<_> = base_cmd
+        .get_args()
+        .map(|a| a.to_string_lossy().to_string())
+        .collect();
 
     println!("🚀 Starting QEMU...");
 
-    let mut child = Command::new(qemu_bin)
+    let mut child = Command::new(arch_enum.qemu_binary())
         .args(&args)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
@@ -140,70 +149,6 @@ pub fn exec(cmd: &str, timeout_secs: u32, arch: &str) -> Result<String> {
     println!("────────────────────────────────────────");
 
     Ok(clean_output)
-}
-
-/// Build QEMU args for shell execution
-fn build_qemu_args(arch: &str) -> Result<Vec<String>> {
-    let (machine, cpu, kernel_args, device_suffix) = match arch {
-        // TEAM_327: Use arch-specific initramfs
-        "aarch64" => (
-            "virt",
-            "cortex-a53",
-            vec![
-                "-kernel",
-                "kernel64_rust.bin",
-                "-initrd",
-                "initramfs_aarch64.cpio",
-            ],
-            "device",
-        ),
-        "x86_64" => (
-            "q35",
-            "qemu64",
-            vec!["-cdrom", "levitate.iso", "-boot", "d"],
-            "pci",
-        ),
-        _ => bail!("Unsupported architecture: {arch}"),
-    };
-
-    let mut args = vec![
-        "-M".to_string(),
-        machine.to_string(),
-        "-cpu".to_string(),
-        cpu.to_string(),
-        "-m".to_string(),
-        "512M".to_string(),
-    ];
-
-    for arg in kernel_args {
-        args.push(arg.to_string());
-    }
-
-    args.extend([
-        "-nographic".to_string(),
-        "-device".to_string(),
-        "virtio-gpu-pci".to_string(),
-        "-device".to_string(),
-        format!("virtio-keyboard-{device_suffix}"),
-        "-device".to_string(),
-        format!("virtio-net-{device_suffix},netdev=net0"),
-        "-netdev".to_string(),
-        "user,id=net0".to_string(),
-        "-serial".to_string(),
-        "mon:stdio".to_string(),
-        "-no-reboot".to_string(),
-    ]);
-
-    if std::path::Path::new("tinyos_disk.img").exists() {
-        args.extend([
-            "-drive".to_string(),
-            "file=tinyos_disk.img,format=raw,if=none,id=hd0".to_string(),
-            "-device".to_string(),
-            format!("virtio-blk-{device_suffix},drive=hd0"),
-        ]);
-    }
-
-    Ok(args)
 }
 
 /// Clean shell output by removing echoed command, prompts, and ANSI codes
