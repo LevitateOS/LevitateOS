@@ -43,7 +43,7 @@ LevitateOS aims to prove that a clean-slate kernel, built with modern language g
 This breaks down into concrete milestones:
 
 1. ✅ Linux syscall ABI compatibility (in progress)
-2. 🔲 Provide libc.so via [c-ward/c-gull](https://github.com/sunfishcode/c-ward) - enables unmodified Linux binaries
+2. ✅ Static libc support via musl (TEAM_444)
 3. 🔲 Dynamic linker (ld-linux.so equivalent)
 4. 🔲 Full POSIX compliance for common utilities
 
@@ -55,20 +55,18 @@ This breaks down into concrete milestones:
 |-------|------|--------|
 | Foundation (1-14) | HAL, MMU, Multitasking, VFS | ✅ Complete |
 | Compatibility (15-17) | Linux syscall layer, TTY | 🟡 In Progress |
-| **libc Layer** | c-gull as libc.so - THE critical milestone | 🔲 Next |
+| **Static libc** | musl libc (static linking) | 🟢 Complete (TEAM_444) |
+| **Dynamic Linker** | ld-linux.so.2 equivalent | 🔲 Next Milestone |
 | Security (18-20) | Identity, authentication, hardening | 🔲 Future |
 
 ### The libc Strategy
 
-**Current (Eyra)**: Apps must be modified to inject Eyra. Not scalable.
+**Current (musl static)**: Static musl binaries work now!
+- Rust programs: `--target x86_64-unknown-linux-musl`
+- C programs: `musl-gcc`
 
-**Future (c-gull libc)**: 
 ```
-Unmodified Linux Binary → libc.so (c-gull) → Linux syscalls → LevitateOS kernel
+Static Linux Binary (musl) → Linux syscalls → LevitateOS kernel
 ```
 
-This is the **key architectural decision** that makes us general purpose:
-- [c-ward](https://github.com/sunfishcode/c-ward) provides a libc implementation in pure Rust
-- [c-gull](https://github.com/sunfishcode/c-ward/tree/main/c-gull) is the "take-charge" mode that handles program startup
-- We build c-gull as `libc.so.6` and ship it with the OS
-- Programs compiled for Linux link against it transparently
+**Next milestone**: Dynamic linker for dynamically-linked binaries.

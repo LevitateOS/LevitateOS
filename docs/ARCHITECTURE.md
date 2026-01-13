@@ -140,15 +140,14 @@ LevitateOS is transitioning from a minimal custom syscall ABI to full **Linux AA
 | Layer | What | Status |
 |-------|------|--------|
 | **Syscall ABI** | Linux syscall numbers + semantics | 🟡 In Progress |
-| **libc** | libc.so.6 via [c-gull](https://github.com/sunfishcode/c-ward) | 🔲 Next Milestone |
-| **Dynamic Linker** | ld-linux.so.2 | 🔲 Future |
+| **Static libc** | musl libc (static linking) | 🟢 Complete (TEAM_444) |
+| **Dynamic Linker** | ld-linux.so.2 | 🔲 Next Milestone |
 | **POSIX APIs** | open, read, write, fork, exec, mmap, etc. | 🟡 Partial |
 
-**Current (Eyra)**: Apps must be modified to inject Eyra dependency. Not scalable for general purpose.
+**Current (musl static)**: Static musl binaries work. Rust programs use `--target x86_64-unknown-linux-musl`, C programs use `musl-gcc`.
 
-**Future (c-gull libc)**: 
 ```
-Unmodified Linux Binary → libc.so (c-gull) → Linux syscalls → LevitateOS kernel
+Static Linux Binary (musl) → Linux syscalls → LevitateOS kernel
 ```
 
 For implementation details and common pitfalls, see:

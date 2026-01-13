@@ -14,7 +14,7 @@ This document outlines the planned development phases for LevitateOS. Each compl
 |-------------|-------------|--------|
 | **No Source Modification** | Programs compiled for Linux just work | 🔲 Goal |
 | **Standard ABI** | Linux syscall interface | 🟡 In Progress |
-| **libc Compatibility** | Provide libc.so via c-gull | 🔲 Critical Milestone |
+| **libc Compatibility** | musl libc (static linking) | 🟢 Complete (TEAM_444) |
 | **POSIX Semantics** | fork, exec, pipes, signals | 🟡 Partial |
 
 **The Test**: Can a user download a Linux binary and run it? If yes, we're general purpose.
@@ -43,18 +43,18 @@ Current State (Eyra):
   App must be modified → Add eyra dependency → Rebuild → Run on LevitateOS
   ❌ NOT general purpose (requires source modification)
 
-Target State (c-gull libc):
-  Unmodified Linux binary → libc.so (c-gull) → Linux syscalls → LevitateOS
-  ✅ General purpose (no source modification needed)
+Target State (musl libc):
+  Unmodified Linux binary (static musl) → Linux syscalls → LevitateOS
+  ✅ General purpose (static binaries work now!)
 ```
 
-**The libc milestone is THE critical blocker for general purpose status.**
+**Static musl binaries now work! Dynamic linking is the next frontier.**
 
 | Phase | Goal | Status |
 |-------|------|--------|
 | Syscall ABI | Linux syscall numbers + semantics | 🟡 In Progress |
-| **libc.so** | [c-gull](https://github.com/sunfishcode/c-ward) as libc.so.6 | 🔲 **NEXT MILESTONE** |
-| Dynamic Linker | ld-linux.so.2 equivalent | 🔲 Future |
+| **Static libc** | musl libc (static linking) | 🟢 Complete (TEAM_444) |
+| Dynamic Linker | ld-linux.so.2 equivalent | 🔲 **NEXT MILESTONE** |
 | Full POSIX | All common syscalls implemented | 🔲 Future |
 
 ---
