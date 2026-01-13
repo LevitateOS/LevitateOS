@@ -105,7 +105,9 @@ impl InitramfsBuilder {
                 size,
             });
 
-            // Copy binary to /init if it's busybox (kernel entry point)
+            // Copy busybox to /init for custom kernel compatibility
+            // (Custom LevitateOS kernel can't follow symlinks for init)
+            // Linux works with either symlink or file, so file is safe for both
             if *name == "busybox" {
                 archive.add_file("init", &data, mode);
                 emit(BuildEvent::BinaryAdded {
@@ -115,22 +117,7 @@ impl InitramfsBuilder {
             }
         }
 
-        // Add musl dynamic linker if available
-        let musl_linker = if self.arch == "x86_64" {
-            Path::new("/lib/ld-musl-x86_64.so.1")
-        } else {
-            Path::new("/lib/ld-musl-aarch64.so.1")
-        };
-        if musl_linker.exists() {
-            let linker_name = musl_linker.file_name().unwrap().to_string_lossy();
-            let data = std::fs::read(musl_linker)?;
-            let size = data.len() as u64;
-            archive.add_file(&format!("lib/{}", linker_name), &data, 0o755);
-            emit(BuildEvent::BinaryAdded {
-                path: format!("/lib/{}", linker_name),
-                size,
-            });
-        }
+        // Note: musl dynamic linker not needed - BusyBox is statically linked
 
         emit(BuildEvent::PhaseComplete {
             name: "Adding binaries",
