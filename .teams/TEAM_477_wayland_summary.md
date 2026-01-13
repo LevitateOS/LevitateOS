@@ -43,9 +43,10 @@ sudo apk add meson ninja pkgconf wayland-dev wayland-protocols \
 - `src/qemu/builder.rs` has `DisplayMode::Sdl` with `gl=on` for 3D acceleration
 - `src/run.rs:run_qemu_wayland()` uses virtio-gpu-gl-pci
 
-### 4. Wayland Initramfs (PARTIAL)
-- Creates at `target/initramfs/x86_64-wayland.cpio` (~350 MB with LLVM)
+### 4. Wayland Initramfs (COMPLETE)
+- Creates at `target/initramfs/x86_64-wayland.cpio` (~273 MB with LLVM)
 - Contains: BusyBox, OpenRC, Alpine libs, wlroots, sway, foot, seatd
+- All shared library dependencies verified resolved
 
 ### 5. OpenRC gendepends.sh Fix (COMPLETE)
 Fixed relative paths in `toolchain/openrc-out/x86_64/lib/rc/sh/gendepends.sh`:
@@ -53,6 +54,19 @@ Fixed relative paths in `toolchain/openrc-out/x86_64/lib/rc/sh/gendepends.sh`:
 - Line 116-118: `etc/rc.conf` → `/etc/rc.conf`
 
 **Note:** This fix is lost if OpenRC is rebuilt from scratch.
+
+## CRITICAL: Alpine Version Must Be "edge"
+
+**wlroots/sway/foot are built in distrobox Alpine edge.** The runtime libraries must ALSO come from Alpine edge, not a stable release (v3.21, v3.20, etc).
+
+**Why?** Libraries like `libdisplay-info` have different soname versions:
+- Alpine v3.21: `libdisplay-info.so.2`
+- Alpine edge: `libdisplay-info.so.3` ← wlroots needs this
+
+In `src/builder/alpine.rs`:
+```rust
+const ALPINE_VERSION: &str = "edge";  // NOT "v3.21"!
+```
 
 ## Alpine Package Names (IMPORTANT)
 
@@ -129,7 +143,14 @@ Host (Fedora)
 
 ## Next Steps
 
-1. Fix missing library packages - verify Alpine package names
-2. Test sway launches successfully
+1. ~~Fix missing library packages~~ ✅ DONE - all libraries resolved
+2. Test sway launches successfully - VM boots, run `start-wayland`
 3. Add `--wayland-term` mode for debugging (serial + GPU window)
 4. Phase 2 tools: fuzzel, waybar, mako, etc.
+
+## Testing Wayland
+
+1. Run: `cargo run -- run --wayland`
+2. Wait for OpenRC to boot (see "Starting seatd ... [ ok ]")
+3. In the VM shell, type: `start-wayland`
+4. Expected: sway launches, background turns blue, Mod+Enter opens foot terminal

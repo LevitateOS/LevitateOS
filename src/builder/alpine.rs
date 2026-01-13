@@ -18,7 +18,8 @@ const ALPINE_MIRRORS: &[&str] = &[
 ];
 
 /// Alpine version to use
-const ALPINE_VERSION: &str = "v3.21";
+/// Use "edge" to match distrobox Alpine edge where wlroots/sway/foot are built
+const ALPINE_VERSION: &str = "edge";
 
 /// Max retries per mirror
 const MAX_RETRIES: u32 = 2;
