@@ -51,7 +51,7 @@ pub fn clone_repo() -> Result<()> {
         return Ok(());
     }
 
-    println!("📥 Cloning BusyBox...");
+    println!("  Cloning BusyBox...");
     let status = Command::new("git")
         .args(["clone", "--depth=1", REPO, &dir.to_string_lossy()])
         .status()
@@ -151,7 +151,7 @@ fn build_native(arch: &str) -> Result<()> {
         "native musl build"
     };
 
-    println!("🔨 Building BusyBox natively ({cross_note})...");
+    println!("  Building BusyBox natively ({cross_note})...");
 
     // Clean previous build
     let _ = Command::new("make")
@@ -160,7 +160,7 @@ fn build_native(arch: &str) -> Result<()> {
         .status();
 
     // Configure
-    println!("⚙️  Configuring BusyBox...");
+    println!("  Configuring BusyBox...");
     let defconfig_arch = if arch == "aarch64" { "arm64" } else { "x86_64" };
     let status = Command::new("make")
         .current_dir(&abs_dir)
@@ -177,7 +177,7 @@ fn build_native(arch: &str) -> Result<()> {
     apply_musl_config(&dir, arch)?;
 
     // Build
-    println!("🔨 Compiling BusyBox...");
+    println!("  Compiling BusyBox...");
     let mut cmd = Command::new("sh");
     cmd.current_dir(&abs_dir);
 
@@ -204,36 +204,7 @@ fn build_native(arch: &str) -> Result<()> {
         bail!("BusyBox build failed");
     }
 
-    // Verify the binary was created
-    let built_binary = dir.join("busybox");
-    if !built_binary.exists() {
-        bail!("BusyBox binary not found after build");
-    }
-
-    // Verify it's statically linked
-    let file_output = Command::new("file")
-        .arg(&built_binary)
-        .output()
-        .context("Failed to run file command")?;
-
-    let file_info = String::from_utf8_lossy(&file_output.stdout);
-    if !file_info.contains("statically linked") {
-        println!("⚠️  Warning: BusyBox may not be statically linked");
-        println!("    file output: {}", file_info.trim());
-    }
-
-    // Copy to output directory
-    let out_dir = output_dir(arch);
-    std::fs::create_dir_all(&out_dir)?;
-    let dst = output_path(arch);
-    std::fs::copy(&built_binary, &dst)?;
-
-    // Show binary size
-    let metadata = std::fs::metadata(&dst)?;
-    let size_mb = metadata.len() as f64 / (1024.0 * 1024.0);
-    println!("✅ BusyBox built: {} ({:.2} MB)", dst.display(), size_mb);
-
-    Ok(())
+    verify_and_install(arch)
 }
 
 /// Build `BusyBox` using distrobox (Alpine container - native musl environment)
@@ -259,7 +230,7 @@ fn build_distrobox(arch: &str) -> Result<()> {
         "native build"
     };
 
-    println!("🐳 Building BusyBox via distrobox (Alpine, {cross_note})...");
+    println!("  Building BusyBox via distrobox (Alpine, {cross_note})...");
 
     // Build script to run inside Alpine distrobox
     // Alpine is musl-native, so gcc IS musl-gcc
@@ -331,36 +302,7 @@ echo "✅ BusyBox build complete"
         bail!("BusyBox build failed");
     }
 
-    // Verify the binary was created
-    let built_binary = dir.join("busybox");
-    if !built_binary.exists() {
-        bail!("BusyBox binary not found after build");
-    }
-
-    // Verify it's statically linked
-    let file_output = Command::new("file")
-        .arg(&built_binary)
-        .output()
-        .context("Failed to run file command")?;
-
-    let file_info = String::from_utf8_lossy(&file_output.stdout);
-    if !file_info.contains("statically linked") {
-        println!("⚠️  Warning: BusyBox may not be statically linked");
-        println!("    file output: {}", file_info.trim());
-    }
-
-    // Copy to output directory
-    let out_dir = output_dir(arch);
-    std::fs::create_dir_all(&out_dir)?;
-    let dst = output_path(arch);
-    std::fs::copy(&built_binary, &dst)?;
-
-    // Show binary size
-    let metadata = std::fs::metadata(&dst)?;
-    let size_mb = metadata.len() as f64 / (1024.0 * 1024.0);
-    println!("✅ BusyBox built: {} ({:.2} MB)", dst.display(), size_mb);
-
-    Ok(())
+    verify_and_install(arch)
 }
 
 /// Apply musl-compatible configuration overrides
@@ -437,6 +379,41 @@ fn num_cpus() -> usize {
         .unwrap_or(4)
 }
 
+/// Verify BusyBox binary and copy to output directory
+fn verify_and_install(arch: &str) -> Result<()> {
+    let dir = clone_dir();
+    let built_binary = dir.join("busybox");
+
+    if !built_binary.exists() {
+        bail!("BusyBox binary not found after build");
+    }
+
+    // Verify it's statically linked
+    let file_output = Command::new("file")
+        .arg(&built_binary)
+        .output()
+        .context("Failed to run file command")?;
+
+    let file_info = String::from_utf8_lossy(&file_output.stdout);
+    if !file_info.contains("statically linked") {
+        println!("  Warning: BusyBox may not be statically linked");
+        println!("    file output: {}", file_info.trim());
+    }
+
+    // Copy to output directory
+    let out_dir = output_dir(arch);
+    std::fs::create_dir_all(&out_dir)?;
+    let dst = output_path(arch);
+    std::fs::copy(&built_binary, &dst)?;
+
+    // Show binary size
+    let metadata = std::fs::metadata(&dst)?;
+    let size_mb = metadata.len() as f64 / (1024.0 * 1024.0);
+    println!("  BusyBox built: {} ({:.2} MB)", dst.display(), size_mb);
+
+    Ok(())
+}
+
 /// Check if musl-gcc is available
 pub fn musl_gcc_available() -> bool {
     Command::new("musl-gcc")
@@ -457,7 +434,7 @@ pub fn setup_aarch64_cross_compiler() -> Result<PathBuf> {
         return Ok(toolchain_dir);
     }
 
-    println!("📥 Downloading aarch64-linux-musl cross-compiler...");
+    println!("  Downloading aarch64-linux-musl cross-compiler...");
 
     let tarball_path = PathBuf::from("toolchain/aarch64-linux-musl-cross.tgz");
     std::fs::create_dir_all("toolchain")?;
@@ -477,7 +454,7 @@ pub fn setup_aarch64_cross_compiler() -> Result<PathBuf> {
         }
     }
 
-    println!("📦 Extracting cross-compiler...");
+    println!("  Extracting cross-compiler...");
 
     // Extract to toolchain directory
     let status = Command::new("tar")
@@ -499,7 +476,7 @@ pub fn setup_aarch64_cross_compiler() -> Result<PathBuf> {
         bail!("Cross-compiler extraction failed - gcc not found");
     }
 
-    println!("✅ aarch64-linux-musl cross-compiler ready");
+    println!("  aarch64-linux-musl cross-compiler ready");
     Ok(toolchain_dir)
 }
 
