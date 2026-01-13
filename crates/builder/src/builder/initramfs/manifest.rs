@@ -1,6 +1,6 @@
 //! Initramfs manifest parser
 //!
-//! TEAM_474: Parses `initramfs/initramfs.toml` declarative configuration.
+//! TEAM_474: Parses `config/initramfs-manifest.toml` declarative configuration.
 
 use anyhow::{anyhow, Context, Result};
 use serde::Deserialize;

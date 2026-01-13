@@ -1,12 +1,12 @@
 [package]
-name = "levitate"
+name = "builder"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 description = "Rust-native Linux distribution builder"
 
 [[bin]]
-name = "levitate"
+name = "builder"
 path = "src/main.rs"
 
 [dependencies]

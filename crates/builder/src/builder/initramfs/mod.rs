@@ -2,7 +2,7 @@
 //!
 //! TEAM_474: Declarative initramfs builder with pure Rust CPIO writer and TUI dashboard.
 //!
-//! Builds initramfs CPIO archives from declarative TOML manifest (`initramfs/initramfs.toml`).
+//! Builds initramfs CPIO archives from declarative TOML manifest (`config/initramfs-manifest.toml`).
 
 mod builder;
 pub mod cpio;
@@ -14,10 +14,10 @@ use std::path::PathBuf;
 
 /// Build initramfs for the given architecture
 ///
-/// Loads `initramfs/initramfs.toml` and produces `target/initramfs/{arch}.cpio`
+/// Loads `config/initramfs-manifest.toml` and produces `target/initramfs/{arch}.cpio`
 pub fn build_initramfs(arch: &str) -> Result<PathBuf> {
-    let base_dir = PathBuf::from("initramfs");
-    let manifest_path = base_dir.join("initramfs.toml");
+    let base_dir = PathBuf::from("config");
+    let manifest_path = base_dir.join("initramfs-manifest.toml");
 
     let manifest = manifest::Manifest::load(&manifest_path.to_string_lossy(), arch, &base_dir)?;
 

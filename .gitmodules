@@ -1,4 +1,0 @@
-[submodule "linux"]
-	path = linux
-	url = git@github.com:LevitateOS/linux.git
-	branch = levitate
