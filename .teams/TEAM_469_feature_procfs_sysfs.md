@@ -70,12 +70,18 @@ Implement `/proc` and `/sys` pseudo-filesystems to support programs that require
 ## Verification
 - ✅ Kernel builds successfully (`cargo xtask build kernel`)
 - ✅ All tests pass (`cargo xtask test`)
-- ⏳ Runtime verification pending (mount -t proc proc /proc)
+- ✅ **Runtime verified:**
+  - `cat /proc/meminfo` → Shows MemTotal, MemFree
+  - `ls /proc` → Shows process PIDs (5, 6), meminfo, self, uptime
+  - `cat /proc/5/status` → Shows Name, Pid, PPid, State, VmSize
+  - `ls /sys` → Shows class, devices directories
+- ⚠️ `/proc/self` symlink resolution has an issue (VFS symlink handling)
 
 ## Remaining Work
-- [ ] Runtime test: verify `mount -t proc proc /proc` works
-- [ ] Runtime test: verify `cat /proc/meminfo` shows content
-- [ ] Runtime test: verify `ls /proc` shows process directories
+- [x] Runtime test: verify `mount -t proc proc /proc` works ✅ (already mounted by init)
+- [x] Runtime test: verify `cat /proc/meminfo` shows content ✅
+- [x] Runtime test: verify `ls /proc` shows process directories ✅
+- [ ] Fix `/proc/self` symlink resolution (VFS-level issue)
 - [ ] Add more procfs files as needed (mounts, version, etc.)
 - [ ] Expand sysfs when device enumeration is needed
 
