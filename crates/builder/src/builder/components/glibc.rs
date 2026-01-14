@@ -126,11 +126,13 @@ pub fn collect() -> Result<()> {
     }
 
     // unix_chkpwd helper (used by pam_unix.so for non-root password checks)
+    // IMPORTANT: pam_unix.so has /usr/bin/unix_chkpwd hardcoded at compile time
     let chkpwd_paths = ["/usr/bin/unix_chkpwd", "/usr/sbin/unix_chkpwd", "/sbin/unix_chkpwd"];
-    let sbin_dir = format!("{}/sbin", initramfs::ROOT);
+    let usr_bin_dir = format!("{}/usr/bin", initramfs::ROOT);
+    std::fs::create_dir_all(&usr_bin_dir)?;
     for chkpwd in chkpwd_paths {
         if Path::new(chkpwd).exists() {
-            let dest = format!("{}/unix_chkpwd", sbin_dir);
+            let dest = format!("{}/unix_chkpwd", usr_bin_dir);
             std::fs::copy(chkpwd, &dest)?;
             #[cfg(unix)]
             {
