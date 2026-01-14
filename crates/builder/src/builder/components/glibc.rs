@@ -1,6 +1,6 @@
 //! System library collection (glibc + dependencies).
 
-use super::{systemd::Systemd, util_linux::UtilLinux, Buildable};
+use super::{procps::Procps, systemd::Systemd, util_linux::UtilLinux, Buildable};
 use crate::builder::initramfs;
 use anyhow::{Context, Result};
 use std::path::Path;
@@ -35,10 +35,10 @@ const SYSTEM_LIBS: &[&str] = &[
     "/lib64/libaudit.so.1",     // dependency of libpam
     "/lib64/libeconf.so.0",     // dependency of libpam
     "/lib64/libcap-ng.so.0",    // dependency of libpam
-    "/lib64/libtirpc.so.3",       // dependency of pam_unix
-    "/lib64/libnsl.so.3",         // dependency of pam_unix
-    "/lib64/libnss_files.so.2",   // NSS module for /etc/passwd, shadow, group
-    "/lib64/libresolv.so.2",      // resolver library
+    "/lib64/libtirpc.so.3",     // dependency of pam_unix
+    "/lib64/libnsl.so.3",       // dependency of pam_unix
+    "/lib64/libnss_files.so.2", // NSS module for /etc/passwd, shadow, group
+    "/lib64/libresolv.so.2",    // resolver library
     // Kerberos libs (pam_unix.so links against them even if not used)
     "/lib64/libgssapi_krb5.so.2",
     "/lib64/libkrb5.so.3",
@@ -46,6 +46,12 @@ const SYSTEM_LIBS: &[&str] = &[
     "/lib64/libcom_err.so.2",
     "/lib64/libkrb5support.so.0",
     "/lib64/libkeyutils.so.1",
+    // procps-ng dependencies
+    "/lib64/libcap.so.2",
+    "/lib64/libsystemd.so.0",
+    // iproute2 (ss) dependencies
+    "/lib64/libelf.so.1",
+    "/lib64/libzstd.so.1",
 ];
 
 /// Collect system libraries into initramfs.
@@ -94,6 +100,24 @@ pub fn collect() -> Result<()> {
         }
     }
 
+    // procps-ng libraries from build
+    for lib in Procps.lib_paths() {
+        let path = Path::new(lib);
+        if path.exists() {
+            let dest = format!("{}/{}", lib_dir, file_name_str(path)?);
+            std::fs::copy(path, &dest)?;
+            // Create soname symlink (libproc2.so.0.0.2 -> libproc2.so.0)
+            if lib.contains("libproc2.so.0.0") {
+                let symlink = format!("{}/libproc2.so.0", lib_dir);
+                let _ = std::fs::remove_file(&symlink);
+                std::os::unix::fs::symlink("libproc2.so.0.0.2", &symlink)?;
+            }
+            println!("  Copied: {lib}");
+        } else {
+            println!("  Warning: {lib} not found (run builder build procps first)");
+        }
+    }
+
     // PAM modules (in /lib64/security/)
     let security_dir = format!("{}/lib64/security", initramfs::ROOT);
     std::fs::create_dir_all(&security_dir)?;
@@ -115,7 +139,11 @@ pub fn collect() -> Result<()> {
 
     // unix_chkpwd helper (used by pam_unix.so for non-root password checks)
     // IMPORTANT: pam_unix.so has /usr/bin/unix_chkpwd hardcoded at compile time
-    let chkpwd_paths = ["/usr/bin/unix_chkpwd", "/usr/sbin/unix_chkpwd", "/sbin/unix_chkpwd"];
+    let chkpwd_paths = [
+        "/usr/bin/unix_chkpwd",
+        "/usr/sbin/unix_chkpwd",
+        "/sbin/unix_chkpwd",
+    ];
     let usr_bin_dir = format!("{}/usr/bin", initramfs::ROOT);
     std::fs::create_dir_all(&usr_bin_dir)?;
     for chkpwd in chkpwd_paths {

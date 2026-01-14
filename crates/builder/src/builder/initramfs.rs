@@ -110,9 +110,7 @@ fn copy_binary(src: &str, dest: &str, root: &Path, mode: u32, component_name: &s
         }
         println!("  Copied: {src} -> {dest}");
     } else {
-        println!(
-            "  Warning: {src} not found (run builder build {component_name} first)"
-        );
+        println!("  Warning: {src} not found (run builder build {component_name} first)");
     }
     Ok(())
 }
@@ -143,7 +141,11 @@ fn create_symlinks() -> Result<()> {
             }
         }
         if !symlinks.is_empty() {
-            println!("  Created {} symlinks for {}", symlinks.len(), component.name());
+            println!(
+                "  Created {} symlinks for {}",
+                symlinks.len(),
+                component.name()
+            );
         }
     }
 
@@ -193,6 +195,9 @@ fn create_etc_files() -> Result<()> {
     // Authentication configuration (passwd, shadow, group, PAM, NSS)
     let auth_config = auth::AuthConfig::default();
     auth_config.write_to(root)?;
+
+    // Copy levitate-test binary (standalone Rust binary for in-VM testing)
+    copy_test_binary(root)?;
 
     // Non-auth system files
     std::fs::write(root.join("etc/hostname"), "levitate\n")?;
@@ -250,6 +255,25 @@ fn create_power_scripts(root: &Path) -> Result<()> {
             use std::os::unix::fs::PermissionsExt;
             std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755))?;
         }
+    }
+
+    Ok(())
+}
+
+fn copy_test_binary(root: &Path) -> Result<()> {
+    let bin_src = Path::new("tools/levitate-test/target/release/levitate-test");
+    let bin_dest = root.join("bin/levitate-test");
+
+    if bin_src.exists() {
+        std::fs::copy(bin_src, &bin_dest)?;
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&bin_dest, std::fs::Permissions::from_mode(0o755))?;
+        }
+        println!("  Copied levitate-test binary");
+    } else {
+        println!("  Warning: levitate-test not found (run: cd tools/levitate-test && cargo build --release)");
     }
 
     Ok(())
@@ -325,6 +349,34 @@ fn create_systemd_units() -> Result<()> {
          DefaultDependencies=no\n",
     )?;
 
+    // levitate-test.target - for automated testing (use with systemd.unit=levitate-test.target)
+    std::fs::write(
+        systemd_dir.join("levitate-test.target"),
+        "[Unit]\n\
+         Description=LevitateOS Automated Test\n\
+         Requires=basic.target\n\
+         After=basic.target\n\
+         Wants=levitate-test.service\n\
+         AllowIsolate=yes\n",
+    )?;
+
+    // levitate-test.service - runs test suite and shuts down
+    std::fs::write(
+        systemd_dir.join("levitate-test.service"),
+        "[Unit]\n\
+         Description=Run LevitateOS Test Suite\n\
+         After=basic.target\n\
+         \n\
+         [Service]\n\
+         Type=oneshot\n\
+         Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\n\
+         StandardOutput=tty\n\
+         StandardError=tty\n\
+         TTYPath=/dev/console\n\
+         ExecStart=/bin/levitate-test\n\
+         ExecStopPost=/sbin/poweroff\n",
+    )?;
+
     // getty@.service (template for virtual terminals)
     // Standard agetty -> login -> PAM -> shell flow
     // Reference: vendor/systemd/units/getty@.service.in
@@ -389,10 +441,7 @@ fn create_systemd_units() -> Result<()> {
     // Create getty.target.wants symlinks
     let getty_tty1 = getty_wants_dir.join("getty@tty1.service");
     if !getty_tty1.exists() {
-        std::os::unix::fs::symlink(
-            "/usr/lib/systemd/system/getty@.service",
-            &getty_tty1,
-        )?;
+        std::os::unix::fs::symlink("/usr/lib/systemd/system/getty@.service", &getty_tty1)?;
     }
 
     let serial_getty = getty_wants_dir.join("serial-getty@ttyS0.service");
@@ -488,9 +537,7 @@ fn create_cpio() -> Result<()> {
         .args([
             "sh",
             "-c",
-            &format!(
-                "cd {ROOT} && find . | cpio -o -H newc | gzip > ../initramfs.cpio.gz"
-            ),
+            &format!("cd {ROOT} && find . | cpio -o -H newc | gzip > ../initramfs.cpio.gz"),
         ])
         .output()
         .context("Failed to create CPIO (is fakeroot installed?)")?;

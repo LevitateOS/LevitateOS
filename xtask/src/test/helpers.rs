@@ -13,6 +13,84 @@ pub struct TestVm {
 }
 
 impl TestVm {
+    /// Start VM with LevitateOS kernel and initramfs
+    pub fn start_levitate() -> Result<Self> {
+        const KERNEL_PATH: &str = "build/linux/arch/x86/boot/bzImage";
+        const INITRAMFS_PATH: &str = "build/initramfs.cpio.gz";
+
+        // Verify artifacts exist
+        if !Path::new(KERNEL_PATH).exists() {
+            bail!(
+                "Kernel not found: {}. Run 'cargo run --bin builder -- initramfs' first.",
+                KERNEL_PATH
+            );
+        }
+        if !Path::new(INITRAMFS_PATH).exists() {
+            bail!(
+                "Initramfs not found: {}. Run 'cargo run --bin builder -- initramfs' first.",
+                INITRAMFS_PATH
+            );
+        }
+
+        // Use unique socket paths for parallel test isolation
+        let timestamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)?
+            .as_nanos();
+        let output_file = format!("build/test-levitate-{}.log", timestamp);
+        let qmp_socket = format!("/tmp/levitate-test-qmp-{}.sock", timestamp);
+        let serial_socket = format!("/tmp/levitate-test-serial-{}.sock", timestamp);
+
+        // Clean up any stale sockets
+        for socket in [&qmp_socket, &serial_socket] {
+            if Path::new(socket).exists() {
+                std::fs::remove_file(socket)?;
+            }
+        }
+
+        // Ensure build directory exists
+        std::fs::create_dir_all("build")?;
+        std::fs::write(&output_file, "")?;
+
+        // Start QEMU with LevitateOS kernel and initramfs
+        // Use levitate-test.target to run tests automatically (no shell needed)
+        let child = Command::new("qemu-system-x86_64")
+            .args([
+                "-kernel",
+                KERNEL_PATH,
+                "-initrd",
+                INITRAMFS_PATH,
+                "-append",
+                "console=ttyS0 rw quiet systemd.unit=levitate-test.target systemd.mask=serial-getty@ttyS0.service systemd.mask=getty@tty1.service",
+                "-m",
+                "1024M",
+                "-display",
+                "none",
+                "-no-reboot",
+                "-chardev",
+                &format!(
+                    "socket,id=serial0,path={},server=on,wait=off,logfile={}",
+                    serial_socket, output_file
+                ),
+                "-serial",
+                "chardev:serial0",
+                "-qmp",
+                &format!("unix:{},server,nowait", qmp_socket),
+            ])
+            .spawn()
+            .context("Failed to start QEMU with LevitateOS")?;
+
+        // Wait for QEMU to initialize sockets
+        std::thread::sleep(Duration::from_millis(500));
+
+        Ok(TestVm {
+            process: Some(child),
+            output_file,
+            qmp_socket,
+            serial_socket,
+            test_name: None,
+        })
+    }
+
     /// Start VM with Alpine ISO
     pub fn start_alpine(iso_path: &str) -> Result<Self> {
         if !Path::new(iso_path).exists() {

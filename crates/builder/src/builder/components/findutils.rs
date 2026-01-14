@@ -31,9 +31,11 @@ impl Buildable for Findutils {
 }
 
 fn run_cargo(dir: &Path, args: &[&str]) -> Result<()> {
+    let manifest = dir.join("Cargo.toml");
     let status = Command::new("cargo")
         .args(args)
-        .current_dir(dir)
+        .arg("--manifest-path")
+        .arg(&manifest)
         .status()
         .context("Failed to run cargo")?;
     if !status.success() {

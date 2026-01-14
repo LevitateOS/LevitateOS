@@ -1,12 +1,28 @@
 # CLAUDE.md
 
+## ⚠️ MANDATORY: CREATE TEAM FILE FIRST ⚠️
+
+**This is NOT optional. EVERY conversation MUST start with creating a team file.**
+
+```bash
+# Step 1: Find the next number
+ls .teams/TEAM_*.md | tail -1
+
+# Step 2: Create your team file IMMEDIATELY (before ANY other action)
+# Format: .teams/TEAM_XXX_short-description.md
+```
+
+**No exceptions. No "I'll do it later." Create the team file NOW.**
+
+---
+
 ## CRITICAL FAILURES TO AVOID
 
 These are recurring mistakes. **DO NOT REPEAT THEM:**
 
 ### 1. Creating team files too late
 **Wrong:** Start coding, then create team file when done
-**Right:** Create team file BEFORE any code changes
+**Right:** Create team file BEFORE any code changes (THIS IS MANDATORY)
 
 ### 2. Making architecture decisions without asking
 **Wrong:** "I'll add autologin to make it work"

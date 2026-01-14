@@ -23,10 +23,13 @@ impl Buildable for Diffutils {
     }
 
     fn binaries(&self) -> &'static [(&'static str, &'static str)] {
-        &[
-            ("vendor/diffutils/target/release/diff", "bin/diff"),
-            ("vendor/diffutils/target/release/cmp", "bin/cmp"),
-        ]
+        // Single multicall binary - symlinks created in create_symlinks()
+        &[("vendor/diffutils/target/release/diffutils", "bin/diffutils")]
+    }
+
+    fn symlinks(&self) -> &'static [(&'static str, &'static str)] {
+        // Multicall symlinks: diff, cmp -> diffutils
+        &[("diff", "diffutils"), ("cmp", "diffutils")]
     }
 }
 
