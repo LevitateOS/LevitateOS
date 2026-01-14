@@ -31,7 +31,12 @@ impl Buildable for Helix {
     }
 
     fn runtime_dirs(&self) -> &'static [(&'static str, &'static str)] {
-        &[("vendor/helix/runtime", "usr/share/helix/runtime")]
+        // Note: grammars/sources/ is 2GB+ of source code, excluded via selective copy
+        // Only queries/ and themes/ are copied; grammars/*.so copied separately
+        &[
+            ("vendor/helix/runtime/queries", "usr/share/helix/runtime/queries"),
+            ("vendor/helix/runtime/themes", "usr/share/helix/runtime/themes"),
+        ]
     }
 }
 

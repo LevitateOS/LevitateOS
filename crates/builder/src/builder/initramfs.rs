@@ -7,7 +7,7 @@ use std::path::Path;
 use std::process::Command;
 
 pub const ROOT: &str = "build/initramfs";
-const CPIO_PATH: &str = "build/initramfs.cpio";
+const CPIO_PATH: &str = "build/initramfs.cpio.gz";
 
 /// Create the initramfs CPIO archive.
 pub fn create() -> Result<()> {
@@ -77,32 +77,43 @@ fn copy_binaries() -> Result<()> {
 
     // Copy all binaries from registry
     for component in registry::COMPONENTS {
+        // Regular binaries (mode 755)
         for (src, dest) in component.binaries() {
-            let src_path = Path::new(src);
-            let dest_path = root.join(dest);
+            copy_binary(src, dest, root, 0o755, component.name())?;
+        }
 
-            // Ensure parent directory exists
-            if let Some(parent) = dest_path.parent() {
-                std::fs::create_dir_all(parent)?;
-            }
-
-            if src_path.exists() {
-                std::fs::copy(src_path, &dest_path)?;
-                #[cfg(unix)]
-                {
-                    use std::os::unix::fs::PermissionsExt;
-                    std::fs::set_permissions(&dest_path, std::fs::Permissions::from_mode(0o755))?;
-                }
-                println!("  Copied: {src} -> {dest}");
-            } else {
-                println!(
-                    "  Warning: {src} not found (run builder build {} first)",
-                    component.name()
-                );
-            }
+        // Setuid binaries (mode 4755)
+        for (src, dest) in component.setuid_binaries() {
+            copy_binary(src, dest, root, 0o4755, component.name())?;
+            println!("    (setuid)");
         }
     }
 
+    Ok(())
+}
+
+fn copy_binary(src: &str, dest: &str, root: &Path, mode: u32, component_name: &str) -> Result<()> {
+    let src_path = Path::new(src);
+    let dest_path = root.join(dest);
+
+    // Ensure parent directory exists
+    if let Some(parent) = dest_path.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+
+    if src_path.exists() {
+        std::fs::copy(src_path, &dest_path)?;
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&dest_path, std::fs::Permissions::from_mode(mode))?;
+        }
+        println!("  Copied: {src} -> {dest}");
+    } else {
+        println!(
+            "  Warning: {src} not found (run builder build {component_name} first)"
+        );
+    }
     Ok(())
 }
 
@@ -148,6 +159,31 @@ fn create_symlinks() -> Result<()> {
         }
     }
 
+    // Special case: copy helix grammar .so files (excluding 2GB+ sources/)
+    copy_helix_grammars(root)?;
+
+    Ok(())
+}
+
+fn copy_helix_grammars(root: &Path) -> Result<()> {
+    let grammars_src = Path::new("vendor/helix/runtime/grammars");
+    if !grammars_src.exists() {
+        return Ok(());
+    }
+
+    let grammars_dest = root.join("usr/share/helix/runtime/grammars");
+    std::fs::create_dir_all(&grammars_dest)?;
+
+    // Copy only .so files, skip sources/ directory
+    for entry in std::fs::read_dir(grammars_src)? {
+        let entry = entry?;
+        let path = entry.path();
+        if path.extension().is_some_and(|ext| ext == "so") {
+            let dest = grammars_dest.join(entry.file_name());
+            std::fs::copy(&path, &dest)?;
+        }
+    }
+    println!("  Copied helix grammars (*.so only)");
     Ok(())
 }
 
@@ -187,7 +223,35 @@ fn create_etc_files() -> Result<()> {
         }
     }
 
+    // Power control scripts (systemctl needs --force without D-Bus)
+    create_power_scripts(root)?;
+
     println!("  Created /etc files (with authentication)");
+    Ok(())
+}
+
+fn create_power_scripts(root: &Path) -> Result<()> {
+    let sbin = root.join("sbin");
+    std::fs::create_dir_all(&sbin)?;
+
+    // These scripts use systemctl --force to bypass D-Bus requirement
+    let scripts = [
+        ("reboot", "#!/bin/sh\nexec /bin/systemctl --force reboot \"$@\"\n"),
+        ("poweroff", "#!/bin/sh\nexec /bin/systemctl --force poweroff \"$@\"\n"),
+        ("halt", "#!/bin/sh\nexec /bin/systemctl --force halt \"$@\"\n"),
+        ("shutdown", "#!/bin/sh\n# shutdown [-h|-r] [-t secs] time [message]\ncase \"$1\" in\n  -r) exec /bin/systemctl --force reboot ;;\n  -h|-P) exec /bin/systemctl --force poweroff ;;\n  *) exec /bin/systemctl --force poweroff ;;\nesac\n"),
+    ];
+
+    for (name, content) in scripts {
+        let path = sbin.join(name);
+        std::fs::write(&path, content)?;
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755))?;
+        }
+    }
+
     Ok(())
 }
 
@@ -419,12 +483,13 @@ fn create_systemd_units() -> Result<()> {
 fn create_cpio() -> Result<()> {
     // Use fakeroot to make all files appear owned by root:root
     // This is required for PAM to accept the shadow file
+    // Compress with gzip for faster loading and smaller size
     let output = Command::new("fakeroot")
         .args([
             "sh",
             "-c",
             &format!(
-                "cd {ROOT} && find . | cpio -o -H newc > ../initramfs.cpio"
+                "cd {ROOT} && find . | cpio -o -H newc | gzip > ../initramfs.cpio.gz"
             ),
         ])
         .output()
@@ -445,14 +510,21 @@ fn create_cpio() -> Result<()> {
     Ok(())
 }
 
-/// Recursively copy a directory.
+/// Recursively copy a directory, handling symlinks.
 fn copy_dir_recursive(src: &Path, dest: &Path) -> Result<()> {
     std::fs::create_dir_all(dest)?;
     for entry in std::fs::read_dir(src)? {
         let entry = entry?;
         let src_path = entry.path();
         let dest_path = dest.join(entry.file_name());
-        if src_path.is_dir() {
+        let file_type = entry.file_type()?;
+
+        if file_type.is_symlink() {
+            // Copy symlinks as-is (may be broken, that's OK)
+            if let Ok(target) = std::fs::read_link(&src_path) {
+                let _ = std::os::unix::fs::symlink(&target, &dest_path);
+            }
+        } else if file_type.is_dir() {
             copy_dir_recursive(&src_path, &dest_path)?;
         } else {
             std::fs::copy(&src_path, &dest_path)?;

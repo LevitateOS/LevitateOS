@@ -22,7 +22,7 @@ impl Buildable for SudoRs {
         Ok(())
     }
 
-    fn binaries(&self) -> &'static [(&'static str, &'static str)] {
+    fn setuid_binaries(&self) -> &'static [(&'static str, &'static str)] {
         &[
             ("vendor/sudo-rs/target/release/sudo", "bin/sudo"),
             ("vendor/sudo-rs/target/release/su", "bin/su"),

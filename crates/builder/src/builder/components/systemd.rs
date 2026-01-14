@@ -47,9 +47,12 @@ impl Buildable for Systemd {
     fn binaries(&self) -> &'static [(&'static str, &'static str)] {
         &[
             ("vendor/systemd/build/systemd", "sbin/init"),
+            ("vendor/systemd/build/systemctl", "bin/systemctl"),
             ("vendor/systemd/build/systemd-executor", "usr/lib/systemd/systemd-executor"),
+            ("vendor/systemd/build/systemd-shutdown", "usr/lib/systemd/systemd-shutdown"),
         ]
     }
+
 
     fn lib_paths(&self) -> Vec<&'static str> {
         vec![

@@ -10,7 +10,10 @@ pub mod diffutils;
 pub mod findutils;
 pub mod glibc;
 pub mod helix;
+pub mod iproute2;
+pub mod iputils;
 pub mod linux;
+pub mod procps;
 pub mod registry;
 pub mod sudo_rs;
 pub mod systemd;
@@ -30,6 +33,11 @@ pub trait Buildable: Send + Sync {
 
     /// Binaries to copy to initramfs: `(source_path, dest_path)`.
     fn binaries(&self) -> &'static [(&'static str, &'static str)] {
+        &[]
+    }
+
+    /// Setuid binaries to copy (mode 4755): `(source_path, dest_path)`.
+    fn setuid_binaries(&self) -> &'static [(&'static str, &'static str)] {
         &[]
     }
 

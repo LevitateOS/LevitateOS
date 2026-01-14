@@ -7,7 +7,7 @@ use std::os::unix::net::UnixStream;
 use std::process::Command;
 
 const KERNEL_PATH: &str = "build/linux/arch/x86/boot/bzImage";
-const INITRAMFS_PATH: &str = "build/initramfs.cpio";
+const INITRAMFS_PATH: &str = "build/initramfs.cpio.gz";
 const OUTPUT_FILE: &str = "build/vm-output.log";
 const QMP_SOCKET: &str = "/tmp/levitate-qemu-qmp.sock";
 const SERIAL_SOCKET: &str = "/tmp/levitate-serial.sock";
@@ -43,7 +43,7 @@ pub fn start() -> Result<()> {
             "-append",
             "console=ttyS0 rw",
             "-m",
-            "512M",
+            "1024M",
             "-no-reboot",
             "-display",
             "none",

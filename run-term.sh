@@ -10,8 +10,8 @@ fi
 
 qemu-system-x86_64 \
     -kernel vendor/linux/arch/x86/boot/bzImage \
-    -initrd build/initramfs.cpio \
+    -initrd build/initramfs.cpio.gz \
     -append "console=ttyS0 rw" \
     -nographic \
-    -m 512M \
+    -m 1024M \
     -no-reboot

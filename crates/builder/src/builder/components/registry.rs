@@ -4,8 +4,9 @@
 
 use super::{
     brush::Brush, diffutils::Diffutils, findutils::Findutils, helix::Helix,
-    linux::Linux, sudo_rs::SudoRs, systemd::Systemd, util_linux::UtilLinux,
-    uutils::Uutils, Buildable,
+    iproute2::Iproute2, iputils::Iputils, linux::Linux, procps::Procps,
+    sudo_rs::SudoRs, systemd::Systemd, util_linux::UtilLinux, uutils::Uutils,
+    Buildable,
 };
 
 /// All registered components.
@@ -21,6 +22,9 @@ pub static COMPONENTS: &[&dyn Buildable] = &[
     &SudoRs,
     &Brush,
     &Helix,
+    &Procps,
+    &Iproute2,
+    &Iputils,
 ];
 
 /// Get component by name.

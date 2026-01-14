@@ -160,6 +160,34 @@ impl UserConfig {
         "console\ntty1\ntty2\ntty3\ntty4\nttyS0\n".to_string()
     }
 
+    /// Generate /etc/sudoers content.
+    #[must_use]
+    pub fn sudoers_content() -> String {
+        "# /etc/sudoers - sudo configuration\n\
+         #\n\
+         # This file MUST be edited with 'visudo' or with mode 0440\n\
+         \n\
+         # Host alias specification\n\
+         \n\
+         # User alias specification\n\
+         \n\
+         # Cmnd alias specification\n\
+         \n\
+         # Defaults\n\
+         Defaults env_reset\n\
+         Defaults secure_path=\"/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\"\n\
+         \n\
+         # User privilege specification\n\
+         root ALL=(ALL:ALL) ALL\n\
+         \n\
+         # Allow members of group wheel to execute any command\n\
+         %wheel ALL=(ALL:ALL) ALL\n\
+         \n\
+         # Live user can sudo without password (development convenience)\n\
+         live ALL=(ALL:ALL) NOPASSWD: ALL\n"
+            .to_string()
+    }
+
     /// Write user config files to the given root directory.
     pub fn write_to(&self, root: &Path) -> Result<()> {
         std::fs::write(root.join("etc/passwd"), self.passwd_content())?;
@@ -179,6 +207,17 @@ impl UserConfig {
             )?;
         }
 
+        // Write sudoers file with strict permissions (0440)
+        std::fs::write(root.join("etc/sudoers"), Self::sudoers_content())?;
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(
+                root.join("etc/sudoers"),
+                std::fs::Permissions::from_mode(0o440),
+            )?;
+        }
+
         // Create home directories with skeleton files
         for user in &self.users {
             // Skip system users with no real home (nobody, etc.)
@@ -195,6 +234,10 @@ impl UserConfig {
                     std::fs::create_dir_all(home_path.join(dir))?;
                 }
             }
+
+            // Create cache directories for applications (helix, etc.)
+            std::fs::create_dir_all(home_path.join(".cache/helix"))?;
+            std::fs::create_dir_all(home_path.join(".config/helix"))?;
 
             // Write skeleton files
             std::fs::write(

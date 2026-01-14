@@ -83,10 +83,11 @@ pub fn build_component(name: &str) -> Result<()> {
 pub fn list_components() {
     println!("Available components:");
     for component in registry::COMPONENTS {
+        let bin_count = component.binaries().len() + component.setuid_binaries().len();
         println!(
             "  {} - {} binaries, {} symlinks",
             component.name(),
-            component.binaries().len(),
+            bin_count,
             component.symlinks().len()
         );
     }

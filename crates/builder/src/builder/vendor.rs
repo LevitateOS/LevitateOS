@@ -16,6 +16,10 @@ pub const SOURCES: &[(&str, &str, &str)] = &[
     ("uutils", "https://github.com/uutils/coreutils.git", "0.5.0"),
     ("sudo-rs", "https://github.com/memorysafety/sudo-rs.git", "v0.2.11"),
     ("brush", "https://github.com/reubeno/brush.git", "main"),
+    ("helix", "https://github.com/helix-editor/helix.git", "25.01"),
+    ("procps-ng", "https://gitlab.com/procps-ng/procps.git", "v4.0.4"),
+    ("iproute2", "https://github.com/iproute2/iproute2.git", "v6.11.0"),
+    ("iputils", "https://github.com/iputils/iputils.git", "20240905"),
 ];
 
 /// Check if a source is cached.
