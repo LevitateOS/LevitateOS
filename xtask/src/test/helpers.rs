@@ -188,6 +188,13 @@ impl TestVm {
             }
         }
 
+        // Clear builder's session file to avoid interfering with subsequent VM starts
+        // This is critical for test isolation - builder stores session state at build/.vm-session.json
+        let session_file = "build/.vm-session.json";
+        if Path::new(session_file).exists() {
+            let _ = std::fs::remove_file(session_file);
+        }
+
         Ok(())
     }
 }
@@ -200,5 +207,7 @@ impl Drop for TestVm {
         }
         let _ = std::fs::remove_file(&self.qmp_socket);
         let _ = std::fs::remove_file(&self.serial_socket);
+        // Always clear session file to prevent test isolation issues
+        let _ = std::fs::remove_file("build/.vm-session.json");
     }
 }
