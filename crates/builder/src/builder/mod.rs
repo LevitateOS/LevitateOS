@@ -3,13 +3,17 @@
 //! Structure:
 //! - `kernel` - Linux kernel builder (only source-built component)
 //! - `fedora` - Fedora ISO extraction for userspace binaries
+//! - `arch` - Arch Linux ISO extraction for reference/study
+//! - `levitate` - LevitateOS-specific tools (AI, Rhai, recipes)
 //! - `libraries` - Library collection from Fedora
 //! - `auth/` - Authentication configuration
 //! - `initramfs` - Initramfs CPIO builder
 //! - `vendor` - Source fetching (kernel only)
 
+pub mod arch;
 pub mod auth;
 pub mod fedora;
+pub mod levitate;
 pub mod initramfs;
 pub mod kernel;
 pub mod libraries;
@@ -39,6 +43,10 @@ pub enum BuildCommands {
     Kernel,
     /// Create initramfs CPIO (includes libraries from Fedora)
     Initramfs,
+    /// Extract Fedora root filesystem from ISO
+    ExtractFedora,
+    /// Extract Arch Linux root filesystem from ISO
+    ExtractArch,
 }
 
 /// Build everything: fetch sources, build kernel, create initramfs.

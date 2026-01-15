@@ -5,17 +5,20 @@
 //! ## Usage
 //!
 //! ```bash
-//! builder all            # Fetch + build kernel + create initramfs
-//! builder kernel         # Build the Linux kernel
-//! builder fetch          # Fetch kernel source
-//! builder status         # Show cache status
-//! builder initramfs      # Create initramfs CPIO
+//! builder all              # Fetch + build kernel + create initramfs
+//! builder kernel           # Build the Linux kernel
+//! builder fetch            # Fetch kernel source
+//! builder status           # Show cache status
+//! builder initramfs        # Create initramfs CPIO
+//! builder extract-fedora   # Extract Fedora root for study
+//! builder extract-arch     # Extract Arch root for study
 //! ```
 //!
 //! ## Architecture
 //!
 //! - Kernel: Built from source (vendor/linux)
 //! - Userspace: Extracted from Fedora ISO (no compilation)
+//! - Reference: Arch Linux ISO for comparison/study
 
 use anyhow::Result;
 use clap::Parser;
@@ -45,6 +48,12 @@ fn main() -> Result<()> {
         builder::BuildCommands::Clean { name } => builder::vendor::clean(name.as_deref())?,
         builder::BuildCommands::Kernel => builder::kernel::build()?,
         builder::BuildCommands::Initramfs => builder::initramfs::create()?,
+        builder::BuildCommands::ExtractFedora => {
+            builder::fedora::ensure_extracted()?;
+        }
+        builder::BuildCommands::ExtractArch => {
+            builder::arch::ensure_extracted()?;
+        }
     }
 
     Ok(())
