@@ -160,13 +160,14 @@ enum InstallerAction {
 ### Rust Crates Needed
 - `serde` / `serde_json` - Action serialization
 - `nix` - Low-level system calls (mount, chroot)
-- `gpt` / `mbr` - Partition table manipulation
-- `block-utils` - Disk enumeration
+- `gptman` - GPT partition table manipulation
+- `mbrman` - MBR partition table manipulation
+- `drives` - Disk enumeration (or read `/sys/block/` directly)
 - `indicatif` - Progress bars
 - `rustyline` - Line editing / history
 
 ### FunctionGemma Integration
-- Load GGUF model via `llama.cpp` bindings or `candle`
+- `llama-cpp-2` - Rust bindings for llama.cpp (actively maintained)
 - Apply LoRA adapter
 - Tokenize input, generate, parse output
 
@@ -192,6 +193,55 @@ enum InstallerAction {
 2. **Offline model loading** - Bundle model in ISO? Separate download?
 3. **Disk operations library** - Use `parted` CLI or pure Rust?
 4. **Copy method** - rsync vs unsquashfs vs cp?
+
+---
+
+## TUI Design
+
+Using `ratatui` for the terminal interface.
+
+```
+┌─ Installation Steps ─────────────┬─ Chat ──────────────────────────────┐
+│                                  │                                     │
+│ [ ] Disk Configuration           │ LevitateOS Installer                │
+│     "partition the disk"         │                                     │
+│     "use whole disk encrypted"   │ > what disks do I have              │
+│                                  │                                     │
+│ [ ] System Installation          │ Found:                              │
+│     "install the system"         │   /dev/sda - 500GB SSD              │
+│                                  │   /dev/sdb - 1TB HDD                │
+│ [ ] Configuration                │                                     │
+│     "set timezone to..."         │ > use the whole ssd                 │
+│     "hostname is..."             │                                     │
+│                                  │ Plan:                               │
+│ [ ] User Setup                   │   /dev/sda1: 512MB EFI              │
+│     "create user X with sudo"    │   /dev/sda2: 499.5GB root           │
+│                                  │                                     │
+│ [ ] Bootloader                   │ Proceed? [y/n]                      │
+│     "install bootloader"         │                                     │
+│                                  │ > _                                 │
+│ [ ] Finalize                     │                                     │
+│     "done" or "reboot"           │                                     │
+│                                  │                                     │
+└──────────────────────────────────┴─────────────────────────────────────┘
+```
+
+### Layout
+
+- **Left panel (35%)**: Installation checklist with example prompts for each stage
+- **Right panel (65%)**: Scrolling chat history + input line at bottom
+
+### Interaction
+
+- User types in the input area (bottom of right panel)
+- LLM response appears in chat history
+- Checkboxes auto-update as stages complete
+- Current stage is highlighted
+
+### Rust Crates for TUI
+
+- `ratatui` - TUI framework
+- `crossterm` - Terminal backend
 
 ---
 
