@@ -181,10 +181,7 @@ impl UserConfig {
          root ALL=(ALL:ALL) ALL\n\
          \n\
          # Allow members of group wheel to execute any command\n\
-         %wheel ALL=(ALL:ALL) ALL\n\
-         \n\
-         # Live user can sudo without password (development convenience)\n\
-         live ALL=(ALL:ALL) NOPASSWD: ALL\n"
+         %wheel ALL=(ALL:ALL) ALL\n"
             .to_string()
     }
 
