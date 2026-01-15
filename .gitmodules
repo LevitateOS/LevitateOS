@@ -1,0 +1,4 @@
+[submodule "kickstarts"]
+	path = kickstarts
+	url = https://pagure.io/fedora-kickstarts.git
+	branch = f43
