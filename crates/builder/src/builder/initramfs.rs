@@ -435,6 +435,16 @@ fn create_systemd_units() -> Result<()> {
     // serial-getty@.service (for serial consoles)
     // Standard agetty -> login -> PAM -> shell flow
     // Reference: vendor/systemd/units/serial-getty@.service.in
+    //
+    // IMPORTANT: Terminal type MUST be "linux" (or another smart terminal), NEVER "dumb"!
+    // - "dumb" breaks ncurses apps like nano, vim, htop, less, etc.
+    // - If you see escape sequences like "[47;106R" polluting input, the fix is NOT
+    //   to use dumb terminal. Instead, add kernel options:
+    //   - systemd.log_color=false (disables ANSI color codes)
+    //   - vt.global_cursor_default=0 (disables cursor blink)
+    //   - systemd.show_status=false (disables boot status line)
+    // - The escape sequences come from systemd querying cursor position (ESC[6n),
+    //   NOT from the terminal type. Fix at the source, not by crippling the terminal.
     std::fs::write(
         systemd_dir.join("serial-getty@.service"),
         "[Unit]\n\
@@ -443,7 +453,7 @@ fn create_systemd_units() -> Result<()> {
          After=sysinit.target\n\
          \n\
          [Service]\n\
-         ExecStart=-/sbin/agetty -o '-p -- \\\\u' --keep-baud 115200,57600,38400,9600 %I dumb\n\
+         ExecStart=-/sbin/agetty -o '-p -- \\\\u' --keep-baud 115200,57600,38400,9600 %I linux\n\
          Type=idle\n\
          Restart=always\n\
          RestartSec=0\n\

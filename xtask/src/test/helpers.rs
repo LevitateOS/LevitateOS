@@ -53,6 +53,8 @@ impl TestVm {
 
         // Start QEMU with LevitateOS kernel and initramfs
         // Use levitate-test.target to run tests automatically (no shell needed)
+        // Kernel options to suppress escape sequences - see vm/commands.rs for explanation
+        // DO NOT use TERM=dumb as a workaround - it breaks ncurses apps
         let child = Command::new("qemu-system-x86_64")
             .args([
                 "-kernel",
@@ -60,7 +62,7 @@ impl TestVm {
                 "-initrd",
                 INITRAMFS_PATH,
                 "-append",
-                "console=ttyS0 rw quiet systemd.log_color=false vt.global_cursor_default=0 systemd.unit=levitate-test.target systemd.mask=serial-getty@ttyS0.service systemd.mask=getty@tty1.service",
+                "console=ttyS0 rw quiet systemd.show_status=false systemd.log_color=false vt.global_cursor_default=0 systemd.unit=levitate-test.target systemd.mask=serial-getty@ttyS0.service systemd.mask=getty@tty1.service",
                 "-m",
                 "1024M",
                 "-display",

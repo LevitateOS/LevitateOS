@@ -41,7 +41,12 @@ pub fn start() -> Result<()> {
             "-initrd",
             INITRAMFS_PATH,
             "-append",
-            "console=ttyS0 rw systemd.log_color=false vt.global_cursor_default=0",
+            // Kernel options to suppress escape sequences on serial console:
+            // - systemd.show_status=false: disable boot status line (source of ESC[6n cursor queries)
+            // - systemd.log_color=false: disable ANSI color codes
+            // - vt.global_cursor_default=0: disable cursor blink
+            // DO NOT use TERM=dumb as a workaround - it breaks ncurses apps (nano, vim, htop)
+            "console=ttyS0 rw systemd.show_status=false systemd.log_color=false vt.global_cursor_default=0",
             "-m",
             "1024M",
             "-no-reboot",
