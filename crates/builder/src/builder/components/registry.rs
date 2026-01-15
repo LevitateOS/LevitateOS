@@ -2,30 +2,13 @@
 //!
 //! All components implement the [`Buildable`] trait and are registered here.
 
-use super::{
-    brush::Brush, diffutils::Diffutils, findutils::Findutils, helix::Helix,
-    iproute2::Iproute2, iputils::Iputils, linux::Linux, procps::Procps,
-    sudo_rs::SudoRs, systemd::Systemd, util_linux::UtilLinux, uutils::Uutils,
-    Buildable,
-};
+use super::{linux::Linux, Buildable};
 
 /// All registered components.
 ///
 /// Order matters for `build_all` - dependencies should come first.
-pub static COMPONENTS: &[&dyn Buildable] = &[
-    &Linux,
-    &Systemd,
-    &UtilLinux,
-    &Uutils,
-    &Findutils,
-    &Diffutils,
-    &SudoRs,
-    &Brush,
-    &Helix,
-    &Procps,
-    &Iproute2,
-    &Iputils,
-];
+/// Note: Most userspace comes from Fedora ISO now, only kernel is built from source.
+pub static COMPONENTS: &[&dyn Buildable] = &[&Linux];
 
 /// Get component by name.
 #[must_use]

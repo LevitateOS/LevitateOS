@@ -1,14 +1,16 @@
 //! Build system for `LevitateOS`.
 //!
 //! Structure:
-//! - `components/` - Buildable components (linux, systemd, brush, etc.)
+//! - `components/` - Buildable components (linux kernel)
 //!   - `registry` - Single source of truth for all components
+//! - `fedora` - Fedora ISO extraction for userspace binaries
 //! - `auth/` - Authentication configuration
 //! - `initramfs` - Initramfs CPIO builder
 //! - `vendor` - Source fetching
 
 pub mod auth;
 pub mod components;
+pub mod fedora;
 pub mod initramfs;
 pub mod vendor;
 

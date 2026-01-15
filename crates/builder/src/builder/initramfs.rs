@@ -1,7 +1,8 @@
 //! Initramfs CPIO archive builder.
 
 use crate::builder::auth;
-use crate::builder::components::{glibc, registry};
+use crate::builder::components::glibc;
+use crate::builder::fedora;
 use anyhow::{bail, Context, Result};
 use std::path::Path;
 use std::process::Command;
@@ -13,6 +14,9 @@ const CPIO_PATH: &str = "build/initramfs.cpio.gz";
 pub fn create() -> Result<()> {
     println!("=== Creating initramfs ===");
 
+    // Ensure Fedora root is extracted first
+    fedora::ensure_extracted()?;
+
     // Clean previous build
     if Path::new(ROOT).exists() {
         std::fs::remove_dir_all(ROOT)?;
@@ -22,7 +26,6 @@ pub fn create() -> Result<()> {
     glibc::collect()?;
     copy_binaries()?;
     create_init_symlink()?;
-    create_symlinks()?;
     create_etc_files()?;
     create_systemd_units()?;
     create_cpio()?;
@@ -40,11 +43,14 @@ fn create_directories() -> Result<()> {
         &format!("{ROOT}/dev"),
         &format!("{ROOT}/proc"),
         &format!("{ROOT}/sys"),
+        &format!("{ROOT}/sys/fs/cgroup"),
         &format!("{ROOT}/tmp"),
         &format!("{ROOT}/run"),
+        &format!("{ROOT}/run/systemd"),
         &format!("{ROOT}/root"),
         &format!("{ROOT}/home/live"),
         &format!("{ROOT}/var/log"),
+        &format!("{ROOT}/var/tmp"),
         &format!("{ROOT}/usr/lib/systemd/system"),
         &format!("{ROOT}/usr/lib/systemd"),
         &format!("{ROOT}/etc/systemd/system/getty.target.wants"),
@@ -61,6 +67,12 @@ fn create_directories() -> Result<()> {
         std::os::unix::fs::symlink("lib64", &lib_link)?;
     }
 
+    // /var/run -> /run symlink (required by many programs)
+    let var_run = root.join("var/run");
+    if !var_run.exists() {
+        std::os::unix::fs::symlink("../run", &var_run)?;
+    }
+
     // PAM module path: Fedora's libpam looks in /usr/lib64/security/ first
     let usr_lib64 = root.join("usr/lib64");
     std::fs::create_dir_all(&usr_lib64)?;
@@ -73,27 +85,43 @@ fn create_directories() -> Result<()> {
 }
 
 fn copy_binaries() -> Result<()> {
+    println!("=== Copying binaries from Fedora ===");
+
     let root = Path::new(ROOT);
+    let fedora_root = fedora::root();
+    let mut copied = 0;
+    let mut missing = 0;
 
-    // Copy all binaries from registry
-    for component in registry::COMPONENTS {
-        // Regular binaries (mode 755)
-        for (src, dest) in component.binaries() {
-            copy_binary(src, dest, root, 0o755, component.name())?;
-        }
-
-        // Setuid binaries (mode 4755)
-        for (src, dest) in component.setuid_binaries() {
-            copy_binary(src, dest, root, 0o4755, component.name())?;
-            println!("    (setuid)");
+    // Copy regular binaries
+    for (src, dest) in fedora::BINARIES {
+        let src_path = fedora_root.join(src);
+        if copy_fedora_binary(&src_path, dest, root, 0o755)? {
+            copied += 1;
+        } else {
+            println!("  Warning: {} not found", src);
+            missing += 1;
         }
     }
+
+    // Copy setuid binaries
+    for (src, dest) in fedora::SETUID_BINARIES {
+        let src_path = fedora_root.join(src);
+        if copy_fedora_binary(&src_path, dest, root, 0o4755)? {
+            copied += 1;
+        } else {
+            println!("  Warning: {} not found (setuid)", src);
+            missing += 1;
+        }
+    }
+
+    println!("  Copied {copied} binaries ({missing} not found)");
 
     Ok(())
 }
 
-fn copy_binary(src: &str, dest: &str, root: &Path, mode: u32, component_name: &str) -> Result<()> {
-    let src_path = Path::new(src);
+/// Copy a binary from Fedora root, handling symlinks.
+/// Returns true if file was copied, false if source doesn't exist.
+fn copy_fedora_binary(src_path: &Path, dest: &str, root: &Path, mode: u32) -> Result<bool> {
     let dest_path = root.join(dest);
 
     // Ensure parent directory exists
@@ -101,18 +129,25 @@ fn copy_binary(src: &str, dest: &str, root: &Path, mode: u32, component_name: &s
         std::fs::create_dir_all(parent)?;
     }
 
-    if src_path.exists() {
-        std::fs::copy(src_path, &dest_path)?;
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            std::fs::set_permissions(&dest_path, std::fs::Permissions::from_mode(mode))?;
-        }
-        println!("  Copied: {src} -> {dest}");
-    } else {
-        println!("  Warning: {src} not found (run builder build {component_name} first)");
+    if !src_path.exists() {
+        return Ok(false);
     }
-    Ok(())
+
+    // Handle symlinks - copy the target file
+    if src_path.is_symlink() {
+        let real_path = std::fs::canonicalize(src_path)?;
+        std::fs::copy(&real_path, &dest_path)?;
+    } else {
+        std::fs::copy(src_path, &dest_path)?;
+    }
+
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(&dest_path, std::fs::Permissions::from_mode(mode))?;
+    }
+
+    Ok(true)
 }
 
 fn create_init_symlink() -> Result<()> {
@@ -128,67 +163,6 @@ fn create_init_symlink() -> Result<()> {
     Ok(())
 }
 
-fn create_symlinks() -> Result<()> {
-    let root = Path::new(ROOT);
-
-    // Create all symlinks from registry
-    for component in registry::COMPONENTS {
-        let symlinks = component.symlinks();
-        for (link_name, target) in symlinks {
-            let link_path = root.join("bin").join(link_name);
-            if !link_path.exists() {
-                std::os::unix::fs::symlink(target, &link_path)?;
-            }
-        }
-        if !symlinks.is_empty() {
-            println!(
-                "  Created {} symlinks for {}",
-                symlinks.len(),
-                component.name()
-            );
-        }
-    }
-
-    // Copy runtime directories from registry
-    for component in registry::COMPONENTS {
-        for (src, dest) in component.runtime_dirs() {
-            let src_path = Path::new(src);
-            let dest_path = root.join(dest);
-            if src_path.exists() {
-                copy_dir_recursive(src_path, &dest_path)?;
-                println!("  Copied {} runtime: {dest}", component.name());
-            }
-        }
-    }
-
-    // Special case: copy helix grammar .so files (excluding 2GB+ sources/)
-    copy_helix_grammars(root)?;
-
-    Ok(())
-}
-
-fn copy_helix_grammars(root: &Path) -> Result<()> {
-    let grammars_src = Path::new("vendor/helix/runtime/grammars");
-    if !grammars_src.exists() {
-        return Ok(());
-    }
-
-    let grammars_dest = root.join("usr/share/helix/runtime/grammars");
-    std::fs::create_dir_all(&grammars_dest)?;
-
-    // Copy only .so files, skip sources/ directory
-    for entry in std::fs::read_dir(grammars_src)? {
-        let entry = entry?;
-        let path = entry.path();
-        if path.extension().is_some_and(|ext| ext == "so") {
-            let dest = grammars_dest.join(entry.file_name());
-            std::fs::copy(&path, &dest)?;
-        }
-    }
-    println!("  Copied helix grammars (*.so only)");
-    Ok(())
-}
-
 fn create_etc_files() -> Result<()> {
     let root = Path::new(ROOT);
 
@@ -201,7 +175,22 @@ fn create_etc_files() -> Result<()> {
 
     // Non-auth system files
     std::fs::write(root.join("etc/hostname"), "levitate\n")?;
-    std::fs::write(root.join("etc/shells"), "/bin/sh\n/bin/brush\n")?;
+    std::fs::write(root.join("etc/shells"), "/bin/sh\n/bin/bash\n")?;
+
+    // /etc/os-release - required by systemd
+    std::fs::write(
+        root.join("etc/os-release"),
+        "NAME=\"LevitateOS\"\n\
+         ID=levitate\n\
+         VERSION_ID=1\n\
+         PRETTY_NAME=\"LevitateOS 1\"\n",
+    )?;
+
+    // /etc/machine-id - systemd will generate if empty, but file must exist
+    std::fs::write(root.join("etc/machine-id"), "")?;
+
+    // /var/lib/systemd directory for state
+    std::fs::create_dir_all(root.join("var/lib/systemd"))?;
 
     // /etc/profile - basic shell environment
     std::fs::write(
@@ -212,19 +201,23 @@ fn create_etc_files() -> Result<()> {
          export PS1='\\u@\\h:\\w\\$ '\n",
     )?;
 
-    // Terminfo entries for terminal handling
-    let terminfo_dirs = ["usr/share/terminfo/l", "usr/share/terminfo/v"];
-    for dir in terminfo_dirs {
-        std::fs::create_dir_all(root.join(dir))?;
-    }
-    // Copy minimal terminfo entries from host
-    let terminfo_files = [
-        ("/usr/share/terminfo/l/linux", "usr/share/terminfo/l/linux"),
-        ("/usr/share/terminfo/v/vt100", "usr/share/terminfo/v/vt100"),
+    // Terminfo entries for terminal handling (from Fedora)
+    let fedora_root = fedora::root();
+    let terminfo_entries = [
+        "usr/share/terminfo/l/linux",
+        "usr/share/terminfo/v/vt100",
+        "usr/share/terminfo/v/vt220",
+        "usr/share/terminfo/x/xterm",
+        "usr/share/terminfo/x/xterm-256color",
     ];
-    for (src, dest) in terminfo_files {
-        if Path::new(src).exists() {
-            std::fs::copy(src, root.join(dest))?;
+    for entry in terminfo_entries {
+        let src = fedora_root.join(entry);
+        let dest = root.join(entry);
+        if src.exists() {
+            if let Some(parent) = dest.parent() {
+                std::fs::create_dir_all(parent)?;
+            }
+            std::fs::copy(&src, &dest)?;
         }
     }
 
@@ -554,28 +547,5 @@ fn create_cpio() -> Result<()> {
     let size_mb = size as f64 / 1_000_000.0;
     println!("\n  Created: {CPIO_PATH} ({size_mb:.1} MB)");
 
-    Ok(())
-}
-
-/// Recursively copy a directory, handling symlinks.
-fn copy_dir_recursive(src: &Path, dest: &Path) -> Result<()> {
-    std::fs::create_dir_all(dest)?;
-    for entry in std::fs::read_dir(src)? {
-        let entry = entry?;
-        let src_path = entry.path();
-        let dest_path = dest.join(entry.file_name());
-        let file_type = entry.file_type()?;
-
-        if file_type.is_symlink() {
-            // Copy symlinks as-is (may be broken, that's OK)
-            if let Ok(target) = std::fs::read_link(&src_path) {
-                let _ = std::os::unix::fs::symlink(&target, &dest_path);
-            }
-        } else if file_type.is_dir() {
-            copy_dir_recursive(&src_path, &dest_path)?;
-        } else {
-            std::fs::copy(&src_path, &dest_path)?;
-        }
-    }
     Ok(())
 }

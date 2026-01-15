@@ -104,9 +104,9 @@ impl Default for UserConfig {
     fn default() -> Self {
         Self {
             users: vec![
-                User::new("root", 0, 0, "root", "/root", "/bin/brush")
+                User::new("root", 0, 0, "root", "/root", "/bin/bash")
                     .with_hash("$6$saltsalt$bAY90rAsHhyx.bxmKP9FE5UF4jP1iWgjV0ltM6ZJxfYkiIaCExjBZIbfmqmZEWoR65aM.1nFvG7fF3gYOjHpM."),
-                User::new("live", 1000, 1000, "Live User", "/home/live", "/bin/brush")
+                User::new("live", 1000, 1000, "Live User", "/home/live", "/bin/bash")
                     .with_hash("$6$saltsalt$lnz8B.EkP7gx/SsOOLQAcEU/F.7k3CE1I9HTM5hraWcxPafsvSqaJ9s7btu0bk1OOGYbFIG93bLmjZ/qM89J/1"),
                 User::new("nobody", 65534, 65534, "Nobody", "/", "/sbin/nologin"),
             ],

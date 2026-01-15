@@ -1,164 +1,116 @@
-//! System library collection (glibc + dependencies).
+//! System library collection from Fedora root.
+//!
+//! Copies libraries from the extracted Fedora root filesystem instead of the host system.
+//! This ensures reproducible builds with consistent library versions.
 
-use super::{procps::Procps, systemd::Systemd, util_linux::UtilLinux, Buildable};
-use crate::builder::initramfs;
+use crate::builder::{fedora, initramfs};
 use anyhow::{Context, Result};
 use std::path::Path;
 
-/// Extract filename as string from path, with proper error handling.
-fn file_name_str(path: &Path) -> Result<&str> {
-    path.file_name()
-        .and_then(|n| n.to_str())
-        .with_context(|| format!("Invalid path: {}", path.display()))
+/// Collect system libraries from Fedora root into initramfs.
+pub fn collect() -> Result<()> {
+    println!("=== Collecting libraries from Fedora ===");
+
+    let fedora_root = fedora::root();
+    let lib_dir = format!("{}/lib64", initramfs::ROOT);
+    let usr_lib_dir = format!("{}/usr/lib64", initramfs::ROOT);
+    std::fs::create_dir_all(&lib_dir)?;
+    std::fs::create_dir_all(&usr_lib_dir)?;
+
+    // Copy libraries from fedora.LIBRARIES list
+    let mut copied = 0;
+    let mut missing = 0;
+
+    for lib_name in fedora::LIBRARIES {
+        // Try usr/lib64 first, then lib64 (some libs are in root lib64)
+        let src_paths = [
+            fedora_root.join("usr/lib64").join(lib_name),
+            fedora_root.join("lib64").join(lib_name),
+        ];
+
+        let mut found = false;
+        for src_path in &src_paths {
+            if src_path.exists() {
+                // Libraries with subdirs (like systemd/) go to /usr/lib64 to match RUNPATH
+                let dest = if lib_name.contains('/') {
+                    format!("{usr_lib_dir}/{lib_name}")
+                } else {
+                    format!("{lib_dir}/{lib_name}")
+                };
+                copy_lib(src_path, &dest)?;
+                copied += 1;
+                found = true;
+                break;
+            }
+        }
+
+        if !found {
+            println!("  Warning: {lib_name} not found in Fedora root");
+            missing += 1;
+        }
+    }
+
+    println!("  Copied {copied} libraries ({missing} not found)");
+
+    // PAM modules
+    copy_pam_modules(&fedora_root)?;
+
+    Ok(())
 }
 
-/// System libraries to collect from host.
-const SYSTEM_LIBS: &[&str] = &[
-    "/lib64/ld-linux-x86-64.so.2",
-    "/lib64/libc.so.6",
-    "/lib64/libm.so.6",
-    "/lib64/libdl.so.2",
-    "/lib64/libpthread.so.0",
-    "/lib64/librt.so.1",
-    "/lib64/libcrypt.so.2",
-    "/lib64/libcrypto.so.3",
-    "/lib64/libz.so.1",
-    "/lib64/libgcc_s.so.1",
-    "/lib64/libmount.so.1",     // systemd uses dlopen for this
-    "/lib64/libblkid.so.1",     // dependency of libmount
-    "/lib64/libselinux.so.1",   // dependency of libmount
-    "/lib64/libpcre2-8.so.0",   // dependency of libselinux
-    "/lib64/libsmartcols.so.1", // for lsblk output
-    "/lib64/libfdisk.so.1",     // for fdisk/sfdisk
-    "/lib64/libpam.so.0",       // for login
-    "/lib64/libpam_misc.so.0",  // for login
-    "/lib64/libaudit.so.1",     // dependency of libpam
-    "/lib64/libeconf.so.0",     // dependency of libpam
-    "/lib64/libcap-ng.so.0",    // dependency of libpam
-    "/lib64/libtirpc.so.3",     // dependency of pam_unix
-    "/lib64/libnsl.so.3",       // dependency of pam_unix
-    "/lib64/libnss_files.so.2", // NSS module for /etc/passwd, shadow, group
-    "/lib64/libresolv.so.2",    // resolver library
-    // Kerberos libs (pam_unix.so links against them even if not used)
-    "/lib64/libgssapi_krb5.so.2",
-    "/lib64/libkrb5.so.3",
-    "/lib64/libk5crypto.so.3",
-    "/lib64/libcom_err.so.2",
-    "/lib64/libkrb5support.so.0",
-    "/lib64/libkeyutils.so.1",
-    // procps-ng dependencies
-    "/lib64/libcap.so.2",
-    "/lib64/libsystemd.so.0",
-    // iproute2 (ss) dependencies
-    "/lib64/libelf.so.1",
-    "/lib64/libzstd.so.1",
-];
+/// Copy a library, following symlinks to get the real file.
+fn copy_lib(src: &Path, dest: &str) -> Result<()> {
+    // Ensure parent directory exists (for libs in subdirs like systemd/)
+    let dest_path = Path::new(dest);
+    if let Some(parent) = dest_path.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
 
-/// Collect system libraries into initramfs.
-pub fn collect() -> Result<()> {
-    println!("=== Collecting system libraries ===");
+    // Follow symlinks to get the actual file
+    let real_path = std::fs::canonicalize(src)
+        .with_context(|| format!("Failed to resolve symlink: {}", src.display()))?;
 
-    let lib_dir = format!("{}/lib64", initramfs::ROOT);
-    std::fs::create_dir_all(&lib_dir)?;
+    std::fs::copy(&real_path, dest)
+        .with_context(|| format!("Failed to copy {} -> {dest}", real_path.display()))?;
 
-    // System libraries from host
-    for lib in SYSTEM_LIBS {
-        let path = Path::new(lib);
-        if path.exists() {
-            let dest = format!("{}/{}", lib_dir, file_name_str(path)?);
-            // Follow symlinks and copy the actual file
-            let real_path = std::fs::canonicalize(path)?;
+    // If src was a symlink, also create the symlink in dest
+    if src.is_symlink() {
+        let link_target = std::fs::read_link(src)?;
+        let link_name = src.file_name().unwrap().to_str().unwrap();
+        let dest_dir = Path::new(dest).parent().unwrap();
+        let dest_link = dest_dir.join(link_name);
+
+        // The dest we copied to is the real file name, create symlink to it
+        if dest_link.to_string_lossy() != dest {
+            let _ = std::fs::remove_file(&dest_link);
+            std::os::unix::fs::symlink(link_target, &dest_link)?;
+        }
+    }
+
+    Ok(())
+}
+
+/// Copy PAM modules from Fedora root.
+fn copy_pam_modules(fedora_root: &Path) -> Result<()> {
+    let security_src = fedora_root.join("usr/lib64/security");
+    let security_dest = format!("{}/lib64/security", initramfs::ROOT);
+    std::fs::create_dir_all(&security_dest)?;
+
+    let mut copied = 0;
+
+    for module_name in fedora::PAM_MODULES {
+        let src = security_src.join(module_name);
+        if src.exists() {
+            let dest = format!("{security_dest}/{module_name}");
+            let real_path = std::fs::canonicalize(&src)?;
             std::fs::copy(&real_path, &dest)?;
-            println!("  Copied: {lib}");
+            copied += 1;
         } else {
-            println!("  Warning: {lib} not found");
+            println!("  Warning: PAM module {module_name} not found");
         }
     }
 
-    // systemd libraries from build
-    for lib in Systemd.lib_paths() {
-        let path = Path::new(lib);
-        if path.exists() {
-            let dest = format!("{}/{}", lib_dir, file_name_str(path)?);
-            std::fs::copy(path, &dest)?;
-            println!("  Copied: {lib}");
-        } else {
-            println!("  Warning: {lib} not found (run builder build systemd first)");
-        }
-    }
-
-    // util-linux libraries from build (may override system libs)
-    for lib in UtilLinux.lib_paths() {
-        let path = Path::new(lib);
-        if path.exists() {
-            let dest = format!("{}/{}", lib_dir, file_name_str(path)?);
-            std::fs::copy(path, &dest)?;
-            println!("  Copied: {lib}");
-        } else {
-            // util-linux libs are optional - system libs may suffice
-            println!("  Note: {lib} not found (using system lib)");
-        }
-    }
-
-    // procps-ng libraries from build
-    for lib in Procps.lib_paths() {
-        let path = Path::new(lib);
-        if path.exists() {
-            let dest = format!("{}/{}", lib_dir, file_name_str(path)?);
-            std::fs::copy(path, &dest)?;
-            // Create soname symlink (libproc2.so.0.0.2 -> libproc2.so.0)
-            if lib.contains("libproc2.so.0.0") {
-                let symlink = format!("{}/libproc2.so.0", lib_dir);
-                let _ = std::fs::remove_file(&symlink);
-                std::os::unix::fs::symlink("libproc2.so.0.0.2", &symlink)?;
-            }
-            println!("  Copied: {lib}");
-        } else {
-            println!("  Warning: {lib} not found (run builder build procps first)");
-        }
-    }
-
-    // PAM modules (in /lib64/security/)
-    let security_dir = format!("{}/lib64/security", initramfs::ROOT);
-    std::fs::create_dir_all(&security_dir)?;
-    let pam_modules = [
-        "/lib64/security/pam_unix.so",
-        "/lib64/security/pam_permit.so", // For testing/fallback
-    ];
-    for module in pam_modules {
-        let path = Path::new(module);
-        if path.exists() {
-            let dest = format!("{}/{}", security_dir, file_name_str(path)?);
-            let real_path = std::fs::canonicalize(path)?;
-            std::fs::copy(&real_path, &dest)?;
-            println!("  Copied: {module}");
-        } else {
-            println!("  Warning: {module} not found");
-        }
-    }
-
-    // unix_chkpwd helper (used by pam_unix.so for non-root password checks)
-    // IMPORTANT: pam_unix.so has /usr/bin/unix_chkpwd hardcoded at compile time
-    let chkpwd_paths = [
-        "/usr/bin/unix_chkpwd",
-        "/usr/sbin/unix_chkpwd",
-        "/sbin/unix_chkpwd",
-    ];
-    let usr_bin_dir = format!("{}/usr/bin", initramfs::ROOT);
-    std::fs::create_dir_all(&usr_bin_dir)?;
-    for chkpwd in chkpwd_paths {
-        if Path::new(chkpwd).exists() {
-            let dest = format!("{usr_bin_dir}/unix_chkpwd");
-            std::fs::copy(chkpwd, &dest)?;
-            #[cfg(unix)]
-            {
-                use std::os::unix::fs::PermissionsExt;
-                std::fs::set_permissions(&dest, std::fs::Permissions::from_mode(0o4755))?;
-            }
-            println!("  Copied: {chkpwd} (setuid)");
-            break;
-        }
-    }
+    println!("  Copied {copied} PAM modules");
 
     Ok(())
 }

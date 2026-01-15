@@ -5,20 +5,9 @@
 
 use anyhow::Result;
 
-pub mod brush;
-pub mod diffutils;
-pub mod findutils;
 pub mod glibc;
-pub mod helix;
-pub mod iproute2;
-pub mod iputils;
 pub mod linux;
-pub mod procps;
 pub mod registry;
-pub mod sudo_rs;
-pub mod systemd;
-pub mod util_linux;
-pub mod uutils;
 
 /// A buildable component for `LevitateOS`.
 ///
