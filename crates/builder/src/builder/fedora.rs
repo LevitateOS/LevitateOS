@@ -468,6 +468,15 @@ pub const LIBRARIES: &[&str] = &[
     // gawk dependencies
     "libmpfr.so.6",
     "libgmp.so.10",
+
+    // LDAP (required by sudo's sudoers.so)
+    "libldap.so.2",
+    "liblber.so.2",
+    "libsasl2.so.3",
+    "libevent-2.1.so.7",
+
+    // File type detection (required by nano)
+    "libmagic.so.1",
 ];
 
 /// PAM modules to copy.
