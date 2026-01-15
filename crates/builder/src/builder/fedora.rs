@@ -273,7 +273,7 @@ pub const BINARIES: &[(&str, &str)] = &[
     // Editors
     ("usr/bin/nano", "bin/nano"),
     ("usr/bin/vi", "bin/vi"),
-    ("usr/bin/vim", "bin/vim"),
+    ("usr/libexec/vi", "usr/libexec/vi"),  // Actual vi binary (script wrapper uses this)
 
     // Process tools (procps-ng)
     ("usr/bin/ps", "bin/ps"),
@@ -450,6 +450,13 @@ pub const LIBRARIES: &[&str] = &[
     "libunistring.so.5",
     "libbrotlidec.so.1",
     "libbrotlicommon.so.1",
+
+    // iproute2 (ip, ss) - libbpf for BPF support
+    "libbpf.so.1",
+
+    // gawk dependencies
+    "libmpfr.so.6",
+    "libgmp.so.10",
 ];
 
 /// PAM modules to copy.

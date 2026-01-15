@@ -81,6 +81,18 @@ fn create_directories() -> Result<()> {
         std::os::unix::fs::symlink("../../lib64/security", &security_link)?;
     }
 
+    // /usr/bin/sh -> /bin/sh (Fedora scripts use #!/usr/bin/sh)
+    let usr_bin = root.join("usr/bin");
+    std::fs::create_dir_all(&usr_bin)?;
+    let usr_bin_sh = usr_bin.join("sh");
+    if !usr_bin_sh.exists() {
+        std::os::unix::fs::symlink("../../bin/sh", &usr_bin_sh)?;
+    }
+
+    // /usr/libexec for vi and other tools
+    let usr_libexec = root.join("usr/libexec");
+    std::fs::create_dir_all(&usr_libexec)?;
+
     Ok(())
 }
 
