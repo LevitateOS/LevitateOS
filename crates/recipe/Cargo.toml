@@ -11,8 +11,14 @@ readme = "README.md"
 keywords = ["package-manager", "recipe", "s-expression", "lisp", "build"]
 categories = ["command-line-utilities", "development-tools"]
 
+[[bin]]
+name = "levitate"
+path = "src/bin/levitate.rs"
+
 [dependencies]
 thiserror = "2"
+clap = { version = "4", features = ["derive", "env"] }
+anyhow = "1"
 
 [dev-dependencies]
 testcontainers = "0.23"
