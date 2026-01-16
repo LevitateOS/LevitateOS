@@ -24,15 +24,16 @@ A Rust-based installer inspired by archinstall, but with **FunctionGemma LLM** f
 - Format filesystems (ext4, btrfs, xfs)
 - Setup encryption (LUKS) if requested
 
-**User interaction examples:**
+**Example prompts:**
 ```
-> use the whole 500gb nvme drive
-> dual boot with windows on sda
-> encrypted root with separate home partition
-> just use the defaults
+"list disks"
+"use the whole 500gb drive"
+"encrypted root partition"
+"dual boot with windows"
+"separate home partition"
 ```
 
-**LLM output (structured):**
+**LLM output:**
 ```json
 {
   "action": "partition",
@@ -49,15 +50,17 @@ A Rust-based installer inspired by archinstall, but with **FunctionGemma LLM** f
 
 **What it does:**
 - Mount target partitions
-- Copy live system to target (rsync or unsquash)
+- Copy live system to target (rsync)
 - Generate /etc/fstab
-- Install bootloader (GRUB for BIOS+UEFI compat)
+- Install bootloader (GRUB)
 
-**User interaction:**
+**Example prompts:**
 ```
-> install the system
-> (mostly automatic, shows progress)
+"install the system"
+"copy to disk"
 ```
+
+*Mostly automatic with progress bar.*
 
 ### 3. System Configuration
 
@@ -67,11 +70,12 @@ A Rust-based installer inspired by archinstall, but with **FunctionGemma LLM** f
 - Set locale/language
 - Set keyboard layout
 
-**User interaction examples:**
+**Example prompts:**
 ```
-> hostname is my-laptop
-> timezone new york
-> us english keyboard
+"hostname is my-laptop"
+"timezone los angeles"
+"keyboard us"
+"language english"
 ```
 
 ### 4. User Setup
@@ -81,10 +85,11 @@ A Rust-based installer inspired by archinstall, but with **FunctionGemma LLM** f
 - Set passwords
 - Configure sudo access
 
-**User interaction examples:**
+**Example prompts:**
 ```
-> create user vince with sudo
-> password is hunter2
+"create user vince with sudo"
+"set password"
+"add user to wheel group"
 ```
 
 ### 5. Bootloader
@@ -94,11 +99,12 @@ A Rust-based installer inspired by archinstall, but with **FunctionGemma LLM** f
 - Generate grub.cfg
 - Set as default boot entry
 
-**User interaction:**
+**Example prompts:**
 ```
-> install bootloader
-> (automatic based on disk config)
+"install bootloader"
 ```
+
+*Usually automatic after system installation.*
 
 ### 6. Finalize
 
@@ -106,19 +112,78 @@ A Rust-based installer inspired by archinstall, but with **FunctionGemma LLM** f
 - Unmount partitions
 - Offer to reboot
 
+**Example prompts:**
+```
+"done"
+"reboot now"
+"exit without reboot"
+```
+
 ---
 
 ## FunctionGemma Integration
 
 ### Model Requirements
-- Base: FunctionGemma 2B (fits in ~4GB RAM)
+- Base: FunctionGemma 270M (fits in ~1GB RAM)
 - LoRA adapter: Trained on installation commands
 - Inference: CPU-only (live ISO environment)
+
+### Conversation Sequence (Multi-Turn)
+
+FunctionGemma uses a **four-turn cycle**, NOT a single combined response:
+
+```
+Turn 1: User sends prompt
+        "list disks"
+
+Turn 2: Model outputs function call (with special tokens)
+        <start_function_call>call:run_shell_command{command:<escape>lsblk<escape>}<end_function_call>
+
+Turn 3: Developer executes command, sends result back as "tool" role
+        {"role": "tool", "content": "sda  500G disk\nsdb  1T disk"}
+
+Turn 4: Model outputs natural language summary
+        "You have two disks: a 500GB SSD and a 1TB HDD."
+```
+
+**Key insight:** The model does NOT output both function call AND natural language in the same response. They are **separate turns**.
+
+### Implementation Flow
+
+```rust
+loop {
+    let response = llm.generate(messages);
+
+    if let Some(function_call) = extract_function_call(&response) {
+        // Execute the command
+        let result = execute_command(&function_call.command);
+
+        // Add tool response to messages
+        messages.push(Message::tool(result));
+
+        // Continue loop - model will generate natural language next
+    } else {
+        // Natural language response - show to user
+        display_response(&response);
+        break;
+    }
+}
+```
+
+### Reference: OpenCode Implementation
+
+OpenCode (vendor/opencode) uses Vercel AI SDK with streaming tool calls:
+- `streamText()` with `tools` parameter
+- `while (true)` loop until all tool calls processed
+- Tool call events: `tool-input-start` → `tool-call` → `tool-result`
+- Text events: `text-start` → `text-delta` → `text-end`
+
+However, FunctionGemma uses **custom tokens** (`<start_function_call>`, `<escape>`), not OpenAI-style tool calling. Manual parsing required.
 
 ### Input/Output Contract
 
 **Input:** Natural language user request
-**Output:** JSON action object
+**Output:** Either function call OR natural language (not both)
 
 ### Action Types
 
@@ -167,9 +232,11 @@ enum InstallerAction {
 - `rustyline` - Line editing / history
 
 ### FunctionGemma Integration
-- `llama-cpp-2` - Rust bindings for llama.cpp (actively maintained)
-- Apply LoRA adapter
-- Tokenize input, generate, parse output
+- Python HTTP server (`crates/installer/python/llm_server.py`)
+- HuggingFace Transformers for inference
+- Rust calls server via HTTP on localhost:8765
+- Server auto-starts when installer launches, auto-stops on exit
+- Model loaded once at startup, stays in memory for fast responses
 
 ### Privilege Handling
 - Run as root (installer context)
