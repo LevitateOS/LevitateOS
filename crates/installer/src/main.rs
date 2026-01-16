@@ -32,7 +32,7 @@ fn main() -> io::Result<()> {
     })?;
 
     // Start LLM server
-    let llm = llm::LlmServer::start("vendor/models/FunctionGemma")
+    let llm = llm::LlmServer::start("vendor/models/SmolLM3-3B")
         .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
 
     let mut app = App::new(llm);

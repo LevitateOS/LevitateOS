@@ -68,11 +68,17 @@ impl App {
 
         if resp.response_type.as_deref() == Some("command") {
             if let Some(cmd) = resp.command {
-                return LlmResult::Command(cmd);
+                return LlmResult::Command {
+                    command: cmd,
+                    thinking: resp.thinking,
+                };
             }
         }
 
-        LlmResult::Text(resp.response.unwrap_or_else(|| "No response".to_string()))
+        LlmResult::Text {
+            response: resp.response.unwrap_or_else(|| "No response".to_string()),
+            thinking: resp.thinking,
+        }
     }
 
     pub fn check_llm_response(&mut self) {
@@ -83,12 +89,13 @@ impl App {
         self.waiting_for_llm = false;
 
         match result {
-            LlmResult::Text(text) => {
+            LlmResult::Text { response, thinking } => {
+                let text = Self::format_with_thinking(&response, thinking.as_deref());
                 self.update_thinking_message(text);
             }
-            LlmResult::Command(cmd) => {
-                self.show_command_confirmation(&cmd);
-                self.pending_command = Some(PendingCommand::new(cmd));
+            LlmResult::Command { command, thinking } => {
+                self.show_command_confirmation(&command, thinking.as_deref());
+                self.pending_command = Some(PendingCommand::new(command));
             }
             LlmResult::Error(err) => {
                 self.update_thinking_message(format!("**Error:** {}", err));
@@ -96,6 +103,15 @@ impl App {
         }
 
         self.chat_scroll = usize::MAX;
+    }
+
+    fn format_with_thinking(response: &str, thinking: Option<&str>) -> String {
+        match thinking {
+            Some(thought) if !thought.is_empty() => {
+                format!("*💭 {}*\n\n{}", thought, response)
+            }
+            _ => response.to_string(),
+        }
     }
 
     fn update_thinking_message(&mut self, new_text: String) {
@@ -106,20 +122,25 @@ impl App {
         }
     }
 
-    fn show_command_confirmation(&mut self, cmd: &str) {
+    fn show_command_confirmation(&mut self, cmd: &str, thinking: Option<&str>) {
         let is_destructive = PendingCommand::check_destructive(cmd);
+
+        let thinking_line = match thinking {
+            Some(thought) if !thought.is_empty() => format!("*💭 {}*\n\n", thought),
+            _ => String::new(),
+        };
 
         let text = if is_destructive {
             format!(
-                "⚠️ **Destructive Action**\n\n```\n$ {}\n```\n\n\
+                "{}⚠️ **Destructive Action**\n\n```\n$ {}\n```\n\n\
                 This action **CANNOT be undone**. Type `yes` and press Enter to confirm, or press Esc to cancel.",
-                cmd
+                thinking_line, cmd
             )
         } else {
             format!(
-                "**Ready to execute:**\n\n```\n$ {}\n```\n\n\
+                "{}**Ready to execute:**\n\n```\n$ {}\n```\n\n\
                 Press **Enter** to execute or **Esc** to cancel.",
-                cmd
+                thinking_line, cmd
             )
         };
 

@@ -17,8 +17,8 @@ pub enum Role {
 
 /// LLM response types for the channel
 pub enum LlmResult {
-    Text(String),
-    Command(String),
+    Text { response: String, thinking: Option<String> },
+    Command { command: String, thinking: Option<String> },
     Error(String),
 }
 

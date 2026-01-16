@@ -16,6 +16,7 @@ pub struct LlmResponse {
     pub response: Option<String>,
     pub command: Option<String>,
     pub error: Option<String>,
+    pub thinking: Option<String>,  // SmolLM3's reasoning (from <think> block)
 }
 
 /// A single message in the conversation

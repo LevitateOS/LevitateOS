@@ -52,9 +52,9 @@ impl App {
                 role: Role::Assistant,
                 text: concat!(
                     "# Welcome to LevitateOS Installer!\n\n",
-                    "**LLM:** `FunctionGemma 2B`\n",
-                    "**LoRA:** `levitate-installer`\n\n",
+                    "**LLM:** `SmolLM3-3B` 💭\n\n",
                     "Type what you want to do in natural language.\n",
+                    "The 💭 icon shows the model's reasoning.\n\n",
                     "Try: `list disks` to see available drives."
                 ).into(),
             }],
