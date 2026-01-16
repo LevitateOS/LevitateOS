@@ -1,0 +1,21 @@
+[package]
+name = "levitate-recipe"
+version = "0.1.0"
+edition = "2024"
+description = "S-expression package recipe parser and executor for LevitateOS"
+license = "MIT"
+repository = "https://github.com/levitate-os/levitate-recipe"
+homepage = "https://github.com/levitate-os/levitate-recipe"
+documentation = "https://docs.rs/levitate-recipe"
+readme = "README.md"
+keywords = ["package-manager", "recipe", "s-expression", "lisp", "build"]
+categories = ["command-line-utilities", "development-tools"]
+
+[dependencies]
+thiserror = "2"
+
+[dev-dependencies]
+testcontainers = "0.23"
+bollard = "0.18"
+tokio = { version = "1", features = ["full"] }
+futures = "0.3"
