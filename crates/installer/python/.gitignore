@@ -20,6 +20,16 @@ checkpoints/
 *.pth
 *.safetensors
 
+# Sweep results (trained adapters, configs)
+sweep_results/
+
+# Generated datasets (from augment_data.py)
+training/
+testing/
+
+# Accidental nested crates directory
+crates/
+
 # Training logs
 *.log
 sweep_results.json
