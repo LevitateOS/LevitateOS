@@ -41,6 +41,7 @@ fn serial_log() -> PathBuf {
 
 const SSH_PORT: u16 = 2222;
 const DISK_SIZE: &str = "20G";
+const ARCH_IMAGE_URL: &str = "https://geo.mirror.pkgbuild.com/images/latest/Arch-Linux-x86_64-cloudimg.qcow2";
 
 /// Check if QEMU is available
 fn check_qemu() -> Result<()> {
@@ -317,7 +318,7 @@ pub fn ssh() -> Result<()> {
             "-o", "StrictHostKeyChecking=no",
             "-o", "UserKnownHostsFile=/dev/null",
             "-p", &SSH_PORT.to_string(),
-            "root@localhost",
+            "arch@localhost",
         ])
         .status()
         .context("Failed to SSH")?;
@@ -325,7 +326,7 @@ pub fn ssh() -> Result<()> {
     Ok(())
 }
 
-/// Setup/create the base Arch Linux image
+/// Setup/create the base Arch Linux image from cloud image
 pub fn setup(force: bool) -> Result<()> {
     check_qemu()?;
 
@@ -341,62 +342,46 @@ pub fn setup(force: bool) -> Result<()> {
     // Check for required tools
     which::which("qemu-img").context("qemu-img not found")?;
 
-    // Create disk image
-    println!("Creating {} disk image...", DISK_SIZE);
+    // Download pre-built Arch cloud image
+    println!("[1/2] Downloading Arch Linux cloud image (~500MB)...");
+    let status = Command::new("curl")
+        .args([
+            "-L",
+            "--progress-bar",
+            "-o", &disk.display().to_string(),
+            ARCH_IMAGE_URL,
+        ])
+        .status()
+        .context("Failed to run curl")?;
+
+    if !status.success() {
+        bail!("Failed to download Arch cloud image");
+    }
+    println!("Downloaded: {:?}", disk);
+
+    // Resize the image
+    println!("[2/2] Resizing disk to {}...", DISK_SIZE);
     let status = Command::new("qemu-img")
-        .args(["create", "-f", "qcow2", &disk.display().to_string(), DISK_SIZE])
+        .args(["resize", &disk.display().to_string(), DISK_SIZE])
         .status()?;
 
     if !status.success() {
-        bail!("Failed to create disk image");
+        bail!("Failed to resize disk image");
     }
 
-    println!("\nDisk image created: {:?}", disk);
-    println!("\n=== Next Steps ===\n");
-    println!("1. Download Arch Linux ISO:");
-    println!("   curl -LO https://mirrors.kernel.org/archlinux/iso/latest/archlinux-x86_64.iso");
-    println!("   mv archlinux-*.iso {:?}", vm_dir().join("arch.iso"));
+    println!("\n=== Setup Complete ===\n");
+    println!("Arch Linux cloud image ready: {:?}", disk);
     println!();
-    println!("2. Boot installer and install Arch:");
-    println!("   cargo xtask vm start --gui");
-    println!("   # Add: -cdrom {:?}", vm_dir().join("arch.iso"));
+    println!("Default credentials:");
+    println!("  Username: arch");
+    println!("  Password: arch");
     println!();
-    println!("3. Inside VM, install with:");
-    println!("   - pacstrap /mnt base linux linux-firmware sway foot waybar");
-    println!("   - Enable sshd, set root password");
-    println!();
-    // Download Arch ISO
-    let iso = vm_dir().join("arch.iso");
-    if !iso.exists() {
-        println!("\nDownloading Arch Linux ISO...");
-        let status = Command::new("curl")
-            .args([
-                "-L",
-                "-o", &iso.display().to_string(),
-                "https://mirrors.kernel.org/archlinux/iso/latest/archlinux-x86_64.iso"
-            ])
-            .status();
-
-        if status.is_ok() && status.unwrap().success() {
-            println!("Downloaded: {:?}", iso);
-        } else {
-            println!("Warning: Failed to download ISO. Download manually:");
-            println!("  curl -LO https://mirrors.kernel.org/archlinux/iso/latest/archlinux-x86_64.iso");
-            println!("  mv archlinux-*.iso {:?}", iso);
-        }
-    } else {
-        println!("Arch ISO already exists: {:?}", iso);
-    }
-
-    println!("\n=== Next Steps ===\n");
-    println!("1. Prepare levitate binary and recipes:");
-    println!("   cargo xtask vm prepare");
-    println!();
-    println!("2. Boot the Arch installer:");
-    println!("   cargo xtask vm start --gui --cdrom arch --uefi");
-    println!();
-    println!("3. Inside the VM, run the install script:");
-    println!("   cargo xtask vm install-script  # (shows what to run)");
+    println!("Next steps:");
+    println!("  1. cargo xtask vm prepare     # Build levitate");
+    println!("  2. cargo xtask vm start --gui # Boot VM");
+    println!("  3. cargo xtask vm copy        # Copy levitate to VM");
+    println!("  4. levitate desktop           # Install Sway");
+    println!("  5. sway                       # Run desktop!");
     println!();
 
     Ok(())
@@ -557,7 +542,7 @@ pub fn copy_files() -> Result<()> {
     let status = Command::new("scp")
         .args(&scp_opts)
         .arg(&levitate)
-        .arg("live@localhost:/tmp/levitate")
+        .arg("arch@localhost:/tmp/levitate")
         .status()
         .context("Failed to SCP levitate")?;
 
@@ -573,7 +558,7 @@ pub fn copy_files() -> Result<()> {
             "-o", "UserKnownHostsFile=/dev/null",
             "-o", "LogLevel=ERROR",
             "-p", &SSH_PORT.to_string(),
-            "live@localhost",
+            "arch@localhost",
             "sudo install -m755 /tmp/levitate /usr/local/bin/levitate",
         ])
         .status()?;
@@ -590,8 +575,8 @@ pub fn copy_files() -> Result<()> {
             "-o", "UserKnownHostsFile=/dev/null",
             "-o", "LogLevel=ERROR",
             "-p", &SSH_PORT.to_string(),
-            "live@localhost",
-            "sudo mkdir -p /usr/share/levitate/recipes && sudo chown -R live:live /usr/share/levitate",
+            "arch@localhost",
+            "sudo mkdir -p /usr/share/levitate/recipes && sudo chown -R arch:arch /usr/share/levitate",
         ])
         .status();
 
@@ -602,7 +587,7 @@ pub fn copy_files() -> Result<()> {
             .args(&scp_opts)
             .arg("-r")
             .arg(format!("{}/*", recipes.display()))
-            .arg("live@localhost:/usr/share/levitate/recipes/")
+            .arg("arch@localhost:/usr/share/levitate/recipes/")
             .status();
 
         if status.is_err() || !status.unwrap().success() {
@@ -614,7 +599,7 @@ pub fn copy_files() -> Result<()> {
                     let _ = Command::new("scp")
                         .args(&scp_opts)
                         .arg(&path)
-                        .arg("live@localhost:/usr/share/levitate/recipes/")
+                        .arg("arch@localhost:/usr/share/levitate/recipes/")
                         .status();
                 }
             }

@@ -1,326 +1,202 @@
 # Sway Desktop E2E Test Instructions
 
-End-to-end test for installing and running Sway desktop using the levitate package manager.
+Test the complete Sway desktop installation using the levitate package manager.
 
 ## Prerequisites
 
 - QEMU with KVM support (`qemu-system-x86_64`)
-- ~25GB free disk space
-- Internet connection (for downloading Arch ISO and packages)
+- ~5GB free disk space
+- Internet connection
 
-Check QEMU is installed:
+## Quick Start (5 commands)
+
 ```bash
-qemu-system-x86_64 --version
+# 1. Download Arch cloud image (~500MB)
+cargo xtask vm setup
+
+# 2. Build levitate binary
+cargo xtask vm prepare
+
+# 3. Boot the VM
+cargo xtask vm start --gui
+
+# 4. In VM: login as arch/arch, then from host:
+cargo xtask vm copy
+
+# 5. In VM: install desktop and run
+levitate desktop
+sway
 ```
 
-## Phase 1: Setup (One-time)
+## Detailed Steps
 
-### 1.1 Create disk image and download Arch ISO
+### Step 1: Setup
 
 ```bash
 cargo xtask vm setup
 ```
 
-This creates:
-- `.vm/levitate-test.qcow2` (20GB disk image)
-- `.vm/arch.iso` (Arch Linux installer, ~1GB download)
+Downloads the official Arch Linux cloud image (~500MB) and resizes it to 20GB.
 
-### 1.2 Build levitate and prepare recipes
+### Step 2: Prepare
 
 ```bash
 cargo xtask vm prepare
 ```
 
-This creates:
-- `.vm/levitate` (compiled binary)
-- `.vm/recipes/` (22 recipe files)
-- `.vm/install-arch.sh` (installation script)
+Builds the `levitate` binary and stages it with all 22 recipes.
 
-## Phase 2: Install Arch Linux (~15 minutes)
-
-### 2.1 Boot the Arch installer
+### Step 3: Boot VM
 
 ```bash
-cargo xtask vm start --gui --cdrom arch --uefi
+cargo xtask vm start --gui
 ```
 
-A QEMU window opens with the Arch live environment.
+Starts QEMU with:
+- virtio-gpu (OpenGL for Wayland)
+- virtio-keyboard/mouse
+- SSH forwarding on port 2222
 
-### 2.2 Install Arch (in the VM)
+### Step 4: Login
 
-Once you see the `root@archiso` prompt, run these commands:
-
-```bash
-# Partition the disk (UEFI layout)
-parted -s /dev/vda mklabel gpt
-parted -s /dev/vda mkpart ESP fat32 1MiB 513MiB
-parted -s /dev/vda set 1 esp on
-parted -s /dev/vda mkpart root ext4 513MiB 100%
-
-# Format partitions
-mkfs.fat -F32 /dev/vda1
-mkfs.ext4 -F /dev/vda2
-
-# Mount
-mount /dev/vda2 /mnt
-mkdir -p /mnt/boot
-mount /dev/vda1 /mnt/boot
-
-# Install base system + build tools + Wayland deps
-pacstrap -K /mnt base linux linux-firmware base-devel git \
-  meson ninja cmake pkg-config \
-  networkmanager openssh sudo \
-  mesa libdrm pixman \
-  wayland wayland-protocols libxkbcommon libinput \
-  cairo pango gdk-pixbuf2 json-c pcre2 \
-  scdoc libevdev mtdev libdisplay-info hwdata
-
-# Generate fstab
-genfstab -U /mnt >> /mnt/etc/fstab
-
-# Configure system
-arch-chroot /mnt /bin/bash
-```
-
-Inside the chroot:
-
-```bash
-# Timezone and locale
-ln -sf /usr/share/zoneinfo/UTC /etc/localtime
-hwclock --systohc
-echo "en_US.UTF-8 UTF-8" >> /etc/locale.gen
-locale-gen
-echo "LANG=en_US.UTF-8" > /etc/locale.conf
-
-# Hostname
-echo "levitate-test" > /etc/hostname
-
-# Set passwords
-echo "root:live" | chpasswd
-
-# Create user live:live
-useradd -m -G wheel,seat -s /bin/bash live
-echo "live:live" | chpasswd
-echo "%wheel ALL=(ALL:ALL) NOPASSWD: ALL" >> /etc/sudoers
-
-# Enable services
-systemctl enable NetworkManager
-systemctl enable sshd
-
-# Install bootloader
-bootctl install
-
-# Create boot entry
-cat > /boot/loader/loader.conf << 'EOF'
-default arch.conf
-timeout 3
-EOF
-
-# Get the PARTUUID
-PARTUUID=$(blkid -s PARTUUID -o value /dev/vda2)
-
-cat > /boot/loader/entries/arch.conf << EOF
-title   Arch Linux
-linux   /vmlinuz-linux
-initrd  /initramfs-linux.img
-options root=PARTUUID=$PARTUUID rw
-EOF
-
-# Exit chroot
-exit
-```
-
-Back in the live environment:
-
-```bash
-# Unmount and reboot
-umount -R /mnt
-reboot
-```
-
-### 2.3 Remove the ISO
-
-Close the QEMU window (or let it reboot). The VM will fail to boot from the ISO again. Stop it:
-
-```bash
-cargo xtask vm stop
-```
-
-## Phase 3: First Boot and Setup
-
-### 3.1 Boot the installed system
-
-```bash
-cargo xtask vm start --gui --uefi
-```
-
-You should see the bootloader, then a login prompt.
-
-### 3.2 Login
+Wait for the VM to boot. Login at the console:
 
 ```
-Username: live
-Password: live
+Username: arch
+Password: arch
 ```
 
-### 3.3 Copy levitate and recipes to VM
+### Step 5: Copy levitate to VM
 
-From another terminal on the **host**:
+From the **host** (another terminal):
 
 ```bash
 cargo xtask vm copy
 ```
 
-This SSHs into the VM and copies:
-- `/usr/local/bin/levitate`
-- `/usr/share/levitate/recipes/*.recipe`
+This copies:
+- `/usr/local/bin/levitate` (package manager)
+- `/usr/share/levitate/recipes/*.recipe` (22 recipes)
 
-### 3.4 Verify levitate works
+### Step 6: Install build dependencies
 
-In the VM:
+In the **VM**:
 
 ```bash
-levitate list
+sudo pacman -Syu --noconfirm
+sudo pacman -S --noconfirm --needed \
+    base-devel meson ninja cmake pkg-config scdoc \
+    wayland wayland-protocols libxkbcommon libinput \
+    mesa libdrm pixman cairo pango gdk-pixbuf2 \
+    json-c pcre2 libevdev mtdev seatd
 ```
 
-You should see 22 packages listed.
-
-## Phase 4: Install Sway Desktop
-
-### 4.1 Install the desktop (in VM)
+### Step 7: Install Sway desktop
 
 ```bash
 levitate desktop
 ```
 
 This installs (in order):
-1. wayland, wayland-protocols
-2. libxkbcommon, libinput
-3. seatd
-4. wlroots
-5. sway, swaybg, swaylock, swayidle
-6. gtk-layer-shell
-7. foot, waybar, wofi, mako
-8. grim, slurp, wl-clipboard
+- wayland, wayland-protocols, libxkbcommon, libinput
+- seatd, wlroots
+- sway, swaybg, swaylock, swayidle
+- foot, waybar, wofi, mako
+- grim, slurp, wl-clipboard
 
-**Note:** This will take a while as it downloads and compiles each package.
-
-### 4.2 Start seatd (required for Sway)
+### Step 8: Start seatd and Sway
 
 ```bash
 sudo systemctl enable --now seatd
-sudo usermod -aG seat live
-# Log out and back in for group to take effect
+sudo usermod -aG seat arch
+# Logout and login again for group to take effect
 exit
 ```
 
-Log back in as `live`.
-
-### 4.3 Start Sway
+Login again, then:
 
 ```bash
 sway
 ```
 
-**Expected result:** Sway compositor starts, you see a gray desktop with a status bar (waybar).
+## Expected Result
 
-## Phase 5: Verify Desktop Works
+Sway compositor starts with:
+- Gray background
+- Status bar (waybar) at top
+- Working keyboard/mouse
 
-### 5.1 Open a terminal
+### Test the desktop
 
-Press `Super + Enter` (Windows key + Enter)
+| Action | Keys |
+|--------|------|
+| Open terminal | `Super + Enter` |
+| Open launcher | `Super + d` |
+| Exit Sway | `Super + Shift + e` |
 
-A foot terminal should open.
-
-### 5.2 Open the launcher
-
-Press `Super + d`
-
-Wofi launcher should appear.
-
-### 5.3 Take a screenshot
+### Take a screenshot
 
 ```bash
 grim ~/screenshot.png
 ```
 
-### 5.4 Exit Sway
-
-Press `Super + Shift + e`
-
-Or type `swaymsg exit` in a terminal.
-
 ## Troubleshooting
 
-### "Failed to connect to socket" when starting sway
+### VM won't start
 
-seatd is not running:
+Check KVM is available:
+```bash
+ls /dev/kvm
+```
+
+### Can't SSH/copy to VM
+
+Make sure VM is booted and SSH is running:
+```bash
+# In VM
+sudo systemctl start sshd
+```
+
+### sway fails: "Failed to connect to socket"
+
+seatd not running:
 ```bash
 sudo systemctl start seatd
 ```
 
-### Black screen after starting sway
+### Black screen in sway
 
-virtio-gpu might not be working. Check:
+Check virtio-gpu:
 ```bash
 ls /dev/dri/
+# Should show: card0  renderD128
 ```
-
-Should show `card0` and `renderD128`.
-
-### SSH connection refused
-
-SSH might not be running:
-```bash
-sudo systemctl start sshd
-```
-
-### levitate command not found
-
-Copy didn't work. Manually copy:
-```bash
-# On host, start a web server
-cd .vm && python3 -m http.server 8080
-
-# In VM
-curl http://10.0.2.2:8080/levitate -o /tmp/levitate
-sudo install -m755 /tmp/levitate /usr/local/bin/levitate
-```
-
-### Package build fails
-
-Check if build dependencies are installed:
-```bash
-pacman -S --needed base-devel meson ninja cmake
-```
-
-## Quick Reference
-
-| Action | Command |
-|--------|---------|
-| Start VM (GUI) | `cargo xtask vm start --gui --uefi` |
-| Stop VM | `cargo xtask vm stop` |
-| SSH into VM | `cargo xtask vm ssh` |
-| Copy files to VM | `cargo xtask vm copy` |
-| VM status | `cargo xtask vm status` |
-| List packages | `levitate list` |
-| Install desktop | `levitate desktop` |
-| Start Sway | `sway` |
 
 ## Credentials
 
 | User | Password |
 |------|----------|
-| live | live |
-| root | live |
+| arch | arch |
 
-## Success Criteria
+## Command Reference
 
-- [ ] Arch Linux boots successfully
-- [ ] Can login as live:live
+| Command | Description |
+|---------|-------------|
+| `cargo xtask vm setup` | Download Arch cloud image |
+| `cargo xtask vm prepare` | Build levitate binary |
+| `cargo xtask vm start --gui` | Start VM with display |
+| `cargo xtask vm stop` | Stop VM |
+| `cargo xtask vm ssh` | SSH into VM |
+| `cargo xtask vm copy` | Copy levitate + recipes |
+| `cargo xtask vm status` | Check VM status |
+
+## Success Checklist
+
+- [ ] VM boots successfully
+- [ ] Can login as arch:arch
+- [ ] `cargo xtask vm copy` succeeds
 - [ ] `levitate list` shows 22 packages
-- [ ] `levitate desktop` completes without errors
-- [ ] `sway` starts and shows desktop
-- [ ] Can open terminal with Super+Enter
-- [ ] Can open launcher with Super+d
-- [ ] Can take screenshot with `grim`
+- [ ] `levitate desktop` completes
+- [ ] `sway` starts
+- [ ] Can open terminal (Super+Enter)
+- [ ] Can open launcher (Super+d)
