@@ -4,7 +4,7 @@
 //! Tests marked with #[should_panic] or that assert bug behavior will need
 //! to be updated once the bugs are fixed.
 
-use levitate_recipe::{parse, Recipe, AcquireSpec, BuildSpec, Verify, GitRef};
+use levitate_recipe::{parse, Recipe, AcquireSpec, BuildSpec, DepSpec, Dependency};
 
 // ============================================================================
 // BUG #1: Dependency Parsing Broken (CRITICAL)
@@ -46,8 +46,22 @@ mod dependency_parsing {
         let expr = parse(input).unwrap();
         let recipe = Recipe::from_expr(&expr).unwrap();
 
-        assert_eq!(recipe.deps, vec!["wayland", "wlroots"]);
-        assert_eq!(recipe.build_deps, vec!["meson", "ninja"]);
+        // Extract dep names for comparison
+        let dep_names: Vec<&str> = recipe.deps.iter()
+            .filter_map(|d| match d {
+                DepSpec::Always(dep) => Some(dep.name.as_str()),
+                _ => None,
+            })
+            .collect();
+        let build_dep_names: Vec<&str> = recipe.build_deps.iter()
+            .filter_map(|d| match d {
+                DepSpec::Always(dep) => Some(dep.name.as_str()),
+                _ => None,
+            })
+            .collect();
+
+        assert_eq!(dep_names, vec!["wayland", "wlroots"]);
+        assert_eq!(build_dep_names, vec!["meson", "ninja"]);
     }
 
     /// Empty deps section should work.
@@ -68,9 +82,9 @@ mod dependency_parsing {
 mod sha256_parsing {
     use super::*;
 
-    /// SHA256 verification in nested format is not parsed.
+    /// SHA256 verification in nested format is now parsed (FIXED).
     #[test]
-    fn test_sha256_nested_format_is_broken() {
+    fn test_sha256_nested_format_works() {
         let input = r#"
             (package "wayland" "1.23.0"
               (acquire
@@ -84,8 +98,8 @@ mod sha256_parsing {
         match &recipe.acquire {
             Some(AcquireSpec::Source { url, verify }) => {
                 assert_eq!(url, "https://example.com/wayland-1.23.0.tar.xz");
-                // BUG: verify should be Some(Verify::Sha256(...))
-                assert!(verify.is_none(), "BUG #2: SHA256 verification is not parsed");
+                // FIXED: verify is now parsed
+                assert!(verify.is_some(), "SHA256 verification should be parsed");
             }
             _ => panic!("Expected Source acquire spec"),
         }
@@ -583,9 +597,9 @@ mod cleanup_phase {
 mod gap_tests {
     use super::*;
 
-    /// Configure phase is not implemented.
+    /// Configure phase is now implemented (FIXED).
     #[test]
-    fn test_configure_not_implemented() {
+    fn test_configure_implemented() {
         let input = r#"
             (package "test" "1.0"
               (configure
@@ -596,8 +610,8 @@ mod gap_tests {
         let expr = parse(input).unwrap();
         let recipe = Recipe::from_expr(&expr).unwrap();
 
-        // GAP: Configure is not implemented, returns None
-        assert!(recipe.configure.is_none(), "GAP: Configure not implemented");
+        // FIXED: Configure is now implemented
+        assert!(recipe.configure.is_some(), "Configure should be implemented");
     }
 }
 

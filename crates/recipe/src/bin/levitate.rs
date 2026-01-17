@@ -5,7 +5,7 @@
 
 use anyhow::{bail, Context, Result};
 use clap::{Parser, Subcommand};
-use levitate_recipe::{parse, Context as ExecContext, Executor, Recipe};
+use levitate_recipe::{parse, Context as ExecContext, DepSpec, Executor, Recipe};
 use std::collections::HashSet;
 use std::fs;
 use std::path::PathBuf;
@@ -181,21 +181,36 @@ fn install_with_deps(
     let recipe = parse_recipe(&content, &path)?;
 
     // First, install BUILD dependencies (needed to compile this package)
-    if !recipe.build_deps.is_empty() {
+    // For now, we install all unconditional deps - feature selection is TODO
+    let build_dep_names: Vec<&str> = recipe.build_deps.iter()
+        .filter_map(|d| match d {
+            DepSpec::Always(dep) => Some(dep.name.as_str()),
+            DepSpec::Conditional { .. } => None, // Skip conditional deps for now
+        })
+        .collect();
+
+    if !build_dep_names.is_empty() {
         if verbose {
-            println!("  [deps] {} requires build deps: {:?}", package, recipe.build_deps);
+            println!("  [deps] {} requires build deps: {:?}", package, build_dep_names);
         }
-        for dep in &recipe.build_deps {
+        for dep in &build_dep_names {
             install_with_deps(dep, recipe_dir, prefix, verbose, dry_run, installed)?;
         }
     }
 
     // Then, install RUNTIME dependencies (needed at runtime)
-    if !recipe.deps.is_empty() {
+    let runtime_dep_names: Vec<&str> = recipe.deps.iter()
+        .filter_map(|d| match d {
+            DepSpec::Always(dep) => Some(dep.name.as_str()),
+            DepSpec::Conditional { .. } => None, // Skip conditional deps for now
+        })
+        .collect();
+
+    if !runtime_dep_names.is_empty() {
         if verbose {
-            println!("  [deps] {} requires runtime deps: {:?}", package, recipe.deps);
+            println!("  [deps] {} requires runtime deps: {:?}", package, runtime_dep_names);
         }
-        for dep in &recipe.deps {
+        for dep in &runtime_dep_names {
             install_with_deps(dep, recipe_dir, prefix, verbose, dry_run, installed)?;
         }
     }
@@ -327,10 +342,12 @@ fn show_info(package: &str, recipe_dir: &PathBuf) -> Result<()> {
     }
 
     if !recipe.build_deps.is_empty() {
-        println!("Build deps: {}", recipe.build_deps.join(", "));
+        let deps: Vec<String> = recipe.build_deps.iter().map(|d| format!("{}", d)).collect();
+        println!("Build deps: {}", deps.join(", "));
     }
     if !recipe.deps.is_empty() {
-        println!("Runtime deps: {}", recipe.deps.join(", "));
+        let deps: Vec<String> = recipe.deps.iter().map(|d| format!("{}", d)).collect();
+        println!("Runtime deps: {}", deps.join(", "));
     }
 
     println!("Recipe: {}", path.display());
@@ -376,13 +393,27 @@ fn show_deps_recursive(
 
     // Show build deps
     for dep in &recipe.build_deps {
+        let dep_name = match dep {
+            DepSpec::Always(d) => d.name.as_str(),
+            DepSpec::Conditional { dep: d, feature } => {
+                println!("{}  (build, if {}) {}", indent, feature, d.name);
+                continue;
+            }
+        };
         print!("{}  (build) ", indent);
-        show_deps_recursive(dep, recipe_dir, depth + 1, visited)?;
+        show_deps_recursive(dep_name, recipe_dir, depth + 1, visited)?;
     }
 
     // Show runtime deps
     for dep in &recipe.deps {
-        show_deps_recursive(dep, recipe_dir, depth + 1, visited)?;
+        let dep_name = match dep {
+            DepSpec::Always(d) => d.name.as_str(),
+            DepSpec::Conditional { dep: d, feature } => {
+                println!("{}  (if {}) {}", indent, feature, d.name);
+                continue;
+            }
+        };
+        show_deps_recursive(dep_name, recipe_dir, depth + 1, visited)?;
     }
 
     Ok(())
