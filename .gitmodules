@@ -9,4 +9,5 @@
 	url = git@github.com:LevitateOS/recipe.git
 [submodule "kickstarts"]
 	path = kickstarts
-	url = git@github.com:LevitateOS/kickstarts.git
+	url = git@github.com:LevitateOS/fedora-kickstarts.git
+	branch = levitate
