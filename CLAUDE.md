@@ -44,6 +44,36 @@ These are recurring mistakes. **DO NOT REPEAT THEM:**
 **Wrong:** Skip authentication, use root, take shortcuts
 **Right:** This is a REAL OS - proper users, proper login, proper security
 
+### 7. DELETING DIRECTORIES WITHOUT CHECKING FOR VALUABLE GITIGNORED FILES
+**This destroyed $12 of API costs, a full night of work, and a critical presentation.**
+
+**What happened (2026-01-18):**
+
+1. **Jan 16**: Claude added `training/` to `.gitignore` with comment "Generated datasets (from augment_data.py)" - treating it as regeneratable data
+
+2. **Jan 17**: User spent ALL NIGHT generating thinking annotations via OpenAI API ($12). This data was saved to `python/training/training_with_thinking.jsonl` - which was GITIGNORED
+
+3. **Jan 18**: Claude migrated `python/` to `llm-toolkit/` and Rust, then DELETED `python/` directory WITHOUT:
+   - Checking `git status --ignored`
+   - Asking what gitignored files existed
+   - Verifying nothing valuable was in gitignored paths
+
+4. **Result**: 7716 training examples with thinking annotations - LOST FOREVER. User had presentation next day, needed investment for rent.
+
+**BEFORE deleting ANY directory, ALWAYS run:**
+```bash
+# Check what gitignored files exist
+git status --ignored
+
+# Or list all files including ignored
+ls -la directory/
+find directory/ -type f
+```
+
+**Gitignored ≠ worthless.** Generated data that cost time/money to create is VALUABLE even if gitignored.
+
+**ASK THE USER** before deleting directories: "Are there any valuable files in here that aren't tracked by git?"
+
 ---
 
 ## RULE 1: CREATE TEAM FILE FIRST
