@@ -1,19 +1,24 @@
 //! Levitate - Package manager for LevitateOS
 //!
 //! Installs packages from S-expression recipes.
+//! Self-sufficient: handles ALL dependencies through recipes, no external package managers.
 
 use anyhow::{bail, Context, Result};
 use clap::{Parser, Subcommand};
 use levitate_recipe::{parse, Context as ExecContext, Executor, Recipe};
+use std::collections::HashSet;
 use std::fs;
 use std::path::PathBuf;
 
 /// Default recipe directory
 const RECIPE_DIR: &str = "/usr/share/levitate/recipes";
 
+/// Track installed packages to avoid cycles and redundant work
+const INSTALLED_DB: &str = "/var/lib/levitate/installed";
+
 #[derive(Parser)]
 #[command(name = "levitate")]
-#[command(about = "LevitateOS package manager")]
+#[command(about = "LevitateOS package manager - self-sufficient, no external dependencies")]
 #[command(version)]
 struct Cli {
     /// Recipe directory (default: /usr/share/levitate/recipes)
@@ -38,7 +43,7 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
-    /// Install a package
+    /// Install a package (with all dependencies)
     Install {
         /// Package name or path to .recipe file
         package: String,
@@ -53,7 +58,7 @@ enum Commands {
     /// List available packages
     List,
 
-    /// Show package info
+    /// Show package info (including dependencies)
     Info {
         /// Package name
         package: String,
@@ -61,6 +66,12 @@ enum Commands {
 
     /// Install the complete Sway desktop environment
     Desktop,
+
+    /// Show dependency tree for a package
+    Deps {
+        /// Package name
+        package: String,
+    },
 }
 
 fn main() -> Result<()> {
@@ -72,7 +83,12 @@ fn main() -> Result<()> {
 
     match cli.command {
         Commands::Install { package } => {
-            install_package(&package, &recipe_dir, &cli.prefix, cli.verbose, cli.dry_run)
+            let mut installed = load_installed_db();
+            install_with_deps(&package, &recipe_dir, &cli.prefix, cli.verbose, cli.dry_run, &mut installed)?;
+            if !cli.dry_run {
+                save_installed_db(&installed)?;
+            }
+            Ok(())
         }
         Commands::Remove { package } => {
             remove_package(&package, &recipe_dir, &cli.prefix, cli.verbose, cli.dry_run)
@@ -80,7 +96,30 @@ fn main() -> Result<()> {
         Commands::List => list_packages(&recipe_dir),
         Commands::Info { package } => show_info(&package, &recipe_dir),
         Commands::Desktop => install_desktop(&recipe_dir, &cli.prefix, cli.verbose, cli.dry_run),
+        Commands::Deps { package } => show_deps(&package, &recipe_dir),
     }
+}
+
+/// Load the set of installed packages
+fn load_installed_db() -> HashSet<String> {
+    let path = PathBuf::from(INSTALLED_DB);
+    if path.exists() {
+        if let Ok(content) = fs::read_to_string(&path) {
+            return content.lines().map(|s| s.to_string()).collect();
+        }
+    }
+    HashSet::new()
+}
+
+/// Save the set of installed packages
+fn save_installed_db(installed: &HashSet<String>) -> Result<()> {
+    let path = PathBuf::from(INSTALLED_DB);
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    let content: Vec<&str> = installed.iter().map(|s| s.as_str()).collect();
+    fs::write(&path, content.join("\n"))?;
+    Ok(())
 }
 
 /// Find a recipe by name or path
@@ -104,9 +143,10 @@ fn find_recipe(package: &str, recipe_dir: &PathBuf) -> Result<(PathBuf, String)>
     }
 
     bail!(
-        "Recipe not found: {}\nLooked in: {}",
+        "Recipe not found: {}\nLooked in: {}\n\nThis package needs a recipe. Create: {}.recipe",
         package,
-        recipe_dir.display()
+        recipe_dir.display(),
+        package
     )
 }
 
@@ -119,17 +159,48 @@ fn parse_recipe(content: &str, path: &PathBuf) -> Result<Recipe> {
         .map_err(|e| anyhow::anyhow!("Recipe error in {}: {}", path.display(), e))
 }
 
-/// Install a single package
-fn install_package(
+/// Install a package WITH all its dependencies (build and runtime)
+fn install_with_deps(
     package: &str,
     recipe_dir: &PathBuf,
     prefix: &PathBuf,
     verbose: bool,
     dry_run: bool,
+    installed: &mut HashSet<String>,
 ) -> Result<()> {
+    // Skip if already installed
+    if installed.contains(package) {
+        if verbose {
+            println!("  [skip] {} (already installed)", package);
+        }
+        return Ok(());
+    }
+
+    // Find and parse the recipe
     let (path, content) = find_recipe(package, recipe_dir)?;
     let recipe = parse_recipe(&content, &path)?;
 
+    // First, install BUILD dependencies (needed to compile this package)
+    if !recipe.build_deps.is_empty() {
+        if verbose {
+            println!("  [deps] {} requires build deps: {:?}", package, recipe.build_deps);
+        }
+        for dep in &recipe.build_deps {
+            install_with_deps(dep, recipe_dir, prefix, verbose, dry_run, installed)?;
+        }
+    }
+
+    // Then, install RUNTIME dependencies (needed at runtime)
+    if !recipe.deps.is_empty() {
+        if verbose {
+            println!("  [deps] {} requires runtime deps: {:?}", package, recipe.deps);
+        }
+        for dep in &recipe.deps {
+            install_with_deps(dep, recipe_dir, prefix, verbose, dry_run, installed)?;
+        }
+    }
+
+    // Now install the package itself
     println!("Installing {} {}...", recipe.name, recipe.version);
 
     let ctx = ExecContext::with_prefix(prefix)
@@ -140,7 +211,10 @@ fn install_package(
 
     executor
         .execute(&recipe)
-        .map_err(|e| anyhow::anyhow!("Execution failed: {}", e))?;
+        .map_err(|e| anyhow::anyhow!("Build failed for {}: {}", package, e))?;
+
+    // Mark as installed
+    installed.insert(package.to_string());
 
     if !dry_run {
         println!("Installed {} {}", recipe.name, recipe.version);
@@ -178,7 +252,11 @@ fn remove_package(
         bail!("Recipe {} does not have a remove section", recipe.name);
     }
 
+    // Remove from installed db
     if !dry_run {
+        let mut installed = load_installed_db();
+        installed.remove(package);
+        save_installed_db(&installed)?;
         println!("Removed {} {}", recipe.name, recipe.version);
     }
 
@@ -191,6 +269,7 @@ fn list_packages(recipe_dir: &PathBuf) -> Result<()> {
         bail!("Recipe directory not found: {}", recipe_dir.display());
     }
 
+    let installed = load_installed_db();
     let mut packages = Vec::new();
 
     for entry in fs::read_dir(recipe_dir)? {
@@ -201,7 +280,8 @@ fn list_packages(recipe_dir: &PathBuf) -> Result<()> {
             if let Ok(content) = fs::read_to_string(&path) {
                 if let Ok(expr) = parse(&content) {
                     if let Ok(recipe) = Recipe::from_expr(&expr) {
-                        packages.push((recipe.name, recipe.version, recipe.description));
+                        let is_installed = installed.contains(&recipe.name);
+                        packages.push((recipe.name, recipe.version, recipe.description, is_installed));
                     }
                 }
             }
@@ -214,10 +294,12 @@ fn list_packages(recipe_dir: &PathBuf) -> Result<()> {
         println!("No recipes found in {}", recipe_dir.display());
     } else {
         println!("Available packages:\n");
-        for (name, version, desc) in packages {
+        for (name, version, desc, is_installed) in packages {
             let desc = desc.as_deref().unwrap_or("");
-            println!("  {:<20} {:<10} {}", name, version, desc);
+            let status = if is_installed { "[*]" } else { "[ ]" };
+            println!("  {} {:<20} {:<10} {}", status, name, version, desc);
         }
+        println!("\n  [*] = installed");
     }
 
     Ok(())
@@ -228,7 +310,10 @@ fn show_info(package: &str, recipe_dir: &PathBuf) -> Result<()> {
     let (path, content) = find_recipe(package, recipe_dir)?;
     let recipe = parse_recipe(&content, &path)?;
 
-    println!("Package: {}", recipe.name);
+    let installed = load_installed_db();
+    let status = if installed.contains(&recipe.name) { "installed" } else { "not installed" };
+
+    println!("Package: {} ({})", recipe.name, status);
     println!("Version: {}", recipe.version);
 
     if let Some(desc) = &recipe.description {
@@ -241,7 +326,64 @@ fn show_info(package: &str, recipe_dir: &PathBuf) -> Result<()> {
         println!("Homepage: {}", homepage);
     }
 
+    if !recipe.build_deps.is_empty() {
+        println!("Build deps: {}", recipe.build_deps.join(", "));
+    }
+    if !recipe.deps.is_empty() {
+        println!("Runtime deps: {}", recipe.deps.join(", "));
+    }
+
     println!("Recipe: {}", path.display());
+
+    Ok(())
+}
+
+/// Show dependency tree for a package
+fn show_deps(package: &str, recipe_dir: &PathBuf) -> Result<()> {
+    let mut visited = HashSet::new();
+    println!("Dependency tree for {}:\n", package);
+    show_deps_recursive(package, recipe_dir, 0, &mut visited)?;
+    Ok(())
+}
+
+fn show_deps_recursive(
+    package: &str,
+    recipe_dir: &PathBuf,
+    depth: usize,
+    visited: &mut HashSet<String>,
+) -> Result<()> {
+    let indent = "  ".repeat(depth);
+
+    if visited.contains(package) {
+        println!("{}{} (circular)", indent, package);
+        return Ok(());
+    }
+    visited.insert(package.to_string());
+
+    let (path, content) = match find_recipe(package, recipe_dir) {
+        Ok(r) => r,
+        Err(_) => {
+            println!("{}{} (MISSING RECIPE)", indent, package);
+            return Ok(());
+        }
+    };
+
+    let recipe = parse_recipe(&content, &path)?;
+    let installed = load_installed_db();
+    let status = if installed.contains(&recipe.name) { "*" } else { " " };
+
+    println!("{}[{}] {} {}", indent, status, recipe.name, recipe.version);
+
+    // Show build deps
+    for dep in &recipe.build_deps {
+        print!("{}  (build) ", indent);
+        show_deps_recursive(dep, recipe_dir, depth + 1, visited)?;
+    }
+
+    // Show runtime deps
+    for dep in &recipe.deps {
+        show_deps_recursive(dep, recipe_dir, depth + 1, visited)?;
+    }
 
     Ok(())
 }
@@ -253,8 +395,14 @@ fn install_desktop(
     verbose: bool,
     dry_run: bool,
 ) -> Result<()> {
-    // Desktop packages in dependency order
+    // Start with build tools - these must exist first!
+    // Then Wayland stack, then desktop apps
     let packages = [
+        // Build tools (must come first - they build everything else)
+        "meson",
+        "ninja",
+        "cmake",
+        "pkg-config",
         // Wayland core
         "wayland",
         "wayland-protocols",
@@ -282,46 +430,27 @@ fn install_desktop(
     ];
 
     println!("Installing Sway desktop environment...\n");
-    println!("Packages to install:");
+    println!("This will install {} packages (with dependencies):\n", packages.len());
     for pkg in &packages {
         println!("  - {}", pkg);
     }
     println!();
 
-    let mut installed = 0;
-    let mut skipped = 0;
-    let mut failed = Vec::new();
+    let mut installed = load_installed_db();
 
+    // FAIL FAST: Stop on first failure - don't continue with broken deps
     for package in &packages {
-        match install_package(package, recipe_dir, prefix, verbose, dry_run) {
-            Ok(_) => {
-                installed += 1;
-            }
-            Err(e) => {
-                eprintln!("Warning: Failed to install {}: {}", package, e);
-                // Check if it's just missing recipe (might be a system dep)
-                if e.to_string().contains("Recipe not found") {
-                    eprintln!("  (might be a system dependency - skipping)");
-                    skipped += 1;
-                } else {
-                    failed.push(package.to_string());
-                }
-            }
-        }
+        install_with_deps(package, recipe_dir, prefix, verbose, dry_run, &mut installed)
+            .with_context(|| format!("Failed to install '{}' - stopping", package))?;
+    }
+
+    // Save installed database
+    if !dry_run {
+        save_installed_db(&installed)?;
     }
 
     println!();
-    println!("Desktop installation complete:");
-    println!("  Installed: {}", installed);
-    println!("  Skipped (system deps): {}", skipped);
-    println!("  Failed: {}", failed.len());
-
-    if !failed.is_empty() {
-        println!("\nFailed packages:");
-        for pkg in &failed {
-            println!("  - {}", pkg);
-        }
-    }
+    println!("Desktop installation complete: {} packages", packages.len());
 
     if !dry_run {
         println!("\nTo start Sway, run: sway");
