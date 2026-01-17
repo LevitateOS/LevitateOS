@@ -117,3 +117,27 @@ The LLM requires GPU acceleration or sufficient RAM:
 - **Fedora components**: GPL-2.0/GPL-3.0/LGPL-2.1
 
 See [LICENSE](LICENSE) for details.
+
+## Credits
+
+**Core Technologies**
+- [SmolLM3](https://huggingface.co/HuggingFaceTB/SmolLM3-3B) - 3B parameter LLM by Hugging Face
+- [Fedora](https://fedoraproject.org) - Base distribution
+- [Rust](https://www.rust-lang.org) - Systems programming language
+
+**Rust Crates**
+- [Ratatui](https://ratatui.rs) - TUI framework for the installer
+- [Clap](https://clap.rs) - CLI argument parsing
+
+**Desktop Stack**
+- [Sway](https://swaywm.org) - Wayland compositor
+- [wlroots](https://gitlab.freedesktop.org/wlroots/wlroots) - Wayland compositor library
+- [foot](https://codeberg.org/dnkl/foot) - Terminal emulator
+- [waybar](https://github.com/Alexays/Waybar) - Status bar
+- [wofi](https://hg.sr.ht/~scoopta/wofi) - Application launcher
+- [mako](https://github.com/emersion/mako) - Notification daemon
+
+**AI/ML**
+- [PyTorch](https://pytorch.org) - ML framework
+- [Transformers](https://huggingface.co/transformers) - Model inference
+- [PEFT](https://github.com/huggingface/peft) - LoRA fine-tuning
