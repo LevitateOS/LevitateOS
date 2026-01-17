@@ -72,3 +72,26 @@
 - Package manager is now called `recipe`
 - 4 variants: Standard/Minimal x with/without LLM
 - SmolLM3 from Hugging Face for AI features
+
+---
+
+## Part 4: Website Styling Cleanup
+
+### Removed all rounded corners from custom code
+User requirement: Keep design stock, use CSS tokens only, no custom Tailwind.
+
+**Files updated:**
+- `src/routes/index.tsx` - removed `rounded-lg` (3 places)
+- `src/routes/download.tsx` - removed `rounded-lg`, `rounded-md` (5 places)
+- `src/routes/docs/install.tsx` - removed `rounded-lg`
+- `src/routes/docs/recipes.tsx` - removed `rounded-lg`
+- `src/routes/docs/levitate.tsx` - removed `rounded`
+- `src/routes/docs/manual-install.tsx` - removed `rounded`
+- `src/components/CodeBlock.tsx` - removed `rounded-lg`, `rounded-bl`
+- `src/components/layout/DocsLayout.tsx` - removed `prose-code:rounded`
+- `src/components/layout/DocsSidebar.tsx` - removed `rounded-md`
+
+### Added all shadcn UI components
+- 53 total components now available in `src/components/ui/`
+- All use `rounded-none` by default (base-lyra style)
+- New components added: sidebar, command, toggle-group, item
