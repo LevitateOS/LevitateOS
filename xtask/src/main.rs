@@ -1,8 +1,9 @@
 //! Development tasks for LevitateOS.
 //!
 //! Usage: cargo xtask <command>
-
-mod vm;
+//!
+//! Note: Recipe VM testing has moved to the recipe submodule.
+//! Use: cd recipe && cargo xtask vm <command>
 
 use clap::{Parser, Subcommand};
 
@@ -16,98 +17,37 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
-    /// VM management for testing
-    Vm {
-        #[command(subcommand)]
-        action: VmAction,
-    },
-}
-
-#[derive(Subcommand)]
-enum VmAction {
-    /// Start the test VM
-    Start {
-        /// Run in background (detached)
-        #[arg(short, long)]
-        detach: bool,
-
-        /// Enable GUI display (default: headless with serial)
-        #[arg(short, long)]
-        gui: bool,
-
-        /// Memory in MB (default: 4096)
-        #[arg(short, long, default_value = "4096")]
-        memory: u32,
-
-        /// Number of CPUs (default: 4)
-        #[arg(short, long, default_value = "4")]
-        cpus: u32,
-
-        /// Boot from ISO/CDROM (for installation)
-        #[arg(long)]
-        cdrom: Option<String>,
-
-        /// Use UEFI boot (requires OVMF)
-        #[arg(long)]
-        uefi: bool,
+    /// Build the LevitateOS initramfs
+    Build {
+        /// Output directory
+        #[arg(short, long, default_value = "target/initramfs")]
+        output: String,
     },
 
-    /// Stop the running VM
-    Stop,
-
-    /// Show VM status
-    Status,
-
-    /// Send a command to the VM via SSH
-    Send {
-        /// Command to execute
-        command: Vec<String>,
-    },
-
-    /// Show VM serial console log
-    Log {
-        /// Follow log output
-        #[arg(short, long)]
-        follow: bool,
-    },
-
-    /// SSH into the VM
-    Ssh,
-
-    /// Create/setup the base Arch Linux image
-    Setup {
-        /// Force recreation even if image exists
-        #[arg(short, long)]
-        force: bool,
-    },
-
-    /// Build recipe binary and prepare files for VM
-    Prepare,
-
-    /// Show the install script to run inside VM
-    InstallScript,
-
-    /// Copy recipe binary and recipes to running VM
-    Copy,
+    /// Show help for recipe VM testing (moved to recipe submodule)
+    RecipeVm,
 }
 
 fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
 
     match cli.command {
-        Commands::Vm { action } => match action {
-            VmAction::Start { detach, gui, memory, cpus, cdrom, uefi } => {
-                vm::start(detach, gui, memory, cpus, cdrom, uefi)
-            }
-            VmAction::Stop => vm::stop(),
-            VmAction::Status => vm::status(),
-            VmAction::Send { command } => vm::send(&command.join(" ")),
-            VmAction::Log { follow } => vm::log(follow),
-            VmAction::Ssh => vm::ssh(),
-            VmAction::Setup { force } => vm::setup(force),
-            VmAction::Prepare => vm::prepare(),
-            VmAction::InstallScript => vm::install_script(),
-            VmAction::Copy => vm::copy_files(),
-        },
+        Commands::Build { output } => {
+            println!("Building initramfs to {}...", output);
+            println!("TODO: Implement initramfs build");
+            Ok(())
+        }
+        Commands::RecipeVm => {
+            println!("Recipe VM testing has moved to the recipe submodule.\n");
+            println!("Usage:");
+            println!("  cd recipe");
+            println!("  cargo xtask vm setup    # Download Arch cloud image");
+            println!("  cargo xtask vm prepare  # Build recipe binary");
+            println!("  cargo xtask vm start    # Start VM");
+            println!("  cargo xtask vm copy     # Copy recipe to VM");
+            println!("  cargo xtask vm ssh      # SSH into VM");
+            println!("  cargo xtask vm stop     # Stop VM");
+            Ok(())
+        }
     }
 }
