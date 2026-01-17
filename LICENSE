@@ -4,48 +4,65 @@ LevitateOS License Information
 This project contains multiple components with different licenses:
 
 
-1. LEVITATE BUILD TOOL (src/*)
-------------------------------
+1. LEVITATEOS RUST CODE (crates/*)
+----------------------------------
 License: MIT
 Copyright (c) 2024-2026 LevitateOS Contributors
 
-The Rust build tool source code in this repository is licensed under MIT.
+The Rust source code (installer, levitate, recipe parser) is MIT licensed.
 See LICENSES/MIT.txt for the full license text.
 
 
-2. BUILT ARTIFACTS
-------------------
-When you run `cargo run -- build all`, the resulting artifacts contain
-software under different licenses:
+2. SMOLLM3-3B MODEL (vendor/models/)
+------------------------------------
+License: Apache-2.0
+Copyright (c) 2025 Hugging Face
 
-  - Linux kernel (linux/)     : GPL-2.0-only
-  - BusyBox (toolchain/)      : GPL-2.0-or-later
-  - OpenRC (toolchain/)       : BSD-2-Clause
-  - musl libc                 : MIT
-
-The GPL-licensed components (Linux, BusyBox) require that source code
-be made available when distributing binaries. This repository satisfies
-that requirement by building everything from source.
+The SmolLM3-3B language model used for the AI installer is Apache 2.0 licensed.
+See LICENSES/Apache-2.0.txt for the full license text.
+Source: https://huggingface.co/HuggingFaceTB/SmolLM3-3B
 
 
-3. DISTRIBUTION NOTICE
+3. FEDORA BASE SYSTEM
+---------------------
+When you build an ISO, the resulting image contains Fedora packages
+under various licenses:
+
+  - Linux kernel           : GPL-2.0-only
+  - systemd                : LGPL-2.1-or-later
+  - GNU coreutils          : GPL-3.0-or-later
+  - bash                   : GPL-3.0-or-later
+  - util-linux             : GPL-2.0-or-later
+  - NetworkManager         : GPL-2.0-or-later
+  - GRUB2                  : GPL-3.0-or-later
+
+The GPL-licensed components require source availability when distributing.
+Fedora provides source packages at https://src.fedoraproject.org
+
+
+4. WEBSITE (website/)
+---------------------
+License: MIT
+The documentation website is MIT licensed.
+
+
+5. DISTRIBUTION NOTICE
 ----------------------
-If you distribute initramfs/ISO images built by this tool, you must:
+If you distribute LevitateOS images, you must:
 
   a) Include this LICENSE file or equivalent notices
-  b) Provide access to source code for GPL components (Linux, BusyBox)
-  c) Preserve copyright notices in BSD/MIT components
+  b) Provide access to source code for GPL/LGPL components
+  c) Preserve copyright notices
 
-The source code for all components is available:
-  - Linux:   https://kernel.org (or the linux/ submodule)
-  - BusyBox: https://busybox.net
-  - OpenRC:  https://github.com/OpenRC/openrc
-  - musl:    https://musl.libc.org
+Fedora source packages: https://src.fedoraproject.org
+SmolLM3 source: https://huggingface.co/HuggingFaceTB/SmolLM3-3B
 
 
-4. FULL LICENSE TEXTS
+6. FULL LICENSE TEXTS
 ---------------------
-See the LICENSES/ directory for complete license texts:
-  - LICENSES/MIT.txt           (levitate build tool, musl)
-  - LICENSES/GPL-2.0.txt       (Linux, BusyBox)
-  - LICENSES/BSD-2-Clause.txt  (OpenRC)
+See the LICENSES/ directory:
+  - LICENSES/MIT.txt          (LevitateOS code, website)
+  - LICENSES/Apache-2.0.txt   (SmolLM3 model)
+  - LICENSES/GPL-2.0.txt      (Linux kernel, util-linux)
+  - LICENSES/GPL-3.0.txt      (coreutils, bash, GRUB2)
+  - LICENSES/LGPL-2.1.txt     (systemd)
