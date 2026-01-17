@@ -93,10 +93,22 @@ website/          # Documentation website
 
 ## Requirements
 
+### System
 - x86_64 architecture
-- 4GB RAM minimum
 - 20GB disk minimum
 - UEFI recommended
+
+### AI Installer (SmolLM3-3B)
+The LLM requires GPU acceleration or sufficient RAM:
+
+| Hardware | VRAM/RAM | Notes |
+|----------|----------|-------|
+| **NVIDIA GPU** | 6GB+ VRAM | CUDA, best compatibility |
+| **NVIDIA GPU (4-bit)** | 2GB+ VRAM | With bitsandbytes quantization |
+| **AMD GPU** | 6GB+ VRAM | ROCm 5.6+, RX 6000/7000 series |
+| **Intel Arc** | 6GB+ VRAM | Via IPEX-LLM |
+| **Apple Silicon** | 8GB+ unified | Metal/MPS acceleration |
+| **CPU only** | 8GB+ RAM | Slow, fallback option |
 
 ## License
 
