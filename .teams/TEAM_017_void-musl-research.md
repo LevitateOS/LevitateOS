@@ -1,4 +1,4 @@
-# TEAM_017: Void Linux musl Research Documentation
+# TEAM_017: Void Linux musl Research + Download Page
 
 ## Status: COMPLETE
 
@@ -8,9 +8,14 @@ Document how Void Linux implements musl support as a reference for LevitateOS.
 ## Tasks
 - [x] Create team file
 - [x] Create documentation file with research findings
+- [x] Create download page with 4 OS variants (website)
+- [x] Create manual installation docs (website)
+- [x] Update header and sidebar navigation
 
 ## Output
 - `docs/void-linux-musl-reference.md` - Full research documentation
+- `website/src/routes/download.tsx` - Download page with 4 variants
+- `website/src/routes/docs/manual-install.tsx` - Manual installation guide
 
 ## Key Findings
 1. Void uses runit (not systemd) specifically because systemd doesn't work with musl
