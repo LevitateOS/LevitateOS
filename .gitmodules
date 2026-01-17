@@ -1,4 +1,3 @@
-[submodule "kickstarts"]
-	path = kickstarts
-	url = https://pagure.io/fedora-kickstarts.git
-	branch = f43
+[submodule "website"]
+	path = website
+	url = git@github.com:LevitateOS/website.git
