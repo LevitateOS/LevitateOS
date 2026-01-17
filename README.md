@@ -112,4 +112,8 @@ The LLM requires GPU acceleration or sufficient RAM:
 
 ## License
 
-LGPL-2.1
+- **LevitateOS code**: MIT
+- **SmolLM3 model**: Apache-2.0
+- **Fedora components**: GPL-2.0/GPL-3.0/LGPL-2.1
+
+See [LICENSE](LICENSE) for details.
