@@ -1,15 +1,19 @@
 # LevitateOS
 
-Linux where you maintain your own packages.
-
-## Philosophy
-
-**Be your own package maintainer.** Write simple recipes, build your own packages, stop waiting for upstream maintainers. You control what gets installed and how.
+A Linux distribution with an AI-powered installer and self-sufficient package manager.
 
 ## Features
 
+### AI-Powered Installer
+
+- **SmolLM3-3B** runs locally - no internet required
+- Natural language commands: "use the whole 500gb drive", "create user vince with sudo"
+- Multi-turn conversation context understands "it", "that one", "yes"
+- TUI chat interface built with Ratatui
+- 7,000+ training examples for installation workflows
+
 ### S-Expression Package Recipes
-Simple Lisp-like syntax - 30-line parser, human-readable:
+Lisp-like syntax designed for small LLMs to generate reliably:
 
 ```lisp
 (package "ripgrep" "14.1.0"
@@ -25,6 +29,7 @@ Simple Lisp-like syntax - 30-line parser, human-readable:
 - Split packages for -dev files
 
 ### Self-Sufficient Package Manager (`levitate`)
+
 - **No apt, dnf, or pacman dependency**
 - Full lifecycle: acquire → build → install → configure → start/stop → remove
 - SHA256 verification, patches support
@@ -36,6 +41,7 @@ levitate desktop  # Install Sway stack
 ```
 
 ### Pure Wayland Desktop
+
 - Complete Sway compositor stack (17 recipes)
 - wayland, wlroots, sway, foot, waybar, wofi, mako
 - XWayland disabled by default
@@ -48,16 +54,6 @@ LevitateOS uses **musl libc + GNU tools** = lightweight + full-featured.
 - ~1MB libc vs ~10MB glibc
 - Better static linking
 - Full GNU coreutils
-
-### LLM Recipe Assistant
-An optional local LLM (SmolLM3-3B) assists with tedious package maintenance tasks:
-
-- Generates initial recipe drafts from upstream sources
-- Suggests version updates and dependency changes
-- Helps debug build failures
-- Natural language interface for installation tasks
-
-The LLM is a *helper tool*, not the identity of LevitateOS.
 
 ## Quick Start
 
@@ -85,10 +81,14 @@ cargo xtask vm log
 ## Structure
 
 ```
-installer/        # TUI installer with LLM assistant
-recipe/           # S-expression recipe parser + levitate CLI
+crates/
+  builder/        # Builds artifacts (kernel, initramfs)
+  installer/      # AI-powered TUI installer
+  levitate/       # Package manager
+  recipe/         # S-expression recipe parser
+
 xtask/            # Dev tasks (VM control, tests)
-vendor/           # Reference implementations
+vendor/           # Reference implementations (systemd, util-linux, brush, uutils)
 docs/             # Design docs
 website/          # Documentation website
 .teams/           # Work history
@@ -97,12 +97,13 @@ website/          # Documentation website
 ## Requirements
 
 ### System
+
 - x86_64 architecture
 - 20GB disk minimum
 - UEFI recommended
 
-### LLM Assistant (SmolLM3-3B)
-The optional LLM assistant requires GPU acceleration or sufficient RAM:
+### AI Installer (SmolLM3-3B)
+The LLM requires GPU acceleration or sufficient RAM:
 
 | Hardware | VRAM/RAM | Notes |
 |----------|----------|-------|
@@ -124,15 +125,18 @@ See [LICENSE](LICENSE) for details.
 ## Credits
 
 **Core Technologies**
+
 - [SmolLM3](https://huggingface.co/HuggingFaceTB/SmolLM3-3B) - 3B parameter LLM by Hugging Face
 - [Fedora](https://fedoraproject.org) - Base distribution
 - [Rust](https://www.rust-lang.org) - Systems programming language
 
 **Rust Crates**
+
 - [Ratatui](https://ratatui.rs) - TUI framework for the installer
 - [Clap](https://clap.rs) - CLI argument parsing
 
 **Desktop Stack**
+
 - [Sway](https://swaywm.org) - Wayland compositor
 - [wlroots](https://gitlab.freedesktop.org/wlroots/wlroots) - Wayland compositor library
 - [foot](https://codeberg.org/dnkl/foot) - Terminal emulator
@@ -140,7 +144,8 @@ See [LICENSE](LICENSE) for details.
 - [wofi](https://hg.sr.ht/~scoopta/wofi) - Application launcher
 - [mako](https://github.com/emersion/mako) - Notification daemon
 
-**LLM Assistant**
+**AI/ML**
+
 - [PyTorch](https://pytorch.org) - ML framework
 - [Transformers](https://huggingface.co/transformers) - Model inference
 - [PEFT](https://github.com/huggingface/peft) - LoRA fine-tuning
