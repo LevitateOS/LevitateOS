@@ -20,3 +20,6 @@
 [submodule "recipes"]
 	path = recipes
 	url = git@github.com:LevitateOS/recipes.git
+[submodule "leviso"]
+	path = leviso
+	url = git@github.com:LevitateOS/leviso.git
