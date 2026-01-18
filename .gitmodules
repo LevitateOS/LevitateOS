@@ -7,10 +7,6 @@
 [submodule "recipe"]
 	path = recipe
 	url = git@github.com:LevitateOS/recipe.git
-[submodule "kickstarts"]
-	path = kickstarts
-	url = git@github.com:LevitateOS/fedora-kickstarts.git
-	branch = levitate
 [submodule "llm-toolkit"]
 	path = llm-toolkit
 	url = git@github.com:LevitateOS/llm-toolkit.git
