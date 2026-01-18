@@ -1,0 +1,16 @@
+{
+  "name": "levitate-os",
+  "private": true,
+  "workspaces": ["website", "installer", "docs-content"],
+  "scripts": {
+    "dev": "turbo dev",
+    "build": "turbo build",
+    "typecheck": "turbo typecheck",
+    "lint": "turbo lint",
+    "check": "turbo check"
+  },
+  "devDependencies": {
+    "turbo": "^2.5.4"
+  },
+  "packageManager": "bun@1.2.17"
+}

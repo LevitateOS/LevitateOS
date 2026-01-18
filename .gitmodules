@@ -14,3 +14,6 @@
 [submodule "llm-toolkit"]
 	path = llm-toolkit
 	url = git@github.com:LevitateOS/llm-toolkit.git
+[submodule "docs-content"]
+	path = docs-content
+	url = git@github.com:LevitateOS/docs-content.git
