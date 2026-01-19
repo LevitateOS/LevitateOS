@@ -24,47 +24,42 @@ These are recurring mistakes. **DO NOT REPEAT THEM:**
 **Wrong:** Start coding, then create team file when done
 **Right:** Create team file BEFORE any code changes (THIS IS MANDATORY)
 
-### 2. Making architecture decisions without asking
-**Wrong:** "I'll add autologin to make it work"
-**Right:** Ask user: "Should I add autologin or implement proper login?"
-
-### 3. Putting code in wrong crates
-**Wrong:** VM control in `builder` (it builds things, not runs things)
-**Right:** VM control in `xtask` (dev tasks)
-
-### 4. Long timeouts that waste user's time
-**Wrong:** 5-minute timeout, 500ms sleeps everywhere
-**Right:** Minimal timeouts (100-200ms), fail fast
-
-### 5. Inventing workarounds instead of checking references
-**Wrong:** Guess how PAM works, invent shell-wrapper
-**Right:** `grep -rn "autologin" vendor/systemd/` first
-
-### 6. Treating this as a toy OS
-**Wrong:** Skip authentication, use root, take shortcuts
-**Right:** This is a REAL OS - proper users, proper login, proper security
-
-### 8. PUTTING REQUIRED FEATURES BEHIND FLAGS
+### 2. PUTTING REQUIRED FEATURES BEHIND FLAGS
 **This is NOT acceptable. EVER.**
 
-When a feature is REQUIRED for the system to work properly on modern hardware, it must work BY DEFAULT. Do not hide it behind a flag.
+When a feature is REQUIRED for the system to work properly, it must work BY DEFAULT. Do not hide it behind a flag.
 
-**Example of what NOT to do:**
-- UEFI boot is required for most modern computers
-- Wrong: `cargo run -- test --uefi` (flag required for UEFI)
-- Right: ISO boots both BIOS and UEFI automatically
+**Examples of what NOT to do:**
+- UEFI boot is required → Wrong: `--uefi` flag. Right: UEFI by default, `--bios` flag
+- Disk needed for disk utilities → Wrong: `--disk 8G` flag. Right: disk by default, `--no-disk` flag
+- Network needed for network tools → Wrong: `--network` flag. Right: network by default
 
 **The pattern:**
 - Required features work by default
-- Optional features get flags
-- UEFI is NOT optional in 2026 - it's required
-- Don't make users add flags just to use standard hardware
+- Optional features (or opting OUT) get flags
+- Ask yourself: "Is this actually optional, or am I just being lazy?"
 
-**If you're adding a flag, ask yourself:** "Is this actually optional, or am I just being lazy?"
+### 3. Making architecture decisions without asking
+**Wrong:** "I'll add autologin to make it work"
+**Right:** Ask user: "Should I add autologin or implement proper login?"
 
----
+### 4. Putting code in wrong crates
+**Wrong:** VM control in `builder` (it builds things, not runs things)
+**Right:** VM control in `xtask` (dev tasks)
 
-### 7. DELETING DIRECTORIES WITHOUT CHECKING FOR VALUABLE GITIGNORED FILES
+### 5. Long timeouts that waste user's time
+**Wrong:** 5-minute timeout, 500ms sleeps everywhere
+**Right:** Minimal timeouts (100-200ms), fail fast
+
+### 6. Inventing workarounds instead of checking references
+**Wrong:** Guess how PAM works, invent shell-wrapper
+**Right:** `grep -rn "autologin" vendor/systemd/` first
+
+### 7. Treating this as a toy OS
+**Wrong:** Skip authentication, use root, take shortcuts
+**Right:** This is a REAL OS - proper users, proper login, proper security
+
+### 8. DELETING DIRECTORIES WITHOUT CHECKING FOR VALUABLE GITIGNORED FILES
 **This destroyed $12 of API costs, a full night of work, and a critical presentation.**
 
 **What happened (2026-01-18):**
@@ -177,13 +172,17 @@ Never mix these.
 
 The `website/` directory is a TanStack Start application.
 
-### Dev Server
+### Package Manager: Bun
+
+**ALWAYS use `bun` for the website, NEVER npm/yarn/pnpm.**
 
 ```bash
 cd website
-npm run dev      # Starts on http://localhost:3000
-npm run typecheck  # TypeScript validation
-npm run build    # Production build
+bun install      # Install dependencies
+bun run dev      # Starts on http://localhost:3000
+bun run typecheck  # TypeScript validation
+bun run build    # Production build
+bun add <pkg>    # Add a dependency
 ```
 
 **Port: 3000** (NOT 5173 - this is TanStack Start, not vanilla Vite)
