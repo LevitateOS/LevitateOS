@@ -1,9 +1,6 @@
 [submodule "website"]
 	path = website
 	url = git@github.com:LevitateOS/website.git
-[submodule "installer"]
-	path = installer
-	url = git@github.com:LevitateOS/installer.git
 [submodule "recipe"]
 	path = recipe
 	url = git@github.com:LevitateOS/recipe.git
@@ -23,3 +20,6 @@
 	path = linux
 	url = git@github.com:LevitateOS/linux.git
 	commit = 7d0a66e4bb9081d75c82ec4957c50034cb0ea449
+[submodule "docs-tui"]
+	path = docs-tui
+	url = git@github.com:LevitateOS/docs-tui.git

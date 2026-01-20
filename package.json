@@ -1,7 +1,7 @@
 {
   "name": "levitate-os",
   "private": true,
-  "workspaces": ["website", "installer", "docs-content"],
+  "workspaces": ["website", "docs-tui", "docs-content"],
   "scripts": {
     "dev": "turbo dev",
     "build": "turbo build",
