@@ -24,7 +24,9 @@
 //!     severity = "CRITICAL",
 //!     ease = "EASY",
 //!     cheats = ["Move sudo to OPTIONAL list", "Remove sudo from essential binaries"],
-//!     consequence = "bash: sudo: command not found"
+//!     consequence = "bash: sudo: command not found",
+//!     legitimate_change = "If sudo is genuinely not needed for a headless profile, \
+//!         add it to the profile's optional list in builder/src/profiles.rs"
 //! )]
 //! #[test]
 //! fn test_sudo_binary_present() {
@@ -37,7 +39,9 @@
 //! When a cheat-aware test fails, it prints:
 //!
 //! ```text
+//! ======================================================================
 //! === TEST FAILED: test_sudo_binary_present ===
+//! ======================================================================
 //!
 //! PROTECTS: User can run sudo commands
 //! SEVERITY: CRITICAL
@@ -47,11 +51,16 @@
 //!   1. Move sudo to OPTIONAL list
 //!   2. Remove sudo from essential binaries
 //!
+//! LEGITIMATE CHANGE PATH:
+//!   If sudo is genuinely not needed for a headless profile,
+//!   add it to the profile's optional list in builder/src/profiles.rs
+//!
 //! USER CONSEQUENCE:
 //!   bash: sudo: command not found
 //!
 //! ORIGINAL ERROR:
 //!   assertion failed: tarball_contains("./usr/bin/sudo")
+//! ======================================================================
 //! ```
 
 use proc_macro::TokenStream;
@@ -70,6 +79,8 @@ struct CheatAwareArgs {
     ease: String,
     cheats: Vec<String>,
     consequence: String,
+    /// Optional: describes how to legitimately change behavior instead of cheating
+    legitimate_change: Option<String>,
 }
 
 impl Default for CheatAwareArgs {
@@ -80,6 +91,7 @@ impl Default for CheatAwareArgs {
             ease: "UNSPECIFIED".to_string(),
             cheats: vec!["UNSPECIFIED".to_string()],
             consequence: "UNSPECIFIED".to_string(),
+            legitimate_change: None,
         }
     }
 }
@@ -148,11 +160,12 @@ impl Parse for CheatAwareArgs {
                 ("ease", MetaValue::Str(s)) => args.ease = s,
                 ("consequence", MetaValue::Str(s)) => args.consequence = s,
                 ("cheats", MetaValue::Array(arr)) => args.cheats = arr,
+                ("legitimate_change", MetaValue::Str(s)) => args.legitimate_change = Some(s),
                 (key, _) => {
                     return Err(syn::Error::new_spanned(
                         item.key,
                         format!(
-                            "unknown key '{}'. Valid keys: protects, severity, ease, cheats, consequence",
+                            "unknown key '{}'. Valid keys: protects, severity, ease, cheats, consequence, legitimate_change",
                             key
                         ),
                     ))
@@ -173,6 +186,11 @@ impl Parse for CheatAwareArgs {
 /// - `ease` - How easy it is to cheat: "EASY", "MEDIUM", "HARD" (string)
 /// - `cheats` - List of ways to cheat this test (array of strings)
 /// - `consequence` - What users see when cheated (string)
+/// - `legitimate_change` - Optional: how to legitimately change behavior (string)
+///
+/// The `legitimate_change` field implements "inoculation prompting" from Anthropic's
+/// research on emergent misalignment. By explicitly describing the legitimate path
+/// for changing behavior, we reduce the temptation to cheat.
 ///
 /// # Example
 ///
@@ -182,7 +200,9 @@ impl Parse for CheatAwareArgs {
 ///     severity = "CRITICAL",
 ///     ease = "EASY",
 ///     cheats = ["Skip PAM config check", "Accept any password"],
-///     consequence = "Authentication failure"
+///     consequence = "Authentication failure",
+///     legitimate_change = "If PAM is genuinely not needed (e.g., embedded system), \
+///         configure the profile in builder/src/profiles.rs with auth_method = None"
 /// )]
 /// #[test]
 /// fn test_login_works() {
@@ -206,6 +226,8 @@ pub fn cheat_aware(args: TokenStream, input: TokenStream) -> TokenStream {
     let ease = &args.ease;
     let consequence = &args.consequence;
     let cheats = &args.cheats;
+    let legitimate_change = args.legitimate_change.as_deref().unwrap_or("");
+    let has_legitimate_change = args.legitimate_change.is_some();
 
     // Build the cheat list as numbered items
     let cheats_display: Vec<String> = cheats
@@ -226,6 +248,7 @@ pub fn cheat_aware(args: TokenStream, input: TokenStream) -> TokenStream {
             let _ease = #ease;
             let _consequence = #consequence;
             let _cheats = #cheats_joined;
+            let _legitimate_change = #legitimate_change;
 
             // For async tests, we run directly and let the test framework handle panics
             // The cheat metadata is available in the source code for documentation
@@ -240,6 +263,8 @@ pub fn cheat_aware(args: TokenStream, input: TokenStream) -> TokenStream {
             let _ease = #ease;
             let _consequence = #consequence;
             let _cheats = #cheats_joined;
+            let _legitimate_change = #legitimate_change;
+            let _has_legitimate_change = #has_legitimate_change;
 
             // Wrap the test body to enhance panic messages
             let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
@@ -267,6 +292,11 @@ pub fn cheat_aware(args: TokenStream, input: TokenStream) -> TokenStream {
                 eprintln!();
                 eprintln!("CHEAT VECTORS:");
                 eprintln!("{}", _cheats);
+                if _has_legitimate_change {
+                    eprintln!();
+                    eprintln!("LEGITIMATE CHANGE PATH:");
+                    eprintln!("  {}", _legitimate_change);
+                }
                 eprintln!();
                 eprintln!("USER CONSEQUENCE:");
                 eprintln!("  {}", _consequence);
@@ -320,6 +350,123 @@ pub fn cheat_reviewed(args: TokenStream, input: TokenStream) -> TokenStream {
         #(#fn_attrs)*
         #fn_vis #fn_asyncness fn #fn_name() {
             // This test has been reviewed for cheat vectors.
+            #fn_block
+        }
+    };
+
+    TokenStream::from(expanded)
+}
+
+/// Metadata for a canary test.
+struct CheatCanaryArgs {
+    bait: String,
+    tripwire: String,
+}
+
+impl Default for CheatCanaryArgs {
+    fn default() -> Self {
+        Self {
+            bait: "UNSPECIFIED".to_string(),
+            tripwire: "UNSPECIFIED".to_string(),
+        }
+    }
+}
+
+impl Parse for CheatCanaryArgs {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        let mut args = CheatCanaryArgs::default();
+
+        let items: Punctuated<MetaItem, Token![,]> =
+            input.parse_terminated(MetaItem::parse, Token![,])?;
+
+        for item in items {
+            let key = item.key.to_string();
+            match (key.as_str(), item.value) {
+                ("bait", MetaValue::Str(s)) => args.bait = s,
+                ("tripwire", MetaValue::Str(s)) => args.tripwire = s,
+                (key, _) => {
+                    return Err(syn::Error::new_spanned(
+                        item.key,
+                        format!("unknown key '{}'. Valid keys: bait, tripwire", key),
+                    ))
+                }
+            }
+        }
+
+        Ok(args)
+    }
+}
+
+/// Mark a test as a canary - an intentionally verbose/tedious test that
+/// should trigger extra scrutiny if modified.
+///
+/// Canary tests are designed to be "bait" for cheating - they look like
+/// easy targets for simplification but modifications should trigger
+/// additional review.
+///
+/// # Attributes
+///
+/// - `bait` - Why this test looks tempting to simplify (string)
+/// - `tripwire` - What happens when this test is modified (string)
+///
+/// # Detection Mechanism
+///
+/// CI should check if files containing `#[cheat_canary]` tests are modified:
+/// - Add `[CANARY TRIGGERED]` label to PR
+/// - Require additional reviewer approval
+/// - Flag for human review
+///
+/// # Example
+///
+/// ```rust,ignore
+/// #[cheat_canary(
+///     bait = "This test looks tedious and tempts simplification to a loop",
+///     tripwire = "Any modification triggers full audit of all test changes"
+/// )]
+/// #[test]
+/// fn canary_verbose_binary_check() {
+///     // Intentionally verbose - checks each binary individually
+///     // A cheater would want to simplify this to a loop
+///     assert!(exists("/usr/bin/ls"), "ls missing");
+///     assert!(exists("/usr/bin/cat"), "cat missing");
+///     assert!(exists("/usr/bin/mount"), "mount missing");
+///     // ... many more individual assertions
+/// }
+/// ```
+///
+/// # Why Canaries Work
+///
+/// 1. They look like easy wins for "cleanup" or "refactoring"
+/// 2. But any change to them is suspicious by definition
+/// 3. The tripwire creates asymmetric cost: cheating is more expensive than honest work
+#[proc_macro_attribute]
+pub fn cheat_canary(args: TokenStream, input: TokenStream) -> TokenStream {
+    let args = parse_macro_input!(args as CheatCanaryArgs);
+    let input_fn = parse_macro_input!(input as ItemFn);
+
+    let fn_name = &input_fn.sig.ident;
+    let fn_name_str = fn_name.to_string();
+    let fn_attrs = &input_fn.attrs;
+    let fn_vis = &input_fn.vis;
+    let fn_block = &input_fn.block;
+    let fn_asyncness = &input_fn.sig.asyncness;
+
+    let bait = &args.bait;
+    let tripwire = &args.tripwire;
+
+    let expanded = quote! {
+        #(#fn_attrs)*
+        #fn_vis #fn_asyncness fn #fn_name() {
+            // CANARY TEST - Modifications to this test trigger extra scrutiny
+            // Bait: #bait
+            // Tripwire: #tripwire
+            //
+            // This comment is intentionally verbose. Do not remove or simplify.
+            // The canary detection system monitors this file for changes.
+            let _canary_test_name = #fn_name_str;
+            let _canary_bait = #bait;
+            let _canary_tripwire = #tripwire;
+
             #fn_block
         }
     };
