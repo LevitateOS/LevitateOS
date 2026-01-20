@@ -23,3 +23,9 @@
 [submodule "docs-tui"]
 	path = docs-tui
 	url = git@github.com:LevitateOS/docs-tui.git
+[submodule "install-tests"]
+	path = install-tests
+	url = git@github.com:LevitateOS/install-tests.git
+[submodule "stage-3"]
+	path = stage-3
+	url = git@github.com:LevitateOS/stage-3.git
