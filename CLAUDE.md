@@ -1,5 +1,29 @@
 # CLAUDE.md
 
+## What is LevitateOS?
+
+**LevitateOS is a daily driver Linux distribution competing with Arch Linux.**
+
+| | Arch | LevitateOS |
+|---|------|------------|
+| Target user | Power users who want control | Same |
+| Philosophy | Minimal base, user builds up | Same |
+| Package manager | pacman + AUR | recipe (Rhai-scripted) |
+| Binary source | Compiled from source | Extracted from Fedora/Rocky RPMs |
+| Build time | Hours (compiling) | Minutes (extracting) |
+
+We are NOT:
+- An embedded OS (too small = missing things)
+- A container base image
+- A server-only distro
+
+We ARE:
+- A daily driver desktop/workstation OS
+- Competing directly with Arch Linux
+- Minimal by default, complete via `recipe install`
+
+---
+
 ## ⚠️ FIRST: Create Team File
 
 ```bash

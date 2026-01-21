@@ -2,7 +2,9 @@
 
 ## What is rootfs-tests?
 
-User experience tests for LevitateOS rootfs. Uses systemd-nspawn to test the OS from a first-hand user perspective.
+User experience tests for LevitateOS rootfs. Uses systemd-nspawn to test the OS as a **daily driver competing with Arch Linux**.
+
+Each test answers: "Can a user do X with this OS?" - file operations, text processing, user administration, package management, networking. If Arch users expect it, we test for it.
 
 ## Commands
 

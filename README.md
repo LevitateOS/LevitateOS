@@ -1,7 +1,16 @@
 # LevitateOS
 
-A Linux distribution built with Rust, combining Arch Linux's elegant build system
-with Rocky Linux's enterprise-grade packages.
+**A daily driver Linux distribution competing with Arch Linux.**
+
+Built with Rust, combining Arch's philosophy (minimal base, user builds up) with pre-built binaries from Fedora/Rocky (builds in minutes, not hours).
+
+| | Arch Linux | LevitateOS |
+|---|------------|------------|
+| Target | Power users | Power users |
+| Philosophy | Minimal, DIY | Minimal, DIY |
+| Package manager | pacman + AUR | recipe (Rhai) |
+| Build time | Hours | Minutes |
+| Base size | ~1.5 GB | ~70 MB |
 
 ## Core Principles
 
