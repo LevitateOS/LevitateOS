@@ -75,3 +75,4 @@ bun.lock
 bun.lockb
 .turbo/
 .gource/historical/installer
+.gource/historical/recipes
