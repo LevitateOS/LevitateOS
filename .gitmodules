@@ -26,3 +26,6 @@
 [submodule "distro-spec"]
 	path = distro-spec
 	url = git@github.com:LevitateOS/distro-spec.git
+[submodule "recstrap"]
+	path = recstrap
+	url = git@github.com:LevitateOS/recstrap.git
