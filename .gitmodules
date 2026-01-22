@@ -29,3 +29,6 @@
 [submodule "recstrap"]
 	path = recstrap
 	url = git@github.com:LevitateOS/recstrap.git
+[submodule "rootfs-tests"]
+	path = rootfs-tests
+	url = git@github.com:LevitateOS/rootfs-test.git
