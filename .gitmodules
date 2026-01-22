@@ -32,3 +32,6 @@
 [submodule "rootfs-tests"]
 	path = rootfs-tests
 	url = git@github.com:LevitateOS/rootfs-test.git
+[submodule "cheat-test"]
+	path = cheat-test
+	url = https://github.com/LevitateOS/cheat-test.git
