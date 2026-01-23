@@ -2,12 +2,38 @@
 
 **A daily driver Linux distribution competing with Arch Linux.**
 
-Built with Rust, combining Arch's philosophy (minimal base, user builds up) with pre-built binaries from Fedora/Rocky (builds in minutes, not hours).
+## Status
+
+| Metric | Value |
+|--------|-------|
+| Stage | Alpha |
+| Target | x86_64 Linux (Haswell 2013+) |
+| Last verified | 2026-01-23 |
+
+### Works
+
+- ISO boots in QEMU (UEFI + BIOS)
+- Live environment with full hardware support
+- Installation via recstrap/recfstab/recchroot
+- recipe package manager with Rhai scripts
+
+### Incomplete / Stubbed
+
+- AI installer TUI (llm-toolkit exists, integration pending)
+- Desktop environment recipes (Sway stack documented, not packaged)
+
+### Known Issues
+
+- See [GitHub Issues](https://github.com/LevitateOS/LevitateOS/issues)
+
+---
+
+Built with Rust, combining Arch's philosophy (base system, user builds up) with pre-built binaries from Fedora/Rocky (builds in minutes, not hours).
 
 | | Arch Linux | LevitateOS |
 |---|------------|------------|
 | Target | Power users | Power users |
-| Philosophy | Minimal, DIY | Minimal, DIY |
+| Philosophy | Base system, DIY | Base system, DIY |
 | Package manager | pacman + AUR | recipe (Rhai) |
 | Build time | Hours | Minutes |
 | Base size | ~1.5 GB | ~500 MB |
@@ -20,7 +46,7 @@ Borrowed from archiso - the tool that builds Arch Linux ISOs:
 
 - **Profile-based configuration**: `profile/packages.txt` + `profile/airootfs/` overlay
 - **Declarative package lists**: Just list package names, leviso handles the rest
-- **SquashFS compression**: xz + BCJ filter for minimal ISO size
+- **SquashFS compression**: xz + BCJ filter for small ISO size
 - **Hybrid boot**: BIOS + UEFI support via xorriso
 - **dracut + dmsquash-live**: Standard Linux live boot infrastructure
 
@@ -28,7 +54,7 @@ Borrowed from archiso - the tool that builds Arch Linux ISOs:
 
 No compilation required - builds in minutes, not hours:
 
-- **Extract RPMs directly** from Rocky Linux 10 minimal ISO
+- **Extract RPMs directly** from Rocky Linux 10 ISO
 - **Enterprise-grade packages** with security patches and stability
 - **glibc-based**: Rocky's packages, not musl
 - **`rpm --root`** for clean installation into any target directory
@@ -145,6 +171,14 @@ The LLM requires GPU acceleration or sufficient RAM:
 - **Rocky Linux components**: Various open source licenses
 
 See [LICENSE](LICENSE) for details.
+
+## Author
+
+<!-- HUMAN WRITTEN - DO NOT MODIFY -->
+
+[Waiting for human input]
+
+<!-- END HUMAN WRITTEN -->
 
 ## Credits
 
