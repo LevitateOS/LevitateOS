@@ -1,0 +1,23 @@
+[workspace]
+resolver = "2"
+members = [
+    "distro-spec",
+    "leviso",
+    "leviso-deps",
+    "leviso-elf",
+    "tools/recipe",
+    "tools/recstrap",
+    "tools/recfstab",
+    "tools/recchroot",
+    "testing/cheat-guard",
+    "testing/cheat-test",
+    "testing/install-tests",
+    "testing/rootfs-tests",
+]
+
+[workspace.package]
+edition = "2021"
+
+[workspace.dependencies]
+anyhow = "1.0"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "fs", "time", "process"] }
