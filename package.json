@@ -10,6 +10,8 @@
     "check": "turbo check"
   },
   "devDependencies": {
+    "@biomejs/biome": "2.3.11",
+    "oxlint": "1.39.0",
     "turbo": "^2.5.4"
   },
   "packageManager": "bun@1.2.17"

@@ -141,6 +141,29 @@ git status --ignored  # Check for valuable gitignored files
 ```
 ASK before deleting. Gitignored ≠ worthless.
 
+### 9. LLM is a TOOL, not the IDENTITY
+
+**The target audience (Linux power users) has a ~50% chance of visceral anti-AI sentiment.**
+
+Some people in the Linux community will ruthlessly destroy reputations based on the mere mention of "AI" or "LLM" - regardless of how the technology is actually used. They don't care about nuance. They see "AI" and attack.
+
+**Therefore, in ALL marketing and communication:**
+
+The story is:
+1. **YOU** are your own package maintainer
+2. **YOU** control your packages directly - no upstream dependency
+3. Oh, and there's a local LLM that can help (if you want it)
+
+**NOT:**
+1. An LLM writes packages for you
+2. AI-powered package management
+3. "Smart" anything
+
+**WRONG:** "A local LLM writes package recipes for you"
+**RIGHT:** "You write your own package recipes. A local LLM is available to help with maintenance."
+
+The LLM is a tool in the toolbox, like `grep` or `sed`. It's not the product. It's not the identity. It's not mentioned first. User autonomy and control come first, always.
+
 ---
 
 ## Commands
@@ -150,8 +173,7 @@ cd leviso
 cargo run -- build      # Full build
 cargo run -- initramfs  # Rebuild initramfs only
 cargo run -- iso        # Rebuild ISO only
-cargo run -- test       # Claude: quick debug (terminal)
-cargo run -- run        # User: full test (QEMU GUI, UEFI)
+cargo run -- run        # Boot ISO in QEMU GUI (UEFI)
 ```
 
 ## Architecture
