@@ -1,0 +1,215 @@
+name: CI
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+    branches: [master, main]
+
+env:
+  CARGO_TERM_COLOR: always
+  # Build rec* tools in release mode for ISO
+  REC_BUILD_RELEASE: "1"
+
+jobs:
+  # ===========================================================================
+  # Stage 1: Build all components
+  # ===========================================================================
+  build:
+    name: Build ISO
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Rust
+        uses: dtolnay/rust-action@stable
+
+      - name: Install host dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            squashfs-tools \
+            xorriso \
+            mtools \
+            dosfstools \
+            qemu-system-x86 \
+            qemu-utils \
+            ovmf
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-registry-
+
+      # Rocky ISO is 8.6GB - use a separate cache with longer TTL
+      # GitHub Actions cache limit is 10GB per repo, so this is tight
+      - name: Cache Rocky ISO
+        uses: actions/cache@v4
+        with:
+          path: leviso/downloads/Rocky-10.1-x86_64-dvd1.iso
+          key: rocky-iso-10.1-x86_64
+          restore-keys: |
+            rocky-iso-
+
+      - name: Cache Linux source
+        uses: actions/cache@v4
+        with:
+          path: leviso/downloads/linux
+          key: linux-source-${{ hashFiles('leviso/kconfig') }}
+
+      - name: Build recipe (package manager)
+        working-directory: recipe
+        run: cargo build --release
+
+      - name: Build leviso
+        working-directory: leviso
+        run: cargo build --release
+
+      - name: Build ISO
+        working-directory: leviso
+        env:
+          RECIPE_BINARY: ${{ github.workspace }}/recipe/target/release/recipe
+        run: cargo run --release -- build
+
+      - name: Upload ISO artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: levitateos-iso
+          path: leviso/output/levitateos.iso
+          retention-days: 7
+
+      - name: Upload squashfs artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: levitateos-squashfs
+          path: leviso/output/filesystem.squashfs
+          retention-days: 7
+
+  # ===========================================================================
+  # Stage 2: Test installation (boots ISO, installs to disk)
+  # ===========================================================================
+  install-tests:
+    name: Installation Tests
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Rust
+        uses: dtolnay/rust-action@stable
+
+      - name: Install QEMU
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y qemu-system-x86 qemu-utils ovmf
+
+      - name: Download ISO artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: levitateos-iso
+          path: leviso/output/
+
+      - name: Build install-tests
+        working-directory: install-tests
+        run: cargo build --release
+
+      - name: Run installation tests
+        working-directory: install-tests
+        run: cargo run --release -- run
+        timeout-minutes: 30
+
+  # ===========================================================================
+  # Stage 3: Test rootfs (uses systemd-nspawn to test the system)
+  # ===========================================================================
+  rootfs-tests:
+    name: Rootfs Tests
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Rust
+        uses: dtolnay/rust-action@stable
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y systemd-container squashfs-tools
+
+      - name: Download squashfs artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: levitateos-squashfs
+          path: leviso/output/
+
+      - name: Extract squashfs for testing
+        run: |
+          sudo unsquashfs -d /var/lib/machines/levitate-test leviso/output/filesystem.squashfs
+
+      - name: Build rootfs-tests
+        working-directory: rootfs-tests
+        run: cargo build --release
+
+      - name: Run rootfs tests
+        working-directory: rootfs-tests
+        run: sudo cargo run --release -- run --rootfs /var/lib/machines/levitate-test
+        timeout-minutes: 15
+
+  # ===========================================================================
+  # Lint and check all crates
+  # ===========================================================================
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Rust
+        uses: dtolnay/rust-action@stable
+        with:
+          components: clippy, rustfmt
+
+      - name: Unit tests - leviso
+        working-directory: leviso
+        run: cargo test --lib --verbose
+
+      - name: Clippy - leviso
+        working-directory: leviso
+        run: cargo clippy -- -D warnings
+
+      - name: Clippy - recipe
+        working-directory: recipe
+        run: cargo clippy -- -D warnings
+
+      - name: Clippy - install-tests
+        working-directory: install-tests
+        run: cargo clippy -- -D warnings
+
+      - name: Clippy - rootfs-tests
+        working-directory: rootfs-tests
+        run: cargo clippy -- -D warnings
+
+      - name: Clippy - recstrap
+        working-directory: recstrap
+        run: cargo clippy -- -D warnings
+
+      - name: Clippy - recfstab
+        working-directory: recfstab
+        run: cargo clippy -- -D warnings
+
+      - name: Clippy - recchroot
+        working-directory: recchroot
+        run: cargo clippy -- -D warnings
