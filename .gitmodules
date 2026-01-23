@@ -50,3 +50,9 @@
 [submodule "leviso-elf"]
 	path = leviso-elf
 	url = git@github.com:LevitateOS/leviso-elf.git
+[submodule "AcornOS"]
+	path = AcornOS
+	url = git@github.com:LevitateOS/AcornOS.git
+[submodule "testing/hardware-compat"]
+	path = testing/hardware-compat
+	url = git@github.com:LevitateOS/hardware-compat.git

@@ -65,7 +65,7 @@ jobs:
           key: linux-source-${{ hashFiles('leviso/kconfig') }}
 
       - name: Build recipe (package manager)
-        working-directory: recipe
+        working-directory: tools/recipe
         run: cargo build --release
 
       - name: Build leviso
@@ -75,7 +75,7 @@ jobs:
       - name: Build ISO
         working-directory: leviso
         env:
-          RECIPE_BINARY: ${{ github.workspace }}/recipe/target/release/recipe
+          RECIPE_BINARY: ${{ github.workspace }}/tools/recipe/target/release/recipe
         run: cargo run --release -- build
 
       - name: Upload ISO artifact
@@ -119,11 +119,11 @@ jobs:
           path: leviso/output/
 
       - name: Build install-tests
-        working-directory: install-tests
+        working-directory: testing/install-tests
         run: cargo build --release
 
       - name: Run installation tests
-        working-directory: install-tests
+        working-directory: testing/install-tests
         run: cargo run --release -- run
         timeout-minutes: 30
 
@@ -158,11 +158,11 @@ jobs:
           sudo unsquashfs -d /var/lib/machines/levitate-test leviso/output/filesystem.squashfs
 
       - name: Build rootfs-tests
-        working-directory: rootfs-tests
+        working-directory: testing/rootfs-tests
         run: cargo build --release
 
       - name: Run rootfs tests
-        working-directory: rootfs-tests
+        working-directory: testing/rootfs-tests
         run: sudo cargo run --release -- run --rootfs /var/lib/machines/levitate-test
         timeout-minutes: 15
 
@@ -191,25 +191,29 @@ jobs:
         run: cargo clippy -- -D warnings
 
       - name: Clippy - recipe
-        working-directory: recipe
+        working-directory: tools/recipe
         run: cargo clippy -- -D warnings
 
       - name: Clippy - install-tests
-        working-directory: install-tests
+        working-directory: testing/install-tests
         run: cargo clippy -- -D warnings
 
       - name: Clippy - rootfs-tests
-        working-directory: rootfs-tests
+        working-directory: testing/rootfs-tests
+        run: cargo clippy -- -D warnings
+
+      - name: Clippy - hardware-compat
+        working-directory: testing/hardware-compat
         run: cargo clippy -- -D warnings
 
       - name: Clippy - recstrap
-        working-directory: recstrap
+        working-directory: tools/recstrap
         run: cargo clippy -- -D warnings
 
       - name: Clippy - recfstab
-        working-directory: recfstab
+        working-directory: tools/recfstab
         run: cargo clippy -- -D warnings
 
       - name: Clippy - recchroot
-        working-directory: recchroot
+        working-directory: tools/recchroot
         run: cargo clippy -- -D warnings

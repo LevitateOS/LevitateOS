@@ -12,6 +12,7 @@ members = [
     "testing/cheat-guard",
     "testing/cheat-test",
     "testing/install-tests",
+    "testing/hardware-compat",
     "testing/rootfs-tests",
 ]
 
