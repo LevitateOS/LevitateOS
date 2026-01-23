@@ -1,211 +1,159 @@
 # LevitateOS
 
-**A daily driver Linux distribution competing with Arch Linux.**
+Linux distribution that extracts Rocky Linux packages into a custom ISO. Manual installation like Arch.
 
 ## Status
 
-| Metric | Value |
-|--------|-------|
-| Stage | Alpha |
-| Target | x86_64 Linux (Haswell 2013+) |
-| Last verified | 2026-01-23 |
+**Alpha. Not for production use.**
 
-### Works
+| Works | Doesn't work yet |
+|-------|------------------|
+| ISO boots in QEMU (UEFI + BIOS) | Bare metal testing incomplete |
+| Live environment reaches shell | AI installer not integrated |
+| `recstrap` extracts system to /mnt | Desktop environment not packaged |
+| `recipe install` runs Rhai scripts | No binary package repository |
 
-- ISO boots in QEMU (UEFI + BIOS)
-- Live environment with full hardware support
-- Installation via recstrap/recfstab/recchroot
-- recipe package manager with Rhai scripts
+Tested on: QEMU 8.x with OVMF, 4GB RAM, virtio disk.
 
-### Incomplete / Stubbed
+## What This Is
 
-- AI installer TUI (llm-toolkit exists, integration pending)
-- Desktop environment recipes (Sway stack documented, not packaged)
+An ISO builder (`leviso`) that:
+1. Downloads Rocky Linux 10 ISO
+2. Extracts packages via `rpm --root`
+3. Builds squashfs + initramfs
+4. Packages hybrid UEFI/BIOS ISO
 
-### Known Issues
+A package manager (`recipe`) where:
+- Recipes are Rhai scripts, not YAML/JSON
+- State is written back to recipe files (no database)
+- You write/maintain your own recipes
 
-- See [GitHub Issues](https://github.com/LevitateOS/LevitateOS/issues)
+Installation tools (`recstrap`, `recfstab`, `recchroot`) that:
+- Extract squashfs to a mount point
+- Generate fstab from mounted filesystems
+- Set up chroot with bind mounts
 
----
+## What This Isn't
 
-Built with Rust, combining Arch's philosophy (base system, user builds up) with pre-built binaries from Fedora/Rocky (builds in minutes, not hours).
-
-| | Arch Linux | LevitateOS |
-|---|------------|------------|
-| Target | Power users | Power users |
-| Philosophy | Base system, DIY | Base system, DIY |
-| Package manager | pacman + AUR | recipe (Rhai) |
-| Build time | Hours | Minutes |
-| Base size | ~1.5 GB | ~500 MB |
-
-## Core Principles
-
-### 1. Arch-like ISO Builder (leviso)
-
-Borrowed from archiso - the tool that builds Arch Linux ISOs:
-
-- **Profile-based configuration**: `profile/packages.txt` + `profile/airootfs/` overlay
-- **Declarative package lists**: Just list package names, leviso handles the rest
-- **SquashFS compression**: xz + BCJ filter for small ISO size
-- **Hybrid boot**: BIOS + UEFI support via xorriso
-- **dracut + dmsquash-live**: Standard Linux live boot infrastructure
-
-### 2. Rocky Linux 10 Prebuilt Binaries
-
-No compilation required - builds in minutes, not hours:
-
-- **Extract RPMs directly** from Rocky Linux 10 ISO
-- **Enterprise-grade packages** with security patches and stability
-- **glibc-based**: Rocky's packages, not musl
-- **`rpm --root`** for clean installation into any target directory
-
-### 3. Rhai-Scripted Recipe Package Manager
-
-Executable code, not static configuration:
-
-```rhai
-// recipes/ripgrep.rhai
-let pkg = #{
-    name: "ripgrep",
-    version: "14.1.0",
-};
-
-fn install() {
-    let url = `https://github.com/BurntSushi/ripgrep/releases/download/${pkg.version}/ripgrep-${pkg.version}-x86_64-unknown-linux-musl.tar.gz`;
-    download(url);
-    extract("tar.gz");
-    install_bin("rg");
-}
-```
-
-- **State lives in recipe files**: No external database - the engine writes `installed = true` back
-- **Supports variables, conditionals, loops**: Real programming, not limited DSL
-- **Self-sufficient**: No apt/dnf/pacman dependency
-- **Helpers**: `rpm_install()`, `install_bin()`, `install_lib()`, `install_man()`
-
-## Three-Layer Architecture
-
-```
-ISO Builder → Live Environment → Installed System
-```
-
-1. **leviso** creates bootable ISO from Rocky packages
-2. **Live environment** boots with recipe binary and tools
-3. **`recipe bootstrap /mnt`** installs base system (like Arch's pacstrap)
-4. **`recipe install`** adds packages post-install
-
-## AI-Powered Installer
-
-- **SmolLM3-3B** runs locally - no internet required
-- Natural language commands: "use the whole 500gb drive", "create user vince with sudo"
-- Multi-turn conversation context understands "it", "that one", "yes"
-- TUI chat interface built with Ratatui
+- **Not a fork of Arch** - Uses Rocky packages, not Arch repos
+- **Not production-ready** - Alpha software with incomplete testing
+- **Not automated** - Manual partitioning, no guided installer (yet)
+- **Not a package repository** - You maintain your own recipes
+- **Not portable** - x86_64 only, requires Haswell (2013) or newer
 
 ## Quick Start
 
 ```bash
 cd leviso
-
-# Build the ISO
-cargo run -- build
-
-# Boot in QEMU (UEFI, GUI)
-cargo run -- run
-
-# Quick debug (serial console)
-cargo run -- test
+cargo run -- build    # Downloads ~2GB, takes 5-10 min
+cargo run -- run      # Boots in QEMU with GUI
 ```
 
-## Development
+Requirements: Rust 1.75+, 20GB disk, QEMU with OVMF.
+
+## Project Structure
+
+```
+leviso/           # ISO builder (Rust)
+tools/recipe/     # Package manager (Rust + Rhai)
+tools/recstrap/   # System extractor
+tools/recfstab/   # fstab generator
+tools/recchroot/  # chroot helper
+testing/          # E2E test suites
+llm-toolkit/      # LoRA training scripts (not integrated)
+```
+
+## Installation (Manual)
+
+From the live ISO:
 
 ```bash
-cd leviso
+# Partition (GPT + EFI)
+fdisk /dev/vda
 
-cargo run -- build      # Full build
-cargo run -- initramfs  # Rebuild initramfs only
-cargo run -- iso        # Rebuild ISO only
-cargo run -- test       # Quick debug (serial console)
-cargo run -- run        # Full test (QEMU GUI, UEFI)
+# Format
+mkfs.fat -F32 /dev/vda1
+mkfs.ext4 /dev/vda2
+
+# Mount
+mount /dev/vda2 /mnt
+mkdir -p /mnt/boot
+mount /dev/vda1 /mnt/boot
+
+# Extract system
+recstrap /mnt
+
+# Configure
+recfstab /mnt >> /mnt/etc/fstab
+recchroot /mnt
+passwd
+bootctl install
+exit
+
+# Reboot
+reboot
 ```
 
-## Structure
+No automation. You partition, format, mount, configure manually.
 
+## Recipe Example
+
+```rhai
+let name = "ripgrep";
+let version = "14.1.0";
+let installed = false;
+
+fn acquire() {
+    download(`https://github.com/BurntSushi/ripgrep/releases/download/${version}/ripgrep-${version}-x86_64-unknown-linux-musl.tar.gz`);
+}
+
+fn install() {
+    extract("tar.gz");
+    install_bin(`ripgrep-${version}-x86_64-unknown-linux-musl/rg`);
+}
 ```
-leviso/           # ISO builder (kernel, initramfs, squashfs, ISO packaging)
-recipe/           # Rhai-based package manager
-recstrap/         # System installer (like archinstall for Arch)
-install-tests/    # E2E installation test runner
-distro-spec/      # Distribution specification (constants, paths, defaults)
 
-vendor/           # Reference implementations (systemd, util-linux, brush, uutils)
-docs/             # Design docs
-website/          # Documentation website (Astro)
-.teams/           # Work history
+After `recipe install ripgrep`, the engine writes `installed = true` back to the file.
+
+## Hardware Requirements
+
+| Resource | Minimum |
+|----------|---------|
+| CPU | x86_64-v3 (Haswell 2013+) |
+| RAM | 8 GB |
+| Disk | 64 GB |
+| Boot | UEFI recommended |
+
+QEMU testing uses 4GB RAM. Bare metal needs more.
+
+## Known Limitations
+
+- No automated installer - manual partitioning required
+- No package repository - you write recipes locally
+- Limited hardware testing - mostly QEMU
+- AI installer exists in `llm-toolkit/` but isn't integrated
+- Desktop environment (Sway) documented but not packaged
+
+## Building from Source
+
+```bash
+# ISO builder
+cd leviso && cargo build --release
+
+# Package manager
+cd tools/recipe && cargo build --release
+
+# Installation tools
+cd tools/recstrap && cargo build --release
+cd tools/recfstab && cargo build --release
+cd tools/recchroot && cargo build --release
 ```
-
-## Requirements
-
-### System
-
-- x86_64 architecture
-- 20GB disk minimum
-- UEFI recommended
-
-### AI Installer (SmolLM3-3B)
-
-The LLM requires GPU acceleration or sufficient RAM:
-
-| Hardware | VRAM/RAM | Notes |
-|----------|----------|-------|
-| **NVIDIA GPU** | 6GB+ VRAM | CUDA, best compatibility |
-| **NVIDIA GPU (4-bit)** | 2GB+ VRAM | With bitsandbytes quantization |
-| **AMD GPU** | 6GB+ VRAM | ROCm 5.6+, RX 6000/7000 series |
-| **Intel Arc** | 6GB+ VRAM | Via IPEX-LLM |
-| **Apple Silicon** | 8GB+ unified | Metal/MPS acceleration |
-| **CPU only** | 8GB+ RAM | Slow, fallback option |
 
 ## License
 
-- **LevitateOS code**: MIT
-- **SmolLM3 model**: Apache-2.0
-- **Rocky Linux components**: Various open source licenses
+MIT (LevitateOS code), various open source (Rocky Linux packages).
 
-See [LICENSE](LICENSE) for details.
+## Links
 
-## Author
-
-<!-- HUMAN WRITTEN - DO NOT MODIFY -->
-
-[Waiting for human input]
-
-<!-- END HUMAN WRITTEN -->
-
-## Credits
-
-**Core Technologies**
-
-- [SmolLM3](https://huggingface.co/HuggingFaceTB/SmolLM3-3B) - 3B parameter LLM by Hugging Face
-- [Rocky Linux](https://rockylinux.org) - Enterprise Linux base packages
-- [Arch Linux](https://archlinux.org) - Build system inspiration (archiso)
-- [Rust](https://www.rust-lang.org) - Systems programming language
-- [Rhai](https://rhai.rs) - Embedded scripting language for recipes
-
-**Rust Crates**
-
-- [Ratatui](https://ratatui.rs) - TUI framework for the installer
-- [Clap](https://clap.rs) - CLI argument parsing
-
-**Desktop Stack**
-
-- [Sway](https://swaywm.org) - Wayland compositor
-- [wlroots](https://gitlab.freedesktop.org/wlroots/wlroots) - Wayland compositor library
-- [foot](https://codeberg.org/dnkl/foot) - Terminal emulator
-- [waybar](https://github.com/Alexays/Waybar) - Status bar
-- [wofi](https://hg.sr.ht/~scoopta/wofi) - Application launcher
-- [mako](https://github.com/emersion/mako) - Notification daemon
-
-**AI/ML**
-
-- [PyTorch](https://pytorch.org) - ML framework
-- [Transformers](https://huggingface.co/transformers) - Model inference
-- [PEFT](https://github.com/huggingface/peft) - LoRA fine-tuning
+- [Rocky Linux](https://rockylinux.org) - Package source
+- [Rhai](https://rhai.rs) - Recipe scripting language
