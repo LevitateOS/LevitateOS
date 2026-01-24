@@ -2,7 +2,9 @@
 resolver = "2"
 members = [
     "distro-spec",
+    "distro-builder",
     "leviso",
+    "AcornOS",
     "leviso-deps",
     "leviso-elf",
     "tools/recipe",
