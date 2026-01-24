@@ -8,7 +8,7 @@ on:
         default: '.'
         type: string
       create-binary-artifact:
-        description: 'Create tar.gz binary artifact'
+        description: 'Create tar.gz binary artifact (for binaries)'
         required: false
         default: false
         type: boolean
@@ -17,9 +17,14 @@ on:
         required: false
         default: ''
         type: string
+      publish-to-crates-io:
+        description: 'Publish to crates.io (for libraries only)'
+        required: false
+        default: false
+        type: boolean
     secrets:
       CARGO_REGISTRY_TOKEN:
-        required: true
+        required: false
 
 jobs:
   release:
@@ -97,4 +102,5 @@ jobs:
           files: ${{ inputs.create-binary-artifact && format('{0}-x86_64-linux.tar.gz', inputs.binary-name) || '' }}
 
       - name: Publish to crates.io
+        if: inputs.publish-to-crates-io
         run: cargo publish --token ${{ secrets.CARGO_REGISTRY_TOKEN }}
