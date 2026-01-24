@@ -1,0 +1,65 @@
+name: Detect Code Changes
+
+on:
+  workflow_call:
+    inputs:
+      type:
+        description: 'Project type: rust, python, or bun'
+        required: true
+        type: string
+    outputs:
+      has_changes:
+        description: 'Whether code changes were detected'
+        value: ${{ jobs.detect.outputs.has_changes }}
+
+jobs:
+  detect:
+    runs-on: ubuntu-latest
+    outputs:
+      has_changes: ${{ steps.rust.outputs.code || steps.python.outputs.code || steps.bun.outputs.code }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Detect Rust changes
+        if: inputs.type == 'rust'
+        uses: dorny/paths-filter@v3
+        id: rust
+        with:
+          base: ${{ github.ref }}
+          filters: |
+            code:
+              - '**/*.rs'
+              - '**/Cargo.toml'
+              - '**/Cargo.lock'
+              - '.github/workflows/**'
+
+      - name: Detect Python changes
+        if: inputs.type == 'python'
+        uses: dorny/paths-filter@v3
+        id: python
+        with:
+          base: ${{ github.ref }}
+          filters: |
+            code:
+              - '**/*.py'
+              - 'requirements.txt'
+              - 'pyproject.toml'
+              - 'setup.py'
+              - '.github/workflows/**'
+
+      - name: Detect Bun/TypeScript changes
+        if: inputs.type == 'bun'
+        uses: dorny/paths-filter@v3
+        id: bun
+        with:
+          base: ${{ github.ref }}
+          filters: |
+            code:
+              - '**/*.ts'
+              - '**/*.tsx'
+              - '**/*.js'
+              - '**/*.jsx'
+              - '**/*.astro'
+              - 'package.json'
+              - 'bun.lockb'
+              - '.github/workflows/**'

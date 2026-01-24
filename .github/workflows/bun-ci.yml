@@ -1,0 +1,52 @@
+name: Bun CI
+
+on:
+  workflow_call:
+    inputs:
+      working-directory:
+        description: 'Working directory'
+        required: false
+        default: '.'
+        type: string
+      run-build:
+        description: 'Run bun run build'
+        required: false
+        default: false
+        type: boolean
+      upload-dist:
+        description: 'Upload dist/ as artifact'
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ${{ inputs.working-directory }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Type check
+        run: bun run typecheck
+
+      - name: Build
+        if: inputs.run-build
+        run: bun run build
+
+      - name: Upload build artifact
+        if: inputs.upload-dist
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: ${{ inputs.working-directory }}/dist/
+          retention-days: 7

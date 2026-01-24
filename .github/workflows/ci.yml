@@ -13,10 +13,20 @@ env:
 
 jobs:
   # ===========================================================================
+  # Stage 0: Detect changes (skip expensive jobs for docs-only commits)
+  # ===========================================================================
+  changes:
+    uses: ./.github/workflows/detect-changes.yml
+    with:
+      type: rust
+
+  # ===========================================================================
   # Stage 1: Build all components
   # ===========================================================================
   build:
     name: Build ISO
+    needs: changes
+    if: needs.changes.outputs.has_changes == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -24,7 +34,7 @@ jobs:
           submodules: recursive
 
       - name: Install Rust
-        uses: dtolnay/rust-action@stable
+        uses: dtolnay/rust-toolchain@stable
 
       - name: Install host dependencies
         run: |
@@ -97,7 +107,8 @@ jobs:
   # ===========================================================================
   install-tests:
     name: Installation Tests
-    needs: build
+    needs: [changes, build]
+    if: needs.changes.outputs.has_changes == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -105,7 +116,7 @@ jobs:
           submodules: recursive
 
       - name: Install Rust
-        uses: dtolnay/rust-action@stable
+        uses: dtolnay/rust-toolchain@stable
 
       - name: Install QEMU
         run: |
@@ -132,7 +143,8 @@ jobs:
   # ===========================================================================
   rootfs-tests:
     name: Rootfs Tests
-    needs: build
+    needs: [changes, build]
+    if: needs.changes.outputs.has_changes == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -140,7 +152,7 @@ jobs:
           submodules: recursive
 
       - name: Install Rust
-        uses: dtolnay/rust-action@stable
+        uses: dtolnay/rust-toolchain@stable
 
       - name: Install dependencies
         run: |
@@ -171,6 +183,8 @@ jobs:
   # ===========================================================================
   lint:
     name: Lint
+    needs: changes
+    if: needs.changes.outputs.has_changes == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -178,7 +192,7 @@ jobs:
           submodules: recursive
 
       - name: Install Rust
-        uses: dtolnay/rust-action@stable
+        uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy, rustfmt
 
