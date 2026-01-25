@@ -122,15 +122,15 @@ After `recipe install ripgrep`, the engine writes `installed = true` back to the
 
 ## Hardware Requirements
 
-| Resource | Minimum | Recommended |
-|----------|---------|-------------|
-| CPU | Intel Haswell / AMD Zen | Recent 8+ core |
-| RAM | 8 GB | 16-32 GB |
-| Storage | 64 GB SSD | 256+ GB NVMe |
-| GPU | Integrated | Dedicated (for LLM acceleration) |
+| Resource | Minimum | Recommended (LLM-ready) |
+|----------|---------|-------------------------|
+| CPU | Intel Haswell / AMD Zen | 8+ cores with AVX2 |
+| RAM | 16 GB | 32-64 GB |
+| Storage | 512 GB NVMe | 1-2 TB NVMe |
+| GPU | Integrated (CPU inference) | NVIDIA RTX 3060+ 12GB |
 | Boot | UEFI required | Secure Boot disabled |
 
-LevitateOS targets modern desktop and workstation hardware.
+LevitateOS ships with local LLM capabilities. Recommended specs run 7B-13B models.
 
 ## Current State
 
