@@ -52,12 +52,13 @@ Complete AcornOS build pipeline to create a bootable ISO:
 - [x] Create qemu.rs
 - [x] Wire up commands in main.rs
 - [x] Compilation passes clean
-- [ ] Test: `acornos download` (requires network)
-- [ ] Test: `acornos extract` (requires downloaded ISO)
-- [ ] Test: `acornos build squashfs`
-- [ ] Test: `acornos initramfs`
-- [ ] Test: `acornos iso`
-- [ ] Test: `acornos run`
+- [x] Test: `acornos download` (requires network)
+- [x] Test: `acornos extract` (packages installed, chroot warning non-critical)
+- [x] Test: `acornos build squashfs` (677 MB)
+- [x] Test: `acornos initramfs` (1.1 MB)
+- [x] Test: `acornos iso` (708 MB)
+- [x] Test: `acornos run` (QEMU launches, GRUB menu displays)
+- [x] Add: `acornos test` (automated boot verification)
 
 ## Usage
 
@@ -69,10 +70,42 @@ cargo run -- extract          # Extract ISO, create rootfs
 cargo run -- build squashfs   # Create filesystem.squashfs
 cargo run -- initramfs        # Create initramfs
 cargo run -- iso              # Create bootable ISO
-cargo run -- run              # Boot in QEMU
+cargo run -- run              # Boot in QEMU (GUI)
+cargo run -- test             # Boot in QEMU (headless, verify login prompt)
 ```
 
 Or do a full build:
 ```bash
 cargo run -- build  # Does squashfs + initramfs + iso
 ```
+
+## Automated Testing
+
+`acornos test` boots the ISO headless via serial console and watches for:
+
+**Success patterns** (test passes if any match):
+- `login:` - Getty prompt reached
+- `Welcome to Alpine Linux`
+- `openrc-init`
+
+**Failure patterns** (test fails immediately):
+- `Kernel panic`
+- `VFS: Cannot open root device`
+- `SQUASHFS error`
+- etc.
+
+**Stall detection**: Fails if no output for 30s (system hung).
+
+### Shared Testing Infrastructure
+
+The `testing/install-tests/` crate provides the same pattern-based boot verification
+for LevitateOS. Both distros use:
+
+| Component | Location | Purpose |
+|-----------|----------|---------|
+| Serial console | QEMU `-nographic -serial mon:stdio` | Capture boot output |
+| Pattern matching | Success/failure pattern lists | Detect boot result |
+| Stall detection | No output timeout | Catch hung boots |
+| Stage tracking | UEFI→kernel→init | Better error context |
+
+Future: The pattern matching could be extracted to `distro-builder/` and shared.
