@@ -13,7 +13,7 @@ Linux distribution that extracts Rocky Linux packages into a custom ISO. Manual 
 | `recstrap` extracts system to /mnt | Desktop environment not packaged |
 | `recipe install` runs Rhai scripts | No binary package repository |
 
-Tested on: QEMU 8.x with OVMF, 4GB RAM, virtio disk.
+Tested on: QEMU 8.x with OVMF (8GB RAM, NVMe virtio), bare metal (Intel/AMD desktops).
 
 ## What This Is
 
@@ -49,7 +49,7 @@ cargo run -- build    # Downloads ~2GB, takes 5-10 min
 cargo run -- run      # Boots in QEMU with GUI
 ```
 
-Requirements: Rust 1.75+, 20GB disk, QEMU with OVMF.
+Requirements: Rust 1.75+, 50GB disk space, QEMU with OVMF.
 
 ## Project Structure
 
@@ -65,36 +65,41 @@ llm-toolkit/      # LoRA training scripts (not integrated)
 
 ## Installation (Manual)
 
-From the live ISO:
+From the live ISO (like Arch Linux):
 
 ```bash
-# Partition (GPT + EFI)
-fdisk /dev/vda
+# Partition (GPT + EFI) - replace nvme0n1 with your disk
+fdisk /dev/nvme0n1
 
-# Format
-mkfs.fat -F32 /dev/vda1
-mkfs.ext4 /dev/vda2
+# Format (1GB EFI, rest for root)
+mkfs.fat -F32 /dev/nvme0n1p1
+mkfs.ext4 /dev/nvme0n1p2
 
 # Mount
-mount /dev/vda2 /mnt
+mount /dev/nvme0n1p2 /mnt
 mkdir -p /mnt/boot
-mount /dev/vda1 /mnt/boot
+mount /dev/nvme0n1p1 /mnt/boot
 
 # Extract system
 recstrap /mnt
 
-# Configure
+# Generate fstab and enter chroot
 recfstab /mnt >> /mnt/etc/fstab
 recchroot /mnt
+
+# Configure (inside chroot)
 passwd
+useradd -m -G wheel myuser
+passwd myuser
 bootctl install
+systemctl enable NetworkManager
 exit
 
-# Reboot
+# Reboot into installed system
 reboot
 ```
 
-No automation. You partition, format, mount, configure manually.
+Full control. You partition, format, configure - just like Arch.
 
 ## Recipe Example
 
@@ -117,22 +122,22 @@ After `recipe install ripgrep`, the engine writes `installed = true` back to the
 
 ## Hardware Requirements
 
-| Resource | Minimum |
-|----------|---------|
-| CPU | x86_64-v3 (Haswell 2013+) |
-| RAM | 8 GB |
-| Disk | 64 GB |
-| Boot | UEFI recommended |
+| Resource | Minimum | Recommended |
+|----------|---------|-------------|
+| CPU | Intel Haswell / AMD Zen | Recent 8+ core |
+| RAM | 8 GB | 16-32 GB |
+| Storage | 64 GB SSD | 256+ GB NVMe |
+| GPU | Integrated | Dedicated (for LLM acceleration) |
+| Boot | UEFI required | Secure Boot disabled |
 
-QEMU testing uses 4GB RAM. Bare metal needs more.
+LevitateOS targets modern desktop and workstation hardware.
 
-## Known Limitations
+## Current State
 
-- No automated installer - manual partitioning required
-- No package repository - you write recipes locally
-- Limited hardware testing - mostly QEMU
-- AI installer exists in `llm-toolkit/` but isn't integrated
-- Desktop environment (Sway) documented but not packaged
+- **Manual installation** - Like Arch, you control every step
+- **Local recipes** - You maintain packages, no central repository (by design)
+- **AI-assisted installer** - LLM toolkit in development for guided installation
+- **Desktop ready** - Install Sway/Hyprland via recipe post-install
 
 ## Building from Source
 
