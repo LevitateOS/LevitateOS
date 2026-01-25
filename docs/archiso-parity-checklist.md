@@ -4,7 +4,7 @@
 
 archiso is the gold standard for a "just works" live Linux environment. This checklist documents what archiso does and identifies gaps in LevitateOS.
 
-**Last verified:** 2026-01-22 (against leviso source code)
+**Last verified:** 2026-01-25 (against leviso source code)
 
 ---
 
@@ -28,8 +28,8 @@ archiso is the gold standard for a "just works" live Linux environment. This che
 | Multiple bootloader options | 3 (syslinux, systemd-boot, GRUB) | 1 (systemd-boot) | Minor |
 | Firmware workarounds for optical media | Yes (GRUB embedded config) | No | **YES** |
 | Boot device hints/fallbacks | Yes | No | Minor |
-| Intel microcode loading | Yes (auto-detect) | No | **YES** |
-| AMD microcode loading | Yes (auto-detect) | No | **YES** |
+| Intel microcode loading | Yes (auto-detect) | Yes (microcode_ctl) | No |
+| AMD microcode loading | Yes (auto-detect) | Yes (linux-firmware) | No |
 | Kernel cmdline parameters documented | Yes (`archisobasedir`, `archisosearchuuid`) | Partial | Minor |
 
 ---
@@ -43,7 +43,7 @@ archiso is the gold standard for a "just works" live Linux environment. This che
 | Pre-packaged WiFi firmware | Yes (Intel, Atheros, Realtek, Broadcom, Marvell) | Yes | No |
 | `linux-firmware` full package | Yes | Partial | Minor |
 | `linux-firmware-marvell` | Yes | No | Minor |
-| `sof-firmware` (sound) | Yes | No | **YES** |
+| `sof-firmware` (sound) | Yes | Yes (alsa-sof-firmware) | No |
 | Broadcom proprietary (`broadcom-wl`) | Yes | No | Minor |
 | Serial console support | Yes | Yes | No |
 | Accessibility (screen reader, brltty) | Yes | No | Future |
@@ -57,13 +57,13 @@ archiso is the gold standard for a "just works" live Linux environment. This che
 | NetworkManager | No (uses systemd-networkd) | Yes | Different approach |
 | systemd-networkd | Yes | Yes (in rootfs) | No |
 | systemd-resolved (DNS) | Yes | Yes | No |
-| iwd (WiFi daemon) | Yes | No | **YES** |
+| iwd (WiFi daemon) | Yes | Yes | No |
 | wpa_supplicant | Yes | Yes | No |
 | ModemManager (mobile broadband) | Yes | No | P2 |
 | Automatic DHCP on all interfaces | Yes | Yes (NetworkManager) | No |
 | Interface priority (Ethernet > WiFi > Mobile) | Yes (metrics 100/600/etc) | NM defaults | Minor |
 | Multicast DNS (mDNS) enabled | Yes | Not configured | Minor |
-| `wireless-regdb` (regulatory compliance) | Yes | No | **YES** |
+| `wireless-regdb` (regulatory compliance) | Yes | Yes | No |
 | Network-online.target sync | Yes | Not configured | Minor |
 
 ---
@@ -75,9 +75,9 @@ archiso is the gold standard for a "just works" live Linux environment. This che
 | pacman-init (keyring init) | Yes | N/A (no pacman) | N/A |
 | systemd-networkd | Yes | Yes | No |
 | systemd-resolved | Yes | Yes | No |
-| iwd | Yes | No | **YES** |
+| iwd | Yes | Yes | No |
 | ModemManager | Yes | No | P2 |
-| sshd | Yes (enabled!) | No | **YES** |
+| sshd | Yes (enabled!) | Available (not enabled) | Minor |
 | choose-mirror (from kernel param) | Yes | N/A (no mirrors yet) | N/A |
 | Accessibility services | Yes (conditional) | No | Future |
 | Audio unmuter | Yes | No | Minor |
@@ -90,8 +90,8 @@ archiso is the gold standard for a "just works" live Linux environment. This che
 |---------|---------|------------|------|
 | Autologin to root shell | Yes | Yes | No |
 | `/etc/machine-id` = "uninitialized" | Yes | Empty (similar) | No |
-| Volatile journal storage | Yes | Not configured | **YES** |
-| No suspend/hibernate in live | Yes (`do-not-suspend.conf`) | No | **YES** |
+| Volatile journal storage | Yes | Yes (live.rs) | No |
+| No suspend/hibernate in live | Yes (`do-not-suspend.conf`) | Yes (live.rs) | No |
 | tmpfs for writable overlay | Yes (overlayfs) | Yes | No |
 | Hostname set to ISO name | Yes ("archiso") | Yes ("levitateos") | No |
 | Locale configured | Yes | Partial | Minor |
@@ -103,16 +103,16 @@ archiso is the gold standard for a "just works" live Linux environment. This che
 | Tool | archiso | LevitateOS | Gap? |
 |------|---------|------------|------|
 | `pacstrap` / `recstrap` | Yes | Yes | No |
-| `genfstab` | Yes | No (manual) | **YES** |
-| `arch-chroot` | Yes | No | **YES** |
+| `genfstab` | Yes | Yes (recfstab) | No |
+| `arch-chroot` | Yes | Yes (recchroot) | No |
 | `archinstall` (guided) | Yes | No (planned) | Future |
 | `parted` | Yes | Initramfs only | Minor |
 | `gdisk` / `sgdisk` | Yes | No | **YES** |
-| `cryptsetup` (LUKS) | Yes | No | **YES** |
-| `lvm2` | Yes | No | **YES** |
+| `cryptsetup` (LUKS) | Yes | Yes | No |
+| `lvm2` | Yes | Yes | No |
 | `mdadm` (RAID) | Yes | No | P2 |
-| `btrfs-progs` | Yes | No | **YES** |
-| `xfsprogs` | Yes | No | Minor |
+| `btrfs-progs` | Yes | Yes | No |
+| `xfsprogs` | Yes | Yes (mkfs.xfs) | No |
 | `ntfs-3g` | Yes | No | Minor |
 | `exfatprogs` | Yes | No | Minor |
 
@@ -122,13 +122,13 @@ archiso is the gold standard for a "just works" live Linux environment. This che
 
 | Tool | archiso | LevitateOS | Gap? |
 |------|---------|------------|------|
-| `dmidecode` (BIOS/DMI) | Yes | No | **YES** |
-| `pciutils` (lspci) | Yes | No | **YES** |
-| `usbutils` (lsusb) | Yes | No | **YES** |
-| `nvme-cli` | Yes | No | Minor |
-| `smartmontools` | Yes | No | Minor |
-| `hdparm` | Yes | No | Minor |
-| `ethtool` | Yes | No | **YES** |
+| `dmidecode` (BIOS/DMI) | Yes | Yes | No |
+| `pciutils` (lspci) | Yes | Yes | No |
+| `usbutils` (lsusb) | Yes | Yes | No |
+| `nvme-cli` | Yes | Yes (nvme) | No |
+| `smartmontools` | Yes | Yes (smartctl) | No |
+| `hdparm` | Yes | Yes | No |
+| `ethtool` | Yes | Yes | No |
 
 ---
 
@@ -147,7 +147,7 @@ archiso is the gold standard for a "just works" live Linux environment. This che
 
 | Feature | archiso | LevitateOS | Gap? |
 |---------|---------|------------|------|
-| SSH server enabled | Yes | No | **YES** |
+| SSH server enabled | Yes | Available (not enabled) | Minor |
 | OpenVPN | Yes | No | P2 |
 | WireGuard tools | Yes (kernel built-in) | No | P2 |
 | vpnc | Yes | No | P2 |
@@ -161,30 +161,34 @@ archiso is the gold standard for a "just works" live Linux environment. This che
 
 These directly affect whether LevitateOS will boot/install on user hardware:
 
-| Gap | Why Critical |
-|-----|--------------|
-| Intel/AMD microcode loading | Without this, CPUs may have bugs/security issues |
-| `genfstab` equivalent | Users need automated fstab generation |
-| `arch-chroot` equivalent | Users need to chroot for configuration |
-| LUKS/cryptsetup | Many users expect encrypted root |
-| LVM2 | Common storage setup |
-| Btrfs support | Increasingly popular default |
+| Gap | Status |
+|-----|--------|
+| Intel/AMD microcode loading | ✅ Implemented (microcode_ctl, linux-firmware) |
+| `genfstab` equivalent | ✅ Implemented (recfstab) |
+| `arch-chroot` equivalent | ✅ Implemented (recchroot) |
+| LUKS/cryptsetup | ✅ Implemented |
+| LVM2 | ✅ Implemented |
+| Btrfs support | ✅ Implemented |
+
+**All P0 items are now implemented.**
 
 ### P1 - Important (Should Have)
 
-| Gap | Why Important |
-|-----|---------------|
-| Volatile journal storage | Prevent filling tmpfs with logs during live session |
-| do-not-suspend config | Prevent accidental sleep during installation |
-| KMS hook | Proper graphics mode switching |
-| iwd | Alternative WiFi daemon, often more reliable than wpa_supplicant |
-| wireless-regdb | Required for legal WiFi operation in many countries |
-| SSH server enabled | Essential for remote installation/rescue |
-| Hardware probing (lspci, lsusb, dmidecode) | Users need to identify hardware |
-| ethtool | NIC diagnostics |
-| gdisk/sgdisk | Better GPT tools than fdisk |
-| ISO integrity verification | Users should be able to verify downloads |
-| sof-firmware | Modern laptop sound often requires this |
+| Gap | Status |
+|-----|--------|
+| Volatile journal storage | ✅ Implemented (live.rs) |
+| do-not-suspend config | ✅ Implemented (live.rs) |
+| KMS hook | **Not implemented** (gap) |
+| iwd | ✅ Implemented |
+| wireless-regdb | ✅ Implemented |
+| SSH server enabled | Available but not auto-enabled |
+| Hardware probing (lspci, lsusb, dmidecode) | ✅ Implemented |
+| ethtool | ✅ Implemented |
+| gdisk/sgdisk | **Not implemented** (gap) |
+| ISO integrity verification | **Not implemented** (gap) |
+| sof-firmware | ✅ Implemented (alsa-sof-firmware) |
+
+**Most P1 items implemented. Remaining gaps:** KMS hook, gdisk, ISO verification.
 
 ### P2 - Nice to Have
 
@@ -197,7 +201,7 @@ These directly affect whether LevitateOS will boot/install on user hardware:
 
 ---
 
-## Verified Items (2026-01-22)
+## Verified Items (2026-01-25)
 
 All previously unknown items have been verified against the source code:
 
@@ -207,9 +211,16 @@ All previously unknown items have been verified against the source code:
 - [x] Multicast DNS (mDNS) - **NOT configured** (minor)
 - [x] Network-online.target sync - **NOT explicitly configured** (minor)
 - [x] `/etc/machine-id` - **Empty string** (functionally similar to archiso's "uninitialized")
-- [x] Volatile journal storage - **NOT configured** (gap)
-- [x] No suspend/hibernate - **NOT configured** (gap)
+- [x] Volatile journal storage - **Configured** (live.rs)
+- [x] No suspend/hibernate - **Configured** (live.rs)
 - [x] Hostname - **"levitateos"** (present, different name is fine)
+- [x] Intel/AMD microcode - **Implemented** (microcode_ctl, linux-firmware)
+- [x] iwd - **Implemented**
+- [x] wireless-regdb - **Implemented**
+- [x] sof-firmware - **Implemented** (alsa-sof-firmware)
+- [x] cryptsetup, lvm2, btrfs-progs - **Implemented**
+- [x] recfstab, recchroot - **Implemented**
+- [x] Hardware probing tools - **Implemented** (dmidecode, pciutils, usbutils, nvme-cli, smartmontools, hdparm, ethtool)
 
 ---
 
