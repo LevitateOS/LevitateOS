@@ -166,3 +166,68 @@ The initramfs.rs now only contains:
 - `build_install_initramfs(base_dir)` - configures InstallConfig, calls recinit
 - `find_kernel_modules_dir(base_dir)` - leviso-specific module path logic
 - `find_kernel_version(modules_dir)` - helper for kernel version detection
+
+---
+
+## Bug Fixing Status (2026-01-27 continued)
+
+### Current Issue: udevd Not Starting in Initramfs
+
+**Root Cause:** The udev socket files (`systemd-udevd-control.socket`, `systemd-udevd-kernel.socket`) have `ConditionPathIsReadWrite=/sys` which fails in early initramfs boot, preventing udevd from starting and creating `/dev/disk/by-uuid/` symlinks.
+
+**Fix Applied:** Added `patch_udev_sockets()` function in `tools/recinit/src/systemd.rs` that removes the condition after copying socket files.
+
+**Test Cycle:** Currently running full E2E test (rebuild ISO → run install tests → wait for verification phase timeout if still broken).
+
+### What's Done
+
+1. Integrated recinit as git submodule
+2. Rewrote leviso/src/artifact/initramfs.rs to use recinit (833 → ~170 lines)
+3. Fixed firmware size issue (include_firmware: false)
+4. Added socket patching for udev condition
+
+### What's Still TODO
+
+1. **If device timeout persists:** Debug why udevd still isn't starting
+   - May need to check if /sys is mounted before udev
+   - May need to ensure devtmpfs is mounted
+   - May need systemd-tmpfiles to run first
+2. **If tests pass:** Commit all changes
+3. **Cleanup:** Remove dead code warnings in leviso
+
+### Test Iteration Improvement Ideas
+
+**Problem:** Each test cycle takes ~10+ minutes (rebuild ISO ~45s + boot live ~30s + install ~60s + boot installed ~90s timeout if broken = total ~7+ minutes wasted on timeout alone).
+
+**Solutions to implement:**
+
+1. **Shorter device wait timeout in initrd** - The 90s systemd timeout is too long
+   - Add kernel param `systemd.device_timeout=15` to boot entry
+   - Or customize initrd's systemd config
+
+2. **Incremental initramfs testing** - Don't rebuild full ISO for initramfs-only changes
+   - After `cargo build` in leviso, manually extract and test initramfs:
+   ```bash
+   # Quick test: check initramfs contents without booting
+   mkdir /tmp/check-initramfs
+   cd /tmp/check-initramfs
+   zcat /path/to/initramfs.img | cpio -id
+   # Verify socket files were patched
+   grep -r "ConditionPathIsReadWrite" usr/lib/systemd/
+   ```
+
+3. **Boot-only test mode** - Skip full install if only testing initramfs boot
+   - Create `--phase 6 --skip-install` that reuses existing disk image
+
+4. **Emergency shell drop** - If boot fails, drop to shell instead of timeout
+   - Add `systemd.debug-shell=1` to boot entry for interactive debugging
+
+5. **Serial console log capture** - Save full boot log to file for post-mortem
+   - Already partially done via console capture
+
+6. **Parallel development** - While tests run, analyze logs from previous run
+
+### Current Test Run
+
+Test started: 2026-01-27 ~moment ago
+Waiting for verification phase to complete...
