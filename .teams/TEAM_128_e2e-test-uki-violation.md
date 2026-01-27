@@ -117,7 +117,7 @@ But tests MUST cover the UKI path since that's what docs recommend.
 
 ## Additional Issues Found
 
-### Partition Label Mismatch
+### 1. Partition Label Mismatch
 
 **TEAM_122 UKI uses:** `root=LABEL=root`
 **Tests use:** `root=UUID=xxx`
@@ -127,7 +127,34 @@ If using UKI, root partition MUST be labeled "root":
 mkfs.ext4 -L root /dev/vda2  # Tests do: mkfs.ext4 -F /dev/vda2 (NO LABEL!)
 ```
 
-### ISO Must Include Both
+### 2. boot-test.rs Also Uses Old Approach
+
+```rust
+// boot-test.rs lines 130-131: Copies separate files
+console.exec_ok("cp /media/cdrom/boot/vmlinuz /mnt/boot/vmlinuz", ...)?;
+console.exec_ok("cp /media/cdrom/boot/initramfs-live.img /mnt/boot/initramfs.img", ...)?;
+
+// boot-test.rs lines 162-166: Creates manual boot entry
+let boot_entry = format!(
+    "title   LevitateOS\nlinux   /vmlinuz\ninitrd  /initramfs.img\noptions root=UUID={} ...",
+    root_uuid
+);
+```
+
+### 3. No UKI Auto-Discovery Testing
+
+Tests don't verify systemd-boot's UKI auto-discovery works:
+- No test copies UKI to `/boot/EFI/Linux/`
+- No test verifies systemd-boot finds UKI automatically
+- No test for UKI filename conventions (`levitateos.efi`)
+
+### 4. BootEntry Type Is For Traditional Boot
+
+The `distro_spec::shared::boot::BootEntry` type creates Type #1 entries (linux/initrd/options).
+UKI uses Type #2 entries (auto-discovered `.efi` files in EFI/Linux/).
+The entire BootEntry abstraction may be obsolete for UKI workflow.
+
+### 5. ISO Must Include Both
 
 For tests to work with UKI, the ISO must include:
 - `/boot/uki/levitateos.efi` (for installed system)
