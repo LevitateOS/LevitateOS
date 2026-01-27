@@ -23,7 +23,3 @@ members = [
 
 [workspace.package]
 edition = "2021"
-
-[workspace.dependencies]
-anyhow = "1.0"
-tokio = { version = "1", features = ["rt-multi-thread", "macros", "fs", "time", "process"] }
