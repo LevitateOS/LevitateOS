@@ -167,11 +167,16 @@ qemu-system-x86_64 -enable-kvm -m 4G -cpu host \
 websockify 6080 localhost:5900 --web /tmp/novnc &
 ```
 
-**2. Connect**: `puppeteer_navigate` → `http://localhost:6080/vnc.html?autoconnect=true`
+**2. Connect + Type + Screenshot** (MCP tool calls):
+```
+mcp__puppeteer__puppeteer_navigate  url="http://localhost:6080/vnc.html?autoconnect=true"
+# wait 3 seconds for connection
+mcp__puppeteer__puppeteer_screenshot  name="boot" width=1024 height=768
+mcp__puppeteer__puppeteer_fill  selector="#noVNC_keyboardinput" value="echo hello\n"
+mcp__puppeteer__puppeteer_screenshot  name="after-echo" width=1024 height=768
+```
 
-**3. Type commands**: `puppeteer_fill` selector=`#noVNC_keyboardinput` value=`"command\n"`
-
-**4. Screenshot**: `puppeteer_screenshot` name=`"name"` width=`1024` height=`768`
+Key: Always use `#noVNC_keyboardinput` for typing, always add `\n` for Enter.
 
 Full docs: `.teams/TEAM_127_visual-install-testing.md`
 
