@@ -125,6 +125,54 @@ Marketing: "You write recipes. A local LLM can help." NOT "AI writes packages fo
 
 ---
 
+## Website Design System (`docs/website/`)
+
+**Target viewport:** 960×1080 — half of a 1080p screen. Power users tile windows (docs on left, terminal on right). Design for split-screen, not full-screen browsing.
+
+### Design Rules
+
+| Rule | Spec |
+|------|------|
+| Rounded corners | **NONE.** `global.css` enforces `* { border-radius: 0 !important; }` |
+| Body text | `text-sm` (14px) — readable at 960px width |
+| Page titles | `text-2xl font-medium` |
+| Section headings | `text-lg font-medium` (h2) or `text-base font-medium` (h3) |
+| Card titles | `text-base font-medium` or `text-lg font-medium` |
+| Primary buttons | `h-10 px-5 text-sm` |
+| Secondary buttons | `h-10 px-5 text-sm` |
+| Section padding | `py-16` for main sections, `py-6` for smaller sections |
+| Card padding | `p-5` or `p-6` |
+| Gaps | `gap-2`, `gap-3`, `gap-4`, `gap-6` — comfortable spacing |
+| SVG icons | `size-5` for buttons/headers, `size-4` for inline |
+| Interactive elements | Add `select-none` |
+| Font weight | `font-medium`, never `font-bold` or `font-semibold` |
+
+### What NOT to Do
+
+```tsx
+// WRONG - rounded corners (CSS reset catches this, but don't add them)
+<button class="rounded-lg">
+
+// WRONG - too small for 960px viewport
+<p class="text-xs">Hard to read body text</p>
+
+// WRONG - oversized marketing-style padding
+<section class="py-32 px-20">
+
+// RIGHT
+<button class="h-10 px-5 text-sm font-medium select-none">
+<p class="text-sm text-muted-foreground">Readable body text</p>
+<section class="py-16">
+```
+
+### Why This Matters
+
+The CSS reset (`* { border-radius: 0 !important; }`) enforces no rounded corners site-wide. This cannot be bypassed.
+
+For font sizes: design for legibility at 960×1080. `text-sm` (14px) is the baseline for body text. Anything smaller becomes hard to read in a split-screen workflow.
+
+---
+
 ## Target Hardware Profile
 
 When reasoning about hardware, think **modern desktop/laptop** not server/embedded:
@@ -147,10 +195,10 @@ Reference: `distro_spec::shared::LEVITATE_REQUIREMENTS`
 
 ```bash
 cd leviso
-cargo run -- build      # Full build
-cargo run -- initramfs  # Rebuild initramfs
-cargo run -- iso        # Rebuild ISO
-cargo run -- run        # Boot in QEMU
+cargo run -- build            # Full build
+cargo run -- build initramfs  # Rebuild initramfs only
+cargo run -- build iso        # Rebuild ISO only
+cargo run -- run              # Boot in QEMU
 ```
 
 ---
