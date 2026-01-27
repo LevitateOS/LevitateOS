@@ -1,5 +1,9 @@
 # Install Test Debugging Session - 2026-01-24
 
+> **NOTE (2026-01-27):** This document references squashfs which has been replaced by EROFS.
+> File references like `leviso/src/artifact/squashfs.rs` are now `leviso/src/artifact/erofs.rs`.
+> The general debugging approaches and learnings still apply.
+
 ## Summary
 
 Debugging session attempting to get E2E installation tests passing. Tests pass all 18 installation steps but fail in the verification phase due to:

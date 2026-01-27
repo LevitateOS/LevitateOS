@@ -227,7 +227,7 @@ All previously unknown items have been verified against the source code:
 ## Implementation Phases
 
 ### Phase 1: Boot Reliability
-1. Add Intel/AMD microcode to initramfs or squashfs
+1. Add Intel/AMD microcode to initramfs or rootfs (EROFS)
 2. ~~Verify machine-id is "uninitialized"~~ (Done: empty string, similar effect)
 3. Add do-not-suspend logind config
 4. Configure volatile journal storage
@@ -235,7 +235,7 @@ All previously unknown items have been verified against the source code:
 ### Phase 2: Installation Tools
 1. Create `genfstab` script (port from arch-install-scripts)
 2. Create `levi-chroot` script (like arch-chroot)
-3. Add cryptsetup, lvm2, btrfs-progs to squashfs
+3. Add cryptsetup, lvm2, btrfs-progs to rootfs (EROFS)
 
 ### Phase 3: Hardware Support
 1. Add pciutils, usbutils, dmidecode
@@ -258,7 +258,7 @@ All previously unknown items have been verified against the source code:
 
 | File | Changes |
 |------|---------|
-| `leviso/src/squashfs/mod.rs` | Add missing packages |
+| `leviso/src/artifact/erofs.rs` | Add missing packages |
 | `leviso/src/initramfs/mod.rs` | Add microcode loading |
 | `leviso/src/config.rs` | Add kernel modules for LUKS/LVM/Btrfs |
 | `leviso/src/build/systemd.rs` | Add volatile journal config, do-not-suspend config |
