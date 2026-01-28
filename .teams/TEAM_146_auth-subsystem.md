@@ -322,11 +322,158 @@ distro-spec/src/shared/auth/
 - CLAUDE.md - Add auth subsystem section
 - TEAM file - Document decisions and lessons learned
 
+## Remaining Phases 4-7 Planning
+
+### Phase 4: Profile Folder Analysis and Potential Migration
+**Status**: PLANNED - Analysis completed
+
+**Analysis**: leviso/profile folder contains 50+ files across 26+ directories
+
+**SHOULD MOVE to distro-spec/src/shared/auth/**:
+- ✗ PAM config files (already embedded as constants in pam.rs)
+  - Why: These are specifications, not runtime artifacts
+  - Files: etc/pam.d/* (17 files total)
+  - Note: Source files stay in leviso/profile for reference, but content is in distro-spec
+
+- ✗ Live overlay auth files (already embedded)
+  - live-overlay/etc/systemd/system/console-autologin.service
+  - live-overlay/etc/systemd/system/serial-console.service
+  - live-overlay/etc/shadow (empty root password)
+  - Why: These are auth subsystem specifications
+
+- ✗ User database files
+  - etc/passwd, group, shadow, gshadow
+  - etc/login.defs
+  - Why: These are user specifications (though current versions are minimal)
+  - Current issue: These are hardcoded in leviso, not managed by distro-spec
+
+- ✗ Security policy files
+  - etc/security/limits.conf
+  - etc/security/access.conf (hardcoded in pam.rs)
+  - etc/security/namespace.conf (empty, hardcoded in pam.rs)
+  - etc/security/pwquality.conf (hardcoded in pam.rs)
+  - etc/security/pam_env.conf (hardcoded in pam.rs)
+  - Why: These are part of auth specifications
+
+- ✗ sudoers and sudo.conf
+  - Why: Part of auth/privilege escalation specifications
+
+**SHOULD STAY in leviso/profile** (not auth subsystem):
+- init_tiny.template (bootloader-specific, not auth)
+- Shell configs (.bashrc, .bash_profile)
+- etc/profile (system environment, not auth)
+- etc/profile.d/*.sh (except auth-related ones)
+- etc/fstab, /etc/hosts, /etc/motd, /etc/locale.conf, /etc/vconsole.conf
+- etc/nsswitch.conf (NSS config, not purely auth)
+- etc/shells (system shells, not auth)
+- etc/adjtime (timezone/clock)
+- etc/recipe.conf (leviso-specific)
+- skel/ and root/ home directories (shell environments)
+- live-overlay profile.d scripts (test/docs instrumentation)
+
+**Decision**: Profile files are ALREADY EMBEDDED in code constants. No filesystem migration needed.
+
+**Action**: Document this design decision in CLAUDE.md
+
+---
+
+### Phase 5: Update Test Imports (fsdbg, rootfs-tests)
+**Status**: PLANNED
+
+**Current State**: Tests import from `distro_spec::shared` which re-exports from auth
+
+**Actions**:
+1. Optional optimization: Direct imports from auth module
+   - `distro_spec::shared::auth::components` vs `distro_spec::shared`
+   - No functional change, just cleaner imports
+
+2. Add auth subsystem tests to fsdbg
+   - Verify PAM modules are present (18 modules)
+   - Verify PAM configs are present (18 configs)
+   - Verify security files are present (5 files)
+   - Verify auth binaries present (critical: unix_chkpwd)
+
+3. Add auth subsystem tests to rootfs-tests
+   - Boot-time verification of auth setup
+   - PAM authentication smoke test
+   - SSH key generation verification
+
+---
+
+### Phase 6: Fix Root Password Issue on Installed Systems
+**Status**: PLANNED - Design complete, implementation pending
+
+**Current Problem**:
+- Live ISO: root has empty password (can login)
+- Installed system: root is locked (cannot login)
+- Users must manually create account or set root password post-install
+
+**Three Implementation Options** (user to choose):
+
+**Option A: User Creation Prompt (RECOMMENDED - Arch-style)**
+- Modify recstrap to prompt: "Create initial user account? (y/n)"
+- If yes: Prompt username, password, shell, groups
+- Add to wheel group automatically
+- Advantage: Matches Arch philosophy, secure default
+- Disadvantage: Requires recstrap modification
+
+**Option B: Root Password Setup**
+- Modify recstrap to prompt: "Set root password: "
+- Hash password, update /etc/shadow
+- Advantage: Simpler implementation
+- Disadvantage: Encourages root usage (less secure)
+
+**Option C: Post-Install Script**
+- Create /root/first-boot-setup.sh in rootfs
+- Script prompts for user creation on first login
+- User runs manually after install
+- Advantage: No recstrap changes needed
+- Disadvantage: User must remember to run it
+
+**Recommendation**: Combine A + Documentation
+- Implement user creation prompt in recstrap
+- Document: "Use sudo for admin tasks"
+- Add /root/FIRST_BOOT_SETUP.txt with instructions
+- Keep it simple and user-friendly
+
+---
+
+### Phase 7: Documentation Updates
+**Status**: PLANNED
+
+**Updates Needed**:
+1. CLAUDE.md
+   - Add "Profile Folder Design" section
+   - Explain why files are embedded, not filesystem-based
+   - Link to auth subsystem documentation
+
+2. distro-spec/CLAUDE.md
+   - Add auth subsystem description
+   - Link to requirements.md
+
+3. leviso/CLAUDE.md
+   - Note that auth configuration is in distro-spec
+   - Point to distro-spec for auth changes
+
+4. Create distro-spec/src/shared/auth/README.md
+   - Architecture overview
+   - How to add new PAM configs
+   - How to modify authentication policies
+   - How to extend for AcornOS
+
+5. Update requirements.md
+   - Add "Embedded Configuration Files" section
+   - Explain OverlayFS three-layer system
+   - Add architectural diagrams
+
+---
+
 ## Notes
 - Keep pam.rs creation functions in leviso (build-time logic)
-- Only move constants and documentation
-- Add backwards compatibility re-exports in components.rs
+- Only moved constants and documentation (already done)
+- No backwards compatibility re-exports (already removed)
 - This is data consolidation, not architecture change
+- Profile files are embedded in code, not filesystem-based
 - Compilation checks: ✅ distro-spec builds successfully
-- distro-spec pulls in auth module automatically via shared/mod.rs
-- leviso not yet updated but will compile once imports are added
+- Tests: ✅ 62 tests passing
+- Bugs: ✅ 4 major bugs found and fixed
