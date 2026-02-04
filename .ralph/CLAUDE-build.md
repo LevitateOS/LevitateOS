@@ -43,8 +43,10 @@ LevitateOS/
 - `distro-spec/src/acorn/` and `distro-spec/src/iuppiter/` — variant specs
 - `distro-builder/` — shared abstractions IF both variants benefit
 
+### You MAY fix bugs in:
+- `leviso/` — fix real bugs if you find them, but do NOT restructure
+
 ### You MUST NOT modify:
-- `leviso/` — do NOT change the LevitateOS builder
 - `distro-spec/src/levitate/` — do NOT change LevitateOS specs
 - `testing/install-tests/src/steps/` — do NOT change test assertions
 - Anything that would break LevitateOS

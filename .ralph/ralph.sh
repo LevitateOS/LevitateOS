@@ -219,12 +219,12 @@ verify_claude_md() {
 # Two tiers of protection:
 #
 # HARD BLOCK (revert + fail iteration):
-#   - leviso/                        — never any reason to touch
 #   - distro-spec/src/levitate/      — never any reason to touch
 #   - testing/cheat-guard/           — gutting protection macros is cheating
 #   - testing/install-tests/src/steps/ — changing what "pass" means is cheating
 #
 # SOFT WARN (log to file, don't revert):
+#   - leviso/                              — might be fixing real bugs
 #   - testing/install-tests/ (other files) — might be adding iuppiter distro context
 #   - testing/rootfs-tests/               — might be legitimate
 #   - tools/                              — might be fixing real bugs
@@ -356,11 +356,6 @@ check_and_revert_protected() {
 
     # ── HARD BLOCKS: revert and fail ──
 
-    # leviso — never touch
-    if ! hard_block_submodule "leviso"; then
-        found_tampering=true
-    fi
-
     # cheat-guard — gutting protection is cheating
     if ! hard_block_submodule "testing/cheat-guard"; then
         found_tampering=true
@@ -382,6 +377,9 @@ check_and_revert_protected() {
     fi
 
     # ── SOFT WARNS: log for review, don't revert ──
+
+    # leviso (might be fixing real bugs)
+    soft_warn_submodule "leviso"
 
     # install-tests other files (adding distro contexts, etc.)
     soft_warn_submodule "testing/install-tests"
@@ -511,7 +509,8 @@ INSTRUCTIONS
 CRITICAL RULES:
 - ONE task per iteration. Stop after completing one task.
 - ALWAYS commit. Small, frequent commits are the point.
-- Do NOT modify leviso/ or distro-spec/src/levitate/.
+- Do NOT modify distro-spec/src/levitate/ or testing/install-tests/src/steps/.
+- You MAY fix bugs in leviso/ if needed (separate commit: fix(leviso): ...).
 - Do NOT modify test expectations to make them pass — fix the code.
 - If a task is blocked, mark it as BLOCKED in the PRD, note why in progress, move to the next task.
 - If you encounter a bug in shared code (distro-builder, distro-spec/shared), fix it in a SEPARATE commit.
@@ -636,7 +635,8 @@ DO NOT:
 - Spend time on style or formatting (pre-commit hooks handle that).
 
 CRITICAL RULES:
-- Do NOT modify leviso/ or distro-spec/src/levitate/.
+- Do NOT modify distro-spec/src/levitate/ or testing/install-tests/src/steps/.
+- You MAY fix bugs in leviso/ if needed (separate commit: fix(leviso): ...).
 - Do NOT modify test expectations — fix the code.
 - Do NOT modify CLAUDE.md — it is managed by the ralph loop.
 - Keep your changes SMALL. You are expensive. Fix what's broken, nothing more.
