@@ -142,3 +142,15 @@
 - The `ensure_user` contains check (`passwd.contains("username:")`) could theoretically match a substring of another username, but in practice this is fine for system usernames.
 
 **No blocked tasks**: Haiku did not mark any tasks as BLOCKED. All PRD tasks through 3.12 are correctly marked [x]. The remaining unchecked tasks (3.13+) haven't been attempted yet — that's expected.
+
+## Iteration 14
+
+### Completed: Phase 3 task 3.14 (All Tier 0-2 packages installed in rootfs)
+
+**3.14**: Integrated Tier 0-2 package installation into the AcornOS build pipeline. Modified AcornOS/src/main.rs cmd_download_alpine() to call acornos::recipe::packages() after extracting the Alpine base. The packages.rhai recipe (which already existed) now runs automatically during the download phase, installing all packages from distro-spec::acorn::packages Tiers 1-2 into the rootfs. Package tiers are: Tier 1 Core (eudev, firmware, cryptsetup, bash, coreutils, doas, grep, sed, gawk, findutils) + Tier 2 Daily (dhcpcd, iproute2, iputils, iwd, wireless-regdb, ca-certificates, tzdata, chrony, curl, less, vim, htop, pciutils, usbutils, dmidecode, ethtool, smartmontools, hdparm, nvme-cli, openssh). The packages.rhai recipe in AcornOS/deps/ already matches the distro-spec package definitions exactly. Task 3.14 complete.
+
+## Iteration 15
+
+### Completed: Phase 3 task 3.15 (Test instrumentation with ___SHELL_READY___ marker)
+
+**3.15**: Added test instrumentation to the AcornOS live ISO. Modified AcornOS/src/component/custom/live.rs create_welcome_message() to copy profile.d test scripts (00-acorn-test.sh and live-docs.sh) from profile/live-overlay/ to the staging rootfs. The 00-acorn-test.sh script emits the ___SHELL_READY___ marker when the shell is ready on the serial console (ttyS0), which is used by install-tests to detect when the system has booted successfully. The script also tracks commands with ___CMD_START___ and ___CMD_END___ markers for test harness integration. All three profile.d scripts now present in rootfs: 00-acorn-test.sh, live-docs.sh, welcome.sh. Verified by checking output/rootfs-staging/etc/profile.d/ and confirmed ___SHELL_READY___ is in the script. Task 3.15 complete.

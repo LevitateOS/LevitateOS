@@ -55,8 +55,8 @@ Tasks are ordered by dependency, not by variant. Tags: [acorn] [iuppiter] [share
 - [x] 3.11 [acorn] User creation works: doas (not sudo), root password for live, user in wheel group
 - [x] 3.12 [acorn] /etc/os-release contains AcornOS identity from distro-spec
 - [x] 3.13 [acorn] SSH: sshd installed, host keys generated, sshd_config allows root login for live ISO
-- [ ] 3.14 [acorn] All Tier 0-2 packages from distro-spec::acorn::packages installed in rootfs
-- [ ] 3.15 [acorn] Test instrumentation: /etc/profile.d/00-test.sh emits ___SHELL_READY___ marker for install-tests
+- [x] 3.14 [acorn] All Tier 0-2 packages from distro-spec::acorn::packages installed in rootfs
+- [x] 3.15 [acorn] Test instrumentation: /etc/profile.d/00-test.sh emits ___SHELL_READY___ marker for install-tests
 - [ ] 3.16 [acorn] Live overlay configuration: rootfs is EROFS (read-only), init creates tmpfs overlay
 - [ ] 3.17 [acorn] EROFS rootfs builds without errors (mkfs.erofs with zstd compression)
 - [ ] 3.18 [acorn] EROFS rootfs size < 500MB compressed
