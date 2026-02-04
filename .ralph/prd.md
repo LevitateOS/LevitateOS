@@ -69,17 +69,17 @@ Tasks are ordered by dependency, not by variant. Tags: [acorn] [iuppiter] [share
 
 ### Phase 4: Initramfs + Boot
 
-- [ ] 4.1 [acorn] Busybox-based initramfs builds using recinit (not dracut — Alpine doesn't use it)
-- [ ] 4.2 [acorn] /init script: mount ISO by label, find EROFS rootfs, mount read-only
-- [ ] 4.3 [acorn] /init script: create overlay (EROFS lower + tmpfs upper), switch_root to overlay
+- [x] 4.1 [acorn] Busybox-based initramfs builds using recinit (not dracut — Alpine doesn't use it)
+- [x] 4.2 [acorn] /init script: mount ISO by label, find EROFS rootfs, mount read-only
+- [x] 4.3 [acorn] /init script: create overlay (EROFS lower + tmpfs upper), switch_root to overlay
 - [ ] 4.4 [acorn] OpenRC starts as PID 1 after switch_root (verify with test boot)
-- [ ] 4.5 [acorn] Kernel modules from distro-spec::acorn::boot (21 modules: virtio, SCSI, NVME, USB, EROFS, overlay)
-- [ ] 4.6 [acorn] Initramfs includes module dependency files (modules.dep from depmod)
-- [ ] 4.7 [iuppiter] IuppiterOS initramfs: same /init script, different module set
-- [ ] 4.8 [iuppiter] Boot modules from distro-spec::iuppiter::boot (27 modules: core + SAS + SES + SG, NO USB)
-- [ ] 4.9 [iuppiter] SAS drivers included: mpt3sas, megaraid_sas, scsi_transport_sas
-- [ ] 4.10 [iuppiter] SCSI enclosure included: enclosure, ses (for LED/slot control)
-- [ ] 4.11 [iuppiter] SCSI generic included: sg (for SG_IO passthrough — smartctl needs this)
+- [x] 4.5 [acorn] Kernel modules from distro-spec::acorn::boot (21 modules: virtio, SCSI, NVME, USB, EROFS, overlay)
+- [x] 4.6 [acorn] Initramfs includes module dependency files (modules.dep from depmod)
+- [x] 4.7 [iuppiter] IuppiterOS initramfs: same /init script, different module set
+- [x] 4.8 [iuppiter] Boot modules from distro-spec::iuppiter::boot (27 modules: core + SAS + SES + SG, NO USB)
+- [x] 4.9 [iuppiter] SAS drivers included: mpt3sas, megaraid_sas, scsi_transport_sas
+- [x] 4.10 [iuppiter] SCSI enclosure included: enclosure, ses (for LED/slot control)
+- [x] 4.11 [iuppiter] SCSI generic included: sg (for SG_IO passthrough — smartctl needs this)
 
 ### Phase 5: ISO Build
 

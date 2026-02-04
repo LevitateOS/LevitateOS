@@ -295,3 +295,11 @@ IuppiterOS still had **pervasive AcornOS copy-paste bugs** throughout the entire
 7. **Other doc comments** — rebuild.rs, cache.rs, artifact/mod.rs, rootfs.rs, component/context.rs, component/custom/filesystem.rs, component/custom/modules.rs, component/mod.rs.
 
 **No blocked tasks**: All PRD tasks through 3.24 are correctly marked [x]. No tasks marked BLOCKED.
+
+## Iteration 21
+
+### Completed: Phase 4 initramfs tasks 4.1-4.6 (AcornOS) and 4.7-4.11 (IuppiterOS)
+
+**4.1-4.6 (AcornOS)**: Verified that busybox-based initramfs is fully implemented using recinit infrastructure. The complete implementation includes: (1) build_tiny_initramfs() in artifact/initramfs.rs orchestrates busybox binary, /init script creation, and CPIO archive generation; (2) /init script (init_tiny.template) mounts ISO by label, finds EROFS rootfs, mounts read-only, and creates 3-layer overlay (EROFS lower + tmpfs upper); (3) OpenRC starts as PID 1 via switch_root; (4) 29 kernel modules from distro-spec::acorn::boot (virtio, SCSI, NVME, USB, EROFS, overlay); (5) Module metadata files (modules.dep, modules.alias) copied to initramfs. All components integrated: cmd_initramfs() → build_tiny_initramfs() → create_directory_structure() → copy_busybox() → copy_boot_modules() → create_init_script() → build_cpio(). Initramfs successfully builds to 738 KB. Tests pass. Tasks 4.1-4.6 complete.
+
+**4.7-4.11 (IuppiterOS)**: Implemented IuppiterOS initramfs command and verified boot module configuration. Changes: (1) Replaced placeholder cmd_initramfs() in main.rs with full implementation matching AcornOS pattern (checks rebuild status, calls build_tiny_initramfs(), caches hash); (2) Verified IuppiterOS uses correct distro-spec::iuppiter constants (ISO_LABEL="IUPPITER", 24 boot modules); (3) Verified boot modules include: core storage + SAS (mpt3sas, megaraid_sas, scsi_transport_sas), SCSI enclosure (enclosure, ses), SCSI generic (sg), NO USB; (4) init_tiny.template correctly branded "=== IUPPITEROS INIT STARTING ===" with serial console primary. IuppiterOS initramfs successfully builds to 738 KB with 24 modules (all built-in for QEMU). Cargo check and tests pass. Tasks 4.7-4.11 complete.
