@@ -72,7 +72,7 @@ Tasks are ordered by dependency, not by variant. Tags: [acorn] [iuppiter] [share
 - [x] 4.1 [acorn] Busybox-based initramfs builds using recinit (not dracut — Alpine doesn't use it)
 - [x] 4.2 [acorn] /init script: mount ISO by label, find EROFS rootfs, mount read-only
 - [x] 4.3 [acorn] /init script: create overlay (EROFS lower + tmpfs upper), switch_root to overlay
-- [ ] 4.4 [acorn] OpenRC starts as PID 1 after switch_root (verify with test boot)
+- [x] 4.4 [acorn] OpenRC starts as PID 1 after switch_root (verify with test boot)
 - [x] 4.5 [acorn] Kernel modules from distro-spec::acorn::boot (21 modules: virtio, SCSI, NVME, USB, EROFS, overlay)
 - [x] 4.6 [acorn] Initramfs includes module dependency files (modules.dep from depmod)
 - [x] 4.7 [iuppiter] IuppiterOS initramfs: same /init script, different module set
