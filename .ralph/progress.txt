@@ -260,3 +260,38 @@
 ### Completed: Phase 3 task 3.24 (IuppiterOS EROFS rootfs builds, size < AcornOS)
 
 **3.24**: Verified that IuppiterOS EROFS rootfs builds successfully and is significantly smaller than AcornOS. Size comparison: AcornOS EROFS = 190 MB, IuppiterOS EROFS = 39 MB. IuppiterOS is 79% smaller due to: (1) fewer packages (appliance-focused vs. desktop); (2) no wireless firmware (WiFi, sof-firmware); (3) no desktop packages (iwd, wireless-regdb, cryptsetup, lvm2, btrfs-progs); (4) smaller binary footprint overall. The EROFS builds without errors using mkfs.erofs with zstd compression (level 3). Both distros are well under size constraints: AcornOS < 500 MB, IuppiterOS < 100 MB. Verification: Confirmed filesystem.erofs exists and file sizes match expectations. All 18 IuppiterOS tests pass. Task 3.24 complete.
+
+## Opus Review (after Iteration 20)
+
+### Review of haiku iterations 18-20
+
+**Scope reviewed**: AcornOS (3 commits: EROFS size reduction, sshd_config fix, test instrumentation); IuppiterOS (3 commits: test instrumentation, inittab serial primary, welcome script fix).
+
+**Verification results**:
+- `cargo check --workspace`: Clean (only pre-existing leviso warnings)
+- `cargo test -p acornos`: 31 tests pass
+- `cargo test -p iuppiteros`: 18 tests pass
+- `cargo test -p distro-builder`: 60 tests pass
+- `cargo test -p distro-spec`: 73 tests pass
+
+**AcornOS code was clean** — no bugs found in the 3 commits (EROFS size optimization, sshd_config line-by-line fix, profile.d copy loop). All correct and well-scoped.
+
+**Bugs found and fixed (1 commit, 14 files)**:
+
+IuppiterOS still had **pervasive AcornOS copy-paste bugs** throughout the entire src/ directory. Previous opus reviews (iterations 9, 12, 17) caught and fixed bugs in imports, definitions.rs branding, and package exclusions, but many files were never audited:
+
+1. **CRITICAL: iso.rs live overlay inittab had tty1-tty6** — IuppiterOS is headless (serial-only), but the live overlay inittab (which OVERRIDES definitions.rs) still had 6 VGA terminals. This means haiku's iteration 18 inittab fix in definitions.rs was functionally useless — the iso.rs overlay takes precedence at runtime. Fixed to serial-only.
+
+2. **iso.rs: 15+ AcornOS references** — /etc/issue said "AcornOS Live", fstab/ACPI/sysctl/logind configs all said "AcornOS Live", error messages referenced `acornos` CLI commands, print messages said "Building AcornOS ISO".
+
+3. **qemu.rs: 10+ AcornOS references** — error messages, OVMF context, smoke test boxes, test instrumentation file name all referenced acorn/AcornOS.
+
+4. **initramfs.rs: 2 references** — doc comment said LABEL=ACORNOS, error said "acornos build kernel".
+
+5. **Profile files: live-docs.sh was entirely AcornOS** — referenced acorn-docs binary, had AcornOS ASCII art, mentioned WiFi (iwctl), had AcornOS URLs. Rewrote for IuppiterOS headless serial console with refurbishment tool quick reference.
+
+6. **init_tiny.template: 3 references** — boot messages said "ACORNOS INIT STARTING" and "AcornOS initramfs starting".
+
+7. **Other doc comments** — rebuild.rs, cache.rs, artifact/mod.rs, rootfs.rs, component/context.rs, component/custom/filesystem.rs, component/custom/modules.rs, component/mod.rs.
+
+**No blocked tasks**: All PRD tasks through 3.24 are correctly marked [x]. No tasks marked BLOCKED.

@@ -65,3 +65,9 @@ When creating test instrumentation for IuppiterOS based on AcornOS, don't just c
 
 ### EROFS Size Reduction Through Package Discipline
 IuppiterOS achieved 79% smaller EROFS than AcornOS (39MB vs 190MB) not through clever optimizations, but through disciplined package selection: no desktop, no wireless, no encryption, no sound. The appliance focus naturally leads to smaller images. This demonstrates that distro-spec's package tier separation is effective — AcornOS's extra 151MB consists entirely of packages excluded from IuppiterOS.
+
+### Live Overlay Overrides EROFS Base — Check Both Paths
+When fixing config files like /etc/inittab, check BOTH the EROFS rootfs path (definitions.rs components) AND the live overlay path (iso.rs create_live_overlay). The overlay filesystem means /live/overlay/etc/inittab takes precedence over the EROFS /etc/inittab. Fixing only definitions.rs is ineffective if iso.rs also writes the same file to the overlay.
+
+### Copy-Paste Audits Must Cover ALL Source Files
+Four opus reviews caught copy-paste bugs in IuppiterOS, each finding new files missed by previous reviews. The pattern: reviews focused on "files changed in last N commits" but copy-paste bugs exist in files that were copied once and never touched again. The definitive fix is `grep -ri acorn IuppiterOS/src/` covering ALL source files, not just recently changed ones.
