@@ -138,22 +138,22 @@ focus on Phases 1-5.
 - [ ] 8.7 [acorn] Phase 6 (Post-reboot): installed system boots and login works (KNOWN BROKEN — may be BLOCKED)
 
 **IuppiterOS install-tests:**
-- [ ] 8.8 [iuppiter] Create IuppiterOS DistroContext in testing/install-tests/src/distro/iuppiter.rs
-- [ ] 8.9 [iuppiter] IuppiterOS DistroContext: OpenRC init, ash shell, serial console boot patterns, iuppiter services
-- [ ] 8.10 [iuppiter] Register iuppiter in distro/mod.rs so `--distro iuppiter` is recognized
-- [ ] 8.11 [iuppiter] install-tests `--distro iuppiter` mode runs
+- [x] 8.8 [iuppiter] Create IuppiterOS DistroContext in testing/install-tests/src/distro/iuppiter.rs
+- [x] 8.9 [iuppiter] IuppiterOS DistroContext: OpenRC init, ash shell, serial console boot patterns, iuppiter services
+- [x] 8.10 [iuppiter] Register iuppiter in distro/mod.rs so `--distro iuppiter` is recognized
+- [x] 8.11 [iuppiter] install-tests `--distro iuppiter` mode runs
 - [ ] 8.12 [iuppiter] Phases 1-5 pass for IuppiterOS (same steps as AcornOS but with iuppiter identity)
 - [ ] 8.13 [iuppiter] Phase 6 (Post-reboot): may be BLOCKED (same as AcornOS)
 
 **IuppiterOS-specific verification (manual or scripted in QEMU):**
-- [ ] 8.14 [iuppiter] smartctl runs against QEMU virtual drive (exit 0 or known SMART error code)
-- [ ] 8.15 [iuppiter] lsscsi shows at least one device in QEMU
-- [ ] 8.16 [iuppiter] hdparm -I /dev/sda works in QEMU
-- [ ] 8.17 [iuppiter] No GPU/DRM kernel modules loaded (lsmod | grep drm returns empty)
-- [ ] 8.18 [iuppiter] /dev/sg* devices exist (SCSI generic loaded)
-- [ ] 8.19 [iuppiter] All OpenRC services running: networking, eudev, chronyd, sshd, iuppiter-engine
-- [ ] 8.20 [iuppiter] /var/data exists and is writable
-- [ ] 8.21 [iuppiter] iuppiter-engine service in rc-status output
+- [x] 8.14 [iuppiter] smartctl runs against QEMU virtual drive (exit 0 or known SMART error code)
+- [x] 8.15 [iuppiter] lsscsi shows at least one device in QEMU
+- [x] 8.16 [iuppiter] hdparm -I /dev/sda works in QEMU
+- [x] 8.17 [iuppiter] No GPU/DRM kernel modules loaded (lsmod | grep drm returns empty)
+- [x] 8.18 [iuppiter] /dev/sg* devices exist (SCSI generic loaded)
+- [x] 8.19 [iuppiter] All OpenRC services running: networking, eudev, chronyd, sshd, iuppiter-engine
+- [x] 8.20 [iuppiter] /var/data exists and is writable
+- [x] 8.21 [iuppiter] iuppiter-engine service in rc-status output
 
 ### Phase 9: Custom Kernel (If Time Permits)
 
