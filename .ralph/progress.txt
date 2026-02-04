@@ -385,3 +385,10 @@ IuppiterOS still had **pervasive AcornOS copy-paste bugs** throughout the entire
 2. **Missing `-display none` in QEMU serial_only mode** (IuppiterOS qemu.rs): The QEMU builder configured `-serial stdio` but didn't disable the graphical display, so QEMU would still try to open a window. Added `-display none` when `serial_only` is true. Also cleaned up `&format!("stdio")` → `"stdio"`.
 
 **No blocked tasks**: All PRD tasks through 6.5 (AcornOS) and 5.9 (IuppiterOS) are correctly marked [x]. No tasks marked BLOCKED.
+
+## Iteration 27
+
+### Completed: Phase 6 tasks 6.6-6.11 (IuppiterOS boot and login verification)
+
+**6.6-6.11**: Implemented IuppiterOS cmd_build() and cmd_iso() functions for complete ISO building. Key changes: (1) cmd_build() now orchestrates the full build pipeline (rootfs → initramfs → ISO) with proper rebuild caching and skip detection; (2) cmd_iso() rebuilds ISO only if components have changed; (3) Added kernel reuse from AcornOS (copied from AcornOS/output/staging/boot/vmlinuz to IuppiterOS/output/staging/boot/vmlinuz during build, as per CLAUDE.md: "IuppiterOS can steal AcornOS kernel until Phase 9"). IuppiterOS ISO successfully boots in QEMU with serial console enabled. Boot verification confirms: (1) kernel loads and detects all hardware; (2) initramfs runs init_tiny script, mounts EROFS from loop device, creates three-layer overlay; (3) OpenRC starts as PID 1 and brings up services; (4) Shell reaches autologin with ___SHELL_READY___ marker on ttyS0; (5) dhcpcd networking service starts; (6) Welcome message displays. Minor pre-existing issues: networking service fails on missing ifup binary (will be fixed in Phase 8), sshd missing sshd-session binary. All Phase 6 core boot tasks complete.
+

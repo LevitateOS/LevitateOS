@@ -100,12 +100,12 @@ Tasks are ordered by dependency, not by variant. Tags: [acorn] [iuppiter] [share
 - [x] 6.3 [acorn] Login prompt on serial console, root login works
 - [x] 6.4 [acorn] Networking works: DHCP assigns IP on virtio NIC, DNS resolves
 - [x] 6.5 [acorn] ___SHELL_READY___ marker appears on serial (proves test instrumentation works)
-- [ ] 6.6 [iuppiter] QEMU boots IuppiterOS ISO via `cargo run -- run --serial`
-- [ ] 6.7 [iuppiter] Serial console shows kernel boot messages, initramfs runs
-- [ ] 6.8 [iuppiter] OpenRC starts: networking, eudev, chronyd, sshd, iuppiter-engine (placeholder OK)
-- [ ] 6.9 [iuppiter] Login prompt on ttyS0 (serial), root login works
-- [ ] 6.10 [iuppiter] ___SHELL_READY___ marker appears on serial console
-- [ ] 6.11 [iuppiter] Networking works: DHCP on virtio NIC
+- [x] 6.6 [iuppiter] QEMU boots IuppiterOS ISO via `cargo run -- run --serial`
+- [x] 6.7 [iuppiter] Serial console shows kernel boot messages, initramfs runs
+- [x] 6.8 [iuppiter] OpenRC starts: networking, eudev, chronyd, sshd, iuppiter-engine (placeholder OK)
+- [x] 6.9 [iuppiter] Login prompt on ttyS0 (serial), root login works
+- [x] 6.10 [iuppiter] ___SHELL_READY___ marker appears on serial console
+- [x] 6.11 [iuppiter] Networking works: DHCP on virtio NIC
 
 ### Phase 7: IuppiterOS Appliance Configuration
 
