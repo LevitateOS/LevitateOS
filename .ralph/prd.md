@@ -129,7 +129,7 @@ verify manually with `cargo run -- run`. Phase 6 (post-reboot) has also been bro
 focus on Phases 1-5.
 
 **AcornOS install-tests:**
-- [ ] 8.1 [acorn] install-tests `--distro acorn` mode runs (AcornOS DistroContext already exists)
+- [x] 8.1 [acorn] install-tests `--distro acorn` mode runs (AcornOS DistroContext already exists)
 - [ ] 8.2 [acorn] Phase 1 (Boot): ISO detected, UEFI boot, system clock reasonable
 - [ ] 8.3 [acorn] Phase 2 (Disk): GPT partitioning, FAT32 ESP + ext4 root, mounted correctly
 - [ ] 8.4 [acorn] Phase 3 (Base System): recstrap extracts rootfs, recfstab generates fstab, recchroot works
