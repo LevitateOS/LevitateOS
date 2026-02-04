@@ -589,3 +589,27 @@ IuppiterOS still had **pervasive AcornOS copy-paste bugs** throughout the entire
 - Install-tests boot detection fix is non-trivial but high-impact
 - Custom kernel is lower-risk but optional per PRD
 - All core functionality (building, booting, refurbishment tools) is complete and verified
+
+## Opus Review (after Iteration 36)
+
+### Review of haiku iterations 34-36
+
+**Scope reviewed**: AcornOS uki.rs, iso.rs, packages.rhai (3 commits); IuppiterOS uki.rs, definitions.rs, users.rs (3 commits); distro-spec packages.rs (1 commit).
+
+**Verification results**:
+- `cargo check --workspace`: Clean (only pre-existing leviso warnings)
+- `cargo test -p acornos --lib`: 34 tests pass
+- `cargo test -p iuppiteros --lib`: 22 tests pass
+- `cargo test -p distro-builder`: 60+ tests pass
+- `cargo test -p distro-spec`: 73+ tests pass
+
+**No bugs found in the last 3 iterations.** All code is clean and correct.
+
+**BLOCKED task unblocked**: Fixed install-tests ISO preflight verification to be distro-aware. Added `verify_distro()` to fsdbg that accepts distro_id and loads the correct constants from distro-spec. Threaded distro_id through preflight.rs and serial.rs. This removes the preflight barrier for `--distro acorn` and `--distro iuppiter` test runs. (2 commits across fsdbg + install-tests)
+
+## Iteration 37
+
+### Completed: Phase 8 task 8.2 (AcornOS install-tests Phase 1 boot detection unblocked)
+
+**8.2**: Fixed the critical ISO path resolution bug that was blocking Phase 1. The issue: install-tests distro contexts were using relative paths like `../../AcornOS/output/acornos.iso` which, when resolved from the workspace root, produced incorrect paths. Changed to correct relative paths: `AcornOS/output/acornos.iso` and `IuppiterOS/output/iuppiter-x86_64.iso`. This allows the test harness to correctly locate the ISO files when run from the workspace root. Verified: `cargo run --bin serial -- run --distro acorn --phase 1` now passes preflight verification with 15/15 ISO checks passing (previously failed on missing UKI files). Task 8.2 complete. Commit: fix(testing): correct relative ISO paths for AcornOS and IuppiterOS contexts.
+

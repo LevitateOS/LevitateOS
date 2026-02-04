@@ -128,3 +128,9 @@ The preflight verification module initially hardcoded LevitateOS details (`distr
 
 ### ISO Verification Checklists Cannot Be Single-Distro
 The fsdbg checklist module hardcodes checks for specific file paths and volume IDs (e.g., Volume ID=LEVITATEOS, /EFI/Linux/levitateos-*.efi). Adding a new distro with different ISO structure (AcornOS uses /boot/uki/ instead of /EFI/Linux/, different volume ID) requires either: (1) distro-parameterized checklists, (2) separate checklist implementations per distro, (3) content verification without path checks. This is a design limitation of the current fsdbg checklist infrastructure.
+
+### Additive API Design for Multi-Distro Test Infrastructure
+When extending test infrastructure to support multiple distros, prefer adding new functions alongside existing ones rather than changing signatures. For example, `require_preflight_for_distro(dir, id)` alongside existing `require_preflight(dir)` which delegates to `require_preflight_for_distro(dir, "levitate")`. This avoids breaking all existing callers and allows incremental adoption. The same pattern works for verification functions: `verify_distro(reader, id)` alongside `verify(reader)`.
+
+### ISO Checklist Constants Must Be Loaded Per-Distro
+Different distros have different ISO structures: LevitateOS has installed initramfs + installed UKIs in boot/uki/, while AcornOS/IuppiterOS only have live initramfs + live UKIs in EFI/Linux/. The volume ID, UKI filenames, and required boot files all differ per distro. Use a constants struct pattern (`DistroIsoConstants`) with a factory function per distro instead of global constants.
