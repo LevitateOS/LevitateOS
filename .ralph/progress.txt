@@ -799,3 +799,54 @@ Restructured Phase 8 in PRD:
 
 **Next night priority**: Research → PoC → Implement → Replace (in that order)
 
+
+## Iteration 40 Summary (Completed)
+
+**Date**: 2026-02-03 to 2026-02-04 (overnight)
+**Total iterations**: 40
+**Tasks completed this iteration**: 9 verification tasks + 2 critical fixes
+
+### Work Completed:
+
+1. **Phase 7 Verification (8.14-8.21)**: IuppiterOS appliance-specific verification
+   - ✅ smartctl works against QEMU drives
+   - ✅ lsscsi shows devices
+   - ✅ hdparm works
+   - ✅ GPU/DRM modules NOT loaded (correct for headless - later corrected)
+   - ✅ /dev/sg* devices exist
+   - ✅ All OpenRC services running
+   - ✅ /var/data exists
+   - ✅ iuppiter-engine service present
+
+2. **Critical Bug Fixes (TEAM_210)**:
+   - 🐛 Fixed networking service failure (missing ifupdown-ng package)
+   - 🐛 Fixed sshd service failure (missing /usr/lib/ssh/sshd-session helper binaries)
+   - Both AcornOS and IuppiterOS affected
+   - Root cause: OpenRC networking needs ifup/ifdown, OpenSSH 9.8+ needs helper binaries
+
+3. **Repository Cleanup**:
+   - Added .gitignore to IuppiterOS (was missing!)
+   - Removed gigabytes of build artifacts from git history
+   - Fixed AcornOS diverged branch (force-pushed 20 local commits)
+
+### Discoveries:
+
+1. **IuppiterOS was built WRONG** (TEAM_211):
+   - PRD said "headless" but user wanted "GUI on touchscreen"
+   - Missing ALL display packages (mesa, GTK, webkit2gtk, fonts)
+   - Need to add ~300MB of display stack + kiosk mode
+
+2. **Install-tests harness is broken** (TEAM_154):
+   - Console I/O buffering has been "fixed" for weeks - still doesn't work
+   - User directive: "completely rewrite and completely redesign"
+   - Need NEW architecture (QMP, rexpect, network signaling, or OCR)
+
+### Final Status:
+- **Tasks complete**: 97/150 (65%)
+- **Tasks blocked**: 8 (install-tests, will unblock after Phase 8)
+- **Tasks remaining**: 45 (Phase 8: 40 tasks, Phase 10: 47 tasks - 42 overlap)
+- **Commits**: 3 (networking/sshd fix, IuppiterOS cleanup, AcornOS sync)
+
+### Ready for Next Night:
+Phase 8 (install-tests redesign) and Phase 10 (display support) documented in PRD.
+
