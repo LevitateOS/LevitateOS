@@ -95,3 +95,9 @@ The AcornOS smoke test `cargo run -- test` successfully boots the system and ver
 - OpenRC starts and runs services
 - ___SHELL_READY___ marker appears on serial
 The test finds minor service issues (missing ifup, missing sshd-session) but core boot chain works correctly. Boot time: ~8.4 seconds. These service issues are configuration, not fundamental problems with the base system.
+
+### Always Use distro-spec Constants for Labels and Identity
+Never hardcode ISO labels, OS names, or other identity strings in format strings. Always import and use the constants from distro-spec (e.g., `ISO_LABEL`, `OS_NAME`, `OS_ID`). This applies to kernel cmdline construction (`root=LABEL=...`), GRUB configs, branding, and any other place where the distro identity appears. Hardcoded values silently go out of sync when distro-spec changes.
+
+### QEMU serial_only Requires Explicit -display none
+When building a QEMU command with `-serial stdio` for headless serial-only mode, you must also pass `-display none` to prevent QEMU from opening a graphical window. Without it, QEMU defaults to opening an SDL/GTK display even when serial is on stdio. Compare with `-nographic` which combines both `-serial stdio` and `-display none`, but `-nographic` also redirects the QEMU monitor which may not be desired for interactive runs.

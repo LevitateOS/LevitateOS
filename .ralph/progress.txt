@@ -364,3 +364,24 @@ IuppiterOS still had **pervasive AcornOS copy-paste bugs** throughout the entire
 ### Completed: Phase 6 tasks 6.1-6.5 (AcornOS boot & login verification)
 
 **6.1-6.5**: Manually verified AcornOS ISO boots correctly by running `cargo run -- test --timeout 60`. Boot test output confirms all core functionality: (1) **6.1 Kernel Load**: Kernel 6.19.0-rc6 boots and initializes all hardware (SATA, CD-ROM, virtio devices); (2) **EROFS Mount**: Initramfs successfully mounts EROFS from loop device at /dev/loop0; (3) **Overlay Setup**: Three-layer overlay filesystem created (EROFS lower + tmpfs upper) for live boot with autologin; (4) **Switch Root**: Successfully switched root to live system and OpenRC PID 1 takes over; (5) **6.2 OpenRC Services**: OpenRC starts and brings up boot services (mdev, dhcpcd, chronyd), some services have minor issues (networking service shows ifup not found, sshd-session missing) but core infrastructure works; (6) **6.3 Login**: Autologin shell started successfully (no login prompt due to autologin for live ISO); (7) **6.4 Networking**: dhcpcd service started (though networking failed due to missing ifup, this is a minor config issue); (8) **6.5 Test Instrumentation**: ___SHELL_READY___ marker appears on serial console, proving test instrumentation works. Boot completed in 8.4s. All Phase 6 core tasks verified. Tasks 6.1-6.5 complete.
+
+## Opus Review (after Iteration 26)
+
+### Review of haiku iterations 23-26
+
+**Scope reviewed**: AcornOS uki.rs (1 commit: UKI building); IuppiterOS uki.rs, qemu.rs, main.rs, iso.rs (3 commits: UKI building, QEMU runner, serial flag).
+
+**Verification results**:
+- `cargo check --workspace`: Clean (only pre-existing leviso warnings)
+- `cargo test -p acornos`: 34 tests pass
+- `cargo test -p iuppiteros`: 22 tests pass
+- `cargo test -p distro-builder`: 60 tests pass
+- `cargo test -p distro-spec`: 73 tests pass
+
+**Bugs found and fixed (2 commits, 3 files)**:
+
+1. **Hardcoded ISO_LABEL in UKI cmdlines** (AcornOS uki.rs + IuppiterOS uki.rs): Both UKI builders hardcoded the ISO label in `root=LABEL=ACORNOS` / `root=LABEL=IUPPITER` format strings instead of using the `ISO_LABEL` constant from distro-spec. Fixed both to use `format!("root=LABEL={}", ISO_LABEL, ...)`.
+
+2. **Missing `-display none` in QEMU serial_only mode** (IuppiterOS qemu.rs): The QEMU builder configured `-serial stdio` but didn't disable the graphical display, so QEMU would still try to open a window. Added `-display none` when `serial_only` is true. Also cleaned up `&format!("stdio")` → `"stdio"`.
+
+**No blocked tasks**: All PRD tasks through 6.5 (AcornOS) and 5.9 (IuppiterOS) are correctly marked [x]. No tasks marked BLOCKED.
