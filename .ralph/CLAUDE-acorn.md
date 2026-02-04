@@ -81,14 +81,49 @@ cd testing/rootfs-tests && cargo test -- --ignored --test-threads=1
 If install-tests doesn't support `--distro acorn` yet, your first task is to make it work
 using the `distro/acorn.rs` module that already exists in install-tests.
 
-## How to Use distro-builder
+## Shared Infrastructure (USE IT — DO NOT REIMPLEMENT)
 
-AcornOS should use `distro-builder` abstractions:
-- `Installable` trait + `Op` enum for component installation
-- `DistroConfig` trait for distro identification
-- Shared artifact builders (EROFS, initramfs, ISO)
+These crates already exist and work. AcornOS should call them, not duplicate them.
 
-Look at how leviso uses distro-builder. Mirror that pattern in AcornOS.
+### distro-spec (`distro-spec/src/acorn/`)
+Single source of truth for AcornOS constants. Already defines:
+- `packages.rs` — tier 0-3 package lists (what to install)
+- `services.rs` — OpenRC services and runlevels
+- `boot.rs` — kernel modules for initramfs
+- `uki.rs` — UKI boot entries and kernel cmdline
+- `paths.rs` — OS identity, partition labels, mount points
+- `keys/` — Alpine signing keys
+
+**Always pull constants from here. Never hardcode paths, package names, or service lists.**
+
+### distro-builder (`distro-builder/`)
+Shared build abstractions:
+- `Installable` trait + `Op` enum — component installation system
+- `DistroConfig` trait — distro identification
+- `artifact::erofs` — EROFS rootfs builder
+- `artifact::cpio` — CPIO/initramfs builder
+- `executor/` — directory, file, and user operations
+- `build/context.rs` — build context trait
+
+**Look at how leviso uses distro-builder. Mirror that pattern in AcornOS.**
+
+### tools/ (Shared CLI tools — already work)
+
+| Tool | What it does | How AcornOS uses it |
+|------|-------------|---------------------|
+| **recstrap** | Extracts rootfs to disk (like pacstrap) | `recstrap` installs AcornOS to target partition |
+| **recinit** | Builds initramfs (busybox for live, systemd for installed) | Called during ISO build to create initramfs |
+| **reciso** | Creates bootable UEFI ISO via xorriso | Final step: kernel + initramfs + rootfs → ISO |
+| **recipe** | Rhai-based declarative package orchestrator | Resolves Alpine APK dependencies, extracts packages |
+| **recqemu** | QEMU command builder | Powers `cargo run -- run` for testing |
+| **recfstab** | Generates /etc/fstab from mounts | Post-install: writes fstab for installed system |
+| **recchroot** | Enters chroot with bind mounts | Post-install: configures system inside chroot |
+| **recuki** | Builds Unified Kernel Images | Creates UKI for systemd-boot |
+
+**These are LIBRARIES you depend on via Cargo.toml, not scripts you call.** Check leviso's Cargo.toml to see how it imports them. Your AcornOS Cargo.toml should have similar dependencies.
+
+### leviso-elf
+ELF binary analysis — finds and copies shared library dependencies. Used by recinit to bundle libraries into initramfs. You don't call this directly; recinit uses it internally.
 
 ## Timeout Awareness
 

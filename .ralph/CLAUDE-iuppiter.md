@@ -55,6 +55,49 @@ LevitateOS/
 
 ### The rule: removing IuppiterOS must leave AcornOS and LevitateOS unbroken.
 
+## Shared Infrastructure (USE IT — DO NOT REIMPLEMENT)
+
+These crates already exist and work. IuppiterOS should call them, not duplicate them.
+
+### distro-spec (`distro-spec/src/iuppiter/`)
+Single source of truth for IuppiterOS constants. Already defines:
+- `packages.rs` — tier 0-3 package lists (minimal server + refurbishment tools)
+- `services.rs` — OpenRC services and runlevels
+- `boot.rs` — kernel modules including SAS HBA drivers, SCSI enclosure, SCSI generic
+- `uki.rs` — UKI boot entries (all with serial console)
+- `paths.rs` — OS identity, appliance paths (/var/data, /opt/iuppiter, /etc/iuppiter)
+
+**Always pull constants from here. Never hardcode paths, package names, or service lists.**
+
+### distro-builder (`distro-builder/`)
+Shared build abstractions:
+- `Installable` trait + `Op` enum — component installation system
+- `DistroConfig` trait — distro identification
+- `artifact::erofs` — EROFS rootfs builder
+- `artifact::cpio` — CPIO/initramfs builder
+- `executor/` — directory, file, and user operations
+- `build/context.rs` — build context trait
+
+**Look at how AcornOS (and leviso) uses distro-builder. Mirror that pattern.**
+
+### tools/ (Shared CLI tools — already work)
+
+| Tool | What it does | How IuppiterOS uses it |
+|------|-------------|------------------------|
+| **recstrap** | Extracts rootfs to disk (like pacstrap) | Installs IuppiterOS to target partition |
+| **recinit** | Builds initramfs (busybox for live) | Creates initramfs with SAS/SCSI modules |
+| **reciso** | Creates bootable UEFI ISO via xorriso | Final step: kernel + initramfs + rootfs → ISO |
+| **recipe** | Rhai-based declarative package orchestrator | Resolves Alpine APK dependencies |
+| **recqemu** | QEMU command builder | Powers `cargo run -- run --serial` |
+| **recfstab** | Generates /etc/fstab from mounts | Post-install fstab (including /var/data) |
+| **recchroot** | Enters chroot with bind mounts | Post-install system configuration |
+| **recuki** | Builds Unified Kernel Images | Creates UKI with serial console cmdline |
+
+**These are LIBRARIES you depend on via Cargo.toml, not scripts you call.** Check AcornOS's Cargo.toml to see how it imports them. Your IuppiterOS Cargo.toml should mirror it.
+
+### leviso-elf
+ELF binary analysis — finds and copies shared library dependencies. Used by recinit internally for initramfs library bundling.
+
 ## Custom Kernel
 
 IuppiterOS uses a custom kernel config optimized for the refurbishment workload.
