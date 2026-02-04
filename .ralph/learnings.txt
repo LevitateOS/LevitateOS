@@ -53,3 +53,9 @@ When checking if a config file setting is active (uncommented), never use `confi
 
 ### Firmware Packages vs Firmware Copying
 Alpine's linux-firmware and related packages pull in firmware for ALL hardware (GPUs, audio, network, etc.) - they're very comprehensive. For a live ISO where size matters, you can: (1) Keep the packages installed (satisfying distro-spec), (2) Use the FIRMWARE component's CopyWifiFirmware to copy only essential WiFi drivers. Additional drivers can be added post-boot via 'apk add' if a user needs them for specific hardware. This reduced AcornOS EROFS from 769MB (all firmware) to 190MB (WiFi only), staying well under the 500MB target while maintaining flexibility.
+
+### Copy-Paste New Crates Need FULL Audit of `use` Statements
+When creating IuppiterOS by copying AcornOS's entire src/, every `use distro_spec::acorn::` import must be changed to `use distro_spec::iuppiter::`. This isn't just a doc comment issue — it's a *functional* bug: wrong ISO label, wrong boot modules, wrong ISO filename, wrong QEMU settings. Grep for `distro_spec::acorn` in the new crate and fix every occurrence. Similarly audit constants, branding strings, package lists, and test assertions.
+
+### IuppiterOS Package Exclusions Are Functional, Not Cosmetic
+IuppiterOS explicitly excludes: iwd/wireless-regdb (no WiFi), cryptsetup/lvm (no LUKS/LVM), mkfs.btrfs/sgdisk (no Btrfs). These aren't just "not needed" — including them would pull in unnecessary dependencies, increase image size, and violate the appliance design. When copying AcornOS component definitions, actively remove excluded packages from ADDITIONAL_SBINS, OPENRC_SCRIPTS, and NETWORK/FIRMWARE components.

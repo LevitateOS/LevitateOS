@@ -191,3 +191,46 @@
 ### Completed: Phase 3 task 3.18 (EROFS rootfs size < 500MB compressed)
 
 **3.18**: Reduced AcornOS EROFS rootfs from 769MB to 190MB by modifying the FIRMWARE component. The issue: firmware packages (linux-firmware, sof-firmware, amd-ucode, intel-ucode) include massive GPU drivers (nvidia 106MB, amdgpu 28MB) and audio firmware that aren't needed for live ISO testing. Solution: Modified FIRMWARE component in definitions.rs to copy only WiFi firmware (CopyWifiFirmware) instead of all firmware (CopyAllFirmware). This maintains distro-spec compliance (packages are still installed via apk), but only essential WiFi drivers are copied to staging. Result: compressed EROFS 190MB (was 769MB), staging rootfs 298MB (was 888MB), well under 500MB target. Cargo check passes. Commit: feat(acorn): reduce EROFS rootfs size to <500MB by using WiFi-only firmware. Task 3.18 complete.
+
+## Opus Review (after Iteration 17)
+
+### Review of haiku iterations 13-17 (AcornOS iterations 13-17, IuppiterOS rootfs build)
+
+**Scope reviewed**: AcornOS ssh.rs, live.rs, definitions.rs (3 commits); IuppiterOS entire src/ (3 commits: rootfs build system, 2 doc fixes); distro-spec (fmt + iuppiter skeleton).
+
+**Verification results**:
+- `cargo check --workspace`: Clean (only pre-existing leviso warnings)
+- `cargo test -p acornos`: 31 tests pass
+- `cargo test -p iuppiteros`: 18 tests pass
+- `cargo test -p distro-builder`: 60 tests pass
+- `cargo test -p distro-spec`: 73 tests pass
+
+**Bugs found and fixed (2 commits, 10 files)**:
+
+1. **IuppiterOS entire codebase imports from `distro_spec::acorn` instead of `distro_spec::iuppiter`** (5 files: qemu.rs, iso.rs, initramfs.rs, rebuild.rs, keys.rs). This is a critical functional bug — IuppiterOS would use AcornOS's ISO label ("ACORNOS" vs "IUPPITER"), AcornOS's boot modules (missing SAS/SCSI), AcornOS's ISO filename, AcornOS's QEMU memory settings, etc. Fixed all imports.
+
+2. **IuppiterOS definitions.rs is a near-verbatim copy of AcornOS** with wrong branding throughout:
+   - OS_RELEASE said "AcornOS" (should be "IuppiterOS", ID=iuppiter)
+   - MOTD had AcornOS ASCII art
+   - ISSUE said "AcornOS"
+   - LIVE_FINAL inittab header said "AcornOS Live"
+   - fstab comment said "AcornOS"
+   - NETWORK_INTERFACES comment said "AcornOS"
+   - BUSYBOX doc said "In AcornOS"
+   - test_branding_content() asserted "AcornOS" (wrong — this test was *passing* because it validated the *wrong* distro name)
+
+3. **IuppiterOS includes AcornOS-only packages** that are explicitly excluded per PRD:
+   - ADDITIONAL_SBINS included cryptsetup, lvm, mkfs.btrfs, sgdisk (no LUKS/LVM/Btrfs for appliance)
+   - OPENRC_SCRIPTS included "iwd" (no WiFi for wired-only appliance)
+   - NETWORK component created var/lib/iwd directory (WiFi)
+   - FIRMWARE copied WiFi firmware (wired-only appliance)
+
+4. **IuppiterOS ssh.rs key comment "root@acornos"** instead of "root@iuppiter"
+
+5. **IuppiterOS live.rs imports from `distro_spec::acorn`** instead of `distro_spec::iuppiter` (wrong LIVE_ISSUE_MESSAGE, wrong OS_NAME). Also had hardcoded `acorn/docs` URL.
+
+6. **IuppiterOS builder.rs print messages** said "Building AcornOS System"
+
+**AcornOS code was clean** — no bugs found in the ssh.rs sshd_config fix (already reviewed and fixed in previous opus review), live.rs test instrumentation, or definitions.rs EROFS size optimization. These changes were well-scoped and correct.
+
+**No blocked tasks**: Haiku did not mark any tasks BLOCKED. All PRD tasks through 3.18 are correctly marked [x] for AcornOS. IuppiterOS task 3.19 was marked [x] but the implementation had significant correctness issues (now fixed).
