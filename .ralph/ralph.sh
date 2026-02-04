@@ -218,29 +218,66 @@ hard_block_submodule() {
 }
 
 # Check a specific path inside a submodule (e.g. src/steps/ inside install-tests)
+# Compares against BOTH working tree AND committed changes since baseline.
+# Baseline is stored per-submodule before each iteration by snapshot_baselines().
 hard_block_path() {
     local sub="$1"        # e.g. testing/install-tests
     local inner="$2"      # e.g. src/steps
     local sub_path="$PROJECT_ROOT/$sub"
     [[ -d "$sub_path/$inner" ]] || return 0
 
-    local changes
-    changes=$(cd "$sub_path" && git diff --name-only -- "$inner" 2>/dev/null)
+    # Check uncommitted changes
+    local dirty
+    dirty=$(cd "$sub_path" && git diff --name-only -- "$inner" 2>/dev/null)
     local untracked
     untracked=$(cd "$sub_path" && git ls-files --others --exclude-standard -- "$inner" 2>/dev/null)
 
-    if [[ -n "$changes" || -n "$untracked" ]]; then
+    # Check committed changes since baseline
+    local baseline_file="$RALPH_DIR/.baseline-$(echo "$sub" | tr '/' '-')"
+    local committed=""
+    if [[ -f "$baseline_file" ]]; then
+        local baseline_sha
+        baseline_sha=$(cat "$baseline_file")
+        local current_sha
+        current_sha=$(cd "$sub_path" && git rev-parse HEAD 2>/dev/null)
+        if [[ "$baseline_sha" != "$current_sha" ]]; then
+            committed=$(cd "$sub_path" && git diff --name-only "$baseline_sha" HEAD -- "$inner" 2>/dev/null)
+        fi
+    fi
+
+    if [[ -n "$dirty" || -n "$untracked" || -n "$committed" ]]; then
         error "HARD BLOCK: $sub/$inner modified — reverting"
-        if [[ -n "$changes" ]]; then
-            (cd "$sub_path" && echo "$changes" | xargs git checkout --) 2>/dev/null
+        # Revert uncommitted
+        if [[ -n "$dirty" ]]; then
+            (cd "$sub_path" && echo "$dirty" | xargs git checkout --) 2>/dev/null
         fi
         if [[ -n "$untracked" ]]; then
             (cd "$sub_path" && echo "$untracked" | xargs rm -f) 2>/dev/null
+        fi
+        # Revert committed changes: reset submodule to baseline
+        if [[ -n "$committed" && -f "$baseline_file" ]]; then
+            local baseline_sha
+            baseline_sha=$(cat "$baseline_file")
+            error "  Resetting $sub to baseline $baseline_sha"
+            (cd "$sub_path" && git reset --hard "$baseline_sha") 2>/dev/null
+            (cd "$PROJECT_ROOT" && git checkout -- "$sub") 2>/dev/null
         fi
         return 1
     fi
 
     return 0
+}
+
+# Snapshot submodule HEADs before an iteration starts.
+# Called from run_iteration() so we can detect committed tampering.
+snapshot_baselines() {
+    for sub in testing/install-tests testing/cheat-guard distro-spec; do
+        local sub_path="$PROJECT_ROOT/$sub"
+        [[ -d "$sub_path/.git" || -f "$sub_path/.git" ]] || continue
+        local sha
+        sha=$(cd "$sub_path" && git rev-parse HEAD 2>/dev/null)
+        echo "$sha" > "$RALPH_DIR/.baseline-$(echo "$sub" | tr '/' '-')"
+    done
 }
 
 # Check a path inside a submodule, warn but don't revert
@@ -450,6 +487,9 @@ run_iteration() {
     todo_count=$(count_unchecked "$prd")
     dim "  PRD: $done_count done, $todo_count remaining"
     echo ""
+
+    # Snapshot submodule baselines before iteration (for committed tampering detection)
+    snapshot_baselines
 
     # Snapshot progress hash before iteration
     local progress_before
