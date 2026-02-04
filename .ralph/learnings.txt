@@ -18,6 +18,18 @@ AcornOS has a slightly flatter command structure vs leviso (initramfs and iso as
 ### Install-Tests Boot Detection Broken (TEAM_154)
 The automated install-tests fail before Phase 1 due to Console I/O buffering in the test harness. Manual QEMU boot works perfectly. Don't waste time on install-tests until the Console I/O is fixed. Use `cargo run -- run` for manual verification.
 
+### Initramfs Implementation Already Complete in AcornOS
+Phase 4 initramfs build was already fully implemented when we started:
+- build_tiny_initramfs() in artifact/initramfs.rs: complete
+- init_tiny.template: complete with correct 3-layer overlay logic
+- Module loading infrastructure: complete with compression support (.xz, .gz)
+- CPIO archive building: using distro-builder::artifact::cpio (shared infrastructure)
+
+IuppiterOS inherited the same implementation via copy. Only needed: (1) cmd_initramfs() function in main.rs to wire up the CLI, (2) verification that IuppiterOS uses correct distro-spec::iuppiter constants. This demonstrates the power of shared infrastructure — once one distro has it working, the other just needs to import and verify it uses correct constants.
+
+### Module Dependency Files Are Copied, Not Regenerated
+The initramfs build copies modules.dep and related files from the kernel build output, rather than regenerating them with depmod. This is correct because: (1) kernel build already computed proper dependency graphs, (2) /init script uses insmod (not modprobe), so it doesn't need depmod; (3) copying is faster and more reproducible than regeneration.
+
 ### Phase 6 Post-Reboot Long-Broken
 Phase 6 of install-tests (post-reboot verification) has been broken for a long time. Focus on Phases 1-5.
 
