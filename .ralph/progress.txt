@@ -676,3 +676,126 @@ Note: Tasks 8.3-8.7 represent automated test steps (partitioning, formatting, mo
 
 **Task Status**: All Phase 1-7 tasks complete (78/103 tasks checkmarked). Phase 8 partially complete (9/13 tasks checkmarked, 4/13 BLOCKED). Phase 9 not started.
 
+
+## Iteration 41
+
+### CRITICAL DISCOVERY: IuppiterOS Display Support Missing
+
+**Date**: 2026-02-04
+**Impact**: HIGH - Entire IuppiterOS was built to incorrect specification
+
+**What Happened**:
+During user review, discovered that IuppiterOS was incorrectly built as "headless appliance" per PRD line 7 and constraint line 178. User clarified that IuppiterOS was **ALWAYS meant to have a GUI on touchscreen** - the PRD was WRONG from the start.
+
+**Current State - BROKEN**:
+IuppiterOS currently has ZERO display support packages:
+- ❌ No GPU drivers (mesa, libdrm)
+- ❌ No Wayland compositor (cage)
+- ❌ No GTK/WebKit for Tauri
+- ❌ No fonts
+- ❌ No touchscreen input handling
+
+**Correct Requirements** (from user 2026-02-04):
+1. **Immutable base**: ✅ Already implemented (EROFS rootfs)
+2. **Kiosk mode**: GUI on touchscreen, fullscreen DAR app
+3. **iuppiter-dar preinstalled**: Tauri app (Rust + React) at /opt/iuppiter/iuppiter-dar
+
+**Actions Taken**:
+1. Created TEAM_211 with full requirements analysis and package list
+2. Updated PRD Goal (line 7): "Touchscreen kiosk refurbishment appliance"
+3. Updated PRD Definition of Done: Added kiosk mode + DAR auto-launch
+4. Updated PRD task 2.7: Changed from "NO desktop packages" to "includes display stack"
+5. Updated PRD constraints (line 178): Changed from "headless ONLY" to "GUI kiosk on touchscreen"
+6. Added **Phase 10**: Display Stack & Kiosk Mode (47 new tasks across 8 sub-phases)
+
+**Phase 10 Tasks Added**:
+- 10.1: Display Foundation (6 tasks) - mesa, libdrm, libinput, fonts
+- 10.2: Wayland Compositor (7 tasks) - Cage kiosk mode with OpenRC service
+- 10.3: GTK + WebView (7 tasks) - webkit2gtk stack for Tauri (~150MB)
+- 10.4: iuppiter-dar Integration (7 tasks) - Build and install DAR app
+- 10.5: Kiosk Security Lockdown (6 tasks) - Disable escapes, auto-restart
+- 10.6: Touchscreen Configuration (4 tasks) - Input calibration and testing
+- 10.7: Live vs Installed (4 tasks) - Data partition persistence
+- 10.8: E2E Verification (7 tasks) - Real hardware testing
+
+**Expected Rootfs Size**:
+- Current (incorrect): 39MB EROFS
+- After display support (correct): ~300-350MB EROFS
+- Still smaller than AcornOS: 190MB EROFS
+
+**Next Night's Focus**:
+Ralph should implement Phase 10 in order (10.1 → 10.8), prioritizing display foundation first so kiosk mode can be built on top of it. All 47 tasks are well-defined with clear acceptance criteria.
+
+**Files Modified**:
+- `.ralph/prd.md` - Corrected IuppiterOS description, added Phase 10 (47 tasks)
+- `.teams/TEAM_210_iuppiter-networking-sshd-broken.md` - Both distros networking/sshd fixed
+- `.teams/TEAM_211_iuppiter-immutable-kiosk-dar-requirements.md` - Full requirements doc
+
+**Commits**:
+- 9af65fd: fix(acorn,iuppiter): fix networking and sshd service failures on live boot
+- (Submodules): distro-spec 8082a76, AcornOS dc1a1e6, IuppiterOS 54d0b7f
+
+**Current Task Count**: 
+- Total: 150 tasks (103 original + 47 new Phase 10)
+- Complete: 97/150 (65%)
+- Blocked: 8/150 (TEAM_154 install-tests)
+- Remaining: 45/150 (Phase 9: 4 tasks, Phase 10: 47 tasks)
+
+
+### CRITICAL PRIORITY CHANGE: Fix Install-Tests Harness FIRST
+
+**User directive (2026-02-04)**: "The testing harness is extremely buggy... might need to completely rewrite and completely redesign that so that it works for crying out loud"
+
+**Impact**: Install-tests has been blocking 8 tasks since iteration 40. User wants this FIXED before other work.
+
+**Action Taken**:
+Restructured Phase 8 in PRD:
+- **OLD Phase 8**: "Install-Tests Pass" (with tasks marked BLOCKED)
+- **NEW Phase 8**: "Fix Install-Tests Harness (CRITICAL PRIORITY)" (26 new tasks)
+- **OLD Phase 8 renamed**: "Phase 8-OLD: Manual Install-Tests Verification (TEMPORARY)"
+
+**New Phase 8 breakdown:**
+- 8.1: Diagnose Console I/O Buffering (5 tasks) - Understand root cause
+- 8.2: Implement Console I/O Fix (7 tasks) - Actually fix the buffering issue
+- 8.3: Fix Phase 6 Post-Reboot Detection (5 tasks) - Fix "broken for ages" post-reboot
+- 8.4: Unblock Install-Tests Tasks (7 tasks) - Run previously blocked tests
+- 8.5: Reliability Improvements (5 tasks) - Retry logic, better errors, verbosity
+
+**Priority order for tonight**:
+1. **Phase 8 (install-tests fix)** - CRITICAL, blocks verification
+2. **Phase 10 (display support)** - High priority, new requirements
+3. **Phase 9 (custom kernel)** - Low priority, "if time permits"
+
+**Rationale**: Can't verify AcornOS or IuppiterOS installation workflows without working install-tests. Fix the harness FIRST, then implement display support with confidence that it can be tested.
+
+**Expected outcome**: After Phase 8 complete, all 8 BLOCKED tasks become testable and should pass.
+
+
+### CORRECTION: REDESIGN Install-Tests, Don't "Fix" It
+
+**User feedback**: "No I don't like that we need to 'fix' install-tests we have been 'fixing' it for weeks... Do you understand what I meant with redesign and rewrite??"
+
+**What I did wrong**: Suggested "fixing" Console I/O buffering again (same approach that's failed for weeks)
+
+**What user actually wants**: THROW OUT the broken harness, DESIGN a new architecture, IMPLEMENT from scratch
+
+**Updated Phase 8 approach**:
+
+1. **Research alternatives** (QMP, expect, network signaling, screenshot+OCR)
+2. **Pick ONE that actually works** - Don't fight stdio buffering anymore
+3. **Proof of Concept** - Build minimal PoC in NEW crate, prove it works (10/10 boots)
+4. **Implement new harness** - Only if PoC succeeds
+5. **Migrate tests** - Port test cases to new implementation
+6. **Delete old harness** - No looking back, it's fundamentally broken
+7. **Verify all tests pass** - Unblock 8 tasks with working harness
+
+**Key insight**: The current architecture (serial console I/O with stdio pipes) is WRONG. Don't patch it, replace it.
+
+**Options to research**:
+- **QMP (QEMU Machine Protocol)**: JSON-based VM control, official QEMU automation API
+- **rexpect**: Rust expect library, handles interactive processes correctly
+- **Network signaling**: Test agent in VM sends TCP/HTTP completion signals
+- **Screenshot + OCR**: Visual verification (slow but reliable)
+
+**Next night priority**: Research → PoC → Implement → Replace (in that order)
+
