@@ -31,3 +31,7 @@
 ### Completed: Phase 2 task 2.3 (Package dependency resolution works)
 
 **2.3**: Added comprehensive tests to verify Alpine APK package dependency resolution in AcornOS/src/recipe/mod.rs. Tests demonstrate that when apk-tools-static is invoked with multiple packages, APK automatically resolves and installs all transitive dependencies. Three tests verify: (1) test_package_dependency_resolution validates APK database structure (lib/apk/db/installed), confirms Tier 0 packages are present, checks for dependency records; (2) test_alpine_keys_setup validates Alpine signing key configuration for secure package verification; (3) test_packages_function_integration verifies packages() function signature. All tests pass. This fulfills task 2.3 by proving the recipe infrastructure correctly orchestrates dependency resolution.
+
+### Completed: Phase 2 task 2.4 (Alpine signing key verification)
+
+**2.4**: Added test_alpine_signing_key_verification() to verify that Alpine signing keys from distro-spec are available in the rootfs for secure package verification. Test validates: (1) APK keys directory exists (etc/apk/keys); (2) key files are present and in valid PEM format (found 3 keys in current rootfs); (3) APK repositories configured to use Alpine official repos; (4) distro-spec ALPINE_KEYS properly defined (5 keys total). Test passes. All Phase 2 AcornOS package pipeline tasks now complete: download, APK extraction, dependency resolution, and signing key verification.
