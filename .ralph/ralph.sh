@@ -27,6 +27,9 @@ LOG_DIR="$RALPH_DIR/logs"
 
 # ── Config ───────────────────────────────────────────────────────────────────
 MODEL="haiku"
+REVIEW_MODEL="opus"
+REVIEW_EVERY=3                 # run an opus review every N haiku iterations
+REVIEW_BUDGET=5.00             # USD cap for opus review (more expensive, but targeted)
 DEFAULT_MAX_ITERATIONS=50
 ITERATION_TIMEOUT=3600         # 60 minutes max per iteration (install-tests need QEMU)
 COOLDOWN_SECONDS=5             # pause between iterations (rate limit protection)
@@ -60,6 +63,7 @@ FAILED_ITERATIONS=0
 TIMED_OUT_ITERATIONS=0
 RATE_LIMITED_WAITS=0
 REWARD_HACKS_BLOCKED=0
+REVIEW_ITERATIONS=0
 
 # =============================================================================
 # Utilities
@@ -413,6 +417,7 @@ print_summary() {
     echo -e "  Failed iterations:   $FAILED_ITERATIONS"
     echo -e "  Timed out:           $TIMED_OUT_ITERATIONS"
     echo -e "  Rate limit waits:    $RATE_LIMITED_WAITS"
+    echo -e "  Opus reviews:        $REVIEW_ITERATIONS"
     echo -e "  Reward hacks blocked: $REWARD_HACKS_BLOCKED"
     echo -e "  Logs:                $LOG_DIR/"
     echo ""
@@ -505,7 +510,204 @@ PROMPT
 }
 
 # =============================================================================
-# Run one iteration
+# Build review prompt (opus — runs every REVIEW_EVERY iterations)
+# =============================================================================
+
+build_review_prompt() {
+    local phase="$1"
+    local iteration="$2"
+    local prd="$RALPH_DIR/${phase}-prd.md"
+    local progress="$RALPH_DIR/${phase}-progress.txt"
+    local learnings="$RALPH_DIR/${phase}-learnings.txt"
+
+    local prd_content
+    prd_content=$(cat "$prd")
+
+    local progress_content
+    progress_content=$(cat "$progress" 2>/dev/null)
+    [[ -z "$progress_content" ]] && progress_content="(no previous progress)"
+
+    local learnings_content
+    learnings_content=$(cat "$learnings" 2>/dev/null)
+    [[ -z "$learnings_content" ]] && learnings_content="(no learnings yet)"
+
+    # Get recent git log from writable submodules
+    local recent_commits=""
+    for sub in AcornOS IuppiterOS distro-spec distro-builder; do
+        local sub_path="$PROJECT_ROOT/$sub"
+        [[ -d "$sub_path" ]] || continue
+        local log_output
+        log_output=$(cd "$sub_path" && git log --oneline -"$REVIEW_EVERY" 2>/dev/null)
+        if [[ -n "$log_output" ]]; then
+            recent_commits+="
+── $sub ──
+$log_output
+"
+        fi
+    done
+
+    # Get recent diffs (summary only — keep prompt small)
+    local recent_diffs=""
+    for sub in AcornOS IuppiterOS distro-spec distro-builder; do
+        local sub_path="$PROJECT_ROOT/$sub"
+        [[ -d "$sub_path" ]] || continue
+        local diff_stat
+        diff_stat=$(cd "$sub_path" && git diff --stat "HEAD~${REVIEW_EVERY}" HEAD 2>/dev/null)
+        if [[ -n "$diff_stat" ]]; then
+            recent_diffs+="
+── $sub ──
+$diff_stat
+"
+        fi
+    done
+
+    cat <<PROMPT
+You are an Opus REVIEW iteration for ${phase^}OS (after iteration $iteration).
+Your job is to REVIEW and FIX the last $REVIEW_EVERY haiku iterations. Do NOT pick up new PRD tasks.
+
+═══════════════════════════════════════════
+RECENT COMMITS (last $REVIEW_EVERY iterations)
+═══════════════════════════════════════════
+
+$recent_commits
+
+═══════════════════════════════════════════
+RECENT CHANGES (diff summary)
+═══════════════════════════════════════════
+
+$recent_diffs
+
+═══════════════════════════════════════════
+PRD — current state (for context only)
+═══════════════════════════════════════════
+
+$prd_content
+
+═══════════════════════════════════════════
+PROGRESS
+═══════════════════════════════════════════
+
+$progress_content
+
+═══════════════════════════════════════════
+LEARNINGS
+═══════════════════════════════════════════
+
+$learnings_content
+
+═══════════════════════════════════════════
+YOUR INSTRUCTIONS (Opus Review)
+═══════════════════════════════════════════
+
+You are the senior reviewer. The last $REVIEW_EVERY iterations were done by haiku (fast but sloppy).
+Your job is targeted quality improvement — be surgical, not exhaustive.
+
+DO:
+1. Run \`cargo check\` across the workspace. Fix any compilation errors haiku left behind.
+2. Read the code haiku wrote in the last $REVIEW_EVERY commits. Look for:
+   - Logic bugs (wrong conditions, off-by-one, missing error handling)
+   - Layer boundary violations (AcornOS code in distro-builder, etc.)
+   - Hardcoded values that should come from distro-spec
+   - Dead code or unused imports haiku forgot to clean up
+3. If you find bugs, fix them and commit: fix($phase): description
+4. If haiku marked a task [x] but the implementation is incomplete/wrong, unmark it [ ] and note why in progress.
+5. Run \`cargo test\` if tests exist for the changed crates. Fix failures.
+6. Append a review summary to: $progress
+7. If you learned something, append to: $learnings
+
+DO NOT:
+- Pick up new PRD tasks. That's haiku's job.
+- Refactor or restructure working code. If it compiles and is correct, leave it.
+- Add features, documentation, or tests beyond what's needed to fix bugs.
+- Spend time on style or formatting (pre-commit hooks handle that).
+
+CRITICAL RULES:
+- Do NOT modify leviso/ or distro-spec/src/levitate/.
+- Do NOT modify test expectations — fix the code.
+- Do NOT modify CLAUDE.md — it is managed by the ralph loop.
+- Keep your changes SMALL. You are expensive. Fix what's broken, nothing more.
+PROMPT
+}
+
+# =============================================================================
+# Run one review iteration (opus)
+# =============================================================================
+
+run_review() {
+    local phase="$1"
+    local after_iteration="$2"
+    local logfile="$LOG_DIR/${phase}-review-$(printf '%03d' "$after_iteration").log"
+
+    local iter_start=$SECONDS
+
+    header "━━━ OPUS REVIEW after iteration $after_iteration [$phase] ━━━"
+    dim "  Time: $(date '+%H:%M:%S')  |  Log: $logfile"
+    dim "  Model: $REVIEW_MODEL  |  Budget: \$${REVIEW_BUDGET}"
+    echo ""
+
+    # Snapshot baselines (for anti-hack guard)
+    snapshot_baselines
+
+    local prompt
+    prompt=$(build_review_prompt "$phase" "$after_iteration")
+
+    # Run opus review
+    local exit_code=0
+    local rate_limit_retries=0
+
+    while true; do
+        exit_code=0
+        timeout "$ITERATION_TIMEOUT" claude \
+            --model "$REVIEW_MODEL" \
+            --print \
+            --dangerously-skip-permissions \
+            --no-session-persistence \
+            --max-budget-usd "$REVIEW_BUDGET" \
+            --verbose \
+            -p "$prompt" \
+            2>&1 | tee "$logfile" || exit_code=$?
+
+        if [[ $exit_code -ne 0 ]] && grep -qi 'rate.limit\|too many requests\|429\|overloaded' "$logfile" 2>/dev/null; then
+            ((rate_limit_retries++))
+            ((RATE_LIMITED_WAITS++))
+            if [[ $rate_limit_retries -ge $MAX_RATE_LIMIT_RETRIES ]]; then
+                warn "Review rate limited $rate_limit_retries times — skipping"
+                break
+            fi
+            warn "Rate limited — waiting ${RATE_LIMIT_WAIT}s before retry"
+            sleep "$RATE_LIMIT_WAIT"
+            continue
+        fi
+        break
+    done
+
+    local iter_elapsed=$((SECONDS - iter_start))
+    echo ""
+    dim "──────────────────────────────────────────"
+
+    if [[ $exit_code -eq 124 ]]; then
+        warn "Review TIMED OUT after $(elapsed $iter_elapsed)"
+        return
+    fi
+
+    if [[ $exit_code -ne 0 ]]; then
+        warn "Review exited with code $exit_code after $(elapsed $iter_elapsed)"
+        return
+    fi
+
+    # Anti-hack guard applies to reviews too
+    verify_claude_md "$phase"
+    if ! check_and_revert_protected; then
+        warn "Review attempted reward hacking — changes reverted"
+        return
+    fi
+
+    ((REVIEW_ITERATIONS++))
+    log "Review completed in $(elapsed $iter_elapsed)"
+}
+
+# =============================================================================
+# Run one iteration (haiku)
 # =============================================================================
 
 run_iteration() {
@@ -690,6 +892,13 @@ run_phase() {
                 ;;
         esac
 
+        # Opus review every REVIEW_EVERY iterations
+        if [[ $((i % REVIEW_EVERY)) -eq 0 && $i -lt $max_iterations ]]; then
+            run_review "$phase" "$i"
+            dim "Cooling down ${COOLDOWN_SECONDS}s..."
+            sleep "$COOLDOWN_SECONDS"
+        fi
+
         # Cooldown between iterations
         if [[ $i -lt $max_iterations ]]; then
             dim "Cooling down ${COOLDOWN_SECONDS}s..."
@@ -731,6 +940,7 @@ main() {
         echo "  ITERATION_TIMEOUT=${ITERATION_TIMEOUT}s"
         echo "  COOLDOWN_SECONDS=${COOLDOWN_SECONDS}s"
         echo "  MAX_BUDGET_PER_ITERATION=\$${MAX_BUDGET_PER_ITERATION}/iter"
+        echo "  REVIEW_MODEL=$REVIEW_MODEL (every $REVIEW_EVERY iters, \$$REVIEW_BUDGET/review)"
         echo "  MAX_STAGNANT_ITERATIONS=$MAX_STAGNANT_ITERATIONS"
         exit 1
     fi
@@ -743,6 +953,7 @@ main() {
     echo "  Iterations: $max_iterations per phase"
     echo "  Timeout:    ${ITERATION_TIMEOUT}s per iteration"
     echo "  Budget:     \$${MAX_BUDGET_PER_ITERATION} per iteration"
+    echo "  Review:     $REVIEW_MODEL every $REVIEW_EVERY iterations (\$${REVIEW_BUDGET}/review)"
     echo "  Stagnation: abort after $MAX_STAGNANT_ITERATIONS stuck iterations"
     echo "  Logs:       $LOG_DIR/"
     echo "  CWD:        $PROJECT_ROOT"
