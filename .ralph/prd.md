@@ -47,13 +47,13 @@ Tasks are ordered by dependency, not by variant. Tags: [acorn] [iuppiter] [share
 - [x] 3.3 [acorn] Busybox symlinks created for all applets (/bin/sh → busybox, /bin/ls → busybox, etc.)
 - [x] 3.4 [acorn] OpenRC installed and configured as init system (not systemd)
 - [x] 3.5 [acorn] eudev installed for device management (not systemd-udevd)
-- [ ] 3.6 [acorn] /etc/inittab configured with getty on tty1 and ttyS0 (OpenRC console management)
-- [ ] 3.7 [acorn] Networking configured: dhcpcd, /etc/network/interfaces or equivalent
-- [ ] 3.8 [acorn] /etc/apk/repositories configured (Alpine v3.23 main + community) so `apk add` works post-boot
-- [ ] 3.9 [acorn] /etc/hostname set to distro-spec DEFAULT_HOSTNAME, /etc/hosts has localhost + hostname
-- [ ] 3.10 [acorn] /etc/resolv.conf configured (or dhcpcd manages it)
-- [ ] 3.11 [acorn] User creation works: doas (not sudo), root password for live, user in wheel group
-- [ ] 3.12 [acorn] /etc/os-release contains AcornOS identity from distro-spec
+- [x] 3.6 [acorn] /etc/inittab configured with getty on tty1 and ttyS0 (OpenRC console management)
+- [x] 3.7 [acorn] Networking configured: dhcpcd, /etc/network/interfaces or equivalent
+- [x] 3.8 [acorn] /etc/apk/repositories configured (Alpine v3.23 main + community) so `apk add` works post-boot
+- [x] 3.9 [acorn] /etc/hostname set to distro-spec DEFAULT_HOSTNAME, /etc/hosts has localhost + hostname
+- [x] 3.10 [acorn] /etc/resolv.conf configured (or dhcpcd manages it)
+- [x] 3.11 [acorn] User creation works: doas (not sudo), root password for live, user in wheel group
+- [x] 3.12 [acorn] /etc/os-release contains AcornOS identity from distro-spec
 - [ ] 3.13 [acorn] SSH: sshd installed, host keys generated, sshd_config allows root login for live ISO
 - [ ] 3.14 [acorn] All Tier 0-2 packages from distro-spec::acorn::packages installed in rootfs
 - [ ] 3.15 [acorn] Test instrumentation: /etc/profile.d/00-test.sh emits ___SHELL_READY___ marker for install-tests
