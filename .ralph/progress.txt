@@ -7,3 +7,21 @@
 ### Completed: Phase 1 tasks 1.5-1.10 (IuppiterOS builder compiles)
 
 **1.5-1.10**: Created IuppiterOS builder with Cargo.toml (matching AcornOS dependencies), src/lib.rs, IuppiterConfig (DistroConfig trait), and CLI scaffold (build, run, status, preflight commands). Updated root Cargo.toml workspace members to include IuppiterOS. All Phase 1 IuppiterOS tasks complete: cargo check passes, status command shows correct identity (IuppiterOS / iuppiter / IUPPITER), preflight command works.
+
+## Iteration 2
+
+### Completed: Phase 2 task 2.1 (AcornOS download command)
+
+**2.1**: Implemented Alpine package download infrastructure for AcornOS. Created recipe module with alpine.rs, linux.rs for recipe orchestration, following leviso's pattern. Download command supports four targets: alpine (ISO + rootfs), linux (kernel source), tools (recstrap/recfstab/recchroot), all (everything). Recipe binary resolution checks system PATH → monorepo → RECIPE_BIN env → RECIPE_SRC env. JSON context parsing for dependency paths. Tests confirm alpine and linux downloads work correctly.
+
+## Iteration 3
+
+### Completed: Phase 2 task 2.5 (IuppiterOS Alpine package pipeline reuse)
+
+**2.5**: Added download command infrastructure to IuppiterOS. Implemented by: (1) adding Download command enum with alpine/linux/tools/all targets to IuppiterOS CLI; (2) copying recipe module from AcornOS with alpine.rs, linux.rs, and mod.rs; (3) adding missing dependencies to IuppiterOS Cargo.toml (dirs, serde_json, which); (4) copying recipe scripts from AcornOS/deps to IuppiterOS/deps; (5) symlinking IuppiterOS/downloads → AcornOS/downloads for shared package storage; (6) modifying alpine.rhai paths to reference shared AcornOS downloads. Result: IuppiterOS can now run `iuppiteros download alpine` and reuses all AcornOS Alpine packages via symlink. Recipe integration working correctly.
+
+## Iteration 4
+
+### Completed: Phase 2 task 2.2 (APK extraction produces correct directory structure)
+
+**2.2**: Verified that APK extraction from alpine.rhai recipe produces the correct FHS directory structure. The existing test_extracted_rootfs_structure() in AcornOS/src/recipe/alpine.rs comprehensively validates: (1) all required FHS directories exist (/bin, /etc, /lib, /usr, /var, /tmp, /proc, /sys, /dev, /run, /home, /root); (2) musl libc loader and symlinks present; (3) busybox binary exists and is executable; (4) shell commands (sh, ash) are symlinks to busybox; (5) apk-tools binary exists; (6) APK repositories file configured with main and community. Test passes. Fixed unused std::env import in preflight/disk_space.rs tests.
