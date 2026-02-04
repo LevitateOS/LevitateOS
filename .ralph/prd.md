@@ -23,12 +23,12 @@ Tasks are ordered by dependency, not by variant. Tags: [acorn] [iuppiter] [share
 - [x] 1.2 [acorn] `cargo run -- status` shows correct AcornOS configuration
 - [x] 1.3 [acorn] `cargo run -- preflight` validates host tools (xorriso, mkfs.erofs, 7z, tar, cpio, curl)
 - [x] 1.4 [acorn] All AcornOS commands match leviso equivalents (build, run, clean, status, preflight)
-- [ ] 1.5 [iuppiter] Create IuppiterOS Cargo.toml with same dependencies as AcornOS (distro-spec, distro-builder, clap, anyhow, tokio)
-- [ ] 1.6 [iuppiter] Create src/main.rs with clap CLI: build, run, status, preflight, clean commands
-- [ ] 1.7 [iuppiter] Implement IuppiterConfig (DistroConfig trait) using distro-spec::iuppiter constants
-- [ ] 1.8 [iuppiter] `cargo check` passes for IuppiterOS with zero errors
-- [ ] 1.9 [iuppiter] `cargo run -- status` shows IuppiterOS identity (OS_NAME, OS_ID, ISO_LABEL from distro-spec)
-- [ ] 1.10 [iuppiter] `cargo run -- preflight` validates host tools
+- [x] 1.5 [iuppiter] Create IuppiterOS Cargo.toml with same dependencies as AcornOS (distro-spec, distro-builder, clap, anyhow, tokio)
+- [x] 1.6 [iuppiter] Create src/main.rs with clap CLI: build, run, status, preflight, clean commands
+- [x] 1.7 [iuppiter] Implement IuppiterConfig (DistroConfig trait) using distro-spec::iuppiter constants
+- [x] 1.8 [iuppiter] `cargo check` passes for IuppiterOS with zero errors
+- [x] 1.9 [iuppiter] `cargo run -- status` shows IuppiterOS identity (OS_NAME, OS_ID, ISO_LABEL from distro-spec)
+- [x] 1.10 [iuppiter] `cargo run -- preflight` validates host tools
 
 ### Phase 2: Alpine Package Pipeline
 

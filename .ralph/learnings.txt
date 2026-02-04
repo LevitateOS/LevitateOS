@@ -11,3 +11,6 @@ The automated install-tests fail before Phase 1 due to Console I/O buffering in 
 
 ### Phase 6 Post-Reboot Long-Broken
 Phase 6 of install-tests (post-reboot verification) has been broken for a long time. Focus on Phases 1-5.
+
+### IuppiterOS inherits distro-spec::iuppiter constants
+All IuppiterOS builder configuration (OS_NAME, OS_ID, ISO_LABEL, BOOT_MODULES, etc.) comes from distro-spec::iuppiter module. The IuppiterConfig struct is a thin wrapper that delegates to distro_spec for all identity constants. Workspace membership must be added to root Cargo.toml for submodules to compile properly.

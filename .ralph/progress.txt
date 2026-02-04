@@ -3,3 +3,7 @@
 ### Completed: Phase 1 tasks 1.1-1.4 (AcornOS builder compiles)
 
 **1.1-1.4**: Added preflight CLI command (validates xorriso, mkfs.erofs, tar, cpio, curl, disk space, network). All Phase 1 AcornOS tasks pass. Builder compiles, status command works, all major CLI commands functional and equivalent to leviso.
+
+### Completed: Phase 1 tasks 1.5-1.10 (IuppiterOS builder compiles)
+
+**1.5-1.10**: Created IuppiterOS builder with Cargo.toml (matching AcornOS dependencies), src/lib.rs, IuppiterConfig (DistroConfig trait), and CLI scaffold (build, run, status, preflight commands). Updated root Cargo.toml workspace members to include IuppiterOS. All Phase 1 IuppiterOS tasks complete: cargo check passes, status command shows correct identity (IuppiterOS / iuppiter / IUPPITER), preflight command works.
