@@ -123,6 +123,46 @@ preflight() {
 }
 
 # =============================================================================
+# Git hooks for writable submodules
+# =============================================================================
+# Installed before each phase. Gives haiku fast feedback:
+#   pre-commit:  cargo fmt (auto-fix) + cargo check (block if broken)
+#   commit-msg:  enforce feat(acorn)/fix(iuppiter) format
+
+install_hooks() {
+    local hook_src="$RALPH_DIR/hooks"
+    [[ -d "$hook_src" ]] || return 0
+
+    # Submodules haiku is allowed to commit in
+    local writable_subs=(AcornOS IuppiterOS distro-spec distro-builder)
+
+    for sub in "${writable_subs[@]}"; do
+        local sub_path="$PROJECT_ROOT/$sub"
+        [[ -d "$sub_path" ]] || continue
+
+        # Find the hooks dir (submodules use .git/modules/X/hooks or .git/hooks)
+        local hooks_dir
+        if [[ -f "$sub_path/.git" ]]; then
+            # Submodule with .git file pointing to parent's .git/modules/
+            local gitdir
+            gitdir=$(cat "$sub_path/.git" | sed 's/^gitdir: //')
+            hooks_dir="$sub_path/$gitdir/hooks"
+        elif [[ -d "$sub_path/.git" ]]; then
+            hooks_dir="$sub_path/.git/hooks"
+        else
+            continue
+        fi
+
+        mkdir -p "$hooks_dir"
+        cp "$hook_src/pre-commit" "$hooks_dir/pre-commit"
+        cp "$hook_src/commit-msg" "$hooks_dir/commit-msg"
+        chmod +x "$hooks_dir/pre-commit" "$hooks_dir/commit-msg"
+    done
+
+    log "Installed git hooks in writable submodules"
+}
+
+# =============================================================================
 # CLAUDE.md management
 # =============================================================================
 
@@ -608,6 +648,7 @@ run_phase() {
     header "═══ Starting phase: $phase (max $max_iterations iterations) ═══"
 
     install_claude_md "$phase"
+    install_hooks
     mkdir -p "$LOG_DIR"
 
     local stagnant_count=0

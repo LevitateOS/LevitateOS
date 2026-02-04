@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+# Ralph loop pre-commit hook — installed by ralph.sh before each run.
+# Purpose: fast feedback, not security. Catch broken commits early.
+set -uo pipefail
+
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+NC='\033[0m'
+
+fail() { echo -e "${RED}[pre-commit]${NC} $*" >&2; exit 1; }
+ok()   { echo -e "${GREEN}[pre-commit]${NC} $*"; }
+
+# ── 1. Commit message format (via commit-msg hook, but check staged for sanity) ──
+
+# ── 2. cargo fmt --check (fast, ~1s) ──
+if [[ -f Cargo.toml ]]; then
+    if command -v cargo &>/dev/null; then
+        if ! cargo fmt --check --quiet 2>/dev/null; then
+            # Auto-fix instead of blocking
+            cargo fmt 2>/dev/null
+            git add -u  # re-stage formatted files
+            ok "Auto-formatted with cargo fmt"
+        fi
+    fi
+fi
+
+# ── 3. cargo check on this crate only (not full workspace) ──
+if [[ -f Cargo.toml ]]; then
+    if command -v cargo &>/dev/null; then
+        if ! cargo check --quiet 2>&1 | tail -5; then
+            fail "cargo check failed — fix compilation errors before committing"
+        fi
+    fi
+fi
+
+exit 0

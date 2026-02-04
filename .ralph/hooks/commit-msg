@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+# Ralph loop commit-msg hook — enforce conventional commit format.
+set -uo pipefail
+
+msg_file="$1"
+msg=$(head -1 "$msg_file")
+
+# Allow: feat(acorn): ..., fix(iuppiter): ..., chore(distro-spec): ..., etc.
+if ! echo "$msg" | grep -qE '^(feat|fix|chore|refactor|docs|test|ci)\([a-z-]+\): .+'; then
+    echo "[commit-msg] Bad format: $msg" >&2
+    echo "[commit-msg] Expected: feat(acorn): description" >&2
+    echo "[commit-msg] Allowed prefixes: feat, fix, chore, refactor, docs, test, ci" >&2
+    exit 1
+fi
+
+exit 0
