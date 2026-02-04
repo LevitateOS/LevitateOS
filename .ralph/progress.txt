@@ -352,3 +352,9 @@ IuppiterOS still had **pervasive AcornOS copy-paste bugs** throughout the entire
 ### Completed: Phase 5 tasks 5.5-5.6 (IuppiterOS UKI building)
 
 **5.5-5.6**: Implemented UKI (Unified Kernel Image) building for IuppiterOS. Created src/artifact/uki.rs mirroring AcornOS pattern but with IuppiterOS-specific branding and serial-console-primary configuration. All UKI entries include console=ttyS0,115200n8 per distro-spec::iuppiter::uki: (1) build_uki() wraps recuki; (2) build_live_ukis() creates 3 live UKIs (normal, emergency, debug) with root=LABEL=IUPPITER; (3) build_installed_ukis() creates 2 installed UKIs with root=LABEL=root rw; (4) All entries explicitly include console=ttyS0,115200n8 in extra_cmdline; (5) Fixed IuppiterOS iso.rs to use serial-only GRUB config (removed VGA_CONSOLE refs for headless appliance); (6) Integrated UKI building into ISO creation as Stage 4.5; (7) Added recuki dependency to Cargo.toml; (8) All 22 IuppiterOS tests pass, including 4 new UKI tests. Tasks 5.5-5.6 complete.
+
+## Iteration 25
+
+### Completed: Phase 5 task 5.9 (IuppiterOS `cargo run -- run --serial` launches QEMU in serial-only mode)
+
+**5.9**: Implemented serial-only QEMU runner for IuppiterOS. Changes: (1) Modified CLI Run command flag from `--display` to `--serial` for clarity (appliance default is headless); (2) Updated run_iso() function signature to accept `serial_only: bool` parameter; (3) Added serial_only field and method to QemuBuilder; (4) Modified build() method to always output serial console to stdio (not file), and only add VGA display when not in serial-only mode; (5) Updated cmd_run() to pass serial flag to run_iso(); (6) Removed unused QEMU_SERIAL_LOG import. Default behavior: `iuppiteros run` or `iuppiteros run --serial` launches headless with serial console on stdio. Alternative: `iuppiteros run` (without --serial flag) launches with GUI display. All 22 IuppiterOS tests pass. Cargo check clean. Task 5.9 complete.

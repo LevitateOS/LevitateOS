@@ -83,3 +83,6 @@ When fixing config files like /etc/inittab, check BOTH the EROFS rootfs path (de
 
 ### Copy-Paste Audits Must Cover ALL Source Files
 Four opus reviews caught copy-paste bugs in IuppiterOS, each finding new files missed by previous reviews. The pattern: reviews focused on "files changed in last N commits" but copy-paste bugs exist in files that were copied once and never touched again. The definitive fix is `grep -ri acorn IuppiterOS/src/` covering ALL source files, not just recently changed ones.
+
+### QEMU Serial Mode: stdout vs File
+When building QEMU commands for interactive testing, use `-serial stdio` (or `-serial mon:stdio` with monitor) instead of `-serial file:...`. This sends serial output directly to the console where the user can see boot messages and interact with the login prompt. File-based serial output is better for automated testing where you need to parse messages, but for manual debugging and interactive boot testing, stdio is more useful and user-friendly.
