@@ -109,7 +109,7 @@ Tasks are ordered by dependency, not by variant. Tags: [acorn] [iuppiter] [share
 
 ### Phase 7: IuppiterOS Appliance Configuration
 
-- [ ] 7.1 [iuppiter] smartmontools installed and `smartctl --version` runs
+- [x] 7.1 [iuppiter] smartmontools installed and `smartctl --version` runs
 - [ ] 7.2 [iuppiter] hdparm installed and `hdparm --version` runs
 - [ ] 7.3 [iuppiter] sg3_utils installed: sg_inq, sg_sat_identify, sg_readcap all in PATH
 - [ ] 7.4 [iuppiter] sdparm, lsscsi, nvme-cli installed and in PATH
