@@ -30,6 +30,8 @@ MODEL="haiku"
 DEFAULT_MAX_ITERATIONS=50
 ITERATION_TIMEOUT=3600         # 60 minutes max per iteration (install-tests need QEMU)
 COOLDOWN_SECONDS=5             # pause between iterations (rate limit protection)
+RATE_LIMIT_WAIT=300            # 5 minutes wait on rate limit before retry
+MAX_RATE_LIMIT_RETRIES=5       # max retries per iteration on rate limit
 MAX_BUDGET_PER_ITERATION=1.00  # USD cap per iteration (haiku is ~$0.01-0.10)
 MAX_STAGNANT_ITERATIONS=3      # abort after N iterations with no progress change
 # ─────────────────────────────────────────────────────────────────────────────
@@ -56,6 +58,7 @@ TOTAL_START_TIME=$SECONDS
 COMPLETED_TASKS=0
 FAILED_ITERATIONS=0
 TIMED_OUT_ITERATIONS=0
+RATE_LIMITED_WAITS=0
 
 # =============================================================================
 # Utilities
@@ -176,6 +179,7 @@ print_summary() {
     echo -e "  Tasks completed:     $COMPLETED_TASKS"
     echo -e "  Failed iterations:   $FAILED_ITERATIONS"
     echo -e "  Timed out:           $TIMED_OUT_ITERATIONS"
+    echo -e "  Rate limit waits:    $RATE_LIMITED_WAITS"
     echo -e "  Logs:                $LOG_DIR/"
     echo ""
 }
@@ -217,7 +221,7 @@ build_prompt() {
 
     cat <<PROMPT
 You are iteration $iteration of a Ralph loop building ${phase^}OS.
-You have a maximum of 15 minutes. Work on ONE task only.
+Work on ONE task only. Take the time you need, but don't wait on stuck commands.
 
 ═══════════════════════════════════════════
 PRD — find the FIRST unchecked [ ] task
@@ -299,16 +303,37 @@ run_iteration() {
     prompt=$(build_prompt "$phase" "$iteration")
 
     # Run claude with timeout, stream to terminal and log
+    # Retry on rate limits with backoff
     local exit_code=0
-    timeout "$ITERATION_TIMEOUT" claude \
-        --model "$MODEL" \
-        --print \
-        --dangerously-skip-permissions \
-        --no-session-persistence \
-        --max-budget-usd "$MAX_BUDGET_PER_ITERATION" \
-        --verbose \
-        -p "$prompt" \
-        2>&1 | tee "$logfile" || exit_code=$?
+    local rate_limit_retries=0
+
+    while true; do
+        exit_code=0
+        timeout "$ITERATION_TIMEOUT" claude \
+            --model "$MODEL" \
+            --print \
+            --dangerously-skip-permissions \
+            --no-session-persistence \
+            --max-budget-usd "$MAX_BUDGET_PER_ITERATION" \
+            --verbose \
+            -p "$prompt" \
+            2>&1 | tee "$logfile" || exit_code=$?
+
+        # Check for rate limit in output
+        if [[ $exit_code -ne 0 ]] && grep -qi 'rate.limit\|too many requests\|429\|overloaded' "$logfile" 2>/dev/null; then
+            ((rate_limit_retries++))
+            ((RATE_LIMITED_WAITS++))
+            if [[ $rate_limit_retries -ge $MAX_RATE_LIMIT_RETRIES ]]; then
+                error "Rate limited $rate_limit_retries times — giving up on iteration $iteration"
+                break
+            fi
+            warn "Rate limited — waiting ${RATE_LIMIT_WAIT}s before retry ($rate_limit_retries/$MAX_RATE_LIMIT_RETRIES)"
+            sleep "$RATE_LIMIT_WAIT"
+            continue
+        fi
+
+        break  # not rate limited, proceed
+    done
 
     local iter_elapsed=$((SECONDS - iter_start))
 
