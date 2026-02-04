@@ -171,100 +171,152 @@ verify_claude_md() {
 # =============================================================================
 # Anti-reward-hack guard
 # =============================================================================
-# These submodules must NOT be modified by the ralph loop.
-# If claude changes test code to make tests pass, we revert it.
+# Two tiers of protection:
+#
+# HARD BLOCK (revert + fail iteration):
+#   - leviso/                        — never any reason to touch
+#   - distro-spec/src/levitate/      — never any reason to touch
+#   - testing/cheat-guard/           — gutting protection macros is cheating
+#   - testing/install-tests/src/steps/ — changing what "pass" means is cheating
+#
+# SOFT WARN (log to file, don't revert):
+#   - testing/install-tests/ (other files) — might be adding iuppiter distro context
+#   - testing/rootfs-tests/               — might be legitimate
+#   - tools/                              — might be fixing real bugs
+#
+# ALLOWED (no check):
+#   - AcornOS/, IuppiterOS/          — the whole point
+#   - distro-spec/src/acorn/         — acorn specs
+#   - distro-spec/src/iuppiter/      — iuppiter specs
+#   - distro-builder/                — shared abstractions
 
-PROTECTED_SUBMODULES=(
-    "testing/install-tests"
-    "testing/cheat-guard"
-    "testing/cheat-test"
-    "testing/rootfs-tests"
-    "testing/fsdbg"
-    "testing/hardware-compat"
-    "leviso"
-    "tools/recstrap"
-    "tools/recfstab"
-    "tools/recchroot"
-    "tools/recqemu"
-    "tools/recuki"
-    "tools/reciso"
-    "tools/recinit"
-    "tools/recipe"
-)
+# Paths that get reverted unconditionally (relative to submodule root)
+hard_block_submodule() {
+    local sub="$1"
+    local sub_path="$PROJECT_ROOT/$sub"
+    [[ -d "$sub_path/.git" || -f "$sub_path/.git" ]] || return 0
 
-# Also protect specific paths inside non-submodule dirs
-PROTECTED_PATHS=(
-    "distro-spec/src/levitate"
-)
+    local dirty
+    dirty=$(cd "$sub_path" && git status --porcelain 2>/dev/null)
+    if [[ -n "$dirty" ]]; then
+        error "HARD BLOCK: $sub modified — reverting"
+        (cd "$sub_path" && git checkout -- . && git clean -fd) 2>/dev/null
+        # Also reset submodule pointer in parent
+        (cd "$PROJECT_ROOT" && git checkout -- "$sub") 2>/dev/null
+        return 1
+    fi
+
+    local parent_diff
+    parent_diff=$(cd "$PROJECT_ROOT" && git diff --submodule=short -- "$sub" 2>/dev/null)
+    if [[ -n "$parent_diff" ]]; then
+        error "HARD BLOCK: $sub pointer changed — reverting"
+        (cd "$PROJECT_ROOT" && git checkout -- "$sub") 2>/dev/null
+        return 1
+    fi
+
+    return 0
+}
+
+# Check a specific path inside a submodule (e.g. src/steps/ inside install-tests)
+hard_block_path() {
+    local sub="$1"        # e.g. testing/install-tests
+    local inner="$2"      # e.g. src/steps
+    local sub_path="$PROJECT_ROOT/$sub"
+    [[ -d "$sub_path/$inner" ]] || return 0
+
+    local changes
+    changes=$(cd "$sub_path" && git diff --name-only -- "$inner" 2>/dev/null)
+    local untracked
+    untracked=$(cd "$sub_path" && git ls-files --others --exclude-standard -- "$inner" 2>/dev/null)
+
+    if [[ -n "$changes" || -n "$untracked" ]]; then
+        error "HARD BLOCK: $sub/$inner modified — reverting"
+        if [[ -n "$changes" ]]; then
+            (cd "$sub_path" && echo "$changes" | xargs git checkout --) 2>/dev/null
+        fi
+        if [[ -n "$untracked" ]]; then
+            (cd "$sub_path" && echo "$untracked" | xargs rm -f) 2>/dev/null
+        fi
+        return 1
+    fi
+
+    return 0
+}
+
+# Check a path inside a submodule, warn but don't revert
+soft_warn_submodule() {
+    local sub="$1"
+    local sub_path="$PROJECT_ROOT/$sub"
+    [[ -d "$sub_path/.git" || -f "$sub_path/.git" ]] || return 0
+
+    local dirty
+    dirty=$(cd "$sub_path" && git status --porcelain 2>/dev/null)
+    local parent_diff
+    parent_diff=$(cd "$PROJECT_ROOT" && git diff --submodule=short -- "$sub" 2>/dev/null)
+
+    if [[ -n "$dirty" || -n "$parent_diff" ]]; then
+        warn "NOTICE: $sub was modified this iteration (may be legitimate)"
+        if [[ -n "$dirty" ]]; then
+            echo "$dirty" | head -5 | while IFS= read -r line; do
+                warn "  $line"
+            done
+        fi
+        # Log to file for later review
+        echo "[$(date '+%H:%M:%S')] $sub modified:" >> "$LOG_DIR/modifications.log"
+        echo "$dirty" >> "$LOG_DIR/modifications.log" 2>/dev/null
+        echo "$parent_diff" >> "$LOG_DIR/modifications.log" 2>/dev/null
+        echo "---" >> "$LOG_DIR/modifications.log"
+    fi
+}
 
 check_and_revert_protected() {
     local found_tampering=false
 
-    # Check submodules for uncommitted changes or new commits
-    for sub in "${PROTECTED_SUBMODULES[@]}"; do
-        local sub_path="$PROJECT_ROOT/$sub"
-        [[ -d "$sub_path/.git" || -f "$sub_path/.git" ]] || continue
+    # ── HARD BLOCKS: revert and fail ──
 
-        # Check for dirty working tree inside submodule
-        local dirty
-        dirty=$(cd "$sub_path" && git status --porcelain 2>/dev/null)
-        if [[ -n "$dirty" ]]; then
-            error "REWARD HACK BLOCKED: $sub has uncommitted changes"
-            error "  Reverting: git -C $sub checkout -- ."
-            (cd "$sub_path" && git checkout -- . && git clean -fd) 2>/dev/null
-            found_tampering=true
-        fi
+    # leviso — never touch
+    if ! hard_block_submodule "leviso"; then
+        found_tampering=true
+    fi
 
-        # Check if submodule pointer moved (new commits)
-        local parent_diff
-        parent_diff=$(cd "$PROJECT_ROOT" && git diff --submodule=short -- "$sub" 2>/dev/null)
-        if [[ -n "$parent_diff" ]]; then
-            error "REWARD HACK BLOCKED: $sub submodule pointer changed"
-            error "  Reverting: git checkout -- $sub"
-            (cd "$PROJECT_ROOT" && git checkout -- "$sub") 2>/dev/null
-            found_tampering=true
-        fi
-    done
+    # cheat-guard — gutting protection is cheating
+    if ! hard_block_submodule "testing/cheat-guard"; then
+        found_tampering=true
+    fi
 
-    # Check protected paths (not submodules, just directories)
-    for protected in "${PROTECTED_PATHS[@]}"; do
-        local ppath="$PROJECT_ROOT/$protected"
-        [[ -d "$ppath" ]] || continue
+    # distro-spec/src/levitate — never touch
+    if ! hard_block_path "distro-spec" "src/levitate"; then
+        found_tampering=true
+    fi
 
-        # Find the submodule this path belongs to
-        # distro-spec/src/levitate → submodule is distro-spec
-        local sub_root="${protected%%/*}"
-        local sub_path="$PROJECT_ROOT/$sub_root"
+    # install-tests step assertions — changing what "pass" means is cheating
+    if ! hard_block_path "testing/install-tests" "src/steps"; then
+        found_tampering=true
+    fi
 
-        local changes
-        changes=$(cd "$sub_path" && git diff --name-only -- "${protected#*/}" 2>/dev/null)
-        if [[ -n "$changes" ]]; then
-            error "REWARD HACK BLOCKED: $protected has changes"
-            while IFS= read -r f; do
-                error "  Reverting: $sub_root/$f"
-                (cd "$sub_path" && git checkout -- "$f") 2>/dev/null
-            done <<< "$changes"
-            found_tampering=true
-        fi
+    # install-tests cheat macros usage (preflight.rs, executor.rs)
+    if ! hard_block_path "testing/install-tests" "src/preflight.rs"; then
+        found_tampering=true
+    fi
 
-        # Also check for untracked files in protected path
-        local untracked
-        untracked=$(cd "$sub_path" && git ls-files --others --exclude-standard -- "${protected#*/}" 2>/dev/null)
-        if [[ -n "$untracked" ]]; then
-            error "REWARD HACK BLOCKED: $protected has new files"
-            while IFS= read -r f; do
-                error "  Removing: $sub_root/$f"
-                rm -f "$sub_path/$f"
-            done <<< "$untracked"
-            found_tampering=true
-        fi
+    # ── SOFT WARNS: log for review, don't revert ──
+
+    # install-tests other files (adding distro contexts, etc.)
+    soft_warn_submodule "testing/install-tests"
+
+    # rootfs-tests
+    soft_warn_submodule "testing/rootfs-tests"
+
+    # tools (might be fixing real bugs)
+    for tool in tools/recstrap tools/recfstab tools/recchroot tools/recqemu tools/recuki tools/reciso; do
+        soft_warn_submodule "$tool"
     done
 
     if [[ "$found_tampering" == "true" ]]; then
         ((REWARD_HACKS_BLOCKED++))
-        error "━━━ TAMPERING DETECTED AND REVERTED ━━━"
-        error "Claude tried to modify protected test/tool code instead of fixing the actual code."
-        error "This iteration's test results are INVALID."
+        error "━━━ REWARD HACK DETECTED AND REVERTED ━━━"
+        error "Claude modified test assertions or protected code."
+        error "Legitimate changes to other test files are preserved."
         return 1
     fi
 
