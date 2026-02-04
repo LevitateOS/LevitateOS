@@ -111,6 +111,11 @@ preflight() {
         ((errors++))
     fi
 
+    if ! command -v jq &>/dev/null; then
+        error "jq command not found (required for streaming output)"
+        ((errors++))
+    fi
+
     if [[ ! -d "$PROJECT_ROOT/.git" ]]; then
         error "Not in a git repo. Run from LevitateOS root."
         ((errors++))
@@ -670,15 +675,16 @@ run_review() {
 
     while true; do
         exit_code=0
-        timeout "$ITERATION_TIMEOUT" claude \
+        timeout "$ITERATION_TIMEOUT" stdbuf -oL -eL claude \
             --model "$REVIEW_MODEL" \
-            --print \
+            --output-format stream-json \
+            --include-partial-messages \
             --dangerously-skip-permissions \
             --no-session-persistence \
             --max-budget-usd "$REVIEW_BUDGET" \
             --verbose \
             -p "$prompt" \
-            2>&1 | tee "$logfile" || exit_code=$?
+            2>&1 | stdbuf -oL tee "$logfile" | stdbuf -oL jq --unbuffered -rj 'select(.type=="stream_event") | .event | select(.type=="content_block_delta") | .delta.text // .delta.partial_json // empty' || exit_code=$?
 
         if [[ $exit_code -ne 0 ]] && grep -qi 'rate.limit\|too many requests\|429\|overloaded' "$logfile" 2>/dev/null; then
             ((rate_limit_retries++))
@@ -760,15 +766,16 @@ run_iteration() {
 
     while true; do
         exit_code=0
-        timeout "$ITERATION_TIMEOUT" claude \
+        timeout "$ITERATION_TIMEOUT" stdbuf -oL -eL claude \
             --model "$MODEL" \
-            --print \
+            --output-format stream-json \
+            --include-partial-messages \
             --dangerously-skip-permissions \
             --no-session-persistence \
             --max-budget-usd "$MAX_BUDGET_PER_ITERATION" \
             --verbose \
             -p "$prompt" \
-            2>&1 | tee "$logfile" || exit_code=$?
+            2>&1 | stdbuf -oL tee "$logfile" | stdbuf -oL jq --unbuffered -rj 'select(.type=="stream_event") | .event | select(.type=="content_block_delta") | .delta.text // .delta.partial_json // empty' || exit_code=$?
 
         # Check for rate limit in output
         if [[ $exit_code -ne 0 ]] && grep -qi 'rate.limit\|too many requests\|429\|overloaded' "$logfile" 2>/dev/null; then
