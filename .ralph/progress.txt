@@ -430,3 +430,19 @@ IuppiterOS still had **pervasive AcornOS copy-paste bugs** throughout the entire
 
 **No other bugs found**. The last 3 iterations' code is clean: AcornOS UKI builder uses constants correctly, IuppiterOS APK fixes are sound, sg3_utils binary additions are correct and well-scoped.
 
+## Iteration 28 (continued)
+
+### Completed: Phase 7 task 7.4 (lsscsi and nvme-cli installed and in PATH)
+
+**7.4**: Added lsscsi and nvme binary support to IuppiterOS. Changes: (1) Added "lsscsi" to ADDITIONAL_BINS in IuppiterOS/src/component/definitions.rs - provides SCSI device enumeration (maps /dev/sd* to HBA:channel:target:lun); (2) Added "nvme" to ADDITIONAL_SBINS - provides NVMe management CLI from nvme-cli package; (3) Both binaries were already present in downloads/rootfs from Alpine package installation. Rebuilt rootfs with `cargo run -- build rootfs` (forced rebuild to avoid cache). Verification: Confirmed /usr/bin/lsscsi (77KB) and /usr/sbin/nvme (1.3MB) present in output/rootfs-staging/ after rebuild. EROFS size increased from 39MB to 47MB (expected due to sg3_utils additions from 7.3). All 22 IuppiterOS tests pass. These tools complete the appliance's disk identification and management capabilities: lsscsi for SCSI enumeration, nvme for NVMe drives, smartctl/hdparm for ATA/SMART. Task 7.4 complete.
+
+## Iteration 30
+
+### Completed: Phase 7 task 7.5 (/var/data mount point exists)
+
+**7.5**: Created `/var/data` mount point in IuppiterOS for storing refurbishment artifacts. Implementation: Added `"var/data"` to FHS_DIRS array in IuppiterOS/src/component/definitions.rs (line 55), placing it in the `/var hierarchy` section alongside other /var subdirectories. The directory will be created automatically by the FILESYSTEM component during rootfs build. Cargo check passes, all 22 IuppiterOS tests pass. This completes the mount point setup; the actual mounting during boot and partition configuration can be handled post-install or via fstab in future phases. Task 7.5 complete.
+
+### Completed: Phase 7 task 7.6 (/etc/iuppiter/ config directory exists)
+
+**7.6**: Created `/etc/iuppiter/` configuration directory in IuppiterOS FHS structure. Implementation: Added `"etc/iuppiter"` to FHS_DIRS array in IuppiterOS/src/component/definitions.rs, placing it after the core "etc" directory and before other /usr and /var hierarchies. The directory is automatically created during rootfs build by the FILESYSTEM component. Verified: Built fresh rootfs and confirmed `/etc/iuppiter` directory exists in output/rootfs-staging/etc/. All 22 IuppiterOS tests pass. Cargo check clean. This directory will hold IuppiterOS-specific appliance configuration files as needed for refurbishment workflows. Commit: feat(iuppiter): add /etc/iuppiter/ config directory to FHS structure. Task 7.6 complete.
+

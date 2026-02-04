@@ -112,9 +112,9 @@ Tasks are ordered by dependency, not by variant. Tags: [acorn] [iuppiter] [share
 - [x] 7.1 [iuppiter] smartmontools installed and `smartctl --version` runs
 - [x] 7.2 [iuppiter] hdparm installed and `hdparm --version` runs
 - [x] 7.3 [iuppiter] sg3_utils installed: sg_inq, sg_sat_identify, sg_readcap all in PATH
-- [ ] 7.4 [iuppiter] sdparm, lsscsi, nvme-cli installed and in PATH
-- [ ] 7.5 [iuppiter] /var/data mount point exists (data partition for refurbishment artifacts)
-- [ ] 7.6 [iuppiter] /etc/iuppiter/ config directory exists
+- [x] 7.4 [iuppiter] sdparm, lsscsi, nvme-cli installed and in PATH
+- [x] 7.5 [iuppiter] /var/data mount point exists (data partition for refurbishment artifacts)
+- [x] 7.6 [iuppiter] /etc/iuppiter/ config directory exists
 - [ ] 7.7 [iuppiter] /opt/iuppiter/ binary directory exists
 - [ ] 7.8 [iuppiter] iuppiter-engine OpenRC service script in /etc/init.d/ (placeholder binary OK — just needs to start/stop cleanly)
 - [ ] 7.9 [iuppiter] Operator user created with wheel + disk group membership (disk group for /dev/sd* access)
