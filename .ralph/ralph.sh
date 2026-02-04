@@ -381,6 +381,13 @@ check_and_revert_protected() {
         found_tampering=true
     fi
 
+    # install-tests QEMU/Console implementation (timeout hacks, boot detection bypasses)
+    # TEAM_154: Boot detection is broken due to Console I/O buffering, not timeouts.
+    # Increasing timeouts is reward hacking - it wastes time without fixing the bug.
+    if ! hard_block_path "testing/install-tests" "src/qemu"; then
+        found_tampering=true
+    fi
+
     # ── SOFT WARNS: log for review, don't revert ──
 
     # leviso (might be fixing real bugs)
@@ -400,7 +407,9 @@ check_and_revert_protected() {
     if [[ "$found_tampering" == "true" ]]; then
         ((REWARD_HACKS_BLOCKED++))
         error "━━━ REWARD HACK DETECTED AND REVERTED ━━━"
-        error "Claude modified test assertions or protected code."
+        error "Claude modified test assertions, test infrastructure, or protected code."
+        error "Common hacks: changing test expectations, increasing timeouts, bypassing checks."
+        error "Read TEAM_154: boot detection bug is in test harness I/O, not timeouts."
         error "Legitimate changes to other test files are preserved."
         return 1
     fi
