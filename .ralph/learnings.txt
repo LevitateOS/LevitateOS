@@ -26,3 +26,9 @@ Instead of downloading duplicate Alpine packages, IuppiterOS symlinks its downlo
 
 ### APK Handles Dependency Resolution Automatically
 When packages.rhai invokes apk-tools-static with multiple package names (e.g., "apk add dhcpcd iproute2 iputils"), APK automatically resolves all transitive dependencies and installs them in the correct order. This is proven by the APK database at lib/apk/db/installed which contains the complete dependency graph. No manual dependency ordering is needed—just pass package names to apk and it handles the rest. This is why the recipe infrastructure is so simple and reliable: APK's built-in dependency resolution does the heavy lifting.
+
+### Alpine Signing Keys are Embedded in distro-spec
+All Alpine signing keys (5 keys total) are embedded as constants in distro_spec::acorn::packages::ALPINE_KEYS. They're included from key files in distro-spec/src/acorn/keys/ as PEM-formatted strings. This allows key installation to happen entirely in Rust code without needing the keys to be in the recipe scripts. Keys need to be installed into rootfs /etc/apk/keys/ early (after basic rootfs extraction) so APK can verify package signatures.
+
+### Key Installation Should Happen After Rootfs Extraction
+The best place to install Alpine signing keys is in the recipe/alpine.rs:alpine() function, immediately after verifying the rootfs paths exist. This ensures keys are available before packages.rhai runs and installs packages. Keys can be verified at build time with unit tests that check PEM format and existence.

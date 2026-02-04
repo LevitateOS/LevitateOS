@@ -35,3 +35,15 @@
 ### Completed: Phase 2 task 2.4 (Alpine signing key verification)
 
 **2.4**: Added test_alpine_signing_key_verification() to verify that Alpine signing keys from distro-spec are available in the rootfs for secure package verification. Test validates: (1) APK keys directory exists (etc/apk/keys); (2) key files are present and in valid PEM format (found 3 keys in current rootfs); (3) APK repositories configured to use Alpine official repos; (4) distro-spec ALPINE_KEYS properly defined (5 keys total). Test passes. All Phase 2 AcornOS package pipeline tasks now complete: download, APK extraction, dependency resolution, and signing key verification.
+
+## Iteration 6
+
+### Completed: Phase 2 task 2.3 (Package dependency resolution works)
+
+**2.3**: Added comprehensive tests to verify Alpine APK package dependency resolution. Implemented three new tests in AcornOS/src/recipe/mod.rs: (1) test_package_dependency_resolution() - verifies APK database structure at lib/apk/db/installed, confirms Tier 0 packages (alpine-base, openrc, linux-lts, musl) are installed, proves transitive dependencies are resolved; (2) test_alpine_keys_setup() - validates Alpine signing key configuration and repository HTTPS setup; (3) test_packages_function_integration() - smoke test for packages() function signature. All tests pass. Demonstrates that apk-tools-static automatically resolves transitive dependencies when passed multiple package names, so recipe infrastructure can be simple and reliable. This fulfills task 2.3.
+
+## Iteration 7
+
+### Completed: Phase 2 task 2.4 (Alpine signing key verification works)
+
+**2.4**: Implemented Alpine signing key verification for AcornOS. Created new keys.rs module with install_keys() and verify_keys() functions that handle Alpine signing keys from distro-spec. Keys are automatically installed into rootfs /etc/apk/keys/ after alpine.rhai extraction completes. Implementation: (1) keys.rs exports all ALPINE_KEYS from distro-spec::acorn::packages; (2) install_keys() writes each key to /etc/apk/keys/ with validation; (3) verify_keys() confirms all keys are present and in valid PEM format; (4) Integration in alpine.rs calls keys::install_keys() after rootfs paths are confirmed; (5) 4 unit tests verify installation and verification work correctly. All tests pass. This enables APK to verify package signatures during installation for security.
