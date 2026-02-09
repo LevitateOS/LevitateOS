@@ -122,6 +122,22 @@ cd testing/install-tests && cargo run --bin install-tests -- run --distro acorn
 cd testing/install-tests && cargo run --bin install-tests -- run --distro iuppiter
 ```
 
+## Token Efficiency (CRITICAL)
+
+**Every token costs money. Do not waste tokens on searches the compiler can do for free.**
+
+- **Use the compiler to find call sites.** When renaming, moving, or deleting code, just make
+  the change and run `cargo check`. The compiler errors ARE your search results — complete,
+  accurate, and zero-cost. Do NOT grep/search for call sites first.
+- **NO backwards compatibility. Ever.** No re-exports, no shims, no wrappers. BC is tech debt.
+  Break the code, run `cargo check`, fix every error the compiler shows you. Done.
+- **Do not read files you don't need.** If you already know what to write, write it. If you
+  need to verify a function signature, read that one file — not five.
+- **Do not speculatively search.** If you're about to run 3 greps "just in case", stop. Make
+  the change, let the compiler tell you what broke.
+- **Prefer `cargo check` over grep** for understanding code relationships. It's faster, it's
+  complete, and it doesn't burn tokens on output you have to read and interpret.
+
 ## Timeout Awareness
 
 - If a command produces no output for 2+ minutes, kill it and move on.
