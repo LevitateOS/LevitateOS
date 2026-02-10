@@ -142,13 +142,20 @@ State is in `.checkpoints/{distro}.json` (gitignored). Auto-resets when ISO mtim
 cd AcornOS && cargo run -- build
 cd IuppiterOS && cargo run -- build
 
-# Boot (manual verification — more reliable than install-tests)
+# Checkpoints (PRIMARY — incremental, fast feedback)
+cd testing/install-tests && cargo run -- --distro acorn --checkpoint 1
+cd testing/install-tests && cargo run -- --distro acorn --up-to 3
+cd testing/install-tests && cargo run -- --distro acorn --status
+cd testing/install-tests && cargo run -- --distro acorn --reset
+
+# Boot (manual verification)
 cd AcornOS && cargo run -- run
 cd IuppiterOS && cargo run -- run --serial
 
-# Install-tests (may fail on boot detection — see Known Issues above)
+# Full 24-step flow (advanced — may fail on boot detection, see Known Issues)
 cd testing/install-tests && cargo run --bin install-tests -- run --distro acorn
 cd testing/install-tests && cargo run --bin install-tests -- run --distro iuppiter
+# Add --experimental to include Phase 6 (post-reboot, known broken)
 ```
 
 ## Token Efficiency (CRITICAL)
