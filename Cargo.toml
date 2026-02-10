@@ -2,6 +2,7 @@
 resolver = "2"
 members = [
     "distro-spec",
+    "distro-contract",
     "distro-builder",
     "leviso",
     "AcornOS",
