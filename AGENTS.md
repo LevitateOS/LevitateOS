@@ -14,7 +14,7 @@ This repo uses git submodules; prefer `git clone --recurse-submodules` or run
 
 ## Build, Test, and Development Commands
 - Build an ISO: `just build leviso` (or `cd leviso && cargo run -- build`).
-- Boot interactively: `just checkpoint 1 leviso` (exit QEMU: `Ctrl-A X`).
+- Boot interactively: `just checkpoint 1 leviso` (live boot), `just checkpoint 2 leviso` (live tools + interactive). Exit QEMU: `Ctrl-A X`.
 - Run automated checkpoints: `just test 4 levitate`, `just test-up-to 6 levitate`, `just test-status levitate` (also: `acorn`, `iuppiter`).
 - Rust checks (CI-style): `cargo test --verbose`, `cargo fmt -- --check`, `cargo clippy -- -D warnings`.
 - Install pre-commit hooks (fmt + clippy + unit tests): `tools/install-hooks.sh`.
@@ -29,28 +29,33 @@ The checkpoint loop is implemented in `testing/install-tests` (CLI: `cargo run -
 - Run up to N: `just test-up-to 4 levitate`
 - Show status: `just test-status levitate`
 - Reset cached state: `just test-reset levitate`
+- Distro IDs: the harness uses `levitate`, `acorn`, `iuppiter`. The `just checkpoint` helper uses `leviso`, `acorn`, `iuppiter`.
 
 ### What Checkpoints Mean
 - Checkpoints are `1..=6` in code (`testing/install-tests/src/checkpoints/mod.rs`).
 - State is persisted under `.checkpoints/<distro>.json` and is gated (checkpoint N requires N-1 passed).
 - If the ISO file mtime changes, cached results are invalidated automatically.
-- Checkpoint 3+ uses temp artifacts:
-  - Disk: `/tmp/checkpoint-<distro>-disk.qcow2`
-  - OVMF vars: `/tmp/checkpoint-<distro>-vars.fd`
+- Checkpoint 3+ uses temp artifacts (disk + OVMF vars):
+- Disk: `/tmp/checkpoint-<distro>-disk.qcow2`
+- OVMF vars: `/tmp/checkpoint-<distro>-vars.fd`
 
 ### Interactive QEMU (Justfile)
-`just checkpoint` is a separate/manual runner (defined in `justfile`), currently only:
-- `just checkpoint 1 <distro>`: live ISO boot
-- `just checkpoint 4 <distro>`: boot an already-installed disk from `<DistroDir>/output/*test.qcow2`
-
-Note: `checkpoints --interactive` exists as a CLI flag but is not currently wired up to the WIP interactive implementation in `testing/install-tests/src/interactive.rs`.
+`just checkpoint` is an interactive helper (defined in `justfile`):
+- `just checkpoint 1 <distro>`: direct QEMU boot of the live ISO (serial)
+- `just checkpoint 2 <distro>`: runs harness interactive CP2 (live tools), then attaches to serial
+- `just checkpoint 4 <distro>`: direct QEMU boot of an already-installed disk from `<DistroDir>/output/*test.qcow2` (separate from the harness disk in `/tmp`)
+  
+`checkpoints --interactive` is implemented for live checkpoints (1-2) via `testing/install-tests/src/interactive.rs`. Installed interactive checkpoints (3-6) are not implemented yet.
 
 ### On-ISO Checkpoint Scripts
 Shell scripts exist in `testing/install-tests/test-scripts/` (`checkpoint-*.sh` + `lib/common.sh`) and are intended to ship on ISOs for manual debugging.
-Currently:
+Wired for all three distros:
 - AcornOS installs them into the live rootfs at `/usr/local/bin/checkpoint-*.sh` and `/usr/local/lib/checkpoint-tests/common.sh` (see `AcornOS/src/component/custom/mod.rs` and `AcornOS/src/component/definitions.rs`).
 - IuppiterOS installs them into the live rootfs at `/usr/local/bin/checkpoint-*.sh` and `/usr/local/lib/checkpoint-tests/common.sh` (see `IuppiterOS/src/component/custom/mod.rs` and `IuppiterOS/src/component/definitions.rs`).
 - LevitateOS installs them into the live rootfs at `/usr/local/bin/checkpoint-*.sh` and `/usr/local/lib/checkpoint-tests/common.sh` (see `leviso/src/component/custom/mod.rs` and `leviso/src/component/definitions.rs`).
+
+To verify without booting, inspect the EROFS rootfs:
+- `dump.erofs --path /usr/local/bin/checkpoint-1-live-boot.sh <DistroDir>/output/filesystem.erofs`
 
 ### Kernel “Theft Mode” (DEV-only)
 For Alpine-based distros (AcornOS/IuppiterOS), the shared kernel recipe (`distro-builder/recipes/linux.rhai`) may reuse/steal a prebuilt kernel from `leviso/output/kernel-build` instead of compiling.

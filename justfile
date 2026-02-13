@@ -21,18 +21,21 @@ checkpoint n distro="leviso":
         disk_name="levitate-test.qcow2"
         vars_name="levitate-ovmf-vars.fd"
         pretty_name="LevitateOS"
+        harness_distro="levitate"
     elif [ "{{distro}}" = "acorn" ]; then
         iso="{{justfile_directory()}}/AcornOS/output/acornos.iso"
         disk_dir="{{justfile_directory()}}/AcornOS/output"
         disk_name="acorn-test.qcow2"
         vars_name="acorn-ovmf-vars.fd"
         pretty_name="AcornOS"
+        harness_distro="acorn"
     elif [ "{{distro}}" = "iuppiter" ]; then
-        iso="{{justfile_directory()}}/IuppiterOS/output/iuppiteros.iso"
+        iso="{{justfile_directory()}}/IuppiterOS/output/iuppiter-x86_64.iso"
         disk_dir="{{justfile_directory()}}/IuppiterOS/output"
         disk_name="iuppiter-test.qcow2"
         vars_name="iuppiter-ovmf-vars.fd"
         pretty_name="IuppiterOS"
+        harness_distro="iuppiter"
     else
         echo "Unknown distro: {{distro}}"
         echo "Valid options: leviso, acorn, iuppiter"
@@ -54,6 +57,9 @@ checkpoint n distro="leviso":
             -nographic \
             -serial mon:stdio \
             -no-reboot
+    elif [ "{{n}}" = "2" ]; then
+        echo "Booting $pretty_name interactive checkpoint 2 (live tools)... (Ctrl-A X to exit)"
+        cd testing/install-tests && cargo run --bin checkpoints -- --distro "$harness_distro" --checkpoint 2 --interactive
     elif [ "{{n}}" = "4" ]; then
         echo "Booting installed $pretty_name... (Ctrl-A X to exit)"
         qemu-system-x86_64 \
@@ -73,7 +79,7 @@ checkpoint n distro="leviso":
             -no-reboot
     else
         echo "Checkpoint {{n}} is automated — use 'just test {{n}} {{distro}}' instead"
-        echo "Interactive checkpoints: 1 (live), 4 (installed)"
+        echo "Interactive checkpoints: 1 (live), 2 (live tools), 4 (installed)"
         exit 1
     fi
 
