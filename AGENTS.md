@@ -40,12 +40,11 @@ The checkpoint loop is implemented in `testing/install-tests` (CLI: `cargo run -
 - OVMF vars: `/tmp/checkpoint-<distro>-vars.fd`
 
 ### Interactive QEMU (Justfile)
-`just checkpoint` is an interactive helper (defined in `justfile`):
+`just checkpoint` is a manual QEMU runner (defined in `justfile`), currently only:
 - `just checkpoint 1 <distro>`: direct QEMU boot of the live ISO (serial)
-- `just checkpoint 2 <distro>`: runs harness interactive CP2 (live tools), then attaches to serial
 - `just checkpoint 4 <distro>`: direct QEMU boot of an already-installed disk from `<DistroDir>/output/*test.qcow2` (separate from the harness disk in `/tmp`)
-  
-`checkpoints --interactive` is implemented for live checkpoints (1-2) via `testing/install-tests/src/interactive.rs`. Installed interactive checkpoints (3-6) are not implemented yet.
+
+Note: the `checkpoints` CLI accepts `--interactive`, and the WIP implementation lives in `testing/install-tests/src/interactive.rs`, but it is not currently wired up in `testing/install-tests/src/bin/checkpoints.rs`. Installed interactive checkpoints (3-6) are not implemented yet.
 
 ### On-ISO Checkpoint Scripts
 Shell scripts exist in `testing/install-tests/test-scripts/` (`checkpoint-*.sh` + `lib/common.sh`) and are intended to ship on ISOs for manual debugging.
@@ -57,10 +56,17 @@ Wired for all three distros:
 To verify without booting, inspect the EROFS rootfs:
 - `dump.erofs --path /usr/local/bin/checkpoint-1-live-boot.sh <DistroDir>/output/filesystem.erofs`
 
-### Kernel “Theft Mode” (DEV-only)
+### Kernel "Theft Mode" (DEV-only)
 For Alpine-based distros (AcornOS/IuppiterOS), the shared kernel recipe (`distro-builder/recipes/linux.rhai`) may reuse/steal a prebuilt kernel from `leviso/output/kernel-build` instead of compiling.
 To force a real kernel build from source, pass the kernel flag and the confirmation flag, e.g.:
 - `cd AcornOS && cargo run -- build --kernel --dangerously-waste-the-users-time`
+
+To verify whether a kernel is "built for this distro" vs "stolen", check the kernel release suffix (from `CONFIG_LOCALVERSION` in each distro `kconfig`):
+- LevitateOS: `file leviso/output/staging/boot/vmlinuz` should include `-levitate`
+- AcornOS: `file AcornOS/output/staging/boot/vmlinuz` should include `-acorn`
+- IuppiterOS: `file IuppiterOS/output/staging/boot/vmlinuz` should include `-iuppiter`
+
+If AcornOS/IuppiterOS show `*-levitate`, that's theft-mode (kernel provenance is LevitateOS). A stronger confirmation is that the `sha256sum` of `output/staging/boot/vmlinuz` matches `leviso/output/staging/boot/vmlinuz`.
 
 ## Coding Style & Naming Conventions
 - Rust: `cargo fmt` formatting; keep `cargo clippy -- -D warnings` clean. Avoid
