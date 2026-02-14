@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>LevitateOS Artifact Explorer</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="topbar__left">
+        <div class="brand">
+          <div class="brand__title">Artifact Explorer</div>
+          <div class="brand__subtitle">.artifacts/out (auditable) + store (dedup)</div>
+        </div>
+      </div>
+      <div class="topbar__right">
+        <div class="pill" id="repo-pill">repo: (loading)</div>
+        <div class="pill" id="mut-pill">mutations: (loading)</div>
+      </div>
+    </header>
+
+    <main class="layout">
+      <section class="pane">
+        <div class="pane__header">
+          <div class="pane__title">Outputs</div>
+          <div class="pane__controls">
+            <label class="select">
+              <span>Distro</span>
+              <select id="distro-select"></select>
+            </label>
+            <button id="refresh-outputs" class="btn">Refresh</button>
+          </div>
+        </div>
+
+        <div class="pane__body">
+          <div class="card">
+            <div class="card__title">Known Artifacts</div>
+            <div class="table-wrap">
+              <table class="table" id="outputs-table">
+                <thead>
+                  <tr>
+                    <th>kind</th>
+                    <th>path</th>
+                    <th>exists</th>
+                    <th>size</th>
+                    <th>mtime</th>
+                    <th>input_key</th>
+                    <th>store</th>
+                    <th>actions</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card__title">File Tree</div>
+            <div class="tree">
+              <div class="tree__path" id="tree-path">(loading)</div>
+              <div class="tree__list" id="tree-list"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="pane">
+        <div class="pane__header">
+          <div class="pane__title">Store</div>
+          <div class="pane__controls">
+            <label class="select">
+              <span>Kind</span>
+              <select id="kind-select"></select>
+            </label>
+            <button id="refresh-store" class="btn">Refresh</button>
+            <button id="gc-btn" class="btn btn--danger">GC</button>
+          </div>
+        </div>
+
+        <div class="pane__body">
+          <div class="card">
+            <div class="card__title">Index Entries</div>
+            <div class="table-wrap">
+              <table class="table" id="store-table">
+                <thead>
+                  <tr>
+                    <th>stored_at</th>
+                    <th>input_key</th>
+                    <th>blob</th>
+                    <th>format</th>
+                    <th>size</th>
+                    <th>open</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+            <div class="pager">
+              <button id="store-prev" class="btn btn--quiet">Prev</button>
+              <div class="pager__text" id="store-page">page 1</div>
+              <button id="store-next" class="btn btn--quiet">Next</button>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card__title">Entry Details</div>
+            <pre class="code" id="entry-details">(select an entry)</pre>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <div class="footer__left">
+        This UI is local-only. Output files are the source of truth for audit.
+      </div>
+      <div class="footer__right" id="status-line"></div>
+    </footer>
+
+    <script src="/app.js"></script>
+  </body>
+</html>
+

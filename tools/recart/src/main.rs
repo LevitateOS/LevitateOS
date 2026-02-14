@@ -4,6 +4,8 @@ use distro_builder::artifact_store::ArtifactStore;
 use std::path::Path;
 use std::path::PathBuf;
 
+mod server;
+
 #[derive(Parser)]
 #[command(name = "recart")]
 #[command(about = "LevitateOS centralized artifact store manager")]
@@ -38,9 +40,25 @@ enum Command {
     ///
     /// This will only ingest artifacts that already exist on disk.
     Ingest,
+
+    /// Serve a local web UI for exploring outputs + store contents.
+    Serve {
+        /// Bind address (default: 127.0.0.1)
+        #[arg(long, default_value = "127.0.0.1")]
+        bind: String,
+
+        /// Port (default: 8765)
+        #[arg(long, default_value = "8765")]
+        port: u16,
+
+        /// Allow mutating operations (gc/prune/restore/ingest) via token-guarded POSTs
+        #[arg(long)]
+        allow_mutate: bool,
+    },
 }
 
-fn main() -> Result<()> {
+#[tokio::main]
+async fn main() -> Result<()> {
     let cli = Cli::parse();
 
     let repo_root = match cli.repo {
@@ -87,6 +105,13 @@ fn main() -> Result<()> {
         }
         Command::Ingest => {
             ingest_all(&repo_root, &store)?;
+        }
+        Command::Serve {
+            bind,
+            port,
+            allow_mutate,
+        } => {
+            server::serve(repo_root, store, bind, port, allow_mutate).await?;
         }
     }
 

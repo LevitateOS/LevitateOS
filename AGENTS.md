@@ -98,6 +98,8 @@ Tooling:
 - List entries: `cargo run -p recart -- ls rootfs_erofs`
 - GC unreferenced blobs: `cargo run -p recart -- gc`
 - Prune (keep last N per kind, then GC): `cargo run -p recart -- prune --keep-last 3`
+- Local artifact explorer UI (read-only): `cargo run -p recart -- serve` (open `http://127.0.0.1:8765/`)
+- Local artifact explorer UI (mutations enabled): `cargo run -p recart -- serve --allow-mutate` (open the printed `?token=...` URL)
 
 ## Coding Style & Naming Conventions
 - Rust: `cargo fmt` formatting; keep `cargo clippy -- -D warnings` clean. Avoid

@@ -11,12 +11,18 @@ authors = ["LevitateOS Contributors"]
 
 [dependencies]
 anyhow = "1.0"
+axum = { version = "0.7", features = ["json"] }
 clap = { version = "4.4", features = ["derive"] }
 distro-builder = { path = "../../distro-builder" }
 distro-spec = { path = "../../distro-spec" }
 leviso = { path = "../../leviso" }
 acornos = { path = "../../AcornOS" }
 iuppiteros = { path = "../../IuppiterOS" }
+rand = "0.8"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tokio = { version = "1", features = ["fs", "macros", "rt-multi-thread"] }
+tokio-util = { version = "0.7", features = ["io"] }
 
 [profile.release]
 strip = true
