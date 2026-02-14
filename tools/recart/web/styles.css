@@ -139,6 +139,26 @@ body {
   color: var(--muted);
 }
 
+input.input {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--stroke);
+  border-radius: 10px;
+  padding: 8px 10px;
+  outline: none;
+  font-size: 12px;
+  width: 240px;
+}
+
+input.input::placeholder {
+  color: rgba(255, 255, 255, 0.38);
+}
+
+input.input--small {
+  width: 120px;
+  padding: 6px 8px;
+}
+
 select {
   color: var(--text);
   background: rgba(255, 255, 255, 0.06);
@@ -178,6 +198,13 @@ select {
 
 .btn--quiet {
   background: transparent;
+}
+
+.row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
 }
 
 .table-wrap {
@@ -315,4 +342,3 @@ select {
   color: var(--muted);
   font-size: 12px;
 }
-

@@ -60,8 +60,20 @@ const state = {
   storeOffset: 0,
   storeLimit: 30,
   mutationsEnabled: false,
-  outRootRel: ".",
   treeRelPath: null,
+  outRootAbs: null,
+  storeRootAbs: null,
+
+  outputsFilter: "",
+  storeFilter: "",
+  treeFilter: "",
+
+  lastSummary: null,
+  lastTree: null,
+  lastStore: null,
+
+  // Cache sha256 calculations by rel_path.
+  shaCache: new Map(),
 };
 
 function setStatus(msg) {
@@ -72,6 +84,18 @@ function setMutations(enabled) {
   state.mutationsEnabled = !!enabled;
   qs("#mut-pill").textContent = "mutations: " + (enabled ? "ON" : "off");
   qs("#gc-btn").disabled = !enabled;
+  qs("#prune-btn").disabled = !enabled;
+  qs("#ingest-all").disabled = !enabled;
+  qs("#restore-missing").disabled = !enabled;
+}
+
+async function copyText(text) {
+  try {
+    await navigator.clipboard.writeText(text);
+    setStatus("Copied to clipboard");
+  } catch {
+    window.prompt("Copy to clipboard:", text);
+  }
 }
 
 function renderDistroSelect() {
@@ -115,25 +139,35 @@ function link(text, href) {
   return a;
 }
 
-function button(text, onClick, danger = false) {
+function actionButton(text, onClick, { danger = false, requiresMutate = false } = {}) {
   const b = document.createElement("button");
   b.className = "btn " + (danger ? "btn--danger" : "");
   b.textContent = text;
   b.onclick = onClick;
-  b.disabled = !state.mutationsEnabled;
+  b.disabled = requiresMutate && !state.mutationsEnabled;
   return b;
 }
 
-async function loadOutputs() {
-  const dir = state.selectedDistro;
-  if (!dir) return;
-
-  setStatus("Loading outputs…");
-  const summary = await api(`/api/v1/distro/${encodeURIComponent(dir)}/summary`);
-
+function renderOutputs() {
+  const summary = state.lastSummary;
+  if (!summary) return;
   const tbody = qs("#outputs-table tbody");
   tbody.innerHTML = "";
-  for (const row of summary.artifacts) {
+
+  const needle = (state.outputsFilter || "").trim().toLowerCase();
+  const filtered = summary.artifacts.filter((row) => {
+    if (!needle) return true;
+    const parts = [
+      row.kind || "",
+      row.rel_path || "",
+      row.input_key || "",
+      row.store?.blob_sha256 || "",
+      row.store?.format || "",
+    ];
+    return parts.join(" ").toLowerCase().includes(needle);
+  });
+
+  for (const row of filtered) {
     const tr = document.createElement("tr");
 
     const tdKind = document.createElement("td");
@@ -141,7 +175,9 @@ async function loadOutputs() {
     tr.appendChild(tdKind);
 
     const tdPath = document.createElement("td");
-    tdPath.appendChild(link(row.rel_path, `/api/v1/file/download?path=${encodeURIComponent(row.rel_path)}`));
+    tdPath.appendChild(
+      link(row.rel_path, `/api/v1/file/download?path=${encodeURIComponent(row.rel_path)}`)
+    );
     tr.appendChild(tdPath);
 
     const tdExists = document.createElement("td");
@@ -157,14 +193,50 @@ async function loadOutputs() {
     tr.appendChild(tdM);
 
     const tdKey = document.createElement("td");
-    tdKey.textContent = row.input_key ? row.input_key.slice(0, 16) + "…" : "";
+    if (row.input_key) {
+      const t = document.createElement("span");
+      t.textContent = row.input_key.slice(0, 16) + "…";
+      t.title = row.input_key;
+      t.style.cursor = "pointer";
+      t.onclick = () => copyText(row.input_key);
+      tdKey.appendChild(t);
+    } else {
+      tdKey.textContent = "";
+    }
     tr.appendChild(tdKey);
+
+    const tdSha = document.createElement("td");
+    const cached = state.shaCache.get(row.rel_path);
+    if (cached) {
+      const t = document.createElement("span");
+      t.textContent = cached.slice(0, 16) + "…";
+      t.title = cached;
+      t.style.cursor = "pointer";
+      t.onclick = () => copyText(cached);
+      tdSha.appendChild(t);
+    } else {
+      tdSha.textContent = "";
+    }
+    tr.appendChild(tdSha);
 
     const tdStore = document.createElement("td");
     if (row.store && row.store.present) {
       tdStore.appendChild(tag("present", true));
       tdStore.appendChild(document.createTextNode(" "));
-      tdStore.appendChild(link(row.store.blob_sha256.slice(0, 16), `/api/v1/blob/${row.store.blob_sha256}`));
+      tdStore.appendChild(
+        link(row.store.blob_sha256.slice(0, 16), `/api/v1/blob/${row.store.blob_sha256}`)
+      );
+      if (row.store.format) {
+        tdStore.appendChild(document.createTextNode(" "));
+        tdStore.appendChild(tag(row.store.format, true));
+      }
+      if (row.store.hardlinked_to_blob === true) {
+        tdStore.appendChild(document.createTextNode(" "));
+        tdStore.appendChild(tag("linked", true));
+      } else if (row.store.hardlinked_to_blob === false) {
+        tdStore.appendChild(document.createTextNode(" "));
+        tdStore.appendChild(tag("copied", false));
+      }
     } else {
       tdStore.appendChild(tag("missing", false));
     }
@@ -175,28 +247,57 @@ async function loadOutputs() {
     wrap.style.display = "flex";
     wrap.style.gap = "8px";
     wrap.appendChild(
-      button("Restore", async () => {
-        setStatus(`Restoring ${row.kind}…`);
-        await api(`/api/v1/distro/${encodeURIComponent(dir)}/restore`, {
-          method: "POST",
-          headers: { "content-type": "application/json", ...tokenHeader() },
-          body: JSON.stringify({ kind: row.kind }),
-        });
-        await loadOutputs();
-        await loadTree(`${dir}`);
-        setStatus(`Restored ${row.kind}`);
+      actionButton(
+        "Restore",
+        async () => {
+          const dir = state.selectedDistro;
+          if (!dir) return;
+          setStatus(`Restoring ${row.kind}…`);
+          await api(`/api/v1/distro/${encodeURIComponent(dir)}/restore`, {
+            method: "POST",
+            headers: { "content-type": "application/json", ...tokenHeader() },
+            body: JSON.stringify({ kind: row.kind }),
+          });
+          await loadOutputs();
+          await loadTree(`${dir}`);
+          setStatus(`Restored ${row.kind}`);
+        },
+        { requiresMutate: true }
+      )
+    );
+    wrap.appendChild(
+      actionButton(
+        "Ingest",
+        async () => {
+          const dir = state.selectedDistro;
+          if (!dir) return;
+          setStatus(`Ingesting ${row.kind}…`);
+          await api(`/api/v1/distro/${encodeURIComponent(dir)}/ingest_existing`, {
+            method: "POST",
+            headers: { "content-type": "application/json", ...tokenHeader() },
+            body: JSON.stringify({ kinds: [row.kind] }),
+          });
+          await loadOutputs();
+          setStatus(`Ingested ${row.kind}`);
+        },
+        { requiresMutate: true }
+      )
+    );
+    wrap.appendChild(
+      actionButton("Hash", async () => {
+        if (!row.rel_path) return;
+        setStatus(`Hashing ${row.rel_path}…`);
+        const resp = await api(`/api/v1/file/sha256?path=${encodeURIComponent(row.rel_path)}`);
+        state.shaCache.set(row.rel_path, resp.sha256);
+        renderOutputs();
+        setStatus(`SHA256 ${row.rel_path}: ${resp.sha256.slice(0, 16)}…`);
       })
     );
     wrap.appendChild(
-      button("Ingest", async () => {
-        setStatus(`Ingesting ${row.kind}…`);
-        await api(`/api/v1/distro/${encodeURIComponent(dir)}/ingest_existing`, {
-          method: "POST",
-          headers: { "content-type": "application/json", ...tokenHeader() },
-          body: JSON.stringify({ kinds: [row.kind] }),
-        });
-        await loadOutputs();
-        setStatus(`Ingested ${row.kind}`);
+      actionButton("Copy Path", async () => {
+        const base = state.outRootAbs || "";
+        const abs = base && row.rel_path ? `${base}/${row.rel_path}` : row.rel_path;
+        await copyText(abs);
       })
     );
     tdAct.appendChild(wrap);
@@ -204,6 +305,17 @@ async function loadOutputs() {
 
     tbody.appendChild(tr);
   }
+}
+
+async function loadOutputs() {
+  const dir = state.selectedDistro;
+  if (!dir) return;
+
+  setStatus("Loading outputs…");
+  const summary = await api(`/api/v1/distro/${encodeURIComponent(dir)}/summary`);
+  state.lastSummary = summary;
+  state.outRootAbs = summary.out_root;
+  renderOutputs();
 
   setStatus("Outputs loaded");
 }
@@ -214,6 +326,15 @@ async function loadTree(relPath) {
   setStatus("Loading tree…");
 
   const list = await api(`/api/v1/out/ls?path=${encodeURIComponent(relPath)}`);
+  state.lastTree = list;
+  renderTree();
+}
+
+function renderTree() {
+  const list = state.lastTree;
+  const relPath = state.treeRelPath || "";
+  if (!list) return;
+
   const root = qs("#tree-list");
   root.innerHTML = "";
 
@@ -236,7 +357,13 @@ async function loadTree(relPath) {
     root.appendChild(up);
   }
 
-  for (const e of list.entries) {
+  const needle = (state.treeFilter || "").trim().toLowerCase();
+  const entries = list.entries.filter((e) => {
+    if (!needle) return true;
+    return (e.name || "").toLowerCase().includes(needle);
+  });
+
+  for (const e of entries) {
     const item = document.createElement("div");
     item.className = "tree__item";
     const left = document.createElement("div");
@@ -252,7 +379,11 @@ async function loadTree(relPath) {
     if (e.kind === "dir") {
       item.onclick = () => loadTree(e.rel_path);
     } else {
-      item.onclick = () => window.open(`/api/v1/file/download?path=${encodeURIComponent(e.rel_path)}`, "_blank");
+      item.onclick = () =>
+        window.open(
+          `/api/v1/file/download?path=${encodeURIComponent(e.rel_path)}`,
+          "_blank"
+        );
     }
 
     root.appendChild(item);
@@ -272,10 +403,24 @@ async function loadStore() {
   const data = await api(
     `/api/v1/store/${encodeURIComponent(kind)}/entries?offset=${state.storeOffset}&limit=${state.storeLimit}`
   );
+  state.lastStore = data;
+  renderStore();
+}
+
+function renderStore() {
+  const data = state.lastStore;
+  if (!data) return;
   const tbody = qs("#store-table tbody");
   tbody.innerHTML = "";
 
-  for (const e of data.entries) {
+  const needle = (state.storeFilter || "").trim().toLowerCase();
+  const filtered = data.entries.filter((e) => {
+    if (!needle) return true;
+    const parts = [e.input_key || "", e.blob_sha256 || "", e.format || ""];
+    return parts.join(" ").toLowerCase().includes(needle);
+  });
+
+  for (const e of filtered) {
     const tr = document.createElement("tr");
 
     const tdT = document.createElement("td");
@@ -323,6 +468,8 @@ async function init() {
   setStatus("Connecting…");
   const st = await api("/api/v1/status");
   qs("#repo-pill").textContent = "repo: " + st.repo_root;
+  qs("#store-pill").textContent = "store: " + st.store_root;
+  state.storeRootAbs = st.store_root;
   setMutations(st.mutations_enabled);
 
   state.kinds = await api("/api/v1/store/kinds");
@@ -352,6 +499,72 @@ async function init() {
   };
   qs("#refresh-store").onclick = async () => {
     await loadStore();
+  };
+
+  qs("#outputs-filter").oninput = async (e) => {
+    state.outputsFilter = e.target.value || "";
+    renderOutputs();
+  };
+  qs("#tree-filter").oninput = async (e) => {
+    state.treeFilter = e.target.value || "";
+    renderTree();
+  };
+  qs("#store-filter").oninput = async (e) => {
+    state.storeFilter = e.target.value || "";
+    renderStore();
+  };
+
+  qs("#ingest-all").onclick = async () => {
+    if (!state.mutationsEnabled) return;
+    const dir = state.selectedDistro;
+    if (!dir) return;
+    setStatus("Ingesting all existing outputs…");
+    await api(`/api/v1/distro/${encodeURIComponent(dir)}/ingest_existing`, {
+      method: "POST",
+      headers: { "content-type": "application/json", ...tokenHeader() },
+      body: JSON.stringify({}),
+    });
+    await loadOutputs();
+    await loadStore();
+    setStatus("Ingest complete");
+  };
+
+  qs("#restore-missing").onclick = async () => {
+    if (!state.mutationsEnabled) return;
+    const dir = state.selectedDistro;
+    if (!dir) return;
+    const summary = state.lastSummary;
+    if (!summary) return;
+    const missing = summary.artifacts.filter((a) => !a.exists).map((a) => a.kind);
+    if (missing.length === 0) {
+      setStatus("No missing artifacts to restore");
+      return;
+    }
+    setStatus(`Restoring ${missing.length} missing artifact(s)…`);
+    for (const k of missing) {
+      await api(`/api/v1/distro/${encodeURIComponent(dir)}/restore`, {
+        method: "POST",
+        headers: { "content-type": "application/json", ...tokenHeader() },
+        body: JSON.stringify({ kind: k }),
+      });
+    }
+    await loadOutputs();
+    await loadTree(`${dir}`);
+    setStatus("Restore missing complete");
+  };
+
+  qs("#prune-btn").onclick = async () => {
+    if (!state.mutationsEnabled) return;
+    const raw = (qs("#prune-keep-last").value || "").trim();
+    const keep = Math.max(1, Number(raw || "3"));
+    setStatus(`Pruning (keep last ${keep})…`);
+    await api("/api/v1/actions/prune", {
+      method: "POST",
+      headers: { "content-type": "application/json", ...tokenHeader() },
+      body: JSON.stringify({ keep_last: keep }),
+    });
+    await loadStore();
+    setStatus("Prune complete");
   };
 
   qs("#store-prev").onclick = async () => {
@@ -386,4 +599,3 @@ init().catch((e) => {
   console.error(e);
   setStatus("ERROR: " + String(e?.message || e));
 });
-

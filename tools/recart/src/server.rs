@@ -9,11 +9,13 @@ use axum::Json;
 use distro_builder::artifact_store::ArtifactStore;
 use rand::RngCore;
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
 use std::path::{Component, Path, PathBuf};
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 use tokio::fs::File;
+use tokio::io::AsyncReadExt;
 use tokio_util::io::ReaderStream;
 
 static INDEX_HTML: &str = include_str!("../web/index.html");
@@ -101,6 +103,7 @@ pub async fn serve(
         .route("/api/v1/distro/:distro/summary", get(api_distro_summary))
         .route("/api/v1/out/ls", get(api_out_ls))
         .route("/api/v1/file/download", get(api_file_download))
+        .route("/api/v1/file/sha256", get(api_file_sha256))
         .route("/api/v1/store/kinds", get(api_store_kinds))
         .route("/api/v1/store/:kind/entries", get(api_store_entries_paged))
         .route("/api/v1/store/:kind/entry", get(api_store_entry))
@@ -237,6 +240,9 @@ async fn api_distros() -> Json<Vec<DistroInfo>> {
 struct StorePresence {
     present: bool,
     blob_sha256: Option<String>,
+    format: Option<distro_builder::artifact_store::ArtifactFormat>,
+    hardlinked_to_blob: Option<bool>,
+    out_nlink: Option<u64>,
 }
 
 #[derive(Serialize)]
@@ -307,14 +313,39 @@ fn store_presence(
     store: &ArtifactStore,
     kind: &str,
     input_key: Option<&str>,
+    out_file: Option<&Path>,
 ) -> Result<Option<StorePresence>, ApiError> {
     let Some(k) = input_key else {
         return Ok(None);
     };
     let found = store.get(kind, k)?;
+    let Some(stored) = found else {
+        return Ok(Some(StorePresence {
+            present: false,
+            blob_sha256: None,
+            format: None,
+            hardlinked_to_blob: None,
+            out_nlink: None,
+        }));
+    };
+
+    let mut hardlinked_to_blob = None;
+    let mut out_nlink = None;
+    if stored.entry.format == distro_builder::artifact_store::ArtifactFormat::File {
+        if let Some(out_file) = out_file {
+            if let Some((hl, nl)) = hardlink_info(out_file, &stored.blob_path) {
+                hardlinked_to_blob = Some(hl);
+                out_nlink = Some(nl);
+            }
+        }
+    }
+
     Ok(Some(StorePresence {
-        present: found.is_some(),
-        blob_sha256: found.map(|s| s.entry.blob_sha256),
+        present: true,
+        blob_sha256: Some(stored.entry.blob_sha256),
+        format: Some(stored.entry.format),
+        hardlinked_to_blob,
+        out_nlink,
     }))
 }
 
@@ -360,7 +391,7 @@ fn summary_leviso(store: &ArtifactStore, out_dir: &Path) -> Result<Vec<ArtifactR
             size_bytes: size,
             mtime_unix: mtime,
             input_key: k_kernel.clone(),
-            store: store_presence(store, "kernel_payload", k_kernel.as_deref())?,
+            store: store_presence(store, "kernel_payload", k_kernel.as_deref(), Some(&vmlinuz))?,
         });
     }
 
@@ -382,7 +413,7 @@ fn summary_leviso(store: &ArtifactStore, out_dir: &Path) -> Result<Vec<ArtifactR
             size_bytes: size,
             mtime_unix: mtime,
             input_key: key.clone(),
-            store: store_presence(store, store_kind, key.as_deref())?,
+            store: store_presence(store, store_kind, key.as_deref(), Some(path))?,
         });
     }
 
@@ -395,7 +426,7 @@ fn summary_leviso(store: &ArtifactStore, out_dir: &Path) -> Result<Vec<ArtifactR
             size_bytes: size,
             mtime_unix: mtime,
             input_key: iso_key.clone(),
-            store: store_presence(store, "iso", iso_key.as_deref())?,
+            store: store_presence(store, "iso", iso_key.as_deref(), Some(&iso))?,
         });
     }
 
@@ -408,7 +439,7 @@ fn summary_leviso(store: &ArtifactStore, out_dir: &Path) -> Result<Vec<ArtifactR
             size_bytes: size,
             mtime_unix: mtime,
             input_key: iso_key.clone(),
-            store: store_presence(store, "iso_checksum", iso_key.as_deref())?,
+            store: store_presence(store, "iso_checksum", iso_key.as_deref(), Some(&checksum))?,
         });
     }
 
@@ -445,7 +476,7 @@ fn summary_acorn(store: &ArtifactStore, out_dir: &Path) -> Result<Vec<ArtifactRo
             size_bytes: size,
             mtime_unix: mtime,
             input_key: k_kernel.clone(),
-            store: store_presence(store, "kernel_payload", k_kernel.as_deref())?,
+            store: store_presence(store, "kernel_payload", k_kernel.as_deref(), Some(&vmlinuz))?,
         });
     }
 
@@ -461,7 +492,7 @@ fn summary_acorn(store: &ArtifactStore, out_dir: &Path) -> Result<Vec<ArtifactRo
             size_bytes: size,
             mtime_unix: mtime,
             input_key: key.clone(),
-            store: store_presence(store, store_kind, key.as_deref())?,
+            store: store_presence(store, store_kind, key.as_deref(), Some(path))?,
         });
     }
 
@@ -474,7 +505,7 @@ fn summary_acorn(store: &ArtifactStore, out_dir: &Path) -> Result<Vec<ArtifactRo
             size_bytes: size,
             mtime_unix: mtime,
             input_key: iso_key.clone(),
-            store: store_presence(store, "iso", iso_key.as_deref())?,
+            store: store_presence(store, "iso", iso_key.as_deref(), Some(&iso))?,
         });
     }
 
@@ -487,7 +518,7 @@ fn summary_acorn(store: &ArtifactStore, out_dir: &Path) -> Result<Vec<ArtifactRo
             size_bytes: size,
             mtime_unix: mtime,
             input_key: iso_key.clone(),
-            store: store_presence(store, "iso_checksum", iso_key.as_deref())?,
+            store: store_presence(store, "iso_checksum", iso_key.as_deref(), Some(&checksum))?,
         });
     }
 
@@ -524,7 +555,7 @@ fn summary_iuppiter(store: &ArtifactStore, out_dir: &Path) -> Result<Vec<Artifac
             size_bytes: size,
             mtime_unix: mtime,
             input_key: k_kernel.clone(),
-            store: store_presence(store, "kernel_payload", k_kernel.as_deref())?,
+            store: store_presence(store, "kernel_payload", k_kernel.as_deref(), Some(&vmlinuz))?,
         });
     }
 
@@ -540,7 +571,7 @@ fn summary_iuppiter(store: &ArtifactStore, out_dir: &Path) -> Result<Vec<Artifac
             size_bytes: size,
             mtime_unix: mtime,
             input_key: key.clone(),
-            store: store_presence(store, store_kind, key.as_deref())?,
+            store: store_presence(store, store_kind, key.as_deref(), Some(path))?,
         });
     }
 
@@ -553,7 +584,7 @@ fn summary_iuppiter(store: &ArtifactStore, out_dir: &Path) -> Result<Vec<Artifac
             size_bytes: size,
             mtime_unix: mtime,
             input_key: iso_key.clone(),
-            store: store_presence(store, "iso", iso_key.as_deref())?,
+            store: store_presence(store, "iso", iso_key.as_deref(), Some(&iso))?,
         });
     }
 
@@ -566,7 +597,7 @@ fn summary_iuppiter(store: &ArtifactStore, out_dir: &Path) -> Result<Vec<Artifac
             size_bytes: size,
             mtime_unix: mtime,
             input_key: iso_key.clone(),
-            store: store_presence(store, "iso_checksum", iso_key.as_deref())?,
+            store: store_presence(store, "iso_checksum", iso_key.as_deref(), Some(&checksum))?,
         });
     }
 
@@ -617,12 +648,17 @@ async fn api_out_ls(
         let name = ent.file_name().to_string_lossy().to_string();
         let md = std::fs::symlink_metadata(&path)?;
         let ft = md.file_type();
+        // Classify symlinks by their target type when possible (useful for symlinked dirs).
         let kind = if ft.is_dir() {
             "dir"
         } else if ft.is_file() {
             "file"
         } else if ft.is_symlink() {
-            "symlink"
+            match std::fs::metadata(&path) {
+                Ok(m) if m.is_dir() => "dir",
+                Ok(m) if m.is_file() => "file",
+                _ => "symlink",
+            }
         } else {
             "other"
         };
@@ -678,6 +714,37 @@ async fn api_file_download(
 ) -> Result<Response, ApiError> {
     let path = sanitize_under_root(&st.out_root, &q.path)?;
     stream_file_download(&path, Some(&q.path)).await
+}
+
+#[derive(Deserialize)]
+struct Sha256Query {
+    /// Path relative to `.artifacts/out`.
+    path: String,
+}
+
+#[derive(Serialize)]
+struct Sha256Resp {
+    rel_path: String,
+    abs_path: String,
+    size_bytes: u64,
+    sha256: String,
+    computed_at_unix: u64,
+}
+
+async fn api_file_sha256(
+    State(st): State<Arc<AppState>>,
+    Query(q): Query<Sha256Query>,
+) -> Result<Json<Sha256Resp>, ApiError> {
+    let rel = q.path.clone();
+    let path = sanitize_under_root(&st.out_root, &q.path)?;
+    let (sha256, size_bytes) = sha256_file_async(&path).await?;
+    Ok(Json(Sha256Resp {
+        rel_path: rel,
+        abs_path: path.display().to_string(),
+        size_bytes,
+        sha256,
+        computed_at_unix: now_unix(),
+    }))
 }
 
 async fn api_store_kinds(State(st): State<Arc<AppState>>) -> Result<Json<Vec<String>>, ApiError> {
@@ -1279,6 +1346,20 @@ fn validate_hex_64(s: &str) -> Result<(), ApiError> {
     Ok(())
 }
 
+#[cfg(unix)]
+fn hardlink_info(out_file: &Path, blob_file: &Path) -> Option<(bool, u64)> {
+    use std::os::unix::fs::MetadataExt;
+    let out_md = std::fs::metadata(out_file).ok()?;
+    let blob_md = std::fs::metadata(blob_file).ok()?;
+    let same = out_md.dev() == blob_md.dev() && out_md.ino() == blob_md.ino();
+    Some((same, out_md.nlink()))
+}
+
+#[cfg(not(unix))]
+fn hardlink_info(_out_file: &Path, _blob_file: &Path) -> Option<(bool, u64)> {
+    None
+}
+
 fn sanitize_relative_path(rel: &str) -> Result<PathBuf, ApiError> {
     let p = PathBuf::from(rel);
     for c in p.components() {
@@ -1335,6 +1416,29 @@ async fn stream_file_download(path: &Path, name_hint: Option<&str>) -> Result<Re
     }
 
     Ok((headers, body).into_response())
+}
+
+async fn sha256_file_async(path: &Path) -> Result<(String, u64), ApiError> {
+    let md =
+        std::fs::metadata(path).with_context(|| format!("File not found: {}", path.display()))?;
+    if !md.is_file() {
+        return Err(ApiError::BadRequest("not a file".to_string()));
+    }
+
+    let mut f = File::open(path).await?;
+    let mut hasher = Sha256::new();
+    let mut buf = vec![0u8; 1024 * 1024];
+    let mut size = 0u64;
+    loop {
+        let n = f.read(&mut buf).await?;
+        if n == 0 {
+            break;
+        }
+        hasher.update(&buf[..n]);
+        size += n as u64;
+    }
+    let sha = format!("{:x}", hasher.finalize());
+    Ok((sha, size))
 }
 
 fn sanitize_filename(name: &str) -> String {

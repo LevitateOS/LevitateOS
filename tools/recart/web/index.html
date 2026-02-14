@@ -16,6 +16,7 @@
       </div>
       <div class="topbar__right">
         <div class="pill" id="repo-pill">repo: (loading)</div>
+        <div class="pill" id="store-pill">store: (loading)</div>
         <div class="pill" id="mut-pill">mutations: (loading)</div>
       </div>
     </header>
@@ -25,11 +26,14 @@
         <div class="pane__header">
           <div class="pane__title">Outputs</div>
           <div class="pane__controls">
+            <input id="outputs-filter" class="input" placeholder="Filter (kind/path/key…)" />
             <label class="select">
               <span>Distro</span>
               <select id="distro-select"></select>
             </label>
             <button id="refresh-outputs" class="btn">Refresh</button>
+            <button id="ingest-all" class="btn">Ingest All</button>
+            <button id="restore-missing" class="btn btn--quiet">Restore Missing</button>
           </div>
         </div>
 
@@ -46,6 +50,7 @@
                     <th>size</th>
                     <th>mtime</th>
                     <th>input_key</th>
+                    <th>sha256</th>
                     <th>store</th>
                     <th>actions</th>
                   </tr>
@@ -56,7 +61,10 @@
           </div>
 
           <div class="card">
-            <div class="card__title">File Tree</div>
+            <div class="card__title row">
+              <div>File Tree</div>
+              <input id="tree-filter" class="input input--small" placeholder="Filter tree…" />
+            </div>
             <div class="tree">
               <div class="tree__path" id="tree-path">(loading)</div>
               <div class="tree__list" id="tree-list"></div>
@@ -69,11 +77,17 @@
         <div class="pane__header">
           <div class="pane__title">Store</div>
           <div class="pane__controls">
+            <input id="store-filter" class="input" placeholder="Filter (key/blob/format…)" />
             <label class="select">
               <span>Kind</span>
               <select id="kind-select"></select>
             </label>
             <button id="refresh-store" class="btn">Refresh</button>
+            <label class="select">
+              <span>Keep</span>
+              <input id="prune-keep-last" class="input input--small" value="3" />
+            </label>
+            <button id="prune-btn" class="btn btn--quiet">Prune</button>
             <button id="gc-btn" class="btn btn--danger">GC</button>
           </div>
         </div>
@@ -121,4 +135,3 @@
     <script src="/app.js"></script>
   </body>
 </html>
-
