@@ -37,6 +37,7 @@ build_warnings*.txt
 !tests/golden_*.txt
 
 # Temporary and Output Directories
+.tmp/
 tmp/
 initrd_root/
 initrd_test_root/
