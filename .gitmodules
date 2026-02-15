@@ -73,3 +73,9 @@
 [submodule "distro-contract"]
 	path = distro-contract
 	url = git@github.com:LevitateOS/distro-contract.git
+[submodule "tools/recab"]
+	path = tools/recab
+	url = git@github.com:LevitateOS/recab.git
+[submodule "RalphOS"]
+	path = RalphOS
+	url = git@github.com:LevitateOS/RalphOS.git
