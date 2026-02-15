@@ -26,7 +26,7 @@ entire build reproducible from a bare Rocky Linux install with only gcc, make, a
 4. NEVER skip creating a recipe because "it's just one tool" — that's how dnf creep starts
 
 **Existing recipe collection:**
-- `rocky-deps.rhai` — aria2c, 7zz, unsquashfs (for Rocky ISO extraction)
+- `rocky-deps.rhai` — 7zz, unsquashfs (for Rocky ISO extraction)
 - `linux-deps.rhai` — flex, bison, gcc, etc. (for kernel compilation)
 - `leviso-deps.rhai` — mkfs.erofs, xorriso, mkfs.fat, mtools, ukify, isoinfo (for ISO building)
 

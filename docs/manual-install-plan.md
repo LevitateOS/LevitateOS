@@ -1,5 +1,11 @@
 # Manual Installation Plan
 
+> WARNING: This document is historical planning notes and does not match the current installer.
+>
+> Current installs are **A/B immutable by default** (`EFI + system-a + system-b + var`). Slot B is the inactive target for atomic updates + rollback. **Mutable mode** (where it exists) is an explicit opt-in for daredevils, and is unsafe if you let an LLM author recipes without review.
+>
+> For real installation instructions, follow the docs site pages under `docs/content/src/content/01-getting-started/`.
+
 ## Overview
 
 - **No dnf/pacman/apt** - LevitateOS uses `recipe` for package management

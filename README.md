@@ -4,13 +4,15 @@
 
 **Customization from the package level.**
 
-A Linux distribution where you maintain your own packages. Write simple Rhai recipes, build from source, with local AI assistance. Full control, no upstream dependencies.
+A Linux distribution where you maintain your own packages. Write simple Rhai recipes, build from source, with local AI assistance. Atomic A/B updates are the default; mutable mode is an explicit opt-in for daredevils (unsafe if you let an LLM author recipes without review).
 
 ## The Idea
 
 While other Linux distributions rely on centralized repositories, LevitateOS takes a different approach. You write your own packages called "recipes": declaring how to acquire, build, and install each piece of software.
 
 Too slow? A locally running LLM (SmolLM3) generates, customizes, and maintains your recipes.
+
+By default, LevitateOS is **A/B immutable**: recipes compose changes into the inactive slot, you reboot to trial-boot it once, then commit (or roll back by rebooting). Mutable mode exists, but it is explicitly unsafe.
 
 **Manual install. Full control. AI-assisted packaging.**
 
@@ -80,18 +82,31 @@ Requirements: Rust 1.75+, 50GB disk, QEMU with OVMF.
 
 ## Installation
 
+Default install is A/B immutable: `EFI + system-a + system-b + var`. Slot B is the inactive slot for atomic updates; persistent state (including home directories) lives under `/var` (`/var/home`).
+
 From the live ISO (like Arch Linux):
 
 ```bash
-# Partition and format
-fdisk /dev/nvme0n1
-mkfs.fat -F32 /dev/nvme0n1p1
-mkfs.ext4 /dev/nvme0n1p2
+# Partition and format (UEFI/GPT)
+DISK=/dev/nvme0n1  # change me
 
-# Mount
-mount /dev/nvme0n1p2 /mnt
-mkdir -p /mnt/boot
-mount /dev/nvme0n1p1 /mnt/boot
+sgdisk -Z "$DISK"
+sgdisk \\
+  -n 1:0:+1G  -t 1:ef00 -c 1:EFI \\
+  -n 2:0:+64G -t 2:8300 -c 2:system-a \\
+  -n 3:0:+64G -t 3:8300 -c 3:system-b \\
+  -n 4:0:0    -t 4:8300 -c 4:var \\
+  "$DISK"
+
+mkfs.fat -F32 -n EFI ${DISK}p1
+mkfs.ext4 -L system-a ${DISK}p2
+mkfs.ext4 -L system-b ${DISK}p3
+mkfs.ext4 -L var ${DISK}p4
+
+# Mount slot A + EFI + /var (leave system-b unmounted)
+mount ${DISK}p2 /mnt
+mount --mkdir ${DISK}p1 /mnt/boot
+mount --mkdir ${DISK}p4 /mnt/var
 
 # Extract and configure
 recstrap /mnt
@@ -101,9 +116,32 @@ recchroot /mnt
 # Inside chroot
 passwd
 useradd -m -G wheel myuser
+passwd myuser
+
+mkdir -p /boot/EFI/Linux
+cp /media/cdrom/boot/uki/levitateos-system-a.efi /boot/EFI/Linux/
+cp /media/cdrom/boot/uki/levitateos-system-b.efi /boot/EFI/Linux/
+
 bootctl install
+
+mkdir -p /boot/loader/entries
+cat > /boot/loader/entries/levitate-a.conf << 'EOF'
+title   LevitateOS (Slot A)
+efi     /EFI/Linux/levitateos-system-a.efi
+EOF
+cat > /boot/loader/entries/levitate-b.conf << 'EOF'
+title   LevitateOS (Slot B)
+efi     /EFI/Linux/levitateos-system-b.efi
+EOF
+cat > /boot/loader/loader.conf << 'EOF'
+default levitate-a.conf
+timeout 3
+editor no
+EOF
+
 exit
 
+umount -R /mnt
 reboot
 ```
 

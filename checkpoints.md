@@ -5,9 +5,10 @@ Human-maintained progress table for the checkpoint-based dev loop in
 
 ## Legend
 
-- `OK`: implemented + expected to pass
-- `HALF`: partially done (see CP0)
-- `X`: not done yet
+- `OK`: verified working for this output target
+- `HALF`: verified working but incomplete/compromised (see CP0)
+- `X`: not verified yet (either not implemented or not tested)
+- `-`: not applicable for this output target
 
 ## Checkpoint Definitions
 
@@ -38,33 +39,22 @@ For public-facing distros (LevitateOS/AcornOS), we need to decide whether to sup
 
 ## Progress Table
 
-### x86_64
+Columns represent distinct output targets (different ISOs and/or installed-disk artifact sets).
+Only mark a cell `OK`/`HALF` after that exact output target has been verified (by the checkpoint harness or an equivalent reproducible run); otherwise keep it `X`.
 
-| Checkpoint | LevitateOS | RalphOS | AcornOS | IuppiterOS |
-|---|---|---|---|---|
-| CP0 (Build) | OK | X | HALF | X |
-| CP1 (Live Boot) | OK | X | OK | X |
-| CP2 (Live Tools) | OK | X | OK | X |
-| CP3 (Installation) | X | X | X | X |
-| CP4 (Installed Boot) | X | X | X | X |
-| CP5 (Automated Login) | X | X | X | X |
-| CP6 (Daily Driver Tools) | X | X | X | X |
-| CP7 (Slot B Trial Boot) | X | X | X | X |
-| CP8 (Release Images) | X | X | X | X |
-
-### AArch64
-
-| Checkpoint | LevitateOS | RalphOS | AcornOS |
-|---|---|---|---|
-| CP0 (Build) | X | X | X |
-| CP1 (Live Boot) | X | X | X |
-| CP2 (Live Tools) | X | X | X |
-| CP3 (Installation) | X | X | X |
-| CP4 (Installed Boot) | X | X | X |
-| CP5 (Automated Login) | X | X | X |
-| CP6 (Daily Driver Tools) | X | X | X |
-| CP7 (Slot B Trial Boot) | X | X | X |
-| CP8 (Release Images) | X | X | X |
+| Checkpoint | LevitateOS |  |  |  | RalphOS |  | AcornOS |  |  |  | IuppiterOS |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| Target | x86_64 |  | aarch64 |  | x86_64 | aarch64 | x86_64 |  | aarch64 |  | x86_64 |
+| Mutability | A/B | mutable | A/B | mutable | A/B | A/B | A/B | mutable | A/B | mutable | A/B |
+| CP0 (Build) | X | OK | X | X | X | X | X | HALF | X | X | X |
+| CP1 (Live Boot) | X | OK | X | X | X | X | X | OK | X | X | X |
+| CP2 (Live Tools) | X | OK | X | X | X | X | X | OK | X | X | X |
+| CP3 (Installation) | X | X | X | X | X | X | X | X | X | X | X |
+| CP4 (Installed Boot) | X | X | X | X | X | X | X | X | X | X | X |
+| CP5 (Automated Login) | X | X | X | X | X | X | X | X | X | X | X |
+| CP6 (Daily Driver Tools) | X | X | X | X | X | X | X | X | X | X | X |
+| CP7 (Slot B Trial Boot) | X | - | X | - | X | X | X | - | X | - | X |
+| CP8 (Release Images) | X | X | X | X | X | X | X | X | X | X | X |
 
 Notes:
-- x86_64 AcornOS: kernel is currently "stolen" from LevitateOS (theft mode), so CP0 is HALF.
+- x86_64 AcornOS (mutable): kernel is currently "stolen" from LevitateOS (theft mode), so CP0 is HALF.

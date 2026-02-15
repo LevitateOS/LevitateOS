@@ -2,6 +2,12 @@
 
 This document defines the capabilities the SmolLM3-3B model must learn to be an effective installation assistant.
 
+## Default Model: A/B Immutable (Mutable Is Opt-In)
+
+- **Default layout:** `EFI + system-a + system-b + var` (A/B immutable).
+- **Update behavior:** changes are composed into the inactive slot and activated via reboot (trial boot + commit/rollback).
+- **Mutable mode:** only if the user explicitly opts in. Treat it as unsafe, especially if the user is relying on LLM-authored recipes without review.
+
 ---
 
 ## CRITICAL: THIS IS A CONVERSATION, NOT SINGLE QUERIES
