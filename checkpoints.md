@@ -13,7 +13,7 @@ Human-maintained progress table for the checkpoint-based dev loop in
 ## Checkpoint Definitions
 
 - `CP0` (Build): custom Linux kernel + bootable ISO.
-  - If the ISO builds but the kernel is reused/stolen ("theft mode", DEV-only), this is `HALF`.
+  - If the ISO builds but the kernel provenance is wrong (kernel release suffix does not match the distro), this is `HALF`.
 - `CP1`: Live Boot (ISO boots in QEMU and reaches a known-good marker)
 - `CP2`: Live Tools
   - LevitateOS/AcornOS: full live environment tooling is present and works (intended for interactive debugging/repair during live boot).
@@ -57,4 +57,4 @@ Only mark a cell `OK`/`HALF` after that exact output target has been verified (b
 | CP8 (Release Images) | X | X | X | X | X | X | X | X | X | X | X |
 
 Notes:
-- x86_64 AcornOS (mutable): kernel is currently "stolen" from LevitateOS (theft mode), so CP0 is HALF.
+- x86_64 AcornOS (mutable): CP0 is `HALF` if the kernel release suffix does not match `-acorn`.

@@ -35,11 +35,17 @@ kernels-check:
 kernels-check-one distro:
     cargo xtask kernels check {{distro}}
 
-kernels-build-all-x86-64:
-    cargo xtask kernels build-all-x86-64
+kernels-build distro:
+    cargo xtask kernels build {{distro}}
 
-kernels-rebuild-all-x86-64:
-    cargo xtask kernels build-all-x86-64 --rebuild
+kernels-build-all:
+    cargo xtask kernels build-all
+
+kernels-rebuild distro:
+    cargo xtask kernels build {{distro}} --rebuild
+
+kernels-rebuild-all:
+    cargo xtask kernels build-all --rebuild
 
 # Boot into a checkpoint stage (interactive serial, Ctrl-A X to exit)
 [no-exit-message]

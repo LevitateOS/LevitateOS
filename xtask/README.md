@@ -41,8 +41,19 @@ cargo run -p levitate-xtask -- checkpoints reset levitate
 cargo run -p levitate-xtask -- kernels check
 cargo run -p levitate-xtask -- kernels check leviso
 
-# Overnight kernel build (policy window enforced: 23:00 through 10:00 local time)
-cargo run -p levitate-xtask -- kernels build-all-x86-64
-# Rebuild even if already verified (alias: --force)
-cargo run -p levitate-xtask -- kernels build-all-x86-64 --rebuild
+# Build one kernel (x86_64; policy window enforced)
+cargo run -p levitate-xtask -- kernels build leviso
+
+# Overnight kernel builds (leviso + AcornOS + IuppiterOS + RalphOS; policy window enforced: 23:00 through 10:00 local time)
+cargo run -p levitate-xtask -- kernels build-all
+# Rebuild even if already verified
+cargo run -p levitate-xtask -- kernels build-all --rebuild
 ```
+
+## Deprecated Shell Wrappers
+
+The repo previously had ad-hoc shell scripts for kernel build/check. They are intentionally deleted; use xtask directly:
+
+- `cargo xtask kernels build <distro>`
+- `cargo xtask kernels build-all`
+- `cargo xtask kernels check`

@@ -7,5 +7,5 @@ publish = false
 [dependencies]
 anyhow = "1"
 clap = { version = "4", features = ["derive"] }
+distro-spec = { path = "../distro-spec" }
 which = "7"
-

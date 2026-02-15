@@ -4,11 +4,11 @@ use clap::{Parser, Subcommand, ValueEnum};
 pub enum Distro {
     #[value(name = "leviso")]
     Leviso,
-    #[value(name = "AcornOS")]
+    #[value(name = "acorn", alias = "AcornOS")]
     AcornOS,
-    #[value(name = "IuppiterOS")]
+    #[value(name = "iuppiter", alias = "IuppiterOS")]
     IuppiterOS,
-    #[value(name = "RalphOS")]
+    #[value(name = "ralph", alias = "RalphOS")]
     RalphOS,
 }
 
@@ -89,20 +89,33 @@ pub enum Cmd {
 
 #[derive(Subcommand)]
 pub enum KernelsCmd {
+    /// Build the kernel for one distro (policy window enforced).
+    #[command(name = "build", alias = "build-x86-64")]
+    Build {
+        #[arg(value_enum)]
+        distro: Distro,
+
+        #[arg(
+            long = "rebuild",
+            help = "Force the selected distro to rebuild+reinstall its kernel even if artifacts are already present. Does not bypass the 23:00-10:00 build-hours policy."
+        )]
+        rebuild: bool,
+    },
+
+    /// Build kernels for all distros (policy window enforced).
+    #[command(name = "build-all", alias = "build-all-x86-64")]
+    BuildAll {
+        #[arg(
+            long = "rebuild",
+            help = "Force every distro to rebuild+reinstall its kernel even if artifacts are already present. Does not bypass the 23:00-10:00 build-hours policy."
+        )]
+        rebuild: bool,
+    },
+
     /// Verify built kernel artifacts for one distro (or all distros if omitted).
     Check {
         #[arg(value_enum)]
         distro: Option<Distro>,
-    },
-
-    /// Build kernels for all distros (x86_64 policy window enforced).
-    BuildAllX86_64 {
-        #[arg(
-            long = "rebuild",
-            visible_alias = "force",
-            help = "Ignore the 'already built+verified' fast-path so every distro rebuilds. This purges `.artifacts/out/<distro>/{kernel-build,staging/boot/vmlinuz,staging/{lib,usr/lib}/modules}` before building. Does not bypass the 23:00-10:00 build-hours policy."
-        )]
-        rebuild: bool,
     },
 }
 

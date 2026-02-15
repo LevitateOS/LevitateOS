@@ -1,2 +1,4 @@
-pub mod build_all_x86_64;
+pub mod build;
+pub mod build_all;
 pub mod check;
+mod common;

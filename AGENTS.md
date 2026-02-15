@@ -79,17 +79,20 @@ Wired for all three distros:
 To verify without booting, inspect the EROFS rootfs:
 - `dump.erofs --path /usr/local/bin/checkpoint-1-live-boot.sh .artifacts/out/<DistroDir>/filesystem.erofs`
 
-### Kernel "Theft Mode" (DEV-only)
-For Alpine-based distros (AcornOS/IuppiterOS), the shared kernel recipe (`distro-builder/recipes/linux.rhai`) may reuse/steal a prebuilt kernel from `.artifacts/out/leviso/kernel-build` instead of compiling.
-To force a real kernel build from source, pass the kernel flag and the confirmation flag, e.g.:
-- `cd AcornOS && cargo run -- build --kernel --dangerously-waste-the-users-time`
+### Kernel Builds (Nightly, Centralized)
+Kernel compilation is centralized in `xtask` so it only happens during the allowed build-hours window (23:00 through 10:00 local time).
 
-To verify whether a kernel is "built for this distro" vs "stolen", check the kernel release suffix (from `CONFIG_LOCALVERSION` in each distro `kconfig`):
+- Build one kernel (x86_64): `cargo xtask kernels build <distro>`
+- Build all kernels (4 distros, x86_64): `cargo xtask kernels build-all`
+- Rebuild regardless of existing artifacts: `cargo xtask kernels build-all --rebuild`
+
+To verify whether a kernel is built for the right distro, check the kernel release suffix (from `CONFIG_LOCALVERSION` in each distro `kconfig`):
 - LevitateOS: `file .artifacts/out/leviso/staging/boot/vmlinuz` should include `-levitate`
 - AcornOS: `file .artifacts/out/AcornOS/staging/boot/vmlinuz` should include `-acorn`
 - IuppiterOS: `file .artifacts/out/IuppiterOS/staging/boot/vmlinuz` should include `-iuppiter`
+- RalphOS: `file .artifacts/out/RalphOS/staging/boot/vmlinuz` should include `-ralph`
 
-If AcornOS/IuppiterOS show `*-levitate`, that's theft-mode (kernel provenance is LevitateOS). A stronger confirmation is that the `sha256sum` of `staging/boot/vmlinuz` matches `.artifacts/out/leviso/staging/boot/vmlinuz`.
+If the suffix does not match, treat it as a broken kernel provenance/build and rebuild via `cargo xtask kernels build <distro> --rebuild`.
 
 ## Centralized Artifact Store
 
