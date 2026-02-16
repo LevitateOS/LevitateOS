@@ -1,4 +1,5 @@
 use clap::{Parser, Subcommand, ValueEnum};
+use std::path::PathBuf;
 
 #[derive(Clone, Copy, Debug, ValueEnum)]
 pub enum Distro {
@@ -100,6 +101,31 @@ pub enum KernelsCmd {
             help = "Force the selected distro to rebuild+reinstall its kernel even if artifacts are already present. Does not bypass the 23:00-10:00 build-hours policy."
         )]
         rebuild: bool,
+
+        #[arg(
+            long = "autofix",
+            help = "On kernel build failure, rerun via `recipe install --autofix ...` so Recipe can ask the configured LLM provider to propose a patch and retry."
+        )]
+        autofix: bool,
+
+        #[arg(
+            long = "autofix-attempts",
+            default_value_t = 2,
+            help = "Maximum number of auto-fix attempts per failing kernel build."
+        )]
+        autofix_attempts: u8,
+
+        #[arg(
+            long = "autofix-prompt-file",
+            help = "Optional extra instructions appended to the built-in Codex autofix prompt."
+        )]
+        autofix_prompt_file: Option<PathBuf>,
+
+        #[arg(
+            long = "llm-profile",
+            help = "Pass through to `recipe --llm-profile <name>` (selects a profile from XDG `recipe/llm.toml`)."
+        )]
+        llm_profile: Option<String>,
     },
 
     /// Build kernels for all distros (policy window enforced).
@@ -110,6 +136,31 @@ pub enum KernelsCmd {
             help = "Force every distro to rebuild+reinstall its kernel even if artifacts are already present. Does not bypass the 23:00-10:00 build-hours policy."
         )]
         rebuild: bool,
+
+        #[arg(
+            long = "autofix",
+            help = "On kernel build failure, rerun via `recipe install --autofix ...` so Recipe can ask the configured LLM provider to propose a patch and retry."
+        )]
+        autofix: bool,
+
+        #[arg(
+            long = "autofix-attempts",
+            default_value_t = 2,
+            help = "Maximum number of auto-fix attempts per failing kernel build."
+        )]
+        autofix_attempts: u8,
+
+        #[arg(
+            long = "autofix-prompt-file",
+            help = "Optional extra instructions appended to the built-in Codex autofix prompt."
+        )]
+        autofix_prompt_file: Option<PathBuf>,
+
+        #[arg(
+            long = "llm-profile",
+            help = "Pass through to `recipe --llm-profile <name>` (selects a profile from XDG `recipe/llm.toml`)."
+        )]
+        llm_profile: Option<String>,
     },
 
     /// Verify built kernel artifacts for one distro (or all distros if omitted).

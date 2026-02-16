@@ -1,60 +1,62 @@
 # Checkpoints
 
-Human-maintained progress table for the checkpoint-based dev loop in
-`testing/install-tests` (CLI: `cargo run --bin checkpoints -- ...`).
+Status matrix for `testing/install-tests` (`cargo run --bin checkpoints -- ...`).
 
 ## Legend
 
-- `OK`: verified working for this output target
-- `HALF`: verified working but incomplete/compromised (see CP0)
-- `X`: not verified yet (either not implemented or not tested)
-- `-`: not applicable for this output target
+- `OK`: verified for that exact output target
+- `X`: not verified yet
+- `-`: not applicable
 
-## Checkpoint Definitions
+## Checkpoints
 
-- `CP0` (Build): custom Linux kernel + bootable ISO.
-  - If the ISO builds but the kernel provenance is wrong (kernel release suffix does not match the distro), this is `HALF`.
-- `CP1`: Live Boot (ISO boots in QEMU and reaches a known-good marker)
+- `CP0`: Build (kernel + bootable install artifact)
+- `CP1`: Live Boot
 - `CP2`: Live Tools
-  - LevitateOS/AcornOS: full live environment tooling is present and works (intended for interactive debugging/repair during live boot).
-  - RalphOS/IuppiterOS: only the minimal live tooling needed for provisioning and diagnostics is present (these OSes primarily ship as installed-disk images at CP8, not as general-purpose live environments).
-- `CP3`: Installation (scripted install to disk succeeds)
-- `CP4`: Installed Boot (boots from disk after install)
-- `CP5`: Automated Login (harness can login + run commands)
-- `CP6`: Daily Driver Tools (expected tools present on installed system)
-- `CP7`: Slot B Trial Boot (A/B systems)
-  - Populate the inactive system slot (`B`) and successfully boot it at least once.
-  - Run a minimal health check on the `B` boot (enough to justify committing the slot in a real update flow).
-- `CP8`: Release Images (produce distributable installed-disk image(s))
-  - RalphOS: `qcow2` + raw `.img`
-  - IuppiterOS: raw `.img` (primary release target; intended to be `dd`'d to SSDs for servers)
+- `CP3`: Installation
+- `CP4`: Installed Boot
+- `CP5`: Automated Login
+- `CP6`: Daily Driver Tools
+- `CP7`: Slot B Trial Boot (A/B)
+- `CP8`: Release Images
 
-## Mutable Mode (Open Question)
+## CP8 Artifact Sets
 
-For public-facing distros (LevitateOS/AcornOS), we need to decide whether to support a mutable (in-place) system mode at all.
+- `LevitateOS`: public `ISO` + `qcow2` + raw `.img`
+- `AcornOS`: public `ISO` + `qcow2` + raw `.img`
+- `RalphOS`: public `qcow2` only (no public ISO)
+- `IuppiterOS`: private raw `.img` only (no public ISO)
 
-- Pros: convenience for power users; fewer reboots for iterative local changes.
-- Cons: much larger blast radius for LLM-driven recipes; harder to keep systems reproducible and supportable; drift bugs.
-- Current bias: A/B immutable is the default; mutable (if it exists) is an explicit opt-in for daredevils, and never applies to RalphOS/IuppiterOS.
+## Distro Behavior (Authoritative)
+
+| Area | LevitateOS | RalphOS | AcornOS | IuppiterOS |
+|---|---|---|---|---|
+| Visibility | Public | Public | Public | Private/internal |
+| Purpose | Stable Daily | Snappy Daily | Agent Sandbox | Specialized |
+| Base stack | Rocky Linux / RPM rootfs | Rocky Linux / RPM rootfs | Alpine Linux / APK rootfs | Alpine Linux / APK rootfs |
+| Toolchain | Glibc/systemd/GNU | Glibc/systemd/GNU | musl/OpenRC/busybox | musl/OpenRC/busybox |
+| Package Manager | Recipe | Recipe | Recipe | Recipe |
+| ISO live env | Full public live env | Minimal internal provisioning/diagnostics live env | Full public live env | Minimal internal provisioning/diagnostics live env |
+| CP8 release target | Public `ISO` + `qcow2` + `.img` | Public `qcow2` (no public ISO) | Public `ISO` + `qcow2` + `.img` | Private `.img` (no public ISO) |
+
+
 
 ## Progress Table
 
-Columns represent distinct output targets (different ISOs and/or installed-disk artifact sets).
-Only mark a cell `OK`/`HALF` after that exact output target has been verified (by the checkpoint harness or an equivalent reproducible run); otherwise keep it `X`.
-
-| Checkpoint | LevitateOS |  |  |  | RalphOS |  | AcornOS |  |  |  | IuppiterOS |
+| Checkpoint | Lev x86_64 A/B | Lev x86_64 mutable | Lev aarch64 A/B | Lev aarch64 mutable | Ralph x86_64 A/B | Ralph aarch64 A/B | Acorn x86_64 A/B | Acorn x86_64 mutable | Acorn aarch64 A/B | Acorn aarch64 mutable | Iuppiter x86_64 A/B |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| Target | x86_64 |  | aarch64 |  | x86_64 | aarch64 | x86_64 |  | aarch64 |  | x86_64 |
-| Mutability | A/B | mutable | A/B | mutable | A/B | A/B | A/B | mutable | A/B | mutable | A/B |
-| CP0 (Build) | X | OK | X | X | X | X | X | HALF | X | X | X |
-| CP1 (Live Boot) | X | OK | X | X | X | X | X | OK | X | X | X |
-| CP2 (Live Tools) | X | OK | X | X | X | X | X | OK | X | X | X |
-| CP3 (Installation) | X | X | X | X | X | X | X | X | X | X | X |
-| CP4 (Installed Boot) | X | X | X | X | X | X | X | X | X | X | X |
-| CP5 (Automated Login) | X | X | X | X | X | X | X | X | X | X | X |
-| CP6 (Daily Driver Tools) | X | X | X | X | X | X | X | X | X | X | X |
-| CP7 (Slot B Trial Boot) | X | - | X | - | X | X | X | - | X | - | X |
-| CP8 (Release Images) | X | X | X | X | X | X | X | X | X | X | X |
+| CP0 | X | OK | X | X | OK | X | X | X | X | X | X |
+| CP1 | X | OK | X | X | X | X | X | OK | X | X | X |
+| CP2 | X | OK | X | X | X | X | X | OK | X | X | X |
+| CP3 | X | X | X | X | X | X | X | X | X | X | X |
+| CP4 | X | X | X | X | X | X | X | X | X | X | X |
+| CP5 | X | X | X | X | X | X | X | X | X | X | X |
+| CP6 | X | X | X | X | X | X | X | X | X | X | X |
+| CP7 | X | - | X | - | X | X | X | - | X | - | X |
+| CP8 | X | X | X | X | X | X | X | X | X | X | X |
 
-Notes:
-- x86_64 AcornOS (mutable): CP0 is `HALF` if the kernel release suffix does not match `-acorn`.
+## Notes
+
+- Levitate/Acorn A/B columns are expected to remain `X` until A/B install flow is implemented.
+- Ralph live install env is internal even though Ralph is public; CP8 release target is public `qcow2`.
+- Iuppiter remains private/internal; CP8 release target is non-public `.img`.

@@ -35,11 +35,17 @@ kernels-check:
 kernels-check-one distro:
     cargo xtask kernels check {{distro}}
 
-kernels-build distro:
+kernels-build-plain distro:
     cargo xtask kernels build {{distro}}
 
-kernels-build-all:
+kernels-build distro llm_profile="kernels_nightly" attempts="4" prompt_file="":
+    if [ -n "{{prompt_file}}" ]; then cargo xtask kernels build {{distro}} --autofix --autofix-attempts {{attempts}} --llm-profile "{{llm_profile}}" --autofix-prompt-file "{{prompt_file}}"; else cargo xtask kernels build {{distro}} --autofix --autofix-attempts {{attempts}} --llm-profile "{{llm_profile}}"; fi
+
+kernels-build-all-plain:
     cargo xtask kernels build-all
+
+kernels-build-all llm_profile="kernels_nightly" attempts="4" prompt_file="":
+    if [ -n "{{prompt_file}}" ]; then cargo xtask kernels build-all --autofix --autofix-attempts {{attempts}} --llm-profile "{{llm_profile}}" --autofix-prompt-file "{{prompt_file}}"; else cargo xtask kernels build-all --autofix --autofix-attempts {{attempts}} --llm-profile "{{llm_profile}}"; fi
 
 kernels-rebuild distro:
     cargo xtask kernels build {{distro}} --rebuild

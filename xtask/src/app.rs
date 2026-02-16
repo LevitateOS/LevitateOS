@@ -5,12 +5,38 @@ pub fn run(cli: crate::cli::Cli) -> Result<()> {
         crate::cli::Cmd::Env { shell } => crate::tasks::tooling::env::run(shell),
         crate::cli::Cmd::Doctor => crate::tasks::tooling::doctor::run(),
         crate::cli::Cmd::Kernels { cmd } => match cmd {
-            crate::cli::KernelsCmd::Build { distro, rebuild } => {
-                crate::tasks::kernels::build::run(distro, rebuild)
-            }
-            crate::cli::KernelsCmd::BuildAll { rebuild } => {
-                crate::tasks::kernels::build_all::run(rebuild)
-            }
+            crate::cli::KernelsCmd::Build {
+                distro,
+                rebuild,
+                autofix,
+                autofix_attempts,
+                autofix_prompt_file,
+                llm_profile,
+            } => crate::tasks::kernels::build::run(
+                distro,
+                rebuild,
+                crate::tasks::kernels::common::AutoFixOptions {
+                    enabled: autofix,
+                    attempts: autofix_attempts,
+                    prompt_file: autofix_prompt_file,
+                    llm_profile,
+                },
+            ),
+            crate::cli::KernelsCmd::BuildAll {
+                rebuild,
+                autofix,
+                autofix_attempts,
+                autofix_prompt_file,
+                llm_profile,
+            } => crate::tasks::kernels::build_all::run(
+                rebuild,
+                crate::tasks::kernels::common::AutoFixOptions {
+                    enabled: autofix,
+                    attempts: autofix_attempts,
+                    prompt_file: autofix_prompt_file,
+                    llm_profile,
+                },
+            ),
             crate::cli::KernelsCmd::Check { distro } => crate::tasks::kernels::check::run(distro),
         },
         crate::cli::Cmd::Hooks { cmd } => match cmd {

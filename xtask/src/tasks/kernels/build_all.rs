@@ -1,7 +1,7 @@
 use anyhow::{Context, Result};
 use std::path::Path;
 
-pub fn run(rebuild_even_if_verified: bool) -> Result<()> {
+pub fn run(rebuild_even_if_verified: bool, autofix: super::common::AutoFixOptions) -> Result<()> {
     let root = crate::util::repo::repo_root()?;
 
     eprintln!("[info] Repo: {}", root.display());
@@ -51,6 +51,7 @@ pub fn run(rebuild_even_if_verified: bool) -> Result<()> {
                 rebuild_even_if_verified,
                 t.kernel,
                 t.module_install_path,
+                &autofix,
             )
         })?;
     }

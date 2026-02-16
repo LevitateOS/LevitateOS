@@ -1,6 +1,10 @@
 use anyhow::{Context, Result};
 
-pub fn run(distro: crate::cli::Distro, rebuild_even_if_verified: bool) -> Result<()> {
+pub fn run(
+    distro: crate::cli::Distro,
+    rebuild_even_if_verified: bool,
+    autofix: super::common::AutoFixOptions,
+) -> Result<()> {
     let root = crate::util::repo::repo_root()?;
     let t = super::common::target_for(distro);
 
@@ -30,6 +34,7 @@ pub fn run(distro: crate::cli::Distro, rebuild_even_if_verified: bool) -> Result
         rebuild_even_if_verified,
         t.kernel,
         t.module_install_path,
+        &autofix,
     ) {
         return Err(e).context(format!("Kernel build failed for {}", t.distro_dir));
     }

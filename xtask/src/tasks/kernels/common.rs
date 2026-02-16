@@ -10,6 +10,14 @@ pub(crate) struct KernelTarget {
     pub module_install_path: &'static str,
 }
 
+#[derive(Clone, Debug)]
+pub(crate) struct AutoFixOptions {
+    pub(crate) enabled: bool,
+    pub(crate) attempts: u8,
+    pub(crate) prompt_file: Option<PathBuf>,
+    pub(crate) llm_profile: Option<String>,
+}
+
 pub(crate) fn target_for(d: crate::cli::Distro) -> KernelTarget {
     match d {
         crate::cli::Distro::Leviso => KernelTarget {
@@ -132,14 +140,20 @@ pub(crate) fn build_kernel_via_recipe(
     force_rebuild: bool,
     kernel: &distro_spec::shared::KernelSource,
     module_install_path: &str,
+    autofix: &AutoFixOptions,
 ) -> Result<()> {
     let recipe_rhai = root.join("distro-builder/recipes/linux.rhai");
     let build_dir = root.join(distro_dir).join("downloads");
     let recipes_path = root.join("distro-builder/recipes");
 
     let mut cmd = Command::new(recipe_bin);
-    cmd.current_dir(root)
-        .arg("install")
+    cmd.current_dir(root);
+
+    if let Some(p) = autofix.llm_profile.as_deref() {
+        cmd.args(["--llm-profile", p]);
+    }
+
+    cmd.arg("install")
         .arg(recipe_rhai)
         .args(["--build-dir", build_dir.to_string_lossy().as_ref()])
         .args(["--recipes-path", recipes_path.to_string_lossy().as_ref()])
@@ -157,6 +171,16 @@ pub(crate) fn build_kernel_via_recipe(
             "--define",
             &format!("MODULE_INSTALL_PATH={module_install_path}"),
         ]);
+
+    if autofix.enabled {
+        cmd.args(["--autofix"]);
+        cmd.args(["--autofix-attempts", &autofix.attempts.max(1).to_string()]);
+        cmd.args(["--autofix-cwd", root.to_string_lossy().as_ref()]);
+        cmd.args(["--autofix-allow-path", "distro-builder/recipes"]);
+        if let Some(p) = autofix.prompt_file.as_deref() {
+            cmd.args(["--autofix-prompt-file", p.to_string_lossy().as_ref()]);
+        }
+    }
 
     run_cmd(&mut cmd)
 }
