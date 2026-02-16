@@ -8,18 +8,18 @@ pub fn boot(n: u8, distro: crate::cli::BootDistro) -> Result<()> {
 
     match n {
         1 => boot_live_iso(&root, &cfg),
-        2 => boot_interactive_checkpoint_2(&root, &cfg),
+        2 => boot_interactive_stage_02(&root, &cfg),
         4 => boot_installed_disk(&root, &cfg),
         _ => {
             bail!(
-                "Checkpoint {n} is automated. Interactive checkpoints: 1 (live), 2 (live tools), 4 (installed)."
+                "Stage {n} is automated. Interactive stages: 01 (live), 02 (live tools), 04 (installed)."
             )
         }
     }
 }
 
 pub fn test(n: u8, distro: crate::cli::HarnessDistro) -> Result<()> {
-    run_install_tests(&["--distro", distro.id(), "--checkpoint", &n.to_string()])
+    run_install_tests(&["--distro", distro.id(), "--stage", &n.to_string()])
 }
 
 pub fn test_up_to(n: u8, distro: crate::cli::HarnessDistro) -> Result<()> {
@@ -118,9 +118,9 @@ fn boot_live_iso(root: &Path, cfg: &BootConfig) -> Result<()> {
     run_checked(&mut cmd)
 }
 
-fn boot_interactive_checkpoint_2(root: &Path, cfg: &BootConfig) -> Result<()> {
+fn boot_interactive_stage_02(root: &Path, cfg: &BootConfig) -> Result<()> {
     eprintln!(
-        "Booting {} interactive checkpoint 2 (live tools)... (Ctrl-A X to exit)",
+        "Booting {} interactive Stage 02 (live tools)... (Ctrl-A X to exit)",
         cfg.pretty_name
     );
     run_install_tests_in_dir(
@@ -128,7 +128,7 @@ fn boot_interactive_checkpoint_2(root: &Path, cfg: &BootConfig) -> Result<()> {
         &[
             "--distro",
             cfg.harness_distro.id(),
-            "--checkpoint",
+            "--stage",
             "2",
             "--interactive",
         ],
@@ -201,13 +201,13 @@ fn run_install_tests_in_dir(root: &Path, args: &[&str]) -> Result<()> {
 
     let mut cmd = Command::new("cargo");
     cmd.current_dir(&install_tests_dir)
-        .args(["run", "--bin", "checkpoints", "--"])
+        .args(["run", "--bin", "stages", "--"])
         .args(args);
 
     crate::util::tools_env::apply_to_command(&mut cmd, root)?;
     run_checked(&mut cmd).with_context(|| {
         format!(
-            "Running install-tests checkpoints in {}",
+            "Running install-tests stages in {}",
             install_tests_dir.display()
         )
     })

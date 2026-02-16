@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 
-# CP0 verifies kernel build capability and provenance outputs.
+# Stage 00 verifies kernel build capability and provenance outputs.
 KERNEL_RELEASE_PATH="${KERNEL_RELEASE_PATH:-.artifacts/out/leviso/kernel-build/include/config/kernel.release}"
 KERNEL_IMAGE_PATH="${KERNEL_IMAGE_PATH:-.artifacts/out/leviso/staging/boot/vmlinuz}"
 
@@ -15,4 +15,4 @@ if [ ! -f "$KERNEL_IMAGE_PATH" ]; then
     exit 1
 fi
 
-echo "CHECKPOINT 0 PASSED"
+echo "STAGE 00 PASSED"

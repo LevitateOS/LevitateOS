@@ -5,35 +5,35 @@ use std::path::PathBuf;
 pub enum Distro {
     #[value(name = "leviso")]
     Leviso,
-    #[value(name = "acorn", alias = "AcornOS")]
+    #[value(name = "acorn")]
     AcornOS,
-    #[value(name = "iuppiter", alias = "IuppiterOS")]
+    #[value(name = "iuppiter")]
     IuppiterOS,
-    #[value(name = "ralph", alias = "RalphOS")]
+    #[value(name = "ralph")]
     RalphOS,
 }
 
 #[derive(Clone, Copy, Debug, ValueEnum)]
 pub enum BootDistro {
-    #[value(name = "leviso", alias = "levitate")]
+    #[value(name = "leviso")]
     Leviso,
 
-    #[value(name = "acorn", alias = "AcornOS")]
+    #[value(name = "acorn")]
     Acorn,
 
-    #[value(name = "iuppiter", alias = "IuppiterOS")]
+    #[value(name = "iuppiter")]
     Iuppiter,
 }
 
 #[derive(Clone, Copy, Debug, ValueEnum)]
 pub enum HarnessDistro {
-    #[value(name = "levitate", alias = "leviso")]
+    #[value(name = "levitate")]
     Levitate,
 
-    #[value(name = "acorn", alias = "AcornOS")]
+    #[value(name = "acorn")]
     Acorn,
 
-    #[value(name = "iuppiter", alias = "IuppiterOS")]
+    #[value(name = "iuppiter")]
     Iuppiter,
 }
 
@@ -81,17 +81,17 @@ pub enum Cmd {
         cmd: HooksCmd,
     },
 
-    /// Install-test checkpoint runner (interactive boot + automated pass/fail checks).
-    Checkpoints {
+    /// Install-test stage runner (interactive boot + automated pass/fail checks).
+    Stages {
         #[command(subcommand)]
-        cmd: CheckpointsCmd,
+        cmd: StagesCmd,
     },
 }
 
 #[derive(Subcommand)]
 pub enum KernelsCmd {
     /// Build the kernel for one distro (policy window enforced).
-    #[command(name = "build", alias = "build-x86-64")]
+    #[command(name = "build")]
     Build {
         #[arg(value_enum)]
         distro: Distro,
@@ -129,7 +129,7 @@ pub enum KernelsCmd {
     },
 
     /// Build kernels for all distros (policy window enforced).
-    #[command(name = "build-all", alias = "build-all-x86-64")]
+    #[command(name = "build-all")]
     BuildAll {
         #[arg(
             long = "rebuild",
@@ -180,37 +180,37 @@ pub enum HooksCmd {
 }
 
 #[derive(Subcommand)]
-pub enum CheckpointsCmd {
-    /// Boot into an interactive checkpoint stage (serial console).
+pub enum StagesCmd {
+    /// Boot into an interactive stage (serial console).
     ///
-    /// Interactive checkpoints: 1 (live ISO), 2 (live tools), 4 (installed).
+    /// Interactive stages: 01 (live ISO), 02 (live tools), 04 (installed).
     Boot {
         n: u8,
         #[arg(value_enum, default_value_t = BootDistro::Leviso)]
         distro: BootDistro,
     },
 
-    /// Run automated checkpoint test N (pass/fail).
+    /// Run automated stage test N (pass/fail).
     Test {
         n: u8,
         #[arg(value_enum, default_value_t = HarnessDistro::Levitate)]
         distro: HarnessDistro,
     },
 
-    /// Run all automated checkpoint tests up to N.
+    /// Run all automated stage tests up to N.
     TestUpTo {
         n: u8,
         #[arg(value_enum, default_value_t = HarnessDistro::Levitate)]
         distro: HarnessDistro,
     },
 
-    /// Show checkpoint test status.
+    /// Show stage test status.
     Status {
         #[arg(value_enum, default_value_t = HarnessDistro::Levitate)]
         distro: HarnessDistro,
     },
 
-    /// Reset cached checkpoint state for a distro.
+    /// Reset cached stage state for a distro.
     Reset {
         #[arg(value_enum, default_value_t = HarnessDistro::Levitate)]
         distro: HarnessDistro,

@@ -14,4 +14,4 @@ if [ ! -f "$KERNEL_IMAGE_PATH" ]; then
     exit 1
 fi
 
-echo "CHECKPOINT 0 PASSED"
+echo "STAGE 00 PASSED"

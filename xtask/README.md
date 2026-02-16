@@ -30,12 +30,12 @@ cargo run -p levitate-xtask -- doctor
 cargo run -p levitate-xtask -- hooks install
 cargo run -p levitate-xtask -- hooks remove
 
-# Install-test checkpoints (boot/install regression signal)
-cargo run -p levitate-xtask -- checkpoints boot 1 leviso
-cargo run -p levitate-xtask -- checkpoints test 4 levitate
-cargo run -p levitate-xtask -- checkpoints test-up-to 6 levitate
-cargo run -p levitate-xtask -- checkpoints status levitate
-cargo run -p levitate-xtask -- checkpoints reset levitate
+# Install-test stages (boot/install regression signal)
+cargo run -p levitate-xtask -- stages boot 1 leviso
+cargo run -p levitate-xtask -- stages test 4 levitate
+cargo run -p levitate-xtask -- stages test-up-to 6 levitate
+cargo run -p levitate-xtask -- stages status levitate
+cargo run -p levitate-xtask -- stages reset levitate
 
 # Kernel artifacts verification
 cargo run -p levitate-xtask -- kernels check

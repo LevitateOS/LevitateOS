@@ -6,7 +6,7 @@
 - `distro-variants/{levitate,acorn,ralph,iuppiter}`: new distro entrypoints that passes the strict conformance test. 
 - `distro-builder/`, `distro-spec/`, `distro-contract/`: shared build engine + specs/contracts.
 - `tools/`: standalone CLIs (`recipe`, `recstrap`, `recfstab`, `recchroot`, `reciso`, `recqemu`, `recart`, ...).
-- `testing/`: Rust test harnesses (notably `install-tests/` checkpoint tests and `rootfs-tests/`).
+- `testing/`: Rust test harnesses (notably `install-tests/` stage tests and `rootfs-tests/`).
 - `docs/`: Bun/Turbo workspaces (`docs/website`, `docs/tui`, `docs/content`).
 - `llm-toolkit/`: Python utilities for local LLM workflows.
 
@@ -15,8 +15,8 @@ This repo uses git submodules; prefer `git clone --recurse-submodules` or run
 
 ## Build, Test, and Development Commands
 - Build an ISO: `just build leviso` (or `cd leviso && cargo run -- build`).
-- Boot interactively: `just checkpoint 1 leviso` (live boot), `just checkpoint 2 leviso` (live tools + interactive). Exit QEMU: `Ctrl-A X`.
-- Run automated checkpoints: `just test 4 levitate`, `just test-up-to 6 levitate`, `just test-status levitate` (also: `acorn`, `iuppiter`).
+- Boot interactively: `just stage 1 leviso` (live boot), `just stage 2 leviso` (live tools + interactive). Exit QEMU: `Ctrl-A X`.
+- Run automated stages: `just test 4 levitate`, `just test-up-to 6 levitate`, `just test-status levitate` (also: `acorn`, `iuppiter`).
 - Rust checks (CI-style): `cargo test --verbose`, `cargo fmt -- --check`, `cargo clippy -- -D warnings`.
 - Install pre-commit hooks (fmt + clippy + unit tests): `cargo xtask hooks install`.
 - Docs dev/build (Bun): `bun run dev`, `bun run build`, `bun run check`.
@@ -40,16 +40,16 @@ This repo uses git submodules; prefer `git clone --recurse-submodules` or run
 - If "should-be-gitignored" files are present and are blocking a clean tree, prefer adding/adjusting `.gitignore` (and, if needed, removing them from tracking) rather than committing them.
 
 ## Conformance test (distro-contract)
-- Primary theme: find and fix inconsistencies across the full checkpoint ladder (CP0-CP8). Do not hide inconsistencies to make tests pass.
-- Treat inconsistencies as first-class failures: path mismatches, schema drift, duplicate sources of truth, checkpoint responsibility leakage, and per-distro behavior divergence without explicit declaration.
-- Preserve checkpoint boundaries from `checkpoints.md`: each checkpoint must enforce its own scope and must not absorb or mask failures that belong to another checkpoint.
-- CP0 is the build-capability exception (not a spawnable runtime state). CP1-CP8 are spawnable system-state checkpoints and must remain independently auditable.
-- For CP0 kernel conformance, enforce Recipe Rhai kernel orchestration (`distro-builder/recipes/linux.rhai` via `recipe install`) and kernel provenance invariants (`kconfig` validity, `kernel.release` version prefix, distro `CONFIG_LOCALVERSION` suffix match).
+- Primary theme: find and fix inconsistencies across the full stage ladder (Stage 00-Stage 08). Do not hide inconsistencies to make tests pass.
+- Treat inconsistencies as first-class failures: path mismatches, schema drift, duplicate sources of truth, stage responsibility leakage, and per-distro behavior divergence without explicit declaration.
+- Preserve stage boundaries from `stages.md`: each stage must enforce its own scope and must not absorb or mask failures that belong to another stage.
+- Stage 00 is the build-capability exception (not a spawnable runtime state). Stage 01-Stage 08 are spawnable system-state stages and must remain independently auditable.
+- For Stage 00 kernel conformance, enforce Recipe Rhai kernel orchestration (`distro-builder/recipes/linux.rhai` via `recipe install`) and kernel provenance invariants (`kconfig` validity, `kernel.release` version prefix, distro `CONFIG_LOCALVERSION` suffix match).
 - Prefer one canonical declaration per invariant (single source of truth). When multiple values exist, converge or fail conformance.
 
-## Checkpoint System
+## Stage System
 
-The checkpoint loop is implemented in `testing/install-tests` (CLI: `cargo run --bin checkpoints -- ...`) and is intended to be the fast E2E boot/install regression signal.
+The stage loop is implemented in `testing/install-tests` (CLI: `cargo run --bin stages -- ...`) and is intended to be the fast E2E boot/install regression signal.
 
 ### Usage
 - Run one: `just test 2 levitate` (or `acorn`, `iuppiter`)
@@ -57,41 +57,41 @@ The checkpoint loop is implemented in `testing/install-tests` (CLI: `cargo run -
 - Show status: `just test-status levitate`
 - Reset cached state: `just test-reset levitate`
 - Prefer `just ...` wrappers: `justfile` exports PATH/LD_LIBRARY_PATH and `OVMF_PATH` for the repo-managed QEMU tooling under `leviso/downloads/.tools/`.
-- Distro IDs: the harness uses `levitate`, `acorn`, `iuppiter`. The `just checkpoint` helper uses `leviso`, `acorn`, `iuppiter`.
+- Distro IDs: the harness uses `levitate`, `acorn`, `iuppiter`. The `just stage` helper uses `leviso`, `acorn`, `iuppiter`.
 
-### What Checkpoints Mean
-- Checkpoints are `1..=6` in code (`testing/install-tests/src/checkpoints/mod.rs`).
-- State is persisted under `.checkpoints/<distro>.json` and is gated (checkpoint N requires N-1 passed).
+### What Stages Mean
+- Stages are `1..=6` in code (`testing/install-tests/src/stages/mod.rs`).
+- State is persisted under `.stages/<distro>.json` and is gated (stage N requires N-1 passed).
 - If the ISO file mtime changes, cached results are invalidated automatically.
-- Checkpoint 3+ uses a temp disk + writable OVMF vars under `std::env::temp_dir()` (usually `/tmp`).
+- Stage 03+ uses a temp disk + writable OVMF vars under `std::env::temp_dir()` (usually `/tmp`).
 
 ### Artifacts & Paths
-- Checkpoint state: `.checkpoints/<distro>.json` (gitignored).
-- Checkpoint temp disk: `$TMPDIR/checkpoint-<distro>-disk.qcow2`
-- Checkpoint temp OVMF vars: `$TMPDIR/checkpoint-<distro>-vars.fd`
+- Stage state: `.stages/<distro>.json` (gitignored).
+- Stage temp disk: `$TMPDIR/stage-<distro>-disk.qcow2`
+- Stage temp OVMF vars: `$TMPDIR/stage-<distro>-vars.fd`
 - Full `install-tests` runner temp disk: `$TMPDIR/leviso-install-test.qcow2`
 - Full `install-tests` runner temp OVMF vars: `$TMPDIR/leviso-install-test-vars.fd`
 - QMP smoke test temp artifacts: `$TMPDIR/leviso-qmp-smoke.qcow2`, `$TMPDIR/leviso-qmp-smoke-vars.fd`, `$TMPDIR/leviso-qmp-smoke.sock`
 - Distro QEMU runners disk (interactive dev): `.artifacts/out/<DistroDir>/virtual-disk.qcow2` (legacy `<DistroDir>/output` is a symlink)
 
 ### Interactive QEMU (Justfile)
-`just checkpoint` is a manual QEMU runner (defined in `justfile`), currently only:
-- `just checkpoint 1 <distro>`: direct QEMU boot of the live ISO (serial)
-- `just checkpoint 4 <distro>`: direct QEMU boot of an already-installed disk from `.artifacts/out/<DistroDir>/*test.qcow2` (separate from the harness disk in `$TMPDIR`)
+`just stage` is a manual QEMU runner (defined in `justfile`), currently only:
+- `just stage 1 <distro>`: direct QEMU boot of the live ISO (serial)
+- `just stage 4 <distro>`: direct QEMU boot of an already-installed disk from `.artifacts/out/<DistroDir>/*test.qcow2` (separate from the harness disk in `$TMPDIR`)
 
-Note: the distro QEMU runners (`cargo run -- run`) use `.artifacts/out/<DistroDir>/virtual-disk.qcow2` (legacy `output/virtual-disk.qcow2` still works via symlink). The justfile checkpoint-4 helper expects `*test.qcow2` + `*ovmf-vars.fd` under `.artifacts/out/<DistroDir>/`.
+Note: the distro QEMU runners (`cargo run -- run`) use `.artifacts/out/<DistroDir>/virtual-disk.qcow2` (legacy `output/virtual-disk.qcow2` still works via symlink). The justfile stage-4 helper expects `*test.qcow2` + `*ovmf-vars.fd` under `.artifacts/out/<DistroDir>/`.
 
-Note: the `checkpoints` CLI accepts `--interactive`, and the WIP implementation lives in `testing/install-tests/src/interactive.rs`, but it is not currently wired up in `testing/install-tests/src/bin/checkpoints.rs`. Installed interactive checkpoints (3-6) are not implemented yet.
+Note: the `stages` CLI accepts `--interactive`, and the WIP implementation lives in `testing/install-tests/src/interactive.rs`, but it is not currently wired up in `testing/install-tests/src/bin/stages.rs`. Installed interactive stages (3-6) are not implemented yet.
 /home/vince/Projects/ralph4days/crates/ralphd
-### On-ISO Checkpoint Scripts
-Shell scripts exist in `testing/install-tests/test-scripts/` (`checkpoint-*.sh` + `lib/common.sh`) and are intended to ship on ISOs for manual debugging.
+### On-ISO Stage Scripts
+Shell scripts exist in `testing/install-tests/test-scripts/` (`stage-*.sh` + `lib/common.sh`) and are intended to ship on ISOs for manual debugging.
 Wired for all three distros:
-- AcornOS installs them into the live rootfs at `/usr/local/bin/checkpoint-*.sh` and `/usr/local/lib/checkpoint-tests/common.sh` (see `AcornOS/src/component/custom/mod.rs` and `AcornOS/src/component/definitions.rs`).
-- IuppiterOS installs them into the live rootfs at `/usr/local/bin/checkpoint-*.sh` and `/usr/local/lib/checkpoint-tests/common.sh` (see `IuppiterOS/src/component/custom/mod.rs` and `IuppiterOS/src/component/definitions.rs`).
-- LevitateOS installs them into the live rootfs at `/usr/local/bin/checkpoint-*.sh` and `/usr/local/lib/checkpoint-tests/common.sh` (see `leviso/src/component/custom/mod.rs` and `leviso/src/component/definitions.rs`).
+- AcornOS installs them into the live rootfs at `/usr/local/bin/stage-*.sh` and `/usr/local/lib/stage-tests/common.sh` (see `AcornOS/src/component/custom/mod.rs` and `AcornOS/src/component/definitions.rs`).
+- IuppiterOS installs them into the live rootfs at `/usr/local/bin/stage-*.sh` and `/usr/local/lib/stage-tests/common.sh` (see `IuppiterOS/src/component/custom/mod.rs` and `IuppiterOS/src/component/definitions.rs`).
+- LevitateOS installs them into the live rootfs at `/usr/local/bin/stage-*.sh` and `/usr/local/lib/stage-tests/common.sh` (see `leviso/src/component/custom/mod.rs` and `leviso/src/component/definitions.rs`).
 
 To verify without booting, inspect the EROFS rootfs:
-- `dump.erofs --path /usr/local/bin/checkpoint-1-live-boot.sh .artifacts/out/<DistroDir>/filesystem.erofs`
+- `dump.erofs --path /usr/local/bin/stage-01-live-boot.sh .artifacts/out/<DistroDir>/filesystem.erofs`
 
 ### Kernel Builds (Nightly, Centralized)
 Kernel compilation is centralized in `xtask` so it only happens during the allowed build-hours window (23:00 through 10:00 local time).
@@ -138,12 +138,12 @@ Tooling:
 - TypeScript (docs): formatted/linted via Biome (see `docs/content/biome.json`); use repo scripts (`bun run lint`, `bun run typecheck`).
 
 ## Testing Guidelines
-- Prefer checkpoint-based E2E coverage in `testing/install-tests/` (`just test ...`) for install/boot regressions.
+- Prefer stage-based E2E coverage in `testing/install-tests/` (`just test ...`) for install/boot regressions.
 - Add unit/integration tests for new public Rust APIs; keep tests deterministic.
 
 ## Commit & Pull Request Guidelines
 - Use Conventional Commits: `feat: ...`, `fix: ...`, `docs: ...`, `refactor: ...`, `chore: ...`, optionally scoped (`feat(leviso): ...`).
-- PRs should include: what changed, how to reproduce, and relevant test output (e.g., checkpoint number/distro). Run fmt/clippy/tests before review.
+- PRs should include: what changed, how to reproduce, and relevant test output (e.g., stage number/distro). Run fmt/clippy/tests before review.
 
 ## Security & Supply Chain
 - Dependency/license policy is enforced via `cargo deny` (`deny.toml`). If you change dependencies, run `cargo deny check licenses`.

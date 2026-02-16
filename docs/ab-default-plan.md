@@ -15,8 +15,8 @@ This is a product-level shift: A/B immutable is the default update model. Mutabl
    - to EFI + ROOT_A + ROOT_B + VAR (and any future partitions).
 2. Add systemd-boot entries for A and B, and an explicit "trial boot B" flow.
 3. Make recipe upgrades target the inactive slot filesystem (compose B), not live `/`.
-4. Define minimal health checks and wire them into the new checkpoint:
-   - CP7 Slot B Trial Boot.
+4. Define minimal health checks and wire them into the new stage:
+   - Stage 07 Slot B Trial Boot.
 5. Keep "mutable mode" as an opt-in boot entry or runtime policy for LevitateOS/AcornOS only.
    - Not part of the supported default test surface unless explicitly requested.
 

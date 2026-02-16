@@ -1,15 +1,15 @@
-# Levitate Variant (CP0 Model Scaffold)
+# Levitate Variant (Stage 00 Model Scaffold)
 
-This directory is the model CP0 declaration scaffold for all distro variants.
+This directory is the model Stage 00 declaration scaffold for all distro variants.
 
-## Required CP0 Files
+## Required Stage 00 Files
 
 - `kconfig`
-- `cp0.toml`
+- `stage-00.toml`
 - `recipes/kernel.rhai`
-- `checkpoint-0-build-capability.sh`
+- `stage-00-build-capability.sh`
 
-## CP0 Invariants Enforced
+## Stage 00 Invariants Enforced
 
 - Kernel configuration file must be declared as `kernel_kconfig_path = "kconfig"`.
 - Kernel build must be orchestrated through Recipe Rhai:
@@ -20,5 +20,5 @@ This directory is the model CP0 declaration scaffold for all distro variants.
 
 ## Source Of Truth
 
-`cp0.toml` is the authoritative CP0 conformance contract for this variant.
+`stage-00.toml` is the authoritative Stage 00 conformance contract for this variant.
 `distro-contract` loads and validates this manifest directly from `distro-variants`.

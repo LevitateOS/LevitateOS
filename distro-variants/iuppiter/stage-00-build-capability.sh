@@ -1,8 +1,8 @@
 #!/bin/sh
 set -eu
 
-KERNEL_RELEASE_PATH="${KERNEL_RELEASE_PATH:-.artifacts/out/AcornOS/kernel-build/include/config/kernel.release}"
-KERNEL_IMAGE_PATH="${KERNEL_IMAGE_PATH:-.artifacts/out/AcornOS/staging/boot/vmlinuz}"
+KERNEL_RELEASE_PATH="${KERNEL_RELEASE_PATH:-.artifacts/out/IuppiterOS/kernel-build/include/config/kernel.release}"
+KERNEL_IMAGE_PATH="${KERNEL_IMAGE_PATH:-.artifacts/out/IuppiterOS/staging/boot/vmlinuz}"
 
 if [ ! -s "$KERNEL_RELEASE_PATH" ]; then
     echo "missing kernel release output: $KERNEL_RELEASE_PATH" >&2
@@ -14,4 +14,4 @@ if [ ! -f "$KERNEL_IMAGE_PATH" ]; then
     exit 1
 fi
 
-echo "CHECKPOINT 0 PASSED"
+echo "STAGE 00 PASSED"

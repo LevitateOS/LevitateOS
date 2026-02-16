@@ -53,26 +53,26 @@ kernels-rebuild distro:
 kernels-rebuild-all:
     cargo xtask kernels build-all --rebuild
 
-# Boot into a checkpoint stage (interactive serial, Ctrl-A X to exit)
+# Boot into a stage (interactive serial, Ctrl-A X to exit)
 [no-exit-message]
-checkpoint n distro="leviso":
-    cargo xtask checkpoints boot {{n}} {{distro}}
+stage n distro="leviso":
+    cargo xtask stages boot {{n}} {{distro}}
 
-# Run automated checkpoint test (pass/fail)
+# Run automated stage test (pass/fail)
 test n distro="levitate":
-    cargo xtask checkpoints test {{n}} {{distro}}
+    cargo xtask stages test {{n}} {{distro}}
 
-# Run all checkpoint tests up to N
+# Run all stage tests up to N
 test-up-to n distro="levitate":
-    cargo xtask checkpoints test-up-to {{n}} {{distro}}
+    cargo xtask stages test-up-to {{n}} {{distro}}
 
-# Show checkpoint test status
+# Show stage test status
 test-status distro="levitate":
-    cargo xtask checkpoints status {{distro}}
+    cargo xtask stages status {{distro}}
 
-# Reset checkpoint test state
+# Reset stage test state
 test-reset distro="levitate":
-    cargo xtask checkpoints reset {{distro}}
+    cargo xtask stages reset {{distro}}
 
 # Build ISO
 build distro="leviso":

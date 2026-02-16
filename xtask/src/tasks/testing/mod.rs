@@ -1,1 +1,1 @@
-pub mod checkpoints;
+pub mod stages;

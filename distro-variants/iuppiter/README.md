@@ -1,9 +1,9 @@
-# Iuppiter Variant (CP0 Scaffold)
+# Iuppiter Variant (Stage 00 Scaffold)
 
-Required CP0 files:
+Required Stage 00 files:
 - `kconfig`
-- `cp0.toml`
+- `stage-00.toml`
 - `recipes/kernel.rhai`
-- `checkpoint-0-build-capability.sh`
+- `stage-00-build-capability.sh`
 
-`cp0.toml` is the CP0 source of truth for Iuppiter.
+`stage-00.toml` is the Stage 00 source of truth for Iuppiter.

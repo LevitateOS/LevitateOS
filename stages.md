@@ -1,8 +1,8 @@
-# Checkpoints
+# Stages
 
-Status matrix for `testing/install-tests` (`cargo run --bin checkpoints -- ...`).
+Status matrix for `testing/install-tests` (`cargo run --bin stages -- ...`).
 
-## Checkpoint Semantics
+## Stage Semantics
 
 Each stage (01–08) represents a deterministic, bootable system state.
 
@@ -18,15 +18,12 @@ represent a bootable runtime state.
 | Area | LevitateOS | RalphOS | AcornOS | iuppiterOS |
 |---|---|---|---|---|
 | Visibility | Public | Public | Public | Private/internal |
+| ISO live env | Full | Minimal | Full | Minimal |
 | Purpose | Stable Daily | R4D Sandbox | Snappy Daily | iuppter-dar |
 | Steal apps from | Rocky DVD ISO | Rocky DVD ISO | Alpine Extended | Alpine Extended |
 | Toolchain | glibc/systemd/GNU | glibc/systemd/GNU | musl/OpenRC/busybox | musl/OpenRC/busybox |
 | Pre-installed |  |  |  |  |
 | Package Manager | recipe | recipe | recipe | recipe |
-| 00 linux kernel | LTS | LTS | Mainline | LTS |
-| 01 Boot | auto-login root
-| 02 live tools | Full | Minimal | Full | Minimal |
-| 03
 | 08 release target | `ISO` + `qcow2` + `.img` | `qcow2` | `ISO` + `qcow2` + `.img` | Private `.img` |
 
 ## Stages

@@ -5,12 +5,12 @@
 
 **Current state:** leviso is ~11,348 LoC reimplementing what distro-builder already provides. AcornOS and IuppiterOS are each ~2,000 LoC thin wrappers. The end state is leviso at a similar size.
 
-**Rule:** After EVERY completed task, rebuild the ISO and verify checkpoint 1 (live boot) still passes before moving on. A task is not done until the ISO boots.
+**Rule:** After EVERY completed task, rebuild the ISO and verify stage 1 (live boot) still passes before moving on. A task is not done until the ISO boots.
 
 ```bash
 # Verification sequence (run after every task)
 cd leviso && cargo run -- build
-cd testing/install-tests && cargo run --bin checkpoints -- --distro levitate --checkpoint 1
+cd testing/install-tests && cargo run --bin stages -- --distro levitate --stage 1
 ```
 
 ---
@@ -25,7 +25,7 @@ These are copy-pasted modules that can be deleted and replaced with imports. No 
 - [ ] Add `distro_builder::alpine::timing::Timer` import (or re-export from distro-builder root)
 - [ ] Update all `use crate::timing::Timer` → `use distro_builder::...::Timer`
 - [ ] `cargo check -p leviso` passes
-- [ ] Rebuild ISO + checkpoint 1 passes
+- [ ] Rebuild ISO + stage 1 passes
 - [ ] Commit: `fix(leviso): use distro-builder Timer instead of local copy`
 
 **Files:**
@@ -42,7 +42,7 @@ These are copy-pasted modules that can be deleted and replaced with imports. No 
 - [ ] Update all `use crate::cache` → `use distro_builder::cache`
 - [ ] Verify `hash_files()`, `needs_rebuild()`, `write_cached_hash()`, `is_newer()` signatures match
 - [ ] `cargo check -p leviso` passes
-- [ ] Rebuild ISO + checkpoint 1 passes
+- [ ] Rebuild ISO + stage 1 passes
 - [ ] Commit: `fix(leviso): use distro-builder cache module instead of local copy`
 
 **Files:**
@@ -58,7 +58,7 @@ These are copy-pasted modules that can be deleted and replaced with imports. No 
 - [ ] Import `distro_builder::executor::directories` instead
 - [ ] Update call sites: `create_dirs()`, `create_dir_all()`, `set_permissions()`
 - [ ] `cargo check -p leviso` passes
-- [ ] Rebuild ISO + checkpoint 1 passes
+- [ ] Rebuild ISO + stage 1 passes
 - [ ] Commit: `fix(leviso): use distro-builder executor directories instead of local copy`
 
 **Files:**
@@ -75,7 +75,7 @@ These are copy-pasted modules that can be deleted and replaced with imports. No 
 - [ ] Update call sites: `copy_file()`, `copy_dir_recursive()`, `write_file()`, `symlink()`
 - [ ] Check if 5% difference (error message wording) matters — if so, update distro-builder to accept the leviso variant or vice versa
 - [ ] `cargo check -p leviso` passes
-- [ ] Rebuild ISO + checkpoint 1 passes
+- [ ] Rebuild ISO + stage 1 passes
 - [ ] Commit: `fix(leviso): use distro-builder executor files instead of local copy`
 
 **Files:**
@@ -99,7 +99,7 @@ These require more thought — leviso's types are structurally similar but not i
 - [ ] If leviso has extra fields: either add them to distro-builder (if generic) or create a leviso wrapper struct that holds `distro_builder::BuildContext` + extras
 - [ ] Update all `use crate::build::context::BuildContext` references
 - [ ] `cargo check -p leviso` passes
-- [ ] Rebuild ISO + checkpoint 1 passes
+- [ ] Rebuild ISO + stage 1 passes
 - [ ] Commit: `feat(leviso): adopt distro-builder BuildContext`
 
 **Files:**
@@ -116,7 +116,7 @@ These require more thought — leviso's types are structurally similar but not i
 - [ ] If distro-builder's is configurable enough: switch leviso to use it
 - [ ] If not: extend distro-builder's erofs builder to support leviso's needs, then switch
 - [ ] `cargo check -p leviso` passes
-- [ ] Rebuild ISO + checkpoint 1 passes
+- [ ] Rebuild ISO + stage 1 passes
 - [ ] Built rootfs is byte-identical or functionally equivalent
 - [ ] Commit: `feat(leviso): use distro-builder EROFS builder`
 
@@ -132,7 +132,7 @@ These require more thought — leviso's types are structurally similar but not i
 - [ ] leviso builds TWO initramfs (tiny live + systemd install) — verify distro-builder supports both patterns
 - [ ] Switch to distro-builder's cpio builder
 - [ ] `cargo check -p leviso` passes
-- [ ] Rebuild ISO + checkpoint 1 passes
+- [ ] Rebuild ISO + stage 1 passes
 - [ ] Both initramfs images boot correctly
 - [ ] Commit: `feat(leviso): use distro-builder CPIO builder`
 
@@ -147,7 +147,7 @@ These require more thought — leviso's types are structurally similar but not i
 - [ ] Determine if leviso can use `reciso` directly (like AcornOS does via distro-builder)
 - [ ] Switch to shared ISO creation path
 - [ ] `cargo check -p leviso` passes
-- [ ] Rebuild ISO + checkpoint 1 passes
+- [ ] Rebuild ISO + stage 1 passes
 - [ ] ISO boots in QEMU
 - [ ] Commit: `feat(leviso): use distro-builder ISO builder`
 
@@ -162,7 +162,7 @@ These require more thought — leviso's types are structurally similar but not i
 - [ ] The `Artifact` struct itself is leviso-specific (tracks leviso's specific input files) — this is fine to keep
 - [ ] Verify it now uses `distro_builder::cache` under the hood
 - [ ] No action needed beyond 1.2 unless `Artifact` pattern should be shared
-- [ ] Rebuild ISO + checkpoint 1 passes (if any changes made)
+- [ ] Rebuild ISO + stage 1 passes (if any changes made)
 
 **Files:**
 | leviso | shared |
@@ -200,28 +200,28 @@ For each component file, determine the migration path:
 ### 3.3 Migrate Components (one at a time, rebuild after each)
 
 - [ ] Migrate `etc.rs` → `Installable` + `Op` pattern
-  - [ ] Rebuild ISO + checkpoint 1 passes
+  - [ ] Rebuild ISO + stage 1 passes
   - [ ] Commit
 - [ ] Migrate `pam.rs` → `Installable` + `Op` pattern
-  - [ ] Rebuild ISO + checkpoint 1 passes
+  - [ ] Rebuild ISO + stage 1 passes
   - [ ] Commit
 - [ ] Migrate `filesystem.rs` → `Installable` + `Op` pattern
-  - [ ] Rebuild ISO + checkpoint 1 passes
+  - [ ] Rebuild ISO + stage 1 passes
   - [ ] Commit
 - [ ] Migrate `modules.rs` → `Installable` + `Op` pattern
-  - [ ] Rebuild ISO + checkpoint 1 passes
+  - [ ] Rebuild ISO + stage 1 passes
   - [ ] Commit
 - [ ] Migrate `firmware.rs` → `Installable` + `Op` pattern
-  - [ ] Rebuild ISO + checkpoint 1 passes
+  - [ ] Rebuild ISO + stage 1 passes
   - [ ] Commit
 - [ ] Migrate `packages.rs` → `Installable` + `Op` pattern
-  - [ ] Rebuild ISO + checkpoint 1 passes
+  - [ ] Rebuild ISO + stage 1 passes
   - [ ] Commit
 - [ ] Evaluate `live.rs` — keep if genuinely leviso-specific, migrate if it fits `Op` pattern
-  - [ ] Rebuild ISO + checkpoint 1 passes
+  - [ ] Rebuild ISO + stage 1 passes
   - [ ] Commit
 - [ ] Delete `leviso/src/component/definitions.rs` and `mod.rs` once all components are migrated
-  - [ ] Rebuild ISO + checkpoint 1 passes
+  - [ ] Rebuild ISO + stage 1 passes
   - [ ] Commit
 
 ### 3.4 Implement DistroConfig
@@ -229,7 +229,7 @@ For each component file, determine the migration path:
 - [ ] Implement `distro_builder::DistroConfig` trait for LevitateOS
 - [ ] Wire it into the build pipeline
 - [ ] This enables distro-builder to identify which distro is being built
-- [ ] Rebuild ISO + checkpoint 1 passes
+- [ ] Rebuild ISO + stage 1 passes
 - [ ] Commit: `feat(leviso): implement DistroConfig trait`
 
 ### 3.5 Build Orchestration
@@ -237,14 +237,14 @@ For each component file, determine the migration path:
 - [ ] Compare `leviso/src/build/mod.rs` with `distro-builder/src/builder.rs`
 - [ ] Migrate leviso's build sequencing to use distro-builder's `Builder` abstraction
 - [ ] Delete leviso's custom orchestration code
-- [ ] Rebuild ISO + checkpoint 1 passes
+- [ ] Rebuild ISO + stage 1 passes
 - [ ] Commit: `feat(leviso): use distro-builder Builder for orchestration`
 
 ### 3.6 Final Verification
 
 - [ ] `cargo check -p leviso` — compiles clean
 - [ ] `cargo test -p leviso` — all tests pass
-- [ ] Full build + all checkpoints pass (1-5)
+- [ ] Full build + all stages pass (1-5)
 - [ ] LoC count for leviso is under 4,000
 - [ ] Commit: `feat(leviso): consolidation complete`
 

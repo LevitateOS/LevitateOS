@@ -43,21 +43,21 @@ pub fn run(cli: crate::cli::Cli) -> Result<()> {
             crate::cli::HooksCmd::Install => crate::tasks::tooling::hooks::install(),
             crate::cli::HooksCmd::Remove => crate::tasks::tooling::hooks::remove(),
         },
-        crate::cli::Cmd::Checkpoints { cmd } => match cmd {
-            crate::cli::CheckpointsCmd::Boot { n, distro } => {
-                crate::tasks::testing::checkpoints::boot(n, distro)
+        crate::cli::Cmd::Stages { cmd } => match cmd {
+            crate::cli::StagesCmd::Boot { n, distro } => {
+                crate::tasks::testing::stages::boot(n, distro)
             }
-            crate::cli::CheckpointsCmd::Test { n, distro } => {
-                crate::tasks::testing::checkpoints::test(n, distro)
+            crate::cli::StagesCmd::Test { n, distro } => {
+                crate::tasks::testing::stages::test(n, distro)
             }
-            crate::cli::CheckpointsCmd::TestUpTo { n, distro } => {
-                crate::tasks::testing::checkpoints::test_up_to(n, distro)
+            crate::cli::StagesCmd::TestUpTo { n, distro } => {
+                crate::tasks::testing::stages::test_up_to(n, distro)
             }
-            crate::cli::CheckpointsCmd::Status { distro } => {
-                crate::tasks::testing::checkpoints::status(distro)
+            crate::cli::StagesCmd::Status { distro } => {
+                crate::tasks::testing::stages::status(distro)
             }
-            crate::cli::CheckpointsCmd::Reset { distro } => {
-                crate::tasks::testing::checkpoints::reset(distro)
+            crate::cli::StagesCmd::Reset { distro } => {
+                crate::tasks::testing::stages::reset(distro)
             }
         },
     }
