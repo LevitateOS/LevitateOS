@@ -113,7 +113,7 @@ stage n distro="levitate" inject="" inject_file="" ssh_pubkey=(env("HOME") + "/.
 stage-ssh n distro="levitate" inject="" inject_file="" ssh_pubkey=(env("HOME") + "/.ssh/id_ed25519.pub") ssh_privkey=(env("HOME") + "/.ssh/id_ed25519") ssh_port="2222":
     just _boot_stage {{n}} {{distro}} "{{inject}}" "{{inject_file}}" true false false "{{ssh_pubkey}}" "{{ssh_privkey}}" "{{ssh_port}}"
 
-# Boot into a stage with a QEMU window while keeping serial console on terminal.
+# Boot into a stage with a VNC window in foreground mode (Ctrl-C to stop).
 [no-exit-message]
 stage-window n distro="levitate" inject="" inject_file="" ssh_pubkey=(env("HOME") + "/.ssh/id_ed25519.pub"):
     just _boot_stage {{n}} {{distro}} "{{inject}}" "{{inject_file}}" false false true "{{ssh_pubkey}}" "" 2222
@@ -257,6 +257,14 @@ docs-tui-check:
     cd docs/tui && bun run typecheck && bun run test
 
 [script, no-exit-message]
+docs-tui *args:
+    #!/usr/bin/env bash
+    set -euo pipefail
+
+    cd docs/tui
+    exec bun src/index.ts {{args}}
+
+[script, no-exit-message]
 docs-tui-inspect *args:
     #!/usr/bin/env bash
     set -euo pipefail
@@ -265,6 +273,15 @@ docs-tui-inspect *args:
     bun run typecheck
     bun run test
     exec bun src/index.ts {{args}}
+
+# recpart TUI
+[script, no-exit-message]
+tools-recpart *args:
+    #!/usr/bin/env bash
+    set -euo pipefail
+
+    cd tools/recpart/frontend
+    exec bun run start -- {{args}}
 
 # Website (Astro)
 website-dev:

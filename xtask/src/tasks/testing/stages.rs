@@ -3,31 +3,45 @@ use serde::Deserialize;
 use std::fs::OpenOptions;
 use std::fs::{self, File};
 use std::io::Write;
-use std::net::TcpListener;
+use std::net::{IpAddr, Ipv4Addr, TcpListener, UdpSocket};
 use std::os::fd::AsRawFd;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::thread::sleep;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 struct WindowConfig {
+    vnc_bind_host: Ipv4Addr,
+    vnc_host: Ipv4Addr,
     vnc_port: u16,
+    serial_log: PathBuf,
 }
 
 impl WindowConfig {
     fn allocate() -> Result<Self> {
-        let vnc_port = allocate_local_port(5900, 5999)?;
-        Ok(Self { vnc_port })
+        let vnc_bind_host = detect_vnc_bind_host()?;
+        let vnc_host = detect_vnc_advertise_host()?;
+        let vnc_port = allocate_local_port(vnc_bind_host, 5900, 5999)?;
+        let serial_log = temp_file_path("levitate-stage-window-serial").with_extension("log");
+        Ok(Self {
+            vnc_bind_host,
+            vnc_host,
+            vnc_port,
+            serial_log,
+        })
     }
 
     fn vnc_endpoint(&self) -> String {
-        format!("vnc://127.0.0.1:{}", self.vnc_port)
+        format!("vnc://{}:{}", self.vnc_host, self.vnc_port)
     }
 
     fn qemu_display_arg(&self) -> String {
         let display_index = self.vnc_port.saturating_sub(5900);
-        format!("vnc=127.0.0.1:{display_index},to=99,id=stage-window")
+        format!(
+            "vnc={}:{display_index},to=99,id=stage-window",
+            self.vnc_bind_host
+        )
     }
 }
 
@@ -45,6 +59,21 @@ pub fn boot(
 ) -> Result<()> {
     let root = crate::util::repo::repo_root()?;
     let cfg = BootConfig::for_distro(&root, distro);
+
+    if window && ssh {
+        bail!(
+            "`--window` cannot be combined with `--ssh`.\n\
+             Use `just stage-window <n> <distro>` for foreground VNC window mode,\n\
+             or `just stage-ssh <n> <distro>` for SSH workflow."
+        );
+    }
+    if window && no_shell {
+        bail!(
+            "`--window` cannot be combined with `--no-shell`.\n\
+             Window mode runs in foreground VNC mode and should be stopped with Ctrl-C."
+        );
+    }
+
     let window_cfg = if window {
         Some(WindowConfig::allocate()?)
     } else {
@@ -436,7 +465,6 @@ fn boot_live_iso_serial(
 ) -> Result<()> {
     if no_shell {
         let log_path = temp_log_path("levitate-stage01-serial-boot");
-        maybe_launch_window_viewer(window)?;
         let mut cmd = qemu_base_command(root, iso_path, injection.as_ref(), None, window)?;
         let child = spawn_qemu_with_log(&mut cmd, &log_path, false)?;
         monitor_live_iso_serial(child, &log_path)?;
@@ -444,10 +472,20 @@ fn boot_live_iso_serial(
         return Ok(());
     }
 
-    eprintln!("Booting {} live ISO... (Ctrl-A X to exit)", cfg.pretty_name);
-    maybe_launch_window_viewer(window)?;
+    if window.is_some() {
+        eprintln!(
+            "Booting {} live ISO in window mode... (Ctrl-C to stop)",
+            cfg.pretty_name
+        );
+    } else {
+        eprintln!("Booting {} live ISO... (Ctrl-A X to exit)", cfg.pretty_name);
+    }
     let mut cmd = qemu_base_command(root, iso_path, injection.as_ref(), None, window)?;
-    run_checked(&mut cmd)
+    if let Some(window_cfg) = window {
+        run_window_mode_foreground(&mut cmd, window_cfg)
+    } else {
+        run_checked(&mut cmd)
+    }
 }
 
 fn monitor_live_iso_serial(mut child: Child, log_path: &Path) -> Result<()> {
@@ -531,7 +569,6 @@ fn boot_live_iso_ssh(
         cfg.pretty_name, stage_label
     );
     ensure_ssh_port_available(ssh_port)?;
-    maybe_launch_window_viewer(window)?;
 
     let mut cmd = qemu_base_command(root, iso_path, injection.as_ref(), Some(ssh_port), window)?;
     let log_path = temp_log_path("levitate-stage01-ssh-boot");
@@ -841,11 +878,6 @@ fn boot_installed_disk(
         bail!("Missing OVMF vars: {}", vars.display());
     }
 
-    eprintln!(
-        "Booting installed {}... (Ctrl-A X to exit)",
-        cfg.pretty_name
-    );
-
     let mut cmd = Command::new("qemu-system-x86_64");
     cmd.args([
         "-enable-kvm",
@@ -868,12 +900,26 @@ fn boot_installed_disk(
         "-device",
         "virtio-net-pci,netdev=net0",
     ]);
+    if window.is_some() {
+        eprintln!(
+            "Booting installed {} in window mode... (Ctrl-C to stop)",
+            cfg.pretty_name
+        );
+    } else {
+        eprintln!(
+            "Booting installed {}... (Ctrl-A X to exit)",
+            cfg.pretty_name
+        );
+    }
     apply_qemu_console_mode(&mut cmd, window);
     cmd.arg("-no-reboot");
-    maybe_launch_window_viewer(window)?;
 
     crate::util::tools_env::apply_to_command(&mut cmd, root)?;
-    run_checked(&mut cmd)
+    if let Some(window_cfg) = window {
+        run_window_mode_foreground(&mut cmd, window_cfg)
+    } else {
+        run_checked(&mut cmd)
+    }
 }
 
 fn run_install_tests(
@@ -991,106 +1037,113 @@ fn apply_qemu_console_mode(cmd: &mut Command, window: Option<&WindowConfig>) {
     if let Some(window_cfg) = window {
         cmd.args(["-vga", "none", "-device", "secondary-vga"]);
         cmd.arg("-display").arg(window_cfg.qemu_display_arg());
-        cmd.args(["-serial", "mon:stdio"]);
+        cmd.arg("-serial")
+            .arg(format!("file:{}", window_cfg.serial_log.display()));
+        cmd.args(["-monitor", "none"]);
     } else {
         cmd.args(["-vga", "none", "-nographic", "-serial", "mon:stdio"]);
     }
 }
 
-fn maybe_launch_window_viewer(window: Option<&WindowConfig>) -> Result<()> {
-    let Some(window_cfg) = window else {
-        return Ok(());
-    };
-
-    let endpoint = window_cfg.vnc_endpoint();
-    let host_port = format!("127.0.0.1:{}", window_cfg.vnc_port);
-    eprintln!("Window mode: VNC endpoint {}", endpoint);
-    enum LaunchMode {
-        Detached,
-        MustSucceed,
+fn run_window_mode_foreground(cmd: &mut Command, window_cfg: &WindowConfig) -> Result<()> {
+    let mut child = cmd
+        .spawn()
+        .context("Spawning QEMU for foreground window mode")?;
+    print_window_mode_details(window_cfg, child.id());
+    let status = child
+        .wait()
+        .context("Waiting for QEMU foreground window mode")?;
+    if !status.success() {
+        bail!("Command failed with status {status}");
     }
-
-    let launchers = [
-        (
-            "remote-viewer",
-            vec![endpoint.clone()],
-            LaunchMode::Detached,
-        ),
-        ("vncviewer", vec![host_port.clone()], LaunchMode::Detached),
-        ("gvncviewer", vec![host_port.clone()], LaunchMode::Detached),
-        ("virt-viewer", vec![endpoint.clone()], LaunchMode::Detached),
-        (
-            "gio",
-            vec!["open".to_string(), endpoint.clone()],
-            LaunchMode::MustSucceed,
-        ),
-        ("xdg-open", vec![endpoint.clone()], LaunchMode::MustSucceed),
-    ];
-
-    for (program, args, mode) in launchers {
-        if which::which(program).is_err() {
-            continue;
-        }
-
-        let mut cmd = Command::new(program);
-        cmd.args(args.iter().map(String::as_str));
-        cmd.stdin(Stdio::null());
-        cmd.stdout(Stdio::null());
-        cmd.stderr(Stdio::null());
-        match mode {
-            LaunchMode::Detached => match cmd.spawn() {
-                Ok(_child) => {
-                    eprintln!("Window mode: launched {program} for {}", endpoint);
-                    return Ok(());
-                }
-                Err(err) => {
-                    eprintln!("Window mode: failed launching {program}: {err}");
-                }
-            },
-            LaunchMode::MustSucceed => match cmd.status() {
-                Ok(status) if status.success() => {
-                    eprintln!("Window mode: launched {program} for {}", endpoint);
-                    return Ok(());
-                }
-                Ok(status) => {
-                    eprintln!(
-                        "Window mode: launcher {program} exited with status {status}; trying next launcher"
-                    );
-                }
-                Err(err) => {
-                    eprintln!("Window mode: failed launching {program}: {err}");
-                }
-            },
-        }
-    }
-
-    if std::env::var("LEVITATE_STAGE_WINDOW_REQUIRE_VIEWER")
-        .ok()
-        .as_deref()
-        == Some("1")
-    {
-        bail!(
-            "Window mode requested, but no local VNC viewer launcher was found.\n\
-             Tried: remote-viewer, vncviewer, gvncviewer, virt-viewer, gio open, xdg-open.\n\
-             Install one of these and rerun, or connect manually to {endpoint}, or use `just stage` / `just stage-ssh`."
-        );
-    }
-
-    eprintln!(
-        "Window mode: no local viewer launcher found; continuing without auto-launch.\n\
-         Connect manually to {endpoint} from your desktop (SSH tunnel recommended)."
-    );
     Ok(())
 }
 
-fn allocate_local_port(start: u16, end: u16) -> Result<u16> {
+fn print_window_mode_details(window_cfg: &WindowConfig, pid: u32) {
+    let endpoint = window_cfg.vnc_endpoint();
+
+    eprintln!(
+        "Window mode: VNC bind {}:{}",
+        window_cfg.vnc_bind_host, window_cfg.vnc_port
+    );
+    eprintln!("Window mode: VNC endpoint {endpoint}");
+    eprintln!("Window mode: PID {pid}");
+    eprintln!(
+        "Window mode: serial log {}",
+        window_cfg.serial_log.display()
+    );
+    eprintln!(
+        "Window mode: SSH tunnel (run on your local machine):\n  ssh -N -L {port}:127.0.0.1:{port} <user>@<remote-host>",
+        port = window_cfg.vnc_port
+    );
+    eprintln!("Window mode: open viewer locally (direct):\n  remote-viewer {endpoint}");
+    eprintln!(
+        "Window mode: open viewer locally (via tunnel):\n  remote-viewer vnc://127.0.0.1:{}",
+        window_cfg.vnc_port
+    );
+}
+
+fn detect_vnc_bind_host() -> Result<Ipv4Addr> {
+    if let Ok(raw) = std::env::var("LEVITATE_STAGE_WINDOW_BIND_HOST") {
+        let parsed: Ipv4Addr = raw.parse().with_context(|| {
+            format!("Parsing LEVITATE_STAGE_WINDOW_BIND_HOST as IPv4 failed: {raw}")
+        })?;
+        return Ok(parsed);
+    }
+    Ok(Ipv4Addr::UNSPECIFIED)
+}
+
+fn detect_vnc_advertise_host() -> Result<Ipv4Addr> {
+    if let Ok(raw) = std::env::var("LEVITATE_STAGE_WINDOW_HOST") {
+        let parsed: Ipv4Addr = raw.parse().with_context(|| {
+            format!("Parsing LEVITATE_STAGE_WINDOW_HOST as IPv4 address failed: {raw}")
+        })?;
+        if parsed.is_unspecified() {
+            bail!("LEVITATE_STAGE_WINDOW_HOST must not be unspecified; got {parsed}");
+        }
+        return Ok(parsed);
+    }
+    if let Some(ip) = detect_ssh_server_ipv4() {
+        return Ok(ip);
+    }
+    if let Some(ip) = detect_default_route_ipv4() {
+        return Ok(ip);
+    }
+    Ok(Ipv4Addr::LOCALHOST)
+}
+
+fn detect_default_route_ipv4() -> Option<Ipv4Addr> {
+    // UDP connect does not send packets; it asks kernel routing for the outbound interface address.
+    let socket = UdpSocket::bind((Ipv4Addr::UNSPECIFIED, 0)).ok()?;
+    socket.connect((Ipv4Addr::new(1, 1, 1, 1), 80)).ok()?;
+    let local_addr = socket.local_addr().ok()?;
+    match local_addr.ip() {
+        IpAddr::V4(ip) if !ip.is_loopback() && !ip.is_unspecified() => Some(ip),
+        _ => None,
+    }
+}
+
+fn detect_ssh_server_ipv4() -> Option<Ipv4Addr> {
+    let raw = std::env::var("SSH_CONNECTION").ok()?;
+    let mut parts = raw.split_whitespace();
+    let _client_ip = parts.next()?;
+    let _client_port = parts.next()?;
+    let server_ip = parts.next()?;
+    let parsed: Ipv4Addr = server_ip.parse().ok()?;
+    if parsed.is_unspecified() {
+        return None;
+    }
+    Some(parsed)
+}
+
+fn allocate_local_port(host: Ipv4Addr, start: u16, end: u16) -> Result<u16> {
     for port in start..=end {
-        if let Ok(listener) = TcpListener::bind(("127.0.0.1", port)) {
+        if let Ok(listener) = TcpListener::bind((host, port)) {
             drop(listener);
             return Ok(port);
         }
     }
-    bail!("No free local TCP port available in range {start}..={end}")
+    bail!("No free local TCP port on {host} in range {start}..={end}")
 }
 
 fn create_boot_injection_iso(payload_path: &Path) -> Result<PathBuf> {
