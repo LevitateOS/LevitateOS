@@ -1,10 +1,16 @@
 #!/bin/sh
 #
-# LevitateOS shared pre-commit hook for Rust submodules
+# LevitateOS shared pre-commit hook for Rust submodules + shared/tui-kit
 #
 # Installs into each submodule via: cargo xtask hooks install
 #
 # What it does:
+#   Parent repo:
+#     A. Policy guard: cargo xtask policy audit-legacy-bindings
+#     B. shared/tui-kit checks (when staged files under shared/tui-kit):
+#        - bun run precommit (or scripts/pre-commit.sh)
+#
+#   Rust submodules:
 #   1. Auto-fix: cargo fmt on staged .rs files (re-stages them)
 #   2. Check:    cargo check (fast compilation check)
 #   3. Check:    cargo clippy --no-deps (lint this crate only, not dependencies)
@@ -14,6 +20,45 @@
 #
 
 set -e
+
+run_tui_kit_checks() {
+    if [ ! -f "$WORKSPACE_ROOT/shared/tui-kit/package.json" ]; then
+        return 0
+    fi
+
+    STAGED_FILES=$(git diff --cached --name-only --diff-filter=ACMR 2>/dev/null || true)
+    STAGED_TUI_KIT=$(printf "%s\n" "$STAGED_FILES" | grep '^shared/tui-kit/' || true)
+    if [ -z "$STAGED_TUI_KIT" ]; then
+        echo "OK  No shared/tui-kit files staged"
+        return 0
+    fi
+
+    echo ""
+    echo ">>> Running shared/tui-kit pre-commit checks..."
+    echo ""
+    TUI_KIT_HOOK="$WORKSPACE_ROOT/shared/tui-kit/scripts/pre-commit.sh"
+    if [ -x "$TUI_KIT_HOOK" ]; then
+        TUI_KIT_PASS=0
+        if ! "$TUI_KIT_HOOK" 2>&1; then
+            TUI_KIT_PASS=1
+        fi
+    else
+        TUI_KIT_PASS=0
+        if ! (cd "$WORKSPACE_ROOT/shared/tui-kit" && bun run precommit 2>&1); then
+            TUI_KIT_PASS=1
+        fi
+    fi
+
+    if [ "$TUI_KIT_PASS" -eq 0 ]; then
+        echo "OK  shared/tui-kit checks clean"
+        return 0
+    else
+        echo "FAIL shared/tui-kit checks failed"
+        echo ""
+        echo "  Fix issues in shared/tui-kit or skip with: git commit --no-verify"
+        return 1
+    fi
+}
 
 # ── Locate workspace root ──────────────────────────────────────────
 find_workspace_root() {
@@ -54,7 +99,11 @@ if [ "$IS_PARENT_REPO" = true ]; then
     echo ""
     if (cd "$WORKSPACE_ROOT" && cargo xtask policy audit-legacy-bindings 2>&1); then
         echo "OK  Policy guard clean"
-        exit 0
+        if run_tui_kit_checks; then
+            exit 0
+        else
+            exit 1
+        fi
     else
         echo "FAIL Policy guard failed"
         echo ""
