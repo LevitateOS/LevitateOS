@@ -2,11 +2,10 @@ export type InlineNodeLike =
   | string
   | {
       text?: string;
-      children?: InlineNodeLike[];
-      [key: string]: unknown;
+      children?: ReadonlyArray<InlineNodeLike>;
     };
 
-export type RichTextLike = InlineNodeLike[];
+export type RichTextLike = ReadonlyArray<InlineNodeLike>;
 
 function inlineNodeToText(node: InlineNodeLike): string {
   if (typeof node === "string") {

@@ -1,27 +1,33 @@
+import { toPositiveInt } from "./internal/numbers";
 import {
+  detectColorRuntime,
+  normalizeColorValue,
+  normalizeThemeColorMode,
+  resolveColorReference,
+  resolveIntentColor,
+  resolveIntentMono,
+  resolveLiteralColor,
+  resolveRgbLiteral,
+  type ColorRuntime,
+  type DetectColorRuntimeOptions,
+} from "./theme/colors";
+import {
+  defaultThemeColors,
   defaultThemeLayout,
-  defaultThemeTokens,
+  defaultTuiTheme,
+  type ColorIntent,
+  type ColorMode,
+  type ThemeColorOverride,
+  type ThemeColors,
+  type ThemeColorsOverride,
   type ThemeLayout,
-  type ThemeTokens,
   type TuiTheme,
 } from "./theme/tokens";
-import { toPositiveInt } from "./internal/numbers";
 
 export * from "./theme/tokens";
 export * from "./theme/palette";
 export * from "./theme/styles";
-
-export const tuiTheme: TuiTheme = {
-  tokens: defaultThemeTokens,
-  layout: defaultThemeLayout,
-};
-
-function stringToken(value: string, fallback: string): string {
-  if (typeof value !== "string" || value.trim().length === 0) {
-    return fallback;
-  }
-  return value;
-}
+export * from "./theme/colors";
 
 export function normalizeThemeLayout(layout: Partial<ThemeLayout>): ThemeLayout {
   const candidate: ThemeLayout = {
@@ -60,29 +66,39 @@ export function normalizeThemeLayout(layout: Partial<ThemeLayout>): ThemeLayout 
   return candidate;
 }
 
-export function normalizeThemeTokens(tokens: Partial<ThemeTokens>): ThemeTokens {
+function normalizeColorOverride(
+  intent: ColorIntent,
+  overrides: ThemeColorsOverride,
+  fallback: ThemeColors,
+): ThemeColors[ColorIntent] {
+  const base = fallback[intent];
+  const override = overrides[intent] as ThemeColorOverride | undefined;
+  return normalizeColorValue(override, base);
+}
+
+export function normalizeThemeColors(
+  colors: ThemeColorsOverride = {},
+  fallback: ThemeColors = defaultThemeColors,
+): ThemeColors {
   return {
-    border: stringToken(tokens.border ?? defaultThemeTokens.border, defaultThemeTokens.border),
-    text: stringToken(tokens.text ?? defaultThemeTokens.text, defaultThemeTokens.text),
-    dimText: stringToken(tokens.dimText ?? defaultThemeTokens.dimText, defaultThemeTokens.dimText),
-    accent: stringToken(tokens.accent ?? defaultThemeTokens.accent, defaultThemeTokens.accent),
-    info: stringToken(tokens.info ?? defaultThemeTokens.info, defaultThemeTokens.info),
-    warning: stringToken(tokens.warning ?? defaultThemeTokens.warning, defaultThemeTokens.warning),
-    error: stringToken(tokens.error ?? defaultThemeTokens.error, defaultThemeTokens.error),
-    success: stringToken(tokens.success ?? defaultThemeTokens.success, defaultThemeTokens.success),
-    background: stringToken(
-      tokens.background ?? defaultThemeTokens.background,
-      defaultThemeTokens.background,
-    ),
+    border: normalizeColorOverride("border", colors, fallback),
+    text: normalizeColorOverride("text", colors, fallback),
+    dimText: normalizeColorOverride("dimText", colors, fallback),
+    accent: normalizeColorOverride("accent", colors, fallback),
+    info: normalizeColorOverride("info", colors, fallback),
+    warning: normalizeColorOverride("warning", colors, fallback),
+    error: normalizeColorOverride("error", colors, fallback),
+    success: normalizeColorOverride("success", colors, fallback),
+    background: normalizeColorOverride("background", colors, fallback),
   };
 }
 
 export function createTheme(
-  tokens: Partial<ThemeTokens> = {},
+  colors: ThemeColorsOverride = {},
   layout: Partial<ThemeLayout> = {},
 ): TuiTheme {
   return {
-    tokens: normalizeThemeTokens(tokens),
+    colors: normalizeThemeColors(colors),
     layout: normalizeThemeLayout(layout),
   };
 }
@@ -95,3 +111,24 @@ export function footerHint(scope: string, extra?: string): string {
   }
   return `${base} | ${extra.trim()}`;
 }
+
+export {
+  defaultThemeColors,
+  defaultThemeLayout,
+  defaultTuiTheme,
+  detectColorRuntime,
+  normalizeThemeColorMode,
+  resolveColorReference,
+  resolveIntentColor,
+  resolveIntentMono,
+  resolveLiteralColor,
+  resolveRgbLiteral,
+};
+
+export type {
+  ColorIntent,
+  ColorMode,
+  ColorRuntime,
+  DetectColorRuntimeOptions,
+  ThemeColorsOverride,
+};

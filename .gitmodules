@@ -85,3 +85,6 @@
 [submodule "tools/recguard"]
 	path = tools/recguard
 	url = git@github.com:LevitateOS/recguard.git
+[submodule "shared/tui-kit"]
+	path = shared/tui-kit
+	url = git@github.com:LevitateOS/tui-kit.git

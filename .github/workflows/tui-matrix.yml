@@ -1,0 +1,59 @@
+name: TUI Compatibility Matrix
+
+on:
+  pull_request:
+    paths:
+      - 'shared/tui-kit/**'
+      - 'docs/tui/**'
+      - 'tools/recpart/**'
+      - 'package.json'
+      - 'bun.lock'
+      - '.github/workflows/tui-matrix.yml'
+  push:
+    branches:
+      - main
+      - master
+    paths:
+      - 'shared/tui-kit/**'
+      - 'docs/tui/**'
+      - 'tools/recpart/**'
+      - 'package.json'
+      - 'bun.lock'
+      - '.github/workflows/tui-matrix.yml'
+
+jobs:
+  tui-compat:
+    name: Shared TUI -> Consumers
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install workspace dependencies
+        run: bun install
+
+      - name: Typecheck shared tui-kit
+        run: bun run --cwd shared/tui-kit typecheck
+
+      - name: Typecheck docs/tui
+        run: bun run --cwd docs/tui typecheck
+
+      - name: Test docs/tui
+        run: bun run --cwd docs/tui test
+
+      - name: Build recpart frontend
+        run: bun run --cwd tools/recpart/frontend build
+
+      - name: Verify recpart backend + frontend contract
+        run: cargo test -p recpart

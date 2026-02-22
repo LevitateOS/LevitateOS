@@ -9,8 +9,14 @@ import {
   type BlessedModule,
 } from "../src/adapters/blessed/runtime";
 import { createBlessedScreen } from "../src/adapters/blessed/screen";
+import { createTheme, type ColorRuntime } from "../src/theme";
 
 type KeyHandler = (...args: unknown[]) => void;
+const TEST_THEME = createTheme();
+const TEST_COLORS: ColorRuntime = {
+  mode: "ansi16",
+  enabled: true,
+};
 
 function toArray(keys: string | string[]): string[] {
   return Array.isArray(keys) ? keys : [keys];
@@ -86,6 +92,17 @@ describe("blessed runtime adapter", () => {
         screen: () => ({}),
       }),
     ).toThrow();
+  });
+
+  it("accepts callable blessed module interop shape", () => {
+    const callable = Object.assign(() => ({}), {
+      screen: () => createFakeKeyEmitter() as any,
+      box: () => ({}) as any,
+      list: () => ({}) as any,
+      textbox: () => ({}) as any,
+    });
+
+    expect(() => assertBlessedModule(callable)).not.toThrow();
   });
 
   it("createBlessedScreen applies defaults and explicit overrides", () => {
@@ -191,6 +208,8 @@ describe("blessed runtime adapter", () => {
 
     const promise = askBlessedInput({
       screen: screen as any,
+      theme: TEST_THEME,
+      colors: TEST_COLORS,
       title: "Input",
       prompt: "Value?",
       initial: "init",
@@ -236,6 +255,8 @@ describe("blessed runtime adapter", () => {
 
     const promise = askBlessedInput({
       screen: screen as any,
+      theme: TEST_THEME,
+      colors: TEST_COLORS,
       title: "Input",
       prompt: "Value?",
     });

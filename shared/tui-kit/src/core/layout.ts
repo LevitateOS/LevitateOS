@@ -1,6 +1,6 @@
 import { createBlessedBox, type BlessedBox } from "../adapters/blessed/box";
 import type { ScreenHandle } from "./screen";
-import { tuiTheme } from "../theme";
+import { resolveIntentColor } from "../theme";
 import { safeDestroy } from "./lifecycle";
 import { clampNumber, toPositiveInt } from "../internal/numbers";
 
@@ -95,13 +95,19 @@ export function createTwoPaneShell(screen: ScreenHandle, options: TwoPaneOptions
   const key = screen.raw as object;
   destroyShell(shellMap.get(key));
 
+  const layout = screen.theme.layout;
   const metrics = computeTwoPaneMetrics(
     screen.width,
     screen.height,
-    options.sidebarWidth ?? tuiTheme.layout.sidebarWidth,
-    tuiTheme.layout.headerHeight,
-    tuiTheme.layout.footerHeight,
+    options.sidebarWidth ?? layout.sidebarWidth,
+    layout.headerHeight,
+    layout.footerHeight,
   );
+
+  const textColor = resolveIntentColor(screen.theme, "text", screen.colors);
+  const dimTextColor = resolveIntentColor(screen.theme, "dimText", screen.colors);
+  const backgroundColor = resolveIntentColor(screen.theme, "background", screen.colors);
+  const borderColor = resolveIntentColor(screen.theme, "border", screen.colors);
 
   const root = createBlessedBox({
     parent: screen.raw,
@@ -120,8 +126,8 @@ export function createTwoPaneShell(screen: ScreenHandle, options: TwoPaneOptions
     content: options.title,
     tags: true,
     style: {
-      fg: tuiTheme.tokens.text,
-      bg: tuiTheme.tokens.background,
+      fg: textColor,
+      bg: backgroundColor,
       bold: true,
     },
   });
@@ -138,8 +144,8 @@ export function createTwoPaneShell(screen: ScreenHandle, options: TwoPaneOptions
     alwaysScroll: true,
     content: options.sidebarContent,
     style: {
-      fg: tuiTheme.tokens.text,
-      border: { fg: tuiTheme.tokens.border },
+      fg: textColor,
+      border: borderColor ? { fg: borderColor } : undefined,
     },
   });
 
@@ -156,8 +162,8 @@ export function createTwoPaneShell(screen: ScreenHandle, options: TwoPaneOptions
     keys: true,
     vi: true,
     style: {
-      fg: tuiTheme.tokens.text,
-      border: { fg: tuiTheme.tokens.border },
+      fg: textColor,
+      border: borderColor ? { fg: borderColor } : undefined,
     },
   });
 
@@ -170,8 +176,8 @@ export function createTwoPaneShell(screen: ScreenHandle, options: TwoPaneOptions
     content: options.footerText ?? "",
     tags: true,
     style: {
-      fg: tuiTheme.tokens.dimText,
-      bg: tuiTheme.tokens.background,
+      fg: dimTextColor,
+      bg: backgroundColor,
     },
   });
 

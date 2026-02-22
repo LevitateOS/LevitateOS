@@ -1,5 +1,6 @@
 import { TuiKitError } from "../../core/errors";
 import { createLifecycleScope } from "../../core/lifecycle";
+import { resolveIntentColor, type ColorRuntime, type TuiTheme } from "../../theme";
 import type { BlessedBox } from "./box";
 import { createBlessedBox } from "./box";
 import { callBlessedFactory } from "./factory";
@@ -20,6 +21,8 @@ export type BlessedTextbox = {
 
 export type AskBlessedInputOptions = {
   screen: BlessedScreen;
+  theme: TuiTheme;
+  colors: ColorRuntime;
   title: string;
   prompt: string;
   initial?: string;
@@ -43,6 +46,8 @@ export function createBlessedTextbox(options: Record<string, unknown> = {}): Ble
 
 export function askBlessedInput(options: AskBlessedInputOptions): Promise<string> {
   const title = options.title.trim().length > 0 ? options.title : "Input";
+  const borderColor = resolveIntentColor(options.theme, "accent", options.colors);
+  const hintColor = resolveIntentColor(options.theme, "dimText", options.colors);
 
   return new Promise((resolve, reject) => {
     if (!options.screen || typeof options.screen.render !== "function") {
@@ -112,7 +117,7 @@ export function askBlessedInput(options: AskBlessedInputOptions): Promise<string
         label: ` ${title} `,
         tags: true,
         style: {
-          border: { fg: "cyan" },
+          border: borderColor ? { fg: borderColor } : undefined,
         },
       });
       scope.onDispose(() => {
@@ -155,7 +160,7 @@ export function askBlessedInput(options: AskBlessedInputOptions): Promise<string
         width: "100%-2",
         height: 1,
         content: "Enter confirm | Esc cancel",
-        style: { fg: "gray" },
+        style: hintColor ? { fg: hintColor } : undefined,
       });
 
       scope.bindEvent(input, "submit", (value: unknown) => {

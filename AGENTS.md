@@ -131,3 +131,8 @@ This file is intentionally compact. Priority is preventing policy violations and
 - Preserve a single default output/logic path:
   - no shadow/compatibility branch in the default path.
   - if a legacy/compat path is needed, it must be a separate explicit command/flag and not the default behavior.
+
+## 17) Module System Policy (Strict)
+- CommonJS is strictly forbidden.
+- Do not introduce `require`, `createRequire`, `.cjs`, or any CJS fallback branch.
+- Runtime/module loading must be ESM-only.

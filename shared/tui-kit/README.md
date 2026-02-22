@@ -13,6 +13,15 @@ This package is intentionally a single flattened package. It does not expose nes
 - `@levitate/tui-kit/wizard` - step flow and sidebar rendering helpers
 - `@levitate/tui-kit/docs` - docs nav flattening and docs page/sidebar rendering helpers
 
+## Colors and Themes
+
+Colors are first-class and explicit.
+
+- Build themes with `createTheme(...)`.
+- Pass `theme` to `createScreen(...)` (no hidden singleton-based styling path).
+- Runtime color capability is auto-detected (`truecolor` / `ansi256` / `ansi16` / `mono`) and can be overridden with `colorMode` / `colorEnabled`.
+- Use `styleText(...)` with `[[...]]` directives for styled content (`fg`, `bg`, `bold`, `underline`, `inverse`).
+
 ## Runtime Requirements
 
 - Bun or Node runtime with terminal support

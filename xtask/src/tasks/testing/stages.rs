@@ -10,6 +10,27 @@ use std::process::{Child, Command, Stdio};
 use std::thread::sleep;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
+#[derive(Clone, Copy, Debug)]
+struct WindowConfig {
+    vnc_port: u16,
+}
+
+impl WindowConfig {
+    fn allocate() -> Result<Self> {
+        let vnc_port = allocate_local_port(5900, 5999)?;
+        Ok(Self { vnc_port })
+    }
+
+    fn vnc_endpoint(&self) -> String {
+        format!("vnc://127.0.0.1:{}", self.vnc_port)
+    }
+
+    fn qemu_display_arg(&self) -> String {
+        let display_index = self.vnc_port.saturating_sub(5900);
+        format!("vnc=127.0.0.1:{display_index},to=99,id=stage-window")
+    }
+}
+
 pub fn boot(
     n: u8,
     distro: crate::cli::BootDistro,
@@ -19,10 +40,16 @@ pub fn boot(
     ssh_port: u16,
     ssh_timeout: u64,
     no_shell: bool,
+    window: bool,
     ssh_private_key: Option<PathBuf>,
 ) -> Result<()> {
     let root = crate::util::repo::repo_root()?;
     let cfg = BootConfig::for_distro(&root, distro);
+    let window_cfg = if window {
+        Some(WindowConfig::allocate()?)
+    } else {
+        None
+    };
 
     match n {
         1 => {
@@ -44,6 +71,7 @@ pub fn boot(
                 ssh_port,
                 ssh_timeout,
                 no_shell,
+                window_cfg.as_ref(),
                 ssh_private_key,
             )
         }
@@ -66,6 +94,7 @@ pub fn boot(
                 ssh_port,
                 ssh_timeout,
                 no_shell,
+                window_cfg.as_ref(),
                 ssh_private_key,
             )
         }
@@ -75,7 +104,7 @@ pub fn boot(
                     "`--ssh` is only supported for Stage 01; use `cargo xtask stages boot 1 --ssh`."
                 );
             }
-            boot_installed_disk(&root, &cfg, inject, inject_file)
+            boot_installed_disk(&root, &cfg, inject, inject_file, window_cfg.as_ref())
         }
         _ => bail!(
             "Stage {n} is automated. Interactive stages: 01 (live), 02 (live tools), 04 (installed)."
@@ -140,8 +169,9 @@ impl BootConfig {
                     .join(".artifacts/out/levitate/s01-boot/levitateos-x86_64-s01_boot.iso"),
                 stage01_iso_filename: "levitateos-x86_64-s01_boot.iso",
                 stage02_root: root.join(".artifacts/out/levitate/s02-live-tools"),
-                stage02_iso_legacy: root
-                    .join(".artifacts/out/levitate/s02-live-tools/levitateos-x86_64-s02_live_tools.iso"),
+                stage02_iso_legacy: root.join(
+                    ".artifacts/out/levitate/s02-live-tools/levitateos-x86_64-s02_live_tools.iso",
+                ),
                 stage02_iso_filename: "levitateos-x86_64-s02_live_tools.iso",
                 disk_dir: root.join(".artifacts/out/levitate"),
                 disk_name: "levitate-test.qcow2",
@@ -169,8 +199,9 @@ impl BootConfig {
                     .join(".artifacts/out/iuppiter/s01-boot/iuppiter-x86_64-s01_boot.iso"),
                 stage01_iso_filename: "iuppiter-x86_64-s01_boot.iso",
                 stage02_root: root.join(".artifacts/out/iuppiter/s02-live-tools"),
-                stage02_iso_legacy: root
-                    .join(".artifacts/out/iuppiter/s02-live-tools/iuppiter-x86_64-s02_live_tools.iso"),
+                stage02_iso_legacy: root.join(
+                    ".artifacts/out/iuppiter/s02-live-tools/iuppiter-x86_64-s02_live_tools.iso",
+                ),
                 stage02_iso_filename: "iuppiter-x86_64-s02_live_tools.iso",
                 disk_dir: root.join(".artifacts/out/iuppiter"),
                 disk_name: "iuppiter-test.qcow2",
@@ -370,6 +401,7 @@ fn boot_live_iso(
     ssh_port: u16,
     ssh_timeout: u64,
     no_shell: bool,
+    window: Option<&WindowConfig>,
     ssh_private_key: Option<PathBuf>,
 ) -> Result<()> {
     let mut injection = boot_injection_payload(inject, inject_file)?;
@@ -386,10 +418,11 @@ fn boot_live_iso(
             ssh_port,
             ssh_timeout,
             no_shell,
+            window,
             ssh_private_key,
         )
     } else {
-        boot_live_iso_serial(root, cfg, iso_path, injection, no_shell)
+        boot_live_iso_serial(root, cfg, iso_path, injection, no_shell, window)
     }
 }
 
@@ -399,15 +432,12 @@ fn boot_live_iso_serial(
     iso_path: &Path,
     injection: Option<BootInjection>,
     no_shell: bool,
+    window: Option<&WindowConfig>,
 ) -> Result<()> {
     if no_shell {
         let log_path = temp_log_path("levitate-stage01-serial-boot");
-        let mut cmd = qemu_base_command(
-            root,
-            iso_path,
-            injection.as_ref(),
-            None,
-        )?;
+        maybe_launch_window_viewer(window)?;
+        let mut cmd = qemu_base_command(root, iso_path, injection.as_ref(), None, window)?;
         let child = spawn_qemu_with_log(&mut cmd, &log_path, false)?;
         monitor_live_iso_serial(child, &log_path)?;
         let _ = fs::remove_file(&log_path);
@@ -415,12 +445,8 @@ fn boot_live_iso_serial(
     }
 
     eprintln!("Booting {} live ISO... (Ctrl-A X to exit)", cfg.pretty_name);
-    let mut cmd = qemu_base_command(
-        root,
-        iso_path,
-        injection.as_ref(),
-        None,
-    )?;
+    maybe_launch_window_viewer(window)?;
+    let mut cmd = qemu_base_command(root, iso_path, injection.as_ref(), None, window)?;
     run_checked(&mut cmd)
 }
 
@@ -497,6 +523,7 @@ fn boot_live_iso_ssh(
     ssh_port: u16,
     ssh_timeout: u64,
     no_shell: bool,
+    window: Option<&WindowConfig>,
     ssh_private_key: Option<PathBuf>,
 ) -> Result<()> {
     eprintln!(
@@ -504,13 +531,9 @@ fn boot_live_iso_ssh(
         cfg.pretty_name, stage_label
     );
     ensure_ssh_port_available(ssh_port)?;
+    maybe_launch_window_viewer(window)?;
 
-    let mut cmd = qemu_base_command(
-        root,
-        iso_path,
-        injection.as_ref(),
-        Some(ssh_port),
-    )?;
+    let mut cmd = qemu_base_command(root, iso_path, injection.as_ref(), Some(ssh_port), window)?;
     let log_path = temp_log_path("levitate-stage01-ssh-boot");
     let child = spawn_qemu_with_log(&mut cmd, &log_path, true)?;
     let result = monitor_live_iso_ssh(
@@ -805,6 +828,7 @@ fn boot_installed_disk(
     cfg: &BootConfig,
     _inject: Option<String>,
     _inject_file: Option<PathBuf>,
+    window: Option<&WindowConfig>,
 ) -> Result<()> {
     let disk = cfg.disk_dir.join(cfg.disk_name);
     let vars = cfg.disk_dir.join(cfg.vars_name);
@@ -843,13 +867,10 @@ fn boot_installed_disk(
         "user,id=net0",
         "-device",
         "virtio-net-pci,netdev=net0",
-        "-vga",
-        "none",
-        "-nographic",
-        "-serial",
-        "mon:stdio",
-        "-no-reboot",
     ]);
+    apply_qemu_console_mode(&mut cmd, window);
+    cmd.arg("-no-reboot");
+    maybe_launch_window_viewer(window)?;
 
     crate::util::tools_env::apply_to_command(&mut cmd, root)?;
     run_checked(&mut cmd)
@@ -904,6 +925,7 @@ fn qemu_base_command(
     iso_path: &Path,
     injection: Option<&BootInjection>,
     ssh_port: Option<u16>,
+    window: Option<&WindowConfig>,
 ) -> Result<Command> {
     let ovmf = crate::util::repo::ovmf_path(root)?;
     let mut cmd = Command::new("qemu-system-x86_64");
@@ -926,13 +948,9 @@ fn qemu_base_command(
         ),
         "-drive",
         &format!("if=pflash,format=raw,readonly=on,file={}", ovmf.display()),
-        "-vga",
-        "none",
-        "-nographic",
-        "-serial",
-        "mon:stdio",
-        "-no-reboot",
     ]);
+    apply_qemu_console_mode(&mut cmd, window);
+    cmd.arg("-no-reboot");
     if let Some(injection) = injection {
         let fw_cfg = format!(
             "name=opt/levitate/boot-injection,file={}",
@@ -967,6 +985,112 @@ fn qemu_base_command(
 
     crate::util::tools_env::apply_to_command(&mut cmd, root)?;
     Ok(cmd)
+}
+
+fn apply_qemu_console_mode(cmd: &mut Command, window: Option<&WindowConfig>) {
+    if let Some(window_cfg) = window {
+        cmd.args(["-vga", "none", "-device", "secondary-vga"]);
+        cmd.arg("-display").arg(window_cfg.qemu_display_arg());
+        cmd.args(["-serial", "mon:stdio"]);
+    } else {
+        cmd.args(["-vga", "none", "-nographic", "-serial", "mon:stdio"]);
+    }
+}
+
+fn maybe_launch_window_viewer(window: Option<&WindowConfig>) -> Result<()> {
+    let Some(window_cfg) = window else {
+        return Ok(());
+    };
+
+    let endpoint = window_cfg.vnc_endpoint();
+    let host_port = format!("127.0.0.1:{}", window_cfg.vnc_port);
+    eprintln!("Window mode: VNC endpoint {}", endpoint);
+    enum LaunchMode {
+        Detached,
+        MustSucceed,
+    }
+
+    let launchers = [
+        (
+            "remote-viewer",
+            vec![endpoint.clone()],
+            LaunchMode::Detached,
+        ),
+        ("vncviewer", vec![host_port.clone()], LaunchMode::Detached),
+        ("gvncviewer", vec![host_port.clone()], LaunchMode::Detached),
+        ("virt-viewer", vec![endpoint.clone()], LaunchMode::Detached),
+        (
+            "gio",
+            vec!["open".to_string(), endpoint.clone()],
+            LaunchMode::MustSucceed,
+        ),
+        ("xdg-open", vec![endpoint.clone()], LaunchMode::MustSucceed),
+    ];
+
+    for (program, args, mode) in launchers {
+        if which::which(program).is_err() {
+            continue;
+        }
+
+        let mut cmd = Command::new(program);
+        cmd.args(args.iter().map(String::as_str));
+        cmd.stdin(Stdio::null());
+        cmd.stdout(Stdio::null());
+        cmd.stderr(Stdio::null());
+        match mode {
+            LaunchMode::Detached => match cmd.spawn() {
+                Ok(_child) => {
+                    eprintln!("Window mode: launched {program} for {}", endpoint);
+                    return Ok(());
+                }
+                Err(err) => {
+                    eprintln!("Window mode: failed launching {program}: {err}");
+                }
+            },
+            LaunchMode::MustSucceed => match cmd.status() {
+                Ok(status) if status.success() => {
+                    eprintln!("Window mode: launched {program} for {}", endpoint);
+                    return Ok(());
+                }
+                Ok(status) => {
+                    eprintln!(
+                        "Window mode: launcher {program} exited with status {status}; trying next launcher"
+                    );
+                }
+                Err(err) => {
+                    eprintln!("Window mode: failed launching {program}: {err}");
+                }
+            },
+        }
+    }
+
+    if std::env::var("LEVITATE_STAGE_WINDOW_REQUIRE_VIEWER")
+        .ok()
+        .as_deref()
+        == Some("1")
+    {
+        bail!(
+            "Window mode requested, but no local VNC viewer launcher was found.\n\
+             Tried: remote-viewer, vncviewer, gvncviewer, virt-viewer, gio open, xdg-open.\n\
+             Install one of these and rerun, or connect manually to {endpoint}, or use `just stage` / `just stage-ssh`."
+        );
+    }
+
+    eprintln!(
+        "Window mode: no local viewer launcher found; continuing without auto-launch.\n\
+         Connect manually to {endpoint} from your desktop (SSH tunnel recommended)."
+    );
+    Ok(())
+}
+
+fn allocate_local_port(start: u16, end: u16) -> Result<u16> {
+    for port in start..=end {
+        if let Ok(listener) = TcpListener::bind(("127.0.0.1", port)) {
+            drop(listener);
+            return Ok(port);
+        }
+    }
+    bail!("No free local TCP port available in range {start}..={end}")
 }
 
 fn create_boot_injection_iso(payload_path: &Path) -> Result<PathBuf> {

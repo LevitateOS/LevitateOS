@@ -8,6 +8,14 @@ import { createBlessedBox } from "../adapters/blessed/box";
 import { TuiKitError } from "./errors";
 import { getTerminalSize, normalizeTerminalSize, terminalMeetsMinimum } from "./terminal";
 import { toPositiveInt } from "../internal/numbers";
+import {
+  defaultTuiTheme,
+  detectColorRuntime,
+  resolveIntentColor,
+  type ColorMode,
+  type ColorRuntime,
+  type TuiTheme,
+} from "../theme";
 
 export type TerminalMinimum = {
   columns: number;
@@ -17,10 +25,15 @@ export type TerminalMinimum = {
 export type CreateScreenOptions = {
   title?: string;
   quitKeybinds?: string[];
+  theme?: TuiTheme;
+  colorMode?: ColorMode;
+  colorEnabled?: boolean;
 };
 
 export type ScreenHandle = {
   raw: BlessedScreen;
+  readonly theme: TuiTheme;
+  readonly colors: ColorRuntime;
   readonly width: number;
   readonly height: number;
   render: () => void;
@@ -37,9 +50,13 @@ const DEFAULT_MINIMUM: TerminalMinimum = {
 
 class BlessedScreenHandle implements ScreenHandle {
   readonly raw: BlessedScreen;
+  readonly theme: TuiTheme;
+  readonly colors: ColorRuntime;
 
-  constructor(raw: BlessedScreen) {
+  constructor(raw: BlessedScreen, theme: TuiTheme, colors: ColorRuntime) {
     this.raw = raw;
+    this.theme = theme;
+    this.colors = colors;
   }
 
   get width(): number {
@@ -76,10 +93,16 @@ class BlessedScreenHandle implements ScreenHandle {
 }
 
 export function createScreen(options: CreateScreenOptions = {}): ScreenHandle {
+  const theme = options.theme ?? defaultTuiTheme;
+  const colors = detectColorRuntime({
+    mode: options.colorMode,
+    enabled: options.colorEnabled,
+  });
+
   const raw = createBlessedScreen({
     title: options.title ?? "tui-kit",
   });
-  const handle = new BlessedScreenHandle(raw);
+  const handle = new BlessedScreenHandle(raw, theme, colors);
 
   const quitKeys = Array.from(
     new Set((options.quitKeybinds ?? ["C-c"]).filter((key) => key.length > 0)),
@@ -125,6 +148,7 @@ export function ensureTerminalMinimum(
 
 export function showFatal(screen: ScreenHandle, message: string, title = "Fatal Error"): never {
   try {
+    const errorColor = resolveIntentColor(screen.theme, "error", screen.colors);
     createBlessedBox({
       parent: screen.raw,
       top: "center",
@@ -136,7 +160,7 @@ export function showFatal(screen: ScreenHandle, message: string, title = "Fatal 
       label: ` ${title} `,
       content: `${message}\n\nExiting...`,
       style: {
-        border: { fg: "red" },
+        border: errorColor ? { fg: errorColor } : undefined,
       },
       padding: {
         left: 1,

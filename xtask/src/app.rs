@@ -54,6 +54,7 @@ pub fn run(cli: crate::cli::Cli) -> Result<()> {
                 ssh_port,
                 ssh_timeout,
                 no_shell,
+                window,
                 ssh_private_key,
             } => crate::tasks::testing::stages::boot(
                 n,
@@ -64,6 +65,7 @@ pub fn run(cli: crate::cli::Cli) -> Result<()> {
                 ssh_port,
                 ssh_timeout,
                 no_shell,
+                window,
                 ssh_private_key,
             ),
             crate::cli::StagesCmd::Test {

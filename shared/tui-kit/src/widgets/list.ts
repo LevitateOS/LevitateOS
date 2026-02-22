@@ -2,7 +2,7 @@ import { createBlessedList } from "../adapters/blessed/list";
 import { TuiKitError } from "../core/errors";
 import { clamp } from "../core/layout";
 import { createLifecycleScope } from "../core/lifecycle";
-import { tuiTheme } from "../theme";
+import { resolveIntentColor } from "../theme";
 import { toInt } from "../internal/numbers";
 import type { WidgetBaseOptions } from "./types";
 import { assertWidgetBaseOptions, cancelled, createWidgetShell } from "./shared";
@@ -35,6 +35,9 @@ export function pickFromList(options: PickFromListOptions): Promise<number> {
   }
 
   const shell = createWidgetShell(options, "Arrows move | Enter select | Esc cancel");
+  const selectedFg = resolveIntentColor(options.screen.theme, "background", options.screen.colors);
+  const selectedBg = resolveIntentColor(options.screen.theme, "accent", options.screen.colors);
+  const itemFg = resolveIntentColor(options.screen.theme, "text", options.screen.colors);
 
   const list = createBlessedList({
     parent: shell.content,
@@ -48,11 +51,11 @@ export function pickFromList(options: PickFromListOptions): Promise<number> {
     mouse: true,
     style: {
       selected: {
-        fg: tuiTheme.tokens.background,
-        bg: tuiTheme.tokens.accent,
+        fg: selectedFg,
+        bg: selectedBg,
       },
       item: {
-        fg: tuiTheme.tokens.text,
+        fg: itemFg,
       },
     },
   });

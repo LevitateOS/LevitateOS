@@ -12,29 +12,16 @@ export type BlessedModule = {
 const REQUIRED_EXPORTS: ReadonlyArray<keyof BlessedModule> = ["screen", "box", "list", "textbox"];
 
 let cachedBlessed: BlessedModule | null = null;
+const blessedModuleId = "blessed";
+const blessedNamespace = await import(blessedModuleId);
 
-function getDynamicRequire(): (moduleId: string) => unknown {
-  const fromGlobal = (globalThis as { require?: unknown }).require;
-  if (typeof fromGlobal === "function") {
-    return fromGlobal as (moduleId: string) => unknown;
-  }
-
-  try {
-    return Function("return require")() as (moduleId: string) => unknown;
-  } catch {
-    throw new TuiKitError(
-      "INTERNAL",
-      "Unable to resolve CommonJS require for blessed runtime loading.",
-      {
-        component: "blessed.runtime",
-        remediation: "Run in a Bun/Node environment that supports require().",
-      },
-    );
-  }
+function resolveBlessedModule(): unknown {
+  const maybeDefault = (blessedNamespace as { default?: unknown }).default;
+  return maybeDefault ?? (blessedNamespace as unknown);
 }
 
 export function assertBlessedModule(value: unknown): asserts value is BlessedModule {
-  if (!value || typeof value !== "object") {
+  if (!value || (typeof value !== "object" && typeof value !== "function")) {
     throw new TuiKitError("INTERNAL", "Blessed module did not load as an object.", {
       component: "blessed.runtime",
       observed: typeof value,
@@ -57,10 +44,8 @@ export function loadBlessed(): BlessedModule {
     return cachedBlessed;
   }
 
-  const dynamicRequire = getDynamicRequire();
-
   try {
-    const maybeBlessed = dynamicRequire("blessed") as unknown;
+    const maybeBlessed = resolveBlessedModule();
     assertBlessedModule(maybeBlessed);
     cachedBlessed = maybeBlessed;
     return maybeBlessed;

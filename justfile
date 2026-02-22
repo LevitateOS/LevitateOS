@@ -63,7 +63,7 @@ kernels-rebuild-all:
 # Boundary rule: stage wrappers consume existing artifacts only.
 # Do not add implicit ISO build steps here; freshness is explicit via `just build*`.
 [script, no-exit-message]
-_boot_stage n distro="levitate" inject="" inject_file="" ssh="false" no_shell="false" ssh_pubkey=(env("HOME") + "/.ssh/id_ed25519.pub") ssh_privkey="" ssh_port="2222":
+_boot_stage n distro="levitate" inject="" inject_file="" ssh="false" no_shell="false" window="false" ssh_pubkey=(env("HOME") + "/.ssh/id_ed25519.pub") ssh_privkey="" ssh_port="2222":
     #!/usr/bin/env bash
     set -euo pipefail
     if [ "{{ssh}}" = "true" ] && [ "{{n}}" != "1" ] && [ "{{n}}" != "01" ] && [ "{{n}}" != "2" ] && [ "{{n}}" != "02" ]; then
@@ -79,6 +79,10 @@ _boot_stage n distro="levitate" inject="" inject_file="" ssh="false" no_shell="f
 
     if [ "{{no_shell}}" = "true" ]; then
       args+=(--no-shell)
+    fi
+
+    if [ "{{window}}" = "true" ]; then
+      args+=(--window)
     fi
 
     if [ -n "{{inject_file}}" ]; then
@@ -102,12 +106,17 @@ _boot_stage n distro="levitate" inject="" inject_file="" ssh="false" no_shell="f
 # Boot into a stage (interactive serial, Ctrl-A X to exit)
 [no-exit-message]
 stage n distro="levitate" inject="" inject_file="" ssh_pubkey=(env("HOME") + "/.ssh/id_ed25519.pub"):
-    just _boot_stage {{n}} {{distro}} "{{inject}}" "{{inject_file}}" false false "{{ssh_pubkey}}" "" 2222
+    just _boot_stage {{n}} {{distro}} "{{inject}}" "{{inject_file}}" false false false "{{ssh_pubkey}}" "" 2222
 
 # Boot a live stage in background and SSH into it (no serial wrapper harness).
 [no-exit-message]
 stage-ssh n distro="levitate" inject="" inject_file="" ssh_pubkey=(env("HOME") + "/.ssh/id_ed25519.pub") ssh_privkey=(env("HOME") + "/.ssh/id_ed25519") ssh_port="2222":
-    just _boot_stage {{n}} {{distro}} "{{inject}}" "{{inject_file}}" true false "{{ssh_pubkey}}" "{{ssh_privkey}}" "{{ssh_port}}"
+    just _boot_stage {{n}} {{distro}} "{{inject}}" "{{inject_file}}" true false false "{{ssh_pubkey}}" "{{ssh_privkey}}" "{{ssh_port}}"
+
+# Boot into a stage with a QEMU window while keeping serial console on terminal.
+[no-exit-message]
+stage-window n distro="levitate" inject="" inject_file="" ssh_pubkey=(env("HOME") + "/.ssh/id_ed25519.pub"):
+    just _boot_stage {{n}} {{distro}} "{{inject}}" "{{inject_file}}" false false true "{{ssh_pubkey}}" "" 2222
 
 # Single-path Stage 01 parity gate (serial boot + SSH boot).
 [script, no-exit-message]
@@ -242,6 +251,20 @@ docs-content-build:
 
 docs-content-check:
     cd docs/content && bun run check
+
+# Docs TUI
+docs-tui-check:
+    cd docs/tui && bun run typecheck && bun run test
+
+[script, no-exit-message]
+docs-tui-inspect *args:
+    #!/usr/bin/env bash
+    set -euo pipefail
+
+    cd docs/tui
+    bun run typecheck
+    bun run test
+    exec bun src/index.ts {{args}}
 
 # Website (Astro)
 website-dev:

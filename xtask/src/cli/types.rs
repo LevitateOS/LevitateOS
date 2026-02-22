@@ -194,7 +194,7 @@ pub enum HooksCmd {
 
 #[derive(Subcommand)]
 pub enum StagesCmd {
-    /// Boot into an interactive stage (serial console).
+    /// Boot into an interactive stage (serial console by default).
     ///
     /// Interactive stages: 01 (live ISO), 02 (live tools), 04 (installed).
     Boot {
@@ -217,6 +217,9 @@ pub enum StagesCmd {
         /// Connect and verify SSH only, without opening an interactive shell.
         #[arg(long)]
         no_shell: bool,
+        /// Open a graphical window via local VNC viewer instead of serial-only headless mode.
+        #[arg(long)]
+        window: bool,
         /// SSH private key used for interactive or probe login when `--ssh` is enabled.
         #[arg(long, value_name = "PATH")]
         ssh_private_key: Option<PathBuf>,

@@ -22,6 +22,8 @@ export async function askText(options: AskTextOptions): Promise<string> {
 
   const value = await askBlessedInput({
     screen: options.screen.raw,
+    theme: options.screen.theme,
+    colors: options.screen.colors,
     title: options.title.trim(),
     prompt: options.prompt,
     initial: options.initial,

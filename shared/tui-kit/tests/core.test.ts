@@ -4,6 +4,9 @@ import { normalizeKeySpec, onKey } from "../src/core/events";
 import { clamp, computeTwoPaneMetrics } from "../src/core/layout";
 import { ensureTerminalMinimum } from "../src/core/screen";
 import { normalizeTerminalSize, terminalMeetsMinimum } from "../src/core/terminal";
+import { createTheme } from "../src/theme";
+
+const TEST_THEME = createTheme();
 
 describe("core utilities", () => {
   it("clamp bounds values", () => {
@@ -20,6 +23,8 @@ describe("core utilities", () => {
   it("terminal minimum guard fails with actionable error", () => {
     const fakeScreen = {
       raw: {},
+      theme: TEST_THEME,
+      colors: { mode: "ansi16", enabled: true },
       width: 79,
       height: 23,
       render: () => {},
@@ -74,6 +79,8 @@ describe("core utilities", () => {
 
     const fakeScreen = {
       raw: {},
+      theme: TEST_THEME,
+      colors: { mode: "ansi16", enabled: true },
       width: 80,
       height: 24,
       render: () => {},
