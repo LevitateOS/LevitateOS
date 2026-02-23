@@ -279,6 +279,8 @@ docs-tui *args:
        [ "$(find ../../shared/tui-kit/src -type f -newer node_modules/@levitate/tui-kit/package.json | head -n 1)" != "" ]; then
       bun install
     fi
+    unset NO_COLOR
+    export FORCE_COLOR="${FORCE_COLOR:-3}"
     exec bun src/main.ts {{args}}
 
 [script, no-exit-message]
@@ -292,6 +294,8 @@ docs-tui-inspect *args:
        [ "$(find ../../shared/tui-kit/src -type f -newer node_modules/@levitate/tui-kit/package.json | head -n 1)" != "" ]; then
       bun install
     fi
+    unset NO_COLOR
+    export FORCE_COLOR="${FORCE_COLOR:-3}"
     bun run typecheck
     bun run test
     exec bun src/main.ts {{args}}

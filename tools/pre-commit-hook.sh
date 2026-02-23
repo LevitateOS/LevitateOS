@@ -66,7 +66,7 @@ run_docs_tui_checks() {
     fi
 
     STAGED_FILES=$(git diff --cached --name-only --diff-filter=ACMR 2>/dev/null || true)
-    STAGED_DOCS_TUI=$(printf "%s\n" "$STAGED_FILES" | grep '^docs/tui/' || true)
+    STAGED_DOCS_TUI=$(printf "%s\n" "$STAGED_FILES" | grep -E '^docs/tui(/|$)' || true)
     if [ -z "$STAGED_DOCS_TUI" ]; then
         echo "OK  No docs/tui files staged"
         return 0

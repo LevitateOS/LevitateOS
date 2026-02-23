@@ -99,6 +99,12 @@ pub enum Cmd {
         #[command(subcommand)]
         cmd: PolicyCmd,
     },
+
+    /// Docs tooling tasks.
+    Docs {
+        #[command(subcommand)]
+        cmd: DocsCmd,
+    },
 }
 
 #[derive(Subcommand)]
@@ -265,6 +271,44 @@ pub enum PolicyCmd {
     /// Fail if forbidden legacy bindings appear in code/config for stage wiring.
     #[command(name = "audit-legacy-bindings")]
     AuditLegacyBindings,
+}
+
+#[derive(Subcommand)]
+pub enum DocsCmd {
+    /// Render docs/tui pages and write plain-text terminal snapshots.
+    Inspect {
+        /// Explicit slug(s) to inspect. If omitted, xtask inspects every slug from docs/content nav.
+        #[arg(long = "slug", value_name = "SLUG")]
+        slug: Vec<String>,
+
+        /// Terminal columns used for rendering.
+        #[arg(long, default_value_t = 140)]
+        columns: u16,
+
+        /// Terminal rows used for rendering.
+        #[arg(long, default_value_t = 40)]
+        rows: u16,
+
+        /// Seconds to keep each page running before snapshot capture.
+        #[arg(long, default_value_t = 2)]
+        seconds: u64,
+
+        /// Optional output base directory. xtask always creates a timestamped run folder under this path.
+        #[arg(long, value_name = "PATH")]
+        out_dir: Option<PathBuf>,
+
+        /// Also print the plain snapshot(s) to stdout.
+        #[arg(long)]
+        stdout: bool,
+
+        /// Also write ANSI-formatted snapshots (`.ansi`) for color/style review.
+        #[arg(long)]
+        ansi: bool,
+
+        /// Keep raw `script` transcripts next to plain outputs for debugging.
+        #[arg(long)]
+        keep_transcript: bool,
+    },
 }
 
 #[derive(Clone, Copy, Debug, ValueEnum)]

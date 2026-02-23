@@ -90,6 +90,27 @@ pub fn run(cli: crate::cli::Cli) -> Result<()> {
                 crate::tasks::tooling::policy::audit_legacy_bindings()
             }
         },
+        crate::cli::Cmd::Docs { cmd } => match cmd {
+            crate::cli::DocsCmd::Inspect {
+                slug,
+                columns,
+                rows,
+                seconds,
+                out_dir,
+                stdout,
+                ansi,
+                keep_transcript,
+            } => crate::tasks::docs::inspect::run(crate::tasks::docs::inspect::Options {
+                slugs: slug,
+                columns,
+                rows,
+                seconds,
+                out_dir,
+                stdout,
+                ansi,
+                keep_transcript,
+            }),
+        },
     }
 }
 

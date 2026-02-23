@@ -45,6 +45,15 @@ cargo run -p levitate-xtask -- stages test 1 levitate --inject-file /tmp/payload
 cargo run -p levitate-xtask -- kernels check
 cargo run -p levitate-xtask -- kernels check levitate
 
+# Docs TUI page inspection snapshots (plain text by default)
+cargo run -p levitate-xtask -- docs inspect
+# Single page
+cargo run -p levitate-xtask -- docs inspect --slug installation-disk --stdout
+# Color/style snapshot output (.ansi files)
+cargo run -p levitate-xtask -- docs inspect --slug installation-disk --ansi
+# View an ANSI snapshot with colors
+less -R .artifacts/out/docs/tui-inspect/run-*/001-installation-disk.ansi
+
 # Build one kernel (x86_64; policy window enforced)
 cargo run -p levitate-xtask -- kernels build levitate
 

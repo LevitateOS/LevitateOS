@@ -5,7 +5,8 @@
     "docs/website",
     "docs/tui",
     "docs/content",
-    "tools/recpart/frontend"
+    "tools/recpart/frontend",
+    "shared/tui-kit"
   ],
   "scripts": {
     "dev": "turbo dev",
