@@ -256,15 +256,27 @@ docs-content-check:
 docs-tui-check:
     cd docs/tui && bun run typecheck && bun run test
 
+docs-tui-inspect-check:
+    cd docs/tui && bun run inspect:check
+
 [script, no-exit-message]
 docs-tui *args:
     #!/usr/bin/env bash
     set -euo pipefail
 
+    if [ ! -t 0 ] || [ ! -t 1 ]; then
+      if [ -r /dev/tty ] && [ -w /dev/tty ]; then
+        exec </dev/tty >/dev/tty 2>&1
+      else
+        echo "docs-tui requires interactive TTY stdin/stdout. Run from a terminal." >&2
+        exit 2
+      fi
+    fi
+
     cd docs/tui
     if [ ! -f node_modules/@levitate/tui-kit/package.json ] || \
-       [ ../shared/tui-kit/package.json -nt node_modules/@levitate/tui-kit/package.json ] || \
-       [ "$(find ../shared/tui-kit/src -type f -newer node_modules/@levitate/tui-kit/package.json | head -n 1)" != "" ]; then
+       [ ../../shared/tui-kit/package.json -nt node_modules/@levitate/tui-kit/package.json ] || \
+       [ "$(find ../../shared/tui-kit/src -type f -newer node_modules/@levitate/tui-kit/package.json | head -n 1)" != "" ]; then
       bun install
     fi
     exec bun src/main.ts {{args}}
@@ -276,8 +288,8 @@ docs-tui-inspect *args:
 
     cd docs/tui
     if [ ! -f node_modules/@levitate/tui-kit/package.json ] || \
-       [ ../shared/tui-kit/package.json -nt node_modules/@levitate/tui-kit/package.json ] || \
-       [ "$(find ../shared/tui-kit/src -type f -newer node_modules/@levitate/tui-kit/package.json | head -n 1)" != "" ]; then
+       [ ../../shared/tui-kit/package.json -nt node_modules/@levitate/tui-kit/package.json ] || \
+       [ "$(find ../../shared/tui-kit/src -type f -newer node_modules/@levitate/tui-kit/package.json | head -n 1)" != "" ]; then
       bun install
     fi
     bun run typecheck

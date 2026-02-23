@@ -60,6 +60,37 @@ run_tui_kit_checks() {
     fi
 }
 
+run_docs_tui_checks() {
+    if [ ! -f "$WORKSPACE_ROOT/docs/tui/package.json" ]; then
+        return 0
+    fi
+
+    STAGED_FILES=$(git diff --cached --name-only --diff-filter=ACMR 2>/dev/null || true)
+    STAGED_DOCS_TUI=$(printf "%s\n" "$STAGED_FILES" | grep '^docs/tui/' || true)
+    if [ -z "$STAGED_DOCS_TUI" ]; then
+        echo "OK  No docs/tui files staged"
+        return 0
+    fi
+
+    echo ""
+    echo ">>> Running docs/tui regression checks..."
+    echo ""
+    DOCS_TUI_PASS=0
+    if ! (cd "$WORKSPACE_ROOT/docs/tui" && bun run check 2>&1); then
+        DOCS_TUI_PASS=1
+    fi
+
+    if [ "$DOCS_TUI_PASS" -eq 0 ]; then
+        echo "OK  docs/tui checks clean"
+        return 0
+    else
+        echo "FAIL docs/tui checks failed"
+        echo ""
+        echo "  Fix docs/tui check failures or skip with: git commit --no-verify"
+        return 1
+    fi
+}
+
 # ── Locate workspace root ──────────────────────────────────────────
 find_workspace_root() {
     dir="$(pwd)"
@@ -99,11 +130,13 @@ if [ "$IS_PARENT_REPO" = true ]; then
     echo ""
     if (cd "$WORKSPACE_ROOT" && cargo xtask policy audit-legacy-bindings 2>&1); then
         echo "OK  Policy guard clean"
-        if run_tui_kit_checks; then
-            exit 0
-        else
+        if ! run_tui_kit_checks; then
             exit 1
         fi
+        if ! run_docs_tui_checks; then
+            exit 1
+        fi
+        exit 0
     else
         echo "FAIL Policy guard failed"
         echo ""
