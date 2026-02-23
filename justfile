@@ -252,7 +252,7 @@ docs-content-build:
 docs-content-check:
     cd docs/content && bun run check
 
-# Docs TUI
+# Docs TUI (installation-focused)
 docs-tui-check:
     cd docs/tui && bun run typecheck && bun run test
 
@@ -262,7 +262,12 @@ docs-tui *args:
     set -euo pipefail
 
     cd docs/tui
-    exec bun src/index.ts {{args}}
+    if [ ! -f node_modules/@levitate/tui-kit/package.json ] || \
+       [ ../shared/tui-kit/package.json -nt node_modules/@levitate/tui-kit/package.json ] || \
+       [ "$(find ../shared/tui-kit/src -type f -newer node_modules/@levitate/tui-kit/package.json | head -n 1)" != "" ]; then
+      bun install
+    fi
+    exec bun src/main.ts {{args}}
 
 [script, no-exit-message]
 docs-tui-inspect *args:
@@ -270,9 +275,31 @@ docs-tui-inspect *args:
     set -euo pipefail
 
     cd docs/tui
+    if [ ! -f node_modules/@levitate/tui-kit/package.json ] || \
+       [ ../shared/tui-kit/package.json -nt node_modules/@levitate/tui-kit/package.json ] || \
+       [ "$(find ../shared/tui-kit/src -type f -newer node_modules/@levitate/tui-kit/package.json | head -n 1)" != "" ]; then
+      bun install
+    fi
     bun run typecheck
     bun run test
-    exec bun src/index.ts {{args}}
+    exec bun src/main.ts {{args}}
+
+[script, no-exit-message]
+docs-tui-refresh *args:
+    #!/usr/bin/env bash
+    set -euo pipefail
+
+    cd docs/tui
+    bun install
+    exec bun src/main.ts {{args}}
+
+[script, no-exit-message]
+docs-tui-split *args:
+    #!/usr/bin/env bash
+    set -euo pipefail
+
+    cd docs/tui
+    exec bash bin/levitate-install-docs-split {{args}}
 
 # recpart TUI
 [script, no-exit-message]
