@@ -1,0 +1,36 @@
+┌──────────────────────────────┐┌──────────────────────────────────────────────────────────────────────────────────────┐
+│Installation Docs             ││Helpers Overview  lines 1-31/140                                                      │
+├──────────────────────────────┤├──────────────────────────────────────────────────────────────────────────────────────┤
+│ ▸ Getting Started            ││ Helper functions available in recipe scripts (/docs/recipe-format). All helpers are  │
+│                              ││ pure functions that take explicit inputs and return explicit outputs.                │
+│ ▸ Package Manager            ││                                                                                      │
+│                              ││ ◆ Introduction                                                                       │
+│ ▾ Helpers                    ││                                                                                      │
+│  ▸ Helpers Overview          ││ Helper functions are organized by lifecycle phase. All functions are pure - they     │
+│    Acquire Helpers           ││ take explicit paths as input and return paths or results. This makes data flow       │
+│    Build Helpers             ││ visible and enables caching.                                                         │
+│    Install Helpers           ││                                                                                      │
+│    Filesystem Helpers        ││ ┌ RHAI ────────────────────────────────────────────────────────────────────────────┐ │
+│    Environment Helpers       ││ │ 1 │let ctx = #{                                                                  │ │
+│    Command Helpers           ││ │ 2 │    name: "foo",                                                              │ │
+│    HTTP Helpers              ││ │ 3 │    version: "1.0",                                                           │ │
+│    Path Helpers              ││ │ 4 │    source_dir: "",                                                           │ │
+│    LLM Helpers               ││ │ 5 │};                                                                            │ │
+│                              ││ │ 6 │                                                                              │ │
+│ ▸ Architecture               ││ │ 7 │fn acquire(ctx) {                                                             │ │
+│                              ││ │ 8 │    let archive = download(                                                   │ │
+│ ▸ Rec Tooling                ││ │ 9 │        "https://example.com/foo-1.0.tar.gz",                                 │ │
+│                              ││ │10 │        join_path(BUILD_DIR, "foo.tar.gz")                                    │ │
+│                              ││ │11 │    );                                                                        │ │
+│                              ││ │12 │    extract(archive, BUILD_DIR);                                              │ │
+│                              ││ │13 │    ctx.source_dir = join_path(BUILD_DIR, "foo-1.0");                         │ │
+│                              ││ │14 │    ctx                                                                       │ │
+│                              ││ │15 │}                                                                             │ │
+│                              ││ │16 │                                                                              │ │
+│                              ││ │17 │fn build(ctx) {                                                               │ │
+│                              ││ │18 │    shell_in(ctx.source_dir, "./configure --prefix=" + PREFIX);               │ │
+│                              ││ │19 │    shell_in(ctx.source_dir, "make -j" + NPROC);                              │ │
+│                              ││ │20 │    ctx                                                                       │ │
+│                              ││ │21 │}                                                                             │ │
+└──────────────────────────────┘└──────────────────────────────────────────────────────────────────────────────────────┘
+ [docs] | q quit | ←/→↑/↓ h/j/k/l nav | PgUp/PgDn b/space page | g/G top/end | page 11/37

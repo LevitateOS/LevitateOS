@@ -105,6 +105,12 @@ pub enum Cmd {
         #[command(subcommand)]
         cmd: DocsCmd,
     },
+
+    /// Generic TUI tooling tasks.
+    Tui {
+        #[command(subcommand)]
+        cmd: TuiCmd,
+    },
 }
 
 #[derive(Subcommand)]
@@ -275,7 +281,7 @@ pub enum PolicyCmd {
 
 #[derive(Subcommand)]
 pub enum DocsCmd {
-    /// Render docs/tui pages and write plain-text terminal snapshots.
+    /// Render install-docs TUI pages and write plain-text terminal snapshots.
     Inspect {
         /// Explicit slug(s) to inspect. If omitted, xtask inspects every slug from docs/content nav.
         #[arg(long = "slug", value_name = "SLUG")]
@@ -306,6 +312,69 @@ pub enum DocsCmd {
         ansi: bool,
 
         /// Keep raw `script` transcripts next to plain outputs for debugging.
+        #[arg(long)]
+        keep_transcript: bool,
+    },
+}
+
+#[derive(Clone, Copy, Debug, ValueEnum)]
+pub enum TuiInspectApp {
+    #[value(name = "s02-install-docs")]
+    S02InstallDocs,
+    #[value(name = "s03-disk-plan")]
+    S03DiskPlan,
+}
+
+#[derive(Subcommand)]
+pub enum TuiCmd {
+    /// Render a TUI app and write terminal snapshots.
+    Inspect {
+        /// Preset app target. If omitted, provide both --cwd and --command.
+        #[arg(long, value_enum)]
+        app: Option<TuiInspectApp>,
+
+        /// Working directory for custom target mode.
+        #[arg(long, value_name = "PATH")]
+        cwd: Option<PathBuf>,
+
+        /// Launch command for custom target mode.
+        #[arg(long, value_name = "CMD")]
+        command: Option<String>,
+
+        /// Optional printable key sequence sent to stdin shortly after launch.
+        /// Supports printf %b escapes, for example: 'n', '\\n', 'jj'.
+        #[arg(long, value_name = "KEYS")]
+        input: Option<String>,
+
+        /// Delay before sending --input.
+        #[arg(long, default_value_t = 1)]
+        input_delay_seconds: u64,
+
+        /// Terminal columns used for rendering.
+        #[arg(long, default_value_t = 140)]
+        columns: u16,
+
+        /// Terminal rows used for rendering.
+        #[arg(long, default_value_t = 40)]
+        rows: u16,
+
+        /// Seconds to keep the app running before snapshot capture.
+        #[arg(long, default_value_t = 2)]
+        seconds: u64,
+
+        /// Optional output base directory. xtask always creates a timestamped run folder under this path.
+        #[arg(long, value_name = "PATH")]
+        out_dir: Option<PathBuf>,
+
+        /// Also print the plain snapshot to stdout.
+        #[arg(long)]
+        stdout: bool,
+
+        /// Also write ANSI-formatted snapshot (`.ansi`) for color/style review.
+        #[arg(long)]
+        ansi: bool,
+
+        /// Keep raw `script` transcript next to plain output for debugging.
         #[arg(long)]
         keep_transcript: bool,
     },

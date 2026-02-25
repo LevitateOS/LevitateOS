@@ -1,0 +1,9 @@
+{
+  "name": "@levitate/tui-presets-install",
+  "version": "0.0.0-stub",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "echo 'stub: presets-install build'"
+  }
+}

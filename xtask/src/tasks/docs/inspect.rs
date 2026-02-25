@@ -22,10 +22,10 @@ pub fn run(options: Options) -> Result<()> {
     ensure_required_tools()?;
 
     let root = crate::util::repo::repo_root()?;
-    let docs_tui_dir = root.join("docs/tui");
+    let docs_tui_dir = root.join("tui/apps/s02-live-tools/install-docs");
     if !docs_tui_dir.is_dir() {
         bail!(
-            "docs inspect: missing docs/tui directory at '{}'",
+            "docs inspect: missing install-docs directory at '{}'",
             docs_tui_dir.display()
         );
     }
@@ -104,7 +104,10 @@ pub fn run(options: Options) -> Result<()> {
             manifest.push_str(&format!(
                 "{} (ansi) => {}\n",
                 slug,
-                ansi_path.strip_prefix(&root).unwrap_or(&ansi_path).display()
+                ansi_path
+                    .strip_prefix(&root)
+                    .unwrap_or(&ansi_path)
+                    .display()
             ));
         }
 
@@ -185,7 +188,7 @@ fn validate_slugs(slugs: &[String]) -> Result<()> {
 fn create_run_dir(root: &Path, out_dir: Option<&Path>) -> Result<PathBuf> {
     let base = out_dir
         .map(Path::to_path_buf)
-        .unwrap_or_else(|| root.join(".artifacts/out/docs/tui-inspect"));
+        .unwrap_or_else(|| root.join(".artifacts/out/tui/install-docs-inspect"));
     let run_dir = base.join(format!("run-{}", unix_timestamp()));
     fs::create_dir_all(&run_dir)
         .with_context(|| format!("docs inspect: creating output dir '{}'", run_dir.display()))?;
@@ -251,8 +254,8 @@ fn render_slug_transcript(
 }
 
 fn parse_plain_screen(transcript: &[u8], rows: u16, columns: u16) -> String {
-	let parser = parse_screen(transcript, rows, columns);
-	trim_line_trailing_spaces(&parser.screen().contents())
+    let parser = parse_screen(transcript, rows, columns);
+    trim_line_trailing_spaces(&parser.screen().contents())
 }
 
 fn parse_formatted_screen(transcript: &[u8], rows: u16, columns: u16) -> Vec<u8> {
@@ -261,17 +264,17 @@ fn parse_formatted_screen(transcript: &[u8], rows: u16, columns: u16) -> Vec<u8>
 }
 
 fn parse_screen(transcript: &[u8], rows: u16, columns: u16) -> vt100::Parser {
-	let sanitized = strip_script_bookends(transcript);
-	let mut parser = vt100::Parser::new(rows, columns, 0);
-	parser.process(&sanitized);
-	parser
+    let sanitized = strip_script_bookends(transcript);
+    let mut parser = vt100::Parser::new(rows, columns, 0);
+    parser.process(&sanitized);
+    parser
 }
 
 fn trim_line_trailing_spaces(text: &str) -> String {
-	text.lines()
-		.map(|line| line.trim_end_matches(' '))
-		.collect::<Vec<_>>()
-		.join("\n")
+    text.lines()
+        .map(|line| line.trim_end_matches(' '))
+        .collect::<Vec<_>>()
+        .join("\n")
 }
 
 fn strip_script_bookends(transcript: &[u8]) -> Vec<u8> {

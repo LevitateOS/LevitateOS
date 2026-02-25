@@ -1,0 +1,9 @@
+{
+  "name": "@levitate/tui-s04-firstboot-check",
+  "version": "0.0.0-stub",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "echo 'stub: s04 firstboot-check'"
+  }
+}

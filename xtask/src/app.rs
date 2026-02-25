@@ -111,6 +111,35 @@ pub fn run(cli: crate::cli::Cli) -> Result<()> {
                 keep_transcript,
             }),
         },
+        crate::cli::Cmd::Tui { cmd } => match cmd {
+            crate::cli::TuiCmd::Inspect {
+                app,
+                cwd,
+                command,
+                input,
+                input_delay_seconds,
+                columns,
+                rows,
+                seconds,
+                out_dir,
+                stdout,
+                ansi,
+                keep_transcript,
+            } => crate::tasks::tui::inspect::run(crate::tasks::tui::inspect::Options {
+                app,
+                cwd,
+                command,
+                input,
+                input_delay_seconds,
+                columns,
+                rows,
+                seconds,
+                out_dir,
+                stdout,
+                ansi,
+                keep_transcript,
+            }),
+        },
     }
 }
 

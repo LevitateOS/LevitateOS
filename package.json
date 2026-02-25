@@ -3,10 +3,12 @@
   "private": true,
   "workspaces": [
     "docs/website",
-    "docs/tui",
     "docs/content",
-    "tools/recpart/frontend",
-    "shared/tui-kit"
+    "tui/apps/s03-install/disk-plan",
+    "tui/apps/s02-live-tools/install-docs",
+    "tui/kit/core",
+    "tui/kit/presets-install",
+    "tui/kit/testing"
   ],
   "scripts": {
     "dev": "turbo dev",

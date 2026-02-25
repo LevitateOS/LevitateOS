@@ -1,0 +1,36 @@
+┌──────────────────────────────┐┌──────────────────────────────────────────────────────────────────────────────────────┐
+│Installation Docs             ││Disk Preparation  lines 1-31/161                                                      │
+├──────────────────────────────┤├──────────────────────────────────────────────────────────────────────────────────────┤
+│ ▾ Getting Started            ││ Installation steps 1-5: Boot the live environment and prepare your disk. See         │
+│    Getting Started           ││ Installation (/docs/installation) for an overview.                                   │
+│    Installation              ││                                                                                      │
+│  ▸ Disk Preparation          ││ ◆ 1. Boot the Live Environment                                                       │
+│    Base System               ││                                                                                      │
+│    Configuration             ││ Boot from the LevitateOS ISO (see Getting Started (/docs/getting-started)). You'll   │
+│    Bootloader & Finish       ││ be dropped into a root shell.                                                        │
+│    Post-Installation         ││                                                                                      │
+│    Troubleshooting           ││ ╭──────────────────────────────────────────────────────────────────────────────────╮ │
+│                              ││ │ INFO                                                                             │ │
+│ ▸ Package Manager            ││ │ Secure Boot: If your system won't boot, disable Secure Boot in your UEFI         │ │
+│                              ││ │ firmware settings. LevitateOS does not currently ship with signed bootloaders.   │ │
+│ ▸ Helpers                    ││ ╰──────────────────────────────────────────────────────────────────────────────────╯ │
+│                              ││                                                                                      │
+│ ▸ Architecture               ││ Verify you booted in UEFI mode                                                       │
+│                              ││ $ ls /sys/firmware/efi/efivars                                                       │
+│ ▸ Rec Tooling                ││                                                                                      │
+│                              ││ If /sys/firmware/efi/efivars doesn't exist, you booted in legacy BIOS mode.          │
+│                              ││ LevitateOS requires UEFI. Reboot and select UEFI boot in your firmware settings.     │
+│                              ││                                                                                      │
+│                              ││ Set keyboard layout (optional, default is US)                                        │
+│                              ││ $ loadkeys us                                                                        │
+│                              ││                                                                                      │
+│                              ││ Sync system clock                                                                    │
+│                              ││ $ timedatectl set-ntp true                                                           │
+│                              ││                                                                                      │
+│                              ││ ◆ WiFi Connection (Optional)                                                         │
+│                              ││                                                                                      │
+│                              ││ Installation is fully offline - no network required. Skip this if using Ethernet or  │
+│                              ││ don't need network access.                                                           │
+│                              ││                                                                                      │
+└──────────────────────────────┘└──────────────────────────────────────────────────────────────────────────────────────┘
+ [docs] | q quit | ←/→↑/↓ h/j/k/l nav | PgUp/PgDn b/space page | g/G top/end | page 3/37

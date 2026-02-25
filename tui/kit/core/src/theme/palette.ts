@@ -1,0 +1,27 @@
+export const palette = {
+	black: "#000000",
+	white: "#ffffff",
+	gray100: "#f5f5f5",
+	gray300: "#d4d4d4",
+	gray500: "#737373",
+	gray700: "#404040",
+	slate900: "#0f172a",
+	slate800: "#1e293b",
+	slate700: "#334155",
+	slate600: "#475569",
+	zinc950: "#09090b",
+	zinc900: "#18181b",
+	zinc800: "#27272a",
+	blue900: "#1e3a8a",
+	blue800: "#1e40af",
+	blue700: "#1d4ed8",
+	amber900: "#451a03",
+	amber800: "#78350f",
+	cyan: "#00bcd4",
+	blue: "#60a5fa",
+	yellow: "#facc15",
+	red: "#ef4444",
+	green: "#22c55e",
+} as const;
+
+export type PaletteKey = keyof typeof palette;

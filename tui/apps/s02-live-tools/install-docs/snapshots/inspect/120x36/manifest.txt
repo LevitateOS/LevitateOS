@@ -1,0 +1,5 @@
+columns=120
+rows=36
+seconds=2
+slugs=installation-disk,cli-reference,faq,helpers-commands,helpers-overview
+files=001-installation-disk.txt,002-cli-reference.txt,003-faq.txt,004-helpers-commands.txt,005-helpers-overview.txt

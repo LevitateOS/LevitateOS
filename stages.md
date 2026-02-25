@@ -25,7 +25,7 @@ Differences below describe *policy and intent*, not structural deviations from t
 | Toolchain | glibc / systemd / GNU | glibc / systemd / GNU | musl / OpenRC / busybox | musl / OpenRC / busybox |
 | Kernel Policy (00) | LTS (.artifacts/kernel/levitate/current/kernel-build) | LTS (.artifacts/kernel/ralph/current/kernel-build) | Mainline (.artifacts/kernel/acorn/current/kernel-build) | LTS (.artifacts/kernel/iuppiter/current/kernel-build) |
 | Boot Policy (01) | Auto-login root (live) | Auto-login root (live) | Auto-login root (live) | Auto-login root (live) |
-| Live Tools Scope (02) | Arch-parity + docs/TUI | Minimal automated installer | Arch-parity + docs/TUI | Minimal automated installer |
+| Live Tools Scope (02) | UX profile (`ux`): local interactive install helper + toolbox | Automated SSH profile (`automated_ssh`): headless installer toolbox | UX profile (`ux`): local interactive install helper + toolbox | Automated SSH profile (`automated_ssh`): headless installer toolbox |
 | Install UX (03) | Narrated logs | Verbose logs | Narrated logs | Verbose logs |
 | Login Model (04) | User-defined account | Root only (pw protected) | User-defined account | Auto-login root (ephemeral) |
 | Harness Authority (05) | User login + sudo verified | Root login verified | User login + sudo verified | Auto-login (ephemeral pass) |
@@ -42,13 +42,36 @@ Differences below describe *policy and intent*, not structural deviations from t
 |---|---|---|
 | 00Build | Kernel + ISO build succeeds. | Not spawnable (build only). |
 | 01Boot | Live ISO boots to ready state. | Spawn into minimal live environment. |
-| 02LiveTools | Live ISO tools verified. | Spawn into live env with functional installer + toolchain. |
-| 03Install | Disk installation completes. | Spawn into freshly installed system (pre-login verified). |
+| 02LiveTools | Live ISO tools + stage session UX/platform verified. | Spawn into live env with install entrypoint, docs/session UX (when enabled), and installer toolchain. |
+| 03Install | Installation task execution and disk mutation flow completes. | Spawn into freshly installed system (pre-login verified). |
 | 04LoginGate | Installed system reaches deterministic login boundary. | Spawn at login surface (TTY/DM/console ready). |
 | 05Harness | Harness can reliably authenticate and execute commands. | Spawn into installed system with trusted automation access. |
 | 06Runtime | Core programs pass integration tests under harness control. | Spawn into validated runtime baseline (canonical state). |
 | 07Update | A/B slot edit + reboot into alternate slot verified. | Spawn into update-capable system with confirmed slot identity. |
 | 08Package | 06 baseline convertible to release artifacts (`qcow2`, `.img`, ISO where applicable). | Spawn into distributable image derived from 06 baseline. |
+
+## Stage 02 Install Experience Profiles
+
+Stage 02 is now explicitly config-driven via `distro-variants/*/02LiveTools.toml`:
+
+- `install_experience = "ux"`
+  - Required intent: local interactive live install flow.
+  - Distros: `levitate`, `acorn`.
+  - Stage authority split:
+    - Stage 02 owns session UX (shell/tmux/docs/overlay/entrypoint behavior).
+    - Stage 03 owns install task UX (disk/filesystem/bootstrap/fstab/chroot/bootloader actions).
+  - Stage 02 marker in rootfs: `/usr/lib/levitate/stage-02/install-experience` = `ux`.
+  - UX profile hook: `/etc/profile.d/30-stage-02-install-ux.sh` (tty1 interactive launch path).
+- `install_experience = "automated_ssh"`
+  - Required intent: SSH-driven automated install/image pipelines (`qcow2`/`.img` focus).
+  - Distros: `ralph`, `iuppiter`.
+  - Local TUI policy:
+    - Stage 02 local interactive UX surfaces are disabled by default.
+    - Stage 03 local interactive installer TUIs are disabled by default.
+    - Install flow is driven by SSH/headless automation entrypoints.
+  - Stage 02 marker in rootfs: `/usr/lib/levitate/stage-02/install-experience` = `automated_ssh`.
+
+All profiles must include executable `/usr/local/bin/stage-02-install-entrypoint`; behavior is profile-specific.
 
 ## Stage Filesystem Delta Matrix
 
@@ -58,7 +81,7 @@ Cells describe the filesystem delta relative to the immediately preceding stage.
 |---|---|---|---|
 | 00Build | Baseline rootfs payload (`s00-filesystem.erofs`) created from stage-00 producers. | Baseline empty/minimal live overlay payload (`s00-overlayfs.erofs`). | Baseline live initramfs payload (`s00-initramfs-live.cpio.gz`). |
 | 01Boot | `s01 = s00 + boot additions` (boot/rootfs producers, stage test scripts, boot readiness wiring). | `s01-overlayfs.erofs` becomes non-empty live overlay with stage banner + required live service wiring (for Levitate: `sshd`). | Rebuilt for stage output naming; no intended functional delta from stage 00. |
-| 02LiveTools | `s02 = s01 + live tools additions` (installer/tool binaries added into rootfs, plus stage test scripts). | Overlay policy reused from stage 01; practical delta is stage identity/banner (`S02 Live Tools`) with the same required live service wiring baseline. | Rebuilt for stage output naming; no intended functional delta from stage 01. |
+| 02LiveTools | `s02 = s01 + live tools additions` (installer/tool binaries, Stage 02 install-experience marker, profile-specific install entrypoint, plus stage test scripts). | Overlay policy reused from stage 01; practical delta is stage identity/banner (`S02 Live Tools`) with the same required live service wiring baseline. | Rebuilt for stage output naming; no intended functional delta from stage 01. |
 | 03Install | N/A in current ISO `*fs` artifact pipeline (install validation stage, not a new live `*fs` image build stage). | N/A in current ISO `*fs` artifact pipeline. | N/A in current ISO `*fs` artifact pipeline. |
 | 04LoginGate | N/A in current ISO `*fs` artifact pipeline. | N/A in current ISO `*fs` artifact pipeline. | N/A in current ISO `*fs` artifact pipeline. |
 | 05Harness | N/A in current ISO `*fs` artifact pipeline. | N/A in current ISO `*fs` artifact pipeline. | N/A in current ISO `*fs` artifact pipeline. |

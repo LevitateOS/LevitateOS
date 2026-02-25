@@ -1,0 +1,36 @@
+┌──────────────────────────────┐┌──────────────────────────────────────────────────────────────────────────────────────┐
+│Installation Docs             ││Command Helpers  lines 1-31/92                                                        │
+├──────────────────────────────┤├──────────────────────────────────────────────────────────────────────────────────────┤
+│ ▸ Getting Started            ││ Functions for executing shell commands with different return types and behaviors.    │
+│                              ││                                                                                      │
+│ ▸ Package Manager            ││ ◆ Overview                                                                           │
+│                              ││                                                                                      │
+│ ▾ Helpers                    ││ These functions have PREFIX and BUILD_DIR environment variables set automatically.   │
+│    Helpers Overview          ││ The shell_in() variants run commands in a specific directory.                        │
+│    Acquire Helpers           ││                                                                                      │
+│    Build Helpers             ││ ◆ shell                                                                              │
+│    Install Helpers           ││                                                                                      │
+│    Filesystem Helpers        ││ Run a shell command. Throws an error if the command fails (non-zero exit).           │
+│    Environment Helpers       ││                                                                                      │
+│  ▸ Command Helpers           ││ ┌ RHAI ────────────────────────────────────────────────────────────────────────────┐ │
+│    HTTP Helpers              ││ │ 1 │shell("make -j" + NPROC);                                                     │ │
+│    Path Helpers              ││ │ 2 │shell("install -Dm755 myapp " + join_path(PREFIX, "bin/myapp"));              │ │
+│    LLM Helpers               ││ └──────────────────────────────────────────────────────────────────────────────────┘ │
+│                              ││                                                                                      │
+│ ▸ Architecture               ││ ◆ shell_in                                                                           │
+│                              ││                                                                                      │
+│ ▸ Rec Tooling                ││ Run a shell command in a specific directory. This is the recommended way to run      │
+│                              ││ commands in a source directory instead of changing directories.                      │
+│                              ││                                                                                      │
+│                              ││ ┌ RHAI ────────────────────────────────────────────────────────────────────────────┐ │
+│                              ││ │ 1 │// Run configure and make in the source directory                             │ │
+│                              ││ │ 2 │shell_in(ctx.source_dir, "./configure --prefix=" + PREFIX);                   │ │
+│                              ││ │ 3 │shell_in(ctx.source_dir, "make -j" + NPROC);                                  │ │
+│                              ││ │ 4 │shell_in(ctx.source_dir, "make install");                                     │ │
+│                              ││ └──────────────────────────────────────────────────────────────────────────────────┘ │
+│                              ││                                                                                      │
+│                              ││ ◆ shell_output                                                                       │
+│                              ││                                                                                      │
+│                              ││ Run a command and return its stdout. Throws if the command fails.                    │
+└──────────────────────────────┘└──────────────────────────────────────────────────────────────────────────────────────┘
+ [docs] | q quit | ←/→↑/↓ h/j/k/l nav | PgUp/PgDn b/space page | g/G top/end | page 17/37

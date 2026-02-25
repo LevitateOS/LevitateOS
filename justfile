@@ -254,15 +254,17 @@ docs-content-check:
 
 # Docs TUI (installation-focused)
 docs-tui-check:
-    cd docs/tui && bun run typecheck && bun run test
+    cd tui/apps/s02-live-tools/install-docs && bun run typecheck && bun run test
 
 docs-tui-inspect-check:
-    cd docs/tui && bun run inspect:check
+    cd tui/apps/s02-live-tools/install-docs && bun run inspect:check
 
 [script, no-exit-message]
 docs-tui *args:
     #!/usr/bin/env bash
     set -euo pipefail
+
+    echo "NOTICE: docs-tui command is now routed to tui/apps/s02-live-tools/install-docs." >&2
 
     if [ ! -t 0 ] || [ ! -t 1 ]; then
       if [ -r /dev/tty ] && [ -w /dev/tty ]; then
@@ -273,10 +275,10 @@ docs-tui *args:
       fi
     fi
 
-    cd docs/tui
+    cd tui/apps/s02-live-tools/install-docs
     if [ ! -f node_modules/@levitate/tui-kit/package.json ] || \
-       [ ../../shared/tui-kit/package.json -nt node_modules/@levitate/tui-kit/package.json ] || \
-       [ "$(find ../../shared/tui-kit/src -type f -newer node_modules/@levitate/tui-kit/package.json | head -n 1)" != "" ]; then
+       [ ../../../kit/core/package.json -nt node_modules/@levitate/tui-kit/package.json ] || \
+       [ "$(find ../../../kit/core/src -type f -newer node_modules/@levitate/tui-kit/package.json | head -n 1)" != "" ]; then
       bun install
     fi
     unset NO_COLOR
@@ -288,10 +290,12 @@ docs-tui-inspect *args:
     #!/usr/bin/env bash
     set -euo pipefail
 
-    cd docs/tui
+    echo "NOTICE: docs-tui-inspect command is now routed to tui/apps/s02-live-tools/install-docs." >&2
+
+    cd tui/apps/s02-live-tools/install-docs
     if [ ! -f node_modules/@levitate/tui-kit/package.json ] || \
-       [ ../../shared/tui-kit/package.json -nt node_modules/@levitate/tui-kit/package.json ] || \
-       [ "$(find ../../shared/tui-kit/src -type f -newer node_modules/@levitate/tui-kit/package.json | head -n 1)" != "" ]; then
+       [ ../../../kit/core/package.json -nt node_modules/@levitate/tui-kit/package.json ] || \
+       [ "$(find ../../../kit/core/src -type f -newer node_modules/@levitate/tui-kit/package.json | head -n 1)" != "" ]; then
       bun install
     fi
     unset NO_COLOR
@@ -305,7 +309,9 @@ docs-tui-refresh *args:
     #!/usr/bin/env bash
     set -euo pipefail
 
-    cd docs/tui
+    echo "NOTICE: docs-tui-refresh command is now routed to tui/apps/s02-live-tools/install-docs." >&2
+
+    cd tui/apps/s02-live-tools/install-docs
     bun install
     exec bun src/main.ts {{args}}
 
@@ -314,16 +320,25 @@ docs-tui-split *args:
     #!/usr/bin/env bash
     set -euo pipefail
 
-    cd docs/tui
+    echo "NOTICE: docs-tui-split command is now routed to tui/apps/s02-live-tools/install-docs." >&2
+
+    cd tui/apps/s02-live-tools/install-docs
     exec bash bin/levitate-install-docs-split {{args}}
 
 # recpart TUI
 [script, no-exit-message]
-tools-recpart *args:
+tui-s03-disk-plan *args:
     #!/usr/bin/env bash
     set -euo pipefail
 
-    cd tools/recpart/frontend
+    echo "NOTICE: running Stage 03 disk-plan TUI (tui/apps/s03-install/disk-plan)." >&2
+
+    if [ ! -t 0 ] || [ ! -t 1 ]; then
+      echo "tui-s03-disk-plan requires interactive TTY stdin/stdout. Run from a terminal." >&2
+      exit 2
+    fi
+
+    cd tui/apps/s03-install/disk-plan
     exec bun run start -- {{args}}
 
 # Website (Astro)

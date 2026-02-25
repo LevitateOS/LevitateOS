@@ -54,6 +54,14 @@ cargo run -p levitate-xtask -- docs inspect --slug installation-disk --ansi
 # View an ANSI snapshot with colors
 less -R .artifacts/out/docs/tui-inspect/run-*/001-installation-disk.ansi
 
+# Generic TUI inspector (preset app target)
+cargo run -p levitate-xtask -- tui inspect --app s03-disk-plan --input 'n'
+# Generic TUI inspector (custom target mode)
+cargo run -p levitate-xtask -- tui inspect \
+  --cwd tui/apps/s03-install/disk-plan \
+  --command "bun run start -- --disk /dev/sda" \
+  --input 'n'
+
 # Build one kernel (x86_64; policy window enforced)
 cargo run -p levitate-xtask -- kernels build levitate
 
