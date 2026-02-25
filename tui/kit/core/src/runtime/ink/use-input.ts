@@ -73,10 +73,6 @@ export function keyNamesFromInput(input: string, key: InkKeyLike): string[] {
 		names.add(input);
 		names.add(input.toLowerCase());
 
-		if (ctrlLetter) {
-			names.add(ctrlLetter);
-		}
-
 		if (input === " ") {
 			names.add("space");
 		}
@@ -91,6 +87,7 @@ export function keyNamesFromInput(input: string, key: InkKeyLike): string[] {
 	}
 
 	if (key.ctrl && ctrlLetter) {
+		names.add(ctrlLetter);
 		names.add(`C-${ctrlLetter}`);
 	}
 

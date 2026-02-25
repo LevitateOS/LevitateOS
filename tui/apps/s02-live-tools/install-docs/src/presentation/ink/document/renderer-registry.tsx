@@ -8,6 +8,7 @@ import { SectionHeadingItem } from "./section-heading-item";
 type DocNodeRenderContext = {
 	contentWidth: number;
 	renderBlock: (block: ContentBlock, indent?: number) => ReactNode;
+	selectedItemKey?: string;
 };
 
 type DocNodeKind = DocRenderItem["kind"];
@@ -75,6 +76,7 @@ const DEFAULT_INSTALL_DOC_NODE_PLUGINS: DocNodePluginMap = Object.freeze({
 				{
 					contentWidth: context.contentWidth,
 					renderBlock: context.renderBlock,
+					isSelected: context.selectedItemKey === item.key,
 				},
 				indent,
 			);
@@ -108,15 +110,18 @@ export function renderDocItemWithRegistry(
 	item: DocRenderItem,
 	registry: DocsRendererRegistry,
 	contentWidth: number,
+	selectedItemKey?: string,
 ): ReactNode {
 	const renderBlock = (block: ContentBlock, indent = 0): ReactNode =>
 		renderDocNode(nestedBlockNode(block, indent), registry, {
 			contentWidth,
 			renderBlock,
+			selectedItemKey: undefined,
 		});
 
 	return renderDocNode(item, registry, {
 		contentWidth,
 		renderBlock,
+		selectedItemKey,
 	});
 }

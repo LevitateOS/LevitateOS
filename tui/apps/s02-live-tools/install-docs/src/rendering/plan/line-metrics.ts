@@ -63,7 +63,7 @@ export function measureContentBlockLines(
 	);
 }
 
-function countDocItemLines(item: DocRenderItem, contentWidth: number): number {
+export function measureDocItemLines(item: DocRenderItem, contentWidth: number): number {
 	if (item.kind === "intro") {
 		return countInlineLines(item.content, Math.max(1, contentWidth));
 	}
@@ -87,7 +87,7 @@ export function countRenderPlanLines(
 
 	let total = 0;
 	for (const [index, item] of items.entries()) {
-		total += countDocItemLines(item, safeWidth);
+		total += measureDocItemLines(item, safeWidth);
 		if (index < items.length - 1) {
 			total += 1;
 		}

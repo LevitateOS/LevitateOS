@@ -11,6 +11,7 @@ export type BlockHotkeyHint = {
 export type BlockRenderContext = {
 	contentWidth: number;
 	renderBlock: (block: ContentBlock, indent?: number) => ReactNode;
+	isSelected?: boolean;
 };
 
 export type BlockMeasureContext = {

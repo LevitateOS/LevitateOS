@@ -8,18 +8,20 @@ type DocsContentViewProps = {
 	items: ReadonlyArray<DocRenderItem>;
 	contentWidth: number;
 	renderers: DocsRendererRegistry;
+	selectedItemKey?: string;
 };
 
 export function DocsContentView({
 	items,
 	contentWidth,
 	renderers,
+	selectedItemKey,
 }: DocsContentViewProps): ReactNode {
 	return (
 		<Box flexDirection="column" width={contentWidth} flexShrink={0}>
 			{items.map((item, index) => (
 				<Box key={item.key} flexDirection="column" width={contentWidth} flexShrink={0}>
-					{renderDocItemWithRegistry(item, renderers, contentWidth)}
+					{renderDocItemWithRegistry(item, renderers, contentWidth, selectedItemKey)}
 					{index < items.length - 1 ? <UiText intent="dimText"> </UiText> : null}
 				</Box>
 			))}

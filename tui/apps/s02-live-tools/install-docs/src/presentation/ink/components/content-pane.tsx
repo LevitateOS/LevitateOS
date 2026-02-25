@@ -6,9 +6,11 @@ import type { DocsRendererRegistry } from "../document/renderer-registry";
 export function InstallContentPane({
 	viewport,
 	renderers,
+	selectedItemKey,
 }: {
 	viewport: DocsViewport;
 	renderers: DocsRendererRegistry;
+	selectedItemKey?: string;
 }) {
 	return (
 		<Box
@@ -28,6 +30,7 @@ export function InstallContentPane({
 					items={viewport.visibleItems}
 					contentWidth={viewport.contentWidth}
 					renderers={renderers}
+					selectedItemKey={selectedItemKey}
 				/>
 			</Box>
 		</Box>

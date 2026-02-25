@@ -13,6 +13,8 @@ export function installStatusBar(
 	pageCount: number,
 	note?: string,
 	focus?: FocusPlane,
+	actionableCount = 0,
+	actionableIndex = 0,
 ): ReactNode {
 	const safePageCount = Math.max(1, pageCount);
 	const safeCurrentPage = Math.max(1, Math.min(safePageCount, currentIndex + 1));
@@ -29,10 +31,21 @@ export function installStatusBar(
 	if (safeFocus === "navigation") {
 		segments.push(hotkeyStatusSegment("nav", "h/l [/]", "pages/sections"));
 		segments.push(hotkeyStatusSegment("scroll", "j/k", "content"));
-		segments.push(hotkeyStatusSegment("open", "enter", "content"));
+		segments.push(hotkeyStatusSegment("open", "tab", "content"));
 	} else {
-		segments.push(hotkeyStatusSegment("scroll", "j/k PgUp/PgDn", "content"));
+		segments.push(hotkeyStatusSegment("actions", "j/k", "next/prev"));
+		segments.push(hotkeyStatusSegment("copy", "enter/c/y", "command"));
+		segments.push(hotkeyStatusSegment("scroll", "PgUp/PgDn", "content"));
 		segments.push(hotkeyStatusSegment("jump", "g/G b/space", "top/end/page"));
+		segments.push(
+			textStatusSegment(
+				"action",
+				actionableCount > 0
+					? `${Math.max(1, Math.min(actionableCount, actionableIndex + 1))}/${actionableCount}`
+					: "none",
+				actionableCount > 0 ? "accent" : "dimText",
+			),
+		);
 	}
 
 	if (typeof note === "string" && note.trim().length > 0) {

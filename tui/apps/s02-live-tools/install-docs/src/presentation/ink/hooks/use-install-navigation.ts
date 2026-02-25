@@ -9,6 +9,7 @@ type InstallNavigationState = {
 	startupNote?: string;
 	movePage: (delta: number) => void;
 	moveSection: (delta: number) => void;
+	setPage: (index: number) => void;
 };
 
 export function useInstallNavigation(
@@ -40,10 +41,16 @@ export function useInstallNavigation(
 		setStartupNote(undefined);
 	};
 
+	const setPage = (index: number) => {
+		indexState.setIndex(index);
+		setStartupNote(undefined);
+	};
+
 	return {
 		safeIndex,
 		startupNote,
 		movePage,
 		moveSection,
+		setPage,
 	};
 }

@@ -40,6 +40,16 @@ describe("hotkey helpers", () => {
 		expect(names.includes("C-c")).toBe(true);
 	});
 
+	it("does not alias enter to printable letters", () => {
+		const names = keyNamesFromInput("\r", {
+			return: true,
+		});
+
+		expect(names.includes("enter")).toBe(true);
+		expect(names.includes("m")).toBe(false);
+		expect(names.includes("C-m")).toBe(false);
+	});
+
 	it("maps raw VT escape sequences for arrows and paging", () => {
 		expect(keyNamesFromInput("\u001b[A", {}).includes("up")).toBe(true);
 		expect(keyNamesFromInput("\u001bOB", {}).includes("down")).toBe(true);

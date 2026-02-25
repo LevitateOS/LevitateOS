@@ -5,6 +5,7 @@ export type BlockComponentProps<TBlock extends ContentBlock> = {
 	block: TBlock;
 	contentWidth: number;
 	indent?: number;
+	isSelected?: boolean;
 };
 
 export type RenderNestedBlock = (block: ContentBlock, indent: number) => ReactNode;

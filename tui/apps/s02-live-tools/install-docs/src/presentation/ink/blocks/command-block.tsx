@@ -13,13 +13,18 @@ export function CommandBlockView({
 	block,
 	contentWidth,
 	indent = 0,
+	isSelected = false,
 }: BlockComponentProps<CommandBlock>): ReactNode {
 	const safeWidth = Math.max(1, contentWidth);
 	const textWidth = Math.max(1, safeWidth - indent);
 	const cardBackground = useIntentColor("cardBackground");
-	const descriptionColor = useIntentColor("dimText");
+	const descriptionColor = useIntentColor(isSelected ? "accent" : "dimText");
 	const dimTextColor = useIntentColor("dimText");
 	const commandLines = commandSnapshotLines(block);
+	const selectedCommandLines =
+		isSelected && commandLines.length > 0
+			? [`${commandLines[0]}  [COPY]`, ...commandLines.slice(1)]
+			: commandLines;
 	const descriptionLines = wrapBoundedText(block.description, textWidth, 1);
 	const outputLines =
 		typeof block.output === "string" && block.output.length > 0
@@ -37,7 +42,13 @@ export function CommandBlockView({
 					{line}
 				</Text>
 			))}
-			<CommandLineSeries lines={commandLines} width={textWidth} bold />
+			<CommandLineSeries
+				lines={selectedCommandLines}
+				width={textWidth}
+				firstPrefix={isSelected ? "▸ " : "$ "}
+				continuationPrefix="  "
+				bold
+			/>
 			{outputLines.map((line, outputIndex) => (
 				<Text key={`output-${outputIndex}`} color={dimTextColor} backgroundColor={cardBackground}>
 					{line}
@@ -51,7 +62,12 @@ export const commandBlockPlugin: BlockPlugin<"command"> = {
 	type: "command",
 	rendererKey: defaultDocsBlockRendererKey("command"),
 	render: (block, context, indent) => (
-		<CommandBlockView block={block} contentWidth={context.contentWidth} indent={indent} />
+		<CommandBlockView
+			block={block}
+			contentWidth={context.contentWidth}
+			indent={indent}
+			isSelected={context.isSelected}
+		/>
 	),
 	measure: (block, context, indent) => {
 		const textWidth = Math.max(1, context.contentWidth - indent);
