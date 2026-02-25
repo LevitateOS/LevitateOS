@@ -46,7 +46,7 @@ describe("rich text renderer helpers", () => {
 			"text",
 		);
 
-		expect(runs.some((run) => run.underline === true && run.intent === "accent")).toBeTrue();
+		expect(runs.some((run) => run.underline === true && run.intent === "linkText")).toBeTrue();
 		expect(runs.some((run) => run.intent === "warning" && run.text.includes("recpart"))).toBeTrue();
 		expect(runs.some((run) => run.italic === true && run.text.includes("verify"))).toBeTrue();
 		expect(runs.some((run) => run.bold === true && run.text.includes("labels"))).toBeTrue();

@@ -8,6 +8,7 @@ type RichParagraphProps = {
 	width: number;
 	intent?: ColorIntent;
 	minimumWidth?: number;
+	selectedLinkHref?: string;
 };
 
 export function RichParagraph({
@@ -15,6 +16,7 @@ export function RichParagraph({
 	width,
 	intent = "text",
 	minimumWidth = 1,
+	selectedLinkHref,
 }: RichParagraphProps): ReactNode {
 	return (
 		<RichTextRenderer
@@ -22,6 +24,7 @@ export function RichParagraph({
 			defaultIntent={intent}
 			width={width}
 			minimumWidth={minimumWidth}
+			selectedLinkHref={selectedLinkHref}
 		/>
 	);
 }

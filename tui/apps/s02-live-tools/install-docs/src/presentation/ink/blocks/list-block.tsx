@@ -12,6 +12,7 @@ export function ListBlockView({
 	block,
 	contentWidth,
 	indent = 0,
+	selectedLinkHref,
 }: BlockComponentProps<ListBlock>): ReactNode {
 	const safeWidth = Math.max(1, contentWidth);
 	const listWidth = Math.max(1, safeWidth - indent);
@@ -30,6 +31,7 @@ export function ListBlockView({
 								width={listWidth}
 								markerIntent="sectionSubheading"
 								contentIntent="sectionSubheading"
+								selectedLinkHref={selectedLinkHref}
 							/>
 						</Box>
 					);
@@ -44,6 +46,7 @@ export function ListBlockView({
 							width={listWidth}
 							markerIntent="sectionSubheading"
 							contentIntent="sectionSubheading"
+							selectedLinkHref={selectedLinkHref}
 						/>
 						{(item.children ?? []).map((child, childIndex) => (
 							<Box key={`list-child-${index}-${childIndex}`} paddingLeft={2}>
@@ -54,6 +57,7 @@ export function ListBlockView({
 									width={Math.max(1, listWidth - 2)}
 									markerIntent="dimText"
 									contentIntent="dimText"
+									selectedLinkHref={selectedLinkHref}
 								/>
 							</Box>
 						))}
@@ -68,7 +72,12 @@ export const listBlockPlugin: BlockPlugin<"list"> = {
 	type: "list",
 	rendererKey: defaultDocsBlockRendererKey("list"),
 	render: (block, context, indent) => (
-		<ListBlockView block={block} contentWidth={context.contentWidth} indent={indent} />
+		<ListBlockView
+			block={block}
+			contentWidth={context.contentWidth}
+			indent={indent}
+			selectedLinkHref={context.selectedLinkHref}
+		/>
 	),
 	measure: (block, context, indent) => {
 		const listWidth = Math.max(1, context.contentWidth - indent);

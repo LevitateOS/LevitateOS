@@ -7,10 +7,12 @@ export function InstallContentPane({
 	viewport,
 	renderers,
 	selectedItemKey,
+	selectedLinkHref,
 }: {
 	viewport: DocsViewport;
 	renderers: DocsRendererRegistry;
 	selectedItemKey?: string;
+	selectedLinkHref?: string;
 }) {
 	return (
 		<Box
@@ -31,6 +33,7 @@ export function InstallContentPane({
 					contentWidth={viewport.contentWidth}
 					renderers={renderers}
 					selectedItemKey={selectedItemKey}
+					selectedLinkHref={selectedLinkHref}
 				/>
 			</Box>
 		</Box>

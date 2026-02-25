@@ -39,6 +39,7 @@ export function TableBlockView({
 	block,
 	contentWidth,
 	indent = 0,
+	selectedLinkHref,
 }: BlockComponentProps<TableBlock>): ReactNode {
 	const headers = block.headers;
 	const rows = block.rows;
@@ -84,6 +85,7 @@ export function TableBlockView({
 				fallbackIntent="sectionHeading"
 				backgroundIntent="cardBackground"
 				bold
+				selectedLinkHref={selectedLinkHref}
 			/>
 			<Text color={dividerColor} backgroundColor={backgroundColor}>
 				{tableDividerLine(normalizedWidths, tableWidth)}
@@ -96,6 +98,7 @@ export function TableBlockView({
 					rowWidth={tableWidth}
 					fallbackIntent="text"
 					backgroundIntent="cardBackground"
+					selectedLinkHref={selectedLinkHref}
 				/>
 			))}
 		</Box>
@@ -106,7 +109,12 @@ export const tableBlockPlugin: BlockPlugin<"table"> = {
 	type: "table",
 	rendererKey: defaultDocsBlockRendererKey("table"),
 	render: (block, context, indent) => (
-		<TableBlockView block={block} contentWidth={context.contentWidth} indent={indent} />
+		<TableBlockView
+			block={block}
+			contentWidth={context.contentWidth}
+			indent={indent}
+			selectedLinkHref={context.selectedLinkHref}
+		/>
 	),
 	measure: (block, _context, _indent) => {
 		const headers = block.headers.map((cell) =>

@@ -7,14 +7,26 @@ type IntroItemProps = {
 	content: string | RichText;
 	contentWidth: number;
 	indent?: number;
+	selectedLinkHref?: string;
 };
 
-export function IntroItem({ content, contentWidth, indent = 0 }: IntroItemProps): ReactNode {
+export function IntroItem({
+	content,
+	contentWidth,
+	indent = 0,
+	selectedLinkHref,
+}: IntroItemProps): ReactNode {
 	const safeWidth = Math.max(1, contentWidth);
 	const introWidth = Math.max(1, safeWidth - indent);
 	return (
 		<Box flexDirection="column" paddingLeft={indent} width={safeWidth}>
-			<RichParagraph content={content} width={introWidth} intent="dimText" minimumWidth={1} />
+			<RichParagraph
+				content={content}
+				width={introWidth}
+				intent="dimText"
+				minimumWidth={1}
+				selectedLinkHref={selectedLinkHref}
+			/>
 		</Box>
 	);
 }

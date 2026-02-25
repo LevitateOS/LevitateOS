@@ -14,6 +14,7 @@ type PrefixedRichListItemProps = {
 	markerBold?: boolean;
 	contentIntent?: ColorIntent;
 	lineKeyPrefix?: string;
+	selectedLinkHref?: string;
 };
 
 export function PrefixedRichListItem({
@@ -25,13 +26,18 @@ export function PrefixedRichListItem({
 	markerBold = false,
 	contentIntent = "text",
 	lineKeyPrefix = "list-item",
+	selectedLinkHref,
 }: PrefixedRichListItemProps): ReactNode {
 	const safeWidth = Math.max(1, width);
 	const prefix = `${marker} `;
 	const textWidth = Math.max(1, safeWidth - prefix.length);
-	const wrappedLines = wrapRichTextRuns(content, textWidth, contentIntent, 1).map((lineRuns) =>
-		backgroundIntent ? withBackgroundIntent(lineRuns, backgroundIntent) : lineRuns,
-	);
+	const wrappedLines = wrapRichTextRuns(
+		content,
+		textWidth,
+		contentIntent,
+		1,
+		selectedLinkHref,
+	).map((lineRuns) => (backgroundIntent ? withBackgroundIntent(lineRuns, backgroundIntent) : lineRuns));
 
 	return (
 		<Box flexDirection="row" width={safeWidth}>

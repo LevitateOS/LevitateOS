@@ -13,6 +13,7 @@ type RichTableRowProps = {
 	fallbackIntent?: ColorIntent;
 	backgroundIntent?: ColorIntent;
 	bold?: boolean;
+	selectedLinkHref?: string;
 };
 
 export const TABLE_COLUMN_SEPARATOR = " │ ";
@@ -22,8 +23,9 @@ function tableCellRuns(
 	columnWidth: number,
 	fallbackIntent: ColorIntent,
 	backgroundIntent: ColorIntent,
+	selectedLinkHref?: string,
 ): RichTextRun[] {
-	const wrapped = wrapRichTextRuns(cell, columnWidth, fallbackIntent, 1);
+	const wrapped = wrapRichTextRuns(cell, columnWidth, fallbackIntent, 1, selectedLinkHref);
 	const firstLine = wrapped[0] ?? [];
 	return padRunsToWidth(
 		withBackgroundIntent(firstLine, backgroundIntent),
@@ -40,6 +42,7 @@ function rowRuns({
 	fallbackIntent,
 	backgroundIntent,
 	bold,
+	selectedLinkHref,
 }: {
 	cells: ReadonlyArray<TableCellContent>;
 	columnWidths: ReadonlyArray<number>;
@@ -47,6 +50,7 @@ function rowRuns({
 	fallbackIntent: ColorIntent;
 	backgroundIntent: ColorIntent;
 	bold: boolean;
+	selectedLinkHref?: string;
 }): RichTextRun[] {
 	const runs: RichTextRun[] = [];
 	for (const [index, columnWidth] of columnWidths.entries()) {
@@ -55,6 +59,7 @@ function rowRuns({
 			columnWidth,
 			fallbackIntent,
 			backgroundIntent,
+			selectedLinkHref,
 		).map((run) => (bold ? { ...run, bold: true } : run));
 		runs.push(...cell);
 		if (index < columnWidths.length - 1) {
@@ -77,6 +82,7 @@ export function RichTableRow({
 	fallbackIntent = "text",
 	backgroundIntent = "cardBackground",
 	bold = false,
+	selectedLinkHref,
 }: RichTableRowProps): ReactNode {
 	return (
 		<RichTextLine
@@ -87,6 +93,7 @@ export function RichTableRow({
 				fallbackIntent,
 				backgroundIntent,
 				bold,
+				selectedLinkHref,
 			})}
 			fallbackIntent={fallbackIntent}
 		/>

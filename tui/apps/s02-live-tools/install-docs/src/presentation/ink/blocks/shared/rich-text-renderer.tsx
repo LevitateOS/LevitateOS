@@ -1,6 +1,11 @@
 import { Box } from "ink";
 import type { InlineNode, RichText } from "@levitate/docs-content";
-import { RichTextLine, type ColorIntent, type RichTextRun } from "@levitate/tui-kit";
+import {
+	RichTextLine,
+	linkRuns,
+	type ColorIntent,
+	type RichTextRun,
+} from "@levitate/tui-kit";
 import type { ReactNode } from "react";
 
 type RichTextRendererProps = {
@@ -8,6 +13,7 @@ type RichTextRendererProps = {
 	defaultIntent?: ColorIntent;
 	width?: number;
 	minimumWidth?: number;
+	selectedLinkHref?: string;
 };
 
 type RichTextWord = {
@@ -67,19 +73,24 @@ function plainTextForInlineNode(node: InlineNode): string {
 	return node.text;
 }
 
-function inlineNodeToRuns(node: InlineNode, defaultIntent: ColorIntent): RichTextRun[] {
+function inlineNodeToRuns(
+	node: InlineNode,
+	defaultIntent: ColorIntent,
+	selectedLinkHref?: string,
+): RichTextRun[] {
 	if (typeof node === "string") {
 		return [{ text: node, intent: defaultIntent }];
 	}
 
 	if (node.type === "link") {
-		if (node.href.trim().length > 0 && node.href !== node.text) {
-			return [
-				{ text: node.text, intent: "accent", underline: true },
-				{ text: ` (${node.href})`, intent: "dimText" },
-			];
-		}
-		return [{ text: node.text, intent: "accent", underline: true }];
+		const selectedHref = selectedLinkHref?.trim() ?? "";
+		const nodeHref = node.href.trim();
+		const isSelectedLink = selectedHref.length > 0 && nodeHref === selectedHref;
+		return linkRuns(node.text, {
+			href: node.href,
+			isSelected: isSelectedLink,
+			includeHrefWhenDifferent: true,
+		});
 	}
 
 	if (node.type === "bold") {
@@ -96,6 +107,7 @@ function inlineNodeToRuns(node: InlineNode, defaultIntent: ColorIntent): RichTex
 function inlineContentToRuns(
 	content: string | RichText | undefined,
 	defaultIntent: ColorIntent,
+	selectedLinkHref?: string,
 ): RichTextRun[] {
 	if (typeof content === "string") {
 		return [{ text: content, intent: defaultIntent }];
@@ -106,7 +118,7 @@ function inlineContentToRuns(
 
 	const runs: RichTextRun[] = [];
 	for (const node of content) {
-		for (const run of inlineNodeToRuns(node, defaultIntent)) {
+		for (const run of inlineNodeToRuns(node, defaultIntent, selectedLinkHref)) {
 			appendRun(runs, run);
 		}
 	}
@@ -273,8 +285,9 @@ export function wrapRichTextRuns(
 	width: number,
 	defaultIntent: ColorIntent = "text",
 	minimumWidth = 1,
+	selectedLinkHref?: string,
 ): RichTextRun[][] {
-	const runs = inlineContentToRuns(content, defaultIntent);
+	const runs = inlineContentToRuns(content, defaultIntent, selectedLinkHref);
 	const safeWidth = safeWrapWidth(width, minimumWidth);
 	const paragraphs = splitRunsByNewline(runs);
 	const wrapped = paragraphs.flatMap((paragraphRuns) =>
@@ -297,8 +310,9 @@ export function wrapRichTextPlainLines(
 export function richTextRuns(
 	content: string | RichText | undefined,
 	defaultIntent: ColorIntent = "text",
+	selectedLinkHref?: string,
 ): RichTextRun[] {
-	return inlineContentToRuns(content, defaultIntent);
+	return inlineContentToRuns(content, defaultIntent, selectedLinkHref);
 }
 
 export function RichTextRenderer({
@@ -306,9 +320,16 @@ export function RichTextRenderer({
 	defaultIntent = "text",
 	width,
 	minimumWidth = 1,
+	selectedLinkHref,
 }: RichTextRendererProps): ReactNode {
 	if (typeof width === "number" && Number.isFinite(width)) {
-		const lines = wrapRichTextRuns(content, width, defaultIntent, minimumWidth);
+		const lines = wrapRichTextRuns(
+			content,
+			width,
+			defaultIntent,
+			minimumWidth,
+			selectedLinkHref,
+		);
 		return (
 			<Box flexDirection="column">
 				{lines.map((line, index) => (
@@ -320,7 +341,7 @@ export function RichTextRenderer({
 
 	return (
 		<RichTextLine
-			runs={inlineContentToRuns(content, defaultIntent)}
+			runs={inlineContentToRuns(content, defaultIntent, selectedLinkHref)}
 			fallbackIntent={defaultIntent}
 		/>
 	);

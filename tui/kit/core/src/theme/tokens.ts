@@ -7,6 +7,9 @@ export type ColorIntent =
 	| "text"
 	| "dimText"
 	| "accent"
+	| "linkText"
+	| "linkActiveText"
+	| "linkActiveBackground"
 	| "info"
 	| "warning"
 	| "error"
@@ -90,6 +93,24 @@ export const defaultThemeColors: ThemeColors = {
 		truecolor: "#7dd3fc",
 		ansi256: 117,
 		ansi16: "cyan",
+		mono: "bold",
+	},
+	linkText: {
+		truecolor: "#7dd3fc",
+		ansi256: 117,
+		ansi16: "cyan",
+		mono: "bold",
+	},
+	linkActiveText: {
+		truecolor: "#0f172a",
+		ansi256: 17,
+		ansi16: "black",
+		mono: "bold",
+	},
+	linkActiveBackground: {
+		truecolor: "#cbd5e1",
+		ansi256: 251,
+		ansi16: "white",
 		mono: "bold",
 	},
 	info: {

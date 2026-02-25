@@ -12,6 +12,7 @@ export function ConversationBlockView({
 	block,
 	contentWidth,
 	indent = 0,
+	selectedLinkHref,
 }: BlockComponentProps<ConversationBlock>): ReactNode {
 	const safeWidth = Math.max(1, contentWidth);
 	const conversationWidth = Math.max(1, safeWidth - indent);
@@ -33,6 +34,7 @@ export function ConversationBlockView({
 							markerBold
 							contentIntent="text"
 							backgroundIntent="cardBackground"
+							selectedLinkHref={selectedLinkHref}
 						/>
 						{(message.list ?? []).map((listItem, listIndex) => (
 							<Box
@@ -49,6 +51,7 @@ export function ConversationBlockView({
 									markerIntent="text"
 									contentIntent="text"
 									backgroundIntent="cardBackground"
+									selectedLinkHref={selectedLinkHref}
 								/>
 							</Box>
 						))}
@@ -63,7 +66,12 @@ export const conversationBlockPlugin: BlockPlugin<"conversation"> = {
 	type: "conversation",
 	rendererKey: defaultDocsBlockRendererKey("conversation"),
 	render: (block, context, indent) => (
-		<ConversationBlockView block={block} contentWidth={context.contentWidth} indent={indent} />
+		<ConversationBlockView
+			block={block}
+			contentWidth={context.contentWidth}
+			indent={indent}
+			selectedLinkHref={context.selectedLinkHref}
+		/>
 	),
 	measure: (block, context, indent) => {
 		const conversationWidth = Math.max(1, context.contentWidth - indent);

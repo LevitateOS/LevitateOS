@@ -17,7 +17,8 @@ Navigation:
   j / k             Scroll content (navigation) or cycle actions (content)
   PgUp / PgDn       Fast scroll (content focus)
   g / G             Top / bottom (content focus)
-  Enter / c / y     Copy selected command action (content focus)
+  Enter             Activate selected action (open docs link / copy command)
+  c / y             Copy selected action payload (command or link href)
 
 Legacy non-interactive flags (--list, --page, --all) were removed.
 `;

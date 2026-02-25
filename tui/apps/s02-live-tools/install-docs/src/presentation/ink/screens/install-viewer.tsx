@@ -1,5 +1,10 @@
 import { useApp } from "ink";
-import type { CommandBlock } from "@levitate/docs-content";
+import type {
+	CommandBlock,
+	ContentBlock,
+	InlineNode,
+	RichText,
+} from "@levitate/docs-content";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
 	SurfaceFrame,
@@ -13,6 +18,7 @@ import {
 	useTuiViewport,
 } from "@levitate/tui-kit";
 import type { DocsContentLike, FlatDocsNavItem } from "../../../domain/content/contracts";
+import { resolveDocsLinkTarget } from "../../../domain/navigation/link-target";
 import type { DocRenderItem } from "../../../domain/render/types";
 import { computeDocsViewport } from "../../../rendering/pipeline/viewport";
 import { measureDocItemLines } from "../../../rendering/plan/line-metrics";
@@ -32,30 +38,143 @@ type InstallViewerScreenProps = {
 };
 
 type ActionableCommand = {
+	kind: "command";
 	itemKey: string;
 	commandText: string;
 	startLine: number;
 	endLine: number;
 };
 
+type ActionableLink = {
+	kind: "link";
+	itemKey: string;
+	href: string;
+	label: string;
+	startLine: number;
+	endLine: number;
+};
+
+type ActionableTarget = ActionableCommand | ActionableLink;
+
 function commandBlockText(block: CommandBlock): string {
 	return Array.isArray(block.command) ? block.command.join("\n") : block.command;
 }
 
-function deriveActionableCommands(
+function extractInlineLinks(content: string | RichText | undefined): Array<{ href: string; label: string }> {
+	if (!Array.isArray(content)) {
+		return [];
+	}
+	const links: Array<{ href: string; label: string }> = [];
+	for (const node of content as InlineNode[]) {
+		if (typeof node !== "string" && node.type === "link") {
+			const href = node.href.trim();
+			if (href.length === 0) {
+				continue;
+			}
+			links.push({ href, label: node.text.trim() || href });
+		}
+	}
+	return links;
+}
+
+function extractBlockLinks(block: ContentBlock): Array<{ href: string; label: string }> {
+	switch (block.type) {
+		case "text":
+			return extractInlineLinks(block.content);
+		case "table": {
+			const links: Array<{ href: string; label: string }> = [];
+			for (const header of block.headers) {
+				links.push(...extractInlineLinks(header));
+			}
+			for (const row of block.rows) {
+				for (const cell of row) {
+					links.push(...extractInlineLinks(cell));
+				}
+			}
+			return links;
+		}
+		case "list": {
+			const links: Array<{ href: string; label: string }> = [];
+			for (const item of block.items) {
+				if (typeof item === "string" || Array.isArray(item)) {
+					links.push(...extractInlineLinks(item));
+					continue;
+				}
+				links.push(...extractInlineLinks(item.text));
+				for (const child of item.children ?? []) {
+					links.push(...extractInlineLinks(child));
+				}
+			}
+			return links;
+		}
+		case "conversation": {
+			const links: Array<{ href: string; label: string }> = [];
+			for (const message of block.messages) {
+				links.push(...extractInlineLinks(message.text));
+				for (const listItem of message.list ?? []) {
+					links.push(...extractInlineLinks(listItem));
+				}
+			}
+			return links;
+		}
+		case "interactive": {
+			const links: Array<{ href: string; label: string }> = [];
+			links.push(...extractInlineLinks(block.intro));
+			for (const step of block.steps) {
+				links.push(...extractInlineLinks(step.description));
+			}
+			return links;
+		}
+		case "qa": {
+			const links: Array<{ href: string; label: string }> = [];
+			for (const item of block.items) {
+				links.push(...extractInlineLinks(item.question));
+				for (const answerBlock of item.answer) {
+					links.push(...extractBlockLinks(answerBlock));
+				}
+			}
+			return links;
+		}
+		case "note":
+			return extractInlineLinks(block.content);
+		default:
+			return [];
+	}
+}
+
+function deriveActionableTargets(
 	items: ReadonlyArray<DocRenderItem>,
 	contentWidth: number,
-): ActionableCommand[] {
-	const commands: ActionableCommand[] = [];
+): ActionableTarget[] {
+	const targets: ActionableTarget[] = [];
 	let cursor = 0;
 	for (const [index, item] of items.entries()) {
 		const lines = measureDocItemLines(item, contentWidth);
+		const startLine = cursor;
+		const endLine = Math.max(cursor, cursor + lines - 1);
 		if (item.kind === "block" && item.block.type === "command") {
-			commands.push({
+			targets.push({
+				kind: "command",
 				itemKey: item.key,
 				commandText: commandBlockText(item.block),
-				startLine: cursor,
-				endLine: Math.max(cursor, cursor + lines - 1),
+				startLine,
+				endLine,
+			});
+		}
+		const links =
+			item.kind === "intro"
+				? extractInlineLinks(item.content)
+				: item.kind === "block"
+					? extractBlockLinks(item.block)
+					: [];
+		for (const link of links) {
+			targets.push({
+				kind: "link",
+				itemKey: item.key,
+				href: link.href,
+				label: link.label,
+				startLine,
+				endLine,
 			});
 		}
 		cursor += lines;
@@ -63,7 +182,7 @@ function deriveActionableCommands(
 			cursor += 1;
 		}
 	}
-	return commands;
+	return targets;
 }
 
 function copyToClipboardOsc52(text: string): boolean {
@@ -94,6 +213,7 @@ export function InstallViewerScreen({
 	const [runtimeNote, setRuntimeNote] = useState<string | undefined>(undefined);
 	const focus = useFocusPlane({ initial: "navigation" });
 	const contentNavLock = useRef<number | null>(null);
+	const contentNavAllowedIndex = useRef<number | null>(null);
 
 	const quit = () => {
 		onExit?.();
@@ -153,12 +273,14 @@ export function InstallViewerScreen({
 		contentRows,
 		contentColumns,
 	);
-	const actionableCommands = useMemo(
-		() => deriveActionableCommands(docsViewport.visibleItems, docsViewport.contentWidth),
+	const actionableTargets = useMemo(
+		() => deriveActionableTargets(docsViewport.visibleItems, docsViewport.contentWidth),
 		[docsViewport.contentWidth, docsViewport.visibleItems],
 	);
-	const selectedActionable = actionableCommands[actionableIndex];
+	const selectedActionable = actionableTargets[actionableIndex];
 	const selectedItemKey = focus.isContent ? selectedActionable?.itemKey : undefined;
+	const selectedLinkHref =
+		focus.isContent && selectedActionable?.kind === "link" ? selectedActionable.href : undefined;
 
 	useEffect(() => {
 		setActionableIndex(0);
@@ -168,9 +290,11 @@ export function InstallViewerScreen({
 	useEffect(() => {
 		if (focus.isContent) {
 			contentNavLock.current = navigation.safeIndex;
+			contentNavAllowedIndex.current = null;
 			return;
 		}
 		contentNavLock.current = null;
+		contentNavAllowedIndex.current = null;
 	}, [focus.isContent, navigation.safeIndex]);
 
 	useEffect(() => {
@@ -181,21 +305,29 @@ export function InstallViewerScreen({
 		if (navigation.safeIndex === locked) {
 			return;
 		}
+		if (
+			contentNavAllowedIndex.current !== null &&
+			navigation.safeIndex === contentNavAllowedIndex.current
+		) {
+			contentNavAllowedIndex.current = null;
+			contentNavLock.current = navigation.safeIndex;
+			return;
+		}
 		navigation.setPage(locked);
 		setRuntimeNote("blocked navigation mutation while content focus is active");
 	}, [focus.isContent, navigation, navigation.safeIndex]);
 
 	useEffect(() => {
-		if (actionableCommands.length === 0) {
+		if (actionableTargets.length === 0) {
 			if (actionableIndex !== 0) {
 				setActionableIndex(0);
 			}
 			return;
 		}
-		if (actionableIndex >= actionableCommands.length) {
-			setActionableIndex(actionableCommands.length - 1);
+		if (actionableIndex >= actionableTargets.length) {
+			setActionableIndex(actionableTargets.length - 1);
 		}
-	}, [actionableCommands.length, actionableIndex]);
+	}, [actionableTargets.length, actionableIndex]);
 
 	const movePage = (delta: number) => {
 		navigation.movePage(delta);
@@ -211,7 +343,7 @@ export function InstallViewerScreen({
 		scroll.scrollBy(delta, docsViewport.maxScroll);
 	};
 	const focusActionable = (index: number) => {
-		const selected = actionableCommands[index];
+		const selected = actionableTargets[index];
 		if (!selected) {
 			return;
 		}
@@ -226,28 +358,51 @@ export function InstallViewerScreen({
 		scroll.scrollBy(targetOffset - scroll.scrollOffset, docsViewport.maxScroll);
 	};
 	const moveActionable = (delta: number) => {
-		if (actionableCommands.length === 0) {
+		if (actionableTargets.length === 0) {
 			scrollBy(delta);
 			return;
 		}
-		const next =
-			(actionableIndex + delta + actionableCommands.length) % actionableCommands.length;
+		const next = (actionableIndex + delta + actionableTargets.length) % actionableTargets.length;
 		setActionableIndex(next);
 		focusActionable(next);
 		setRuntimeNote(undefined);
 	};
 	const copySelectedActionable = () => {
-		const selected = actionableCommands[actionableIndex];
+		const selected = actionableTargets[actionableIndex];
 		if (!selected) {
-			setRuntimeNote("no actionable command on this page");
+			setRuntimeNote("no actionable target on this page");
 			return;
 		}
-		const copied = copyToClipboardOsc52(selected.commandText);
+		const payload = selected.kind === "command" ? selected.commandText : selected.href;
+		const copied = copyToClipboardOsc52(payload);
+		const actionLabel =
+			selected.kind === "command"
+				? `command ${actionableIndex + 1}/${actionableTargets.length}`
+				: `link ${actionableIndex + 1}/${actionableTargets.length} (${selected.label})`;
 		setRuntimeNote(
-			copied
-				? `copied command ${actionableIndex + 1}/${actionableCommands.length}`
-				: "copy failed (terminal clipboard unsupported)",
+			copied ? `copied ${actionLabel}` : "copy failed (terminal clipboard unsupported)",
 		);
+	};
+	const activateSelectedActionable = () => {
+		const selected = actionableTargets[actionableIndex];
+		if (!selected) {
+			setRuntimeNote("no actionable target on this page");
+			return;
+		}
+		if (selected.kind === "command") {
+			copySelectedActionable();
+			return;
+		}
+		const resolution = resolveDocsLinkTarget(selected.href, currentItem.slug, navItems);
+		if (!resolution.ok) {
+			setRuntimeNote(`invalid docs link target: '${selected.href}' (${resolution.reason})`);
+			return;
+		}
+		contentNavAllowedIndex.current = resolution.index;
+		navigation.setPage(resolution.index);
+		scroll.reset();
+		setActionableIndex(0);
+		setRuntimeNote(`opened docs page '${resolution.slug}'`);
 	};
 	const pageJump = Math.max(1, contentRows - 1);
 
@@ -281,7 +436,7 @@ export function InstallViewerScreen({
 		scrollBy(1);
 	}, { isActive: focus.isNavigation });
 	useHotkeys(["enter"], () => {
-		copySelectedActionable();
+		activateSelectedActionable();
 	}, { isActive: focus.isContent });
 	useHotkeys(["pageup", "b"], () => {
 		if (!focus.isContent) {
@@ -327,7 +482,7 @@ export function InstallViewerScreen({
 		navItems.length,
 		runtimeNote ?? navigation.startupNote,
 		focus.plane,
-		actionableCommands.length,
+		actionableTargets.length,
 		actionableIndex,
 	);
 	const contentPaneMeta = `lines ${docsViewport.startItem}-${docsViewport.endItem}/${Math.max(docsViewport.totalItems, 1)}`;
@@ -358,6 +513,7 @@ export function InstallViewerScreen({
 						viewport={docsViewport}
 						renderers={renderers}
 						selectedItemKey={selectedItemKey}
+						selectedLinkHref={selectedLinkHref}
 					/>
 				),
 				borderIntent: "cardBorder",

@@ -9,6 +9,7 @@ type DocNodeRenderContext = {
 	contentWidth: number;
 	renderBlock: (block: ContentBlock, indent?: number) => ReactNode;
 	selectedItemKey?: string;
+	selectedLinkHref?: string;
 };
 
 type DocNodeKind = DocRenderItem["kind"];
@@ -49,7 +50,11 @@ const DEFAULT_INSTALL_DOC_NODE_PLUGINS: DocNodePluginMap = Object.freeze({
 	intro: {
 		kind: "intro",
 		render: (item, context) => (
-			<IntroItem content={item.content} contentWidth={context.contentWidth} />
+			<IntroItem
+				content={item.content}
+				contentWidth={context.contentWidth}
+				selectedLinkHref={context.selectedItemKey === item.key ? context.selectedLinkHref : undefined}
+			/>
 		),
 	},
 	section: {
@@ -77,6 +82,8 @@ const DEFAULT_INSTALL_DOC_NODE_PLUGINS: DocNodePluginMap = Object.freeze({
 					contentWidth: context.contentWidth,
 					renderBlock: context.renderBlock,
 					isSelected: context.selectedItemKey === item.key,
+					selectedLinkHref:
+						context.selectedItemKey === item.key ? context.selectedLinkHref : undefined,
 				},
 				indent,
 			);
@@ -111,17 +118,20 @@ export function renderDocItemWithRegistry(
 	registry: DocsRendererRegistry,
 	contentWidth: number,
 	selectedItemKey?: string,
+	selectedLinkHref?: string,
 ): ReactNode {
 	const renderBlock = (block: ContentBlock, indent = 0): ReactNode =>
 		renderDocNode(nestedBlockNode(block, indent), registry, {
 			contentWidth,
 			renderBlock,
 			selectedItemKey: undefined,
+			selectedLinkHref,
 		});
 
 	return renderDocNode(item, registry, {
 		contentWidth,
 		renderBlock,
 		selectedItemKey,
+		selectedLinkHref,
 	});
 }

@@ -1,6 +1,6 @@
 import type { FlatDocsNavItem, NavSection } from "../content/contracts";
 
-function slugFromHref(href: string): string {
+export function docsSlugFromHref(href: string): string {
 	const normalizedHref = href.trim();
 	const withoutQuery = normalizedHref.split("?")[0]?.split("#")[0] ?? normalizedHref;
 	const noTrailingSlash = withoutQuery.replace(/\/+$/, "");
@@ -29,7 +29,7 @@ export function flattenDocsNav(sections: ReadonlyArray<NavSection>): FlatDocsNav
 				sectionTitle: section.title,
 				title: item.title,
 				href: item.href,
-				slug: slugFromHref(item.href),
+				slug: docsSlugFromHref(item.href),
 			});
 		}
 	}

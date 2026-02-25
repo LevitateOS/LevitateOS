@@ -17,6 +17,7 @@ export function QABlockView({
 	contentWidth,
 	indent = 0,
 	renderNestedBlock,
+	selectedLinkHref,
 }: QABlockProps): ReactNode {
 	const safeWidth = Math.max(1, contentWidth);
 
@@ -34,6 +35,7 @@ export function QABlockView({
 								defaultIntent="sectionHeading"
 								width={Math.max(1, safeWidth - 2)}
 								minimumWidth={1}
+								selectedLinkHref={selectedLinkHref}
 							/>
 						</Box>
 						<UiText intent="sectionSubheading" bold>
@@ -65,6 +67,7 @@ export const qaBlockPlugin: BlockPlugin<"qa"> = {
 			block={block}
 			contentWidth={context.contentWidth}
 			indent={indent}
+			selectedLinkHref={context.selectedLinkHref}
 			renderNestedBlock={(nestedBlock, nestedIndent) =>
 				context.renderBlock(nestedBlock, nestedIndent)
 			}

@@ -46,6 +46,21 @@ export function createInstallDocsTheme(): TuiTheme {
 				ansi256: 111,
 				ansi16: "cyan",
 			},
+			linkText: {
+				truecolor: "#7db3ff",
+				ansi256: 111,
+				ansi16: "cyan",
+			},
+			linkActiveText: {
+				truecolor: "#ffffff",
+				ansi256: 15,
+				ansi16: "white",
+			},
+			linkActiveBackground: {
+				truecolor: "#2f5ed7",
+				ansi256: 26,
+				ansi16: "blue",
+			},
 			info: "#8ab8ff",
 			warning: "#ffc76a",
 			commandBarBackground: "default",

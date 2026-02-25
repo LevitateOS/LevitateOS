@@ -34,7 +34,8 @@ export function installStatusBar(
 		segments.push(hotkeyStatusSegment("open", "tab", "content"));
 	} else {
 		segments.push(hotkeyStatusSegment("actions", "j/k", "next/prev"));
-		segments.push(hotkeyStatusSegment("copy", "enter/c/y", "command"));
+		segments.push(hotkeyStatusSegment("activate", "enter", "open/copy"));
+		segments.push(hotkeyStatusSegment("copy", "c/y", "action"));
 		segments.push(hotkeyStatusSegment("scroll", "PgUp/PgDn", "content"));
 		segments.push(hotkeyStatusSegment("jump", "g/G b/space", "top/end/page"));
 		segments.push(

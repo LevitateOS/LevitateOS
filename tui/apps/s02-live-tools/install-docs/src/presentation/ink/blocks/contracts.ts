@@ -12,6 +12,7 @@ export type BlockRenderContext = {
 	contentWidth: number;
 	renderBlock: (block: ContentBlock, indent?: number) => ReactNode;
 	isSelected?: boolean;
+	selectedLinkHref?: string;
 };
 
 export type BlockMeasureContext = {

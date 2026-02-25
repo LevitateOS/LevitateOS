@@ -57,6 +57,7 @@ export function NoteBlockView({
 	block,
 	contentWidth,
 	indent = 0,
+	selectedLinkHref,
 }: BlockComponentProps<NoteBlock>): ReactNode {
 	const safeWidth = Math.max(1, contentWidth);
 	const noteWidth = Math.max(1, safeWidth - indent);
@@ -72,13 +73,23 @@ export function NoteBlockView({
 					<Text color={palette.labelColor} backgroundColor={backgroundColor} bold>
 						{`${palette.label}: `}
 					</Text>
-					<RichTextRenderer content={block.content} defaultIntent={contentIntent} />
+					<RichTextRenderer
+						content={block.content}
+						defaultIntent={contentIntent}
+						selectedLinkHref={selectedLinkHref}
+					/>
 				</Text>
 			</Box>
 		);
 	}
 	const noteTextWidth = Math.max(1, noteWidth - 4);
-	const noteLines = wrapRichTextRuns(block.content, noteTextWidth, contentIntent, 1);
+	const noteLines = wrapRichTextRuns(
+		block.content,
+		noteTextWidth,
+		contentIntent,
+		1,
+		selectedLinkHref,
+	);
 
 	return (
 		<Box flexDirection="column" paddingLeft={indent} width={safeWidth}>
@@ -104,7 +115,12 @@ export const noteBlockPlugin: BlockPlugin<"note"> = {
 	type: "note",
 	rendererKey: defaultDocsBlockRendererKey("note"),
 	render: (block, context, indent) => (
-		<NoteBlockView block={block} contentWidth={context.contentWidth} indent={indent} />
+		<NoteBlockView
+			block={block}
+			contentWidth={context.contentWidth}
+			indent={indent}
+			selectedLinkHref={context.selectedLinkHref}
+		/>
 	),
 	measure: (block, context, indent) => {
 		const noteWidth = Math.max(1, context.contentWidth - indent);

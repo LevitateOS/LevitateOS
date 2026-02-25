@@ -45,9 +45,13 @@ describe("theme helpers", () => {
 	it("createTheme supports shorthand literal color overrides", () => {
 		const theme = createTheme({
 			accent: "#00ff88",
+			linkText: "#3399ff",
+			linkActiveBackground: "#224488",
 		});
 
 		expect(theme.colors.accent.truecolor).toBe("#00ff88");
+		expect(theme.colors.linkText.truecolor).toBe("#3399ff");
+		expect(theme.colors.linkActiveBackground.truecolor).toBe("#224488");
 		expect(theme.colors.accent.ansi256).toBeGreaterThanOrEqual(0);
 		expect(theme.colors.accent.ansi16.length).toBeGreaterThan(0);
 	});

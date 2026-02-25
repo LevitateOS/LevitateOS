@@ -4,3 +4,4 @@ export * from "./divider";
 export * from "./panel";
 export * from "./syntax-token-line";
 export * from "./rich-text";
+export * from "./link";

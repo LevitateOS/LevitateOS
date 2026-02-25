@@ -13,11 +13,12 @@ export function InteractiveBlockView({
 	block,
 	contentWidth,
 	indent = 0,
+	selectedLinkHref,
 }: BlockComponentProps<InteractiveBlock>): ReactNode {
 	const safeWidth = Math.max(1, contentWidth);
 	const interactiveWidth = Math.max(1, safeWidth - indent);
 	const introLines = block.intro
-		? wrapRichTextRuns(block.intro, interactiveWidth, "dimText", 1)
+		? wrapRichTextRuns(block.intro, interactiveWidth, "dimText", 1, selectedLinkHref)
 		: [];
 
 	return (
@@ -37,7 +38,7 @@ export function InteractiveBlockView({
 						startRowIndex={stepIndex}
 						bold
 					/>
-					{wrapRichTextRuns(step.description, interactiveWidth, "text", 1).map(
+					{wrapRichTextRuns(step.description, interactiveWidth, "text", 1, selectedLinkHref).map(
 						(lineRuns, lineIndex) => (
 							<RichTextLine
 								key={`interactive-step-description-${stepIndex}-${lineIndex}`}
@@ -56,7 +57,12 @@ export const interactiveBlockPlugin: BlockPlugin<"interactive"> = {
 	type: "interactive",
 	rendererKey: defaultDocsBlockRendererKey("interactive"),
 	render: (block, context, indent) => (
-		<InteractiveBlockView block={block} contentWidth={context.contentWidth} indent={indent} />
+		<InteractiveBlockView
+			block={block}
+			contentWidth={context.contentWidth}
+			indent={indent}
+			selectedLinkHref={context.selectedLinkHref}
+		/>
 	),
 	measure: (block, context, indent) => {
 		const interactiveWidth = Math.max(1, context.contentWidth - indent);

@@ -9,6 +9,7 @@ type DocsContentViewProps = {
 	contentWidth: number;
 	renderers: DocsRendererRegistry;
 	selectedItemKey?: string;
+	selectedLinkHref?: string;
 };
 
 export function DocsContentView({
@@ -16,12 +17,19 @@ export function DocsContentView({
 	contentWidth,
 	renderers,
 	selectedItemKey,
+	selectedLinkHref,
 }: DocsContentViewProps): ReactNode {
 	return (
 		<Box flexDirection="column" width={contentWidth} flexShrink={0}>
 			{items.map((item, index) => (
 				<Box key={item.key} flexDirection="column" width={contentWidth} flexShrink={0}>
-					{renderDocItemWithRegistry(item, renderers, contentWidth, selectedItemKey)}
+					{renderDocItemWithRegistry(
+						item,
+						renderers,
+						contentWidth,
+						selectedItemKey,
+						selectedLinkHref,
+					)}
 					{index < items.length - 1 ? <UiText intent="dimText"> </UiText> : null}
 				</Box>
 			))}
