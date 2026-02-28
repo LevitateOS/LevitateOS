@@ -1,9 +1,0 @@
-{
-  "name": "@levitate/tui-testing",
-  "version": "0.0.0-stub",
-  "private": true,
-  "type": "module",
-  "scripts": {
-    "test": "echo 'stub: tui-testing test'"
-  }
-}

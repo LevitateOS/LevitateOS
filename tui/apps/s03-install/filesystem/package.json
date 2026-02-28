@@ -1,9 +1,0 @@
-{
-  "name": "@levitate/tui-s03-filesystem",
-  "version": "0.0.0-stub",
-  "private": true,
-  "type": "module",
-  "scripts": {
-    "start": "echo 'stub: s03 filesystem'"
-  }
-}

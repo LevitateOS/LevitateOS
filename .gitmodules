@@ -88,3 +88,7 @@
 [submodule "shared/tui-kit"]
 	path = shared/tui-kit
 	url = git@github.com:LevitateOS/tui-kit.git
+[submodule "tui"]
+	path = tui
+	url = git@github.com:LevitateOS/tui-root.git
+	branch = master
