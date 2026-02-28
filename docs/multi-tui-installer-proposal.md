@@ -227,7 +227,7 @@ This section defines the concrete repository layout to centralize all TUI work c
 
 - `docs/tui` (canonical implementation)
 - `shared/tui-kit` (shared package)
-- `tools/recpart/frontend` (consumer frontend to be reintroduced)
+- `tools/recpart/frontend` (deprecated legacy path; removed)
 
 ### Invariant
 
@@ -310,7 +310,7 @@ Chosen: **Option B** because it gives one canonical app lineage plus a reusable 
 
 1. `docs/tui` -> `tui/apps/s02-live-tools/install-docs` (canonical S02 session UX/docs app).
 2. `shared/tui-kit` -> `tui/kit/core` (re-architecture happens here; no docs-domain logic).
-3. `tools/recpart/frontend` -> `tui/apps/s03-install/disk-plan` (stage-native UI owner).
+3. legacy `tools/recpart/frontend` -> `tui/apps/s03-install/disk-plan` (stage-native UI owner).
 
 Compatibility shims during migration:
 
@@ -331,7 +331,7 @@ Update root `package.json` workspaces from:
 
 - `docs/tui`
 - `shared/tui-kit`
-- `tools/recpart/frontend`
+- `tools/recpart/frontend` (removed)
 
 to:
 

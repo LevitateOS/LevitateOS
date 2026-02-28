@@ -4,6 +4,7 @@ members = [
     "distro-spec",
     "distro-contract",
     "distro-builder",
+    "distro-builder/stage02-split-pane",
     "leviso",
     "AcornOS",
     "IuppiterOS",
