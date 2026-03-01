@@ -92,3 +92,6 @@
 	path = tui
 	url = git@github.com:LevitateOS/tui-root.git
 	branch = master
+[submodule "tools/recshuttle"]
+	path = tools/recshuttle
+	url = git@github.com:LevitateOS/recshuttle.git

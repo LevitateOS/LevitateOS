@@ -21,6 +21,7 @@ members = [
     "tools/recab",
     "tools/recpart",
     "tools/recqemu",
+    "tools/recshuttle",
     "testing/fsdbg",
     "testing/cheat-guard",
     "testing/cheat-test",
