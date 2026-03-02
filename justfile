@@ -6,6 +6,7 @@ tools_prefix := join(justfile_directory(), ".artifacts/tools/.tools")
 export PATH := tools_prefix / "usr/bin" + ":" + tools_prefix / "usr/libexec" + ":" + env("PATH")
 export LD_LIBRARY_PATH := tools_prefix / "usr/lib64"
 export OVMF_PATH := tools_prefix / "usr/share/edk2/ovmf/OVMF_CODE.fd"
+export OVMF_VARS_PATH := tools_prefix / "usr/share/edk2/ovmf/OVMF_VARS.fd"
 
 # -----------------------------------------------------------------------------
 # xtask wrappers
@@ -211,10 +212,52 @@ build *args:
     #!/usr/bin/env bash
     set -euo pipefail
 
-    cargo run -p distro-builder --bin distro-builder -- iso build {{args}}
+    stage03_build() {
+      local distro="$1"
+      local ssh_pubkey="${HOME}/.ssh/id_ed25519.pub"
+
+      if [ -f "$ssh_pubkey" ]; then
+        local tmp
+        tmp="$(mktemp)"
+        trap "rm -f '$tmp'" EXIT
+        local key
+        key="$(tr -d '\n' < "$ssh_pubkey")"
+        printf 'SSH_AUTHORIZED_KEY=%s\n' "$key" > "$tmp"
+        cargo xtask stages test 3 "$distro" --force --inject-file "$tmp"
+      else
+        cargo xtask stages test 3 "$distro" --force
+      fi
+    }
+
+    is_stage03() {
+      case "$1" in
+        3|03|03Install) return 0 ;;
+        *) return 1 ;;
+      esac
+    }
+
+    set -- {{args}}
+
+    if [ "$#" -eq 1 ] && is_stage03 "$1"; then
+      stage03_build levitate
+      exit 0
+    fi
+
+    if [ "$#" -eq 2 ]; then
+      if is_stage03 "$1"; then
+        stage03_build "$2"
+        exit 0
+      fi
+      if is_stage03 "$2"; then
+        stage03_build "$1"
+        exit 0
+      fi
+    fi
+
+    cargo run -p distro-builder --bin distro-builder -- iso build "$@"
 
 # Build stage ISOs from 00 up to N (inclusive) for a distro.
-# Usage: just build-up-to 2 levitate
+# Usage: just build-up-to 3 levitate
 [script, no-exit-message]
 build-up-to n distro="levitate":
     #!/usr/bin/env bash
@@ -224,13 +267,14 @@ build-up-to n distro="levitate":
       0|00) target=0 ;;
       1|01) target=1 ;;
       2|02) target=2 ;;
+      3|03) target=3 ;;
       *)
-        echo "build-up-to supports stages 0..2 (got: {{n}})" >&2
+        echo "build-up-to supports stages 0..3 (got: {{n}})" >&2
         exit 2
         ;;
     esac
 
-    stages=(00Build 01Boot 02LiveTools)
+    stages=(00Build 01Boot 02LiveTools 03Install)
     for i in $(seq 0 "$target"); do
       stage="${stages[$i]}"
       echo "==> Building ${stage} for {{distro}}"
@@ -350,3 +394,11 @@ website-build:
 
 website-typecheck:
     cd docs/website && bun run typecheck
+
+# Launch Codex CLI from the workspace root.
+[script, no-exit-message]
+codex *args:
+    #!/usr/bin/env bash
+    set -euo pipefail
+
+    exec codex {{args}}

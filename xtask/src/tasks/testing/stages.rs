@@ -2,7 +2,7 @@ use anyhow::{Context, Result, bail};
 use serde::Deserialize;
 use std::fs::OpenOptions;
 use std::fs::{self, File};
-use std::io::Write;
+use std::io::{Read, Write};
 use std::net::{IpAddr, Ipv4Addr, TcpListener, UdpSocket};
 use std::os::fd::AsRawFd;
 use std::path::{Path, PathBuf};
@@ -146,12 +146,19 @@ pub fn test(
     distro: crate::cli::HarnessDistro,
     inject: Option<String>,
     inject_file: Option<PathBuf>,
+    force: bool,
 ) -> Result<()> {
-    run_install_tests(
-        &["--distro", distro.id(), "--stage", &n.to_string()],
-        inject,
-        inject_file,
-    )
+    let mut args = vec![
+        "--distro".to_string(),
+        distro.id().to_string(),
+        "--stage".to_string(),
+        n.to_string(),
+    ];
+    if force {
+        args.push("--force".to_string());
+    }
+    let arg_refs: Vec<&str> = args.iter().map(String::as_str).collect();
+    run_install_tests(&arg_refs, inject, inject_file)
 }
 
 pub fn test_up_to(
@@ -182,9 +189,7 @@ struct BootConfig {
     stage02_root: PathBuf,
     stage02_iso_legacy: PathBuf,
     stage02_iso_filename: &'static str,
-    disk_dir: PathBuf,
-    disk_name: &'static str,
-    vars_name: &'static str,
+    stage03_root: PathBuf,
     pretty_name: &'static str,
     harness_distro: crate::cli::HarnessDistro,
 }
@@ -202,9 +207,7 @@ impl BootConfig {
                     ".artifacts/out/levitate/s02-live-tools/levitateos-x86_64-s02_live_tools.iso",
                 ),
                 stage02_iso_filename: "levitateos-x86_64-s02_live_tools.iso",
-                disk_dir: root.join(".artifacts/out/levitate"),
-                disk_name: "levitate-test.qcow2",
-                vars_name: "levitate-ovmf-vars.fd",
+                stage03_root: root.join(".artifacts/out/levitate/s03-install"),
                 pretty_name: "LevitateOS",
                 harness_distro: crate::cli::HarnessDistro::Levitate,
             },
@@ -216,9 +219,7 @@ impl BootConfig {
                 stage02_iso_legacy: root
                     .join(".artifacts/out/acorn/s02-live-tools/acornos-s02_live_tools.iso"),
                 stage02_iso_filename: "acornos-s02_live_tools.iso",
-                disk_dir: root.join(".artifacts/out/acorn"),
-                disk_name: "acorn-test.qcow2",
-                vars_name: "acorn-ovmf-vars.fd",
+                stage03_root: root.join(".artifacts/out/acorn/s03-install"),
                 pretty_name: "AcornOS",
                 harness_distro: crate::cli::HarnessDistro::Acorn,
             },
@@ -232,9 +233,7 @@ impl BootConfig {
                     ".artifacts/out/iuppiter/s02-live-tools/iuppiter-x86_64-s02_live_tools.iso",
                 ),
                 stage02_iso_filename: "iuppiter-x86_64-s02_live_tools.iso",
-                disk_dir: root.join(".artifacts/out/iuppiter"),
-                disk_name: "iuppiter-test.qcow2",
-                vars_name: "iuppiter-ovmf-vars.fd",
+                stage03_root: root.join(".artifacts/out/iuppiter/s03-install"),
                 pretty_name: "IuppiterOS",
                 harness_distro: crate::cli::HarnessDistro::Iuppiter,
             },
@@ -247,9 +246,7 @@ impl BootConfig {
                 stage02_iso_legacy: root
                     .join(".artifacts/out/ralph/s02-live-tools/ralphos-x86_64-s02_live_tools.iso"),
                 stage02_iso_filename: "ralphos-x86_64-s02_live_tools.iso",
-                disk_dir: root.join(".artifacts/out/ralph"),
-                disk_name: "ralph-test.qcow2",
-                vars_name: "ralph-ovmf-vars.fd",
+                stage03_root: root.join(".artifacts/out/ralph/s03-install"),
                 pretty_name: "RalphOS",
                 harness_distro: crate::cli::HarnessDistro::Ralph,
             },
@@ -259,10 +256,20 @@ impl BootConfig {
 
 #[derive(Debug, Deserialize)]
 struct StageRunManifest {
+    run_id: Option<String>,
     status: String,
     created_at_utc: String,
     finished_at_utc: Option<String>,
     iso_path: Option<String>,
+    disk_path: Option<String>,
+    ovmf_vars_path: Option<String>,
+}
+
+struct Stage03RuntimeArtifacts {
+    run_id: String,
+    disk_path: PathBuf,
+    ovmf_vars_path: PathBuf,
+    disk_format: String,
 }
 
 fn resolve_stage_iso(
@@ -867,16 +874,11 @@ fn boot_installed_disk(
     _inject_file: Option<PathBuf>,
     window: Option<&WindowConfig>,
 ) -> Result<()> {
-    let disk = cfg.disk_dir.join(cfg.disk_name);
-    let vars = cfg.disk_dir.join(cfg.vars_name);
+    let runtime = resolve_stage03_runtime("03Install", &cfg.stage03_root, cfg.harness_distro)?;
+    let disk = runtime.disk_path;
+    let vars = runtime.ovmf_vars_path;
+    let disk_format = runtime.disk_format;
     let ovmf = crate::util::repo::ovmf_path(root)?;
-
-    if !disk.is_file() {
-        bail!("Missing disk image: {}", disk.display());
-    }
-    if !vars.is_file() {
-        bail!("Missing OVMF vars: {}", vars.display());
-    }
 
     let mut cmd = Command::new("qemu-system-x86_64");
     cmd.args([
@@ -888,7 +890,11 @@ fn boot_installed_disk(
         "-m",
         "4G",
         "-drive",
-        &format!("file={},format=qcow2,if=virtio", disk.display()),
+        &format!(
+            "file={},format={},if=virtio",
+            disk.display(),
+            disk_format.as_str()
+        ),
         "-drive",
         &format!("if=pflash,format=raw,readonly=on,file={}", ovmf.display()),
         "-drive",
@@ -902,13 +908,22 @@ fn boot_installed_disk(
     ]);
     if window.is_some() {
         eprintln!(
-            "Booting installed {} in window mode... (Ctrl-C to stop)",
-            cfg.pretty_name
+            "Booting installed {} from Stage 03 run {} in window mode... (Ctrl-C to stop)",
+            cfg.pretty_name, runtime.run_id
         );
     } else {
         eprintln!(
-            "Booting installed {}... (Ctrl-A X to exit)",
-            cfg.pretty_name
+            "Booting installed {} from Stage 03 run {}... (Ctrl-A X to exit)",
+            cfg.pretty_name, runtime.run_id
+        );
+    }
+    eprintln!("  disk: {}", disk.display());
+    eprintln!("  disk format: {}", disk_format);
+    eprintln!("  ovmf vars: {}", vars.display());
+    if disk_format != "qcow2" {
+        eprintln!(
+            "  warning: Stage 03 produced non-qcow2 disk format '{}'; investigate qemu-img availability for strict qcow2 parity.",
+            disk_format
         );
     }
     apply_qemu_console_mode(&mut cmd, window);
@@ -919,6 +934,125 @@ fn boot_installed_disk(
         run_window_mode_foreground(&mut cmd, window_cfg)
     } else {
         run_checked(&mut cmd)
+    }
+}
+
+fn resolve_stage03_runtime(
+    stage_label: &str,
+    stage_root: &Path,
+    harness_distro: crate::cli::HarnessDistro,
+) -> Result<Stage03RuntimeArtifacts> {
+    let mut candidates: Vec<(String, Stage03RuntimeArtifacts)> = Vec::new();
+    if stage_root.is_dir() {
+        for entry in fs::read_dir(stage_root).with_context(|| {
+            format!(
+                "reading {} output directory '{}'",
+                stage_label,
+                stage_root.display()
+            )
+        })? {
+            let entry = entry.with_context(|| {
+                format!(
+                    "iterating {} output directory '{}'",
+                    stage_label,
+                    stage_root.display()
+                )
+            })?;
+            let run_dir = entry.path();
+            if !run_dir.is_dir() {
+                continue;
+            }
+            let manifest_path = run_dir.join("run-manifest.json");
+            if !manifest_path.is_file() {
+                continue;
+            }
+            let raw = fs::read(&manifest_path).with_context(|| {
+                format!("reading stage run manifest '{}'", manifest_path.display())
+            })?;
+            let manifest: StageRunManifest = serde_json::from_slice(&raw).with_context(|| {
+                format!("parsing stage run manifest '{}'", manifest_path.display())
+            })?;
+            if manifest.status != "success" {
+                continue;
+            }
+
+            let sort_key = manifest
+                .finished_at_utc
+                .clone()
+                .unwrap_or(manifest.created_at_utc.clone());
+            let run_id = manifest
+                .run_id
+                .clone()
+                .or_else(|| {
+                    run_dir
+                        .file_name()
+                        .and_then(|name| name.to_str())
+                        .map(ToOwned::to_owned)
+                })
+                .unwrap_or_else(|| "<unknown>".to_string());
+
+            let disk_candidate = manifest
+                .disk_path
+                .as_ref()
+                .map(PathBuf::from)
+                .unwrap_or_else(|| run_dir.join("stage-disk.qcow2"));
+            let vars_candidate = manifest
+                .ovmf_vars_path
+                .as_ref()
+                .map(PathBuf::from)
+                .unwrap_or_else(|| run_dir.join("stage-ovmf-vars.fd"));
+            if disk_candidate.is_file() && vars_candidate.is_file() {
+                let disk_format = detect_disk_image_format(&disk_candidate).with_context(|| {
+                    format!("detecting disk format for '{}'", disk_candidate.display())
+                })?;
+                candidates.push((
+                    sort_key,
+                    Stage03RuntimeArtifacts {
+                        run_id,
+                        disk_path: disk_candidate,
+                        ovmf_vars_path: vars_candidate,
+                        disk_format,
+                    },
+                ));
+            }
+        }
+    }
+
+    candidates.sort_by(|a, b| b.0.cmp(&a.0));
+    if let Some((_, artifacts)) = candidates.into_iter().next() {
+        return Ok(artifacts);
+    }
+
+    bail!(
+        "Missing Stage 03 install runtime artifacts under '{}'.\n\
+         Run Stage 03 first (example: `just test 3 {}`), then retry Stage 04 boot.\n\
+         Expected latest successful run with files: stage-disk.qcow2 + stage-ovmf-vars.fd",
+        stage_root.display(),
+        harness_distro.id(),
+    )
+}
+
+fn detect_disk_image_format(path: &Path) -> Result<String> {
+    // qcow2 images begin with ASCII 'QFI' + 0xfb.
+    const QCOW2_MAGIC: [u8; 4] = [0x51, 0x46, 0x49, 0xFB];
+
+    let mut file = File::open(path).with_context(|| {
+        format!(
+            "opening disk image for format detection '{}'",
+            path.display()
+        )
+    })?;
+    let mut header = [0u8; 4];
+    file.read_exact(&mut header).with_context(|| {
+        format!(
+            "reading disk image header for format detection '{}'",
+            path.display()
+        )
+    })?;
+    if header == QCOW2_MAGIC {
+        Ok("qcow2".to_string())
+    } else {
+        Ok("raw".to_string())
     }
 }
 
@@ -1227,6 +1361,136 @@ fn spawn_qemu_with_log(cmd: &mut Command, log_path: &Path, allow_stdin: bool) ->
     Ok(child)
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::atomic::{AtomicU64, Ordering};
+
+    static TEST_COUNTER: AtomicU64 = AtomicU64::new(0);
+
+    #[test]
+    fn resolve_stage03_runtime_prefers_latest_successful_run() {
+        let root = test_temp_dir("stage03-resolve-latest");
+        let stage_root = root.join("s03-install");
+        fs::create_dir_all(&stage_root).expect("create stage root");
+
+        let run_old = stage_root.join("run-old");
+        fs::create_dir_all(&run_old).expect("create old run dir");
+        fs::write(run_old.join("stage-disk.qcow2"), b"old-disk").expect("write old disk");
+        fs::write(run_old.join("stage-ovmf-vars.fd"), b"old-vars").expect("write old vars");
+        fs::write(
+            run_old.join("run-manifest.json"),
+            r#"{
+  "run_id": "run-old",
+  "status": "success",
+  "created_at_utc": "20260101T000000Z",
+  "finished_at_utc": "20260101T000100Z"
+}"#,
+        )
+        .expect("write old manifest");
+
+        let run_new = stage_root.join("run-new");
+        fs::create_dir_all(&run_new).expect("create new run dir");
+        fs::write(run_new.join("stage-disk.qcow2"), b"new-disk").expect("write new disk");
+        fs::write(run_new.join("stage-ovmf-vars.fd"), b"new-vars").expect("write new vars");
+        fs::write(
+            run_new.join("run-manifest.json"),
+            r#"{
+  "run_id": "run-new",
+  "status": "success",
+  "created_at_utc": "20260101T010000Z",
+  "finished_at_utc": "20260101T010100Z"
+}"#,
+        )
+        .expect("write new manifest");
+
+        let resolved = resolve_stage03_runtime(
+            "03Install",
+            &stage_root,
+            crate::cli::HarnessDistro::Iuppiter,
+        )
+        .expect("resolve runtime");
+
+        assert_eq!(resolved.run_id, "run-new");
+        assert_eq!(resolved.disk_path, run_new.join("stage-disk.qcow2"));
+        assert_eq!(resolved.ovmf_vars_path, run_new.join("stage-ovmf-vars.fd"));
+        assert_eq!(resolved.disk_format, "raw");
+
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn resolve_stage03_runtime_ignores_failed_or_incomplete_runs() {
+        let root = test_temp_dir("stage03-resolve-filter");
+        let stage_root = root.join("s03-install");
+        fs::create_dir_all(&stage_root).expect("create stage root");
+
+        let run_failed = stage_root.join("run-failed");
+        fs::create_dir_all(&run_failed).expect("create failed run dir");
+        fs::write(run_failed.join("stage-disk.qcow2"), b"failed-disk").expect("write failed disk");
+        fs::write(run_failed.join("stage-ovmf-vars.fd"), b"failed-vars")
+            .expect("write failed vars");
+        fs::write(
+            run_failed.join("run-manifest.json"),
+            r#"{
+  "run_id": "run-failed",
+  "status": "failed",
+  "created_at_utc": "20260101T020000Z",
+  "finished_at_utc": "20260101T020100Z"
+}"#,
+        )
+        .expect("write failed manifest");
+
+        let run_success = stage_root.join("run-success");
+        fs::create_dir_all(&run_success).expect("create success run dir");
+        fs::write(run_success.join("stage-disk.qcow2"), b"ok-disk").expect("write success disk");
+        fs::write(run_success.join("stage-ovmf-vars.fd"), b"ok-vars").expect("write success vars");
+        fs::write(
+            run_success.join("run-manifest.json"),
+            r#"{
+  "run_id": "run-success",
+  "status": "success",
+  "created_at_utc": "20260101T021000Z",
+  "finished_at_utc": "20260101T021100Z"
+}"#,
+        )
+        .expect("write success manifest");
+
+        let resolved = resolve_stage03_runtime(
+            "03Install",
+            &stage_root,
+            crate::cli::HarnessDistro::Iuppiter,
+        )
+        .expect("resolve runtime");
+        assert_eq!(resolved.run_id, "run-success");
+        assert_eq!(resolved.disk_format, "raw");
+
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn detect_disk_image_format_recognizes_qcow2_magic() {
+        let root = test_temp_dir("stage03-detect-qcow2");
+        fs::create_dir_all(&root).expect("create temp dir");
+        let disk = root.join("disk.qcow2");
+        fs::write(&disk, [0x51_u8, 0x46, 0x49, 0xFB, 0, 0, 0, 0]).expect("write disk");
+
+        let format = detect_disk_image_format(&disk).expect("detect format");
+        assert_eq!(format, "qcow2");
+
+        let _ = fs::remove_dir_all(root);
+    }
+
+    fn test_temp_dir(tag: &str) -> PathBuf {
+        let id = TEST_COUNTER.fetch_add(1, Ordering::Relaxed);
+        let nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("clock")
+            .as_nanos();
+        std::env::temp_dir().join(format!("levitate-xtask-{tag}-{nanos}-{id}"))
+    }
+}
+
 fn collect_guest_ssh_debug(child: &mut Child) -> Result<()> {
     let Some(stdin) = child.stdin.as_mut() else {
         return Ok(());
@@ -1235,6 +1499,10 @@ fn collect_guest_ssh_debug(child: &mut Child) -> Result<()> {
     let probe = concat!(
         "\n",
         "echo ___SSH_DEBUG_BEGIN___\n",
+        "ip -brief addr 2>/dev/null || ip addr 2>/dev/null || true\n",
+        "ip route 2>/dev/null || route -n 2>/dev/null || true\n",
+        "rc-service networking status 2>/dev/null || true\n",
+        "rc-service dhcpcd status 2>/dev/null || true\n",
         "ss -ltnp | grep ':22' || true\n",
         "ls -l /root/.ssh /root/.ssh/authorized_keys /run/boot-injection /run/boot-injection/* 2>/dev/null || true\n",
         "cat /run/boot-injection/source /run/boot-injection/payload.env 2>/dev/null || true\n",

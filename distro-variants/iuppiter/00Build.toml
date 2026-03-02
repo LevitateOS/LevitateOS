@@ -60,4 +60,4 @@ pass_marker = "STAGE 00 PASSED"
 
 [stage_01]
 required_kernel_cmdline = ["audit=1"]
-required_live_services = ["sshd"]
+required_live_services = ["networking", "dhcpcd", "sshd"]

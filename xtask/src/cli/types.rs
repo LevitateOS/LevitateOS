@@ -246,6 +246,9 @@ pub enum StagesCmd {
         inject: Option<String>,
         #[arg(long, value_name = "PATH")]
         inject_file: Option<PathBuf>,
+        /// Re-run the requested stage even if it is already cached as passed.
+        #[arg(long)]
+        force: bool,
     },
 
     /// Run all automated stage tests up to N.

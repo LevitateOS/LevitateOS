@@ -73,7 +73,8 @@ pub fn run(cli: crate::cli::Cli) -> Result<()> {
                 distro,
                 inject,
                 inject_file,
-            } => crate::tasks::testing::stages::test(n, distro, inject, inject_file),
+                force,
+            } => crate::tasks::testing::stages::test(n, distro, inject, inject_file, force),
             crate::cli::StagesCmd::TestUpTo {
                 n,
                 distro,

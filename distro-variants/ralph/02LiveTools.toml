@@ -1,2 +1,3 @@
 [stage_02.live_tools]
 os_name = "RalphOS"
+install_experience = "automated_ssh"
