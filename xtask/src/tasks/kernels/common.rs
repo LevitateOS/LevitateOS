@@ -204,6 +204,55 @@ pub(crate) fn build_kernel_via_recipe(
     run_cmd(&mut cmd)
 }
 
+pub(crate) fn install_prebuilt_kernel_via_recipe(
+    recipe_bin: &Path,
+    root: &Path,
+    distro_id: &str,
+    force_redownload: bool,
+    kernel: &distro_spec::shared::KernelSource,
+    module_install_path: &str,
+) -> Result<()> {
+    let recipe_rhai = root.join("distro-builder/recipes/linux-prebuilt.rhai");
+    let build_dir = root
+        .join(".artifacts/work")
+        .join(distro_id)
+        .join("downloads");
+    let recipes_path = root.join("distro-builder/recipes");
+    let kernel_artifact_root = root
+        .join(".artifacts/kernel")
+        .join(distro_id)
+        .join("current");
+
+    let mut cmd = Command::new(recipe_bin);
+    cmd.current_dir(root)
+        .arg("install")
+        .arg(recipe_rhai)
+        .args(["--build-dir", build_dir.to_string_lossy().as_ref()])
+        .args(["--recipes-path", recipes_path.to_string_lossy().as_ref()])
+        .args(["--define", &format!("KERNEL_VERSION={}", kernel.version)])
+        .args([
+            "--define",
+            &format!("KERNEL_LOCALVERSION={}", kernel.localversion),
+        ])
+        .args([
+            "--define",
+            &format!("KERNEL_ARTIFACT_ROOT={}", kernel_artifact_root.display()),
+        ])
+        .args([
+            "--define",
+            &format!(
+                "KERNEL_FORCE_REBUILD={}",
+                if force_redownload { 1 } else { 0 }
+            ),
+        ])
+        .args([
+            "--define",
+            &format!("MODULE_INSTALL_PATH={module_install_path}"),
+        ]);
+
+    run_cmd(&mut cmd)
+}
+
 fn run_capture(prog: &str, args: &[&str]) -> Result<String> {
     let out = Command::new(prog)
         .args(args)

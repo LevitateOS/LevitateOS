@@ -188,6 +188,19 @@ pub enum KernelsCmd {
         llm_profile: Option<String>,
     },
 
+    /// Install prebuilt kernel artifacts for one distro (no source compile).
+    #[command(name = "prebuilt")]
+    Prebuilt {
+        #[arg(value_enum)]
+        distro: Distro,
+
+        #[arg(
+            long = "refresh",
+            help = "Force re-download and reinstall of prebuilt artifacts even when local kernel artifacts already verify."
+        )]
+        refresh: bool,
+    },
+
     /// Verify built kernel artifacts for one distro (or all distros if omitted).
     Check {
         #[arg(value_enum)]

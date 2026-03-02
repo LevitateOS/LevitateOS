@@ -38,6 +38,9 @@ pub fn run(cli: crate::cli::Cli) -> Result<()> {
                     llm_profile,
                 },
             ),
+            crate::cli::KernelsCmd::Prebuilt { distro, refresh } => {
+                crate::tasks::kernels::prebuilt::run(distro, refresh)
+            }
             crate::cli::KernelsCmd::Check { distro } => crate::tasks::kernels::check::run(distro),
         },
         crate::cli::Cmd::Hooks { cmd } => match cmd {
@@ -150,7 +153,9 @@ fn enforce_policy_guard_placement(cmd: &crate::cli::Cmd) -> Result<()> {
     let requires_guard = matches!(
         cmd,
         Cmd::Kernels {
-            cmd: KernelsCmd::Build { .. } | KernelsCmd::BuildAll { .. }
+            cmd: KernelsCmd::Build { .. }
+                | KernelsCmd::BuildAll { .. }
+                | KernelsCmd::Prebuilt { .. }
         } | Cmd::Stages {
             cmd: StagesCmd::Boot { .. } | StagesCmd::Test { .. } | StagesCmd::TestUpTo { .. }
         }
