@@ -389,6 +389,11 @@ build-up-to n distro="levitate":
 build-all *args:
     cargo run -p distro-builder --bin distro-builder -- iso build-all {{args}}
 
+# Prepare stage inputs and build both rootfs/overlay EROFS artifacts.
+# Example: just stage-erofs 02LiveTools levitate
+stage-erofs stage="02LiveTools" distro="levitate":
+    cargo run -p distro-builder --bin distro-builder -- artifact build-stage-erofs {{stage}} {{distro}}
+
 # Remove stage artifacts output tree (all stage run directories and manifests).
 clean-out:
     rm -rf .artifacts/out

@@ -39,17 +39,19 @@ This file is intentionally compact. Priority is preventing policy violations and
 - For ordered files/modules use numbered prefixes, e.g. `s00_build`, `s01_boot`.
 - Avoid new aliases like `stage00`, `stage_00` (except existing compatibility keys where externally required).
 
-## 4) Stage Artifact Split (Strict)
+## 4) Stage Artifact Split (Default)
 - Every stage writes non-kernel outputs only into its own directory:
   - `.artifacts/out/<distro>/sNN-<stage-name>/...`
-- Stage-cross reuse of non-kernel artifacts is forbidden.
-- Kernel artifacts are the only shared artifacts across stages.
+- Stage-cross reuse of non-kernel artifacts is forbidden in release/hardening mode.
+- Kernel artifacts are the only shared artifacts across stages in release/hardening mode.
+- While `9.2` bypass mode is active, Stage 02 may intentionally carry forward-looking non-kernel payload for filesystem design convenience.
 - No cross-stage symlinks/copies/manual post-build surgery to fake stage outputs.
 
-## 5) Stage Envelope (Nothing More, Nothing Less)
-- Stage artifact must contain exactly what that stage needs.
+## 5) Stage Envelope (Mode-Aware)
+- Stage artifact must contain exactly what that stage needs in release/hardening mode.
 - Missing required payload = fail.
-- Carrying later-stage payload = fail.
+- Carrying later-stage payload = fail in release/hardening mode.
+- While `9.2` bypass mode is active, Stage 02 may include later-stage-intent payload, provided it is produced via canonical builder/producers.
 - Stage scope must be produced by composition in builder/contract, not by runtime suppression.
 
 ## 6) Incremental Producer Model (No Subtractive Shaping)
@@ -59,6 +61,7 @@ This file is intentionally compact. Priority is preventing policy violations and
   - `s00` minimal build payload
   - `s01 = s00 + boot additions`
   - same model for later stages
+- In `9.2` bypass mode, prefer implementing candidate payload in Stage 02 producers first, then formalize stage-specific envelopes during hardening.
 - Variant manifests (`distro-variants/*/NNStage.toml`) may express OS deltas only, not stage file allow/deny lists.
 
 ## 7) No-Mask / No-Suppression Policy
@@ -88,6 +91,13 @@ This file is intentionally compact. Priority is preventing policy violations and
 - Fixing wrapper parity/routing must not change artifact freshness policy.
 - If fresh artifacts are required, use explicit build commands (`just build ...`, `just build-up-to ...`) before stage boot/test.
 
+## 9.2) Stage Ladder Bypass (Current Workflow Override)
+- Strict adherence to stage test ladders is an anti-pattern for the current development mode.
+- The owner intentionally bypasses ordered stage gates while iterating on filesystem design.
+- Stage 02 is the canonical convenience surface for filesystem composition, including payload that may later be required by installed stages.
+- Prefer implementing payload at producer/rootfs level (not ad-hoc artifact edits) so Stage 02 design work naturally carries forward.
+- Before release/hardening, run the full stage ladder and fix any regressions discovered outside the bypass workflow.
+
 ## 10) Error Messaging Policy
 - Fail fast with explicit diagnostics.
 - Errors must name: component, stage, expectation, and concrete remediation command/path.
@@ -105,6 +115,7 @@ This file is intentionally compact. Priority is preventing policy violations and
 - Stage tests:
   - `just test <n> <distro>`
   - `just test-up-to <n> <distro>`
+- In `9.2` bypass mode, stage tests may be run out of ladder order during design iteration; full ordered ladder remains required before release/hardening.
 
 ## 13) Dirty Tree Rule
 - Assume existing diffs are intentional.
