@@ -62,8 +62,9 @@ pass_marker = "STAGE 00 PASSED"
 [stage_01]
 required_kernel_cmdline = [
   "audit=1",
-  "systemd.show_status=1",
-  "rd.systemd.show_status=1",
-  "systemd.log_target=console",
+  "audit_backlog_limit=8192",
+  "loglevel=3",
+  "systemd.show_status=0",
+  "rd.systemd.show_status=0",
 ]
 required_live_services = ["sshd"]

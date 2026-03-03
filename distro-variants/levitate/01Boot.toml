@@ -1,7 +1,7 @@
 [stage_01.boot_inputs]
 os_name = "LevitateOS"
 overlay_kind = "systemd"
-required_services = ["sshd"]
+required_services = ["sshd", "auditd"]
 
 [stage_01.boot_inputs.rootfs_source]
 kind = "recipe_rocky"
