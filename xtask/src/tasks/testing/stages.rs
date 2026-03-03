@@ -139,7 +139,6 @@ pub fn boot(
                 "01Boot",
                 &cfg.stage01_root,
                 cfg.stage01_iso_filename,
-                &cfg.stage01_iso_legacy,
                 cfg.harness_distro,
             )?;
             boot_live_iso(
@@ -162,7 +161,6 @@ pub fn boot(
                 "02LiveTools",
                 &cfg.stage02_root,
                 cfg.stage02_iso_filename,
-                &cfg.stage02_iso_legacy,
                 cfg.harness_distro,
             )?;
             boot_live_iso(
@@ -237,10 +235,8 @@ pub fn reset(distro: crate::cli::HarnessDistro) -> Result<()> {
 
 struct BootConfig {
     stage01_root: PathBuf,
-    stage01_iso_legacy: PathBuf,
     stage01_iso_filename: &'static str,
     stage02_root: PathBuf,
-    stage02_iso_legacy: PathBuf,
     stage02_iso_filename: &'static str,
     stage03_root: PathBuf,
     pretty_name: &'static str,
@@ -252,13 +248,8 @@ impl BootConfig {
         match distro {
             crate::cli::BootDistro::Levitate => Self {
                 stage01_root: root.join(".artifacts/out/levitate/s01-boot"),
-                stage01_iso_legacy: root
-                    .join(".artifacts/out/levitate/s01-boot/levitateos-x86_64-s01_boot.iso"),
                 stage01_iso_filename: "levitateos-x86_64-s01_boot.iso",
                 stage02_root: root.join(".artifacts/out/levitate/s02-live-tools"),
-                stage02_iso_legacy: root.join(
-                    ".artifacts/out/levitate/s02-live-tools/levitateos-x86_64-s02_live_tools.iso",
-                ),
                 stage02_iso_filename: "levitateos-x86_64-s02_live_tools.iso",
                 stage03_root: root.join(".artifacts/out/levitate/s03-install"),
                 pretty_name: "LevitateOS",
@@ -266,11 +257,8 @@ impl BootConfig {
             },
             crate::cli::BootDistro::Acorn => Self {
                 stage01_root: root.join(".artifacts/out/acorn/s01-boot"),
-                stage01_iso_legacy: root.join(".artifacts/out/acorn/s01-boot/acornos-s01_boot.iso"),
                 stage01_iso_filename: "acornos-s01_boot.iso",
                 stage02_root: root.join(".artifacts/out/acorn/s02-live-tools"),
-                stage02_iso_legacy: root
-                    .join(".artifacts/out/acorn/s02-live-tools/acornos-s02_live_tools.iso"),
                 stage02_iso_filename: "acornos-s02_live_tools.iso",
                 stage03_root: root.join(".artifacts/out/acorn/s03-install"),
                 pretty_name: "AcornOS",
@@ -278,13 +266,8 @@ impl BootConfig {
             },
             crate::cli::BootDistro::Iuppiter => Self {
                 stage01_root: root.join(".artifacts/out/iuppiter/s01-boot"),
-                stage01_iso_legacy: root
-                    .join(".artifacts/out/iuppiter/s01-boot/iuppiter-x86_64-s01_boot.iso"),
                 stage01_iso_filename: "iuppiter-x86_64-s01_boot.iso",
                 stage02_root: root.join(".artifacts/out/iuppiter/s02-live-tools"),
-                stage02_iso_legacy: root.join(
-                    ".artifacts/out/iuppiter/s02-live-tools/iuppiter-x86_64-s02_live_tools.iso",
-                ),
                 stage02_iso_filename: "iuppiter-x86_64-s02_live_tools.iso",
                 stage03_root: root.join(".artifacts/out/iuppiter/s03-install"),
                 pretty_name: "IuppiterOS",
@@ -292,12 +275,8 @@ impl BootConfig {
             },
             crate::cli::BootDistro::Ralph => Self {
                 stage01_root: root.join(".artifacts/out/ralph/s01-boot"),
-                stage01_iso_legacy: root
-                    .join(".artifacts/out/ralph/s01-boot/ralphos-x86_64-s01_boot.iso"),
                 stage01_iso_filename: "ralphos-x86_64-s01_boot.iso",
                 stage02_root: root.join(".artifacts/out/ralph/s02-live-tools"),
-                stage02_iso_legacy: root
-                    .join(".artifacts/out/ralph/s02-live-tools/ralphos-x86_64-s02_live_tools.iso"),
                 stage02_iso_filename: "ralphos-x86_64-s02_live_tools.iso",
                 stage03_root: root.join(".artifacts/out/ralph/s03-install"),
                 pretty_name: "RalphOS",
@@ -329,7 +308,6 @@ fn resolve_stage_iso(
     stage_label: &str,
     stage_root: &Path,
     stage_iso_filename: &str,
-    stage_iso_legacy: &Path,
     harness_distro: crate::cli::HarnessDistro,
 ) -> Result<PathBuf> {
     let mut candidates: Vec<(String, PathBuf)> = Vec::new();
@@ -386,18 +364,17 @@ fn resolve_stage_iso(
         return Ok(iso_path);
     }
 
-    if stage_iso_legacy.is_file() {
-        return Ok(stage_iso_legacy.to_path_buf());
-    }
+    let expected_path = stage_root.join(stage_iso_filename);
 
     bail!(
-        "Missing {} ISO: {} (build it first, e.g. `just build {} {}`)\n\
-         Also checked latest successful stage runs under '{}'.",
+        "Missing {} ISO: no successful run-manifest ISO found under '{}'.\n\
+         Expected ISO path: {}\n\
+         Build it first, e.g. `just build {} {}`.",
         stage_label,
-        stage_iso_legacy.display(),
+        stage_root.display(),
+        expected_path.display(),
         harness_distro.id(),
         stage_label,
-        stage_root.display()
     )
 }
 
