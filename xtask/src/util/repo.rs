@@ -1,5 +1,6 @@
 use anyhow::{Context, Result, bail};
 use std::fs;
+use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
 
 pub fn repo_root() -> Result<PathBuf> {
@@ -10,19 +11,54 @@ pub fn repo_root() -> Result<PathBuf> {
 }
 
 pub fn canonical_tools_install_command() -> &'static str {
-    "recipe install --build-dir .artifacts/tools --recipes-path distro-builder/recipes qemu-deps"
+    "just tools-install"
 }
 
 pub fn tools_prefix(root: &Path) -> Result<PathBuf> {
     let centralized = root.join(".artifacts/tools/.tools");
-    if !fs::metadata(&centralized)
-        .with_context(|| format!("checking tools root at {}", centralized.display()))?
-        .is_dir()
-    {
+    let build_root = centralized
+        .parent()
+        .map(Path::to_path_buf)
+        .unwrap_or_else(|| root.join(".artifacts/tools"));
+    let meta = match fs::metadata(&centralized) {
+        Ok(meta) => meta,
+        Err(err) if err.kind() == ErrorKind::NotFound => {
+            bail!(
+                "component: xtask tools-env preflight\n\
+                 stage: stage boot/test runtime\n\
+                 expectation: canonical tools root directory exists\n\
+                 path: {}\n\
+                 failure: directory not found\n\
+                 remediation:\n  {}\n  cargo run -p levitate-recipe --bin recipe -- install --build-dir {} --recipes-path distro-builder/recipes --no-persist-ctx --define TOOLS_PREFIX={} qemu-deps",
+                centralized.display(),
+                canonical_tools_install_command(),
+                build_root.display(),
+                centralized.display()
+            );
+        }
+        Err(err) => {
+            return Err(err).with_context(|| {
+                format!(
+                    "checking canonical tools root metadata at {}",
+                    centralized.display()
+                )
+            });
+        }
+    };
+
+    if !meta.is_dir() {
         bail!(
-            "missing canonical tools root: {}\nInstall with: {}",
+            "component: xtask tools-env preflight\n\
+             stage: stage boot/test runtime\n\
+             expectation: canonical tools root must be a directory\n\
+             path: {}\n\
+             failure: path exists but is not a directory\n\
+             remediation:\n  rm -f {}\n  {}\n  cargo run -p levitate-recipe --bin recipe -- install --build-dir {} --recipes-path distro-builder/recipes --no-persist-ctx --define TOOLS_PREFIX={} qemu-deps",
             centralized.display(),
-            canonical_tools_install_command()
+            centralized.display(),
+            canonical_tools_install_command(),
+            build_root.display(),
+            centralized.display()
         );
     }
     Ok(centralized)

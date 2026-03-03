@@ -10,21 +10,65 @@ use std::process::{Child, Command, Stdio};
 use std::thread::sleep;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum WindowMode {
+    RemoteVnc,
+    LocalGui,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum LocalDisplayBackend {
+    Gtk,
+    Sdl,
+}
+
+impl LocalDisplayBackend {
+    fn qemu_arg(self) -> &'static str {
+        match self {
+            Self::Gtk => "gtk",
+            Self::Sdl => "sdl",
+        }
+    }
+}
+
 #[derive(Clone, Debug)]
 struct WindowConfig {
-    vnc_bind_host: Ipv4Addr,
-    vnc_host: Ipv4Addr,
-    vnc_port: u16,
+    mode: WindowMode,
+    local_qemu_bin: Option<PathBuf>,
+    local_display_backend: Option<LocalDisplayBackend>,
+    vnc_bind_host: Option<Ipv4Addr>,
+    vnc_host: Option<Ipv4Addr>,
+    vnc_port: Option<u16>,
     serial_log: PathBuf,
 }
 
 impl WindowConfig {
     fn allocate() -> Result<Self> {
-        let vnc_bind_host = detect_vnc_bind_host()?;
-        let vnc_host = detect_vnc_advertise_host()?;
-        let vnc_port = allocate_local_port(vnc_bind_host, 5900, 5999)?;
+        let mode = detect_window_mode()?;
+        let (local_qemu_bin, local_display_backend, vnc_bind_host, vnc_host, vnc_port) = match mode
+        {
+            WindowMode::RemoteVnc => {
+                let vnc_bind_host = detect_vnc_bind_host()?;
+                let vnc_host = detect_vnc_advertise_host()?;
+                let vnc_port = allocate_local_port(vnc_bind_host, 5900, 5999)?;
+                (
+                    None,
+                    None,
+                    Some(vnc_bind_host),
+                    Some(vnc_host),
+                    Some(vnc_port),
+                )
+            }
+            WindowMode::LocalGui => {
+                let (qemu_bin, display_backend) = detect_local_qemu_runtime()?;
+                (Some(qemu_bin), Some(display_backend), None, None, None)
+            }
+        };
         let serial_log = temp_file_path("levitate-stage-window-serial").with_extension("log");
         Ok(Self {
+            mode,
+            local_qemu_bin,
+            local_display_backend,
             vnc_bind_host,
             vnc_host,
             vnc_port,
@@ -32,16 +76,24 @@ impl WindowConfig {
         })
     }
 
-    fn vnc_endpoint(&self) -> String {
-        format!("vnc://{}:{}", self.vnc_host, self.vnc_port)
+    fn vnc_endpoint(&self) -> Option<String> {
+        let (host, port) = match (self.vnc_host, self.vnc_port) {
+            (Some(host), Some(port)) => (host, port),
+            _ => return None,
+        };
+        Some(format!("vnc://{}:{}", host, port))
     }
 
-    fn qemu_display_arg(&self) -> String {
-        let display_index = self.vnc_port.saturating_sub(5900);
-        format!(
+    fn qemu_display_arg(&self) -> Option<String> {
+        let (bind_host, vnc_port) = match (self.vnc_bind_host, self.vnc_port) {
+            (Some(bind_host), Some(vnc_port)) => (bind_host, vnc_port),
+            _ => return None,
+        };
+        let display_index = vnc_port.saturating_sub(5900);
+        Some(format!(
             "vnc={}:{display_index},to=99,id=stage-window",
-            self.vnc_bind_host
-        )
+            bind_host
+        ))
     }
 }
 
@@ -63,14 +115,15 @@ pub fn boot(
     if window && ssh {
         bail!(
             "`--window` cannot be combined with `--ssh`.\n\
-             Use `just stage-window <n> <distro>` for foreground VNC window mode,\n\
+             Use `just stage-window <n> <distro>` for local QEMU window mode,\n\
+             `just stage-window-remote <n> <distro>` for foreground VNC remote mode,\n\
              or `just stage-ssh <n> <distro>` for SSH workflow."
         );
     }
     if window && no_shell {
         bail!(
             "`--window` cannot be combined with `--no-shell`.\n\
-             Window mode runs in foreground VNC mode and should be stopped with Ctrl-C."
+             Window mode runs in foreground and should be stopped with Ctrl-C."
         );
     }
 
@@ -880,7 +933,7 @@ fn boot_installed_disk(
     let disk_format = runtime.disk_format;
     let ovmf = crate::util::repo::ovmf_path(root)?;
 
-    let mut cmd = Command::new("qemu-system-x86_64");
+    let mut cmd = qemu_command_for_window(window)?;
     cmd.args([
         "-enable-kvm",
         "-cpu",
@@ -929,7 +982,7 @@ fn boot_installed_disk(
     apply_qemu_console_mode(&mut cmd, window);
     cmd.arg("-no-reboot");
 
-    crate::util::tools_env::apply_to_command(&mut cmd, root)?;
+    apply_qemu_runtime_env(&mut cmd, root, window)?;
     if let Some(window_cfg) = window {
         run_window_mode_foreground(&mut cmd, window_cfg)
     } else {
@@ -1108,7 +1161,7 @@ fn qemu_base_command(
     window: Option<&WindowConfig>,
 ) -> Result<Command> {
     let ovmf = crate::util::repo::ovmf_path(root)?;
-    let mut cmd = Command::new("qemu-system-x86_64");
+    let mut cmd = qemu_command_for_window(window)?;
     cmd.args([
         "-enable-kvm",
         "-cpu",
@@ -1163,17 +1216,33 @@ fn qemu_base_command(
         cmd.args(["-device", "virtio-net-pci,netdev=net0"]);
     }
 
-    crate::util::tools_env::apply_to_command(&mut cmd, root)?;
+    apply_qemu_runtime_env(&mut cmd, root, window)?;
     Ok(cmd)
 }
 
 fn apply_qemu_console_mode(cmd: &mut Command, window: Option<&WindowConfig>) {
     if let Some(window_cfg) = window {
-        cmd.args(["-vga", "none", "-device", "secondary-vga"]);
-        cmd.arg("-display").arg(window_cfg.qemu_display_arg());
-        cmd.arg("-serial")
-            .arg(format!("file:{}", window_cfg.serial_log.display()));
-        cmd.args(["-monitor", "none"]);
+        match window_cfg.mode {
+            WindowMode::RemoteVnc => {
+                let display_arg = window_cfg
+                    .qemu_display_arg()
+                    .expect("internal error: remote window mode missing VNC display configuration");
+                cmd.args(["-vga", "none", "-device", "secondary-vga"]);
+                cmd.arg("-display").arg(display_arg);
+                cmd.arg("-serial")
+                    .arg(format!("file:{}", window_cfg.serial_log.display()));
+                cmd.args(["-monitor", "none"]);
+            }
+            WindowMode::LocalGui => {
+                let display_backend = window_cfg
+                    .local_display_backend
+                    .expect("internal error: local window mode missing local display backend");
+                cmd.args(["-display", display_backend.qemu_arg(), "-vga", "virtio"]);
+                cmd.arg("-serial")
+                    .arg(format!("file:{}", window_cfg.serial_log.display()));
+                cmd.args(["-monitor", "none"]);
+            }
+        }
     } else {
         cmd.args(["-vga", "none", "-nographic", "-serial", "mon:stdio"]);
     }
@@ -1194,27 +1263,167 @@ fn run_window_mode_foreground(cmd: &mut Command, window_cfg: &WindowConfig) -> R
 }
 
 fn print_window_mode_details(window_cfg: &WindowConfig, pid: u32) {
-    let endpoint = window_cfg.vnc_endpoint();
-
-    eprintln!(
-        "Window mode: VNC bind {}:{}",
-        window_cfg.vnc_bind_host, window_cfg.vnc_port
-    );
-    eprintln!("Window mode: VNC endpoint {endpoint}");
     eprintln!("Window mode: PID {pid}");
     eprintln!(
         "Window mode: serial log {}",
         window_cfg.serial_log.display()
     );
-    eprintln!(
-        "Window mode: SSH tunnel (run on your local machine):\n  ssh -N -L {port}:127.0.0.1:{port} <user>@<remote-host>",
-        port = window_cfg.vnc_port
-    );
-    eprintln!("Window mode: open viewer locally (direct):\n  remote-viewer {endpoint}");
-    eprintln!(
-        "Window mode: open viewer locally (via tunnel):\n  remote-viewer vnc://127.0.0.1:{}",
-        window_cfg.vnc_port
-    );
+    match window_cfg.mode {
+        WindowMode::LocalGui => {
+            let qemu_bin = window_cfg
+                .local_qemu_bin
+                .as_ref()
+                .expect("internal error: missing local qemu binary in local mode");
+            let display_backend = window_cfg
+                .local_display_backend
+                .expect("internal error: missing local display backend in local mode");
+            eprintln!(
+                "Window mode: local QEMU window requested via '{}' with display backend '{}'.",
+                qemu_bin.display(),
+                display_backend.qemu_arg()
+            );
+        }
+        WindowMode::RemoteVnc => {
+            let bind_host = window_cfg
+                .vnc_bind_host
+                .expect("internal error: missing VNC bind host in remote mode");
+            let vnc_port = window_cfg
+                .vnc_port
+                .expect("internal error: missing VNC port in remote mode");
+            let endpoint = window_cfg
+                .vnc_endpoint()
+                .expect("internal error: missing VNC endpoint in remote mode");
+            eprintln!("Window mode: VNC bind {}:{}", bind_host, vnc_port);
+            eprintln!("Window mode: VNC endpoint {endpoint}");
+            eprintln!(
+                "Window mode: SSH tunnel (run on your local machine):\n  ssh -N -L {port}:127.0.0.1:{port} <user>@<remote-host>",
+                port = vnc_port
+            );
+            eprintln!("Window mode: open viewer locally (direct):\n  remote-viewer {endpoint}");
+            eprintln!(
+                "Window mode: open viewer locally (via tunnel):\n  remote-viewer vnc://127.0.0.1:{}",
+                vnc_port
+            );
+        }
+    }
+}
+
+fn detect_window_mode() -> Result<WindowMode> {
+    let raw = std::env::var("LEVITATE_STAGE_WINDOW_MODE").unwrap_or_else(|_| "remote".to_string());
+    match raw.trim().to_ascii_lowercase().as_str() {
+        "remote" | "vnc" | "" => Ok(WindowMode::RemoteVnc),
+        "local" | "gtk" => Ok(WindowMode::LocalGui),
+        other => bail!(
+            "Unsupported LEVITATE_STAGE_WINDOW_MODE value '{}'. Expected one of: remote, vnc, local, gtk.",
+            other
+        ),
+    }
+}
+
+fn qemu_command_for_window(window: Option<&WindowConfig>) -> Result<Command> {
+    if let Some(window_cfg) = window {
+        if window_cfg.mode == WindowMode::LocalGui {
+            let qemu_bin = window_cfg.local_qemu_bin.as_ref().ok_or_else(|| {
+                anyhow::anyhow!("local window mode missing detected qemu binary path")
+            })?;
+            return Ok(Command::new(qemu_bin));
+        }
+    }
+    Ok(Command::new("qemu-system-x86_64"))
+}
+
+fn apply_qemu_runtime_env(
+    cmd: &mut Command,
+    root: &Path,
+    window: Option<&WindowConfig>,
+) -> Result<()> {
+    if matches!(window.map(|cfg| cfg.mode), Some(WindowMode::LocalGui)) {
+        // Local GUI mode intentionally uses the detected system QEMU binary.
+        // Avoid forcing tools PATH/LD_LIBRARY_PATH, which can shadow host GUI-enabled builds.
+        cmd.env_remove("LD_LIBRARY_PATH");
+        return Ok(());
+    }
+    crate::util::tools_env::apply_to_command(cmd, root)
+}
+
+fn detect_local_qemu_runtime() -> Result<(PathBuf, LocalDisplayBackend)> {
+    if let Ok(raw) = std::env::var("LEVITATE_STAGE_WINDOW_QEMU_BIN") {
+        let candidate = PathBuf::from(raw.trim());
+        return pick_local_display_backend(&candidate).map(|backend| (candidate, backend));
+    }
+
+    let mut candidates: Vec<PathBuf> = Vec::new();
+    if let Some(path_os) = std::env::var_os("PATH") {
+        for dir in std::env::split_paths(&path_os) {
+            let candidate = dir.join("qemu-system-x86_64");
+            if !candidate.is_file() {
+                continue;
+            }
+            let path_str = candidate.to_string_lossy();
+            if path_str.contains("/.artifacts/tools/.tools/") {
+                continue;
+            }
+            if !candidates.iter().any(|existing| existing == &candidate) {
+                candidates.push(candidate);
+            }
+        }
+    }
+    for candidate in [
+        PathBuf::from("/usr/bin/qemu-system-x86_64"),
+        PathBuf::from("/usr/local/bin/qemu-system-x86_64"),
+    ] {
+        if candidate.is_file() && !candidates.iter().any(|existing| existing == &candidate) {
+            candidates.push(candidate);
+        }
+    }
+
+    for candidate in candidates {
+        if let Ok(backend) = pick_local_display_backend(&candidate) {
+            return Ok((candidate, backend));
+        }
+    }
+
+    bail!(
+        "Local window mode requires a system qemu-system-x86_64 with either gtk or sdl display backend.\n\
+         The bundled tools QEMU is headless-only.\n\
+         Remediation: install host QEMU GUI support (for example `sudo dnf install qemu-system-x86 qemu-ui-gtk`) and rerun,\n\
+         or use `just stage-window-remote <n> <distro>`."
+    )
+}
+
+fn pick_local_display_backend(qemu_bin: &Path) -> Result<LocalDisplayBackend> {
+    if !qemu_bin.is_file() {
+        bail!("qemu binary not found at '{}'", qemu_bin.display());
+    }
+    let output = Command::new(qemu_bin)
+        .env_remove("LD_LIBRARY_PATH")
+        .args(["-display", "help"])
+        .output()
+        .with_context(|| {
+            format!(
+                "querying display backends for local qemu binary '{}'",
+                qemu_bin.display()
+            )
+        })?;
+    if !output.status.success() {
+        bail!(
+            "qemu binary '{}' failed display backend probe",
+            qemu_bin.display()
+        );
+    }
+    let text = String::from_utf8_lossy(&output.stdout);
+    let has_gtk = text.lines().any(|line| line.trim() == "gtk");
+    if has_gtk {
+        return Ok(LocalDisplayBackend::Gtk);
+    }
+    let has_sdl = text.lines().any(|line| line.trim() == "sdl");
+    if has_sdl {
+        return Ok(LocalDisplayBackend::Sdl);
+    }
+    bail!(
+        "qemu binary '{}' does not expose gtk/sdl display backends",
+        qemu_bin.display()
+    )
 }
 
 fn detect_vnc_bind_host() -> Result<Ipv4Addr> {

@@ -23,6 +23,14 @@ env shell="bash":
 doctor:
     cargo xtask doctor
 
+# Install canonical QEMU/OVMF helper tooling into .artifacts/tools/.tools.
+tools-install:
+    cargo run -p levitate-recipe --bin recipe -- install --build-dir {{join(justfile_directory(), ".artifacts/tools")}} --recipes-path distro-builder/recipes --no-persist-ctx --define TOOLS_PREFIX={{tools_prefix}} qemu-deps
+
+# Short alias for tools-install.
+tools:
+    just tools-install
+
 # Fail fast on forbidden legacy stage/rootfs bindings.
 policy-legacy:
     cargo xtask policy audit-legacy-bindings
@@ -59,20 +67,63 @@ kernels-rebuild distro:
 kernels-rebuild-all:
     cargo xtask kernels build-all --rebuild
 
+# Canonical Stage 01 source preseed helpers (distro-builder artifact commands).
+[script, no-exit-message]
+preseed distro refresh="true":
+    #!/usr/bin/env bash
+    set -euo pipefail
+
+    case "{{distro}}" in
+      levitate|leviso)
+        if [ "{{refresh}}" = "true" ]; then
+          cargo run -p distro-builder --bin distro-builder -- artifact preseed-rocky-iso levitate --refresh
+        else
+          cargo run -p distro-builder --bin distro-builder -- artifact preseed-rocky-iso levitate
+        fi
+        ;;
+      acorn|acornos)
+        if [ "{{refresh}}" = "true" ]; then
+          cargo run -p distro-builder --bin distro-builder -- artifact preseed-alpine-stage01-assets acorn --refresh
+        else
+          cargo run -p distro-builder --bin distro-builder -- artifact preseed-alpine-stage01-assets acorn
+        fi
+        ;;
+      *)
+        echo "preseed supports: levitate, acorn (got: {{distro}})" >&2
+        exit 2
+        ;;
+    esac
+
+preseed-levitate:
+    just preseed levitate true
+
+preseed-acorn:
+    just preseed acorn true
+
 # Internal delegate for stage booting.
 # Keep `cargo xtask stages boot` as the only execution path for stage wrappers.
 # Boundary rule: stage wrappers consume existing artifacts only.
 # Do not add implicit ISO build steps here; freshness is explicit via `just build*`.
 [script, no-exit-message]
-_boot_stage n distro="levitate" inject="" inject_file="" ssh="false" no_shell="false" window="false" ssh_pubkey=(env("HOME") + "/.ssh/id_ed25519.pub") ssh_privkey="" ssh_port="2222":
+_boot_stage n distro="levitate" inject="" inject_file="" ssh="false" no_shell="false" window="false" ssh_pubkey=(env("HOME") + "/.ssh/id_ed25519.pub") ssh_privkey="" ssh_port="2222" inject_append="":
     #!/usr/bin/env bash
     set -euo pipefail
+    CARGO_BIN="${CARGO_BIN:-cargo}"
+    if ! command -v "$CARGO_BIN" >/dev/null 2>&1; then
+      if [ -n "${HOME:-}" ] && [ -x "${HOME}/.cargo/bin/cargo" ]; then
+        CARGO_BIN="${HOME}/.cargo/bin/cargo"
+      else
+        echo "cargo not found in PATH for _boot_stage." >&2
+        echo "Remediation: source \"\$HOME/.cargo/env\" (or install Rust), then rerun." >&2
+        exit 127
+      fi
+    fi
     if [ "{{ssh}}" = "true" ] && [ "{{n}}" != "1" ] && [ "{{n}}" != "01" ] && [ "{{n}}" != "2" ] && [ "{{n}}" != "02" ]; then
       echo "SSH boot mode supports only live stages 1/2 (got: {{n}})" >&2
       exit 2
     fi
 
-    args=(cargo xtask stages boot {{n}} "{{distro}}")
+    args=("$CARGO_BIN" xtask stages boot {{n}} "{{distro}}")
 
     if [ "{{ssh}}" = "true" ]; then
       args+=(--ssh --ssh-port "{{ssh_port}}")
@@ -86,6 +137,73 @@ _boot_stage n distro="levitate" inject="" inject_file="" ssh="false" no_shell="f
       args+=(--window)
     fi
 
+    inject_append="{{inject_append}}"
+    tmp=""
+    cleanup_tmp() {
+      [ -n "$tmp" ] && [ -f "$tmp" ] && rm -f "$tmp"
+    }
+    trap cleanup_tmp EXIT
+
+    if [ -n "{{inject_file}}" ]; then
+      if [ -n "$inject_append" ]; then
+        tmp=$(mktemp)
+        cat "{{inject_file}}" > "$tmp"
+        printf '%s\n' "$inject_append" >> "$tmp"
+        args+=(--inject-file "$tmp")
+      else
+        args+=(--inject-file "{{inject_file}}")
+      fi
+    elif [ -n "{{inject}}" ]; then
+      if [ -n "$inject_append" ]; then
+        args+=(--inject "{{inject}},$inject_append")
+      else
+        args+=(--inject "{{inject}}")
+      fi
+    elif [ -f "{{ssh_pubkey}}" ]; then
+      tmp=$(mktemp)
+      key="$(tr -d '\n' < "{{ssh_pubkey}}")"
+      printf 'SSH_AUTHORIZED_KEY=%s\n' "$key" > "$tmp"
+      [ -n "$inject_append" ] && printf '%s\n' "$inject_append" >> "$tmp"
+      args+=(--inject-file "$tmp")
+    elif [ -n "$inject_append" ]; then
+      args+=(--inject "$inject_append")
+    fi
+
+    if [ "{{ssh}}" = "true" ] && [ -n "{{ssh_privkey}}" ]; then
+      args+=(--ssh-private-key "{{ssh_privkey}}")
+    fi
+
+    "${args[@]}"
+
+# Boot into a stage (interactive serial, Ctrl-A X to exit)
+[no-exit-message]
+stage n distro="levitate" inject="" inject_file="" ssh_pubkey=(env("HOME") + "/.ssh/id_ed25519.pub"):
+    just _boot_stage {{n}} {{distro}} "{{inject}}" "{{inject_file}}" false false false "{{ssh_pubkey}}" "" 2222 STAGE02_SERIAL_UX=1
+
+# Boot a live stage in background and SSH into it (no serial wrapper harness).
+[no-exit-message]
+stage-ssh n distro="levitate" inject="" inject_file="" ssh_pubkey=(env("HOME") + "/.ssh/id_ed25519.pub") ssh_privkey=(env("HOME") + "/.ssh/id_ed25519") ssh_port="2222":
+    just _boot_stage {{n}} {{distro}} "{{inject}}" "{{inject_file}}" true false false "{{ssh_pubkey}}" "{{ssh_privkey}}" "{{ssh_port}}" ""
+
+# Boot into a stage with a local QEMU GUI window in foreground mode (Ctrl-C to stop).
+[script, no-exit-message]
+stage-window n distro="levitate" inject="" inject_file="" ssh_pubkey=(env("HOME") + "/.ssh/id_ed25519.pub"):
+    #!/usr/bin/env bash
+    set -euo pipefail
+    CARGO_BIN="${CARGO_BIN:-cargo}"
+    if ! command -v "$CARGO_BIN" >/dev/null 2>&1; then
+      if [ -n "${HOME:-}" ] && [ -x "${HOME}/.cargo/bin/cargo" ]; then
+        CARGO_BIN="${HOME}/.cargo/bin/cargo"
+      else
+        echo "cargo not found in PATH for stage-window." >&2
+        echo "Remediation: source \"\$HOME/.cargo/env\" (or install Rust), then rerun." >&2
+        exit 127
+      fi
+    fi
+
+    export LEVITATE_STAGE_WINDOW_MODE=local
+    args=("$CARGO_BIN" xtask stages boot {{n}} "{{distro}}" --window)
+
     if [ -n "{{inject_file}}" ]; then
       args+=(--inject-file "{{inject_file}}")
     elif [ -n "{{inject}}" ]; then
@@ -98,26 +216,12 @@ _boot_stage n distro="levitate" inject="" inject_file="" ssh="false" no_shell="f
       args+=(--inject-file "$tmp")
     fi
 
-    if [ "{{ssh}}" = "true" ] && [ -n "{{ssh_privkey}}" ]; then
-      args+=(--ssh-private-key "{{ssh_privkey}}")
-    fi
-
     "${args[@]}"
 
-# Boot into a stage (interactive serial, Ctrl-A X to exit)
+# Boot into a stage with a remote VNC window endpoint in foreground mode (Ctrl-C to stop).
 [no-exit-message]
-stage n distro="levitate" inject="" inject_file="" ssh_pubkey=(env("HOME") + "/.ssh/id_ed25519.pub"):
-    just _boot_stage {{n}} {{distro}} "{{inject}}" "{{inject_file}}" false false false "{{ssh_pubkey}}" "" 2222
-
-# Boot a live stage in background and SSH into it (no serial wrapper harness).
-[no-exit-message]
-stage-ssh n distro="levitate" inject="" inject_file="" ssh_pubkey=(env("HOME") + "/.ssh/id_ed25519.pub") ssh_privkey=(env("HOME") + "/.ssh/id_ed25519") ssh_port="2222":
-    just _boot_stage {{n}} {{distro}} "{{inject}}" "{{inject_file}}" true false false "{{ssh_pubkey}}" "{{ssh_privkey}}" "{{ssh_port}}"
-
-# Boot into a stage with a VNC window in foreground mode (Ctrl-C to stop).
-[no-exit-message]
-stage-window n distro="levitate" inject="" inject_file="" ssh_pubkey=(env("HOME") + "/.ssh/id_ed25519.pub"):
-    just _boot_stage {{n}} {{distro}} "{{inject}}" "{{inject_file}}" false false true "{{ssh_pubkey}}" "" 2222
+stage-window-remote n distro="levitate" inject="" inject_file="" ssh_pubkey=(env("HOME") + "/.ssh/id_ed25519.pub"):
+    just _boot_stage {{n}} {{distro}} "{{inject}}" "{{inject_file}}" false false true "{{ssh_pubkey}}" "" 2222 ""
 
 # Single-path Stage 01 parity gate (serial boot + SSH boot).
 [script, no-exit-message]
