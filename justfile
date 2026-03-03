@@ -138,6 +138,16 @@ _boot_stage n distro="levitate" inject="" inject_file="" ssh="false" no_shell="f
     fi
 
     inject_append="{{inject_append}}"
+    append_inject_lines() {
+      local payload="$1"
+      [ -z "$payload" ] && return 0
+      local old_ifs="$IFS"
+      IFS=','
+      for item in $payload; do
+        [ -n "$item" ] && printf '%s\n' "$item"
+      done
+      IFS="$old_ifs"
+    }
     tmp=""
     cleanup_tmp() {
       [ -n "$tmp" ] && [ -f "$tmp" ] && rm -f "$tmp"
@@ -148,7 +158,7 @@ _boot_stage n distro="levitate" inject="" inject_file="" ssh="false" no_shell="f
       if [ -n "$inject_append" ]; then
         tmp=$(mktemp)
         cat "{{inject_file}}" > "$tmp"
-        printf '%s\n' "$inject_append" >> "$tmp"
+        append_inject_lines "$inject_append" >> "$tmp"
         args+=(--inject-file "$tmp")
       else
         args+=(--inject-file "{{inject_file}}")
@@ -163,7 +173,7 @@ _boot_stage n distro="levitate" inject="" inject_file="" ssh="false" no_shell="f
       tmp=$(mktemp)
       key="$(tr -d '\n' < "{{ssh_pubkey}}")"
       printf 'SSH_AUTHORIZED_KEY=%s\n' "$key" > "$tmp"
-      [ -n "$inject_append" ] && printf '%s\n' "$inject_append" >> "$tmp"
+      [ -n "$inject_append" ] && append_inject_lines "$inject_append" >> "$tmp"
       args+=(--inject-file "$tmp")
     elif [ -n "$inject_append" ]; then
       args+=(--inject "$inject_append")
@@ -179,6 +189,11 @@ _boot_stage n distro="levitate" inject="" inject_file="" ssh="false" no_shell="f
 [no-exit-message]
 stage n distro="levitate" inject="" inject_file="" ssh_pubkey=(env("HOME") + "/.ssh/id_ed25519.pub"):
     just _boot_stage {{n}} {{distro}} "{{inject}}" "{{inject_file}}" false false false "{{ssh_pubkey}}" "" 2222 STAGE02_SERIAL_UX=1
+
+# Boot into a stage with verbose serial logging (kernel printks + Stage 02 shell UX).
+[no-exit-message]
+stage-verbose n distro="levitate" inject="" inject_file="" ssh_pubkey=(env("HOME") + "/.ssh/id_ed25519.pub"):
+    just _boot_stage {{n}} {{distro}} "{{inject}}" "{{inject_file}}" false false false "{{ssh_pubkey}}" "" 2222 STAGE02_SERIAL_UX=1,STAGE_SERIAL_VERBOSE=1
 
 # Boot a live stage in background and SSH into it (no serial wrapper harness).
 [no-exit-message]
