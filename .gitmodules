@@ -1,93 +1,123 @@
 [submodule "website"]
 	path = docs/website
 	url = git@github.com:LevitateOS/website.git
+	branch = master
 [submodule "recipe"]
 	path = tools/recipe
 	url = git@github.com:LevitateOS/recipe.git
+	branch = master
 [submodule "llm-toolkit"]
 	path = llm-toolkit
 	url = git@github.com:LevitateOS/llm-toolkit.git
+	branch = master
 [submodule "docs-content"]
 	path = docs/content
 	url = git@github.com:LevitateOS/docs-content.git
+	branch = master
 [submodule "leviso"]
 	path = leviso
 	url = git@github.com:LevitateOS/leviso.git
+	branch = master
 [submodule "docs-tui"]
 	path = docs/tui
 	url = git@github.com:LevitateOS/docs-tui.git
+	branch = master
 [submodule "install-tests"]
 	path = testing/install-tests
 	url = git@github.com:LevitateOS/install-tests.git
+	branch = master
 [submodule "distro-spec"]
 	path = distro-spec
 	url = git@github.com:LevitateOS/distro-spec.git
+	branch = master
 [submodule "recstrap"]
 	path = tools/recstrap
 	url = git@github.com:LevitateOS/recstrap.git
+	branch = master
 [submodule "rootfs-tests"]
 	path = testing/rootfs-tests
 	url = git@github.com:LevitateOS/rootfs-test.git
+	branch = master
 [submodule "cheat-test"]
 	path = testing/cheat-test
 	url = https://github.com/LevitateOS/cheat-test.git
+	branch = master
 [submodule "cheat-guard"]
 	path = testing/cheat-guard
 	url = git@github.com:LevitateOS/cheat_guard.git
+	branch = master
 [submodule "recfstab"]
 	path = tools/recfstab
 	url = git@github.com:LevitateOS/recfstab.git
+	branch = master
 [submodule "recchroot"]
 	path = tools/recchroot
 	url = git@github.com:LevitateOS/recchroot.git
+	branch = master
 [submodule "leviso-elf"]
 	path = leviso-elf
 	url = git@github.com:LevitateOS/leviso-elf.git
+	branch = main
 [submodule "AcornOS"]
 	path = AcornOS
 	url = git@github.com:LevitateOS/AcornOS.git
+	branch = main
 [submodule "testing/hardware-compat"]
 	path = testing/hardware-compat
 	url = git@github.com:LevitateOS/hardware-compat.git
+	branch = main
 [submodule "distro-builder"]
 	path = distro-builder
 	url = git@github.com:LevitateOS/distro-builder.git
+	branch = main
 [submodule "tools/recinit"]
 	path = tools/recinit
 	url = git@github.com:LevitateOS/recinit.git
+	branch = main
 [submodule "tools/recuki"]
 	path = tools/recuki
 	url = git@github.com:LevitateOS/recuki.git
+	branch = main
 [submodule "tools/reciso"]
 	path = tools/reciso
 	url = git@github.com:LevitateOS/reciso.git
+	branch = main
 [submodule "tools/recqemu"]
 	path = tools/recqemu
 	url = git@github.com:LevitateOS/recqemu.git
+	branch = main
 [submodule "testing/fsdbg"]
 	path = testing/fsdbg
 	url = git@github.com:LevitateOS/fsdbg.git
+	branch = main
 [submodule "IuppiterOS"]
 	path = IuppiterOS
 	url = git@github.com:veighnsche/iuppiterOS.git
+	branch = master
 [submodule "distro-contract"]
 	path = distro-contract
 	url = git@github.com:LevitateOS/distro-contract.git
+	branch = master
 [submodule "tools/recab"]
 	path = tools/recab
 	url = git@github.com:LevitateOS/recab.git
+	branch = main
 [submodule "RalphOS"]
 	path = RalphOS
 	url = git@github.com:LevitateOS/RalphOS.git
+	branch = main
 [submodule "tools/recpart"]
 	path = tools/recpart
 	url = git@github.com:LevitateOS/recpart.git
+	branch = main
 [submodule "tools/recguard"]
 	path = tools/recguard
 	url = git@github.com:LevitateOS/recguard.git
+	branch = main
 [submodule "shared/tui-kit"]
 	path = shared/tui-kit
 	url = git@github.com:LevitateOS/tui-kit.git
+	branch = master
 [submodule "tui"]
 	path = tui
 	url = git@github.com:LevitateOS/tui-root.git
@@ -95,3 +125,4 @@
 [submodule "tools/recshuttle"]
 	path = tools/recshuttle
 	url = git@github.com:LevitateOS/recshuttle.git
+	branch = master
