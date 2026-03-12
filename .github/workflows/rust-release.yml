@@ -12,10 +12,20 @@ on:
         required: false
         default: false
         type: boolean
+      create-rpm-artifact:
+        description: 'Create RPM artifact with cargo-generate-rpm'
+        required: false
+        default: false
+        type: boolean
       binary-name:
         description: 'Binary name for artifact (required if create-binary-artifact)'
         required: false
         default: ''
+        type: string
+      rpm-glob:
+        description: 'Glob for generated RPM files relative to working-directory'
+        required: false
+        default: 'target/generate-rpm/*.rpm'
         type: string
       publish-to-crates-io:
         description: 'Publish to crates.io (for libraries only)'
@@ -84,7 +94,7 @@ jobs:
           git push origin "v${{ steps.bump.outputs.version }}"
 
       - name: Build release binary
-        if: inputs.create-binary-artifact
+        if: inputs.create-binary-artifact || inputs.create-rpm-artifact
         run: cargo build --release
 
       - name: Create artifact
@@ -93,13 +103,45 @@ jobs:
           tar -czvf ${{ inputs.binary-name }}-x86_64-linux.tar.gz \
             -C target/release ${{ inputs.binary-name }}
 
+      - name: Install cargo-generate-rpm
+        if: inputs.create-rpm-artifact
+        run: cargo install cargo-generate-rpm
+
+      - name: Build RPM artifact
+        if: inputs.create-rpm-artifact
+        run: cargo generate-rpm
+
+      - name: Collect release files
+        id: release_files
+        shell: bash
+        run: |
+          files=()
+          if [[ "${{ inputs.create-binary-artifact }}" == "true" ]]; then
+            files+=("${{ inputs.binary-name }}-x86_64-linux.tar.gz")
+          fi
+          if [[ "${{ inputs.create-rpm-artifact }}" == "true" ]]; then
+            shopt -s nullglob
+            rpm_matches=( ${{ inputs.rpm-glob }} )
+            shopt -u nullglob
+            if [[ ${#rpm_matches[@]} -eq 0 ]]; then
+              echo "No RPM artifacts matched '${{ inputs.rpm-glob }}'" >&2
+              exit 1
+            fi
+            files+=("${rpm_matches[@]}")
+          fi
+          {
+            echo "files<<EOF"
+            printf '%s\n' "${files[@]}"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
           tag_name: v${{ steps.bump.outputs.version }}
           name: v${{ steps.bump.outputs.version }}
           generate_release_notes: true
-          files: ${{ inputs.create-binary-artifact && format('{0}-x86_64-linux.tar.gz', inputs.binary-name) || '' }}
+          files: ${{ steps.release_files.outputs.files }}
 
       - name: Publish to crates.io
         if: inputs.publish-to-crates-io
