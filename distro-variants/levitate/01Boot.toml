@@ -4,8 +4,9 @@ overlay_kind = "systemd"
 required_services = ["sshd", "auditd"]
 
 [stage_01.boot_inputs.rootfs_source]
-kind = "recipe_rocky"
+kind = "recipe_rpm_dvd"
 recipe_script = "distro-builder/recipes/rocky-stage01-rootfs.rhai"
+preseed_recipe_script = "distro-builder/recipes/rocky-preseed-iso.rhai"
 
 # To use your own Stage 01 rootfs source, switch to:
 # kind = "recipe_custom"
