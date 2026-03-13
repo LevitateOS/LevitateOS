@@ -51,6 +51,32 @@ prepare_live_inputs() {
     prepare_s01_boot_inputs "$@"
 }
 
+prepare_product_inputs() {
+    if [ "$#" -ne 3 ]; then
+        echo "prepare_product_inputs requires <product_name> <distro_id> <output_dir>" >&2
+        exit 64
+    fi
+
+    product_name="$1"
+    distro_id="$2"
+    output_dir="$3"
+    rootfs_source_path_file="${output_dir}/${ROOTFS_SOURCE_POINTER_FILENAME:-.live-rootfs-source.path}"
+    live_overlay_dirname="${LIVE_OVERLAY_DIRNAME:-live-overlay}"
+
+    run_distro_builder product prepare "$product_name" "$distro_id" "$output_dir" 1>&2
+
+    need_file "$rootfs_source_path_file"
+    ROOTFS_SOURCE_DIR="$(tr -d '\n' < "$rootfs_source_path_file")"
+    if [ -z "$ROOTFS_SOURCE_DIR" ]; then
+        echo "invalid live rootfs source path file: $rootfs_source_path_file" >&2
+        exit 1
+    fi
+    need_dir "$ROOTFS_SOURCE_DIR"
+    need_dir "${output_dir}/${live_overlay_dirname}"
+
+    printf '%s\n' "$ROOTFS_SOURCE_DIR"
+}
+
 prepare_stage_inputs() {
     if [ "$#" -ne 3 ]; then
         echo "prepare_stage_inputs requires <build_stage_dirname> <distro_id> <output_dir>" >&2
@@ -84,6 +110,25 @@ prepare_stage_inputs() {
     need_dir "${output_dir}/${stage_tag}-live-overlay"
 
     printf '%s\n' "$ROOTFS_SOURCE_DIR"
+}
+
+prepare_build_inputs() {
+    if [ "$#" -ne 4 ]; then
+        echo "prepare_build_inputs requires <product_name_or_empty> <build_stage_dirname> <distro_id> <output_dir>" >&2
+        exit 64
+    fi
+
+    product_name="$1"
+    build_stage_dirname="$2"
+    distro_id="$3"
+    output_dir="$4"
+
+    if [ -n "$product_name" ]; then
+        prepare_product_inputs "$product_name" "$distro_id" "$output_dir"
+        return
+    fi
+
+    prepare_stage_inputs "$build_stage_dirname" "$distro_id" "$output_dir"
 }
 
 prepare_s02_live_tools_inputs() {
