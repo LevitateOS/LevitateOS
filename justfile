@@ -76,16 +76,16 @@ preseed distro refresh="true":
     case "{{distro}}" in
       levitate|leviso)
         if [ "{{refresh}}" = "true" ]; then
-          cargo run -p distro-builder --bin distro-builder -- artifact preseed-rocky-iso levitate --refresh
+          cargo run -p distro-builder --bin distro-builder -- artifact preseed-stage01-source levitate --refresh
         else
-          cargo run -p distro-builder --bin distro-builder -- artifact preseed-rocky-iso levitate
+          cargo run -p distro-builder --bin distro-builder -- artifact preseed-stage01-source levitate
         fi
         ;;
       acorn|acornos)
         if [ "{{refresh}}" = "true" ]; then
-          cargo run -p distro-builder --bin distro-builder -- artifact preseed-alpine-stage01-assets acorn --refresh
+          cargo run -p distro-builder --bin distro-builder -- artifact preseed-stage01-source acorn --refresh
         else
-          cargo run -p distro-builder --bin distro-builder -- artifact preseed-alpine-stage01-assets acorn
+          cargo run -p distro-builder --bin distro-builder -- artifact preseed-stage01-source acorn
         fi
         ;;
       *)
