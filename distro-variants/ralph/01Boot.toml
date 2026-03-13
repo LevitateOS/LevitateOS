@@ -2,3 +2,8 @@
 os_name = "RalphOS"
 overlay_kind = "systemd"
 required_services = ["sshd"]
+
+[stage_01.boot_inputs.rootfs_source]
+kind = "recipe_rpm_dvd"
+recipe_script = "distro-builder/recipes/fedora-stage01-rootfs.rhai"
+preseed_recipe_script = "distro-builder/recipes/fedora-preseed-iso.rhai"
