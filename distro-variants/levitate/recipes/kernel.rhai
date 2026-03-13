@@ -1,4 +1,4 @@
-// Stage 00 contract declaration: Levitate kernel build must go through Recipe Rhai.
-// The concrete build script remains centralized at distro-builder/recipes/linux.rhai.
-let required_kernel_recipe = "distro-builder/recipes/linux.rhai";
+// Stage 00 contract declaration: Levitate kernel install must go through Recipe Rhai.
+// The canonical Levitate path now uses the prebuilt artifact recipe.
+let required_kernel_recipe = "distro-builder/recipes/linux-prebuilt.rhai";
 let required_invocation = "recipe install";

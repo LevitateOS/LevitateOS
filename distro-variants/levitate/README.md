@@ -14,7 +14,7 @@ This directory is the model Stage 00 declaration scaffold for all distro variant
 
 - Kernel configuration file must be declared as `kernel_kconfig_path = "kconfig"`.
 - Kernel build must be orchestrated through Recipe Rhai:
-  - `recipe_kernel_script = "distro-builder/recipes/linux.rhai"`
+  - `recipe_kernel_script = "distro-builder/recipes/linux-prebuilt.rhai"`
   - `recipe_kernel_invocation = "recipe install"`
 - Kernel outputs and provenance fields are mandatory and validated.
 - Modules installation path must be `/usr/lib/modules` for cross-distro consistency.
