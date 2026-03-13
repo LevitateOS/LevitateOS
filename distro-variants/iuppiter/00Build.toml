@@ -11,6 +11,8 @@ default_hostname = "iuppiter"
 rootfs_name = "s00-filesystem.erofs"
 initramfs_live_output = "s00-initramfs-live.cpio.gz"
 iso_filename = "iuppiter-x86_64-s00_build.iso"
+installed_uki_outputs = ["iuppiter.efi", "iuppiter-recovery.efi"]
+disk_image_output = "iuppiteros-x86_64.img"
 
 [stage_00]
 required_build_tools = [

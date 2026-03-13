@@ -11,6 +11,7 @@ default_hostname = "acornos"
 rootfs_name = "s00-filesystem.erofs"
 initramfs_live_output = "s00-initramfs-live.cpio.gz"
 iso_filename = "acornos-s00_build.iso"
+installed_uki_outputs = ["acornos.efi", "acornos-recovery.efi"]
 
 [stage_00]
 required_build_tools = [
