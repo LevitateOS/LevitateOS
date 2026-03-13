@@ -6,10 +6,6 @@ required_services = ["sshd", "auditd"]
 [stage_01.boot_inputs.rootfs_source]
 kind = "recipe_rocky"
 recipe_script = "distro-builder/recipes/rocky-stage01-rootfs.rhai"
-iso_name = "Rocky-10.1-x86_64-dvd1.iso"
-sha256 = "55f96d45a052c0ed4f06309480155cb66281a008691eb7f3f359957205b1849a"
-sha256_url = "https://download.rockylinux.org/pub/rocky/10/isos/x86_64/CHECKSUM"
-torrent_url = "https://download.rockylinux.org/pub/rocky/10/isos/x86_64/Rocky-10.1-x86_64-dvd1.torrent"
 
 # To use your own Stage 01 rootfs source, switch to:
 # kind = "recipe_custom"
