@@ -27,5 +27,5 @@ kernel_localversion = "-levitate"
 module_install_path = "/usr/lib/modules"
 
 [build_host.evidence]
-script_path = "00Build-build-capability.sh"
-pass_marker = "STAGE 00 PASSED"
+script_path = "build-capability.sh"
+pass_marker = "BUILD CAPABILITY PASSED"

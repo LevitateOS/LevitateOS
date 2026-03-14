@@ -1,9 +1,10 @@
 #!/bin/sh
 set -eu
 
+# Release evidence: verify kernel + ISO capability only.
 KERNEL_RELEASE_PATH="${KERNEL_RELEASE_PATH:-.artifacts/out/acorn/kernel-build/include/config/kernel.release}"
 KERNEL_IMAGE_PATH="${KERNEL_IMAGE_PATH:-.artifacts/out/acorn/staging/boot/vmlinuz}"
-ISO_PATH="${ISO_PATH:-.artifacts/out/acorn/s00-build/acornos-x86_64.iso}"
+ISO_PATH="${ISO_PATH:-.artifacts/out/acorn/base-rootfs/acornos-x86_64.iso}"
 
 if [ ! -s "$KERNEL_RELEASE_PATH" ]; then
     echo "missing kernel release output: $KERNEL_RELEASE_PATH" >&2
@@ -20,4 +21,4 @@ if [ ! -f "$ISO_PATH" ]; then
     exit 1
 fi
 
-echo "STAGE 00 PASSED"
+echo "BUILD CAPABILITY PASSED"

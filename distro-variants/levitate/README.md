@@ -1,16 +1,16 @@
-# Levitate Variant (Stage 00 Model Scaffold)
+# Levitate Variant (Build-Host Model Scaffold)
 
-This directory is the model Stage 00 declaration scaffold for all distro variants.
+This directory is the canonical build-host scaffold for all distro variants.
 
-## Required Stage 00 Files
+## Required Build-Host Files
 
 - `kconfig`
-- `00Build.toml`
+- `build-host.toml`
 - `recipes/kernel.rhai`
-- `00Build-build.sh`
-- `00Build-build-capability.sh`
+- `build-release.sh`
+- `build-capability.sh`
 
-## Stage 00 Invariants Enforced
+## Build-Host Invariants Enforced
 
 - Kernel configuration file must be declared as `kernel_kconfig_path = "kconfig"`.
 - Kernel build must be orchestrated through Recipe Rhai:
@@ -21,5 +21,5 @@ This directory is the model Stage 00 declaration scaffold for all distro variant
 
 ## Source Of Truth
 
-`00Build.toml` is the authoritative Stage 00 conformance contract for this variant.
-`distro-contract` loads and validates this manifest directly from `distro-variants`.
+`build-host.toml` is the authoritative build-host contract for this variant.
+`distro-contract` loads and validates the canonical ring manifest family directly from `distro-variants`.

@@ -11,7 +11,7 @@ required_kernel_cmdline = [
 required_live_services = ["sshd"]
 
 [scenarios.live_boot.evidence]
-script_path = "stage-01-live-boot.sh"
+script_path = "live-boot.sh"
 pass_marker = "STAGE 01 PASSED"
 
 [scenarios.live_environment]
@@ -21,5 +21,5 @@ required_services = ["sshd", "auditd"]
 install_experience = "ux"
 
 [scenarios.live_tools.evidence]
-script_path = "stage-02-live-tools.sh"
+script_path = "live-tools.sh"
 pass_marker = "STAGE 02 PASSED"

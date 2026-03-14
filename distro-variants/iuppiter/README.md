@@ -1,9 +1,9 @@
-# Iuppiter Variant (Stage 00 Scaffold)
+# Iuppiter Variant (Build-Host Scaffold)
 
-Required Stage 00 files:
+Required build-host files:
 - `kconfig`
-- `00Build.toml`
+- `build-host.toml`
 - `recipes/kernel.rhai`
-- `00Build-build-capability.sh`
+- `build-capability.sh`
 
-`00Build.toml` is the Stage 00 source of truth for Iuppiter.
+`build-host.toml` is the canonical build-host source of truth for Iuppiter.
