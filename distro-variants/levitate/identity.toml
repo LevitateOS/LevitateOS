@@ -1,0 +1,8 @@
+schema_version = 6
+
+[identity]
+os_name = "LevitateOS"
+os_id = "levitateos"
+iso_label = "LEVITATEOS"
+os_version = "1.0"
+default_hostname = "levitateos"
