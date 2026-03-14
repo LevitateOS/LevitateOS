@@ -24,6 +24,7 @@ extends = "product.payload.boot.live"
 [ring2_products.boot_installed]
 logical_name = "product.payload.boot.installed"
 description = "Installed-system boot payload inputs"
+extends = "product.rootfs.base"
 
 [ring2_products.kernel_staging]
 logical_name = "product.kernel.staging"
