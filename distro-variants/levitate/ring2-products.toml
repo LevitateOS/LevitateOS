@@ -13,6 +13,7 @@ overlay_kind = "systemd"
 logical_name = "product.payload.boot.live"
 description = "Live boot payload inputs"
 extends = "product.rootfs.base"
+payload_profile = "boot_baseline"
 
 [ring2_products.live_tools]
 logical_name = "product.payload.live_tools"
@@ -23,6 +24,143 @@ extends = "product.payload.boot.live"
 logical_name = "product.payload.boot.installed"
 description = "Installed-system boot payload inputs"
 extends = "product.rootfs.base"
+payload_profile = "boot_baseline"
+
+[ring2_payload_profiles.boot_baseline]
+[[ring2_payload_profiles.boot_baseline.producers]]
+kind = "write_text"
+path = ".live-payload-role"
+content = "rootfs\n"
+
+[[ring2_payload_profiles.boot_baseline.producers]]
+kind = "copy_symlink"
+source = "bin"
+destination = "bin"
+
+[[ring2_payload_profiles.boot_baseline.producers]]
+kind = "copy_symlink"
+source = "sbin"
+destination = "sbin"
+
+[[ring2_payload_profiles.boot_baseline.producers]]
+kind = "copy_symlink"
+source = "lib"
+destination = "lib"
+
+[[ring2_payload_profiles.boot_baseline.producers]]
+kind = "copy_symlink"
+source = "lib64"
+destination = "lib64"
+
+[[ring2_payload_profiles.boot_baseline.producers]]
+kind = "copy_tree"
+source = "usr/lib/systemd"
+destination = "usr/lib/systemd"
+
+[[ring2_payload_profiles.boot_baseline.producers]]
+kind = "copy_tree"
+source = "usr/lib/tmpfiles.d"
+destination = "usr/lib/tmpfiles.d"
+
+[[ring2_payload_profiles.boot_baseline.producers]]
+kind = "copy_tree"
+source = "usr/lib/udev"
+destination = "usr/lib/udev"
+
+[[ring2_payload_profiles.boot_baseline.producers]]
+kind = "copy_tree"
+source = "usr/lib/kbd"
+destination = "usr/lib/kbd"
+
+[[ring2_payload_profiles.boot_baseline.producers]]
+kind = "copy_file"
+source = "usr/lib/locale/C.utf8/LC_CTYPE"
+destination = "usr/lib/locale/C.utf8/LC_CTYPE"
+
+[[ring2_payload_profiles.boot_baseline.producers]]
+kind = "copy_tree"
+source = "usr/lib64"
+destination = "usr/lib64"
+
+[[ring2_payload_profiles.boot_baseline.producers]]
+kind = "copy_tree"
+source = "usr/bin"
+destination = "usr/bin"
+
+[[ring2_payload_profiles.boot_baseline.producers]]
+kind = "copy_tree"
+source = "usr/sbin"
+destination = "usr/sbin"
+
+[[ring2_payload_profiles.boot_baseline.producers]]
+kind = "copy_tree"
+source = "usr/libexec"
+destination = "usr/libexec"
+
+[[ring2_payload_profiles.boot_baseline.producers]]
+kind = "copy_tree"
+source = "usr/share/dbus-1"
+destination = "usr/share/dbus-1"
+
+[[ring2_payload_profiles.boot_baseline.producers]]
+kind = "copy_tree"
+source = "etc"
+destination = "etc"
+
+[[ring2_payload_profiles.boot_baseline.producers]]
+kind = "copy_tree"
+source = "var"
+destination = "var"
+
+[[ring2_payload_profiles.boot_baseline.producers]]
+kind = "copy_file"
+source = "usr/lib/systemd/systemd"
+destination = "usr/lib/systemd/systemd"
+
+[[ring2_payload_profiles.boot_baseline.producers]]
+kind = "copy_file"
+source = "usr/sbin/agetty"
+destination = "usr/sbin/agetty"
+
+[[ring2_payload_profiles.boot_baseline.producers]]
+kind = "copy_file"
+source = "usr/bin/login"
+destination = "usr/bin/login"
+
+[[ring2_payload_profiles.boot_baseline.producers]]
+kind = "copy_file"
+source = "usr/bin/bash"
+destination = "usr/bin/bash"
+
+[[ring2_payload_profiles.boot_baseline.producers]]
+kind = "copy_file"
+source = "usr/bin/sh"
+destination = "usr/bin/sh"
+
+[[ring2_payload_profiles.boot_baseline.producers]]
+kind = "copy_file"
+source = "usr/bin/mount"
+destination = "usr/bin/mount"
+
+[[ring2_payload_profiles.boot_baseline.producers]]
+kind = "copy_file"
+source = "usr/bin/umount"
+destination = "usr/bin/umount"
+
+[[ring2_payload_profiles.boot_baseline.producers]]
+kind = "copy_file"
+source = "usr/bin/systemd-tmpfiles"
+destination = "usr/bin/systemd-tmpfiles"
+
+[[ring2_payload_profiles.boot_baseline.producers]]
+kind = "copy_file"
+source = "usr/bin/udevadm"
+destination = "usr/bin/udevadm"
+
+[[ring2_payload_profiles.boot_baseline.producers]]
+kind = "copy_file"
+source = "usr/sbin/modprobe"
+destination = "usr/sbin/modprobe"
 
 [ring2_products.kernel_staging]
 logical_name = "product.kernel.staging"

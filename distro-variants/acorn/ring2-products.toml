@@ -15,6 +15,7 @@ profile_overlay = "distro-variants/acorn/profile/live-overlay"
 logical_name = "product.payload.boot.live"
 description = "Live boot payload inputs"
 extends = "product.rootfs.base"
+payload_profile = "boot_baseline"
 
 [ring2_products.live_tools]
 logical_name = "product.payload.live_tools"
@@ -25,6 +26,73 @@ extends = "product.payload.boot.live"
 logical_name = "product.payload.boot.installed"
 description = "Installed-system boot payload inputs"
 extends = "product.rootfs.base"
+payload_profile = "boot_baseline"
+
+[ring2_payload_profiles.boot_baseline]
+[[ring2_payload_profiles.boot_baseline.producers]]
+kind = "write_text"
+path = ".live-payload-role"
+content = "rootfs\n"
+
+[[ring2_payload_profiles.boot_baseline.producers]]
+kind = "copy_tree"
+source = "bin"
+destination = "bin"
+
+[[ring2_payload_profiles.boot_baseline.producers]]
+kind = "copy_tree"
+source = "sbin"
+destination = "sbin"
+
+[[ring2_payload_profiles.boot_baseline.producers]]
+kind = "copy_tree"
+source = "lib"
+destination = "lib"
+
+[[ring2_payload_profiles.boot_baseline.producers]]
+kind = "copy_tree"
+source = "etc"
+destination = "etc"
+
+[[ring2_payload_profiles.boot_baseline.producers]]
+kind = "copy_tree"
+source = "usr/bin"
+destination = "usr/bin"
+
+[[ring2_payload_profiles.boot_baseline.producers]]
+kind = "copy_tree"
+source = "usr/sbin"
+destination = "usr/sbin"
+
+[[ring2_payload_profiles.boot_baseline.producers]]
+kind = "copy_tree"
+source = "usr/lib"
+destination = "usr/lib"
+
+[[ring2_payload_profiles.boot_baseline.producers]]
+kind = "copy_tree"
+source = "usr/libexec"
+destination = "usr/libexec"
+
+[[ring2_payload_profiles.boot_baseline.producers]]
+kind = "copy_tree"
+source = "usr/share/empty.sshd"
+destination = "usr/share/empty.sshd"
+
+[[ring2_payload_profiles.boot_baseline.producers]]
+kind = "copy_tree"
+source = "usr/share/i18n/locales/musl"
+destination = "usr/share/i18n/locales/musl"
+
+[[ring2_payload_profiles.boot_baseline.producers]]
+kind = "copy_tree"
+source = "var/empty"
+destination = "var/empty"
+
+[[ring2_payload_profiles.boot_baseline.producers]]
+kind = "copy_tree"
+source = "var/lib"
+destination = "var/lib"
 
 [ring2_products.kernel_staging]
 logical_name = "product.kernel.staging"
