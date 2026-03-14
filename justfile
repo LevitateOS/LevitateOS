@@ -76,16 +76,16 @@ preseed distro refresh="true":
     case "{{distro}}" in
       levitate|leviso)
         if [ "{{refresh}}" = "true" ]; then
-          cargo run -p distro-builder --bin distro-builder -- artifact preseed-stage01-source levitate --refresh
+          cargo run -p distro-builder --bin distro-builder -- artifact preseed-rootfs-source levitate --refresh
         else
-          cargo run -p distro-builder --bin distro-builder -- artifact preseed-stage01-source levitate
+          cargo run -p distro-builder --bin distro-builder -- artifact preseed-rootfs-source levitate
         fi
         ;;
       acorn|acornos)
         if [ "{{refresh}}" = "true" ]; then
-          cargo run -p distro-builder --bin distro-builder -- artifact preseed-stage01-source acorn --refresh
+          cargo run -p distro-builder --bin distro-builder -- artifact preseed-rootfs-source acorn --refresh
         else
-          cargo run -p distro-builder --bin distro-builder -- artifact preseed-stage01-source acorn
+          cargo run -p distro-builder --bin distro-builder -- artifact preseed-rootfs-source acorn
         fi
         ;;
       *)
@@ -459,10 +459,17 @@ build-up-to n distro="levitate":
 build-all *args:
     just release-build-all {{args}}
 
-# Prepare compatibility stage inputs and build both rootfs/overlay EROFS artifacts.
-# Example: just stage-erofs 02LiveTools levitate
-stage-erofs stage="02LiveTools" distro="levitate":
-    cargo run -p distro-builder --bin distro-builder -- artifact build-stage-erofs {{stage}} {{distro}}
+# Prepare a canonical product and build both rootfs/overlay EROFS artifacts.
+# Example: just product-erofs live-tools levitate
+[script]
+product-erofs product="live-tools" distro="levitate":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    prepared_dir=".artifacts/prepared/{{distro}}/{{product}}"
+    rm -rf "${prepared_dir}"
+    mkdir -p "${prepared_dir}"
+    cargo run -p distro-builder --bin distro-builder -- product prepare {{product}} {{distro}} "${prepared_dir}"
+    cargo run -p distro-builder --bin distro-builder -- artifact build product-erofs "${prepared_dir}"
 
 # Remove stage artifacts output tree (all stage run directories and manifests).
 clean-out:

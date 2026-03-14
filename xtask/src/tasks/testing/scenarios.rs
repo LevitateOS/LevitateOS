@@ -1,5 +1,5 @@
 use anyhow::{Context, Result, bail};
-use install_tests::stages::{
+use install_tests::scenarios::{
     ScenarioId, compat, resolve_iso_artifact_for_scenario, resolve_latest_install_runtime,
 };
 use std::fs::OpenOptions;
@@ -894,7 +894,7 @@ fn run_install_tests_in_dir(
 
     let mut cmd = Command::new("cargo");
     cmd.current_dir(&install_tests_dir)
-        .args(["run", "--bin", "stages", "--"])
+        .args(["run", "--bin", "scenarios", "--"])
         .args(args);
     if let Some(path) = &inject_file {
         let path = path.to_string_lossy();
