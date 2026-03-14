@@ -52,7 +52,10 @@ Differences below describe *policy and intent*, not structural deviations from t
 
 ## Stage 02 Install Experience Profiles
 
-Stage 02 is now explicitly config-driven via `distro-variants/*/02LiveTools.toml`:
+Stage 02 is now explicitly config-driven via canonical owner manifests:
+
+- `distro-variants/*/scenarios.toml`
+- `distro-variants/*/ring2-products.toml`
 
 - `install_experience = "ux"`
   - Required intent: local interactive live install flow.

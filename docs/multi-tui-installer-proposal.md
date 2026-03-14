@@ -12,7 +12,7 @@ This proposal intentionally avoids a monolithic, highly-branching installer flow
 
 ## Scope Gate (Stage 02 Policy)
 
-This proposal applies only to distro variants that declare Stage 02 `install_experience = "ux"` in `distro-variants/*/02LiveTools.toml`.
+This proposal applies only to distro variants that declare Stage 02 `install_experience = "ux"` in `distro-variants/*/scenarios.toml` under `[scenarios.live_tools]`.
 
 - In-scope UX variants: `levitate`, `acorn`
 - Out-of-scope (default path): `ralph`, `iuppiter` (`install_experience = "automated_ssh"`)
