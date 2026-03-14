@@ -21,6 +21,8 @@ payload_profile = "boot_baseline"
 logical_name = "product.payload.live_tools"
 description = "Live tools payload tree"
 extends = "product.payload.boot.live"
+runtime_profiles = ["live_tools_common"]
+runtime_profiles_ux = ["live_tools_ux"]
 
 [ring2_products.boot_installed]
 logical_name = "product.payload.boot.installed"
@@ -93,6 +95,39 @@ destination = "var/empty"
 kind = "copy_tree"
 source = "var/lib"
 destination = "var/lib"
+
+[ring2_runtime_profiles.live_tools_common]
+[[ring2_runtime_profiles.live_tools_common.actions]]
+kind = "tool_payload_workspace_binary"
+package = "recstrap"
+target = "x86_64-unknown-linux-musl"
+
+[[ring2_runtime_profiles.live_tools_common.actions]]
+kind = "tool_payload_workspace_binary"
+package = "recfstab"
+target = "x86_64-unknown-linux-musl"
+
+[[ring2_runtime_profiles.live_tools_common.actions]]
+kind = "tool_payload_workspace_binary"
+package = "recchroot"
+target = "x86_64-unknown-linux-musl"
+
+[[ring2_runtime_profiles.live_tools_common.actions]]
+kind = "apk_packages"
+packages = ["curl", "pciutils", "smartmontools", "hdparm", "vim", "htop"]
+
+[[ring2_runtime_profiles.live_tools_common.actions]]
+kind = "install_mode_payload"
+interactive_shell = "/bin/sh"
+ux_docs_frontend = "plain_text"
+
+[ring2_runtime_profiles.live_tools_ux]
+[[ring2_runtime_profiles.live_tools_ux.actions]]
+kind = "rootfs_workspace_binary"
+package = "stage02-split-pane"
+binary = "levitate-install-docs-split"
+target = "x86_64-unknown-linux-musl"
+destination = "usr/local/bin/levitate-install-docs-split"
 
 [ring2_products.kernel_staging]
 logical_name = "product.kernel.staging"
