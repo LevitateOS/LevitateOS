@@ -18,25 +18,28 @@ REPO_ROOT="$(CDPATH= cd -- "$SCRIPT_DIR/../.." && pwd)"
 OUTPUT_DIR="${REPO_ROOT}/.artifacts/out/${DISTRO_ID}"
 KERNEL_OUTPUT_DIR="${KERNEL_OUTPUT_DIR:-${REPO_ROOT}/.artifacts/kernel/${DISTRO_ID}/current}"
 PRODUCT_NAME="${PRODUCT_NAME:-}"
-BUILD_STAGE_DIRNAME="${BUILD_STAGE_DIRNAME:-s00-build}"
-STAGE_ROOT_DIR="${STAGE_ROOT_DIR:-${OUTPUT_DIR}/${BUILD_STAGE_DIRNAME}}"
-STAGE_RUN_DIR="${STAGE_RUN_DIR:-${STAGE_OUTPUT_DIR:-${STAGE_ROOT_DIR}}}"
-STAGE_OUTPUT_DIR="${STAGE_OUTPUT_DIR:-${STAGE_RUN_DIR}}"
-STAGE_ARTIFACT_TAG="${STAGE_ARTIFACT_TAG:-$(printf '%s' "$BUILD_STAGE_DIRNAME" | cut -c1-3)}"
+COMPAT_BUILD_STAGE_DIRNAME="${COMPAT_BUILD_STAGE_DIRNAME:-${BUILD_STAGE_DIRNAME:-s00-build}}"
+RUN_ROOT_DIR="${RUN_ROOT_DIR:-${STAGE_ROOT_DIR:-${OUTPUT_DIR}/${COMPAT_BUILD_STAGE_DIRNAME}}}"
+RUN_OUTPUT_DIR="${RUN_OUTPUT_DIR:-${STAGE_RUN_DIR:-${STAGE_OUTPUT_DIR:-${RUN_ROOT_DIR}}}}"
+BUILD_STAGE_DIRNAME="${BUILD_STAGE_DIRNAME:-${COMPAT_BUILD_STAGE_DIRNAME}}"
+STAGE_ROOT_DIR="${STAGE_ROOT_DIR:-${RUN_ROOT_DIR}}"
+STAGE_RUN_DIR="${STAGE_RUN_DIR:-${RUN_OUTPUT_DIR}}"
+STAGE_OUTPUT_DIR="${STAGE_OUTPUT_DIR:-${RUN_OUTPUT_DIR}}"
+STAGE_ARTIFACT_TAG="${STAGE_ARTIFACT_TAG:-${COMPAT_STAGE_ARTIFACT_TAG:-$(printf '%s' "$BUILD_STAGE_DIRNAME" | cut -c1-3)}}"
 FORCE_COLOR="${FORCE_COLOR:-0}"
 ARTIFACT_NAME_WIDTH="${ARTIFACT_NAME_WIDTH:-8}"
 
 # Color policy: NO_COLOR disables color globally; FORCE_COLOR enables in non-TTY contexts.
 KERNEL_RELEASE_PATH="${KERNEL_RELEASE_PATH:-${KERNEL_OUTPUT_DIR}/kernel-build/include/config/kernel.release}"
 KERNEL_IMAGE_PATH="${KERNEL_IMAGE_PATH:-${KERNEL_OUTPUT_DIR}/staging/boot/vmlinuz}"
-ISO_FILENAME="${ISO_FILENAME:-${IDENTITY_OS_ID}-x86_64-s00_build.iso}"
+ISO_FILENAME="${ISO_FILENAME:-$(default_iso_filename)}"
 ISO_PATH="${ISO_PATH:-${STAGE_OUTPUT_DIR}/${ISO_FILENAME}}"
 ISO_SHA="${ISO_SHA:-${ISO_PATH%.iso}.sha512}"
-ROOTFS_FILENAME="${ROOTFS_FILENAME:-${STAGE_ARTIFACT_TAG}-filesystem.erofs}"
-INITRAMFS_LIVE_FILENAME="${INITRAMFS_LIVE_FILENAME:-${STAGE_ARTIFACT_TAG}-initramfs-live.cpio.gz}"
-LIVE_OVERLAY_DIRNAME="${LIVE_OVERLAY_DIRNAME:-${STAGE_ARTIFACT_TAG}-live-overlay}"
-LIVE_OVERLAY_IMAGE_FILENAME="${LIVE_OVERLAY_IMAGE_FILENAME:-${STAGE_ARTIFACT_TAG}-overlayfs.erofs}"
-ROOTFS_SOURCE_POINTER_FILENAME="${ROOTFS_SOURCE_POINTER_FILENAME:-.${STAGE_ARTIFACT_TAG}-live-rootfs-source.path}"
+ROOTFS_FILENAME="${ROOTFS_FILENAME:-$(default_rootfs_filename)}"
+INITRAMFS_LIVE_FILENAME="${INITRAMFS_LIVE_FILENAME:-$(default_initramfs_live_filename)}"
+LIVE_OVERLAY_DIRNAME="${LIVE_OVERLAY_DIRNAME:-$(default_live_overlay_dirname)}"
+LIVE_OVERLAY_IMAGE_FILENAME="${LIVE_OVERLAY_IMAGE_FILENAME:-$(default_live_overlay_image_filename)}"
+ROOTFS_SOURCE_POINTER_FILENAME="${ROOTFS_SOURCE_POINTER_FILENAME:-$(default_rootfs_source_pointer_filename)}"
 
 ROOTFS_PATH="${STAGE_OUTPUT_DIR}/${ROOTFS_FILENAME}"
 INITRAMFS_LIVE_PATH="${STAGE_OUTPUT_DIR}/${INITRAMFS_LIVE_FILENAME}"
@@ -56,6 +59,7 @@ BUILD_LOG_PATH="${STAGE_OUTPUT_DIR}/build-log.json"
 BUILD_STARTED_AT_UTC="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
 BUILD_FINISHED_AT_UTC=""
 BUILD_STATUS="failed"
+STAGE_REQUIRED_KERNEL_CMDLINE="${STAGE_REQUIRED_KERNEL_CMDLINE:-${COMPAT_STAGE_REQUIRED_KERNEL_CMDLINE:-}}"
 
 TMP_STAGE_INIT_TEMPLATE=""
 TMP_STAGE_INIT_TEMPLATE_EDIT=""
@@ -74,6 +78,55 @@ cleanup_tmp_artifacts() {
 
 json_escape() {
     printf '%s' "$1" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g'
+}
+
+default_iso_filename() {
+    case "${PRODUCT_NAME:-}" in
+        base-rootfs) printf '%s\n' "${IDENTITY_OS_ID}-x86_64-base-rootfs.iso" ;;
+        live-boot) printf '%s\n' "${IDENTITY_OS_ID}-x86_64-live-boot.iso" ;;
+        live-tools) printf '%s\n' "${IDENTITY_OS_ID}-x86_64-live-tools.iso" ;;
+        *) printf '%s\n' "${IDENTITY_OS_ID}-x86_64-s00_build.iso" ;;
+    esac
+}
+
+default_rootfs_filename() {
+    if [ -n "${PRODUCT_NAME:-}" ]; then
+        printf '%s\n' "filesystem.erofs"
+        return
+    fi
+    printf '%s-filesystem.erofs\n' "$STAGE_ARTIFACT_TAG"
+}
+
+default_initramfs_live_filename() {
+    if [ -n "${PRODUCT_NAME:-}" ]; then
+        printf '%s\n' "initramfs-live.cpio.gz"
+        return
+    fi
+    printf '%s-initramfs-live.cpio.gz\n' "$STAGE_ARTIFACT_TAG"
+}
+
+default_live_overlay_dirname() {
+    if [ -n "${PRODUCT_NAME:-}" ]; then
+        printf '%s\n' "live-overlay"
+        return
+    fi
+    printf '%s-live-overlay\n' "$STAGE_ARTIFACT_TAG"
+}
+
+default_live_overlay_image_filename() {
+    if [ -n "${PRODUCT_NAME:-}" ]; then
+        printf '%s\n' "overlayfs.erofs"
+        return
+    fi
+    printf '%s-overlayfs.erofs\n' "$STAGE_ARTIFACT_TAG"
+}
+
+default_rootfs_source_pointer_filename() {
+    if [ -n "${PRODUCT_NAME:-}" ]; then
+        printf '%s\n' ".live-rootfs-source.path"
+        return
+    fi
+    printf '.%s-live-rootfs-source.path\n' "$STAGE_ARTIFACT_TAG"
 }
 
 file_size_bytes() {
