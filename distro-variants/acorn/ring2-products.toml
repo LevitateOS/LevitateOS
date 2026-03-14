@@ -14,6 +14,12 @@ profile_overlay = "distro-variants/acorn/profile/live-overlay"
 [ring2_products.boot_live]
 logical_name = "product.payload.boot.live"
 description = "Live boot payload inputs"
+extends = "product.rootfs.base"
+
+[ring2_products.live_tools]
+logical_name = "product.payload.live_tools"
+description = "Live tools payload tree"
+extends = "product.payload.boot.live"
 
 [ring2_products.boot_installed]
 logical_name = "product.payload.boot.installed"
