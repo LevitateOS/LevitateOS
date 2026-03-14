@@ -47,8 +47,8 @@ pub fn run(cli: crate::cli::Cli) -> Result<()> {
             crate::cli::HooksCmd::Install => crate::tasks::tooling::hooks::install(),
             crate::cli::HooksCmd::Remove => crate::tasks::tooling::hooks::remove(),
         },
-        crate::cli::Cmd::Stages { cmd } => match cmd {
-            crate::cli::StagesCmd::Boot {
+        crate::cli::Cmd::Scenarios { cmd } => match cmd {
+            crate::cli::ScenariosCmd::Boot {
                 target,
                 distro,
                 inject,
@@ -71,23 +71,25 @@ pub fn run(cli: crate::cli::Cli) -> Result<()> {
                 window,
                 ssh_private_key,
             ),
-            crate::cli::StagesCmd::Test {
+            crate::cli::ScenariosCmd::Test {
                 target,
                 distro,
                 inject,
                 inject_file,
                 force,
             } => crate::tasks::testing::stages::test(target, distro, inject, inject_file, force),
-            crate::cli::StagesCmd::TestUpTo {
+            crate::cli::ScenariosCmd::TestUpTo {
                 target,
                 distro,
                 inject,
                 inject_file,
             } => crate::tasks::testing::stages::test_up_to(target, distro, inject, inject_file),
-            crate::cli::StagesCmd::Status { distro } => {
+            crate::cli::ScenariosCmd::Status { distro } => {
                 crate::tasks::testing::stages::status(distro)
             }
-            crate::cli::StagesCmd::Reset { distro } => crate::tasks::testing::stages::reset(distro),
+            crate::cli::ScenariosCmd::Reset { distro } => {
+                crate::tasks::testing::stages::reset(distro)
+            }
         },
         crate::cli::Cmd::Policy { cmd } => match cmd {
             crate::cli::PolicyCmd::AuditLegacyBindings => {
@@ -148,7 +150,7 @@ pub fn run(cli: crate::cli::Cli) -> Result<()> {
 }
 
 fn enforce_policy_guard_placement(cmd: &crate::cli::Cmd) -> Result<()> {
-    use crate::cli::{Cmd, KernelsCmd, StagesCmd};
+    use crate::cli::{Cmd, KernelsCmd, ScenariosCmd};
 
     let requires_guard = matches!(
         cmd,
@@ -156,8 +158,10 @@ fn enforce_policy_guard_placement(cmd: &crate::cli::Cmd) -> Result<()> {
             cmd: KernelsCmd::Build { .. }
                 | KernelsCmd::BuildAll { .. }
                 | KernelsCmd::Prebuilt { .. }
-        } | Cmd::Stages {
-            cmd: StagesCmd::Boot { .. } | StagesCmd::Test { .. } | StagesCmd::TestUpTo { .. }
+        } | Cmd::Scenarios {
+            cmd: ScenariosCmd::Boot { .. }
+                | ScenariosCmd::Test { .. }
+                | ScenariosCmd::TestUpTo { .. }
         }
     );
     if !requires_guard {

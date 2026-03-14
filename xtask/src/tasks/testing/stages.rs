@@ -1,7 +1,6 @@
 use anyhow::{Context, Result, bail};
 use install_tests::stages::{
-    ScenarioId, parse_scenario_arg, resolve_iso_artifact_for_scenario,
-    resolve_latest_install_runtime,
+    ScenarioId, compat, resolve_iso_artifact_for_scenario, resolve_latest_install_runtime,
 };
 use std::fs::OpenOptions;
 use std::fs::{self, File};
@@ -114,7 +113,7 @@ pub fn boot(
 ) -> Result<()> {
     let root = crate::util::repo::repo_root()?;
     let cfg = BootConfig::for_distro(distro);
-    let scenario = parse_scenario_arg(&target)
+    let scenario = compat::parse_scenario_target_arg(&target)
         .with_context(|| format!("parsing interactive scenario target '{}'", target))?;
 
     if window && ssh {
@@ -164,7 +163,7 @@ pub fn boot(
         ScenarioId::InstalledBoot => {
             if ssh {
                 bail!(
-                    "`--ssh` is only supported for the live-boot scenario; use `cargo xtask stages boot live-boot --ssh`."
+                    "`--ssh` is only supported for the live-boot scenario; use `cargo xtask scenarios boot live-boot --ssh`."
                 );
             }
             boot_installed_disk(&root, &cfg, inject, inject_file, window_cfg.as_ref())
@@ -183,7 +182,7 @@ pub fn test(
     inject_file: Option<PathBuf>,
     force: bool,
 ) -> Result<()> {
-    let scenario = parse_scenario_arg(&target)
+    let scenario = compat::parse_scenario_target_arg(&target)
         .with_context(|| format!("parsing test scenario target '{}'", target))?;
     let mut args = vec![
         "--distro".to_string(),
@@ -204,7 +203,7 @@ pub fn test_up_to(
     inject: Option<String>,
     inject_file: Option<PathBuf>,
 ) -> Result<()> {
-    let scenario = parse_scenario_arg(&target)
+    let scenario = compat::parse_scenario_target_arg(&target)
         .with_context(|| format!("parsing test-up-to scenario target '{}'", target))?;
     run_install_tests(
         &["--distro", distro.id(), "--up-to-scenario", scenario.key()],

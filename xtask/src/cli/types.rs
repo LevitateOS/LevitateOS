@@ -88,10 +88,11 @@ pub enum Cmd {
         cmd: HooksCmd,
     },
 
-    /// Install-test stage runner (interactive boot + automated pass/fail checks).
-    Stages {
+    /// Install-test scenario runner (stage-number aliases retained for compatibility).
+    #[command(name = "scenarios", alias = "stages")]
+    Scenarios {
         #[command(subcommand)]
-        cmd: StagesCmd,
+        cmd: ScenariosCmd,
     },
 
     /// Repository policy checks.
@@ -218,7 +219,7 @@ pub enum HooksCmd {
 }
 
 #[derive(Subcommand)]
-pub enum StagesCmd {
+pub enum ScenariosCmd {
     /// Boot into an interactive scenario (stage-number aliases accepted).
     ///
     /// Interactive targets: `live-boot`, `live-tools`, `installed-boot`
@@ -231,7 +232,7 @@ pub enum StagesCmd {
         inject: Option<String>,
         #[arg(long, value_name = "PATH")]
         inject_file: Option<PathBuf>,
-        /// Boot the stage and wait for SSH readiness on the host forwarded port.
+        /// Boot the scenario and wait for SSH readiness on the host forwarded port.
         #[arg(long)]
         ssh: bool,
         /// SSH host-forward port when `--ssh` is enabled.
@@ -260,7 +261,7 @@ pub enum StagesCmd {
         inject: Option<String>,
         #[arg(long, value_name = "PATH")]
         inject_file: Option<PathBuf>,
-        /// Re-run the requested stage even if it is already cached as passed.
+        /// Re-run the requested scenario even if it is already cached as passed.
         #[arg(long)]
         force: bool,
     },
@@ -276,13 +277,13 @@ pub enum StagesCmd {
         inject_file: Option<PathBuf>,
     },
 
-    /// Show stage test status.
+    /// Show scenario test status.
     Status {
         #[arg(value_enum, default_value_t = HarnessDistro::Levitate)]
         distro: HarnessDistro,
     },
 
-    /// Reset cached stage state for a distro.
+    /// Reset cached scenario state for a distro.
     Reset {
         #[arg(value_enum, default_value_t = HarnessDistro::Levitate)]
         distro: HarnessDistro,
