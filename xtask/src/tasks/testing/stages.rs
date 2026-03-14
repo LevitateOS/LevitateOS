@@ -1,5 +1,8 @@
 use anyhow::{Context, Result, bail};
-use serde::Deserialize;
+use install_tests::stages::{
+    ScenarioId, parse_scenario_arg, resolve_iso_artifact_for_scenario,
+    resolve_latest_install_runtime,
+};
 use std::fs::OpenOptions;
 use std::fs::{self, File};
 use std::io::{Read, Write};
@@ -98,7 +101,7 @@ impl WindowConfig {
 }
 
 pub fn boot(
-    n: u8,
+    target: String,
     distro: crate::cli::BootDistro,
     inject: Option<String>,
     inject_file: Option<PathBuf>,
@@ -110,7 +113,9 @@ pub fn boot(
     ssh_private_key: Option<PathBuf>,
 ) -> Result<()> {
     let root = crate::util::repo::repo_root()?;
-    let cfg = BootConfig::for_distro(&root, distro);
+    let cfg = BootConfig::for_distro(distro);
+    let scenario = parse_scenario_arg(&target)
+        .with_context(|| format!("parsing interactive scenario target '{}'", target))?;
 
     if window && ssh {
         bail!(
@@ -133,18 +138,18 @@ pub fn boot(
         None
     };
 
-    match n {
-        1 => {
-            let iso_path = resolve_stage_iso(
-                "01Boot",
-                &cfg.stage01_root,
-                cfg.stage01_iso_filename,
-                cfg.harness_distro,
-            )?;
+    match scenario {
+        ScenarioId::LiveBoot | ScenarioId::LiveTools => {
+            let iso_path = resolve_interactive_iso(&cfg, scenario)?;
+            let label = if scenario == ScenarioId::LiveBoot {
+                "Live boot ISO"
+            } else {
+                "Live tools ISO"
+            };
             boot_live_iso(
                 &root,
                 &cfg,
-                "Stage 01 live ISO",
+                label,
                 &iso_path,
                 inject,
                 inject_file,
@@ -156,54 +161,35 @@ pub fn boot(
                 ssh_private_key,
             )
         }
-        2 => {
-            let iso_path = resolve_stage_iso(
-                "02LiveTools",
-                &cfg.stage02_root,
-                cfg.stage02_iso_filename,
-                cfg.harness_distro,
-            )?;
-            boot_live_iso(
-                &root,
-                &cfg,
-                "Stage 02 live tools ISO",
-                &iso_path,
-                inject,
-                inject_file,
-                ssh,
-                ssh_port,
-                ssh_timeout,
-                no_shell,
-                window_cfg.as_ref(),
-                ssh_private_key,
-            )
-        }
-        4 => {
+        ScenarioId::InstalledBoot => {
             if ssh {
                 bail!(
-                    "`--ssh` is only supported for Stage 01; use `cargo xtask stages boot 1 --ssh`."
+                    "`--ssh` is only supported for the live-boot scenario; use `cargo xtask stages boot live-boot --ssh`."
                 );
             }
             boot_installed_disk(&root, &cfg, inject, inject_file, window_cfg.as_ref())
         }
         _ => bail!(
-            "Stage {n} is automated. Interactive stages: 01 (live), 02 (live tools), 04 (installed)."
+            "scenario '{}' is automated. Interactive targets: live-boot, live-tools, installed-boot. Compatibility aliases: 1, 2, 4.",
+            scenario.key()
         ),
     }
 }
 
 pub fn test(
-    n: u8,
+    target: String,
     distro: crate::cli::HarnessDistro,
     inject: Option<String>,
     inject_file: Option<PathBuf>,
     force: bool,
 ) -> Result<()> {
+    let scenario = parse_scenario_arg(&target)
+        .with_context(|| format!("parsing test scenario target '{}'", target))?;
     let mut args = vec![
         "--distro".to_string(),
         distro.id().to_string(),
-        "--stage".to_string(),
-        n.to_string(),
+        "--scenario".to_string(),
+        scenario.key().to_string(),
     ];
     if force {
         args.push("--force".to_string());
@@ -213,13 +199,15 @@ pub fn test(
 }
 
 pub fn test_up_to(
-    n: u8,
+    target: String,
     distro: crate::cli::HarnessDistro,
     inject: Option<String>,
     inject_file: Option<PathBuf>,
 ) -> Result<()> {
+    let scenario = parse_scenario_arg(&target)
+        .with_context(|| format!("parsing test-up-to scenario target '{}'", target))?;
     run_install_tests(
-        &["--distro", distro.id(), "--up-to", &n.to_string()],
+        &["--distro", distro.id(), "--up-to-scenario", scenario.key()],
         inject,
         inject_file,
     )
@@ -234,148 +222,38 @@ pub fn reset(distro: crate::cli::HarnessDistro) -> Result<()> {
 }
 
 struct BootConfig {
-    stage01_root: PathBuf,
-    stage01_iso_filename: &'static str,
-    stage02_root: PathBuf,
-    stage02_iso_filename: &'static str,
-    stage03_root: PathBuf,
+    distro_id: &'static str,
     pretty_name: &'static str,
-    harness_distro: crate::cli::HarnessDistro,
 }
 
 impl BootConfig {
-    fn for_distro(root: &Path, distro: crate::cli::BootDistro) -> Self {
+    fn for_distro(distro: crate::cli::BootDistro) -> Self {
         match distro {
             crate::cli::BootDistro::Levitate => Self {
-                stage01_root: root.join(".artifacts/out/levitate/s01-boot"),
-                stage01_iso_filename: "levitateos-x86_64-s01_boot.iso",
-                stage02_root: root.join(".artifacts/out/levitate/s02-live-tools"),
-                stage02_iso_filename: "levitateos-x86_64-s02_live_tools.iso",
-                stage03_root: root.join(".artifacts/out/levitate/s03-install"),
+                distro_id: "levitate",
                 pretty_name: "LevitateOS",
-                harness_distro: crate::cli::HarnessDistro::Levitate,
             },
             crate::cli::BootDistro::Acorn => Self {
-                stage01_root: root.join(".artifacts/out/acorn/s01-boot"),
-                stage01_iso_filename: "acornos-s01_boot.iso",
-                stage02_root: root.join(".artifacts/out/acorn/s02-live-tools"),
-                stage02_iso_filename: "acornos-s02_live_tools.iso",
-                stage03_root: root.join(".artifacts/out/acorn/s03-install"),
+                distro_id: "acorn",
                 pretty_name: "AcornOS",
-                harness_distro: crate::cli::HarnessDistro::Acorn,
             },
             crate::cli::BootDistro::Iuppiter => Self {
-                stage01_root: root.join(".artifacts/out/iuppiter/s01-boot"),
-                stage01_iso_filename: "iuppiter-x86_64-s01_boot.iso",
-                stage02_root: root.join(".artifacts/out/iuppiter/s02-live-tools"),
-                stage02_iso_filename: "iuppiter-x86_64-s02_live_tools.iso",
-                stage03_root: root.join(".artifacts/out/iuppiter/s03-install"),
+                distro_id: "iuppiter",
                 pretty_name: "IuppiterOS",
-                harness_distro: crate::cli::HarnessDistro::Iuppiter,
             },
             crate::cli::BootDistro::Ralph => Self {
-                stage01_root: root.join(".artifacts/out/ralph/s01-boot"),
-                stage01_iso_filename: "ralphos-x86_64-s01_boot.iso",
-                stage02_root: root.join(".artifacts/out/ralph/s02-live-tools"),
-                stage02_iso_filename: "ralphos-x86_64-s02_live_tools.iso",
-                stage03_root: root.join(".artifacts/out/ralph/s03-install"),
+                distro_id: "ralph",
                 pretty_name: "RalphOS",
-                harness_distro: crate::cli::HarnessDistro::Ralph,
             },
         }
     }
 }
 
-#[derive(Debug, Deserialize)]
-struct StageRunManifest {
-    run_id: Option<String>,
-    status: String,
-    created_at_utc: String,
-    finished_at_utc: Option<String>,
-    iso_path: Option<String>,
-    disk_path: Option<String>,
-    ovmf_vars_path: Option<String>,
-}
-
-struct Stage03RuntimeArtifacts {
-    run_id: String,
-    disk_path: PathBuf,
-    ovmf_vars_path: PathBuf,
-    disk_format: String,
-}
-
-fn resolve_stage_iso(
-    stage_label: &str,
-    stage_root: &Path,
-    stage_iso_filename: &str,
-    harness_distro: crate::cli::HarnessDistro,
-) -> Result<PathBuf> {
-    let mut candidates: Vec<(String, PathBuf)> = Vec::new();
-    if stage_root.is_dir() {
-        for entry in fs::read_dir(stage_root).with_context(|| {
-            format!(
-                "reading {} output directory '{}'",
-                stage_label,
-                stage_root.display()
-            )
-        })? {
-            let entry = entry.with_context(|| {
-                format!(
-                    "iterating {} output directory '{}'",
-                    stage_label,
-                    stage_root.display()
-                )
-            })?;
-            let run_dir = entry.path();
-            if !run_dir.is_dir() {
-                continue;
-            }
-            let manifest_path = run_dir.join("run-manifest.json");
-            if !manifest_path.is_file() {
-                continue;
-            }
-            let raw = fs::read(&manifest_path).with_context(|| {
-                format!("reading stage run manifest '{}'", manifest_path.display())
-            })?;
-            let manifest: StageRunManifest = serde_json::from_slice(&raw).with_context(|| {
-                format!("parsing stage run manifest '{}'", manifest_path.display())
-            })?;
-            if manifest.status != "success" {
-                continue;
-            }
-            let sort_key = manifest
-                .finished_at_utc
-                .clone()
-                .unwrap_or(manifest.created_at_utc.clone());
-            let iso_candidate = manifest
-                .iso_path
-                .as_ref()
-                .map(PathBuf::from)
-                .filter(|path| path.is_file())
-                .unwrap_or_else(|| run_dir.join(stage_iso_filename));
-            if iso_candidate.is_file() {
-                candidates.push((sort_key, iso_candidate));
-            }
-        }
-    }
-
-    candidates.sort_by(|a, b| b.0.cmp(&a.0));
-    if let Some((_, iso_path)) = candidates.into_iter().next() {
-        return Ok(iso_path);
-    }
-
-    let expected_path = stage_root.join(stage_iso_filename);
-
-    bail!(
-        "Missing {} ISO: no successful run-manifest ISO found under '{}'.\n\
-         Expected ISO path: {}\n\
-         Build it first, e.g. `just build {} {}`.",
-        stage_label,
-        stage_root.display(),
-        expected_path.display(),
-        harness_distro.id(),
-        stage_label,
-    )
+fn resolve_interactive_iso(cfg: &BootConfig, scenario: ScenarioId) -> Result<PathBuf> {
+    let iso = resolve_iso_artifact_for_scenario(cfg.distro_id, scenario)?.ok_or_else(|| {
+        anyhow::anyhow!("scenario '{}' is not backed by a live ISO", scenario.key())
+    })?;
+    Ok(iso.path)
 }
 
 struct BootInjection {
@@ -904,10 +782,10 @@ fn boot_installed_disk(
     _inject_file: Option<PathBuf>,
     window: Option<&WindowConfig>,
 ) -> Result<()> {
-    let runtime = resolve_stage03_runtime("03Install", &cfg.stage03_root, cfg.harness_distro)?;
+    let runtime = resolve_latest_install_runtime(cfg.distro_id)?;
     let disk = runtime.disk_path;
     let vars = runtime.ovmf_vars_path;
-    let disk_format = runtime.disk_format;
+    let disk_format = detect_disk_image_format(&disk)?;
     let ovmf = crate::util::repo::ovmf_path(root)?;
 
     let mut cmd = qemu_command_for_window(window)?;
@@ -938,12 +816,12 @@ fn boot_installed_disk(
     ]);
     if window.is_some() {
         eprintln!(
-            "Booting installed {} from Stage 03 run {} in window mode... (Ctrl-C to stop)",
+            "Booting installed {} from install scenario run {} in window mode... (Ctrl-C to stop)",
             cfg.pretty_name, runtime.run_id
         );
     } else {
         eprintln!(
-            "Booting installed {} from Stage 03 run {}... (Ctrl-A X to exit)",
+            "Booting installed {} from install scenario run {}... (Ctrl-A X to exit)",
             cfg.pretty_name, runtime.run_id
         );
     }
@@ -952,7 +830,7 @@ fn boot_installed_disk(
     eprintln!("  ovmf vars: {}", vars.display());
     if disk_format != "qcow2" {
         eprintln!(
-            "  warning: Stage 03 produced non-qcow2 disk format '{}'; investigate qemu-img availability for strict qcow2 parity.",
+            "  warning: install scenario produced non-qcow2 disk format '{}'; investigate qemu-img availability for strict qcow2 parity.",
             disk_format
         );
     }
@@ -965,101 +843,6 @@ fn boot_installed_disk(
     } else {
         run_checked(&mut cmd)
     }
-}
-
-fn resolve_stage03_runtime(
-    stage_label: &str,
-    stage_root: &Path,
-    harness_distro: crate::cli::HarnessDistro,
-) -> Result<Stage03RuntimeArtifacts> {
-    let mut candidates: Vec<(String, Stage03RuntimeArtifacts)> = Vec::new();
-    if stage_root.is_dir() {
-        for entry in fs::read_dir(stage_root).with_context(|| {
-            format!(
-                "reading {} output directory '{}'",
-                stage_label,
-                stage_root.display()
-            )
-        })? {
-            let entry = entry.with_context(|| {
-                format!(
-                    "iterating {} output directory '{}'",
-                    stage_label,
-                    stage_root.display()
-                )
-            })?;
-            let run_dir = entry.path();
-            if !run_dir.is_dir() {
-                continue;
-            }
-            let manifest_path = run_dir.join("run-manifest.json");
-            if !manifest_path.is_file() {
-                continue;
-            }
-            let raw = fs::read(&manifest_path).with_context(|| {
-                format!("reading stage run manifest '{}'", manifest_path.display())
-            })?;
-            let manifest: StageRunManifest = serde_json::from_slice(&raw).with_context(|| {
-                format!("parsing stage run manifest '{}'", manifest_path.display())
-            })?;
-            if manifest.status != "success" {
-                continue;
-            }
-
-            let sort_key = manifest
-                .finished_at_utc
-                .clone()
-                .unwrap_or(manifest.created_at_utc.clone());
-            let run_id = manifest
-                .run_id
-                .clone()
-                .or_else(|| {
-                    run_dir
-                        .file_name()
-                        .and_then(|name| name.to_str())
-                        .map(ToOwned::to_owned)
-                })
-                .unwrap_or_else(|| "<unknown>".to_string());
-
-            let disk_candidate = manifest
-                .disk_path
-                .as_ref()
-                .map(PathBuf::from)
-                .unwrap_or_else(|| run_dir.join("stage-disk.qcow2"));
-            let vars_candidate = manifest
-                .ovmf_vars_path
-                .as_ref()
-                .map(PathBuf::from)
-                .unwrap_or_else(|| run_dir.join("stage-ovmf-vars.fd"));
-            if disk_candidate.is_file() && vars_candidate.is_file() {
-                let disk_format = detect_disk_image_format(&disk_candidate).with_context(|| {
-                    format!("detecting disk format for '{}'", disk_candidate.display())
-                })?;
-                candidates.push((
-                    sort_key,
-                    Stage03RuntimeArtifacts {
-                        run_id,
-                        disk_path: disk_candidate,
-                        ovmf_vars_path: vars_candidate,
-                        disk_format,
-                    },
-                ));
-            }
-        }
-    }
-
-    candidates.sort_by(|a, b| b.0.cmp(&a.0));
-    if let Some((_, artifacts)) = candidates.into_iter().next() {
-        return Ok(artifacts);
-    }
-
-    bail!(
-        "Missing Stage 03 install runtime artifacts under '{}'.\n\
-         Run Stage 03 first (example: `just test 3 {}`), then retry Stage 04 boot.\n\
-         Expected latest successful run with files: stage-disk.qcow2 + stage-ovmf-vars.fd",
-        stage_root.display(),
-        harness_distro.id(),
-    )
 }
 
 fn detect_disk_image_format(path: &Path) -> Result<String> {
@@ -1553,106 +1336,6 @@ mod tests {
     use std::sync::atomic::{AtomicU64, Ordering};
 
     static TEST_COUNTER: AtomicU64 = AtomicU64::new(0);
-
-    #[test]
-    fn resolve_stage03_runtime_prefers_latest_successful_run() {
-        let root = test_temp_dir("stage03-resolve-latest");
-        let stage_root = root.join("s03-install");
-        fs::create_dir_all(&stage_root).expect("create stage root");
-
-        let run_old = stage_root.join("run-old");
-        fs::create_dir_all(&run_old).expect("create old run dir");
-        fs::write(run_old.join("stage-disk.qcow2"), b"old-disk").expect("write old disk");
-        fs::write(run_old.join("stage-ovmf-vars.fd"), b"old-vars").expect("write old vars");
-        fs::write(
-            run_old.join("run-manifest.json"),
-            r#"{
-  "run_id": "run-old",
-  "status": "success",
-  "created_at_utc": "20260101T000000Z",
-  "finished_at_utc": "20260101T000100Z"
-}"#,
-        )
-        .expect("write old manifest");
-
-        let run_new = stage_root.join("run-new");
-        fs::create_dir_all(&run_new).expect("create new run dir");
-        fs::write(run_new.join("stage-disk.qcow2"), b"new-disk").expect("write new disk");
-        fs::write(run_new.join("stage-ovmf-vars.fd"), b"new-vars").expect("write new vars");
-        fs::write(
-            run_new.join("run-manifest.json"),
-            r#"{
-  "run_id": "run-new",
-  "status": "success",
-  "created_at_utc": "20260101T010000Z",
-  "finished_at_utc": "20260101T010100Z"
-}"#,
-        )
-        .expect("write new manifest");
-
-        let resolved = resolve_stage03_runtime(
-            "03Install",
-            &stage_root,
-            crate::cli::HarnessDistro::Iuppiter,
-        )
-        .expect("resolve runtime");
-
-        assert_eq!(resolved.run_id, "run-new");
-        assert_eq!(resolved.disk_path, run_new.join("stage-disk.qcow2"));
-        assert_eq!(resolved.ovmf_vars_path, run_new.join("stage-ovmf-vars.fd"));
-        assert_eq!(resolved.disk_format, "raw");
-
-        let _ = fs::remove_dir_all(root);
-    }
-
-    #[test]
-    fn resolve_stage03_runtime_ignores_failed_or_incomplete_runs() {
-        let root = test_temp_dir("stage03-resolve-filter");
-        let stage_root = root.join("s03-install");
-        fs::create_dir_all(&stage_root).expect("create stage root");
-
-        let run_failed = stage_root.join("run-failed");
-        fs::create_dir_all(&run_failed).expect("create failed run dir");
-        fs::write(run_failed.join("stage-disk.qcow2"), b"failed-disk").expect("write failed disk");
-        fs::write(run_failed.join("stage-ovmf-vars.fd"), b"failed-vars")
-            .expect("write failed vars");
-        fs::write(
-            run_failed.join("run-manifest.json"),
-            r#"{
-  "run_id": "run-failed",
-  "status": "failed",
-  "created_at_utc": "20260101T020000Z",
-  "finished_at_utc": "20260101T020100Z"
-}"#,
-        )
-        .expect("write failed manifest");
-
-        let run_success = stage_root.join("run-success");
-        fs::create_dir_all(&run_success).expect("create success run dir");
-        fs::write(run_success.join("stage-disk.qcow2"), b"ok-disk").expect("write success disk");
-        fs::write(run_success.join("stage-ovmf-vars.fd"), b"ok-vars").expect("write success vars");
-        fs::write(
-            run_success.join("run-manifest.json"),
-            r#"{
-  "run_id": "run-success",
-  "status": "success",
-  "created_at_utc": "20260101T021000Z",
-  "finished_at_utc": "20260101T021100Z"
-}"#,
-        )
-        .expect("write success manifest");
-
-        let resolved = resolve_stage03_runtime(
-            "03Install",
-            &stage_root,
-            crate::cli::HarnessDistro::Iuppiter,
-        )
-        .expect("resolve runtime");
-        assert_eq!(resolved.run_id, "run-success");
-        assert_eq!(resolved.disk_format, "raw");
-
-        let _ = fs::remove_dir_all(root);
-    }
 
     #[test]
     fn detect_disk_image_format_recognizes_qcow2_magic() {

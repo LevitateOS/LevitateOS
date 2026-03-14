@@ -219,11 +219,12 @@ pub enum HooksCmd {
 
 #[derive(Subcommand)]
 pub enum StagesCmd {
-    /// Boot into an interactive stage (serial console by default).
+    /// Boot into an interactive scenario (stage-number aliases accepted).
     ///
-    /// Interactive stages: 01 (live ISO), 02 (live tools), 04 (installed).
+    /// Interactive targets: `live-boot`, `live-tools`, `installed-boot`
+    /// Compatibility aliases: `1`, `2`, `4`
     Boot {
-        n: u8,
+        target: String,
         #[arg(value_enum, default_value_t = BootDistro::Levitate)]
         distro: BootDistro,
         #[arg(long, value_name = "KEY=VALUE[,KEY=VALUE...]")]
@@ -250,9 +251,9 @@ pub enum StagesCmd {
         ssh_private_key: Option<PathBuf>,
     },
 
-    /// Run automated stage test N (pass/fail).
+    /// Run one automated scenario (or stage-number alias).
     Test {
-        n: u8,
+        target: String,
         #[arg(value_enum, default_value_t = HarnessDistro::Levitate)]
         distro: HarnessDistro,
         #[arg(long, value_name = "KEY=VALUE[,KEY=VALUE...]")]
@@ -264,9 +265,9 @@ pub enum StagesCmd {
         force: bool,
     },
 
-    /// Run all automated stage tests up to N.
+    /// Run all automated scenarios up to the given scenario (or stage-number alias).
     TestUpTo {
-        n: u8,
+        target: String,
         #[arg(value_enum, default_value_t = HarnessDistro::Levitate)]
         distro: HarnessDistro,
         #[arg(long, value_name = "KEY=VALUE[,KEY=VALUE...]")]

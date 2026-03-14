@@ -49,7 +49,7 @@ pub fn run(cli: crate::cli::Cli) -> Result<()> {
         },
         crate::cli::Cmd::Stages { cmd } => match cmd {
             crate::cli::StagesCmd::Boot {
-                n,
+                target,
                 distro,
                 inject,
                 inject_file,
@@ -60,7 +60,7 @@ pub fn run(cli: crate::cli::Cli) -> Result<()> {
                 window,
                 ssh_private_key,
             } => crate::tasks::testing::stages::boot(
-                n,
+                target,
                 distro,
                 inject,
                 inject_file,
@@ -72,18 +72,18 @@ pub fn run(cli: crate::cli::Cli) -> Result<()> {
                 ssh_private_key,
             ),
             crate::cli::StagesCmd::Test {
-                n,
+                target,
                 distro,
                 inject,
                 inject_file,
                 force,
-            } => crate::tasks::testing::stages::test(n, distro, inject, inject_file, force),
+            } => crate::tasks::testing::stages::test(target, distro, inject, inject_file, force),
             crate::cli::StagesCmd::TestUpTo {
-                n,
+                target,
                 distro,
                 inject,
                 inject_file,
-            } => crate::tasks::testing::stages::test_up_to(n, distro, inject, inject_file),
+            } => crate::tasks::testing::stages::test_up_to(target, distro, inject, inject_file),
             crate::cli::StagesCmd::Status { distro } => {
                 crate::tasks::testing::stages::status(distro)
             }
