@@ -82,10 +82,10 @@ json_escape() {
 
 default_iso_filename() {
     case "${PRODUCT_NAME:-}" in
-        base-rootfs) printf '%s\n' "${IDENTITY_OS_ID}-x86_64-base-rootfs.iso" ;;
+        base-rootfs) printf '%s\n' "${IDENTITY_OS_ID}-x86_64.iso" ;;
         live-boot) printf '%s\n' "${IDENTITY_OS_ID}-x86_64-live-boot.iso" ;;
         live-tools) printf '%s\n' "${IDENTITY_OS_ID}-x86_64-live-tools.iso" ;;
-        *) printf '%s\n' "${IDENTITY_OS_ID}-x86_64-s00_build.iso" ;;
+        *) printf '%s\n' "${IDENTITY_OS_ID}-x86_64.iso" ;;
     esac
 }
 

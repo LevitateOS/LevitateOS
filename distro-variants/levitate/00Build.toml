@@ -10,7 +10,7 @@ default_hostname = "levitateos"
 [artifacts]
 rootfs_name = "s00-filesystem.erofs"
 initramfs_live_output = "s00-initramfs-live.cpio.gz"
-iso_filename = "levitateos-x86_64-s00_build.iso"
+iso_filename = "levitateos-x86_64.iso"
 initramfs_installed_output = "s00-initramfs-installed.img"
 installed_uki_outputs = ["levitateos.efi", "levitateos-recovery.efi"]
 

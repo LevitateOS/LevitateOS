@@ -100,12 +100,12 @@ preseed-levitate:
 preseed-acorn:
     just preseed acorn true
 
-# Internal delegate for stage booting.
-# Keep `cargo xtask scenarios boot` as the canonical execution path for stage wrappers.
-# Boundary rule: stage wrappers consume existing artifacts only.
-# Do not add implicit ISO build steps here; freshness is explicit via `just build*`.
+# Internal delegate for scenario booting.
+# Keep `cargo xtask scenarios boot` as the canonical execution path.
+# Boundary rule: boot wrappers consume existing artifacts only.
+# Do not add implicit ISO build steps here; freshness is explicit via `just release-build*` or compatibility `just build*`.
 [script, no-exit-message]
-_boot_stage n distro="levitate" inject="" inject_file="" ssh="false" no_shell="false" window="false" ssh_pubkey=(env("HOME") + "/.ssh/id_ed25519.pub") ssh_privkey="" ssh_port="2222" inject_append="":
+_boot_scenario n distro="levitate" inject="" inject_file="" ssh="false" no_shell="false" window="false" ssh_pubkey=(env("HOME") + "/.ssh/id_ed25519.pub") ssh_privkey="" ssh_port="2222" inject_append="":
     #!/usr/bin/env bash
     set -euo pipefail
     CARGO_BIN="${CARGO_BIN:-cargo}"
@@ -113,7 +113,7 @@ _boot_stage n distro="levitate" inject="" inject_file="" ssh="false" no_shell="f
       if [ -n "${HOME:-}" ] && [ -x "${HOME}/.cargo/bin/cargo" ]; then
         CARGO_BIN="${HOME}/.cargo/bin/cargo"
       else
-        echo "cargo not found in PATH for _boot_stage." >&2
+        echo "cargo not found in PATH for _boot_scenario." >&2
         echo "Remediation: source \"\$HOME/.cargo/env\" (or install Rust), then rerun." >&2
         exit 127
       fi
@@ -185,24 +185,29 @@ _boot_stage n distro="levitate" inject="" inject_file="" ssh="false" no_shell="f
 
     "${args[@]}"
 
-# Boot into a stage (interactive serial, Ctrl-A X to exit)
+# Compatibility alias for the old stage boot delegate.
 [no-exit-message]
-stage n distro="levitate" inject="" inject_file="" ssh_pubkey=(env("HOME") + "/.ssh/id_ed25519.pub"):
-    just _boot_stage {{n}} {{distro}} "{{inject}}" "{{inject_file}}" false false false "{{ssh_pubkey}}" "" 2222 LEVITATE_INSTALL_SERIAL_UX=1
+_boot_stage n distro="levitate" inject="" inject_file="" ssh="false" no_shell="false" window="false" ssh_pubkey=(env("HOME") + "/.ssh/id_ed25519.pub") ssh_privkey="" ssh_port="2222" inject_append="":
+    just _boot_scenario {{n}} {{distro}} "{{inject}}" "{{inject_file}}" {{ssh}} {{no_shell}} {{window}} "{{ssh_pubkey}}" "{{ssh_privkey}}" "{{ssh_port}}" "{{inject_append}}"
 
-# Boot into a stage with verbose serial logging (kernel printks + install UX shell).
+# Boot a scenario (interactive serial, Ctrl-A X to exit)
 [no-exit-message]
-stage-verbose n distro="levitate" inject="" inject_file="" ssh_pubkey=(env("HOME") + "/.ssh/id_ed25519.pub"):
-    just _boot_stage {{n}} {{distro}} "{{inject}}" "{{inject_file}}" false false false "{{ssh_pubkey}}" "" 2222 LEVITATE_INSTALL_SERIAL_UX=1,LEVITATE_INSTALL_SERIAL_VERBOSE=1
+scenario n distro="levitate" inject="" inject_file="" ssh_pubkey=(env("HOME") + "/.ssh/id_ed25519.pub"):
+    just _boot_scenario {{n}} {{distro}} "{{inject}}" "{{inject_file}}" false false false "{{ssh_pubkey}}" "" 2222 LEVITATE_INSTALL_SERIAL_UX=1
 
-# Boot a live stage in background and SSH into it (no serial wrapper harness).
+# Boot a scenario with verbose serial logging (kernel printks + install UX shell).
 [no-exit-message]
-stage-ssh n distro="levitate" inject="" inject_file="" ssh_pubkey=(env("HOME") + "/.ssh/id_ed25519.pub") ssh_privkey=(env("HOME") + "/.ssh/id_ed25519") ssh_port="2222":
-    just _boot_stage {{n}} {{distro}} "{{inject}}" "{{inject_file}}" true false false "{{ssh_pubkey}}" "{{ssh_privkey}}" "{{ssh_port}}" ""
+scenario-verbose n distro="levitate" inject="" inject_file="" ssh_pubkey=(env("HOME") + "/.ssh/id_ed25519.pub"):
+    just _boot_scenario {{n}} {{distro}} "{{inject}}" "{{inject_file}}" false false false "{{ssh_pubkey}}" "" 2222 LEVITATE_INSTALL_SERIAL_UX=1,LEVITATE_INSTALL_SERIAL_VERBOSE=1
 
-# Boot into a stage with a local QEMU GUI window in foreground mode (Ctrl-C to stop).
+# Boot a live scenario in background and SSH into it (no serial wrapper harness).
+[no-exit-message]
+scenario-ssh n distro="levitate" inject="" inject_file="" ssh_pubkey=(env("HOME") + "/.ssh/id_ed25519.pub") ssh_privkey=(env("HOME") + "/.ssh/id_ed25519") ssh_port="2222":
+    just _boot_scenario {{n}} {{distro}} "{{inject}}" "{{inject_file}}" true false false "{{ssh_pubkey}}" "{{ssh_privkey}}" "{{ssh_port}}" ""
+
+# Boot a scenario with a local QEMU GUI window in foreground mode (Ctrl-C to stop).
 [script, no-exit-message]
-stage-window n distro="levitate" inject="" inject_file="" ssh_pubkey=(env("HOME") + "/.ssh/id_ed25519.pub"):
+scenario-window n distro="levitate" inject="" inject_file="" ssh_pubkey=(env("HOME") + "/.ssh/id_ed25519.pub"):
     #!/usr/bin/env bash
     set -euo pipefail
     CARGO_BIN="${CARGO_BIN:-cargo}"
@@ -210,7 +215,7 @@ stage-window n distro="levitate" inject="" inject_file="" ssh_pubkey=(env("HOME"
       if [ -n "${HOME:-}" ] && [ -x "${HOME}/.cargo/bin/cargo" ]; then
         CARGO_BIN="${HOME}/.cargo/bin/cargo"
       else
-        echo "cargo not found in PATH for stage-window." >&2
+        echo "cargo not found in PATH for scenario-window." >&2
         echo "Remediation: source \"\$HOME/.cargo/env\" (or install Rust), then rerun." >&2
         exit 127
       fi
@@ -233,17 +238,42 @@ stage-window n distro="levitate" inject="" inject_file="" ssh_pubkey=(env("HOME"
 
     "${args[@]}"
 
+# Boot a scenario with a remote VNC window endpoint in foreground mode (Ctrl-C to stop).
+[no-exit-message]
+scenario-window-remote n distro="levitate" inject="" inject_file="" ssh_pubkey=(env("HOME") + "/.ssh/id_ed25519.pub"):
+    just _boot_scenario {{n}} {{distro}} "{{inject}}" "{{inject_file}}" false false true "{{ssh_pubkey}}" "" 2222 ""
+
+# Boot into a stage (interactive serial, Ctrl-A X to exit)
+[no-exit-message]
+stage n distro="levitate" inject="" inject_file="" ssh_pubkey=(env("HOME") + "/.ssh/id_ed25519.pub"):
+    just scenario {{n}} {{distro}} "{{inject}}" "{{inject_file}}" "{{ssh_pubkey}}"
+
+# Boot into a stage with verbose serial logging (kernel printks + install UX shell).
+[no-exit-message]
+stage-verbose n distro="levitate" inject="" inject_file="" ssh_pubkey=(env("HOME") + "/.ssh/id_ed25519.pub"):
+    just scenario-verbose {{n}} {{distro}} "{{inject}}" "{{inject_file}}" "{{ssh_pubkey}}"
+
+# Boot a live stage in background and SSH into it (no serial wrapper harness).
+[no-exit-message]
+stage-ssh n distro="levitate" inject="" inject_file="" ssh_pubkey=(env("HOME") + "/.ssh/id_ed25519.pub") ssh_privkey=(env("HOME") + "/.ssh/id_ed25519") ssh_port="2222":
+    just scenario-ssh {{n}} {{distro}} "{{inject}}" "{{inject_file}}" "{{ssh_pubkey}}" "{{ssh_privkey}}" "{{ssh_port}}"
+
+# Boot into a stage with a local QEMU GUI window in foreground mode (Ctrl-C to stop).
+[no-exit-message]
+stage-window n distro="levitate" inject="" inject_file="" ssh_pubkey=(env("HOME") + "/.ssh/id_ed25519.pub"):
+    just scenario-window {{n}} {{distro}} "{{inject}}" "{{inject_file}}" "{{ssh_pubkey}}"
+
 # Boot into a stage with a remote VNC window endpoint in foreground mode (Ctrl-C to stop).
 [no-exit-message]
 stage-window-remote n distro="levitate" inject="" inject_file="" ssh_pubkey=(env("HOME") + "/.ssh/id_ed25519.pub"):
-    just _boot_stage {{n}} {{distro}} "{{inject}}" "{{inject_file}}" false false true "{{ssh_pubkey}}" "" 2222 ""
+    just scenario-window-remote {{n}} {{distro}} "{{inject}}" "{{inject_file}}" "{{ssh_pubkey}}"
 
 # Single-path live-boot parity gate (serial boot + SSH boot).
 [script, no-exit-message]
 s01-parity distro="levitate" inject="" inject_file="" ssh_pubkey=(env("HOME") + "/.ssh/id_ed25519.pub") ssh_privkey=(env("HOME") + "/.ssh/id_ed25519") ssh_port="2222":
     #!/usr/bin/env bash
     set -euo pipefail
-    just build 01Boot {{distro}}
+    just release-build live-boot {{distro}}
 
     tmp_serial=""
     tmp_ssh=""
@@ -284,7 +314,7 @@ s01-parity distro="levitate" inject="" inject_file="" ssh_pubkey=(env("HOME") + 
     cargo xtask scenarios boot 1 "{{distro}}" "${ssh_args[@]}"
 
 # Run automated scenario test (pass/fail)
-test n distro="levitate" inject="" inject_file="" ssh_pubkey=(env("HOME") + "/.ssh/id_ed25519.pub"):
+scenario-test n distro="levitate" inject="" inject_file="" ssh_pubkey=(env("HOME") + "/.ssh/id_ed25519.pub"):
     if [ -n "{{inject_file}}" ]; then \
       cargo xtask scenarios test {{n}} {{distro}} --inject-file "{{inject_file}}"; \
     elif [ -n "{{inject}}" ]; then \
@@ -299,8 +329,12 @@ test n distro="levitate" inject="" inject_file="" ssh_pubkey=(env("HOME") + "/.s
       cargo xtask scenarios test {{n}} {{distro}}; \
     fi
 
+# Run automated stage test (compatibility alias).
+test n distro="levitate" inject="" inject_file="" ssh_pubkey=(env("HOME") + "/.ssh/id_ed25519.pub"):
+    just scenario-test {{n}} {{distro}} "{{inject}}" "{{inject_file}}" "{{ssh_pubkey}}"
+
 # Run all scenario tests up to N
-test-up-to n distro="levitate" inject="" inject_file="" ssh_pubkey=(env("HOME") + "/.ssh/id_ed25519.pub"):
+scenario-test-up-to n distro="levitate" inject="" inject_file="" ssh_pubkey=(env("HOME") + "/.ssh/id_ed25519.pub"):
     if [ -n "{{inject_file}}" ]; then \
       cargo xtask scenarios test-up-to {{n}} {{distro}} --inject-file "{{inject_file}}"; \
     elif [ -n "{{inject}}" ]; then \
@@ -315,17 +349,38 @@ test-up-to n distro="levitate" inject="" inject_file="" ssh_pubkey=(env("HOME") 
       cargo xtask scenarios test-up-to {{n}} {{distro}}; \
     fi
 
+# Run all stage tests up to N (compatibility alias).
+test-up-to n distro="levitate" inject="" inject_file="" ssh_pubkey=(env("HOME") + "/.ssh/id_ed25519.pub"):
+    just scenario-test-up-to {{n}} {{distro}} "{{inject}}" "{{inject_file}}" "{{ssh_pubkey}}"
+
 # Show scenario test status
-test-status distro="levitate":
+scenario-status distro="levitate":
     cargo xtask scenarios status {{distro}}
 
+# Show stage test status (compatibility alias).
+test-status distro="levitate":
+    just scenario-status {{distro}}
+
 # Reset scenario test state
-test-reset distro="levitate":
+scenario-reset distro="levitate":
     cargo xtask scenarios reset {{distro}}
 
-# Build ISO via new distro-builder endpoint (`distro-variants` Stage flow).
-# Human-friendly: use `<stage-or-distro> [<stage-or-distro>]`.
-# `distro-builder` canonicalizes missing/default values and aliases.
+# Reset stage test state (compatibility alias).
+test-reset distro="levitate":
+    just scenario-reset {{distro}}
+
+# Build release ISOs via the canonical product-first distro-builder endpoint.
+# Human-friendly: use `<product-or-distro> [<product-or-distro>]`.
+[no-exit-message]
+release-build *args:
+    cargo run -p distro-builder --bin distro-builder -- release build iso {{args}}
+
+# Build release ISOs for all variants via the canonical endpoint.
+release-build-all *args:
+    cargo run -p distro-builder --bin distro-builder -- release build-all iso {{args}}
+
+# Compatibility build wrapper.
+# Supports stage aliases and the special Stage 03 install/test shortcut.
 [script, no-exit-message]
 build *args:
     #!/usr/bin/env bash
@@ -373,9 +428,9 @@ build *args:
       fi
     fi
 
-    cargo run -p distro-builder --bin distro-builder -- iso build "$@"
+    cargo run -p distro-builder --bin distro-builder -- release build iso "$@"
 
-# Build stage ISOs from 00 up to N (inclusive) for a distro.
+# Build stage aliases from 00 up to N (inclusive) for a distro.
 # Usage: just build-up-to 3 levitate
 [script, no-exit-message]
 build-up-to n distro="levitate":
@@ -400,11 +455,11 @@ build-up-to n distro="levitate":
       just build "{{distro}}" "${stage}"
     done
 
-# Build ISOs for all variants via new endpoint
+# Build ISOs for all variants via compatibility wrapper.
 build-all *args:
-    cargo run -p distro-builder --bin distro-builder -- iso build-all {{args}}
+    just release-build-all {{args}}
 
-# Prepare stage inputs and build both rootfs/overlay EROFS artifacts.
+# Prepare compatibility stage inputs and build both rootfs/overlay EROFS artifacts.
 # Example: just stage-erofs 02LiveTools levitate
 stage-erofs stage="02LiveTools" distro="levitate":
     cargo run -p distro-builder --bin distro-builder -- artifact build-stage-erofs {{stage}} {{distro}}
