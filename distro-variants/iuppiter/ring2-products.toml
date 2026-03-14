@@ -1,0 +1,24 @@
+schema_version = 6
+
+[ring2_products.rootfs_base]
+logical_name = "product.rootfs.base"
+description = "Canonical base root filesystem tree"
+
+[ring2_products.live_overlay]
+logical_name = "product.payload.live_overlay"
+description = "Read-only live overlay payload tree"
+overlay_kind = "openrc"
+openrc_inittab = "serial_only"
+profile_overlay = "distro-variants/iuppiter/profile/live-overlay"
+
+[ring2_products.boot_live]
+logical_name = "product.payload.boot.live"
+description = "Live boot payload inputs"
+
+[ring2_products.boot_installed]
+logical_name = "product.payload.boot.installed"
+description = "Installed-system boot payload inputs"
+
+[ring2_products.kernel_staging]
+logical_name = "product.kernel.staging"
+description = "Kernel image and modules staging product"

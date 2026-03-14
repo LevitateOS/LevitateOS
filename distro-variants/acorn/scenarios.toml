@@ -1,0 +1,19 @@
+schema_version = 6
+
+[scenarios.live_boot]
+required_kernel_cmdline = ["audit=1"]
+required_live_services = ["networking", "dhcpcd", "sshd"]
+
+[scenarios.live_boot.evidence]
+script_path = "stage-01-live-boot.sh"
+pass_marker = "STAGE 01 PASSED"
+
+[scenarios.live_environment]
+required_services = ["networking", "dhcpcd", "sshd"]
+
+[scenarios.live_tools]
+install_experience = "ux"
+
+[scenarios.live_tools.evidence]
+script_path = "stage-02-live-tools.sh"
+pass_marker = "STAGE 02 PASSED"

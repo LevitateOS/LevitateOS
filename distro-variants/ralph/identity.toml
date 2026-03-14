@@ -1,0 +1,8 @@
+schema_version = 6
+
+[identity]
+os_name = "RalphOS"
+os_id = "ralphos"
+iso_label = "RALPHOS"
+os_version = "1.0"
+default_hostname = "ralphos"

@@ -1,0 +1,8 @@
+schema_version = 6
+
+[identity]
+os_name = "AcornOS"
+os_id = "acornos"
+iso_label = "ACORNOS"
+os_version = "1.0"
+default_hostname = "acornos"

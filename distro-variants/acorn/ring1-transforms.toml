@@ -1,0 +1,32 @@
+schema_version = 6
+
+[ring1_transforms.rootfs_image]
+logical_name = "artifact.rootfs.erofs"
+dependencies = ["product.rootfs.base"]
+output_names = ["s00-filesystem.erofs"]
+format = "erofs"
+
+[ring1_transforms.overlay_image]
+logical_name = "artifact.overlay.erofs"
+dependencies = ["product.payload.live_overlay"]
+output_names = ["s00-overlayfs.erofs"]
+format = "erofs"
+
+[ring1_transforms.initramfs_live]
+logical_name = "artifact.initramfs.live"
+dependencies = ["product.payload.boot.live", "product.kernel.staging"]
+output_names = ["s00-initramfs-live.cpio.gz"]
+format = "cpio.gz"
+
+[ring1_transforms.live_uki]
+logical_name = "artifact.uki.live"
+dependencies = ["product.payload.boot.live", "product.kernel.staging"]
+output_names = ["acornos-live.efi", "acornos-emergency.efi", "acornos-debug.efi"]
+format = "uki"
+extra_cmdline = "video=1920x1080"
+
+[ring1_transforms.installed_uki]
+logical_name = "artifact.uki.installed"
+dependencies = ["product.payload.boot.installed", "product.kernel.staging"]
+output_names = ["acornos.efi", "acornos-recovery.efi"]
+format = "uki"

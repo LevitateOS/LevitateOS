@@ -1,0 +1,8 @@
+schema_version = 6
+
+[identity]
+os_name = "IuppiterOS"
+os_id = "iuppiter"
+iso_label = "IUPPITER"
+os_version = "1.0"
+default_hostname = "iuppiter"

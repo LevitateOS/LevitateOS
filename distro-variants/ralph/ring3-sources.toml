@@ -1,7 +1,6 @@
-[stage_01.boot_inputs]
-required_services = ["sshd"]
+schema_version = 6
 
-[stage_01.boot_inputs.rootfs_source]
+[ring3_sources.rootfs_source]
 kind = "recipe_rpm_dvd"
 recipe_script = "distro-builder/recipes/fedora-stage01-rootfs.rhai"
 preseed_recipe_script = "distro-builder/recipes/fedora-preseed-iso.rhai"

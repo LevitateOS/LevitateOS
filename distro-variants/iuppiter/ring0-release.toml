@@ -1,0 +1,31 @@
+schema_version = 6
+
+[ring0_release.iso]
+logical_name = "artifact.iso"
+dependencies = [
+  "artifact.rootfs.erofs",
+  "artifact.overlay.erofs",
+  "artifact.initramfs.live",
+  "artifact.uki.live",
+]
+output_names = ["iuppiter-x86_64.iso"]
+format = "iso"
+
+[ring0_release.disk_image]
+logical_name = "artifact.disk"
+dependencies = ["product.rootfs.base", "product.kernel.staging"]
+output_names = ["iuppiteros-x86_64.img"]
+format = "img"
+
+[ring0_release.release]
+primary_outputs = ["iuppiter-x86_64.iso", "iuppiteros-x86_64.img"]
+supporting_artifacts = ["s00-filesystem.erofs", "s00-initramfs-live.cpio.gz"]
+metadata_outputs = []
+metadata_facts = [
+  "kernel_source.version",
+  "kernel_source.sha256",
+  "kernel_source.localversion",
+  "artifact.rootfs_name",
+  "artifact.iso_filename",
+  "artifact.disk_image_filename",
+]

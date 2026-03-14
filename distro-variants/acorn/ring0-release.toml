@@ -1,0 +1,24 @@
+schema_version = 6
+
+[ring0_release.iso]
+logical_name = "artifact.iso"
+dependencies = [
+  "artifact.rootfs.erofs",
+  "artifact.overlay.erofs",
+  "artifact.initramfs.live",
+  "artifact.uki.live",
+]
+output_names = ["acornos-x86_64.iso"]
+format = "iso"
+
+[ring0_release.release]
+primary_outputs = ["acornos-x86_64.iso"]
+supporting_artifacts = ["s00-filesystem.erofs", "s00-initramfs-live.cpio.gz"]
+metadata_outputs = []
+metadata_facts = [
+  "kernel_source.version",
+  "kernel_source.sha256",
+  "kernel_source.localversion",
+  "artifact.rootfs_name",
+  "artifact.iso_filename",
+]
