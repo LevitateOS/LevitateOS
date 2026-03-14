@@ -66,7 +66,7 @@ impl WindowConfig {
                 (Some(qemu_bin), Some(display_backend), None, None, None)
             }
         };
-        let serial_log = temp_file_path("levitate-stage-window-serial").with_extension("log");
+        let serial_log = temp_file_path("levitate-scenario-window-serial").with_extension("log");
         Ok(Self {
             mode,
             local_qemu_bin,
@@ -93,7 +93,7 @@ impl WindowConfig {
         };
         let display_index = vnc_port.saturating_sub(5900);
         Some(format!(
-            "vnc={}:{display_index},to=99,id=stage-window",
+            "vnc={}:{display_index},to=99,id=scenario-window",
             bind_host
         ))
     }
@@ -336,7 +336,7 @@ fn boot_injection_payload(
 fn boot_live_iso(
     root: &Path,
     cfg: &BootConfig,
-    stage_label: &'static str,
+    scenario_label: &'static str,
     iso_path: &Path,
     inject: Option<String>,
     inject_file: Option<PathBuf>,
@@ -355,7 +355,7 @@ fn boot_live_iso(
         boot_live_iso_ssh(
             root,
             cfg,
-            stage_label,
+            scenario_label,
             iso_path,
             injection,
             ssh_port,
@@ -378,7 +378,7 @@ fn boot_live_iso_serial(
     window: Option<&WindowConfig>,
 ) -> Result<()> {
     if no_shell {
-        let log_path = temp_log_path("levitate-stage01-serial-boot");
+        let log_path = temp_log_path("levitate-live-boot-serial");
         let mut cmd = qemu_base_command(root, iso_path, injection.as_ref(), None, window)?;
         let child = spawn_qemu_with_log(&mut cmd, &log_path, false)?;
         monitor_live_iso_serial(child, &log_path)?;
@@ -405,8 +405,9 @@ fn boot_live_iso_serial(
 fn monitor_live_iso_serial(mut child: Child, log_path: &Path) -> Result<()> {
     let booted_message = "switching root to live system";
     let default_timeout = 120u64;
-    let timeout_secs = std::env::var("LEVITATE_STAGE01_SERIAL_TIMEOUT")
+    let timeout_secs = std::env::var("LEVITATE_LIVE_BOOT_SERIAL_TIMEOUT")
         .ok()
+        .or_else(|| std::env::var("LEVITATE_STAGE01_SERIAL_TIMEOUT").ok())
         .and_then(|raw| raw.parse::<u64>().ok())
         .unwrap_or(default_timeout);
     let deadline = Instant::now() + Duration::from_secs(timeout_secs.max(1));
@@ -444,7 +445,7 @@ fn monitor_live_iso_serial(mut child: Child, log_path: &Path) -> Result<()> {
             let _ = child.kill();
             let _ = child.wait();
             return bail_with_tail(
-                &format!("Timed out waiting for Stage 01 serial boot handoff ({timeout_secs}s)"),
+                &format!("Timed out waiting for live-boot serial handoff ({timeout_secs}s)"),
                 log_path,
                 Some("No root-switch handoff marker observed."),
             );
@@ -469,7 +470,7 @@ fn detect_live_boot_success(log_path: &Path, pattern: &str) -> bool {
 fn boot_live_iso_ssh(
     root: &Path,
     cfg: &BootConfig,
-    stage_label: &'static str,
+    scenario_label: &'static str,
     iso_path: &Path,
     injection: Option<BootInjection>,
     ssh_port: u16,
@@ -480,12 +481,12 @@ fn boot_live_iso_ssh(
 ) -> Result<()> {
     eprintln!(
         "Booting {} {} with SSH wait (port 127.0.0.1:{ssh_port})...",
-        cfg.pretty_name, stage_label
+        cfg.pretty_name, scenario_label
     );
     ensure_ssh_port_available(ssh_port)?;
 
     let mut cmd = qemu_base_command(root, iso_path, injection.as_ref(), Some(ssh_port), window)?;
-    let log_path = temp_log_path("levitate-stage01-ssh-boot");
+    let log_path = temp_log_path("levitate-live-boot-ssh");
     let child = spawn_qemu_with_log(&mut cmd, &log_path, true)?;
     let result = monitor_live_iso_ssh(
         child,
@@ -517,7 +518,7 @@ fn monitor_live_iso_ssh(
     no_shell: bool,
     ssh_private_key: Option<PathBuf>,
 ) -> Result<()> {
-    let known_hosts = temp_file_path("levitate-stage01-ssh-known-hosts");
+    let known_hosts = temp_file_path("levitate-live-boot-ssh-known-hosts");
     fs::write(&known_hosts, "").context("creating known-hosts scratch file")?;
     let deadline = Instant::now() + Duration::from_secs(ssh_timeout.max(1));
     let key = resolve_ssh_private_key(ssh_private_key)?;
@@ -554,7 +555,7 @@ fn monitor_live_iso_ssh(
         }
 
         if !hook_seen {
-            if let Some(pat) = detect_stage01_boot_hook(log_path)? {
+            if let Some(pat) = detect_live_boot_hook(log_path)? {
                 hook_seen = true;
                 eprintln!(
                     "Boot hook observed ({pat}); waiting for SSH readiness on 127.0.0.1:{ssh_port}..."
@@ -594,7 +595,7 @@ fn monitor_live_iso_ssh(
     }
 }
 
-fn detect_stage01_boot_hook(log_path: &Path) -> Result<Option<String>> {
+fn detect_live_boot_hook(log_path: &Path) -> Result<Option<String>> {
     let raw = match fs::read_to_string(log_path) {
         Ok(raw) => raw,
         Err(_) => return Ok(None),
@@ -906,7 +907,7 @@ fn run_install_tests_in_dir(
     crate::util::tools_env::apply_to_command(&mut cmd, root)?;
     run_checked(&mut cmd).with_context(|| {
         format!(
-            "Running install-tests stages in {}",
+            "Running install-tests scenarios in {}",
             install_tests_dir.display()
         )
     })

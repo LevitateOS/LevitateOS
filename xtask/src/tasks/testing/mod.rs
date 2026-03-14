@@ -1,1 +1,1 @@
-pub mod stages;
+pub mod scenarios;

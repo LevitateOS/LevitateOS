@@ -67,7 +67,7 @@ kernels-rebuild distro:
 kernels-rebuild-all:
     cargo xtask kernels build-all --rebuild
 
-# Canonical Stage 01 source preseed helpers (distro-builder artifact commands).
+# Canonical live-source preseed helpers (distro-builder artifact commands).
 [script, no-exit-message]
 preseed distro refresh="true":
     #!/usr/bin/env bash
@@ -101,7 +101,7 @@ preseed-acorn:
     just preseed acorn true
 
 # Internal delegate for stage booting.
-# Keep `cargo xtask stages boot` as the only execution path for stage wrappers.
+# Keep `cargo xtask scenarios boot` as the canonical execution path for stage wrappers.
 # Boundary rule: stage wrappers consume existing artifacts only.
 # Do not add implicit ISO build steps here; freshness is explicit via `just build*`.
 [script, no-exit-message]
@@ -119,11 +119,11 @@ _boot_stage n distro="levitate" inject="" inject_file="" ssh="false" no_shell="f
       fi
     fi
     if [ "{{ssh}}" = "true" ] && [ "{{n}}" != "1" ] && [ "{{n}}" != "01" ] && [ "{{n}}" != "2" ] && [ "{{n}}" != "02" ]; then
-      echo "SSH boot mode supports only live stages 1/2 (got: {{n}})" >&2
+      echo "SSH boot mode supports only live scenario aliases 1/2 (got: {{n}})" >&2
       exit 2
     fi
 
-    args=("$CARGO_BIN" xtask stages boot {{n}} "{{distro}}")
+    args=("$CARGO_BIN" xtask scenarios boot {{n}} "{{distro}}")
 
     if [ "{{ssh}}" = "true" ]; then
       args+=(--ssh --ssh-port "{{ssh_port}}")
@@ -188,12 +188,12 @@ _boot_stage n distro="levitate" inject="" inject_file="" ssh="false" no_shell="f
 # Boot into a stage (interactive serial, Ctrl-A X to exit)
 [no-exit-message]
 stage n distro="levitate" inject="" inject_file="" ssh_pubkey=(env("HOME") + "/.ssh/id_ed25519.pub"):
-    just _boot_stage {{n}} {{distro}} "{{inject}}" "{{inject_file}}" false false false "{{ssh_pubkey}}" "" 2222 STAGE02_SERIAL_UX=1
+    just _boot_stage {{n}} {{distro}} "{{inject}}" "{{inject_file}}" false false false "{{ssh_pubkey}}" "" 2222 LEVITATE_INSTALL_SERIAL_UX=1
 
-# Boot into a stage with verbose serial logging (kernel printks + Stage 02 shell UX).
+# Boot into a stage with verbose serial logging (kernel printks + install UX shell).
 [no-exit-message]
 stage-verbose n distro="levitate" inject="" inject_file="" ssh_pubkey=(env("HOME") + "/.ssh/id_ed25519.pub"):
-    just _boot_stage {{n}} {{distro}} "{{inject}}" "{{inject_file}}" false false false "{{ssh_pubkey}}" "" 2222 STAGE02_SERIAL_UX=1,STAGE_SERIAL_VERBOSE=1
+    just _boot_stage {{n}} {{distro}} "{{inject}}" "{{inject_file}}" false false false "{{ssh_pubkey}}" "" 2222 LEVITATE_INSTALL_SERIAL_UX=1,LEVITATE_INSTALL_SERIAL_VERBOSE=1
 
 # Boot a live stage in background and SSH into it (no serial wrapper harness).
 [no-exit-message]
@@ -217,7 +217,7 @@ stage-window n distro="levitate" inject="" inject_file="" ssh_pubkey=(env("HOME"
     fi
 
     export LEVITATE_STAGE_WINDOW_MODE=local
-    args=("$CARGO_BIN" xtask stages boot {{n}} "{{distro}}" --window)
+    args=("$CARGO_BIN" xtask scenarios boot {{n}} "{{distro}}" --window)
 
     if [ -n "{{inject_file}}" ]; then
       args+=(--inject-file "{{inject_file}}")
@@ -238,7 +238,7 @@ stage-window n distro="levitate" inject="" inject_file="" ssh_pubkey=(env("HOME"
 stage-window-remote n distro="levitate" inject="" inject_file="" ssh_pubkey=(env("HOME") + "/.ssh/id_ed25519.pub"):
     just _boot_stage {{n}} {{distro}} "{{inject}}" "{{inject_file}}" false false true "{{ssh_pubkey}}" "" 2222 ""
 
-# Single-path Stage 01 parity gate (serial boot + SSH boot).
+# Single-path live-boot parity gate (serial boot + SSH boot).
 [script, no-exit-message]
 s01-parity distro="levitate" inject="" inject_file="" ssh_pubkey=(env("HOME") + "/.ssh/id_ed25519.pub") ssh_privkey=(env("HOME") + "/.ssh/id_ed25519") ssh_port="2222":
     #!/usr/bin/env bash
@@ -280,48 +280,48 @@ s01-parity distro="levitate" inject="" inject_file="" ssh_pubkey=(env("HOME") + 
       ssh_args+=(--inject-file "$tmp_ssh")
     fi
 
-    cargo xtask stages boot 1 "{{distro}}" --no-shell "${serial_args[@]}"
-    cargo xtask stages boot 1 "{{distro}}" "${ssh_args[@]}"
+    cargo xtask scenarios boot 1 "{{distro}}" --no-shell "${serial_args[@]}"
+    cargo xtask scenarios boot 1 "{{distro}}" "${ssh_args[@]}"
 
-# Run automated stage test (pass/fail)
+# Run automated scenario test (pass/fail)
 test n distro="levitate" inject="" inject_file="" ssh_pubkey=(env("HOME") + "/.ssh/id_ed25519.pub"):
     if [ -n "{{inject_file}}" ]; then \
-      cargo xtask stages test {{n}} {{distro}} --inject-file "{{inject_file}}"; \
+      cargo xtask scenarios test {{n}} {{distro}} --inject-file "{{inject_file}}"; \
     elif [ -n "{{inject}}" ]; then \
-      cargo xtask stages test {{n}} {{distro}} --inject "{{inject}}"; \
+      cargo xtask scenarios test {{n}} {{distro}} --inject "{{inject}}"; \
     elif [ -f "{{ssh_pubkey}}" ]; then \
       tmp=$(mktemp); \
       trap 'rm -f "$tmp"' EXIT; \
       key="$(tr -d '\n' < "{{ssh_pubkey}}")"; \
       printf 'SSH_AUTHORIZED_KEY=%s\n' "$key" > "$tmp"; \
-      cargo xtask stages test {{n}} {{distro}} --inject-file "$tmp"; \
+      cargo xtask scenarios test {{n}} {{distro}} --inject-file "$tmp"; \
     else \
-      cargo xtask stages test {{n}} {{distro}}; \
+      cargo xtask scenarios test {{n}} {{distro}}; \
     fi
 
-# Run all stage tests up to N
+# Run all scenario tests up to N
 test-up-to n distro="levitate" inject="" inject_file="" ssh_pubkey=(env("HOME") + "/.ssh/id_ed25519.pub"):
     if [ -n "{{inject_file}}" ]; then \
-      cargo xtask stages test-up-to {{n}} {{distro}} --inject-file "{{inject_file}}"; \
+      cargo xtask scenarios test-up-to {{n}} {{distro}} --inject-file "{{inject_file}}"; \
     elif [ -n "{{inject}}" ]; then \
-      cargo xtask stages test-up-to {{n}} {{distro}} --inject "{{inject}}"; \
+      cargo xtask scenarios test-up-to {{n}} {{distro}} --inject "{{inject}}"; \
     elif [ -f "{{ssh_pubkey}}" ]; then \
       tmp=$(mktemp); \
       trap 'rm -f "$tmp"' EXIT; \
       key="$(tr -d '\n' < "{{ssh_pubkey}}")"; \
       printf 'SSH_AUTHORIZED_KEY=%s\n' "$key" > "$tmp"; \
-      cargo xtask stages test-up-to {{n}} {{distro}} --inject-file "$tmp"; \
+      cargo xtask scenarios test-up-to {{n}} {{distro}} --inject-file "$tmp"; \
     else \
-      cargo xtask stages test-up-to {{n}} {{distro}}; \
+      cargo xtask scenarios test-up-to {{n}} {{distro}}; \
     fi
 
-# Show stage test status
+# Show scenario test status
 test-status distro="levitate":
-    cargo xtask stages status {{distro}}
+    cargo xtask scenarios status {{distro}}
 
-# Reset stage test state
+# Reset scenario test state
 test-reset distro="levitate":
-    cargo xtask stages reset {{distro}}
+    cargo xtask scenarios reset {{distro}}
 
 # Build ISO via new distro-builder endpoint (`distro-variants` Stage flow).
 # Human-friendly: use `<stage-or-distro> [<stage-or-distro>]`.
@@ -342,9 +342,9 @@ build *args:
         local key
         key="$(tr -d '\n' < "$ssh_pubkey")"
         printf 'SSH_AUTHORIZED_KEY=%s\n' "$key" > "$tmp"
-        cargo xtask stages test 3 "$distro" --force --inject-file "$tmp"
+        cargo xtask scenarios test 3 "$distro" --force --inject-file "$tmp"
       else
-        cargo xtask stages test 3 "$distro" --force
+        cargo xtask scenarios test 3 "$distro" --force
       fi
     }
 

@@ -59,7 +59,7 @@ pub fn run(cli: crate::cli::Cli) -> Result<()> {
                 no_shell,
                 window,
                 ssh_private_key,
-            } => crate::tasks::testing::stages::boot(
+            } => crate::tasks::testing::scenarios::boot(
                 target,
                 distro,
                 inject,
@@ -77,18 +77,18 @@ pub fn run(cli: crate::cli::Cli) -> Result<()> {
                 inject,
                 inject_file,
                 force,
-            } => crate::tasks::testing::stages::test(target, distro, inject, inject_file, force),
+            } => crate::tasks::testing::scenarios::test(target, distro, inject, inject_file, force),
             crate::cli::ScenariosCmd::TestUpTo {
                 target,
                 distro,
                 inject,
                 inject_file,
-            } => crate::tasks::testing::stages::test_up_to(target, distro, inject, inject_file),
+            } => crate::tasks::testing::scenarios::test_up_to(target, distro, inject, inject_file),
             crate::cli::ScenariosCmd::Status { distro } => {
-                crate::tasks::testing::stages::status(distro)
+                crate::tasks::testing::scenarios::status(distro)
             }
             crate::cli::ScenariosCmd::Reset { distro } => {
-                crate::tasks::testing::stages::reset(distro)
+                crate::tasks::testing::scenarios::reset(distro)
             }
         },
         crate::cli::Cmd::Policy { cmd } => match cmd {
