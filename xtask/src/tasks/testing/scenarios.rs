@@ -1,6 +1,7 @@
 use anyhow::{Context, Result, bail};
 use install_tests::scenarios::{
-    ScenarioId, compat, resolve_iso_artifact_for_scenario, resolve_latest_install_runtime,
+    ScenarioId, parse_scenario_name, resolve_iso_artifact_for_scenario,
+    resolve_latest_install_runtime,
 };
 use std::fs::OpenOptions;
 use std::fs::{self, File};
@@ -113,15 +114,14 @@ pub fn boot(
 ) -> Result<()> {
     let root = crate::util::repo::repo_root()?;
     let cfg = BootConfig::for_distro(distro);
-    let scenario = compat::parse_scenario_target_arg(&target)
-        .with_context(|| format!("parsing interactive scenario target '{}'", target))?;
+    let scenario =
+        parse_scenario_name(&target).with_context(|| format!("parsing scenario '{}'", target))?;
 
     if window && ssh {
         bail!(
             "`--window` cannot be combined with `--ssh`.\n\
-             Use `just stage-window <n> <distro>` for local QEMU window mode,\n\
-             `just stage-window-remote <n> <distro>` for foreground VNC remote mode,\n\
-             or `just stage-ssh <n> <distro>` for SSH workflow."
+             Use `cargo xtask scenarios boot <scenario> <distro> --window` for window mode,\n\
+             or `cargo xtask scenarios boot live-boot <distro> --ssh` for SSH workflow."
         );
     }
     if window && no_shell {
@@ -169,7 +169,7 @@ pub fn boot(
             boot_installed_disk(&root, &cfg, inject, inject_file, window_cfg.as_ref())
         }
         _ => bail!(
-            "scenario '{}' is automated. Interactive targets: live-boot, live-tools, installed-boot. Compatibility aliases: 1, 2, 4.",
+            "scenario '{}' is automated. Interactive targets: live-boot, live-tools, installed-boot.",
             scenario.key()
         ),
     }
@@ -182,8 +182,8 @@ pub fn test(
     inject_file: Option<PathBuf>,
     force: bool,
 ) -> Result<()> {
-    let scenario = compat::parse_scenario_target_arg(&target)
-        .with_context(|| format!("parsing test scenario target '{}'", target))?;
+    let scenario =
+        parse_scenario_name(&target).with_context(|| format!("parsing scenario '{}'", target))?;
     let mut args = vec![
         "--distro".to_string(),
         distro.id().to_string(),
@@ -203,8 +203,8 @@ pub fn test_up_to(
     inject: Option<String>,
     inject_file: Option<PathBuf>,
 ) -> Result<()> {
-    let scenario = compat::parse_scenario_target_arg(&target)
-        .with_context(|| format!("parsing test-up-to scenario target '{}'", target))?;
+    let scenario =
+        parse_scenario_name(&target).with_context(|| format!("parsing scenario '{}'", target))?;
     run_install_tests(
         &["--distro", distro.id(), "--up-to-scenario", scenario.key()],
         inject,
@@ -1147,7 +1147,7 @@ fn detect_local_qemu_runtime() -> Result<(PathBuf, LocalDisplayBackend)> {
         "Local window mode requires a system qemu-system-x86_64 with either gtk or sdl display backend.\n\
          The bundled tools QEMU is headless-only.\n\
          Remediation: install host QEMU GUI support (for example `sudo dnf install qemu-system-x86 qemu-ui-gtk`) and rerun,\n\
-         or use `just stage-window-remote <n> <distro>`."
+         or rerun without `--window` and use the serial/SSH workflow."
     )
 }
 

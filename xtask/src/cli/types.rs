@@ -88,8 +88,8 @@ pub enum Cmd {
         cmd: HooksCmd,
     },
 
-    /// Install-test scenario runner (stage-number aliases retained for compatibility).
-    #[command(name = "scenarios", alias = "stages")]
+    /// Install-test scenario runner.
+    #[command(name = "scenarios")]
     Scenarios {
         #[command(subcommand)]
         cmd: ScenariosCmd,
@@ -220,10 +220,9 @@ pub enum HooksCmd {
 
 #[derive(Subcommand)]
 pub enum ScenariosCmd {
-    /// Boot into an interactive scenario (stage-number aliases accepted).
+    /// Boot into an interactive scenario.
     ///
     /// Interactive targets: `live-boot`, `live-tools`, `installed-boot`
-    /// Compatibility aliases: `1`, `2`, `4`
     Boot {
         target: String,
         #[arg(value_enum, default_value_t = BootDistro::Levitate)]
@@ -252,7 +251,7 @@ pub enum ScenariosCmd {
         ssh_private_key: Option<PathBuf>,
     },
 
-    /// Run one automated scenario (or stage-number alias).
+    /// Run one automated scenario.
     Test {
         target: String,
         #[arg(value_enum, default_value_t = HarnessDistro::Levitate)]
@@ -266,7 +265,7 @@ pub enum ScenariosCmd {
         force: bool,
     },
 
-    /// Run all automated scenarios up to the given scenario (or stage-number alias).
+    /// Run all automated scenarios up to the given scenario.
     TestUpTo {
         target: String,
         #[arg(value_enum, default_value_t = HarnessDistro::Levitate)]
