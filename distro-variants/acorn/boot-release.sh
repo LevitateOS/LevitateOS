@@ -6,6 +6,4 @@ REPO_ROOT="$(CDPATH= cd -- "$SCRIPT_DIR/../.." && pwd)"
 
 export DISTRO_ID="acorn"
 export PRODUCT_NAME="${PRODUCT_NAME:-live-boot}"
-export BUILD_TARGET_LABEL="${BUILD_TARGET_LABEL:-live-boot}"
-export BUILD_STAGE_DIRNAME="${BUILD_STAGE_DIRNAME:-live-boot}"
 exec "${REPO_ROOT}/distro-variants/_shared/build-release.sh"

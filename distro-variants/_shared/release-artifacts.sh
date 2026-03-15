@@ -73,19 +73,18 @@ prepare_product_inputs() {
     printf '%s\n' "$ROOTFS_SOURCE_DIR"
 }
 
-prepare_build_inputs() {
-    if [ "$#" -ne 4 ]; then
-        echo "prepare_build_inputs requires <product_name> <release_dirname> <distro_id> <output_dir>" >&2
+prepare_release_inputs() {
+    if [ "$#" -ne 3 ]; then
+        echo "prepare_release_inputs requires <product_name> <distro_id> <output_dir>" >&2
         exit 64
     fi
 
     product_name="$1"
-    release_dirname="$2"
-    distro_id="$3"
-    output_dir="$4"
+    distro_id="$2"
+    output_dir="$3"
 
     if [ -z "$product_name" ]; then
-        echo "missing PRODUCT_NAME for release dir '$release_dirname'; expected a canonical product name such as base-rootfs, live-boot, or live-tools" >&2
+        echo "missing PRODUCT_NAME for release build; expected a canonical product name such as base-rootfs, live-boot, or live-tools" >&2
         exit 64
     fi
 
@@ -101,17 +100,17 @@ build_overlayfs_erofs() {
     run_distro_builder artifact build-overlayfs-erofs "$1" "$2"
 }
 
-stage_boot_label() {
+product_boot_label() {
     if [ "$#" -ne 1 ]; then
-        echo "stage_boot_label requires <build_stage_dirname>" >&2
+        echo "product_boot_label requires <product_name>" >&2
         exit 64
     fi
 
     case "$1" in
-        s00-build) printf '%s\n' "S00 Build" ;;
-        s01-boot) printf '%s\n' "S01 Boot" ;;
-        s02-live-tools) printf '%s\n' "S02 Live Tools" ;;
-        *) echo "unsupported BUILD_STAGE_DIRNAME for stage_boot_label: $1" >&2; exit 64 ;;
+        base-rootfs) printf '%s\n' "Base Rootfs" ;;
+        live-boot) printf '%s\n' "Live Boot" ;;
+        live-tools) printf '%s\n' "Live Tools" ;;
+        *) echo "unsupported PRODUCT_NAME for product_boot_label: $1" >&2; exit 64 ;;
     esac
 }
 
@@ -122,7 +121,7 @@ merge_uki_cmdline() {
     fi
 
     stage_specific="$1"
-    required="${STAGE_REQUIRED_KERNEL_CMDLINE:-}"
+    required="${PRODUCT_REQUIRED_KERNEL_CMDLINE:-}"
 
     if [ -n "$stage_specific" ] && [ -n "$required" ]; then
         merged="${stage_specific} ${required}"

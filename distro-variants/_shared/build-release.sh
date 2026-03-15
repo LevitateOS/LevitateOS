@@ -11,21 +11,18 @@ REPO_ROOT="$(CDPATH= cd -- "$SCRIPT_DIR/../.." && pwd)"
 : "${IDENTITY_OS_ID:?missing IDENTITY_OS_ID}"
 : "${IDENTITY_OS_VERSION:?missing IDENTITY_OS_VERSION}"
 : "${IDENTITY_ISO_LABEL:?missing IDENTITY_ISO_LABEL}"
+: "${PRODUCT_NAME:?missing PRODUCT_NAME}"
 : "${S00_LIVE_UKI_FILENAME:?missing S00_LIVE_UKI_FILENAME}"
 : "${S00_EMERGENCY_UKI_FILENAME:?missing S00_EMERGENCY_UKI_FILENAME}"
 : "${S00_DEBUG_UKI_FILENAME:?missing S00_DEBUG_UKI_FILENAME}"
 
 OUTPUT_DIR="${REPO_ROOT}/.artifacts/out/${DISTRO_ID}"
 KERNEL_OUTPUT_DIR="${KERNEL_OUTPUT_DIR:-${REPO_ROOT}/.artifacts/kernel/${DISTRO_ID}/current}"
-PRODUCT_NAME="${PRODUCT_NAME:-}"
-COMPAT_BUILD_STAGE_DIRNAME="${COMPAT_BUILD_STAGE_DIRNAME:-${BUILD_STAGE_DIRNAME:-s00-build}}"
-RUN_ROOT_DIR="${RUN_ROOT_DIR:-${STAGE_ROOT_DIR:-${OUTPUT_DIR}/${COMPAT_BUILD_STAGE_DIRNAME}}}"
-RUN_OUTPUT_DIR="${RUN_OUTPUT_DIR:-${STAGE_RUN_DIR:-${STAGE_OUTPUT_DIR:-${RUN_ROOT_DIR}}}}"
-BUILD_STAGE_DIRNAME="${BUILD_STAGE_DIRNAME:-${COMPAT_BUILD_STAGE_DIRNAME}}"
-STAGE_ROOT_DIR="${STAGE_ROOT_DIR:-${RUN_ROOT_DIR}}"
-STAGE_RUN_DIR="${STAGE_RUN_DIR:-${RUN_OUTPUT_DIR}}"
-STAGE_OUTPUT_DIR="${STAGE_OUTPUT_DIR:-${RUN_OUTPUT_DIR}}"
-STAGE_ARTIFACT_TAG="${STAGE_ARTIFACT_TAG:-${COMPAT_STAGE_ARTIFACT_TAG:-$(printf '%s' "$BUILD_STAGE_DIRNAME" | cut -c1-3)}}"
+PRODUCT_DIRNAME="${PRODUCT_DIRNAME:-${PRODUCT_NAME}}"
+PRODUCT_ARTIFACT_TAG="${PRODUCT_ARTIFACT_TAG:-${PRODUCT_NAME}}"
+RELEASE_ROOT_DIR="${RELEASE_ROOT_DIR:-${OUTPUT_DIR}/releases/${PRODUCT_DIRNAME}}"
+RELEASE_RUN_DIR="${RELEASE_RUN_DIR:-${RELEASE_ROOT_DIR}/adhoc}"
+RELEASE_OUTPUT_DIR="${RELEASE_OUTPUT_DIR:-${RELEASE_RUN_DIR}}"
 FORCE_COLOR="${FORCE_COLOR:-0}"
 ARTIFACT_NAME_WIDTH="${ARTIFACT_NAME_WIDTH:-8}"
 
@@ -33,7 +30,7 @@ ARTIFACT_NAME_WIDTH="${ARTIFACT_NAME_WIDTH:-8}"
 KERNEL_RELEASE_PATH="${KERNEL_RELEASE_PATH:-${KERNEL_OUTPUT_DIR}/kernel-build/include/config/kernel.release}"
 KERNEL_IMAGE_PATH="${KERNEL_IMAGE_PATH:-${KERNEL_OUTPUT_DIR}/staging/boot/vmlinuz}"
 ISO_FILENAME="${ISO_FILENAME:-$(default_iso_filename)}"
-ISO_PATH="${ISO_PATH:-${STAGE_OUTPUT_DIR}/${ISO_FILENAME}}"
+ISO_PATH="${ISO_PATH:-${RELEASE_OUTPUT_DIR}/${ISO_FILENAME}}"
 ISO_SHA="${ISO_SHA:-${ISO_PATH%.iso}.sha512}"
 ROOTFS_FILENAME="${ROOTFS_FILENAME:-$(default_rootfs_filename)}"
 INITRAMFS_LIVE_FILENAME="${INITRAMFS_LIVE_FILENAME:-$(default_initramfs_live_filename)}"
@@ -41,10 +38,10 @@ LIVE_OVERLAY_DIRNAME="${LIVE_OVERLAY_DIRNAME:-$(default_live_overlay_dirname)}"
 LIVE_OVERLAY_IMAGE_FILENAME="${LIVE_OVERLAY_IMAGE_FILENAME:-$(default_live_overlay_image_filename)}"
 ROOTFS_SOURCE_POINTER_FILENAME="${ROOTFS_SOURCE_POINTER_FILENAME:-$(default_rootfs_source_pointer_filename)}"
 
-ROOTFS_PATH="${STAGE_OUTPUT_DIR}/${ROOTFS_FILENAME}"
-INITRAMFS_LIVE_PATH="${STAGE_OUTPUT_DIR}/${INITRAMFS_LIVE_FILENAME}"
-LIVE_OVERLAY_DIR="${STAGE_OUTPUT_DIR}/${LIVE_OVERLAY_DIRNAME}"
-LIVE_OVERLAY_IMAGE="${STAGE_OUTPUT_DIR}/${LIVE_OVERLAY_IMAGE_FILENAME}"
+ROOTFS_PATH="${RELEASE_OUTPUT_DIR}/${ROOTFS_FILENAME}"
+INITRAMFS_LIVE_PATH="${RELEASE_OUTPUT_DIR}/${INITRAMFS_LIVE_FILENAME}"
+LIVE_OVERLAY_DIR="${RELEASE_OUTPUT_DIR}/${LIVE_OVERLAY_DIRNAME}"
+LIVE_OVERLAY_IMAGE="${RELEASE_OUTPUT_DIR}/${LIVE_OVERLAY_IMAGE_FILENAME}"
 INIT_TEMPLATE="${REPO_ROOT}/tools/recinit/templates/init_tiny.template"
 BUSYBOX_URL="${BUSYBOX_URL:-https://busybox.net/downloads/binaries/1.35.0-x86_64-linux-musl/busybox}"
 BUSYBOX_PATH="${BUSYBOX_PATH:-${REPO_ROOT}/.artifacts/tools/busybox-static}"
@@ -54,22 +51,21 @@ ISO_LABEL="${IDENTITY_ISO_LABEL}"
 OS_NAME="${IDENTITY_OS_NAME}"
 OS_ID="${IDENTITY_OS_ID}"
 OS_VERSION="${IDENTITY_OS_VERSION}"
-STAGE_BOOT_LABEL="${BUILD_TARGET_LABEL:-$(stage_boot_label "$BUILD_STAGE_DIRNAME")}"
-BUILD_LOG_PATH="${STAGE_OUTPUT_DIR}/build-log.json"
+PRODUCT_BOOT_LABEL="${PRODUCT_BOOT_LABEL:-$(product_boot_label "$PRODUCT_NAME")}"
+RELEASE_LOG_PATH="${RELEASE_OUTPUT_DIR}/build-log.json"
 BUILD_STARTED_AT_UTC="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
 BUILD_FINISHED_AT_UTC=""
 BUILD_STATUS="failed"
-STAGE_REQUIRED_KERNEL_CMDLINE="${STAGE_REQUIRED_KERNEL_CMDLINE:-${COMPAT_STAGE_REQUIRED_KERNEL_CMDLINE:-}}"
 
-TMP_STAGE_INIT_TEMPLATE=""
-TMP_STAGE_INIT_TEMPLATE_EDIT=""
+TMP_RELEASE_INIT_TEMPLATE=""
+TMP_RELEASE_INIT_TEMPLATE_EDIT=""
 TMP_ARTIFACT_LIST=""
 cleanup_tmp_artifacts() {
-    if [ -n "${TMP_STAGE_INIT_TEMPLATE:-}" ] && [ -f "${TMP_STAGE_INIT_TEMPLATE}" ]; then
-        rm -f "${TMP_STAGE_INIT_TEMPLATE}"
+    if [ -n "${TMP_RELEASE_INIT_TEMPLATE:-}" ] && [ -f "${TMP_RELEASE_INIT_TEMPLATE}" ]; then
+        rm -f "${TMP_RELEASE_INIT_TEMPLATE}"
     fi
-    if [ -n "${TMP_STAGE_INIT_TEMPLATE_EDIT:-}" ] && [ -f "${TMP_STAGE_INIT_TEMPLATE_EDIT}" ]; then
-        rm -f "${TMP_STAGE_INIT_TEMPLATE_EDIT}"
+    if [ -n "${TMP_RELEASE_INIT_TEMPLATE_EDIT:-}" ] && [ -f "${TMP_RELEASE_INIT_TEMPLATE_EDIT}" ]; then
+        rm -f "${TMP_RELEASE_INIT_TEMPLATE_EDIT}"
     fi
     if [ -n "${TMP_ARTIFACT_LIST:-}" ] && [ -f "${TMP_ARTIFACT_LIST}" ]; then
         rm -f "${TMP_ARTIFACT_LIST}"
@@ -85,48 +81,28 @@ default_iso_filename() {
         base-rootfs) printf '%s\n' "${IDENTITY_OS_ID}-x86_64.iso" ;;
         live-boot) printf '%s\n' "${IDENTITY_OS_ID}-x86_64-live-boot.iso" ;;
         live-tools) printf '%s\n' "${IDENTITY_OS_ID}-x86_64-live-tools.iso" ;;
-        *) printf '%s\n' "${IDENTITY_OS_ID}-x86_64.iso" ;;
+        *) echo "unsupported PRODUCT_NAME for default_iso_filename: ${PRODUCT_NAME:-}" >&2; exit 64 ;;
     esac
 }
 
 default_rootfs_filename() {
-    if [ -n "${PRODUCT_NAME:-}" ]; then
-        printf '%s\n' "filesystem.erofs"
-        return
-    fi
-    printf '%s-filesystem.erofs\n' "$STAGE_ARTIFACT_TAG"
+    printf '%s\n' "filesystem.erofs"
 }
 
 default_initramfs_live_filename() {
-    if [ -n "${PRODUCT_NAME:-}" ]; then
-        printf '%s\n' "initramfs-live.cpio.gz"
-        return
-    fi
-    printf '%s-initramfs-live.cpio.gz\n' "$STAGE_ARTIFACT_TAG"
+    printf '%s\n' "initramfs-live.cpio.gz"
 }
 
 default_live_overlay_dirname() {
-    if [ -n "${PRODUCT_NAME:-}" ]; then
-        printf '%s\n' "live-overlay"
-        return
-    fi
-    printf '%s-live-overlay\n' "$STAGE_ARTIFACT_TAG"
+    printf '%s\n' "live-overlay"
 }
 
 default_live_overlay_image_filename() {
-    if [ -n "${PRODUCT_NAME:-}" ]; then
-        printf '%s\n' "overlayfs.erofs"
-        return
-    fi
-    printf '%s-overlayfs.erofs\n' "$STAGE_ARTIFACT_TAG"
+    printf '%s\n' "overlayfs.erofs"
 }
 
 default_rootfs_source_pointer_filename() {
-    if [ -n "${PRODUCT_NAME:-}" ]; then
-        printf '%s\n' ".live-rootfs-source.path"
-        return
-    fi
-    printf '.%s-live-rootfs-source.path\n' "$STAGE_ARTIFACT_TAG"
+    printf '%s\n' ".live-rootfs-source.path"
 }
 
 file_size_bytes() {
@@ -203,10 +179,10 @@ set_artifact_name_width() {
     ARTIFACT_NAME_WIDTH="$artifact_name_width"
 }
 
-collect_stage_artifacts() {
+collect_release_artifacts() {
     output_file="$1"
     : > "$output_file"
-    for artifact_path in "$STAGE_OUTPUT_DIR"/*; do
+    for artifact_path in "$RELEASE_OUTPUT_DIR"/*; do
         [ -f "$artifact_path" ] || continue
         artifact_name="${artifact_path##*/}"
         printf '%s\n' "$artifact_path" >> "$output_file"
@@ -221,17 +197,18 @@ write_build_log_json() {
     iso_size="$(file_size_bytes "$ISO_PATH")"
     sha_path="${ISO_SHA:-}"
     sha_size="$(file_size_bytes "$sha_path")"
-    cat > "$BUILD_LOG_PATH" <<EOF
+    cat > "$RELEASE_LOG_PATH" <<EOF
 {
   "schema": 1,
-  "component": "s00-build-shared",
+  "component": "release-build-shared",
   "distro_id": "$(json_escape "$DISTRO_ID")",
-  "stage_dirname": "$(json_escape "$BUILD_STAGE_DIRNAME")",
-  "stage_artifact_tag": "$(json_escape "$STAGE_ARTIFACT_TAG")",
+  "product_name": "$(json_escape "$PRODUCT_NAME")",
+  "product_dirname": "$(json_escape "$PRODUCT_DIRNAME")",
+  "product_artifact_tag": "$(json_escape "$PRODUCT_ARTIFACT_TAG")",
   "status": "$(json_escape "$BUILD_STATUS")",
   "started_at_utc": "$(json_escape "$BUILD_STARTED_AT_UTC")",
   "finished_at_utc": "$(json_escape "$BUILD_FINISHED_AT_UTC")",
-  "run_dir": "$(json_escape "$STAGE_OUTPUT_DIR")",
+  "run_dir": "$(json_escape "$RELEASE_OUTPUT_DIR")",
   "artifacts": {
     "rootfs_erofs": { "path": "$(json_escape "$ROOTFS_PATH")", "size_bytes": $rootfs_size },
     "initramfs_live": { "path": "$(json_escape "$INITRAMFS_LIVE_PATH")", "size_bytes": $initramfs_size },
@@ -253,8 +230,8 @@ trap 'exit 143' TERM
 
 need_file "$KERNEL_RELEASE_PATH"
 need_file "$KERNEL_IMAGE_PATH"
-mkdir -p "$STAGE_OUTPUT_DIR"
-ROOTFS_SOURCE_DIR="$(prepare_build_inputs "$PRODUCT_NAME" "$BUILD_STAGE_DIRNAME" "$DISTRO_ID" "$STAGE_OUTPUT_DIR")"
+mkdir -p "$RELEASE_OUTPUT_DIR"
+ROOTFS_SOURCE_DIR="$(prepare_release_inputs "$PRODUCT_NAME" "$DISTRO_ID" "$RELEASE_OUTPUT_DIR")"
 need_dir "$LIVE_OVERLAY_DIR"
 
 rm -f "$ROOTFS_PATH"
@@ -310,18 +287,18 @@ need_file "$BUSYBOX_PATH"
 verify_busybox_sha256 "$BUSYBOX_PATH"
 
 rm -f "$INITRAMFS_LIVE_PATH"
-TMP_STAGE_INIT_TEMPLATE="$(mktemp "${STAGE_OUTPUT_DIR}/.tmp-${STAGE_ARTIFACT_TAG}-init.XXXXXX")"
-cp "$INIT_TEMPLATE" "$TMP_STAGE_INIT_TEMPLATE"
-printf '\n# stage-artifact-tag: %s\n' "$STAGE_ARTIFACT_TAG" >> "$TMP_STAGE_INIT_TEMPLATE"
-expected_init_msg="msg \"${OS_NAME} ${STAGE_BOOT_LABEL} initramfs starting...\""
+TMP_RELEASE_INIT_TEMPLATE="$(mktemp "${RELEASE_OUTPUT_DIR}/.tmp-${PRODUCT_ARTIFACT_TAG}-init.XXXXXX")"
+cp "$INIT_TEMPLATE" "$TMP_RELEASE_INIT_TEMPLATE"
+printf '\n# product-artifact-tag: %s\n' "$PRODUCT_ARTIFACT_TAG" >> "$TMP_RELEASE_INIT_TEMPLATE"
+expected_init_msg="msg \"${OS_NAME} ${PRODUCT_BOOT_LABEL} initramfs starting...\""
 placeholder_init_msg='msg "LevitateOS initramfs starting..."'
-if grep -Fq "$placeholder_init_msg" "$TMP_STAGE_INIT_TEMPLATE"; then
-    TMP_STAGE_INIT_TEMPLATE_EDIT="${TMP_STAGE_INIT_TEMPLATE}.edit"
+if grep -Fq "$placeholder_init_msg" "$TMP_RELEASE_INIT_TEMPLATE"; then
+    TMP_RELEASE_INIT_TEMPLATE_EDIT="${TMP_RELEASE_INIT_TEMPLATE}.edit"
     sed "s|$placeholder_init_msg|$expected_init_msg|" \
-        "$TMP_STAGE_INIT_TEMPLATE" > "$TMP_STAGE_INIT_TEMPLATE_EDIT"
-    mv -f "$TMP_STAGE_INIT_TEMPLATE_EDIT" "$TMP_STAGE_INIT_TEMPLATE"
+        "$TMP_RELEASE_INIT_TEMPLATE" > "$TMP_RELEASE_INIT_TEMPLATE_EDIT"
+    mv -f "$TMP_RELEASE_INIT_TEMPLATE_EDIT" "$TMP_RELEASE_INIT_TEMPLATE"
 fi
-if ! grep -Fq "$expected_init_msg" "$TMP_STAGE_INIT_TEMPLATE"; then
+if ! grep -Fq "$expected_init_msg" "$TMP_RELEASE_INIT_TEMPLATE"; then
     echo "failed to materialize init template banner; expected line not found: $expected_init_msg" >&2
     exit 1
 fi
@@ -330,7 +307,7 @@ need_cmd cargo
 cargo run -q -p recinit -- build-tiny \
     --modules-dir "$MODULES_DIR" \
     --busybox "$BUSYBOX_PATH" \
-    --template "$TMP_STAGE_INIT_TEMPLATE" \
+    --template "$TMP_RELEASE_INIT_TEMPLATE" \
     --output "$INITRAMFS_LIVE_PATH" \
     --iso-label "$ISO_LABEL" \
     --rootfs-path "live/filesystem.erofs"
@@ -362,9 +339,9 @@ set -- \
     --os-name "$OS_NAME" \
     --os-id "$OS_ID" \
     --os-version "$OS_VERSION" \
-    --build-uki "${OS_NAME} ${STAGE_BOOT_LABEL}:${LIVE_UKI_CMDLINE}:${S00_LIVE_UKI_FILENAME}" \
-    --build-uki "${OS_NAME} ${STAGE_BOOT_LABEL} (Emergency):${EMERGENCY_UKI_CMDLINE}:${S00_EMERGENCY_UKI_FILENAME}" \
-    --build-uki "${OS_NAME} ${STAGE_BOOT_LABEL} (Debug):${DEBUG_UKI_CMDLINE}:${S00_DEBUG_UKI_FILENAME}" \
+    --build-uki "${OS_NAME} ${PRODUCT_BOOT_LABEL}:${LIVE_UKI_CMDLINE}:${S00_LIVE_UKI_FILENAME}" \
+    --build-uki "${OS_NAME} ${PRODUCT_BOOT_LABEL} (Emergency):${EMERGENCY_UKI_CMDLINE}:${S00_EMERGENCY_UKI_FILENAME}" \
+    --build-uki "${OS_NAME} ${PRODUCT_BOOT_LABEL} (Debug):${DEBUG_UKI_CMDLINE}:${S00_DEBUG_UKI_FILENAME}" \
     --overlay-image "$LIVE_OVERLAY_IMAGE"
 
 set -- "$@" --live-payload-layout iso-files
@@ -386,8 +363,8 @@ elif [ -f "$ISO_TMP_SHA_ALT2" ]; then
 fi
 
 BUILD_STATUS="success"
-TMP_ARTIFACT_LIST="$(mktemp "${STAGE_OUTPUT_DIR}/.tmp-${STAGE_ARTIFACT_TAG}-artifacts.XXXXXX")"
-collect_stage_artifacts "$TMP_ARTIFACT_LIST"
+TMP_ARTIFACT_LIST="$(mktemp "${RELEASE_OUTPUT_DIR}/.tmp-${PRODUCT_ARTIFACT_TAG}-artifacts.XXXXXX")"
+collect_release_artifacts "$TMP_ARTIFACT_LIST"
 set_artifact_name_width "$TMP_ARTIFACT_LIST"
 printf '%s\n' "Artifact summary:"
 printf '  %-*s | %-24s\n' "$ARTIFACT_NAME_WIDTH" "Artifact" "Size"
