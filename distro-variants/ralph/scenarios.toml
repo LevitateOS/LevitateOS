@@ -8,7 +8,7 @@ required_live_services = ["sshd"]
 
 [scenarios.live_boot.evidence]
 script_path = "live-boot.sh"
-pass_marker = "STAGE 01 PASSED"
+pass_marker = "LIVE BOOT PASSED"
 
 [scenarios.live_environment]
 required_services = ["sshd"]
@@ -31,7 +31,7 @@ install_experience = "automated_ssh"
 
 [scenarios.live_tools.evidence]
 script_path = "live-tools.sh"
-pass_marker = "STAGE 02 PASSED"
+pass_marker = "LIVE TOOLS PASSED"
 
 [scenarios.install]
 required_tools = ["recstrap", "recfstab", "recchroot", "sfdisk", "mkfs.ext4"]
@@ -39,7 +39,7 @@ required_services = ["sshd"]
 
 [scenarios.install.evidence]
 script_path = "install.sh"
-pass_marker = "STAGE 03 PASSED"
+pass_marker = "INSTALL PASSED"
 
 [scenarios.installed_boot]
 success_patterns = ["___SHELL_READY___", "ralphos login:", "multi-user.target"]
@@ -49,7 +49,7 @@ required_live_services = []
 
 [scenarios.installed_boot.evidence]
 script_path = "installed-boot.sh"
-pass_marker = "STAGE 04 PASSED"
+pass_marker = "INSTALLED BOOT PASSED"
 
 [scenarios.automated_login]
 auth_mode = "default_password_login"
@@ -59,14 +59,14 @@ login_prompt_pattern = "ralphos login:"
 
 [scenarios.automated_login.evidence]
 script_path = "automated-login.sh"
-pass_marker = "STAGE 05 PASSED"
+pass_marker = "AUTOMATED LOGIN PASSED"
 
 [scenarios.installed_tools]
 required_tools = ["sudo", "ip", "ssh", "bash", "mount", "umount", "dmesg", "ps", "ls", "cat"]
 
 [scenarios.installed_tools.evidence]
 script_path = "installed-tools.sh"
-pass_marker = "STAGE 06 PASSED"
+pass_marker = "INSTALLED TOOLS PASSED"
 
 [scenarios.runtime_policy]
 rootfs_mutability = "mutable"
