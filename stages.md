@@ -82,7 +82,7 @@ Cells describe the filesystem delta relative to the immediately preceding stage.
 
 | Stage | `*-filesystem.erofs` delta vs previous stage | `*-overlayfs.erofs` delta vs previous stage | `*-initramfs-live.cpio.gz` delta vs previous stage |
 |---|---|---|---|
-| 00Build | Baseline rootfs payload (`s00-filesystem.erofs`) created from stage-00 producers. | Baseline empty/minimal live overlay payload (`s00-overlayfs.erofs`). | Baseline live initramfs payload (`s00-initramfs-live.cpio.gz`). |
+| 00Build | Baseline rootfs payload (`filesystem.erofs`) created from stage-00 producers. | Baseline empty/minimal live overlay payload (`overlayfs.erofs`). | Baseline live initramfs payload (`initramfs-live.cpio.gz`). |
 | 01Boot | `s01 = s00 + boot additions` (boot/rootfs producers, stage test scripts, boot readiness wiring). | `s01-overlayfs.erofs` becomes non-empty live overlay with stage banner + required live service wiring (for Levitate: `sshd`). | Rebuilt for stage output naming; no intended functional delta from stage 00. |
 | 02LiveTools | `s02 = s01 + live tools additions` (installer/tool binaries, Stage 02 install-experience marker, profile-specific install entrypoint, plus stage test scripts). | Overlay policy reused from stage 01; practical delta is stage identity/banner (`S02 Live Tools`) with the same required live service wiring baseline. | Rebuilt for stage output naming; no intended functional delta from stage 01. |
 | 03Install | N/A in current ISO `*fs` artifact pipeline (install validation stage, not a new live `*fs` image build stage). | N/A in current ISO `*fs` artifact pipeline. | N/A in current ISO `*fs` artifact pipeline. |
