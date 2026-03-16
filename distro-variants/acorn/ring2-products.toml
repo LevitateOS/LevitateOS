@@ -124,7 +124,7 @@ ux_docs_frontend = "plain_text"
 [ring2_runtime_profiles.live_tools_ux]
 [[ring2_runtime_profiles.live_tools_ux.actions]]
 kind = "rootfs_workspace_binary"
-package = "stage02-split-pane"
+package = "install-split-pane"
 binary = "levitate-install-docs-split"
 target = "x86_64-unknown-linux-musl"
 destination = "usr/local/bin/levitate-install-docs-split"

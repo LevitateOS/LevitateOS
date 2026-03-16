@@ -484,17 +484,17 @@ docs-content-check:
 
 # Docs TUI (installation-focused)
 docs-tui-check:
-    cd tui/apps/s02-live-tools/install-docs && bun run typecheck && bun run test
+    cd tui/apps/live-tools/install-docs && bun run typecheck && bun run test
 
 docs-tui-inspect-check:
-    cd tui/apps/s02-live-tools/install-docs && bun run inspect:check
+    cd tui/apps/live-tools/install-docs && bun run inspect:check
 
 [script, no-exit-message]
 docs-tui *args:
     #!/usr/bin/env bash
     set -euo pipefail
 
-    echo "NOTICE: docs-tui command is now routed to tui/apps/s02-live-tools/install-docs." >&2
+    echo "NOTICE: docs-tui command is now routed to tui/apps/live-tools/install-docs." >&2
 
     if [ ! -t 0 ] || [ ! -t 1 ]; then
       if [ -r /dev/tty ] && [ -w /dev/tty ]; then
@@ -505,7 +505,7 @@ docs-tui *args:
       fi
     fi
 
-    cd tui/apps/s02-live-tools/install-docs
+    cd tui/apps/live-tools/install-docs
     if [ ! -f node_modules/@levitate/tui-kit/package.json ] || \
        [ ../../../kit/core/package.json -nt node_modules/@levitate/tui-kit/package.json ] || \
        [ "$(find ../../../kit/core/src -type f -newer node_modules/@levitate/tui-kit/package.json | head -n 1)" != "" ]; then
@@ -520,9 +520,9 @@ docs-tui-inspect *args:
     #!/usr/bin/env bash
     set -euo pipefail
 
-    echo "NOTICE: docs-tui-inspect command is now routed to tui/apps/s02-live-tools/install-docs." >&2
+    echo "NOTICE: docs-tui-inspect command is now routed to tui/apps/live-tools/install-docs." >&2
 
-    cd tui/apps/s02-live-tools/install-docs
+    cd tui/apps/live-tools/install-docs
     if [ ! -f node_modules/@levitate/tui-kit/package.json ] || \
        [ ../../../kit/core/package.json -nt node_modules/@levitate/tui-kit/package.json ] || \
        [ "$(find ../../../kit/core/src -type f -newer node_modules/@levitate/tui-kit/package.json | head -n 1)" != "" ]; then
@@ -539,9 +539,9 @@ docs-tui-refresh *args:
     #!/usr/bin/env bash
     set -euo pipefail
 
-    echo "NOTICE: docs-tui-refresh command is now routed to tui/apps/s02-live-tools/install-docs." >&2
+    echo "NOTICE: docs-tui-refresh command is now routed to tui/apps/live-tools/install-docs." >&2
 
-    cd tui/apps/s02-live-tools/install-docs
+    cd tui/apps/live-tools/install-docs
     bun install
     exec bun src/main.ts {{args}}
 
@@ -550,9 +550,9 @@ docs-tui-split *args:
     #!/usr/bin/env bash
     set -euo pipefail
 
-    echo "NOTICE: docs-tui-split command is now routed to tui/apps/s02-live-tools/install-docs." >&2
+    echo "NOTICE: docs-tui-split command is now routed to tui/apps/live-tools/install-docs." >&2
 
-    cd tui/apps/s02-live-tools/install-docs
+    cd tui/apps/live-tools/install-docs
     exec bash bin/levitate-install-docs-split {{args}}
 
 # recpart TUI

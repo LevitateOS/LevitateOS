@@ -277,7 +277,7 @@ Chosen: **Option B** because it gives one canonical app lineage plus a reusable 
   /README.md
   /AGENTS.md
   /apps
-    /s02-live-tools
+    /live-tools
       /install-docs                    # canonical S02 docs/session UX surface
         /src
         /bin
@@ -308,14 +308,14 @@ Chosen: **Option B** because it gives one canonical app lineage plus a reusable 
 
 ## Migration Map (Current -> Target)
 
-1. `docs/tui` -> `tui/apps/s02-live-tools/install-docs` (canonical S02 session UX/docs app).
+1. `docs/tui` -> `tui/apps/live-tools/install-docs` (canonical live-tools session UX/docs app).
 2. `shared/tui-kit` -> `tui/kit/core` (re-architecture happens here; no docs-domain logic).
 3. legacy `tools/recpart/frontend` -> `tui/apps/s03-install/disk-plan` (stage-native UI owner).
 
 Compatibility shims during migration:
 
 1. Keep legacy paths as thin wrappers/symlinks only for one transition window.
-2. `just docs-tui` routes to `tui/apps/s02-live-tools/install-docs`.
+2. `just docs-tui` routes to `tui/apps/live-tools/install-docs`.
 3. `just tui-s03-disk-plan` routes to `tui/apps/s03-install/disk-plan`.
 
 ## Dependency Rules (Must Hold)
@@ -335,7 +335,7 @@ Update root `package.json` workspaces from:
 
 to:
 
-- `tui/apps/s02-live-tools/*`
+- `tui/apps/live-tools/*`
 - `tui/kit/core`
 - `tui/apps/s03-install/*`
 - `tui/apps/s04-login-gate/*`

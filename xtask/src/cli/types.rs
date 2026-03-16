@@ -336,8 +336,8 @@ pub enum DocsCmd {
 
 #[derive(Clone, Copy, Debug, ValueEnum)]
 pub enum TuiInspectApp {
-    #[value(name = "s02-install-docs")]
-    S02InstallDocs,
+    #[value(name = "install-docs")]
+    InstallDocs,
     #[value(name = "s03-disk-plan")]
     S03DiskPlan,
 }

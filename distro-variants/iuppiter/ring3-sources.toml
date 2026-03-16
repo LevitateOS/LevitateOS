@@ -2,7 +2,7 @@ schema_version = 6
 
 [ring3_sources.rootfs_source]
 kind = "recipe_custom"
-recipe_script = "distro-builder/recipes/alpine-stage01-rootfs.rhai"
+recipe_script = "distro-builder/recipes/alpine-live-source-rootfs.rhai"
 
 [ring3_sources.rootfs_source.defines]
 ALPINE_RELEASE_BRANCH = "v3.23"

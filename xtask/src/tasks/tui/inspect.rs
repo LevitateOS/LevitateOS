@@ -119,9 +119,9 @@ fn resolve_target(root: &Path, options: &Options) -> Result<Target> {
             bail!("tui inspect: --app cannot be combined with --cwd/--command");
         }
         return Ok(match app {
-            crate::cli::TuiInspectApp::S02InstallDocs => Target {
-                name: "s02-install-docs".to_string(),
-                cwd: root.join("tui/apps/s02-live-tools/install-docs"),
+            crate::cli::TuiInspectApp::InstallDocs => Target {
+                name: "install-docs".to_string(),
+                cwd: root.join("tui/apps/live-tools/install-docs"),
                 command: "bun src/main.ts".to_string(),
             },
             crate::cli::TuiInspectApp::S03DiskPlan => Target {

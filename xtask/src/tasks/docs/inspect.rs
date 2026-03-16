@@ -22,7 +22,7 @@ pub fn run(options: Options) -> Result<()> {
     ensure_required_tools()?;
 
     let root = crate::util::repo::repo_root()?;
-    let docs_tui_dir = root.join("tui/apps/s02-live-tools/install-docs");
+    let docs_tui_dir = root.join("tui/apps/live-tools/install-docs");
     if !docs_tui_dir.is_dir() {
         bail!(
             "docs inspect: missing install-docs directory at '{}'",

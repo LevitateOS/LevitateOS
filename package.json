@@ -5,7 +5,7 @@
     "docs/website",
     "docs/content",
     "tui/apps/s03-install/disk-plan",
-    "tui/apps/s02-live-tools/install-docs",
+    "tui/apps/live-tools/install-docs",
     "tui/kit/core",
     "tui/kit/presets-install",
     "tui/kit/testing"
