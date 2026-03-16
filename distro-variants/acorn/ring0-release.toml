@@ -13,7 +13,7 @@ format = "iso"
 
 [ring0_release.release]
 primary_outputs = ["acornos-x86_64.iso"]
-supporting_artifacts = ["s00-filesystem.erofs", "s00-initramfs-live.cpio.gz"]
+supporting_artifacts = ["filesystem.erofs", "initramfs-live.cpio.gz"]
 metadata_outputs = []
 metadata_facts = [
   "kernel_source.version",

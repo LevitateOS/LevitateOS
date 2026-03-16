@@ -19,7 +19,7 @@ format = "img"
 
 [ring0_release.release]
 primary_outputs = ["iuppiter-x86_64.iso", "iuppiteros-x86_64.img"]
-supporting_artifacts = ["s00-filesystem.erofs", "s00-initramfs-live.cpio.gz"]
+supporting_artifacts = ["filesystem.erofs", "initramfs-live.cpio.gz"]
 metadata_outputs = []
 metadata_facts = [
   "kernel_source.version",

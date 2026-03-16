@@ -14,9 +14,9 @@ format = "iso"
 [ring0_release.release]
 primary_outputs = ["levitateos-x86_64.iso"]
 supporting_artifacts = [
-  "s00-filesystem.erofs",
-  "s00-initramfs-live.cpio.gz",
-  "s00-initramfs-installed.img",
+  "filesystem.erofs",
+  "initramfs-live.cpio.gz",
+  "initramfs-installed.img",
 ]
 metadata_outputs = []
 metadata_facts = [
