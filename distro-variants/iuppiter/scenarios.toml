@@ -1,6 +1,8 @@
 schema_version = 6
 
 [scenarios.live_boot]
+success_patterns = []
+fatal_patterns = []
 required_kernel_cmdline = ["audit=1"]
 required_live_services = ["networking", "dhcpcd", "sshd"]
 
@@ -12,8 +14,79 @@ pass_marker = "STAGE 01 PASSED"
 required_services = ["networking", "dhcpcd", "sshd"]
 
 [scenarios.live_tools]
+required_tools = [
+  "recstrap",
+  "recfstab",
+  "recchroot",
+  "recab",
+  "iuppiter-dar",
+  "sfdisk",
+  "mkfs.ext4",
+  "mount",
+  "smartctl",
+  "hdparm",
+  "sg_inq",
+  "ip",
+  "ping",
+  "less",
+  "grep",
+  "find",
+]
 install_experience = "automated_ssh"
 
 [scenarios.live_tools.evidence]
 script_path = "live-tools.sh"
 pass_marker = "STAGE 02 PASSED"
+
+[scenarios.install]
+required_tools = ["recstrap", "recfstab", "recchroot", "sfdisk", "mkfs.ext4"]
+required_services = ["networking", "dhcpcd", "sshd"]
+
+[scenarios.install.evidence]
+script_path = "install.sh"
+pass_marker = "STAGE 03 PASSED"
+
+[scenarios.installed_boot]
+success_patterns = ["___SHELL_READY___", "iuppiter login:", "login:", "Welcome to IuppiterOS"]
+fatal_patterns = []
+required_kernel_cmdline = []
+required_live_services = []
+
+[scenarios.installed_boot.evidence]
+script_path = "installed-boot.sh"
+pass_marker = "STAGE 04 PASSED"
+
+[scenarios.automated_login]
+auth_mode = "default_password_login"
+default_username = "operator"
+default_password = "iuppiter"
+login_prompt_pattern = "iuppiter login:"
+
+[scenarios.automated_login.evidence]
+script_path = "automated-login.sh"
+pass_marker = "STAGE 05 PASSED"
+
+[scenarios.installed_tools]
+required_tools = [
+  "sudo",
+  "ip",
+  "ssh",
+  "ash",
+  "smartctl",
+  "hdparm",
+  "sg_inq",
+  "recab",
+  "iuppiter-dar",
+  "mount",
+  "umount",
+  "dmesg",
+]
+
+[scenarios.installed_tools.evidence]
+script_path = "installed-tools.sh"
+pass_marker = "STAGE 06 PASSED"
+
+[scenarios.runtime_policy]
+rootfs_mutability = "mutable"
+mutable_required_rw_paths = []
+immutable_required_ro_paths = []
