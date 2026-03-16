@@ -3,7 +3,6 @@ use regex::Regex;
 use std::collections::HashSet;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 #[derive(Debug, Clone)]
@@ -132,7 +131,7 @@ pub fn run(options: Options) -> Result<()> {
 }
 
 fn ensure_required_tools() -> Result<()> {
-    for tool in ["bun", "script", "timeout"] {
+    for tool in ["bun"] {
         if which::which(tool).is_err() {
             bail!(
                 "docs inspect: required tool '{}' not found in PATH. Install it and retry.",
@@ -224,33 +223,17 @@ fn render_slug_transcript(
     seconds: u64,
     transcript_path: &Path,
 ) -> Result<()> {
-    let command = format!(
-        "unset NO_COLOR; export FORCE_COLOR=3; export TERM=xterm-256color; stty rows {rows} cols {columns}; timeout {seconds} bun src/main.ts --slug {slug}"
-    );
-
-    let status = Command::new("script")
-        .arg("-q")
-        .arg("-c")
-        .arg(&command)
-        .arg(transcript_path)
-        .current_dir(docs_tui_dir)
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .status()
-        .with_context(|| {
-            format!(
-                "docs inspect: running script capture for slug '{}' in '{}'",
-                slug,
-                docs_tui_dir.display()
-            )
-        })?;
-    if !status.success() {
-        bail!(
-            "docs inspect: script capture failed for slug '{}', exit={status}",
-            slug
-        );
-    }
-    Ok(())
+    let command = format!("exec bun src/main.ts --slug {slug}");
+    let label = format!("docs inspect: capture slug '{slug}'");
+    crate::util::pty_capture::capture_shell_transcript(crate::util::pty_capture::ShellCapture {
+        label: &label,
+        cwd: docs_tui_dir,
+        command: &command,
+        columns,
+        rows,
+        seconds,
+        transcript_path,
+    })
 }
 
 fn parse_plain_screen(transcript: &[u8], rows: u16, columns: u16) -> String {

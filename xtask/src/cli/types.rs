@@ -328,7 +328,7 @@ pub enum DocsCmd {
         #[arg(long)]
         ansi: bool,
 
-        /// Keep raw `script` transcripts next to plain outputs for debugging.
+        /// Keep raw terminal transcripts next to plain outputs for debugging.
         #[arg(long)]
         keep_transcript: bool,
     },
@@ -391,7 +391,7 @@ pub enum TuiCmd {
         #[arg(long)]
         ansi: bool,
 
-        /// Keep raw `script` transcript next to plain output for debugging.
+        /// Keep raw terminal transcript next to plain output for debugging.
         #[arg(long)]
         keep_transcript: bool,
     },

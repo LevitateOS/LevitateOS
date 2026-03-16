@@ -484,9 +484,11 @@ docs-content-check:
 
 # Docs TUI (installation-focused)
 docs-tui-check:
+    cd docs/content && bun run build
     cd tui/apps/live-tools/install-docs && bun run typecheck && bun run test
 
 docs-tui-inspect-check:
+    cd docs/content && bun run build
     cd tui/apps/live-tools/install-docs && bun run inspect:check
 
 [script, no-exit-message]

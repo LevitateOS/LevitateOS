@@ -1,7 +1,6 @@
 use anyhow::{Context, Result, bail};
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 #[derive(Debug, Clone)]
@@ -28,8 +27,6 @@ struct Target {
 }
 
 pub fn run(options: Options) -> Result<()> {
-    ensure_required_tools()?;
-
     let root = crate::util::repo::repo_root()?;
     let target = resolve_target(&root, &options)?;
     if !target.cwd.is_dir() {
@@ -200,18 +197,6 @@ fn build_manifest(
     manifest
 }
 
-fn ensure_required_tools() -> Result<()> {
-    for tool in ["script", "timeout"] {
-        if which::which(tool).is_err() {
-            bail!(
-                "tui inspect: required tool '{}' not found in PATH. Install it and retry.",
-                tool
-            );
-        }
-    }
-    Ok(())
-}
-
 fn create_run_dir(root: &Path, out_dir: Option<&Path>) -> Result<PathBuf> {
     let base = out_dir
         .map(Path::to_path_buf)
@@ -250,43 +235,25 @@ fn render_transcript(
     seconds: u64,
     transcript_path: &Path,
 ) -> Result<()> {
-    let base = format!(
-        "unset NO_COLOR; export FORCE_COLOR=3; export TERM=xterm-256color; stty rows {rows} cols {columns}; timeout {seconds} {}",
-        target.command
-    );
+    let base = target.command.to_string();
     let command = if let Some(sequence) = input {
         let escaped = sh_single_quote(sequence);
         format!(
-            "( sleep {input_delay_seconds}; printf '%b' '{escaped}' > /dev/tty; sleep 1; printf '%b' '{escaped}' > /dev/tty ) & unset NO_COLOR; export FORCE_COLOR=3; export TERM=xterm-256color; stty rows {rows} cols {columns}; timeout {seconds} {}",
-            target.command
+            "( sleep {input_delay_seconds}; printf '%b' '{escaped}' > /dev/tty; sleep 1; printf '%b' '{escaped}' > /dev/tty ) & {base}"
         )
     } else {
         base
     };
-
-    let status = Command::new("script")
-        .arg("-q")
-        .arg("-c")
-        .arg(&command)
-        .arg(transcript_path)
-        .current_dir(&target.cwd)
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .status()
-        .with_context(|| {
-            format!(
-                "tui inspect: running script capture for '{}' in '{}'",
-                target.name,
-                target.cwd.display()
-            )
-        })?;
-    if !status.success() {
-        bail!(
-            "tui inspect: script capture failed for '{}' (exit={status})",
-            target.name
-        );
-    }
-    Ok(())
+    let label = format!("tui inspect: capture '{}'", target.name);
+    crate::util::pty_capture::capture_shell_transcript(crate::util::pty_capture::ShellCapture {
+        label: &label,
+        cwd: &target.cwd,
+        command: &command,
+        columns,
+        rows,
+        seconds,
+        transcript_path,
+    })
 }
 
 fn sh_single_quote(input: &str) -> String {
