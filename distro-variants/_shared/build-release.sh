@@ -12,9 +12,9 @@ REPO_ROOT="$(CDPATH= cd -- "$SCRIPT_DIR/../.." && pwd)"
 : "${IDENTITY_OS_VERSION:?missing IDENTITY_OS_VERSION}"
 : "${IDENTITY_ISO_LABEL:?missing IDENTITY_ISO_LABEL}"
 : "${PRODUCT_NAME:?missing PRODUCT_NAME}"
-: "${S00_LIVE_UKI_FILENAME:?missing S00_LIVE_UKI_FILENAME}"
-: "${S00_EMERGENCY_UKI_FILENAME:?missing S00_EMERGENCY_UKI_FILENAME}"
-: "${S00_DEBUG_UKI_FILENAME:?missing S00_DEBUG_UKI_FILENAME}"
+: "${LIVE_UKI_FILENAME:?missing LIVE_UKI_FILENAME}"
+: "${EMERGENCY_UKI_FILENAME:?missing EMERGENCY_UKI_FILENAME}"
+: "${DEBUG_UKI_FILENAME:?missing DEBUG_UKI_FILENAME}"
 
 OUTPUT_DIR="${REPO_ROOT}/.artifacts/out/${DISTRO_ID}"
 KERNEL_OUTPUT_DIR="${KERNEL_OUTPUT_DIR:-${REPO_ROOT}/.artifacts/kernel/${DISTRO_ID}/current}"
@@ -326,7 +326,7 @@ ISO_TMP_SHA_ALT2="${ISO_TMP%.*}.sha512"
 
 rm -f "$ISO_TMP" "$ISO_TMP_SHA_ALT1" "$ISO_TMP_SHA_ALT2"
 
-LIVE_UKI_CMDLINE="$(merge_uki_cmdline "${S00_LIVE_CMDLINE-}")"
+LIVE_UKI_CMDLINE="$(merge_uki_cmdline "${LIVE_UKI_CMDLINE-}")"
 EMERGENCY_UKI_CMDLINE="$(merge_uki_cmdline "emergency")"
 DEBUG_UKI_CMDLINE="$(merge_uki_cmdline "debug")"
 
@@ -339,9 +339,9 @@ set -- \
     --os-name "$OS_NAME" \
     --os-id "$OS_ID" \
     --os-version "$OS_VERSION" \
-    --build-uki "${OS_NAME} ${PRODUCT_BOOT_LABEL}:${LIVE_UKI_CMDLINE}:${S00_LIVE_UKI_FILENAME}" \
-    --build-uki "${OS_NAME} ${PRODUCT_BOOT_LABEL} (Emergency):${EMERGENCY_UKI_CMDLINE}:${S00_EMERGENCY_UKI_FILENAME}" \
-    --build-uki "${OS_NAME} ${PRODUCT_BOOT_LABEL} (Debug):${DEBUG_UKI_CMDLINE}:${S00_DEBUG_UKI_FILENAME}" \
+    --build-uki "${OS_NAME} ${PRODUCT_BOOT_LABEL}:${LIVE_UKI_CMDLINE}:${LIVE_UKI_FILENAME}" \
+    --build-uki "${OS_NAME} ${PRODUCT_BOOT_LABEL} (Emergency):${EMERGENCY_UKI_CMDLINE}:${EMERGENCY_UKI_FILENAME}" \
+    --build-uki "${OS_NAME} ${PRODUCT_BOOT_LABEL} (Debug):${DEBUG_UKI_CMDLINE}:${DEBUG_UKI_FILENAME}" \
     --overlay-image "$LIVE_OVERLAY_IMAGE"
 
 set -- "$@" --live-payload-layout iso-files
