@@ -15,7 +15,7 @@ required_build_tools = [
   "recfstab",
   "recchroot",
 ]
-kernel_kconfig_path = "kconfig"
+kernel_kconfig_path = "kernel/kconfig"
 recipe_kernel_script = "distro-builder/recipes/linux.rhai"
 recipe_kernel_invocation = "recipe install"
 kernel_release_path = "kernel-build/include/config/kernel.release"
@@ -27,5 +27,5 @@ kernel_localversion = "-acorn"
 module_install_path = "/usr/lib/modules"
 
 [build_host.evidence]
-script_path = "build-capability.sh"
+script_path = "evidence/build-capability.sh"
 pass_marker = "BUILD CAPABILITY PASSED"
