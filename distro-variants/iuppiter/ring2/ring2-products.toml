@@ -9,7 +9,7 @@ logical_name = "product.payload.live_overlay"
 description = "Read-only live overlay payload tree"
 overlay_kind = "openrc"
 openrc_inittab = "serial_only"
-profile_overlay = "distro-variants/iuppiter/ring2/overlays/live"
+seed_overlay = "distro-variants/iuppiter/ring2/overlays/live"
 
 [ring2_products.boot_live]
 logical_name = "product.payload.boot.live"
