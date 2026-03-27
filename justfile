@@ -657,18 +657,33 @@ docs-tui-split *args:
 
 # recpart TUI
 [script, no-exit-message]
+tui-install-disk-plan *args:
+    #!/usr/bin/env bash
+    set -euo pipefail
+
+    echo "NOTICE: running install disk-plan TUI (tui/apps/install/disk-plan)." >&2
+
+    if [ ! -t 0 ] || [ ! -t 1 ]; then
+      echo "tui-install-disk-plan requires interactive TTY stdin/stdout. Run from a terminal." >&2
+      exit 2
+    fi
+
+    cd tui/apps/install/disk-plan
+    exec bun run start -- {{args}}
+
+[script, no-exit-message]
 tui-s03-disk-plan *args:
     #!/usr/bin/env bash
     set -euo pipefail
 
-    echo "NOTICE: running Stage 03 disk-plan TUI (tui/apps/s03-install/disk-plan)." >&2
+    echo "NOTICE: tui-s03-disk-plan is compatibility-only. Use tui-install-disk-plan." >&2
 
     if [ ! -t 0 ] || [ ! -t 1 ]; then
       echo "tui-s03-disk-plan requires interactive TTY stdin/stdout. Run from a terminal." >&2
       exit 2
     fi
 
-    cd tui/apps/s03-install/disk-plan
+    cd tui/apps/install/disk-plan
     exec bun run start -- {{args}}
 
 # Website (Astro)

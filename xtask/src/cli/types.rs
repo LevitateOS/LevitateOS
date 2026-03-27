@@ -338,8 +338,8 @@ pub enum DocsCmd {
 pub enum TuiInspectApp {
     #[value(name = "install-docs")]
     InstallDocs,
-    #[value(name = "s03-disk-plan")]
-    S03DiskPlan,
+    #[value(name = "install-disk-plan", alias = "s03-disk-plan")]
+    InstallDiskPlan,
 }
 
 #[derive(Subcommand)]

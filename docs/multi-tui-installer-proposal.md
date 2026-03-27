@@ -1,4 +1,4 @@
-# Multi-TUI Installer Proposal (Stage-Native, Non-Monolithic)
+# Multi-TUI Installer Proposal (Checkpoint-Oriented, Non-Monolithic)
 
 ## Status
 
@@ -6,9 +6,9 @@ Draft proposal for implementation planning.
 
 ## Goal
 
-Build a multi-TUI installation system using `tui-kit` where each TUI owns a single installation concern and stage boundary, instead of creating one large "do everything" installer.
+Build a multi-TUI installation system using `tui-kit` where each TUI owns a single installation concern and checkpoint boundary, instead of creating one large "do everything" installer.
 
-This proposal intentionally avoids a monolithic, highly-branching installer flow. The design is explicit, stage-native, and reproducible.
+This proposal intentionally avoids a monolithic, highly-branching installer flow. The design is explicit, checkpoint-oriented, and reproducible.
 
 ## Scope Gate (Stage 02 Policy)
 
@@ -19,13 +19,13 @@ This proposal applies only to distro variants that declare Stage 02 `install_exp
 
 For `automated_ssh` variants:
 
-1. Stage 02 remains SSH/headless automation oriented and must not route default ISO flow through local TUI install surfaces.
-2. Stage 03 install flow also remains automation-first; local installer TUIs are disabled by default.
+1. 02LiveTools remains SSH/headless automation oriented and must not route default ISO flow through local TUI install surfaces.
+2. 03Install also remains automation-first; local installer TUIs are disabled by default.
 
-## Stage UX Authority Split
+## Checkpoint UX Authority Split
 
-1. Stage 02 (`02LiveTools`) owns **session UX**: shell profile, tmux/session layout, docs visibility defaults, live overlay UX, and install entrypoint launch behavior.
-2. Stage 03 (`03Install`) owns **task UX**: disk/filesystem/bootstrap/fstab/chroot/bootloader mutation workflows and their handoff artifacts.
+1. 02LiveTools owns **session UX**: shell profile, tmux/session layout, docs visibility defaults, live overlay UX, and install entrypoint launch behavior.
+2. 03Install owns **task UX**: disk/filesystem/bootstrap/fstab/chroot/bootloader mutation workflows and their handoff artifacts.
 
 ## Design Intent
 
@@ -258,7 +258,7 @@ The workspace root can enforce dependency direction (`apps -> kit`, never `kit -
 
 ## MODEL RECLASSIFICATION GATE
 
-Current pain is architectural drift (multiple partial owners), not missing widgets. The model must change from "scattered app+kit implementations" to "single TUI workspace with strict ownership and stage-native app packages."
+Current pain is architectural drift (multiple partial owners), not missing widgets. The model must change from "scattered app+kit implementations" to "single TUI workspace with strict ownership and role-based app packages."
 
 Decision matrix:
 
@@ -286,16 +286,16 @@ Chosen: **Option B** because it gives one canonical app lineage plus a reusable 
         /package.json
         /tsconfig.json
         /README.md
-    /s03-install
+    /install
       /disk-plan                       # tui-disk-plan (canonical recpart UI surface)
       /filesystem                      # tui-filesystem
       /bootstrap                       # tui-bootstrap
       /fstab                           # tui-fstab
       /chroot-config                   # tui-chroot-config
       /bootloader                      # tui-bootloader
-    /s04-login-gate
+    /login-gate
       /firstboot-check                 # tui-firstboot-check
-    /s06-runtime
+    /runtime
       /postinstall-tools               # tui-postinstall-tools
   /kit
     /core                              # re-architected tui-kit owner
@@ -310,13 +310,13 @@ Chosen: **Option B** because it gives one canonical app lineage plus a reusable 
 
 1. `docs/tui` -> `tui/apps/live-tools/install-docs` (canonical live-tools session UX/docs app).
 2. `shared/tui-kit` -> `tui/kit/core` (re-architecture happens here; no docs-domain logic).
-3. legacy `tools/recpart/frontend` -> `tui/apps/s03-install/disk-plan` (stage-native UI owner).
+3. legacy `tools/recpart/frontend` -> `tui/apps/install/disk-plan` (canonical interactive UI owner).
 
 Compatibility shims during migration:
 
 1. Keep legacy paths as thin wrappers/symlinks only for one transition window.
 2. `just docs-tui` routes to `tui/apps/live-tools/install-docs`.
-3. `just tui-s03-disk-plan` routes to `tui/apps/s03-install/disk-plan`.
+3. `just tui-install-disk-plan` routes to `tui/apps/install/disk-plan`.
 
 ## Dependency Rules (Must Hold)
 
@@ -337,15 +337,15 @@ to:
 
 - `tui/apps/live-tools/*`
 - `tui/kit/core`
-- `tui/apps/s03-install/*`
-- `tui/apps/s04-login-gate/*`
-- `tui/apps/s06-runtime/*`
+- `tui/apps/install/*`
+- `tui/apps/login-gate/*`
+- `tui/apps/runtime/*`
 
 ## Phase Plan
 
 1. **Phase 0 (no behavior change):** create `tui/*` tree, move packages, keep CLI wrappers.
 2. **Phase 1:** re-architect `tui/kit/core` API surface (runtime/primitives/components/patterns).
 3. **Phase 2:** repoint S02 install-docs app imports to new kit API and lock snapshots.
-4. **Phase 3:** reintroduce recpart-backed S03 disk-plan UI at `tui/apps/s03-install/disk-plan` on top of new kit API.
-5. **Phase 4:** implement stage-native installer TUIs (`s03/s04/s06`) with contract-gated handoff artifacts.
+4. **Phase 3:** reintroduce recpart-backed install disk-plan UI at `tui/apps/install/disk-plan` on top of new kit API.
+5. **Phase 4:** implement checkpoint-scoped installer TUIs (`install/login-gate/runtime`) with contract-gated handoff artifacts.
 6. **Phase 5 (optional auth-model promotion):** if desired, add a true TUI login for S04+ as an explicit model change after contract/test parity is complete.

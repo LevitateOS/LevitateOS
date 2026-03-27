@@ -4,7 +4,7 @@
   "workspaces": [
     "docs/website",
     "docs/content",
-    "tui/apps/s03-install/disk-plan",
+    "tui/apps/install/disk-plan",
     "tui/apps/live-tools/install-docs",
     "tui/kit/core",
     "tui/kit/presets-install",

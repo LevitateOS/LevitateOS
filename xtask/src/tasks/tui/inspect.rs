@@ -121,9 +121,9 @@ fn resolve_target(root: &Path, options: &Options) -> Result<Target> {
                 cwd: root.join("tui/apps/live-tools/install-docs"),
                 command: "bun src/main.ts".to_string(),
             },
-            crate::cli::TuiInspectApp::S03DiskPlan => Target {
-                name: "s03-disk-plan".to_string(),
-                cwd: root.join("tui/apps/s03-install/disk-plan"),
+            crate::cli::TuiInspectApp::InstallDiskPlan => Target {
+                name: "install-disk-plan".to_string(),
+                cwd: root.join("tui/apps/install/disk-plan"),
                 command: "bun run start -- --disk /dev/sda".to_string(),
             },
         });

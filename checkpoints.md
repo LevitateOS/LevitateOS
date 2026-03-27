@@ -4,18 +4,18 @@ Status matrix for `testing/install-tests` (`cargo run --bin checkpoints -- ...`)
 
 ## Checkpoint Semantics
 
-Each stage (01–08) represents a deterministic, bootable system state.
+Each checkpoint (01–08) represents a deterministic, bootable system state.
 
-A stage is not only a validation gate — it is a *spawn point*.
-From any passed stage, the system must be rebuildable and bootable
+A checkpoint is not only a validation gate. It is also a *spawn point*.
+From any passed checkpoint, the system must be rebuildable and bootable
 so a human can enter that exact state for audit, debugging, or inspection.
 
-Stage 00 is the only exception: it validates build capability only and does not
+00Build is the only exception: it validates build capability only and does not
 represent a bootable runtime state.
 
 ## Distro Behavior (Authoritative)
 
-All distros share the same Stage ladder (00–08).
+All distros share the same checkpoint ladder (`00Build` through `08Package`).
 Differences below describe *policy and intent*, not structural deviations from the ladder.
 
 | Area | LevitateOS | RalphOS | AcornOS | iuppiterOS |
@@ -36,9 +36,9 @@ Differences below describe *policy and intent*, not structural deviations from t
 | App Source | Rocky DVD ISO baseline | Rocky DVD ISO baseline | Alpine Extended baseline | Alpine Extended baseline |
 
 
-## Stages
+## Checkpoint Ladder
 
-| Stage | Ladder Semantics (Proven Authority) | Game Savepoint Semantics (Spawnable State) |
+| Checkpoint | Ladder Semantics (Proven Authority) | Game Savepoint Semantics (Spawnable State) |
 |---|---|---|
 | 00Build | Kernel + ISO build succeeds. | Not spawnable (build only). |
 | 01Boot | Live ISO boots to ready state. | Spawn into minimal live environment. |
@@ -50,9 +50,9 @@ Differences below describe *policy and intent*, not structural deviations from t
 | 07Update | A/B slot edit + reboot into alternate slot verified. | Spawn into update-capable system with confirmed slot identity. |
 | 08Package | 06 baseline convertible to release artifacts (`qcow2`, `.img`, ISO where applicable). | Spawn into distributable image derived from 06 baseline. |
 
-## Stage 02 Install Experience Profiles
+## 02LiveTools Install Experience Profiles
 
-Stage 02 is now explicitly config-driven via canonical owner manifests:
+02LiveTools is now explicitly config-driven via canonical owner manifests:
 
 - `distro-variants/*/scenarios.toml`
 - `distro-variants/*/ring2-products.toml`
@@ -60,37 +60,37 @@ Stage 02 is now explicitly config-driven via canonical owner manifests:
 - `install_experience = "ux"`
   - Required intent: local interactive live install flow.
   - Distros: `levitate`, `acorn`.
-  - Stage authority split:
-    - Stage 02 owns session UX (shell/tmux/docs/overlay/entrypoint behavior).
-    - Stage 03 owns install task UX (disk/filesystem/bootstrap/fstab/chroot/bootloader actions).
-  - Stage 02 marker in rootfs: `/usr/lib/levitate/stage-02/install-experience` = `ux`.
-  - UX profile hook: `/etc/profile.d/30-stage-02-install-ux.sh` (tty1 interactive launch path).
+  - Checkpoint authority split:
+    - 02LiveTools owns session UX (shell/tmux/docs/overlay/entrypoint behavior).
+    - 03Install owns install task UX (disk/filesystem/bootstrap/fstab/chroot/bootloader actions).
+  - Install marker in rootfs: `/usr/lib/levitate/install-experience` = `ux`.
+  - UX profile hook: `/etc/profile.d/30-install-ux.sh` (tty1 interactive launch path).
 - `install_experience = "automated_ssh"`
   - Required intent: SSH-driven automated install/image pipelines (`qcow2`/`.img` focus).
   - Distros: `ralph`, `iuppiter`.
   - Local TUI policy:
-    - Stage 02 local interactive UX surfaces are disabled by default.
-    - Stage 03 local interactive installer TUIs are disabled by default.
+    - 02LiveTools local interactive UX surfaces are disabled by default.
+    - 03Install local interactive installer TUIs are disabled by default.
     - Install flow is driven by SSH/headless automation entrypoints.
-  - Stage 02 marker in rootfs: `/usr/lib/levitate/stage-02/install-experience` = `automated_ssh`.
+  - Install marker in rootfs: `/usr/lib/levitate/install-experience` = `automated_ssh`.
 
-All profiles must include executable `/usr/local/bin/stage-02-install-entrypoint`; behavior is profile-specific.
+All profiles must include executable `/usr/local/bin/levitate-install-entrypoint`; behavior is profile-specific.
 
-## Stage Filesystem Delta Matrix
+## Checkpoint Filesystem Delta Matrix
 
 Cells describe the filesystem delta relative to the immediately preceding stage.
 
-| Stage | `*-filesystem.erofs` delta vs previous stage | `*-overlayfs.erofs` delta vs previous stage | `*-initramfs-live.cpio.gz` delta vs previous stage |
+| Checkpoint | `*-filesystem.erofs` delta vs previous checkpoint | `*-overlayfs.erofs` delta vs previous checkpoint | `*-initramfs-live.cpio.gz` delta vs previous checkpoint |
 |---|---|---|---|
-| 00Build | Baseline rootfs payload (`filesystem.erofs`) created from stage-00 producers. | Baseline empty/minimal live overlay payload (`overlayfs.erofs`). | Baseline live initramfs payload (`initramfs-live.cpio.gz`). |
-| 01Boot | `s01 = s00 + boot additions` (boot/rootfs producers, stage test scripts, boot readiness wiring). | `s01-overlayfs.erofs` becomes non-empty live overlay with stage banner + required live service wiring (for Levitate: `sshd`). | Rebuilt for stage output naming; no intended functional delta from stage 00. |
-| 02LiveTools | `s02 = s01 + live tools additions` (installer/tool binaries, Stage 02 install-experience marker, profile-specific install entrypoint, plus stage test scripts). | Overlay policy reused from stage 01; practical delta is stage identity/banner (`S02 Live Tools`) with the same required live service wiring baseline. | Rebuilt for stage output naming; no intended functional delta from stage 01. |
-| 03Install | N/A in current ISO `*fs` artifact pipeline (install validation stage, not a new live `*fs` image build stage). | N/A in current ISO `*fs` artifact pipeline. | N/A in current ISO `*fs` artifact pipeline. |
+| 00Build | Baseline rootfs payload (`filesystem.erofs`) created from build producers. | Baseline empty/minimal live overlay payload (`overlayfs.erofs`). | Baseline live initramfs payload (`initramfs-live.cpio.gz`). |
+| 01Boot | `s01 = s00 + boot additions` (boot/rootfs producers, checkpoint test scripts, boot readiness wiring). | `s01-overlayfs.erofs` becomes non-empty live overlay with checkpoint banner + required live service wiring (for Levitate: `sshd`). | Rebuilt for checkpoint output naming; no intended functional delta from 00Build. |
+| 02LiveTools | `s02 = s01 + live tools additions` (installer/tool binaries, install-experience marker, profile-specific install entrypoint, plus checkpoint test scripts). | Overlay policy reused from 01Boot; practical delta is checkpoint identity/banner (`02LiveTools`) with the same required live service wiring baseline. | Rebuilt for checkpoint output naming; no intended functional delta from 01Boot. |
+| 03Install | N/A in current ISO `*fs` artifact pipeline (install validation checkpoint, not a new live `*fs` image build checkpoint). | N/A in current ISO `*fs` artifact pipeline. | N/A in current ISO `*fs` artifact pipeline. |
 | 04LoginGate | N/A in current ISO `*fs` artifact pipeline. | N/A in current ISO `*fs` artifact pipeline. | N/A in current ISO `*fs` artifact pipeline. |
 | 05Harness | N/A in current ISO `*fs` artifact pipeline. | N/A in current ISO `*fs` artifact pipeline. | N/A in current ISO `*fs` artifact pipeline. |
 | 06Runtime | N/A in current ISO `*fs` artifact pipeline. | N/A in current ISO `*fs` artifact pipeline. | N/A in current ISO `*fs` artifact pipeline. |
 | 07Update | N/A in current ISO `*fs` artifact pipeline. | N/A in current ISO `*fs` artifact pipeline. | N/A in current ISO `*fs` artifact pipeline. |
-| 08Package | N/A in current ISO `*fs` artifact pipeline (packaging/conversion of verified baseline, not stage-local live `*fs` assembly). | N/A in current ISO `*fs` artifact pipeline. | N/A in current ISO `*fs` artifact pipeline. |
+| 08Package | N/A in current ISO `*fs` artifact pipeline (packaging/conversion of verified baseline, not checkpoint-local live `*fs` assembly). | N/A in current ISO `*fs` artifact pipeline. | N/A in current ISO `*fs` artifact pipeline. |
 
 ### Caveat
 
