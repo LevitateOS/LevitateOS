@@ -105,7 +105,7 @@ preseed-acorn:
 # Boundary rule: boot wrappers consume existing artifacts only.
 # Do not add implicit ISO build steps here; freshness is explicit via `just release-build*` or compatibility `just build*`.
 [script, no-exit-message]
-_boot_scenario n distro="levitate" inject="" inject_file="" ssh="false" no_shell="false" window="false" ssh_pubkey=(env("HOME") + "/.ssh/id_ed25519.pub") ssh_privkey="" ssh_port="2222" inject_append="":
+_boot_scenario target distro="levitate" inject="" inject_file="" ssh="false" no_shell="false" window="false" ssh_pubkey=(env("HOME") + "/.ssh/id_ed25519.pub") ssh_privkey="" ssh_port="2222" inject_append="":
     #!/usr/bin/env bash
     set -euo pipefail
     CARGO_BIN="${CARGO_BIN:-cargo}"
@@ -118,12 +118,25 @@ _boot_scenario n distro="levitate" inject="" inject_file="" ssh="false" no_shell
         exit 127
       fi
     fi
-    if [ "{{ssh}}" = "true" ] && [ "{{n}}" != "1" ] && [ "{{n}}" != "01" ] && [ "{{n}}" != "2" ] && [ "{{n}}" != "02" ]; then
-      echo "SSH boot mode supports only live scenario aliases 1/2 (got: {{n}})" >&2
-      exit 2
+    case "{{target}}" in
+      live-boot|live_boot|live-tools|live_tools|installed-boot|installed_boot) ;;
+      *)
+        echo "scenario boot expects an interactive scenario target: live-boot, live-tools, or installed-boot (got: {{target}})" >&2
+        exit 2
+        ;;
+    esac
+
+    if [ "{{ssh}}" = "true" ]; then
+      case "{{target}}" in
+        live-boot|live_boot|live-tools|live_tools) ;;
+        *)
+          echo "SSH boot mode supports only live ISO scenario targets: live-boot or live-tools (got: {{target}})" >&2
+          exit 2
+          ;;
+      esac
     fi
 
-    args=("$CARGO_BIN" xtask scenarios boot {{n}} "{{distro}}")
+    args=("$CARGO_BIN" xtask scenarios boot {{target}} "{{distro}}")
 
     if [ "{{ssh}}" = "true" ]; then
       args+=(--ssh --ssh-port "{{ssh_port}}")
@@ -185,29 +198,24 @@ _boot_scenario n distro="levitate" inject="" inject_file="" ssh="false" no_shell
 
     "${args[@]}"
 
-# Compatibility alias for the old stage boot delegate.
+# Boot a scenario by canonical scenario name (interactive serial, Ctrl-A X to exit).
 [no-exit-message]
-_boot_stage n distro="levitate" inject="" inject_file="" ssh="false" no_shell="false" window="false" ssh_pubkey=(env("HOME") + "/.ssh/id_ed25519.pub") ssh_privkey="" ssh_port="2222" inject_append="":
-    just _boot_scenario {{n}} {{distro}} "{{inject}}" "{{inject_file}}" {{ssh}} {{no_shell}} {{window}} "{{ssh_pubkey}}" "{{ssh_privkey}}" "{{ssh_port}}" "{{inject_append}}"
+scenario target distro="levitate" inject="" inject_file="" ssh_pubkey=(env("HOME") + "/.ssh/id_ed25519.pub"):
+    just _boot_scenario {{target}} {{distro}} "{{inject}}" "{{inject_file}}" false false false "{{ssh_pubkey}}" "" 2222 LEVITATE_INSTALL_SERIAL_UX=1
 
-# Boot a scenario (interactive serial, Ctrl-A X to exit)
+# Boot a scenario by canonical scenario name with verbose serial logging.
 [no-exit-message]
-scenario n distro="levitate" inject="" inject_file="" ssh_pubkey=(env("HOME") + "/.ssh/id_ed25519.pub"):
-    just _boot_scenario {{n}} {{distro}} "{{inject}}" "{{inject_file}}" false false false "{{ssh_pubkey}}" "" 2222 LEVITATE_INSTALL_SERIAL_UX=1
+scenario-verbose target distro="levitate" inject="" inject_file="" ssh_pubkey=(env("HOME") + "/.ssh/id_ed25519.pub"):
+    just _boot_scenario {{target}} {{distro}} "{{inject}}" "{{inject_file}}" false false false "{{ssh_pubkey}}" "" 2222 LEVITATE_INSTALL_SERIAL_UX=1,LEVITATE_INSTALL_SERIAL_VERBOSE=1
 
-# Boot a scenario with verbose serial logging (kernel printks + install UX shell).
+# Boot a live ISO scenario in background and SSH into it.
 [no-exit-message]
-scenario-verbose n distro="levitate" inject="" inject_file="" ssh_pubkey=(env("HOME") + "/.ssh/id_ed25519.pub"):
-    just _boot_scenario {{n}} {{distro}} "{{inject}}" "{{inject_file}}" false false false "{{ssh_pubkey}}" "" 2222 LEVITATE_INSTALL_SERIAL_UX=1,LEVITATE_INSTALL_SERIAL_VERBOSE=1
-
-# Boot a live scenario in background and SSH into it (no serial wrapper harness).
-[no-exit-message]
-scenario-ssh n distro="levitate" inject="" inject_file="" ssh_pubkey=(env("HOME") + "/.ssh/id_ed25519.pub") ssh_privkey=(env("HOME") + "/.ssh/id_ed25519") ssh_port="2222":
-    just _boot_scenario {{n}} {{distro}} "{{inject}}" "{{inject_file}}" true false false "{{ssh_pubkey}}" "{{ssh_privkey}}" "{{ssh_port}}" ""
+scenario-ssh target distro="levitate" inject="" inject_file="" ssh_pubkey=(env("HOME") + "/.ssh/id_ed25519.pub") ssh_privkey=(env("HOME") + "/.ssh/id_ed25519") ssh_port="2222":
+    just _boot_scenario {{target}} {{distro}} "{{inject}}" "{{inject_file}}" true false false "{{ssh_pubkey}}" "{{ssh_privkey}}" "{{ssh_port}}" ""
 
 # Boot a scenario with a local QEMU GUI window in foreground mode (Ctrl-C to stop).
 [script, no-exit-message]
-scenario-window n distro="levitate" inject="" inject_file="" ssh_pubkey=(env("HOME") + "/.ssh/id_ed25519.pub"):
+scenario-window target distro="levitate" inject="" inject_file="" ssh_pubkey=(env("HOME") + "/.ssh/id_ed25519.pub"):
     #!/usr/bin/env bash
     set -euo pipefail
     CARGO_BIN="${CARGO_BIN:-cargo}"
@@ -221,8 +229,8 @@ scenario-window n distro="levitate" inject="" inject_file="" ssh_pubkey=(env("HO
       fi
     fi
 
-    export LEVITATE_STAGE_WINDOW_MODE=local
-    args=("$CARGO_BIN" xtask scenarios boot {{n}} "{{distro}}" --window)
+    export LEVITATE_SCENARIO_WINDOW_MODE=local
+    args=("$CARGO_BIN" xtask scenarios boot {{target}} "{{distro}}" --window)
 
     if [ -n "{{inject_file}}" ]; then
       args+=(--inject-file "{{inject_file}}")
@@ -240,33 +248,98 @@ scenario-window n distro="levitate" inject="" inject_file="" ssh_pubkey=(env("HO
 
 # Boot a scenario with a remote VNC window endpoint in foreground mode (Ctrl-C to stop).
 [no-exit-message]
-scenario-window-remote n distro="levitate" inject="" inject_file="" ssh_pubkey=(env("HOME") + "/.ssh/id_ed25519.pub"):
-    just _boot_scenario {{n}} {{distro}} "{{inject}}" "{{inject_file}}" false false true "{{ssh_pubkey}}" "" 2222 ""
+scenario-window-remote target distro="levitate" inject="" inject_file="" ssh_pubkey=(env("HOME") + "/.ssh/id_ed25519.pub"):
+    just _boot_scenario {{target}} {{distro}} "{{inject}}" "{{inject_file}}" false false true "{{ssh_pubkey}}" "" 2222 ""
 
-# Boot into a stage (interactive serial, Ctrl-A X to exit)
-[no-exit-message]
-stage n distro="levitate" inject="" inject_file="" ssh_pubkey=(env("HOME") + "/.ssh/id_ed25519.pub"):
-    just scenario {{n}} {{distro}} "{{inject}}" "{{inject_file}}" "{{ssh_pubkey}}"
+[script]
+_compat_scenario_target raw mode="automated":
+    #!/usr/bin/env bash
+    set -euo pipefail
 
-# Boot into a stage with verbose serial logging (kernel printks + install UX shell).
-[no-exit-message]
-stage-verbose n distro="levitate" inject="" inject_file="" ssh_pubkey=(env("HOME") + "/.ssh/id_ed25519.pub"):
-    just scenario-verbose {{n}} {{distro}} "{{inject}}" "{{inject_file}}" "{{ssh_pubkey}}"
+    case "{{raw}}" in
+      build-preflight|build_preflight|0|00|00Build) target="build-preflight" ;;
+      live-boot|live_boot|1|01|01Boot) target="live-boot" ;;
+      live-tools|live_tools|2|02|02LiveTools) target="live-tools" ;;
+      install|3|03|03Install) target="install" ;;
+      installed-boot|installed_boot|4|04|04LoginGate) target="installed-boot" ;;
+      automated-login|automated_login|5|05|05Harness) target="automated-login" ;;
+      runtime|6|06|06Runtime) target="runtime" ;;
+      *)
+        echo "unsupported compatibility scenario target '{{raw}}'; prefer canonical scenario names: build-preflight, live-boot, live-tools, install, installed-boot, automated-login, runtime" >&2
+        exit 2
+        ;;
+    esac
 
-# Boot a live stage in background and SSH into it (no serial wrapper harness).
-[no-exit-message]
-stage-ssh n distro="levitate" inject="" inject_file="" ssh_pubkey=(env("HOME") + "/.ssh/id_ed25519.pub") ssh_privkey=(env("HOME") + "/.ssh/id_ed25519") ssh_port="2222":
-    just scenario-ssh {{n}} {{distro}} "{{inject}}" "{{inject_file}}" "{{ssh_pubkey}}" "{{ssh_privkey}}" "{{ssh_port}}"
+    case "{{mode}}" in
+      interactive)
+        case "$target" in
+          live-boot|live-tools|installed-boot) ;;
+          *)
+            echo "legacy interactive stage aliases map only to interactive scenarios: live-boot, live-tools, installed-boot (got: $target)" >&2
+            exit 2
+            ;;
+        esac
+        ;;
+      live)
+        case "$target" in
+          live-boot|live-tools) ;;
+          *)
+            echo "legacy SSH/window stage aliases map only to live ISO scenarios: live-boot, live-tools (got: $target)" >&2
+            exit 2
+            ;;
+        esac
+        ;;
+      automated|upto) ;;
+      *)
+        echo "unsupported compatibility scenario mode '{{mode}}'" >&2
+        exit 2
+        ;;
+    esac
 
-# Boot into a stage with a local QEMU GUI window in foreground mode (Ctrl-C to stop).
-[no-exit-message]
-stage-window n distro="levitate" inject="" inject_file="" ssh_pubkey=(env("HOME") + "/.ssh/id_ed25519.pub"):
-    just scenario-window {{n}} {{distro}} "{{inject}}" "{{inject_file}}" "{{ssh_pubkey}}"
+    printf '%s\n' "$target"
 
-# Boot into a stage with a remote VNC window endpoint in foreground mode (Ctrl-C to stop).
-[no-exit-message]
-stage-window-remote n distro="levitate" inject="" inject_file="" ssh_pubkey=(env("HOME") + "/.ssh/id_ed25519.pub"):
-    just scenario-window-remote {{n}} {{distro}} "{{inject}}" "{{inject_file}}" "{{ssh_pubkey}}"
+# Compatibility aliases only.
+# Prefer `just scenario*`, `just scenario-test*`, and `just release-build*`.
+
+# Compatibility alias: boot a scenario using the legacy `just stage` name.
+[script, no-exit-message]
+stage target distro="levitate" inject="" inject_file="" ssh_pubkey=(env("HOME") + "/.ssh/id_ed25519.pub"):
+    #!/usr/bin/env bash
+    set -euo pipefail
+    canonical="$(just _compat_scenario_target "{{target}}" interactive)"
+    just scenario "$canonical" "{{distro}}" "{{inject}}" "{{inject_file}}" "{{ssh_pubkey}}"
+
+# Compatibility alias: boot a scenario with verbose logging using the legacy `just stage-verbose` name.
+[script, no-exit-message]
+stage-verbose target distro="levitate" inject="" inject_file="" ssh_pubkey=(env("HOME") + "/.ssh/id_ed25519.pub"):
+    #!/usr/bin/env bash
+    set -euo pipefail
+    canonical="$(just _compat_scenario_target "{{target}}" interactive)"
+    just scenario-verbose "$canonical" "{{distro}}" "{{inject}}" "{{inject_file}}" "{{ssh_pubkey}}"
+
+# Compatibility alias: boot a live scenario via SSH using the legacy `just stage-ssh` name.
+[script, no-exit-message]
+stage-ssh target distro="levitate" inject="" inject_file="" ssh_pubkey=(env("HOME") + "/.ssh/id_ed25519.pub") ssh_privkey=(env("HOME") + "/.ssh/id_ed25519") ssh_port="2222":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    canonical="$(just _compat_scenario_target "{{target}}" live)"
+    just scenario-ssh "$canonical" "{{distro}}" "{{inject}}" "{{inject_file}}" "{{ssh_pubkey}}" "{{ssh_privkey}}" "{{ssh_port}}"
+
+# Compatibility alias: boot a scenario in a local GUI window using the legacy `just stage-window` name.
+[script, no-exit-message]
+stage-window target distro="levitate" inject="" inject_file="" ssh_pubkey=(env("HOME") + "/.ssh/id_ed25519.pub"):
+    #!/usr/bin/env bash
+    set -euo pipefail
+    canonical="$(just _compat_scenario_target "{{target}}" interactive)"
+    just scenario-window "$canonical" "{{distro}}" "{{inject}}" "{{inject_file}}" "{{ssh_pubkey}}"
+
+# Compatibility alias: boot a scenario in remote-window mode using the legacy `just stage-window-remote` name.
+[script, no-exit-message]
+stage-window-remote target distro="levitate" inject="" inject_file="" ssh_pubkey=(env("HOME") + "/.ssh/id_ed25519.pub"):
+    #!/usr/bin/env bash
+    set -euo pipefail
+    canonical="$(just _compat_scenario_target "{{target}}" interactive)"
+    just scenario-window-remote "$canonical" "{{distro}}" "{{inject}}" "{{inject_file}}" "{{ssh_pubkey}}"
 
 # Single-path live-boot parity gate (serial boot + SSH boot).
 [script, no-exit-message]
@@ -310,62 +383,70 @@ s01-parity distro="levitate" inject="" inject_file="" ssh_pubkey=(env("HOME") + 
       ssh_args+=(--inject-file "$tmp_ssh")
     fi
 
-    cargo xtask scenarios boot 1 "{{distro}}" --no-shell "${serial_args[@]}"
-    cargo xtask scenarios boot 1 "{{distro}}" "${ssh_args[@]}"
+    cargo xtask scenarios boot live-boot "{{distro}}" --no-shell "${serial_args[@]}"
+    cargo xtask scenarios boot live-boot "{{distro}}" "${ssh_args[@]}"
 
-# Run automated scenario test (pass/fail)
-scenario-test n distro="levitate" inject="" inject_file="" ssh_pubkey=(env("HOME") + "/.ssh/id_ed25519.pub"):
+# Run one automated scenario by canonical scenario name.
+scenario-test target distro="levitate" inject="" inject_file="" ssh_pubkey=(env("HOME") + "/.ssh/id_ed25519.pub"):
     if [ -n "{{inject_file}}" ]; then \
-      cargo xtask scenarios test {{n}} {{distro}} --inject-file "{{inject_file}}"; \
+      cargo xtask scenarios test {{target}} {{distro}} --inject-file "{{inject_file}}"; \
     elif [ -n "{{inject}}" ]; then \
-      cargo xtask scenarios test {{n}} {{distro}} --inject "{{inject}}"; \
+      cargo xtask scenarios test {{target}} {{distro}} --inject "{{inject}}"; \
     elif [ -f "{{ssh_pubkey}}" ]; then \
       tmp=$(mktemp); \
       trap 'rm -f "$tmp"' EXIT; \
       key="$(tr -d '\n' < "{{ssh_pubkey}}")"; \
       printf 'SSH_AUTHORIZED_KEY=%s\n' "$key" > "$tmp"; \
-      cargo xtask scenarios test {{n}} {{distro}} --inject-file "$tmp"; \
+      cargo xtask scenarios test {{target}} {{distro}} --inject-file "$tmp"; \
     else \
-      cargo xtask scenarios test {{n}} {{distro}}; \
+      cargo xtask scenarios test {{target}} {{distro}}; \
     fi
 
-# Run automated stage test (compatibility alias).
-test n distro="levitate" inject="" inject_file="" ssh_pubkey=(env("HOME") + "/.ssh/id_ed25519.pub"):
-    just scenario-test {{n}} {{distro}} "{{inject}}" "{{inject_file}}" "{{ssh_pubkey}}"
-
-# Run all scenario tests up to N
-scenario-test-up-to n distro="levitate" inject="" inject_file="" ssh_pubkey=(env("HOME") + "/.ssh/id_ed25519.pub"):
+# Run all automated scenarios up to a canonical scenario name.
+scenario-test-up-to target distro="levitate" inject="" inject_file="" ssh_pubkey=(env("HOME") + "/.ssh/id_ed25519.pub"):
     if [ -n "{{inject_file}}" ]; then \
-      cargo xtask scenarios test-up-to {{n}} {{distro}} --inject-file "{{inject_file}}"; \
+      cargo xtask scenarios test-up-to {{target}} {{distro}} --inject-file "{{inject_file}}"; \
     elif [ -n "{{inject}}" ]; then \
-      cargo xtask scenarios test-up-to {{n}} {{distro}} --inject "{{inject}}"; \
+      cargo xtask scenarios test-up-to {{target}} {{distro}} --inject "{{inject}}"; \
     elif [ -f "{{ssh_pubkey}}" ]; then \
       tmp=$(mktemp); \
       trap 'rm -f "$tmp"' EXIT; \
       key="$(tr -d '\n' < "{{ssh_pubkey}}")"; \
       printf 'SSH_AUTHORIZED_KEY=%s\n' "$key" > "$tmp"; \
-      cargo xtask scenarios test-up-to {{n}} {{distro}} --inject-file "$tmp"; \
+      cargo xtask scenarios test-up-to {{target}} {{distro}} --inject-file "$tmp"; \
     else \
-      cargo xtask scenarios test-up-to {{n}} {{distro}}; \
+      cargo xtask scenarios test-up-to {{target}} {{distro}}; \
     fi
 
-# Run all stage tests up to N (compatibility alias).
-test-up-to n distro="levitate" inject="" inject_file="" ssh_pubkey=(env("HOME") + "/.ssh/id_ed25519.pub"):
-    just scenario-test-up-to {{n}} {{distro}} "{{inject}}" "{{inject_file}}" "{{ssh_pubkey}}"
+# Compatibility alias: run one automated scenario using the legacy `just test` name.
+[script]
+test target distro="levitate" inject="" inject_file="" ssh_pubkey=(env("HOME") + "/.ssh/id_ed25519.pub"):
+    #!/usr/bin/env bash
+    set -euo pipefail
+    canonical="$(just _compat_scenario_target "{{target}}" automated)"
+    just scenario-test "$canonical" "{{distro}}" "{{inject}}" "{{inject_file}}" "{{ssh_pubkey}}"
 
-# Show scenario test status
+# Compatibility alias: run scenarios up to a target using the legacy `just test-up-to` name.
+[script]
+test-up-to target distro="levitate" inject="" inject_file="" ssh_pubkey=(env("HOME") + "/.ssh/id_ed25519.pub"):
+    #!/usr/bin/env bash
+    set -euo pipefail
+    canonical="$(just _compat_scenario_target "{{target}}" upto)"
+    just scenario-test-up-to "$canonical" "{{distro}}" "{{inject}}" "{{inject_file}}" "{{ssh_pubkey}}"
+
+# Show scenario test status.
 scenario-status distro="levitate":
     cargo xtask scenarios status {{distro}}
 
-# Show stage test status (compatibility alias).
+# Compatibility alias: show scenario status via the legacy `just test-status` name.
 test-status distro="levitate":
     just scenario-status {{distro}}
 
-# Reset scenario test state
+# Reset scenario test state.
 scenario-reset distro="levitate":
     cargo xtask scenarios reset {{distro}}
 
-# Reset stage test state (compatibility alias).
+# Compatibility alias: reset scenario state via the legacy `just test-reset` name.
 test-reset distro="levitate":
     just scenario-reset {{distro}}
 
@@ -379,14 +460,14 @@ release-build *args:
 release-build-all *args:
     cargo run -p distro-builder --bin distro-builder -- release build-all iso {{args}}
 
-# Compatibility build wrapper.
-# Supports stage aliases and the special Stage 03 install/test shortcut.
+# Compatibility build wrapper only.
+# Prefer `just release-build ...` for release products and `just scenario-test ...` for install/runtime scenarios.
 [script, no-exit-message]
 build *args:
     #!/usr/bin/env bash
     set -euo pipefail
 
-    stage03_build() {
+    install_scenario_build() {
       local distro="$1"
       local ssh_pubkey="${HOME}/.ssh/id_ed25519.pub"
 
@@ -397,41 +478,58 @@ build *args:
         local key
         key="$(tr -d '\n' < "$ssh_pubkey")"
         printf 'SSH_AUTHORIZED_KEY=%s\n' "$key" > "$tmp"
-        cargo xtask scenarios test 3 "$distro" --force --inject-file "$tmp"
+        cargo xtask scenarios test install "$distro" --force --inject-file "$tmp"
       else
-        cargo xtask scenarios test 3 "$distro" --force
+        cargo xtask scenarios test install "$distro" --force
       fi
     }
 
-    is_stage03() {
+    compat_release_target() {
       case "$1" in
-        3|03|03Install) return 0 ;;
+        0|00|00Build|base-rootfs) printf '%s\n' "base-rootfs" ;;
+        1|01|01Boot|live-boot) printf '%s\n' "live-boot" ;;
+        2|02|02LiveTools|live-tools) printf '%s\n' "live-tools" ;;
+        3|03|03Install|install) printf '%s\n' "__install__" ;;
         *) return 1 ;;
       esac
     }
 
     set -- {{args}}
 
-    if [ "$#" -eq 1 ] && is_stage03 "$1"; then
-      stage03_build levitate
-      exit 0
+    if [ "$#" -eq 1 ]; then
+      if compat="$(compat_release_target "$1" 2>/dev/null)"; then
+        if [ "$compat" = "__install__" ]; then
+          install_scenario_build levitate
+        else
+          cargo run -p distro-builder --bin distro-builder -- release build iso levitate "$compat"
+        fi
+        exit 0
+      fi
     fi
 
     if [ "$#" -eq 2 ]; then
-      if is_stage03 "$1"; then
-        stage03_build "$2"
+      if compat="$(compat_release_target "$1" 2>/dev/null)"; then
+        if [ "$compat" = "__install__" ]; then
+          install_scenario_build "$2"
+        else
+          cargo run -p distro-builder --bin distro-builder -- release build iso "$2" "$compat"
+        fi
         exit 0
       fi
-      if is_stage03 "$2"; then
-        stage03_build "$1"
+      if compat="$(compat_release_target "$2" 2>/dev/null)"; then
+        if [ "$compat" = "__install__" ]; then
+          install_scenario_build "$1"
+        else
+          cargo run -p distro-builder --bin distro-builder -- release build iso "$1" "$compat"
+        fi
         exit 0
       fi
     fi
 
     cargo run -p distro-builder --bin distro-builder -- release build iso "$@"
 
-# Build stage aliases from 00 up to N (inclusive) for a distro.
-# Usage: just build-up-to 3 levitate
+# Compatibility wrapper: build legacy stage aliases from 00 up to N (inclusive) for a distro.
+# Prefer explicit `just release-build ...` calls on canonical products.
 [script, no-exit-message]
 build-up-to n distro="levitate":
     #!/usr/bin/env bash
@@ -443,19 +541,19 @@ build-up-to n distro="levitate":
       2|02) target=2 ;;
       3|03) target=3 ;;
       *)
-        echo "build-up-to supports stages 0..3 (got: {{n}})" >&2
+        echo "build-up-to is a compatibility wrapper and supports only legacy build aliases 0..3 (got: {{n}})" >&2
         exit 2
         ;;
     esac
 
-    stages=(00Build 01Boot 02LiveTools 03Install)
+    compat_targets=(00Build 01Boot 02LiveTools 03Install)
     for i in $(seq 0 "$target"); do
-      stage="${stages[$i]}"
-      echo "==> Building ${stage} for {{distro}}"
-      just build "{{distro}}" "${stage}"
+      compat_target="${compat_targets[$i]}"
+      echo "==> Compatibility build ${compat_target} for {{distro}}"
+      just build "{{distro}}" "${compat_target}"
     done
 
-# Build ISOs for all variants via compatibility wrapper.
+# Compatibility alias for `just release-build-all`.
 build-all *args:
     just release-build-all {{args}}
 
@@ -471,7 +569,7 @@ product-erofs product="live-tools" distro="levitate":
     cargo run -p distro-builder --bin distro-builder -- product prepare {{product}} {{distro}} "${prepared_dir}"
     cargo run -p distro-builder --bin distro-builder -- artifact build product-erofs "${prepared_dir}"
 
-# Remove stage artifacts output tree (all stage run directories and manifests).
+# Remove `.artifacts/out` (release products, scenario runtimes, and compatibility leftovers).
 clean-out:
     rm -rf .artifacts/out
 

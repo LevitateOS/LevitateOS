@@ -25,7 +25,7 @@ pub fn tools_prefix(root: &Path) -> Result<PathBuf> {
         Err(err) if err.kind() == ErrorKind::NotFound => {
             bail!(
                 "component: xtask tools-env preflight\n\
-                 stage: stage boot/test runtime\n\
+                 surface: scenario boot/test runtime\n\
                  expectation: canonical tools root directory exists\n\
                  path: {}\n\
                  failure: directory not found\n\
@@ -49,7 +49,7 @@ pub fn tools_prefix(root: &Path) -> Result<PathBuf> {
     if !meta.is_dir() {
         bail!(
             "component: xtask tools-env preflight\n\
-             stage: stage boot/test runtime\n\
+             surface: scenario boot/test runtime\n\
              expectation: canonical tools root must be a directory\n\
              path: {}\n\
              failure: path exists but is not a directory\n\

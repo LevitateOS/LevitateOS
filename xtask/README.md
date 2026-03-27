@@ -30,16 +30,16 @@ cargo run -p levitate-xtask -- doctor
 cargo run -p levitate-xtask -- hooks install
 cargo run -p levitate-xtask -- hooks remove
 
-# Install-test stages (boot/install regression signal)
-cargo run -p levitate-xtask -- stages boot 1 levitate
-cargo run -p levitate-xtask -- stages test 4 levitate
-cargo run -p levitate-xtask -- stages test-up-to 6 levitate
-cargo run -p levitate-xtask -- stages status levitate
-cargo run -p levitate-xtask -- stages reset levitate
+# Interactive / automated scenario loop
+cargo run -p levitate-xtask -- scenarios boot live-boot levitate
+cargo run -p levitate-xtask -- scenarios test install levitate
+cargo run -p levitate-xtask -- scenarios test-up-to runtime levitate
+cargo run -p levitate-xtask -- scenarios status levitate
+cargo run -p levitate-xtask -- scenarios reset levitate
 
-# Optional boot injection (for stage boot/test paths)
-cargo run -p levitate-xtask -- stages boot 1 levitate --inject 'SSH_AUTHORIZED_KEY=ssh-ed25519 AAAA...'
-cargo run -p levitate-xtask -- stages test 1 levitate --inject-file /tmp/payload.env
+# Optional boot injection (for scenario boot/test paths)
+cargo run -p levitate-xtask -- scenarios boot live-boot levitate --inject 'SSH_AUTHORIZED_KEY=ssh-ed25519 AAAA...'
+cargo run -p levitate-xtask -- scenarios test live-boot levitate --inject-file /tmp/payload.env
 
 # Kernel artifacts verification
 cargo run -p levitate-xtask -- kernels check
@@ -78,3 +78,5 @@ The repo previously had ad-hoc shell scripts for kernel build/check. They are in
 - `cargo xtask kernels build <distro>`
 - `cargo xtask kernels build-all`
 - `cargo xtask kernels check`
+
+Legacy `stages ...` spellings are compatibility-only and should not be used for new operator/docs examples.

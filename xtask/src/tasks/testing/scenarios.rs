@@ -1069,12 +1069,14 @@ fn print_window_mode_details(window_cfg: &WindowConfig, pid: u32) {
 }
 
 fn detect_window_mode() -> Result<WindowMode> {
-    let raw = std::env::var("LEVITATE_STAGE_WINDOW_MODE").unwrap_or_else(|_| "remote".to_string());
+    let raw = std::env::var("LEVITATE_SCENARIO_WINDOW_MODE")
+        .or_else(|_| std::env::var("LEVITATE_STAGE_WINDOW_MODE"))
+        .unwrap_or_else(|_| "remote".to_string());
     match raw.trim().to_ascii_lowercase().as_str() {
         "remote" | "vnc" | "" => Ok(WindowMode::RemoteVnc),
         "local" | "gtk" => Ok(WindowMode::LocalGui),
         other => bail!(
-            "Unsupported LEVITATE_STAGE_WINDOW_MODE value '{}'. Expected one of: remote, vnc, local, gtk.",
+            "Unsupported LEVITATE_SCENARIO_WINDOW_MODE value '{}'. Expected one of: remote, vnc, local, gtk.",
             other
         ),
     }
@@ -1107,7 +1109,9 @@ fn apply_qemu_runtime_env(
 }
 
 fn detect_local_qemu_runtime() -> Result<(PathBuf, LocalDisplayBackend)> {
-    if let Ok(raw) = std::env::var("LEVITATE_STAGE_WINDOW_QEMU_BIN") {
+    if let Ok(raw) = std::env::var("LEVITATE_SCENARIO_WINDOW_QEMU_BIN")
+        .or_else(|_| std::env::var("LEVITATE_STAGE_WINDOW_QEMU_BIN"))
+    {
         let candidate = PathBuf::from(raw.trim());
         return pick_local_display_backend(&candidate).map(|backend| (candidate, backend));
     }
@@ -1187,9 +1191,11 @@ fn pick_local_display_backend(qemu_bin: &Path) -> Result<LocalDisplayBackend> {
 }
 
 fn detect_vnc_bind_host() -> Result<Ipv4Addr> {
-    if let Ok(raw) = std::env::var("LEVITATE_STAGE_WINDOW_BIND_HOST") {
+    if let Ok(raw) = std::env::var("LEVITATE_SCENARIO_WINDOW_BIND_HOST")
+        .or_else(|_| std::env::var("LEVITATE_STAGE_WINDOW_BIND_HOST"))
+    {
         let parsed: Ipv4Addr = raw.parse().with_context(|| {
-            format!("Parsing LEVITATE_STAGE_WINDOW_BIND_HOST as IPv4 failed: {raw}")
+            format!("Parsing LEVITATE_SCENARIO_WINDOW_BIND_HOST as IPv4 failed: {raw}")
         })?;
         return Ok(parsed);
     }
@@ -1197,12 +1203,14 @@ fn detect_vnc_bind_host() -> Result<Ipv4Addr> {
 }
 
 fn detect_vnc_advertise_host() -> Result<Ipv4Addr> {
-    if let Ok(raw) = std::env::var("LEVITATE_STAGE_WINDOW_HOST") {
+    if let Ok(raw) = std::env::var("LEVITATE_SCENARIO_WINDOW_HOST")
+        .or_else(|_| std::env::var("LEVITATE_STAGE_WINDOW_HOST"))
+    {
         let parsed: Ipv4Addr = raw.parse().with_context(|| {
-            format!("Parsing LEVITATE_STAGE_WINDOW_HOST as IPv4 address failed: {raw}")
+            format!("Parsing LEVITATE_SCENARIO_WINDOW_HOST as IPv4 address failed: {raw}")
         })?;
         if parsed.is_unspecified() {
-            bail!("LEVITATE_STAGE_WINDOW_HOST must not be unspecified; got {parsed}");
+            bail!("LEVITATE_SCENARIO_WINDOW_HOST must not be unspecified; got {parsed}");
         }
         return Ok(parsed);
     }
