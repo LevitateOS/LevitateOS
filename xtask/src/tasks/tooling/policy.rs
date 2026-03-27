@@ -153,16 +153,16 @@ pub fn audit_legacy_bindings() -> Result<()> {
         );
     }
     cheat_bail!(
-        protects = "Stage wiring remains fully migrated to new entrypoints without legacy crate path coupling",
+        protects = "Checkpoint wiring remains fully migrated to canonical entrypoints without legacy crate path coupling",
         severity = "CRITICAL",
         cheats = [
-            "Rewire stage inputs to legacy */downloads paths and keep green checks",
+            "Rewire checkpoint inputs to legacy */downloads paths and keep green checks",
             "Hide legacy path composition with split join() chains",
             "Move legacy path usage into less-reviewed tooling paths",
             "Rely on known-token-only scanners that miss novel legacy path variants",
         ],
-        consequence = "Builds appear healthy while reintroducing legacy coupling, causing non-reproducible stage behavior and false migration progress",
-        "forbidden legacy bindings detected ({} violation(s)); migrate stage wiring to non-legacy producers",
+        consequence = "Builds appear healthy while reintroducing legacy coupling, causing non-reproducible checkpoint behavior and false migration progress",
+        "forbidden legacy bindings detected ({} violation(s)); migrate checkpoint wiring to canonical producers",
         violations.len()
     )
 }

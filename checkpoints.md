@@ -42,7 +42,7 @@ Differences below describe *policy and intent*, not structural deviations from t
 |---|---|---|
 | 00Build | Kernel + ISO build succeeds. | Not spawnable (build only). |
 | 01Boot | Live ISO boots to ready state. | Spawn into minimal live environment. |
-| 02LiveTools | Live ISO tools + stage session UX/platform verified. | Spawn into live env with install entrypoint, docs/session UX (when enabled), and installer toolchain. |
+| 02LiveTools | Live ISO tools + checkpoint session UX/platform verified. | Spawn into live env with install entrypoint, docs/session UX (when enabled), and installer toolchain. |
 | 03Install | Installation task execution and disk mutation flow completes. | Spawn into freshly installed system (pre-login verified). |
 | 04LoginGate | Installed system reaches deterministic login boundary. | Spawn at login surface (TTY/DM/console ready). |
 | 05Harness | Harness can reliably authenticate and execute commands. | Spawn into installed system with trusted automation access. |
@@ -78,7 +78,7 @@ All profiles must include executable `/usr/local/bin/levitate-install-entrypoint
 
 ## Checkpoint Filesystem Delta Matrix
 
-Cells describe the filesystem delta relative to the immediately preceding stage.
+Cells describe the filesystem delta relative to the immediately preceding checkpoint.
 
 | Checkpoint | `*-filesystem.erofs` delta vs previous checkpoint | `*-overlayfs.erofs` delta vs previous checkpoint | `*-initramfs-live.cpio.gz` delta vs previous checkpoint |
 |---|---|---|---|
@@ -95,11 +95,11 @@ Cells describe the filesystem delta relative to the immediately preceding stage.
 ### Caveat
 
 At 00 the ISO must build successfully, but it is not yet feature-complete.
-Each subsequent stage validates additional functionality and requires rebuilding the ISO with the newly verified components included.
-Each stage must assemble from its own stage-scoped non-kernel artifacts (`s00-build`, `s01-boot`, ...); non-kernel cross-stage reuse is not allowed.
-Kernel artifacts are the only shared exception across stages.
-Each stage artifact must satisfy a strict stage envelope: nothing required may be missing, and nothing from later stages may be present.
-If a stage artifact includes payload outside its declared stage envelope, that stage must fail conformance.
+Each subsequent checkpoint validates additional functionality and requires rebuilding the ISO with the newly verified components included.
+Each checkpoint must assemble from its own checkpoint-scoped non-kernel artifacts (`s00-build`, `s01-boot`, ...); non-kernel cross-checkpoint reuse is not allowed.
+Kernel artifacts are the only shared exception across checkpoints.
+Each checkpoint artifact must satisfy a strict checkpoint envelope: nothing required may be missing, and nothing from later checkpoints may be present.
+If a checkpoint artifact includes payload outside its declared checkpoint envelope, that checkpoint must fail conformance.
 The ISO at 06 represents the fully verified runtime baseline.
 08 converts that verified baseline into distributable images.
 
@@ -128,4 +128,4 @@ The ISO at 06 represents the fully verified runtime baseline.
 - Levitate/Acorn A/B columns are expected to remain `X` from install/layout-dependent stages onward (starting at 03) until A/B install flow is implemented.
 - Ralph live install env is internal even though Ralph is public; 08 release target is public `qcow2`.
 - Iuppiter remains private/internal; 08 release target is non-public `.img`.
-- DO NOT UNDERESTIMATE 05: it is the stage where the harness becomes a trusted instrument (reliable login + readiness detection + command execution on an installed OS); without 05, 06–08 results are not credible.
+- DO NOT UNDERESTIMATE 05: it is the checkpoint where the harness becomes a trusted instrument (reliable login + readiness detection + command execution on an installed OS); without 05, 06–08 results are not credible.

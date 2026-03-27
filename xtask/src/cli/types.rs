@@ -291,7 +291,7 @@ pub enum ScenariosCmd {
 
 #[derive(Subcommand)]
 pub enum PolicyCmd {
-    /// Fail if forbidden legacy bindings appear in code/config for stage wiring.
+    /// Fail if forbidden legacy bindings appear in code/config for checkpoint wiring.
     #[command(name = "audit-legacy-bindings")]
     AuditLegacyBindings,
 }
@@ -338,7 +338,7 @@ pub enum DocsCmd {
 pub enum TuiInspectApp {
     #[value(name = "install-docs")]
     InstallDocs,
-    #[value(name = "install-disk-plan", alias = "s03-disk-plan")]
+    #[value(name = "install-disk-plan")]
     InstallDiskPlan,
 }
 

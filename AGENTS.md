@@ -3,7 +3,7 @@
 This file is intentionally compact. Priority is preventing policy violations and reward-hacking behavior.
 
 ## 0) Prime Directive
-- Do not optimize for green checks. Optimize for true stage correctness and reproducibility.
+- Do not optimize for green checks. Optimize for true checkpoint correctness and reproducibility.
 - Never hide failures. Fix root causes.
 - If a command passes only because of suppression/masking/fallback tricks, treat it as a failure.
 
@@ -17,7 +17,7 @@ This file is intentionally compact. Priority is preventing policy violations and
 - Rust/TOML orchestration is the canonical owner for sequencing, policy, contract checks, and artifact topology.
 - Keep the boundary hard:
   - Recipes own versions, URLs, checksums, torrent links, package lists, trust-marker semantics, default paths, and acquire/build/install/remove logic.
-  - Rust owns recipe selection, build/output roots, stage/product sequencing, policy enforcement, and contract validation.
+  - Rust owns recipe selection, build/output roots, product/release/scenario sequencing, checkpoint policy enforcement, and contract validation.
 - Rust must stay dumb about recipe contents.
 - Forbidden in Rust/TOML default paths:
   - duplicating release URLs, checksums, torrent URLs, or package lists solely to inject them into recipes
@@ -37,7 +37,7 @@ This file is intentionally compact. Priority is preventing policy violations and
   - Rust = dumb orchestrator that runs the right recipe at the right time
 
 ## 2) Hard Ban: Legacy Binding
-- Never wire stage/rootfs/tooling paths to legacy crate downloads outputs.
+- Never wire checkpoint/rootfs/tooling paths to legacy crate downloads outputs.
 - Forbidden examples (non-exhaustive):
   - `*/downloads/rootfs` from legacy crates
   - `leviso/downloads/.tools` (or any legacy crate equivalent)
@@ -48,7 +48,7 @@ This file is intentionally compact. Priority is preventing policy violations and
 - Any violation is a hard failure.
 
 ## 2.1) Guard Placement (Authoritative Boundary)
-- Guard placement is valid only at executable entrypoints that perform work (`distro-builder`, `testing/install-tests`, `xtask` commands that build/test/stage).
+- Guard placement is valid only at executable entrypoints that perform work (`distro-builder`, `testing/install-tests`, `xtask` commands that build/test/scenario-run).
 - `just` checks are convenience only and must never be the sole enforcement layer.
 - A command path that can build/test artifacts without running policy guards is a policy bug and must be fixed immediately.
 - Required model:
@@ -57,42 +57,42 @@ This file is intentionally compact. Priority is preventing policy violations and
   - no "best effort continue" after guard failure
 - Treat wrapper-only guard wiring as insufficient even if current developers usually use wrappers.
 
-## 3) Stage Naming (Canonical)
-- Use canonical stage names in new code/docs/APIs:
+## 3) Checkpoint Vocabulary (Canonical)
+- Use canonical checkpoint names only where the conformance ladder is the real owner:
   - `00Build`, `01Boot`, `02LiveTools`, `03Install`, `04LoginGate`, `05Harness`, `06Runtime`, `07Update`, `08Package`
-- For ordered files/modules use numbered prefixes, e.g. `s00_build`, `s01_boot`.
-- Avoid new aliases like `stage00`, `stage_00` (except existing compatibility keys where externally required).
+- Rings, products, releases, and scenarios own manifests, filetree layout, and orchestration.
+- Do not introduce new legacy alias families, `sNN_*`, or checkpoint-numbered owners outside explicit compatibility or reporting surfaces.
 
-## 4) Stage Artifact Split (Default)
-- Every stage writes non-kernel outputs only into its own directory:
-  - `.artifacts/out/<distro>/sNN-<stage-name>/...`
-- Stage-cross reuse of non-kernel artifacts is forbidden in release/hardening mode.
-- Kernel artifacts are the only shared artifacts across stages in release/hardening mode.
-- While `9.2` bypass mode is active, Stage 02 may intentionally carry forward-looking non-kernel payload for filesystem design convenience.
-- No cross-stage symlinks/copies/manual post-build surgery to fake stage outputs.
+## 4) Checkpoint Artifact Split (Current Output Family)
+- Every checkpoint writes non-kernel outputs only into its own directory family:
+  - `.artifacts/out/<distro>/sNN-<checkpoint-name>/...`
+- Cross-checkpoint reuse of non-kernel artifacts is forbidden in release/hardening mode.
+- Kernel artifacts are the only shared artifacts across checkpoints in release/hardening mode.
+- While `9.2` bypass mode is active, `02LiveTools` may intentionally carry forward-looking non-kernel payload for filesystem design convenience.
+- No cross-checkpoint symlinks/copies/manual post-build surgery to fake checkpoint outputs.
 
-## 5) Stage Envelope (Mode-Aware)
-- Stage artifact must contain exactly what that stage needs in release/hardening mode.
+## 5) Checkpoint Envelope (Mode-Aware)
+- A checkpoint artifact must contain exactly what that checkpoint needs in release/hardening mode.
 - Missing required payload = fail.
-- Carrying later-stage payload = fail in release/hardening mode.
-- While `9.2` bypass mode is active, Stage 02 may include later-stage-intent payload, provided it is produced via canonical builder/producers.
-- Stage scope must be produced by composition in builder/contract, not by runtime suppression.
+- Carrying later-checkpoint payload = fail in release/hardening mode.
+- While `9.2` bypass mode is active, `02LiveTools` may include later-checkpoint-intent payload, provided it is produced via canonical builder/producers.
+- Checkpoint scope must be produced by composition in builder/contract, not by runtime suppression.
 
 ## 6) Incremental Producer Model (No Subtractive Shaping)
-- Build stage rootfs incrementally by stage producers.
-- Forbidden: prune/exclude/post-copy deletion strategies to shape stage payload.
-- Stage progression is additive:
+- Build checkpoint rootfs incrementally by producers.
+- Forbidden: prune/exclude/post-copy deletion strategies to shape checkpoint payload.
+- Checkpoint progression is additive:
   - `s00` minimal build payload
   - `s01 = s00 + boot additions`
   - same model for later stages
-- In `9.2` bypass mode, prefer implementing candidate payload in Stage 02 producers first, then formalize stage-specific envelopes during hardening.
-- Variant manifests (`distro-variants/*/NNStage.toml`) may express OS deltas only, not stage file allow/deny lists.
+- In `9.2` bypass mode, prefer implementing candidate payload in `02LiveTools` producers first, then formalize checkpoint-specific envelopes during hardening.
+- Do not reintroduce `NNStage.toml` or checkpoint-scoped file allow/deny manifests.
 
 ## 7) No-Mask / No-Suppression Policy
-- Do not mask services/checks to make stages pass.
+- Do not mask services/checks to make checkpoints pass.
 - Do not downgrade `FAIL` to `SKIP/PASS` to keep pipelines green.
 - Do not add fallback paths that hide wiring errors.
-- Any intentional disablement must be explicit stage policy intent and validated in `distro-contract`.
+- Any intentional disablement must be explicit checkpoint policy intent and validated in `distro-contract`.
 
 ## 8) Kernel Boundary Policy
 - Kernel artifacts are only:
@@ -106,40 +106,43 @@ This file is intentionally compact. Priority is preventing policy violations and
 
 ## 9) Reproducibility-First
 - No ad-hoc artifact surgery (`cp`, `mv`, `ln -s`, manual edits under `.artifacts/out/*`) to force success.
-- If stage build fails, fix code/contracts/wiring; do not patch outputs manually.
-- A stage is considered working only if reproducible from repository commands with existing kernel artifacts.
+- If a checkpoint build fails, fix code/contracts/wiring; do not patch outputs manually.
+- A checkpoint is considered working only if reproducible from repository commands with existing kernel artifacts.
 
 ## 9.1) Build/Boot Boundary (Strict)
-- `build` commands produce artifacts; `stage`/`stage-ssh` commands consume existing artifacts.
-- Do not add implicit build side effects to stage boot/test wrappers.
+- `build` and `release-build` commands produce artifacts; `scenario*` commands consume existing artifacts.
+- Do not add implicit build side effects to scenario boot/test wrappers.
 - Fixing wrapper parity/routing must not change artifact freshness policy.
-- If fresh artifacts are required, use explicit build commands (`just build ...`, `just build-up-to ...`) before stage boot/test.
+- If fresh artifacts are required, use explicit build commands (`just build ...`, `just build-up-to ...`, or `just release-build ...`) before scenario boot/test.
 
-## 9.2) Stage Ladder Bypass (Current Workflow Override)
-- Strict adherence to stage test ladders is an anti-pattern for the current development mode.
-- The owner intentionally bypasses ordered stage gates while iterating on filesystem design.
-- Stage 02 is the canonical convenience surface for filesystem composition, including payload that may later be required by installed stages.
-- Prefer implementing payload at producer/rootfs level (not ad-hoc artifact edits) so Stage 02 design work naturally carries forward.
-- Before release/hardening, run the full stage ladder and fix any regressions discovered outside the bypass workflow.
+## 9.2) Checkpoint Ladder Bypass (Current Workflow Override)
+- Strict adherence to checkpoint test ladders is an anti-pattern for the current development mode.
+- The owner intentionally bypasses ordered checkpoint gates while iterating on filesystem design.
+- `02LiveTools` is the canonical convenience surface for filesystem composition, including payload that may later be required by installed checkpoints.
+- Prefer implementing payload at producer/rootfs level (not ad-hoc artifact edits) so `02LiveTools` design work naturally carries forward.
+- Before release/hardening, run the full checkpoint ladder and fix any regressions discovered outside the bypass workflow.
 
 ## 10) Error Messaging Policy
 - Fail fast with explicit diagnostics.
-- Errors must name: component, stage, expectation, and concrete remediation command/path.
+- Errors must name: component, checkpoint or product, expectation, and concrete remediation command/path.
 - Silent fallback is prohibited.
 
 ## 11) Live Environment Completeness
-- Do not ship warning-prone stage environments by ignoring missing runtime payload.
+- Do not ship warning-prone checkpoint environments by ignoring missing runtime payload.
 - Fix missing payload at producer level, wire canonical config, enforce in contract checks.
 
 ## 12) Required Commands (Day-to-day)
 - Legacy policy guard:
   - `cargo xtask policy audit-legacy-bindings`
-- Build stage ISO:
-  - `cargo run -p distro-builder --bin distro-builder -- iso build <distro> <stage>`
-- Stage tests:
-  - `just test <n> <distro>`
-  - `just test-up-to <n> <distro>`
-- In `9.2` bypass mode, stage tests may be run out of ladder order during design iteration; full ordered ladder remains required before release/hardening.
+- Build release products:
+  - `cargo run -p distro-builder --bin distro-builder -- release build iso <distro> <product>`
+  - `just release-build <distro> <product>`
+- Scenario tests:
+  - `cargo xtask scenarios test <scenario> <distro>`
+  - `cargo xtask scenarios test-up-to <scenario> <distro>`
+  - `just scenario-test <scenario> <distro>`
+  - `just scenario-test-up-to <scenario> <distro>`
+- In `9.2` bypass mode, scenario tests may be run out of ladder order during design iteration; full ordered checkpoint coverage remains required before release/hardening.
 
 ## 13) Dirty Tree Rule
 - Assume existing diffs are intentional.

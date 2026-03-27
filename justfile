@@ -31,7 +31,7 @@ tools-install:
 tools:
     just tools-install
 
-# Fail fast on forbidden legacy stage/rootfs bindings.
+# Fail fast on forbidden legacy checkpoint/rootfs bindings.
 policy-legacy:
     cargo xtask policy audit-legacy-bindings
 
@@ -275,7 +275,7 @@ _compat_scenario_target raw mode="automated":
         case "$target" in
           live-boot|live-tools|installed-boot) ;;
           *)
-            echo "legacy interactive stage aliases map only to interactive scenarios: live-boot, live-tools, installed-boot (got: $target)" >&2
+            echo "legacy interactive checkpoint aliases map only to interactive scenarios: live-boot, live-tools, installed-boot (got: $target)" >&2
             exit 2
             ;;
         esac
@@ -284,7 +284,7 @@ _compat_scenario_target raw mode="automated":
         case "$target" in
           live-boot|live-tools) ;;
           *)
-            echo "legacy SSH/window stage aliases map only to live ISO scenarios: live-boot, live-tools (got: $target)" >&2
+            echo "legacy SSH/window checkpoint aliases map only to live ISO scenarios: live-boot, live-tools (got: $target)" >&2
             exit 2
             ;;
         esac
@@ -300,46 +300,6 @@ _compat_scenario_target raw mode="automated":
 
 # Compatibility aliases only.
 # Prefer `just scenario*`, `just scenario-test*`, and `just release-build*`.
-
-# Compatibility alias: boot a scenario using the legacy `just stage` name.
-[script, no-exit-message]
-stage target distro="levitate" inject="" inject_file="" ssh_pubkey=(env("HOME") + "/.ssh/id_ed25519.pub"):
-    #!/usr/bin/env bash
-    set -euo pipefail
-    canonical="$(just _compat_scenario_target "{{target}}" interactive)"
-    just scenario "$canonical" "{{distro}}" "{{inject}}" "{{inject_file}}" "{{ssh_pubkey}}"
-
-# Compatibility alias: boot a scenario with verbose logging using the legacy `just stage-verbose` name.
-[script, no-exit-message]
-stage-verbose target distro="levitate" inject="" inject_file="" ssh_pubkey=(env("HOME") + "/.ssh/id_ed25519.pub"):
-    #!/usr/bin/env bash
-    set -euo pipefail
-    canonical="$(just _compat_scenario_target "{{target}}" interactive)"
-    just scenario-verbose "$canonical" "{{distro}}" "{{inject}}" "{{inject_file}}" "{{ssh_pubkey}}"
-
-# Compatibility alias: boot a live scenario via SSH using the legacy `just stage-ssh` name.
-[script, no-exit-message]
-stage-ssh target distro="levitate" inject="" inject_file="" ssh_pubkey=(env("HOME") + "/.ssh/id_ed25519.pub") ssh_privkey=(env("HOME") + "/.ssh/id_ed25519") ssh_port="2222":
-    #!/usr/bin/env bash
-    set -euo pipefail
-    canonical="$(just _compat_scenario_target "{{target}}" live)"
-    just scenario-ssh "$canonical" "{{distro}}" "{{inject}}" "{{inject_file}}" "{{ssh_pubkey}}" "{{ssh_privkey}}" "{{ssh_port}}"
-
-# Compatibility alias: boot a scenario in a local GUI window using the legacy `just stage-window` name.
-[script, no-exit-message]
-stage-window target distro="levitate" inject="" inject_file="" ssh_pubkey=(env("HOME") + "/.ssh/id_ed25519.pub"):
-    #!/usr/bin/env bash
-    set -euo pipefail
-    canonical="$(just _compat_scenario_target "{{target}}" interactive)"
-    just scenario-window "$canonical" "{{distro}}" "{{inject}}" "{{inject_file}}" "{{ssh_pubkey}}"
-
-# Compatibility alias: boot a scenario in remote-window mode using the legacy `just stage-window-remote` name.
-[script, no-exit-message]
-stage-window-remote target distro="levitate" inject="" inject_file="" ssh_pubkey=(env("HOME") + "/.ssh/id_ed25519.pub"):
-    #!/usr/bin/env bash
-    set -euo pipefail
-    canonical="$(just _compat_scenario_target "{{target}}" interactive)"
-    just scenario-window-remote "$canonical" "{{distro}}" "{{inject}}" "{{inject_file}}" "{{ssh_pubkey}}"
 
 # Single-path live-boot parity gate (serial boot + SSH boot).
 [script, no-exit-message]
@@ -528,7 +488,7 @@ build *args:
 
     cargo run -p distro-builder --bin distro-builder -- release build iso "$@"
 
-# Compatibility wrapper: build legacy stage aliases from 00 up to N (inclusive) for a distro.
+# Compatibility wrapper: build legacy checkpoint aliases from 00 up to N (inclusive) for a distro.
 # Prefer explicit `just release-build ...` calls on canonical products.
 [script, no-exit-message]
 build-up-to n distro="levitate":
@@ -665,21 +625,6 @@ tui-install-disk-plan *args:
 
     if [ ! -t 0 ] || [ ! -t 1 ]; then
       echo "tui-install-disk-plan requires interactive TTY stdin/stdout. Run from a terminal." >&2
-      exit 2
-    fi
-
-    cd tui/apps/install/disk-plan
-    exec bun run start -- {{args}}
-
-[script, no-exit-message]
-tui-s03-disk-plan *args:
-    #!/usr/bin/env bash
-    set -euo pipefail
-
-    echo "NOTICE: tui-s03-disk-plan is compatibility-only. Use tui-install-disk-plan." >&2
-
-    if [ ! -t 0 ] || [ ! -t 1 ]; then
-      echo "tui-s03-disk-plan requires interactive TTY stdin/stdout. Run from a terminal." >&2
       exit 2
     fi
 
