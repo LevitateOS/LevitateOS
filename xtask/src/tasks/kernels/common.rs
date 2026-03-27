@@ -1,4 +1,5 @@
 use anyhow::{Context, Result, bail};
+use distro_contract::load_variant_contract_bundle_for_distro_from;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -145,13 +146,17 @@ pub(crate) fn build_kernel_via_recipe(
     module_install_path: &str,
     autofix: &AutoFixOptions,
 ) -> Result<()> {
+    let bundle = load_variant_contract_bundle_for_distro_from(root, distro_id)
+        .with_context(|| format!("loading canonical variant contract for '{}'", distro_id))?;
     let recipe_rhai = root.join("distro-builder/recipes/linux.rhai");
     let build_dir = root
         .join(".artifacts/work")
         .join(distro_id)
         .join("downloads");
     let recipes_path = root.join("distro-builder/recipes");
-    let kconfig_path = root.join("distro-variants").join(distro_id).join("kconfig");
+    let kconfig_path = bundle
+        .paths
+        .build_host_declared_path(&bundle.contract.build.kernel.kconfig_path);
     let kernel_artifact_root = root
         .join(".artifacts/kernel")
         .join(distro_id)
