@@ -2,9 +2,9 @@
 set -eu
 
 SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
-REPO_ROOT="$(CDPATH= cd -- "$SCRIPT_DIR/../.." && pwd)"
+REPO_ROOT="$(CDPATH= cd -- "$SCRIPT_DIR/../../../.." && pwd)"
 
-. "${REPO_ROOT}/distro-variants/_shared/release-artifacts.sh"
+. "$SCRIPT_DIR/release-artifacts.sh"
 
 : "${DISTRO_ID:?missing DISTRO_ID}"
 : "${IDENTITY_OS_NAME:?missing IDENTITY_OS_NAME}"
