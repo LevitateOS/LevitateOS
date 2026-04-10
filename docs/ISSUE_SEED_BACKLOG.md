@@ -31,6 +31,8 @@ GitHub Issues are now the live source of truth for this backlog.
   Child issues: `#22`, `#23`, `#24`
 - `#6` epic: small active cleanup and optional legacy compatibility debt
   Child issues: `#25`, `#26`, `#27`
+- `#32` task: migrate LevitateOS default-branch delivery to a PR-gated workflow
+- `#34` task: enable automatic AI review for pull requests
 
 ## Epic 1: Remove Stage/Checkpoint Residue From Canonical Validation And Reporting
 

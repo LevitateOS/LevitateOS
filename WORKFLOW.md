@@ -96,6 +96,17 @@ Every PR should state:
 
 Use `.github/pull_request_template.md`.
 
+## Automatic AI Review
+
+- The default-branch ruleset automatically requests GitHub Copilot code review.
+- Automatic review runs on draft pull requests and on each new push to the pull
+  request.
+- Repository-specific review guidance lives in `.github/copilot-instructions.md`.
+- AI review is advisory and does not replace the required human approval.
+- If an automatic AI review does not appear, verify that GitHub Copilot code
+  review is available to the repository or author and that the relevant quota
+  and policy settings allow the review to run.
+
 ## Merge Rules
 
 - Prefer small PRs with one clear owner.
