@@ -1,0 +1,71 @@
+name: Task
+description: Concrete implementation, migration slice, or cleanup task
+title: "task: "
+body:
+  - type: dropdown
+    id: owner
+    attributes:
+      label: Primary owner
+      description: Choose one canonical owner path.
+      options:
+        - distro-builder
+        - distro-contract
+        - distro-spec
+        - distro-variants/levitate
+        - distro-variants/acorn
+        - distro-variants/iuppiter
+        - distro-variants/ralph
+        - testing/install-tests
+        - testing/fsdbg
+        - testing/rootfs-tests
+        - xtask
+        - tools/recipe
+        - tools/recab
+        - docs/content
+        - legacy-compat
+    validations:
+      required: true
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Outcome
+      description: What should be true when this task is done?
+      placeholder: Add sysroot confinement to the recipe executor...
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Why this matters
+      description: Root cause or user-facing reason.
+      placeholder: This is blocking the A/B composition model...
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance
+      description: Commands, tests, or observable behavior.
+      placeholder: |
+        - cargo check -p ...
+        - cargo test -p ...
+        - no canonical path uses ...
+    validations:
+      required: true
+  - type: textarea
+    id: related
+    attributes:
+      label: Related paths and docs
+      description: Keep this short and specific.
+      placeholder: |
+        tools/recipe/README.md
+        tools/recipe/src/...
+        docs/manual-install-plan.md
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope notes
+      description: Optional constraints or non-goals.
+      placeholder: Keep compatibility wrappers untouched in this slice...

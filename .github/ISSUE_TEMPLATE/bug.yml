@@ -1,0 +1,70 @@
+name: Bug
+description: Reproducible defect or drift in code, tests, or docs
+title: "bug: "
+body:
+  - type: dropdown
+    id: owner
+    attributes:
+      label: Primary owner
+      description: Choose one canonical owner path.
+      options:
+        - distro-builder
+        - distro-contract
+        - distro-spec
+        - distro-variants/levitate
+        - distro-variants/acorn
+        - distro-variants/iuppiter
+        - distro-variants/ralph
+        - testing/install-tests
+        - testing/fsdbg
+        - testing/rootfs-tests
+        - xtask
+        - tools/recipe
+        - tools/recab
+        - docs/content
+        - legacy-compat
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Reproduction
+      description: Exact command or path to trigger the problem.
+      placeholder: |
+        cargo check --workspace --all-targets
+        ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      placeholder: Full workspace compile should pass...
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      placeholder: Legacy crate still references profile_overlay...
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance
+      description: What proves the bug is fixed?
+      placeholder: |
+        - cargo check --workspace --all-targets passes
+        - docs page matches implemented behavior
+    validations:
+      required: true
+  - type: textarea
+    id: related
+    attributes:
+      label: Related paths and docs
+      placeholder: |
+        AcornOS/src/artifact/iso.rs
+        IuppiterOS/src/artifact/iso.rs
+    validations:
+      required: true
