@@ -1,0 +1,87 @@
+name: PR Hygiene
+
+on:
+  pull_request_target:
+    types: [opened, edited, reopened, synchronize, ready_for_review]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  validate:
+    name: Validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate PR body and submodule metadata
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          body_file="$(mktemp)"
+          printf '%s\n' "${PR_BODY:-}" > "${body_file}"
+
+          fail=0
+
+          require_regex() {
+            local pattern="$1"
+            local message="$2"
+            if ! grep -Eiq "${pattern}" "${body_file}"; then
+              echo "::error::${message}"
+              fail=1
+            fi
+          }
+
+          require_regex '(^|[[:space:]])(Closes|Close|Fixes|Fix|Refs|Ref)[:[:space:]]+#([0-9]+)' \
+            "PR body must link a GitHub issue using Closes/Fixes/Refs #<number>."
+
+          require_regex '^## Primary Owner Path' \
+            "PR body must include a 'Primary Owner Path' section."
+
+          require_regex '^## Acceptance' \
+            "PR body must include an 'Acceptance' section."
+
+          if ! grep -Eq '^[[:space:]]*-[[:space:]]+`[^`]+`' "${body_file}"; then
+            echo "::error::Acceptance section must include at least one backticked command bullet."
+            fail=1
+          fi
+
+          mapfile -t submodule_paths < <(git config -f .gitmodules --get-regexp '^submodule\\..*\\.path$' | awk '{print $2}')
+          changed_files="$(gh api "repos/${REPO}/pulls/${PR_NUMBER}/files" --paginate --jq '.[].filename')"
+
+          submodule_pointer_change=0
+          while IFS= read -r file; do
+            [ -n "${file}" ] || continue
+            if [ "${file}" = ".gitmodules" ]; then
+              submodule_pointer_change=1
+              break
+            fi
+            for submodule_path in "${submodule_paths[@]}"; do
+              if [ "${file}" = "${submodule_path}" ]; then
+                submodule_pointer_change=1
+                break 2
+              fi
+            done
+          done <<< "${changed_files}"
+
+          if [ "${submodule_pointer_change}" -eq 1 ]; then
+            require_regex '^## Submodule PRs' \
+              "PR updates a submodule pointer, so it must include a 'Submodule PRs' section."
+
+            if grep -Eq '^[[:space:]]*-[[:space:]]+None[[:space:]]*$' "${body_file}"; then
+              echo "::error::Submodule pointer PRs must list the linked submodule PR(s), not 'None'."
+              fail=1
+            fi
+          fi
+
+          rm -f "${body_file}"
+
+          if [ "${fail}" -ne 0 ]; then
+            exit 1
+          fi
