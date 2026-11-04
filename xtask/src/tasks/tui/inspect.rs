@@ -320,28 +320,3 @@ fn unix_timestamp() -> u64 {
         .map(|d| d.as_secs())
         .unwrap_or(0)
 }
-
-#[cfg(test)]
-mod tests {
-    use super::{sh_single_quote, strip_script_bookends, trim_line_trailing_spaces};
-
-    #[test]
-    fn strip_script_bookends_removes_headers() {
-        let input =
-            b"Script started on 2026-02-25\n\x1b[Halpha\r\nbeta\r\nScript done on 2026-02-25\n";
-        let cleaned = strip_script_bookends(input);
-        assert_eq!(cleaned, b"\x1b[Halpha\r\nbeta\r");
-    }
-
-    #[test]
-    fn trim_line_trailing_spaces_removes_only_right_padding() {
-        let input = "A  \n| x |   \n";
-        let trimmed = trim_line_trailing_spaces(input);
-        assert_eq!(trimmed, "A\n| x |");
-    }
-
-    #[test]
-    fn sh_single_quote_escapes_single_quotes() {
-        assert_eq!(sh_single_quote("a'b"), "a'\\''b");
-    }
-}

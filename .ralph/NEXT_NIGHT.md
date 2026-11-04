@@ -52,7 +52,7 @@
 - Run all 8 previously BLOCKED tests
 - Must pass 10/10 times each
 
-**Success criteria**: Can run `cargo test -p install-tests` and ALL tests pass reliably
+**Success criteria**: Can run the relevant `cargo xtask scenarios test <scenario> <distro>` successfully
 
 ---
 

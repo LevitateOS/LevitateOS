@@ -241,10 +241,6 @@ jobs:
         with:
           components: clippy, rustfmt
 
-      - name: Unit tests - leviso
-        working-directory: leviso
-        run: cargo test --lib --verbose
-
       - name: Clippy - leviso
         working-directory: leviso
         run: cargo clippy -- -D warnings

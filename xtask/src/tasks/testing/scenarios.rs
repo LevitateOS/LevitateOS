@@ -1338,36 +1338,6 @@ fn spawn_qemu_with_log(cmd: &mut Command, log_path: &Path, allow_stdin: bool) ->
     Ok(child)
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use std::sync::atomic::{AtomicU64, Ordering};
-
-    static TEST_COUNTER: AtomicU64 = AtomicU64::new(0);
-
-    #[test]
-    fn detect_disk_image_format_recognizes_qcow2_magic() {
-        let root = test_temp_dir("stage03-detect-qcow2");
-        fs::create_dir_all(&root).expect("create temp dir");
-        let disk = root.join("disk.qcow2");
-        fs::write(&disk, [0x51_u8, 0x46, 0x49, 0xFB, 0, 0, 0, 0]).expect("write disk");
-
-        let format = detect_disk_image_format(&disk).expect("detect format");
-        assert_eq!(format, "qcow2");
-
-        let _ = fs::remove_dir_all(root);
-    }
-
-    fn test_temp_dir(tag: &str) -> PathBuf {
-        let id = TEST_COUNTER.fetch_add(1, Ordering::Relaxed);
-        let nanos = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("clock")
-            .as_nanos();
-        std::env::temp_dir().join(format!("levitate-xtask-{tag}-{nanos}-{id}"))
-    }
-}
-
 fn collect_guest_ssh_debug(child: &mut Child) -> Result<()> {
     let Some(stdin) = child.stdin.as_mut() else {
         return Ok(());

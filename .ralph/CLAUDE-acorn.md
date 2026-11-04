@@ -75,7 +75,7 @@ cd AcornOS && cargo run -- run
 cd testing/install-tests && cargo run --bin install-tests -- run --distro acorn
 
 # Run rootfs-tests
-cd testing/rootfs-tests && cargo test -- --ignored --test-threads=1
+cargo run -p rootfs-tests -- run --rootfs <rootfs-path>
 ```
 
 If install-tests doesn't support `--distro acorn` yet, your first task is to make it work

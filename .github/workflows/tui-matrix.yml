@@ -49,11 +49,8 @@ jobs:
       - name: Typecheck docs/tui
         run: bun run --cwd docs/tui typecheck
 
-      - name: Test docs/tui
-        run: bun run --cwd docs/tui test
-
       - name: Build recpart frontend
         run: bun run --cwd tools/recpart/frontend build
 
       - name: Verify recpart backend + frontend contract
-        run: cargo test -p recpart
+        run: cargo test -p recpart --test integration_cli

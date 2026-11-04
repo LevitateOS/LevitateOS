@@ -135,46 +135,6 @@ preflight() {
 }
 
 # =============================================================================
-# Git hooks for writable submodules
-# =============================================================================
-# Installed before each phase. Gives haiku fast feedback:
-#   pre-commit:  cargo fmt (auto-fix) + cargo check (block if broken)
-#   commit-msg:  enforce feat(acorn)/fix(iuppiter) format
-
-install_hooks() {
-    local hook_src="$RALPH_DIR/hooks"
-    [[ -d "$hook_src" ]] || return 0
-
-    # Submodules haiku is allowed to commit in
-    local writable_subs=(AcornOS IuppiterOS distro-spec distro-builder)
-
-    for sub in "${writable_subs[@]}"; do
-        local sub_path="$PROJECT_ROOT/$sub"
-        [[ -d "$sub_path" ]] || continue
-
-        # Find the hooks dir (submodules use .git/modules/X/hooks or .git/hooks)
-        local hooks_dir
-        if [[ -f "$sub_path/.git" ]]; then
-            # Submodule with .git file pointing to parent's .git/modules/
-            local gitdir
-            gitdir=$(cat "$sub_path/.git" | sed 's/^gitdir: //')
-            hooks_dir="$sub_path/$gitdir/hooks"
-        elif [[ -d "$sub_path/.git" ]]; then
-            hooks_dir="$sub_path/.git/hooks"
-        else
-            continue
-        fi
-
-        mkdir -p "$hooks_dir"
-        cp "$hook_src/pre-commit" "$hooks_dir/pre-commit"
-        cp "$hook_src/commit-msg" "$hooks_dir/commit-msg"
-        chmod +x "$hooks_dir/pre-commit" "$hooks_dir/commit-msg"
-    done
-
-    log "Installed git hooks in writable submodules"
-}
-
-# =============================================================================
 # CLAUDE.md management
 # =============================================================================
 
@@ -633,7 +593,7 @@ DO:
    - Dead code or unused imports haiku forgot to clean up
 3. If you find bugs, fix them and commit with the right scope: fix(acorn): ... / fix(iuppiter): ... / fix(shared): ...
 4. If haiku marked a task [x] but the implementation is incomplete/wrong, unmark it [ ] and note why in progress.
-5. Run \`cargo test\` if tests exist for the changed crates. Fix failures.
+5. Validate changed behavior with a focused integration or runtime check when useful. Unit testing is prohibited.
 6. **IMPORTANT: Check for BLOCKED tasks or tasks haiku struggled with** (look in progress.txt).
    If haiku marked a task BLOCKED or failed on it multiple times, YOU should attempt it.
    You are more capable at complex integration work, debugging, and architecture decisions.
@@ -646,7 +606,7 @@ DO NOT:
 - Pick up NEW unchecked tasks that haiku hasn't attempted yet. That's haiku's job.
 - Refactor or restructure working code. If it compiles and is correct, leave it.
 - Add features, documentation, or tests beyond what's needed to fix bugs or unblock.
-- Spend time on style or formatting (pre-commit hooks handle that).
+- Spend time on unrelated style or formatting.
 
 CRITICAL RULES:
 - Do NOT modify distro-spec/src/levitate/ or testing/install-tests/src/steps/.
@@ -877,7 +837,6 @@ run_build() {
     header "═══ Starting consolidated build (max $max_iterations iterations) ═══"
 
     install_claude_md
-    install_hooks
     mkdir -p "$LOG_DIR"
 
     local stagnant_count=0

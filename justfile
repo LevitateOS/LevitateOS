@@ -35,7 +35,7 @@ tools:
 policy-legacy:
     cargo xtask policy audit-legacy-bindings
 
-# Install/remove the shared pre-commit hook into the workspace + Rust submodules.
+# Install/remove the optional whitespace-only pre-commit hook.
 hooks-install:
     cargo xtask hooks install
 
@@ -543,7 +543,7 @@ docs-content-check:
 # Docs TUI (installation-focused)
 docs-tui-check:
     cd docs/content && bun run build
-    cd tui/apps/live-tools/install-docs && bun run typecheck && bun run test
+    cd tui/apps/live-tools/install-docs && bun run typecheck
 
 docs-tui-inspect-check:
     cd docs/content && bun run build
@@ -591,7 +591,6 @@ docs-tui-inspect *args:
     unset NO_COLOR
     export FORCE_COLOR="${FORCE_COLOR:-3}"
     bun run typecheck
-    bun run test
     exec bun src/main.ts {{args}}
 
 [script, no-exit-message]

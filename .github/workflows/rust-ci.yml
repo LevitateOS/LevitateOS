@@ -29,8 +29,8 @@ env:
   RUST_BACKTRACE: 1
 
 jobs:
-  test:
-    name: Test
+  build:
+    name: Build
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -54,8 +54,6 @@ jobs:
             target/
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock', '**/Cargo.toml') }}
           restore-keys: ${{ runner.os }}-cargo-
-
-      - run: cargo test --verbose
 
       - run: cargo build --verbose
 

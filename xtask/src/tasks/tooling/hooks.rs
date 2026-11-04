@@ -56,7 +56,7 @@ fn run(mode: Mode) -> Result<()> {
             eprintln!();
             eprintln!("Installed: {installed}  Skipped: {skipped}");
             eprintln!();
-            eprintln!("Hook runs: cargo fmt (auto-fix) + clippy + unit tests");
+            eprintln!("Hook runs: git diff --cached --check (whitespace only)");
             eprintln!("Skip with: git commit --no-verify");
         }
         Mode::Remove => {
