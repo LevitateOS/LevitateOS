@@ -16,7 +16,8 @@ Active Ginux branch `codex/ginux-recipe-local-integration` contains upstream
 `5ed26bf2` through local merge `28f0a7d6`. Recipe is on
 `ginux-recipe/r06-launch`, starting at `650f7a3`. The paused interpreter edits
 were preserved in a Git stash named `wip: preserve unfinished owned interpreter
-chains` before continuing from the verified merge. They remain incomplete.
+chains` before continuing from the verified merge. The stash remains preserved;
+its intended interpreter-chain capability is now implemented and verified below.
 Baseline: 29 focused Recipe integration cases passed against that merge; the
 broad review reproduced dropped defines, nested imports, and missing dependency
 inputs. Review/evidence: `.artifacts/ginux-local-integration/broad-review-20261105/`.
@@ -190,14 +191,40 @@ real dependency suite exposed setup running before the previous late rejection;
 that is corrected. Four dependency cases now pass, including two compiled C tools,
 transitive tool lookup, retained files/state/reuse, cycle/missing/declaration
 errors and early legacy rejection (/tmp/recipe-dependencies-final.log).
-Current action: finish owned interpreter-chain handling using the preserved work
-as a reference, with actual direct/recursive interpreter, failure and reference-
-lifetime scenarios. The stash itself remains preserved. Then continue consumer
-source/cache migration and the remaining filesystem capability work.
+Ginux `cda76faa` completes bounded owned interpreter chains (up to four scripts),
+including owned ELF and native image interpreter leaves. Every script stays pinned
+until successful exec or failure, and argv/environment/aux reconstruction happens
+in the new image. Actual chain, cycle, depth, permissions, lifetime and existing
+native/owned/script/thread scenarios pass, together with all static/unit checks.
+Recipe `341c61f` verifies real Bash chains and `74e6f20` preserves ordinary source
+filenames including spaces, punctuation and Unicode. Evidence:
+/tmp/ginux-chain-{test,regression,static,final}.log, /tmp/recipe-owned-chain.log,
+/tmp/recipe-input-names.log.
+Ginux `909399b4` adds merged component-by-component symlink resolution; `aa8becf2`
+wires owned symlink/readlink/stat/open/exec and directory-fd calls with assignment
+checks. Snapshots preserve bounded relative, absolute and long link targets;
+restore rejects writes through symlink parents. All 61 unit cases and static
+checks pass, along with actual storage/checkpoint/owned-exec/script/thread cases.
+An existing descriptor-relative script regression exposed incorrect suffix joining;
+that was fixed and rerun successfully. Evidence: /tmp/ginux-link-final-{test,static}.log,
+/tmp/ginux-link-regression-test.log, /tmp/ginux-link-archive-test.log (the latter
+also records the earlier failed script case). Cross-image/owned link traversal
+remains unsupported and fails rather than falling through to native storage.
+Recipe `85187b2` preserves symlinks inside named file/directory publications,
+including long and absolute rootfs targets. Regular bytes and all parents are
+materialized before links; parent collisions and named outputs that are themselves
+links fail without host effects. Actual retained invocation reuse preserves the
+same links, skips rebuilding and leaves the previous publication intact. All 46
+managed CLI integration checks pass (/tmp/recipe-link-regression.log); focused
+publication attack and retained cases pass in /tmp/recipe-link-{publication,state}-test.log.
+Current action: continue remaining filesystem capabilities and consumer source/cache
+migration. General rootfs products still require hardlink identity, larger bounded
+namespace capacity and owned-directory cwd support; source acquisition still needs
+the planned bounded network backend. Do not claim the full integration is ready.
 All changes remain local; no branch or pull request has been published.
-Remaining: source assets and representative consumers; owned interpreter-chain
-stash, Ginux SQLite locking warning, temporary-root cleanup and broader integration
-limitations listed above still need attention. SIGKILL stops workload processes and recovery works,
+Remaining: representative consumer migration, true owned hardlink identity, scalable
+rootfs storage, installed-target views, Ginux SQLite locking, and the broader
+integration limitations listed above still need attention. SIGKILL stops workload processes and recovery works,
 and newly leased prepared roots are reclaimed on the next invocation. Older
 unleased roots and automatic retained-generation cleanup remain unfinished. Cargo global-cache SQLite locking warnings remain unresolved.
 Evidence: `/tmp/ginux-{noctty,cwd,packet,channel-bounds,exe-link,path-probe,memfd}-*`,

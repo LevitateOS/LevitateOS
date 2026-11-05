@@ -310,11 +310,15 @@ The current final-export bridge (Ginux 48b26f8d, Recipe 11057ca) publishes selec
 regular files/directories under /work or /out into fresh coordinator-owned
 .artifacts/ginux-export/<invocation>/<name> directories and returns host paths.
 It requires successful completion, bounds and validates the archive, rejects
-links/traversal/missing selections, and never overwrites an existing publication.
+traversal/missing selections and hardlinks, and never overwrites an existing publication.
+Symbolic links inside selected directories are preserved as bounded data. Regular
+bytes and all parents are materialized before creating links; conflicts with file
+or directory parents fail. A selected root cannot itself be a symlink. Absolute
+rootfs targets are preserved but never traversed during extraction or cleanup.
 Current limits are 64 named outputs, 4096 archive entries and 2 GiB. Ginux exports
 the owned writable view after task teardown; Recipe publishes only selections.
 Retained generations use the separate coordinator state path described below.
-Image-backed selections and symlink-containing products remain unsupported.
+Image-backed selections and hardlink-containing products remain unsupported.
 
 Preseeded source assets are explicit inputs to a materializer. The builder selects
 the canonical host cache through orchestration metadata; input preparation maps
