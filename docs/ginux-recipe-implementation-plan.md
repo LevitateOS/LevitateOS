@@ -572,7 +572,8 @@ to introduce new crates or parallel behavior owners.
   outputs. This task does not itself promise the build succeeds.
 
 - [ ] **I04 — Close observed compatibility gaps in small assignments.** Depends:
-  I03. Owner: appropriate Ginux lane for each gap. Create one named follow-up per
+  I03. (In progress 2026-11-05: **M1 done** — worktree `/tmp/ginux-i04`, branch `ginux-recipe/i04-mmap`, commit `7cfb8070`, pushed to fork. Anonymous mmap/brk/mprotect/munmap mediated with caps (64 MiB single, 256 MiB total, 256 regions); file-backed → ENODEV, shared/fixed → EPERM, W|X → EACCES, over-cap → ENOMEM; teardown audits live-mappings=0. Coordinator reran: I04-MMAP-PROBE PASS; loader probes now pass brk+mmap and die later at openat/access (M2/M3's job). Remaining: M2 domain library access, M3 loader metadata.)
+  Owner: appropriate Ginux lane for each gap. Create one named follow-up per
   related operation family, normally one to three syscall/ABI behaviors per task;
   identify its files, dependency, contract semantics, and real reproducer. Iterate
   only as new execution evidence requires. Done: follow-ups have actual runtime
