@@ -217,6 +217,13 @@ links fail without host effects. Actual retained invocation reuse preserves the
 same links, skips rebuilding and leaves the previous publication intact. All 46
 managed CLI integration checks pass (/tmp/recipe-link-regression.log); focused
 publication attack and retained cases pass in /tmp/recipe-link-{publication,state}-test.log.
+Ginux `8b14578c` additionally prevents trailing-slash and terminal-dot namespace
+mutations from following a link and deleting or renaming its target directory.
+The VFS owns the shared namespace resolver. It also reports image symlink target
+length in nofollow metadata. All static/unit checks and the real storage,
+directory and checkpoint suites pass (/tmp/ginux-link-dot-{static,test}.log).
+`d7f628cc` updates Ginux's own capability documentation without workspace policy.
+Current local heads: Ginux `d7f628cc`, Recipe `85187b2`, distro-builder `97ce3a9`.
 Current action: continue remaining filesystem capabilities and consumer source/cache
 migration. General rootfs products still require hardlink identity, larger bounded
 namespace capacity and owned-directory cwd support; source acquisition still needs
