@@ -288,7 +288,7 @@ the consumer case checks acquisition/readiness only and does not prove those pat
 
 ### S2 Unify setup and command execution
 
-Dependencies: S1 where overlapping. Status: not started.
+Dependencies: S1 where overlapping. Status: partial helper implementation.
 
 - Consolidate engine creation in src/lib.rs and worker/run.rs. Build scopes
   through one invocation builder used by executor/private/actions.rs, flow.rs,
@@ -305,6 +305,28 @@ Evidence: a real recipe using globals and imports behaves consistently under
 install, all checks, cleanup, and remove; setup runs once. Child commands handle
 spaces/quotes, cwd, environment, failure, and clean machine output inside Ginux.
 Compilation and worker-protocol checks can precede S0; final runtime evidence cannot.
+
+Command-helper slice 2026-11-05: tools/recipe 8254215 replaces the unused
+ShellCmd builder and duplicate shell/argv runners with one subprocess owner.
+`exec_checked` has checked two-argument and cwd/env options forms; `exec` retains
+explicit status returns and `exec_output` retains checked stdout capture. Child
+environment overrides do not mutate the worker environment. Child stdin is
+closed, streaming diagnostics use stderr, and errors retain bounded output tails
+without printing environment override values. The helper reference, author guide,
+and man page describe the implemented API.
+
+    cargo build -p levitate-recipe --bin recipe --offline
+    cargo test -p levitate-recipe --test e2e command_options:: --offline -- --nocapture
+    cargo test -p levitate-recipe --test e2e process:: --offline -- --nocapture
+    cargo test -p levitate-recipe --test e2e preseed_recipes:: --offline -- --nocapture
+
+Five command CLI cases pass for literal argv/quotes, cwd, child-only environment,
+closed stdin, failure stopping installation, retained diagnostics, invalid options,
+and legacy shell/status/capture behavior. Both process cases and all three preseed
+cases pass with the shared runner. These checks use the current pre-S0 CLI;
+managed Ginux execution remains unverified. Engine factory, initialization-once,
+invocation context, and API 2 work remain outstanding and must coordinate with
+the Ginux agent before editing shared engine/worker files.
 
 ### S3 Separate durable state and adapt the worker boundary
 
@@ -479,7 +501,7 @@ unrelated edits and current branches. Update task status with concrete evidence
 as work lands. Temporary audit probes are useful reproductions, not durable
 acceptance artifacts; preserve needed cases in the existing integration owner.
 
-Next implementation action in this chat: consolidate independent command helpers
-and add checked argv execution with cwd/environment options. Keep the concurrent
+Next implementation action in this chat: repair retained HTTP resume behavior
+and consolidate acquisition publication. Keep the concurrent
 Ginux agent's launcher/worker/coordinator work separate. Re-run implemented slices
 through the mandatory Ginux path once that agent's integration is available.
