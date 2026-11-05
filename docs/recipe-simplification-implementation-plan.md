@@ -377,7 +377,7 @@ when files exist. These runtime cases run through the required Ginux path.
 
 ### S5 Consolidate acquisition and recipe-owned shared facts
 
-Dependencies: S2; state integration uses S3/S4. Status: partial helper implementation.
+Dependencies: S2; state integration uses S3/S4. Status: partial helper and recipe implementation.
 The independent response-writing change below does not depend on context/lifecycle
 refactoring; the remaining recipe/state work still follows those dependencies.
 
@@ -448,6 +448,31 @@ valid/corrupt resumed/416 reuse. Corruption never reaches installation or replac
 the old destination in these cases. The GitHub path compiles against the shared
 writer but its external discovery/download was not exercised. Managed Ginux
 network/storage evidence and recipe migration remain outstanding.
+
+Shared-source slice 2026-11-05: distro-builder ac6ef1b gives Alpine and Fedora
+preseed/materialization pairs one recipe-owned source declaration and marker
+format each in recipes/sources. Literal imports include file extensions so the
+existing invocation input discovery can resolve them. Versions, hashes, and URLs
+stay in Rhai. Custom lifecycle/readiness hooks remain in their recipes and still
+hash actual cache/staged bytes. Marker size inspection uses checked argv capture,
+handling quoted paths without shell interpolation and propagating real errors.
+The six production files together remove 49 lines; no custom check was discarded.
+tools/recipe 3c80a1f adapts the real CLI fixtures to copy those actual modules and
+change only fixture checksum facts, with an added quoted-path case. All four
+preseed CLI cases passed. Existing unrelated account/package edits in the two
+consumer files remain separate and uncommitted. These are pre-S0 CLI results;
+managed import reconstruction and full materialization remain outstanding.
+
+Alpine publication migration: distro-builder 0ad6c55 uses the optional SHA256
+download form for both assets, removes impossible empty-success handling, and
+preserves old verified assets during refresh/failure cleanup. This removes another
+29 recipe lines. tools/recipe 6bc7500 exercises the actual acquire and cleanup
+hooks using loopback HTTP with fixture source URLs/digests. All five preseed CLI
+cases pass, including successful refresh and failed ISO/APK verification; previous
+asset and marker bytes remain usable after either failure. This HTTP case needs
+sandbox socket permission. Fedora torrent publication still needs its own staging
+work; HTTP publication evidence does not establish BitTorrent behavior or Ginux
+network/storage operation.
 
 ### S6 Migrate representative recipes and validate managed execution
 
@@ -533,7 +558,7 @@ unrelated edits and current branches. Update task status with concrete evidence
 as work lands. Temporary audit probes are useful reproductions, not durable
 acceptance artifacts; preserve needed cases in the existing integration owner.
 
-Next implementation action in this chat: share recipe-owned source facts and
-verification between preseed producers and consumers. Keep the concurrent
+Next implementation action in this chat: consolidate retained Git acquisition
+with explicit origin, revision, and destination semantics. Keep the concurrent
 Ginux agent's launcher/worker/coordinator work separate. Re-run implemented slices
 through the mandatory Ginux path once that agent's integration is available.
