@@ -60,6 +60,17 @@ until the supervisor is reaped, then is removed. This root is currently ephemera
 retained writable storage, generation-backed checkpoints, full input/dependency
 layout reconstruction, and selected output publication still need integration.
 
+Current writable adapter (local Ginux 10091e4e, Recipe ab9fc89): generic
+`memory:/domain/path` storage assignments provide empty ephemeral namespaces at
+`/work`, `/work/build`, `/work/tools`, `/work/tmp`, and `/out`. Ginux owns their
+bytes/descriptors; native image access remains read-only and missing owned paths
+never fall through to host storage. Current limits are 32 objects including
+seeded directories, 64 KiB/file, 64 open files, and 4096-byte IO calls. The generic
+backend's supported operations and limitations are documented in Ginux README.
+This is not retained storage, ordinary compiler support or publication. The v1
+ack generation remains placeholder 0; result generation remains null. The stable
+paths table below describes the target backing, not completed retention.
+
 Per invocation Recipe supplies:
 
 - A domain config document: `execution.profile = "balanced"`,

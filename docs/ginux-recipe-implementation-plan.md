@@ -157,15 +157,65 @@ Public entry and checkpoint continuation 2026-11-05:
   and the real library regression are saved in
   `.artifacts/ginux-local-integration/worker-entry/` (13 passing test cases total).
 
-Next local slice: connect domain-owned writable filesystem operations to the
-configured supervisor, using the existing filesystem owners and preserving the
-read-only image/input boundary. Re-run the file-producing install first; then
-exercise actual cleanup/removal and child commands on its products. Full
-input/dependency layout, target/options transport, resource enforcement, durable
-generations/state and output publication remain incomplete. The unreachable
-legacy host callbacks/wrappers still need removal with R07/S7 option transport;
-they are never invoked by public operations. The linked review thread owns
-upstream review and PR creation; no push or PR was performed.
+Writable-file continuation 2026-11-05:
+
+- Ginux **222d29ff** extends the existing VFS with directory/file metadata,
+  file positioning, sparse/append IO, chmod and exclusive create. It fixes
+  descriptor-exhaustion side effects, reads beyond EOF, and unlink/recreate
+  object lifetime. Seven VFS cases pass, retaining all four upstream cases.
+- Ginux **10091e4e** connects supervisor-owned storage to configured launch.
+  Generic `memory:/absolute/path` assignments declare empty writable namespaces;
+  they never assign a writable host directory or permit native write fallback.
+  Native image/loader reads remain confined to the prepared root. Virtual
+  descriptors start at 1048576, with native soft/hard limits clamped below that
+  namespace. Parent-only process_vm copies respect guest page protections;
+  failed/partial read copyout restores the correct file offset. Metadata uses
+  virtual object identities. The x86-64 bootstrap mkdirat number is corrected.
+- This is a bounded ephemeral backend: 32 objects including directories, 64 KiB
+  per file, 64 open files, 4096-byte IO calls. Directory descriptors/enumeration/
+  removal, rename, links, shared-offset duplicate descriptors, generated-file
+  execution/mapping, scalable backing, retention, configured storage quotas and
+  export remain unfinished. It is not sufficient for an ordinary Cargo build.
+  Do not mark old library-only G06–G13 records as integrated based on this slice.
+- The real `scripts/test-launch.py` and new `scripts/test-launch-storage.py`
+  both pass with the final release binary. The latter exercises fresh-launch
+  isolation, hidden image files, actual bytes and metadata, unlink/recreate,
+  exclusive create, bad/readonly/partially inaccessible pointers, native FD hard
+  limits, file/descriptor/object exhaustion, malformed assignments and no
+  storage assignment. Makefile producers/scenarios and existing Linux CI are
+  extended; upstream tests are retained. All 12 focused core/VFS cases pass.
+  Release clippy passes with `-D warnings`; the initial dev-profile clippy
+  command failed because this no_std binary requires release panic=abort.
+- Recipe **ab9fc89** declares memory storage at `/work`, `/work/build`,
+  `/work/tools`, `/work/tmp` and `/out`. Its actual acquire/build/install now
+  transforms `prepared source` into `prepared source: built: installed`;
+  auto.install.success cleanup reads the product and removes the build file.
+  Six v1 checkpoints are acknowledged. Separate cleanup/remove scenarios read
+  and delete actual domain artifacts created in the same invocation. Source
+  files remain unchanged. These prove ephemeral file effects, not target
+  removal across invocations, durable generations or host publication.
+- Final actual Recipe checks: 12 managed CLI cases, two worker-entry guards,
+  and one library-default case pass (15 total), using the final real supervisor,
+  verified Rocky tar and CLI worker. Commands, environment and raw logs are in
+  `.artifacts/ginux-local-integration/memory-storage/checks.json` and adjacent
+  logs. The library case spoofs worker environment and still uses Ginux.
+- A subsequent actual image-child probe (`/usr/bin/bash -c 'exit 0'`, image ELF
+  verified present) fails during helper startup with ENOENT, before any build
+  checkpoint. Source and stdout/stderr are retained under the same directory.
+  The helper requests Stdio::null() and two pipes before spawn; the missing
+  device/channel/process operation must be isolated on configured launch.
+  No syscall-cause claim or successful child execution is made.
+
+Next local action: reproduce that child-startup failure with the actual syscall
+sequence, then connect the required domain-owned device/channel/process objects
+without native child fallthrough. Replace/extend bounded storage through its
+existing owner for compiler-sized files and directory operations. Full input/
+dependency layout, target/options transport, resource enforcement, durable
+state/generations and output publication remain incomplete. The unreachable
+legacy host wrappers still need removal with R07/S7 option transport; public
+operations never invoke them. The linked review thread owns upstream review and
+PR creation. Local Ginux/Recipe commits above are review inputs, not reviewed or
+upstream-accepted changes; no push or PR was performed.
 
 Recovery checkpoint: active skill `hdae-development`, discovery path
 `/home/vince/.codex/worktrees/ginux-recipe-local-integration/ginux/.agents/skills/hdae-development/SKILL.md`;

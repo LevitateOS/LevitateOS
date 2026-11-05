@@ -197,6 +197,20 @@ removal, retained storage or durable recovery. A real file-producing install
 still fails at its acquire write; domain-owned writable filesystem integration
 is next. Detailed commands, limitations and raw evidence live in the Ginux plan.
 
+Writable-file continuation 2026-11-05: Ginux **222d29ff/10091e4e** connects
+bounded supervisor-owned memory storage to configured launch; Recipe **ab9fc89**
+uses it for `/work` and `/out`. A real acquire/build/install transforms files,
+acknowledges six checkpoints and runs cleanup that reads the installed product
+and deletes the intermediate build file. Cleanup and remove also read/delete
+actual domain artifacts within one invocation. All 15 focused managed CLI,
+entry-guard and library cases pass. Native launch/storage suites and 12 core/VFS
+cases pass. This backend is ephemeral, with 32 objects, 64 KiB per file and 64
+open files; ordinary compiler builds, retained target removal, durable state and
+publication remain unfinished. S0 remains in progress. A subsequent real image
+child command fails at startup with ENOENT; isolate the device/channel/process
+cause before relaxing the contract. Evidence and exact limitations live in the
+Ginux plan; no upstream push or PR was performed.
+
 - Complete the existing Ginux launch adapter instead of adding another launcher.
   Route every executable CLI and library operation through it by default.
 - Remove public host/in-process backend selection, host defaults, and fallback.
@@ -1004,9 +1018,11 @@ unrelated edits and current branches. Update task status with concrete evidence
 as work lands. Temporary audit probes are useful reproductions, not durable
 acceptance artifacts; preserve needed cases in the existing integration owner.
 
-Next implementation action in this chat: wire domain-owned writable filesystem
-operations into the configured supervisor and re-run the captured file-producing
-install, then cleanup/removal and child commands on its artifacts. Public entry,
+Next implementation action in this chat: isolate the actual child-startup
+failure after the file-producing lifecycle/cleanup/removal pass, then connect
+its required device/channel/process objects through configured supervision.
+Extend the existing storage owner for compiler-sized files and directory
+operations; the current bounded memory backend is not compiler support. Public entry,
 prepared tool paths and bounded checkpoint waiting are connected; process-global
 dependency environment cleanup remains outstanding. Explicit cache/input and dependency-state
 transport still require R07. Remaining
