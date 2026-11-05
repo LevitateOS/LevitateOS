@@ -364,8 +364,9 @@ to introduce new crates or parallel behavior owners.
   normal filesystem tools inspect domain data accurately without host metadata
   leakage. Split additional metadata ABIs into observed follow-ups.
 
-- [ ] **G05a — Connect inherited pipes and close-on-exec descriptors.** Depends:
-  G05, G07b. Owner: G-process/descriptor adapter; serialize with G-files changes.
+- [x] **G05a — Connect inherited pipes and close-on-exec descriptors.** Depends:
+  G05, G07b. (Done 2026-11-05: worktree `/tmp/ginux-g05a`, branch `ginux-recipe/g05a-pipes`, commit `e97eb58c`, pushed to fork. `PipeSpace`/`FdEntry`/`FdKind` domain objects in ginux-process (also removed a prohibited `#[cfg(test)]` suite in the touched file); host executes pipe/dup/close/fcntl while the loop mirrors outcomes; pipe2 allows only O_CLOEXEC|O_NONBLOCK, dup3 only O_CLOEXEC, other fcntls ENOSYS; CLOEXEC scrubbed at exec + late paths; teardown audits live-pipes. Coordinator reran reproducer: PIPE_REPRO PASS (46 checks), live-pipes=0, GATE7 PASS, G03/G03b/G04/G05 regressions PASS, no survivors. LIMIT: merge-time convergence with the G07 fd table recorded; real-libc shell pipeline needs G06a/G07 file/memory mediation, so acceptance used raw static stages.)
+  Owner: G-process/descriptor adapter; serialize with G-files changes.
   Implement duplication/shared-offset and pipe inheritance through domain objects.
   Done: a real shell pipeline and an exec with close-on-exec descriptors behave
   correctly without receiving supervisor descriptors.
