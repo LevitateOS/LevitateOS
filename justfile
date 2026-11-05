@@ -31,7 +31,7 @@ tools-install:
 tools:
     just tools-install
 
-# Fail fast on forbidden legacy checkpoint/rootfs bindings.
+# Fail fast on forbidden legacy artifact/rootfs bindings.
 policy-legacy:
     cargo xtask policy audit-legacy-bindings
 
@@ -251,62 +251,11 @@ scenario-window target distro="levitate" inject="" inject_file="" ssh_pubkey=(en
 scenario-window-remote target distro="levitate" inject="" inject_file="" ssh_pubkey=(env("HOME") + "/.ssh/id_ed25519.pub"):
     just _boot_scenario {{target}} {{distro}} "{{inject}}" "{{inject_file}}" false false true "{{ssh_pubkey}}" "" 2222 ""
 
-[script]
-_compat_scenario_target raw mode="automated":
-    #!/usr/bin/env bash
-    set -euo pipefail
-
-    case "{{raw}}" in
-      build-preflight|build_preflight|0|00|00Build) target="build-preflight" ;;
-      live-boot|live_boot|1|01|01Boot) target="live-boot" ;;
-      live-tools|live_tools|2|02|02LiveTools) target="live-tools" ;;
-      install|3|03|03Install) target="install" ;;
-      installed-boot|installed_boot|4|04|04LoginGate) target="installed-boot" ;;
-      automated-login|automated_login|5|05|05Harness) target="automated-login" ;;
-      runtime|6|06|06Runtime) target="runtime" ;;
-      *)
-        echo "unsupported compatibility scenario target '{{raw}}'; prefer canonical scenario names: build-preflight, live-boot, live-tools, install, installed-boot, automated-login, runtime" >&2
-        exit 2
-        ;;
-    esac
-
-    case "{{mode}}" in
-      interactive)
-        case "$target" in
-          live-boot|live-tools|installed-boot) ;;
-          *)
-            echo "legacy interactive checkpoint aliases map only to interactive scenarios: live-boot, live-tools, installed-boot (got: $target)" >&2
-            exit 2
-            ;;
-        esac
-        ;;
-      live)
-        case "$target" in
-          live-boot|live-tools) ;;
-          *)
-            echo "legacy SSH/window checkpoint aliases map only to live ISO scenarios: live-boot, live-tools (got: $target)" >&2
-            exit 2
-            ;;
-        esac
-        ;;
-      automated|upto) ;;
-      *)
-        echo "unsupported compatibility scenario mode '{{mode}}'" >&2
-        exit 2
-        ;;
-    esac
-
-    printf '%s\n' "$target"
-
-# Compatibility aliases only.
-# Prefer `just scenario*`, `just scenario-test*`, and `just release-build*`.
-
 # Single-path live-boot parity gate (serial boot + SSH boot).
 [script, no-exit-message]
-s01-parity distro="levitate" inject="" inject_file="" ssh_pubkey=(env("HOME") + "/.ssh/id_ed25519.pub") ssh_privkey=(env("HOME") + "/.ssh/id_ed25519") ssh_port="2222":
+live-boot-parity distro="levitate" inject="" inject_file="" ssh_pubkey=(env("HOME") + "/.ssh/id_ed25519.pub") ssh_privkey=(env("HOME") + "/.ssh/id_ed25519") ssh_port="2222":
     #!/usr/bin/env bash
     set -euo pipefail
-    just release-build live-boot {{distro}}
 
     tmp_serial=""
     tmp_ssh=""
@@ -362,53 +311,13 @@ scenario-test target distro="levitate" inject="" inject_file="" ssh_pubkey=(env(
       cargo xtask scenarios test {{target}} {{distro}}; \
     fi
 
-# Run all automated scenarios up to a canonical scenario name.
-scenario-test-up-to target distro="levitate" inject="" inject_file="" ssh_pubkey=(env("HOME") + "/.ssh/id_ed25519.pub"):
-    if [ -n "{{inject_file}}" ]; then \
-      cargo xtask scenarios test-up-to {{target}} {{distro}} --inject-file "{{inject_file}}"; \
-    elif [ -n "{{inject}}" ]; then \
-      cargo xtask scenarios test-up-to {{target}} {{distro}} --inject "{{inject}}"; \
-    elif [ -f "{{ssh_pubkey}}" ]; then \
-      tmp=$(mktemp); \
-      trap 'rm -f "$tmp"' EXIT; \
-      key="$(tr -d '\n' < "{{ssh_pubkey}}")"; \
-      printf 'SSH_AUTHORIZED_KEY=%s\n' "$key" > "$tmp"; \
-      cargo xtask scenarios test-up-to {{target}} {{distro}} --inject-file "$tmp"; \
-    else \
-      cargo xtask scenarios test-up-to {{target}} {{distro}}; \
-    fi
-
-# Compatibility alias: run one automated scenario using the legacy `just test` name.
-[script]
-test target distro="levitate" inject="" inject_file="" ssh_pubkey=(env("HOME") + "/.ssh/id_ed25519.pub"):
-    #!/usr/bin/env bash
-    set -euo pipefail
-    canonical="$(just _compat_scenario_target "{{target}}" automated)"
-    just scenario-test "$canonical" "{{distro}}" "{{inject}}" "{{inject_file}}" "{{ssh_pubkey}}"
-
-# Compatibility alias: run scenarios up to a target using the legacy `just test-up-to` name.
-[script]
-test-up-to target distro="levitate" inject="" inject_file="" ssh_pubkey=(env("HOME") + "/.ssh/id_ed25519.pub"):
-    #!/usr/bin/env bash
-    set -euo pipefail
-    canonical="$(just _compat_scenario_target "{{target}}" upto)"
-    just scenario-test-up-to "$canonical" "{{distro}}" "{{inject}}" "{{inject_file}}" "{{ssh_pubkey}}"
-
 # Show scenario test status.
 scenario-status distro="levitate":
     cargo xtask scenarios status {{distro}}
 
-# Compatibility alias: show scenario status via the legacy `just test-status` name.
-test-status distro="levitate":
-    just scenario-status {{distro}}
-
 # Reset scenario test state.
 scenario-reset distro="levitate":
     cargo xtask scenarios reset {{distro}}
-
-# Compatibility alias: reset scenario state via the legacy `just test-reset` name.
-test-reset distro="levitate":
-    just scenario-reset {{distro}}
 
 # Build release ISOs via the canonical product-first distro-builder endpoint.
 # Human-friendly: use `<product-or-distro> [<product-or-distro>]`.
@@ -419,103 +328,6 @@ release-build *args:
 # Build release ISOs for all variants via the canonical endpoint.
 release-build-all *args:
     cargo run -p distro-builder --bin distro-builder -- release build-all iso {{args}}
-
-# Compatibility build wrapper only.
-# Prefer `just release-build ...` for release products and `just scenario-test ...` for install/runtime scenarios.
-[script, no-exit-message]
-build *args:
-    #!/usr/bin/env bash
-    set -euo pipefail
-
-    install_scenario_build() {
-      local distro="$1"
-      local ssh_pubkey="${HOME}/.ssh/id_ed25519.pub"
-
-      if [ -f "$ssh_pubkey" ]; then
-        local tmp
-        tmp="$(mktemp)"
-        trap "rm -f '$tmp'" EXIT
-        local key
-        key="$(tr -d '\n' < "$ssh_pubkey")"
-        printf 'SSH_AUTHORIZED_KEY=%s\n' "$key" > "$tmp"
-        cargo xtask scenarios test install "$distro" --force --inject-file "$tmp"
-      else
-        cargo xtask scenarios test install "$distro" --force
-      fi
-    }
-
-    compat_release_target() {
-      case "$1" in
-        0|00|00Build|base-rootfs) printf '%s\n' "base-rootfs" ;;
-        1|01|01Boot|live-boot) printf '%s\n' "live-boot" ;;
-        2|02|02LiveTools|live-tools) printf '%s\n' "live-tools" ;;
-        3|03|03Install|install) printf '%s\n' "__install__" ;;
-        *) return 1 ;;
-      esac
-    }
-
-    set -- {{args}}
-
-    if [ "$#" -eq 1 ]; then
-      if compat="$(compat_release_target "$1" 2>/dev/null)"; then
-        if [ "$compat" = "__install__" ]; then
-          install_scenario_build levitate
-        else
-          cargo run -p distro-builder --bin distro-builder -- release build iso levitate "$compat"
-        fi
-        exit 0
-      fi
-    fi
-
-    if [ "$#" -eq 2 ]; then
-      if compat="$(compat_release_target "$1" 2>/dev/null)"; then
-        if [ "$compat" = "__install__" ]; then
-          install_scenario_build "$2"
-        else
-          cargo run -p distro-builder --bin distro-builder -- release build iso "$2" "$compat"
-        fi
-        exit 0
-      fi
-      if compat="$(compat_release_target "$2" 2>/dev/null)"; then
-        if [ "$compat" = "__install__" ]; then
-          install_scenario_build "$1"
-        else
-          cargo run -p distro-builder --bin distro-builder -- release build iso "$1" "$compat"
-        fi
-        exit 0
-      fi
-    fi
-
-    cargo run -p distro-builder --bin distro-builder -- release build iso "$@"
-
-# Compatibility wrapper: build legacy checkpoint aliases from 00 up to N (inclusive) for a distro.
-# Prefer explicit `just release-build ...` calls on canonical products.
-[script, no-exit-message]
-build-up-to n distro="levitate":
-    #!/usr/bin/env bash
-    set -euo pipefail
-
-    case "{{n}}" in
-      0|00) target=0 ;;
-      1|01) target=1 ;;
-      2|02) target=2 ;;
-      3|03) target=3 ;;
-      *)
-        echo "build-up-to is a compatibility wrapper and supports only legacy build aliases 0..3 (got: {{n}})" >&2
-        exit 2
-        ;;
-    esac
-
-    compat_targets=(00Build 01Boot 02LiveTools 03Install)
-    for i in $(seq 0 "$target"); do
-      compat_target="${compat_targets[$i]}"
-      echo "==> Compatibility build ${compat_target} for {{distro}}"
-      just build "{{distro}}" "${compat_target}"
-    done
-
-# Compatibility alias for `just release-build-all`.
-build-all *args:
-    just release-build-all {{args}}
 
 # Prepare a canonical product and build both rootfs/overlay EROFS artifacts.
 # Example: just product-erofs live-tools levitate

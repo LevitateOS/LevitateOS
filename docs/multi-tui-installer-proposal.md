@@ -1,4 +1,4 @@
-# Multi-TUI Installer Proposal (Checkpoint-Oriented, Non-Monolithic)
+# Multi-TUI Installer Proposal (Product-Oriented, Non-Monolithic)
 
 ## Status
 
@@ -6,25 +6,25 @@ Draft proposal for implementation planning.
 
 ## Goal
 
-Build a multi-TUI installation system using `tui-kit` where each TUI owns a single installation concern and checkpoint boundary, instead of creating one large "do everything" installer.
+Build a multi-TUI installation system using `tui-kit` where each TUI owns a single installation concern and product boundary, instead of creating one large "do everything" installer.
 
-This proposal intentionally avoids a monolithic, highly-branching installer flow. The design is explicit, checkpoint-oriented, and reproducible.
+This proposal intentionally avoids a monolithic, highly-branching installer flow. The design is explicit, product-oriented, and reproducible.
 
-## Scope Gate (Stage 02 Policy)
+## Scope Gate (live-tools Policy)
 
-This proposal applies only to distro variants that declare Stage 02 `install_experience = "ux"` in `distro-variants/*/scenarios.toml` under `[scenarios.live_tools]`.
+This proposal applies only to distro variants that declare live-tools `install_experience = "ux"` in `distro-variants/*/scenarios/scenarios.toml` under `[scenarios.live_tools]`.
 
 - In-scope UX variants: `levitate`, `acorn`
 
 For `automated_ssh` variants:
 
-1. 02LiveTools remains SSH/headless automation oriented and must not route default ISO flow through local TUI install surfaces.
-2. 03Install also remains automation-first; local installer TUIs are disabled by default.
+1. live-tools remains SSH/headless automation oriented and must not route default ISO flow through local TUI install surfaces.
+2. installation also remains automation-first; local installer TUIs are disabled by default.
 
-## Checkpoint UX Authority Split
+## Product UX Authority Split
 
-1. 02LiveTools owns **session UX**: shell profile, tmux/session layout, docs visibility defaults, live overlay UX, and install entrypoint launch behavior.
-2. 03Install owns **task UX**: disk/filesystem/bootstrap/fstab/chroot/bootloader mutation workflows and their handoff artifacts.
+1. live-tools owns **session UX**: shell profile, tmux/session layout, docs visibility defaults, live overlay UX, and install entrypoint launch behavior.
+2. installation owns **task UX**: disk/filesystem/bootstrap/fstab/chroot/bootloader mutation workflows and their handoff artifacts.
 
 ## Design Intent
 
@@ -36,13 +36,13 @@ For `automated_ssh` variants:
 
 ## Stage Mapping and TUI Set
 
-### 02LiveTools (session UX platform, `ux` variants only)
+### live-tools (session UX platform, `ux` variants only)
 
 - `tui-install-docs`
   - Canonical install docs/navigation surface in live environment.
-  - Intended to run as part of Stage 02 session layout (for example, tmux pane integration).
+  - Intended to run as part of live-tools session layout (for example, tmux pane integration).
 
-### 03Install (primary interactive stage)
+### installation (primary interactive stage)
 
 - `tui-disk-plan`
   - Captures disk target selection, partition strategy, and encryption options.
@@ -77,7 +77,7 @@ For `automated_ssh` variants:
 
 #### 04LoginGate Auth Boundary Policy
 
-1. Default S04+ auth boundary remains native `getty` + PAM login prompt.
+1. Default installed-system auth boundary remains native `getty` + PAM login prompt.
 2. First TUI step is post-login (`tui-firstboot-check`) as the default UX gate.
 3. A full TUI login replacement is allowed only as an explicit variant policy change, with matching updates in:
    - `distro-contract` auth declarations
@@ -277,7 +277,7 @@ Chosen: **Option B** because it gives one canonical app lineage plus a reusable 
   /AGENTS.md
   /apps
     /live-tools
-      /install-docs                    # canonical S02 docs/session UX surface
+      /install-docs                    # canonical live-tools docs/session UX surface
         /src
         /bin
         /scripts
@@ -344,7 +344,7 @@ to:
 
 1. **Phase 0 (no behavior change):** create `tui/*` tree, move packages, keep CLI wrappers.
 2. **Phase 1:** re-architect `tui/kit/core` API surface (runtime/primitives/components/patterns).
-3. **Phase 2:** repoint S02 install-docs app imports to new kit API and lock snapshots.
+3. **Phase 2:** repoint live-tools install-docs app imports to new kit API and lock snapshots.
 4. **Phase 3:** reintroduce recpart-backed install disk-plan UI at `tui/apps/install/disk-plan` on top of new kit API.
-5. **Phase 4:** implement checkpoint-scoped installer TUIs (`install/login-gate/runtime`) with contract-gated handoff artifacts.
-6. **Phase 5 (optional auth-model promotion):** if desired, add a true TUI login for S04+ as an explicit model change after contract/test parity is complete.
+5. **Phase 4:** implement product-scoped installer TUIs (`install/login-gate/runtime`) with contract-gated handoff artifacts.
+6. **Phase 5 (optional auth-model promotion):** if desired, add a true TUI login for installed-system as an explicit model change after contract/test parity is complete.

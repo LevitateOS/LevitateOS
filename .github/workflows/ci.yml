@@ -20,14 +20,15 @@ jobs:
     with:
       type: rust
 
-  # ===========================================================================
-  # Stage 1: Build all components
-  # ===========================================================================
-  build:
-    name: Build ISO
+  # Build explicit products once; all runtime checks consume those artifacts.
+  product-integration:
+    name: Products and Integration Tests
     needs: changes
     if: needs.changes.outputs.has_changes == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      RECIPE_BINARY: ${{ github.workspace }}/target/release/recipe
     steps:
       - uses: actions/checkout@v4
         with:
@@ -36,17 +37,15 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Install host dependencies
+      - name: Install Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Install host tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y \
-            squashfs-tools \
-            xorriso \
-            mtools \
-            dosfstools \
-            qemu-system-x86 \
-            qemu-utils \
-            ovmf
+          sudo apt-get install -y erofs-utils xorriso mtools dosfstools cpio zstd \
+            qemu-system-x86 qemu-utils ovmf systemd-container systemd-ukify
+          bun install --ignore-scripts
 
       - name: Cache cargo registry
         uses: actions/cache@v4
@@ -58,170 +57,72 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-registry-
 
-      # Rocky ISO is 8.6GB - use a separate cache with longer TTL
-      # GitHub Actions cache limit is 10GB per repo, so this is tight
-      - name: Cache Rocky ISO
-        uses: actions/cache@v4
-        with:
-          path: leviso/downloads/Rocky-10.1-x86_64-dvd1.iso
-          key: rocky-iso-10.1-x86_64
-          restore-keys: |
-            rocky-iso-
+      - name: Build product and scenario tools
+        run: cargo build --release -p levitate-recipe -p distro-builder -p install-tests -p rootfs-tests
 
-      - name: Cache Linux source
-        uses: actions/cache@v4
-        with:
-          path: leviso/downloads/linux
-          key: linux-source-${{ hashFiles('leviso/kconfig') }}
-
-      - name: Build recipe (package manager)
-        working-directory: tools/recipe
-        run: cargo build --release
-
-      - name: Build leviso
-        working-directory: leviso
-        run: cargo build --release
-
-      - name: Build ISO
-        working-directory: leviso
-        env:
-          RECIPE_BINARY: ${{ github.workspace }}/tools/recipe/target/release/recipe
-        run: cargo run --release -- build
-
-      - name: Upload ISO artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: levitateos-iso
-          path: leviso/output/levitateos-x86_64.iso
-          retention-days: 7
-
-      - name: Upload squashfs artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: levitateos-squashfs
-          path: leviso/output/filesystem.squashfs
-          retention-days: 7
-
-  # ===========================================================================
-  # Stage 2: Test installation (boots ISO, installs to disk)
-  # ===========================================================================
-  install-tests:
-    name: Installation Tests
-    needs: [changes, build]
-    if: needs.changes.outputs.has_changes == 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          submodules: recursive
-
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Install QEMU
+      - name: Acquire declared kernel and rootfs inputs
         run: |
-          sudo apt-get update
-          sudo apt-get install -y qemu-system-x86 qemu-utils ovmf
+          cargo xtask kernels prebuilt levitate
+          target/release/distro-builder artifact preseed-rootfs-source levitate
 
-      - name: Download ISO artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: levitateos-iso
-          path: leviso/output/
+      - name: Build live products explicitly
+        run: |
+          target/release/distro-builder release build iso live-boot levitate
+          target/release/distro-builder release build iso live-tools levitate
 
-      - name: Build install-tests
-        working-directory: testing/install-tests
-        run: cargo build --release
-
-      - name: Run installation tests
-        working-directory: testing/install-tests
-        run: cargo run --release -- run
+      - name: Verify serial, SSH, installation and runtime behavior
         timeout-minutes: 30
-
-  # ===========================================================================
-  # Stage 2b: Single-path Stage 01 parity gate
-  # ===========================================================================
-  s01-parity:
-    name: Stage 01 Parity
-    needs: [changes, build]
-    if: needs.changes.outputs.has_changes == 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          submodules: recursive
-
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Install QEMU tools
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y qemu-system-x86 qemu-utils ovmf
-
-      - name: Run Stage 01 parity boot check
         run: |
           set -euo pipefail
+          key_dir="$(mktemp -d)"
+          trap 'rm -rf "$key_dir"' EXIT
+          ssh-keygen -q -t ed25519 -N "" -f "$key_dir/key"
+          printf 'SSH_AUTHORIZED_KEY=%s\n' "$(cat "$key_dir/key.pub")" > "$key_dir/inject.env"
 
-          if ! cargo xtask kernels check levitate; then
-            cargo xtask kernels build levitate
+          cargo xtask scenarios boot live-boot levitate --inject-file "$key_dir/inject.env" --no-shell
+          cargo xtask scenarios boot live-boot levitate --inject-file "$key_dir/inject.env" --ssh --no-shell --ssh-private-key "$key_dir/key"
+          # This list is the CI coverage selection. Each scenario is also runnable directly.
+          # Installed-system scenarios consume the disk created by the install scenario.
+          for scenario in live-boot live-tools install installed-boot automated-login runtime; do
+            cargo xtask scenarios test "$scenario" levitate --inject-file "$key_dir/inject.env" --force
+          done
+
+      - name: Verify the composed product rootfs
+        timeout-minutes: 15
+        run: |
+          set -euo pipefail
+          rootfs_images=(.artifacts/out/levitate/releases/live-tools/run-*/filesystem.erofs)
+          overlay_images=(.artifacts/out/levitate/releases/live-tools/run-*/overlayfs.erofs)
+          if [ "${#rootfs_images[@]}" -ne 1 ] || [ ! -f "${rootfs_images[0]}" ] || \
+             [ "${#overlay_images[@]}" -ne 1 ] || [ ! -f "${overlay_images[0]}" ]; then
+            echo 'Expected one live-tools release with rootfs and overlay EROFS images.' >&2
+            exit 1
           fi
-
-          cargo run -p distro-builder --bin distro-builder -- iso build levitate 01Boot
-
-          tmp_key="$(mktemp)"
-          tmp_pub="${tmp_key}.pub"
-          tmp_inject="$(mktemp)"
+          inspection="$(mktemp -d "$RUNNER_TEMP/rootfs-check.XXXXXX")"
+          mkdir -p "$inspection"/{rootfs,overlay,upper,work,merged}
           cleanup() {
-            rm -f "$tmp_key" "$tmp_pub" "$tmp_inject"
+            for mountpoint in merged overlay rootfs; do
+              if mountpoint -q "$inspection/$mountpoint"; then
+                sudo umount "$inspection/$mountpoint"
+              fi
+            done
+            sudo rm -rf -- "$inspection"
           }
           trap cleanup EXIT
+          sudo mount -t erofs -o loop,ro "${rootfs_images[0]}" "$inspection/rootfs"
+          sudo mount -t erofs -o loop,ro "${overlay_images[0]}" "$inspection/overlay"
+          sudo mount -t overlay overlay \
+            -o "lowerdir=$inspection/overlay:$inspection/rootfs,upperdir=$inspection/upper,workdir=$inspection/work" \
+            "$inspection/merged"
+          target/release/rootfs-tests run --rootfs "$inspection/merged"
 
-          ssh-keygen -q -t ed25519 -N "" -f "$tmp_key"
-          printf 'SSH_AUTHORIZED_KEY=%s\n' "$(cat "$tmp_pub")" > "$tmp_inject"
-
-          cargo xtask stages boot 1 levitate --inject-file "$tmp_inject" --no-shell
-          cargo xtask stages boot 1 levitate --inject-file "$tmp_inject" --ssh --ssh-port 2222 --no-shell --ssh-private-key "$tmp_key"
-
-  # ===========================================================================
-  # Stage 3: Test rootfs (uses systemd-nspawn to test the system)
-  # ===========================================================================
-  rootfs-tests:
-    name: Rootfs Tests
-    needs: [changes, build]
-    if: needs.changes.outputs.has_changes == 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
+      - name: Upload live-tools ISO
+        uses: actions/upload-artifact@v4
         with:
-          submodules: recursive
-
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Install dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y systemd-container squashfs-tools
-
-      - name: Download squashfs artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: levitateos-squashfs
-          path: leviso/output/
-
-      - name: Extract squashfs for testing
-        run: |
-          sudo unsquashfs -d /var/lib/machines/levitate-test leviso/output/filesystem.squashfs
-
-      - name: Build rootfs-tests
-        working-directory: testing/rootfs-tests
-        run: cargo build --release
-
-      - name: Run rootfs tests
-        working-directory: testing/rootfs-tests
-        run: sudo cargo run --release -- run --rootfs /var/lib/machines/levitate-test
-        timeout-minutes: 15
+          name: levitateos-live-tools-iso
+          path: .artifacts/out/levitate/releases/live-tools/run-*/*.iso
+          if-no-files-found: error
+          retention-days: 7
 
   # ===========================================================================
   # Lint and check all crates

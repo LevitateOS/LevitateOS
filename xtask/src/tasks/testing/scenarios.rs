@@ -197,21 +197,6 @@ pub fn test(
     run_install_tests(&arg_refs, inject, inject_file)
 }
 
-pub fn test_up_to(
-    target: String,
-    distro: crate::cli::HarnessDistro,
-    inject: Option<String>,
-    inject_file: Option<PathBuf>,
-) -> Result<()> {
-    let scenario =
-        parse_scenario_name(&target).with_context(|| format!("parsing scenario '{}'", target))?;
-    run_install_tests(
-        &["--distro", distro.id(), "--up-to-scenario", scenario.key()],
-        inject,
-        inject_file,
-    )
-}
-
 pub fn status(distro: crate::cli::HarnessDistro) -> Result<()> {
     run_install_tests(&["--distro", distro.id(), "--status"], None, None)
 }
@@ -399,7 +384,6 @@ fn monitor_live_iso_serial(mut child: Child, log_path: &Path) -> Result<()> {
     let default_timeout = 120u64;
     let timeout_secs = std::env::var("LEVITATE_LIVE_BOOT_SERIAL_TIMEOUT")
         .ok()
-        .or_else(|| std::env::var("LEVITATE_STAGE01_SERIAL_TIMEOUT").ok())
         .and_then(|raw| raw.parse::<u64>().ok())
         .unwrap_or(default_timeout);
     let deadline = Instant::now() + Duration::from_secs(timeout_secs.max(1));
@@ -1061,9 +1045,8 @@ fn print_window_mode_details(window_cfg: &WindowConfig, pid: u32) {
 }
 
 fn detect_window_mode() -> Result<WindowMode> {
-    let raw = std::env::var("LEVITATE_SCENARIO_WINDOW_MODE")
-        .or_else(|_| std::env::var("LEVITATE_STAGE_WINDOW_MODE"))
-        .unwrap_or_else(|_| "remote".to_string());
+    let raw =
+        std::env::var("LEVITATE_SCENARIO_WINDOW_MODE").unwrap_or_else(|_| "remote".to_string());
     match raw.trim().to_ascii_lowercase().as_str() {
         "remote" | "vnc" | "" => Ok(WindowMode::RemoteVnc),
         "local" | "gtk" => Ok(WindowMode::LocalGui),
@@ -1101,9 +1084,7 @@ fn apply_qemu_runtime_env(
 }
 
 fn detect_local_qemu_runtime() -> Result<(PathBuf, LocalDisplayBackend)> {
-    if let Ok(raw) = std::env::var("LEVITATE_SCENARIO_WINDOW_QEMU_BIN")
-        .or_else(|_| std::env::var("LEVITATE_STAGE_WINDOW_QEMU_BIN"))
-    {
+    if let Ok(raw) = std::env::var("LEVITATE_SCENARIO_WINDOW_QEMU_BIN") {
         let candidate = PathBuf::from(raw.trim());
         return pick_local_display_backend(&candidate).map(|backend| (candidate, backend));
     }
@@ -1183,9 +1164,7 @@ fn pick_local_display_backend(qemu_bin: &Path) -> Result<LocalDisplayBackend> {
 }
 
 fn detect_vnc_bind_host() -> Result<Ipv4Addr> {
-    if let Ok(raw) = std::env::var("LEVITATE_SCENARIO_WINDOW_BIND_HOST")
-        .or_else(|_| std::env::var("LEVITATE_STAGE_WINDOW_BIND_HOST"))
-    {
+    if let Ok(raw) = std::env::var("LEVITATE_SCENARIO_WINDOW_BIND_HOST") {
         let parsed: Ipv4Addr = raw.parse().with_context(|| {
             format!("Parsing LEVITATE_SCENARIO_WINDOW_BIND_HOST as IPv4 failed: {raw}")
         })?;
@@ -1195,9 +1174,7 @@ fn detect_vnc_bind_host() -> Result<Ipv4Addr> {
 }
 
 fn detect_vnc_advertise_host() -> Result<Ipv4Addr> {
-    if let Ok(raw) = std::env::var("LEVITATE_SCENARIO_WINDOW_HOST")
-        .or_else(|_| std::env::var("LEVITATE_STAGE_WINDOW_HOST"))
-    {
+    if let Ok(raw) = std::env::var("LEVITATE_SCENARIO_WINDOW_HOST") {
         let parsed: Ipv4Addr = raw.parse().with_context(|| {
             format!("Parsing LEVITATE_SCENARIO_WINDOW_HOST as IPv4 address failed: {raw}")
         })?;

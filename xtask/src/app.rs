@@ -78,12 +78,6 @@ pub fn run(cli: crate::cli::Cli) -> Result<()> {
                 inject_file,
                 force,
             } => crate::tasks::testing::scenarios::test(target, distro, inject, inject_file, force),
-            crate::cli::ScenariosCmd::TestUpTo {
-                target,
-                distro,
-                inject,
-                inject_file,
-            } => crate::tasks::testing::scenarios::test_up_to(target, distro, inject, inject_file),
             crate::cli::ScenariosCmd::Status { distro } => {
                 crate::tasks::testing::scenarios::status(distro)
             }
@@ -159,9 +153,7 @@ fn enforce_policy_guard_placement(cmd: &crate::cli::Cmd) -> Result<()> {
                 | KernelsCmd::BuildAll { .. }
                 | KernelsCmd::Prebuilt { .. }
         } | Cmd::Scenarios {
-            cmd: ScenariosCmd::Boot { .. }
-                | ScenariosCmd::Test { .. }
-                | ScenariosCmd::TestUpTo { .. }
+            cmd: ScenariosCmd::Boot { .. } | ScenariosCmd::Test { .. }
         }
     );
     if !requires_guard {

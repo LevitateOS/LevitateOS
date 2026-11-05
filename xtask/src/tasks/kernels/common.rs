@@ -21,7 +21,7 @@ pub(crate) struct AutoFixOptions {
 
 pub(crate) fn target_for(d: crate::cli::Distro) -> KernelTarget {
     match d {
-        crate::cli::Distro::Leviso => KernelTarget {
+        crate::cli::Distro::Levitate => KernelTarget {
             distro_id: "levitate",
             kernel: &distro_spec::levitate::KERNEL_SOURCE,
             module_install_path: distro_spec::levitate::MODULE_INSTALL_PATH,

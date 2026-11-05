@@ -19,13 +19,13 @@ These rules apply to every directory and submodule, recursively, across Git repo
 - Report failures and unverified behavior honestly. Fix causes; do not fabricate success, suppress failures, or silently substitute outputs.
 
 ## Build and runtime
-- Filesystem iteration uses `02LiveTools`; scenarios may run in any order. Full checkpoint validation belongs to release preparation.
+- Filesystem iteration uses the `live-tools` product. Named integration/e2e scenarios run independently against existing artifacts; do not reintroduce numbered composition, numeric aliases, or ordered test gates.
 - Recipes own source/package facts and acquisition/build/install behavior. Rust/TOML owns orchestration, output locations, and contracts. Normal public recipes run without required defines.
 - Build payload through its producers. Keep build commands explicit; scenario commands consume existing artifacts.
 - Use `.artifacts` for current outputs and tooling. Do not bind active builds to legacy crates' download directories.
 - Reuse existing kernel artifacts during ordinary development. Rebuild kernels explicitly with `cargo xtask kernels build <distro>` or `build-all`.
 - Keep runtime checks that prevent invalid artifacts or destructive operations. Fail with useful errors.
-- For releases, produce reproducible artifacts and validate checkpoint payloads and isolation. Development convenience is not release evidence.
+- For releases, produce reproducible artifacts and validate declared products, provenance, and relevant integration/e2e behavior. Development convenience is not release evidence.
 
 ## Code ownership
 - Prefer `distro-variants/*`, `distro-builder`, `distro-contract`, `distro-spec`, `testing/*`, `tools/*`, `tui`, and `xtask` for active work. Edit legacy crates when the requested work requires it.

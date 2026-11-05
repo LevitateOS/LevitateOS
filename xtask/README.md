@@ -33,7 +33,6 @@ cargo run -p levitate-xtask -- hooks remove
 # Interactive / automated scenario loop
 cargo run -p levitate-xtask -- scenarios boot live-boot levitate
 cargo run -p levitate-xtask -- scenarios test install levitate
-cargo run -p levitate-xtask -- scenarios test-up-to runtime levitate
 cargo run -p levitate-xtask -- scenarios status levitate
 cargo run -p levitate-xtask -- scenarios reset levitate
 
@@ -79,4 +78,5 @@ The repo previously had ad-hoc shell scripts for kernel build/check. They are in
 - `cargo xtask kernels build-all`
 - `cargo xtask kernels check`
 
-Legacy `stages ...` spellings are compatibility-only and should not be used for new operator/docs examples.
+
+Scenarios run independently and consume existing artifacts. Build products explicitly with `just release-build <product> <distro>`. See the workspace `architecture.md` for ownership and output locations.

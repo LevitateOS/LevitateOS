@@ -3,8 +3,8 @@ use std::path::PathBuf;
 
 #[derive(Clone, Copy, Debug, ValueEnum)]
 pub enum Distro {
-    #[value(name = "leviso")]
-    Leviso,
+    #[value(name = "levitate")]
+    Levitate,
     #[value(name = "acorn")]
     AcornOS,
 }
@@ -247,17 +247,6 @@ pub enum ScenariosCmd {
         force: bool,
     },
 
-    /// Run all automated scenarios up to the given scenario.
-    TestUpTo {
-        target: String,
-        #[arg(value_enum, default_value_t = HarnessDistro::Levitate)]
-        distro: HarnessDistro,
-        #[arg(long, value_name = "KEY=VALUE[,KEY=VALUE...]")]
-        inject: Option<String>,
-        #[arg(long, value_name = "PATH")]
-        inject_file: Option<PathBuf>,
-    },
-
     /// Show scenario test status.
     Status {
         #[arg(value_enum, default_value_t = HarnessDistro::Levitate)]
@@ -273,7 +262,7 @@ pub enum ScenariosCmd {
 
 #[derive(Subcommand)]
 pub enum PolicyCmd {
-    /// Fail if forbidden legacy bindings appear in code/config for checkpoint wiring.
+    /// Fail if forbidden legacy bindings appear in code/config for product wiring.
     #[command(name = "audit-legacy-bindings")]
     AuditLegacyBindings,
 }

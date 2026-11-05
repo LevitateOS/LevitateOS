@@ -7,7 +7,7 @@ pub fn run(rebuild_even_if_verified: bool, autofix: super::common::AutoFixOption
     eprintln!("[info] Repo: {}", root.display());
 
     let targets = [
-        super::common::target_for(crate::cli::Distro::Leviso),
+        super::common::target_for(crate::cli::Distro::Levitate),
         super::common::target_for(crate::cli::Distro::AcornOS),
     ];
 

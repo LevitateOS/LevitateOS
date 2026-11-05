@@ -4,10 +4,7 @@ pub fn run(distro: Option<crate::cli::Distro>) -> Result<()> {
     let root = crate::util::repo::repo_root()?;
     let distros: Vec<crate::cli::Distro> = match distro {
         Some(d) => vec![d],
-        None => vec![
-            crate::cli::Distro::Leviso,
-            crate::cli::Distro::AcornOS,
-        ],
+        None => vec![crate::cli::Distro::Levitate, crate::cli::Distro::AcornOS],
     };
 
     let mut fail = false;
