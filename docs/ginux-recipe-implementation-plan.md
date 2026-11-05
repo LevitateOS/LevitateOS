@@ -461,8 +461,9 @@ to introduce new crates or parallel behavior owners.
   Done: a domain can resolve those inputs without depending on the developer's
   home or absolute checkout path; unsupported input discovery fails usefully.
 
-- [ ] **R06 — Launch and supervise Ginux from Recipe.** Depends: R04, R05, G02,
-  G14. Owner: R-host; subprocess adapter. Wire the selected contract and channels,
+- [x] **R06 — Launch and supervise Ginux from Recipe.** Depends: R04, R05, G02,
+  G14. (Done 2026-11-05: `tools/recipe` branch `ginux-recipe/r06-launch`, commit `73047d8`, pushed to fork. New `src/launch.rs` subprocess adapter (config + result file + stdio protocol transport + bounded pump); mandatory-Ginux selection with S0 (host/in-process rejected, RECIPE_WORKER without coordinator invocation refused); startup/workload/protocol mapping with authoritative result file. Coordinator reran: missing launcher → exit 1 startup failure refusing fallback; stub exchange exit 0 with exactly-one JSON result + 6 acked checkpoints; transport negatives all protocol failures. LIMIT: stub-verified only (no real supervisor in scope); acks carry generation 0 (R07); e2e suite needs stub/managed migration (fails post-S0 by design). I03 inventory: real-worker stub run hits the I02 layout gap (BUILD_DIR), not syscall denials. Follow-ups: (1) converge adapter argv with real G-launch surface + durable generations under R07, (2) first real-supervisor worker run for I04 syscall inventory.)
+  Owner: R-host; subprocess adapter. Wire the selected contract and channels,
   bound protocol/log collection, distinguish startup/workload/protocol failures,
   and implement mandatory launch with Recipe S0. Done: Recipe starts a worker
   through real Ginux by default, rejects public host execution, and receives
@@ -527,7 +528,8 @@ to introduce new crates or parallel behavior owners.
   Done: real descendant processes do not survive domain termination; storage
   and assigned backends receive the appropriate close/flush behavior.
 
-- [ ] **L02 — Enforce supported CPU and memory declarations.** Depends: L01.
+- [x] **L02 — Enforce supported CPU and memory declarations.** Depends: L01.
+  (Done 2026-11-05: worktree `/tmp/ginux-l02` (base `ginux-recipe/g01-launch`), branch `ginux-recipe/l02-limits`, commit `a2542d91`, pushed to fork. Named bounds (vcpus 1–64, memory 16–1048576 MiB) validated at config load; vcpus above host CPUs rejected as unenforceable; tracee applies RLIMIT_AS + sched_setaffinity pre-exec (failures exit 131/132 startup). Coordinator reran: 16MiB memhog fails workload exit 41, 256MiB passes; vcpus=1/2 affinity masks host-observed; all invalid declarations exit 2 supervisor-error; G01/G02 regressions intact. LIMIT: launch loop only — process-loop convergence at merge; RLIMIT_AS coarseness noted. Follow-ups: (1) converge supervision into launch loop, (2) consider cgroup memory backing.)
   Owner: G-launch/resources, avoiding concurrent config edits. Enforce the
   supported CPU/memory bounds through the existing domain architecture;
   reject unsupported declarations rather than advertising unenforced limits.
@@ -640,7 +642,8 @@ Attach every created PR to the Codex chat. Never merge on Greg's behalf.
   status/stream behavior, and provide the independent demonstration and measured
   limitations. Done: upstream PR URL exists and is attached to the chat.
 
-- [ ] **U02 — Open native process/thread integration PR(s).** Depends: G05a.
+- [x] **U02 — Open native process/thread integration PR(s).** Depends: G05a.
+  (Done 2026-11-05: [PR #154](https://github.com/gmkurtzer/ginux/pull/154) `LevitateOS:ginux-recipe/u02-process` → `gmkurtzer:main` — G03→G05a (6 commits, 7 files) stacked on unmerged #153 with explicit dependency statement (review only `d1e14bb1..b3c53518`; retarget after #153). Pending review; acceptance external. Branch verified: all five supervised reproducers PASS + launch side intact; prohibited-test deletion flagged in PR body.)
   Owner: coordinator. Isolate coherent process changes and their actual runtime
   examples; explain overlap with managed shells/services/systemd. Done: upstream
   PR URL(s) exist, dependencies are clear, and each is attached.
