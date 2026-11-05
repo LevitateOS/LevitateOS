@@ -499,6 +499,31 @@ Ignored build files remain outside the cleanliness check; recipe-specific source
 readiness still applies. Managed Ginux execution and shared-destination locking
 remain outstanding with S0/S3.
 
+Kernel ownership slice 2026-11-05: distro-builder 0dc3be7 makes linux.rhai the
+single source-kernel lifecycle owner and moves target/source facts, artifact path
+guards, and release checks into kernel/metadata.rhai. The prebuilt recipe reuses
+the target/path helpers while retaining independent pinned release facts and
+readiness rules. linux-base.rhai becomes a documented deprecated entry point to
+the canonical lifecycle, not a second implementation. Source checks now accept
+omitted optional Kconfig input and return the discovered release/build directory
+on installed reuse. Explicit artifact root, legacy target inference, force hacks,
+and source persistence still require the S2-S4 migration; this is not API 2.
+
+leviso 5e7e502 removes its unused 228-line overlay; its Rust caller already
+delegates to distro-builder's canonical recipe. With the 231-line reduction in
+the shared recipes/helpers, this removes 459 production lines. tools/recipe
+502eb3d documents the migration and extends the actual CLI cases:
+
+    cargo test -p levitate-recipe --test e2e kernel_recipes:: --offline -- --nocapture
+
+All eight cases pass, including valid and stale release/module readiness for both
+targets, independent source build versus installation checks, force precedence,
+safe cleanup/removal, and the deprecated entry point's canonical removal. They use
+disposable artifacts and prove readiness/control behavior only. No kernel was
+downloaded, built, installed on the system, or booted. Full kernel producer/module
+installation and managed Ginux execution remain unverified. Existing source and
+prebuilt curl/tar acquisition still need migration to shared checked helpers.
+
 ### S6 Migrate representative recipes and validate managed execution
 
 Dependencies: S3-S5. Status: not started.
@@ -583,8 +608,8 @@ unrelated edits and current branches. Update task status with concrete evidence
 as work lands. Temporary audit probes are useful reproductions, not durable
 acceptance artifacts; preserve needed cases in the existing integration owner.
 
-Next implementation action in this chat: consolidate the kernel recipe lifecycle
-while retaining its custom readiness and reusable metadata/config/module logic.
+Next implementation action in this chat: migrate kernel acquisition to verified
+download and safe extraction, exercising the actual producer with disposable inputs.
 Keep the concurrent
 Ginux agent's launcher/worker/coordinator work separate. Re-run implemented slices
 through the mandatory Ginux path once that agent's integration is available.
