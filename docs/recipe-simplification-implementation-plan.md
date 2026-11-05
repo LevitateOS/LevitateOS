@@ -211,6 +211,17 @@ child command fails at startup with ENOENT; isolate the device/channel/process
 cause before relaxing the contract. Evidence and exact limitations live in the
 Ginux plan; no upstream push or PR was performed.
 
+Null-device continuation 2026-11-05: actual supervisor tracing identifies the
+child helper's ENOENT as its initial `/dev/null` open. Ginux **e3458063** connects
+explicit null assignment through the existing device registry; Recipe **50edb61**
+requests it. A real Rhai helper regression writes/discards bytes, reads EOF and
+checks character-device metadata. All 16 focused CLI/library cases and all three
+native launch/storage/device suites pass; six existing device cases and release
+clippy pass. The child probe advances to an actual pipe2 (293) ENOSYS denial;
+pipes and child execution remain unfinished. S0 stays in progress. Traces, source
+and raw logs are saved under `.artifacts/ginux-local-integration/null-device/`.
+No upstream push or PR was performed.
+
 - Complete the existing Ginux launch adapter instead of adding another launcher.
   Route every executable CLI and library operation through it by default.
 - Remove public host/in-process backend selection, host defaults, and fallback.
@@ -1018,9 +1029,10 @@ unrelated edits and current branches. Update task status with concrete evidence
 as work lands. Temporary audit probes are useful reproductions, not durable
 acceptance artifacts; preserve needed cases in the existing integration owner.
 
-Next implementation action in this chat: isolate the actual child-startup
-failure after the file-producing lifecycle/cleanup/removal pass, then connect
-its required device/channel/process objects through configured supervision.
+Next implementation action in this chat: connect the domain-owned pipe2/channel
+objects now that the actual child helper opens its assigned null stdin. The
+observed next call is pipe2 (293), denied ENOSYS; preserve supervision and file/
+device descriptor ownership while implementing it, then rerun the real child.
 Extend the existing storage owner for compiler-sized files and directory
 operations; the current bounded memory backend is not compiler support. Public entry,
 prepared tool paths and bounded checkpoint waiting are connected; process-global

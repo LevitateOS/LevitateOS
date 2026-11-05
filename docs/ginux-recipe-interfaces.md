@@ -71,6 +71,16 @@ This is not retained storage, ordinary compiler support or publication. The v1
 ack generation remains placeholder 0; result generation remains null. The stable
 paths table below describes the target backing, not completed retention.
 
+Current device adapter (local Ginux e3458063, Recipe 50edb61): Recipe supplies
+`[devices].assignments = ["null"]`. The configured `/dev` view is virtual and
+immutable; image entries there are hidden. The explicitly assigned null device
+uses Ginux's existing device registry, returning EOF/discarding bounded writes
+and reporting character-device metadata. Device descriptors use a reserved range,
+with native limits constrained even for device-only configurations. Other device
+assignments and duplicate assignments fail before launch. Pipe2 and child
+execution remain unfinished; this does not enable a host device or native child
+fallback.
+
 Per invocation Recipe supplies:
 
 - A domain config document: `execution.profile = "balanced"`,

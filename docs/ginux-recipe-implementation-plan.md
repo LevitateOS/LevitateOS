@@ -206,16 +206,60 @@ Writable-file continuation 2026-11-05:
   device/channel/process operation must be isolated on configured launch.
   No syscall-cause claim or successful child execution is made.
 
-Next local action: reproduce that child-startup failure with the actual syscall
-sequence, then connect the required domain-owned device/channel/process objects
-without native child fallthrough. Replace/extend bounded storage through its
-existing owner for compiler-sized files and directory operations. Full input/
-dependency layout, target/options transport, resource enforcement, durable
-state/generations and output publication remain incomplete. The unreachable
-legacy host wrappers still need removal with R07/S7 option transport; public
-operations never invoke them. The linked review thread owns upstream review and
-PR creation. Local Ginux/Recipe commits above are review inputs, not reviewed or
-upstream-accepted changes; no push or PR was performed.
+Null-device continuation 2026-11-05:
+
+- The previous goal turn made concrete progress (managed file lifecycles and
+  tested source changes); no user/external blocker is preventing continuation.
+  The next actual child failure was isolated by tracing the supervisor's own
+  `process_vm_readv` calls, without attaching a second tracer to its worker.
+  The last copied path is `/dev/null`; the corresponding native openat returns
+  -2. The helper opens Stdio::null() before creating its stdout/stderr pipes.
+- Ginux **e3458063** projects an immutable virtual `/dev` view on configured
+  launch, empty by default. Explicit `[devices].assignments = ["null"]`
+  connects the existing ginux-devices DeviceRegistry/Null implementation.
+  Reads return EOF, bounded writes discard bytes, and stat/fstat/fstatat/statx
+  identify a character device with virtual inode and major/minor 1:3. No host
+  device node or descriptor is used. Image entries beneath `/dev` remain hidden,
+  including when no device is assigned. Unsupported/duplicate assignments fail
+  before launch. Access modes, seek, descriptor flags and close are mediated;
+  the 64 device descriptors occupy a reserved range and device-only launch also
+  clamps native limits. Duplication, device polling and other device types
+  remain unsupported on configured launch.
+- Files and devices reuse controlled guest-memory copying and stat serialization
+  in tracee_io.rs. Configured object resolution is centralized in dispatch.rs;
+  device handles resolve before filesystem rejection of unknown virtual FDs.
+  No writable native syscall, native child, or host-device fallback was enabled.
+- Fresh release build and release clippy with `-D warnings` pass. The actual
+  launch, storage and new launch-devices suites all pass. Device integration
+  covers IO/metadata/access/close, invalid/read-only copyout, descriptor exhaustion,
+  assignment errors, image preservation/hiding, fresh instances, and both
+  device-only and storage-plus-device configurations. All six existing device
+  unit cases pass. Makefile producers/scenarios and existing Linux CI include
+  the device fixture; upstream tests remain intact.
+- Recipe **50edb61** explicitly assigns null. A new actual Rhai helper check
+  writes bytes to `/dev/null`, reads EOF, distinguishes it from a regular file,
+  and sees `/dev` as a directory, while preserving source. The complete focused
+  real checks pass: 13 managed CLI cases, two worker-entry guards and one
+  library-default case (16 total). Commands/environment and raw output are in
+  `.artifacts/ginux-local-integration/null-device/checks.json` and adjacent logs.
+- The same actual image-child probe now opens the owned null handle
+  (1073741824), then fails at **pipe2 (293), denied ENOSYS (-38)**, and closes
+  the null handle. This is a changed, observed failure, not successful child
+  execution. Before/after supervisor audits and VM-copy traces, source and CLI
+  stdout/stderr are retained in that artifact directory. The child recipe
+  remains unchanged, fails explicitly in build and acknowledges zero checkpoints.
+
+Next local action: connect domain-owned pipe2/channel descriptors through the
+existing channel/process owners and configured dispatch, including safe copyout,
+EOF/backpressure and descriptor lifecycle, then rerun this child reproducer to
+expose the next actual spawn requirement. Preserve supervision before enabling
+any child to run. Replace/extend bounded storage through its existing owner for
+compiler-sized files and directory operations. Full input/dependency layout,
+target/options transport, resources, durable state/generations and publication
+remain incomplete. Unreachable legacy host wrappers still need removal with
+R07/S7 option transport; public operations never invoke them. The linked review
+thread owns upstream review and PR creation. Local commits are review inputs,
+not reviewed or upstream-accepted changes; no push or PR was performed.
 
 Recovery checkpoint: active skill `hdae-development`, discovery path
 `/home/vince/.codex/worktrees/ginux-recipe-local-integration/ginux/.agents/skills/hdae-development/SKILL.md`;
