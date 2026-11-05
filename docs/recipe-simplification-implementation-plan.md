@@ -524,6 +524,26 @@ downloaded, built, installed on the system, or booted. Full kernel producer/modu
 installation and managed Ginux execution remain unverified. Existing source and
 prebuilt curl/tar acquisition still need migration to shared checked helpers.
 
+Kernel acquisition slice 2026-11-05: distro-builder d21aaa0 migrates source and
+prebuilt acquisition to the shared SHA256-before-publication download and native
+safe extraction helpers. Prebuilt scratch cleanup now runs after acquisition
+failure, and its filesystem publication uses native helpers rather than quoted
+shell strings. tools/recipe b1fbc25 runs the actual prebuilt recipe lifecycle with
+fixture URL/digest facts and disposable tar.xz artifact trees:
+
+    cargo test -p levitate-recipe --test e2e kernel_acquisition:: --offline -- --nocapture
+    cargo test -p levitate-recipe --test e2e downloads:: --offline -- --nocapture
+
+The new producer case passes for a valid payload and rejects wrong digests,
+truncated HTTP responses, missing modules, and an escaping symlink before replacing
+prior artifacts. Failed attempts remove extraction scratch and preserve unrelated
+downloads. The valid path passes all three custom readiness checks. All eight
+existing download cases also pass with the binary-capable loopback fixture.
+Socket permission is required by the sandbox. These inputs are not bootable
+kernels; no kernel was compiled or booted. Source acquisition's changed branches
+were parsed through CLI checks but were not run end to end. Managed Ginux
+acquisition/publication and interruption recovery remain outstanding.
+
 ### S6 Migrate representative recipes and validate managed execution
 
 Dependencies: S3-S5. Status: not started.
@@ -608,8 +628,9 @@ unrelated edits and current branches. Update task status with concrete evidence
 as work lands. Temporary audit probes are useful reproductions, not durable
 acceptance artifacts; preserve needed cases in the existing integration owner.
 
-Next implementation action in this chat: migrate kernel acquisition to verified
-download and safe extraction, exercising the actual producer with disposable inputs.
+Next implementation action in this chat: unify Recipe engine/setup semantics,
+starting with initialization-once and consistent invocation globals. Worker/launcher
+integration remains coordinated with the Ginux owner.
 Keep the concurrent
 Ginux agent's launcher/worker/coordinator work separate. Re-run implemented slices
 through the mandatory Ginux path once that agent's integration is available.
