@@ -118,3 +118,7 @@
 	path = tools/recshuttle
 	url = git@github.com:LevitateOS/recshuttle.git
 	branch = master
+[submodule "tools/ginux"]
+	path = tools/ginux
+	url = git@github.com:LevitateOS/ginux.git
+	branch = main

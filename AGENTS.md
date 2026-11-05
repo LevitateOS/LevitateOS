@@ -10,6 +10,8 @@ These rules apply to every directory and submodule, recursively, across Git repo
 - Use the existing owner of a behavior. Prefer a small direct change over a new framework or parallel implementation.
 - Preserve unrelated edits. Do not commit secrets, caches, or generated junk.
 - Development submodules may follow their working branches. A checkout differing from the superproject pin is normal, not a development failure. Require exact pins only when reproducing or preparing a release.
+- Never create, switch, or rename Git branches without the user's explicit permission. Commit on whatever branch is checked out, including `master`/`main`, in the superproject and in every submodule.
+- Commit early and often. Commit each coherent, working step as it lands rather than batching a session's work into one large commit at the end.
 
 ## Validation
 - Unit testing, including assertion-based unit doctests, is prohibited. Do not add, retain, run, require, or replace unit tests with renamed equivalents, snapshots of isolated helpers, or mock-only unit suites.
