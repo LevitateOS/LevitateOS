@@ -564,8 +564,9 @@ to introduce new crates or parallel behavior owners.
   Done: build/install locations are known and initially empty; local acquisition
   behavior and cache/toolchain inputs are documented honestly.
 
-- [ ] **I03 — Inventory the first actual worker/compiler incompatibilities.**
-  Depends: I02, R06, G09, G12a. Owner: Integration; execute real Recipe/Cargo under
+- [x] **I03 — Inventory the first actual worker/compiler incompatibilities.**
+  Depends: I02, R06, G09, G12a. (Done 2026-11-05: `docs/ginux-i03-inventory.md`. Real worker (242 MB dynamic) + `cargo --version` under the integration supervisor (`e7936f57`, rebuilt fresh): both die exit 127 silent in loader startup; harness baseline PASS, fd1/fd2 control proves the silence is the loader's. Denial order (host-strace reconstruction, stated as such): brk → mmap → access/openat (ld.so.cache, liblzma) → fstat. Classified: memory-mapping → new M1; library file access → M2 (G-files); loader metadata → M3 (G-files, needs G07 merge); H1–H6 unreached (death precedes Rhai eval); R06/G14 + L02 nothing failed. I04 follow-ups named: M1 mmap/brk/mprotect, M2 openat/read-on-domain-fd, M3 faccessat/newfstatat. LIMIT: host-exec fall-through (242 MB unstaged); no /inputs in this loop; silent denials; R06/G14 transport unexercised.)
+  Owner: Integration; execute real Recipe/Cargo under
   Ginux with captured diagnostics. Classify failures by existing owner. Done:
   concrete missing operations are identified without silent fallback or fabricated
   outputs. This task does not itself promise the build succeeds.
