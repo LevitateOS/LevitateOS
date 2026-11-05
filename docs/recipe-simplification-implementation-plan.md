@@ -444,9 +444,9 @@ for real Ginux storage and recovery evidence.
 
 ### S4 Unify lifecycle and dependency semantics
 
-Dependencies: S2, S3. Status: readiness adapter and producer rechecks implemented
-independently in 930d153; managed verification, migration, and remaining lifecycle
-and dependency work pending.
+Dependencies: S2, S3. Status: readiness adapter/producer rechecks (930d153) and
+optional cleanup/shared cleanup errors (f097670) implemented independently;
+managed verification, migration, and the common dependency executor remain pending.
 
 - Implement ready/needs_work/error handling and keep all three independent custom
   checks. Preserve check-returned context. Migrate repository checks together with
@@ -465,6 +465,41 @@ Evidence: real dependency-built tools are consumed by a parent recipe; missing
 transitive dependencies/cycles fail usefully; check errors do not trigger a
 successful reinstall; custom readiness detects stale version/configuration even
 when files exist. These runtime cases run through the required Ginux path.
+
+Optional cleanup slice 2026-11-05: tools/recipe f097670 removes the install-time
+cleanup requirement and consolidates normal/dependency cleanup in core/runner.rs.
+An absent hook is a no-op for legacy and API 2 recipes. Manual cleanup returns
+initialized ctx without removing products or emitting a cleanup checkpoint when
+the hook is absent. A present hook must accept ctx and reason; malformed hooks
+fail before recipe setup in install, manual cleanup, and dependency preparation.
+Successful cleanup still carries returned ctx forward. Errors during success
+cleanup fail the command; errors during failure cleanup are reported without
+replacing the primary failure. Retained-storage interruption/scratch recovery
+remains part of S3/R07; this slice does not establish that behavior.
+
+The CLI fixture writer no longer inserts a cleanup stub into every recipe. Five
+real CLI cases in tests/e2e/cleanup.rs cover omitted hooks with an executable
+installed/run, reason/context propagation through acquire/build/install and
+manual cleanup, success/secondary cleanup failures, malformed-hook rejection
+before setup, and dependency cleanup failure stopping the parent. The legacy
+refresh case now declares its meaningful cleanup explicitly; inherited cleanup
+no longer needs a fixture workaround. Author guidance and man pages describe
+optional cleanup and its error behavior.
+
+    cargo check -p levitate-recipe --lib --offline
+    cargo test -p levitate-recipe --test e2e --no-run --offline
+
+Both compilation commands pass. The focused optional-cleanup CLI case attempted
+the real tools/ginux/target/x86_64-unknown-linux-gnu/release/ginux launcher; it fails
+before recipe execution with the same oversize first frame (1195986517 bytes,
+limit 4194304) and missing result file. No new cleanup runtime case has passed;
+all five still require managed execution evidence. No native bypass or stub
+launcher was used to obtain a lifecycle result.
+
+distro-builder 5354025 removes five empty production cleanup hooks from Alpine
+preseeding and the DVD/Linux/leviso/QEMU tool recipes. ca41220 keeps the leviso
+cache-retention comment accurate. Meaningful cleanup hooks remain; the removals
+and comments pass diff checks, but those recipes have not run through Ginux.
 
 ### S5 Consolidate acquisition and recipe-owned shared facts
 
@@ -719,9 +754,9 @@ unrelated edits and current branches. Update task status with concrete evidence
 as work lands. Temporary audit probes are useful reproductions, not durable
 acceptance artifacts; preserve needed cases in the existing integration owner.
 
-Next implementation action in this chat: implement optional cleanup and explicit
-invocation context; revalidate the shared invocation slice when R06/G14 transport
-works with the real launcher. Keep the legacy adapter until recipes migrate. The
+Next implementation action in this chat: implement explicit invocation context;
+revalidate invocation/cleanup through the real launcher when R06/G14 converge.
+Keep the legacy adapter until recipes migrate. The
 complete dependency executor and durable state integration still follow their
 shared S3/R07 contracts. Worker/launcher integration remains with the Ginux owner.
 Keep the concurrent
