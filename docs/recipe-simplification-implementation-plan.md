@@ -755,6 +755,31 @@ work/cache directories and source-cache UI hint, managed publication/integrity,
 and the remaining acquisition helpers. The named-path consumer layer is not
 evidence that those responsibilities are complete.
 
+Explicit preseed contract slice 2026-11-05: distro-contract d2b6693 and
+distro-builder c949481 let either source kind declare its acquisition script and
+required named output kinds.
+Canonical Acorn declares its Alpine preseed script with iso/apk_tools files;
+Levitate declares its Fedora preseed script with an iso file. A declaration needs
+both the script and nonempty output contracts; unknown kinds fail parsing.
+Recipe filenames no longer select preseed capability. Rust retains source kinds
+for policy and explicit compatibility conveniences, while materialization and
+preseeding each use one runner. Preseeding remains a separate command. The CLI
+validates the contract before source operations, and reports selected output
+paths rather than guessing a trust directory from an ISO parent. Alpine accepts
+the common ROOTFS_SOURCE_FORCE_REFRESH request with its legacy alias retained.
+
+    cargo check -p distro-builder --bins --lib --offline
+    cargo test -p distro-builder --test preseed_contract --offline -- --nocapture
+
+Compilation and all three actual CLI cases pass. The cases copy canonical recipe
+and variant files, confirm filenames alone do not enable preseeding, rename both
+declared scripts, and reject incomplete or invalid output declarations before
+recipe launch. The renamed case reaches the real Recipe executable and fails
+closed without GINUX_BIN. No managed acquisition or output publication is proved.
+R07 still needs to transport refresh/options and explicit input/cache paths;
+R08 still owns publication. Legacy adapter cache paths and basename inference
+remain outstanding, alongside actual managed runtime verification.
+
 ### S6 Migrate representative recipes and validate managed execution
 
 Dependencies: S3-S5. Status: not started.
@@ -839,8 +864,8 @@ unrelated edits and current branches. Update task status with concrete evidence
 as work lands. Temporary audit probes are useful reproductions, not durable
 acceptance artifacts; preserve needed cases in the existing integration owner.
 
-Next implementation action in this chat: replace filename-based preseed capability
-detection with explicit orchestration metadata and finish cache/work path ownership.
+Next implementation action in this chat: finish cache/work path ownership after
+the explicit preseed capability declaration slice.
 Target/state transport follows the coordinated S3/R07 change. Revalidate the
 invocation, cleanup, and output contracts through the real launcher when
 R06/G14 converge. Keep the legacy adapter until recipes migrate. The

@@ -3,3 +3,5 @@ schema_version = 6
 [ring3_sources.rootfs_source]
 kind = "recipe_custom"
 recipe_script = "distro-builder/recipes/alpine-live-source-rootfs.rhai"
+preseed_recipe_script = "distro-builder/recipes/alpine-preseed-source-assets.rhai"
+preseed_outputs = { iso = "file", apk_tools = "file" }
