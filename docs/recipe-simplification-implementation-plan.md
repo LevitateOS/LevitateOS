@@ -243,6 +243,18 @@ Kconfig. The two new cases failed before the change; all six kernel CLI cases
 passed afterward. No caller/launcher/worker/coordinator code changed. Managed
 Ginux revalidation remains outstanding.
 
+Child output slice: tools/recipe 4cde8fd streams exec child stdout to Recipe stderr
+while retaining the documented status return. The actual CLI case runs a child
+that emits both streams and exits 23, explicitly handles that status, writes a
+payload, and verifies parseable final JSON and stderr diagnostics:
+
+    cargo test -p levitate-recipe --test e2e process:: --offline -- --nocapture
+
+Before the change, JSON parsing failed on the child stdout prefix. The case passed
+afterward. Rhai built-in print/debug routing still awaits the common engine
+factory/worker integration; the exec change alone does not complete S1 output
+discipline or prove managed Ginux behavior.
+
 ### S2 Unify setup and command execution
 
 Dependencies: S1 where overlapping. Status: not started.
@@ -436,7 +448,7 @@ unrelated edits and current branches. Update task status with concrete evidence
 as work lands. Temporary audit probes are useful reproductions, not durable
 acceptance artifacts; preserve needed cases in the existing integration owner.
 
-Next implementation action in this chat: address helper output routing and
-independent preseed refresh/trust checks. Keep the concurrent
+Next implementation action in this chat: consolidate independent preseed readiness
+checks so refresh is honored and same-size corruption is rejected. Keep the concurrent
 Ginux agent's launcher/worker/coordinator work separate. Re-run implemented slices
 through the mandatory Ginux path once that agent's integration is available.
