@@ -417,6 +417,25 @@ socket binding. The GitHub caller shares the compiled writer; its external API
 was not exercised. These pre-S0 CLI checks do not establish mediated Ginux network
 behavior, which remains outstanding with the rest of S5.
 
+Resume slice 2026-11-05: tools/recipe e01540f routes HTTP resume through the same
+staging/publication owner as ordinary and GitHub downloads. It handles ureq's
+416 error response explicitly, requires an exact 206 remainder range and matching
+length, requests identity encoding, and replaces the destination only after the
+complete response is staged. Failed attempts preserve the old destination and
+discard that attempt's new bytes; staging requires space for a full replacement.
+A matching size on 416 is explicitly not integrity proof. Recipe digest checks
+remain required. The public Rust import from the torrent module remains an alias.
+
+    cargo build -p levitate-recipe --bin recipe --offline
+    cargo test -p levitate-recipe --test e2e downloads:: --offline -- --nocapture
+
+Four new CLI cases reproduced published partial files, rejected valid 416, and
+accepted incorrect ranges before the fix. All six download cases now pass against
+a real loopback HTTP fixture, including seven invalid/interrupted resume responses,
+successful resumed installation, and matching/mismatching totals. Compilation
+also passes. The checks require sandbox socket permission and are pre-S0 evidence;
+managed networking and digest-verified publication remain outstanding.
+
 ### S6 Migrate representative recipes and validate managed execution
 
 Dependencies: S3-S5. Status: not started.
@@ -501,7 +520,7 @@ unrelated edits and current branches. Update task status with concrete evidence
 as work lands. Temporary audit probes are useful reproductions, not durable
 acceptance artifacts; preserve needed cases in the existing integration owner.
 
-Next implementation action in this chat: repair retained HTTP resume behavior
-and consolidate acquisition publication. Keep the concurrent
+Next implementation action in this chat: add digest verification before download
+publication, then share recipe-owned source facts. Keep the concurrent
 Ginux agent's launcher/worker/coordinator work separate. Re-run implemented slices
 through the mandatory Ginux path once that agent's integration is available.
