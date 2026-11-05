@@ -447,14 +447,49 @@ tracked pthreads and shared descriptor ownership on the existing local branch:
   not-ready probe now fails at its intentional readiness rule after command
   completion; the new case supplies proper readiness and exposes the log gap.
 
-Next local action: deliver bounded child diagnostics through the worker and host
-coordinator, keeping supervisor audit bytes separate and JSON/protocol results
-intact. The current v1 transport accepts only request/checkpoint/ack/failure/
-result; use an explicit versioned transport change if adding diagnostic frames,
-not stderr parsing or an in-place payload reinterpretation. Re-run and complete
-managed_bash_child_writes_domain_files_and_keeps_logs_out_of_json, then commit
-that retained case with the working diagnostic change. Keep the mandatory
-launcher and custom readiness checks. S0/S1 remain in progress.
+Managed-diagnostic continuation 2026-11-05: Recipe **096a656/0ffa1bf** completes
+the retained child-output case with worker transport v2:
+
+- Op 6 carries typed stdout/stderr/Recipe diagnostic byte arrays. Child binary
+  output, Rhai print/debug/log/warn and phase narration reach CLI stderr without
+  parsing supervisor audit or contaminating JSON. The worker installs its sink
+  explicitly after validating the private request; environment flags do not
+  install or select it. All thread sends and checkpoint/result frames share the
+  sender lock; it is released before waiting for checkpoint acks.
+- Diagnostic messages hold at most 768 bytes. Reads/writes are chunked at 4096
+  bytes so larger valid contexts cross the configured console ABI. The worker
+  and host independently enforce 16 MiB/32768-message budgets. One empty marker
+  reports truncation, excess output continues draining, and lifecycle/result
+  frames still complete. Transport failure prevents successful termination.
+  Ginux config/result schema remains 1; Recipe API 2 is independent. Historical
+  v1 payload documentation is retained; future incompatible persistence is v3.
+- All 20 focused actual CLI/library cases pass: 15 managed cases, three entry
+  guards and one library case in the grouped run, plus a separate frame-budget
+  case. The formerly failing Bash case now checks exact installed domain bytes,
+  both streams, NUL/0xff bytes, Rhai print/debug/warn, a 32 KiB context, clean JSON,
+  no supervisor-audit leakage and source immutability. Two actual excess-output
+  cases prove byte and message truncation while preserving later readiness and
+  result. A real private-entry negative rejects v1 before any recipe setup.
+- CLI build, integration compilation and examples compile. Strict Clippy was
+  attempted and remains red on 11 findings in unchanged executor, invocation,
+  torrent and input files; no clean strict-lint result is claimed. No unit tests
+  were added or run for Recipe. Ginux code is unchanged this slice.
+- Evidence, commands/environment, the grouped 19-case logs, separate frame-limit
+  result, binary identity and the next probe are under
+  `.artifacts/ginux-local-integration/diagnostic-transport/`. The previously
+  uncommitted child regression is now committed and passing. Live-peer
+  complete-frame deadlines, durable logging/state and cancellation remain open.
+
+Next local action: connect owned-pipe nonblocking ioctl and readiness, starting
+with the actual captured-output helper. A new real exec_output Bash probe fails
+before its readiness query returns: ioctl **FIONBIO 0x5421** on public fd 4 returns
+ENOTTY, and Rust std's process-output implementation unwraps that read_output
+error. The worker exits 101; Ginux reaps it and the child. The local std source
+and ptrace registers identify this call. Implement the pipe operation through
+its existing status owner with validated copyin, then inspect/implement the
+subsequent poll path rather than allowing raw private handles or catching the
+panic to fabricate success. Retain the capture stdout/stderr contract and add a
+real successful capture case. S0/S1/S2 remain in progress.
 Compiler-sized storage/directory operations, full input/dependency layout,
 target/options transport, resources, durable state/generations, publication and
 unreachable legacy-wrapper removal remain incomplete. The linked review thread

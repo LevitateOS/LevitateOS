@@ -290,6 +290,23 @@ under `.artifacts/ginux-local-integration/thread-supervision/`. Threaded exec,
 robust futexes and broader runtime support remain incomplete. S0 stays in progress;
 no push or PR occurred.
 
+Managed-diagnostic continuation 2026-11-05: Recipe **096a656/0ffa1bf** delivers
+bounded human diagnostics over transport v2. Child stdout/stderr, binary bytes,
+Rhai print/debug/log/warn and phase narration reach CLI stderr while machine JSON
+stays intact. Shared sending prevents interleaved frames. Byte and message caps
+report once and keep draining without skipping lifecycle checks/results. Frame IO
+is chunked to fit the Ginux console contract, including a 32 KiB context. All
+20 focused actual CLI/library cases pass. The prior child-log regression is now
+committed and passing. Config schema 1 and Recipe API 2 stay independent; future
+incompatible state transport is v3, recorded in the interface document.
+
+Build and integration/example compilation pass. Strict Clippy reports 11 findings
+in unchanged files and is not clean. Ginux is unchanged this slice; no push or PR
+occurred. The next real capture-helper probe fails at pipe FIONBIO (0x5421), with
+owned-descriptor readiness still needed. S0 remains in progress. Commands, logs,
+limits and the next failure are under
+`.artifacts/ginux-local-integration/diagnostic-transport/`.
+
 - Complete the existing Ginux launch adapter instead of adding another launcher.
   Route every executable CLI and library operation through it by default.
 - Remove public host/in-process backend selection, host defaults, and fallback.
@@ -429,6 +446,16 @@ those child diagnostics disappear. Source/JSON assertions pass before the log
 assertion. Keep the case uncommitted until bounded diagnostic transport preserves
 and surfaces both child streams separately from machine results. No assertion
 has been removed, and no log parsing or host execution fallback is authorized.
+
+Diagnostic transport completion for this slice 2026-11-05: tools/recipe
+**096a656** makes the retained child-output CLI regression pass without removing
+its assertions. Twenty actual CLI/library cases cover byte-preserving child and
+Rhai diagnostics, machine JSON, source immutability, large context framing, both
+diagnostic limits, and previous-version rejection before setup. Logging is
+explicitly versioned transport v2; it does not interpret supervisor stderr or
+change readiness. Durable log storage, complete-frame deadlines and the broader
+S1 acceptance remain unfinished. Streaming helpers work for the demonstrated
+lifecycle; captured helpers expose the separate pipe ioctl/readiness gap.
 
 ### S2 Unify setup and command execution
 
@@ -1117,16 +1144,16 @@ unrelated edits and current branches. Update task status with concrete evidence
 as work lands. Temporary audit probes are useful reproductions, not durable
 acceptance artifacts; preserve needed cases in the existing integration owner.
 
-Next implementation action in this chat: fix successful child diagnostic
-transport through the worker/coordinator and complete the retained CLI case
-managed_bash_child_writes_domain_files_and_keeps_logs_out_of_json. Bash now runs,
-returns 0 and produces exact domain bytes; shared threads, pinned IO, joins and
-group teardown have real coverage. The remaining assertion catches diagnostics
-silently discarded with the coordinator's temporary log. Keep machine results
-separate, preserve both streams with bounds, and version any protocol change
-explicitly; do not parse supervisor stderr into control messages. The case is
-uncommitted and failing, while the 16 established managed cases pass. Broader
-threaded exec/signal/robust-futex/readiness semantics remain incomplete. Extend the existing storage owner for compiler-sized files and directory
+Next implementation action in this chat: implement owned-pipe FIONBIO and
+readiness for the actual exec_output capture path. The new probe gets ENOTTY
+from ioctl 0x5421 on fd 4 and std read_output panics; ptrace and local std source
+identify the operation. Use the existing pipe status and descriptor owners with
+validated guest copyin, then wire the following poll path and verify stdout
+capture/stderr diagnostics through the actual CLI. The diagnostic slice is
+committed: the former child-log case and all 20 focused cases pass. Keep machine
+results separate, custom checks authoritative and the launcher mandatory. Broader
+threaded exec/signal/robust-futex/readiness, complete-frame deadlines, durable
+logging/state and cancellation remain unfinished. Extend the existing storage owner for compiler-sized files and directory
 operations; the current bounded memory backend is not compiler support. Public entry,
 prepared tool paths and bounded checkpoint waiting are connected; process-global
 dependency environment cleanup remains outstanding. Explicit cache/input and dependency-state

@@ -7,16 +7,15 @@ implementation lanes build against. Ginux owns §2 stream/result behavior and
 its config/parser changes. Recipe owns §4 framing and the worker/host split.
 
 Direction update 2026-11-05: Ginux is mandatory for executable recipe operations;
-macOS support is deferred. Sections 1–6 retain the existing v1 interface
-reference. Sections 4 and 5 describe legacy worker/persistence behavior; they
-must not be used to implement new source-rewriting or public host bypass paths.
-Section 7 defines the target migration and supersedes those behaviors. This
-document change does not claim
-that the new execution policy or transport revision is implemented.
+macOS support is deferred. The current worker transport is v2 (section 4.1).
+Section 4 retains the original v1 payload/persistence reference; it does not
+authorize source rewriting or public host bypasses. Section 7 defines the
+separate state migration, which will require transport v3. Recipe API 2, Ginux
+config schema 1 and worker transport versions describe independent contracts.
 
 ## 1. Versioning and failure reporting
 
-- Worker protocol version: `1` (`u32`, every frame header). Version mismatch is
+- Current worker protocol version: `2` (`u32`, every frame header). Version mismatch is
   a `protocol` failure: the receiver aborts, the host reports failure, and no
   retry is attempted on the same invocation.
 - Ginux `DomainConfig.schema_version` stays `1`. Recipe generates config text
@@ -177,6 +176,44 @@ version change for incompatible payloads. Ginux's byte channel is unchanged.
   exit without `result`, or a nonzero exit, is a `protocol`/`workload`
   failure using the §2 result file, retaining the last acked pair.
 
+### 4.1 Current diagnostic transport v2
+
+The coordinator and worker now use header version 2 and reject version 1 before
+recipe setup. Framing stays bounded to 4 MiB with 14-byte headers, independent
+per-direction sequence numbers and strict direction checks. Ops 1–5 retain
+their v1 payload shapes for now; generation 0 is still a placeholder, not a
+claim of durability. No runtime version fallback or source-writing is added.
+
+Op 6 is worker→host diagnostic only:
+
+    {"stream":"stdout|stderr|recipe","data":[0,255,...],"truncated":false}
+
+`stream` distinguishes child stdout/stderr and Recipe narration/print/debug/log/
+warn. `data` is a JSON byte array, preserving non-UTF-8 bytes. A data frame has
+1–768 bytes; an empty frame is valid only with `truncated:true`. Diagnostic
+fields have no result, checkpoint, installation or filesystem authority. The
+coordinator writes these bytes only to CLI stderr; JSON results stay on stdout.
+Supervisor stderr remains an opaque separately drained audit stream. It is
+never parsed as a control message or mixed into successful user diagnostics.
+
+All worker sends share a sender lock, including output-reader threads. Frames
+cannot interleave. Checkpoint sends release the lock before waiting for ack.
+Reads/writes use at most 4096 bytes per IO call, so large legal contexts still
+cross the configured console surface. This does not change the frame-size cap.
+
+The invocation budget is 16 MiB of raw diagnostic bytes or 32768 data frames,
+whichever is reached first. If more output arrives, the worker sends exactly one
+empty truncation marker, then keeps draining without sending further diagnostic
+frames. The coordinator checks both budgets and marker order independently,
+emits one truncation notice, and continues accepting lifecycle frames/results.
+Limits do not turn a failed recipe into success. A broken diagnostic transport
+prevents successful termination. A finished operation closes diagnostic sending
+before its terminal frames. A live peer stalled inside a frame still needs the
+complete-frame timeout/cancellation work; the current wait bounds header arrival.
+
+The real CLI cases cover binary bytes, Rhai logging, large contexts, concurrent
+child readers, the byte and frame budgets, and v1 rejection before setup.
+
 ## 5. Environment and private worker bootstrap
 
 - Worker environment is an explicit allowlist only. PATH searches
@@ -302,10 +339,10 @@ host. Ginux transports that closure; the shared Recipe executor determines which
 checks and phases actually run. The dependency graph CLI case requires an actual
 C compiler in the prepared domain and does not substitute a host-built tool.
 
-Keep the current v1 framing/payload reference intact while its callers exist.
-Implement incompatible request/checkpoint/result changes as transport v2 with
-matching coordinator and worker changes and explicit mismatch rejection. Recipe
-API 2 and transport v2 are independent versions. In the replacement checkpoint,
+Keep the historical v1 framing/payload reference and current v2 diagnostic
+contract distinct. Implement incompatible request/checkpoint/result changes as
+transport v3 with matching coordinator and worker changes and explicit mismatch
+rejection. Recipe API 2 and worker transport v3 are independent versions. In the replacement checkpoint,
 state and outputs replace main_ctx/base_ctx/base_path as persistence data; input
 source identity belongs to prepared inputs, not to a write destination. Keep the
 existing bounded framing, sequencing, failure reporting, and opaque Ginux channel.
