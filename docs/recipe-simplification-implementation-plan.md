@@ -436,6 +436,19 @@ successful resumed installation, and matching/mismatching totals. Compilation
 also passes. The checks require sandbox socket permission and are pre-S0 evidence;
 managed networking and digest-verified publication remain outstanding.
 
+Digest-publication slice 2026-11-05: tools/recipe 84d5e46 adds optional recipe-owned
+SHA256 arguments to `download`, `download_with_resume`, and
+`github_download_release`, sharing the existing hash implementation. Supplied
+digests are validated before acquisition and checked on staged bytes before
+replacement. Resume's 416 reuse verifies the existing file when a digest is
+supplied. Legacy calls still require separate hash verification. No package
+digest or source facts were added to Rust. All eight download CLI cases pass,
+including new valid/corrupt transfers with absent/existing destinations and
+valid/corrupt resumed/416 reuse. Corruption never reaches installation or replaces
+the old destination in these cases. The GitHub path compiles against the shared
+writer but its external discovery/download was not exercised. Managed Ginux
+network/storage evidence and recipe migration remain outstanding.
+
 ### S6 Migrate representative recipes and validate managed execution
 
 Dependencies: S3-S5. Status: not started.
@@ -520,7 +533,7 @@ unrelated edits and current branches. Update task status with concrete evidence
 as work lands. Temporary audit probes are useful reproductions, not durable
 acceptance artifacts; preserve needed cases in the existing integration owner.
 
-Next implementation action in this chat: add digest verification before download
-publication, then share recipe-owned source facts. Keep the concurrent
+Next implementation action in this chat: share recipe-owned source facts and
+verification between preseed producers and consumers. Keep the concurrent
 Ginux agent's launcher/worker/coordinator work separate. Re-run implemented slices
 through the mandatory Ginux path once that agent's integration is available.
