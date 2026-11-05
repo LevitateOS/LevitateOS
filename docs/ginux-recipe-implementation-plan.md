@@ -171,19 +171,35 @@ total. Input kinds/targets/modes participate in retained identity. Indexed priva
 staging avoids collisions between input names and coordinator metadata. All 44
 managed integration scenarios pass, including a real 513 MiB asset and rejected
 oversized/escaping/cyclic inputs (/tmp/recipe-assets-regression.log).
-Current action: verify the canonical recfstab consumer recipe and builder explicit
-input/state adapter (uncommitted in distro-builder). A full source compile,
-version check, installation and publication already passed in 51 seconds compile
-time (/tmp/recipe-recfstab-canonical.{stdout,stderr}); the real consumer scenario
-is checking reuse/removal/reinstall/cleanup with the published executable
-(/tmp/builder-recfstab-consumer.log). Next wire these imports into materializers
-and migrate source/cache assumptions. All commits remain local; no branch or
-pull request has been published.
+Distro-builder `97ce3a9` adds the canonical API 2 recfstab recipe and an explicit
+input/retained-state adapter. A real full source compile, version check, install
+and publication passed (51 seconds compile time). A six-invocation builder case
+passed installation, reuse, removal, expected not-ready, reinstallation and
+cleanup using that published executable, preserving input bytes and prior
+publications. Evidence: /tmp/recipe-recfstab-canonical.{stdout,stderr},
+/tmp/builder-recfstab-consumer.log. Existing install_tools/materializer callers
+still need migration; this is one verified consumer surface, not all consumers.
+Recipe `3e340a8` adds leased coordinator scratch pools. All 44 managed checks
+passed, including concurrent active-directory preservation, actual SIGKILL and
+next-invocation reclamation. A final removal-race correction passed the focused
+scenario again (/tmp/recipe-scratch-{regression,final}.log). Leases stay with the
+supervisor and are closed before guest execution; retained state/publications
+are not pruned. Older unleased temporary roots are not automatically removed.
+Recipe `f79ad61` rejects persistent legacy execution before evaluating setup. The
+real dependency suite exposed setup running before the previous late rejection;
+that is corrected. Four dependency cases now pass, including two compiled C tools,
+transitive tool lookup, retained files/state/reuse, cycle/missing/declaration
+errors and early legacy rejection (/tmp/recipe-dependencies-final.log).
+Current action: finish owned interpreter-chain handling using the preserved work
+as a reference, with actual direct/recursive interpreter, failure and reference-
+lifetime scenarios. The stash itself remains preserved. Then continue consumer
+source/cache migration and the remaining filesystem capability work.
+All changes remain local; no branch or pull request has been published.
 Remaining: source assets and representative consumers; owned interpreter-chain
 stash, Ginux SQLite locking warning, temporary-root cleanup and broader integration
 limitations listed above still need attention. SIGKILL stops workload processes and recovery works,
-but can leave temporary prepared roots; automatic generation cleanup is also
-unfinished. Cargo global-cache SQLite locking warnings remain unresolved.
+and newly leased prepared roots are reclaimed on the next invocation. Older
+unleased roots and automatic retained-generation cleanup remain unfinished. Cargo global-cache SQLite locking warnings remain unresolved.
 Evidence: `/tmp/ginux-{noctty,cwd,packet,channel-bounds,exe-link,path-probe,memfd}-*`,
 `/tmp/recipe-{long-input,deadline,cancel}-*`,
 `/tmp/ginux-compiler-probe.{stdout,stderr}`, `/tmp/ginux-recfstab-probe.stderr`.
