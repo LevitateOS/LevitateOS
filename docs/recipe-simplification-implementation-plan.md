@@ -267,7 +267,24 @@ The two cases reproduced ignored refresh and accepted same-size corruption befor
 the fix. They now pass for valid cache reuse, all three check operations, corruption
 of each asset, and the supported refresh variables. Vendor source facts in the
 real recipes remain unchanged. Rootfs consumer marker checks and failed RPM
-extraction still need fixes; managed Ginux verification remains outstanding.
+extraction still needed fixes at this point; the following slice addresses them.
+Managed Ginux verification remains outstanding.
+
+Large-asset diagnostics: tools/recipe 8737107 routes SHA/BLAKE3 progress to stderr.
+The real CLI case process::cli_large_asset_hash_progress_does_not_corrupt_json
+failed on malformed JSON before the fix and passed afterward for SHA256 and
+BLAKE3 against a 101 MiB sparse asset. This covers the large-file path used by
+ISO verification, which the small preseed fixtures do not exercise.
+
+Consumer integrity slice: distro-builder a45fa88 verifies both cache and staged
+asset contents before reuse and changes the RPM extraction pipeline from ignored
+status to checked shell execution with diagnostics. tools/recipe 4178701 adds
+preseed_recipes::cli_rootfs_consumers_reject_changed_cache_and_staged_assets;
+it reproduced accepted same-size corruption and now passes for both materializers,
+including Alpine's ISO and APK. Existing unrelated account/package edits in those
+same files were preserved and excluded from the commit. The actual RPM pipeline
+failure path and full managed materialization still require runtime verification;
+the consumer case checks acquisition/readiness only and does not prove those paths.
 
 ### S2 Unify setup and command execution
 
@@ -462,7 +479,7 @@ unrelated edits and current branches. Update task status with concrete evidence
 as work lands. Temporary audit probes are useful reproductions, not durable
 acceptance artifacts; preserve needed cases in the existing integration owner.
 
-Next implementation action in this chat: fix rootfs consumer trust checks and
-RPM extraction failure propagation, preserving unrelated materializer edits. Keep the concurrent
+Next implementation action in this chat: consolidate independent command helpers
+and add checked argv execution with cwd/environment options. Keep the concurrent
 Ginux agent's launcher/worker/coordinator work separate. Re-run implemented slices
 through the mandatory Ginux path once that agent's integration is available.
