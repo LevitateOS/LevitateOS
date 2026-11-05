@@ -165,9 +165,20 @@ socket readiness. The private signal mask and descriptor are created after the
 root exec stop. Real 10,000-syscall checks take 0.121 seconds without control and
 0.153 with it, including inherited ignored SIGCHLD. Checkpoint, storage, task,
 thread and all existing unit/static checks pass (/tmp/ginux-event-{test,static}.log).
-Current action: complete explicit source assets (large files, contained source
-links/empty directories), then migrate representative consumers. All commits
-remain local; no branch or pull request has been published.
+Recipe `adcedd0` preserves empty directories and contained relative source links,
+validates complete link chains, and streams inputs up to 16 GiB/file and 32 GiB
+total. Input kinds/targets/modes participate in retained identity. Indexed private
+staging avoids collisions between input names and coordinator metadata. All 44
+managed integration scenarios pass, including a real 513 MiB asset and rejected
+oversized/escaping/cyclic inputs (/tmp/recipe-assets-regression.log).
+Current action: verify the canonical recfstab consumer recipe and builder explicit
+input/state adapter (uncommitted in distro-builder). A full source compile,
+version check, installation and publication already passed in 51 seconds compile
+time (/tmp/recipe-recfstab-canonical.{stdout,stderr}); the real consumer scenario
+is checking reuse/removal/reinstall/cleanup with the published executable
+(/tmp/builder-recfstab-consumer.log). Next wire these imports into materializers
+and migrate source/cache assumptions. All commits remain local; no branch or
+pull request has been published.
 Remaining: source assets and representative consumers; owned interpreter-chain
 stash, Ginux SQLite locking warning, temporary-root cleanup and broader integration
 limitations listed above still need attention. SIGKILL stops workload processes and recovery works,

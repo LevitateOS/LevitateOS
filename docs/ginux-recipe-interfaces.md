@@ -325,13 +325,14 @@ rules remain recipe-owned. A host pathname supplied as a define does not import
 an asset or grant the worker access to it.
 
 Current R05 preparation exposes explicit file/tree imports through --input and
-the library, with a 512 MiB per-file and 2 GiB total limit. Tree inputs preserve
-relative paths up to 247 bytes (plus /inputs/ and NUL in the launcher buffer),
-reject symlinks, and omit root .git/target. These bounds still cannot accommodate
-the canonical Fedora DVD. R07/input
-integration must provide bounded support for the selected real assets and expose
-their domain paths before materializer cache inference can be removed end to end.
-This is an outstanding interface requirement, not completed transport evidence.
+the library, with streamed bounds of 16 GiB per file, 32 GiB total and 100,000
+entries. Tree inputs preserve relative paths up to 247 bytes, empty directories
+and relative symlinks confined to the selected tree. Link chains are expanded
+before processing parent components; escapes, cycles and excluded .git/target
+references fail. Root .git/target are omitted. File bytes, modes, entry kinds and
+link targets participate in retained identity. A real 513 MiB import succeeds;
+oversized input and malicious-link cases fail before execution. Large asset
+transport is available; materializer cache selection still needs migration.
 
 Protocol v5 checkpoints name a canonical `/inputs/...rhai` recipe and its
 JSON-object state; requests supply the matching per-recipe saved states. The
@@ -343,7 +344,7 @@ also checkpoint discovered state. Sources are never rewritten.
 
 R05 discovery now follows extends/imports and literal deps/build_deps arrays,
 preserving nested source/module references. Explicit --input selections stage
-regular files and trees; symlinks are rejected. Dynamic declarations fail during
+regular files and trees with confined source symlinks. Dynamic declarations fail during
 preparation. Static preparation must fail
 usefully for unsupported dynamic discovery rather than evaluating recipes on the
 host. Ginux transports that closure; the shared Recipe executor determines which
