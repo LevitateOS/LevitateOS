@@ -90,6 +90,18 @@ preflight, so the next adapter revision must provide a common table of small
 public descriptors while retaining private backend handles. Raw pipe-data tests
 are not evidence of successful libc spawn. Keep the byte protocol unchanged.
 
+Current descriptor adapter (Ginux 3b00c1c8) supersedes the sparse public
+ranges mentioned above. One table allocates up to 256 small public descriptors
+across image files, writable files, devices, pipes and stdio. Backend handles
+remain private. Aliases share an open description and retain it through the last
+close; public descriptor flags remain independent. Native operations translate
+arguments/results, including mmap, and restore argument registers at exit. Real
+soft/hard limits are capped at 256, preserving lower operator limits; reporting
+is not inflated. Libc spawn preflight succeeds. The configured task loop still
+denies clone3/clone: inheritance, peer scheduling and child teardown are next.
+Relative directory-fd access and readiness beyond original bootstrap consoles
+remain unsupported. The worker byte protocol is unchanged.
+
 Per invocation Recipe supplies:
 
 - A domain config document: `execution.profile = "balanced"`,

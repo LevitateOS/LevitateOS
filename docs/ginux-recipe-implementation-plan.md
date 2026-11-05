@@ -285,15 +285,53 @@ Owned-pipe continuation 2026-11-05:
   its author guide to the observed behavior; executable code is unchanged from
   50edb61. Local Ginux changes remain in this attached worktree for review.
 
-Next local action: replace separate public handle ranges with one bounded table
-of small public descriptors for immutable-image files, writable files, devices,
-pipes and stdio. Keep backend handles private; reserve/commit native opens and
-translate descriptor-bearing calls (including mmap), close and duplication through
-that table. Preserve shared open-description state and cross-owner replacement.
-Do not inflate reported limits to make the sparse handles pass libc preflight.
-Rerun the actual child probe, then integrate process/thread ownership, peer
-scheduling and teardown before allowing a child to run. This is the pending
-G07/G05a convergence on configured launch, not completion of old demo records.
+Shared-descriptor continuation 2026-11-05:
+
+- Ginux **3b00c1c8** replaces separate public ranges with a common table of
+  256 small descriptors for image files, writable files, null, pipes and stdio.
+  Lowest-free allocation reserves before open/create/truncate, with rollback
+  on failure. Only actually open bootstrap stdio is registered. Backend handles
+  remain private; forged old handle values return EBADF. Aliases across owners
+  share offsets/lifetimes; descriptor flags are independent. Last-alias close
+  releases the backend, including a supervised native close when needed.
+- Native opens commit their kernel result into the reserved public slot.
+  Native IO/metadata/mmap translate handles and restore syscall arguments at
+  exit; replaced native fd numbers can be reused without changing an owned
+  descriptor's meaning. Stdio cannot become a file mapping or directory view.
+  Native fcntl locks, leases and signal-ownership operations are denied.
+  The obsolete pipe-specific duplication/creation-copyout path is removed.
+- The real native soft/hard limit is capped at 256, preserving lower operator
+  limits; public allocation uses the same lower bound. No limit reporting was
+  inflated. Runtime NOFILE changes are explicitly denied for now. Relative
+  directory-fd access, readiness beyond original bootstrap consoles, inherited
+  per-process tables, peer scheduling and actual exec-time CLOEXEC remain
+  incomplete. The table is currently used by one configured task.
+- Five real Ginux suites pass: launch, storage, devices, pipes and new fds.
+  The latter checks cross-owner/stdout replacement, native reuse/mmap, shared
+  file offsets, argument-register preservation, private-handle rejection,
+  exhaustion without truncation, fresh launch, and a real lower limit of eight.
+  Existing fixtures keep their data/negative assertions and now expect small
+  public numbers; no raw syscall success is used to claim child execution.
+  Release build/clippy with `-D warnings` pass. Makefile/CI include the explicit
+  descriptor producer/scenario. All 16 real focused Recipe CLI/library cases pass.
+- The unchanged actual child probe now passes libc preflight and reaches
+  **clone3 (435), then clone (56), both denied ENOSYS**. No child runs; the
+  worker returns a structured build failure with zero checkpoints and exits
+  normally. Before/after audits, source, stdout/stderr, commands/environment,
+  all five Ginux suite logs and the 16-case logs are retained under
+  `.artifacts/ginux-local-integration/shared-descriptors/`.
+- Recipe **6bbb9a3** updates author guidance to current behavior; executable
+  Recipe code is unchanged. The previous goal turn and this turn both made
+  concrete implementation/runtime progress; there is no external blocker.
+
+Next local action: connect configured process supervision to the observed spawn
+path, with task identity, fork/vfork/clone and exec events, per-process descriptor
+inheritance and owned-backend references that survive either parent or child
+closing its aliases. Keep every new task stopped until its ownership is installed;
+use current x86-64 ABI definitions rather than copying the old demo's unchecked
+constants/fallthrough. Wire waits, peer wakeup and complete teardown before
+claiming a working child. Preserve the existing ProcessTable owner. This remains
+G03/G05a integration on configured launch, not completion of old demo records.
 Compiler-sized storage/directory operations, full input/dependency layout,
 target/options transport, resources, durable state/generations, publication and
 unreachable legacy-wrapper removal remain incomplete. The linked review thread

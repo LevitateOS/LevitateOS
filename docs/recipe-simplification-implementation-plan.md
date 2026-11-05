@@ -234,6 +234,17 @@ substitute inflated limit reporting for that convergence. Multi-task scheduling
 and complete child execution remain unfinished; S0 stays in progress. Evidence
 is in `.artifacts/ginux-local-integration/owned-pipes/`; no push or PR occurred.
 
+Shared-descriptor continuation 2026-11-05: Ginux **3b00c1c8** provides one
+bounded table of small public descriptors across image/file/device/pipe/stdio
+owners, with shared offsets/lifetimes, cross-owner aliases and checked native
+translation. Actual limits are capped at 256 while preserving a lower operator
+limit; reporting is not inflated. Five real Ginux runtime suites and all 16
+focused actual Recipe CLI/library cases pass. The real child helper gets past
+libc's fd preflight and reaches clone3/clone ENOSYS denials. Process/thread
+supervision, inherited tables/backend references, peer scheduling and exec
+semantics are next; S0 remains in progress. Evidence lives under
+`.artifacts/ginux-local-integration/shared-descriptors/`; no push or PR occurred.
+
 - Complete the existing Ginux launch adapter instead of adding another launcher.
   Route every executable CLI and library operation through it by default.
 - Remove public host/in-process backend selection, host defaults, and fallback.
@@ -1041,12 +1052,11 @@ unrelated edits and current branches. Update task status with concrete evidence
 as work lands. Temporary audit probes are useful reproductions, not durable
 acceptance artifacts; preserve needed cases in the existing integration owner.
 
-Next implementation action in this chat: converge the current file/device/
-pipe/stdio public descriptors into one bounded table of small numbers. The real
-child helper now creates pipes but libc rejects sparse handles against the
-reported limit before clone/exec. Translate native image operations through the
-same table, preserve backend ownership/alias lifetime and rerun the real child;
-then connect process/thread ownership, peer scheduling and teardown.
+Next implementation action in this chat: connect configured task supervision,
+per-process descriptor inheritance and owned-backend lifetimes for the observed
+clone3/clone spawn path. Libc preflight now succeeds with the common small-fd
+table. Every child must be supervised and registered before running; waits,
+peer scheduling and teardown must converge through the existing process owner.
 Extend the existing storage owner for compiler-sized files and directory
 operations; the current bounded memory backend is not compiler support. Public entry,
 prepared tool paths and bounded checkpoint waiting are connected; process-global
