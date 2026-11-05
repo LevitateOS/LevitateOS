@@ -404,15 +404,57 @@ local integration branch implements image execve/execveat:
   live under `.artifacts/ginux-local-integration/exec-supervision/`. These are
   real privileged chroot runs using the pinned Rocky image and actual worker.
 
-Next local action: support the observed pthread shape through tracked task and
-shared descriptor ownership. Separate per-task pending descriptor-call state from
-the process-wide table before sharing it for CLONE_FILES. Reuse ProcessTable's
-thread/tgid model, project native TID copyouts, and connect clear-TID/futex/join and
-per-thread exit without releasing peers' file handles. Keep fork snapshots and
-exec ownership coherent under concurrent calls; do not simply allow the flags.
-Then rerun the unchanged actual Bash helper and add a durable successful managed
-child case when it works. Thread creation and broader wait/signal/readiness
-semantics remain incomplete; this remains G03/G05a configured-launch integration.
+Configured-thread continuation 2026-11-05: Ginux **928dc9a1/e59e2e61** adds
+tracked pthreads and shared descriptor ownership on the existing local branch:
+
+- Per-task DescriptorCall transactions are separate from shared process tables.
+  The observed x86-64 clone shape 0x3d0f00 registers before execution and shares
+  the table. getpid uses tgid, gettid uses virtual TID; native PARENT_SETTID
+  copyout is suppressed and replaced with virtual identity at birth. Clear-TID
+  and ordinary native futex waits/wakes support joins. Failed native thread
+  creation rolls back without changing the caller's TID slot.
+- Blocked owned IO pins its original handle through a peer close/reuse. Native
+  open/close transactions remain per task; fork waits for table mutations and
+  holds a snapshot barrier until child birth. Threads share process child waits,
+  with a zombie reservation preventing duplicate concurrent reaps. Thread exit
+  retains peer handles, and leader exit waits for remaining threads before the
+  process ends. Whole-group signal/failure teardown reaps native TIDs and releases
+  pins, aliases and process records. Unpublished creation reservations roll back
+  if their creator dies. Read-only getcwd is mediated inside the chroot.
+- Exec still requires a sole process leader; other threaded exec forms fail
+  explicitly. PI futex operations are rejected before they can write native owner
+  TIDs. Robust owner-death behavior, broader clone/wait/signal variants and full
+  readiness remain unfinished; this is not complete Linux threading support.
+- Release build/clippy with -D warnings, 14 core/process cases, and eight actual
+  Ginux suites pass. The new thread suite verifies virtual TIDs, shared close/
+  offsets, blocked-read pinning across fd reuse, native-fd concurrency and fork
+  snapshots, fork from a nonleader, 16-task bounds/reuse, native rollback, leader
+  exit, nonleader exec rejection and /proc-confirmed whole-group teardown on root
+  signal and supervisor failure. Makefile/CI retain this producer and scenario.
+- The new actual Recipe CLI case now runs Bash, gets child code 0, checks exact
+  domain-file bytes through independent readiness checks, installs/rechecks them,
+  returns a named output, parses clean JSON and preserves recipe source. Its
+  worker reports ok=true and two checkpoints. The case then **fails** because
+  child-stdout/child-stderr are absent from CLI diagnostics: run_domain drains
+  them into a temporary combined log and discards it after success. This case
+  remains uncommitted at tools/recipe/tests/e2e/managed_inputs.rs; do not weaken
+  its output assertions or call it passed. Recipe **437c325** updates the guide.
+- All 16 previously established actual CLI/library cases pass separately, with
+  the new diagnostic case explicitly excluded and recorded as failing. Raw logs,
+  commands/environment, exact failure line, prerequisite assertions, build
+  identity and source snapshot are under
+  `.artifacts/ginux-local-integration/thread-supervision/`. The earlier always-
+  not-ready probe now fails at its intentional readiness rule after command
+  completion; the new case supplies proper readiness and exposes the log gap.
+
+Next local action: deliver bounded child diagnostics through the worker and host
+coordinator, keeping supervisor audit bytes separate and JSON/protocol results
+intact. The current v1 transport accepts only request/checkpoint/ack/failure/
+result; use an explicit versioned transport change if adding diagnostic frames,
+not stderr parsing or an in-place payload reinterpretation. Re-run and complete
+managed_bash_child_writes_domain_files_and_keeps_logs_out_of_json, then commit
+that retained case with the working diagnostic change. Keep the mandatory
+launcher and custom readiness checks. S0/S1 remain in progress.
 Compiler-sized storage/directory operations, full input/dependency layout,
 target/options transport, resources, durable state/generations, publication and
 unreachable legacy-wrapper removal remain incomplete. The linked review thread

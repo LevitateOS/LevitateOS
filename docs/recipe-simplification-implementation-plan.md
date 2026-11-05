@@ -272,6 +272,24 @@ wait/signal/readiness semantics; generated-file execution still awaits storage.
 S0 remains in progress. Evidence is in
 `.artifacts/ginux-local-integration/exec-supervision/`; no push or PR occurred.
 
+Configured-thread continuation 2026-11-05: Ginux **928dc9a1/e59e2e61** tracks
+the observed pthread shape, shares descriptor tables with independent syscall
+transactions, publishes virtual TIDs, supports clear-TID joins, pins blocked IO
+through peer fd reuse, coordinates fork snapshots, and retains handles after
+thread/leader exit. Whole-group termination reaps all native tasks. Eight actual
+Ginux suites, 14 core/process cases and release build/clippy pass.
+
+The added real CLI child case now proves Bash exit 0, exact child-produced domain
+bytes, custom readiness and installation rechecks, named output, clean JSON and
+source immutability. It still fails its child-log assertions because successful
+stderr is drained into a temporary coordinator log and discarded. Keep this
+uncommitted case and its assertions; diagnostic transport is the next S0/S1
+slice. The 16 previously established managed cases pass separately; do not count
+the new case as passed. Recipe **437c325** corrects author guidance. Evidence is
+under `.artifacts/ginux-local-integration/thread-supervision/`. Threaded exec,
+robust futexes and broader runtime support remain incomplete. S0 stays in progress;
+no push or PR occurred.
+
 - Complete the existing Ginux launch adapter instead of adding another launcher.
   Route every executable CLI and library operation through it by default.
 - Remove public host/in-process backend selection, host defaults, and fallback.
@@ -402,6 +420,15 @@ no surviving child. All 16 focused managed CLI/library checks pass after rebuild
 The first-reader failure is directly reproduced; second-reader cleanup still
 needs a runtime resource-limit case once tracked threads are available. This
 does not establish successful command execution or complete S1 acceptance.
+
+Child diagnostic continuation 2026-11-05: the actual threaded Bash helper now
+runs and produces verified domain files, but the new CLI case fails after the
+successful lifecycle because run_domain only retains stderr in an invocation-
+temporary file. Its successful LaunchReport is reduced to context/summary, and
+those child diagnostics disappear. Source/JSON assertions pass before the log
+assertion. Keep the case uncommitted until bounded diagnostic transport preserves
+and surfaces both child streams separately from machine results. No assertion
+has been removed, and no log parsing or host execution fallback is authorized.
 
 ### S2 Unify setup and command execution
 
@@ -1090,16 +1117,16 @@ unrelated edits and current branches. Update task status with concrete evidence
 as work lands. Temporary audit probes are useful reproductions, not durable
 acceptance artifacts; preserve needed cases in the existing integration owner.
 
-Next implementation action in this chat: connect the observed pthread clone
-shape to tracked tasks and shared descriptor ownership. Exec replacement and
-CLOEXEC now have real runtime coverage; the actual helper advances into the
-image's dynamic loader but fails to create its output reader thread. Separate
-per-task pending descriptor-call state before sharing the table, preserve
-process/thread identity and TID copyouts, and connect clear-TID/futex/join and
-thread exit without closing peers' handles. Keep fork/exec snapshots coherent
-under concurrent calls; broadening the syscall allowlist is insufficient. The
-reader error is now structured and the child reaped. Broader runtime semantics
-remain unfinished. Extend the existing storage owner for compiler-sized files and directory
+Next implementation action in this chat: fix successful child diagnostic
+transport through the worker/coordinator and complete the retained CLI case
+managed_bash_child_writes_domain_files_and_keeps_logs_out_of_json. Bash now runs,
+returns 0 and produces exact domain bytes; shared threads, pinned IO, joins and
+group teardown have real coverage. The remaining assertion catches diagnostics
+silently discarded with the coordinator's temporary log. Keep machine results
+separate, preserve both streams with bounds, and version any protocol change
+explicitly; do not parse supervisor stderr into control messages. The case is
+uncommitted and failing, while the 16 established managed cases pass. Broader
+threaded exec/signal/robust-futex/readiness semantics remain incomplete. Extend the existing storage owner for compiler-sized files and directory
 operations; the current bounded memory backend is not compiler support. Public entry,
 prepared tool paths and bounded checkpoint waiting are connected; process-global
 dependency environment cleanup remains outstanding. Explicit cache/input and dependency-state
