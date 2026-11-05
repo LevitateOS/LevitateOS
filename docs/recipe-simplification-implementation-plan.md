@@ -481,9 +481,10 @@ for real Ginux storage and recovery evidence.
 
 ### S4 Unify lifecycle and dependency semantics
 
-Dependencies: S2, S3. Status: readiness adapter/producer rechecks (930d153) and
-optional cleanup/shared cleanup errors (f097670) implemented independently;
-managed verification, migration, and the common dependency executor remain pending.
+Dependencies: S2, S3. Status: readiness adapter/producer rechecks (930d153),
+optional cleanup/shared cleanup errors (f097670), and the common non-resumable
+dependency lifecycle (3a462ce) implemented independently. Managed verification,
+migration, dependency input closure, and durable dependency checkpoints remain pending.
 
 - Implement ready/needs_work/error handling and keep all three independent custom
   checks. Preserve check-returned context. Migrate repository checks together with
@@ -537,6 +538,44 @@ distro-builder 5354025 removes five empty production cleanup hooks from Alpine
 preseeding and the DVD/Linux/leviso/QEMU tool recipes. ca41220 keeps the leviso
 cache-retention comment accurate. Meaningful cleanup hooks remain; the removals
 and comments pass diff checks, but those recipes have not run through Ginux.
+
+Shared dependency lifecycle slice 2026-11-05: tools/recipe 3a462ce removes the
+separate acquire/install and retry implementation in core/build_deps.rs. Every
+needed dependency now enters the common install executor, including transitive
+deps/build_deps, optional build hooks, check-returned context, API 2 producer/final
+checks, cleanup handling, and the same retry eligibility as its parent. The
+invocation owns a shared tools prefix and canonical-path cycle stack. Cycles are
+rejected before another lock/evaluation; depth is bounded to 64 active recipes.
+Work directories under .deps include a source-path hash to distinguish equal
+names; this is not S3 durable input identity. Names cannot traverse parents, and
+malformed dependency arrays/entries fail instead of silently dropping tools.
+Diamond graph branches still call custom readiness rather than memoizing success.
+
+The existing v1 checkpoint cannot identify a dependency separately from its
+parent. Persistent worker dependency execution now fails before dependency setup
+with a non-resumable-mode remediation. With --no-persist-ctx, dependency phases
+have no independent checkpoint/state acknowledgements; parent checkpoints still
+report through the existing sink. Dependency ctx is never substituted for the
+parent snapshot, and dependency sources are never rewritten. R07 must replace
+this explicit temporary restriction and its v1-specific regression case with
+per-recipe identity/state tied to acknowledged filesystem generations. State/output
+locking and complete recovery remain S3/R07 work; this does not complete S4.
+
+    cargo check -p levitate-recipe --lib --offline
+    cargo test -p levitate-recipe --test e2e --no-run --offline
+
+Both compile. Six literal Rhai fixtures also compile with cached Rhai 1.19.0 and
+optimization disabled, without evaluating recipe code. Four retained CLI cases
+cover a transitive dependency actually compiled with cc and consumed by its
+parent (including inherited/imported helpers and a diamond reuse check), cycles,
+missing/invalid declarations, broken custom checks, and the v1 persistence
+restriction. No kernel build is involved. The graph attempt through the actual
+Ginux release launcher fails before Rhai with the same oversized frame
+(1195986517 versus 4194304) and no result file. No dependency graph runtime case
+has passed; the C compiler has not run inside Ginux. R05 currently collects
+extends/imports but not deps/build_deps, so dependency closure staging is another
+explicit R07/R10 handoff in the interface document. No worker, launcher, backend,
+or input-preparation implementation was changed by this slice.
 
 ### S5 Consolidate acquisition and recipe-owned shared facts
 
@@ -930,8 +969,9 @@ unrelated edits and current branches. Update task status with concrete evidence
 as work lands. Temporary audit probes are useful reproductions, not durable
 acceptance artifacts; preserve needed cases in the existing integration owner.
 
-Next implementation action in this chat: complete the shared dependency lifecycle
-semantics while explicit cache/input transport is coordinated with R07. Remaining
+Next implementation action in this chat: remove process-global dependency
+environment mutation through the existing subprocess owner while explicit
+cache/input and dependency-state transport are coordinated with R07. Remaining
 legacy adapter cache/work paths and materializer cache inference still need
 migration using that input contract. Kernel and preseed callers share the
 canonical work path; torrent/Fedora publication code now awaits managed evidence.

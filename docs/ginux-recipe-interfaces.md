@@ -207,6 +207,24 @@ integration must provide bounded support for the selected real assets and expose
 their domain paths before materializer cache inference can be removed end to end.
 This is an outstanding interface requirement, not completed transport evidence.
 
+Dependency checkpoints also require explicit recipe identity. The current v1
+checkpoint contains only a main-recipe context, so it cannot safely carry a
+dependency's context. The shared dependency executor rejects persistent worker
+dependency execution under v1 before dependency setup. With persistence disabled,
+dependency phases run without independent checkpoint acknowledgements; parent
+checkpoints still use the existing v1 stream, and no resumable dependency state
+is claimed. Dependency source files remain unchanged. R07 must replace this
+restriction with per-recipe state/identity associated with acknowledged storage
+generations; never serialize a dependency as the parent's main context.
+
+R05's current discovery follows extends/imports, but does not stage recipes named
+by deps/build_deps. Input integration must include the declared dependency
+closure and preserve source/module references. Static preparation must fail
+usefully for unsupported dynamic discovery rather than evaluating recipes on the
+host. Ginux transports that closure; the shared Recipe executor determines which
+checks and phases actually run. The dependency graph CLI case requires an actual
+C compiler in the prepared domain and does not substitute a host-built tool.
+
 Keep the current v1 framing/payload reference intact while its callers exist.
 Implement incompatible request/checkpoint/result changes as transport v2 with
 matching coordinator and worker changes and explicit mismatch rejection. Recipe
