@@ -1,6 +1,6 @@
 # Recipe simplification implementation plan
 
-Status: planned; implementation has not started under this plan.
+Status: implementation in progress, one coherent slice at a time.
 Updated: 2026-11-05.
 
 Make recipes smaller by consolidating execution, state handling, and common
@@ -14,7 +14,7 @@ discussion. The [Ginux implementation plan](ginux-recipe-implementation-plan.md)
 continues to own Ginux integration tasks. This plan owns Recipe semantics and
 recipe migration, and specifies the persistence adjustment needed by that work.
 Task identifiers express implementation dependencies, not runtime stages or
-mandatory approval gates. This planning request does not start implementation.
+mandatory approval gates. Implementation was requested after this plan was written.
 
 ## Requirements to preserve
 
@@ -162,6 +162,9 @@ outside this artifact-production change.
 
 Dependencies: Ginux R05, G02, G14 and launch/input work. Status: not started.
 Implement together with R06 as one coordinated delivery.
+The concurrent Ginux implementation agent owns launch/worker/coordinator changes.
+This chat implements independent Recipe slices and integrates with those changes
+when available; it does not take over Ginux implementation.
 
 - Complete the existing Ginux launch adapter instead of adding another launcher.
   Route every executable CLI and library operation through it by default.
@@ -183,7 +186,7 @@ protocol probes alone do not establish this behavior.
 
 ### S1 Fix immediate correctness defects
 
-Dependencies: none. Status: not started.
+Dependencies: none. Status: in progress.
 
 - In distro-builder/recipes/linux-base.rhai and linux.rhai, initialize cleanup
   targets and reject empty/shared-root deletion; align remove with actual install
@@ -203,6 +206,20 @@ reject archive escape, produce parseable JSON/framed output, honor forced work,
 and fail on broken extraction. Fixes can be developed while S0 is underway;
 completed runtime verification requires S0. No kernel compilation or real system
 installation.
+
+Progress 2026-11-05: tools/recipe a3ecaa8 rejects unsafe ZIP members and existing
+symlinks at destination ancestors, destination root, nested directories, and leaf
+files. It shares the tar path guard, reports metadata/permission errors, and
+preserves valid executable payloads and contained tar links. Actual CLI checks:
+
+    cargo test -p levitate-recipe --test e2e archives:: --offline -- --nocapture
+
+Before the fix, two negative CLI cases failed because extraction reported
+success. After the fix, all four archive CLI cases passed, including the four
+symlink positions and a tar regression case. These use the current pre-S0 CLI
+implementation and prove the helper/CLI behavior only. The required managed
+Ginux rerun remains outstanding; S1 is not complete. No launch, worker, coordinator,
+or tools/ginux source was changed by this slice.
 
 ### S2 Unify setup and command execution
 
@@ -377,8 +394,7 @@ unrelated edits and current branches. Update task status with concrete evidence
 as work lands. Temporary audit probes are useful reproductions, not durable
 acceptance artifacts; preserve needed cases in the existing integration owner.
 
-Next implementation action: re-read current R05/R06 launch work, apply S0 in its
-existing owner, and develop independent S1 fixes alongside it. Build Recipe and
-the required environment explicitly; run the focused CLI cases through Ginux
-when those artifacts are ready. This plan is ready for implementation when that
-work is requested.
+Next implementation action in this chat: fix S1 kernel cleanup/remove in the
+existing recipe owner and verify against disposable artifacts. Keep the concurrent
+Ginux agent's launcher/worker/coordinator work separate. Re-run implemented slices
+through the mandatory Ginux path once that agent's integration is available.
