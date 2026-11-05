@@ -192,6 +192,21 @@ evidence. Consumer filesystem-kind checks supplement custom readiness and the
 coordinator's publication guarantees; they do not grant host-path authority.
 This bridge is still pending; named-output declarations alone do not implement it.
 
+Preseeded source assets are explicit inputs to a materializer. The builder selects
+the canonical host cache through orchestration metadata; input preparation maps
+selected assets and any recipe-used trust records into the domain. The worker
+receives their domain paths through invocation inputs rather than reconstructing
+a sibling downloads directory from BUILD_DIR. Filenames, hashes, and verification
+rules remain recipe-owned. A host pathname supplied as a define does not import
+an asset or grant the worker access to it.
+
+Current R05 preparation supports extra regular files internally, with a 512 MiB
+per-file and 2 GiB total limit. The public R06 coordinator supplies no extra
+assets, and those bounds cannot accommodate the canonical Fedora DVD. R07/input
+integration must provide bounded support for the selected real assets and expose
+their domain paths before materializer cache inference can be removed end to end.
+This is an outstanding interface requirement, not completed transport evidence.
+
 Keep the current v1 framing/payload reference intact while its callers exist.
 Implement incompatible request/checkpoint/result changes as transport v2 with
 matching coordinator and worker changes and explicit mismatch rejection. Recipe

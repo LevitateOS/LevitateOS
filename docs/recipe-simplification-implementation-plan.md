@@ -805,6 +805,47 @@ does not establish artifact reuse or production inside Ginux. The legacy
 Alpine/package/tool paths and materializer cache-input inference still need
 migration. Explicit worker target/options/cache transport remains S2/S3/R07.
 
+Torrent publication slice 2026-11-05: tools/recipe b76d093 makes both torrent
+forms use a private staging directory under the selected destination. It resolves
+and validates every metadata path before starting payload writes, rejects unsafe
+existing destination parents/entries, and stops the session before validation and
+publication. Completed regular files must match declared lengths and are flushed
+before rename. Legacy calls copy existing cache files into staging for the
+client's piece-checked reuse. Multi-file publication is atomic per completed file,
+not a transaction over the whole set; an export failure can leave a subset of
+complete files. Process termination can leave hidden staging, which is not
+automatically resumed or treated as a completed cache entry.
+
+The four-argument torrent(url, dest_dir, filename, sha256) form requires exactly
+the requested basename, acquires a fresh replacement, and verifies the recipe's
+SHA256 before replacing an old entry. distro-builder 272d62b migrates Fedora to
+that form and removes filename-normalization and destructive refresh/failure
+cleanup. Its checksum-manifest validation and custom readiness/content/marker
+checks remain. A failed transfer or digest check no longer intentionally deletes
+the old ISO and trust marker. The recipe removes 34 net lines.
+
+    cargo check -p levitate-recipe --lib --offline
+    cargo test -p levitate-recipe --test e2e --no-run --offline
+
+Both compilation commands pass. Fedora's modified recipe and shared facts also
+pass syntax-only compilation with cached Rhai 1.19.0 and optimization disabled.
+Three retained CLI cases use an actual local librqbit seeder and loopback tracker:
+single-file success/digest rejection with absent/existing cache, metadata
+selection and legacy multi-file transfer, and the actual Fedora recipe's forced
+refresh preserving old ISO/marker on digest failure. Verification runs inside
+the worker work directory; returned domain paths are not host filesystem evidence.
+
+The focused single-file attempt through the actual tools/ginux release launcher
+fails before Rhai with the same oversize first frame (1195986517 versus 4194304)
+and no result file. No torrent CLI case has passed and managed interrupted
+transfer/cancellation/publication still need evidence. No native bypass or stub
+launcher was used. The interface now records the separate materializer input
+gap: public R06 supplies no extra assets, and R05's 512 MiB/file, 2 GiB total bounds
+cannot stage the Fedora DVD. R07/input integration owns bounded real-asset
+transport and domain paths; merely passing a host path as a define cannot replace
+that work. Existing materializer cache inference is still present and must be
+removed once this input contract is wired.
+
 ### S6 Migrate representative recipes and validate managed execution
 
 Dependencies: S3-S5. Status: not started.
@@ -889,9 +930,11 @@ unrelated edits and current branches. Update task status with concrete evidence
 as work lands. Temporary audit probes are useful reproductions, not durable
 acceptance artifacts; preserve needed cases in the existing integration owner.
 
-Next implementation action in this chat: migrate the remaining legacy adapter
-cache/work paths and remove materializer cache-input inference using the explicit
-input contract. Kernel and preseed callers now share the canonical work path.
+Next implementation action in this chat: complete the shared dependency lifecycle
+semantics while explicit cache/input transport is coordinated with R07. Remaining
+legacy adapter cache/work paths and materializer cache inference still need
+migration using that input contract. Kernel and preseed callers share the
+canonical work path; torrent/Fedora publication code now awaits managed evidence.
 Target/state transport follows the coordinated S3/R07 change. Revalidate the
 invocation, cleanup, and output contracts through the real launcher when
 R06/G14 converge. Keep the legacy adapter until recipes migrate. The
