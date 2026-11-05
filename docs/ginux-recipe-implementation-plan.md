@@ -1,5 +1,21 @@
 # Ginux execution for Recipe: implementation and upstream contribution plan
 
+Current direction (2026-11-06): [the Recipe remaining-work queue](recipe-simplification-implementation-plan.md)
+is authoritative for dependency order, four parallel lanes, current file writers
+and completion criteria. Its T01–T27 supersede the historical task/status entries
+below. Recipe has zero external users: directly update in-repository callers and
+remove obsolete interfaces; no compatibility adapters, aliases, old-state
+converters or migration period. This is a planning update, not new implementation.
+
+**No new Ginux PRs, pushes or edits to existing Ginux PRs are authorized by this
+queue.** Earlier U03–U07/D02 publication instructions below are superseded.
+Potential contributions are recorded in the Recipe plan's Ginux backlog only.
+The earlier authorization that produced #216–#218 was completed; it does not
+extend to publishing the remaining integration. Preserve all upstream tests and
+human-authored public text. The remaining material records historical evidence;
+its older “current action”, “unfinished” and permission statements are not the
+current execution queue.
+
 Status: implementation is in progress; individual tasks record completion and evidence.
 
 PR preparation checkpoint (2026-11-05): the user requested prospective upstream

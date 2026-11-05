@@ -1,5 +1,15 @@
 # Ginux–Recipe execution interfaces (F02)
 
+Planning update (2026-11-06): [the current Recipe task queue](recipe-simplification-implementation-plan.md)
+owns remaining implementation order and lane boundaries. Recipe will support one
+current recipe/worker/state interface, with direct in-repository caller changes
+and no backward-compatibility adapters, deprecated aliases or old-state readers.
+T01 performs the engine/caller-contract cutover; T09/T11/T16/T21 update the target,
+archive, cancellation and retry seams. Ginux's own versioned contracts remain
+Ginux-owned. Historical protocol examples below are not supported formats and do
+not authorize source rewriting, compatibility code or Ginux PR publication.
+Until those tasks land, distinguish these selected changes from current v5 code.
+
 Cross-process contract for Recipe's required Ginux execution environment.
 `docs/ginux-recipe-implementation-plan.md` is authoritative on objectives and
 ownership; this file fixes the concrete fields, limits, paths, and behaviors
