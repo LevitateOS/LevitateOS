@@ -572,7 +572,7 @@ to introduce new crates or parallel behavior owners.
   outputs. This task does not itself promise the build succeeds.
 
 - [ ] **I04 — Close observed compatibility gaps in small assignments.** Depends:
-  I03. (In progress 2026-11-05: **M1 done** (`7cfb8070`, pushed); **M2 done** (`698847b4`, pushed); **M3 done** — worktree `/tmp/ginux-i04m3`, branch `ginux-recipe/i04-m3-meta`, commit `6ad28863`, pushed to fork. fstat/newfstatat/faccessat over the merged view with supervised struct-stat write-back (staged sizes/modes only); file-backed mmap (private, RO/RX, unfixed) rewritten to anonymous host mapping + filled from staged bytes under M1 caps. Coordinator reran: lib-fstat + 208920-byte fill succeed, death now at MAP_FIXED remap (EPERM, len 143360). Remaining: M4 fixed file-backed mmap + pread64.)
+  I03. (In progress 2026-11-05: **M1 done** (`7cfb8070`, pushed); **M2 done** (`698847b4`, pushed); **M3 done** (`6ad28863`, pushed); **M4 done** — worktree `/tmp/ginux-i04m4`, branch `ginux-recipe/i04-m4-fixed`, commit `6c507d1f`, pushed to fork. Confined MAP_FIXED file-backed remaps (same-fd/compatible-offset inside live regions, split-in-place ledger) + pread64 on domain fds; 13-case denial matrix (wild/low/shared/NOREPLACE/writable → EPERM/EACCES/ENOMEM/EINVAL/ENODEV). Coordinator reran: two fixed remaps fill (143360 + 49152), death now at the writable DATA segment (EACCES len 4096, by design). Remaining: M5 writable file-backed segments + mprotect transitions.)
   Owner: appropriate Ginux lane for each gap. Create one named follow-up per
   related operation family, normally one to three syscall/ABI behaviors per task;
   identify its files, dependency, contract semantics, and real reproducer. Iterate
