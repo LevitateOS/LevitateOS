@@ -33,7 +33,19 @@ that the new execution policy or transport revision is implemented.
 
 Recipe spawns a configured launcher executable (path from `GINUX_BIN` env or
 backend config; missing/unexecutable launcher is an explicit `startup`
-failure — never fall back to host execution). Per invocation Recipe supplies:
+failure — never fall back to host execution).
+
+The reviewed upstream configured-launch surface at 6361bbd5 is
+`ginux launch <config.toml> <prepared-rootfs> --result-file <fresh-path>`.
+The rootfs argument is an operator/coordinator-selected host artifact path, not
+a worker-selected path. The current Recipe R06 adapter incorrectly supplies
+`--config <config.toml> --result-file ...`; no such configured command is accepted
+by that launcher. Its unknown-command/demo output is not worker protocol data.
+Correct the adapter together with explicit prepared-root/input wiring, rather
+than adding a parallel launcher interface or treating process-native demos as
+configured Recipe execution.
+
+Per invocation Recipe supplies:
 
 - A domain config document: `execution.profile = "balanced"`,
   `execution.backend = "ptrace-native"`, `contract.profile = "balanced"`,
@@ -46,9 +58,8 @@ failure — never fall back to host execution). Per invocation Recipe supplies:
   R05 fails explicitly when inputs exceed them): id ≤ 64 B, root/init ≤ 128 B,
   args ≤ 7 × 128 B, environment ≤ 8 × 256 B, storage/devices ≤ 8 × 64 B,
   normalized config ≤ 4096 B.
-- `workdir`: new optional `[domain]` field owned by Ginux (G01), domain path,
-  default `/work`. Until it lands, the worker starts at `/work` by supervisor
-  convention.
+- `workdir`: optional `[domain]` field implemented by G01, a domain path with
+  default `/work`.
 - Streams: worker process stdin/stdout are the opaque protocol pipes (§4).
   Worker stderr carries human logs (drained to a Recipe log file, never
   parsed). Supervisor diagnostics go to launcher stderr prefixed `ginux:`.

@@ -162,9 +162,11 @@ outside this artifact-production change.
 
 Dependencies: Ginux R05, G02, G14 and launch/input work. Status: not started.
 Implement together with R06 as one coordinated delivery.
-The concurrent Ginux implementation agent owns launch/worker/coordinator changes.
-This chat implements independent Recipe slices and integrates with those changes
-when available; it does not take over Ginux implementation.
+Ownership updated by the user 2026-11-05: this chat now owns continuing local
+launch/worker/coordinator integration and may edit the local Ginux fork. The
+previous implementation agent has stopped. Upstream PR creation remains with
+the linked review thread in the Ginux plan; this chat prepares local changes and
+evidence for its review. Preserve unfinished and unrelated work.
 
 - Complete the existing Ginux launch adapter instead of adding another launcher.
   Route every executable CLI and library operation through it by default.
@@ -969,9 +971,11 @@ unrelated edits and current branches. Update task status with concrete evidence
 as work lands. Temporary audit probes are useful reproductions, not durable
 acceptance artifacts; preserve needed cases in the existing integration owner.
 
-Next implementation action in this chat: remove process-global dependency
-environment mutation through the existing subprocess owner while explicit
-cache/input and dependency-state transport are coordinated with R07. Remaining
+Next implementation action in this chat: converge the Recipe launch adapter with
+the reviewed upstream configured launcher, including explicit prepared roots and
+inputs. Process-global dependency environment cleanup is deferred while this
+execution boundary is restored. Explicit cache/input and dependency-state
+transport still require R07. Remaining
 legacy adapter cache/work paths and materializer cache inference still need
 migration using that input contract. Kernel and preseed callers share the
 canonical work path; torrent/Fedora publication code now awaits managed evidence.
@@ -979,7 +983,7 @@ Target/state transport follows the coordinated S3/R07 change. Revalidate the
 invocation, cleanup, and output contracts through the real launcher when
 R06/G14 converge. Keep the legacy adapter until recipes migrate. The
 complete dependency executor and durable state integration still follow their
-shared S3/R07 contracts. Worker/launcher integration remains with the Ginux owner.
-Keep the concurrent
-Ginux agent's launcher/worker/coordinator work separate. Re-run implemented slices
-through the mandatory Ginux path once that agent's integration is available.
+shared S3/R07 contracts. This chat now owns local worker/launcher integration
+under the user's updated instruction. Re-run implemented slices through the
+mandatory Ginux path when the corrected integration is available; upstream PRs
+remain the review thread's responsibility.

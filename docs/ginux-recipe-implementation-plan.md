@@ -7,6 +7,44 @@ work assignments. Task IDs are scheduling references, not build stages or test
 gates. No task requires a review ceremony or additional permission merely to
 continue authorized implementation.
 
+Ownership update 2026-11-05: the user stopped the previous Ginux implementation
+agent and authorized this chat to continue local Recipe/Ginux integration and
+edit the local LevitateOS Ginux fork. Upstream PR creation belongs to
+[review and fix for ginux before PR · infra](codex://threads/01a1aa2b-ee57-7c51-9c42-cd34e76998db?hostId=remote-ssh-codex-managed%3Ainfra).
+Prepare concrete local changes and runtime evidence for that thread to review;
+this chat does not create or publish upstream PRs. Preserve its review checkouts,
+the unfinished I04-M7 edits, and unrelated work. Existing branch restrictions
+remain in force.
+
+Local integration restart evidence 2026-11-05: refreshed upstream/main and
+inspected accepted commit 6361bbd5. Its configured entry point is `ginux launch
+<config> <rootfs> --result-file <path>`, while Recipe R06 currently invokes
+`--config <config> --result-file <path>`. The I04-M1–M7 branch extends the
+separate process-native demo loop and does not contain that configured-launch
+entry point. Its loader progress is not evidence that Recipe's configured
+boundary is connected. Preserve that work for review rather than continuing
+same-fd/mmap relaxations as the next integration action.
+
+Built an unchanged archive of upstream 6361bbd5 under
+`.artifacts/ginux-local-integration/upstream-6361bbd5`, with build outputs in
+`.artifacts/ginux-local-integration/build-6361bbd5`. Compiled its static launch
+fixture and ran the actual upstream focused CLI integration:
+
+    sudo -n python3 .artifacts/ginux-local-integration/upstream-6361bbd5/scripts/test-launch.py \
+      .artifacts/ginux-local-integration/build-6361bbd5/x86_64-unknown-linux-gnu/release/ginux \
+      .artifacts/ginux-local-integration/launch-fixture
+
+Result: `test-launch: PASS`, covering real exits/signals, argv/environment/cwd,
+descriptor handling, bounded audit, invalid configurations, result-file failures,
+stopped workloads, incomplete commands, and explicit unprivileged-bootstrap
+failure. The temporary chroot checks required execution outside the sandbox's
+no-new-privileges restriction. This establishes the reviewed static launcher
+baseline only; no Recipe worker, dynamic compiler, checkpoint generation, input
+image, or output export is proved. No Ginux source, existing branch/worktree,
+remote branch, or upstream PR was changed. The next change is configured
+launch/root/input convergence in Recipe, with Ginux changes driven by failures
+on that path and handed to the review thread before any upstream PR.
+
 Recipe direction updated 2026-11-05: Ginux is required for every operation that
 evaluates recipe code; macOS support is deferred. The
 [Recipe simplification plan](recipe-simplification-implementation-plan.md) owns
@@ -53,14 +91,11 @@ Ginux and Recipe are sibling submodules. Recipe invokes a configurable executabl
 it does not depend on Ginux being nested in its source tree. Ginux must never
 understand `.rhai`, `ctx`, package dependencies, or Recipe phase names.
 
-Follow repository `AGENTS.md` instructions. Preserve unrelated edits. Use
-`.artifacts` for current outputs/tooling; do not build kernels. Unit tests,
-assertion-based unit doctests, renamed isolated-helper tests, and mock-only suites
-are prohibited. Use compilation and focused CLI/integration/runtime checks.
-Remove prohibited suites/runners when addressing their owners; keep policy-only
-cleanup separate from upstream feature commits. Do not run Ginux's current
-aggregate `make test`/`test-unit` or assume its upstream runners satisfy local
-instructions. No mandatory local commit pipeline is introduced by this plan.
+Follow the current repository `AGENTS.md` instructions. Preserve unrelated edits
+and upstream tests/CI. Keep LevitateOS-specific policy out of Ginux contributions.
+Use `.artifacts` for current outputs/tooling; do not build kernels. Select
+compilation and focused CLI/integration/runtime checks appropriate to the change.
+No mandatory local commit pipeline is introduced by this plan.
 
 Existing Ginux historical gate records are lineage, not a new implementation
 schedule imposed on Recipe. Follow applicable instructions if explicitly using
