@@ -324,14 +324,55 @@ Shared-descriptor continuation 2026-11-05:
   Recipe code is unchanged. The previous goal turn and this turn both made
   concrete implementation/runtime progress; there is no external blocker.
 
-Next local action: connect configured process supervision to the observed spawn
-path, with task identity, fork/vfork/clone and exec events, per-process descriptor
-inheritance and owned-backend references that survive either parent or child
-closing its aliases. Keep every new task stopped until its ownership is installed;
-use current x86-64 ABI definitions rather than copying the old demo's unchecked
-constants/fallthrough. Wire waits, peer wakeup and complete teardown before
-claiming a working child. Preserve the existing ProcessTable owner. This remains
-G03/G05a integration on configured launch, not completion of old demo records.
+Configured-process continuation 2026-11-05: Ginux **ccd62ca1** on the existing
+local integration branch connects the configured launcher to ProcessTable:
+
+- Up to 16 processes, virtual IDs starting at 1, reserved before native creation.
+  Ptrace birth stops install ownership and inherited descriptor tables before
+  execution. Fork/vfork and clone flags SIGCHLD or VM|VFORK|SIGCHLD are supported;
+  clone3, threads, namespace and untraced/shared-fd shapes remain denied.
+- Native file tables retain kernel shared offsets. Owned file/device/pipe
+  references span all process tables; either process can close or exit without
+  prematurely releasing a peer's handles. Blocked owned pipe IO retries after
+  object progress/death; unrelated stops no longer exhaust the audit budget.
+- Wait4 supports positive virtual child IDs or -1, 0/WNOHANG and null rusage.
+  Status comes from observed ptrace death. Copyout precedes reap; EFAULT preserves
+  the child. Native wait is used where possible; adopted children already reaped
+  by the supervisor return their observed virtual status after native ECHILD.
+  Kernel fork failure rolls back the process reservation and owned references.
+- Virtual init adopts orphans, and the native supervisor is a subreaper. Root
+  death and supervisor failure kill/reap all descendants and release all owned
+  state before completion. Signal sender PIDs are projected. Positive-ID kill
+  supports 0/SIGKILL. Bootstrap normalizes ignored SIGCHLD; unsupported auto-reap
+  dispositions fail explicitly. Job control, parked-call interruption/restart,
+  adopted-child SIGCHLD notification and broader wait/signal forms remain open.
+- Release build/clippy with -D warnings, eight process unit cases and six actual
+  Ginux suites pass. The new task suite covers fork/vfork/both clone shapes,
+  identities, cross-process pipes/native and memory file offsets/device lifetime,
+  EOF, WNOHANG, failed status copyout, signal status, 16-task bounds, fork rollback
+  under an actual kernel process limit, orphan waits and /proc-confirmed absence
+  of descendants after root signal and supervisor failure. Existing launch fork
+  coverage now verifies an actual child status; Makefile/CI retain the new suite.
+- All 16 focused actual Recipe CLI/library cases pass with the real launcher and
+  full pinned image. The unchanged real Bash helper now creates supervised child
+  2, performs signal and stdio setup, then reaches **execve (59), denied ENOSYS**.
+  Child exit/wait and structured build failure complete without hanging; zero
+  checkpoints are acknowledged. Bash itself has not executed. Recipe executable
+  source is unchanged; **d9473f8** corrects its author guide.
+- Raw audits, child source/stdout/stderr, command/environment records, six Ginux
+  suite logs, build identity and 16-case results are retained under
+  `.artifacts/ginux-local-integration/task-supervision/`. Verification requires
+  root for the real chroot bootstrap; an initial unprivileged attempt failed
+  before managed code, then the correctly privileged cases passed.
+
+Next local action: implement successful and failed exec transitions, including
+per-public-descriptor CLOEXEC and safe native-handle synchronization. Do not close
+owned handles before a failed exec, or let aliases lose native handles that must
+survive. Reuse the process and descriptor owners, verify real replacement and
+failure behavior through retained runtime fixtures, then rerun the unchanged
+actual Recipe Bash helper. Clone3 fallback remains deliberate; thread ownership
+and the broader libc helper/runtime surface still need integration. This is
+G03/G05a configured-launch integration, not completion of old demo records.
 Compiler-sized storage/directory operations, full input/dependency layout,
 target/options transport, resources, durable state/generations, publication and
 unreachable legacy-wrapper removal remain incomplete. The linked review thread

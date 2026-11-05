@@ -245,6 +245,20 @@ supervision, inherited tables/backend references, peer scheduling and exec
 semantics are next; S0 remains in progress. Evidence lives under
 `.artifacts/ginux-local-integration/shared-descriptors/`; no push or PR occurred.
 
+Configured-process continuation 2026-11-05: Ginux **ccd62ca1** supervises up
+to 16 processes using the existing ProcessTable, virtual IDs and registered
+ptrace birth stops. Fork/vfork and supported clone shapes inherit native tables
+and shared owned-backend references. Pipe peers wake, waits preserve actual
+exit status and EFAULT retry, failed native fork rolls back, and root death or
+supervisor failure kills/reaps every descendant. Six real Ginux suites, eight
+process cases, release build/clippy and all 16 focused actual Recipe CLI/library
+cases pass. The real child helper now creates a supervised child and completes
+signal/stdio setup, then fails explicitly at execve (59). Bash has not executed;
+exec/CLOEXEC is next, followed by thread and remaining runtime semantics. Recipe
+**d9473f8** updates author guidance; executable code is unchanged. S0 remains in
+progress. Evidence is in `.artifacts/ginux-local-integration/task-supervision/`;
+no push or PR occurred. The designated review thread still owns upstream PRs.
+
 - Complete the existing Ginux launch adapter instead of adding another launcher.
   Route every executable CLI and library operation through it by default.
 - Remove public host/in-process backend selection, host defaults, and fallback.
@@ -1052,12 +1066,13 @@ unrelated edits and current branches. Update task status with concrete evidence
 as work lands. Temporary audit probes are useful reproductions, not durable
 acceptance artifacts; preserve needed cases in the existing integration owner.
 
-Next implementation action in this chat: connect configured task supervision,
-per-process descriptor inheritance and owned-backend lifetimes for the observed
-clone3/clone spawn path. Libc preflight now succeeds with the common small-fd
-table. Every child must be supervised and registered before running; waits,
-peer scheduling and teardown must converge through the existing process owner.
-Extend the existing storage owner for compiler-sized files and directory
+Next implementation action in this chat: connect successful/failed exec and
+correct close-on-exec behavior through the configured task and descriptor owners.
+The actual helper now creates a supervised child and reaches execve denial;
+process inheritance, owned peer IO, waits and teardown have actual runtime
+coverage. Do not retire handles before a failed exec or discard native handles
+needed by surviving public aliases. Thread ownership and broader runtime
+semantics remain unfinished. Extend the existing storage owner for compiler-sized files and directory
 operations; the current bounded memory backend is not compiler support. Public entry,
 prepared tool paths and bounded checkpoint waiting are connected; process-global
 dependency environment cleanup remains outstanding. Explicit cache/input and dependency-state
