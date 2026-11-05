@@ -31,7 +31,9 @@ were not rerun. GitHub CI has not run because these candidates remain local.
 - [Manifest and exact worktree paths](../.artifacts/ginux-pr-preparation-20261105/manifest.json), [baseline failures](../.artifacts/ginux-pr-preparation-20261105/all-regressions-baseline.log), [combined checks](../.artifacts/ginux-pr-preparation-20261105/combined-checks.log).
 
 Each candidate directory also contains its title, plain diff, build/CLI logs and
-initial reproduction. The three candidate worktrees are retained for inspection:
+initial reproduction. The temporary combination checkout is not a candidate;
+its archive request was refused by the app as owned by another task, so it was
+left intact. Its exact path and disposition are in the manifest. The three candidate worktrees are retained for inspection:
 
 - `/home/vince/.codex/worktrees/ginux-pr-open-failure/ginux`
 - `/home/vince/.codex/worktrees/ginux-pr-unlink-lifetime/ginux`
