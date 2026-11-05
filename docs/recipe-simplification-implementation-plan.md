@@ -395,19 +395,25 @@ legacy top-level refresh and explicit native-error handling; an API 2 dependency
 tool consumed by its parent; invalid/error readiness rejection; unsupported API
 rejection before effects and failed-producer cleanup. The existing two invocation
 CLI cases also passed during the initial runtime refactor. These are pre-S0 evidence.
-A sixth case now covers failure cleanup after operation exhaustion and rejection
-of success cleanup that removes the installed product; it has not run yet.
+A sixth case covers failure cleanup after operation exhaustion and rejection of
+success cleanup that removes the installed product. Its managed attempt stops at
+the launcher/worker protocol boundary before that lifecycle behavior executes.
 
     cargo test -p levitate-recipe --test e2e api2:: --offline -- --nocapture
     cargo test -p levitate-recipe --test e2e --offline
     cargo check -p levitate-recipe --lib --offline
 
-The broader integration attempt could not compile the concurrent R06 worktree;
-the latest check encountered host_removed_error arity and Dynamic::from_str errors
-in backend.rs. Those files remain with the Ginux owner. No launcher/backend,
-worker, input, or public dispatch change is part of 930d153. Re-run the current
-cases after R06 converges; no passing current-worktree or managed execution claim
-is made. R06's per-operation worker engine must keep a fresh module resolver;
+The initial broader integration attempt encountered concurrent R06 compile
+errors; those have since been resolved by its owner, and the current
+`cargo check -p levitate-recipe --lib --offline` passes. A real launcher attempt
+using tools/ginux/target/x86_64-unknown-linux-gnu/release/ginux fails closed before
+recipe execution: the first worker frame declares 1195986517 bytes (limit 4194304),
+the launcher is killed/signaled, and no authoritative result file is produced.
+The focused case therefore fails; it does not prove cleanup or resource-limit
+behavior inside Ginux. Commit 50ef5de improves its failure diagnostics.
+No launcher/backend, worker, input, or public dispatch change is part of this
+Recipe slice. Re-run the cases after R06/G14 converge; managed behavior remains
+unverified. R06's per-operation worker engine must keep a fresh module resolver;
 module initialization cached across separate invocations must not replace fresh
 package facts. The pinned Rhai internals dependency is confined to invocation.rs.
 
@@ -713,9 +719,9 @@ unrelated edits and current branches. Update task status with concrete evidence
 as work lands. Temporary audit probes are useful reproductions, not durable
 acceptance artifacts; preserve needed cases in the existing integration owner.
 
-Next implementation action in this chat: revalidate the shared invocation slice
-when concurrent R06 dispatch compiles, then implement optional cleanup and explicit
-invocation context. Keep the legacy adapter until its recipes are migrated. The
+Next implementation action in this chat: implement optional cleanup and explicit
+invocation context; revalidate the shared invocation slice when R06/G14 transport
+works with the real launcher. Keep the legacy adapter until recipes migrate. The
 complete dependency executor and durable state integration still follow their
 shared S3/R07 contracts. Worker/launcher integration remains with the Ginux owner.
 Keep the concurrent
