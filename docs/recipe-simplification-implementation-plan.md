@@ -168,6 +168,16 @@ previous implementation agent has stopped. Upstream PR creation remains with
 the linked review thread in the Ginux plan; this chat prepares local changes and
 evidence for its review. Preserve unfinished and unrelated work.
 
+Local restart slice 2026-11-05: Ginux **4632b5b2** makes the incorrect
+launcher syntax fail explicitly rather than running a demo on the protocol
+stream; the expanded real configured-launch suite passes. Recipe **7b06db6**
+corrects the pinned rootfs digest and rebuilds successfully. A real configured
+worker probe loads the selected Rocky runtime libraries, then terminates by
+signal 11 after poll/gettid/tgkill denials, without emitting worker frames.
+Root/input assembly and transport remain incomplete; S0 is not complete. See
+the Ginux plan's local continuation evidence for commands, limitations, and
+next action. No upstream push or PR was performed.
+
 - Complete the existing Ginux launch adapter instead of adding another launcher.
   Route every executable CLI and library operation through it by default.
 - Remove public host/in-process backend selection, host defaults, and fallback.

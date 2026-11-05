@@ -45,6 +45,61 @@ remote branch, or upstream PR was changed. The next change is configured
 launch/root/input convergence in Recipe, with Ginux changes driven by failures
 on that path and handed to the review thread before any upstream PR.
 
+Local continuation evidence 2026-11-05:
+
+- Attached Ginux checkout: `/home/vince/.codex/worktrees/ginux-recipe-local-integration/ginux`,
+  branch `codex/ginux-recipe-local-integration`, based on reviewed 6361bbd5.
+  Local commit **4632b5b2** rejects unknown/incomplete commands with exit 2,
+  diagnostics on stderr, empty stdout, and no workload/result-file effects.
+  Only no-argument invocation retains the interception demonstration. This
+  fixes the misleading demo output triggered by Recipe's incorrect `--config`
+  invocation; it does not fix that adapter or claim Recipe execution.
+- The expanded actual `scripts/test-launch.py` fails against the unchanged
+  6361bbd5 binary on `--config` (demo output, exit 1). After the fix, a fresh
+  offline release build and the full configured-launch suite pass, including
+  sixteen invalid-command cases. Formatting and diff whitespace checks pass.
+  The build is `/tmp/ginux-recipe-local-build/x86_64-unknown-linux-gnu/release/ginux`.
+- Recipe local commit **7b06db6** corrects its mistyped default rootfs digest to
+  `1026f8d3b36eaea1bcab8e609045991f08c70eb7645cb37f58f48faa8b40be9c`.
+  Direct SHA-256 hashing of the cached assembled tar matches that value and
+  its recorded rootfs identity. The current Recipe binary rebuild passes.
+  `verify-rocky-oci.sh` was not completed: this host lacks `shasum`; do not
+  describe that as a fresh full OCI-chain verification.
+- A real configured `launch` probe runs that rebuilt Recipe worker as domain
+  init, with five runtime libraries read from the cached Rocky tar, explicit
+  worker environment, and a temporary root containing `/inputs/main.rhai`.
+  Audit records show successful library opens/reads/maps and protections.
+  The first denied call is `poll` (7), followed by `gettid` (186) and
+  `tgkill` (234); the worker terminates by SIGSEGV (exit 139), emitting zero
+  stdout bytes. Its authoritative result is `signaled`, signal 11. These are
+  actual configured-path observations, not the old process-native loader
+  reconstruction. Which denied call causes which failure remains to be isolated.
+- The probe receives EOF on stdin, not a Recipe request. It is a startup
+  diagnostic with selected copied libraries, not an assembled invocation
+  image, successful Rhai evaluation, coordinator transport, or publication
+  proof. Script, config, result, exact argv, stdout, and full audit are saved
+  under `.artifacts/ginux-local-integration/configured-worker-probe/`.
+  Reproduction: `sudo -n python3 .artifacts/ginux-local-integration/configured-worker-probe/probe.py`.
+
+Next local slice: converge the existing R05/R06 adapter with a verified,
+per-invocation root containing the worker and declared inputs. Isolate the
+configured-path Rust startup failure and connect bounded channel/process
+handling to this same supervisor. Preserve domain virtual identities rather
+than permitting native gettid/tgkill. Do not transplant the process-native
+mmap experiments or claim they are needed: the current configured probe already
+loads the worker's libraries. Leave durable state and output publication open.
+The linked review thread owns upstream review and PR creation; no push or PR
+was performed by this continuation.
+
+Recovery checkpoint: active skill `hdae-development`, discovery path
+`/home/vince/.codex/worktrees/ginux-recipe-local-integration/ginux/.agents/skills/hdae-development/SKILL.md`;
+reload it and required references after context shifts. This integration task
+record and the Recipe simplification plan govern the current authorized work.
+Ginux's upstream Gate 8.5 checkpoint is historical context, not this integration's
+next task. Git in the attached submodule worktree inherits a relative
+`core.worktree` that resolves incorrectly; use explicit `--git-dir` and
+`--work-tree` arguments there, without modifying the common repository config.
+
 Recipe direction updated 2026-11-05: Ginux is required for every operation that
 evaluates recipe code; macOS support is deferred. The
 [Recipe simplification plan](recipe-simplification-implementation-plan.md) owns
