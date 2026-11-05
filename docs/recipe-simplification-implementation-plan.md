@@ -288,7 +288,7 @@ the consumer case checks acquisition/readiness only and does not prove those pat
 
 ### S2 Unify setup and command execution
 
-Dependencies: S1 where overlapping. Status: partial helper implementation.
+Dependencies: S1 where overlapping. Status: helper/setup and opt-in API 2 implementation partial.
 
 - Consolidate engine creation in src/lib.rs and worker/run.rs. Build scopes
   through one invocation builder used by executor/private/actions.rs, flow.rs,
@@ -367,6 +367,50 @@ distinguish invocation setup from deliberate per-hook refresh and preserve the
 existing scope isolation where recipes depend on it. Retaining imports alone
 is not sufficient evidence that a replacement preserves recipe behavior.
 
+API 2 invocation/readiness slice 2026-11-05: tools/recipe 930d153 adds a shared
+invocation runtime used by install, manual checks, cleanup/removal, and dependency
+preparation. A supported top-level `const RECIPE_API = 2` selects initialization
+once for the merged recipe; unsupported declarations fail before setup effects.
+The runtime retains Rhai's imported modules, global constants, initialized
+variables, and inherited functions. Dynamic import expressions are evaluated
+during setup rather than replayed on every hook. Checks retain isolated variable
+scopes and carry discovered ctx through both ready and needs-work outcomes.
+Unversioned recipes deliberately retain Rhai's reevaluation path while repository
+recipes are migrated; do not remove that behavior merely because it repeats.
+
+The same slice registers ready/needs_work constructors and validates their
+outcomes. API 2 errors are fatal. The legacy adapter accepts deliberate throws
+but rejects interpreter failures and tagged native-helper failures. Native errors
+remain catchable so a recipe can handle a known condition explicitly. Custom
+checks verify API 2 acquire/build/install results; installation is checked again
+after success cleanup. Per-hook operation budgets retain bounded failure cleanup.
+No generic existence rule replaces custom readiness. API 2 target/runtime/state
+namespaces, durable state, optional cleanup, complete dependency execution, and
+repository migration remain outstanding.
+
+Five retained real CLI cases in tests/e2e/api2.rs passed before concurrent R06
+dispatch changes: inherited/dynamic imports and global constants across lifecycle
+operations with one setup per command; a built/installed executable actually run;
+legacy top-level refresh and explicit native-error handling; an API 2 dependency
+tool consumed by its parent; invalid/error readiness rejection; unsupported API
+rejection before effects and failed-producer cleanup. The existing two invocation
+CLI cases also passed during the initial runtime refactor. These are pre-S0 evidence.
+A sixth case now covers failure cleanup after operation exhaustion and rejection
+of success cleanup that removes the installed product; it has not run yet.
+
+    cargo test -p levitate-recipe --test e2e api2:: --offline -- --nocapture
+    cargo test -p levitate-recipe --test e2e --offline
+    cargo check -p levitate-recipe --lib --offline
+
+The broader integration attempt could not compile the concurrent R06 worktree;
+the latest check encountered host_removed_error arity and Dynamic::from_str errors
+in backend.rs. Those files remain with the Ginux owner. No launcher/backend,
+worker, input, or public dispatch change is part of 930d153. Re-run the current
+cases after R06 converges; no passing current-worktree or managed execution claim
+is made. R06's per-operation worker engine must keep a fresh module resolver;
+module initialization cached across separate invocations must not replace fresh
+package facts. The pinned Rhai internals dependency is confined to invocation.rs.
+
 ### S3 Separate durable state and adapt the worker boundary
 
 Dependencies: S2; full managed recovery also needs Ginux R06/G12a. Status: not started.
@@ -394,7 +438,9 @@ for real Ginux storage and recovery evidence.
 
 ### S4 Unify lifecycle and dependency semantics
 
-Dependencies: S2, S3. Status: not started.
+Dependencies: S2, S3. Status: readiness adapter and producer rechecks implemented
+independently in 930d153; managed verification, migration, and remaining lifecycle
+and dependency work pending.
 
 - Implement ready/needs_work/error handling and keep all three independent custom
   checks. Preserve check-returned context. Migrate repository checks together with
@@ -667,10 +713,11 @@ unrelated edits and current branches. Update task status with concrete evidence
 as work lands. Temporary audit probes are useful reproductions, not durable
 acceptance artifacts; preserve needed cases in the existing integration owner.
 
-Next implementation action in this chat: establish which repeated top-level
-effects are required, then simplify initialization while preserving imports,
-initialized globals, and intended hook isolation. Worker/launcher
-integration remains coordinated with the Ginux owner.
+Next implementation action in this chat: revalidate the shared invocation slice
+when concurrent R06 dispatch compiles, then implement optional cleanup and explicit
+invocation context. Keep the legacy adapter until its recipes are migrated. The
+complete dependency executor and durable state integration still follow their
+shared S3/R07 contracts. Worker/launcher integration remains with the Ginux owner.
 Keep the concurrent
 Ginux agent's launcher/worker/coordinator work separate. Re-run implemented slices
 through the mandatory Ginux path once that agent's integration is available.
