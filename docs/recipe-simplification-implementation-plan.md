@@ -318,6 +318,18 @@ nonfatal interruption/restart remain unsupported. S0 stays in progress; storage,
 retention and publication are still missing. See the Ginux plan and
 `.artifacts/ginux-local-integration/captured-output/` for evidence and limits.
 
+Growable-storage continuation 2026-11-05: Ginux **06d24ae2** separates VFS byte
+backing from metadata and uses growable anonymous mappings for configured
+launch. The fixed 64 KiB/file bound is gone; 4096 objects share mapped capacity
+bounded by memory_mib (file backing only, not total process RAM). Sparse IO,
+ftruncate, quota failure, unlinked aliases and teardown have real runtime
+coverage. Recipe **acf174c** adds an actual install with independent content
+checks on 131072-byte work/output products and an unchanged source. All 23
+focused Recipe cases, nine Ginux launch suites and eight VFS cases pass; release
+Ginux build/Clippy pass. S0 stays in progress: directory traversal/removal,
+rename, file mappings, generated exec, retention and publication are unfinished.
+See the Ginux plan and `.artifacts/ginux-local-integration/growable-storage/`.
+
 - Complete the existing Ginux launch adapter instead of adding another launcher.
   Route every executable CLI and library operation through it by default.
 - Remove public host/in-process backend selection, host defaults, and fallback.
@@ -1161,18 +1173,18 @@ unrelated edits and current branches. Update task status with concrete evidence
 as work lands. Temporary audit probes are useful reproductions, not durable
 acceptance artifacts; preserve needed cases in the existing integration owner.
 
-Next implementation action in this chat: extend the existing VFS/launch
-storage owner for larger regular files and directory operations. Actual CLI
-probes now fail at a 131072-byte write (EFBIG), prepared directory copy
-(EOPNOTSUPP), and rename (ENOSYS), with structured errors and unchanged source.
-The current bounded memory backend is not compiler support. Captured output is now verified: Ginux **75acd2be/210a8cca**
-adds shared pipe FIONBIO and public-descriptor polling, including peer wakeups,
-finite deadlines and clean parked-task SIGKILL teardown. Recipe **4275769** adds
-actual CLI cases for 80,000-byte capture on both streams, empty/whitespace stdout
-and fatal child exit 23. All 22 focused CLI/library cases and all nine Ginux
-launch suites pass; source files remain unchanged. Full evidence and limits
-are recorded in the Ginux plan and
-`.artifacts/ginux-local-integration/captured-output/`. Keep machine results
+Next implementation action in this chat: implement directory descriptors and
+enumeration through the existing VFS/public-descriptor owners, then rename and
+removal. The prepared directory-copy probe still returns EOPNOTSUPP and rename
+returns ENOSYS; source and failures are retained under the capture slice's
+storage-next directory. The 131072-byte EFBIG failure is fixed: Ginux
+**06d24ae2** adds growable bounded file backing, and Recipe **acf174c** verifies
+larger work/output products through independent custom content checks. All 23
+focused CLI/library cases, nine Ginux launch suites and eight VFS cases pass.
+Current limits and source/binary identities are in the Ginux plan and
+`.artifacts/ginux-local-integration/growable-storage/`. This is still ephemeral
+storage, with unfinished directory operations, mappings and generated-file
+execution; ordinary compiler projects are not supported yet. Keep machine results
 separate, custom checks authoritative and the launcher mandatory. Image-file
 polling, broader threaded exec/signal/robust-futex behavior, complete-frame
 deadlines, durable logging/state and cancellation remain unfinished. Public entry,

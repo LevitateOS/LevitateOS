@@ -517,16 +517,53 @@ Managed-capture continuation 2026-11-05: Ginux **75acd2be/210a8cca** and Recipe
   failure evidence remains under `diagnostic-transport/`. These commits are
   local review inputs; no push or PR was performed.
 
-Next local action: extend the existing VFS/launch storage owner for larger
-regular files and directory operations. Three actual CLI probes now establish
-the next failures: a 131072-byte write returns EFBIG (27), copying a prepared
-source directory into an existing destination returns EOPNOTSUPP (95), and
-rename returns ENOSYS (38). They are structured workload errors with unchanged
-source and no panic/protocol failure; they are not passing storage acceptance.
-Sources/results are under `captured-output/storage-next/` in the artifact root.
-The current 32-object, 64 KiB/file ephemeral backend cannot build ordinary
-compiler projects. Preserve custom readiness, diagnostics, the mandatory
-launcher and the public-descriptor ownership rules. S0/S1/S2 remain in progress.
+Growable-storage continuation 2026-11-05: Ginux **06d24ae2** removes the
+configured launcher's fixed per-file byte array and connects growable anonymous
+backing through the existing VFS owner. Recipe **acf174c** verifies a larger
+file-producing lifecycle through the mandatory launcher:
+
+- VirtualFs keeps namespace/metadata/open-description ownership; OverlayStorage
+  holds bytes. Existing freestanding/small users retain the default inline
+  backing and constructor. Configured launch maps byte capacity on demand,
+  supports 4096 metadata objects and retains its 64 independently opened-file
+  bound. Total mapped capacity (including page rounding/growth reserve) is
+  bounded by resources.memory_mib. This bounds overlay backing only; total
+  supervisor/tracee RAM enforcement is still unfinished.
+- ftruncate grows/shrinks the same owned object without moving its open offset.
+  Sparse gaps and truncate/regrow zero exposed bytes, failed growth preserves
+  metadata/content/offset, and shrink returns unused mapped pages. Unlink keeps
+  bytes while a descriptor/alias/fork reference exists; final close releases
+  them. Domain teardown clears all backing and asserts zero mapped bytes.
+  No host writable file, mapping handle or backend integer reaches the guest.
+- The real storage fixture verifies writes beyond 64 KiB, a sparse 2 MiB offset,
+  truncate/regrow zeroing, exactly 4096 total namespace objects, and allocation
+  exhaustion across multiple files under a configured 16 MiB bound. Its quota
+  checks preserve failed-file size, reclaim shrinking/closed-unlinked objects,
+  retain unlinked bytes across public aliases, and leave full-quota data live
+  for domain teardown. Fresh launches preserve the prepared host root.
+- All nine actual Ginux launch suites and eight VFS unit cases pass. Release
+  build and strict Clippy pass. The added VFS case also proves that custom byte
+  backing, rather than the legacy inline-size parameter, determines capacity;
+  failed resize and truncate preserve the expected bytes and open offset.
+- All 23 focused Recipe CLI/library cases pass (19 managed, three entry guards,
+  one library case). The new actual CLI install writes and reads 131072-byte
+  work/output files, independently rechecks their contents, returns the named
+  output and keeps the recipe source unchanged. Existing capture/logging,
+  process/thread/descriptor and input guards remain passing. No Recipe unit
+  tests were added or run.
+- Evidence, exact commands/environment, source and binary/image identities are
+  under `.artifacts/ginux-local-integration/growable-storage/`. All commits are
+  local review inputs; no push or PR was performed.
+
+Next local action: implement directory descriptors/enumeration through the VFS
+and public-descriptor adapter, then rename/removal. The prepared directory-copy
+probe still reaches EOPNOTSUPP (95) and rename reaches ENOSYS (38); their retained
+sources are under `captured-output/storage-next/` in the artifact root. The former
+131072-byte EFBIG failure now has a passing actual lifecycle regression. Preserve
+open-object identity and directory cursors on faults/aliases; unsupported image
+or unassigned paths must not acquire native write authority. File mappings,
+generated-file execution, full compiler-sized projects and durable storage still
+need implementation. S0/S1/S2 remain in progress.
 Compiler-sized storage/directory operations, full input/dependency layout,
 target/options transport, resources, durable state/generations, publication and
 unreachable legacy-wrapper removal remain incomplete. The linked review thread
