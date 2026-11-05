@@ -480,16 +480,53 @@ the retained child-output case with worker transport v2:
   uncommitted child regression is now committed and passing. Live-peer
   complete-frame deadlines, durable logging/state and cancellation remain open.
 
-Next local action: connect owned-pipe nonblocking ioctl and readiness, starting
-with the actual captured-output helper. A new real exec_output Bash probe fails
-before its readiness query returns: ioctl **FIONBIO 0x5421** on public fd 4 returns
-ENOTTY, and Rust std's process-output implementation unwraps that read_output
-error. The worker exits 101; Ginux reaps it and the child. The local std source
-and ptrace registers identify this call. Implement the pipe operation through
-its existing status owner with validated copyin, then inspect/implement the
-subsequent poll path rather than allowing raw private handles or catching the
-panic to fabricate success. Retain the capture stdout/stderr contract and add a
-real successful capture case. S0/S1/S2 remain in progress.
+Managed-capture continuation 2026-11-05: Ginux **75acd2be/210a8cca** and Recipe
+**4275769** fix the actual captured-output path:
+
+- FIONBIO updates the pipe owner's shared O_NONBLOCK status after a complete,
+  validated four-byte copyin. Aliases see the update; access/APPEND and public
+  CLOEXEC flags remain intact. Invalid/partial pointers leave flags unchanged.
+- Configured poll resolves public handles through their owners, combining pipe
+  input/output, HUP/ERR, assigned regular memory files/directories, null and
+  console aliases. Closed/unknown descriptors return POLLNVAL; negative slots
+  are ignored. No private handle or untracked host FD is polled. Image-file
+  polling remains explicitly EOPNOTSUPP.
+- Finite deadlines use monotonic nanoseconds and a 1 ms observation tick;
+  negative timeouts wait indefinitely. Infinite owned-object waits need no
+  periodic retry. Object changes and observed peer deaths wake parked calls.
+  A SIGKILL race during retry now waits for the real native death event instead
+  of converting ptrace ESRCH into a supervisor failure. General nonfatal
+  interruption/restart is still unfinished. Limits remain 16 slots and at most
+  300000 ms for a positive timeout.
+- All nine Ginux launch suites pass, including the new ten-scenario polling
+  runner: masks/aliases/mixed consoles, faulty memory, HUP/ERR/EOF, read/write
+  wakeups across actual fork, peer exit, finite timeout under a busy child,
+  zero-FD sleep, and finite/infinite parked-task teardown. Existing bootstrap
+  assertions now check the newly supported negative timeout and POLLNVAL/EFAULT
+  semantics. Producers and independent scenarios are connected to Make/CI.
+  Ginux release build and strict Clippy pass.
+- All 22 focused actual Recipe CLI/library cases pass (18 managed, three entry
+  guards, one library case). New cases capture 80,000 stdout bytes and more than
+  a pipe buffer of stderr, preserve whitespace and empty stdout, keep stdout
+  return values distinct from diagnostics/JSON framing, and report child exit
+  23 as a custom-check error without a panic or fabricated readiness. Source
+  files remain unchanged. No Recipe implementation change or unit tests were
+  needed for this slice; the existing std output reader now works.
+- Commands, environments, logs and binary/source identities are under
+  `.artifacts/ginux-local-integration/captured-output/`. The original FIONBIO
+  failure evidence remains under `diagnostic-transport/`. These commits are
+  local review inputs; no push or PR was performed.
+
+Next local action: extend the existing VFS/launch storage owner for larger
+regular files and directory operations. Three actual CLI probes now establish
+the next failures: a 131072-byte write returns EFBIG (27), copying a prepared
+source directory into an existing destination returns EOPNOTSUPP (95), and
+rename returns ENOSYS (38). They are structured workload errors with unchanged
+source and no panic/protocol failure; they are not passing storage acceptance.
+Sources/results are under `captured-output/storage-next/` in the artifact root.
+The current 32-object, 64 KiB/file ephemeral backend cannot build ordinary
+compiler projects. Preserve custom readiness, diagnostics, the mandatory
+launcher and the public-descriptor ownership rules. S0/S1/S2 remain in progress.
 Compiler-sized storage/directory operations, full input/dependency layout,
 target/options transport, resources, durable state/generations, publication and
 unreachable legacy-wrapper removal remain incomplete. The linked review thread

@@ -307,6 +307,17 @@ owned-descriptor readiness still needed. S0 remains in progress. Commands, logs,
 limits and the next failure are under
 `.artifacts/ginux-local-integration/diagnostic-transport/`.
 
+Managed-capture continuation 2026-11-05: Ginux **75acd2be/210a8cca** connects
+shared pipe FIONBIO and public-descriptor readiness through the existing owners.
+Recipe **4275769** verifies large capture, empty/whitespace stdout and fatal
+child exit 23 through the actual CLI. All 22 focused Recipe cases and nine Ginux
+launch suites pass; release Ginux build/Clippy pass. Polling supports pipes,
+assigned memory files/directories, null and console aliases, with peer wakeups,
+finite deadlines and parked-task SIGKILL teardown. Image-file polling and
+nonfatal interruption/restart remain unsupported. S0 stays in progress; storage,
+retention and publication are still missing. See the Ginux plan and
+`.artifacts/ginux-local-integration/captured-output/` for evidence and limits.
+
 - Complete the existing Ginux launch adapter instead of adding another launcher.
   Route every executable CLI and library operation through it by default.
 - Remove public host/in-process backend selection, host defaults, and fallback.
@@ -456,6 +467,12 @@ explicitly versioned transport v2; it does not interpret supervisor stderr or
 change readiness. Durable log storage, complete-frame deadlines and the broader
 S1 acceptance remain unfinished. Streaming helpers work for the demonstrated
 lifecycle; captured helpers expose the separate pipe ioctl/readiness gap.
+
+Capture continuation 2026-11-05: Ginux **75acd2be/210a8cca** resolves that gap;
+Recipe **4275769** adds actual CLI acceptance for captured stdout and separately
+forwarded stderr beyond pipe capacity. Exit 23 remains a fatal custom-check
+error. S0 above records the 22-case passing run. Durable logging and the broader
+S1 acceptance remain unfinished.
 
 ### S2 Unify setup and command execution
 
@@ -1144,17 +1161,21 @@ unrelated edits and current branches. Update task status with concrete evidence
 as work lands. Temporary audit probes are useful reproductions, not durable
 acceptance artifacts; preserve needed cases in the existing integration owner.
 
-Next implementation action in this chat: implement owned-pipe FIONBIO and
-readiness for the actual exec_output capture path. The new probe gets ENOTTY
-from ioctl 0x5421 on fd 4 and std read_output panics; ptrace and local std source
-identify the operation. Use the existing pipe status and descriptor owners with
-validated guest copyin, then wire the following poll path and verify stdout
-capture/stderr diagnostics through the actual CLI. The diagnostic slice is
-committed: the former child-log case and all 20 focused cases pass. Keep machine
-results separate, custom checks authoritative and the launcher mandatory. Broader
-threaded exec/signal/robust-futex/readiness, complete-frame deadlines, durable
-logging/state and cancellation remain unfinished. Extend the existing storage owner for compiler-sized files and directory
-operations; the current bounded memory backend is not compiler support. Public entry,
+Next implementation action in this chat: extend the existing VFS/launch
+storage owner for larger regular files and directory operations. Actual CLI
+probes now fail at a 131072-byte write (EFBIG), prepared directory copy
+(EOPNOTSUPP), and rename (ENOSYS), with structured errors and unchanged source.
+The current bounded memory backend is not compiler support. Captured output is now verified: Ginux **75acd2be/210a8cca**
+adds shared pipe FIONBIO and public-descriptor polling, including peer wakeups,
+finite deadlines and clean parked-task SIGKILL teardown. Recipe **4275769** adds
+actual CLI cases for 80,000-byte capture on both streams, empty/whitespace stdout
+and fatal child exit 23. All 22 focused CLI/library cases and all nine Ginux
+launch suites pass; source files remain unchanged. Full evidence and limits
+are recorded in the Ginux plan and
+`.artifacts/ginux-local-integration/captured-output/`. Keep machine results
+separate, custom checks authoritative and the launcher mandatory. Image-file
+polling, broader threaded exec/signal/robust-futex behavior, complete-frame
+deadlines, durable logging/state and cancellation remain unfinished. Public entry,
 prepared tool paths and bounded checkpoint waiting are connected; process-global
 dependency environment cleanup remains outstanding. Explicit cache/input and dependency-state
 transport still require R07. Remaining
