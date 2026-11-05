@@ -160,7 +160,7 @@ outside this artifact-production change.
 
 ### S0 Make Ginux the required execution path
 
-Dependencies: Ginux R05, G02, G14 and launch/input work. Status: not started.
+Dependencies: Ginux R05, G02, G14 and launch/input work. Status: in progress.
 Implement together with R06 as one coordinated delivery.
 Ownership updated by the user 2026-11-05: this chat now owns continuing local
 launch/worker/coordinator integration and may edit the local Ginux fork. The
@@ -168,15 +168,21 @@ previous implementation agent has stopped. Upstream PR creation remains with
 the linked review thread in the Ginux plan; this chat prepares local changes and
 evidence for its review. Preserve unfinished and unrelated work.
 
-Local restart slice 2026-11-05: Ginux **4632b5b2** makes the incorrect
-launcher syntax fail explicitly rather than running a demo on the protocol
-stream; the expanded real configured-launch suite passes. Recipe **7b06db6**
-corrects the pinned rootfs digest and rebuilds successfully. A real configured
-worker probe loads the selected Rocky runtime libraries, then terminates by
-signal 11 after poll/gettid/tgkill denials, without emitting worker frames.
-Root/input assembly and transport remain incomplete; S0 is not complete. See
-the Ginux plan's local continuation evidence for commands, limitations, and
-next action. No upstream push or PR was performed.
+Managed execution slice 2026-11-05: Recipe **2f90e5f** now prepares verified,
+invocation-private image/worker/input roots and uses the actual configured
+launcher. Ginux **3dd05f42** adds bounded nonblocking bootstrap polling; Recipe
+**c780ee8** validates the coordinator-prepared build directory. Actual readiness
+queries now execute Rhai inside Ginux and return discovered context. A managed
+inheritance regression exposed incorrect ctx shadow selection; **33262d1**
+fixes it while preserving shared closure values. All **8** focused
+`managed_inputs::` CLI scenarios pass with the real supervisor and full image,
+including independent custom checks, errors/not-ready outcomes, bases/imports,
+child/shared contexts, source immutability, image guards, and a denied host write.
+See the Ginux plan for exact evidence and artifact paths. This establishes
+managed readiness queries; install/remove/cleanup, full input/dependency staging,
+worker-entry hardening, tool-path convergence, storage, resource limits, durable
+state, and publication still need implementation or runtime verification. S0
+remains in progress. No upstream push or PR was performed.
 
 - Complete the existing Ginux launch adapter instead of adding another launcher.
   Route every executable CLI and library operation through it by default.
@@ -301,6 +307,10 @@ the consumer case checks acquisition/readiness only and does not prove those pat
 ### S2 Unify setup and command execution
 
 Dependencies: S1 where overlapping. Status: helper/setup and opt-in API 2 implementation partial.
+
+Managed readiness, inheritance, and shared-context validation now run through
+Ginux; see the S0 managed execution slice. Lifecycle-wide initialization and
+subprocess/environment validation still await the install scenarios.
 
 - Consolidate engine creation in src/lib.rs and worker/run.rs. Build scopes
   through one invocation builder used by executor/private/actions.rs, flow.rs,
@@ -981,10 +991,11 @@ unrelated edits and current branches. Update task status with concrete evidence
 as work lands. Temporary audit probes are useful reproductions, not durable
 acceptance artifacts; preserve needed cases in the existing integration owner.
 
-Next implementation action in this chat: converge the Recipe launch adapter with
-the reviewed upstream configured launcher, including explicit prepared roots and
-inputs. Process-global dependency environment cleanup is deferred while this
-execution boundary is restored. Explicit cache/input and dependency-state
+Next implementation action in this chat: finish internal worker-entry and
+invocation-path convergence, then run install/remove/cleanup through the now
+working configured launcher and connect the observed generic storage/process
+capabilities. Process-global dependency environment cleanup remains deferred
+until lifecycle execution works. Explicit cache/input and dependency-state
 transport still require R07. Remaining
 legacy adapter cache/work paths and materializer cache inference still need
 migration using that input contract. Kernel and preseed callers share the

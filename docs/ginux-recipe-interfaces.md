@@ -38,12 +38,27 @@ failure — never fall back to host execution).
 The reviewed upstream configured-launch surface at 6361bbd5 is
 `ginux launch <config.toml> <prepared-rootfs> --result-file <fresh-path>`.
 The rootfs argument is an operator/coordinator-selected host artifact path, not
-a worker-selected path. The current Recipe R06 adapter incorrectly supplies
-`--config <config.toml> --result-file ...`; no such configured command is accepted
-by that launcher. Its unknown-command/demo output is not worker protocol data.
-Correct the adapter together with explicit prepared-root/input wiring, rather
-than adding a parallel launcher interface or treating process-native demos as
-configured Recipe execution.
+a worker-selected path. Recipe's R06 adapter now supplies this command with a
+fresh prepared root. Its former `--config ...` spelling was invalid; unknown
+commands now fail explicitly in the local Ginux continuation.
+
+The coordinator selects an assembled, uncompressed tar via `GINUX_ROOTFS`, or
+`<user-cache>/recipe/images/<digest>.tar` when unset. `GINUX_ROOT` names its
+content as `oci:NAME@sha256:<assembled-tar-sha256>` (the pinned Rocky identity by
+default); an OCI manifest digest is not an assembled-tar digest. Recipe snapshots
+and hashes the bytes it extracts, rejects mismatches and unsupported entries,
+and builds an invocation-private root. Absolute image symlinks remain valid
+inside chroot, while extraction never writes through any symlink. `/inputs`,
+`/work`, and `/out` are reserved to the coordinator. No mutable hardlinks to the
+image cache are shared with the domain.
+
+The `recipe` CLI copies itself to `/inputs/recipe-worker`; library callers select
+an installed Recipe binary via PATH or `RECIPE_WORKER_BIN`. This replaces the
+former `RECIPE_LAUNCH_WORKER` stub scaffolding. Selected staged inputs are copied
+and verified again against their discovered sizes/hashes. The root remains alive
+until the supervisor is reaped, then is removed. This root is currently ephemeral:
+retained writable storage, generation-backed checkpoints, full input/dependency
+layout reconstruction, and selected output publication still need integration.
 
 Per invocation Recipe supplies:
 

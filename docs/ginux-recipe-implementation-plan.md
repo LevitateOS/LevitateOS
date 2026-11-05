@@ -18,7 +18,7 @@ remain in force.
 
 Local integration restart evidence 2026-11-05: refreshed upstream/main and
 inspected accepted commit 6361bbd5. Its configured entry point is `ginux launch
-<config> <rootfs> --result-file <path>`, while Recipe R06 currently invokes
+<config> <rootfs> --result-file <path>`, while Recipe R06 at that restart invoked
 `--config <config> --result-file <path>`. The I04-M1–M7 branch extends the
 separate process-native demo loop and does not contain that configured-launch
 entry point. Its loader progress is not evidence that Recipe's configured
@@ -81,15 +81,54 @@ Local continuation evidence 2026-11-05:
   under `.artifacts/ginux-local-integration/configured-worker-probe/`.
   Reproduction: `sudo -n python3 .artifacts/ginux-local-integration/configured-worker-probe/probe.py`.
 
-Next local slice: converge the existing R05/R06 adapter with a verified,
-per-invocation root containing the worker and declared inputs. Isolate the
-configured-path Rust startup failure and connect bounded channel/process
-handling to this same supervisor. Preserve domain virtual identities rather
-than permitting native gettid/tgkill. Do not transplant the process-native
-mmap experiments or claim they are needed: the current configured probe already
-loads the worker's libraries. Leave durable state and output publication open.
-The linked review thread owns upstream review and PR creation; no push or PR
-was performed by this continuation.
+Configured execution checkpoint 2026-11-05:
+
+- Recipe **2f90e5f** connects R05/R06 to `ginux launch <config> <root> ...`.
+  The input owner verifies a snapshot of the assembled rootfs tar, builds a
+  fresh root, copies/reverifies inputs, and stages the real worker. It rejects
+  image paths that escape, write through symlinks, duplicate files, or replace
+  invocation-owned paths. Root cleanup restores directory access without
+  following symlinks; **ce4bdfb** counts every archive entry against the bound.
+  Image selection, library-worker selection, and exact limits live in Recipe's
+  author guide and `inputs/root.rs`. No retained-state claim is made.
+- Ginux **3dd05f42** mediates bounded zero-time `poll` queries for assigned
+  bootstrap descriptors. Before the change, the real fixture fails on syscall 7;
+  after it, the full configured-launch suite passes, including invalid pointer,
+  descriptor, count, timeout, ignored-slot, and closed-descriptor cases. All five
+  core unit cases pass with the Makefile's `RUSTFLAGS=''` convention; the first
+  invocation without that override failed to link with freestanding flags.
+- With polling fixed, the actual worker reaches initialization and reports that
+  its redundant mkdir of the already-prepared BUILD_DIR is denied. Recipe
+  **c780ee8** makes bootstrap require and validate the prepared directory. The
+  next actual CLI readiness query succeeds: custom Rhai code returns discovered
+  context, the supervisor and worker exit zero, and a host-private 0600 source
+  remains unchanged. Evidence is in
+  `.artifacts/ginux-local-integration/configured-readiness/`.
+- Actual managed inheritance exposed a separate API 2 bug: `iter_raw()` visits
+  newer scope bindings first, but initialization selected the last ctx and
+  replaced the child's ctx with the base. Recipe **33262d1** selects the newest
+  binding without flattening shared values. Its retained regression covers
+  child overrides, inherited functions, imported modules, and a ctx captured by
+  a closure. The pre-fix failure is retained alongside the passing run.
+- Final focused verification: compile `cargo test -p levitate-recipe --test e2e
+  --no-run --offline`, then run its emitted binary with `managed_inputs::
+  --nocapture`, the real `GINUX_BIN`, verified `GINUX_ROOTFS`, and bootstrap
+  privilege available. **8 passed, 0 failed, 0 ignored** (25.00 s). This includes
+  the four image/worker guards, three independent custom checks with discovered
+  context, explicit not-ready and genuine script errors, inherited/imported
+  code and shared ctx, source preservation, and a denied absolute host write.
+  Raw before/after output is in
+  `.artifacts/ginux-local-integration/managed-inputs/`.
+
+Next local slice: harden the internal worker entry against public environment
+selection, converge the prepared tool path with the engine's current `.tools`
+path, and exercise install/remove/cleanup through this same configured entry.
+Use resulting failures to connect generic writable-filesystem, child-process,
+and checkpoint capabilities. Full dependency/input layout, resource enforcement,
+durable generations/state, and selected output publication remain incomplete.
+The old process-native mmap experiments remain preserved for review; they were
+not needed to execute these managed readiness cases. The linked review thread
+owns upstream review and PR creation; no push or PR was performed.
 
 Recovery checkpoint: active skill `hdae-development`, discovery path
 `/home/vince/.codex/worktrees/ginux-recipe-local-integration/ginux/.agents/skills/hdae-development/SKILL.md`;
