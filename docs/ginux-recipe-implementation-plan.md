@@ -645,22 +645,60 @@ streamed/captured execution and content-checked installation:
   `.artifacts/ginux-local-integration/owned-exec/`. All commits are local review
   inputs; no push or PR was performed.
 
-Next local action: implement generated shebang scripts through the existing
-exec owner, preserving optional interpreter arguments, script pathname/$0,
-argv/environment, executable checks and failed-exec/CLOEXEC behavior. The actual
-51-byte coreutils wrapper copied into /work still returns EOPNOTSUPP; its
-verified source header is in owned-exec/prepared-program-types.json and its
-previous CLI source/result remain in directory-storage/generated-exec-next.
-Then connect guest file mappings through the filesystem/memory owners. Do not
-rewrite recipes around the gap, expose arbitrary host files/private handles,
-or add a host fallback. Source compilation, retained storage, resources and
-publication remain incomplete; this slice proves copied ELF execution, not a
-compiled source project. S0/S1/S2 remain in progress.
-Generated script execution and guest file mappings, full input/dependency layout,
+Named-script continuation 2026-11-05: Ginux **73593745** and Recipe
+**17d145c** connect generated scripts with image interpreters through the
+existing supervised exec transaction:
+
+- The kernel performs shebang dispatch, preserving its single optional argument
+  and recursive image interpreter prefix. The supervisor verifies the resulting
+  script argument, then restores the caller's pathname in argv and AT_EXECFN in
+  the new exec stack. Original arguments/environment remain intact. Old address
+  spaces are never scratch, including vfork/CLONE_VM. Stack restoration failure
+  after kernel commit stops the domain; it cannot return to the old program.
+- The sealed script backing survives kernel exec without public descriptor
+  exposure. Its private fd closes before the interpreter's first syscall; the
+  verified syscall instruction replays with original registers. Failed kernel
+  exec closes its private fd before returning the real errno and preserves all
+  public CLOEXEC entries. Pending pins survive until commit or teardown;
+  committed scripts release their data pin, while running ELF pins retain their
+  process lifetime. The freestanding binary now supplies overlap-safe memmove
+  required by the larger transaction state.
+- All **twelve** actual Ginux launch suites pass. The new independent script
+  family covers nine modes: plain/optional/nested-image interpreter, relative
+  name, absolute execveat ignoring invalid dirfd, fork/vfork/CLONE_VM, and 4096
+  arguments. It checks exact argv/environment/AT_EXECFN, missing/malformed
+  interpreter errors, permission/writer rejection, invalid/oversize arrays,
+  CLOEXEC rollback and descriptor-script limits. Host procfs independently
+  verifies private-fd cleanup before and after replacement, actual interpreter
+  bytes, task reaping, and no named host outputs. Existing ELF suites pass.
+- All **28** focused Recipe cases pass (24 managed, three entry guards, one
+  library case). The new lifecycle writes and chmods a Bash shebang script,
+  validates its exact $0 and arguments with spaces, checks produced bytes with
+  custom is_built/is_installed, installs a named product, and directly runs a
+  copied coreutils true wrapper. Machine results stay separate from diagnostics,
+  and recipe source remains unchanged. The original true-wrapper probe now
+  exits zero. Release build and strict Ginux Clippy pass. No Recipe unit tests
+  were added or run; VFS implementation was unchanged in this slice.
+- Scope is named execve/cwd-relative names and absolute or AT_FDCWD execveat.
+  Direct owned interpreters and descriptor-named scripts remain EOPNOTSUPP;
+  source/relative directory CLOEXEC returns ENOENT. Script arrays are bounded to
+  4096 argv and 4096 environment entries. The first interpreter receives a
+  lexical namespace check; nested image interpreter resolution still belongs
+  to the kernel's image view. A complete image/overlay path resolver, symlink
+  semantics and owned interpreter chains remain unfinished. Source compilation
+  has not been demonstrated. Evidence, commands and exact identities are in
+  `.artifacts/ginux-local-integration/owned-scripts/`.
+
+Next local action: extend the same exec owner to owned interpreter chains and
+connect descriptor-named scripts through the common descriptor/filesystem owner,
+including CLOEXEC and unlinked-file lifetime. Preserve exact script path/$0,
+argv/environment, rollback and the existing fork/vfork cases. Then implement
+guest file mappings through the filesystem/memory owners. Do not rewrite
+recipes around gaps or expose private handles. Input/dependency layout,
 target/options transport, resources, durable state/generations, publication and
-unreachable legacy-wrapper removal remain incomplete. The linked review thread
-owns upstream review and PR creation; local commits are unreviewed inputs.
-No push or PR was performed.
+legacy-wrapper removal remain incomplete. S0/S1/S2 remain in progress. The linked
+review thread owns upstream review and PR creation; these commits remain local
+unreviewed inputs. No push or PR was performed.
 
 Recovery checkpoint: active skill `hdae-development`, discovery path
 `/home/vince/.codex/worktrees/ginux-recipe-local-integration/ginux/.agents/skills/hdae-development/SKILL.md`;
