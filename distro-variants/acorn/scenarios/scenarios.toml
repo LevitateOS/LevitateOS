@@ -69,7 +69,7 @@ script_path = "automated-login.sh"
 pass_marker = "AUTOMATED LOGIN PASSED"
 
 [scenarios.installed_tools]
-required_tools = ["sudo", "ip", "ssh", "ash", "mount", "umount", "dmesg", "ps", "ls", "cat"]
+required_tools = ["doas", "ip", "ssh", "ash", "mount", "umount", "dmesg", "ps", "ls", "cat"]
 
 [scenarios.installed_tools.evidence]
 script_path = "installed-tools.sh"

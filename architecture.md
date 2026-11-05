@@ -13,6 +13,8 @@ LevitateOS and AcornOS use ring-owned manifests under `distro-variants/<distro>/
 
 Recipes own package/source facts and acquire/build/install behavior. Orchestration owns product dependencies, output locations and execution. Product dependencies form a build graph; they do not impose an ordered test ladder.
 
+Privilege escalation is an intentional platform difference: Levitate uses `sudo`, and Acorn uses `doas`. Both provide password-authenticated administration for members of `wheel`; parity checks must exercise the variant's declared tool.
+
 ## Build a product
 
 ```sh
