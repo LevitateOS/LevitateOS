@@ -293,8 +293,12 @@ Dependencies: S1 where overlapping. Status: partial helper implementation.
 - Consolidate engine creation in src/lib.rs and worker/run.rs. Build scopes
   through one invocation builder used by executor/private/actions.rs, flow.rs,
   and dependency execution.
-- Evaluate top-level setup once, then call hooks without reevaluating it. Preserve
-  imported module availability and inherited function resolution explicitly.
+- Investigate and preserve the semantics of repeated top-level evaluation before
+  replacing it. Rhai's default call_fn reevaluates the AST to load imports, and
+  recipes also refresh invocation settings and clear saved paths at top level.
+  Prefer setup once per invocation only when imports, inherited functions,
+  initialized bindings, and the intended isolation between hooks remain correct.
+  Keep repeated readiness checks and any necessary refresh behavior explicit.
 - Add a checked argv command helper with cwd/environment/output behavior on top
   of one process implementation. Retain an explicit status-returning variant and
   shell support. Avoid process-global environment mutation for child settings.
@@ -354,8 +358,14 @@ by Rhai's default call_fn path, and imported module resolution must be preserved
 when replacing that behavior; this slice does not claim initialization-once,
 API 2, or a complete shared worker engine factory.
 A disposable actual CLI install with an append-only setup log confirmed five
-top-level executions for one install (exit 0, payload produced). Initialization
-is therefore a reproduced remaining defect, not inferred from source alone.
+top-level executions for one install (exit 0, payload produced). This proves
+repetition, not that it is unnecessary or a defect. Rhai 1.19.0 documents AST
+evaluation before call_fn as necessary to load modules; its call_fn path creates
+a fresh runtime state for each call. Linux recipes additionally refresh force
+settings and clear saved paths at top level. Before changing this behavior,
+distinguish invocation setup from deliberate per-hook refresh and preserve the
+existing scope isolation where recipes depend on it. Retaining imports alone
+is not sufficient evidence that a replacement preserves recipe behavior.
 
 ### S3 Separate durable state and adapt the worker boundary
 
@@ -657,8 +667,9 @@ unrelated edits and current branches. Update task status with concrete evidence
 as work lands. Temporary audit probes are useful reproductions, not durable
 acceptance artifacts; preserve needed cases in the existing integration owner.
 
-Next implementation action in this chat: fix repeated top-level initialization
-while preserving imports and initialized globals in hook calls. Worker/launcher
+Next implementation action in this chat: establish which repeated top-level
+effects are required, then simplify initialization while preserving imports,
+initialized globals, and intended hook isolation. Worker/launcher
 integration remains coordinated with the Ginux owner.
 Keep the concurrent
 Ginux agent's launcher/worker/coordinator work separate. Re-run implemented slices
