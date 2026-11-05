@@ -417,6 +417,43 @@ unverified. R06's per-operation worker engine must keep a fresh module resolver;
 module initialization cached across separate invocations must not replace fresh
 package facts. The pinned Rhai internals dependency is confined to invocation.rs.
 
+Invocation namespace slice 2026-11-05: tools/recipe 35161a0 prepares canonical
+orchestration inputs separately from legacy define overrides. API 2 receives the
+RUNTIME constant before setup and ctx.runtime before checks/hooks, with host and
+target OS/architecture, recipe/base/build/tools/input/output/temp paths, operation,
+jobs, and requested persistence policy. The current target is the native Linux
+default. Conflicting defines for engine-owned bindings and declarations of
+RUNTIME fail before setup. Legacy define semantics and unversioned ctx remain
+unchanged. Fresh runtime inputs replace a stale runtime field in source.
+
+API 2 initializes missing ctx.state/ctx.outputs as maps, preserves declared map
+entries, and validates namespace types and unchanged engine runtime on returned
+check/phase/cleanup contexts. Initialization updates a closure-captured shared
+ctx through a Dynamic write lock, preserving the captured reference rather than
+using Rhai's panicking nonshared get_value_mut API. This is in-memory context;
+separate durable state import, strict nested-value serialization, producer output
+contracts, and publication remain pending. persist_state records policy only.
+
+    cargo check -p levitate-recipe --lib --offline
+    cargo test -p levitate-recipe --test e2e --no-run --offline
+
+Both compilation commands pass. Two new actual-CLI cases in
+tests/e2e/invocation.rs cover lifecycle access to fresh inputs, closure-captured
+ctx, execution of a declared output tool, state/output propagation, and rejected
+namespace types/runtime replacement/reserved declarations. The real Ginux
+launcher attempt fails before recipe execution with the existing oversize frame
+(1195986517 bytes versus 4194304) and absent result file. Neither new runtime
+case has passed; static compilation does not prove namespace behavior in Ginux.
+
+R07 handoff: supply explicitly selected target/input/options values and canonical
+domain paths through the versioned worker contract; the current scope builder
+records the paths its caller supplies and is not a target-configuration transport.
+In particular, removal still needs the worker's known build directory forwarded
+through its existing seam, and the final /work/tools layout must be supplied
+consistently. Variant selection in kernel metadata still infers directory names
+and remains to be migrated. No launcher, backend, worker, input, or public dispatch
+file was changed in 35161a0.
+
 ### S3 Separate durable state and adapt the worker boundary
 
 Dependencies: S2; full managed recovery also needs Ginux R06/G12a. Status: not started.
@@ -754,9 +791,10 @@ unrelated edits and current branches. Update task status with concrete evidence
 as work lands. Temporary audit probes are useful reproductions, not durable
 acceptance artifacts; preserve needed cases in the existing integration owner.
 
-Next implementation action in this chat: implement explicit invocation context;
-revalidate invocation/cleanup through the real launcher when R06/G14 converge.
-Keep the legacy adapter until recipes migrate. The
+Next implementation action in this chat: define named producer outputs and remove
+Rust filename/path guesses, while target/state transport follows the coordinated
+S3/R07 change. Revalidate invocation/cleanup through the real launcher when
+R06/G14 converge. Keep the legacy adapter until recipes migrate. The
 complete dependency executor and durable state integration still follow their
 shared S3/R07 contracts. Worker/launcher integration remains with the Ginux owner.
 Keep the concurrent
