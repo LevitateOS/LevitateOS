@@ -221,6 +221,19 @@ implementation and prove the helper/CLI behavior only. The required managed
 Ginux rerun remains outstanding; S1 is not complete. No launch, worker, coordinator,
 or tools/ginux source was changed by this slice.
 
+Kernel lifecycle slice: distro-builder 9e4bade initializes fresh cleanup metadata,
+rejects unsafe cleanup components/globs, and removes only the current kernel
+output directories. Source/prebuilt removal preserves unrelated files and does
+not create missing artifact roots. tools/recipe ef5d654 exercises the actual
+repository recipes through the CLI with disposable artifacts:
+
+    cargo test -p levitate-recipe --test e2e kernel_recipes:: --offline -- --nocapture
+
+Three original cases reproduced deletion/unsafe traversal/incorrect removal
+before the fix. All four final kernel CLI cases passed, including malformed
+artifact-root rejection. No kernel was downloaded or compiled. This is pre-S0
+recipe/CLI evidence; managed Ginux revalidation remains outstanding.
+
 ### S2 Unify setup and command execution
 
 Dependencies: S1 where overlapping. Status: not started.
@@ -394,7 +407,7 @@ unrelated edits and current branches. Update task status with concrete evidence
 as work lands. Temporary audit probes are useful reproductions, not durable
 acceptance artifacts; preserve needed cases in the existing integration owner.
 
-Next implementation action in this chat: fix S1 kernel cleanup/remove in the
-existing recipe owner and verify against disposable artifacts. Keep the concurrent
+Next implementation action in this chat: correct S1 kernel caller KCONFIG/force
+inputs, then address independent acquisition/refresh behavior. Keep the concurrent
 Ginux agent's launcher/worker/coordinator work separate. Re-run implemented slices
 through the mandatory Ginux path once that agent's integration is available.
