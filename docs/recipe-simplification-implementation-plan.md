@@ -687,9 +687,18 @@ file was changed in 35161a0.
 
 ### S3 Separate durable state and adapt the worker boundary
 
-Dependencies: S2; full managed recovery also needs Ginux R06/G12a. Status: not started.
-Implement together with R07, extending R05's input preparation for state import.
-Neither task waits for the other's completion; they share one state/coordinator change.
+Dependencies: S2 and configured Ginux snapshot/restore. Status: implemented in
+Recipe af4e092 with protocol v4 and verified through real configured Ginux runs.
+Explicit target/options and representative consumer migration remain incomplete;
+see the current checkpoint in ginux-recipe-implementation-plan.md.
+
+Nine actual CLI scenarios cover separate nested state, immutable sources,
+source/input/define invalidation, dependency state, default state storage,
+disabled persistence, corruption, shared destination writers, and coordinator
+interruption before/after acknowledgement. 27 existing managed scenarios and
+3 private-entry checks pass. Evidence: /tmp/recipe-retained-{complete,dependencies,
+regression,entry}.log. The first dependency fixture was intentionally corrected
+because its custom check did not report readiness after installation.
 
 - Implement separate state storage using executor/private/context.rs and state.rs
   seams. Retain atomic replace and directory durability behavior supported by the
@@ -782,15 +791,10 @@ names; this is not S3 durable input identity. Names cannot traverse parents, and
 malformed dependency arrays/entries fail instead of silently dropping tools.
 Diamond graph branches still call custom readiness rather than memoizing success.
 
-The existing v1 checkpoint cannot identify a dependency separately from its
-parent. Persistent worker dependency execution now fails before dependency setup
-with a non-resumable-mode remediation. With --no-persist-ctx, dependency phases
-have no independent checkpoint/state acknowledgements; parent checkpoints still
-report through the existing sink. Dependency ctx is never substituted for the
-parent snapshot, and dependency sources are never rewritten. R07 must replace
-this explicit temporary restriction and its v1-specific regression case with
-per-recipe identity/state tied to acknowledged filesystem generations. State/output
-locking and complete recovery remain S3/R07 work; this does not complete S4.
+The former v1 dependency restriction is superseded by Recipe af4e092/v4.
+Dependencies checkpoint their own state with the shared filesystem generation;
+reused checks also save discoveries. Sources remain immutable. Actual repeated
+dependency executions prove restored per-recipe state and file consistency.
 
     cargo check -p levitate-recipe --lib --offline
     cargo test -p levitate-recipe --test e2e --no-run --offline

@@ -137,9 +137,13 @@ context to exercise reuse while truthfully reporting completion within a run.
 Snapshot reads serialize with all owned filesystem mutations; shared writable
 mappings remain prohibited. This is filesystem consistency, not process-memory
 checkpointing. Ginux result generation stays null; Recipe owns durable generations.
-Current action: remove obsolete Recipe host/source-rewriting persistence paths,
-then complete target/options, the tracked compiler-image producer, source assets
-and representative consumers. SIGKILL stops workload processes and recovery works,
+Recipe `c795d5c` removes the unreachable host callbacks, host Rhai engine accessor, old
+source rewriting/parser/serializer and source-file lock implementation. All nine
+managed recovery cases, the real public-library boundary, three worker-entry and
+three cleanup/remove scenarios pass; /tmp/recipe-host-removal-*.log. Manual checks
+now expose the actual persistence setting in ctx.runtime.options.
+Current action: complete explicit target/options transport, then the tracked
+compiler-image producer, source assets and representative consumers. SIGKILL stops workload processes and recovery works,
 but can leave temporary prepared roots; automatic generation cleanup is also
 unfinished. Cargo global-cache SQLite locking warnings remain unresolved.
 Evidence: `/tmp/ginux-{noctty,cwd,packet,channel-bounds,exe-link,path-probe,memfd}-*`,
