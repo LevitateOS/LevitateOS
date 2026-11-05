@@ -8,20 +8,31 @@ All three commits have the same immediate parent, upstream `main` at
 `2489517e89c3b62c5203ccd0f6d1eb28cf8500af`. Each changes only
 `crates/ginux-vfs/src/lib.rs`, includes focused regression coverage, and retains
 the existing tests and CI. Each worktree is detached; no branch was created or
-switched. Their patches also apply together without conflicts.
+switched. Their changes also merge together without conflicts.
 
 | Candidate | Local commit | Change size | Validation |
 | --- | --- | --- | --- |
-| Failed opens preserve contents and capacity | `397471245b8335c3ab8494197af81b26e3125987` | +55 / -5 | static checks, 57 unit tests, release build, VFS CLI |
-| Unlinked files retain bytes until their last close | `4070b3a1a19ee83d9521c43043f27c07000cf239` | +137 / -6 | static checks, 58 unit tests, release build, VFS CLI |
+| Failed opens preserve contents and capacity | `c2a18bb07b3adfa811fee57dc777cbf9ec757a53` | +92 / -7 | static checks, 58 unit tests, release build, VFS CLI |
+| Unlinked files retain bytes until their last close | `be56d00121cf7fb1be3463dfd48343949c82aebd` | +152 / -6 | static checks, 59 unit tests, release build, VFS CLI |
 | Links resolve before parent components | `2a60d36170c1c31636eee55322e035403188122c` | +125 / -64 | static checks, 56 unit tests, release build, VFS CLI |
 
-The combined tree passes static checks and all 61 unit cases. On the exact
-unmodified upstream VFS source, its four existing VFS tests pass and all six new
-regressions fail. Most added lines in the lifetime fix are its three regression
-scenarios. The CLI checks ran on the Linux host using the existing prepared
-Rocky rootfs and a freshly verified 9,827-entry index; the Rocky VM wrappers
-were not rerun. GitHub CI has not run because these candidates remain local.
+Review found and fixed two additional failures: an image read error left an
+empty overlay hiding the original, and recycling a deleted slot could resurrect
+an image file addressed through a symlinked directory. Each correction has a
+regression that failed before the fix. The path-resolution implementation needed
+no changes; extra absolute/relative/dangling-link and bound probes passed.
+
+Each candidate passes the current CI workflow’s build and test commands locally on
+Linux: static checks, unit tests, full release/fixture builds, launch, native
+supervision, process-native and gate1 setup checks. The VFS CLI also passes with
+the prepared Rocky rootfs. These are local results; GitHub Actions and its macOS
+runner have not run because the candidates remain unpublished. No CI coverage
+was removed or changed.
+
+A fresh upstream source tree with the three changes merged passes static checks
+and all 63 unit cases. Against unmodified upstream VFS, its four original tests
+pass and all eight added regression tests fail. The previous combination
+worktree was preserved; the fresh validation source is recorded in the manifest.
 
 ## Review files
 
