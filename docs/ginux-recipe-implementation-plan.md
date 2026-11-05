@@ -689,16 +689,46 @@ existing supervised exec transaction:
   has not been demonstrated. Evidence, commands and exact identities are in
   `.artifacts/ginux-local-integration/owned-scripts/`.
 
-Next local action: extend the same exec owner to owned interpreter chains and
-connect descriptor-named scripts through the common descriptor/filesystem owner,
-including CLOEXEC and unlinked-file lifetime. Preserve exact script path/$0,
-argv/environment, rollback and the existing fork/vfork cases. Then implement
-guest file mappings through the filesystem/memory owners. Do not rewrite
-recipes around gaps or expose private handles. Input/dependency layout,
-target/options transport, resources, durable state/generations, publication and
-legacy-wrapper removal remain incomplete. S0/S1/S2 remain in progress. The linked
-review thread owns upstream review and PR creation; these commits remain local
-unreviewed inputs. No push or PR was performed.
+Descriptor-script continuation 2026-11-05: Ginux **a08aff7a** and Recipe
+**bf41b5c** complete owned descriptor-named scripts through the common owners:
+
+- Owned execveat supports open/unlinked files and owned directory-relative names,
+  including renamed directories. Script argv and AT_EXECFN use public
+  /dev/fd/N[/path] names. CLOEXEC sources/directories still fail before replacement.
+- Readonly open/openat resolves those names through the public table into the
+  existing filesystem. Reopening creates an independent offset/status description
+  and retains unlinked bytes. Numeric overflow/wraparound, missing/malformed
+  descriptors, directory escapes, writes and native/device/pipe handle imports
+  are rejected. There is no native/private-fd path fallback. This is readonly
+  opening, not general /dev/fd metadata, symlink or procfs support.
+- All twelve Ginux launch suites pass. The script family now has fifteen modes,
+  covering descriptor/unlinked execution, directory rename, fork/vfork inheritance
+  and previous named cases. Host fd inspection still proves private cleanup.
+  Twelve VFS unit cases pass, including deleted-object reopening, independent
+  offsets, replacement identity, readonly enforcement and directory cursors.
+- All **29** focused Recipe cases pass (25 managed, three entry guards, one
+  library). The added real Bash case sources an inherited owned descriptor and
+  validates captured text and produced bytes. This proves real Bash reopening;
+  the native fixture separately proves execveat replacement and unlinked lifetime.
+  Release build and strict Ginux Clippy pass. No Recipe unit tests were run.
+- Two exploratory probes remain failures, preserved under
+  `.artifacts/ginux-local-integration/descriptor-scripts/`: Python stops during
+  initialization because the prepared image lacks encodings; it never reaches
+  fexecve. Bash attempting /usr/bin/rm before sourcing reports fork ENOSYS.
+  Supervisor-only ptrace confirms that Bash requests clone flags 0x1200011
+  (CHILD_SETTID | CHILD_CLEARTID | SIGCHLD), rejected by the current process
+  owner's exact supported shapes. The successful readonly-source case does not
+  prove this ordinary external-command workflow. No host bypass was used.
+
+Next local action: support the observed libc fork shape through the process
+owner, publishing child TID through virtual identity before the child runs and
+retaining kernel clear-TID behavior. Re-run the preserved Bash deletion/source
+workflow and native process cases. Then finish owned interpreter chains in the
+existing exec owner, followed by guest file mappings through filesystem/memory
+owners. Keep the full input/dependency, target/options, resource, durable state,
+publication and migration scope. S0/S1/S2 remain in progress. Upstream review/PR
+creation belongs to the linked review thread; all commits remain local inputs.
+No push or PR was performed.
 
 Recovery checkpoint: active skill `hdae-development`, discovery path
 `/home/vince/.codex/worktrees/ginux-recipe-local-integration/ginux/.agents/skills/hdae-development/SKILL.md`;
