@@ -720,15 +720,44 @@ Descriptor-script continuation 2026-11-05: Ginux **a08aff7a** and Recipe
   owner's exact supported shapes. The successful readonly-source case does not
   prove this ordinary external-command workflow. No host bypass was used.
 
-Next local action: support the observed libc fork shape through the process
-owner, publishing child TID through virtual identity before the child runs and
-retaining kernel clear-TID behavior. Re-run the preserved Bash deletion/source
-workflow and native process cases. Then finish owned interpreter chains in the
-existing exec owner, followed by guest file mappings through filesystem/memory
-owners. Keep the full input/dependency, target/options, resource, durable state,
-publication and migration scope. S0/S1/S2 remain in progress. Upstream review/PR
-creation belongs to the linked review thread; all commits remain local inputs.
-No push or PR was performed.
+Libc-fork continuation 2026-11-05: Ginux **9279e71b** fixes the traced fork
+and signal-return gaps; Recipe **650f7a3** strengthens the retained CLI case:
+
+- The process owner accepts libc fork's exact 0x1200011 shape. It suppresses
+  kernel CHILD_SETTID copyout, publishes the virtual child TID into the child's
+  private address space at the confirmed birth barrier, and restores original
+  argument registers. CHILD_CLEARTID registration remains native. Invalid and
+  readonly child-TID copyout is ignored without forced writes, matching the
+  native child-copy convention; failed forks release reserved state.
+- With fork enabled, the original Bash probe reached its child and then crashed
+  after SIGCHLD. Supervisor-only tracing proved rt_sigreturn was denied with
+  ENOSYS. The balanced task policy now mediates native rt_sigreturn, preserving
+  the kernel-restored signal frame. The native process fixture covers virtual
+  child TID before user execution, invalid/readonly destinations, resource-limit
+  rollback, SIGCHLD sender identity, a handler syscall and return to the parent.
+- The actual Recipe/Bash workflow now passes: inherit a file descriptor, fork
+  the image's rm helper, delete the named script, return from SIGCHLD, then source
+  the unlinked script through the public descriptor. The retained case checks
+  deletion, exact captured text, product bytes, source immutability and separate
+  machine output. This supersedes the earlier ENOSYS failure; the Python image's
+  missing encodings remains a separate limitation.
+- All **29** focused Recipe CLI/library cases and **twelve** launch suites pass
+  with the final binary. The process family includes the new libc and handler
+  cases plus root/failure descendant teardown. All **26** focused Ginux unit
+  cases pass (core 5, process 9, VFS 12); no Recipe unit tests were run. Release
+  build and strict Ginux Clippy pass. Before-sigreturn failure traces, final
+  passing probe, full launch/Recipe logs and exact source/binary/image identities
+  are under `.artifacts/ginux-local-integration/libc-fork/`.
+
+Next local action: finish owned interpreter chains through the existing exec
+owner, preserving script paths, shebang optional arguments, argv/environment,
+CLOEXEC, executable lifetime, rollback and fork/vfork behavior. Then implement
+guest file mappings through filesystem/memory owners. The remaining full input,
+dependency, target/options, resource, durable state, publication and migration
+scope is unchanged. General signal restart/job control, robust futex owner death,
+image/overlay path resolution and ordinary source builds remain incomplete.
+S0/S1/S2 remain in progress. Upstream review/PR creation belongs to the linked
+review thread; all commits remain local inputs. No push or PR was performed.
 
 Recovery checkpoint: active skill `hdae-development`, discovery path
 `/home/vince/.codex/worktrees/ginux-recipe-local-integration/ginux/.agents/skills/hdae-development/SKILL.md`;

@@ -1200,33 +1200,32 @@ unrelated edits and current branches. Update task status with concrete evidence
 as work lands. Temporary audit probes are useful reproductions, not durable
 acceptance artifacts; preserve needed cases in the existing integration owner.
 
-Next implementation action in this chat: fix the observed libc fork clone shape
-0x1200011 through the process owner, then rerun the preserved Bash external-command
-workflow. Owned descriptor-named scripts now work (Ginux **a08aff7a**, Recipe
-**bf41b5c**): open/unlinked files, owned directory-relative names, directory
-rename, CLOEXEC and fork/vfork inheritance are verified by real native launches.
-Readonly /dev/fd/N[/path] opening uses the public descriptor owner with independent
-offsets and deleted-object lifetime. Twelve VFS unit cases, twelve launch suites
-(including fifteen script modes), and **29** focused Recipe CLI/library cases
-pass. Real Bash sources an owned descriptor and custom-checks produced bytes;
-its external rm/fork attempt still fails ENOSYS. The supervisor trace identifies
-the rejected flags. A separate Python fexecve probe stops at missing encodings
-in the prepared image before script execution. Exact evidence and identities are
-under `.artifacts/ginux-local-integration/descriptor-scripts/` and the Ginux plan.
-No Recipe unit tests were added or run.
+Next implementation action in this chat: complete owned interpreter chains
+through the existing exec owner, preserving script paths, optional shebang
+arguments, argv/environment, CLOEXEC, lifetime and rollback. Owned descriptor
+scripts work (Ginux **a08aff7a**). The traced libc fork and signal-return gaps are
+also fixed (Ginux **9279e71b**, Recipe **650f7a3**). Real Bash now forks the image
+rm helper, deletes a script, returns from SIGCHLD, and sources the unlinked script
+through its inherited public descriptor. The retained CLI case checks deletion,
+exact captured text and product bytes. All **29** focused Recipe CLI/library
+cases, **twelve** launch suites and **26** focused Ginux unit cases pass; release
+build and strict Ginux Clippy pass. No Recipe unit tests were added or run.
+Source/binary/image identities, failure traces and passing probe/logs are under
+`.artifacts/ginux-local-integration/libc-fork/`; the descriptor slice has its own
+prior evidence directory. The separate Python fexecve probe still stops at
+missing encodings in the prepared image before script execution.
 
-Then complete owned interpreter chains through the existing exec owner and
-connect guest file mappings through the filesystem/memory owners. Storage remains
-ephemeral. Unified image/overlay resolution, image-relative directory access,
-image mutation, links and ordinary compiler projects remain unfinished. Custom
-checks remain authoritative and Ginux mandatory. Image-file polling, broader
-threaded exec/signal/robust-futex behavior, complete-frame deadlines, durable
-logging/state and cancellation remain unfinished. Public entry, prepared tool
-paths and bounded checkpoint waiting are connected; process-global dependency
-environment cleanup remains outstanding. Explicit input/cache/dependency layout
-and state transport still require R07. Adapter cache/work-path and materializer
-inference migration follow that contract. Target/state transport follows the
-coordinated S3/R07 change. Retain legacy adapters until callers migrate. Local
-launcher/worker integration is authorized in this chat; upstream review/PR
-creation belongs to the linked review thread. No push or PR was performed.
-S0/S1/S2 remain in progress; S3-S7 are not complete.
+Then connect guest file mappings through filesystem/memory owners. Storage
+remains ephemeral. Unified image/overlay resolution, image-relative directory
+access, image mutation, links and ordinary compiler projects remain unfinished.
+Custom checks remain authoritative and Ginux mandatory. Image-file polling,
+broader threaded exec/signal/robust-futex behavior, complete-frame deadlines,
+durable logging/state and cancellation remain unfinished. Public entry,
+prepared tool paths and bounded checkpoint waiting are connected; process-global
+dependency environment cleanup remains outstanding. Explicit input/cache/
+dependency layout and state transport still require R07. Adapter cache/work-path
+and materializer inference migration follow that contract. Target/state transport
+follows coordinated S3/R07. Retain legacy adapters until callers migrate. Local
+launcher/worker integration is authorized in this chat; upstream review/PR creation
+belongs to the linked review thread. No push or PR was performed. S0/S1/S2 remain
+in progress; S3-S7 are not complete.
