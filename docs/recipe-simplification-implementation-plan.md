@@ -343,6 +343,20 @@ and mappings, full source/compiler projects, resources, retention and publicatio
 remain unfinished. Exact evidence and limits are in the Ginux plan and
 `.artifacts/ginux-local-integration/directory-storage/`.
 
+Owned-ELF continuation 2026-11-05: Ginux **c5ae1c5d** adds VFS executable
+references and a private sealed-memfd exec transaction, preserving permissions,
+writer exclusion, fork lifetime, failed-exec cleanup and the existing public
+CLOEXEC commit point. Recipe **287701b** copies a real Bash ELF into /work,
+executes it using streamed/captured helpers, custom-validates its result and
+installs a named product. All 27 focused Recipe cases, eleven launch suites and
+eleven VFS cases pass; release build/Clippy pass. Native /proc checks prove the
+running bytes, seals/mode and absence of leaked private fds. The older
+/usr/bin/true probe was mislabeled: artifact bytes show a 51-byte shebang wrapper,
+so it remains an unsupported-script probe. S0 stays in progress: generated
+scripts, guest file mappings, real source compilation, resources, retention and
+publication remain unfinished. Exact evidence and limits are in the Ginux plan
+and `.artifacts/ginux-local-integration/owned-exec/`.
+
 - Complete the existing Ginux launch adapter instead of adding another launcher.
   Route every executable CLI and library operation through it by default.
 - Remove public host/in-process backend selection, host defaults, and fallback.
@@ -1186,19 +1200,21 @@ unrelated edits and current branches. Update task status with concrete evidence
 as work lands. Temporary audit probes are useful reproductions, not durable
 acceptance artifacts; preserve needed cases in the existing integration owner.
 
-Next implementation action in this chat: connect owned-file execution and
-mappings through the existing filesystem/exec/memory owners. The actual CLI
-probe now copies /usr/bin/true into /work/build/domain-true successfully, then
-exec_checked reports EOPNOTSUPP with clean workload failure and unchanged source.
-Its source/result are under directory-storage/generated-exec-next. Ginux
-**9ba6a1d4** now supports owned directory traversal, relative operations, rename
-and removal; Recipe **2303bb7** verifies nested tree production/movement,
-recursive cleanup and protection of staged recipe source. All 25 focused
-CLI/library cases, ten Ginux launch suites and ten VFS cases pass. Current
-limits and source/binary identities are in the Ginux plan and
-`.artifacts/ginux-local-integration/directory-storage/`. Storage remains
-ephemeral. Image-relative directory access, image mutation, links, mappings,
-generated-file execution and ordinary compiler projects are unfinished. Keep machine results
+Next implementation action in this chat: implement generated shebang scripts
+through the existing exec owner, preserving optional interpreter arguments,
+script pathname/$0, argv/environment, permission checks and CLOEXEC behavior.
+Then connect guest file mappings through the filesystem/memory owners. Artifact
+inspection corrects the earlier probe assumption: /usr/bin/true is a 51-byte
+shebang wrapper, which still returns EOPNOTSUPP after copying to /work. The
+passing ELF probe and actual lifecycle now use the verified Bash ELF. Ginux
+**c5ae1c5d** executes owned ELF through a private sealed backing and tracks VFS
+executable lifetime; Recipe **287701b** verifies streamed/captured output,
+custom product checks and executable permission errors. All 27 focused
+CLI/library cases, eleven Ginux launch suites and eleven VFS cases pass. Current
+limits, program-type correction and source/binary identities are in the Ginux
+plan and `.artifacts/ginux-local-integration/owned-exec/`. Storage remains
+ephemeral. Image-relative directory access, image mutation, links, guest file
+mappings, generated scripts and ordinary compiler projects are unfinished. Keep machine results
 separate, custom checks authoritative and the launcher mandatory. Image-file
 polling, broader threaded exec/signal/robust-futex behavior, complete-frame
 deadlines, durable logging/state and cancellation remain unfinished. Public entry,

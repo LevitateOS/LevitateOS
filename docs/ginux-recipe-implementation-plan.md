@@ -599,17 +599,64 @@ directory operations; Recipe **2303bb7** exercises nested production and cleanup
   `.artifacts/ginux-local-integration/directory-storage/`. All commits remain
   local review inputs; no push or PR was performed.
 
-Next local action: connect owned-file execution and file mappings through the
-existing filesystem/exec/memory owners. The new actual CLI probe successfully
-copies the immutable /usr/bin/true ELF into /work/build/domain-true, then
-exec_checked fails with EOPNOTSUPP (95). It is a structured workload failure
-with zero acknowledgements, unchanged source and no panic/protocol failure;
-source/result are under directory-storage/generated-exec-next. Preserve public
-FD ownership, executable permissions and failed-exec descriptor semantics;
-do not expose host writable files, permit raw private handles, or add a host
-fallback. Full source/compiler projects, durable storage and publication remain
-unverified and incomplete. S0/S1/S2 remain in progress.
-Complete file mappings/generated execution, full input/dependency layout,
+Owned-ELF continuation 2026-11-05: Ginux **c5ae1c5d** executes generated ELF
+files through the existing supervised transaction; Recipe **287701b** verifies
+streamed/captured execution and content-checked installation:
+
+- VFS executable references validate permissions and reject open writers with
+  ETXTBSY. They preserve object identity across rename/unlink, inherit on fork,
+  survive until the final process using the executable exits/replaces it, and
+  never change an ordinary file offset. Pending references release on failed
+  exec/death; process groups release committed references before teardown.
+- The transaction injects a private CLOEXEC memfd_create into the stopped
+  tracee. The supervisor opens only that registered task's freshly returned
+  kernel fd via procfs, fills it from pinned VFS bytes, sets mode 0500 and
+  verifies mandatory write/grow/shrink/seal locks. It closes its own fd, then
+  injects execveat of the sealed backing. The private fd never enters the public
+  table and closes on kernel success or explicit failed-exec cleanup. There is
+  no named host output or public memfd syscall allowance. Image exec behavior
+  and the PTRACE_EVENT_EXEC CLOEXEC commit boundary remain intact.
+- Owned execve/execveat supports paths, owned directory-fd relative paths, and
+  AT_EMPTY_PATH on open/unlinked files. A temporary native fd and supervisor
+  procfs access to its stopped tracee are required; failures propagate without
+  fallback. Sole process-leader exec remains required. Snapshot kernel memory
+  is additional to the VFS mapping bound; total process/kernel resource
+  accounting is unfinished. Guest mmap of owned files is still unsupported.
+- All eleven actual Ginux launch suites and eleven VFS cases pass; release
+  build and strict Clippy pass. The new seven-mode family verifies invalid
+  argv and malformed ELF rollback, permission/write exclusion, public CLOEXEC
+  preservation, source offsets, direct/descriptor/unlinked/relative exec,
+  fork/vfork/CLONE_VM lifetime, and eventual write permission after final exec
+  reference release. Host /proc inspection independently verifies no private
+  fd before/after exec, exact running ELF bytes, required seals and mode 0500.
+- All 27 focused actual Recipe CLI/library cases pass (23 managed, three entry
+  guards, one library case). The new lifecycle copies the prepared Bash ELF to
+  /work/build, runs that owned executable through streamed and captured helpers,
+  validates its produced bytes with custom checks, and installs a named product.
+  Another case rejects non-executable owned data with EACCES. Source files and
+  result/diagnostic framing remain intact. No Recipe unit tests were run.
+- Correction to the previous probe description: the prepared /usr/bin/true is
+  a **51-byte shebang wrapper**, not an ELF. Direct artifact inspection verifies
+  that header and the **1410688-byte Bash ELF** used by the passing probe. The
+  old true-wrapper EOPNOTSUPP result remains valid script evidence; it never
+  established a failing ELF test. Generated scripts are still unsupported.
+  Program-byte evidence, exact source/binary identities, commands/logs and the
+  passing ELF probe are under
+  `.artifacts/ginux-local-integration/owned-exec/`. All commits are local review
+  inputs; no push or PR was performed.
+
+Next local action: implement generated shebang scripts through the existing
+exec owner, preserving optional interpreter arguments, script pathname/$0,
+argv/environment, executable checks and failed-exec/CLOEXEC behavior. The actual
+51-byte coreutils wrapper copied into /work still returns EOPNOTSUPP; its
+verified source header is in owned-exec/prepared-program-types.json and its
+previous CLI source/result remain in directory-storage/generated-exec-next.
+Then connect guest file mappings through the filesystem/memory owners. Do not
+rewrite recipes around the gap, expose arbitrary host files/private handles,
+or add a host fallback. Source compilation, retained storage, resources and
+publication remain incomplete; this slice proves copied ELF execution, not a
+compiled source project. S0/S1/S2 remain in progress.
+Generated script execution and guest file mappings, full input/dependency layout,
 target/options transport, resources, durable state/generations, publication and
 unreachable legacy-wrapper removal remain incomplete. The linked review thread
 owns upstream review and PR creation; local commits are unreviewed inputs.
