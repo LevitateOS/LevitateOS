@@ -328,7 +328,7 @@ to introduce new crates or parallel behavior owners.
   behavior in bounded patches. Done: a real threaded program completes; Recipe's
   output-draining thread pattern is supported without weakening mediation.
 
-- [ ] **G05 — Complete child waits and normal signal delivery.** Depends: G04.
+- [x] **G05 — Complete child waits and normal signal delivery.** Depends: G04. (Done 2026-11-05: worktree `/tmp/ginux-g05`, branch `ginux-recipe/g05-waits`, commit `4655aaa2`, pushed to fork. `TaskState::Signaled` + Linux wait-word `ChildStatus` + `WaitTarget` in ginux-process; wait4 fully emulated (blocking park, WNOHANG→0, EINVAL/ECHILD); kill forwards SIGTERM/SIGINT/SIGKILL + signal-0 probe, others denied; SIGCHLD queued+delivered per child death; signaled-but-unreaped renders zombie. Coordinator reran reproducer: WAIT_REPRO PASS (exits 42,3; signals 15,9), GATE7 PASS, G03/G03b/G04 regressions PASS, no survivors. LIMIT: in-tracee SIGCHLD handler observation needs rt_sigaction mediation; job-control stops unmediated (WUNTRACED/WCONTINUED accepted but never produced; SIGSTOP/SIGCONT denied). Follow-ups: (1) rt_sigaction + handler delivery, (2) job-control mediation.)
   Owner: G-process. Cover child wait results, SIGCHLD, and normal forwarded
   termination signals without relying on fixture-specific statuses. Done: parent
   and child observe real completion and cancellation with no escaped task.
