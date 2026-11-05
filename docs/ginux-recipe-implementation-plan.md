@@ -2,6 +2,17 @@
 
 Status: implementation is in progress; individual tasks record completion and evidence.
 
+PR preparation checkpoint (2026-11-05): the user requested prospective upstream
+contributions. Three independent VFS bug fixes are prepared locally on upstream
+`2489517e`, each in a detached worktree with one signed-off commit, a short PR
+draft and runtime/unit evidence. All six new regressions fail on unmodified
+upstream; the combined fixes pass 61 unit cases and static checks. See
+[the contribution package](ginux-pr-preparation-20261105.md) for exact commits,
+paths and validation. User review is next; no push, new PR or public text edit
+was performed. Hold further balanced-profile proposals pending the current
+maintainer guidance on issue #179 and PR #207. The integration work and its
+remaining limitations below are preserved.
+
 Current execution checkpoint (2026-11-05, supersedes older next-action text):
 the user authorized this review thread to complete the local integration, using
 existing branches and keeping publication under their control. Work order is
