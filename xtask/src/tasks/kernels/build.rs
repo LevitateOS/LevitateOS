@@ -32,8 +32,6 @@ pub fn run(
         &root,
         t.distro_id,
         rebuild_even_if_verified,
-        t.kernel,
-        t.module_install_path,
         &autofix,
     ) {
         return Err(e).context(format!("Kernel build failed for {}", t.distro_id));

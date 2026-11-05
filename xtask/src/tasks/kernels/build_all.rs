@@ -47,8 +47,6 @@ pub fn run(rebuild_even_if_verified: bool, autofix: super::common::AutoFixOption
                 &root,
                 t.distro_id,
                 rebuild_even_if_verified,
-                t.kernel,
-                t.module_install_path,
                 &autofix,
             )
         })?;

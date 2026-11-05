@@ -8,7 +8,6 @@ use std::process::Command;
 pub(crate) struct KernelTarget {
     pub distro_id: &'static str,
     pub kernel: &'static distro_spec::shared::KernelSource,
-    pub module_install_path: &'static str,
 }
 
 #[derive(Clone, Debug)]
@@ -24,12 +23,10 @@ pub(crate) fn target_for(d: crate::cli::Distro) -> KernelTarget {
         crate::cli::Distro::Levitate => KernelTarget {
             distro_id: "levitate",
             kernel: &distro_spec::levitate::KERNEL_SOURCE,
-            module_install_path: distro_spec::levitate::MODULE_INSTALL_PATH,
         },
         crate::cli::Distro::AcornOS => KernelTarget {
             distro_id: "acorn",
             kernel: &distro_spec::acorn::KERNEL_SOURCE,
-            module_install_path: distro_spec::acorn::MODULE_INSTALL_PATH,
         },
     }
 }
@@ -132,17 +129,12 @@ pub(crate) fn build_kernel_via_recipe(
     root: &Path,
     distro_id: &str,
     force_rebuild: bool,
-    kernel: &distro_spec::shared::KernelSource,
-    module_install_path: &str,
     autofix: &AutoFixOptions,
 ) -> Result<()> {
     let bundle = load_variant_contract_bundle_for_distro_from(root, distro_id)
         .with_context(|| format!("loading canonical variant contract for '{}'", distro_id))?;
     let recipe_rhai = root.join("distro-builder/recipes/linux.rhai");
-    let build_dir = root
-        .join(".artifacts/work")
-        .join(distro_id)
-        .join("downloads");
+    let build_dir = distro_builder::recipe::recipe_work_dir(root, distro_id)?;
     let recipes_path = root.join("distro-builder/recipes");
     let kconfig_path = bundle
         .paths
@@ -163,12 +155,6 @@ pub(crate) fn build_kernel_via_recipe(
         .arg(recipe_rhai)
         .args(["--build-dir", build_dir.to_string_lossy().as_ref()])
         .args(["--recipes-path", recipes_path.to_string_lossy().as_ref()])
-        .args(["--define", &format!("KERNEL_VERSION={}", kernel.version)])
-        .args(["--define", &format!("KERNEL_SHA256={}", kernel.sha256)])
-        .args([
-            "--define",
-            &format!("KERNEL_LOCALVERSION={}", kernel.localversion),
-        ])
         .args([
             "--define",
             &format!("KERNEL_KCONFIG_PATH={}", kconfig_path.display()),
@@ -180,10 +166,6 @@ pub(crate) fn build_kernel_via_recipe(
         .args([
             "--define",
             &format!("KERNEL_FORCE_REBUILD={}", if force_rebuild { 1 } else { 0 }),
-        ])
-        .args([
-            "--define",
-            &format!("MODULE_INSTALL_PATH={module_install_path}"),
         ]);
 
     if autofix.enabled {
@@ -204,14 +186,9 @@ pub(crate) fn install_prebuilt_kernel_via_recipe(
     root: &Path,
     distro_id: &str,
     force_redownload: bool,
-    kernel: &distro_spec::shared::KernelSource,
-    module_install_path: &str,
 ) -> Result<()> {
     let recipe_rhai = root.join("distro-builder/recipes/linux-prebuilt.rhai");
-    let build_dir = root
-        .join(".artifacts/work")
-        .join(distro_id)
-        .join("downloads");
+    let build_dir = distro_builder::recipe::recipe_work_dir(root, distro_id)?;
     let recipes_path = root.join("distro-builder/recipes");
     let kernel_artifact_root = root
         .join(".artifacts/kernel")
@@ -224,11 +201,6 @@ pub(crate) fn install_prebuilt_kernel_via_recipe(
         .arg(recipe_rhai)
         .args(["--build-dir", build_dir.to_string_lossy().as_ref()])
         .args(["--recipes-path", recipes_path.to_string_lossy().as_ref()])
-        .args(["--define", &format!("KERNEL_VERSION={}", kernel.version)])
-        .args([
-            "--define",
-            &format!("KERNEL_LOCALVERSION={}", kernel.localversion),
-        ])
         .args([
             "--define",
             &format!("KERNEL_ARTIFACT_ROOT={}", kernel_artifact_root.display()),
@@ -239,10 +211,6 @@ pub(crate) fn install_prebuilt_kernel_via_recipe(
                 "KERNEL_FORCE_REBUILD={}",
                 if force_redownload { 1 } else { 0 }
             ),
-        ])
-        .args([
-            "--define",
-            &format!("MODULE_INSTALL_PATH={module_install_path}"),
         ]);
 
     run_cmd(&mut cmd)

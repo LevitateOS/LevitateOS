@@ -18,15 +18,8 @@ pub fn run(distro: crate::cli::Distro, refresh: bool) -> Result<()> {
     let recipe_bin = super::common::build_recipe_bin(&root).context("Building recipe binary")?;
 
     eprintln!("[step] Install prebuilt kernel: {}", t.distro_id);
-    super::common::install_prebuilt_kernel_via_recipe(
-        &recipe_bin,
-        &root,
-        t.distro_id,
-        refresh,
-        t.kernel,
-        t.module_install_path,
-    )
-    .with_context(|| format!("Prebuilt kernel install failed for {}", t.distro_id))?;
+    super::common::install_prebuilt_kernel_via_recipe(&recipe_bin, &root, t.distro_id, refresh)
+        .with_context(|| format!("Prebuilt kernel install failed for {}", t.distro_id))?;
 
     let rel = super::common::verify_one(&root, &t).with_context(|| {
         format!(

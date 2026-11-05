@@ -750,8 +750,7 @@ the coordinator must export selected domain products and return published host
 paths, never treat a worker path as host authority. The interface records this
 requirement explicitly. No kernel was compiled or booted.
 
-Remaining S5 work includes the filename-based Alpine preseed selector, legacy
-work/cache directories and source-cache UI hint, managed publication/integrity,
+Remaining S5 work includes legacy work/cache directories, managed publication/integrity,
 and the remaining acquisition helpers. The named-path consumer layer is not
 evidence that those responsibilities are complete.
 
@@ -779,6 +778,32 @@ closed without GINUX_BIN. No managed acquisition or output publication is proved
 R07 still needs to transport refresh/options and explicit input/cache paths;
 R08 still owns publication. Legacy adapter cache paths and basename inference
 remain outstanding, alongside actual managed runtime verification.
+
+Kernel work-path slice 2026-11-05: distro-builder aabc3f8 provides the existing
+orchestration path owner as recipe::recipe_work_dir. Kernel readiness checks,
+source/prebuilt xtask producers, explicit source preseeding, and the Linux adapter
+share .artifacts/work/<normalized-distro>/downloads. The Linux adapter's explicit
+linux_for_distro entry point loads and validates canonical variant configuration;
+the legacy base-directory API delegates to it. Published kernel roots remain
+.artifacts/kernel/<distro>/current. No files are moved and existing artifacts are
+not rebuilt. leviso f1c62e9 uses the explicit adapter and no longer treats missing
+source caches as a preflight warning or claims that they will be downloaded on
+an ordinary artifact-consuming build. The public has_linux_source compatibility
+hint remains, now looking in the canonical work directory; it does not determine
+readiness. xtask uses the shared path owner and stops sending unused kernel
+version/hash/localversion/module-layout defines that the recipes do not consume.
+
+    cargo check -p distro-builder --bins --lib -p leviso -p levitate-xtask --offline
+    cargo test -p distro-builder --test preseed_contract --offline -- --nocapture
+    cargo run -p levitate-xtask --offline -- kernels check
+
+Compilation and all three CLI cases pass, including a check that renamed explicit
+preseeding creates canonical work rather than legacy AcornOS/downloads. The
+read-only kernel check fails because both canonical kernel.release files are
+absent. No kernel build or managed Linux execution was attempted; compilation
+does not establish artifact reuse or production inside Ginux. The legacy
+Alpine/package/tool paths and materializer cache-input inference still need
+migration. Explicit worker target/options/cache transport remains S2/S3/R07.
 
 ### S6 Migrate representative recipes and validate managed execution
 
@@ -864,8 +889,9 @@ unrelated edits and current branches. Update task status with concrete evidence
 as work lands. Temporary audit probes are useful reproductions, not durable
 acceptance artifacts; preserve needed cases in the existing integration owner.
 
-Next implementation action in this chat: finish cache/work path ownership after
-the explicit preseed capability declaration slice.
+Next implementation action in this chat: migrate the remaining legacy adapter
+cache/work paths and remove materializer cache-input inference using the explicit
+input contract. Kernel and preseed callers now share the canonical work path.
 Target/state transport follows the coordinated S3/R07 change. Revalidate the
 invocation, cleanup, and output contracts through the real launcher when
 R06/G14 converge. Keep the legacy adapter until recipes migrate. The
