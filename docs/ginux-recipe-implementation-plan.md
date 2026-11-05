@@ -303,20 +303,20 @@ to introduce new crates or parallel behavior owners.
   audit output. Done: a real subprocess caller can distinguish each result and
   capture clean application output.
 
-- [ ] **G03 — Connect native fork to managed child ownership.** Depends: F03.
+- [x] **G03 — Connect native fork to managed child ownership.** Depends: F03. (Done 2026-11-05: worktree `/tmp/ginux-g03`, branch `ginux-recipe/g03-fork`, commit `724dd3ae`. Fixture exit-23/32 rules replaced by `ProcessTable::wait` translation with status-word poke-back; pid translation hides host pids. Coordinator rebuilt + reran supervised fork reproducer: virtual pids 2,3, real statuses 7+13, cleanup PASS, no survivors. Follow-up: wire fork events into the G01 `launch_main` loop at merge time; prohibited `#[cfg(test)]` in ginux-process/core left for separate policy cleanup.)
   Owner: G-process; existing process model and native process adapter. Connect
   fork to the general supervisor, replacing fixture-specific completion rules
   with ordinary parent/child ownership. Done: a real fork workload returns child
   status without exposing host process identities or leaving an untraced child.
 
-- [ ] **G03a — Support libc process-creation variants.** Depends: G03.
+- [x] **G03a — Support libc process-creation variants.** Depends: G03. (Done 2026-11-05: worktree `/tmp/ginux-g03`, branch `ginux-recipe/g03a-variants`, commit `668a86f2`. clone/fork/vfork claimed; CLONE_THREAD + bare CLONE_VM denied ENOSYS; clone3 untouched so glibc falls back; VFORK/CLONE events translated at creation exit stop. Variant selection measured via strace/ptracer ground truth (glibc 2.39). Coordinator reran supervised reproducer: `VARIANT_REPRO: PASS`, GATE7 PASS, no survivors.)
   Owner: G-process. Add the vfork/clone process-creation variants required by the
   selected libc, sharing the existing managed-task path. Keep clone-thread work
   for G04. Done: a normal libc subprocess launcher creates a managed child; each
   unsupported variant fails explicitly. Split clone3 into its own follow-up if
   required rather than bundling another ABI into this assignment.
 
-- [ ] **G03b — Supervise executable replacement.** Depends: G03a.
+- [x] **G03b — Supervise executable replacement.** Depends: G03a. (Done 2026-11-05: worktree `/tmp/ginux-g03`, branch `ginux-recipe/g03b-exec`, commit `bef09013`, pushed to fork. `process_hooks::exec_mediated` claims execve(59)/execveat(322): plain execve and execveat(AT_FDCWD,path,argv,envp,0) execute under supervision, other shapes denied ENOSYS; TRACEEXEC + PTRACE_EVENT_EXEC handler preserves virtual pid with exec-epoch bump. Coordinator reran supervised reproducer: SHELL_REPRO PASS, GATE7 PASS, no survivors. LIMIT: wiring into the G01 `launch_main` loop pending at merge time; exec-target path allowlisting deferred to G05a/G07.)
   Owner: G-process. Handle execve and a required execveat variant, controlled
   loader transitions, and task identity across exec. Done: a managed shell starts
   another executable and its caller observes the real result; executable
@@ -370,7 +370,7 @@ to introduce new crates or parallel behavior owners.
   Done: a real shell pipeline and an exec with close-on-exec descriptors behave
   correctly without receiving supervisor descriptors.
 
-- [ ] **G08 — Add rename and removal behavior.** Depends: G07b.
+- [x] **G08 — Add rename and removal behavior.** Depends: G07b. (Done 2026-11-05: worktree `/tmp/ginux-g08`, branch `ginux-recipe/g08-rename`, commit `d4ecd78`. Pure-core `rename_at`/`unlink_at` + VFS `rename` (atomic replace, nofollow, tombstones; fixed nofollow gap + tombstone-shadows-live bug). Coordinator reran source-verbatim reproducer: 70/70 PASS, base blob immutable. LIMIT: claims still deny at the entry layer; supervised wiring + `rmdir` pending.)
   Owner: G-files. Implement the rename/unlink operations required for temporary
   files, compiler output, and cleanup. Keep atomic rename semantics and explicit
   unsupported cases. Done: real tools replace and remove domain files correctly;
@@ -393,13 +393,13 @@ to introduce new crates or parallel behavior owners.
   generic program reads an imported file at a configured domain path; no host
   path or descriptor is disclosed as managed authority.
 
-- [ ] **G11 — Add retained writable backing.** Depends: G07a, G10.
+- [x] **G11 — Add retained writable backing.** Depends: G07a, G10. (Done 2026-11-05: worktree `/tmp/ginux-g11`, branch `ginux-recipe/g11-retained`, commit `a396ab14`. `retained.rs`: checkpoint/restore with validation, per-file/total/count bounds, instance-id isolation. Coordinator reran reproducer: PASS (stop/reopen identical, 4 exhaustion cases explicit, cross-instance rejected with nothing applied). Flush seam defined for G12: publish staged bytes + fsync + atomic rename; reserved header word becomes generation counter; restore reads only G12-published images.)
   Owner: G-storage; existing VFS backend hook and a retained-storage module.
   Replace demo-sized disposable backing for the selected workload with bounded
   retained storage. Preserve isolation between instances. Done: files survive a
   normal domain stop/reopen and storage exhaustion returns useful errors.
 
-- [ ] **G12 — Flush retained storage durably.** Depends: G11.
+- [x] **G12 — Flush retained storage durably.** Depends: G11. (Done 2026-11-05: worktree `/tmp/ginux-g11`, branch `ginux-recipe/g12-flush`, commit `eb2589dd`. Header word = generation counter; `DurableStore` (write-temp/fsync/atomic-rename/dir-sync/read-back) + `flush_retained`/`recover_retained`; restore reads only published images; per-phase FlushError never reports failure as durable. Coordinator reran reproducer: all checks PASS incl. torn-write rejection and generation increments.)
   Owner: G-storage. Implement the backing store's explicit flush and recovery
   behavior with useful error propagation. Done: a completed flush survives
   reopen; incomplete/failed writes cannot be reported as durable.
@@ -546,8 +546,9 @@ to introduce new crates or parallel behavior owners.
   secrets. Done: required files and runtime libraries are present; ordinary
   execution consumes this environment without downloading or rebuilding it.
 
-- [ ] **I02 — Prepare the isolated recfstab source/layout inputs.** Depends: I01,
-  R05. Owner: Integration; `AcornOS/deps/recfstab.rhai` if adaptation is necessary.
+- [x] **I02 — Prepare the isolated recfstab source/layout inputs.** Depends: I01,
+  R05. (Done 2026-11-05: `docs/ginux-i02-recfstab-inputs.md`. `recfstab.rhai` (3124 B, no extends/imports) stages exactly 1 input `/inputs/main.rhai`; source closure pinned at `tools/recfstab @98926aa` (recfstab 0.1.5, clap 4.5.54, 8 src files hashed); build output and install staging verified absent; acquisition is local Cargo.toml-existence check only, no HTTP claimed. Adaptation: NONE (submodule-owned, untestable until R06/G09/G12a). Open gaps H1–H6 handed to I03.)
+  Owner: Integration; `AcornOS/deps/recfstab.rhai` if adaptation is necessary.
   Resolve the recipe's checkout-relative paths and Cargo workspace manifest/source
   closure explicitly. Prefer declared input layout; make a small recipe-owned
   adaptation if needed, without required defines or Ginux-specific package logic.
