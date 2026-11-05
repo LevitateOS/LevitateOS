@@ -175,6 +175,23 @@ The target persistence contract is:
   recovery. The existing --no-persist-ctx option becomes a documented compatibility
   alias for that policy; it does not disable filesystem effects.
 
+Named path products use `ctx.outputs`, a map from selected product names to
+nonempty absolute domain-path strings. Rust/TOML consumer contracts select names
+and filesystem kinds; the worker does not choose authoritative host destinations.
+The current builder consumers require `rootfs` (directory), preseed `iso` (file)
+and Alpine `apk_tools` (file), or kernel `kernel` (file) and `modules` (directory).
+Kernel `source` is an optional directory; kernel release metadata is the required
+`ctx.kernel_version` string. Successful custom readiness checks rediscover the
+same names when an installation is reused.
+
+R08 must resolve selections in the matching domain view/generation, export them
+through confined coordinator-owned staging, validate them, and return published
+host paths under the selected names only after successful publication. Forwarding
+a worker's path and finding a file at that path on the host is not publication
+evidence. Consumer filesystem-kind checks supplement custom readiness and the
+coordinator's publication guarantees; they do not grant host-path authority.
+This bridge is still pending; named-output declarations alone do not implement it.
+
 Keep the current v1 framing/payload reference intact while its callers exist.
 Implement incompatible request/checkpoint/result changes as transport v2 with
 matching coordinator and worker changes and explicit mismatch rejection. Recipe

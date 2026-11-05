@@ -707,6 +707,54 @@ kernels; no kernel was compiled or booted. Source acquisition's changed branches
 were parsed through CLI checks but were not run end to end. Managed Ginux
 acquisition/publication and interruption recovery remain outstanding.
 
+Named-output consumer slice 2026-11-05: distro-builder 6bc459f replaces flat-field
+fallbacks and guessed rootfs/ISO/APK/kernel/source paths in the four recipe
+adapters with shared named-output contracts. Required ctx.outputs entries must
+be nonempty absolute paths with the requested filesystem kind. Kernel image and
+modules are required; source is optional (LinuxPaths.source is now Option<PathBuf>)
+and kernel_version is required metadata instead of an "unknown" fallback.
+Installed kernel reuse no longer invents a source tree or reconstructs vmlinuz
+under a different output root.
+
+The shared kernel metadata owner declares kernel/module paths for source and
+prebuilt lifecycles. Prebuilt context/output assembly is consolidated while its
+independent checks still run. Rootfs and preseed producers report named products
+on successful install/readiness paths; legacy flat fields remain for migration.
+AcornOS d1777d3 adds matching names to the legacy Alpine facade producer.
+tools/recipe 0eb2907 extends existing real CLI kernel/preseed cases to check names
+on acquisition and reuse, and documents path declarations. Custom readiness
+rules remain in recipes; consumer type checks do not replace them.
+
+The builder also uses an invocation-owned temporary result file, removed on
+success/failure, instead of reusing .recipe-output.json. distro-builder 8dc194c
+adds a passing real-CLI regression: static `recipe info` exits zero without a
+lifecycle result, and the adapter rejects it while preserving old cached JSON.
+That case does not evaluate Rhai or validate managed publication.
+
+    cargo check -p distro-builder --lib --offline
+    cargo check -p distro-builder --bins -p leviso -p acornos --offline
+    cargo test -p distro-builder --test recipe_outputs --no-run --offline
+    cargo test -p levitate-recipe --test e2e --no-run --offline
+
+These compilation commands pass. All nine changed Rhai sources also pass a
+temporary Rhai 1.19.0 compile_file check with optimization disabled; this compiles
+syntax without evaluating setup/imports/hooks. The durable integration cases use
+the actual CLI rather than that temporary probe.
+
+The new managed producer/consumer case creates a real rootfs tool and tests named
+selection, omitted/wrong-kind/missing products, and stale conventional artifacts.
+Its positive attempt through the actual Ginux launcher still fails before recipe
+execution with the oversize first frame (1195986517 versus 4194304) and no result
+file. No managed output-contract case has passed. Publication remains R08 work:
+the coordinator must export selected domain products and return published host
+paths, never treat a worker path as host authority. The interface records this
+requirement explicitly. No kernel was compiled or booted.
+
+Remaining S5 work includes the filename-based Alpine preseed selector, legacy
+work/cache directories and source-cache UI hint, managed publication/integrity,
+and the remaining acquisition helpers. The named-path consumer layer is not
+evidence that those responsibilities are complete.
+
 ### S6 Migrate representative recipes and validate managed execution
 
 Dependencies: S3-S5. Status: not started.
@@ -791,9 +839,10 @@ unrelated edits and current branches. Update task status with concrete evidence
 as work lands. Temporary audit probes are useful reproductions, not durable
 acceptance artifacts; preserve needed cases in the existing integration owner.
 
-Next implementation action in this chat: define named producer outputs and remove
-Rust filename/path guesses, while target/state transport follows the coordinated
-S3/R07 change. Revalidate invocation/cleanup through the real launcher when
+Next implementation action in this chat: replace filename-based preseed capability
+detection with explicit orchestration metadata and finish cache/work path ownership.
+Target/state transport follows the coordinated S3/R07 change. Revalidate the
+invocation, cleanup, and output contracts through the real launcher when
 R06/G14 converge. Keep the legacy adapter until recipes migrate. The
 complete dependency executor and durable state integration still follow their
 shared S3/R07 contracts. Worker/launcher integration remains with the Ginux owner.
