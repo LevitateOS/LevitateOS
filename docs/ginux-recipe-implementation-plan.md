@@ -365,14 +365,54 @@ local integration branch connects the configured launcher to ProcessTable:
   root for the real chroot bootstrap; an initial unprivileged attempt failed
   before managed code, then the correctly privileged cases passed.
 
-Next local action: implement successful and failed exec transitions, including
-per-public-descriptor CLOEXEC and safe native-handle synchronization. Do not close
-owned handles before a failed exec, or let aliases lose native handles that must
-survive. Reuse the process and descriptor owners, verify real replacement and
-failure behavior through retained runtime fixtures, then rerun the unchanged
-actual Recipe Bash helper. Clone3 fallback remains deliberate; thread ownership
-and the broader libc helper/runtime surface still need integration. This is
-G03/G05a configured-launch integration, not completion of old demo records.
+Configured-exec continuation 2026-11-05: Ginux **8f768700** on the existing
+local integration branch implements image execve/execveat:
+
+- The configured task owner reserves exec, replays its verified x86-64 syscall
+  instruction to synchronize native CLOEXEC flags through controlled fcntl calls,
+  and commits public descriptor retirement only at PTRACE_EVENT_EXEC. No code
+  bytes are patched. Mixed public aliases preserve their shared native handle;
+  owned handles release only after successful replacement. Failed exec retains
+  all public descriptors and flags. Bootstrap CLOEXEC stdio is no longer
+  represented as a live public console after the initial exec.
+- Identity survives replacement; the existing process owner advances exec state.
+  Supported paths include current-workdir-relative execve, absolute execveat,
+  image-fd AT_EMPTY_PATH and image symlinks. Relative directory-fd execution and
+  generated-file execution remain unsupported. The path view is still lexical;
+  a unified image/overlay resolver remains future storage work. Signals during
+  descriptor synchronization fail the domain explicitly; restart/deferred
+  delivery for that interval remains incomplete.
+- Seven actual Ginux runtime suites and release build/clippy with -D warnings
+  pass. New exec coverage checks failed ENOENT/EACCES/ENOEXEC/EFAULT calls,
+  rejected owned/hidden paths, per-alias flags and owned lifetimes, two successive
+  replacements, fork isolation, execveat, relative paths and symlinks. The runner
+  inspects actual /proc kernel descriptors before new opens can hide a leaked
+  native handle. Makefile/CI retain the fixture producer and scenario.
+- All 16 focused actual Recipe CLI/library cases pass after the subprocess fix.
+  The actual Bash helper now completes a supervised exec event and starts its
+  dynamic loader. The Recipe worker then attempts **clone flags 0x3d0f00** for
+  its stdout-draining pthread; clone3 fallback and clone remain denied for threads.
+  This initially panicked std::thread::spawn, ending the worker with code 101
+  and breaking the protocol. It is not a successful Bash command result.
+- Recipe **7f30e3c** uses fallible thread builders for both output readers. A
+  startup failure kills/reaps the child and joins any reader already started;
+  it returns an ordinary command error. Replaying the actual helper now returns
+  a structured build failure, zero acknowledged checkpoints and launcher exit 0,
+  with the child reaped and no worker panic. Author guidance reflects the limits.
+- Before/after panic/error audits, child source/stdout/stderr, exact clone registers,
+  build/worker identities, commands/environment, seven suite logs and 16-case logs
+  live under `.artifacts/ginux-local-integration/exec-supervision/`. These are
+  real privileged chroot runs using the pinned Rocky image and actual worker.
+
+Next local action: support the observed pthread shape through tracked task and
+shared descriptor ownership. Separate per-task pending descriptor-call state from
+the process-wide table before sharing it for CLONE_FILES. Reuse ProcessTable's
+thread/tgid model, project native TID copyouts, and connect clear-TID/futex/join and
+per-thread exit without releasing peers' file handles. Keep fork snapshots and
+exec ownership coherent under concurrent calls; do not simply allow the flags.
+Then rerun the unchanged actual Bash helper and add a durable successful managed
+child case when it works. Thread creation and broader wait/signal/readiness
+semantics remain incomplete; this remains G03/G05a configured-launch integration.
 Compiler-sized storage/directory operations, full input/dependency layout,
 target/options transport, resources, durable state/generations, publication and
 unreachable legacy-wrapper removal remain incomplete. The linked review thread

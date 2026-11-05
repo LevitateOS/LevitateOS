@@ -259,6 +259,19 @@ exec/CLOEXEC is next, followed by thread and remaining runtime semantics. Recipe
 progress. Evidence is in `.artifacts/ginux-local-integration/task-supervision/`;
 no push or PR occurred. The designated review thread still owns upstream PRs.
 
+Configured-exec continuation 2026-11-05: Ginux **8f768700** handles image
+execve/execveat and commits CLOEXEC retirement only after kernel-confirmed
+replacement. Mixed native aliases survive; failed exec preserves descriptors.
+Seven real Ginux suites and all 16 focused Recipe CLI/library cases pass. The
+actual child now reaches a successful exec event and Bash's dynamic loader,
+then the worker fails at pthread clone flags 0x3d0f00 for its output reader.
+Recipe **7f30e3c** replaces that worker panic with a fallible reader startup,
+child termination/reap and structured build error. No successful Bash command
+result is claimed. Thread/shared-descriptor ownership is next, alongside remaining
+wait/signal/readiness semantics; generated-file execution still awaits storage.
+S0 remains in progress. Evidence is in
+`.artifacts/ginux-local-integration/exec-supervision/`; no push or PR occurred.
+
 - Complete the existing Ginux launch adapter instead of adding another launcher.
   Route every executable CLI and library operation through it by default.
 - Remove public host/in-process backend selection, host defaults, and fallback.
@@ -378,6 +391,17 @@ including Alpine's ISO and APK. Existing unrelated account/package edits in thos
 same files were preserved and excluded from the commit. The actual RPM pipeline
 failure path and full managed materialization still require runtime verification;
 the consumer case checks acquisition/readiness only and does not prove those paths.
+
+Command resource-error continuation 2026-11-05: tools/recipe **7f30e3c** makes
+both streaming output readers use fallible thread builders. Failure to start
+either reader kills/reaps the command, joins a previously started reader, and
+returns an interpreter-visible command error. The real managed Bash helper
+previously panicked at its first reader startup and broke protocol framing; it
+now returns phase=build, zero checkpoints and a normal worker completion with
+no surviving child. All 16 focused managed CLI/library checks pass after rebuild.
+The first-reader failure is directly reproduced; second-reader cleanup still
+needs a runtime resource-limit case once tracked threads are available. This
+does not establish successful command execution or complete S1 acceptance.
 
 ### S2 Unify setup and command execution
 
@@ -1066,13 +1090,16 @@ unrelated edits and current branches. Update task status with concrete evidence
 as work lands. Temporary audit probes are useful reproductions, not durable
 acceptance artifacts; preserve needed cases in the existing integration owner.
 
-Next implementation action in this chat: connect successful/failed exec and
-correct close-on-exec behavior through the configured task and descriptor owners.
-The actual helper now creates a supervised child and reaches execve denial;
-process inheritance, owned peer IO, waits and teardown have actual runtime
-coverage. Do not retire handles before a failed exec or discard native handles
-needed by surviving public aliases. Thread ownership and broader runtime
-semantics remain unfinished. Extend the existing storage owner for compiler-sized files and directory
+Next implementation action in this chat: connect the observed pthread clone
+shape to tracked tasks and shared descriptor ownership. Exec replacement and
+CLOEXEC now have real runtime coverage; the actual helper advances into the
+image's dynamic loader but fails to create its output reader thread. Separate
+per-task pending descriptor-call state before sharing the table, preserve
+process/thread identity and TID copyouts, and connect clear-TID/futex/join and
+thread exit without closing peers' handles. Keep fork/exec snapshots coherent
+under concurrent calls; broadening the syscall allowlist is insufficient. The
+reader error is now structured and the child reaped. Broader runtime semantics
+remain unfinished. Extend the existing storage owner for compiler-sized files and directory
 operations; the current bounded memory backend is not compiler support. Public entry,
 prepared tool paths and bounded checkpoint waiting are connected; process-global
 dependency environment cleanup remains outstanding. Explicit cache/input and dependency-state
