@@ -255,6 +255,20 @@ afterward. Rhai built-in print/debug routing still awaits the common engine
 factory/worker integration; the exec change alone does not complete S1 output
 discipline or prove managed Ginux behavior.
 
+Preseed readiness slice: distro-builder a77ae1b makes all three checks use each
+recipe's verified-asset rule, honoring refresh before a cache hit and hashing
+actual ISO/APK contents. It removes 33 repeated lines while retaining every
+custom hook. tools/recipe a32a227 runs both repository recipes through the CLI
+against small synthetic assets with fixture checksum facts:
+
+    cargo test -p levitate-recipe --test e2e preseed_recipes:: --offline -- --nocapture
+
+The two cases reproduced ignored refresh and accepted same-size corruption before
+the fix. They now pass for valid cache reuse, all three check operations, corruption
+of each asset, and the supported refresh variables. Vendor source facts in the
+real recipes remain unchanged. Rootfs consumer marker checks and failed RPM
+extraction still need fixes; managed Ginux verification remains outstanding.
+
 ### S2 Unify setup and command execution
 
 Dependencies: S1 where overlapping. Status: not started.
@@ -448,7 +462,7 @@ unrelated edits and current branches. Update task status with concrete evidence
 as work lands. Temporary audit probes are useful reproductions, not durable
 acceptance artifacts; preserve needed cases in the existing integration owner.
 
-Next implementation action in this chat: consolidate independent preseed readiness
-checks so refresh is honored and same-size corruption is rejected. Keep the concurrent
+Next implementation action in this chat: fix rootfs consumer trust checks and
+RPM extraction failure propagation, preserving unrelated materializer edits. Keep the concurrent
 Ginux agent's launcher/worker/coordinator work separate. Re-run implemented slices
 through the mandatory Ginux path once that agent's integration is available.
