@@ -5,7 +5,7 @@
 
 ## Summary
 
-Started consolidating leviso to use distro-builder like AcornOS/IuppiterOS. Successfully replaced two copy-pasted modules and began migration to thin wrapper architecture.
+Started consolidating leviso to use distro-builder like AcornOS. Successfully replaced two copy-pasted modules and began migration to thin wrapper architecture.
 
 ## Completed
 
@@ -22,12 +22,11 @@ Started consolidating leviso to use distro-builder like AcornOS/IuppiterOS. Succ
 ### Bonus: Timer Module Refactoring ✅
 - **What:** Moved Timer from `distro_builder/src/alpine/timing.rs` to `distro_builder/src/timing.rs` (root level)
 - **Why:** Timer is generic (uses only `std::time::Instant`), not Alpine-specific
-- **Updated:** leviso, AcornOS, IuppiterOS all use `distro_builder::timing::Timer`
 - **Impact:** Cleaner architecture — generic utilities at root, distro-specific in modules
 
 ## Testing
 
-- ✅ `cargo check -p leviso -p distro-builder -p acornos -p iuppiteros` — all compile
+- ✅ `cargo check -p leviso -p distro-builder -p acornos` — all compile
 - ✅ `cargo test -p leviso` — all 55+51+17 tests pass
 - ✅ ISO builds in ~1.5 minutes
 - ✅ Checkpoint 1 passes (live boot)
@@ -95,7 +94,6 @@ distro-builder/
 AcornOS/
   src/main.rs           — Timer import updated (6 locations)
 
-IuppiterOS/
   src/main.rs           — Timer import updated (6 locations)
 
 docs/

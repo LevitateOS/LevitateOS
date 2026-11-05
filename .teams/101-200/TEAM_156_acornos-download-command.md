@@ -107,12 +107,10 @@ None. Phase 2.1 complete and unblocked.
 1. **2.2** - APK extraction produces correct directory structure
 2. **2.3** - Package dependency resolution works (via recipe)
 3. **2.4** - Alpine signing key verification
-4. **2.5-2.7** - Repeat for IuppiterOS with iuppiter package tiers
 
 All infrastructure is in place. Implementation of remaining 2.x tasks involves:
 - Verifying apk extracts correctly
 - Adding signing key verification to alpine.rhai
-- Creating IuppiterOS variant (minimal code duplication)
 
 ## Architecture Notes
 

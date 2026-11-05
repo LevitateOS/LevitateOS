@@ -65,7 +65,7 @@ cargo run -p levitate-xtask -- tui inspect \
 # Build one kernel (x86_64; policy window enforced)
 cargo run -p levitate-xtask -- kernels build levitate
 
-# Overnight kernel builds (levitate + acorn + iuppiter + ralph; policy window enforced: 23:00 through 10:00 local time)
+# Overnight kernel builds (levitate + acorn; policy window enforced: 23:00 through 10:00 local time)
 cargo run -p levitate-xtask -- kernels build-all
 # Rebuild even if already verified
 cargo run -p levitate-xtask -- kernels build-all --rebuild

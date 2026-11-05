@@ -40,8 +40,6 @@ All tests pass:
 - `AcornOS/src/keys.rs` (NEW) - 160 lines
 - `AcornOS/src/recipe/alpine.rs` - Added key installation call
 - `AcornOS/src/lib.rs` - Added keys module declaration
-- `.ralph/progress.txt` - Added Iteration 7 summary
-- `.ralph/learnings.txt` - Added key management learnings
 
 ### Key Decisions
 

@@ -9,8 +9,6 @@ pub fn run(rebuild_even_if_verified: bool, autofix: super::common::AutoFixOption
     let targets = [
         super::common::target_for(crate::cli::Distro::Leviso),
         super::common::target_for(crate::cli::Distro::AcornOS),
-        super::common::target_for(crate::cli::Distro::IuppiterOS),
-        super::common::target_for(crate::cli::Distro::RalphOS),
     ];
 
     let need_build = rebuild_even_if_verified

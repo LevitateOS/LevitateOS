@@ -73,5 +73,3 @@ These are configuration issues that don't affect the core boot sequence or syste
 ## Next Steps
 
 Phase 6 remaining tasks:
-- 6.6-6.11: IuppiterOS boot verification (similar process)
-- Phase 7: IuppiterOS appliance configuration

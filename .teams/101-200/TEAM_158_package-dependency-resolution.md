@@ -64,5 +64,4 @@ None. All tests pass and dependency resolution is confirmed to work correctly.
 ## Next Steps
 
 - Phase 2.4: Alpine signing key verification (next task)
-- Phase 2.5: IuppiterOS package pipeline reuse
 - Phase 3: Rootfs build with components

@@ -85,11 +85,5 @@ bun.lockb
 output/
 ovmf_vars2.fd
 
-# Ralph loop runtime files
-.ralph/.baseline-*
-.ralph/.claude-md-backup
-.ralph/.claude-md-checksum
-.ralph/logs/
-
 # Local stage runtime state
 .stages/

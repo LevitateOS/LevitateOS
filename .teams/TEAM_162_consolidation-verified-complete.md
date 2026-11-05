@@ -5,7 +5,7 @@
 
 ## Summary
 
-The consolidation work has been completed. leviso is now at the same level of distro-builder integration as AcornOS and IuppiterOS.
+The consolidation work has been completed. leviso is now at the same level of distro-builder integration as AcornOS.
 
 ## Integration Level Achieved
 
@@ -68,7 +68,7 @@ These remaining custom operations are **legitimate architectural differences** (
 ✅ Checkpoint 1 boots successfully
 ✅ No regressions from consolidation work
 ✅ Architecture validated:
-   - leviso independent of AcornOS/IuppiterOS
+   - leviso independent of AcornOS
    - All shared code through distro-builder
    - No cross-distro dependencies
 
@@ -79,6 +79,6 @@ The goal of achieving "same level of integration with distro-builder as acorn or
 - Implements required traits
 - Delegates to distro-builder for common operations
 - Maintains appropriate distro-specific customizations
-- Follows identical integration pattern as AcornOS/IuppiterOS
+- Follows identical integration pattern as AcornOS
 
 Further component system refactoring is optional and does not affect consolidation status.

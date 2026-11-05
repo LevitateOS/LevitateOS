@@ -236,14 +236,6 @@ impl BootConfig {
                 distro_id: "acorn",
                 pretty_name: "AcornOS",
             },
-            crate::cli::BootDistro::Iuppiter => Self {
-                distro_id: "iuppiter",
-                pretty_name: "IuppiterOS",
-            },
-            crate::cli::BootDistro::Ralph => Self {
-                distro_id: "ralph",
-                pretty_name: "RalphOS",
-            },
         }
     }
 }

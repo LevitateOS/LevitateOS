@@ -23,9 +23,7 @@ Properly scoped per-crate, skips parent repo pointer updates, has `--no-verify` 
 | Fix Type | Crates Affected |
 |----------|----------------|
 | `cargo fmt` formatting | 11 submodules |
-| `collapsible_if` | recipe, IuppiterOS |
 | `redundant_closure` | recipe |
-| `trim_split_whitespace` | fsdbg, AcornOS, IuppiterOS |
 | `should_implement_trait` (`from_str`) | recinit, fsdbg (renamed to `parse_name`) |
 | `derivable_impls` | recinit |
 | `io_other_error` | recstrap |
@@ -35,11 +33,6 @@ Properly scoped per-crate, skips parent repo pointer updates, has `--no-verify` 
 | `unnecessary_to_owned` | fsdbg |
 | `needless_borrow` | fsdbg |
 | `manual_pattern_char_comparison` | install-tests |
-| `manual_find` | AcornOS, IuppiterOS |
-| `single_element_loop` | AcornOS (already fixed), IuppiterOS |
-| `redundant_pattern_matching` | AcornOS, IuppiterOS |
-| `collapsible_else_if` | IuppiterOS |
-| `useless_format` | AcornOS, IuppiterOS, leviso |
 | `identity_op` | leviso |
 | `doc_lazy_continuation` | leviso |
 | `let_and_return` | leviso |

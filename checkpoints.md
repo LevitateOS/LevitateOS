@@ -18,22 +18,22 @@ represent a bootable runtime state.
 All distros share the same checkpoint ladder (`00Build` through `08Package`).
 Differences below describe *policy and intent*, not structural deviations from the ladder.
 
-| Area | LevitateOS | RalphOS | AcornOS | iuppiterOS |
-|---|---|---|---|---|
-| Visibility | Public | Public | Public | Private/internal |
-| Purpose | Stable daily workstation | R4D sandbox + agent runtime | Lightweight daily system | HDD refurbishment / ephemeral tooling |
-| Toolchain | glibc / systemd / GNU | glibc / systemd / GNU | musl / OpenRC / busybox | musl / OpenRC / busybox |
-| Kernel Policy (00) | LTS (.artifacts/kernel/levitate/current/kernel-build) | LTS (.artifacts/kernel/ralph/current/kernel-build) | Mainline (.artifacts/kernel/acorn/current/kernel-build) | LTS (.artifacts/kernel/iuppiter/current/kernel-build) |
-| Boot Policy (01) | Auto-login root (live) | Auto-login root (live) | Auto-login root (live) | Auto-login root (live) |
-| Live Tools Scope (02) | UX profile (`ux`): local interactive install helper + toolbox | Automated SSH profile (`automated_ssh`): headless installer toolbox | UX profile (`ux`): local interactive install helper + toolbox | Automated SSH profile (`automated_ssh`): headless installer toolbox |
-| Install UX (03) | Narrated logs | Verbose logs | Narrated logs | Verbose logs |
-| Login Model (04) | User-defined account | Root only (pw protected) | User-defined account | Auto-login root (ephemeral) |
-| Harness Authority (05) | User login + sudo verified | Root login verified | User login + sudo verified | Auto-login (ephemeral pass) |
-| Runtime Validation (06) | Full integration test | Full e2e test | Integration test | e2e test |
-| Update Mechanism (07) | A/B + high-value payload mutation | A/B swap validation | A/B + high-value payload mutation | A/B swap validation |
-| Packaging Policy (08) | Public `ISO` + `qcow2` + `.img` | Public `qcow2` | Public `ISO` + `qcow2` + `.img` | Private `.img` |
-| Package Manager | `recipe` | `recipe` | `recipe` | none |
-| App Source | Rocky DVD ISO baseline | Rocky DVD ISO baseline | Alpine Extended baseline | Alpine Extended baseline |
+| Area | LevitateOS | AcornOS |
+|---|---|---|
+| Visibility | Public | Public |
+| Purpose | Stable daily workstation | Lightweight daily system |
+| Toolchain | glibc / systemd / GNU | musl / OpenRC / busybox |
+| Kernel Policy (00) | LTS (.artifacts/kernel/levitate/current/kernel-build) | Mainline (.artifacts/kernel/acorn/current/kernel-build) |
+| Boot Policy (01) | Auto-login root (live) | Auto-login root (live) |
+| Live Tools Scope (02) | UX profile (`ux`): local interactive install helper + toolbox | UX profile (`ux`): local interactive install helper + toolbox |
+| Install UX (03) | Narrated logs | Narrated logs |
+| Login Model (04) | User-defined account | User-defined account |
+| Harness Authority (05) | User login + sudo verified | User login + sudo verified |
+| Runtime Validation (06) | Full integration test | Integration test |
+| Update Mechanism (07) | A/B + high-value payload mutation | A/B + high-value payload mutation |
+| Packaging Policy (08) | Public `ISO` + `qcow2` + `.img` | Public `ISO` + `qcow2` + `.img` |
+| Package Manager | `recipe` | `recipe` |
+| App Source | Rocky DVD ISO baseline | Alpine Extended baseline |
 
 
 ## Checkpoint Ladder
@@ -67,7 +67,6 @@ Differences below describe *policy and intent*, not structural deviations from t
   - UX profile hook: `/etc/profile.d/30-install-ux.sh` (tty1 interactive launch path).
 - `install_experience = "automated_ssh"`
   - Required intent: SSH-driven automated install/image pipelines (`qcow2`/`.img` focus).
-  - Distros: `ralph`, `iuppiter`.
   - Local TUI policy:
     - 02LiveTools local interactive UX surfaces are disabled by default.
     - 03Install local interactive installer TUIs are disabled by default.
@@ -111,21 +110,19 @@ The ISO at 06 represents the fully verified runtime baseline.
 
 ## Progress Table
 
-| Stage | Lev x86_64 A/B | Lev x86_64 mutable | Lev aarch64 A/B | Lev aarch64 mutable | Ralph x86_64 A/B | Ralph aarch64 A/B | Acorn x86_64 A/B | Acorn x86_64 mutable | Acorn aarch64 A/B | Acorn aarch64 mutable | Iuppiter x86_64 A/B |
-|---|---|---|---|---|---|---|---|---|---|---|---|
-| 00 | OK | OK | X | X | OK | X | OK | OK | X | X | OK |
-| 01 | OK | OK | X | X | OK | X | OK | OK | X | X | OK |
-| 02 | OK | OK | X | X | OK | X | OK | OK | X | X | OK |
-| 03 | X | X | X | X | X | X | X | X | X | X | X |
-| 04 | X | X | X | X | X | X | X | X | X | X | X |
-| 05 | X | X | X | X | X | X | X | X | X | X | X |
-| 06 | X | X | X | X | X | X | X | X | X | X | X |
-| 07 | X | - | X | - | X | X | X | - | X | - | X |
-| 08 | X | X | X | X | X | X | X | X | X | X | X |
+| Stage | Lev x86_64 A/B | Lev x86_64 mutable | Lev aarch64 A/B | Lev aarch64 mutable | Acorn x86_64 A/B | Acorn x86_64 mutable | Acorn aarch64 A/B | Acorn aarch64 mutable |
+|---|---|---|---|---|---|---|---|---|
+| 00 | OK | OK | X | X | OK | OK | X | X |
+| 01 | OK | OK | X | X | OK | OK | X | X |
+| 02 | OK | OK | X | X | OK | OK | X | X |
+| 03 | X | X | X | X | X | X | X | X |
+| 04 | X | X | X | X | X | X | X | X |
+| 05 | X | X | X | X | X | X | X | X |
+| 06 | X | X | X | X | X | X | X | X |
+| 07 | X | - | X | - | X | - | X | - |
+| 08 | X | X | X | X | X | X | X | X |
 
 ## Notes
 
 - Levitate/Acorn A/B columns are expected to remain `X` from install/layout-dependent stages onward (starting at 03) until A/B install flow is implemented.
-- Ralph live install env is internal even though Ralph is public; 08 release target is public `qcow2`.
-- Iuppiter remains private/internal; 08 release target is non-public `.img`.
 - DO NOT UNDERESTIMATE 05: it is the checkpoint where the harness becomes a trusted instrument (reliable login + readiness detection + command execution on an installed OS); without 05, 06–08 results are not credible.

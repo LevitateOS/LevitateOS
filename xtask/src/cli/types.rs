@@ -7,10 +7,6 @@ pub enum Distro {
     Leviso,
     #[value(name = "acorn")]
     AcornOS,
-    #[value(name = "iuppiter")]
-    IuppiterOS,
-    #[value(name = "ralph")]
-    RalphOS,
 }
 
 #[derive(Clone, Copy, Debug, ValueEnum)]
@@ -20,12 +16,6 @@ pub enum BootDistro {
 
     #[value(name = "acorn")]
     Acorn,
-
-    #[value(name = "iuppiter")]
-    Iuppiter,
-
-    #[value(name = "ralph")]
-    Ralph,
 }
 
 #[derive(Clone, Copy, Debug, ValueEnum)]
@@ -35,12 +25,6 @@ pub enum HarnessDistro {
 
     #[value(name = "acorn")]
     Acorn,
-
-    #[value(name = "iuppiter")]
-    Iuppiter,
-
-    #[value(name = "ralph")]
-    Ralph,
 }
 
 impl HarnessDistro {
@@ -48,8 +32,6 @@ impl HarnessDistro {
         match self {
             Self::Levitate => "levitate",
             Self::Acorn => "acorn",
-            Self::Iuppiter => "iuppiter",
-            Self::Ralph => "ralph",
         }
     }
 }

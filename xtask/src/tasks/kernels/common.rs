@@ -31,16 +31,6 @@ pub(crate) fn target_for(d: crate::cli::Distro) -> KernelTarget {
             kernel: &distro_spec::acorn::KERNEL_SOURCE,
             module_install_path: distro_spec::acorn::MODULE_INSTALL_PATH,
         },
-        crate::cli::Distro::IuppiterOS => KernelTarget {
-            distro_id: "iuppiter",
-            kernel: &distro_spec::iuppiter::KERNEL_SOURCE,
-            module_install_path: distro_spec::iuppiter::MODULE_INSTALL_PATH,
-        },
-        crate::cli::Distro::RalphOS => KernelTarget {
-            distro_id: "ralph",
-            kernel: &distro_spec::ralph::KERNEL_SOURCE,
-            module_install_path: distro_spec::ralph::MODULE_INSTALL_PATH,
-        },
     }
 }
 

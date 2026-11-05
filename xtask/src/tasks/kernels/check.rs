@@ -7,8 +7,6 @@ pub fn run(distro: Option<crate::cli::Distro>) -> Result<()> {
         None => vec![
             crate::cli::Distro::Leviso,
             crate::cli::Distro::AcornOS,
-            crate::cli::Distro::IuppiterOS,
-            crate::cli::Distro::RalphOS,
         ],
     };
 

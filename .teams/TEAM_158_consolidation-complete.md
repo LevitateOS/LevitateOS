@@ -1,7 +1,7 @@
 # TEAM_158: leviso Consolidation Complete
 
 **Date:** 2026-02-10
-**Status:** ✅ COMPLETE — leviso at same distro-builder integration level as AcornOS/IuppiterOS
+**Status:** ✅ COMPLETE — leviso at same distro-builder integration level as AcornOS
 
 ## Achievement Summary
 
@@ -50,7 +50,7 @@ leviso successfully migrated to use distro-builder for all duplicated functional
 - `distro-builder/src/lib.rs` — Added public `timing` module
 - `distro-builder/src/executor/mod.rs` — Added `execute_generic_op_ctx` adapter
 
-## Integration Parity with AcornOS/IuppiterOS
+## Integration Parity with AcornOS
 
 | Aspect | leviso | AcornOS | Status |
 |--------|--------|---------|--------|
@@ -64,7 +64,7 @@ leviso successfully migrated to use distro-builder for all duplicated functional
 
 ## What This Means
 
-leviso and AcornOS/IuppiterOS now follow the **same integration pattern**:
+leviso and AcornOS now follow the **same integration pattern**:
 
 ```
 ┌─────────────────────────────────────────────────────────┐
@@ -115,12 +115,12 @@ These are **not consolidation opportunities** because they're distro-specific by
 
 ## Architecture Validation
 
-**Removing AcornOS/IuppiterOS leaves leviso unbroken** ✓
-- leviso doesn't depend on AcornOS/IuppiterOS code
+**Removing AcornOS leaves leviso unbroken** ✓
+- leviso doesn't depend on AcornOS code
 - All shared code goes through distro-builder
 
-**Removing leviso leaves AcornOS/IuppiterOS unbroken** ✓
-- AcornOS/IuppiterOS don't depend on leviso code
+**Removing leviso leaves AcornOS unbroken** ✓
+- AcornOS don't depend on leviso code
 - Each distro has own artifact builders
 
 **Consolidation complete** ✓
@@ -130,4 +130,4 @@ These are **not consolidation opportunities** because they're distro-specific by
 
 ---
 
-**Completion Status:** leviso is at the same level of distro-builder integration as AcornOS and IuppiterOS. The consolidation is complete.
+**Completion Status:** leviso is at the same level of distro-builder integration as AcornOS. The consolidation is complete.

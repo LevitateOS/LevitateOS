@@ -50,7 +50,7 @@ Total non-artifact: ~3,700 LoC
 leviso is NOT "reimplementing what distro-builder provides" for artifacts — it's **properly delegating** to distro-builder tools and adding LevitateOS-specific orchestration.
 
 The remaining ~3,700 LoC is:
-1. **Component system** — Different from AcornOS/IuppiterOS (more granular)
+1. **Component system** — Different from AcornOS (more granular)
 2. **Orchestration** — Build sequencing, atomic operations
 3. **Rocky-specific logic** — Package library handling, user management
 

@@ -229,10 +229,6 @@ async fn api_distros() -> Json<Vec<DistroInfo>> {
             dir: "AcornOS".to_string(),
             label: "AcornOS".to_string(),
         },
-        DistroInfo {
-            dir: "IuppiterOS".to_string(),
-            label: "IuppiterOS".to_string(),
-        },
     ])
 }
 
@@ -275,7 +271,6 @@ async fn api_distro_summary(
     let rows = match distro_dir.as_str() {
         "leviso" => summary_leviso(&st.store, &out_dir)?,
         "AcornOS" => summary_acorn(&st.store, &out_dir)?,
-        "IuppiterOS" => summary_iuppiter(&st.store, &out_dir)?,
         _ => {
             return Err(ApiError::BadRequest(format!(
                 "Unknown distro dir '{}'",
@@ -448,85 +443,6 @@ fn summary_leviso(store: &ArtifactStore, out_dir: &Path) -> Result<Vec<ArtifactR
 
 fn summary_acorn(store: &ArtifactStore, out_dir: &Path) -> Result<Vec<ArtifactRow>, ApiError> {
     use distro_spec::acorn::{INITRAMFS_LIVE_OUTPUT, ISO_FILENAME, ROOTFS_NAME};
-
-    let rootfs = out_dir.join(ROOTFS_NAME);
-    let initramfs = out_dir.join(INITRAMFS_LIVE_OUTPUT);
-    let iso = out_dir.join(ISO_FILENAME);
-    let checksum = find_iso_checksum_file(&iso).unwrap_or_else(|| iso.with_extension("sha512"));
-    let vmlinuz = out_dir.join("staging/boot/vmlinuz");
-
-    let k_kernel = read_key_file(&out_dir.join(".kernel-inputs.hash"))?;
-    let k_rootfs = read_key_file(&out_dir.join(".rootfs-inputs.hash"))?;
-    let k_initramfs = read_key_file(&out_dir.join(".initramfs-inputs.hash"))?;
-
-    let iso_key = iso_input_key(&[
-        out_dir.join(".kernel-inputs.hash"),
-        out_dir.join(".rootfs-inputs.hash"),
-        out_dir.join(".initramfs-inputs.hash"),
-    ]);
-
-    let mut out = vec![];
-
-    {
-        let (exists, size, mtime) = file_info(&vmlinuz);
-        out.push(ArtifactRow {
-            kind: "kernel_payload".to_string(),
-            rel_path: out_rel_path(out_dir, &vmlinuz),
-            exists,
-            size_bytes: size,
-            mtime_unix: mtime,
-            input_key: k_kernel.clone(),
-            store: store_presence(store, "kernel_payload", k_kernel.as_deref(), Some(&vmlinuz))?,
-        });
-    }
-
-    for (kind, path, key, store_kind) in [
-        ("rootfs_erofs", &rootfs, k_rootfs.clone(), "rootfs_erofs"),
-        ("initramfs", &initramfs, k_initramfs.clone(), "initramfs"),
-    ] {
-        let (exists, size, mtime) = file_info(path);
-        out.push(ArtifactRow {
-            kind: kind.to_string(),
-            rel_path: out_rel_path(out_dir, path),
-            exists,
-            size_bytes: size,
-            mtime_unix: mtime,
-            input_key: key.clone(),
-            store: store_presence(store, store_kind, key.as_deref(), Some(path))?,
-        });
-    }
-
-    {
-        let (exists, size, mtime) = file_info(&iso);
-        out.push(ArtifactRow {
-            kind: "iso".to_string(),
-            rel_path: out_rel_path(out_dir, &iso),
-            exists,
-            size_bytes: size,
-            mtime_unix: mtime,
-            input_key: iso_key.clone(),
-            store: store_presence(store, "iso", iso_key.as_deref(), Some(&iso))?,
-        });
-    }
-
-    {
-        let (exists, size, mtime) = file_info(&checksum);
-        out.push(ArtifactRow {
-            kind: "iso_checksum".to_string(),
-            rel_path: out_rel_path(out_dir, &checksum),
-            exists,
-            size_bytes: size,
-            mtime_unix: mtime,
-            input_key: iso_key.clone(),
-            store: store_presence(store, "iso_checksum", iso_key.as_deref(), Some(&checksum))?,
-        });
-    }
-
-    Ok(out)
-}
-
-fn summary_iuppiter(store: &ArtifactStore, out_dir: &Path) -> Result<Vec<ArtifactRow>, ApiError> {
-    use distro_spec::iuppiter::{INITRAMFS_LIVE_OUTPUT, ISO_FILENAME, ROOTFS_NAME};
 
     let rootfs = out_dir.join(ROOTFS_NAME);
     let initramfs = out_dir.join(INITRAMFS_LIVE_OUTPUT);
@@ -999,7 +915,7 @@ fn default_kinds_for_distro(distro_dir: &str) -> Vec<String> {
         .into_iter()
         .map(|s| s.to_string())
         .collect(),
-        "AcornOS" | "IuppiterOS" => vec![
+        "AcornOS" => vec![
             "kernel_payload",
             "rootfs_erofs",
             "initramfs",
@@ -1026,11 +942,6 @@ fn ensure_hash_keys(distro_dir: &str, base_dir: &Path) {
             acornos::rebuild::cache_kernel_hash(base_dir);
             acornos::rebuild::cache_rootfs_hash(base_dir);
             acornos::rebuild::cache_initramfs_hash(base_dir);
-        }
-        "IuppiterOS" => {
-            iuppiteros::rebuild::cache_kernel_hash(base_dir);
-            iuppiteros::rebuild::cache_rootfs_hash(base_dir);
-            iuppiteros::rebuild::cache_initramfs_hash(base_dir);
         }
         _ => {}
     }
@@ -1303,7 +1214,7 @@ fn iso_key_files(distro_dir: &str, out_dir: &Path) -> Vec<PathBuf> {
             out_dir.join(".initramfs-inputs.hash"),
             out_dir.join(".install-initramfs-inputs.hash"),
         ],
-        "AcornOS" | "IuppiterOS" => vec![
+        "AcornOS" => vec![
             out_dir.join(".kernel-inputs.hash"),
             out_dir.join(".rootfs-inputs.hash"),
             out_dir.join(".initramfs-inputs.hash"),
@@ -1316,7 +1227,6 @@ fn distro_rootfs_name(distro_dir: &str) -> &'static str {
     match distro_dir {
         "leviso" => distro_spec::levitate::ROOTFS_NAME,
         "AcornOS" => distro_spec::acorn::ROOTFS_NAME,
-        "IuppiterOS" => distro_spec::iuppiter::ROOTFS_NAME,
         _ => "filesystem.erofs",
     }
 }
@@ -1325,7 +1235,6 @@ fn distro_initramfs_name(distro_dir: &str) -> &'static str {
     match distro_dir {
         "leviso" => distro_spec::levitate::INITRAMFS_LIVE_OUTPUT,
         "AcornOS" => distro_spec::acorn::INITRAMFS_LIVE_OUTPUT,
-        "IuppiterOS" => distro_spec::iuppiter::INITRAMFS_LIVE_OUTPUT,
         _ => "initramfs-live.cpio.gz",
     }
 }
@@ -1334,7 +1243,6 @@ fn distro_iso_name(distro_dir: &str) -> &'static str {
     match distro_dir {
         "leviso" => distro_spec::levitate::ISO_FILENAME,
         "AcornOS" => distro_spec::acorn::ISO_FILENAME,
-        "IuppiterOS" => distro_spec::iuppiter::ISO_FILENAME,
         _ => "distro.iso",
     }
 }

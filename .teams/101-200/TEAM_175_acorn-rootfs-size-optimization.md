@@ -59,11 +59,8 @@ None. Task complete.
 ## Related Tasks
 
 - 3.17: EROFS rootfs builds without errors (prerequisite, now verified with smaller size)
-- 3.19+: IuppiterOS rootfs will use same FIRMWARE component optimization (fewer packages though)
 - Phase 4: Initramfs/boot will verify that WiFi firmware is sufficient for test scenarios
 
 ## Notes
-
-The firmware optimization could be extended to IuppiterOS, which needs even less (no desktop/WiFi, just server tools). That's Phase 3 task 3.24.
 
 The component system's CopyWifiFirmware is well-designed and handles the common WiFi chipsets (Intel iwlwifi, Realtek rtl*, Atheros ath*, MediaTek, Broadcom, Marvell). This pattern could be extended for other firmware categories if needed.

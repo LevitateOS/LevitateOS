@@ -6,7 +6,7 @@
 
 ## Summary
 
-Verified that the distro-builder crate provides a complete component system foundation for both AcornOS and IuppiterOS builders. The infrastructure was already in place and functional; this iteration added comprehensive integration tests to document and verify the design.
+Verified that the distro-builder crate provides a complete component system foundation for both AcornOS builders. The infrastructure was already in place and functional; this iteration added comprehensive integration tests to document and verify the design.
 
 ## What Was Done
 
@@ -57,13 +57,6 @@ Components are sorted by Phase before execution, ensuring:
 7. Firmware (WiFi, hardware support)
 8. Final (overlay setup, live ISO tweaks)
 
-### Reusable Pattern for IuppiterOS
-The component system is distro-agnostic, allowing IuppiterOS to:
-1. Use the same `Installable` trait and `Op` enum from distro-builder
-2. Extend with IuppiterOS-specific operations if needed
-3. Define different components for headless appliance use case
-4. Reuse the same executor infrastructure
-
 ## Files Modified
 
 - **distro-builder/src/component/mod.rs**: Added 4 integration tests (74 lines)
@@ -78,7 +71,6 @@ All 60 distro-builder tests pass:
 
 The distro-builder component system is the foundation for Phase 3 rootfs building. By verifying it works correctly:
 1. Confirms AcornOS can use it for building components
-2. Ensures IuppiterOS will have a clear pattern to follow
 3. Documents the design for future maintenance
 4. Provides regression tests to prevent accidental breakage
 
@@ -86,7 +78,6 @@ The distro-builder component system is the foundation for Phase 3 rootfs buildin
 
 With task 3.1 complete, the foundation is ready for:
 - 3.2-3.18: AcornOS rootfs building (FHS, OpenRC, packages, config)
-- 3.19-3.24: IuppiterOS rootfs building (same but with appliance-specific packages)
 
 ## Blockers
 

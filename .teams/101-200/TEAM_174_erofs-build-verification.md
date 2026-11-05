@@ -183,8 +183,6 @@ None - implementation is complete and tested.
 ## Next Tasks
 
 - Task 3.18: EROFS rootfs size < 500MB compressed (verification task)
-- Task 3.19: IuppiterOS rootfs: same FHS structure as AcornOS
-- Task 3.20: IuppiterOS /etc/inittab configuration
 
 ## Notes for Future Teams
 

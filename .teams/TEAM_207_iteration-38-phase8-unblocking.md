@@ -5,13 +5,12 @@
 
 ## What Was Done
 
-Fixed critical ISO path resolution bug that was preventing Phase 2-7 install-tests from running for both AcornOS and IuppiterOS.
+Fixed critical ISO path resolution bug that was preventing Phase 2-7 install-tests from running for both AcornOS.
 
 ### Problem
 
 Install-tests framework couldn't find the ISO files when running Phase 2-7 tests. The issue:
 - Test runner executes from `/testing/install-tests/` directory
-- Distro contexts provided relative ISO paths: `AcornOS/output/acornos.iso`, `IuppiterOS/output/iuppiter-x86_64.iso`
 - Path resolution joined these relative paths to current directory, resulting in:
   - Expected: `/home/vince/Projects/LevitateOS/AcornOS/output/acornos.iso`
   - Actual: `/home/vince/Projects/LevitateOS/testing/install-tests/AcornOS/output/acornos.iso` ✗
@@ -20,7 +19,6 @@ Install-tests framework couldn't find the ISO files when running Phase 2-7 tests
 
 Updated both distro contexts to use correct relative paths:
 - AcornOS: `AcornOS/output/acornos.iso` → `../../AcornOS/output/acornos.iso`
-- IuppiterOS: `IuppiterOS/output/iuppiter-x86_64.iso` → `../../IuppiterOS/output/iuppiter-x86_64.iso`
 
 This correctly navigates from `testing/install-tests/` up two levels to workspace root, then down to the distro output directory.
 
@@ -42,9 +40,6 @@ Added 2-second delays before waiting for boot detection in both live and install
 
 **testing/install-tests/src/distro/acorn.rs**
 - Updated `default_iso_path()`: `"AcornOS/output/acornos.iso"` → `"../../AcornOS/output/acornos.iso"`
-
-**testing/install-tests/src/distro/iuppiter.rs**
-- Updated `default_iso_path()`: `"IuppiterOS/output/iuppiter-x86_64.iso"` → `"../../IuppiterOS/output/iuppiter-x86_64.iso"`
 
 **testing/install-tests/src/bin/serial.rs**
 - Added 2-second delays in `run_tests()` before boot detection (two locations):
@@ -76,7 +71,6 @@ Added 2-second delays before waiting for boot detection in both live and install
 ## Test Status
 
 - AcornOS ISO: Found, verified by preflight (466 MB)
-- IuppiterOS ISO: Path fixed, not yet booted
 - Phase 2 test: Infrastructure ready, full run interrupted due to TCG slowness
 - Next steps: Run full Phase 2-7 tests when time permits
 

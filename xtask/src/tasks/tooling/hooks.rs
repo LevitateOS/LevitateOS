@@ -85,7 +85,6 @@ fn run(mode: Mode) -> Result<()> {
 fn rust_submodules() -> &'static [&'static str] {
     &[
         "AcornOS",
-        "IuppiterOS",
         "distro-builder",
         "distro-spec",
         "leviso",

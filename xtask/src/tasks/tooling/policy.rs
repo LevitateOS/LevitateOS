@@ -10,8 +10,6 @@ const SCAN_ROOTS: &[&str] = &[
     "distro-variants",
     "testing/install-tests",
     "AcornOS",
-    "IuppiterOS",
-    "RalphOS",
     "xtask",
 ];
 
@@ -26,7 +24,7 @@ struct ForbiddenRegexSpec {
 
 const FORBIDDEN_LINE_REGEX_SPECS: &[ForbiddenRegexSpec] = &[
     ForbiddenRegexSpec {
-        pattern: r#"(?i)\b(?:leviso|acornos|iuppiteros|ralphos)/downloads/"#,
+        pattern: r#"(?i)\b(?:leviso|acornos)/downloads/"#,
         reason: "legacy crate downloads path binding detected",
         escalated: false,
     },
@@ -39,7 +37,7 @@ const FORBIDDEN_LINE_REGEX_SPECS: &[ForbiddenRegexSpec] = &[
 
 const FORBIDDEN_NORMALIZED_REGEX_SPECS: &[ForbiddenRegexSpec] = &[
     ForbiddenRegexSpec {
-        pattern: r#"join\("(?:leviso|AcornOS|IuppiterOS|RalphOS)"\)\.join\("downloads"\)"#,
+        pattern: r#"join\("(?:leviso|AcornOS)"\)\.join\("downloads"\)"#,
         reason: "legacy crate downloads join-chain detected",
         escalated: false,
     },
@@ -60,7 +58,7 @@ struct Violation {
     escalated: bool,
 }
 
-const LEGACY_CRATE_NAMES: &[&str] = &["leviso", "AcornOS", "IuppiterOS", "RalphOS"];
+const LEGACY_CRATE_NAMES: &[&str] = &["leviso", "AcornOS"];
 const PASS_MARK: &str = "\x1b[1;32m[PASSED]\x1b[0m";
 const FAIL_MARK: &str = "\x1b[1;31m[FAILED]\x1b[0m";
 

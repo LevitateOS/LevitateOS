@@ -132,7 +132,6 @@ None - implementation is complete and working.
 
 - Task 3.17: EROFS rootfs builds without errors (mkfs.erofs with zstd compression)
 - Task 3.18: EROFS rootfs size < 500MB compressed
-- Task 3.19: IuppiterOS rootfs: same FHS structure as AcornOS, using iuppiter package tiers
 
 ## Notes for Future Teams
 
@@ -150,4 +149,3 @@ The 3-layer overlay with live-overlay as middle layer is elegant because:
 - Live configs don't need to be in EROFS (saves space)
 - Live configs override base configs during live boot
 - Removing the overlay layer during installation gives normal behavior
-- Easy to implement different live behaviors per distro (AcornOS vs IuppiterOS)

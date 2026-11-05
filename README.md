@@ -18,14 +18,14 @@ By default, LevitateOS is **A/B immutable**: recipes compose changes into the in
 
 ## Variants
 
-| | LevitateOS | AcornOS | IuppiterOS |
-|---|---|---|---|
-| **Purpose** | Daily-driver desktop | Daily-driver desktop | Refurbishment appliance (disk tooling) |
-| **Stack** | glibc / systemd / GNU | musl / OpenRC / busybox | musl / OpenRC / busybox |
-| **Base** | Rocky Linux RPMs | Alpine Linux APKs | Alpine Linux APKs |
-| **Best for** | Maximum compatibility | Smaller, simpler base | Headless-first systems + optional kiosk UI |
+| | LevitateOS | AcornOS |
+|---|---|---|
+| **Purpose** | Daily-driver desktop | Daily-driver desktop |
+| **Stack** | glibc / systemd / GNU | musl / OpenRC / busybox |
+| **Base** | Rocky Linux RPMs | Alpine Linux APKs |
+| **Best for** | Maximum compatibility | Smaller, simpler base |
 
-All three share the same recipe system and build tooling. Variant specs live in `distro-spec/src/{levitate,acorn,iuppiter}/`.
+Both share the same recipe system and build tooling. Variant specs live in `distro-spec/src/{levitate,acorn}/`.
 
 ## Recipe System
 
@@ -157,7 +157,6 @@ tools/
 distro-spec/      # Shared specifications
 testing/          # E2E test suites
 AcornOS/          # Alpine-based variant
-IuppiterOS/       # Alpine-based appliance variant
 ```
 
 ## Hardware Requirements

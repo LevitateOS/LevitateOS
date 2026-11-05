@@ -1,9 +1,9 @@
 # leviso Consolidation Checklist
 
 **Date:** 2026-02-10
-**Goal:** Eliminate all code duplication between `leviso/` and `distro-builder/`, converging leviso into a thin wrapper like AcornOS/IuppiterOS.
+**Goal:** Eliminate all code duplication between `leviso/` and `distro-builder/`, converging leviso into a thin wrapper like AcornOS.
 
-**Current state:** leviso is ~11,348 LoC reimplementing what distro-builder already provides. AcornOS and IuppiterOS are each ~2,000 LoC thin wrappers. The end state is leviso at a similar size.
+**Current state:** leviso is ~11,348 LoC reimplementing what distro-builder already provides. AcornOS is ~2,000 LoC thin wrappers. The end state is leviso at a similar size.
 
 **Rule:** After EVERY completed task, rebuild the ISO and verify stage 1 (live boot) still passes before moving on. A task is not done until the ISO boots.
 
@@ -143,7 +143,7 @@ These require more thought — leviso's types are structurally similar but not i
 
 ### 2.4 ISO Builder
 
-- [ ] Compare `leviso/src/artifact/iso.rs` with how AcornOS/IuppiterOS create ISOs
+- [ ] Compare `leviso/src/artifact/iso.rs` with how AcornOS create ISOs
 - [ ] Determine if leviso can use `reciso` directly (like AcornOS does via distro-builder)
 - [ ] Switch to shared ISO creation path
 - [ ] `cargo check -p leviso` passes
@@ -252,9 +252,9 @@ For each component file, determine the migration path:
 
 ## Consolidation Efforts leviso Missed (Historical Context)
 
-These are the key refactoring efforts in distro-builder / AcornOS / IuppiterOS that leviso didn't adopt. Understanding these helps prioritize the checklist above.
+These are the key refactoring efforts in distro-builder / AcornOS that leviso didn't adopt. Understanding these helps prioritize the checklist above.
 
-1. **Installable trait + Op enum** — Replaced per-component functions with declarative component definitions. AcornOS/IuppiterOS adopted; leviso still uses procedural `component/custom/*.rs`. (Phase 3)
+1. **Installable trait + Op enum** — Replaced per-component functions with declarative component definitions. AcornOS adopted; leviso still uses procedural `component/custom/*.rs`. (Phase 3)
 
 2. **Shared artifact builders** — `distro-builder/src/artifact/erofs.rs` and `cpio.rs` extracted from AcornOS. leviso still has its own in `artifact/`. (Phase 2.2-2.4)
 
@@ -275,4 +275,4 @@ When all boxes are checked:
 - `distro-spec/src/levitate/` provides all LevitateOS constants
 - `distro-builder/` provides all build logic
 - leviso only contains LevitateOS-specific wiring (which distro-spec constants to use, build order, CLI)
-- Removing AcornOS/IuppiterOS leaves LevitateOS unbroken (and vice versa)
+- Removing AcornOS leaves LevitateOS unbroken (and vice versa)

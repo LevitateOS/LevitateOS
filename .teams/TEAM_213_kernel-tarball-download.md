@@ -11,7 +11,6 @@ Replaced the shared `linux` git submodule approach with per-distro kernel tarbal
 |---|---|---|
 | LevitateOS | 6.18.4 | LTS |
 | AcornOS | 6.19 | Mainline |
-| IuppiterOS | 6.18.4 | LTS |
 
 ## Key decisions
 
@@ -24,19 +23,15 @@ Replaced the shared `linux` git submodule approach with per-distro kernel tarbal
 ## Files modified
 
 ### New files
-- `distro-spec/src/shared/kernel.rs` — KernelSource struct + ACORN_KERNEL, IUPPITER_KERNEL, LEVITATE_KERNEL constants
 
 ### Modified files
 - `distro-spec/src/shared/mod.rs` — added kernel module + re-exports
 - `distro-spec/src/acorn/mod.rs` — added KERNEL_SOURCE re-export
-- `distro-spec/src/iuppiter/mod.rs` — added KERNEL_SOURCE re-export
 - `distro-spec/src/levitate/mod.rs` — added KERNEL_SOURCE re-export
 - `distro-builder/src/build/kernel.rs` — added download_kernel_tarball() + acquire_kernel_source()
 - `AcornOS/deps/linux.rhai` — tarball download primary, submodule fallback, DEV ONLY warnings on theft
-- `IuppiterOS/deps/linux.rhai` — tarball download primary, submodule fallback, DEV ONLY warnings on theft
 - `leviso/deps/linux.rhai` — tarball download primary, submodule fallback (no theft - primary builder)
 - `AcornOS/src/main.rs` — cmd_build_kernel/cmd_build_with_kernel/cmd_download_linux use acquire_kernel_source + theft warnings
-- `IuppiterOS/src/main.rs` — same changes as AcornOS
 - `AcornOS/src/rebuild.rs` — unchanged (already handles missing Makefile gracefully)
 
 ## Hardening done

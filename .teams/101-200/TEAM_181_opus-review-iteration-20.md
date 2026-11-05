@@ -8,19 +8,8 @@
 
 Last 3 haiku iterations (18-20):
 - AcornOS: EROFS size reduction, sshd_config fix, test instrumentation
-- IuppiterOS: test instrumentation, inittab serial primary, welcome script fix
 
 ## Bugs Found and Fixed
-
-### Critical: IuppiterOS live overlay inittab overrides definitions.rs
-
-Haiku's iteration 18 fixed the BASE_INITTAB in `definitions.rs` to be serial-only.
-But `iso.rs::create_live_overlay()` writes its own `/etc/inittab` to the live overlay
-directory, which takes precedence over the EROFS base (overlay > base). The iso.rs
-inittab still had tty1-tty6 VGA terminals from AcornOS.
-
-**Impact**: IuppiterOS live boot would spawn 6 VGA gettys on a headless appliance.
-**Fix**: Replaced iso.rs inittab with serial-only version matching definitions.rs.
 
 ### Pervasive AcornOS copy-paste bugs (40+ occurrences, 14 files)
 
@@ -35,12 +24,10 @@ wrong /etc/issue content, wrong test file references.
 ### live-docs.sh was entirely AcornOS-specific
 
 The script referenced acorn-docs, had AcornOS ASCII art, mentioned WiFi (iwctl),
-and checked for tty1 (which IuppiterOS doesn't have). Rewrote for headless
 serial console with refurbishment tool quick reference.
 
 ## Files Modified
 
-IuppiterOS submodule (14 files):
 - `src/artifact/iso.rs` - Live overlay inittab, branding, error messages
 - `src/qemu.rs` - Error messages, smoke test UI, comments
 - `src/artifact/initramfs.rs` - Doc comments, error messages
@@ -65,5 +52,5 @@ IuppiterOS submodule (14 files):
 ## Verification
 
 - `cargo check --workspace`: Clean
-- `cargo test -p iuppiteros`: 18 tests pass
+- `cargo test`: 18 tests pass
 - `cargo test -p acornos`: 31 tests pass

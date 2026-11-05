@@ -10,7 +10,6 @@
 - **1.1 Timer Module** — Removed copy-pasted `leviso/src/timing.rs`, imported `distro_builder::timing::Timer`
 - **1.2 Cache Module** — Removed copy-pasted `leviso/src/cache.rs`, imported `distro_builder::cache`
 - **Bonus: Timer Location Fix** — Moved Timer from `distro_builder/src/alpine/timing.rs` to root level (generic utility, not distro-specific)
-  - Updated all consumers: leviso, AcornOS, IuppiterOS
 
 ### Documentation & Planning ✅
 - **`docs/leviso-duplication-audit.md`** — Comprehensive checklist with 3 phases:
@@ -48,7 +47,6 @@
 - `leviso/src/component/builder.rs` (Timer import)
 - `leviso/src/rebuild.rs` (cache import)
 - `AcornOS/src/main.rs` (Timer import x6)
-- `IuppiterOS/src/main.rs` (Timer import x6)
 
 **Metrics:**
 - Lines deleted: 352 (copy-paste, now single source of truth)

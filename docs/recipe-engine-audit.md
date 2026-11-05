@@ -31,7 +31,7 @@ Bug and gap audit of `tools/recipe/` and related recipe infrastructure.
 ## High
 
 - [ ] **Silent shell failures** — `packages.rhai` ignores `shell_status()` and `shell_status_in()` return values. Failed package installs silently produce a broken rootfs.
-  - File: `AcornOS/deps/packages.rhai`, `IuppiterOS/deps/packages.rhai`
+  - File: `AcornOS/deps/packages.rhai`
   - Fix: Check return values and bail on non-zero exit.
   - **Planning effort: 2/5** — Grep for `shell_status` in .rhai files, add `if status != 0 { throw "..."; }` after each. Straightforward but tedious.
 

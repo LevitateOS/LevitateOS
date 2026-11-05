@@ -5,7 +5,7 @@
 
 ## What Was Done
 
-Fixed a critical path resolution bug in the install-tests framework that was blocking Phase 1 boot verification for both AcornOS and IuppiterOS.
+Fixed a critical path resolution bug in the install-tests framework that was blocking Phase 1 boot verification for both AcornOS.
 
 ### Problem
 
@@ -19,7 +19,6 @@ This caused the preflight verification to fail with "ISO not found" errors.
 
 Changed relative paths to be correct from the workspace root:
 - `AcornOS`: `../../AcornOS/output/acornos.iso` → `AcornOS/output/acornos.iso`
-- `IuppiterOS`: `../../IuppiterOS/output/iuppiter-x86_64.iso` → `IuppiterOS/output/iuppiter-x86_64.iso`
 
 ### Verification
 
@@ -33,7 +32,6 @@ Results:
 ## Files Modified
 
 - `testing/install-tests/src/distro/acorn.rs`: Fixed `default_iso_path()` method
-- `testing/install-tests/src/distro/iuppiter.rs`: Fixed `default_iso_path()` method
 
 ## Key Decisions
 
@@ -51,4 +49,3 @@ Results:
 - All pre-existing tests still pass
 - LevitateOS path (leviso/output/levitateos-x86_64.iso) unchanged
 - Install-tests framework continues to work as before for LevitateOS
-

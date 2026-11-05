@@ -8,14 +8,13 @@
 
 Last 3 haiku iterations (34-36) covering:
 - **AcornOS** (3 commits): UKI building, ISO_LABEL constant fix, APK --usermode removal + db init
-- **IuppiterOS** (3 commits): UKI duplicate console fix, udev I/O scheduler rule, operator user creation
 - **distro-spec** (1 commit): sdparm removal from REFURBISHMENT_PACKAGES
 
 ## Verification Results
 
 - `cargo check --workspace`: Clean (only pre-existing leviso warnings)
 - `cargo test -p acornos --lib`: 34 tests pass
-- `cargo test -p iuppiteros --lib`: 22 tests pass
+- `cargo test --lib`: 22 tests pass
 - `cargo test -p distro-builder`: 60+ tests pass
 - `cargo test -p distro-spec`: 73+ tests pass
 
@@ -24,9 +23,6 @@ Last 3 haiku iterations (34-36) covering:
 **None.** The last 3 haiku iterations produced clean, well-scoped code:
 
 1. AcornOS UKI builder correctly uses ISO_LABEL constant, handles extra_cmdline properly
-2. IuppiterOS UKI duplicate console fix correctly removes SERIAL_CONSOLE from base cmdline
-3. IuppiterOS operator user creation (users.rs) uses correct line-by-line matching
-4. IuppiterOS udev rule is clean and correctly targets rotational block devices
 5. distro-spec sdparm removal is correct (package unavailable in Alpine v3.23)
 
 ## BLOCKED Task Unblocked
@@ -58,5 +54,5 @@ This unblocks `cargo run --bin serial -- run --distro acorn --phase 1` from fail
 ## Key Decisions
 
 - Used additive approach: new functions alongside existing ones, no breaking changes
-- AcornOS/IuppiterOS skip installed initramfs and installed UKI checks (not yet built)
-- Kept loader.conf check out of non-LevitateOS checklists (AcornOS/IuppiterOS use GRUB, not systemd-boot exclusively)
+- AcornOS skip installed initramfs and installed UKI checks (not yet built)
+- Kept loader.conf check out of non-LevitateOS checklists (AcornOS use GRUB, not systemd-boot exclusively)

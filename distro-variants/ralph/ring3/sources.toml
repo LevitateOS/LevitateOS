@@ -1,6 +1,0 @@
-schema_version = 6
-
-[ring3_sources.rootfs_source]
-kind = "recipe_rpm_dvd"
-recipe_script = "distro-builder/recipes/fedora-dvd-source-rootfs.rhai"
-preseed_recipe_script = "distro-builder/recipes/fedora-preseed-iso.rhai"

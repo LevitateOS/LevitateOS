@@ -1,6 +1,6 @@
 # A/B Default Plan (Repo-Wide)
 
-This is a product-level shift: A/B immutable is the default update model. Mutable mode is optional (LevitateOS/AcornOS only) and explicitly unsafe. RalphOS and IuppiterOS are immutable-only.
+This is a product-level shift: A/B immutable is the default update model. Mutable mode is optional (LevitateOS/AcornOS only) and explicitly unsafe.
 
 ## Why A/B Default
 

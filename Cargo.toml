@@ -7,8 +7,6 @@ members = [
     "distro-builder/install-split-pane",
     "leviso",
     "AcornOS",
-    "IuppiterOS",
-    "RalphOS",
     "leviso-elf",
     "xtask",
     "tools/recipe",
