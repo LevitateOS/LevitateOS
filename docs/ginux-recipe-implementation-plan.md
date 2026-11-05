@@ -322,7 +322,7 @@ to introduce new crates or parallel behavior owners.
   another executable and its caller observes the real result; executable
   replacement never detaches syscall supervision.
 
-- [ ] **G04 — Connect native threads and synchronization.** Depends: G03b.
+- [x] **G04 — Connect native threads and synchronization.** Depends: G03b. (Done 2026-11-05: worktree `/tmp/ginux-g04`, branch `ginux-recipe/g04-threads`, commit `19bf68c9`, pushed to fork. Supported CLONE_THREAD shape (VM+SIGHAND) executes via existing `ProcessTable::clone_thread`; clone return/parent-tid-cell/gettid translate to virtual tid, getpid reports tgid; arch_prctl/futex/robust/rseq execute on host; thread exit drops host slot, zero-root-exit drains live threads. Other CLONE_THREAD shapes, bare CLONE_VM, clone3 denied ENOSYS. Coordinator reran reproducer: THREAD_REPRO PASS (2 threads, join + detach, 7 denials), GATE7 PASS, exec regression PASS, no survivors. LIMIT: G03a step-5 denial assertion superseded — coordinator to update that reproducer; real glibc-pthread coverage needs mmap-family mediation, still denied.)
   Owner: G-process. Handle required thread creation, thread identity, futex/TLS,
   and thread exit using existing models. Implement only the concrete required
   behavior in bounded patches. Done: a real threaded program completes; Recipe's
