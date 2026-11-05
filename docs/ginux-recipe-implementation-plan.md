@@ -555,16 +555,61 @@ file-producing lifecycle through the mandatory launcher:
   under `.artifacts/ginux-local-integration/growable-storage/`. All commits are
   local review inputs; no push or PR was performed.
 
-Next local action: implement directory descriptors/enumeration through the VFS
-and public-descriptor adapter, then rename/removal. The prepared directory-copy
-probe still reaches EOPNOTSUPP (95) and rename reaches ENOSYS (38); their retained
-sources are under `captured-output/storage-next/` in the artifact root. The former
-131072-byte EFBIG failure now has a passing actual lifecycle regression. Preserve
-open-object identity and directory cursors on faults/aliases; unsupported image
-or unassigned paths must not acquire native write authority. File mappings,
-generated-file execution, full compiler-sized projects and durable storage still
-need implementation. S0/S1/S2 remain in progress.
-Compiler-sized storage/directory operations, full input/dependency layout,
+Directory-storage continuation 2026-11-05: Ginux **9ba6a1d4** adds owned
+directory operations; Recipe **2303bb7** exercises nested production and cleanup:
+
+- VirtualFs owns directory descriptions, object identity and enumeration
+  cookies. getdents64 serializes bounded, aligned records with direct children,
+  domain inode IDs and types. It commits the cursor only after complete copyout.
+  Public aliases/fork share the same description; native handles/private backend
+  numbers never bypass ownership. Owned relative openat/mkdirat/fstatat/
+  unlinkat/chmodat resolve the current object path, including after rename.
+  Relative native-image directory handles remain explicitly unsupported.
+- Rename, renameat and renameat2 (zero flags/NOREPLACE) move overlay files/trees.
+  Preflight checks every descendant path and replacement rule before mutation.
+  Replaced/unlinked open objects retain their bytes/inode; removed directory
+  handles retain metadata but enumerate empty and cannot create children.
+  Nonempty removal, self-descendant moves, invalid replacements, protected roots
+  and moves across the assigned/image boundary fail explicitly. Overlapping
+  assignments merely seed directories beneath the minimal protected roots.
+  Image subtree mutation, links and a full unified resolver remain unfinished.
+- The real copy probe exposed two additional requirements: libc opendir uses
+  flags 0x90800 (including O_NONBLOCK), and std copy passes full st_mode 0x81a4
+  to fchmod. Status flags now retain NONBLOCK; chmod/fchmod ignore file-type
+  bits while preserving the prior denial of special permission bits. The
+  supervisor-only register/audit trace of the fchmod failure is retained.
+- All ten actual Ginux launch suites and ten VFS cases pass. The new native
+  family checks complete/short/faulting dirents, EOF and rewind, shared cursors
+  across aliases/fork, relative operations, file/tree replacement with open
+  handles, removed directory behavior, NOREPLACE/unsupported flag rejection,
+  seeded-directory removal, assignment/input isolation and clean teardown.
+  Core checks include failed overlong subtree moves leaving names unchanged.
+  Release build and strict Clippy pass; Make/CI have an explicit producer and
+  independent directory scenario.
+- All 25 focused actual Recipe CLI/library cases pass (21 managed, three entry
+  guards, one library case). The new install copies a nested tree containing
+  131072 bytes, verifies contents with independent checks, moves the staged
+  output, and recursively removes scratch trees via cleanup(ctx, reason).
+  Another case rejects replacing the actual staged /inputs/main.rhai before
+  mutation. Both preserve source and clean JSON/error transport. The original
+  prepared directory-copy and rename probes now succeed. No Recipe unit tests
+  were added or run.
+- Evidence, exact commands/environment, source/binary/image identities and
+  supervisor traces are under
+  `.artifacts/ginux-local-integration/directory-storage/`. All commits remain
+  local review inputs; no push or PR was performed.
+
+Next local action: connect owned-file execution and file mappings through the
+existing filesystem/exec/memory owners. The new actual CLI probe successfully
+copies the immutable /usr/bin/true ELF into /work/build/domain-true, then
+exec_checked fails with EOPNOTSUPP (95). It is a structured workload failure
+with zero acknowledgements, unchanged source and no panic/protocol failure;
+source/result are under directory-storage/generated-exec-next. Preserve public
+FD ownership, executable permissions and failed-exec descriptor semantics;
+do not expose host writable files, permit raw private handles, or add a host
+fallback. Full source/compiler projects, durable storage and publication remain
+unverified and incomplete. S0/S1/S2 remain in progress.
+Complete file mappings/generated execution, full input/dependency layout,
 target/options transport, resources, durable state/generations, publication and
 unreachable legacy-wrapper removal remain incomplete. The linked review thread
 owns upstream review and PR creation; local commits are unreviewed inputs.

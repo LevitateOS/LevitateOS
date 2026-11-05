@@ -330,6 +330,19 @@ Ginux build/Clippy pass. S0 stays in progress: directory traversal/removal,
 rename, file mappings, generated exec, retention and publication are unfinished.
 See the Ginux plan and `.artifacts/ginux-local-integration/growable-storage/`.
 
+Directory-storage continuation 2026-11-05: Ginux **9ba6a1d4** connects owned
+directory descriptions/getdents64, relative operations, rename/NOREPLACE and
+empty-directory removal through the existing owners. Faulting copyout preserves
+cursors; aliases/fork share descriptions and replacement preserves open objects.
+The actual copy path also required opendir NONBLOCK and full-st_mode fchmod
+handling. Recipe **2303bb7** verifies nested copying with a 131072-byte product,
+output-tree movement, recursive cleanup and rejection of staged-source
+replacement. All 25 focused Recipe cases, ten Ginux launch suites and ten VFS
+cases pass; release build/Clippy pass. S0 stays in progress: owned-file execution
+and mappings, full source/compiler projects, resources, retention and publication
+remain unfinished. Exact evidence and limits are in the Ginux plan and
+`.artifacts/ginux-local-integration/directory-storage/`.
+
 - Complete the existing Ginux launch adapter instead of adding another launcher.
   Route every executable CLI and library operation through it by default.
 - Remove public host/in-process backend selection, host defaults, and fallback.
@@ -1173,18 +1186,19 @@ unrelated edits and current branches. Update task status with concrete evidence
 as work lands. Temporary audit probes are useful reproductions, not durable
 acceptance artifacts; preserve needed cases in the existing integration owner.
 
-Next implementation action in this chat: implement directory descriptors and
-enumeration through the existing VFS/public-descriptor owners, then rename and
-removal. The prepared directory-copy probe still returns EOPNOTSUPP and rename
-returns ENOSYS; source and failures are retained under the capture slice's
-storage-next directory. The 131072-byte EFBIG failure is fixed: Ginux
-**06d24ae2** adds growable bounded file backing, and Recipe **acf174c** verifies
-larger work/output products through independent custom content checks. All 23
-focused CLI/library cases, nine Ginux launch suites and eight VFS cases pass.
-Current limits and source/binary identities are in the Ginux plan and
-`.artifacts/ginux-local-integration/growable-storage/`. This is still ephemeral
-storage, with unfinished directory operations, mappings and generated-file
-execution; ordinary compiler projects are not supported yet. Keep machine results
+Next implementation action in this chat: connect owned-file execution and
+mappings through the existing filesystem/exec/memory owners. The actual CLI
+probe now copies /usr/bin/true into /work/build/domain-true successfully, then
+exec_checked reports EOPNOTSUPP with clean workload failure and unchanged source.
+Its source/result are under directory-storage/generated-exec-next. Ginux
+**9ba6a1d4** now supports owned directory traversal, relative operations, rename
+and removal; Recipe **2303bb7** verifies nested tree production/movement,
+recursive cleanup and protection of staged recipe source. All 25 focused
+CLI/library cases, ten Ginux launch suites and ten VFS cases pass. Current
+limits and source/binary identities are in the Ginux plan and
+`.artifacts/ginux-local-integration/directory-storage/`. Storage remains
+ephemeral. Image-relative directory access, image mutation, links, mappings,
+generated-file execution and ordinary compiler projects are unfinished. Keep machine results
 separate, custom checks authoritative and the launcher mandatory. Image-file
 polling, broader threaded exec/signal/robust-futex behavior, complete-frame
 deadlines, durable logging/state and cancellation remain unfinished. Public entry,
