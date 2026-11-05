@@ -474,6 +474,31 @@ sandbox socket permission. Fedora torrent publication still needs its own stagin
 work; HTTP publication evidence does not establish BitTorrent behavior or Ginux
 network/storage operation.
 
+Git acquisition slice 2026-11-05: tools/recipe daa77d6 makes the retained clone/depth helpers share one
+acquisition owner with `git_checkout(url, dest, commit)`. Pinned acquisition uses
+an exact destination and full commit ID, validates origin and local changes,
+fetches a missing commit, and selects detached HEAD. Legacy calls preserve their
+destination-parent convention, selected revision, and local edits on valid reuse;
+they now reject wrong-origin or damaged destinations instead of deleting them.
+Fresh clones stage beside the destination and publish after successful selection.
+Explicit `file://` origins allow local declared inputs. Git commands use the shared
+process runner, explicit repository/worktree paths, and child-only removal of
+inherited repository/index locators. HTTP low-speed bounds are not advertised as
+whole-process deadlines. Author/helper/man documentation describes these semantics.
+
+    cargo build -p levitate-recipe --bin recipe --offline
+    cargo test -p levitate-recipe --test e2e git_acquisition:: --offline -- --nocapture
+
+All four real CLI cases pass using real temporary Git repositories: older commit
+selection and installation, offline reuse, fetching a newly created commit,
+preserved wrong-origin/dirty/damaged destinations (including under another repo),
+legacy full/shallow cloning and dirty reuse, inherited Git locator isolation, and
+failed acquisition with no published checkout or staging leftovers. These cases
+use local file transport; HTTP/SSH and SHA-256-format repositories were not run.
+Ignored build files remain outside the cleanliness check; recipe-specific source
+readiness still applies. Managed Ginux execution and shared-destination locking
+remain outstanding with S0/S3.
+
 ### S6 Migrate representative recipes and validate managed execution
 
 Dependencies: S3-S5. Status: not started.
@@ -558,7 +583,8 @@ unrelated edits and current branches. Update task status with concrete evidence
 as work lands. Temporary audit probes are useful reproductions, not durable
 acceptance artifacts; preserve needed cases in the existing integration owner.
 
-Next implementation action in this chat: consolidate retained Git acquisition
-with explicit origin, revision, and destination semantics. Keep the concurrent
+Next implementation action in this chat: consolidate the kernel recipe lifecycle
+while retaining its custom readiness and reusable metadata/config/module logic.
+Keep the concurrent
 Ginux agent's launcher/worker/coordinator work separate. Re-run implemented slices
 through the mandatory Ginux path once that agent's integration is available.
