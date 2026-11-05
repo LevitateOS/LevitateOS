@@ -3,16 +3,16 @@
 Status: implementation is in progress; individual tasks record completion and evidence.
 
 PR preparation checkpoint (2026-11-05): the user requested prospective upstream
-contributions. Three independent VFS bug fixes are prepared locally on upstream
+contributions. Three independent VFS bug fixes are published as PRs #216, #217 and #218 on upstream
 `2489517e`, each in a detached worktree with one signed-off commit, a short PR
 draft and runtime/unit evidence. All eight new regressions fail on unmodified
 upstream; the reviewed combined fixes pass 63 unit cases and static checks.
 Each candidate also passes the CI build and test commands locally on Linux.
 Review corrected incomplete copy-up after read errors and image whiteout reuse
-through symlinked directories; GitHub Actions has not run for these local commits.
+through symlinked directories; both required GitHub Actions jobs passed on all three PRs.
 See [the contribution package](ginux-pr-preparation-20261105.md) for exact commits,
-paths and validation. User review is next; no push, new PR or public text edit
-was performed. Hold further balanced-profile proposals pending the current
+paths and validation. The user explicitly authorized publishing all three
+together; existing human-authored public text remains unchanged. Hold further balanced-profile proposals pending the current
 maintainer guidance on issue #179 and PR #207. The integration work and its
 remaining limitations below are preserved.
 

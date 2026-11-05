@@ -1,14 +1,17 @@
 # Prepared Ginux contributions — 2026-11-05
 
-Three local, standalone candidates are ready for user review. Nothing has been
-pushed or opened. Recommended first submission: the failed-open fix; the other
-two can follow at the user's pace.
+Published together at the user's request as three standalone PRs against `main`:
+[#216](https://github.com/gmkurtzer/ginux/pull/216) (failed opens),
+[#217](https://github.com/gmkurtzer/ginux/pull/217) (unlink lifetime), and
+[#218](https://github.com/gmkurtzer/ginux/pull/218) (path resolution).
+Both required GitHub CI jobs passed on every reviewed commit below:
+`static-and-unit` on macOS and `launch-integration` on Linux.
 
 All three commits have the same immediate parent, upstream `main` at
 `2489517e89c3b62c5203ccd0f6d1eb28cf8500af`. Each changes only
 `crates/ginux-vfs/src/lib.rs`, includes focused regression coverage, and retains
-the existing tests and CI. Each worktree is detached; no branch was created or
-switched. Their changes also merge together without conflicts.
+the existing tests and CI. Each local worktree remains detached; three new fork branches carry the
+reviewed commits. Their changes also merge together without conflicts.
 
 | Candidate | Local commit | Change size | Validation |
 | --- | --- | --- | --- |
@@ -25,8 +28,8 @@ no changes; extra absolute/relative/dangling-link and bound probes passed.
 Each candidate passes the current CI workflow’s build and test commands locally on
 Linux: static checks, unit tests, full release/fixture builds, launch, native
 supervision, process-native and gate1 setup checks. The VFS CLI also passes with
-the prepared Rocky rootfs. These are local results; GitHub Actions and its macOS
-runner have not run because the candidates remain unpublished. No CI coverage
+the prepared Rocky rootfs. GitHub Actions also passed its Linux integration and macOS static/unit jobs
+on all three PRs. No CI coverage
 was removed or changed.
 
 A fresh upstream source tree with the three changes merged passes static checks
@@ -83,6 +86,5 @@ only read and remains unchanged.
 
 Active skill: `hdae-development` at
 `.agents/skills/hdae-development/SKILL.md`; reload after context shifts.
-Current boundary: local preparation complete; user review precedes publication.
-Exact next action: review `01-open-failure`; refresh the chosen candidate against
-upstream again immediately before any separately authorized publication.
+Current boundary: all three PRs published under explicit user authorization.
+Exact next action: await upstream review; no merge is authorized.
