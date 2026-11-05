@@ -314,7 +314,15 @@ host paths under the selected names only after successful publication. Forwardin
 a worker's path and finding a file at that path on the host is not publication
 evidence. Consumer filesystem-kind checks supplement custom readiness and the
 coordinator's publication guarantees; they do not grant host-path authority.
-This bridge is still pending; named-output declarations alone do not implement it.
+The current final-export bridge (Ginux 48b26f8d, Recipe 11057ca) publishes selected
+regular files/directories under /work or /out into fresh coordinator-owned
+.artifacts/ginux-export/<invocation>/<name> directories and returns host paths.
+It requires successful completion, bounds and validates the archive, rejects
+links/traversal/missing selections, and never overwrites an existing publication.
+Current limits are 64 named outputs, 4096 archive entries and 2 GiB. Ginux exports
+the owned writable view after task teardown; Recipe publishes only selections.
+This proves final publication, not retained generations or resumable recovery.
+Image-backed selections and symlink-containing products remain unsupported.
 
 Preseeded source assets are explicit inputs to a materializer. The builder selects
 the canonical host cache through orchestration metadata; input preparation maps

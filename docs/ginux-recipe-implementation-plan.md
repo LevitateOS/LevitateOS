@@ -53,24 +53,62 @@ proc-macro2's build script and advances to unicode-ident; Rust then fails with
 missing capability is private mapping of owned files. Temporary dependency-info
 diagnostics were removed exactly before this commit; no diagnostic source edit
 remains. The probe's ls output is now useful and does not replace Cargo's error.
-Current action: implement coherent private mappings. The verified backing step
-uses supervisor-owned anonymous memfds, preserving inode identity through writes
-and ftruncate instead of detached snapshots. Storage quota/truncate, owned exec,
-and task suites pass (`/tmp/ginux-memfd-test.log`). Host pidfd_getfd was checked
-with a real fork and succeeds, permitting a private, bounded descriptor-transfer
-transaction. The intended mapping transaction creates a private local socket pair
-in the stopped tracee, duplicates one endpoint via pidfd_getfd, sends only a
-readonly backing reference via SCM_RIGHTS, injects recvmsg/mmap, and closes all
-private tracee descriptors before resuming. Public descriptor resolution stays
-with the existing owner; no host path is injected. MAP_SHARED remains unsupported
-so all durable file mutations remain mediated. Do not substitute immutable
-snapshots: mappings must observe writes/truncation correctly. Add actual mapped
-file fixtures (COW, offsets, cross-task writes, truncate/SIGBUS, FD cleanup) before
-claiming compiler support. The backing commit is recorded in Ginux history;
-the transaction itself is not implemented yet.
-Output export, retained state/generations, locking, resumable recovery and
-representative consumers remain incomplete. Successful in-domain output paths
-are not host artifacts.
+Ginux `32e2c85f` replaces anonymous overlay allocations with supervisor-owned
+memfd backing; storage quota/truncate, owned exec and task suites pass. `868862bc`
+adds coherent private and readonly-shared mappings through a bounded temporary
+socket/SCM_RIGHTS transaction. It rejects shared writable mappings and protection
+upgrades, guards fixed mappings against overwriting scratch/code, excludes all
+pre-existing native fds from scratch-derived selections, serializes descriptor
+changes, restores stack bytes and closes every private fd. A real host pidfd_getfd
+probe succeeds. The new configured storage fixture passes COW, cross-process
+write visibility, truncate/SIGBUS, regrowth, unlink lifetime, invalid flags and
+fixed-stack overlap checks; its runner confirms only native fds 0/1/2 remain in
+the workload. Native/owned exec, threads and channel suites also pass. Evidence:
+`/tmp/ginux-map-test.log` and `/tmp/ginux-map-regression.log`. The current binary
+was built before the final audit-label/comment-only change in 868862bc; rebuild
+before final exact-commit validation.
+Ginux `680d5081` fixes private mapping by nonleader Rust threads, including after
+leader exit; configured thread/storage cases pass. `adc79f0a` mediates owned
+access/faccessat probes; storage and real cc/lld version-script cases pass.
+The actual recfstab build now succeeds and its binary runs inside Ginux. LLD
+exceeded the bounded 16-task domain during final linking; the explicit local
+probe now supplies `RUSTFLAGS=-C link-arg=-Wl,--threads=1`, in addition to
+CARGO_BUILD_JOBS=1. No task limit was weakened. Cargo still reports a nonfatal
+SQLite global-cache IO error, requiring follow-up. One earlier retry hit
+"launch requires the x86-64 syscall ABI" during compiler thread exit; the actual thread-group-exit regression reproduced it. Diagnostic evidence
+confirmed GET_SYSCALL_INFO returned ESRCH after GETREGS as a peer died. The local
+fix waits for actual wait4 death events on ESRCH from either syscall-stop read;
+30 exit_group and 100 SIGKILL cases pass. Related execution checks are running
+before this fix is committed.
+Ginux `48b26f8d` adds optional --export-file: exclusive caller-selected archive,
+written only after successful root completion and complete task teardown; regular
+owned files/directories, modes, long names, no deleted entries or image files.
+Configured storage/export, launch and thread cases pass. Static/unit validation
+then found two lint issues in earlier changes; those corrections are committed as `c541a67f` and `make check test-unit` passes
+(all 59 existing cases).
+Recipe `11057ca` validates and publishes only named /work or /out file/directory
+outputs under coordinator-owned `.artifacts/ginux-export/<invocation>/<name>`.
+Returned outputs are host paths. Fresh staging, exclusive final rename, bounds,
+missing-output rejection, and rejection of archive links/traversal/oversized long
+names are covered by real CLI fault scenarios. 27 managed regressions passed;
+the two publication scenarios passed again after bounded raw tar-header parsing
+and long-filename coverage. No public text or remote branch was changed.
+The full Recipe recfstab build/run/publication passed. Its published executable:
+`.artifacts/ginux-export/recfstab-1793908382636-1646239/program` (1,178,736 bytes).
+Evidence: `/tmp/recipe-recfstab-published.{stdout,stderr}`,
+`/tmp/recipe-publication-test.log`, `/tmp/recipe-publication-boundary-test.log`,
+`/tmp/ginux-export-test.log`, `/tmp/ginux-integration-static-unit.log`.
+Current action: implement retained state/generations, destination locking and
+resumable recovery. Next concrete change is a private coordinator control socket
+for filesystem snapshots through the existing archive owner, plus startup restore.
+Snapshot reads serialize with all owned filesystem mutations in the supervisor;
+shared writable mappings remain prohibited, so no guest CPU/native fd can mutate
+owned bytes during capture. This is filesystem consistency, not process-memory
+checkpointing. The worker waits for coordinator persistence before acknowledgement. Current
+export is final-output publication only. Ack generation 0 and result generation
+null remain placeholders. Representative consumers, the tracked compiler-image
+producer, complete options/target identity, large source assets and resumable
+cancellation are still incomplete. Shared writable mappings remain denied.
 Evidence: `/tmp/ginux-{noctty,cwd,packet,channel-bounds,exe-link,path-probe,memfd}-*`,
 `/tmp/recipe-{long-input,deadline,cancel}-*`,
 `/tmp/ginux-compiler-probe.{stdout,stderr}`, `/tmp/ginux-recfstab-probe.stderr`.
