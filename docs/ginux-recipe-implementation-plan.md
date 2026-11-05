@@ -249,17 +249,56 @@ Null-device continuation 2026-11-05:
   stdout/stderr are retained in that artifact directory. The child recipe
   remains unchanged, fails explicitly in build and acknowledges zero checkpoints.
 
-Next local action: connect domain-owned pipe2/channel descriptors through the
-existing channel/process owners and configured dispatch, including safe copyout,
-EOF/backpressure and descriptor lifecycle, then rerun this child reproducer to
-expose the next actual spawn requirement. Preserve supervision before enabling
-any child to run. Replace/extend bounded storage through its existing owner for
-compiler-sized files and directory operations. Full input/dependency layout,
-target/options transport, resources, durable state/generations and publication
-remain incomplete. Unreachable legacy host wrappers still need removal with
-R07/S7 option transport; public operations never invoke them. The linked review
-thread owns upstream review and PR creation. Local commits are review inputs,
-not reviewed or upstream-accepted changes; no push or PR was performed.
+Owned-pipe continuation 2026-11-05:
+
+- Ginux **7f072f2c** emulates pipe/pipe2 in the existing channel owner, using
+  supervisor-owned memory and handles, not the old native-pipe mirror. Eight
+  64-KiB objects and 64 pipe descriptors bound allocation; flags accept only
+  CLOEXEC/NONBLOCK. IO is bounded to 4096 bytes, small writes are atomic,
+  failed/partial copyout consumes only delivered bytes, and aliases preserve
+  endpoint lifetimes/status flags with independent close-on-exec flags.
+  EOF, SIGPIPE, metadata, seek rejection, limits and pipe-table duplication
+  are implemented. All configured starts now constrain native descriptor limits.
+- Blocking empty/full operations stay at entry instead of returning EAGAIN.
+  The single-task configured loop cannot run peers or restart interrupted waits;
+  a parked self-pipe stays blocked until termination. Real SIGKILL/reaping cases
+  pass. Multi-task wakeup, cross-owner/stdio aliases, inherited tables, polling,
+  and exec-time close-on-exec remain unfinished. No child was enabled.
+- The new real launch-pipes suite and existing launch, storage and device suites
+  pass; release build/clippy with `-D warnings` pass. The pipe fixture covers
+  byte-exact wraparound, atomicity, bad/read-only/partially inaccessible buffers,
+  allocation rollback, alias replacement/flags/lifetime, EOF, object/descriptor
+  exhaustion, blocking read/write, SIGPIPE and fresh instances. CI/Makefile include
+  the explicit producer/scenario. **f1c6419e** fixes an observation race by reading
+  parked audits through a separate file description; the pipe suite passes again.
+- All 16 actual focused Recipe CLI/library cases pass against this supervisor.
+  The same real child helper now creates both stdio pipes but fails with EBADF
+  before process creation. Its audit includes a native prlimit query followed by
+  cleanup of owned null/pipe handles; no clone/exec call is reached. Inspection
+  of the pinned image libc shows posix_spawn_file_actions_adddup2 checking both
+  numbers through __spawn_valid_fd against sysconf(_SC_OPEN_MAX). The current
+  sparse public handle ranges exceed the reported native descriptor limit.
+  Green raw-syscall fixtures therefore do not prove libc spawn compatibility.
+- Before/after audits, source, CLI stdout/stderr, pinned-libc disassembly,
+  commands/environment and 16-case output live under
+  `.artifacts/ginux-local-integration/owned-pipes/`. Recipe **07b61f2** updates
+  its author guide to the observed behavior; executable code is unchanged from
+  50edb61. Local Ginux changes remain in this attached worktree for review.
+
+Next local action: replace separate public handle ranges with one bounded table
+of small public descriptors for immutable-image files, writable files, devices,
+pipes and stdio. Keep backend handles private; reserve/commit native opens and
+translate descriptor-bearing calls (including mmap), close and duplication through
+that table. Preserve shared open-description state and cross-owner replacement.
+Do not inflate reported limits to make the sparse handles pass libc preflight.
+Rerun the actual child probe, then integrate process/thread ownership, peer
+scheduling and teardown before allowing a child to run. This is the pending
+G07/G05a convergence on configured launch, not completion of old demo records.
+Compiler-sized storage/directory operations, full input/dependency layout,
+target/options transport, resources, durable state/generations, publication and
+unreachable legacy-wrapper removal remain incomplete. The linked review thread
+owns upstream review and PR creation; local commits are unreviewed inputs.
+No push or PR was performed.
 
 Recovery checkpoint: active skill `hdae-development`, discovery path
 `/home/vince/.codex/worktrees/ginux-recipe-local-integration/ginux/.agents/skills/hdae-development/SKILL.md`;

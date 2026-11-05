@@ -222,6 +222,18 @@ pipes and child execution remain unfinished. S0 stays in progress. Traces, sourc
 and raw logs are saved under `.artifacts/ginux-local-integration/null-device/`.
 No upstream push or PR was performed.
 
+Owned-pipe continuation 2026-11-05: Ginux **7f072f2c/f1c6419e** connects
+bounded in-memory anonymous pipes, safe copyout, atomic small writes, aliases,
+EOF/SIGPIPE and stopped blocking calls. Four real Ginux integration suites,
+release build/clippy, and all 16 focused actual Recipe CLI/library cases pass.
+The child helper advances past pipe2, but libc rejects the sparse public handle
+numbers as exceeding the descriptor limit before any process is created. The
+next correction is one bounded table of small public descriptors across file,
+device, pipe and stdio owners, preserving private backend authority. Do not
+substitute inflated limit reporting for that convergence. Multi-task scheduling
+and complete child execution remain unfinished; S0 stays in progress. Evidence
+is in `.artifacts/ginux-local-integration/owned-pipes/`; no push or PR occurred.
+
 - Complete the existing Ginux launch adapter instead of adding another launcher.
   Route every executable CLI and library operation through it by default.
 - Remove public host/in-process backend selection, host defaults, and fallback.
@@ -1029,10 +1041,12 @@ unrelated edits and current branches. Update task status with concrete evidence
 as work lands. Temporary audit probes are useful reproductions, not durable
 acceptance artifacts; preserve needed cases in the existing integration owner.
 
-Next implementation action in this chat: connect the domain-owned pipe2/channel
-objects now that the actual child helper opens its assigned null stdin. The
-observed next call is pipe2 (293), denied ENOSYS; preserve supervision and file/
-device descriptor ownership while implementing it, then rerun the real child.
+Next implementation action in this chat: converge the current file/device/
+pipe/stdio public descriptors into one bounded table of small numbers. The real
+child helper now creates pipes but libc rejects sparse handles against the
+reported limit before clone/exec. Translate native image operations through the
+same table, preserve backend ownership/alias lifetime and rerun the real child;
+then connect process/thread ownership, peer scheduling and teardown.
 Extend the existing storage owner for compiler-sized files and directory
 operations; the current bounded memory backend is not compiler support. Public entry,
 prepared tool paths and bounded checkpoint waiting are connected; process-global

@@ -81,6 +81,15 @@ assignments and duplicate assignments fail before launch. Pipe2 and child
 execution remain unfinished; this does not enable a host device or native child
 fallback.
 
+Current pipe adapter (local Ginux 7f072f2c/f1c6419e): pipe/pipe2 create
+bounded supervisor-owned byte queues with virtual handles, safe copyout,
+small-write atomicity, aliases and EOF/SIGPIPE. Blocking calls can remain stopped;
+configured multi-task wakeup and complete child execution are not integrated.
+The current separate public file/device/pipe ranges conflict with libc's fd-limit
+preflight, so the next adapter revision must provide a common table of small
+public descriptors while retaining private backend handles. Raw pipe-data tests
+are not evidence of successful libc spawn. Keep the byte protocol unchanged.
+
 Per invocation Recipe supplies:
 
 - A domain config document: `execution.profile = "balanced"`,
