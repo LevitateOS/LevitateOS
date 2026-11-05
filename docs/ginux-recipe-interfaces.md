@@ -6,24 +6,16 @@ ownership; this file fixes the concrete fields, limits, paths, and behaviors
 implementation lanes build against. Ginux owns §2 stream/result behavior and
 its config/parser changes. Recipe owns §4 framing and the worker/host split.
 
-Current transport update 2026-11-05: version 3 adds required invocation options
-to the request: `defines` (up to 64 unique identifier/string pairs) and
-`cleanup_reason`. Coordinator and worker change together; old versions fail
-explicitly. Managed autofix/LLM profile requests are rejected before recipe
-effects. This options change does not implement the state migration below;
-that future incompatible state change must bump the transport version again.
-The v1/v2 sections below retain their historical payload/diagnostic descriptions.
-
-Direction update 2026-11-05: Ginux is mandatory for executable recipe operations;
-macOS support is deferred. The current worker transport is v3 (options update above).
-Section 4 retains the original v1 payload/persistence reference; it does not
-authorize source rewriting or public host bypasses. Section 7 defines the
-separate state migration, which will require a further transport version. Recipe API 2, Ginux
-config schema 1 and worker transport versions describe independent contracts.
+Current transport is v4: invocation options from v3 plus explicit per-recipe
+state in requests/checkpoints. Coordinator and worker change together; old
+versions fail before setup. Managed autofix/LLM profile requests still fail before
+recipe effects. Ginux is mandatory; macOS support is deferred. Recipe API 2,
+Ginux config schema 1 and worker transport versions are independent contracts.
+Historical v1/v2 descriptions below do not authorize source rewriting.
 
 ## 1. Versioning and failure reporting
 
-- Current worker protocol version: `3` (`u32`, every frame header). Version mismatch is
+- Current worker protocol version: `4` (`u32`, every frame header). Version mismatch is
   a `protocol` failure: the receiver aborts, the host reports failure, and no
   retry is attempted on the same invocation.
 - Ginux `DomainConfig.schema_version` stays `1`. Recipe generates config text
@@ -321,7 +313,7 @@ It requires successful completion, bounds and validates the archive, rejects
 links/traversal/missing selections, and never overwrites an existing publication.
 Current limits are 64 named outputs, 4096 archive entries and 2 GiB. Ginux exports
 the owned writable view after task teardown; Recipe publishes only selections.
-This proves final publication, not retained generations or resumable recovery.
+Retained generations use the separate coordinator state path described below.
 Image-backed selections and symlink-containing products remain unsupported.
 
 Preseeded source assets are explicit inputs to a materializer. The builder selects
@@ -341,15 +333,13 @@ integration must provide bounded support for the selected real assets and expose
 their domain paths before materializer cache inference can be removed end to end.
 This is an outstanding interface requirement, not completed transport evidence.
 
-Dependency checkpoints also require explicit recipe identity. The current v1
-checkpoint contains only a main-recipe context, so it cannot safely carry a
-dependency's context. The shared dependency executor rejects persistent worker
-dependency execution under v1 before dependency setup. With persistence disabled,
-dependency phases run without independent checkpoint acknowledgements; parent
-checkpoints still use the existing v1 stream, and no resumable dependency state
-is claimed. Dependency source files remain unchanged. R07 must replace this
-restriction with per-recipe state/identity associated with acknowledged storage
-generations; never serialize a dependency as the parent's main context.
+Protocol v4 checkpoints name a canonical `/inputs/...rhai` recipe and its
+JSON-object state; requests supply the matching per-recipe saved states. The
+coordinator validates identities against prepared inputs, captures the shared
+filesystem through the private GXS1/GXA1 control socket, fsyncs the state record
+and atomic current pointer, then acknowledges a positive generation. Disabled
+persistence acknowledges 0 without retaining state. Reused dependency checks
+also checkpoint discovered state. Sources are never rewritten.
 
 R05 discovery now follows extends/imports and literal deps/build_deps arrays,
 preserving nested source/module references. Explicit --input selections stage
@@ -360,19 +350,16 @@ host. Ginux transports that closure; the shared Recipe executor determines which
 checks and phases actually run. The dependency graph CLI case requires an actual
 C compiler in the prepared domain and does not substitute a host-built tool.
 
-Keep the historical v1/v2 reference distinct from the current v3 options contract.
-Implement the incompatible state checkpoint/result migration with another
-transport version bump and matching coordinator/worker mismatch rejection.
-Recipe API 2 and worker transport versions are independent. In the replacement checkpoint,
-state and outputs replace main_ctx/base_ctx/base_path as persistence data; input
-source identity belongs to prepared inputs, not to a write destination. Keep the
-existing bounded framing, sequencing, failure reporting, and opaque Ginux channel.
-Ginux does not parse or version Recipe's JSON state semantics.
+Current v4 preserves bounded framing, sequencing, failure/diagnostic reporting
+and the opaque Ginux channel. Ginux never parses Recipe JSON.
 
-Deliver the coordinator and worker update together under R07/Recipe S3. Fresh
-invocations need no saved state. Repeated invocations restore only a matching
-state/files pair; corrupted or incompatible records fail with useful recovery
-guidance. Keep publication status separate from phase completion so an export
-failure is not reported as a completed installation. Exercise protocol mismatch,
-interruption on both sides of acknowledgement, disabled persistence, and source
-immutability through the actual managed execution path.
+State lives in explicit --state-dir or per-user application state. Destination
+locks serialize writers across input versions. Scope includes recipe path and
+destination; identity includes staged closure bytes/modes, defines, environment
+image, worker binary and native platform. Restore hashes the exact private copy
+consumed by the launcher before startup. Only ctx.state is restored into fresh
+initialized context. Previous complete generations remain available. Corrupt
+records/snapshots fail explicitly; disabled persistence never claims recovery.
+Final successful state capture includes direct-check results; output publication
+remains a separate success requirement. Force policy and explicit target inputs
+remain follow-up work.

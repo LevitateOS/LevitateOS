@@ -98,17 +98,50 @@ The full Recipe recfstab build/run/publication passed. Its published executable:
 Evidence: `/tmp/recipe-recfstab-published.{stdout,stderr}`,
 `/tmp/recipe-publication-test.log`, `/tmp/recipe-publication-boundary-test.log`,
 `/tmp/ginux-export-test.log`, `/tmp/ginux-integration-static-unit.log`.
-Current action: implement retained state/generations, destination locking and
-resumable recovery. Next concrete change is a private coordinator control socket
-for filesystem snapshots through the existing archive owner, plus startup restore.
-Snapshot reads serialize with all owned filesystem mutations in the supervisor;
-shared writable mappings remain prohibited, so no guest CPU/native fd can mutate
-owned bytes during capture. This is filesystem consistency, not process-memory
-checkpointing. The worker waits for coordinator persistence before acknowledgement. Current
-export is final-output publication only. Ack generation 0 and result generation
-null remain placeholders. Representative consumers, the tracked compiler-image
-producer, complete options/target identity, large source assets and resumable
-cancellation are still incomplete. Shared writable mappings remain denied.
+Ginux `2b306eff` adds the optional private inherited Unix control socket. Bounded
+GXS1 requests capture a new exclusively created filesystem tar; GXA1 replies
+follow file fsync/close. Mid-run capture reuses the final-export owner. The real
+fixture proves two distinct states, prior-snapshot immutability, no guest control
+fd, partial-frame buffering, duplicate-sequence rejection, and preservation of
+an occupied destination. Checkpoints, storage/export, launch and thread suites
+and static checks pass. Evidence: /tmp/ginux-control-{test,regression,static}.log.
+Startup restore is implemented and verified: --restore-file loads only bounded
+regular files/directories into assigned owned storage before the workload starts.
+The real checkpoint fixture restarts from each captured generation and verifies
+bytes, modes, empty directories, long names and immutable source snapshots.
+Traversal, links, duplicate entries, checksums, truncation and assignment mismatch
+fail before workload execution. Checkpoint, storage, launch, thread and static
+checks pass; evidence /tmp/ginux-restore-{test,regression,static}.log.
+Ginux `9ec95527` supports read-only realtime/monotonic clocks and interruptible
+relative/absolute sleeps, rejecting dynamic FD and host CPU-clock IDs. Real task
+checks and all existing static/unit checks pass. This fixed the actual sleep
+failure exposed by the interruption scenarios; evidence /tmp/ginux-time-*.log.
+Recipe `af4e092` wires durable state/input identity, explicit --state-dir and per-user
+state storage, shared destination locking, per-recipe v4 checkpoints and recovery.
+Only ctx.state is restored into freshly initialized API 2 contexts; sources stay
+immutable. Disabled persistence (including the old alias) retains no state.
+Successful reuse checks save dependency state, and direct-check results receive a
+final state/files capture. Corrupt snapshots fail before guest startup. Previous
+complete generations remain available. Field-specific errors reject unsupported
+state values rather than stringifying them.
+Nine actual managed state scenarios passed (eight in
+/tmp/recipe-retained-complete.log, the corrected dependency fixture separately in
+/tmp/recipe-retained-dependencies.log). They cover source/input/define identity,
+nested values, dependency reuse, application-state defaults outside a checkout,
+legacy guidance, disabled persistence, corrupt bytes, shared writers and killing
+the coordinator before/after acknowledgement. All 27 existing managed scenarios
+and 3 worker-entry boundary checks pass: /tmp/recipe-retained-{regression,entry}.log.
+The first dependency fixtures failed correctly because their readiness checks
+remained not-ready after completion; the final fixture uses fresh ephemeral
+context to exercise reuse while truthfully reporting completion within a run.
+Snapshot reads serialize with all owned filesystem mutations; shared writable
+mappings remain prohibited. This is filesystem consistency, not process-memory
+checkpointing. Ginux result generation stays null; Recipe owns durable generations.
+Current action: remove obsolete Recipe host/source-rewriting persistence paths,
+then complete target/options, the tracked compiler-image producer, source assets
+and representative consumers. SIGKILL stops workload processes and recovery works,
+but can leave temporary prepared roots; automatic generation cleanup is also
+unfinished. Cargo global-cache SQLite locking warnings remain unresolved.
 Evidence: `/tmp/ginux-{noctty,cwd,packet,channel-bounds,exe-link,path-probe,memfd}-*`,
 `/tmp/recipe-{long-input,deadline,cancel}-*`,
 `/tmp/ginux-compiler-probe.{stdout,stderr}`, `/tmp/ginux-recfstab-probe.stderr`.
