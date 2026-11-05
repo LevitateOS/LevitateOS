@@ -160,7 +160,8 @@ outside this artifact-production change.
 
 ### S0 Make Ginux the required execution path
 
-Dependencies: existing Ginux R05/R06 and launch/input/channel work. Status: not started.
+Dependencies: Ginux R05, G02, G14 and launch/input work. Status: not started.
+Implement together with R06 as one coordinated delivery.
 
 - Complete the existing Ginux launch adapter instead of adding another launcher.
   Route every executable CLI and library operation through it by default.
@@ -225,7 +226,9 @@ Compilation and worker-protocol checks can precede S0; final runtime evidence ca
 
 ### S3 Separate durable state and adapt the worker boundary
 
-Dependencies: S2; coordinate with Ginux R05/R07. Status: not started.
+Dependencies: S2; full managed recovery also needs Ginux R06/G12a. Status: not started.
+Implement together with R07, extending R05's input preparation for state import.
+Neither task waits for the other's completion; they share one state/coordinator change.
 
 - Implement separate state storage using executor/private/context.rs and state.rs
   seams. Retain atomic replace and directory durability behavior supported by the
