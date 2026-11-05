@@ -383,8 +383,9 @@ to introduce new crates or parallel behavior owners.
   selected tools, preserving path confinement and metadata. Done: ordinary tools
   install a usable executable tree and retain meaningful links and permissions.
 
-- [ ] **G09 — Execute files produced in writable domain storage.** Depends: G08a,
-  G03b. Owner: G-files with G-process interface fixed first. Connect generated
+- [x] **G09 — Execute files produced in writable domain storage.** Depends: G08a,
+  G03b. (Done 2026-11-05: worktree `/tmp/ginux-g09` (base `ginux-recipe/integration`), branch `ginux-recipe/g09-exec-run`, commit `9e4a5fa5`, pushed to fork. Loop-global domain view (seeded base + overlay, staged via `GINUX_DOMAIN_STAGE`); exec-bit files materialize at domain path and load under supervised exec mediation (same pid, epoch bump); scripts stage a domain interpreter (bounded depth, ENOEXEC on bad #!); chmod(90)/fchmodat emulated via G08a path, host untouched; missing falls through to host byte-identical. Coordinator reran reproducer: G09_REPRO PASS (domain prog status 42, interp status 7, EACCES/ENOENT/EPERM faithful, revocations stick), wait+pipe regressions PASS, no survivors. LIMIT: loop-global view, shared cwd, 8×64KiB caps under staged prefix; real-libc interpreters need mmap mediation; per-task fd/cwd tables with G07 merge. Follow-ups: (1) rootfd-backed loading + per-task tables at G07 launch merge, (2) QuiesceGate hookup for staged files.)
+  Owner: G-files with G-process interface fixed first. Connect generated
   executables and interpreters to controlled native loading; do not export and
   execute them on the host as a substitute. Done: a prepared compiler creates a
   small executable and Ginux runs that exact domain-produced file.
@@ -413,14 +414,16 @@ to introduce new crates or parallel behavior owners.
   Done: interruption cannot present an acknowledged generation with missing
   matching files; inability to obtain consistency is an explicit error.
 
-- [ ] **G13 — Export selected results and deletions.** Depends: G12a, G08a.
+- [x] **G13 — Export selected results and deletions.** Depends: G12a, G08a.
+  (Done 2026-11-05: worktree `/tmp/ginux-g13` (base `ginux-recipe/integration`), branch `ginux-recipe/g13-export`, commit `50c6a399`, pushed to fork. New `export.rs`: `export_generation` (verify → replace view → walk merged subtree into fresh staging; symlinks recorded never followed; absolute/escaping targets rejected per-file; tombstones under `.ginux-tombstones/`; max_files stops explicitly, oversize skipped per-file with full report); retained image gains symlink record kind (old images still validate). Coordinator reran reproducer: ALL G13 CHECKS PASSED (24 lines) + G12a 17/17 backward-compatible. LIMIT: child/depth caps 64; lexical symlink containment; publish only when failed==0 && !exhausted. Follow-ups: (1) wire into R08 publication adapter, (2) hardlink coherence decision.)
   Owner: G-storage. Export selected trees or changes into a fresh confined host
   staging destination with needed metadata/tombstones. Validate traversal, links,
   output bounds, and partial failure. Done: a generic file-transform workload's
   output can be retrieved and removed without modifying arbitrary host paths.
 
-- [ ] **G14 — Provide domain-owned bidirectional byte channels.** Depends: G07b,
-  G05a. Owner: G-files/channel adapter, serialized with G-files edits. Supply the
+- [x] **G14 — Provide domain-owned bidirectional byte channels.** Depends: G07b,
+  G05a. (Done 2026-11-05: worktree `/tmp/ginux-g14` (base `ginux-recipe/integration`), branch `ginux-recipe/g14-channels`, commit `a92471ae`, pushed to fork. New `channel_transport.rs`: supervisor-owned `ChannelSpace` (bounded 64 KiB/direction, short I/O, WouldBlock backpressure, half-close drain-then-EOF, full close with freeing, opaque bytes, zero host descriptors); `channel_hooks.rs` rewrite keeps declining + defines fd 0/1 convention and merge seam (`channel_managed_read/write/close` signatures recorded). Coordinator reran harness: G14_REPRO PASS (262218 bytes via real /bin/cat, 4 §4-shaped frames with op 99 proving opacity, byte-exact echo, clean EOF, no survivors). LIMIT: loop wiring pending (G09 merge; WouldBlock pump policy open). Follow-ups: (1) merge wiring + blocking policy, (2) aliasing coherence only if channels ever alias.)
+  Owner: G-files/channel adapter, serialized with G-files edits. Supply the
   generic opaque transport agreed in F02, bounded I/O and clean closure. Done:
   an ordinary managed program exchanges bytes with its invoking controller;
   Ginux does not parse Recipe messages or expose raw controller descriptors.
