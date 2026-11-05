@@ -328,6 +328,35 @@ managed Ginux execution remains unverified. Engine factory, initialization-once,
 invocation context, and API 2 work remain outstanding and must coordinate with
 the Ginux agent before editing shared engine/worker files.
 
+Common invocation slice 2026-11-05: tools/recipe 6a46f56 extracts core/invocation.rs
+as the existing engine-configuration owner and the compatibility scope builder
+used by install, manual checks, cleanup/removal, and dependency preparation.
+CLI/RecipeEngine removal now forwards its known build directory through the
+existing compatibility seam. Standard ARCH/NPROC/RPM_PATH/TOOLS_PREFIX bindings
+are consistent across those operations. Built-in print/debug callbacks live in
+helper registration, shared by normal and worker engines; the conflicting
+unit-returning debug overload is removed so Rhai's formatter works correctly.
+No backend, worker transport/entry point, input preparation, or launcher file was
+changed. R06 should adopt core/invocation::engine in its existing worker builder
+and pass the worker's explicit build directory to removal; the current worker
+removal seam still lacks that value when its defines are empty.
+
+    cargo build -p levitate-recipe --bin recipe --offline
+    cargo test -p levitate-recipe --test e2e invocation:: --offline -- --nocapture
+    cargo test -p levitate-recipe --test e2e kernel_recipes:: --offline -- --nocapture
+    cargo test -p levitate-recipe --test e2e process:: --offline -- --nocapture
+
+Two new CLI cases pass for inherited/imported functions and standard globals
+across all six operations, stdout-safe built-ins, and an actual dependency script
+installed/executed by its parent. All eight kernel cases and both process cases
+also pass. These remain pre-S0 results. Top-level initialization is still repeated
+by Rhai's default call_fn path, and imported module resolution must be preserved
+when replacing that behavior; this slice does not claim initialization-once,
+API 2, or a complete shared worker engine factory.
+A disposable actual CLI install with an append-only setup log confirmed five
+top-level executions for one install (exit 0, payload produced). Initialization
+is therefore a reproduced remaining defect, not inferred from source alone.
+
 ### S3 Separate durable state and adapt the worker boundary
 
 Dependencies: S2; full managed recovery also needs Ginux R06/G12a. Status: not started.
@@ -628,8 +657,8 @@ unrelated edits and current branches. Update task status with concrete evidence
 as work lands. Temporary audit probes are useful reproductions, not durable
 acceptance artifacts; preserve needed cases in the existing integration owner.
 
-Next implementation action in this chat: unify Recipe engine/setup semantics,
-starting with initialization-once and consistent invocation globals. Worker/launcher
+Next implementation action in this chat: fix repeated top-level initialization
+while preserving imports and initialized globals in hook calls. Worker/launcher
 integration remains coordinated with the Ginux owner.
 Keep the concurrent
 Ginux agent's launcher/worker/coordinator work separate. Re-run implemented slices
