@@ -6,8 +6,8 @@ ownership; this file fixes the concrete fields, limits, paths, and behaviors
 implementation lanes build against. Ginux owns §2 stream/result behavior and
 its config/parser changes. Recipe owns §4 framing and the worker/host split.
 
-Current transport is v4: invocation options from v3 plus explicit per-recipe
-state in requests/checkpoints. Coordinator and worker change together; old
+Current transport is v5: per-recipe state from v4 plus explicit target OS/arch,
+job count and main-recipe phase-force options. Coordinator and worker change together; old
 versions fail before setup. Managed autofix/LLM profile requests still fail before
 recipe effects. Ginux is mandatory; macOS support is deferred. Recipe API 2,
 Ginux config schema 1 and worker transport versions are independent contracts.
@@ -15,7 +15,7 @@ Historical v1/v2 descriptions below do not authorize source rewriting.
 
 ## 1. Versioning and failure reporting
 
-- Current worker protocol version: `4` (`u32`, every frame header). Version mismatch is
+- Current worker protocol version: `5` (`u32`, every frame header). Version mismatch is
   a `protocol` failure: the receiver aborts, the host reports failure, and no
   retry is attempted on the same invocation.
 - Ginux `DomainConfig.schema_version` stays `1`. Recipe generates config text
@@ -333,7 +333,7 @@ integration must provide bounded support for the selected real assets and expose
 their domain paths before materializer cache inference can be removed end to end.
 This is an outstanding interface requirement, not completed transport evidence.
 
-Protocol v4 checkpoints name a canonical `/inputs/...rhai` recipe and its
+Protocol v5 checkpoints name a canonical `/inputs/...rhai` recipe and its
 JSON-object state; requests supply the matching per-recipe saved states. The
 coordinator validates identities against prepared inputs, captures the shared
 filesystem through the private GXS1/GXA1 control socket, fsyncs the state record
@@ -350,16 +350,18 @@ host. Ginux transports that closure; the shared Recipe executor determines which
 checks and phases actually run. The dependency graph CLI case requires an actual
 C compiler in the prepared domain and does not substitute a host-built tool.
 
-Current v4 preserves bounded framing, sequencing, failure/diagnostic reporting
+Current v5 preserves bounded framing, sequencing, failure/diagnostic reporting
 and the opaque Ginux channel. Ginux never parses Recipe JSON.
 
 State lives in explicit --state-dir or per-user application state. Destination
 locks serialize writers across input versions. Scope includes recipe path and
 destination; identity includes staged closure bytes/modes, defines, environment
-image, worker binary and native platform. Restore hashes the exact private copy
+image, worker binary, explicit native target and job count. Phase-force flags
+are deliberately excluded from identity. Restore hashes the exact private copy
 consumed by the launcher before startup. Only ctx.state is restored into fresh
 initialized context. Previous complete generations remain available. Corrupt
 records/snapshots fail explicitly; disabled persistence never claims recovery.
 Final successful state capture includes direct-check results; output publication
-remains a separate success requirement. Force policy and explicit target inputs
-remain follow-up work.
+remains a separate success requirement. Only native linux/x86_64 is supported. Force options select main-recipe work
+without bypassing custom checks or forcing dependencies; jobs default to one
+and are bounded to 16. Installed-target views and consumer migration remain open.

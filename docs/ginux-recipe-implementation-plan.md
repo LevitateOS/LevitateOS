@@ -142,8 +142,19 @@ source rewriting/parser/serializer and source-file lock implementation. All nine
 managed recovery cases, the real public-library boundary, three worker-entry and
 three cleanup/remove scenarios pass; /tmp/recipe-host-removal-*.log. Manual checks
 now expose the actual persistence setting in ctx.runtime.options.
-Current action: complete explicit target/options transport, then the tracked
-compiler-image producer, source assets and representative consumers. SIGKILL stops workload processes and recovery works,
+Recipe `3177f69` implements and verifies explicit execution options: protocol v5 carries
+native target OS/arch, 1–16 jobs (default one) and main-recipe force flags. Target
+and jobs participate in state identity; force does not. CLI/library validation
+rejects unsupported targets and invalid policy before setup. Domain config,
+worker environment and Rhai runtime agree. Dependencies keep their own readiness
+without inheriting parent force flags; post-phase validation remains enforced.
+All 43 filtered managed scenarios (including image-boundary cases), plus three
+worker-entry checks pass. Build/example compilation is clean. Evidence:
+/tmp/recipe-options-{regression,entry,build,examples}.log. The old toy protocol
+example was removed under Recipe's no-unit-test rule; real worker and managed
+CLI scenarios remain. No Ginux tests were removed.
+Current action: implement the tracked compiler-image producer, then source
+assets and representative consumers. SIGKILL stops workload processes and recovery works,
 but can leave temporary prepared roots; automatic generation cleanup is also
 unfinished. Cargo global-cache SQLite locking warnings remain unresolved.
 Evidence: `/tmp/ginux-{noctty,cwd,packet,channel-bounds,exe-link,path-probe,memfd}-*`,
