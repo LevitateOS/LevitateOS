@@ -1,7 +1,6 @@
 # Recipe simplification implementation plan
 
-Updated: 2026-11-06. Status: remaining work planned; implementation has not been
-started by this planning request.
+Updated: 2026-11-06. Status: implementation active under the user’s “go and make a goal” authorization.
 
 This is the authoritative remaining-work queue for Recipe simplification and
 its local Ginux dependencies. It supersedes the old S0–S7 and F/G/R/L/I/N/U/D
@@ -51,7 +50,7 @@ cross-process reference and must track changes made by these tasks.
 | Distro-builder | `97ce3a9` on `codex/streamline-development` | Canonical API 2 recfstab and explicit-input adapter; real build/run/publication and six-invocation reuse/removal/reinstall/cleanup exercise |
 | Upstream Ginux, last verified | `2489517e` | Integration branch still needs reconciliation with this newer upstream history; the three small VFS PRs were prepared independently |
 
-The current filesystem lacks true owned hardlinks, owned-directory cwd and
+The inspected starting filesystem lacked true owned hardlinks, owned-directory cwd and
 cross-image/owned link traversal. The namespace has 4,096 object slots, while
 Recipe publication and Ginux restore have 2 GiB bounds. Cargo reports SQLite
 cache-locking errors. Acquisition helpers have earlier host-side evidence, not
@@ -62,7 +61,7 @@ These observations, rather than historical unchecked boxes, define the work.
 ## Four parallel lanes and file ownership
 
 Use up to four active implementers, with the coordinator also implementing lane C.
-This is a schedule for later execution, not a request to launch agents now. Keep
+The user authorized this rolling parallel schedule with “go and make a goal”. Keep
 existing branch/worktree choices; this plan does not authorize new branches.
 Paths below are repository-relative. Ginux means the integration worktree at
 `/home/vince/.codex/worktrees/ginux-recipe-local-integration/ginux`, not the old
@@ -84,7 +83,9 @@ rootfs and VM validation share one operator to avoid host resource contention.
 
 ## Remaining tasks in dependency order
 
-All tasks below are **todo**. Dependencies refer to completed implementation and
+Completed focused tasks: **T02, T03, T05, T06, T08, T10, T20**.
+Active or partial: **T01, T04, T09, T11, T13, T14, T15, T18, T19**.
+Other tasks remain todo; partial source preparation is not runtime acceptance. Dependencies refer to completed implementation and
 the stated evidence, not merely a draft or a compiling helper. The list is a
 valid topological order; lane availability also constrains execution. Source
 preparation may overlap a dependency, but do not mark its dependent behavior
@@ -187,9 +188,61 @@ pending PRs. Publishing requires a later explicit user instruction.
 
 ## Current checkpoint
 
-Planning complete; all T01–T27 remain todo. No implementation agents dispatched,
-no product code changed and no Ginux PR or remote branch modified. The next
-implementation start is the four ready tasks T01/T02/T03/T04, if requested.
+Goal active: complete T01–T27 with four rolling lanes. Root implements C;
+`lane_a_runtime`, `lane_b_acquisition`, `lane_d_consumers` own A/B/D. No new
+branch, Ginux publication or maintainer message is authorized.
+
+- T02 reconciled upstream `2a82f61e` in local `8b5cf5dd`, preserving unit tests;
+  configured launch/storage/exec/checkpoint checks and static/unit suites pass.
+- T05 `6a45d8f8`, T06 `9e2a39e8`, T10 `38fa14fd`: owned cwd, shared hardlink
+  backing and scalable bounded storage pass their focused real-program cases.
+  Storage defaults to 16,384 objects with configurable data/metadata budgets;
+  an 8,192-object exhaustion fixture proves this replaces the 4,096-slot limit.
+- T03/T08: numeric TCP grants, immutable hostname mapping, connection/byte
+  budgets, no proxies/UDP/listening; backend commits `8ff83d64`–`9a70427b`.
+  T13 central Ginux dispatch `66de2880` passes supervised socket/readiness,
+  denial/quota/timeout/fork/revocation cases; real HTTP then exposed missing
+  owned-file fsync, fixed in `53dec6b3`. Recipe HTTP/TLS acceptance is running.
+  Endpoint grants do not isolate virtual hosts sharing a granted IP/port.
+- Recipe `fb3b38e`: sole API2 engine, protocol6, explicit invocation environment,
+  no backend/persistence aliases, canonical verified acquisition helpers and
+  loader-owned non-evaluating metadata. T20 actual CLI scenarios: 3 pass.
+  T01 managed input batch: 33/34 pass; the remaining fixture lacked the strict
+  API marker and was corrected to reach its intended filesystem boundary.
+  Retained-state batch: 12/12 pass, including changed input identity, separate
+  state/files recovery and simultaneous destination users.
+- T09 fresh selected-target seeding and T11 Recipe archive joins are in progress.
+  Initial target fixture found GNU-header/USTAR mismatch, corrected at the
+  writer; a selected-file trailing-slash publication bug is also corrected.
+  Ginux T11 archive half `e3374593` preserves aliases across export/restart and
+  rejects invalid link targets; it validates an above-2GiB header under explicit
+  4GiB capacity, but no actual above-2GiB payload has been demonstrated yet.
+- D prepared canonical offline/source-rootfs, kernel and preseed sources/callers
+  in distro-builder `3cb94ef`–`45d7f5e`, distro-contract `ceecd63`, AcornOS
+  `40dc9a0`/`3e0db2b`, and leviso `b423f9b`–`6d15e89`. Affected Rust callers and
+  all retained Rhai sources compile. Current inventory: original35 +2canonical
+  tools -4unused entries =33 paths; 11 legacy executable facades still require
+  actual caller cutover/removal through T14/T23. Kernel/rootfs/acquisition
+  acceptance stays partial. Acorn live-tools still requires explicit musl
+  compiler-image support; GNU output is not an acceptable silent substitution.
+- T18 network-independent argument acceptance passes five actual domain cases.
+  Real Git2.52 image is prepared from a pinned git-core RPM, without changing
+  the original compiler image. Exact image SHA256:
+  `8bd5ad2e715c163ea201cc629856fb7ee970104f31e7d899913e185e56d3117b`.
+  Fixture-only CA image SHA256:
+  `fcc70d8c3052ff988a2223839a1050e5305c19ad6344f80cb3bd369c8b3132b8`.
+  TLS/Git startup and full positive transfer scenarios are not yet accepted.
+
+Exact next actions: finish real target/storage publication acceptance; A runs
+cross-image/owned resolution and actual Cargo locking; B runs managed HTTP/TLS
+and pinned Git; D connects offline source closures and removes superseded
+callers. C continues cancellation/durable diagnostics, bounded retention and
+optional coordinator repair after those joins. Validation uses immutable copied
+CLI/worker/supervisor artifacts so concurrent rebuilds cannot corrupt a run.
+Evidence logs currently include `/tmp/recipe-go-t01-stable-{inputs,state}.log`,
+`/tmp/recipe-t11-check.log`, `/tmp/recipe-t09-ustar.log`,
+`/tmp/recipe-lane-b-network/`, and `/tmp/ginux-t11-*.log`. The inputs log contains
+one known corrected-fixture failure; it is not an overall green claim.
 Active existing planning skill: `hdae-development`; discovery path
 `/home/vince/.codex/worktrees/ginux-pr-combination-check/ginux/.agents/skills/hdae-development/SKILL.md`.
 Reload after context shifts. The user's direct-work/no-bureaucracy instructions
