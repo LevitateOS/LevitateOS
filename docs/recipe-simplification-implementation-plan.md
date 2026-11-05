@@ -234,6 +234,15 @@ before the fix. All four final kernel CLI cases passed, including malformed
 artifact-root rejection. No kernel was downloaded or compiled. This is pre-S0
 recipe/CLI evidence; managed Ginux revalidation remains outstanding.
 
+Kernel invocation slice: distro-builder d0582d1 now reads the existing
+KERNEL_FORCE_REBUILD scope define before its legacy environment fallback and
+defaults omitted prebuilt Kconfig paths to empty. Invocation options are refreshed
+on load so persisted legacy ctx cannot freeze force policy. tools/recipe 18c18a6
+extends the kernel CLI cases for force precedence/fallback and missing optional
+Kconfig. The two new cases failed before the change; all six kernel CLI cases
+passed afterward. No caller/launcher/worker/coordinator code changed. Managed
+Ginux revalidation remains outstanding.
+
 ### S2 Unify setup and command execution
 
 Dependencies: S1 where overlapping. Status: not started.
@@ -407,7 +416,7 @@ unrelated edits and current branches. Update task status with concrete evidence
 as work lands. Temporary audit probes are useful reproductions, not durable
 acceptance artifacts; preserve needed cases in the existing integration owner.
 
-Next implementation action in this chat: correct S1 kernel caller KCONFIG/force
-inputs, then address independent acquisition/refresh behavior. Keep the concurrent
+Next implementation action in this chat: address independent acquisition completion
+and refresh behavior, then helper output routing. Keep the concurrent
 Ginux agent's launcher/worker/coordinator work separate. Re-run implemented slices
 through the mandatory Ginux path once that agent's integration is available.
