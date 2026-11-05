@@ -2,7 +2,7 @@
 
 Keep development fast. Fix the actual behavior, use judgment, and keep process proportional to the change.
 
-These rules apply to every directory and submodule, recursively, across Git repository boundaries. Nested guides may add domain details but must not reintroduce unit tests or mandatory development bureaucracy.
+These rules apply to every directory and submodule, recursively, across Git repository boundaries. Nested guides may add domain details but must not reintroduce unit tests or mandatory development bureaucracy, except for the ginux unit-testing exception below.
 
 ## Working style
 - Act on authorized work without repeated permission requests, plans, audits, checklists, decision matrices, or approval gates.
@@ -14,6 +14,7 @@ These rules apply to every directory and submodule, recursively, across Git repo
 - Commit early and often. Commit each coherent, working step as it lands rather than batching a session's work into one large commit at the end.
 
 ## Validation
+- Exception: the ginux repository (`tools/ginux`, including its branches and worktrees) permits unit tests, assertion-based unit doctests, their runners, and unit-test CI coverage. Preserve its existing tests and coverage; add or update focused tests when useful. The following unit-test prohibition and removal requirement do not apply to ginux.
 - Unit testing, including assertion-based unit doctests, is prohibited. Do not add, retain, run, require, or replace unit tests with renamed equivalents, snapshots of isolated helpers, or mock-only unit suites.
 - Remove unit tests and their runners rather than marking them ignored or reporting them as passing.
 - Use compilation, typechecking, and focused integration, CLI, boot, install, or runtime checks when they help establish the changed behavior. Choose checks appropriate to the work; do not run a full suite for every edit or commit.
