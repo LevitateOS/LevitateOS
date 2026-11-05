@@ -6,16 +6,24 @@ ownership; this file fixes the concrete fields, limits, paths, and behaviors
 implementation lanes build against. Ginux owns §2 stream/result behavior and
 its config/parser changes. Recipe owns §4 framing and the worker/host split.
 
+Current transport update 2026-11-05: version 3 adds required invocation options
+to the request: `defines` (up to 64 unique identifier/string pairs) and
+`cleanup_reason`. Coordinator and worker change together; old versions fail
+explicitly. Managed autofix/LLM profile requests are rejected before recipe
+effects. This options change does not implement the state migration below;
+that future incompatible state change must bump the transport version again.
+The v1/v2 sections below retain their historical payload/diagnostic descriptions.
+
 Direction update 2026-11-05: Ginux is mandatory for executable recipe operations;
-macOS support is deferred. The current worker transport is v2 (section 4.1).
+macOS support is deferred. The current worker transport is v3 (options update above).
 Section 4 retains the original v1 payload/persistence reference; it does not
 authorize source rewriting or public host bypasses. Section 7 defines the
-separate state migration, which will require transport v3. Recipe API 2, Ginux
+separate state migration, which will require a further transport version. Recipe API 2, Ginux
 config schema 1 and worker transport versions describe independent contracts.
 
 ## 1. Versioning and failure reporting
 
-- Current worker protocol version: `2` (`u32`, every frame header). Version mismatch is
+- Current worker protocol version: `3` (`u32`, every frame header). Version mismatch is
   a `protocol` failure: the receiver aborts, the host reports failure, and no
   retry is attempted on the same invocation.
 - Ginux `DomainConfig.schema_version` stays `1`. Recipe generates config text
@@ -176,9 +184,9 @@ version change for incompatible payloads. Ginux's byte channel is unchanged.
   exit without `result`, or a nonzero exit, is a `protocol`/`workload`
   failure using the §2 result file, retaining the last acked pair.
 
-### 4.1 Current diagnostic transport v2
+### 4.1 Historical diagnostic transport v2
 
-The coordinator and worker now use header version 2 and reject version 1 before
+The v2 coordinator and worker used header version 2 and rejected version 1 before
 recipe setup. Framing stays bounded to 4 MiB with 14-byte headers, independent
 per-direction sequence numbers and strict direction checks. Ops 1–5 retain
 their v1 payload shapes for now; generation 0 is still a placeholder, not a
@@ -331,18 +339,19 @@ is claimed. Dependency source files remain unchanged. R07 must replace this
 restriction with per-recipe state/identity associated with acknowledged storage
 generations; never serialize a dependency as the parent's main context.
 
-R05's current discovery follows extends/imports, but does not stage recipes named
-by deps/build_deps. Input integration must include the declared dependency
-closure and preserve source/module references. Static preparation must fail
+R05 discovery now follows extends/imports and literal deps/build_deps arrays,
+preserving nested source/module references. Explicit --input selections stage
+regular files and trees; symlinks are rejected. Dynamic declarations fail during
+preparation. Static preparation must fail
 usefully for unsupported dynamic discovery rather than evaluating recipes on the
 host. Ginux transports that closure; the shared Recipe executor determines which
 checks and phases actually run. The dependency graph CLI case requires an actual
 C compiler in the prepared domain and does not substitute a host-built tool.
 
-Keep the historical v1 framing/payload reference and current v2 diagnostic
-contract distinct. Implement incompatible request/checkpoint/result changes as
-transport v3 with matching coordinator and worker changes and explicit mismatch
-rejection. Recipe API 2 and worker transport v3 are independent versions. In the replacement checkpoint,
+Keep the historical v1/v2 reference distinct from the current v3 options contract.
+Implement the incompatible state checkpoint/result migration with another
+transport version bump and matching coordinator/worker mismatch rejection.
+Recipe API 2 and worker transport versions are independent. In the replacement checkpoint,
 state and outputs replace main_ctx/base_ctx/base_path as persistence data; input
 source identity belongs to prepared inputs, not to a write destination. Keep the
 existing bounded framing, sequencing, failure reporting, and opaque Ginux channel.

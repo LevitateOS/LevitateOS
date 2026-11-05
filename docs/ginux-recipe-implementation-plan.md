@@ -1,6 +1,52 @@
 # Ginux execution for Recipe: implementation and upstream contribution plan
 
 Status: implementation is in progress; individual tasks record completion and evidence.
+
+Current execution checkpoint (2026-11-05, supersedes older next-action text):
+the user authorized this review thread to complete the local integration, using
+existing branches and keeping publication under their control. Work order is
+invocation/options and complete inputs, prepared compiler environment, real
+recfstab build/run/export, retained state and recovery, then representative
+consumers. Preserve mandatory Ginux, custom readiness, and upstream unit tests.
+Older task evidence below is historical, not proof that a capability is wired
+into the current configured launcher; any older instruction to remove Ginux
+tests is superseded by the repository's explicit exception.
+
+Active Ginux branch `codex/ginux-recipe-local-integration` contains upstream
+`5ed26bf2` through local merge `28f0a7d6`. Recipe is on
+`ginux-recipe/r06-launch`, starting at `650f7a3`. The paused interpreter edits
+were preserved in a Git stash named `wip: preserve unfinished owned interpreter
+chains` before continuing from the verified merge. They remain incomplete.
+Baseline: 29 focused Recipe integration cases passed against that merge; the
+broad review reproduced dropped defines, nested imports, and missing dependency
+inputs. Review/evidence: `.artifacts/ginux-local-integration/broad-review-20261105/`.
+Local implementation progress: Recipe `f8766b8` transports invocation defines
+and cleanup reasons (protocol v3); `7bb751d` preserves nested modules and stages
+literal dependency closures; `b9c0bcb` exposes explicit read-only source-tree
+inputs; `e776d22` permits nested paths up to the actual launcher path bound.
+The corresponding real CLI regressions pass. Ginux `8752f708` accepts O_NOCTTY
+on owned regular files and passes the configured storage suite. A real C source
+is now compiled, linked, and executed successfully inside the prepared domain.
+The toolchain image is `.artifacts/ginux-env/build-rootfs.tar`, digest
+`2ec000344178ac27c1c6d28feb23bc91959723893fdb4421bfe90296d462e909`;
+its input provenance is beside it in `build-rootfs.json`. It is an experimental
+local assembled image, not a published producer. The copied recfstab source and
+vendored offline dependency lock are under `.artifacts/ginux-env/recfstab-source`;
+Cargo refreshed that isolated lock from locally cached compatible versions.
+Ginux `d9490772` adds image cwd changes and resolves relative paths from the
+calling process; the configured task, exec, and storage suites pass. Owned-directory
+chdir remains explicitly unsupported. Current action: diagnose Rust compiler
+startup (Cargo now starts but its rustc -vV subprocess exits 127), then rerun the
+real recfstab build. Output export, retained state/generations,
+locking, complete-frame deadlines, cancellation and representative consumers are
+still incomplete; successful in-domain output paths are not host artifacts.
+Evidence: `/tmp/ginux-noctty-test.log`, `/tmp/recipe-long-input-test.log`,
+`/tmp/ginux-compiler-probe.{stdout,stderr}`, `/tmp/ginux-recfstab-probe.stderr`.
+Active skill: `hdae-development` at
+`.agents/skills/hdae-development/SKILL.md`; reload fully after context shifts.
+Keep this existing plan as the continuation record; no new approval ceremony or
+upstream policy files. No pushes or new PRs are authorized by this checkpoint.
+
 This plan records the agreed objective,
 source investigation, proposed interfaces, dependency-ordered tasks, and parallel
 work assignments. Task IDs are scheduling references, not build stages or test
