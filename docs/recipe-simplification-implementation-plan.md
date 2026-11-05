@@ -179,10 +179,23 @@ fixes it while preserving shared closure values. All **8** focused
 including independent custom checks, errors/not-ready outcomes, bases/imports,
 child/shared contexts, source immutability, image guards, and a denied host write.
 See the Ginux plan for exact evidence and artifact paths. This establishes
-managed readiness queries; install/remove/cleanup, full input/dependency staging,
-worker-entry hardening, tool-path convergence, storage, resource limits, durable
-state, and publication still need implementation or runtime verification. S0
-remains in progress. No upstream push or PR was performed.
+managed readiness queries. Subsequent entry/path/checkpoint progress is recorded
+below; file-producing lifecycles, installed-target views, full input/dependency
+staging, storage, resources, durable state and publication remain incomplete.
+S0 remains in progress. No upstream push or PR was performed.
+
+Entry and path continuation 2026-11-05: Recipe **7992bd9** removes the public
+Host backend and worker-environment selection, makes default library operations
+resolve Ginux, binds private worker requests to bootstrap identity, and unifies
+prepared tool paths. The actual library default previously evaluated on the
+host under a spoofed worker environment; its real regression now passes through
+Ginux. Two CLI guards, eight managed readiness/input cases, one library case,
+and two managed cleanup/checkpoint cases pass (13 total). Ginux **f8235d56**
+provides bounded finite readiness waits, allowing cleanup/remove hooks to receive
+acks. This proves hook dispatch and v1 acknowledgement, not installed-artifact
+removal, retained storage or durable recovery. A real file-producing install
+still fails at its acquire write; domain-owned writable filesystem integration
+is next. Detailed commands, limitations and raw evidence live in the Ginux plan.
 
 - Complete the existing Ginux launch adapter instead of adding another launcher.
   Route every executable CLI and library operation through it by default.
@@ -991,11 +1004,11 @@ unrelated edits and current branches. Update task status with concrete evidence
 as work lands. Temporary audit probes are useful reproductions, not durable
 acceptance artifacts; preserve needed cases in the existing integration owner.
 
-Next implementation action in this chat: finish internal worker-entry and
-invocation-path convergence, then run install/remove/cleanup through the now
-working configured launcher and connect the observed generic storage/process
-capabilities. Process-global dependency environment cleanup remains deferred
-until lifecycle execution works. Explicit cache/input and dependency-state
+Next implementation action in this chat: wire domain-owned writable filesystem
+operations into the configured supervisor and re-run the captured file-producing
+install, then cleanup/removal and child commands on its artifacts. Public entry,
+prepared tool paths and bounded checkpoint waiting are connected; process-global
+dependency environment cleanup remains outstanding. Explicit cache/input and dependency-state
 transport still require R07. Remaining
 legacy adapter cache/work paths and materializer cache inference still need
 migration using that input contract. Kernel and preseed callers share the

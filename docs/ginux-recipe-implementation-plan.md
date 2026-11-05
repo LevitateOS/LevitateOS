@@ -120,15 +120,52 @@ Configured execution checkpoint 2026-11-05:
   Raw before/after output is in
   `.artifacts/ginux-local-integration/managed-inputs/`.
 
-Next local slice: harden the internal worker entry against public environment
-selection, converge the prepared tool path with the engine's current `.tools`
-path, and exercise install/remove/cleanup through this same configured entry.
-Use resulting failures to connect generic writable-filesystem, child-process,
-and checkpoint capabilities. Full dependency/input layout, resource enforcement,
-durable generations/state, and selected output publication remain incomplete.
-The old process-native mmap experiments remain preserved for review; they were
-not needed to execute these managed readiness cases. The linked review thread
-owns upstream review and PR creation; no push or PR was performed.
+Public entry and checkpoint continuation 2026-11-05:
+
+- Recipe **7992bd9** removes `Backend::Host` and all environment-driven public
+  host selection. The default library backend now resolves required Ginux at
+  operation time; `RecipeEngine::backend()` returns `Result<Backend>`. The real
+  library regression first failed because a spoofed worker environment caused
+  host evaluation (runtime recipe directory was a host `/tmp/...` path).
+  After the change it passes through Ginux and reports `/inputs`, `/work/build`,
+  and `/work/tools`, even with those spoofed variables.
+- Coordinator and worker use the private argv entry together. The worker binds
+  its request id to bootstrap identity before setup. Two actual CLI guards pass
+  for public environment spoofing/legacy host selection and private missing or
+  mismatched bootstrap; the latter decodes the real failure/result frames.
+  Worker engine construction now uses the shared invocation factory.
+- Prepared tools, engine globals/runtime, dependency destination and PATH use
+  `/work/tools`. Removal now receives the prepared BUILD_DIR. The eight existing
+  managed input/readiness cases pass again with these paths and private entry,
+  and the downstream `cargo check -p distro-builder --offline` passes.
+- A real file-producing install reaches acquire and is denied at `write_file`.
+  Cleanup/removal hooks reached their checkpoint, but acknowledgement waiting
+  was denied because their finite poll timeout exceeded the old zero-time-only
+  policy. These original failures and source are retained under
+  `.artifacts/ginux-local-integration/worker-entry/before-finite-wait-*`.
+- Ginux **f8235d56** allows finite waits through 300000 ms on the same assigned
+  descriptors. No descriptor ownership or writable-filesystem authority changed.
+  The full real configured-launch suite passes, including the maximum accepted
+  timeout, rejected overflow/infinite waits and existing descriptor/pointer bounds.
+  All five core tests pass with the documented `RUSTFLAGS=''` unit-test convention.
+- Two additional actual managed cases pass: cleanup and remove return hook state
+  after one acknowledged v1 checkpoint, and missing cleanup is a no-op with zero
+  checkpoints. These hooks do not mutate installed artifacts and the root is
+  fresh/ephemeral; this is not real installed-target removal or durable recovery.
+  The ack still carries placeholder generation 0 and the Ginux result generation
+  remains null. Logs for these two cases, two CLI guards, eight managed cases,
+  and the real library regression are saved in
+  `.artifacts/ginux-local-integration/worker-entry/` (13 passing test cases total).
+
+Next local slice: connect domain-owned writable filesystem operations to the
+configured supervisor, using the existing filesystem owners and preserving the
+read-only image/input boundary. Re-run the file-producing install first; then
+exercise actual cleanup/removal and child commands on its products. Full
+input/dependency layout, target/options transport, resource enforcement, durable
+generations/state and output publication remain incomplete. The unreachable
+legacy host callbacks/wrappers still need removal with R07/S7 option transport;
+they are never invoked by public operations. The linked review thread owns
+upstream review and PR creation; no push or PR was performed.
 
 Recovery checkpoint: active skill `hdae-development`, discovery path
 `/home/vince/.codex/worktrees/ginux-recipe-local-integration/ginux/.agents/skills/hdae-development/SKILL.md`;
