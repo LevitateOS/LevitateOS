@@ -34,14 +34,47 @@ local assembled image, not a published producer. The copied recfstab source and
 vendored offline dependency lock are under `.artifacts/ginux-env/recfstab-source`;
 Cargo refreshed that isolated lock from locally cached compatible versions.
 Ginux `d9490772` adds image cwd changes and resolves relative paths from the
-calling process; the configured task, exec, and storage suites pass. Owned-directory
-chdir remains explicitly unsupported. Current action: diagnose Rust compiler
-startup (Cargo now starts but its rustc -vV subprocess exits 127), then rerun the
-real recfstab build. Output export, retained state/generations,
-locking, complete-frame deadlines, cancellation and representative consumers are
-still incomplete; successful in-domain output paths are not host artifacts.
-Evidence: `/tmp/ginux-noctty-test.log`, `/tmp/recipe-long-input-test.log`,
+calling process; configured task/exec/storage suites pass. Owned-directory chdir
+remains explicitly unsupported. `3b27b370` adds owned local sequenced-packet pairs
+for Rust's fork/exec error channel; `e954010d` raises the bounded channel pool to
+16 buffers after a real nested linker launch exhausted eight. Channel and task
+suites pass. `32ba41e9` reports `/proc/self/exe` and readlinkat in the domain
+namespace, including pinned deleted executables; native and owned exec suites
+pass. The prepared Rust toolchain currently needs child LD_LIBRARY_PATH=/usr/lib;
+Rust -vV runs and Cargo reaches code generation and linker invocation.
+Recipe `db20b58` adds complete-frame read/write deadlines, bounded stderr shutdown,
+launcher process-group cleanup, and Linux parent-death cleanup. The real partial
+frame CLI fault scenario and 24 managed regression cases pass. `ff880f0` adds a
+passing actual coordinator-death scenario that observes launcher/worker termination.
+These checks do not prove resumable cancellation.
+Ginux `37ca30cb` corrects owned readlink and stat flags. Cargo now compiles
+proc-macro2's build script and advances to unicode-ident; Rust then fails with
+"failed to create encoded metadata from file: Operation not supported". The
+missing capability is private mapping of owned files. Temporary dependency-info
+diagnostics were removed exactly before this commit; no diagnostic source edit
+remains. The probe's ls output is now useful and does not replace Cargo's error.
+Current action: implement coherent private mappings. The verified backing step
+uses supervisor-owned anonymous memfds, preserving inode identity through writes
+and ftruncate instead of detached snapshots. Storage quota/truncate, owned exec,
+and task suites pass (`/tmp/ginux-memfd-test.log`). Host pidfd_getfd was checked
+with a real fork and succeeds, permitting a private, bounded descriptor-transfer
+transaction. The intended mapping transaction creates a private local socket pair
+in the stopped tracee, duplicates one endpoint via pidfd_getfd, sends only a
+readonly backing reference via SCM_RIGHTS, injects recvmsg/mmap, and closes all
+private tracee descriptors before resuming. Public descriptor resolution stays
+with the existing owner; no host path is injected. MAP_SHARED remains unsupported
+so all durable file mutations remain mediated. Do not substitute immutable
+snapshots: mappings must observe writes/truncation correctly. Add actual mapped
+file fixtures (COW, offsets, cross-task writes, truncate/SIGBUS, FD cleanup) before
+claiming compiler support. The backing commit is recorded in Ginux history;
+the transaction itself is not implemented yet.
+Output export, retained state/generations, locking, resumable recovery and
+representative consumers remain incomplete. Successful in-domain output paths
+are not host artifacts.
+Evidence: `/tmp/ginux-{noctty,cwd,packet,channel-bounds,exe-link,path-probe,memfd}-*`,
+`/tmp/recipe-{long-input,deadline,cancel}-*`,
 `/tmp/ginux-compiler-probe.{stdout,stderr}`, `/tmp/ginux-recfstab-probe.stderr`.
+The newest diagnostic trace/audit are `/tmp/ginux-compiler-{ptrace,audit}.log`.
 Active skill: `hdae-development` at
 `.agents/skills/hdae-development/SKILL.md`; reload fully after context shifts.
 Keep this existing plan as the continuation record; no new approval ceremony or

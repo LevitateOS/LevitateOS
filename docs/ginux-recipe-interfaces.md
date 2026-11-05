@@ -216,8 +216,10 @@ frames. The coordinator checks both budgets and marker order independently,
 emits one truncation notice, and continues accepting lifecycle frames/results.
 Limits do not turn a failed recipe into success. A broken diagnostic transport
 prevents successful termination. A finished operation closes diagnostic sending
-before its terminal frames. A live peer stalled inside a frame still needs the
-complete-frame timeout/cancellation work; the current wait bounds header arrival.
+before its terminal frames. Complete-frame deadlines now cover headers, payloads and writes, using an
+absolute deadline across short IO. RECIPE_FRAME_TIMEOUT_SECS selects 1–86400
+seconds (default 300). Shutdown and stderr collection are bounded. Coordinator
+death stops the launcher and traced workload; resumable cancellation remains open.
 
 The real CLI cases cover binary bytes, Rhai logging, large contexts, concurrent
 child readers, the byte and frame budgets, and v1 rejection before setup.
@@ -322,9 +324,11 @@ a sibling downloads directory from BUILD_DIR. Filenames, hashes, and verificatio
 rules remain recipe-owned. A host pathname supplied as a define does not import
 an asset or grant the worker access to it.
 
-Current R05 preparation supports extra regular files internally, with a 512 MiB
-per-file and 2 GiB total limit. The public R06 coordinator supplies no extra
-assets, and those bounds cannot accommodate the canonical Fedora DVD. R07/input
+Current R05 preparation exposes explicit file/tree imports through --input and
+the library, with a 512 MiB per-file and 2 GiB total limit. Tree inputs preserve
+relative paths up to 247 bytes (plus /inputs/ and NUL in the launcher buffer),
+reject symlinks, and omit root .git/target. These bounds still cannot accommodate
+the canonical Fedora DVD. R07/input
 integration must provide bounded support for the selected real assets and expose
 their domain paths before materializer cache inference can be removed end to end.
 This is an outstanding interface requirement, not completed transport evidence.
