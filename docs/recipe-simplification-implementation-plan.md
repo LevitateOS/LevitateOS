@@ -312,7 +312,9 @@ when files exist. These runtime cases run through the required Ginux path.
 
 ### S5 Consolidate acquisition and recipe-owned shared facts
 
-Dependencies: S2; state integration uses S3/S4. Status: not started.
+Dependencies: S2; state integration uses S3/S4. Status: partial helper implementation.
+The independent response-writing change below does not depend on context/lifecycle
+refactoring; the remaining recipe/state work still follows those dependencies.
 
 - Unify download implementations around partial-file staging, integrity checking,
   and publication on completion. Fix HTTP-resume status handling if retained.
@@ -331,6 +333,24 @@ Dependencies: S2; state integration uses S3/S4. Status: not started.
 Evidence: interrupted downloads never publish completed-looking files; same-size
 corruption fails verification; preseed consumers work from explicit existing
 assets; named output contracts fail clearly when omitted. Reuse kernel artifacts.
+
+Acquisition completion slice 2026-11-05: tools/recipe dcb989f stages HTTP responses
+in sibling temporary files and publishes only after a complete successful write.
+Failed reads preserve previous destination bytes and remove the partial file.
+GitHub asset downloads reuse this writer and reject non-basename asset names.
+Hash verification remains a separate recipe operation; this slice does not claim
+digest-verified publication or crash-recovery completion for acquisition.
+
+    cargo build -p levitate-recipe --bin recipe --offline
+    cargo test -p levitate-recipe --test e2e downloads:: --offline -- --nocapture
+
+The truncated-response CLI case failed before the change and passed afterward
+for both absent and existing destinations; complete-response replacement and
+installation also passed. The two CLI cases use a real loopback HTTP fixture,
+with elevated execution needed only because the sandbox prohibits localhost
+socket binding. The GitHub caller shares the compiled writer; its external API
+was not exercised. These pre-S0 CLI checks do not establish mediated Ginux network
+behavior, which remains outstanding with the rest of S5.
 
 ### S6 Migrate representative recipes and validate managed execution
 
@@ -416,7 +436,7 @@ unrelated edits and current branches. Update task status with concrete evidence
 as work lands. Temporary audit probes are useful reproductions, not durable
 acceptance artifacts; preserve needed cases in the existing integration owner.
 
-Next implementation action in this chat: address independent acquisition completion
-and refresh behavior, then helper output routing. Keep the concurrent
+Next implementation action in this chat: address helper output routing and
+independent preseed refresh/trust checks. Keep the concurrent
 Ginux agent's launcher/worker/coordinator work separate. Re-run implemented slices
 through the mandatory Ginux path once that agent's integration is available.
