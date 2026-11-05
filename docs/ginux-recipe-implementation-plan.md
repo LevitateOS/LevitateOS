@@ -377,8 +377,9 @@ to introduce new crates or parallel behavior owners.
   unsupported cases. Done: real tools replace and remove domain files correctly;
   denied mutations have no host effect.
 
-- [ ] **G08a — Add installation permissions and link operations.** Depends: G08,
-  G05a. Owner: G-files. Implement chmod and the link variants required by the
+- [x] **G08a — Add installation permissions and link operations.** Depends: G08,
+  G05a. (Done 2026-11-05: worktree `/tmp/ginux-g08`, branch `ginux-recipe/g08a-perms`, commit `80763e50`, pushed to fork. VFS chmod/chmod_fd (plain 0o777, setuid/sticky denied), link (in-domain copy, never replaces), symlink (uninterpreted target), readlink (nofollow, Linux truncation), overlay write-bit enforcement on writable open; pure-core chmod_at/fchmod_at/fchmod_fd/link_at/symlink_at/readlink_at; all 13 perm/link/chown syscalls claimed and denied EPERM at entry layer (closes readlink-89 host-mediation path); base never mutates. Coordinator reran reproducer: G08A 61/61 PASS, G08 baseline 70/70 PASS. LIMIT: supervised tracee-memory/fd wiring pending at merge; hardlinks are content copies (nlink 1); fchmodat/linkat flags 0 only; chown denied unemulated. Follow-ups: (1) merge-time supervisor wiring + per-task fd tables, (2) decide hardlink coherence vs copy semantics for installers.)
+  Owner: G-files. Implement chmod and the link variants required by the
   selected tools, preserving path confinement and metadata. Done: ordinary tools
   install a usable executable tree and retain meaningful links and permissions.
 
@@ -405,8 +406,9 @@ to introduce new crates or parallel behavior owners.
   behavior with useful error propagation. Done: a completed flush survives
   reopen; incomplete/failed writes cannot be reported as durable.
 
-- [ ] **G12a — Checkpoint a consistent domain storage generation.** Depends:
-  G12, G05a. Owner: G-storage. Add bounded quiesce/flush or equivalent consistency
+- [x] **G12a — Checkpoint a consistent domain storage generation.** Depends:
+  G12, G05a. (Done 2026-11-05: worktree `/tmp/ginux-g11`, branch `ginux-recipe/g12a-generation`, commit `4d036c07`, pushed to fork. Library-only: `QuiesceGate` trait seam (process lane implements, storage consumes), `quiesce_retained` (bounded polls, fails closed Busy, core does no sleeping), `checkpoint_generation` (quiesce-then-atomic-publish ack order), `verify_published`, `list_recoverable`; failures storage-category, never durable. Coordinator reran reproducer: all 17 checks PASS incl. torn-write rejection, previous-generation recovery, quiesce Busy/fail-closed paths. LIMIT: multi-generation history needs supervisor-rotated publish paths; cross-task settling needs the process-lane gate at launch merge. Follow-ups: (1) process-lane QuiesceGate + supervisor wiring at launch merge, (2) R07 ack transport recording {seq → generation}.)
+  Owner: G-storage. Add bounded quiesce/flush or equivalent consistency
   behavior for all tasks sharing storage and identify recoverable generations.
   Done: interruption cannot present an acknowledged generation with missing
   matching files; inability to obtain consistency is an explicit error.
@@ -515,8 +517,9 @@ to introduce new crates or parallel behavior owners.
 
 ### Lifecycle and resource lane
 
-- [ ] **L01 — Terminate and reap the complete domain workload.** Depends: G05,
-  G02. Owner: G-process/lifecycle. Handle normal completion, startup failure,
+- [x] **L01 — Terminate and reap the complete domain workload.** Depends: G05,
+  G02. (Done 2026-11-05: worktree `/tmp/ginux-l01`, branch `ginux-recipe/l01-teardown`, commit `c46b132c`, pushed to fork. New `teardown.rs`: cancel-signal arming, kill_remaining, TeardownOutcome, flush/close seams (G12a-owned no-op); root death in any order funnels to teardown_domain (kill-all, drain-reap, pipe release, tasks=0/live-pipes=0 audit); startup failures exit 2 supervisor-error. Coordinator reran: WAIT_REPRO PASS with teardown audit, orphan reaped (status 137), no survivors. LIMIT: process-native loop only — G01/G02 launch loop needs same wiring at merge; storage flush seam no-op until G12a wired. Follow-ups: (1) converge teardown/outcome into launch loop incl. result-file outcomes, (2) durable flush seam + backend closes.)
+  Owner: G-process/lifecycle. Handle normal completion, startup failure,
   explicit cancellation, and supervisor loss according to the supported model.
   Done: real descendant processes do not survive domain termination; storage
   and assigned backends receive the appropriate close/flush behavior.
