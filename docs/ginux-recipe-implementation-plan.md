@@ -153,8 +153,24 @@ worker-entry checks pass. Build/example compilation is clean. Evidence:
 /tmp/recipe-options-{regression,entry,build,examples}.log. The old toy protocol
 example was removed under Recipe's no-unit-test rule; real worker and managed
 CLI scenarios remain. No Ginux tests were removed.
-Current action: implement the tracked compiler-image producer, then source
-assets and representative consumers. SIGKILL stops workload processes and recovery works,
+Recipe `c622527` adds the explicit pinned compiler-image producer and real CLI
+verification. Two independent builds produced SHA-256
+2e99d8dc80324b185267fcbf646eb407a469751f69a0d794ffc00977e8755fba
+(1,014,543,360 bytes). The actual retained recfstab build/run/publication passed
+against this image, followed by a successful restored invocation that skipped
+compilation, reran the executable and published it. Evidence:
+/tmp/recipe-image-final.log and /tmp/recipe-recfstab-retained{,-reuse}.{stdout,stderr}.
+Ginux `990fbb7a` replaces fixed per-stop sleeps with SIGCHLD/signalfd and control
+socket readiness. The private signal mask and descriptor are created after the
+root exec stop. Real 10,000-syscall checks take 0.121 seconds without control and
+0.153 with it, including inherited ignored SIGCHLD. Checkpoint, storage, task,
+thread and all existing unit/static checks pass (/tmp/ginux-event-{test,static}.log).
+Current action: complete explicit source assets (large files, contained source
+links/empty directories), then migrate representative consumers. All commits
+remain local; no branch or pull request has been published.
+Remaining: source assets and representative consumers; owned interpreter-chain
+stash, Ginux SQLite locking warning, temporary-root cleanup and broader integration
+limitations listed above still need attention. SIGKILL stops workload processes and recovery works,
 but can leave temporary prepared roots; automatic generation cleanup is also
 unfinished. Cargo global-cache SQLite locking warnings remain unresolved.
 Evidence: `/tmp/ginux-{noctty,cwd,packet,channel-bounds,exe-link,path-probe,memfd}-*`,
