@@ -1,0 +1,663 @@
+From 33bf08a746bd64306e0375f8d419af4744d31064 Mon Sep 17 00:00:00 2001
+From: vince <vincepaul.liem@gmail.com>
+Date: Fri, 6 Nov 2026 15:59:48 +0100
+Subject: [PATCH] feat(storage): restore snapshots before workload startup
+
+Import bounded regular-file and directory snapshots into the prepared
+owned filesystem before any workload executes. Restore bytes, permission
+bits and long names with checked archive and assignment boundaries.
+Discard the new memory view on import failure and retain the source file.
+
+Signed-off-by: vince <vincepaul.liem@gmail.com>
+---
+ .github/workflows/check.yml              |   1 +
+ Makefile                                 |   4 +
+ README.md                                |  14 +-
+ crates/ginux-init/src/fs_hooks.rs        |  96 ++++++++++-
+ crates/ginux-init/src/launch.rs          |  15 +-
+ crates/ginux-init/src/main.rs            |  11 +-
+ crates/ginux-init/src/storage_restore.rs | 207 +++++++++++++++++++++++
+ scripts/test-launch-restore.py           | 109 ++++++++++++
+ tests/fixtures/launch-storage-fixture.c  |  32 ++++
+ 9 files changed, 482 insertions(+), 7 deletions(-)
+ create mode 100644 crates/ginux-init/src/storage_restore.rs
+ create mode 100644 scripts/test-launch-restore.py
+
+diff --git a/.github/workflows/check.yml b/.github/workflows/check.yml
+index 1db61bc9..85d6feeb 100644
+--- a/.github/workflows/check.yml
++++ b/.github/workflows/check.yml
+@@ -27,6 +27,7 @@ jobs:
+       - run: make build build-launch-fixture build-launch-storage-fixture build-launch-device-fixture build-launch-pipe-fixture build-launch-fd-fixture build-launch-task-fixture build-launch-exec-fixture build-launch-directory-fixture build-launch-owned-exec-fixture build-process-fixtures build-gate1-fixture build-launch-script-fixture
+       - run: sudo make test-launch
+       - run: sudo make test-launch-storage
++      - run: sudo make test-launch-restore
+       - run: sudo make test-launch-devices
+       - run: sudo make test-launch-pipes
+       - run: sudo make test-launch-fds
+diff --git a/Makefile b/Makefile
+index b3b7bd9a..6b239154 100644
+--- a/Makefile
++++ b/Makefile
+@@ -267,3 +267,7 @@ build-launch-script-fixture:
+ 
+ test-launch-scripts:
+ 	python3 scripts/test-launch-scripts.py $(GINUX) .artifacts/launch/launch-script-fixture
++
++.PHONY: test-launch-restore
++test-launch-restore:
++	python3 scripts/test-launch-restore.py $(GINUX) .artifacts/launch/launch-storage-fixture
+diff --git a/README.md b/README.md
+index 0b9f7c8d..7bb5d00e 100644
+--- a/README.md
++++ b/README.md
+@@ -454,6 +454,18 @@ write, sync and close. Failed workloads cancel staging. Export failures fail the
+ launch; an existing destination is preserved. Abrupt supervisor death can leave a
+ private staging file, which is never a published archive. Consumers must require
+ both successful completion and a valid archive. This is final export, without
+-retained storage, checkpoint/restore, symlink or hardlink archive support.
++retained storage, live checkpoint control, symlink or hardlink archive support.
+ Owned regular files support fsync/fdatasync against their supervisor backing;
+ these calls do not imply persistence after the in-memory domain ends.
++
++`--restore-file <snapshot tar>` imports owned files before workload startup. It
++restores regular files, directories, permission bits and GNU long names into the
++new memory view. The current32-slot namespace (including prepared assignment
++parents), configured byte capacity and2 GiB archive payload bound all apply.
++The input must be a bounded regular file opened without following a symlink;
++import never changes it. Invalid paths, duplicate entries, links, invalid metadata,
++checksums/terminators and truncated data fail launch and discard the new view.
++The archive must have exactly two zero terminator blocks and no trailing data.
++This is filesystem reconstruction, without process memory, handles or matching
++runtime state; the host must select and verify the intended snapshot. It does
++not require a checkpoint control socket.
+diff --git a/crates/ginux-init/src/fs_hooks.rs b/crates/ginux-init/src/fs_hooks.rs
+index de6061f4..8efa62c2 100644
+--- a/crates/ginux-init/src/fs_hooks.rs
++++ b/crates/ginux-init/src/fs_hooks.rs
+@@ -18,7 +18,7 @@ pub const FD_BASE: usize = 1 << 20;
+ const IO_SIZE: usize = 4096;
+ type Path = Text<MAX_PATH>;
+ type ExecutableName = Text<{ MAX_PATH + 10 }>;
+-const OBJECTS: usize = 32;
++pub(crate) const OBJECTS: usize = 32;
+ type MemoryFs = VirtualFs<'static, EmptyReader, OBJECTS, 0, 64, MemoryStorage<OBJECTS>>;
+ static mut ROOT_INDEX: [u8; HEADER_SIZE + RECORD_SIZE] = [0; HEADER_SIZE + RECORD_SIZE];
+ static ROOT_INITIALIZED: AtomicBool = AtomicBool::new(false);
+@@ -125,6 +125,100 @@ impl LaunchFs {
+         })
+     }
+ 
++    pub fn restore_entry(
++        &mut self,
++        path: &[u8],
++        directory: bool,
++        mode: u32,
++        length: usize,
++        seen: &mut [bool; OBJECTS],
++        mut read: impl FnMut(&mut [u8]) -> Result<(), &'static [u8]>,
++    ) -> Result<(), &'static [u8]> {
++        // The archive parser has already validated absolute path components.
++        if !self.owns_path(path)
++            && !(directory
++                && self.prefixes[..self.count]
++                    .iter()
++                    .any(|p| within(p.as_bytes(), path)))
++        {
++            return Err(b"restore path is outside assigned storage");
++        }
++        // Entries may precede their parents in the overlay's slot order.
++        for end in 1..path.len() {
++            if path[end] == b'/' {
++                match self.fs.mkdir(&path[..end], 0o755) {
++                    Ok(()) | Err(VfsError::AlreadyExists) => {}
++                    Err(_) => return Err(b"restore parent creation failed"),
++                }
++            }
++        }
++        if directory {
++            match self.fs.mkdir(path, mode) {
++                Ok(()) | Err(VfsError::AlreadyExists) => {}
++                Err(_) => return Err(b"restore directory creation failed"),
++            }
++            if self
++                .fs
++                .metadata(path)
++                .map_err(|_| b"restore directory lookup failed".as_slice())?
++                .kind
++                != NodeKind::Directory
++            {
++                return Err(b"restore directory collides with file");
++            }
++            self.fs
++                .chmod(path, mode)
++                .map_err(|_| b"restore directory mode failed".as_slice())?;
++        } else {
++            let fd = self
++                .fs
++                .open(path, O_WRITE | O_CREATE | O_EXCLUSIVE)
++                .map_err(|_| b"restore file creation failed".as_slice())?;
++            let result = (|| {
++                self.fs
++                    .truncate(fd, length as u64)
++                    .map_err(|_| b"restore storage bound exceeded".as_slice())?;
++                let mut bytes = [0u8; IO_SIZE];
++                let mut offset = 0;
++                while offset < length {
++                    let count = (length - offset).min(bytes.len());
++                    read(&mut bytes[..count])?;
++                    if self
++                        .fs
++                        .write(fd, &bytes[..count])
++                        .map_err(|_| b"restore file write failed".as_slice())?
++                        != count
++                    {
++                        return Err(b"restore file short write".as_slice());
++                    }
++                    offset += count;
++                }
++                self.fs
++                    .fchmod(fd, mode)
++                    .map_err(|_| b"restore file mode failed".as_slice())
++            })();
++            let closed = self.fs.close(fd);
++            result?;
++            closed.map_err(|_| b"restore file close failed".as_slice())?;
++        }
++        // This launch view has a one-entry immutable root; live owned inode
++        // numbers are stable slot+2 for the duration of startup import.
++        let inode = self
++            .fs
++            .metadata(path)
++            .map_err(|_| b"restore entry lookup failed".as_slice())?
++            .inode;
++        let slot = inode
++            .checked_sub(2)
++            .filter(|slot| *slot < OBJECTS as u64)
++            .ok_or(b"invalid restored inode".as_slice())? as usize;
++        if seen[slot] {
++            return Err(b"duplicate restore entry");
++        }
++        seen[slot] = true;
++        Ok(())
++    }
++
+     pub fn export(&self) -> Result<(), &'static [u8]> {
+         crate::storage_export::finish(|archive| {
+             for slot in 0..OBJECTS {
+diff --git a/crates/ginux-init/src/launch.rs b/crates/ginux-init/src/launch.rs
+index 72e93c43..f2e34546 100644
+--- a/crates/ginux-init/src/launch.rs
++++ b/crates/ginux-init/src/launch.rs
+@@ -34,7 +34,7 @@ pub enum Command {
+     Devices(*const u8, *const u8),
+     DeviceBench(*const u8, *const u8, *const u8),
+     KernelViews(*const u8),
+-    Launch(*const u8, *const u8, *const u8, *const u8),
++    Launch(*const u8, *const u8, *const u8, *const u8, *const u8),
+     LaunchUsage,
+     Usage,
+ }
+@@ -106,6 +106,7 @@ pub fn parse_argv(argc: usize, argv: *const usize) -> Option<Command> {
+         let root_path = unsafe { *argv.add(3) as *const u8 };
+         let mut result_path: *const u8 = core::ptr::null();
+         let mut export_path: *const u8 = core::ptr::null();
++        let mut restore_path: *const u8 = core::ptr::null();
+         let mut i = 4;
+         while i < argc {
+             if i + 1 >= argc {
+@@ -120,6 +121,8 @@ pub fn parse_argv(argc: usize, argv: *const usize) -> Option<Command> {
+                 result_path = value;
+             } else if c_string_equals(option, b"--export-file") && export_path.is_null() {
+                 export_path = value;
++            } else if c_string_equals(option, b"--restore-file") && restore_path.is_null() {
++                restore_path = value;
+             } else {
+                 return Some(Command::LaunchUsage);
+             }
+@@ -130,6 +133,7 @@ pub fn parse_argv(argc: usize, argv: *const usize) -> Option<Command> {
+             root_path,
+             result_path,
+             export_path,
++            restore_path,
+         ))
+     } else {
+         Some(Command::Usage)
+@@ -304,6 +308,7 @@ pub fn launch_main(
+     root_path: *const u8,
+     result_path: *const u8,
+     export_path: *const u8,
++    restore_path: *const u8,
+ ) -> ! {
+     stage_result_path(result_path);
+     crate::storage_export::prepare(export_path)
+@@ -314,6 +319,10 @@ pub fn launch_main(
+         .unwrap_or_else(|reason| launch_startup_fail(reason));
+     let mut filesystem = crate::fs_hooks::LaunchFs::prepare(&config)
+         .unwrap_or_else(|reason| launch_startup_fail(reason));
++    if let Err(reason) = crate::storage_restore::restore(restore_path, &mut filesystem) {
++        filesystem.teardown();
++        launch_startup_fail(reason);
++    }
+     let mut channels = crate::channel_hooks::LaunchChannels::new();
+     let descriptors = crate::descriptors::DescriptorTable::new()
+         .unwrap_or_else(|reason| launch_startup_fail(reason));
+@@ -622,12 +631,12 @@ pub fn usage() -> ! {
+     line_stderr(b"ginux: usage: ginux devices <config> <block>");
+     line_stderr(b"ginux: usage: ginux device-bench <config> <block> <kind>");
+     line_stderr(b"ginux: usage: ginux vfs <config> <rootfs> <index>");
+-    line_stderr(b"ginux: usage: ginux launch <config> <root> [--result-file <fresh host path>] [--export-file <fresh tar path>]");
++    line_stderr(b"ginux: usage: ginux launch <config> <root> [--result-file <fresh host path>] [--export-file <fresh tar path>] [--restore-file <snapshot tar>]");
+     exit_process(2)
+ }
+ 
+ pub fn launch_usage() -> ! {
+-    line_stderr(b"ginux: launch usage: launch <config> <root> [--result-file <fresh host path>] [--export-file <fresh tar path>]");
++    line_stderr(b"ginux: launch usage: launch <config> <root> [--result-file <fresh host path>] [--export-file <fresh tar path>] [--restore-file <snapshot tar>]");
+     exit_process(2)
+ }
+ 
+diff --git a/crates/ginux-init/src/main.rs b/crates/ginux-init/src/main.rs
+index 3f1879d2..c34cfa86 100644
+--- a/crates/ginux-init/src/main.rs
++++ b/crates/ginux-init/src/main.rs
+@@ -22,6 +22,7 @@ mod path_hooks;
+ mod process_hooks;
+ mod storage_export;
+ mod storage_memory;
++mod storage_restore;
+ mod supervisor;
+ mod tracee_io;
+ 
+@@ -204,8 +205,14 @@ extern "C" fn rust_main(initial_stack: *const usize) -> ! {
+             device_bench_main(config_path, block_path, kind)
+         }
+         Some(Command::KernelViews(config_path)) => kernel_views_main(config_path),
+-        Some(Command::Launch(config_path, root_path, result_path, export_path)) => {
+-            launch_main(config_path, root_path, result_path, export_path)
++        Some(Command::Launch(config_path, root_path, result_path, export_path, restore_path)) => {
++            launch_main(
++                config_path,
++                root_path,
++                result_path,
++                export_path,
++                restore_path,
++            )
+         }
+         Some(Command::LaunchUsage) => launch_usage(),
+         Some(Command::Usage) => usage(),
+diff --git a/crates/ginux-init/src/storage_restore.rs b/crates/ginux-init/src/storage_restore.rs
+new file mode 100644
+index 00000000..ccfc2a1d
+--- /dev/null
++++ b/crates/ginux-init/src/storage_restore.rs
+@@ -0,0 +1,207 @@
++//! Bounded startup import of an owned-filesystem snapshot. All entries are
++//! validated before a workload starts; failures discard this new memory view.
++use crate::fs_hooks::{LaunchFs, OBJECTS};
++use crate::supervisor::{syscall1, syscall2, syscall3, syscall4};
++type Error = &'static [u8];
++const LIMIT: u64 = 2 * 1024 * 1024 * 1024;
++struct Input(usize);
++impl Drop for Input {
++    fn drop(&mut self) {
++        unsafe {
++            syscall1(3, self.0);
++        }
++    }
++}
++impl Input {
++    fn read(&mut self, bytes: &mut [u8]) -> Result<usize, Error> {
++        loop {
++            let count = unsafe { syscall3(0, self.0, bytes.as_mut_ptr() as usize, bytes.len()) };
++            if count == -4 {
++                continue;
++            }
++            if count < 0 {
++                return Err(b"restore archive read failed");
++            }
++            return Ok(count as usize);
++        }
++    }
++    fn exact(&mut self, mut bytes: &mut [u8]) -> Result<(), Error> {
++        while !bytes.is_empty() {
++            let count = self.read(bytes)?;
++            if count == 0 {
++                return Err(b"truncated restore archive");
++            }
++            bytes = &mut bytes[count..];
++        }
++        Ok(())
++    }
++    fn padding(&mut self, length: usize) -> Result<(), Error> {
++        let mut bytes = [0u8; 512];
++        let count = (512 - length % 512) % 512;
++        self.exact(&mut bytes[..count])?;
++        if bytes.iter().any(|b| *b != 0) {
++            return Err(b"nonzero restore padding");
++        }
++        Ok(())
++    }
++}
++
++pub fn restore(path: *const u8, files: &mut LaunchFs) -> Result<(), Error> {
++    if path.is_null() {
++        return Ok(());
++    }
++    let mut length = 0;
++    while length <= crate::launch::MAX_RESULT_PATH_LEN
++        && unsafe { core::ptr::read_volatile(path.add(length)) } != 0
++    {
++        length += 1;
++    }
++    if length == 0 || length > crate::launch::MAX_RESULT_PATH_LEN {
++        return Err(b"invalid restore-file path length");
++    }
++    let fd = unsafe {
++        syscall4(
++            257,
++            (-100isize) as usize,
++            path as usize,
++            // O_NONBLOCK prevents a non-regular source blocking before fstat.
++            0x80000 | 0x20000 | 0x800,
++            0,
++        )
++    };
++    if fd < 0 {
++        return Err(b"cannot open restore archive");
++    }
++    let mut input = Input(fd as usize);
++    let mut stat = [0u64; 18];
++    if unsafe { syscall2(5, input.0, stat.as_mut_ptr() as usize) } < 0
++        || stat[3] & 0o170000 != 0o100000
++        || stat[6] > LIMIT + 8 * 1024 * 1024
++    {
++        return Err(b"restore archive is not a bounded regular file");
++    }
++    let mut seen = [false; OBJECTS];
++    let mut long_name = [0u8; 256];
++    let mut long_len = 0;
++    let mut total = 0u64;
++    for _ in 0..=OBJECTS * 2 {
++        let mut header = [0u8; 512];
++        input.exact(&mut header)?;
++        if header.iter().all(|b| *b == 0) {
++            if long_len != 0 {
++                return Err(b"restore long name has no entry");
++            }
++            input.exact(&mut header)?;
++            if header.iter().any(|b| *b != 0) || input.read(&mut header[..1])? != 0 {
++                return Err(b"invalid restore archive terminator");
++            }
++            return Ok(());
++        }
++        let checksum = octal(&header[148..156])?;
++        let actual: u64 = header
++            .iter()
++            .enumerate()
++            .map(|(i, b)| {
++                if (148..156).contains(&i) {
++                    32
++                } else {
++                    *b as u64
++                }
++            })
++            .sum();
++        if actual != checksum || &header[257..263] != b"ustar\0" {
++            return Err(b"invalid restore header");
++        }
++        let size = octal(&header[124..136])?;
++        if header[156] == b'L' {
++            if long_len != 0 || !(2..=256).contains(&size) {
++                return Err(b"invalid restore long name");
++            }
++            input.exact(&mut long_name[..size as usize])?;
++            if long_name[size as usize - 1] != 0 {
++                return Err(b"unterminated restore long name");
++            }
++            long_len = size as usize - 1;
++            input.padding(size as usize)?;
++            continue;
++        }
++        let directory = match header[156] {
++            b'5' => true,
++            b'0' | 0 => false,
++            _ => return Err(b"unsupported restore entry kind"),
++        };
++        let mode = octal(&header[100..108])?;
++        if mode & !0o777 != 0 || (directory && size != 0) {
++            return Err(b"invalid restore metadata");
++        }
++        total = total
++            .checked_add(size)
++            .filter(|n| *n <= LIMIT)
++            .ok_or(b"restore archive byte bound exceeded".as_slice())?;
++        let mut path = [0u8; 256];
++        path[0] = b'/';
++        let mut end = 1;
++        if long_len != 0 {
++            append(&mut path, &mut end, &long_name[..long_len])?;
++            long_len = 0;
++        } else {
++            let prefix = field(&header[345..500]);
++            if !prefix.is_empty() {
++                append(&mut path, &mut end, prefix)?;
++                append(&mut path, &mut end, b"/")?;
++            }
++            append(&mut path, &mut end, field(&header[..100]))?;
++        }
++        if directory && end > 1 && path[end - 1] == b'/' {
++            end -= 1;
++        }
++        if end < 2
++            || path[1..end]
++                .split(|b| *b == b'/')
++                .any(|part| part.is_empty() || part == b"." || part == b".." || part.contains(&0))
++        {
++            return Err(b"invalid restore entry path");
++        }
++        files.restore_entry(
++            &path[..end],
++            directory,
++            mode as u32,
++            size as usize,
++            &mut seen,
++            |bytes| input.exact(bytes),
++        )?;
++        input.padding(size as usize)?;
++    }
++    Err(b"restore archive entry bound exceeded")
++}
++
++fn field(bytes: &[u8]) -> &[u8] {
++    &bytes[..bytes.iter().position(|b| *b == 0).unwrap_or(bytes.len())]
++}
++fn append(path: &mut [u8; 256], end: &mut usize, bytes: &[u8]) -> Result<(), Error> {
++    let next = end
++        .checked_add(bytes.len())
++        .filter(|n| *n < path.len())
++        .ok_or(b"restore path bound exceeded".as_slice())?;
++    path[*end..next].copy_from_slice(bytes);
++    *end = next;
++    Ok(())
++}
++fn octal(bytes: &[u8]) -> Result<u64, Error> {
++    let mut value = 0u64;
++    let mut ended = false;
++    for byte in bytes {
++        if *byte == 0 || *byte == b' ' {
++            ended = true;
++            continue;
++        }
++        if ended || !(b'0'..=b'7').contains(byte) {
++            return Err(b"invalid restore octal field");
++        }
++        value = value
++            .checked_mul(8)
++            .and_then(|n| n.checked_add((byte - b'0') as u64))
++            .ok_or(b"restore field overflow".as_slice())?;
++    }
++    Ok(value)
++}
+diff --git a/scripts/test-launch-restore.py b/scripts/test-launch-restore.py
+new file mode 100644
+index 00000000..0d130019
+--- /dev/null
++++ b/scripts/test-launch-restore.py
+@@ -0,0 +1,109 @@
++#!/usr/bin/env python3
++"""Startup filesystem reconstruction against explicit existing binaries."""
++import io
++import json
++import os
++from pathlib import Path
++import shutil
++import subprocess
++import sys
++import tarfile
++import tempfile
++
++
++def main():
++    if len(sys.argv) not in (3, 4) or os.geteuid() != 0:
++        sys.exit('usage (as root): test-launch-restore.py <ginux> <storage-fixture> [ordinary]')
++    binary, fixture = [str(Path(p).resolve()) for p in sys.argv[1:3]]
++    ordinary = len(sys.argv) == 4
++    if ordinary and sys.argv[3] != 'ordinary':
++        sys.exit('unknown restore selection')
++    template = (Path(__file__).resolve().parent.parent / 'config/domain-gate5.toml').read_text()
++    with tempfile.TemporaryDirectory(prefix='ginux-restore-') as folder:
++        work = Path(folder)
++        root = work / 'root'
++        (root / 'bin').mkdir(parents=True)
++        (root / 'out').mkdir()
++        (root / 'out/image').write_bytes(b'immutable image')
++        shutil.copyfile(fixture, root / 'bin/fixture')
++        (root / 'bin/fixture').chmod(0o755)
++        config = template.replace('init = "/bin/bash"', 'init = "/bin/fixture"')
++        config = config.replace('[storage]\nassignments = []', '[storage]\nassignments = ["memory:/out"]')
++        config_path = work / 'config.toml'
++        result = work / 'result.json'
++
++        def launch(mode, archive=None, exported=None, failure=False, assignments='memory:/out'):
++            config_path.write_text(config.replace('args = []', 'args = ' + json.dumps([mode])).replace('memory:/out', assignments))
++            result.unlink(missing_ok=True)
++            command = [binary, 'launch', str(config_path), str(root), '--result-file', str(result)]
++            if archive is not None:
++                command += ['--restore-file', str(archive)]
++            if exported is not None:
++                command += ['--export-file', str(exported)]
++            proc = subprocess.run(command, capture_output=True, timeout=10)
++            assert proc.returncode == (2 if failure else 0), proc.stderr.decode()
++            assert proc.stdout == (b'restored: PASS\n' if mode.startswith('restore') and not failure else b''), proc.stdout
++            record = json.loads(result.read_text())
++            assert record['outcome'] == ('supervisor-error' if failure else 'exited'), record
++            if not failure:
++                assert record['code'] == 0
++            if failure and exported is not None:
++                assert not exported.exists()
++            assert not list(work.glob('.ginux-export-*'))
++            assert (root / 'out/image').read_bytes() == b'immutable image'
++            assert sorted(p.name for p in (root / 'out').iterdir()) == ['image']
++
++        snapshot = work / 'snapshot.tar'
++        launch('export', exported=snapshot)
++        original = snapshot.read_bytes()
++        # Each restart is a fresh memory view; mutations must not alter its source.
++        for n in range(2):
++            exported = work / f'restored-{n}.tar'
++            launch('restore', snapshot, exported)
++            assert snapshot.read_bytes() == original, 'restore mutated its snapshot'
++            with tarfile.open(exported) as tar:
++                assert tar.extractfile('out/product').read() == b'changed'
++                assert tar.extractfile('out/' + 'a'*120 + '/' + 'b'*80).read() == b'long'
++                assert tar.getmember('out/product').mode == 0o700
++
++        # A valid child entry may precede its directory in the exported slot order.
++        stream = io.BytesIO()
++        with tarfile.open(fileobj=stream, mode='w', format=tarfile.USTAR_FORMAT) as tar:
++            data = bytes(n % 251 for n in range(8193))
++            entry = tarfile.TarInfo('out/nested/data')
++            entry.mode, entry.size = 0o640, len(data)
++            tar.addfile(entry, io.BytesIO(data))
++            entry = tarfile.TarInfo('out/nested')
++            entry.type, entry.mode = tarfile.DIRTYPE, 0o700
++            tar.addfile(entry)
++            size = tar.offset
++        large = work / 'large.tar'
++        large.write_bytes(stream.getvalue()[:size+1024])
++        launch('restore-large', large)
++
++        if not ordinary:
++            launch('restore', snapshot, work/'outside.tar', failure=True, assignments='memory:/work')
++            for name, data in (('truncated', original[:-512]), ('checksum', b'x' + original[1:])):
++                archive = work / f'{name}.tar'
++                archive.write_bytes(data)
++                launch('restore', archive, work/f'{name}-export.tar', failure=True)
++            for kind in ('traversal', 'symlink', 'hardlink', 'duplicate'):
++                archive = work / f'{kind}.tar'
++                with tarfile.open(archive, 'w', format=tarfile.USTAR_FORMAT) as tar:
++                    entry = tarfile.TarInfo('out/../../escaped' if kind == 'traversal' else 'out')
++                    entry.mode = 0o700
++                    entry.type = {'symlink': tarfile.SYMTYPE, 'hardlink': tarfile.LNKTYPE}.get(kind, tarfile.DIRTYPE)
++                    entry.linkname = '/outside' if kind in ('symlink', 'hardlink') else ''
++                    tar.addfile(entry)
++                    if kind == 'duplicate':
++                        tar.addfile(entry)
++                launch('restore', archive, work/f'{kind}-export.tar', failure=True)
++            link = work / 'snapshot-link.tar'
++            link.symlink_to(snapshot)
++            launch('restore', link, failure=True)
++            assert not (work / 'escaped').exists()
++        print('test-launch-restore: PASS (' + ('ordinary roundtrip, data, modes, long paths, restart and parent ordering' if ordinary else 'roundtrip, startup isolation, parent ordering and malformed inputs') + ')')
++
++
++if __name__ == '__main__':
++    main()
+diff --git a/tests/fixtures/launch-storage-fixture.c b/tests/fixtures/launch-storage-fixture.c
+index 7cb2ba17..6d065b46 100644
+--- a/tests/fixtures/launch-storage-fixture.c
++++ b/tests/fixtures/launch-storage-fixture.c
+@@ -92,10 +92,42 @@ static long export_data(const char *mode) {
+     }
+     return equal(mode,"failed-export") ? 7 : 0;
+ }
++static long restore_data(int large) {
++    if(large) {
++        long fd=DO(2,"/out/nested/data",0,0); CHECK(fd==3,220);
++        word offset=0;
++        while(offset<8193) {
++            long count=DO(0,fd,output+offset,8193-offset);
++            CHECK(count>0 && (word)count<=8193-offset,221); offset+=(word)count;
++        }
++        CHECK(DO(0,fd,output,1)==0,221);
++        for(word i=0;i<8193;++i) CHECK(output[i]==(char)(i%251),222);
++        CHECK(DO(3,fd,0,0)==0,223);
++        CHECK(DO(4,"/out/nested",meta,0)==0 && (*(word *)(meta+24)&0777)==0700,224);
++    } else {
++        long fd=DO(2,"/out/product",0,0); CHECK(fd==3,225);
++        CHECK(DO(0,fd,output,sizeof output)==11,226);
++        const char expected[]="result\0data";
++        for(word i=0;i<11;++i) CHECK(output[i]==expected[i],227);
++        CHECK(DO(5,fd,meta,0)==0 && (*(word *)(meta+24)&0777)==0700 && DO(3,fd,0,0)==0,228);
++        CHECK(DO(4,"/out/empty",meta,0)==0 && (*(word *)(meta+24)&0170000)==0040000,229);
++        CHECK(DO(2,"/out/empty-file",0,0)==3 && DO(0,3,output,1)==0 && DO(3,3,0,0)==0,230);
++        char path[208]="/out/";
++        for(word i=5;i<125;++i) path[i]='a';
++        path[125]='/';
++        for(word i=126;i<206;++i) path[i]='b';
++        path[206]=0;
++        CHECK(DO(2,path,0,0)==3 && DO(0,3,output,4)==4 && output[0]=='l' && DO(3,3,0,0)==0,231);
++        CHECK(DO(2,"/out/product",01001,0600)==3 && DO(1,3,"changed",7)==7 && DO(3,3,0,0)==0,232);
++    }
++    CHECK(DO(1,1,"restored: PASS\n",15)==15,233); return 0;
++}
+ long storage_main(word *stack)
+ {
+     word argc = *stack;
+     char **argv = (char **)(stack + 1);
++    if(argc>1 && equal(argv[1],"restore")) return restore_data(0);
++    if(argc>1 && equal(argv[1],"restore-large")) return restore_data(1);
+     if(argc>1 && (equal(argv[1],"flush") || equal(argv[1],"export") || equal(argv[1],"export-wait") || equal(argv[1],"failed-export") || equal(argv[1],"child-export"))) return export_data(argv[1]);
+     if (argc > 1 && argv[1][0] == 'v') {
+         long fd=DO(2,"/work/probe",0102|0400,0600);

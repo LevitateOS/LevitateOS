@@ -561,14 +561,25 @@ status ownership. Essential G31 checkpoint CI wiring is folded into this packet;
 full/default/remote runs, security, G07 threads and upstream independence remain
 pending. Exact G19 rejects the new option. No publication occurred.
 
-Exact next task: **G21 — validated startup restore**.
-Inspect1d9e00e0 on the G19 export/storage owner. Keep restore independent of G20's
-control transport and use the shared current filesystem/metadata/storage owners.
-Run ordinary valid startup reconstruction before workload execution; write down
-malformed/traversing/oversized archive, collision/authority and failure-injection
-security acceptance for DaybreakBlue instead of executing it. Preserve full
-fixtures and fold essential restore CI wiring into the feature. No publication
-or maintainer messages before F04.
+G21 source/ordinary preparation is retained at `33bf08a7` directly on
+G19a36e7644, without a G20 dependency. [Review/evidence](ginux-contributions/g21-review.md)
+records 92 units, 181-path strict replay and valid startup reconstruction, repeated
+fresh launches, binary/empty/multi-chunk data, modes, long paths and child-before-
+parent ordering, plus export/mapping/exec/storage controls, in source/clean copies.
+The fixture now respects existing short reads; no G25 behavior is imported.
+Essential G31 restore wiring is folded into its introducing packet. Exact G19
+exports the archive but rejects restore. Security/full CI/upstream independence
+and G18/G13/G15/G20 combined joins remain pending; no publication occurred.
+
+Exact next task: **G22 — bounded archives with link identity**.
+Inspect e3374593 and join only the reviewed G13/G15/G18/G21 storage/archive owners
+in a disposable composition. Preserve G19 staging/publication and G21 startup
+cleanup, without importing G20 or held thread/policy capabilities accidentally.
+Review alias/symlink identity and dynamic capacity in the shared owners; run
+ordinary archive roundtrips/scale as resources permit. Record hostile paths,
+forward aliases, conflicting metadata, oversized/malformed input and races for
+DaybreakBlue instead of executing security probes. No publication or maintainer
+messages before F04.
 
 Active skill: `hdae-development`, discovered at
 `/home/vince/.codex/worktrees/ginux-pr-combination-check/ginux/.agents/skills/hdae-development/SKILL.md`.

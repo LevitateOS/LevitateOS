@@ -986,7 +986,6 @@
       "packet": "G21",
       "purpose": "Validated startup restore (`1d9e00e0`)",
       "dependencies": [
-        "G09",
         "G19"
       ],
       "source_commits": [
@@ -994,8 +993,47 @@
       ],
       "acceptance": "Restore occurs before workload execution; reject malformed/traversing/oversized snapshots and occupied destinations without corrupting previous state.",
       "planned_delivery": "one coherent change plus its generic docs and focused regression fixtures; split coupled responsibilities only as recorded by P04",
-      "status": "pending extraction and R01-R04 review",
-      "artifact_directory": ".artifacts/ginux-contribution-preparation/G21"
+      "status": "source separately self-reviewed; selected ordinary source/clean checks pass; security/full CI/upstream independence pending",
+      "artifact_directory": ".artifacts/ginux-contribution-preparation/G21",
+      "base": "a36e76441b5a7c1a30b3461c9537bb3c6aee9d8e",
+      "head": "33bf08a746bd64306e0375f8d419af4744d31064",
+      "tree": "0d531e213782be8ea029d3a5aebb3231633f5f62",
+      "changed_files": [
+        "README.md",
+        "Makefile",
+        ".github/workflows/check.yml",
+        "crates/ginux-init/src/storage_restore.rs",
+        "crates/ginux-init/src/fs_hooks.rs",
+        "crates/ginux-init/src/launch.rs",
+        "crates/ginux-init/src/main.rs",
+        "scripts/test-launch-restore.py",
+        "tests/fixtures/launch-storage-fixture.c"
+      ],
+      "standalone": false,
+      "patch_sha256": "f5f6060ae7191e6085ee100a0afe554f1b8e86a3533849a927c60b762d73a886",
+      "deferred_joins": [
+        "G13/G15 links and G18 scalable namespace join at G22",
+        "G20 combined control/restore join at F02"
+      ],
+      "unit_tests": 92,
+      "vfs_tests": 34,
+      "clean_matched_paths": 181,
+      "review": "separate self-review; no independent reviewer/security acceptance",
+      "remote_ci": "not run",
+      "security_handoff": "daybreakblue-handoff.md",
+      "source_binary_sha256": "e93837240d695e2896138645248308a44f1ce199fcf5e29642c7c6ee5a70ed66",
+      "clean_binary_sha256": "e93837240d695e2896138645248308a44f1ce199fcf5e29642c7c6ee5a70ed66",
+      "fixture_sha256": {
+        "launch-storage-fixture": "e589d3268a1789d73bf48ce193245d8bfa746d1e60625cbf086c1e7d0c7e79cf",
+        "launch-directory-fixture": "c07d2fe17d870fceb7237cb65fa4962e33aa4f454d0aaa4861440e2760e761e8",
+        "launch-script-fixture": "bbf5f27163c9fa1edb0042719da1fe8d31065fbc35ef221fec608370f4821953",
+        "launch-owned-exec-fixture": "ac70dd24534767b47ee52d088575f6d3d4a1e95f71b526bb3589daaf2e5ddf90"
+      },
+      "evidence": "g21-review.md",
+      "source_patch": "patches/G21.patch",
+      "held_dependencies": [
+        "inherited G07 shared-argument security; no thread code imported"
+      ]
     },
     {
       "packet": "G22",
@@ -1156,7 +1194,8 @@
       "planned_delivery": "one coherent change plus its generic docs and focused regression fixtures; split coupled responsibilities only as recorded by P04",
       "status": "pending extraction and R01-R04 review",
       "artifact_directory": ".artifacts/ginux-contribution-preparation/G31",
-      "checkpoint_wiring": "Folded into G20 introducing packet; full/default runtime and remote CI unrun. Restore wiring remains with G21."
+      "checkpoint_wiring": "Folded into G20 introducing packet; full/default runtime and remote CI unrun. Restore wiring remains with G21.",
+      "restore_wiring": "Folded into G21 introducing packet; full/default/remote runtime unrun. G20 checkpoint wiring retained separately; combined join remains F02."
     },
     {
       "packet": "G17a",

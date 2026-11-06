@@ -408,3 +408,25 @@ No negative-frame, private-FD inspection, race or injected-failure run occurred.
 Validate bounded framing/authority, bootstrap leakage, readiness/lost-stop races,
 inherited signal masks and shared mutation independently. No cloud dispatch;
 [review/evidence](g20-review.md).
+
+## G21 — startup restore (in progress)
+
+Porting1d9e00e0 directly on G19a36e7644, without G20 control or held threads.
+Ordinary checks cover valid final-export reconstruction, long names, permissions,
+empty/binary/multi-chunk data, repeated fresh starts, child-before-parent ordering
+and unchanged source archives. Full/default rejection fixtures remain available.
+DaybreakBlue must validate malformed/truncated/oversized archives, traversal and
+assignment authority, duplicate/colliding entries, unsupported links, hostile
+source replacement, FIFO/device inputs, quota/FD/read/close failures and concurrent
+mutation. The source open adds O_NONBLOCK so a non-regular input cannot block
+before fstat; this is a source correction, not experimentally validated security.
+Do not run those adversarial probes here. Namespace/link/scale joins remain G22
+and F02 work. No cloud dispatch or security acceptance is implied.
+
+G21 exact retained revision: 33bf08a746bd64306e0375f8d419af4744d31064 on G19 a36e76441b5a7c1a30b3461c9537bb3c6aee9d8e.
+92 routine units and selected ordinary restore/restart/data/mode/parent-order plus
+export/mapping/exec/storage controls pass in source and clean replay. Default
+malformed/traversal/duplicate/authority fixtures remain unrun. Independently
+validate archive and assignment bounds, hostile input/replacement, resource and
+close/read failures and shared-mutation behavior. No cloud dispatch or security
+acceptance; [review/evidence](g21-review.md).
