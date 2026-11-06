@@ -79,8 +79,10 @@ four** failed scenarios: dependency C compilation, Bash child output, owned ELF
 execution and storage metadata via touch. Recipe's existing owner is
 `src/process.rs:270`, which starts output-reader threads. The combined configured
 launch owner, `crates/ginux-init/src/launch_tasks.rs:845`, supports only the three
-listed process clone flag shapes and returns -38 for a thread clone. This is a
-missing G07 capability; changing the command, dropping output capture or importing
+listed process clone flag shapes and returns -38 for a thread clone. The child
+is spawned before reader startup, so these failures do not establish that the
+child performed no work; they prevent acceptance of the complete scenarios.
+This is a missing G07 capability; changing the command, dropping output capture or importing
 the unready G07 snapshot would not establish the required consumer acceptance.
 No such workaround or thread import has been made. G07 correction and security
 verification remain with the written DaybreakBlue handoff, without dispatch.
@@ -96,7 +98,37 @@ checking nested state, product bytes, saved generations and unchanged sources.
 This replaces only that case's interrupted status; the four thread-related
 failures and all other unperformed criteria remain open.
 
-Three further source-reviewed ordinary cases are running serially: independent
-custom readiness, 128 KiB file publication and nested-directory copy/move/cleanup.
-Their receipts remain pending until each complete scenario finishes. This is
-selected ordinary verification, not complete applicable-suite acceptance.
+Eight destination scenarios have completed: **seven pass, one fails**. The
+passing cases are state restore, independent custom readiness, 128 KiB file
+publication, nested-directory copy/move/cleanup, lifecycle machine-event order,
+current API initialization without legacy globals, and publication of 5,000
+entries with unchanged selected inputs. Each was selected exactly and run
+serially through the actual managed CLI. The retained logs contain complete
+harness summaries; no interrupted or unrun case is included in the pass count.
+
+The Bash child case was repeated once on the destination to check whether the
+saved failure persisted after migration. It fails again in 86.45 seconds with
+`command output reader failed to start` / ENOSYS. The harness exits 101; the
+four-case runner correctly exits nonzero. This is fresh failure evidence, not a
+passing destination smoke. The other three original failures remain historical
+failures pending the same G07 prerequisite; they have not been rerun unchanged.
+
+The next 23 complete ordinary cases have been source-reviewed and are running
+serially from `ordinary-pending-selection.json`, beginning with valid archive
+extraction. They cover valid tar/zip payloads, retained state and dependencies,
+selected targets, lifecycle options, cleanup and a valid large-file digest.
+`pending-ordinary-receipts.json` records each exact command and completed result;
+`state.json` reconciles fresh and historical statuses against all 135 exact
+catalog names. Multi-invocation cases have correspondingly longer time limits.
+This is selected ordinary verification, not complete applicable-suite acceptance.
+
+All six restored worktrees retain identical HEAD, raw-index and staged/unstaged/
+conflict-status fingerprints in the before/after comparison. Concurrent edits
+elsewhere in the main checkout are preserved. No Ginux candidate source, branch,
+remote ref, upstream test or CI coverage has changed during this continuation.
+
+Exact next action: monitor the active serial ordinary runner and inspect each
+failure before deciding its fix or dependency. Keep G07, monitored security,
+actual compiler/Cargo/APK/RPM, full/default platform CI and current-main
+independence requirements open. F04 remains dependent on required F02/F03 work;
+the goal is active, incomplete, and not publication-authorized.

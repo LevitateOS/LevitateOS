@@ -748,7 +748,11 @@ verification, stopping at F04 for inspection with no publication. F03 remains
 active and partial. The complete saved log has now been read: all four failures
 report command-output reader thread creation ENOSYS, consistent with excluded
 G07. The previously interrupted state-restore case now passes 1/1 in 328.38s on
-the destination-built harness, covering all four invocations. No failure or interrupted case
+the destination-built harness, covering all four invocations. Eight fresh
+destination cases have completed: seven pass and the Bash child case fails with
+the same reader-thread ENOSYS. Passing cases additionally cover custom readiness,
+128 KiB file bytes, directory copy/move/cleanup, lifecycle event order, current
+API initialization and 5,000-entry publication. No failure or interrupted case
 has been counted as passing. See [F03 evidence](ginux-contributions/f03-review.md).
 
 Fresh strict replay verifies all 37 retained patches against their recorded
@@ -758,9 +762,12 @@ tracked paths except its separately normalized standalone lock. The six restored
 worktrees remain untouched; their index/status fingerprints are retained with
 the new F03 evidence. No Ginux contribution source has changed.
 
-Exact next action: finish the three running ordinary custom-readiness/file/
-directory checks and record their actual results, then continue source-reviewed
-ordinary consumer checks serially. Keep reader-thread-dependent consumers pending on G07. Do not import
+Exact next action: monitor the running 23-case serial ordinary queue, starting
+with valid archive extraction; exact selection, receipts and the reconciled
+135-case status catalog are in
+`.artifacts/ginux-contribution-preparation/F03/resume-2026-11-06/`.
+Inspect each new failure before choosing its owning fix or dependency. Keep
+reader-thread-dependent consumers pending on G07. Do not import
 the unready thread snapshot, rerun adversarial probes, dispatch DaybreakBlue,
 weaken required checks or treat source integrity as full acceptance. G07,
 security/policy, full CI and current-main independence remain open; F04 depends

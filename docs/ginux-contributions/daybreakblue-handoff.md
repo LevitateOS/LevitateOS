@@ -714,3 +714,12 @@ under the recovery directory's `recovery/evidence/ginux-contribution-preparation
 The destination harness and commands are in `f03-destination-bin/`; the old
 harness embeds source-machine paths. This path update does not authorize cloud
 dispatch or constitute security acceptance.
+
+The destination-built Bash scenario has now been repeated once on the migrated
+host and fails identically at reader-thread creation (harness exit 101, 86.45s).
+This rules out relying on migration alone to clear the observed consumer failure.
+The remaining original failures are not rerun unchanged; keep them pending on
+the G07 capability. Ordinary non-thread consumers continue independently.
+Fresh receipt/log: the new F03 evidence directory's
+`next-ordinary-receipts.json` and
+`managed_bash_child_writes_domain_files_and_keeps_logs_out_of_json.log`.
