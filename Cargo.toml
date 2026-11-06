@@ -8,6 +8,7 @@ members = [
     "leviso-elf",
     "xtask",
     "tools/recipe",
+    "tools/recinit",
     "tools/recstrap",
     "tools/recfstab",
     "tools/recchroot",
@@ -26,7 +27,11 @@ members = [
 ]
 
 [workspace.package]
+version = "0.2.0"
 edition = "2021"
+rust-version = "1.93"
+license = "MIT OR Apache-2.0"
+authors = ["LevitateOS Contributors"]
 
 [profile.release]
 strip = true
