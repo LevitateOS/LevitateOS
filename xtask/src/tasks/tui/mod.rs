@@ -7,6 +7,12 @@ use std::process::Command;
 use distro_contract::tui_apps::{self, TuiApp};
 
 pub fn run(name: String, args: Vec<String>) -> Result<()> {
+    // Before installing or building anything: without a terminal the app
+    // would refuse anyway, and only xtask can name the headless alternative.
+    crate::util::exit::require_terminal(
+        "`cargo xtask tui`",
+        &format!("cargo xtask inspect {name} renders it without one"),
+    )?;
     let root = crate::util::repo::repo_root()?;
     let app = tui_apps::find(&root, &name)?;
     let mut cmd = app_command(&root, &app)?;
