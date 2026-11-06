@@ -286,8 +286,28 @@ and records the holds on #207/#179 and transfer clamping. Open #224/#226 overlap
 with process cleanup/copyout work. No existing PR was changed. Git fetch changed
 cached refs only; integration source and HEAD remain intact.
 
-Exact next task: **P03 — account for every local change**. No new standalone
-review/test result is claimed yet.
+Active task: **P03 — account for every local change**. The initial
+[catalog](ginux-contributions/p03-catalog.json) maps 66 integration commits,
+49 additional non-upstream commits reachable from preserved worktrees, and
+59 net changed paths against current main. Classification is not a completed
+source review; extra-branch semantic dispositions and per-hunk coverage remain.
+
+Two concrete joins need attention in P03/P04:
+
+- Current upstream #221 is absent from the older integration HEAD. A whole-file
+  copy would delete its protected-copyout helpers and regressions. Preserve those
+  incoming changes when composing or extracting contributions.
+- Preserved review commit `b500f859` fixed shared offsets in VFS duplicated
+  descriptors, but the current integration's VFS still stores offsets per
+  descriptor. Public launch alias tests exercise another ownership layer and do
+  not establish the library property. Compare its regression on current main and
+  the integration; retain a focused G05 subpacket if confirmed. No fix/test run
+  is claimed yet. Other review commits `17050a20`, `acbde526`, `3fac8e05` need
+  semantic comparisons rather than assuming absence by commit hash.
+
+Exact next action: reconcile the 49 extra-worktree commits against current main
+and integration, beginning with those four review commits; complete P03 before P04.
+No Ginux source change, new branch/worktree, push or PR has occurred.
 
 Active skill: `hdae-development`, discovered at
 `/home/vince/.codex/worktrees/ginux-pr-combination-check/ginux/.agents/skills/hdae-development/SKILL.md`.

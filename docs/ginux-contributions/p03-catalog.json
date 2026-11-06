@@ -1,0 +1,2173 @@
+{
+  "base": "3f2fe7dfadd4b40e235d982a6a3d386dc6490177",
+  "integration": "7cf2638adaf2fd3b783be636fe2a05b2d60458c5",
+  "commits": [
+    {
+      "commit": "4632b5b2b311e4ae27d6c0575eaa1eeb8bff12f4",
+      "subject": "fix(cli): reject invalid commands before running a workload",
+      "packet": "already upstream: invalid command rejection",
+      "files": [
+        "README.md",
+        "crates/ginux-init/src/launch.rs",
+        "crates/ginux-init/src/main.rs",
+        "scripts/test-launch.py"
+      ],
+      "review_status": "classification only; full packet review pending"
+    },
+    {
+      "commit": "3dd05f425b0b960f565610212179a26721d17251",
+      "subject": "feat(console): mediate bounded nonblocking bootstrap polling",
+      "packet": "G01",
+      "files": [
+        "README.md",
+        "crates/ginux-core/src/lib.rs",
+        "crates/ginux-init/src/channel_hooks.rs",
+        "crates/ginux-init/src/dispatch.rs",
+        "crates/ginux-init/src/launch.rs",
+        "crates/ginux-init/src/main.rs",
+        "scripts/test-launch.py",
+        "tests/fixtures/launch-fixture.c"
+      ],
+      "review_status": "classification only; full packet review pending"
+    },
+    {
+      "commit": "f8235d56ffc4d6ae6d6c4cfdfab2f298986bfd00",
+      "subject": "fix(console): allow bounded waits for assigned descriptors",
+      "packet": "G01",
+      "files": [
+        "README.md",
+        "crates/ginux-core/src/lib.rs",
+        "crates/ginux-init/src/channel_hooks.rs",
+        "tests/fixtures/launch-fixture.c"
+      ],
+      "review_status": "classification only; full packet review pending"
+    },
+    {
+      "commit": "222d29ffd26e95c1574895d393c95b1fb295fa80",
+      "subject": "feat(vfs): support bounded writable file metadata and positioning",
+      "packet": "G03",
+      "files": [
+        "crates/ginux-vfs/src/lib.rs"
+      ],
+      "review_status": "classification only; full packet review pending"
+    },
+    {
+      "commit": "10091e4e48bb14dcf9f0ee20e62f471fb7d0cf2f",
+      "subject": "feat(launch): mediate bounded ephemeral memory storage",
+      "packet": "G03",
+      "files": [
+        ".github/workflows/check.yml",
+        "Makefile",
+        "README.md",
+        "crates/ginux-init/src/fs_hooks.rs",
+        "crates/ginux-init/src/launch.rs",
+        "crates/ginux-init/src/supervisor.rs",
+        "crates/ginux-vfs/src/lib.rs",
+        "scripts/test-launch-storage.py",
+        "tests/fixtures/launch-storage-fixture.c"
+      ],
+      "review_status": "classification only; full packet review pending"
+    },
+    {
+      "commit": "e3458063812a07cc548d2237d92c22142b587cad",
+      "subject": "feat(launch): expose explicitly assigned virtual null devices",
+      "packet": "G04",
+      "files": [
+        ".github/workflows/check.yml",
+        "Makefile",
+        "README.md",
+        "crates/ginux-init/src/device_hooks.rs",
+        "crates/ginux-init/src/dispatch.rs",
+        "crates/ginux-init/src/fs_hooks.rs",
+        "crates/ginux-init/src/launch.rs",
+        "crates/ginux-init/src/main.rs",
+        "crates/ginux-init/src/tracee_io.rs",
+        "scripts/test-launch-devices.py",
+        "tests/fixtures/launch-device-fixture.c"
+      ],
+      "review_status": "classification only; full packet review pending"
+    },
+    {
+      "commit": "7f072f2c4f6f68ff227f43ca591731004cf096ac",
+      "subject": "feat(launch): mediate owned anonymous pipe objects",
+      "packet": "G05",
+      "files": [
+        ".github/workflows/check.yml",
+        "Makefile",
+        "README.md",
+        "crates/ginux-init/src/channel_hooks.rs",
+        "crates/ginux-init/src/device_hooks.rs",
+        "crates/ginux-init/src/dispatch.rs",
+        "crates/ginux-init/src/fs_hooks.rs",
+        "crates/ginux-init/src/launch.rs",
+        "crates/ginux-init/src/main.rs",
+        "crates/ginux-init/src/tracee_io.rs",
+        "scripts/test-launch-pipes.py",
+        "tests/fixtures/launch-pipe-fixture.c"
+      ],
+      "review_status": "classification only; full packet review pending"
+    },
+    {
+      "commit": "f1c6419e3dc0d2451259b6d289a65eb1c1ff1dda",
+      "subject": "test(launch): observe parked pipes without moving stderr offset",
+      "packet": "G05",
+      "files": [
+        "scripts/test-launch-pipes.py"
+      ],
+      "review_status": "classification only; full packet review pending"
+    },
+    {
+      "commit": "3b00c1c8802cef6ed69350aee53f97ff6715f233",
+      "subject": "feat(launch): unify public descriptors across domain objects",
+      "packet": "G05",
+      "files": [
+        ".github/workflows/check.yml",
+        "Makefile",
+        "README.md",
+        "crates/ginux-init/src/channel_hooks.rs",
+        "crates/ginux-init/src/descriptors.rs",
+        "crates/ginux-init/src/dispatch.rs",
+        "crates/ginux-init/src/launch.rs",
+        "crates/ginux-init/src/main.rs",
+        "crates/ginux-init/src/supervisor.rs",
+        "scripts/test-launch-fds.py",
+        "tests/fixtures/launch-device-fixture.c",
+        "tests/fixtures/launch-fd-fixture.c",
+        "tests/fixtures/launch-pipe-fixture.c",
+        "tests/fixtures/launch-storage-fixture.c"
+      ],
+      "review_status": "classification only; full packet review pending"
+    },
+    {
+      "commit": "ccd62ca146550e81c54fec2c49d8e642948a1e8a",
+      "subject": "feat(launch): supervise child processes and inherited descriptors",
+      "packet": "G06",
+      "files": [
+        ".github/workflows/check.yml",
+        "Makefile",
+        "README.md",
+        "crates/ginux-init/src/descriptors.rs",
+        "crates/ginux-init/src/dispatch.rs",
+        "crates/ginux-init/src/launch.rs",
+        "crates/ginux-init/src/launch_tasks.rs",
+        "crates/ginux-init/src/main.rs",
+        "crates/ginux-process/src/lib.rs",
+        "scripts/test-launch-tasks.py",
+        "tests/fixtures/launch-fixture.c",
+        "tests/fixtures/launch-task-fixture.c"
+      ],
+      "review_status": "classification only; full packet review pending"
+    },
+    {
+      "commit": "8f7687004c44f97ef261c2dc2f1245c42267692d",
+      "subject": "feat(launch): supervise exec and commit close-on-exec on success",
+      "packet": "G06",
+      "files": [
+        ".github/workflows/check.yml",
+        "Makefile",
+        "README.md",
+        "crates/ginux-init/src/descriptors.rs",
+        "crates/ginux-init/src/fs_hooks.rs",
+        "crates/ginux-init/src/launch_tasks.rs",
+        "scripts/test-launch-exec.py",
+        "scripts/test-launch.py",
+        "tests/fixtures/launch-exec-fixture.c"
+      ],
+      "review_status": "classification only; full packet review pending"
+    },
+    {
+      "commit": "928dc9a1b8dc81ac9cc504e7eb6a8c83d3e4dd8b",
+      "subject": "refactor(launch): keep descriptor transactions with each task",
+      "packet": "G07",
+      "files": [
+        "crates/ginux-init/src/descriptors.rs",
+        "crates/ginux-init/src/dispatch.rs",
+        "crates/ginux-init/src/launch_tasks.rs"
+      ],
+      "review_status": "classification only; full packet review pending"
+    },
+    {
+      "commit": "e59e2e61a580054685967c6c75086061829e0f90",
+      "subject": "feat(launch): track pthreads and share descriptor ownership",
+      "packet": "G07",
+      "files": [
+        ".github/workflows/check.yml",
+        "Makefile",
+        "README.md",
+        "crates/ginux-core/src/lib.rs",
+        "crates/ginux-init/src/descriptors.rs",
+        "crates/ginux-init/src/launch_tasks.rs",
+        "crates/ginux-process/src/lib.rs",
+        "scripts/test-launch-threads.py",
+        "tests/fixtures/launch-thread-fixture.c"
+      ],
+      "review_status": "classification only; full packet review pending"
+    },
+    {
+      "commit": "75acd2beeb95fbc62f9177e5116fd6b5d8f22ca8",
+      "subject": "fix(launch): honor FIONBIO on owned pipe endpoints",
+      "packet": "G08",
+      "files": [
+        "crates/ginux-init/src/channel_hooks.rs",
+        "tests/fixtures/launch-pipe-fixture.c"
+      ],
+      "review_status": "classification only; full packet review pending"
+    },
+    {
+      "commit": "210a8cca92265385b5f59081d053ecaf6eef1e77",
+      "subject": "feat(launch): poll owned descriptors with peer wakeups and deadlines",
+      "packet": "G08",
+      "files": [
+        ".github/workflows/check.yml",
+        "Makefile",
+        "README.md",
+        "crates/ginux-init/src/channel_hooks.rs",
+        "crates/ginux-init/src/descriptors.rs",
+        "crates/ginux-init/src/device_hooks.rs",
+        "crates/ginux-init/src/dispatch.rs",
+        "crates/ginux-init/src/fs_hooks.rs",
+        "crates/ginux-init/src/launch_tasks.rs",
+        "crates/ginux-init/src/main.rs",
+        "scripts/test-launch-poll.py",
+        "tests/fixtures/launch-fixture.c",
+        "tests/fixtures/launch-poll-fixture.c"
+      ],
+      "review_status": "classification only; full packet review pending"
+    },
+    {
+      "commit": "06d24ae2966a20a0a420287182c30d0b764299e1",
+      "subject": "feat(vfs): grow owned overlay files within a shared memory bound",
+      "packet": "G09",
+      "files": [
+        "README.md",
+        "crates/ginux-init/src/fs_hooks.rs",
+        "crates/ginux-init/src/launch_tasks.rs",
+        "crates/ginux-init/src/main.rs",
+        "crates/ginux-init/src/storage_memory.rs",
+        "crates/ginux-vfs/src/lib.rs",
+        "scripts/test-launch-storage.py",
+        "tests/fixtures/launch-storage-fixture.c"
+      ],
+      "review_status": "classification only; full packet review pending"
+    },
+    {
+      "commit": "9ba6a1d4a21405c9c041f386c6df416cf935cae0",
+      "subject": "feat(vfs): support owned directory traversal and namespace changes",
+      "packet": "G09",
+      "files": [
+        ".github/workflows/check.yml",
+        "Makefile",
+        "README.md",
+        "crates/ginux-init/src/descriptors.rs",
+        "crates/ginux-init/src/fs_hooks.rs",
+        "crates/ginux-vfs/src/lib.rs",
+        "scripts/test-launch-directories.py",
+        "tests/fixtures/launch-directory-fixture.c"
+      ],
+      "review_status": "classification only; full packet review pending"
+    },
+    {
+      "commit": "c5ae1c5d1da287486c6330965deae3744997fbdf",
+      "subject": "feat(launch): execute pinned owned ELF files through sealed memfds",
+      "packet": "G10",
+      "files": [
+        ".github/workflows/check.yml",
+        "Makefile",
+        "README.md",
+        "crates/ginux-init/src/descriptors.rs",
+        "crates/ginux-init/src/exec_image.rs",
+        "crates/ginux-init/src/fs_hooks.rs",
+        "crates/ginux-init/src/launch_tasks.rs",
+        "crates/ginux-init/src/main.rs",
+        "crates/ginux-vfs/src/lib.rs",
+        "scripts/test-launch-owned-exec.py",
+        "tests/fixtures/launch-exec-fixture.c",
+        "tests/fixtures/launch-owned-exec-fixture.c"
+      ],
+      "review_status": "classification only; full packet review pending"
+    },
+    {
+      "commit": "73593745dd181344e62661868bed8890eb6076d7",
+      "subject": "feat(launch): execute named owned scripts with image interpreters",
+      "packet": "G11",
+      "files": [
+        ".github/workflows/check.yml",
+        "Makefile",
+        "README.md",
+        "crates/ginux-init/src/descriptors.rs",
+        "crates/ginux-init/src/exec_image.rs",
+        "crates/ginux-init/src/exec_script.rs",
+        "crates/ginux-init/src/fs_hooks.rs",
+        "crates/ginux-init/src/launch_tasks.rs",
+        "crates/ginux-init/src/main.rs",
+        "scripts/test-launch-scripts.py",
+        "tests/fixtures/launch-owned-exec-fixture.c",
+        "tests/fixtures/launch-script-fixture.c"
+      ],
+      "review_status": "classification only; full packet review pending"
+    },
+    {
+      "commit": "a08aff7a8a425323fe893859ed65c1ed6bcde98b",
+      "subject": "feat(launch): reopen owned descriptor paths for script execution",
+      "packet": "G11",
+      "files": [
+        "README.md",
+        "crates/ginux-init/src/descriptors.rs",
+        "crates/ginux-init/src/exec_script.rs",
+        "crates/ginux-init/src/fs_hooks.rs",
+        "crates/ginux-vfs/src/lib.rs",
+        "scripts/test-launch-scripts.py",
+        "tests/fixtures/launch-script-fixture.c"
+      ],
+      "review_status": "classification only; full packet review pending"
+    },
+    {
+      "commit": "9279e71b61a4cbe9936612e92fd9b8c9975149ee",
+      "subject": "fix(launch): support libc fork and native signal return",
+      "packet": "G06",
+      "files": [
+        "README.md",
+        "crates/ginux-core/src/lib.rs",
+        "crates/ginux-init/src/launch_tasks.rs",
+        "scripts/test-launch-tasks.py",
+        "tests/fixtures/launch-task-fixture.c"
+      ],
+      "review_status": "classification only; full packet review pending"
+    },
+    {
+      "commit": "8752f708b8dbcf11c591900847e244db32305a04",
+      "subject": "fix(storage): accept noctty for owned regular files",
+      "packet": "G09",
+      "files": [
+        "crates/ginux-init/src/fs_hooks.rs",
+        "tests/fixtures/launch-storage-fixture.c"
+      ],
+      "review_status": "classification only; full packet review pending"
+    },
+    {
+      "commit": "d949077267e55c430aba94c5e2c9e56882a28c36",
+      "subject": "fix(launch): resolve relative paths from the calling process cwd",
+      "packet": "G09",
+      "files": [
+        "crates/ginux-init/src/fs_hooks.rs",
+        "crates/ginux-init/src/launch_tasks.rs",
+        "crates/ginux-init/src/tracee_io.rs",
+        "scripts/test-launch-tasks.py",
+        "tests/fixtures/launch-task-fixture.c"
+      ],
+      "review_status": "classification only; full packet review pending"
+    },
+    {
+      "commit": "3b27b37010110b4ccf14936e259fae0a5487efdb",
+      "subject": "feat(channels): add bounded local sequenced-packet pairs",
+      "packet": "G08",
+      "files": [
+        "crates/ginux-init/src/channel_hooks.rs",
+        "crates/ginux-init/src/descriptors.rs",
+        "scripts/test-launch-pipes.py",
+        "tests/fixtures/launch-pipe-fixture.c"
+      ],
+      "review_status": "classification only; full packet review pending"
+    },
+    {
+      "commit": "e954010d7f74151d6ab8d03a1d40f4c4b9cb9b5e",
+      "subject": "fix(channels): accommodate nested compiler process streams",
+      "packet": "G08",
+      "files": [
+        "README.md",
+        "crates/ginux-init/src/channel_hooks.rs",
+        "crates/ginux-init/src/descriptors.rs",
+        "tests/fixtures/launch-pipe-fixture.c"
+      ],
+      "review_status": "classification only; full packet review pending"
+    },
+    {
+      "commit": "32ba41e93c1355c28d0112fb564122315220af48",
+      "subject": "feat(launch): report executable links in the domain namespace",
+      "packet": "G10",
+      "files": [
+        "crates/ginux-init/src/fs_hooks.rs",
+        "crates/ginux-init/src/launch_tasks.rs",
+        "crates/ginux-init/src/tracee_io.rs",
+        "crates/ginux-vfs/src/lib.rs",
+        "tests/fixtures/launch-exec-fixture.c",
+        "tests/fixtures/launch-owned-exec-fixture.c"
+      ],
+      "review_status": "classification only; full packet review pending"
+    },
+    {
+      "commit": "37ca30cbefc73e0b51e4ffc35924273f25fd4ddf",
+      "subject": "fix(storage): keep path probes in the owned namespace",
+      "packet": "G09",
+      "files": [
+        "crates/ginux-init/src/descriptors.rs",
+        "crates/ginux-init/src/fs_hooks.rs",
+        "tests/fixtures/launch-storage-fixture.c"
+      ],
+      "review_status": "classification only; full packet review pending"
+    },
+    {
+      "commit": "32e2c85fc7445da3e1e379bb6bf0dce6293dc3d7",
+      "subject": "refactor(storage): retain anonymous file identity across resizing",
+      "packet": "G09",
+      "files": [
+        "crates/ginux-init/src/storage_memory.rs"
+      ],
+      "review_status": "classification only; full packet review pending"
+    },
+    {
+      "commit": "868862bce0627b1bc8b579a0cc8c761dfbec88f1",
+      "subject": "feat(storage): map owned files through private backing transfers",
+      "packet": "G12",
+      "files": [
+        "README.md",
+        "crates/ginux-init/src/descriptors.rs",
+        "crates/ginux-init/src/file_mapping.rs",
+        "crates/ginux-init/src/fs_hooks.rs",
+        "crates/ginux-init/src/launch_tasks.rs",
+        "crates/ginux-init/src/main.rs",
+        "crates/ginux-vfs/src/lib.rs",
+        "scripts/test-launch-storage.py",
+        "tests/fixtures/launch-storage-fixture.c"
+      ],
+      "review_status": "classification only; full packet review pending"
+    },
+    {
+      "commit": "680d5081e58b4e1e4ca2a86190505ba867645ab7",
+      "subject": "fix(storage): map owned files from nonleader threads",
+      "packet": "G12",
+      "files": [
+        "crates/ginux-init/src/file_mapping.rs",
+        "scripts/test-launch-threads.py",
+        "tests/fixtures/launch-thread-fixture.c"
+      ],
+      "review_status": "classification only; full packet review pending"
+    },
+    {
+      "commit": "adc79f0a57ab86311b1a4b76747f023561ae2050",
+      "subject": "fix(storage): resolve access probes in the owned namespace",
+      "packet": "G09",
+      "files": [
+        "crates/ginux-init/src/fs_hooks.rs",
+        "tests/fixtures/launch-storage-fixture.c"
+      ],
+      "review_status": "classification only; full packet review pending"
+    },
+    {
+      "commit": "48b26f8ddc17543e53ce6c55079f47f2da245f51",
+      "subject": "feat(launch): export quiesced writable files after successful exit",
+      "packet": "G19",
+      "files": [
+        "README.md",
+        "crates/ginux-init/src/fs_hooks.rs",
+        "crates/ginux-init/src/launch.rs",
+        "crates/ginux-init/src/launch_tasks.rs",
+        "crates/ginux-init/src/main.rs",
+        "crates/ginux-init/src/storage_export.rs",
+        "crates/ginux-vfs/src/lib.rs",
+        "scripts/test-launch-storage.py",
+        "tests/fixtures/launch-storage-fixture.c"
+      ],
+      "review_status": "classification only; full packet review pending"
+    },
+    {
+      "commit": "c541a67f01f9d00fce214203469a5769fbdc0bdb",
+      "subject": "chore: satisfy static checks for storage integration",
+      "packet": "G19",
+      "files": [
+        "crates/ginux-init/src/fs_hooks.rs",
+        "crates/ginux-init/src/main.rs",
+        "crates/ginux-init/src/storage_memory.rs"
+      ],
+      "review_status": "classification only; full packet review pending"
+    },
+    {
+      "commit": "d693ae63e2e07b9314d65c74f2ef944133cc3592",
+      "subject": "fix(process): await death events when syscall-stop reads race exit",
+      "packet": "G06",
+      "files": [
+        "crates/ginux-init/src/launch_tasks.rs",
+        "scripts/test-launch-threads.py",
+        "tests/fixtures/launch-thread-fixture.c"
+      ],
+      "review_status": "classification only; full packet review pending"
+    },
+    {
+      "commit": "2b306eff66f5e650c5b33d256ce922e9a6989445",
+      "subject": "feat(storage): capture filesystem snapshots over private control socket",
+      "packet": "G20",
+      "files": [
+        "Makefile",
+        "README.md",
+        "crates/ginux-init/src/checkpoint_control.rs",
+        "crates/ginux-init/src/fs_hooks.rs",
+        "crates/ginux-init/src/launch.rs",
+        "crates/ginux-init/src/launch_tasks.rs",
+        "crates/ginux-init/src/main.rs",
+        "crates/ginux-init/src/storage_export.rs",
+        "scripts/test-launch-checkpoints.py",
+        "tests/fixtures/launch-storage-fixture.c"
+      ],
+      "review_status": "classification only; full packet review pending"
+    },
+    {
+      "commit": "1d9e00e05627791b0da193240319342bc4932b8b",
+      "subject": "feat(storage): restore validated snapshots before workload startup",
+      "packet": "G21",
+      "files": [
+        "README.md",
+        "crates/ginux-init/src/fs_hooks.rs",
+        "crates/ginux-init/src/launch.rs",
+        "crates/ginux-init/src/main.rs",
+        "crates/ginux-init/src/storage_restore.rs",
+        "scripts/test-launch-checkpoints.py",
+        "tests/fixtures/launch-storage-fixture.c"
+      ],
+      "review_status": "classification only; full packet review pending"
+    },
+    {
+      "commit": "9ec9552709332e563513fb24e76eee2025f42960",
+      "subject": "feat(task): support global clock reads and interruptible sleeps",
+      "packet": "G02",
+      "files": [
+        "crates/ginux-core/src/lib.rs",
+        "scripts/test-launch-tasks.py",
+        "tests/fixtures/launch-task-fixture.c"
+      ],
+      "review_status": "classification only; full packet review pending"
+    },
+    {
+      "commit": "990fbb7a42f9481b63b80d8ccc41226cd568f10e",
+      "subject": "fix(launch): wait on task and checkpoint events without delay",
+      "packet": "G20",
+      "files": [
+        "crates/ginux-init/src/checkpoint_control.rs",
+        "crates/ginux-init/src/launch_tasks.rs",
+        "scripts/test-launch-checkpoints.py",
+        "tests/fixtures/launch-storage-fixture.c"
+      ],
+      "review_status": "classification only; full packet review pending"
+    },
+    {
+      "commit": "cda76faaa0dd00bc61008f952464e02053cf4c60",
+      "subject": "feat(exec): resolve bounded owned interpreter chains",
+      "packet": "G11",
+      "files": [
+        "README.md",
+        "crates/ginux-init/src/exec_script.rs",
+        "crates/ginux-init/src/fs_hooks.rs",
+        "crates/ginux-init/src/launch_tasks.rs",
+        "scripts/test-launch-owned-exec.py",
+        "tests/fixtures/launch-owned-exec-fixture.c",
+        "tests/fixtures/launch-script-fixture.c"
+      ],
+      "review_status": "classification only; full packet review pending"
+    },
+    {
+      "commit": "909399b4d9ad6f802320bfab2b39480af6052ec6",
+      "subject": "feat(vfs): resolve owned symbolic links component by component",
+      "packet": "G13",
+      "files": [
+        "crates/ginux-vfs/src/lib.rs"
+      ],
+      "review_status": "classification only; full packet review pending"
+    },
+    {
+      "commit": "aa8becf25814a2e4bf40518b7c5753cc7cc9d737",
+      "subject": "feat(launch): mediate and retain owned symbolic links",
+      "packet": "G13",
+      "files": [
+        "crates/ginux-init/src/descriptors.rs",
+        "crates/ginux-init/src/fs_hooks.rs",
+        "crates/ginux-init/src/storage_export.rs",
+        "crates/ginux-init/src/storage_restore.rs",
+        "crates/ginux-vfs/src/lib.rs",
+        "scripts/test-launch-checkpoints.py",
+        "scripts/test-launch-storage.py",
+        "tests/fixtures/launch-storage-fixture.c"
+      ],
+      "review_status": "classification only; full packet review pending"
+    },
+    {
+      "commit": "8b14578c8ff342fb2fe74a167fbdf30e484a54cb",
+      "subject": "fix(vfs): preserve final entries during namespace mutations",
+      "packet": "G13",
+      "files": [
+        "crates/ginux-init/src/fs_hooks.rs",
+        "crates/ginux-vfs/src/lib.rs",
+        "tests/fixtures/launch-storage-fixture.c"
+      ],
+      "review_status": "classification only; full packet review pending"
+    },
+    {
+      "commit": "d7f628cc96c52affea8f77087777b83698a5dda9",
+      "subject": "docs(launch): describe owned links and interpreter chains",
+      "packet": "G13",
+      "files": [
+        "README.md"
+      ],
+      "review_status": "classification only; full packet review pending"
+    },
+    {
+      "commit": "6a45d8f83d12c8a78cd99f1613ef2a44be6e821a",
+      "subject": "feat(launch): retain owned current directories across task lifecycle",
+      "packet": "G14",
+      "files": [
+        "crates/ginux-init/src/fs_hooks.rs",
+        "crates/ginux-init/src/launch_tasks.rs",
+        "scripts/test-launch-threads.py",
+        "tests/fixtures/launch-directory-fixture.c",
+        "tests/fixtures/launch-thread-fixture.c"
+      ],
+      "review_status": "classification only; full packet review pending"
+    },
+    {
+      "commit": "8ff83d64deb7a08b707c9e67d1744057bef6857e",
+      "subject": "feat(devices): add bounded nonblocking tcp connections",
+      "packet": "G28",
+      "files": [
+        "crates/ginux-devices/src/lib.rs"
+      ],
+      "review_status": "classification only; full packet review pending"
+    },
+    {
+      "commit": "9e2a39e80805014f4600cb9d54a706f60bad23ab",
+      "subject": "feat(vfs): share owned inode identity across hardlink names",
+      "packet": "G15",
+      "files": [
+        "README.md",
+        "crates/ginux-init/src/channel_hooks.rs",
+        "crates/ginux-init/src/descriptors.rs",
+        "crates/ginux-init/src/device_hooks.rs",
+        "crates/ginux-init/src/fs_hooks.rs",
+        "crates/ginux-init/src/tracee_io.rs",
+        "crates/ginux-vfs/src/lib.rs",
+        "tests/fixtures/launch-directory-fixture.c"
+      ],
+      "review_status": "classification only; full packet review pending"
+    },
+    {
+      "commit": "539c1c77d02f3844ff6fe06656e221996bf537b9",
+      "subject": "feat(devices): expose bounded tcp endpoint metadata",
+      "packet": "G28",
+      "files": [
+        "crates/ginux-devices/src/lib.rs"
+      ],
+      "review_status": "classification only; full packet review pending"
+    },
+    {
+      "commit": "9a70427bb106eff3b44d64e94644a1cb9b69c448",
+      "subject": "fix(devices): implement tcp endpoint metadata adapter",
+      "packet": "G28",
+      "files": [
+        "crates/ginux-devices/src/lib.rs"
+      ],
+      "review_status": "classification only; full packet review pending"
+    },
+    {
+      "commit": "38fa14fd9b14f1d62f1c4a9ba2e9b38e11303eca",
+      "subject": "feat(storage): allocate bounded configurable namespace metadata",
+      "packet": "G18",
+      "files": [
+        "README.md",
+        "crates/ginux-domain/src/lib.rs",
+        "crates/ginux-init/src/fs_hooks.rs",
+        "crates/ginux-init/src/storage_memory.rs",
+        "crates/ginux-init/src/storage_restore.rs",
+        "crates/ginux-vfs/src/lib.rs",
+        "scripts/test-launch-storage.py",
+        "tests/fixtures/launch-storage-fixture.c"
+      ],
+      "review_status": "classification only; full packet review pending"
+    },
+    {
+      "commit": "66de28808afd59808d6c0180a376629e41478a9c",
+      "subject": "feat(launch): mediate bounded tcp through owned descriptors",
+      "packet": "G29",
+      "files": [
+        ".github/workflows/check.yml",
+        "Makefile",
+        "README.md",
+        "crates/ginux-domain/src/lib.rs",
+        "crates/ginux-init/src/descriptors.rs",
+        "crates/ginux-init/src/device_hooks.rs",
+        "crates/ginux-init/src/dispatch.rs",
+        "crates/ginux-init/src/main.rs",
+        "crates/ginux-init/src/network_hooks.rs",
+        "scripts/test-launch-network.py",
+        "tests/fixtures/launch-network-fixture.c"
+      ],
+      "review_status": "classification only; full packet review pending"
+    },
+    {
+      "commit": "e33745930acdbf35e4a0671a5d7de034d8fd1ef2",
+      "subject": "feat(storage): preserve hardlinks across bounded archives",
+      "packet": "G22",
+      "files": [
+        "README.md",
+        "crates/ginux-init/src/fs_hooks.rs",
+        "crates/ginux-init/src/storage_export.rs",
+        "crates/ginux-init/src/storage_restore.rs",
+        "crates/ginux-vfs/src/lib.rs",
+        "scripts/test-launch-checkpoints.py",
+        "tests/fixtures/launch-storage-fixture.c"
+      ],
+      "review_status": "classification only; full packet review pending"
+    },
+    {
+      "commit": "53dec6b3102d246fd3f727fa839fcdb21f2fb807",
+      "subject": "fix(storage): flush owned backing for fsync and fdatasync",
+      "packet": "G19",
+      "files": [
+        "crates/ginux-init/src/fs_hooks.rs",
+        "crates/ginux-init/src/storage_memory.rs",
+        "crates/ginux-vfs/src/lib.rs",
+        "tests/fixtures/launch-storage-fixture.c"
+      ],
+      "review_status": "classification only; full packet review pending"
+    },
+    {
+      "commit": "1da0ce137de73e13b66a331de8f7ff7b12903925",
+      "subject": "feat(launch): resolve paths across image and owned storage",
+      "packet": "G16",
+      "files": [
+        "README.md",
+        "crates/ginux-init/src/descriptors.rs",
+        "crates/ginux-init/src/exec_image.rs",
+        "crates/ginux-init/src/exec_script.rs",
+        "crates/ginux-init/src/fs_hooks.rs",
+        "crates/ginux-init/src/launch_tasks.rs",
+        "crates/ginux-init/src/main.rs",
+        "crates/ginux-init/src/path_hooks.rs",
+        "crates/ginux-init/src/tracee_io.rs",
+        "crates/ginux-vfs/src/lib.rs",
+        "scripts/test-launch-directories.py",
+        "scripts/test-launch-exec.py",
+        "scripts/test-launch-scripts.py",
+        "tests/fixtures/launch-directory-fixture.c",
+        "tests/fixtures/launch-exec-fixture.c",
+        "tests/fixtures/launch-script-fixture.c",
+        "tests/fixtures/launch-storage-fixture.c"
+      ],
+      "review_status": "classification only; full packet review pending"
+    },
+    {
+      "commit": "07c949db7a7e5ffeb94cc42e48df330f2fbe3c66",
+      "subject": "fix(init): reap adopted ptrace zombies once",
+      "packet": "G06",
+      "files": [
+        "crates/ginux-init/src/launch_tasks.rs",
+        "scripts/test-launch-tasks.py",
+        "tests/fixtures/launch-task-fixture.c"
+      ],
+      "review_status": "classification only; full packet review pending"
+    },
+    {
+      "commit": "53a2c9cc6ee842e97d0ca8214cc1205547b0ab65",
+      "subject": "fix(init): reserve bounded storage descriptors and support pwrite",
+      "packet": "G17",
+      "files": [
+        "README.md",
+        "crates/ginux-init/src/fs_hooks.rs",
+        "scripts/test-launch-storage.py",
+        "tests/fixtures/launch-storage-fixture.c"
+      ],
+      "review_status": "classification only; full packet review pending"
+    },
+    {
+      "commit": "26784843bea2eacdfb4e661bf47a40d2b94a7a8f",
+      "subject": "feat(init): mediate owned file locks with virtual ownership",
+      "packet": "G23",
+      "files": [
+        "README.md",
+        "crates/ginux-init/src/descriptors.rs",
+        "crates/ginux-init/src/file_locks.rs",
+        "crates/ginux-init/src/fs_hooks.rs",
+        "crates/ginux-init/src/launch_tasks.rs",
+        "crates/ginux-init/src/main.rs",
+        "scripts/test-launch-tasks.py",
+        "tests/fixtures/launch-task-fixture.c"
+      ],
+      "review_status": "classification only; full packet review pending"
+    },
+    {
+      "commit": "d21d26c879ad53b96652b2f9677c928e7ac2183c",
+      "subject": "feat(vfs): retain explicit inode timestamps and archive mtime",
+      "packet": "G24",
+      "files": [
+        "README.md",
+        "crates/ginux-init/src/channel_hooks.rs",
+        "crates/ginux-init/src/descriptors.rs",
+        "crates/ginux-init/src/device_hooks.rs",
+        "crates/ginux-init/src/fs_hooks.rs",
+        "crates/ginux-init/src/network_hooks.rs",
+        "crates/ginux-init/src/storage_export.rs",
+        "crates/ginux-init/src/storage_restore.rs",
+        "crates/ginux-init/src/tracee_io.rs",
+        "crates/ginux-vfs/src/lib.rs",
+        "scripts/test-launch-checkpoints.py",
+        "scripts/test-launch-storage.py",
+        "tests/fixtures/launch-storage-fixture.c"
+      ],
+      "review_status": "classification only; full packet review pending"
+    },
+    {
+      "commit": "d5357101e9ce7b268235a9377a9366a33cd92813",
+      "subject": "fix(init): retain public fd limits when reserving private backing",
+      "packet": "G17",
+      "files": [
+        "crates/ginux-init/src/descriptors.rs",
+        "crates/ginux-init/src/launch.rs",
+        "scripts/test-launch-fds.py",
+        "tests/fixtures/launch-fd-fixture.c"
+      ],
+      "review_status": "classification only; full packet review pending"
+    },
+    {
+      "commit": "88fa4749cd357bb088e0bc8207f09fa49c97102f",
+      "subject": "feat(init): support bounded vectored io on owned files and pipes",
+      "packet": "G25",
+      "files": [
+        "crates/ginux-init/src/channel_hooks.rs",
+        "crates/ginux-init/src/fs_hooks.rs",
+        "crates/ginux-init/src/tracee_io.rs",
+        "scripts/test-launch-pipes.py",
+        "tests/fixtures/launch-pipe-fixture.c",
+        "tests/fixtures/launch-storage-fixture.c"
+      ],
+      "review_status": "classification only; full packet review pending"
+    },
+    {
+      "commit": "0c571cbbc36756c55af051cd07f513dd2b9228af",
+      "subject": "feat(init): enforce inherited address space and cpu affinity bounds",
+      "packet": "G26",
+      "files": [
+        "README.md",
+        "config/domain-gate5.toml",
+        "crates/ginux-init/src/descriptors.rs",
+        "crates/ginux-init/src/launch.rs",
+        "crates/ginux-init/src/launch_tasks.rs",
+        "scripts/test-launch-tasks.py",
+        "tests/fixtures/launch-task-fixture.c"
+      ],
+      "review_status": "classification only; full packet review pending"
+    },
+    {
+      "commit": "9cf265bab6f24cd398af4dd5b4fd71ee3147c81c",
+      "subject": "feat(kernel-views): project configured virtual platform identity",
+      "packet": "G27",
+      "files": [
+        "README.md",
+        "crates/ginux-init/src/launch_tasks.rs",
+        "crates/ginux-kernel-views/src/lib.rs",
+        "tests/fixtures/launch-task-fixture.c"
+      ],
+      "review_status": "classification only; full packet review pending"
+    },
+    {
+      "commit": "7d556b4ed1c26699f985d75a1cc5364a79bb92d8",
+      "subject": "fix(init): complete bounded regular file writes in scratch chunks",
+      "packet": "G25",
+      "files": [
+        "README.md",
+        "crates/ginux-init/src/fs_hooks.rs",
+        "tests/fixtures/launch-storage-fixture.c"
+      ],
+      "review_status": "classification only; full packet review pending"
+    },
+    {
+      "commit": "5e20a65f29b2d45e2840a69ef0e24613dc40e278",
+      "subject": "ci: run configured checkpoint and restore regressions",
+      "packet": "G31",
+      "files": [
+        ".github/workflows/check.yml"
+      ],
+      "review_status": "classification only; full packet review pending"
+    },
+    {
+      "commit": "93a1a56dbdf5c4af0a66b73cd5e8a932c0894418",
+      "subject": "fix(init): retain absent semantics for hidden device paths",
+      "packet": "G16",
+      "files": [
+        "crates/ginux-init/src/fs_hooks.rs"
+      ],
+      "review_status": "classification only; full packet review pending"
+    },
+    {
+      "commit": "7483508993db9572a87739592d34c5c2d41a7f74",
+      "subject": "fix(init): submit large native reads as bounded chunks",
+      "packet": "G25",
+      "files": [
+        "crates/ginux-init/src/descriptors.rs",
+        "scripts/test-launch-fds.py",
+        "tests/fixtures/launch-fd-fixture.c"
+      ],
+      "review_status": "classification only; full packet review pending"
+    },
+    {
+      "commit": "7cf2638adaf2fd3b783be636fe2a05b2d60458c5",
+      "subject": "feat(init): preserve virtual root ownership on owned objects",
+      "packet": "G30",
+      "files": [
+        "README.md",
+        "crates/ginux-init/src/descriptors.rs",
+        "crates/ginux-init/src/fs_hooks.rs",
+        "tests/fixtures/launch-storage-fixture.c"
+      ],
+      "review_status": "classification only; full packet review pending"
+    }
+  ],
+  "other_worktree_commits": [
+    {
+      "commit": "0042dcaa6e4b0d8dd3ad0e55387bf1d0fa9c1959",
+      "subject": "vfs: file data I/O and offsets (G07a)",
+      "files": [
+        "crates/ginux-init/src/fs_hooks.rs",
+        "crates/ginux-vfs/src/lib.rs"
+      ],
+      "semantic_disposition": "pending comparison to current implementation; do not resubmit old prototype wholesale"
+    },
+    {
+      "commit": "022294a9e983dd4097dcae6e198f6ecd87c1047a",
+      "subject": "I04-M6: confined anonymous MAP_FIXED + initial-exec-image ledger coverage",
+      "files": [
+        "crates/ginux-init/src/main.rs",
+        "crates/ginux-init/src/process_hooks.rs"
+      ],
+      "semantic_disposition": "pending comparison to current implementation; do not resubmit old prototype wholesale"
+    },
+    {
+      "commit": "11bd6f1699a100c708513a27cdeaa040b2d843fa",
+      "subject": "feat(console): mediate bounded nonblocking bootstrap polling",
+      "files": [
+        "README.md",
+        "crates/ginux-core/src/lib.rs",
+        "crates/ginux-init/src/channel_hooks.rs",
+        "crates/ginux-init/src/dispatch.rs",
+        "crates/ginux-init/src/launch.rs",
+        "crates/ginux-init/src/main.rs",
+        "scripts/test-launch.py",
+        "tests/fixtures/launch-fixture.c"
+      ],
+      "semantic_disposition": "pending comparison to current implementation; do not resubmit old prototype wholesale"
+    },
+    {
+      "commit": "17050a20aaf1cc6323dd5b14371a51b69af632de",
+      "subject": "fix(storage): validate traversed directories before normalization",
+      "files": [
+        "crates/ginux-init/src/fs_hooks.rs",
+        "tests/fixtures/launch-directory-fixture.c"
+      ],
+      "semantic_disposition": "pending comparison to current implementation; do not resubmit old prototype wholesale"
+    },
+    {
+      "commit": "18286aa6097262ef5590aecd418d44693d833c19",
+      "subject": "test(storage): exercise disk-backed recovery and export",
+      "files": [
+        ".github/workflows/check.yml",
+        "Makefile",
+        "crates/ginux-vfs/examples/storage-workload.rs",
+        "scripts/test-storage.py"
+      ],
+      "semantic_disposition": "pending comparison to current implementation; do not resubmit old prototype wholesale"
+    },
+    {
+      "commit": "19bf68c986421b5aa999a3667c8f7fd1146e148a",
+      "subject": "process: connect native threads and synchronization (G04)",
+      "files": [
+        "crates/ginux-init/src/main.rs",
+        "crates/ginux-init/src/process_hooks.rs"
+      ],
+      "semantic_disposition": "pending comparison to current implementation; do not resubmit old prototype wholesale"
+    },
+    {
+      "commit": "2eac10bf8c9e7a7e72e1ae94990aa2425b2f3ba0",
+      "subject": "vfs: file metadata queries (G07b)",
+      "files": [
+        "crates/ginux-init/src/fs_hooks.rs",
+        "crates/ginux-vfs/src/lib.rs"
+      ],
+      "semantic_disposition": "pending comparison to current implementation; do not resubmit old prototype wholesale"
+    },
+    {
+      "commit": "38e9bd26acd2ed54028a353630fd3ca457a925ca",
+      "subject": "fix(process): enforce syscall and clone boundaries",
+      "files": [
+        "crates/ginux-init/src/main.rs",
+        "crates/ginux-init/src/process_hooks.rs",
+        "crates/ginux-process/src/lib.rs"
+      ],
+      "semantic_disposition": "pending comparison to current implementation; do not resubmit old prototype wholesale"
+    },
+    {
+      "commit": "3fac8e0598193218d6bcda4d7e0813ee60d96238",
+      "subject": "test(storage): validate owned mappings through public aliases",
+      "files": [
+        "crates/ginux-init/src/storage_memory.rs",
+        "tests/fixtures/launch-fd-fixture.c"
+      ],
+      "semantic_disposition": "pending comparison to current implementation; do not resubmit old prototype wholesale"
+    },
+    {
+      "commit": "4655aaa2bd17454d70920a7e84ec2daf75121c5c",
+      "subject": "process: complete child waits and normal signal delivery (G05)",
+      "files": [
+        "crates/ginux-init/src/main.rs",
+        "crates/ginux-init/src/process_hooks.rs",
+        "crates/ginux-init/src/supervisor.rs",
+        "crates/ginux-kernel-views/src/lib.rs",
+        "crates/ginux-process/src/lib.rs"
+      ],
+      "semantic_disposition": "pending comparison to current implementation; do not resubmit old prototype wholesale"
+    },
+    {
+      "commit": "47ca4500de8b708d119e385e39ec8ff2fdfab793",
+      "subject": "process: supervise executable replacement (G03b)",
+      "files": [
+        "crates/ginux-init/src/dispatch.rs",
+        "crates/ginux-init/src/main.rs",
+        "crates/ginux-init/src/process_hooks.rs",
+        "crates/ginux-init/src/supervisor.rs"
+      ],
+      "semantic_disposition": "pending comparison to current implementation; do not resubmit old prototype wholesale"
+    },
+    {
+      "commit": "4d036c07ed3f7735aa4812fe4968e05ef24b5c8a",
+      "subject": "storage: consistent generation checkpoint with bounded quiesce (G12a)",
+      "files": [
+        "crates/ginux-vfs/src/lib.rs",
+        "crates/ginux-vfs/src/retained.rs"
+      ],
+      "semantic_disposition": "pending comparison to current implementation; do not resubmit old prototype wholesale"
+    },
+    {
+      "commit": "4d494e76dea48b0298a142d220b1f95ec4ddc504",
+      "subject": "fix(process): preserve native identities and termination signals",
+      "files": [
+        "crates/ginux-init/src/main.rs",
+        "crates/ginux-init/src/process_hooks.rs"
+      ],
+      "semantic_disposition": "pending comparison to current implementation; do not resubmit old prototype wholesale"
+    },
+    {
+      "commit": "50c6a39900f3859d171e54fb2f6cf63245d02f5f",
+      "subject": "vfs: export selected results and deletions from verified generations (G13)",
+      "files": [
+        "crates/ginux-vfs/src/export.rs",
+        "crates/ginux-vfs/src/lib.rs",
+        "crates/ginux-vfs/src/retained.rs"
+      ],
+      "semantic_disposition": "pending comparison to current implementation; do not resubmit old prototype wholesale"
+    },
+    {
+      "commit": "56c1ddf56d86a22e1f6d91be226e46096cef6020",
+      "subject": "fix(process): share descriptor ownership and retire native threads",
+      "files": [
+        "crates/ginux-init/src/main.rs",
+        "crates/ginux-process/src/lib.rs"
+      ],
+      "semantic_disposition": "pending comparison to current implementation; do not resubmit old prototype wholesale"
+    },
+    {
+      "commit": "5c6989b0060b4a684626b562baf7754443a5c166",
+      "subject": "process: connect native fork to managed ownership (G03)",
+      "files": [
+        "crates/ginux-init/src/main.rs",
+        "crates/ginux-init/src/process_hooks.rs",
+        "scripts/test-process.sh"
+      ],
+      "semantic_disposition": "pending comparison to current implementation; do not resubmit old prototype wholesale"
+    },
+    {
+      "commit": "668a86f21a50de0c235b45e10949cbf46788f94c",
+      "subject": "process: libc creation variants (G03a)",
+      "files": [
+        "crates/ginux-init/src/main.rs",
+        "crates/ginux-init/src/process_hooks.rs"
+      ],
+      "semantic_disposition": "pending comparison to current implementation; do not resubmit old prototype wholesale"
+    },
+    {
+      "commit": "698847b498f87a9c6873aec4be928957a402eee2",
+      "subject": "I04-M2: domain library file access (openat + read-on-domain-fd)",
+      "files": [
+        "crates/ginux-init/src/main.rs",
+        "crates/ginux-vfs/src/lib.rs"
+      ],
+      "semantic_disposition": "pending comparison to current implementation; do not resubmit old prototype wholesale"
+    },
+    {
+      "commit": "6ad28863cde168ce01ada171a65f9b7203ae3f5c",
+      "subject": "I04-M3: loader metadata (fstat/newfstatat/faccessat) + file-backed mmap",
+      "files": [
+        "crates/ginux-init/src/main.rs"
+      ],
+      "semantic_disposition": "pending comparison to current implementation; do not resubmit old prototype wholesale"
+    },
+    {
+      "commit": "6c507d1f371209bc3672612145460e62c943d787",
+      "subject": "I04-M4: confined MAP_FIXED file-backed remaps + pread64 on domain fds",
+      "files": [
+        "crates/ginux-init/src/main.rs",
+        "crates/ginux-process/src/lib.rs"
+      ],
+      "semantic_disposition": "pending comparison to current implementation; do not resubmit old prototype wholesale"
+    },
+    {
+      "commit": "724dd3ae16144583dbb2dd0d52afc37449e65e39",
+      "subject": "process: connect native fork to managed ownership (G03)",
+      "files": [
+        "crates/ginux-init/src/main.rs",
+        "crates/ginux-init/src/process_hooks.rs",
+        "scripts/test-process.sh"
+      ],
+      "semantic_disposition": "pending comparison to current implementation; do not resubmit old prototype wholesale"
+    },
+    {
+      "commit": "7bc0ee04e68f6c0d96ab4c2ee1f4ec000bcc0c13",
+      "subject": "fix(vfs): preserve open file data and shared descriptor offsets",
+      "files": [
+        "crates/ginux-vfs/src/lib.rs"
+      ],
+      "semantic_disposition": "pending comparison to current implementation; do not resubmit old prototype wholesale"
+    },
+    {
+      "commit": "7cfb8070427dadaabed5304224faf30ba20e1ffb",
+      "subject": "I04-M1: anonymous memory mapping mediation (mmap/brk/mprotect/munmap)",
+      "files": [
+        "crates/ginux-init/src/main.rs",
+        "crates/ginux-init/src/process_hooks.rs",
+        "crates/ginux-init/src/supervisor.rs",
+        "crates/ginux-process/src/lib.rs"
+      ],
+      "semantic_disposition": "pending comparison to current implementation; do not resubmit old prototype wholesale"
+    },
+    {
+      "commit": "7f21da2375fcff2ebe5bb9c1c594876f847a1578",
+      "subject": "process: connect native threads and synchronization (G04)",
+      "files": [
+        "crates/ginux-init/src/main.rs",
+        "crates/ginux-init/src/process_hooks.rs"
+      ],
+      "semantic_disposition": "pending comparison to current implementation; do not resubmit old prototype wholesale"
+    },
+    {
+      "commit": "80763e5054a33d31e46c8acdd736d5a749d03458",
+      "subject": "vfs: installation permissions and link operations (G08a)",
+      "files": [
+        "crates/ginux-init/src/fs_hooks.rs",
+        "crates/ginux-vfs/src/lib.rs"
+      ],
+      "semantic_disposition": "pending comparison to current implementation; do not resubmit old prototype wholesale"
+    },
+    {
+      "commit": "808c1d1640a14bfe569814fa4adf2bd62dde0725",
+      "subject": "vfs: working directories and relative paths (G06a)",
+      "files": [
+        "crates/ginux-init/src/fs_hooks.rs"
+      ],
+      "semantic_disposition": "pending comparison to current implementation; do not resubmit old prototype wholesale"
+    },
+    {
+      "commit": "860a6d328a49b4d20886b0b0dfcc04882e852686",
+      "subject": "fix(storage): restore atomically and export the verified snapshot",
+      "files": [
+        "crates/ginux-vfs/src/export.rs",
+        "crates/ginux-vfs/src/retained.rs"
+      ],
+      "semantic_disposition": "pending comparison to current implementation; do not resubmit old prototype wholesale"
+    },
+    {
+      "commit": "9e4a5fa574f26aae91ac2d889aba9f44f7a54491",
+      "subject": "supervision: load domain-produced executables under exec mediation (G09)",
+      "files": [
+        "crates/ginux-init/src/main.rs",
+        "crates/ginux-init/src/process_hooks.rs"
+      ],
+      "semantic_disposition": "pending comparison to current implementation; do not resubmit old prototype wholesale"
+    },
+    {
+      "commit": "a2542d9133a15ad6dd5fb2aad9392ed7f5d8c36d",
+      "subject": "init: enforce supported CPU/memory declarations on launch (L02)",
+      "files": [
+        "crates/ginux-domain/src/lib.rs",
+        "crates/ginux-init/src/launch.rs"
+      ],
+      "semantic_disposition": "pending comparison to current implementation; do not resubmit old prototype wholesale"
+    },
+    {
+      "commit": "a396ab141734654c3fc1593ddc1d7a61529396be",
+      "subject": "storage: retained writable backing (G11)",
+      "files": [
+        "crates/ginux-init/src/fs_hooks.rs",
+        "crates/ginux-vfs/src/lib.rs",
+        "crates/ginux-vfs/src/retained.rs"
+      ],
+      "semantic_disposition": "pending comparison to current implementation; do not resubmit old prototype wholesale"
+    },
+    {
+      "commit": "a92471ae23698d976a631eb166fbfebcc28895fd",
+      "subject": "G14: domain-owned bidirectional byte channels (transport + lane seam)",
+      "files": [
+        "crates/ginux-init/src/channel_hooks.rs",
+        "crates/ginux-init/src/channel_transport.rs"
+      ],
+      "semantic_disposition": "pending comparison to current implementation; do not resubmit old prototype wholesale"
+    },
+    {
+      "commit": "acbde526e800e23a6e93fdf8511a72c6951648e3",
+      "subject": "fix(launch): await thread death after ptrace loses its stop",
+      "files": [
+        "crates/ginux-init/src/launch_tasks.rs",
+        "scripts/test-launch-threads.py",
+        "tests/fixtures/launch-thread-fixture.c"
+      ],
+      "semantic_disposition": "pending comparison to current implementation; do not resubmit old prototype wholesale"
+    },
+    {
+      "commit": "b3c53518b206ee4a3d90f84cea9726458d77a87a",
+      "subject": "process: connect inherited pipes and close-on-exec descriptors (G05a)",
+      "files": [
+        "crates/ginux-init/src/main.rs",
+        "crates/ginux-init/src/process_hooks.rs",
+        "crates/ginux-init/src/supervisor.rs",
+        "crates/ginux-process/src/lib.rs"
+      ],
+      "semantic_disposition": "pending comparison to current implementation; do not resubmit old prototype wholesale"
+    },
+    {
+      "commit": "b42354f3381bb62a8a6be04f473152b5f0241396",
+      "subject": "process: complete child waits and normal signal delivery (G05)",
+      "files": [
+        "crates/ginux-init/src/main.rs",
+        "crates/ginux-init/src/process_hooks.rs",
+        "crates/ginux-init/src/supervisor.rs",
+        "crates/ginux-kernel-views/src/lib.rs",
+        "crates/ginux-process/src/lib.rs"
+      ],
+      "semantic_disposition": "pending comparison to current implementation; do not resubmit old prototype wholesale"
+    },
+    {
+      "commit": "b500f859a3b1f22da59d0b500a6c07bcb8ba3d3f",
+      "subject": "fix(vfs): share offsets between duplicated descriptors",
+      "files": [
+        "crates/ginux-vfs/src/lib.rs"
+      ],
+      "semantic_disposition": "pending comparison to current implementation; do not resubmit old prototype wholesale"
+    },
+    {
+      "commit": "bef09013b91adbf3141cc1c42680fbe7b405aa21",
+      "subject": "process: supervise executable replacement (G03b)",
+      "files": [
+        "crates/ginux-init/src/dispatch.rs",
+        "crates/ginux-init/src/main.rs",
+        "crates/ginux-init/src/process_hooks.rs",
+        "crates/ginux-init/src/supervisor.rs"
+      ],
+      "semantic_disposition": "pending comparison to current implementation; do not resubmit old prototype wholesale"
+    },
+    {
+      "commit": "c46b132cdcb6a58c22d747b018c939ec283d9f6e",
+      "subject": "init: terminate and reap the complete domain workload (L01)",
+      "files": [
+        "crates/ginux-init/src/main.rs",
+        "crates/ginux-init/src/teardown.rs"
+      ],
+      "semantic_disposition": "pending comparison to current implementation; do not resubmit old prototype wholesale"
+    },
+    {
+      "commit": "c4a0820deac6a91bdfc0f96796bbb8416e39911a",
+      "subject": "test(limits): verify kernel enforcement on a running workload",
+      "files": [
+        ".github/workflows/check.yml",
+        "Makefile",
+        "README.md",
+        "crates/ginux-domain/src/lib.rs",
+        "crates/ginux-init/src/launch.rs",
+        "scripts/test-limits.py"
+      ],
+      "semantic_disposition": "pending comparison to current implementation; do not resubmit old prototype wholesale"
+    },
+    {
+      "commit": "c97dcba84054f66d6dd026b3e5b4ff28fe53574c",
+      "subject": "fix(channels): reject stale handles after slot reuse",
+      "files": [
+        "crates/ginux-init/src/channel_transport.rs"
+      ],
+      "semantic_disposition": "pending comparison to current implementation; do not resubmit old prototype wholesale"
+    },
+    {
+      "commit": "ca64fddf028a4110bcde2666fbb3949f2d0eea7d",
+      "subject": "vfs: native open and descriptor lifetime (G07)",
+      "files": [
+        "crates/ginux-init/src/fs_hooks.rs",
+        "crates/ginux-vfs/src/lib.rs"
+      ],
+      "semantic_disposition": "pending comparison to current implementation; do not resubmit old prototype wholesale"
+    },
+    {
+      "commit": "d11f7f99843b5d0e088319ed425a6f5f8a61e2cd",
+      "subject": "process: libc creation variants (G03a)",
+      "files": [
+        "crates/ginux-init/src/main.rs",
+        "crates/ginux-init/src/process_hooks.rs"
+      ],
+      "semantic_disposition": "pending comparison to current implementation; do not resubmit old prototype wholesale"
+    },
+    {
+      "commit": "d4ecd781eaca5ae1d511e938bf60ca15bf2d8b4e",
+      "subject": "vfs: rename and removal (G08)",
+      "files": [
+        "crates/ginux-init/src/fs_hooks.rs",
+        "crates/ginux-vfs/src/lib.rs"
+      ],
+      "semantic_disposition": "pending comparison to current implementation; do not resubmit old prototype wholesale"
+    },
+    {
+      "commit": "dc65b4128891e13d46de56b775b61f644b96668a",
+      "subject": "vfs: domain directory operations (G06)",
+      "files": [
+        "crates/ginux-init/src/fs_hooks.rs",
+        "crates/ginux-vfs/src/lib.rs"
+      ],
+      "semantic_disposition": "pending comparison to current implementation; do not resubmit old prototype wholesale"
+    },
+    {
+      "commit": "e7f5f552747e0b451b6dd31395f9199d10a42ce3",
+      "subject": "fix(console): allow bounded waits for assigned descriptors",
+      "files": [
+        "README.md",
+        "crates/ginux-core/src/lib.rs",
+        "crates/ginux-init/src/channel_hooks.rs",
+        "tests/fixtures/launch-fixture.c"
+      ],
+      "semantic_disposition": "pending comparison to current implementation; do not resubmit old prototype wholesale"
+    },
+    {
+      "commit": "e97eb58c8132b85b481359ec5b7f26b20c9a1e41",
+      "subject": "process: connect inherited pipes and close-on-exec descriptors (G05a)",
+      "files": [
+        "crates/ginux-init/src/main.rs",
+        "crates/ginux-init/src/process_hooks.rs",
+        "crates/ginux-init/src/supervisor.rs",
+        "crates/ginux-process/src/lib.rs"
+      ],
+      "semantic_disposition": "pending comparison to current implementation; do not resubmit old prototype wholesale"
+    },
+    {
+      "commit": "eb2589dd5f5797a0e0cfefe5f5c5bb6cfa0900f1",
+      "subject": "storage: durable flush and recovery (G12)",
+      "files": [
+        "crates/ginux-vfs/src/lib.rs",
+        "crates/ginux-vfs/src/retained.rs"
+      ],
+      "semantic_disposition": "pending comparison to current implementation; do not resubmit old prototype wholesale"
+    },
+    {
+      "commit": "ebd68025d4db318e903867f12d0574e41f2511ce",
+      "subject": "I04-M5: writable file-backed segments + mprotect transitions",
+      "files": [
+        "crates/ginux-init/src/main.rs"
+      ],
+      "semantic_disposition": "pending comparison to current implementation; do not resubmit old prototype wholesale"
+    },
+    {
+      "commit": "f8ce52747111c6b33a872e0215e94e1863a51271",
+      "subject": "fix(native): isolate executable staging and reliably drain cancellation",
+      "files": [
+        ".github/workflows/check.yml",
+        "Makefile",
+        "crates/ginux-init/src/main.rs",
+        "crates/ginux-init/src/teardown.rs",
+        "scripts/test-upcoming-native.py",
+        "tests/fixtures/process-review-fixture.c"
+      ],
+      "semantic_disposition": "pending comparison to current implementation; do not resubmit old prototype wholesale"
+    },
+    {
+      "commit": "ff72a60c7589653e929222940342785d0d04c9e0",
+      "subject": "test(process): exercise native ownership and failure paths in CI",
+      "files": [
+        ".github/workflows/check.yml",
+        "Makefile",
+        "README.md",
+        "scripts/test-process-native.py",
+        "tests/fixtures/process-exec-target.S",
+        "tests/fixtures/process-review-fixture.c"
+      ],
+      "semantic_disposition": "pending comparison to current implementation; do not resubmit old prototype wholesale"
+    }
+  ],
+  "paths": [
+    {
+      "path": ".github/workflows/check.yml",
+      "status": "M",
+      "candidate_owners": [
+        "G03",
+        "G04",
+        "G05",
+        "G06",
+        "G07",
+        "G08",
+        "G09",
+        "G10",
+        "G11",
+        "G29",
+        "G31"
+      ],
+      "incoming_upstream_delta": false,
+      "hunk_review": "pending; preserve current upstream changes rather than copying integrated files wholesale"
+    },
+    {
+      "path": "Makefile",
+      "status": "M",
+      "candidate_owners": [
+        "G03",
+        "G04",
+        "G05",
+        "G06",
+        "G07",
+        "G08",
+        "G09",
+        "G10",
+        "G11",
+        "G20",
+        "G29"
+      ],
+      "incoming_upstream_delta": true,
+      "hunk_review": "pending; preserve current upstream changes rather than copying integrated files wholesale"
+    },
+    {
+      "path": "README.md",
+      "status": "M",
+      "candidate_owners": [
+        "G01",
+        "G03",
+        "G04",
+        "G05",
+        "G06",
+        "G07",
+        "G08",
+        "G09",
+        "G10",
+        "G11",
+        "G12",
+        "G13",
+        "G15",
+        "G16",
+        "G17",
+        "G18",
+        "G19",
+        "G20",
+        "G21",
+        "G22",
+        "G23",
+        "G24",
+        "G25",
+        "G26",
+        "G27",
+        "G29",
+        "G30",
+        "already upstream: invalid command rejection"
+      ],
+      "incoming_upstream_delta": false,
+      "hunk_review": "pending; preserve current upstream changes rather than copying integrated files wholesale"
+    },
+    {
+      "path": "config/domain-gate5.toml",
+      "status": "M",
+      "candidate_owners": [
+        "G26"
+      ],
+      "incoming_upstream_delta": false,
+      "hunk_review": "pending; preserve current upstream changes rather than copying integrated files wholesale"
+    },
+    {
+      "path": "crates/ginux-core/src/lib.rs",
+      "status": "M",
+      "candidate_owners": [
+        "G01",
+        "G02",
+        "G06",
+        "G07"
+      ],
+      "incoming_upstream_delta": false,
+      "hunk_review": "pending; preserve current upstream changes rather than copying integrated files wholesale"
+    },
+    {
+      "path": "crates/ginux-devices/src/lib.rs",
+      "status": "M",
+      "candidate_owners": [
+        "G28"
+      ],
+      "incoming_upstream_delta": false,
+      "hunk_review": "pending; preserve current upstream changes rather than copying integrated files wholesale"
+    },
+    {
+      "path": "crates/ginux-domain/src/lib.rs",
+      "status": "M",
+      "candidate_owners": [
+        "G18",
+        "G29"
+      ],
+      "incoming_upstream_delta": false,
+      "hunk_review": "pending; preserve current upstream changes rather than copying integrated files wholesale"
+    },
+    {
+      "path": "crates/ginux-init/src/channel_hooks.rs",
+      "status": "M",
+      "candidate_owners": [
+        "G01",
+        "G05",
+        "G08",
+        "G15",
+        "G24",
+        "G25"
+      ],
+      "incoming_upstream_delta": false,
+      "hunk_review": "pending; preserve current upstream changes rather than copying integrated files wholesale"
+    },
+    {
+      "path": "crates/ginux-init/src/checkpoint_control.rs",
+      "status": "A",
+      "candidate_owners": [
+        "G20"
+      ],
+      "incoming_upstream_delta": false,
+      "hunk_review": "pending; preserve current upstream changes rather than copying integrated files wholesale"
+    },
+    {
+      "path": "crates/ginux-init/src/descriptors.rs",
+      "status": "A",
+      "candidate_owners": [
+        "G05",
+        "G06",
+        "G07",
+        "G08",
+        "G09",
+        "G10",
+        "G11",
+        "G12",
+        "G13",
+        "G15",
+        "G16",
+        "G17",
+        "G23",
+        "G24",
+        "G25",
+        "G26",
+        "G29",
+        "G30"
+      ],
+      "incoming_upstream_delta": false,
+      "hunk_review": "pending; preserve current upstream changes rather than copying integrated files wholesale"
+    },
+    {
+      "path": "crates/ginux-init/src/device_hooks.rs",
+      "status": "A",
+      "candidate_owners": [
+        "G04",
+        "G05",
+        "G08",
+        "G15",
+        "G24",
+        "G29"
+      ],
+      "incoming_upstream_delta": false,
+      "hunk_review": "pending; preserve current upstream changes rather than copying integrated files wholesale"
+    },
+    {
+      "path": "crates/ginux-init/src/dispatch.rs",
+      "status": "M",
+      "candidate_owners": [
+        "G01",
+        "G04",
+        "G05",
+        "G06",
+        "G07",
+        "G08",
+        "G29"
+      ],
+      "incoming_upstream_delta": false,
+      "hunk_review": "pending; preserve current upstream changes rather than copying integrated files wholesale"
+    },
+    {
+      "path": "crates/ginux-init/src/exec_image.rs",
+      "status": "A",
+      "candidate_owners": [
+        "G10",
+        "G11",
+        "G16"
+      ],
+      "incoming_upstream_delta": false,
+      "hunk_review": "pending; preserve current upstream changes rather than copying integrated files wholesale"
+    },
+    {
+      "path": "crates/ginux-init/src/exec_script.rs",
+      "status": "A",
+      "candidate_owners": [
+        "G11",
+        "G16"
+      ],
+      "incoming_upstream_delta": false,
+      "hunk_review": "pending; preserve current upstream changes rather than copying integrated files wholesale"
+    },
+    {
+      "path": "crates/ginux-init/src/file_locks.rs",
+      "status": "A",
+      "candidate_owners": [
+        "G23"
+      ],
+      "incoming_upstream_delta": false,
+      "hunk_review": "pending; preserve current upstream changes rather than copying integrated files wholesale"
+    },
+    {
+      "path": "crates/ginux-init/src/file_mapping.rs",
+      "status": "A",
+      "candidate_owners": [
+        "G12"
+      ],
+      "incoming_upstream_delta": false,
+      "hunk_review": "pending; preserve current upstream changes rather than copying integrated files wholesale"
+    },
+    {
+      "path": "crates/ginux-init/src/fs_hooks.rs",
+      "status": "M",
+      "candidate_owners": [
+        "G03",
+        "G04",
+        "G05",
+        "G06",
+        "G08",
+        "G09",
+        "G10",
+        "G11",
+        "G12",
+        "G13",
+        "G14",
+        "G15",
+        "G16",
+        "G17",
+        "G18",
+        "G19",
+        "G20",
+        "G21",
+        "G22",
+        "G23",
+        "G24",
+        "G25",
+        "G30"
+      ],
+      "incoming_upstream_delta": false,
+      "hunk_review": "pending; preserve current upstream changes rather than copying integrated files wholesale"
+    },
+    {
+      "path": "crates/ginux-init/src/launch.rs",
+      "status": "M",
+      "candidate_owners": [
+        "G01",
+        "G03",
+        "G04",
+        "G05",
+        "G06",
+        "G17",
+        "G19",
+        "G20",
+        "G21",
+        "G26",
+        "already upstream: invalid command rejection"
+      ],
+      "incoming_upstream_delta": false,
+      "hunk_review": "pending; preserve current upstream changes rather than copying integrated files wholesale"
+    },
+    {
+      "path": "crates/ginux-init/src/launch_tasks.rs",
+      "status": "A",
+      "candidate_owners": [
+        "G06",
+        "G07",
+        "G08",
+        "G09",
+        "G10",
+        "G11",
+        "G12",
+        "G14",
+        "G16",
+        "G19",
+        "G20",
+        "G23",
+        "G26",
+        "G27"
+      ],
+      "incoming_upstream_delta": false,
+      "hunk_review": "pending; preserve current upstream changes rather than copying integrated files wholesale"
+    },
+    {
+      "path": "crates/ginux-init/src/main.rs",
+      "status": "M",
+      "candidate_owners": [
+        "G01",
+        "G04",
+        "G05",
+        "G06",
+        "G08",
+        "G09",
+        "G10",
+        "G11",
+        "G12",
+        "G16",
+        "G19",
+        "G20",
+        "G21",
+        "G23",
+        "G29",
+        "already upstream: invalid command rejection"
+      ],
+      "incoming_upstream_delta": true,
+      "hunk_review": "pending; preserve current upstream changes rather than copying integrated files wholesale"
+    },
+    {
+      "path": "crates/ginux-init/src/network_hooks.rs",
+      "status": "A",
+      "candidate_owners": [
+        "G24",
+        "G29"
+      ],
+      "incoming_upstream_delta": false,
+      "hunk_review": "pending; preserve current upstream changes rather than copying integrated files wholesale"
+    },
+    {
+      "path": "crates/ginux-init/src/path_hooks.rs",
+      "status": "A",
+      "candidate_owners": [
+        "G16"
+      ],
+      "incoming_upstream_delta": false,
+      "hunk_review": "pending; preserve current upstream changes rather than copying integrated files wholesale"
+    },
+    {
+      "path": "crates/ginux-init/src/storage_export.rs",
+      "status": "A",
+      "candidate_owners": [
+        "G13",
+        "G19",
+        "G20",
+        "G22",
+        "G24"
+      ],
+      "incoming_upstream_delta": false,
+      "hunk_review": "pending; preserve current upstream changes rather than copying integrated files wholesale"
+    },
+    {
+      "path": "crates/ginux-init/src/storage_memory.rs",
+      "status": "A",
+      "candidate_owners": [
+        "G09",
+        "G18",
+        "G19"
+      ],
+      "incoming_upstream_delta": false,
+      "hunk_review": "pending; preserve current upstream changes rather than copying integrated files wholesale"
+    },
+    {
+      "path": "crates/ginux-init/src/storage_restore.rs",
+      "status": "A",
+      "candidate_owners": [
+        "G13",
+        "G18",
+        "G21",
+        "G22",
+        "G24"
+      ],
+      "incoming_upstream_delta": false,
+      "hunk_review": "pending; preserve current upstream changes rather than copying integrated files wholesale"
+    },
+    {
+      "path": "crates/ginux-init/src/supervisor.rs",
+      "status": "M",
+      "candidate_owners": [
+        "G03",
+        "G05"
+      ],
+      "incoming_upstream_delta": true,
+      "hunk_review": "pending; preserve current upstream changes rather than copying integrated files wholesale"
+    },
+    {
+      "path": "crates/ginux-init/src/tracee_io.rs",
+      "status": "A",
+      "candidate_owners": [
+        "G04",
+        "G05",
+        "G09",
+        "G10",
+        "G15",
+        "G16",
+        "G24",
+        "G25"
+      ],
+      "incoming_upstream_delta": false,
+      "hunk_review": "pending; preserve current upstream changes rather than copying integrated files wholesale"
+    },
+    {
+      "path": "crates/ginux-kernel-views/src/lib.rs",
+      "status": "M",
+      "candidate_owners": [
+        "G27"
+      ],
+      "incoming_upstream_delta": false,
+      "hunk_review": "pending; preserve current upstream changes rather than copying integrated files wholesale"
+    },
+    {
+      "path": "crates/ginux-process/src/lib.rs",
+      "status": "M",
+      "candidate_owners": [
+        "G06",
+        "G07"
+      ],
+      "incoming_upstream_delta": false,
+      "hunk_review": "pending; preserve current upstream changes rather than copying integrated files wholesale"
+    },
+    {
+      "path": "crates/ginux-vfs/src/lib.rs",
+      "status": "M",
+      "candidate_owners": [
+        "G03",
+        "G09",
+        "G10",
+        "G11",
+        "G12",
+        "G13",
+        "G15",
+        "G16",
+        "G18",
+        "G19",
+        "G22",
+        "G24"
+      ],
+      "incoming_upstream_delta": false,
+      "hunk_review": "pending; preserve current upstream changes rather than copying integrated files wholesale"
+    },
+    {
+      "path": "scripts/test-launch-checkpoints.py",
+      "status": "A",
+      "candidate_owners": [
+        "G13",
+        "G20",
+        "G21",
+        "G22",
+        "G24"
+      ],
+      "incoming_upstream_delta": false,
+      "hunk_review": "pending; preserve current upstream changes rather than copying integrated files wholesale"
+    },
+    {
+      "path": "scripts/test-launch-devices.py",
+      "status": "A",
+      "candidate_owners": [
+        "G04"
+      ],
+      "incoming_upstream_delta": false,
+      "hunk_review": "pending; preserve current upstream changes rather than copying integrated files wholesale"
+    },
+    {
+      "path": "scripts/test-launch-directories.py",
+      "status": "A",
+      "candidate_owners": [
+        "G09",
+        "G16"
+      ],
+      "incoming_upstream_delta": false,
+      "hunk_review": "pending; preserve current upstream changes rather than copying integrated files wholesale"
+    },
+    {
+      "path": "scripts/test-launch-exec.py",
+      "status": "A",
+      "candidate_owners": [
+        "G06",
+        "G16"
+      ],
+      "incoming_upstream_delta": false,
+      "hunk_review": "pending; preserve current upstream changes rather than copying integrated files wholesale"
+    },
+    {
+      "path": "scripts/test-launch-fds.py",
+      "status": "A",
+      "candidate_owners": [
+        "G05",
+        "G17",
+        "G25"
+      ],
+      "incoming_upstream_delta": false,
+      "hunk_review": "pending; preserve current upstream changes rather than copying integrated files wholesale"
+    },
+    {
+      "path": "scripts/test-launch-network.py",
+      "status": "A",
+      "candidate_owners": [
+        "G29"
+      ],
+      "incoming_upstream_delta": false,
+      "hunk_review": "pending; preserve current upstream changes rather than copying integrated files wholesale"
+    },
+    {
+      "path": "scripts/test-launch-owned-exec.py",
+      "status": "A",
+      "candidate_owners": [
+        "G10",
+        "G11"
+      ],
+      "incoming_upstream_delta": false,
+      "hunk_review": "pending; preserve current upstream changes rather than copying integrated files wholesale"
+    },
+    {
+      "path": "scripts/test-launch-pipes.py",
+      "status": "A",
+      "candidate_owners": [
+        "G05",
+        "G08",
+        "G25"
+      ],
+      "incoming_upstream_delta": false,
+      "hunk_review": "pending; preserve current upstream changes rather than copying integrated files wholesale"
+    },
+    {
+      "path": "scripts/test-launch-poll.py",
+      "status": "A",
+      "candidate_owners": [
+        "G08"
+      ],
+      "incoming_upstream_delta": false,
+      "hunk_review": "pending; preserve current upstream changes rather than copying integrated files wholesale"
+    },
+    {
+      "path": "scripts/test-launch-scripts.py",
+      "status": "A",
+      "candidate_owners": [
+        "G11",
+        "G16"
+      ],
+      "incoming_upstream_delta": false,
+      "hunk_review": "pending; preserve current upstream changes rather than copying integrated files wholesale"
+    },
+    {
+      "path": "scripts/test-launch-storage.py",
+      "status": "A",
+      "candidate_owners": [
+        "G03",
+        "G09",
+        "G12",
+        "G13",
+        "G17",
+        "G18",
+        "G19",
+        "G24"
+      ],
+      "incoming_upstream_delta": false,
+      "hunk_review": "pending; preserve current upstream changes rather than copying integrated files wholesale"
+    },
+    {
+      "path": "scripts/test-launch-tasks.py",
+      "status": "A",
+      "candidate_owners": [
+        "G02",
+        "G06",
+        "G09",
+        "G23",
+        "G26"
+      ],
+      "incoming_upstream_delta": false,
+      "hunk_review": "pending; preserve current upstream changes rather than copying integrated files wholesale"
+    },
+    {
+      "path": "scripts/test-launch-threads.py",
+      "status": "A",
+      "candidate_owners": [
+        "G06",
+        "G07",
+        "G12",
+        "G14"
+      ],
+      "incoming_upstream_delta": false,
+      "hunk_review": "pending; preserve current upstream changes rather than copying integrated files wholesale"
+    },
+    {
+      "path": "scripts/test-launch.py",
+      "status": "M",
+      "candidate_owners": [
+        "G01",
+        "G06",
+        "already upstream: invalid command rejection"
+      ],
+      "incoming_upstream_delta": false,
+      "hunk_review": "pending; preserve current upstream changes rather than copying integrated files wholesale"
+    },
+    {
+      "path": "scripts/test-process-native.py",
+      "status": "M",
+      "candidate_owners": [],
+      "incoming_upstream_delta": true,
+      "hunk_review": "pending; preserve current upstream changes rather than copying integrated files wholesale"
+    },
+    {
+      "path": "tests/fixtures/launch-device-fixture.c",
+      "status": "A",
+      "candidate_owners": [
+        "G04",
+        "G05"
+      ],
+      "incoming_upstream_delta": false,
+      "hunk_review": "pending; preserve current upstream changes rather than copying integrated files wholesale"
+    },
+    {
+      "path": "tests/fixtures/launch-directory-fixture.c",
+      "status": "A",
+      "candidate_owners": [
+        "G09",
+        "G14",
+        "G15",
+        "G16"
+      ],
+      "incoming_upstream_delta": false,
+      "hunk_review": "pending; preserve current upstream changes rather than copying integrated files wholesale"
+    },
+    {
+      "path": "tests/fixtures/launch-exec-fixture.c",
+      "status": "A",
+      "candidate_owners": [
+        "G06",
+        "G10",
+        "G16"
+      ],
+      "incoming_upstream_delta": false,
+      "hunk_review": "pending; preserve current upstream changes rather than copying integrated files wholesale"
+    },
+    {
+      "path": "tests/fixtures/launch-fd-fixture.c",
+      "status": "A",
+      "candidate_owners": [
+        "G05",
+        "G17",
+        "G25"
+      ],
+      "incoming_upstream_delta": false,
+      "hunk_review": "pending; preserve current upstream changes rather than copying integrated files wholesale"
+    },
+    {
+      "path": "tests/fixtures/launch-fixture.c",
+      "status": "M",
+      "candidate_owners": [
+        "G01",
+        "G06",
+        "G08"
+      ],
+      "incoming_upstream_delta": false,
+      "hunk_review": "pending; preserve current upstream changes rather than copying integrated files wholesale"
+    },
+    {
+      "path": "tests/fixtures/launch-network-fixture.c",
+      "status": "A",
+      "candidate_owners": [
+        "G29"
+      ],
+      "incoming_upstream_delta": false,
+      "hunk_review": "pending; preserve current upstream changes rather than copying integrated files wholesale"
+    },
+    {
+      "path": "tests/fixtures/launch-owned-exec-fixture.c",
+      "status": "A",
+      "candidate_owners": [
+        "G10",
+        "G11"
+      ],
+      "incoming_upstream_delta": false,
+      "hunk_review": "pending; preserve current upstream changes rather than copying integrated files wholesale"
+    },
+    {
+      "path": "tests/fixtures/launch-pipe-fixture.c",
+      "status": "A",
+      "candidate_owners": [
+        "G05",
+        "G08",
+        "G25"
+      ],
+      "incoming_upstream_delta": false,
+      "hunk_review": "pending; preserve current upstream changes rather than copying integrated files wholesale"
+    },
+    {
+      "path": "tests/fixtures/launch-poll-fixture.c",
+      "status": "A",
+      "candidate_owners": [
+        "G08"
+      ],
+      "incoming_upstream_delta": false,
+      "hunk_review": "pending; preserve current upstream changes rather than copying integrated files wholesale"
+    },
+    {
+      "path": "tests/fixtures/launch-script-fixture.c",
+      "status": "A",
+      "candidate_owners": [
+        "G11",
+        "G16"
+      ],
+      "incoming_upstream_delta": false,
+      "hunk_review": "pending; preserve current upstream changes rather than copying integrated files wholesale"
+    },
+    {
+      "path": "tests/fixtures/launch-storage-fixture.c",
+      "status": "A",
+      "candidate_owners": [
+        "G03",
+        "G05",
+        "G09",
+        "G12",
+        "G13",
+        "G16",
+        "G17",
+        "G18",
+        "G19",
+        "G20",
+        "G21",
+        "G22",
+        "G24",
+        "G25",
+        "G30"
+      ],
+      "incoming_upstream_delta": false,
+      "hunk_review": "pending; preserve current upstream changes rather than copying integrated files wholesale"
+    },
+    {
+      "path": "tests/fixtures/launch-task-fixture.c",
+      "status": "A",
+      "candidate_owners": [
+        "G02",
+        "G06",
+        "G09",
+        "G23",
+        "G26",
+        "G27"
+      ],
+      "incoming_upstream_delta": false,
+      "hunk_review": "pending; preserve current upstream changes rather than copying integrated files wholesale"
+    },
+    {
+      "path": "tests/fixtures/launch-thread-fixture.c",
+      "status": "A",
+      "candidate_owners": [
+        "G06",
+        "G07",
+        "G12",
+        "G14"
+      ],
+      "incoming_upstream_delta": false,
+      "hunk_review": "pending; preserve current upstream changes rather than copying integrated files wholesale"
+    },
+    {
+      "path": "tests/fixtures/process-review-fixture.c",
+      "status": "M",
+      "candidate_owners": [],
+      "incoming_upstream_delta": true,
+      "hunk_review": "pending; preserve current upstream changes rather than copying integrated files wholesale"
+    }
+  ],
+  "status": "P03 in progress; catalog created; semantic extra-branch reconciliation and per-hunk dispositions pending"
+}
