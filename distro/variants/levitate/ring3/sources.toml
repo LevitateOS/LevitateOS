@@ -38,6 +38,13 @@ packages = [
   "kmod",
   "util-linux",
   "util-linux-core",
+  # Installing to disk and A/B updates: recpart formats ext4 and FAT, recab
+  # stage formats a slot, and bootctl install copies systemd-boot's EFI binary.
+  "e2fsprogs",
+  "e2fsprogs-libs",
+  "libss",
+  "dosfstools",
+  "systemd-boot-unsigned",
   "iputils",
   "curl",
   "libcurl",
