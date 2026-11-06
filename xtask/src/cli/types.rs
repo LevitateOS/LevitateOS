@@ -105,7 +105,10 @@ pub enum Cmd {
     },
 
     /// Quick checks before committing: cargo check, generated files current, TypeScript typecheck.
-    Check,
+    Check {
+        #[command(subcommand)]
+        what: Option<CheckCmd>,
+    },
 
     /// Launch a terminal app from tui/ in this terminal.
     Tui {
@@ -326,6 +329,17 @@ pub struct TestArgs {
     pub json: bool,
     #[command(flatten)]
     pub boot: BootArgs,
+}
+
+#[derive(Subcommand)]
+pub enum CheckCmd {
+    /// The terminal apps: typecheck, lint, format, render (also at the install screen's
+    /// docs-pane size), snapshots and each app's key walk.
+    Tui {
+        /// Rewrite snapshots from what the apps render now.
+        #[arg(long)]
+        bless: bool,
+    },
 }
 
 #[derive(Args)]

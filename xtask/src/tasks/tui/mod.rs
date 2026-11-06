@@ -48,4 +48,5 @@ pub fn tools_path(root: &Path, app: &TuiApp) -> Result<Option<std::ffi::OsString
     Ok(Some(std::env::join_paths(paths)?))
 }
 
+pub mod check;
 pub mod inspect;

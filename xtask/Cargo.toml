@@ -10,6 +10,7 @@ anyhow = "1"
 clap = { version = "4", features = ["derive"] }
 distro-contract = { path = "../distro/contract" }
 distro-builder = { path = "../distro/builder" }
+install-split-pane = { path = "../distro/builder/install-split-pane" }
 recinit = { path = "../tools/recinit" }
 which = "7"
 regex = "1"

@@ -1,0 +1,232 @@
+//! `check tui`: the checks that tell whether the terminal apps work.
+//!
+//! For every TUI package: typecheck, lint and format check. For every app: it must
+//! draw at a full console size without crashing; install-docs must also draw at the
+//! size the install screen's docs pane really has; snapshots under an app's
+//! `snapshots/<columns>x<rows>/<page>.txt` must match; and each app's declared walk
+//! (keys typed in turn, text each screen must show) must hold.
+
+use anyhow::{Context, Result, bail};
+use regex::Regex;
+use std::fs;
+use std::path::Path;
+use std::process::Command;
+use std::time::Duration;
+
+use super::inspect::{CaptureError, Launch, Shot, Size, Wait};
+use crate::util::pty_capture::parse_keys;
+use distro_contract::tui_apps::{self, TuiApp};
+
+/// Console sizes the install screen runs on: VGA text mode and a 1024x768 framebuffer.
+const CONSOLES: &[(u16, u16)] = &[(80, 25), (128, 48)];
+/// A roomy terminal, as a developer runs the apps.
+const FULL: Size = Size {
+    columns: 120,
+    rows: 36,
+};
+const WAIT: Wait = Wait {
+    settle: Duration::from_millis(500),
+    timeout: Duration::from_secs(30),
+};
+/// Screens that mean the app is broken even though it is still running.
+const BROKEN: &[&str] = &["Unhandled TUI error", "Terminal too small", "Invalid hook call"];
+/// The app shown in the install screen's docs pane.
+const DOCS_PANE_APP: &str = "install-docs";
+
+pub fn run(bless: bool) -> Result<()> {
+    let root = crate::util::repo::repo_root()?;
+    crate::tasks::check::install_js_workspace(&root)?;
+    let mut failed = Vec::new();
+    let mut step = |name: String, result: Result<()>| match result {
+        Ok(()) => eprintln!("[ok]   {name}"),
+        Err(e) => {
+            eprintln!("[FAIL] {name}: {e:#}");
+            failed.push(name);
+        }
+    };
+
+    for dir in tui_apps::tui_packages(&root)? {
+        let name = dir.strip_prefix(&root).unwrap_or(&dir).display().to_string();
+        for script in ["typecheck", "lint", "format:check"] {
+            step(format!("{script} {name}"), bun_run(&dir, script));
+        }
+    }
+
+    for app in tui_apps::discover(&root)? {
+        let name = app.name.clone();
+        let launch = match Launch::prepare(&root, app) {
+            Ok(launch) => launch,
+            Err(e) => {
+                step(format!("prepare {name}"), Err(e));
+                continue;
+            }
+        };
+        step(format!("render {name} {}x{}", FULL.columns, FULL.rows), render(&launch, &[], FULL));
+        if name == DOCS_PANE_APP {
+            for &(columns, rows) in CONSOLES {
+                let (pane_columns, pane_rows) =
+                    install_split_pane::docs_pane_size(columns, rows);
+                let size = Size {
+                    columns: pane_columns,
+                    rows: pane_rows,
+                };
+                step(
+                    format!("render {name} in the docs pane of a {columns}x{rows} console ({pane_columns}x{pane_rows})"),
+                    render(&launch, &[], size),
+                );
+            }
+        }
+        if !launch.app.inspect.walk.is_empty() {
+            step(format!("walk {name}"), walk(&launch));
+        }
+        let snapshots = launch.app.dir.join("snapshots");
+        if snapshots.is_dir() {
+            step(format!("snapshots {name}"), compare_snapshots(&launch, &snapshots, bless));
+        }
+    }
+
+    if !failed.is_empty() {
+        bail!("{} check(s) failed: {}", failed.len(), failed.join(", "));
+    }
+    Ok(())
+}
+
+fn bun_run(dir: &Path, script: &str) -> Result<()> {
+    let output = Command::new("bun")
+        .current_dir(dir)
+        .args(["run", script])
+        .output()
+        .with_context(|| format!("running bun run {script}"))?;
+    if !output.status.success() {
+        let mut text = String::from_utf8_lossy(&output.stdout).into_owned();
+        text.push_str(&String::from_utf8_lossy(&output.stderr));
+        let tail: Vec<&str> = text.lines().rev().take(20).collect();
+        bail!("{}", tail.into_iter().rev().collect::<Vec<_>>().join("\n"));
+    }
+    Ok(())
+}
+
+fn render(launch: &Launch, args: &[String], size: Size) -> Result<()> {
+    let shot = launch.capture(args, &[], size, WAIT).map_err(capture_error)?;
+    healthy(&shot)
+}
+
+fn healthy(shot: &Shot) -> Result<()> {
+    if let Some(marker) = BROKEN.iter().find(|marker| shot.plain.contains(*marker)) {
+        bail!("the screen shows '{marker}':\n{}", shot.plain);
+    }
+    Ok(())
+}
+
+fn capture_error(error: CaptureError) -> anyhow::Error {
+    match error.shot {
+        Some(shot) => anyhow::anyhow!("{}\nscreen:\n{}", error.message, shot.plain),
+        None => anyhow::anyhow!(error.message),
+    }
+}
+
+fn walk(launch: &Launch) -> Result<()> {
+    let mut keys = Vec::new();
+    for (index, step) in launch.app.inspect.walk.iter().enumerate() {
+        keys.extend(parse_keys(&step.keys)?);
+        let shot = launch.capture(&[], &keys, FULL, WAIT).map_err(capture_error)?;
+        healthy(&shot)?;
+        if !shot.plain.contains(&step.expect) {
+            bail!(
+                "step {} (keys so far '{}'): expected '{}' on screen:\n{}",
+                index + 1,
+                launch.app.inspect.walk[..=index]
+                    .iter()
+                    .map(|s| s.keys.as_str())
+                    .collect::<String>(),
+                step.expect,
+                shot.plain
+            );
+        }
+    }
+    Ok(())
+}
+
+/// `snapshots/<columns>x<rows>/<page>.txt`: render each page at that size and compare.
+fn compare_snapshots(launch: &Launch, dir: &Path, bless: bool) -> Result<()> {
+    let masks = launch
+        .app
+        .inspect
+        .mask
+        .iter()
+        .map(|pattern| Regex::new(pattern).with_context(|| format!("mask '{pattern}'")))
+        .collect::<Result<Vec<_>>>()?;
+    let mask = |text: &str| {
+        masks
+            .iter()
+            .fold(text.to_string(), |text, re| re.replace_all(&text, "<masked>").into_owned())
+    };
+    let page_arg = page_arg(&launch.app)?;
+    let mut mismatches = Vec::new();
+    let mut sizes: Vec<_> = fs::read_dir(dir)?.collect::<std::io::Result<_>>()?;
+    sizes.sort_by_key(|entry| entry.file_name());
+    for size_dir in sizes {
+        let size_name = size_dir.file_name().to_string_lossy().into_owned();
+        let size = parse_size(&size_name)
+            .with_context(|| format!("snapshot directory '{size_name}' is not <columns>x<rows>"))?;
+        let mut pages: Vec<_> = fs::read_dir(size_dir.path())?.collect::<std::io::Result<_>>()?;
+        pages.sort_by_key(|entry| entry.file_name());
+        for page_file in pages {
+            let path = page_file.path();
+            let Some(page) = path.file_stem().and_then(|s| s.to_str()).map(str::to_string) else {
+                continue;
+            };
+            let args = vec![page_arg.clone(), page.clone()];
+            let shot = launch.capture(&args, &[], size, WAIT).map_err(capture_error)?;
+            let actual = format!("{}\n", mask(&shot.plain));
+            if bless {
+                fs::write(&path, &actual)?;
+                continue;
+            }
+            let expected = fs::read_to_string(&path)?;
+            if expected != actual {
+                mismatches.push(format!(
+                    "{size_name}/{page}.txt:\n{}",
+                    line_diff(&expected, &actual)
+                ));
+            }
+        }
+    }
+    if !mismatches.is_empty() {
+        bail!(
+            "{} snapshot(s) differ (rerun with --bless to accept):\n{}",
+            mismatches.len(),
+            mismatches.join("\n")
+        );
+    }
+    Ok(())
+}
+
+fn page_arg(app: &TuiApp) -> Result<String> {
+    app.inspect
+        .pages
+        .as_ref()
+        .map(|pages| pages.arg.clone())
+        .with_context(|| format!("{} has snapshots but declares no inspect.pages", app.name))
+}
+
+fn parse_size(name: &str) -> Option<Size> {
+    let (columns, rows) = name.split_once('x')?;
+    Some(Size {
+        columns: columns.parse().ok()?,
+        rows: rows.parse().ok()?,
+    })
+}
+
+/// The lines that differ, as `-expected` / `+actual` pairs.
+fn line_diff(expected: &str, actual: &str) -> String {
+    let (e, a): (Vec<&str>, Vec<&str>) = (expected.lines().collect(), actual.lines().collect());
+    let mut out = String::new();
+    for i in 0..e.len().max(a.len()) {
+        let (x, y) = (e.get(i).copied(), a.get(i).copied());
+        if x != y {
+            out.push_str(&format!("  line {}:\n  -{}\n  +{}\n", i + 1, x.unwrap_or(""), y.unwrap_or("")));
+        }
+    }
+    out
+}

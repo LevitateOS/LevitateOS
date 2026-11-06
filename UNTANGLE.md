@@ -1173,7 +1173,11 @@ Commits land on the checked-out branches (superproject `master`, submodules `cod
   - **Bug fixed:** `--input` keys never reached the app; `cargo xtask inspect disk-plan --input jj` now lands on mode-selection.
   - Verified: all 35 docs pages render byte-identical to the baseline rerun.
   - Deferred to F20: `pty_capture` still forces TERM/COLORTERM/FORCE_COLOR like the split pane (X008's copied env), and `tui` still forces `FORCE_COLOR=3` (A016).
-- [ ] F4 — Checks that fail on real bugs: `cargo xtask check tui`.
+- [x] F4 — Checks that fail on real bugs. builder `a717466` (`install-split-pane` exposes its screen layout as a library), contract `6362aed` (manifest `inspect.mask`, `inspect.walk`), tui `5c45ef5`, superproject commit "Checks that fail on real bugs…". `cargo xtask check tui` runs typecheck/lint/format-check for every TUI package, renders every app at 120x36, renders install-docs at the docs-pane size of an 80x25 and a 128x48 console (38x22, 62x45, from the split pane's own layout), compares `snapshots/<cols>x<rows>/<page>.txt` (masks from the manifest, `--bless` to accept, diff printed), and runs each app's declared key walk. The bun PTY test, `verify-inspect-snapshots.sh` and the `inspect:check`/`test:e2e` scripts are deleted.
+  - **Bug fixed early (D073):** the split pane sized each child's PTY from the full terminal while drawing it one row shorter; both now come from one layout.
+  - Verified: the walk reaches disk-plan's preflight page; editing a snapshot fails the check with a diff; recab's old crash text and "Terminal too small" are failure markers.
+  - Expected failures until F9: both docs-pane renders ("Terminal too small: got 38x22, need 88x24").
+  - Not done here: disk-plan's walk drives the host's real `recpart` read-only (list/plan/dry-run; the shim refuses `apply --confirm`), so it stops at preflight on a host whose disk is mounted and can't cover the apply outcomes; a recorded recpart fixture belongs with F15. recab-tui renders against the host's real `recab` (exit 21 off an A/B system) rather than a fixture.
 - [ ] F5 — Delete the kit surface no app uses.
 - [ ] F6 — One colour pipeline from theme intent to Ink.
 - [ ] F7 — Keymap as data, with one dispatcher and focus scopes.

@@ -1178,6 +1178,7 @@ dependencies = [
  "clap",
  "distro-builder",
  "distro-contract",
+ "install-split-pane",
  "install-tests",
  "libc",
  "portable-pty",

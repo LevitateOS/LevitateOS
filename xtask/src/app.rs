@@ -1,6 +1,6 @@
 use anyhow::Result;
 
-use crate::cli::{BaseCmd, Cmd};
+use crate::cli::{BaseCmd, CheckCmd, Cmd};
 
 pub fn run(cli: crate::cli::Cli) -> Result<()> {
     match cli.cmd {
@@ -14,7 +14,10 @@ pub fn run(cli: crate::cli::Cli) -> Result<()> {
         Cmd::Status { distro, json } => crate::tasks::scenarios::status(distro, json),
         Cmd::Reset { distro } => crate::tasks::scenarios::reset(distro),
         Cmd::Gen { check } => crate::tasks::generate::run(check),
-        Cmd::Check => crate::tasks::check::run(),
+        Cmd::Check { what: None } => crate::tasks::check::run(),
+        Cmd::Check {
+            what: Some(CheckCmd::Tui { bless }),
+        } => crate::tasks::tui::check::run(bless),
         Cmd::Tui { app, args } => crate::tasks::tui::run(app, args),
         Cmd::Inspect(args) => crate::tasks::tui::inspect::run(crate::tasks::tui::inspect::Options {
             app: args.app,
