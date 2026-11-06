@@ -1,6 +1,6 @@
-From 14866b1de07bc8474557396c09f74275e8fb6bf5 Mon Sep 17 00:00:00 2001
+From 38f7ee402611f9023b4173eff5dc5d64b7d68375 Mon Sep 17 00:00:00 2001
 From: vince <vincepaul.liem@gmail.com>
-Date: Fri, 6 Nov 2026 13:01:02 +0100
+Date: Fri, 6 Nov 2026 23:27:25 +0100
 Subject: [PATCH] feat(launch): execute pinned owned ELF files through private
  backing
 
@@ -31,7 +31,7 @@ Signed-off-by: vince <vincepaul.liem@gmail.com>
  create mode 100644 tests/fixtures/launch-owned-exec-fixture.c
 
 diff --git a/.github/workflows/check.yml b/.github/workflows/check.yml
-index acc81abe..83f16959 100644
+index acc81abea24d1fd9c507339a30475efe5cfcadc0..83f169596dc5605c0c33250f4da0c06625c577dc 100644
 --- a/.github/workflows/check.yml
 +++ b/.github/workflows/check.yml
 @@ -24,7 +24,7 @@ jobs:
@@ -49,10 +49,10 @@ index acc81abe..83f16959 100644
        - run: sudo make test-gate1-setup
 +      - run: sudo make test-launch-owned-exec
 diff --git a/Makefile b/Makefile
-index 15c55879..f29b73ff 100644
+index 159c48acf87de5e7beff5c84eb64dadcf603e7d4..c9c57e7bf04b585bf4a8537844417ba9826adf8f 100644
 --- a/Makefile
 +++ b/Makefile
-@@ -251,3 +251,11 @@ build-launch-directory-fixture:
+@@ -293,3 +293,11 @@ build-launch-directory-fixture:
  
  test-launch-directories:
  	python3 scripts/test-launch-directories.py $(GINUX) .artifacts/launch/launch-directory-fixture
@@ -65,10 +65,10 @@ index 15c55879..f29b73ff 100644
 +test-launch-owned-exec:
 +	python3 scripts/test-launch-owned-exec.py $(GINUX) .artifacts/launch/launch-owned-exec-fixture
 diff --git a/README.md b/README.md
-index a3982c7c..28d22c77 100644
+index 94e0eabd1b6e9c1caa00b608c6377ead16719cf2..a5d689fd4422d85d8e89731321d66e94a2e32361 100644
 --- a/README.md
 +++ b/README.md
-@@ -242,7 +242,7 @@ Relative AT_FDCWD paths follow the calling process's image cwd; owned directory
+@@ -319,7 +319,7 @@ Relative AT_FDCWD paths follow the calling process's image cwd; owned directory
  FDs resolve relative operations through their current VFS identity. Image chdir,
  getcwd and relative image exec retain native per-process cwd semantics. Entering
  owned directories as cwd, relative image-directory FD access, owned symlinks,
@@ -77,7 +77,7 @@ index a3982c7c..28d22c77 100644
  Component-wise image-link traversal preserves assignment
  precedence, missing components and non-directory errors. Native image operations
  use a temporary canonical path below the stopped workload's stack; an unavailable
-@@ -278,6 +278,21 @@ Guest-memory copies respect page protections, including partial read copyout.
+@@ -355,6 +355,21 @@ Guest-memory copies respect page protections, including partial read copyout.
  No writable host descriptor is exposed. Data disappears at domain teardown;
  there is no retention, export, storage generation or separate storage-quota setting.
  
@@ -100,7 +100,7 @@ index a3982c7c..28d22c77 100644
  image entries beneath it are hidden. `[devices].assignments = ["null"]` exposes
  `/dev/null` through the existing device registry: reads return EOF and writes
 diff --git a/crates/ginux-init/src/descriptors.rs b/crates/ginux-init/src/descriptors.rs
-index 17dc0bb1..889d3b8a 100644
+index 17dc0bb1a48ef2ca3ce8c78b804d772bb4d7fc74..889d3b8a9178e8f35bfaaf2d98ffdba53a555e6a 100644
 --- a/crates/ginux-init/src/descriptors.rs
 +++ b/crates/ginux-init/src/descriptors.rs
 @@ -10,6 +10,10 @@ use crate::tracee_io::{copy_memory, read_path};
@@ -137,7 +137,7 @@ index 17dc0bb1..889d3b8a 100644
      pub fn exec_completed(&mut self, backends: &mut Backends) -> Result<(), &'static [u8]> {
 diff --git a/crates/ginux-init/src/exec_image.rs b/crates/ginux-init/src/exec_image.rs
 new file mode 100644
-index 00000000..63ae9dd6
+index 0000000000000000000000000000000000000000..63ae9dd62a8445af08d0f7da5f22666022e6095a
 --- /dev/null
 +++ b/crates/ginux-init/src/exec_image.rs
 @@ -0,0 +1,97 @@
@@ -239,7 +239,7 @@ index 00000000..63ae9dd6
 +    }
 +}
 diff --git a/crates/ginux-init/src/fs_hooks.rs b/crates/ginux-init/src/fs_hooks.rs
-index 6dd53976..31be412c 100644
+index 6dd539766015fa35aaf31a1a005e76b7baa29fa5..31be412c8c8440f1acde92458a3856283398cf00 100644
 --- a/crates/ginux-init/src/fs_hooks.rs
 +++ b/crates/ginux-init/src/fs_hooks.rs
 @@ -1,6 +1,7 @@
@@ -404,7 +404,7 @@ index 6dd53976..31be412c 100644
          VfsError::PermissionDenied => -13,
          VfsError::InvalidDescriptor => -9,
 diff --git a/crates/ginux-init/src/launch_tasks.rs b/crates/ginux-init/src/launch_tasks.rs
-index c9c494b2..305f52a7 100644
+index c9c494b2c5e6c13219b19dc8dd380266db780a0f..305f52a724fe306a96288b6a3e3764aabac7ebd3 100644
 --- a/crates/ginux-init/src/launch_tasks.rs
 +++ b/crates/ginux-init/src/launch_tasks.rs
 @@ -1,7 +1,7 @@
@@ -932,10 +932,10 @@ index c9c494b2..305f52a7 100644
              if let Err(reason) = task.descriptors.release_exited(&mut self.objects) {
                  supervision_error(domain, reason)
 diff --git a/crates/ginux-init/src/main.rs b/crates/ginux-init/src/main.rs
-index d9f42132..7f1ac1b0 100644
+index 11a362c75010a6bb08de102c12c1fc6dfc349db8..5b0344c05d9213d0c8c41ed1d9b0581d882f6893 100644
 --- a/crates/ginux-init/src/main.rs
 +++ b/crates/ginux-init/src/main.rs
-@@ -12,6 +12,7 @@ mod channel_hooks;
+@@ -14,6 +14,7 @@ mod channel_hooks;
  mod descriptors;
  mod device_hooks;
  mod dispatch;
@@ -944,7 +944,7 @@ index d9f42132..7f1ac1b0 100644
  mod launch;
  mod launch_tasks;
 diff --git a/crates/ginux-init/src/path_hooks.rs b/crates/ginux-init/src/path_hooks.rs
-index fefa7ff0..49e7ec27 100644
+index fefa7ff096b54339654e66e9ce170a753a15c0c1..49e7ec2751eb1ee172298e0dc683f6012432fed4 100644
 --- a/crates/ginux-init/src/path_hooks.rs
 +++ b/crates/ginux-init/src/path_hooks.rs
 @@ -188,91 +188,96 @@ impl Drop for ImageRoot {
@@ -1121,7 +1121,7 @@ index fefa7ff0..49e7ec27 100644
  
      fn read(&self, offset: u64, output: &mut [u8]) -> Result<usize, i64> {
 diff --git a/crates/ginux-init/src/tracee_io.rs b/crates/ginux-init/src/tracee_io.rs
-index 548cc955..81f392c6 100644
+index 548cc9557a0e4d92e6984d9edba07e6b4c8c1890..81f392c6666d70f083b810d714917b4f7c075487 100644
 --- a/crates/ginux-init/src/tracee_io.rs
 +++ b/crates/ginux-init/src/tracee_io.rs
 @@ -62,6 +62,10 @@ pub fn read_path(pid: usize, address: u64) -> Result<Path, i64> {
@@ -1145,7 +1145,7 @@ index 548cc955..81f392c6 100644
          &cwd[..cwd_len]
      } else {
 diff --git a/crates/ginux-vfs/src/lib.rs b/crates/ginux-vfs/src/lib.rs
-index f1ffb93d..0ec4b0e0 100644
+index aebe1d153bdfd6ab36843b4f8577e6b343f2cd5b..7c5e350534105b03eeb7bb5f58d3babd16c251b1 100644
 --- a/crates/ginux-vfs/src/lib.rs
 +++ b/crates/ginux-vfs/src/lib.rs
 @@ -31,6 +31,7 @@ pub enum VfsError {
@@ -1368,7 +1368,7 @@ index f1ffb93d..0ec4b0e0 100644
              _ => self.allocate_overlay()?,
          };
          self.storage.clear(index);
-@@ -2288,4 +2427,89 @@ mod tests {
+@@ -2357,4 +2496,89 @@ mod tests {
          fs.remove_directory(b"/work/empty/").unwrap();
          assert_eq!(fs.metadata(b"/work/empty"), Err(VfsError::NotFound));
      }
@@ -1460,7 +1460,7 @@ index f1ffb93d..0ec4b0e0 100644
  }
 diff --git a/scripts/test-launch-owned-exec.py b/scripts/test-launch-owned-exec.py
 new file mode 100644
-index 00000000..7661b9a2
+index 0000000000000000000000000000000000000000..7661b9a22651b15ede02219204f73224f9d3e6bd
 --- /dev/null
 +++ b/scripts/test-launch-owned-exec.py
 @@ -0,0 +1,99 @@
@@ -1564,7 +1564,7 @@ index 00000000..7661b9a2
 +if __name__ == '__main__':
 +    main()
 diff --git a/tests/fixtures/launch-exec-fixture.c b/tests/fixtures/launch-exec-fixture.c
-index 61563a90..c30c3dd3 100644
+index 61563a90be075f7b6664803f44cda45069b6f78d..c30c3dd36f7a06d93d64bb45a62ee8fa51bec5db 100644
 --- a/tests/fixtures/launch-exec-fixture.c
 +++ b/tests/fixtures/launch-exec-fixture.c
 @@ -20,11 +20,23 @@ static int intact(void)
@@ -1614,7 +1614,7 @@ index 61563a90..c30c3dd3 100644
          long child=DO(57,0,0,0);
 diff --git a/tests/fixtures/launch-owned-exec-fixture.c b/tests/fixtures/launch-owned-exec-fixture.c
 new file mode 100644
-index 00000000..33b455e6
+index 0000000000000000000000000000000000000000..33b455e634b00c1eabfb2c42f5d48012e4030f51
 --- /dev/null
 +++ b/tests/fixtures/launch-owned-exec-fixture.c
 @@ -0,0 +1,171 @@

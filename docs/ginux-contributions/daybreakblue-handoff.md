@@ -843,3 +843,19 @@ automatic approval rejection of view-probes remains respected; no such run was
 retried or routed around. Default tests/CI remain enabled and unrun where they
 contain these checks. G07 is still unready and excluded. Keep security acceptance
 pending; no DaybreakBlue agent was dispatched.
+
+
+## Refreshed G10 security revision — 2026-11-06
+
+G10 is now `38f7ee402611f9023b4173eff5dc5d64b7d68375` on refreshed G09d
+`ab47378f657b8d13d72077009107d223ba04d3a3`, still based on observed main8a475e8b.
+[Current review](g10-review.md) records100 units and59 ordinary controls per
+source/clean. Shared/indirect kernel-argument capture remains unresolved and
+blocking for publication, including injected exec setup. Malformed ELF/interpreter
+authority, private descriptor/seal visibility and rollback, protected-memory and
+virtual executable-name/readlink runtime checks remain unrun. The full native
+exec fixture also has unconditional readlink/protected-pointer probes; local
+inherited ordinary checks use the exact earlier G09d image program instead,
+without altering that contributed fixture or CI. Reconcile upstream PR#231's
+new contract/audit owner before assigning acceptance to a final revision. No
+DaybreakBlue agent was dispatched and no security pass is claimed.

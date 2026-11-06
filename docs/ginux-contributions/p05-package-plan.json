@@ -522,11 +522,11 @@
       ],
       "acceptance": "Valid ELF executes from owned backing, malformed input fails, executable identity is virtual, pins release at death and no host-path reopening occurs.",
       "planned_delivery": "one coherent change plus its generic docs and focused regression fixtures; split coupled responsibilities only as recorded by P04",
-      "status": "source separately self-reviewed; static/unit/build and selected ordinary runtime checks pass in source/clean replay; security-held and full CI/current-main independence pending",
-      "artifact_directory": ".artifacts/ginux-contribution-preparation/G10",
-      "base": "85b53fe15a64041f451ec7e7aa1e77d08cb2c18a",
-      "head": "14866b1de07bc8474557396c09f74275e8fb6bf5",
-      "tree": "6fe2f90d36faa7c50143004505d283bab176ad90",
+      "status": "observed8a475e8b local-prerequisite source reviewed; all 100 units/static/build and 59 ordinary controls pass in source/clean; security/shared kernel arguments/full CI/actual upstream prerequisites remain pending",
+      "artifact_directory": ".artifacts/ginux-contribution-preparation/upstream-refresh-2026-11-06/G10",
+      "base": "ab47378f657b8d13d72077009107d223ba04d3a3",
+      "head": "38f7ee402611f9023b4173eff5dc5d64b7d68375",
+      "tree": "43cf4b65274a94d510e594a6e0b3937ac5c885aa",
       "standalone": false,
       "changed_files": [
         ".github/workflows/check.yml",
@@ -544,10 +544,10 @@
         "tests/fixtures/launch-exec-fixture.c",
         "tests/fixtures/launch-owned-exec-fixture.c"
       ],
-      "patch_sha256": "5d431da7baae926e97311db39ea7508dafe341b333115407a905c67ac49e0f1b",
+      "patch_sha256": "47401ee6f88e14b3268051c481d4ad7b06eab3b1438694b355337b4c6e569f48",
       "security_handoff": "daybreakblue-handoff.md",
-      "unit_tests": 91,
-      "vfs_tests": 33,
+      "unit_tests": 100,
+      "vfs_tests": 34,
       "clean_matched_paths": 174,
       "review": "separate self-review; no independent reviewer/security coverage claimed",
       "remote_ci": "not run",
@@ -555,7 +555,9 @@
       "source_binary_sha256": "fe88112af7cbaf39d729315a80eb66b5a930af58ef188f1f1704145829be7c97",
       "clean_binary_sha256": "fe88112af7cbaf39d729315a80eb66b5a930af58ef188f1f1704145829be7c97",
       "evidence": "g10-review.md",
-      "source_patch": "patches/G10.patch"
+      "source_patch": "patches/G10.patch",
+      "previous_head": "14866b1de07bc8474557396c09f74275e8fb6bf5",
+      "latest_main_acceptance": "pending PR231 contract/audit reconciliation"
     },
     {
       "packet": "G11",
@@ -1878,5 +1880,7 @@
       "artifact_directory": ".artifacts/ginux-contribution-preparation/G08b",
       "acceptance": "Original G08 criteria remain; see g08b-review.md for minimal per-process scope and pending joins"
     }
-  ]
+  ],
+  "latest_observed_upstream_main": "ff926d0c228b71d55d0f2f0909dd86ec62197c8a",
+  "latest_upstream_reconciliation": "pending; inspect PR231 contract/audit owner before continuing G11; previous thirteen reviewed preparations were based on8a475e8b"
 }

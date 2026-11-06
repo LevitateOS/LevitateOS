@@ -86,3 +86,45 @@ reproduction helpers, logs and baseline/review failures are retained under
 No real Ginux branch, checkout/index, upstream/fork remote, human PR text or
 maintainer communication changed. Source and review material remain local;
 F04 user inspection precedes any publication.
+
+## Observed-main refresh — 2026-11-06
+
+Refreshed head `38f7ee402611f9023b4173eff5dc5d64b7d68375`, tree
+`43cf4b65274a94d510e594a6e0b3937ac5c885aa`, on refreshed G09d
+`ab47378f657b8d13d72077009107d223ba04d3a3`, incorporates observed main
+`8a475e8b2318425fd2fc15246a5c6f4bca6caf86`. All added/removed lines match
+the corrected historical delta; scope remains fourteen files,+1165/-131.
+A separate self-review reread the entire diff, executable pins/whiteout reuse,
+interpreter parser/namespace joins, native/public descriptors, exec states,
+fork/death/rollback and cleanup owners. Core, native supervisor, process-table
+and domain source remain byte-identical to the prerequisite. All prior VFS
+coverage, including the new chunk-copy test, remains. Independent reviewer
+coverage is not claimed.
+
+Source and strict clean replay pass the Makefile's check/test-unit/build and all
+applicable fixture builds:100 units,34 VFS tests. Each export passes59 ordinary
+controls:49 inherited controls, four directory/cwd launches and six explicit
+owned ELF modes. Exact G09d fails the identical ordinary-path fixture at
+workload exit128. The83,288-byte program reads its64 KiB initialized data after
+loading, preserves public descriptors on missing-file failure, commits CLOEXEC
+retirement on successful replacement and releases its executable pin on image
+reexec. All211 tracked paths match the head and both binaries have SHA256
+`238cfb94f1c73eac57258309347dfccf15c8756836477c18160a3a92c3aa14fa`.
+
+G10's native-exec fixture now unconditionally performs protected-pointer and
+readlink probes. The inherited ordinary task/exec helper therefore uses unchanged
+G09d image-fixture bytes (SHA256
+`6ca9887c748ca9ead4c70f2a4c597cd8f725eeda0edeb462b33fc709aea4bb6b`),
+recorded per invocation, instead of running those probes. The contributed full
+fixture/CI remain untouched and pending. Exact logs, receipts, patch, local draft
+and manifests are in
+`.artifacts/ginux-contribution-preparation/upstream-refresh-2026-11-06/G10/`.
+
+A fresh upstream check then found main advanced to
+`ff926d0c228b71d55d0f2f0909dd86ec62197c8a` via PR#231, adding configurable
+contracts/audit. The results above are exact8a475e8b-composition evidence, not
+latest-main acceptance. Reconcile this new upstream owner before proceeding to
+G11. Shared kernel-argument capture, malformed input, seal/private-FD/readlink/
+protected runtime, full CI/macOS, actual upstream prerequisite merges and final
+standalone delivery remain pending. No security agent was dispatched, branch
+created, remote text edited or PR opened.

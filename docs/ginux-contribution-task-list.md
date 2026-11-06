@@ -783,8 +783,9 @@ Earlier P02/P03 and candidate results remain historical records; current-main
 reconciliation is required before final closure.
 
 Exact next action: refresh R04's current-main prerequisite serially, continuing
-with G10's owned ELF execution on refreshed G09d. G09c/G09d's required
-enum/runtime errno join remains paired in the proposed directory feature. G07's preserved
+with upstream PR#231 contract/audit reconciliation against newly observed
+main `ff926d0c228b71d55d0f2f0909dd86ec62197c8a`, before G11 or any final
+current-main claim. Preserve the completed8a475e8b-composition evidence. G07's preserved
 unready snapshot still needs DaybreakBlue correction/validation; do not import it. Local dependent
 preparation stays blocked for standalone delivery until its prerequisites
 actually merge upstream.
@@ -869,10 +870,17 @@ security/full CI and actual upstream prerequisites pending. G09d is refreshed at
 all208 paths and both binaries match. The identical fixture fails on exact
 G09b at exits12/94. Its eleven-file +582/-53 delta is unchanged, including the
 enum/runtime join. [Review](ginux-contributions/g09d-review.md) and the downstream
-security handoff retain security/view-probes/full CI/actual-upstream holds. The refreshed
+security handoff retain security/view-probes/full CI/actual-upstream holds. G10 is
+refreshed at `38f7ee402611f9023b4173eff5dc5d64b7d68375` on G09d: all100 units/
+static/build and59 ordinary controls pass per source/clean, all211 paths and both
+binaries match, and exact G09d rejects the same valid owned ELF at exit128.
+[Review](ginux-contributions/g10-review.md) records its unchanged fourteen-file
++1165/-131 delta and all security/shared-argument/full CI/upstream holds. The refreshed
 `upstream-refresh-2026-11-06/current-inventory.json` records each currently retained
-patch/head and exact-parent replay. Twelve packets now have current-main source/
-ordinary preparation; the other 25 still need current-main reconciliation;
+patch/head and exact-parent replay. Thirteen packets have source/ordinary preparation against the earlier observed
+8a475e8b base; the other24 have not yet reached that base. Newly observed main
+ff926d0c requires reconciliation of all retained packets before latest-main
+acceptance;
 integrity is not source/runtime acceptance. The fresh preserved-worktree report
 also confirms all six restored HEAD, raw-index and staged/unstaged/conflict-status
 fingerprints are unchanged. Reconcile the
@@ -888,3 +896,19 @@ Active skill: `hdae-development`, discovered at
 Reload it and its required references after a context shift; then read applicable
 instructions and this checkpoint. Direct user scope and the superproject's
 proportional-process instructions prevail; this plan adds no automated framework.
+
+
+### New upstream contract owner — 2026-11-06
+
+A read-only GitHub recheck found upstream main
+`ff926d0c228b71d55d0f2f0909dd86ec62197c8a` ([PR#231](https://github.com/gmkurtzer/ginux/pull/231)),
+eight commits after8a475e8b, with a new ginux-contract catalog, normalized domain
+contract profiles, semantic-family enforcement and bounded audit evidence. Ginux
+leads; Recipe and the proposed contributions must follow this owner. Do not keep
+a downstream parallel contract or describe the8a475e8b refresh as latest-main
+acceptance. The main checkout's Ginux pin is still
+`2eac10bf8c9e7a7e72e1ae94990aa2425b2f3ba0`; it was inspected, not changed.
+Exact next action: inspect the complete upstream delta and current configured
+launch/contract callers in a separate source export, then reconcile candidates
+serially in dependency order. Preserve all prior exact-revision results and
+restored worktrees. No branch/ref rewrite or publication is authorized.
