@@ -1,0 +1,799 @@
+From a36e76441b5a7c1a30b3461c9537bb3c6aee9d8e Mon Sep 17 00:00:00 2001
+From: vince <vincepaul.liem@gmail.com>
+Date: Fri, 6 Nov 2026 15:29:04 +0100
+Subject: [PATCH] feat(launch): flush owned files and export after quiesced
+ success
+
+Flush supervisor backing for fsync and fdatasync. After successful root
+exit, settle remaining tasks and capture live regular files and directories.
+Stage beside the requested host destination and publish a complete, synced,
+closed archive without overwrite. Cancel staging on failed workloads.
+
+Signed-off-by: vince <vincepaul.liem@gmail.com>
+---
+ README.md                               |  14 ++
+ crates/ginux-init/src/fs_hooks.rs       |  25 +++
+ crates/ginux-init/src/launch.rs         |  55 +++--
+ crates/ginux-init/src/launch_tasks.rs   |  14 +-
+ crates/ginux-init/src/main.rs           |   5 +-
+ crates/ginux-init/src/storage_export.rs | 276 ++++++++++++++++++++++++
+ crates/ginux-init/src/storage_memory.rs |   8 +
+ crates/ginux-vfs/src/lib.rs             |  53 +++++
+ scripts/test-launch-storage.py          |  65 +++++-
+ tests/fixtures/launch-storage-fixture.c |  36 ++++
+ 10 files changed, 527 insertions(+), 24 deletions(-)
+ create mode 100644 crates/ginux-init/src/storage_export.rs
+
+diff --git a/README.md b/README.md
+index f451e894..0b9f7c8d 100644
+--- a/README.md
++++ b/README.md
+@@ -443,3 +443,17 @@ checks for syscall ABI dispatch, clone restrictions, descriptor inheritance,
+ thread reuse, successful and failed worker exec, signals, wait-status writes,
+ nonblocking waits, and vfork. The existing native fork fixture also runs. These
+ checks do not claim complete libc, job-control, or systemd compatibility.
++
++Configured launch accepts `--export-file <fresh tar path>` to retrieve owned
++regular files and directories after a successful workload exit. Remaining tasks
++are terminated and reaped before capture. Deleted names and immutable image files
++are excluded; file modes and long paths are preserved. Guest names are archive
++data and never select host destinations. The supervisor stages mode0600 output
++beside the destination, then publishes without overwrite only after complete
++write, sync and close. Failed workloads cancel staging. Export failures fail the
++launch; an existing destination is preserved. Abrupt supervisor death can leave a
++private staging file, which is never a published archive. Consumers must require
++both successful completion and a valid archive. This is final export, without
++retained storage, checkpoint/restore, symlink or hardlink archive support.
++Owned regular files support fsync/fdatasync against their supervisor backing;
++these calls do not imply persistence after the in-memory domain ends.
+diff --git a/crates/ginux-init/src/fs_hooks.rs b/crates/ginux-init/src/fs_hooks.rs
+index 2eaa5926..de6061f4 100644
+--- a/crates/ginux-init/src/fs_hooks.rs
++++ b/crates/ginux-init/src/fs_hooks.rs
+@@ -125,6 +125,21 @@ impl LaunchFs {
+         })
+     }
+ 
++    pub fn export(&self) -> Result<(), &'static [u8]> {
++        crate::storage_export::finish(|archive| {
++            for slot in 0..OBJECTS {
++                if let Some((path, metadata)) = self.fs.overlay_entry(slot) {
++                    archive.entry(path, metadata, |offset, buffer| {
++                        self.fs
++                            .read_overlay(slot, offset, buffer)
++                            .map_err(|_| b"export read failed".as_slice())
++                    })?;
++                }
++            }
++            Ok(())
++        })
++    }
++
+     pub fn teardown(&mut self) {
+         assert_eq!(
+             self.fs.executable_pins(),
+@@ -813,6 +828,16 @@ impl LaunchFs {
+                 .map(|n| n as i64)
+                 .map_err(errno),
+             91 => self.fs.fchmod(fd, r.rsi as u32).map(|_| 0).map_err(errno),
++            74 | 75 => self.fs.fstat(fd).map_err(errno).and_then(|metadata| {
++                if metadata.kind == NodeKind::Directory {
++                    return Ok(0);
++                }
++                let (storage, object) = self.fs.descriptor_storage(fd).map_err(errno)?;
++                storage
++                    .sync(object, r.orig_rax == 75)
++                    .map(|_| 0)
++                    .map_err(errno)
++            }),
+             77 if r.rsi as i64 >= 0 => self.fs.truncate(fd, r.rsi).map(|_| 0).map_err(errno),
+             77 => Err(-22),
+             217 => self.getdents(pid, fd, r.rsi, r.rdx),
+diff --git a/crates/ginux-init/src/launch.rs b/crates/ginux-init/src/launch.rs
+index 40f7837c..72e93c43 100644
+--- a/crates/ginux-init/src/launch.rs
++++ b/crates/ginux-init/src/launch.rs
+@@ -34,7 +34,7 @@ pub enum Command {
+     Devices(*const u8, *const u8),
+     DeviceBench(*const u8, *const u8, *const u8),
+     KernelViews(*const u8),
+-    Launch(*const u8, *const u8, *const u8),
++    Launch(*const u8, *const u8, *const u8, *const u8),
+     LaunchUsage,
+     Usage,
+ }
+@@ -104,17 +104,33 @@ pub fn parse_argv(argc: usize, argv: *const usize) -> Option<Command> {
+     } else if argc >= 4 && c_string_equals(command, b"launch") {
+         let config_path = unsafe { *argv.add(2) as *const u8 };
+         let root_path = unsafe { *argv.add(3) as *const u8 };
+-        if argc == 4 {
+-            Some(Command::Launch(config_path, root_path, core::ptr::null()))
+-        } else if argc == 6
+-            && c_string_equals(unsafe { *argv.add(4) as *const u8 }, b"--result-file")
+-            && unsafe { *(*argv.add(5) as *const u8) } != 0
+-        {
+-            let result_path = unsafe { *argv.add(5) as *const u8 };
+-            Some(Command::Launch(config_path, root_path, result_path))
+-        } else {
+-            Some(Command::LaunchUsage)
++        let mut result_path: *const u8 = core::ptr::null();
++        let mut export_path: *const u8 = core::ptr::null();
++        let mut i = 4;
++        while i < argc {
++            if i + 1 >= argc {
++                return Some(Command::LaunchUsage);
++            }
++            let option = unsafe { *argv.add(i) as *const u8 };
++            let value = unsafe { *argv.add(i + 1) as *const u8 };
++            if unsafe { *value } == 0 {
++                return Some(Command::LaunchUsage);
++            }
++            if c_string_equals(option, b"--result-file") && result_path.is_null() {
++                result_path = value;
++            } else if c_string_equals(option, b"--export-file") && export_path.is_null() {
++                export_path = value;
++            } else {
++                return Some(Command::LaunchUsage);
++            }
++            i += 2;
+         }
++        Some(Command::Launch(
++            config_path,
++            root_path,
++            result_path,
++            export_path,
++        ))
+     } else {
+         Some(Command::Usage)
+     }
+@@ -283,8 +299,15 @@ static mut LAUNCH_WORKDIR: [u8; 129] = [0; 129];
+ static mut LAUNCH_ARGV: [*const u8; 9] = [core::ptr::null(); 9];
+ static mut LAUNCH_ENVP: [*const u8; 9] = [core::ptr::null(); 9];
+ 
+-pub fn launch_main(config_path: *const u8, root_path: *const u8, result_path: *const u8) -> ! {
++pub fn launch_main(
++    config_path: *const u8,
++    root_path: *const u8,
++    result_path: *const u8,
++    export_path: *const u8,
++) -> ! {
+     stage_result_path(result_path);
++    crate::storage_export::prepare(export_path)
++        .unwrap_or_else(|reason| launch_startup_fail(reason));
+     let config = launch_load_config(config_path);
+     launch_validate(&config);
+     let mut devices = crate::device_hooks::LaunchDevices::prepare(&config)
+@@ -599,12 +622,12 @@ pub fn usage() -> ! {
+     line_stderr(b"ginux: usage: ginux devices <config> <block>");
+     line_stderr(b"ginux: usage: ginux device-bench <config> <block> <kind>");
+     line_stderr(b"ginux: usage: ginux vfs <config> <rootfs> <index>");
+-    line_stderr(b"ginux: usage: ginux launch <config> <root> [--result-file <fresh host path>]");
++    line_stderr(b"ginux: usage: ginux launch <config> <root> [--result-file <fresh host path>] [--export-file <fresh tar path>]");
+     exit_process(2)
+ }
+ 
+ pub fn launch_usage() -> ! {
+-    line_stderr(b"ginux: launch usage: launch <config> <root> [--result-file <fresh host path>]");
++    line_stderr(b"ginux: launch usage: launch <config> <root> [--result-file <fresh host path>] [--export-file <fresh tar path>]");
+     exit_process(2)
+ }
+ 
+@@ -707,6 +730,10 @@ fn push_bytes(buffer: &mut [u8], mut position: usize, bytes: &[u8]) -> usize {
+ }
+ 
+ fn write_completion_result(outcome: u8, has_code: bool, code: u64, has_signal: bool, signal: u64) {
++    if crate::storage_export::cancel().is_err() {
++        line_stderr(b"ginux: export staging cleanup failed");
++    }
++
+     let descriptor = unsafe { RESULT_FD };
+     if descriptor < 0 {
+         return;
+diff --git a/crates/ginux-init/src/launch_tasks.rs b/crates/ginux-init/src/launch_tasks.rs
+index 2ee9b69d..b8b389f9 100644
+--- a/crates/ginux-init/src/launch_tasks.rs
++++ b/crates/ginux-init/src/launch_tasks.rs
+@@ -214,7 +214,7 @@ pub fn supervise(
+         if exited(status) || signaled(status) {
+             s.died(index, status, domain);
+             if index == 0 {
+-                s.teardown(domain);
++                s.teardown(domain, status == 0);
+                 let normal = exited(status);
+                 let _ = domain.task_exited(normal);
+                 if normal {
+@@ -1500,7 +1500,7 @@ impl Supervisor<'_> {
+         audit_u64(self.task(index).id.pid as u64);
+         audit_write(b"\n");
+     }
+-    fn teardown(&mut self, domain: &mut Domain) {
++    fn teardown(&mut self, domain: &mut Domain, export: bool) {
+         self.tearing_down = true;
+         for t in self
+             .tasks
+@@ -1559,11 +1559,19 @@ impl Supervisor<'_> {
+         if self.objects.refs.active() != 0 || self.processes.active() != 0 {
+             supervision_error(domain, b"domain teardown retained owned state")
+         }
++        let exported = if export {
++            self.objects.filesystem.export()
++        } else {
++            crate::storage_export::cancel()
++        };
+         self.objects.filesystem.teardown();
++        if let Err(reason) = exported {
++            supervision_error(domain, reason);
++        }
+         line_stderr(b"ginux: teardown tasks=0 owned-handles=0");
+     }
+     fn fail(&mut self, domain: &mut Domain, reason: &[u8]) -> ! {
+-        self.teardown(domain);
++        self.teardown(domain, false);
+         supervision_error(domain, reason)
+     }
+ }
+diff --git a/crates/ginux-init/src/main.rs b/crates/ginux-init/src/main.rs
+index ab6e95e9..3f1879d2 100644
+--- a/crates/ginux-init/src/main.rs
++++ b/crates/ginux-init/src/main.rs
+@@ -20,6 +20,7 @@ mod launch;
+ mod launch_tasks;
+ mod path_hooks;
+ mod process_hooks;
++mod storage_export;
+ mod storage_memory;
+ mod supervisor;
+ mod tracee_io;
+@@ -203,8 +204,8 @@ extern "C" fn rust_main(initial_stack: *const usize) -> ! {
+             device_bench_main(config_path, block_path, kind)
+         }
+         Some(Command::KernelViews(config_path)) => kernel_views_main(config_path),
+-        Some(Command::Launch(config_path, root_path, result_path)) => {
+-            launch_main(config_path, root_path, result_path)
++        Some(Command::Launch(config_path, root_path, result_path, export_path)) => {
++            launch_main(config_path, root_path, result_path, export_path)
+         }
+         Some(Command::LaunchUsage) => launch_usage(),
+         Some(Command::Usage) => usage(),
+diff --git a/crates/ginux-init/src/storage_export.rs b/crates/ginux-init/src/storage_export.rs
+new file mode 100644
+index 00000000..2c06b62a
+--- /dev/null
++++ b/crates/ginux-init/src/storage_export.rs
+@@ -0,0 +1,276 @@
++//! Quiesced owned-file export. Stage privately beside the requested host path,
++//! then publish a complete, synced, closed archive without replacing a name.
++//! Guest names are archive data and never choose supervisor host destinations.
++use crate::supervisor::{syscall1, syscall3, syscall4, syscall5};
++use ginux_vfs::{FileMetadata, NodeKind};
++
++type Error = &'static [u8];
++const PATH_BYTES: usize = crate::launch::MAX_RESULT_PATH_LEN + 1;
++const AT_FDCWD: usize = (-100isize) as usize;
++struct Export {
++    fd: usize,
++    destination: [u8; PATH_BYTES],
++    temporary: [u8; PATH_BYTES],
++}
++static mut EXPORT: Option<Export> = None;
++
++impl Export {
++    fn remove(&self) -> Result<(), Error> {
++        if unsafe { syscall1(87, self.temporary.as_ptr() as usize) } == 0 {
++            Ok(())
++        } else {
++            Err(b"export staging cleanup failed")
++        }
++    }
++}
++
++fn take() -> Option<Export> {
++    unsafe { core::ptr::replace(core::ptr::addr_of_mut!(EXPORT), None) }
++}
++
++pub fn prepare(path: *const u8) -> Result<(), Error> {
++    if path.is_null() {
++        return Ok(());
++    }
++    let mut destination = [0; PATH_BYTES];
++    let mut length = 0;
++    while length < PATH_BYTES {
++        let byte = unsafe { core::ptr::read_volatile(path.add(length)) };
++        if byte == 0 {
++            break;
++        }
++        destination[length] = byte;
++        length += 1;
++    }
++    if length == 0 || length == PATH_BYTES {
++        return Err(b"export-file path length invalid");
++    }
++    let mut stat = [0u64; 18];
++    let existing = unsafe {
++        syscall4(
++            262,
++            AT_FDCWD,
++            destination.as_ptr() as usize,
++            stat.as_mut_ptr() as usize,
++            0x100,
++        )
++    };
++    if existing != -2 {
++        return Err(b"export-file path is not fresh or not creatable");
++    }
++    let parent = destination[..length]
++        .iter()
++        .rposition(|b| *b == b'/')
++        .map_or(0, |n| n + 1);
++    let pid = unsafe { syscall1(39, 0) };
++    if pid <= 0 {
++        return Err(b"export staging identity unavailable");
++    }
++    let mut digits = [0; 20];
++    let mut value = pid as usize;
++    let mut count = 0;
++    while value != 0 {
++        digits[count] = b'0' + (value % 10) as u8;
++        value /= 10;
++        count += 1;
++    }
++    let prefix = b".ginux-export-";
++    let end = parent
++        .checked_add(prefix.len())
++        .and_then(|n| n.checked_add(count))
++        .filter(|n| *n < PATH_BYTES)
++        .ok_or(b"export staging path exceeds bound".as_slice())?;
++    let mut temporary = [0; PATH_BYTES];
++    temporary[..parent].copy_from_slice(&destination[..parent]);
++    temporary[parent..parent + prefix.len()].copy_from_slice(prefix);
++    for (index, digit) in digits[..count].iter().rev().enumerate() {
++        temporary[parent + prefix.len() + index] = *digit;
++    }
++    if temporary[..end] == destination[..length] {
++        return Err(b"export staging name conflicts with destination");
++    }
++    // O_EXCL and mode0600 keep an incomplete archive private. A stale staging
++    // name fails explicitly; it is never overwritten or treated as output.
++    let opened = unsafe {
++        syscall4(
++            257,
++            AT_FDCWD,
++            temporary.as_ptr() as usize,
++            1 | 64 | 128 | 0x80000,
++            0o600,
++        )
++    };
++    if opened < 0 {
++        return Err(b"export staging path is not fresh or not creatable");
++    }
++    let mut state = Export {
++        fd: opened as usize,
++        destination,
++        temporary,
++    };
++    if opened < 3 {
++        let duplicate = unsafe { syscall3(72, opened as usize, 1030, 3) };
++        let closed = unsafe { syscall1(3, opened as usize) };
++        if duplicate < 0 || closed != 0 {
++            if duplicate >= 0 {
++                unsafe {
++                    syscall1(3, duplicate as usize);
++                }
++            }
++            state.remove()?;
++            return Err(b"export-file descriptor reservation failed");
++        }
++        state.fd = duplicate as usize;
++    }
++    unsafe {
++        core::ptr::write(core::ptr::addr_of_mut!(EXPORT), Some(state));
++    }
++    Ok(())
++}
++
++pub fn cancel() -> Result<(), Error> {
++    let Some(state) = take() else {
++        return Ok(());
++    };
++    let closed = unsafe { syscall1(3, state.fd) };
++    let removed = state.remove();
++    if closed != 0 {
++        return Err(b"export-file close failed");
++    }
++    removed
++}
++
++pub fn finish(write: impl FnOnce(&mut Archive) -> Result<(), Error>) -> Result<(), Error> {
++    let Some(state) = take() else {
++        return Ok(());
++    };
++    let mut archive = Archive(state.fd);
++    let result = write(&mut archive)
++        .and_then(|_| archive.bytes(&[0; 1024]))
++        .and_then(|_| loop {
++            match unsafe { syscall1(74, state.fd) } {
++                0 => break Ok(()),
++                -4 => continue,
++                _ => break Err(b"export-file sync failed".as_slice()),
++            }
++        });
++    let closed = unsafe { syscall1(3, state.fd) };
++    if let Err(reason) = result {
++        state.remove()?;
++        return Err(reason);
++    }
++    if closed != 0 {
++        state.remove()?;
++        return Err(b"export-file close failed");
++    }
++    // RENAME_NOREPLACE is the publication point, after successful close. An
++    // intervening destination creation cannot replace that caller's file.
++    if unsafe {
++        syscall5(
++            316,
++            AT_FDCWD,
++            state.temporary.as_ptr() as usize,
++            AT_FDCWD,
++            state.destination.as_ptr() as usize,
++            1,
++        )
++    } != 0
++    {
++        state.remove()?;
++        return Err(b"export-file publication failed");
++    }
++    Ok(())
++}
++
++pub struct Archive(usize);
++impl Archive {
++    fn bytes(&mut self, mut bytes: &[u8]) -> Result<(), Error> {
++        while !bytes.is_empty() {
++            let count = unsafe { syscall3(1, self.0, bytes.as_ptr() as usize, bytes.len()) };
++            if count == -4 {
++                continue;
++            }
++            if count <= 0 {
++                return Err(b"export-file write failed");
++            }
++            bytes = &bytes[count as usize..];
++        }
++        Ok(())
++    }
++
++    pub fn entry(
++        &mut self,
++        path: &[u8],
++        metadata: FileMetadata,
++        mut read: impl FnMut(usize, &mut [u8]) -> Result<(), Error>,
++    ) -> Result<(), Error> {
++        let name = path
++            .strip_prefix(b"/")
++            .ok_or(b"export path is not absolute".as_slice())?;
++        if name.is_empty()
++            || name
++                .split(|b| *b == b'/')
++                .any(|part| part.is_empty() || part == b"." || part == b"..")
++        {
++            return Err(b"invalid export path");
++        }
++        let (kind, length) = match metadata.kind {
++            NodeKind::File => (b'0', metadata.size),
++            NodeKind::Directory => (b'5', 0),
++            _ => return Err(b"unsupported export entry kind"),
++        };
++        if name.len() > 100 {
++            // GNU long names preserve any normalized VFS path, including a
++            // single component longer than ustar's 100-byte name field.
++            self.header(b"././@LongLink", 0, (name.len() + 1) as u64, b'L')?;
++            self.bytes(name)?;
++            self.bytes(&[0; 512][..512 - name.len()])?;
++        }
++        self.header(
++            &name[..name.len().min(100)],
++            (metadata.mode & 0o777) as u64,
++            length,
++            kind,
++        )?;
++        let mut buffer = [0u8; 4096];
++        let mut offset = 0usize;
++        while (offset as u64) < length {
++            let size = (length - offset as u64).min(buffer.len() as u64) as usize;
++            read(offset, &mut buffer[..size])?;
++            self.bytes(&buffer[..size])?;
++            offset += size;
++        }
++        let padding = (512 - (length % 512)) % 512;
++        self.bytes(&[0; 512][..padding as usize])
++    }
++    fn header(&mut self, name: &[u8], mode: u64, length: u64, kind: u8) -> Result<(), Error> {
++        let mut header = [0u8; 512];
++        header[..name.len()].copy_from_slice(name);
++        octal(&mut header[100..108], mode)?;
++        octal(&mut header[108..116], 0)?;
++        octal(&mut header[116..124], 0)?;
++        octal(&mut header[124..136], length)?;
++        octal(&mut header[136..148], 0)?;
++        header[148..156].fill(b' ');
++        header[156] = kind;
++        header[257..263].copy_from_slice(b"ustar\0");
++        header[263..265].copy_from_slice(b"00");
++        let checksum = header.iter().map(|b| *b as u64).sum();
++        octal(&mut header[148..155], checksum)?;
++        self.bytes(&header)
++    }
++}
++
++fn octal(output: &mut [u8], mut value: u64) -> Result<(), Error> {
++    output.fill(b'0');
++    let digits = output.len() - 1;
++    output[digits] = 0;
++    for byte in output[..digits].iter_mut().rev() {
++        *byte = b'0' + (value & 7) as u8;
++        value >>= 3;
++    }
++    if value != 0 {
++        return Err(b"export metadata exceeds tar bound");
++    }
++    Ok(())
++}
+diff --git a/crates/ginux-init/src/storage_memory.rs b/crates/ginux-init/src/storage_memory.rs
+index 12a7e8b8..d72e4bde 100644
+--- a/crates/ginux-init/src/storage_memory.rs
++++ b/crates/ginux-init/src/storage_memory.rs
+@@ -41,6 +41,14 @@ impl<const FILES: usize> MemoryStorage<FILES> {
+         self.allocated
+     }
+ 
++    pub fn sync(&mut self, slot: usize, data_only: bool) -> Result<(), VfsError> {
++        let descriptor = self.backing(slot)?;
++        if unsafe { syscall1(if data_only { 75 } else { 74 }, descriptor as usize) } != 0 {
++            return Err(VfsError::Io);
++        }
++        Ok(())
++    }
++
+     fn pages(length: usize) -> Result<usize, VfsError> {
+         length
+             .checked_add(PAGE - 1)
+diff --git a/crates/ginux-vfs/src/lib.rs b/crates/ginux-vfs/src/lib.rs
+index 45a200e3..ad1246b7 100644
+--- a/crates/ginux-vfs/src/lib.rs
++++ b/crates/ginux-vfs/src/lib.rs
+@@ -520,6 +520,16 @@ impl<
+         }
+     }
+ 
++    /// Adapter-owned flush/lock operations may use the backing of any open
++    /// regular file, including write-only descriptions.
++    pub fn descriptor_storage(&mut self, descriptor: i32) -> Result<(&mut S, usize), VfsError> {
++        let fd = self.descriptors[self.descriptor(descriptor)?];
++        if !fd.overlay || fd.directory {
++            return Err(VfsError::InvalidDescriptor);
++        }
++        Ok((&mut self.storage, fd.object))
++    }
++
+     /// Readable regular-file backing for an adapter-owned mapping reference.
+     pub fn readable_storage(&mut self, descriptor: i32) -> Result<(&mut S, usize), VfsError> {
+         let fd = self.descriptors[self.descriptor(descriptor)?];
+@@ -1076,6 +1086,49 @@ impl<
+         self.descriptors.fill(Descriptor::empty());
+     }
+ 
++    /// Enumerate live writable entries while the caller has quiesced mutation.
++    /// Slots are opaque and stable only until the next filesystem mutation.
++    pub fn overlay_entry(&self, slot: usize) -> Option<(&[u8], FileMetadata)> {
++        let entry = self.overlay.get(slot)?;
++        if !matches!(entry.state, 1 | 3) {
++            return None;
++        }
++        Some((
++            entry.path.as_bytes(),
++            FileMetadata {
++                inode: (self.index.len() + slot + 1) as u64,
++                kind: if entry.state == 3 {
++                    NodeKind::Directory
++                } else {
++                    NodeKind::File
++                },
++                mode: entry.mode,
++                size: entry.len as u64,
++            },
++        ))
++    }
++
++    /// Read a live writable regular file without allocating a guest descriptor.
++    pub fn read_overlay(
++        &self,
++        slot: usize,
++        offset: usize,
++        output: &mut [u8],
++    ) -> Result<(), VfsError> {
++        let entry = self.overlay.get(slot).ok_or(VfsError::NotFound)?;
++        if entry.state != 1 {
++            return Err(VfsError::NotFound);
++        }
++        if offset
++            .checked_add(output.len())
++            .filter(|end| *end <= entry.len)
++            .is_none()
++        {
++            return Err(VfsError::Io);
++        }
++        self.storage.read(slot, offset, output)
++    }
++
+     pub fn overlay_files(&self) -> usize {
+         self.overlay.iter().filter(|entry| entry.state == 1).count()
+     }
+diff --git a/scripts/test-launch-storage.py b/scripts/test-launch-storage.py
+index 97d13e31..0d8336d5 100644
+--- a/scripts/test-launch-storage.py
++++ b/scripts/test-launch-storage.py
+@@ -8,6 +8,7 @@ import select
+ import subprocess
+ import sys
+ import tempfile
++import tarfile
+ 
+ 
+ def main():
+@@ -29,18 +30,35 @@ def main():
+         shutil.copyfile(fixture, root / 'bin/fixture')
+         (root / 'bin/fixture').chmod(0o755)
+ 
+-        def invoke(assignments, args, expected=0, memory=256):
++        def invoke(assignments, args, expected=0, memory=256, export=False):
+             config = template.replace('init = "/bin/bash"', 'init = "/bin/fixture"')
+             config = config.replace('args = []', 'args = ' + json.dumps(args))
+             config = config.replace('memory_mib = 256', 'memory_mib = ' + str(memory))
+             config = config.replace('assignments = []', 'assignments = ' + json.dumps(assignments), 1)
+             config = config.replace('id = "gate5-demo"', 'id = "storage-fixture"\nworkdir = "/work"')
++            if args == ['invalid-export-config']:
++                config += '\n[not_a_section]\n'
+             path = work / 'launch.toml'
+             path.write_text(config)
+             result = work / 'result.json'
+             result.unlink(missing_ok=True)
+             command = [binary, 'launch', str(path), str(root), '--result-file', str(result)]
+-            if args == ['mapping']:
++            archive = work / 'export.tar'
++            if export:
++                archive.unlink(missing_ok=True)
++                command += ['--export-file', str(archive)]
++            if args == ['export-wait']:
++                proc = subprocess.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
++                try:
++                    assert select.select([proc.stdout], [], [], 5)[0], 'export readiness missing'
++                    assert proc.stdout.readline() == b'export-ready\n'
++                    assert not archive.exists(), 'archive published before workload completed'
++                    stdout, stderr = proc.communicate(b'G', timeout=10)
++                    proc.stdout, proc.stderr = stdout, stderr
++                finally:
++                    if proc.poll() is None:
++                        proc.kill(); proc.communicate(timeout=5)
++            elif args == ['mapping']:
+                 with (work / 'mapping.audit').open('wb') as audit:
+                     proc = subprocess.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=audit)
+                     try:
+@@ -62,7 +80,7 @@ def main():
+             record = json.loads(result.read_text())
+             if proc.returncode != expected:
+                 sys.exit(f'launch failed: {proc.returncode}\n{proc.stderr.decode()}\n{record}')
+-            assert record['outcome'] == ('exited' if expected == 0 else 'supervisor-error'), record
++            assert record['outcome'] == ('exited' if expected in (0, 7) else 'supervisor-error'), record
+             if expected == 0:
+                 assert record['code'] == 0 and record['generation'] is None, record
+                 assert proc.stdout == (b'' if args else b'memory-storage: PASS\n'), proc.stdout
+@@ -70,13 +88,43 @@ def main():
+             assert (root / 'work/existing').read_bytes() == b'hidden immutable work file'
+             assert sorted(p.name for p in (root / 'work').iterdir()) == ['existing']
+             assert not (root / 'out').exists()
++            if expected == 7: assert record['code'] == 7
++            if export:
++                assert not list(work.glob('.ginux-export-*')), 'staging output retained'
++                if expected != 0:
++                    assert not archive.exists(), 'failed workload published an archive'
++                else:
++                    with tarfile.open(archive) as tar:
++                        names = tar.getnames()
++                        assert len(names) == len(set(names)), names
++                        assert 'out/deleted' not in names and 'image' not in names
++                        assert tar.extractfile('out/product').read() == b'result\0data'
++                        assert tar.getmember('out/product').mode == 0o700
++                        assert tar.getmember('out/empty').isdir()
++                        assert tar.extractfile('out/empty-file').read() == b''
++                        assert tar.extractfile('out/' + 'a'*120 + '/' + 'b'*80).read() == b'long'
++                        if args == ['child-export']:
++                            assert tar.extractfile('out/child').read() == b'settled'
++                            assert 'out/late' not in names
++                    result.unlink()
++                    refused = subprocess.run(command, capture_output=True, timeout=10)
++                    assert refused.returncode == 2 and b'not fresh' in refused.stderr
++                    with tarfile.open(archive) as tar:
++                        assert tar.extractfile('out/product').read() == b'result\0data'
++
+ 
+         if sys.argv[3:]:
+             for mode in sys.argv[3:]:
+-                if mode not in ('growth', 'bounds', 'quota', 'view-probes', 'mapping', 'ordinary-mapping', 'ordinary-unlinked-mapping'):
++                if mode == 'bad-export-config':
++                    invoke(['disk0'], ['export'], expected=2, export=True)
++                    print('PASS launch storage: bad-export-config')
++                    continue
++                if mode not in ('growth', 'bounds', 'quota', 'flush', 'export', 'export-wait', 'failed-export', 'child-export', 'bad-export-config', 'invalid-export-config', 'view-probes', 'mapping', 'ordinary-mapping', 'ordinary-unlinked-mapping'):
+                     sys.exit('unknown selected storage scenario')
+                 invoke(['memory:/work', 'memory:/work/build', 'memory:/out'], [mode],
+-                       memory=16 if mode == 'bounds' else 256)
++                       expected=2 if mode == 'invalid-export-config' else (7 if mode == 'failed-export' else 0),
++                       memory=16 if mode == 'bounds' else 256,
++                       export=mode in ('export', 'export-wait', 'failed-export', 'child-export', 'invalid-export-config'))
+                 print(f'PASS launch storage: {mode}')
+             return
+         invoke(['memory:/work'], ['view-probes'])
+@@ -93,6 +141,13 @@ def main():
+         invoke(['memory:/work', 'memory:/out'], ['mapping'])
+         invoke(['memory:/work', 'memory:/out'], ['ordinary-mapping'])
+         invoke(['memory:/work', 'memory:/out'], ['ordinary-unlinked-mapping'])
++        invoke(['memory:/work', 'memory:/out'], ['flush'])
++        invoke(['memory:/work', 'memory:/out'], ['export'], export=True)
++        invoke(['memory:/work', 'memory:/out'], ['export-wait'], export=True)
++        invoke(['memory:/work', 'memory:/out'], ['child-export'], export=True)
++        invoke(['memory:/work', 'memory:/out'], ['failed-export'], expected=7, export=True)
++        invoke(['memory:/work', 'memory:/out'], ['invalid-export-config'], expected=2, export=True)
++        invoke(['disk0'], ['export'], expected=2, export=True)
+         invoke([], ['no-storage'])
+         for assignment in ['disk0', 'memory:/', 'memory:/proc', 'memory:/sys/x', 'memory:/dev',
+                            'memory:/bin', 'memory:/work/../out', 'memory:/work/', 'memory:work']:
+diff --git a/tests/fixtures/launch-storage-fixture.c b/tests/fixtures/launch-storage-fixture.c
+index 8bb66926..7cb2ba17 100644
+--- a/tests/fixtures/launch-storage-fixture.c
++++ b/tests/fixtures/launch-storage-fixture.c
+@@ -57,10 +57,46 @@ static long ordinary_mapping(int unlink_mode) {
+     CHECK(DO(11,mapped,4096,0)==0 && DO(3,fd,0,0)==0,165);
+     return 0;
+ }
++static long export_data(const char *mode) {
++    CHECK(DO(83,"/out/empty",0755,0)==0,180);
++    long fd=DO(2,"/out/product",0101,0700); CHECK(fd==3,181);
++    CHECK(DO(1,fd,"result\0data",11)==11 && DO(74,fd,0,0)==0 && DO(75,fd,0,0)==0,182);
++    CHECK(DO(3,fd,0,0)==0,183);
++    fd=DO(2,"/out/empty-file",0101,0600); CHECK(fd==3 && DO(74,fd,0,0)==0 && DO(3,fd,0,0)==0,184);
++    fd=DO(2,"/out",0200000,0); CHECK(fd==3 && DO(74,fd,0,0)==0 && DO(75,fd,0,0)==0 && DO(3,fd,0,0)==0,185);
++    CHECK(DO(2,"/out/deleted",0101,0600)==3 && DO(3,3,0,0)==0 && DO(87,"/out/deleted",0,0)==0,186);
++    char longpath[208]="/out/";
++    for(word i=5;i<125;++i) longpath[i]='a';
++    longpath[125]=0; CHECK(DO(83,longpath,0700,0)==0,187);
++    longpath[125]='/';
++    for(word i=126;i<206;++i) longpath[i]='b';
++    longpath[206]=0;
++    CHECK(DO(2,longpath,0101,0600)==3 && DO(1,3,"long",4)==4 && DO(3,3,0,0)==0,188);
++    if(equal(mode,"child-export")) {
++        int ready[2], wait[2];
++        CHECK(DO(293,ready,0,0)==0 && DO(293,wait,0,0)==0,189);
++        long child=DO(57,0,0,0); CHECK(child>=0,190);
++        if(!child) {
++            CHECK(DO(3,ready[0],0,0)==0 && DO(3,wait[1],0,0)==0,191);
++            fd=DO(2,"/out/child",0101,0600); CHECK(fd>=3,192);
++            CHECK(DO(1,fd,"settled",7)==7 && DO(74,fd,0,0)==0 && DO(3,fd,0,0)==0,193);
++            CHECK(DO(1,ready[1],"R",1)==1,194);
++            DO(0,wait[0],output,1);
++            DO(2,"/out/late",0101,0600); return 195;
++        }
++        CHECK(DO(3,ready[1],0,0)==0 && DO(3,wait[0],0,0)==0,196);
++        CHECK(DO(0,ready[0],output,1)==1 && output[0]=='R',197);
++    }
++    if(equal(mode,"export-wait")) {
++        CHECK(DO(1,1,"export-ready\n",13)==13 && DO(0,0,output,1)==1 && output[0]=='G',198);
++    }
++    return equal(mode,"failed-export") ? 7 : 0;
++}
+ long storage_main(word *stack)
+ {
+     word argc = *stack;
+     char **argv = (char **)(stack + 1);
++    if(argc>1 && (equal(argv[1],"flush") || equal(argv[1],"export") || equal(argv[1],"export-wait") || equal(argv[1],"failed-export") || equal(argv[1],"child-export"))) return export_data(argv[1]);
+     if (argc > 1 && argv[1][0] == 'v') {
+         long fd=DO(2,"/work/probe",0102|0400,0600);
+         CHECK(fd>=3 && DO(1,fd,"ok",2)==2,145);

@@ -541,13 +541,23 @@ fails both new limit/scale fixtures. The outdated mapping fixture assertion is
 corrected in its prerequisite owner and retained for F01/F02. G17a/G17b ordinary
 preparation is retained; inherited security/full CI/upstream holds remain pending.
 
-Exact next task: **G19 — flush and quiesced export**. Inspect53dec6b3/48b26f8d and
-allocate c541a67f static fixes to actual owners. Trace the minimal storage/task
-settlement prerequisites; keep held G07 threading/security joins explicit. Prepare
-ordinary fsync/fdatasync and successful/failed workload/export behavior without
-importing downstream protocols or unrelated archives/control. Do not run hostile
-export/path/race probes here; record those for DaybreakBlue. Preserve tests,
-current typed process cleanup and all existing work. No publication before F04.
+G19 per-process source/ordinary preparation is retained at `a36e7644` on
+G1283072ec3. [Review/evidence](ginux-contributions/g19-review.md) records92
+units,179-path strict replay and ordinary flush, binary/long-path/mode export,
+publication-after-completion, child settlement, failed workload and early/late
+config cleanup in source/clean exports, plus mapping/ELF/script/storage controls.
+The donor's direct-final-file output is replaced with private staging and no-
+overwrite publication after sync/close. A reproduced early-rejection staging leak
+is fixed at common completion. Exact G12 rejects flush. G07 thread/security,
+G13/G15/G18/G21/G22 joins, full CI and actual upstream independence remain pending.
+
+Exact next task: **G20 — private checkpoint control and event-driven waiting**.
+Inspect2b306eff/990fbb7a against current task/process wait ownership and the reviewed
+export owner. Keep the transport host-owned, bounded and absent from workloads;
+do not import G08 guest channels or downstream protocols. Preserve typed cleanup
+and the held G07 thread/race boundary. Run ordinary capture/acknowledgment and
+process event/cancellation paths; record hostile frames, private-FD authority and
+races for DaybreakBlue. No publication or maintainer messages before F04.
 
 Active skill: `hdae-development`, discovered at
 `/home/vince/.codex/worktrees/ginux-pr-combination-check/ginux/.agents/skills/hdae-development/SKILL.md`.

@@ -869,9 +869,7 @@
       "packet": "G19",
       "purpose": "Flush and quiesced export (`53dec6b3`, `48b26f8d`, relevant static fixes `c541a67f`)",
       "dependencies": [
-        "G06",
-        "G07",
-        "G09"
+        "G12"
       ],
       "source_commits": [
         "48b26f8ddc17543e53ce6c55079f47f2da245f51",
@@ -880,8 +878,51 @@
       ],
       "acceptance": "fsync/fdatasync reach owned backing, live writers settle before successful export, failed workload/export cannot publish partial output. Allocate static fixes to their owning packets.",
       "planned_delivery": "one coherent change plus its generic docs and focused regression fixtures; split coupled responsibilities only as recorded by P04",
-      "status": "pending extraction and R01-R04 review",
-      "artifact_directory": ".artifacts/ginux-contribution-preparation/G19"
+      "status": "per-process source separately self-reviewed; selected ordinary source/clean checks pass; thread/security/full CI/upstream independence pending",
+      "artifact_directory": ".artifacts/ginux-contribution-preparation/G19",
+      "base": "83072ec3ddab3e4712ce8db9ba232a10342557de",
+      "head": "a36e76441b5a7c1a30b3461c9537bb3c6aee9d8e",
+      "tree": "a6768f59733e746cc5e92afcf982ef686f5b22d4",
+      "changed_files": [
+        "README.md",
+        "crates/ginux-init/src/fs_hooks.rs",
+        "crates/ginux-init/src/storage_memory.rs",
+        "crates/ginux-vfs/src/lib.rs",
+        "crates/ginux-init/src/launch.rs",
+        "crates/ginux-init/src/launch_tasks.rs",
+        "crates/ginux-init/src/main.rs",
+        "crates/ginux-init/src/storage_export.rs",
+        "scripts/test-launch-storage.py",
+        "tests/fixtures/launch-storage-fixture.c"
+      ],
+      "standalone": false,
+      "patch_sha256": "94cee2752c9519757786d0fa3eeb84a63a4c386c106b6c9cdee3cee99b595f3d",
+      "deferred_joins": [
+        "G07 thread quiescence/security",
+        "G13 symlink/G15 hardlink archive join at G22",
+        "G18 dynamic namespace and G17b budget composition",
+        "G20 control/G21 restore"
+      ],
+      "unit_tests": 92,
+      "vfs_tests": 34,
+      "clean_matched_paths": 179,
+      "review": "separate self-review; no independent reviewer/security acceptance",
+      "remote_ci": "not run",
+      "security_handoff": "daybreakblue-handoff.md",
+      "held_dependencies": [
+        "G07 thread quiescence and shared-argument security"
+      ],
+      "source_binary_sha256": "57fb6b344910b6132413df059e4f11e17936a466a9cc512d9e2dc178ff04031a",
+      "clean_binary_sha256": "57fb6b344910b6132413df059e4f11e17936a466a9cc512d9e2dc178ff04031a",
+      "backing_dependency": "native fsync uses G12 memfd backing; export alone does not inherently require mappings",
+      "fixture_sha256": {
+        "launch-storage-fixture": "8e0ae985156d5db2cc50eb44c40e0552709c65ebbce6629326e0bd8fc4c81536",
+        "launch-directory-fixture": "c07d2fe17d870fceb7237cb65fa4962e33aa4f454d0aaa4861440e2760e761e8",
+        "launch-script-fixture": "bbf5f27163c9fa1edb0042719da1fe8d31065fbc35ef221fec608370f4821953",
+        "launch-owned-exec-fixture": "ac70dd24534767b47ee52d088575f6d3d4a1e95f71b526bb3589daaf2e5ddf90"
+      },
+      "evidence": "g19-review.md",
+      "source_patch": "patches/G19.patch"
     },
     {
       "packet": "G20",

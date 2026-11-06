@@ -362,3 +362,27 @@ checks pass in source and clean replay. Independently validate private FD leakag
 inherited FD overhead beyond the fixed128 allowance, bootstrap/transient state,
 protected copy, failure injection and races. No cloud dispatch or security
 acceptance is claimed. Full FD width/authority and mapping inspection modes remain.
+
+
+## G19 — flush and quiesced export (in progress)
+
+Local port uses G12 memfd/per-process ownership and does not import held G07
+thread groups. Ordinary verification will cover fsync/fdatasync, complete regular
+file/directory archives, a child writer settled before final capture, failed
+workload cancellation and an existing destination. Final publication now uses a
+private same-directory staging file and RENAME_NOREPLACE after write/sync/close.
+DaybreakBlue must validate malicious archive/path components, hostile destination
+parents or staging-name replacement, final-name races, abrupt interruption,
+write/sync/close/cleanup failure injection, inherited FD authority and concurrent
+writer/shared-argument behavior. Do not execute those security probes here.
+Full thread and symlink/hardlink/archive joins remain pending. Ordinary results
+cannot establish those guarantees; no cloud agent has been dispatched.
+
+G19 exact retained revision: a36e76441b5a7c1a30b3461c9537bb3c6aee9d8e on G12 83072ec3ddab3e4712ce8db9ba232a10342557de.
+92 routine units and ordinary flush/export/config-cleanup/child-settlement plus
+mapping/exec/storage controls pass in source and clean replay. Early config
+rejection staging leakage was reproduced and fixed at common completion. Validate
+hostile parent/staging/final-name changes, abrupt interruption, I/O/close/cleanup
+failure injection and shared-thread/argument races independently. A complete
+archive is published only after close, but no adversarial authority acceptance is
+inferred. No cloud agent dispatched; [review/evidence](g19-review.md).
