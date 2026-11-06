@@ -46,7 +46,16 @@ pub fn run(bless: bool) -> Result<()> {
     }
 
     let hosted = install_screen_docs(&root)?;
-    for app in tui_apps::discover(&root)? {
+    let apps = tui_apps::discover(&root)?;
+    for (variant, (app, _)) in &hosted {
+        if !apps.iter().any(|known| &known.name == app) {
+            step(
+                format!("{variant}'s install screen docs"),
+                Err(anyhow::anyhow!("no TUI app named '{app}' under tui/apps")),
+            );
+        }
+    }
+    for app in apps {
         let name = app.name.clone();
         let launch = match Launch::prepare(&root, app) {
             Ok(launch) => launch,
@@ -91,20 +100,13 @@ pub fn run(bless: bool) -> Result<()> {
 /// Each variant whose install screen shows a TUI app: variant, (app, page).
 fn install_screen_docs(root: &Path) -> Result<Vec<(String, (String, Option<String>))>> {
     let mut hosted = Vec::new();
-    let mut variants: Vec<_> = fs::read_dir(root.join("distro/variants"))?
-        .collect::<std::io::Result<_>>()?;
-    variants.sort_by_key(|entry| entry.file_name());
-    for entry in variants {
-        let name = entry.file_name().to_string_lossy().into_owned();
-        if name.starts_with('_') || !entry.path().join("ring2/products.toml").is_file() {
-            continue;
-        }
-        let contract = distro_contract::load_variant_contract_for_distro_from(root, &name)
-            .with_context(|| format!("loading variant '{name}'"))?;
+    for distro in crate::cli::Distro::ALL {
+        let contract = distro_contract::load_variant_contract_for_distro_from(root, distro.id())
+            .with_context(|| format!("loading variant '{}'", distro.id()))?;
         if let distro_contract::InstallDocs::TuiApp { app, page } =
             contract.product_config.install_ux.docs
         {
-            hosted.push((name, (app, page)));
+            hosted.push((distro.id().to_string(), (app, page)));
         }
     }
     Ok(hosted)
@@ -225,7 +227,7 @@ fn page_arg(app: &TuiApp) -> Result<String> {
         .pages
         .as_ref()
         .map(|pages| pages.arg.clone())
-        .with_context(|| format!("{} has snapshots but declares no inspect.pages", app.name))
+        .with_context(|| format!("{} declares no inspect.pages to open a page with", app.name))
 }
 
 fn parse_size(name: &str) -> Option<Size> {
