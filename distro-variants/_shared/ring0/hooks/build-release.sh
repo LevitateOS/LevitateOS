@@ -294,13 +294,6 @@ need_file "$LIVE_OVERLAY_IMAGE"
 
 mkdir -p "$(dirname "$ISO_PATH")"
 
-ISO_TMP="${ISO_PATH}.tmp"
-ISO_SHA="${ISO_PATH%.iso}.sha512"
-ISO_TMP_SHA_ALT1="${ISO_TMP}.sha512"
-ISO_TMP_SHA_ALT2="${ISO_TMP%.*}.sha512"
-
-rm -f "$ISO_TMP" "$ISO_TMP_SHA_ALT1" "$ISO_TMP_SHA_ALT2"
-
 LIVE_UKI_CMDLINE="$(merge_uki_cmdline "${LIVE_UKI_CMDLINE-}")"
 EMERGENCY_UKI_CMDLINE="$(merge_uki_cmdline "emergency")"
 DEBUG_UKI_CMDLINE="$(merge_uki_cmdline "debug")"
@@ -310,7 +303,7 @@ set -- \
     --initrd "$INITRAMFS_LIVE_PATH" \
     --rootfs "$ROOTFS_PATH" \
     --label "$ISO_LABEL" \
-    --output "$ISO_TMP" \
+    --output "$ISO_PATH" \
     --os-name "$OS_NAME" \
     --os-id "$OS_ID" \
     --os-version "$OS_VERSION" \
@@ -324,18 +317,9 @@ set -- "$@" --live-payload-layout iso-files
 need_cmd cargo
 cargo run -q -p reciso -- "$@"
 
-if [ ! -f "$ISO_TMP" ]; then
-    echo "reciso finished without producing ISO: $ISO_TMP" >&2
-    exit 1
-fi
-
-mv -f "$ISO_TMP" "$ISO_PATH"
-
-if [ -f "$ISO_TMP_SHA_ALT1" ]; then
-    mv -f "$ISO_TMP_SHA_ALT1" "$ISO_SHA"
-elif [ -f "$ISO_TMP_SHA_ALT2" ]; then
-    mv -f "$ISO_TMP_SHA_ALT2" "$ISO_SHA"
-fi
+# reciso writes the ISO atomically and its checksum next to it.
+need_file "$ISO_PATH"
+need_file "$ISO_SHA"
 
 BUILD_STATUS="success"
 TMP_ARTIFACT_LIST="$(mktemp "${RELEASE_OUTPUT_DIR}/.tmp-${PRODUCT_ARTIFACT_TAG}-artifacts.XXXXXX")"

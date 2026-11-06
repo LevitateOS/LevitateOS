@@ -3,7 +3,11 @@ schema_version = 6
 [scenarios.live_boot]
 success_patterns = []
 fatal_patterns = []
-required_kernel_cmdline = ["audit=1"]
+required_kernel_cmdline = [
+  "console=ttyS0,115200n8",
+  "console=tty0",
+  "audit=1",
+]
 required_live_services = ["networking", "dhcpcd", "sshd"]
 
 [scenarios.live_boot.evidence]
