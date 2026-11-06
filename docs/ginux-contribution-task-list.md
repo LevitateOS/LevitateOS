@@ -517,14 +517,23 @@ shebang separators now fail explicitly. Exact G14 rejects the new valid-cross
 fixture. G15/G12/G07 joins and security/full CI/current-main independence remain
 pending. No Ginux checkout, branch/index, remote or human text changed.
 
-Exact next task: **G18 — configurable bounded namespace capacity**, before G17.
-Inspect38fa14fd and derive the minimum actual configuration/VFS/storage capability
-base. Preserve shared data/alias charging, checked namespace and byte accounting,
-whiteouts, cwd/exec references and failure rollback; do not import accidental
-thread/mapping/archive ancestry. Implement and run ordinary nonempty-file scale
-and exhaustion checks. Record adversarial overflow/allocation/authority probes
-for DaybreakBlue. Then continue G17 in approved dependency order; no publication
-before F04, and inherited security holds remain pending.
+G18 source/ordinary preparation is retained at `f58ba480` on G09d85b53fe1.
+[Review/evidence](ginux-contributions/g18-review.md) records91 units,171-path strict
+replay and5000 actual nonempty files with readback, namespace exhaustion and last-
+close reclamation, plus storage/directory controls in source/clean exports. Default
+capacity32 is retained; explicit object/data limits charge rounded metadata before
+data. The exact old runtime fails the same scale fixture at its32-slot bound.
+Restore/archive and G10–G16 combined joins remain assigned to their owners/F02;
+security/full CI/current-main independence remain pending. Nothing was published.
+
+Exact next task: **G17 — private backing descriptors, public FD budgets and
+positioned writes**, now that G18 is prepared. Inspect53a2c9cc/d5357101 and split
+only by actual capability ownership as P04 requires. Compose the minimum mapping/
+storage/namespace prerequisites in a disposable export, preserving current typed
+process APIs, public descriptor aliases, dynamic metadata/data charging and exact
+checks. Keep private-FD authority/protected-copy/race probes with DaybreakBlue;
+perform ordinary low-limit/lifetime/pwrite checks locally. No publication before
+F04; all security and standalone prerequisite holds remain explicit.
 
 Active skill: `hdae-development`, discovered at
 `/home/vince/.codex/worktrees/ginux-pr-combination-check/ginux/.agents/skills/hdae-development/SKILL.md`.

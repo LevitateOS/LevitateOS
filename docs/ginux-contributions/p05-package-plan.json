@@ -795,15 +795,52 @@
       "packet": "G18",
       "purpose": "Configurable bounded namespace capacity (`38fa14fd`)",
       "dependencies": [
-        "G09"
+        "G09d"
       ],
       "source_commits": [
         "38fa14fd9b14f1d62f1c4a9ba2e9b38e11303eca"
       ],
       "acceptance": "Thousands of actual nonempty objects; checked allocation arithmetic, metadata/data accounting, configured exhaustion and shared-byte charging.",
       "planned_delivery": "one coherent change plus its generic docs and focused regression fixtures; split coupled responsibilities only as recorded by P04",
-      "status": "pending extraction and R01-R04 review",
-      "artifact_directory": ".artifacts/ginux-contribution-preparation/G18"
+      "status": "source separately self-reviewed; static/unit/build and selected ordinary scale/runtime pass in source/clean replay; security/full CI/current-main independence pending",
+      "artifact_directory": ".artifacts/ginux-contribution-preparation/G18",
+      "base": "85b53fe15a64041f451ec7e7aa1e77d08cb2c18a",
+      "head": "f58ba480942e91ad7a0a43158a9c57496acc202a",
+      "tree": "6ed8bc3ca7a42f718b23c1b8f67c4a6a5c601d1c",
+      "changed_files": [
+        "README.md",
+        "crates/ginux-domain/src/lib.rs",
+        "crates/ginux-vfs/src/lib.rs",
+        "crates/ginux-init/src/fs_hooks.rs",
+        "crates/ginux-init/src/storage_memory.rs",
+        "scripts/test-launch-storage.py",
+        "tests/fixtures/launch-storage-fixture.c"
+      ],
+      "standalone": false,
+      "patch_sha256": "8ed707dd6338718bef63280e6eea19e7fec68d18806a192c5fd41fa9d138e60c",
+      "deferred_joins": [
+        "G15/G14/G12 combined accounting and lifetime",
+        "G19/G21/G22 export/restore dynamic capacity",
+        "security allocation/accounting validation"
+      ],
+      "unit_tests": 91,
+      "vfs_tests": 32,
+      "clean_matched_paths": 171,
+      "review": "separate self-review; no independent reviewer/security acceptance claimed",
+      "remote_ci": "not run",
+      "security_handoff": "daybreakblue-handoff.md",
+      "source_binary_sha256": "1edcebef405c5b105efbe578fb54e3eea5d5e2c1df7e9f7cc5c22a343f7cd25b",
+      "clean_binary_sha256": "1edcebef405c5b105efbe578fb54e3eea5d5e2c1df7e9f7cc5c22a343f7cd25b",
+      "final_clean_export": "verified-head",
+      "default_max_objects": 32,
+      "scale_nonempty_files": 5000,
+      "scale_configured_objects": 5003,
+      "fixture_sha256": {
+        "launch-directory-fixture": "c07d2fe17d870fceb7237cb65fa4962e33aa4f454d0aaa4861440e2760e761e8",
+        "launch-storage-fixture": "e5e7d4b885e4b14399b213c0ce7e1e6010d78cb10dab3c576808e241023c5f3c"
+      },
+      "evidence": "g18-review.md",
+      "source_patch": "patches/G18.patch"
     },
     {
       "packet": "G17",

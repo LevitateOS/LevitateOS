@@ -1,0 +1,648 @@
+From f58ba480942e91ad7a0a43158a9c57496acc202a Mon Sep 17 00:00:00 2001
+From: vince <vincepaul.liem@gmail.com>
+Date: Fri, 6 Nov 2026 14:56:32 +0100
+Subject: [PATCH] feat(storage): configure bounded namespace and data capacity
+
+Allocate namespace and backing metadata in bounded supervisor mappings.
+Charge page-rounded metadata before file bytes, expose explicit object/data
+limits, and retain small inline VFS defaults and shared open positions.
+
+Signed-off-by: vince <vincepaul.liem@gmail.com>
+---
+ README.md                               |   9 +-
+ crates/ginux-domain/src/lib.rs          |  61 ++++++++++++
+ crates/ginux-init/src/fs_hooks.rs       |  44 +++++++--
+ crates/ginux-init/src/storage_memory.rs |  87 ++++++++++++++---
+ crates/ginux-vfs/src/lib.rs             | 118 ++++++++++++++++++++++--
+ scripts/test-launch-storage.py          |  13 ++-
+ tests/fixtures/launch-storage-fixture.c |  29 ++++++
+ 7 files changed, 324 insertions(+), 37 deletions(-)
+
+diff --git a/README.md b/README.md
+index a3982c7c..1482d84f 100644
+--- a/README.md
++++ b/README.md
+@@ -248,8 +248,13 @@ precedence, missing components and non-directory errors. Native image operations
+ use a temporary canonical path below the stopped workload's stack; an unavailable
+ scratch area or overlapping output buffer returns EFAULT. This is a bounded
+ storage adapter, not a complete unified image/overlay filesystem. IO is bounded
+-to 4096 bytes per call. Metadata capacity remains 32 objects (including seeded
+-directories) and 64 independently opened files. Bytes grow on demand in anonymous
++to 4096 bytes per call. Metadata defaults to 32 objects (including seeded directories) and 64 independently
++opened files. `[storage].max_objects` permits 1–1000000 namespace slots. Bounded
++supervisor allocations hold namespace and backing metadata; their page-rounded
++bytes are charged before file data. Optional positive `[storage].max_bytes` caps
++file-data capacity. Data plus metadata must fit `[resources].memory_mib`; without
++max_bytes, data uses the remainder. Removed names with live descriptions retain
++their slots until final close. Bytes grow on demand in anonymous
+ supervisor mappings. Total mapped capacity, including page rounding and growth
+ reserve, is bounded by `[resources].memory_mib`, shared across files instead of
+ a 64 KiB per-file ceiling. This accounts for writable backing, not total process
+diff --git a/crates/ginux-domain/src/lib.rs b/crates/ginux-domain/src/lib.rs
+index d0077a7e..c4b2464d 100644
+--- a/crates/ginux-domain/src/lib.rs
++++ b/crates/ginux-domain/src/lib.rs
+@@ -130,6 +130,8 @@ pub struct DomainConfig {
+     pub execution_backend: ExecutionBackend,
+     pub contract_profile: Text<IDENTIFIER_BYTES>,
+     pub storage: TextList<ASSIGNMENT_ITEMS, ASSIGNMENT_BYTES>,
++    pub storage_max_objects: u64,
++    pub storage_max_bytes: u64,
+     pub devices: TextList<ASSIGNMENT_ITEMS, ASSIGNMENT_BYTES>,
+     pub network_backend: NetworkBackend,
+     pub audit_mode: AuditMode,
+@@ -208,6 +210,8 @@ struct ConfigBuilder {
+     execution_backend: ExecutionBackend,
+     contract_profile: Text<IDENTIFIER_BYTES>,
+     storage: TextList<ASSIGNMENT_ITEMS, ASSIGNMENT_BYTES>,
++    storage_max_objects: u64,
++    storage_max_bytes: u64,
+     devices: TextList<ASSIGNMENT_ITEMS, ASSIGNMENT_BYTES>,
+     network_backend: NetworkBackend,
+     audit_mode: AuditMode,
+@@ -231,6 +235,8 @@ impl ConfigBuilder {
+             execution_backend: ExecutionBackend::Interpreter,
+             contract_profile: Text::empty(),
+             storage: TextList::empty(),
++            storage_max_objects: 32,
++            storage_max_bytes: 0,
+             devices: TextList::empty(),
+             network_backend: NetworkBackend::None,
+             audit_mode: AuditMode::Stderr,
+@@ -271,6 +277,8 @@ impl ConfigBuilder {
+             execution_backend: self.execution_backend,
+             contract_profile: self.contract_profile,
+             storage: self.storage,
++            storage_max_objects: self.storage_max_objects,
++            storage_max_bytes: self.storage_max_bytes,
+             devices: self.devices,
+             network_backend: self.network_backend,
+             audit_mode: self.audit_mode,
+@@ -321,6 +329,14 @@ impl DomainConfig {
+             validate_domain_path(self.workdir.as_bytes())?;
+         }
+         validate_identifier(self.contract_profile.as_bytes())?;
++        if !(1..=1_000_000).contains(&self.storage_max_objects)
++            || self
++                .memory_mib
++                .checked_mul(1024 * 1024)
++                .is_none_or(|limit| self.storage_max_bytes > limit)
++        {
++            return Err(ConfigError::InvalidValue);
++        }
+         if !(1..=64).contains(&self.vcpus) || !(16..=1_048_576).contains(&self.memory_mib) {
+             return Err(ConfigError::InvalidValue);
+         }
+@@ -390,6 +406,12 @@ impl DomainConfig {
+         output.quoted(self.contract_profile.as_bytes())?;
+         output.raw(b"\n\n[storage]\nassignments = ")?;
+         output.list(self.storage.as_slice())?;
++        output.raw(b"\nmax_objects = ")?;
++        output.number(self.storage_max_objects)?;
++        if self.storage_max_bytes != 0 {
++            output.raw(b"\nmax_bytes = ")?;
++            output.number(self.storage_max_bytes)?;
++        }
+         output.raw(b"\n\n[devices]\nassignments = ")?;
+         output.list(self.devices.as_slice())?;
+         output.raw(b"\n\n[network]\nbackend = ")?;
+@@ -590,6 +612,17 @@ fn parse_field(
+             builder.mark(1 << 11)?;
+             builder.storage = parse_list(value)?;
+         }
++        (Section::Storage, b"max_objects") => {
++            builder.mark(1 << 17)?;
++            builder.storage_max_objects = parse_u64(value)?;
++        }
++        (Section::Storage, b"max_bytes") => {
++            builder.mark(1 << 18)?;
++            builder.storage_max_bytes = parse_u64(value)?;
++            if builder.storage_max_bytes == 0 {
++                return Err(ConfigError::InvalidValue);
++            }
++        }
+         (Section::Devices, b"assignments") => {
+             builder.mark(1 << 12)?;
+             builder.devices = parse_list(value)?;
+@@ -923,6 +956,34 @@ mode = "stderr"
+ policy = "stop"
+ "#;
+ 
++    #[test]
++    fn storage_bounds_are_explicit_and_round_trip() {
++        use std::format;
++        let text = VALID.replace(
++            "[storage]",
++            "[storage]\nmax_objects = 8192\nmax_bytes = 8388608",
++        );
++        let config = DomainConfig::parse(text.as_bytes()).unwrap();
++        assert_eq!(config.storage_max_objects, 8192);
++        assert_eq!(config.storage_max_bytes, 8388608);
++        let normalized = config.normalized().unwrap();
++        assert_eq!(DomainConfig::parse(normalized.as_bytes()).unwrap(), config);
++        for field in [
++            "max_objects = 0",
++            "max_objects = 1000001",
++            "max_bytes = 0",
++            "max_bytes = 18446744073709551615",
++            "max_objects = 1\nmax_objects = 2",
++        ] {
++            assert!(DomainConfig::parse(
++                VALID
++                    .replace("[storage]", &format!("[storage]\n{field}"))
++                    .as_bytes()
++            )
++            .is_err());
++        }
++    }
++
+     #[test]
+     fn parses_and_normalizes_versioned_config() {
+         let config = DomainConfig::parse(VALID.as_bytes()).unwrap();
+diff --git a/crates/ginux-init/src/fs_hooks.rs b/crates/ginux-init/src/fs_hooks.rs
+index 6dd53976..cafad728 100644
+--- a/crates/ginux-init/src/fs_hooks.rs
++++ b/crates/ginux-init/src/fs_hooks.rs
+@@ -2,7 +2,7 @@
+ //! the supervisor; no writable host descriptor is installed in the workload.
+ //! Retained storage, mappings and generated-file exec are not provided.
+ 
+-use crate::storage_memory::MemoryStorage;
++use crate::storage_memory::{MappedArray, MemoryStorage};
+ use crate::supervisor::UserRegs;
+ use crate::tracee_io::{copy_memory, read_path};
+ use core::sync::atomic::{AtomicBool, Ordering};
+@@ -15,8 +15,8 @@ use ginux_vfs::{
+ pub const FD_BASE: usize = 1 << 20;
+ const IO_SIZE: usize = 4096;
+ type Path = Text<MAX_PATH>;
+-const OBJECTS: usize = 32;
+-type MemoryFs = VirtualFs<'static, EmptyReader, OBJECTS, 0, 64, MemoryStorage<OBJECTS>>;
++type MemoryFs =
++    VirtualFs<'static, EmptyReader, 0, 0, 64, MemoryStorage, MappedArray<ginux_vfs::OverlayFile>>;
+ static mut ROOT_INDEX: [u8; HEADER_SIZE + RECORD_SIZE] = [0; HEADER_SIZE + RECORD_SIZE];
+ static ROOT_INITIALIZED: AtomicBool = AtomicBool::new(false);
+ 
+@@ -87,15 +87,39 @@ impl LaunchFs {
+             record.try_into().unwrap(),
+         )
+         .map_err(|_| b"invalid storage root index".as_slice())?;
+-        let mut fs = MemoryFs::with_storage(
++        let objects = usize::try_from(config.storage_max_objects)
++            .map_err(|_| b"storage object capacity exceeds address space".as_slice())?;
++        let metadata = MappedArray::<ginux_vfs::OverlayFile>::bytes_for(objects)
++            .and_then(|n| {
++                MemoryStorage::metadata_bytes(objects)
++                    .and_then(|m| n.checked_add(m).ok_or(VfsError::OverlayLimit))
++            })
++            .map_err(|_| b"storage metadata size overflow".as_slice())?;
++        let memory = usize::try_from(config.memory_mib)
++            .ok()
++            .and_then(|mib| mib.checked_mul(1024 * 1024))
++            .ok_or(b"memory storage capacity exceeds address space".as_slice())?;
++        let available = memory
++            .checked_sub(metadata)
++            .ok_or(b"storage metadata exceeds memory bound".as_slice())?;
++        let limit = if config.storage_max_bytes == 0 {
++            available
++        } else {
++            let limit = usize::try_from(config.storage_max_bytes)
++                .map_err(|_| b"storage data capacity exceeds address space".as_slice())?;
++            if limit > available {
++                return Err(b"storage data and metadata exceed memory bound");
++            }
++            limit
++        };
++        let namespace = MappedArray::new(objects, ginux_vfs::OverlayFile::empty())
++            .map_err(|_| b"storage namespace allocation failed".as_slice())?;
++        let mut fs = MemoryFs::with_namespace(
+             Index::new(index_bytes).map_err(|_| b"invalid storage root index".as_slice())?,
+             EmptyReader,
+-            MemoryStorage::new(
+-                usize::try_from(config.memory_mib)
+-                    .ok()
+-                    .and_then(|mib| mib.checked_mul(1024 * 1024))
+-                    .ok_or(b"memory storage capacity exceeds address space".as_slice())?,
+-            ),
++            MemoryStorage::new(limit, objects)
++                .map_err(|_| b"storage metadata allocation failed".as_slice())?,
++            namespace,
+         );
+         for prefix in &prefixes[..count] {
+             let path = prefix.as_bytes();
+diff --git a/crates/ginux-init/src/storage_memory.rs b/crates/ginux-init/src/storage_memory.rs
+index 77d2cf3a..cb622b8e 100644
+--- a/crates/ginux-init/src/storage_memory.rs
++++ b/crates/ginux-init/src/storage_memory.rs
+@@ -11,25 +11,88 @@ struct Mapping {
+     address: usize,
+     capacity: usize,
+ }
++impl Mapping {
++    const EMPTY: Self = Self {
++        address: 0,
++        capacity: 0,
++    };
++}
+ 
+-pub struct MemoryStorage<const FILES: usize> {
+-    files: [Mapping; FILES],
++/// Supervisor allocation with an explicit capacity and a small stack footprint.
++/// Every element is initialized before slices are formed; Drop returns pages.
++pub struct MappedArray<T: Copy> {
++    address: *mut T,
++    length: usize,
++    bytes: usize,
++}
++impl<T: Copy> MappedArray<T> {
++    pub fn new(length: usize, initial: T) -> Result<Self, VfsError> {
++        let bytes = Self::bytes_for(length)?;
++        let address = unsafe { syscall6(9, 0, bytes, 3, 0x22, usize::MAX, 0) };
++        if address < 0 {
++            return Err(VfsError::OverlayLimit);
++        }
++        let address = address as *mut T;
++        for index in 0..length {
++            unsafe {
++                address.add(index).write(initial);
++            }
++        }
++        Ok(Self {
++            address,
++            length,
++            bytes,
++        })
++    }
++    pub fn bytes_for(length: usize) -> Result<usize, VfsError> {
++        if core::mem::align_of::<T>() > PAGE {
++            return Err(VfsError::OverlayLimit);
++        }
++        length
++            .checked_mul(core::mem::size_of::<T>())
++            .and_then(|n| n.checked_add(PAGE - 1))
++            .map(|n| n & !(PAGE - 1))
++            .filter(|n| *n != 0 && *n <= isize::MAX as usize)
++            .ok_or(VfsError::OverlayLimit)
++    }
++}
++impl<T: Copy> core::ops::Deref for MappedArray<T> {
++    type Target = [T];
++    fn deref(&self) -> &[T] {
++        unsafe { core::slice::from_raw_parts(self.address, self.length) }
++    }
++}
++impl<T: Copy> core::ops::DerefMut for MappedArray<T> {
++    fn deref_mut(&mut self) -> &mut [T] {
++        unsafe { core::slice::from_raw_parts_mut(self.address, self.length) }
++    }
++}
++impl<T: Copy> Drop for MappedArray<T> {
++    fn drop(&mut self) {
++        assert_eq!(
++            unsafe { syscall2(11, self.address as usize, self.bytes) },
++            0
++        );
++    }
++}
++
++pub struct MemoryStorage {
++    files: MappedArray<Mapping>,
+     limit: usize,
+     allocated: usize,
+ }
+ 
+-impl<const FILES: usize> MemoryStorage<FILES> {
+-    pub const fn new(limit: usize) -> Self {
+-        Self {
+-            files: [Mapping {
+-                address: 0,
+-                capacity: 0,
+-            }; FILES],
++impl MemoryStorage {
++    pub fn metadata_bytes(objects: usize) -> Result<usize, VfsError> {
++        MappedArray::<Mapping>::bytes_for(objects)
++    }
++    pub fn new(limit: usize, objects: usize) -> Result<Self, VfsError> {
++        Ok(Self {
++            files: MappedArray::new(objects, Mapping::EMPTY)?,
+             limit,
+             allocated: 0,
+-        }
++        })
+     }
+-
+     pub fn allocated_bytes(&self) -> usize {
+         self.allocated
+     }
+@@ -72,7 +135,7 @@ impl<const FILES: usize> MemoryStorage<FILES> {
+     }
+ }
+ 
+-impl<const FILES: usize> OverlayStorage for MemoryStorage<FILES> {
++impl OverlayStorage for MemoryStorage {
+     fn resize(&mut self, slot: usize, old_len: usize, new_len: usize) -> Result<(), VfsError> {
+         let previous = self.files[slot];
+         if old_len > previous.capacity {
+diff --git a/crates/ginux-vfs/src/lib.rs b/crates/ginux-vfs/src/lib.rs
+index f1ffb93d..29ad2b04 100644
+--- a/crates/ginux-vfs/src/lib.rs
++++ b/crates/ginux-vfs/src/lib.rs
+@@ -1,5 +1,7 @@
+ #![no_std]
+ 
++use core::ops::{Deref, DerefMut};
++
+ pub const INDEX_MAGIC: &[u8; 8] = b"GINUXVFS";
+ pub const INDEX_VERSION: u32 = 1;
+ pub const HEADER_SIZE: usize = 64;
+@@ -358,7 +360,7 @@ fn child_name<'a>(directory: &[u8], path: &'a [u8]) -> Option<&'a [u8]> {
+ }
+ 
+ #[derive(Clone, Copy)]
+-struct OverlayFile {
++pub struct OverlayFile {
+     state: u8,
+     path: Path,
+     mode: u32,
+@@ -366,7 +368,7 @@ struct OverlayFile {
+ }
+ 
+ impl OverlayFile {
+-    const fn empty() -> Self {
++    pub const fn empty() -> Self {
+         Self {
+             state: 0,
+             path: Path::new(),
+@@ -412,7 +414,8 @@ impl Descriptor {
+ /// resize preserves the previous readable contents and zeroes newly exposed
+ /// bytes on success. Reads/writes within that length must not allocate; failed
+ /// writes leave their range unchanged. Clear is idempotent.
+-/// Slots are owned by VirtualFs and are always below its FILES bound.
++/// Slots are owned by VirtualFs and are below its namespace capacity.
++/// A custom namespace and storage must provide matching slot capacities.
+ pub trait OverlayStorage {
+     fn resize(&mut self, slot: usize, old_len: usize, new_len: usize) -> Result<(), VfsError>;
+     fn read(&self, slot: usize, offset: usize, output: &mut [u8]) -> Result<(), VfsError>;
+@@ -465,6 +468,21 @@ impl<const FILES: usize, const FILE_SIZE: usize> OverlayStorage
+     }
+ }
+ 
++/// Inline names for freestanding users. Larger adapters may supply a bounded
++/// namespace backed by their own allocation instead of a giant stack array.
++pub struct InlineNamespace<const FILES: usize>([OverlayFile; FILES]);
++impl<const FILES: usize> Deref for InlineNamespace<FILES> {
++    type Target = [OverlayFile];
++    fn deref(&self) -> &Self::Target {
++        &self.0
++    }
++}
++impl<const FILES: usize> DerefMut for InlineNamespace<FILES> {
++    fn deref_mut(&mut self) -> &mut Self::Target {
++        &mut self.0
++    }
++}
++
+ pub struct VirtualFs<
+     'a,
+     R,
+@@ -472,10 +490,11 @@ pub struct VirtualFs<
+     const FILE_SIZE: usize,
+     const FDS: usize,
+     S = InlineStorage<FILES, FILE_SIZE>,
++    N = InlineNamespace<FILES>,
+ > {
+     index: Index<'a>,
+     reader: R,
+-    overlay: [OverlayFile; FILES],
++    overlay: N,
+     storage: S,
+     descriptors: [Descriptor; FDS],
+     positions: [usize; FDS],
+@@ -503,11 +522,37 @@ impl<
+             index,
+             reader,
+             storage,
+-            overlay: [OverlayFile::empty(); FILES],
++            overlay: InlineNamespace([OverlayFile::empty(); FILES]),
++            descriptors: [Descriptor::empty(); FDS],
++            positions: [0; FDS],
++        }
++    }
++}
++
++impl<
++        'a,
++        R: BaseReader,
++        const FILES: usize,
++        const FILE_SIZE: usize,
++        const FDS: usize,
++        S: OverlayStorage,
++        N: Deref<Target = [OverlayFile]> + DerefMut,
++    > VirtualFs<'a, R, FILES, FILE_SIZE, FDS, S, N>
++{
++    /// Storage must service every slot in the supplied empty namespace.
++    pub fn with_namespace(index: Index<'a>, reader: R, storage: S, namespace: N) -> Self {
++        Self {
++            index,
++            reader,
++            storage,
++            overlay: namespace,
+             descriptors: [Descriptor::empty(); FDS],
+             positions: [0; FDS],
+         }
+     }
++    pub fn namespace_capacity(&self) -> usize {
++        self.overlay.len()
++    }
+ 
+     pub fn storage(&self) -> &S {
+         &self.storage
+@@ -710,7 +755,7 @@ impl<
+             }));
+         }
+         let start = usize::try_from(cookie - 2).map_err(|_| VfsError::InvalidPath)?;
+-        for ordinal in start..self.index.len() + FILES {
++        for ordinal in start..self.index.len() + self.overlay.len() {
+             if ordinal < self.index.len() {
+                 let entry = self.index.entry(ordinal)?;
+                 if self.find_overlay(entry.path).is_some() {
+@@ -888,7 +933,7 @@ impl<
+     }
+ 
+     pub fn teardown(&mut self) {
+-        for slot in 0..FILES {
++        for slot in 0..self.overlay.len() {
+             self.storage.clear(slot);
+         }
+         self.overlay.fill(OverlayFile::empty());
+@@ -1078,7 +1123,7 @@ impl<
+             Err(error) => return Err(error),
+         };
+         // Check every new descendant path before changing any namespace entry.
+-        for entry in &self.overlay {
++        for entry in self.overlay.iter() {
+             if matches!(entry.state, 1 | 3) && beneath(entry.path.as_bytes(), source.as_bytes()) {
+                 let suffix = entry.path.len - source.len;
+                 if destination
+@@ -1094,7 +1139,7 @@ impl<
+             self.overlay[target].state = 2;
+             self.release_unlinked(target);
+         }
+-        for entry in &mut self.overlay {
++        for entry in self.overlay.iter_mut() {
+             if matches!(entry.state, 1 | 3) && beneath(entry.path.as_bytes(), source.as_bytes()) {
+                 let mut path = destination;
+                 path.extend(&entry.path.as_bytes()[source.len..])?; // Preflight above guarantees capacity.
+@@ -1446,6 +1491,61 @@ mod tests {
+         }
+     }
+ 
++    #[test]
++    fn supplied_namespace_controls_capacity_without_changing_inline_defaults() {
++        let bytes = index_bytes();
++        let mut fs: VirtualFs<
++            '_,
++            Reader,
++            0,
++            16,
++            4,
++            InlineStorage<3, 16>,
++            std::vec::Vec<OverlayFile>,
++        > = VirtualFs::with_namespace(
++            Index::new(&bytes).unwrap(),
++            Reader(*b"BASETOOL"),
++            InlineStorage::default(),
++            std::vec![OverlayFile::empty(); 3],
++        );
++        assert_eq!(fs.namespace_capacity(), 3);
++        for name in [b"/one".as_slice(), b"/two", b"/three"] {
++            let fd = fs.open(name, O_CREATE | O_READ | O_WRITE).unwrap();
++            fs.write(fd, b"data").unwrap();
++            fs.close(fd).unwrap();
++        }
++        assert_eq!(
++            fs.open(b"/four", O_CREATE | O_WRITE),
++            Err(VfsError::OverlayLimit)
++        );
++        let dir = fs.open_directory(b"/", 0).unwrap();
++        let mut cookie = 0;
++        let mut found = 0;
++        while let Some(entry) = fs.directory_entry(dir, cookie).unwrap() {
++            if matches!(entry.name, b"one" | b"two" | b"three") {
++                found += 1;
++            }
++            cookie = entry.next;
++        }
++        assert_eq!(found, 3);
++        fs.close(dir).unwrap();
++
++        let fd = fs.open(b"/three", O_READ).unwrap();
++        fs.unlink(b"/three").unwrap();
++        assert_eq!(
++            fs.open(b"/four", O_CREATE | O_WRITE),
++            Err(VfsError::OverlayLimit)
++        );
++        let mut data = [0; 4];
++        assert_eq!(fs.read(fd, &mut data), Ok(4));
++        assert_eq!(&data, b"data");
++        fs.close(fd).unwrap();
++        let fd = fs.open(b"/four", O_CREATE | O_WRITE).unwrap();
++        fs.close(fd).unwrap();
++        fs.teardown();
++        assert_eq!(fs.overlay_files(), 0);
++    }
++
+     #[test]
+     fn resolves_links_before_parent_components_and_checks_each_directory() {
+         let bytes = index_bytes();
+diff --git a/scripts/test-launch-storage.py b/scripts/test-launch-storage.py
+index 4cf64e17..c9cdfe64 100644
+--- a/scripts/test-launch-storage.py
++++ b/scripts/test-launch-storage.py
+@@ -11,7 +11,7 @@ import tempfile
+ 
+ def main():
+     if len(sys.argv) < 3 or os.geteuid() != 0:
+-        sys.exit('usage (as root): test-launch-storage.py <ginux> <storage-fixture> [growth|bounds|quota|view-probes ...]')
++        sys.exit('usage (as root): test-launch-storage.py <ginux> <storage-fixture> [growth|bounds|quota|namespace|view-probes ...]')
+     binary, fixture = [str(Path(p).resolve()) for p in sys.argv[1:3]]
+     template = (Path(__file__).resolve().parent.parent / 'config/domain-gate5.toml').read_text()
+     with tempfile.TemporaryDirectory(prefix='ginux-storage-') as directory:
+@@ -33,6 +33,10 @@ def main():
+             config = config.replace('args = []', 'args = ' + json.dumps(args))
+             config = config.replace('memory_mib = 256', 'memory_mib = ' + str(memory))
+             config = config.replace('assignments = []', 'assignments = ' + json.dumps(assignments), 1)
++            if args == ['namespace']:
++                config = config.replace('[storage]\n', '[storage]\nmax_objects = 5003\n')
++            if args == ['bounds']:
++                config = config.replace('[storage]\n', '[storage]\nmax_bytes = 16777216\n')
+             config = config.replace('id = "gate5-demo"', 'id = "storage-fixture"\nworkdir = "/work"')
+             path = work / 'launch.toml'
+             path.write_text(config)
+@@ -54,10 +58,10 @@ def main():
+ 
+         if sys.argv[3:]:
+             for mode in sys.argv[3:]:
+-                if mode not in ('growth', 'bounds', 'quota', 'view-probes'):
++                if mode not in ('growth', 'bounds', 'quota', 'namespace', 'view-probes'):
+                     sys.exit('unknown selected storage scenario')
+                 invoke(['memory:/work', 'memory:/work/build', 'memory:/out'], [mode],
+-                       memory=16 if mode == 'bounds' else 256)
++                       memory=32 if mode == 'bounds' else (64 if mode == 'namespace' else 256))
+                 print(f'PASS launch storage: {mode}')
+             return
+         invoke(['memory:/work'], ['view-probes'])
+@@ -70,7 +74,8 @@ def main():
+         for _ in range(2):
+             invoke(['memory:/work', 'memory:/work/build', 'memory:/out'], [])
+         invoke(['memory:/work', 'memory:/work/build', 'memory:/out'], ['quota'])
+-        invoke(['memory:/work', 'memory:/work/build', 'memory:/out'], ['bounds'], memory=16)
++        invoke(['memory:/work', 'memory:/work/build', 'memory:/out'], ['bounds'], memory=32)
++        invoke(['memory:/work', 'memory:/work/build', 'memory:/out'], ['namespace'], memory=64)
+         invoke([], ['no-storage'])
+         for assignment in ['disk0', 'memory:/', 'memory:/proc', 'memory:/sys/x', 'memory:/dev',
+                            'memory:/bin', 'memory:/work/../out', 'memory:/work/', 'memory:work']:
+diff --git a/tests/fixtures/launch-storage-fixture.c b/tests/fixtures/launch-storage-fixture.c
+index e553487a..194f3031 100644
+--- a/tests/fixtures/launch-storage-fixture.c
++++ b/tests/fixtures/launch-storage-fixture.c
+@@ -24,10 +24,39 @@ __asm__(".global scratch_stat\nscratch_stat:\n"
+         "mov %rsi,%rdi\nmov %rdx,%rsi\nmov $4,%rax\nsyscall\n"
+         "cmp %r13,%rdi\njne 1f\ncmp %r14,%rsi\nje 2f\n"
+         "1: mov $-123,%rax\n2: mov %r12,%rsp\npop %r14\npop %r13\npop %r12\nret\n");
++static int equal(const char *a, const char *b) {
++    while (*a && *a==*b) { ++a; ++b; } return *a==*b;
++}
++static void numbered(char *path, word n) {
++    for(int digit=3;digit>=0;--digit) { path[10+digit]='0'+n%10; n/=10; }
++}
++static long namespace_scale(void) {
++    char path[]="/out/file-0000";
++    for(word n=0;n<5000;++n) {
++        numbered(path,n);
++        long fd=DO(2,path,0102,0600); CHECK(fd>=3,160);
++        CHECK(DO(1,fd,path+10,4)==4 && DO(3,fd,0,0)==0,161);
++    }
++    CHECK(DO(2,"/out/overflow",0102,0600)==-28,162);
++    for(word n=0;n<5000;++n) {
++        numbered(path,n);
++        long fd=DO(2,path,0,0); CHECK(fd>=3,163);
++        CHECK(DO(0,fd,output,4)==4,164);
++        for(word k=0;k<4;++k) CHECK(output[k]==path[10+k],165);
++        CHECK(DO(3,fd,0,0)==0,166);
++    }
++    numbered(path,4999);
++    long held=DO(2,path,0,0); CHECK(held>=3 && DO(87,path,0,0)==0,167);
++    CHECK(DO(2,"/out/replacement",0102,0600)==-28,168);
++    CHECK(DO(3,held,0,0)==0,169);
++    long fd=DO(2,"/out/replacement",0102,0600); CHECK(fd>=3 && DO(1,fd,"new",3)==3 && DO(3,fd,0,0)==0,170);
++    return 0;
++}
+ long storage_main(word *stack)
+ {
+     word argc = *stack;
+     char **argv = (char **)(stack + 1);
++    if(argc>1 && equal(argv[1],"namespace")) return namespace_scale();
+     if (argc > 1 && argv[1][0] == 'v') {
+         long fd=DO(2,"/work/probe",0102|0400,0600);
+         CHECK(fd>=3 && DO(1,fd,"ok",2)==2,145);

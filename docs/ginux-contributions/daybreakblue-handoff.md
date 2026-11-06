@@ -314,3 +314,28 @@ canonical-token rejection added through source review; its adversarial validatio
 and the previously listed boundary/FD/race/stack checks remain pending. VFS walker
 and native lookup are preserved. Full cross modes remain present and unrun here.
 No monitored agent was dispatched; security acceptance is still pending.
+
+
+## G18 — configurable namespace allocation/accounting (in progress)
+
+Local port starts on G09d85b53fe1, excluding unrelated exec/link/cwd/mapping/thread
+features. Ordinary local checks will create and read5000 nonempty files, exercise
+configured exhaustion, retain an unlinked open file and reclaim its slot on close.
+DaybreakBlue should validate adversarial configuration sizes, checked arithmetic,
+mapped-array initialization/alignment/lifetime, allocation failure and cleanup,
+metadata/data accounting under hostile state and future alias/pin interactions.
+Do not run malformed/bypass/protected-memory probes here. Public inline VFS defaults
+are preserved; namespace/backing capacities must match in the runtime adapter.
+No agent dispatch or outgoing message is implied; exact revision remains pending.
+
+
+### G18 exact retained revision
+
+Candidate f58ba480942e91ad7a0a43158a9c57496acc202a on G09d 85b53fe15a64041f451ec7e7aa1e77d08cb2c18a has91 routine units and5000 nonempty
+files with individual readback, configured exhaustion and unlinked-FD final-close
+reclamation passing in source/clean exports. [Review/evidence](g18-review.md) records
+checked metadata charging and explicit byte quota. Malicious configuration sizes,
+allocation failure/cleanup, unsafe pointer/alignment/initialization and future
+alias/cwd/executable/map interactions remain pending for security validation.
+Routine API/error units do not constitute that adversarial acceptance. No cloud
+agent was dispatched or security probes performed.
