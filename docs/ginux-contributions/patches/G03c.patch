@@ -1,0 +1,1362 @@
+From 5ee456348905c4985689053f259484706ac3c8c0 Mon Sep 17 00:00:00 2001
+From: vince <vincepaul.liem@gmail.com>
+Date: Fri, 6 Nov 2026 09:51:46 +0100
+Subject: [PATCH] feat(launch): add assigned ephemeral memory storage
+
+Keep configured writable files in supervisor memory, with bounded data,
+metadata and descriptors. Resolve paths component by component so image
+links cannot bypass assignment precedence or hide invalid parents.
+
+Cover storage isolation, copy protections, bounds and temporary native
+path restoration while retaining existing unit and integration checks.
+
+Signed-off-by: vince <vincepaul.liem@gmail.com>
+---
+ .github/workflows/check.yml             |   3 +-
+ Makefile                                |   9 +-
+ README.md                               |  37 ++
+ crates/ginux-init/src/fs_hooks.rs       | 599 +++++++++++++++++++++++-
+ crates/ginux-init/src/launch.rs         |  64 ++-
+ crates/ginux-init/src/main.rs           |   1 +
+ crates/ginux-init/src/path_hooks.rs     | 188 ++++++++
+ crates/ginux-vfs/src/lib.rs             |  13 +
+ scripts/test-launch-storage.py          |  71 +++
+ tests/fixtures/launch-storage-fixture.c | 180 +++++++
+ 10 files changed, 1139 insertions(+), 26 deletions(-)
+ create mode 100644 crates/ginux-init/src/path_hooks.rs
+ create mode 100644 scripts/test-launch-storage.py
+ create mode 100644 tests/fixtures/launch-storage-fixture.c
+
+diff --git a/.github/workflows/check.yml b/.github/workflows/check.yml
+index d7f05af2..9a0bec5e 100644
+--- a/.github/workflows/check.yml
++++ b/.github/workflows/check.yml
+@@ -24,8 +24,9 @@ jobs:
+     steps:
+       - uses: actions/checkout@v5
+       - run: rustup target add x86_64-unknown-linux-gnu
+-      - run: make build build-launch-fixture build-process-fixtures build-gate1-fixture
++      - run: make build build-launch-fixture build-launch-storage-fixture build-process-fixtures build-gate1-fixture
+       - run: sudo make test-launch
++      - run: sudo make test-launch-storage
+       - run: sudo make test-native-supervision
+       - run: make test-process-native
+       - run: sudo make test-gate1-setup
+diff --git a/Makefile b/Makefile
+index 47835b3c..a0f56acf 100644
+--- a/Makefile
++++ b/Makefile
+@@ -183,7 +183,7 @@ clean:
+ 	cargo clean
+ 	@./scripts/clean-build.sh
+ 
+-.PHONY: build-launch-fixture test-launch test-native-supervision
++.PHONY: build-launch-fixture test-launch test-native-supervision build-launch-storage-fixture test-launch-storage
+ build-launch-fixture:
+ 	mkdir -p .artifacts/launch
+ 	$(CC) -nostdlib -static -fno-stack-protector -fno-builtin -O2 -Wall -Wextra -Werror tests/fixtures/launch-fixture.c -o .artifacts/launch/launch-fixture
+@@ -194,3 +194,10 @@ test-launch:
+ 
+ test-native-supervision:
+ 	python3 scripts/test-native-supervision.py $(GINUX) .artifacts/launch/native-fixture
++
++build-launch-storage-fixture:
++	mkdir -p .artifacts/launch
++	$(CC) -nostdlib -static -fno-stack-protector -fno-builtin -O2 -Wall -Wextra -Werror tests/fixtures/launch-storage-fixture.c -o .artifacts/launch/launch-storage-fixture
++
++test-launch-storage:
++	python3 scripts/test-launch-storage.py $(GINUX) .artifacts/launch/launch-storage-fixture
+diff --git a/README.md b/README.md
+index 1700a0a4..fb504da2 100644
+--- a/README.md
++++ b/README.md
+@@ -215,6 +215,41 @@ child supervision is implemented. Non-x86-64 syscall ABIs and job-control
+ group stops fail explicitly. Audit output is capped at 64 KiB plus a truncation
+ notice. This path does not implement resource quotas from the domain metadata.
+ 
++Optional `[storage].assignments` entries of the form `"memory:/absolute/path"`
++declare empty, ephemeral writable namespaces. For example:
++
++```toml
++[storage]
++assignments = ["memory:/work", "memory:/work/build", "memory:/out"]
++```
++
++Each assignment creates its directory and parents in supervisor-owned memory.
++Overlapping assignments can precreate nested directories. Image files beneath
++an assigned path are hidden; missing files there never fall through to native
++storage. Paths must be canonical, unique, and cannot cover init, `/`, `/proc`,
++`/sys`, or `/dev`. Up to eight assignments fit the existing 64-byte entry bound.
++Without assignments, native image access remains read-only.
++
++This backend supports regular-file open/create/exclusive-create/truncate/append,
++read/write/pread, seek, close, basic descriptor flags, mkdir, file unlink, chmod,
++and stat/fstat/fstatat/statx metadata. Relative paths use the configured workdir;
++directory descriptors, directory enumeration/removal, symlinks, hardlinks,
++rename, duplicate descriptors, file mappings and execution of generated files
++are unsupported. Component-wise image-link traversal preserves assignment
++precedence, missing components and non-directory errors. Native image operations
++use a temporary canonical path below the stopped workload's stack; an unavailable
++scratch area or overlapping output buffer returns EFAULT. This is a bounded
++storage adapter, not a complete unified image/overlay filesystem. IO is bounded
++to 4096 bytes per call. Capacity is
++32 objects (including seeded directories), 65536 bytes per file and 64 open
++descriptors. Exhaustion returns `ENOSPC`, `EFBIG`, or `EMFILE` as appropriate.
++
++Virtual descriptors start at 1048576; bootstrap clamps the native descriptor
++soft/hard limits below that namespace while preserving lower inherited limits.
++Guest-memory copies respect page protections, including partial read copyout.
++No writable host descriptor is exposed. Data disappears at domain teardown;
++there is no retention, export, storage generation or configured storage quota.
++
+ When requested, the result file is reserved exclusively before launch, with
+ mode 0600 and a maximum path length of 512 bytes. Existing files are never
+ overwritten. After completion, it contains one synced JSON object:
+@@ -238,6 +273,8 @@ make build-gate1-fixture
+ sudo make test-gate1-setup
+ sudo make test-launch
+ sudo make test-native-supervision
++make build-launch-storage-fixture
++sudo make test-launch-storage
+ ```
+ 
+ ## Native process scenarios
+diff --git a/crates/ginux-init/src/fs_hooks.rs b/crates/ginux-init/src/fs_hooks.rs
+index b75d7015..8034a09d 100644
+--- a/crates/ginux-init/src/fs_hooks.rs
++++ b/crates/ginux-init/src/fs_hooks.rs
+@@ -1,18 +1,589 @@
+-//! Native filesystem-lane dispatch hooks.
+-//!
+-//! Owner: G-files lane. Next task: G06 adds domain directory and
+-//! working-directory operations. Until then every hook declines and the
+-//! supervisor keeps its existing behavior byte-identical.
+-
+-/// Lane membership by syscall number. Reserved for G06+.
+-pub fn claims(syscall: u64) -> bool {
+-    let _ = syscall;
+-    false
++//! Configured-launch ephemeral memory storage. Bytes and descriptors belong to
++//! the supervisor; no writable host descriptor is installed in the workload.
++//! Retained storage, directory descriptors, mappings and exec are not provided.
++
++use crate::supervisor::{syscall4, syscall6, UserRegs};
++use core::sync::atomic::{AtomicBool, Ordering};
++use ginux_domain::{DomainConfig, Text};
++use ginux_vfs::{
++    BaseReader, Entry, FileMetadata, Index, NodeKind, VfsError, VirtualFs, HEADER_SIZE, MAX_PATH,
++    O_APPEND, O_CLOEXEC, O_CREATE, O_EXCLUSIVE, O_READ, O_TRUNC, O_WRITE, RECORD_SIZE,
++};
++
++pub const FD_BASE: usize = 1 << 20;
++const IO_SIZE: usize = 4096;
++type Path = Text<MAX_PATH>;
++type MemoryFs = VirtualFs<'static, EmptyReader, 32, 65536, 64>;
++static mut ROOT_INDEX: [u8; HEADER_SIZE + RECORD_SIZE] = [0; HEADER_SIZE + RECORD_SIZE];
++static ROOT_INITIALIZED: AtomicBool = AtomicBool::new(false);
++
++pub struct EmptyReader;
++impl BaseReader for EmptyReader {
++    fn read_at(&mut self, _: u64, _: &mut [u8]) -> Result<(), VfsError> {
++        Err(VfsError::Io)
++    }
++}
++
++pub struct LaunchFs {
++    fs: MemoryFs,
++    prefixes: [Path; 8],
++    count: usize,
++    cwd: Path,
+ }
+ 
+-/// Emulated result when this lane handles the entry. `None` falls through to
+-/// the shared balanced-contract decision. Reserved for G06+.
+-pub fn claim(syscall: u64, rdi: u64, rsi: u64, rdx: u64) -> Option<i64> {
+-    let _ = (syscall, rdi, rsi, rdx);
++impl LaunchFs {
++    /// Called once, before fork. Assignments are domain paths, never host paths.
++    pub fn prepare(config: &DomainConfig) -> Result<Self, &'static [u8]> {
++        let mut prefixes = [Path::empty(); 8];
++        let mut count = 0;
++        for assignment in config.storage.as_slice() {
++            let path = assignment
++                .as_bytes()
++                .strip_prefix(b"memory:")
++                .ok_or(b"unsupported launch storage assignment".as_slice())?;
++            if path.len() < 2
++                || path[0] != b'/'
++                || path.ends_with(b"/")
++                || path
++                    .split(|b| *b == b'/')
++                    .skip(1)
++                    .any(|p| p.is_empty() || p == b"." || p == b"..")
++                || [b"/proc".as_slice(), b"/sys", b"/dev"]
++                    .iter()
++                    .any(|r| within(path, r) || within(r, path))
++                || within(config.init.as_bytes(), path)
++                || within(path, config.init.as_bytes())
++                || prefixes[..count].iter().any(|p| p.as_bytes() == path)
++            {
++                return Err(b"invalid launch memory-storage path");
++            }
++            prefixes[count] =
++                Path::from_bytes(path).map_err(|_| b"storage path exceeds bound".as_slice())?;
++            count += 1;
++        }
++        // Root-only index: writable opens cannot copy image files into memory.
++        // Never mutate the static index while any existing view can borrow it.
++        if ROOT_INITIALIZED.swap(true, Ordering::Relaxed) {
++            return Err(b"launch filesystem already initialized");
++        }
++        let index_bytes = unsafe { &mut *core::ptr::addr_of_mut!(ROOT_INDEX) };
++        let (header, record) = index_bytes.split_at_mut(HEADER_SIZE);
++        ginux_vfs::encode_header(1, header.try_into().unwrap());
++        ginux_vfs::encode_record(
++            Entry {
++                path: b"/",
++                kind: NodeKind::Directory,
++                mode: 0o755,
++                uid: 0,
++                gid: 0,
++                size: 0,
++                data_offset: 0,
++                link: b"",
++            },
++            record.try_into().unwrap(),
++        )
++        .map_err(|_| b"invalid storage root index".as_slice())?;
++        let mut fs = MemoryFs::new(
++            Index::new(index_bytes).map_err(|_| b"invalid storage root index".as_slice())?,
++            EmptyReader,
++        );
++        for prefix in &prefixes[..count] {
++            let path = prefix.as_bytes();
++            for end in 1..=path.len() {
++                if end == path.len() || path[end] == b'/' {
++                    match fs.mkdir(&path[..end], 0o755) {
++                        Ok(()) | Err(VfsError::AlreadyExists) => {}
++                        Err(_) => return Err(b"memory storage directory capacity exceeded"),
++                    }
++                }
++            }
++        }
++        Ok(Self {
++            fs,
++            prefixes,
++            count,
++            cwd: Path::from_bytes(config.workdir.as_bytes())
++                .map_err(|_| b"storage workdir exceeds bound".as_slice())?,
++        })
++    }
++
++    pub fn enabled(&self) -> bool {
++        self.count != 0
++    }
++
++    /// Native open/dup cannot obtain descriptors in the virtual namespace.
++    pub fn reserve_descriptors(&self) -> bool {
++        if !self.enabled() {
++            return true;
++        }
++        let mut limits = [0u64; 2];
++        if unsafe { syscall4(302, 0, 7, 0, limits.as_mut_ptr() as usize) } < 0 {
++            return false;
++        }
++        limits[0] = limits[0].min(FD_BASE as u64);
++        limits[1] = limits[1].min(FD_BASE as u64);
++        unsafe { syscall4(302, 0, 7, limits.as_ptr() as usize, 0) == 0 }
++    }
++
++    fn owns_path(&self, path: &[u8]) -> bool {
++        self.prefixes[..self.count]
++            .iter()
++            .any(|p| within(path, p.as_bytes()))
++    }
++
++    fn path(&self, pid: usize, address: u64, dirfd: u64) -> Result<Path, i64> {
++        let text = read_path(pid, address)?;
++        if text.is_empty() {
++            return Err(-2);
++        }
++        let absolute = text.as_bytes().first() == Some(&b'/');
++        if !absolute && dirfd as i32 != -100 {
++            return Err(if dirfd as i32 >= FD_BASE as i32 {
++                -20
++            } else {
++                -9
++            });
++        }
++        let mut bytes = [0; MAX_PATH];
++        let base = if absolute {
++            b"".as_slice()
++        } else {
++            self.cwd.as_bytes()
++        };
++        let separator = usize::from(!base.is_empty() && base != b"/");
++        let end = base
++            .len()
++            .checked_add(separator)
++            .and_then(|n| n.checked_add(text.as_bytes().len()))
++            .filter(|n| *n < MAX_PATH)
++            .ok_or(-36)?;
++        bytes[..base.len()].copy_from_slice(base);
++        if separator != 0 {
++            bytes[base.len()] = b'/';
++        }
++        bytes[base.len() + separator..end].copy_from_slice(text.as_bytes());
++        Path::from_bytes(&bytes[..end]).map_err(|_| -36)
++    }
++
++    fn resolve(&self, pid: usize, path: &[u8], follow: bool, missing: bool) -> Result<Path, i64> {
++        let image = crate::path_hooks::ImageRoot::new(pid)?;
++        let mut output = [0; MAX_PATH];
++        let n = ginux_vfs::resolve_namespace(path, follow, missing, &mut output, |path, target| {
++            if self.owns_path(path)
++                || path != b"/"
++                    && self.prefixes[..self.count]
++                        .iter()
++                        .any(|prefix| within(prefix.as_bytes(), path))
++            {
++                return self.fs.metadata(path).map(|m| (m.kind, 0));
++            }
++            image.lookup(path, target)
++        })
++        .map_err(errno)?;
++        Path::from_bytes(&output[..n]).map_err(|_| -36)
++    }
++
++    fn request_path(&self, pid: usize, r: &UserRegs) -> Result<Option<(u8, Path)>, i64> {
++        let (argument, address, dirfd, follow, missing) = match r.orig_rax {
++            2 => (
++                0,
++                r.rdi,
++                (-100i64) as u64,
++                r.rsi & 0o400000 == 0 && r.rsi & 0o300 != 0o300,
++                r.rsi & 0o100 != 0,
++            ),
++            257 => (
++                1,
++                r.rsi,
++                r.rdi,
++                r.rdx & 0o400000 == 0 && r.rdx & 0o300 != 0o300,
++                r.rdx & 0o100 != 0,
++            ),
++            4 | 21 | 90 => (0, r.rdi, (-100i64) as u64, true, false),
++            6 | 87 | 89 => (0, r.rdi, (-100i64) as u64, false, false),
++            83 => (0, r.rdi, (-100i64) as u64, false, true),
++            258 => (1, r.rsi, r.rdi, false, true),
++            262 => (1, r.rsi, r.rdi, r.r10 & 0x100 == 0, false),
++            263 => (1, r.rsi, r.rdi, false, false),
++            268 => (1, r.rsi, r.rdi, true, false),
++            332 => (1, r.rsi, r.rdi, r.rdx & 0x100 == 0, false),
++            439 => (1, r.rsi, r.rdi, r.r10 & 0x100 == 0, false),
++            _ => return Ok(None),
++        };
++        if matches!(r.orig_rax, 262 | 332 | 439)
++            && (dirfd as i32) < FD_BASE as i32
++            && read_path(pid, address)?.is_empty()
++        {
++            return Ok(None);
++        }
++        let path = self.path(pid, address, dirfd)?;
++        self.resolve(pid, path.as_bytes(), follow, missing)
++            .map(|p| Some((argument, p)))
++    }
++
++    /// Canonical image paths preserve assignment precedence even through links
++    /// and parent components; the kernel never follows a hidden image subtree.
++    pub fn native_path(&self, pid: usize, r: &UserRegs) -> Result<Option<(u8, Path)>, i64> {
++        if !self.enabled() {
++            return Ok(None);
++        }
++        let Some((argument, path)) = self.request_path(pid, r)? else {
++            return Ok(None);
++        };
++        if self.owns_path(path.as_bytes()) {
++            return Ok(None);
++        }
++        let raw = read_path(pid, if argument == 0 { r.rdi } else { r.rsi })?;
++        if raw == path {
++            return Ok(None);
++        }
++        Ok(Some((argument, path)))
++    }
++
++    /// Configured-launch dispatch only; demo paths keep their existing contract.
++    pub fn claim(&mut self, pid: usize, r: &UserRegs) -> Option<i64> {
++        if !self.enabled() {
++            return None;
++        }
++        let fd = r.rdi as i32;
++        if matches!(
++            r.orig_rax,
++            0 | 1 | 3 | 5 | 8 | 16 | 17 | 18 | 19 | 20 | 32 | 33 | 72 | 74 | 75 | 77 | 91 | 292
++        ) && fd >= FD_BASE as i32
++        {
++            return Some(self.descriptor_call(pid, r, fd - FD_BASE as i32 + 3));
++        }
++        if matches!(r.orig_rax, 262 | 332) {
++            match read_path(pid, r.rsi) {
++                Ok(p) if p.is_empty() && fd >= FD_BASE as i32 => {
++                    return Some(self.descriptor_call(pid, r, fd - FD_BASE as i32 + 3))
++                }
++                Ok(p) if p.is_empty() => return None,
++                Err(error) => return Some(error),
++                _ => {}
++            }
++        }
++        let path = match self.request_path(pid, r) {
++            Ok(Some((_, path))) => path,
++            Ok(None) => return None,
++            Err(error) => return Some(error),
++        };
++        if !self.owns_path(path.as_bytes()) {
++            return None;
++        }
++        let result = match r.orig_rax {
++            2 => self.open(path.as_bytes(), r.rsi, r.rdx),
++            257 => self.open(path.as_bytes(), r.rdx, r.r10),
++            4 | 6 => self.stat(pid, path.as_bytes(), r.rsi, false),
++            262 => {
++                if r.r10 & !0x1900 != 0 {
++                    Err(-22)
++                } else {
++                    self.stat(pid, path.as_bytes(), r.rdx, false)
++                }
++            }
++            332 => {
++                if !valid_statx(r.rdx, r.r10) {
++                    Err(-22)
++                } else {
++                    self.stat(pid, path.as_bytes(), r.r8, true)
++                }
++            }
++            83 => self
++                .fs
++                .mkdir(path.as_bytes(), r.rsi as u32 & 0o755)
++                .map(|_| 0)
++                .map_err(errno),
++            258 => self
++                .fs
++                .mkdir(path.as_bytes(), r.rdx as u32 & 0o755)
++                .map(|_| 0)
++                .map_err(errno),
++            87 => self.fs.unlink(path.as_bytes()).map(|_| 0).map_err(errno),
++            263 => {
++                if r.rdx != 0 {
++                    Err(-95)
++                } else {
++                    self.fs.unlink(path.as_bytes()).map(|_| 0).map_err(errno)
++                }
++            }
++            90 => self
++                .fs
++                .chmod(path.as_bytes(), r.rsi as u32)
++                .map(|_| 0)
++                .map_err(errno),
++            268 => self
++                .fs
++                .chmod(path.as_bytes(), r.rdx as u32)
++                .map(|_| 0)
++                .map_err(errno),
++            _ => Err(-95),
++        };
++        Some(result.unwrap_or_else(|error| error))
++    }
++
++    fn open(&mut self, path: &[u8], flags: u64, mode: u64) -> Result<i64, i64> {
++        // NOFOLLOW is valid because this backend has no symlinks. Unsupported
++        // directory/path-only behavior never falls through to native storage.
++        const ALLOWED: u64 = 3 | 0o100 | 0o200 | 0o1000 | 0o2000 | 0o100000 | 0o400000 | 0o2000000;
++        if flags & !ALLOWED != 0 || flags & 3 == 3 {
++            return Err(-95);
++        }
++        let mut translated = match flags & 3 {
++            0 => O_READ,
++            1 => O_WRITE,
++            _ => O_READ | O_WRITE,
++        };
++        for (native, internal) in [
++            (0o100, O_CREATE),
++            (0o200, O_EXCLUSIVE),
++            (0o1000, O_TRUNC),
++            (0o2000, O_APPEND),
++            (0o2000000, O_CLOEXEC),
++        ] {
++            if flags & native != 0 {
++                translated |= internal;
++            }
++        }
++        let existed = self.fs.metadata(path).is_ok();
++        let fd = self.fs.open(path, translated).map_err(errno)?;
++        if !existed && flags & 0o100 != 0 {
++            self.fs.fchmod(fd, mode as u32 & 0o755).map_err(errno)?;
++        }
++        Ok(FD_BASE as i64 + fd as i64 - 3)
++    }
++
++    fn stat(&self, pid: usize, path: &[u8], destination: u64, statx: bool) -> Result<i64, i64> {
++        copy_metadata(
++            pid,
++            destination,
++            self.fs.metadata(path).map_err(errno)?,
++            statx,
++        )
++    }
++
++    fn descriptor_call(&mut self, pid: usize, r: &UserRegs, fd: i32) -> i64 {
++        let result = match r.orig_rax {
++            0 => self.read(pid, fd, r.rsi, r.rdx, None),
++            17 => self.read(pid, fd, r.rsi, r.rdx, Some(r.r10 as i64)),
++            1 => self.write(pid, fd, r.rsi, r.rdx),
++            3 => self.fs.close(fd).map(|_| 0).map_err(errno),
++            5 => self
++                .fs
++                .fstat(fd)
++                .map_err(errno)
++                .and_then(|m| copy_metadata(pid, r.rsi, m, false)),
++            8 => self
++                .fs
++                .seek(fd, r.rsi as i64, r.rdx as u32)
++                .map(|n| n as i64)
++                .map_err(errno),
++            91 => self.fs.fchmod(fd, r.rsi as u32).map(|_| 0).map_err(errno),
++            72 => self
++                .fs
++                .descriptor_flags(fd)
++                .map_err(errno)
++                .and_then(|(flags, cloexec)| match r.rsi {
++                    1 => Ok(cloexec as i64),
++                    2 if r.rdx & !1 == 0 => self
++                        .fs
++                        .set_close_on_exec(fd, r.rdx != 0)
++                        .map(|_| 0)
++                        .map_err(errno),
++                    3 => Ok(flags as i64),
++                    _ => Err(-95),
++                }),
++            262 | 332 => {
++                let flags = if r.orig_rax == 262 { r.r10 } else { r.rdx };
++                let valid = if r.orig_rax == 262 {
++                    flags & !0x1900 == 0
++                } else {
++                    valid_statx(flags, r.r10)
++                };
++                if flags & 0x1000 == 0 || !valid {
++                    Err(-22)
++                } else {
++                    self.fs.fstat(fd).map_err(errno).and_then(|m| {
++                        copy_metadata(
++                            pid,
++                            if r.orig_rax == 262 { r.rdx } else { r.r8 },
++                            m,
++                            r.orig_rax == 332,
++                        )
++                    })
++                }
++            }
++            _ => Err(-95),
++        };
++        result.unwrap_or_else(|error| error)
++    }
++
++    fn read(
++        &mut self,
++        pid: usize,
++        fd: i32,
++        address: u64,
++        length: u64,
++        offset: Option<i64>,
++    ) -> Result<i64, i64> {
++        let previous = self.fs.seek(fd, 0, 1).map_err(errno)?;
++        if let Some(offset) = offset {
++            self.fs.seek(fd, offset, 0).map_err(errno)?;
++        }
++        let start = self.fs.seek(fd, 0, 1).map_err(errno)?;
++        let mut buffer = [0u8; IO_SIZE];
++        let read = self
++            .fs
++            .read(fd, &mut buffer[..length.min(IO_SIZE as u64) as usize])
++            .map_err(errno);
++        let result = read.and_then(|count| copy_memory(pid, address, &mut buffer[..count], true));
++        let next = if offset.is_some() {
++            previous
++        } else {
++            start + result.unwrap_or(0) as u64
++        };
++        self.fs.seek(fd, next as i64, 0).map_err(errno)?;
++        result
++    }
++
++    fn write(&mut self, pid: usize, fd: i32, address: u64, length: u64) -> Result<i64, i64> {
++        self.fs.fstat(fd).map_err(errno)?;
++        let mut buffer = [0u8; IO_SIZE];
++        let count = length.min(IO_SIZE as u64) as usize;
++        let copied = copy_memory(pid, address, &mut buffer[..count], false)? as usize;
++        self.fs
++            .write(fd, &buffer[..copied])
++            .map(|n| n as i64)
++            .map_err(errno)
++    }
++}
++
++fn valid_statx(flags: u64, mask: u64) -> bool {
++    flags & !0x7900 == 0 && flags & 0x6000 != 0x6000 && mask & 0x8000_0000 == 0
++}
++
++fn within(path: &[u8], prefix: &[u8]) -> bool {
++    path == prefix
++        || path
++            .strip_prefix(prefix)
++            .is_some_and(|suffix| suffix.first() == Some(&b'/'))
++}
++
++#[repr(C)]
++struct IoVec {
++    address: usize,
++    length: usize,
++}
++
++// Parent-only calls honor guest page protections. No PTRACE forced copyout.
++pub(crate) fn copy_memory(
++    pid: usize,
++    address: u64,
++    buffer: &mut [u8],
++    output: bool,
++) -> Result<i64, i64> {
++    if buffer.is_empty() {
++        return Ok(0);
++    }
++    address.checked_add(buffer.len() as u64).ok_or(-14)?;
++    let local = IoVec {
++        address: buffer.as_mut_ptr() as usize,
++        length: buffer.len(),
++    };
++    let remote = IoVec {
++        address: address as usize,
++        length: buffer.len(),
++    };
++    let result = unsafe {
++        syscall6(
++            if output { 311 } else { 310 },
++            pid,
++            &local as *const _ as usize,
++            1,
++            &remote as *const _ as usize,
++            1,
++            0,
++        )
++    };
++    if result <= 0 {
++        Err(-14)
++    } else {
++        Ok(result as i64)
++    }
++}
++
++fn read_path(pid: usize, address: u64) -> Result<Path, i64> {
++    let mut buffer = [0; MAX_PATH];
++    for i in 0..MAX_PATH {
++        copy_memory(
++            pid,
++            address.checked_add(i as u64).ok_or(-14)?,
++            &mut buffer[i..i + 1],
++            false,
++        )?;
++        if buffer[i] == 0 {
++            return Path::from_bytes(&buffer[..i]).map_err(|_| -36);
++        }
++    }
++    Err(-36)
++}
++
++fn copy_metadata(
++    pid: usize,
++    address: u64,
++    metadata: FileMetadata,
++    statx: bool,
++) -> Result<i64, i64> {
++    let mut bytes = [0u8; 256];
++    let mode = metadata.mode
++        | if metadata.kind == NodeKind::Directory {
++            0o40000
++        } else {
++            0o100000
++        };
++    let (ino, mode_at, size_at, blocks_at, length) = if statx {
++        bytes[..4].copy_from_slice(&0x7ffu32.to_le_bytes());
++        bytes[4..8].copy_from_slice(&4096u32.to_le_bytes());
++        bytes[16..20].copy_from_slice(&1u32.to_le_bytes());
++        bytes[28..30].copy_from_slice(&(mode as u16).to_le_bytes());
++        (32, None, 40, 48, 256)
++    } else {
++        bytes[16..24].copy_from_slice(&1u64.to_le_bytes());
++        bytes[56..64].copy_from_slice(&4096u64.to_le_bytes());
++        (8, Some(24), 48, 64, 144)
++    };
++    bytes[ino..ino + 8].copy_from_slice(&metadata.inode.to_le_bytes());
++    if let Some(mode_at) = mode_at {
++        bytes[mode_at..mode_at + 4].copy_from_slice(&mode.to_le_bytes());
++    }
++    bytes[size_at..size_at + 8].copy_from_slice(&metadata.size.to_le_bytes());
++    bytes[blocks_at..blocks_at + 8].copy_from_slice(&metadata.size.div_ceil(512).to_le_bytes());
++    if copy_memory(pid, address, &mut bytes[..length], true)? != length as i64 {
++        return Err(-14);
++    }
++    Ok(0)
++}
++
++fn errno(error: VfsError) -> i64 {
++    match error {
++        VfsError::NotFound => -2,
++        VfsError::NotDirectory => -20,
++        VfsError::IsDirectory => -21,
++        VfsError::AlreadyExists => -17,
++        VfsError::PermissionDenied => -13,
++        VfsError::InvalidDescriptor => -9,
++        VfsError::DescriptorLimit => -24,
++        VfsError::OverlayLimit => -28,
++        VfsError::FileTooLarge => -27,
++        VfsError::InvalidPath => -22,
++        VfsError::SymlinkLoop => -40,
++        VfsError::InvalidIndex | VfsError::Io => -5,
++    }
++}
++
++pub fn claims(_: u64) -> bool {
++    false
++}
++pub fn claim(_: u64, _: u64, _: u64, _: u64) -> Option<i64> {
+     None
+ }
+diff --git a/crates/ginux-init/src/launch.rs b/crates/ginux-init/src/launch.rs
+index 533b12fa..f0a586d0 100644
+--- a/crates/ginux-init/src/launch.rs
++++ b/crates/ginux-init/src/launch.rs
+@@ -296,6 +296,8 @@ pub fn launch_main(config_path: *const u8, root_path: *const u8, result_path: *c
+     stage_result_path(result_path);
+     let config = launch_load_config(config_path);
+     launch_validate(&config);
++    let mut filesystem = crate::fs_hooks::LaunchFs::prepare(&config)
++        .unwrap_or_else(|reason| launch_startup_fail(reason));
+     print_launch_config(&config);
+     let mut domain = Domain::create(config);
+     if domain.start().is_err() {
+@@ -307,9 +309,9 @@ pub fn launch_main(config_path: *const u8, root_path: *const u8, result_path: *c
+         launch_domain_fail(&mut domain, b"launch tracee fork failed");
+     }
+     if child == 0 {
+-        launch_tracee(root_path);
++        launch_tracee(root_path, &filesystem);
+     }
+-    supervise_launch(child as usize, &mut domain)
++    supervise_launch(child as usize, &mut domain, &mut filesystem)
+ }
+ 
+ fn launch_validate(config: &DomainConfig) {
+@@ -318,8 +320,8 @@ fn launch_validate(config: &DomainConfig) {
+     {
+         launch_startup_fail(b"launch requires profile=balanced backend=ptrace-native");
+     }
+-    if !config.storage.as_slice().is_empty() || !config.devices.as_slice().is_empty() {
+-        launch_startup_fail(b"launch does not support storage or device assignments");
++    if !config.devices.as_slice().is_empty() {
++        launch_startup_fail(b"launch does not support device assignments");
+     }
+     if config.id.as_bytes().is_empty() || config.id.as_bytes().len() > 64 {
+         launch_startup_fail(b"domain id length invalid");
+@@ -790,11 +792,17 @@ fn finish_signaled(signal: u64) {
+     exit_process(128 + signal as usize)
+ }
+ 
+-fn launch_tracee(root_path: *const u8) -> ! {
++fn launch_tracee(root_path: *const u8, filesystem: &crate::fs_hooks::LaunchFs) -> ! {
+     static ROOT: &[u8] = b"/\0";
+     // Host descriptors (including the result file) must not grant the
+     // workload authority outside the supplied root. Only stdio is shared.
+     const SYS_CLOSE_RANGE: usize = 436;
++    if !filesystem.reserve_descriptors() {
++        tracee_setup_fail(
++            b"ginux: launch bootstrap failed: descriptor namespace unavailable\n",
++            130,
++        );
++    }
+     if unsafe { syscall3(SYS_CLOSE_RANGE, 3, u32::MAX as usize, 0) } < 0 {
+         tracee_setup_fail(
+             b"ginux: launch bootstrap failed: descriptor cleanup failed\n",
+@@ -874,7 +882,11 @@ fn tracee_setup_fail(message: &[u8], code: usize) -> ! {
+     }
+ }
+ 
+-fn supervise_launch(pid: usize, domain: &mut Domain) -> ! {
++fn supervise_launch(
++    pid: usize,
++    domain: &mut Domain,
++    filesystem: &mut crate::fs_hooks::LaunchFs,
++) -> ! {
+     let mut status = 0i32;
+     if wait(pid, &mut status) < 0 {
+         launch_fail(domain, pid, b"launch tracee wait after exec failed");
+@@ -894,6 +906,7 @@ fn supervise_launch(pid: usize, domain: &mut Domain) -> ! {
+ 
+     let mut sequence = 0u64;
+     let mut awaiting_exit = false;
++    let mut path_rewrite: Option<crate::path_hooks::Rewrite> = None;
+     let mut override_exit = false;
+     let mut override_result = 0i64;
+     loop {
+@@ -942,11 +955,19 @@ fn supervise_launch(pid: usize, domain: &mut Domain) -> ! {
+         let mut registers = unsafe { registers.assume_init() };
+ 
+         if awaiting_exit {
++            let rewritten = path_rewrite.is_some();
++            if let Some(rewrite) = path_rewrite.take() {
++                if let Err(reason) = rewrite.finish(pid, &mut registers) {
++                    launch_fail(domain, pid, reason);
++                }
++            }
+             if override_exit {
+                 registers.rax = override_result as u64;
+-                if ptrace(PTRACE_SETREGS, pid, 0, &registers as *const _ as usize) < 0 {
+-                    launch_fail(domain, pid, b"launch result override failed");
+-                }
++            }
++            if (override_exit || rewritten)
++                && ptrace(PTRACE_SETREGS, pid, 0, &registers as *const _ as usize) < 0
++            {
++                launch_fail(domain, pid, b"launch result override failed");
+             }
+             audit_write(b"ginux: audit sequence=");
+             audit_u64(sequence);
+@@ -978,7 +999,29 @@ fn supervise_launch(pid: usize, domain: &mut Domain) -> ! {
+         }
+         sequence += 1;
+         let syscall = registers.orig_rax;
+-        let decision = match decide_native(syscall, registers.rdi, registers.rsi, registers.rdx) {
++        let dispatched = match filesystem.claim(pid, &registers) {
++            Some(result) => NativeDecision::Hooked {
++                lane: crate::dispatch::Lane::Filesystem,
++                result,
++            },
++            None => match crate::path_hooks::Rewrite::prepare(filesystem, pid, &mut registers) {
++                Ok(rewrite) => {
++                    if rewrite.is_some()
++                        && ptrace(PTRACE_SETREGS, pid, 0, &registers as *const _ as usize) < 0
++                    {
++                        launch_fail(domain, pid, b"launch path translation failed");
++                    }
++                    path_rewrite = rewrite;
++                    decide_native(syscall, registers.rdi, registers.rsi, registers.rdx)
++                }
++                Err(-5) => launch_fail(domain, pid, b"launch path scratch restoration failed"),
++                Err(result) => NativeDecision::Hooked {
++                    lane: crate::dispatch::Lane::Filesystem,
++                    result,
++                },
++            },
++        };
++        let decision = match dispatched {
+             NativeDecision::Contract(decision) => decision,
+             NativeDecision::Hooked { lane, result } => {
+                 let lane_name: &[u8] = match lane {
+@@ -1106,6 +1149,7 @@ fn launch_exit_reason(code: i32) -> &'static [u8] {
+         127 => b"exec of configured domain init failed",
+         128 => b"configured domain workdir unavailable",
+         129 => b"descriptor cleanup failed",
++        130 => b"descriptor namespace unavailable",
+         _ => b"tracee exited before supervision",
+     }
+ }
+diff --git a/crates/ginux-init/src/main.rs b/crates/ginux-init/src/main.rs
+index 8ad7f5cb..151a3fec 100644
+--- a/crates/ginux-init/src/main.rs
++++ b/crates/ginux-init/src/main.rs
+@@ -12,6 +12,7 @@ mod channel_hooks;
+ mod dispatch;
+ mod fs_hooks;
+ mod launch;
++mod path_hooks;
+ mod process_hooks;
+ mod supervisor;
+ 
+diff --git a/crates/ginux-init/src/path_hooks.rs b/crates/ginux-init/src/path_hooks.rs
+new file mode 100644
+index 00000000..d967bc1d
+--- /dev/null
++++ b/crates/ginux-init/src/path_hooks.rs
+@@ -0,0 +1,188 @@
++//! Exact component lookup beneath the tracee root and temporary native path
++//! translation. Supervisor prefixes never enter a workload pathname.
++use crate::fs_hooks::copy_memory;
++use crate::supervisor::{syscall1, syscall4, UserRegs, DOMAIN_GID, DOMAIN_UID};
++use ginux_vfs::{NodeKind, VfsError, MAX_PATH};
++pub struct ImageRoot(usize);
++impl ImageRoot {
++    pub fn new(pid: usize) -> Result<Self, i64> {
++        let mut name = [0u8; 64];
++        name[..6].copy_from_slice(b"/proc/");
++        let mut number = pid;
++        let mut digits = [0; 20];
++        let mut count = 0;
++        loop {
++            digits[count] = b'0' + (number % 10) as u8;
++            count += 1;
++            number /= 10;
++            if number == 0 {
++                break;
++            }
++        }
++        for i in 0..count {
++            name[6 + i] = digits[count - 1 - i];
++        }
++        name[6 + count..11 + count].copy_from_slice(b"/root");
++        let fd = unsafe {
++            syscall4(
++                257,
++                (-100isize) as usize,
++                name.as_ptr() as usize,
++                0x280000,
++                0,
++            )
++        };
++        if fd < 0 {
++            return Err(fd as i64);
++        }
++        Ok(Self(fd as usize))
++    }
++    pub fn lookup(
++        &self,
++        path: &[u8],
++        target: &mut [u8; MAX_PATH],
++    ) -> Result<(NodeKind, usize), VfsError> {
++        let path = path.strip_prefix(b"/").ok_or(VfsError::InvalidPath)?;
++        let path = if path.is_empty() {
++            b".".as_slice()
++        } else {
++            path
++        };
++        let mut name = [0; MAX_PATH + 1];
++        name[..path.len()].copy_from_slice(path);
++        let mut stat = [0u64; 18];
++        let result = unsafe {
++            syscall4(
++                262,
++                self.0,
++                name.as_ptr() as usize,
++                stat.as_mut_ptr() as usize,
++                0x100,
++            )
++        };
++        if result < 0 {
++            return Err(match result {
++                -2 => VfsError::NotFound,
++                -20 => VfsError::NotDirectory,
++                -13 => VfsError::PermissionDenied,
++                _ => VfsError::Io,
++            });
++        }
++        let mode = stat[3] as u32;
++        match mode & 0o170000 {
++            0o40000 => {
++                let uid = (stat[3] >> 32) as u32;
++                let gid = stat[4] as u32;
++                let shift = if uid == DOMAIN_UID as u32 {
++                    6
++                } else if gid == DOMAIN_GID as u32 {
++                    3
++                } else {
++                    0
++                };
++                if mode & (1 << shift) == 0 {
++                    return Err(VfsError::PermissionDenied);
++                }
++                Ok((NodeKind::Directory, 0))
++            }
++            0o100000 => Ok((NodeKind::File, 0)),
++            0o120000 => {
++                let n = unsafe {
++                    syscall4(
++                        267,
++                        self.0,
++                        name.as_ptr() as usize,
++                        target.as_mut_ptr() as usize,
++                        target.len(),
++                    )
++                };
++                if n < 0 {
++                    return Err(VfsError::Io);
++                }
++                if n as usize >= target.len() {
++                    return Err(VfsError::InvalidPath);
++                }
++                Ok((NodeKind::Symlink, n as usize))
++            }
++            _ => Err(VfsError::PermissionDenied),
++        }
++    }
++}
++impl Drop for ImageRoot {
++    fn drop(&mut self) {
++        unsafe {
++            syscall1(3, self.0);
++        }
++    }
++}
++
++pub struct Rewrite {
++    address: u64,
++    saved: [u8; MAX_PATH + 1],
++    args: [u64; 7],
++}
++impl Rewrite {
++    pub fn prepare(
++        fs: &crate::fs_hooks::LaunchFs,
++        pid: usize,
++        r: &mut UserRegs,
++    ) -> Result<Option<Self>, i64> {
++        let Some((argument, path)) = fs.native_path(pid, r)? else {
++            return Ok(None);
++        };
++        let address = r.rsp.checked_sub(512).ok_or(-14)?;
++        let output = match r.orig_rax {
++            4 | 6 => Some((r.rsi, 144)),
++            262 => Some((r.rdx, 144)),
++            332 => Some((r.r8, 256)),
++            89 => Some((r.rsi, r.rdx)),
++            _ => None,
++        };
++        if output.is_some_and(|(start, length)| {
++            length != 0
++                && start < address + (MAX_PATH + 1) as u64
++                && start.checked_add(length).is_none_or(|end| end > address)
++        }) {
++            return Err(-14);
++        }
++        let mut saved = [0; MAX_PATH + 1];
++        if copy_memory(pid, address, &mut saved, false)? != saved.len() as i64 {
++            return Err(-14);
++        }
++        let mut bytes = [0; MAX_PATH + 1];
++        bytes[..path.as_bytes().len()].copy_from_slice(path.as_bytes());
++        let written = copy_memory(pid, address, &mut bytes, true)? as usize;
++        if written != bytes.len() {
++            // Restore exactly the prefix that was changed. The untouched suffix
++            // may be readable but protected against writes.
++            if copy_memory(pid, address, &mut saved[..written], true) != Ok(written as i64) {
++                return Err(-5);
++            }
++            return Err(-14);
++        }
++        let args = [r.rdi, r.rsi, r.rdx, r.r10, r.r8, r.r9, r.orig_rax];
++        if argument == 0 {
++            r.rdi = address;
++        } else {
++            r.rsi = address;
++        }
++        Ok(Some(Self {
++            address,
++            saved,
++            args,
++        }))
++    }
++    pub fn finish(mut self, pid: usize, r: &mut UserRegs) -> Result<(), &'static [u8]> {
++        if copy_memory(pid, self.address, &mut self.saved, true) != Ok(self.saved.len() as i64) {
++            return Err(b"native path scratch restoration failed");
++        }
++        r.rdi = self.args[0];
++        r.rsi = self.args[1];
++        r.rdx = self.args[2];
++        r.r10 = self.args[3];
++        r.r8 = self.args[4];
++        r.r9 = self.args[5];
++        r.orig_rax = self.args[6];
++        Ok(())
++    }
++}
+diff --git a/crates/ginux-vfs/src/lib.rs b/crates/ginux-vfs/src/lib.rs
+index 48170e5b..a480b7bd 100644
+--- a/crates/ginux-vfs/src/lib.rs
++++ b/crates/ginux-vfs/src/lib.rs
+@@ -220,6 +220,19 @@ impl Path {
+     }
+ }
+ 
++/// Resolve a composed namespace with the same component walker used by the VFS.
++pub fn resolve_namespace(
++    path: &[u8],
++    follow_final: bool,
++    missing: bool,
++    output: &mut [u8; MAX_PATH],
++    lookup: impl FnMut(&[u8], &mut [u8; MAX_PATH]) -> Result<(NodeKind, usize), VfsError>,
++) -> Result<usize, VfsError> {
++    let path = resolve_components(path, follow_final, missing, lookup)?;
++    output[..path.len].copy_from_slice(path.as_bytes());
++    Ok(path.len)
++}
++
+ // Walk original components: collapsing `..` first can skip a link or erase
+ // a missing/non-directory component before it has been checked.
+ fn resolve_components(
+diff --git a/scripts/test-launch-storage.py b/scripts/test-launch-storage.py
+new file mode 100644
+index 00000000..a42386ab
+--- /dev/null
++++ b/scripts/test-launch-storage.py
+@@ -0,0 +1,71 @@
++#!/usr/bin/env python3
++"""Real configured-launch storage checks against explicit existing binaries."""
++import json
++import os
++from pathlib import Path
++import shutil
++import subprocess
++import sys
++import tempfile
++
++
++def main():
++    if len(sys.argv) != 3 or os.geteuid() != 0:
++        sys.exit('usage (as root): test-launch-storage.py <ginux> <storage-fixture>')
++    binary, fixture = [str(Path(p).resolve()) for p in sys.argv[1:]]
++    template = (Path(__file__).resolve().parent.parent / 'config/domain-gate5.toml').read_text()
++    with tempfile.TemporaryDirectory(prefix='ginux-storage-') as directory:
++        work = Path(directory)
++        root = work / 'root'
++        (root / 'bin').mkdir(parents=True)
++        (root / 'work').mkdir()
++        (root / 'work/existing').write_bytes(b'hidden immutable work file')
++        (root / 'image').write_bytes(b'immutable image')
++        (root / 'image-link').symlink_to('/work')
++        (root / 'shadow/nest').mkdir(parents=True)
++        (root / 'shadow/image').write_bytes(b'incorrect hidden path')
++        (root / 'virtual').symlink_to('/shadow/nest')
++        shutil.copyfile(fixture, root / 'bin/fixture')
++        (root / 'bin/fixture').chmod(0o755)
++
++        def invoke(assignments, args, expected=0):
++            config = template.replace('init = "/bin/bash"', 'init = "/bin/fixture"')
++            config = config.replace('args = []', 'args = ' + json.dumps(args))
++            config = config.replace('assignments = []', 'assignments = ' + json.dumps(assignments), 1)
++            config = config.replace('id = "gate5-demo"', 'id = "storage-fixture"\nworkdir = "/work"')
++            path = work / 'launch.toml'
++            path.write_text(config)
++            result = work / 'result.json'
++            result.unlink(missing_ok=True)
++            proc = subprocess.run([binary, 'launch', str(path), str(root), '--result-file', str(result)],
++                                  capture_output=True, timeout=20)
++            record = json.loads(result.read_text())
++            if proc.returncode != expected:
++                sys.exit(f'launch failed: {proc.returncode}\n{proc.stderr.decode()}\n{record}')
++            assert record['outcome'] == ('exited' if expected == 0 else 'supervisor-error'), record
++            if expected == 0:
++                assert record['code'] == 0 and record['generation'] is None, record
++                assert proc.stdout == (b'' if args else b'memory-storage: PASS\n'), proc.stdout
++            assert (root / 'image').read_bytes() == b'immutable image'
++            assert (root / 'work/existing').read_bytes() == b'hidden immutable work file'
++            assert sorted(p.name for p in (root / 'work').iterdir()) == ['existing']
++            assert not (root / 'out').exists()
++
++        for mode in ['path-owned', 'missing-owned', 'image-parent', 'alias-shadow']:
++            invoke(['memory:/work'], [mode])
++        invoke(['memory:/work', 'memory:/virtual'], ['cross-boundary'])
++        invoke(['memory:/work', 'memory:/virtual'], ['scratch-restoration'])
++        invoke(['memory:/work'], ['type-flags'])
++        for _ in range(2):
++            invoke(['memory:/work', 'memory:/work/build', 'memory:/out'], [])
++        invoke(['memory:/work', 'memory:/work/build', 'memory:/out'], ['quota'])
++        invoke([], ['no-storage'])
++        for assignment in ['disk0', 'memory:/', 'memory:/proc', 'memory:/sys/x', 'memory:/dev',
++                           'memory:/bin', 'memory:/work/../out', 'memory:/work/', 'memory:work']:
++            invoke([assignment], [], 2)
++        invoke(['memory:/work', 'memory:/work'], [], 2)
++        print('test-launch-storage: PASS (isolation, data, metadata, copy protections, bounds, fresh launch)')
++
++
++if __name__ == '__main__':
++    main()
+diff --git a/tests/fixtures/launch-storage-fixture.c b/tests/fixtures/launch-storage-fixture.c
+new file mode 100644
+index 00000000..51b373f9
+--- /dev/null
++++ b/tests/fixtures/launch-storage-fixture.c
+@@ -0,0 +1,180 @@
++/* Freestanding workload for real configured-launch memory-storage checks. */
++typedef unsigned long word;
++static long call(long n, word a, word b, word c, word d, word e, word f)
++{
++    register word r10 __asm__("r10") = d;
++    register word r8 __asm__("r8") = e;
++    register word r9 __asm__("r9") = f;
++    long result;
++    __asm__ volatile("syscall" : "=a"(result) : "a"(n), "D"(a), "S"(b), "d"(c),
++                     "r"(r10), "r"(r8), "r"(r9) : "rcx", "r11", "memory");
++    return result;
++}
++#define DO(n,a,b,c) call(n,(word)(a),(word)(b),(word)(c),0,0,0)
++#define CHECK(expr,code) if (!(expr)) return code
++static const char immutable[] = "readonly";
++static char data[65536];
++static char output[65536];
++static char meta[256] __attribute__((aligned(8)));
++/* Use controlled scratch pages and verify restored path argument registers. */
++extern long scratch_stat(word stack, const char *path, char *destination);
++__asm__(".global scratch_stat\nscratch_stat:\n"
++        "push %r12\npush %r13\npush %r14\nmov %rsp,%r12\n"
++        "mov %rsi,%r13\nmov %rdx,%r14\nmov %rdi,%rsp\n"
++        "mov %rsi,%rdi\nmov %rdx,%rsi\nmov $4,%rax\nsyscall\n"
++        "cmp %r13,%rdi\njne 1f\ncmp %r14,%rsi\nje 2f\n"
++        "1: mov $-123,%rax\n2: mov %r12,%rsp\npop %r14\npop %r13\npop %r12\nret\n");
++long storage_main(word *stack)
++{
++    word argc = *stack;
++    char **argv = (char **)(stack + 1);
++    if (argc > 1 && argv[1][0] == 'n') {
++        CHECK(DO(2, "/work/new", 0101, 0644) < 0, 10);
++        return 0;
++    }
++    if (argc > 1 && argv[1][0] == 'p') {
++        CHECK(DO(2, "/work/file", 0102, 0644) >= 1048576, 80);
++        CHECK(DO(2, "/work/file/../created", 0102, 0644) == -20, 81);
++        return 0;
++    }
++    if (argc > 1 && argv[1][0] == 'm') {
++        CHECK(DO(2, "/work/file", 0102, 0644) >= 1048576, 85);
++        CHECK(DO(4, "/work/missing/../file", meta, 0) == -2, 82);
++        return 0;
++    }
++    if (argc > 1 && argv[1][0] == 'i') {
++        CHECK(DO(2, "/image/../work/created", 0102, 0644) == -20, 83);
++        return 0;
++    }
++    if (argc > 1 && argv[1][0] == 'a') {
++        CHECK(DO(2, "/image-link/existing", 0, 0) == -2, 84);
++        return 0;
++    }
++    if (argc > 1 && argv[1][0] == 'c') {
++        long fd = DO(2, "/virtual/../image", 0, 0);
++        CHECK(fd >= 3 && fd < 1048576, 86);
++        CHECK(DO(0, fd, output, 15) == 15 && output[0] == 'i', 87);
++        CHECK(call(262,fd,(word)"",(word)meta,0x1000,0,0) == 0, 88);
++        CHECK(*(word *)(meta+48) == 15, 89);
++        CHECK(DO(3, fd, 0, 0) == 0, 90);
++        CHECK(DO(89, "/work/existing", output, 256) == -2, 91);
++        CHECK(DO(21, "/work/existing", 0, 0) == -2, 92);
++        return 0;
++    }
++    if (argc > 1 && argv[1][0] == 's') {
++        long pages = call(9,0,8192,3,0x22,-1,0);
++        CHECK(pages > 0, 93);
++        unsigned char *bytes = (unsigned char *)pages;
++        for (word i = 0; i < 8192; ++i) bytes[i] = 0x5a;
++        CHECK(scratch_stat(pages+512, "/virtual/../image", meta) == 0, 94);
++        CHECK(*(word *)(meta+48) == 15, 95);
++        for (word i = 0; i < 257; ++i) CHECK(bytes[i] == 0x5a, 96);
++        CHECK(scratch_stat(pages+512, "/virtual/../image", (char *)(pages+16)) == -14, 97);
++        CHECK(DO(10, pages+4096, 4096, 1) == 0, 98);
++        CHECK(scratch_stat(pages+4608, "/virtual/../image", meta) == -14, 99);
++        CHECK(scratch_stat(pages+4480, "/virtual/../image", meta) == -14, 100);
++        for (word i = 0; i < 8192; ++i) CHECK(bytes[i] == 0x5a, 101);
++        CHECK(DO(11, pages, 8192, 0) == 0, 102);
++        return 0;
++    }
++    if (argc > 1 && argv[1][0] == 't') {
++        long fd = DO(2, "/work/file", 0102, 0644);
++        CHECK(fd >= 1048576, 103);
++        CHECK(call(262,-100,(word)"/work/file",(word)meta,0x1900,0,0) == 0, 104);
++        CHECK(call(262,fd,(word)"",(word)meta,0x1900,0,0) == 0, 105);
++        CHECK(call(332,-100,(word)"/work/file",0x2900,0x7ff,(word)meta,0) == 0, 106);
++        CHECK(call(332,fd,(word)"",0x5900,0x7ff,(word)meta,0) == 0, 107);
++        CHECK(call(332,-100,(word)"/work/file",0x6000,0x7ff,(word)meta,0) == -22, 108);
++        CHECK(call(332,fd,(word)"",0x1000,0x80000000,(word)meta,0) == -22, 109);
++        CHECK(call(332,-100,(word)"/work/file",0,0x80000000,(word)meta,0) == -22, 110);
++        return 0;
++    }
++    if (argc > 1 && argv[1][0] == 'q') {
++        char path[] = "/out/file-00";
++        for (word i = 0; i < 99; ++i) {
++            path[10] = '0' + i / 10;
++            path[11] = '0' + i % 10;
++            long fd = DO(2, path, 0101, 0644);
++            if (fd == -28) return i > 0 && i < 32 ? 0 : 61;
++            CHECK(fd >= 1048576, 62);
++            CHECK(DO(3, fd, 0, 0) == 0, 63);
++        }
++        return 64;
++    }
++    word limits[2];
++    CHECK(call(302,0,7,0,(word)limits,0,0) == 0, 65);
++    CHECK(limits[0] <= 1048576 && limits[1] <= 1048576, 66);
++    limits[0] = limits[1] = 1048577;
++    CHECK(call(302,0,7,(word)limits,0,0,0) < 0, 67);
++    CHECK(DO(4, "/work", meta, 0) == 0, 11);
++    CHECK((*(unsigned int *)(meta + 24) & 0170000) == 0040000, 12);
++    CHECK(DO(2, "/work/existing", 0, 0) == -2, 13);
++    CHECK(DO(2, "/image", 1, 0) < 0, 14);
++    CHECK(DO(2, "/out/missing", 0, 0) == -2, 15);
++    CHECK(DO(2, 1, 0, 0) == -14, 16);
++    CHECK(DO(83, "/work/build/nested", 0755, 0) == 0, 17);
++    long fd = call(257, -100, (word)"build/nested/file", 0102|02000000, 0644, 0, 0);
++    CHECK(fd == 1048576, 18);
++    CHECK(DO(1, fd, "hello", 5) == 5, 19);
++    CHECK(DO(72, fd, 1, 0) == 1, 20);
++    CHECK(DO(72, fd, 2, 0) == 0, 21);
++    CHECK(DO(72, fd, 1, 0) == 0, 22);
++    CHECK(DO(5, fd, meta, 0) == 0 && *(word *)(meta+48) == 5, 23);
++    word inode = *(word *)(meta+8);
++    CHECK(call(332,-100,(word)"/work/build/nested/file",0,0x7ff,(word)meta,0) == 0, 24);
++    CHECK(*(word *)(meta+40) == 5 && *(word *)(meta+32) == inode, 25);
++    CHECK(DO(8, fd, 0, 0) == 0, 26);
++    CHECK(DO(0, fd, immutable, 5) == -14, 27);
++    CHECK(DO(8, fd, 0, 1) == 0, 28);
++    long pages = call(9,0,8192,3,0x22,-1,0);
++    CHECK(pages > 0, 68);
++    CHECK(DO(10, pages+4096, 4096, 0) == 0, 69);
++    CHECK(DO(0, fd, pages+4094, 5) == 2, 70);
++    CHECK(DO(8, fd, 0, 1) == 2, 71);
++    CHECK(DO(0, fd, output, 3) == 3 && output[0] == 'l' && output[2] == 'o', 72);
++    CHECK(DO(11, pages, 8192, 0) == 0, 73);
++    CHECK(DO(8, fd, 0, 0) == 0, 74);
++    CHECK(DO(0, fd, output, 5) == 5, 29);
++    CHECK(output[0] == 'h' && output[4] == 'o', 30);
++    CHECK(DO(1, fd, 1, 5) == -14, 31);
++    CHECK(DO(5, fd, 1, 0) == -14, 32);
++    CHECK(DO(0, fd, 1, 0) == 0, 33);
++    CHECK(DO(3, 1048639, 0, 0) == -9, 34);
++    CHECK(DO(2, "/work/build/nested/file", 0301, 0600) == -17, 35);
++    CHECK(call(262,fd,(word)"",(word)meta,0x1000,0,0) == 0, 36);
++    CHECK(*(word *)(meta+8) == inode, 37);
++    CHECK(DO(87, "/work/build/nested/file", 0, 0) == 0, 38);
++    CHECK(DO(4, "/work/build/nested/file", meta, 0) == -2, 39);
++    CHECK(DO(8, fd, 0, 0) == 0, 40);
++    CHECK(DO(0, fd, output, 5) == 5 && output[0] == 'h', 41);
++    long replacement = DO(2, "/work/build/nested/file", 0102, 0600);
++    CHECK(replacement > fd, 42);
++    CHECK(DO(1, replacement, "other", 5) == 5, 43);
++    CHECK(DO(5, replacement, meta, 0) == 0 && *(word *)(meta+8) != inode, 44);
++    CHECK(DO(3, fd, 0, 0) == 0 && DO(3, replacement, 0, 0) == 0, 45);
++    // Exhaustion must not truncate or mutate a file before open fails.
++    long fds[64];
++    for (word i = 0; i < 64; ++i) {
++        fds[i] = DO(2, "/work/build/nested/file", 2, 0);
++        CHECK(fds[i] >= 1048576, 46);
++    }
++    CHECK(DO(2, "/work/build/nested/file", 01002, 0) == -24, 47);
++    CHECK(DO(5, fds[0], meta, 0) == 0 && *(word *)(meta+48) == 5, 48);
++    for (word i = 0; i < 64; ++i) CHECK(DO(3, fds[i], 0, 0) == 0, 49);
++    fd = DO(2, "/out/product", 0102, 0644);
++    CHECK(fd >= 1048576, 50);
++    for (word i = 0; i < sizeof data; ++i) data[i] = i % 251;
++    for (word i = 0; i < sizeof data; i += 4096) CHECK(DO(1, fd, data+i, 4096) == 4096, 51);
++    CHECK(DO(1, fd, "x", 1) == -27, 52);
++    CHECK(DO(8, fd, 0, 0) == 0, 53);
++    for (word i = 0; i < sizeof output; i += 4096) CHECK(DO(0, fd, output+i, 4096) == 4096, 54);
++    for (word i = 0; i < sizeof output; ++i) CHECK(output[i] == data[i], 55);
++    CHECK(DO(91, fd, 0755, 0) == 0, 56);
++    CHECK(DO(5, fd, meta, 0) == 0 && (*(unsigned int *)(meta+24) & 0777) == 0755, 57);
++    CHECK(DO(3, fd, 0, 0) == 0, 58);
++    CHECK(DO(87, "/out/product", 0, 0) == 0, 59);
++    CHECK(DO(4, "/out/product", meta, 0) == -2, 60);
++    DO(1, 1, "memory-storage: PASS\n", 21);
++    return 0;
++}
++__asm__(".global _start\n_start:\nmov %rsp,%rdi\nandq $-16,%rsp\ncall storage_main\nmov %rax,%rdi\nmov $60,%rax\nsyscall\nud2\n");

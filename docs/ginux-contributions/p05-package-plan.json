@@ -93,6 +93,29 @@
       "artifact_directory": ".artifacts/ginux-contribution-preparation/G03b"
     },
     {
+      "packet": "G03c",
+      "parent_packet": "G03",
+      "purpose": "configured bounded ephemeral memory storage runtime",
+      "dependencies": [
+        "G05a",
+        "G03a",
+        "G03b"
+      ],
+      "base": "603391c66d37915f3db2c9cec63d1c3e832216a6",
+      "head": "5ee456348905c4985689053f259484706ac3c8c0",
+      "tree": "df43c224381fe345212e453ec1c5e3a6c2bcd0f3",
+      "upstream_base": "3f2fe7dfadd4b40e235d982a6a3d386dc6490177",
+      "source_commits": [
+        "10091e4e48bb14dcf9f0ee20e62f471fb7d0cf2f",
+        "1da0ce137de73e13b66a331de8f7ff7b12903925"
+      ],
+      "status": "source reviewed and locally validated on explicit prerequisites; standalone delivery waits for their upstream merge",
+      "evidence": "g03c-review.md",
+      "source_patch": "patches/G03c.patch",
+      "standalone": false,
+      "artifact_directory": ".artifacts/ginux-contribution-preparation/G03c"
+    },
+    {
       "packet": "G03",
       "purpose": "Configured writable storage and file metadata (`222d29ff`, `10091e4e`)",
       "dependencies": [],
@@ -102,8 +125,13 @@
       ],
       "acceptance": "Explicit mounts only; correct read/write/seek/stat/truncate and quota failure; unassigned paths cannot fall through to host writes.",
       "planned_delivery": "one coherent change plus its generic docs and focused regression fixtures; split coupled responsibilities only as recorded by P04",
-      "status": "pending extraction and R01-R04 review",
-      "artifact_directory": ".artifacts/ginux-contribution-preparation/G03"
+      "status": "decomposed into locally reviewed G03a/G03b/G03c; standalone delivery depends on prerequisite merges",
+      "artifact_directory": ".artifacts/ginux-contribution-preparation/G03",
+      "extracted_packets": [
+        "G03a",
+        "G03b",
+        "G03c"
+      ]
     },
     {
       "packet": "G04",
@@ -325,7 +353,8 @@
       "acceptance": "Cross-boundary links/parents/exec, assignment precedence and confinement; hidden `/dev` paths retain absent semantics.",
       "planned_delivery": "one coherent change plus its generic docs and focused regression fixtures; split coupled responsibilities only as recorded by P04",
       "status": "pending extraction and R01-R04 review",
-      "artifact_directory": ".artifacts/ginux-contribution-preparation/G16"
+      "artifact_directory": ".artifacts/ginux-contribution-preparation/G16",
+      "extraction_note": "G03c already requires the existing component walker, ImageRoot and bounded native Rewrite for initial assignment isolation. Later owned-link/cwd/device/exec joins remain here; do not duplicate earlier primitives."
     },
     {
       "packet": "G18",

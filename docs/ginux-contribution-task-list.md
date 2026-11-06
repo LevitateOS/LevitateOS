@@ -345,18 +345,24 @@ unit tests and both complete Linux runtime replays. Its patch is retained in
 this superproject's docs alongside G05a/G03a. It is **not standalone-ready** until
 G05a merges upstream; the local composition must not be published as a stack.
 
-Previous goal turn: progress (two standalone fixes). Current goal turn: progress
-(G03b source extraction, reviewed corrections, fresh validation and source package).
-The full goal remains active; broader G03 and later packets are incomplete.
+G03c's runtime adapter is locally reviewed/validated at5ee45634 on composition
+603391c6 (G05a/G03b plus G03a). [Review/evidence](ginux-contributions/g03c-review.md)
+records four initial-adapter path failures, their corrections, scratch restoration,
+metadata flags,77 unit tests and all applicable Linux runtime checks passing twice.
+The source patch is retained downstream. Minimal image lookup/native path rewriting
+moves forward from G16 because assignment isolation requires it; later G16 joins
+remain pending. G03's three extracted parts are locally prepared, with explicit
+upstream prerequisite waits. No publication or existing-PR modification occurred.
 
-Exact next task: **G03c — controlled configured-storage runtime adapter**.
-Extract the actual LaunchFs join from10091e4e on an explicit local composition of
-G03b and G03a. Preserve current supervisor #221 copyout helpers, native behavior,
-unit/CI coverage and component-wise path semantics. Reproduce and fix any ownership,
-path-classification or copy-failure defect before declaring the adapter reviewed.
-Do not start G04 while G03's required local preparation remains unfinished. G01/G02
-policy holds and G02's missing standalone acceptance remain visible. F04 is the
-user inspection checkpoint before publication.
+Current goal-turn classification: **progress**. The full goal remains active;
+G04 and later packets, cross-candidate interaction and Recipe closure are incomplete.
+
+Exact next task: **G04 — explicit virtual null devices**. Trace e3458063's actual
+runtime/shared-copy dependencies and extract the smallest coherent device feature.
+Preserve G03c's path/copy corrections if a local composition is required; label all
+local prerequisites honestly. Do not silently duplicate them in a standalone PR.
+G01/G02 policy holds and G02's missing standalone acceptance remain visible. F04 is
+the user inspection checkpoint before any publication.
 
 Active skill: `hdae-development`, discovered at
 `/home/vince/.codex/worktrees/ginux-pr-combination-check/ginux/.agents/skills/hdae-development/SKILL.md`.
