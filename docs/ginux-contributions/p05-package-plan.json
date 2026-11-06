@@ -339,6 +339,28 @@
       "artifact_directory": ".artifacts/ginux-contribution-preparation/G09b"
     },
     {
+      "packet": "G09c",
+      "parent_packet": "G09",
+      "purpose": "VFS directory descriptions and namespace mutations",
+      "base": "d29381c72352c33e33a4f164258f9ac80239ee85",
+      "head": "94fbfc2d2c67f90efb08f99ed18dee91188ceb17",
+      "tree": "13309a21ab7b2a445eea6752baa707adf788ddbb",
+      "dependencies": [
+        "G09a"
+      ],
+      "standalone": false,
+      "status": "source separately self-reviewed; static/unit/build and clean replay pass; runtime adapter/full CI/security/current-main independence pending",
+      "patch_sha256": "c41393ac573f75c37078e2354a21c77476de236e4922e3a1f14c7318d76b2b82",
+      "unit_tests": 84,
+      "vfs_tests": 31,
+      "clean_matched_paths": 150,
+      "publication_group": "pair VFS owner with its future directory runtime adapter; no abstraction-only PR",
+      "remote_ci": "not run",
+      "evidence": "g09c-review.md",
+      "source_patch": "patches/G09c.patch",
+      "artifact_directory": ".artifacts/ginux-contribution-preparation/G09c"
+    },
+    {
       "packet": "G09",
       "purpose": "Growable owned files, directories and basic path operations (`06d24ae2`, `32e2c85f`, `9ba6a1d4`, `d9490772`, `8752f708`, `37ca30cb`, `adc79f0a`)",
       "dependencies": [
@@ -357,11 +379,12 @@
       ],
       "acceptance": "Sparse growth, shared quota, directory cursors/mutations, relative paths and access probes; failed operations preserve data, identity and confinement.",
       "planned_delivery": "one coherent change plus its generic docs and focused regression fixtures; split coupled responsibilities only as recorded by P04",
-      "status": "G09a/G09b locally reviewed with limited functional checks; directories/relative paths/access still pending",
+      "status": "G09a/b/c locally reviewed with limited functional evidence; directory runtime/relative paths/access pending",
       "artifact_directory": ".artifacts/ginux-contribution-preparation/G09",
       "extracted_packets": [
         "G09a",
-        "G09b"
+        "G09b",
+        "G09c"
       ],
       "source_disposition": {
         "32e2c85f": "defer memfd identity to G12 mapping consumer; no runtime mapping feature imported here"

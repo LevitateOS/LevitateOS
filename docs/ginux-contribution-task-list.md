@@ -428,17 +428,25 @@ G09a/G09b are review subpackets intended together for one useful growth proposal
 no abstraction-only PR or stack is implied. Memfd identity moves to G12, its
 actual consumer. G09 directories/relative paths/access remain incomplete.
 
+G09c's VFS directory owner is retained at94fbfc2d on G09a.
+[Review/evidence](ginux-contributions/g09c-review.md) records84 units/31 VFS tests,
+checked source/clean builds,150-path strict replay and the corrected dot-entry
+mutation failure. Directory runtime integration, full CI/security and actual
+upstream independence remain pending. Pair this review subpacket with its
+runtime adapter before proposing a useful contribution.
+
 Current goal-turn classification: **progress**. The full goal remains active;
 security-held G07, later packets, policy acceptance, interactions and Recipe
 closure remain incomplete. F04 remains the user inspection stop.
 
-Exact next task: **G09c — owned directories and namespace changes**. Extract the
-VFS directory owner from9ba6a1d4 on G09a, then adapt the runtime join on reviewed
-G09b. Preserve current component traversal, shared offsets, whiteouts, strict
-copies and configured memory bound. Follow with relative-cwd/access/noctty fixes
-from the existing G09 donors. G07/G08 remain held; do not import them to compile
-this work. Keep full security probes with DaybreakBlue and ordinary functional
-checks local. No publication is authorized.
+Exact next task: **G09d — configured directory runtime and basic path joins**.
+Compose G09c with reviewed G09b, then adapt9ba6a1d4's runtime/tests/build/docs and
+G09's noctty/access/relative-cwd fixes8752f708/d9490772/37ca30cb/adc79f0a. Preserve
+current component resolution and strict copies. Directory-fd/cwd translation
+must use the existing path owner, not the obsolete lexical donor. Memfd identity
+32e2c85f stays with G12. G07/G08 remain held; do not import their pending code.
+Full security probes belong in the written DaybreakBlue handoff; ordinary
+functional checks stay local. No publication is authorized.
 
 Active skill: `hdae-development`, discovered at
 `/home/vince/.codex/worktrees/ginux-pr-combination-check/ginux/.agents/skills/hdae-development/SKILL.md`.
