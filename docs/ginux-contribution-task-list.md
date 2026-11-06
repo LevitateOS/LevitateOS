@@ -804,7 +804,12 @@ eight ordinary controls pass in source/clean, preserving new upstream job-contro
 coverage. The one-file +118 scope is unchanged and binaries match.
 [Review](ginux-contributions/g06a-review.md) keeps full default/runtime/macOS
 checks pending. Initial 37-patch integrity results remain historical;
-the final aggregate inventory must use each refreshed head. Reconcile the
+the new `upstream-refresh-2026-11-06/current-inventory.json` verifies all 37
+currently retained patch/head hashes and exact-parent replays, including these
+three refreshed heads. The other 34 still need current-main reconciliation;
+integrity is not source/runtime acceptance. The fresh preserved-worktree report
+also confirms all six restored HEAD, raw-index and staged/unstaged/conflict-status
+fingerprints are unchanged. Reconcile the
 remaining source owners before rebuilding the final F02/F03 revisions. Keep
 reader/progress-thread-dependent consumers pending on G07. Do not import
 the unready thread snapshot, rerun adversarial probes, dispatch DaybreakBlue,
