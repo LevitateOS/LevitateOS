@@ -525,3 +525,21 @@ races, append/offset/close ordering and failure rollback. Preserve existing full
 pointer/copy tests and required CI; no adversarial probes were run here and no
 cloud agent was dispatched. G07's shared-argument hold remains. Source self-review
 is not security acceptance; [review/evidence](g25-review.md).
+
+## G26 — inherited AS/CPU bounds and task queries (partial)
+
+Exact G26a `1d0824e6634aca994a38a9f9531b90344c787ac7` on recorded main; G26b `2ed520c4437a8459c70dc79208d40b2923390939` on
+G06b/G26a composition `687eb942fb9d0628558d1d25094f5d53a9e3094f`. Ordinary source/clean AS bounds,
+lower operator limit, exact eligible CPU subsets and fork/exec inheritance pass.
+No host-pressure stress: over-limit requests reserve virtual space only and
+successful1 MiB mappings touch two pages. Existing default coverage is preserved.
+
+DaybreakBlue must validate resource/affinity mutation and bypass, unsupported or
+foreign identities/CPU IDs, oversized/invalid/protected/mutable query buffers,
+partial copyout, AS arithmetic/limits, hostile memory/process exhaustion,
+bootstrap syscall failures, CPU hotplug/reconfiguration, stop/death/exec races
+and thread-group target selection. Known F02 join: a nonleader requesting its
+own TGID must resolve the registered leader host, not always the caller. Current
+G26b is process-only (PID==TGID); do not imply G07 acceptance. No adversarial
+probes or cloud dispatch occurred. Public resource contract, full CI and combined
+consumer evidence remain pending; [review/evidence](g26-review.md).

@@ -1,0 +1,217 @@
+From 2ed520c4437a8459c70dc79208d40b2923390939 Mon Sep 17 00:00:00 2001
+From: vince <vincepaul.liem@gmail.com>
+Date: Fri, 6 Nov 2026 17:31:09 +0100
+Subject: [PATCH] feat(init): expose task-owned affinity and preserve process
+ bounds
+
+Translate self affinity queries through the registered virtual task identity
+and copy only the bounded kernel mask to the tracee. Deny affinity and
+address-space limit mutation and verify process-bound inheritance across fork
+and exec within the operator CPU subset.
+
+Signed-off-by: vince <vincepaul.liem@gmail.com>
+---
+ README.md                             |  4 ++-
+ crates/ginux-init/src/descriptors.rs  |  4 +--
+ crates/ginux-init/src/launch_tasks.rs | 41 +++++++++++++++++++++++++++
+ scripts/test-launch-tasks.py          | 36 +++++++++++++++++++++--
+ tests/fixtures/launch-task-fixture.c  | 37 ++++++++++++++++++++++++
+ 5 files changed, 116 insertions(+), 6 deletions(-)
+
+diff --git a/README.md b/README.md
+index 1a29feb8..8bdd0285 100644
+--- a/README.md
++++ b/README.md
+@@ -220,7 +220,9 @@ anonymous and image mappings; it is not an aggregate domain RSS limit.
+ from the launcher's allowed affinity mask. This bounds eligible CPUs, not CPU
+ time. Limits are installed only in the child before exec; no host-global cgroup
+ policy is changed. Kernel inheritance preserves them for supported descendants.
+-CPU affinity syscalls retain the existing default-denied policy.
++Self affinity queries (zero, current virtual PID or thread-group ID) report the
++actual eligible CPU subset through a buffer of at most 1024 bytes. Affinity mutation and address-space limit mutation
++are denied; unrelated virtual PIDs are not native scheduler targets.
+ 
+ Optional `[storage].assignments` entries of the form `"memory:/absolute/path"`
+ declare empty, ephemeral writable namespaces. For example:
+diff --git a/crates/ginux-init/src/descriptors.rs b/crates/ginux-init/src/descriptors.rs
+index cb69292d..dd7da768 100644
+--- a/crates/ginux-init/src/descriptors.rs
++++ b/crates/ginux-init/src/descriptors.rs
+@@ -293,8 +293,8 @@ impl DescriptorTable {
+         r: &mut UserRegs,
+         backends: &mut Backends,
+     ) -> NativeDecision {
+-        // Resource changes cannot silently invalidate the public allocator.
+-        if r.orig_rax == 302 && r.rsi == 7 && r.rdx != 0 {
++        // Resource changes cannot invalidate the public allocator or address-space bound.
++        if r.orig_rax == 302 && matches!(r.rsi, 7 | 9) && r.rdx != 0 {
+             return ready(-1);
+         }
+         let result = match r.orig_rax {
+diff --git a/crates/ginux-init/src/launch_tasks.rs b/crates/ginux-init/src/launch_tasks.rs
+index 1adee8cd..1f77d15b 100644
+--- a/crates/ginux-init/src/launch_tasks.rs
++++ b/crates/ginux-init/src/launch_tasks.rs
+@@ -375,6 +375,47 @@ impl Supervisor<'_> {
+         let original = *r;
+         let id = self.task(index).id;
+         match r.orig_rax {
++            203 => {
++                self.emulate(index, r, -1, domain);
++                return;
++            }
++            204 => {
++                let result = (|| {
++                    let target = r.rdi as u32;
++                    let tgid = self.processes.view(id).unwrap().tgid;
++                    if target != 0 && target != id.pid && target != tgid {
++                        return Err(-3);
++                    }
++                    if r.rsi > 1024 {
++                        return Err(-22);
++                    }
++                    let mut mask = [0u8; 1024];
++                    let size = unsafe {
++                        crate::supervisor::syscall3(
++                            204,
++                            self.task(index).host,
++                            r.rsi as usize,
++                            mask.as_mut_ptr() as usize,
++                        )
++                    };
++                    if size < 0 {
++                        return Err(size as i64);
++                    }
++                    if copy_memory(
++                        self.task(index).host,
++                        r.rdx,
++                        &mut mask[..size as usize],
++                        true,
++                    )? != size as i64
++                    {
++                        return Err(-14);
++                    }
++                    Ok(size as i64)
++                })()
++                .unwrap_or_else(|error| error);
++                self.emulate(index, r, result, domain);
++                return;
++            }
+             59 | 322 => {
+                 let result = self.prepare_exec(index, r);
+                 if result == Err(-5) {
+diff --git a/scripts/test-launch-tasks.py b/scripts/test-launch-tasks.py
+index 05da63c4..1862a72a 100644
+--- a/scripts/test-launch-tasks.py
++++ b/scripts/test-launch-tasks.py
+@@ -13,9 +13,9 @@ import time
+ 
+ 
+ def main():
+-    if len(sys.argv) != 3 or os.geteuid() != 0:
++    if len(sys.argv) < 3 or os.geteuid() != 0:
+         sys.exit('usage (as root): test-launch-tasks.py <ginux> <task-fixture>')
+-    binary, fixture = [str(Path(p).resolve()) for p in sys.argv[1:]]
++    binary, fixture = [str(Path(p).resolve()) for p in sys.argv[1:3]]
+     template = (Path(__file__).resolve().parent.parent / 'config/domain-gate5.toml').read_text()
+     with tempfile.TemporaryDirectory(prefix='ginux-tasks-') as directory:
+         work = Path(directory)
+@@ -28,7 +28,35 @@ def main():
+         config = template.replace('init = "/bin/bash"', 'init = "/bin/fixture"')
+         config = config.replace('[storage]\nassignments = []', '[storage]\nassignments = ["memory:/work"]')
+         config = config.replace('[devices]\nassignments = []', '[devices]\nassignments = ["null"]')
+-        for mode in ('qfault', 'fork', 'vfork', 'clone', 'shared-vfork', 'libc-fork', 'junk-child-tid', 'protected-child-tid', 'x-child-tid', 'handler-return', 'inherit', 'kill', 'bound', 'orphan', 'adopted-zombie', 'rollback', 'inherit'):
++        original_affinity = os.sched_getaffinity(0)
++        allowed = sorted(original_affinity)[:2]
++        assert allowed
++        scenarios = [(1, allowed[:1])]
++        scenarios.append((3, allowed))
++        for vcpus, expected_cpus in scenarios:
++            path, result = work / f'resources-{vcpus}.toml', work / f'resources-{vcpus}.json'
++            current = config.replace('memory_mib = 256', 'memory_mib = 32')
++            current = current.replace('vcpus = 1', f'vcpus = {vcpus}')
++            current = current.replace('args = []', 'args = ' + json.dumps(
++                ['Resources', ','.join(str(cpu) for cpu in expected_cpus)]))
++            path.write_text(current)
++            def restrict_operator_cpus():
++                os.sched_setaffinity(0, allowed)
++            proc = subprocess.run([binary, 'launch', str(path), str(root), '--result-file', str(result)],
++                                  capture_output=True, timeout=20, preexec_fn=restrict_operator_cpus)
++            assert proc.returncode == 0, (proc.returncode, proc.stderr.decode())
++            assert proc.stdout == b'owned-tasks: PASS\n', proc.stdout
++            assert json.loads(result.read_text()) == {'version': 1, 'outcome': 'exited',
++                'code': 0, 'signal': None, 'generation': None}
++            assert b'teardown tasks=0 owned-handles=0' in proc.stderr
++            assert os.sched_getaffinity(0) == original_affinity
++            print(f'PASS launch resources: vcpus={vcpus}, operator={allowed}, actual={expected_cpus}; fork/exec')
++        ordinary = ('fork', 'vfork', 'clone', 'shared-vfork', 'libc-fork', 'handler-return',
++                    'inherit', 'kill', 'orphan', 'adopted-zombie')
++        if sys.argv[3:] and sys.argv[3:] != ['ordinary-resources']:
++            sys.exit('unknown selected task scenario')
++        modes = ordinary if sys.argv[3:] else ('qfault', 'fork', 'vfork', 'clone', 'shared-vfork', 'libc-fork', 'junk-child-tid', 'protected-child-tid', 'x-child-tid', 'handler-return', 'inherit', 'kill', 'bound', 'orphan', 'adopted-zombie', 'rollback', 'inherit')
++        for mode in modes:
+             path, result = work / f'{mode}.toml', work / f'{mode}.json'
+             path.write_text(config.replace('args = []', 'args = ' + json.dumps([mode])))
+             result.unlink(missing_ok=True)
+@@ -62,6 +90,8 @@ def main():
+             assert b'teardown tasks=0 owned-handles=0' in proc.stderr, proc.stderr
+             assert not (root / 'work/data').exists()
+             print(f'PASS launch tasks: {mode}')
++        if sys.argv[3:]:
++            return
+         # No descendant may survive root death or a supervisor failure.
+         for failure in (False, True):
+             path, result = work / f'teardown-{failure}.toml', work / f'teardown-{failure}.json'
+diff --git a/tests/fixtures/launch-task-fixture.c b/tests/fixtures/launch-task-fixture.c
+index 69182281..8604d9e0 100644
+--- a/tests/fixtures/launch-task-fixture.c
++++ b/tests/fixtures/launch-task-fixture.c
+@@ -22,11 +22,48 @@ static void child_handler(int signal, const int *info, void *context) {
+     (void)context;
+     child_signal=(signal==17 && info[4]==2 && info[5]==0 && info[6]==37 && DO(39,0,0,0)==1)?1:-1;
+ }
++static long ordinary_resources(word argc, char **argv) {
++    const word mib=1024*1024;
++    long self=argc>3 ? 2 : 1;
++    CHECK(argc>2 && DO(39,0,0,0)==self && DO(186,0,0,0)==self,200);
++    word limits[2];
++    CHECK(call(302,0,9,0,(word)limits,0,0)==0 && limits[0]==32*mib && limits[1]==limits[0],201);
++    CHECK(call(9,0,64*mib,3,0x22,-1,0)==-12,202);
++    long memory=call(9,0,mib,3,0x22,-1,0);CHECK(memory>0,203);
++    ((volatile char *)memory)[0]=1;((volatile char *)memory)[mib-1]=2;
++    CHECK(DO(11,memory,mib,0)==0,204);
++    unsigned char expected[1024]={0},mask[1024]={0};
++    const char *text=argv[2];
++    while(*text) {
++        word cpu=0;
++        while(*text>='0' && *text<='9') cpu=cpu*10+(*text++-'0');
++        CHECK(cpu<8192,205);expected[cpu/8]|=1<<(cpu%8);
++        if(*text==',') ++text; else CHECK(*text==0,206);
++    }
++    for(word which=0;which<2;++which) {
++        long size=DO(204,which ? self : 0,sizeof mask,mask);CHECK(size>0 && size<=1024,207);
++        for(word i=0;i<sizeof mask;++i) CHECK(mask[i]==expected[i],208);
++    }
++    if(argc>3) return 0;
++    long child=DO(57,0,0,0);CHECK(child>=0,209);
++    if(child==0) {
++        CHECK(call(302,0,9,0,(word)limits,0,0)==0 && limits[0]==32*mib && limits[1]==limits[0],210);
++        long size=DO(204,2,sizeof mask,mask);CHECK(size>0 && size<=1024,211);
++        for(word i=0;i<sizeof mask;++i) CHECK(mask[i]==expected[i],212);
++        char *arguments[]={"/bin/fixture","Resources",argv[2],"exec",0};
++        char *environment[]={0};
++        DO(59,"/bin/fixture",arguments,environment);return 213;
++    }
++    int status=-1;CHECK(DO(61,child,&status,0)==child && status==0,214);
++    DO(1,1,"owned-tasks: PASS\n",18);
++    return 0;
++}
+ long task_main(word *stack)
+ {
+     word argc=*stack;
+     char **argv=(char **)(stack+1);
+     char mode=argc>1 ? argv[1][0] : 'f';
++    if(mode=='R') return ordinary_resources(argc,argv);
+     CHECK(DO(39,0,0,0)==1 && DO(186,0,0,0)==1,10);
+     CHECK(DO(110,0,0,0)==0 && DO(111,0,0,0)==1,11);
+     word action[4]={1,0,0,0};

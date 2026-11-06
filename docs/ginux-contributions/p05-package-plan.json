@@ -1291,8 +1291,18 @@
       ],
       "acceptance": "AS exhaustion, affinity enforcement, fork/exec inheritance and invalid requests; state per-process virtual AS and allowed CPU subset accurately, not aggregate RSS/CPU time.",
       "planned_delivery": "one coherent change plus its generic docs and focused regression fixtures; split coupled responsibilities only as recorded by P04",
-      "status": "pending extraction and R01-R04 review",
-      "artifact_directory": ".artifacts/ginux-contribution-preparation/G26"
+      "status": "split source/ordinary preparation retained; full G26 partial: G07/security, resource contract/full CI/upstream independence pending",
+      "artifact_directory": ".artifacts/ginux-contribution-preparation/G26",
+      "subpackets": [
+        "G26a",
+        "G26b"
+      ],
+      "evidence": "g26-review.md",
+      "source_disposition": {
+        "bootstrap": "G26a standalone source on recorded main",
+        "affinity_and_AS_mutation_guard": "G26b on G06b/G26a",
+        "thread_group_target_resolution": "required G07/F02 join; unresolved"
+      }
     },
     {
       "packet": "G27",
@@ -1460,6 +1470,91 @@
       "artifact_directory": ".artifacts/ginux-contribution-preparation/G17b",
       "evidence": "g17b-review.md",
       "source_patch": "patches/G17b.patch"
+    },
+    {
+      "packet": "G26a",
+      "base": "3f2fe7dfadd4b40e235d982a6a3d386dc6490177",
+      "head": "1d0824e6634aca994a38a9f9531b90344c787ac7",
+      "tree": "fe41942091ec425d3c7ac92ca7ef46e9886b9d34",
+      "changed_files": [
+        "README.md",
+        "config/domain-gate5.toml",
+        "crates/ginux-init/src/launch.rs",
+        "scripts/test-launch.py",
+        "tests/fixtures/launch-fixture.c"
+      ],
+      "dependencies": [],
+      "standalone_source": true,
+      "status": "ordinary source/clean preparation and separate self-review retained; G26 full task partial: thread join/security, policy/full CI/fresh upstream acceptance pending",
+      "patch_sha256": "e2d227766d9ef6dda67982f1416e4cab2d3574ce095c06052d3adec5b5206de3",
+      "deferred_joins": [
+        "G26b affinity queries/resource mutation in task owner",
+        "G06/G07 fork/exec/thread inheritance"
+      ],
+      "policy": "metadata-to-enforcement contract requires upstream review; no consent inferred",
+      "unit_tests": 65,
+      "vfs_tests": 12,
+      "clean_matched_paths": 150,
+      "review": "separate whole-diff self-review; no independent reviewer or security acceptance",
+      "remote_ci": "not run",
+      "security_handoff": "daybreakblue-handoff.md",
+      "source_binary_sha256": "43a062270f31782523fce5342c7c6eae8ceda986b68b1a3997ef74028740bcf0",
+      "clean_binary_sha256": "43a062270f31782523fce5342c7c6eae8ceda986b68b1a3997ef74028740bcf0",
+      "fixture_sha256": "379dd32a9fcc8bedb408d48cb004ed381908ae93f9f5ac14a60f5c4406a2f237",
+      "evidence": "g26-review.md",
+      "source_patch": "patches/G26a.patch",
+      "affinity_evidence": "same bootstrap function checked byte-identical in G26b; exact subset and fork/exec pass in that task-aware composition; public query stays denied on main",
+      "purpose": "Child-only bootstrap AS/CPU bounds",
+      "source_commits": [
+        "0c571cbbc36756c55af051cd07f513dd2b9228af"
+      ],
+      "artifact_directory": ".artifacts/ginux-contribution-preparation/G26a",
+      "acceptance": "G26 original criteria; see g26-review.md for split evidence and still-pending acceptance"
+    },
+    {
+      "packet": "G26b",
+      "base": "687eb942fb9d0628558d1d25094f5d53a9e3094f",
+      "head": "2ed520c4437a8459c70dc79208d40b2923390939",
+      "tree": "48b3c4815085ae8af318af2250033d3c84fd3b0d",
+      "changed_files": [
+        "README.md",
+        "crates/ginux-init/src/launch_tasks.rs",
+        "crates/ginux-init/src/descriptors.rs",
+        "scripts/test-launch-tasks.py",
+        "tests/fixtures/launch-task-fixture.c"
+      ],
+      "dependencies": [
+        "G06b",
+        "G26a"
+      ],
+      "standalone": false,
+      "status": "ordinary source/clean preparation and separate self-review retained; G26 full task partial: thread join/security, policy/full CI/fresh upstream acceptance pending",
+      "patch_sha256": "3314bf14a29918a3277c8059c6f7d5a2c1f46bc1730854287801aa383fe2eb20",
+      "deferred_joins": [
+        "G07 nonleader/thread-group affinity target and shared-argument security"
+      ],
+      "policy": "metadata-to-enforcement and affinity public contract need upstream review",
+      "unit_tests": 82,
+      "vfs_tests": 24,
+      "clean_matched_paths": 168,
+      "review": "separate whole-diff self-review; no independent reviewer or security acceptance",
+      "remote_ci": "not run",
+      "security_handoff": "daybreakblue-handoff.md",
+      "source_binary_sha256": "c5b56ec9aa55a8bacca1506b2558559438a8e6e5aeab95f85c77de98dc9437d5",
+      "clean_binary_sha256": "c5b56ec9aa55a8bacca1506b2558559438a8e6e5aeab95f85c77de98dc9437d5",
+      "fixture_sha256": {
+        "launch-fixture": "379dd32a9fcc8bedb408d48cb004ed381908ae93f9f5ac14a60f5c4406a2f237",
+        "launch-task-fixture": "393e2512f5cf58cb6b3835bbf2d25689b354c9ba17811f476996f1f29b753a04"
+      },
+      "evidence": "g26-review.md",
+      "source_patch": "patches/G26b.patch",
+      "thread_join_finding": "Nonleader query of own TGID must resolve the registered leader host before G07 thread composition; this candidate has only process tasks where pid==tgid",
+      "purpose": "Task-owned self affinity and AS mutation guard",
+      "source_commits": [
+        "0c571cbbc36756c55af051cd07f513dd2b9228af"
+      ],
+      "artifact_directory": ".artifacts/ginux-contribution-preparation/G26b",
+      "acceptance": "G26 original criteria; see g26-review.md for split evidence and still-pending acceptance"
     }
   ]
 }

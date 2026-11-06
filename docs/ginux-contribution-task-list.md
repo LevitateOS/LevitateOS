@@ -614,13 +614,22 @@ policy-held under #178/#163. The full task remains partial: actual APK/RPM,
 G07/security, G08 channels, full CI and upstream independence remain F02/F03 or
 publication prerequisites; fixtures do not replace application acceptance.
 
-Exact next task: **G26 — explicit inherited process resource limits**.
-Inspect0c571cbb against current config validation, native child setup and existing
-task lifecycle. Separate useful per-process limits from held thread/policy scope;
-state virtual AS and allowed CPU subset accurately, without aggregate RSS/time
-claims. Use only ordinary bounded allocation/affinity/inheritance checks locally.
-Record boundary/authority/hostile exhaustion/race probes for DaybreakBlue. Preserve
-all pending G23–G25/F02/F03 acceptance. No publication or maintainer messages before F04.
+G26 is split into source packets G26a `1d0824e6` on recorded main and G26b
+`2ed520c4` on G06b/G26a composition `687eb942`.
+[Review/evidence](ginux-contributions/g26-review.md) records65/82 units and strict
+clean replay, configured/lower-operator AS limits, exact operator CPU subsets and
+process fork/exec inheritance plus ordinary lifecycle controls passing. Kernel
+limits are per-process AS/eligible CPUs, not aggregate RSS or CPU time. Existing
+bootstrap/descriptor/CLOEXEC owners and full default coverage are preserved.
+Full G26 remains partial: resource contract, G07 nonleader/TGID target join,
+security/full CI and fresh upstream independence are pending; no publication.
+
+Exact next task: **G27 — configured virtual platform identity**.
+Inspect9cf265ba against current identity/config/ABI owners. Distinguish virtual
+uname from sysinfo (#219), preserve existing defaults and avoid downstream policy
+in upstream code. Verify ordinary raw ABI and actual RPM when consumer capabilities
+permit; keep invalid/oversized inputs and authority probes with DaybreakBlue.
+Preserve all pending G23–G26/F02/F03 acceptance. No publication or maintainer messages before F04.
 
 Active skill: `hdae-development`, discovered at
 `/home/vince/.codex/worktrees/ginux-pr-combination-check/ginux/.agents/skills/hdae-development/SKILL.md`.

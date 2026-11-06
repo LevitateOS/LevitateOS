@@ -78,3 +78,11 @@ replay pass89 units and ordinary vectors/large-file/offset/quota/pipe controls.
 74835089 native descriptor clamping stays held under #178/#163, with its FD
 fixture hunks, rather than being hidden in this packet. G08 channel adaptation,
 G07 security and actual APK/RPM closure still require F02/F03; G25 remains partial.
+
+G26 split: G26a `1d0824e6` has only recorded main as parent and installs
+child-only AS/CPU bounds; G26b `2ed520c4` requires the G06b process owner
+and G26a, composed at `687eb942` without G07. Ordinary AS and exact CPU
+subsets/fork/exec pass; thread-group affinity target resolution (calling nonleader
+versus requested TGID leader), resource policy, security and full CI remain
+unresolved. Bootstrap helper bytes match across both exports. No generic resource
+framework or aggregate RSS/time semantics are introduced; [review](g26-review.md).

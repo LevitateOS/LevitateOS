@@ -1,0 +1,223 @@
+From 1d0824e6634aca994a38a9f9531b90344c787ac7 Mon Sep 17 00:00:00 2001
+From: vince <vincepaul.liem@gmail.com>
+Date: Fri, 6 Nov 2026 17:25:45 +0100
+Subject: [PATCH] feat(init): apply configured process bounds before launch
+ exec
+
+Set child-only address-space hard/soft limits without raising lower operator
+limits and select eligible CPUs within the inherited affinity mask.
+Document per-process virtual memory and CPU eligibility rather than aggregate
+RSS or CPU time, and retain existing workload affinity syscall policy.
+
+Signed-off-by: vince <vincepaul.liem@gmail.com>
+---
+ README.md                       |  9 ++++++-
+ config/domain-gate5.toml        |  2 ++
+ crates/ginux-init/src/launch.rs | 48 +++++++++++++++++++++++++++++++--
+ scripts/test-launch.py          | 24 ++++++++++++++---
+ tests/fixtures/launch-fixture.c | 27 +++++++++++++++++++
+ 5 files changed, 103 insertions(+), 7 deletions(-)
+
+diff --git a/README.md b/README.md
+index 1700a0a4..58c3c1ca 100644
+--- a/README.md
++++ b/README.md
+@@ -213,7 +213,14 @@ failure returns 2; supervision or result-writing failure returns 1. Native
+ fork, clone, and subsequent exec are unsupported; fork returns `ENOSYS` until
+ child supervision is implemented. Non-x86-64 syscall ABIs and job-control
+ group stops fail explicitly. Audit output is capped at 64 KiB plus a truncation
+-notice. This path does not implement resource quotas from the domain metadata.
++notice. `[resources].memory_mib` caps each tracee process's virtual address space
++with hard/soft `RLIMIT_AS`, preserving lower operator limits. This includes
++anonymous and image mappings; it is not an aggregate domain RSS limit.
++`[resources].vcpus` restricts the child to at most that many logical CPUs selected
++from the launcher's allowed affinity mask. This bounds eligible CPUs, not CPU
++time. Limits are installed only in the child before exec; no host-global cgroup
++policy is changed. Kernel inheritance preserves them for supported descendants.
++CPU affinity syscalls retain the existing default-denied policy.
+ 
+ When requested, the result file is reserved exclusively before launch, with
+ mode 0600 and a maximum path length of 512 bytes. Existing files are never
+diff --git a/config/domain-gate5.toml b/config/domain-gate5.toml
+index 505bee67..74762e21 100644
+--- a/config/domain-gate5.toml
++++ b/config/domain-gate5.toml
+@@ -8,7 +8,9 @@ args = []
+ environment = ["container=ginux"]
+ 
+ [resources]
++# Maximum eligible logical CPUs within the operator affinity mask.
+ vcpus = 1
++# Per-process virtual address-space bound, not aggregate RSS.
+ memory_mib = 256
+ 
+ [execution]
+diff --git a/crates/ginux-init/src/launch.rs b/crates/ginux-init/src/launch.rs
+index 1c475fc4..6d31e7c7 100644
+--- a/crates/ginux-init/src/launch.rs
++++ b/crates/ginux-init/src/launch.rs
+@@ -307,7 +307,7 @@ pub fn launch_main(config_path: *const u8, root_path: *const u8, result_path: *c
+         launch_domain_fail(&mut domain, b"launch tracee fork failed");
+     }
+     if child == 0 {
+-        launch_tracee(root_path);
++        launch_tracee(root_path, &config);
+     }
+     supervise_launch(child as usize, &mut domain)
+ }
+@@ -790,8 +790,52 @@ fn finish_signaled(signal: u64) {
+     exit_process(128 + signal as usize)
+ }
+ 
+-fn launch_tracee(root_path: *const u8) -> ! {
++// Limits apply only to this child, before its exec. Kernel inheritance keeps
++// them on descendants; no cgroup mounts or host-global policy are modified.
++fn restrict_tracee_resources(config: &DomainConfig) -> bool {
++    let mut limits = [0usize; 2];
++    if unsafe { syscall4(302, 0, 9, 0, limits.as_mut_ptr() as usize) } != 0 {
++        return false;
++    }
++    let Some(bytes) = usize::try_from(config.memory_mib)
++        .ok()
++        .and_then(|mib| mib.checked_mul(1024 * 1024))
++    else {
++        return false;
++    };
++    let bound = bytes.min(limits[0]).min(limits[1]);
++    limits = [bound, bound];
++    if unsafe { syscall4(302, 0, 9, limits.as_ptr() as usize, 0) } != 0 {
++        return false;
++    }
++    let mut mask = [0u8; 1024];
++    let size = unsafe { syscall3(204, 0, mask.len(), mask.as_mut_ptr() as usize) };
++    if size <= 0 || size as usize > mask.len() {
++        return false;
++    }
++    let mut remaining = config.vcpus;
++    for byte in &mut mask[..size as usize] {
++        for bit in 0..8 {
++            if *byte & (1 << bit) != 0 {
++                if remaining == 0 {
++                    *byte &= !(1 << bit);
++                } else {
++                    remaining -= 1;
++                }
++            }
++        }
++    }
++    unsafe { syscall3(203, 0, size as usize, mask.as_ptr() as usize) == 0 }
++}
++
++fn launch_tracee(root_path: *const u8, config: &DomainConfig) -> ! {
+     static ROOT: &[u8] = b"/\0";
++    if !restrict_tracee_resources(config) {
++        tracee_setup_fail(
++            b"ginux: launch bootstrap failed: resource bounds unavailable\n",
++            132,
++        );
++    }
+     // Host descriptors (including the result file) must not grant the
+     // workload authority outside the supplied root. Only stdio is shared.
+     const SYS_CLOSE_RANGE: usize = 436;
+diff --git a/scripts/test-launch.py b/scripts/test-launch.py
+index c507d3bb..78ddffb2 100644
+--- a/scripts/test-launch.py
++++ b/scripts/test-launch.py
+@@ -13,9 +13,9 @@ import tempfile
+ 
+ 
+ def main():
+-    if len(sys.argv) != 3 or os.geteuid() != 0:
++    if len(sys.argv) < 3 or os.geteuid() != 0:
+         sys.exit("usage (as root): test-launch.py <ginux binary> <launch fixture>")
+-    binary, fixture = (str(Path(arg).resolve()) for arg in sys.argv[1:])
++    binary, fixture = (str(Path(arg).resolve()) for arg in sys.argv[1:3])
+     template = (Path(__file__).resolve().parent.parent / "config/domain-gate5.toml").read_text()
+     with tempfile.TemporaryDirectory(prefix="ginux-launch-") as directory:
+         work = Path(directory)
+@@ -34,7 +34,7 @@ def main():
+         (root / "work/a..b").mkdir()
+         counter = 0
+ 
+-        def invoke(args, expected, outcome, *, stdout=b"", changes=None, env=None, pass_fds=()):
++        def invoke(args, expected, outcome, *, stdout=b"", changes=None, env=None, pass_fds=(), preexec=None):
+             nonlocal counter
+             counter += 1
+             config = template.replace('init = "/bin/bash"', 'init = "/bin/fixture"')
+@@ -47,7 +47,7 @@ def main():
+             result_path = work / f"{counter}.json"
+             proc = subprocess.run([binary, "launch", str(config_path), str(root),
+                                    "--result-file", str(result_path)], capture_output=True,
+-                                  timeout=20, pass_fds=pass_fds)
++                                  timeout=20, pass_fds=pass_fds, preexec_fn=preexec)
+             record = json.loads(result_path.read_text())
+             wanted = {"version": 1, "outcome": outcome, "code": None,
+                       "signal": None, "generation": None}
+@@ -63,6 +63,22 @@ def main():
+             print(f"PASS launch {args}: {outcome} ({expected})")
+             return proc
+ 
++        def resource_cases():
++            invoke(["resources", "32"], 0, "exited", stdout=b"process-address-space: PASS\n",
++                   changes={"memory_mib = 256": "memory_mib = 32"})
++            original = resource.getrlimit(resource.RLIMIT_AS)
++            def lower_operator_limit():
++                resource.setrlimit(resource.RLIMIT_AS, (24*1024*1024, original[1]))
++            invoke(["resources", "24"], 0, "exited", stdout=b"process-address-space: PASS\n",
++                   changes={"memory_mib = 256": "memory_mib = 32"},
++                   preexec=lower_operator_limit)
++            assert resource.getrlimit(resource.RLIMIT_AS) == original
++        if sys.argv[3:]:
++            if sys.argv[3:] != ['ordinary-resources']:
++                sys.exit('unknown selected launch scenario')
++            resource_cases()
++            return
++        resource_cases()
+         for code in (0, 3, 120, 127, 128, 255):
+             invoke(["exit", str(code)], code, "exited")
+         invoke(["args", "one two", ""], 0, "exited", env=["GREETING=hello world", "EMPTY="],
+diff --git a/tests/fixtures/launch-fixture.c b/tests/fixtures/launch-fixture.c
+index 70c70f18..3c528df5 100644
+--- a/tests/fixtures/launch-fixture.c
++++ b/tests/fixtures/launch-fixture.c
+@@ -20,6 +20,17 @@ static long call4(long number, word a, word b, word c, word d)
+     return result;
+ }
+ 
++static long call6(long n, word a, word b, word c, word d, word e, word f)
++{
++    register word r10 __asm__("r10") = d;
++    register word r8 __asm__("r8") = e;
++    register word r9 __asm__("r9") = f;
++    long result;
++    __asm__ volatile("syscall" : "=a"(result) : "a"(n), "D"(a), "S"(b), "d"(c),
++                     "r"(r10), "r"(r8), "r"(r9) : "rcx", "r11", "memory");
++    return result;
++}
++
+ /* Signal return trampoline (SA_RESTORER), as libc provides it. */
+ void launch_fixture_restore(void);
+ __asm__(".global launch_fixture_restore\n"
+@@ -78,6 +89,22 @@ long launch_fixture_main(word *stack)
+     char **env = argv + argc + 1;
+     if (argc < 2) return 90;
+     switch (argv[1][0]) {
++    case 'r': {
++        word limits[2];
++        word expected=(argc>2 ? number(argv[2]) : 32)*1024*1024;
++        if(call4(302,0,9,0,(word)limits)!=0 || limits[0]!=expected || limits[1]!=expected) return 160;
++        /* Reserve virtual space only; no host memory pressure is generated. */
++        if(call6(9,0,64*1024*1024,3,0x22,-1,0)!=-12) return 161;
++        long memory=call6(9,0,1024*1024,3,0x22,-1,0);
++        if(memory<=0) return 162;
++        ((volatile char *)memory)[0]=1;
++        ((volatile char *)memory)[1024*1024-1]=2;
++        if(call3(11,memory,1024*1024,0)!=0) return 163;
++        long previous=call3(12,0,0,0);
++        if(previous<=0 || call3(12,previous+64*1024*1024,0,0)!=previous) return 164;
++        print("process-address-space: PASS");
++        return 0;
++    }
+     case 'e': return argc > 2 ? number(argv[2]) : 0;
+     case 'a':
+         for (word i = 2; i < argc; ++i) print(argv[i]);
