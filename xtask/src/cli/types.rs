@@ -121,6 +121,16 @@ pub enum Cmd {
 
     /// Render a terminal app headlessly (optionally typing keys) and write its screen.
     Inspect(InspectArgs),
+
+    /// Open a web page of live terminals, one per story, each running the real app.
+    Stories {
+        /// Local port to serve on (127.0.0.1 only).
+        #[arg(long, default_value_t = 7681)]
+        port: u16,
+        /// Don't open the page in a browser.
+        #[arg(long)]
+        no_open: bool,
+    },
 }
 
 #[derive(Subcommand)]
@@ -329,7 +339,7 @@ pub struct TestArgs {
 #[derive(Subcommand)]
 pub enum CheckCmd {
     /// The terminal apps: typecheck, lint, format, render (also at the install screen's
-    /// docs-pane size), snapshots and each app's key walk.
+    /// docs-pane size), snapshots and each app's stories.
     Tui {
         /// Rewrite snapshots from what the apps render now.
         #[arg(long)]
@@ -341,6 +351,10 @@ pub enum CheckCmd {
 pub struct InspectArgs {
     /// App name (its package.json `bin`).
     pub app: String,
+    /// Open one of the app's stories (its manifest's `inspect.stories`): its arguments,
+    /// environment and keys come first.
+    #[arg(long, value_name = "NAME")]
+    pub story: Option<String>,
     /// Keys to type once it has drawn, one at a time (printf escapes: '\n', '\e[B', 'jj').
     #[arg(long, value_name = "KEYS")]
     pub input: Option<String>,

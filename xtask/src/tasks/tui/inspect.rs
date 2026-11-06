@@ -7,30 +7,22 @@ use std::process::Command;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use crate::util::pty_capture::{PtySession, Settled, parse_keys, plain_text};
-use distro_contract::tui_apps::{self, TuiApp};
+use crate::cli::InspectArgs;
+use distro_contract::tui_apps::{self, Story, TuiApp};
 
-pub struct Options {
-    pub app: String,
-    pub args: Vec<String>,
-    pub input: Option<String>,
-    pub all_pages: bool,
-    pub columns: u16,
-    pub rows: u16,
-    pub timeout_seconds: u64,
-    pub settle_ms: u64,
-    pub out_dir: Option<PathBuf>,
-    pub stdout: bool,
-    pub ansi: bool,
-    pub keep_transcript: bool,
-}
-
-pub fn run(options: Options) -> Result<()> {
+pub fn run(options: InspectArgs) -> Result<()> {
     let root = crate::util::repo::repo_root()?;
     let launch = Launch::prepare(&root, tui_apps::find(&root, &options.app)?)?;
-    let keys = match &options.input {
-        Some(spec) => parse_keys(spec)?,
-        None => Vec::new(),
-    };
+    let story = options.story.as_deref().map(|name| launch.story(name)).transpose()?;
+    let mut keys = Vec::new();
+    for step in story.iter().flat_map(|story| &story.steps) {
+        keys.extend(parse_keys(&step.keys)?);
+    }
+    if let Some(spec) = &options.input {
+        keys.extend(parse_keys(spec)?);
+    }
+    let env: Vec<(String, String)> = story.map(|s| s.env.clone().into_iter().collect()).unwrap_or_default();
+    let story_args = story.map(|s| s.args.clone()).unwrap_or_default();
     let size = Size {
         columns: options.columns.max(1),
         rows: options.rows.max(1),
@@ -47,7 +39,8 @@ pub fn run(options: Options) -> Result<()> {
             .map(|(page, args)| (page, [args, options.args.clone()].concat()))
             .collect()
     } else {
-        vec![(launch.app.name.clone(), options.args.clone())]
+        let name = options.story.clone().unwrap_or_else(|| launch.app.name.clone());
+        vec![(name, [story_args, options.args.clone()].concat())]
     };
 
     let base = options
@@ -68,7 +61,7 @@ pub fn run(options: Options) -> Result<()> {
         if runs.len() > 1 {
             eprintln!("[inspect] {}/{} {name}", index + 1, runs.len());
         }
-        let capture = launch.capture(args, &[], &keys, size, wait);
+        let capture = launch.capture(args, &env, &keys, size, wait);
         let shot = match &capture {
             Ok(shot) | Err(CaptureError { shot: Some(shot), .. }) => Some(shot),
             Err(_) => None,
@@ -132,38 +125,45 @@ pub struct CaptureError {
     pub shot: Option<Shot>,
 }
 
-/// An app ready to run headlessly: workspace installed, its tools built and on PATH,
-/// refused tool calls shimmed out.
+/// An app ready to run headlessly: workspace installed, its stand-in tools first on PATH.
 pub struct Launch {
     pub app: TuiApp,
     env: Vec<(String, String)>,
-    _shims: Option<tempfile::TempDir>,
 }
 
 impl Launch {
     pub fn prepare(root: &Path, app: TuiApp) -> Result<Self> {
         crate::tasks::check::install_js_workspace(root)?;
-        let mut path = super::tools_path(root, &app)?
-            .unwrap_or_else(|| std::env::var_os("PATH").unwrap_or_default());
-        if !app.inspect.path.is_empty() {
-            let mut paths: Vec<PathBuf> = app.inspect.path.iter().map(|dir| app.dir.join(dir)).collect();
-            // A missing stand-in folder would let the real tool run instead.
-            if let Some(missing) = paths.iter().find(|dir| !dir.is_dir()) {
-                bail!("{}: inspect.path folder '{}' does not exist", app.name, missing.display());
+        let stand_ins: Vec<PathBuf> = app.inspect.path.iter().map(|dir| app.dir.join(dir)).collect();
+        // A headless run must never reach a real tool: each one the app runs needs a stand-in.
+        for tool in &app.tools {
+            if !stand_ins.iter().any(|dir| dir.join(tool).is_file()) {
+                bail!(
+                    "{}: no stand-in for '{tool}' in inspect.path ({}); headless runs never run the real tool",
+                    app.name,
+                    app.inspect.path.join(", ")
+                );
             }
-            paths.extend(std::env::split_paths(&path));
-            path = std::env::join_paths(paths)?;
         }
-        let shims = refuse_shims(&app, &path)?;
-        if let Some(dir) = &shims {
-            let mut paths = vec![dir.path().to_path_buf()];
-            paths.extend(std::env::split_paths(&path));
-            path = std::env::join_paths(paths)?;
-        }
+        let mut paths = stand_ins;
+        paths.extend(std::env::split_paths(&std::env::var_os("PATH").unwrap_or_default()));
+        let path = std::env::join_paths(paths)?;
         Ok(Self {
             app,
             env: vec![("PATH".to_string(), path.to_string_lossy().into_owned())],
-            _shims: shims,
+        })
+    }
+
+    /// The environment headless runs add (PATH with the stand-ins first).
+    pub fn env(&self) -> &[(String, String)] {
+        &self.env
+    }
+
+    /// The story the manifest names `name`.
+    pub fn story(&self, name: &str) -> Result<&Story> {
+        self.app.inspect.stories.iter().find(|story| story.name == name).with_context(|| {
+            let names: Vec<&str> = self.app.inspect.stories.iter().map(|s| s.name.as_str()).collect();
+            format!("{} has no story '{name}' (stories: {})", self.app.name, names.join(", "))
         })
     }
 
@@ -261,49 +261,6 @@ impl Launch {
         })?;
         Ok(result)
     }
-}
-
-/// Writes one shim per refused tool: it exits 97 for a refused call and runs the real
-/// tool (found on `path`) otherwise.
-fn refuse_shims(app: &TuiApp, path: &std::ffi::OsStr) -> Result<Option<tempfile::TempDir>> {
-    if app.inspect.refuse.is_empty() {
-        return Ok(None);
-    }
-    let dir = tempfile::tempdir().context("creating the refuse-shim directory")?;
-    let mut rules: Vec<(String, Vec<String>)> = Vec::new();
-    for rule in &app.inspect.refuse {
-        let mut words = rule.split_whitespace().map(str::to_string);
-        let tool = words
-            .next()
-            .with_context(|| format!("{}: empty refuse rule", app.name))?;
-        rules.push((tool, words.collect()));
-    }
-    let mut tools: Vec<&String> = rules.iter().map(|(tool, _)| tool).collect();
-    tools.dedup();
-    for tool in tools {
-        let real = which::which_in(tool, Some(path), &app.dir)
-            .with_context(|| format!("{}: '{tool}' is not on PATH", app.name))?;
-        let mut script = String::from("#!/bin/sh\n");
-        for (rule_tool, tokens) in &rules {
-            if rule_tool != tool {
-                continue;
-            }
-            let test = tokens
-                .iter()
-                .map(|token| format!("case \" $* \" in *\" {token} \"*) ;; *) false ;; esac"))
-                .collect::<Vec<_>>()
-                .join(" && ");
-            script.push_str(&format!(
-                "if {test}; then\n  echo \"cargo xtask inspect: refused '{tool} $*' (headless runs never do this)\" >&2\n  exit 97\nfi\n"
-            ));
-        }
-        script.push_str(&format!("exec '{}' \"$@\"\n", real.display()));
-        let shim = dir.path().join(tool);
-        fs::write(&shim, script)?;
-        use std::os::unix::fs::PermissionsExt;
-        fs::set_permissions(&shim, fs::Permissions::from_mode(0o755))?;
-    }
-    Ok(Some(dir))
 }
 
 fn write(path: &Path, bytes: &[u8]) -> Result<()> {

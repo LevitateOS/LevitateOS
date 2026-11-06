@@ -4,8 +4,8 @@
 //! draw at a full console size without crashing; an app a variant shows in its
 //! install screen (`[install_ux]` docs) must also draw, at that variant's page, at the
 //! size the docs pane really has on each console; snapshots under an app's
-//! `snapshots/<columns>x<rows>/<page>.txt` must match; and each app's declared walk
-//! (keys typed in turn, text each screen must show) must hold.
+//! `snapshots/<columns>x<rows>/<page>.txt` must match; and each app's declared story
+//! (keys typed in turn, text the screens must show) must hold.
 
 use anyhow::{Context, Result, bail};
 use regex::Regex;
@@ -82,8 +82,8 @@ pub fn run(bless: bool) -> Result<()> {
                 );
             }
         }
-        for walk_spec in &launch.app.inspect.walks {
-            step(format!("walk {name}: {}", walk_spec.name), walk(&launch, walk_spec));
+        for story_spec in &launch.app.inspect.stories {
+            step(format!("story {name}: {}", story_spec.name), story(&launch, story_spec));
         }
         let snapshots = launch.app.dir.join("snapshots");
         if snapshots.is_dir() {
@@ -146,22 +146,33 @@ fn capture_error(error: CaptureError) -> anyhow::Error {
     }
 }
 
-fn walk(launch: &Launch, spec: &distro_contract::tui_apps::Walk) -> Result<()> {
+/// Runs the story: the screen must be healthy after its keys, and show each step's
+/// expected text once that step's keys are typed.
+fn story(launch: &Launch, spec: &distro_contract::tui_apps::Story) -> Result<()> {
     let env: Vec<(String, String)> = spec.env.clone().into_iter().collect();
     let mut keys = Vec::new();
     let mut typed = String::new();
+    let last = spec.steps.len().saturating_sub(1);
+    if spec.steps.is_empty() {
+        let shot = launch.capture(&spec.args, &env, &keys, FULL, WAIT).map_err(capture_error)?;
+        return healthy(&shot);
+    }
     for (index, step) in spec.steps.iter().enumerate() {
         keys.extend(parse_keys(&step.keys)?);
         typed.push_str(&step.keys);
-        let shot = launch.capture(&[], &env, &keys, FULL, WAIT).map_err(capture_error)?;
+        if step.expect.is_none() && index != last {
+            continue;
+        }
+        let shot = launch.capture(&spec.args, &env, &keys, FULL, WAIT).map_err(capture_error)?;
         healthy(&shot)?;
-        if !shot.plain.contains(&step.expect) {
-            bail!(
-                "step {} (keys so far '{typed}'): expected '{}' on screen:\n{}",
-                index + 1,
-                step.expect,
-                shot.plain
-            );
+        if let Some(expect) = &step.expect {
+            if !shot.plain.contains(expect) {
+                bail!(
+                    "step {} (keys so far '{typed}'): expected '{expect}' on screen:\n{}",
+                    index + 1,
+                    shot.plain
+                );
+            }
         }
     }
     Ok(())

@@ -19,19 +19,10 @@ pub fn run(cli: crate::cli::Cli) -> Result<()> {
             what: Some(CheckCmd::Tui { bless }),
         } => crate::tasks::tui::check::run(bless),
         Cmd::Tui { app, args } => crate::tasks::tui::run(app, args),
-        Cmd::Inspect(args) => crate::tasks::tui::inspect::run(crate::tasks::tui::inspect::Options {
-            app: args.app,
-            args: args.args,
-            input: args.input,
-            all_pages: args.all_pages,
-            columns: args.columns,
-            rows: args.rows,
-            timeout_seconds: args.timeout_seconds,
-            settle_ms: args.settle_ms,
-            out_dir: args.out_dir,
-            stdout: args.stdout,
-            ansi: args.ansi,
-            keep_transcript: args.keep_transcript,
+        Cmd::Inspect(args) => crate::tasks::tui::inspect::run(args),
+        Cmd::Stories { port, no_open } => crate::tasks::tui::stories::run(crate::tasks::tui::stories::Options {
+            port,
+            open: !no_open,
         }),
     }
 }

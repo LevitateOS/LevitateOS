@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TUI stories</title>
+<link rel="stylesheet" href="/xterm.css">
+<style>
+  :root {
+    --bg: #f4f4f5; --panel: #ffffff; --text: #18181b; --muted: #71717a;
+    --line: #e4e4e7; --accent: #2563eb; --term: #0b0b0e;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #0f0f12; --panel: #18181b; --text: #e4e4e7; --muted: #a1a1aa; --line: #27272a; --accent: #60a5fa; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 14px/1.4 system-ui, sans-serif; background: var(--bg); color: var(--text); display: flex; height: 100vh; }
+  nav { width: 240px; flex: none; overflow-y: auto; border-right: 1px solid var(--line); background: var(--panel); padding: 12px; }
+  nav h1 { font-size: 15px; margin: 0 0 8px; }
+  nav .hint { color: var(--muted); font-size: 12px; margin: 0 0 12px; }
+  nav h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin: 16px 0 4px; display: flex; justify-content: space-between; align-items: center; }
+  nav h2 button { font-size: 11px; }
+  nav a { display: block; padding: 3px 6px; border-radius: 4px; color: var(--text); text-decoration: none; cursor: pointer; }
+  nav a:hover { background: var(--line); }
+  main { flex: 1; overflow: auto; padding: 16px; display: flex; flex-wrap: wrap; gap: 16px; align-content: flex-start; }
+  main:empty::before { content: "Pick a story on the left."; color: var(--muted); }
+  .tile { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+  .tile.focus { border-color: var(--accent); }
+  .bar { display: flex; gap: 8px; align-items: center; padding: 6px 8px; border-bottom: 1px solid var(--line); font-size: 12px; }
+  .bar .title { font-weight: 600; margin-right: auto; white-space: nowrap; }
+  .bar .title span { color: var(--muted); font-weight: 400; }
+  .term { background: var(--term); padding: 4px; }
+  button, select { font: inherit; font-size: 12px; }
+</style>
+</head>
+<body>
+<nav>
+  <h1>TUI stories</h1>
+  <p class="hint">Each tile runs the real app in a real terminal. Click a tile to type into it.</p>
+  <div id="list"></div>
+</nav>
+<main id="tiles"></main>
+<script src="/xterm.js"></script>
+<script>
+const SIZES = [
+  ["120x36", "120×36 dev terminal"],
+  ["80x24", "80×24 serial console"],
+  ["38x21", "38×21 docs pane (80×24)"],
+  ["118x64", "118×64 docs pane (240×67)"],
+  ["240x67", "240×67 framebuffer"],
+];
+
+function defaultSize(story) {
+  return story.group === "install screen" ? "80x24" : "120x36";
+}
+
+function openTile(story) {
+  const tile = document.createElement("div");
+  tile.className = "tile";
+  const sizeOptions = SIZES.map(([v, l]) => `<option value="${v}">${l}</option>`).join("");
+  tile.innerHTML = `
+    <div class="bar">
+      <div class="title">${story.name} <span>${story.group}</span></div>
+      <select class="size">${sizeOptions}</select>
+      <label><input type="checkbox" class="nocolor"> NO_COLOR</label>
+      <button class="restart">Restart</button>
+      <button class="close">Close</button>
+    </div>
+    <div class="term"></div>`;
+  document.getElementById("tiles").prepend(tile);
+  const sizeSelect = tile.querySelector(".size");
+  sizeSelect.value = defaultSize(story);
+  let term, socket;
+
+  function start() {
+    if (socket) socket.close();
+    if (term) term.dispose();
+    const [cols, rows] = sizeSelect.value.split("x").map(Number);
+    term = new Terminal({ cols, rows, fontSize: 13, fontFamily: "ui-monospace, Menlo, Consolas, monospace", cursorBlink: true, allowProposedApi: true });
+    term.open(tile.querySelector(".term"));
+    const nocolor = tile.querySelector(".nocolor").checked ? 1 : 0;
+    socket = new WebSocket(`ws://${location.host}/pty?id=${story.id}&cols=${cols}&rows=${rows}&nocolor=${nocolor}`);
+    socket.binaryType = "arraybuffer";
+    socket.onmessage = (e) => term.write(typeof e.data === "string" ? e.data : new Uint8Array(e.data));
+    socket.onclose = () => term.write("\r\n\x1b[2m[disconnected]\x1b[0m");
+    const encoder = new TextEncoder();
+    term.onData((data) => socket.readyState === 1 && socket.send(encoder.encode(data)));
+    term.textarea.addEventListener("focus", () => tile.classList.add("focus"));
+    term.textarea.addEventListener("blur", () => tile.classList.remove("focus"));
+  }
+
+  sizeSelect.onchange = start;
+  tile.querySelector(".nocolor").onchange = start;
+  tile.querySelector(".restart").onclick = start;
+  tile.querySelector(".close").onclick = () => { socket?.close(); term?.dispose(); tile.remove(); };
+  start();
+}
+
+fetch("/catalog.json").then((r) => r.json()).then((stories) => {
+  const list = document.getElementById("list");
+  const groups = new Map();
+  for (const story of stories) {
+    if (!groups.has(story.group)) groups.set(story.group, []);
+    groups.get(story.group).push(story);
+  }
+  for (const [group, members] of groups) {
+    const heading = document.createElement("h2");
+    heading.textContent = group;
+    const all = document.createElement("button");
+    all.textContent = "open all";
+    all.onclick = () => [...members].reverse().forEach(openTile);
+    heading.append(all);
+    list.append(heading);
+    for (const story of members) {
+      const link = document.createElement("a");
+      link.textContent = story.name;
+      link.onclick = () => openTile(story);
+      list.append(link);
+    }
+  }
+});
+</script>
+</body>
+</html>

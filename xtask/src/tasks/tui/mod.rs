@@ -55,3 +55,4 @@ pub fn tools_path(root: &Path, app: &TuiApp) -> Result<Option<std::ffi::OsString
 
 pub mod check;
 pub mod inspect;
+pub mod stories;
