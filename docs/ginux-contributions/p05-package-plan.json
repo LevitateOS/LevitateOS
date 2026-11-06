@@ -284,6 +284,27 @@
       "artifact_directory": ".artifacts/ginux-contribution-preparation/G08"
     },
     {
+      "packet": "G09a",
+      "parent_packet": "G09",
+      "purpose": "pluggable bounded VFS storage with truncation",
+      "base": "785bfb9d6b7fcfb901d9f5efb8a845c8d9d4d53a",
+      "head": "d29381c72352c33e33a4f164258f9ac80239ee85",
+      "tree": "e81178500226544c6d053471abbd53a95d68db3f",
+      "dependencies": [
+        "G03b"
+      ],
+      "standalone": false,
+      "status": "source separately self-reviewed; static/unit/build and selected native checks pass; full runtime CI and standalone refresh pending",
+      "patch_sha256": "8a77ebbc5d843cdc77c9ed6171024e53a5c20264a6191ffd3fc35c0fb63508ca",
+      "unit_tests": 80,
+      "clean_matched_paths": 150,
+      "review": "separate self-review; no independent reviewer claimed",
+      "remote_ci": "not run",
+      "evidence": "g09a-review.md",
+      "source_patch": "patches/G09a.patch",
+      "artifact_directory": ".artifacts/ginux-contribution-preparation/G09a"
+    },
+    {
       "packet": "G09",
       "purpose": "Growable owned files, directories and basic path operations (`06d24ae2`, `32e2c85f`, `9ba6a1d4`, `d9490772`, `8752f708`, `37ca30cb`, `adc79f0a`)",
       "dependencies": [
@@ -302,8 +323,11 @@
       ],
       "acceptance": "Sparse growth, shared quota, directory cursors/mutations, relative paths and access probes; failed operations preserve data, identity and confinement.",
       "planned_delivery": "one coherent change plus its generic docs and focused regression fixtures; split coupled responsibilities only as recorded by P04",
-      "status": "pending extraction and R01-R04 review",
-      "artifact_directory": ".artifacts/ginux-contribution-preparation/G09"
+      "status": "VFS byte-storage subpacket G09a locally reviewed with limited functional checks; runtime growth/directories still in preparation",
+      "artifact_directory": ".artifacts/ginux-contribution-preparation/G09",
+      "extracted_packets": [
+        "G09a"
+      ]
     },
     {
       "packet": "G10",

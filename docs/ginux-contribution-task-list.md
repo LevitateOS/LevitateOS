@@ -413,11 +413,17 @@ DaybreakBlue in the downstream security record. G07 is not complete or ready;
 G08 remains held by G01/G02 policy and G07. No security acceptance is inferred
 from functional results, and no DaybreakBlue dispatch has occurred.
 
+G09a separates VFS byte storage atd29381c7 on G03b, preserving the inline
+default and existing offsets/whiteouts. [Review/evidence](ginux-contributions/g09a-review.md)
+records80 passing unit tests, source/clean build checks, four selected native
+smoke scenarios and the fixed O_TRUNC capacity failure. Full runtime CI remains
+pending; it is not standalone-ready before its VFS prerequisites merge.
+
 Current goal-turn classification: **progress**. The full goal remains active;
 security-held G07, later packets, policy acceptance, interactions and Recipe
 closure remain incomplete. F04 remains the user inspection stop.
 
-Exact next task: **G09 — growable owned files/directories**, from reviewed G06b
+Exact next task: **G09b — runtime growable storage**, compose G09a with reviewed G06b
 8c783e71 (not the unready G07 snapshot). Its traced prerequisites do not include
 G07 or G08. Review/extract its existing behavior owners in dependency order and
 run ordinary functional checks. Preserve all upstream tests; write exploit-like
