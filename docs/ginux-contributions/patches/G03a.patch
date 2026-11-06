@@ -1,6 +1,6 @@
-From 0b563cf87a3c0e83a20a22eee3af8ffdb7adf015 Mon Sep 17 00:00:00 2001
+From c28dd1321f024ec6b5d2087fd489457f31f20e2c Mon Sep 17 00:00:00 2001
 From: vince <vincepaul.liem@gmail.com>
-Date: Fri, 6 Nov 2026 09:06:29 +0100
+Date: Fri, 6 Nov 2026 22:10:41 +0100
 Subject: [PATCH] fix(launch): use mkdirat when creating the workload directory
 
 Use the x86-64 mkdirat syscall number instead of mknodat so launch
@@ -14,10 +14,10 @@ Signed-off-by: vince <vincepaul.liem@gmail.com>
  2 files changed, 4 insertions(+), 1 deletion(-)
 
 diff --git a/crates/ginux-init/src/launch.rs b/crates/ginux-init/src/launch.rs
-index 1c475fc4..533b12fa 100644
+index 2a01289abe19678572664764f2c2bd53b7e6de7c..cb499f89bee64001d71a3288116461f20d2af0d3 100644
 --- a/crates/ginux-init/src/launch.rs
 +++ b/crates/ginux-init/src/launch.rs
-@@ -283,7 +283,7 @@ pub const MAX_LAUNCH_ARG_LEN: usize = 128;
+@@ -324,7 +324,7 @@ pub const MAX_LAUNCH_ARG_LEN: usize = 128;
  pub const MAX_LAUNCH_ENV_LEN: usize = 256;
  pub const MAX_LAUNCH_PATH_LEN: usize = 128;
  
@@ -27,7 +27,7 @@ index 1c475fc4..533b12fa 100644
  static mut LAUNCH_EXEC: [u8; 129] = [0; 129];
  static mut LAUNCH_ARGS: [u8; 7 * 129] = [0; 7 * 129];
 diff --git a/scripts/test-launch.py b/scripts/test-launch.py
-index c507d3bb..6ef91eaa 100644
+index c507d3bb54a2d4491fdad5cfc6accd3a26e8c1f6..6ef91eaa28a9866bc30ba190ca2ff9b1ffbb3a2f 100644
 --- a/scripts/test-launch.py
 +++ b/scripts/test-launch.py
 @@ -77,6 +77,9 @@ def main():

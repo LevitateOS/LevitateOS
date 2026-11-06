@@ -1,6 +1,10 @@
 # G03a — create an absent workload directory correctly
 
-Local candidate `0b563cf87a3c0e83a20a22eee3af8ffdb7adf015` has sole parent
+Current retained candidate `c28dd1321f024ec6b5d2087fd489457f31f20e2c` has sole parent
+`8a475e8b2318425fd2fc15246a5c6f4bca6caf86`. The current-main refresh below owns
+its fresh evidence and pending checks; the earlier results remain historical.
+
+Earlier candidate `0b563cf87a3c0e83a20a22eee3af8ffdb7adf015` has sole parent
 upstream `3f2fe7dfadd4b40e235d982a6a3d386dc6490177`. Two files, +4/-1.
 This one-line correction was already included in the local10091e4e storage
 commit; it is independently useful and is extracted from that larger feature.
@@ -48,3 +52,41 @@ R01–R04 pass locally. macOS Actions/full Rocky VM checks remain unrun; no remo
 CI result is claimed. No branch was created/switched and no remote was changed.
 User inspection of the full package remains F04. The broader G03 writable-storage
 and metadata feature is still pending; this small fix does not complete it.
+
+## Current-main refresh — 2026-11-06
+
+The two-file patch applies to observed upstream `8a475e8b` without any other
+proposal. The complete final diff remains +4/-1: syscall 259 becomes 258 and the
+existing launch runner gains the three-line absent-workdir regression. Installed
+x86-64 ABI headers confirm `mkdirat=258` and `mknodat=259`. The constant has one
+launch-bootstrap caller; upstream's separate native `SYS_MKDIRAT_HOST` owner
+already uses 258 and is unchanged.
+
+The exact new upstream binary fails the trusted ordinary missing-workdir case:
+exit 2, supervisor-error, configured workdir unavailable, and a path exists but
+is not a directory. Candidate and independent clean replay both exit 0 with an
+actual directory and successful fixture execution. All three runs use identical
+fixture bytes. Source/call-site review confirms the call stays after chroot and
+before privilege drop/chdir; path validation, modes and workload syscall grants
+are unchanged. Separate self-review found no additional blocking source change;
+no independent reviewer or security acceptance is claimed.
+
+Both candidate and clean replay pass:
+
+- `make check test-unit build build-launch-fixture build-process-fixtures build-gate1-fixture`, including all 73 current unit tests.
+- The real missing-workdir regression and eight additional ordinary launch/wait
+  controls (nine controls per export).
+
+All 187 tracked paths match the retained commit in both exports. Both binaries
+hash `6eec588fd18a3d052a28a8c87c9711151e7d5886745c6f97ef65d6f31baf622c`.
+The base, candidate and clean builds use separate target directories. Exact
+commands, source exports, baseline failure, receipts, manifest, earlier patch
+and a new concise draft are retained under
+`.artifacts/ginux-contribution-preparation/upstream-refresh-2026-11-06/G03a/`.
+The snapshot commit is local and unreferenced; real branches/indexes/worktrees
+and remote text remain untouched.
+
+Current upstream tests and CI wiring remain intact. Full default Linux runtime
+jobs contain authority/protected/fault probes and remain unrun under the written
+security boundary; macOS/remote CI also remains unrun. R03 retains those checks.
+Selected ordinary success is not a full CI result or publication authorization.

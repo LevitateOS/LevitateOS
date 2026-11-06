@@ -762,12 +762,13 @@ The additional retained-dependency-state case passes all three invocations,
 including persisted discoveries from reused readiness checks. Changed source/
 input identity and default application-state placement/reuse also pass.
 
-Fresh strict replay verifies all 37 retained patches against their recorded
+Initial strict replay verified all 37 original retained patches against their recorded
 parents/trees, including corrected G12. All 189 F02 tracked paths match the
 recorded combined head. The paused Recipe snapshot matches all 153 current
 tracked paths except its separately normalized standalone lock. The six restored
 worktrees remain untouched; their index/status fingerprints are retained with
-the new F03 evidence. No Ginux contribution source has changed.
+the new F03 evidence. That initial F03 continuation changed no Ginux candidate;
+the subsequent current-main refreshes below supersede individual retained heads.
 
 The revised ordinary queue is stopped. Exact selection, receipts and the reconciled
 135-case status catalog are in
@@ -782,13 +783,19 @@ Earlier P02/P03 and candidate results remain historical records; current-main
 reconciliation is required before final closure.
 
 Exact next action: refresh R04's current-main prerequisite serially, starting
-with the remaining independent G03a correction. G05a is refreshed at
+with the independent G06a process-table correction. G05a is refreshed at
 `936d0eb7a9b46e58ade5219705c12d3d476dfae9`, solely on observed main `8a475e8b`:
 three exact-base regressions fail, all 76 units/static/build and eight ordinary
 controls pass in source and strict 187-path clean replay. The one-file VFS diff
 is unchanged; both binaries match. Its retained patch/manifest now describe the
 new head. [Review](ginux-contributions/g05a-review.md) keeps full default runtime
-and macOS/remote CI pending. Initial 37-patch integrity results remain historical;
+and macOS/remote CI pending. G03a is refreshed at
+`c28dd1321f024ec6b5d2087fd489457f31f20e2c`, also solely on `8a475e8b`:
+the exact base exits 2 for the missing workdir; source and strict clean replay
+create it and exit 0. All 73 units/static/build and nine ordinary controls pass
+in each export; the two-file +4/-1 scope and upstream CI coverage are preserved.
+[Review](ginux-contributions/g03a-review.md) retains all unrun default/runtime/
+macOS checks. Initial 37-patch integrity results remain historical;
 the final aggregate inventory must use each refreshed head. Reconcile the
 remaining source owners before rebuilding the final F02/F03 revisions. Keep
 reader/progress-thread-dependent consumers pending on G07. Do not import

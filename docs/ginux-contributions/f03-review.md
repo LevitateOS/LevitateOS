@@ -182,8 +182,11 @@ G05a's current-main source refresh is now retained at
 `936d0eb7a9b46e58ade5219705c12d3d476dfae9`; its
 [review](g05a-review.md) owns the new regression, full-unit/static/build and
 selected ordinary source/clean evidence, with default runtime/macOS checks pending.
-Exact next action: continue R04's current-main prerequisite one packet at a time,
-starting with G03a's independent configured-workdir syscall correction.
+G03a's independent configured-workdir correction is now refreshed at
+`c28dd1321f024ec6b5d2087fd489457f31f20e2c`; its
+[review](g03a-review.md) records the exact-base failure, successful source/clean
+regression and pending checks. Exact next action: continue R04's current-main
+prerequisite one packet at a time with G06a's process-table correction.
 Then reconcile remaining owners before rebuilding the final F02 composition and
 rerunning applicable F03 checks. Keep G07, monitored security,
 actual compiler/Cargo/APK/RPM, full/default platform CI and current-main

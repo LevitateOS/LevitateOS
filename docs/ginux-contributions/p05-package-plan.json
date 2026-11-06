@@ -73,12 +73,19 @@
         "10091e4e48bb14dcf9f0ee20e62f471fb7d0cf2f"
       ],
       "acceptance": "real absent-workdir launch fails at upstream and passes with correction; directory is created; existing suite preserved",
-      "status": "reviewed and locally validated standalone candidate; user inspection and remote CI pending",
-      "base": "3f2fe7dfadd4b40e235d982a6a3d386dc6490177",
-      "head": "0b563cf87a3c0e83a20a22eee3af8ffdb7adf015",
-      "tree": "ea3e2dd5025937f84abf5f4112e35871501e4410",
+      "status": "current-main source reviewed; all 73 units/static/build and 9 ordinary controls pass in source/clean; full default runtime/macOS CI remain pending",
+      "base": "8a475e8b2318425fd2fc15246a5c6f4bca6caf86",
+      "head": "c28dd1321f024ec6b5d2087fd489457f31f20e2c",
+      "tree": "43e400d0bdc87c1275ba69380cb65ea28a4e4de8",
       "evidence": "g03a-review.md",
-      "artifact_directory": ".artifacts/ginux-contribution-preparation/G03a"
+      "artifact_directory": ".artifacts/ginux-contribution-preparation/upstream-refresh-2026-11-06/G03a",
+      "previous_head": "0b563cf87a3c0e83a20a22eee3af8ffdb7adf015",
+      "historical_artifact_directory": ".artifacts/development-migration/2026-11-06/recovery/evidence/ginux-contribution-preparation/G03a",
+      "patch_sha256": "931f279d884dbe68e0cb42c447871415514bdc034fdd9878ce95c3840d469a69",
+      "unit_tests": 73,
+      "source_patch": "patches/G03a.patch",
+      "standalone": true,
+      "remote_ci": "not run"
     },
     {
       "packet": "G03b",
