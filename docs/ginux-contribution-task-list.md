@@ -983,3 +983,16 @@ remote CI and G07 holds. Three retained packets have latest-base source/ordinary
 preparation;34 remain. Exact next action: refresh G03b on refreshed G05a, then
 join configured contract/catalog before effects and retain the existing audit
 owner at G03c. Later task-loop ordering belongs to G06b. F02/F03/F04 remain open.
+
+G03b is now `095f89c5bfb2f8d07404f2304a5088f709ef7652` on refreshed G05a
+`25d4f05a30a2b367e24aea9460149bd55baa3406`, rooted atff926d0c. Source/clean
+pass all95 units/static/build and eight ordinary controls; all196 paths and both
+binaries match, with unchanged one-file +425/-6 VFS source and all tests retained.
+[Review](ginux-contributions/g03b-review.md) retains actual G05a merge and full
+runtime/security/macOS/remote CI holds. Four retained packets have latest-base
+source/ordinary preparation;33 remain. Exact next action: reconcile G03c on
+refreshed G03b/G03a, tracing configured contract dispatch, new syscall catalog
+membership and the existing bounded audit writer before implementing the join.
+Keep actual upstream semantics and source owners; do not count a clean apply or
+old passing runtime check as the missing policy integration. G07/F02/F03/F04 and
+security acceptance remain pending.

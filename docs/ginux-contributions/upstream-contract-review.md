@@ -93,3 +93,13 @@ G06a is now also directly onff926d0c at
 ordinary controls pass per source/clean; three exact-base adoption regressions
 fail. Three latest-base preparations exist;34 retained packets remain. Next is
 G03b on refreshed G05a, then the configured-owner join at G03c.
+
+
+G03b is now refreshed on latest G05a at
+`095f89c5bfb2f8d07404f2304a5088f709ef7652`:95 units/static/build and eight
+ordinary controls pass per source/clean. Four preparations are rooted atff926d0c;
+33 retained packets remain. Next is G03c on refreshed G03b/G03a. Review actual
+catalog membership for newly implemented configured syscalls as well as guarding
+hook dispatch before effects; preserve all existing catalog/core consistency
+coverage and configured audit bounds. Actual upstream prerequisite merges and
+security/full CI remain required.

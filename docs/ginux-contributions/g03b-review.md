@@ -1,7 +1,7 @@
 # G03b — bounded writable VFS primitives
 
-Current retained local commit `5fb12ab4a56efd365d7d451d181f6e2a41c9d31d` on refreshed G05a
-`936d0eb7a9b46e58ade5219705c12d3d476dfae9`, rooted at observed main `8a475e8b`.
+Current retained local commit `095f89c5bfb2f8d07404f2304a5088f709ef7652` on refreshed G05a
+`25d4f05a30a2b367e24aea9460149bd55baa3406`, rooted at observed main `ff926d0c`.
 The current-main refresh below owns fresh evidence and pending checks; earlier
 results remain historical.
 
@@ -113,3 +113,31 @@ jobs contain authority/protected/fault cases and remain unrun under the written
 security boundary. macOS/remote CI also remains unrun. R03/R04 keep those
 acceptance and prerequisite requirements pending; ordinary success is not full
 CI, security acceptance or publication authorization.
+
+## PR231 latest-observed-base refresh — 2026-11-06
+
+Head `095f89c5bfb2f8d07404f2304a5088f709ef7652`, tree
+`71bc806e4550a92c1f63b10e3b130ac9690d191d`, is on refreshed G05a
+`25d4f05a30a2b367e24aea9460149bd55baa3406`, rooted at observed upstream
+`ff926d0c228b71d55d0f2f0909dd86ec62197c8a`. Complete VFS-file bytes match
+previous corrected head5fb12ab4; scope remains one file,+425/-6. A separate
+self-review reread the whole delta, all nine added tests and existing resolution,
+open/read/write, copy-up, whiteout allocation/reuse and metadata callers. All
+pre-existing VFS tests are retained. Upstream contract/domain/native/CI additions
+are unchanged. Independent reviewer coverage is not claimed.
+
+Source and strict clean G05a-plus-only-G03b replay pass make check/test-unit/build
+and launch/process/setup fixture builds:95 units, including24 VFS tests. Nine
+feature/boundary cases cover sparse/append/empty I/O, seek aliases and failure
+preservation, metadata/CLOEXEC ownership, final-link exclusive creation, capacity
+and unlinked lifetime. Eight ordinary configured-launch/valid wait-status controls
+pass per export. All196 tracked paths match the head; both binaries have SHA256
+`ce0e0a895dfebe39ff9a5382ca39604ea32e3be57a01635782804a36eb65ee5a`.
+Exact source/clean exports, logs, receipts, patch, draft and manifest are in
+`.artifacts/ginux-contribution-preparation/upstream-contract-refresh-2026-11-06/G03b/`.
+
+This remains local-prerequisite source/ordinary preparation: actual G05a upstream
+merge, full default runtime/security, macOS and remote CI are pending. Configured
+storage and upstream contract-policy joins belong to G03c and are not established
+by these library checks. No branch, real checkout/index, remote text or publication
+changed.
