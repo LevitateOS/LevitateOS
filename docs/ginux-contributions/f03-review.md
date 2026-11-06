@@ -98,11 +98,12 @@ checking nested state, product bytes, saved generations and unchanged sources.
 This replaces only that case's interrupted status; the four thread-related
 failures and all other unperformed criteria remain open.
 
-Ten destination scenarios have completed: **seven pass, three fail**, with one
+Eleven destination scenarios have completed: **eight pass, three fail**, with one
 additional case interrupted and unverified. The
 passing cases are state restore, independent custom readiness, 128 KiB file
 publication, nested-directory copy/move/cleanup, lifecycle machine-event order,
-current API initialization without legacy globals, and publication of 5,000
+current API initialization without legacy globals, retained dependency files and
+reused-check state over three invocations, and publication of 5,000
 entries with unchanged selected inputs. Each was selected exactly and run
 serially through the actual managed CLI. The retained logs contain complete
 harness summaries; no interrupted or unrun case is included in the pass count.
@@ -131,7 +132,8 @@ claim. Both tar failures remain failed. No progress suppression, replacement
 implementation or unready G07 import was used to bypass this missing capability.
 
 The revised 20-case ordinary queue is now running serially from
-`ordinary-independent-selection.json`, beginning with retained dependency state.
+`ordinary-independent-selection.json`. Retained dependency state has passed;
+the active case now checks changed source/input bytes and fresh state identity.
 It covers retained state and dependencies, selected targets, lifecycle options,
 cleanup and a valid large-file digest. Original selections and receipts are
 retained; `independent-ordinary-receipts.json` records the new commands/results.
@@ -143,6 +145,9 @@ All six restored worktrees retain identical HEAD, raw-index and staged/unstaged/
 conflict-status fingerprints in the before/after comparison. Concurrent edits
 elsewhere in the main checkout are preserved. No Ginux candidate source, branch,
 remote ref, upstream test or CI coverage has changed during this continuation.
+The continuation's source comparison also confirms all 153 recorded Recipe
+file hashes still match in both the retained snapshot and current checkout;
+`source-continuation-comparison.json` records no differences.
 
 Exact next action: monitor the active serial ordinary runner and inspect each
 failure before deciding its fix or dependency. Keep G07, monitored security,

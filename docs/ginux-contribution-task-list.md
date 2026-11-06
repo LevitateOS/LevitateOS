@@ -748,8 +748,8 @@ verification, stopping at F04 for inspection with no publication. F03 remains
 active and partial. The complete saved log has now been read: all four failures
 report command-output reader thread creation ENOSYS, consistent with excluded
 G07. The previously interrupted state-restore case now passes 1/1 in 328.38s on
-the destination-built harness, covering all four invocations. Ten fresh
-destination cases have completed: seven pass and three fail. The Bash child
+the destination-built harness, covering all four invocations. Eleven fresh
+destination cases have completed: eight pass and three fail. The Bash child
 case fails with the same reader-thread ENOSYS; two valid tar cases also fail
 because the existing progress spinner needs a thread. A valid zip case was
 interrupted when that batch was stopped and remains unverified.
@@ -757,6 +757,8 @@ Passing cases additionally cover custom readiness,
 128 KiB file bytes, directory copy/move/cleanup, lifecycle event order, current
 API initialization and 5,000-entry publication. No failure or interrupted case
 has been counted as passing. See [F03 evidence](ginux-contributions/f03-review.md).
+The additional retained-dependency-state case passes all three invocations,
+including persisted discoveries from reused readiness checks.
 
 Fresh strict replay verifies all 37 retained patches against their recorded
 parents/trees, including corrected G12. All 189 F02 tracked paths match the
@@ -765,8 +767,9 @@ tracked paths except its separately normalized standalone lock. The six restored
 worktrees remain untouched; their index/status fingerprints are retained with
 the new F03 evidence. No Ginux contribution source has changed.
 
-Exact next action: monitor the revised running 20-case serial ordinary queue,
-starting with retained dependency state; exact selection, receipts and the reconciled
+Exact next action: monitor the revised 20-case serial ordinary queue. Its first
+retained-dependency-state case passed; changed source/input identity is running.
+Exact selection, receipts and the reconciled
 135-case status catalog are in
 `.artifacts/ginux-contribution-preparation/F03/resume-2026-11-06/`.
 Inspect each new failure before choosing its owning fix or dependency. Keep
