@@ -1,9 +1,9 @@
 # G05 — public descriptor ownership and anonymous pipes
 
-Current retained local commit `51b2c751af4a68d78261e7b63e731672e0b13240`, on refreshed G04
-`09fdb1b0f2caae3432846966815dcb7444a3c0e2`, rooted at observed main `8a475e8b`.
-The current-main refresh below owns fresh evidence and pending checks; earlier
-results remain historical.
+Current retained local commit `2718b860f04bc644c001d7a9cea906a74ddd386a`, on refreshed G04
+`8880ddc8fd7b3918707a5a832de47e86f49c9fda`, rooted at observed main `ff926d0c`.
+The latest-base contract refresh below owns fresh evidence and pending checks;
+earlier results remain historical.
 
 Earlier local feature commit `8c1a579aafb873be289b49259b961ee2cb6532eb`.
 Explicit local prerequisite G04 `5036b7e8a61c4cf1e18abad8746208d03d268ea5`
@@ -137,3 +137,59 @@ satisfy their acceptance. No agent was dispatched. macOS/remote CI is unrun.
 R03/R04 retain full required validation and actual G04/prerequisite upstream
 merges before standalone extraction/revalidation. No stacked publication or
 combined F02/F03 closure is implied; child/thread integration remains later work.
+
+
+## Latest-base descriptor/contract refresh — 2026-11-07
+
+Current head `2718b860f04bc644c001d7a9cea906a74ddd386a`, tree `72bfe4dec68a549daed6d6f180517fcad41748c3`, has sole parent G04
+`8880ddc8fd7b3918707a5a832de47e86f49c9fda`, rooted at upstreamff926d0c. Nineteen files,+1331/-87.
+Existing public-FD/pipe semantics, native/systemd callers, full source fixtures
+and CI coverage are retained through the new upstream contract owner.
+
+Separate final-diff self-review reread descriptor reservation/get/dup/close/
+finish, pipe allocation/ring/alias lifetime, strict copies, path rewriting and
+argument restoration, bootstrap limits, current native dispatch and completion/
+failure paths. Policy admission now precedes descriptors.enter, including slot
+reservation, alias retirement, pipe allocation, guest copies and path scratch.
+A15-line pure method on the existing descriptor owner classifies regular-file
+operations through their public handle before translation; aliases keep the
+filesystem semantic family. Native, null and pipe data handles are not
+misclassified as regular files. No separate policy registry is added. Existing
+bounded/disabled audit behavior and native core contract remain. Independent
+review/security acceptance is not claimed.
+
+The first ordinary lifecycle run exposed a real join failure: pipe2 worked,
+but write-full called pipe22, absent from the new catalog, and exited13 after
+Deny38 instead of parking. Initial logs/receipts/source/head remain separately
+retained. Pipe22 is now cataloged through ginux-contract with configured-pipe
+evidence, and generated coverage is186 operations. The existing consistency
+unit explicitly keeps native systemd Deny38 for22 and all earlier configured-only
+entries; every previous assertion remains. The unchanged lifecycle checks pass
+on the corrected revision. An initial rustfmt failure is separately retained;
+formatting was corrected before the final build. No check was weakened.
+
+The inherited valid metadata fixture's expected descriptor range is updated for
+the common public ABI, preserving its data/metadata assertions. The earlier G04
+faccessat call and all raw/semantic denial modes remain compiled/registered.
+No default runtime/security case was removed or disabled.
+
+Source and strict clean G04-plus-only-G05 replay pass96 units (24 VFS/10 contract),
+make check, all applicable builds, generated contract docs and27 ordinary controls
+per export: eight launch/valid-wait, three storage, one valid metadata, three
+audit, three null-device, six public-FD/pipe and three lifecycle cases. SIGPIPE and
+both parked operations terminate with the expected status and owned children are
+reaped. Exact G04 fails the identical valid pipe/public-FD fixtures at exits10/11.
+All83 upstream named tests remain; all208 tracked paths match in both exports.
+Both binaries hash `d3c120a1a70e10a3c0321e9a5e2d5959adcb43346c433f08e8fe869bbaff012c`.
+Core/process/runtime/domain source is unchanged; supervisor only adds Clone/Copy
+to UserRegs. Exact source/clean/prior-failure/patch/draft/commands/logs/hashes are
+in `.artifacts/ginux-contribution-preparation/upstream-contract-refresh-2026-11-06/G05/`.
+All37 retained patch/head/parent/tree replays verify; all six restored worktrees
+remain unchanged. No real checkout/index/ref, remote text or publication changed.
+
+Full default runtime, raw/semantic denial ordering, private/backend authority,
+protected/partial pipe copies, scratch/shared-argument security and macOS/remote
+CI remain unrun and required. The downstream DaybreakBlue record retains those
+checks with no dispatch. Actual G04/prerequisite merges, standalone extraction/
+validation and final F02/F03/F04 remain pending. Later G06b must preserve this
+guard before early task/exec/wait hooks; G07 remains unready and excluded.

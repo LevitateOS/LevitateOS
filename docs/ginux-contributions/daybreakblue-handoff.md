@@ -912,3 +912,23 @@ indirect arguments on this head or a recorded successor. Existing full fixtures
 and CI remain enabled; their adversarial probes and enforcement cases are unrun.
 Ordinary valid null access/metadata is not security acceptance. G07 stays unready;
 no DaybreakBlue agent was dispatched. Keep monitored acceptance pending.
+
+
+## G05 latest-base descriptor/contract revision — 2026-11-07
+
+Current G05 is `2718b860f04bc644c001d7a9cea906a74ddd386a` on G048880ddc8 rooted atff926d0c.
+[Review](g05-review.md) records96 units and27 ordinary controls per source/clean.
+Resolved policy precedes public slot/alias/pipe effects and path scratch. A pure
+lookup on the existing descriptor owner retains regular-file semantic families
+through public aliases. The ordinary write-full failure revealed missing pipe22
+catalog membership; the corrected catalog retains native Deny38 and the unchanged
+lifecycle fixture now passes. This is functional evidence, not security acceptance.
+
+Revalidate raw/semantic denial precedence before reservation/dup retirement/open/
+pipe allocation/copies, owned alias classification, private/backend authority,
+strict protected/partial pipe and metadata copies, restoration ordering, audit
+bounds/disabled mode and shared/indirect arguments on this revision or successor.
+Default fixtures and CI remain intact and unrun where adversarial. Earlier G05
+security requirements still apply; G06b early task hooks need the same contract
+ordering. G07 remains unready. No DaybreakBlue agent was dispatched; acceptance
+stays pending.

@@ -1075,3 +1075,31 @@ changed. Current goal turn: progress. Exact next action: refresh G05 on G04
 translation/effects; then review G06b before early task/exec/wait hooks. Security
 work stays downstream for DaybreakBlue without dispatch. Active HDAE skill and
 required context-reload procedure remain as recorded above.
+
+
+### G05 latest-base checkpoint — 2026-11-07
+
+G05 is now `2718b860f04bc644c001d7a9cea906a74ddd386a`, tree `72bfe4dec68a549daed6d6f180517fcad41748c3`, on latest
+G048880ddc8 rooted atff926d0c. [Review](ginux-contributions/g05-review.md) owns
+its nineteen-file +1331/-87 scope. Policy precedes descriptor translation and
+slot/alias/pipe effects; the existing descriptor owner performs a pure regular-file
+semantic lookup. The initial write-full lifecycle failed because pipe22 was absent
+from upstream's new catalog. That implemented ABI is now cataloged with native
+Deny38 preserved, and the unchanged check passes; initial failure evidence remains.
+The inherited valid metadata range follows the public ABI without losing assertions.
+
+Source/clean pass96 units/static/build, generated docs and27 ordinary controls
+per export. All208 tracked paths and both binaries match. Exact G04 fails the
+same valid pipe/public-FD fixtures at exits10/11. All37 retained patch/head/parent/
+tree replays verify; all six restored worktrees remain unchanged. Seven latest-base
+preparations exist;30 retained patches remain. Full default/runtime-policy/security/
+macOS/remote CI, actual upstream prerequisite merges and G07/F02/F03/F04 remain
+pending. Current goal turn: progress. No branch/ref/real checkout, remote text
+or publication changed; no DaybreakBlue dispatch occurred.
+
+Exact next action: compose latest G052718b860 with G06a4a62d81e, then refresh
+G06b serially. Inspect and place contract admission before its early task/exec/
+wait hooks, join actually implemented new syscalls to upstream's catalog and
+retain the existing bounded/disabled audit owner. Do not import unready G07 or
+substitute ordinary evidence for monitored security/full CI acceptance. Active
+HDAE skill and context-reload procedure remain as recorded above.

@@ -144,3 +144,14 @@ the same valid assigned-null workload. A read-only GitHub recheck at2026-11-06
 Six latest-base preparations exist;31 patches still need reconciliation. Next:
 G05 public descriptor translation, then G06b early task/exec/wait ordering. Security,
 full CI, actual upstream prerequisite merges and F02/F03/F04 remain pending.
+
+
+G05 is now `2718b860f04bc644c001d7a9cea906a74ddd386a` on latest G048880ddc8. [Review](g05-review.md)
+records policy before descriptor effects, pure owned-handle semantic classification
+and the actual pipe22 catalog correction. Initial write-full failed with missing
+catalog/ENOSYS; unchanged checks pass after the join. Source/clean pass96 units/
+static/build, generated docs and27 ordinary controls per export; all208 paths
+and binaries match. Seven latest-base preparations exist;30 retained patches
+remain. Next: G06b on refreshed G05/G06a, checking early task/exec/wait admission
+and catalog coverage. G07/security/full CI/actual upstream merges/F02/F03 remain
+pending; no publication or remote text changed.
