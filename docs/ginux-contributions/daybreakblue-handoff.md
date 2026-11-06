@@ -339,3 +339,19 @@ allocation failure/cleanup, unsafe pointer/alignment/initialization and future
 alias/cwd/executable/map interactions remain pending for security validation.
 Routine API/error units do not constitute that adversarial acceptance. No cloud
 agent was dispatched or security probes performed.
+
+
+## G17 — positioned I/O and private descriptor budgets (in progress)
+
+G17a ports pwrite onto G09d without namespace/mapping ancestry. Ordinary local
+checks cover duplicate/shared offsets, sparse writes, negative offset rejection,
+append behavior and byte-quota failure. Protected/partially readable buffers and
+raced FD/offset ownership remain for DaybreakBlue. G17b will join actual memfd
+backing with G18 metadata and retain the captured public descriptor bound.
+Private-FD authority, exhaustion/failure injection, bootstrap leakage and mutable
+syscall races must be validated independently; do not execute those probes here.
+This written handoff dispatches no agent; exact revisions will be appended later.
+
+G17a exact retained revision: 94baebbec5e887ae659718c3f6162d08ca267b99 on 85b53fe15a64041f451ec7e7aa1e77d08cb2c18a.89 routine units and
+ordinary positioned/alias/sparse/append/quota checks pass in source/clean replay.
+Protected-copy/race acceptance remains pending; no cloud agent dispatched.

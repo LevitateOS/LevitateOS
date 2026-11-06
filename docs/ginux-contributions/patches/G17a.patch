@@ -1,0 +1,158 @@
+From 94baebbec5e887ae659718c3f6162d08ca267b99 Mon Sep 17 00:00:00 2001
+From: vince <vincepaul.liem@gmail.com>
+Date: Fri, 6 Nov 2026 15:02:39 +0100
+Subject: [PATCH] feat(storage): support positioned writes on owned files
+
+Route pwrite through the existing owned write path, restoring the shared
+open-description offset on success and failure. Retain bounded transfers,
+sparse growth, Linux append behavior and existing descriptor ownership.
+
+Signed-off-by: vince <vincepaul.liem@gmail.com>
+---
+ README.md                               |  5 +++--
+ crates/ginux-init/src/fs_hooks.rs       | 26 +++++++++++++++++++++----
+ scripts/test-launch-storage.py          |  5 +++--
+ tests/fixtures/launch-storage-fixture.c | 21 ++++++++++++++++++++
+ 4 files changed, 49 insertions(+), 8 deletions(-)
+
+diff --git a/README.md b/README.md
+index a3982c7c..62318b23 100644
+--- a/README.md
++++ b/README.md
+@@ -232,9 +232,10 @@ storage. Paths must be canonical, unique, and cannot cover init, `/`, `/proc`,
+ Without assignments, native image access remains read-only.
+ 
+ This backend supports regular-file open/create/exclusive-create/truncate/append,
+-read/write/pread, ftruncate, seek, close, descriptor flags, mkdir/unlink/rmdir,
++read/write/pread/pwrite, ftruncate, seek, close, descriptor flags, mkdir/unlink/rmdir,
+ owned directory descriptions/getdents64, rename/renameat/renameat2 with NOREPLACE,
+-chmod and stat/fstat/fstatat/statx metadata. Access and readlink probes stay in
++chmod and stat/fstat/fstatat/statx metadata. Positioned writes preserve the
++shared open-description offset; append descriptions retain Linux append semantics. Access and readlink probes stay in
+ the owned namespace; regular files accept O_NOCTTY. Directory cookies and inode
+ identity follow open descriptions across aliases, fork, rename and removal.
+ Namespace changes validate types, capacity and replacement before mutation.
+diff --git a/crates/ginux-init/src/fs_hooks.rs b/crates/ginux-init/src/fs_hooks.rs
+index 6dd53976..59053aff 100644
+--- a/crates/ginux-init/src/fs_hooks.rs
++++ b/crates/ginux-init/src/fs_hooks.rs
+@@ -622,7 +622,8 @@ impl LaunchFs {
+         let result = match r.orig_rax {
+             0 => self.read(pid, fd, r.rsi, r.rdx, None),
+             17 => self.read(pid, fd, r.rsi, r.rdx, Some(r.r10 as i64)),
+-            1 => self.write(pid, fd, r.rsi, r.rdx),
++            1 => self.write(pid, fd, r.rsi, r.rdx, None),
++            18 => self.write(pid, fd, r.rsi, r.rdx, Some(r.r10 as i64)),
+             3 => self.fs.close(fd).map(|_| 0).map_err(errno),
+             5 => self
+                 .fs
+@@ -715,16 +716,33 @@ impl LaunchFs {
+         result
+     }
+ 
+-    fn write(&mut self, pid: usize, fd: i32, address: u64, length: u64) -> Result<i64, i64> {
++    fn write(
++        &mut self,
++        pid: usize,
++        fd: i32,
++        address: u64,
++        length: u64,
++        offset: Option<i64>,
++    ) -> Result<i64, i64> {
+         self.fs.fstat(fd).map_err(errno)?;
+         let mut buffer = [0u8; IO_SIZE];
+         let count = length.min(IO_SIZE as u64) as usize;
+         let copied = copy_memory(pid, address, &mut buffer[..count], false)? as usize;
+-        self.fs
++        let previous = self.fs.seek(fd, 0, 1).map_err(errno)?;
++        if let Some(offset) = offset {
++            self.fs.seek(fd, offset, 0).map_err(errno)?;
++        }
++        let result = self
++            .fs
+             .write(fd, &buffer[..copied])
+             .map(|n| n as i64)
+-            .map_err(errno)
++            .map_err(errno);
++        if offset.is_some() {
++            self.fs.seek(fd, previous as i64, 0).map_err(errno)?;
++        }
++        result
+     }
++
+     fn getdents(&mut self, pid: usize, fd: i32, address: u64, length: u64) -> Result<i64, i64> {
+         if self.fs.fstat(fd).map_err(errno)?.kind != NodeKind::Directory {
+             return Err(-20);
+diff --git a/scripts/test-launch-storage.py b/scripts/test-launch-storage.py
+index 4cf64e17..831f8257 100644
+--- a/scripts/test-launch-storage.py
++++ b/scripts/test-launch-storage.py
+@@ -11,7 +11,7 @@ import tempfile
+ 
+ def main():
+     if len(sys.argv) < 3 or os.geteuid() != 0:
+-        sys.exit('usage (as root): test-launch-storage.py <ginux> <storage-fixture> [growth|bounds|quota|view-probes ...]')
++        sys.exit('usage (as root): test-launch-storage.py <ginux> <storage-fixture> [growth|bounds|quota|positioned|view-probes ...]')
+     binary, fixture = [str(Path(p).resolve()) for p in sys.argv[1:3]]
+     template = (Path(__file__).resolve().parent.parent / 'config/domain-gate5.toml').read_text()
+     with tempfile.TemporaryDirectory(prefix='ginux-storage-') as directory:
+@@ -54,7 +54,7 @@ def main():
+ 
+         if sys.argv[3:]:
+             for mode in sys.argv[3:]:
+-                if mode not in ('growth', 'bounds', 'quota', 'view-probes'):
++                if mode not in ('growth', 'bounds', 'quota', 'positioned', 'view-probes'):
+                     sys.exit('unknown selected storage scenario')
+                 invoke(['memory:/work', 'memory:/work/build', 'memory:/out'], [mode],
+                        memory=16 if mode == 'bounds' else 256)
+@@ -71,6 +71,7 @@ def main():
+             invoke(['memory:/work', 'memory:/work/build', 'memory:/out'], [])
+         invoke(['memory:/work', 'memory:/work/build', 'memory:/out'], ['quota'])
+         invoke(['memory:/work', 'memory:/work/build', 'memory:/out'], ['bounds'], memory=16)
++        invoke(['memory:/work', 'memory:/work/build', 'memory:/out'], ['positioned'])
+         invoke([], ['no-storage'])
+         for assignment in ['disk0', 'memory:/', 'memory:/proc', 'memory:/sys/x', 'memory:/dev',
+                            'memory:/bin', 'memory:/work/../out', 'memory:/work/', 'memory:work']:
+diff --git a/tests/fixtures/launch-storage-fixture.c b/tests/fixtures/launch-storage-fixture.c
+index e553487a..5be055cf 100644
+--- a/tests/fixtures/launch-storage-fixture.c
++++ b/tests/fixtures/launch-storage-fixture.c
+@@ -24,10 +24,30 @@ __asm__(".global scratch_stat\nscratch_stat:\n"
+         "mov %rsi,%rdi\nmov %rdx,%rsi\nmov $4,%rax\nsyscall\n"
+         "cmp %r13,%rdi\njne 1f\ncmp %r14,%rsi\nje 2f\n"
+         "1: mov $-123,%rax\n2: mov %r12,%rsp\npop %r14\npop %r13\npop %r12\nret\n");
++static int equal(const char *a, const char *b) {
++    while (*a && *a==*b) { ++a; ++b; } return *a==*b;
++}
++static long positioned(void) {
++    long fd=DO(2,"/out/positioned",0102,0600); CHECK(fd>=3,160);
++    CHECK(DO(1,fd,"ABC",3)==3 && DO(8,fd,1,0)==1,161);
++    long alias=DO(32,fd,0,0); CHECK(alias>=3,162);
++    CHECK(call(18,alias,(word)"Z",1,2,0,0)==1 && DO(8,fd,0,1)==1,163);
++    CHECK(call(18,fd,(word)"x",1,-1,0,0)==-22 && DO(8,alias,0,1)==1,164);
++    CHECK(DO(0,alias,output,2)==2 && output[0]=='B' && output[1]=='Z',165);
++    CHECK(DO(8,fd,1,0)==1 && call(18,alias,(word)"Q",1,8192,0,0)==1 && DO(8,fd,0,1)==1,166);
++    CHECK(call(17,fd,(word)output,2,8191,0,0)==2 && output[0]==0 && output[1]=='Q' && DO(8,alias,0,1)==1,167);
++    CHECK(DO(3,fd,0,0)==0 && DO(3,alias,0,0)==0,168);
++    fd=DO(2,"/out/positioned",02002,0); CHECK(fd>=3 && DO(8,fd,2,0)==2,169);
++    CHECK(call(18,fd,(word)"!",1,0,0,0)==1 && DO(8,fd,0,1)==2,170);
++    CHECK(DO(5,fd,meta,0)==0 && *(word *)(meta+48)==8194,171);
++    CHECK(call(17,fd,(word)output,1,8193,0,0)==1 && output[0]=='!' && DO(3,fd,0,0)==0,172);
++    return 0;
++}
+ long storage_main(word *stack)
+ {
+     word argc = *stack;
+     char **argv = (char **)(stack + 1);
++    if(argc>1 && equal(argv[1],"positioned")) return positioned();
+     if (argc > 1 && argv[1][0] == 'v') {
+         long fd=DO(2,"/work/probe",0102|0400,0600);
+         CHECK(fd>=3 && DO(1,fd,"ok",2)==2,145);
+@@ -159,6 +179,7 @@ long storage_main(word *stack)
+         CHECK(DO(3,a,0,0)==0 && DO(87,"/out/a",0,0)==0 && DO(77,c,5*mib,0)==0,80);
+         CHECK(DO(1,c,"K",1)==1,141);
+         CHECK(DO(87,"/out/b",0,0)==0 && DO(77,c,9*mib,0)==-28,81);
++        CHECK(call(18,c,(word)"x",1,9*mib,0,0)==-28 && DO(8,c,0,1)==1,173);
+         CHECK(DO(8,c,0,1)==1 && DO(5,c,meta,0)==0 && *(word *)(meta+48)==5*mib,142);
+         CHECK(DO(8,c,0,0)==0 && DO(0,c,output,1)==1 && output[0]=='K',143);
+         CHECK(DO(3,b,0,0)==0 && DO(77,c,9*mib,0)==0,82);

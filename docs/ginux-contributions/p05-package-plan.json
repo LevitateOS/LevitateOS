@@ -857,8 +857,11 @@
       ],
       "acceptance": "Private reservations do not consume or raise public limits; lower operator limits work, pwrite respects offset/alias semantics and all resources close on failure.",
       "planned_delivery": "one coherent change plus its generic docs and focused regression fixtures; split coupled responsibilities only as recorded by P04",
-      "status": "pending extraction and R01-R04 review",
-      "artifact_directory": ".artifacts/ginux-contribution-preparation/G17"
+      "status": "partial: G17a pwrite prepared; G17b private backing/public budgets next",
+      "artifact_directory": ".artifacts/ginux-contribution-preparation/G17",
+      "subpackets": [
+        "G17a"
+      ]
     },
     {
       "packet": "G19",
@@ -1069,6 +1072,44 @@
       "planned_delivery": "one coherent change plus its generic docs and focused regression fixtures; split coupled responsibilities only as recorded by P04",
       "status": "pending extraction and R01-R04 review",
       "artifact_directory": ".artifacts/ginux-contribution-preparation/G31"
+    },
+    {
+      "packet": "G17a",
+      "base": "85b53fe15a64041f451ec7e7aa1e77d08cb2c18a",
+      "head": "94baebbec5e887ae659718c3f6162d08ca267b99",
+      "tree": "1bc04233b377cbd2f775d7c03915a534da997053",
+      "changed_files": [
+        "README.md",
+        "crates/ginux-init/src/fs_hooks.rs",
+        "scripts/test-launch-storage.py",
+        "tests/fixtures/launch-storage-fixture.c"
+      ],
+      "dependencies": [
+        "G09d"
+      ],
+      "standalone": false,
+      "status": "pwrite source separately self-reviewed; selected ordinary source/clean checks pass; G17b and security/full CI/upstream independence pending",
+      "patch_sha256": "872dc1f69548ef0302e9d8d6393f193ddd980a85287bb4db5b3d16ef8fbbd152",
+      "deferred_joins": [
+        "G17b private backing budgets",
+        "G15 alias and G12 mapping composition",
+        "security protected-copy/race validation"
+      ],
+      "unit_tests": 89,
+      "vfs_tests": 31,
+      "clean_matched_paths": 171,
+      "review": "separate self-review; no independent reviewer/security acceptance",
+      "remote_ci": "not run",
+      "security_handoff": "daybreakblue-handoff.md",
+      "source_binary_sha256": "03b710c569e97649a29ba8bb897e0470029eca5d25bb722162cbdd1cb7264f53",
+      "clean_binary_sha256": "03b710c569e97649a29ba8bb897e0470029eca5d25bb722162cbdd1cb7264f53",
+      "purpose": "Positioned writes on owned files",
+      "source_commits": [
+        "53a2c9cc6ee842e97d0ca8214cc1205547b0ab65"
+      ],
+      "artifact_directory": ".artifacts/ginux-contribution-preparation/G17a",
+      "evidence": "g17a-review.md",
+      "source_patch": "patches/G17a.patch"
     }
   ]
 }
