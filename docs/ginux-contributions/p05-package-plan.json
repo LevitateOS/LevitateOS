@@ -178,6 +178,24 @@
       "standalone": false
     },
     {
+      "packet": "G06a",
+      "parent_packet": "G06",
+      "purpose": "process-table orphan adoption after final parent-thread retirement",
+      "dependencies": [],
+      "base": "3f2fe7dfadd4b40e235d982a6a3d386dc6490177",
+      "head": "b2347523d460b8cbeee2284fd1089509bf9f920c",
+      "tree": "f9854648b87e2c8e4f270a93fc40bd1b15b3f35e",
+      "upstream_base": "3f2fe7dfadd4b40e235d982a6a3d386dc6490177",
+      "source_commits": [
+        "ccd62ca146550e81c54fec2c49d8e642948a1e8a"
+      ],
+      "status": "fully reviewed and locally validated standalone candidate on pinned main; user inspection and remote CI pending",
+      "evidence": "g06a-review.md",
+      "source_patch": "patches/G06a.patch",
+      "standalone": true,
+      "artifact_directory": ".artifacts/ginux-contribution-preparation/G06a"
+    },
+    {
       "packet": "G06",
       "purpose": "Configured child/exec lifecycle and death accounting (`ccd62ca1`, `8f768700`, `9279e71b`, `d693ae63`, `07c949db`)",
       "dependencies": [

@@ -372,17 +372,32 @@ tests and all applicable Linux suites passing in candidate and clean replay.
 The source patch is retained. Held G01/G02 code and future task/network joins
 are excluded; core policy remains unchanged. Standalone delivery waits for G04.
 
-Current goal-turn classification: **progress**. The full goal remains active;
-G06 and later packets, cross-candidate interaction and Recipe closure are incomplete.
+G06 upstream refresh confirms #224 clone-TID and #226 tracee teardown remain
+open/unchanged with no discussion comments. Their main base is still3f2fe7df;
+the open-PR list also retains held #207. Raw read-only snapshots are retained
+with G06a. Do not duplicate those native-process contributions.
 
-Exact next task: **G06 — configured children/exec/death accounting**. Recheck
-current process-related upstream changes/discussion (including #224/#226), then
-extract the smallest coherent lifecycle change from ccd62ca1/8f768700/9279e71b/
-d693ae63/07c949db on the reviewed descriptor owner. Preserve current #221 helpers
-and task tests, G03–G05 path/copy/alias corrections, failed-exec/CLOEXEC rollback,
-adoption/death accounting and all existing native behavior. Do not import future
-threads/network/mappings simply because integration donors reference them.
-G01/G02 holds remain explicit. F04 remains the inspection stop before publication.
+G06a is an independent process-table correction atb2347523, sole parent3f2fe7df.
+[Review/evidence](ginux-contributions/g06a-review.md) records three baseline failures
+and68 passing full unit tests plus all required Linux checks in candidate and
+clean replay. It reuses current typed wait/status APIs and adopts only after the
+parent's last running thread, including signal exit and live-init-thread cases.
+No broader configured child/exec capability is claimed by this standalone fix.
+
+Current goal-turn classification: **progress**. The full goal remains active;
+broader G06 and later packets, interactions and Recipe closure are incomplete.
+
+Exact next task: **G06b — configured child/exec lifecycle extraction**. Compose
+reviewed G05 and G06a locally, then adapt ccd62ca1/8f768700 plus selected9279e71b,
+d693ae63 and07c949db fixes. Current ProcessTable already uses ChildStatus and
+WaitTarget; do not replace it with the donor's old raw-status/Option selector API.
+Add cancel/peek helpers only where the runtime actually requires them. Preserve
+all #221 helpers/native tests and G03–G05 path/copy/alias corrections. In particular,
+the donor copies wait status before host reap and can partially write a status
+word: adapt configured wait fault/reap semantics and strict all-or-nothing copyout
+instead of inheriting that regression. Libc CHILD_SETTID copyout needs the same
+protection. Do not import future threads/network/mappings to make old code compile.
+G01/G02 holds remain explicit; F04 is the user inspection stop before publication.
 
 Active skill: `hdae-development`, discovered at
 `/home/vince/.codex/worktrees/ginux-pr-combination-check/ginux/.agents/skills/hdae-development/SKILL.md`.

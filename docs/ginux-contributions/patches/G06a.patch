@@ -1,0 +1,165 @@
+From b2347523d460b8cbeee2284fd1089509bf9f920c Mon Sep 17 00:00:00 2001
+From: vince <vincepaul.liem@gmail.com>
+Date: Fri, 6 Nov 2026 10:29:17 +0100
+Subject: [PATCH] fix(process): adopt orphans after the last parent thread
+ exits
+
+Reparent children to a live virtual init group when the final running
+member of their parent thread group exits or is signaled. Keep children
+with their process while another thread remains alive, and never adopt
+into an init group that has already died.
+
+Cover normal and signaled exits, thread-origin forks, live init threads
+and subsequent waits while retaining the current status/wait API.
+
+Signed-off-by: vince <vincepaul.liem@gmail.com>
+---
+ crates/ginux-process/src/lib.rs | 118 ++++++++++++++++++++++++++++++++
+ 1 file changed, 118 insertions(+)
+
+diff --git a/crates/ginux-process/src/lib.rs b/crates/ginux-process/src/lib.rs
+index 01fa64ea..5e855832 100644
+--- a/crates/ginux-process/src/lib.rs
++++ b/crates/ginux-process/src/lib.rs
+@@ -437,6 +437,7 @@ impl<const TASKS: usize> ProcessTable<TASKS> {
+             return Err(ProcessError::InvalidState);
+         }
+         self.tasks[index].state = TaskState::Exited(status);
++        self.adopt_orphans(self.tasks[index].tgid);
+         Ok(())
+     }
+ 
+@@ -486,9 +487,31 @@ impl<const TASKS: usize> ProcessTable<TASKS> {
+             return Err(ProcessError::InvalidState);
+         }
+         self.tasks[index].state = TaskState::Signaled(signal);
++        self.adopt_orphans(self.tasks[index].tgid);
+         Ok(())
+     }
+ 
++    /// Children remain with a live thread group even when its leader exits.
++    /// Adopt them into virtual init only after its final running task retires.
++    fn adopt_orphans(&mut self, tgid: u32) {
++        if self
++            .tasks
++            .iter()
++            .any(|task| task.occupied && task.tgid == tgid && task.state == TaskState::Running)
++            || !self
++                .tasks
++                .iter()
++                .any(|task| task.occupied && task.tgid == 1 && task.state == TaskState::Running)
++        {
++            return;
++        }
++        for task in &mut self.tasks {
++            if task.occupied && task.parent == tgid {
++                task.parent = 1;
++            }
++        }
++    }
++
+     fn is_waitable_child(&self, task: &Task, parent_pid: u32, target: WaitTarget) -> bool {
+         // Thread-group members are joined over a futex, never reaped: only
+         // leaders (tgid == pid) are waitable children.
+@@ -1586,6 +1609,101 @@ mod tests {
+         assert!(replacement.pid > child.pid);
+     }
+ 
++    #[test]
++    fn exited_and_signaled_parents_reparent_children() {
++        for signal in [false, true] {
++            let mut table: ProcessTable<6> = ProcessTable::new();
++            let init = table.create_init(Credentials::root()).unwrap();
++            let parent = table.fork(init).unwrap();
++            let child = table.fork(parent).unwrap();
++            let child_thread = table.clone_thread(child).unwrap();
++            if signal {
++                table.signaled(parent, 9).unwrap();
++            } else {
++                table.exit(parent, 37).unwrap();
++            }
++            assert_eq!(table.view(child).unwrap().parent, init.pid);
++            assert_eq!(table.view(child_thread).unwrap().parent, init.pid);
++            let outcome = table
++                .wait(init, WaitTarget::Specific(parent.pid), 0)
++                .unwrap();
++            assert_eq!(
++                outcome.status,
++                if signal {
++                    ChildStatus::Signaled(9)
++                } else {
++                    ChildStatus::Exited(37)
++                }
++            );
++            table.exit(child_thread, 0).unwrap();
++            table.reap_thread(child_thread).unwrap();
++            table.exit(child, 23).unwrap();
++            assert_eq!(
++                table
++                    .wait(init, WaitTarget::Specific(child.pid), 0)
++                    .unwrap()
++                    .status,
++                ChildStatus::Exited(23)
++            );
++        }
++    }
++
++    #[test]
++    fn orphan_adoption_waits_for_the_last_group_member() {
++        for leader_signal in [false, true] {
++            let mut table: ProcessTable<6> = ProcessTable::new();
++            let init = table.create_init(Credentials::root()).unwrap();
++            let parent = table.fork(init).unwrap();
++            let parent_thread = table.clone_thread(parent).unwrap();
++            // Fork from a thread belongs to its process, not its individual tid.
++            let child = table.fork(parent_thread).unwrap();
++            assert_eq!(table.view(child).unwrap().parent, parent.pid);
++            if leader_signal {
++                table.signaled(parent, 15).unwrap();
++            } else {
++                table.exit(parent, 0).unwrap();
++            }
++            assert_eq!(table.view(child).unwrap().parent, parent.pid);
++            if leader_signal {
++                table.exit(parent_thread, 0).unwrap();
++            } else {
++                table.signaled(parent_thread, 9).unwrap();
++            }
++            assert_eq!(table.view(child).unwrap().parent, init.pid);
++        }
++    }
++
++    #[test]
++    fn orphan_adoption_requires_a_live_init_group() {
++        for live_thread in [false, true] {
++            let mut table: ProcessTable<6> = ProcessTable::new();
++            let init = table.create_init(Credentials::root()).unwrap();
++            let reaper = if live_thread {
++                table.clone_thread(init).unwrap()
++            } else {
++                init
++            };
++            let parent = table.fork(init).unwrap();
++            let child = table.fork(parent).unwrap();
++            table.exit(init, 0).unwrap();
++            table.signaled(parent, 9).unwrap();
++            assert_eq!(
++                table.view(child).unwrap().parent,
++                if live_thread { init.pid } else { parent.pid }
++            );
++            if live_thread {
++                table.exit(child, 19).unwrap();
++                assert_eq!(
++                    table
++                        .wait(reaper, WaitTarget::Specific(child.pid), 0)
++                        .unwrap()
++                        .status,
++                    ChildStatus::Exited(19)
++                );
++            }
++        }
++    }
++
+     #[test]
+     fn threads_groups_and_sessions_remain_virtual() {
+         let mut table: ProcessTable<8> = ProcessTable::new();
