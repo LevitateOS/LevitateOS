@@ -453,3 +453,24 @@ source review; that adversarial rejection remains unrun. Validate archive/alias/
 assignment authority, malformed and oversized input, conflicting metadata,
 hostile source changes, failure injection and races independently. No security
 acceptance or cloud dispatch; [review/evidence](g22-review.md).
+
+## G23 — owned file locks (in progress)
+
+Porting26784843 directly on reviewed G15 inode/description ownership, without
+held G07 thread groups, public readiness policy or unrelated archive capabilities.
+Ordinary checks use trusted lock structs and synchronized real child processes
+for conflicts, query results, split ranges, blocking wakeups and process versus
+open-description lifetime. Full invalid-pointer/default fixtures remain available.
+DaybreakBlue must validate protected/mutable lock structs, raced close/reuse and
+owner changes, descriptor/inode authority, table exhaustion rollback, interruption
+and wait/death races, thread group ownership and deadlock/cancellation behavior.
+Do not run adversarial FD/lock/copy/race probes here. Actual SQLite/Cargo consumer
+closure requires their other filesystem capabilities and remains explicitly
+separate from minimal lock-fixture evidence. No cloud dispatch occurs.
+
+G23 exact retained per-process revision: 14c3332121d0f8375649d6af5ddb18fb16633e22 on G15 8ab24d4b47adeb9897623627060846070d41219d.
+98 routine units and selected ordinary real record/flock contenders, audit-
+confirmed blocking/wakeup, supported SIGKILL cancellation, exec/CLOEXEC/final-close
+and existing controls pass in source/clean. Full pointer/authority/race/capacity
+and thread acceptance remain unrun; actual SQLite/Cargo closure is still F02/F03
+work. No cloud dispatch or security acceptance; [review/evidence](g23-review.md).

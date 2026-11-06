@@ -143,7 +143,7 @@ small generic documentation in that packet; never defer essential coverage to G3
 | G20 | Private checkpoint control and event-driven waiting (`2b306eff`, `990fbb7a`) | G06, G07, G19 | Checkpoint acknowledgment follows consistent capture; opaque bounded control, malformed frames, dead peers, cancellation and simultaneous task events behave correctly. |
 | G21 | Validated startup restore (`1d9e00e0`) | G09, G19 | Restore occurs before workload execution; reject malformed/traversing/oversized snapshots and occupied destinations without corrupting previous state. |
 | G22 | Bounded archives with hardlink identity (`e3374593`) | G13, G15, G18, G17b (memfd scale), G21 | Export/restore preserves aliases and symbolic links; >2 GiB payload and 5,000 nonempty files; reject unsafe paths, conflicting entries, invalid forward aliases and inconsistent link metadata. |
-| G23 | Owned file locks (`26784843`) | G06, G07, G15, G17 | Real simultaneous SQLite/Cargo clients contend correctly, locks release under close/exit, ownership follows defined descriptor/process semantics; no disabled-lock workaround. |
+| G23 | Owned file locks (`26784843`) | G06, G15; G07 thread join and consumer capabilities at F02/F03 | Real simultaneous SQLite/Cargo clients contend correctly, locks release under close/exit, ownership follows defined descriptor/process semantics; no disabled-lock workaround. |
 | G24 | Inode timestamps and archive mtime (`d21d26c8`) | G15, G22 | Explicit timestamps survive alias access/checkpoint/restart, invalid/no-follow cases are correct; document seconds-only persistence. |
 | G25 | Vectored and chunked regular I/O (`88fa4749`, `7d556b4e`, `74835089`) | G05, G09, G17 | readv/writev bounds, short I/O, invalid buffers, offsets and partial effects; real APK/RPM and >1 MiB reads/writes complete without assuming pipes are regular files. |
 | G26 | Explicit inherited process resource limits (`0c571cbb`) | G06, G07; upstream resource contract | AS exhaustion, affinity enforcement, fork/exec inheritance and invalid requests; state per-process virtual AS and allowed CPU subset accurately, not aggregate RSS/CPU time. |
@@ -582,13 +582,24 @@ G19 atomic export and G21 startup cleanup remain. Existing restore CI wiring
 covers the new fixtures. Security/full CI/upstream independence and remaining
 F02 interactions are pending; nothing was published.
 
-Exact next task: **G23 — owned file locks**.
-Inspect26784843 against current descriptor/process identities and shared G15 inode
-ownership. Distinguish process record locks from open-description flock lifetime;
-retain blocking/cancellation/close/exit behavior without importing held threads
-or readiness policy. Run ordinary real simultaneous clients and the existing
-SQLite/Cargo consumer scenarios where dependencies permit. Record adversarial
-FD/lock ownership, copy and race probes for DaybreakBlue. No publication or
+G23 per-process source/ordinary preparation is retained at `14c33321` directly
+on G158ab24d4b. [Review/evidence](ginux-contributions/g23-review.md) records98
+units,178-path strict replay and real record/flock contenders, audit-confirmed
+blocking/wakeup, supported SIGKILL cancellation, exec/CLOEXEC/final-close lifetime
+and existing process/storage/exec controls passing in source/clean. Code uses
+existing G15 ownership without G17 or G07 machinery. The full packet remains
+partial: G07 thread/security, actual simultaneous SQLite/Cargo with their combined
+consumer prerequisites at F02/F03, full CI and upstream independence are pending.
+Do not substitute these fixtures or historical integrated logs for that consumer
+acceptance. Existing Make/CI wiring includes the new cases; no publication.
+
+Exact next task: **G24 — inode timestamps and archive mtime**.
+Inspect d21d26c8 on the reviewed G15/G22 metadata/archive owners, preserving shared
+inode identity and matching export/import fields. Keep seconds-only persistence
+explicit and avoid importing unrelated process/network/readiness policy. Run
+ordinary explicit times across aliases and archive restart; record malformed,
+no-follow/authority and clock-boundary security checks for DaybreakBlue. Preserve
+G23's still-pending application/thread joins for F02/F03. No publication or
 maintainer messages before F04.
 
 Active skill: `hdae-development`, discovered at

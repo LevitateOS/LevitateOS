@@ -1100,18 +1100,55 @@
       "packet": "G23",
       "purpose": "Owned file locks (`26784843`)",
       "dependencies": [
-        "G06",
-        "G07",
-        "G15",
-        "G17"
+        "G15"
       ],
       "source_commits": [
         "26784843bea2eacdfb4e661bf47a40d2b94a7a8f"
       ],
       "acceptance": "Real simultaneous SQLite/Cargo clients contend correctly, locks release under close/exit, ownership follows defined descriptor/process semantics; no disabled-lock workaround.",
       "planned_delivery": "one coherent change plus its generic docs and focused regression fixtures; split coupled responsibilities only as recorded by P04",
-      "status": "pending extraction and R01-R04 review",
-      "artifact_directory": ".artifacts/ginux-contribution-preparation/G23"
+      "status": "partial: per-process source separately self-reviewed and selected ordinary source/clean checks pass; thread/security/SQLite-Cargo/full CI/upstream independence pending",
+      "artifact_directory": ".artifacts/ginux-contribution-preparation/G23",
+      "base": "8ab24d4b47adeb9897623627060846070d41219d",
+      "head": "14c3332121d0f8375649d6af5ddb18fb16633e22",
+      "tree": "e6fa27f9672e5b9a2f40f26ab18e7f1f35e83e12",
+      "changed_files": [
+        "README.md",
+        "crates/ginux-init/src/file_locks.rs",
+        "crates/ginux-init/src/descriptors.rs",
+        "crates/ginux-init/src/fs_hooks.rs",
+        "crates/ginux-init/src/launch_tasks.rs",
+        "crates/ginux-init/src/main.rs",
+        "scripts/test-launch-tasks.py",
+        "tests/fixtures/launch-task-fixture.c"
+      ],
+      "standalone": false,
+      "patch_sha256": "cdfbc9d01f480cb345258e726f4c673bc6e296b70817e5b499759725c539215a",
+      "deferred_joins": [
+        "G07 thread/process-group locks and shared-argument security",
+        "actual SQLite/Cargo consumer closure at F02/F03"
+      ],
+      "unit_tests": 98,
+      "vfs_tests": 40,
+      "clean_matched_paths": 178,
+      "review": "separate self-review; no independent reviewer or security acceptance",
+      "remote_ci": "not run",
+      "security_handoff": "daybreakblue-handoff.md",
+      "held_dependencies": [
+        "G07 process-group/thread lifetime and shared-argument security"
+      ],
+      "consumer_validation": "actual SQLite/Cargo not rerun on this prepared head; required combined consumer closure remains F02/F03",
+      "source_binary_sha256": "27a937b287b0511010326b5effb2c0c9c02e0d76dcd0163ac1b4833f3baa565a",
+      "clean_binary_sha256": "27a937b287b0511010326b5effb2c0c9c02e0d76dcd0163ac1b4833f3baa565a",
+      "fixture_sha256": {
+        "launch-task-fixture": "a94d3a43beb3a95007423c24927f6b4e4c9d95f2026d7e063440f90f2feebd95",
+        "launch-storage-fixture": "ac2322103b62819f8d0eb0a44536059608615cce3e153d9f8189f9ab086a129e",
+        "launch-directory-fixture": "d6f6fd948a7d72b8822ebc1b165a132a5f1912cc88e48eca6b0e738d7e74ef7f",
+        "launch-script-fixture": "b644cedb25fdadad8fee88ce1c60756dac8810b0e09c4e1941e2245769962c27",
+        "launch-owned-exec-fixture": "566f74cdadd00eac9266de8307c882e5ac6f8912e53dc46fc560058914478b88"
+      },
+      "evidence": "g23-review.md",
+      "source_patch": "patches/G23.patch"
     },
     {
       "packet": "G24",
