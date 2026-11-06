@@ -167,7 +167,13 @@ _boot_scenario target distro="levitate" inject="" inject_file="" ssh="false" no_
     }
     trap cleanup_tmp EXIT
 
-    if [ -n "{{inject_file}}" ]; then
+    # Boot injection is read by the live init only; the installed system gets none.
+    if [ "{{target}}" = installed-boot ] || [ "{{target}}" = installed_boot ]; then
+      if [ -n "{{inject_file}}{{inject}}" ]; then
+        echo "installed-boot does not take boot injection (--inject/--inject-file)" >&2
+        exit 2
+      fi
+    elif [ -n "{{inject_file}}" ]; then
       if [ -n "$inject_append" ]; then
         tmp=$(mktemp)
         cat "{{inject_file}}" > "$tmp"
@@ -232,7 +238,13 @@ scenario-window target distro="levitate" inject="" inject_file="" ssh_pubkey=(en
     export LEVITATE_SCENARIO_WINDOW_MODE=local
     args=("$CARGO_BIN" xtask scenarios boot {{target}} "{{distro}}" --window)
 
-    if [ -n "{{inject_file}}" ]; then
+    # Boot injection is read by the live init only; the installed system gets none.
+    if [ "{{target}}" = installed-boot ] || [ "{{target}}" = installed_boot ]; then
+      if [ -n "{{inject_file}}{{inject}}" ]; then
+        echo "installed-boot does not take boot injection (--inject/--inject-file)" >&2
+        exit 2
+      fi
+    elif [ -n "{{inject_file}}" ]; then
       args+=(--inject-file "{{inject_file}}")
     elif [ -n "{{inject}}" ]; then
       args+=(--inject "{{inject}}")
