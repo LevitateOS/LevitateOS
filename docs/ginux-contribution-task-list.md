@@ -678,14 +678,24 @@ make test-unit/all7 packages remain, ordinary runtime receipts already pass on
 those exact heads. No separate wiring-only patch/PR is needed. Full/default,
 combined owner and remote CI evidence remains pending; nothing published.
 
-Exact next task: **F01 — complete queue/hunk accounting**.
-Join the P03 catalog/hunks and P05 extraction manifests; enumerate actual retained
-patches, folded/upstream/superseded material, policy/security holds and incomplete
-G07/G08 source/consumer work. Do not mistake source-only dispositions or ordinary
-fixtures for complete acceptance. Retain or finish every remaining useful hunk
-before declaring the queue accounted. Then perform F02 combined owner review,
-F03 fresh complete Recipe/actual consumer checks and F04 user inspection. No
-branches/refs/pushes/PRs/maintainer messages before user inspection.
+F01 is in progress: [inventory/review](ginux-contributions/f01-review.md) verifies
+36 distinct patches/heads and their hashes, maps all66 integration commits and
+retains all49 other-fork dispositions/6 dirty/stash records. The canonical P03
+261-hunk digest matches. Six patches are based on recorded main; this is not a
+PR count or a fresh readiness claim. G07 and policy/security/actual consumer
+criteria remain held. Final semantic hunk accounting remains open.
+
+Exact next action under F01: **prepare the remaining original G08 material**.
+G08a covers readiness only. Trace/port75acd2be FIONBIO,3b27b370 sequenced-packet
+pairs and e954010d nested stream capacity/reference changes onto G08a
+fe27c693bf2629166ee82da2efefb62b298bb567 as a minimal per-process G08b candidate.
+Use existing channel/descriptor owners and preserve default negative fixtures;
+validate ordinary pairs, aliases/nonblocking/message/EOF/peer/poll/capacity paths.
+Do not import G07 threads/G02 guest clock merely for donor call-layout ancestry.
+Reconcile G25 vector and G29 reference indices when those owners join at F02;
+keep nested compiler/application acceptance active. Then finish F01 original
+hunk/old-fork accounting, F02 combined owner review, F03 fresh Recipe/actual
+consumers, and F04 user inspection. No branches/refs/pushes/PRs/maintainer messages.
 
 Active skill: `hdae-development`, discovered at
 `/home/vince/.codex/worktrees/ginux-pr-combination-check/ginux/.agents/skills/hdae-development/SKILL.md`.

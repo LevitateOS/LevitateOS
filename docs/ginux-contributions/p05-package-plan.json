@@ -280,12 +280,21 @@
       ],
       "acceptance": "Real peers, nonblocking transitions, short I/O, readiness/deadlines, half-close and bounded capacity; nested compiler streams and cancellation. Split readiness/channels if independently usable.",
       "planned_delivery": "one coherent change plus its generic docs and focused regression fixtures; split coupled responsibilities only as recorded by P04",
-      "status": "partial source prep: G08a per-process readiness retained for G29; original socketpairs/FIONBIO/thread and policy/security/full CI still pending",
+      "status": "partial: G08a readiness prepared; F01 identified still-unextracted FIONBIO/packet-pair/nested-stream remainder; prepare G08b on current per-process G08a owner, preserve policy/security and consumer holds",
       "artifact_directory": ".artifacts/ginux-contribution-preparation/G08",
       "subpackets": [
         "G08a"
       ],
-      "evidence": "g08a-review.md"
+      "evidence": "g08a-review.md",
+      "planned_subpackets": [
+        "G08b"
+      ],
+      "remainder_sources": [
+        "75acd2beeb95fbc62f9177e5116fd6b5d8f22ca8",
+        "3b27b37010110b4ccf14936e259fae0a5487efdb",
+        "e954010d7f74151d6ab8d03a1d40f4c4b9cb9b5e"
+      ],
+      "reconciliation": "f01-review.md"
     },
     {
       "packet": "G09a",
