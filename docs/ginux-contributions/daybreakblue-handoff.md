@@ -621,3 +621,20 @@ fixture modes deny/quota/hold/hold-kill/slots/off and the3 new policy/security
 units; all remain enabled and locally unrun. G07 shared-path/thread hold still
 applies. No cloud dispatch or security acceptance occurred; policy/full CI/fresh
 upstream independence and final consumer closure remain pending.
+
+## G30 — storage virtual-root ownership
+
+Head `2186548d5af38b6ab06379a38b9f8fc7a08636bc` directly on G15 `8ab24d4b47adeb9897623627060846070d41219d`.
+98 units and ordinary source/clean ownership/storage checks plus actual trusted
+GNU cpio2.15 valid archive extraction pass. Actual cpio fails ownership syscalls
+on exact G15. A reproduced empty-path dispatch failure is corrected. No ownership
+suppression flags, external downloads, invalid archive or hostile buffer probes.
+[Review/evidence](g30-review.md).
+
+Validate protected/mutable ownership paths, UID/GID width/invalid IDs, flags and
+missing/dangling/empty-path behavior; native/private/closed/reused descriptors,
+assignment and inode authority; shared-thread/rename/close/exec races and error
+ordering; verify no host ownership mutation or fallback. The full new ownership
+mode retains donor negative/pointer/authority checks but is locally unrun. G07
+shared-path/security, full CI and combined consumers remain pending. No cloud
+dispatch or security acceptance occurred.

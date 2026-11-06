@@ -1472,18 +1472,46 @@
       "packet": "G30",
       "purpose": "Virtual root ownership on owned objects (`7cf2638a`)",
       "dependencies": [
-        "G09",
-        "G13",
-        "G15",
-        "G25"
+        "G15"
       ],
       "source_commits": [
         "7cf2638adaf2fd3b783be636fe2a05b2d60458c5"
       ],
       "acceptance": "Actual cpio extraction with uid/gid zero or unchanged IDs; invalid IDs, absent objects and nofollow fail correctly; no claim of arbitrary Linux ownership.",
       "planned_delivery": "one coherent change plus its generic docs and focused regression fixtures; split coupled responsibilities only as recorded by P04",
-      "status": "pending extraction and R01-R04 review",
-      "artifact_directory": ".artifacts/ginux-contribution-preparation/G30"
+      "status": "source/strict clean preparation and separate full-diff self-review retained; security/full CI/fresh upstream independence and combined consumer joins pending",
+      "artifact_directory": ".artifacts/ginux-contribution-preparation/G30",
+      "base": "8ab24d4b47adeb9897623627060846070d41219d",
+      "head": "2186548d5af38b6ab06379a38b9f8fc7a08636bc",
+      "tree": "4e4ab30c24f1cc5f8cdaf7c360f5c353d9e23f5c",
+      "changed_files": [
+        "README.md",
+        "crates/ginux-init/src/descriptors.rs",
+        "crates/ginux-init/src/fs_hooks.rs",
+        "scripts/test-launch-storage.py",
+        "tests/fixtures/launch-storage-fixture.c"
+      ],
+      "standalone_source": false,
+      "patch_sha256": "34d22855b27698e1c8d80d016ce5bc7bb8084c5e2135dd486f0068f2b559a753",
+      "deferred_joins": [
+        "G07 shared paths/FD calls security",
+        "G24/G25/F02 package pipeline, no runtime source dependency"
+      ],
+      "policy": "virtual root-preserving storage operations only; arbitrary identity changes unsupported; no host chown forwarded",
+      "unit_tests": 98,
+      "vfs_tests": 40,
+      "clean_matched_paths": 177,
+      "review": "separate whole-diff self-review; no independent or security acceptance claimed",
+      "remote_ci": "not run",
+      "security_handoff": "daybreakblue-handoff.md",
+      "source_binary_sha256": "9c30cca4a56ddc183ea28ecbca299df06f2c03fcdc658167b2e3ba769ddd9e21",
+      "clean_binary_sha256": "9c30cca4a56ddc183ea28ecbca299df06f2c03fcdc658167b2e3ba769ddd9e21",
+      "fixture_sha256": "56779a26742d57e81e4825bad9c4bea9704743e0abfb772eed6d2b82ce13efb2",
+      "functional_evidence": "ordinary root/unchanged path/FD/dirfd/nofollow/empty-path/alias/unlinked ownership plus existing storage controls; actual GNU cpio2.15 valid8229-byte extraction, hardlink identity and symlink metadata source/clean",
+      "baseline_evidence": "same frozen valid cpio archive/wrapper on exact G15 fails ownership syscalls with ENOSYS and wrapper exits83; candidate succeeds",
+      "baseline_binary_sha256": "07bc20172727f4ef8b8e7a410119483870bfa3b6d4c9de3a496b7bb591d014ac",
+      "evidence": "g30-review.md",
+      "source_patch": "patches/G30.patch"
     },
     {
       "packet": "G31",

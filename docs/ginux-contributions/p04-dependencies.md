@@ -110,3 +110,11 @@ SO_ERROR state and vector/SIGPIPE findings were subsequently corrected in G29;
 source/clean ordinary TCP/curl validation passes while actual Git needs G14
 at F02/F03 and policy/security/full CI remain held;
 [readiness review](g08a-review.md), [G29 progress](g29-review.md).
+
+G30 `2186548d` extracts directly on G15: existing shared inode/path/public FD
+owners suffice; no G25/G24/G14 ancestry is required. Actual GNU cpio2.15 extracts
+root-owned regular/hardlink/symlink content in source/clean, while exact G15 fails
+fchown/lchown;98 units pass. General package/cwd/time/vector/thread integration
+still belongs to F02/F03, and security/full CI remain pending. Empty-path
+ownership must bypass shared path resolution to reach its descriptor owner;
+[review/evidence](g30-review.md).

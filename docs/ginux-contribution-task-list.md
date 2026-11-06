@@ -661,13 +661,23 @@ false closure. Three default-enabled policy/security units/full security modes,
 G07/G20/G24/G25 joins, network policy and full CI/upstream independence remain
 pending. G29 is partial, not publication-ready. No publication occurred.
 
-Exact next task: **G30 — trace and extract virtual root ownership**.
-Inspect7cf2638a against the existing inode/path/descriptor owners and prove its
-smallest actual prerequisites before composing. Keep correct uid/gid zero or
-unchanged semantics and nofollow/absence/error behavior; test actual trusted cpio
-extraction with the needed reviewed consumer capabilities. Preserve every G08,
-G23–G29/F02/F03 open criterion. Then reconcile G31 and perform F01/F02/F03/F04.
-No branch/ref/publication or maintainer messages before user inspection.
+G30 `2186548d` is retained directly on G15.
+[Review/evidence](ginux-contributions/g30-review.md) records98 units,177-path strict
+replay and ordinary owner/path/FD/nofollow/empty-path/alias metadata plus storage
+controls passing in source/clean. Actual GNU cpio2.15 extracts all8229 payload
+bytes, hardlink identity and symlink metadata with UID/GID0; the same archive and
+wrapper fail ownership on exact G15. Empty-path shared routing was reproduced
+and corrected. No G25/G24/G14 ancestry or ownership-suppression flag is needed.
+Security/full default runtime/remote CI/current-main independence and actual
+combined package/Recipe closure remain pending. No publication occurred.
+
+Exact next task: **G31 — reconcile checkpoint/restore coverage into its owners**.
+Trace5e20a65f against retained G20/G21 CI/Make/runner evidence and account for its
+single coverage line without a duplicate wiring-only packet. Preserve all unit
+modules and default runner scenarios. Then proceed F01 complete hunk accounting,
+F02 combined owners, F03 fresh Recipe/actual consumers and F04 user inspection.
+All G08/G23–G30/security/policy/consumer open criteria remain active. No branches,
+refs, pushes, PRs or maintainer messages before user inspection.
 
 Active skill: `hdae-development`, discovered at
 `/home/vince/.codex/worktrees/ginux-pr-combination-check/ginux/.agents/skills/hdae-development/SKILL.md`.

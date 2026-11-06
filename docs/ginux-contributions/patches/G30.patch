@@ -1,0 +1,243 @@
+From 2186548d5af38b6ab06379a38b9f8fc7a08636bc Mon Sep 17 00:00:00 2001
+From: vince <vincepaul.liem@gmail.com>
+Date: Fri, 6 Nov 2026 18:52:26 +0100
+Subject: [PATCH] feat(launch): preserve virtual root ownership on assigned
+ storage
+
+Handle chown variants through existing inode, path and descriptor owners.
+Accept root or unchanged IDs on existing storage objects without issuing host
+ownership calls, including no-follow and empty-path descriptor operations.
+
+Signed-off-by: vince <vincepaul.liem@gmail.com>
+---
+ README.md                               |  5 +++
+ crates/ginux-init/src/descriptors.rs    |  7 +++-
+ crates/ginux-init/src/fs_hooks.rs       | 53 +++++++++++++++++++++++--
+ scripts/test-launch-storage.py          |  3 +-
+ tests/fixtures/launch-storage-fixture.c | 27 +++++++++++++
+ 5 files changed, 88 insertions(+), 7 deletions(-)
+
+diff --git a/README.md b/README.md
+index 92f9a305..565f58a9 100644
+--- a/README.md
++++ b/README.md
+@@ -445,3 +445,8 @@ checks for syscall ABI dispatch, clone restrictions, descriptor inheritance,
+ thread reuse, successful and failed worker exec, signals, wait-status writes,
+ nonblocking waits, and vfork. The existing native fork fixture also runs. These
+ checks do not claim complete libc, job-control, or systemd compatibility.
++
++Owned storage inode uid/gid are virtual root. `chown`, `fchown`, `lchown` and
++`fchownat` can preserve 0 or unchanged (-1) on existing assigned storage objects,
++including symlinks and empty-path descriptor operations. Other identities remain
++unsupported; these operations never change host ownership.
+diff --git a/crates/ginux-init/src/descriptors.rs b/crates/ginux-init/src/descriptors.rs
+index d4632d70..ee12dc46 100644
+--- a/crates/ginux-init/src/descriptors.rs
++++ b/crates/ginux-init/src/descriptors.rs
+@@ -347,7 +347,7 @@ impl DescriptorTable {
+                     },
+                 }
+             }
+-            0 | 1 | 5 | 8 | 16 | 17 | 18 | 19 | 20 | 74 | 75 | 77 | 78 | 91 | 217 => {
++            0 | 1 | 5 | 8 | 16 | 17 | 18 | 19 | 20 | 74 | 75 | 77 | 78 | 91 | 93 | 217 => {
+                 self.save(r);
+                 self.get(r.rdi)
+                     .and_then(|d| self.descriptor(pid, r, d, backends))
+@@ -377,7 +377,7 @@ impl DescriptorTable {
+                     backends.claim(pid, r)
+                 })
+             }
+-            258 | 262 | 263 | 267 | 268 | 269 | 332 | 439 => {
++            258 | 260 | 262 | 263 | 267 | 268 | 269 | 332 | 439 => {
+                 self.save(r);
+                 self.path_descriptor(pid, r, backends)
+             }
+@@ -573,6 +573,9 @@ impl DescriptorTable {
+         let public_fd = r.rdi as u32;
+         match entry.handle {
+             Handle::Native { fd, console } => {
++                if r.orig_rax == 93 {
++                    return Err(-1);
++                }
+                 if console && matches!(r.orig_rax, 78 | 217) {
+                     return Err(-20);
+                 }
+diff --git a/crates/ginux-init/src/fs_hooks.rs b/crates/ginux-init/src/fs_hooks.rs
+index a86272eb..77579742 100644
+--- a/crates/ginux-init/src/fs_hooks.rs
++++ b/crates/ginux-init/src/fs_hooks.rs
+@@ -240,6 +240,11 @@ impl LaunchFs {
+     }
+ 
+     pub(crate) fn request_path(&self, pid: usize, r: &UserRegs) -> Result<Option<(u8, Path)>, i64> {
++        // Empty-path ownership is a descriptor operation. Other path owners
++        // must leave it for claim's descriptor dispatch, including AT_EMPTY_PATH.
++        if r.orig_rax == 260 && read_path(pid, r.rsi)?.is_empty() {
++            return Ok(None);
++        }
+         let (argument, address, dirfd, follow, missing) = match r.orig_rax {
+             2 => (
+                 0,
+@@ -258,12 +263,14 @@ impl LaunchFs {
+             80 => (0, r.rdi, (-100i64) as u64, true, false),
+             59 => (0, r.rdi, (-100i64) as u64, true, false),
+             322 => (1, r.rsi, r.rdi, r.r8 & 0x100 == 0, false),
+-            4 | 21 | 90 => (0, r.rdi, (-100i64) as u64, true, false),
+-            6 | 84 | 87 | 89 => (0, r.rdi, (-100i64) as u64, false, false),
++            4 | 21 | 90 | 92 => (0, r.rdi, (-100i64) as u64, true, false),
++            6 | 84 | 87 | 89 | 94 => (0, r.rdi, (-100i64) as u64, false, false),
+             83 => (0, r.rdi, (-100i64) as u64, false, true),
+             88 => (1, r.rsi, (-100i64) as u64, false, true),
+             266 => (2, r.rdx, r.rsi, false, true),
+             258 => (1, r.rsi, r.rdi, false, true),
++            260 if r.r8 & !0x1100 != 0 => return Err(-22),
++            260 => (1, r.rsi, r.rdi, r.r8 & 0x100 == 0, false),
+             262 => (1, r.rsi, r.rdi, r.r10 & 0x100 == 0, false),
+             263 | 267 => (1, r.rsi, r.rdi, false, false),
+             268 | 269 => (1, r.rsi, r.rdi, true, false),
+@@ -271,7 +278,7 @@ impl LaunchFs {
+             439 => (1, r.rsi, r.rdi, r.r10 & 0x100 == 0, false),
+             _ => return Ok(None),
+         };
+-        if matches!(r.orig_rax, 262 | 332 | 439 | 322)
++        if matches!(r.orig_rax, 260 | 262 | 332 | 439 | 322)
+             && (dirfd as i32) < FD_BASE as i32
+             && read_path(pid, address)?.is_empty()
+         {
+@@ -641,13 +648,14 @@ impl LaunchFs {
+                 | 75
+                 | 77
+                 | 91
++                | 93
+                 | 217
+                 | 292
+         ) && fd >= FD_BASE as i32
+         {
+             return Some(self.descriptor_call(pid, r, fd - FD_BASE as i32 + 3));
+         }
+-        if matches!(r.orig_rax, 262 | 332 | 439) {
++        if matches!(r.orig_rax, 260 | 262 | 332 | 439) {
+             match read_path(pid, r.rsi) {
+                 Ok(p) if p.is_empty() && fd >= FD_BASE as i32 => {
+                     return Some(self.descriptor_call(pid, r, fd - FD_BASE as i32 + 3))
+@@ -669,6 +677,17 @@ impl LaunchFs {
+             2 => self.open(path.as_bytes(), r.rsi, r.rdx),
+             257 => self.open(path.as_bytes(), r.rdx, r.r10),
+             4 | 6 => self.stat(pid, path.as_bytes(), r.rsi, false),
++            92 | 94 => self
++                .fs
++                .metadata_no_follow(path.as_bytes())
++                .map_err(errno)
++                .and_then(|_| preserve_owner(r.rsi, r.rdx)),
++            260 if r.r8 & !0x1100 == 0 => self
++                .fs
++                .metadata_no_follow(path.as_bytes())
++                .map_err(errno)
++                .and_then(|_| preserve_owner(r.rdx, r.r10)),
++            260 => Err(-22),
+             21 | 269 | 439 => self
+                 .fs
+                 .metadata_no_follow(path.as_bytes())
+@@ -939,6 +958,18 @@ impl LaunchFs {
+                 .map(|n| n as i64)
+                 .map_err(errno),
+             91 => self.fs.fchmod(fd, r.rsi as u32).map(|_| 0).map_err(errno),
++            93 => self
++                .fs
++                .fstat(fd)
++                .map_err(errno)
++                .and_then(|_| preserve_owner(r.rsi, r.rdx)),
++            260 if r.r8 & !0x1100 != 0 => Err(-22),
++            260 if r.r8 & 0x1000 == 0 => Err(-2),
++            260 => self
++                .fs
++                .fstat(fd)
++                .map_err(errno)
++                .and_then(|_| preserve_owner(r.rdx, r.r10)),
+             77 if r.rsi as i64 >= 0 => self.fs.truncate(fd, r.rsi).map(|_| 0).map_err(errno),
+             77 => Err(-22),
+             217 => self.getdents(pid, fd, r.rsi, r.rdx),
+@@ -1070,6 +1101,20 @@ pub(crate) fn valid_statx(flags: u64, mask: u64) -> bool {
+     flags & !0x7900 == 0 && flags & 0x6000 != 0x6000 && mask & 0x8000_0000 == 0
+ }
+ 
++// Owned inode uid/gid are always virtual root, as projected by copy_metadata.
++// Preserving that identity is a real no-op; changing it is unsupported. No host
++// chown syscall is issued for a domain path or private backing descriptor.
++fn preserve_owner(uid: u64, gid: u64) -> Result<i64, i64> {
++    if [uid, gid]
++        .iter()
++        .all(|id| matches!(*id as u32, 0 | u32::MAX))
++    {
++        Ok(0)
++    } else {
++        Err(-95)
++    }
++}
++
+ fn access(metadata: FileMetadata, r: &UserRegs) -> Result<i64, i64> {
+     let mode = if r.orig_rax == 21 { r.rsi } else { r.rdx };
+     let flags = if r.orig_rax == 439 { r.r10 } else { 0 };
+diff --git a/scripts/test-launch-storage.py b/scripts/test-launch-storage.py
+index dbe669f0..32d55f7c 100644
+--- a/scripts/test-launch-storage.py
++++ b/scripts/test-launch-storage.py
+@@ -54,7 +54,7 @@ def main():
+ 
+         if sys.argv[3:]:
+             for mode in sys.argv[3:]:
+-                if mode not in ('growth', 'bounds', 'quota', 'view-probes', 'symlinks', 'ordinary-symlinks'):
++                if mode not in ('growth', 'bounds', 'quota', 'view-probes', 'symlinks', 'ordinary-symlinks', 'ownership', 'ordinary-ownership'):
+                     sys.exit('unknown selected storage scenario')
+                 invoke(['memory:/work', 'memory:/work/build', 'memory:/out'], [mode],
+                        memory=16 if mode == 'bounds' else 256)
+@@ -73,6 +73,7 @@ def main():
+         invoke(['memory:/work', 'memory:/work/build', 'memory:/out'], ['bounds'], memory=16)
+         invoke(['memory:/work', 'memory:/out'], ['symlinks'])
+         invoke(['memory:/work', 'memory:/out'], ['ordinary-symlinks'])
++        invoke(['memory:/work'], ['ownership'])
+         invoke([], ['no-storage'])
+         for assignment in ['disk0', 'memory:/', 'memory:/proc', 'memory:/sys/x', 'memory:/dev',
+                            'memory:/bin', 'memory:/work/../out', 'memory:/work/', 'memory:work']:
+diff --git a/tests/fixtures/launch-storage-fixture.c b/tests/fixtures/launch-storage-fixture.c
+index 54cd19f8..44e9546e 100644
+--- a/tests/fixtures/launch-storage-fixture.c
++++ b/tests/fixtures/launch-storage-fixture.c
+@@ -49,10 +49,37 @@ static long ordinary_symlinks(void) {
+     CHECK(DO(82,"/work/link","/work/renamed",0)==0 && DO(87,"/work/renamed",0,0)==0 && DO(4,"/work/dir/file",meta,0)==0,212);
+     return 0;
+ }
++static long ownership(int full) {
++    long fd=DO(2,"/work/owner",0102,0640); CHECK(fd>=3,100);
++    CHECK(DO(1,fd,"root",4)==4 && DO(86,"/work/owner","/work/alias",0)==0,101);
++    CHECK(DO(93,fd,0,-1)==0 && DO(92,"/work/alias",-1,0)==0,102);
++    long alias=DO(32,fd,0,0); CHECK(alias>=3 && DO(3,fd,0,0)==0,103);
++    CHECK(DO(88,"owner","/work/owner-link",0)==0 && DO(94,"/work/owner-link",0,0)==0,104);
++    CHECK(call(260,-100,(word)"/work/owner-link",-1,0,0x100,0)==0,105);
++    CHECK(call(260,alias,(word)"",0,-1,0x1000,0)==0,106);
++    long dir=DO(2,"/work",0200000,0); CHECK(dir>=3,107);
++    CHECK(call(260,dir,(word)"alias",0,0,0,0)==0 && DO(93,dir,-1,-1)==0,108);
++    CHECK(DO(5,alias,meta,0)==0 && *(unsigned *)(meta+28)==0 && *(unsigned *)(meta+32)==0,109);
++    CHECK(*(word *)(meta+16)==2 && *(word *)(meta+48)==4 && (*(unsigned *)(meta+24)&0777)==0640,110);
++    CHECK(call(332,alias,(word)"",0x1000,0x7ff,(word)meta,0)==0 && *(unsigned *)(meta+20)==0 && *(unsigned *)(meta+24)==0,111);
++    CHECK(DO(87,"/work/owner",0,0)==0 && DO(87,"/work/alias",0,0)==0 && DO(93,alias,0,0)==0,112);
++    CHECK(DO(8,alias,0,0)==0 && DO(0,alias,output,4)==4 && output[0]=='r' && output[3]=='t',113);
++    if(full) {
++        CHECK(DO(88,"missing","/work/dangling",0)==0 && DO(94,"/work/dangling",0,0)==0,114);
++        CHECK(DO(92,"/work/dangling",0,0)==-2 && call(260,-100,(word)"/work/dangling",0,0,0x100,0)==0,115);
++        CHECK(call(260,alias,(word)"",0,0,0,0)==-2 && DO(93,alias,1,0)==-95,116);
++        CHECK(DO(92,"/work/missing",0,0)==-2 && DO(92,1,0,0)==-14,117);
++        CHECK(call(260,dir,(word)"missing",0,0,2,0)==-22 && DO(93,0,0,0)==-1,118);
++    }
++    CHECK(DO(3,dir,0,0)==0 && DO(3,alias,0,0)==0,119);
++    return 0;
++}
+ long storage_main(word *stack)
+ {
+     word argc = *stack;
+     char **argv = (char **)(stack + 1);
++    if(argc>1 && named(argv[1],"ordinary-ownership"))return ownership(0);
++    if(argc>1 && named(argv[1],"ownership"))return ownership(1);
+     if (argc > 1 && argv[1][0] == 'v') {
+         long fd=DO(2,"/work/probe",0102|0400,0600);
+         CHECK(fd>=3 && DO(1,fd,"ok",2)==2,145);
