@@ -928,3 +928,30 @@ this new prerequisite. The exactff926d0c baseline now passes83 units/static/buil
 generated contract-document consistency and eight ordinary controls; this does
 not validate a refreshed contribution or configured contract enforcement. Read
 its complete remaining source/callers before choosing the minimal adjustment.
+
+
+### PR231 source trace and serial refresh — 2026-11-06
+
+The complete contract library/tool, configuration/Cargo/script changes and
+Recipe renderer/preparation caller are now read. Ginux's existing versioned
+catalog, profiles, EffectiveContract and AuditBudget lead the adjustment.
+Recipe commit `d0fafc199640b6c9e71b9589c75378e2a7345b32` corrects its one
+unversioned profile value to `gate5-balanced-v1`; library/binary compilation
+passes, and exact upstream rejects the previous name while accepting this name.
+Full rendered-config/consumer acceptance remains pending on the actual storage/
+network/runtime contributions. Original paused inputs were preserved.
+
+G05a is now `25d4f05a30a2b367e24aea9460149bd55baa3406`, directly onff926d0c:
+three exact-base regressions fail, all86 units/static/build and eight ordinary
+controls pass in source/clean, all196 tracked paths and both binaries match.
+Its VFS source is unchanged. [Review](ginux-contributions/g05a-review.md) retains
+full default/security/macOS/remote CI holds. The latest37-patch inventory is now
+`upstream-contract-refresh-2026-11-06/current-inventory.json`; only G05a has
+source/ordinary preparation onff926d0c, and36 retained packets remain.
+
+Exact next action: refresh G03a, then G06a and G03b, serially onff926d0c. At
+G03c, join configured launch effects to upstream contract/catalog/audit owners
+before continuing dependent runtime packets, then inspect the task-loop join
+at G06b. Source review identified the separate fixed-dispatch paths; security
+checks are recorded downstream and remain pending, with no local exploit-like
+reproduction or DaybreakBlue dispatch. G07, F02/F03 and final F04 remain open.

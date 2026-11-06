@@ -35,3 +35,38 @@ compositions of earlier8a475e8b;24 have not reached that base. None of the37
 retained patches has latest-main acceptance yet. Keep G07/security/full CI and
 actual upstream prerequisite holds; do not continue G11 on stale assumptions.
 No branches, remote text, PRs or publication changed.
+
+
+## Source trace and first adjustment — 2026-11-06
+
+The complete2120-line contract library and102-line contract-doc tool have now
+been read, along with Cargo/config/script deltas and Recipe's actual config
+renderer/preparation caller. The upstream catalog/versioned profiles/selectors/
+digest/AuditBudget remain the owners. Configured launch still calls the fixed
+balanced dispatch, while configured task entry handles fork/exec/wait and owned
+hooks before a new contract guard. A clean replay would not establish the new
+contract semantics. At G03c, integrate configured effects through the upstream
+contract/catalog/audit owners before proceeding with dependent runtime packets;
+review later task hooks at G06b. Security acceptance stays pending downstream.
+No contract-denial or adversarial runtime probe was run.
+
+Recipe emitted `[contract] profile = "balanced"`, which upstream now rejects.
+Recipe commit `d0fafc199640b6c9e71b9589c75378e2a7345b32` changes only that
+renderer value to upstream's `gate5-balanced-v1`. `cargo check --offline --locked
+-p levitate-recipe --lib --bins` passes with a separate target directory. On exact
+upstreamff926d0c, the same ordinary gate5 configuration with old profile exits2
+with invalid-contract; the versioned profile's contract-plan exits0. Initial
+receipt matching expected the diagnostic on stderr; upstream prints it on stdout,
+and the corrected receipt records the observed rejection. No parser or assertion
+was relaxed. This is profile acceptance, not acceptance of Recipe's full rendered
+configuration or end-to-end execution: storage quota/network extensions and
+remaining configured capabilities still require their actual contribution owners.
+The original paused Recipe source and destination binaries remain unchanged.
+
+[G05a](g05a-review.md) is the first refreshed candidate directly onff926d0c:
+head25d4f05a,86 units/static/build and8 ordinary controls pass per source/clean,
+with three exact-base regressions failing. The other36 retained patches still
+need latest-base reconciliation; all full default/security/macOS/remote CI holds
+remain. The latest retained-patch integrity inventory is now
+`upstream-contract-refresh-2026-11-06/current-inventory.json`. Next: G03a, G06a,
+G03b serially, then the configured contract join at G03c.

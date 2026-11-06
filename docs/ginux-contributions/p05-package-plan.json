@@ -49,20 +49,21 @@
       ],
       "acceptance": "The direct duplicate-read regression fails on upstream and integration, passes old review fix; extract current-main correction, test aliases, independent opens, reused slots and CLOEXEC. No configured-storage prerequisite.",
       "planned_delivery": "one coherent change plus its generic docs and focused regression fixtures; split coupled responsibilities only as recorded by P04",
-      "status": "current-main source reviewed; static/build, all 76 unit tests and 8 ordinary controls pass in source/clean; full default runtime/macOS CI remain pending",
-      "artifact_directory": ".artifacts/ginux-contribution-preparation/upstream-refresh-2026-11-06/G05a",
-      "head": "936d0eb7a9b46e58ade5219705c12d3d476dfae9",
-      "tree": "41382469978a673120e707dade56eb3cbc872749",
+      "status": "observed ff926d0c direct-base source reviewed; three exact-base regressions fail; all86 units/static/build and8 ordinary controls pass in source/clean; full default/runtime/security/macOS/remote CI remain pending",
+      "artifact_directory": ".artifacts/ginux-contribution-preparation/upstream-contract-refresh-2026-11-06/G05a",
+      "head": "25d4f05a30a2b367e24aea9460149bd55baa3406",
+      "tree": "30ad30ad45297fead5efe7975d59adf86ee7cab0",
       "evidence": "g05a-review.md",
-      "base": "8a475e8b2318425fd2fc15246a5c6f4bca6caf86",
-      "previous_head": "bb2c82bf18bb30a7ebc514af5131fa5b03a5fcc5",
+      "base": "ff926d0c228b71d55d0f2f0909dd86ec62197c8a",
+      "previous_head": "936d0eb7a9b46e58ade5219705c12d3d476dfae9",
       "historical_artifact_directory": ".artifacts/development-migration/2026-11-06/recovery/evidence/ginux-contribution-preparation/G05a",
-      "patch_sha256": "1509cf5c73325fc211b5792094c89d77c36ed222e1499e253cdf94c2ac1979ef",
-      "unit_tests": 76,
+      "patch_sha256": "e3ec0948fb998676534b54afc5de0dde4dff289700885646ed4632e3a546c0a9",
+      "unit_tests": 86,
       "vfs_tests": 15,
       "source_patch": "patches/G05a.patch",
       "remote_ci": "not run",
-      "standalone": true
+      "standalone": true,
+      "latest_main_acceptance": "source/ordinary preparation only; full runtime/macOS/remote CI pending"
     },
     {
       "packet": "G03a",
@@ -1882,5 +1883,5 @@
     }
   ],
   "latest_observed_upstream_main": "ff926d0c228b71d55d0f2f0909dd86ec62197c8a",
-  "latest_upstream_reconciliation": "pending; inspect PR231 contract/audit owner before continuing G11; previous thirteen reviewed preparations were based on8a475e8b"
+  "latest_upstream_reconciliation": "G05a refreshed on ff926d0c; all remaining retained packets pending serial refresh and configured contract-owner integration"
 }

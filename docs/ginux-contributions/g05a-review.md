@@ -100,3 +100,28 @@ remain unrun under the security handoff boundary. macOS/remote CI is also unrun.
 R03 therefore retains those required checks; selected ordinary controls are not
 a full CI result. This current-main source refresh does not close the overall
 goal or authorize publication.
+
+## PR231 latest-observed-base refresh — 2026-11-06
+
+Head `25d4f05a30a2b367e24aea9460149bd55baa3406`, tree
+`30ad30ad45297fead5efe7975d59adf86ee7cab0`, is directly on upstream
+`ff926d0c228b71d55d0f2f0909dd86ec62197c8a` after PR231. The complete VFS
+owner is unchanged by PR231, and the candidate's VFS bytes are identical to
+previous head936d0eb7. Separate source self-review reread the full +95/-21
+one-file delta and existing allocation/offset/close/whiteout paths; it imports no
+contract/catalog/audit changes. Independent review is not claimed.
+
+The exactff926d0c base fails all three duplicate regressions (0 pass,3 fail).
+Source and strict clean replay pass `make check test-unit build
+build-launch-fixture build-process-fixtures build-gate1-fixture`:86 units,
+including15 VFS tests and all new upstream contract/domain tests. Eight ordinary
+controls pass per export; all196 tracked paths match the final head. Both
+binaries have SHA256
+`3a710e46d78023aca0a51797b0933f5a0c712a6fb1f98c2b5ae0056fd8168093`.
+Exact logs/receipts/draft/manifest/retained patch are in
+`.artifacts/ginux-contribution-preparation/upstream-contract-refresh-2026-11-06/G05a/`.
+
+This refresh establishes source/ordinary preparation on the newly observed base.
+Full default runtime/security suites, macOS Actions and remote CI remain pending;
+new contract enforcement is not inferred from these controls. No upstream/fork
+ref, real checkout/index, human PR text or publication changed.

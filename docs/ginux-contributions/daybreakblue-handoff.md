@@ -859,3 +859,19 @@ inherited ordinary checks use the exact earlier G09d image program instead,
 without altering that contributed fixture or CI. Reconcile upstream PR#231's
 new contract/audit owner before assigning acceptance to a final revision. No
 DaybreakBlue agent was dispatched and no security pass is claimed.
+
+
+## Upstream PR231 configured-contract join — source finding, 2026-11-06
+
+Observed upstream `ff926d0c228b71d55d0f2f0909dd86ec62197c8a` adds contract
+resolution and native supervisor enforcement. Source review finds configured
+launch remains separate (`launch.rs:1028` dispatch), while the retained G10 task
+loop handles task/cwd/exec operations before `launch_tasks.rs:600` fixed dispatch.
+Do not assume the new EffectiveContract or bounded audit covers these paths.
+Ordinary integration must use upstream's catalog/profile/rule and AuditBudget
+owners before effects; include new supported operations in that same catalog
+rather than bypassing it. Monitor validation of deny precedence, semantic-family
+selection, side-effect ordering, bounded/disabled audit and task/owned hooks on
+the final recorded revision. No runtime reproduction or adversarial probe was
+executed here, and no DaybreakBlue agent was dispatched. Keep acceptance pending.
+The separate G07 shared-kernel-argument finding remains unresolved.
