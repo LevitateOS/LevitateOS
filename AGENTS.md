@@ -10,8 +10,8 @@ These rules apply to every directory and submodule, recursively, across Git repo
 - Bureaucracy is prohibited: do not introduce mandatory paperwork, review ceremonies, coverage targets, or process-only blockers.
 - Use the existing owner of a behavior. Prefer a small direct change over a new framework or parallel implementation.
 - Preserve unrelated edits. Do not commit secrets, caches, or generated junk.
-- Development submodules may follow their working branches. A checkout differing from the superproject pin is normal, not a development failure. Require exact pins only when reproducing or preparing a release.
-- Never create, switch, or rename Git branches without the user's explicit permission. Commit on whatever branch is checked out, including `master`/`main`, in the superproject and in every submodule.
+- No branches. Every repository, the superproject and each submodule, has exactly one branch: `master` or `main`, as `.gitmodules` names it. Do not create, push, check out or rename any other branch, for features, experiments, pull requests, agents or anything else; there are no pull-request or review-branch workflows. Commit and push straight to that branch. Work that is not ready stays uncommitted. The one exception is `tools/ginux`: contributions to the upstream project go as pull requests from branches of our fork, as upstream requires.
+- A submodule checkout ahead of the superproject pin is normal, not a development failure. Require exact pins only when reproducing or preparing a release.
 - Commit early and often. Commit each coherent, working step as it lands rather than batching a session's work into one large commit at the end.
 
 ## Validation
