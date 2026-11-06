@@ -377,9 +377,9 @@
       "packet": "G09b",
       "parent_packet": "G09",
       "purpose": "bounded growable runtime storage",
-      "base": "ccd42e319c3a76bf85d9cfce81a44cc9ba051911",
-      "head": "297ad8dde26e02ca32d6becd60d654c1fd67ecd0",
-      "tree": "17008873b421921585a93748a341a9f0cb1f21f3",
+      "base": "ff29e8574f1382355bd4b925bf2aaf634885c305",
+      "head": "a2a70d1c7811886d2fca20d228a94e7dc6b31a61",
+      "tree": "74b42993f54f391d014ecdfd19482c8dc4da562d",
       "dependencies": [
         "G06b",
         "G09a"
@@ -394,17 +394,22 @@
         "scripts/test-launch-storage.py",
         "tests/fixtures/launch-storage-fixture.c"
       ],
-      "status": "source separately self-reviewed; static/unit/build and selected storage runtime checks pass in source and clean replay; full CI/security and current-main independence pending",
-      "patch_sha256": "acf9993a37407ad34a062ed57e310683a9f3947ffee3dc8bd219dd9d4de6bd7e",
-      "unit_tests": 85,
-      "clean_matched_paths": 169,
+      "status": "current-main local-prerequisite source reviewed; exact-base growth fails at old64KiB ceiling, all 94 units/static/build and 49 ordinary controls pass in source/clean; paired G09a/standalone delivery/security/full default runtime/macOS CI remain pending",
+      "patch_sha256": "9284a4e1dbbc290920351751aa33124965428637c9d882f02aa5338f391f5dce",
+      "unit_tests": 94,
+      "clean_matched_paths": 206,
       "review": "separate self-review; no independent reviewer coverage",
       "remote_ci": "not run",
       "publication_group": "review G09a/G09b separately but propose together as one useful growable-storage feature unless final review changes this",
       "security_handoff": "daybreakblue-handoff.md",
       "evidence": "g09b-review.md",
       "source_patch": "patches/G09b.patch",
-      "artifact_directory": ".artifacts/ginux-contribution-preparation/G09b"
+      "artifact_directory": ".artifacts/ginux-contribution-preparation/upstream-refresh-2026-11-06/G09b",
+      "previous_head": "297ad8dde26e02ca32d6becd60d654c1fd67ecd0",
+      "process_tests": 18,
+      "vfs_tests": 28,
+      "upstream_base": "8a475e8b2318425fd2fc15246a5c6f4bca6caf86",
+      "historical_artifact_directory": ".artifacts/development-migration/2026-11-06/recovery/evidence/ginux-contribution-preparation/G09b"
     },
     {
       "packet": "G09c",

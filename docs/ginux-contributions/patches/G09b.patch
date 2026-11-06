@@ -1,6 +1,6 @@
-From 297ad8dde26e02ca32d6becd60d654c1fd67ecd0 Mon Sep 17 00:00:00 2001
+From a2a70d1c7811886d2fca20d228a94e7dc6b31a61 Mon Sep 17 00:00:00 2001
 From: vince <vincepaul.liem@gmail.com>
-Date: Fri, 6 Nov 2026 12:15:13 +0100
+Date: Fri, 6 Nov 2026 23:10:19 +0100
 Subject: [PATCH] feat(launch): grow memory files within a shared allocation
  bound
 
@@ -22,10 +22,10 @@ Signed-off-by: vince <vincepaul.liem@gmail.com>
  create mode 100644 crates/ginux-init/src/storage_memory.rs
 
 diff --git a/README.md b/README.md
-index 64912653..f46b73b5 100644
+index 9e88e307ee23149aec2b182e295e493ef6aad44c..f2fa36bc15d05ed30fcda551988b13398f3d10ba 100644
 --- a/README.md
 +++ b/README.md
-@@ -213,7 +213,8 @@ failure returns 2; supervision or result-writing failure returns 1. Native
+@@ -290,7 +290,8 @@ failure returns 2; supervision or result-writing failure returns 1. Native
  fork/vfork, bounded process-only clone, image exec and child wait are supervised
  by a configured-launch task loop. Non-x86-64 syscall ABIs and job-control
  group stops fail explicitly. Audit output is capped at 64 KiB plus a truncation
@@ -35,7 +35,7 @@ index 64912653..f46b73b5 100644
  
  Optional `[storage].assignments` entries of the form `"memory:/absolute/path"`
  declare empty, ephemeral writable namespaces. For example:
-@@ -231,7 +232,8 @@ storage. Paths must be canonical, unique, and cannot cover init, `/`, `/proc`,
+@@ -308,7 +309,8 @@ storage. Paths must be canonical, unique, and cannot cover init, `/`, `/proc`,
  Without assignments, native image access remains read-only.
  
  This backend supports regular-file open/create/exclusive-create/truncate/append,
@@ -45,7 +45,7 @@ index 64912653..f46b73b5 100644
  and stat/fstat/fstatat/statx metadata. Relative paths use the configured workdir;
  directory descriptors, directory enumeration/removal, owned symlinks, hardlinks,
  rename, file mappings and execution of generated files are unsupported. Component-wise image-link traversal preserves assignment
-@@ -239,9 +241,15 @@ precedence, missing components and non-directory errors. Native image operations
+@@ -316,9 +318,15 @@ precedence, missing components and non-directory errors. Native image operations
  use a temporary canonical path below the stopped workload's stack; an unavailable
  scratch area or overlapping output buffer returns EFAULT. This is a bounded
  storage adapter, not a complete unified image/overlay filesystem. IO is bounded
@@ -64,7 +64,7 @@ index 64912653..f46b73b5 100644
  
  Configured launch uses one table of up to 256 public descriptors for bootstrap
  stdio, immutable-image files, writable files, devices and pipes. Allocation uses
-@@ -261,7 +269,7 @@ CLOEXEC entries; failed exec preserves the table. Relative directory-fd access
+@@ -338,7 +346,7 @@ CLOEXEC entries; failed exec preserves the table. Relative directory-fd access
  and descriptor polling remain unsupported.
  Guest-memory copies respect page protections, including partial read copyout.
  No writable host descriptor is exposed. Data disappears at domain teardown;
@@ -74,7 +74,7 @@ index 64912653..f46b73b5 100644
  The configured `/dev` view is an immutable virtual directory, empty by default;
  image entries beneath it are hidden. `[devices].assignments = ["null"]` exposes
 diff --git a/crates/ginux-init/src/fs_hooks.rs b/crates/ginux-init/src/fs_hooks.rs
-index 9fb764c5..f739af55 100644
+index 9fb764c59ff06a950bf68c4c816a4840cc5fc7d1..f739af553b41c2354221321f0919a22dae8cff58 100644
 --- a/crates/ginux-init/src/fs_hooks.rs
 +++ b/crates/ginux-init/src/fs_hooks.rs
 @@ -3,6 +3,7 @@
@@ -138,7 +138,7 @@ index 9fb764c5..f739af55 100644
                  .fs
                  .descriptor_flags(fd)
 diff --git a/crates/ginux-init/src/launch_tasks.rs b/crates/ginux-init/src/launch_tasks.rs
-index 1adee8cd..e9ff5688 100644
+index 1adee8cdfc9f352a6530d593b334063c916f29a6..e9ff5688425c87bb4e7f827a4ae37d499e15f311 100644
 --- a/crates/ginux-init/src/launch_tasks.rs
 +++ b/crates/ginux-init/src/launch_tasks.rs
 @@ -1020,6 +1020,7 @@ impl Supervisor<'_> {
@@ -150,10 +150,10 @@ index 1adee8cd..e9ff5688 100644
      }
      fn fail(&mut self, domain: &mut Domain, reason: &[u8]) -> ! {
 diff --git a/crates/ginux-init/src/main.rs b/crates/ginux-init/src/main.rs
-index 02ab8779..d9f42132 100644
+index 7aa139994f973475d2d650de0c74f0e07f3d38a6..11a362c75010a6bb08de102c12c1fc6dfc349db8 100644
 --- a/crates/ginux-init/src/main.rs
 +++ b/crates/ginux-init/src/main.rs
-@@ -17,6 +17,7 @@ mod launch;
+@@ -19,6 +19,7 @@ mod launch;
  mod launch_tasks;
  mod path_hooks;
  mod process_hooks;
@@ -163,7 +163,7 @@ index 02ab8779..d9f42132 100644
  
 diff --git a/crates/ginux-init/src/storage_memory.rs b/crates/ginux-init/src/storage_memory.rs
 new file mode 100644
-index 00000000..77d2cf3a
+index 0000000000000000000000000000000000000000..77d2cf3a2390091681015ac645001feda9585db5
 --- /dev/null
 +++ b/crates/ginux-init/src/storage_memory.rs
 @@ -0,0 +1,161 @@
@@ -329,7 +329,7 @@ index 00000000..77d2cf3a
 +    }
 +}
 diff --git a/scripts/test-launch-storage.py b/scripts/test-launch-storage.py
-index a42386ab..5a93640f 100644
+index a42386ab4df6500014b52d823a15e0fdc5931f1d..5a93640fe2590690acf1ed50ff3ecb0bc9111e03 100644
 --- a/scripts/test-launch-storage.py
 +++ b/scripts/test-launch-storage.py
 @@ -10,9 +10,9 @@ import tempfile
@@ -382,7 +382,7 @@ index a42386ab..5a93640f 100644
          for assignment in ['disk0', 'memory:/', 'memory:/proc', 'memory:/sys/x', 'memory:/dev',
                             'memory:/bin', 'memory:/work/../out', 'memory:/work/', 'memory:work']:
 diff --git a/tests/fixtures/launch-storage-fixture.c b/tests/fixtures/launch-storage-fixture.c
-index 407a116f..bfc3c9c0 100644
+index 407a116f5fdcd345cd194a0635c0aeabb297313b..bfc3c9c07394428e278e8cd2ef6f90193c74b545 100644
 --- a/tests/fixtures/launch-storage-fixture.c
 +++ b/tests/fixtures/launch-storage-fixture.c
 @@ -28,6 +28,38 @@ long storage_main(word *stack)

@@ -813,3 +813,16 @@ reader-error cleanup; it does not validate malformed image offsets or adversaria
 backend/range behavior. Those existing security checks remain pending alongside
 full default suites. Runtime growth remains G09b; no thread/security acceptance
 or DaybreakBlue dispatch is implied.
+
+
+## Refreshed G09b security revision — 2026-11-06
+
+Current runtime growth subpacket G09b is `a2a70d1c7811886d2fca20d228a94e7dc6b31a61` on
+refreshed G06b/G09a composition `ff29e8574f1382355bd4b925bf2aaf634885c305`.
+[Current review](g09b-review.md) records 94 units and forty-nine ordinary controls
+in source/clean replay, with exact-prerequisite failure beyond 64 KiB. Validate
+anonymous allocation/remap rollback, hostile range/copy behavior, page accounting
+and indirect/shared argument authority independently. Ordinary quota exhaustion,
+zero-fill, alias lifetime and successful teardown do not satisfy those security
+checks. Default protected/authority fixtures remain enabled and unrun. G07 stays
+unready; no cloud agent was dispatched and no security pass is claimed.
