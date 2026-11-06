@@ -1,0 +1,531 @@
+{
+  "upstream_base": "3f2fe7dfadd4b40e235d982a6a3d386dc6490177",
+  "integration_donor": "7cf2638adaf2fd3b783be636fe2a05b2d60458c5",
+  "execution": "sequential; one active packet at a time",
+  "authorization": "local preparation through user checkpoint F04; no remote mutations",
+  "workspace_strategy": "disposable source exports under /tmp; no new or switched branches; retain patches and exact source/commit identities downstream",
+  "pr_count": "not finalized; work packets are not PRs",
+  "review_per_packet": [
+    "R01 full source/contract review and fixes",
+    "R02 meaningful regression/capability and negative cases",
+    "R03 relevant complete CI commands and runtime validation at recorded revision",
+    "R04 clean main/composition independence check and concise draft"
+  ],
+  "packets": [
+    {
+      "packet": "G01",
+      "purpose": "Assigned-console bounded polling (`3dd05f42`, `f8235d56`)",
+      "dependencies": [],
+      "source_commits": [
+        "3dd05f425b0b960f565610212179a26721d17251",
+        "f8235d56ffc4d6ae6d6c4cfdfab2f298986bfd00"
+      ],
+      "acceptance": "Assigned descriptors wait/wake within bounds; denied/unassigned descriptors stay denied; interruption and timeout work without busy looping.",
+      "planned_delivery": "one coherent change plus its generic docs and focused regression fixtures; split coupled responsibilities only as recorded by P04",
+      "status": "existing PR207, held; review/disposition pending, no new PR or head modification",
+      "artifact_directory": ".artifacts/ginux-contribution-preparation/G01"
+    },
+    {
+      "packet": "G02",
+      "purpose": "Restricted global clock reads and interruptible sleeps (`9ec95527`)",
+      "dependencies": [],
+      "source_commits": [
+        "9ec9552709332e563513fb24e76eee2025f42960"
+      ],
+      "acceptance": "Only the chosen realtime/monotonic clock IDs, deadline expiry and signal interruption; document native global-clock visibility honestly, and deny fd/PID CPU-clock encodings.",
+      "planned_delivery": "one coherent change plus its generic docs and focused regression fixtures; split coupled responsibilities only as recorded by P04",
+      "status": "pending extraction and R01-R04 review",
+      "artifact_directory": ".artifacts/ginux-contribution-preparation/G02",
+      "policy_hold": "issue179; prepare/review existing local material only; no publication or assumption of upstream consent"
+    },
+    {
+      "packet": "G05a",
+      "purpose": "Shared offsets for duplicated VFS descriptors (`b500f859`, relevant semantics from `7bc0ee04`)",
+      "dependencies": [],
+      "source_commits": [
+        "b500f859a3b1f22da59d0b500a6c07bcb8ba3d3f"
+      ],
+      "acceptance": "The direct duplicate-read regression fails on upstream and integration, passes old review fix; extract current-main correction, test aliases, independent opens, reused slots and CLOEXEC. No configured-storage prerequisite.",
+      "planned_delivery": "one coherent change plus its generic docs and focused regression fixtures; split coupled responsibilities only as recorded by P04",
+      "status": "pending extraction and R01-R04 review",
+      "artifact_directory": ".artifacts/ginux-contribution-preparation/G05a"
+    },
+    {
+      "packet": "G03",
+      "purpose": "Configured writable storage and file metadata (`222d29ff`, `10091e4e`)",
+      "dependencies": [],
+      "source_commits": [
+        "222d29ffd26e95c1574895d393c95b1fb295fa80",
+        "10091e4e48bb14dcf9f0ee20e62f471fb7d0cf2f"
+      ],
+      "acceptance": "Explicit mounts only; correct read/write/seek/stat/truncate and quota failure; unassigned paths cannot fall through to host writes.",
+      "planned_delivery": "one coherent change plus its generic docs and focused regression fixtures; split coupled responsibilities only as recorded by P04",
+      "status": "pending extraction and R01-R04 review",
+      "artifact_directory": ".artifacts/ginux-contribution-preparation/G03"
+    },
+    {
+      "packet": "G04",
+      "purpose": "Explicit virtual null devices (`e3458063`)",
+      "dependencies": [],
+      "source_commits": [
+        "e3458063812a07cc548d2237d92c22142b587cad"
+      ],
+      "acceptance": "Assigned null semantics, denied absent devices, correct path metadata and teardown.",
+      "planned_delivery": "one coherent change plus its generic docs and focused regression fixtures; split coupled responsibilities only as recorded by P04",
+      "status": "pending extraction and R01-R04 review",
+      "artifact_directory": ".artifacts/ginux-contribution-preparation/G04"
+    },
+    {
+      "packet": "G05",
+      "purpose": "Owned pipes and unified public descriptor ownership (`7f072f2c`, `3b00c1c8`, fixture correction `f1c6419e`)",
+      "dependencies": [
+        "G03",
+        "G04"
+      ],
+      "source_commits": [
+        "7f072f2c4f6f68ff227f43ca591731004cf096ac",
+        "f1c6419e3dc0d2451259b6d289a65eb1c1ff1dda",
+        "3b00c1c8802cef6ed69350aee53f97ff6715f233"
+      ],
+      "acceptance": "Correct alias/refcount/dup/close/CLOEXEC behavior, EOF/backpressure, invalid-pointer rollback and FD exhaustion. Reassess whether pipes and descriptor core can split coherently.",
+      "planned_delivery": "one coherent change plus its generic docs and focused regression fixtures; split coupled responsibilities only as recorded by P04",
+      "status": "pending extraction and R01-R04 review",
+      "artifact_directory": ".artifacts/ginux-contribution-preparation/G05"
+    },
+    {
+      "packet": "G06",
+      "purpose": "Configured child/exec lifecycle and death accounting (`ccd62ca1`, `8f768700`, `9279e71b`, `d693ae63`, `07c949db`)",
+      "dependencies": [
+        "G05"
+      ],
+      "source_commits": [
+        "ccd62ca146550e81c54fec2c49d8e642948a1e8a",
+        "8f7687004c44f97ef261c2dc2f1245c42267692d",
+        "9279e71b61a4cbe9936612e92fd9b8c9975149ee",
+        "d693ae63e2e07b9314d65c74f2ef944133cc3592",
+        "07c949db7a7e5ffeb94cc42e48df330f2fbe3c66"
+      ],
+      "acceptance": "Fork/exec/wait/signal/exit, failed exec retains FDs, CLOEXEC commits only on success, adopted children reaped once, repeated races leave no surviving tasks. Extract portable standalone fixes separately when main supports them.",
+      "planned_delivery": "one coherent change plus its generic docs and focused regression fixtures; split coupled responsibilities only as recorded by P04",
+      "status": "pending extraction and R01-R04 review",
+      "artifact_directory": ".artifacts/ginux-contribution-preparation/G06"
+    },
+    {
+      "packet": "G07",
+      "purpose": "Thread ownership and per-task transactions (`928dc9a1`, `e59e2e61`)",
+      "dependencies": [
+        "G06"
+      ],
+      "source_commits": [
+        "928dc9a1b8dc81ac9cc504e7eb6a8c83d3e4dd8b",
+        "e59e2e61a580054685967c6c75086061829e0f90"
+      ],
+      "acceptance": "Shared FD lifetime, independent syscall transactions, clone failure rollback, nonleader/leader exit and supported thread exec constraints.",
+      "planned_delivery": "one coherent change plus its generic docs and focused regression fixtures; split coupled responsibilities only as recorded by P04",
+      "status": "pending extraction and R01-R04 review",
+      "artifact_directory": ".artifacts/ginux-contribution-preparation/G07"
+    },
+    {
+      "packet": "G08",
+      "purpose": "Owned readiness and local sequenced-packet channels (`75acd2be`, `210a8cca`, `3b27b370`, `e954010d`)",
+      "dependencies": [
+        "G01",
+        "G02",
+        "G05",
+        "G06",
+        "G07"
+      ],
+      "source_commits": [
+        "75acd2beeb95fbc62f9177e5116fd6b5d8f22ca8",
+        "210a8cca92265385b5f59081d053ecaf6eef1e77",
+        "3b27b37010110b4ccf14936e259fae0a5487efdb",
+        "e954010d7f74151d6ab8d03a1d40f4c4b9cb9b5e"
+      ],
+      "acceptance": "Real peers, nonblocking transitions, short I/O, readiness/deadlines, half-close and bounded capacity; nested compiler streams and cancellation. Split readiness/channels if independently usable.",
+      "planned_delivery": "one coherent change plus its generic docs and focused regression fixtures; split coupled responsibilities only as recorded by P04",
+      "status": "pending extraction and R01-R04 review",
+      "artifact_directory": ".artifacts/ginux-contribution-preparation/G08"
+    },
+    {
+      "packet": "G09",
+      "purpose": "Growable owned files, directories and basic path operations (`06d24ae2`, `32e2c85f`, `9ba6a1d4`, `d9490772`, `8752f708`, `37ca30cb`, `adc79f0a`)",
+      "dependencies": [
+        "G03",
+        "G05",
+        "G06"
+      ],
+      "source_commits": [
+        "06d24ae2966a20a0a420287182c30d0b764299e1",
+        "9ba6a1d4a21405c9c041f386c6df416cf935cae0",
+        "8752f708b8dbcf11c591900847e244db32305a04",
+        "d949077267e55c430aba94c5e2c9e56882a28c36",
+        "37ca30cbefc73e0b51e4ffc35924273f25fd4ddf",
+        "32e2c85fc7445da3e1e379bb6bf0dce6293dc3d7",
+        "adc79f0a57ab86311b1a4b76747f023561ae2050"
+      ],
+      "acceptance": "Sparse growth, shared quota, directory cursors/mutations, relative paths and access probes; failed operations preserve data, identity and confinement.",
+      "planned_delivery": "one coherent change plus its generic docs and focused regression fixtures; split coupled responsibilities only as recorded by P04",
+      "status": "pending extraction and R01-R04 review",
+      "artifact_directory": ".artifacts/ginux-contribution-preparation/G09"
+    },
+    {
+      "packet": "G10",
+      "purpose": "Execution of owned ELF files (`c5ae1c5d`, `32ba41e9`)",
+      "dependencies": [
+        "G06",
+        "G09"
+      ],
+      "source_commits": [
+        "c5ae1c5d1da287486c6330965deae3744997fbdf",
+        "32ba41e93c1355c28d0112fb564122315220af48"
+      ],
+      "acceptance": "Valid ELF executes from owned backing, malformed input fails, executable identity is virtual, pins release at death and no host-path reopening occurs.",
+      "planned_delivery": "one coherent change plus its generic docs and focused regression fixtures; split coupled responsibilities only as recorded by P04",
+      "status": "pending extraction and R01-R04 review",
+      "artifact_directory": ".artifacts/ginux-contribution-preparation/G10"
+    },
+    {
+      "packet": "G11",
+      "purpose": "Owned scripts and bounded interpreter chains (`73593745`, `a08aff7a`, `cda76faa`)",
+      "dependencies": [
+        "G10"
+      ],
+      "source_commits": [
+        "73593745dd181344e62661868bed8890eb6076d7",
+        "a08aff7a8a425323fe893859ed65c1ed6bcde98b",
+        "cda76faaa0dd00bc61008f952464e02053cf4c60"
+      ],
+      "acceptance": "Script FD lifetime, image/owned interpreter selection, recursion bounds, malformed/shebang failure and exec cleanup.",
+      "planned_delivery": "one coherent change plus its generic docs and focused regression fixtures; split coupled responsibilities only as recorded by P04",
+      "status": "pending extraction and R01-R04 review",
+      "artifact_directory": ".artifacts/ginux-contribution-preparation/G11"
+    },
+    {
+      "packet": "G12",
+      "purpose": "Owned file mappings (`868862bc`, `680d5081`)",
+      "dependencies": [
+        "G07",
+        "G09",
+        "G10"
+      ],
+      "source_commits": [
+        "868862bce0627b1bc8b579a0cc8c761dfbec88f1",
+        "680d5081e58b4e1e4ca2a86190505ba867645ab7"
+      ],
+      "acceptance": "Mapping offsets/permissions/aliasing, resize and private-copy behavior, nonleader mappings and cleanup; backing remains supervisor-owned.",
+      "planned_delivery": "one coherent change plus its generic docs and focused regression fixtures; split coupled responsibilities only as recorded by P04",
+      "status": "pending extraction and R01-R04 review",
+      "artifact_directory": ".artifacts/ginux-contribution-preparation/G12"
+    },
+    {
+      "packet": "G13",
+      "purpose": "Owned symlink traversal and mutation (`909399b4`, `aa8becf2`, `8b14578c`, relevant docs `d7f628cc`)",
+      "dependencies": [
+        "G09",
+        "G11"
+      ],
+      "source_commits": [
+        "909399b4d9ad6f802320bfab2b39480af6052ec6",
+        "aa8becf25814a2e4bf40518b7c5753cc7cc9d737",
+        "8b14578c8ff342fb2fe74a167fbdf30e484a54cb",
+        "d7f628cc96c52affea8f77087777b83698a5dda9"
+      ],
+      "acceptance": "Relative/absolute/dangling/loop cases; link-before-parent resolution, correct nofollow/final-entry mutation, failure preserves namespace. Allocate script docs back to G11.",
+      "planned_delivery": "one coherent change plus its generic docs and focused regression fixtures; split coupled responsibilities only as recorded by P04",
+      "status": "pending extraction and R01-R04 review",
+      "artifact_directory": ".artifacts/ginux-contribution-preparation/G13"
+    },
+    {
+      "packet": "G14",
+      "purpose": "Owned current directories (`6a45d8f8`)",
+      "dependencies": [
+        "G06",
+        "G09",
+        "G13"
+      ],
+      "source_commits": [
+        "6a45d8f83d12c8a78cd99f1613ef2a44be6e821a"
+      ],
+      "acceptance": "chdir/fchdir/getcwd, relative paths across fork/exec and directory mutations; no host cwd leakage.",
+      "planned_delivery": "one coherent change plus its generic docs and focused regression fixtures; split coupled responsibilities only as recorded by P04",
+      "status": "pending extraction and R01-R04 review",
+      "artifact_directory": ".artifacts/ginux-contribution-preparation/G14",
+      "policy_hold": "issue179; prepare/review existing local material only; no publication or assumption of upstream consent"
+    },
+    {
+      "packet": "G15",
+      "purpose": "Shared hardlink inode identity (`9e2a39e8`)",
+      "dependencies": [
+        "G05",
+        "G09",
+        "G13"
+      ],
+      "source_commits": [
+        "9e2a39e80805014f4600cb9d54a706f60bad23ab"
+      ],
+      "acceptance": "Aliases share bytes/metadata and open-file lifetime; unlink/relink, quota charging and final close remain correct.",
+      "planned_delivery": "one coherent change plus its generic docs and focused regression fixtures; split coupled responsibilities only as recorded by P04",
+      "status": "pending extraction and R01-R04 review",
+      "artifact_directory": ".artifacts/ginux-contribution-preparation/G15"
+    },
+    {
+      "packet": "G16",
+      "purpose": "Unified image/owned traversal (`1da0ce13`, `93a1a56d`)",
+      "dependencies": [
+        "G04",
+        "G13",
+        "G14"
+      ],
+      "source_commits": [
+        "1da0ce137de73e13b66a331de8f7ff7b12903925",
+        "93a1a56dbdf5c4af0a66b73cd5e8a932c0894418"
+      ],
+      "acceptance": "Cross-boundary links/parents/exec, assignment precedence and confinement; hidden `/dev` paths retain absent semantics.",
+      "planned_delivery": "one coherent change plus its generic docs and focused regression fixtures; split coupled responsibilities only as recorded by P04",
+      "status": "pending extraction and R01-R04 review",
+      "artifact_directory": ".artifacts/ginux-contribution-preparation/G16"
+    },
+    {
+      "packet": "G18",
+      "purpose": "Configurable bounded namespace capacity (`38fa14fd`)",
+      "dependencies": [
+        "G09"
+      ],
+      "source_commits": [
+        "38fa14fd9b14f1d62f1c4a9ba2e9b38e11303eca"
+      ],
+      "acceptance": "Thousands of actual nonempty objects; checked allocation arithmetic, metadata/data accounting, configured exhaustion and shared-byte charging.",
+      "planned_delivery": "one coherent change plus its generic docs and focused regression fixtures; split coupled responsibilities only as recorded by P04",
+      "status": "pending extraction and R01-R04 review",
+      "artifact_directory": ".artifacts/ginux-contribution-preparation/G18"
+    },
+    {
+      "packet": "G17",
+      "purpose": "Private backing descriptors, public FD budgets and positioned writes (`53a2c9cc`, `d5357101`)",
+      "dependencies": [
+        "G05",
+        "G09",
+        "G12",
+        "G18"
+      ],
+      "source_commits": [
+        "53a2c9cc6ee842e97d0ca8214cc1205547b0ab65",
+        "d5357101e9ce7b268235a9377a9366a33cd92813"
+      ],
+      "acceptance": "Private reservations do not consume or raise public limits; lower operator limits work, pwrite respects offset/alias semantics and all resources close on failure.",
+      "planned_delivery": "one coherent change plus its generic docs and focused regression fixtures; split coupled responsibilities only as recorded by P04",
+      "status": "pending extraction and R01-R04 review",
+      "artifact_directory": ".artifacts/ginux-contribution-preparation/G17"
+    },
+    {
+      "packet": "G19",
+      "purpose": "Flush and quiesced export (`53dec6b3`, `48b26f8d`, relevant static fixes `c541a67f`)",
+      "dependencies": [
+        "G06",
+        "G07",
+        "G09"
+      ],
+      "source_commits": [
+        "48b26f8ddc17543e53ce6c55079f47f2da245f51",
+        "c541a67f01f9d00fce214203469a5769fbdc0bdb",
+        "53dec6b3102d246fd3f727fa839fcdb21f2fb807"
+      ],
+      "acceptance": "fsync/fdatasync reach owned backing, live writers settle before successful export, failed workload/export cannot publish partial output. Allocate static fixes to their owning packets.",
+      "planned_delivery": "one coherent change plus its generic docs and focused regression fixtures; split coupled responsibilities only as recorded by P04",
+      "status": "pending extraction and R01-R04 review",
+      "artifact_directory": ".artifacts/ginux-contribution-preparation/G19"
+    },
+    {
+      "packet": "G20",
+      "purpose": "Private checkpoint control and event-driven waiting (`2b306eff`, `990fbb7a`)",
+      "dependencies": [
+        "G06",
+        "G07",
+        "G19"
+      ],
+      "source_commits": [
+        "2b306eff66f5e650c5b33d256ce922e9a6989445",
+        "990fbb7a42f9481b63b80d8ccc41226cd568f10e"
+      ],
+      "acceptance": "Checkpoint acknowledgment follows consistent capture; opaque bounded control, malformed frames, dead peers, cancellation and simultaneous task events behave correctly.",
+      "planned_delivery": "one coherent change plus its generic docs and focused regression fixtures; split coupled responsibilities only as recorded by P04",
+      "status": "pending extraction and R01-R04 review",
+      "artifact_directory": ".artifacts/ginux-contribution-preparation/G20"
+    },
+    {
+      "packet": "G21",
+      "purpose": "Validated startup restore (`1d9e00e0`)",
+      "dependencies": [
+        "G09",
+        "G19"
+      ],
+      "source_commits": [
+        "1d9e00e05627791b0da193240319342bc4932b8b"
+      ],
+      "acceptance": "Restore occurs before workload execution; reject malformed/traversing/oversized snapshots and occupied destinations without corrupting previous state.",
+      "planned_delivery": "one coherent change plus its generic docs and focused regression fixtures; split coupled responsibilities only as recorded by P04",
+      "status": "pending extraction and R01-R04 review",
+      "artifact_directory": ".artifacts/ginux-contribution-preparation/G21"
+    },
+    {
+      "packet": "G22",
+      "purpose": "Bounded archives with hardlink identity (`e3374593`)",
+      "dependencies": [
+        "G13",
+        "G15",
+        "G18",
+        "G21"
+      ],
+      "source_commits": [
+        "e33745930acdbf35e4a0671a5d7de034d8fd1ef2"
+      ],
+      "acceptance": "Export/restore preserves aliases and symbolic links; >2 GiB payload and 5,000 nonempty files; reject unsafe paths, conflicting entries, invalid forward aliases and inconsistent link metadata.",
+      "planned_delivery": "one coherent change plus its generic docs and focused regression fixtures; split coupled responsibilities only as recorded by P04",
+      "status": "pending extraction and R01-R04 review",
+      "artifact_directory": ".artifacts/ginux-contribution-preparation/G22"
+    },
+    {
+      "packet": "G23",
+      "purpose": "Owned file locks (`26784843`)",
+      "dependencies": [
+        "G06",
+        "G07",
+        "G15",
+        "G17"
+      ],
+      "source_commits": [
+        "26784843bea2eacdfb4e661bf47a40d2b94a7a8f"
+      ],
+      "acceptance": "Real simultaneous SQLite/Cargo clients contend correctly, locks release under close/exit, ownership follows defined descriptor/process semantics; no disabled-lock workaround.",
+      "planned_delivery": "one coherent change plus its generic docs and focused regression fixtures; split coupled responsibilities only as recorded by P04",
+      "status": "pending extraction and R01-R04 review",
+      "artifact_directory": ".artifacts/ginux-contribution-preparation/G23"
+    },
+    {
+      "packet": "G24",
+      "purpose": "Inode timestamps and archive mtime (`d21d26c8`)",
+      "dependencies": [
+        "G15",
+        "G22"
+      ],
+      "source_commits": [
+        "d21d26c879ad53b96652b2f9677c928e7ac2183c"
+      ],
+      "acceptance": "Explicit timestamps survive alias access/checkpoint/restart, invalid/no-follow cases are correct; document seconds-only persistence.",
+      "planned_delivery": "one coherent change plus its generic docs and focused regression fixtures; split coupled responsibilities only as recorded by P04",
+      "status": "pending extraction and R01-R04 review",
+      "artifact_directory": ".artifacts/ginux-contribution-preparation/G24"
+    },
+    {
+      "packet": "G25",
+      "purpose": "Vectored and chunked regular I/O (`88fa4749`, `7d556b4e`, `74835089`)",
+      "dependencies": [
+        "G05",
+        "G09",
+        "G17"
+      ],
+      "source_commits": [
+        "88fa4749cd357bb088e0bc8207f09fa49c97102f",
+        "7d556b4ed1c26699f985d75a1cc5364a79bb92d8",
+        "7483508993db9572a87739592d34c5c2d41a7f74"
+      ],
+      "acceptance": "readv/writev bounds, short I/O, invalid buffers, offsets and partial effects; real APK/RPM and >1 MiB reads/writes complete without assuming pipes are regular files.",
+      "planned_delivery": "one coherent change plus its generic docs and focused regression fixtures; split coupled responsibilities only as recorded by P04",
+      "status": "pending extraction and R01-R04 review",
+      "artifact_directory": ".artifacts/ginux-contribution-preparation/G25",
+      "policy_hold": "native scalar clamping #178/#163 separated from owned vectors"
+    },
+    {
+      "packet": "G26",
+      "purpose": "Explicit inherited process resource limits (`0c571cbb`)",
+      "dependencies": [
+        "G06",
+        "G07"
+      ],
+      "source_commits": [
+        "0c571cbbc36756c55af051cd07f513dd2b9228af"
+      ],
+      "acceptance": "AS exhaustion, affinity enforcement, fork/exec inheritance and invalid requests; state per-process virtual AS and allowed CPU subset accurately, not aggregate RSS/CPU time.",
+      "planned_delivery": "one coherent change plus its generic docs and focused regression fixtures; split coupled responsibilities only as recorded by P04",
+      "status": "pending extraction and R01-R04 review",
+      "artifact_directory": ".artifacts/ginux-contribution-preparation/G26"
+    },
+    {
+      "packet": "G27",
+      "purpose": "Configured virtual platform identity (`9cf265ba`)",
+      "dependencies": [],
+      "source_commits": [
+        "9cf265bab6f24cd398af4dd5b4fd71ee3147c81c"
+      ],
+      "acceptance": "Raw ABI and real RPM tool report configured virtual identity; invalid/oversized values fail and no host uname leaks.",
+      "planned_delivery": "one coherent change plus its generic docs and focused regression fixtures; split coupled responsibilities only as recorded by P04",
+      "status": "pending extraction and R01-R04 review",
+      "artifact_directory": ".artifacts/ginux-contribution-preparation/G27",
+      "policy_hold": "issue179; prepare/review existing local material only; no publication or assumption of upstream consent"
+    },
+    {
+      "packet": "G28",
+      "purpose": "Bounded TCP device backend (`8ff83d64`, `539c1c77`, `9a70427b`)",
+      "dependencies": [],
+      "source_commits": [
+        "8ff83d64deb7a08b707c9e67d1744057bef6857e",
+        "539c1c77d02f3844ff6fe06656e221996bf537b9",
+        "9a70427bb106eff3b44d64e94644a1cb9b69c448"
+      ],
+      "acceptance": "Explicit endpoints, nonblocking connect/read/write, endpoint metadata, connection/byte budgets, revocation and cleanup. Backend-only proposal must be useful/testable on main.",
+      "planned_delivery": "one coherent change plus its generic docs and focused regression fixtures; split coupled responsibilities only as recorded by P04",
+      "status": "pending extraction and R01-R04 review",
+      "artifact_directory": ".artifacts/ginux-contribution-preparation/G28"
+    },
+    {
+      "packet": "G29",
+      "purpose": "Configured TCP syscall/readiness integration (`66de2880`)",
+      "dependencies": [
+        "G05",
+        "G06",
+        "G07",
+        "G08",
+        "G28"
+      ],
+      "source_commits": [
+        "66de28808afd59808d6c0180a376629e41478a9c"
+      ],
+      "acceptance": "Default-denied real connections; authorized HTTP/TLS/Git, refused endpoints, readiness, byte/connection exhaustion, cancellation/revocation; no host-network fallback.",
+      "planned_delivery": "one coherent change plus its generic docs and focused regression fixtures; split coupled responsibilities only as recorded by P04",
+      "status": "pending extraction and R01-R04 review",
+      "artifact_directory": ".artifacts/ginux-contribution-preparation/G29"
+    },
+    {
+      "packet": "G30",
+      "purpose": "Virtual root ownership on owned objects (`7cf2638a`)",
+      "dependencies": [
+        "G09",
+        "G13",
+        "G15",
+        "G25"
+      ],
+      "source_commits": [
+        "7cf2638adaf2fd3b783be636fe2a05b2d60458c5"
+      ],
+      "acceptance": "Actual cpio extraction with uid/gid zero or unchanged IDs; invalid IDs, absent objects and nofollow fail correctly; no claim of arbitrary Linux ownership.",
+      "planned_delivery": "one coherent change plus its generic docs and focused regression fixtures; split coupled responsibilities only as recorded by P04",
+      "status": "pending extraction and R01-R04 review",
+      "artifact_directory": ".artifacts/ginux-contribution-preparation/G30"
+    },
+    {
+      "packet": "G31",
+      "purpose": "Checkpoint/restore CI coverage (`5e20a65f`)",
+      "dependencies": [
+        "G20",
+        "G21"
+      ],
+      "source_commits": [
+        "5e20a65f29b2d45e2840a69ef0e24613dc40e278"
+      ],
+      "acceptance": "Actual runner builds and executes checkpoint/restore checks; static-and-unit still runs all existing modules. Prefer folding this small wiring into the feature that introduces the fixtures.",
+      "planned_delivery": "one coherent change plus its generic docs and focused regression fixtures; split coupled responsibilities only as recorded by P04",
+      "status": "pending extraction and R01-R04 review",
+      "artifact_directory": ".artifacts/ginux-contribution-preparation/G31"
+    }
+  ]
+}

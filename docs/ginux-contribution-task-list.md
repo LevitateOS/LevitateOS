@@ -92,7 +92,7 @@ its affected packet and dependents, not unrelated fixes.
   not accidental commit ancestry. Separate pure fixes from feature additions and
   unresolved policy choices. Explain any inseparable grouping. Record public API
   impact and Ginux's upstream compatibility expectations.
-- [ ] **P05 — Freeze extraction packets and execution lanes.** Give each retained
+- [x] **P05 — Freeze extraction packets and execution lanes.** Give each retained
   packet one observable problem, scope, source hunks, base, dependency list and
   verification commands. Reuse suitable worktrees; obtain the user authorization
   required by repository rules before creating/switching branches. All eventual
@@ -313,13 +313,18 @@ channels, remove restore's false checkpoint prerequisite, and identify G05a as
 independent on current main. G02's clocks are native global clocks, not a virtual
 timer implementation. Relevant policy restrictions remain explicit.
 
-Active task: **P05 — freeze extraction packets**. Prepare local patch/source
-snapshots without creating or switching branches; the user authorized sequential
-preparation, while publication remains after F04. Preserve all existing dirty
-worktrees and use new disposable source directories under /tmp for extraction.
-Exact next action: define the package manifest, starting with the current-main
-G05a VFS fix and keeping dependent feature patches labeled with their actual
-prerequisite composition. No remote actions are authorized.
+P05 complete. The [frozen package plan](ginux-contributions/p05-package-plan.json)
+records all32 rows, exact source commits, dependencies, acceptance and R01–R04
+requirements. It is an execution manifest, not proof of extraction or completed
+review. Use disposable /tmp source snapshots; no branch creation/switch is needed.
+
+Next sequential work: account for G01's existing held PR without changing it,
+prepare G02's existing local policy delta with its hold explicit, then start
+G05a's confirmed independent VFS correction. Each packet gets its own source,
+regression, validation and draft evidence; do not start the next implementation
+while its predecessor's in-scope review/checks remain unfinished. A policy-held
+packet can receive a recorded local-review disposition without inventing upstream
+approval or waiting idly for an external decision. F04 must show such holds.
 
 Active skill: `hdae-development`, discovered at
 `/home/vince/.codex/worktrees/ginux-pr-combination-check/ginux/.agents/skills/hdae-development/SKILL.md`.
