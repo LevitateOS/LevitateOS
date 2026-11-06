@@ -1,37 +1,27 @@
 use clap::{Parser, Subcommand, ValueEnum};
 use std::path::PathBuf;
 
+/// A LevitateOS variant (`distro-variants/<id>`).
 #[derive(Clone, Copy, Debug, ValueEnum)]
 pub enum Distro {
     #[value(name = "levitate")]
     Levitate,
     #[value(name = "acorn")]
-    AcornOS,
-}
-
-#[derive(Clone, Copy, Debug, ValueEnum)]
-pub enum BootDistro {
-    #[value(name = "levitate")]
-    Levitate,
-
-    #[value(name = "acorn")]
     Acorn,
 }
 
-#[derive(Clone, Copy, Debug, ValueEnum)]
-pub enum HarnessDistro {
-    #[value(name = "levitate")]
-    Levitate,
-
-    #[value(name = "acorn")]
-    Acorn,
-}
-
-impl HarnessDistro {
+impl Distro {
     pub fn id(self) -> &'static str {
         match self {
             Self::Levitate => "levitate",
             Self::Acorn => "acorn",
+        }
+    }
+
+    pub fn pretty_name(self) -> &'static str {
+        match self {
+            Self::Levitate => "LevitateOS",
+            Self::Acorn => "AcornOS",
         }
     }
 }
@@ -211,8 +201,8 @@ pub enum ScenariosCmd {
     /// Interactive targets: `live-boot`, `live-tools`, `installed-boot`
     Boot {
         target: String,
-        #[arg(value_enum, default_value_t = BootDistro::Levitate)]
-        distro: BootDistro,
+        #[arg(value_enum, default_value_t = Distro::Levitate)]
+        distro: Distro,
         #[arg(long, value_name = "KEY=VALUE[,KEY=VALUE...]")]
         inject: Option<String>,
         #[arg(long, value_name = "PATH")]
@@ -240,8 +230,8 @@ pub enum ScenariosCmd {
     /// Run one automated scenario.
     Test {
         target: String,
-        #[arg(value_enum, default_value_t = HarnessDistro::Levitate)]
-        distro: HarnessDistro,
+        #[arg(value_enum, default_value_t = Distro::Levitate)]
+        distro: Distro,
         #[arg(long, value_name = "KEY=VALUE[,KEY=VALUE...]")]
         inject: Option<String>,
         #[arg(long, value_name = "PATH")]
@@ -253,14 +243,14 @@ pub enum ScenariosCmd {
 
     /// Show scenario test status.
     Status {
-        #[arg(value_enum, default_value_t = HarnessDistro::Levitate)]
-        distro: HarnessDistro,
+        #[arg(value_enum, default_value_t = Distro::Levitate)]
+        distro: Distro,
     },
 
     /// Reset cached scenario state for a distro.
     Reset {
-        #[arg(value_enum, default_value_t = HarnessDistro::Levitate)]
-        distro: HarnessDistro,
+        #[arg(value_enum, default_value_t = Distro::Levitate)]
+        distro: Distro,
     },
 }
 

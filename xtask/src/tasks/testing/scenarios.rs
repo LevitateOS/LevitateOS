@@ -104,7 +104,7 @@ impl WindowConfig {
 
 pub fn boot(
     target: String,
-    distro: crate::cli::BootDistro,
+    distro: crate::cli::Distro,
     inject: Option<String>,
     inject_file: Option<PathBuf>,
     ssh: bool,
@@ -182,32 +182,41 @@ pub fn boot(
 
 pub fn test(
     target: String,
-    distro: crate::cli::HarnessDistro,
+    distro: crate::cli::Distro,
     inject: Option<String>,
     inject_file: Option<PathBuf>,
     force: bool,
 ) -> Result<()> {
     let scenario =
         parse_scenario_name(&target).with_context(|| format!("parsing scenario '{}'", target))?;
-    let mut args = vec![
-        "--distro".to_string(),
-        distro.id().to_string(),
-        "--scenario".to_string(),
-        scenario.key().to_string(),
-    ];
-    if force {
-        args.push("--force".to_string());
+    let root = crate::util::repo::repo_root()?;
+    crate::util::tools_env::apply_to_process(&root)?;
+    // The scenario runs read the injection the way the scenarios binary hands it over.
+    // SAFETY: single-threaded command entry point.
+    unsafe {
+        if let Some(path) = &inject_file {
+            std::env::set_var(install_tests::boot_injection::ENV_INJECT_FILE, path);
+        } else if let Some(raw) = &inject {
+            std::env::set_var(install_tests::boot_injection::ENV_INJECT_KV, raw);
+        }
     }
-    let arg_refs: Vec<&str> = args.iter().map(String::as_str).collect();
-    run_install_tests(&arg_refs, inject, inject_file)
+    let passed = if force {
+        install_tests::scenarios::run_scenario_forced(distro.id(), scenario)?
+    } else {
+        install_tests::scenarios::run_scenario(distro.id(), scenario)?
+    };
+    if !passed {
+        bail!("scenario {} failed for {}", scenario.key(), distro.id());
+    }
+    Ok(())
 }
 
-pub fn status(distro: crate::cli::HarnessDistro) -> Result<()> {
-    run_install_tests(&["--distro", distro.id(), "--status"], None, None)
+pub fn status(distro: crate::cli::Distro) -> Result<()> {
+    install_tests::scenarios::print_status(distro.id())
 }
 
-pub fn reset(distro: crate::cli::HarnessDistro) -> Result<()> {
-    run_install_tests(&["--distro", distro.id(), "--reset"], None, None)
+pub fn reset(distro: crate::cli::Distro) -> Result<()> {
+    install_tests::scenarios::reset_state(distro.id())
 }
 
 struct BootConfig {
@@ -216,16 +225,10 @@ struct BootConfig {
 }
 
 impl BootConfig {
-    fn for_distro(distro: crate::cli::BootDistro) -> Self {
-        match distro {
-            crate::cli::BootDistro::Levitate => Self {
-                distro_id: "levitate",
-                pretty_name: "LevitateOS",
-            },
-            crate::cli::BootDistro::Acorn => Self {
-                distro_id: "acorn",
-                pretty_name: "AcornOS",
-            },
+    fn for_distro(distro: crate::cli::Distro) -> Self {
+        Self {
+            distro_id: distro.id(),
+            pretty_name: distro.pretty_name(),
         }
     }
 }
@@ -294,7 +297,7 @@ fn boot_live_iso_serial(
         let log_path = temp_log_path("levitate-live-boot-serial");
         let mut cmd = qemu_base_command(root, iso_path, injection.as_ref(), None, window)?;
         let child = spawn_qemu_with_log(&mut cmd, &log_path, false)?;
-        monitor_live_iso_serial(child, &log_path)?;
+        monitor_live_iso_serial(child, &log_path, &LiveBootPatterns::load(cfg.distro_id)?)?;
         let _ = fs::remove_file(&log_path);
         return Ok(());
     }
@@ -315,8 +318,33 @@ fn boot_live_iso_serial(
     }
 }
 
-fn monitor_live_iso_serial(mut child: Child, log_path: &Path) -> Result<()> {
-    let booted_message = "switching root to live system";
+/// What the live-boot console output means, from the variant's scenario
+/// contract (plus the serial test protocol's marker and the live init's
+/// rootfs-missing message).
+struct LiveBootPatterns {
+    success: Vec<String>,
+    fatal: Vec<String>,
+}
+
+impl LiveBootPatterns {
+    fn load(distro_id: &str) -> Result<Self> {
+        let live = install_tests::distro::load_scenarios(distro_id)?.live_boot;
+        let mut success = live.success_patterns;
+        success.push(recqemu::serial::protocol::SHELL_READY_MARKER.to_string());
+        let mut fatal = live.fatal_patterns;
+        fatal.push(distro_spec::shared::live_boot::ROOTFS_MISSING_MESSAGE.to_string());
+        Ok(Self { success, fatal })
+    }
+
+    fn first_in<'a>(list: &'a [String], log_path: &Path) -> Option<&'a str> {
+        let content = fs::read_to_string(log_path).ok()?;
+        list.iter()
+            .find(|p| content.contains(p.as_str()))
+            .map(String::as_str)
+    }
+}
+
+fn monitor_live_iso_serial(mut child: Child, log_path: &Path, patterns: &LiveBootPatterns) -> Result<()> {
     let default_timeout = 120u64;
     let timeout_secs = std::env::var("LEVITATE_LIVE_BOOT_SERIAL_TIMEOUT")
         .ok()
@@ -337,17 +365,17 @@ fn monitor_live_iso_serial(mut child: Child, log_path: &Path) -> Result<()> {
             );
         }
 
-        if let Some(pat) = detect_boot_regression(log_path)? {
+        if let Some(pat) = detect_boot_regression(log_path, patterns)? {
             let _ = child.kill();
             let _ = child.wait();
             return bail_with_tail(
-                &format!("Detected boot regression while waiting for live boot handoff: {pat}"),
+                &format!("Detected boot regression while waiting for live boot: {pat}"),
                 log_path,
                 None::<&str>,
             );
         }
 
-        if detect_live_boot_success(log_path, booted_message) {
+        if LiveBootPatterns::first_in(&patterns.success, log_path).is_some() {
             let _ = child.kill();
             let _ = child.wait();
             return Ok(());
@@ -359,24 +387,12 @@ fn monitor_live_iso_serial(mut child: Child, log_path: &Path) -> Result<()> {
             return bail_with_tail(
                 &format!("Timed out waiting for live-boot serial handoff ({timeout_secs}s)"),
                 log_path,
-                Some("No root-switch handoff marker observed."),
+                Some("No live-boot success pattern observed."),
             );
         }
 
         sleep(Duration::from_secs(1));
     }
-}
-
-fn detect_live_boot_success(log_path: &Path, pattern: &str) -> bool {
-    let content = match fs::read_to_string(log_path) {
-        Ok(raw) => raw,
-        Err(_) => return false,
-    };
-
-    let needle = pattern.to_lowercase();
-    content
-        .lines()
-        .any(|line| line.to_lowercase().contains(&needle))
 }
 
 fn boot_live_iso_ssh(
@@ -392,8 +408,10 @@ fn boot_live_iso_ssh(
     ssh_private_key: Option<PathBuf>,
 ) -> Result<()> {
     eprintln!(
-        "Booting {} {} with SSH wait (port 127.0.0.1:{ssh_port})...",
-        cfg.pretty_name, scenario_label
+        "Booting {} {} with SSH wait (port {}:{ssh_port})...",
+        cfg.pretty_name,
+        scenario_label,
+        recqemu::HOSTFWD_ADDRESS
     );
     ensure_ssh_port_available(ssh_port)?;
 
@@ -403,6 +421,7 @@ fn boot_live_iso_ssh(
     let result = monitor_live_iso_ssh(
         child,
         &log_path,
+        &LiveBootPatterns::load(cfg.distro_id)?,
         ssh_port,
         ssh_timeout,
         no_shell,
@@ -425,6 +444,7 @@ fn boot_live_iso_ssh(
 fn monitor_live_iso_ssh(
     mut child: Child,
     log_path: &Path,
+    patterns: &LiveBootPatterns,
     ssh_port: u16,
     ssh_timeout: u64,
     no_shell: bool,
@@ -453,24 +473,23 @@ fn monitor_live_iso_ssh(
             );
         }
 
-        if let Some(pat) = detect_boot_regression(log_path)? {
+        if let Some(pat) = detect_boot_regression(log_path, patterns)? {
             let _ = child.kill();
             let _ = child.wait();
             let _ = fs::remove_file(&known_hosts);
             return bail_with_tail(
-                &format!(
-                    "Detected boot regression while waiting for SSH (sshd failure or locale warning): {pat}"
-                ),
+                &format!("Detected boot regression while waiting for SSH: {pat}"),
                 log_path,
                 None::<&str>,
             );
         }
 
         if !hook_seen {
-            if let Some(pat) = detect_live_boot_hook(log_path)? {
+            if let Some(pat) = LiveBootPatterns::first_in(&patterns.success, log_path) {
                 hook_seen = true;
                 eprintln!(
-                    "Boot hook observed ({pat}); waiting for SSH readiness on 127.0.0.1:{ssh_port}..."
+                    "Boot hook observed ({pat}); waiting for SSH readiness on {}:{ssh_port}...",
+                    recqemu::HOSTFWD_ADDRESS
                 );
             }
         } else if can_ssh_connect(ssh_port, &key, &known_hosts)? {
@@ -505,16 +524,6 @@ fn monitor_live_iso_ssh(
         }
         sleep(Duration::from_secs(1));
     }
-}
-
-fn detect_live_boot_hook(log_path: &Path) -> Result<Option<String>> {
-    let raw = match fs::read_to_string(log_path) {
-        Ok(raw) => raw,
-        Err(_) => return Ok(None),
-    };
-
-    let marker = recqemu::serial::protocol::SHELL_READY_MARKER;
-    Ok(raw.contains(marker).then(|| marker.to_string()))
 }
 
 fn emit_new_log_lines(log_path: &Path, line_cursor: &mut usize) -> Result<()> {
@@ -663,50 +672,6 @@ fn boot_installed_disk(
     }
 }
 
-fn run_install_tests(
-    args: &[&str],
-    inject: Option<String>,
-    inject_file: Option<PathBuf>,
-) -> Result<()> {
-    let root = crate::util::repo::repo_root()?;
-    run_install_tests_in_dir(&root, args, inject, inject_file)
-}
-
-fn run_install_tests_in_dir(
-    root: &Path,
-    args: &[&str],
-    inject: Option<String>,
-    inject_file: Option<PathBuf>,
-) -> Result<()> {
-    let install_tests_dir = root.join("testing/install-tests");
-    if !install_tests_dir.is_dir() {
-        bail!(
-            "Missing {} (submodule not initialized? try `git submodule update --init --recursive`)",
-            install_tests_dir.display()
-        );
-    }
-
-    let mut cmd = Command::new("cargo");
-    cmd.current_dir(&install_tests_dir)
-        .args(["run", "--bin", "scenarios", "--"])
-        .args(args);
-    if let Some(path) = &inject_file {
-        let path = path.to_string_lossy();
-        cmd.args(["--inject-file", path.as_ref()]);
-    }
-    if let Some(payload) = inject {
-        cmd.args(["--inject", &payload]);
-    }
-
-    crate::util::tools_env::apply_to_command(&mut cmd, root)?;
-    run_checked(&mut cmd).with_context(|| {
-        format!(
-            "Running install-tests scenarios in {}",
-            install_tests_dir.display()
-        )
-    })
-}
-
 fn qemu_base_command(
     root: &Path,
     iso_path: &Path,
@@ -726,7 +691,7 @@ fn qemu_base_command(
         builder = builder.extra_cdrom(&injection.media_iso_file);
     }
     builder = match ssh_port {
-        Some(port) => builder.user_network_with_hostfwd(port, 22),
+        Some(port) => builder.user_network_with_hostfwd(port, recqemu::GUEST_SSH_PORT),
         None => builder.user_network(),
     };
     let mut cmd = builder.build();
@@ -1043,38 +1008,21 @@ fn collect_guest_ssh_debug(child: &mut Child) -> Result<()> {
     Ok(())
 }
 
-fn detect_boot_regression(log_path: &Path) -> Result<Option<String>> {
-    if !log_path.is_file() {
-        return Ok(None);
-    }
-
+/// A fatal live-boot pattern from the contract, or QEMU failing to set up
+/// the SSH host forward.
+fn detect_boot_regression(log_path: &Path, patterns: &LiveBootPatterns) -> Result<Option<String>> {
     let content = fs::read_to_string(log_path).unwrap_or_default();
-    if content.is_empty() {
-        return Ok(None);
+    if let Some(line) = content
+        .lines()
+        .find(|l| l.to_lowercase().contains("could not set up host forwarding rule"))
+    {
+        return Ok(Some(format!("hostfwd setup failed: {line}")));
     }
-
-    for line in content.lines() {
-        let lower = line.to_lowercase();
-        if lower.contains("could not set up host forwarding rule") {
-            return Ok(Some(format!("hostfwd setup failed: {line}")));
-        }
-        if lower.contains("warning") && lower.contains("locale") {
-            return Ok(Some(format!("locale warning: {line}")));
-        }
-        if lower.contains("failed to start sshd.service")
-            || lower.contains("sshd.service: failed with result")
-            || lower.contains("start request repeated too quickly")
-            || lower.contains("failed to start ssh.service")
-        {
-            return Ok(Some(format!("sshd failure: {line}")));
-        }
-    }
-
-    Ok(None)
+    Ok(LiveBootPatterns::first_in(&patterns.fatal, log_path).map(str::to_string))
 }
 
 fn ensure_ssh_port_available(ssh_port: u16) -> Result<()> {
-    match TcpListener::bind(("127.0.0.1", ssh_port)) {
+    match TcpListener::bind((recqemu::HOSTFWD_ADDRESS, ssh_port)) {
         Ok(listener) => {
             drop(listener);
             Ok(())

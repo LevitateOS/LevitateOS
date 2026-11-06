@@ -8,7 +8,7 @@ pub fn run(rebuild_even_if_verified: bool, autofix: super::common::AutoFixOption
 
     let targets = [
         super::common::target_for(crate::cli::Distro::Levitate),
-        super::common::target_for(crate::cli::Distro::AcornOS),
+        super::common::target_for(crate::cli::Distro::Acorn),
     ];
 
     let need_build = rebuild_even_if_verified

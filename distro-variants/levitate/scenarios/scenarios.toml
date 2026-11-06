@@ -35,6 +35,8 @@ fatal_patterns = [
   "fatal error",
   "Segmentation fault",
   "core dumped",
+  "Failed to start sshd.service",
+  "sshd.service: Failed with result",
 ]
 required_kernel_cmdline = [
   "console=ttyS0,115200n8",

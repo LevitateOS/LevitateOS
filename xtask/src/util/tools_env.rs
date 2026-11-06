@@ -3,8 +3,8 @@ use std::env;
 use std::path::Path;
 use std::process::Command;
 
-/// Applies the same PATH/LD_LIBRARY_PATH/OVMF_PATH environment wiring as the repo `justfile`.
-pub fn apply_to_command(cmd: &mut Command, repo_root: &Path) -> Result<()> {
+/// The PATH/LD_LIBRARY_PATH/OVMF_PATH wiring the repo `justfile` sets.
+fn tool_env(repo_root: &Path) -> Result<Vec<(&'static str, std::ffi::OsString)>> {
     let tools = crate::util::repo::tools_prefix(repo_root)?;
 
     let usr_bin = tools.join("usr/bin");
@@ -18,8 +18,27 @@ pub fn apply_to_command(cmd: &mut Command, repo_root: &Path) -> Result<()> {
     paths.push(usr_libexec);
     paths.extend(env::split_paths(&existing_path));
 
-    cmd.env("PATH", env::join_paths(paths)?);
-    cmd.env("LD_LIBRARY_PATH", ld_library_path);
-    cmd.env("OVMF_PATH", ovmf);
+    Ok(vec![
+        ("PATH", env::join_paths(paths)?),
+        ("LD_LIBRARY_PATH", ld_library_path.into_os_string()),
+        ("OVMF_PATH", ovmf.into_os_string()),
+    ])
+}
+
+/// Give `cmd` the tool environment.
+pub fn apply_to_command(cmd: &mut Command, repo_root: &Path) -> Result<()> {
+    for (key, value) in tool_env(repo_root)? {
+        cmd.env(key, value);
+    }
+    Ok(())
+}
+
+/// Give this process (and what it spawns) the tool environment. Call before
+/// starting threads.
+pub fn apply_to_process(repo_root: &Path) -> Result<()> {
+    for (key, value) in tool_env(repo_root)? {
+        // SAFETY: called from the single-threaded command entry point.
+        unsafe { env::set_var(key, value) };
+    }
     Ok(())
 }

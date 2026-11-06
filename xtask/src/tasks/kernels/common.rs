@@ -24,7 +24,7 @@ pub(crate) fn target_for(d: crate::cli::Distro) -> KernelTarget {
             distro_id: "levitate",
             kernel: &distro_spec::levitate::KERNEL_SOURCE,
         },
-        crate::cli::Distro::AcornOS => KernelTarget {
+        crate::cli::Distro::Acorn => KernelTarget {
             distro_id: "acorn",
             kernel: &distro_spec::acorn::KERNEL_SOURCE,
         },

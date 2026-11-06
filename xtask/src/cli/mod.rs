@@ -1,6 +1,6 @@
 mod types;
 
 pub use types::{
-    BootDistro, Cli, Cmd, Distro, DocsCmd, HarnessDistro, HooksCmd, KernelsCmd, PolicyCmd,
+    Cli, Cmd, Distro, DocsCmd, HooksCmd, KernelsCmd, PolicyCmd,
     ScenariosCmd, Shell, TuiCmd, TuiInspectApp,
 };
