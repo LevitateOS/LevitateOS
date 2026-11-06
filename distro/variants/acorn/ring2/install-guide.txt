@@ -1,0 +1,66 @@
+AcornOS Live - Install Guide
+============================
+
+Left pane: root shell. Right pane: this guide.
+Ctrl-g switches panes. In the guide,
+arrow keys scroll and q closes it.
+
+The steps below install AcornOS to a whole
+disk, erasing it. Run them in the left pane.
+
+1. Pick the target disk
+   recpart list-disks
+
+2. Partition, format and mount it at /mnt
+   Preview first (changes nothing):
+     recpart apply --disk /dev/sdX \
+       --mode mutable --dry-run
+   Then apply (ERASES THE DISK):
+     recpart apply --disk /dev/sdX \
+       --mode mutable --confirm DESTROY
+   Note the root device it mounted at
+   /mnt (for example /dev/sdX2).
+
+3. Extract AcornOS
+   recstrap /mnt
+
+4. Generate fstab
+   recfstab /mnt >> /mnt/etc/fstab
+
+5. Copy the kernel to the EFI partition
+   cp /run/live-media/boot/vmlinuz /mnt/boot/
+
+6. Install systemd-boot
+   recchroot /mnt -- sh -c 'set -e
+     E=/usr/lib/systemd/boot/efi/systemd-bootx64.efi
+     mkdir -p /boot/EFI/BOOT /boot/EFI/systemd
+     cp $E /boot/EFI/BOOT/BOOTX64.EFI
+     cp $E /boot/EFI/systemd/'
+
+7. Add a boot entry
+   AcornOS boots without an initramfs, so
+   name the root partition by PARTUUID:
+     U=$(blkid -s PARTUUID -o value /dev/sdX2)
+     mkdir -p /mnt/boot/loader/entries
+     printf 'default acorn.conf\ntimeout 5\n' \
+       > /mnt/boot/loader/loader.conf
+     printf '%s\n' 'title AcornOS' \
+       'linux /vmlinuz' \
+       "options root=PARTUUID=$U rw rootwait" \
+       > /mnt/boot/loader/entries/acorn.conf
+
+8. Set hostname and root password
+   echo acornos > /mnt/etc/hostname
+   recchroot /mnt -- passwd
+
+9. Reboot into AcornOS
+   reboot
+   Remove the install media when the
+   machine restarts.
+
+Troubleshooting
+---------------
+recpart refuses the disk: it prints why;
+  --dry-run shows the same checks.
+No network: check ip addr; dhcpcd starts
+  at boot on wired interfaces.

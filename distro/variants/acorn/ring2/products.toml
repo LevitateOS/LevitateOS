@@ -126,6 +126,7 @@ packages = ["curl", "pciutils", "smartmontools", "hdparm", "vim", "htop"]
 kind = "install_mode_payload"
 interactive_shell = "/bin/sh"
 ux_docs_frontend = "plain_text"
+ux_docs_guide = "distro/variants/acorn/ring2/install-guide.txt"
 
 [ring2_runtime_profiles.live_tools_ux]
 [[ring2_runtime_profiles.live_tools_ux.actions]]
