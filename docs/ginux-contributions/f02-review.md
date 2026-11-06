@@ -1,69 +1,92 @@
-# F02 — combined source review (in progress)
+# F02 — combined per-process source (partial)
 
-The disposable per-process export is `/tmp/ginux-contribution-preparation/F02/source`,
-with temporary index `/tmp/ginux-contribution-preparation/F02/index`. Recorded main
-is `3f2fe7dfadd4b40e235d982a6a3d386dc6490177`. The37 prepared patch units are applied through that
-index and the existing object database. Original branches, checkouts, indexes and
-stashes remain preserved; no remote or publication action is authorized.
+All37 prepared patches are joined in `/tmp/ginux-contribution-preparation/F02/source`.
+Local unreferenced snapshot `dfebda7c29b628fc41f50635b07e8cb48d6f883a`, tree `eee8bf11a3461f2b07e726f8b582a68adb51e4a0`,
+is based on recorded main `3f2fe7dfadd4b40e235d982a6a3d386dc6490177`. This is a local integration
+snapshot, not a proposed PR or a fresh remote-main check. The temporary index
+is `/tmp/ginux-contribution-preparation/F02/index`; state.json records exact patch
+order, conflict resolutions, source snapshots, findings and receipts. Real branch,
+index, checkout and stash state is preserved; nothing was published.
 
-Current state: 22 patches applied. Pending `G17a` has conflicts in
-`scripts/test-launch-storage.py`, `tests/fixtures/launch-storage-fixture.c`. Those pending patch's other changes
-are already staged in the temporary index. Do not apply it again: resolve its
-remaining files, stage only those files, complete that state transition, then
-continue the saved order. state.json records exact ordered/applied lists, tree
-checkpoints, conflicts, commands and every resolved join.
+## Source joins and fixes
 
-G01/G02 held native rules, G25's held native read clamp and G07's unready thread/
-security snapshot are excluded. This ordinary per-process composition does not
-fulfil shared-thread/compiler/security acceptance. Every original criterion and
-[DaybreakBlue](daybreakblue-handoff.md) hold remains open. Core source and native
-fixture preservation from F01 must be checked again on the final combined tree.
+- Existing behavior owners retain cwd, executable/mapping transactions, locks,
+  readiness and teardown. Mapping transactions remain before ordinary dispatch.
+- Dynamic memfd/namespace backing retains aliases, directory/link states,
+  accounting and mapping identity. Restore/export/checkpoints share correct
+  canonical metadata and backing reads. The G22 extraction depended on a base
+  that already adapted archive helpers; compilation exposed that missing join.
+  `G22-archive-prerequisite-join.patch` explicitly retains it for future extraction.
+- Private signal/control poll uses a1ms timeout only for finite/external guest
+  readiness waits. wait4(WNOHANG) remains the task-status owner.
+- One canonical IoVectors helper serves files, pipes, packets and TCP. Packets
+  retain duplex direction, message boundaries, short-read discard and zero-size
+  messages. FIONBIO retains its copy helper after the vector port.
+- Object references place TCP after64 file+32 channel+64 device slots (start160,
+  total176). Network-specific ENOTSOCK guards preserve local packet send/receive
+  through the channel owner. Socket stats include link/timestamp fields.
+- G26 retains typed per-process identity queries; G27 configured uname moves to
+  the task entry after ABI/private transaction handling. Native core is unchanged.
+- Descriptor futimens-null and fchownat-empty routing coexist. Default fixture,
+  Make and CI coverage are retained together; stale combined docs are corrected.
+- Mixed task selections initially accepted ordinary-resources without calling
+  its resource cases. The runner now invokes those cases whenever selected and
+  removes this runner-only name before fixture dispatch; source/clean reruns pass.
+- G12's stale FD mapping assertion is assigned to corrected candidate
+  `8bb50aaa50e80428ff417654d35affd468255775`. Its source/strict replay passes92 units,178 paths and ordinary
+  mapping/storage. Full FD/security remains enabled and unrun. The first edit's
+  duplicate variable failed compilation and was corrected before validation.
 
-Resolved source interactions so far:
+## Exact ordinary evidence
 
-- Registered file readiness and owned storage teardown coexist as separate
-  LaunchFs methods.
-- Fixture build lists and default Make/CI targets are retained together; required
-  static-and-unit remains. Independent fixture helpers/default/ordinary cases
-  are combined rather than selecting one side's coverage.
-- Per-task cwd selection precedes mapping and ordinary dispatch; the existing
-  private mapping transaction remains ahead of normal syscalls.
-- Cwd, hardlink, symlink and cross-namespace docs/fixtures retain their own cases;
-  stale unsupported-feature descriptions are removed from the combined text.
-- G18 dynamic namespace retains G15 symlink/hardlink descendant states using
-  generic iterators and G10 executable-name type. The backing module is the
-  already reviewed G12+G18 composition f41ed1b after verifying that current
-  backing had no later changes; this preserves memfd identity and metadata/data
-  charging rather than using the anonymous-only donor. All mapping/link/scale
-  fixture paths remain. Namespace config/capacity is explicit.
+Source and strict recorded-main-plus-combined-patch replay pass make check,
+all five Rust build binaries and all12 configured-launch fixture build targets.
+All189 tracked paths match, and both binaries hash
+`c01ff13db7b61b47ce959881ae140de2a250bf53f63841a60da1fca1d581d2b0`. The final snapshot only changes the Python task
+selection after the first full build/replay; exact final-tree equality is checked,
+and the affected source/clean task/resource/lock scenarios rerun successfully.
+All compiled Rust/fixture bytes and the binary remain unchanged.
 
-No combined Rust build, unit or runtime pass exists yet. C fixture and Python
-runner syntax was checked at the relevant merged fixture boundaries only.
-An archive-export stat-cache mismatch was diagnosed with equal file/index blobs
-and corrected by refreshing only the temporary index. One merge-helper parser
-was corrected before staging; its guards prevented conflicted files being staged.
-Shared Git common config transiently became a directory containing domain configs,
-then returned to a file while inspected; this task made no config replacement.
-The failed G18 stage was retried only after explicit disposable-worktree checking.
-Source and temporary index remained intact. This is recorded environment evidence,
-not a claim about which external actor changed metadata.
+Seven unit packages pass102 selected tests in each export. The three new TCP
+policy/security tests remain enabled but locally unrun, so this is not a full
+make test-unit/CI pass. Source checks preserve all65 original named unit tests,
+all7 package commands, required CI, exact native core/process fixtures/cgroup
+module and five native protected-copy caller bodies. No security acceptance is
+claimed by source comparison.
 
-Required joins/verification still include G17b's known mapping-fixture prerequisite
-correction from f41ed1b (not in G17b's delta), one canonical G25/G29 IoVectors owner,
-G08b packet and G29 TCP send/recv dispatch plus dynamic reference offsets, G24
-Stat fields, G20 control wait with finite external/timer ticks, G26 typed identity
-query resolution and G27 configured identity in the G06 task loop. Fixes needed
-by an individual standalone candidate must also be assigned back to that owner;
-the combined union is not a substitute for its review/CI.
+Eleven ordinary integration groups pass in source/clean: channels (including
+vectors), polling, storage/mapping/link/namespace/positioned/vector/large-I/O/
+timestamp/ownership/export, directories/cwd/cross paths, owned ELF, scripts,
+resources/identity, locks/process lifecycle, TCP, checkpoints and full restore.
+Restore covers5,000 nonempty files, archive link identity and the complete payload
+above2 GiB. The corrected mixed resource selection has a separate final receipt.
+A focused valid regression holds TCP alongside64 null devices, fourteen pipes,
+packet vectors and owned storage, proving the joined ranges/functionality.
 
-Exact next action: inspect/resolve the saved `G17a` storage fixture/runner
-conflicts, preserving all current mapping/symlink/namespace and positioned-I/O
-cases. Use the existing temporary-index helpers, retaining complete default
-security fixtures without running adversarial probes. Continue source joins,
-review the complete union, build/check it and run appropriate ordinary combined
-checks and actual consumers as capabilities join. F03 then uses fresh Recipe
-revisions; F04 remains user inspection before publication.
+Actual trusted cpio extracts all8229 bytes plus hardlink/symlink/root metadata.
+Actual curl IPv4/IPv6 HTTP and verified local TLS pass; actual Git ls-remote now
+passes controlled HTTP and TLS through the real helper subprocess. All actual
+consumer checks pass in source and clean replay. The earlier G29-only Git getcwd
+failure is resolved by the configured cwd owner here, without a native core grant.
+No external service, negative TLS or hostile-input scenario ran.
 
-State, temporary-index snapshots, apply logs and reproducing helpers are copied
-to .artifacts/ginux-contribution-preparation/F02/. The active source remains the
-/tmp export; do not replace it from an old artifact snapshot during recovery.
+## Remaining work and limits
+
+G07 threads/shared arguments remains unready and excluded. G01/G02 native policy
+and G25 native clamp remain excluded. [DaybreakBlue](daybreakblue-handoff.md)
+owns written adversarial validation; no agent was dispatched and no security
+criterion is passed. Policy/full default/remote platform CI/current-main standalone
+acceptance remain pending. Actual compiler, SQLite/Cargo and APK/RPM package
+consumer closure plus the fresh complete applicable Recipe suite remain open.
+This combined proof does not replace candidate-specific independence or reviews.
+
+Evidence and helpers are retained in .artifacts/ginux-contribution-preparation/F02;
+G12 correction evidence remains under its own directory. Private TLS keys and raw
+mode0600 result files are excluded from evidence copies. Initial formatting,
+compile/merge-helper failures and the transient shared Git config observation
+remain recorded. No shared config repair was made by this task.
+
+Exact next action: review remaining ordinary consumer requirements/current Recipe
+code against this per-process composition; keep G07/security/policy and every
+unperformed criterion explicit. F03 complete acceptance and F04 user inspection
+remain open. No branch/ref creation, push, PR or maintainer message is authorized.

@@ -558,8 +558,8 @@
       "status": "per-process source separately self-reviewed; static/unit/build and ordinary runtime pass in source/clean replay; G07 thread join, security/full CI/current-main independence pending",
       "artifact_directory": ".artifacts/ginux-contribution-preparation/G12",
       "base": "0798d991ab2d652e54682750acb4fdd9f1e6d9ac",
-      "head": "83072ec3ddab3e4712ce8db9ba232a10342557de",
-      "tree": "4943047fea72e3e814ca38794fc573e9bd050238",
+      "head": "8bb50aaa50e80428ff417654d35affd468255775",
+      "tree": "13478b2782cdf93d380239d15b1bb54bc0886810",
       "changed_files": [
         "README.md",
         "crates/ginux-init/src/descriptors.rs",
@@ -570,13 +570,14 @@
         "crates/ginux-init/src/storage_memory.rs",
         "crates/ginux-vfs/src/lib.rs",
         "scripts/test-launch-storage.py",
+        "tests/fixtures/launch-fd-fixture.c",
         "tests/fixtures/launch-storage-fixture.c"
       ],
       "held_dependencies": [
         "G07 nonleader/thread ownership and shared-argument security acceptance"
       ],
       "standalone": false,
-      "patch_sha256": "528b05833a472e45c6c935419b05767ddf78145627c01a956c616a1d36200bcd",
+      "patch_sha256": "b395275ea9c888e0abe1703ea39731efd1cdc24567e2c1e6680ff7fa4b6e9170",
       "unit_tests": 92,
       "vfs_tests": 34,
       "clean_matched_paths": 178,
@@ -589,7 +590,8 @@
       "held_thread_join": "held-thread-join.patch",
       "evidence": "g12-review.md",
       "source_patch": "patches/G12.patch",
-      "composition_note": "G17b prerequisite f41ed1b0 corrects outdated full FD mapping fixture assertion using existing supported owned readonly mmap; preserve this mapping-owner join at F01/F02. Full fixture/security remains unrun."
+      "composition_note": "F02 assigned stale FD read-only mmap assertion correction to G12; source and strict replay pass92 units/178 paths and ordinary mapping/storage. Descendant historical snapshots retain prior bases until refresh; publication still requires correct G12 prerequisite and current-main replay.",
+      "previous_head": "83072ec3ddab3e4712ce8db9ba232a10342557de"
     },
     {
       "packet": "G13",

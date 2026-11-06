@@ -656,3 +656,21 @@ separation; concurrent aliases/close/fork/exec/cancel, blocked retries, capacity
 failure, MSG_NOSIGNAL/SIGPIPE and shared-thread signal/call ownership. Retain full
 default source tests. These adversarial/proc/authority/fault probes remain unrun;
 no cloud dispatch or security acceptance. G07 shared-path hold remains.
+
+## F02 — combined per-process snapshot (security unverified)
+
+Combined `dfebda7c29b628fc41f50635b07e8cb48d6f883a` excludes G07 threads/shared arguments, native
+clock/poll policy and the native read clamp. Ordinary source/clean build,102
+selected units, channels/storage/cwd/locks/TCP/control/restore and actual
+curl/Git/cpio checks pass. These results do not validate hostile cross-owner
+inputs, private-FD/mapping transactions, shared argument races, control/task
+cancellation faults or rollback/authority/confinement under adversarial input.
+Carry all earlier packet handoffs into the combined review, including packet/
+TCP dispatch, dynamic references, archive canonical metadata and typed resource
+queries. Three default-enabled TCP policy/security units and full security
+fixtures remain locally unrun. G07 remains unready; no cloud dispatch occurred.
+
+G12 corrected `8bb50aaa50e80428ff417654d35affd468255775` preserves full FD security cases while replacing
+its obsolete read-only mapping denial assertion with valid data/unmap checks.
+Only ordinary mapping scenarios ran; the full protected/private-FD fixture is
+still for monitored review. No security acceptance or green full CI is claimed.

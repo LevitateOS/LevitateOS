@@ -1,7 +1,7 @@
 # G12 — per-process owned mappings; thread/security joins pending
 
-Head `83072ec3ddab3e4712ce8db9ba232a10342557de`, tree `4943047fea72e3e814ca38794fc573e9bd050238`, sole local prerequisite
-G11 `0798d991ab2d652e54682750acb4fdd9f1e6d9ac`. [Retained patch](patches/G12.patch). Ten files,+663/-80.
+Current head `8bb50aaa50e80428ff417654d35affd468255775`, tree `13478b2782cdf93d380239d15b1bb54bc0886810`, sole local prerequisite
+G11 `0798d991ab2d652e54682750acb4fdd9f1e6d9ac`. [Retained patch](patches/G12.patch). Eleven files,+666/-81.
 This is partial G12 preparation: per-process source/ordinary functionality is
 retained, but G07 thread ownership, nonleader acceptance, security, full CI and
 current-main independence remain pending. Do not publish the local composition.
@@ -56,7 +56,7 @@ reviewer coverage or security acceptance is claimed.
   Full mapping protection, fixed-region, SIGBUS, private-FD and interruption tests
   are retained, compiled and unrun here. Nonleader mapping acceptance is unrun.
 
-## Exact ordinary evidence
+## Initial ordinary evidence (previous head83072ec3)
 
 Both source and strict clean prerequisite-plus-patch export pass `make check
  test-unit build build-launch-storage-fixture build-launch-owned-exec-fixture
@@ -80,3 +80,20 @@ Full runtime/security fixtures, old-kernel pidfd fallback, independent review,
 macOS/remote CI and standalone refresh remain pending. Local Linux success is
 not green remote CI or G12 completion. All real branches, checkout/index state,
 remotes, human PR text and maintainer communications remain unchanged.
+
+## F02 fixture correction
+
+The full descriptor fixture still expected an owned read-only mmap to return
+EOPNOTSUPP after G12 introduced that operation. The corrected candidate verifies
+mapped byte A and unmap, retaining writable-shared denial. This belongs to G12;
+it is no longer an unrecorded fix only in a later composition. Earlier descendant
+snapshots remain historical and need the corrected prerequisite at extraction.
+
+Current source and a strict G11-plus-patch replay pass `make check test-unit build
+build-launch-fd-fixture build-launch-storage-fixture`:92 units,178 matching paths,
+and the same binary SHA256cab7a0daf11ce3f927e495a0c285dd537675941aa9d99e7cd2b3d0c355c711c8.
+Both also pass ordinary-mapping, ordinary-unlinked-mapping, growth, bounds and
+quota. The first correction accidentally redeclared an existing C variable;
+the fixture compiler caught it, assignment fixed it, and both final builds pass.
+The failure log is retained. Full FD fixture/protected/private-FD checks remain
+enabled and locally unrun for DaybreakBlue; this is not full CI acceptance.

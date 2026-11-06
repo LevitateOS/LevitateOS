@@ -1,6 +1,6 @@
-From 83072ec3ddab3e4712ce8db9ba232a10342557de Mon Sep 17 00:00:00 2001
+From 8bb50aaa50e80428ff417654d35affd468255775 Mon Sep 17 00:00:00 2001
 From: vince <vincepaul.liem@gmail.com>
-Date: Fri, 6 Nov 2026 13:31:11 +0100
+Date: Fri, 6 Nov 2026 20:21:46 +0100
 Subject: [PATCH] feat(storage): map owned files through read-only backing
  references
 
@@ -20,8 +20,9 @@ Signed-off-by: vince <vincepaul.liem@gmail.com>
  crates/ginux-init/src/storage_memory.rs | 143 ++++++-----
  crates/ginux-vfs/src/lib.rs             |   9 +
  scripts/test-launch-storage.py          |  30 ++-
+ tests/fixtures/launch-fd-fixture.c      |   4 +-
  tests/fixtures/launch-storage-fixture.c |  81 ++++++
- 10 files changed, 663 insertions(+), 80 deletions(-)
+ 11 files changed, 666 insertions(+), 81 deletions(-)
  create mode 100644 crates/ginux-init/src/file_mapping.rs
 
 diff --git a/README.md b/README.md
@@ -947,6 +948,21 @@ index 4cf64e17..97d13e31 100644
          invoke([], ['no-storage'])
          for assignment in ['disk0', 'memory:/', 'memory:/proc', 'memory:/sys/x', 'memory:/dev',
                             'memory:/bin', 'memory:/work/../out', 'memory:/work/', 'memory:work']:
+diff --git a/tests/fixtures/launch-fd-fixture.c b/tests/fixtures/launch-fd-fixture.c
+index f59206aa..0ccfd68e 100644
+--- a/tests/fixtures/launch-fd-fixture.c
++++ b/tests/fixtures/launch-fd-fixture.c
+@@ -65,7 +65,9 @@ long fd_main(word *stack)
+     long mapped=call(9,0,4096,1,2,reopened,0);
+     CHECK(mapped>0 && *(unsigned char *)mapped==127,22);
+     CHECK(DO(11,mapped,4096,0)==0,23);
+-    CHECK(call(9,0,4096,1,2,memory,0)==-95,24); // Owned files never become native mmap handles.
++    mapped=call(9,0,4096,1,2,memory,0);
++    CHECK(mapped>0 && *(unsigned char *)mapped=='A' && DO(11,mapped,4096,0)==0,24);
++    CHECK(call(9,0,4096,3,1,memory,0)==-95,55); // Writable shared backing remains unsupported.
+     CHECK(call(9,0,4096,1,2,0,0)==-95 && DO(217,0,bytes,sizeof bytes)==-20,48);
+     CHECK(DO(33,null,reopened,0)==reopened,25);
+     CHECK(DO(0,reopened,bytes,1)==0,26);
 diff --git a/tests/fixtures/launch-storage-fixture.c b/tests/fixtures/launch-storage-fixture.c
 index e553487a..8bb66926 100644
 --- a/tests/fixtures/launch-storage-fixture.c
@@ -1046,3 +1062,6 @@ index e553487a..8bb66926 100644
      if (argc > 1 && argv[1][0] == 'n') {
          CHECK(DO(2, "/work/new", 0101, 0644) < 0, 10);
          return 0;
+-- 
+2.52.0
+
