@@ -207,6 +207,11 @@ coverage remain outside this implementation's demonstrated scope.
 
 ## Future Ginux contribution candidates
 
+The [complete contribution task list](ginux-contribution-task-list.md) covers
+these candidates and their earlier local foundations, dependency order, review,
+validation and the user checkpoint before publication. Its work packets are not
+a finalized PR count.
+
 These are local records, not PR drafts ready to publish. Re-evaluate against
 then-current upstream, extract the smallest coherent change and make each
 proposal standalone once its prerequisites are available upstream. No pending
