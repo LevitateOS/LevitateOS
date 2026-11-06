@@ -1,6 +1,6 @@
-From 5ee456348905c4985689053f259484706ac3c8c0 Mon Sep 17 00:00:00 2001
+From b36e0752caa1c91e4bbbe112c589c85915a6ce6d Mon Sep 17 00:00:00 2001
 From: vince <vincepaul.liem@gmail.com>
-Date: Fri, 6 Nov 2026 09:51:46 +0100
+Date: Fri, 6 Nov 2026 10:00:21 +0100
 Subject: [PATCH] feat(launch): add assigned ephemeral memory storage
 
 Keep configured writable files in supervisor memory, with bounded data,
@@ -14,7 +14,7 @@ Signed-off-by: vince <vincepaul.liem@gmail.com>
 ---
  .github/workflows/check.yml             |   3 +-
  Makefile                                |   9 +-
- README.md                               |  37 ++
+ README.md                               |  40 +-
  crates/ginux-init/src/fs_hooks.rs       | 599 +++++++++++++++++++++++-
  crates/ginux-init/src/launch.rs         |  64 ++-
  crates/ginux-init/src/main.rs           |   1 +
@@ -22,7 +22,7 @@ Signed-off-by: vince <vincepaul.liem@gmail.com>
  crates/ginux-vfs/src/lib.rs             |  13 +
  scripts/test-launch-storage.py          |  71 +++
  tests/fixtures/launch-storage-fixture.c | 180 +++++++
- 10 files changed, 1139 insertions(+), 26 deletions(-)
+ 10 files changed, 1140 insertions(+), 28 deletions(-)
  create mode 100644 crates/ginux-init/src/path_hooks.rs
  create mode 100644 scripts/test-launch-storage.py
  create mode 100644 tests/fixtures/launch-storage-fixture.c
@@ -67,10 +67,21 @@ index 47835b3c..a0f56acf 100644
 +test-launch-storage:
 +	python3 scripts/test-launch-storage.py $(GINUX) .artifacts/launch/launch-storage-fixture
 diff --git a/README.md b/README.md
-index 1700a0a4..fb504da2 100644
+index 1700a0a4..ac0e8b46 100644
 --- a/README.md
 +++ b/README.md
-@@ -215,6 +215,41 @@ child supervision is implemented. Non-x86-64 syscall ABIs and job-control
+@@ -196,8 +196,8 @@ executes `[domain].init` with the configured arguments and environment inside
+ the supplied host root directory. The bootstrap requires chroot and credential
+ change privileges, and a kernel with `close_range` (Linux 5.9 or later).
+ It drops to UID/GID 1000 before executing the workload. The configuration must
+-select `profile = "balanced"` and `backend = "ptrace-native"`; storage and device
+-assignments are not implemented by this command and are rejected.
++select `profile = "balanced"` and `backend = "ptrace-native"`. Memory storage is
++supported as described below; device assignments are rejected.
+ 
+ `[domain].workdir` is optional and defaults to `/work`; `/` is also supported.
+ The bootstrap creates the working directory if its parent exists, then enters
+@@ -215,6 +215,40 @@ child supervision is implemented. Non-x86-64 syscall ABIs and job-control
  group stops fail explicitly. Audit output is capped at 64 KiB plus a truncation
  notice. This path does not implement resource quotas from the domain metadata.
  
@@ -92,15 +103,14 @@ index 1700a0a4..fb504da2 100644
 +This backend supports regular-file open/create/exclusive-create/truncate/append,
 +read/write/pread, seek, close, basic descriptor flags, mkdir, file unlink, chmod,
 +and stat/fstat/fstatat/statx metadata. Relative paths use the configured workdir;
-+directory descriptors, directory enumeration/removal, symlinks, hardlinks,
++directory descriptors, directory enumeration/removal, owned symlinks, hardlinks,
 +rename, duplicate descriptors, file mappings and execution of generated files
 +are unsupported. Component-wise image-link traversal preserves assignment
 +precedence, missing components and non-directory errors. Native image operations
 +use a temporary canonical path below the stopped workload's stack; an unavailable
 +scratch area or overlapping output buffer returns EFAULT. This is a bounded
 +storage adapter, not a complete unified image/overlay filesystem. IO is bounded
-+to 4096 bytes per call. Capacity is
-+32 objects (including seeded directories), 65536 bytes per file and 64 open
++to 4096 bytes per call. Capacity is 32 objects (including seeded directories), 65536 bytes per file and 64 open
 +descriptors. Exhaustion returns `ENOSPC`, `EFBIG`, or `EMFILE` as appropriate.
 +
 +Virtual descriptors start at 1048576; bootstrap clamps the native descriptor
@@ -112,7 +122,7 @@ index 1700a0a4..fb504da2 100644
  When requested, the result file is reserved exclusively before launch, with
  mode 0600 and a maximum path length of 512 bytes. Existing files are never
  overwritten. After completion, it contains one synced JSON object:
-@@ -238,6 +273,8 @@ make build-gate1-fixture
+@@ -238,6 +272,8 @@ make build-gate1-fixture
  sudo make test-gate1-setup
  sudo make test-launch
  sudo make test-native-supervision

@@ -1,9 +1,9 @@
 # G03c — configured ephemeral memory storage
 
-Local feature commit `5ee456348905c4985689053f259484706ac3c8c0`.
+Local feature commit `b36e0752caa1c91e4bbbe112c589c85915a6ce6d`.
 Local base `603391c66d37915f3db2c9cec63d1c3e832216a6` composes reviewed
 G03b785bfb9d (including G05a) and G03a0b563cf8 on upstream3f2fe7df.
-[Retained source patch](patches/G03c.patch). Ten files,+1139/-26.
+[Retained source patch](patches/G03c.patch). Ten files,+1140/-28.
 
 This joins the existing configured-launch/VFS owners: explicit memory assignments,
 bounded supervisor-owned files/descriptors, virtual metadata and strict tracee
@@ -72,3 +72,8 @@ Rocky VM checks are unrun. Bounds are32 objects,64KiB per file,64 descriptors an
 remain later work. Canonical native paths require writable scratch below the
 stack; overlapping output returns EFAULT. Strict process_vm copies do not force
 writes into protected pages. No real branch/index/worktree/remote was changed.
+
+A final introductory README correction removes the obsolete blanket rejection of
+storage assignments and clarifies the owned-symlink exclusion. The final object
+differs from the runtime-tested5ee45634 only in README; all executable source
+bytes are identical. A fresh final patch application matches all153 paths.

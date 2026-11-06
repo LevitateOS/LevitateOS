@@ -345,7 +345,7 @@ unit tests and both complete Linux runtime replays. Its patch is retained in
 this superproject's docs alongside G05a/G03a. It is **not standalone-ready** until
 G05a merges upstream; the local composition must not be published as a stack.
 
-G03c's runtime adapter is locally reviewed/validated at5ee45634 on composition
+G03c's runtime adapter is locally reviewed/validated atb36e0752 on composition
 603391c6 (G05a/G03b plus G03a). [Review/evidence](ginux-contributions/g03c-review.md)
 records four initial-adapter path failures, their corrections, scratch restoration,
 metadata flags,77 unit tests and all applicable Linux runtime checks passing twice.
