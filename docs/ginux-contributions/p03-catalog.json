@@ -925,7 +925,10 @@
         "crates/ginux-init/src/fs_hooks.rs",
         "crates/ginux-vfs/src/lib.rs"
       ],
-      "semantic_disposition": "pending comparison to current implementation; do not resubmit old prototype wholesale"
+      "semantic_disposition": "Superseded demo/native file owner. Use configured LaunchFs/VFS backing and its fixtures; do not revive the old hook implementation.",
+      "disposition": "prototype-file",
+      "packet": "G03/G09",
+      "verification": "Source comparison/classification; runtime validation is pending unless a linked probe is stated."
     },
     {
       "commit": "022294a9e983dd4097dcae6e198f6ecd87c1047a",
@@ -934,7 +937,10 @@
         "crates/ginux-init/src/main.rs",
         "crates/ginux-init/src/process_hooks.rs"
       ],
-      "semantic_disposition": "pending comparison to current implementation; do not resubmit old prototype wholesale"
+      "semantic_disposition": "Historical process-native loader/mapping ledger. Configured file_mapping now uses a private readonly backing transaction and native kernel mappings under inherited limits; keep partial-page, offset, stale-handle, error and teardown requirements, not this obsolete library basename/staging implementation.",
+      "disposition": "prototype-memory",
+      "packet": "G12/G26",
+      "verification": "Source comparison/classification; runtime validation is pending unless a linked probe is stated."
     },
     {
       "commit": "11bd6f1699a100c708513a27cdeaa040b2d843fa",
@@ -949,7 +955,10 @@
         "scripts/test-launch.py",
         "tests/fixtures/launch-fixture.c"
       ],
-      "semantic_disposition": "pending comparison to current implementation; do not resubmit old prototype wholesale"
+      "semantic_disposition": "Already represented by open #207 at e7f5f552. Preserve its held head; no duplicate proposal.",
+      "disposition": "existing-poll",
+      "packet": "G01",
+      "verification": "Source comparison/classification; runtime validation is pending unless a linked probe is stated."
     },
     {
       "commit": "17050a20aaf1cc6323dd5b14371a51b69af632de",
@@ -958,7 +967,10 @@
         "crates/ginux-init/src/fs_hooks.rs",
         "tests/fixtures/launch-directory-fixture.c"
       ],
-      "semantic_disposition": "pending comparison to current implementation; do not resubmit old prototype wholesale"
+      "semantic_disposition": "The old lexical normalization check is replaced by joined_path plus resolve_namespace, which checks intermediate NodeKind before parent traversal. Retain the three old file/../file, missing/../file and file/. cases in extracted runtime regressions; do not apply its obsolete normalize hook.",
+      "disposition": "superseded resolver",
+      "packet": "G09/G13/G16",
+      "verification": "Source comparison/classification; runtime validation is pending unless a linked probe is stated."
     },
     {
       "commit": "18286aa6097262ef5590aecd418d44693d833c19",
@@ -969,7 +981,10 @@
         "crates/ginux-vfs/examples/storage-workload.rs",
         "scripts/test-storage.py"
       ],
-      "semantic_disposition": "pending comparison to current implementation; do not resubmit old prototype wholesale"
+      "semantic_disposition": "Old retained binary-image/export library. Configured storage_export/storage_restore/checkpoint_control now own archives and consistency. Keep atomic/failure/verified-generation requirements; do not introduce a second persistence format.",
+      "disposition": "prototype-storage",
+      "packet": "G19/G20/G21/G22",
+      "verification": "Source comparison/classification; runtime validation is pending unless a linked probe is stated."
     },
     {
       "commit": "19bf68c986421b5aa999a3667c8f7fd1146e148a",
@@ -978,7 +993,10 @@
         "crates/ginux-init/src/main.rs",
         "crates/ginux-init/src/process_hooks.rs"
       ],
-      "semantic_disposition": "pending comparison to current implementation; do not resubmit old prototype wholesale"
+      "semantic_disposition": "Older process-native implementation superseded by merged #154 and later native fixes. Preserve current upstream supervise_process_native/ProcessTable; configured child support is a separate retained packet.",
+      "disposition": "prototype-process",
+      "packet": "G06/G07",
+      "verification": "Source comparison/classification; runtime validation is pending unless a linked probe is stated."
     },
     {
       "commit": "2eac10bf8c9e7a7e72e1ae94990aa2425b2f3ba0",
@@ -987,7 +1005,10 @@
         "crates/ginux-init/src/fs_hooks.rs",
         "crates/ginux-vfs/src/lib.rs"
       ],
-      "semantic_disposition": "pending comparison to current implementation; do not resubmit old prototype wholesale"
+      "semantic_disposition": "Superseded demo/native file owner. Use configured LaunchFs/VFS backing and its fixtures; do not revive the old hook implementation.",
+      "disposition": "prototype-file",
+      "packet": "G03/G09",
+      "verification": "Source comparison/classification; runtime validation is pending unless a linked probe is stated."
     },
     {
       "commit": "38e9bd26acd2ed54028a353630fd3ca457a925ca",
@@ -997,7 +1018,10 @@
         "crates/ginux-init/src/process_hooks.rs",
         "crates/ginux-process/src/lib.rs"
       ],
-      "semantic_disposition": "pending comparison to current implementation; do not resubmit old prototype wholesale"
+      "semantic_disposition": "Older process-native implementation superseded by merged #154 and later native fixes. Preserve current upstream supervise_process_native/ProcessTable; configured child support is a separate retained packet.",
+      "disposition": "prototype-process",
+      "packet": "G06/G07",
+      "verification": "Source comparison/classification; runtime validation is pending unless a linked probe is stated."
     },
     {
       "commit": "3fac8e0598193218d6bcda4d7e0813ee60d96238",
@@ -1006,7 +1030,10 @@
         "crates/ginux-init/src/storage_memory.rs",
         "tests/fixtures/launch-fd-fixture.c"
       ],
-      "semantic_disposition": "pending comparison to current implementation; do not resubmit old prototype wholesale"
+      "semantic_disposition": "Current backing already uses c\"ginux-storage\" and launch-fd fixture checks owned public alias mappings with reused native fd numbers. Preserve its additional offset-unchanged assertion during G12 review; do not copy old readonly-mapping denial.",
+      "disposition": "partly equivalent; strengthen assertion",
+      "packet": "G12",
+      "verification": "Source comparison/classification; runtime validation is pending unless a linked probe is stated."
     },
     {
       "commit": "4655aaa2bd17454d70920a7e84ec2daf75121c5c",
@@ -1018,7 +1045,10 @@
         "crates/ginux-kernel-views/src/lib.rs",
         "crates/ginux-process/src/lib.rs"
       ],
-      "semantic_disposition": "pending comparison to current implementation; do not resubmit old prototype wholesale"
+      "semantic_disposition": "Older process-native implementation superseded by merged #154 and later native fixes. Preserve current upstream supervise_process_native/ProcessTable; configured child support is a separate retained packet.",
+      "disposition": "prototype-process",
+      "packet": "G06/G07",
+      "verification": "Source comparison/classification; runtime validation is pending unless a linked probe is stated."
     },
     {
       "commit": "47ca4500de8b708d119e385e39ec8ff2fdfab793",
@@ -1029,7 +1059,10 @@
         "crates/ginux-init/src/process_hooks.rs",
         "crates/ginux-init/src/supervisor.rs"
       ],
-      "semantic_disposition": "pending comparison to current implementation; do not resubmit old prototype wholesale"
+      "semantic_disposition": "Older process-native implementation superseded by merged #154 and later native fixes. Preserve current upstream supervise_process_native/ProcessTable; configured child support is a separate retained packet.",
+      "disposition": "prototype-process",
+      "packet": "G06/G07",
+      "verification": "Source comparison/classification; runtime validation is pending unless a linked probe is stated."
     },
     {
       "commit": "4d036c07ed3f7735aa4812fe4968e05ef24b5c8a",
@@ -1038,7 +1071,10 @@
         "crates/ginux-vfs/src/lib.rs",
         "crates/ginux-vfs/src/retained.rs"
       ],
-      "semantic_disposition": "pending comparison to current implementation; do not resubmit old prototype wholesale"
+      "semantic_disposition": "Old retained binary-image/export library. Configured storage_export/storage_restore/checkpoint_control now own archives and consistency. Keep atomic/failure/verified-generation requirements; do not introduce a second persistence format.",
+      "disposition": "prototype-storage",
+      "packet": "G19/G20/G21/G22",
+      "verification": "Source comparison/classification; runtime validation is pending unless a linked probe is stated."
     },
     {
       "commit": "4d494e76dea48b0298a142d220b1f95ec4ddc504",
@@ -1047,7 +1083,10 @@
         "crates/ginux-init/src/main.rs",
         "crates/ginux-init/src/process_hooks.rs"
       ],
-      "semantic_disposition": "pending comparison to current implementation; do not resubmit old prototype wholesale"
+      "semantic_disposition": "Older process-native implementation superseded by merged #154 and later native fixes. Preserve current upstream supervise_process_native/ProcessTable; configured child support is a separate retained packet.",
+      "disposition": "prototype-process",
+      "packet": "G06/G07",
+      "verification": "Source comparison/classification; runtime validation is pending unless a linked probe is stated."
     },
     {
       "commit": "50c6a39900f3859d171e54fb2f6cf63245d02f5f",
@@ -1057,7 +1096,10 @@
         "crates/ginux-vfs/src/lib.rs",
         "crates/ginux-vfs/src/retained.rs"
       ],
-      "semantic_disposition": "pending comparison to current implementation; do not resubmit old prototype wholesale"
+      "semantic_disposition": "Old retained binary-image/export library. Configured storage_export/storage_restore/checkpoint_control now own archives and consistency. Keep atomic/failure/verified-generation requirements; do not introduce a second persistence format.",
+      "disposition": "prototype-storage",
+      "packet": "G19/G20/G21/G22",
+      "verification": "Source comparison/classification; runtime validation is pending unless a linked probe is stated."
     },
     {
       "commit": "56c1ddf56d86a22e1f6d91be226e46096cef6020",
@@ -1066,7 +1108,10 @@
         "crates/ginux-init/src/main.rs",
         "crates/ginux-process/src/lib.rs"
       ],
-      "semantic_disposition": "pending comparison to current implementation; do not resubmit old prototype wholesale"
+      "semantic_disposition": "Older process-native implementation superseded by merged #154 and later native fixes. Preserve current upstream supervise_process_native/ProcessTable; configured child support is a separate retained packet.",
+      "disposition": "prototype-process",
+      "packet": "G06/G07",
+      "verification": "Source comparison/classification; runtime validation is pending unless a linked probe is stated."
     },
     {
       "commit": "5c6989b0060b4a684626b562baf7754443a5c166",
@@ -1076,7 +1121,10 @@
         "crates/ginux-init/src/process_hooks.rs",
         "scripts/test-process.sh"
       ],
-      "semantic_disposition": "pending comparison to current implementation; do not resubmit old prototype wholesale"
+      "semantic_disposition": "Older process-native implementation superseded by merged #154 and later native fixes. Preserve current upstream supervise_process_native/ProcessTable; configured child support is a separate retained packet.",
+      "disposition": "prototype-process",
+      "packet": "G06/G07",
+      "verification": "Source comparison/classification; runtime validation is pending unless a linked probe is stated."
     },
     {
       "commit": "668a86f21a50de0c235b45e10949cbf46788f94c",
@@ -1085,7 +1133,10 @@
         "crates/ginux-init/src/main.rs",
         "crates/ginux-init/src/process_hooks.rs"
       ],
-      "semantic_disposition": "pending comparison to current implementation; do not resubmit old prototype wholesale"
+      "semantic_disposition": "Older process-native implementation superseded by merged #154 and later native fixes. Preserve current upstream supervise_process_native/ProcessTable; configured child support is a separate retained packet.",
+      "disposition": "prototype-process",
+      "packet": "G06/G07",
+      "verification": "Source comparison/classification; runtime validation is pending unless a linked probe is stated."
     },
     {
       "commit": "698847b498f87a9c6873aec4be928957a402eee2",
@@ -1094,7 +1145,10 @@
         "crates/ginux-init/src/main.rs",
         "crates/ginux-vfs/src/lib.rs"
       ],
-      "semantic_disposition": "pending comparison to current implementation; do not resubmit old prototype wholesale"
+      "semantic_disposition": "Historical process-native loader/mapping ledger. Configured file_mapping now uses a private readonly backing transaction and native kernel mappings under inherited limits; keep partial-page, offset, stale-handle, error and teardown requirements, not this obsolete library basename/staging implementation.",
+      "disposition": "prototype-memory",
+      "packet": "G12/G26",
+      "verification": "Source comparison/classification; runtime validation is pending unless a linked probe is stated."
     },
     {
       "commit": "6ad28863cde168ce01ada171a65f9b7203ae3f5c",
@@ -1102,7 +1156,10 @@
       "files": [
         "crates/ginux-init/src/main.rs"
       ],
-      "semantic_disposition": "pending comparison to current implementation; do not resubmit old prototype wholesale"
+      "semantic_disposition": "Historical process-native loader/mapping ledger. Configured file_mapping now uses a private readonly backing transaction and native kernel mappings under inherited limits; keep partial-page, offset, stale-handle, error and teardown requirements, not this obsolete library basename/staging implementation.",
+      "disposition": "prototype-memory",
+      "packet": "G12/G26",
+      "verification": "Source comparison/classification; runtime validation is pending unless a linked probe is stated."
     },
     {
       "commit": "6c507d1f371209bc3672612145460e62c943d787",
@@ -1111,7 +1168,10 @@
         "crates/ginux-init/src/main.rs",
         "crates/ginux-process/src/lib.rs"
       ],
-      "semantic_disposition": "pending comparison to current implementation; do not resubmit old prototype wholesale"
+      "semantic_disposition": "Historical process-native loader/mapping ledger. Configured file_mapping now uses a private readonly backing transaction and native kernel mappings under inherited limits; keep partial-page, offset, stale-handle, error and teardown requirements, not this obsolete library basename/staging implementation.",
+      "disposition": "prototype-memory",
+      "packet": "G12/G26",
+      "verification": "Source comparison/classification; runtime validation is pending unless a linked probe is stated."
     },
     {
       "commit": "724dd3ae16144583dbb2dd0d52afc37449e65e39",
@@ -1121,7 +1181,10 @@
         "crates/ginux-init/src/process_hooks.rs",
         "scripts/test-process.sh"
       ],
-      "semantic_disposition": "pending comparison to current implementation; do not resubmit old prototype wholesale"
+      "semantic_disposition": "Older process-native implementation superseded by merged #154 and later native fixes. Preserve current upstream supervise_process_native/ProcessTable; configured child support is a separate retained packet.",
+      "disposition": "prototype-process",
+      "packet": "G06/G07",
+      "verification": "Source comparison/classification; runtime validation is pending unless a linked probe is stated."
     },
     {
       "commit": "7bc0ee04e68f6c0d96ab4c2ee1f4ec000bcc0c13",
@@ -1129,7 +1192,10 @@
       "files": [
         "crates/ginux-vfs/src/lib.rs"
       ],
-      "semantic_disposition": "pending comparison to current implementation; do not resubmit old prototype wholesale"
+      "semantic_disposition": "Failed-open and unlinked-object preservation are now handled by merged #216/#217 and integrated owners. Shared offset fix overlaps b500f859 and is confirmed still needed. The old read-only image handle redirection on writable copy-up is absent from current copy_to_overlay; retain that explicit image/overlay identity question for G03/G05 reproduction and contract review, not a bulk patch.",
+      "disposition": "mixed superseded fixes; retained question",
+      "packet": "G03/G05/G09",
+      "verification": "Source comparison/classification; runtime validation is pending unless a linked probe is stated."
     },
     {
       "commit": "7cfb8070427dadaabed5304224faf30ba20e1ffb",
@@ -1140,7 +1206,10 @@
         "crates/ginux-init/src/supervisor.rs",
         "crates/ginux-process/src/lib.rs"
       ],
-      "semantic_disposition": "pending comparison to current implementation; do not resubmit old prototype wholesale"
+      "semantic_disposition": "Historical process-native loader/mapping ledger. Configured file_mapping now uses a private readonly backing transaction and native kernel mappings under inherited limits; keep partial-page, offset, stale-handle, error and teardown requirements, not this obsolete library basename/staging implementation.",
+      "disposition": "prototype-memory",
+      "packet": "G12/G26",
+      "verification": "Source comparison/classification; runtime validation is pending unless a linked probe is stated."
     },
     {
       "commit": "7f21da2375fcff2ebe5bb9c1c594876f847a1578",
@@ -1149,7 +1218,10 @@
         "crates/ginux-init/src/main.rs",
         "crates/ginux-init/src/process_hooks.rs"
       ],
-      "semantic_disposition": "pending comparison to current implementation; do not resubmit old prototype wholesale"
+      "semantic_disposition": "Older process-native implementation superseded by merged #154 and later native fixes. Preserve current upstream supervise_process_native/ProcessTable; configured child support is a separate retained packet.",
+      "disposition": "prototype-process",
+      "packet": "G06/G07",
+      "verification": "Source comparison/classification; runtime validation is pending unless a linked probe is stated."
     },
     {
       "commit": "80763e5054a33d31e46c8acdd736d5a749d03458",
@@ -1158,7 +1230,10 @@
         "crates/ginux-init/src/fs_hooks.rs",
         "crates/ginux-vfs/src/lib.rs"
       ],
-      "semantic_disposition": "pending comparison to current implementation; do not resubmit old prototype wholesale"
+      "semantic_disposition": "Superseded demo/native file owner. Use configured LaunchFs/VFS backing and its fixtures; do not revive the old hook implementation.",
+      "disposition": "prototype-file",
+      "packet": "G03/G09",
+      "verification": "Source comparison/classification; runtime validation is pending unless a linked probe is stated."
     },
     {
       "commit": "808c1d1640a14bfe569814fa4adf2bd62dde0725",
@@ -1166,7 +1241,10 @@
       "files": [
         "crates/ginux-init/src/fs_hooks.rs"
       ],
-      "semantic_disposition": "pending comparison to current implementation; do not resubmit old prototype wholesale"
+      "semantic_disposition": "Superseded demo/native file owner. Use configured LaunchFs/VFS backing and its fixtures; do not revive the old hook implementation.",
+      "disposition": "prototype-file",
+      "packet": "G03/G09",
+      "verification": "Source comparison/classification; runtime validation is pending unless a linked probe is stated."
     },
     {
       "commit": "860a6d328a49b4d20886b0b0dfcc04882e852686",
@@ -1175,7 +1253,10 @@
         "crates/ginux-vfs/src/export.rs",
         "crates/ginux-vfs/src/retained.rs"
       ],
-      "semantic_disposition": "pending comparison to current implementation; do not resubmit old prototype wholesale"
+      "semantic_disposition": "Old retained binary-image/export library. Configured storage_export/storage_restore/checkpoint_control now own archives and consistency. Keep atomic/failure/verified-generation requirements; do not introduce a second persistence format.",
+      "disposition": "prototype-storage",
+      "packet": "G19/G20/G21/G22",
+      "verification": "Source comparison/classification; runtime validation is pending unless a linked probe is stated."
     },
     {
       "commit": "9e4a5fa574f26aae91ac2d889aba9f44f7a54491",
@@ -1184,7 +1265,10 @@
         "crates/ginux-init/src/main.rs",
         "crates/ginux-init/src/process_hooks.rs"
       ],
-      "semantic_disposition": "pending comparison to current implementation; do not resubmit old prototype wholesale"
+      "semantic_disposition": "Old domain-produced exec staging. Current configured exec_image uses sealed memfd backing and explicit script transactions. Do not restore public host staging files.",
+      "disposition": "prototype-exec",
+      "packet": "G10/G11",
+      "verification": "Source comparison/classification; runtime validation is pending unless a linked probe is stated."
     },
     {
       "commit": "a2542d9133a15ad6dd5fb2aad9392ed7f5d8c36d",
@@ -1193,7 +1277,10 @@
         "crates/ginux-domain/src/lib.rs",
         "crates/ginux-init/src/launch.rs"
       ],
-      "semantic_disposition": "pending comparison to current implementation; do not resubmit old prototype wholesale"
+      "semantic_disposition": "Earlier resource implementation/test superseded by 0c571cbb. Keep actual kernel affinity/RLIMIT_AS/invalid-allocation assertions in focused validation; no claim of aggregate CPU/RSS accounting.",
+      "disposition": "limits",
+      "packet": "G26",
+      "verification": "Source comparison/classification; runtime validation is pending unless a linked probe is stated."
     },
     {
       "commit": "a396ab141734654c3fc1593ddc1d7a61529396be",
@@ -1203,7 +1290,10 @@
         "crates/ginux-vfs/src/lib.rs",
         "crates/ginux-vfs/src/retained.rs"
       ],
-      "semantic_disposition": "pending comparison to current implementation; do not resubmit old prototype wholesale"
+      "semantic_disposition": "Old retained binary-image/export library. Configured storage_export/storage_restore/checkpoint_control now own archives and consistency. Keep atomic/failure/verified-generation requirements; do not introduce a second persistence format.",
+      "disposition": "prototype-storage",
+      "packet": "G19/G20/G21/G22",
+      "verification": "Source comparison/classification; runtime validation is pending unless a linked probe is stated."
     },
     {
       "commit": "a92471ae23698d976a631eb166fbfebcc28895fd",
@@ -1212,7 +1302,10 @@
         "crates/ginux-init/src/channel_hooks.rs",
         "crates/ginux-init/src/channel_transport.rs"
       ],
-      "semantic_disposition": "pending comparison to current implementation; do not resubmit old prototype wholesale"
+      "semantic_disposition": "Old ChannelSpace transport and stale-ID fix. Current configured LaunchChannels is reached only through live public DescriptorTable entries and closes backend handles at last ownership release. Carry stale-public-handle/slot-reuse regression into review, not the obsolete channel_transport module.",
+      "disposition": "prototype-channel",
+      "packet": "G05/G08",
+      "verification": "Source comparison/classification; runtime validation is pending unless a linked probe is stated."
     },
     {
       "commit": "acbde526e800e23a6e93fdf8511a72c6951648e3",
@@ -1222,7 +1315,10 @@
         "scripts/test-launch-threads.py",
         "tests/fixtures/launch-thread-fixture.c"
       ],
-      "semantic_disposition": "pending comparison to current implementation; do not resubmit old prototype wholesale"
+      "semantic_disposition": "d693ae63 already retains task ownership on ESRCH from GETREGS or GET_SYSCALL_INFO; current launch_tasks lines 410-428 and repeated group-termination fixture cover the same death window. No extra copy of the old patch.",
+      "disposition": "equivalent fix retained",
+      "packet": "G06/G07",
+      "verification": "Source comparison/classification; runtime validation is pending unless a linked probe is stated."
     },
     {
       "commit": "b3c53518b206ee4a3d90f84cea9726458d77a87a",
@@ -1233,7 +1329,10 @@
         "crates/ginux-init/src/supervisor.rs",
         "crates/ginux-process/src/lib.rs"
       ],
-      "semantic_disposition": "pending comparison to current implementation; do not resubmit old prototype wholesale"
+      "semantic_disposition": "Older process-native implementation superseded by merged #154 and later native fixes. Preserve current upstream supervise_process_native/ProcessTable; configured child support is a separate retained packet.",
+      "disposition": "prototype-process",
+      "packet": "G06/G07",
+      "verification": "Source comparison/classification; runtime validation is pending unless a linked probe is stated."
     },
     {
       "commit": "b42354f3381bb62a8a6be04f473152b5f0241396",
@@ -1245,7 +1344,10 @@
         "crates/ginux-kernel-views/src/lib.rs",
         "crates/ginux-process/src/lib.rs"
       ],
-      "semantic_disposition": "pending comparison to current implementation; do not resubmit old prototype wholesale"
+      "semantic_disposition": "Older process-native implementation superseded by merged #154 and later native fixes. Preserve current upstream supervise_process_native/ProcessTable; configured child support is a separate retained packet.",
+      "disposition": "prototype-process",
+      "packet": "G06/G07",
+      "verification": "Source comparison/classification; runtime validation is pending unless a linked probe is stated."
     },
     {
       "commit": "b500f859a3b1f22da59d0b500a6c07bcb8ba3d3f",
@@ -1253,7 +1355,10 @@
       "files": [
         "crates/ginux-vfs/src/lib.rs"
       ],
-      "semantic_disposition": "pending comparison to current implementation; do not resubmit old prototype wholesale"
+      "semantic_disposition": "VFS duplicate copies per-descriptor offsets on both current upstream 3f2fe7df and integration 7cf2638a. The same direct VFS regression fails both and passes b500f859. Extract the smallest current-main fix and separately review status flags/reused slots rather than blindly replaying old seek/directory code.",
+      "disposition": "confirmed missing fix",
+      "packet": "G05 standalone subpacket",
+      "verification": "Source comparison/classification; runtime validation is pending unless a linked probe is stated."
     },
     {
       "commit": "bef09013b91adbf3141cc1c42680fbe7b405aa21",
@@ -1264,7 +1369,10 @@
         "crates/ginux-init/src/process_hooks.rs",
         "crates/ginux-init/src/supervisor.rs"
       ],
-      "semantic_disposition": "pending comparison to current implementation; do not resubmit old prototype wholesale"
+      "semantic_disposition": "Older process-native implementation superseded by merged #154 and later native fixes. Preserve current upstream supervise_process_native/ProcessTable; configured child support is a separate retained packet.",
+      "disposition": "prototype-process",
+      "packet": "G06/G07",
+      "verification": "Source comparison/classification; runtime validation is pending unless a linked probe is stated."
     },
     {
       "commit": "c46b132cdcb6a58c22d747b018c939ec283d9f6e",
@@ -1273,7 +1381,10 @@
         "crates/ginux-init/src/main.rs",
         "crates/ginux-init/src/teardown.rs"
       ],
-      "semantic_disposition": "pending comparison to current implementation; do not resubmit old prototype wholesale"
+      "semantic_disposition": "Old teardown/staging implementation. Current configured owner kills/reaps every tracked task and uses private memfds; assess cancellation/lost-stop assertions in those owners, preserving newer upstream native fixes.",
+      "disposition": "prototype-cancel",
+      "packet": "G06/G10",
+      "verification": "Source comparison/classification; runtime validation is pending unless a linked probe is stated."
     },
     {
       "commit": "c4a0820deac6a91bdfc0f96796bbb8416e39911a",
@@ -1286,7 +1397,10 @@
         "crates/ginux-init/src/launch.rs",
         "scripts/test-limits.py"
       ],
-      "semantic_disposition": "pending comparison to current implementation; do not resubmit old prototype wholesale"
+      "semantic_disposition": "Earlier resource implementation/test superseded by 0c571cbb. Keep actual kernel affinity/RLIMIT_AS/invalid-allocation assertions in focused validation; no claim of aggregate CPU/RSS accounting.",
+      "disposition": "limits",
+      "packet": "G26",
+      "verification": "Source comparison/classification; runtime validation is pending unless a linked probe is stated."
     },
     {
       "commit": "c97dcba84054f66d6dd026b3e5b4ff28fe53574c",
@@ -1294,7 +1408,10 @@
       "files": [
         "crates/ginux-init/src/channel_transport.rs"
       ],
-      "semantic_disposition": "pending comparison to current implementation; do not resubmit old prototype wholesale"
+      "semantic_disposition": "Old ChannelSpace transport and stale-ID fix. Current configured LaunchChannels is reached only through live public DescriptorTable entries and closes backend handles at last ownership release. Carry stale-public-handle/slot-reuse regression into review, not the obsolete channel_transport module.",
+      "disposition": "prototype-channel",
+      "packet": "G05/G08",
+      "verification": "Source comparison/classification; runtime validation is pending unless a linked probe is stated."
     },
     {
       "commit": "ca64fddf028a4110bcde2666fbb3949f2d0eea7d",
@@ -1303,7 +1420,10 @@
         "crates/ginux-init/src/fs_hooks.rs",
         "crates/ginux-vfs/src/lib.rs"
       ],
-      "semantic_disposition": "pending comparison to current implementation; do not resubmit old prototype wholesale"
+      "semantic_disposition": "Superseded demo/native file owner. Use configured LaunchFs/VFS backing and its fixtures; do not revive the old hook implementation.",
+      "disposition": "prototype-file",
+      "packet": "G03/G09",
+      "verification": "Source comparison/classification; runtime validation is pending unless a linked probe is stated."
     },
     {
       "commit": "d11f7f99843b5d0e088319ed425a6f5f8a61e2cd",
@@ -1312,7 +1432,10 @@
         "crates/ginux-init/src/main.rs",
         "crates/ginux-init/src/process_hooks.rs"
       ],
-      "semantic_disposition": "pending comparison to current implementation; do not resubmit old prototype wholesale"
+      "semantic_disposition": "Older process-native implementation superseded by merged #154 and later native fixes. Preserve current upstream supervise_process_native/ProcessTable; configured child support is a separate retained packet.",
+      "disposition": "prototype-process",
+      "packet": "G06/G07",
+      "verification": "Source comparison/classification; runtime validation is pending unless a linked probe is stated."
     },
     {
       "commit": "d4ecd781eaca5ae1d511e938bf60ca15bf2d8b4e",
@@ -1321,7 +1444,10 @@
         "crates/ginux-init/src/fs_hooks.rs",
         "crates/ginux-vfs/src/lib.rs"
       ],
-      "semantic_disposition": "pending comparison to current implementation; do not resubmit old prototype wholesale"
+      "semantic_disposition": "Superseded demo/native file owner. Use configured LaunchFs/VFS backing and its fixtures; do not revive the old hook implementation.",
+      "disposition": "prototype-file",
+      "packet": "G03/G09",
+      "verification": "Source comparison/classification; runtime validation is pending unless a linked probe is stated."
     },
     {
       "commit": "dc65b4128891e13d46de56b775b61f644b96668a",
@@ -1330,7 +1456,10 @@
         "crates/ginux-init/src/fs_hooks.rs",
         "crates/ginux-vfs/src/lib.rs"
       ],
-      "semantic_disposition": "pending comparison to current implementation; do not resubmit old prototype wholesale"
+      "semantic_disposition": "Superseded demo/native file owner. Use configured LaunchFs/VFS backing and its fixtures; do not revive the old hook implementation.",
+      "disposition": "prototype-file",
+      "packet": "G03/G09",
+      "verification": "Source comparison/classification; runtime validation is pending unless a linked probe is stated."
     },
     {
       "commit": "e7f5f552747e0b451b6dd31395f9199d10a42ce3",
@@ -1341,7 +1470,10 @@
         "crates/ginux-init/src/channel_hooks.rs",
         "tests/fixtures/launch-fixture.c"
       ],
-      "semantic_disposition": "pending comparison to current implementation; do not resubmit old prototype wholesale"
+      "semantic_disposition": "Already represented by open #207 at e7f5f552. Preserve its held head; no duplicate proposal.",
+      "disposition": "existing-poll",
+      "packet": "G01",
+      "verification": "Source comparison/classification; runtime validation is pending unless a linked probe is stated."
     },
     {
       "commit": "e97eb58c8132b85b481359ec5b7f26b20c9a1e41",
@@ -1352,7 +1484,10 @@
         "crates/ginux-init/src/supervisor.rs",
         "crates/ginux-process/src/lib.rs"
       ],
-      "semantic_disposition": "pending comparison to current implementation; do not resubmit old prototype wholesale"
+      "semantic_disposition": "Older process-native implementation superseded by merged #154 and later native fixes. Preserve current upstream supervise_process_native/ProcessTable; configured child support is a separate retained packet.",
+      "disposition": "prototype-process",
+      "packet": "G06/G07",
+      "verification": "Source comparison/classification; runtime validation is pending unless a linked probe is stated."
     },
     {
       "commit": "eb2589dd5f5797a0e0cfefe5f5c5bb6cfa0900f1",
@@ -1361,7 +1496,10 @@
         "crates/ginux-vfs/src/lib.rs",
         "crates/ginux-vfs/src/retained.rs"
       ],
-      "semantic_disposition": "pending comparison to current implementation; do not resubmit old prototype wholesale"
+      "semantic_disposition": "Old retained binary-image/export library. Configured storage_export/storage_restore/checkpoint_control now own archives and consistency. Keep atomic/failure/verified-generation requirements; do not introduce a second persistence format.",
+      "disposition": "prototype-storage",
+      "packet": "G19/G20/G21/G22",
+      "verification": "Source comparison/classification; runtime validation is pending unless a linked probe is stated."
     },
     {
       "commit": "ebd68025d4db318e903867f12d0574e41f2511ce",
@@ -1369,7 +1507,10 @@
       "files": [
         "crates/ginux-init/src/main.rs"
       ],
-      "semantic_disposition": "pending comparison to current implementation; do not resubmit old prototype wholesale"
+      "semantic_disposition": "Historical process-native loader/mapping ledger. Configured file_mapping now uses a private readonly backing transaction and native kernel mappings under inherited limits; keep partial-page, offset, stale-handle, error and teardown requirements, not this obsolete library basename/staging implementation.",
+      "disposition": "prototype-memory",
+      "packet": "G12/G26",
+      "verification": "Source comparison/classification; runtime validation is pending unless a linked probe is stated."
     },
     {
       "commit": "f8ce52747111c6b33a872e0215e94e1863a51271",
@@ -1382,7 +1523,10 @@
         "scripts/test-upcoming-native.py",
         "tests/fixtures/process-review-fixture.c"
       ],
-      "semantic_disposition": "pending comparison to current implementation; do not resubmit old prototype wholesale"
+      "semantic_disposition": "Old teardown/staging implementation. Current configured owner kills/reaps every tracked task and uses private memfds; assess cancellation/lost-stop assertions in those owners, preserving newer upstream native fixes.",
+      "disposition": "prototype-cancel",
+      "packet": "G06/G10",
+      "verification": "Source comparison/classification; runtime validation is pending unless a linked probe is stated."
     },
     {
       "commit": "ff72a60c7589653e929222940342785d0d04c9e0",
@@ -1395,7 +1539,10 @@
         "tests/fixtures/process-exec-target.S",
         "tests/fixtures/process-review-fixture.c"
       ],
-      "semantic_disposition": "pending comparison to current implementation; do not resubmit old prototype wholesale"
+      "semantic_disposition": "Older process-native implementation superseded by merged #154 and later native fixes. Preserve current upstream supervise_process_native/ProcessTable; configured child support is a separate retained packet.",
+      "disposition": "prototype-process",
+      "packet": "G06/G07",
+      "verification": "Source comparison/classification; runtime validation is pending unless a linked probe is stated."
     }
   ],
   "paths": [
@@ -2169,5 +2316,53 @@
       "hunk_review": "pending; preserve current upstream changes rather than copying integrated files wholesale"
     }
   ],
-  "status": "P03 in progress; catalog created; semantic extra-branch reconciliation and per-hunk dispositions pending"
+  "status": "P03 inventory and semantic dispositions complete. Full source review, exact subpacket extraction and runtime acceptance remain P04/P05/G/R tasks.",
+  "hunk_count": 261,
+  "hunk_manifest_sha256": "406ff213def1fe3f65e727f40c96404e72c25b87a8462e53fccbc9291d51b146",
+  "missing_fix_probe": [
+    {
+      "source_revision": "3f2fe7df",
+      "source_sha256": "5889d558f715ba35e7c7d8561836ff5064311edefed8ac23220eef2e4c7b50a5",
+      "status": 101,
+      "log": "/tmp/ginux-contribution-p03/upstream-duplicate.log"
+    },
+    {
+      "source_revision": "7cf2638a",
+      "source_sha256": "120473aa1882290b45612d3f575338c1f6bffd36d7a2df24837297dddb0c4119",
+      "status": 101,
+      "log": "/tmp/ginux-contribution-p03/integration-duplicate.log"
+    },
+    {
+      "source_revision": "b500f859",
+      "source_sha256": "c5e1ac52fed4a9e0761a2c8cf7e4e99814a0212b85881c9dd05607b6d50d61f2",
+      "status": 0,
+      "log": "/tmp/ginux-contribution-p03/review-fix-duplicate.log"
+    }
+  ],
+  "preserved_dirty_work_and_stashes": [
+    {
+      "location": "ginux-local-contribution-review",
+      "disposition": "Uncommitted typed owner/explicit release and dispatch simplification experiment, maps G05/G08. Current code still has raw handles. Review only useful owner-local cleanup with a needed feature; no separate refactor PR or blanket copying."
+    },
+    {
+      "location": "ginux-pr-combination-check",
+      "disposition": "Staged combined #216-#218 VFS package; all three now merged. Preserve staging; no duplicate delivery."
+    },
+    {
+      "location": "/tmp/ginux-i04m5",
+      "disposition": "Old memory-loader corrections plus restored VFS/process tests and untracked native memory scenarios. Preserve originals. Map meaningful offset/page/zero-length/stale-handle/fault cases to G12; current configured kernel-backed mappings are the implementation owner."
+    },
+    {
+      "location": "/tmp/ginux-i04m7",
+      "disposition": "Uncommitted same-file offset-aliased fixed-remap prototype. Current configured mappings pass native offsets to a readonly backing and use kernel mapping semantics; retain aliasing tests in G12, not the obsolete manual loader ledger."
+    },
+    {
+      "location": "/tmp/ginux-limits-review and /tmp/ginux-upcoming-review",
+      "disposition": "Interrupted merges with restored upstream unit modules, CI and unresolved Makefile/process conflicts. They are not deliverable source trees. Preserve them; current-main unit tests and workflow are authoritative, newer integrated owners are donors."
+    },
+    {
+      "location": "stashes 2b887da6 and a94d56fb",
+      "disposition": "Identical two-file unfinished owned-interpreter draft (same patch bytes). cda76faa and current exec_script::Script::resolve/held pin release replace it. Preserve both stash objects; do not apply them."
+    }
+  ]
 }

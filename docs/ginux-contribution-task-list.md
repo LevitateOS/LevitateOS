@@ -78,7 +78,7 @@ its affected packet and dependents, not unrelated fixes.
   merged PRs, relevant issue comments and required CI configuration. Recheck #153,
   #154, #207, #216–#218 and #179 as historical entry points, then follow current
   discussion. Record URLs, exact main SHA and policy outcomes. No outgoing messages.
-- [ ] **P03 — Account for every local change.** Compare every local/fork-only
+- [x] **P03 — Account for every local change.** Compare every local/fork-only
   commit and changed path against current main and the working integration.
   Classify as already upstream/equivalent, superseded prototype, existing PR,
   candidate, or intentionally downstream. Include older remote branches so unique
@@ -286,28 +286,24 @@ and records the holds on #207/#179 and transfer clamping. Open #224/#226 overlap
 with process cleanup/copyout work. No existing PR was changed. Git fetch changed
 cached refs only; integration source and HEAD remain intact.
 
-Active task: **P03 — account for every local change**. The initial
-[catalog](ginux-contributions/p03-catalog.json) maps 66 integration commits,
-49 additional non-upstream commits reachable from preserved worktrees, and
-59 net changed paths against current main. Classification is not a completed
-source review; extra-branch semantic dispositions and per-hunk coverage remain.
+P03 complete as inventory/classification. [Reconciliation](ginux-contributions/p03-reconciliation.md)
+and [catalog](ginux-contributions/p03-catalog.json) account for66 integration
+commits,49 extra-worktree commits,59 changed paths and261 assigned diff hunks.
+Full review is still pending for each extracted candidate.
 
-Two concrete joins need attention in P03/P04:
+A direct VFS regression confirms duplicated reads incorrectly keep separate
+offsets on both upstream3f2fe7df and integration7cf2638a, and passes on old fix
+b500f859. Preserve this as a standalone G05 subpacket. The other review fixes have
+semantic dispositions, including fixture assertions to retain. Older prototype
+and dirty/stashed work is preserved and mapped to its current owners.
 
-- Current upstream #221 is absent from the older integration HEAD. A whole-file
-  copy would delete its protected-copyout helpers and regressions. Preserve those
-  incoming changes when composing or extracting contributions.
-- Preserved review commit `b500f859` fixed shared offsets in VFS duplicated
-  descriptors, but the current integration's VFS still stores offsets per
-  descriptor. Public launch alias tests exercise another ownership layer and do
-  not establish the library property. Compare its regression on current main and
-  the integration; retain a focused G05 subpacket if confirmed. No fix/test run
-  is claimed yet. Other review commits `17050a20`, `acbde526`, `3fac8e05` need
-  semantic comparisons rather than assuming absence by commit hash.
+The upstream merge preview identifies conflicts in supervisor.rs and VFSlib.rs;
+new #221 helpers/fixtures and #217/#218 changes must be preserved. No source/index/
+branch/remote was modified by the preview or regression probes.
 
-Exact next action: reconcile the 49 extra-worktree commits against current main
-and integration, beginning with those four review commits; complete P03 before P04.
-No Ginux source change, new branch/worktree, push or PR has occurred.
+Active task and exact next action: **P04 — verify capability dependencies**,
+beginning with G17/G18's backing/capacity ordering and standalone G05 extraction.
+Run only one task at a time; F04 remains the user checkpoint before publication.
 
 Active skill: `hdae-development`, discovered at
 `/home/vince/.codex/worktrees/ginux-pr-combination-check/ginux/.agents/skills/hdae-development/SKILL.md`.
