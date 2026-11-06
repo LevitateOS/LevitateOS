@@ -13,7 +13,7 @@ All LevitateOS source code is dual-licensed under MIT and Apache-2.0.
 You may choose either license. See LICENSE-MIT and LICENSE-APACHE.
 
 This includes:
-  - Rust crates (leviso, distro-spec, tools/*, etc.)
+  - Rust crates (distro-builder, distro-spec, tools/*, etc.)
   - TypeScript packages (docs/content, docs/tui, docs/website)
   - Python code (llm-toolkit)
 
@@ -62,7 +62,7 @@ LevitateOS uses the vanilla Linux kernel with configuration-only customization:
 
   - Version: 6.18.x-levitate (CONFIG_LOCALVERSION="-levitate")
   - Patches: None (vanilla kernel)
-  - Configuration: leviso/kconfig
+  - Configuration: distro-variants/*/build-host/kernel/kconfig
 
 GPL-2.0 compliance is satisfied through:
 
@@ -73,7 +73,7 @@ GPL-2.0 compliance is satisfied through:
     https://github.com/LevitateOS/linux
 
 No modifications to kernel source are distributed; only the kernel
-configuration file (leviso/kconfig) which is MIT OR Apache-2.0 licensed.
+configuration files (distro-variants/*/build-host/kernel/kconfig), which are MIT OR Apache-2.0 licensed.
 
 
 5. RUST DEPENDENCIES

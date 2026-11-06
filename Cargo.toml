@@ -5,8 +5,6 @@ members = [
     "distro-contract",
     "distro-builder",
     "distro-builder/install-split-pane",
-    "leviso",
-    "AcornOS",
     "leviso-elf",
     "xtask",
     "tools/recipe",

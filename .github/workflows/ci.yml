@@ -142,10 +142,6 @@ jobs:
         with:
           components: clippy, rustfmt
 
-      - name: Clippy - leviso
-        working-directory: leviso
-        run: cargo clippy -- -D warnings
-
       - name: Clippy - recipe
         working-directory: tools/recipe
         run: cargo clippy -- -D warnings

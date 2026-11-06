@@ -9,7 +9,6 @@ const SCAN_ROOTS: &[&str] = &[
     "distro-contract",
     "distro-variants",
     "testing/install-tests",
-    "AcornOS",
     "xtask",
 ];
 

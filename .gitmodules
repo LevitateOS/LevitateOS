@@ -14,10 +14,6 @@
 	path = docs/content
 	url = git@github.com:LevitateOS/docs-content.git
 	branch = master
-[submodule "leviso"]
-	path = leviso
-	url = git@github.com:LevitateOS/leviso.git
-	branch = master
 [submodule "docs-tui"]
 	path = docs/tui
 	url = git@github.com:LevitateOS/docs-tui.git
@@ -57,10 +53,6 @@
 [submodule "leviso-elf"]
 	path = leviso-elf
 	url = git@github.com:LevitateOS/leviso-elf.git
-	branch = main
-[submodule "AcornOS"]
-	path = AcornOS
-	url = git@github.com:LevitateOS/AcornOS.git
 	branch = main
 [submodule "testing/hardware-compat"]
 	path = testing/hardware-compat
