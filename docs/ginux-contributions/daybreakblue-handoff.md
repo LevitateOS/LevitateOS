@@ -386,3 +386,25 @@ hostile parent/staging/final-name changes, abrupt interruption, I/O/close/cleanu
 failure injection and shared-thread/argument races independently. A complete
 archive is published only after close, but no adversarial authority acceptance is
 inferred. No cloud agent dispatched; [review/evidence](g19-review.md).
+
+
+## G20 — private control and task-event wait (in progress)
+
+Porting on G19a36e7644 without guest polling/channels, restore or held threads.
+Ordinary local checks will use valid full/fragmented control frames, two complete
+snapshots, final export in the same directory, normal peer closure/cancellation,
+and task status wakeups (including ignored host SIGCHLD). Distinct internal staging
+identities isolate concurrent final-export and checkpoint owners.
+DaybreakBlue must validate hostile/oversized/replayed frames, control FD authority
+and bootstrap leakage, readiness/lost-stop races, pending mutation/mapping/thread
+state, inherited signal masks and fault-injected send/read/close/capture failures.
+These are not run here. Keep the donor full negative/private-FD checks in CI;
+ordinary selections are not security acceptance or monitored cloud dispatch.
+
+G20 exact retained revision: 7afa833d1babcc5dd62ef326f81c52835f9aa349 on G19 a36e76441b5a7c1a30b3461c9537bb3c6aee9d8e.
+92 routine units and selected ordinary capture/fragmentation/final-export/peer-
+closure/task-event plus existing storage/exec controls pass in source/clean replay.
+No negative-frame, private-FD inspection, race or injected-failure run occurred.
+Validate bounded framing/authority, bootstrap leakage, readiness/lost-stop races,
+inherited signal masks and shared mutation independently. No cloud dispatch;
+[review/evidence](g20-review.md).

@@ -1,0 +1,874 @@
+From 7afa833d1babcc5dd62ef326f81c52835f9aa349 Mon Sep 17 00:00:00 2001
+From: vince <vincepaul.liem@gmail.com>
+Date: Fri, 6 Nov 2026 15:52:02 +0100
+Subject: [PATCH] feat(launch): capture snapshots over private host control
+
+Accept bounded sequenced capture requests over an inherited Unix stream
+socket, acknowledge after complete publication, and cancel on peer loss.
+Reuse the archive owner with distinct staging names for repeated captures.
+Wake task/control processing through private signalfd and poll while
+keeping wait4 as the sole task-status owner.
+
+Signed-off-by: vince <vincepaul.liem@gmail.com>
+---
+ .github/workflows/check.yml                 |   1 +
+ Makefile                                    |   4 +
+ README.md                                   |  16 +-
+ crates/ginux-init/src/checkpoint_control.rs | 165 ++++++++++++++++++++
+ crates/ginux-init/src/fs_hooks.rs           |  31 ++--
+ crates/ginux-init/src/launch.rs             |  34 +++-
+ crates/ginux-init/src/launch_tasks.rs       | 116 +++++++++++++-
+ crates/ginux-init/src/main.rs               |   5 +-
+ crates/ginux-init/src/storage_export.rs     |  68 ++++++--
+ scripts/test-launch-checkpoints.py          | 139 +++++++++++++++++
+ tests/fixtures/launch-storage-fixture.c     |  20 +++
+ 11 files changed, 563 insertions(+), 36 deletions(-)
+ create mode 100644 crates/ginux-init/src/checkpoint_control.rs
+ create mode 100644 scripts/test-launch-checkpoints.py
+
+diff --git a/.github/workflows/check.yml b/.github/workflows/check.yml
+index 1db61bc9..bd7c43c2 100644
+--- a/.github/workflows/check.yml
++++ b/.github/workflows/check.yml
+@@ -27,6 +27,7 @@ jobs:
+       - run: make build build-launch-fixture build-launch-storage-fixture build-launch-device-fixture build-launch-pipe-fixture build-launch-fd-fixture build-launch-task-fixture build-launch-exec-fixture build-launch-directory-fixture build-launch-owned-exec-fixture build-process-fixtures build-gate1-fixture build-launch-script-fixture
+       - run: sudo make test-launch
+       - run: sudo make test-launch-storage
++      - run: sudo make test-launch-checkpoints
+       - run: sudo make test-launch-devices
+       - run: sudo make test-launch-pipes
+       - run: sudo make test-launch-fds
+diff --git a/Makefile b/Makefile
+index b3b7bd9a..9736e61e 100644
+--- a/Makefile
++++ b/Makefile
+@@ -267,3 +267,7 @@ build-launch-script-fixture:
+ 
+ test-launch-scripts:
+ 	python3 scripts/test-launch-scripts.py $(GINUX) .artifacts/launch/launch-script-fixture
++
++.PHONY: test-launch-checkpoints
++test-launch-checkpoints:
++	python3 scripts/test-launch-checkpoints.py $(GINUX) .artifacts/launch/launch-storage-fixture
+diff --git a/README.md b/README.md
+index 0b9f7c8d..11dc9333 100644
+--- a/README.md
++++ b/README.md
+@@ -454,6 +454,20 @@ write, sync and close. Failed workloads cancel staging. Export failures fail the
+ launch; an existing destination is preserved. Abrupt supervisor death can leave a
+ private staging file, which is never a published archive. Consumers must require
+ both successful completion and a valid archive. This is final export, without
+-retained storage, checkpoint/restore, symlink or hardlink archive support.
++retained storage, startup restoration, symlink or hardlink archive support.
+ Owned regular files support fsync/fdatasync against their supervisor backing;
+ these calls do not imply persistence after the in-memory domain ends.
++
++A host coordinator may pass `--control-fd <inherited Unix stream socket>` for
++mid-run filesystem snapshots. The supervisor keeps the socket private. Requests
++are GXS1, a little-endian u64 strictly increasing sequence, a little-endian u16
++pathname length1–512, and non-NUL pathname bytes. Destinations must be fresh.
++Only after complete archive write/sync/close and no-overwrite publication does
++it reply GXA1, the matching little-endian u64 sequence and u64 zero status.
++Valid partial frames are buffered within the fixed bound. Invalid requests,
++peer loss and capture failure stop the domain. The host owns request deadlines,
++directory durability, paired state and workload acknowledgment. Capture serializes
++with mediated owned filesystem mutation; it does not save process memory or live
++handles. Private signal/control readiness wakes the supervisor without a periodic
++control tick; wait4 remains the sole task-status owner. Guest polling, shared
++thread capture and startup restore remain separate capabilities.
+diff --git a/crates/ginux-init/src/checkpoint_control.rs b/crates/ginux-init/src/checkpoint_control.rs
+new file mode 100644
+index 00000000..6fb554aa
+--- /dev/null
++++ b/crates/ginux-init/src/checkpoint_control.rs
+@@ -0,0 +1,165 @@
++//! Private coordinator socket for serialized owned-filesystem snapshots.
++//! Requests: GXS1, u64 LE sequence, u16 LE pathname length, pathname bytes.
++//! Replies: GXA1, matching u64 sequence, u64 zero status. A reply follows file
++//! fsync/close; the coordinator must sync its directory and matching state before
++//! acknowledging the workload. Invalid requests or storage failures stop launch.
++use crate::fs_hooks::LaunchFs;
++use crate::supervisor::{syscall3, syscall5, syscall6};
++
++type Error = &'static [u8];
++const HEADER: usize = 14;
++const PATH: usize = crate::launch::MAX_RESULT_PATH_LEN;
++struct Control {
++    fd: Option<usize>,
++    bytes: [u8; HEADER + PATH],
++    used: usize,
++    wanted: usize,
++    last: u64,
++    reply: [u8; 20],
++    sent: usize,
++}
++static mut CONTROL: Control = Control {
++    fd: None,
++    bytes: [0; HEADER + PATH],
++    used: 0,
++    wanted: HEADER,
++    last: 0,
++    reply: [0; 20],
++    sent: 20,
++};
++
++pub fn prepare(fd: Option<usize>) -> Result<(), Error> {
++    let Some(fd) = fd else {
++        return Ok(());
++    };
++    let mut kind = 0i32;
++    let mut length = 4u32;
++    let mut address = [0u8; 128];
++    let mut address_length = address.len() as u32;
++    if unsafe {
++        syscall5(
++            55,
++            fd,
++            1,
++            3,
++            &mut kind as *mut _ as usize,
++            &mut length as *mut _ as usize,
++        )
++    } != 0
++        || kind != 1
++        || length != 4
++        || unsafe {
++            syscall3(
++                51,
++                fd,
++                address.as_mut_ptr() as usize,
++                &mut address_length as *mut _ as usize,
++            )
++        } != 0
++        || address_length < 2
++        || u16::from_ne_bytes([address[0], address[1]]) != 1
++    {
++        return Err(b"control fd must be an inherited Unix stream socket");
++    }
++    let flags = unsafe { syscall3(72, fd, 3, 0) };
++    if flags < 0
++        || unsafe { syscall3(72, fd, 4, flags as usize | 0x800) } < 0
++        || unsafe { syscall3(72, fd, 2, 1) } < 0
++    {
++        return Err(b"control fd setup failed");
++    }
++    unsafe {
++        CONTROL.fd = Some(fd);
++    }
++    Ok(())
++}
++
++/// Readiness interest for the supervisor's private event wait.
++pub fn readiness() -> (i32, i16) {
++    let state = unsafe { &*core::ptr::addr_of!(CONTROL) };
++    (
++        state.fd.map_or(-1, |fd| fd as i32),
++        if state.sent < state.reply.len() { 4 } else { 1 },
++    )
++}
++
++pub fn poll(files: &LaunchFs) -> Result<(), Error> {
++    // Only the single supervisor event loop accesses this owner. The tracee
++    // closes all inherited descriptors above stdio before running guest code.
++    let state = unsafe { &mut *core::ptr::addr_of_mut!(CONTROL) };
++    let Some(fd) = state.fd else {
++        return Ok(());
++    };
++    if state.sent < state.reply.len() {
++        let reply = &state.reply[state.sent..];
++        let count = unsafe { syscall6(44, fd, reply.as_ptr() as usize, reply.len(), 0x4000, 0, 0) };
++        if count == -4 || count == -11 {
++            return Ok(());
++        }
++        if count <= 0 {
++            return Err(b"checkpoint control reply failed");
++        }
++        state.sent += count as usize;
++        return Ok(());
++    }
++    loop {
++        let count = unsafe {
++            syscall3(
++                0,
++                fd,
++                state.bytes.as_mut_ptr().add(state.used) as usize,
++                state.wanted - state.used,
++            )
++        };
++        if count == -4 || count == -11 {
++            return Ok(());
++        }
++        if count <= 0 {
++            return Err(b"checkpoint control peer closed");
++        }
++        state.used += count as usize;
++        if state.used < state.wanted {
++            return Ok(());
++        }
++        if state.wanted == HEADER {
++            let length = u16::from_le_bytes(state.bytes[12..14].try_into().unwrap()) as usize;
++            let sequence = u64::from_le_bytes(state.bytes[4..12].try_into().unwrap());
++            if &state.bytes[..4] != b"GXS1"
++                || length == 0
++                || length > PATH
++                || sequence <= state.last
++            {
++                return Err(b"invalid checkpoint control request");
++            }
++            state.wanted += length;
++            continue;
++        }
++        let mut path = [0u8; PATH + 1];
++        let length = state.wanted - HEADER;
++        path[..length].copy_from_slice(&state.bytes[HEADER..state.wanted]);
++        if path[..length].contains(&0) {
++            return Err(b"invalid checkpoint destination");
++        }
++        // The event loop cannot mediate another owned write during this call.
++        // Shared writable mappings and native writable backing fds are denied.
++        files.snapshot(path.as_ptr())?;
++        state.last = u64::from_le_bytes(state.bytes[4..12].try_into().unwrap());
++        state.reply[..4].copy_from_slice(b"GXA1");
++        state.reply[4..12].copy_from_slice(&state.last.to_le_bytes());
++        state.sent = 0;
++        state.used = 0;
++        state.wanted = HEADER;
++        return Ok(());
++    }
++}
++
++pub fn close() -> Result<(), Error> {
++    let state = unsafe { &mut *core::ptr::addr_of_mut!(CONTROL) };
++    let Some(fd) = state.fd.take() else {
++        return Ok(());
++    };
++    if unsafe { crate::supervisor::syscall1(3, fd) } != 0 {
++        return Err(b"checkpoint control close failed");
++    }
++    Ok(())
++}
+diff --git a/crates/ginux-init/src/fs_hooks.rs b/crates/ginux-init/src/fs_hooks.rs
+index de6061f4..341013e7 100644
+--- a/crates/ginux-init/src/fs_hooks.rs
++++ b/crates/ginux-init/src/fs_hooks.rs
+@@ -126,18 +126,27 @@ impl LaunchFs {
+     }
+ 
+     pub fn export(&self) -> Result<(), &'static [u8]> {
+-        crate::storage_export::finish(|archive| {
+-            for slot in 0..OBJECTS {
+-                if let Some((path, metadata)) = self.fs.overlay_entry(slot) {
+-                    archive.entry(path, metadata, |offset, buffer| {
+-                        self.fs
+-                            .read_overlay(slot, offset, buffer)
+-                            .map_err(|_| b"export read failed".as_slice())
+-                    })?;
+-                }
++        crate::storage_export::finish(|archive| self.write_archive(archive))
++    }
++
++    pub fn snapshot(&self, path: *const u8) -> Result<(), &'static [u8]> {
++        crate::storage_export::capture(path, |archive| self.write_archive(archive))
++    }
++
++    fn write_archive(
++        &self,
++        archive: &mut crate::storage_export::Archive,
++    ) -> Result<(), &'static [u8]> {
++        for slot in 0..OBJECTS {
++            if let Some((path, metadata)) = self.fs.overlay_entry(slot) {
++                archive.entry(path, metadata, |offset, buffer| {
++                    self.fs
++                        .read_overlay(slot, offset, buffer)
++                        .map_err(|_| b"export read failed".as_slice())
++                })?;
+             }
+-            Ok(())
+-        })
++        }
++        Ok(())
+     }
+ 
+     pub fn teardown(&mut self) {
+diff --git a/crates/ginux-init/src/launch.rs b/crates/ginux-init/src/launch.rs
+index 72e93c43..0a81c903 100644
+--- a/crates/ginux-init/src/launch.rs
++++ b/crates/ginux-init/src/launch.rs
+@@ -34,7 +34,7 @@ pub enum Command {
+     Devices(*const u8, *const u8),
+     DeviceBench(*const u8, *const u8, *const u8),
+     KernelViews(*const u8),
+-    Launch(*const u8, *const u8, *const u8, *const u8),
++    Launch(*const u8, *const u8, *const u8, *const u8, Option<usize>),
+     LaunchUsage,
+     Usage,
+ }
+@@ -106,6 +106,7 @@ pub fn parse_argv(argc: usize, argv: *const usize) -> Option<Command> {
+         let root_path = unsafe { *argv.add(3) as *const u8 };
+         let mut result_path: *const u8 = core::ptr::null();
+         let mut export_path: *const u8 = core::ptr::null();
++        let mut control_fd = None;
+         let mut i = 4;
+         while i < argc {
+             if i + 1 >= argc {
+@@ -120,6 +121,11 @@ pub fn parse_argv(argc: usize, argv: *const usize) -> Option<Command> {
+                 result_path = value;
+             } else if c_string_equals(option, b"--export-file") && export_path.is_null() {
+                 export_path = value;
++            } else if c_string_equals(option, b"--control-fd") && control_fd.is_none() {
++                control_fd = parse_control_fd(value);
++                if control_fd.is_none() {
++                    return Some(Command::LaunchUsage);
++                }
+             } else {
+                 return Some(Command::LaunchUsage);
+             }
+@@ -130,12 +136,28 @@ pub fn parse_argv(argc: usize, argv: *const usize) -> Option<Command> {
+             root_path,
+             result_path,
+             export_path,
++            control_fd,
+         ))
+     } else {
+         Some(Command::Usage)
+     }
+ }
+ 
++fn parse_control_fd(value: *const u8) -> Option<usize> {
++    let mut fd = 0usize;
++    for i in 0..6 {
++        let byte = unsafe { core::ptr::read_volatile(value.add(i)) };
++        if byte == 0 {
++            return (i != 0 && (3..=65535).contains(&fd)).then_some(fd);
++        }
++        if !byte.is_ascii_digit() {
++            return None;
++        }
++        fd = fd * 10 + (byte - b'0') as usize;
++    }
++    None
++}
++
+ pub fn load_config(path: *const u8) -> DomainConfig {
+     let length = read_config(path);
+     let bytes = unsafe {
+@@ -304,10 +326,13 @@ pub fn launch_main(
+     root_path: *const u8,
+     result_path: *const u8,
+     export_path: *const u8,
++    control_fd: Option<usize>,
+ ) -> ! {
+     stage_result_path(result_path);
+     crate::storage_export::prepare(export_path)
+         .unwrap_or_else(|reason| launch_startup_fail(reason));
++    crate::checkpoint_control::prepare(control_fd)
++        .unwrap_or_else(|reason| launch_startup_fail(reason));
+     let config = launch_load_config(config_path);
+     launch_validate(&config);
+     let mut devices = crate::device_hooks::LaunchDevices::prepare(&config)
+@@ -622,12 +647,12 @@ pub fn usage() -> ! {
+     line_stderr(b"ginux: usage: ginux devices <config> <block>");
+     line_stderr(b"ginux: usage: ginux device-bench <config> <block> <kind>");
+     line_stderr(b"ginux: usage: ginux vfs <config> <rootfs> <index>");
+-    line_stderr(b"ginux: usage: ginux launch <config> <root> [--result-file <fresh host path>] [--export-file <fresh tar path>]");
++    line_stderr(b"ginux: usage: ginux launch <config> <root> [--result-file <fresh host path>] [--export-file <fresh tar path>] [--control-fd <inherited socket>]");
+     exit_process(2)
+ }
+ 
+ pub fn launch_usage() -> ! {
+-    line_stderr(b"ginux: launch usage: launch <config> <root> [--result-file <fresh host path>] [--export-file <fresh tar path>]");
++    line_stderr(b"ginux: launch usage: launch <config> <root> [--result-file <fresh host path>] [--export-file <fresh tar path>] [--control-fd <inherited socket>]");
+     exit_process(2)
+ }
+ 
+@@ -734,6 +759,9 @@ fn write_completion_result(outcome: u8, has_code: bool, code: u64, has_signal: b
+         line_stderr(b"ginux: export staging cleanup failed");
+     }
+ 
++    if crate::checkpoint_control::close().is_err() {
++        line_stderr(b"ginux: checkpoint control close failed");
++    }
+     let descriptor = unsafe { RESULT_FD };
+     if descriptor < 0 {
+         return;
+diff --git a/crates/ginux-init/src/launch_tasks.rs b/crates/ginux-init/src/launch_tasks.rs
+index b8b389f9..9a03b8e4 100644
+--- a/crates/ginux-init/src/launch_tasks.rs
++++ b/crates/ginux-init/src/launch_tasks.rs
+@@ -95,6 +95,87 @@ struct Supervisor<'a> {
+     sequence: u64,
+     wake_needed: bool,
+     tearing_down: bool,
++    signal_fd: Option<usize>,
++}
++
++// Created only after the tracee's initial exec stop, so neither the blocked
++// signal nor this private descriptor can enter the workload. SIGCHLD remains
++// blocked between wait4(WNOHANG) and poll: a new ptrace stop cannot be lost in
++// that interval. wait4 owns statuses; signalfd is only a wakeup notification.
++fn task_events() -> Result<usize, &'static [u8]> {
++    let mask = 1u64 << (SIGCHLD - 1);
++    let action = [0u64; 4];
++    if unsafe {
++        syscall4(
++            SYS_RT_SIGPROCMASK,
++            SIG_BLOCK,
++            &mask as *const _ as usize,
++            0,
++            8,
++        )
++    } < 0
++        || unsafe { syscall4(13, SIGCHLD, action.as_ptr() as usize, 0, 8) } < 0
++    {
++        return Err(b"task event signal setup failed");
++    }
++    let fd = unsafe {
++        syscall4(
++            SYS_SIGNALFD4,
++            usize::MAX,
++            &mask as *const _ as usize,
++            8,
++            0x80800,
++        )
++    };
++    if fd < 0 {
++        return Err(b"task event descriptor setup failed");
++    }
++    Ok(fd as usize)
++}
++
++fn wait_events(signal_fd: usize) -> Result<(), &'static [u8]> {
++    #[repr(C)]
++    struct PollFd {
++        fd: i32,
++        events: i16,
++        revents: i16,
++    }
++    let (control, events) = crate::checkpoint_control::readiness();
++    let mut fds = [
++        PollFd {
++            fd: signal_fd as i32,
++            events: 1,
++            revents: 0,
++        },
++        PollFd {
++            fd: control,
++            events,
++            revents: 0,
++        },
++    ];
++    // Either private descriptor wakes us, including requests while tasks sleep.
++    let result = unsafe { syscall3(7, fds.as_mut_ptr() as usize, fds.len(), usize::MAX) };
++    if result < 0 && result != -4 {
++        return Err(b"task event wait failed");
++    }
++    if fds[0].revents & !1 != 0 {
++        return Err(b"task event descriptor failed");
++    }
++    if fds[0].revents & 1 != 0 {
++        let mut info = [0u8; 128];
++        let count = unsafe {
++            syscall3(
++                SYS_READ_HOST,
++                signal_fd,
++                info.as_mut_ptr() as usize,
++                info.len(),
++            )
++        };
++        if count != 128 && count != -4 && count != -11 {
++            return Err(b"task event read failed");
++        }
++    }
++    Ok(())
+ }
+ 
+ pub fn supervise(
+@@ -151,6 +232,7 @@ pub fn supervise(
+         sequence: 0,
+         wake_needed: false,
+         tearing_down: false,
++        signal_fd: None,
+     };
+     s.tasks[0] = Some(Task {
+         id,
+@@ -173,19 +255,32 @@ pub fn supervise(
+     }
+     line_stderr(b"ginux: launch backend=ptrace-native profile=balanced elf-loader=host");
+     line_stderr(b"ginux: launch tracee-uid=1000 tracee-gid=1000 root=host-path-read-only");
++    let signal_fd = task_events().unwrap_or_else(|reason| s.fail(domain, reason));
++    s.signal_fd = Some(signal_fd);
+     s.resume(0, 0, domain);
+     loop {
+         s.wake(domain);
++        // Only this owner mediates owned mutations; snapshot serialization
++        // cannot interleave with another owned write.
++        if let Err(reason) = crate::checkpoint_control::poll(s.objects.filesystem) {
++            s.fail(domain, reason);
++        }
+         status = 0;
+         let host = unsafe {
+             syscall4(
+                 SYS_WAIT4,
+                 usize::MAX,
+                 &mut status as *mut _ as usize,
+-                WALL,
++                WALL | 1,
+                 0,
+             )
+         };
++        if host == 0 {
++            if let Err(reason) = wait_events(signal_fd) {
++                s.fail(domain, reason);
++            }
++            continue;
++        }
+         if host == -4 {
+             continue;
+         }
+@@ -1559,11 +1654,24 @@ impl Supervisor<'_> {
+         if self.objects.refs.active() != 0 || self.processes.active() != 0 {
+             supervision_error(domain, b"domain teardown retained owned state")
+         }
+-        let exported = if export {
+-            self.objects.filesystem.export()
++        let control_closed = crate::checkpoint_control::close();
++        let event_closed = if let Some(fd) = self.signal_fd.take() {
++            if unsafe { syscall1(3, fd) } == 0 {
++                Ok(())
++            } else {
++                Err(b"task event close failed".as_slice())
++            }
+         } else {
+-            crate::storage_export::cancel()
++            Ok(())
+         };
++        let settled = control_closed.and(event_closed);
++        let exported = settled.and_then(|_| {
++            if export {
++                self.objects.filesystem.export()
++            } else {
++                crate::storage_export::cancel()
++            }
++        });
+         self.objects.filesystem.teardown();
+         if let Err(reason) = exported {
+             supervision_error(domain, reason);
+diff --git a/crates/ginux-init/src/main.rs b/crates/ginux-init/src/main.rs
+index 3f1879d2..fda09133 100644
+--- a/crates/ginux-init/src/main.rs
++++ b/crates/ginux-init/src/main.rs
+@@ -9,6 +9,7 @@ use ginux_core::{
+ };
+ 
+ mod channel_hooks;
++mod checkpoint_control;
+ mod descriptors;
+ mod device_hooks;
+ mod dispatch;
+@@ -204,8 +205,8 @@ extern "C" fn rust_main(initial_stack: *const usize) -> ! {
+             device_bench_main(config_path, block_path, kind)
+         }
+         Some(Command::KernelViews(config_path)) => kernel_views_main(config_path),
+-        Some(Command::Launch(config_path, root_path, result_path, export_path)) => {
+-            launch_main(config_path, root_path, result_path, export_path)
++        Some(Command::Launch(config_path, root_path, result_path, export_path, control_fd)) => {
++            launch_main(config_path, root_path, result_path, export_path, control_fd)
+         }
+         Some(Command::LaunchUsage) => launch_usage(),
+         Some(Command::Usage) => usage(),
+diff --git a/crates/ginux-init/src/storage_export.rs b/crates/ginux-init/src/storage_export.rs
+index 2c06b62a..4cdcb627 100644
+--- a/crates/ginux-init/src/storage_export.rs
++++ b/crates/ginux-init/src/storage_export.rs
+@@ -13,6 +13,7 @@ struct Export {
+     temporary: [u8; PATH_BYTES],
+ }
+ static mut EXPORT: Option<Export> = None;
++static mut SERIAL: u64 = 0;
+ 
+ impl Export {
+     fn remove(&self) -> Result<(), Error> {
+@@ -32,6 +33,14 @@ pub fn prepare(path: *const u8) -> Result<(), Error> {
+     if path.is_null() {
+         return Ok(());
+     }
++    let state = create(path)?;
++    unsafe {
++        core::ptr::write(core::ptr::addr_of_mut!(EXPORT), Some(state));
++    }
++    Ok(())
++}
++
++fn create(path: *const u8) -> Result<Export, Error> {
+     let mut destination = [0; PATH_BYTES];
+     let mut length = 0;
+     while length < PATH_BYTES {
+@@ -66,26 +75,44 @@ pub fn prepare(path: *const u8) -> Result<(), Error> {
+     if pid <= 0 {
+         return Err(b"export staging identity unavailable");
+     }
+-    let mut digits = [0; 20];
+-    let mut value = pid as usize;
+-    let mut count = 0;
+-    while value != 0 {
+-        digits[count] = b'0' + (value % 10) as u8;
+-        value /= 10;
+-        count += 1;
++    let serial =
++        unsafe { SERIAL.checked_add(1) }.ok_or(b"export staging identity exhausted".as_slice())?;
++    unsafe {
++        SERIAL = serial;
++    }
++    let mut suffix = [0; 41];
++    let mut suffix_len = 0;
++    for number in [pid as u64, serial] {
++        if suffix_len != 0 {
++            suffix[suffix_len] = b'-';
++            suffix_len += 1;
++        }
++        let mut digits = [0; 20];
++        let mut count = 0;
++        let mut number = number;
++        loop {
++            digits[count] = b'0' + (number % 10) as u8;
++            count += 1;
++            number /= 10;
++            if number == 0 {
++                break;
++            }
++        }
++        for digit in digits[..count].iter().rev() {
++            suffix[suffix_len] = *digit;
++            suffix_len += 1;
++        }
+     }
+     let prefix = b".ginux-export-";
+     let end = parent
+         .checked_add(prefix.len())
+-        .and_then(|n| n.checked_add(count))
++        .and_then(|n| n.checked_add(suffix_len))
+         .filter(|n| *n < PATH_BYTES)
+         .ok_or(b"export staging path exceeds bound".as_slice())?;
+     let mut temporary = [0; PATH_BYTES];
+     temporary[..parent].copy_from_slice(&destination[..parent]);
+     temporary[parent..parent + prefix.len()].copy_from_slice(prefix);
+-    for (index, digit) in digits[..count].iter().rev().enumerate() {
+-        temporary[parent + prefix.len() + index] = *digit;
+-    }
++    temporary[parent + prefix.len()..end].copy_from_slice(&suffix[..suffix_len]);
+     if temporary[..end] == destination[..length] {
+         return Err(b"export staging name conflicts with destination");
+     }
+@@ -122,10 +149,7 @@ pub fn prepare(path: *const u8) -> Result<(), Error> {
+         }
+         state.fd = duplicate as usize;
+     }
+-    unsafe {
+-        core::ptr::write(core::ptr::addr_of_mut!(EXPORT), Some(state));
+-    }
+-    Ok(())
++    Ok(state)
+ }
+ 
+ pub fn cancel() -> Result<(), Error> {
+@@ -144,6 +168,20 @@ pub fn finish(write: impl FnOnce(&mut Archive) -> Result<(), Error>) -> Result<(
+     let Some(state) = take() else {
+         return Ok(());
+     };
++    complete(state, write)
++}
++
++pub fn capture(
++    path: *const u8,
++    write: impl FnOnce(&mut Archive) -> Result<(), Error>,
++) -> Result<(), Error> {
++    complete(create(path)?, write)
++}
++
++fn complete(
++    state: Export,
++    write: impl FnOnce(&mut Archive) -> Result<(), Error>,
++) -> Result<(), Error> {
+     let mut archive = Archive(state.fd);
+     let result = write(&mut archive)
+         .and_then(|_| archive.bytes(&[0; 1024]))
+diff --git a/scripts/test-launch-checkpoints.py b/scripts/test-launch-checkpoints.py
+new file mode 100644
+index 00000000..cfb8dd86
+--- /dev/null
++++ b/scripts/test-launch-checkpoints.py
+@@ -0,0 +1,139 @@
++#!/usr/bin/env python3
++"""Exercise private snapshot control against a real configured workload."""
++import json
++import os
++from pathlib import Path
++import select
++import shutil
++import signal
++import time
++import socket
++import struct
++import subprocess
++import sys
++import tarfile
++import tempfile
++
++
++def receive(sock, count):
++    data = bytearray()
++    while len(data) < count:
++        chunk = sock.recv(count - len(data))
++        assert chunk, 'control socket closed before acknowledgement'
++        data.extend(chunk)
++    return bytes(data)
++
++
++def main():
++    if len(sys.argv) not in (3,4) or os.geteuid() != 0:
++        sys.exit('usage (as root): test-launch-checkpoints.py <ginux> <storage-fixture> [ordinary]')
++    binary, fixture = [str(Path(p).resolve()) for p in sys.argv[1:3]]
++    ordinary = len(sys.argv)==4
++    if ordinary and sys.argv[3]!='ordinary': sys.exit('unknown checkpoint selection')
++    template = (Path(__file__).resolve().parent.parent / 'config/domain-gate5.toml').read_text()
++    with tempfile.TemporaryDirectory(prefix='ginux-checkpoints-') as folder:
++        work = Path(folder)
++        root = work / 'root'
++        (root / 'bin').mkdir(parents=True)
++        (root / 'work').mkdir()
++        shutil.copyfile(fixture, root / 'bin/fixture')
++        (root / 'bin/fixture').chmod(0o755)
++        config = template.replace('init = "/bin/bash"', 'init = "/bin/fixture"')
++        config = config.replace('args = []', 'args = ["checkpoint"]')
++        config = config.replace('[storage]\nassignments = []', '[storage]\nassignments = ["memory:/work"]')
++        config_path = work / 'config.toml'
++        config_path.write_text(config)
++        for failure in ((None,) if ordinary else (None, 'replay', 'existing')):
++            client, server = socket.socketpair()
++            client.settimeout(5)
++            result = work / f'result-{failure}.json'
++            final = work / f'final-{failure}.tar'
++            with (work / f'audit-{failure}').open('wb') as audit:
++                proc = subprocess.Popen([binary, 'launch', str(config_path), str(root),
++                    '--result-file', str(result), '--export-file', str(final), '--control-fd', str(server.fileno())],
++                    pass_fds=(server.fileno(),), stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=audit)
++                server.close()
++                try:
++                    for sequence, expected in ((1, b'first'), (2, b'second')):
++                        assert select.select([proc.stdout], [], [], 5)[0]
++                        assert proc.stdout.readline() == b'checkpoint-ready\n'
++                        if not ordinary:
++                            children = Path(f'/proc/{proc.pid}/task/{proc.pid}/children').read_text().split()
++                            assert len(children) == 1
++                            assert sorted(p.name for p in Path(f'/proc/{children[0]}/fd').iterdir()) == ['0', '1', '2']
++                        archive = work / f'snapshot-{failure}-{sequence}.tar'
++                        if sequence == 2 and failure == 'existing':
++                            archive.write_bytes(b'preserve')
++                        request_id = 1 if sequence == 2 and failure == 'replay' else sequence
++                        path = os.fsencode(archive)
++                        frame = b'GXS1' + struct.pack('<QH', request_id, len(path)) + path
++                        client.sendall(frame[:5])
++                        assert not select.select([client], [], [], .02)[0], 'partial request acknowledged'
++                        client.sendall(frame[5:])
++                        if sequence == 2 and failure:
++                            stdout, _ = proc.communicate(timeout=5)
++                            assert proc.returncode == 1 and not stdout
++                            assert json.loads(result.read_text())['outcome'] == 'supervisor-error'
++                            if failure == 'existing': assert archive.read_bytes() == b'preserve'
++                            else: assert not archive.exists()
++                            assert not final.exists()
++                            break
++                        assert receive(client, 20) == b'GXA1' + struct.pack('<QQ', sequence, 0)
++                        with tarfile.open(archive) as tar:
++                            assert tar.extractfile('work/checkpoint').read() == expected
++                            assert tar.extractfile('work/child').read() == b'child'
++                        proc.stdin.write(b'G')
++                        proc.stdin.flush()
++                    if failure is None:
++                        stdout, _ = proc.communicate(timeout=5)
++                        assert proc.returncode == 0 and not stdout
++                        with tarfile.open(work / 'snapshot-None-1.tar') as tar:
++                            assert tar.extractfile('work/checkpoint').read() == b'first'
++                        assert json.loads(result.read_text())['code'] == 0
++                        with tarfile.open(final) as tar:
++                            assert tar.extractfile('work/checkpoint').read() == b'second'
++                        assert not list(work.glob('.ginux-export-*'))
++                finally:
++                    client.close()
++                    if proc.poll() is None:
++                        proc.kill()
++                        proc.communicate(timeout=5)
++        # A normally disconnected coordinator cancels a blocked workload.
++        client, server = socket.socketpair()
++        result, final = work/'closed.json', work/'closed.tar'
++        with (work/'closed.audit').open('wb') as audit:
++            proc = subprocess.Popen([binary,'launch',str(config_path),str(root),'--result-file',str(result),'--export-file',str(final),'--control-fd',str(server.fileno())],
++                pass_fds=(server.fileno(),),stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=audit)
++            server.close()
++            try:
++                assert select.select([proc.stdout],[],[],5)[0]
++                assert proc.stdout.readline()==b'checkpoint-ready\n'
++                client.close()
++                assert proc.wait(timeout=5)==1
++                stdout,_=proc.communicate(timeout=5)
++                assert not stdout and json.loads(result.read_text())['outcome']=='supervisor-error'
++                assert not final.exists() and not list(work.glob('.ginux-export-*'))
++            finally:
++                client.close()
++                if proc.poll() is None: proc.kill(); proc.communicate(timeout=5)
++        # Idle control must not force a polling tick per syscall. An inherited
++        # ignored SIGCHLD must not prevent the supervisor's private task wait.
++        config_path.write_text(config.replace('args = ["checkpoint"]','args = ["events"]'))
++        for controlled in (False,True):
++            client, server = socket.socketpair()
++            try:
++                command=[binary,'launch',str(config_path),str(root)]
++                if controlled: command+=['--control-fd',str(server.fileno())]
++                start=time.monotonic()
++                proc=subprocess.run(command,pass_fds=(server.fileno(),) if controlled else (),
++                    preexec_fn=lambda: signal.signal(signal.SIGCHLD,signal.SIG_IGN),capture_output=True,timeout=10)
++                assert proc.returncode==0,proc.stderr.decode()
++                assert proc.stdout==b'events: PASS\n',proc.stdout
++                print(f'10000 syscalls, control={controlled}: {time.monotonic()-start:.3f}s')
++            finally:
++                client.close(); server.close()
++        print('test-launch-checkpoints: PASS (' + ('ordinary snapshots, fragmented valid frames, final export, cancellation and task events' if ordinary else 'snapshots, private fds, partial frames, replay, freshness, cancellation and task events') + ')')
++
++
++if __name__ == '__main__':
++    main()
+diff --git a/tests/fixtures/launch-storage-fixture.c b/tests/fixtures/launch-storage-fixture.c
+index 7cb2ba17..fcb8a03e 100644
+--- a/tests/fixtures/launch-storage-fixture.c
++++ b/tests/fixtures/launch-storage-fixture.c
+@@ -92,10 +92,30 @@ static long export_data(const char *mode) {
+     }
+     return equal(mode,"failed-export") ? 7 : 0;
+ }
++static long checkpoint_data(void) {
++    long fd=DO(2,"/work/checkpoint",0102,0600); CHECK(fd==3 && DO(1,fd,"first",5)==5,210);
++    long child=DO(57,0,0,0); CHECK(child>=0,211);
++    if(!child) {
++        long data=DO(2,"/work/child",0101,0600);
++        CHECK(data>=3 && DO(1,data,"child",5)==5 && DO(3,data,0,0)==0,212); return 0;
++    }
++    int status=-1; CHECK(DO(61,child,&status,0)==child && status==0,213);
++    CHECK(DO(1,1,"checkpoint-ready\n",17)==17 && DO(0,0,output,1)==1,214);
++    CHECK(DO(8,fd,0,0)==0 && DO(1,fd,"second",6)==6,215);
++    CHECK(DO(1,1,"checkpoint-ready\n",17)==17 && DO(0,0,output,1)==1,216);
++    CHECK(DO(74,fd,0,0)==0 && DO(75,fd,0,0)==0 && DO(3,fd,0,0)==0,217);
++    return 0;
++}
++static long task_events_data(void) {
++    for(word n=0;n<10000;++n) CHECK(DO(39,0,0,0)>0,218);
++    CHECK(DO(1,1,"events: PASS\n",13)==13,219); return 0;
++}
+ long storage_main(word *stack)
+ {
+     word argc = *stack;
+     char **argv = (char **)(stack + 1);
++    if(argc>1 && equal(argv[1],"checkpoint")) return checkpoint_data();
++    if(argc>1 && equal(argv[1],"events")) return task_events_data();
+     if(argc>1 && (equal(argv[1],"flush") || equal(argv[1],"export") || equal(argv[1],"export-wait") || equal(argv[1],"failed-export") || equal(argv[1],"child-export"))) return export_data(argv[1]);
+     if (argc > 1 && argv[1][0] == 'v') {
+         long fd=DO(2,"/work/probe",0102|0400,0600);

@@ -928,8 +928,6 @@
       "packet": "G20",
       "purpose": "Private checkpoint control and event-driven waiting (`2b306eff`, `990fbb7a`)",
       "dependencies": [
-        "G06",
-        "G07",
         "G19"
       ],
       "source_commits": [
@@ -938,8 +936,51 @@
       ],
       "acceptance": "Checkpoint acknowledgment follows consistent capture; opaque bounded control, malformed frames, dead peers, cancellation and simultaneous task events behave correctly.",
       "planned_delivery": "one coherent change plus its generic docs and focused regression fixtures; split coupled responsibilities only as recorded by P04",
-      "status": "pending extraction and R01-R04 review",
-      "artifact_directory": ".artifacts/ginux-contribution-preparation/G20"
+      "status": "per-process source separately self-reviewed; selected ordinary source/clean checks pass; security/thread/full CI/upstream independence pending",
+      "artifact_directory": ".artifacts/ginux-contribution-preparation/G20",
+      "base": "a36e76441b5a7c1a30b3461c9537bb3c6aee9d8e",
+      "head": "7afa833d1babcc5dd62ef326f81c52835f9aa349",
+      "tree": "1d010ec50a9d95edab1ac96d888c8e6592420f90",
+      "changed_files": [
+        "README.md",
+        "Makefile",
+        ".github/workflows/check.yml",
+        "crates/ginux-init/src/checkpoint_control.rs",
+        "crates/ginux-init/src/fs_hooks.rs",
+        "crates/ginux-init/src/launch.rs",
+        "crates/ginux-init/src/launch_tasks.rs",
+        "crates/ginux-init/src/main.rs",
+        "crates/ginux-init/src/storage_export.rs",
+        "scripts/test-launch-checkpoints.py",
+        "tests/fixtures/launch-storage-fixture.c"
+      ],
+      "standalone": false,
+      "patch_sha256": "9f27e03884a9f8c8b8a9d4367edd3189c197737ed49ebe746126dd1e5e00a7c6",
+      "deferred_joins": [
+        "G07 thread/shared-argument security",
+        "G08 guest readiness timer",
+        "G13/G15/G18 archive join at G22",
+        "G21 restore"
+      ],
+      "unit_tests": 92,
+      "vfs_tests": 34,
+      "clean_matched_paths": 181,
+      "review": "separate self-review; no independent reviewer or security acceptance",
+      "remote_ci": "not run",
+      "security_handoff": "daybreakblue-handoff.md",
+      "held_dependencies": [
+        "G07 thread/shared-argument security"
+      ],
+      "source_binary_sha256": "d20e4f74ebe726842d1b9022c73a4f32d3d6e2a947a346a61765e8ee554921fc",
+      "clean_binary_sha256": "d20e4f74ebe726842d1b9022c73a4f32d3d6e2a947a346a61765e8ee554921fc",
+      "fixture_sha256": {
+        "launch-storage-fixture": "3011e02819729bccb3b520f6cb79a68aa1a9534126c569f5f8fb3e36935b3d04",
+        "launch-directory-fixture": "c07d2fe17d870fceb7237cb65fa4962e33aa4f454d0aaa4861440e2760e761e8",
+        "launch-script-fixture": "bbf5f27163c9fa1edb0042719da1fe8d31065fbc35ef221fec608370f4821953",
+        "launch-owned-exec-fixture": "ac70dd24534767b47ee52d088575f6d3d4a1e95f71b526bb3589daaf2e5ddf90"
+      },
+      "evidence": "g20-review.md",
+      "source_patch": "patches/G20.patch"
     },
     {
       "packet": "G21",
@@ -1114,7 +1155,8 @@
       "acceptance": "Actual runner builds and executes checkpoint/restore checks; static-and-unit still runs all existing modules. Prefer folding this small wiring into the feature that introduces the fixtures.",
       "planned_delivery": "one coherent change plus its generic docs and focused regression fixtures; split coupled responsibilities only as recorded by P04",
       "status": "pending extraction and R01-R04 review",
-      "artifact_directory": ".artifacts/ginux-contribution-preparation/G31"
+      "artifact_directory": ".artifacts/ginux-contribution-preparation/G31",
+      "checkpoint_wiring": "Folded into G20 introducing packet; full/default runtime and remote CI unrun. Restore wiring remains with G21."
     },
     {
       "packet": "G17a",

@@ -551,13 +551,24 @@ overwrite publication after sync/close. A reproduced early-rejection staging lea
 is fixed at common completion. Exact G12 rejects flush. G07 thread/security,
 G13/G15/G18/G21/G22 joins, full CI and actual upstream independence remain pending.
 
-Exact next task: **G20 — private checkpoint control and event-driven waiting**.
-Inspect2b306eff/990fbb7a against current task/process wait ownership and the reviewed
-export owner. Keep the transport host-owned, bounded and absent from workloads;
-do not import G08 guest channels or downstream protocols. Preserve typed cleanup
-and the held G07 thread/race boundary. Run ordinary capture/acknowledgment and
-process event/cancellation paths; record hostile frames, private-FD authority and
-races for DaybreakBlue. No publication or maintainer messages before F04.
+G20 per-process source/ordinary preparation is retained at `7afa833d` on
+G19a36e7644. [Review/evidence](ginux-contributions/g20-review.md) records92
+units,181-path strict replay, two valid fragmented captures plus final export,
+normal peer cancellation and task events, plus export/mapping/exec/storage controls
+passing in source/clean exports. Shared archive staging now has distinct capture
+identities. Private signalfd/poll replaces blocking task wait while wait4 retains
+status ownership. Essential G31 checkpoint CI wiring is folded into this packet;
+full/default/remote runs, security, G07 threads and upstream independence remain
+pending. Exact G19 rejects the new option. No publication occurred.
+
+Exact next task: **G21 — validated startup restore**.
+Inspect1d9e00e0 on the G19 export/storage owner. Keep restore independent of G20's
+control transport and use the shared current filesystem/metadata/storage owners.
+Run ordinary valid startup reconstruction before workload execution; write down
+malformed/traversing/oversized archive, collision/authority and failure-injection
+security acceptance for DaybreakBlue instead of executing it. Preserve full
+fixtures and fold essential restore CI wiring into the feature. No publication
+or maintainer messages before F04.
 
 Active skill: `hdae-development`, discovered at
 `/home/vince/.codex/worktrees/ginux-pr-combination-check/ginux/.agents/skills/hdae-development/SKILL.md`.
