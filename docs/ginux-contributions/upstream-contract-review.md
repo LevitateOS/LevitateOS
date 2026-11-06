@@ -70,3 +70,19 @@ need latest-base reconciliation; all full default/security/macOS/remote CI holds
 remain. The latest retained-patch integrity inventory is now
 `upstream-contract-refresh-2026-11-06/current-inventory.json`. Next: G03a, G06a,
 G03b serially, then the configured contract join at G03c.
+
+
+Configured launch already owns a64 KiB byte audit cap in `launch.rs`
+(`AUDIT_BYTE_BUDGET`), distinct from upstream native's8192-record AuditBudget.
+Preserve the existing configured writer and its bound when joining contract
+metadata/disabled mode; do not add a parallel audit system or assume native's
+record budget is an instruction to replace this public configured behavior.
+
+
+G03a is now also refreshed directly onff926d0c at
+`feafbad2a374e80c18943370e7efd1263554a245`:83 units/static/build and9 ordinary
+controls pass per source/clean; exact upstream fails the same workdir case.
+G05a/G03a are the two latest-base preparations;35 retained packets remain.
+Next is G06a, then G03b and the configured-owner join at G03c. Complete raw
+upstream delta is retained; upstream HDAE records describe its own project and
+are not authorization to change this downstream task's branch/publication rules.

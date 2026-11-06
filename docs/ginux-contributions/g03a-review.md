@@ -90,3 +90,26 @@ Current upstream tests and CI wiring remain intact. Full default Linux runtime
 jobs contain authority/protected/fault probes and remain unrun under the written
 security boundary; macOS/remote CI also remains unrun. R03 retains those checks.
 Selected ordinary success is not a full CI result or publication authorization.
+
+## PR231 latest-observed-base refresh — 2026-11-06
+
+Head `feafbad2a374e80c18943370e7efd1263554a245`, tree
+`e5ded2be4d64a14bfd641a561a51369acf1a7810`, is directly on upstream
+`ff926d0c228b71d55d0f2f0909dd86ec62197c8a`. The full added/removed delta
+remains two files,+4/-1. Separate self-review reread the entire delta and current
+bootstrap/configured-workdir/result path; PR231's contract-plan/config changes
+remain intact. Independent reviewer coverage is not claimed.
+
+Exact upstream exits2 without creating the missing directory. Candidate source
+and strict clean replay create it and exit0, with identical config/fixture hashes
+across all three invocations. Both exports pass make check/test-unit/build and
+launch/process/setup fixture builds:83 units, including all new upstream contract/
+domain coverage, plus nine ordinary controls each. All196 tracked paths match
+the head, and both binaries have SHA256
+`be9f2eb9111846a10d91aaf6d9b4e01946b8a50d4e6ad1b0b386a71b37296d17`.
+Logs, receipts, draft, manifest and patch are in
+`.artifacts/ginux-contribution-preparation/upstream-contract-refresh-2026-11-06/G03a/`.
+
+Full default runtime/security suites, macOS and remote CI remain pending; ordinary
+launch success does not establish new contract enforcement. No actual checkout/
+index, branch, remote text or publication changed.

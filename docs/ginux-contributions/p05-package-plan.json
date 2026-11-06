@@ -74,19 +74,20 @@
         "10091e4e48bb14dcf9f0ee20e62f471fb7d0cf2f"
       ],
       "acceptance": "real absent-workdir launch fails at upstream and passes with correction; directory is created; existing suite preserved",
-      "status": "current-main source reviewed; all 73 units/static/build and 9 ordinary controls pass in source/clean; full default runtime/macOS CI remain pending",
-      "base": "8a475e8b2318425fd2fc15246a5c6f4bca6caf86",
-      "head": "c28dd1321f024ec6b5d2087fd489457f31f20e2c",
-      "tree": "43e400d0bdc87c1275ba69380cb65ea28a4e4de8",
+      "status": "observed ff926d0c direct-base source reviewed; exact base missing-workdir failure; all83 units/static/build and9 ordinary controls pass in source/clean; full default/runtime/security/macOS/remote CI remain pending",
+      "base": "ff926d0c228b71d55d0f2f0909dd86ec62197c8a",
+      "head": "feafbad2a374e80c18943370e7efd1263554a245",
+      "tree": "e5ded2be4d64a14bfd641a561a51369acf1a7810",
       "evidence": "g03a-review.md",
-      "artifact_directory": ".artifacts/ginux-contribution-preparation/upstream-refresh-2026-11-06/G03a",
-      "previous_head": "0b563cf87a3c0e83a20a22eee3af8ffdb7adf015",
+      "artifact_directory": ".artifacts/ginux-contribution-preparation/upstream-contract-refresh-2026-11-06/G03a",
+      "previous_head": "c28dd1321f024ec6b5d2087fd489457f31f20e2c",
       "historical_artifact_directory": ".artifacts/development-migration/2026-11-06/recovery/evidence/ginux-contribution-preparation/G03a",
-      "patch_sha256": "931f279d884dbe68e0cb42c447871415514bdc034fdd9878ce95c3840d469a69",
-      "unit_tests": 73,
+      "patch_sha256": "3b112bf9010bdd6c59d8cd4efb5c507db641264b4fa0802b3fcd3790d73e7518",
+      "unit_tests": 83,
       "source_patch": "patches/G03a.patch",
       "standalone": true,
-      "remote_ci": "not run"
+      "remote_ci": "not run",
+      "latest_main_acceptance": "source/ordinary preparation only; full runtime/macOS/remote CI pending"
     },
     {
       "packet": "G03b",
@@ -1883,5 +1884,5 @@
     }
   ],
   "latest_observed_upstream_main": "ff926d0c228b71d55d0f2f0909dd86ec62197c8a",
-  "latest_upstream_reconciliation": "G05a refreshed on ff926d0c; all remaining retained packets pending serial refresh and configured contract-owner integration"
+  "latest_upstream_reconciliation": "G05a/G03a refreshed on ff926d0c; remaining retained packets pending serial refresh and configured contract-owner integration"
 }

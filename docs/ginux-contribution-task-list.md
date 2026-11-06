@@ -955,3 +955,18 @@ before continuing dependent runtime packets, then inspect the task-loop join
 at G06b. Source review identified the separate fixed-dispatch paths; security
 checks are recorded downstream and remain pending, with no local exploit-like
 reproduction or DaybreakBlue dispatch. G07, F02/F03 and final F04 remain open.
+
+G03a is now `feafbad2a374e80c18943370e7efd1263554a245`, directly onff926d0c:
+exact upstream exits2 without creating the missing workdir; source/clean create
+it and exit0. All83 units/static/build and nine ordinary controls pass per
+export, all196 paths and both binaries match, and the two-file +4/-1 scope is
+unchanged. [Review](ginux-contributions/g03a-review.md) preserves all full default/
+security/macOS/remote CI holds. Two retained packets now have source/ordinary
+preparation onff926d0c;35 remain. Configured launch's existing64KiB byte audit
+cap must be preserved through its own writer; do not add a parallel budget merely
+because native supervision now has an8192-event budget.
+
+Exact next action: refresh G06a onff926d0c, then G03b. At G03c, use upstream
+contract/catalog owners before configured effects and extend the existing audit
+writer as needed; review task-loop ordering at G06b. This supersedes earlier
+read-position/next-action entries. Keep G07, security, F02/F03 and F04 pending.

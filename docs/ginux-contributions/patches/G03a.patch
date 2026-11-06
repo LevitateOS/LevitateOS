@@ -1,6 +1,6 @@
-From c28dd1321f024ec6b5d2087fd489457f31f20e2c Mon Sep 17 00:00:00 2001
+From feafbad2a374e80c18943370e7efd1263554a245 Mon Sep 17 00:00:00 2001
 From: vince <vincepaul.liem@gmail.com>
-Date: Fri, 6 Nov 2026 22:10:41 +0100
+Date: Fri, 6 Nov 2026 23:39:05 +0100
 Subject: [PATCH] fix(launch): use mkdirat when creating the workload directory
 
 Use the x86-64 mkdirat syscall number instead of mknodat so launch
@@ -14,10 +14,10 @@ Signed-off-by: vince <vincepaul.liem@gmail.com>
  2 files changed, 4 insertions(+), 1 deletion(-)
 
 diff --git a/crates/ginux-init/src/launch.rs b/crates/ginux-init/src/launch.rs
-index 2a01289abe19678572664764f2c2bd53b7e6de7c..cb499f89bee64001d71a3288116461f20d2af0d3 100644
+index 43efcbb36e808713ebb20d3b894dea29b2be424c..162a22b9f8269cefcb1f9fb941ab1ce1e7f653a0 100644
 --- a/crates/ginux-init/src/launch.rs
 +++ b/crates/ginux-init/src/launch.rs
-@@ -324,7 +324,7 @@ pub const MAX_LAUNCH_ARG_LEN: usize = 128;
+@@ -328,7 +328,7 @@ pub const MAX_LAUNCH_ARG_LEN: usize = 128;
  pub const MAX_LAUNCH_ENV_LEN: usize = 256;
  pub const MAX_LAUNCH_PATH_LEN: usize = 128;
  
