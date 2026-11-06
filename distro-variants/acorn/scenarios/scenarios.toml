@@ -47,7 +47,7 @@ pass_marker = "LIVE BOOT PASSED"
 required_services = ["networking", "dhcpcd", "sshd"]
 
 [scenarios.live_tools]
-serial_ready_patterns = ["Login as 'root' (no password)", " login:"]
+serial_ready_patterns = [" login:"]
 required_tools = [
   "recpart",
   "recstrap",

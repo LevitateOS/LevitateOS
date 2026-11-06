@@ -56,7 +56,7 @@ pass_marker = "LIVE BOOT PASSED"
 required_services = ["sshd", "auditd"]
 
 [scenarios.live_tools]
-serial_ready_patterns = ["Login as 'root' (no password)", " login:"]
+serial_ready_patterns = [" login:"]
 required_tools = [
   "recpart",
   "recstrap",

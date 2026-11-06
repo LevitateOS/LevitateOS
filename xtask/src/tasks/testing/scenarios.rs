@@ -1,4 +1,6 @@
 use anyhow::{Context, Result, bail};
+use distro_spec::shared::live_boot::{BOOT_INJECTION_DIR, BOOT_INJECTION_ENV};
+use install_tests::boot_injection::BootInjection;
 use install_tests::scenarios::{
     ScenarioId, parse_scenario_name, resolve_iso_artifact_for_scenario,
     resolve_latest_install_runtime,
@@ -166,7 +168,10 @@ pub fn boot(
                     "`--ssh` is only supported for the live-boot scenario; use `cargo xtask scenarios boot live-boot --ssh`."
                 );
             }
-            boot_installed_disk(&root, &cfg, inject, inject_file, window_cfg.as_ref())
+            if inject.is_some() || inject_file.is_some() {
+                bail!("boot injection is read by the live init; installed-boot does not support --inject/--inject-file");
+            }
+            boot_installed_disk(&root, &cfg, window_cfg.as_ref())
         }
         _ => bail!(
             "scenario '{}' is automated. Interactive targets: live-boot, live-tools, installed-boot.",
@@ -232,82 +237,16 @@ fn resolve_interactive_iso(cfg: &BootConfig, scenario: ScenarioId) -> Result<Pat
     Ok(iso.path)
 }
 
-struct BootInjection {
-    path: PathBuf,
-    cleanup: bool,
-    media_iso: Option<PathBuf>,
-}
-
-impl Drop for BootInjection {
-    fn drop(&mut self) {
-        if self.cleanup {
-            let _ = fs::remove_file(&self.path);
-        }
-        if let Some(path) = &self.media_iso {
-            let _ = fs::remove_file(path);
-        }
-    }
-}
-
-fn boot_injection_payload(
+/// The boot injection from `--inject-file` or `--inject` (KEY=VALUE pairs).
+fn boot_injection(
     inject: Option<String>,
     inject_file: Option<PathBuf>,
 ) -> Result<Option<BootInjection>> {
-    if let Some(path) = inject_file {
-        if !path.is_file() {
-            bail!("--inject-file is not a readable file: {}", path.display());
-        }
-        return Ok(Some(BootInjection {
-            path,
-            cleanup: false,
-            media_iso: None,
-        }));
+    match (inject_file, inject) {
+        (Some(path), _) => BootInjection::from_file(&path).map(Some),
+        (None, Some(raw)) => BootInjection::from_pairs(&raw),
+        (None, None) => Ok(None),
     }
-
-    let inject = match inject {
-        Some(raw) => raw,
-        None => return Ok(None),
-    };
-    let raw = inject.trim();
-    if raw.is_empty() {
-        return Ok(None);
-    }
-
-    let mut lines = Vec::new();
-    for entry in raw
-        .split(',')
-        .map(str::trim)
-        .filter(|entry| !entry.is_empty())
-    {
-        match entry.split_once('=') {
-            Some((key, _value)) if !key.trim().is_empty() => {
-                lines.push(entry.to_string());
-            }
-            _ => {
-                bail!(
-                    "invalid --inject payload '{}'; expected KEY=VALUE pairs separated by commas",
-                    entry
-                );
-            }
-        }
-    }
-    if lines.is_empty() {
-        return Ok(None);
-    }
-
-    let ts = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .context("system clock before UNIX_EPOCH")?
-        .as_nanos();
-    let path = std::env::temp_dir().join(format!("levitate-boot-injection-{ts}.env"));
-    fs::write(&path, format!("{}\n", lines.join("\n")))
-        .with_context(|| format!("writing boot injection payload '{}'", path.display()))?;
-
-    Ok(Some(BootInjection {
-        path,
-        cleanup: true,
-        media_iso: None,
-    }))
 }
 
 fn boot_live_iso(
@@ -324,10 +263,7 @@ fn boot_live_iso(
     window: Option<&WindowConfig>,
     ssh_private_key: Option<PathBuf>,
 ) -> Result<()> {
-    let mut injection = boot_injection_payload(inject, inject_file)?;
-    if let Some(inj) = injection.as_mut() {
-        inj.media_iso = Some(create_boot_injection_iso(&inj.path)?);
-    }
+    let injection = boot_injection(inject, inject_file)?;
     if ssh {
         boot_live_iso_ssh(
             root,
@@ -689,8 +625,6 @@ fn common_ssh_args(key: &Path, ssh_port: u16, known_hosts: &Path) -> Vec<String>
 fn boot_installed_disk(
     root: &Path,
     cfg: &BootConfig,
-    _inject: Option<String>,
-    _inject_file: Option<PathBuf>,
     window: Option<&WindowConfig>,
 ) -> Result<()> {
     let runtime = resolve_latest_install_runtime(cfg.distro_id)?;
@@ -787,11 +721,9 @@ fn qemu_base_command(
     if let Some(injection) = injection {
         builder = builder.fw_cfg_file(
             distro_spec::shared::live_boot::BOOT_INJECTION_FW_CFG,
-            &injection.path,
+            &injection.payload_file,
         );
-        if let Some(media_iso) = &injection.media_iso {
-            builder = builder.extra_cdrom(media_iso);
-        }
+        builder = builder.extra_cdrom(&injection.media_iso_file);
     }
     builder = match ssh_port {
         Some(port) => builder.user_network_with_hostfwd(port, 22),
@@ -1066,74 +998,6 @@ fn allocate_local_port(host: Ipv4Addr, start: u16, end: u16) -> Result<u16> {
     bail!("No free local TCP port on {host} in range {start}..={end}")
 }
 
-fn create_boot_injection_iso(payload_path: &Path) -> Result<PathBuf> {
-    let ts = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .context("system clock before UNIX_EPOCH")?
-        .as_nanos();
-    let iso_path = std::env::temp_dir().join(format!("levitate-boot-injection-{ts}.iso"));
-
-    let mut tried = Vec::new();
-    for (tool, mut args) in [
-        (
-            "xorriso",
-            vec![
-                "-as".to_string(),
-                "mkisofs".to_string(),
-                "-quiet".to_string(),
-                "-V".to_string(),
-                "LEVITATE_INJECT".to_string(),
-                "-o".to_string(),
-                iso_path.display().to_string(),
-                "-graft-points".to_string(),
-            ],
-        ),
-        (
-            "genisoimage",
-            vec![
-                "-quiet".to_string(),
-                "-V".to_string(),
-                "LEVITATE_INJECT".to_string(),
-                "-o".to_string(),
-                iso_path.display().to_string(),
-                "-graft-points".to_string(),
-            ],
-        ),
-        (
-            "mkisofs",
-            vec![
-                "-quiet".to_string(),
-                "-V".to_string(),
-                "LEVITATE_INJECT".to_string(),
-                "-o".to_string(),
-                iso_path.display().to_string(),
-                "-graft-points".to_string(),
-            ],
-        ),
-    ] {
-        args.push(format!(
-            "{}={}",
-            distro_spec::shared::live_boot::BOOT_INJECTION_FILE,
-            payload_path.display()
-        ));
-        match Command::new(tool).args(&args).status() {
-            Ok(status) if status.success() => return Ok(iso_path),
-            Ok(status) => {
-                tried.push(format!("{tool} exited with status {status}"));
-            }
-            Err(err) => {
-                tried.push(format!("{tool} unavailable: {err}"));
-            }
-        }
-    }
-
-    bail!(
-        "failed to build boot-injection ISO from '{}': {}",
-        payload_path.display(),
-        tried.join("; ")
-    )
-}
-
 fn spawn_qemu_with_log(cmd: &mut Command, log_path: &Path, allow_stdin: bool) -> Result<Child> {
     let log_out = File::create(log_path)
         .with_context(|| format!("creating QEMU log file '{}'", log_path.display()))?;
@@ -1156,18 +1020,18 @@ fn collect_guest_ssh_debug(child: &mut Child) -> Result<()> {
         return Ok(());
     };
 
-    let probe = concat!(
-        "\n",
-        "echo ___SSH_DEBUG_BEGIN___\n",
-        "ip -brief addr 2>/dev/null || ip addr 2>/dev/null || true\n",
-        "ip route 2>/dev/null || route -n 2>/dev/null || true\n",
-        "rc-service networking status 2>/dev/null || true\n",
-        "rc-service dhcpcd status 2>/dev/null || true\n",
-        "ss -ltnp | grep ':22' || true\n",
-        "ls -l /root/.ssh /root/.ssh/authorized_keys /run/boot-injection /run/boot-injection/* 2>/dev/null || true\n",
-        "cat /run/boot-injection/source /run/boot-injection/payload.env 2>/dev/null || true\n",
-        "journalctl -b -u sshd.service --no-pager -n 120 || true\n",
-        "echo ___SSH_DEBUG_END___\n",
+    let probe = format!(
+        "\n\
+         echo ___SSH_DEBUG_BEGIN___\n\
+         ip -brief addr 2>/dev/null || ip addr 2>/dev/null || true\n\
+         ip route 2>/dev/null || route -n 2>/dev/null || true\n\
+         rc-service networking status 2>/dev/null || true\n\
+         rc-service dhcpcd status 2>/dev/null || true\n\
+         ss -ltnp | grep ':22' || true\n\
+         ls -l /root/.ssh /root/.ssh/authorized_keys {BOOT_INJECTION_DIR} {BOOT_INJECTION_DIR}/* 2>/dev/null || true\n\
+         cat {BOOT_INJECTION_DIR}/source {BOOT_INJECTION_ENV} 2>/dev/null || true\n\
+         journalctl -b -u sshd.service --no-pager -n 120 || true\n\
+         echo ___SSH_DEBUG_END___\n"
     );
     stdin
         .write_all(probe.as_bytes())
