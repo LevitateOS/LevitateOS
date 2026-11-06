@@ -1,0 +1,123 @@
+{
+  "captured_utc": "2026-11-06 07:33:45 UTC",
+  "upstream_main": "3f2fe7dfadd4b40e235d982a6a3d386dc6490177",
+  "prior_base": "2a82f61e84a44b681f15e35664b82fe5529df5b2",
+  "prs": [
+    {
+      "number": 153,
+      "url": "https://github.com/gmkurtzer/ginux/pull/153",
+      "state": "closed",
+      "merged": true,
+      "head": "d8b011bef2df8f72562e4c36496db6b638f9e975",
+      "merge": "6361bbd59cd208f58d146db70891136e5923764c"
+    },
+    {
+      "number": 154,
+      "url": "https://github.com/gmkurtzer/ginux/pull/154",
+      "state": "closed",
+      "merged": true,
+      "head": "42332ab110556c1a65bd2f666d3adda052c5f9ce",
+      "merge": "48f86b6ccbd1b22b5535c16d9c7f1ce1d3138238"
+    },
+    {
+      "number": 216,
+      "url": "https://github.com/gmkurtzer/ginux/pull/216",
+      "state": "closed",
+      "merged": true,
+      "head": "c2a18bb07b3adfa811fee57dc777cbf9ec757a53",
+      "merge": "2a82f61e84a44b681f15e35664b82fe5529df5b2"
+    },
+    {
+      "number": 217,
+      "url": "https://github.com/gmkurtzer/ginux/pull/217",
+      "state": "closed",
+      "merged": true,
+      "head": "be56d00121cf7fb1be3463dfd48343949c82aebd",
+      "merge": "6fab48951e4fa0a5978ef9fb43af0b878a67da8b"
+    },
+    {
+      "number": 218,
+      "url": "https://github.com/gmkurtzer/ginux/pull/218",
+      "state": "closed",
+      "merged": true,
+      "head": "2a60d36170c1c31636eee55322e035403188122c",
+      "merge": "64a3e3f76817b3c3991468ae0eb80f3be0e344c1"
+    }
+  ],
+  "open_prs": [
+    {
+      "number": 226,
+      "title": "fix(init): end tracees with kill(2) instead of PTRACE_KILL",
+      "body": "Fixes #225\n\n## Summary\n\n- `native_fail` and the domain-stop paths of `native` and Gate 1 ended their tracee with `PTRACE_KILL` and then reaped it. When a seccomp policy refuses `PTRACE_KILL`, the reap blocked with the tracee in its stop; on the `native` and `process-native` setup failures, before `PTRACE_O_EXITKILL` is set, the tracee ran on untraced once the blocked supervisor was killed (#225).\n- A new `kill_tracee` sends `SIGKILL` with `kill(2)` and reaps, as `launch_fail` does. `native_fail`, both domain-stop paths and `supervise_setup_fail` (Gate 1 setup) use it. `PTRACE_KILL` remains only as a fallback when `kill(2)` fails: the native tracee runs as UID 1000, so a supervisor without `CAP_KILL` can only end it through the tracer relationship.\n- Some `native_fail` callers have already reaped the child (`did not stop after exec`, `escaped supervision`), where the old `PTRACE_KILL` just returned `ESRCH`. `kill_tracee` first does a nonblocking `wait4` on the pid and returns if the child is gone (`ECHILD`) or has just been reaped, so `kill(2)` only reaches a child that is still ours and whose pid cannot have been reused.\n- `process_native_fail` no longer sends anything to the root task. Every caller runs after `PTRACE_SETOPTIONS` set `PTRACE_O_EXITKILL`, which fork, vfork and clone children inherit, so the exit in `domain_fail` kills every tracee; the root may already be reaped at some callers, and reaping it there could block on traced threads.\n- Output and exit status are unchanged on every path.\n\n## Changes\n\n- `crates/ginux-init/src/main.rs`: `kill_tracee`, used by `native_fail`, the `native` and Gate 1 domain-stop paths and `supervise_setup_fail`; `process_native_fail` relies on `PTRACE_O_EXITKILL`.\n- `tests/fixtures/gate1-setup-fixture.c`: `deny-ptrace <request> <program> [args...]` passes the remaining arguments on (it passed only the program before; `test-gate1-setup.py` is unaffected).\n- `scripts/test-tracee-kill.py`: five checks in a private mount namespace with a temporary directory bound over `/var/tmp`: `native` and `process-native` with every request but `PTRACE_TRACEME` refused (exit 1, failure reason, payload never runs); `native` and Gate 1 with only `PTRACE_KILL` refused (exit 0, `GINUX_NATIVE_CHECK: PASS` / `GATE1: PASS`); `native` with `CAP_KILL` dropped from the bounding set (`setpriv`), which covers the fallback.\n- `Makefile` (`test-tracee-kill`), `.github/workflows/check.yml` (`sudo make test-tracee-kill` in `launch-integration`), `README.md` (Linux integration steps), `docs/gate-1-foundation.md` (one sentence after the setup-failure paragraph).\n\n## Testing\n\n`scripts/test-tracee-kill.py` with `main`'s binary (3f2fe7df) fails its first four checks in 10 of 10 runs (output in #225); the `CAP_KILL` check passes there, since `main` uses `PTRACE_KILL`. A variant of this change without the `PTRACE_KILL` fallback hangs in the `CAP_KILL` check (`exit=timeout`). With this change all five checks pass in 10 of 10 runs, and `test-gate1-setup` passes in 10 of 10 runs.\n\n| scenario | `main` | this change |\n|---|---|---|\n| `native`, every request but `PTRACE_TRACEME` refused | hangs in `wait4`; after the supervisor is killed the payload runs | `GINUX_DOMAIN: failed reason=native ptrace setup failed`, exit 1, payload never runs |\n| `process-native`, same | hangs; payload runs afterwards | `GINUX_DOMAIN: failed reason=process ptrace options failed`, exit 1, payload never runs |\n| `native`, only `PTRACE_KILL` refused | hangs after `emulate result=domain-stop` | `GINUX_NATIVE_CHECK: PASS`, exit 0 |\n| Gate 1 with `managed-payload`, only `PTRACE_KILL` refused | hangs at the payload's `exit` | `GATE1: PASS`, exit 0 |\n| `native` without `CAP_KILL` | `GINUX_NATIVE_CHECK: PASS` | `GINUX_NATIVE_CHECK: PASS` (fallback) |\n\n| check | result |\n|---|---|\n| `cargo fmt --check`, `make check` (incl. clippy), `make test-unit`, `make build`, `make test-process-native` | pass |\n| `make test-launch`, `make test-native-supervision`, `make test-gate1-setup` and `make test-tracee-kill` as root on x86-64 Linux | pass |\n| `make host-boot-test` and `make test` (Rocky host VM suite, QEMU TCG, macOS arm64) | pass |",
+      "head": "5593e8203ed2e864cc45c879de41a892be23787f",
+      "base": "3f2fe7dfadd4b40e235d982a6a3d386dc6490177",
+      "url": "https://github.com/gmkurtzer/ginux/pull/226"
+    },
+    {
+      "number": 224,
+      "title": "fix(process): skip clone tid stores the caller cannot write like Linux",
+      "body": "Fixes #223\n\n## Summary\n\n- `clone` published the virtual tid into the `CLONE_PARENT_SETTID` and `CLONE_CHILD_SETTID` cells with `PTRACE_POKETEXT`. A ptrace write ignores page protections, so a cell in read-only memory was written. An unmapped cell made the store fail, and the supervisor failed the domain. Linux stores both cells with `put_user` and ignores a fault (`kernel_clone` for the parent cell, `schedule_tail` in the child for the child cell): `clone` succeeds and the memory stays untouched.\n- `store_tracee_tid` now uses the all-or-nothing 4-byte store that #221 added for the wait4 status, renamed from `store_tracee_status` to `store_tracee_u32`. It writes through `write_tracee_bytes` and so honors the tracee's page protections. A cell that crosses a page boundary is written all or nothing, like the kernel's single store.\n- `-EFAULT` from that store is ignored, at all three call sites: the parent cell of a process clone, the parent cell of a thread or another `CLONE_VM` clone (such as `CLONE_VM | CLONE_VFORK`), and the child cell at the child's first stop. A skipped store is recorded with a new audit line `tid store fault virtual-tid=N`; the thread site then no longer claims `thread-tid virtual-tid=N`. Any other error (for example `ESRCH` for a tracee that is gone) keeps the existing killed-task check and domain failure.\n- On the ptrace fallback of `write_tracee_bytes` (no `process_vm_writev`), an unmapped cell is now skipped as well. A read-only cell is still written there, as before this change.\n\nDetails and reproduction: #223.\n\n## Changes\n\n- `crates/ginux-init/src/main.rs`: `store_tracee_tid` calls `store_tracee_u32`, audits and skips `-EFAULT`, and returns whether the tid was stored; the thread site prints `thread-tid virtual-tid=N` only then. `store_tracee_status` becomes `store_tracee_u32` (same code, generic parameter names). The now unused `poke_tracee_bytes` import is dropped.\n- `tests/fixtures/process-review-fixture.c`: scenarios `ro_clone_tid`, `bad_clone_tid` and `straddle_clone_tid`. Each one creates a process with both tid flags (no `CLONE_VM`, so the child cell is in the child's own copy), waits for it, then creates a thread with both tid flags, all with the tid pointers at a read-only cell, an unmapped address, or a cell crossing into an unmapped page. The parent, the child and the thread print the clone result, the read-only word and the bytes before the end of the bss page.\n- `scripts/test-process-native.py`: expected lines for these scenarios, the same as natively, with 20 repetitions each, and a check that all four tid stores (parent and child cell, process and thread) were audited as skipped and no `thread-tid` publication was claimed. `ro_clone_tid` and `bad_clone_tid` also get the `/vm-writev-enosys` and `/vm-writev-eperm` modes. There `bad_clone_tid` expects the same lines, and `ro_clone_tid` expects the reduced-fidelity result (the tid written into the read-only cell, no skipped store), which a plain mode also accepts where the supervisor reports the fallback. `straddle_clone_tid` has no fallback mode, like `straddle_status`: the page after its cell is unmapped, so the store faults at the `PTRACE_PEEKTEXT` of that page before any write.\n- `Makefile`: the three scenarios added to `build-process-fixtures`.\n\n## Testing\n\nThe three scenarios fail on `main`'s binary (3f2fe7df): `ro_clone_tid` with the virtual tid in the read-only cell (`process ro cell=2`, `child ro cell=2`, `thread ro cell=3`), `bad_clone_tid` and `straddle_clone_tid` with `GINUX_DOMAIN: failed reason=child tid store failed` (or `clone parent tid store failed`). With this change all three pass 20 of 20 runs in each of two full runs, and so do the four new `/vm-writev-*` modes.\n\n| case | Linux (pid namespace) | `main` | this change |\n|---|---|---|---|\n| tid cells in `.rodata`, process and thread (`ro_clone_tid`) | created, cell `0` | created, cell `2` (process, both sides) and `3` (thread) | created, cell `0` |\n| tid cells unmapped (`bad_clone_tid`) | created | domain failure | created |\n| tid cells crossing into an unmapped page (`straddle_clone_tid`) | created, both bytes untouched | domain failure | created, both bytes untouched |\n| each flag alone, process and thread (manual probes, unmapped and crossing cell) | created | domain failure (`clone parent tid`, `thread tid` or `child tid store failed`) | created |\n| each flag alone, process and thread (manual probes, read-only cell) | created, cell `0` | created, the side that stores sees `2` or `3` | created, cell `0` |\n| `ro_clone_tid` with `process_vm_writev` unavailable (fallback) | as above | cell `2`/`3` | cell `2`/`3` (reduced fidelity, as `main`) |\n| `bad_clone_tid` with `process_vm_writev` unavailable (fallback) | as above | domain failure | created |\n| `straddle_clone_tid` with `process_vm_writev` failing for the whole run (`ENOSYS` and `EPERM` wraps below) | as above | domain failure | created, both bytes untouched |\n| valid tid cells (`clone_tid`, `unused_parent_tid`) | virtual tid stored in both cells | pass | pass |\n\n| check | result |\n|---|---|\n| `cargo fmt --check`, `make check` (incl. clippy), `make test-unit`, `make build` | pass |\n| `make test-process-native` (all scenarios incl. the three new ones, the twelve `/vm-writev-*` modes and `legacy`), twice | pass |\n| `make test-process-native` with `process_vm_writev` failing for the whole run, once with `ENOSYS`, once with `EPERM` | pass |\n| `make test` (Rocky host VM suite, QEMU TCG, macOS arm64) | pass |",
+      "head": "027b524e8c0c1b4833887331ba16ec9de33f5a2b",
+      "base": "3f2fe7dfadd4b40e235d982a6a3d386dc6490177",
+      "url": "https://github.com/gmkurtzer/ginux/pull/224"
+    },
+    {
+      "number": 207,
+      "title": "feat(console): support bounded polling of standard descriptors",
+      "body": "Programs using `poll` to wait for standard input or output readiness currently receive a policy denial in native execution. This adds a bounded allowance for descriptors 0–2 (plus ignored negative entries), with at most 16 entries and a timeout of 0–300 seconds. The supervisor validates the descriptor array before continuation; other descriptors, unreadable arrays, and unbounded waits remain denied.\n\nBased directly on `main` at `0e06a986`. The launch fixture covers readiness, timeout limits, invalid pointers, descriptor restrictions, and closed descriptors.\n\nValidation passed: `make check`, `make test-unit` (54 tests), release build, `test-launch`, `test-native-supervision`, and `test-process-native`.",
+      "head": "e7f5f552747e0b451b6dd31395f9199d10a42ce3",
+      "base": "0e06a9860250b655a094761cd424bc022fd8db68",
+      "url": "https://github.com/gmkurtzer/ginux/pull/207"
+    }
+  ],
+  "policy_comments": {
+    "163": [
+      {
+        "url": "https://github.com/gmkurtzer/ginux/issues/163#issuecomment-6658892629",
+        "author": "gmkurtzer",
+        "body": "Confirmed from the current balanced argument check: syscall 318 compares arg2, which is flags, so the intended 256-byte buflen bound is ineffective. This is a current userspace-kernel policy decision, so I am leaving the issue open. My recommendation is option 2: clamp rsi to 256 before mediation and expose the kernel-permitted short read. That preserves the intended per-call resource bound without turning larger glibc arc4random_buf requests into fatal errors. Maintainer approval is needed before implementation because this intentionally changes observable syscall behavior; no implementation work has been authorized or started."
+      }
+    ],
+    "178": [
+      {
+        "url": "https://github.com/gmkurtzer/ginux/issues/178#issuecomment-6661706860",
+        "author": "gmkurtzer",
+        "body": "Maintainer review: the core claim is confirmed on current `main`. `balanced_arguments_allowed` rejects `read`/`pread64` above 1 MiB and `write` above 4096 bytes, and the launch path turns that policy failure into EPERM rather than a legal short transfer.\n\nThis should follow the same policy decision as #163. My recommended implementation is to clamp the length register before mediation so callers observe ordinary short-transfer semantics, with focused launch regressions for each syscall. Keep `writev` out of that first change unless its aggregate-byte accounting can be made independently reviewable; its iovec-count limit is a related but distinct contract.\n\nPlease hold the PR until Gregory confirms that shared clamping direction, because it changes observable syscall behavior. No further reproduction evidence is needed."
+      }
+    ],
+    "179": [
+      {
+        "url": "https://github.com/gmkurtzer/ginux/issues/179#issuecomment-6661708444",
+        "author": "gmkurtzer",
+        "body": "Maintainer review: the policy-surface claim is confirmed on current `main`; the listed syscall numbers are absent from `balanced_surface` and therefore fall through to ENOSYS. This is relevant to the maintained userspace shim, but it is a bundle of policy decisions rather than one mechanical fix.\n\nPlease hold implementation while we choose the contract. My recommended split is: (1) process-local compatibility such as getcwd, dup/dup2/dup3, chdir/fchdir, sleep, and read-only xattr calls; (2) virtualized identity/state such as uname, umask, times, and selected scheduler/group queries; and (3) separate isolation work for `/proc` identity and audit/workload stderr framing. Host-identity or host-topology leakage should not be admitted merely for compatibility.\n\nFocused PRs with one coherent policy group and launch fixtures will be much easier to validate than a single broad surface expansion. Gregory’s policy choice is still required before those PRs should start."
+      }
+    ],
+    "207": [
+      {
+        "url": "https://github.com/gmkurtzer/ginux/pull/207#issuecomment-6668318556",
+        "author": "gmkurtzer",
+        "body": "Maintainer review: the implementation is coherent and both required checks are green at current head `e7f5f552747e0b451b6dd31395f9199d10a42ce3`; I found no code-level blocker in the bounded `pollfd` validation or timeout limits. I am not merging it yet because adding `poll` to the balanced surface is an observable policy expansion covered by the unresolved compatibility decision in [issue #179](https://github.com/gmkurtzer/ginux/issues/179). Please hold this head while Gregory decides that policy. No revision is requested at this time."
+      }
+    ],
+    "219": [
+      {
+        "url": "https://github.com/gmkurtzer/ginux/issues/219#issuecomment-6672163838",
+        "author": "gmkurtzer",
+        "body": "Maintainer review: the host-information exposure is confirmed by the current balanced surface—`sysinfo` is mediated unchanged in launch/native. This is an observable policy decision, so please continue holding the implementation. The deterministic zero-filled emulation is the safer default than either host passthrough or `-ENOSYS`: it avoids host topology disclosure and avoids glibc deriving values from an uninitialized buffer, without claiming an unenforced domain memory limit. Gregory’s approval is required before opening that PR; `process-native` behavior should remain out of scope for the first change."
+      }
+    ],
+    "222": [
+      {
+        "url": "https://github.com/gmkurtzer/ginux/issues/222#issuecomment-6677739555",
+        "author": "gmkurtzer",
+        "body": "Thanks for tracing this. I checked the transition history: the removal was **not documented as an intentional overflow-policy decision**. PR #152 made the userspace source at `2306c2e` authoritative; that source already lacked `overflow-checks = true`. The setting existed only in the prior full-kernel lineage from `9b11baea`, so it was not carried across the architecture transition. I found no rationale in PR #152 saying release overflow checks were deliberately disabled or that all arithmetic had become explicitly checked.\n\nThe 65/65 result is useful evidence that restoring the setting does not break the unit suite, but the unreviewed `scan_layer` paths, self-start binaries, and release/runtime cost remain open. I am leaving this issue open for the maintainer decision. My recommendation is to restore `overflow-checks = true` as the safer default unless a release benchmark demonstrates a material cost that warrants a documented exception."
+      }
+    ]
+  },
+  "notes": [
+    "Read-only connector fetches and Git fetch/ls-remote; no remote changes.",
+    "P01 original refs remain in inventory.",
+    "PR 224 and 226 are someone else's existing work, not our candidates; track overlap.",
+    "Current workflow has macOS static-and-unit make check/test-unit and Linux launch/native/process/gate1 tests."
+  ]
+}

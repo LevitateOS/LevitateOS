@@ -74,7 +74,7 @@ its affected packet and dependents, not unrelated fixes.
   preserve original stashes and unrelated work. Record the integration commit and
   baseline above plus any later changes. Use explicit Ginux work-tree paths because
   its shared `core.worktree` setting can otherwise select the wrong checkout.
-- [ ] **P02 — Refresh upstream and read discussion.** Read current main, open and
+- [x] **P02 — Refresh upstream and read discussion.** Read current main, open and
   merged PRs, relevant issue comments and required CI configuration. Recheck #153,
   #154, #207, #216–#218 and #179 as historical entry points, then follow current
   discussion. Record URLs, exact main SHA and policy outcomes. No outgoing messages.
@@ -280,8 +280,14 @@ Recipe has advanced separately from the previous `022e91c` validation baseline t
 and the superproject's existing pointer difference are preserved. F03 must use
 explicitly recorded current revisions rather than silently reusing old results.
 
-Exact next task: **P02 — refresh upstream and read discussion**. No fresh remote
-status or new standalone review/test result is claimed yet.
+P02 complete. [Upstream refresh and policy record](ginux-contributions/p02-upstream.md)
+pins current main `3f2fe7df`, confirms #216–#218 merged and #221 newly merged,
+and records the holds on #207/#179 and transfer clamping. Open #224/#226 overlap
+with process cleanup/copyout work. No existing PR was changed. Git fetch changed
+cached refs only; integration source and HEAD remain intact.
+
+Exact next task: **P03 — account for every local change**. No new standalone
+review/test result is claimed yet.
 
 Active skill: `hdae-development`, discovered at
 `/home/vince/.codex/worktrees/ginux-pr-combination-check/ginux/.agents/skills/hdae-development/SKILL.md`.
