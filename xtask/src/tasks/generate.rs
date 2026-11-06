@@ -131,9 +131,7 @@ fn write_tool_help(out: &mut Out, root: &Path) -> Result<()> {
     );
     for (_, binaries) in DOCUMENTED_TOOLS {
         for binary in *binaries {
-            let target_dir = std::env::var_os("CARGO_TARGET_DIR")
-                .map(std::path::PathBuf::from)
-                .unwrap_or_else(|| root.join("target"));
+            let target_dir = crate::util::repo::cargo_target_dir(root);
             let output = std::process::Command::new(target_dir.join("debug").join(binary))
                 .arg("--help")
                 .output()

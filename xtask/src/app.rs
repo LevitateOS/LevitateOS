@@ -1,6 +1,6 @@
 use anyhow::Result;
 
-use crate::cli::{BaseCmd, Cmd, InspectCmd};
+use crate::cli::{BaseCmd, Cmd};
 
 pub fn run(cli: crate::cli::Cli) -> Result<()> {
     match cli.cmd {
@@ -16,40 +16,19 @@ pub fn run(cli: crate::cli::Cli) -> Result<()> {
         Cmd::Gen { check } => crate::tasks::generate::run(check),
         Cmd::Check => crate::tasks::check::run(),
         Cmd::Tui { app, args } => crate::tasks::tui::run(app, args),
-        Cmd::Inspect { what } => match what {
-            InspectCmd::Docs { slug, snapshot } => {
-                crate::tasks::inspect_docs::run(crate::tasks::inspect_docs::Options {
-                    slugs: slug,
-                    columns: snapshot.columns,
-                    rows: snapshot.rows,
-                    seconds: snapshot.seconds,
-                    out_dir: snapshot.out_dir,
-                    stdout: snapshot.stdout,
-                    ansi: snapshot.ansi,
-                    keep_transcript: snapshot.keep_transcript,
-                })
-            }
-            InspectCmd::Tui {
-                app,
-                cwd,
-                command,
-                input,
-                input_delay_seconds,
-                snapshot,
-            } => crate::tasks::inspect_tui::run(crate::tasks::inspect_tui::Options {
-                app,
-                cwd,
-                command,
-                input,
-                input_delay_seconds,
-                columns: snapshot.columns,
-                rows: snapshot.rows,
-                seconds: snapshot.seconds,
-                out_dir: snapshot.out_dir,
-                stdout: snapshot.stdout,
-                ansi: snapshot.ansi,
-                keep_transcript: snapshot.keep_transcript,
-            }),
-        },
+        Cmd::Inspect(args) => crate::tasks::tui::inspect::run(crate::tasks::tui::inspect::Options {
+            app: args.app,
+            args: args.args,
+            input: args.input,
+            all_pages: args.all_pages,
+            columns: args.columns,
+            rows: args.rows,
+            timeout_seconds: args.timeout_seconds,
+            settle_ms: args.settle_ms,
+            out_dir: args.out_dir,
+            stdout: args.stdout,
+            ansi: args.ansi,
+            keep_transcript: args.keep_transcript,
+        }),
     }
 }

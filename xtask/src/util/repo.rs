@@ -9,6 +9,13 @@ pub fn repo_root() -> Result<PathBuf> {
         .context("xtask is expected at <repo>/xtask")
 }
 
+/// Cargo's target directory for this checkout (`CARGO_TARGET_DIR`, else `<repo>/target`).
+pub fn cargo_target_dir(root: &Path) -> PathBuf {
+    std::env::var_os("CARGO_TARGET_DIR")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| root.join("target"))
+}
+
 /// The repo's QEMU tools (`cargo xtask setup`), or `None` when they are not
 /// installed and the host's QEMU and OVMF are used instead.
 pub fn repo_tools(root: &Path) -> Result<Option<PathBuf>> {

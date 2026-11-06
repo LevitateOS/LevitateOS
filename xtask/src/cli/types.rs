@@ -116,11 +116,8 @@ pub enum Cmd {
         args: Vec<String>,
     },
 
-    /// Render a terminal app or the install docs headlessly and write snapshots.
-    Inspect {
-        #[command(subcommand)]
-        what: InspectCmd,
-    },
+    /// Render a terminal app headlessly (optionally typing keys) and write its screen.
+    Inspect(InspectArgs),
 }
 
 #[derive(Subcommand)]
@@ -331,59 +328,41 @@ pub struct TestArgs {
     pub boot: BootArgs,
 }
 
-#[derive(Subcommand)]
-pub enum InspectCmd {
-    /// Render install-docs pages and write plain-text snapshots.
-    Docs {
-        /// Slug(s) to render. Default: every slug in the docs nav.
-        #[arg(long = "slug", value_name = "SLUG")]
-        slug: Vec<String>,
-        #[command(flatten)]
-        snapshot: SnapshotArgs,
-    },
-
-    /// Render a terminal app and write snapshots.
-    Tui {
-        /// App name (its package.json `bin`). Without it, give --cwd and --command.
-        app: Option<String>,
-        /// Working directory for a custom target.
-        #[arg(long, value_name = "PATH")]
-        cwd: Option<PathBuf>,
-        /// Launch command for a custom target.
-        #[arg(long, value_name = "CMD")]
-        command: Option<String>,
-        /// Keys sent to stdin after launch (printf %b escapes, e.g. 'n', '\\n', 'jj').
-        #[arg(long, value_name = "KEYS")]
-        input: Option<String>,
-        /// Seconds before sending --input.
-        #[arg(long, default_value_t = 1)]
-        input_delay_seconds: u64,
-        #[command(flatten)]
-        snapshot: SnapshotArgs,
-    },
-}
-
 #[derive(Args)]
-pub struct SnapshotArgs {
+pub struct InspectArgs {
+    /// App name (its package.json `bin`).
+    pub app: String,
+    /// Keys to type once it has drawn, one at a time (printf escapes: '\n', '\e[B', 'jj').
+    #[arg(long, value_name = "KEYS")]
+    pub input: Option<String>,
+    /// Render every page the app lists (its manifest's `inspect.pages`).
+    #[arg(long)]
+    pub all_pages: bool,
     /// Terminal columns.
     #[arg(long, default_value_t = 140)]
     pub columns: u16,
     /// Terminal rows.
     #[arg(long, default_value_t = 40)]
     pub rows: u16,
-    /// Seconds to run before capturing.
-    #[arg(long, default_value_t = 2)]
-    pub seconds: u64,
+    /// Milliseconds without output that count as "drawn".
+    #[arg(long, default_value_t = 500)]
+    pub settle_ms: u64,
+    /// Give up if the screen never settles within this many seconds.
+    #[arg(long, default_value_t = 30)]
+    pub timeout_seconds: u64,
     /// Base directory; a timestamped run folder is created under it.
     #[arg(long, value_name = "PATH")]
     pub out_dir: Option<PathBuf>,
-    /// Also print the plain snapshot(s).
+    /// Also print the plain screen(s).
     #[arg(long)]
     pub stdout: bool,
-    /// Also write ANSI snapshots (`.ansi`).
+    /// Also write ANSI screens (`.ansi`).
     #[arg(long)]
     pub ansi: bool,
     /// Keep raw terminal transcripts.
     #[arg(long)]
     pub keep_transcript: bool,
+    /// Arguments passed to the app.
+    #[arg(last = true)]
+    pub args: Vec<String>,
 }

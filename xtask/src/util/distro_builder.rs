@@ -21,10 +21,9 @@ pub fn binary(root: &Path) -> Result<PathBuf> {
     if !build.status().context("running cargo build")?.success() {
         bail!("building distro-builder failed");
     }
-    let target_dir = std::env::var_os("CARGO_TARGET_DIR")
-        .map(PathBuf::from)
-        .unwrap_or_else(|| root.join("target"));
-    Ok(target_dir.join(profile()).join("distro-builder"))
+    Ok(crate::util::repo::cargo_target_dir(root)
+        .join(profile())
+        .join("distro-builder"))
 }
 
 /// Run distro-builder with the repo's tool environment.

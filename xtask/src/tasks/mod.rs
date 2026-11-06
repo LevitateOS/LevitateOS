@@ -2,8 +2,6 @@ pub mod base;
 pub mod build;
 pub mod check;
 pub mod generate;
-pub mod inspect_docs;
-pub mod inspect_tui;
 pub mod kernels;
 pub mod scenarios;
 pub mod setup;

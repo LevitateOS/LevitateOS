@@ -29,9 +29,10 @@ cargo xtask reset levitate
 cargo xtask gen [--check]                      # schemas, TS declarations, tool help from the Rust types
 cargo xtask check                              # cargo check, generated files current, TS typecheck
 
-cargo xtask tui install-docs                   # run a terminal app from tui/
-cargo xtask inspect docs --slug installation-disk --stdout
-cargo xtask inspect tui disk-plan --input 'n'
+cargo xtask tui install-docs                   # run a terminal app from tui/ (any name in its package.json bin)
+cargo xtask inspect install-docs --stdout -- --slug installation-disk
+cargo xtask inspect install-docs --all-pages   # every page the app lists
+cargo xtask inspect disk-plan --input 'jj'     # type keys once it has drawn, then capture
 ```
 
 `just <command>` is a short alias for each of these.

@@ -7,10 +7,6 @@ use std::process::Command;
 use distro_contract::tui_apps::{self, TuiApp};
 
 pub fn run(name: String, args: Vec<String>) -> Result<()> {
-    crate::util::exit::require_terminal(
-        "`cargo xtask tui`",
-        "cargo xtask inspect tui <app> --stdout renders it without one",
-    )?;
     let root = crate::util::repo::repo_root()?;
     let app = tui_apps::find(&root, &name)?;
     let mut cmd = app_command(&root, &app)?;
@@ -47,10 +43,9 @@ pub fn tools_path(root: &Path, app: &TuiApp) -> Result<Option<std::ffi::OsString
     if !build.status()?.success() {
         bail!("building {} for {} failed", app.tools.join(", "), app.name);
     }
-    let target_dir = std::env::var_os("CARGO_TARGET_DIR")
-        .map(std::path::PathBuf::from)
-        .unwrap_or_else(|| root.join("target"));
-    let mut paths = vec![target_dir.join("debug")];
+    let mut paths = vec![crate::util::repo::cargo_target_dir(root).join("debug")];
     paths.extend(std::env::split_paths(&std::env::var_os("PATH").unwrap_or_default()));
     Ok(Some(std::env::join_paths(paths)?))
 }
+
+pub mod inspect;
