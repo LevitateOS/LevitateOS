@@ -76,7 +76,6 @@ required_tools = [
   "grep",
   "find",
 ]
-install_experience = "ux"
 
 [scenarios.live_tools.evidence]
 script_path = "live-tools.sh"

@@ -1,5 +1,10 @@
 schema_version = 6
 
+# The live ISO's install screen: this shell beside the install docs.
+[install_ux]
+shell = "/bin/sh"
+docs = { text = "install-guide.txt" }
+
 [ring2_products.rootfs_base]
 logical_name = "product.rootfs.base"
 description = "Canonical base root filesystem tree"
@@ -21,8 +26,7 @@ payload_profile = "boot_baseline"
 logical_name = "product.payload.live_tools"
 description = "Live tools payload tree"
 extends = "product.payload.boot.live"
-runtime_profiles = ["live_tools_common"]
-runtime_profiles_ux = ["live_tools_ux"]
+runtime_profiles = ["live_tools_common", "live_tools_ux"]
 
 [ring2_products.boot_installed]
 logical_name = "product.payload.boot.installed"
@@ -121,12 +125,6 @@ target = "x86_64-unknown-linux-musl"
 [[ring2_runtime_profiles.live_tools_common.actions]]
 kind = "apk_packages"
 packages = ["curl", "pciutils", "smartmontools", "hdparm", "vim", "htop"]
-
-[[ring2_runtime_profiles.live_tools_common.actions]]
-kind = "install_mode_payload"
-interactive_shell = "/bin/sh"
-ux_docs_frontend = "plain_text"
-ux_docs_guide = "distro/variants/acorn/ring2/install-guide.txt"
 
 [ring2_runtime_profiles.live_tools_ux]
 [[ring2_runtime_profiles.live_tools_ux.actions]]

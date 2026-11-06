@@ -1,5 +1,10 @@
 schema_version = 6
 
+# The live ISO's install screen: this shell beside the install docs.
+[install_ux]
+shell = "/bin/bash"
+docs = { tui_app = "install-docs" }
+
 [ring2_products.rootfs_base]
 logical_name = "product.rootfs.base"
 description = "Canonical base root filesystem tree"
@@ -19,8 +24,7 @@ payload_profile = "boot_baseline"
 logical_name = "product.payload.live_tools"
 description = "Live tools payload tree"
 extends = "product.payload.boot.live"
-runtime_profiles = ["live_tools_common"]
-runtime_profiles_ux = ["live_tools_ux"]
+runtime_profiles = ["live_tools_common", "live_tools_ux"]
 
 [ring2_products.boot_installed]
 logical_name = "product.payload.boot.installed"
@@ -194,11 +198,6 @@ destination = "usr/bin/recab"
 kind = "rootfs_workspace_binary"
 package = "recstrap"
 destination = "usr/bin/recstrap"
-
-[[ring2_runtime_profiles.live_tools_common.actions]]
-kind = "install_mode_payload"
-interactive_shell = "/bin/bash"
-ux_docs_frontend = "bun_bundle"
 
 [ring2_runtime_profiles.live_tools_ux]
 [[ring2_runtime_profiles.live_tools_ux.actions]]

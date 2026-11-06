@@ -903,7 +903,7 @@ Every script the builder writes into the guest (entrypoint, launcher, profile sc
 
 Solves 13 problems (5 hidden · 4 needless · 4 surplus).
 
-`products.toml` holds one `install_ux` block per variant. It lists the consoles that launch the UX (and their autologin), the interactive shell, the docs frontend with its title and default page, and the split helper. The frontend is either `tui_app = "install-docs"` or `text = "install-guide.txt"`, resolved by the variant loader relative to the variant directory. The contract validates the block once, in `variant.rs`, with `deny_unknown_fields` on every action struct; `config.rs` only maps it. The builder stops reading `install_experience` from `scenarios.toml`. Gone: `AutomatedSsh`, `issue_message`, `ux_docs_frontend` under automated mode, and the install-experience marker file (tests read the variant). Builder code imports contract types from the contract crate, not through `live_tools`. Another session is editing `distro/contract` and `products.rs`, so land this in small commits and commit only these hunks.
+`products.toml` holds one `install_ux` block per variant. It lists the consoles that launch the UX (and their autologin), the interactive shell, the docs frontend with its title and default page, and the split helper. The frontend is either `tui_app = "install-docs"` or `text = "install-guide.txt"`, resolved by the variant loader relative to products.toml. The contract validates the block once, in `variant.rs`, with `deny_unknown_fields` on every action struct; `config.rs` only maps it. The builder stops reading `install_experience` from `scenarios.toml`. Gone: `AutomatedSsh`, `issue_message`, `ux_docs_frontend` under automated mode, and the install-experience marker file (tests read the variant). Builder code imports contract types from the contract crate, not through `live_tools`. Another session is editing `distro/contract` and `products.rs`, so land this in small commits and commit only these hunks.
 
 **Done when:** No build input comes from `scenarios.toml`; each field has one validator; an unknown key in any runtime action fails variant loading.
 
@@ -1238,7 +1238,10 @@ Commits land on the checked-out branches (superproject `master`, submodules `cod
   - **Bug fixed:** live-net-setup's awk programs (D039) were rejected by gawk; the extracted file's programs print the interface for sample `ip` output.
   - Verified: both live overlays rendered through the builder's public functions (scratch harness, not committed) are byte-identical to before apart from that fix; every guest file passes `sh -n`. No shellcheck on this host.
   - Boot behaviour is unverified on this machine: products can't be prepared without root (kernel and output dirs are root-owned).
-- [ ] F18 — The install experience is declared once, in the variant's products.toml.
+- [x] F18 — The install experience is declared once, in the variant's products.toml. contract `29ccf86`, builder `76cc637`, install-tests `d6bb6b6`, superproject commit "F18: declare the install experience once…".
+  - `[install_ux]` holds `shell` and `docs = { tui_app = … }` or `{ text = … }` (resolved next to products.toml). Consoles, the docs page and the split helper's name join the block in F19, where something reads them; until then the split helper stays a runtime action, now in the one `runtime_profiles` list.
+  - The builder uses the contract's `RuntimeActionContract` directly; its own copy of the type and its second validator are gone.
+  - Verified: both variants load and validate; a misspelt key on a runtime action now fails loading (`unknown field 'pakages'`); both live overlays render byte-identical to F17.
 - [ ] F19 — One owner for the chain from login to install screen.
 - [ ] F20 — The program that owns the terminal sets TERM, and nothing forces colour.
 - [ ] F21 — Each live-ISO file has one writer, and init and distro differences come from config.
