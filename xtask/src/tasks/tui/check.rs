@@ -76,8 +76,8 @@ pub fn run(bless: bool) -> Result<()> {
                 );
             }
         }
-        if !launch.app.inspect.walk.is_empty() {
-            step(format!("walk {name}"), walk(&launch));
+        for walk_spec in &launch.app.inspect.walks {
+            step(format!("walk {name}: {}", walk_spec.name), walk(&launch, walk_spec));
         }
         let snapshots = launch.app.dir.join("snapshots");
         if snapshots.is_dir() {
@@ -107,7 +107,7 @@ fn bun_run(dir: &Path, script: &str) -> Result<()> {
 }
 
 fn render(launch: &Launch, args: &[String], size: Size) -> Result<()> {
-    let shot = launch.capture(args, &[], size, WAIT).map_err(capture_error)?;
+    let shot = launch.capture(args, &[], &[], size, WAIT).map_err(capture_error)?;
     healthy(&shot)
 }
 
@@ -125,20 +125,19 @@ fn capture_error(error: CaptureError) -> anyhow::Error {
     }
 }
 
-fn walk(launch: &Launch) -> Result<()> {
+fn walk(launch: &Launch, spec: &distro_contract::tui_apps::Walk) -> Result<()> {
+    let env: Vec<(String, String)> = spec.env.clone().into_iter().collect();
     let mut keys = Vec::new();
-    for (index, step) in launch.app.inspect.walk.iter().enumerate() {
+    let mut typed = String::new();
+    for (index, step) in spec.steps.iter().enumerate() {
         keys.extend(parse_keys(&step.keys)?);
-        let shot = launch.capture(&[], &keys, FULL, WAIT).map_err(capture_error)?;
+        typed.push_str(&step.keys);
+        let shot = launch.capture(&[], &env, &keys, FULL, WAIT).map_err(capture_error)?;
         healthy(&shot)?;
         if !shot.plain.contains(&step.expect) {
             bail!(
-                "step {} (keys so far '{}'): expected '{}' on screen:\n{}",
+                "step {} (keys so far '{typed}'): expected '{}' on screen:\n{}",
                 index + 1,
-                launch.app.inspect.walk[..=index]
-                    .iter()
-                    .map(|s| s.keys.as_str())
-                    .collect::<String>(),
                 step.expect,
                 shot.plain
             );
@@ -177,7 +176,7 @@ fn compare_snapshots(launch: &Launch, dir: &Path, bless: bool) -> Result<()> {
                 continue;
             };
             let args = vec![page_arg.clone(), page.clone()];
-            let shot = launch.capture(&args, &[], size, WAIT).map_err(capture_error)?;
+            let shot = launch.capture(&args, &[], &[], size, WAIT).map_err(capture_error)?;
             let actual = format!("{}\n", mask(&shot.plain));
             if bless {
                 fs::write(&path, &actual)?;

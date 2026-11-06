@@ -1226,7 +1226,10 @@ Commits land on the checked-out branches (superproject `master`, submodules `cod
   - **Bug fixed:** a failing `recpart list-disks` showed its error document as a raw JSON blob; now its `observed (remediation)`.
   - Bonus: recpart's own `plan --help` now describes each `--mode`.
   - Left as is (see there): C011, C012, C014, C073–C077, C132, C137 need recab/recpart output changes while another session was rewriting those tools.
-- [ ] F15 — disk-plan as an explicit flow graph, with IO kept apart from pages.
+- [x] F15 — disk-plan as an explicit flow graph. tui `471a6d3`, contract `44362e5` (manifest `inspect.path`, named `inspect.walks` with env), superproject commit "disk-plan as an explicit flow graph…". disk-plan: `src/flow.ts`, `src/app/plan-runner.ts`, `src/presentation/{use-recpart.ts,pages.tsx,disk-plan-screen.tsx}`, `fixtures/recpart` + recorded JSON. Kit: `useAsyncTask` (A180/A181, deferred from F10). xtask: walks take env; a key that changes nothing on screen counts as settled.
+  - **Bugs fixed:** Next on result-handoff landed on failure-diagnostics; Back from an apply failure landed on result-handoff; a stored failure outlived a successful re-run; the "exact command sequence" omitted list-disks and the real apply; non-rotational disks were labelled "ssd"; the empty-list message blamed `--disk`. Driver bug found by the walk: a keypress with no screen change made `inspect` wait until timeout.
+  - Verified: `cargo xtask check tui` walks disk-plan through both apply outcomes (success → handoff, Next stays; failure → diagnostics, Back → apply-progress) against the fixture.
+  - Unchanged on purpose: the next-step commands on the handoff page are still this app's text (C011, left as is under F14); generic vendor names are still hidden (C050).
 - [ ] F16 — recab TUI: results stay visible, and status is a separate panel.
 - [ ] F17 — Guest scripts are files, with one placeholder scheme that is checked.
 - [ ] F18 — The install experience is declared once, in the variant's products.toml.

@@ -68,7 +68,7 @@ pub fn run(options: Options) -> Result<()> {
         if runs.len() > 1 {
             eprintln!("[inspect] {}/{} {name}", index + 1, runs.len());
         }
-        let capture = launch.capture(args, &keys, size, wait);
+        let capture = launch.capture(args, &[], &keys, size, wait);
         let shot = match &capture {
             Ok(shot) | Err(CaptureError { shot: Some(shot), .. }) => Some(shot),
             Err(_) => None,
@@ -134,6 +134,11 @@ impl Launch {
         crate::tasks::check::install_js_workspace(root)?;
         let mut path = super::tools_path(root, &app)?
             .unwrap_or_else(|| std::env::var_os("PATH").unwrap_or_default());
+        if !app.inspect.path.is_empty() {
+            let mut paths: Vec<PathBuf> = app.inspect.path.iter().map(|dir| app.dir.join(dir)).collect();
+            paths.extend(std::env::split_paths(&path));
+            path = std::env::join_paths(paths)?;
+        }
         let shims = refuse_shims(&app, &path)?;
         if let Some(dir) = &shims {
             let mut paths = vec![dir.path().to_path_buf()];
@@ -187,6 +192,7 @@ impl Launch {
     pub fn capture(
         &self,
         args: &[String],
+        extra_env: &[(String, String)],
         keys: &[Vec<u8>],
         size: Size,
         wait: Wait,
@@ -194,7 +200,14 @@ impl Launch {
         let argv = self.argv(args);
         let label = format!("inspect {}", self.app.name);
         let mut session =
-            PtySession::spawn(&label, &self.app.dir, &argv, &self.env, size.columns, size.rows)
+            PtySession::spawn(
+                &label,
+                &self.app.dir,
+                &argv,
+                &[self.env.as_slice(), extra_env].concat(),
+                size.columns,
+                size.rows,
+            )
                 .map_err(|e| CaptureError {
                     message: format!("{e:#}"),
                     shot: None,
@@ -210,7 +223,7 @@ impl Launch {
         };
 
         for step in 0..=keys.len() {
-            match session.settle(wait.settle, wait.timeout) {
+            match session.settle(wait.settle, wait.timeout, step == 0) {
                 Ok(Settled::Quiet) => {}
                 Ok(Settled::Exited(status)) => {
                     let message = format!(

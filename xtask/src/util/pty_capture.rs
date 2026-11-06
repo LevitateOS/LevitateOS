@@ -95,10 +95,12 @@ impl PtySession {
         })
     }
 
-    /// Reads output until nothing arrives for `quiet`, the program exits, or `timeout` passes.
-    pub fn settle(&mut self, quiet: Duration, timeout: Duration) -> Result<Settled> {
+    /// Reads output until nothing arrives for `quiet`, the program exits, or `timeout`
+    /// passes. With `first_draw`, quiet only counts once something was drawn (a key that
+    /// changes nothing on screen produces no output at all, which is also settled).
+    pub fn settle(&mut self, quiet: Duration, timeout: Duration, first_draw: bool) -> Result<Settled> {
         let deadline = Instant::now() + timeout;
-        let mut seen_output = false;
+        let mut seen_output = !first_draw;
         loop {
             if let Some(status) = &self.exit {
                 return Ok(Settled::Exited(status.clone()));
