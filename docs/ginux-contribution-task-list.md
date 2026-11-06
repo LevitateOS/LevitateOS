@@ -1052,3 +1052,26 @@ exec/wait hooks. Reconcile each final packet's whole diff and ordinary/clean
 verification serially. G07 and shared/indirect argument security remain unready.
 Active skill remains hdae-development at the discovery path above; reload it,
 required references and this latest checkpoint after any context shift.
+
+
+### G04 latest-base checkpoint — 2026-11-07
+
+G04 is now `8880ddc8fd7b3918707a5a832de47e86f49c9fda`, tree `2215efdef3eca9a27e90a1e72ed91b9fa53611f9`, on refreshed
+G03c3801fd45 rooted atff926d0c. [Review](ginux-contributions/g04-review.md) owns
+its fourteen-file +624/-125 scope. Device claims remain below resolved policy
+admission; faccessat269 joins upstream's catalog/read-family owner with native
+Deny38 and all earlier assertions preserved. Existing audit/copy owners remain.
+Source/clean pass96 units/static/build, generated docs and18 ordinary controls
+per export; all203 paths and both binaries match. Exact G03c rejects the identical
+valid null assignment. All37 retained patch/head/parent/tree replays verify and
+all six restored worktrees remain unchanged. Read-only GitHub still reports
+upstreamff926d0c; Ginux leads and Recipe/contributions follow its contract.
+
+Six latest-base preparations exist;31 retained patches remain. Full default/
+runtime-policy/security/macOS/remote CI, actual upstream prerequisite merges and
+G07/F02/F03/F04 remain pending. No branches/real checkouts/remote text/publication
+changed. Current goal turn: progress. Exact next action: refresh G05 on G04
+8880ddc8fd7b3918707a5a832de47e86f49c9fda, preserving contract admission before public descriptor
+translation/effects; then review G06b before early task/exec/wait hooks. Security
+work stays downstream for DaybreakBlue without dispatch. Active HDAE skill and
+required context-reload procedure remain as recorded above.

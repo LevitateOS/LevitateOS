@@ -897,3 +897,18 @@ recorded successor. All earlier G03c authority/protected/fault probes remain
 required. Recheck these joins as device/FD/task packets are refreshed, especially
 early task entry in G06b. No adversarial runtime reproduction or cloud agent was
 run. G07 remains excluded and unready; keep acceptance pending.
+
+
+## G04 latest-base resolved-contract revision — 2026-11-07
+
+Current G04 is `8880ddc8fd7b3918707a5a832de47e86f49c9fda` on G03c3801fd45 rooted atff926d0c.
+[Review](g04-review.md) records96 units and18 ordinary controls per source/clean.
+Device effects are under the configured resolved-contract guard; faccessat269
+uses upstream's catalog and existing read-family owner with native denial intact.
+Revalidate raw/semantic denial before device opens/descriptor effects, namespace
+and assignment authority, hidden image aliases, strict protected/partial metadata
+copies, private/public descriptor separation, scratch restoration and shared/
+indirect arguments on this head or a recorded successor. Existing full fixtures
+and CI remain enabled; their adversarial probes and enforcement cases are unrun.
+Ordinary valid null access/metadata is not security acceptance. G07 stays unready;
+no DaybreakBlue agent was dispatched. Keep monitored acceptance pending.

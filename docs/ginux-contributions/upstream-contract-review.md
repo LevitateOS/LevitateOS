@@ -132,3 +132,15 @@ Five latest-base preparations exist;32 retained patches remain. Next is G04 on
 G03c, ensuring its device claims stay under the resolved guard; then descriptor/
 task joins at G05/G06b must preserve the same ordering. Actual upstream prerequisite
 merges, catalog/contract scope review, full CI/security and F02/F03 remain open.
+
+
+G04 is now `8880ddc8fd7b3918707a5a832de47e86f49c9fda` on G03c3801fd45, rooted atff926d0c.
+[Review](g04-review.md) records device claims under the existing pre-effect guard,
+faccessat269 catalog/read-family integration, native Deny38 preserved and existing
+audit/copy owners retained. Source/clean pass96 units/static/build, generated docs
+and18 ordinary controls each; all203 paths and binaries match. Exact G03c rejects
+the same valid assigned-null workload. A read-only GitHub recheck at2026-11-06
+23:06–23:14 UTC still reportedff926d0c; the main checkout/pin remains unchanged.
+Six latest-base preparations exist;31 patches still need reconciliation. Next:
+G05 public descriptor translation, then G06b early task/exec/wait ordering. Security,
+full CI, actual upstream prerequisite merges and F02/F03/F04 remain pending.

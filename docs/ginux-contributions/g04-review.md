@@ -1,9 +1,9 @@
 # G04 — assigned virtual null devices
 
-Current retained local commit `09fdb1b0f2caae3432846966815dcb7444a3c0e2`, on refreshed
-G03c `e9c0a4d494cb9c2c2080289aa198dda42dd65b08`, rooted at observed main `8a475e8b`.
-The current-main refresh below owns fresh evidence and pending checks; earlier
-results remain historical.
+Current retained local commit `8880ddc8fd7b3918707a5a832de47e86f49c9fda`, on refreshed
+G03c `3801fd45bd6280a5b320f2d464ada0bd04539326`, rooted at observed main `ff926d0c`.
+The latest-base contract refresh below owns fresh evidence and pending checks;
+earlier results remain historical.
 
 Earlier local feature commit `5036b7e8a61c4cf1e18abad8746208d03d268ea5`.
 Explicit local prerequisite G03c `b36e0752caa1c91e4bbbe112c589c85915a6ce6d`
@@ -123,3 +123,51 @@ the written security boundary. Monitored validation is still assigned downstream
 to DaybreakBlue; no dispatch has occurred. macOS/remote CI is unrun. R03/R04 retain
 these requirements and actual G03c/prerequisite upstream merges before standalone
 extraction/revalidation; no stacked publication or F02/F03 closure is implied.
+
+
+## Latest-base contract/device refresh — 2026-11-07
+
+Current head `8880ddc8fd7b3918707a5a832de47e86f49c9fda`, tree `2215efdef3eca9a27e90a1e72ed91b9fa53611f9`, has sole parent G03c `3801fd45bd6280a5b320f2d464ada0bd04539326`, rooted at
+upstreamff926d0c. A fresh read-only GitHub check still reports that main. The
+fourteen-file +624/-125 scope retains the previous device behavior and full
+fixtures/CI, adapting to upstream's contract/catalog/audit owners.
+
+A separate full-diff self-review traced registry assignment/open/read/write/
+close, current namespace and strict copy/metadata callers, native descriptor
+reservation, launch completion/error paths, resolved-rule selection and both
+native/configured dispatch contexts. Device claims remain inside the existing
+policy-admitted branch, before memory-file claims; they cannot precede the guard.
+No parallel policy or device framework is added. Public null handles remain
+outside the regular-file range. The existing configured audit writer and its
+64KiB bound/disabled mode stay unchanged. Independent review is not claimed.
+
+The implemented faccessat269 device path was absent from upstream's catalog.
+It now has a configured-device entry and read-family classification through
+existing owners. Generated coverage is185 operations. The catalog consistency
+unit still asserts native systemd Deny38 for configured-only6/268/269 and retains
+all previous assertions. Source default and ordinary fixtures include a valid
+faccessat call; no new native syscall implementation is enabled.
+
+Source and strict clean G03c-plus-only-G04 replay pass96 unit tests (24 VFS/
+10 contract), make check and all applicable build targets, generated contract
+document checks and18 ordinary controls per export: eight launch/valid-wait,
+three storage, one valid owned metadata, three audit and three null-device cases.
+The null controls include valid buffers, EOF/discard bounds, metadata, flags,
+seek, access modes,64-slot exhaustion/reuse and fresh/mixed configurations.
+Exact G03c rejects the identical valid assigned-null workload at exit2 with
+`launch does not support device assignments`. All83 upstream named unit tests
+remain; all203 tracked paths match in both exports. Both binaries hash
+`6034f7bb06b744e302f44dec3c65539138ef817f8fc4d83783775fe1572e4305`.
+Core/process/runtime/domain/supervisor source is unchanged from the prerequisite.
+
+Exact source, patch/draft, commands/logs, receipts, generated docs and hashes are
+in `.artifacts/ginux-contribution-preparation/upstream-contract-refresh-2026-11-06/G04/`.
+All37 retained patch/head/parent/tree replays verify; all six restored worktree
+8880ddc8fd7b3918707a5a832de47e86f49c9fda/index/status fingerprints remain unchanged. No branch/index/real checkout,
+remote text or publication changed.
+
+Runtime policy-denial, protected/fault/hidden-alias/shared-argument security,
+full default suites and macOS/remote CI remain unrun and required. The downstream
+DaybreakBlue record retains monitored acceptance; no dispatch occurred. This is
+ordinary preparation, not completed R03/standalone acceptance. Actual G03c and
+prerequisite upstream merges, final F02/F03 and F04 remain pending.
