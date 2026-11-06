@@ -124,7 +124,7 @@ fn resolve_target(root: &Path, options: &Options) -> Result<Target> {
             crate::cli::TuiApp::InstallDiskPlan => Target {
                 name: "install-disk-plan".to_string(),
                 cwd: root.join("tui/apps/install/disk-plan"),
-                command: "bun run start -- --disk /dev/sda".to_string(),
+                command: "bun src/main.ts --disk /dev/sda".to_string(),
             },
         });
     }

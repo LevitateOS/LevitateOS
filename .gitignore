@@ -6,7 +6,8 @@
 # JavaScript workspace
 node_modules/
 .turbo/
-bun.lock
+/**/bun.lock
+!/bun.lock
 bun.lockb
 
 # Editors, OS and local tool state

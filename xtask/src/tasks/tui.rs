@@ -14,7 +14,7 @@ pub fn run(app: TuiApp, args: Vec<String>) -> Result<()> {
     let mut cmd = match app {
         TuiApp::InstallDocs => {
             let dir = root.join("tui/apps/live-tools/install-docs");
-            crate::tasks::check::ensure_node_modules(&dir)?;
+            crate::tasks::check::install_js_workspace(&root)?;
             let mut cmd = Command::new("bun");
             cmd.current_dir(dir).arg("src/main.ts");
             cmd.env_remove("NO_COLOR").env("FORCE_COLOR", "3");
@@ -30,7 +30,7 @@ pub fn run(app: TuiApp, args: Vec<String>) -> Result<()> {
                 bail!("building recpart failed");
             }
             let dir = root.join("tui/apps/install/disk-plan");
-            crate::tasks::check::ensure_node_modules(&dir)?;
+            crate::tasks::check::install_js_workspace(&root)?;
             let target_dir = std::env::var_os("CARGO_TARGET_DIR")
                 .map(std::path::PathBuf::from)
                 .unwrap_or_else(|| root.join("target"));
@@ -38,7 +38,7 @@ pub fn run(app: TuiApp, args: Vec<String>) -> Result<()> {
             paths.extend(std::env::split_paths(&std::env::var_os("PATH").unwrap_or_default()));
             let mut cmd = Command::new("bun");
             cmd.current_dir(dir)
-                .args(["run", "start", "--"])
+                .arg("src/main.ts")
                 .env("PATH", std::env::join_paths(paths)?);
             cmd
         }

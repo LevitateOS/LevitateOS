@@ -99,7 +99,7 @@ fn generate(out: &mut Out) -> Result<()> {
     recab_ts.types::<recab::Slot>();
     recab_ts.types::<recab::Status>();
     recab_ts.constant("SLOTS", <recab::Slot as clap::ValueEnum>::value_variants())?;
-    recab_ts.write(out, &root.join("tui/apps/runtime/recab/domain/contract.ts"))?;
+    recab_ts.write(out, &root.join("tui/apps/runtime/recab/src/domain/contract.ts"))?;
 
     write_tool_help(out, &root)?;
     Ok(())

@@ -40,11 +40,13 @@ pub fn run() -> Result<()> {
         "docs content builds",
         command(&root.join("docs/content"), "bun", &["run", "build"]),
     );
+    step("bun install --frozen-lockfile", install_js_workspace(&root));
     for package in TS_PACKAGES {
         let dir = root.join(package);
-        let result = ensure_node_modules(&dir)
-            .and_then(|()| command(&dir, "bun", &["run", "typecheck"]));
-        step(&format!("typecheck {package}"), result);
+        step(
+            &format!("typecheck {package}"),
+            command(&dir, "bun", &["run", "typecheck"]),
+        );
     }
 
     if !failed.is_empty() {
@@ -53,11 +55,10 @@ pub fn run() -> Result<()> {
     Ok(())
 }
 
-pub fn ensure_node_modules(dir: &Path) -> Result<()> {
-    if dir.join("node_modules").is_dir() {
-        return Ok(());
-    }
-    command(dir, "bun", &["install"])
+/// Installs the one JavaScript workspace (root `package.json`, root `bun.lock`).
+/// Every TUI package is a member, so this is the only install there is.
+pub fn install_js_workspace(root: &Path) -> Result<()> {
+    command(root, "bun", &["install", "--frozen-lockfile"])
 }
 
 fn command(dir: &Path, program: &str, args: &[&str]) -> Result<()> {

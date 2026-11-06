@@ -1157,3 +1157,35 @@ Generic live-ISO behaviour outside the install UI: QEMU-slirp network setup, the
 - `R011` [special] `distro/builder/src/pipeline/overlay.rs:209-253`: OpenRC service wiring has one hand-written branch per service name (`sshd`, `networking`, `dhcpcd`), each with its own runlevel; any other name bails.
 
 ## Progress
+
+Commits land on the checked-out branches (superproject `master`, submodules `codex/streamline-development`); AGENTS.md forbids creating branches, so each fix is one commit per repo it touches, submodules first.
+
+**Baseline rerun (2026-11-06, before F1).** Same results as `## Baseline` once this machine had what the old one had: a root `bun install`, `docs/content` `bun run build` (its `src/generated` was missing, so install-docs failed typecheck), and a `bun install` inside recab (which recreates the duplicate React). Typecheck passes in all four packages; lint fails in kit and install-docs, format-check fails in all four; `inspect:check` fails on `001-installation-disk.txt`; `test:e2e` 0/3 (`unrecognized subcommand 'docs'`); `cargo check -p install-split-pane` passes. Renders: disk-plan identical, recab identical (crash), docs identical except `021-faq`, `022-how-we-compare`, `024-variants` and the manifest, which changed with docs/content `b22d24b` (Rocky → Fedora wording). Outputs in `.artifacts/untangle-ui/rerun/`.
+
+- [x] F1 — One TUI workspace: one React, one lockfile, one toolchain, one package shape. tui `74d5e49`; superproject commit "One TUI workspace…" (root workspaces incl. recab, root `bun.lock` un-ignored and committed, root `.oxlintrc.json`/`.oxfmtrc.json` with tabs (the style of kit, install-docs and docs/content; disk-plan and recab reformatted), turbo keeps only dev/build, xtask runs one `bun install --frozen-lockfile`).
+  - **Bug fixed:** recab TUI crashed on launch (duplicate React); it renders now.
+  - recab's runner moved to `Bun.spawn` early (its `node:child_process` typings broke without `@types/node`); same failure semantics. The PTY test's unused `expect` import was dropped so lint passes.
+  - Known until F14: the generated contracts are now formatted, so `cargo xtask gen --check` reports them stale.
+- [ ] F2 — One app manifest: each app declares its name, entry and needs once, and xtask and the builder read it.
+- [ ] F3 — One xtask TUI driver for run, inspect and capture.
+- [ ] F4 — Checks that fail on real bugs: `cargo xtask check tui`.
+- [ ] F5 — Delete the kit surface no app uses.
+- [ ] F6 — One colour pipeline from theme intent to Ink.
+- [ ] F7 — Keymap as data, with one dispatcher and focus scopes.
+- [ ] F8 — No app vocabulary in the kit.
+- [ ] F9 — One frame and width model, and one app shell that fits the space it gets.
+- [ ] F10 — The kit owns the app lifecycle: args, TTY, errors, exit codes and processes.
+- [ ] F11 — One generic component per job in the kit.
+- [ ] F12 — install-docs lays each block out once: block → lines.
+- [ ] F13 — Apps get distro identity from their launcher, and install-docs fails fast.
+- [ ] F14 — Facts owned by recpart and recab reach the TUIs only through `cargo xtask gen`.
+- [ ] F15 — disk-plan as an explicit flow graph, with IO kept apart from pages.
+- [ ] F16 — recab TUI: results stay visible, and status is a separate panel.
+- [ ] F17 — Guest scripts are files, with one placeholder scheme that is checked.
+- [ ] F18 — The install experience is declared once, in the variant's products.toml.
+- [ ] F19 — One owner for the chain from login to install screen.
+- [ ] F20 — The program that owns the terminal sets TERM, and nothing forces colour.
+- [ ] F21 — Each live-ISO file has one writer, and init and distro differences come from config.
+- [ ] F22 — ISO payload is built by recipes and one generic TUI-app action.
+- [ ] F23 — The split pane is a robust terminal host.
+- [ ] F24 — Install tests exercise the real launch, not a smoke stand-in.
