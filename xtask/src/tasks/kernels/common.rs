@@ -19,14 +19,11 @@ pub(crate) struct AutoFixOptions {
 }
 
 pub(crate) fn target_for(d: crate::cli::Distro) -> KernelTarget {
-    match d {
-        crate::cli::Distro::Levitate => KernelTarget {
-            distro_id: "levitate",
-            kernel: &distro_spec::levitate::KERNEL_SOURCE,
-        },
-        crate::cli::Distro::Acorn => KernelTarget {
-            distro_id: "acorn",
-            kernel: &distro_spec::acorn::KERNEL_SOURCE,
+    KernelTarget {
+        distro_id: d.id(),
+        kernel: match d {
+            crate::cli::Distro::Levitate => &distro_spec::levitate::KERNEL_SOURCE,
+            crate::cli::Distro::Acorn => &distro_spec::acorn::KERNEL_SOURCE,
         },
     }
 }
@@ -61,10 +58,7 @@ pub(crate) fn kernel_is_built(root: &Path, t: &KernelTarget) -> bool {
 }
 
 pub(crate) fn verify_one(root: &Path, t: &KernelTarget) -> Result<String> {
-    let kernel_root = root
-        .join(".artifacts/kernel")
-        .join(t.distro_id)
-        .join("current");
+    let kernel_root = distro_builder::run_history::kernel_output_dir(root, t.distro_id);
     let rel_file = kernel_root.join("kernel-build/include/config/kernel.release");
     let vmlinuz = kernel_root.join("staging/boot/vmlinuz");
 
@@ -139,10 +133,7 @@ pub(crate) fn build_kernel_via_recipe(
     let kconfig_path = bundle
         .paths
         .build_host_declared_path(&bundle.contract.build.kernel.kconfig_path);
-    let kernel_artifact_root = root
-        .join(".artifacts/kernel")
-        .join(distro_id)
-        .join("current");
+    let kernel_artifact_root = distro_builder::run_history::kernel_output_dir(root, distro_id);
 
     let mut cmd = Command::new(recipe_bin);
     cmd.current_dir(root);
@@ -199,10 +190,7 @@ pub(crate) fn install_prebuilt_kernel_via_recipe(
     let recipe_rhai = root.join("distro-builder/recipes/linux-prebuilt.rhai");
     let build_dir = distro_builder::recipe::recipe_work_dir(root, distro_id)?;
     let recipes_path = root.join("distro-builder/recipes");
-    let kernel_artifact_root = root
-        .join(".artifacts/kernel")
-        .join(distro_id)
-        .join("current");
+    let kernel_artifact_root = distro_builder::run_history::kernel_output_dir(root, distro_id);
 
     let mut cmd = Command::new(recipe_bin);
     cmd.current_dir(root)

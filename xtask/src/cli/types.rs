@@ -20,8 +20,8 @@ impl Distro {
 
     pub fn pretty_name(self) -> &'static str {
         match self {
-            Self::Levitate => "LevitateOS",
-            Self::Acorn => "AcornOS",
+            Self::Levitate => distro_spec::levitate::OS_NAME,
+            Self::Acorn => distro_spec::acorn::OS_NAME,
         }
     }
 }

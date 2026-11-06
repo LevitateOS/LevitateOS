@@ -115,7 +115,7 @@ pub fn boot(
     ssh_private_key: Option<PathBuf>,
 ) -> Result<()> {
     let root = crate::util::repo::repo_root()?;
-    let cfg = BootConfig::for_distro(distro);
+    let cfg = distro;
     let scenario =
         parse_scenario_name(&target).with_context(|| format!("parsing scenario '{}'", target))?;
 
@@ -141,7 +141,7 @@ pub fn boot(
 
     match scenario {
         ScenarioId::LiveBoot | ScenarioId::LiveTools => {
-            let iso_path = resolve_interactive_iso(&cfg, scenario)?;
+            let iso_path = resolve_interactive_iso(cfg, scenario)?;
             let label = if scenario == ScenarioId::LiveBoot {
                 "Live boot ISO"
             } else {
@@ -149,7 +149,7 @@ pub fn boot(
             };
             boot_live_iso(
                 &root,
-                &cfg,
+                cfg,
                 label,
                 &iso_path,
                 inject,
@@ -171,7 +171,7 @@ pub fn boot(
             if inject.is_some() || inject_file.is_some() {
                 bail!("boot injection is read by the live init; installed-boot does not support --inject/--inject-file");
             }
-            boot_installed_disk(&root, &cfg, window_cfg.as_ref())
+            boot_installed_disk(&root, cfg, window_cfg.as_ref())
         }
         _ => bail!(
             "scenario '{}' is automated. Interactive targets: live-boot, live-tools, installed-boot.",
@@ -219,22 +219,8 @@ pub fn reset(distro: crate::cli::Distro) -> Result<()> {
     install_tests::scenarios::reset_state(distro.id())
 }
 
-struct BootConfig {
-    distro_id: &'static str,
-    pretty_name: &'static str,
-}
-
-impl BootConfig {
-    fn for_distro(distro: crate::cli::Distro) -> Self {
-        Self {
-            distro_id: distro.id(),
-            pretty_name: distro.pretty_name(),
-        }
-    }
-}
-
-fn resolve_interactive_iso(cfg: &BootConfig, scenario: ScenarioId) -> Result<PathBuf> {
-    let iso = resolve_iso_artifact_for_scenario(cfg.distro_id, scenario)?.ok_or_else(|| {
+fn resolve_interactive_iso(cfg: crate::cli::Distro, scenario: ScenarioId) -> Result<PathBuf> {
+    let iso = resolve_iso_artifact_for_scenario(cfg.id(), scenario)?.ok_or_else(|| {
         anyhow::anyhow!("scenario '{}' is not backed by a live ISO", scenario.key())
     })?;
     Ok(iso.path)
@@ -254,7 +240,7 @@ fn boot_injection(
 
 fn boot_live_iso(
     root: &Path,
-    cfg: &BootConfig,
+    cfg: crate::cli::Distro,
     scenario_label: &'static str,
     iso_path: &Path,
     inject: Option<String>,
@@ -287,7 +273,7 @@ fn boot_live_iso(
 
 fn boot_live_iso_serial(
     root: &Path,
-    cfg: &BootConfig,
+    cfg: crate::cli::Distro,
     iso_path: &Path,
     injection: Option<BootInjection>,
     no_shell: bool,
@@ -297,7 +283,7 @@ fn boot_live_iso_serial(
         let log_path = temp_log_path("levitate-live-boot-serial");
         let mut cmd = qemu_base_command(root, iso_path, injection.as_ref(), None, window)?;
         let child = spawn_qemu_with_log(&mut cmd, &log_path, false)?;
-        monitor_live_iso_serial(child, &log_path, &LiveBootPatterns::load(cfg.distro_id)?)?;
+        monitor_live_iso_serial(child, &log_path, &LiveBootPatterns::load(cfg.id())?)?;
         let _ = fs::remove_file(&log_path);
         return Ok(());
     }
@@ -305,10 +291,10 @@ fn boot_live_iso_serial(
     if window.is_some() {
         eprintln!(
             "Booting {} live ISO in window mode... (Ctrl-C to stop)",
-            cfg.pretty_name
+            cfg.pretty_name()
         );
     } else {
-        eprintln!("Booting {} live ISO... (Ctrl-A X to exit)", cfg.pretty_name);
+        eprintln!("Booting {} live ISO... (Ctrl-A X to exit)", cfg.pretty_name());
     }
     let mut cmd = qemu_base_command(root, iso_path, injection.as_ref(), None, window)?;
     if let Some(window_cfg) = window {
@@ -329,10 +315,9 @@ struct LiveBootPatterns {
 impl LiveBootPatterns {
     fn load(distro_id: &str) -> Result<Self> {
         let live = install_tests::distro::load_scenarios(distro_id)?.live_boot;
-        let mut success = live.success_patterns;
+        let mut success = live.success_patterns.clone();
         success.push(recqemu::serial::protocol::SHELL_READY_MARKER.to_string());
-        let mut fatal = live.fatal_patterns;
-        fatal.push(distro_spec::shared::live_boot::ROOTFS_MISSING_MESSAGE.to_string());
+        let fatal = install_tests::qemu::serial::live_fatal(&live);
         Ok(Self { success, fatal })
     }
 
@@ -397,7 +382,7 @@ fn monitor_live_iso_serial(mut child: Child, log_path: &Path, patterns: &LiveBoo
 
 fn boot_live_iso_ssh(
     root: &Path,
-    cfg: &BootConfig,
+    cfg: crate::cli::Distro,
     scenario_label: &'static str,
     iso_path: &Path,
     injection: Option<BootInjection>,
@@ -409,7 +394,7 @@ fn boot_live_iso_ssh(
 ) -> Result<()> {
     eprintln!(
         "Booting {} {} with SSH wait (port {}:{ssh_port})...",
-        cfg.pretty_name,
+        cfg.pretty_name(),
         scenario_label,
         recqemu::HOSTFWD_ADDRESS
     );
@@ -421,7 +406,7 @@ fn boot_live_iso_ssh(
     let result = monitor_live_iso_ssh(
         child,
         &log_path,
-        &LiveBootPatterns::load(cfg.distro_id)?,
+        &LiveBootPatterns::load(cfg.id())?,
         ssh_port,
         ssh_timeout,
         no_shell,
@@ -561,7 +546,7 @@ fn run_interactive_ssh(
     args.push("-tt".to_string());
     args.push("-o".to_string());
     args.push("BatchMode=no".to_string());
-    args.push(format!("root@{}", recshuttle::FORWARD_HOST));
+    args.push(format!("root@{}", recqemu::HOSTFWD_ADDRESS));
     let status = Command::new("ssh")
         .env("TERM", "vt100")
         .args(&args)
@@ -594,7 +579,7 @@ fn can_ssh_connect(ssh_port: u16, private_key: &Path, known_hosts: &Path) -> Res
     args.push("-n".to_string());
     args.push("-o".to_string());
     args.push("BatchMode=yes".to_string());
-    args.push(format!("root@{}", recshuttle::FORWARD_HOST));
+    args.push(format!("root@{}", recqemu::HOSTFWD_ADDRESS));
     args.push("true".to_string());
     let status = Command::new("ssh")
         .args(&args)
@@ -633,10 +618,10 @@ fn common_ssh_args(key: &Path, ssh_port: u16, known_hosts: &Path) -> Vec<String>
 
 fn boot_installed_disk(
     root: &Path,
-    cfg: &BootConfig,
+    cfg: crate::cli::Distro,
     window: Option<&WindowConfig>,
 ) -> Result<()> {
-    let runtime = resolve_latest_install_runtime(cfg.distro_id)?;
+    let runtime = resolve_latest_install_runtime(cfg.id())?;
     let disk = runtime.disk_path;
     let vars = runtime.ovmf_vars_path;
     let disk_format = recqemu::disk_image_format(&disk);
@@ -652,12 +637,12 @@ fn boot_installed_disk(
     if window.is_some() {
         eprintln!(
             "Booting installed {} from install scenario run {} in window mode... (Ctrl-C to stop)",
-            cfg.pretty_name, runtime.run_id
+            cfg.pretty_name(), runtime.run_id
         );
     } else {
         eprintln!(
             "Booting installed {} from install scenario run {}... (Ctrl-A X to exit)",
-            cfg.pretty_name, runtime.run_id
+            cfg.pretty_name(), runtime.run_id
         );
     }
     eprintln!("  disk: {}", disk.display());
@@ -684,11 +669,7 @@ fn qemu_base_command(
         .cdrom_as_disk()
         .uefi(crate::util::repo::ovmf_path(root)?);
     if let Some(injection) = injection {
-        builder = builder.fw_cfg_file(
-            distro_spec::shared::live_boot::BOOT_INJECTION_FW_CFG,
-            &injection.payload_file,
-        );
-        builder = builder.extra_cdrom(&injection.media_iso_file);
+        builder = injection.attach(builder);
     }
     builder = match ssh_port {
         Some(port) => builder.user_network_with_hostfwd(port, recqemu::GUEST_SSH_PORT),
