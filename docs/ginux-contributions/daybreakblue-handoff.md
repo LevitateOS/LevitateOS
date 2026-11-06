@@ -723,3 +723,15 @@ the G07 capability. Ordinary non-thread consumers continue independently.
 Fresh receipt/log: the new F03 evidence directory's
 `next-ordinary-receipts.json` and
 `managed_bash_child_writes_domain_files_and_keeps_logs_out_of_json.log`.
+
+Valid tar extraction reveals another G07 consumer on the destination: the two
+ordinary contained-symlink/hardlink cases panic at thread creation. The existing
+Recipe progress owner calls `enable_steady_tick` at
+`src/helpers/internal/progress.rs:20`, reached from extraction at
+`src/helpers/build/extract.rs:425`. Git and download progress use the same owner.
+Logs retain clone3/clone ENOSYS and worker exit 101; these are ordinary functional
+failures, not archive security validation. The zip case was interrupted during
+administrative cleanup of the owned batch and is not a pass. Preserve these
+checks for exact-revision reruns after G07; do not disable progress to substitute
+for thread support. Other ordinary cases continue, with all security acceptance
+and dispatch still pending.

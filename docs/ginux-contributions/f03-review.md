@@ -98,7 +98,8 @@ checking nested state, product bytes, saved generations and unchanged sources.
 This replaces only that case's interrupted status; the four thread-related
 failures and all other unperformed criteria remain open.
 
-Eight destination scenarios have completed: **seven pass, one fails**. The
+Ten destination scenarios have completed: **seven pass, three fail**, with one
+additional case interrupted and unverified. The
 passing cases are state restore, independent custom readiness, 128 KiB file
 publication, nested-directory copy/move/cleanup, lifecycle machine-event order,
 current API initialization without legacy globals, and publication of 5,000
@@ -113,11 +114,27 @@ four-case runner correctly exits nonzero. This is fresh failure evidence, not a
 passing destination smoke. The other three original failures remain historical
 failures pending the same G07 prerequisite; they have not been rerun unchanged.
 
-The next 23 complete ordinary cases have been source-reviewed and are running
-serially from `ordinary-pending-selection.json`, beginning with valid archive
-extraction. They cover valid tar/zip payloads, retained state and dependencies,
-selected targets, lifecycle options, cleanup and a valid large-file digest.
-`pending-ordinary-receipts.json` records each exact command and completed result;
+The initial 23-case ordinary queue exposed a second G07 consumer: both valid tar
+extraction cases fail with a worker panic, `failed to spawn thread` / ENOSYS.
+The logs show clone3 denied and clone rejected by the configured process owner.
+Source tracing identifies `src/helpers/internal/progress.rs:20`:
+`enable_steady_tick` starts a progress thread, reached by extraction at
+`src/helpers/build/extract.rs:425`. These are valid archive failures, not hostile
+archive probes. They do not establish whether archive parsing/link handling
+would otherwise pass. Git/download helpers also use this progress owner; their
+acceptance remains pending rather than assuming they are thread-independent.
+
+The batch was stopped after this dependency was established. Only its identified
+runner and owned descendants were signaled; `batch-stop.json` records cleanup.
+The in-flight valid zip case is **interrupted**, with no case exit code or pass
+claim. Both tar failures remain failed. No progress suppression, replacement
+implementation or unready G07 import was used to bypass this missing capability.
+
+The revised 20-case ordinary queue is now running serially from
+`ordinary-independent-selection.json`, beginning with retained dependency state.
+It covers retained state and dependencies, selected targets, lifecycle options,
+cleanup and a valid large-file digest. Original selections and receipts are
+retained; `independent-ordinary-receipts.json` records the new commands/results.
 `state.json` reconciles fresh and historical statuses against all 135 exact
 catalog names. Multi-invocation cases have correspondingly longer time limits.
 This is selected ordinary verification, not complete applicable-suite acceptance.
