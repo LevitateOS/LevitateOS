@@ -1230,7 +1230,7 @@ Commits land on the checked-out branches (superproject `master`, submodules `cod
   - **Bugs fixed:** Next on result-handoff landed on failure-diagnostics; Back from an apply failure landed on result-handoff; a stored failure outlived a successful re-run; the "exact command sequence" omitted list-disks and the real apply; non-rotational disks were labelled "ssd"; the empty-list message blamed `--disk`. Driver bug found by the walk: a keypress with no screen change made `inspect` wait until timeout.
   - Verified: `cargo xtask check tui` walks disk-plan through both apply outcomes (success → handoff, Next stays; failure → diagnostics, Back → apply-progress) against the fixture.
   - Unchanged on purpose: the next-step commands on the handoff page are still this app's text (C011, left as is under F14); generic vendor names are still hidden (C050).
-- [x] F16 — recab-tui: results stay visible, status is a separate panel. tui `99f87a0`.
+- [x] F16 — recab-tui: results stay visible, status is a separate panel. tui `61445c5`.
   - **Bugs fixed:** the status refresh after a successful mutation overwrote its result (C079); the footer printed the literal "status-error" (R013).
   - Verified headlessly: pressing `c` logs "Commit active slot: recab commit (exit 97 …refused…)" while the status panel keeps its own error.
   - Note: another session edits recab and recab-tui's status rows (`d1f0b39`, the `committed`/`rollback` rows); `STATUS_ROWS` was left as they have it.
