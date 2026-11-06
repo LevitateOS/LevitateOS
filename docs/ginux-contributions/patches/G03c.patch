@@ -1,6 +1,6 @@
-From e9c0a4d494cb9c2c2080289aa198dda42dd65b08 Mon Sep 17 00:00:00 2001
+From 3801fd45bd6280a5b320f2d464ada0bd04539326 Mon Sep 17 00:00:00 2001
 From: vince <vincepaul.liem@gmail.com>
-Date: Fri, 6 Nov 2026 22:32:20 +0100
+Date: Sat, 7 Nov 2026 00:00:27 +0100
 Subject: [PATCH] feat(launch): add assigned ephemeral memory storage
 
 Keep configured writable files in supervisor memory, with bounded data,
@@ -10,19 +10,26 @@ links cannot bypass assignment precedence or hide invalid parents.
 Cover storage isolation, copy protections, bounds and temporary native
 path restoration while retaining existing unit and integration checks.
 
+Apply resolved syscall and semantic rules before owned effects or path
+rewriting, using the upstream contract catalog and bounded audit owner.
+Register owned metadata ABIs without enabling unimplemented native calls.
+
 Signed-off-by: vince <vincepaul.liem@gmail.com>
 ---
  .github/workflows/check.yml             |   3 +-
  Makefile                                |   9 +-
- README.md                               |  40 +-
- crates/ginux-init/src/fs_hooks.rs       | 599 +++++++++++++++++++++++-
- crates/ginux-init/src/launch.rs         |  64 ++-
- crates/ginux-init/src/main.rs           |   1 +
- crates/ginux-init/src/path_hooks.rs     | 188 ++++++++
+ README.md                               |  49 +-
+ crates/ginux-contract/src/lib.rs        |  80 +++
+ crates/ginux-init/src/fs_hooks.rs       | 620 +++++++++++++++++++++++-
+ crates/ginux-init/src/launch.rs         | 128 ++++-
+ crates/ginux-init/src/main.rs           |   7 +-
+ crates/ginux-init/src/path_hooks.rs     | 188 +++++++
  crates/ginux-vfs/src/lib.rs             |  13 +
- scripts/test-launch-storage.py          |  71 +++
- tests/fixtures/launch-storage-fixture.c | 180 +++++++
- 10 files changed, 1140 insertions(+), 28 deletions(-)
+ docs/abi-contract-coverage.md           |   6 +-
+ scripts/test-launch-storage.py          |  83 ++++
+ scripts/test-launch.py                  |   8 +
+ tests/fixtures/launch-storage-fixture.c | 196 ++++++++
+ 13 files changed, 1351 insertions(+), 39 deletions(-)
  create mode 100644 crates/ginux-init/src/path_hooks.rs
  create mode 100644 scripts/test-launch-storage.py
  create mode 100644 tests/fixtures/launch-storage-fixture.c
@@ -43,10 +50,10 @@ index d7f05af2ca5133210b171d3093acb3e9e89ec61a..9a0bec5e0c254eda4e7519074b8e622a
        - run: make test-process-native
        - run: sudo make test-gate1-setup
 diff --git a/Makefile b/Makefile
-index e9c91163fee05b54effdcaa118320bb29d102884..138b4fd83ddf99c409bf9729e6ea2051527b0aab 100644
+index 054dc9e6ba7a14ea3d70ca125db74f48534b03f2..af6d883ca7438f8de781a850fbbfaba3314392d3 100644
 --- a/Makefile
 +++ b/Makefile
-@@ -225,7 +225,7 @@ clean:
+@@ -244,7 +244,7 @@ clean:
  	cargo clean
  	@./scripts/clean-build.sh
  
@@ -55,7 +62,7 @@ index e9c91163fee05b54effdcaa118320bb29d102884..138b4fd83ddf99c409bf9729e6ea2051
  build-launch-fixture:
  	mkdir -p .artifacts/launch
  	$(CC) -nostdlib -static -fno-stack-protector -fno-builtin -O2 -Wall -Wextra -Werror tests/fixtures/launch-fixture.c -o .artifacts/launch/launch-fixture
-@@ -236,3 +236,10 @@ test-launch:
+@@ -255,3 +255,10 @@ test-launch:
  
  test-native-supervision:
  	python3 scripts/test-native-supervision.py $(GINUX) .artifacts/launch/native-fixture
@@ -67,7 +74,7 @@ index e9c91163fee05b54effdcaa118320bb29d102884..138b4fd83ddf99c409bf9729e6ea2051
 +test-launch-storage:
 +	python3 scripts/test-launch-storage.py $(GINUX) .artifacts/launch/launch-storage-fixture
 diff --git a/README.md b/README.md
-index 83ff833f13389cd775d0e65195cdf0790f776b1f..f36d0cf70d0bcb1c42e1741380f4dcba9952b910 100644
+index 83ff833f13389cd775d0e65195cdf0790f776b1f..3cbc6f791eb22abbaedd3a2b3642f982253a2e11 100644
 --- a/README.md
 +++ b/README.md
 @@ -273,8 +273,8 @@ executes `[domain].init` with the configured arguments and environment inside
@@ -81,10 +88,20 @@ index 83ff833f13389cd775d0e65195cdf0790f776b1f..f36d0cf70d0bcb1c42e1741380f4dcba
  
  `[domain].workdir` is optional and defaults to `/work`; `/` is also supported.
  The bootstrap creates the working directory if its parent exists, then enters
-@@ -292,6 +292,40 @@ child supervision is implemented. Non-x86-64 syscall ABIs and job-control
+@@ -290,7 +290,48 @@ failure returns 2; supervision or result-writing failure returns 1. Native
+ fork, clone, and subsequent exec are unsupported; fork returns `ENOSYS` until
+ child supervision is implemented. Non-x86-64 syscall ABIs and job-control
  group stops fail explicitly. Audit output is capped at 64 KiB plus a truncation
- notice. This path does not implement resource quotas from the domain metadata.
- 
+-notice. This path does not implement resource quotas from the domain metadata.
++notice. The existing byte budget also covers contract metadata records (domain,
++resolved digest, selected operation, provenance and policy action); audit disabled
++mode suppresses decision records. Resolved syscall and semantic-family denials
++apply before owned operations and native path rewriting. Contract allowance does
++not implement an unsupported operation or replace storage/argument validation.
++The versioned catalog includes configured owned lstat/fchmodat, while native
++backends continue to deny these unimplemented ABI operations.
++This path does not implement resource quotas from the domain metadata.
++
 +Optional `[storage].assignments` entries of the form `"memory:/absolute/path"`
 +declare empty, ephemeral writable namespaces. For example:
 +
@@ -118,11 +135,10 @@ index 83ff833f13389cd775d0e65195cdf0790f776b1f..f36d0cf70d0bcb1c42e1741380f4dcba
 +Guest-memory copies respect page protections, including partial read copyout.
 +No writable host descriptor is exposed. Data disappears at domain teardown;
 +there is no retention, export, storage generation or configured storage quota.
-+
+ 
  When requested, the result file is reserved exclusively before launch, with
  mode 0600 and a maximum path length of 512 bytes. Existing files are never
- overwritten. After completion, it contains one synced JSON object:
-@@ -315,6 +349,8 @@ make build-gate1-fixture
+@@ -315,6 +356,8 @@ make build-gate1-fixture
  sudo make test-gate1-setup
  sudo make test-launch
  sudo make test-native-supervision
@@ -131,11 +147,130 @@ index 83ff833f13389cd775d0e65195cdf0790f776b1f..f36d0cf70d0bcb1c42e1741380f4dcba
  ```
  
  ## Native process scenarios
+diff --git a/crates/ginux-contract/src/lib.rs b/crates/ginux-contract/src/lib.rs
+index aaf6c553d0a4652ccacb305a3c61638c64bf8e57..8292f42292d37017ddcdc1e2c81e5f7a9c940bc8 100644
+--- a/crates/ginux-contract/src/lib.rs
++++ b/crates/ginux-contract/src/lib.rs
+@@ -215,6 +215,14 @@ pub static CATALOG: &[Operation] = &[
+         "domain descriptor",
+         "test-systemd"
+     ),
++    syscall!(
++        "lstat",
++        6,
++        Partial,
++        Action::Mediate,
++        "configured owned path metadata",
++        "test-launch-storage"
++    ),
+     syscall!(
+         "poll",
+         7,
+@@ -1207,6 +1215,14 @@ pub static CATALOG: &[Operation] = &[
+         "domain path",
+         "test-systemd"
+     ),
++    syscall!(
++        "fchmodat",
++        268,
++        Partial,
++        Action::Mediate,
++        "configured owned path mode",
++        "test-launch-storage"
++    ),
+     syscall!(
+         "pselect6",
+         270,
+@@ -1751,6 +1767,16 @@ impl EffectiveContract {
+             .find(|rule| rule.operation.abi_number == Some(number))
+     }
+ 
++    /// A semantic denial takes precedence; a semantic allowance cannot grant
++    /// an unknown or denied syscall. Backends still validate implementation
++    /// support and typed resource constraints before producing effects.
++    pub fn runtime_rule(&self, number: u64, semantic: Option<&str>) -> Option<&EffectiveRule> {
++        semantic
++            .and_then(|id| self.operation_rule(id))
++            .filter(|rule| matches!(rule.action, Action::Deny(_)))
++            .or_else(|| self.syscall_rule(number))
++    }
++
+     pub fn operation_rule(&self, id: &str) -> Option<&EffectiveRule> {
+         self.rules().iter().find(|rule| rule.operation.id == id)
+     }
+@@ -2089,6 +2115,15 @@ mod tests {
+             let catalog = CATALOG
+                 .iter()
+                 .find(|operation| operation.abi_number == Some(number));
++            // These entries belong to configured owned storage. Adding them
++            // to the catalog must not enable the native systemd backend.
++            if matches!(number, 6 | 268) {
++                assert_eq!(implementation, ginux_core::Action::Deny(38));
++                let operation = catalog.unwrap();
++                assert_eq!(operation.action, Action::Mediate);
++                assert_eq!(operation.evidence, "test-launch-storage");
++                continue;
++            }
+             match (implementation, catalog) {
+                 (ginux_core::Action::Deny(_), None) => {}
+                 (ginux_core::Action::Emulate, Some(operation)) => {
+@@ -2105,6 +2140,51 @@ mod tests {
+         }
+     }
+ 
++    #[test]
++    fn runtime_rule_keeps_semantic_and_syscall_denials() {
++        let semantic =
++            resolve(b"gate5-balanced-v1", &[], &[], &[b"filesystem.path.write"]).unwrap();
++        let rule = semantic
++            .runtime_rule(2, Some("filesystem.path.write"))
++            .unwrap();
++        assert_eq!(rule.action, Action::Deny(1));
++        assert_eq!(rule.provenance, Provenance::DomainDeny);
++        assert_eq!(rule.operation.id, "filesystem.path.write");
++        let syscall = resolve(b"gate5-balanced-v1", &[], &[], &[b"syscall.open"]).unwrap();
++        assert_eq!(
++            syscall
++                .runtime_rule(2, Some("filesystem.path.write"))
++                .unwrap()
++                .action,
++            Action::Deny(1)
++        );
++        assert!(syscall
++            .runtime_rule(999, Some("filesystem.path.write"))
++            .is_none());
++        let minimal = resolve(b"minimal-v1", &[], &[b"filesystem.path.read"], &[]).unwrap();
++        assert_eq!(
++            minimal
++                .runtime_rule(2, Some("filesystem.path.read"))
++                .unwrap()
++                .action,
++            Action::Deny(38)
++        );
++        assert_eq!(
++            semantic
++                .runtime_rule(6, Some("filesystem.path.read"))
++                .unwrap()
++                .action,
++            Action::Mediate
++        );
++        assert_eq!(
++            semantic
++                .runtime_rule(268, Some("filesystem.path.write"))
++                .unwrap()
++                .action,
++            Action::Deny(1)
++        );
++    }
++
+     #[test]
+     fn audit_budget_is_bounded_and_reports_drops_logarithmically() {
+         let mut budget = AuditBudget::new(2);
 diff --git a/crates/ginux-init/src/fs_hooks.rs b/crates/ginux-init/src/fs_hooks.rs
-index b75d7015b15ef694937004d3d6605bbe72c32a95..8034a09dc04f7c86f954d1800a01b6c65dc6ab96 100644
+index b75d7015b15ef694937004d3d6605bbe72c32a95..281fd1db8f2cd5befbc0a299c210c0fd4e637d3b 100644
 --- a/crates/ginux-init/src/fs_hooks.rs
 +++ b/crates/ginux-init/src/fs_hooks.rs
-@@ -1,18 +1,589 @@
+@@ -1,18 +1,610 @@
 -//! Native filesystem-lane dispatch hooks.
 -//!
 -//! Owner: G-files lane. Next task: G06 adds domain directory and
@@ -177,12 +312,8 @@ index b75d7015b15ef694937004d3d6605bbe72c32a95..8034a09dc04f7c86f954d1800a01b6c6
 +    prefixes: [Path; 8],
 +    count: usize,
 +    cwd: Path,
- }
- 
--/// Emulated result when this lane handles the entry. `None` falls through to
--/// the shared balanced-contract decision. Reserved for G06+.
--pub fn claim(syscall: u64, rdi: u64, rsi: u64, rdx: u64) -> Option<i64> {
--    let _ = (syscall, rdi, rsi, rdx);
++}
++
 +impl LaunchFs {
 +    /// Called once, before fork. Assignments are domain paths, never host paths.
 +    pub fn prepare(config: &DomainConfig) -> Result<Self, &'static [u8]> {
@@ -390,6 +521,27 @@ index b75d7015b15ef694937004d3d6605bbe72c32a95..8034a09dc04f7c86f954d1800a01b6c6
 +            return Ok(None);
 +        }
 +        Ok(Some((argument, path)))
++    }
++
++    /// Classify policy without reading or mutating workload memory or objects.
++    /// Resource/descriptor validation remains in claim after policy admission.
++    pub fn contract_operation(&self, r: &UserRegs) -> Option<&'static str> {
++        let write = match r.orig_rax {
++            2 | 257 => {
++                let flags = if r.orig_rax == 2 { r.rsi } else { r.rdx };
++                flags & 3 != 0 || flags & (0o100 | 0o1000 | 0o2000) != 0
++            }
++            4 | 6 | 21 | 89 | 262 | 332 | 439 => false,
++            83 | 87 | 90 | 258 | 263 | 268 => true,
++            0 | 5 | 17 if r.rdi >= FD_BASE as u64 && r.rdi < FD_BASE as u64 + 64 => false,
++            1 | 77 | 91 if r.rdi >= FD_BASE as u64 && r.rdi < FD_BASE as u64 + 64 => true,
++            _ => return None,
++        };
++        Some(if write {
++            "filesystem.path.write"
++        } else {
++            "filesystem.path.read"
++        })
 +    }
 +
 +    /// Configured-launch dispatch only; demo paths keep their existing contract.
@@ -612,8 +764,12 @@ index b75d7015b15ef694937004d3d6605bbe72c32a95..8034a09dc04f7c86f954d1800a01b6c6
 +
 +fn valid_statx(flags: u64, mask: u64) -> bool {
 +    flags & !0x7900 == 0 && flags & 0x6000 != 0x6000 && mask & 0x8000_0000 == 0
-+}
-+
+ }
+ 
+-/// Emulated result when this lane handles the entry. `None` falls through to
+-/// the shared balanced-contract decision. Reserved for G06+.
+-pub fn claim(syscall: u64, rdi: u64, rsi: u64, rdx: u64) -> Option<i64> {
+-    let _ = (syscall, rdi, rsi, rdx);
 +fn within(path: &[u8], prefix: &[u8]) -> bool {
 +    path == prefix
 +        || path
@@ -740,19 +896,38 @@ index b75d7015b15ef694937004d3d6605bbe72c32a95..8034a09dc04f7c86f954d1800a01b6c6
      None
  }
 diff --git a/crates/ginux-init/src/launch.rs b/crates/ginux-init/src/launch.rs
-index cb499f89bee64001d71a3288116461f20d2af0d3..2c70f336b0b4cc5138e437e072afceccf9446451 100644
+index 162a22b9f8269cefcb1f9fb941ab1ce1e7f653a0..bb7c6abe104a494f4fc1b617440dfa5f863ae3dc 100644
 --- a/crates/ginux-init/src/launch.rs
 +++ b/crates/ginux-init/src/launch.rs
-@@ -337,6 +337,8 @@ pub fn launch_main(config_path: *const u8, root_path: *const u8, result_path: *c
+@@ -4,11 +4,14 @@
+ //! input-file staging. Workload definitions stay with the entry points in
+ //! `main.rs`; `launch` runs the executable and arguments from domain config.
+ 
++use ginux_contract::{Action as ContractAction, EffectiveContract, EffectiveRule};
+ use ginux_core::{
+     balanced_identity_result, balanced_mediated_result, balanced_surface, Action, SYS_EXIT,
+     SYS_EXIT_GROUP,
+ };
+-use ginux_domain::{ConfigError, Domain, DomainConfig, ExecutionBackend, ExecutionProfile};
++use ginux_domain::{
++    AuditMode, ConfigError, Domain, DomainConfig, ExecutionBackend, ExecutionProfile,
++};
+ 
+ use crate::dispatch::{
+     balanced_surface_name, decide_native, native_arguments_allowed, NativeDecision,
+@@ -341,6 +344,11 @@ pub fn launch_main(config_path: *const u8, root_path: *const u8, result_path: *c
      stage_result_path(result_path);
      let config = launch_load_config(config_path);
      launch_validate(&config);
++    unsafe {
++        AUDIT_DISABLED = config.audit_mode == AuditMode::Disabled;
++    }
 +    let mut filesystem = crate::fs_hooks::LaunchFs::prepare(&config)
 +        .unwrap_or_else(|reason| launch_startup_fail(reason));
      print_launch_config(&config);
      let mut domain = Domain::create(config);
      if domain.start().is_err() {
-@@ -348,9 +350,9 @@ pub fn launch_main(config_path: *const u8, root_path: *const u8, result_path: *c
+@@ -352,9 +360,9 @@ pub fn launch_main(config_path: *const u8, root_path: *const u8, result_path: *c
          launch_domain_fail(&mut domain, b"launch tracee fork failed");
      }
      if child == 0 {
@@ -764,7 +939,7 @@ index cb499f89bee64001d71a3288116461f20d2af0d3..2c70f336b0b4cc5138e437e072afcecc
  }
  
  fn launch_validate(config: &DomainConfig) {
-@@ -359,8 +361,8 @@ fn launch_validate(config: &DomainConfig) {
+@@ -363,8 +371,8 @@ fn launch_validate(config: &DomainConfig) {
      {
          launch_startup_fail(b"launch requires profile=balanced backend=ptrace-native");
      }
@@ -775,7 +950,60 @@ index cb499f89bee64001d71a3288116461f20d2af0d3..2c70f336b0b4cc5138e437e072afcecc
      }
      if config.id.as_bytes().is_empty() || config.id.as_bytes().len() > 64 {
          launch_startup_fail(b"domain id length invalid");
-@@ -831,11 +833,17 @@ fn finish_signaled(signal: u64) {
+@@ -506,12 +514,14 @@ pub const AUDIT_BYTE_BUDGET: usize = 64 * 1024;
+ 
+ static mut RESULT_FD: isize = -1;
+ 
++static mut AUDIT_DISABLED: bool = false;
+ static mut AUDIT_BYTES: usize = 0;
+ static mut AUDIT_CAPPED: bool = false;
+ // One audit record is staged here and written whole once its newline
+ // arrives, so the budget never splits a record and the truncation notice
+ // always starts its own line.
+-const AUDIT_RECORD_CAPACITY: usize = 256;
++// Contract digest, bounded domain id and canonical policy metadata fit one record.
++const AUDIT_RECORD_CAPACITY: usize = 512;
+ static mut AUDIT_RECORD: [u8; AUDIT_RECORD_CAPACITY] = [0; AUDIT_RECORD_CAPACITY];
+ static mut AUDIT_RECORD_LEN: usize = 0;
+ 
+@@ -652,7 +662,7 @@ pub fn launch_usage() -> ! {
+ 
+ fn audit_write(bytes: &[u8]) {
+     let record = unsafe {
+-        if AUDIT_CAPPED {
++        if AUDIT_DISABLED || AUDIT_CAPPED {
+             return;
+         }
+         let start = AUDIT_RECORD_LEN;
+@@ -682,6 +692,27 @@ fn audit_write(bytes: &[u8]) {
+     write_stderr(record);
+ }
+ 
++fn audit_contract(
++    sequence: u64,
++    config: &DomainConfig,
++    contract: &EffectiveContract,
++    rule: Option<&EffectiveRule>,
++) {
++    audit_write(b"ginux: contract sequence=");
++    audit_u64(sequence);
++    audit_write(b" domain=");
++    audit_write(config.id.as_bytes());
++    audit_write(b" digest=");
++    audit_write(contract.digest());
++    audit_write(b" operation=");
++    audit_write(rule.map_or(b"unknown".as_slice(), |r| r.operation.id.as_bytes()));
++    audit_write(b" policy-source=");
++    audit_write(rule.map_or(b"default-deny".as_slice(), |r| r.source.as_bytes()));
++    audit_write(b" policy-action=");
++    audit_write(rule.map_or(b"deny".as_slice(), |r| r.action.name().as_bytes()));
++    audit_write(b"\n");
++}
++
+ fn audit_cap() {
+     unsafe {
+         AUDIT_CAPPED = true;
+@@ -837,11 +868,17 @@ fn finish_signaled(signal: u64) {
      exit_process(128 + signal as usize)
  }
  
@@ -794,7 +1022,7 @@ index cb499f89bee64001d71a3288116461f20d2af0d3..2c70f336b0b4cc5138e437e072afcecc
      if unsafe { syscall3(SYS_CLOSE_RANGE, 3, u32::MAX as usize, 0) } < 0 {
          tracee_setup_fail(
              b"ginux: launch bootstrap failed: descriptor cleanup failed\n",
-@@ -915,7 +923,11 @@ fn tracee_setup_fail(message: &[u8], code: usize) -> ! {
+@@ -921,7 +958,11 @@ fn tracee_setup_fail(message: &[u8], code: usize) -> ! {
      }
  }
  
@@ -807,15 +1035,21 @@ index cb499f89bee64001d71a3288116461f20d2af0d3..2c70f336b0b4cc5138e437e072afcecc
      let mut status = 0i32;
      if wait(pid, &mut status) < 0 {
          launch_fail(domain, pid, b"launch tracee wait after exec failed");
-@@ -935,6 +947,7 @@ fn supervise_launch(pid: usize, domain: &mut Domain) -> ! {
+@@ -939,8 +980,13 @@ fn supervise_launch(pid: usize, domain: &mut Domain) -> ! {
+     line_stderr(b"ginux: launch backend=ptrace-native profile=balanced elf-loader=host");
+     line_stderr(b"ginux: launch tracee-uid=1000 tracee-gid=1000 root=host-path-read-only");
  
++    let contract = domain
++        .config()
++        .effective_contract()
++        .unwrap_or_else(|_| launch_fail(domain, pid, b"resolved launch contract unavailable"));
      let mut sequence = 0u64;
      let mut awaiting_exit = false;
 +    let mut path_rewrite: Option<crate::path_hooks::Rewrite> = None;
      let mut override_exit = false;
      let mut override_result = 0i64;
      loop {
-@@ -983,11 +996,19 @@ fn supervise_launch(pid: usize, domain: &mut Domain) -> ! {
+@@ -989,11 +1035,19 @@ fn supervise_launch(pid: usize, domain: &mut Domain) -> ! {
          let mut registers = unsafe { registers.assume_init() };
  
          if awaiting_exit {
@@ -838,38 +1072,63 @@ index cb499f89bee64001d71a3288116461f20d2af0d3..2c70f336b0b4cc5138e437e072afcecc
              }
              audit_write(b"ginux: audit sequence=");
              audit_u64(sequence);
-@@ -1019,7 +1040,29 @@ fn supervise_launch(pid: usize, domain: &mut Domain) -> ! {
+@@ -1025,7 +1079,54 @@ fn supervise_launch(pid: usize, domain: &mut Domain) -> ! {
          }
          sequence += 1;
          let syscall = registers.orig_rax;
 -        let decision = match decide_native(syscall, registers.rdi, registers.rsi, registers.rdx) {
-+        let dispatched = match filesystem.claim(pid, &registers) {
-+            Some(result) => NativeDecision::Hooked {
-+                lane: crate::dispatch::Lane::Filesystem,
-+                result,
-+            },
-+            None => match crate::path_hooks::Rewrite::prepare(filesystem, pid, &mut registers) {
-+                Ok(rewrite) => {
-+                    if rewrite.is_some()
-+                        && ptrace(PTRACE_SETREGS, pid, 0, &registers as *const _ as usize) < 0
-+                    {
-+                        launch_fail(domain, pid, b"launch path translation failed");
-+                    }
-+                    path_rewrite = rewrite;
-+                    decide_native(syscall, registers.rdi, registers.rsi, registers.rdx)
-+                }
-+                Err(-5) => launch_fail(domain, pid, b"launch path scratch restoration failed"),
-+                Err(result) => NativeDecision::Hooked {
++        let semantic = filesystem.contract_operation(&registers).or(match syscall {
++            16 if registers.rsi == 0x5413 => Some("ioctl.tty.get_winsize"),
++            9..=12 => Some("memory.virtual.manage"),
++            13 | 14 | 62 | 127..=130 | 289 => Some("signal.virtual.deliver"),
++            96 | 228 | 229 => Some("time.clock.read"),
++            105 | 106 | 116 | 117 | 119 | 122 | 123 => Some("credential.virtual.set"),
++            _ => None,
++        });
++        let rule = contract.runtime_rule(syscall, semantic);
++        audit_contract(sequence, domain.config(), &contract, rule);
++        // Policy admission precedes owned effects and temporary tracee writes.
++        let dispatched = if let ContractAction::Deny(errno) =
++            rule.map_or(ContractAction::Deny(38), |rule| rule.action)
++        {
++            NativeDecision::Contract(ginux_core::Decision {
++                syscall,
++                action: Action::Deny(errno),
++            })
++        } else {
++            match filesystem.claim(pid, &registers) {
++                Some(result) => NativeDecision::Hooked {
 +                    lane: crate::dispatch::Lane::Filesystem,
 +                    result,
 +                },
-+            },
++                None => {
++                    match crate::path_hooks::Rewrite::prepare(filesystem, pid, &mut registers) {
++                        Ok(rewrite) => {
++                            if rewrite.is_some()
++                                && ptrace(PTRACE_SETREGS, pid, 0, &registers as *const _ as usize)
++                                    < 0
++                            {
++                                launch_fail(domain, pid, b"launch path translation failed");
++                            }
++                            path_rewrite = rewrite;
++                            decide_native(syscall, registers.rdi, registers.rsi, registers.rdx)
++                        }
++                        Err(-5) => {
++                            launch_fail(domain, pid, b"launch path scratch restoration failed")
++                        }
++                        Err(result) => NativeDecision::Hooked {
++                            lane: crate::dispatch::Lane::Filesystem,
++                            result,
++                        },
++                    }
++                }
++            }
 +        };
 +        let decision = match dispatched {
              NativeDecision::Contract(decision) => decision,
              NativeDecision::Hooked { lane, result } => {
                  let lane_name: &[u8] = match lane {
-@@ -1147,6 +1190,7 @@ fn launch_exit_reason(code: i32) -> &'static [u8] {
+@@ -1153,6 +1254,7 @@ fn launch_exit_reason(code: i32) -> &'static [u8] {
          127 => b"exec of configured domain init failed",
          128 => b"configured domain workdir unavailable",
          129 => b"descriptor cleanup failed",
@@ -878,10 +1137,10 @@ index cb499f89bee64001d71a3288116461f20d2af0d3..2c70f336b0b4cc5138e437e072afcecc
      }
  }
 diff --git a/crates/ginux-init/src/main.rs b/crates/ginux-init/src/main.rs
-index 7226409fbb69d7c7c9d84b363f80d41e8e108a3c..7cb8610a0117036e217d094f45d358a227f93be1 100644
+index a28b9d14e18639673287254b9e2c826ce1ef79b8..48c6383061a32bb1101175fddfa46c7a118b7920 100644
 --- a/crates/ginux-init/src/main.rs
 +++ b/crates/ginux-init/src/main.rs
-@@ -14,6 +14,7 @@ mod channel_hooks;
+@@ -16,6 +16,7 @@ mod channel_hooks;
  mod dispatch;
  mod fs_hooks;
  mod launch;
@@ -889,6 +1148,19 @@ index 7226409fbb69d7c7c9d84b363f80d41e8e108a3c..7cb8610a0117036e217d094f45d358a2
  mod process_hooks;
  mod supervisor;
  
+@@ -5525,11 +5526,7 @@ fn supervise_native(
+         } else {
+             None
+         };
+-        let semantic_rule = semantic_operation.and_then(|id| contract.operation_rule(id));
+-        let syscall_rule = contract.syscall_rule(syscall);
+-        let contract_rule = semantic_rule
+-            .filter(|rule| matches!(rule.action, ContractAction::Deny(_)))
+-            .or(syscall_rule);
++        let contract_rule = contract.runtime_rule(syscall, semantic_operation);
+         let contract_action = contract_rule
+             .map(|rule| rule.action)
+             .unwrap_or(ContractAction::Deny(38));
 diff --git a/crates/ginux-init/src/path_hooks.rs b/crates/ginux-init/src/path_hooks.rs
 new file mode 100644
 index 0000000000000000000000000000000000000000..d967bc1dcee354b1df6b160b75d8587e3acaceea
@@ -1107,12 +1379,46 @@ index 48170e5b2fbe7f708326ae9ac33b7c250a129897..a480b7bda562788cdfdf4e2e9585f159
  // Walk original components: collapsing `..` first can skip a link or erase
  // a missing/non-directory component before it has been checked.
  fn resolve_components(
+diff --git a/docs/abi-contract-coverage.md b/docs/abi-contract-coverage.md
+index 2507972c3b999573d3cd75b2e8033b5d5816043a..64a9c996bb26a27113eae9fcbead8dc7ed06683d 100644
+--- a/docs/abi-contract-coverage.md
++++ b/docs/abi-contract-coverage.md
+@@ -9,11 +9,11 @@ The catalog is the reviewable inventory used to normalize domain contracts. An e
+ | Status | Operations |
+ |---|---:|
+ | complete | 23 |
+-| partial | 156 |
++| partial | 158 |
+ | denied | 1 |
+ | planned | 1 |
+ | out-of-scope | 1 |
+-| **Total** | **182** |
++| **Total** | **184** |
+ 
+ ## Versioned contract inputs
+ 
+@@ -32,6 +32,7 @@ The catalog is the reviewable inventory used to normalize domain contracts. An e
+ | `syscall.close` | syscall | 3 | complete | mediate | domain descriptor | `test-systemd` | x86-64 Linux ABI only |
+ | `syscall.stat` | syscall | 4 | partial | mediate | domain path | `test-systemd` | x86-64 Linux ABI only |
+ | `syscall.fstat` | syscall | 5 | partial | mediate | domain descriptor | `test-systemd` | x86-64 Linux ABI only |
++| `syscall.lstat` | syscall | 6 | partial | mediate | configured owned path metadata | `test-launch-storage` | x86-64 Linux ABI only |
+ | `syscall.poll` | syscall | 7 | partial | mediate | bounded descriptor set | `test-systemd` | x86-64 Linux ABI only |
+ | `syscall.lseek` | syscall | 8 | complete | mediate | domain descriptor | `test-systemd` | x86-64 Linux ABI only |
+ | `syscall.mmap` | syscall | 9 | partial | mediate | W^X and bounded mapping | `test-runtime` | x86-64 Linux ABI only |
+@@ -156,6 +157,7 @@ The catalog is the reviewable inventory used to normalize domain contracts. An e
+ | `syscall.linkat` | syscall | 265 | partial | mediate | domain paths | `test-systemd` | x86-64 Linux ABI only |
+ | `syscall.symlinkat` | syscall | 266 | partial | mediate | domain paths | `test-systemd` | x86-64 Linux ABI only |
+ | `syscall.readlinkat` | syscall | 267 | partial | mediate | domain path | `test-systemd` | x86-64 Linux ABI only |
++| `syscall.fchmodat` | syscall | 268 | partial | mediate | configured owned path mode | `test-launch-storage` | x86-64 Linux ABI only |
+ | `syscall.pselect6` | syscall | 270 | partial | mediate | bounded descriptor set | `test-systemd` | x86-64 Linux ABI only |
+ | `syscall.ppoll` | syscall | 271 | partial | mediate | bounded descriptor set | `test-systemd` | x86-64 Linux ABI only |
+ | `syscall.set_robust_list` | syscall | 273 | partial | mediate | virtual task | `test-process` | x86-64 Linux ABI only |
 diff --git a/scripts/test-launch-storage.py b/scripts/test-launch-storage.py
 new file mode 100644
-index 0000000000000000000000000000000000000000..a42386ab4df6500014b52d823a15e0fdc5931f1d
+index 0000000000000000000000000000000000000000..9b8247071de15af040d47bf0684d15330699f33a
 --- /dev/null
 +++ b/scripts/test-launch-storage.py
-@@ -0,0 +1,71 @@
+@@ -0,0 +1,83 @@
 +#!/usr/bin/env python3
 +"""Real configured-launch storage checks against explicit existing binaries."""
 +import json
@@ -1125,9 +1431,9 @@ index 0000000000000000000000000000000000000000..a42386ab4df6500014b52d823a15e0fd
 +
 +
 +def main():
-+    if len(sys.argv) != 3 or os.geteuid() != 0:
-+        sys.exit('usage (as root): test-launch-storage.py <ginux> <storage-fixture>')
-+    binary, fixture = [str(Path(p).resolve()) for p in sys.argv[1:]]
++    if len(sys.argv) not in (3, 4) or os.geteuid() != 0:
++        sys.exit('usage (as root): test-launch-storage.py <ginux> <storage-fixture> [ordinary-metadata]')
++    binary, fixture = [str(Path(p).resolve()) for p in sys.argv[1:3]]
 +    template = (Path(__file__).resolve().parent.parent / 'config/domain-gate5.toml').read_text()
 +    with tempfile.TemporaryDirectory(prefix='ginux-storage-') as directory:
 +        work = Path(directory)
@@ -1143,11 +1449,14 @@ index 0000000000000000000000000000000000000000..a42386ab4df6500014b52d823a15e0fd
 +        shutil.copyfile(fixture, root / 'bin/fixture')
 +        (root / 'bin/fixture').chmod(0o755)
 +
-+        def invoke(assignments, args, expected=0):
++        def invoke(assignments, args, expected=0, deny=None):
 +            config = template.replace('init = "/bin/bash"', 'init = "/bin/fixture"')
 +            config = config.replace('args = []', 'args = ' + json.dumps(args))
 +            config = config.replace('assignments = []', 'assignments = ' + json.dumps(assignments), 1)
 +            config = config.replace('id = "gate5-demo"', 'id = "storage-fixture"\nworkdir = "/work"')
++            if deny is not None:
++                config = config.replace('[contract]\nprofile = "gate5-balanced-v1"',
++                                        '[contract]\nprofile = "gate5-balanced-v1"\ndeny = ' + json.dumps(deny))
 +            path = work / 'launch.toml'
 +            path.write_text(config)
 +            result = work / 'result.json'
@@ -1166,6 +1475,15 @@ index 0000000000000000000000000000000000000000..a42386ab4df6500014b52d823a15e0fd
 +            assert sorted(p.name for p in (root / 'work').iterdir()) == ['existing']
 +            assert not (root / 'out').exists()
 +
++        if len(sys.argv) == 4:
++            if sys.argv[3] != 'ordinary-metadata':
++                sys.exit('unknown selected storage scenario')
++            invoke(['memory:/work'], ['descriptor-metadata'])
++            print('PASS launch storage: ordinary-metadata')
++            return
++        invoke(['memory:/work'], ['descriptor-metadata'])
++        invoke(['memory:/work'], ['Dpolicy'], deny=['syscall.open'])
++        invoke(['memory:/work'], ['Dpolicy'], deny=['filesystem.path.write'])
 +        for mode in ['path-owned', 'missing-owned', 'image-parent', 'alias-shadow']:
 +            invoke(['memory:/work'], [mode])
 +        invoke(['memory:/work', 'memory:/virtual'], ['cross-boundary'])
@@ -1184,12 +1502,40 @@ index 0000000000000000000000000000000000000000..a42386ab4df6500014b52d823a15e0fd
 +
 +if __name__ == '__main__':
 +    main()
+diff --git a/scripts/test-launch.py b/scripts/test-launch.py
+index 6ef91eaa28a9866bc30ba190ca2ff9b1ffbb3a2f..59b53017fb05d60137a65dceb7e6bd3ac9f50181 100644
+--- a/scripts/test-launch.py
++++ b/scripts/test-launch.py
+@@ -80,6 +80,10 @@ def main():
+         invoke(["exit"], 0, "exited", changes={"args = [": 'workdir = "/created-workdir"\nargs = ['})
+         if not (root / "created-workdir").is_dir():
+             raise RuntimeError("missing workload directory was not created as a directory")
++        disabled = invoke(["exit", "0"], 0, "exited",
++                          changes={'mode = "stderr"': 'mode = "disabled"'})
++        if b"ginux: audit " in disabled.stderr or b"ginux: contract " in disabled.stderr:
++            raise RuntimeError("disabled audit emitted decision records")
+         invoke(["trap"], 133, "signaled")
+         invoke(["handler"], 0, "exited", stdout=b"handled\n")
+         invoke(["segv"], 139, "signaled")
+@@ -106,8 +110,12 @@ def main():
+         lines = proc.stderr.splitlines()
+         record = re.compile(rb"ginux: audit sequence=\d+ phase=(exit result=-?\d+|"
+                             rb"entry syscall=\d+ action=\S.* result=\S+)")
++        contract_record = re.compile(rb"ginux: contract sequence=\d+ domain=\S+ digest=[0-9a-f]{64} "
++                                     rb"operation=\S+ policy-source=\S+ policy-action=(deny|emulate|mediate)")
+         if (b"ginux: audit truncated budget=65536" not in lines
+                 or any(line.startswith(b"ginux: audit sequence=") and not record.fullmatch(line)
++                       for line in lines)
++                or any(line.startswith(b"ginux: contract sequence=") and not contract_record.fullmatch(line)
+                        for line in lines)):
+             raise RuntimeError(f"audit budget split a record: {proc.stderr[-400:]!r}")
+         invoke(["exit"], 2, "supervisor-error", changes={
 diff --git a/tests/fixtures/launch-storage-fixture.c b/tests/fixtures/launch-storage-fixture.c
 new file mode 100644
-index 0000000000000000000000000000000000000000..51b373f90424a0b624be6e7791c09c2d5834969e
+index 0000000000000000000000000000000000000000..16b271aa41e757c517179a1ad0715a068e6b3239
 --- /dev/null
 +++ b/tests/fixtures/launch-storage-fixture.c
-@@ -0,0 +1,180 @@
+@@ -0,0 +1,196 @@
 +/* Freestanding workload for real configured-launch memory-storage checks. */
 +typedef unsigned long word;
 +static long call(long n, word a, word b, word c, word d, word e, word f)
@@ -1220,6 +1566,22 @@ index 0000000000000000000000000000000000000000..51b373f90424a0b624be6e7791c09c2d
 +{
 +    word argc = *stack;
 +    char **argv = (char **)(stack + 1);
++    if (argc > 1 && argv[1][0] == 'd') {
++        long fd = DO(2, "/work/metadata", 0102, 0600);
++        CHECK(fd >= 1048576 && DO(1, fd, "ok", 2) == 2, 111);
++        CHECK(DO(5, fd, meta, 0) == 0, 112);
++        word inode = *(word *)(meta+8);
++        CHECK(DO(6, "/work/metadata", meta, 0) == 0 && *(word *)(meta+8) == inode, 113);
++        CHECK(call(268, -100, (word)"/work/metadata", 0640, 0, 0, 0) == 0, 114);
++        CHECK(DO(4, "/work/metadata", meta, 0) == 0 && (*(unsigned int *)(meta+24)&0777) == 0640, 115);
++        CHECK(*(word *)(meta+48) == 2 && DO(3, fd, 0, 0) == 0, 116);
++        return 0;
++    }
++    if (argc > 1 && argv[1][0] == 'D') {
++        CHECK(DO(2, "/work/policy-file", 0102, 0600) == -1, 117);
++        CHECK(DO(4, "/work/policy-file", meta, 0) == -2, 118);
++        return 0;
++    }
 +    if (argc > 1 && argv[1][0] == 'n') {
 +        CHECK(DO(2, "/work/new", 0101, 0644) < 0, 10);
 +        return 0;

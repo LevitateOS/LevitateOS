@@ -126,25 +126,27 @@
         "G03a",
         "G03b"
       ],
-      "base": "6c35957d17c54dde9d98e5a91e49d37465d13a6d",
-      "head": "e9c0a4d494cb9c2c2080289aa198dda42dd65b08",
-      "tree": "a6c791adb05dfebb641ddc9c43e44ab02aa3b655",
-      "upstream_base": "8a475e8b2318425fd2fc15246a5c6f4bca6caf86",
+      "base": "85ee433afd71c9985cb714246c343145c2cdfb01",
+      "head": "3801fd45bd6280a5b320f2d464ada0bd04539326",
+      "tree": "f85bd3524a30f7f794847516ffd3453d3f49423d",
+      "upstream_base": "ff926d0c228b71d55d0f2f0909dd86ec62197c8a",
       "source_commits": [
         "10091e4e48bb14dcf9f0ee20e62f471fb7d0cf2f",
         "1da0ce137de73e13b66a331de8f7ff7b12903925"
       ],
-      "status": "current-main local-prerequisite source reviewed; all 85 units/static/build and 11 ordinary controls pass in source/clean; standalone delivery/security/full default runtime/macOS CI remain pending",
+      "status": "observed ff926d0c local-prerequisite configured contract/catalog/audit integration source reviewed; all96 units/static/build, generated contract docs and15 ordinary controls pass in source/clean; runtime policy-denial/security/full CI/actual upstream prerequisite acceptance remains pending",
       "evidence": "g03c-review.md",
       "source_patch": "patches/G03c.patch",
       "standalone": false,
-      "artifact_directory": ".artifacts/ginux-contribution-preparation/upstream-refresh-2026-11-06/G03c",
-      "previous_head": "b36e0752caa1c91e4bbbe112c589c85915a6ce6d",
-      "patch_sha256": "33dfc23b948cab074b135fa59a05a9efd010b66f0322e707673acac73bd9496a",
-      "unit_tests": 85,
+      "artifact_directory": ".artifacts/ginux-contribution-preparation/upstream-contract-refresh-2026-11-06/G03c",
+      "previous_head": "e9c0a4d494cb9c2c2080289aa198dda42dd65b08",
+      "patch_sha256": "3f10516ce54bc97ac810ce46de0045cfe0beec762f9a24f9ba064d980d98ef6f",
+      "unit_tests": 96,
       "vfs_tests": 24,
       "historical_artifact_directory": ".artifacts/development-migration/2026-11-06/recovery/evidence/ginux-contribution-preparation/G03c",
-      "remote_ci": "not run"
+      "remote_ci": "not run",
+      "latest_main_acceptance": "source/ordinary preparation only; resolved-policy runtime/security/default CI/actual upstream prerequisites pending",
+      "current_scope": "Configured memory storage with shared upstream resolved-rule selection, configured pre-effect guard, two configured metadata catalog entries and existing bounded/disabled audit writer; no new core/native syscall implementations."
     },
     {
       "packet": "G03",
@@ -1886,5 +1888,5 @@
     }
   ],
   "latest_observed_upstream_main": "ff926d0c228b71d55d0f2f0909dd86ec62197c8a",
-  "latest_upstream_reconciliation": "G05a/G03a/G06a/G03b refreshed on ff926d0c; G03c configured contract-owner integration next, remaining retained packets pending serial refresh"
+  "latest_upstream_reconciliation": "G05a/G03a/G06a/G03b/G03c refreshed on ff926d0c; G03c configured contract/catalog/audit join implemented with ordinary verification; dependent runtime packets and policy/security/full CI acceptance pending"
 }

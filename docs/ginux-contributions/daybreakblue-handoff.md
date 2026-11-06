@@ -875,3 +875,25 @@ selection, side-effect ordering, bounded/disabled audit and task/owned hooks on
 the final recorded revision. No runtime reproduction or adversarial probe was
 executed here, and no DaybreakBlue agent was dispatched. Keep acceptance pending.
 The separate G07 shared-kernel-argument finding remains unresolved.
+
+
+## G03c resolved-contract revision — 2026-11-07
+
+Current G03c is `3801fd45bd6280a5b320f2d464ada0bd04539326`, based on refreshed
+G03b/G03a composition85ee433a rooted at upstreamff926d0c. [Review](g03c-review.md)
+records96 units and15 ordinary controls per source/clean, plus generated catalog
+docs. It integrates upstream rule selection before configured filesystem claims
+and scratch rewriting, catalog lstat6/fchmodat268 with native denial preserved,
+and existing64KiB audit/disabled-mode metadata. Pure contract units and ordinary
+data/logging checks are not monitored enforcement/security acceptance.
+
+The new default Dpolicy fixture cases check raw syscall.open and semantic
+filesystem.path.write denial without creating a file; they are compiled and
+registered but unrun here. Validate those and broader raw/semantic precedence,
+pre-effect ordering, translated/private descriptors, inherited/native file views,
+metadata/copy protection, scratch restoration, audit metadata/bounds/disabled
+behavior and shared/indirect argument authority on this exact revision or a
+recorded successor. All earlier G03c authority/protected/fault probes remain
+required. Recheck these joins as device/FD/task packets are refreshed, especially
+early task entry in G06b. No adversarial runtime reproduction or cloud agent was
+run. G07 remains excluded and unready; keep acceptance pending.

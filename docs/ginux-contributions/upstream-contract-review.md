@@ -113,3 +113,22 @@ audit owners, preserving native denials and all existing consistency assertions
 for previously cataloged operations. No preview build/runtime check has run;
 no G03c readiness claim or retained-head replacement is made. Exact source/read
 position is in the preview's state.json.
+
+
+## Configured storage join verified ordinarily — 2026-11-07
+
+G03c's preview is superseded by final
+`3801fd45bd6280a5b320f2d464ada0bd04539326` on composition85ee433a.
+[Exact review](g03c-review.md) records the real shared rule-selection/catalog/
+pre-effect configured guard and existing audit integration, not a clean-apply
+inference. New catalog entries retain native denials; all previous consistency
+assertions/CI coverage remain. Source/clean pass96 units/static/build, generated
+docs and15 ordinary controls each; all199 source paths and both binaries match.
+The earlier proposed contract gap is corrected in this source revision; monitored
+runtime denial/authority/shared-argument acceptance remains pending. The default
+Dpolicy fixtures are compiled/preserved and unrun. No security agent was dispatched.
+
+Five latest-base preparations exist;32 retained patches remain. Next is G04 on
+G03c, ensuring its device claims stay under the resolved guard; then descriptor/
+task joins at G05/G06b must preserve the same ordering. Actual upstream prerequisite
+merges, catalog/contract scope review, full CI/security and F02/F03 remain open.

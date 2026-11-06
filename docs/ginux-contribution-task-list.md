@@ -1,6 +1,6 @@
 # Ginux contribution task list
 
-Updated: 2026-11-06. Status: preparation active under the user’s sequential goal authorization;
+Updated: 2026-11-07. Status: preparation active under the user’s sequential goal authorization;
 extraction, new reviews and publication below are pending. This request authorizes this task list, not
 opening PRs. The user will inspect the prepared changes before publication.
 
@@ -1013,3 +1013,42 @@ its owner. Exact next action: implement that join, then static/unit/build and
 ordinary source/clean verification; preserve all default/security checks and
 keep their monitored acceptance pending. `G03c/state.json` records the source
 read position. Do not dispatch DaybreakBlue or rerun adversarial probes.
+
+
+### G03c resolved-contract checkpoint — 2026-11-07
+
+The preview's missing join is implemented in final G03c
+`3801fd45bd6280a5b320f2d464ada0bd04539326`, tree
+`f85bd3524a30f7f794847516ffd3453d3f49423d`, on refreshed G03b/G03a composition
+`85ee433afd71c9985cb714246c343145c2cdfb01` rooted atff926d0c.
+[Review](ginux-contributions/g03c-review.md) owns the thirteen-file +1351/-39 scope:
+upstream EffectiveContract now selects raw/semantic policy before configured
+filesystem effects or scratch rewriting; native shares that existing owner;
+lstat6/fchmodat268 are cataloged with native Deny38 preserved; configured audit
+retains its64KiB cap and gains metadata/disabled mode. No parallel policy registry
+or audit system was introduced. All prior tests and CI remain enabled.
+
+Source and strict clean replay pass96 units/static/build (24 VFS/10 contract),
+generated contract docs and15 ordinary controls per export. These include valid
+owned metadata and complete audit records/disabled output/budget, alongside all
+11 earlier ordinary controls. All199 tracked paths and both binaries match. The
+exact prerequisite rejects the same storage fixture and reproduces ignored
+audit-disabled mode with an exit-zero workload. A downstream audit receipt
+serialization failure was corrected without changing assertions; initial evidence
+is retained. The new default raw/semantic denial fixtures are compiled and
+registered but unrun; [DaybreakBlue handoff](ginux-contributions/daybreakblue-handoff.md)
+keeps runtime policy/security acceptance pending. No cloud dispatch occurred.
+
+Five retained packets now have source/ordinary preparation rooted atff926d0c;
+32 remain. This does not close full default/runtime-policy/security/macOS/remote
+CI, actual upstream prerequisites or F02/F03/F04. Latest patch integrity/readiness
+is in `upstream-contract-refresh-2026-11-06/current-inventory.json`. Original
+worktrees, paused snapshots and human remote text remain preserved.
+
+Exact next action: refresh G04 on G03c3801fd45 and keep device claims under the
+resolved policy guard and existing audit owner. Then G05 must preserve that guard
+through descriptor translation, and G06b must check policy before its early task/
+exec/wait hooks. Reconcile each final packet's whole diff and ordinary/clean
+verification serially. G07 and shared/indirect argument security remain unready.
+Active skill remains hdae-development at the discovery path above; reload it,
+required references and this latest checkpoint after any context shift.

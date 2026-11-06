@@ -1,8 +1,8 @@
 # G03c — configured ephemeral memory storage
 
-Current retained local commit `e9c0a4d494cb9c2c2080289aa198dda42dd65b08`, based on
-composition `6c35957d17c54dde9d98e5a91e49d37465d13a6d` of refreshed G03b and G03a,
-rooted at observed main `8a475e8b`. The current-main refresh below owns fresh
+Current retained local commit `3801fd45bd6280a5b320f2d464ada0bd04539326`, based on
+composition `85ee433afd71c9985cb714246c343145c2cdfb01` of refreshed G03b and G03a,
+rooted at observed main `ff926d0c`. The current-main refresh below owns fresh
 evidence and pending checks; earlier results remain historical.
 
 Earlier local feature commit `b36e0752caa1c91e4bbbe112c589c85915a6ce6d`.
@@ -132,3 +132,69 @@ has been dispatched. macOS/remote CI is also unrun. R03 retains those checks;
 R04 standalone delivery waits for actual G05a/G03a/G03b upstream merges, followed
 by extraction/revalidation. Do not publish this local composition as a stack.
 The broader combined F02/F03 closure remains pending at its final revisions.
+
+## PR231 contract integration — 2026-11-07
+
+Head `3801fd45bd6280a5b320f2d464ada0bd04539326`, tree
+`f85bd3524a30f7f794847516ffd3453d3f49423d`, is on refreshed G03b/G03a composition
+`85ee433afd71c9985cb714246c343145c2cdfb01`, rooted atff926d0c. Source preview
+e72f1f95 alone lacked the required contract join and was never accepted. The
+final scope is thirteen files,+1351/-39 (previously ten,+1140/-28).
+
+Configured launch now resolves the upstream EffectiveContract once and checks
+raw/semantic rules before filesystem claims or canonical scratch writes. Shared
+rule selection moved into the existing EffectiveContract owner and is reused by
+native supervision with identical precedence: semantic denial wins, semantic
+allowance cannot grant an unknown/denied raw syscall, and implementation/resource
+constraints still apply after policy admission. The filesystem owner classifies
+path/owned-file operations without reading guest memory or mutating objects.
+Native memory/signal/time/credential families use upstream's canonical IDs.
+
+Configured lstat6/fchmodat268 are registered in the same catalog and generated
+coverage document (184 operations). Existing systemd/core consistency assertions
+remain for every prior ABI; the two newly cataloged configured-only operations
+explicitly assert native Deny38 and catalog Mediate. No core/native syscall
+implementation was enabled. Public contract resolution follows the existing
+versioned profile owner; catalog/digest additions remain part of the proposed
+feature's upstream review, with no compatibility fallback or parallel registry.
+
+The existing configured audit writer retains its64KiB byte cap and whole-record
+truncation. Its single-record buffer grows256→512 for bounded domain/digest/policy
+metadata. Disabled mode suppresses decision records. The native8192-event audit
+budget remains its own upstream implementation. New default fixtures cover valid
+owned metadata, raw/semantic denied create without a partial file, disabled audit
+and complete contract records at budget exhaustion; all original fixtures and CI
+steps remain present/enabled. Denial/security fixture modes were not run locally.
+
+A separate final self-review reread the full original storage delta and complete
+PR231 integration delta, existing config/dispatch/bootstrap, VFS namespace/storage,
+copy/rewrite, native rule selection and audit/teardown paths. Core, process table,
+runtime, supervisor and domain source match the prerequisite exactly. Independent
+reviewer/security coverage is not claimed; shared/indirect arguments and all
+existing authority/protected/scratch probes remain pending downstream.
+
+Both source and strict prerequisite-plus-only-G03c replay pass:
+
+- `make check test-unit build build-launch-fixture build-launch-storage-fixture build-process-fixtures build-gate1-fixture`:96 units, including24 VFS and10 contract tests.
+- Generated contract-doc consistency and Python harness compilation.
+- Fifteen ordinary controls per export:8 launch/valid wait,3 data/metadata/position/lifetime/quota,1 valid lstat/fchmodat mode and3 audit metadata/disabled/budget cases. The budget case uses the existing4000-getpid workload and preserves the whole-record/64KiB assertions.
+
+Exact prerequisite85ee433a rejects the identical trusted storage fixture at exit2.
+It also reproduces ignored disabled audit with an exit-zero workload; the candidate
+suppresses the records. Runtime policy-denial validation remains unrun. The audit
+receipt helper initially shadowed its result dict with a regex and failed JSON
+serialization; the corrected variable name preserves assertions, and the rerun
+passes. Initial evidence and correction record remain retained.
+
+All199 tracked paths match the head in source and clean. Both binaries hash
+`43f1ad0ed0a1841fed70665af0e07d1f6754a67d613360d09de1d5777bde06d7`.
+Exact sources, complete integration delta, commands/receipts/logs, old/final patch,
+manifest and local draft are under
+`.artifacts/ginux-contribution-preparation/upstream-contract-refresh-2026-11-06/G03c/`.
+
+This is source/ordinary preparation only. Actual prerequisite merges, default
+runtime/policy-denial/security suites, macOS/remote CI and final F02/F03 remain
+pending. Do not publish the local composition. Later device/descriptor/task
+adapters must preserve policy admission before their effects; G06b's early task
+branches need the same join. G07 remains unready. No real checkout/index, branch,
+remote text, PR, maintainer message or DaybreakBlue dispatch changed.
