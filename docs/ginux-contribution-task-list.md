@@ -419,16 +419,26 @@ records80 passing unit tests, source/clean build checks, four selected native
 smoke scenarios and the fixed O_TRUNC capacity failure. Full runtime CI remains
 pending; it is not standalone-ready before its VFS prerequisites merge.
 
+G09b adds anonymous runtime growth at297ad8dd on compositionccd42e31
+(G06b/G09a). [Review/evidence](ginux-contributions/g09b-review.md) records85 units
+and growth/bounds/quota runtime scenarios passing in both source and strict
+clean replay, with169 tracked paths matching. The feature fails on its exact
+prerequisite at the old64 KiB ceiling. Full CI/security evidence remains pending.
+G09a/G09b are review subpackets intended together for one useful growth proposal;
+no abstraction-only PR or stack is implied. Memfd identity moves to G12, its
+actual consumer. G09 directories/relative paths/access remain incomplete.
+
 Current goal-turn classification: **progress**. The full goal remains active;
 security-held G07, later packets, policy acceptance, interactions and Recipe
 closure remain incomplete. F04 remains the user inspection stop.
 
-Exact next task: **G09b — runtime growable storage**, compose G09a with reviewed G06b
-8c783e71 (not the unready G07 snapshot). Its traced prerequisites do not include
-G07 or G08. Review/extract its existing behavior owners in dependency order and
-run ordinary functional checks. Preserve all upstream tests; write exploit-like
-confinement/fault probes down for DaybreakBlue instead of executing them. Do not
-import later owned exec, mappings, networking or checkpoint functionality.
+Exact next task: **G09c — owned directories and namespace changes**. Extract the
+VFS directory owner from9ba6a1d4 on G09a, then adapt the runtime join on reviewed
+G09b. Preserve current component traversal, shared offsets, whiteouts, strict
+copies and configured memory bound. Follow with relative-cwd/access/noctty fixes
+from the existing G09 donors. G07/G08 remain held; do not import them to compile
+this work. Keep full security probes with DaybreakBlue and ordinary functional
+checks local. No publication is authorized.
 
 Active skill: `hdae-development`, discovered at
 `/home/vince/.codex/worktrees/ginux-pr-combination-check/ginux/.agents/skills/hdae-development/SKILL.md`.

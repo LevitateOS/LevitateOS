@@ -302,7 +302,41 @@
       "remote_ci": "not run",
       "evidence": "g09a-review.md",
       "source_patch": "patches/G09a.patch",
-      "artifact_directory": ".artifacts/ginux-contribution-preparation/G09a"
+      "artifact_directory": ".artifacts/ginux-contribution-preparation/G09a",
+      "planned_delivery": "review subpacket; include with G09b in one growable-storage feature rather than an abstraction-only PR"
+    },
+    {
+      "packet": "G09b",
+      "parent_packet": "G09",
+      "purpose": "bounded growable runtime storage",
+      "base": "ccd42e319c3a76bf85d9cfce81a44cc9ba051911",
+      "head": "297ad8dde26e02ca32d6becd60d654c1fd67ecd0",
+      "tree": "17008873b421921585a93748a341a9f0cb1f21f3",
+      "dependencies": [
+        "G06b",
+        "G09a"
+      ],
+      "standalone": false,
+      "changed_files": [
+        "README.md",
+        "crates/ginux-init/src/fs_hooks.rs",
+        "crates/ginux-init/src/launch_tasks.rs",
+        "crates/ginux-init/src/main.rs",
+        "crates/ginux-init/src/storage_memory.rs",
+        "scripts/test-launch-storage.py",
+        "tests/fixtures/launch-storage-fixture.c"
+      ],
+      "status": "source separately self-reviewed; static/unit/build and selected storage runtime checks pass in source and clean replay; full CI/security and current-main independence pending",
+      "patch_sha256": "acf9993a37407ad34a062ed57e310683a9f3947ffee3dc8bd219dd9d4de6bd7e",
+      "unit_tests": 85,
+      "clean_matched_paths": 169,
+      "review": "separate self-review; no independent reviewer coverage",
+      "remote_ci": "not run",
+      "publication_group": "review G09a/G09b separately but propose together as one useful growable-storage feature unless final review changes this",
+      "security_handoff": "daybreakblue-handoff.md",
+      "evidence": "g09b-review.md",
+      "source_patch": "patches/G09b.patch",
+      "artifact_directory": ".artifacts/ginux-contribution-preparation/G09b"
     },
     {
       "packet": "G09",
@@ -323,11 +357,15 @@
       ],
       "acceptance": "Sparse growth, shared quota, directory cursors/mutations, relative paths and access probes; failed operations preserve data, identity and confinement.",
       "planned_delivery": "one coherent change plus its generic docs and focused regression fixtures; split coupled responsibilities only as recorded by P04",
-      "status": "VFS byte-storage subpacket G09a locally reviewed with limited functional checks; runtime growth/directories still in preparation",
+      "status": "G09a/G09b locally reviewed with limited functional checks; directories/relative paths/access still pending",
       "artifact_directory": ".artifacts/ginux-contribution-preparation/G09",
       "extracted_packets": [
-        "G09a"
-      ]
+        "G09a",
+        "G09b"
+      ],
+      "source_disposition": {
+        "32e2c85f": "defer memfd identity to G12 mapping consumer; no runtime mapping feature imported here"
+      }
     },
     {
       "packet": "G10",

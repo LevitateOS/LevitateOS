@@ -56,3 +56,15 @@ The existing `qfault` clone-TID and `x-path` security scenarios remain in source
 but are excluded from this agent's new functional-only runs. Existing review
 artifacts and logs remain available; no new exploitation or security probing
 has been performed here. A written handoff is not evidence of dispatch or fix.
+
+## G09 security validation pending
+
+- G09a d29381c7: review malformed image offsets and backend failure contracts;
+  checked copy-up extent arithmetic is implemented, but adversarial index probes
+  have not been run here. Ordinary VFS data/truncation/rollback units pass.
+- G09b 297ad8dd: validate anonymous mmap/mremap rollback and indirect memory-copy
+  protections under adversarial workloads, plus inherited namespace confinement.
+  Ordinary growth, quota, zero-fill and forked-alias checks pass in both source
+  and clean replay. Full storage suite retains the older confinement/protected
+  buffer scenarios; these were not rerun by this agent. The configured thread
+  snapshot is deliberately excluded from this candidate.
