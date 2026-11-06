@@ -1,104 +1,20 @@
 use anyhow::{Context, Result, bail};
 use recinit::live::{BOOT_INJECTION_DIR, BOOT_INJECTION_ENV};
+use recqemu::libvirt::{runtime_dir, Domain, DomainSpec, SerialTarget, UefiVars};
+use recqemu::serial::Console;
 use install_tests::boot_injection::BootInjection;
 use install_tests::scenarios::{ScenarioId, resolve_latest_install_runtime};
 use crate::cli::{BootArgs, Distro, Product, RunArgs, RunScenario, TestArgs, TestScenario};
 use crate::util::exit::usage;
 use std::fs::OpenOptions;
-use std::fs::{self, File};
+use std::fs;
 use std::io::Write;
-use std::net::{IpAddr, Ipv4Addr, TcpListener, UdpSocket};
+use std::net::TcpListener;
 use std::os::fd::AsRawFd;
 use std::path::{Path, PathBuf};
-use std::process::{Child, Command, Stdio};
+use std::process::Command;
 use std::thread::sleep;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum WindowMode {
-    RemoteVnc,
-    LocalGui,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum LocalDisplayBackend {
-    Gtk,
-    Sdl,
-}
-
-impl LocalDisplayBackend {
-    fn qemu_arg(self) -> &'static str {
-        match self {
-            Self::Gtk => "gtk",
-            Self::Sdl => "sdl",
-        }
-    }
-}
-
-#[derive(Clone, Debug)]
-struct WindowConfig {
-    mode: WindowMode,
-    local_qemu_bin: Option<PathBuf>,
-    local_display_backend: Option<LocalDisplayBackend>,
-    vnc_bind_host: Option<Ipv4Addr>,
-    vnc_host: Option<Ipv4Addr>,
-    vnc_port: Option<u16>,
-    serial_log: PathBuf,
-}
-
-impl WindowConfig {
-    fn allocate(mode: WindowMode) -> Result<Self> {
-        let (local_qemu_bin, local_display_backend, vnc_bind_host, vnc_host, vnc_port) = match mode
-        {
-            WindowMode::RemoteVnc => {
-                let vnc_bind_host = detect_vnc_bind_host()?;
-                let vnc_host = detect_vnc_advertise_host()?;
-                let vnc_port = allocate_local_port(vnc_bind_host, 5900, 5999)?;
-                (
-                    None,
-                    None,
-                    Some(vnc_bind_host),
-                    Some(vnc_host),
-                    Some(vnc_port),
-                )
-            }
-            WindowMode::LocalGui => {
-                let (qemu_bin, display_backend) = detect_local_qemu_runtime()?;
-                (Some(qemu_bin), Some(display_backend), None, None, None)
-            }
-        };
-        let serial_log = temp_file_path("levitate-scenario-window-serial").with_extension("log");
-        Ok(Self {
-            mode,
-            local_qemu_bin,
-            local_display_backend,
-            vnc_bind_host,
-            vnc_host,
-            vnc_port,
-            serial_log,
-        })
-    }
-
-    fn vnc_endpoint(&self) -> Option<String> {
-        let (host, port) = match (self.vnc_host, self.vnc_port) {
-            (Some(host), Some(port)) => (host, port),
-            _ => return None,
-        };
-        Some(format!("vnc://{}:{}", host, port))
-    }
-
-    fn qemu_display_arg(&self) -> Option<String> {
-        let (bind_host, vnc_port) = match (self.vnc_bind_host, self.vnc_port) {
-            (Some(bind_host), Some(vnc_port)) => (bind_host, vnc_port),
-            _ => return None,
-        };
-        let display_index = vnc_port.saturating_sub(5900);
-        Some(format!(
-            "vnc={}:{display_index},to=99,id=scenario-window",
-            bind_host
-        ))
-    }
-}
 
 pub fn run(args: RunArgs) -> Result<()> {
     let root = crate::util::repo::repo_root()?;
@@ -117,13 +33,6 @@ pub fn run(args: RunArgs) -> Result<()> {
             ),
         )?;
     }
-    let window = if args.window {
-        Some(WindowConfig::allocate(WindowMode::LocalGui)?)
-    } else if args.vnc {
-        Some(WindowConfig::allocate(WindowMode::RemoteVnc)?)
-    } else {
-        None
-    };
 
     let product = match args.scenario {
         RunScenario::LiveBoot => Product::LiveBoot,
@@ -140,7 +49,7 @@ pub fn run(args: RunArgs) -> Result<()> {
                     "installed-boot takes no boot injection: the live init reads it, the installed system does not",
                 ));
             }
-            return boot_installed_disk(&root, distro, window.as_ref());
+            return boot_installed_disk(distro);
         }
     };
     let iso = crate::tasks::build::require_iso(distro, product)?;
@@ -154,7 +63,7 @@ pub fn run(args: RunArgs) -> Result<()> {
     } else {
         None
     };
-    if !args.ssh && !args.no_shell && window.is_none() {
+    if !args.ssh && !args.no_shell {
         // An interactive serial console: the install UX runs on it.
         pairs.push(format!("{}=1", distro_builder::install_ux::SERIAL_KEY));
     }
@@ -166,7 +75,6 @@ pub fn run(args: RunArgs) -> Result<()> {
 
     match ssh_key.filter(|_| args.ssh) {
         Some(key) => boot_live_iso_ssh(
-            &root,
             distro,
             product.id(),
             &iso,
@@ -176,7 +84,7 @@ pub fn run(args: RunArgs) -> Result<()> {
             args.no_shell,
             &key,
         ),
-        None => boot_live_iso_serial(&root, distro, &iso, injection, args.no_shell, window.as_ref()),
+        None => boot_live_iso_serial(distro, product.id(), &iso, injection, args.no_shell),
     }
 }
 
@@ -324,36 +232,25 @@ pub fn reset(distro: Distro) -> Result<()> {
 }
 
 fn boot_live_iso_serial(
-    root: &Path,
     distro: crate::cli::Distro,
+    scenario_label: &str,
     iso_path: &Path,
     injection: Option<BootInjection>,
     no_shell: bool,
-    window: Option<&WindowConfig>,
 ) -> Result<()> {
+    let vm = start_vm(
+        distro,
+        scenario_label,
+        Boot::Iso(iso_path),
+        injection.as_ref(),
+        None,
+        !no_shell,
+    )?;
     if no_shell {
-        let log_path = temp_log_path("levitate-live-boot-serial");
-        let mut cmd = qemu_base_command(root, iso_path, injection.as_ref(), None, window)?;
-        let child = spawn_qemu_with_log(&mut cmd, &log_path, false)?;
-        monitor_live_iso_serial(child, &log_path, &LiveBootPatterns::load(distro.id())?)?;
-        let _ = fs::remove_file(&log_path);
-        return Ok(());
+        return monitor_live_iso_serial(&vm, &LiveBootPatterns::load(distro.id())?);
     }
-
-    if window.is_some() {
-        eprintln!(
-            "Booting {} live ISO in window mode... (Ctrl-C to stop)",
-            distro.pretty_name()
-        );
-    } else {
-        eprintln!("Booting {} live ISO... (Ctrl-A X to exit)", distro.pretty_name());
-    }
-    let mut cmd = qemu_base_command(root, iso_path, injection.as_ref(), None, window)?;
-    if let Some(window_cfg) = window {
-        run_window_mode_foreground(&mut cmd, window_cfg)
-    } else {
-        run_checked(&mut cmd)
-    }
+    eprintln!("Booting {} live ISO...", distro.pretty_name());
+    attach_console(vm)
 }
 
 /// What the live-boot console output means, from the variant's scenario
@@ -381,59 +278,41 @@ impl LiveBootPatterns {
     }
 }
 
-fn monitor_live_iso_serial(mut child: Child, log_path: &Path, patterns: &LiveBootPatterns) -> Result<()> {
+fn monitor_live_iso_serial(vm: &RunVm, patterns: &LiveBootPatterns) -> Result<()> {
     let default_timeout = 120u64;
     let timeout_secs = std::env::var("LEVITATE_LIVE_BOOT_SERIAL_TIMEOUT")
         .ok()
         .and_then(|raw| raw.parse::<u64>().ok())
         .unwrap_or(default_timeout);
     let deadline = Instant::now() + Duration::from_secs(timeout_secs.max(1));
+    let log_path = &vm.log;
 
     loop {
-        if let Some(exit_status) = child.try_wait()? {
-            let reason = match exit_status.code() {
-                Some(code) => format!("QEMU exited with code {code}"),
-                None => "QEMU exited by signal".to_string(),
-            };
-            return bail_with_tail(
-                &format!("{reason} before live boot completed"),
-                log_path,
-                None::<&str>,
-            );
+        if !vm.domain.is_running() {
+            return bail_with_tail("The VM stopped before live boot completed", log_path, None::<&str>);
         }
-
         if let Some(pat) = detect_boot_regression(log_path, patterns)? {
-            let _ = child.kill();
-            let _ = child.wait();
             return bail_with_tail(
                 &format!("Detected boot regression while waiting for live boot: {pat}"),
                 log_path,
                 None::<&str>,
             );
         }
-
         if LiveBootPatterns::first_in(&patterns.success, log_path).is_some() {
-            let _ = child.kill();
-            let _ = child.wait();
             return Ok(());
         }
-
         if Instant::now() > deadline {
-            let _ = child.kill();
-            let _ = child.wait();
             return bail_with_tail(
                 &format!("Timed out waiting for live-boot serial handoff ({timeout_secs}s)"),
                 log_path,
                 Some("No live-boot success pattern observed."),
             );
         }
-
         sleep(Duration::from_secs(1));
     }
 }
 
 fn boot_live_iso_ssh(
-    root: &Path,
     distro: crate::cli::Distro,
     scenario_label: &str,
     iso_path: &Path,
@@ -451,11 +330,17 @@ fn boot_live_iso_ssh(
     );
     ensure_ssh_port_available(ssh_port)?;
 
-    let mut cmd = qemu_base_command(root, iso_path, injection.as_ref(), Some(ssh_port), None)?;
-    let log_path = temp_log_path("levitate-live-boot-ssh");
-    let child = spawn_qemu_with_log(&mut cmd, &log_path, true)?;
+    let mut vm = start_vm(
+        distro,
+        scenario_label,
+        Boot::Iso(iso_path),
+        injection.as_ref(),
+        Some(ssh_port),
+        false,
+    )?;
+    let log_path = vm.log.clone();
     let result = monitor_live_iso_ssh(
-        child,
+        &mut vm,
         &log_path,
         &LiveBootPatterns::load(distro.id())?,
         ssh_port,
@@ -463,7 +348,7 @@ fn boot_live_iso_ssh(
         no_shell,
         ssh_private_key,
     );
-    let result = match result {
+    match result {
         Ok(()) => Ok(()),
         Err(err) => {
             let report = maybe_append_log_fault(&log_path);
@@ -472,13 +357,11 @@ fn boot_live_iso_ssh(
             }
             bail!("{:#}", err);
         }
-    };
-    let _ = fs::remove_file(&log_path);
-    result
+    }
 }
 
 fn monitor_live_iso_ssh(
-    mut child: Child,
+    vm: &mut RunVm,
     log_path: &Path,
     patterns: &LiveBootPatterns,
     ssh_port: u16,
@@ -495,22 +378,12 @@ fn monitor_live_iso_ssh(
     loop {
         let _ = emit_new_log_lines(log_path, &mut lines_seen)?;
 
-        if let Some(exit_status) = child.try_wait()? {
-            let reason = match exit_status.code() {
-                Some(code) => format!("QEMU exited with code {code}"),
-                None => "QEMU exited by signal".to_string(),
-            };
+        if !vm.domain.is_running() {
             let _ = fs::remove_file(&known_hosts);
-            return bail_with_tail(
-                &format!("{reason} before SSH became ready"),
-                log_path,
-                None::<&str>,
-            );
+            return bail_with_tail("The VM stopped before SSH became ready", log_path, None::<&str>);
         }
 
         if let Some(pat) = detect_boot_regression(log_path, patterns)? {
-            let _ = child.kill();
-            let _ = child.wait();
             let _ = fs::remove_file(&known_hosts);
             return bail_with_tail(
                 &format!("Detected boot regression while waiting for SSH: {pat}"),
@@ -529,23 +402,19 @@ fn monitor_live_iso_ssh(
             }
         } else if can_ssh_connect(ssh_port, &key, &known_hosts)? {
             if no_shell {
-                let _ = child.kill();
-                let _ = child.wait();
                 let _ = fs::remove_file(&known_hosts);
                 return Ok(());
             }
 
-            let status = run_interactive_ssh(ssh_port, &key, &known_hosts, &mut child);
+            let status = run_interactive_ssh(ssh_port, &key, &known_hosts);
             let _ = fs::remove_file(&known_hosts);
             return status;
         }
 
         if Instant::now() > deadline {
             if hook_seen {
-                let _ = collect_guest_ssh_debug(&mut child);
+                let _ = collect_guest_ssh_debug(vm);
             }
-            let _ = child.kill();
-            let _ = child.wait();
             let _ = fs::remove_file(&known_hosts);
             let mut extra = format!("No successful SSH handshake observed.");
             if !hook_seen {
@@ -582,12 +451,7 @@ fn emit_new_log_lines(log_path: &Path, line_cursor: &mut usize) -> Result<()> {
     Ok(())
 }
 
-fn run_interactive_ssh(
-    ssh_port: u16,
-    private_key: &Path,
-    known_hosts: &Path,
-    qemu: &mut Child,
-) -> Result<()> {
+fn run_interactive_ssh(ssh_port: u16, private_key: &Path, known_hosts: &Path) -> Result<()> {
     // Some interactive shells emit cursor-position queries (CSI 6n). If a reply
     // races with session teardown, bytes can leak into the next shell prompt.
     flush_tty_input_queue();
@@ -605,8 +469,6 @@ fn run_interactive_ssh(
 
     flush_tty_input_queue();
 
-    let _ = qemu.kill();
-    let _ = qemu.wait();
     if status.success() {
         Ok(())
     } else {
@@ -655,343 +517,135 @@ fn common_ssh_args(key: &Path, ssh_port: u16, known_hosts: &Path) -> Vec<String>
     ]
 }
 
-fn boot_installed_disk(
-    root: &Path,
-    distro: crate::cli::Distro,
-    window: Option<&WindowConfig>,
-) -> Result<()> {
+fn boot_installed_disk(distro: crate::cli::Distro) -> Result<()> {
     let runtime = resolve_latest_install_runtime(distro.id())?;
-    let disk = runtime.disk_path;
-    let vars = runtime.ovmf_vars_path;
-    let disk_format = recqemu::disk_image_format(&disk);
-    let ovmf = crate::util::repo::ovmf_path(root)?;
-
-    let mut cmd = qemu_builder_for_window(window)?
-        .disk(&disk)
-        .uefi(ovmf)
-        .uefi_vars(&vars)
-        .boot_order("c")
-        .user_network()
-        .build();
-    if window.is_some() {
-        eprintln!(
-            "Booting installed {} from install scenario run {} in window mode... (Ctrl-C to stop)",
-            distro.pretty_name(), runtime.run_id
-        );
-    } else {
-        eprintln!(
-            "Booting installed {} from install scenario run {}... (Ctrl-A X to exit)",
-            distro.pretty_name(), runtime.run_id
-        );
-    }
-    eprintln!("  disk: {}", disk.display());
-    eprintln!("  disk format: {}", disk_format);
-    eprintln!("  ovmf vars: {}", vars.display());
-
-    apply_qemu_runtime_env(&mut cmd, root, window)?;
-    if let Some(window_cfg) = window {
-        run_window_mode_foreground(&mut cmd, window_cfg)
-    } else {
-        run_checked(&mut cmd)
-    }
+    eprintln!(
+        "Booting installed {} from install scenario run {}...",
+        distro.pretty_name(),
+        runtime.run_id
+    );
+    eprintln!("  disk: {}", runtime.disk_path.display());
+    eprintln!("  ovmf vars: {}", runtime.ovmf_vars_path.display());
+    let vm = start_vm(
+        distro,
+        "installed-boot",
+        Boot::Disk {
+            disk: &runtime.disk_path,
+            vars: &runtime.ovmf_vars_path,
+        },
+        None,
+        None,
+        true,
+    )?;
+    attach_console(vm)
 }
 
-fn qemu_base_command(
-    root: &Path,
-    iso_path: &Path,
+/// What a run boots.
+enum Boot<'a> {
+    /// A live ISO, with a fresh UEFI variable store.
+    Iso(&'a Path),
+    /// An installed disk and its UEFI variable store.
+    Disk { disk: &'a Path, vars: &'a Path },
+}
+
+/// A run's VM: its libvirt domain, the serial transcript, and the console
+/// when this process reads the serial port (`--ssh`, `--no-shell`).
+struct RunVm {
+    domain: Domain,
+    log: PathBuf,
+    console: Option<Console>,
+}
+
+/// Start the run's VM as a libvirt domain named `<distro>-run-<scenario>`,
+/// visible in Cockpit. `interactive` gives it a pty serial port for
+/// `virsh console`; otherwise this process reads the serial port.
+fn start_vm(
+    distro: crate::cli::Distro,
+    scenario: &str,
+    boot: Boot<'_>,
     injection: Option<&BootInjection>,
     ssh_port: Option<u16>,
-    window: Option<&WindowConfig>,
-) -> Result<Command> {
-    let mut builder = qemu_builder_for_window(window)?
-        .cdrom(iso_path)
-        .cdrom_as_disk()
-        .uefi(crate::util::repo::ovmf_path(root)?);
+    interactive: bool,
+) -> Result<RunVm> {
+    let dir = runtime_dir();
+    let name = format!("{}-run-{scenario}", distro.id());
+    let socket = dir.join(format!("{name}.serial"));
+    let log = dir.join(format!("{name}.serial.log"));
+    let _ = fs::remove_file(&log);
+    let absolute = |path: &Path| fs::canonicalize(path).with_context(|| format!("resolving '{}'", path.display()));
+    let (boot_iso, disk, uefi_vars) = match boot {
+        Boot::Iso(iso) => (
+            Some(absolute(iso)?),
+            None,
+            UefiVars::Fresh {
+                template: recqemu::find_ovmf_vars()?,
+                path: dir.join(format!("{name}.VARS.fd")),
+            },
+        ),
+        Boot::Disk { disk, vars } => (None, Some(absolute(disk)?), UefiVars::Existing(absolute(vars)?)),
+    };
+    let mut spec = DomainSpec {
+        name: name.clone(),
+        title: format!("{} {scenario} (cargo xtask run)", distro.pretty_name()),
+        // The host's OVMF, matching the variable stores and libvirt's QEMU.
+        uefi_code: recqemu::find_ovmf()?,
+        uefi_vars,
+        disk,
+        boot_iso,
+        extra_cdroms: Vec::new(),
+        fw_cfg: Vec::new(),
+        ssh_forward: ssh_port,
+        serial: if interactive { SerialTarget::Pty } else { SerialTarget::Socket(socket.clone()) },
+        serial_log: log.clone(),
+    };
     if let Some(injection) = injection {
-        builder = injection.attach(builder);
+        injection.attach(&mut spec);
     }
-    builder = match ssh_port {
-        Some(port) => builder.user_network_with_hostfwd(port, recqemu::GUEST_SSH_PORT),
-        None => builder.user_network(),
+    let domain = Domain::create_paused(&spec)?;
+    let console = if interactive {
+        None
+    } else {
+        Some(Console::connect(&socket, Duration::from_secs(20))?)
     };
-    let mut cmd = builder.build();
-    apply_qemu_runtime_env(&mut cmd, root, window)?;
-    Ok(cmd)
+    domain.resume()?;
+    eprintln!(
+        "VM '{name}' runs on {}: watch it in Cockpit (Virtual Machines) or `virsh -c {} console {name}`.",
+        domain.uri(),
+        domain.uri()
+    );
+    Ok(RunVm { domain, log, console })
 }
 
-/// The QEMU console for a boot: serial on stdio, or a window (VNC or local
-/// GUI) with serial logged to a file.
-fn qemu_builder_for_window(window: Option<&WindowConfig>) -> Result<recqemu::QemuBuilder> {
-    let builder = recqemu::QemuBuilder::new().no_reboot();
-    let Some(window_cfg) = window else {
-        return Ok(builder.nographic().serial_stdio());
-    };
-    let builder = builder.serial_file(&window_cfg.serial_log).no_monitor();
-    Ok(match window_cfg.mode {
-        WindowMode::RemoteVnc => {
-            let display_arg = window_cfg
-                .qemu_display_arg()
-                .context("remote window mode has no VNC display configuration")?;
-            builder
-                .vga("none")
-                .device("secondary-vga")
-                .display(&display_arg)
-        }
-        WindowMode::LocalGui => {
-            let display_backend = window_cfg
-                .local_display_backend
-                .context("local window mode has no local display backend")?;
-            let qemu_bin = window_cfg
-                .local_qemu_bin
-                .as_ref()
-                .context("local window mode has no detected qemu binary")?;
-            builder
-                .program(qemu_bin)
-                .display(display_backend.qemu_arg())
-                .vga("virtio")
-        }
-    })
-}
-
-fn run_window_mode_foreground(cmd: &mut Command, window_cfg: &WindowConfig) -> Result<()> {
-    let mut child = cmd
-        .spawn()
-        .context("Spawning QEMU for foreground window mode")?;
-    print_window_mode_details(window_cfg, child.id());
-    let status = child
-        .wait()
-        .context("Waiting for QEMU foreground window mode")?;
+/// Hand the terminal to the VM's serial console (Ctrl+] leaves it). The VM
+/// keeps running after you leave, for Cockpit; it stops when the guest powers off.
+fn attach_console(vm: RunVm) -> Result<()> {
+    eprintln!("Attaching the serial console (Ctrl+] to leave)...");
+    let status = Command::new("virsh")
+        .args(["-c", vm.domain.uri(), "console", "--force", vm.domain.name()])
+        .status()
+        .context("running virsh console")?;
+    flush_tty_input_queue();
+    if vm.domain.is_running() {
+        eprintln!(
+            "Left the console; '{}' keeps running. Stop it in Cockpit or with: virsh -c {} destroy {}",
+            vm.domain.name(),
+            vm.domain.uri(),
+            vm.domain.name()
+        );
+        vm.domain.keep_running();
+    }
     if !status.success() {
-        bail!("Command failed with status {status}");
+        bail!("virsh console exited with {status}");
     }
     Ok(())
 }
 
-fn print_window_mode_details(window_cfg: &WindowConfig, pid: u32) {
-    eprintln!("Window mode: PID {pid}");
-    eprintln!(
-        "Window mode: serial log {}",
-        window_cfg.serial_log.display()
-    );
-    match window_cfg.mode {
-        WindowMode::LocalGui => {
-            let qemu_bin = window_cfg
-                .local_qemu_bin
-                .as_ref()
-                .expect("internal error: missing local qemu binary in local mode");
-            let display_backend = window_cfg
-                .local_display_backend
-                .expect("internal error: missing local display backend in local mode");
-            eprintln!(
-                "Window mode: local QEMU window requested via '{}' with display backend '{}'.",
-                qemu_bin.display(),
-                display_backend.qemu_arg()
-            );
-        }
-        WindowMode::RemoteVnc => {
-            let bind_host = window_cfg
-                .vnc_bind_host
-                .expect("internal error: missing VNC bind host in remote mode");
-            let vnc_port = window_cfg
-                .vnc_port
-                .expect("internal error: missing VNC port in remote mode");
-            let endpoint = window_cfg
-                .vnc_endpoint()
-                .expect("internal error: missing VNC endpoint in remote mode");
-            eprintln!("Window mode: VNC bind {}:{}", bind_host, vnc_port);
-            eprintln!("Window mode: VNC endpoint {endpoint}");
-            eprintln!(
-                "Window mode: SSH tunnel (run on your local machine):\n  ssh -N -L {port}:127.0.0.1:{port} <user>@<remote-host>",
-                port = vnc_port
-            );
-            eprintln!("Window mode: open viewer locally (direct):\n  remote-viewer {endpoint}");
-            eprintln!(
-                "Window mode: open viewer locally (via tunnel):\n  remote-viewer vnc://127.0.0.1:{}",
-                vnc_port
-            );
-        }
-    }
-}
-
-fn apply_qemu_runtime_env(
-    cmd: &mut Command,
-    root: &Path,
-    window: Option<&WindowConfig>,
-) -> Result<()> {
-    if matches!(window.map(|distro| distro.mode), Some(WindowMode::LocalGui)) {
-        // Local GUI mode intentionally uses the detected system QEMU binary.
-        // Avoid forcing tools PATH/LD_LIBRARY_PATH, which can shadow host GUI-enabled builds.
-        cmd.env_remove("LD_LIBRARY_PATH");
-        return Ok(());
-    }
-    crate::util::tools_env::apply_to_command(cmd, root)
-}
-
-fn detect_local_qemu_runtime() -> Result<(PathBuf, LocalDisplayBackend)> {
-    if let Ok(raw) = std::env::var("LEVITATE_SCENARIO_WINDOW_QEMU_BIN") {
-        let candidate = PathBuf::from(raw.trim());
-        return pick_local_display_backend(&candidate).map(|backend| (candidate, backend));
-    }
-
-    let mut candidates: Vec<PathBuf> = Vec::new();
-    if let Some(path_os) = std::env::var_os("PATH") {
-        for dir in std::env::split_paths(&path_os) {
-            let candidate = dir.join("qemu-system-x86_64");
-            if !candidate.is_file() {
-                continue;
-            }
-            let path_str = candidate.to_string_lossy();
-            if path_str.contains("/.artifacts/tools/.tools/") {
-                continue;
-            }
-            if !candidates.iter().any(|existing| existing == &candidate) {
-                candidates.push(candidate);
-            }
-        }
-    }
-    for candidate in [
-        PathBuf::from("/usr/bin/qemu-system-x86_64"),
-        PathBuf::from("/usr/local/bin/qemu-system-x86_64"),
-    ] {
-        if candidate.is_file() && !candidates.iter().any(|existing| existing == &candidate) {
-            candidates.push(candidate);
-        }
-    }
-
-    for candidate in candidates {
-        if let Ok(backend) = pick_local_display_backend(&candidate) {
-            return Ok((candidate, backend));
-        }
-    }
-
-    bail!(
-        "Local window mode requires a system qemu-system-x86_64 with either gtk or sdl display backend.\n\
-         The bundled tools QEMU is headless-only.\n\
-         Remediation: install host QEMU GUI support (for example `sudo dnf install qemu-system-x86 qemu-ui-gtk`) and rerun,\n\
-         or rerun without `--window` and use the serial/SSH workflow."
-    )
-}
-
-fn pick_local_display_backend(qemu_bin: &Path) -> Result<LocalDisplayBackend> {
-    if !qemu_bin.is_file() {
-        bail!("qemu binary not found at '{}'", qemu_bin.display());
-    }
-    let output = Command::new(qemu_bin)
-        .env_remove("LD_LIBRARY_PATH")
-        .args(["-display", "help"])
-        .output()
-        .with_context(|| {
-            format!(
-                "querying display backends for local qemu binary '{}'",
-                qemu_bin.display()
-            )
-        })?;
-    if !output.status.success() {
-        bail!(
-            "qemu binary '{}' failed display backend probe",
-            qemu_bin.display()
-        );
-    }
-    let text = String::from_utf8_lossy(&output.stdout);
-    let has_gtk = text.lines().any(|line| line.trim() == "gtk");
-    if has_gtk {
-        return Ok(LocalDisplayBackend::Gtk);
-    }
-    let has_sdl = text.lines().any(|line| line.trim() == "sdl");
-    if has_sdl {
-        return Ok(LocalDisplayBackend::Sdl);
-    }
-    bail!(
-        "qemu binary '{}' does not expose gtk/sdl display backends",
-        qemu_bin.display()
-    )
-}
-
-fn detect_vnc_bind_host() -> Result<Ipv4Addr> {
-    if let Ok(raw) = std::env::var("LEVITATE_SCENARIO_WINDOW_BIND_HOST") {
-        let parsed: Ipv4Addr = raw.parse().with_context(|| {
-            format!("Parsing LEVITATE_SCENARIO_WINDOW_BIND_HOST as IPv4 failed: {raw}")
-        })?;
-        return Ok(parsed);
-    }
-    Ok(Ipv4Addr::UNSPECIFIED)
-}
-
-fn detect_vnc_advertise_host() -> Result<Ipv4Addr> {
-    if let Ok(raw) = std::env::var("LEVITATE_SCENARIO_WINDOW_HOST") {
-        let parsed: Ipv4Addr = raw.parse().with_context(|| {
-            format!("Parsing LEVITATE_SCENARIO_WINDOW_HOST as IPv4 address failed: {raw}")
-        })?;
-        if parsed.is_unspecified() {
-            bail!("LEVITATE_SCENARIO_WINDOW_HOST must not be unspecified; got {parsed}");
-        }
-        return Ok(parsed);
-    }
-    if let Some(ip) = detect_ssh_server_ipv4() {
-        return Ok(ip);
-    }
-    if let Some(ip) = detect_default_route_ipv4() {
-        return Ok(ip);
-    }
-    Ok(Ipv4Addr::LOCALHOST)
-}
-
-fn detect_default_route_ipv4() -> Option<Ipv4Addr> {
-    // UDP connect does not send packets; it asks kernel routing for the outbound interface address.
-    let socket = UdpSocket::bind((Ipv4Addr::UNSPECIFIED, 0)).ok()?;
-    socket.connect((Ipv4Addr::new(1, 1, 1, 1), 80)).ok()?;
-    let local_addr = socket.local_addr().ok()?;
-    match local_addr.ip() {
-        IpAddr::V4(ip) if !ip.is_loopback() && !ip.is_unspecified() => Some(ip),
-        _ => None,
-    }
-}
-
-fn detect_ssh_server_ipv4() -> Option<Ipv4Addr> {
-    let raw = std::env::var("SSH_CONNECTION").ok()?;
-    let mut parts = raw.split_whitespace();
-    let _client_ip = parts.next()?;
-    let _client_port = parts.next()?;
-    let server_ip = parts.next()?;
-    let parsed: Ipv4Addr = server_ip.parse().ok()?;
-    if parsed.is_unspecified() {
-        return None;
-    }
-    Some(parsed)
-}
-
-fn allocate_local_port(host: Ipv4Addr, start: u16, end: u16) -> Result<u16> {
-    for port in start..=end {
-        if let Ok(listener) = TcpListener::bind((host, port)) {
-            drop(listener);
-            return Ok(port);
-        }
-    }
-    bail!("No free local TCP port on {host} in range {start}..={end}")
-}
-
-fn spawn_qemu_with_log(cmd: &mut Command, log_path: &Path, allow_stdin: bool) -> Result<Child> {
-    let log_out = File::create(log_path)
-        .with_context(|| format!("creating QEMU log file '{}'", log_path.display()))?;
-    let log_err = log_out
-        .try_clone()
-        .with_context(|| format!("duplicating QEMU log file '{}'", log_path.display()))?;
-    cmd.stdout(Stdio::from(log_out));
-    cmd.stderr(Stdio::from(log_err));
-    if allow_stdin {
-        cmd.stdin(Stdio::piped());
-    } else {
-        cmd.stdin(Stdio::null());
-    }
-    let child = cmd.spawn().context("Spawning QEMU for SSH boot")?;
-    Ok(child)
-}
-
-fn collect_guest_ssh_debug(child: &mut Child) -> Result<()> {
-    let Some(stdin) = child.stdin.as_mut() else {
+/// Type a probe of the guest's network and sshd state into its serial
+/// console; the output lands in the serial transcript.
+fn collect_guest_ssh_debug(vm: &mut RunVm) -> Result<()> {
+    let Some(console) = vm.console.as_mut() else {
         return Ok(());
     };
-
     let probe = format!(
         "\n\
          echo ___SSH_DEBUG_BEGIN___\n\
@@ -1005,26 +659,13 @@ fn collect_guest_ssh_debug(child: &mut Child) -> Result<()> {
          journalctl -b -u sshd.service --no-pager -n 120 || true\n\
          echo ___SSH_DEBUG_END___\n"
     );
-    stdin
-        .write_all(probe.as_bytes())
-        .context("writing guest SSH debug probe to QEMU stdin")?;
-    stdin
-        .flush()
-        .context("flushing guest SSH debug probe to QEMU stdin")?;
+    console.send(&probe).context("typing the SSH debug probe into the guest")?;
     sleep(Duration::from_secs(2));
     Ok(())
 }
 
-/// A fatal live-boot pattern from the contract, or QEMU failing to set up
-/// the SSH host forward.
+/// A fatal live-boot pattern from the contract.
 fn detect_boot_regression(log_path: &Path, patterns: &LiveBootPatterns) -> Result<Option<String>> {
-    let content = fs::read_to_string(log_path).unwrap_or_default();
-    if let Some(line) = content
-        .lines()
-        .find(|l| l.to_lowercase().contains("could not set up host forwarding rule"))
-    {
-        return Ok(Some(format!("hostfwd setup failed: {line}")));
-    }
     Ok(LiveBootPatterns::first_in(&patterns.fatal, log_path).map(str::to_string))
 }
 
@@ -1039,14 +680,6 @@ fn ensure_ssh_port_available(ssh_port: u16) -> Result<()> {
             Use `--ssh-port` to choose a free port."
         ),
     }
-}
-
-fn temp_log_path(prefix: &str) -> PathBuf {
-    let ts = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|dur| dur.as_nanos())
-        .unwrap_or(0);
-    std::env::temp_dir().join(format!("{prefix}-{ts}.log"))
 }
 
 fn temp_file_path(prefix: &str) -> PathBuf {
@@ -1100,10 +733,3 @@ fn bail_with_tail(message: &str, log_path: &Path, extra: Option<&str>) -> Result
     bail!("{message}{detail}");
 }
 
-fn run_checked(cmd: &mut Command) -> Result<()> {
-    let status = cmd.status().with_context(|| "Spawning command")?;
-    if !status.success() {
-        bail!("Command failed with status {status}");
-    }
-    Ok(())
-}

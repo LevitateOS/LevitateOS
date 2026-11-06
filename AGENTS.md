@@ -27,6 +27,7 @@ These rules apply to every directory and submodule, recursively, across Git repo
 - Recipes own source/package facts and acquisition/build/install behavior. Rust/TOML owns orchestration, output locations, and contracts. Normal public recipes run without required defines.
 - Build payload through its producers. Keep build commands explicit; scenario commands consume existing artifacts.
 - Use `.artifacts` for current outputs and tooling.
+- Every VM runs under libvirt: scenarios and `cargo xtask run` boot transient domains on the user session (`qemu:///session`), named `<distro>-<scenario>`, so they can be watched and managed in Cockpit (Virtual Machines). Do not start QEMU directly. Test LevitateOS and AcornOS both this way: `cargo xtask test all levitate` and `cargo xtask test all acorn`, plus `cargo xtask test ab-update <distro>` for each.
 - Reuse existing kernel artifacts during ordinary development. Rebuild kernels explicitly with `cargo xtask build kernel <distro>` (or `--all`).
 - Keep runtime checks that prevent invalid artifacts or destructive operations. Fail with useful errors.
 - For releases, produce reproducible artifacts and validate declared products, provenance, and relevant integration/e2e behavior. Development convenience is not release evidence.

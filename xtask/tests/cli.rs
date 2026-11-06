@@ -87,7 +87,7 @@ fn bad_usage_exits_2_without_touching_state() {
         vec!["status", "levitate", "--force"],
         vec!["reset", "../other"],
         vec!["build", "kernel"],
-        vec!["run", "live-boot", "levitate", "--window", "--no-shell"],
+        vec!["run", "live-boot", "levitate", "--no-such-option", "--no-shell"],
     ] {
         let output = xtask(temp.path()).args(&args).output().unwrap();
         assert_eq!(output.status.code(), Some(2), "{args:?}\n{}", diagnostic(&output));

@@ -94,26 +94,42 @@ fn checks(root: &Path) -> Vec<Check> {
             Err(e) => Err(gap(e)),
         },
     ));
-    let qemu = match &repo_tools {
-        Ok(Some(tools)) if tools.join("usr/bin/qemu-system-x86_64").is_file() => {
-            Some(tools.join("usr/bin/qemu-system-x86_64"))
-        }
-        _ => which::which("qemu-system-x86_64").ok(),
-    };
+    // Scenario VMs are libvirt domains on the user session (Cockpit shows them).
+    let uri = recqemu::libvirt::uri();
     checks.push(Check::new(
-        "qemu-system-x86_64",
+        "libvirt (virsh)",
         true,
-        qemu.map(|p| p.display().to_string())
-            .ok_or_else(|| ("not in the repo tools or on PATH".into(), "cargo xtask setup (or install the host's qemu-system-x86)".into())),
+        which::which("virsh")
+            .map(|p| p.display().to_string())
+            .map_err(|_| ("not on PATH; scenario VMs run under libvirt".into(), "install libvirt-client and libvirt-daemon-kvm".into())),
+    ));
+    checks.push(Check::new(
+        format!("libvirt connection {uri}"),
+        true,
+        recqemu::libvirt::virsh(&uri, &["version"])
+            .map(|out| out.lines().find(|l| l.contains("hypervisor")).unwrap_or("connected").trim().to_string())
+            .map_err(|e| (format!("{e:#}"), "install libvirt-daemon-kvm (the session daemon starts on demand)".into())),
+    ));
+    checks.push(Check::new(
+        "passt",
+        true,
+        which::which("passt")
+            .map(|p| p.display().to_string())
+            .map_err(|_| ("not on PATH (user networking and the SSH forward of scenario VMs)".into(), "install passt".into())),
+    ));
+    checks.push(Check::new(
+        "qemu-img",
+        true,
+        which::which("qemu-img")
+            .map(|p| p.display().to_string())
+            .map_err(|_| ("not on PATH (scenario disk images)".into(), "cargo xtask setup (or install qemu-img)".into())),
     ));
     checks.push(Check::new(
         "OVMF firmware",
         true,
-        match crate::util::repo::ovmf_path(root) {
-            Ok(p) if p.is_file() => Ok(p.display().to_string()),
-            Ok(p) => Err((format!("missing {}", p.display()), "cargo xtask setup".into())),
-            Err(e) => Err(gap(&e)),
-        },
+        recqemu::find_ovmf()
+            .map(|p| p.display().to_string())
+            .map_err(|e| (format!("{e:#}"), "install edk2-ovmf".into())),
     ));
     let key = crate::util::ssh::repo_key_path(root);
     checks.push(Check::new(

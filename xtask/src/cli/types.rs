@@ -257,14 +257,8 @@ pub struct RunArgs {
     #[arg(value_enum, default_value_t = Distro::Levitate)]
     pub distro: Distro,
     /// Wait for SSH on a forwarded port and open a shell over it (live scenarios).
-    #[arg(long, conflicts_with_all = ["window", "vnc"])]
+    #[arg(long)]
     pub ssh: bool,
-    /// Show the console in a local QEMU window.
-    #[arg(long, conflicts_with_all = ["vnc", "no_shell"])]
-    pub window: bool,
-    /// Show the console over VNC (prints the endpoint).
-    #[arg(long, conflicts_with_all = ["window", "no_shell"])]
-    pub vnc: bool,
     /// Boot, check that it came up (and that SSH logs in, with --ssh), then stop. Needs no terminal.
     #[arg(long)]
     pub no_shell: bool,

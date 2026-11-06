@@ -15,11 +15,16 @@ cargo xtask build live-tools levitate          # also base-rootfs, live-boot; --
 cargo xtask build erofs live-tools levitate    # a product's EROFS images, no ISO
 cargo xtask base lock levitate [--check]       # take Fedora's updates: re-lock the signed base RPMs
 
-cargo xtask run live-tools levitate            # serial console with the install UX (Ctrl-A X exits)
+cargo xtask run live-tools levitate            # serial console with the install UX (Ctrl+] leaves; the VM keeps running)
 cargo xtask run live-boot levitate --ssh       # wait for SSH, open a shell over it
-cargo xtask run live-boot levitate --window    # local QEMU window (--vnc for a VNC endpoint)
 cargo xtask run live-boot levitate --no-shell  # boot, check it came up, stop (no terminal needed)
 cargo xtask run installed-boot levitate        # the disk the latest install scenario produced
+
+Every VM, from `run` and from `test`, is a libvirt domain on your user
+session (`qemu:///session`), named `<distro>-<scenario>` (`<distro>-run-<scenario>`
+for `run`): watch and manage it in Cockpit (Virtual Machines) or with
+`virsh -c qemu:///session list`. Its screen is a VNC display Cockpit shows; its
+serial transcript is in `$XDG_RUNTIME_DIR/levitate-vm/<name>.serial.log`.
 
 cargo xtask test all levitate [--force] [--json]   # live-boot … runtime, in order, stop at first failure
 cargo xtask test install levitate
