@@ -1,6 +1,7 @@
 //! `cargo xtask gen`: the JSON the tools print is described once, by
 //! their Rust output types. This writes the JSON Schemas next to each tool
-//! and the TypeScript declarations into the TUI that reads that JSON, and
+//! and the TypeScript declarations into every TUI app whose manifest lists the
+//! tool (`src/generated/<tool>.ts`), and
 //! captures each tool's `--help` for the docs site, so pages show the real
 //! options instead of copies.
 
@@ -68,39 +69,32 @@ fn generate(out: &mut Out) -> Result<()> {
 
     let cfg = Config::new().with_large_int("number");
     let mut recpart_ts = Declarations::new(&cfg);
-    recpart_ts.types::<recpart::InstallMode>();
-    recpart_ts.types::<recpart::DiskTarget>();
-    recpart_ts.types::<recpart::DiskInventory>();
-    recpart_ts.types::<recpart::DiskListResult>();
-    recpart_ts.types::<recpart::LayoutRequest>();
-    recpart_ts.types::<recpart::ResolvedLayout>();
-    recpart_ts.types::<recpart::types::Filesystem>();
-    recpart_ts.types::<recpart::types::PartitionTemplate>();
-    recpart_ts.types::<recpart::PartitionPlan>();
-    recpart_ts.types::<recpart::types::MountMapping>();
-    recpart_ts.types::<recpart::types::ModeContext>();
-    recpart_ts.types::<recpart::HandoffPayload>();
-    recpart_ts.types::<recpart::types::CommandRecord>();
-    recpart_ts.types::<recpart::ApplyResult>();
-    recpart_ts.types::<recpart::types::ErrorPayload>();
+    recpart_ts.types_from::<recpart::DiskListResult>();
+    recpart_ts.types_from::<recpart::PartitionPlan>();
+    recpart_ts.types_from::<recpart::ApplyResult>();
+    recpart_ts.types_from::<recpart::types::ErrorPayload>();
     recpart_ts.constant("PLAN_SCHEMA_VERSION", &recpart::types::PLAN_SCHEMA_VERSION)?;
     recpart_ts.constant("APPLY_SCHEMA_VERSION", &recpart::types::APPLY_SCHEMA_VERSION)?;
-    recpart_ts.constant("HANDOFF_SCHEMA_VERSION", &recpart::types::HANDOFF_SCHEMA_VERSION)?;
     recpart_ts.constant("ERROR_SCHEMA_VERSION", &recpart::types::ERROR_SCHEMA_VERSION)?;
     recpart_ts.constant("DISK_LIST_SCHEMA_VERSION", &recpart::types::DISK_LIST_SCHEMA_VERSION)?;
     recpart_ts.constant("CONFIRM_TOKEN", &recpart::types::CONFIRM_TOKEN)?;
-    recpart_ts.constant(
-        "INSTALL_MODES",
-        <recpart::InstallMode as clap::ValueEnum>::value_variants(),
-    )?;
-    let app_dir = |name: &str| distro_contract::tui_apps::find(&root, name).map(|app| app.dir);
-    recpart_ts.write(out, &app_dir("disk-plan")?.join("src/contract/recpart.ts"))?;
+    recpart_ts.value_enum::<recpart::InstallMode>("INSTALL_MODES", "INSTALL_MODE_HELP")?;
+    recpart_ts.constant("DEFAULT_INSTALL_MODE", &recpart::InstallMode::default())?;
+    recpart_ts.raw(RECPART_OUTPUT);
 
     let mut recab_ts = Declarations::new(&cfg);
-    recab_ts.types::<recab::Slot>();
-    recab_ts.types::<recab::Status>();
-    recab_ts.constant("SLOTS", <recab::Slot as clap::ValueEnum>::value_variants())?;
-    recab_ts.write(out, &app_dir("recab-tui")?.join("src/domain/contract.ts"))?;
+    recab_ts.types_from::<recab::Status>();
+    recab_ts.value_enum::<recab::Slot>("SLOTS", "SLOT_HELP")?;
+
+    // Each app gets the module of every tool its manifest says it runs.
+    let modules = [("recpart", &recpart_ts), ("recab", &recab_ts)];
+    for app in distro_contract::tui_apps::discover(&root)? {
+        for (tool, module) in &modules {
+            if app.tools.iter().any(|t| t == tool) {
+                module.write(out, &root, &app.dir.join(format!("src/generated/{tool}.ts")))?;
+            }
+        }
+    }
 
     write_tool_help(out, &root)?;
     Ok(())
@@ -152,9 +146,48 @@ fn write_schema<T: JsonSchema>(out: &mut Out, dir: &Path, name: &str) -> Result<
     out.emit(&dir.join(format!("{name}.schema.json")), &(json + "\n"))
 }
 
+/// recpart prints its result document on stdout and, on failure, an error document on
+/// stderr; this reads either, so callers never look at the streams themselves.
+const RECPART_OUTPUT: &str = r#"
+/** What a recpart run printed, read the one way recpart writes it. */
+export type RecpartOutput<T> =
+	| { kind: "ok"; value: T }
+	| { kind: "error"; error: ErrorPayload }
+	| { kind: "unreadable"; reason: string };
+
+export function readRecpartOutput<T extends { schema_version: number }>(
+	run: { exitCode: number | null; stdout: string; stderr: string },
+	schemaVersion: number,
+): RecpartOutput<T> {
+	const ok = run.exitCode === 0;
+	const text = ok ? run.stdout : run.stderr;
+	let value: { schema_version?: unknown } | null;
+	try {
+		value = JSON.parse(text);
+	} catch {
+		return { kind: "unreadable", reason: `recpart printed no JSON (${ok ? "stdout" : "stderr"}): ${text.trim().slice(0, 200)}` };
+	}
+	const expected = ok ? schemaVersion : ERROR_SCHEMA_VERSION;
+	if (!value || value.schema_version !== expected) {
+		return { kind: "unreadable", reason: `recpart printed schema ${String(value?.schema_version)}, expected ${expected}` };
+	}
+	return ok ? { kind: "ok", value: value as T } : { kind: "error", error: value as unknown as ErrorPayload };
+}
+"#;
+
 struct Declarations<'a> {
     cfg: &'a Config,
     text: String,
+    declared: std::collections::HashSet<std::any::TypeId>,
+}
+
+/// Declares a type after everything it refers to, once.
+struct Collect<'d, 'a>(&'d mut Declarations<'a>);
+
+impl ts_rs::TypeVisitor for Collect<'_, '_> {
+    fn visit<T: TS + 'static + ?Sized>(&mut self) {
+        self.0.types_from::<T>();
+    }
 }
 
 impl<'a> Declarations<'a> {
@@ -162,10 +195,16 @@ impl<'a> Declarations<'a> {
         Self {
             cfg,
             text: HEADER.to_string(),
+            declared: Default::default(),
         }
     }
 
-    fn types<T: TS>(&mut self) {
+    /// `T` and every type it refers to, dependencies first.
+    fn types_from<T: TS + 'static + ?Sized>(&mut self) {
+        if T::output_path().is_none() || !self.declared.insert(std::any::TypeId::of::<T>()) {
+            return;
+        }
+        T::visit_dependencies(&mut Collect(self));
         self.text.push_str(&format!("\nexport {}\n", T::decl(self.cfg)));
     }
 
@@ -176,7 +215,42 @@ impl<'a> Declarations<'a> {
         Ok(())
     }
 
-    fn write(&self, out: &mut Out, path: &Path) -> Result<()> {
-        out.emit(path, &self.text)
+    /// The enum's values, and each value's doc comment (its clap help) as `help`.
+    fn value_enum<E: clap::ValueEnum + Serialize>(&mut self, values: &str, help: &str) -> Result<()> {
+        self.constant(values, E::value_variants())?;
+        let mut docs = serde_json::Map::new();
+        for variant in E::value_variants() {
+            let value = variant.to_possible_value().context("hidden enum value")?;
+            let text = value.get_help().map(|h| h.to_string()).unwrap_or_default();
+            docs.insert(value.get_name().to_string(), text.into());
+        }
+        self.constant(help, &docs)
     }
+
+    fn raw(&mut self, text: &str) {
+        self.text.push_str(text);
+    }
+
+    /// Writes the module as the repo's formatter would leave it, so `gen --check` and
+    /// `format:check` agree on the same file.
+    fn write(&self, out: &mut Out, root: &Path, path: &Path) -> Result<()> {
+        out.emit(path, &format_ts(root, path, &self.text)?)
+    }
+}
+
+fn format_ts(root: &Path, path: &Path, text: &str) -> Result<String> {
+    use std::io::Write;
+    let mut child = std::process::Command::new(root.join("node_modules/.bin/oxfmt"))
+        .current_dir(root)
+        .arg(format!("--stdin-filepath={}", path.display()))
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .spawn()
+        .context("running oxfmt (bun install at the repo root)")?;
+    child.stdin.take().context("oxfmt stdin")?.write_all(text.as_bytes())?;
+    let output = child.wait_with_output()?;
+    if !output.status.success() {
+        bail!("oxfmt failed on {}", path.display());
+    }
+    Ok(String::from_utf8(output.stdout)?)
 }
