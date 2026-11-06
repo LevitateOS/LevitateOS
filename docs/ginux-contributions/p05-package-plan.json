@@ -1224,9 +1224,7 @@
       "packet": "G25",
       "purpose": "Vectored and chunked regular I/O (`88fa4749`, `7d556b4e`, `74835089`)",
       "dependencies": [
-        "G05",
-        "G09",
-        "G17"
+        "G17a"
       ],
       "source_commits": [
         "88fa4749cd357bb088e0bc8207f09fa49c97102f",
@@ -1235,9 +1233,51 @@
       ],
       "acceptance": "readv/writev bounds, short I/O, invalid buffers, offsets and partial effects; real APK/RPM and >1 MiB reads/writes complete without assuming pipes are regular files.",
       "planned_delivery": "one coherent change plus its generic docs and focused regression fixtures; split coupled responsibilities only as recorded by P04",
-      "status": "pending extraction and R01-R04 review",
+      "status": "ordinary source/clean preparation and separate self-review retained; full G25 partial: actual APK/RPM, security, native clamping policy, full CI and upstream independence pending",
       "artifact_directory": ".artifacts/ginux-contribution-preparation/G25",
-      "policy_hold": "native scalar clamping #178/#163 separated from owned vectors"
+      "policy_hold": "native scalar clamping #178/#163 separated from owned vectors",
+      "base": "94baebbec5e887ae659718c3f6162d08ca267b99",
+      "head": "9afd60cca140881288498fc21058b404814c08e4",
+      "tree": "1caf52f3f4d2cf5374de29991cd7c525491a6de9",
+      "changed_files": [
+        "README.md",
+        "crates/ginux-init/src/channel_hooks.rs",
+        "crates/ginux-init/src/fs_hooks.rs",
+        "crates/ginux-init/src/tracee_io.rs",
+        "scripts/test-launch-storage.py",
+        "scripts/test-launch-pipes.py",
+        "tests/fixtures/launch-storage-fixture.c",
+        "tests/fixtures/launch-pipe-fixture.c"
+      ],
+      "standalone": false,
+      "patch_sha256": "f93ab12889e43712165ffc15aa4a3461bd6000e0c523a107a7e42d02f53823f0",
+      "deferred_joins": [
+        "G08 sockets/G07 threads",
+        "actual APK/RPM at F02/F03"
+      ],
+      "held_source": [
+        "74835089 native scalar clamping under #178/#163"
+      ],
+      "unit_tests": 89,
+      "vfs_tests": 31,
+      "clean_matched_paths": 171,
+      "review": "separate whole-diff self-review; no independent or adversarial acceptance",
+      "remote_ci": "not run",
+      "security_handoff": "daybreakblue-handoff.md",
+      "source_binary_sha256": "8602ec24b9692dec7a59adf405610ffb3a12afbf255ab11e7c88a6a0c59c229c",
+      "clean_binary_sha256": "8602ec24b9692dec7a59adf405610ffb3a12afbf255ab11e7c88a6a0c59c229c",
+      "fixture_sha256": {
+        "launch-storage-fixture": "6c16b2f946ee98da95cd994ca895aa1b862cfc51759e360f913d25c9af1a3c5e",
+        "launch-pipe-fixture": "40e7ac5d957dee5abc2abc920aa9a8a9b9e45765046d07b03db645e93a3e98f1",
+        "launch-directory-fixture": "c07d2fe17d870fceb7237cb65fa4962e33aa4f454d0aaa4861440e2760e761e8"
+      },
+      "held_dependencies": [
+        "G07 shared-argument security"
+      ],
+      "consumer_acceptance": "actual APK/RPM on final combined capabilities required at F02/F03; this packet remains partial",
+      "native_policy": "74835089 descriptors/fd fixture hunks excluded and held under #178/#163; no native clamp imported",
+      "evidence": "g25-review.md",
+      "source_patch": "patches/G25.patch"
     },
     {
       "packet": "G26",

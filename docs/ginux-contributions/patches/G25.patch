@@ -1,0 +1,473 @@
+From 9afd60cca140881288498fc21058b404814c08e4 Mon Sep 17 00:00:00 2001
+From: vince <vincepaul.liem@gmail.com>
+Date: Fri, 6 Nov 2026 17:18:30 +0100
+Subject: [PATCH] feat(init): support bounded owned vectors and chunked writes
+
+Use one bounded iovec snapshot for owned files and pipes, retaining pipe
+atomicity and strict tracee copies. Process regular writes and pwrites in
+4 KiB scratch chunks up to 1 MiB and report only committed progress.
+Keep native transfer policy unchanged.
+
+Signed-off-by: vince <vincepaul.liem@gmail.com>
+---
+ README.md                               | 12 +++--
+ crates/ginux-init/src/channel_hooks.rs  | 26 ++++++----
+ crates/ginux-init/src/fs_hooks.rs       | 65 ++++++++++++++++++++++---
+ crates/ginux-init/src/tracee_io.rs      | 62 +++++++++++++++++++++++
+ scripts/test-launch-pipes.py            | 13 +++--
+ scripts/test-launch-storage.py          |  4 +-
+ tests/fixtures/launch-pipe-fixture.c    | 36 ++++++++++++++
+ tests/fixtures/launch-storage-fixture.c | 60 +++++++++++++++++++++++
+ 8 files changed, 253 insertions(+), 25 deletions(-)
+
+diff --git a/README.md b/README.md
+index 62318b23..47503fef 100644
+--- a/README.md
++++ b/README.md
+@@ -248,9 +248,15 @@ Component-wise image-link traversal preserves assignment
+ precedence, missing components and non-directory errors. Native image operations
+ use a temporary canonical path below the stopped workload's stack; an unavailable
+ scratch area or overlapping output buffer returns EFAULT. This is a bounded
+-storage adapter, not a complete unified image/overlay filesystem. IO is bounded
+-to 4096 bytes per call. Metadata capacity remains 32 objects (including seeded
+-directories) and 64 independently opened files. Bytes grow on demand in anonymous
++storage adapter, not a complete unified image/overlay filesystem. Regular writes
++and pwrites process at most 1 MiB per call in 4 KiB scratch chunks, returning
++only committed bytes after a short transfer or error. Reads and readv/writev
++remain bounded to 4096 bytes per call; callers must handle short transfers.
++Owned files and pipes accept at most 16 iovecs, including empty entries, with a
++combined length no greater than the signed transfer-result range. Pipe writes
++use the combined vector length for atomicity and retain their existing bounds.
++Native image/console transfer policy is unchanged. Metadata capacity remains
++32 objects (including seeded directories) and 64 independently opened files. Bytes grow on demand in anonymous
+ supervisor mappings. Total mapped capacity, including page rounding and growth
+ reserve, is bounded by `[resources].memory_mib`, shared across files instead of
+ a 64 KiB per-file ceiling. This accounts for writable backing, not total process
+diff --git a/crates/ginux-init/src/channel_hooks.rs b/crates/ginux-init/src/channel_hooks.rs
+index 639cd66c..bd0eef3c 100644
+--- a/crates/ginux-init/src/channel_hooks.rs
++++ b/crates/ginux-init/src/channel_hooks.rs
+@@ -19,7 +19,7 @@ pub fn claim(syscall: u64, rdi: u64, rsi: u64, rdx: u64) -> Option<i64> {
+ }
+ 
+ use crate::supervisor::{syscall2, UserRegs, SYS_KILL};
+-use crate::tracee_io::{copy_memory, read_path, write_stat, Stat};
++use crate::tracee_io::{read_path, write_stat, Stat};
+ 
+ pub const PIPE_FD_BASE: u32 = 0x2000_0000;
+ const FDS: usize = 2 * PIPES;
+@@ -107,7 +107,7 @@ impl LaunchChannels {
+             Ok(entry) => entry,
+             Err(error) => return Some(ChannelResult::Ready(error)),
+         };
+-        if matches!(r.orig_rax, 0 | 1) {
++        if matches!(r.orig_rax, 0 | 1 | 19 | 20) {
+             return Some(match self.io(pid, slot, entry, r) {
+                 Ok(result) => result,
+                 Err(error) => ChannelResult::Ready(error),
+@@ -226,11 +226,17 @@ impl LaunchChannels {
+         entry: PipeFd,
+         r: &UserRegs,
+     ) -> Result<ChannelResult, i64> {
+-        let writing = r.orig_rax == 1;
++        let writing = matches!(r.orig_rax, 1 | 20);
++        let vectors = if matches!(r.orig_rax, 19 | 20) {
++            crate::tracee_io::IoVectors::read(pid, r.rsi, r.rdx)?
++        } else {
++            crate::tracee_io::IoVectors::single(r.rsi, r.rdx)
++        };
++        let requested = vectors.length;
+         if writing != entry.write {
+             return Err(-9);
+         }
+-        if r.rdx == 0 {
++        if requested == 0 {
+             return Ok(ChannelResult::Ready(0));
+         }
+         let nonblock = self.flags(entry) & NONBLOCK != 0;
+@@ -245,16 +251,16 @@ impl LaunchChannels {
+                 return Err(-32);
+             }
+             let available = CAPACITY - p.len;
+-            let atomic = r.rdx <= IO_SIZE as u64;
+-            if available == 0 || (atomic && available < r.rdx as usize) {
++            let atomic = requested <= IO_SIZE;
++            if available == 0 || (atomic && available < requested) {
+                 return Ok(if nonblock {
+                     ChannelResult::Ready(-11)
+                 } else {
+                     ChannelResult::Blocked { fd }
+                 });
+             }
+-            let count = r.rdx.min(IO_SIZE as u64).min(available as u64) as usize;
+-            let copied = copy_memory(pid, r.rsi, &mut buffer[..count], false)? as usize;
++            let count = requested.min(IO_SIZE).min(available);
++            let copied = vectors.copy(pid, &mut buffer[..count], false)?;
+             if atomic && copied != count {
+                 return Err(-14);
+             }
+@@ -273,11 +279,11 @@ impl LaunchChannels {
+                     ChannelResult::Blocked { fd }
+                 });
+             }
+-            let count = r.rdx.min(IO_SIZE as u64).min(p.len as u64) as usize;
++            let count = requested.min(IO_SIZE).min(p.len);
+             for (i, byte) in buffer[..count].iter_mut().enumerate() {
+                 *byte = p.data[(p.head + i) % CAPACITY];
+             }
+-            let copied = copy_memory(pid, r.rsi, &mut buffer[..count], true)? as usize;
++            let copied = vectors.copy(pid, &mut buffer[..count], true)?;
+             p.head = (p.head + copied) % CAPACITY;
+             p.len -= copied;
+             Ok(ChannelResult::Ready(copied as i64))
+diff --git a/crates/ginux-init/src/fs_hooks.rs b/crates/ginux-init/src/fs_hooks.rs
+index 59053aff..3c4e0242 100644
+--- a/crates/ginux-init/src/fs_hooks.rs
++++ b/crates/ginux-init/src/fs_hooks.rs
+@@ -623,6 +623,7 @@ impl LaunchFs {
+             0 => self.read(pid, fd, r.rsi, r.rdx, None),
+             17 => self.read(pid, fd, r.rsi, r.rdx, Some(r.r10 as i64)),
+             1 => self.write(pid, fd, r.rsi, r.rdx, None),
++            19 | 20 => self.vector_io(pid, fd, r),
+             18 => self.write(pid, fd, r.rsi, r.rdx, Some(r.r10 as i64)),
+             3 => self.fs.close(fd).map(|_| 0).map_err(errno),
+             5 => self
+@@ -716,6 +717,31 @@ impl LaunchFs {
+         result
+     }
+ 
++    fn vector_io(&mut self, pid: usize, fd: i32, r: &UserRegs) -> Result<i64, i64> {
++        let vectors = crate::tracee_io::IoVectors::read(pid, r.rsi, r.rdx)?;
++        let mut bytes = [0u8; IO_SIZE];
++        let count = vectors.length.min(IO_SIZE);
++        if r.orig_rax == 20 {
++            let copied = vectors.copy(pid, &mut bytes[..count], false)?;
++            self.fs
++                .write(fd, &bytes[..copied])
++                .map(|n| n as i64)
++                .map_err(errno)
++        } else {
++            let offset = self.fs.seek(fd, 0, 1).map_err(errno)?;
++            let read = self.fs.read(fd, &mut bytes[..count]).map_err(errno)?;
++            let result = vectors.copy(pid, &mut bytes[..read], true);
++            self.fs
++                .seek(
++                    fd,
++                    (offset + result.as_ref().copied().unwrap_or(0) as u64) as i64,
++                    0,
++                )
++                .map_err(errno)?;
++            result.map(|n| n as i64)
++        }
++    }
++
+     fn write(
+         &mut self,
+         pid: usize,
+@@ -725,18 +751,41 @@ impl LaunchFs {
+         offset: Option<i64>,
+     ) -> Result<i64, i64> {
+         self.fs.fstat(fd).map_err(errno)?;
+-        let mut buffer = [0u8; IO_SIZE];
+-        let count = length.min(IO_SIZE as u64) as usize;
+-        let copied = copy_memory(pid, address, &mut buffer[..count], false)? as usize;
+         let previous = self.fs.seek(fd, 0, 1).map_err(errno)?;
+         if let Some(offset) = offset {
+             self.fs.seek(fd, offset, 0).map_err(errno)?;
+         }
+-        let result = self
+-            .fs
+-            .write(fd, &buffer[..copied])
+-            .map(|n| n as i64)
+-            .map_err(errno);
++        let result = (|| {
++            let mut buffer = [0u8; IO_SIZE];
++            let limit = length.min(1024 * 1024) as usize;
++            if limit == 0 {
++                return self.fs.write(fd, &[]).map(|n| n as i64).map_err(errno);
++            }
++            let mut written = 0usize;
++            while written < limit {
++                let count = (limit - written).min(IO_SIZE);
++                let copy = address
++                    .checked_add(written as u64)
++                    .ok_or(-14)
++                    .and_then(|address| copy_memory(pid, address, &mut buffer[..count], false));
++                let copied = match copy {
++                    Ok(n) => n as usize,
++                    Err(_) if written != 0 => break,
++                    Err(error) => return Err(error),
++                };
++                match self.fs.write(fd, &buffer[..copied]).map_err(errno) {
++                    Ok(n) => {
++                        written += n;
++                        if n != copied || copied != count {
++                            break;
++                        }
++                    }
++                    Err(_) if written != 0 => break,
++                    Err(error) => return Err(error),
++                }
++            }
++            Ok(written as i64)
++        })();
+         if offset.is_some() {
+             self.fs.seek(fd, previous as i64, 0).map_err(errno)?;
+         }
+diff --git a/crates/ginux-init/src/tracee_io.rs b/crates/ginux-init/src/tracee_io.rs
+index 548cc955..7d04a835 100644
+--- a/crates/ginux-init/src/tracee_io.rs
++++ b/crates/ginux-init/src/tracee_io.rs
+@@ -209,3 +209,65 @@ pub fn store_u32(pid: usize, address: u64, value: u32) -> Result<(), i64> {
+     }
+     Ok(())
+ }
++
++/// Bounded scatter/gather layout shared by owned byte-stream backends.
++pub struct IoVectors {
++    entries: [(u64, usize); 16],
++    pub length: usize,
++}
++impl IoVectors {
++    pub fn single(address: u64, length: u64) -> Self {
++        let mut entries = [(0, 0); 16];
++        entries[0] = (address, length as usize);
++        Self {
++            entries,
++            length: length as usize,
++        }
++    }
++    pub fn read(pid: usize, address: u64, count: u64) -> Result<Self, i64> {
++        if count > 16 {
++            return Err(-22);
++        }
++        let mut output = Self::single(0, 0);
++        let mut bytes = [0u8; 16 * 16];
++        let size = count as usize * 16;
++        if size != 0 && copy_memory(pid, address, &mut bytes[..size], false)? != size as i64 {
++            return Err(-14);
++        }
++        for (index, entry) in output.entries[..count as usize].iter_mut().enumerate() {
++            let address = u64::from_ne_bytes(bytes[index * 16..index * 16 + 8].try_into().unwrap());
++            let length =
++                u64::from_ne_bytes(bytes[index * 16 + 8..index * 16 + 16].try_into().unwrap())
++                    as usize;
++            output.length = output.length.checked_add(length).ok_or(-22)?;
++            if output.length > isize::MAX as usize {
++                return Err(-22);
++            }
++            *entry = (address, length);
++        }
++        Ok(output)
++    }
++    pub fn copy(&self, pid: usize, buffer: &mut [u8], to_tracee: bool) -> Result<usize, i64> {
++        let mut copied = 0;
++        for (address, length) in self.entries {
++            let count = length.min(buffer.len() - copied);
++            if count == 0 {
++                continue;
++            }
++            match copy_memory(pid, address, &mut buffer[copied..copied + count], to_tracee) {
++                Ok(n) => {
++                    copied += n as usize;
++                    if n as usize != count {
++                        break;
++                    }
++                }
++                Err(error) if copied == 0 => return Err(error),
++                Err(_) => break,
++            }
++            if copied == buffer.len() {
++                break;
++            }
++        }
++        Ok(copied)
++    }
++}
+diff --git a/scripts/test-launch-pipes.py b/scripts/test-launch-pipes.py
+index d24605db..6c455146 100644
+--- a/scripts/test-launch-pipes.py
++++ b/scripts/test-launch-pipes.py
+@@ -12,9 +12,9 @@ import time
+ 
+ 
+ def main():
+-    if len(sys.argv) != 3 or os.geteuid() != 0:
+-        sys.exit('usage (as root): test-launch-pipes.py <ginux> <pipe-fixture>')
+-    binary, fixture = [str(Path(p).resolve()) for p in sys.argv[1:]]
++    if len(sys.argv) < 3 or os.geteuid() != 0:
++        sys.exit('usage (as root): test-launch-pipes.py <ginux> <pipe-fixture> [ordinary-vectors]')
++    binary, fixture = [str(Path(p).resolve()) for p in sys.argv[1:3]]
+     template = (Path(__file__).resolve().parent.parent / 'config/domain-gate5.toml').read_text()
+     with tempfile.TemporaryDirectory(prefix='ginux-pipes-') as directory:
+         work = Path(directory)
+@@ -74,6 +74,13 @@ def main():
+                 assert stdout == b'owned-pipes: PASS\n', stdout
+             assert record['generation'] is None
+ 
++        if sys.argv[3:]:
++            if sys.argv[3:] != ['ordinary-vectors']:
++                sys.exit('unknown selected pipe scenario')
++            invoke(['vectors'])
++            print('PASS launch pipes: ordinary vectors')
++            return
++        invoke(['vectors'])
+         invoke()
+         invoke(assigned=True)
+         invoke(['sigpipe'], sig=signal.SIGPIPE)
+diff --git a/scripts/test-launch-storage.py b/scripts/test-launch-storage.py
+index 831f8257..12e36d27 100644
+--- a/scripts/test-launch-storage.py
++++ b/scripts/test-launch-storage.py
+@@ -54,7 +54,7 @@ def main():
+ 
+         if sys.argv[3:]:
+             for mode in sys.argv[3:]:
+-                if mode not in ('growth', 'bounds', 'quota', 'positioned', 'view-probes'):
++                if mode not in ('growth', 'bounds', 'quota', 'positioned', 'ordinary-vectors', 'ordinary-large-io', 'view-probes'):
+                     sys.exit('unknown selected storage scenario')
+                 invoke(['memory:/work', 'memory:/work/build', 'memory:/out'], [mode],
+                        memory=16 if mode == 'bounds' else 256)
+@@ -72,6 +72,8 @@ def main():
+         invoke(['memory:/work', 'memory:/work/build', 'memory:/out'], ['quota'])
+         invoke(['memory:/work', 'memory:/work/build', 'memory:/out'], ['bounds'], memory=16)
+         invoke(['memory:/work', 'memory:/work/build', 'memory:/out'], ['positioned'])
++        for mode in ['ordinary-vectors', 'ordinary-large-io']:
++            invoke(['memory:/work', 'memory:/work/build', 'memory:/out'], [mode])
+         invoke([], ['no-storage'])
+         for assignment in ['disk0', 'memory:/', 'memory:/proc', 'memory:/sys/x', 'memory:/dev',
+                            'memory:/bin', 'memory:/work/../out', 'memory:/work/', 'memory:work']:
+diff --git a/tests/fixtures/launch-pipe-fixture.c b/tests/fixtures/launch-pipe-fixture.c
+index 7fd408e0..84e4eb71 100644
+--- a/tests/fixtures/launch-pipe-fixture.c
++++ b/tests/fixtures/launch-pipe-fixture.c
+@@ -16,11 +16,47 @@ static const char immutable[] = "read-only guest buffer";
+ static char buffer[65536];
+ static char data[65536];
+ static char meta[256] __attribute__((aligned(8)));
++static long ordinary_vectors(void) {
++    int pair[2];word vectors[32]={0};
++    CHECK(DO(293,pair,04000,0)==0,90);
++    CHECK(DO(19,pair[0],vectors,0)==0 && DO(20,pair[1],vectors,0)==0,91);
++    vectors[0]=(word)"ab";vectors[1]=2;vectors[4]=(word)"cde";vectors[5]=3;
++    CHECK(DO(20,pair[1],vectors,3)==5,92);
++    vectors[0]=(word)buffer;vectors[1]=1;vectors[4]=(word)(buffer+1);vectors[5]=8;
++    CHECK(DO(19,pair[0],vectors,3)==5 && buffer[0]=='a' && buffer[4]=='e',93);
++    for(word i=0;i<16;++i) { data[i]=(char)('A'+i);vectors[2*i]=(word)(data+i);vectors[2*i+1]=1; }
++    CHECK(DO(20,pair[1],vectors,16)==16 && DO(20,pair[1],vectors,17)==-22,94);
++    for(word i=0;i<16;++i) vectors[2*i]=(word)(buffer+i);
++    CHECK(DO(19,pair[0],vectors,16)==16,95);
++    for(word i=0;i<16;++i) CHECK(buffer[i]==data[i],96);
++    for(word i=0;i<65536;++i) data[i]=(char)(i%251);
++    for(word i=0;i<65536-4096;i+=4096) CHECK(DO(1,pair[1],data+i,4096)==4096,97);
++    CHECK(DO(1,pair[1],data,4095)==4095,98);
++    vectors[0]=(word)"x";vectors[1]=1;vectors[2]=(word)"y";vectors[3]=1;
++    CHECK(DO(20,pair[1],vectors,2)==-11 && DO(0,pair[0],buffer,1)==1,99);
++    CHECK(DO(20,pair[1],vectors,2)==2,100);
++    for(word i=0;i<65536;i+=4096) CHECK(DO(0,pair[0],buffer,4096)==4096,101);
++    vectors[0]=(word)data;vectors[1]=4090;vectors[2]=(word)(data+4090);vectors[3]=4102;
++    CHECK(DO(20,pair[1],vectors,2)==4096,102);
++    vectors[0]=(word)buffer;vectors[1]=4090;vectors[2]=(word)(buffer+4090);vectors[3]=4102;
++    CHECK(DO(19,pair[0],vectors,2)==4096,103);
++    for(word i=0;i<4096;++i) CHECK(buffer[i]==data[i],104);
++    CHECK(DO(0,pair[0],buffer,1)==-11,105);
++    long alias=DO(32,pair[1],0,0);CHECK(alias>=3 && DO(3,pair[1],0,0)==0,106);
++    vectors[0]=(word)"bye";vectors[1]=3;
++    CHECK(DO(20,alias,vectors,1)==3 && DO(3,alias,0,0)==0,107);
++    vectors[0]=(word)buffer;vectors[1]=16;
++    CHECK(DO(19,pair[0],vectors,1)==3 && buffer[0]=='b' && buffer[2]=='e',108);
++    CHECK(DO(19,pair[0],vectors,1)==0 && DO(3,pair[0],0,0)==0,109);
++    DO(1,1,"owned-pipes: PASS\n",18);
++    return 0;
++}
+ long pipe_main(word *stack)
+ {
+     word argc = *stack;
+     char **argv = (char **)(stack + 1);
+     int pair[2];
++    if (argc>1 && argv[1][0]=='v') return ordinary_vectors();
+     if (argc > 1 && argv[1][0] == 'b') {
+         CHECK(DO(293,pair,0,0) == 0, 10);
+         return DO(0,pair[0],buffer,1) == -11 ? 11 : 12;
+diff --git a/tests/fixtures/launch-storage-fixture.c b/tests/fixtures/launch-storage-fixture.c
+index 5be055cf..eb5d6a64 100644
+--- a/tests/fixtures/launch-storage-fixture.c
++++ b/tests/fixtures/launch-storage-fixture.c
+@@ -43,10 +43,66 @@ static long positioned(void) {
+     CHECK(call(17,fd,(word)output,1,8193,0,0)==1 && output[0]=='!' && DO(3,fd,0,0)==0,172);
+     return 0;
+ }
++/* Valid, stable buffers exercise owned I/O without relying on native transfers. */
++static char large_io[2*1024*1024+37];
++static long ordinary_vectors(void) {
++    long fd=DO(2,"/out/vectors",0102,0600); CHECK(fd>=3,180);
++    word vectors[32]={0};
++    CHECK(DO(20,fd,vectors,0)==0 && DO(19,fd,vectors,0)==0,181);
++    vectors[0]=(word)"ab";vectors[1]=2;vectors[2]=0;vectors[3]=0;
++    vectors[4]=(word)"cde";vectors[5]=3;
++    CHECK(DO(20,fd,vectors,3)==5 && DO(8,fd,0,1)==5,182);
++    long alias=DO(32,fd,0,0);CHECK(alias>=3 && DO(8,alias,0,0)==0,183);
++    vectors[0]=(word)output;vectors[1]=1;vectors[4]=(word)(output+1);vectors[5]=8;
++    CHECK(DO(19,alias,vectors,3)==5 && DO(8,fd,0,1)==5,184);
++    CHECK(output[0]=='a' && output[1]=='b' && output[4]=='e' && DO(19,fd,vectors,3)==0,185);
++    for(word i=0;i<16;++i) { data[i]=(char)('A'+i);vectors[2*i]=(word)(data+i);vectors[2*i+1]=1; }
++    CHECK(DO(20,fd,vectors,16)==16 && DO(8,fd,5,0)==5,186);
++    for(word i=0;i<16;++i) vectors[2*i]=(word)(output+i);
++    CHECK(DO(19,fd,vectors,16)==16,187);
++    for(word i=0;i<16;++i) CHECK(output[i]==data[i],188);
++    CHECK(DO(20,fd,vectors,17)==-22 && DO(8,fd,0,1)==21,189);
++    for(word i=0;i<8192;++i) data[i]=(char)(i%251);
++    vectors[0]=(word)data;vectors[1]=4090;vectors[2]=(word)(data+4090);vectors[3]=4102;
++    CHECK(DO(77,fd,0,0)==0 && DO(8,fd,0,0)==0 && DO(20,fd,vectors,2)==4096,190);
++    CHECK(DO(5,fd,meta,0)==0 && *(word *)(meta+48)==4096 && DO(8,alias,0,1)==4096,191);
++    CHECK(DO(8,fd,0,0)==0,192);
++    vectors[0]=(word)output;vectors[1]=4090;vectors[2]=(word)(output+4090);vectors[3]=4102;
++    CHECK(DO(19,alias,vectors,2)==4096 && DO(8,fd,0,1)==4096,193);
++    for(word i=0;i<4096;++i) CHECK(output[i]==data[i],194);
++    CHECK(DO(3,fd,0,0)==0 && DO(3,alias,0,0)==0,195);
++    return 0;
++}
++static long ordinary_large_io(void) {
++    const word mib=1024*1024;
++    for(word i=0;i<sizeof large_io;++i) large_io[i]=(char)(i%251);
++    long fd=DO(2,"/out/large-io",0102,0600);CHECK(fd>=3,196);
++    CHECK(DO(1,fd,large_io,sizeof large_io)==mib && DO(8,fd,0,1)==mib,197);
++    CHECK(DO(1,fd,large_io+mib,sizeof large_io-mib)==mib,198);
++    CHECK(DO(1,fd,large_io+2*mib,37)==37 && DO(5,fd,meta,0)==0,199);
++    CHECK(*(word *)(meta+48)==sizeof large_io && DO(8,fd,0,0)==0,200);
++    for(word i=0;i<sizeof large_io;++i) large_io[i]=0;
++    word done=0;
++    while(done<sizeof large_io) {
++        long n=DO(0,fd,large_io+done,sizeof large_io-done);
++        CHECK(n>0 && n<=4096,201);
++        for(long i=0;i<n;++i) CHECK(large_io[done+i]==(char)((done+i)%251),202);
++        done+=(word)n;
++    }
++    CHECK(DO(0,fd,output,sizeof output)==0,203);
++    long alias=DO(32,fd,0,0);CHECK(alias>=3 && DO(8,fd,17,0)==17,204);
++    CHECK(call(18,alias,(word)large_io,sizeof large_io,3*mib,0,0)==mib && DO(8,fd,0,1)==17,205);
++    CHECK(call(17,fd,(word)output,4096,4*mib-4096,0,0)==4096 && DO(8,alias,0,1)==17,206);
++    for(word i=0;i<4096;++i) CHECK(output[i]==large_io[mib-4096+i],207);
++    CHECK(DO(3,fd,0,0)==0 && DO(3,alias,0,0)==0,208);
++    return 0;
++}
+ long storage_main(word *stack)
+ {
+     word argc = *stack;
+     char **argv = (char **)(stack + 1);
++    if(argc>1 && equal(argv[1],"ordinary-vectors")) return ordinary_vectors();
++    if(argc>1 && equal(argv[1],"ordinary-large-io")) return ordinary_large_io();
+     if(argc>1 && equal(argv[1],"positioned")) return positioned();
+     if (argc > 1 && argv[1][0] == 'v') {
+         long fd=DO(2,"/work/probe",0102|0400,0600);
+@@ -172,6 +228,10 @@ long storage_main(word *stack)
+         const word mib=1024*1024;
+         long a=DO(2,"/out/a",0102,0600), b=DO(2,"/out/b",0102,0600), c=DO(2,"/out/c",0102,0600);
+         CHECK(a>=3 && b>=3 && c>=3,75);
++        CHECK(DO(77,a,16*mib-4096,0)==0 && DO(8,a,16*mib-4096,0)==16*mib-4096,209);
++        CHECK(DO(1,a,data,8192)==4096 && DO(1,a,data,1)==-28,210);
++        CHECK(DO(5,a,meta,0)==0 && *(word *)(meta+48)==16*mib && DO(8,a,0,1)==16*mib,211);
++        CHECK(DO(77,a,0,0)==0 && DO(8,a,0,0)==0,212);
+         CHECK(DO(77,a,12*mib,0)==0 && DO(77,b,8*mib,0)==-28,76);
+         CHECK(DO(5,b,meta,0)==0 && *(word *)(meta+48)==0,77);
+         CHECK(DO(77,a,4*mib,0)==0 && DO(77,b,8*mib,0)==0,78);

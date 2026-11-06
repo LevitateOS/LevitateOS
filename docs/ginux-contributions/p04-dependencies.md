@@ -70,3 +70,11 @@ Current plan does not require making31 PRs. Freeze coherent contributions in P05
 and revise their boundaries when extraction reveals real coupling. No arbitrary
 line-count target, new workflow framework, compatibility adapter, extra kernel
 build or upstream-policy file is part of this work.
+
+G25 ordinary extraction uses only G17a94baebbe (includes G09/G05) as capability
+base: owned vectors and regular write chunks need no mapping/private-budget,
+archive/time/lock/thread/socket owner. Exact owned candidate9afd60cc and clean
+replay pass89 units and ordinary vectors/large-file/offset/quota/pipe controls.
+74835089 native descriptor clamping stays held under #178/#163, with its FD
+fixture hunks, rather than being hidden in this packet. G08 channel adaptation,
+G07 security and actual APK/RPM closure still require F02/F03; G25 remains partial.

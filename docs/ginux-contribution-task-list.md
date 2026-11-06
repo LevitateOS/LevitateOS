@@ -604,15 +604,23 @@ calls also pass; native-realtime/#179 policy, security/full CI and upstream inde
 The absent network Stat field join is assigned to G29. G23's actual application/
 thread closure remains pending for F02/F03; nothing was published.
 
-Exact next task: **G25 — vectored and chunked regular I/O**.
-Inspect88fa4749/7d556b4e/74835089 against current public descriptor, tracee-copy and
-owned regular-file/channel owners. Separate useful owned vector/chunk handling
-from native scalar clamping policy held by #178/#163; do not import that policy
-or treat pipe semantics as regular-file behavior. Include ordinary real vectors,
-short transfers/offsets and large regular I/O, then actual APK/RPM consumer paths
-when their dependencies permit. Record protected/mutable iovecs/buffers, partial
-faults, authority and races for DaybreakBlue. Preserve all pending G23/G24/F02/F03
-requirements. No publication or maintainer messages before F04.
+G25 owned-vector/chunk source preparation is retained at `9afd60cc` directly
+on G17a94baebbe. [Review/evidence](ginux-contributions/g25-review.md) records89
+units,171-path strict replay and vectors/short transfers/alias offsets, complete
+2 MiB+37 byte-checked payload, positioned writes, quota prefixes and pipe atomicity/
+EOF plus existing controls passing in source/clean. Final large-read fixture
+allocates its entire request. Native descriptor clamp74835089 is excluded and
+policy-held under #178/#163. The full task remains partial: actual APK/RPM,
+G07/security, G08 channels, full CI and upstream independence remain F02/F03 or
+publication prerequisites; fixtures do not replace application acceptance.
+
+Exact next task: **G26 — explicit inherited process resource limits**.
+Inspect0c571cbb against current config validation, native child setup and existing
+task lifecycle. Separate useful per-process limits from held thread/policy scope;
+state virtual AS and allowed CPU subset accurately, without aggregate RSS/time
+claims. Use only ordinary bounded allocation/affinity/inheritance checks locally.
+Record boundary/authority/hostile exhaustion/race probes for DaybreakBlue. Preserve
+all pending G23–G25/F02/F03 acceptance. No publication or maintainer messages before F04.
 
 Active skill: `hdae-development`, discovered at
 `/home/vince/.codex/worktrees/ginux-pr-combination-check/ginux/.agents/skills/hdae-development/SKILL.md`.

@@ -508,3 +508,20 @@ NOW/null-times checks also pass. Clock-boundary/failure and invalid/protected/
 mutable inputs, authority/races, unrepresentable archive times
 and conflicting alias timestamps remain unrun. No cloud dispatch or security
 acceptance; [review/evidence](g24-review.md).
+
+## G25 — vectors and chunked regular I/O (partial)
+
+Exact retained ordinary head `9afd60cca140881288498fc21058b404814c08e4` on G17a `94baebbec5e887ae659718c3f6162d08ca267b99`.
+89 routine units and selected ordinary source/clean vectors, complete2 MiB+37
+payload, offset/alias, quota-prefix and nonblocking pipe atomicity/EOF checks pass.
+Native scalar clamp74835089 remains policy-held and absent; actual APK/RPM is
+still F02/F03 consumer work, not established by these small fixtures.
+
+DaybreakBlue must validate protected/mutable iovec metadata and payloads, faults
+inside and between vector/chunk boundaries, short-copy/error prefix accounting,
+aggregate/address overflow, read-only destinations, FD/inode authority and reused
+slots, cancellation and blocked retry with changing layouts, shared-buffer/thread
+races, append/offset/close ordering and failure rollback. Preserve existing full
+pointer/copy tests and required CI; no adversarial probes were run here and no
+cloud agent was dispatched. G07's shared-argument hold remains. Source self-review
+is not security acceptance; [review/evidence](g25-review.md).
