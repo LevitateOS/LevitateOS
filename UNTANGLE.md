@@ -1215,7 +1215,10 @@ Commits land on the checked-out branches (superproject `master`, submodules `cod
   - Verified: `G` lands on each page's last line (installation-disk, faq, helpers-overview, cli-reference, variants); snapshot changes limited to tables (cells wrap; the divider spans the columns only).
   - Behaviour changes on purpose: a selected command shows `▸` instead of `$` and no longer grows a `[COPY]` suffix (the status bar says Enter copies), so selecting never moves the layout.
   - Found, not fixed here (logged under Problems as N001): docs-content's highlighted lines end a `\`-continued line with `\[[/]]`, which the markup grammar reads as an escaped `[[`, so `[[/]]` shows in code blocks (also before this fix).
-- [ ] F13 — Apps get distro identity from their launcher, and install-docs fails fast.
+- [x] F13 — Apps get distro identity from their launcher; install-docs fails fast. tui `c934d87`. install-docs: `src/docs.ts` replaces `adapters/`, `domain/` and `app/`; `--title` (default "Docs") and `--slug` (default first page) come from the launcher; unknown `--slug` exits 2. disk-plan: the mode page's "default" follows the `--mode` it was launched with; the LevitateOS-specific advice is gone.
+  - Behaviour changes on purpose: without `--slug` the first nav page opens (was the profile's "installation"); the page list is titled by `--title` ("Installation Docs" was hard-coded); clipboard copies go through Ink's stdout and the note says they were sent via OSC 52 (success can't be detected).
+  - Until F19: the live ISO still launches `docs-tui --slug installation` without `--title`, so it shows "Docs".
+  - The mode cards themselves (C006/C007, still `cyan`/`gray` borders) are rewritten in F15.
 - [ ] F14 — Facts owned by recpart and recab reach the TUIs only through `cargo xtask gen`.
 - [ ] F15 — disk-plan as an explicit flow graph, with IO kept apart from pages.
 - [ ] F16 — recab TUI: results stay visible, and status is a separate panel.
