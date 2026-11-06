@@ -268,9 +268,6 @@ pub struct RunArgs {
     /// Boot, check that it came up (and that SSH logs in, with --ssh), then stop. Needs no terminal.
     #[arg(long)]
     pub no_shell: bool,
-    /// Verbose install UX logging on the serial console.
-    #[arg(long)]
-    pub verbose: bool,
     #[command(flatten)]
     pub boot: BootArgs,
     /// Host port forwarded to the guest's SSH (with --ssh).

@@ -1,9 +1,12 @@
 schema_version = 6
 
-# The live ISO's install screen: this shell beside the install docs.
+# The live ISO's install screen: this shell beside the install docs. getty
+# starts it on each console listed; the serial console runs it only when the
+# boot asks for it (the INSTALL_UX_SERIAL boot-injection key).
 [install_ux]
+consoles = ["tty1", "ttyS0"]
 shell = "/bin/bash"
-docs = { tui_app = "install-docs" }
+docs = { tui_app = "install-docs", page = "installation" }
 
 [ring2_products.rootfs_base]
 logical_name = "product.rootfs.base"
@@ -203,8 +206,8 @@ destination = "usr/bin/recstrap"
 [[ring2_runtime_profiles.live_tools_ux.actions]]
 kind = "rootfs_workspace_binary"
 package = "install-split-pane"
-binary = "levitate-install-docs-split"
-destination = "usr/local/bin/levitate-install-docs-split"
+binary = "install-split"
+destination = "usr/local/bin/install-split"
 
 [ring2_products.kernel_staging]
 logical_name = "product.kernel.staging"

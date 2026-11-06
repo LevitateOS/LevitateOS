@@ -48,8 +48,8 @@ recfstab /mnt >> /mnt/etc/fstab
 recchroot /mnt                                         # finish configuration inside the new system
 ```
 
-The live ISO ships the full guide (`levitate-install-entrypoint`, or
-`docs-tui --slug installation`), and the same pages are on the website.
+The live ISO boots into the install screen, a shell beside the full guide
+(`install-docs` opens the guide on its own), and the same pages are on the website.
 
 ## Recipes
 

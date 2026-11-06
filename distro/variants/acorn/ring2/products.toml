@@ -1,7 +1,10 @@
 schema_version = 6
 
-# The live ISO's install screen: this shell beside the install docs.
+# The live ISO's install screen: this shell beside the install docs. getty
+# starts it on each console listed; the serial console runs it only when the
+# boot asks for it (the INSTALL_UX_SERIAL boot-injection key).
 [install_ux]
+consoles = ["tty1", "ttyS0"]
 shell = "/bin/sh"
 docs = { text = "install-guide.txt" }
 
@@ -130,9 +133,9 @@ packages = ["curl", "pciutils", "smartmontools", "hdparm", "vim", "htop"]
 [[ring2_runtime_profiles.live_tools_ux.actions]]
 kind = "rootfs_workspace_binary"
 package = "install-split-pane"
-binary = "levitate-install-docs-split"
+binary = "install-split"
 target = "x86_64-unknown-linux-musl"
-destination = "usr/local/bin/levitate-install-docs-split"
+destination = "usr/local/bin/install-split"
 
 [ring2_products.kernel_staging]
 logical_name = "product.kernel.staging"

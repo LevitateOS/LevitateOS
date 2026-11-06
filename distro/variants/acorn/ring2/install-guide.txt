@@ -1,9 +1,10 @@
 AcornOS Live - Install Guide
 ============================
 
-Left pane: root shell. Right pane: this guide.
-Ctrl-g switches panes. In the guide,
-arrow keys scroll and q closes it.
+This guide sits beside a root shell.
+The screen's bottom line lists its
+keys; in the guide, arrows scroll
+and q closes it.
 
 The steps below install AcornOS to a whole
 disk, erasing it. Run them in the left pane.

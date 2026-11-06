@@ -156,10 +156,7 @@ pub fn run(args: RunArgs) -> Result<()> {
     };
     if !args.ssh && !args.no_shell && window.is_none() {
         // An interactive serial console: the install UX runs on it.
-        pairs.push("LEVITATE_INSTALL_SERIAL_UX=1".to_string());
-        if args.verbose {
-            pairs.push("LEVITATE_INSTALL_SERIAL_VERBOSE=1".to_string());
-        }
+        pairs.push(format!("{}=1", distro_builder::install_ux::SERIAL_KEY));
     }
     let payload = injection_payload(&pairs, &args.boot)?;
     let injection = match &payload {
