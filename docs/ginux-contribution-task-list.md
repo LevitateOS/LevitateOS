@@ -692,19 +692,28 @@ security/full CI/current-main independence, actual compiler/SQLite/Cargo/APK/RPM
 Git and complete current Recipe acceptance remain open.37 patches is not a PR
 count, and no publication is authorized.
 
-Exact next action: **F02 — compose and review shared owners**.
-Use a disposable local source tree and temporary index/unreferenced commits,
-preserving all real branches/checkouts/indexes/stashes. Compose the currently
-source-prepared per-process candidates; keep G07's unready thread/security work
-separate until a monitored correction is available. Exclude G01/G02 held native
-rules and G25 held native clamp. Resolve shared G14/G16 path/cwd, G15/G18 archive,
-G20 event wait plus finite G08/G29 ticks, G24 Stat fields, G25 canonical vectors/
-IoVectors, G26 resource queries and G27 configured identity in the G06 task loop.
-G29 must preserve local packet send/recv and place network references after the
-enlarged channel/device range. Run relevant ordinary combined scenarios and
-actual consumers as capabilities join; retain every unrun thread/security/full
-criterion. Then F03 fresh complete applicable Recipe/consumer closure and F04
-user inspection. No branches/refs/pushes/PRs/maintainer messages before approval.
+F02 composition is active: [progress/evidence](ginux-contributions/f02-review.md)
+records22 applied patch units in `/tmp/ginux-contribution-preparation/F02/source`.
+The explicit temporary index is `/tmp/ginux-contribution-preparation/F02/index`;
+state.json owns exact progress. Required unit/native coverage is preserved in
+source; this union has no combined build/unit/runtime result yet. Ordinary source
+joins retain readiness+teardown, mapping+cwd, hardlinks/cross paths and dynamic
+memfd/namespace ownership. No publication occurred.
+
+Exact next action: **resolve pending F02 G17a fixture/runner conflicts**.
+Read the F02 progress record/state and current markers; retain existing mapping/
+symlink/namespace and pwrite cases, stage only resolved files in the temporary
+index, complete that pending transition and continue the saved37-patch order.
+Carry G17b's known mapping-fixture prerequisite correction from f41ed1b; assign
+needed standalone fixes back to their owners. Then resolve G25/G29 shared vectors,
+G08b packet/TCP dispatch/reference offsets, G24 Stat, G20 finite waits, G26 typed
+queries and G27 identity at the G06 task loop. Keep G07 unready threads/security,
+G01/G02 native policy and G25 native clamp excluded and every original acceptance
+open. Review/build/test the final union, then F03 fresh complete applicable
+Recipe/actual consumer closure and F04 user inspection. No branches/refs/pushes/
+PRs/maintainer messages before approval. Shared config transiently failed and
+restored during inspection; no config repair was performed here, and explicit
+worktree/index isolation was reverified before resuming.
 
 Active skill: `hdae-development`, discovered at
 `/home/vince/.codex/worktrees/ginux-pr-combination-check/ginux/.agents/skills/hdae-development/SKILL.md`.
