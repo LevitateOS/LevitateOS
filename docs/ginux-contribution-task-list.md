@@ -1103,3 +1103,61 @@ wait hooks, join actually implemented new syscalls to upstream's catalog and
 retain the existing bounded/disabled audit owner. Do not import unready G07 or
 substitute ordinary evidence for monitored security/full CI acceptance. Active
 HDAE skill and context-reload procedure remain as recorded above.
+
+
+### User pause — G06b source preview, 2026-11-07
+
+The user paused the persistent goal. Stop implementation/verification until an
+explicit resume. No build/runtime process remains active: build session64899
+completed with exit0 before this checkpoint; no G06b runtime suite was started.
+The goal status is paused, not complete. The preceding goal turn made progress.
+
+A separate G06b preview exists at
+`.artifacts/ginux-contribution-preparation/upstream-contract-refresh-2026-11-06/G06b/source`.
+Its exact local prerequisite is `98531335b47de1363d30428a56b0fc7b7e38fce5`, tree
+`5b2d2d65d6356d3d3c77a8a855bdd7c81f5726a3`, composing latest G052718b860 and
+G06a4a62d81e. Composition/temp indexes/read positions are retained with the preview.
+No final source commit/patch or clean export has been prepared. The retained
+G06b proposal remains historical7240bb21; do not replace it with a readiness claim.
+
+Preview edits move resolved-contract admission to task entry before early exec/
+fork/wait/signal/descriptor hooks; blocked calls reenter the same admission point.
+The task supervisor resolves one EffectiveContract through the existing owner and
+uses the existing bounded/disabled audit writer. Implemented execveat322 now joins
+upstream's catalog with native Deny38 retained. All prior assertions/fixtures/CI
+remain. README/launch/storage paths and source whole-record assertions are adapted
+to the moved task owner. Initial source-context/format failures are preserved.
+
+The first source `make check test-unit build build-launch-fixture
+build-launch-storage-fixture build-launch-device-fixture build-launch-pipe-fixture
+build-launch-fd-fixture build-launch-task-fixture build-launch-exec-fixture
+build-process-fixtures build-gate1-fixture` completed with exit0 and101 unit
+tests. The contract-document producer succeeded; its final check, full-diff review,
+ordinary runtime, baseline comparison, source hashes/clean replay and security/full
+CI remain pending. This is partial source progress, not verified G06b acceptance.
+
+On explicit resume: reload the complete active HDAE skill/references, applicable
+instructions and this checkpoint, then inspect actual preview source/diff/fixtures.
+Complete task/contract/catalog/audit review before running scoped ordinary controls;
+its inherited audit receipt regex must recognize the existing virtual-pid field
+while retaining all whole-record/budget assertions. Then prepare and verify the
+independent clean replay. Preserve all six restored worktrees, prior patches and
+paused Recipe inputs. No G07 import, adversarial probes, DaybreakBlue dispatch,
+branches/remote mutations or publication is authorized. F02/F03/F04 remain open.
+
+
+### Ownership change — 2026-11-07 (authoritative; supersedes the resume steps above)
+
+The user transferred ownership of the Ginux contribution queue to Claude. Codex continues
+implementation only from prompts the user relays from Claude. The sequential HDAE goal,
+the R01–R04/F01–F04 ceremony and the "on explicit resume" steps above are retired; earlier
+sections remain as history and evidence.
+
+Current state lives in [the PR inventory](ginux-contributions/pr-inventory.md):
+- Wave 1 is published upstream as #232 (G05a), #233 (G03a) and #234 (G06a), reworked after
+  independent review, with green CI. The heads are `5e79a172`, `44b3f89c` and `78a534c1` on fork
+  branches `fix/*`. Do not refresh, replace or duplicate these packets.
+- G03b failed independent review. G03b and G03c are rebuilt as one configured-storage
+  feature per [the redesign spec](ginux-contributions/storage-redesign-spec.md). The G04–G05
+  refreshes from 2026-11-06/07 and the G06b preview stay paused until that redesign is reviewed.
+- Held upstream issues (#163, #178, #179, #219) have no work requested by the maintainer.
