@@ -1279,5 +1279,10 @@ Commits land on the checked-out branches (superproject `master`, submodules `cod
   - No generic `tui_app` runtime action: nothing would use it yet (disk-plan ships nowhere), so it would be speculative surface. Bundling takes the app name from `[install_ux]` (F19). READMEs now say disk-plan ships on no ISO (C001, C002).
   - **Bug fixed:** `apk add` left the build host's `/etc/resolv.conf` in the shipped AcornOS rootfs; it's restored (or removed) after apk runs.
   - Verified: builder compiles; the split pane prints `install-split 0.1.0`; overlays render unchanged. The merged recipe could not be run here: the recipe runner's ginux sandbox needs host privileges ("chroot failed (host privilege required)").
-- [ ] F23 — The split pane is a robust terminal host.
+- [x] F23 — The split pane is a robust terminal host. builder `34c82df`, superproject commit "F23: the split pane…".
+  - One `Side` enum; each `Pane` owns its argv, PTY size, emulator and running `Process`, with a run counter so a restarted program's output isn't mixed with the old one's. Reader errors other than EIO (the normal end of a PTY) show in the title.
+  - Host keys: Ctrl-] switch pane, Ctrl-q quit, and Enter restarts an exited focused pane. D073 had been fixed by F4's layout lib (one layout for drawing and PTY sizes); D086/D088 went with F19's argv.
+  - argv parsing returns `Help`/`Version`/`Run` and `main` acts on it (no exit inside the parser). Not clap: `--left PROGRAM ARGS... --right PROGRAM ARGS...` takes everything up to `--right`, which clap expresses only through a value terminator.
+  - **Bug fixed:** Ctrl-] and the other control characters terminals report as Ctrl-digit (0x1C–0x1F) were sent to panes as the wrong byte (Ctrl-5 became Ctrl-U).
+  - Verified in a PTY (scratch vt100 driver): both panes draw at 80×16 with the shell cursor at the prompt; Ctrl-] moves focus; F5 reaches the docs pane as `^[[15~`; a docs program exiting 3 shows "Docs (exit 3) Enter restarts" and Enter starts it again with a new PID; Ctrl-q exits 0; `--smoke` passes; a missing pane program fails with "right pane: 'nosuch' is not a program on PATH".
 - [ ] F24 — Install tests exercise the real launch, not a smoke stand-in.
