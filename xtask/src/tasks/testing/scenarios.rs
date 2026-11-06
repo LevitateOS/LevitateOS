@@ -577,12 +577,8 @@ fn detect_live_boot_hook(log_path: &Path) -> Result<Option<String>> {
         Err(_) => return Ok(None),
     };
 
-    for pat in ["___SHELL_READY___"] {
-        if raw.contains(pat) {
-            return Ok(Some(pat.to_string()));
-        }
-    }
-    Ok(None)
+    let marker = recqemu::serial::protocol::SHELL_READY_MARKER;
+    Ok(raw.contains(marker).then(|| marker.to_string()))
 }
 
 fn emit_new_log_lines(log_path: &Path, line_cursor: &mut usize) -> Result<()> {
