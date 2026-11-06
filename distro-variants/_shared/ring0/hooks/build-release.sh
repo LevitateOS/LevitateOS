@@ -28,7 +28,7 @@ ARTIFACT_NAME_WIDTH="${ARTIFACT_NAME_WIDTH:-8}"
 
 # Color policy: NO_COLOR disables color globally; FORCE_COLOR enables in non-TTY contexts.
 KERNEL_RELEASE_PATH="${KERNEL_RELEASE_PATH:-${KERNEL_OUTPUT_DIR}/kernel-build/include/config/kernel.release}"
-KERNEL_IMAGE_PATH="${KERNEL_IMAGE_PATH:-${KERNEL_OUTPUT_DIR}/staging/boot/vmlinuz}"
+: "${KERNEL_IMAGE_PATH:?set by the release workflow from the build contract (kernel_image_path)}"
 ISO_FILENAME="${ISO_FILENAME:-$(default_iso_filename)}"
 ISO_PATH="${ISO_PATH:-${RELEASE_OUTPUT_DIR}/${ISO_FILENAME}}"
 ISO_SHA="${ISO_SHA:-${ISO_PATH%.iso}.sha512}"

@@ -2,18 +2,19 @@ schema_version = 6
 
 [build_host]
 required_build_tools = [
-  "recipe",
+  # Commands the kernel/rootfs build and the release hook run on the host.
+  # Workspace tools (recinit, reciso, recuki, install tools) and Recipe are
+  # built from this checkout and are not host requirements.
   "cargo",
   "make",
-  "recuki",
-  "ukify",
+  "curl",
   "mkfs.erofs",
   "xorriso",
-  "reciso",
-  "recinit",
-  "recstrap",
-  "recfstab",
-  "recchroot",
+  "mkfs.fat",
+  "mmd",
+  "mcopy",
+  "sha512sum",
+  "ukify",
 ]
 kernel_kconfig_path = "kernel/kconfig"
 recipe_kernel_script = "distro-builder/recipes/linux.rhai"

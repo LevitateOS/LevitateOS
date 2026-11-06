@@ -39,7 +39,8 @@ fn run(mode: Mode) -> Result<()> {
                 installed += 1;
             }
 
-            for sub in rust_submodules() {
+            for sub in rust_submodules(&root)? {
+                let sub = sub.as_str();
                 let sub_path = root.join(sub);
                 match hooks_dir_for_repo(&sub_path)? {
                     Some(hooks_dir) => {
@@ -67,10 +68,10 @@ fn run(mode: Mode) -> Result<()> {
                 remove_one(&hooks_dir, "(parent repo)", &hook_source)?;
             }
 
-            for sub in rust_submodules() {
-                let sub_path = root.join(sub);
+            for sub in rust_submodules(&root)? {
+                let sub_path = root.join(&sub);
                 if let Some(hooks_dir) = hooks_dir_for_repo(&sub_path)? {
-                    remove_one(&hooks_dir, sub, &hook_source)?;
+                    remove_one(&hooks_dir, &sub, &hook_source)?;
                 }
             }
 
@@ -82,24 +83,21 @@ fn run(mode: Mode) -> Result<()> {
     Ok(())
 }
 
-fn rust_submodules() -> &'static [&'static str] {
-    &[
-        "distro-builder",
-        "distro-spec",
-        "leviso-elf",
-        "testing/cheat-guard",
-        "testing/cheat-test",
-        "testing/fsdbg",
-        "testing/hardware-compat",
-        "testing/install-tests",
-        "testing/rootfs-tests",
-        "tools/recinit",
-        "tools/recipe",
-        "tools/reciso",
-        "tools/recqemu",
-        "tools/recstrap",
-        "tools/recuki",
-    ]
+/// Submodules owned by an external upstream; LevitateOS hooks stay out of them.
+const UPSTREAM_SUBMODULES: &[&str] = &["tools/ginux"];
+
+/// The submodules (from `.gitmodules`) that are LevitateOS Rust repositories.
+fn rust_submodules(root: &Path) -> Result<Vec<String>> {
+    let gitmodules = std::fs::read_to_string(root.join(".gitmodules"))
+        .with_context(|| format!("reading {}", root.join(".gitmodules").display()))?;
+    Ok(gitmodules
+        .lines()
+        .filter_map(|line| line.trim().strip_prefix("path"))
+        .filter_map(|rest| rest.trim_start().strip_prefix('='))
+        .map(|path| path.trim().to_string())
+        .filter(|path| !UPSTREAM_SUBMODULES.contains(&path.as_str()))
+        .filter(|path| root.join(path).join("Cargo.toml").is_file())
+        .collect())
 }
 
 fn hooks_dir_for_repo(repo_path: &Path) -> Result<Option<PathBuf>> {
