@@ -1,90 +1,23 @@
-# TEAM_326: Build and Test Artifacts
-*.bin
-*.log
-*.o
-*.elf
-*.cpio
-*.img
-*.iso
-*.dtb
-*.asm
-*.png
-actual_*.txt
-vnc_*.txt
-repro.*
-linker_repro.ld
-debug_out.txt
-qemu_*.log
-build_warnings*.txt
+# Build outputs and repo-local tooling (see architecture.md)
+/target/
+/.artifacts/
+/.scenarios/
 
-# IDE and OS transient files
-.vscode/
-.windsurf/
-.DS_Store
-*.swp
-*.gdb
-.idea/
-
-# AI assistant configs (local, not shared; HDAE skill links are shared)
-.claude/*
-!.claude/skills
-.agent/
-
-# Centralized build artifact store (repo-local, not committed)
-.artifacts/
-
-# Selective exceptions
-!docs/**/*.txt
-!tests/golden_*.txt
-
-# Temporary and Output Directories
-.tmp/
-tmp/
-initrd_root/
-initrd_test_root/
-iso_root/
-target/
-limine-bin/
-Cargo.lock
-/build/
-
-# External reference kernels (not part of build)
-.external-kernels/
-
-# Vendored sources (managed by `vendor` binary)
-/vendor/
-
-# Auto-fetched syscall specs
-docs/specs/syscalls/
-toolchain
-
-# TEAM_474: initramfs build output directory, but NOT source
-/target/initramfs/
-# Legacy initramfs output at root (covered by *.cpio pattern above)
-
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-.pytest_cache/
-*.egg-info/
-.coverage
-.env
-
-# VM testing
-.vm/
-
-# Node/Bun monorepo
+# JavaScript workspace
 node_modules/
+.turbo/
 bun.lock
 bun.lockb
-.turbo/
-.gource/historical/installer
-.gource/historical/recipes
 
-# Build artifacts
-output/
-ovmf_vars2.fd
+# Editors, OS and local tool state
+.vscode/
+.idea/
+.lsp/
+.clj-kondo/
+.muse/
+*.swp
+.DS_Store
 
-# Local stage runtime state
-.stages/
+# Agent configs are local; the HDAE skill links are shared
+.claude/*
+!.claude/skills
