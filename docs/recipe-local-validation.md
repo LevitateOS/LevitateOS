@@ -18,8 +18,16 @@ that the unmodified checkout contains this separate worktree's changes.
 Current validation baseline supervisor: `93a1a56d`, immutable binary
 `/tmp/ginux-t24-hidden-devices`, SHA256
 `641db1d511ae0ba9ce538eb0bf764ab63cae20a5e015a8cb949c519009503df3`.
-Its final extraction/large-input corrections are tracked in the task checkpoint;
-newer focused evidence must name its own revision rather than inherit this pass.
+Final local Ginux HEAD is `7cf2638adaf2fd3b783be636fe2a05b2d60458c5`.
+The additive corrections are `74835089` (bounded native reads above1MiB) and
+`7cf2638a` (preserve owned virtual uid/gid0 or unchanged IDs; other ownership
+changes fail explicitly). Immutable `/tmp/ginux-owned-root` SHA256 is
+`e3d4b6ec6216f012aee5e657f7bd2364afccf7fc4a160f3a6d83573a68ee54d0`.
+Full `make check test-unit` passes again at that HEAD; affected storage, FD,
+checkpoint, exec, scripts, network and device suites pass. Logs:
+`/tmp/ginux-owner-{check,storage,fds,checkpoints,affected-runtime}.log`.
+The full Recipe run uses the stated baseline; later focused results are
+separately recorded rather than relabeled as a whole-suite final-HEAD run.
 
 The actual combined CLI/worker binary is `/tmp/recipe-t25-bin`, SHA256
 `48f9c4ba2a30f857ea23a7481b3f28bfe4f2c510653a5ae562fcec3033edd3ff`.
@@ -91,7 +99,14 @@ with the final baseline binaries. Exact commands/case outputs are retained under
 The production Alpine version output is
 `apk-tools 3.0.9-r0, compiled for x86_64.`. The verified package SHA256 is
 `ea77b2533566e70c9566c03748199b79348010c3199ba02d97e0634cf0fa9ef7`.
-QEMU/RPM extraction and split-pane are still partial, as recorded in the queue.
+Actual RPM→rpm2cpio→cpio extraction→named publication also passes at final
+`7cf2638a` with the acquisition image: mode0755 uid/gid0,26,671,584 bytes,
+SHA256 `cba3b1f95298902f87c9730c61f746651282f326b126bd1ba964b4c61f866cde`,
+independently matching the pinned RPM metadata. Source RPM is unchanged;
+no ownership flag/error was suppressed. Proof:
+`/tmp/recipe-lane-b-network/rpm-repro/published-validation.json` and
+`stderr-owned-root-corrected.log`. Full QEMU package closure/typed selection and
+split-pane remain with the consumer lane, as recorded in the queue.
 
 ## Working demonstration
 
@@ -150,10 +165,10 @@ PR should be used as an implicit base.
 | Explicit inherited process bounds | `0c571cbb` | Configured native bootstrap; actual AS exhaustion, fork/exec inheritance and affinity denial |
 | Virtual platform identity | `9cf265ba` | Existing identity view; real RPM tool and raw ABI checks, no host uname |
 | Duplicate task-death accounting | `07c949db` | Ptrace/subreaper lifecycle; actual Git failure cleanup and repeated native process cases |
+| Virtual root ownership preservation | `7cf2638a` | Existing owned metadata; actual cpio and invalid-ID/missing-object/nofollow cases |
 | Checkpoint/restore CI coverage | `5e20a65f` | Existing checkpoint fixture/feature; adds coverage while retaining every upstream unit/static job |
 
-Ownership-preservation and any later concrete corrections receive their exact
-commits in the final checkpoint. Some capabilities share prerequisites and are
+Any later concrete corrections receive their exact commits in the final checkpoint. Some capabilities share prerequisites and are
 not independent proposals today; this table does not turn the entire local
 integration into one large upstream request. It also does not duplicate existing
 PRs #216–#218 or authorize editing their human text.

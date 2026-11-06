@@ -83,8 +83,8 @@ rootfs and VM validation share one operator to avoid host resource contention.
 
 ## Remaining tasks in dependency order
 
-Completed focused tasks: **T01, T02, T03, T04, T05, T06, T07, T08, T09, T10, T11, T12, T13, T15, T16, T17, T18, T20, T21**.
-Active or partial: **T14, T19, T22, T23, T24, T25, T26**.
+Completed focused tasks: **T01, T02, T03, T04, T05, T06, T07, T08, T09, T10, T11, T12, T13, T15, T16, T17, T18, T20, T21, T24**.
+Active or partial: **T14, T19, T22, T23, T25, T26**.
 Other tasks remain todo; partial source preparation is not runtime acceptance. Dependencies refer to completed implementation and
 the stated evidence, not merely a draft or a compiling helper. The list is a
 valid topological order; lane availability also constrains execution. Source
@@ -228,8 +228,12 @@ Implementation and focused evidence:
   pass: `/tmp/ginux-t24-final-{a,b,check}.log`,
   `/tmp/ginux-t24-process-native.log`, `/tmp/ginux-t24-gate1.log`.
   Actual8192-object/nonempty, task/FD/AS/CPU/TCP exhaustion and concurrent Cargo
-  cache then compile/run are covered. T24's final delta is the live cpio owner
-  preservation gap, now assigned A; do not mistake old green checks for that fix.
+  cache then compile/run are covered. Final additive deltas `74835089` (large native reads) and `7cf2638a`
+  (virtual root ownership preservation) pass full static/unit plus affected
+  storage/FD/checkpoint/exec/network/device suites, `/tmp/ginux-owner-*.log`.
+  Real cpio now succeeds and matches its publisher package's executable digest.
+  Final immutable supervisor `/tmp/ginux-owned-root`, SHA256
+  `e3d4b6ec6216f012aee5e657f7bd2364afccf7fc4a160f3a6d83573a68ee54d0`.
 - T04/T23 inventory is now19 retained Rhai paths:14 API2 producers,3 facts modules,
   2 kernel declarations. Obsolete facades/callers are deleted, not aliased.
   Distro-builder `141d1c7` prepares four offline production source closures;
@@ -274,9 +278,9 @@ B records its manifest/provenance and is repeating real TLS/Git/APK/RPM pipeline
 with final binaries. Fixture CA image remains explicit and separate; host trust
 is unchanged. Images/cache are not committed.
 
-Exact next actions: A finishes virtual ownership preservation for actual cpio and
-its focused/full upstream checks; B finishes final acquisition pipeline/durable
-bootstrap inputs; D completes current-snapshot split-pane/QEMU selection, preseed
+Exact next actions: A stands by for demonstrated consumer findings; B completes
+its final read-only acquisition review (runtime evidence and pinned bootstrap
+manifest are committed); D completes current-snapshot split-pane/QEMU selection, preseed
 cases and current docs; C waits for actual full-suite outcomes, fixes demonstrated
 failures, then records local commits/pins/provenance and closes T25–T27. Preserve
 original untracked outputs and Acorn lockfile; original tools/ginux checkout and
