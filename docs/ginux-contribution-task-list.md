@@ -783,7 +783,7 @@ Earlier P02/P03 and candidate results remain historical records; current-main
 reconciliation is required before final closure.
 
 Exact next action: refresh R04's current-main prerequisite serially, continuing
-with G04's virtual null-device adapter on refreshed G03c. Local dependent
+with G05's pipes/public descriptor owner on refreshed G04. Local dependent
 preparation stays blocked for standalone delivery until its prerequisites
 actually merge upstream.
 G05a is refreshed at
@@ -818,10 +818,17 @@ the identical valid storage fixture. The ten-file +1140/-28 delta preserves new
 upstream native/domain/network additions. [Review](ginux-contributions/g03c-review.md)
 and [security handoff](ginux-contributions/daybreakblue-handoff.md) retain full
 required runtime/security/macOS CI and actual upstream-merge holds.
-Initial 37-patch integrity results remain historical. The refreshed
+G04 is refreshed at `09fdb1b0f2caae3432846966815dcb7444a3c0e2` on G03c:
+all 85 units/static/build and fourteen ordinary controls pass in source/clean,
+all 194 tracked paths and both binaries match, and exact G03c rejects the
+identical valid assigned-null fixture. Only the module/native audit-label context
+needed adjustment for upstream changes; its twelve-file +601/-119 scope remains.
+[Review](ginux-contributions/g04-review.md) keeps security/full CI and actual
+upstream prerequisite merges pending. Initial 37-patch integrity results remain
+historical. The refreshed
 `upstream-refresh-2026-11-06/current-inventory.json` records each currently retained
-patch/head and exact-parent replay. Five packets now have current-main source/
-ordinary preparation; the other 32 still need current-main reconciliation;
+patch/head and exact-parent replay. Six packets now have current-main source/
+ordinary preparation; the other 31 still need current-main reconciliation;
 integrity is not source/runtime acceptance. The fresh preserved-worktree report
 also confirms all six restored HEAD, raw-index and staged/unstaged/conflict-status
 fingerprints are unchanged. Reconcile the

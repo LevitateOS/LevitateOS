@@ -1,6 +1,11 @@
 # G04 — assigned virtual null devices
 
-Local feature commit `5036b7e8a61c4cf1e18abad8746208d03d268ea5`.
+Current retained local commit `09fdb1b0f2caae3432846966815dcb7444a3c0e2`, on refreshed
+G03c `e9c0a4d494cb9c2c2080289aa198dda42dd65b08`, rooted at observed main `8a475e8b`.
+The current-main refresh below owns fresh evidence and pending checks; earlier
+results remain historical.
+
+Earlier local feature commit `5036b7e8a61c4cf1e18abad8746208d03d268ea5`.
 Explicit local prerequisite G03c `b36e0752caa1c91e4bbbe112c589c85915a6ce6d`
 (on G05a/G03a/G03b), underlying upstream3f2fe7df.
 [Retained source patch](patches/G04.patch). Twelve files,+601/-119.
@@ -70,3 +75,51 @@ Only null,64 slots and4096-byte discarded writes are provided; duplication,
 readiness, additional devices and configured child/thread ownership remain later
 work. The shared canonical native path scratch restrictions remain documented.
 No real Git branch/index/worktree/remote was changed.
+
+## Current-main refresh — 2026-11-06
+
+The retained scope remains twelve files, +601/-119. The old patch's `main.rs`
+module context no longer applies after upstream's import/native-loop additions.
+Only its two module declarations and Device audit-label arm are placed in their
+current owners; every other hunk applies unchanged. Added/removed lines match
+the previous corrected extraction apart from the native arm's indentation.
+Upstream native/systemd/domain/network behavior is preserved.
+
+A separate full-diff self-review reread the existing DeviceRegistry assignment,
+open/read/write/close owners, configured dispatch order, VFS namespace/copy
+callers, bootstrap reservation, completion/error paths and current native-loop
+join. Device handles remain bounded and are checked before registry access;
+null I/O uses the existing registry. Memory and native empty-path metadata keep
+their owners, and strict copies/metadata now have one shared serializer. No new
+blocking source correction was identified; this is not independent reviewer or
+security acceptance.
+
+Both source and independent clean G03c-plus-only-G04 replay pass:
+
+- `make check test-unit build build-launch-fixture build-launch-storage-fixture build-launch-device-fixture build-process-fixtures build-gate1-fixture`, including all 85 current unit tests and 24 VFS tests.
+- Fourteen ordinary controls per export: eight launch/valid-wait, three storage
+  data/metadata/lifetime/capacity and three null-device scenarios. Device-only,
+  mixed memory/device and fresh launches check EOF without changing valid output,
+  bounded discarded writes, metadata/major/minor identity, flags, seek, access
+  modes, 64-slot exhaustion, closure and reuse with valid guest buffers.
+
+The exact recorded G03c binary rejects the identical assigned-null fixture with
+exit 2 and `launch does not support device assignments`; the refreshed candidate
+and clean replay succeed. The existing G03c ordinary storage controls also pass
+after shared copy/metadata ownership moves. Focused ordinary fixtures are kept
+as downstream evidence; no default Ginux case was removed or weakened.
+
+All 194 tracked paths match the retained head in source and clean exports. Both
+binaries hash `b405fcc7a9bc19d86d859318006764d354967b54c9c289fe743e56e46161ac9b`.
+Exact source, commands, logs, receipts, old/new patches, manifest and concise
+draft are retained under
+`.artifacts/ginux-contribution-preparation/upstream-refresh-2026-11-06/G04/`.
+Build target directories are isolated. No real Ginux branch/index/checkout or
+remote text changed.
+
+Full default device/storage/launch/native/setup suites contain protected,
+fault, authority, hidden-image-alias and scratch probes and remain unrun under
+the written security boundary. Monitored validation is still assigned downstream
+to DaybreakBlue; no dispatch has occurred. macOS/remote CI is unrun. R03/R04 retain
+these requirements and actual G03c/prerequisite upstream merges before standalone
+extraction/revalidation; no stacked publication or F02/F03 closure is implied.

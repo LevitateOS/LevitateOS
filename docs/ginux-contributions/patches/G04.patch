@@ -1,6 +1,6 @@
-From 5036b7e8a61c4cf1e18abad8746208d03d268ea5 Mon Sep 17 00:00:00 2001
+From 09fdb1b0f2caae3432846966815dcb7444a3c0e2 Mon Sep 17 00:00:00 2001
 From: vince <vincepaul.liem@gmail.com>
-Date: Fri, 6 Nov 2026 10:07:28 +0100
+Date: Fri, 6 Nov 2026 22:38:10 +0100
 Subject: [PATCH] feat(launch): expose explicitly assigned virtual null devices
 
 Use the existing device registry for an immutable virtual /dev view,
@@ -32,7 +32,7 @@ Signed-off-by: vince <vincepaul.liem@gmail.com>
  create mode 100644 tests/fixtures/launch-device-fixture.c
 
 diff --git a/.github/workflows/check.yml b/.github/workflows/check.yml
-index 9a0bec5e..e77aa9cd 100644
+index 9a0bec5e0c254eda4e7519074b8e622a724e0755..e77aa9cd565befb1cb8a2788811b643c19bd4313 100644
 --- a/.github/workflows/check.yml
 +++ b/.github/workflows/check.yml
 @@ -24,9 +24,10 @@ jobs:
@@ -48,10 +48,10 @@ index 9a0bec5e..e77aa9cd 100644
        - run: make test-process-native
        - run: sudo make test-gate1-setup
 diff --git a/Makefile b/Makefile
-index a0f56acf..00ed13e7 100644
+index 138b4fd83ddf99c409bf9729e6ea2051527b0aab..f62576c833c8dc24c6b9a017235ff994012ca336 100644
 --- a/Makefile
 +++ b/Makefile
-@@ -201,3 +201,11 @@ build-launch-storage-fixture:
+@@ -243,3 +243,11 @@ build-launch-storage-fixture:
  
  test-launch-storage:
  	python3 scripts/test-launch-storage.py $(GINUX) .artifacts/launch/launch-storage-fixture
@@ -64,10 +64,10 @@ index a0f56acf..00ed13e7 100644
 +test-launch-devices:
 +	python3 scripts/test-launch-devices.py $(GINUX) .artifacts/launch/launch-device-fixture
 diff --git a/README.md b/README.md
-index ac0e8b46..c2a9e055 100644
+index f36d0cf70d0bcb1c42e1741380f4dcba9952b910..a32684824e3046064497cfa64e6ab03baf5a1844 100644
 --- a/README.md
 +++ b/README.md
-@@ -196,8 +196,8 @@ executes `[domain].init` with the configured arguments and environment inside
+@@ -273,8 +273,8 @@ executes `[domain].init` with the configured arguments and environment inside
  the supplied host root directory. The bootstrap requires chroot and credential
  change privileges, and a kernel with `close_range` (Linux 5.9 or later).
  It drops to UID/GID 1000 before executing the workload. The configuration must
@@ -78,7 +78,7 @@ index ac0e8b46..c2a9e055 100644
  
  `[domain].workdir` is optional and defaults to `/work`; `/` is also supported.
  The bootstrap creates the working directory if its parent exists, then enters
-@@ -249,6 +249,19 @@ Guest-memory copies respect page protections, including partial read copyout.
+@@ -326,6 +326,19 @@ Guest-memory copies respect page protections, including partial read copyout.
  No writable host descriptor is exposed. Data disappears at domain teardown;
  there is no retention, export, storage generation or configured storage quota.
  
@@ -98,7 +98,7 @@ index ac0e8b46..c2a9e055 100644
  When requested, the result file is reserved exclusively before launch, with
  mode 0600 and a maximum path length of 512 bytes. Existing files are never
  overwritten. After completion, it contains one synced JSON object:
-@@ -274,6 +287,8 @@ sudo make test-launch
+@@ -351,6 +364,8 @@ sudo make test-launch
  sudo make test-native-supervision
  make build-launch-storage-fixture
  sudo make test-launch-storage
@@ -109,7 +109,7 @@ index ac0e8b46..c2a9e055 100644
  ## Native process scenarios
 diff --git a/crates/ginux-init/src/device_hooks.rs b/crates/ginux-init/src/device_hooks.rs
 new file mode 100644
-index 00000000..752a867f
+index 0000000000000000000000000000000000000000..752a867f2445a897c2e48f3a45584881984d4c3d
 --- /dev/null
 +++ b/crates/ginux-init/src/device_hooks.rs
 @@ -0,0 +1,244 @@
@@ -358,7 +358,7 @@ index 00000000..752a867f
 +    }
 +}
 diff --git a/crates/ginux-init/src/dispatch.rs b/crates/ginux-init/src/dispatch.rs
-index 57501b7b..5d062ae2 100644
+index 5e286db5eca78d61cfb9b6a8229d05bd6b8db102..2f52694ca83604e2249ab6062c37793f6b9289b0 100644
 --- a/crates/ginux-init/src/dispatch.rs
 +++ b/crates/ginux-init/src/dispatch.rs
 @@ -14,6 +14,7 @@ use crate::supervisor::UserRegs;
@@ -379,7 +379,7 @@ index 57501b7b..5d062ae2 100644
  }
  
 diff --git a/crates/ginux-init/src/fs_hooks.rs b/crates/ginux-init/src/fs_hooks.rs
-index 8034a09d..53f44c75 100644
+index 8034a09dc04f7c86f954d1800a01b6c65dc6ab96..53f44c759710c6af16b6054fbc34adfe4c68e496 100644
 --- a/crates/ginux-init/src/fs_hooks.rs
 +++ b/crates/ginux-init/src/fs_hooks.rs
 @@ -2,7 +2,8 @@
@@ -607,10 +607,10 @@ index 8034a09d..53f44c75 100644
  
  fn errno(error: VfsError) -> i64 {
 diff --git a/crates/ginux-init/src/launch.rs b/crates/ginux-init/src/launch.rs
-index f0a586d0..768d117b 100644
+index 2c70f336b0b4cc5138e437e072afceccf9446451..df320408f47ed43fedfdf7fe8f64d6cf55dff6f2 100644
 --- a/crates/ginux-init/src/launch.rs
 +++ b/crates/ginux-init/src/launch.rs
-@@ -296,6 +296,8 @@ pub fn launch_main(config_path: *const u8, root_path: *const u8, result_path: *c
+@@ -337,6 +337,8 @@ pub fn launch_main(config_path: *const u8, root_path: *const u8, result_path: *c
      stage_result_path(result_path);
      let config = launch_load_config(config_path);
      launch_validate(&config);
@@ -619,7 +619,7 @@ index f0a586d0..768d117b 100644
      let mut filesystem = crate::fs_hooks::LaunchFs::prepare(&config)
          .unwrap_or_else(|reason| launch_startup_fail(reason));
      print_launch_config(&config);
-@@ -311,7 +313,7 @@ pub fn launch_main(config_path: *const u8, root_path: *const u8, result_path: *c
+@@ -352,7 +354,7 @@ pub fn launch_main(config_path: *const u8, root_path: *const u8, result_path: *c
      if child == 0 {
          launch_tracee(root_path, &filesystem);
      }
@@ -628,7 +628,7 @@ index f0a586d0..768d117b 100644
  }
  
  fn launch_validate(config: &DomainConfig) {
-@@ -320,9 +322,6 @@ fn launch_validate(config: &DomainConfig) {
+@@ -361,9 +363,6 @@ fn launch_validate(config: &DomainConfig) {
      {
          launch_startup_fail(b"launch requires profile=balanced backend=ptrace-native");
      }
@@ -638,7 +638,7 @@ index f0a586d0..768d117b 100644
      if config.id.as_bytes().is_empty() || config.id.as_bytes().len() > 64 {
          launch_startup_fail(b"domain id length invalid");
      }
-@@ -886,6 +885,7 @@ fn supervise_launch(
+@@ -927,6 +926,7 @@ fn supervise_launch(
      pid: usize,
      domain: &mut Domain,
      filesystem: &mut crate::fs_hooks::LaunchFs,
@@ -646,7 +646,7 @@ index f0a586d0..768d117b 100644
  ) -> ! {
      let mut status = 0i32;
      if wait(pid, &mut status) < 0 {
-@@ -999,11 +999,16 @@ fn supervise_launch(
+@@ -1040,11 +1040,16 @@ fn supervise_launch(
          }
          sequence += 1;
          let syscall = registers.orig_rax;
@@ -668,7 +668,7 @@ index f0a586d0..768d117b 100644
              None => match crate::path_hooks::Rewrite::prepare(filesystem, pid, &mut registers) {
                  Ok(rewrite) => {
                      if rewrite.is_some()
-@@ -1027,6 +1032,7 @@ fn supervise_launch(
+@@ -1068,6 +1073,7 @@ fn supervise_launch(
                  let lane_name: &[u8] = match lane {
                      crate::dispatch::Lane::Process => b"process",
                      crate::dispatch::Lane::Filesystem => b"filesystem",
@@ -677,11 +677,11 @@ index f0a586d0..768d117b 100644
                      crate::dispatch::Lane::Contract => b"contract",
                  };
 diff --git a/crates/ginux-init/src/main.rs b/crates/ginux-init/src/main.rs
-index 151a3fec..96098520 100644
+index 7cb8610a0117036e217d094f45d358a227f93be1..7f3645c90ad86ce9f898ce4a1bdcea754b1aedc7 100644
 --- a/crates/ginux-init/src/main.rs
 +++ b/crates/ginux-init/src/main.rs
-@@ -9,12 +9,14 @@ use ginux_core::{
- };
+@@ -11,12 +11,14 @@ use ginux_core::{
+ use ginux_domain::HookFailurePolicy;
  
  mod channel_hooks;
 +mod device_hooks;
@@ -693,18 +693,18 @@ index 151a3fec..96098520 100644
  mod supervisor;
 +mod tracee_io;
  
- use crate::dispatch::{
-     balanced_surface_name, decide_native, native_arguments_allowed, process_entry, Lane,
-@@ -3144,6 +3146,7 @@ fn supervise_native(pid: usize, domain: &mut Domain) -> ! {
-                 let lane_name: &[u8] = match lane {
-                     Lane::Process => b"process",
-                     Lane::Filesystem => b"filesystem",
-+                    Lane::Device => b"device",
-                     Lane::Channel => b"channel",
-                     Lane::Contract => b"contract",
-                 };
+ use crate::dispatch::{balanced_surface_name, decide_native, process_entry, Lane, NativeDecision};
+ use crate::launch::{
+@@ -5379,6 +5381,7 @@ fn supervise_native(pid: usize, domain: &mut Domain, mode: usize, root_descripto
+                     let lane_name: &[u8] = match lane {
+                         Lane::Process => b"process",
+                         Lane::Filesystem => b"filesystem",
++                        Lane::Device => b"device",
+                         Lane::Channel => b"channel",
+                         Lane::Contract => b"contract",
+                     };
 diff --git a/crates/ginux-init/src/path_hooks.rs b/crates/ginux-init/src/path_hooks.rs
-index d967bc1d..7c9fcc76 100644
+index d967bc1dcee354b1df6b160b75d8587e3acaceea..7c9fcc767f45f6779008fc6cc993f4f2d45b188e 100644
 --- a/crates/ginux-init/src/path_hooks.rs
 +++ b/crates/ginux-init/src/path_hooks.rs
 @@ -1,7 +1,7 @@
@@ -718,7 +718,7 @@ index d967bc1d..7c9fcc76 100644
  impl ImageRoot {
 diff --git a/crates/ginux-init/src/tracee_io.rs b/crates/ginux-init/src/tracee_io.rs
 new file mode 100644
-index 00000000..a3369944
+index 0000000000000000000000000000000000000000..a336994478ae3842d1e6e9122ff408f74acd6891
 --- /dev/null
 +++ b/crates/ginux-init/src/tracee_io.rs
 @@ -0,0 +1,106 @@
@@ -830,7 +830,7 @@ index 00000000..a3369944
 +}
 diff --git a/scripts/test-launch-devices.py b/scripts/test-launch-devices.py
 new file mode 100644
-index 00000000..e9a8b676
+index 0000000000000000000000000000000000000000..e9a8b676fc1cac4030d4b0d546c666d026772fb9
 --- /dev/null
 +++ b/scripts/test-launch-devices.py
 @@ -0,0 +1,64 @@
@@ -900,7 +900,7 @@ index 00000000..e9a8b676
 +    main()
 diff --git a/tests/fixtures/launch-device-fixture.c b/tests/fixtures/launch-device-fixture.c
 new file mode 100644
-index 00000000..69ceffab
+index 0000000000000000000000000000000000000000..69ceffabc1a8c158bc5d1206bbed4e5d8d999717
 --- /dev/null
 +++ b/tests/fixtures/launch-device-fixture.c
 @@ -0,0 +1,101 @@

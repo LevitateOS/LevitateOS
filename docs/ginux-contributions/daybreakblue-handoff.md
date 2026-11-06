@@ -758,3 +758,16 @@ The complete preserved `test-launch-storage`, `test-launch`, native/process and
 setup suites remain pending where they contain these probes. No such probes
 were run in this refresh and no DaybreakBlue agent was dispatched. Earlier
 source-machine security results are historical and must not satisfy this hold.
+
+
+## Refreshed G04 security revision — 2026-11-06
+
+Current local G04 is `09fdb1b0f2caae3432846966815dcb7444a3c0e2` on refreshed G03c
+`e9c0a4d494cb9c2c2080289aa198dda42dd65b08`. [Current review](g04-review.md) records
+85 units and fourteen ordinary controls in source/clean replay. The earlier
+G03c–G06b authority handoff applies to this revision: validate hidden image-device
+aliases, immutable virtual `/dev`, descriptor namespace/copyout authority,
+protected/partial buffers and shared canonical-path scratch independently.
+Complete default fixtures stay present and enabled; their security probes were
+not executed during this refresh. Keep acceptance pending until monitored results
+exist on the final revision. No DaybreakBlue agent has been dispatched.
