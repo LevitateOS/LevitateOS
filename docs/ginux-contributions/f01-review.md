@@ -1,6 +1,7 @@
 # F01 — complete queue reconciliation (in progress)
 
-Current inventory verifies36 distinct retained heads and36 durable patches,
+Current inventory now includes37 retained heads and37 durable patches (36 verified in the initial
+F01 inventory plus the G08b source-gap correction),
 including parent/tree/diff checks and exact patch hashes. This is a count of
 review/extraction units, not a PR count. Six are based directly on the recorded
 main3f2fe7df: G05a, G03a, G06a, G26a, G27 and G28. The latter3 retain new contract/
@@ -21,17 +22,17 @@ policy-held. G25's native scalar clamp remains excluded/#178/#163-held. Resource
 network, NOW/identity policy, current-main independence and full CI remain open.
 Do not relabel these as reviewed/green/submittable from ordinary fixture results.
 
-The audit found a useful source gap: only G08a readiness has been prepared.
+The initial audit found a useful source gap: only G08a readiness had been prepared.
 Original75acd2be FIONBIO,3b27b370 sequenced-packet pairs and e954010d nested stream
-capacity/reference changes still need a retained minimal extraction. Their source
+capacity/reference changes needed a retained minimal extraction; [G08b](g08b-review.md) now provides it. Their source
 uses the existing channel/public-descriptor owners; descriptor transaction naming
-reflects donor ancestry, not an inherent G07/thread requirement. Prepare G08b on
-G08a's per-process owner, preserving all full/default negative cases and ordinary
-peer/channel acceptance. Do not pull native guest clock or unrelated shared-thread
+reflects donor ancestry, not an inherent G07/thread requirement. G08b uses
+G08a's per-process owner, preserves full/default negative cases and passes ordinary
+source/clean peer/channel checks. Do not pull native guest clock or unrelated shared-thread
 policy to match donor layout. Combine G25 vector and G29 reference joins at F02.
 
-F01 is not complete. Next finish this already-authorized original G08 remainder,
-then reconcile all remaining source hunks/old-fork dispositions before F02 shared
+F01 is not complete. The original G08 remainder is now source-prepared;
+reconcile all remaining source hunks/old-fork dispositions before F02 shared
 owner composition and F03 fresh actual consumers/Recipe. Actual simultaneous
 SQLite/Cargo, APK/RPM, Git, thread joins and remaining nested streams retain their
 original acceptance. F04 is the user inspection stop; no publication is authorized.

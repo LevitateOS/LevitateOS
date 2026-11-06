@@ -638,3 +638,21 @@ ordering; verify no host ownership mutation or fallback. The full new ownership
 mode retains donor negative/pointer/authority checks but is locally unrun. G07
 shared-path/security, full CI and combined consumers remain pending. No cloud
 dispatch or security acceptance occurred.
+
+## G08b — configured packet pairs/FIONBIO/capacity
+
+Head `bc34cf66d8472b786ba10455352a91c6a7081bb9` on G08a `fe27c693bf2629166ee82da2efefb62b298bb567`.
+82 units and ordinary source/clean packet messages/truncation/zero/alias/EOF/peer,
+FIONBIO/metadata,12 nested-process streams and poll controls pass. Current stat
+flag handling was restored after a donor-port regression reproduced at163.
+No native bootstrap poll or guest clock rules were added. Actual compiler/
+thread/vector/network joins and full CI/policy remain pending. [Review](g08b-review.md).
+
+Validate protected/mutable packet receive/send and FIONBIO integers, cross-page
+short copies and prefix/atomicity/retained-packet behavior; malformed or oversized
+messages, unknown flags/family/protocol and unsupported operations; allocation/
+copyout rollback, reused/stale/closed/native/private descriptors and assignment
+separation; concurrent aliases/close/fork/exec/cancel, blocked retries, capacity
+failure, MSG_NOSIGNAL/SIGPIPE and shared-thread signal/call ownership. Retain full
+default source tests. These adversarial/proc/authority/fault probes remain unrun;
+no cloud dispatch or security acceptance. G07 shared-path hold remains.

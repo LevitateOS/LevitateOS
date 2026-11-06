@@ -280,15 +280,13 @@
       ],
       "acceptance": "Real peers, nonblocking transitions, short I/O, readiness/deadlines, half-close and bounded capacity; nested compiler streams and cancellation. Split readiness/channels if independently usable.",
       "planned_delivery": "one coherent change plus its generic docs and focused regression fixtures; split coupled responsibilities only as recorded by P04",
-      "status": "partial: G08a readiness prepared; F01 identified still-unextracted FIONBIO/packet-pair/nested-stream remainder; prepare G08b on current per-process G08a owner, preserve policy/security and consumer holds",
+      "status": "G08a/G08b source and ordinary preparation retained; actual compiler/thread/vector/network joins and policy/security/full CI remain pending",
       "artifact_directory": ".artifacts/ginux-contribution-preparation/G08",
       "subpackets": [
-        "G08a"
-      ],
-      "evidence": "g08a-review.md",
-      "planned_subpackets": [
+        "G08a",
         "G08b"
       ],
+      "evidence": "g08a-review.md",
       "remainder_sources": [
         "75acd2beeb95fbc62f9177e5116fd6b5d8f22ca8",
         "3b27b37010110b4ccf14936e259fae0a5487efdb",
@@ -1769,6 +1767,50 @@
       ],
       "artifact_directory": ".artifacts/ginux-contribution-preparation/G08a",
       "acceptance": "See original G08 plus split scope/evidence and pending checks in g08a-review.md"
+    },
+    {
+      "packet": "G08b",
+      "base": "fe27c693bf2629166ee82da2efefb62b298bb567",
+      "head": "bc34cf66d8472b786ba10455352a91c6a7081bb9",
+      "tree": "f3318e93f85f0841e448a8b91f52275eeb7d14ed",
+      "changed_files": [
+        "README.md",
+        "crates/ginux-init/src/descriptors.rs",
+        "crates/ginux-init/src/channel_hooks.rs",
+        "scripts/test-launch-pipes.py",
+        "tests/fixtures/launch-pipe-fixture.c"
+      ],
+      "dependencies": [
+        "G08a"
+      ],
+      "standalone_source": false,
+      "status": "minimal per-process source/clean preparation and separate whole-diff self-review retained; full G08 partial: actual compiler/thread/vector/network joins, policy/security/full CI/upstream independence pending",
+      "patch_sha256": "55670dc69b03e0ab43bc36324cc2c7ceb44e5681576cc4ebf2494b231894f04d",
+      "deferred_joins": [
+        "G07 shared FD/thread/security",
+        "G25 channel vectors",
+        "G29 local/network socket demux and dynamic reference offsets",
+        "actual nested compiler streams F02/F03"
+      ],
+      "policy": "configured local packet pairs only; no native bootstrap poll or guest clock rules imported; full security/policy unchanged",
+      "unit_tests": 82,
+      "clean_matched_paths": 170,
+      "review": "separate full-diff self-review; no independent or security acceptance",
+      "remote_ci": "not run",
+      "security_handoff": "daybreakblue-handoff.md",
+      "source_binary_sha256": "65dea9448849832e3ee2dfce16f1576df9dba52233df14710ab215826a76c0a9",
+      "clean_binary_sha256": "65dea9448849832e3ee2dfce16f1576df9dba52233df14710ab215826a76c0a9",
+      "pipe_fixture_sha256": "ef3d194b74be97f4c7bedd884483fc54ea73fc9cd715c1d88a7bbc414ab70dca",
+      "evidence": "g08b-review.md",
+      "source_patch": "patches/G08b.patch",
+      "purpose": "Bounded local packet pairs, shared FIONBIO and nested stream capacity",
+      "source_commits": [
+        "75acd2beeb95fbc62f9177e5116fd6b5d8f22ca8",
+        "3b27b37010110b4ccf14936e259fae0a5487efdb",
+        "e954010d7f74151d6ab8d03a1d40f4c4b9cb9b5e"
+      ],
+      "artifact_directory": ".artifacts/ginux-contribution-preparation/G08b",
+      "acceptance": "Original G08 criteria remain; see g08b-review.md for minimal per-process scope and pending joins"
     }
   ]
 }

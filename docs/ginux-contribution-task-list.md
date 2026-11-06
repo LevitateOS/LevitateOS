@@ -678,24 +678,32 @@ make test-unit/all7 packages remain, ordinary runtime receipts already pass on
 those exact heads. No separate wiring-only patch/PR is needed. Full/default,
 combined owner and remote CI evidence remains pending; nothing published.
 
-F01 is in progress: [inventory/review](ginux-contributions/f01-review.md) verifies
-36 distinct patches/heads and their hashes, maps all66 integration commits and
+F01 is in progress: [inventory/review](ginux-contributions/f01-review.md) now verifies
+37 distinct patches/heads and their hashes, maps all66 integration commits and
 retains all49 other-fork dispositions/6 dirty/stash records. The canonical P03
 261-hunk digest matches. Six patches are based on recorded main; this is not a
 PR count or a fresh readiness claim. G07 and policy/security/actual consumer
 criteria remain held. Final semantic hunk accounting remains open.
 
-Exact next action under F01: **prepare the remaining original G08 material**.
-G08a covers readiness only. Trace/port75acd2be FIONBIO,3b27b370 sequenced-packet
-pairs and e954010d nested stream capacity/reference changes onto G08a
-fe27c693bf2629166ee82da2efefb62b298bb567 as a minimal per-process G08b candidate.
-Use existing channel/descriptor owners and preserve default negative fixtures;
-validate ordinary pairs, aliases/nonblocking/message/EOF/peer/poll/capacity paths.
-Do not import G07 threads/G02 guest clock merely for donor call-layout ancestry.
-Reconcile G25 vector and G29 reference indices when those owners join at F02;
-keep nested compiler/application acceptance active. Then finish F01 original
-hunk/old-fork accounting, F02 combined owner review, F03 fresh Recipe/actual
-consumers, and F04 user inspection. No branches/refs/pushes/PRs/maintainer messages.
+The initial F01 source gap is corrected: G08b `bc34cf66` on G08a retains
+packet pairs/FIONBIO/nested stream capacity. [Review/evidence](ginux-contributions/g08b-review.md)
+records82 units,170-path strict replay, ordinary packets/aliases/EOF/peers,
+FIONBIO/accepted metadata flags,12 child/grandchild streams and poll controls
+passing in source/clean. Exact G08a fails the new valid capabilities; a donor
+metadata-flag regression was reproduced and corrected. All default security
+coverage remains enabled/unrun; actual compiler/thread/vector/network joins,
+policy/security/full CI/current-main independence remain pending. There are now
+37 retained patch units, not37 PRs. No publication occurred.
+
+Exact next action: **finish F01 semantic hunk/old-fork reconciliation**.
+The refreshed inventory includes G08b. Reconcile every original
+261-hunk/P03 commit disposition against actual final owners and explicitly retain
+G07/policy/security/consumer holds. Then compose/review shared owners at F02,
+run fresh complete current Recipe and actual consumers at F03, and present F04
+for user inspection. G29 socket demux must continue supporting local packet
+send/recv, and network reference offsets must follow the enlarged channel/device
+range. Preserve G25 helper/vector and G24 Stat joins; all open G07/G08/G23–G30
+acceptance remains active. No branch/ref/push/PR/maintainer messages before review.
 
 Active skill: `hdae-development`, discovered at
 `/home/vince/.codex/worktrees/ginux-pr-combination-check/ginux/.agents/skills/hdae-development/SKILL.md`.

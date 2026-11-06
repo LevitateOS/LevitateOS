@@ -118,3 +118,11 @@ fchown/lchown;98 units pass. General package/cwd/time/vector/thread integration
 still belongs to F02/F03, and security/full CI remain pending. Empty-path
 ownership must bypass shared path resolution to reach its descriptor owner;
 [review/evidence](g30-review.md).
+
+F01 identified G08's missing non-readiness source. G08b `bc34cf66` now retains
+FIONBIO/packet pairs/capacity directly on G08a;82 units and ordinary source/clean
+peers/messages/metadata/12 nested streams pass. No G07/native-clock/bootstrap-poll
+ancestry is required. Preserve current stat flag validation rather than donor's
+older restricted check. Actual compiler/thread/vector/security/full CI remain;
+G29 local/network send/recv and reference-index joining is required at F02.
+[Review/evidence](g08b-review.md).
