@@ -129,3 +129,31 @@ Ginux's inherited per-process address-space/CPU-affinity limits are not aggregat
 RSS or CPU-time accounting. Endpoint grants do not isolate cohosted virtual names.
 The current tasks must resolve their actual extraction/build failures before this
 record or the goal may be marked complete.
+
+## Future Ginux contribution candidates
+
+These are local records, not PR drafts ready to publish. Re-evaluate against
+then-current upstream, extract the smallest coherent change and make each
+proposal standalone once its prerequisites are available upstream. No pending
+PR should be used as an implicit base.
+
+| Purpose | Local implementation references | Prerequisite and actual evidence |
+| --- | --- | --- |
+| Owned directory cwd and shared hardlink identity | `6a45d8f8`, `9e2a39e8` | Existing configured owned storage; real relative/fork/alias/unlink cases |
+| Cross-image/owned traversal | `1da0ce13`, hidden-device correction `93a1a56d` | Shared VFS/assignment owners; existing exec/device cases preserved |
+| Scalable bounded storage and archive identity | `38fa14fd`, `e3374593`, `53a2c9cc` | Owned storage backing and private FD ownership; actual5000 nonempty files and2GiB+ payload |
+| SQLite/Cargo file locking | `26784843` | Owned open descriptions; actual simultaneous Cargo cache users then compile/run |
+| Timestamp preservation | `d21d26c8` | Inode identity and archive format; actual hardlink/symlink/restart timestamps |
+| Bounded TCP assignments and readiness | backend `8ff83d64`–`9a70427b`, dispatch `66de2880` | Maintainer network policy plus device/descriptor owners; actual grants/TLS/Git/budgets/revocation |
+| Correct private/public FD budgets | `d5357101` | Public descriptor ownership; lower operator limits and actual many-file use |
+| Vectored and bounded regular IO | `88fa4749`, `7d556b4e`, `74835089` | Existing owned/native IO owners; actual APK/RPM/large-input failures and corrected cases |
+| Explicit inherited process bounds | `0c571cbb` | Configured native bootstrap; actual AS exhaustion, fork/exec inheritance and affinity denial |
+| Virtual platform identity | `9cf265ba` | Existing identity view; real RPM tool and raw ABI checks, no host uname |
+| Duplicate task-death accounting | `07c949db` | Ptrace/subreaper lifecycle; actual Git failure cleanup and repeated native process cases |
+| Checkpoint/restore CI coverage | `5e20a65f` | Existing checkpoint fixture/feature; adds coverage while retaining every upstream unit/static job |
+
+Ownership-preservation and any later concrete corrections receive their exact
+commits in the final checkpoint. Some capabilities share prerequisites and are
+not independent proposals today; this table does not turn the entire local
+integration into one large upstream request. It also does not duplicate existing
+PRs #216–#218 or authorize editing their human text.
