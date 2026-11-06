@@ -1,8 +1,37 @@
 schema_version = 6
 
 [scenarios.live_boot]
+# The serial test protocol's readiness marker always means success; the
+# rootfs-missing message of the live init (live_boot::ROOTFS_MISSING_MESSAGE)
+# is always fatal.
 success_patterns = []
-fatal_patterns = []
+fatal_patterns = [
+  "No bootable device",
+  "Boot Failed",
+  "Default Boot Device Missing",
+  "Shell>",
+  "ASSERT_EFI_ERROR",
+  "map: Cannot find",
+  "systemd-boot: Failed",
+  "loader: Failed",
+  "vmlinuz: not found",
+  "initramfs: not found",
+  "Error loading",
+  "File not found",
+  "Kernel panic",
+  "not syncing",
+  "VFS: Cannot open root device",
+  "No init found",
+  "Attempted to kill init",
+  "can't find /init",
+  "No root device",
+  "EROFS:",
+  "ERROR: cannot start",
+  "ERROR: ",
+  "fatal error",
+  "Segmentation fault",
+  "core dumped",
+]
 required_kernel_cmdline = [
   "console=ttyS0,115200n8",
   "console=tty0",
@@ -18,6 +47,7 @@ pass_marker = "LIVE BOOT PASSED"
 required_services = ["networking", "dhcpcd", "sshd"]
 
 [scenarios.live_tools]
+serial_ready_patterns = ["Login as 'root' (no password)", " login:"]
 required_tools = [
   "recpart",
   "recstrap",
@@ -54,8 +84,33 @@ script_path = "install.sh"
 pass_marker = "INSTALL PASSED"
 
 [scenarios.installed_boot]
-success_patterns = ["___SHELL_READY___", "acornos login:", "login:", "Welcome to AcornOS"]
-fatal_patterns = []
+success_patterns = ["acornos login:", "login:", "Welcome to AcornOS"]
+fatal_patterns = [
+  "No bootable device",
+  "Boot Failed",
+  "Default Boot Device Missing",
+  "Shell>",
+  "ASSERT_EFI_ERROR",
+  "map: Cannot find",
+  "systemd-boot: Failed",
+  "loader: Failed",
+  "vmlinuz: not found",
+  "initramfs: not found",
+  "Error loading",
+  "File not found",
+  "Kernel panic",
+  "not syncing",
+  "VFS: Cannot open root device",
+  "No init found",
+  "Attempted to kill init",
+  "can't find /init",
+  "No root device",
+  "EROFS:",
+  "fatal error",
+  "Segmentation fault",
+  "core dumped",
+]
+service_failure_patterns = ["ERROR: cannot start", "* ERROR:", "crashed"]
 required_kernel_cmdline = []
 required_live_services = []
 
