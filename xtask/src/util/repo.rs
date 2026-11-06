@@ -1,4 +1,4 @@
-use anyhow::{Context, Result, bail};
+use anyhow::{Context, Result};
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -9,41 +9,39 @@ pub fn repo_root() -> Result<PathBuf> {
         .context("xtask is expected at <repo>/xtask")
 }
 
-pub fn canonical_tools_install_command() -> &'static str {
-    "just tools-install"
-}
-
-pub fn tools_prefix(root: &Path) -> Result<PathBuf> {
+/// The repo's QEMU tools (`cargo xtask setup`), or `None` when they are not
+/// installed and the host's QEMU and OVMF are used instead.
+pub fn repo_tools(root: &Path) -> Result<Option<PathBuf>> {
     let selection = root.join(".artifacts/tools/current");
-    let published = match fs::canonicalize(&selection) {
-        Ok(published) => published,
+    match fs::canonicalize(&selection) {
+        Ok(published) if published.is_dir() => Ok(Some(published)),
+        Ok(_) => Err(crate::util::exit::missing(
+            format!("the QEMU tools selection at {} is not a directory", selection.display()),
+            "remove .artifacts/tools and run cargo xtask setup",
+        )),
         Err(error) if error.kind() == std::io::ErrorKind::PermissionDenied => {
-            return Err(error).with_context(|| format!(
-                "cannot access QEMU tools selected at {}; published products retain coordinator ownership, so consume with matching privileges or explicitly install the selected product",
-                selection.display()
-            ));
-        }
-        Err(error) => {
-            return Err(error).with_context(|| {
+            Err(crate::util::exit::missing(
                 format!(
-                    "QEMU tools selection is unavailable at {}; prepare it with {}",
-                    selection.display(),
-                    canonical_tools_install_command()
-                )
-            });
+                    "the QEMU tools at {} are not readable by this user ({error})",
+                    selection.display()
+                ),
+                "run as the user that installed them, or remove .artifacts/tools and run cargo xtask setup",
+            ))
         }
-    };
-    if !published.is_dir() {
-        bail!(
-            "QEMU tools selection at {} must identify a published directory; prepare it with {}",
-            selection.display(),
-            canonical_tools_install_command()
-        );
+        Err(_) => Ok(None),
     }
-    Ok(published)
 }
 
+/// UEFI firmware: the repo tools' OVMF, else the host's (`OVMF_PATH` or the
+/// installed edk2/ovmf package).
 pub fn ovmf_path(root: &Path) -> Result<PathBuf> {
-    let tools_prefix = tools_prefix(root)?;
-    Ok(tools_prefix.join("usr/share/edk2/ovmf/OVMF_CODE.fd"))
+    if let Some(tools) = repo_tools(root)? {
+        return Ok(tools.join("usr/share/edk2/ovmf/OVMF_CODE.fd"));
+    }
+    recqemu::find_ovmf().map_err(|_| {
+        crate::util::exit::missing(
+            "no OVMF firmware: the repo QEMU tools are not installed and the host has none",
+            "cargo xtask setup (or install the host's edk2-ovmf / ovmf package)",
+        )
+    })
 }

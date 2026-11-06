@@ -1,82 +1,50 @@
 # levitate-xtask
 
-Repository developer tasks for LevitateOS. This is intentionally small and boring; it complements the `justfile`.
+`cargo xtask` is the workspace's one front door: every workflow (set up, build, boot, test, regenerate, check) is a subcommand, and `cargo xtask --help` lists them all. The producers do the work: distro-builder builds products, recipe builds kernels, install-tests runs scenarios. xtask only composes them and sets up the environment.
 
-## Hard Organization Rules
-
-- `src/main.rs` is an entrypoint only.
-  - Allowed: argument parsing + one call to `app::run(...)`.
-  - Forbidden: task logic, filesystem probing, command execution, etc.
-- Tasks must be grouped by category folders under `src/tasks/`.
-  - Example: `src/tasks/tooling/`, `src/tasks/distro/`, `src/tasks/docs/`.
-- Every `mod.rs` must be a shim only.
-  - Allowed: `pub mod ...`, `mod ...`, and `pub use ...` re-exports.
-  - Forbidden: behavior, business logic, argument handling, IO, side effects.
-- Actual task implementations live in non-`mod.rs` files (for example `src/tasks/<category>/<task>.rs`).
-- Shared helpers live under `src/util/` (and follow the same `mod.rs` shim rule).
-
-If you add a new task, you should be able to find it by path alone: `src/tasks/<category>/<task>.rs`.
-
-## Usage
+## Commands
 
 ```bash
-# Print exports matching the justfile (for interactive work)
-eval "$(cargo run -p levitate-xtask -- env bash)"
+cargo xtask setup                              # QEMU/OVMF tools into .artifacts/tools, repo SSH key, doctor
+cargo xtask doctor [--json]                    # what is missing, with the command that fixes it
+eval "$(cargo xtask env)"                      # the repo QEMU tools in your shell
 
-# Validate local tooling expectations
-cargo run -p levitate-xtask -- doctor
+cargo xtask build kernel levitate --prebuilt   # or compile: build kernel levitate [--now] [--rebuild]
+cargo xtask build rootfs-source levitate [--refresh]
+cargo xtask build live-tools levitate          # also base-rootfs, live-boot; --all for every distro
+cargo xtask build erofs live-tools levitate    # a product's EROFS images, no ISO
 
-# Install/remove shared git hooks across workspace + Rust submodules
-cargo run -p levitate-xtask -- hooks install
-cargo run -p levitate-xtask -- hooks remove
+cargo xtask run live-tools levitate            # serial console with the install UX (Ctrl-A X exits)
+cargo xtask run live-boot levitate --ssh       # wait for SSH, open a shell over it
+cargo xtask run live-boot levitate --window    # local QEMU window (--vnc for a VNC endpoint)
+cargo xtask run live-boot levitate --no-shell  # boot, check it came up, stop (no terminal needed)
+cargo xtask run installed-boot levitate        # the disk the latest install scenario produced
 
-# Interactive / automated scenario loop
-cargo run -p levitate-xtask -- scenarios boot live-boot levitate
-cargo run -p levitate-xtask -- scenarios test install levitate
-cargo run -p levitate-xtask -- scenarios status levitate
-cargo run -p levitate-xtask -- scenarios reset levitate
+cargo xtask test all levitate [--force] [--json]   # live-boot … runtime, in order, stop at first failure
+cargo xtask test install levitate
+cargo xtask status levitate [--json]
+cargo xtask reset levitate
 
-# Optional boot injection (for scenario boot/test paths)
-cargo run -p levitate-xtask -- scenarios boot live-boot levitate --inject 'SSH_AUTHORIZED_KEY=ssh-ed25519 AAAA...'
-cargo run -p levitate-xtask -- scenarios test live-boot levitate --inject-file /tmp/payload.env
+cargo xtask gen [--check]                      # schemas, TS declarations, tool help from the Rust types
+cargo xtask check                              # cargo check, generated files current, TS typecheck
 
-# Kernel artifacts verification
-cargo run -p levitate-xtask -- kernels check
-cargo run -p levitate-xtask -- kernels check levitate
-
-# Docs TUI page inspection snapshots (plain text by default)
-cargo run -p levitate-xtask -- docs inspect
-# Single page
-cargo run -p levitate-xtask -- docs inspect --slug installation-disk --stdout
-# Color/style snapshot output (.ansi files)
-cargo run -p levitate-xtask -- docs inspect --slug installation-disk --ansi
-# View an ANSI snapshot with colors
-less -R .artifacts/out/docs/tui-inspect/run-*/001-installation-disk.ansi
-
-# Generic TUI inspector (preset app target)
-cargo run -p levitate-xtask -- tui inspect --app install-disk-plan --input 'n'
-# Generic TUI inspector (custom target mode)
-cargo run -p levitate-xtask -- tui inspect \
-  --cwd tui/apps/install/disk-plan \
-  --command "bun run start -- --disk /dev/sda" \
-  --input 'n'
-
-# Build one kernel (x86_64; policy window enforced)
-cargo run -p levitate-xtask -- kernels build levitate
-
-# Overnight kernel builds (levitate + acorn; policy window enforced: 23:00 through 10:00 local time)
-cargo run -p levitate-xtask -- kernels build-all
-# Rebuild even if already verified
-cargo run -p levitate-xtask -- kernels build-all --rebuild
+cargo xtask tui install-docs                   # run a terminal app from tui/
+cargo xtask inspect docs --slug installation-disk --stdout
+cargo xtask inspect tui install-disk-plan --input 'n'
 ```
 
-## Deprecated Shell Wrappers
+`just <command>` is a short alias for each of these.
 
-The repo previously had ad-hoc shell scripts for kernel build/check. They are intentionally deleted; use xtask directly:
+## Behaviour every command keeps
 
-- `cargo xtask kernels build <distro>`
-- `cargo xtask kernels build-all`
-- `cargo xtask kernels check`
+- **Exit codes:** 0 ok, 1 failed, 2 bad usage, 3 missing prerequisite. A prerequisite error ends with `fix: <command>`.
+- **No hidden waiting:** `run` and `tui` need a terminal; without one they exit 2 and name the command that works without one. `test` never waits for input.
+- **SSH keys:** guests trust the repo key in `.artifacts/ssh` (created on first use), or `--ssh-key <private key>`. Nothing reads `~/.ssh`.
+- **Boot injection:** `--inject KEY=VALUE[,...]` and `--inject-file PATH` add to what xtask injects itself (the SSH key, and the serial install UX for `run`).
+- **QEMU:** the repo tools from `cargo xtask setup` when installed, otherwise the host's `qemu-system-x86_64` and OVMF.
+- **Nothing expensive by surprise:** kernel compiles run 23:00-10:00 unless `--now`; LLM autofix only with `--autofix`.
+- **What next:** builds print what they made and the command that tests it.
 
+## Layout
 
-Scenarios run independently and consume existing artifacts. Build products explicitly with `just release-build <product> <distro>`. See the workspace `architecture.md` for ownership and output locations.
+`src/cli/types.rs` defines every command; `src/app.rs` dispatches; each command group has one file under `src/tasks/` (`setup.rs`, `build.rs`, `scenarios.rs`, `generate.rs`, `check.rs`, `tui.rs`, `inspect_*.rs`, `kernels/`). Shared helpers live in `src/util/`. `tests/cli.rs` checks the CLI contract (status, reset, exit codes).

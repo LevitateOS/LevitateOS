@@ -1,10 +1,9 @@
 use anyhow::{Context, Result, bail};
 use distro_spec::shared::live_boot::{BOOT_INJECTION_DIR, BOOT_INJECTION_ENV};
 use install_tests::boot_injection::BootInjection;
-use install_tests::scenarios::{
-    ScenarioId, parse_scenario_name, resolve_iso_artifact_for_scenario,
-    resolve_latest_install_runtime,
-};
+use install_tests::scenarios::{ScenarioId, resolve_latest_install_runtime};
+use crate::cli::{BootArgs, Distro, Product, RunArgs, RunScenario, TestArgs, TestScenario};
+use crate::util::exit::usage;
 use std::fs::OpenOptions;
 use std::fs::{self, File};
 use std::io::Write;
@@ -48,8 +47,7 @@ struct WindowConfig {
 }
 
 impl WindowConfig {
-    fn allocate() -> Result<Self> {
-        let mode = detect_window_mode()?;
+    fn allocate(mode: WindowMode) -> Result<Self> {
         let (local_qemu_bin, local_display_backend, vnc_bind_host, vnc_host, vnc_port) = match mode
         {
             WindowMode::RemoteVnc => {
@@ -102,172 +100,219 @@ impl WindowConfig {
     }
 }
 
-pub fn boot(
-    target: String,
-    distro: crate::cli::Distro,
-    inject: Option<String>,
-    inject_file: Option<PathBuf>,
-    ssh: bool,
-    ssh_port: u16,
-    ssh_timeout: u64,
-    no_shell: bool,
-    window: bool,
-    ssh_private_key: Option<PathBuf>,
-) -> Result<()> {
+pub fn run(args: RunArgs) -> Result<()> {
     let root = crate::util::repo::repo_root()?;
-    let scenario =
-        parse_scenario_name(&target).with_context(|| format!("parsing scenario '{}'", target))?;
-
-    if window && ssh {
-        bail!(
-            "`--window` cannot be combined with `--ssh`.\n\
-             Use `cargo xtask scenarios boot <scenario> <distro> --window` for window mode,\n\
-             or `cargo xtask scenarios boot live-boot <distro> --ssh` for SSH workflow."
-        );
+    let distro = args.distro;
+    let key = match args.scenario {
+        RunScenario::LiveBoot => "live-boot",
+        RunScenario::LiveTools => "live-tools",
+        RunScenario::InstalledBoot => "installed-boot",
+    };
+    if !args.no_shell {
+        crate::util::exit::require_terminal(
+            "`cargo xtask run` (it hands you the guest's console)",
+            &format!(
+                "cargo xtask run {key} {0} --no-shell to boot and check it, or cargo xtask test {key} {0}",
+                distro.id()
+            ),
+        )?;
     }
-    if window && no_shell {
-        bail!(
-            "`--window` cannot be combined with `--no-shell`.\n\
-             Window mode runs in foreground and should be stopped with Ctrl-C."
-        );
-    }
-
-    let window_cfg = if window {
-        Some(WindowConfig::allocate()?)
+    let window = if args.window {
+        Some(WindowConfig::allocate(WindowMode::LocalGui)?)
+    } else if args.vnc {
+        Some(WindowConfig::allocate(WindowMode::RemoteVnc)?)
     } else {
         None
     };
 
-    match scenario {
-        ScenarioId::LiveBoot | ScenarioId::LiveTools => {
-            let iso_path = resolve_interactive_iso(distro, scenario)?;
-            let label = if scenario == ScenarioId::LiveBoot {
-                "Live boot ISO"
-            } else {
-                "Live tools ISO"
-            };
-            boot_live_iso(
-                &root,
-                distro,
-                label,
-                &iso_path,
-                inject,
-                inject_file,
-                ssh,
-                ssh_port,
-                ssh_timeout,
-                no_shell,
-                window_cfg.as_ref(),
-                ssh_private_key,
-            )
-        }
-        ScenarioId::InstalledBoot => {
-            if ssh {
-                bail!(
-                    "`--ssh` is only supported for the live-boot scenario; use `cargo xtask scenarios boot live-boot --ssh`."
-                );
+    let product = match args.scenario {
+        RunScenario::LiveBoot => Product::LiveBoot,
+        RunScenario::LiveTools => Product::LiveTools,
+        RunScenario::InstalledBoot => {
+            if args.ssh || args.no_shell {
+                return Err(usage(format!(
+                    "installed-boot opens the installed system's console; to check it without one use cargo xtask test installed-boot {}",
+                    distro.id()
+                )));
             }
-            if inject.is_some() || inject_file.is_some() {
-                bail!("boot injection is read by the live init; installed-boot does not support --inject/--inject-file");
+            if args.boot.inject.is_some() || args.boot.inject_file.is_some() || args.boot.ssh_key.is_some() {
+                return Err(usage(
+                    "installed-boot takes no boot injection: the live init reads it, the installed system does not",
+                ));
             }
-            boot_installed_disk(&root, distro, window_cfg.as_ref())
+            return boot_installed_disk(&root, distro, window.as_ref());
         }
-        _ => bail!(
-            "scenario '{}' is automated. Interactive targets: live-boot, live-tools, installed-boot.",
-            scenario.key()
+    };
+    let iso = crate::tasks::build::require_iso(distro, product)?;
+
+    // What the live init is told at boot.
+    let mut pairs = Vec::new();
+    let ssh_key = if args.ssh || args.boot.ssh_key.is_some() {
+        let (key, public) = crate::util::ssh::resolve(&root, args.boot.ssh_key.as_deref())?;
+        pairs.push(format!("SSH_AUTHORIZED_KEY={public}"));
+        Some(key)
+    } else {
+        None
+    };
+    if !args.ssh && !args.no_shell && window.is_none() {
+        // An interactive serial console: the install UX runs on it.
+        pairs.push("LEVITATE_INSTALL_SERIAL_UX=1".to_string());
+        if args.verbose {
+            pairs.push("LEVITATE_INSTALL_SERIAL_VERBOSE=1".to_string());
+        }
+    }
+    let payload = injection_payload(&pairs, &args.boot)?;
+    let injection = match &payload {
+        Some(file) => Some(BootInjection::from_file(file.path())?),
+        None => None,
+    };
+
+    match ssh_key.filter(|_| args.ssh) {
+        Some(key) => boot_live_iso_ssh(
+            &root,
+            distro,
+            product.id(),
+            &iso,
+            injection,
+            args.ssh_port,
+            args.ssh_timeout,
+            args.no_shell,
+            &key,
         ),
+        None => boot_live_iso_serial(&root, distro, &iso, injection, args.no_shell, window.as_ref()),
     }
 }
 
-pub fn test(
-    target: String,
-    distro: crate::cli::Distro,
-    inject: Option<String>,
-    inject_file: Option<PathBuf>,
-    force: bool,
-) -> Result<()> {
-    let scenario =
-        parse_scenario_name(&target).with_context(|| format!("parsing scenario '{}'", target))?;
-    let root = crate::util::repo::repo_root()?;
-    crate::util::tools_env::apply_to_process(&root)?;
-    // The scenario runs read the injection the way the scenarios binary hands it over.
-    // SAFETY: single-threaded command entry point.
-    unsafe {
-        if let Some(path) = &inject_file {
-            std::env::set_var(install_tests::boot_injection::ENV_INJECT_FILE, path);
-        } else if let Some(raw) = &inject {
-            std::env::set_var(install_tests::boot_injection::ENV_INJECT_KV, raw);
+/// `pairs`, then `--inject-file`, then `--inject`, as a KEY=VALUE payload file
+/// (none when there is nothing to inject).
+fn injection_payload(pairs: &[String], boot: &BootArgs) -> Result<Option<tempfile::NamedTempFile>> {
+    let mut text = String::new();
+    for pair in pairs {
+        text.push_str(pair);
+        text.push('\n');
+    }
+    if let Some(path) = &boot.inject_file {
+        let extra = fs::read_to_string(path)
+            .with_context(|| format!("reading --inject-file {}", path.display()))?;
+        text.push_str(extra.trim_end());
+        text.push('\n');
+    }
+    if let Some(raw) = &boot.inject {
+        for item in raw.split(',').map(str::trim).filter(|item| !item.is_empty()) {
+            text.push_str(item);
+            text.push('\n');
         }
     }
-    let passed = if force {
-        install_tests::scenarios::run_scenario_forced(distro.id(), scenario)?
-    } else {
-        install_tests::scenarios::run_scenario(distro.id(), scenario)?
+    if text.trim().is_empty() {
+        return Ok(None);
+    }
+    let mut file = tempfile::Builder::new()
+        .prefix("levitate-boot-injection-")
+        .suffix(".env")
+        .tempfile()
+        .context("creating the boot injection payload")?;
+    file.write_all(text.as_bytes())?;
+    Ok(Some(file))
+}
+
+/// What a scenario needs built or run first.
+fn require_inputs(distro: Distro, scenario: ScenarioId) -> Result<()> {
+    let product = match scenario {
+        ScenarioId::BuildPreflight => Product::BaseRootfs,
+        ScenarioId::LiveBoot => Product::LiveBoot,
+        ScenarioId::LiveTools | ScenarioId::Install => Product::LiveTools,
+        ScenarioId::InstalledBoot | ScenarioId::AutomatedLogin | ScenarioId::Runtime => {
+            return resolve_latest_install_runtime(distro.id()).map(|_| ()).map_err(|_| {
+                crate::util::exit::missing(
+                    format!("{} needs a disk from the install scenario, and there is none for {}", scenario.key(), distro.id()),
+                    format!("cargo xtask test install {}", distro.id()),
+                )
+            });
+        }
     };
-    if !passed {
+    crate::tasks::build::require_iso(distro, product).map(|_| ())
+}
+
+fn scenarios_for(scenario: TestScenario) -> Vec<ScenarioId> {
+    match scenario {
+        TestScenario::All => vec![
+            ScenarioId::LiveBoot,
+            ScenarioId::LiveTools,
+            ScenarioId::Install,
+            ScenarioId::InstalledBoot,
+            ScenarioId::AutomatedLogin,
+            ScenarioId::Runtime,
+        ],
+        TestScenario::BuildPreflight => vec![ScenarioId::BuildPreflight],
+        TestScenario::LiveBoot => vec![ScenarioId::LiveBoot],
+        TestScenario::LiveTools => vec![ScenarioId::LiveTools],
+        TestScenario::Install => vec![ScenarioId::Install],
+        TestScenario::InstalledBoot => vec![ScenarioId::InstalledBoot],
+        TestScenario::AutomatedLogin => vec![ScenarioId::AutomatedLogin],
+        TestScenario::Runtime => vec![ScenarioId::Runtime],
+    }
+}
+
+pub fn test(args: TestArgs) -> Result<()> {
+    let root = crate::util::repo::repo_root()?;
+    let distro = args.distro;
+    let scenarios = scenarios_for(args.scenario);
+    require_inputs(distro, scenarios[0])?;
+    crate::util::tools_env::apply_to_process(&root)?;
+    let (key, public) = crate::util::ssh::resolve(&root, args.boot.ssh_key.as_deref())?;
+    let payload = injection_payload(&[format!("SSH_AUTHORIZED_KEY={public}")], &args.boot)?
+        .context("the payload always holds the SSH key")?;
+    // The scenario runs read the injection and the login key from here.
+    // SAFETY: single-threaded command entry point.
+    unsafe {
+        std::env::set_var(install_tests::boot_injection::ENV_INJECT_FILE, payload.path());
+        std::env::set_var("LEVITATE_SSH_PRIVATE_KEY", &key);
+    }
+
+    let mut results = Vec::new();
+    for scenario in scenarios {
+        require_inputs(distro, scenario)?;
+        let passed = if args.force {
+            install_tests::scenarios::run_scenario_forced(distro.id(), scenario)?
+        } else {
+            install_tests::scenarios::run_scenario(distro.id(), scenario)?
+        };
+        results.push((scenario, passed));
+        if !passed {
+            break;
+        }
+    }
+
+    if args.json {
+        let summary: Vec<_> = results
+            .iter()
+            .map(|(scenario, passed)| serde_json::json!({ "scenario": scenario.key(), "passed": passed }))
+            .collect();
+        println!("{}", serde_json::to_string_pretty(&summary)?);
+    }
+    if let Some((scenario, _)) = results.iter().find(|(_, passed)| !passed) {
         bail!("scenario {} failed for {}", scenario.key(), distro.id());
     }
     Ok(())
 }
 
-pub fn status(distro: crate::cli::Distro) -> Result<()> {
-    install_tests::scenarios::print_status(distro.id())
+pub fn status(distro: Distro, json: bool) -> Result<()> {
+    if !json {
+        return install_tests::scenarios::print_status(distro.id());
+    }
+    let scenarios: Vec<_> = install_tests::scenarios::scenario_statuses(distro.id())?
+        .into_iter()
+        .map(|(scenario, status)| serde_json::json!({ "scenario": scenario.key(), "status": status }))
+        .collect();
+    println!(
+        "{}",
+        serde_json::to_string_pretty(&serde_json::json!({ "distro": distro.id(), "scenarios": scenarios }))?
+    );
+    Ok(())
 }
 
-pub fn reset(distro: crate::cli::Distro) -> Result<()> {
+pub fn reset(distro: Distro) -> Result<()> {
     install_tests::scenarios::reset_state(distro.id())
-}
-
-fn resolve_interactive_iso(distro: crate::cli::Distro, scenario: ScenarioId) -> Result<PathBuf> {
-    let iso = resolve_iso_artifact_for_scenario(distro.id(), scenario)?.ok_or_else(|| {
-        anyhow::anyhow!("scenario '{}' is not backed by a live ISO", scenario.key())
-    })?;
-    Ok(iso.path)
-}
-
-/// The boot injection from `--inject-file` or `--inject` (KEY=VALUE pairs).
-fn boot_injection(
-    inject: Option<String>,
-    inject_file: Option<PathBuf>,
-) -> Result<Option<BootInjection>> {
-    match (inject_file, inject) {
-        (Some(path), _) => BootInjection::from_file(&path).map(Some),
-        (None, Some(raw)) => BootInjection::from_pairs(&raw),
-        (None, None) => Ok(None),
-    }
-}
-
-fn boot_live_iso(
-    root: &Path,
-    distro: crate::cli::Distro,
-    scenario_label: &'static str,
-    iso_path: &Path,
-    inject: Option<String>,
-    inject_file: Option<PathBuf>,
-    ssh: bool,
-    ssh_port: u16,
-    ssh_timeout: u64,
-    no_shell: bool,
-    window: Option<&WindowConfig>,
-    ssh_private_key: Option<PathBuf>,
-) -> Result<()> {
-    let injection = boot_injection(inject, inject_file)?;
-    if ssh {
-        boot_live_iso_ssh(
-            root,
-            distro,
-            scenario_label,
-            iso_path,
-            injection,
-            ssh_port,
-            ssh_timeout,
-            no_shell,
-            window,
-            ssh_private_key,
-        )
-    } else {
-        boot_live_iso_serial(root, distro, iso_path, injection, no_shell, window)
-    }
 }
 
 fn boot_live_iso_serial(
@@ -382,14 +427,13 @@ fn monitor_live_iso_serial(mut child: Child, log_path: &Path, patterns: &LiveBoo
 fn boot_live_iso_ssh(
     root: &Path,
     distro: crate::cli::Distro,
-    scenario_label: &'static str,
+    scenario_label: &str,
     iso_path: &Path,
     injection: Option<BootInjection>,
     ssh_port: u16,
     ssh_timeout: u64,
     no_shell: bool,
-    window: Option<&WindowConfig>,
-    ssh_private_key: Option<PathBuf>,
+    ssh_private_key: &Path,
 ) -> Result<()> {
     eprintln!(
         "Booting {} {} with SSH wait (port {}:{ssh_port})...",
@@ -399,7 +443,7 @@ fn boot_live_iso_ssh(
     );
     ensure_ssh_port_available(ssh_port)?;
 
-    let mut cmd = qemu_base_command(root, iso_path, injection.as_ref(), Some(ssh_port), window)?;
+    let mut cmd = qemu_base_command(root, iso_path, injection.as_ref(), Some(ssh_port), None)?;
     let log_path = temp_log_path("levitate-live-boot-ssh");
     let child = spawn_qemu_with_log(&mut cmd, &log_path, true)?;
     let result = monitor_live_iso_ssh(
@@ -432,12 +476,11 @@ fn monitor_live_iso_ssh(
     ssh_port: u16,
     ssh_timeout: u64,
     no_shell: bool,
-    ssh_private_key: Option<PathBuf>,
+    key: &Path,
 ) -> Result<()> {
     let known_hosts = temp_file_path("levitate-live-boot-ssh-known-hosts");
     fs::write(&known_hosts, "").context("creating known-hosts scratch file")?;
     let deadline = Instant::now() + Duration::from_secs(ssh_timeout.max(1));
-    let key = resolve_ssh_private_key(ssh_private_key)?;
     let mut hook_seen = false;
     let mut lines_seen = 0usize;
 
@@ -585,17 +628,6 @@ fn can_ssh_connect(ssh_port: u16, private_key: &Path, known_hosts: &Path) -> Res
         .status()
         .context("checking SSH readiness")?;
     Ok(status.success())
-}
-
-fn resolve_ssh_private_key(arg: Option<PathBuf>) -> Result<PathBuf> {
-    let path = arg.unwrap_or_else(recshuttle::ssh_private_key_path);
-    if !path.is_file() {
-        bail!(
-            "SSH private key {} does not exist; pass --ssh-private-key or set LEVITATE_SSH_PRIVATE_KEY",
-            path.display()
-        );
-    }
-    Ok(path)
 }
 
 fn common_ssh_args(key: &Path, ssh_port: u16, known_hosts: &Path) -> Vec<String> {
@@ -770,19 +802,6 @@ fn print_window_mode_details(window_cfg: &WindowConfig, pid: u32) {
                 vnc_port
             );
         }
-    }
-}
-
-fn detect_window_mode() -> Result<WindowMode> {
-    let raw =
-        std::env::var("LEVITATE_SCENARIO_WINDOW_MODE").unwrap_or_else(|_| "remote".to_string());
-    match raw.trim().to_ascii_lowercase().as_str() {
-        "remote" | "vnc" | "" => Ok(WindowMode::RemoteVnc),
-        "local" | "gtk" => Ok(WindowMode::LocalGui),
-        other => bail!(
-            "Unsupported LEVITATE_SCENARIO_WINDOW_MODE value '{}'. Expected one of: remote, vnc, local, gtk.",
-            other
-        ),
     }
 }
 

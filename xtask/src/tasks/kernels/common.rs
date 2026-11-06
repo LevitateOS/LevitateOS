@@ -10,6 +10,16 @@ pub(crate) struct KernelTarget {
     pub kernel: &'static distro_spec::shared::KernelSource,
 }
 
+/// How `build kernel` compiles.
+#[derive(Clone, Debug)]
+pub(crate) struct KernelBuild {
+    /// Build again even if verified artifacts are present.
+    pub(crate) rebuild: bool,
+    /// Ignore the 23:00-10:00 build window.
+    pub(crate) now: bool,
+    pub(crate) autofix: AutoFixOptions,
+}
+
 #[derive(Clone, Debug)]
 pub(crate) struct AutoFixOptions {
     pub(crate) enabled: bool,
@@ -25,29 +35,24 @@ pub(crate) fn target_for(d: crate::cli::Distro) -> KernelTarget {
     }
 }
 
-pub(crate) fn enforce_build_hours() -> Result<()> {
+/// Kernel compiles run 23:00-10:00 so they do not tie up the machine during
+/// the day; `--now` overrides.
+pub(crate) fn enforce_build_hours(now: bool) -> Result<()> {
+    if now {
+        return Ok(());
+    }
     let hhmm = run_capture("date", &["+%H%M"])?;
     let hhmm = hhmm.trim();
-    let now = run_capture("date", &["+%Y-%m-%d %H:%M:%S %z"])?;
-    let now = now.trim();
-
     let hhmm_num: i32 = hhmm
         .parse()
         .with_context(|| format!("Parsing date +%H%M output: '{hhmm}'"))?;
-
-    // Allowed: 23:00-23:59, 00:00-10:00 (inclusive)
     if hhmm_num >= 2300 || hhmm_num <= 1000 {
         return Ok(());
     }
-
-    eprintln!(
-        "[policy] Refusing to build kernels outside the allowed window.\n\
-         Allowed local time window: 23:00 (11pm) through 10:00 (10am).\n\
-         Current local time: {now}\n\
-\n\
-         If you really intend to build right now, rerun later during the window."
-    );
-    std::process::exit(3);
+    Err(crate::util::exit::missing(
+        format!("kernel compiles run between 23:00 and 10:00 (it is {}:{})", &hhmm[..2], &hhmm[2..]),
+        "add --now to compile anyway, or use --prebuilt to download it",
+    ))
 }
 
 pub(crate) fn kernel_is_built(root: &Path, t: &KernelTarget) -> bool {

@@ -57,35 +57,27 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-registry-
 
-      - name: Build product and scenario tools
-        run: cargo build --release -p levitate-recipe -p distro-builder -p install-tests -p rootfs-tests
+      - name: Build xtask and the rootfs checker
+        run: cargo build --release -p levitate-recipe -p levitate-xtask -p rootfs-tests
 
       - name: Acquire declared kernel and rootfs inputs
         run: |
-          cargo xtask kernels prebuilt levitate
-          target/release/distro-builder artifact preseed-rootfs-source levitate
+          target/release/levitate-xtask build kernel levitate --prebuilt
+          target/release/levitate-xtask build rootfs-source levitate
 
       - name: Build live products explicitly
         run: |
-          target/release/distro-builder release build iso live-boot levitate
-          target/release/distro-builder release build iso live-tools levitate
+          target/release/levitate-xtask build live-boot levitate
+          target/release/levitate-xtask build live-tools levitate
 
       - name: Verify serial, SSH, installation and runtime behavior
         timeout-minutes: 30
         run: |
           set -euo pipefail
-          key_dir="$(mktemp -d)"
-          trap 'rm -rf "$key_dir"' EXIT
-          ssh-keygen -q -t ed25519 -N "" -f "$key_dir/key"
-          printf 'SSH_AUTHORIZED_KEY=%s\n' "$(cat "$key_dir/key.pub")" > "$key_dir/inject.env"
-
-          cargo xtask scenarios boot live-boot levitate --inject-file "$key_dir/inject.env" --no-shell
-          cargo xtask scenarios boot live-boot levitate --inject-file "$key_dir/inject.env" --ssh --no-shell --ssh-private-key "$key_dir/key"
-          # This list is the CI coverage selection. Each scenario is also runnable directly.
-          # Installed-system scenarios consume the disk created by the install scenario.
-          for scenario in live-boot live-tools install installed-boot automated-login runtime; do
-            cargo xtask scenarios test "$scenario" levitate --inject-file "$key_dir/inject.env" --force
-          done
+          target/release/levitate-xtask run live-boot levitate --no-shell
+          target/release/levitate-xtask run live-boot levitate --ssh --no-shell
+          # `all` is live-boot, live-tools, install, installed-boot, automated-login, runtime.
+          target/release/levitate-xtask test all levitate --force
 
       - name: Verify the composed product rootfs
         timeout-minutes: 15

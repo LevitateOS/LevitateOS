@@ -1,5 +1,9 @@
-pub mod docs;
+pub mod build;
+pub mod check;
+pub mod generate;
+pub mod inspect_docs;
+pub mod inspect_tui;
 pub mod kernels;
-pub mod testing;
-pub mod tooling;
+pub mod scenarios;
+pub mod setup;
 pub mod tui;

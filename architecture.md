@@ -18,14 +18,15 @@ Privilege escalation is an intentional platform difference: Levitate uses `sudo`
 ## Build a product
 
 ```sh
-just release-build live-tools levitate
-just release-build live-tools acorn
+cargo xtask build live-tools levitate
+cargo xtask build live-tools acorn
 ```
 
 Canonical ISO products are `base-rootfs`, `live-boot` and `live-tools`. `installed-boot` is a product preparation target, not a release ISO target. An explicit release build can realize missing parent products from the dependency graph. Kernel rebuilds stay explicit:
 
 ```sh
-cargo xtask kernels build levitate
+cargo xtask build kernel levitate             # compile (23:00-10:00 unless --now)
+cargo xtask build kernel levitate --prebuilt  # or download
 ```
 
 Release runs live under `.artifacts/out/<distro>/releases/<product>/run-*/`. Installed test disks live under `.artifacts/out/<distro>/scenarios/install/run-*/`. Kernel artifacts remain under `.artifacts/kernel/<distro>/current/`. There are no numbered checkpoint output families.
@@ -33,17 +34,17 @@ Release runs live under `.artifacts/out/<distro>/releases/<product>/run-*/`. Ins
 ## Run a scenario
 
 ```sh
-just scenario-test live-tools levitate
-just scenario-test install levitate
-just scenario-test runtime levitate
-just scenario live-tools levitate
-cargo xtask scenarios test runtime levitate --force
-cargo xtask scenarios status levitate
+cargo xtask test live-tools levitate
+cargo xtask test install levitate
+cargo xtask test runtime levitate --force
+cargo xtask test all levitate
+cargo xtask run live-tools levitate     # interactive
+cargo xtask status levitate
 ```
 
 Available scenarios are `build-preflight`, `live-boot`, `live-tools`, `install`, `installed-boot`, `automated-login` and `runtime`. Select any scenario directly. Each consumes existing artifacts and performs its required preflight; it does not build missing artifacts or require earlier scenario pass records. Installed-system scenarios require a completed install disk because that is their actual input. Create that input explicitly with the `install` scenario when needed.
 
-Each cached result is bound to its own resolved input fingerprint. A changed input invalidates that result, and status reports stale results separately from passes. `--force` reruns only the selected scenario. `cargo xtask scenarios reset <distro>` removes saved results. Set `LEVITATE_SCENARIO_STATE_DIR` to keep separate state for CI or another local run.
+Each cached result is bound to its own resolved input fingerprint. A changed input invalidates that result, and status reports stale results separately from passes. `--force` reruns only the selected scenario. `cargo xtask reset <distro>` removes saved results. Set `LEVITATE_SCENARIO_STATE_DIR` to keep separate state for CI or another local run.
 
 ## Correctness
 

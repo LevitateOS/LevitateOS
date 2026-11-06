@@ -1,8 +1,8 @@
-use clap::{Parser, Subcommand, ValueEnum};
+use clap::{Args, Parser, Subcommand, ValueEnum};
 use std::path::PathBuf;
 
 /// A LevitateOS variant (`distro-variants/<id>`).
-#[derive(Clone, Copy, Debug, ValueEnum)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, ValueEnum)]
 pub enum Distro {
     #[value(name = "levitate")]
     Levitate,
@@ -11,6 +11,8 @@ pub enum Distro {
 }
 
 impl Distro {
+    pub const ALL: [Distro; 2] = [Distro::Levitate, Distro::Acorn];
+
     pub fn id(self) -> &'static str {
         match self {
             Self::Levitate => "levitate",
@@ -33,9 +35,20 @@ impl Distro {
     }
 }
 
+const AFTER_HELP: &str = "\
+Typical loop:
+  cargo xtask setup                       once: QEMU tools, firmware, SSH key
+  cargo xtask build kernel levitate --prebuilt
+  cargo xtask build live-tools levitate
+  cargo xtask test all levitate
+  cargo xtask status levitate
+
+Exit codes: 0 ok, 1 failed, 2 bad usage, 3 missing prerequisite (the message names the command that provides it).
+Nothing waits for input unless it needs a terminal; without one it stops and names the command that works without it.";
+
+/// The LevitateOS workspace front door: set up, build, boot, test and check.
 #[derive(Parser)]
-#[command(name = "xtask")]
-#[command(about = "LevitateOS repo developer tasks (scaffolding; complements justfile)")]
+#[command(name = "xtask", bin_name = "cargo xtask", after_help = AFTER_HELP)]
 pub struct Cli {
     #[command(subcommand)]
     pub cmd: Cmd,
@@ -43,258 +56,271 @@ pub struct Cli {
 
 #[derive(Subcommand)]
 pub enum Cmd {
-    /// Print the environment exports that the justfile sets for QEMU/tooling.
-    ///
-    /// Usage:
-    ///   eval "$(cargo xtask env bash)"
-    Env {
-        #[arg(value_enum, default_value_t = Shell::Bash)]
-        shell: Shell,
+    /// Install the QEMU/OVMF tools into .artifacts/tools, create the repo SSH key, then run doctor.
+    Setup,
+
+    /// Check tools, firmware, kernels and ISOs; print the command that fixes each gap.
+    Doctor {
+        /// Print the checks as JSON.
+        #[arg(long)]
+        json: bool,
     },
 
-    /// Check that the local toolchain/tools match what the justfile expects.
-    Doctor,
+    /// Print shell exports for the repo's QEMU tools: eval "$(cargo xtask env)".
+    Env,
 
-    /// Kernel-related tasks.
-    Kernels {
-        #[command(subcommand)]
-        cmd: KernelsCmd,
-    },
-
-    /// Install/remove shared git hooks (pre-commit) across the workspace + Rust submodules.
-    Hooks {
-        #[command(subcommand)]
-        cmd: HooksCmd,
-    },
-
-    /// Install-test scenario runner.
-    #[command(name = "scenarios")]
-    Scenarios {
-        #[command(subcommand)]
-        cmd: ScenariosCmd,
-    },
-
-    /// Docs tooling tasks.
-    Docs {
-        #[command(subcommand)]
-        cmd: DocsCmd,
-    },
-
-    /// Generic TUI tooling tasks.
-    Tui {
-        #[command(subcommand)]
-        cmd: TuiCmd,
-    },
-
-    /// Regenerate recpart's and recab's JSON Schemas and the TUIs'
-    /// TypeScript declarations from the tools' output types.
-    Contracts,
-}
-
-#[derive(Subcommand)]
-pub enum KernelsCmd {
-    /// Build the kernel for one distro (policy window enforced).
-    #[command(name = "build")]
+    /// Build a product ISO, a kernel, the rootfs source, or a product's EROFS images.
     Build {
-        #[arg(value_enum)]
-        distro: Distro,
-
-        #[arg(
-            long = "rebuild",
-            help = "Force the selected distro to rebuild+reinstall its kernel even if artifacts are already present. Does not bypass the 23:00-10:00 build-hours policy."
-        )]
-        rebuild: bool,
-
-        #[arg(
-            long = "autofix",
-            help = "On kernel build failure, rerun via `recipe install --autofix ...` so Recipe can ask the configured LLM provider to propose a patch and retry."
-        )]
-        autofix: bool,
-
-        #[arg(
-            long = "autofix-attempts",
-            default_value_t = 2,
-            help = "Maximum number of auto-fix attempts per failing kernel build."
-        )]
-        autofix_attempts: u8,
-
-        #[arg(
-            long = "autofix-prompt-file",
-            help = "Optional extra instructions appended to the built-in Codex autofix prompt."
-        )]
-        autofix_prompt_file: Option<PathBuf>,
-
-        #[arg(
-            long = "llm-profile",
-            help = "Pass through to `recipe --llm-profile <name>` (selects a profile from XDG `recipe/llm.toml`)."
-        )]
-        llm_profile: Option<String>,
+        #[command(subcommand)]
+        what: BuildCmd,
     },
 
-    /// Build kernels for all distros (policy window enforced).
-    #[command(name = "build-all")]
-    BuildAll {
-        #[arg(
-            long = "rebuild",
-            help = "Force every distro to rebuild+reinstall its kernel even if artifacts are already present. Does not bypass the 23:00-10:00 build-hours policy."
-        )]
-        rebuild: bool,
+    /// Boot a scenario for interactive use (needs a terminal unless --no-shell).
+    Run(RunArgs),
 
-        #[arg(
-            long = "autofix",
-            help = "On kernel build failure, rerun via `recipe install --autofix ...` so Recipe can ask the configured LLM provider to propose a patch and retry."
-        )]
-        autofix: bool,
+    /// Run automated scenarios; results are cached per input (--force reruns).
+    Test(TestArgs),
 
-        #[arg(
-            long = "autofix-attempts",
-            default_value_t = 2,
-            help = "Maximum number of auto-fix attempts per failing kernel build."
-        )]
-        autofix_attempts: u8,
-
-        #[arg(
-            long = "autofix-prompt-file",
-            help = "Optional extra instructions appended to the built-in Codex autofix prompt."
-        )]
-        autofix_prompt_file: Option<PathBuf>,
-
-        #[arg(
-            long = "llm-profile",
-            help = "Pass through to `recipe --llm-profile <name>` (selects a profile from XDG `recipe/llm.toml`)."
-        )]
-        llm_profile: Option<String>,
-    },
-
-    /// Install prebuilt kernel artifacts for one distro (no source compile).
-    #[command(name = "prebuilt")]
-    Prebuilt {
-        #[arg(value_enum)]
-        distro: Distro,
-
-        #[arg(
-            long = "refresh",
-            help = "Force re-download and reinstall of prebuilt artifacts even when local kernel artifacts already verify."
-        )]
-        refresh: bool,
-    },
-
-    /// Verify built kernel artifacts for one distro (or all distros if omitted).
-    Check {
-        #[arg(value_enum)]
-        distro: Option<Distro>,
-    },
-}
-
-#[derive(Subcommand)]
-pub enum HooksCmd {
-    /// Install the shared pre-commit hook into the workspace + Rust submodules.
-    Install,
-
-    /// Remove the shared pre-commit hook from the workspace + Rust submodules.
-    Remove,
-}
-
-#[derive(Subcommand)]
-pub enum ScenariosCmd {
-    /// Boot into an interactive scenario.
-    ///
-    /// Interactive targets: `live-boot`, `live-tools`, `installed-boot`
-    Boot {
-        target: String,
-        #[arg(value_enum, default_value_t = Distro::Levitate)]
-        distro: Distro,
-        #[arg(long, value_name = "KEY=VALUE[,KEY=VALUE...]")]
-        inject: Option<String>,
-        #[arg(long, value_name = "PATH")]
-        inject_file: Option<PathBuf>,
-        /// Boot the scenario and wait for SSH readiness on the host forwarded port.
-        #[arg(long)]
-        ssh: bool,
-        /// SSH host-forward port when `--ssh` is enabled.
-        #[arg(long, default_value_t = 2222)]
-        ssh_port: u16,
-        /// Timeout in seconds to wait for SSH readiness and probe when `--ssh` is enabled.
-        #[arg(long, default_value_t = 90)]
-        ssh_timeout: u64,
-        /// Connect and verify SSH only, without opening an interactive shell.
-        #[arg(long)]
-        no_shell: bool,
-        /// Open a graphical window via local VNC viewer instead of serial-only headless mode.
-        #[arg(long)]
-        window: bool,
-        /// SSH private key used for interactive or probe login when `--ssh` is enabled.
-        #[arg(long, value_name = "PATH")]
-        ssh_private_key: Option<PathBuf>,
-    },
-
-    /// Run one automated scenario.
-    Test {
-        target: String,
-        #[arg(value_enum, default_value_t = Distro::Levitate)]
-        distro: Distro,
-        #[arg(long, value_name = "KEY=VALUE[,KEY=VALUE...]")]
-        inject: Option<String>,
-        #[arg(long, value_name = "PATH")]
-        inject_file: Option<PathBuf>,
-        /// Re-run the requested scenario even if it is already cached as passed.
-        #[arg(long)]
-        force: bool,
-    },
-
-    /// Show scenario test status.
+    /// Show which scenarios pass, fail, are stale or have not run.
     Status {
         #[arg(value_enum, default_value_t = Distro::Levitate)]
         distro: Distro,
+        /// Print the statuses as JSON.
+        #[arg(long)]
+        json: bool,
     },
 
-    /// Reset cached scenario state for a distro.
+    /// Forget saved scenario results for a distro.
     Reset {
         #[arg(value_enum, default_value_t = Distro::Levitate)]
         distro: Distro,
     },
-}
 
-#[derive(Subcommand)]
-pub enum DocsCmd {
-    /// Render install-docs TUI pages and write plain-text terminal snapshots.
+    /// Regenerate files derived from the Rust types and CLIs (schemas, TS declarations, tool help).
+    Gen {
+        /// Only report files that are out of date (exit 1 if any).
+        #[arg(long)]
+        check: bool,
+    },
+
+    /// Quick checks before committing: cargo check, generated files current, TypeScript typecheck.
+    Check,
+
+    /// Launch a terminal app from tui/ in this terminal.
+    Tui {
+        #[arg(value_enum)]
+        app: TuiApp,
+        /// Arguments passed to the app.
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
+        args: Vec<String>,
+    },
+
+    /// Render a terminal app or the install docs headlessly and write snapshots.
     Inspect {
-        /// Explicit slug(s) to inspect. If omitted, xtask inspects every slug from docs/content nav.
-        #[arg(long = "slug", value_name = "SLUG")]
-        slug: Vec<String>,
-
-        /// Terminal columns used for rendering.
-        #[arg(long, default_value_t = 140)]
-        columns: u16,
-
-        /// Terminal rows used for rendering.
-        #[arg(long, default_value_t = 40)]
-        rows: u16,
-
-        /// Seconds to keep each page running before snapshot capture.
-        #[arg(long, default_value_t = 2)]
-        seconds: u64,
-
-        /// Optional output base directory. xtask always creates a timestamped run folder under this path.
-        #[arg(long, value_name = "PATH")]
-        out_dir: Option<PathBuf>,
-
-        /// Also print the plain snapshot(s) to stdout.
-        #[arg(long)]
-        stdout: bool,
-
-        /// Also write ANSI-formatted snapshots (`.ansi`) for color/style review.
-        #[arg(long)]
-        ansi: bool,
-
-        /// Keep raw terminal transcripts next to plain outputs for debugging.
-        #[arg(long)]
-        keep_transcript: bool,
+        #[command(subcommand)]
+        what: InspectCmd,
     },
 }
 
+/// A product ISO.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, ValueEnum)]
+pub enum Product {
+    #[value(name = "base-rootfs")]
+    BaseRootfs,
+    #[value(name = "live-boot")]
+    LiveBoot,
+    #[value(name = "live-tools")]
+    LiveTools,
+}
+
+impl Product {
+    pub fn id(self) -> &'static str {
+        match self {
+            Self::BaseRootfs => "base-rootfs",
+            Self::LiveBoot => "live-boot",
+            Self::LiveTools => "live-tools",
+        }
+    }
+}
+
+#[derive(Subcommand)]
+pub enum BuildCmd {
+    /// The base-rootfs ISO.
+    #[command(name = "base-rootfs")]
+    BaseRootfs(ProductArgs),
+    /// The live-boot ISO.
+    #[command(name = "live-boot")]
+    LiveBoot(ProductArgs),
+    /// The live-tools ISO (the one the install scenarios use).
+    #[command(name = "live-tools")]
+    LiveTools(ProductArgs),
+    /// The kernel: compiled from source, or downloaded with --prebuilt.
+    Kernel(KernelArgs),
+    /// Download (or refresh) the rootfs source that product builds start from.
+    #[command(name = "rootfs-source")]
+    RootfsSource {
+        #[arg(value_enum, default_value_t = Distro::Levitate)]
+        distro: Distro,
+        /// Download it again even if it is present.
+        #[arg(long)]
+        refresh: bool,
+    },
+    /// Prepare a product and build its rootfs and overlay EROFS images (no ISO).
+    Erofs {
+        #[arg(value_enum)]
+        product: Product,
+        #[arg(value_enum, default_value_t = Distro::Levitate)]
+        distro: Distro,
+    },
+}
+
+impl BuildCmd {
+    pub fn product(&self) -> Option<(Product, &ProductArgs)> {
+        match self {
+            Self::BaseRootfs(args) => Some((Product::BaseRootfs, args)),
+            Self::LiveBoot(args) => Some((Product::LiveBoot, args)),
+            Self::LiveTools(args) => Some((Product::LiveTools, args)),
+            _ => None,
+        }
+    }
+}
+
+#[derive(Args)]
+pub struct ProductArgs {
+    /// Defaults to levitate.
+    #[arg(value_enum)]
+    pub distro: Option<Distro>,
+    /// Build it for every distro.
+    #[arg(long, conflicts_with = "distro")]
+    pub all: bool,
+}
+
+#[derive(Args)]
+pub struct KernelArgs {
+    #[arg(value_enum, required_unless_present = "all")]
+    pub distro: Option<Distro>,
+    /// Every distro.
+    #[arg(long, conflicts_with = "distro")]
+    pub all: bool,
+    /// Download the distro's prebuilt kernel instead of compiling.
+    #[arg(long, conflicts_with = "autofix")]
+    pub prebuilt: bool,
+    /// Build (or download) again even if verified artifacts are present.
+    #[arg(long)]
+    pub rebuild: bool,
+    /// Compile even outside the 23:00-10:00 kernel build window.
+    #[arg(long)]
+    pub now: bool,
+    /// On failure, let recipe ask the configured LLM for a patch and retry.
+    #[arg(long)]
+    pub autofix: bool,
+    /// Autofix attempts per failing build.
+    #[arg(long, default_value_t = 2, requires = "autofix")]
+    pub autofix_attempts: u8,
+    /// Extra instructions appended to the autofix prompt.
+    #[arg(long, value_name = "PATH", requires = "autofix")]
+    pub autofix_prompt_file: Option<PathBuf>,
+    /// recipe LLM profile (from XDG `recipe/llm.toml`).
+    #[arg(long, requires = "autofix")]
+    pub llm_profile: Option<String>,
+}
+
+/// A scenario that boots for interactive use.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, ValueEnum)]
+pub enum RunScenario {
+    #[value(name = "live-boot")]
+    LiveBoot,
+    #[value(name = "live-tools")]
+    LiveTools,
+    /// The disk the latest install scenario produced.
+    #[value(name = "installed-boot")]
+    InstalledBoot,
+}
+
+#[derive(Args)]
+pub struct RunArgs {
+    #[arg(value_enum)]
+    pub scenario: RunScenario,
+    #[arg(value_enum, default_value_t = Distro::Levitate)]
+    pub distro: Distro,
+    /// Wait for SSH on a forwarded port and open a shell over it (live scenarios).
+    #[arg(long, conflicts_with_all = ["window", "vnc"])]
+    pub ssh: bool,
+    /// Show the console in a local QEMU window.
+    #[arg(long, conflicts_with_all = ["vnc", "no_shell"])]
+    pub window: bool,
+    /// Show the console over VNC (prints the endpoint).
+    #[arg(long, conflicts_with_all = ["window", "no_shell"])]
+    pub vnc: bool,
+    /// Boot, check that it came up (and that SSH logs in, with --ssh), then stop. Needs no terminal.
+    #[arg(long)]
+    pub no_shell: bool,
+    /// Verbose install UX logging on the serial console.
+    #[arg(long)]
+    pub verbose: bool,
+    #[command(flatten)]
+    pub boot: BootArgs,
+    /// Host port forwarded to the guest's SSH (with --ssh).
+    #[arg(long, default_value_t = 2222)]
+    pub ssh_port: u16,
+    /// Seconds to wait for SSH (with --ssh).
+    #[arg(long, default_value_t = 90)]
+    pub ssh_timeout: u64,
+}
+
+/// Boot injection and the SSH key the guest trusts.
+#[derive(Args)]
+pub struct BootArgs {
+    /// Extra boot injection, KEY=VALUE[,KEY=VALUE...].
+    #[arg(long, value_name = "KEY=VALUE[,...]")]
+    pub inject: Option<String>,
+    /// Extra boot injection from a KEY=VALUE file.
+    #[arg(long, value_name = "PATH")]
+    pub inject_file: Option<PathBuf>,
+    /// Private key to log in with (its .pub is injected). Default: the repo key in
+    /// .artifacts/ssh, created on first use.
+    #[arg(long, value_name = "PATH")]
+    pub ssh_key: Option<PathBuf>,
+}
+
+/// An automated scenario, or all of the ones that boot (in run order).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, ValueEnum)]
+pub enum TestScenario {
+    /// live-boot, live-tools, install, installed-boot, automated-login, runtime.
+    All,
+    #[value(name = "build-preflight")]
+    BuildPreflight,
+    #[value(name = "live-boot")]
+    LiveBoot,
+    #[value(name = "live-tools")]
+    LiveTools,
+    Install,
+    #[value(name = "installed-boot")]
+    InstalledBoot,
+    #[value(name = "automated-login")]
+    AutomatedLogin,
+    Runtime,
+}
+
+#[derive(Args)]
+pub struct TestArgs {
+    #[arg(value_enum)]
+    pub scenario: TestScenario,
+    #[arg(value_enum, default_value_t = Distro::Levitate)]
+    pub distro: Distro,
+    /// Rerun even if the cached result for the same inputs passed.
+    #[arg(long)]
+    pub force: bool,
+    /// Print a JSON summary of the results at the end.
+    #[arg(long)]
+    pub json: bool,
+    #[command(flatten)]
+    pub boot: BootArgs,
+}
+
+/// A terminal app under tui/.
 #[derive(Clone, Copy, Debug, ValueEnum)]
-pub enum TuiInspectApp {
+pub enum TuiApp {
     #[value(name = "install-docs")]
     InstallDocs,
     #[value(name = "install-disk-plan")]
@@ -302,62 +328,59 @@ pub enum TuiInspectApp {
 }
 
 #[derive(Subcommand)]
-pub enum TuiCmd {
-    /// Render a TUI app and write terminal snapshots.
-    Inspect {
-        /// Preset app target. If omitted, provide both --cwd and --command.
-        #[arg(long, value_enum)]
-        app: Option<TuiInspectApp>,
+pub enum InspectCmd {
+    /// Render install-docs pages and write plain-text snapshots.
+    Docs {
+        /// Slug(s) to render. Default: every slug in the docs nav.
+        #[arg(long = "slug", value_name = "SLUG")]
+        slug: Vec<String>,
+        #[command(flatten)]
+        snapshot: SnapshotArgs,
+    },
 
-        /// Working directory for custom target mode.
+    /// Render a terminal app and write snapshots.
+    Tui {
+        /// Preset app. Without it, give --cwd and --command.
+        #[arg(value_enum)]
+        app: Option<TuiApp>,
+        /// Working directory for a custom target.
         #[arg(long, value_name = "PATH")]
         cwd: Option<PathBuf>,
-
-        /// Launch command for custom target mode.
+        /// Launch command for a custom target.
         #[arg(long, value_name = "CMD")]
         command: Option<String>,
-
-        /// Optional printable key sequence sent to stdin shortly after launch.
-        /// Supports printf %b escapes, for example: 'n', '\\n', 'jj'.
+        /// Keys sent to stdin after launch (printf %b escapes, e.g. 'n', '\\n', 'jj').
         #[arg(long, value_name = "KEYS")]
         input: Option<String>,
-
-        /// Delay before sending --input.
+        /// Seconds before sending --input.
         #[arg(long, default_value_t = 1)]
         input_delay_seconds: u64,
-
-        /// Terminal columns used for rendering.
-        #[arg(long, default_value_t = 140)]
-        columns: u16,
-
-        /// Terminal rows used for rendering.
-        #[arg(long, default_value_t = 40)]
-        rows: u16,
-
-        /// Seconds to keep the app running before snapshot capture.
-        #[arg(long, default_value_t = 2)]
-        seconds: u64,
-
-        /// Optional output base directory. xtask always creates a timestamped run folder under this path.
-        #[arg(long, value_name = "PATH")]
-        out_dir: Option<PathBuf>,
-
-        /// Also print the plain snapshot to stdout.
-        #[arg(long)]
-        stdout: bool,
-
-        /// Also write ANSI-formatted snapshot (`.ansi`) for color/style review.
-        #[arg(long)]
-        ansi: bool,
-
-        /// Keep raw terminal transcript next to plain output for debugging.
-        #[arg(long)]
-        keep_transcript: bool,
+        #[command(flatten)]
+        snapshot: SnapshotArgs,
     },
 }
 
-#[derive(Clone, Copy, Debug, ValueEnum)]
-pub enum Shell {
-    Bash,
-    Sh,
+#[derive(Args)]
+pub struct SnapshotArgs {
+    /// Terminal columns.
+    #[arg(long, default_value_t = 140)]
+    pub columns: u16,
+    /// Terminal rows.
+    #[arg(long, default_value_t = 40)]
+    pub rows: u16,
+    /// Seconds to run before capturing.
+    #[arg(long, default_value_t = 2)]
+    pub seconds: u64,
+    /// Base directory; a timestamped run folder is created under it.
+    #[arg(long, value_name = "PATH")]
+    pub out_dir: Option<PathBuf>,
+    /// Also print the plain snapshot(s).
+    #[arg(long)]
+    pub stdout: bool,
+    /// Also write ANSI snapshots (`.ansi`).
+    #[arg(long)]
+    pub ansi: bool,
+    /// Keep raw terminal transcripts.
+    #[arg(long)]
+    pub keep_transcript: bool,
 }

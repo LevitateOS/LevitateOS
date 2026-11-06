@@ -5,7 +5,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 #[derive(Debug, Clone)]
 pub struct Options {
-    pub app: Option<crate::cli::TuiInspectApp>,
+    pub app: Option<crate::cli::TuiApp>,
     pub cwd: Option<PathBuf>,
     pub command: Option<String>,
     pub input: Option<String>,
@@ -116,12 +116,12 @@ fn resolve_target(root: &Path, options: &Options) -> Result<Target> {
             bail!("tui inspect: --app cannot be combined with --cwd/--command");
         }
         return Ok(match app {
-            crate::cli::TuiInspectApp::InstallDocs => Target {
+            crate::cli::TuiApp::InstallDocs => Target {
                 name: "install-docs".to_string(),
                 cwd: root.join("tui/apps/live-tools/install-docs"),
                 command: "bun src/main.ts".to_string(),
             },
-            crate::cli::TuiInspectApp::InstallDiskPlan => Target {
+            crate::cli::TuiApp::InstallDiskPlan => Target {
                 name: "install-disk-plan".to_string(),
                 cwd: root.join("tui/apps/install/disk-plan"),
                 command: "bun run start -- --disk /dev/sda".to_string(),

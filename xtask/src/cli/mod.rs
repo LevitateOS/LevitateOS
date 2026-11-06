@@ -1,6 +1,6 @@
 mod types;
 
 pub use types::{
-    Cli, Cmd, Distro, DocsCmd, HooksCmd, KernelsCmd,
-    ScenariosCmd, Shell, TuiCmd, TuiInspectApp,
+    BootArgs, BuildCmd, Cli, Cmd, Distro, InspectCmd, KernelArgs, Product, RunArgs, RunScenario,
+    TestArgs, TestScenario, TuiApp,
 };
