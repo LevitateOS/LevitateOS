@@ -1201,7 +1201,11 @@ Commits land on the checked-out branches (superproject `master`, submodules `cod
   - **Bugs fixed:** a render error exited 0 (verified in a PTY for an error in the first frame and in a later one: now exit 1 with Ink's error screen and the stack on stderr). Cause found on the way: when the first frame throws, Ink unmounts before `waitUntilExit` is attached and that promise never settles, so the kit records the crash in a boundary and sets the status on `exit`. `--slug -x` was rejected as a missing value (B084).
   - Behaviour changes on purpose: recab-tui has no `--recab-bin` (tools come from PATH, as xtask sets it); every app's usage errors print `<name>: <message> (see --help)` and exit 2; the docs footer reads `[install-docs]` (snapshots re-blessed).
   - Deferred to F15: `useAsyncTask` (A180/A181) is written with disk-plan's hooks, its only user.
-- [ ] F11 — One generic component per job in the kit.
+- [x] F11 — One generic component per job. tui `866af40`. Kit: `components/navigation/nav-list.tsx` (`NavList`, `NavListMode`), `components/navigation/selectable-grid.tsx` (grid folded in), `utils/runs.ts` (`RichTextRun`, `appendRun`, `wrapRuns`, `wrapText`, `prefixWrappedText`, `truncateLines`). Deleted: `tree-nav.tsx`, `section-list.tsx`, `primitives/layout/grid.tsx`, the docs app's word-wrap internals and `StatusAtom`.
+  - **Bug fixed:** `RichTextLine` called hooks after an early return (A162; React reports it when a line goes from empty to non-empty).
+  - Behaviour change on purpose: recab-tui's action list now uses the same nav list as the docs sidebar (section markers, highlighted selection) instead of a plain `>`/`::` text block.
+  - Verified: snapshots unchanged; 256-colour code counts unchanged (installation-disk 229).
+  - Moved to F12: A150 (`useScrollState` taking its maximum once) needs the docs line model, where the maximum is known before the offset.
 - [ ] F12 — install-docs lays each block out once: block → lines.
 - [ ] F13 — Apps get distro identity from their launcher, and install-docs fails fast.
 - [ ] F14 — Facts owned by recpart and recab reach the TUIs only through `cargo xtask gen`.
