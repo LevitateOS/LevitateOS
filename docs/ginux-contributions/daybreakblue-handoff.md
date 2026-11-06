@@ -686,3 +686,31 @@ autofix and fault/cancellation cases under monitored security execution. They
 remain enabled and unrun locally; no cloud agent was dispatched. The ordinary
 first managed case passing is not complete suite/security acceptance. G07
 thread/shared arguments and all earlier Ginux handoffs remain unresolved.
+
+### Destination resume: G07 blocks ordinary Recipe consumers
+
+On 2026-11-06 the complete paused F03 batch log was reread. All four failed
+ordinary cases stop at Recipe's output-reader thread startup with ENOSYS:
+`dependencies::cli_transitive_dependencies_compile_tools_through_the_shared_lifecycle`,
+`managed_inputs::managed_bash_child_writes_domain_files_and_keeps_logs_out_of_json`,
+`managed_inputs::managed_owned_elf_build_executes_and_validates_its_product`, and
+`managed_storage::managed_storage_preserves_source_modes_links_and_restart_identity`.
+The last case stops at touch, before its timestamp/restart assertions. Do not
+treat these receipts as independent compiler, executable or archive defects.
+
+Recipe's existing `src/process.rs:270` creates output-reader threads. Combined
+F02 `crates/ginux-init/src/launch_tasks.rs:845` deliberately rejects thread clone
+flags with -38. Required capability remains G07, whose retained unready revision
+and unresolved shared-path finding are recorded above. Before importing thread
+support, correct and validate its kernel-argument authority in the monitored
+environment, then join the existing FD/task/path/cwd/mapping/resource owners in
+F02 and rerun actual consumer cases on exact new binaries. No local thread
+workaround, security probe or dispatch has occurred.
+
+Migration paths: combined source is
+`.artifacts/development-migration/2026-11-06/f02-source/`; paused Recipe source is
+`/home/vince/levitate-development/f03-recipe-source`; preserved G07 evidence is
+under the recovery directory's `recovery/evidence/ginux-contribution-preparation/G07/`.
+The destination harness and commands are in `f03-destination-bin/`; the old
+harness embeds source-machine paths. This path update does not authorize cloud
+dispatch or constitute security acceptance.
