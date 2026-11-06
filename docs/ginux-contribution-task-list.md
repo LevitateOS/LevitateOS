@@ -1,7 +1,7 @@
 # Ginux contribution task list
 
-Updated: 2026-11-06. Status: planning complete; preparation, extraction, new reviews
-and publication below are pending. This request authorizes this task list, not
+Updated: 2026-11-06. Status: preparation active under the user’s sequential goal authorization;
+extraction, new reviews and publication below are pending. This request authorizes this task list, not
 opening PRs. The user will inspect the prepared changes before publication.
 
 This is the remaining contribution queue for the completed local Ginux→Recipe
@@ -69,7 +69,7 @@ its affected packet and dependents, not unrelated fixes.
 
 ## Preparation tasks
 
-- [ ] **P01 — Preserve and inventory exact inputs.** Record upstream/fork URLs,
+- [x] **P01 — Preserve and inventory exact inputs.** Record upstream/fork URLs,
   current branches, local and remote refs, dirty changes and existing worktrees;
   preserve original stashes and unrelated work. Record the integration commit and
   baseline above plus any later changes. Use explicit Ginux work-tree paths because
@@ -264,10 +264,24 @@ publication. Do not keep reviewers idle waiting for every packet to finish.
 
 ## Checkpoint
 
-Planning artifact only. No new review outcome, standalone test result or remote
-status is claimed by this list. The completed local implementation remains intact.
-Exact next action when preparation is authorized: P01, then P02/P03 upstream and
-fork reconciliation. Final packet boundaries and PR count follow P04/P05.
+User authorization: “make a goal for yourself to do one task at a time until finish”.
+Run preparation serially through F04; stop before publication for user inspection.
+The parallel-lane section above is available scheduling context, not the active
+execution mode. No extra agents are started.
+
+P01 complete. [Exact inventory](ginux-contributions/p01-inventory.json) records
+all 12 registered Ginux worktrees, cached local/remote refs, statuses, tracked-diff
+hashes and both stashes. The integration remains clean at `7cf2638a`. The old
+combination worktree's staged VFS edits and all unrelated files are preserved.
+No branch was created/switched and no source was modified.
+
+Recipe has advanced separately from the previous `022e91c` validation baseline to
+`4056374758ba2de8517b2faf3438c64380611992`; its untracked audit/artifact outputs
+and the superproject's existing pointer difference are preserved. F03 must use
+explicitly recorded current revisions rather than silently reusing old results.
+
+Exact next task: **P02 — refresh upstream and read discussion**. No fresh remote
+status or new standalone review/test result is claimed yet.
 
 Active skill: `hdae-development`, discovered at
 `/home/vince/.codex/worktrees/ginux-pr-combination-check/ginux/.agents/skills/hdae-development/SKILL.md`.

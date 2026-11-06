@@ -1,0 +1,150 @@
+{
+  "captured_utc": "2026-11-06T07:31:47.025000+00:00",
+  "task": "P01",
+  "integration_head": "7cf2638adaf2fd3b783be636fe2a05b2d60458c5",
+  "integration_branch": "codex/ginux-recipe-local-integration",
+  "remotes": "origin\tgit@github.com:LevitateOS/ginux.git (fetch)\norigin\tgit@github.com:LevitateOS/ginux.git (push)\nupstream\thttps://github.com/gmkurtzer/ginux.git (fetch)\nupstream\thttps://github.com/gmkurtzer/ginux.git (push)\n",
+  "cached_refs_before_refresh": "refs/heads/codex/bounded-console-poll e7f5f552747e0b451b6dd31395f9199d10a42ce3\nrefs/heads/codex/ginux-recipe-local-integration 7cf2638adaf2fd3b783be636fe2a05b2d60458c5\nrefs/heads/ginux-recipe/i04-m5-writable ebd68025d4db318e903867f12d0574e41f2511ce\nrefs/heads/ginux-recipe/i04-m7-alias 022294a9e983dd4097dcae6e198f6ecd87c1047a\nrefs/heads/main 2489517e89c3b62c5203ccd0f6d1eb28cf8500af\nrefs/remotes/origin/HEAD 2489517e89c3b62c5203ccd0f6d1eb28cf8500af\nrefs/remotes/origin/codex/bounded-console-poll e7f5f552747e0b451b6dd31395f9199d10a42ce3\nrefs/remotes/origin/codex/vfs-open-failure c2a18bb07b3adfa811fee57dc777cbf9ec757a53\nrefs/remotes/origin/codex/vfs-path-resolution 2a60d36170c1c31636eee55322e035403188122c\nrefs/remotes/origin/codex/vfs-unlink-lifetime be56d00121cf7fb1be3463dfd48343949c82aebd\nrefs/remotes/origin/main 2489517e89c3b62c5203ccd0f6d1eb28cf8500af\nrefs/remotes/upstream/HEAD 2a82f61e84a44b681f15e35664b82fe5529df5b2\nrefs/remotes/upstream/bootable-kernel 4d4a53bbcc09b16e56aa5eb671ac815f16f2b82f\nrefs/remotes/upstream/codex/userspace-transition 5f5000424943ad1cf59a7cffea04402edec5604b\nrefs/remotes/upstream/main 2a82f61e84a44b681f15e35664b82fe5529df5b2\n",
+  "stashes": "stash@{0} 2b887da678c6edf3baf4ddf3036585d6143d7566 On codex/ginux-recipe-local-integration: wip: preserve unfinished owned interpreter chains\nstash@{1} a94d56fb4c65e693de8bc1930ee1caefee989f4b On codex/ginux-recipe-local-integration: paused recipe interpreter work before upstream sync\n",
+  "worktrees": [
+    {
+      "registration": {
+        "worktree": "/home/vince/Projects/LevitateOS/.git/modules/tools/ginux",
+        "HEAD": "2eac10bf8c9e7a7e72e1ae94990aa2425b2f3ba0",
+        "detached": true
+      },
+      "inspected_checkout": "/home/vince/Projects/LevitateOS/tools/ginux",
+      "exists": true,
+      "status": "",
+      "tracked_diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "registration": {
+        "worktree": "/home/vince/.codex/worktrees/ginux-console-poll-review/ginux",
+        "HEAD": "e7f5f552747e0b451b6dd31395f9199d10a42ce3",
+        "branch": "refs/heads/codex/bounded-console-poll"
+      },
+      "inspected_checkout": "/home/vince/.codex/worktrees/ginux-console-poll-review/ginux",
+      "exists": true,
+      "status": "",
+      "tracked_diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "registration": {
+        "worktree": "/home/vince/.codex/worktrees/ginux-local-contribution-review/ginux",
+        "HEAD": "3fac8e0598193218d6bcda4d7e0813ee60d96238",
+        "detached": true
+      },
+      "inspected_checkout": "/home/vince/.codex/worktrees/ginux-local-contribution-review/ginux",
+      "exists": true,
+      "status": " M crates/ginux-init/src/channel_hooks.rs\n M crates/ginux-init/src/descriptors.rs\n M crates/ginux-init/src/device_hooks.rs\n M crates/ginux-init/src/dispatch.rs\n M crates/ginux-init/src/fs_hooks.rs\n M crates/ginux-init/src/launch_tasks.rs\n M crates/ginux-init/src/main.rs\n M crates/ginux-init/src/process_hooks.rs\n",
+      "tracked_diff_sha256": "a99e134b738bf5eee92d993ce6f3a1092bf510c6010045b00370f68ff054fe66"
+    },
+    {
+      "registration": {
+        "worktree": "/home/vince/.codex/worktrees/ginux-pr-combination-check/ginux",
+        "HEAD": "2489517e89c3b62c5203ccd0f6d1eb28cf8500af",
+        "detached": true
+      },
+      "inspected_checkout": "/home/vince/.codex/worktrees/ginux-pr-combination-check/ginux",
+      "exists": true,
+      "status": "M  crates/ginux-vfs/src/lib.rs\n",
+      "tracked_diff_sha256": "9e2f478e581c1fabc03036a9d3f1f80b5ea61b8fc0ad122560499ad484f20cbf"
+    },
+    {
+      "registration": {
+        "worktree": "/home/vince/.codex/worktrees/ginux-pr-open-failure/ginux",
+        "HEAD": "c2a18bb07b3adfa811fee57dc777cbf9ec757a53",
+        "detached": true
+      },
+      "inspected_checkout": "/home/vince/.codex/worktrees/ginux-pr-open-failure/ginux",
+      "exists": true,
+      "status": "",
+      "tracked_diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "registration": {
+        "worktree": "/home/vince/.codex/worktrees/ginux-pr-path-resolution/ginux",
+        "HEAD": "2a60d36170c1c31636eee55322e035403188122c",
+        "detached": true
+      },
+      "inspected_checkout": "/home/vince/.codex/worktrees/ginux-pr-path-resolution/ginux",
+      "exists": true,
+      "status": "",
+      "tracked_diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "registration": {
+        "worktree": "/home/vince/.codex/worktrees/ginux-pr-unlink-lifetime/ginux",
+        "HEAD": "be56d00121cf7fb1be3463dfd48343949c82aebd",
+        "detached": true
+      },
+      "inspected_checkout": "/home/vince/.codex/worktrees/ginux-pr-unlink-lifetime/ginux",
+      "exists": true,
+      "status": "",
+      "tracked_diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "registration": {
+        "worktree": "/home/vince/.codex/worktrees/ginux-recipe-local-integration/ginux",
+        "HEAD": "7cf2638adaf2fd3b783be636fe2a05b2d60458c5",
+        "branch": "refs/heads/codex/ginux-recipe-local-integration"
+      },
+      "inspected_checkout": "/home/vince/.codex/worktrees/ginux-recipe-local-integration/ginux",
+      "exists": true,
+      "status": "",
+      "tracked_diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "registration": {
+        "worktree": "/tmp/ginux-i04m5",
+        "HEAD": "ebd68025d4db318e903867f12d0574e41f2511ce",
+        "branch": "refs/heads/ginux-recipe/i04-m5-writable"
+      },
+      "inspected_checkout": "/tmp/ginux-i04m5",
+      "exists": true,
+      "status": " M .gitignore\n M Makefile\n M crates/ginux-init/src/main.rs\n M crates/ginux-init/src/process_hooks.rs\n M crates/ginux-process/src/lib.rs\n M crates/ginux-vfs/src/lib.rs\n?? scripts/test-memory-native.py\n?? tests/fixtures/memory-review-fixture.c\n",
+      "tracked_diff_sha256": "7b20b06899056b7a471c18e3689a76a43b2f89b292e24cad148b9f789822ed70"
+    },
+    {
+      "registration": {
+        "worktree": "/tmp/ginux-i04m7",
+        "HEAD": "022294a9e983dd4097dcae6e198f6ecd87c1047a",
+        "branch": "refs/heads/ginux-recipe/i04-m7-alias"
+      },
+      "inspected_checkout": "/tmp/ginux-i04m7",
+      "exists": true,
+      "status": " M crates/ginux-init/src/main.rs\n M crates/ginux-process/src/lib.rs\n",
+      "tracked_diff_sha256": "02f809be3a27251d83e824d770aa212c56ff4ac409394e721f9a2467b482c541"
+    },
+    {
+      "registration": {
+        "worktree": "/tmp/ginux-limits-review",
+        "HEAD": "c4a0820deac6a91bdfc0f96796bbb8416e39911a",
+        "detached": true
+      },
+      "inspected_checkout": "/tmp/ginux-limits-review",
+      "exists": true,
+      "status": "M  .github/workflows/check.yml\nUU Makefile\nM  crates/ginux-core/src/lib.rs\nM  crates/ginux-devices/src/lib.rs\nM  crates/ginux-domain/src/lib.rs\nM  crates/ginux-kernel-views/src/cgroup.rs\nM  crates/ginux-kernel-views/src/lib.rs\nM  crates/ginux-process/src/lib.rs\nM  crates/ginux-runtime/src/lib.rs\nM  crates/ginux-vfs/src/lib.rs\n",
+      "tracked_diff_sha256": "348777e83d74f8e92f731214c884e0c4925e877e012909785386747401dbd5a9"
+    },
+    {
+      "registration": {
+        "worktree": "/tmp/ginux-upcoming-review",
+        "HEAD": "f8ce52747111c6b33a872e0215e94e1863a51271",
+        "detached": true
+      },
+      "inspected_checkout": "/tmp/ginux-upcoming-review",
+      "exists": true,
+      "status": "M  .github/workflows/check.yml\nUU Makefile\nM  crates/ginux-core/src/lib.rs\nM  crates/ginux-devices/src/lib.rs\nM  crates/ginux-domain/src/lib.rs\nM  crates/ginux-kernel-views/src/cgroup.rs\nM  crates/ginux-kernel-views/src/lib.rs\nUU crates/ginux-process/src/lib.rs\nM  crates/ginux-runtime/src/lib.rs\nM  crates/ginux-vfs/src/lib.rs\n",
+      "tracked_diff_sha256": "c530c7502ec4d63ee3bd87f46ddb84e68abdeb8502c8889bb862618a3d19554e"
+    }
+  ],
+  "superproject_head": "e2a65bd624af8653499dbc4f8e2ffc55f53b1a32",
+  "superproject_status": " M tools/recipe\n?? nf.err\n?? nf.out\n?? u1.err\n?? u1.out\n?? u2.err\n?? u2.out\n",
+  "superproject_ginux_gitlink": "160000 2eac10bf8c9e7a7e72e1ae94990aa2425b2f3ba0 0\ttools/ginux",
+  "recipe_current_head": "4056374758ba2de8517b2faf3438c64380611992",
+  "recipe_current_status": "?? .artifacts/\n?? .untangle/__pycache__/\n?? .untangle/out/deps.txt\n?? .untangle/out/history.txt\n?? .untangle/out/skeleton.rs\n",
+  "recipe_previously_validated_head": "022e91c5049350bf449847a2bc1365d067f1c290",
+  "remote_freshness": "Cached refs only; remote refresh is P02. No remote claims from this inventory."
+}
