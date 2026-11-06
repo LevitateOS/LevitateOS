@@ -783,8 +783,8 @@ Earlier P02/P03 and candidate results remain historical records; current-main
 reconciliation is required before final closure.
 
 Exact next action: refresh R04's current-main prerequisite serially, continuing
-with G06b's configured task/exec lifecycle on a composition of refreshed G05
-and G06a. Local dependent
+with independent G09a's VFS storage owner on refreshed G03b. G07's preserved
+unready snapshot still needs DaybreakBlue correction/validation; do not import it. Local dependent
 preparation stays blocked for standalone delivery until its prerequisites
 actually merge upstream.
 G05a is refreshed at
@@ -832,11 +832,21 @@ all 199 tracked paths and both binaries match, and exact G04 fails the identical
 pipe/public-FD capability fixtures at exits 10/11. Its seventeen-file +1297/-76
 scope is preserved, with the native match context adapted to current upstream.
 [Review](ginux-contributions/g05-review.md) retains security/full default CI,
-macOS and upstream prerequisite merge holds. Initial 37-patch integrity results remain
+macOS and upstream prerequisite merge holds. G06b is refreshed at
+`7240bb217e16750f55f57a490d444964e8bf537a` on refreshed G05/G06a composition
+`7e0061b500e32e0735d34a375fcb668968f09ee6`. The first build found duplicate memmove; the
+packet now reuses the current upstream owner. All 90 units/static/build and
+forty-six ordinary controls pass in source/clean, with all 205 tracked paths and
+both binaries matching. Exact prerequisite fork/exec fixtures fail at exits
+95/61 and pass on the final head. [Review](ginux-contributions/g06b-review.md)
+keeps protected-copy/interpreter/FD/shared-argument security, full CI and actual
+upstream prerequisites pending. G07 remains unready on its historical base; its
+security correction and thread consumer closure are not established. Initial
+37-patch integrity results remain
 historical. The refreshed
 `upstream-refresh-2026-11-06/current-inventory.json` records each currently retained
-patch/head and exact-parent replay. Seven packets now have current-main source/
-ordinary preparation; the other 30 still need current-main reconciliation;
+patch/head and exact-parent replay. Eight packets now have current-main source/
+ordinary preparation; the other 29 still need current-main reconciliation;
 integrity is not source/runtime acceptance. The fresh preserved-worktree report
 also confirms all six restored HEAD, raw-index and staged/unstaged/conflict-status
 fingerprints are unchanged. Reconcile the

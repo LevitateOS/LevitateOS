@@ -272,10 +272,10 @@
         "G05",
         "G06a"
       ],
-      "base": "5cb0370f8b9d96d95f28498cc2d6a1c3698af72f",
-      "head": "8c783e717b839b0e511820e89d29840cae0f3c0c",
-      "tree": "0c416ecb5220d4cec93900c2834cf35099ad294a",
-      "upstream_base": "3f2fe7dfadd4b40e235d982a6a3d386dc6490177",
+      "base": "7e0061b500e32e0735d34a375fcb668968f09ee6",
+      "head": "7240bb217e16750f55f57a490d444964e8bf537a",
+      "tree": "6f5ac66adf756a40758b04409e41e9b5ce53785e",
+      "upstream_base": "8a475e8b2318425fd2fc15246a5c6f4bca6caf86",
       "source_commits": [
         "ccd62ca1",
         "8f768700",
@@ -283,11 +283,18 @@
         "d693ae63",
         "07c949db"
       ],
-      "status": "locally reviewed and validated on explicit prerequisites; standalone publication awaits upstream merges",
+      "status": "current-main local-prerequisite source reviewed; duplicate memmove resolved through upstream owner; all 90 units/static/build and 46 ordinary controls pass in source/clean; standalone delivery/security/full default runtime/macOS CI remain pending",
       "evidence": "g06b-review.md",
       "source_patch": "patches/G06b.patch",
       "standalone": false,
-      "artifact_directory": ".artifacts/ginux-contribution-preparation/G06b"
+      "artifact_directory": ".artifacts/ginux-contribution-preparation/upstream-refresh-2026-11-06/G06b",
+      "previous_head": "8c783e717b839b0e511820e89d29840cae0f3c0c",
+      "patch_sha256": "cb7209625c6c78f607659269337c56c7a3499a4311a1d361adbeed80e1da0a08",
+      "unit_tests": 90,
+      "process_tests": 18,
+      "vfs_tests": 24,
+      "historical_artifact_directory": ".artifacts/development-migration/2026-11-06/recovery/evidence/ginux-contribution-preparation/G06b",
+      "remote_ci": "not run"
     },
     {
       "packet": "G07",

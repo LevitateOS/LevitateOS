@@ -34,3 +34,11 @@ No full-suite or clean replay success is claimed. Preserve this snapshot while
 continuing independent authorized work; G08 and G07-dependent joins stay held.
 
 No publication, PR edits, maintainer contact or cloud dispatch occurred.
+
+
+The current-main G06b prerequisite is now `7240bb217e16750f55f57a490d444964e8bf537a`;
+[its refresh](g06b-review.md) reuses upstream memmove and passes ordinary
+process-only checks. The preserved G07 snapshot above still has its historical
+base and has not been rebased, corrected or security-accepted. Keep its race and
+thread-dependent consumers pending for DaybreakBlue; independent G09a work may
+continue under the existing authorization. No dispatch has occurred.

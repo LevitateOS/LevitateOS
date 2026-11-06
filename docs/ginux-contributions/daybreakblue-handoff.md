@@ -785,3 +785,19 @@ partial effects, translated arguments and canonical scratch independently.
 Complete default fixtures and CI remain present; their fault/authority probes
 were not run here. Shared-argument/thread safety and G07 acceptance remain pending.
 No DaybreakBlue agent has been dispatched and no security pass is claimed.
+
+
+## Refreshed G06b security revision — 2026-11-06
+
+Current G06b is `7240bb217e16750f55f57a490d444964e8bf537a`, based on refreshed G05/G06a
+composition `7e0061b500e32e0735d34a375fcb668968f09ee6`. [Current review](g06b-review.md)
+records 90 units and forty-six ordinary controls in source/clean replay. The old
+packet's duplicate memmove was dropped in favor of the unchanged upstream owner.
+Revalidate protected/unmapped/cross-page child-TID/wait stores and rollback,
+wait-fault consumption, implicit interpreter ownership, image exec FD authority,
+private native CLOEXEC closure, shared/indirect kernel arguments and the preserved
+full default security fixtures on this revision or a recorded successor.
+Those probes remain unrun; ordinary successful exec and virtual CLOEXEC checks
+are not private-kernel-FD or authority acceptance. G07's old unready snapshot and
+shared-path finding remain unresolved; it is not refreshed or imported here.
+No DaybreakBlue agent has been dispatched and no security pass is claimed.

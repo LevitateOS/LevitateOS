@@ -1,6 +1,6 @@
-From 8c783e717b839b0e511820e89d29840cae0f3c0c Mon Sep 17 00:00:00 2001
+From 7240bb217e16750f55f57a490d444964e8bf537a Mon Sep 17 00:00:00 2001
 From: vince <vincepaul.liem@gmail.com>
-Date: Fri, 6 Nov 2026 11:23:46 +0100
+Date: Fri, 6 Nov 2026 22:53:29 +0100
 Subject: [PATCH] feat(launch): supervise configured child and exec lifecycles
 
 Own bounded process identities and descriptor snapshots before children
@@ -22,7 +22,7 @@ Signed-off-by: vince <vincepaul.liem@gmail.com>
  crates/ginux-init/src/fs_hooks.rs           |  117 ++-
  crates/ginux-init/src/launch.rs             |  327 +-----
  crates/ginux-init/src/launch_tasks.rs       | 1036 +++++++++++++++++++
- crates/ginux-init/src/main.rs               |   21 +
+ crates/ginux-init/src/main.rs               |    1 +
  crates/ginux-init/src/path_hooks.rs         |  184 ++++
  crates/ginux-init/src/tracee_io.rs          |   37 +
  crates/ginux-process/src/lib.rs             |   99 +-
@@ -33,7 +33,7 @@ Signed-off-by: vince <vincepaul.liem@gmail.com>
  tests/fixtures/launch-fixture.c             |   13 +-
  tests/fixtures/launch-interpreter-fixture.S |    9 +
  tests/fixtures/launch-task-fixture.c        |  204 ++++
- 19 files changed, 2343 insertions(+), 351 deletions(-)
+ 19 files changed, 2323 insertions(+), 351 deletions(-)
  create mode 100644 crates/ginux-init/src/launch_tasks.rs
  create mode 100644 scripts/test-launch-exec.py
  create mode 100644 scripts/test-launch-tasks.py
@@ -42,7 +42,7 @@ Signed-off-by: vince <vincepaul.liem@gmail.com>
  create mode 100644 tests/fixtures/launch-task-fixture.c
 
 diff --git a/.github/workflows/check.yml b/.github/workflows/check.yml
-index 8043a736..0c5b117a 100644
+index 8043a736774e8ea6065352484a6e45fc75bc5b01..0c5b117a55c8d5e12fcdb0091660bae31a695fda 100644
 --- a/.github/workflows/check.yml
 +++ b/.github/workflows/check.yml
 @@ -24,12 +24,14 @@ jobs:
@@ -62,10 +62,10 @@ index 8043a736..0c5b117a 100644
        - run: make test-process-native
        - run: sudo make test-gate1-setup
 diff --git a/Makefile b/Makefile
-index 33da3a7e..4623d95d 100644
+index ff6299b0c42f358ce88e5df0b23a6ced46bfbe24..5c07f5642e984baabab24eea47f9c11a196aa51e 100644
 --- a/Makefile
 +++ b/Makefile
-@@ -225,3 +225,21 @@ build-launch-fd-fixture:
+@@ -267,3 +267,21 @@ build-launch-fd-fixture:
  
  test-launch-fds:
  	python3 scripts/test-launch-fds.py $(GINUX) .artifacts/launch/launch-fd-fixture
@@ -88,10 +88,10 @@ index 33da3a7e..4623d95d 100644
 +test-launch-exec:
 +	python3 scripts/test-launch-exec.py $(GINUX) .artifacts/launch/launch-exec-fixture .artifacts/launch/launch-interpreter-fixture .artifacts/launch/launch-interpreter-allowed-fixture
 diff --git a/README.md b/README.md
-index e5553eef..64912653 100644
+index f574dffa3f398e029329a02f3fd61d7e0b7d5cfd..9e88e307ee23149aec2b182e295e493ef6aad44c 100644
 --- a/README.md
 +++ b/README.md
-@@ -210,8 +210,8 @@ Workload stdout stays separate from supervisor diagnostics on stderr. Only
+@@ -287,8 +287,8 @@ Workload stdout stays separate from supervisor diagnostics on stderr. Only
  stdin, stdout, and stderr are inherited by the workload. The launcher returns
  the workload exit code, or `128 + signal` for signal termination. Startup
  failure returns 2; supervision or result-writing failure returns 1. Native
@@ -102,7 +102,7 @@ index e5553eef..64912653 100644
  group stops fail explicitly. Audit output is capped at 64 KiB plus a truncation
  notice. This path does not implement resource quotas from the domain metadata.
  
-@@ -255,8 +255,10 @@ mmap and restored at exit. Native locks, leases and signal ownership are denied.
+@@ -332,8 +332,10 @@ mmap and restored at exit. Native locks, leases and signal ownership are denied.
  Bootstrap constrains the real descriptor soft/hard limits to 256 while keeping
  lower operator limits. Allocation respects that lower soft limit; runtime
  NOFILE-limit changes are currently denied. Reported limits are not inflated to
@@ -115,7 +115,7 @@ index e5553eef..64912653 100644
  Guest-memory copies respect page protections, including partial read copyout.
  No writable host descriptor is exposed. Data disappears at domain teardown;
  there is no retention, export, storage generation or configured storage quota.
-@@ -284,12 +286,36 @@ Alias status flags and endpoint lifetimes are shared; close-on-exec flags are
+@@ -361,12 +363,36 @@ Alias status flags and endpoint lifetimes are shared; close-on-exec flags are
  per descriptor. No native pipe or host descriptor is given to the workload.
  
  Nonblocking empty/full operations return `EAGAIN`. Blocking operations stay
@@ -158,7 +158,7 @@ index e5553eef..64912653 100644
  
  When requested, the result file is reserved exclusively before launch, with
  mode 0600 and a maximum path length of 512 bytes. Existing files are never
-@@ -320,6 +346,8 @@ make build-launch-device-fixture
+@@ -397,6 +423,8 @@ make build-launch-device-fixture
  sudo make test-launch-devices
  make build-launch-pipe-fixture build-launch-fd-fixture
  sudo make test-launch-pipes test-launch-fds
@@ -167,7 +167,7 @@ index e5553eef..64912653 100644
  ```
  
  ## Native process scenarios
-@@ -328,7 +356,8 @@ The separate `process-native <config> <executable>` command exercises native
+@@ -405,7 +433,8 @@ The separate `process-native <config> <executable>` command exercises native
  fork, clone, vfork, exec, threads, waits, termination signals, and pipes. It
  executes a trusted host fixture as the caller, without chroot; it does not
  require root on a host that permits tracing child processes. Configured
@@ -178,7 +178,7 @@ index e5553eef..64912653 100644
  Process creation returns virtual identities, including clone TID cells.
  Untraced, reparenting, namespace, and unsupported clone flags are denied.
 diff --git a/crates/ginux-init/src/descriptors.rs b/crates/ginux-init/src/descriptors.rs
-index ca13d82a..cb69292d 100644
+index ca13d82a2dadea823cb6e05a3754ced22c06501e..cb69292d924ea3bd070bef3fd24e45e3785d13b8 100644
 --- a/crates/ginux-init/src/descriptors.rs
 +++ b/crates/ginux-init/src/descriptors.rs
 @@ -31,6 +31,70 @@ enum Pending {
@@ -589,7 +589,7 @@ index ca13d82a..cb69292d 100644
          Ok(decision)
      }
 diff --git a/crates/ginux-init/src/dispatch.rs b/crates/ginux-init/src/dispatch.rs
-index 23ff2a49..f1a5a7c3 100644
+index 5baf7109b617a87d30d69e687701d386d7e09f2f..809662aa58c6a263175ec8f0cbec67eb9d1eed82 100644
 --- a/crates/ginux-init/src/dispatch.rs
 +++ b/crates/ginux-init/src/dispatch.rs
 @@ -119,6 +119,16 @@ pub fn decide_objects(
@@ -610,7 +610,7 @@ index 23ff2a49..f1a5a7c3 100644
  /// `None` keeps the existing entry match in the supervision loop.
  pub fn process_entry(syscall: u64, rdi: u64, rsi: u64, rdx: u64) -> Option<i64> {
 diff --git a/crates/ginux-init/src/fs_hooks.rs b/crates/ginux-init/src/fs_hooks.rs
-index 71c5be2a..9fb764c5 100644
+index 71c5be2a267ee72275534e3a868741c4c36cebba..9fb764c59ff06a950bf68c4c816a4840cc5fc7d1 100644
 --- a/crates/ginux-init/src/fs_hooks.rs
 +++ b/crates/ginux-init/src/fs_hooks.rs
 @@ -1,6 +1,7 @@
@@ -772,7 +772,7 @@ index 71c5be2a..9fb764c5 100644
      pub fn claim(&mut self, pid: usize, r: &UserRegs) -> Option<i64> {
          let fd = r.rdi as i32;
 diff --git a/crates/ginux-init/src/launch.rs b/crates/ginux-init/src/launch.rs
-index 2d08cda2..40f7837c 100644
+index 5b69a2efcdde51f7fac194a0fddc3b62a587ce13..e4af16f41fe9e1c6da540e076195d945c7905b91 100644
 --- a/crates/ginux-init/src/launch.rs
 +++ b/crates/ginux-init/src/launch.rs
 @@ -4,20 +4,13 @@
@@ -800,7 +800,7 @@ index 2d08cda2..40f7837c 100644
  };
  
  pub const MAX_ELF_SIZE: usize = 64 * 1024;
-@@ -299,7 +292,7 @@ pub fn launch_main(config_path: *const u8, root_path: *const u8, result_path: *c
+@@ -340,7 +333,7 @@ pub fn launch_main(config_path: *const u8, root_path: *const u8, result_path: *c
      let mut filesystem = crate::fs_hooks::LaunchFs::prepare(&config)
          .unwrap_or_else(|reason| launch_startup_fail(reason));
      let mut channels = crate::channel_hooks::LaunchChannels::new();
@@ -809,7 +809,7 @@ index 2d08cda2..40f7837c 100644
          .unwrap_or_else(|reason| launch_startup_fail(reason));
      print_launch_config(&config);
      let mut domain = Domain::create(config);
-@@ -307,6 +300,9 @@ pub fn launch_main(config_path: *const u8, root_path: *const u8, result_path: *c
+@@ -348,6 +341,9 @@ pub fn launch_main(config_path: *const u8, root_path: *const u8, result_path: *c
          launch_domain_fail(&mut domain, b"invalid launch start transition");
      }
      stage_launch(&config);
@@ -819,7 +819,7 @@ index 2d08cda2..40f7837c 100644
      let child = unsafe { syscall0(SYS_FORK) };
      if child < 0 {
          launch_domain_fail(&mut domain, b"launch tracee fork failed");
-@@ -320,7 +316,7 @@ pub fn launch_main(config_path: *const u8, root_path: *const u8, result_path: *c
+@@ -361,7 +357,7 @@ pub fn launch_main(config_path: *const u8, root_path: *const u8, result_path: *c
          &mut filesystem,
          &mut devices,
          &mut channels,
@@ -828,7 +828,7 @@ index 2d08cda2..40f7837c 100644
      )
  }
  
-@@ -612,7 +608,7 @@ pub fn launch_usage() -> ! {
+@@ -653,7 +649,7 @@ pub fn launch_usage() -> ! {
      exit_process(2)
  }
  
@@ -837,7 +837,7 @@ index 2d08cda2..40f7837c 100644
      let record = unsafe {
          if AUDIT_CAPPED {
              return;
-@@ -652,12 +648,7 @@ fn audit_cap() {
+@@ -693,12 +689,7 @@ fn audit_cap() {
      write_stderr(b"ginux: audit truncated budget=65536\n");
  }
  
@@ -851,7 +851,7 @@ index 2d08cda2..40f7837c 100644
      let mut buffer = [0u8; 20];
      let mut index = buffer.len();
      if value == 0 {
-@@ -672,7 +663,7 @@ fn audit_u64(mut value: u64) {
+@@ -713,7 +704,7 @@ fn audit_u64(mut value: u64) {
      audit_write(&buffer[index..]);
  }
  
@@ -860,7 +860,7 @@ index 2d08cda2..40f7837c 100644
      if value < 0 {
          audit_write(b"-");
          audit_u64(value.unsigned_abs());
-@@ -781,7 +772,7 @@ fn write_completion_result(outcome: u8, has_code: bool, code: u64, has_signal: b
+@@ -822,7 +813,7 @@ fn write_completion_result(outcome: u8, has_code: bool, code: u64, has_signal: b
      }
  }
  
@@ -869,7 +869,7 @@ index 2d08cda2..40f7837c 100644
      line_stderr(b"ginux: launch supervisor=attached direct-unsupervised-syscalls=0");
      write_stderr(b"ginux: launch complete workload-exit-code=");
      write_stderr_u64(code);
-@@ -790,7 +781,7 @@ fn finish_exited(code: u64) {
+@@ -831,7 +822,7 @@ fn finish_exited(code: u64) {
      exit_process(code as usize)
  }
  
@@ -878,7 +878,7 @@ index 2d08cda2..40f7837c 100644
      line_stderr(b"ginux: launch supervisor=attached direct-unsupervised-syscalls=0");
      write_stderr(b"ginux: launch complete workload-signal=");
      write_stderr_u64(signal);
-@@ -816,6 +807,15 @@ fn launch_tracee(root_path: *const u8) -> ! {
+@@ -857,6 +848,15 @@ fn launch_tracee(root_path: *const u8) -> ! {
              129,
          );
      }
@@ -894,7 +894,7 @@ index 2d08cda2..40f7837c 100644
      if unsafe { syscall1(SYS_CHROOT, root_path as usize) } < 0 {
          tracee_setup_fail(
              b"ginux: launch bootstrap unavailable: chroot failed (host privilege required)\n",
-@@ -895,270 +895,19 @@ fn supervise_launch(
+@@ -936,270 +936,19 @@ fn supervise_launch(
      filesystem: &mut crate::fs_hooks::LaunchFs,
      devices: &mut crate::device_hooks::LaunchDevices,
      channels: &mut crate::channel_hooks::LaunchChannels,
@@ -1175,7 +1175,7 @@ index 2d08cda2..40f7837c 100644
      match code {
          120 => b"bootstrap unavailable: chroot failed (host privilege required)",
          121 => b"bootstrap failed: root directory unavailable",
-@@ -1171,11 +920,12 @@ fn launch_exit_reason(code: i32) -> &'static [u8] {
+@@ -1212,11 +961,12 @@ fn launch_exit_reason(code: i32) -> &'static [u8] {
          128 => b"configured domain workdir unavailable",
          129 => b"descriptor cleanup failed",
          130 => b"descriptor namespace unavailable",
@@ -1189,7 +1189,7 @@ index 2d08cda2..40f7837c 100644
      let _ = domain.task_exited(false);
      launch_startup_fail(reason)
  }
-@@ -1185,10 +935,7 @@ fn launch_domain_fail(domain: &mut Domain, reason: &[u8]) -> ! {
+@@ -1226,10 +976,7 @@ fn launch_domain_fail(domain: &mut Domain, reason: &[u8]) -> ! {
      launch_startup_fail(reason)
  }
  
@@ -1201,7 +1201,7 @@ index 2d08cda2..40f7837c 100644
      let _ = domain.task_exited(false);
      write_stderr(b"ginux: launch supervision failure: ");
      write_stderr(reason);
-@@ -1223,7 +970,7 @@ fn write_stderr(bytes: &[u8]) {
+@@ -1264,7 +1011,7 @@ fn write_stderr(bytes: &[u8]) {
      }
  }
  
@@ -1212,7 +1212,7 @@ index 2d08cda2..40f7837c 100644
  }
 diff --git a/crates/ginux-init/src/launch_tasks.rs b/crates/ginux-init/src/launch_tasks.rs
 new file mode 100644
-index 00000000..1adee8cd
+index 0000000000000000000000000000000000000000..1adee8cdfc9f352a6530d593b334063c916f29a6
 --- /dev/null
 +++ b/crates/ginux-init/src/launch_tasks.rs
 @@ -0,0 +1,1036 @@
@@ -2253,10 +2253,10 @@ index 00000000..1adee8cd
 +    status & 127 != 0 && status & 127 != 127
 +}
 diff --git a/crates/ginux-init/src/main.rs b/crates/ginux-init/src/main.rs
-index 81a3ee9c..02ab8779 100644
+index 92b9194ce77253441263ebc6865cae70d69dde2c..7aa139994f973475d2d650de0c74f0e07f3d38a6 100644
 --- a/crates/ginux-init/src/main.rs
 +++ b/crates/ginux-init/src/main.rs
-@@ -14,6 +14,7 @@ mod device_hooks;
+@@ -16,6 +16,7 @@ mod device_hooks;
  mod dispatch;
  mod fs_hooks;
  mod launch;
@@ -2264,35 +2264,8 @@ index 81a3ee9c..02ab8779 100644
  mod path_hooks;
  mod process_hooks;
  mod supervisor;
-@@ -101,6 +102,26 @@ unsafe extern "C" fn memcpy(
-     destination
- }
- 
-+#[no_mangle]
-+unsafe extern "C" fn memmove(
-+    destination: *mut core::ffi::c_void,
-+    source: *const core::ffi::c_void,
-+    length: usize,
-+) -> *mut core::ffi::c_void {
-+    if destination as usize <= source as usize {
-+        return memcpy(destination, source, length);
-+    }
-+    let mut index = length;
-+    while index != 0 {
-+        index -= 1;
-+        core::ptr::write_volatile(
-+            destination.cast::<u8>().add(index),
-+            core::ptr::read_volatile(source.cast::<u8>().add(index)),
-+        );
-+    }
-+    destination
-+}
-+
- #[no_mangle]
- unsafe extern "C" fn memset(
-     destination: *mut core::ffi::c_void,
 diff --git a/crates/ginux-init/src/path_hooks.rs b/crates/ginux-init/src/path_hooks.rs
-index 7c9fcc76..fefa7ff0 100644
+index 7c9fcc767f45f6779008fc6cc993f4f2d45b188e..fefa7ff096b54339654e66e9ce170a753a15c0c1 100644
 --- a/crates/ginux-init/src/path_hooks.rs
 +++ b/crates/ginux-init/src/path_hooks.rs
 @@ -37,6 +37,78 @@ impl ImageRoot {
@@ -2494,7 +2467,7 @@ index 7c9fcc76..fefa7ff0 100644
      address: u64,
      saved: [u8; MAX_PATH + 1],
 diff --git a/crates/ginux-init/src/tracee_io.rs b/crates/ginux-init/src/tracee_io.rs
-index eb6fe123..bff07887 100644
+index eb6fe123cc2b6f7052e35da3c7b64d8f17ba4a36..bff0788721bdb2acb51b4bf811d240b8f2d533a5 100644
 --- a/crates/ginux-init/src/tracee_io.rs
 +++ b/crates/ginux-init/src/tracee_io.rs
 @@ -116,3 +116,40 @@ pub fn reserve_native_descriptors(limit: usize) -> bool {
@@ -2539,7 +2512,7 @@ index eb6fe123..bff07887 100644
 +    Ok(())
 +}
 diff --git a/crates/ginux-process/src/lib.rs b/crates/ginux-process/src/lib.rs
-index 5e855832..2dd08ea0 100644
+index a182328b59ac23806754b411b0ba391f7bd5d0a9..e3f7d717784e1dd51eb1e6aa7a48933b376b4083 100644
 --- a/crates/ginux-process/src/lib.rs
 +++ b/crates/ginux-process/src/lib.rs
 @@ -394,6 +394,27 @@ impl<const TASKS: usize> ProcessTable<TASKS> {
@@ -2598,7 +2571,7 @@ index 5e855832..2dd08ea0 100644
              return Ok(WaitResult {
                  child: task.id,
                  status,
-@@ -1704,6 +1737,70 @@ mod tests {
+@@ -1741,6 +1774,70 @@ mod tests {
          }
      }
  
@@ -2671,7 +2644,7 @@ index 5e855832..2dd08ea0 100644
          let mut table: ProcessTable<8> = ProcessTable::new();
 diff --git a/scripts/test-launch-exec.py b/scripts/test-launch-exec.py
 new file mode 100644
-index 00000000..3e331d3a
+index 0000000000000000000000000000000000000000..3e331d3ad0adc6aa0106b82559eadc4825b8ac96
 --- /dev/null
 +++ b/scripts/test-launch-exec.py
 @@ -0,0 +1,104 @@
@@ -2781,7 +2754,7 @@ index 00000000..3e331d3a
 +    main()
 diff --git a/scripts/test-launch-tasks.py b/scripts/test-launch-tasks.py
 new file mode 100644
-index 00000000..05da63c4
+index 0000000000000000000000000000000000000000..05da63c4b686ea1cb321b82867d11ab60aa3b20b
 --- /dev/null
 +++ b/scripts/test-launch-tasks.py
 @@ -0,0 +1,101 @@
@@ -2887,7 +2860,7 @@ index 00000000..05da63c4
 +if __name__ == '__main__':
 +    main()
 diff --git a/scripts/test-launch.py b/scripts/test-launch.py
-index 6ef91eaa..5fb0b515 100644
+index 6ef91eaa28a9866bc30ba190ca2ff9b1ffbb3a2f..5fb0b515ca3ad55fa53c3140fb41526f9e1ea80f 100644
 --- a/scripts/test-launch.py
 +++ b/scripts/test-launch.py
 @@ -1,6 +1,7 @@
@@ -2939,7 +2912,7 @@ index 6ef91eaa..5fb0b515 100644
                         for line in lines)):
 diff --git a/tests/fixtures/launch-exec-fixture.c b/tests/fixtures/launch-exec-fixture.c
 new file mode 100644
-index 00000000..61563a90
+index 0000000000000000000000000000000000000000..61563a90be075f7b6664803f44cda45069b6f78d
 --- /dev/null
 +++ b/tests/fixtures/launch-exec-fixture.c
 @@ -0,0 +1,129 @@
@@ -3073,7 +3046,7 @@ index 00000000..61563a90
 +}
 +__asm__(".global _start\n_start:\nmov %rsp,%rdi\nandq $-16,%rsp\ncall exec_main\nmov %rax,%rdi\nmov $60,%rax\nsyscall\nud2\n");
 diff --git a/tests/fixtures/launch-fixture.c b/tests/fixtures/launch-fixture.c
-index 70c70f18..f108e353 100644
+index 70c70f18b2ad6c2eb1007cae6f93678106b407c3..f108e3531fbc76cf2a668306eb4a7996f991d08d 100644
 --- a/tests/fixtures/launch-fixture.c
 +++ b/tests/fixtures/launch-fixture.c
 @@ -94,7 +94,18 @@ long launch_fixture_main(word *stack)
@@ -3098,7 +3071,7 @@ index 70c70f18..f108e353 100644
          return 96;
 diff --git a/tests/fixtures/launch-interpreter-fixture.S b/tests/fixtures/launch-interpreter-fixture.S
 new file mode 100644
-index 00000000..7464d671
+index 0000000000000000000000000000000000000000..7464d671845f136477b1bf6d0b536d7b6f6363ba
 --- /dev/null
 +++ b/tests/fixtures/launch-interpreter-fixture.S
 @@ -0,0 +1,9 @@
@@ -3113,7 +3086,7 @@ index 00000000..7464d671
 +.section .note.GNU-stack,"",@progbits
 diff --git a/tests/fixtures/launch-task-fixture.c b/tests/fixtures/launch-task-fixture.c
 new file mode 100644
-index 00000000..69182281
+index 0000000000000000000000000000000000000000..69182281cab147e7251c0efc7788dc18a95c345c
 --- /dev/null
 +++ b/tests/fixtures/launch-task-fixture.c
 @@ -0,0 +1,204 @@

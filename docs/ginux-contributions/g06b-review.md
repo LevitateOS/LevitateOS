@@ -1,6 +1,11 @@
 # G06b — configured child and exec ownership
 
-Local candidate `8c783e717b839b0e511820e89d29840cae0f3c0c`, tree
+Current retained local candidate `7240bb217e16750f55f57a490d444964e8bf537a`, on
+composition `7e0061b500e32e0735d34a375fcb668968f09ee6` of refreshed G05 and G06a,
+rooted at observed main `8a475e8b`. The current-main refresh below owns fresh
+evidence and pending checks; earlier results remain historical.
+
+Earlier local candidate `8c783e717b839b0e511820e89d29840cae0f3c0c`, tree
 `0c416ecb5220d4cec93900c2834cf35099ad294a`, on prerequisite composition
 `5cb0370f8b9d96d95f28498cc2d6a1c3698af72f` (reviewed G05 plus G06a).
 [Retained source patch](patches/G06b.patch). 19 files,+2343/-351 lines.
@@ -91,3 +96,62 @@ pending upstream prerequisites and the later publication refresh.
 
 No real Ginux branch, index, checkout, remote text or PR was changed. Source and
 review material remain downstream. User inspection at F04 precedes publication.
+
+## Current-main refresh — 2026-11-06
+
+The exact local prerequisite combines refreshed G05 `51b2c751` and G06a
+`01f22e06`; both parent identities are recorded. The old patch applies cleanly,
+but the first static build fails with E0428 because upstream already supplies
+`memmove`. Remove only the packet's duplicate twenty-line helper and retain the
+current upstream implementation byte-for-byte. The final `main.rs` delta is only
+`mod launch_tasks;`. The source scope is now nineteen files, +2323/-351; all other
+added/removed feature lines are unchanged. Initial failed-build log and unready
+snapshot remain evidence; they are not the proposed final head.
+
+A separate self-review reread the complete corrected diff and current process,
+descriptor, dispatch, bootstrap, exec-metadata, wait/reap and teardown callers.
+Task birth remains stopped until identity/table publication, references are
+retained across fork, rollback uses `cancel_fork`, wait consumes typed outcomes
+through `peek_wait`/`wait`, and exec commits CLOEXEC only at its event. The new
+upstream job-control owner/test remain intact. Current native/systemd supervisor,
+core contract and domain/network additions are preserved; this packet still does
+not duplicate the native-process PRs. The duplicate helper was the new blocking
+source correction found by this refresh. No independent reviewer or security
+acceptance is claimed.
+
+Candidate and strict clean prerequisite-plus-only-G06b replay both pass:
+
+- `make check test-unit build build-launch-fixture build-launch-storage-fixture build-launch-device-fixture build-launch-pipe-fixture build-launch-fd-fixture build-launch-task-fixture build-launch-exec-fixture build-process-fixtures build-gate1-fixture`, including all 90 current unit tests, 18 process tests and 24 VFS tests.
+- Forty-six ordinary controls per export. Twenty-three preserve launch, storage,
+  device, FD and pipe behavior. Nineteen cover supported fork/vfork/clone forms,
+  valid libc child-TID, shared native/owned offsets and blocking pipes, task bound
+  and reuse, 32 failed fork reservations with intact objects, supported child
+  kill/wait, orphan/adopted-zombie reaping, six valid image-exec forms and two
+  allowed initial interpreter controls. Additional checks cover failed ENOENT
+  exec preserving arguments/FD flags/data before successful CLOEXEC commit,
+  descendant drain/reaping after init death or supervisor error, and the exact
+  same fork fixture used for prerequisite comparison.
+
+The separately built exact prerequisite fails the identical trusted fork and
+image-exec fixtures at exits 95 and 61; both succeed with the final candidate and
+clean replay. The complete source fixtures remain enabled. The ordinary task
+artifact uses valid status/TID storage and omits security scenarios; the exec
+controls deliberately omit native private-FD inspection. These selections are
+not complete default-suite results.
+
+All 205 tracked paths match the retained head in both exports. Both binaries hash
+`bf5babad3393a0189300682ae5aa847ccfbe930ca13d968096d4e726c6747a97`.
+Source, clean and prerequisite builds use separate target directories. Exact
+commands, logs, failures, receipts, old/new patches, source exports, manifest and
+concise draft are retained under
+`.artifacts/ginux-contribution-preparation/upstream-refresh-2026-11-06/G06b/`.
+No real Ginux branch/index/checkout or remote text changed.
+
+Protected/unmapped/cross-page TID/wait copyout and rollback, interpreter/path/FD
+authority, indirect/shared argument capture and complete default runtime suites
+remain pending with the written DaybreakBlue handoff. macOS/remote CI is unrun.
+R03/R04 keep these checks and actual G05/G06a/prerequisite upstream merges pending;
+no public stack or F02/F03 closure is implied. G07 remains unready on its preserved
+historical base; this process-only refresh does not supply thread support or
+resolve the saved race. Continue independent G09a on refreshed G03b while retaining
+those holds.
