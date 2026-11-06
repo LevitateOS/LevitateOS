@@ -1013,8 +1013,6 @@ One `InitSystem` interface (OpenRC, systemd) writes getty and autologin, the rea
 - `D031` [special] `live_overlay.rs:360-378` (live-help text "LevitateOS Live Quick Help") and `:535` ("Levitate live network setup") hard-code the brand in the systemd overlay, though `os_name` is a config parameter. "systemd" is treated as meaning "LevitateOS".
 - `D035` [hidden] `live_tools.rs:652-655` (`25-shell-color.sh`) and `live_overlay.rs:386-389` (`20-live-shell-ux.sh`, systemd only) both export `PAGER` and `LESS`. Both also set PS1: `live_overlay.rs:391-393` sets it if empty, then `live_tools.rs:685` overwrites it for bash, so the systemd one is dead for bash.
 - `D037` [needless] `live_tools.rs:426-431`: `install_shell_color_profile` (generic shell colours, PS1, bash history and completion) is written by `install_mode_payload`, so shell defaults change with the install-UX action and only exist on live-tools ISOs.
-- `D101` [hidden] OpenRC `serial-autologin` is written twice. `pipeline/overlay.rs:278-295` puts a rootfs version with no UX launch and no boot-injection import into the live-boot rootfs, which the live-tools product inherits (`extends`). `artifact/live_overlay.rs:92-120` puts an overlay version with the UX launch on top of it. Only the overlay copy runs, but someone fixing the rootfs one can't tell.
-- `D102` [hidden] OpenRC `/etc/inittab` is written twice with the same getty lines: `pipeline/overlay.rs:294-322` (rootfs) and `artifact/live_overlay.rs:148-200` (overlay). The `serial-autologin` path and the baud/TERM arguments have to match in both.
 - `D103` [hidden] `/etc/issue` is written by three generators: `overlay.rs:328-337` ("Boot Live"), `live_overlay.rs:123-131` (OpenRC default) and `live_overlay.rs:622-630` (systemd default). All three must carry `LIVE_LOGIN_HINT` for the test at `qemu/serial/mod.rs:71`.
 - `D104` [surplus] `live_overlay.rs:123-127` and `:622-626`: the `default_issue` fallbacks are dead because the only caller always passes `Some(...)` (`overlay.rs:39-41,58`).
 - `D105` [special] `overlay.rs:355-358` + `bin/workflows/parse.rs:146,158`: the banner format `"{os} {label} Live"` combined with labels "Live Boot"/"Live Tools" yields "AcornOS Live Tools Live".
@@ -1124,6 +1122,11 @@ The entrypoint has no test branches (`--probe`, `LEVITATE_INSTALL_ENTRYPOINT_SMO
 - `D119` [hidden] `schema.rs:357-359` documents `serial_ready_patterns` as the readiness lines when "the serial console runs the install UX", but the harness never runs serial UX (see the install-test entries above).
 
 ### Leave as is
+
+Found while applying F21: `recstrap` installs the live **rootfs** (`recinit::live::ROOTFS_SEARCH_PATHS`), so the rootfs's OpenRC inittab, serial autologin, issue and shadow written by `ensure_openrc_shell` are what an installed AcornOS starts from; they are not dead copies of the overlay's. Removing them changes installed systems (serial autologin and an empty root password today), which is an installer decision outside this scope and can't be tested here. The overlay no longer writes its own serial autologin; it points the serial getty at the rootfs's.
+
+- `D101` [hidden] OpenRC `serial-autologin` is written twice. `pipeline/overlay.rs:278-295` puts a rootfs version with no UX launch and no boot-injection import into the live-boot rootfs, which the live-tools product inherits (`extends`). `artifact/live_overlay.rs:92-120` puts an overlay version with the UX launch on top of it. Only the overlay copy runs, but someone fixing the rootfs one can't tell.
+- `D102` [hidden] OpenRC `/etc/inittab` is written twice with the same getty lines: `pipeline/overlay.rs:294-322` (rootfs) and `artifact/live_overlay.rs:148-200` (overlay). The `serial-autologin` path and the baud/TERM arguments have to match in both.
 
 Left during the refactor (F14): these need recab's and recpart's own output to change (recab's CLI moved into its library and a `schema_version` on `status --json`; recpart's handoff document carrying the mount root, next-step commands and a slot type). Another session was rewriting recab (trial supervision, durable state) and editing recpart's policy and tests while this ran, so changing their public output here would have collided. The TUIs keep these copies until those tools settle; the generator side (dependency walk, per-manifest output, formatting, default mode, mode help, one output reader) is done.
 
@@ -1256,7 +1259,17 @@ Commits land on the checked-out branches (superproject `master`, submodules `cod
   - `rg 'FORCE_COLOR|COLORTERM|NO_COLOR' distro/builder xtask/src` finds only reads, plus xtask's capture host removing the three variables so the developer's shell can't change a capture (that clears, it doesn't force).
   - **Bug fixed:** `NO_COLOR` was overridden everywhere on the live ISO (set to "" by the split pane, unset by the launchers); it now reaches the docs app, and the shell colour profile treats any non-empty value as off, as the kit and no-color.org do.
   - Verified: in a PTY with outer `TERM=linux NO_COLOR=1`, a pane sees `TERM=xterm-256color NO_COLOR=1` and no `COLORTERM`; `cargo xtask check tui` passes (renders, docs-pane sizes, walks, snapshots).
-- [ ] F21 — Each live-ISO file has one writer, and init and distro differences come from config.
+- [x] F21 — Each live-ISO file has one writer, and init and distro differences come from config. contract `db66d42`, builder `fb8dadb`, superproject commit "F21: one writer per live-ISO file…".
+  - `artifact/live_overlay.rs` has one `create_live_overlay` with a shared part (issue, shadow, payload role, shell profile, serial test profile, live-help, getty autologin) and an OpenRC or systemd part, chosen by `InitSystem`. Its module doc lists what each part writes. The crate root no longer re-exports it.
+  - Gone: `masked_units`, `write_serial_test_profile`, `machine_id`, `enforce_utf8_locale_profile` (and its `LANG=C` profile), `seed_overlay` (contract field, variant key and AcornOS's seed `shadow`, which was always overwritten), the `default_issue` fallbacks, the OpenRC overlay's own `serial-autologin` and the `00-volatile-log.start` script (fstab alone mounts the tmpfs `/var/log`).
+  - One shell profile, `20-live-shell.sh`, for both distros (merges `25-shell-color.sh` from the install payload with the systemd-only `20-live-shell-ux.sh`); AcornOS now has it and live-help, branded with `os_name`. The serial test profile is now `99-serial-test.sh`, so it runs after the shell defaults.
+  - systemd: the VT template drop-in is a VT autologin (`--noclear %I $TERM`); serial settings stay in the serial template; install-screen consoles get same-named instance drop-ins.
+  - D103/D106/D109 shrink to the rootfs copies kept above (issue, shadow, the rootfs serial autologin's marker).
+  - **Bug fixed:** on LevitateOS, tty2–tty6 ran agetty with the serial line's `vt100` and baud flags (the template drop-in was the serial one).
+  - **Bug fixed:** the serial test protocol's empty prompt was overwritten by the colour profile's bash PS1 (profile.d order 00 < 25); it now runs last.
+  - **Bug fixed:** every live ISO had the same machine-id; `/etc/machine-id` is now empty, so systemd makes one per boot. OpenRC's root `lastchg` is 20000 like systemd's.
+  - Banner: "{os} Live Tools - \l" (was "AcornOS Live Tools Live").
+  - Verified: overlays render (scratch harness) with the differences above and nothing else; all guest scripts and rendered profiles pass `sh -n`; shadow is 0600 on both. Booting unverified here.
 - [ ] F22 — ISO payload is built by recipes and one generic TUI-app action.
 - [ ] F23 — The split pane is a robust terminal host.
 - [ ] F24 — Install tests exercise the real launch, not a smoke stand-in.
