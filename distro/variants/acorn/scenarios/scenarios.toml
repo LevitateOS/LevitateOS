@@ -128,13 +128,15 @@ script_path = "automated-login.sh"
 pass_marker = "AUTOMATED LOGIN PASSED"
 
 [scenarios.installed_tools]
-required_tools = ["doas", "ip", "ssh", "ash", "mount", "umount", "dmesg", "ps", "ls", "cat"]
+required_tools = ["doas", "ip", "ssh", "ash", "mount", "umount", "dmesg", "ps", "ls", "cat", "recab", "recstrap"]
 
 [scenarios.installed_tools.evidence]
 script_path = "installed-tools.sh"
 pass_marker = "INSTALLED TOOLS PASSED"
 
 [scenarios.runtime_policy]
-rootfs_mutability = "mutable"
+# "immutable" installs the A/B layout (two root slots, shared /var) that recab
+# updates and rolls back; each slot's root is still mounted read-write.
+rootfs_mutability = "immutable"
 mutable_required_rw_paths = []
 immutable_required_ro_paths = []

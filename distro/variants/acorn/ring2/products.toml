@@ -124,6 +124,20 @@ package = "recstrap"
 binary = "recchroot"
 target = "x86_64-unknown-linux-musl"
 
+# A/B updates on the installed system: recab stages the inactive slot with
+# recstrap. Both go into the rootfs, which is what the installer extracts.
+[[ring2_runtime_profiles.live_tools_common.actions]]
+kind = "rootfs_workspace_binary"
+package = "recab"
+target = "x86_64-unknown-linux-musl"
+destination = "usr/bin/recab"
+
+[[ring2_runtime_profiles.live_tools_common.actions]]
+kind = "rootfs_workspace_binary"
+package = "recstrap"
+target = "x86_64-unknown-linux-musl"
+destination = "usr/bin/recstrap"
+
 [[ring2_runtime_profiles.live_tools_common.actions]]
 kind = "apk_packages"
 packages = ["curl", "pciutils", "smartmontools", "hdparm", "vim", "htop"]

@@ -13,14 +13,19 @@ disk, erasing it. Run them in the left pane.
    recpart list-disks
 
 2. Partition, format and mount it at /mnt
-   Preview first (changes nothing):
+   AcornOS installs two system slots, A
+   and B, so an update can be tried and
+   rolled back. Preview first (changes
+   nothing):
      recpart apply --disk /dev/sdX \
-       --mode mutable --dry-run
+       --mode ab --dry-run
    Then apply (ERASES THE DISK):
      recpart apply --disk /dev/sdX \
-       --mode mutable --confirm DESTROY
-   Note the root device it mounted at
-   /mnt (for example /dev/sdX2).
+       --mode ab --confirm DESTROY
+   Slot A is mounted at /mnt and the state
+   partition at /mnt/var. Note the slot A
+   and slot B devices it reports (for
+   example /dev/sdX2 and /dev/sdX3).
 
 3. Extract AcornOS
    recstrap /mnt
@@ -28,36 +33,43 @@ disk, erasing it. Run them in the left pane.
 4. Generate fstab
    recfstab /mnt >> /mnt/etc/fstab
 
-5. Copy the kernel to the EFI partition
-   cp /run/live-media/boot/vmlinuz /mnt/boot/
-
-6. Install systemd-boot
+5. Install systemd-boot
    recchroot /mnt -- sh -c 'set -e
      E=/usr/lib/systemd/boot/efi/systemd-bootx64.efi
      mkdir -p /boot/EFI/BOOT /boot/EFI/systemd
      cp $E /boot/EFI/BOOT/BOOTX64.EFI
      cp $E /boot/EFI/systemd/'
 
-7. Add a boot entry
-   AcornOS boots without an initramfs, so
-   name the root partition by PARTUUID:
-     U=$(blkid -s PARTUUID -o value /dev/sdX2)
-     mkdir -p /mnt/boot/loader/entries
-     printf 'default acorn.conf\ntimeout 5\n' \
-       > /mnt/boot/loader/loader.conf
-     printf '%s\n' 'title AcornOS' \
-       'linux /vmlinuz' \
-       "options root=PARTUUID=$U rw rootwait" \
-       > /mnt/boot/loader/entries/acorn.conf
+6. Set up the A/B boot layout
+   recab init --root /mnt \
+     --slot-a /dev/sdX2 --slot-b /dev/sdX3 \
+     --kernel /run/live-media/boot/vmlinuz
+   It writes a boot entry per slot, copies
+   the kernel for slot A, makes slot A the
+   default, and enables recab-trial, which
+   keeps a healthy update and reboots out
+   of a failed one.
 
-8. Set hostname and root password
+7. Set hostname and root password
    echo acornos > /mnt/etc/hostname
    recchroot /mnt -- passwd
 
-9. Reboot into AcornOS
+8. Reboot into AcornOS
    reboot
    Remove the install media when the
    machine restarts.
+
+Updating later
+--------------
+From a new release's ISO, mounted at /mnt:
+  recab stage \
+    --rootfs /mnt/live/filesystem.erofs \
+    --kernel /mnt/boot/vmlinuz
+  recab set-next B
+  reboot
+The update is kept if it boots healthy;
+otherwise AcornOS returns to slot A.
+recab rollback goes back later.
 
 Troubleshooting
 ---------------
