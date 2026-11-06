@@ -210,8 +210,38 @@
       ],
       "acceptance": "Fork/exec/wait/signal/exit, failed exec retains FDs, CLOEXEC commits only on success, adopted children reaped once, repeated races leave no surviving tasks. Extract portable standalone fixes separately when main supports them.",
       "planned_delivery": "one coherent change plus its generic docs and focused regression fixtures; split coupled responsibilities only as recorded by P04",
-      "status": "pending extraction and R01-R04 review",
-      "artifact_directory": ".artifacts/ginux-contribution-preparation/G06"
+      "status": "local preparation completed through G06a and G06b; standalone delivery remains prerequisite-dependent",
+      "artifact_directory": ".artifacts/ginux-contribution-preparation/G06",
+      "extracted_packets": [
+        "G06a",
+        "G06b"
+      ],
+      "evidence": "g06b-review.md"
+    },
+    {
+      "packet": "G06b",
+      "parent_packet": "G06",
+      "purpose": "configured bounded child/exec lifecycle with shared descriptor ownership",
+      "dependencies": [
+        "G05",
+        "G06a"
+      ],
+      "base": "5cb0370f8b9d96d95f28498cc2d6a1c3698af72f",
+      "head": "8c783e717b839b0e511820e89d29840cae0f3c0c",
+      "tree": "0c416ecb5220d4cec93900c2834cf35099ad294a",
+      "upstream_base": "3f2fe7dfadd4b40e235d982a6a3d386dc6490177",
+      "source_commits": [
+        "ccd62ca1",
+        "8f768700",
+        "9279e71b",
+        "d693ae63",
+        "07c949db"
+      ],
+      "status": "locally reviewed and validated on explicit prerequisites; standalone publication awaits upstream merges",
+      "evidence": "g06b-review.md",
+      "source_patch": "patches/G06b.patch",
+      "standalone": false,
+      "artifact_directory": ".artifacts/ginux-contribution-preparation/G06b"
     },
     {
       "packet": "G07",

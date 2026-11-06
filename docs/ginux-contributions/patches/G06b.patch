@@ -1,0 +1,3323 @@
+From 8c783e717b839b0e511820e89d29840cae0f3c0c Mon Sep 17 00:00:00 2001
+From: vince <vincepaul.liem@gmail.com>
+Date: Fri, 6 Nov 2026 11:23:46 +0100
+Subject: [PATCH] feat(launch): supervise configured child and exec lifecycles
+
+Own bounded process identities and descriptor snapshots before children
+run. Join fork, image exec, child waits and signals to shared filesystem,
+device and pipe ownership; drain descendants when init exits.
+
+Commit CLOEXEC retirement only after successful exec, preserve public
+state on failure, and validate kernel-selected interpreter authority.
+Keep typed child outcomes and all-or-nothing TID/status writes while
+reaping children even when wait status copyout faults.
+
+Signed-off-by: vince <vincepaul.liem@gmail.com>
+---
+ .github/workflows/check.yml                 |    4 +-
+ Makefile                                    |   18 +
+ README.md                                   |   51 +-
+ crates/ginux-init/src/descriptors.rs        |  219 +++-
+ crates/ginux-init/src/dispatch.rs           |   10 +
+ crates/ginux-init/src/fs_hooks.rs           |  117 ++-
+ crates/ginux-init/src/launch.rs             |  327 +-----
+ crates/ginux-init/src/launch_tasks.rs       | 1036 +++++++++++++++++++
+ crates/ginux-init/src/main.rs               |   21 +
+ crates/ginux-init/src/path_hooks.rs         |  184 ++++
+ crates/ginux-init/src/tracee_io.rs          |   37 +
+ crates/ginux-process/src/lib.rs             |   99 +-
+ scripts/test-launch-exec.py                 |  104 ++
+ scripts/test-launch-tasks.py                |  101 ++
+ scripts/test-launch.py                      |   11 +-
+ tests/fixtures/launch-exec-fixture.c        |  129 +++
+ tests/fixtures/launch-fixture.c             |   13 +-
+ tests/fixtures/launch-interpreter-fixture.S |    9 +
+ tests/fixtures/launch-task-fixture.c        |  204 ++++
+ 19 files changed, 2343 insertions(+), 351 deletions(-)
+ create mode 100644 crates/ginux-init/src/launch_tasks.rs
+ create mode 100644 scripts/test-launch-exec.py
+ create mode 100644 scripts/test-launch-tasks.py
+ create mode 100644 tests/fixtures/launch-exec-fixture.c
+ create mode 100644 tests/fixtures/launch-interpreter-fixture.S
+ create mode 100644 tests/fixtures/launch-task-fixture.c
+
+diff --git a/.github/workflows/check.yml b/.github/workflows/check.yml
+index 8043a736..0c5b117a 100644
+--- a/.github/workflows/check.yml
++++ b/.github/workflows/check.yml
+@@ -24,12 +24,14 @@ jobs:
+     steps:
+       - uses: actions/checkout@v5
+       - run: rustup target add x86_64-unknown-linux-gnu
+-      - run: make build build-launch-fixture build-launch-storage-fixture build-launch-device-fixture build-launch-pipe-fixture build-launch-fd-fixture build-process-fixtures build-gate1-fixture
++      - run: make build build-launch-fixture build-launch-storage-fixture build-launch-device-fixture build-launch-pipe-fixture build-launch-fd-fixture build-launch-task-fixture build-launch-exec-fixture build-process-fixtures build-gate1-fixture
+       - run: sudo make test-launch
+       - run: sudo make test-launch-storage
+       - run: sudo make test-launch-devices
+       - run: sudo make test-launch-pipes
+       - run: sudo make test-launch-fds
++      - run: sudo make test-launch-tasks
++      - run: sudo make test-launch-exec
+       - run: sudo make test-native-supervision
+       - run: make test-process-native
+       - run: sudo make test-gate1-setup
+diff --git a/Makefile b/Makefile
+index 33da3a7e..4623d95d 100644
+--- a/Makefile
++++ b/Makefile
+@@ -225,3 +225,21 @@ build-launch-fd-fixture:
+ 
+ test-launch-fds:
+ 	python3 scripts/test-launch-fds.py $(GINUX) .artifacts/launch/launch-fd-fixture
++
++.PHONY: build-launch-task-fixture test-launch-tasks
++build-launch-task-fixture:
++	mkdir -p .artifacts/launch
++	$(CC) -nostdlib -static -fno-stack-protector -fno-builtin -O2 -Wall -Wextra -Werror tests/fixtures/launch-task-fixture.c -o .artifacts/launch/launch-task-fixture
++
++test-launch-tasks:
++	python3 scripts/test-launch-tasks.py $(GINUX) .artifacts/launch/launch-task-fixture
++
++.PHONY: build-launch-exec-fixture test-launch-exec
++build-launch-exec-fixture:
++	mkdir -p .artifacts/launch
++	$(CC) -nostdlib -static -fno-stack-protector -fno-builtin -O2 -Wall -Wextra -Werror tests/fixtures/launch-exec-fixture.c -o .artifacts/launch/launch-exec-fixture
++	$(CC) -nostdlib -pie -Wl,--dynamic-linker=/work/hidden tests/fixtures/launch-interpreter-fixture.S -o .artifacts/launch/launch-interpreter-fixture
++	$(CC) -nostdlib -pie -Wl,--dynamic-linker=/bin/second tests/fixtures/launch-interpreter-fixture.S -o .artifacts/launch/launch-interpreter-allowed-fixture
++
++test-launch-exec:
++	python3 scripts/test-launch-exec.py $(GINUX) .artifacts/launch/launch-exec-fixture .artifacts/launch/launch-interpreter-fixture .artifacts/launch/launch-interpreter-allowed-fixture
+diff --git a/README.md b/README.md
+index e5553eef..64912653 100644
+--- a/README.md
++++ b/README.md
+@@ -210,8 +210,8 @@ Workload stdout stays separate from supervisor diagnostics on stderr. Only
+ stdin, stdout, and stderr are inherited by the workload. The launcher returns
+ the workload exit code, or `128 + signal` for signal termination. Startup
+ failure returns 2; supervision or result-writing failure returns 1. Native
+-fork, clone, and subsequent exec are unsupported; fork returns `ENOSYS` until
+-child supervision is implemented. Non-x86-64 syscall ABIs and job-control
++fork/vfork, bounded process-only clone, image exec and child wait are supervised
++by a configured-launch task loop. Non-x86-64 syscall ABIs and job-control
+ group stops fail explicitly. Audit output is capped at 64 KiB plus a truncation
+ notice. This path does not implement resource quotas from the domain metadata.
+ 
+@@ -255,8 +255,10 @@ mmap and restored at exit. Native locks, leases and signal ownership are denied.
+ Bootstrap constrains the real descriptor soft/hard limits to 256 while keeping
+ lower operator limits. Allocation respects that lower soft limit; runtime
+ NOFILE-limit changes are currently denied. Reported limits are not inflated to
+-accommodate backend handle ranges. Child process creation remains denied.
+-Relative directory-fd access, descriptor polling, process inheritance and exec-time close-on-exec remain unfinished.
++accommodate backend handle ranges. Fork copies public descriptor tables while
++sharing open descriptions and owned-object lifetimes. Successful exec closes
++CLOEXEC entries; failed exec preserves the table. Relative directory-fd access
++and descriptor polling remain unsupported.
+ Guest-memory copies respect page protections, including partial read copyout.
+ No writable host descriptor is exposed. Data disappears at domain teardown;
+ there is no retention, export, storage generation or configured storage quota.
+@@ -284,12 +286,36 @@ Alias status flags and endpoint lifetimes are shared; close-on-exec flags are
+ per descriptor. No native pipe or host descriptor is given to the workload.
+ 
+ Nonblocking empty/full operations return `EAGAIN`. Blocking operations stay
+-stopped at entry until progress is possible. The current single-task launch
+-loop cannot run a peer or implement signal-driven restart; a parked self-pipe
+-waits indefinitely unless the workload is killed. SIGKILL termination and reaping
+-are tested. Pipe polling, multi-task wakeup, inherited descriptor tables, and
+-actual exec-time close-on-exec still require process integration. Pipe allocation/
+-byte-flow evidence alone does not prove ordinary child commands work.
++stopped at entry until another task changes pipe state. Forked peers can exchange
++data and wake blocked reads/writes; a self-pipe without a runnable peer still
++waits indefinitely. SIGKILL termination and reaping are supported. Descriptor
++polling and signal-driven restart of emulated blocking operations remain
++unsupported.
++
++Configured launch owns at most 16 task slots, including unreaped children.
++Process creation accepts fork, vfork, and clone with `SIGCHLD`,
++`CLONE_VM|CLONE_VFORK|SIGCHLD`, or the libc-fork
++`CLONE_CHILD_SETTID|CLONE_CHILD_CLEARTID|SIGCHLD` flags. Threads and other clone
++forms are unsupported. New children remain stopped until their virtual identity
++and descriptor snapshot are installed. Init is PID 1; PID/TID/parent queries,
++child-TID writes and forwarded signal senders use virtual identities. Actual
++credentials remain UID/GID 1000. `wait4` supports a positive child PID or -1,
++optional `WNOHANG`, and a null rusage pointer. A faulty status destination still
++reaps the child and leaves the status word unchanged. Kill supports only signal
++0 and SIGKILL directed at a positive virtual PID. Ignoring SIGCHLD and
++`SA_NOCLDWAIT` are unsupported. Init termination kills and reaps all descendants
++before the launcher reports completion.
++
++Subsequent exec supports image paths and native image descriptors with
++`execveat(AT_EMPTY_PATH)`. Descriptor synchronization precedes native exec;
++CLOEXEC retirement commits at the observed successful exec event. Failed exec
++restores public arguments and descriptor state. Owned-file execution is not
++implemented. Script and ELF interpreter paths must resolve to the same permitted
++image object in both the configured and native namespaces; hidden assignments
++cannot be bypassed through a kernel-selected interpreter. Interpreter metadata
++is bounded to x86-64 ELF headers, 256-byte paths and 16 script-chain inspections;
++unsupported or ambiguous chains fail explicitly. The initial executable has the
++same interpreter ownership check before its first instruction runs.
+ 
+ When requested, the result file is reserved exclusively before launch, with
+ mode 0600 and a maximum path length of 512 bytes. Existing files are never
+@@ -320,6 +346,8 @@ make build-launch-device-fixture
+ sudo make test-launch-devices
+ make build-launch-pipe-fixture build-launch-fd-fixture
+ sudo make test-launch-pipes test-launch-fds
++make build-launch-task-fixture build-launch-exec-fixture
++sudo make test-launch-tasks test-launch-exec
+ ```
+ 
+ ## Native process scenarios
+@@ -328,7 +356,8 @@ The separate `process-native <config> <executable>` command exercises native
+ fork, clone, vfork, exec, threads, waits, termination signals, and pipes. It
+ executes a trusted host fixture as the caller, without chroot; it does not
+ require root on a host that permits tracing child processes. Configured
+-`launch` remains a separate entry point and does not yet use this process loop.
++`launch` uses its own bounded task loop that joins configured storage, device
++and descriptor ownership; it does not use this native-only fixture loop.
+ 
+ Process creation returns virtual identities, including clone TID cells.
+ Untraced, reparenting, namespace, and unsupported clone flags are denied.
+diff --git a/crates/ginux-init/src/descriptors.rs b/crates/ginux-init/src/descriptors.rs
+index ca13d82a..cb69292d 100644
+--- a/crates/ginux-init/src/descriptors.rs
++++ b/crates/ginux-init/src/descriptors.rs
+@@ -31,6 +31,70 @@ enum Pending {
+     Close { result: Option<i64> },
+ }
+ 
++/// Owned backend handles are domain-wide; native kernel numbers are per task.
++pub struct ObjectReferences {
++    counts: [u16; 144],
++}
++impl ObjectReferences {
++    pub const fn new() -> Self {
++        Self { counts: [0; 144] }
++    }
++    pub fn active(&self) -> usize {
++        self.counts.iter().filter(|n| **n != 0).count()
++    }
++    fn index(handle: u32) -> usize {
++        if (0x4000_0000..0x4000_0040).contains(&handle) {
++            80 + (handle - 0x4000_0000) as usize
++        } else if (0x2000_0000..0x2000_0010).contains(&handle) {
++            64 + (handle - 0x2000_0000) as usize
++        } else {
++            assert!((1048576..1048640).contains(&handle));
++            (handle - 1048576) as usize
++        }
++    }
++    fn retain(&mut self, handle: u32) {
++        let i = Self::index(handle);
++        self.counts[i] = self.counts[i]
++            .checked_add(1)
++            .expect("owned descriptor reference overflow");
++    }
++    fn release(&mut self, handle: u32) -> bool {
++        let i = Self::index(handle);
++        assert!(self.counts[i] > 0);
++        self.counts[i] -= 1;
++        self.counts[i] == 0
++    }
++}
++
++pub struct Backends<'a> {
++    pub filesystem: &'a mut LaunchFs,
++    pub devices: &'a mut LaunchDevices,
++    pub channels: &'a mut LaunchChannels,
++    pub refs: &'a mut ObjectReferences,
++}
++impl Backends<'_> {
++    fn claim(&mut self, pid: usize, r: &UserRegs) -> NativeDecision {
++        decide_objects(pid, r, self.filesystem, self.devices, self.channels)
++    }
++    fn release(&mut self, handle: u32) -> Result<(), &'static [u8]> {
++        if !self.refs.release(handle) {
++            return Ok(());
++        }
++        // Owned close does not use task memory or a native descriptor.
++        let mut r = empty_regs();
++        r.orig_rax = 3;
++        r.rdi = handle as u64;
++        match self.claim(0, &r) {
++            NativeDecision::Hooked { result: 0, .. } => Ok(()),
++            _ => Err(b"owned backend release failed"),
++        }
++    }
++}
++
++fn empty_regs() -> UserRegs {
++    unsafe { core::mem::zeroed() }
++}
++
+ pub struct DescriptorTable {
+     entries: [Option<Descriptor>; LIMIT],
+     capacity: usize,
+@@ -51,8 +115,9 @@ impl DescriptorTable {
+             saved_args: None,
+         };
+         for fd in 0..3 {
+-            // Closed bootstrap stdio must not invent an open public handle.
+-            if unsafe { syscall3(72, fd, 1, 0) } >= 0 {
++            // Bootstrap exec closes CLOEXEC stdio just like an already closed
++            // descriptor. Neither may invent a live public console handle.
++            if unsafe { syscall3(72, fd, 1, 0) } == 0 {
+                 table.entries[fd] = Some(Descriptor {
+                     handle: Handle::Native {
+                         fd: fd as u32,
+@@ -65,6 +130,80 @@ impl DescriptorTable {
+         Ok(table)
+     }
+ 
++    pub fn fork_copy(&self, refs: &mut ObjectReferences) -> Result<Self, &'static [u8]> {
++        if self.pending.is_some() || self.saved_args.is_some() {
++            return Err(b"cannot inherit unfinished descriptor syscall");
++        }
++        for entry in self.entries.iter().flatten() {
++            if let Handle::Owned(handle) = entry.handle {
++                refs.retain(handle);
++            }
++        }
++        Ok(Self {
++            entries: self.entries,
++            capacity: self.capacity,
++            pending: None,
++            saved_args: None,
++        })
++    }
++
++    /// One native handle can back public aliases with different FD_CLOEXEC.
++    /// Synchronize the kernel bit only when all aliases will be retired.
++    pub fn next_exec_native(&self, first: usize) -> Option<(usize, bool)> {
++        for fd in first..LIMIT {
++            let mut aliases = self
++                .entries
++                .iter()
++                .flatten()
++                .filter(
++                    |d| matches!(d.handle, Handle::Native { fd: raw, .. } if raw as usize == fd),
++                )
++                .peekable();
++            if aliases.peek().is_some() {
++                return Some((fd, aliases.all(|d| d.cloexec)));
++            }
++        }
++        None
++    }
++
++    pub fn exec_native_descriptor(&self, fd: u64) -> Result<u32, i64> {
++        match self.get(fd)?.handle {
++            Handle::Native { fd, console: false } => Ok(fd),
++            _ => Err(-95),
++        }
++    }
++
++    /// PTRACE_EVENT_EXEC is the commit point. Failed exec never calls this.
++    pub fn exec_completed(&mut self, backends: &mut Backends) -> Result<(), &'static [u8]> {
++        if self.pending.is_some() || self.saved_args.is_some() {
++            return Err(b"exec overlapped unfinished descriptor syscall");
++        }
++        for entry in &mut self.entries {
++            if entry.is_some_and(|d| d.cloexec) {
++                if let Handle::Owned(handle) = entry.take().unwrap().handle {
++                    backends.release(handle)?;
++                }
++                // Kernel closed native handles with no surviving aliases.
++            }
++        }
++        Ok(())
++    }
++
++    pub fn release_exited(&mut self, backends: &mut Backends) -> Result<(), &'static [u8]> {
++        for entry in &mut self.entries {
++            if let Some(Descriptor {
++                handle: Handle::Owned(handle),
++                ..
++            }) = entry.take()
++            {
++                backends.release(handle)?;
++            }
++        }
++        self.pending = None;
++        self.saved_args = None;
++        Ok(())
++    }
++
+     fn get(&self, fd: u64) -> Result<Descriptor, i64> {
+         let fd = fd as i32;
+         if fd < 0 {
+@@ -152,9 +291,7 @@ impl DescriptorTable {
+         &mut self,
+         pid: usize,
+         r: &mut UserRegs,
+-        fs: &mut LaunchFs,
+-        devices: &mut LaunchDevices,
+-        channels: &mut LaunchChannels,
++        backends: &mut Backends,
+     ) -> NativeDecision {
+         // Resource changes cannot silently invalidate the public allocator.
+         if r.orig_rax == 302 && r.rsi == 7 && r.rdx != 0 {
+@@ -163,27 +300,27 @@ impl DescriptorTable {
+         let result = match r.orig_rax {
+             2 | 257 => {
+                 self.save(r);
+-                self.open(pid, r, fs, devices, channels)
++                self.open(pid, r, backends)
+             }
+             22 | 293 => {
+                 self.save(r);
+-                self.pipe(pid, r, channels)
++                self.pipe(pid, r, backends)
+             }
+             3 => {
+                 self.save(r);
+                 self.get(r.rdi)
+-                    .and_then(|_| self.close(r.rdi as u32 as usize, r, pid, fs, devices, channels))
++                    .and_then(|_| self.close(r.rdi as u32 as usize, r, pid, backends))
+             }
+             32 | 33 | 292 => {
+                 self.save(r);
+-                self.dup(pid, r, fs, devices, channels)
++                self.dup(pid, r, backends)
+             }
+             72 => {
+                 self.save(r);
+                 match self.get(r.rdi) {
+                     Err(e) => Err(e),
+                     Ok(entry) => match r.rsi {
+-                        0 | 1030 => self.dup(pid, r, fs, devices, channels),
++                        0 | 1030 => self.dup(pid, r, backends),
+                         1 => Ok(ready(entry.cloexec as i64)),
+                         2 if r.rdx & !1 == 0 => {
+                             self.entries[r.rdi as u32 as usize]
+@@ -193,14 +330,14 @@ impl DescriptorTable {
+                             Ok(ready(0))
+                         }
+                         2 => Err(-22),
+-                        _ => self.descriptor(pid, r, entry, fs, devices, channels),
++                        _ => self.descriptor(pid, r, entry, backends),
+                     },
+                 }
+             }
+             0 | 1 | 5 | 8 | 16 | 17 | 18 | 19 | 20 | 74 | 75 | 77 | 78 | 91 | 217 => {
+                 self.save(r);
+                 self.get(r.rdi)
+-                    .and_then(|d| self.descriptor(pid, r, d, fs, devices, channels))
++                    .and_then(|d| self.descriptor(pid, r, d, backends))
+             }
+             9 if r.r10 & 0x20 == 0 => {
+                 self.save(r);
+@@ -210,7 +347,7 @@ impl DescriptorTable {
+                         ..
+                     }) => {
+                         r.r8 = fd as u64;
+-                        Ok(decide_objects(pid, r, fs, devices, channels))
++                        Ok(backends.claim(pid, r))
+                     }
+                     Ok(_) => Err(-95),
+                     Err(e) => Err(e),
+@@ -218,9 +355,9 @@ impl DescriptorTable {
+             }
+             258 | 262 | 263 | 268 | 269 | 332 | 439 => {
+                 self.save(r);
+-                self.path_descriptor(pid, r, fs, devices, channels)
++                self.path_descriptor(pid, r, backends)
+             }
+-            _ => Ok(decide_objects(pid, r, fs, devices, channels)),
++            _ => Ok(backends.claim(pid, r)),
+         };
+         result.unwrap_or_else(ready)
+     }
+@@ -229,9 +366,7 @@ impl DescriptorTable {
+         &mut self,
+         pid: usize,
+         r: &mut UserRegs,
+-        fs: &mut LaunchFs,
+-        devices: &mut LaunchDevices,
+-        channels: &mut LaunchChannels,
++        backends: &mut Backends,
+     ) -> Result<NativeDecision, i64> {
+         let path = read_path(pid, r.rsi)?;
+         if path.as_bytes().first() == Some(&b'/') {
+@@ -254,16 +389,14 @@ impl DescriptorTable {
+                 });
+             }
+         }
+-        Ok(decide_objects(pid, r, fs, devices, channels))
++        Ok(backends.claim(pid, r))
+     }
+ 
+     fn open(
+         &mut self,
+         pid: usize,
+         r: &mut UserRegs,
+-        fs: &mut LaunchFs,
+-        devices: &mut LaunchDevices,
+-        channels: &mut LaunchChannels,
++        backends: &mut Backends,
+     ) -> Result<NativeDecision, i64> {
+         let flags = if r.orig_rax == 2 { r.rsi } else { r.rdx };
+         // Reserve before any create/truncate or native open can occur.
+@@ -274,13 +407,14 @@ impl DescriptorTable {
+             r.rdx &= !CLOEXEC;
+         }
+         let decision = if r.orig_rax == 257 {
+-            self.path_descriptor(pid, r, fs, devices, channels)
++            self.path_descriptor(pid, r, backends)
+         } else {
+-            Ok(decide_objects(pid, r, fs, devices, channels))
++            Ok(backends.claim(pid, r))
+         };
+         match decision {
+             Ok(NativeDecision::Hooked { lane, result }) => {
+                 if result >= 0 {
++                    backends.refs.retain(result as u32);
+                     self.entries[slot].as_mut().unwrap().handle = Handle::Owned(result as u32);
+                 } else {
+                     self.entries[slot] = None;
+@@ -305,7 +439,7 @@ impl DescriptorTable {
+         &mut self,
+         pid: usize,
+         r: &UserRegs,
+-        channels: &mut LaunchChannels,
++        backends: &mut Backends,
+     ) -> Result<NativeDecision, i64> {
+         let flags = if r.orig_rax == 293 { r.rsi } else { 0 };
+         if flags & !(CLOEXEC | 0o4000) != 0 {
+@@ -319,7 +453,7 @@ impl DescriptorTable {
+                 return Err(e);
+             }
+         };
+-        let handles = match channels.allocate(flags & !CLOEXEC) {
++        let handles = match backends.channels.allocate(flags & !CLOEXEC) {
+             Ok(handles) => handles,
+             Err(e) => {
+                 self.entries[first] = None;
+@@ -332,12 +466,14 @@ impl DescriptorTable {
+         bytes[4..].copy_from_slice(&(second as u32).to_le_bytes());
+         let copied = copy_memory(pid, r.rdi, &mut bytes, true);
+         if copied != Ok(8) {
+-            channels.release(handles[0]);
+-            channels.release(handles[1]);
++            backends.channels.release(handles[0]);
++            backends.channels.release(handles[1]);
+             self.entries[first] = None;
+             self.entries[second] = None;
+             return Err(-14);
+         }
++        backends.refs.retain(handles[0]);
++        backends.refs.retain(handles[1]);
+         self.entries[first].as_mut().unwrap().handle = Handle::Owned(handles[0]);
+         self.entries[second].as_mut().unwrap().handle = Handle::Owned(handles[1]);
+         Ok(ready(0))
+@@ -348,9 +484,7 @@ impl DescriptorTable {
+         pid: usize,
+         r: &mut UserRegs,
+         entry: Descriptor,
+-        fs: &mut LaunchFs,
+-        devices: &mut LaunchDevices,
+-        channels: &mut LaunchChannels,
++        backends: &mut Backends,
+     ) -> Result<NativeDecision, i64> {
+         let public_fd = r.rdi as u32;
+         match entry.handle {
+@@ -378,7 +512,7 @@ impl DescriptorTable {
+             Handle::Owned(handle) => r.rdi = handle as u64,
+             Handle::Reserved => return Err(-9),
+         }
+-        Ok(match decide_objects(pid, r, fs, devices, channels) {
++        Ok(match backends.claim(pid, r) {
+             NativeDecision::Park { .. } => NativeDecision::Park { fd: public_fd },
+             decision => decision,
+         })
+@@ -389,9 +523,7 @@ impl DescriptorTable {
+         slot: usize,
+         r: &mut UserRegs,
+         pid: usize,
+-        fs: &mut LaunchFs,
+-        devices: &mut LaunchDevices,
+-        channels: &mut LaunchChannels,
++        backends: &mut Backends,
+     ) -> Result<NativeDecision, i64> {
+         let result = if r.orig_rax == 3 {
+             None
+@@ -399,7 +531,11 @@ impl DescriptorTable {
+             Some(slot as i64)
+         };
+         let entry = self.entries[slot].take().ok_or(-9)?;
+-        if self
++        if let Handle::Owned(handle) = entry.handle {
++            if !backends.refs.release(handle) {
++                return Ok(ready(result.unwrap_or(0)));
++            }
++        } else if self
+             .entries
+             .iter()
+             .flatten()
+@@ -418,7 +554,7 @@ impl DescriptorTable {
+                 let mut close = *r;
+                 close.orig_rax = 3;
+                 close.rdi = handle as u64;
+-                match decide_objects(pid, &close, fs, devices, channels) {
++                match backends.claim(pid, &close) {
+                     NativeDecision::Hooked { result: 0, .. } => Ok(ready(result.unwrap_or(0))),
+                     _ => Err(-5),
+                 }
+@@ -431,9 +567,7 @@ impl DescriptorTable {
+         &mut self,
+         pid: usize,
+         r: &mut UserRegs,
+-        fs: &mut LaunchFs,
+-        devices: &mut LaunchDevices,
+-        channels: &mut LaunchChannels,
++        backends: &mut Backends,
+     ) -> Result<NativeDecision, i64> {
+         let source = r.rdi as i32;
+         let mut entry = self.get(r.rdi)?;
+@@ -458,10 +592,13 @@ impl DescriptorTable {
+         entry.cloexec = cloexec;
+         // Preserve the source in its own slot until target retirement completes.
+         let decision = if self.entries[target].is_some() {
+-            self.close(target, r, pid, fs, devices, channels)?
++            self.close(target, r, pid, backends)?
+         } else {
+             ready(target as i64)
+         };
++        if let Handle::Owned(handle) = entry.handle {
++            backends.refs.retain(handle);
++        }
+         self.entries[target] = Some(entry);
+         Ok(decision)
+     }
+diff --git a/crates/ginux-init/src/dispatch.rs b/crates/ginux-init/src/dispatch.rs
+index 23ff2a49..f1a5a7c3 100644
+--- a/crates/ginux-init/src/dispatch.rs
++++ b/crates/ginux-init/src/dispatch.rs
+@@ -119,6 +119,16 @@ pub fn decide_objects(
+     }
+ }
+ 
++/// Configured launch resolves the public descriptor ABI before backend handles.
++pub fn decide_launch(
++    pid: usize,
++    registers: &mut UserRegs,
++    descriptors: &mut crate::descriptors::DescriptorTable,
++    backends: &mut crate::descriptors::Backends,
++) -> NativeDecision {
++    descriptors.enter(pid, registers, backends)
++}
++
+ /// Dispatch one process-supervision entry through the process-lane hook.
+ /// `None` keeps the existing entry match in the supervision loop.
+ pub fn process_entry(syscall: u64, rdi: u64, rsi: u64, rdx: u64) -> Option<i64> {
+diff --git a/crates/ginux-init/src/fs_hooks.rs b/crates/ginux-init/src/fs_hooks.rs
+index 71c5be2a..9fb764c5 100644
+--- a/crates/ginux-init/src/fs_hooks.rs
++++ b/crates/ginux-init/src/fs_hooks.rs
+@@ -1,6 +1,7 @@
+ //! Configured-launch ephemeral memory storage. Bytes and descriptors belong to
+ //! the supervisor; no writable host descriptor is installed in the workload.
+-//! Retained storage, directory descriptors, mappings and exec are not provided.
++//! Retained storage, directory descriptors, mappings and generated-file exec
++//! are not provided.
+ 
+ use crate::supervisor::UserRegs;
+ use crate::tracee_io::{copy_memory, read_path};
+@@ -30,6 +31,7 @@ pub struct LaunchFs {
+     prefixes: [Path; 8],
+     count: usize,
+     cwd: Path,
++    init: Path,
+     null: bool,
+ }
+ 
+@@ -109,6 +111,8 @@ impl LaunchFs {
+                 .as_slice()
+                 .iter()
+                 .any(|name| name.as_bytes() == b"null"),
++            init: Path::from_bytes(config.init.as_bytes())
++                .map_err(|_| b"init path exceeds bound".as_slice())?,
+             cwd: Path::from_bytes(config.workdir.as_bytes())
+                 .map_err(|_| b"storage workdir exceeds bound".as_slice())?,
+         })
+@@ -197,6 +201,8 @@ impl LaunchFs {
+                 r.rdx & 0o400000 == 0 && r.rdx & 0o300 != 0o300,
+                 r.rdx & 0o100 != 0,
+             ),
++            59 => (0, r.rdi, (-100i64) as u64, true, false),
++            322 => (1, r.rsi, r.rdi, r.r8 & 0x100 == 0, false),
+             4 | 21 | 90 => (0, r.rdi, (-100i64) as u64, true, false),
+             6 | 87 | 89 => (0, r.rdi, (-100i64) as u64, false, false),
+             83 => (0, r.rdi, (-100i64) as u64, false, true),
+@@ -208,7 +214,7 @@ impl LaunchFs {
+             439 => (1, r.rsi, r.rdi, r.r10 & 0x100 == 0, false),
+             _ => return Ok(None),
+         };
+-        if matches!(r.orig_rax, 262 | 332 | 439)
++        if matches!(r.orig_rax, 262 | 332 | 439 | 322)
+             && (dirfd as i32) < FD_BASE as i32
+             && read_path(pid, address)?.is_empty()
+         {
+@@ -235,6 +241,113 @@ impl LaunchFs {
+         Ok(Some((argument, path)))
+     }
+ 
++    /// Image execution never reopens assigned paths, including implicit script
++    /// and ELF interpreters selected by the native kernel loader.
++    pub fn native_exec_path(&self, pid: usize, address: u64, follow: bool) -> Result<(), i64> {
++        let path = self.path(pid, address, (-100i64) as u64)?;
++        let path = self.resolve(pid, path.as_bytes(), follow, true)?;
++        self.check_exec_owner(path.as_bytes())?;
++        if !follow {
++            let image = crate::path_hooks::ImageRoot::new(pid)?;
++            if image
++                .lookup(path.as_bytes(), &mut [0; MAX_PATH])
++                .map_err(errno)?
++                .0
++                == NodeKind::Symlink
++            {
++                return Ok(());
++            }
++        }
++        self.check_interpreters(pid, path)
++    }
++
++    pub fn validate_initial_exec(&self, pid: usize) -> Result<(), i64> {
++        let path = self.resolve(pid, self.init.as_bytes(), true, false)?;
++        self.check_exec_owner(path.as_bytes())?;
++        let image = crate::path_hooks::ImageRoot::new(pid)?;
++        let mut physical = [0; MAX_PATH];
++        let length = image
++            .resolve_image(self.init.as_bytes(), &mut physical)
++            .map_err(errno)?;
++        if physical[..length] != *path.as_bytes() {
++            return Err(-95);
++        }
++        self.check_interpreters(pid, path)
++    }
++
++    fn check_exec_owner(&self, path: &[u8]) -> Result<(), i64> {
++        if self.owns_path(path) {
++            return Err(-95);
++        }
++        if [b"/dev".as_slice(), b"/proc", b"/sys"]
++            .iter()
++            .any(|p| within(path, p))
++        {
++            return Err(-13);
++        }
++        Ok(())
++    }
++
++    pub fn native_exec_fd(&self, pid: usize, fd: u32) -> Result<(), i64> {
++        let image = crate::path_hooks::ImageRoot::new(pid)?;
++        let mut name = [0; MAX_PATH];
++        let next = crate::path_hooks::ImageRoot::interpreter_fd(pid, fd, &mut name)?;
++        self.check_interpreter_chain(pid, &image, name, next)
++    }
++
++    fn check_interpreters(&self, pid: usize, path: Path) -> Result<(), i64> {
++        let image = crate::path_hooks::ImageRoot::new(pid)?;
++        let mut name = [0; MAX_PATH];
++        let next = image.interpreter(path.as_bytes(), &mut name)?;
++        self.check_interpreter_chain(pid, &image, name, next)
++    }
++
++    fn check_interpreter_chain(
++        &self,
++        pid: usize,
++        image: &crate::path_hooks::ImageRoot,
++        mut name: [u8; MAX_PATH],
++        mut next: Option<(usize, bool)>,
++    ) -> Result<(), i64> {
++        for _ in 0..16 {
++            let Some((length, script)) = next else {
++                return Ok(());
++            };
++            let mut joined = [0; MAX_PATH];
++            let base = if name.first() == Some(&b'/') {
++                b"".as_slice()
++            } else {
++                self.cwd.as_bytes()
++            };
++            let separator = usize::from(!base.is_empty() && base != b"/");
++            let end = base
++                .len()
++                .checked_add(separator)
++                .and_then(|n| n.checked_add(length))
++                .filter(|end| *end < MAX_PATH)
++                .ok_or(-36)?;
++            joined[..base.len()].copy_from_slice(base);
++            if separator != 0 {
++                joined[base.len()] = b'/';
++            }
++            joined[base.len() + separator..end].copy_from_slice(&name[..length]);
++            let path = self.resolve(pid, &joined[..end], true, true)?;
++            self.check_exec_owner(path.as_bytes())?;
++            let mut physical = [0; MAX_PATH];
++            let n = image
++                .resolve_image(&joined[..end], &mut physical)
++                .map_err(errno)?;
++            if physical[..n] != *path.as_bytes() {
++                return Err(-95);
++            }
++            if !script {
++                return Ok(());
++            }
++            next = image.interpreter(path.as_bytes(), &mut name)?;
++        }
++        Err(-40)
++    }
++
+     /// Configured-launch dispatch only; demo paths keep their existing contract.
+     pub fn claim(&mut self, pid: usize, r: &UserRegs) -> Option<i64> {
+         let fd = r.rdi as i32;
+diff --git a/crates/ginux-init/src/launch.rs b/crates/ginux-init/src/launch.rs
+index 2d08cda2..40f7837c 100644
+--- a/crates/ginux-init/src/launch.rs
++++ b/crates/ginux-init/src/launch.rs
+@@ -4,20 +4,13 @@
+ //! input-file staging. Workload definitions stay with the entry points in
+ //! `main.rs`; `launch` runs the executable and arguments from domain config.
+ 
+-use ginux_core::{
+-    balanced_identity_result, balanced_mediated_result, balanced_surface, Action, SYS_EXIT,
+-    SYS_EXIT_GROUP,
+-};
+ use ginux_domain::{ConfigError, Domain, DomainConfig, ExecutionBackend, ExecutionProfile};
+ 
+-use crate::dispatch::{balanced_surface_name, native_arguments_allowed, NativeDecision};
+ use crate::supervisor::{
+-    exit_process, line, ptrace, stopped, syscall0, syscall1, syscall2, syscall3, syscall4,
+-    syscall5, wait, write_all, UserRegs, AT_FDCWD, DOMAIN_GID, DOMAIN_UID, O_RDONLY,
+-    PR_SET_NO_NEW_PRIVS, PTRACE_GETREGS, PTRACE_O_EXITKILL, PTRACE_O_TRACESYSGOOD,
+-    PTRACE_SETOPTIONS, PTRACE_SETREGS, PTRACE_SYSCALL, PTRACE_TRACEME, SYS_CHDIR, SYS_CHROOT,
+-    SYS_CLOSE_HOST, SYS_EXECVE, SYS_EXIT_HOST, SYS_FORK, SYS_FSYNC, SYS_OPENAT_HOST, SYS_PRCTL,
+-    SYS_PTRACE, SYS_READ_HOST, SYS_SETGID, SYS_SETGROUPS, SYS_SETUID, SYS_WRITE_HOST,
++    exit_process, line, syscall0, syscall1, syscall2, syscall3, syscall4, syscall5, write_all,
++    AT_FDCWD, DOMAIN_GID, DOMAIN_UID, O_RDONLY, PR_SET_NO_NEW_PRIVS, PTRACE_TRACEME, SYS_CHDIR,
++    SYS_CHROOT, SYS_CLOSE_HOST, SYS_EXECVE, SYS_EXIT_HOST, SYS_FORK, SYS_FSYNC, SYS_OPENAT_HOST,
++    SYS_PRCTL, SYS_PTRACE, SYS_READ_HOST, SYS_SETGID, SYS_SETGROUPS, SYS_SETUID, SYS_WRITE_HOST,
+ };
+ 
+ pub const MAX_ELF_SIZE: usize = 64 * 1024;
+@@ -299,7 +292,7 @@ pub fn launch_main(config_path: *const u8, root_path: *const u8, result_path: *c
+     let mut filesystem = crate::fs_hooks::LaunchFs::prepare(&config)
+         .unwrap_or_else(|reason| launch_startup_fail(reason));
+     let mut channels = crate::channel_hooks::LaunchChannels::new();
+-    let mut descriptors = crate::descriptors::DescriptorTable::new()
++    let descriptors = crate::descriptors::DescriptorTable::new()
+         .unwrap_or_else(|reason| launch_startup_fail(reason));
+     print_launch_config(&config);
+     let mut domain = Domain::create(config);
+@@ -307,6 +300,9 @@ pub fn launch_main(config_path: *const u8, root_path: *const u8, result_path: *c
+         launch_domain_fail(&mut domain, b"invalid launch start transition");
+     }
+     stage_launch(&config);
++    if unsafe { syscall5(SYS_PRCTL, 36, 1, 0, 0, 0) } < 0 {
++        launch_domain_fail(&mut domain, b"domain subreaper setup failed");
++    }
+     let child = unsafe { syscall0(SYS_FORK) };
+     if child < 0 {
+         launch_domain_fail(&mut domain, b"launch tracee fork failed");
+@@ -320,7 +316,7 @@ pub fn launch_main(config_path: *const u8, root_path: *const u8, result_path: *c
+         &mut filesystem,
+         &mut devices,
+         &mut channels,
+-        &mut descriptors,
++        descriptors,
+     )
+ }
+ 
+@@ -612,7 +608,7 @@ pub fn launch_usage() -> ! {
+     exit_process(2)
+ }
+ 
+-fn audit_write(bytes: &[u8]) {
++pub(crate) fn audit_write(bytes: &[u8]) {
+     let record = unsafe {
+         if AUDIT_CAPPED {
+             return;
+@@ -652,12 +648,7 @@ fn audit_cap() {
+     write_stderr(b"ginux: audit truncated budget=65536\n");
+ }
+ 
+-fn audit_line(message: &[u8]) {
+-    audit_write(message);
+-    audit_write(b"\n");
+-}
+-
+-fn audit_u64(mut value: u64) {
++pub(crate) fn audit_u64(mut value: u64) {
+     let mut buffer = [0u8; 20];
+     let mut index = buffer.len();
+     if value == 0 {
+@@ -672,7 +663,7 @@ fn audit_u64(mut value: u64) {
+     audit_write(&buffer[index..]);
+ }
+ 
+-fn audit_i64(value: i64) {
++pub(crate) fn audit_i64(value: i64) {
+     if value < 0 {
+         audit_write(b"-");
+         audit_u64(value.unsigned_abs());
+@@ -781,7 +772,7 @@ fn write_completion_result(outcome: u8, has_code: bool, code: u64, has_signal: b
+     }
+ }
+ 
+-fn finish_exited(code: u64) {
++pub(crate) fn finish_exited(code: u64) {
+     line_stderr(b"ginux: launch supervisor=attached direct-unsupervised-syscalls=0");
+     write_stderr(b"ginux: launch complete workload-exit-code=");
+     write_stderr_u64(code);
+@@ -790,7 +781,7 @@ fn finish_exited(code: u64) {
+     exit_process(code as usize)
+ }
+ 
+-fn finish_signaled(signal: u64) {
++pub(crate) fn finish_signaled(signal: u64) {
+     line_stderr(b"ginux: launch supervisor=attached direct-unsupervised-syscalls=0");
+     write_stderr(b"ginux: launch complete workload-signal=");
+     write_stderr_u64(signal);
+@@ -816,6 +807,15 @@ fn launch_tracee(root_path: *const u8) -> ! {
+             129,
+         );
+     }
++    // A caller's ignored SIGCHLD must not silently enable native auto-reap
++    // in a domain whose child lifetime is owned by the virtual process table.
++    let default_sigchld = [0u64; 4];
++    if unsafe { syscall4(13, 17, default_sigchld.as_ptr() as usize, 0, 8) } < 0 {
++        tracee_setup_fail(
++            b"ginux: launch bootstrap failed: child signal setup failed\n",
++            131,
++        );
++    }
+     if unsafe { syscall1(SYS_CHROOT, root_path as usize) } < 0 {
+         tracee_setup_fail(
+             b"ginux: launch bootstrap unavailable: chroot failed (host privilege required)\n",
+@@ -895,270 +895,19 @@ fn supervise_launch(
+     filesystem: &mut crate::fs_hooks::LaunchFs,
+     devices: &mut crate::device_hooks::LaunchDevices,
+     channels: &mut crate::channel_hooks::LaunchChannels,
+-    descriptors: &mut crate::descriptors::DescriptorTable,
++    descriptors: crate::descriptors::DescriptorTable,
+ ) -> ! {
+-    let mut status = 0i32;
+-    if wait(pid, &mut status) < 0 {
+-        launch_fail(domain, pid, b"launch tracee wait after exec failed");
+-    }
+-    if launch_exited(status) {
+-        launch_early_fail(domain, launch_exit_reason(launch_exit_code(status)));
+-    }
+-    if !stopped(status) || (status >> 8) & 0xff != 5 {
+-        launch_fail(domain, pid, b"launch tracee did not stop after exec");
+-    }
+-    let options = PTRACE_O_TRACESYSGOOD | PTRACE_O_EXITKILL;
+-    if ptrace(PTRACE_SETOPTIONS, pid, 0, options) < 0 || ptrace(PTRACE_SYSCALL, pid, 0, 0) < 0 {
+-        launch_fail(domain, pid, b"launch ptrace setup failed");
+-    }
+-    line_stderr(b"ginux: launch backend=ptrace-native profile=balanced elf-loader=host");
+-    line_stderr(b"ginux: launch tracee-uid=1000 tracee-gid=1000 root=host-path-read-only");
+-
+-    let mut sequence = 0u64;
+-    let mut awaiting_exit = false;
+-    let mut path_rewrite: Option<crate::path_hooks::Rewrite> = None;
+-    let mut override_exit = false;
+-    let mut override_result = 0i64;
+-    loop {
+-        status = 0;
+-        if wait(pid, &mut status) < 0 {
+-            launch_fail(domain, pid, b"launch tracee wait failed");
+-        }
+-        if stopped(status) {
+-            let signal = ((status >> 8) & 0xff) as u8;
+-            if signal != (5 | 0x80) {
+-                // Group stops cannot be resumed with signal reinjection.
+-                // Fail explicitly instead of spinning on SIGSTOP forever.
+-                const PTRACE_GETSIGINFO: usize = 0x4202;
+-                let mut info = [0u64; 16];
+-                if ptrace(PTRACE_GETSIGINFO, pid, 0, info.as_mut_ptr() as usize) < 0 {
+-                    launch_fail(domain, pid, b"launch group stops are unsupported");
+-                }
+-                // Signal-delivery stop, not a syscall trap: forward the
+-                // signal and keep supervising so a terminating signal is
+-                // reported as outcome=signaled below.
+-                audit_write(b"ginux: audit phase=signal-forwarded signal=");
+-                audit_u64(signal as u64);
+-                audit_write(b"\n");
+-                if ptrace(PTRACE_SYSCALL, pid, 0, signal as usize) < 0 {
+-                    launch_fail(domain, pid, b"launch signal forward failed");
+-                }
+-                continue;
+-            }
+-        } else if launch_exited(status) {
+-            let code = launch_exit_code(status) as u64;
+-            if domain.task_exited(true).is_err() {
+-                launch_fail(domain, pid, b"invalid launch exit transition");
+-            }
+-            finish_exited(code);
+-        } else if launch_signaled(status) {
+-            let signal = launch_term_signal(status) as u64;
+-            let _ = domain.task_exited(false);
+-            finish_signaled(signal);
+-        } else {
+-            launch_fail(domain, pid, b"launch tracee escaped supervision");
+-        }
+-        let mut registers = core::mem::MaybeUninit::<UserRegs>::uninit();
+-        if ptrace(PTRACE_GETREGS, pid, 0, registers.as_mut_ptr() as usize) < 0 {
+-            launch_fail(domain, pid, b"launch register read failed");
+-        }
+-        let mut registers = unsafe { registers.assume_init() };
+-
+-        if awaiting_exit {
+-            let rewritten = path_rewrite.is_some();
+-            if let Some(rewrite) = path_rewrite.take() {
+-                if let Err(reason) = rewrite.finish(pid, &mut registers) {
+-                    launch_fail(domain, pid, reason);
+-                }
+-            }
+-            if override_exit {
+-                registers.rax = override_result as u64;
+-            }
+-            let descriptor_change = descriptors
+-                .finish(&mut registers)
+-                .unwrap_or_else(|reason| launch_fail(domain, pid, reason));
+-            if (override_exit || rewritten || descriptor_change)
+-                && ptrace(PTRACE_SETREGS, pid, 0, &registers as *const _ as usize) < 0
+-            {
+-                launch_fail(domain, pid, b"launch result override failed");
+-            }
+-            audit_write(b"ginux: audit sequence=");
+-            audit_u64(sequence);
+-            audit_write(b" phase=exit result=");
+-            audit_i64(registers.rax as i64);
+-            audit_write(b"\n");
+-            awaiting_exit = false;
+-            override_exit = false;
+-            if ptrace(PTRACE_SYSCALL, pid, 0, 0) < 0 {
+-                launch_fail(domain, pid, b"launch resume failed");
+-            }
+-            continue;
+-        }
+-
+-        // int 0x80 uses a different syscall table even from a 64-bit ELF.
+-        // Never classify that ABI using the x86-64 contract's numbers.
+-        const PTRACE_GET_SYSCALL_INFO: usize = 0x420e;
+-        let mut syscall_info = [0u64; 11];
+-        if ptrace(
+-            PTRACE_GET_SYSCALL_INFO,
+-            pid,
+-            core::mem::size_of_val(&syscall_info),
+-            syscall_info.as_mut_ptr() as usize,
+-        ) < 24
+-            || syscall_info[0] as u8 != 1
+-            || (syscall_info[0] >> 32) as u32 != 0xc000003e
+-        {
+-            launch_fail(domain, pid, b"launch requires the x86-64 syscall ABI");
+-        }
+-        sequence += 1;
+-        let syscall = registers.orig_rax;
+-        let dispatched = descriptors.enter(pid, &mut registers, filesystem, devices, channels);
+-        let dispatched = match dispatched {
+-            NativeDecision::Contract(decision) => {
+-                match crate::path_hooks::Rewrite::prepare(filesystem, pid, &mut registers) {
+-                    Ok(rewrite) => {
+-                        path_rewrite = rewrite;
+-                        NativeDecision::Contract(decision)
+-                    }
+-                    Err(-5) => launch_fail(domain, pid, b"launch path scratch restoration failed"),
+-                    Err(result) => NativeDecision::Hooked {
+-                        lane: crate::dispatch::Lane::Filesystem,
+-                        result,
+-                    },
+-                }
+-            }
+-            decision => decision,
+-        };
+-        let decision = match dispatched {
+-            NativeDecision::Park { fd } => {
+-                audit_write(b"ginux: park surface=lane-channel fd=");
+-                audit_u64(fd as u64);
+-                audit_write(b" syscall=");
+-                audit_u64(syscall);
+-                audit_write(b"\n");
+-                // The single task has no runnable peer. SIGKILL still produces
+-                // its normal terminal wait status; later task ownership retries IO.
+-                continue;
+-            }
+-            NativeDecision::Contract(decision) => decision,
+-            NativeDecision::Hooked { lane, result } => {
+-                let lane_name: &[u8] = match lane {
+-                    crate::dispatch::Lane::Process => b"process",
+-                    crate::dispatch::Lane::Filesystem => b"filesystem",
+-                    crate::dispatch::Lane::Device => b"device",
+-                    crate::dispatch::Lane::Channel => b"channel",
+-                    crate::dispatch::Lane::Contract => b"contract",
+-                };
+-                audit_write(b"ginux: emulate surface=lane-");
+-                audit_write(lane_name);
+-                audit_write(b" result=");
+-                audit_i64(result);
+-                audit_write(b"\n");
+-                registers.orig_rax = u64::MAX;
+-                awaiting_exit = true;
+-                override_exit = true;
+-                override_result = result;
+-                if ptrace(PTRACE_SETREGS, pid, 0, &registers as *const _ as usize) < 0
+-                    || ptrace(PTRACE_SYSCALL, pid, 0, 0) < 0
+-                {
+-                    launch_fail(domain, pid, b"launch lane emulation failed");
+-                }
+-                continue;
+-            }
+-        };
+-        audit_write(b"ginux: audit sequence=");
+-        audit_u64(sequence);
+-        audit_write(b" phase=entry syscall=");
+-        audit_u64(syscall);
+-        audit_write(b" action=");
+-        match decision.action {
+-            Action::Emulate if balanced_identity_result(syscall).is_some() => {
+-                let result = balanced_identity_result(syscall).unwrap_or(0);
+-                audit_write(b"emulate surface=virtual-identity result=");
+-                audit_i64(result);
+-                audit_write(b"\n");
+-                registers.orig_rax = u64::MAX;
+-                awaiting_exit = true;
+-                override_exit = true;
+-                override_result = result;
+-                if ptrace(PTRACE_SETREGS, pid, 0, &registers as *const _ as usize) < 0
+-                    || ptrace(PTRACE_SYSCALL, pid, 0, 0) < 0
+-                {
+-                    launch_fail(domain, pid, b"launch getpid emulation failed");
+-                }
+-            }
+-            Action::Emulate if syscall == SYS_EXIT || syscall == SYS_EXIT_GROUP => {
+-                audit_line(b"emulate result=domain-stop");
+-                awaiting_exit = true;
+-                if ptrace(PTRACE_SYSCALL, pid, 0, 0) < 0 {
+-                    launch_fail(domain, pid, b"launch exit resume failed");
+-                }
+-            }
+-            Action::Mediate if native_arguments_allowed(registers.orig_rax, &registers) => {
+-                audit_write(b"mediate surface=");
+-                audit_line(balanced_surface_name(balanced_surface(registers.orig_rax)));
+-                awaiting_exit = true;
+-                // A host result that is the caller's host tid is replaced
+-                // at the exit stop.
+-                if let Some(result) = balanced_mediated_result(syscall) {
+-                    override_exit = true;
+-                    override_result = result;
+-                }
+-                if ptrace(PTRACE_SETREGS, pid, 0, &registers as *const _ as usize) < 0
+-                    || ptrace(PTRACE_SYSCALL, pid, 0, 0) < 0
+-                {
+-                    launch_fail(domain, pid, b"launch mediated syscall failed");
+-                }
+-            }
+-            Action::Mediate => {
+-                audit_line(b"deny result=-1 reason=invalid-arguments");
+-                registers.orig_rax = u64::MAX;
+-                awaiting_exit = true;
+-                override_exit = true;
+-                override_result = -1;
+-                if ptrace(PTRACE_SETREGS, pid, 0, &registers as *const _ as usize) < 0
+-                    || ptrace(PTRACE_SYSCALL, pid, 0, 0) < 0
+-                {
+-                    launch_fail(domain, pid, b"launch argument denial failed");
+-                }
+-            }
+-            Action::Deny(errno) => {
+-                audit_write(b"deny result=-");
+-                audit_u64(errno as u64);
+-                audit_write(b"\n");
+-                registers.orig_rax = u64::MAX;
+-                awaiting_exit = true;
+-                override_exit = true;
+-                override_result = -(errno as i64);
+-                if ptrace(PTRACE_SETREGS, pid, 0, &registers as *const _ as usize) < 0
+-                    || ptrace(PTRACE_SYSCALL, pid, 0, 0) < 0
+-                {
+-                    launch_fail(domain, pid, b"launch syscall denial failed");
+-                }
+-            }
+-            _ => launch_fail(domain, pid, b"invalid launch contract decision"),
+-        }
+-    }
+-}
+-
+-fn launch_exited(status: i32) -> bool {
+-    status & 0x7f == 0
+-}
+-
+-fn launch_exit_code(status: i32) -> i32 {
+-    (status >> 8) & 0xff
+-}
+-
+-fn launch_signaled(status: i32) -> bool {
+-    let low = status & 0x7f;
+-    low != 0 && low != 0x7f
+-}
+-
+-fn launch_term_signal(status: i32) -> i32 {
+-    status & 0x7f
++    let mut refs = crate::descriptors::ObjectReferences::new();
++    let objects = crate::descriptors::Backends {
++        filesystem,
++        devices,
++        channels,
++        refs: &mut refs,
++    };
++    crate::launch_tasks::supervise(pid, domain, objects, descriptors)
+ }
+ 
+-fn launch_exit_reason(code: i32) -> &'static [u8] {
++pub(crate) fn launch_exit_reason(code: i32) -> &'static [u8] {
+     match code {
+         120 => b"bootstrap unavailable: chroot failed (host privilege required)",
+         121 => b"bootstrap failed: root directory unavailable",
+@@ -1171,11 +920,12 @@ fn launch_exit_reason(code: i32) -> &'static [u8] {
+         128 => b"configured domain workdir unavailable",
+         129 => b"descriptor cleanup failed",
+         130 => b"descriptor namespace unavailable",
++        131 => b"child signal setup failed",
+         _ => b"tracee exited before supervision",
+     }
+ }
+ 
+-fn launch_early_fail(domain: &mut Domain, reason: &[u8]) -> ! {
++pub(crate) fn launch_early_fail(domain: &mut Domain, reason: &[u8]) -> ! {
+     let _ = domain.task_exited(false);
+     launch_startup_fail(reason)
+ }
+@@ -1185,10 +935,7 @@ fn launch_domain_fail(domain: &mut Domain, reason: &[u8]) -> ! {
+     launch_startup_fail(reason)
+ }
+ 
+-fn launch_fail(domain: &mut Domain, pid: usize, reason: &[u8]) -> ! {
+-    let _ = unsafe { syscall2(crate::supervisor::SYS_KILL, pid, crate::supervisor::SIGKILL) };
+-    let mut status = 0;
+-    let _ = wait(pid, &mut status);
++pub(crate) fn supervision_error(domain: &mut Domain, reason: &[u8]) -> ! {
+     let _ = domain.task_exited(false);
+     write_stderr(b"ginux: launch supervision failure: ");
+     write_stderr(reason);
+@@ -1223,7 +970,7 @@ fn write_stderr(bytes: &[u8]) {
+     }
+ }
+ 
+-fn line_stderr(message: &[u8]) {
++pub(crate) fn line_stderr(message: &[u8]) {
+     write_stderr(message);
+     write_stderr(b"\n");
+ }
+diff --git a/crates/ginux-init/src/launch_tasks.rs b/crates/ginux-init/src/launch_tasks.rs
+new file mode 100644
+index 00000000..1adee8cd
+--- /dev/null
++++ b/crates/ginux-init/src/launch_tasks.rs
+@@ -0,0 +1,1036 @@
++//! Task ownership for configured native launch. A newborn never runs before
++//! its process identity and descriptor snapshot are installed.
++
++use crate::descriptors::{Backends, DescriptorTable};
++use crate::dispatch::{
++    balanced_surface_name, decide_launch, native_arguments_allowed, NativeDecision,
++};
++use crate::launch::{
++    audit_i64, audit_u64, audit_write, finish_exited, finish_signaled, launch_early_fail,
++    launch_exit_reason, line_stderr, supervision_error,
++};
++use crate::supervisor::*;
++use crate::tracee_io::copy_memory;
++use ginux_core::{balanced_identity_result, balanced_surface, Action};
++use ginux_domain::Domain;
++use ginux_process::{Credentials, ProcessError, ProcessTable, TaskId, WaitTarget};
++
++const TASKS: usize = 16;
++const WALL: usize = 0x4000_0000;
++// Linux x86-64: sys/ptrace and asm/unistd_64.h.
++const OPTIONS: usize = PTRACE_O_TRACESYSGOOD | PTRACE_O_EXITKILL | 2 | 4 | 8 | 16;
++
++#[derive(Clone, Copy)]
++enum Pending {
++    None,
++    Fork {
++        child: usize,
++        flags: u64,
++        child_tid: Option<u64>,
++    },
++    Wait {
++        child: usize,
++        original: [u64; 7],
++        status: u32,
++    },
++}
++
++#[derive(Clone, Copy, PartialEq, Eq)]
++enum ExecStage {
++    Sync,
++    Reenter,
++    Kernel,
++    Completed,
++}
++
++#[derive(Clone, Copy)]
++struct Exec {
++    original: UserRegs,
++    native_dirfd: u64,
++    next_native: usize,
++    stage: ExecStage,
++}
++
++struct Task {
++    id: TaskId,
++    host: usize,
++    alive: bool,
++    adopted_reaped: bool,
++    wait_status: Option<i32>,
++    descriptors: DescriptorTable,
++    pending: Pending,
++    override_result: Option<i64>,
++    blocked: Option<UserRegs>,
++    sequence: u64,
++    exec: Option<Exec>,
++    path_rewrite: Option<crate::path_hooks::Rewrite>,
++}
++
++struct Supervisor<'a> {
++    tasks: [Option<Task>; TASKS],
++    processes: ProcessTable<TASKS>,
++    objects: Backends<'a>,
++    unknown_stops: [usize; TASKS],
++    retired: [(usize, u32); TASKS],
++    retired_next: usize,
++    sequence: u64,
++    wake_needed: bool,
++}
++
++pub fn supervise(
++    root: usize,
++    domain: &mut Domain,
++    objects: Backends,
++    descriptors: DescriptorTable,
++) -> ! {
++    let mut status = 0;
++    let waited = loop {
++        let result = wait(root, &mut status);
++        if result != -4 {
++            break result;
++        }
++    };
++    if waited < 0 {
++        if waited != -10 {
++            let _ = unsafe { syscall2(SYS_KILL, root, SIGKILL) };
++            while wait(root, &mut status) == -4 {}
++        }
++        supervision_error(domain, b"launch tracee wait after exec failed");
++    }
++    if exited(status) {
++        launch_early_fail(domain, launch_exit_reason((status >> 8) & 255));
++    }
++    if signaled(status) {
++        // The terminal wait already reaped this PID; never signal it again.
++        supervision_error(domain, b"launch tracee signaled before supervision");
++    }
++    if !stopped(status) || (status >> 8) & 255 != 5 {
++        let _ = unsafe { syscall2(SYS_KILL, root, SIGKILL) };
++        while wait(root, &mut status) == -4 {}
++        supervision_error(domain, b"launch tracee did not stop after exec");
++    }
++    if objects.filesystem.validate_initial_exec(root).is_err() {
++        let _ = unsafe { syscall2(SYS_KILL, root, SIGKILL) };
++        while wait(root, &mut status) == -4 {}
++        supervision_error(
++            domain,
++            b"initial executable interpreter is outside its image namespace",
++        );
++    }
++    let mut processes = ProcessTable::new();
++    let id = processes
++        .create_init(Credentials::unprivileged(0, 0))
++        .unwrap();
++    let mut s = Supervisor {
++        tasks: core::array::from_fn(|_| None),
++        processes,
++        objects,
++        unknown_stops: [0; TASKS],
++        retired: [(0, 0); TASKS],
++        retired_next: 0,
++        sequence: 0,
++        wake_needed: false,
++    };
++    s.tasks[0] = Some(Task {
++        id,
++        host: root,
++        alive: true,
++        adopted_reaped: false,
++        wait_status: None,
++        descriptors,
++        pending: Pending::None,
++        override_result: None,
++        blocked: None,
++        sequence: 0,
++        exec: None,
++        path_rewrite: None,
++    });
++    if ptrace(PTRACE_SETOPTIONS, root, 0, OPTIONS) < 0 {
++        s.fail(domain, b"launch ptrace setup failed");
++    }
++    line_stderr(b"ginux: launch backend=ptrace-native profile=balanced elf-loader=host");
++    line_stderr(b"ginux: launch tracee-uid=1000 tracee-gid=1000 root=host-path-read-only");
++    s.resume(0, 0, domain);
++    loop {
++        s.wake(domain);
++        status = 0;
++        let host = unsafe {
++            syscall4(
++                SYS_WAIT4,
++                usize::MAX,
++                &mut status as *mut _ as usize,
++                WALL,
++                0,
++            )
++        };
++        if host == -4 {
++            continue;
++        }
++        if host < 0 {
++            s.fail(domain, b"launch task wait failed")
++        }
++        let host = host as usize;
++        let index = s
++            .tasks
++            .iter()
++            .position(|t| t.as_ref().is_some_and(|t| t.host == host && host != 0));
++        let Some(index) = index else {
++            // Auto-attached children can report their birth stop before the
++            // parent's event. Hold them; GETEVENTMSG must confirm ownership.
++            if stopped(status) && ((status >> 8) & 255) == 19 {
++                let slot = s
++                    .unknown_stops
++                    .iter()
++                    .position(|p| *p == 0)
++                    .unwrap_or_else(|| s.fail(domain, b"unregistered task bound exceeded"));
++                s.unknown_stops[slot] = host;
++                continue;
++            }
++            s.fail(domain, b"event from unregistered task");
++        };
++        if exited(status) || signaled(status) {
++            s.died(index, status, domain);
++            if index == 0 {
++                s.teardown(domain);
++                let normal = exited(status);
++                let _ = domain.task_exited(normal);
++                if normal {
++                    finish_exited(((status >> 8) & 255) as u64)
++                } else {
++                    finish_signaled((status & 127) as u64)
++                }
++            }
++            continue;
++        }
++        if !stopped(status) {
++            s.fail(domain, b"task escaped supervision")
++        }
++        let event = (status as u32 >> 16) as usize;
++        if matches!(event, 1..=3) {
++            s.birth(index, domain);
++            continue;
++        }
++        if event == 4 {
++            s.exec_completed(index, domain);
++            continue;
++        }
++        if event != 0 {
++            s.fail(domain, b"unsupported task transition")
++        }
++        let signal = ((status >> 8) & 255) as usize;
++        if signal != 133 {
++            if s.task(index)
++                .exec
++                .is_some_and(|e| matches!(e.stage, ExecStage::Sync | ExecStage::Reenter))
++            {
++                s.fail(domain, b"signal interrupted exec descriptor setup");
++            }
++            let mut info = [0u64; 16];
++            if ptrace(0x4202, host, 0, info.as_mut_ptr() as usize) < 0 {
++                s.fail(domain, b"launch group stops are unsupported")
++            }
++            let bytes =
++                unsafe { core::slice::from_raw_parts_mut(info.as_mut_ptr().cast::<u8>(), 128) };
++            let code = i32::from_ne_bytes(bytes[8..12].try_into().unwrap());
++            if signal == 17 || matches!(code, 0 | -1 | -6) {
++                let source = u32::from_ne_bytes(bytes[16..20].try_into().unwrap()) as usize;
++                let virtual_pid = s.virtual_pid(source).unwrap_or(0);
++                bytes[16..20].copy_from_slice(&virtual_pid.to_ne_bytes());
++                bytes[20..24].copy_from_slice(&0u32.to_ne_bytes());
++                if ptrace(0x4203, host, 0, info.as_ptr() as usize) < 0 {
++                    s.fail(domain, b"signal identity projection failed")
++                }
++            }
++            audit_write(b"ginux: audit phase=signal-forwarded signal=");
++            audit_u64(signal as u64);
++            audit_write(b"\n");
++            s.resume(index, signal, domain);
++            continue;
++        }
++        let mut r = match s.read_registers(index) {
++            Ok(registers) => registers,
++            Err(-3) => continue,
++            Err(_) => s.fail(domain, b"launch register read failed"),
++        };
++        let mut info = [0u64; 11];
++        let info_length = ptrace(
++            0x420e,
++            host,
++            core::mem::size_of_val(&info),
++            info.as_mut_ptr() as usize,
++        );
++        // Preserve task ownership when a peer's SIGKILL invalidates this stop;
++        // wait4's actual terminal event remains the sole death transition.
++        if info_length == -3 {
++            continue;
++        }
++        if info_length < 24 || (info[0] >> 32) as u32 != 0xc000003e {
++            s.fail(domain, b"launch requires the x86-64 syscall ABI")
++        }
++        match info[0] as u8 {
++            1 => s.entry(index, &mut r, domain),
++            2 => s.syscall_exit(index, &mut r, domain),
++            _ => s.fail(domain, b"unknown syscall stop"),
++        }
++    }
++}
++
++impl Supervisor<'_> {
++    fn task(&self, index: usize) -> &Task {
++        self.tasks[index].as_ref().unwrap()
++    }
++    fn task_mut(&mut self, index: usize) -> &mut Task {
++        self.tasks[index].as_mut().unwrap()
++    }
++    fn virtual_pid(&self, host: usize) -> Option<u32> {
++        if host == 0 {
++            return None;
++        }
++        self.tasks
++            .iter()
++            .flatten()
++            .find(|t| t.host == host)
++            .map(|t| t.id.pid)
++            .or_else(|| {
++                self.retired
++                    .iter()
++                    .find(|p| p.0 == host && host != 0)
++                    .map(|p| p.1)
++            })
++    }
++    fn read_registers(&self, index: usize) -> Result<UserRegs, isize> {
++        let mut r = core::mem::MaybeUninit::uninit();
++        let result = ptrace(
++            PTRACE_GETREGS,
++            self.task(index).host,
++            0,
++            r.as_mut_ptr() as usize,
++        );
++        if result < 0 {
++            return Err(result);
++        }
++        Ok(unsafe { r.assume_init() })
++    }
++    fn registers(&mut self, index: usize, domain: &mut Domain) -> UserRegs {
++        self.read_registers(index)
++            .unwrap_or_else(|_| self.fail(domain, b"launch register read failed"))
++    }
++    fn resume(&mut self, index: usize, signal: usize, domain: &mut Domain) {
++        let result = ptrace(PTRACE_SYSCALL, self.task(index).host, 0, signal);
++        if result == -3 {
++            return;
++        }
++        if result < 0 {
++            self.fail(domain, b"launch task resume failed")
++        }
++    }
++    fn run(&mut self, index: usize, r: &UserRegs, domain: &mut Domain) {
++        let result = ptrace(
++            PTRACE_SETREGS,
++            self.task(index).host,
++            0,
++            r as *const _ as usize,
++        );
++        if result == -3 {
++            return;
++        }
++        if result < 0 {
++            self.fail(domain, b"launch register update failed");
++        }
++        self.resume(index, 0, domain);
++    }
++    fn emulate(&mut self, index: usize, r: &mut UserRegs, result: i64, domain: &mut Domain) {
++        self.task_mut(index).override_result = Some(result);
++        r.orig_rax = u64::MAX;
++        audit_write(b"emulate result=");
++        audit_i64(result);
++        audit_write(b"\n");
++        self.run(index, r, domain);
++    }
++    fn entry(&mut self, index: usize, r: &mut UserRegs, domain: &mut Domain) {
++        if let Some(exec) = self.task(index).exec {
++            match exec.stage {
++                ExecStage::Reenter => {
++                    if r.orig_rax != exec.original.orig_rax || r.rip != exec.original.rip {
++                        self.fail(domain, b"exec replay left its syscall instruction");
++                    }
++                    self.exec_step(index, r, domain);
++                    return;
++                }
++                ExecStage::Completed => {
++                    self.task_mut(index).exec = None;
++                }
++                _ => self.fail(domain, b"unexpected entry during exec"),
++            }
++        }
++        self.sequence += 1;
++        self.task_mut(index).sequence = self.sequence;
++        audit_write(b"ginux: audit sequence=");
++        audit_u64(self.sequence);
++        audit_write(b" phase=entry syscall=");
++        audit_u64(r.orig_rax);
++        audit_write(b" virtual-pid=");
++        audit_u64(self.task(index).id.pid as u64);
++        audit_write(b" action=");
++        let original = *r;
++        let id = self.task(index).id;
++        match r.orig_rax {
++            59 | 322 => {
++                let result = self.prepare_exec(index, r);
++                if result == Err(-5) {
++                    self.fail(domain, b"exec path scratch restoration failed");
++                }
++                if let Err(errno) = result {
++                    self.emulate(index, r, errno, domain);
++                } else {
++                    audit_write(b"mediate surface=owned-exec\n");
++                    self.exec_step(index, r, domain);
++                }
++                return;
++            }
++            13 if r.rdi == 17 && r.rsi != 0 && r.r10 == 8 => {
++                // Native auto-reaping would bypass the explicit virtual wait
++                // lifecycle. Keep unsupported dispositions fail-closed.
++                let mut action = [0u8; 16];
++                if copy_memory(self.task(index).host, r.rsi, &mut action, false) != Ok(16) {
++                    self.emulate(index, r, -14, domain);
++                    return;
++                }
++                let handler = u64::from_ne_bytes(action[..8].try_into().unwrap());
++                let flags = u64::from_ne_bytes(action[8..].try_into().unwrap());
++                if handler == 1 || flags & 2 != 0 {
++                    self.emulate(index, r, -95, domain);
++                    return;
++                }
++            }
++            39 | 186 => {
++                self.emulate(index, r, id.pid as i64, domain);
++                return;
++            }
++            110 | 111 => {
++                let view = self.processes.view(id).unwrap();
++                self.emulate(
++                    index,
++                    r,
++                    if r.orig_rax == 110 {
++                        view.parent
++                    } else {
++                        view.process_group
++                    } as i64,
++                    domain,
++                );
++                return;
++            }
++            56..=58 => {
++                let flags = r.rdi;
++                let libc_fork = r.orig_rax == 56 && flags == 0x1200011;
++                if r.orig_rax == 56 && !matches!(flags, 17 | 0x4111 | 0x1200011) {
++                    self.emulate(index, r, -38, domain);
++                    return;
++                }
++                let Some(slot) = self.tasks.iter().position(|t| t.is_none()) else {
++                    self.emulate(index, r, -11, domain);
++                    return;
++                };
++                let child = match self.processes.fork(id) {
++                    Ok(id) => id,
++                    Err(_) => {
++                        self.emulate(index, r, -11, domain);
++                        return;
++                    }
++                };
++                let table = match self.tasks[index]
++                    .as_ref()
++                    .unwrap()
++                    .descriptors
++                    .fork_copy(self.objects.refs)
++                {
++                    Ok(table) => table,
++                    Err(reason) => self.fail(domain, reason),
++                };
++                self.tasks[slot] = Some(Task {
++                    id: child,
++                    host: 0,
++                    alive: true,
++                    adopted_reaped: false,
++                    wait_status: None,
++                    descriptors: table,
++                    pending: Pending::None,
++                    override_result: None,
++                    blocked: None,
++                    sequence: 0,
++                    exec: None,
++                    path_rewrite: None,
++                });
++                self.task_mut(index).pending = Pending::Fork {
++                    child: slot,
++                    flags,
++                    child_tid: libc_fork.then_some(r.r10),
++                };
++                if libc_fork {
++                    r.rdi &= !0x1000000;
++                }
++                audit_write(b"mediate surface=owned-process-create\n");
++                self.run(index, r, domain);
++                return;
++            }
++            61 => {
++                self.wait_entry(index, r, domain);
++                return;
++            }
++            62 => {
++                let target = r.rdi as i32;
++                let signal = r.rsi;
++                if target <= 0 || !matches!(signal, 0 | 9) {
++                    self.emulate(index, r, -95, domain);
++                    return;
++                }
++                let found = self
++                    .tasks
++                    .iter()
++                    .flatten()
++                    .find(|t| t.id.pid == target as u32 && t.alive && t.host != 0)
++                    .map(|t| t.host);
++                let result = found
++                    .map(|host| unsafe { syscall2(SYS_KILL, host, signal as usize) } as i64)
++                    .unwrap_or(-3);
++                self.emulate(index, r, result, domain);
++                return;
++            }
++            218 => {
++                self.task_mut(index).override_result = Some(id.pid as i64);
++            }
++            _ => {}
++        }
++        let decision = {
++            let task = self.tasks[index].as_mut().unwrap();
++            decide_launch(task.host, r, &mut task.descriptors, &mut self.objects)
++        };
++        let decision = match decision {
++            NativeDecision::Contract(decision) => {
++                match crate::path_hooks::Rewrite::prepare(
++                    self.objects.filesystem,
++                    self.task(index).host,
++                    r,
++                ) {
++                    Ok(rewrite) => {
++                        self.task_mut(index).path_rewrite = rewrite;
++                        NativeDecision::Contract(decision)
++                    }
++                    Err(-5) => self.fail(domain, b"launch path scratch restoration failed"),
++                    Err(result) => NativeDecision::Hooked {
++                        lane: crate::dispatch::Lane::Filesystem,
++                        result,
++                    },
++                }
++            }
++            decision => decision,
++        };
++        match decision {
++            NativeDecision::Park { fd } => {
++                self.task_mut(index).blocked = Some(original);
++                audit_write(b"park\nginux: park surface=lane-channel fd=");
++                audit_u64(fd as u64);
++                audit_write(b"\n");
++            }
++            NativeDecision::Hooked { result, .. } => {
++                self.wake_needed = true;
++                self.emulate(index, r, result, domain)
++            }
++            NativeDecision::Contract(decision) => match decision.action {
++                Action::Emulate if matches!(original.orig_rax, 60 | 231) => {
++                    audit_write(b"emulate result=domain-stop\n");
++                    self.run(index, r, domain)
++                }
++                Action::Emulate => self.emulate(
++                    index,
++                    r,
++                    balanced_identity_result(original.orig_rax).unwrap_or(0),
++                    domain,
++                ),
++                Action::Mediate if native_arguments_allowed(r.orig_rax, r) => {
++                    audit_write(b"mediate surface=");
++                    audit_write(balanced_surface_name(balanced_surface(r.orig_rax)));
++                    audit_write(b"\n");
++                    self.run(index, r, domain)
++                }
++                Action::Mediate => self.emulate(index, r, -1, domain),
++                Action::Deny(errno) => {
++                    audit_write(b"deny result=-");
++                    audit_u64(errno as u64);
++                    audit_write(b"\n");
++                    self.task_mut(index).override_result = Some(-(errno as i64));
++                    r.orig_rax = u64::MAX;
++                    self.run(index, r, domain)
++                }
++            },
++        }
++    }
++    fn prepare_exec(&mut self, index: usize, r: &mut UserRegs) -> Result<(), i64> {
++        let host = self.task(index).host;
++        let mut native_dirfd = r.rdi;
++        if r.orig_rax == 59 {
++            self.objects
++                .filesystem
++                .native_exec_path(host, r.rdi, true)?;
++        } else {
++            if r.r8 & !0x1100 != 0 {
++                return Err(-22);
++            }
++            let path = crate::tracee_io::read_path(host, r.rsi)?;
++            if path.is_empty() {
++                if r.r8 & 0x1000 == 0 {
++                    return Err(-2);
++                }
++                native_dirfd = self.task(index).descriptors.exec_native_descriptor(r.rdi)? as u64;
++                self.objects
++                    .filesystem
++                    .native_exec_fd(host, native_dirfd as u32)?;
++            } else {
++                if path.as_bytes()[0] != b'/' && r.rdi as i32 != -100 {
++                    return Err(-95);
++                }
++                self.objects
++                    .filesystem
++                    .native_exec_path(host, r.rsi, r.r8 & 0x100 == 0)?;
++                native_dirfd = (-100i64) as u64;
++            }
++        }
++        let mut instruction = [0u8; 2];
++        let address = r.rip.checked_sub(2).ok_or(-95)?;
++        if copy_memory(host, address, &mut instruction, false) != Ok(2)
++            || instruction != [0x0f, 0x05]
++        {
++            return Err(-95);
++        }
++        let rewrite = crate::path_hooks::Rewrite::prepare(self.objects.filesystem, host, r)?;
++        self.task_mut(index).path_rewrite = rewrite;
++        if r.orig_rax == 59 {
++            native_dirfd = r.rdi;
++        }
++        self.task_mut(index).exec = Some(Exec {
++            original: *r,
++            native_dirfd,
++            next_native: 0,
++            stage: ExecStage::Reenter,
++        });
++        Ok(())
++    }
++
++    fn exec_step(&mut self, index: usize, r: &mut UserRegs, domain: &mut Domain) {
++        let exec = self.task(index).exec.unwrap();
++        if let Some((fd, cloexec)) = self
++            .task(index)
++            .descriptors
++            .next_exec_native(exec.next_native)
++        {
++            let state = self.task_mut(index).exec.as_mut().unwrap();
++            state.next_native = fd + 1;
++            state.stage = ExecStage::Sync;
++            // This replaces the stopped exec syscall with a supervisor-chosen
++            // fcntl. Its exit replays the verified original syscall instruction.
++            r.orig_rax = 72;
++            r.rax = 72;
++            r.rdi = fd as u64;
++            r.rsi = 2;
++            r.rdx = cloexec as u64;
++            audit_write(b"ginux: exec native-fd=");
++            audit_u64(fd as u64);
++            audit_write(b" close-on-exec=");
++            audit_u64(cloexec as u64);
++            audit_write(b"\n");
++        } else {
++            *r = exec.original;
++            r.rdi = exec.native_dirfd;
++            self.task_mut(index).exec.as_mut().unwrap().stage = ExecStage::Kernel;
++        }
++        self.run(index, r, domain);
++    }
++
++    fn exec_completed(&mut self, index: usize, domain: &mut Domain) {
++        if !self
++            .task(index)
++            .exec
++            .is_some_and(|e| e.stage == ExecStage::Kernel)
++        {
++            self.fail(domain, b"unreserved exec transition");
++        }
++        let result = self.tasks[index]
++            .as_mut()
++            .unwrap()
++            .descriptors
++            .exec_completed(&mut self.objects);
++        if let Err(reason) = result {
++            self.fail(domain, reason);
++        }
++        if self.processes.exec(self.task(index).id).is_err() {
++            self.fail(domain, b"virtual exec transition failed");
++        }
++        // Exec replaced the address space: the old path scratch no longer exists.
++        self.task_mut(index).path_rewrite = None;
++        self.task_mut(index).exec.as_mut().unwrap().stage = ExecStage::Completed;
++        self.wake_needed = true;
++        audit_write(b"ginux: task exec virtual-pid=");
++        audit_u64(self.task(index).id.pid as u64);
++        audit_write(b"\n");
++        self.resume(index, 0, domain);
++    }
++
++    fn birth(&mut self, parent: usize, domain: &mut Domain) {
++        let Pending::Fork {
++            child: slot,
++            flags,
++            child_tid,
++        } = self.task(parent).pending
++        else {
++            self.fail(domain, b"unreserved child event")
++        };
++        let mut host = 0usize;
++        if ptrace(
++            PTRACE_GETEVENTMSG,
++            self.task(parent).host,
++            0,
++            &mut host as *mut _ as usize,
++        ) < 0
++            || host == 0
++        {
++            self.fail(domain, b"child event identity missing")
++        }
++        self.task_mut(slot).host = host;
++        let early = self.unknown_stops.iter().position(|p| *p == host);
++        if let Some(i) = early {
++            self.unknown_stops[i] = 0;
++        } else {
++            let mut status = 0;
++            if unsafe { syscall4(SYS_WAIT4, host, &mut status as *mut _ as usize, WALL, 0) } < 0
++                || !stopped(status)
++                || ((status >> 8) & 255) != 19
++            {
++                self.fail(domain, b"child birth stop missing")
++            }
++        }
++        if ptrace(PTRACE_SETOPTIONS, host, 0, OPTIONS) < 0 {
++            self.fail(domain, b"child supervision setup failed")
++        }
++        if let Some(address) = child_tid {
++            match crate::tracee_io::store_u32(host, address, self.task(slot).id.pid) {
++                Ok(()) | Err(-14) => {}
++                Err(_) => self.fail(domain, b"child tid rollback failed"),
++            }
++            let mut registers = self.registers(slot, domain);
++            registers.rdi = flags;
++            if ptrace(PTRACE_SETREGS, host, 0, &registers as *const _ as usize) < 0 {
++                self.fail(domain, b"child clone argument restoration failed");
++            }
++        }
++        audit_write(b"ginux: task registered virtual-pid=");
++        audit_u64(self.task(slot).id.pid as u64);
++        audit_write(b"\n");
++        self.resume(slot, 0, domain);
++        self.resume(parent, 0, domain);
++    }
++    fn syscall_exit(&mut self, index: usize, r: &mut UserRegs, domain: &mut Domain) {
++        if let Some(exec) = self.task(index).exec {
++            match exec.stage {
++                ExecStage::Sync => {
++                    if r.orig_rax != 72 || r.rax != 0 {
++                        self.fail(domain, b"exec native descriptor synchronization failed");
++                    }
++                    let mut replay = exec.original;
++                    replay.rip -= 2;
++                    replay.rax = replay.orig_rax;
++                    self.task_mut(index).exec.as_mut().unwrap().stage = ExecStage::Reenter;
++                    self.run(index, &replay, domain);
++                    return;
++                }
++                ExecStage::Kernel => {
++                    if r.rax as i64 >= 0 {
++                        self.fail(domain, b"exec success missing its ownership event");
++                    }
++                    let old = exec.original;
++                    r.rdi = old.rdi;
++                    r.rsi = old.rsi;
++                    r.rdx = old.rdx;
++                    r.r10 = old.r10;
++                    r.r8 = old.r8;
++                    r.r9 = old.r9;
++                    r.orig_rax = old.orig_rax;
++                    // Public descriptors, aliases and owned refs are unchanged.
++                    self.task_mut(index).exec = None;
++                }
++                ExecStage::Completed => {
++                    self.task_mut(index).exec = None;
++                }
++                ExecStage::Reenter => self.fail(domain, b"unexpected exit during exec replay"),
++            }
++        }
++        if let Some(rewrite) = self.task_mut(index).path_rewrite.take() {
++            let result = rewrite.finish(self.task(index).host, r);
++            if let Err(reason) = result {
++                self.fail(domain, reason);
++            }
++        }
++        let pending = self.task(index).pending;
++        match pending {
++            Pending::Fork { child, flags, .. } => {
++                r.rdi = flags;
++                if (r.rax as i64) < 0 {
++                    let result = self.tasks[child]
++                        .as_mut()
++                        .unwrap()
++                        .descriptors
++                        .release_exited(&mut self.objects);
++                    if let Err(reason) = result {
++                        self.fail(domain, reason)
++                    }
++                    let child_id = self.task(child).id;
++                    if self
++                        .processes
++                        .cancel_fork(self.task(index).id, child_id)
++                        .is_err()
++                    {
++                        self.fail(domain, b"fork rollback failed")
++                    }
++                    self.tasks[child] = None;
++                } else {
++                    if self.task(child).host == 0 || r.rax as usize != self.task(child).host {
++                        self.fail(domain, b"unregistered fork result")
++                    }
++                    r.rax = self.task(child).id.pid as u64;
++                }
++            }
++            Pending::Wait {
++                child,
++                original,
++                status,
++            } => {
++                // An adopted orphan is a native child of this subreaper,
++                // not of virtual init. ECHILD is expected there: the status
++                // reported status comes from its observed ptrace death.
++                if (r.rax as i64) > 0 || r.rax as i64 == -10 {
++                    let id = self.task(child).id;
++                    if self
++                        .processes
++                        .wait(self.task(index).id, WaitTarget::Specific(id.pid), 0)
++                        .is_err()
++                    {
++                        self.fail(domain, b"virtual child reap failed")
++                    }
++                    self.retired[self.retired_next] = (self.task(child).host, id.pid);
++                    self.retired_next = (self.retired_next + 1) % TASKS;
++                    self.tasks[child] = None;
++                    r.rax = id.pid as u64;
++                    if original[1] != 0 {
++                        match crate::tracee_io::store_u32(
++                            self.task(index).host,
++                            original[1],
++                            status,
++                        ) {
++                            Ok(()) => {}
++                            Err(-5) => self.fail(domain, b"wait status rollback failed"),
++                            Err(error) => r.rax = error as u64,
++                        }
++                    }
++                }
++                r.rdi = original[0];
++                r.rsi = original[1];
++                r.rdx = original[2];
++                r.r10 = original[3];
++                r.r8 = original[4];
++                r.r9 = original[5];
++                r.orig_rax = original[6];
++            }
++            Pending::None => {}
++        }
++        self.task_mut(index).pending = Pending::None;
++        if let Some(result) = self.task_mut(index).override_result.take() {
++            r.rax = result as u64;
++        }
++        let result = self.tasks[index].as_mut().unwrap().descriptors.finish(r);
++        if let Err(reason) = result {
++            self.fail(domain, reason)
++        }
++        audit_write(b"ginux: audit sequence=");
++        audit_u64(self.task(index).sequence);
++        audit_write(b" phase=exit result=");
++        audit_i64(r.rax as i64);
++        audit_write(b"\n");
++        self.run(index, r, domain);
++    }
++    fn wait_entry(&mut self, index: usize, r: &mut UserRegs, domain: &mut Domain) {
++        let selector = r.rdi as i32;
++        if selector != -1 && selector <= 0 || r.rdx & !1 != 0 || r.r10 != 0 {
++            self.emulate(index, r, -95, domain);
++            return;
++        }
++        let selected = (selector > 0).then_some(selector as u32);
++        let parent = self.task(index).id;
++        match self.processes.peek_wait(
++            parent,
++            selected.map_or(WaitTarget::Any, WaitTarget::Specific),
++            r.rdx as u32,
++        ) {
++            Ok(result) => {
++                let child = self
++                    .tasks
++                    .iter()
++                    .position(|t| t.as_ref().is_some_and(|t| t.id == result.child))
++                    .unwrap();
++                let original = [r.rdi, r.rsi, r.rdx, r.r10, r.r8, r.r9, r.orig_rax];
++                self.task_mut(index).pending = Pending::Wait {
++                    child,
++                    original,
++                    status: result.status.word(),
++                };
++                r.rdi = self.task(child).host as u64;
++                // Reap natively before status copyout, including when the
++                // caller's buffer faults. Never publish host wait status.
++                r.rsi = 0;
++                r.rdx = 0;
++                audit_write(b"mediate surface=owned-child-wait\n");
++                self.run(index, r, domain);
++            }
++            Err(ProcessError::NotChild) => self.emulate(index, r, -10, domain),
++            Err(ProcessError::NoExitedChild) => {
++                let has_child = self.tasks.iter().flatten().any(|t| {
++                    self.processes.view(t.id).is_ok_and(|v| {
++                        v.parent == parent.pid && selected.is_none_or(|id| id == t.id.pid)
++                    })
++                });
++                if !has_child {
++                    self.emulate(index, r, -10, domain)
++                } else if r.rdx & 1 != 0 {
++                    self.emulate(index, r, 0, domain)
++                } else {
++                    self.task_mut(index).blocked = Some(*r);
++                    audit_write(b"park surface=owned-child-wait\n");
++                }
++            }
++            Err(_) => self.fail(domain, b"invalid virtual wait state"),
++        }
++    }
++    fn wake(&mut self, domain: &mut Domain) {
++        // Only object operations and observed deaths can satisfy these waits.
++        // Other tasks' register/signal/fork stops do not change readiness.
++        if !core::mem::replace(&mut self.wake_needed, false) {
++            return;
++        }
++        for index in 0..TASKS {
++            let Some(mut r) = self.tasks[index].as_mut().and_then(|t| t.blocked.take()) else {
++                continue;
++            };
++            self.entry(index, &mut r, domain);
++        }
++    }
++    fn died(&mut self, index: usize, status: i32, domain: &mut Domain) {
++        self.wake_needed = true;
++        if !self.task(index).alive {
++            let task = self.task(index);
++            if !task.adopted_reaped
++                && task.id.pid != 1
++                && task.wait_status == Some(status)
++                && self
++                    .processes
++                    .view(task.id)
++                    .is_ok_and(|view| view.id.pid == view.tgid)
++            {
++                self.task_mut(index).adopted_reaped = true;
++                audit_write(b"ginux: adopted zombie native-reap virtual-pid=");
++                audit_u64(self.task(index).id.pid as u64);
++                audit_write(b"\n");
++                return;
++            }
++            self.fail(domain, b"inconsistent repeated task death");
++        }
++        self.task_mut(index).alive = false;
++        self.task_mut(index).wait_status = Some(status);
++        self.task_mut(index).blocked = None;
++        let result = if exited(status) {
++            self.processes
++                .exit(self.task(index).id, (status >> 8) & 255)
++        } else {
++            self.processes
++                .signaled(self.task(index).id, (status & 127) as u8)
++        };
++        if result.is_err() {
++            self.fail(domain, b"virtual task exit failed")
++        }
++        let result = self.tasks[index]
++            .as_mut()
++            .unwrap()
++            .descriptors
++            .release_exited(&mut self.objects);
++        if let Err(reason) = result {
++            self.fail(domain, reason)
++        }
++        audit_write(b"ginux: task exited virtual-pid=");
++        audit_u64(self.task(index).id.pid as u64);
++        audit_write(b"\n");
++    }
++    fn teardown(&mut self, domain: &mut Domain) {
++        for t in self
++            .tasks
++            .iter()
++            .flatten()
++            .filter(|t| t.alive && t.host != 0)
++        {
++            let _ = unsafe { syscall2(SYS_KILL, t.host, SIGKILL) };
++        }
++        for host in self.unknown_stops.iter().filter(|p| **p != 0) {
++            let _ = unsafe { syscall2(SYS_KILL, *host, SIGKILL) };
++        }
++        loop {
++            let mut status = 0;
++            let host = unsafe {
++                syscall4(
++                    SYS_WAIT4,
++                    usize::MAX,
++                    &mut status as *mut _ as usize,
++                    WALL,
++                    0,
++                )
++            };
++            if host == -10 {
++                break;
++            }
++            if host == -4 {
++                continue;
++            }
++            if host < 0 {
++                supervision_error(domain, b"domain teardown wait failed")
++            }
++            if stopped(status) {
++                let _ = unsafe { syscall2(SYS_KILL, host as usize, SIGKILL) };
++                continue;
++            }
++            if let Some(index) = self.tasks.iter().position(|t| {
++                t.as_ref()
++                    .is_some_and(|t| t.host == host as usize && t.alive)
++            }) {
++                self.died(index, status, domain);
++            }
++        }
++        for task in self.tasks.iter_mut().flatten() {
++            if let Err(reason) = task.descriptors.release_exited(&mut self.objects) {
++                supervision_error(domain, reason)
++            }
++        }
++        self.processes.shutdown(137);
++        self.processes.reap_all();
++        if self.objects.refs.active() != 0 || self.processes.active() != 0 {
++            supervision_error(domain, b"domain teardown retained owned state")
++        }
++        line_stderr(b"ginux: teardown tasks=0 owned-handles=0");
++    }
++    fn fail(&mut self, domain: &mut Domain, reason: &[u8]) -> ! {
++        self.teardown(domain);
++        supervision_error(domain, reason)
++    }
++}
++
++fn exited(status: i32) -> bool {
++    status & 127 == 0
++}
++fn signaled(status: i32) -> bool {
++    status & 127 != 0 && status & 127 != 127
++}
+diff --git a/crates/ginux-init/src/main.rs b/crates/ginux-init/src/main.rs
+index 81a3ee9c..02ab8779 100644
+--- a/crates/ginux-init/src/main.rs
++++ b/crates/ginux-init/src/main.rs
+@@ -14,6 +14,7 @@ mod device_hooks;
+ mod dispatch;
+ mod fs_hooks;
+ mod launch;
++mod launch_tasks;
+ mod path_hooks;
+ mod process_hooks;
+ mod supervisor;
+@@ -101,6 +102,26 @@ unsafe extern "C" fn memcpy(
+     destination
+ }
+ 
++#[no_mangle]
++unsafe extern "C" fn memmove(
++    destination: *mut core::ffi::c_void,
++    source: *const core::ffi::c_void,
++    length: usize,
++) -> *mut core::ffi::c_void {
++    if destination as usize <= source as usize {
++        return memcpy(destination, source, length);
++    }
++    let mut index = length;
++    while index != 0 {
++        index -= 1;
++        core::ptr::write_volatile(
++            destination.cast::<u8>().add(index),
++            core::ptr::read_volatile(source.cast::<u8>().add(index)),
++        );
++    }
++    destination
++}
++
+ #[no_mangle]
+ unsafe extern "C" fn memset(
+     destination: *mut core::ffi::c_void,
+diff --git a/crates/ginux-init/src/path_hooks.rs b/crates/ginux-init/src/path_hooks.rs
+index 7c9fcc76..fefa7ff0 100644
+--- a/crates/ginux-init/src/path_hooks.rs
++++ b/crates/ginux-init/src/path_hooks.rs
+@@ -37,6 +37,78 @@ impl ImageRoot {
+         }
+         Ok(Self(fd as usize))
+     }
++    /// Inspect only the kernel loader's interpreter metadata. The descriptor
++    /// stays private and is closed on every return path.
++    pub fn interpreter(
++        &self,
++        path: &[u8],
++        output: &mut [u8; MAX_PATH],
++    ) -> Result<Option<(usize, bool)>, i64> {
++        let mut name = [0; MAX_PATH + 1];
++        let path = path.strip_prefix(b"/").ok_or(-22)?;
++        name[..path.len()].copy_from_slice(path);
++        let fd = unsafe { syscall4(257, self.0, name.as_ptr() as usize, 0o2400000, 0) };
++        if fd < 0 {
++            return Err(fd as i64);
++        }
++        let file = ImageFile(fd as usize);
++        file.interpreter(output)
++    }
++
++    pub fn interpreter_fd(
++        pid: usize,
++        fd: u32,
++        output: &mut [u8; MAX_PATH],
++    ) -> Result<Option<(usize, bool)>, i64> {
++        let mut name = [0; 80];
++        name[..6].copy_from_slice(b"/proc/");
++        let mut cursor = 6;
++        for (index, mut number) in [pid, fd as usize].into_iter().enumerate() {
++            let mut digits = [0; 20];
++            let mut length = 0;
++            loop {
++                digits[length] = b'0' + (number % 10) as u8;
++                length += 1;
++                number /= 10;
++                if number == 0 {
++                    break;
++                }
++            }
++            for digit in digits[..length].iter().rev() {
++                name[cursor] = *digit;
++                cursor += 1;
++            }
++            if index == 0 {
++                name[cursor..cursor + 4].copy_from_slice(b"/fd/");
++                cursor += 4;
++            }
++        }
++        // fd is a registered native image handle in a stopped, owned task.
++        let opened = unsafe {
++            syscall4(
++                257,
++                (-100isize) as usize,
++                name.as_ptr() as usize,
++                0o2000000,
++                0,
++            )
++        };
++        if opened < 0 {
++            return Err(opened as i64);
++        }
++        ImageFile(opened as usize).interpreter(output)
++    }
++
++    pub fn resolve_image(
++        &self,
++        path: &[u8],
++        output: &mut [u8; MAX_PATH],
++    ) -> Result<usize, VfsError> {
++        ginux_vfs::resolve_namespace(path, true, false, output, |path, target| {
++            self.lookup(path, target)
++        })
++    }
++
+     pub fn lookup(
+         &self,
+         path: &[u8],
+@@ -116,6 +188,118 @@ impl Drop for ImageRoot {
+     }
+ }
+ 
++struct ImageFile(usize);
++impl ImageFile {
++    fn interpreter(&self, output: &mut [u8; MAX_PATH]) -> Result<Option<(usize, bool)>, i64> {
++        let mut first = [0; 256];
++        let n = self
++            .read(0, &mut first)
++            .map_err(|error| if error == -21 { -13 } else { error })?;
++        if first[..n].starts_with(b"#!") {
++            let mut start = 2;
++            while start < n && matches!(first[start], b' ' | b'\t') {
++                start += 1;
++            }
++            let mut end = start;
++            while end < n && !matches!(first[end], 0 | b' ' | b'\t' | b'\n') {
++                end += 1;
++            }
++            if start == end || end == first.len() {
++                return Err(-8);
++            }
++            output[..end - start].copy_from_slice(&first[start..end]);
++            return Ok(Some((end - start, true)));
++        }
++        if n < 4 || &first[..4] != b"\x7fELF" {
++            return Ok(None);
++        }
++        if n < 64 {
++            return Err(-8);
++        }
++        if first[4] != 2 || first[5] != 1 {
++            return Err(-95);
++        }
++        if u16::from_le_bytes(first[18..20].try_into().unwrap()) != 62 {
++            return Err(-8);
++        }
++        let offset = u64::from_le_bytes(first[32..40].try_into().unwrap());
++        let size = u16::from_le_bytes(first[54..56].try_into().unwrap());
++        let count = u16::from_le_bytes(first[56..58].try_into().unwrap()) as usize;
++        if size != 56 {
++            return Err(-8);
++        }
++        offset.checked_add((count * 56) as u64).ok_or(-8)?;
++        let mut buffer = [0; 56 * 73];
++        let mut index = 0;
++        let mut interpreter = None;
++        while index < count {
++            let headers = (count - index).min(73);
++            let bytes = headers * 56;
++            if self.read(offset + (index * 56) as u64, &mut buffer[..bytes])? != bytes {
++                return Err(-8);
++            }
++            for header in buffer[..bytes].as_chunks::<56>().0 {
++                if u32::from_le_bytes(header[..4].try_into().unwrap()) != 3 {
++                    continue;
++                }
++                if interpreter.is_some() {
++                    return Err(-8);
++                }
++                interpreter = Some((
++                    u64::from_le_bytes(header[8..16].try_into().unwrap()),
++                    u64::from_le_bytes(header[32..40].try_into().unwrap()),
++                ));
++            }
++            index += headers;
++        }
++        let Some((offset, length)) = interpreter else {
++            return Ok(None);
++        };
++        if length == 0 {
++            return Err(-8);
++        }
++        if length > MAX_PATH as u64 {
++            return Err(-36);
++        }
++        let length = length as usize;
++        if self.read(offset, &mut output[..length])? != length || output[length - 1] != 0 {
++            return Err(-8);
++        }
++        let end = output[..length]
++            .iter()
++            .position(|byte| *byte == 0)
++            .ok_or(-8)?;
++        if end == 0 {
++            return Err(-8);
++        }
++        Ok(Some((end, false)))
++    }
++
++    fn read(&self, offset: u64, output: &mut [u8]) -> Result<usize, i64> {
++        let n = unsafe {
++            syscall4(
++                17,
++                self.0,
++                output.as_mut_ptr() as usize,
++                output.len(),
++                offset as usize,
++            )
++        };
++        if n < 0 {
++            Err(n as i64)
++        } else {
++            Ok(n as usize)
++        }
++    }
++}
++impl Drop for ImageFile {
++    fn drop(&mut self) {
++        unsafe {
++            syscall1(3, self.0);
++        }
++    }
++}
++
+ pub struct Rewrite {
+     address: u64,
+     saved: [u8; MAX_PATH + 1],
+diff --git a/crates/ginux-init/src/tracee_io.rs b/crates/ginux-init/src/tracee_io.rs
+index eb6fe123..bff07887 100644
+--- a/crates/ginux-init/src/tracee_io.rs
++++ b/crates/ginux-init/src/tracee_io.rs
+@@ -116,3 +116,40 @@ pub fn reserve_native_descriptors(limit: usize) -> bool {
+     limits[1] = limits[1].min(limit as u64);
+     unsafe { syscall4(302, 0, 7, limits.as_ptr() as usize, 0) == 0 }
+ }
++
++/// Publish a word all or nothing across a page boundary. Reads may use ptrace,
++/// but every write goes through the strict copy path and honors page protections.
++pub fn store_u32(pid: usize, address: u64, value: u32) -> Result<(), i64> {
++    let mut bytes = value.to_ne_bytes();
++    address.checked_add(4).ok_or(-14)?;
++    let head = 4096 - (address as usize & 4095);
++    if head >= 4 {
++        return if copy_memory(pid, address, &mut bytes, true) == Ok(4) {
++            Ok(())
++        } else {
++            Err(-14)
++        };
++    }
++    let tail = address + head as u64;
++    let mut previous = 0usize;
++    if crate::supervisor::ptrace(
++        crate::supervisor::PTRACE_PEEKTEXT,
++        pid,
++        tail as usize,
++        &mut previous as *mut _ as usize,
++    ) < 0
++    {
++        return Err(-14);
++    }
++    if copy_memory(pid, tail, &mut bytes[head..], true) != Ok((4 - head) as i64) {
++        return Err(-14);
++    }
++    if copy_memory(pid, address, &mut bytes[..head], true) != Ok(head as i64) {
++        let mut original = previous.to_ne_bytes();
++        if copy_memory(pid, tail, &mut original[..4 - head], true) != Ok((4 - head) as i64) {
++            return Err(-5);
++        }
++        return Err(-14);
++    }
++    Ok(())
++}
+diff --git a/crates/ginux-process/src/lib.rs b/crates/ginux-process/src/lib.rs
+index 5e855832..2dd08ea0 100644
+--- a/crates/ginux-process/src/lib.rs
++++ b/crates/ginux-process/src/lib.rs
+@@ -394,6 +394,27 @@ impl<const TASKS: usize> ProcessTable<TASKS> {
+         Ok(child)
+     }
+ 
++    /// Roll back a supervisor-reserved fork that never became a runnable task.
++    /// The caller must use this only before publishing the child to execution.
++    pub fn cancel_fork(&mut self, parent: TaskId, child: TaskId) -> Result<(), ProcessError> {
++        let parent_task = self.tasks[self.index(parent)?];
++        let index = self.index(child)?;
++        let task = self.tasks[index];
++        if parent_task.state != TaskState::Running
++            || task.id.pid != task.tgid
++            || task.parent != parent_task.tgid
++            || task.state != TaskState::Running
++            || task.exec_epoch != 0
++            || self.tasks.iter().any(|t| {
++                t.occupied && (t.parent == child.pid || t.tgid == child.pid && t.id != child)
++            })
++        {
++            return Err(ProcessError::InvalidState);
++        }
++        self.tasks[index] = Task::empty();
++        Ok(())
++    }
++
+     pub fn clone_thread(&mut self, leader: TaskId) -> Result<TaskId, ProcessError> {
+         let leader = self.tasks[self.index(leader)?];
+         if leader.state != TaskState::Running {
+@@ -556,6 +577,19 @@ impl<const TASKS: usize> ProcessTable<TASKS> {
+         &mut self,
+         parent: TaskId,
+         target: WaitTarget,
++        options: u32,
++    ) -> Result<WaitResult, ProcessError> {
++        let result = self.peek_wait(parent, target, options)?;
++        let index = self.index(result.child)?;
++        self.tasks[index] = Task::empty();
++        Ok(result)
++    }
++
++    /// Inspect the next waitable child without consuming its reported outcome.
++    pub fn peek_wait(
++        &self,
++        parent: TaskId,
++        target: WaitTarget,
+         _options: u32,
+     ) -> Result<WaitResult, ProcessError> {
+         let parent_index = self.index(parent)?;
+@@ -574,7 +608,6 @@ impl<const TASKS: usize> ProcessTable<TASKS> {
+                 TaskState::Signaled(signal) => ChildStatus::Signaled(signal),
+                 _ => return Err(ProcessError::InvalidState),
+             };
+-            self.tasks[index] = Task::empty();
+             return Ok(WaitResult {
+                 child: task.id,
+                 status,
+@@ -1704,6 +1737,70 @@ mod tests {
+         }
+     }
+ 
++    #[test]
++    fn fork_reservation_cancellation_preserves_published_state() {
++        let mut table: ProcessTable<8> = ProcessTable::new();
++        let init = table.create_init(Credentials::root()).unwrap();
++        let reserved = table.fork(init).unwrap();
++        let other = table.fork(init).unwrap();
++        assert_eq!(
++            table.cancel_fork(other, reserved),
++            Err(ProcessError::InvalidState)
++        );
++        table.cancel_fork(init, reserved).unwrap();
++        assert_eq!(table.view(reserved), Err(ProcessError::InvalidTask));
++        let executed = table.fork(init).unwrap();
++        table.exec(executed).unwrap();
++        assert_eq!(
++            table.cancel_fork(init, executed),
++            Err(ProcessError::InvalidState)
++        );
++        let threaded = table.fork(init).unwrap();
++        let thread = table.clone_thread(threaded).unwrap();
++        assert_eq!(
++            table.cancel_fork(init, threaded),
++            Err(ProcessError::InvalidState)
++        );
++        assert_eq!(
++            table.cancel_fork(init, thread),
++            Err(ProcessError::InvalidState)
++        );
++        let parent = table.fork(init).unwrap();
++        let child = table.fork(parent).unwrap();
++        assert_eq!(
++            table.cancel_fork(init, parent),
++            Err(ProcessError::InvalidState)
++        );
++        assert_eq!(table.view(child).unwrap().parent, parent.pid);
++        assert_eq!(table.active(), 7);
++    }
++
++    #[test]
++    fn wait_inspection_preserves_typed_outcomes_until_consumed() {
++        let mut table: ProcessTable<4> = ProcessTable::new();
++        let init = table.create_init(Credentials::root()).unwrap();
++        let thread = table.clone_thread(init).unwrap();
++        let child = table.fork(thread).unwrap();
++        table.signaled(child, 15).unwrap();
++        let report = table.peek_wait(thread, WaitTarget::Group(1), 0).unwrap();
++        assert_eq!(report.child, child);
++        assert_eq!(report.status, ChildStatus::Signaled(15));
++        assert_eq!(
++            table.peek_wait(init, WaitTarget::Specific(child.pid), 0),
++            Ok(report)
++        );
++        assert_eq!(table.active(), 3);
++        assert_eq!(
++            table.wait(thread, WaitTarget::Specific(child.pid), 0),
++            Ok(report)
++        );
++        assert_eq!(
++            table.peek_wait(init, WaitTarget::Specific(child.pid), 0),
++            Err(ProcessError::NotChild)
++        );
++        assert_eq!(table.has_waitable_child(init, WaitTarget::Any), Ok(false));
++    }
++
+     #[test]
+     fn threads_groups_and_sessions_remain_virtual() {
+         let mut table: ProcessTable<8> = ProcessTable::new();
+diff --git a/scripts/test-launch-exec.py b/scripts/test-launch-exec.py
+new file mode 100644
+index 00000000..3e331d3a
+--- /dev/null
++++ b/scripts/test-launch-exec.py
+@@ -0,0 +1,104 @@
++#!/usr/bin/env python3
++"""Check real exec replacement and CLOEXEC across descriptor owners and fork."""
++import json
++import os
++from pathlib import Path
++import select
++import shutil
++import subprocess
++import sys
++import tempfile
++
++
++def children(pid):
++    return [int(p) for p in Path(f'/proc/{pid}/task/{pid}/children').read_text().split()]
++
++
++def main():
++    if len(sys.argv) != 5 or os.geteuid() != 0:
++        sys.exit('usage (as root): test-launch-exec.py <ginux> <exec-fixture> <interpreter-fixture> <allowed-interpreter-fixture>')
++    binary, fixture, interpreter, allowed_interpreter = [str(Path(p).resolve()) for p in sys.argv[1:]]
++    template = (Path(__file__).resolve().parent.parent / 'config/domain-gate5.toml').read_text()
++    with tempfile.TemporaryDirectory(prefix='ginux-exec-') as directory:
++        work = Path(directory)
++        root = work / 'root'
++        (root / 'bin').mkdir(parents=True)
++        (root / 'work').mkdir()
++        for path in ('bin/fixture', 'bin/second', 'noexec', 'work/hidden'):
++            shutil.copyfile(fixture, root / path)
++            (root / path).chmod(0o644 if path == 'noexec' else 0o755)
++        (root / 'bin/link').symlink_to('/bin/second')
++        (root / 'owned-link').symlink_to('/work/hidden')
++        (root / 'work/nested').mkdir()
++        (root / 'virtual').symlink_to('/work/nested')
++        shutil.copyfile(fixture, root / 'hidden')
++        (root / 'hidden').chmod(0o755)
++        shutil.copyfile(interpreter, root / 'image-elf')
++        (root / 'image-elf').chmod(0o755)
++        shutil.copyfile(allowed_interpreter, root / 'allowed-elf')
++        (root / 'allowed-elf').chmod(0o755)
++        for name, target in [('image-script', '/work/hidden'), ('allowed-script', '/bin/second'),
++                             ('link-script', '/owned-link'), ('mixed-script', '/virtual/../hidden')]:
++            (root / name).write_text('#!' + target + '\n')
++            (root / name).chmod(0o755)
++        (root / 'malformed').write_bytes(b'not an executable\n')
++        (root / 'malformed').chmod(0o755)
++        (root / 'input').write_bytes(b'abcdef')
++        config = template.replace('init = "/bin/bash"', 'init = "/bin/fixture"')
++        config = config.replace('[storage]\nassignments = []', '[storage]\nassignments = ["memory:/work", "memory:/virtual"]')
++        config = config.replace('[devices]\nassignments = []', '[devices]\nassignments = ["null"]')
++        for initial, mode, expected in [('/bin/fixture', 'u-guards', 0),
++                                        ('/image-script', '', 1), ('/image-elf', '', 1),
++                                        ('/allowed-script', '', 77), ('/allowed-elf', '/allowed-elf', 77)]:
++            label=initial.strip('/').replace('/', '-') + '-' + (mode or 'initial').replace('/', '-')
++            path, result = work / (label+'.toml'), work / (label+'.json')
++            text=config.replace('init = "/bin/fixture"', 'init = '+json.dumps(initial))
++            text=text.replace('args = []', 'args = '+json.dumps([mode] if mode else []))
++            path.write_text(text)
++            proc=subprocess.run([binary,'launch',str(path),str(root),'--result-file',str(result)],capture_output=True,timeout=20)
++            record=json.loads(result.read_text())
++            assert proc.returncode==expected, (label,proc.returncode,proc.stderr,record)
++            assert record['outcome']==('supervisor-error' if expected==1 else 'exited'),record
++            assert proc.stdout==(b'interpreter-guards: PASS\n' if mode=='u-guards' else b''),proc.stdout
++            if expected!=1: assert record['code']==expected,record
++            print('PASS interpreter ownership:',label)
++        for mode in ('success', 'bad', 'child', 'descriptor', 'path', 'relative', 'link'):
++            path, result, audit_path = work / f'{mode}.toml', work / f'{mode}.json', work / f'{mode}.audit'
++            path.write_text(config.replace('args = []', 'args = ' + json.dumps([mode])))
++            with audit_path.open('wb') as audit:
++                proc = subprocess.Popen([binary, 'launch', str(path), str(root), '--result-file', str(result)],
++                                        stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=audit)
++                try:
++                    assert select.select([proc.stdout], [], [], 5)[0], 'exec did not reach ready handshake'
++                    ready = proc.stdout.readline()
++                    assert ready == b'after-ready\n', (mode, ready, audit_path.read_text())
++                    tasks = children(proc.pid)
++                    assert len(tasks) == 1, tasks
++                    target = tasks[0]
++                    if mode == 'child':
++                        descendants = children(target)
++                        assert len(descendants) == 1, descendants
++                        target = descendants[0]
++                    # The all-CLOEXEC image fd is gone in the kernel. A mixed
++                    # alias keeps only its single native handle, number 3.
++                    native_fds = sorted(int(p.name) for p in Path(f'/proc/{target}/fd').iterdir())
++                    assert native_fds == [0, 1, 2, 3], (mode, native_fds)
++                    stdout, _ = proc.communicate(b'G', timeout=5)
++                    expected = b'exec: PASS\n' + (b'parent: PASS\n' if mode == 'child' else b'')
++                    assert proc.returncode == 0 and stdout == expected, (mode, proc.returncode, stdout, audit_path.read_text())
++                    record = json.loads(result.read_text())
++                    assert record == {'version': 1, 'outcome': 'exited', 'code': 0, 'signal': None, 'generation': None}, record
++                    diagnostics = audit_path.read_bytes()
++                    assert diagnostics.count(b'ginux: task exec virtual-pid=') == 2, diagnostics
++                    assert b'teardown tasks=0 owned-handles=0' in diagnostics
++                    assert not Path(f'/proc/{target}').exists(), 'executed task was not reaped'
++                finally:
++                    if proc.poll() is None:
++                        proc.kill()
++                        proc.communicate(timeout=5)
++            print(f'PASS launch exec: {mode}')
++    print('test-launch-exec: PASS')
++
++
++if __name__ == '__main__':
++    main()
+diff --git a/scripts/test-launch-tasks.py b/scripts/test-launch-tasks.py
+new file mode 100644
+index 00000000..05da63c4
+--- /dev/null
++++ b/scripts/test-launch-tasks.py
+@@ -0,0 +1,101 @@
++#!/usr/bin/env python3
++"""Exercise actual configured children, owned FD inheritance and complete teardown."""
++import json
++import os
++from pathlib import Path
++import shutil
++import signal
++import subprocess
++import sys
++import tempfile
++import select
++import time
++
++
++def main():
++    if len(sys.argv) != 3 or os.geteuid() != 0:
++        sys.exit('usage (as root): test-launch-tasks.py <ginux> <task-fixture>')
++    binary, fixture = [str(Path(p).resolve()) for p in sys.argv[1:]]
++    template = (Path(__file__).resolve().parent.parent / 'config/domain-gate5.toml').read_text()
++    with tempfile.TemporaryDirectory(prefix='ginux-tasks-') as directory:
++        work = Path(directory)
++        root = work / 'root'
++        (root / 'bin').mkdir(parents=True)
++        (root / 'work').mkdir()
++        shutil.copyfile(fixture, root / 'bin/fixture')
++        (root / 'bin/fixture').chmod(0o755)
++        (root / 'input').write_bytes(b'abcdef')
++        config = template.replace('init = "/bin/bash"', 'init = "/bin/fixture"')
++        config = config.replace('[storage]\nassignments = []', '[storage]\nassignments = ["memory:/work"]')
++        config = config.replace('[devices]\nassignments = []', '[devices]\nassignments = ["null"]')
++        for mode in ('qfault', 'fork', 'vfork', 'clone', 'shared-vfork', 'libc-fork', 'junk-child-tid', 'protected-child-tid', 'x-child-tid', 'handler-return', 'inherit', 'kill', 'bound', 'orphan', 'adopted-zombie', 'rollback', 'inherit'):
++            path, result = work / f'{mode}.toml', work / f'{mode}.json'
++            path.write_text(config.replace('args = []', 'args = ' + json.dumps([mode])))
++            result.unlink(missing_ok=True)
++            def inherit_ignored_child_signal():
++                signal.signal(signal.SIGCHLD, signal.SIG_IGN)
++            command=[binary, 'launch', str(path), str(root), '--result-file', str(result)]
++            if mode == 'adopted-zombie':
++                audit=work/'adopted-zombie.audit'
++                with audit.open('wb') as errors:
++                    proc=subprocess.Popen(command,stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=errors)
++                    try:
++                        assert select.select([proc.stdout],[],[],5)[0], 'orphan handshake timed out'
++                        assert proc.stdout.readline()==b'zombie-ready\n'
++                        deadline=time.monotonic()+5
++                        while b'ginux: task exited virtual-pid=3' not in audit.read_bytes():
++                            assert proc.poll() is None and time.monotonic()<deadline, audit.read_text()
++                            time.sleep(.01)
++                        stdout,_=proc.communicate(b'G',timeout=5)
++                    finally:
++                        if proc.poll() is None:
++                            proc.kill();proc.communicate(timeout=5)
++                proc.stdout=stdout
++                proc.stderr=audit.read_bytes()
++            else:
++                proc = subprocess.run(command, capture_output=True, timeout=20,
++                                      preexec_fn=inherit_ignored_child_signal if mode == 'fork' else None)
++            record = json.loads(result.read_text())
++            assert proc.returncode == 0, (mode, proc.returncode, proc.stderr.decode(), record)
++            assert proc.stdout == b'owned-tasks: PASS\n', (mode, proc.stdout)
++            assert record == {'version': 1, 'outcome': 'exited', 'code': 0, 'signal': None, 'generation': None}, record
++            assert b'teardown tasks=0 owned-handles=0' in proc.stderr, proc.stderr
++            assert not (root / 'work/data').exists()
++            print(f'PASS launch tasks: {mode}')
++        # No descendant may survive root death or a supervisor failure.
++        for failure in (False, True):
++            path, result = work / f'teardown-{failure}.toml', work / f'teardown-{failure}.json'
++            path.write_text(config.replace('args = []', 'args = ["teardown"]'))
++            # Use a file so audit backpressure cannot prevent the ready handshake.
++            with (work / f'teardown-{failure}.audit').open('wb') as audit:
++                proc = subprocess.Popen([binary, 'launch', str(path), str(root), '--result-file', str(result)],
++                                        stdout=subprocess.PIPE, stderr=audit)
++                observed = []
++                try:
++                    assert select.select([proc.stdout], [], [], 5)[0], 'descendants did not start'
++                    assert proc.stdout.readline() == b'ready\n'
++                    def children(pid):
++                        return [int(p) for p in Path(f'/proc/{pid}/task/{pid}/children').read_text().split()]
++                    observed = children(proc.pid)
++                    assert len(observed) == 1, observed
++                    root_pid = observed[0]
++                    observed += children(root_pid)
++                    assert len(observed) == 2, observed
++                    observed += children(observed[1])
++                    assert len(observed) == 3, observed
++                    os.kill(root_pid, signal.SIGSTOP if failure else signal.SIGKILL)
++                    stdout, _ = proc.communicate(timeout=5)
++                    assert not stdout
++                    assert proc.returncode == (1 if failure else 137), proc.returncode
++                    assert json.loads(result.read_text())['outcome'] == ('supervisor-error' if failure else 'signaled')
++                    assert all(not Path(f'/proc/{pid}').exists() for pid in observed), observed
++                finally:
++                    if proc.poll() is None:
++                        proc.kill()
++                        proc.communicate(timeout=5)
++            print(f'PASS full descendant teardown: {"failure" if failure else "root signal"}')
++    print('test-launch-tasks: PASS')
++
++
++if __name__ == '__main__':
++    main()
+diff --git a/scripts/test-launch.py b/scripts/test-launch.py
+index 6ef91eaa..5fb0b515 100644
+--- a/scripts/test-launch.py
++++ b/scripts/test-launch.py
+@@ -1,6 +1,7 @@
+ #!/usr/bin/env python3
+ """Run real launch workloads against an existing binary and fixture (Linux/root)."""
+ import json
++import fcntl
+ import os
+ from pathlib import Path
+ import re
+@@ -34,7 +35,7 @@ def main():
+         (root / "work/a..b").mkdir()
+         counter = 0
+ 
+-        def invoke(args, expected, outcome, *, stdout=b"", changes=None, env=None, pass_fds=()):
++        def invoke(args, expected, outcome, *, stdout=b"", changes=None, env=None, pass_fds=(), cloexec_stdin=False):
+             nonlocal counter
+             counter += 1
+             config = template.replace('init = "/bin/bash"', 'init = "/bin/fixture"')
+@@ -47,7 +48,8 @@ def main():
+             result_path = work / f"{counter}.json"
+             proc = subprocess.run([binary, "launch", str(config_path), str(root),
+                                    "--result-file", str(result_path)], capture_output=True,
+-                                  timeout=20, pass_fds=pass_fds)
++                                  timeout=20, pass_fds=pass_fds,
++                                  preexec_fn=(lambda: fcntl.fcntl(0, fcntl.F_SETFD, fcntl.FD_CLOEXEC)) if cloexec_stdin else None)
+             record = json.loads(result_path.read_text())
+             wanted = {"version": 1, "outcome": outcome, "code": None,
+                       "signal": None, "generation": None}
+@@ -91,8 +93,9 @@ def main():
+         # it instead of the host tid, and PI futexes, which would store the
+         # host tid in the futex word, are denied.
+         invoke(["virtual-tid"], 0, "exited",
+-               stdout=b"set_tid_address=4242\ngetpid=4242\ngettid=-38\nfutex_lock_pi=-1\n"
++               stdout=b"set_tid_address=1\ngetpid=1\ngettid=1\nfutex_lock_pi=-1\n"
+                b"pi_word=0\nfutex_lock_pi_flags=-1\npi_flags_word=0\n")
++        invoke(["descriptor", "0"], 0, "exited", cloexec_stdin=True)
+         with (work / "secret").open("w+b") as secret:
+             secret.write(b"host-only data")
+             secret.flush()
+@@ -105,7 +108,7 @@ def main():
+         # every syscall record before it is complete.
+         lines = proc.stderr.splitlines()
+         record = re.compile(rb"ginux: audit sequence=\d+ phase=(exit result=-?\d+|"
+-                            rb"entry syscall=\d+ action=\S.* result=\S+)")
++                            rb"entry syscall=\d+(?: virtual-pid=\d+)? action=\S.* result=\S+)")
+         if (b"ginux: audit truncated budget=65536" not in lines
+                 or any(line.startswith(b"ginux: audit sequence=") and not record.fullmatch(line)
+                        for line in lines)):
+diff --git a/tests/fixtures/launch-exec-fixture.c b/tests/fixtures/launch-exec-fixture.c
+new file mode 100644
+index 00000000..61563a90
+--- /dev/null
++++ b/tests/fixtures/launch-exec-fixture.c
+@@ -0,0 +1,129 @@
++/* Real configured exec replacement, failed exec, CLOEXEC and fork isolation. */
++typedef unsigned long word;
++static long call(long n, word a, word b, word c, word d, word e, word f)
++{
++    register word r10 __asm__("r10") = d;
++    register word r8 __asm__("r8") = e;
++    register word r9 __asm__("r9") = f;
++    long result;
++    __asm__ volatile("syscall" : "=a"(result) : "a"(n), "D"(a), "S"(b), "d"(c),
++                     "r"(r10), "r"(r8), "r"(r9) : "rcx", "r11", "memory");
++    return result;
++}
++#define DO(n,a,b,c) call(n,(word)(a),(word)(b),(word)(c),0,0,0)
++#define CHECK(expr,code) if (!(expr)) return code
++static char buffer[8];
++static char *empty_env[]={0};
++static int intact(void)
++{
++    if (DO(72,4,1,0)!=1 || DO(72,6,1,0)!=1 || DO(72,11,1,0)!=1 || DO(72,12,1,0)!=0 || DO(72,13,1,0)!=1) return 0;
++    if (DO(8,4,0,0)!=0 || DO(0,4,buffer,1)!=1 || buffer[0]!='C') return 0;
++    return DO(1,6,"discard",7)==7 && DO(8,11,0,1)==1;
++}
++long exec_main(word *stack)
++{
++    word argc=*stack;
++    char **argv=(char **)(stack+1), **env=argv+argc+1;
++    char mode=argc>1 ? argv[1][0] : 's';
++    if (mode=='/') return 77; // Interpreter of the allowed image script.
++    if (mode=='u') {
++        char *args[]={"probe",0};
++        for(word i=0;i<4;++i) {
++            const char *paths[]={"/image-script","/image-elf","/link-script","/mixed-script"};
++            CHECK(DO(59,paths[i],args,empty_env)==-95,73);
++        }
++        CHECK(call(322,-100,(word)"/image-elf",(word)args,(word)empty_env,0x100,0)==-95,74);
++        for(word i=0;i<2;++i) {
++            long fd=DO(2,i?"/image-elf":"/image-script",0,0);
++            CHECK(fd>=3,75);
++            CHECK(call(322,fd,(word)"",(word)args,(word)empty_env,0x1000,0)==-95,76);
++            CHECK(DO(3,fd,0,0)==0,77);
++        }
++        for(word image=0;image<2;++image) {
++            char *allowed_args[]={"probe","/allowed-elf",0};
++            long child=DO(57,0,0,0);
++            if(child==0) { DO(59,image?"/allowed-elf":"/allowed-script",allowed_args,empty_env); return 78; }
++            int status=-1;
++            CHECK(child==(long)(2+image) && DO(61,child,&status,0)==child && status==(77<<8),79);
++        }
++        CHECK(DO(1,1,"interpreter-guards: PASS\n",25)==25,80);
++        return 0;
++    }
++    if (mode=='a') {
++        CHECK(DO(39,0,0,0)==(argv[2][0]=='c'?2:1),10);
++        CHECK(env[0] && env[0][0]=='E' && env[0][5]=='y' && !env[1],11);
++        CHECK(DO(0,4,buffer,1)==-9 && DO(0,6,buffer,1)==-9,12);
++        CHECK(DO(0,7,buffer,1)==-9 && DO(1,8,"X",1)==-9 && DO(0,11,buffer,1)==-9,13);
++        CHECK(DO(0,13,buffer,1)==-9 && DO(0,14,buffer,1)==-9,14);
++        // Runner inspects native kernel descriptors before any new open can hide a leak.
++        CHECK(DO(1,1,"after-ready\n",12)==12 && DO(0,0,buffer,1)==1 && buffer[0]=='G',15);
++        CHECK(DO(0,3,buffer,1)==1 && buffer[0]=='K',16);
++        CHECK(DO(0,5,buffer,1)==0,17);
++        CHECK(DO(0,9,buffer,1)==1 && buffer[0]=='Q',18);
++        CHECK(DO(3,10,0,0)==0 && DO(0,9,buffer,1)==0,19);
++        CHECK(DO(0,12,buffer,1)==1 && buffer[0]=='b',20);
++        CHECK(DO(72,12,1,0)==0 && DO(72,12,2,1)==0,21);
++        CHECK(DO(2,"/input",02000000,0)==4,22); // Reuses the freed public and raw slots.
++        char *next[]={"second","final",0};
++        DO(59,"/bin/second",next,empty_env);
++        return 23;
++    }
++    if (mode=='f') {
++        CHECK(DO(0,4,buffer,1)==-9 && DO(0,12,buffer,1)==-9,24);
++        CHECK(DO(8,3,0,0)==0 && DO(0,3,buffer,1)==1 && buffer[0]=='K',25);
++        CHECK(DO(0,5,buffer,1)==0 && DO(0,9,buffer,1)==0,26);
++        CHECK(DO(1,1,"exec: PASS\n",11)==11,27);
++        return 0;
++    }
++    CHECK(DO(2,"/work/keep",0102,0600)==3 && DO(1,3,"K",1)==1 && DO(8,3,0,0)==0,30);
++    CHECK(DO(2,"/work/closed",02000102,0600)==4 && DO(1,4,"C",1)==1,31);
++    CHECK(DO(2,"/dev/null",2,0)==5 && DO(2,"/dev/null",02000002,0)==6,32);
++    int pair[2];
++    CHECK(DO(293,pair,02000000,0)==0 && pair[0]==7 && pair[1]==8,33);
++    CHECK(DO(32,7,0,0)==9 && DO(32,8,0,0)==10 && DO(1,8,"Q",1)==1,34);
++    CHECK(DO(2,"/input",02000000,0)==11 && DO(32,11,0,0)==12 && DO(2,"/input",02000000,0)==13,35);
++    CHECK(DO(0,11,buffer,1)==1 && buffer[0]=='a',36);
++    char *next[]={"second","after",mode=='c'?"child":"root",0};
++    char *next_env[]={"EXEC=yes",0};
++    if (mode=='b') {
++        CHECK(DO(59,"/missing",next,next_env)==-2 && intact(),40);
++        CHECK(DO(59,"/noexec",next,next_env)==-13 && intact(),41);
++        CHECK(DO(59,"/bin",next,next_env)==-13 && intact(),81);
++        CHECK(DO(59,"/malformed",next,next_env)==-8 && intact(),42);
++        CHECK(DO(59,"/bin/second",1,next_env)==-14 && intact(),43);
++        CHECK(DO(59,1,next,next_env)==-14 && intact(),44);
++        CHECK(DO(59,"/work/closed",next,next_env)==-95 && intact(),45);
++        CHECK(DO(59,"/work/hidden",next,next_env)==-95 && intact(),46);
++        CHECK(DO(59,"/owned-link",next,next_env)==-95 && intact(),70);
++        CHECK(call(322,-100,(word)"/bin/link",(word)next,(word)next_env,0x100,0)==-40 && intact(),71);
++        long failed=59;
++        word path=(word)"/work/../bin/second", arguments=1, environment=(word)next_env;
++        __asm__ volatile("syscall":"+a"(failed),"+D"(path),"+S"(arguments),"+d"(environment)::"rcx","r11","memory");
++        CHECK(failed==-14 && path==(word)"/work/../bin/second" && arguments==1 && environment==(word)next_env && intact(),72);
++        CHECK(DO(59,"/dev/null",next,next_env)==-13 && intact(),47);
++        CHECK(call(322,4,(word)"",(word)next,(word)next_env,0x1000,0)==-95 && intact(),48);
++    }
++    if (mode=='c') {
++        long child=DO(57,0,0,0);
++        if (child) {
++            CHECK(child==2,50);
++            for (word i=7;i<=10;++i) CHECK(DO(3,i,0,0)==0,51);
++            int status;
++            CHECK(DO(61,child,&status,0)==child && status==0,52);
++            CHECK(DO(72,4,1,0)==1 && DO(8,4,0,0)==0 && DO(0,4,buffer,1)==1 && buffer[0]=='C',53);
++            CHECK(DO(1,6,"parent",6)==6 && DO(72,13,1,0)==1,54);
++            CHECK(DO(1,1,"parent: PASS\n",13)==13,55);
++            return 0;
++        }
++    }
++    if (mode=='d') {
++        CHECK(DO(2,"/bin/second",02000000,0)==14,60);
++        call(322,14,(word)"",(word)next,(word)next_env,0x1000,0);
++    } else if (mode=='p') {
++        call(322,-1,(word)"/bin/second",(word)next,(word)next_env,0,0);
++    } else {
++        DO(59,mode=='r'?"../bin/second":mode=='l'?"/bin/link":"/bin/second",next,next_env);
++    }
++    return 61;
++}
++__asm__(".global _start\n_start:\nmov %rsp,%rdi\nandq $-16,%rsp\ncall exec_main\nmov %rax,%rdi\nmov $60,%rax\nsyscall\nud2\n");
+diff --git a/tests/fixtures/launch-fixture.c b/tests/fixtures/launch-fixture.c
+index 70c70f18..f108e353 100644
+--- a/tests/fixtures/launch-fixture.c
++++ b/tests/fixtures/launch-fixture.c
+@@ -94,7 +94,18 @@ long launch_fixture_main(word *stack)
+     }
+     case 't': __asm__ volatile("int3"); return 93;
+     case 's': __asm__ volatile("xor %%rax, %%rax; mov (%%rax), %%rax" ::: "rax", "memory"); return 94;
+-    case 'f': return call3(57, 0, 0, 0) == -38 ? 0 : 95;
++    case 'f': {
++        long child = call3(57, 0, 0, 0);
++        if (child == 0) return 31;
++        if (child != 2) return 95;
++        int status = 0;
++        register word r10 __asm__("r10") = 0;
++        long reaped;
++        __asm__ volatile("syscall" : "=a"(reaped)
++            : "a"(61), "D"(child), "S"(&status), "d"(0), "r"(r10)
++            : "rcx", "r11", "memory");
++        return reaped == child && status == (31 << 8) ? 0 : 113;
++    }
+     case 'i':
+         __asm__ volatile("int $0x80" :: "a"(20), "b"(1), "c"(0), "d"(0) : "memory");
+         return 96;
+diff --git a/tests/fixtures/launch-interpreter-fixture.S b/tests/fixtures/launch-interpreter-fixture.S
+new file mode 100644
+index 00000000..7464d671
+--- /dev/null
++++ b/tests/fixtures/launch-interpreter-fixture.S
+@@ -0,0 +1,9 @@
++/* A PIE that names an interpreter hidden by the memory assignment. */
++.global _start
++.text
++_start:
++    mov $88, %edi
++    mov $60, %eax
++    syscall
++    ud2
++.section .note.GNU-stack,"",@progbits
+diff --git a/tests/fixtures/launch-task-fixture.c b/tests/fixtures/launch-task-fixture.c
+new file mode 100644
+index 00000000..69182281
+--- /dev/null
++++ b/tests/fixtures/launch-task-fixture.c
+@@ -0,0 +1,204 @@
++/* Actual configured fork/wait and cross-task owned descriptor lifecycle. */
++typedef unsigned long word;
++static long call(long n, word a, word b, word c, word d, word e, word f)
++{
++    register word r10 __asm__("r10") = d;
++    register word r8 __asm__("r8") = e;
++    register word r9 __asm__("r9") = f;
++    long result;
++    __asm__ volatile("syscall" : "=a"(result) : "a"(n), "D"(a), "S"(b), "d"(c),
++                     "r"(r10), "r"(r8), "r"(r9) : "rcx", "r11", "memory");
++    return result;
++}
++#define DO(n,a,b,c) call(n,(word)(a),(word)(b),(word)(c),0,0,0)
++#define CHECK(expr,code) if (!(expr)) return code
++static void pause_forever(void) { for (;;) __asm__ volatile("pause"); }
++static char buffer[8];
++static const unsigned int readonly_status=0x12345678;
++static volatile int fork_tid=0x1357;
++static volatile int child_signal;
++extern void signal_return(void);
++static void child_handler(int signal, const int *info, void *context) {
++    (void)context;
++    child_signal=(signal==17 && info[4]==2 && info[5]==0 && info[6]==37 && DO(39,0,0,0)==1)?1:-1;
++}
++long task_main(word *stack)
++{
++    word argc=*stack;
++    char **argv=(char **)(stack+1);
++    char mode=argc>1 ? argv[1][0] : 'f';
++    CHECK(DO(39,0,0,0)==1 && DO(186,0,0,0)==1,10);
++    CHECK(DO(110,0,0,0)==0 && DO(111,0,0,0)==1,11);
++    word action[4]={1,0,0,0};
++    CHECK(call(13,17,(word)action,0,8,0,0)==-95,81);
++    action[0]=0; action[1]=2;
++    CHECK(call(13,17,(word)action,0,8,0,0)==-95,82);
++    if (mode=='a') {
++        long child=DO(57,0,0,0); CHECK(child>=0,117);
++        if(child==0) {
++            long grandchild=DO(57,0,0,0); CHECK(grandchild>=0,118);
++            if(grandchild==0) {DO(60,37,0,0);__builtin_unreachable();}
++            CHECK(grandchild==3 && DO(1,1,"zombie-ready\n",13)==13 && DO(0,0,buffer,1)==1,119);
++            DO(60,19,0,0);__builtin_unreachable();
++        }
++        int status=-1;
++        CHECK(child==2 && DO(61,child,&status,0)==child && status==(19<<8),120);
++        CHECK(DO(61,3,&status,0)==3 && status==(37<<8),121);
++        CHECK(DO(61,-1,&status,0)==-10,122);
++    }
++    else if (mode=='q') {
++        for (word fault=0;fault<4;++fault) {
++            long pages=-1;
++            word destination=fault==0?(word)&readonly_status:1;
++            if(fault>=2) {
++                pages=call(9,0,8192,3,0x22,(word)-1,0);
++                CHECK(pages>0,120);
++                for(word i=4094;i<4098;++i) ((unsigned char *)pages)[i]=0x5a;
++                destination=pages+4094;
++                CHECK(DO(10,fault==2?pages+4096:pages,4096,fault==2?0:1)==0,121);
++            }
++            long child=DO(57,0,0,0);
++            if(child==0) return 42;
++            CHECK(child>1,122);
++            CHECK(DO(61,child,destination,0)==-14,123);
++            CHECK(DO(61,child,0,0)==-10,124);
++            CHECK(readonly_status==0x12345678,125);
++            if(fault==2) CHECK(((unsigned char *)pages)[4094]==0x5a && ((unsigned char *)pages)[4095]==0x5a,126);
++            if(fault==3) for(word i=4094;i<4098;++i) CHECK(((unsigned char *)pages)[i]==0x5a,127);
++            if(pages>0) CHECK(DO(11,pages,8192,0)==0,128);
++        }
++    } else
++    if (mode=='f' || mode=='v' || mode=='c' || mode=='s') {
++        long child=(mode=='c' || mode=='s') ? DO(56,mode=='s'?0x4111:17,0,0) : DO(mode=='v'?58:57,0,0,0);
++        if (child==0) {
++            CHECK(DO(39,0,0,0)==2 && DO(186,0,0,0)==2,12);
++            CHECK(DO(110,0,0,0)==1 && DO(111,0,0,0)==1,13);
++            DO(60,37,0,0);
++            __builtin_unreachable();
++        }
++        CHECK(child==2,14);
++        int status=0;
++        CHECK(DO(61,child,&status,0)==child && status==(37<<8),15);
++        CHECK(DO(61,child,&status,0)==-10,16);
++        CHECK(DO(61,-1,&status,0)==-10,17);
++    } else if (mode=='l' || mode=='j' || mode=='p' || mode=='h' || mode=='x') {
++        if(mode=='h') {
++            word handler[4]={(word)child_handler,0x4000004,(word)signal_return,0};
++            CHECK(call(13,17,(word)handler,0,8,0,0)==0,92);
++        }
++        long protected=call(9,0,mode=='x'?8192:4096,mode=='x'?3:1,0x22,(word)-1,0);
++        CHECK(protected>0,90);
++        if(mode=='x') {
++            for(word i=4094;i<4098;++i) ((unsigned char *)protected)[i]=0x5a;
++            CHECK(DO(10,protected+4096,4096,1)==0,130);
++        }
++        word address=mode=='j'?1:(mode=='p'?(word)protected:(mode=='x'?(word)protected+4094:(word)&fork_tid));
++        long child=call(56,0x1200011,0,0,address,0,0);
++        if (!child) {
++            CHECK(DO(39,0,0,0)==2 && DO(186,0,0,0)==2,83);
++            if(mode=='l' || mode=='h') { CHECK(fork_tid==2,84); }
++            else { CHECK(fork_tid==0x1357 && *(volatile int *)protected==0,85); }
++            if(mode=='x') for(word i=4094;i<4098;++i) CHECK(((unsigned char *)protected)[i]==0x5a,131);
++            return 37;
++        }
++        CHECK(child==2 && fork_tid==0x1357 && *(volatile int *)protected==0,86);
++        int status=0;
++        CHECK(DO(61,child,&status,0)==child && status==(37<<8),87);
++        CHECK(DO(61,child,&status,0)==-10,88);
++        if(mode=='h') {
++            for(word n=0;n<1000 && !child_signal;++n) DO(39,0,0,0);
++            CHECK(child_signal==1,93);
++        }
++        CHECK(DO(11,protected,mode=='x'?8192:4096,0)==0,91);
++    } else if (mode=='r') {
++        int pipe[2]; CHECK(DO(22,pipe,0,0)==0,76);
++        word limit[2]={1,1}; CHECK(DO(302,0,6,limit)==0,80);
++        CHECK(DO(57,0,0,0)==-11 && DO(57,0,0,0)==-11,77);
++        CHECK(call(56,0x1200011,0,0,(word)&fork_tid,0,0)==-11 && fork_tid==0x1357,89);
++        CHECK(DO(1,pipe[1],"K",1)==1 && DO(0,pipe[0],buffer,1)==1 && buffer[0]=='K',78);
++        CHECK(DO(3,pipe[0],0,0)==0 && DO(3,pipe[1],0,0)==0,79);
++    } else if (mode=='i') {
++        int send[2],reply[2];
++        CHECK(DO(22,send,0,0)==0 && DO(22,reply,0,0)==0,20);
++        long fd=DO(2,"/work/data",0102,0600), native=DO(2,"/input",0,0), null=DO(2,"/dev/null",2,0);
++        CHECK(fd>=0 && native>=0 && null>=0,21);
++        CHECK(DO(1,fd,"P",1)==1 && DO(0,native,buffer,2)==2 && buffer[0]=='a',22);
++        long child=DO(57,0,0,0);
++        if (child==0) {
++            CHECK(DO(3,send[1],0,0)==0 && DO(3,reply[0],0,0)==0,23);
++            CHECK(DO(0,send[0],buffer,1)==1 && buffer[0]=='G',24);
++            CHECK(DO(1,fd,"C",1)==1 && DO(0,native,buffer,2)==2 && buffer[0]=='c',25);
++            CHECK(DO(1,null,"discard",7)==7 && DO(3,null,0,0)==0,26);
++            CHECK(DO(3,fd,0,0)==0 && DO(3,native,0,0)==0,27);
++            CHECK(DO(1,reply[1],"R",1)==1 && DO(3,reply[1],0,0)==0,28);
++            return 42;
++        }
++        CHECK(child==2,29);
++        CHECK(DO(3,send[0],0,0)==0 && DO(3,reply[1],0,0)==0,30);
++        int status=123;
++        CHECK(DO(61,child,&status,1)==0 && status==123,31);
++        CHECK(DO(1,send[1],"G",1)==1 && DO(3,send[1],0,0)==0,32);
++        CHECK(DO(0,reply[0],buffer,1)==1 && buffer[0]=='R',33);
++        CHECK(DO(0,reply[0],buffer,1)==0,34);
++        CHECK(DO(61,child,1,0)==-14,35); // Linux still reaps the child on a copy fault.
++        CHECK(DO(61,child,&status,0)==-10 && status==123,36);
++        CHECK(DO(8,fd,0,0)==0 && DO(0,fd,buffer,8)==2 && buffer[0]=='P' && buffer[1]=='C',37);
++        CHECK(DO(0,native,buffer,2)==2 && buffer[0]=='e',38);
++        CHECK(DO(1,null,"still open",10)==10,39);
++        CHECK(DO(3,null,0,0)==0 && DO(3,fd,0,0)==0 && DO(3,native,0,0)==0,40);
++        CHECK(DO(3,reply[0],0,0)==0,41);
++    } else if (mode=='k') {
++        long child=DO(57,0,0,0);
++        if (child==0) pause_forever();
++        CHECK(child==2 && DO(62,child,0,0)==0,50);
++        CHECK(DO(62,child,9,0)==0,51);
++        int status;
++        CHECK(DO(61,child,&status,0)==child && status==9,52);
++        CHECK(DO(62,child,0,0)==-3 && DO(62,-1,9,0)==-95,53);
++    } else if (mode=='b') {
++        int pipe[2];
++        CHECK(DO(22,pipe,0,0)==0,60);
++        long children[15];
++        for (word i=0;i<15;++i) {
++            long child=DO(57,0,0,0);
++            if (child==0) { CHECK(DO(0,pipe[0],buffer,1)==1,61); return 0; }
++            CHECK(child>1,62);
++            children[i]=child;
++        }
++        CHECK(DO(57,0,0,0)==-11,63);
++        CHECK(DO(56,17|0x800000,0,0)==-38,64); // CLONE_UNTRACED
++        CHECK(DO(56,17|0x20000000,0,0)==-38,65); // CLONE_NEWPID
++        CHECK(DO(56,17|0x400,0,0)==-38,66); // CLONE_FILES
++        for (word i=0;i<15;++i) CHECK(DO(62,children[i],9,0)==0,67);
++        for (word i=0;i<15;++i) { int status; CHECK(DO(61,children[i],&status,0)==children[i] && status==9,68); }
++        long child=DO(57,0,0,0);
++        if (child==0) return 19;
++        int status;
++        CHECK(child>16 && DO(61,child,&status,0)==child && status==(19<<8),69);
++    } else if (mode=='o') {
++        int pipe[2]; CHECK(DO(22,pipe,0,0)==0,70);
++        long child=DO(57,0,0,0);
++        if (child==0) {
++            long grandchild=DO(57,0,0,0);
++            if (grandchild==0) { CHECK(DO(1,pipe[1],"ready\n",6)==6,71); pause_forever(); }
++            CHECK(grandchild==3,72);
++            return 0;
++        }
++        CHECK(child==2 && DO(0,pipe[0],buffer,6)==6,73);
++        int status;
++        CHECK(DO(61,child,&status,0)==child && status==0,74);
++        CHECK(DO(62,3,9,0)==0 && DO(61,3,&status,0)==3 && status==9,75);
++    } else if (mode=='t') {
++        long child=DO(57,0,0,0);
++        if (child==0) {
++            long grandchild=DO(57,0,0,0);
++            if (grandchild==0) { DO(1,1,"ready\n",6); pause_forever(); }
++            pause_forever();
++        }
++        pause_forever(); // Runner kills root with two descendants still alive.
++    } else return 99;
++    DO(1,1,"owned-tasks: PASS\n",18);
++    return 0;
++}
++__asm__(".global _start\n_start:\nmov %rsp,%rdi\nandq $-16,%rsp\ncall task_main\nmov %rax,%rdi\nmov $60,%rax\nsyscall\nud2\n");
++__asm__(".global signal_return\nsignal_return:\nmov $15,%rax\nsyscall\nud2\n");

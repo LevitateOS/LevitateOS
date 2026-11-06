@@ -384,20 +384,30 @@ clean replay. It reuses current typed wait/status APIs and adopts only after the
 parent's last running thread, including signal exit and live-init-thread cases.
 No broader configured child/exec capability is claimed by this standalone fix.
 
-Current goal-turn classification: **progress**. The full goal remains active;
-broader G06 and later packets, interactions and Recipe closure are incomplete.
+G06b is locally prepared at `8c783e71` on explicit composition `5cb0370f`
+(G05 plus G06a). [Review/evidence](ginux-contributions/g06b-review.md) records
+strict child-TID/wait-status copyout, fault-still-reaps semantics, image-interpreter
+ownership checks, native exec/CLOEXEC transactions and adopted-zombie handling.
+82 full unit tests and all applicable Linux suites pass in candidate and clean
+patch replay, plus 20 task/exec repetitions. All 168 tracked paths match. Current
+upstream native helpers/tests are unchanged; #224/#226 are not duplicated. G06's
+local preparation is complete through its two subpackets; standalone delivery
+still waits for actual prerequisite merges. The source patch/draft/logs/hashes
+are retained downstream; nothing was published.
 
-Exact next task: **G06b — configured child/exec lifecycle extraction**. Compose
-reviewed G05 and G06a locally, then adapt ccd62ca1/8f768700 plus selected9279e71b,
-d693ae63 and07c949db fixes. Current ProcessTable already uses ChildStatus and
-WaitTarget; do not replace it with the donor's old raw-status/Option selector API.
-Add cancel/peek helpers only where the runtime actually requires them. Preserve
-all #221 helpers/native tests and G03–G05 path/copy/alias corrections. In particular,
-the donor copies wait status before host reap and can partially write a status
-word: adapt configured wait fault/reap semantics and strict all-or-nothing copyout
-instead of inheriting that regression. Libc CHILD_SETTID copyout needs the same
-protection. Do not import future threads/network/mappings to make old code compile.
-G01/G02 holds remain explicit; F04 is the user inspection stop before publication.
+Current goal-turn classification: **progress**. The full goal remains active;
+G07 and later packets, held-policy acceptance, interactions and Recipe closure
+remain incomplete. F04 remains the user inspection stop before publication.
+
+Exact next task: **G07 — thread ownership and per-task transactions**. Start from
+reviewed G06b `8c783e71` and adapt `928dc9a1`/`e59e2e61` only. Trace per-task descriptor
+transactions and shared descriptor-group lifetime; preserve typed process APIs,
+strict word copyouts, interpreter authority, per-task path scratch and native
+exec failure restoration. Include clone rollback, live leader/nonleader exits,
+concurrent object operations and supported exec constraints. Existing native
+thread coverage is regression evidence, not proof of configured thread support.
+Do not import later mappings/network/checkpoint features to make a donor compile.
+G01/G02 holds remain explicit; no parallel agents or publication are authorized.
 
 Active skill: `hdae-development`, discovered at
 `/home/vince/.codex/worktrees/ginux-pr-combination-check/ginux/.agents/skills/hdae-development/SKILL.md`.
