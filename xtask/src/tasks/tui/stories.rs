@@ -58,13 +58,30 @@ pub fn run(options: Options) -> Result<()> {
     let token: Arc<str> = random_token()?.into();
     let listener = TcpListener::bind(("0.0.0.0", options.port))
         .with_context(|| format!("listening on port {}", options.port))?;
-    let host = std::fs::read_to_string("/proc/sys/kernel/hostname")
-        .map(|name| name.trim().to_string())
-        .unwrap_or_else(|_| "localhost".to_string());
-    let url = format!("http://{host}:{}/?token={token}", options.port);
-    println!("stories: {} stories at {url} (Ctrl-C stops)", catalog.len());
+    // The machine's IPv4 addresses: other machines may not resolve its hostname.
+    let addresses = std::process::Command::new("hostname")
+        .arg("-I")
+        .output()
+        .map(|out| String::from_utf8_lossy(&out.stdout).into_owned())
+        .unwrap_or_default();
+    let mut urls: Vec<String> = addresses
+        .split_whitespace()
+        .filter(|address| address.parse::<std::net::Ipv4Addr>().is_ok())
+        .map(|address| format!("http://{address}:{}/?token={token}", options.port))
+        .collect();
+    if urls.is_empty() {
+        urls.push(format!("http://127.0.0.1:{}/?token={token}", options.port));
+    }
+    println!(
+        "stories: {} stories (Ctrl-C stops), open one of:",
+        catalog.len()
+    );
+    for url in &urls {
+        println!("  {url}");
+    }
+    let url = &urls[0];
     if options.open {
-        let _ = std::process::Command::new("xdg-open").arg(&url).spawn();
+        let _ = std::process::Command::new("xdg-open").arg(url).spawn();
     }
     for stream in listener.incoming() {
         let Ok(stream) = stream else { continue };
