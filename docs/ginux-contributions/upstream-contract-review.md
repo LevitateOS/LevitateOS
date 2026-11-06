@@ -86,3 +86,10 @@ G05a/G03a are the two latest-base preparations;35 retained packets remain.
 Next is G06a, then G03b and the configured-owner join at G03c. Complete raw
 upstream delta is retained; upstream HDAE records describe its own project and
 are not authorization to change this downstream task's branch/publication rules.
+
+
+G06a is now also directly onff926d0c at
+`4a62d81e3d81ede3b987d679333c39b62212c8bf`:86 units/static/build and eight
+ordinary controls pass per source/clean; three exact-base adoption regressions
+fail. Three latest-base preparations exist;34 retained packets remain. Next is
+G03b on refreshed G05a, then the configured-owner join at G03c.

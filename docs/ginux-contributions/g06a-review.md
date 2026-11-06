@@ -1,7 +1,7 @@
 # G06a — process-table orphan adoption
 
-Current retained local commit `01f22e0615e54fdcf3b85f8cc3b3542fb88b1a27`, sole
-parent `8a475e8b2318425fd2fc15246a5c6f4bca6caf86`. The current-main refresh below
+Current retained local commit `4a62d81e3d81ede3b987d679333c39b62212c8bf`, sole
+parent `ff926d0c228b71d55d0f2f0909dd86ec62197c8a`. The current-main refresh below
 owns its fresh evidence and pending checks; earlier results remain historical.
 
 Earlier standalone local commit `b2347523d460b8cbeee2284fd1089509bf9f920c`, sole parent
@@ -85,3 +85,30 @@ runtime jobs include authority/protected/fault scenarios and remain unrun under
 the written security boundary; macOS/remote CI also remains unrun. R03 retains
 those checks. The ordinary results do not add configured G07 thread support or
 resolve its shared-argument hold, and do not authorize publication.
+
+## PR231 latest-observed-base refresh — 2026-11-06
+
+Head `4a62d81e3d81ede3b987d679333c39b62212c8bf`, tree
+`bfd06357784e4f432ef291858a68b82e642e446a`, is directly on observed upstream
+`ff926d0c228b71d55d0f2f0909dd86ec62197c8a`. PR231 does not change the process
+table; candidate process-file bytes match previous head01f22e06. Scope remains
+one file,+118 (23 implementation/95 test lines). A separate self-review reread
+the full diff, current fork/clone/normal and signaled retirement/exec/wait/shutdown
+paths, job-control additions and native retirement callers. Only parent fields
+change after final group retirement with live init; current typed/status APIs
+and all upstream coverage remain. Independent review is not claimed.
+
+The exactff926d0c production code with only the same regressions added yields
+13 existing process passes and3 adoption failures. Source and strict clean replay
+pass make check/test-unit/build and launch/process/setup fixture builds:86 units,
+including16 process tests and new upstream contract/domain coverage. Eight ordinary
+configured-launch/valid wait-status controls pass per export. All196 tracked
+paths match the final head. Both binaries hash
+`5aaaeaa085e0776a5aae04ee3f2089226b08dd30b8547288bdd7e8c059aaf375`.
+Exact logs/receipts/draft/manifest/patch are in
+`.artifacts/ginux-contribution-preparation/upstream-contract-refresh-2026-11-06/G06a/`.
+
+Full default runtime/security suites, macOS and remote CI remain pending. Library
+thread-group tests do not establish G07 configured thread support, contract
+enforcement or security acceptance. No real checkout/index, branch, remote text
+or publication changed.

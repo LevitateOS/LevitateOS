@@ -1,6 +1,6 @@
-From 01f22e0615e54fdcf3b85f8cc3b3542fb88b1a27 Mon Sep 17 00:00:00 2001
+From 4a62d81e3d81ede3b987d679333c39b62212c8bf Mon Sep 17 00:00:00 2001
 From: vince <vincepaul.liem@gmail.com>
-Date: Fri, 6 Nov 2026 22:18:32 +0100
+Date: Fri, 6 Nov 2026 23:42:39 +0100
 Subject: [PATCH] fix(process): adopt orphans after the last parent thread
  exits
 

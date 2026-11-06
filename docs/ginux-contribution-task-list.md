@@ -970,3 +970,16 @@ Exact next action: refresh G06a onff926d0c, then G03b. At G03c, use upstream
 contract/catalog owners before configured effects and extend the existing audit
 writer as needed; review task-loop ordering at G06b. This supersedes earlier
 read-position/next-action entries. Keep G07, security, F02/F03 and F04 pending.
+
+
+### Latest-base G06a — 2026-11-06
+
+G06a is now `4a62d81e3d81ede3b987d679333c39b62212c8bf`, directly onff926d0c.
+The process source is unchanged from the previous corrected extraction. Three
+exact-base adoption regressions fail; source/clean pass all86 units/static/build
+and eight ordinary controls, with all196 tracked paths and both binaries matching.
+[Review](ginux-contributions/g06a-review.md) retains full default/security/macOS/
+remote CI and G07 holds. Three retained packets have latest-base source/ordinary
+preparation;34 remain. Exact next action: refresh G03b on refreshed G05a, then
+join configured contract/catalog before effects and retain the existing audit
+owner at G03c. Later task-loop ordering belongs to G06b. F02/F03/F04 remain open.

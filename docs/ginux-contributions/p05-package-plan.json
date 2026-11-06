@@ -224,24 +224,25 @@
       "parent_packet": "G06",
       "purpose": "process-table orphan adoption after final parent-thread retirement",
       "dependencies": [],
-      "base": "8a475e8b2318425fd2fc15246a5c6f4bca6caf86",
-      "head": "01f22e0615e54fdcf3b85f8cc3b3542fb88b1a27",
-      "tree": "5b926de1bff2b17ecf38feecdeb08e97e8336ecc",
+      "base": "ff926d0c228b71d55d0f2f0909dd86ec62197c8a",
+      "head": "4a62d81e3d81ede3b987d679333c39b62212c8bf",
+      "tree": "bfd06357784e4f432ef291858a68b82e642e446a",
       "upstream_base": "3f2fe7dfadd4b40e235d982a6a3d386dc6490177",
       "source_commits": [
         "ccd62ca146550e81c54fec2c49d8e642948a1e8a"
       ],
-      "status": "current-main source reviewed; three exact-base regressions fail, all 76 units/static/build and 8 ordinary controls pass in source/clean; full default runtime/macOS CI remain pending",
+      "status": "observed ff926d0c direct-base source reviewed; three exact-base adoption regressions fail; all86 units/static/build and8 ordinary controls pass in source/clean; full default/runtime/security/macOS/remote CI remain pending",
       "evidence": "g06a-review.md",
       "source_patch": "patches/G06a.patch",
       "standalone": true,
-      "artifact_directory": ".artifacts/ginux-contribution-preparation/upstream-refresh-2026-11-06/G06a",
-      "previous_head": "b2347523d460b8cbeee2284fd1089509bf9f920c",
+      "artifact_directory": ".artifacts/ginux-contribution-preparation/upstream-contract-refresh-2026-11-06/G06a",
+      "previous_head": "01f22e0615e54fdcf3b85f8cc3b3542fb88b1a27",
       "historical_artifact_directory": ".artifacts/development-migration/2026-11-06/recovery/evidence/ginux-contribution-preparation/G06a",
-      "patch_sha256": "06e37b7bb4202a379184b3b69ed65b936cb15ec5d002b578098e2f8246f70fd8",
-      "unit_tests": 76,
+      "patch_sha256": "126a14c17ee865ed3762b1500bc3657674afa32ebe4e8093c69c5f6548e5e25d",
+      "unit_tests": 86,
       "process_tests": 16,
-      "remote_ci": "not run"
+      "remote_ci": "not run",
+      "latest_main_acceptance": "source/ordinary preparation only; full runtime/macOS/remote CI pending"
     },
     {
       "packet": "G06",
@@ -1884,5 +1885,5 @@
     }
   ],
   "latest_observed_upstream_main": "ff926d0c228b71d55d0f2f0909dd86ec62197c8a",
-  "latest_upstream_reconciliation": "G05a/G03a refreshed on ff926d0c; remaining retained packets pending serial refresh and configured contract-owner integration"
+  "latest_upstream_reconciliation": "G05a/G03a/G06a refreshed on ff926d0c; remaining retained packets pending serial refresh and configured contract-owner integration"
 }
