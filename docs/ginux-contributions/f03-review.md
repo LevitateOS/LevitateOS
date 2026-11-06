@@ -54,3 +54,40 @@ claim complete Recipe acceptance.
 On explicit resume: inspect state.json/ordinary-batch.log and the interrupted
 case, then continue only authorized ordinary work. The G07 shared-path security
 correction/verification remains assigned to the written DaybreakBlue handoff.
+
+## Destination continuation — 2026-11-06
+
+The user explicitly resumed preparation through F04, with publication excluded.
+The paused results above remain historical and unchanged. Destination paths and
+binary provenance come from
+`.artifacts/development-migration/2026-11-06/destination-report.json`.
+Use its `f03-destination-bin/e2e`, not the original harness with embedded old paths.
+Future snapshot builds require a separate `CARGO_TARGET_DIR`.
+
+Exact-source verification now passes all 37 patches: each retained patch hash
+matches its manifest and applying it to its exact parent through a disposable
+index reconstructs its recorded tree. This accommodates the original G05a mail
+patch and later plain diffs without changing either. G12 uses its corrected
+manifest/head. All 189 F02 source paths match combined commit
+`dfebda7c29b628fc41f50635b07e8cb48d6f883a`. All 153 current tracked Recipe paths
+other than the independently normalized standalone lock match the snapshot;
+current Recipe HEAD is `ce3cae5`. This establishes source identity, not runtime,
+current-upstream independence, security or CI passage.
+
+The complete paused log shows the same reader-thread startup ENOSYS in **all
+four** failed scenarios: dependency C compilation, Bash child output, owned ELF
+execution and storage metadata via touch. Recipe's existing owner is
+`src/process.rs:270`, which starts output-reader threads. The combined configured
+launch owner, `crates/ginux-init/src/launch_tasks.rs:845`, supports only the three
+listed process clone flag shapes and returns -38 for a thread clone. This is a
+missing G07 capability; changing the command, dropping output capture or importing
+the unready G07 snapshot would not establish the required consumer acceptance.
+No such workaround or thread import has been made. G07 correction and security
+verification remain with the written DaybreakBlue handoff, without dispatch.
+
+New evidence is separate from the preserved recovery logs:
+`.artifacts/ginux-contribution-preparation/F03/resume-2026-11-06/` contains
+`verify-integrity.py`, `integrity.json`, and fingerprints of all six restored
+worktree indexes/statuses. The interrupted ordinary state-restore scenario is
+being rerun with the destination harness, one case at a time, using the documented
+privileged coordinator. Its result remains pending until the harness finishes.

@@ -727,12 +727,12 @@ new immutable binaries and1/1 first managed case passing. The12-case ordinary
 batch was interrupted at the user’s pause; inspect saved state/logs on resume. Full suite,
 compiler/Cargo/APK/RPM and security acceptance remain open.
 
-**Goal paused by the user.** The active F03 batch is stopped; partial results
+**Historical pause, superseded by explicit resume below.** The active F03 batch was stopped; partial results
 are7 passed,4 failed and1 interrupted/unreported, plus the first ordinary
 probe passed. These are not full-suite results. The C dependency/Bash paths expose
 reader-thread creation ENOSYS while G07 is excluded; logs preserve all failures.
 
-Exact next action **only after explicit resume**: inspect F03 state/logs and the
+The saved resume action was: inspect F03 state/logs and the
 remaining case; continue authorized ordinary consumer work without disguising
 G07/security dependencies. The supplementary candidate-integrity refresh stopped
 on a missing source_patch key in an older manifest row; it made no candidate
@@ -741,8 +741,33 @@ concurrent live edits. G07 and all security/policy/full CI/current-main holds
 remain. F04 inspection precedes any publication; no branches/refs/pushes/PRs/
 maintainer messages are authorized.
 
+### Destination resume — 2026-11-06
+
+The user explicitly resumed the sequential goal through final review and
+verification, stopping at F04 for inspection with no publication. F03 remains
+active and partial. The complete saved log has now been read: all four failures
+report command-output reader thread creation ENOSYS, consistent with excluded
+G07. The remaining state-restore case is running on the destination-built
+harness; it has no completed-case result yet. No failure or interrupted case
+has been counted as passing. See [F03 evidence](ginux-contributions/f03-review.md).
+
+Fresh strict replay verifies all 37 retained patches against their recorded
+parents/trees, including corrected G12. All 189 F02 tracked paths match the
+recorded combined head. The paused Recipe snapshot matches all 153 current
+tracked paths except its separately normalized standalone lock. The six restored
+worktrees remain untouched; their index/status fingerprints are retained with
+the new F03 evidence. No Ginux contribution source has changed.
+
+Exact next action: finish the previously interrupted ordinary state case, record
+its actual result, then continue source-reviewed ordinary consumer checks
+serially. Keep reader-thread-dependent consumers pending on G07. Do not import
+the unready thread snapshot, rerun adversarial probes, dispatch DaybreakBlue,
+weaken required checks or treat source integrity as full acceptance. G07,
+security/policy, full CI and current-main independence remain open; F04 depends
+on the required F02/F03 evidence.
+
 Active skill: `hdae-development`, discovered at
-`/home/vince/.codex/worktrees/ginux-pr-combination-check/ginux/.agents/skills/hdae-development/SKILL.md`.
+`/home/vince/Projects/LevitateOS/.agents/skills/hdae-development/SKILL.md`.
 Reload it and its required references after a context shift; then read applicable
 instructions and this checkpoint. Direct user scope and the superproject's
 proportional-process instructions prevail; this plan adds no automated framework.
