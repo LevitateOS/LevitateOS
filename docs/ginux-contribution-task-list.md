@@ -499,15 +499,23 @@ Current link/script/ELF/storage/directory controls pass in source/clean exports;
 exact G13 fails the owned-cwd fixture. Thread-shared cwd stays with G07's held
 join, and security/full CI/current-main independence remain pending. No publication.
 
-Exact next task: **G15 — shared hardlink inode identity**. Inspect9e2a39e8 and trace
-its actual VFS path/object/FD dependencies before extracting on the smallest base
-(G135c3ae8e5 if G14 cwd capability is unused). Preserve shared duplicate
-positions, reopened offsets, whiteout replacement, executable pins, link-before-
-parent traversal and final-entry mutations. Reconcile cwd directory references
-when composing G14, without adding accidental stack ancestry. Prepare ordinary
-alias bytes/metadata, unlink/relink and quota/lifetime checks locally; write
-adversarial namespace, host authority and race validation down for DaybreakBlue.
-Do not revive the held G07/G12 joins as validated or publish anything before F04.
+G15 source/ordinary preparation is retained at `8ab24d4b` directly on
+G135c3ae8e5. [Review/evidence](ginux-contributions/g15-review.md) records98
+units,177-path strict replay, shared hardlink metadata/bytes, alias executable
+identity and final-descriptor quota reclamation, plus script/ELF/storage/directory
+controls passing in source/clean exports. Donor executable-name and initial file-
+count regressions are reproduced and corrected. Exact G13 rejects the valid-link
+fixture. G19/G22 export joins and G14/G12 interactions remain explicitly assigned;
+security/full CI/upstream prerequisites remain pending. Nothing was published.
+
+Exact next task: **G16 — unified image/owned traversal**. Inspect1da0ce13 and
+93a1a56d against existing G03c/G13 walker and G14 cwd owners. Extract on the
+smallest proven capability base; exclude accidental G15/G12/G07 ancestry unless a
+real consumer requires it. Preserve link-before-parent semantics, assignment
+precedence, executable/script identity, native rewrites and hidden /dev behavior.
+Perform ordinary cross-boundary path/parent/exec checks; record exploit-like
+namespace, authority, race and protected-buffer probes for DaybreakBlue. Keep all
+inherited security and standalone prerequisites pending; no publication before F04.
 
 Active skill: `hdae-development`, discovered at
 `/home/vince/.codex/worktrees/ginux-pr-combination-check/ginux/.agents/skills/hdae-development/SKILL.md`.

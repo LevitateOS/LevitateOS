@@ -681,8 +681,6 @@
       "packet": "G15",
       "purpose": "Shared hardlink inode identity (`9e2a39e8`)",
       "dependencies": [
-        "G05",
-        "G09",
         "G13"
       ],
       "source_commits": [
@@ -690,8 +688,48 @@
       ],
       "acceptance": "Aliases share bytes/metadata and open-file lifetime; unlink/relink, quota charging and final close remain correct.",
       "planned_delivery": "one coherent change plus its generic docs and focused regression fixtures; split coupled responsibilities only as recorded by P04",
-      "status": "pending extraction and R01-R04 review",
-      "artifact_directory": ".artifacts/ginux-contribution-preparation/G15"
+      "status": "source separately self-reviewed; static/unit/build and selected ordinary runtime pass in source/clean replay; security/full CI/current-main independence pending",
+      "artifact_directory": ".artifacts/ginux-contribution-preparation/G15",
+      "base": "5c3ae8e5068b5da21d2c37f9545c0f7b10eba147",
+      "head": "8ab24d4b47adeb9897623627060846070d41219d",
+      "tree": "b5349e7d0684e0b2313141803e78e55a344e3df2",
+      "changed_files": [
+        "README.md",
+        "crates/ginux-vfs/src/lib.rs",
+        "crates/ginux-init/src/descriptors.rs",
+        "crates/ginux-init/src/fs_hooks.rs",
+        "crates/ginux-init/src/tracee_io.rs",
+        "crates/ginux-init/src/channel_hooks.rs",
+        "crates/ginux-init/src/device_hooks.rs",
+        "scripts/test-launch-directories.py",
+        "tests/fixtures/launch-directory-fixture.c",
+        "scripts/test-launch-owned-exec.py",
+        "tests/fixtures/launch-owned-exec-fixture.c"
+      ],
+      "standalone": false,
+      "patch_sha256": "37a0924c7e1573e9707e512f8d63b91becc2ce3736fc2ffcc130ea73f895d49f",
+      "deferred_joins": [
+        "G14 cwd composition",
+        "G12 mapping composition",
+        "G19/G22 overlay_entry/read_overlay/export hardlink identity from 9e2a39e8"
+      ],
+      "unit_tests": 98,
+      "vfs_tests": 40,
+      "clean_matched_paths": 177,
+      "review": "separate self-review; no independent reviewer/security acceptance claimed",
+      "remote_ci": "not run",
+      "security_handoff": "daybreakblue-handoff.md",
+      "source_binary_sha256": "07bc20172727f4ef8b8e7a410119483870bfa3b6d4c9de3a496b7bb591d014ac",
+      "clean_binary_sha256": "07bc20172727f4ef8b8e7a410119483870bfa3b6d4c9de3a496b7bb591d014ac",
+      "final_clean_export": "verified-head",
+      "fixture_sha256": {
+        "launch-directory-fixture": "d6f6fd948a7d72b8822ebc1b165a132a5f1912cc88e48eca6b0e738d7e74ef7f",
+        "launch-storage-fixture": "ac2322103b62819f8d0eb0a44536059608615cce3e153d9f8189f9ab086a129e",
+        "launch-script-fixture": "b644cedb25fdadad8fee88ce1c60756dac8810b0e09c4e1941e2245769962c27",
+        "launch-owned-exec-fixture": "566f74cdadd00eac9266de8307c882e5ac6f8912e53dc46fc560058914478b88"
+      },
+      "evidence": "g15-review.md",
+      "source_patch": "patches/G15.patch"
     },
     {
       "packet": "G16",

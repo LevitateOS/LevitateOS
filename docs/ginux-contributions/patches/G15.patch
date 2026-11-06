@@ -1,0 +1,998 @@
+From 8ab24d4b47adeb9897623627060846070d41219d Mon Sep 17 00:00:00 2001
+From: vince <vincepaul.liem@gmail.com>
+Date: Fri, 6 Nov 2026 14:31:29 +0100
+Subject: [PATCH] feat(storage): share owned inode identity across hardlink
+ names
+
+Share bytes, permissions and link counts through a canonical VFS inode.
+Retain named file and executable references independently so removed
+alias entries cannot be recycled before their references retire. Preserve
+shared duplicate offsets, fresh reopen offsets and whiteout identity.
+
+Signed-off-by: vince <vincepaul.liem@gmail.com>
+---
+ README.md                                  |  12 +-
+ crates/ginux-init/src/channel_hooks.rs     |   1 +
+ crates/ginux-init/src/descriptors.rs       |   2 +-
+ crates/ginux-init/src/device_hooks.rs      |   1 +
+ crates/ginux-init/src/fs_hooks.rs          |  36 ++
+ crates/ginux-init/src/tracee_io.rs         |   5 +-
+ crates/ginux-vfs/src/lib.rs                | 398 +++++++++++++++++----
+ scripts/test-launch-directories.py         |   6 +-
+ scripts/test-launch-owned-exec.py          |   2 +-
+ tests/fixtures/launch-directory-fixture.c  |  37 ++
+ tests/fixtures/launch-owned-exec-fixture.c |  13 +-
+ 11 files changed, 441 insertions(+), 72 deletions(-)
+
+diff --git a/README.md b/README.md
+index 9fffd909..92f9a305 100644
+--- a/README.md
++++ b/README.md
+@@ -241,8 +241,16 @@ Namespace changes validate types, capacity and replacement before mutation.
+ Relative AT_FDCWD paths follow the calling process's image cwd; owned directory
+ FDs resolve relative operations through their current VFS identity. Image chdir,
+ getcwd and relative image exec retain native per-process cwd semantics. Entering
+-owned directories as cwd, relative image-directory FD access, hardlinks and
+-guest file mappings remain unsupported.
++owned directories as cwd, relative image-directory FD access and guest file
++mappings remain unsupported.
++Owned regular-file link/linkat names share inode, bytes, permissions and link
++counts. Removing one name preserves data through other names, file descriptions
++and executable references. Descriptions and executable pins retain the name
++through which they were obtained, including rename and deletion state. Hardlinks
++consume namespace entries without duplicating file capacity. Only owned regular
++files are linkable; linkat supports flags zero or AT_SYMLINK_FOLLOW. Symlink inode
++links, image-file imports, descriptor-only AT_EMPTY_PATH linking and directory
++hardlinks remain unsupported. Failed creation preserves names and link counts.
+ Owned symlink/symlinkat and readlink/readlinkat support bounded targets and
+ nofollow metadata. Link expansion precedes later parent components; mutations
+ name the final link itself, including directory requirements on trailing slashes.
+diff --git a/crates/ginux-init/src/channel_hooks.rs b/crates/ginux-init/src/channel_hooks.rs
+index 639cd66c..10072cee 100644
+--- a/crates/ginux-init/src/channel_hooks.rs
++++ b/crates/ginux-init/src/channel_hooks.rs
+@@ -289,6 +289,7 @@ impl LaunchChannels {
+             pid,
+             address,
+             Stat {
++                links: 1,
+                 inode: 0x2_0000_0000 + pipe as u64,
+                 mode: 0o10600,
+                 size: 0,
+diff --git a/crates/ginux-init/src/descriptors.rs b/crates/ginux-init/src/descriptors.rs
+index f00dfa8e..d4632d70 100644
+--- a/crates/ginux-init/src/descriptors.rs
++++ b/crates/ginux-init/src/descriptors.rs
+@@ -366,7 +366,7 @@ impl DescriptorTable {
+                     Err(e) => Err(e),
+                 }
+             }
+-            264 | 316 => {
++            264 | 265 | 316 => {
+                 self.save(r);
+                 self.rename_paths(pid, r, backends)
+             }
+diff --git a/crates/ginux-init/src/device_hooks.rs b/crates/ginux-init/src/device_hooks.rs
+index 752a867f..9ac45a5b 100644
+--- a/crates/ginux-init/src/device_hooks.rs
++++ b/crates/ginux-init/src/device_hooks.rs
+@@ -223,6 +223,7 @@ impl LaunchDevices {
+             pid,
+             destination,
+             Stat {
++                links: 1,
+                 inode: if dir { 0x1_0000_0000 } else { 0x1_0000_0001 },
+                 mode: if dir { 0o40555 } else { 0o20666 },
+                 size: 0,
+diff --git a/crates/ginux-init/src/fs_hooks.rs b/crates/ginux-init/src/fs_hooks.rs
+index 05b0499c..a86272eb 100644
+--- a/crates/ginux-init/src/fs_hooks.rs
++++ b/crates/ginux-init/src/fs_hooks.rs
+@@ -616,6 +616,9 @@ impl LaunchFs {
+ 
+     /// Configured-launch dispatch only; demo paths keep their existing contract.
+     pub fn claim(&mut self, pid: usize, r: &UserRegs) -> Option<i64> {
++        if matches!(r.orig_rax, 86 | 265) {
++            return Some(self.hard_link(pid, r).unwrap_or_else(|error| error));
++        }
+         if matches!(r.orig_rax, 82 | 264 | 316) {
+             return Some(self.rename(pid, r).unwrap_or_else(|error| error));
+         }
+@@ -829,6 +832,38 @@ impl LaunchFs {
+                 .any(|p| p.as_bytes() != path && within(path, p.as_bytes()))
+     }
+ 
++    fn hard_link(&mut self, pid: usize, r: &UserRegs) -> Result<i64, i64> {
++        let (source, destination, flags) = if r.orig_rax == 86 {
++            (
++                self.path(pid, r.rdi, (-100i64) as u64)?,
++                self.path(pid, r.rsi, (-100i64) as u64)?,
++                0,
++            )
++        } else {
++            (
++                self.path(pid, r.rsi, r.rdi)?,
++                self.path(pid, r.r10, r.rdx)?,
++                r.r8,
++            )
++        };
++        if flags & !0x400 != 0 {
++            return Err(-95);
++        }
++        let source = self.resolve(pid, source.as_bytes(), flags & 0x400 != 0, false)?;
++        let raw_destination_slash = destination.as_bytes().ends_with(b"/");
++        let destination = self.mutation_path(pid, destination.as_bytes(), true)?;
++        if !self.owns_path(source.as_bytes()) || !self.owns_path(destination.as_bytes()) {
++            return Err(-18);
++        }
++        if raw_destination_slash && self.fs.metadata_no_follow(destination.as_bytes()).is_err() {
++            return Err(-2);
++        }
++        self.fs
++            .hard_link(source.as_bytes(), destination.as_bytes(), false)
++            .map(|_| 0)
++            .map_err(errno)
++    }
++
+     fn rename(&mut self, pid: usize, r: &UserRegs) -> Result<i64, i64> {
+         let (source, destination, flags) = if r.orig_rax == 82 {
+             (
+@@ -1071,6 +1106,7 @@ fn copy_metadata(
+         address,
+         crate::tracee_io::Stat {
+             inode: metadata.inode,
++            links: metadata.links,
+             mode: metadata.mode
+                 | match metadata.kind {
+                     NodeKind::Directory => 0o40000,
+diff --git a/crates/ginux-init/src/tracee_io.rs b/crates/ginux-init/src/tracee_io.rs
+index 81f392c6..de987848 100644
+--- a/crates/ginux-init/src/tracee_io.rs
++++ b/crates/ginux-init/src/tracee_io.rs
+@@ -121,6 +121,7 @@ pub fn image_link(pid: usize, member: &[u8]) -> Result<Path, i64> {
+ /// Linux file type bits are part of mode; identities belong to the domain.
+ pub struct Stat {
+     pub inode: u64,
++    pub links: u64,
+     pub mode: u32,
+     pub size: u64,
+     pub device_major: u32,
+@@ -133,11 +134,11 @@ pub fn write_stat(pid: usize, address: u64, metadata: Stat, statx: bool) -> Resu
+     let (ino, mode_at, size_at, blocks_at, length) = if statx {
+         bytes[..4].copy_from_slice(&0x7ffu32.to_le_bytes());
+         bytes[4..8].copy_from_slice(&4096u32.to_le_bytes());
+-        bytes[16..20].copy_from_slice(&1u32.to_le_bytes());
++        bytes[16..20].copy_from_slice(&(metadata.links as u32).to_le_bytes());
+         bytes[28..30].copy_from_slice(&(mode as u16).to_le_bytes());
+         (32, None, 40, 48, 256)
+     } else {
+-        bytes[16..24].copy_from_slice(&1u64.to_le_bytes());
++        bytes[16..24].copy_from_slice(&metadata.links.to_le_bytes());
+         bytes[56..64].copy_from_slice(&4096u64.to_le_bytes());
+         (8, Some(24), 48, 64, 144)
+     };
+diff --git a/crates/ginux-vfs/src/lib.rs b/crates/ginux-vfs/src/lib.rs
+index 91c1f6f0..03f18e20 100644
+--- a/crates/ginux-vfs/src/lib.rs
++++ b/crates/ginux-vfs/src/lib.rs
+@@ -327,6 +327,7 @@ pub struct FileMetadata {
+     pub kind: NodeKind,
+     pub mode: u32,
+     pub size: u64,
++    pub links: u64,
+ }
+ 
+ /// A VFS-owned executable reference. Retain/release explicitly when process
+@@ -334,6 +335,7 @@ pub struct FileMetadata {
+ #[derive(Clone, Copy)]
+ pub struct Executable {
+     object: usize,
++    entry: usize,
+     pub size: usize,
+ }
+ 
+@@ -373,6 +375,9 @@ struct OverlayFile {
+     mode: u32,
+     len: usize,
+     executions: usize,
++    links: u64,
++    object: Option<usize>,
++    name_pins: usize,
+ }
+ 
+ impl OverlayFile {
+@@ -383,6 +388,9 @@ impl OverlayFile {
+             mode: 0,
+             len: 0,
+             executions: 0,
++            links: 0,
++            object: None,
++            name_pins: 0,
+         }
+     }
+ }
+@@ -392,6 +400,7 @@ struct Descriptor {
+     open: bool,
+     overlay: bool,
+     object: usize,
++    entry: usize,
+     position: usize,
+     readable: bool,
+     writable: bool,
+@@ -407,6 +416,7 @@ impl Descriptor {
+             open: false,
+             overlay: false,
+             object: 0,
++            entry: 0,
+             position: 0,
+             readable: false,
+             writable: false,
+@@ -572,6 +582,7 @@ impl<
+             Some(index) if self.overlay[index].state == 3 => return Err(VfsError::IsDirectory),
+             Some(index) if self.overlay[index].state == 4 => return Err(VfsError::SymlinkLoop),
+             Some(index) => {
++                let index = self.object(index);
+                 if writable && self.overlay[index].executions != 0 {
+                     return Err(VfsError::TextBusy);
+                 }
+@@ -615,11 +626,17 @@ impl<
+             self.overlay[object].len = 0;
+         }
+ 
++        let entry = if overlay {
++            self.find_overlay(path.as_bytes()).unwrap()
++        } else {
++            object
++        };
+         self.positions[position] = 0;
+         self.descriptors[slot] = Descriptor {
+             open: true,
+             overlay,
+             object,
++            entry,
+             position,
+             readable,
+             writable,
+@@ -660,6 +677,7 @@ impl<
+             open: true,
+             overlay: source.overlay,
+             object: source.object,
++            entry: source.entry,
+             position,
+             readable: true,
+             writable: false,
+@@ -707,6 +725,7 @@ impl<
+             open: true,
+             overlay: overlay.is_some(),
+             object,
++            entry: object,
+             position,
+             readable: true,
+             writable: false,
+@@ -782,13 +801,13 @@ impl<
+             } else {
+                 let object = ordinal - self.index.len();
+                 let entry = &self.overlay[object];
+-                if !matches!(entry.state, 1 | 3 | 4) {
++                if !matches!(entry.state, 1 | 3 | 4 | 5) {
+                     continue;
+                 }
+                 if let Some(name) = child_name(path, entry.path.as_bytes()) {
+                     return Ok(Some(DirectoryEntry {
+                         name,
+-                        inode: (self.index.len() + object + 1) as u64,
++                        inode: (self.index.len() + self.object(object) + 1) as u64,
+                         kind: match entry.state {
+                             3 => NodeKind::Directory,
+                             4 => NodeKind::Symlink,
+@@ -883,7 +902,7 @@ impl<
+         let state = self.descriptors[slot];
+         self.descriptors[slot] = Descriptor::empty();
+         if state.overlay {
+-            self.release_unlinked(state.object);
++            self.release_unlinked(state.entry);
+         }
+         Ok(())
+     }
+@@ -899,11 +918,38 @@ impl<
+     fn referenced(&self, object: usize) -> bool {
+         self.descriptors
+             .iter()
+-            .any(|fd| fd.open && fd.overlay && fd.object == object)
++            .any(|fd| fd.open && fd.overlay && (fd.object == object || fd.entry == object))
+     }
+ 
+-    fn release_unlinked(&mut self, object: usize) {
++    fn object(&self, slot: usize) -> usize {
++        self.overlay[slot].object.unwrap_or(slot)
++    }
++
++    fn link_count(&self, object: usize) -> u64 {
++        self.overlay[object].links
++    }
++
++    fn remove_name(&mut self, slot: usize) {
++        let object = self.object(slot);
++        self.overlay[object].links = self.overlay[object]
++            .links
++            .checked_sub(1)
++            .expect("live inode link count");
++        self.overlay[slot].state = 2;
++        self.release_unlinked(slot);
++    }
++
++    fn release_unlinked(&mut self, slot: usize) {
++        let object = self.object(slot);
++        if object != slot
++            && self.overlay[slot].state == 2
++            && self.overlay[slot].name_pins == 0
++            && !self.referenced(slot)
++        {
++            self.overlay[slot].object = None;
++        }
+         if self.overlay[object].state == 2
++            && self.overlay[object].links == 0
+             && self.overlay[object].executions == 0
+             && !self.referenced(object)
+         {
+@@ -936,8 +982,7 @@ impl<
+             if self.overlay[index].state == 3 {
+                 return Err(VfsError::IsDirectory);
+             }
+-            self.overlay[index].state = 2;
+-            self.release_unlinked(index);
++            self.remove_name(index);
+             // Open descriptors still own the removed object's bytes.
+             return Ok(());
+         }
+@@ -946,8 +991,11 @@ impl<
+             return Err(VfsError::IsDirectory);
+         }
+         let index = self.allocate_overlay()?;
+-        self.overlay[index].state = 2;
+-        self.overlay[index].path = path;
++        self.overlay[index] = OverlayFile {
++            state: 2,
++            path,
++            ..OverlayFile::empty()
++        };
+         Ok(())
+     }
+ 
+@@ -968,10 +1016,11 @@ impl<
+         if !state.overlay || state.directory {
+             return Err(VfsError::PermissionDenied);
+         }
+-        self.pin_object(state.object)
++        self.pin_object(state.entry)
+     }
+ 
+-    fn pin_object(&mut self, object: usize) -> Result<Executable, VfsError> {
++    fn pin_object(&mut self, entry: usize) -> Result<Executable, VfsError> {
++        let object = self.object(entry);
+         if self.overlay[object].mode & 0o111 == 0 {
+             return Err(VfsError::PermissionDenied);
+         }
+@@ -984,43 +1033,79 @@ impl<
+         }
+         let image = Executable {
+             object,
++            entry,
+             size: self.overlay[object].len,
+         };
+-        self.overlay[object].executions = self.overlay[object]
++        let executions = self.overlay[object]
+             .executions
+             .checked_add(1)
+             .ok_or(VfsError::OverlayLimit)?;
++        let names = self.overlay[entry]
++            .name_pins
++            .checked_add(1)
++            .ok_or(VfsError::OverlayLimit)?;
++        self.overlay[object].executions = executions;
++        self.overlay[entry].name_pins = names;
+         Ok(image)
+     }
+ 
+     pub fn retain_executable(&mut self, image: Executable) -> Result<(), VfsError> {
+         let object = self
+             .overlay
+-            .get_mut(image.object)
++            .get(image.object)
+             .ok_or(VfsError::InvalidDescriptor)?;
+-        if object.executions == 0 || object.len != image.size {
++        let entry = self
++            .overlay
++            .get(image.entry)
++            .ok_or(VfsError::InvalidDescriptor)?;
++        if object.executions == 0
++            || object.len != image.size
++            || entry.name_pins == 0
++            || self.object(image.entry) != image.object
++        {
+             return Err(VfsError::InvalidDescriptor);
+         }
+-        object.executions = object
++        let executions = object
+             .executions
+             .checked_add(1)
+             .ok_or(VfsError::OverlayLimit)?;
++        let names = entry
++            .name_pins
++            .checked_add(1)
++            .ok_or(VfsError::OverlayLimit)?;
++        self.overlay[image.object].executions = executions;
++        self.overlay[image.entry].name_pins = names;
++
+         Ok(())
+     }
+ 
+     pub fn release_executable(&mut self, image: Executable) -> Result<(), VfsError> {
+         let object = self
+             .overlay
+-            .get_mut(image.object)
++            .get(image.object)
+             .ok_or(VfsError::InvalidDescriptor)?;
+-        if object.len != image.size {
++        let entry = self
++            .overlay
++            .get(image.entry)
++            .ok_or(VfsError::InvalidDescriptor)?;
++        if object.executions == 0
++            || object.len != image.size
++            || entry.name_pins == 0
++            || self.object(image.entry) != image.object
++        {
+             return Err(VfsError::InvalidDescriptor);
+         }
+-        object.executions = object
++        let executions = object
+             .executions
+             .checked_sub(1)
+             .ok_or(VfsError::InvalidDescriptor)?;
+-        self.release_unlinked(image.object);
++        let names = entry
++            .name_pins
++            .checked_sub(1)
++            .ok_or(VfsError::InvalidDescriptor)?;
++        self.overlay[image.object].executions = executions;
++        self.overlay[image.entry].name_pins = names;
++        self.release_unlinked(image.entry);
+         Ok(())
+     }
+ 
+@@ -1053,7 +1138,14 @@ impl<
+         if object.executions == 0 || object.len != image.size {
+             return Err(VfsError::InvalidDescriptor);
+         }
+-        Ok((object.path.as_bytes(), object.state == 2))
++        let entry = self
++            .overlay
++            .get(image.entry)
++            .ok_or(VfsError::InvalidDescriptor)?;
++        if entry.name_pins == 0 || self.object(image.entry) != image.object {
++            return Err(VfsError::InvalidDescriptor);
++        }
++        Ok((entry.path.as_bytes(), entry.state == 2))
+     }
+ 
+     pub fn executable_pins(&self) -> usize {
+@@ -1069,7 +1161,10 @@ impl<
+     }
+ 
+     pub fn overlay_files(&self) -> usize {
+-        self.overlay.iter().filter(|entry| entry.state == 1).count()
++        self.overlay
++            .iter()
++            .filter(|entry| matches!(entry.state, 1 | 5))
++            .count()
+     }
+ 
+     pub fn canonical_path(
+@@ -1115,16 +1210,7 @@ impl<
+             Err(error) => return Err(error),
+         }
+         self.require_parent(path.as_bytes())?;
+-        let slot = match self.find_overlay(path.as_bytes()) {
+-            Some(slot)
+-                if self.overlay[slot].state == 2
+-                    && self.overlay[slot].executions == 0
+-                    && !self.referenced(slot) =>
+-            {
+-                slot
+-            }
+-            _ => self.allocate_overlay()?,
+-        };
++        let slot = self.name_slot(path.as_bytes())?;
+         self.storage.clear(slot);
+         if let Err(error) = self
+             .storage
+@@ -1140,6 +1226,9 @@ impl<
+             mode: 0o777,
+             len: target.len(),
+             executions: 0,
++            links: 1,
++            object: None,
++            name_pins: 0,
+         };
+         Ok(())
+     }
+@@ -1167,6 +1256,62 @@ impl<
+         Ok(count)
+     }
+ 
++    fn overlay_metadata(&self, slot: usize) -> FileMetadata {
++        let object = self.object(slot);
++        let entry = &self.overlay[object];
++        FileMetadata {
++            inode: (self.index.len() + object + 1) as u64,
++            kind: match self.overlay[slot].state {
++                3 => NodeKind::Directory,
++                4 => NodeKind::Symlink,
++                _ => NodeKind::File,
++            },
++            mode: entry.mode,
++            size: entry.len as u64,
++            links: self.link_count(object),
++        }
++    }
++
++    pub fn hard_link(
++        &mut self,
++        source: &[u8],
++        destination: &[u8],
++        follow: bool,
++    ) -> Result<(), VfsError> {
++        let source = self.resolved_path(source, follow, false)?;
++        let metadata = self.metadata_no_follow(source.as_bytes())?;
++        if metadata.kind != NodeKind::File {
++            return Err(VfsError::PermissionDenied);
++        }
++        let object = self
++            .find_overlay(source.as_bytes())
++            .map(|slot| self.object(slot))
++            .ok_or(VfsError::PermissionDenied)?;
++        let directory_destination = destination.ends_with(b"/");
++        let destination = self.namespace_path(destination, true)?;
++        match self.metadata_no_follow(destination.as_bytes()) {
++            Ok(_) => return Err(VfsError::AlreadyExists),
++            Err(VfsError::NotFound) if directory_destination => return Err(VfsError::NotFound),
++            Err(VfsError::NotFound) => {}
++            Err(e) => return Err(e),
++        }
++        self.require_parent(destination.as_bytes())?;
++        let links = self.overlay[object]
++            .links
++            .checked_add(1)
++            .ok_or(VfsError::OverlayLimit)?;
++        let slot = self.name_slot(destination.as_bytes())?;
++        self.storage.clear(slot);
++        self.overlay[object].links = links;
++        self.overlay[slot] = OverlayFile {
++            state: 5,
++            path: destination,
++            object: Some(object),
++            ..OverlayFile::empty()
++        };
++        Ok(())
++    }
++
+     pub fn metadata_no_follow(&self, path: &[u8]) -> Result<FileMetadata, VfsError> {
+         let path = self.resolved_path(path, false, false)?;
+         self.metadata_at(path.as_bytes())
+@@ -1184,19 +1329,11 @@ impl<
+             if file.state == 2 {
+                 return Err(VfsError::NotFound);
+             }
+-            return Ok(FileMetadata {
+-                inode: (self.index.len() + index + 1) as u64,
+-                kind: match file.state {
+-                    3 => NodeKind::Directory,
+-                    4 => NodeKind::Symlink,
+-                    _ => NodeKind::File,
+-                },
+-                mode: file.mode,
+-                size: file.len as u64,
+-            });
++            return Ok(self.overlay_metadata(index));
+         }
+         let entry = self.index.lookup_exact(path)?;
+         Ok(FileMetadata {
++            links: 1,
+             inode: (self
+                 .find_base_record(entry.path)
+                 .ok_or(VfsError::InvalidIndex)?
+@@ -1216,6 +1353,7 @@ impl<
+         if state.overlay {
+             let file = &self.overlay[state.object];
+             Ok(FileMetadata {
++                links: self.link_count(state.object),
+                 inode: (self.index.len() + state.object + 1) as u64,
+                 kind: if state.directory {
+                     NodeKind::Directory
+@@ -1228,6 +1366,7 @@ impl<
+         } else {
+             let entry = self.index.entry(state.object)?;
+             Ok(FileMetadata {
++                links: 1,
+                 inode: (state.object + 1) as u64,
+                 kind: entry.kind,
+                 mode: entry.mode,
+@@ -1251,7 +1390,8 @@ impl<
+ 
+     fn has_children(&self, path: &[u8]) -> Result<bool, VfsError> {
+         if self.overlay.iter().any(|entry| {
+-            matches!(entry.state, 1 | 3 | 4) && child_name(path, entry.path.as_bytes()).is_some()
++            matches!(entry.state, 1 | 3 | 4 | 5)
++                && child_name(path, entry.path.as_bytes()).is_some()
+         }) {
+             return Ok(true);
+         }
+@@ -1283,8 +1423,7 @@ impl<
+         if self.has_children(path.as_bytes())? {
+             return Err(VfsError::DirectoryNotEmpty);
+         }
+-        self.overlay[slot].state = 2;
+-        self.release_unlinked(slot);
++        self.remove_name(slot);
+         Ok(())
+     }
+ 
+@@ -1354,9 +1493,13 @@ impl<
+             Err(VfsError::NotFound) => None,
+             Err(error) => return Err(error),
+         };
++        if target.is_some_and(|target| self.object(target) == self.object(source_slot)) {
++            return Ok(());
++        }
+         // Check every new descendant path before changing any namespace entry.
+         for entry in &self.overlay {
+-            if matches!(entry.state, 1 | 3 | 4) && beneath(entry.path.as_bytes(), source.as_bytes())
++            if matches!(entry.state, 1 | 3 | 4 | 5)
++                && beneath(entry.path.as_bytes(), source.as_bytes())
+             {
+                 let suffix = entry.path.len - source.len;
+                 if destination
+@@ -1369,11 +1512,11 @@ impl<
+             }
+         }
+         if let Some(target) = target {
+-            self.overlay[target].state = 2;
+-            self.release_unlinked(target);
++            self.remove_name(target);
+         }
+         for entry in &mut self.overlay {
+-            if matches!(entry.state, 1 | 3 | 4) && beneath(entry.path.as_bytes(), source.as_bytes())
++            if matches!(entry.state, 1 | 3 | 4 | 5)
++                && beneath(entry.path.as_bytes(), source.as_bytes())
+             {
+                 let mut path = destination;
+                 path.extend(&entry.path.as_bytes()[source.len..])?; // Preflight above guarantees capacity.
+@@ -1398,7 +1541,8 @@ impl<
+         if mode & !0o777 != 0 {
+             return Err(VfsError::PermissionDenied);
+         }
+-        self.overlay[slot].mode = mode;
++        let object = self.object(slot);
++        self.overlay[object].mode = mode;
+         Ok(())
+     }
+ 
+@@ -1464,7 +1608,7 @@ impl<
+     fn find_overlay(&self, path: &[u8]) -> Option<usize> {
+         self.overlay
+             .iter()
+-            .position(|entry| matches!(entry.state, 1 | 3 | 4) && entry.path.as_bytes() == path)
++            .position(|entry| matches!(entry.state, 1 | 3 | 4 | 5) && entry.path.as_bytes() == path)
+             .or_else(|| {
+                 self.overlay
+                     .iter()
+@@ -1480,6 +1624,8 @@ impl<
+                 self.overlay.iter().enumerate().position(|(slot, entry)| {
+                     entry.state == 2
+                         && entry.executions == 0
++                        && entry.name_pins == 0
++                        && entry.links == 0
+                         && !self.referenced(slot)
+                         && (self.index.lookup_exact(entry.path.as_bytes())
+                             == Err(VfsError::NotFound)
+@@ -1493,24 +1639,31 @@ impl<
+             .ok_or(VfsError::OverlayLimit)
+     }
+ 
+-    fn create_overlay(&mut self, path: Path, mode: u32) -> Result<usize, VfsError> {
+-        // A whiteout can become the same live name again only after its old
+-        // descriptions close. Whiteouts for other image names remain reserved.
+-        let index = match self.find_overlay(path.as_bytes()) {
++    fn name_slot(&self, path: &[u8]) -> Result<usize, VfsError> {
++        match self.find_overlay(path) {
+             Some(slot)
+                 if self.overlay[slot].state == 2
+                     && self.overlay[slot].executions == 0
++                    && self.overlay[slot].name_pins == 0
++                    && self.overlay[slot].links == 0
+                     && !self.referenced(slot) =>
+             {
+-                slot
++                Ok(slot)
+             }
+-            _ => self.allocate_overlay()?,
+-        };
++            _ => self.allocate_overlay(),
++        }
++    }
++
++    fn create_overlay(&mut self, path: Path, mode: u32) -> Result<usize, VfsError> {
++        let index = self.name_slot(path.as_bytes())?;
+         self.storage.clear(index);
+-        self.overlay[index].state = 1;
+-        self.overlay[index].path = path;
+-        self.overlay[index].mode = mode;
+-        self.overlay[index].len = 0;
++        self.overlay[index] = OverlayFile {
++            state: 1,
++            path,
++            mode,
++            links: 1,
++            ..OverlayFile::empty()
++        };
+         Ok(index)
+     }
+ 
+@@ -2043,6 +2196,129 @@ mod tests {
+         assert_eq!(&output, b"keep");
+     }
+ 
++    #[test]
++    fn hardlinks_share_identity_and_preserve_pinned_bytes_at_capacity() {
++        let bytes = index_bytes();
++        let mut fs: VirtualFs<'_, Reader, 2, 32, 3> =
++            VirtualFs::new(Index::new(&bytes).unwrap(), Reader(*b"BASETOOL"));
++        let fd = fs.open(b"/one", O_CREATE | O_READ | O_WRITE).unwrap();
++        fs.write(fd, b"shared").unwrap();
++        fs.hard_link(b"/one", b"/two", false).unwrap();
++        assert_eq!(fs.metadata(b"/one"), fs.metadata(b"/two"));
++        assert_eq!(fs.metadata(b"/one").unwrap().links, 2);
++        assert_eq!(
++            fs.hard_link(b"/two", b"/three", false),
++            Err(VfsError::OverlayLimit)
++        );
++        fs.unlink(b"/one").unwrap();
++        assert_eq!(fs.overlay_files(), 1);
++        assert_eq!(fs.metadata(b"/two").unwrap().links, 1);
++        assert_eq!(
++            fs.open(b"/one", O_CREATE | O_WRITE),
++            Err(VfsError::OverlayLimit)
++        );
++        fs.rename(b"/two", b"/moved", false).unwrap();
++        let alias = fs.open(b"/moved", O_READ | O_WRITE).unwrap();
++        fs.write(alias, b"S").unwrap();
++        fs.unlink(b"/moved").unwrap();
++        assert_eq!(fs.fstat(fd).unwrap().links, 0);
++        let mut output = [0; 6];
++        fs.seek(fd, 0, 0).unwrap();
++        assert_eq!(fs.read(fd, &mut output), Ok(6));
++        assert_eq!(&output, b"Shared");
++        fs.close(alias).unwrap();
++        fs.close(fd).unwrap();
++        let empty = fs.open(b"/fresh", O_CREATE | O_READ).unwrap();
++        assert_eq!(fs.read(empty, &mut output), Ok(0));
++    }
++
++    #[test]
++    fn hardlink_file_and_exec_references_retain_the_named_entry() {
++        let bytes = index_bytes();
++        let mut fs: VirtualFs<'_, Reader, 3, 32, 4> =
++            VirtualFs::new(Index::new(&bytes).unwrap(), Reader(*b"BASETOOL"));
++        let writer = fs.open(b"/one", O_CREATE | O_WRITE).unwrap();
++        fs.write(writer, b"shared").unwrap();
++        fs.fchmod(writer, 0o755).unwrap();
++        fs.close(writer).unwrap();
++        fs.hard_link(b"/one", b"/two", false).unwrap();
++        let fd = fs.open(b"/two", O_READ).unwrap();
++        let dup = fs.duplicate(fd, false).unwrap();
++        let reopen = fs.reopen_readonly(fd, 0).unwrap();
++        let mut bytes = [0; 6];
++        fs.read(fd, &mut bytes[..2]).unwrap();
++        assert_eq!(&bytes[..2], b"sh");
++        fs.read(dup, &mut bytes[..2]).unwrap();
++        assert_eq!(&bytes[..2], b"ar");
++        fs.read(reopen, &mut bytes[..2]).unwrap();
++        assert_eq!(&bytes[..2], b"sh");
++        assert_eq!(fs.seek(fd, 0, 1), Ok(4));
++        let old = fs.pin_executable_fd(fd).unwrap();
++        assert_eq!(fs.executable_name(old), Ok((b"/two".as_slice(), false)));
++        fs.retain_executable(old).unwrap();
++        fs.unlink(b"/two").unwrap();
++        fs.hard_link(b"/one", b"/two", false).unwrap();
++        let new = fs.pin_executable(b"/two").unwrap();
++        fs.rename(b"/two", b"/renamed", false).unwrap();
++        assert_eq!(fs.executable_name(old), Ok((b"/two".as_slice(), true)));
++        assert_eq!(fs.executable_name(new), Ok((b"/renamed".as_slice(), false)));
++        assert_eq!(fs.read_executable(old, 0, &mut bytes), Ok(6));
++        assert_eq!(&bytes, b"shared");
++        assert_eq!(fs.open(b"/one", O_WRITE), Err(VfsError::TextBusy));
++        for fd in [fd, dup, reopen] {
++            fs.close(fd).unwrap();
++        }
++        assert_eq!(
++            fs.open(b"/fresh", O_CREATE | O_WRITE),
++            Err(VfsError::OverlayLimit)
++        );
++        fs.release_executable(old).unwrap();
++        assert_eq!(
++            fs.open(b"/fresh", O_CREATE | O_WRITE),
++            Err(VfsError::OverlayLimit)
++        );
++        fs.release_executable(old).unwrap();
++        let fresh = fs.open(b"/fresh", O_CREATE | O_WRITE).unwrap();
++        fs.close(fresh).unwrap();
++        assert_eq!(fs.open(b"/one", O_WRITE), Err(VfsError::TextBusy));
++        fs.release_executable(new).unwrap();
++        let writer = fs.open(b"/renamed", O_WRITE).unwrap();
++        fs.write(writer, b"S").unwrap();
++        fs.close(writer).unwrap();
++        assert_eq!(fs.metadata(b"/one"), fs.metadata(b"/renamed"));
++        assert_eq!(fs.metadata(b"/one").unwrap().links, 2);
++        assert_eq!(fs.executable_pins(), 0);
++    }
++
++    #[test]
++    fn hardlink_creation_preserves_entries_on_failure_and_follows_only_when_requested() {
++        let bytes = index_bytes();
++        let mut fs: VirtualFs<'_, Reader, 4, 32, 4> =
++            VirtualFs::new(Index::new(&bytes).unwrap(), Reader(*b"BASETOOL"));
++        let fd = fs.open(b"/one", O_CREATE | O_WRITE).unwrap();
++        fs.write(fd, b"data").unwrap();
++        fs.close(fd).unwrap();
++        assert_eq!(
++            fs.hard_link(b"/one", b"/missing/", false),
++            Err(VfsError::NotFound)
++        );
++        assert_eq!(fs.metadata_no_follow(b"/missing"), Err(VfsError::NotFound));
++        fs.symlink(b"one", b"/sym").unwrap();
++        assert_eq!(
++            fs.hard_link(b"/sym", b"/no-follow", false),
++            Err(VfsError::PermissionDenied)
++        );
++        assert_eq!(fs.metadata(b"/one").unwrap().links, 1);
++        fs.hard_link(b"/sym", b"/follow", true).unwrap();
++        assert_eq!(fs.metadata(b"/follow"), fs.metadata(b"/one"));
++        assert_eq!(fs.metadata_no_follow(b"/sym").unwrap().links, 1);
++        assert_eq!(
++            fs.hard_link(b"/one", b"/follow", false),
++            Err(VfsError::AlreadyExists)
++        );
++        assert_eq!(fs.metadata(b"/one").unwrap().links, 2);
++    }
++
+     #[test]
+     fn create_unlink_and_failures_are_deterministic() {
+         let bytes = index_bytes();
+diff --git a/scripts/test-launch-directories.py b/scripts/test-launch-directories.py
+index 3fb6aa36..326ab879 100644
+--- a/scripts/test-launch-directories.py
++++ b/scripts/test-launch-directories.py
+@@ -29,11 +29,13 @@ def main():
+         config=template.replace('init = "/bin/bash"','init = "/bin/fixture"')
+         config=config.replace('[storage]\nassignments = []','[storage]\nassignments = ["memory:/work", "memory:/work/seed"]')
+         config=config.replace('[devices]\nassignments = []','[devices]\nassignments = ["null"]')
+-        for mode in (sys.argv[3:] or ['all', 'cwd']):
+-            if mode not in ('all', 'functional', 'cwd'):
++        for mode in (sys.argv[3:] or ['all', 'cwd', 'hardlinks', 'ordinary-hardlinks', 'ordinary-hardlink-quota']):
++            if mode not in ('all', 'functional', 'cwd', 'hardlinks', 'ordinary-hardlinks', 'ordinary-hardlink-quota'):
+                 sys.exit('unknown directory scenario')
+             # Each launch creates fresh domain storage; image cwd stays kernel-owned.
+             (work/'launch.toml').write_text(config.replace('args = []', 'args = ' + json.dumps([] if mode == 'all' else [mode])))
++            if mode == 'ordinary-hardlink-quota':
++                (work/'launch.toml').write_text((work/'launch.toml').read_text().replace('memory_mib = 256', 'memory_mib = 16'))
+             for i in range(2):
+                 result=work/f'{mode}-{i}.json'
+                 proc=subprocess.run([binary,'launch',str(work/'launch.toml'),str(root),'--result-file',str(result)],capture_output=True,timeout=20)
+diff --git a/scripts/test-launch-owned-exec.py b/scripts/test-launch-owned-exec.py
+index 656c63c0..eec5976e 100644
+--- a/scripts/test-launch-owned-exec.py
++++ b/scripts/test-launch-owned-exec.py
+@@ -31,7 +31,7 @@ def main():
+         (root / 'input').write_bytes(b'Q')
+         config = template.replace('init = "/bin/bash"', 'init = "/bin/fixture"')
+         config = config.replace('[storage]\nassignments = []', '[storage]\nassignments = ["memory:/work"]')
+-        ordinary = ('ordinary-path', 'ordinary-fd', 'ordinary-unlinked', 'ordinary-relative', 'ordinary-child', 'ordinary-reexec')
++        ordinary = ('ordinary-path', 'ordinary-fd', 'ordinary-unlinked', 'ordinary-relative', 'ordinary-child', 'ordinary-reexec', 'ordinary-hardlinked', 'ordinary-fd-hardlinked')
+         full = ('success', 'descriptor', 'unlinked', 'relative', 'child', 'vfork', 'mixed-clone')
+         for mode in (sys.argv[3:] or (*full, *ordinary)):
+             if mode not in (*full, *ordinary):
+diff --git a/tests/fixtures/launch-directory-fixture.c b/tests/fixtures/launch-directory-fixture.c
+index 0cd125f8..2f291496 100644
+--- a/tests/fixtures/launch-directory-fixture.c
++++ b/tests/fixtures/launch-directory-fixture.c
+@@ -25,9 +25,46 @@ static long create(const char *path, const char *data)
+     if (DO(3,fd,0,0)!=0) return -1;
+     return 0;
+ }
++static long hardlinks(int functional) {
++    CHECK(create("/work/link-source","shared")==0,130);
++    CHECK(DO(86,"/work/link-source","/work/link-alias",0)==0,131);
++    CHECK(DO(4,"/work/link-source",meta,0)==0 && *(word *)(meta+16)==2,132);
++    word shared_inode=*(word *)(meta+8);
++    CHECK(DO(4,"/work/link-alias",meta,0)==0 && *(word *)(meta+8)==shared_inode && *(word *)(meta+16)==2,133);
++    long linked=DO(2,"/work/link-alias",2,0); CHECK(linked>=3 && DO(1,linked,"S",1)==1,134);
++    CHECK(DO(82,"/work/link-source","/work/link-alias",0)==0 && DO(4,"/work/link-source",meta,0)==0,135);
++    CHECK(DO(87,"/work/link-source",0,0)==0 && DO(5,linked,meta,0)==0 && *(word *)(meta+16)==1,136);
++    CHECK(DO(82,"/work/link-alias","/work/link-renamed",0)==0 && DO(4,"/work/link-renamed",meta,0)==0 && *(word *)(meta+8)==shared_inode,137);
++    long linked_dir=DO(2,"/work",0200000,0); CHECK(linked_dir>=3,138);
++    CHECK(call(265,linked_dir,(word)"link-renamed",linked_dir,(word)"link-third",0,0)==0,139);
++    CHECK(DO(3,linked_dir,0,0)==0 && DO(90,"/work/link-third",0700,0)==0,140);
++    CHECK(DO(5,linked,meta,0)==0 && (*(unsigned int *)(meta+24)&0777)==0700 && *(word *)(meta+16)==2,141);
++    CHECK(DO(87,"/work/link-renamed",0,0)==0 && DO(87,"/work/link-third",0,0)==0,142);
++    CHECK(DO(5,linked,meta,0)==0 && *(word *)(meta+16)==0 && DO(8,linked,0,0)==0,143);
++    CHECK(DO(0,linked,buffer,6)==6 && buffer[0]=='S' && DO(3,linked,0,0)==0,144);
++    if(!functional) CHECK(DO(86,"/image","/work/image-link",0)==-18 && DO(86,"/work","/work/dir-link",0)==-13,145);
++    DO(1,1,"owned-directories: PASS\n",24); return 0;
++}
++static long hardlink_quota(void) {
++    long fd=DO(2,"/work/large",0102,0600); CHECK(fd>=3,180);
++    buffer[0]='Q';
++    for(word offset=0;offset<12UL*1024*1024;offset+=sizeof buffer) CHECK(DO(1,fd,buffer,sizeof buffer)==sizeof buffer,181);
++    CHECK(DO(86,"/work/large","/work/large-alias",0)==0,182);
++    CHECK(DO(4,"/work/large-alias",meta,0)==0 && *(word *)(meta+16)==2 && *(word *)(meta+48)==12UL*1024*1024,183);
++    long alias=DO(2,"/work/large-alias",0,0); CHECK(alias>=3,184);
++    CHECK(DO(87,"/work/large",0,0)==0 && DO(3,fd,0,0)==0,185);
++    CHECK(DO(0,alias,buffer,1)==1 && buffer[0]=='Q' && DO(87,"/work/large-alias",0,0)==0,186);
++    long probe=DO(2,"/work/probe",0102,0600); CHECK(probe>=3,187);
++    CHECK(DO(1,probe,buffer,sizeof buffer)==-28,188);
++    CHECK(DO(3,alias,0,0)==0 && DO(1,probe,buffer,sizeof buffer)==sizeof buffer && DO(3,probe,0,0)==0,189);
++    DO(1,1,"owned-directories: PASS\n",24); return 0;
++}
+ long directory_main(word *stack)
+ {
+     char **argv=(char **)(stack+1);
++    if(stack[0]>1 && equal(argv[1],"ordinary-hardlinks")) return hardlinks(1);
++    if(stack[0]>1 && equal(argv[1],"hardlinks")) return hardlinks(0);
++    if(stack[0]>1 && equal(argv[1],"ordinary-hardlink-quota")) return hardlink_quota();
+     int functional=stack[0]>1 && equal(argv[1],"functional");
+     if(stack[0]>1 && equal(argv[1],"cwd-child")) {
+         CHECK(DO(79,buffer,sizeof buffer,0)==11 && equal(buffer,"/image-dir"),90);
+diff --git a/tests/fixtures/launch-owned-exec-fixture.c b/tests/fixtures/launch-owned-exec-fixture.c
+index fad39c6a..c2c6e7ae 100644
+--- a/tests/fixtures/launch-owned-exec-fixture.c
++++ b/tests/fixtures/launch-owned-exec-fixture.c
+@@ -42,6 +42,11 @@ static long ordinary_exec(word *stack)
+         CHECK(ordinary_data[0]==1 && ordinary_data[sizeof ordinary_data-1]==0,131);
+         CHECK(stack[0]==3 && DO(8,3,0,0)==0 && DO(0,3,buffer,1)==1 && buffer[0]=='K',112);
+         CHECK(DO(72,4,1,0)==-9,113); /* Successful exec retired a public CLOEXEC file. */
++        if(equal(argv[2],"ordinary-hardlinked") || equal(argv[2],"ordinary-fd-hardlinked")) {
++            CHECK(DO(2,"/work/program",1,0)==-26,132);
++            if(equal(argv[2],"ordinary-hardlinked")) CHECK(DO(2,"/work/alias",1,0)==-26 && DO(87,"/work/alias",0,0)==0,133);
++            CHECK(DO(2,"/work/program",1,0)==-26,134);
++        }
+         if(equal(argv[2],"ordinary-reexec")) {
+             char *next[]={"payload","ordinary-released",argv[2],0};
+             DO(59,"/bin/payload",next,empty_env); return 114;
+@@ -59,6 +64,7 @@ static long ordinary_exec(word *stack)
+     CHECK(DO(91,dest,0755,0)==0 && DO(3,source,0,0)==0 && DO(3,dest,0,0)==0,119);
+     CHECK(DO(2,"/work/keep",0102,0600)==3 && DO(1,3,"K",1)==1,120);
+     CHECK(DO(2,"/work/drop",02000102,0600)==4,121);
++    if(equal(argv[1],"ordinary-hardlinked") || equal(argv[1],"ordinary-fd-hardlinked")) CHECK(DO(86,"/work/program","/work/alias",0)==0,135);
+     char *next[]={"payload","ordinary-after",argv[1],0};
+     if(equal(argv[1],"ordinary-reexec")) {
+         CHECK(DO(59,"/work/missing",next,empty_env)==-2 && DO(72,4,1,0)==1,129);
+@@ -73,14 +79,15 @@ static long ordinary_exec(word *stack)
+             return 0;
+         }
+     }
+-    if(equal(argv[1],"ordinary-fd") || equal(argv[1],"ordinary-unlinked")) {
+-        long fd=DO(2,"/work/program",02000000,0); CHECK(fd>=5,125);
++    if(equal(argv[1],"ordinary-fd") || equal(argv[1],"ordinary-unlinked") || equal(argv[1],"ordinary-fd-hardlinked")) {
++        long fd=DO(2,equal(argv[1],"ordinary-fd-hardlinked")?"/work/alias":"/work/program",02000000,0); CHECK(fd>=5,125);
++        if(equal(argv[1],"ordinary-fd-hardlinked")) CHECK(DO(87,"/work/alias",0,0)==0,136);
+         if(equal(argv[1],"ordinary-unlinked")) CHECK(DO(87,"/work/program",0,0)==0,126);
+         call(322,fd,(word)"",(word)next,(word)empty_env,0x1000,0);
+     } else if(equal(argv[1],"ordinary-relative")) {
+         long dir=DO(2,"/work",02200000,0); CHECK(dir>=5,127);
+         call(322,dir,(word)"program",(word)next,(word)empty_env,0,0);
+-    } else DO(59,"/work/program",next,empty_env);
++    } else DO(59,equal(argv[1],"ordinary-hardlinked")?"/work/alias":"/work/program",next,empty_env);
+     return 128;
+ }
+ long owned_exec_main(word *stack)

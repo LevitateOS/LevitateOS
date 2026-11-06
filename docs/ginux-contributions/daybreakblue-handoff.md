@@ -260,3 +260,31 @@ relative-interpreter authority remain unrun. Thread-sharing hunks remain in the
 G14 held-thread-join.patch artifact for G07. Review the transient cwd selector,
 success-only native cwd commit, failed-fork rollback and deferred shared-thread
 ownership independently. No monitored agent was dispatched; security remains pending.
+
+
+## G15 hardlink authority and alias lifetime
+
+Prepare donor9e2a39e8 on G13 candidate5c3ae8e; no G14 cwd capability is required
+by the hardlink implementation. Ordinary shared bytes/metadata/counts, quota,
+FD/reopen/executable reference lifetime and unlink/rename are local functionality.
+DaybreakBlue owns adversarial namespace/FD races, assignment/host authority,
+proc executable/readlink identity projection and protected metadata copyout.
+
+Source review must preserve the distinction between an inode and the name through
+which a file/exec reference was obtained. Removing a hardlink must not permit
+recycling that entry while its FD or executable still uses its name. Keep shared
+positions and independent reopen offsets; maintain G13's exact-entry whiteouts.
+Runtime security-looking probes remain unrun and are not replaced by ordinary
+library/API checks. Pin the final candidate before monitored validation. This
+written handoff dispatches no agent and authorizes no publication or messages.
+
+
+### G15 exact retained revision
+
+Candidate 8ab24d4b47adeb9897623627060846070d41219d on G13 5c3ae8e5068b5da21d2c37f9545c0f7b10eba147 has98 passing routine units and
+selected ordinary alias/quota/ELF/script/storage checks in source and clean replay.
+[Review/evidence](g15-review.md) records name-versus-data identity, final-close
+reclamation and ordinary donor regression comparisons. Adversarial namespace,
+FD/private backing, protected copy, shared arguments and low-level executable-name
+validation remain pending. No cloud agent was dispatched and no security
+acceptance is claimed. G14 cwd/G12 mappings still need the later combined review.
