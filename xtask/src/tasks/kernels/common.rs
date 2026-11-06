@@ -168,11 +168,10 @@ pub(crate) fn build_kernel_via_recipe(
             &format!("kconfig_fragments={}", fragments.display()),
         ]);
     }
-    if kernel_artifact_root.is_dir() {
-        cmd.args([
-            "--input",
-            &format!("target={}", kernel_artifact_root.display()),
-        ]);
+    if let Ok(target) = fs::canonicalize(&kernel_artifact_root) {
+        // `current` is a symlink to the selected bundle; Recipe stages only
+        // real files and directories.
+        cmd.args(["--input", &format!("target={}", target.display())]);
     }
     if force_rebuild {
         cmd.args(["--force-build", "--force-install"]);
@@ -214,11 +213,10 @@ pub(crate) fn install_prebuilt_kernel_via_recipe(
     for host in ["github.com:443", "release-assets.githubusercontent.com:443"] {
         cmd.args(["--network-host", host]);
     }
-    if kernel_artifact_root.is_dir() {
-        cmd.args([
-            "--input",
-            &format!("target={}", kernel_artifact_root.display()),
-        ]);
+    if let Ok(target) = fs::canonicalize(&kernel_artifact_root) {
+        // `current` is a symlink to the selected bundle; Recipe stages only
+        // real files and directories.
+        cmd.args(["--input", &format!("target={}", target.display())]);
     }
     if force_redownload {
         cmd.args(["--force-acquire", "--force-install"]);
