@@ -104,12 +104,14 @@ target = "x86_64-unknown-linux-musl"
 
 [[ring2_runtime_profiles.live_tools_common.actions]]
 kind = "tool_payload_workspace_binary"
-package = "recfstab"
+package = "recstrap"
+binary = "recfstab"
 target = "x86_64-unknown-linux-musl"
 
 [[ring2_runtime_profiles.live_tools_common.actions]]
 kind = "tool_payload_workspace_binary"
-package = "recchroot"
+package = "recstrap"
+binary = "recchroot"
 target = "x86_64-unknown-linux-musl"
 
 [[ring2_runtime_profiles.live_tools_common.actions]]

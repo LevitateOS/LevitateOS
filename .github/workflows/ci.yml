@@ -162,10 +162,3 @@ jobs:
         working-directory: tools/recstrap
         run: cargo clippy -- -D warnings
 
-      - name: Clippy - recfstab
-        working-directory: tools/recfstab
-        run: cargo clippy -- -D warnings
-
-      - name: Clippy - recchroot
-        working-directory: tools/recchroot
-        run: cargo clippy -- -D warnings

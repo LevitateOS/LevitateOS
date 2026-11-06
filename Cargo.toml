@@ -10,8 +10,6 @@ members = [
     "tools/recipe",
     "tools/recinit",
     "tools/recstrap",
-    "tools/recfstab",
-    "tools/recchroot",
     "tools/recuki",
     "tools/reciso",
     "tools/recab",

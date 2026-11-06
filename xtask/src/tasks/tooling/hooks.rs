@@ -93,8 +93,6 @@ fn rust_submodules() -> &'static [&'static str] {
         "testing/hardware-compat",
         "testing/install-tests",
         "testing/rootfs-tests",
-        "tools/recchroot",
-        "tools/recfstab",
         "tools/recinit",
         "tools/recipe",
         "tools/reciso",

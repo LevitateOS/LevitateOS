@@ -42,14 +42,6 @@
 	path = testing/cheat-guard
 	url = git@github.com:LevitateOS/cheat_guard.git
 	branch = master
-[submodule "recfstab"]
-	path = tools/recfstab
-	url = git@github.com:LevitateOS/recfstab.git
-	branch = master
-[submodule "recchroot"]
-	path = tools/recchroot
-	url = git@github.com:LevitateOS/recchroot.git
-	branch = master
 [submodule "leviso-elf"]
 	path = leviso-elf
 	url = git@github.com:LevitateOS/leviso-elf.git
