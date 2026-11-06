@@ -280,8 +280,12 @@
       ],
       "acceptance": "Real peers, nonblocking transitions, short I/O, readiness/deadlines, half-close and bounded capacity; nested compiler streams and cancellation. Split readiness/channels if independently usable.",
       "planned_delivery": "one coherent change plus its generic docs and focused regression fixtures; split coupled responsibilities only as recorded by P04",
-      "status": "held on G01/G02 policy and G07 security prerequisites; no extraction",
-      "artifact_directory": ".artifacts/ginux-contribution-preparation/G08"
+      "status": "partial source prep: G08a per-process readiness retained for G29; original socketpairs/FIONBIO/thread and policy/security/full CI still pending",
+      "artifact_directory": ".artifacts/ginux-contribution-preparation/G08",
+      "subpackets": [
+        "G08a"
+      ],
+      "evidence": "g08a-review.md"
     },
     {
       "packet": "G09a",
@@ -1407,10 +1411,7 @@
       "packet": "G29",
       "purpose": "Configured TCP syscall/readiness integration (`66de2880`)",
       "dependencies": [
-        "G05",
-        "G06",
-        "G07",
-        "G08",
+        "G08a",
         "G28"
       ],
       "source_commits": [
@@ -1418,8 +1419,14 @@
       ],
       "acceptance": "Default-denied real connections; authorized HTTP/TLS/Git, refused endpoints, readiness, byte/connection exhaustion, cancellation/revocation; no host-network fallback.",
       "planned_delivery": "one coherent change plus its generic docs and focused regression fixtures; split coupled responsibilities only as recorded by P04",
-      "status": "pending extraction and R01-R04 review",
-      "artifact_directory": ".artifacts/ginux-contribution-preparation/G29"
+      "status": "in progress: traced minimal G08a/G28 prerequisites and recorded source receive/connection-state findings; no G29 candidate/runtime yet",
+      "artifact_directory": ".artifacts/ginux-contribution-preparation/G29",
+      "evidence": "g29-review.md",
+      "deferred_joins": [
+        "G07 shared-table/thread ownership and security",
+        "G24 socket Stat nlink/times at F02",
+        "actual combined consumers at F02/F03"
+      ]
     },
     {
       "packet": "G30",
@@ -1627,6 +1634,57 @@
       ],
       "artifact_directory": ".artifacts/ginux-contribution-preparation/G26b",
       "acceptance": "G26 original criteria; see g26-review.md for split evidence and still-pending acceptance"
+    },
+    {
+      "packet": "G08a",
+      "parent_packet": "G08",
+      "base": "8c783e717b839b0e511820e89d29840cae0f3c0c",
+      "head": "fe27c693bf2629166ee82da2efefb62b298bb567",
+      "tree": "73f3e8adbe874a711c1e6777cb5e39cce94532d2",
+      "changed_files": [
+        "README.md",
+        "Makefile",
+        ".github/workflows/check.yml",
+        "crates/ginux-init/src/channel_hooks.rs",
+        "crates/ginux-init/src/descriptors.rs",
+        "crates/ginux-init/src/device_hooks.rs",
+        "crates/ginux-init/src/dispatch.rs",
+        "crates/ginux-init/src/fs_hooks.rs",
+        "crates/ginux-init/src/launch_tasks.rs",
+        "crates/ginux-init/src/main.rs",
+        "scripts/test-launch-poll.py",
+        "tests/fixtures/launch-poll-fixture.c"
+      ],
+      "dependencies": [
+        "G06b"
+      ],
+      "standalone": false,
+      "status": "minimal per-process readiness source/clean preparation and separate self-review retained; G08 full task partial: socketpairs/FIONBIO/thread join, policy/security/full CI pending",
+      "patch_sha256": "b7167244819e0cb70478b82642941c59856c12d63a792e71b4cb74a4b784c2b6",
+      "scope": "minimal per-process public poll readiness prerequisite for G29; no G07 threads, socketpairs or guest clock/core policy changes",
+      "deferred_joins": [
+        "G07 shared-FD-table call ownership and authority races",
+        "G08 socketpairs/FIONBIO",
+        "G20 private host event waiting at F02",
+        "G29 TCP/ppoll and external readiness"
+      ],
+      "policy": "#179/#207 configured readiness contract unresolved; no consent inferred",
+      "unit_tests": 82,
+      "clean_matched_paths": 170,
+      "review": "separate whole-diff self-review; no independent or adversarial acceptance",
+      "source_binary_sha256": "3e143517aeab7921390668798e15b55ae79440ff0e81eaf17763d3c2258b36da",
+      "clean_binary_sha256": "3e143517aeab7921390668798e15b55ae79440ff0e81eaf17763d3c2258b36da",
+      "fixture_sha256": "52da933824ec5a1e9cc391a14575724df6a8657bdb3f13bf58eb0e5c72ea7a6e",
+      "security_handoff": "daybreakblue-handoff.md",
+      "remote_ci": "not run",
+      "evidence": "g08a-review.md",
+      "source_patch": "patches/G08a.patch",
+      "purpose": "Minimal per-process public poll readiness",
+      "source_commits": [
+        "210a8cca92265385b5f59081d053ecaf6eef1e77"
+      ],
+      "artifact_directory": ".artifacts/ginux-contribution-preparation/G08a",
+      "acceptance": "See original G08 plus split scope/evidence and pending checks in g08a-review.md"
     }
   ]
 }

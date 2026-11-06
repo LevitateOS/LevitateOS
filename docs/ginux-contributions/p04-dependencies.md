@@ -101,3 +101,10 @@ no G29/domain/FD/task/readiness policy code is imported. Linux-only coverage now
 has an explicit Linux CI step with existing unit flags.67 routine units pass in
 source/clean; two donor policy/security tests remain enabled and unrun. Full CI,
 network contract and security still hold delivery; [review](g28-review.md).
+
+G29 tracing requires the G08 readiness owner but not its full thread/socketpair
+ancestry. G08a `fe27c693` is now prepared on G06b only:82 units and ordinary
+source/clean poll/peer/timer checks pass; socketpairs/FIONBIO/thread/policy/security
+and full CI stay open. G29's next local composition is G08a+G28. Its receive-copy,
+SO_ERROR state and vector/SIGPIPE review findings remain unfixed source findings;
+[readiness review](g08a-review.md), [G29 progress](g29-review.md).

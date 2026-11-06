@@ -1,0 +1,694 @@
+From fe27c693bf2629166ee82da2efefb62b298bb567 Mon Sep 17 00:00:00 2001
+From: vince <vincepaul.liem@gmail.com>
+Date: Fri, 6 Nov 2026 18:18:09 +0100
+Subject: [PATCH] feat(launch): poll owned descriptors through their registered
+ owners
+
+Resolve bounded configured-launch readiness through existing descriptor
+ownership and park on peer progress or finite deadlines. Snapshot the poll
+layout and use checked internal monotonic time without enabling guest clocks.
+Keep per-process descriptor transactions and shared native policy unchanged.
+
+Signed-off-by: vince <vincepaul.liem@gmail.com>
+---
+ .github/workflows/check.yml            |   3 +-
+ Makefile                               |   8 ++
+ README.md                              |  10 ++
+ crates/ginux-init/src/channel_hooks.rs |  13 +++
+ crates/ginux-init/src/descriptors.rs   | 146 ++++++++++++++++++++++++-
+ crates/ginux-init/src/device_hooks.rs  |   7 ++
+ crates/ginux-init/src/dispatch.rs      |   2 +
+ crates/ginux-init/src/fs_hooks.rs      |   9 ++
+ crates/ginux-init/src/launch_tasks.rs  |  46 ++++++--
+ crates/ginux-init/src/main.rs          |   2 +-
+ scripts/test-launch-poll.py            |  88 +++++++++++++++
+ tests/fixtures/launch-poll-fixture.c   | 110 +++++++++++++++++++
+ 12 files changed, 434 insertions(+), 10 deletions(-)
+ create mode 100644 scripts/test-launch-poll.py
+ create mode 100644 tests/fixtures/launch-poll-fixture.c
+
+diff --git a/.github/workflows/check.yml b/.github/workflows/check.yml
+index 0c5b117a..179c3e5f 100644
+--- a/.github/workflows/check.yml
++++ b/.github/workflows/check.yml
+@@ -24,7 +24,7 @@ jobs:
+     steps:
+       - uses: actions/checkout@v5
+       - run: rustup target add x86_64-unknown-linux-gnu
+-      - run: make build build-launch-fixture build-launch-storage-fixture build-launch-device-fixture build-launch-pipe-fixture build-launch-fd-fixture build-launch-task-fixture build-launch-exec-fixture build-process-fixtures build-gate1-fixture
++      - run: make build build-launch-fixture build-launch-storage-fixture build-launch-device-fixture build-launch-pipe-fixture build-launch-fd-fixture build-launch-task-fixture build-launch-exec-fixture build-process-fixtures build-gate1-fixture build-launch-poll-fixture
+       - run: sudo make test-launch
+       - run: sudo make test-launch-storage
+       - run: sudo make test-launch-devices
+@@ -35,3 +35,4 @@ jobs:
+       - run: sudo make test-native-supervision
+       - run: make test-process-native
+       - run: sudo make test-gate1-setup
++      - run: sudo make test-launch-poll
+diff --git a/Makefile b/Makefile
+index 4623d95d..17cf341f 100644
+--- a/Makefile
++++ b/Makefile
+@@ -243,3 +243,11 @@ build-launch-exec-fixture:
+ 
+ test-launch-exec:
+ 	python3 scripts/test-launch-exec.py $(GINUX) .artifacts/launch/launch-exec-fixture .artifacts/launch/launch-interpreter-fixture .artifacts/launch/launch-interpreter-allowed-fixture
++
++.PHONY: build-launch-poll-fixture test-launch-poll
++build-launch-poll-fixture:
++	mkdir -p .artifacts/launch
++	$(CC) -nostdlib -static -fno-stack-protector -fno-builtin -O2 -Wall -Wextra -Werror tests/fixtures/launch-poll-fixture.c -o .artifacts/launch/launch-poll-fixture
++
++test-launch-poll:
++	python3 scripts/test-launch-poll.py $(GINUX) .artifacts/launch/launch-poll-fixture
+diff --git a/README.md b/README.md
+index 64912653..21910dbc 100644
+--- a/README.md
++++ b/README.md
+@@ -381,3 +381,13 @@ checks for syscall ABI dispatch, clone restrictions, descriptor inheritance,
+ thread reuse, successful and failed worker exec, signals, wait-status writes,
+ nonblocking waits, and vfork. The existing native fork fixture also runs. These
+ checks do not claim complete libc, job-control, or systemd compatibility.
++
++Configured `poll` resolves at most 16 public descriptors through their existing
++owners: pipes, assigned memory files/null and inherited console aliases. Negative
++descriptors are ignored; closed descriptors report POLLNVAL. Image files remain
++unsupported for this operation. Error/hangup bits are reported independently of
++the requested mask. Zero through 300000 ms and negative infinite waits are
++supported. Queries park and wake on object progress; finite/console waits also
++use a 1 ms supervisor tick. Internal monotonic time does not enable guest clocks.
++General nonfatal signal interruption/restart remains unfinished. The shared
++native syscall contract is unchanged; this is configured-launch readiness.
+diff --git a/crates/ginux-init/src/channel_hooks.rs b/crates/ginux-init/src/channel_hooks.rs
+index 639cd66c..bb963e3b 100644
+--- a/crates/ginux-init/src/channel_hooks.rs
++++ b/crates/ginux-init/src/channel_hooks.rs
+@@ -191,6 +191,19 @@ impl LaunchChannels {
+         self.close((handle - PIPE_FD_BASE) as usize);
+     }
+ 
++    /// Current readiness of a live owned endpoint. ERR/HUP do not depend on
++    /// the requested event mask; buffered bytes and HUP may coexist.
++    pub fn readiness(&self, handle: u32) -> Option<u16> {
++        let slot = handle.checked_sub(PIPE_FD_BASE)? as usize;
++        let entry = self.entry(slot).ok()?;
++        let pipe = &self.pipes[entry.pipe];
++        Some(if entry.write {
++            (if pipe.len < CAPACITY { 0x104 } else { 0 }) | (if pipe.readers == 0 { 8 } else { 0 })
++        } else {
++            (if pipe.len != 0 { 0x41 } else { 0 }) | (if pipe.writers == 0 { 16 } else { 0 })
++        })
++    }
++
+     fn entry(&self, slot: usize) -> Result<PipeFd, i64> {
+         self.descriptors.get(slot).copied().flatten().ok_or(-9)
+     }
+diff --git a/crates/ginux-init/src/descriptors.rs b/crates/ginux-init/src/descriptors.rs
+index cb69292d..4d755920 100644
+--- a/crates/ginux-init/src/descriptors.rs
++++ b/crates/ginux-init/src/descriptors.rs
+@@ -5,7 +5,7 @@ use crate::channel_hooks::LaunchChannels;
+ use crate::device_hooks::LaunchDevices;
+ use crate::dispatch::{decide_objects, Lane, NativeDecision};
+ use crate::fs_hooks::LaunchFs;
+-use crate::supervisor::{syscall3, syscall4, UserRegs};
++use crate::supervisor::{syscall2, syscall3, syscall4, UserRegs};
+ use crate::tracee_io::{copy_memory, read_path};
+ use ginux_core::decide_balanced;
+ 
+@@ -100,6 +100,10 @@ pub struct DescriptorTable {
+     capacity: usize,
+     pending: Option<Pending>,
+     saved_args: Option<[u64; 7]>,
++    poll_wait: bool,
++    poll_tick: bool,
++    poll_deadline: Option<u64>,
++    poll_input: [u8; 128],
+ }
+ 
+ impl DescriptorTable {
+@@ -113,6 +117,10 @@ impl DescriptorTable {
+             capacity: limits[0].min(LIMIT as u64) as usize,
+             pending: None,
+             saved_args: None,
++            poll_wait: false,
++            poll_tick: false,
++            poll_deadline: None,
++            poll_input: [0; 128],
+         };
+         for fd in 0..3 {
+             // Bootstrap exec closes CLOEXEC stdio just like an already closed
+@@ -130,6 +138,10 @@ impl DescriptorTable {
+         Ok(table)
+     }
+ 
++    pub fn needs_poll_tick(&self) -> bool {
++        self.poll_tick
++    }
++
+     pub fn fork_copy(&self, refs: &mut ObjectReferences) -> Result<Self, &'static [u8]> {
+         if self.pending.is_some() || self.saved_args.is_some() {
+             return Err(b"cannot inherit unfinished descriptor syscall");
+@@ -144,6 +156,10 @@ impl DescriptorTable {
+             capacity: self.capacity,
+             pending: None,
+             saved_args: None,
++            poll_wait: false,
++            poll_tick: false,
++            poll_deadline: None,
++            poll_input: [0; 128],
+         })
+     }
+ 
+@@ -201,6 +217,9 @@ impl DescriptorTable {
+         }
+         self.pending = None;
+         self.saved_args = None;
++        self.poll_wait = false;
++        self.poll_tick = false;
++        self.poll_deadline = None;
+         Ok(())
+     }
+ 
+@@ -245,6 +264,9 @@ impl DescriptorTable {
+     /// Called at the matching syscall exit, including emulated exits. Never
+     /// restore memory/TLS or signal state: only the arguments we translated.
+     pub fn finish(&mut self, r: &mut UserRegs) -> Result<bool, &'static [u8]> {
++        self.poll_wait = false;
++        self.poll_tick = false;
++        self.poll_deadline = None;
+         let mut changed = false;
+         if let Some(pending) = self.pending.take() {
+             match pending {
+@@ -357,6 +379,7 @@ impl DescriptorTable {
+                 self.save(r);
+                 self.path_descriptor(pid, r, backends)
+             }
++            7 => self.poll(pid, r, backends),
+             _ => Ok(backends.claim(pid, r)),
+         };
+         result.unwrap_or_else(ready)
+@@ -602,6 +625,127 @@ impl DescriptorTable {
+         self.entries[target] = Some(entry);
+         Ok(decision)
+     }
++    fn poll(
++        &mut self,
++        pid: usize,
++        r: &UserRegs,
++        backends: &Backends,
++    ) -> Result<NativeDecision, i64> {
++        let timeout = r.rdx as i32;
++        if r.rsi > 16 || timeout > 300000 {
++            return Err(-1);
++        }
++        let count = r.rsi as usize;
++        let mut bytes = [0u8; 128];
++        let length = count * 8;
++        if self.poll_wait {
++            bytes = self.poll_input;
++        } else {
++            if copy_memory(pid, r.rdi, &mut bytes[..length], false)? != length as i64 {
++                return Err(-14);
++            }
++            self.poll_input = bytes;
++        }
++        // Console OFDs are inherited unchanged from this supervisor. Only
++        // explicitly tracked console handles can query those host descriptors.
++        // Image descriptors are not supervisor handles and remain unsupported.
++        let mut consoles = [PollFd {
++            fd: -1,
++            events: 0,
++            revents: 0,
++        }; 16];
++        let mut ready_count = 0;
++        for i in 0..count {
++            let entry = &mut bytes[i * 8..i * 8 + 8];
++            let fd = i32::from_ne_bytes(entry[..4].try_into().unwrap());
++            let events = u16::from_ne_bytes(entry[4..6].try_into().unwrap());
++            entry[6..8].fill(0);
++            if fd < 0 {
++                continue;
++            }
++            let revents = match self.get(fd as u64) {
++                Ok(Descriptor {
++                    handle: Handle::Native { fd, console: true },
++                    ..
++                }) => {
++                    assert!(fd < 3);
++                    consoles[i] = PollFd {
++                        fd: fd as i32,
++                        events,
++                        revents: 0,
++                    };
++                    0
++                }
++                Ok(Descriptor {
++                    handle: Handle::Native { .. },
++                    ..
++                }) => return Err(-95),
++                Ok(Descriptor {
++                    handle: Handle::Owned(handle),
++                    ..
++                }) => {
++                    // Assigned regular memory files/directories and null are
++                    // immediately ready. Pipes supply their own live state.
++                    let available = backends
++                        .channels
++                        .readiness(handle)
++                        .or_else(|| backends.filesystem.readiness(handle))
++                        .or_else(|| backends.devices.readiness(handle))
++                        .ok_or(-95)?;
++                    available & (events | 8 | 16)
++                }
++                _ => 32, // POLLNVAL, even when events is zero.
++            };
++            entry[6..8].copy_from_slice(&revents.to_ne_bytes());
++        }
++        let result = unsafe { syscall3(7, consoles.as_mut_ptr() as usize, count, 0) };
++        if result < 0 {
++            return Err(result as i64);
++        }
++        for i in 0..count {
++            let output = &mut bytes[i * 8 + 6..i * 8 + 8];
++            let revents = u16::from_ne_bytes(output.try_into().unwrap()) | consoles[i].revents;
++            output.copy_from_slice(&revents.to_ne_bytes());
++            ready_count += i64::from(revents != 0);
++        }
++        let now = monotonic_nanoseconds()?;
++        if !self.poll_wait && timeout > 0 {
++            self.poll_deadline = Some(now.checked_add(timeout as u64 * 1_000_000).ok_or(-22)?);
++        }
++        if ready_count != 0 || timeout == 0 || self.poll_deadline.is_some_and(|end| now >= end) {
++            for i in 0..count {
++                let address = r.rdi.checked_add((i * 8 + 6) as u64).ok_or(-14)?;
++                if copy_memory(pid, address, &mut bytes[i * 8 + 6..i * 8 + 8], true)? != 2 {
++                    return Err(-14);
++                }
++            }
++            return Ok(ready(ready_count));
++        }
++        self.poll_wait = true;
++        // Infinite owned-object waits need no timer: object progress/death
++        // already wakes them. External console IO needs periodic observation.
++        self.poll_tick = timeout > 0 || consoles[..count].iter().any(|fd| fd.fd >= 0);
++        Ok(NativeDecision::ParkPoll)
++    }
++}
++
++#[derive(Clone, Copy)]
++#[repr(C)]
++struct PollFd {
++    fd: i32,
++    events: u16,
++    revents: u16,
++}
++
++pub fn monotonic_nanoseconds() -> Result<u64, i64> {
++    let mut time = [0u64; 2];
++    if unsafe { syscall2(228, 1, time.as_mut_ptr() as usize) } < 0 {
++        return Err(-5);
++    }
++    time[0]
++        .checked_mul(1_000_000_000)
++        .and_then(|seconds| seconds.checked_add(time[1]))
++        .ok_or(-5)
+ }
+ 
+ fn ready(result: i64) -> NativeDecision {
+diff --git a/crates/ginux-init/src/device_hooks.rs b/crates/ginux-init/src/device_hooks.rs
+index 752a867f..c7c0a746 100644
+--- a/crates/ginux-init/src/device_hooks.rs
++++ b/crates/ginux-init/src/device_hooks.rs
+@@ -20,6 +20,13 @@ pub struct LaunchDevices {
+ }
+ 
+ impl LaunchDevices {
++    pub fn readiness(&self, handle: u32) -> Option<u16> {
++        let slot = handle.checked_sub(FD_BASE)? as usize;
++        // Configured launch currently assigns only null, whose reads/writes
++        // never wait. Future device kinds must supply their own readiness.
++        self.flags.get(slot).copied().flatten().map(|_| 0x145)
++    }
++
+     pub fn prepare(config: &DomainConfig) -> Result<Self, &'static [u8]> {
+         let mut registry = DeviceRegistry::new();
+         for device in config.devices.as_slice() {
+diff --git a/crates/ginux-init/src/dispatch.rs b/crates/ginux-init/src/dispatch.rs
+index f1a5a7c3..7212dbbb 100644
+--- a/crates/ginux-init/src/dispatch.rs
++++ b/crates/ginux-init/src/dispatch.rs
+@@ -36,6 +36,8 @@ pub fn classify(syscall: u64) -> Lane {
+ pub enum NativeDecision {
+     /// An owned channel cannot progress yet; retain its syscall-entry stop.
+     Park { fd: u32 },
++    /// A public-descriptor query waits for object readiness or a deadline.
++    ParkPoll,
+     /// A lane hook claimed the entry; emulate it with this result.
+     Hooked { lane: Lane, result: i64 },
+     /// No hook claimed the entry; apply the shared contract decision.
+diff --git a/crates/ginux-init/src/fs_hooks.rs b/crates/ginux-init/src/fs_hooks.rs
+index 9fb764c5..0bcf67cf 100644
+--- a/crates/ginux-init/src/fs_hooks.rs
++++ b/crates/ginux-init/src/fs_hooks.rs
+@@ -118,6 +118,15 @@ impl LaunchFs {
+         })
+     }
+ 
++    pub fn readiness(&self, handle: u32) -> Option<u16> {
++        let slot = handle.checked_sub(FD_BASE as u32)?;
++        if slot >= 64 {
++            return None;
++        }
++        // This owner contains only regular memory files and directories.
++        self.fs.fstat(slot as i32 + 3).ok().map(|_| 0x145)
++    }
++
+     fn owns_path(&self, path: &[u8]) -> bool {
+         self.prefixes[..self.count]
+             .iter()
+diff --git a/crates/ginux-init/src/launch_tasks.rs b/crates/ginux-init/src/launch_tasks.rs
+index 1adee8cd..8cf706ee 100644
+--- a/crates/ginux-init/src/launch_tasks.rs
++++ b/crates/ginux-init/src/launch_tasks.rs
+@@ -151,7 +151,22 @@ pub fn supervise(
+     line_stderr(b"ginux: launch backend=ptrace-native profile=balanced elf-loader=host");
+     line_stderr(b"ginux: launch tracee-uid=1000 tracee-gid=1000 root=host-path-read-only");
+     s.resume(0, 0, domain);
++    let mut poll_tick = 0;
+     loop {
++        let polling = s
++            .tasks
++            .iter()
++            .flatten()
++            .any(|t| t.blocked.is_some() && t.descriptors.needs_poll_tick());
++        if polling {
++            let now = crate::descriptors::monotonic_nanoseconds()
++                .unwrap_or_else(|_| s.fail(domain, b"readiness clock failed"))
++                / 1_000_000;
++            if now != poll_tick {
++                poll_tick = now;
++                s.wake_needed = true;
++            }
++        }
+         s.wake(domain);
+         status = 0;
+         let host = unsafe {
+@@ -159,13 +174,23 @@ pub fn supervise(
+                 SYS_WAIT4,
+                 usize::MAX,
+                 &mut status as *mut _ as usize,
+-                WALL,
++                WALL | usize::from(polling),
+                 0,
+             )
+         };
+         if host == -4 {
+             continue;
+         }
++        if host == 0 {
++            // No trace stop is pending. Sleep for one readiness tick instead
++            // of spinning or blocking wait4 beyond a finite poll deadline.
++            let delay = [0u64, 1_000_000];
++            let result = unsafe { syscall2(35, delay.as_ptr() as usize, 0) };
++            if result < 0 && result != -4 {
++                s.fail(domain, b"readiness sleep failed");
++            }
++            continue;
++        }
+         if host < 0 {
+             s.fail(domain, b"launch task wait failed")
+         }
+@@ -318,9 +343,10 @@ impl Supervisor<'_> {
+     fn resume(&mut self, index: usize, signal: usize, domain: &mut Domain) {
+         let result = ptrace(PTRACE_SYSCALL, self.task(index).host, 0, signal);
+         if result == -3 {
+-            return;
+-        }
+-        if result < 0 {
++            // SIGKILL can end a ptrace stop between an object retry and
++            // resume. Keep ownership until wait4 supplies the actual death.
++            self.task_mut(index).blocked = None;
++        } else if result < 0 {
+             self.fail(domain, b"launch task resume failed")
+         }
+     }
+@@ -332,10 +358,13 @@ impl Supervisor<'_> {
+             r as *const _ as usize,
+         );
+         if result == -3 {
++            // A parked task may die while copyin/readiness is being retried.
++            // Do not invent an IO result or a supervisor failure for its exit.
++            self.task_mut(index).blocked = None;
+             return;
+         }
+         if result < 0 {
+-            self.fail(domain, b"launch register update failed");
++            self.fail(domain, b"launch register update failed")
+         }
+         self.resume(index, 0, domain);
+     }
+@@ -527,6 +556,10 @@ impl Supervisor<'_> {
+             decision => decision,
+         };
+         match decision {
++            NativeDecision::ParkPoll => {
++                self.task_mut(index).blocked = Some(original);
++                audit_write(b"park surface=owned-poll\n");
++            }
+             NativeDecision::Park { fd } => {
+                 self.task_mut(index).blocked = Some(original);
+                 audit_write(b"park\nginux: park surface=lane-channel fd=");
+@@ -910,8 +943,7 @@ impl Supervisor<'_> {
+         }
+     }
+     fn wake(&mut self, domain: &mut Domain) {
+-        // Only object operations and observed deaths can satisfy these waits.
+-        // Other tasks' register/signal/fork stops do not change readiness.
++        // Object operations, observed deaths and readiness ticks retry parked calls.
+         if !core::mem::replace(&mut self.wake_needed, false) {
+             return;
+         }
+diff --git a/crates/ginux-init/src/main.rs b/crates/ginux-init/src/main.rs
+index 02ab8779..dccbc476 100644
+--- a/crates/ginux-init/src/main.rs
++++ b/crates/ginux-init/src/main.rs
+@@ -3163,7 +3163,7 @@ fn supervise_native(pid: usize, domain: &mut Domain) -> ! {
+         sequence += 1;
+         let syscall = registers.orig_rax;
+         let decision = match decide_native(syscall, registers.rdi, registers.rsi, registers.rdx) {
+-            NativeDecision::Park { .. } => {
++            NativeDecision::Park { .. } | NativeDecision::ParkPoll => {
+                 native_fail(domain, pid, b"unexpected configured channel wait")
+             }
+             NativeDecision::Contract(decision) => decision,
+diff --git a/scripts/test-launch-poll.py b/scripts/test-launch-poll.py
+new file mode 100644
+index 00000000..8733a45b
+--- /dev/null
++++ b/scripts/test-launch-poll.py
+@@ -0,0 +1,88 @@
++#!/usr/bin/env python3
++"""Consume a built launcher/fixture to exercise public-descriptor readiness."""
++import json
++import os
++from pathlib import Path
++import shutil
++import signal
++import subprocess
++import sys
++import tempfile
++import time
++
++
++def main():
++    if len(sys.argv) < 3 or os.geteuid() != 0:
++        sys.exit('usage (as root): test-launch-poll.py <ginux> <poll-fixture>')
++    binary, fixture = [str(Path(p).resolve()) for p in sys.argv[1:3]]
++    template = (Path(__file__).resolve().parent.parent / 'config/domain-gate5.toml').read_text()
++    with tempfile.TemporaryDirectory(prefix='ginux-poll-') as directory:
++        work = Path(directory)
++        root = work / 'root'
++        (root / 'bin').mkdir(parents=True)
++        (root / 'work').mkdir()
++        shutil.copyfile(fixture, root / 'bin/fixture')
++        (root / 'bin/fixture').chmod(0o755)
++        selected = sys.argv[3:]
++        if selected and any(mode not in ('ordinary', 'read', 'write', 'hup', 'ordinary-timer') for mode in selected):
++            sys.exit('unknown selected poll scenario')
++        for mode in selected or ('all', 'read', 'write', 'hup', 'deadline', 'timer', 'console', 'kill', 'infinite-kill', 'all-again', 'ordinary', 'ordinary-timer'):
++            config = template.replace('init = "/bin/bash"', 'init = "/bin/fixture"')
++            config = config.replace('args = []', 'args = ' + json.dumps([mode]))
++            config = config.replace('[storage]\nassignments = []', '[storage]\nassignments = ["memory:/work"]')
++            config = config.replace('[devices]\nassignments = []', '[devices]\nassignments = ["null"]')
++            path, result, audit_path = [work / (mode + suffix) for suffix in ('.toml', '.json', '.audit')]
++            path.write_text(config)
++            start = time.monotonic()
++            child = None
++            with audit_path.open('wb') as audit:
++                proc = subprocess.Popen([binary, 'launch', str(path), str(root), '--result-file', str(result)],
++                                        stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=audit)
++                try:
++                    if mode in ('console', 'kill', 'infinite-kill'):
++                        deadline = time.monotonic() + 5
++                        while time.monotonic() < deadline:
++                            if b'park surface=owned-poll' in audit_path.read_bytes():
++                                children = Path(f'/proc/{proc.pid}/task/{proc.pid}/children').read_text().split()
++                                assert len(children) == 1, children
++                                child = int(children[0])
++                                break
++                            assert proc.poll() is None, (proc.returncode, audit_path.read_bytes())
++                            time.sleep(0.005)
++                        assert child is not None, 'readiness query did not park'
++                        if mode.endswith('kill'):
++                            os.kill(child, signal.SIGKILL)
++                        else:
++                            proc.stdin.write(b'C')
++                            proc.stdin.flush()
++                    stdout, _ = proc.communicate(timeout=10)
++                finally:
++                    if proc.poll() is None:
++                        # Kill the actual workload first so the supervisor
++                        # observes its death and performs normal domain teardown.
++                        for pid in Path(f'/proc/{proc.pid}/task/{proc.pid}/children').read_text().split():
++                            os.kill(int(pid), signal.SIGKILL)
++                        proc.communicate(timeout=5)
++            elapsed = time.monotonic() - start
++            record = json.loads(result.read_text())
++            audit = audit_path.read_bytes()
++            assert b'ginux: teardown tasks=0 owned-handles=0' in audit, audit
++            if mode.endswith('kill'):
++                assert proc.returncode == 137 and record['outcome'] == 'signaled' and record['signal'] == 9, (proc.returncode, record, audit)
++                assert not Path(f'/proc/{child}').exists(), 'parked task survived teardown'
++                assert stdout == b'', stdout
++            else:
++                assert proc.returncode == 0 and record['outcome'] == 'exited' and record['code'] == 0, (mode, proc.returncode, record, audit)
++                assert stdout == b'owned-poll: PASS\n', stdout
++            if mode in ('timer', 'ordinary-timer'):
++                assert elapsed >= 0.055, ('finite wait returned early', elapsed)
++            assert elapsed < 5, ('readiness/deadline stalled', mode, elapsed)
++            assert record['generation'] is None, record
++            assert not (root / 'work/data').exists(), 'owned data escaped into host tree'
++            print('PASS poll ' + mode, flush=True)
++        print('test-launch-poll: PASS (selected ordinary scenarios)' if selected else
++              'test-launch-poll: PASS (masks, aliases, mixed console, faults, EOF, peer wakeups, timers, teardown)')
++
++
++if __name__ == '__main__':
++    main()
+diff --git a/tests/fixtures/launch-poll-fixture.c b/tests/fixtures/launch-poll-fixture.c
+new file mode 100644
+index 00000000..9119eb62
+--- /dev/null
++++ b/tests/fixtures/launch-poll-fixture.c
+@@ -0,0 +1,110 @@
++/* Real configured public-descriptor readiness, timers and peer wakeups. */
++typedef unsigned long word;
++static long call(long n, word a, word b, word c, word d, word e, word f)
++{
++    register word r10 __asm__("r10") = d;
++    register word r8 __asm__("r8") = e;
++    register word r9 __asm__("r9") = f;
++    long result;
++    __asm__ volatile("syscall" : "=a"(result) : "a"(n), "D"(a), "S"(b), "d"(c),
++                     "r"(r10), "r"(r8), "r"(r9) : "rcx", "r11", "memory");
++    return result;
++}
++#define DO(n,a,b,c) call(n,(word)(a),(word)(b),(word)(c),0,0,0)
++#define CHECK(expr,code) if (!(expr)) return code
++struct pollfd { int fd; unsigned short events, revents; };
++static const struct pollfd readonly_poll = {123,0,0};
++static char buffer[4096];
++static long query(int fd, unsigned short events, unsigned short expected)
++{
++    struct pollfd entry={fd,events,0xffff};
++    return DO(7,&entry,1,0)==(expected!=0) && entry.fd==fd && entry.events==events && entry.revents==expected;
++}
++long poll_main(word *stack)
++{
++    char **argv=(char **)(stack+1);
++    char mode=*stack>1 ? argv[1][0] : 'a';
++    int pipe[2]; CHECK(DO(293,pipe,04000,0)==0,10);
++    if (mode=='o') {
++        if(argv[1][8]=='-') {
++            CHECK(DO(7,0,0,60)==0,70);
++        } else {
++            CHECK(query(pipe[0],1,0) && query(pipe[1],4,4),71);
++            long moved=DO(32,1,0,0);CHECK(moved>=3 && query(moved,4,4),72);
++            long file=DO(2,"/work/data",0102,0600), null=DO(2,"/dev/null",2,0);
++            CHECK(file>=3 && null>=3 && query(file,0x145,0x145) && query(null,0x145,0x145),73);
++            struct pollfd mixed[3]={{pipe[0],1,99},{(int)moved,4,99},{(int)file,1,99}};
++            CHECK(DO(7,mixed,3,0)==2 && mixed[0].revents==0 && mixed[1].revents==4 && mixed[2].revents==1,74);
++            long writer=DO(32,pipe[1],0,0);CHECK(writer>=3 && DO(3,pipe[1],0,0)==0,75);
++            CHECK(DO(1,writer,"X",1)==1 && query(pipe[0],1,1),76);
++            CHECK(DO(3,writer,0,0)==0 && query(pipe[0],1,17),77);
++            CHECK(DO(0,pipe[0],buffer,1)==1 && buffer[0]=='X' && query(pipe[0],1,16),78);
++            CHECK(DO(3,pipe[0],0,0)==0 && DO(3,moved,0,0)==0 && DO(3,file,0,0)==0 && DO(3,null,0,0)==0,79);
++        }
++    } else if (mode=='t') {
++        CHECK(DO(7,1,0,60)==0,11); // nfds=0 ignores the pointer and actually sleeps.
++    } else if (mode=='k' || mode=='i') {
++        struct pollfd entry={pipe[0],1,0};
++        DO(7,&entry,1,mode=='k' ? 300000 : -1);
++        return 12; // Runner terminates the genuinely parked caller.
++    } else if (mode=='c') {
++        struct pollfd entries[2]={{pipe[0],1,99},{0,1,99}};
++        CHECK(DO(7,entries,2,2000)==1 && entries[0].revents==0 && (entries[1].revents&1),13);
++        CHECK(DO(0,0,buffer,1)==1 && buffer[0]=='C',14);
++    } else if (mode=='r' || mode=='w' || mode=='h' || mode=='d') {
++        if (mode=='w') for (int i=0;i<16;++i) CHECK(DO(1,pipe[1],buffer,sizeof buffer)==sizeof buffer,15);
++        long child=DO(57,0,0,0); CHECK(child>=0,16);
++        if (child==0) {
++            if (mode=='d') { for (;;) DO(39,0,0,0); }
++            CHECK(DO(7,0,0,30)==0,17);
++            if (mode=='r') CHECK(DO(1,pipe[1],"X",1)==1,18);
++            if (mode=='w') CHECK(DO(0,pipe[0],buffer,sizeof buffer)==sizeof buffer,19);
++            return 0; // Exit releases inherited pipe references and wakes HUP.
++        }
++        if (mode=='r' || mode=='h') CHECK(DO(3,pipe[1],0,0)==0,20);
++        struct pollfd entry={mode=='w' ? pipe[1] : pipe[0],mode=='w' ? 4 : 1,99};
++        if (mode=='d') {
++            CHECK(DO(7,&entry,1,40)==0 && entry.revents==0,21);
++            CHECK(DO(62,child,9,0)==0,22);
++        } else {
++            CHECK(DO(7,&entry,1,mode=='h' ? -2 : -1)==1,23); // Any negative timeout is infinite.
++            if (mode=='r') CHECK((entry.revents&1) && DO(0,pipe[0],buffer,1)==1 && buffer[0]=='X',24);
++            if (mode=='w') CHECK(entry.revents==4,25);
++            if (mode=='h') CHECK(entry.revents==16 && DO(0,pipe[0],buffer,1)==0,26);
++        }
++        int status=-1;
++        CHECK(DO(61,child,&status,0)==child && status==(mode=='d' ? 9 : 0),27);
++    } else {
++        CHECK(query(pipe[0],1,0) && query(pipe[1],4,4),30);
++        CHECK(query(-1,0xffff,0) && query(123,0,32) && query(0x20000000,1,32),31);
++        CHECK(DO(7,1,1,0)==-14 && DO(7,0,17,0)==-1 && DO(7,0,0,300001)==-1,32);
++        CHECK(DO(7,&readonly_poll,1,0)==-14,33);
++        long pages=call(9,0,8192,3,0x22,-1,0);
++        CHECK(pages>0 && DO(10,pages+4096,4096,0)==0,34);
++        CHECK(DO(7,pages+4092,1,0)==-14 && DO(11,pages,8192,0)==0,35);
++        long moved=DO(32,1,0,0); CHECK(moved>=0 && query(moved,4,4),36);
++        struct pollfd mixed[3]={{pipe[0],1,7},{(int)moved,4,7},{123,0,7}};
++        CHECK(DO(7,mixed,3,0)==2 && mixed[0].revents==0 && mixed[1].revents==4 && mixed[2].revents==32,37);
++        CHECK(DO(3,moved,0,0)==0,38);
++        long file=DO(2,"/work/data",0102,0600), null=DO(2,"/dev/null",2,0), image=DO(2,"/bin/fixture",0,0);
++        CHECK(file>=0 && null>=0 && image>=0,39);
++        CHECK(query(file,0x145,0x145) && query(null,0x145,0x145),40);
++        struct pollfd unsupported={(int)image,1,0};
++        CHECK(DO(7,&unsupported,1,0)==-95,41); // Never poll the supervisor's same-numbered host FD.
++        CHECK(DO(3,file,0,0)==0 && DO(3,null,0,0)==0 && DO(3,image,0,0)==0,42);
++        for (int i=0;i<16;++i) CHECK(DO(1,pipe[1],buffer,sizeof buffer)==sizeof buffer,43);
++        CHECK(query(pipe[1],4,0) && query(pipe[0],0x41,0x41),44);
++        CHECK(DO(0,pipe[0],buffer,sizeof buffer)==sizeof buffer && query(pipe[1],0x104,0x104),45);
++        long alias=DO(32,pipe[1],0,0); CHECK(alias>=0,46);
++        CHECK(DO(3,pipe[1],0,0)==0 && query(pipe[0],1,1),47);
++        CHECK(DO(3,alias,0,0)==0 && query(pipe[0],1,17) && query(pipe[0],0,16),48);
++        for (int i=0;i<15;++i) CHECK(DO(0,pipe[0],buffer,sizeof buffer)==sizeof buffer,49);
++        CHECK(query(pipe[0],1,16) && DO(0,pipe[0],buffer,1)==0,50);
++        CHECK(DO(3,pipe[0],0,0)==0 && query(pipe[0],1,32),51);
++        CHECK(DO(293,pipe,04000,0)==0 && DO(3,pipe[0],0,0)==0,52);
++        CHECK(query(pipe[1],0,8) && query(pipe[1],4,12),53);
++    }
++    DO(1,1,"owned-poll: PASS\n",17);
++    return 0;
++}
++__asm__(".global _start\n_start:\nmov %rsp,%rdi\nandq $-16,%rsp\ncall poll_main\nmov %rax,%rdi\nmov $60,%rax\nsyscall\nud2\n");

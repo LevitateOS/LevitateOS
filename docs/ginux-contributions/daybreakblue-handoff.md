@@ -583,3 +583,21 @@ network/race/failure probes. Check async SO_ERROR consumption when G29 integrate
 it. Host descriptor/CLOEXEC authority and guest confinement need that join too.
 No cloud dispatch occurred; upstream network policy/full CI and final consumer
 acceptance remain pending; [review/evidence](g28-review.md).
+
+## G08a readiness prerequisite and G29 source findings
+
+G08a `fe27c693bf2629166ee82da2efefb62b298bb567` on G06b `8c783e717b839b0e511820e89d29840cae0f3c0c` passes82 units and
+five ordinary source/clean poll modes (live/mixed/aliases, read/write/HUP peers,
+EOF and timer). Poll input is now snapshotted across retries with checked internal
+time arithmetic. Default protected-array/authority/kill cases remain enabled but
+unrun; no proc/FD inspection or hostile probes were executed locally.
+DaybreakBlue must validate protected/mutable poll buffers and partial output,
+unknown/native/closed/reused FD authority, thread/call snapshots, interruption/
+cancellation/death races, rollback and clock/bounds failures. #179/#207 and full
+runtime/remote CI remain pending; no cloud dispatch.
+
+G29 has source-only receive ownership/copyout and consumed SO_ERROR/state findings,
+plus vector/SIGPIPE review work, in [G29 progress](g29-review.md). No G29 extraction
+or runtime evidence exists yet. During later validation, route hostile endpoint,
+buffer, FD/assignment bypass and network/race/failure probes here. Ordinary local
+HTTP/TLS/Git remains authorized. [G08a evidence](g08a-review.md).
