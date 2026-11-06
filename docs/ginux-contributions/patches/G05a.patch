@@ -1,6 +1,6 @@
-From bb2c82bf18bb30a7ebc514af5131fa5b03a5fcc5 Mon Sep 17 00:00:00 2001
+From 936d0eb7a9b46e58ade5219705c12d3d476dfae9 Mon Sep 17 00:00:00 2001
 From: vince <vincepaul.liem@gmail.com>
-Date: Fri, 6 Nov 2026 08:59:06 +0100
+Date: Fri, 6 Nov 2026 21:59:52 +0100
 Subject: [PATCH] fix(vfs): share offsets between duplicated descriptors
 MIME-Version: 1.0
 Content-Type: text/plain; charset=UTF-8
@@ -19,7 +19,7 @@ Signed-off-by: vince <vincepaul.liem@gmail.com>
  1 file changed, 95 insertions(+), 21 deletions(-)
 
 diff --git a/crates/ginux-vfs/src/lib.rs b/crates/ginux-vfs/src/lib.rs
-index 40ac9df5..f196ad13 100644
+index 40ac9df5f13a28e3a3b83ab6ceee5c6f396fc862..f196ad13c82f69327a8859cb8042fa4a6e51a3be 100644
 --- a/crates/ginux-vfs/src/lib.rs
 +++ b/crates/ginux-vfs/src/lib.rs
 @@ -328,7 +328,7 @@ struct Descriptor {

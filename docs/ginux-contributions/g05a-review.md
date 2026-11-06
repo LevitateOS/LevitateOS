@@ -1,7 +1,11 @@
 # G05a — shared VFS descriptor offsets
 
-Local standalone candidate: `bb2c82bf18bb30a7ebc514af5131fa5b03a5fcc5`.
-Sole parent: upstream main `3f2fe7dfadd4b40e235d982a6a3d386dc6490177`.
+Current retained candidate: `936d0eb7a9b46e58ade5219705c12d3d476dfae9`, solely on
+upstream `8a475e8b2318425fd2fc15246a5c6f4bca6caf86`. See the current-main refresh
+below; the earlier evidence remains historical and is not a new full-runtime pass.
+
+Earlier standalone candidate: `bb2c82bf18bb30a7ebc514af5131fa5b03a5fcc5`.
+Earlier sole parent: upstream main `3f2fe7dfadd4b40e235d982a6a3d386dc6490177`.
 One file, `crates/ginux-vfs/src/lib.rs`, +95/-21. No prerequisite proposal,
 branch creation/switch, existing source-tree mutation, push or PR.
 
@@ -55,3 +59,44 @@ untouched. The patch also preserves the newer upstream #217/#218/#221 changes.
 This candidate has passed R01–R04 locally. macOS Actions and full Rocky VM checks
 have not run on it. No remote CI pass is claimed before publication. User review
 of the complete package remains F04.
+
+## Current-main refresh — 2026-11-06
+
+Upstream advanced 52 commits to `8a475e8b`. The VFS file is byte-identical to the
+old base, so the original one-file fix remains necessary and applies without a
+prerequisite proposal. Its production/test diff remains +95/-21; no native
+runtime, domain/network policy, workflow or other packet enters this revision.
+All 187 tracked source paths match the recorded candidate tree in both the
+tested export and an independent clean-main-plus-retained-patch replay.
+
+The complete diff, VFS implementation, allocation/error/close paths and current
+VFS caller were reread in a separate self-review. Shared position ownership,
+reservation before mutation and descriptor-local CLOEXEC retain the earlier
+invariants. No new blocking source finding was identified. This is self-review,
+not independent reviewer or security acceptance.
+
+All three duplicate-offset regressions fail on exact new upstream production
+code with only those tests appended (exit 101). The candidate passes all 15 VFS
+tests and all 76 repository unit tests. In both candidate and clean replay:
+
+- `make check test-unit build build-launch-fixture build-process-fixtures build-gate1-fixture` passes.
+- Seven selected ordinary configured-launch controls pass: exit statuses,
+  argv/environment, configured/root cwd and directory enumeration.
+- The existing valid unaligned `wait_status` fixture passes directly under
+  `process-native`, without the default runner's inherited host-FD injection or
+  fault variants.
+
+Both exact binaries hash
+`745654b931672079480724c7f14ed136b86654f96d113ec9fc049d2cdd33acd9`.
+Builds use isolated target directories. The retained patch is regenerated for
+the new sole parent; its earlier version, logs, source exports, strict replay,
+manifest and a concise new draft are retained under
+`.artifacts/ginux-contribution-preparation/upstream-refresh-2026-11-06/G05a/`.
+The local commit is unreferenced; no branch, shared index or checkout was changed.
+
+The current upstream Makefile and workflow are preserved byte-for-byte. Their
+full default Linux runtime jobs include authority/protected/fault scenarios and
+remain unrun under the security handoff boundary. macOS/remote CI is also unrun.
+R03 therefore retains those required checks; selected ordinary controls are not
+a full CI result. This current-main source refresh does not close the overall
+goal or authorize publication.

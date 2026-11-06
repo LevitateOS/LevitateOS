@@ -782,7 +782,14 @@ Earlier P02/P03 and candidate results remain historical records; current-main
 reconciliation is required before final closure.
 
 Exact next action: refresh R04's current-main prerequisite serially, starting
-with G05a's unchanged VFS owner, regression and caller review. Reconcile the
+with the remaining independent G03a correction. G05a is refreshed at
+`936d0eb7a9b46e58ade5219705c12d3d476dfae9`, solely on observed main `8a475e8b`:
+three exact-base regressions fail, all 76 units/static/build and eight ordinary
+controls pass in source and strict 187-path clean replay. The one-file VFS diff
+is unchanged; both binaries match. Its retained patch/manifest now describe the
+new head. [Review](ginux-contributions/g05a-review.md) keeps full default runtime
+and macOS/remote CI pending. Initial 37-patch integrity results remain historical;
+the final aggregate inventory must use each refreshed head. Reconcile the
 remaining source owners before rebuilding the final F02/F03 revisions. Keep
 reader/progress-thread-dependent consumers pending on G07. Do not import
 the unready thread snapshot, rerun adversarial probes, dispatch DaybreakBlue,
