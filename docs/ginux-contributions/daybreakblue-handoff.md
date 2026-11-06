@@ -35,3 +35,24 @@ performed before this instruction, not a new DaybreakBlue result.
 Run only against authorized disposable local fixtures/images in the monitored
 blue-team environment. Return exact revision, commands, observations, exit
 statuses and any unverified checks. Do not publish PRs or contact maintainers.
+
+## G07 blocking source finding
+
+An unfinished disposable G07 export already existed when this continuation
+started: `/tmp/ginux-contribution-preparation/G07/source`. Its prior
+`path-race-initial.log` records a failing `x-path` scenario (fixture exit99).
+The tracee's shared pathname can change between owner selection and native
+pathname capture; a concurrent thread can therefore reach an image path hidden
+by the configured memory assignment. This old reproduction was read, not rerun
+under the new instruction. No G07 candidate is approved or publication-ready.
+
+DaybreakBlue should investigate and correct stable pathname/metadata capture
+across threads and other shared writable mappings, then validate confinement
+against the exact corrected revision. Stack scratch alone is shared writable
+tracee memory and is not a complete solution. Include SIGCHLD disposition
+validation and kernel-consumed indirect arguments in the review. Do not broaden
+public Linux support or weaken assignment authority to make tests green.
+The existing `qfault` clone-TID and `x-path` security scenarios remain in source
+but are excluded from this agent's new functional-only runs. Existing review
+artifacts and logs remain available; no new exploitation or security probing
+has been performed here. A written handoff is not evidence of dispatch or fix.

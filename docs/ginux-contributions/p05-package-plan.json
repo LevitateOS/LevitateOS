@@ -255,8 +255,12 @@
       ],
       "acceptance": "Shared FD lifetime, independent syscall transactions, clone failure rollback, nonleader/leader exit and supported thread exec constraints.",
       "planned_delivery": "one coherent change plus its generic docs and focused regression fixtures; split coupled responsibilities only as recorded by P04",
-      "status": "pending extraction and R01-R04 review",
-      "artifact_directory": ".artifacts/ginux-contribution-preparation/G07"
+      "status": "partial extraction; ordinary checks pass; security correction/validation handed to DaybreakBlue; not ready",
+      "artifact_directory": ".artifacts/ginux-contribution-preparation/G07",
+      "base": "8c783e717b839b0e511820e89d29840cae0f3c0c",
+      "unready_snapshot": "5fa497c18ee306b1e4da36ffedde1d51b0e73263",
+      "evidence": "g07-review.md",
+      "standalone": false
     },
     {
       "packet": "G08",
@@ -276,7 +280,7 @@
       ],
       "acceptance": "Real peers, nonblocking transitions, short I/O, readiness/deadlines, half-close and bounded capacity; nested compiler streams and cancellation. Split readiness/channels if independently usable.",
       "planned_delivery": "one coherent change plus its generic docs and focused regression fixtures; split coupled responsibilities only as recorded by P04",
-      "status": "pending extraction and R01-R04 review",
+      "status": "held on G01/G02 policy and G07 security prerequisites; no extraction",
       "artifact_directory": ".artifacts/ginux-contribution-preparation/G08"
     },
     {

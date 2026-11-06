@@ -405,19 +405,24 @@ local preparation is complete through its two subpackets; standalone delivery
 still waits for actual prerequisite merges. The source patch/draft/logs/hashes
 are retained downstream; nothing was published.
 
-Current goal-turn classification: **progress**. The full goal remains active;
-G07 and later packets, held-policy acceptance, interactions and Recipe closure
-remain incomplete. F04 remains the user inspection stop before publication.
+G07 is partially extracted and retained as an explicitly unready snapshot.
+[Review/evidence](ginux-contributions/g07-review.md) records83 passing unit tests
+and11 selected ordinary thread scenarios, with qfault/x-path security checks
+excluded. A previously recorded shared-path race is unresolved and handed to
+DaybreakBlue in the downstream security record. G07 is not complete or ready;
+G08 remains held by G01/G02 policy and G07. No security acceptance is inferred
+from functional results, and no DaybreakBlue dispatch has occurred.
 
-Exact next task: **G07 — thread ownership and per-task transactions**. Start from
-reviewed G06b `8c783e71` and adapt `928dc9a1`/`e59e2e61` only. Trace per-task descriptor
-transactions and shared descriptor-group lifetime; preserve typed process APIs,
-strict word copyouts, interpreter authority, per-task path scratch and native
-exec failure restoration. Include clone rollback, live leader/nonleader exits,
-concurrent object operations and supported exec constraints. Existing native
-thread coverage is regression evidence, not proof of configured thread support.
-Do not import later mappings/network/checkpoint features to make a donor compile.
-G01/G02 holds remain explicit; no parallel agents or publication are authorized.
+Current goal-turn classification: **progress**. The full goal remains active;
+security-held G07, later packets, policy acceptance, interactions and Recipe
+closure remain incomplete. F04 remains the user inspection stop.
+
+Exact next task: **G09 — growable owned files/directories**, from reviewed G06b
+8c783e71 (not the unready G07 snapshot). Its traced prerequisites do not include
+G07 or G08. Review/extract its existing behavior owners in dependency order and
+run ordinary functional checks. Preserve all upstream tests; write exploit-like
+confinement/fault probes down for DaybreakBlue instead of executing them. Do not
+import later owned exec, mappings, networking or checkpoint functionality.
 
 Active skill: `hdae-development`, discovered at
 `/home/vince/.codex/worktrees/ginux-pr-combination-check/ginux/.agents/skills/hdae-development/SKILL.md`.
