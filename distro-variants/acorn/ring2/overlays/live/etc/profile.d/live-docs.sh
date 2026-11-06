@@ -41,9 +41,13 @@ else
 Welcome to AcornOS Live!
 
 Quick Start:
-  recstrap /mnt         Install AcornOS to /mnt
-  recfstab /mnt         Generate fstab
-  recchroot /mnt        Chroot into installation
+  recpart list-disks                          Pick a target disk
+  recpart apply --disk DISK --mode mutable --confirm DESTROY
+                                              Partition, format, mount at /mnt/sysroot
+  recstrap /mnt/sysroot                       Install AcornOS
+  recfstab /mnt/sysroot >> /mnt/sysroot/etc/fstab
+                                              Generate fstab
+  recchroot /mnt/sysroot                      Chroot into installation
 
 Network:
   ip addr              Show IP addresses
