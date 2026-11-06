@@ -543,3 +543,21 @@ own TGID must resolve the registered leader host, not always the caller. Current
 G26b is process-only (PID==TGID); do not imply G07 acceptance. No adversarial
 probes or cloud dispatch occurred. Public resource contract, full CI and combined
 consumer evidence remain pending; [review/evidence](g26-review.md).
+
+## G27 — configured uname identity
+
+Exact head `1eb3e189525670e1056e89ef4bc49ab7f0d481dd` solely on recorded main `3f2fe7dfadd4b40e235d982a6a3d386dc6490177`.
+65 routine units, full ordinary390-byte utsname ABI/padding/max-valid ID and
+actual RPM4.19.1.1 documented Lua identity queries pass in source/clean. The
+existing ordinary valid-buffer native wait_status case also passes. New uname
+copyout is strict process_vm; existing legacy helper fallback remains unchanged.
+No fallback injection or protected output probe ran here.
+
+DaybreakBlue must validate invalid/oversized/NUL identity fields and short output,
+protected/mutable/partially mapped destinations, address arithmetic and prefix
+fault effects, process_vm unavailability/failure, signal/thread races and correct
+owner joins. The trusted ordinary RPM baseline on exact main signals11 after
+uname is denied; candidate succeeds. Treat that as observed functional evidence,
+not an exploitability conclusion; no hostile input or crash exploitation ran.
+No cloud dispatch occurred. #179 identity policy, full CI and G06/F02 task-loop
+join remain pending; [review/evidence](g27-review.md).

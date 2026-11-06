@@ -86,3 +86,11 @@ subsets/fork/exec pass; thread-group affinity target resolution (calling nonlead
 versus requested TGID leader), resource policy, security and full CI remain
 unresolved. Bootstrap helper bytes match across both exports. No generic resource
 framework or aggregate RSS/time semantics are introduced; [review](g26-review.md).
+
+G27 `1eb3e189` is one coherent source packet directly on recorded main:
+IdentityView encoder plus its existing configured-launch entry and strict copyout
+in the supervisor copy owner. It needs no G06/G26/storage/I/O packet.65 units,
+raw390-byte ABI/max-valid IDs, actual RPM identity queries and ordinary valid
+native wait-status copying pass in source/clean. G06 task-loop emulation join is
+F02 work; #179, security/full CI and fresh upstream acceptance remain pending.
+Sysinfo/#219 stays outside this identity contribution; [review](g27-review.md).

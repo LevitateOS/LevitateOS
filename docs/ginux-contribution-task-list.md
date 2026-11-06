@@ -624,12 +624,24 @@ bootstrap/descriptor/CLOEXEC owners and full default coverage are preserved.
 Full G26 remains partial: resource contract, G07 nonleader/TGID target join,
 security/full CI and fresh upstream independence are pending; no publication.
 
-Exact next task: **G27 — configured virtual platform identity**.
-Inspect9cf265ba against current identity/config/ABI owners. Distinguish virtual
-uname from sysinfo (#219), preserve existing defaults and avoid downstream policy
-in upstream code. Verify ordinary raw ABI and actual RPM when consumer capabilities
-permit; keep invalid/oversized inputs and authority probes with DaybreakBlue.
-Preserve all pending G23–G26/F02/F03 acceptance. No publication or maintainer messages before F04.
+G27 source/ordinary preparation is retained at `1eb3e189` directly on recorded
+main, without G06/G26/storage prerequisites. [Review/evidence](ginux-contributions/g27-review.md)
+records65 units,150-path strict replay, complete390-byte ABI/padding/max-valid ID,
+actual RPM4.19.1.1 identity queries under two domain names and ordinary valid
+native wait-status copy control passing in source/clean. IdentityView and the
+existing launch/copy owners provide the behavior; core/native defaults and
+sysinfo/#219 remain unchanged. Exact main lacks the ABI and its RPM query fails.
+#179 identity policy, security/full CI, fresh upstream acceptance and G06/F02
+runtime-owner join remain pending. No publication occurred.
+
+Exact next task: **G28 — bounded TCP device backend**.
+Inspect8ff83d64/539c1c77/9a70427b against current device assignment/backend owners.
+Keep useful backend-only behavior separate from G29 syscall/readiness policy.
+Review exact endpoint/connection/byte budgets and cleanup; use controlled trusted
+local peers for ordinary functional checks. Record scanning, denied/foreign
+endpoints, bypass/authority/revocation attacks and adversarial network/race probes
+for DaybreakBlue. Preserve all pending G23–G27/F02/F03 acceptance and public policy
+holds. No publication or maintainer messages before F04.
 
 Active skill: `hdae-development`, discovered at
 `/home/vince/.codex/worktrees/ginux-pr-combination-check/ginux/.agents/skills/hdae-development/SKILL.md`.

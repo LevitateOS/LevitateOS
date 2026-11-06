@@ -1313,9 +1313,46 @@
       ],
       "acceptance": "Raw ABI and real RPM tool report configured virtual identity; invalid/oversized values fail and no host uname leaks.",
       "planned_delivery": "one coherent change plus its generic docs and focused regression fixtures; split coupled responsibilities only as recorded by P04",
-      "status": "pending extraction and R01-R04 review",
+      "status": "ordinary source/clean ABI and actual RPM preparation plus separate self-review retained; policy/security/full CI/fresh upstream acceptance pending",
       "artifact_directory": ".artifacts/ginux-contribution-preparation/G27",
-      "policy_hold": "issue179; prepare/review existing local material only; no publication or assumption of upstream consent"
+      "policy_hold": "issue179; prepare/review existing local material only; no publication or assumption of upstream consent",
+      "base": "3f2fe7dfadd4b40e235d982a6a3d386dc6490177",
+      "head": "1eb3e189525670e1056e89ef4bc49ab7f0d481dd",
+      "tree": "813671c521217a42b97e8471513e3d5b44ab0e6b",
+      "changed_files": [
+        "README.md",
+        "crates/ginux-kernel-views/src/lib.rs",
+        "crates/ginux-init/src/launch.rs",
+        "crates/ginux-init/src/supervisor.rs",
+        "scripts/test-launch.py",
+        "tests/fixtures/launch-fixture.c"
+      ],
+      "standalone_source": true,
+      "patch_sha256": "3a7631b9cb118e28bcbacd4b9a3cf109ad2c659d7fa9c630ce12f0b1183ba096",
+      "deferred_joins": [
+        "G06 task-loop configured uname at F02, without changing shared core defaults"
+      ],
+      "policy": "#179 configured identity contract unresolved; sysinfo/#219 excluded",
+      "unit_tests": 65,
+      "kernel_view_tests": 6,
+      "clean_matched_paths": 150,
+      "review": "separate whole-diff self-review; no independent reviewer/security acceptance",
+      "remote_ci": "not run",
+      "security_handoff": "daybreakblue-handoff.md",
+      "source_binary_sha256": "c0e07f5f66b84961e8d2ffe0a249f75be5ed136887d8dfbde4fc9a952591d18a",
+      "clean_binary_sha256": "c0e07f5f66b84961e8d2ffe0a249f75be5ed136887d8dfbde4fc9a952591d18a",
+      "fixture_sha256": "72ca1e272f5ea5d80fe3a5dcd6c53463c3994ed48f3538dd74e1fea666399d68",
+      "ordinary_wait_status_fixture_sha256": "186da9340cd394c78203e8add855cde3cc135732fa0f932e85e50bd0a1b0f626",
+      "actual_rpm": "RPM4.19.1.1 documented Lua posix.uname(%s|%n|%r|%v|%m), exact configured values across two domains; source and clean pass",
+      "rpm_provenance": "rpm-provenance.json",
+      "baseline_behavior": "exact main valid raw ABI unsupported (170); same actual RPM identity query signaled11 after uname denial (139); not a root-cause/security conclusion",
+      "held_dependencies": [
+        "#179 configured identity policy",
+        "security/full CI"
+      ],
+      "combined_join": "G06 task supervisor must retain configured uname emulation at F02; no process/task loop is imported here",
+      "evidence": "g27-review.md",
+      "source_patch": "patches/G27.patch"
     },
     {
       "packet": "G28",

@@ -1,0 +1,236 @@
+From 1eb3e189525670e1056e89ef4bc49ab7f0d481dd Mon Sep 17 00:00:00 2001
+From: vince <vincepaul.liem@gmail.com>
+Date: Fri, 6 Nov 2026 17:43:04 +0100
+Subject: [PATCH] feat(kernel-views): project configured uname identity at
+ launch
+
+Encode domain-owned utsname fields in the existing identity view and expose
+them through configured launch with strict tracee copyout. Keep native
+syscall defaults and sysinfo behavior unchanged.
+
+Signed-off-by: vince <vincepaul.liem@gmail.com>
+---
+ README.md                            |  5 ++++
+ crates/ginux-init/src/launch.rs      | 28 +++++++++++++++++-
+ crates/ginux-init/src/supervisor.rs  | 43 +++++++++++++++++++---------
+ crates/ginux-kernel-views/src/lib.rs | 30 +++++++++++++++++++
+ scripts/test-launch.py               | 21 ++++++++++++--
+ tests/fixtures/launch-fixture.c      |  8 ++++++
+ 6 files changed, 119 insertions(+), 16 deletions(-)
+
+diff --git a/README.md b/README.md
+index 1700a0a4..a6b432d7 100644
+--- a/README.md
++++ b/README.md
+@@ -214,6 +214,11 @@ fork, clone, and subsequent exec are unsupported; fork returns `ENOSYS` until
+ child supervision is implemented. Non-x86-64 syscall ABIs and job-control
+ group stops fail explicitly. Audit output is capped at 64 KiB plus a truncation
+ notice. This path does not implement resource quotas from the domain metadata.
++Configured `uname` returns `Linux`, the domain id as nodename, the kernel-views
++package version with `-ginux` as its virtual release, version `ginux`, machine
++`x86_64`, and an empty domainname. This identifies the virtual implementation;
++it does not report host kernel/hostname data or promise the host kernel's ABI.
++The shared native syscall contract and `sysinfo` behavior are unchanged.
+ 
+ When requested, the result file is reserved exclusively before launch, with
+ mode 0600 and a maximum path length of 512 bytes. Existing files are never
+diff --git a/crates/ginux-init/src/launch.rs b/crates/ginux-init/src/launch.rs
+index 1c475fc4..4770f4e8 100644
+--- a/crates/ginux-init/src/launch.rs
++++ b/crates/ginux-init/src/launch.rs
+@@ -978,7 +978,33 @@ fn supervise_launch(pid: usize, domain: &mut Domain) -> ! {
+         }
+         sequence += 1;
+         let syscall = registers.orig_rax;
+-        let decision = match decide_native(syscall, registers.rdi, registers.rsi, registers.rdx) {
++        let entry = if syscall == ginux_core::SYS_UNAME {
++            let identity = ginux_kernel_views::IdentityView {
++                hostname: domain.config().id.as_bytes(),
++                machine_id: b"",
++                boot_id: b"",
++            };
++            let mut bytes = [0u8; 390];
++            let result = identity
++                .uname(b"x86_64", &mut bytes)
++                .map_err(|_| -5)
++                .and_then(|_| {
++                    crate::supervisor::write_tracee_bytes_strict(
++                        pid,
++                        registers.rdi as usize,
++                        &bytes,
++                    )
++                })
++                .map(|_| 0)
++                .unwrap_or_else(|error| error);
++            NativeDecision::Hooked {
++                lane: crate::dispatch::Lane::Contract,
++                result,
++            }
++        } else {
++            decide_native(syscall, registers.rdi, registers.rsi, registers.rdx)
++        };
++        let decision = match entry {
+             NativeDecision::Contract(decision) => decision,
+             NativeDecision::Hooked { lane, result } => {
+                 let lane_name: &[u8] = match lane {
+diff --git a/crates/ginux-init/src/supervisor.rs b/crates/ginux-init/src/supervisor.rs
+index f0f7882d..e43aec1b 100644
+--- a/crates/ginux-init/src/supervisor.rs
++++ b/crates/ginux-init/src/supervisor.rs
+@@ -146,19 +146,7 @@ const VM_WRITE_DENIED: u8 = 2;
+ pub fn write_tracee_bytes(pid: usize, address: usize, bytes: &[u8]) -> Result<(), i64> {
+     let state = VM_WRITE.load(Ordering::Relaxed);
+     if state != VM_WRITE_DENIED {
+-        let local = [bytes.as_ptr() as usize, bytes.len()];
+-        let remote = [address, bytes.len()];
+-        let written = unsafe {
+-            syscall6(
+-                SYS_PROCESS_VM_WRITEV,
+-                pid,
+-                local.as_ptr() as usize,
+-                1,
+-                remote.as_ptr() as usize,
+-                1,
+-                0,
+-            )
+-        } as i64;
++        let written = process_vm_write_bytes(pid, address, bytes);
+         let unavailable = matches!(-written, ENOSYS | EPERM | EACCES);
+         if !unavailable || state == VM_WRITE_AVAILABLE {
+             if written >= 0 {
+@@ -180,6 +168,35 @@ pub fn write_tracee_bytes(pid: usize, address: usize, bytes: &[u8]) -> Result<()
+     poke_tracee_bytes(pid, address, bytes).map_err(fault_errno)
+ }
+ 
++/// Copy without ptrace fallback: guest page protections remain authoritative.
++pub fn write_tracee_bytes_strict(pid: usize, address: usize, bytes: &[u8]) -> Result<(), i64> {
++    address.checked_add(bytes.len()).ok_or(-EFAULT)?;
++    let written = process_vm_write_bytes(pid, address, bytes);
++    if written == bytes.len() as i64 {
++        Ok(())
++    } else if written < 0 {
++        Err(written)
++    } else {
++        Err(-EFAULT)
++    }
++}
++
++fn process_vm_write_bytes(pid: usize, address: usize, bytes: &[u8]) -> i64 {
++    let local = [bytes.as_ptr() as usize, bytes.len()];
++    let remote = [address, bytes.len()];
++    (unsafe {
++        syscall6(
++            SYS_PROCESS_VM_WRITEV,
++            pid,
++            local.as_ptr() as usize,
++            1,
++            remote.as_ptr() as usize,
++            1,
++            0,
++        )
++    }) as i64
++}
++
+ /// Map a failed ptrace access to the errno a user copy would report: an
+ /// unmapped address (`EIO` or `EFAULT`) is `-EFAULT`; anything else, such as
+ /// `ESRCH` for a tracee that is gone, stays as it is.
+diff --git a/crates/ginux-kernel-views/src/lib.rs b/crates/ginux-kernel-views/src/lib.rs
+index 90a3a534..d4e92cb2 100644
+--- a/crates/ginux-kernel-views/src/lib.rs
++++ b/crates/ginux-kernel-views/src/lib.rs
+@@ -32,6 +32,36 @@ pub struct IdentityView<'a> {
+     pub boot_id: &'a [u8],
+ }
+ 
++impl IdentityView<'_> {
++    /// Linux utsname layout with domain-owned identity and a virtual release.
++    /// This release names the contract implementation, not the host kernel.
++    pub fn uname(&self, machine: &[u8], output: &mut [u8]) -> Result<usize, ViewError> {
++        const LENGTH: usize = 6 * 65;
++        if output.len() < LENGTH {
++            return Err(ViewError::BufferTooSmall);
++        }
++        let fields = [
++            b"Linux".as_slice(),
++            self.hostname,
++            concat!(env!("CARGO_PKG_VERSION"), "-ginux").as_bytes(),
++            b"ginux",
++            machine,
++            b"",
++        ];
++        if fields
++            .iter()
++            .any(|field| field.len() >= 65 || field.contains(&0))
++        {
++            return Err(ViewError::InvalidPath);
++        }
++        output[..LENGTH].fill(0);
++        for (index, field) in fields.iter().enumerate() {
++            output[index * 65..index * 65 + field.len()].copy_from_slice(field);
++        }
++        Ok(LENGTH)
++    }
++}
++
+ #[derive(Clone, Copy)]
+ pub struct NamespaceView {
+     pub mount: u64,
+diff --git a/scripts/test-launch.py b/scripts/test-launch.py
+index c507d3bb..4139db18 100644
+--- a/scripts/test-launch.py
++++ b/scripts/test-launch.py
+@@ -13,9 +13,9 @@ import tempfile
+ 
+ 
+ def main():
+-    if len(sys.argv) != 3 or os.geteuid() != 0:
++    if len(sys.argv) < 3 or os.geteuid() != 0:
+         sys.exit("usage (as root): test-launch.py <ginux binary> <launch fixture>")
+-    binary, fixture = (str(Path(arg).resolve()) for arg in sys.argv[1:])
++    binary, fixture = (str(Path(arg).resolve()) for arg in sys.argv[1:3])
+     template = (Path(__file__).resolve().parent.parent / "config/domain-gate5.toml").read_text()
+     with tempfile.TemporaryDirectory(prefix="ginux-launch-") as directory:
+         work = Path(directory)
+@@ -63,6 +63,23 @@ def main():
+             print(f"PASS launch {args}: {outcome} ({expected})")
+             return proc
+ 
++        def identity_cases():
++            manifest = (Path(__file__).resolve().parent.parent /
++                        'crates/ginux-kernel-views/Cargo.toml').read_text()
++            release = re.search(r'^version = "([^"]+)"', manifest, re.MULTILINE).group(1) + '-ginux'
++            for name in ['gate5-demo', 'identity-other', 'u'*64, 'gate5-demo']:
++                fields = ['Linux', name, release, 'ginux', 'x86_64', '']
++                expected = b''.join(field.encode() + b'\0'*(65-len(field)) for field in fields)
++                invoke(['uname'], 0, 'exited', stdout=expected,
++                       changes={'id = "gate5-demo"': 'id = "' + name + '"'})
++            invoke(['exit', '3'], 3, 'exited')
++            invoke(['args', 'identity-control'], 0, 'exited', stdout=b'identity-control\n')
++        if sys.argv[3:]:
++            if sys.argv[3:] != ['ordinary-uname']:
++                sys.exit('unknown selected launch scenario')
++            identity_cases()
++            return
++        identity_cases()
+         for code in (0, 3, 120, 127, 128, 255):
+             invoke(["exit", str(code)], code, "exited")
+         invoke(["args", "one two", ""], 0, "exited", env=["GREETING=hello world", "EMPTY="],
+diff --git a/tests/fixtures/launch-fixture.c b/tests/fixtures/launch-fixture.c
+index 70c70f18..4bc5181c 100644
+--- a/tests/fixtures/launch-fixture.c
++++ b/tests/fixtures/launch-fixture.c
+@@ -78,6 +78,14 @@ long launch_fixture_main(word *stack)
+     char **env = argv + argc + 1;
+     if (argc < 2) return 90;
+     switch (argv[1][0]) {
++    case 'u': {
++        unsigned char bytes[400];
++        for(word i=0;i<sizeof bytes;++i) bytes[i]=0xa5;
++        if(call3(63,(word)(bytes+5),0,0)!=0) return 170;
++        for(word i=0;i<5;++i) if(bytes[i]!=0xa5 || bytes[395+i]!=0xa5) return 171;
++        if(call3(1,1,(word)(bytes+5),390)!=390) return 172;
++        return 0;
++    }
+     case 'e': return argc > 2 ? number(argv[2]) : 0;
+     case 'a':
+         for (word i = 2; i < argc; ++i) print(argv[i]);
