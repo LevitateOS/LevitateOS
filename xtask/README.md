@@ -13,6 +13,7 @@ cargo xtask build kernel levitate --prebuilt   # or compile: build kernel levita
 cargo xtask build rootfs-source levitate [--refresh]
 cargo xtask build live-tools levitate          # also base-rootfs, live-boot; --all for every distro
 cargo xtask build erofs live-tools levitate    # a product's EROFS images, no ISO
+cargo xtask base lock levitate [--check]       # take Fedora's updates: re-lock the signed base RPMs
 
 cargo xtask run live-tools levitate            # serial console with the install UX (Ctrl-A X exits)
 cargo xtask run live-boot levitate --ssh       # wait for SSH, open a shell over it

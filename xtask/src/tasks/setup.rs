@@ -149,6 +149,9 @@ fn checks(root: &Path) -> Vec<Check> {
     ));
 
     for distro in Distro::ALL {
+        if let Some(check) = base_lock_check(root, distro) {
+            checks.push(check);
+        }
         let target = crate::tasks::kernels::common::target_for(distro);
         checks.push(Check::new(
             format!("{} kernel", distro.id()),
@@ -179,4 +182,45 @@ fn checks(root: &Path) -> Vec<Check> {
         }
     }
     checks
+}
+
+/// How current a variant's Fedora base lock is (none for a non-RPM base).
+fn base_lock_check(root: &Path, distro: Distro) -> Option<Check> {
+    let contract = distro_contract::load_variant_contract_for_distro_from(root, distro.id()).ok()?;
+    let base = contract.sources.rootfs_source.rpm_base?;
+    let fix = format!("cargo xtask base lock {}", distro.id());
+    let path = crate::tasks::base::lock_path(root, distro);
+    let name = format!("{} Fedora base lock", distro.id());
+    let Ok(text) = std::fs::read_to_string(&path) else {
+        return Some(Check::new(name, true, Err(("missing".into(), fix))));
+    };
+    let field = |f: &str| {
+        text.lines()
+            .find_map(|l| l.trim().strip_prefix(&format!("fn {f}() {{ "))?.strip_suffix(" }"))
+            .map(|v| v.trim_matches('"').to_string())
+    };
+    let release = field("release").unwrap_or_default();
+    if release != base.fedora_release.to_string() {
+        return Some(Check::new(
+            name,
+            true,
+            Err((format!("locks Fedora {release}, the contract asks for {}", base.fedora_release), fix)),
+        ));
+    }
+    let locked_on = field("locked_on").unwrap_or_default();
+    let age_days = std::process::Command::new("date")
+        .args(["-d", &locked_on, "+%s"])
+        .output()
+        .ok()
+        .and_then(|o| String::from_utf8(o.stdout).ok()?.trim().parse::<i64>().ok())
+        .map(|then| (std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs() as i64).unwrap_or(then) - then) / 86_400);
+    Some(Check::new(
+        name,
+        false,
+        match age_days {
+            Some(days) if days <= 30 => Ok(format!("Fedora {release}, locked {locked_on}")),
+            Some(days) => Err((format!("Fedora {release}, locked {days} days ago; updates are likely waiting"), fix)),
+            None => Err((format!("cannot read the lock date in {}", path.display()), fix)),
+        },
+    ))
 }

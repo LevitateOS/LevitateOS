@@ -22,6 +22,8 @@ cargo xtask build live-tools levitate
 cargo xtask build live-tools acorn
 ```
 
+LevitateOS's rootfs starts from a locked set of signed Fedora RPMs: the variant declares the Fedora release, signing key and packages (`rpm_base` in `ring3/sources.toml`), and `cargo xtask base lock levitate` resolves the newest build of each from the release and updates repositories into `distro/builder/recipes/sources/levitate-rpm-lock.rhai`. Rerun it to take Fedora's security updates; `cargo xtask doctor` says when the lock is a month old.
+
 Canonical ISO products are `base-rootfs`, `live-boot` and `live-tools`. `installed-boot` is a product preparation target, not a release ISO target. An explicit release build can realize missing parent products from the dependency graph. Kernel rebuilds stay explicit:
 
 ```sh
