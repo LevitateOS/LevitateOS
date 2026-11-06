@@ -1007,3 +1007,4 @@ Each special case in the audit is a requirement the design never named. Grouped:
 
 - 2026-11-06: Audit (phase 1) complete. Code untouched. Next: untangle-redesign.
 - 2026-11-06: Redesign (phase 2) complete. 32 fixes, 719 problems assigned, 9 left as is. User decisions: delete leviso/AcornOS, delete recart, merge the install trio, move SSH/user setup out of recstrap. Code untouched. Next: untangle-refactor, starting at F01.
+- [x] F01 Delete recart: tools/recart removed from the workspace; docs page and overview mentions removed (docs/content 93deda1). Baseline before refactor re-run: identical (58 passed, 7 ignored).
