@@ -98,12 +98,13 @@ checking nested state, product bytes, saved generations and unchanged sources.
 This replaces only that case's interrupted status; the four thread-related
 failures and all other unperformed criteria remain open.
 
-Eleven destination scenarios have completed: **eight pass, three fail**, with one
-additional case interrupted and unverified. The
+Thirteen destination scenarios have completed: **ten pass, three fail**, with two
+additional cases interrupted and unverified. The
 passing cases are state restore, independent custom readiness, 128 KiB file
 publication, nested-directory copy/move/cleanup, lifecycle machine-event order,
 current API initialization without legacy globals, retained dependency files and
-reused-check state over three invocations, and publication of 5,000
+reused-check state over three invocations, changed source/input identity, default
+application-state placement/reuse, and publication of 5,000
 entries with unchanged selected inputs. Each was selected exactly and run
 serially through the actual managed CLI. The retained logs contain complete
 harness summaries; no interrupted or unrun case is included in the pass count.
@@ -131,9 +132,11 @@ The in-flight valid zip case is **interrupted**, with no case exit code or pass
 claim. Both tar failures remain failed. No progress suppression, replacement
 implementation or unready G07 import was used to bypass this missing capability.
 
-The revised 20-case ordinary queue is now running serially from
-`ordinary-independent-selection.json`. Retained dependency state has passed;
-the active case now checks changed source/input bytes and fresh state identity.
+The revised 20-case ordinary queue ran serially from
+`ordinary-independent-selection.json`. Its first three cases passed: retained
+dependency state, changed source/input identity and default application state.
+It was then stopped for the current-main prerequisite refresh below. The in-flight
+retained-links case is interrupted/unverified; unstarted cases remain not run.
 It covers retained state and dependencies, selected targets, lifecycle options,
 cleanup and a valid large-file digest. Original selections and receipts are
 retained; `independent-ordinary-receipts.json` records the new commands/results.
@@ -149,8 +152,36 @@ The continuation's source comparison also confirms all 153 recorded Recipe
 file hashes still match in both the retained snapshot and current checkout;
 `source-continuation-comparison.json` records no differences.
 
-Exact next action: monitor the active serial ordinary runner and inspect each
-failure before deciding its fix or dependency. Keep G07, monitored security,
+### New upstream prerequisite — 2026-11-06
+
+A read-only upstream check now pins main
+`8a475e8b2318425fd2fc15246a5c6f4bca6caf86`, 52 commits beyond the recorded
+`3f2fe7df` base. The merged #228/#229 work substantially changes native process,
+filesystem, identity, network and typed domain configuration owners. Configured
+`launch_validate` still rejects storage/device assignments, so native systemd
+support is not proof that the prepared owned-storage/Recipe path is replaced.
+The current network enum also includes `Shared`; future joins must preserve it
+and the upstream contract fields rather than copying an old whole module.
+
+The six recorded-main-based patches (G05a/G03a/G06a/G26a/G27/G28) apply cleanly
+to that exact new head through a disposable index. This is context evidence
+only: no new candidate head, compilation, runtime or security passage is implied.
+The exact new source export and preview are retained under
+`.artifacts/ginux-contribution-preparation/upstream-refresh-2026-11-06/`.
+The commit was fetched by exact SHA without updating refs or FETCH_HEAD.
+No remote text or history was changed.
+
+Further old-composition checks cannot establish final-source closure after
+these owner changes. Only the identified old runner and its descendants were
+stopped; `upstream-refresh-stop.json` preserves cleanup provenance. All ten
+passing and three failing receipts remain evidence for the saved F02/F03
+revisions, and both interrupted cases remain unverified. This does not remove
+any required case or replace the final applicable suite with a smaller suite.
+
+Exact next action: refresh R04's current-main prerequisite one packet at a time,
+starting with G05a's unchanged VFS owner and its exact regression/caller review.
+Then reconcile remaining owners before rebuilding the final F02 composition and
+rerunning applicable F03 checks. Keep G07, monitored security,
 actual compiler/Cargo/APK/RPM, full/default platform CI and current-main
 independence requirements open. F04 remains dependent on required F02/F03 work;
 the goal is active, incomplete, and not publication-authorized.

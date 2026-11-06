@@ -748,17 +748,19 @@ verification, stopping at F04 for inspection with no publication. F03 remains
 active and partial. The complete saved log has now been read: all four failures
 report command-output reader thread creation ENOSYS, consistent with excluded
 G07. The previously interrupted state-restore case now passes 1/1 in 328.38s on
-the destination-built harness, covering all four invocations. Eleven fresh
-destination cases have completed: eight pass and three fail. The Bash child
+the destination-built harness, covering all four invocations. Thirteen fresh
+destination cases have completed: ten pass and three fail. The Bash child
 case fails with the same reader-thread ENOSYS; two valid tar cases also fail
 because the existing progress spinner needs a thread. A valid zip case was
-interrupted when that batch was stopped and remains unverified.
+interrupted when that batch was stopped and remains unverified. The retained-link
+case was also interrupted at the upstream-refresh stop below; neither is a pass.
 Passing cases additionally cover custom readiness,
 128 KiB file bytes, directory copy/move/cleanup, lifecycle event order, current
 API initialization and 5,000-entry publication. No failure or interrupted case
 has been counted as passing. See [F03 evidence](ginux-contributions/f03-review.md).
 The additional retained-dependency-state case passes all three invocations,
-including persisted discoveries from reused readiness checks.
+including persisted discoveries from reused readiness checks. Changed source/
+input identity and default application-state placement/reuse also pass.
 
 Fresh strict replay verifies all 37 retained patches against their recorded
 parents/trees, including corrected G12. All 189 F02 tracked paths match the
@@ -767,12 +769,21 @@ tracked paths except its separately normalized standalone lock. The six restored
 worktrees remain untouched; their index/status fingerprints are retained with
 the new F03 evidence. No Ginux contribution source has changed.
 
-Exact next action: monitor the revised 20-case serial ordinary queue. Its first
-retained-dependency-state case passed; changed source/input identity is running.
-Exact selection, receipts and the reconciled
+The revised ordinary queue is stopped. Exact selection, receipts and the reconciled
 135-case status catalog are in
 `.artifacts/ginux-contribution-preparation/F03/resume-2026-11-06/`.
-Inspect each new failure before choosing its owning fix or dependency. Keep
+**New prerequisite evidence:** upstream main is now
+`8a475e8b2318425fd2fc15246a5c6f4bca6caf86`, 52 commits beyond the recorded base,
+with substantial native runtime and domain/network changes from #228/#229.
+The six directly based patches apply cleanly, but that does not prove their new
+source/runtime acceptance. Exact source and context previews are retained in
+`.artifacts/ginux-contribution-preparation/upstream-refresh-2026-11-06/`.
+Earlier P02/P03 and candidate results remain historical records; current-main
+reconciliation is required before final closure.
+
+Exact next action: refresh R04's current-main prerequisite serially, starting
+with G05a's unchanged VFS owner, regression and caller review. Reconcile the
+remaining source owners before rebuilding the final F02/F03 revisions. Keep
 reader/progress-thread-dependent consumers pending on G07. Do not import
 the unready thread snapshot, rerun adversarial probes, dispatch DaybreakBlue,
 weaken required checks or treat source integrity as full acceptance. G07,

@@ -735,3 +735,11 @@ administrative cleanup of the owned batch and is not a pass. Preserve these
 checks for exact-revision reruns after G07; do not disable progress to substitute
 for thread support. Other ordinary cases continue, with all security acceptance
 and dispatch still pending.
+
+Read-only upstream refresh now pins main
+`8a475e8b2318425fd2fc15246a5c6f4bca6caf86`, 52 commits beyond the old extraction
+base, including #228/#229 native runtime/domain/network work. The old combined
+snapshot and G07 finding remain exact historical inputs, not proof about the
+new source. Reconcile new native owners and typed network fields before choosing
+the final combined revision for monitored validation. No new security probe,
+cloud dispatch or security acceptance occurred during this refresh.
