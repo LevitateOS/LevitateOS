@@ -3,9 +3,110 @@ schema_version = 6
 [ring3_sources.rootfs_source]
 memory_mib = 8192
 preseed_memory_mib = 8192
-network_hosts = ["7-zip.org:443"]
+network_hosts = []
 preseed_network_hosts = ["dl.fedoraproject.org:443"]
-kind = "recipe_rpm_dvd"
-recipe_script = "distro/builder/recipes/fedora-dvd-source-rootfs.rhai"
-preseed_recipe_script = "distro/builder/recipes/fedora-preseed-iso.rhai"
-preseed_outputs = { iso = "file" }
+kind = "recipe_rpm_set"
+recipe_script = "distro/builder/recipes/fedora-rpm-source-rootfs.rhai"
+preseed_recipe_script = "distro/builder/recipes/fedora-rpm-preseed.rhai"
+preseed_outputs = { rpms = "directory" }
+
+# What the rootfs takes from Fedora. `cargo xtask base lock levitate` resolves
+# the newest signed build of each from the release and updates repositories
+# into distro/builder/recipes/sources/levitate-rpm-lock.rhai.
+[ring3_sources.rootfs_source.rpm_base]
+fedora_release = 45
+signing_key = "ring3/keys/RPM-GPG-KEY-fedora-45-primary"
+packages = [
+  # Root filesystem skeleton and core runtime.
+  "filesystem",
+  "setup",
+  "bash",
+  "bash-completion",
+  "coreutils",
+  "coreutils-common",
+  "findutils",
+  "grep",
+  "gawk",
+  "ncurses-libs",
+  "sed",
+  "diffutils",
+  # System boot/service runtime for live boot.
+  "systemd",
+  "systemd-libs",
+  "systemd-udev",
+  "iproute",
+  "kmod",
+  "util-linux",
+  "util-linux-core",
+  "iputils",
+  "curl",
+  "libcurl",
+  "libidn2",
+  "libunistring",
+  "libnghttp2",
+  "libssh",
+  "libpsl",
+  "openldap",
+  "libbrotli",
+  "libevent",
+  "cyrus-sasl-lib",
+  "pciutils",
+  "pciutils-libs",
+  "usbutils",
+  "libusb1",
+  "less",
+  "libfdisk",
+  "readline",
+  "kmod-libs",
+  "libmount",
+  "libblkid",
+  "libsmartcols",
+  "libuuid",
+  "shadow-utils",
+  "sudo",
+  # SSH + service wiring expectations.
+  "openssh-server",
+  "openssh",
+  "openssh-clients",
+  # RPM dependency solving is not active in this extraction path; include
+  # OpenSSH Kerberos runtime libs explicitly for sshd-session.
+  "krb5-libs",
+  "keyutils-libs",
+  "libverto",
+  "libcom_err",
+  "dbus",
+  "dbus-common",
+  "dbus-daemon",
+  "dbus-broker",
+  "expat",
+  # Locale + console essentials.
+  "glibc",
+  "glibc-common",
+  "glibc-minimal-langpack",
+  "kbd",
+  "kbd-misc",
+  # Common runtime libs used by copied binaries.
+  "libgcc",
+  "libstdc++",
+  "pam",
+  "pam-libs",
+  "libacl",
+  "libattr",
+  "libcap-ng",
+  "libeconf",
+  "libseccomp",
+  "pcre2",
+  "libxcrypt",
+  "libcap",
+  "libbpf",
+  "elfutils-libelf",
+  "libmnl",
+  "libzstd",
+  "audit-libs",
+  "audit",
+  "libselinux",
+  "openssl-libs",
+  "zlib-ng-compat",
+  "xz-libs",
+  "procps-ng",
+]

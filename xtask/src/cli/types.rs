@@ -73,6 +73,12 @@ pub enum Cmd {
     /// Boot a scenario for interactive use (needs a terminal unless --no-shell).
     Run(RunArgs),
 
+    /// The packages a variant takes from its Fedora base.
+    Base {
+        #[command(subcommand)]
+        what: BaseCmd,
+    },
+
     /// Run automated scenarios; results are cached per input (--force reruns).
     Test(TestArgs),
 
@@ -114,6 +120,18 @@ pub enum Cmd {
     Inspect {
         #[command(subcommand)]
         what: InspectCmd,
+    },
+}
+
+#[derive(Subcommand)]
+pub enum BaseCmd {
+    /// Resolve the newest signed build of each base package (release + updates) and write the lock.
+    Lock {
+        #[arg(value_enum, default_value_t = Distro::Levitate)]
+        distro: Distro,
+        /// Only report packages with newer builds (exit 1 if any).
+        #[arg(long)]
+        check: bool,
     },
 }
 

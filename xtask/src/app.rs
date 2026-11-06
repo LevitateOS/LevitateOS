@@ -1,6 +1,6 @@
 use anyhow::Result;
 
-use crate::cli::{Cmd, InspectCmd};
+use crate::cli::{BaseCmd, Cmd, InspectCmd};
 
 pub fn run(cli: crate::cli::Cli) -> Result<()> {
     match cli.cmd {
@@ -8,6 +8,7 @@ pub fn run(cli: crate::cli::Cli) -> Result<()> {
         Cmd::Doctor { json } => crate::tasks::setup::doctor(json),
         Cmd::Env => crate::tasks::setup::env(),
         Cmd::Build { what } => crate::tasks::build::run(what),
+        Cmd::Base { what: BaseCmd::Lock { distro, check } } => crate::tasks::base::lock(distro, check),
         Cmd::Run(args) => crate::tasks::scenarios::run(args),
         Cmd::Test(args) => crate::tasks::scenarios::test(args),
         Cmd::Status { distro, json } => crate::tasks::scenarios::status(distro, json),
