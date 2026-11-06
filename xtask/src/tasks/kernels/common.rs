@@ -209,6 +209,11 @@ pub(crate) fn install_prebuilt_kernel_via_recipe(
         .args(["--build-dir", build_dir.to_string_lossy().as_ref()])
         .args(["--recipes-path", recipes_path.to_string_lossy().as_ref()])
         .args(["--define", &format!("KERNEL_TARGET={distro_id}")]);
+    // The recipe downloads a GitHub release asset; GitHub redirects release
+    // downloads to its asset host, and recipe networking is off unless granted.
+    for host in ["github.com:443", "release-assets.githubusercontent.com:443"] {
+        cmd.args(["--network-host", host]);
+    }
     if kernel_artifact_root.is_dir() {
         cmd.args([
             "--input",
