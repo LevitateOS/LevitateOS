@@ -1,0 +1,602 @@
+{
+  "scope": "all active origin repository branch/tag tips, with one older local main retained as an origin ancestor; no force updates",
+  "repositories": [
+    {
+      "path": ".",
+      "origin": "git@github.com:LevitateOS/LevitateOS",
+      "branches": [
+        {
+          "ref": "refs/heads/codex/push-everything",
+          "local": "23472ff108db3dc58eee7773d51d48a8db43fea1",
+          "origin": "23472ff108db3dc58eee7773d51d48a8db43fea1",
+          "verified": "exact"
+        },
+        {
+          "ref": "refs/heads/master",
+          "local": "131c856ed07dd158230c355b233f598ac6901431",
+          "origin": "131c856ed07dd158230c355b233f598ac6901431",
+          "verified": "exact"
+        }
+      ],
+      "tags": [
+        {
+          "ref": "refs/tags/v.0.1.0-alpha",
+          "sha": "36f5f432198c7922e4683a1f100cb9f93b66c818",
+          "verified": "exact"
+        }
+      ],
+      "worktree_status": ""
+    },
+    {
+      "path": "docs/website",
+      "origin": "git@github.com:LevitateOS/website.git",
+      "branches": [
+        {
+          "ref": "refs/heads/codex/streamline-development",
+          "local": "a3e1a3f3752c5f9b7d0606b53dd693181499de8b",
+          "origin": "a3e1a3f3752c5f9b7d0606b53dd693181499de8b",
+          "verified": "exact"
+        },
+        {
+          "ref": "refs/heads/master",
+          "local": "dcfdd75de413616cdbf3efafd96d88bbd960925d",
+          "origin": "dcfdd75de413616cdbf3efafd96d88bbd960925d",
+          "verified": "exact"
+        }
+      ],
+      "tags": [],
+      "worktree_status": ""
+    },
+    {
+      "path": "tools/recipe",
+      "origin": "git@github.com:LevitateOS/recipe.git",
+      "branches": [
+        {
+          "ref": "refs/heads/codex/streamline-development",
+          "local": "18db12ce75c38fdfd741151b242a0fa60350cb2b",
+          "origin": "18db12ce75c38fdfd741151b242a0fa60350cb2b",
+          "verified": "exact"
+        },
+        {
+          "ref": "refs/heads/ginux-recipe/f04-persist-seams",
+          "local": "25a9ff83f38424501447c59945ff2d287ec02c26",
+          "origin": "25a9ff83f38424501447c59945ff2d287ec02c26",
+          "verified": "exact"
+        },
+        {
+          "ref": "refs/heads/ginux-recipe/r01-protocol",
+          "local": "0b7875b9f27521bd9e6de5132eb3bee4b01b724d",
+          "origin": "0b7875b9f27521bd9e6de5132eb3bee4b01b724d",
+          "verified": "exact"
+        },
+        {
+          "ref": "refs/heads/ginux-recipe/r02-worker",
+          "local": "80e45dfca4e2e19082437863ea5acdee8d70bda7",
+          "origin": "80e45dfca4e2e19082437863ea5acdee8d70bda7",
+          "verified": "exact"
+        },
+        {
+          "ref": "refs/heads/ginux-recipe/r03-checkpoints",
+          "local": "e957651099dbd15fd3a1af504e6355283b8aafbd",
+          "origin": "e957651099dbd15fd3a1af504e6355283b8aafbd",
+          "verified": "exact"
+        },
+        {
+          "ref": "refs/heads/ginux-recipe/r04-backend",
+          "local": "61a742bf299c8bd5920fdc27b900e03c840d2164",
+          "origin": "61a742bf299c8bd5920fdc27b900e03c840d2164",
+          "verified": "exact"
+        },
+        {
+          "ref": "refs/heads/ginux-recipe/r05-inputs",
+          "local": "6a46f5648a930fc154e8c05ebc0fc32f40c62235",
+          "origin": "6a46f5648a930fc154e8c05ebc0fc32f40c62235",
+          "verified": "exact"
+        },
+        {
+          "ref": "refs/heads/ginux-recipe/r06-launch",
+          "local": "4056374758ba2de8517b2faf3438c64380611992",
+          "origin": "4056374758ba2de8517b2faf3438c64380611992",
+          "verified": "exact"
+        },
+        {
+          "ref": "refs/heads/master",
+          "local": "ce3cae5f7b979cadedfeb12cfcfb7b2b0a25b6a5",
+          "origin": "ce3cae5f7b979cadedfeb12cfcfb7b2b0a25b6a5",
+          "verified": "exact"
+        }
+      ],
+      "tags": [
+        {
+          "ref": "refs/tags/0.1.3",
+          "sha": "bc7843d45fa64ebb457762ebe16f53602b7f09f5",
+          "verified": "exact"
+        },
+        {
+          "ref": "refs/tags/0.1.4",
+          "sha": "6324e1d4f8d45717d86e49b76010cd68d078a8f8",
+          "verified": "exact"
+        },
+        {
+          "ref": "refs/tags/v0.1.1",
+          "sha": "1a0d84befa763b829c0ebca6b7a733bfe8c5b640",
+          "verified": "exact"
+        },
+        {
+          "ref": "refs/tags/v0.1.2",
+          "sha": "e1166e67369bee5d748ea0663f3d897395ca598f",
+          "verified": "exact"
+        }
+      ],
+      "worktree_status": ""
+    },
+    {
+      "path": "docs/content",
+      "origin": "git@github.com:LevitateOS/docs-content.git",
+      "branches": [
+        {
+          "ref": "refs/heads/codex/streamline-development",
+          "local": "b22d24b3b70502abfa73c41c74f4c9808901f41c",
+          "origin": "b22d24b3b70502abfa73c41c74f4c9808901f41c",
+          "verified": "exact"
+        },
+        {
+          "ref": "refs/heads/master",
+          "local": "ca9b5ab8378c2257d7cb4642c27242ef96b4ef24",
+          "origin": "ca9b5ab8378c2257d7cb4642c27242ef96b4ef24",
+          "verified": "exact"
+        }
+      ],
+      "tags": [],
+      "worktree_status": ""
+    },
+    {
+      "path": "testing/install-tests",
+      "origin": "git@github.com:LevitateOS/install-tests.git",
+      "branches": [
+        {
+          "ref": "refs/heads/codex/streamline-development",
+          "local": "ae36293214b5b04d32311ff2019e98f4b9d95f0e",
+          "origin": "ae36293214b5b04d32311ff2019e98f4b9d95f0e",
+          "verified": "exact"
+        },
+        {
+          "ref": "refs/heads/master",
+          "local": "9d9e937d7e6c990024a222a0d3176b79160bf5e9",
+          "origin": "9d9e937d7e6c990024a222a0d3176b79160bf5e9",
+          "verified": "exact"
+        }
+      ],
+      "tags": [],
+      "worktree_status": ""
+    },
+    {
+      "path": "tools/recstrap",
+      "origin": "git@github.com:LevitateOS/recstrap.git",
+      "branches": [
+        {
+          "ref": "refs/heads/codex/streamline-development",
+          "local": "96c081a8e564ac894ed66234308d147c39bcfb0a",
+          "origin": "96c081a8e564ac894ed66234308d147c39bcfb0a",
+          "verified": "exact"
+        },
+        {
+          "ref": "refs/heads/master",
+          "local": "60299620be06e7fa1dbe9ad5c7e935adc1844a76",
+          "origin": "60299620be06e7fa1dbe9ad5c7e935adc1844a76",
+          "verified": "exact"
+        }
+      ],
+      "tags": [
+        {
+          "ref": "refs/tags/v0.1.1",
+          "sha": "485e055de9b1558e36a435af6e6acc55ff0fe354",
+          "verified": "exact"
+        },
+        {
+          "ref": "refs/tags/v0.1.2",
+          "sha": "7013e36d220f590e187f0f2faa03f620d0c4b37c",
+          "verified": "exact"
+        },
+        {
+          "ref": "refs/tags/v0.1.3",
+          "sha": "bb6d643a9ff76167ae7de22e6cafd289d21eefdc",
+          "verified": "exact"
+        },
+        {
+          "ref": "refs/tags/v0.1.4",
+          "sha": "290e1551eb5dd818dfd0e0325a1460aec32bb6db",
+          "verified": "exact"
+        },
+        {
+          "ref": "refs/tags/v0.1.5",
+          "sha": "ebc9a0425ee690f988b64eadf0bae06d3253e3b9",
+          "verified": "exact"
+        }
+      ],
+      "worktree_status": ""
+    },
+    {
+      "path": "testing/rootfs-tests",
+      "origin": "git@github.com:LevitateOS/rootfs-test.git",
+      "branches": [
+        {
+          "ref": "refs/heads/codex/streamline-development",
+          "local": "d83de1f634155a430c76fb7f80d6a697b8ceaf98",
+          "origin": "d83de1f634155a430c76fb7f80d6a697b8ceaf98",
+          "verified": "exact"
+        },
+        {
+          "ref": "refs/heads/master",
+          "local": "dfab66d0b4fb48b7420af936bd588122c5a1cfaa",
+          "origin": "dfab66d0b4fb48b7420af936bd588122c5a1cfaa",
+          "verified": "exact"
+        }
+      ],
+      "tags": [],
+      "worktree_status": ""
+    },
+    {
+      "path": "distro/elf",
+      "origin": "git@github.com:LevitateOS/leviso-elf.git",
+      "branches": [
+        {
+          "ref": "refs/heads/codex/streamline-development",
+          "local": "76b6c236d7eb930ae7eeda66bb4a1043bcf6ba96",
+          "origin": "76b6c236d7eb930ae7eeda66bb4a1043bcf6ba96",
+          "verified": "exact"
+        },
+        {
+          "ref": "refs/heads/main",
+          "local": "2ff9684c2ee8f503ddaac282e6e3cac15999ada0",
+          "origin": "2ff9684c2ee8f503ddaac282e6e3cac15999ada0",
+          "verified": "exact"
+        }
+      ],
+      "tags": [
+        {
+          "ref": "refs/tags/v0.1.1",
+          "sha": "aee388d51b7563137e34d68f95441dd1055605f9",
+          "verified": "exact"
+        },
+        {
+          "ref": "refs/tags/v0.1.2",
+          "sha": "8478df899ee651b8d1ade623b2a6aa723cc76456",
+          "verified": "exact"
+        },
+        {
+          "ref": "refs/tags/v0.1.3",
+          "sha": "3d3d76d9dbb094bf98bbb3e8d088ad6f2a95b72b",
+          "verified": "exact"
+        },
+        {
+          "ref": "refs/tags/v0.1.4",
+          "sha": "58c1ce58384e587e8b74861fdf06cd19ea8644e7",
+          "verified": "exact"
+        },
+        {
+          "ref": "refs/tags/v0.1.5",
+          "sha": "ffbd0f41e976035080187c64f996fab86d7ee826",
+          "verified": "exact"
+        },
+        {
+          "ref": "refs/tags/v0.1.6",
+          "sha": "406787f0a8aaf4b7a8b1990dc43e801afc661e2d",
+          "verified": "exact"
+        },
+        {
+          "ref": "refs/tags/v0.1.7",
+          "sha": "8b6dcb187c15de2b2693d7453d5c1a598ad5a18e",
+          "verified": "exact"
+        }
+      ],
+      "worktree_status": ""
+    },
+    {
+      "path": "testing/hardware-compat",
+      "origin": "git@github.com:LevitateOS/hardware-compat.git",
+      "branches": [
+        {
+          "ref": "refs/heads/main",
+          "local": "a41fd0390902e45bc7f050d3765b72864df0d19e",
+          "origin": "465ab5f964eebe411befea14196c7a1be0e2e457",
+          "verified": "contained"
+        }
+      ],
+      "tags": [
+        {
+          "ref": "refs/tags/v0.1.1",
+          "sha": "262a86f67d7b7433e538b88387f57b487bcd5a83",
+          "verified": "exact"
+        },
+        {
+          "ref": "refs/tags/v0.1.2",
+          "sha": "dc4281b2012d61e8b30a032d3fecf36e13b5c73b",
+          "verified": "exact"
+        }
+      ],
+      "worktree_status": ""
+    },
+    {
+      "path": "distro/builder",
+      "origin": "git@github.com:LevitateOS/distro-builder.git",
+      "branches": [
+        {
+          "ref": "refs/heads/codex/streamline-development",
+          "local": "d2d644d47c860884d746c0b09d250722b6629047",
+          "origin": "d2d644d47c860884d746c0b09d250722b6629047",
+          "verified": "exact"
+        },
+        {
+          "ref": "refs/heads/main",
+          "local": "b60c8f89058aabbbda44301a001e198106ccd46c",
+          "origin": "b60c8f89058aabbbda44301a001e198106ccd46c",
+          "verified": "exact"
+        }
+      ],
+      "tags": [],
+      "worktree_status": ""
+    },
+    {
+      "path": "tools/recinit",
+      "origin": "git@github.com:LevitateOS/recinit.git",
+      "branches": [
+        {
+          "ref": "refs/heads/codex/streamline-development",
+          "local": "86f7b7e6ef6c8338238069f4f05fb8420de95132",
+          "origin": "86f7b7e6ef6c8338238069f4f05fb8420de95132",
+          "verified": "exact"
+        },
+        {
+          "ref": "refs/heads/main",
+          "local": "fd14dccb3d2ab50448bf4d296b28c3cd6ca06713",
+          "origin": "fd14dccb3d2ab50448bf4d296b28c3cd6ca06713",
+          "verified": "exact"
+        }
+      ],
+      "tags": [],
+      "worktree_status": ""
+    },
+    {
+      "path": "tools/recuki",
+      "origin": "git@github.com:LevitateOS/recuki.git",
+      "branches": [
+        {
+          "ref": "refs/heads/codex/streamline-development",
+          "local": "a6fb8f57b5bd73113ed6138c1af1ab969225a91f",
+          "origin": "a6fb8f57b5bd73113ed6138c1af1ab969225a91f",
+          "verified": "exact"
+        },
+        {
+          "ref": "refs/heads/main",
+          "local": "4187fd541d48b6662724e893ddb86b9d2bf751ff",
+          "origin": "4187fd541d48b6662724e893ddb86b9d2bf751ff",
+          "verified": "exact"
+        }
+      ],
+      "tags": [],
+      "worktree_status": ""
+    },
+    {
+      "path": "tools/reciso",
+      "origin": "git@github.com:LevitateOS/reciso.git",
+      "branches": [
+        {
+          "ref": "refs/heads/codex/streamline-development",
+          "local": "848d92316f74c84466fce28434f1308f6938b6c2",
+          "origin": "848d92316f74c84466fce28434f1308f6938b6c2",
+          "verified": "exact"
+        },
+        {
+          "ref": "refs/heads/main",
+          "local": "97e620711054c9fe954439e0af3939211a2e5211",
+          "origin": "97e620711054c9fe954439e0af3939211a2e5211",
+          "verified": "exact"
+        }
+      ],
+      "tags": [],
+      "worktree_status": ""
+    },
+    {
+      "path": "tools/recqemu",
+      "origin": "git@github.com:LevitateOS/recqemu.git",
+      "branches": [
+        {
+          "ref": "refs/heads/codex/streamline-development",
+          "local": "35a67b02b807b60d70ad018fab68f7492bd1d75e",
+          "origin": "35a67b02b807b60d70ad018fab68f7492bd1d75e",
+          "verified": "exact"
+        },
+        {
+          "ref": "refs/heads/main",
+          "local": "0a8de289965d175be06e917e5eebdcc3eb961910",
+          "origin": "0a8de289965d175be06e917e5eebdcc3eb961910",
+          "verified": "exact"
+        }
+      ],
+      "tags": [],
+      "worktree_status": ""
+    },
+    {
+      "path": "testing/fsdbg",
+      "origin": "git@github.com:LevitateOS/fsdbg.git",
+      "branches": [
+        {
+          "ref": "refs/heads/codex/streamline-development",
+          "local": "14bc68bae3f307dee230bd155ef177b98707b697",
+          "origin": "14bc68bae3f307dee230bd155ef177b98707b697",
+          "verified": "exact"
+        },
+        {
+          "ref": "refs/heads/main",
+          "local": "db09f51ffe5f91054d7cb15d16decac94122854f",
+          "origin": "db09f51ffe5f91054d7cb15d16decac94122854f",
+          "verified": "exact"
+        }
+      ],
+      "tags": [],
+      "worktree_status": ""
+    },
+    {
+      "path": "distro/contract",
+      "origin": "git@github.com:LevitateOS/distro-contract.git",
+      "branches": [
+        {
+          "ref": "refs/heads/codex/streamline-development",
+          "local": "de2f6e50793f2d5c8eb75168d11d37a6ef20dae9",
+          "origin": "de2f6e50793f2d5c8eb75168d11d37a6ef20dae9",
+          "verified": "exact"
+        },
+        {
+          "ref": "refs/heads/master",
+          "local": "d2a96ee0126a6b3d3871b4dcdb22dcad2bf4acf3",
+          "origin": "d2a96ee0126a6b3d3871b4dcdb22dcad2bf4acf3",
+          "verified": "exact"
+        }
+      ],
+      "tags": [],
+      "worktree_status": ""
+    },
+    {
+      "path": "tools/recab",
+      "origin": "git@github.com:LevitateOS/recab.git",
+      "branches": [
+        {
+          "ref": "refs/heads/codex/streamline-development",
+          "local": "36c60e96b3f752db53034dc17fdfc928f648449a",
+          "origin": "36c60e96b3f752db53034dc17fdfc928f648449a",
+          "verified": "exact"
+        },
+        {
+          "ref": "refs/heads/main",
+          "local": "8e2853913454cebd80f8f4e1b29b28708a713209",
+          "origin": "8e2853913454cebd80f8f4e1b29b28708a713209",
+          "verified": "exact"
+        }
+      ],
+      "tags": [],
+      "worktree_status": ""
+    },
+    {
+      "path": "tools/recpart",
+      "origin": "git@github.com:LevitateOS/recpart.git",
+      "branches": [
+        {
+          "ref": "refs/heads/codex/streamline-development",
+          "local": "6008f1eec2b664ecbf2dcff2a429a0f8ef53d88d",
+          "origin": "6008f1eec2b664ecbf2dcff2a429a0f8ef53d88d",
+          "verified": "exact"
+        },
+        {
+          "ref": "refs/heads/main",
+          "local": "c73b4a69cecb397f2bd1ddb1cfd56e5ef7a4d707",
+          "origin": "c73b4a69cecb397f2bd1ddb1cfd56e5ef7a4d707",
+          "verified": "exact"
+        }
+      ],
+      "tags": [],
+      "worktree_status": ""
+    },
+    {
+      "path": "tui",
+      "origin": "git@github.com:LevitateOS/tui-root.git",
+      "branches": [
+        {
+          "ref": "refs/heads/codex/streamline-development",
+          "local": "cfb5a5a584c8bd1adfffce798e61d83cabd51673",
+          "origin": "cfb5a5a584c8bd1adfffce798e61d83cabd51673",
+          "verified": "exact"
+        },
+        {
+          "ref": "refs/heads/master",
+          "local": "5758b25b0ad31106fdb0105496af7e794b9ae2c0",
+          "origin": "5758b25b0ad31106fdb0105496af7e794b9ae2c0",
+          "verified": "exact"
+        }
+      ],
+      "tags": [],
+      "worktree_status": ""
+    },
+    {
+      "path": "tools/recshuttle",
+      "origin": "git@github.com:LevitateOS/recshuttle.git",
+      "branches": [
+        {
+          "ref": "refs/heads/codex/streamline-development",
+          "local": "f23c93baf4b97bdb79cf0451f207044edb5e6c9b",
+          "origin": "f23c93baf4b97bdb79cf0451f207044edb5e6c9b",
+          "verified": "exact"
+        },
+        {
+          "ref": "refs/heads/master",
+          "local": "5cf1a8df0d428e89fb65ccbc4c344935a758061a",
+          "origin": "5cf1a8df0d428e89fb65ccbc4c344935a758061a",
+          "verified": "exact"
+        }
+      ],
+      "tags": [],
+      "worktree_status": ""
+    },
+    {
+      "path": "tools/ginux",
+      "origin": "git@github.com:LevitateOS/ginux.git",
+      "branches": [
+        {
+          "ref": "refs/heads/codex/bounded-console-poll",
+          "local": "e7f5f552747e0b451b6dd31395f9199d10a42ce3",
+          "origin": "e7f5f552747e0b451b6dd31395f9199d10a42ce3",
+          "verified": "exact"
+        },
+        {
+          "ref": "refs/heads/codex/ginux-recipe-local-integration",
+          "local": "7cf2638adaf2fd3b783be636fe2a05b2d60458c5",
+          "origin": "7cf2638adaf2fd3b783be636fe2a05b2d60458c5",
+          "verified": "exact"
+        },
+        {
+          "ref": "refs/heads/ginux-recipe/i04-m5-writable",
+          "local": "ebd68025d4db318e903867f12d0574e41f2511ce",
+          "origin": "ebd68025d4db318e903867f12d0574e41f2511ce",
+          "verified": "exact"
+        },
+        {
+          "ref": "refs/heads/ginux-recipe/i04-m7-alias",
+          "local": "022294a9e983dd4097dcae6e198f6ecd87c1047a",
+          "origin": "022294a9e983dd4097dcae6e198f6ecd87c1047a",
+          "verified": "exact"
+        },
+        {
+          "ref": "refs/heads/main",
+          "local": "2489517e89c3b62c5203ccd0f6d1eb28cf8500af",
+          "origin": "2489517e89c3b62c5203ccd0f6d1eb28cf8500af",
+          "verified": "exact"
+        }
+      ],
+      "tags": [
+        {
+          "ref": "refs/tags/bootable-kernel-final",
+          "sha": "7fb7407103cf71fe06c897c9694836cd3e23e131",
+          "verified": "exact"
+        },
+        {
+          "ref": "refs/tags/research-v1-baseline",
+          "sha": "f94732fbd2c99d684acca46b1733ac175c438e80",
+          "verified": "exact"
+        }
+      ],
+      "worktree_status": ""
+    }
+  ],
+  "repository_count": 21,
+  "branch_count": 51,
+  "tag_count": 21,
+  "verification_snapshot_root": "131c856ed07dd158230c355b233f598ac6901431",
+  "recovery": {
+    "worktree_states_restored_exactly": 6,
+    "stashes_preserved": 2,
+    "retired_repositories_bundled": 13,
+    "original_git_state_preserved": true,
+    "goal": "implementation remains paused; migration backup only",
+    "remote_effects": "origin branch/tag backups only; no force pushes, upstream writes or PRs"
+  }
+}

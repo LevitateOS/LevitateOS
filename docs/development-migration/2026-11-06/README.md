@@ -93,3 +93,13 @@ non-Git build assets have been transferred or reproduced successfully.
 
 All new archives/bundles have SHA256 checksums in the manifest. `push-results.json`
 records the origin verification completed after saving the source changes.
+
+## Verified origin backup
+
+All21 active origins were checked directly after the push:51 local branch heads
+are exact or already contained by origin, and all21 local tags match. The older
+hardware-compat main is safely contained by origin's newer main; no rollback was
+performed. The primary superproject and submodule checkouts were clean. Six old
+Ginux worktrees deliberately retain their original raw edits/conflicts locally;
+their exact remote recovery copies were independently restored and verified.
+See `push-results.json` and `restore-verification.json` for the recorded checks.
