@@ -19,6 +19,7 @@ required_services = ["networking", "dhcpcd", "sshd"]
 
 [scenarios.live_tools]
 required_tools = [
+  "recpart",
   "recstrap",
   "recfstab",
   "recchroot",
@@ -45,7 +46,7 @@ script_path = "live-tools.sh"
 pass_marker = "LIVE TOOLS PASSED"
 
 [scenarios.install]
-required_tools = ["recstrap", "recfstab", "recchroot", "sfdisk", "mkfs.ext4"]
+required_tools = ["recpart", "recstrap", "recfstab", "recchroot", "sfdisk", "mkfs.ext4"]
 required_services = ["networking", "dhcpcd", "sshd"]
 
 [scenarios.install.evidence]

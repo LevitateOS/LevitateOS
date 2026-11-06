@@ -671,7 +671,7 @@ fn run_interactive_ssh(
     args.push("-tt".to_string());
     args.push("-o".to_string());
     args.push("BatchMode=no".to_string());
-    args.push("root@127.0.0.1".to_string());
+    args.push(format!("root@{}", recshuttle::FORWARD_HOST));
     let status = Command::new("ssh")
         .env("TERM", "vt100")
         .args(&args)
@@ -704,7 +704,7 @@ fn can_ssh_connect(ssh_port: u16, private_key: &Path, known_hosts: &Path) -> Res
     args.push("-n".to_string());
     args.push("-o".to_string());
     args.push("BatchMode=yes".to_string());
-    args.push("root@127.0.0.1".to_string());
+    args.push(format!("root@{}", recshuttle::FORWARD_HOST));
     args.push("true".to_string());
     let status = Command::new("ssh")
         .args(&args)
@@ -714,24 +714,14 @@ fn can_ssh_connect(ssh_port: u16, private_key: &Path, known_hosts: &Path) -> Res
 }
 
 fn resolve_ssh_private_key(arg: Option<PathBuf>) -> Result<PathBuf> {
-    if let Some(path) = arg {
-        if !path.is_file() {
-            bail!("SSH private key does not exist: {}", path.display());
-        }
-        return Ok(path);
-    }
-
-    let home = std::env::var_os("HOME")
-        .map(PathBuf::from)
-        .context("HOME is not set; pass --ssh-private-key")?;
-    let fallback = home.join(".ssh").join("id_ed25519");
-    if !fallback.is_file() {
+    let path = arg.unwrap_or_else(recshuttle::ssh_private_key_path);
+    if !path.is_file() {
         bail!(
-            "--ssh-private-key was not provided and {} does not exist",
-            fallback.display()
+            "SSH private key {} does not exist; pass --ssh-private-key or set LEVITATE_SSH_PRIVATE_KEY",
+            path.display()
         );
     }
-    Ok(fallback)
+    Ok(path)
 }
 
 fn common_ssh_args(key: &Path, ssh_port: u16, known_hosts: &Path) -> Vec<String> {

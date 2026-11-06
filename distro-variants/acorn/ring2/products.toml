@@ -99,6 +99,10 @@ destination = "var/lib"
 [ring2_runtime_profiles.live_tools_common]
 [[ring2_runtime_profiles.live_tools_common.actions]]
 kind = "tool_payload_workspace_binary"
+package = "recpart"
+
+[[ring2_runtime_profiles.live_tools_common.actions]]
+kind = "tool_payload_workspace_binary"
 package = "recstrap"
 target = "x86_64-unknown-linux-musl"
 

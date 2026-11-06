@@ -22,5 +22,6 @@ install-tests = { path = "../testing/install-tests" }
 portable-pty = "0.8"
 recpart = { path = "../tools/recpart", features = ["contracts"] }
 recab = { path = "../tools/recab", features = ["contracts"] }
+recshuttle = { path = "../tools/recshuttle" }
 schemars = "1"
 ts-rs = "12"
