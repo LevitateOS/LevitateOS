@@ -1,6 +1,6 @@
-From 85b53fe15a64041f451ec7e7aa1e77d08cb2c18a Mon Sep 17 00:00:00 2001
+From ab47378f657b8d13d72077009107d223ba04d3a3 Mon Sep 17 00:00:00 2001
 From: vince <vincepaul.liem@gmail.com>
-Date: Fri, 6 Nov 2026 12:33:14 +0100
+Date: Fri, 6 Nov 2026 23:23:37 +0100
 Subject: [PATCH] feat(launch): join owned directory and image cwd operations
 
 Translate public directory descriptors through their VFS owner for
@@ -26,7 +26,7 @@ Signed-off-by: vince <vincepaul.liem@gmail.com>
  create mode 100644 tests/fixtures/launch-directory-fixture.c
 
 diff --git a/.github/workflows/check.yml b/.github/workflows/check.yml
-index 0c5b117a..acc81abe 100644
+index 0c5b117a55c8d5e12fcdb0091660bae31a695fda..acc81abea24d1fd9c507339a30475efe5cfcadc0 100644
 --- a/.github/workflows/check.yml
 +++ b/.github/workflows/check.yml
 @@ -24,13 +24,14 @@ jobs:
@@ -46,10 +46,10 @@ index 0c5b117a..acc81abe 100644
        - run: sudo make test-native-supervision
        - run: make test-process-native
 diff --git a/Makefile b/Makefile
-index 4623d95d..15c55879 100644
+index 5c07f5642e984baabab24eea47f9c11a196aa51e..159c48acf87de5e7beff5c84eb64dadcf603e7d4 100644
 --- a/Makefile
 +++ b/Makefile
-@@ -243,3 +243,11 @@ build-launch-exec-fixture:
+@@ -285,3 +285,11 @@ build-launch-exec-fixture:
  
  test-launch-exec:
  	python3 scripts/test-launch-exec.py $(GINUX) .artifacts/launch/launch-exec-fixture .artifacts/launch/launch-interpreter-fixture .artifacts/launch/launch-interpreter-allowed-fixture
@@ -62,10 +62,10 @@ index 4623d95d..15c55879 100644
 +test-launch-directories:
 +	python3 scripts/test-launch-directories.py $(GINUX) .artifacts/launch/launch-directory-fixture
 diff --git a/README.md b/README.md
-index f46b73b5..a3982c7c 100644
+index f2fa36bc15d05ed30fcda551988b13398f3d10ba..94e0eabd1b6e9c1caa00b608c6377ead16719cf2 100644
 --- a/README.md
 +++ b/README.md
-@@ -232,11 +232,18 @@ storage. Paths must be canonical, unique, and cannot cover init, `/`, `/proc`,
+@@ -309,11 +309,18 @@ storage. Paths must be canonical, unique, and cannot cover init, `/`, `/proc`,
  Without assignments, native image access remains read-only.
  
  This backend supports regular-file open/create/exclusive-create/truncate/append,
@@ -89,7 +89,7 @@ index f46b73b5..a3982c7c 100644
  precedence, missing components and non-directory errors. Native image operations
  use a temporary canonical path below the stopped workload's stack; an unavailable
  scratch area or overlapping output buffer returns EFAULT. This is a bounded
-@@ -265,8 +272,8 @@ lower operator limits. Allocation respects that lower soft limit; runtime
+@@ -342,8 +349,8 @@ lower operator limits. Allocation respects that lower soft limit; runtime
  NOFILE-limit changes are currently denied. Reported limits are not inflated to
  accommodate backend handle ranges. Fork copies public descriptor tables while
  sharing open descriptions and owned-object lifetimes. Successful exec closes
@@ -101,7 +101,7 @@ index f46b73b5..a3982c7c 100644
  No writable host descriptor is exposed. Data disappears at domain teardown;
  there is no retention, export, storage generation or separate storage-quota setting.
 diff --git a/crates/ginux-init/src/descriptors.rs b/crates/ginux-init/src/descriptors.rs
-index cb69292d..17dc0bb1 100644
+index cb69292d924ea3bd070bef3fd24e45e3785d13b8..17dc0bb1a48ef2ca3ce8c78b804d772bb4d7fc74 100644
 --- a/crates/ginux-init/src/descriptors.rs
 +++ b/crates/ginux-init/src/descriptors.rs
 @@ -353,7 +353,11 @@ impl DescriptorTable {
@@ -174,7 +174,7 @@ index cb69292d..17dc0bb1 100644
      }
  
 diff --git a/crates/ginux-init/src/fs_hooks.rs b/crates/ginux-init/src/fs_hooks.rs
-index f739af55..6dd53976 100644
+index f739af553b41c2354221321f0919a22dae8cff58..6dd539766015fa35aaf31a1a005e76b7baa29fa5 100644
 --- a/crates/ginux-init/src/fs_hooks.rs
 +++ b/crates/ginux-init/src/fs_hooks.rs
 @@ -1,7 +1,6 @@
@@ -580,7 +580,7 @@ index f739af55..6dd53976 100644
          VfsError::PermissionDenied => -13,
          VfsError::InvalidDescriptor => -9,
 diff --git a/crates/ginux-init/src/launch_tasks.rs b/crates/ginux-init/src/launch_tasks.rs
-index e9ff5688..c9c494b2 100644
+index e9ff5688425c87bb4e7f827a4ae37d499e15f311..c9c494b2c5e6c13219b19dc8dd380266db780a0f 100644
 --- a/crates/ginux-init/src/launch_tasks.rs
 +++ b/crates/ginux-init/src/launch_tasks.rs
 @@ -375,6 +375,31 @@ impl Supervisor<'_> {
@@ -616,7 +616,7 @@ index e9ff5688..c9c494b2 100644
                  let result = self.prepare_exec(index, r);
                  if result == Err(-5) {
 diff --git a/crates/ginux-init/src/tracee_io.rs b/crates/ginux-init/src/tracee_io.rs
-index bff07887..548cc955 100644
+index bff0788721bdb2acb51b4bf811d240b8f2d533a5..548cc9557a0e4d92e6984d9edba07e6b4c8c1890 100644
 --- a/crates/ginux-init/src/tracee_io.rs
 +++ b/crates/ginux-init/src/tracee_io.rs
 @@ -58,6 +58,62 @@ pub fn read_path(pid: usize, address: u64) -> Result<Path, i64> {
@@ -684,7 +684,7 @@ index bff07887..548cc955 100644
      pub inode: u64,
 diff --git a/scripts/test-launch-directories.py b/scripts/test-launch-directories.py
 new file mode 100644
-index 00000000..3fb6aa36
+index 0000000000000000000000000000000000000000..3fb6aa36f1129afc217cf6c90739a63b828f5c64
 --- /dev/null
 +++ b/scripts/test-launch-directories.py
 @@ -0,0 +1,52 @@
@@ -741,7 +741,7 @@ index 00000000..3fb6aa36
 +if __name__=='__main__':
 +    main()
 diff --git a/scripts/test-launch-storage.py b/scripts/test-launch-storage.py
-index 5a93640f..4cf64e17 100644
+index 5a93640fe2590690acf1ed50ff3ecb0bc9111e03..4cf64e174206262b6bd528a6d556302cdd313a73 100644
 --- a/scripts/test-launch-storage.py
 +++ b/scripts/test-launch-storage.py
 @@ -11,7 +11,7 @@ import tempfile
@@ -770,7 +770,7 @@ index 5a93640f..4cf64e17 100644
              invoke(['memory:/work'], [mode])
 diff --git a/tests/fixtures/launch-directory-fixture.c b/tests/fixtures/launch-directory-fixture.c
 new file mode 100644
-index 00000000..0cd125f8
+index 0000000000000000000000000000000000000000..0cd125f8519a0e07622ee473e2b5a7e7b19ce4e6
 --- /dev/null
 +++ b/tests/fixtures/launch-directory-fixture.c
 @@ -0,0 +1,151 @@
@@ -926,7 +926,7 @@ index 00000000..0cd125f8
 +}
 +__asm__(".global _start\n_start:\nmov %rsp,%rdi\nandq $-16,%rsp\ncall directory_main\nmov %rax,%rdi\nmov $60,%rax\nsyscall\nud2\n");
 diff --git a/tests/fixtures/launch-storage-fixture.c b/tests/fixtures/launch-storage-fixture.c
-index bfc3c9c0..e553487a 100644
+index bfc3c9c07394428e278e8cd2ef6f90193c74b545..e553487aca4c1ff40773156391180c1f480a1822 100644
 --- a/tests/fixtures/launch-storage-fixture.c
 +++ b/tests/fixtures/launch-storage-fixture.c
 @@ -28,6 +28,21 @@ long storage_main(word *stack)

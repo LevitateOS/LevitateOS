@@ -826,3 +826,20 @@ and indirect/shared argument authority independently. Ordinary quota exhaustion,
 zero-fill, alias lifetime and successful teardown do not satisfy those security
 checks. Default protected/authority fixtures remain enabled and unrun. G07 stays
 unready; no cloud agent was dispatched and no security pass is claimed.
+
+
+## Refreshed G09c/G09d security revisions — 2026-11-06
+
+Current VFS directory owner G09c is `1e34ef3641c9a2d93f449818692692ac2b561ebc`
+on refreshed G09a; paired configured runtime G09d is
+`ab47378f657b8d13d72077009107d223ba04d3a3` on refreshed G09b/G09c composition
+`eed013c73443a24390b1f5f6638dedca170c855f`. [G09c review](g09c-review.md) and
+[G09d review](g09d-review.md) record fresh ordinary evidence only. Revalidate
+protected/partial getdents copyout and cookie preservation, private/public FD
+translation, namespace/assignment authority, canonical scratch restoration,
+per-process proc-root/cwd interpretation, access/readlink view-probes and shared
+argument authority on these exact revisions or a recorded successor. The earlier
+automatic approval rejection of view-probes remains respected; no such run was
+retried or routed around. Default tests/CI remain enabled and unrun where they
+contain these checks. G07 is still unready and excluded. Keep security acceptance
+pending; no DaybreakBlue agent was dispatched.

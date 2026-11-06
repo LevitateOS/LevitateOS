@@ -439,9 +439,9 @@
       "packet": "G09d",
       "parent_packet": "G09",
       "purpose": "configured directory/cwd and basic path runtime joins",
-      "base": "300fe207a8adf4bd390ec423df8437420fd8cb5f",
-      "head": "85b53fe15a64041f451ec7e7aa1e77d08cb2c18a",
-      "tree": "34854087927e7ca8c951f3d316d0f241bc7a8c90",
+      "base": "eed013c73443a24390b1f5f6638dedca170c855f",
+      "head": "ab47378f657b8d13d72077009107d223ba04d3a3",
+      "tree": "40d9ad17e9ec4581e869c5693665e41f7c7f12f3",
       "dependencies": [
         "G09b",
         "G09c"
@@ -460,14 +460,14 @@
         "tests/fixtures/launch-directory-fixture.c",
         "tests/fixtures/launch-storage-fixture.c"
       ],
-      "status": "source separately self-reviewed; static/unit/build and selected directory/cwd/storage functional checks pass twice; access/readlink/security/full CI/current-main independence pending",
+      "status": "current-main local-prerequisite source reviewed; all 98 units/static/build and 49 ordinary controls plus 4 directory/cwd launches pass in source/clean; paired G09c/security/full CI/actual upstream prerequisites remain pending",
       "security_excluded": [
         "view-probes",
         "directory protected buffers/private-FD/confinement scenarios"
       ],
-      "patch_sha256": "424f2cd085c1bdbe858471c992443b1c07283019a19d1c1f47dda1ccdea70cee",
-      "unit_tests": 89,
-      "vfs_tests": 31,
+      "patch_sha256": "706d61262a4779955a3e0681c8e9bdd733c150fdcf389707e19c192428fbe6fc",
+      "unit_tests": 98,
+      "vfs_tests": 32,
       "clean_matched_paths": 171,
       "review": "separate self-review; no independent reviewer coverage",
       "publication_group": "G09c/G09d together as one useful directory feature; never publish a broken intermediate enum/runtime composition",
@@ -475,7 +475,8 @@
       "security_handoff": "daybreakblue-handoff.md",
       "evidence": "g09d-review.md",
       "source_patch": "patches/G09d.patch",
-      "artifact_directory": ".artifacts/ginux-contribution-preparation/G09d"
+      "artifact_directory": ".artifacts/ginux-contribution-preparation/upstream-refresh-2026-11-06/G09d",
+      "previous_head": "85b53fe15a64041f451ec7e7aa1e77d08cb2c18a"
     },
     {
       "packet": "G09",

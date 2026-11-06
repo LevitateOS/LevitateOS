@@ -783,8 +783,8 @@ Earlier P02/P03 and candidate results remain historical records; current-main
 reconciliation is required before final closure.
 
 Exact next action: refresh R04's current-main prerequisite serially, continuing
-with G09d's runtime adapter on refreshed G09b/G09c, including the required
-enum/runtime errno join. G07's preserved
+with G10's owned ELF execution on refreshed G09d. G09c/G09d's required
+enum/runtime errno join remains paired in the proposed directory feature. G07's preserved
 unready snapshot still needs DaybreakBlue correction/validation; do not import it. Local dependent
 preparation stays blocked for standalone delivery until its prerequisites
 actually merge upstream.
@@ -862,10 +862,17 @@ and eight ordinary controls pass in source/clean, all187 paths and both binaries
 match, and the one-file +491/-2 production/four-test delta is unchanged. Only
 append context adapts around preserved G09a chunk-copy coverage.
 [Review](ginux-contributions/g09c-review.md) keeps G09d pairing, its errno join,
-security/full CI and actual upstream prerequisites pending. The refreshed
+security/full CI and actual upstream prerequisites pending. G09d is refreshed at
+`ab47378f657b8d13d72077009107d223ba04d3a3` on G09b/G09c composition
+`eed013c73443a24390b1f5f6638dedca170c855f`: all98 units/static/build,
+49 ordinary controls and four directory/cwd launches pass per source/clean;
+all208 paths and both binaries match. The identical fixture fails on exact
+G09b at exits12/94. Its eleven-file +582/-53 delta is unchanged, including the
+enum/runtime join. [Review](ginux-contributions/g09d-review.md) and the downstream
+security handoff retain security/view-probes/full CI/actual-upstream holds. The refreshed
 `upstream-refresh-2026-11-06/current-inventory.json` records each currently retained
-patch/head and exact-parent replay. Eleven packets now have current-main source/
-ordinary preparation; the other 26 still need current-main reconciliation;
+patch/head and exact-parent replay. Twelve packets now have current-main source/
+ordinary preparation; the other 25 still need current-main reconciliation;
 integrity is not source/runtime acceptance. The fresh preserved-worktree report
 also confirms all six restored HEAD, raw-index and staged/unstaged/conflict-status
 fingerprints are unchanged. Reconcile the
