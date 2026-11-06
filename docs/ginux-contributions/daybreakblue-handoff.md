@@ -674,3 +674,15 @@ G12 corrected `8bb50aaa50e80428ff417654d35affd468255775` preserves full FD secur
 its obsolete read-only mapping denial assertion with valid data/unmap checks.
 Only ordinary mapping scenarios ran; the full protected/private-FD fixture is
 still for monitored review. No security acceptance or green full CI is claimed.
+
+## F03 — current Recipe integration catalog
+
+Fresh snapshot `bde746221988094d4a0b80bb46808beab447e3dc` plus hashed tracked dirty overlays is built
+separately; current e2e catalog has135 cases. F03 state/catalog lists exact names.
+Only selected ordinary operations run locally. Preserve/review the full
+worker_entry spoof/bootstrap, protected setup/source/asset authority, archive
+traversal/link redirect, modified snapshot, redirect/network grant, protected
+autofix and fault/cancellation cases under monitored security execution. They
+remain enabled and unrun locally; no cloud agent was dispatched. The ordinary
+first managed case passing is not complete suite/security acceptance. G07
+thread/shared arguments and all earlier Ginux handoffs remain unresolved.

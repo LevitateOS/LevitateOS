@@ -63,6 +63,12 @@ above2 GiB. The corrected mixed resource selection has a separate final receipt.
 A focused valid regression holds TCP alongside64 null devices, fourteen pipes,
 packet vectors and owned storage, proving the joined ranges/functionality.
 
+Actual installed SQLite library passes with two forked clients in both exports:
+SQLITE_BUSY while the first holds BEGIN IMMEDIATE, then a successful second
+transaction after commit/release, sum33 and integrity_check. No disabled lock or
+alternate VFS option is used. This is combined G23/G14/filesystem consumer
+acceptance, not independent proof on the minimal G23 candidate alone.
+
 Actual trusted cpio extracts all8229 bytes plus hardlink/symlink/root metadata.
 Actual curl IPv4/IPv6 HTTP and verified local TLS pass; actual Git ls-remote now
 passes controlled HTTP and TLS through the real helper subprocess. All actual
@@ -76,7 +82,7 @@ G07 threads/shared arguments remains unready and excluded. G01/G02 native policy
 and G25 native clamp remain excluded. [DaybreakBlue](daybreakblue-handoff.md)
 owns written adversarial validation; no agent was dispatched and no security
 criterion is passed. Policy/full default/remote platform CI/current-main standalone
-acceptance remain pending. Actual compiler, SQLite/Cargo and APK/RPM package
+acceptance remain pending. Actual compiler, Cargo and APK/RPM package
 consumer closure plus the fresh complete applicable Recipe suite remain open.
 This combined proof does not replace candidate-specific independence or reviews.
 

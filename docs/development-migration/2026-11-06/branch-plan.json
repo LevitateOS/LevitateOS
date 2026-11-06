@@ -1,0 +1,359 @@
+[
+  {
+    "path": "/home/vince/Projects/LevitateOS",
+    "branch": "codex/push-everything",
+    "local": "23472ff108db3dc58eee7773d51d48a8db43fea1",
+    "remote": null,
+    "state": "new remote branch from existing local branch"
+  },
+  {
+    "path": "/home/vince/Projects/LevitateOS",
+    "branch": "master",
+    "local": "84094544a501bab5232d67e4b6ee516321b7e472",
+    "remote": "84094544a501bab5232d67e4b6ee516321b7e472",
+    "state": "equal"
+  },
+  {
+    "path": "/home/vince/Projects/LevitateOS/docs/website",
+    "branch": "codex/streamline-development",
+    "local": "a3e1a3f3752c5f9b7d0606b53dd693181499de8b",
+    "remote": "a3e1a3f3752c5f9b7d0606b53dd693181499de8b",
+    "state": "equal"
+  },
+  {
+    "path": "/home/vince/Projects/LevitateOS/docs/website",
+    "branch": "master",
+    "local": "dcfdd75de413616cdbf3efafd96d88bbd960925d",
+    "remote": "dcfdd75de413616cdbf3efafd96d88bbd960925d",
+    "state": "equal"
+  },
+  {
+    "path": "/home/vince/Projects/LevitateOS/tools/recipe",
+    "branch": "codex/streamline-development",
+    "local": "18db12ce75c38fdfd741151b242a0fa60350cb2b",
+    "remote": null,
+    "state": "new remote branch from existing local branch"
+  },
+  {
+    "path": "/home/vince/Projects/LevitateOS/tools/recipe",
+    "branch": "ginux-recipe/f04-persist-seams",
+    "local": "25a9ff83f38424501447c59945ff2d287ec02c26",
+    "remote": "25a9ff83f38424501447c59945ff2d287ec02c26",
+    "state": "equal"
+  },
+  {
+    "path": "/home/vince/Projects/LevitateOS/tools/recipe",
+    "branch": "ginux-recipe/r01-protocol",
+    "local": "0b7875b9f27521bd9e6de5132eb3bee4b01b724d",
+    "remote": null,
+    "state": "new remote branch from existing local branch"
+  },
+  {
+    "path": "/home/vince/Projects/LevitateOS/tools/recipe",
+    "branch": "ginux-recipe/r02-worker",
+    "local": "80e45dfca4e2e19082437863ea5acdee8d70bda7",
+    "remote": null,
+    "state": "new remote branch from existing local branch"
+  },
+  {
+    "path": "/home/vince/Projects/LevitateOS/tools/recipe",
+    "branch": "ginux-recipe/r03-checkpoints",
+    "local": "e957651099dbd15fd3a1af504e6355283b8aafbd",
+    "remote": null,
+    "state": "new remote branch from existing local branch"
+  },
+  {
+    "path": "/home/vince/Projects/LevitateOS/tools/recipe",
+    "branch": "ginux-recipe/r04-backend",
+    "local": "61a742bf299c8bd5920fdc27b900e03c840d2164",
+    "remote": null,
+    "state": "new remote branch from existing local branch"
+  },
+  {
+    "path": "/home/vince/Projects/LevitateOS/tools/recipe",
+    "branch": "ginux-recipe/r05-inputs",
+    "local": "6a46f5648a930fc154e8c05ebc0fc32f40c62235",
+    "remote": "6a46f5648a930fc154e8c05ebc0fc32f40c62235",
+    "state": "equal"
+  },
+  {
+    "path": "/home/vince/Projects/LevitateOS/tools/recipe",
+    "branch": "ginux-recipe/r06-launch",
+    "local": "4056374758ba2de8517b2faf3438c64380611992",
+    "remote": "73047d8cb8f47eedf087911e48b2eed00c18bbbe",
+    "state": "fast-forward push"
+  },
+  {
+    "path": "/home/vince/Projects/LevitateOS/tools/recipe",
+    "branch": "master",
+    "local": "ce3cae5f7b979cadedfeb12cfcfb7b2b0a25b6a5",
+    "remote": "6dd4774aa017dbb33bbd6c4f4c311e4b373ad791",
+    "state": "fast-forward push"
+  },
+  {
+    "path": "/home/vince/Projects/LevitateOS/docs/content",
+    "branch": "codex/streamline-development",
+    "local": "b22d24b3b70502abfa73c41c74f4c9808901f41c",
+    "remote": "b22d24b3b70502abfa73c41c74f4c9808901f41c",
+    "state": "equal"
+  },
+  {
+    "path": "/home/vince/Projects/LevitateOS/docs/content",
+    "branch": "master",
+    "local": "ca9b5ab8378c2257d7cb4642c27242ef96b4ef24",
+    "remote": "ca9b5ab8378c2257d7cb4642c27242ef96b4ef24",
+    "state": "equal"
+  },
+  {
+    "path": "/home/vince/Projects/LevitateOS/testing/install-tests",
+    "branch": "codex/streamline-development",
+    "local": "ae36293214b5b04d32311ff2019e98f4b9d95f0e",
+    "remote": "ae36293214b5b04d32311ff2019e98f4b9d95f0e",
+    "state": "equal"
+  },
+  {
+    "path": "/home/vince/Projects/LevitateOS/testing/install-tests",
+    "branch": "master",
+    "local": "9d9e937d7e6c990024a222a0d3176b79160bf5e9",
+    "remote": "9d9e937d7e6c990024a222a0d3176b79160bf5e9",
+    "state": "equal"
+  },
+  {
+    "path": "/home/vince/Projects/LevitateOS/tools/recstrap",
+    "branch": "codex/streamline-development",
+    "local": "96c081a8e564ac894ed66234308d147c39bcfb0a",
+    "remote": "96c081a8e564ac894ed66234308d147c39bcfb0a",
+    "state": "equal"
+  },
+  {
+    "path": "/home/vince/Projects/LevitateOS/tools/recstrap",
+    "branch": "master",
+    "local": "60299620be06e7fa1dbe9ad5c7e935adc1844a76",
+    "remote": "60299620be06e7fa1dbe9ad5c7e935adc1844a76",
+    "state": "equal"
+  },
+  {
+    "path": "/home/vince/Projects/LevitateOS/testing/rootfs-tests",
+    "branch": "codex/streamline-development",
+    "local": "d83de1f634155a430c76fb7f80d6a697b8ceaf98",
+    "remote": "d83de1f634155a430c76fb7f80d6a697b8ceaf98",
+    "state": "equal"
+  },
+  {
+    "path": "/home/vince/Projects/LevitateOS/testing/rootfs-tests",
+    "branch": "master",
+    "local": "dfab66d0b4fb48b7420af936bd588122c5a1cfaa",
+    "remote": "dfab66d0b4fb48b7420af936bd588122c5a1cfaa",
+    "state": "equal"
+  },
+  {
+    "path": "/home/vince/Projects/LevitateOS/distro/elf",
+    "branch": "codex/streamline-development",
+    "local": "76b6c236d7eb930ae7eeda66bb4a1043bcf6ba96",
+    "remote": "76b6c236d7eb930ae7eeda66bb4a1043bcf6ba96",
+    "state": "equal"
+  },
+  {
+    "path": "/home/vince/Projects/LevitateOS/distro/elf",
+    "branch": "main",
+    "local": "2ff9684c2ee8f503ddaac282e6e3cac15999ada0",
+    "remote": "2ff9684c2ee8f503ddaac282e6e3cac15999ada0",
+    "state": "equal"
+  },
+  {
+    "path": "/home/vince/Projects/LevitateOS/testing/hardware-compat",
+    "branch": "main",
+    "local": "a41fd0390902e45bc7f050d3765b72864df0d19e",
+    "remote": "465ab5f964eebe411befea14196c7a1be0e2e457",
+    "state": "local head already contained by remote"
+  },
+  {
+    "path": "/home/vince/Projects/LevitateOS/distro/builder",
+    "branch": "codex/streamline-development",
+    "local": "d2d644d47c860884d746c0b09d250722b6629047",
+    "remote": "d2d644d47c860884d746c0b09d250722b6629047",
+    "state": "equal"
+  },
+  {
+    "path": "/home/vince/Projects/LevitateOS/distro/builder",
+    "branch": "main",
+    "local": "b60c8f89058aabbbda44301a001e198106ccd46c",
+    "remote": "b60c8f89058aabbbda44301a001e198106ccd46c",
+    "state": "equal"
+  },
+  {
+    "path": "/home/vince/Projects/LevitateOS/tools/recinit",
+    "branch": "codex/streamline-development",
+    "local": "86f7b7e6ef6c8338238069f4f05fb8420de95132",
+    "remote": "86f7b7e6ef6c8338238069f4f05fb8420de95132",
+    "state": "equal"
+  },
+  {
+    "path": "/home/vince/Projects/LevitateOS/tools/recinit",
+    "branch": "main",
+    "local": "fd14dccb3d2ab50448bf4d296b28c3cd6ca06713",
+    "remote": "fd14dccb3d2ab50448bf4d296b28c3cd6ca06713",
+    "state": "equal"
+  },
+  {
+    "path": "/home/vince/Projects/LevitateOS/tools/recuki",
+    "branch": "codex/streamline-development",
+    "local": "a6fb8f57b5bd73113ed6138c1af1ab969225a91f",
+    "remote": "a6fb8f57b5bd73113ed6138c1af1ab969225a91f",
+    "state": "equal"
+  },
+  {
+    "path": "/home/vince/Projects/LevitateOS/tools/recuki",
+    "branch": "main",
+    "local": "4187fd541d48b6662724e893ddb86b9d2bf751ff",
+    "remote": "4187fd541d48b6662724e893ddb86b9d2bf751ff",
+    "state": "equal"
+  },
+  {
+    "path": "/home/vince/Projects/LevitateOS/tools/reciso",
+    "branch": "codex/streamline-development",
+    "local": "848d92316f74c84466fce28434f1308f6938b6c2",
+    "remote": "848d92316f74c84466fce28434f1308f6938b6c2",
+    "state": "equal"
+  },
+  {
+    "path": "/home/vince/Projects/LevitateOS/tools/reciso",
+    "branch": "main",
+    "local": "97e620711054c9fe954439e0af3939211a2e5211",
+    "remote": "97e620711054c9fe954439e0af3939211a2e5211",
+    "state": "equal"
+  },
+  {
+    "path": "/home/vince/Projects/LevitateOS/tools/recqemu",
+    "branch": "codex/streamline-development",
+    "local": "35a67b02b807b60d70ad018fab68f7492bd1d75e",
+    "remote": "35a67b02b807b60d70ad018fab68f7492bd1d75e",
+    "state": "equal"
+  },
+  {
+    "path": "/home/vince/Projects/LevitateOS/tools/recqemu",
+    "branch": "main",
+    "local": "0a8de289965d175be06e917e5eebdcc3eb961910",
+    "remote": "0a8de289965d175be06e917e5eebdcc3eb961910",
+    "state": "equal"
+  },
+  {
+    "path": "/home/vince/Projects/LevitateOS/testing/fsdbg",
+    "branch": "codex/streamline-development",
+    "local": "14bc68bae3f307dee230bd155ef177b98707b697",
+    "remote": "14bc68bae3f307dee230bd155ef177b98707b697",
+    "state": "equal"
+  },
+  {
+    "path": "/home/vince/Projects/LevitateOS/testing/fsdbg",
+    "branch": "main",
+    "local": "db09f51ffe5f91054d7cb15d16decac94122854f",
+    "remote": "db09f51ffe5f91054d7cb15d16decac94122854f",
+    "state": "equal"
+  },
+  {
+    "path": "/home/vince/Projects/LevitateOS/distro/contract",
+    "branch": "codex/streamline-development",
+    "local": "de2f6e50793f2d5c8eb75168d11d37a6ef20dae9",
+    "remote": "de2f6e50793f2d5c8eb75168d11d37a6ef20dae9",
+    "state": "equal"
+  },
+  {
+    "path": "/home/vince/Projects/LevitateOS/distro/contract",
+    "branch": "master",
+    "local": "d2a96ee0126a6b3d3871b4dcdb22dcad2bf4acf3",
+    "remote": "d2a96ee0126a6b3d3871b4dcdb22dcad2bf4acf3",
+    "state": "equal"
+  },
+  {
+    "path": "/home/vince/Projects/LevitateOS/tools/recab",
+    "branch": "codex/streamline-development",
+    "local": "36c60e96b3f752db53034dc17fdfc928f648449a",
+    "remote": "36c60e96b3f752db53034dc17fdfc928f648449a",
+    "state": "equal"
+  },
+  {
+    "path": "/home/vince/Projects/LevitateOS/tools/recab",
+    "branch": "main",
+    "local": "8e2853913454cebd80f8f4e1b29b28708a713209",
+    "remote": "8e2853913454cebd80f8f4e1b29b28708a713209",
+    "state": "equal"
+  },
+  {
+    "path": "/home/vince/Projects/LevitateOS/tools/recpart",
+    "branch": "codex/streamline-development",
+    "local": "6008f1eec2b664ecbf2dcff2a429a0f8ef53d88d",
+    "remote": "6008f1eec2b664ecbf2dcff2a429a0f8ef53d88d",
+    "state": "equal"
+  },
+  {
+    "path": "/home/vince/Projects/LevitateOS/tools/recpart",
+    "branch": "main",
+    "local": "c73b4a69cecb397f2bd1ddb1cfd56e5ef7a4d707",
+    "remote": "c73b4a69cecb397f2bd1ddb1cfd56e5ef7a4d707",
+    "state": "equal"
+  },
+  {
+    "path": "/home/vince/Projects/LevitateOS/tui",
+    "branch": "codex/streamline-development",
+    "local": "cfb5a5a584c8bd1adfffce798e61d83cabd51673",
+    "remote": "cfb5a5a584c8bd1adfffce798e61d83cabd51673",
+    "state": "equal"
+  },
+  {
+    "path": "/home/vince/Projects/LevitateOS/tui",
+    "branch": "master",
+    "local": "5758b25b0ad31106fdb0105496af7e794b9ae2c0",
+    "remote": "5758b25b0ad31106fdb0105496af7e794b9ae2c0",
+    "state": "equal"
+  },
+  {
+    "path": "/home/vince/Projects/LevitateOS/tools/recshuttle",
+    "branch": "codex/streamline-development",
+    "local": "f23c93baf4b97bdb79cf0451f207044edb5e6c9b",
+    "remote": "f23c93baf4b97bdb79cf0451f207044edb5e6c9b",
+    "state": "equal"
+  },
+  {
+    "path": "/home/vince/Projects/LevitateOS/tools/recshuttle",
+    "branch": "master",
+    "local": "5cf1a8df0d428e89fb65ccbc4c344935a758061a",
+    "remote": "5cf1a8df0d428e89fb65ccbc4c344935a758061a",
+    "state": "equal"
+  },
+  {
+    "path": "/home/vince/Projects/LevitateOS/tools/ginux",
+    "branch": "codex/bounded-console-poll",
+    "local": "e7f5f552747e0b451b6dd31395f9199d10a42ce3",
+    "remote": "e7f5f552747e0b451b6dd31395f9199d10a42ce3",
+    "state": "equal"
+  },
+  {
+    "path": "/home/vince/Projects/LevitateOS/tools/ginux",
+    "branch": "codex/ginux-recipe-local-integration",
+    "local": "7cf2638adaf2fd3b783be636fe2a05b2d60458c5",
+    "remote": null,
+    "state": "new remote branch from existing local branch"
+  },
+  {
+    "path": "/home/vince/Projects/LevitateOS/tools/ginux",
+    "branch": "ginux-recipe/i04-m5-writable",
+    "local": "ebd68025d4db318e903867f12d0574e41f2511ce",
+    "remote": null,
+    "state": "new remote branch from existing local branch"
+  },
+  {
+    "path": "/home/vince/Projects/LevitateOS/tools/ginux",
+    "branch": "ginux-recipe/i04-m7-alias",
+    "local": "022294a9e983dd4097dcae6e198f6ecd87c1047a",
+    "remote": null,
+    "state": "new remote branch from existing local branch"
+  },
+  {
+    "path": "/home/vince/Projects/LevitateOS/tools/ginux",
+    "branch": "main",
+    "local": "2489517e89c3b62c5203ccd0f6d1eb28cf8500af",
+    "remote": "2489517e89c3b62c5203ccd0f6d1eb28cf8500af",
+    "state": "equal"
+  }
+]

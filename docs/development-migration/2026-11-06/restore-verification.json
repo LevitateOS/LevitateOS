@@ -1,0 +1,43 @@
+{
+  "ginux_reference_objects_imported": 457,
+  "worktree_restore_checks": [
+    {
+      "original_path": "/home/vince/.codex/worktrees/ginux-local-contribution-review/ginux",
+      "head": "3fac8e0598193218d6bcda4d7e0813ee60d96238",
+      "status_identical": true,
+      "unmerged_entries_preserved": false
+    },
+    {
+      "original_path": "/home/vince/.codex/worktrees/ginux-pr-combination-check/ginux",
+      "head": "2489517e89c3b62c5203ccd0f6d1eb28cf8500af",
+      "status_identical": true,
+      "unmerged_entries_preserved": false
+    },
+    {
+      "original_path": "/tmp/ginux-i04m5",
+      "head": "ebd68025d4db318e903867f12d0574e41f2511ce",
+      "status_identical": true,
+      "unmerged_entries_preserved": false
+    },
+    {
+      "original_path": "/tmp/ginux-i04m7",
+      "head": "022294a9e983dd4097dcae6e198f6ecd87c1047a",
+      "status_identical": true,
+      "unmerged_entries_preserved": false
+    },
+    {
+      "original_path": "/tmp/ginux-limits-review",
+      "head": "c4a0820deac6a91bdfc0f96796bbb8416e39911a",
+      "status_identical": true,
+      "unmerged_entries_preserved": true
+    },
+    {
+      "original_path": "/tmp/ginux-upcoming-review",
+      "head": "f8ce52747111c6b33a872e0215e94e1863a51271",
+      "status_identical": true,
+      "unmerged_entries_preserved": true
+    }
+  ],
+  "retired_self_contained_bundles_verified": 13,
+  "scope": "fresh isolated Git store and disposable checkouts; original worktree/index/ref/stash state unchanged"
+}

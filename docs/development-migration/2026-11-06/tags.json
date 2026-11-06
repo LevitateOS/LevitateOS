@@ -1,0 +1,137 @@
+[
+  {
+    "path": "/home/vince/Projects/LevitateOS",
+    "tags": [
+      {
+        "ref": "refs/tags/v.0.1.0-alpha",
+        "local": "36f5f432198c7922e4683a1f100cb9f93b66c818",
+        "remote": "36f5f432198c7922e4683a1f100cb9f93b66c818"
+      }
+    ]
+  },
+  {
+    "path": "/home/vince/Projects/LevitateOS/tools/recipe",
+    "tags": [
+      {
+        "ref": "refs/tags/0.1.3",
+        "local": "bc7843d45fa64ebb457762ebe16f53602b7f09f5",
+        "remote": "bc7843d45fa64ebb457762ebe16f53602b7f09f5"
+      },
+      {
+        "ref": "refs/tags/0.1.4",
+        "local": "6324e1d4f8d45717d86e49b76010cd68d078a8f8",
+        "remote": "6324e1d4f8d45717d86e49b76010cd68d078a8f8"
+      },
+      {
+        "ref": "refs/tags/v0.1.1",
+        "local": "1a0d84befa763b829c0ebca6b7a733bfe8c5b640",
+        "remote": "1a0d84befa763b829c0ebca6b7a733bfe8c5b640"
+      },
+      {
+        "ref": "refs/tags/v0.1.2",
+        "local": "e1166e67369bee5d748ea0663f3d897395ca598f",
+        "remote": "e1166e67369bee5d748ea0663f3d897395ca598f"
+      }
+    ]
+  },
+  {
+    "path": "/home/vince/Projects/LevitateOS/tools/recstrap",
+    "tags": [
+      {
+        "ref": "refs/tags/v0.1.1",
+        "local": "485e055de9b1558e36a435af6e6acc55ff0fe354",
+        "remote": "485e055de9b1558e36a435af6e6acc55ff0fe354"
+      },
+      {
+        "ref": "refs/tags/v0.1.2",
+        "local": "7013e36d220f590e187f0f2faa03f620d0c4b37c",
+        "remote": "7013e36d220f590e187f0f2faa03f620d0c4b37c"
+      },
+      {
+        "ref": "refs/tags/v0.1.3",
+        "local": "bb6d643a9ff76167ae7de22e6cafd289d21eefdc",
+        "remote": "bb6d643a9ff76167ae7de22e6cafd289d21eefdc"
+      },
+      {
+        "ref": "refs/tags/v0.1.4",
+        "local": "290e1551eb5dd818dfd0e0325a1460aec32bb6db",
+        "remote": "290e1551eb5dd818dfd0e0325a1460aec32bb6db"
+      },
+      {
+        "ref": "refs/tags/v0.1.5",
+        "local": "ebc9a0425ee690f988b64eadf0bae06d3253e3b9",
+        "remote": "ebc9a0425ee690f988b64eadf0bae06d3253e3b9"
+      }
+    ]
+  },
+  {
+    "path": "/home/vince/Projects/LevitateOS/distro/elf",
+    "tags": [
+      {
+        "ref": "refs/tags/v0.1.1",
+        "local": "aee388d51b7563137e34d68f95441dd1055605f9",
+        "remote": "aee388d51b7563137e34d68f95441dd1055605f9"
+      },
+      {
+        "ref": "refs/tags/v0.1.2",
+        "local": "8478df899ee651b8d1ade623b2a6aa723cc76456",
+        "remote": "8478df899ee651b8d1ade623b2a6aa723cc76456"
+      },
+      {
+        "ref": "refs/tags/v0.1.3",
+        "local": "3d3d76d9dbb094bf98bbb3e8d088ad6f2a95b72b",
+        "remote": "3d3d76d9dbb094bf98bbb3e8d088ad6f2a95b72b"
+      },
+      {
+        "ref": "refs/tags/v0.1.4",
+        "local": "58c1ce58384e587e8b74861fdf06cd19ea8644e7",
+        "remote": "58c1ce58384e587e8b74861fdf06cd19ea8644e7"
+      },
+      {
+        "ref": "refs/tags/v0.1.5",
+        "local": "ffbd0f41e976035080187c64f996fab86d7ee826",
+        "remote": "ffbd0f41e976035080187c64f996fab86d7ee826"
+      },
+      {
+        "ref": "refs/tags/v0.1.6",
+        "local": "406787f0a8aaf4b7a8b1990dc43e801afc661e2d",
+        "remote": "406787f0a8aaf4b7a8b1990dc43e801afc661e2d"
+      },
+      {
+        "ref": "refs/tags/v0.1.7",
+        "local": "8b6dcb187c15de2b2693d7453d5c1a598ad5a18e",
+        "remote": "8b6dcb187c15de2b2693d7453d5c1a598ad5a18e"
+      }
+    ]
+  },
+  {
+    "path": "/home/vince/Projects/LevitateOS/testing/hardware-compat",
+    "tags": [
+      {
+        "ref": "refs/tags/v0.1.1",
+        "local": "262a86f67d7b7433e538b88387f57b487bcd5a83",
+        "remote": "262a86f67d7b7433e538b88387f57b487bcd5a83"
+      },
+      {
+        "ref": "refs/tags/v0.1.2",
+        "local": "dc4281b2012d61e8b30a032d3fecf36e13b5c73b",
+        "remote": "dc4281b2012d61e8b30a032d3fecf36e13b5c73b"
+      }
+    ]
+  },
+  {
+    "path": "/home/vince/Projects/LevitateOS/tools/ginux",
+    "tags": [
+      {
+        "ref": "refs/tags/bootable-kernel-final",
+        "local": "7fb7407103cf71fe06c897c9694836cd3e23e131",
+        "remote": null
+      },
+      {
+        "ref": "refs/tags/research-v1-baseline",
+        "local": "f94732fbd2c99d684acca46b1733ac175c438e80",
+        "remote": null
+      }
+    ]
+  }
+]

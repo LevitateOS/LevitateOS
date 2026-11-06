@@ -1,0 +1,999 @@
+# Untangle log
+
+## Scope
+
+- **Target:** the install UI for LevitateOS and AcornOS, with its wiring, taken as one system:
+  - `tui/` (submodule): `kit/core`, `kit/presets-install`, `kit/testing`, `apps/live-tools/install-docs`, `apps/install/disk-plan`, `apps/runtime/recab`.
+  - `distro/builder/install-split-pane` (the split-pane helper, `levitate-install-docs-split`).
+  - The builder's install-UX payload code: `distro/builder/src/pipeline/live_tools.rs`, `src/live_ux.rs`, `src/artifact/live_overlay.rs` (UX parts), `src/recipe/tools.rs` and `recipes/install-split-pane.rhai` where they build UI binaries.
+  - Contract types for install UX: `distro/contract/src/{schema,variant}.rs` (`InstallExperience`, `InstallDocsFrontend`, `RuntimeActionContract::InstallModePayload`, `live_tools_ux`).
+  - Variant install profiles: `distro/variants/{levitate,acorn}/ring2/products.toml` (`live_tools_*` runtime profiles), `distro/variants/acorn/ring2/install-guide.txt`, live overlays.
+  - xtask tasks that drive the UI: `xtask/src/tasks/{tui,inspect_tui,inspect_docs,check,generate}.rs`.
+- **Out of scope as targets** (links to them still count as findings): the rec* tools themselves (finished untangle in `docs/history/UNTANGLE.md`), `docs/content` (the docs data the install-docs app renders), `docs/website`, `testing/*` harnesses other than where they drive the UI.
+- **Additions chosen:** Comments (remove comments that only restate the code) and Tests (remove tests that wouldn't catch a real bug, and fix the ones that fail without one).
+  - AGENTS.md prohibits unit tests outside ginux, so "Tests" applies to the PTY/integration tests (`install-viewer.chrome.pty.test.ts`), snapshot checks (`inspect:check`), and the `kit/testing` package.
+- **Repo rules that bind the refactor:** commit on the checked-out branch (no new branches), submodules first then superproject pointers, no unit tests. Another session is concurrently editing `distro/contract`, `distro/builder/src/pipeline/products.rs`, `xtask/` (rpm_dvd → rpm_set work): commit only our own hunks.
+- **Tooling for later phases:** `.artifacts/untangle-ui/` (gitignored)
+  - `scripts/skeleton.py` — body-stripped TS/TSX/Rust skeleton of the scope → `.artifacts/untangle-ui/skeleton/`.
+  - `scripts/depgraph.py` — TS import graph (file and package level), cycles, fan-in → `.artifacts/untangle-ui/map/`.
+  - `scripts/history.sh` — churn and co-change for `tui/` and the builder UX files → `.artifacts/untangle-ui/map/`.
+  - `baseline/` — command outputs and render snapshots listed below.
+
+## Baseline
+
+Taken 2026-11-06.
+
+- **Superproject:** `master` @ `90229932fddab1213dd0595153abb3e7ab923afb`. Unrelated dirty files from another session: `Cargo.lock`, `xtask/{Cargo.toml,src/app.rs,src/cli/*,src/tasks/mod.rs,src/tasks/base.rs}`, `distro/variants/levitate/ring3/{sources.toml,keys/}`, `tools/recipe` pointer.
+- **Submodules** (all on `codex/streamline-development`):
+
+  | repo | SHA | state |
+  |---|---|---|
+  | tui | cfb5a5a | clean |
+  | distro/builder | 3963bf9 | dirty (other session: `products.rs`) |
+  | distro/contract | bb90e68 | dirty (other session: rpm_set) |
+  | docs/content | bd9e103 | clean |
+
+- **Typecheck** (`bun run typecheck`): pass for `tui/kit/core`, `tui/apps/install/disk-plan`, `tui/apps/live-tools/install-docs`, `tui/apps/runtime/recab`. `cargo check -p install-split-pane`: pass.
+- **Lint** (`bun run lint`): pass for disk-plan and recab; **fail** for kit/core and install-docs — their scripts point at `.oxlintrc.json` at the repo root, which does not exist.
+- **Format** (`bun run format:check`): **fail** in all four packages. kit/core and install-docs point at a missing `.oxfmtrc.json`; disk-plan and recab run with oxfmt defaults and report unformatted files.
+- **install-docs `inspect:check`** (`scripts/verify-inspect-snapshots.sh`): **fail** — `001-installation-disk.txt` differs from `snapshots/inspect/120x36/` (docs content moved on; snapshots stale).
+- **install-docs `test:e2e`** (`install-viewer.chrome.pty.test.ts`): **0 pass, 3 fail** — the test runs `xtask docs inspect`, renamed to `xtask inspect docs` in tui `60669a0`; `unrecognized subcommand 'docs'`.
+- **Renders** (`.artifacts/untangle-ui/baseline/`):
+  - `docs/run-*/`: `cargo xtask inspect docs --columns 120 --rows 36` → all 35 nav pages render (exit 0).
+  - `disk-plan/run-*/`: `cargo xtask inspect tui install-disk-plan --columns 120 --rows 36` → welcome page renders (10-page flow, disk `/dev/sda`, mode `ab`).
+  - `recab/run-*/`: `cargo xtask inspect tui --cwd tui/apps/runtime/recab --command 'bun run main.ts'` → **crashes**: "Invalid hook call … more than one copy of React", then `Unhandled TUI error: null is not an object (evaluating 'dispatcher.useContext')`. recab is not in the root `package.json` workspaces.
+- **Live ISO:** not built or booted. QEMU tools under `.artifacts/tools/current` point into root-owned `.artifacts/ginux-export`, unreadable by this user; the user chose to skip boot checks. The install-UX profile scripts, entrypoint and split pane are therefore only verified by compilation.
+
+## Map
+
+Views (rerun with the scripts in Scope): skeleton `.artifacts/untangle-ui/skeleton/` (~15k → ~5k lines), import graph `.artifacts/untangle-ui/map/{deps,fanin,packages,cycles}.txt`, history `.artifacts/untangle-ui/map/{churn,cochange}-*.txt`.
+
+| Area | Size | What it is | Depends on |
+|---|---|---|---|
+| A. `tui/kit/core` | 85 files, 5.5k lines | Ink/React runtime, primitives, components, "chrome" box-drawing renderer, theme, hooks, patterns (wizard, two-pane, review) | ink, react |
+| A'. `tui/kit/presets-install`, `tui/kit/testing` | 7 + 6 files, 1 line each | Stubs: every file is an empty barrel; `build` echoes "stub" | — |
+| B. `tui/apps/live-tools/install-docs` | 58 files, 4.3k lines | LevitateOS docs/installer guide viewer (sidebar nav + rich page renderer), bundled with Bun onto the LevitateOS ISO | `@levitate/tui-kit` (28 imports), `@levitate/docs-content` (26) |
+| C. `tui/apps/install/disk-plan` | 11 files, 1.7k lines | 10-page partition-planning wizard over `recpart` JSON; not shipped on any ISO | tui-kit (2), generated `contract/recpart.ts` |
+| C'. `tui/apps/runtime/recab` | 13 files, 0.5k lines | A/B slot status TUI over `recab`; not shipped; crashes at baseline (duplicate React; not in root workspaces) | tui-kit (2) |
+| D. Split pane | `install-split-pane/src/main.rs`, 0.8k lines | Rust ratatui+vt100+PTY two-pane host: shell left, docs right; `--smoke` | crossterm, portable-pty, vt100 |
+| E. Builder UX payload | `live_tools.rs` (0.7k), `live_ux.rs`, `live_overlay.rs` (0.7k) | Generates entrypoint, profile.d hook, docs launcher scripts as Rust format strings; bundles the Bun app; overlay autologin | contract, recipe tools |
+| F. Contract + variants | `schema.rs`/`variant.rs` install types; `products.toml` `live_tools_*` profiles | Declares install experience, docs frontend, split-pane binary per distro | — |
+| G. xtask | `tui.rs`, `inspect_tui.rs`, `inspect_docs.rs`, `check.rs`, `generate.rs` | Launch/render/typecheck the apps; generate `recpart.ts` | tui paths by string |
+
+**Hotspots.** tui history was re-rooted (17 commits total), so churn is thin: `disk-plan-screen.tsx` (7), `runtime-recab-screen.tsx` (4), `contract/recpart.ts` (4). In the builder, `live_overlay.rs` (23) and `live_tools.rs` (22) are the volatile files, and the superproject's tui pointer moves together with `xtask/src/tasks/{tui,docs}/inspect.rs` (4×) — xtask and the TUI change together across a repo boundary.
+
+**Graph.** No import cycles. Fan-in concentrates on `kit/core/src/utils/clamp.ts` (20), `theme.ts` (17), `app/app-provider.tsx` (17). 24 files nothing imports: entrypoints, plus all of `presets-install` and `testing` (dead), `install-docs/.../primitives/index.ts`, and recab's three entry/barrel files. Each app reaches `@levitate/tui-kit` only through the barrel; install-docs is the only heavy kit consumer.
+
+**Where leverage looks highest.** (1) The seam between Rust and the UI: shell scripts emitted from Rust format strings, env-var protocols (`LEVITATE_INSTALL_*`, `LEVITATE_DOCS_PLAIN`), command names resolved by string at three layers (profile hook → entrypoint → split pane → docs). (2) Two distros, two different docs frontends (Bun TUI vs `less`). (3) kit/core's size vs its two real consumers. (4) Dead/stub packages and broken checks (lint/format configs missing, e2e and snapshot checks failing).
+
+## Problems
+
+Totals: **649 entries — 364 hidden, 47 needless, 130 surplus, 108 special** (636 from the area passes after dropping 9 cross-area duplicates, plus 13 from the completeness pass). The special-case count, 108, is the number the refactor works to bring down.
+
+**Biggest clusters** (detail in the sections below):
+1. **The launch chain from login to install screen has no owner.** tty selection, command choice, shell choice and env (`LEVITATE_INSTALL_*`, `LEVITATE_DOCS_PLAIN`, TERM/COLORTERM/FORCE_COLOR/NO_COLOR) are decided separately in the profile hook, serial autologin, entrypoint, split pane, docs launcher scripts and xtask, all as Rust format strings or copies; paths differ per distro and two are dead (systemd agetty has no `-l`; Acorn's ttyS0 branch can't run).
+2. **The UI can't fit where it's shown and lies about colour.** The docs app needs 88 columns but gets half the console (verified: "Terminal too small"); ansi256 colours are emitted as bare numbers Ink ignores, hidden by forcing `FORCE_COLOR=3` in five places; `LEVITATE_DOCS_PLAIN` is never read.
+3. **Checks that can't catch anything.** lint/format point at missing configs; the PTY test calls a renamed xtask subcommand; snapshots embed the page count; `inspect tui --input` writes keys to the screen, not the app; split-pane `--smoke` passes on tty echo; recab is typechecked but crashes on launch (kit lists React as a dependency, recab isn't a workspace member).
+4. **Duplicated facts across the TS/Rust/repo boundaries.** recpart/recab modes, tokens, command lines and labels copied into the apps; the app list in six places; the split-pane name in ~9; theme colours in three RGB tables; block layout computed twice (measure vs render) in install-docs.
+5. **Surplus kit and app scaffolding.** All of `kit/core/patterns`, ~20 components, ~25 helpers, two stub packages, ~20 barrels, plugin/registry/profile layers with one implementation (the `acorn` docs profile can't be selected), docs/README/architecture files that describe code that no longer exists.
+6. **Distro-blind UI.** LevitateOS gets a Bun TUI, AcornOS a `less` text file; disk-plan defaults to `ab` and isn't shipped on either ISO; LevitateOS branding and `/usr/local/share/levitate` paths ship on AcornOS.
+
+Real bugs found while auditing (from reading code unless noted): recab TUI crash (run); `inspect tui --input` dead (run); docs pane "Terminal too small" at half width (run); `recipe/tools.rs` adds `recpart` to one of two package maps; live-net-setup awk programs rejected by gawk (run on host gawk); split pane PTYs one row taller than drawn; `truncate_for_error` can panic on a UTF-8 boundary; any failure in the UX `exec` chain ends the login with no fallback shell; `rich-text.tsx:45` returns before hooks; `AsyncWizardFlow` ignores `defaultIndex`; QA-answer links selectable but never highlighted; recab mutation result overwritten by the status refresh; disk-plan Next on result-handoff lands on failure-diagnostics.
+
+| Area | hidden | needless | surplus | special |
+|---|---|---|---|---|
+| Cross-area | 7 | 0 | 0 | 2 |
+| A. kit | 95 | 18 | 43 | 32 |
+| B. install-docs | 97 | 15 | 44 | 23 |
+| C. disk-plan + recab | 92 | 4 | 25 | 16 |
+| D. Rust/shell wiring | 71 | 10 | 15 | 27 |
+
+### Cross-area (lead pass)
+
+#### The list of UI apps/packages, repeated
+- [hidden] The set of TUI packages is listed separately in `package.json:4-12` (root workspaces: install-docs, disk-plan, kit/core, presets-install, testing — no recab), `xtask/src/tasks/check.rs:8-14` (`TS_PACKAGES`: kit/core, disk-plan, install-docs, recab — no presets/testing), `xtask/src/cli/types.rs:337-339` (`TuiApp`: install-docs, install-disk-plan), `xtask/src/tasks/tui.rs:15-33` (paths per app), `xtask/src/tasks/inspect_tui.rs:~120-130` (presets: install-docs, install-disk-plan), `tui/README.md` (lists all three apps, "run an app with `cargo xtask tui <app>`"). Adding or moving an app needs all six; they already disagree (recab is typechecked but not a workspace member, cannot be launched or inspected by xtask, and crashes on launch with a duplicate React).
+- [hidden] App names differ by place: `install-docs` (dir, xtask) vs `@levitate/docs-tui` (package name) vs `levitate-install-docs` (bin, ISO command) vs `docs-tui` (ISO alias) vs `install-disk-plan` (xtask) vs `disk-plan` (dir). Nothing ties them.
+
+#### Terminal environment forcing, five copies
+- [hidden] "Force TERM to xterm-256color if empty/dumb/vt100/vt102/linux, COLORTERM=truecolor, FORCE_COLOR=3, clear NO_COLOR" is written five times: `distro/builder/install-split-pane/src/main.rs:550-567` (`apply_common_env`), `xtask/src/util/pty_capture.rs:114-131` (`apply_terminal_env`, same TERM list), `distro/builder/src/pipeline/live_tools.rs:~388-398` (Bun docs launcher shell), `live_tools.rs:~465-475` (plain-text docs launcher shell), `xtask/src/tasks/tui.rs:20` (`env_remove("NO_COLOR").env("FORCE_COLOR","3")`). They already differ (split pane sets `NO_COLOR=""`, xtask removes it; tui.rs doesn't touch TERM/COLORTERM).
+- [special] The same code overrides `TERM=linux` (the real tty1 console) to `xterm-256color` + truecolor for the docs app, so the app is told it has a terminal it doesn't have; the split pane then re-renders the inner screen to the real console. The capability the app should render for is decided by three layers, none of which is the terminal.
+
+#### Two task runners, two lint/format toolchains
+- [hidden] Root `package.json:13-19` runs `turbo dev|build|typecheck|lint|check` (`turbo.json`) while `xtask/src/tasks/check.rs` runs its own typecheck loop over a different package list; AGENTS.md says workflows go through `cargo xtask`. Two definitions of "check the UI".
+- [hidden] Root `package.json:21` pins `@biomejs/biome` (used only by `docs/content/biome.json`), while every tui package lints/formats with `oxlint`/`oxfmt`; kit/core and install-docs point `--config` at root `.oxlintrc.json`/`.oxfmtrc.json` that don't exist, disk-plan and recab run oxlint/oxfmt with defaults. Three lint/format setups across one UI.
+
+#### xtask and the TUI change together across the repo boundary
+- [hidden] Superproject history: the `tui` pointer moves with `xtask/src/tasks/{tui,docs}/inspect.rs` in 4 commits and with xtask tooling files 3× each (`.artifacts/untangle-ui/map/cochange-super-tui.txt`). The TUI's render/inspect harness lives in xtask (another repo), its PTY test lives in the app and shells out to xtask by subcommand name — the rename `docs inspect` → `inspect docs` broke it silently.
+- [hidden] `xtask/src/util/pty_capture.rs` (PTY spawn, kill process group, env) and `install-split-pane/src/main.rs` (PTY spawn, env, vt100 screen) are two PTY hosts for the same apps in two repos with copied setup.
+
+#### Verified by the lead
+- [special] `tui/kit/core/src/theme.ts:50-66` minimum 88 columns for the docs layout, while the split pane gives the docs app about half the console. Verified: `cargo xtask inspect docs --slug installation --columns 60 --rows 24` renders only "Terminal too small: got 60x24, need 88x24". On a typical framebuffer console (100–128 columns) the LevitateOS install screen's right pane shows nothing but that message. The width the docs app gets is decided by the split pane (Rust, builder repo) and the width it needs by the kit theme (TS, tui repo); nothing connects them.
+
+### A — tui/kit (core, presets-install, testing)
+
+Path shorthand: `core/…` = `tui/kit/core/…`; `presets/…` = `tui/kit/presets-install/…`; `testing/…` = `tui/kit/testing/…`; `install-docs/…` = `tui/apps/live-tools/install-docs/src/…`; `disk-plan/…` = `tui/apps/install/disk-plan/src/…`; `recab/…` = `tui/apps/runtime/recab/…`. Consumers were read only to judge how kit exports are used.
+
+#### Packaging, React/ink declaration, the duplicate-React crash
+
+- [hidden] `core/package.json:23-26` declares `ink` and `react` as `dependencies`, not peers, so `tui/kit/core/node_modules/react` exists. Bun resolves kit source files to their real path, so the kit's `import "react"` resolves from `tui/kit/core/node_modules` (root store `react@19.3.1`). recab is not a workspace member (root `package.json:4-12`), so its own `bun install` gives it `recab/node_modules/react@19.2.4`, and its `@levitate/tui-kit` copy (`recab/node_modules/@levitate/tui-kit/`, per-file symlinks back into `tui/kit/core`) still reads kit React from the kit's folder. That makes two Reacts and the "Invalid hook call" crash. disk-plan and install-docs work only because, as workspace members, their `react` symlinks point at the same root store path as the kit's. Whether a kit consumer works depends on where it sits in the workspace, and nothing in the kit says so.
+- [hidden] `recab/package.json:19-23`, `disk-plan` `package.json` and `install-docs` `package.json` each list `ink` and `react` again next to `@levitate/tui-kit`, and the apps import `ink` directly (`disk-plan/presentation/disk-plan-screen.tsx:1` `Box, Text, useApp, useInput`; `recab/presentation/runtime-recab-screen.tsx:1`; `install-docs/presentation/ink/screens/install-viewer.tsx:1`). The kit and each app must resolve the same ink/React instance, but each manifest pins its own range.
+- [hidden] `core/package.json` consumers use `"file:../../../kit/core"` (`recab/package.json:20`, disk-plan, install-docs). install-docs uses `"workspace:*"` for docs-content in the same manifest. The `file:` protocol makes a non-workspace app take a copy, while a workspace app gets a symlink, and the code doesn't show that difference.
+- [hidden] `core/bun.lock:128` pins `react@19.2.4`, but the kit runs on the root store `react@19.3.1` (`tui/kit/core/node_modules/react` symlink). The kit lockfile is a standalone leftover that doesn't describe what is installed. The repo root has no `bun.lock`, and `disk-plan/../bun.lock` and `recab/bun.lock` are separate lockfiles too.
+- [hidden] `xtask/src/tasks/check.rs:8-14,45,56-60`: `ensure_node_modules` runs a bare `bun install` inside `tui/apps/runtime/recab`, which creates the separate `node_modules` that causes the crash. The `typecheck` step then passes, because types don't detect two runtime React copies. The check that sets up recab is what breaks it, and it can't catch the breakage.
+- [hidden] `core/src/globals.d.ts:1-26` hand-declares `process` (with `stdout.on?`, `off?`, `removeListener?` optional) because the kit has no `@types/node` (`core/node_modules/@types` has only `react`). When an app compiles kit source, `@types/node` or `@types/bun` supplies `process` instead. The same code is typechecked against two different `process` shapes, and the fallbacks at `core/src/app/app-provider.tsx:73-77` exist only for the hand-written one.
+- [hidden] `core/src/app/render-app.tsx:12-16,45` redeclares Ink's render handle as `InkRenderHandle` and casts `render(...) as unknown as InkRenderHandle`. Ink's `Instance` type can change without the kit's typecheck noticing. `rerender?.` at `:64` is optional only because of this local type.
+- [hidden] `core/src/runtime/ink/use-input.ts:7-24,178` redeclares Ink's `Key` as `InkKeyLike` and casts `key as InkKeyLike`. If Ink adds or renames key flags (for example `super`), the names table at `:94-132` won't follow.
+
+#### Broken scripts, configs and checks
+
+- [hidden] `turbo.json` `lint` plus root `package.json` `"lint": "turbo lint"` runs the kit's broken `lint`, so the root lint fails because of a path in the kit's manifest.
+- [surplus] `core/package.json:13-14`: `clean` and `build` emit `dist/` with declarations, but `exports` (`:8-11`) point at `./src/*.ts`, so nothing consumes `dist/`. `turbo.json` `typecheck.dependsOn: ["^build"]` makes every app typecheck run this unused build first.
+- [surplus] `core/scripts/pre-commit.sh:1-4` repeats `core/package.json:21` (`git diff --cached --check`), and nothing references the script (no hook, no package script).
+- [surplus] `core/package.json:29-30` keeps its own `oxfmt`/`oxlint` devDependencies, while the root `package.json` also pins `oxlint 1.39.0`. Two pins of the same tool must be bumped together.
+- [hidden] `presets/package.json:7` `build` is `echo 'stub: presets-install build'`, so `turbo build` reports success for a package that builds nothing. This check can never fail.
+- [hidden] `presets/tsconfig.json` and `testing/tsconfig.json` set `"types": ["node"]`, but neither package depends on `@types/node`. Any `tsc` run there would fail. Neither has a `typecheck` script, so nothing notices.
+- [hidden] `xtask/src/tasks/tui.rs:14-44` and `inspect_tui.rs:117-128` have no recab target, yet `tui/README.md:9,17` says every app runs with `cargo xtask tui <app>`. The recab launch crash is invisible to every repo command.
+- [hidden] `xtask/src/tasks/tui.rs:20` forces `FORCE_COLOR=3` and removes `NO_COLOR` before running install-docs. This hides the kit's ansi256 colour bug (see the colour runtime section) in development runs. The xtask has to know the kit's env contract.
+
+#### Stub packages
+
+- [surplus] `presets/src/index.ts:1` exports only `TUI_PRESETS_INSTALL_STUB = true`, and nothing imports it (fan-in 0).
+- [surplus] `presets/src/{apply-confirm,command-preview,evidence-panels,layout-presets,session-shell,status-model}/index.ts:1` are each `// stub`, empty files nothing imports. These are extension points for things that don't exist.
+- [surplus] `testing/src/index.ts:1` exports only `TUI_TESTING_STUB = true`, and nothing imports it.
+- [surplus] `testing/src/{asserts,fixtures,matchers,pty,snapshots}/index.ts:1` are each `// stub`, and nothing imports them. The package is described as a "test harness" (`testing/README.md:3`) in a repo that bans unit tests.
+- [surplus] `testing/package.json:6` has `"scripts": {}`, and root `package.json:10-11` still lists both stub packages as workspaces.
+
+#### Docs and comments that contradict the code
+
+- [hidden] `tui/README.md:14-15` says `kit/presets-install` holds "install UX compositions shared by the apps" and `kit/testing` holds "test harness and snapshot helpers". Both are empty stubs.
+- [hidden] `core/README.md:16` says "Docs-domain rendering/navigation no longer lives in `tui-kit`". `core/src/components/navigation/tree-nav.tsx:52` (`"Docs"`), `:96` (`"(no docs pages)"`), `core/src/primitives/display/syntax-token-line.tsx:44` (the docs `[[fg=…]]` markup), `core/src/primitives/display/link.tsx:21` (`linkRuns`) and `core/src/components/feedback/status-line.tsx:167` (pager keymap) are docs-viewer code still in the kit.
+- [hidden] `core/README.md:9-14` lists the folders as app, runtime, primitives, components, patterns and theme. It omits `surfaces/`, `chrome/`, `hooks/` and `utils/`, which are what the apps actually use (`SurfaceFrame`, chrome glyphs, hooks).
+- [hidden] `core/README.md:14` lists "typography" under theme. `core/src/theme/typography.ts:1` is only a re-export of string helpers from `utils/strings`.
+- [hidden] `core/README.md:25-37`: the Quick Start renders `TwoPane` with `footer="q quit"` through `renderApp`, which defaults `exitOnCtrlC: false` (`core/src/app/render-app.tsx:44`). Nothing in `TwoPane` binds `q`, so the documented example can't be exited. It also showcases `TwoPane`, which no app uses.
+- [hidden] `core/README.md:21` and `core/AGENTS.md:7` advertise `@levitate/tui-kit/theme` as a public entry. No consumer imports it.
+- [hidden] `core/README.md:46-47` lists `bun run lint` and `bun run format:check` as working scripts. Both fail (missing config).
+- [hidden] `core/AGENTS.md:5` says "The kit owns … terminal input, focus". disk-plan reads raw input with Ink's `useInput` (`disk-plan/presentation/disk-plan-screen.tsx:293`) and keeps its own pane focus (`:170`), because the kit has no input capture.
+- [hidden] `core/src/patterns/wizard-flow.tsx:26` says the aliases are "Backward-compatible helper names for tests and callsites during the cutover". The tests were removed (commit `1e2ca92`) and no call site uses `pageClampIndex` or `formatPageCard`.
+- [hidden] `core/src/hooks/use-hotkeys.ts:22` says "Alias retained as a stable generic input hook name". Nothing uses `useTuiInput`.
+- [hidden] `install-docs/../chrome-architecture.md:4,34-40` says chrome is "rendered from deterministic coordinates, not content layout" and that `SurfacePane` frames are chrome-owned. `core/src/surfaces/frame/pane.tsx:97-126` draws only the top three rows with `ChromeLayer`. The sides and bottom come from Ink's `borderStyle` (`:110-115`, cli-boxes glyphs). The doc describing kit internals lives in an app, and `:45` still names the old `docs/tui` path.
+- [hidden] `install-docs/../chrome-architecture.md:21` says "No ASCII `-` fallback is used for structural chrome". `core/src/utils/strings.ts:45,50` (`horizontalRule` defaults to `-`) and `core/src/components/data/table.tsx:37` (`-`/`-+-` separators) draw rules in ASCII.
+- [hidden] `core/package.json:5` says "Reusable terminal UI primitives". The package also carries install-docs vocabulary (see below) and workflow patterns (`WizardFlow`, `ReviewScreen`) that no app uses.
+
+#### Barrels and entry points
+
+- [surplus] `core/src/index.ts:1-10` is a pure re-export barrel over ten folder barrels, and every app import goes through it.
+- [surplus] Folder barrels that only re-export: `core/src/app/index.ts:1-4`, `runtime/index.ts:1-2`, `runtime/ink/index.ts:1-3`, `runtime/terminal/index.ts:1-2`, `hooks/index.ts:1-7`, `primitives/index.ts:1-2`, `primitives/layout/index.ts:1-4`, `primitives/display/index.ts:1-7`, `components/index.ts:1-4`, `components/{data,feedback,forms}/index.ts:1-3`, `components/navigation/index.ts:1-6`, `patterns/index.ts:1-4`, `surfaces/index.ts:1`, `surfaces/frame/index.ts:1-4`, `chrome/index.ts:1-5`, `utils/index.ts:1-3`.
+- [surplus] `core/src/theme.ts:29-34` already does `export *` from `./theme/tokens` and `./theme/colors`, and `:182-201` exports the same names again (`defaultThemeChrome`, `detectColorRuntime`, `resolveIntentColor`, `ColorIntent`, …). That's two export lists to keep in step.
+- [needless] `core/src/theme.ts` is both a barrel and the owner of `createTheme`, `normalizeTheme*` and `footerHint` (`:36-180`), next to a `theme/` folder that holds the rest of the theme. Theme logic is split between `theme.ts` and `theme/*.ts` for no reason the layout shows.
+- [surplus] `core/src/theme/typography.ts:1` re-exports four `utils/strings` functions under the theme namespace. Those names reach the root barrel twice (`index.ts:9` through theme, `:10` through utils).
+- [surplus] `core/src/hooks/use-hotkeys.ts:18-20` re-exports `keyNamesFromInput`, `normalizeKeySpec` and five types that `runtime/ink/index.ts:1` already exports through the root barrel.
+- [surplus] `core/package.json:10` `"./theme": "./src/theme.ts"` is a second entry point for the same symbols the root barrel exports, and nobody imports it.
+
+#### Dead export surface (nothing outside the kit uses it)
+
+- [surplus] Exports kept only for the unit tests removed in `1e2ca92`, and now unused anywhere outside their own file: `createFocusManager` (`core/src/runtime/ink/focus-manager.ts:11`), `toggleFocusPlane` (`hooks/use-focus-plane.ts:19`, used only internally), `transitionGridIndex` (`hooks/use-grid-navigation.ts:33`), `resolveDividerGlyph` (`primitives/display/divider.tsx:11`), `keyNamesFromInput`/`normalizeKeySpec` exports (`runtime/ink/use-input.ts:60,68`), `groupGridRows` (`primitives/layout/grid.tsx:67`), `progressRatio`/`renderProgress`/`renderProgressBar` (`components/feedback/progress.ts:15,26,31`), `normalizeTerminalSize`/`readScreenSize`/`DEFAULT_TERMINAL_SIZE`/`terminalMeetsMinimum` exports (`runtime/terminal/screen-size.ts:8,17,27,52`), `renderSectionList` (`components/navigation/section-list.tsx:25`), `mapSelectableGridItems` (`components/navigation/selectable-grid.tsx:23`), `flattenStatusSegments`/`formatPagedStatusLine` (`components/feedback/status-line.tsx:38,167`), `footerHint` (`theme.ts:173`), `buildTreeNavRows` (`components/navigation/tree-nav.tsx:74`), `resolveTwoPaneGeometry` (`patterns/two-pane.tsx:70`), `formatWizardCard`/`wizardClampIndex` (`patterns/wizard-flow.tsx:15,19`), `createChromeGrid` (`chrome/grid.ts:276`).
+- [surplus] Components nothing renders: `Stack` (`primitives/layout/stack.tsx:12`), `Inline` (`primitives/layout/inline.tsx:12`), `Grid`/`GridItem` outside `SelectableGrid` (`primitives/layout/grid.tsx:82,90`), `ScrollView` outside `ReviewScreen` (`primitives/layout/scroll-view.tsx:40`), `Heading` (`primitives/display/heading.tsx:8`), `Divider` (`primitives/display/divider.tsx:15`), `Panel` (`primitives/display/panel.tsx:15`), `UiLink` (`primitives/display/link.tsx:51`), `SyntaxTokenLine` (`primitives/display/syntax-token-line.tsx:102`), `EmptyState` (`components/data/empty-state.tsx:8`), `Table` (`components/data/table.tsx:45`), `Spinner` (`components/feedback/spinner.tsx:11`), `ProgressBar` (`components/feedback/progress.ts:39`), `StatusLine` (`components/feedback/status-line.tsx:12`), `Confirm` (`components/forms/confirm.tsx:12`), `Select` (`components/forms/select.tsx:14`), `TextField` outside `TextEntryScreen` (`components/forms/text-field.tsx:23`), `List` (`components/navigation/list.tsx:5`), `Pager` (`components/navigation/pager.tsx:33`), `Tabs` (`components/navigation/tabs.tsx:18`), `ErrorBoundary` as an export (`app/error-boundary.tsx:14`), `ThemeProvider` (`theme/theme-provider.tsx:10`), `AppProvider` as an export (`app/app-provider.tsx:18`).
+- [surplus] The whole `patterns/` folder is unused by every app: `PageFrame` (`patterns/page-frame.tsx:12`), `TwoPane` and `ScreenFrame` (`patterns/two-pane.tsx:88,136`), `ReviewScreen` (`patterns/review-screen.tsx:17`), `WizardFlow`, `AsyncWizardFlow`, `TextEntryScreen` and `ReviewScreenFlow` (`patterns/wizard-flow.tsx:41,123,234,272`). That's about 500 lines that change only when the kit changes.
+- [surplus] Unused hooks and runtime helpers: `useMeasure` (`hooks/use-measure.ts:5`), `useAsyncTask` outside `AsyncWizardFlow` (`hooks/use-async-task.ts:13`), `useTuiInput` (`hooks/use-hotkeys.ts:23`), `useKeyInput` as an export (`runtime/ink/use-input.ts:163`), `useTuiApp` outside the kit (`app/app-provider.tsx:22`), `useThemeTokens` (`theme/theme-provider.tsx:14`), `createExitController` (`runtime/ink/exit-controller.ts:8`), `getTerminalSize` (`runtime/terminal/screen-size.ts:42`), `detectTtyColors` and `ttySupportsColor` (`runtime/terminal/tty-capabilities.ts:10,14`).
+- [surplus] Unused theme and utility exports: `spacing`/`resolveSpacing`/`SpacingToken` (`theme/spacing.ts:1-17`; the kit hard-codes `paddingX={1}` instead), `PaletteKey` (`theme/palette.ts:27`), palette keys `gray100`, `gray300`, `gray700`, `slate700`, `blue800`, `blue700`, `amber900` (`theme/palette.ts:4,5,7,10,16,17,18`, never read), `resolveIntentMono` (`theme/colors.ts:349`), `resolveColorReference` (`theme/colors.ts:353`), `resolveRgbLiteral` (`theme/colors.ts:431`), `normalizeThemeColorMode` (`theme/colors.ts:417`), `chunkArray` (`utils/arrays.ts:11`), `toPositiveIntOrFallback`/`toInt`/`toFiniteNumber` exports (`utils/clamp.ts:1,9,17`), `renderChromeRowStrings` (`chrome/renderer.ts:50`), `applyChromeInstruction` export (`chrome/renderer.ts:4`), `ChromeRule` and `ChromeSplit` (`chrome/components.tsx:115,117`), `ChromeGrid` class export (`chrome/grid.ts:84`).
+- [surplus] `core/src/app/create-app.tsx:38` `disposeTuiApp(_app) {}` is an empty function nothing calls.
+- [surplus] `core/src/app/app-provider.tsx:7` `TuiAppContextValue.title` is set by `create-app.tsx:32`, and the three apps pass titles (`disk-plan/app/bootstrap.tsx:11`, `recab/app/bootstrap.tsx:9`, `install-docs/app/bootstrap.tsx:30`), but nothing reads `title` from context.
+- [surplus] `core/src/theme/tokens.ts:41` `ColorValue.mono` (`normal|bold|dim`) is given for every intent and normalised (`theme/colors.ts:404-407`), but no renderer applies it. In mono mode the hints are ignored.
+- [surplus] `core/src/theme/tokens.ts:60,64` `ThemeChrome.titleStyle` and `sidebarHeaderMode` are normalised (`theme.ts:92-105`) and set by install-docs (`install-docs/presentation/ink/theme/index.ts:82,86`), but no renderer reads them.
+- [surplus] `core/src/theme/tokens.ts:21,31` intents `headerAccentBackground` and `warningBackground` are defined and overridden by install-docs, but no kit or app component renders with them.
+- [surplus] `core/src/surfaces/frame/types.ts:4,20` `SurfacePaneTitleStyle`/`titleStyle` prop is accepted but never read in `surfaces/frame/pane.tsx`.
+- [surplus] `core/src/primitives/display/link.tsx:12,59` `UiLink` accepts `onActivate` and discards it with `void onActivate`.
+
+#### Install-docs vocabulary inside the general kit
+
+- [needless] `core/src/theme/tokens.ts:5-35` `ColorIntent` includes `sidebarSectionText`, `sidebarItem*`, `commandBarBackground`, `commandPrompt`, `sectionHeading`, `sectionSubheading` and `card*`. These name install-docs regions. `commandPrompt`/`commandBarBackground` are read only by `install-docs/presentation/ink/primitives/command-line-row.tsx:23-24`. Every change to the docs viewer's palette roles changes the kit's central type.
+- [needless] `core/src/theme/tokens.ts:50-56,256-262` `ThemeLayout.sidebarWidth`, `headerHeight` and `footerHeight` describe one two-pane screen shape, so the general theme carries one layout's dimensions.
+- [needless] `core/src/theme/tokens.ts:64` `sidebarHeaderMode: "current-section-title" | "all-section-headers"` names the docs sidebar's modes. The real modes live in `components/navigation/tree-nav.tsx:6` and again in `install-docs/presentation/ink/components/sidebar.tsx:5`.
+- [needless] `core/src/components/navigation/tree-nav.tsx:52,96` default section `"Docs"` and empty label `"(no docs pages)"`. Its only consumer is `install-docs/presentation/ink/components/sidebar.tsx:23-43`, which overrides every option. `TreeNav` changes whenever the docs sidebar does.
+- [needless] `core/src/components/navigation/tree-nav.tsx:174-178` defaults its colours to `sidebar*` intents, so the general tree is tied to "sidebar" theme roles.
+- [needless] `core/src/primitives/display/syntax-token-line.tsx:44-94` `parseSyntaxTokenLine` parses an ad-hoc `[[fg=#hex]]…[[/]]` markup that only the docs content pipeline produces. Its only consumers are install-docs (`blocks/code-block.tsx:44`, `blocks/shared/syntax-line.tsx:18,40`). The markup format is owned by the docs producer but parsed in the kit.
+- [needless] `core/src/primitives/display/link.tsx:21-49` `linkRuns` (with `includeHrefWhenDifferent`) is used only by `install-docs/presentation/ink/blocks/shared/rich-text-renderer.tsx:89`.
+- [needless] `core/src/components/feedback/status-line.tsx:157-191` `formatPagedStatusLine` hard-codes the pager keymap `"q quit | h/l page | j/k scroll | g/G top/end"` and page/lines counters for one docs pager.
+- [needless] `core/src/hooks/use-focus-plane.ts:4` `FocusPlane = "navigation" | "content"` is used only by install-docs (`install-viewer.tsx:214`, `components/status-bar.tsx:7`). disk-plan re-invents the same thing as `"nav" | "content"` (`disk-plan/presentation/disk-plan-screen.tsx:170`).
+- [needless] `core/src/utils/strings.ts:110-144` `normalizeTextWidth`, `truncateBoundedLine`, `wrapBoundedText` and `prefixWrappedText` default `minimum = 20`. Every external caller passes `1` (`install-docs/blocks/command-block.tsx:28,31,74,78`, `blocks/list-block.tsx:98`, `blocks/table-block.tsx:56`, `rendering/plan/line-metrics.ts`), and inside the kit `section-list.tsx:34,50,59` and `tree-nav.tsx:96,117,138` pass `1` too. The `20` default serves no caller.
+- [needless] `install-docs/domain/content/contracts.ts:9,27-28`: an app domain contract imports kit `TuiTheme`/`ColorRuntime`, so the kit's theme type shape leaks into docs domain types.
+
+#### Theme: tokens, palette and colour values
+
+- [hidden] `core/src/theme.ts:123-157` `normalizeThemeColors` lists all 30 intents by hand, a copy of the `ColorIntent` union at `core/src/theme/tokens.ts:5-35` and the keys at `:73-254`. Adding an intent means editing three places, and a miss silently drops the override.
+- [hidden] `core/src/theme.ts:84-105` `normalizeThemeChrome` repeats the literal unions of `ThemeChrome` (`theme/tokens.ts:58-65`) as runtime `===` chains.
+- [hidden] `core/src/theme/tokens.ts:73-254`: each intent hand-writes `truecolor`, `ansi256` and `ansi16` triples that must describe the same colour (for example `text` `#e5e7eb`/`15`/`white`, `sectionHeading` `#e2e8f0`/`255`). `colorOverrideToDefaults` (`theme/colors.ts:369-384`) can derive them, but the defaults don't use it, so the three columns drift independently.
+- [hidden] `core/src/theme/tokens.ts:93,99,237`: `accent`, `linkText` and `sectionSubheading` are the same literal `#7dd3fc`/`117`/`cyan` three times.
+- [hidden] `core/src/theme/tokens.ts:105,189`: `linkActiveText` and `sidebarItemActiveText` repeat `#0f172a`/`17`/`black`, which is also `palette.slate900` (`theme/palette.ts:8`) written as a literal.
+- [hidden] `core/src/theme/tokens.ts:111,195`: `linkActiveBackground` and `sidebarItemActiveBackground` repeat `#cbd5e1`/`251`/`white`.
+- [hidden] `core/src/theme/tokens.ts:123`: `warning` uses the literal `#facc15`, which equals `palette.yellow` (`theme/palette.ts:22`). `:74-79`/`:200-205` (`border`/`sidebarBorder`) and `:212-217`/`:248-253` (`commandBarBackground`/`cardBackground`) are identical pairs too.
+- [hidden] `core/src/theme/tokens.ts`: about half the intents use `palette.*` and half use inline hex not in the palette (`#e5e7eb`, `#94a3b8`, `#7dd3fc`, `#93c5fd`, `#f87171`, `#86efac`, `#dbeafe`, `#bfdbfe`, `#fef08a`, `#e2e8f0`, `#64748b`). A palette change reaches only part of the theme.
+- [hidden] `core/src/theme/colors.ts:23-34` (`ANSI16_RGB`, VS Code-style RGB), `:36-47` (`NAMED_COLORS`, Tailwind hex from the palette, plus magenta `#d946ef` inline at `:46`) and `:85-102` (xterm base-16 RGB) are three different tables for the same 16 colour names. `red` is 205,49,49 in one, `#ef4444` in another and 128,0,0 or 255,0,0 in the third, and which one applies depends on the code path.
+- [hidden] `install-docs/presentation/ink/theme/index.ts:6,17-21,66,68,72` sets backgrounds to `"default"`. The kit has no "inherit" colour: in truecolor mode `resolveLiteralColor` passes the unknown string through (`theme/colors.ts:291`) and Ink ignores it, but in ansi256/ansi16 mode it falls back to the kit default (`232`/`black`). `install-docs/presentation/ink/blocks/shared/intent-color.ts:3-14` keeps a hand-copied set of those same ten intents to force `undefined`. Theme file, intent-color file and kit colour code must change together, and none of them shows it.
+- [hidden] `core/src/theme/tokens.ts:256-262` `defaultThemeLayout.minColumns: 80, minRows: 24` repeats `DEFAULT_TERMINAL_SIZE` (`core/src/runtime/terminal/screen-size.ts:8-11`) and the `80` fallback at `core/src/primitives/layout/grid.tsx:54`.
+- [hidden] `core/src/theme/tokens.ts:257` `sidebarWidth: 30` is repeated as the default `maxWidth ?? 30` in `components/navigation/section-list.tsx:34` and `tree-nav.tsx:78`.
+- [needless] `core/src/theme.ts:173-180` `footerHint` builds the hint string `"q quit | arrows navigate"` inside the theme module. It is key-binding text, unrelated to colour or layout, so the theme changes whenever keymap wording does.
+- [surplus] `core/src/theme/theme-provider.tsx:4-16` is a second theme context. Every kit component reads the theme from `AppProvider` (`app/app-provider.tsx:30-32`), so a theme passed to `ThemeProvider` reaches nothing. There are two ways to provide a theme, and only one is wired.
+- [special] `core/src/theme.ts:60-68` `normalizeThemeLayout` silently raises `minRows`/`minColumns` to fit header, footer and sidebar, so a caller's explicit minimum is overwritten for one layout shape.
+
+#### Colour runtime and environment reads
+
+- [hidden] `core/src/theme/colors.ts:294-305,334-335`: in `ansi256` mode the kit returns bare digits (`"117"`). Ink's `colorize` (`ink/build/colorize.js`) accepts only chalk names, `#hex`, `ansi256(n)` or `rgb(…)`, and returns unknown strings uncoloured. So on a 256-colour terminal without `COLORTERM`, every theme colour vanishes. The kit's colour string format has to match Ink's parser, and nothing ties them together.
+- [hidden] `core/src/theme/colors.ts:283-290`: in truecolor mode, named colours come back as names (`"gray"`) and numeric strings as bare indices, so a truecolor runtime can emit ANSI16 names or invalid digit strings. The mode contract depends on which input form a theme author used.
+- [hidden] `core/src/theme/colors.ts:218-266` `detectColorRuntime` re-implements `NO_COLOR`/`FORCE_COLOR`/`COLORTERM`/`TERM` detection, while chalk (used by Ink for every coloured `Text`) runs its own `supports-color` detection on the same variables and downsamples hex itself. Two detectors read the same globals and can disagree.
+- [hidden] `core/src/theme/colors.ts:230-231` defaults to the globals `process.env` and `process.stdout.isTTY`. `core/src/app/create-app.tsx:26-29` calls it with no env, so app colour mode comes from globals at `createTuiApp` time, and nothing in the signatures shows it.
+- [special] `core/src/theme/colors.ts:233-238`: `enabled: true` forces `ansi16` (or mono when not a TTY), ignoring `COLORTERM`/`TERM`. Asking for colour gives less colour than asking for nothing.
+- [special] `core/src/theme/colors.ts:192-212` `parseForcedColor` is typed `| null` but never returns null, so `if (forced)` at `:246` always passes. Empty and non-numeric `FORCE_COLOR` each get their own `ansi16` branch (`:194-201`).
+- [hidden] `core/src/theme/colors.ts:49-51` defines `TRUECOLOR_RUNTIME`/`ANSI256_RUNTIME`/`ANSI16_RUNTIME`, yet `:195,201,206,209,211,257,262,265` rebuild the same objects as literals.
+- [hidden] `core/src/theme/colors.ts:214-216` (`runtimeModeEnabled`), `:269` and `:326` (`!runtime.enabled || runtime.mode === "mono"`), and `core/src/runtime/terminal/tty-capabilities.ts:14-16` (`ttySupportsColor`) are four copies of the "is colour on" rule.
+- [hidden] `core/src/primitives/display/syntax-token-line.tsx:13-26` `normalizeHexColor` copies `core/src/theme/colors.ts:53-63` `normalizeHex` (plus an 8-digit case).
+- [hidden] `core/src/primitives/display/syntax-token-line.tsx:115` and `core/src/primitives/display/rich-text.tsx:27-29` pass raw `#hex`/`literalColor` straight to Ink, bypassing `resolveLiteralColor`. Under `NO_COLOR` or mono mode, syntax and literal colours still print, while intent colours obey the runtime.
+- [hidden] `core/src/app/error-boundary.tsx:38` hard-codes `color="red"`, bypassing the theme and colour runtime (so it ignores mono and `NO_COLOR`).
+- [surplus] `core/src/runtime/terminal/tty-capabilities.ts:3-12`: `DetectTtyColorsOptions` copies `DetectColorRuntimeOptions` (`theme/colors.ts:10-15`) field for field, and `detectTtyColors` only calls `detectColorRuntime(options)`.
+- [needless] `core/src/runtime/terminal/tty-capabilities.ts:1` makes the low-level runtime layer import the `theme` barrel, so terminal capability code changes when theme exports change.
+- [special] `core/src/theme/colors.ts:425` `normalizeThemeColorMode` accepts `"none"` as an alias for `"mono"`, a value nothing sends (the function itself is unused).
+
+#### Frame and layout systems
+
+- [hidden] There are four separate ways to draw boxes and rules: Ink `borderStyle` (`core/src/primitives/display/panel.tsx:29`, `surfaces/frame/pane.tsx:110,138`); the instruction renderer `ChromeLayer` (`chrome/components.tsx:120`, used only at `pane.tsx:97-104`); raw glyph-string concatenation from `resolveChromeGlyphSet` (`primitives/display/divider.tsx:12`, `install-docs/presentation/ink/primitives/admonition-frame.tsx:31-38`, `blocks/code-block.tsx:107`); and ASCII `horizontalRule` (`utils/strings.ts:45`, `components/data/table.tsx:37`). A border-style change has to be made in each.
+- [hidden] `core/src/surfaces/frame/pane.tsx:97-126` joins a `ChromeLayer` top (kit glyphs from `chrome/glyph-sets.ts`) to an Ink-bordered body (cli-boxes glyphs) with `borderTop={false}`. The seam lines up only while the kit's glyph tables and cli-boxes agree for each style name.
+- [hidden] `core/src/surfaces/frame/pane.tsx:74` (`chromeHeaderRows = 3`) and `core/src/surfaces/frame/surface-frame.tsx:48` (`paneTitleRows` returns `2`, plus `BORDER_ROWS = 2` at `:18`) each encode the titled-pane row budget. They agree only by arithmetic, and nothing links them.
+- [hidden] `core/src/surfaces/frame/surface-frame.tsx:16-26`: `HORIZONTAL_PADDING_COLUMNS = 2` and `paddingY` `0` (`:129,131`) assume `theme.chrome.panePaddingX = 1`/`panePaddingY = 0`, while `pane.tsx:64-65` renders with the theme values. Changing theme padding desynchronises the text-area geometry from what is drawn.
+- [hidden] `core/src/surfaces/frame/surface-frame.tsx:172-184` computes geometry internally but doesn't expose it to pane bodies. So `install-docs/presentation/ink/screens/install-viewer.tsx:252-262` recomputes it with the same inputs copied by hand, and hard-codes `leftTitleRows: 2, rightTitleRows: 2` instead of `paneTitleRows`. The caller has to mirror SurfaceFrame's internals.
+- [hidden] `core/src/patterns/review-screen.tsx:23-26` derives body height as `viewport.rows - headerHeight - footerHeight - 4`. The `4` is a hand copy of the frame/title row budget that `resolveSurfaceFrameGeometry` computes.
+- [hidden] Three places set the left/right pane intent defaults independently: `core/src/surfaces/frame/surface-frame.tsx:217-231` (sidebar defaults), `core/src/patterns/two-pane.tsx:113-127` (the same values again), and `core/src/surfaces/frame/pane.tsx:49-52` (`border`/`background`/`text`/`sectionHeading`).
+- [hidden] All three apps pass the same left-pane block (`title`, `titleMode: "inline"`, `borderIntent: "sidebarBorder"`, `textIntent: "sidebarItemText"`, `titleIntent: "sidebarSectionText"`), the same right-pane block (`borderIntent: "cardBorder"`, `textIntent: "text"`, `titleIntent: "sectionHeading"`) and `showHeader={false}`: `install-viewer.tsx:226-248,495-523`, `disk-plan/presentation/disk-plan-screen.tsx:1153-1170`, `recab/presentation/runtime-recab-screen.tsx:232-252`. The shared shell is copied rather than owned by the kit.
+- [surplus] `core/src/surfaces/frame/surface-frame.tsx:137,187-192`: `showHeader` defaults to `true` and the `title` header with `"tui"` fallback exists, but every app passes `showHeader={false}`, so `title` is never shown.
+- [surplus] `core/src/surfaces/frame/types.ts:5` `SurfacePaneTitleMode` has `"inline"`, which every app passes, but `pane.tsx:63,69` only distinguishes `"none"`, so `"inline"` behaves like `"slot"`.
+- [surplus] `core/src/patterns/page-frame.tsx:12-22` `PageFrame` copies props into `TwoPane` and adds only the default `sidebar ?? "tui-kit"`.
+- [surplus] `core/src/patterns/two-pane.tsx:134-138` `ScreenFrame`/`ScreenFrameProps` are aliases that pass every prop to `TwoPane`.
+- [needless] `core/src/patterns/two-pane.tsx:26-86` `TwoPaneGeometry`/`resolveTwoPaneGeometry` rename every `SurfaceFrameGeometry` field (`left*`→`sidebar*`, `right*`→`content*`). Each change to surface geometry needs a matching rename map.
+- [surplus] `core/src/surfaces/frame/frame-canvas.tsx:16-59` `FrameCanvas` has one caller (`surface-frame.tsx:195`), which passes 16 props one by one from the geometry object.
+- [hidden] `core/src/surfaces/frame/frame-canvas.tsx:5-14` and `core/src/surfaces/frame/pane.tsx:15-25` are identical `renderNode` helpers.
+- [hidden] `core/src/surfaces/frame/pane.tsx:34-39` `paneTitleText` and `core/src/surfaces/frame/surface-frame.tsx:41-46` repeat the same string/number/bigint title coercion.
+- [hidden] `core/src/surfaces/frame/pane.tsx:27-32` `normalizeDimension`, `surface-frame.tsx:51-56` `normalizeMinWidth`, `runtime/terminal/screen-size.ts:13-15` `normalizeDimension` (a different rule under the same name), and `utils/clamp.ts:13-15` `toPositiveInt` are four copies of "finite, floored, ≥1".
+- [special] `core/src/surfaces/frame/surface-frame.tsx:185` calls `resolveLayoutGuards` a second time after `resolveSurfaceFrameGeometry` already did (`:91`), because geometry doesn't return the resolved guards.
+- [special] `core/src/surfaces/frame/surface-frame.tsx:87` `bodyRows = Math.max(3, …)` sets a floor of 3 for one layout. It can exceed the real space after the minimum-size check passes.
+- [special] `core/src/surfaces/frame/pane.tsx:80` `innerColumns` falls back to `40` when width is unknown, but that branch is only reached when `canRenderChromeTitle` is false, where `titleCell` isn't used.
+- [special] `core/src/surfaces/frame/pane.tsx:84-85` maps `"none"` to `"single"` for `chromeLineWeight`, but the chrome path only runs when `hasBorder` is true, so the branch is dead.
+- [hidden] `core/src/primitives/display/panel.tsx:29,37,41` hard-codes `borderStyle="single"` and `paddingX={1}`, ignoring `theme.chrome.borderGlyphSet`/`panePaddingX`, which `SurfacePane` honours. Two pane components follow different theme rules.
+- [hidden] `core/src/primitives/display/divider.tsx:19-20` defaults to the full `viewport.columns` width and the `footerSeparator` intent, so a divider inside a pane overflows, and the general divider is tied to footer vocabulary.
+
+#### Border-style union copies
+
+- [hidden] The union `"single" | "double" | "round" | "bold"` is written out separately at `core/src/theme/tokens.ts:59`, `core/src/chrome/types.ts:4`, `core/src/primitives/display/divider.tsx:11`, `core/src/patterns/two-pane.tsx:19-20`, `core/src/surfaces/frame/surface-frame.tsx:30` and (with `"none"`) `core/src/surfaces/frame/types.ts:14`, plus the runtime check at `core/src/theme.ts:86-89`. `pane.tsx:85` casts between them. It also has to match Ink's `borderStyle` names (`pane.tsx:110`).
+- [hidden] `core/src/surfaces/frame/types.ts:4` `SurfacePaneTitleStyle` copies `ThemeChrome.titleStyle` (`core/src/theme/tokens.ts:60`).
+- [hidden] `core/src/surfaces/frame/types.ts:15-16` and `core/src/primitives/display/panel.tsx:9` each restrict border and background intents to hand-picked subsets of `ColorIntent`.
+
+#### Chrome renderer
+
+- [hidden] `core/src/chrome/components.tsx:32-40,114-118`: `ChromeFrame`, `ChromeSeam` and the others render `null` and work only when `ChromeLayer` walks its children (`:95-112`). Used anywhere else they silently draw nothing, and nothing in their types says so.
+- [hidden] `core/src/chrome/components.tsx:42-93` `childToInstruction` re-reads each node's props with casts, a second copy of the `ChromeInstruction` shapes at `core/src/chrome/types.ts:27-61` that typecheck can't link.
+- [surplus] `core/src/chrome/types.ts:33-46`: the `rule` and `seam` instruction kinds have identical shapes. `chrome/renderer.ts:13-21` handles them in two branches that do the same thing, `chrome/grid.ts:195-201` `drawSeam`/`drawSplit` only forward to `drawHorizontal`/`drawVertical`, and `ChromeRuleProps` equals `ChromeSeamProps` (`types.ts:90-109`).
+- [surplus] `core/src/chrome/grid.ts:276-278` `createChromeGrid` only calls `new ChromeGrid`.
+- [hidden] `core/src/chrome/grid.ts:24-26` defines its own `clamp`, a copy of `core/src/utils/clamp.ts:29-33` `clampNumber`. `grid.ts:17-22` `normalizeCoordinate` is another finite/floor helper.
+- [special] `core/src/chrome/components.tsx:140-149` memoizes on `children`, which is a new object every render, so the memo never hits.
+- [needless] `core/src/chrome/components.tsx:10` imports `UiText` from `primitives`, while `core/src/primitives/display/divider.tsx:2` imports from `chrome`. The two folders depend on each other.
+- [hidden] `core/src/chrome/glyph-sets.ts:45-57` `ROUND_GLYPHS` repeats every non-corner glyph of `SINGLE_GLYPHS` (`:3-15`).
+
+#### Input and hotkeys
+
+- [hidden] `core/src/runtime/ink/use-input.ts:72-75` always adds the raw and lowercased input as names, even when `key.ctrl`/`key.meta` is set (Ink reports Ctrl-C as input `"c"`). So a binding for `"c"` also fires on Ctrl-C (`install-docs/presentation/ink/screens/install-viewer.tsx:467` copy plus `:223` quit both run), and `"q"` fires on `Q`. Every binding depends on this name-expansion rule, and none can opt out.
+- [hidden] `core/src/runtime/ink/use-input.ts:74`: lowercasing means `"G"` also matches handlers bound to `"g"`. `core/src/patterns/review-screen.tsx:37-38` and `install-viewer.tsx:453-466` bind `["g","home"]` and `["G","end","S-g"]`. Pressing `G` runs both, and it lands on "end" only because the `G` handler was registered second.
+- [hidden] `core/src/runtime/ink/use-input.ts:163-198` `useKeyInput` registers a global Ink listener per call with no focus or capture layer. `TextField` (`components/forms/text-field.tsx:45,49-67`) binds `"q"` to cancel and also appends every printable key, so typing `q` both cancels and inserts. disk-plan bypasses the kit with raw `useInput` (`disk-plan/presentation/disk-plan-screen.tsx:293-313`) for its confirm token while its unconditional `useHotkeys(["q",…], quit)` (`:526`) still listens.
+- [hidden] `core/src/app/render-app.tsx:44` defaults `exitOnCtrlC: false`. Every app must then bind `"C-c"` itself (`install-viewer.tsx:223`, `disk-plan-screen.tsx:526`, `recab/presentation/runtime-recab-screen.tsx:141`) and also passes `exitOnCtrlC: false` again (`disk-plan/app/bootstrap.tsx:14`, `recab/app/bootstrap.tsx:12`, `install-docs/app/bootstrap.tsx:45`). Callers just have to know this convention.
+- [hidden] `core/src/hooks/use-focus-plane.ts:31` binds `tab`/`S-tab` globally unless `bindTabKeys: false`. An app that also binds tab (as `disk-plan-screen.tsx:527` does with its own pane focus) would toggle twice.
+- [hidden] Hotkey hints are hand-written strings, separate from the bindings they describe: `core/src/theme.ts:175`, `core/src/components/feedback/status-line.tsx:185`, `core/src/patterns/review-screen.tsx:47`, `core/src/patterns/wizard-flow.tsx:96,215,249,287`, and in apps `install-docs/presentation/ink/components/status-bar.tsx:26-40`. `hotkeyStatusSegment` (`status-line.tsx:113`) and `useHotkeys` share no data, so a rebinding leaves the hint wrong. For example, `review-screen.tsx:47` omits the `g/G/b/space` keys it binds at `:35-38`.
+- [hidden] `core/src/patterns/review-screen.tsx:47` says `"Arrows/PgUp/PgDn …"`, while `core/src/patterns/wizard-flow.tsx:287` says `"Arrows/PageUp/PageDown …"` for the same `ReviewScreen` bindings.
+- [hidden] The cancel binding `["escape","q"]` is copied in `components/forms/confirm.tsx:31`, `components/forms/select.tsx:39`, `components/forms/text-field.tsx:45` and `patterns/wizard-flow.tsx:73,175`. The up/down binding `["up","k"]`/`["down","j"]` is copied in `select.tsx:23-29`, `review-screen.tsx:33-34` and `wizard-flow.tsx:57-63,145-157`.
+- [surplus] `core/src/hooks/use-hotkeys.ts:10-16` `useHotkeys` passes every argument straight to `useKeyInput`, and `:23` `useTuiInput` is a third name for the same function.
+- [special] `core/src/components/forms/confirm.tsx:19,23` binds `["y","Y"]`/`["n","N"]`, but `Y`/`N` are redundant because of the lowercase expansion.
+- [special] `core/src/runtime/ink/use-input.ts:38-45,134-158` keeps hand-written VT escape-sequence tables "for some terminals", in parallel with Ink's own key parsing.
+- [special] `core/src/runtime/ink/use-input.ts:113` emits `"S-tab"` instead of `"tab"` when shift is held. That's a one-off name scheme: shift+letter emits both `x` and `S-x` (`:73-82`), but shift+tab never emits `tab`.
+
+#### Navigation and index state
+
+- [hidden] Clamped or wrapped index state is implemented separately in `core/src/runtime/ink/focus-manager.ts:11-46` (wraps), `core/src/hooks/use-list-navigation.ts:19-37` (clamps), `core/src/hooks/use-grid-navigation.ts:61-116`, `core/src/components/forms/select.tsx:21-29`, and `core/src/patterns/wizard-flow.tsx:51-63,137-157`. None of them uses the others.
+- [hidden] `core/src/hooks/use-list-navigation.ts:11-17` and `core/src/hooks/use-grid-navigation.ts:26-31` have identical `safeCount` helpers. `core/src/runtime/ink/focus-manager.ts:12,39` inlines the same rule twice.
+- [hidden] `core/src/components/navigation/section-list.tsx:18-23` and `core/src/components/navigation/tree-nav.tsx:43-48` have identical `marker()` helpers. `section-list.tsx:40-56` and `tree-nav.tsx:55-72` group items by section twice, so `SectionList` and `TreeNav` are two components for the same job (recab uses one, install-docs the other).
+- [hidden] `core/src/components/navigation/tree-nav.tsx:6` `TreeNavMode` is copied as `SidebarMode` in `install-docs/presentation/ink/components/sidebar.tsx:5` and named differently in `ThemeChrome.sidebarHeaderMode` (`core/src/theme/tokens.ts:64`). That's three names for one setting.
+- [hidden] `core/src/components/navigation/selectable-grid.tsx:52` resolves columns from the viewport internally, while the caller's `useGridNavigation` needs the same count. So `disk-plan/presentation/disk-plan-screen.tsx:189` repeats `resolveGridColumns(diskColumnsSpec, viewport.columns, 1)` to keep navigation and rendering in step.
+- [hidden] `core/src/primitives/layout/grid.tsx:93,101` (`columns = 2`, fallback `2`) and `core/src/components/navigation/selectable-grid.tsx:43,52` (`columns = 2`, fallback `1`) disagree on the fallback column count. `SelectableGrid` then passes the resolved number plus `viewportColumns` to `Grid` (`:59,62`), which resolves again.
+- [hidden] `core/src/primitives/layout/grid.tsx:67-80` `groupGridRows` copies `core/src/utils/arrays.ts:11-22` `chunkArray`.
+- [hidden] `core/src/components/navigation/pager.tsx:10-25` `computePagerWindow` and `core/src/primitives/layout/scroll-view.tsx:19-38` `computeScrollWindow` are two line-window computations. install-docs has its own third one (`rendering/pipeline/viewport.ts:73`).
+- [surplus] `core/src/components/navigation/list.tsx:3-7` `List`/`ListProps` pass everything through to `Select`.
+- [surplus] `core/src/patterns/wizard-flow.tsx:15-17` `wizardClampIndex` only calls `clampIndex`, and `:27-28` alias it and `formatWizardCard` again.
+- [hidden] `core/src/hooks/use-scroll-state.ts:15-25`: `scrollBy` needs the caller to pass `maxScroll` on every call, and `scrollToBottom` defaults to `Number.MAX_SAFE_INTEGER`, so the stored offset is only valid if the render path clamps it later. Callers just have to know that.
+- [special] `core/src/components/forms/select.tsx:21`: `selected` is never re-clamped when `items` shrinks (unlike `wizard-flow.tsx:53-55`), so the marker can point past the list until a key is pressed.
+- [special] `core/src/patterns/wizard-flow.tsx:137`: `wizardClampIndex(defaultIndex, 1)` always yields `0`, so `AsyncWizardFlow`'s `defaultIndex` prop is ignored.
+
+#### Text width and string helpers
+
+- [hidden] Three width models: `core/src/utils/strings.ts:15-108` measures with `.length` (UTF-16 units), `core/src/chrome/grid.ts:209` with `Array.from` (code points, one cell each), and Ink lays out with `string-width`. Truncation, padding and chrome placement disagree with Ink for wide or combining characters.
+- [hidden] `core/src/utils/clamp.ts:13-23`: `toPositiveInt` clamps to ≥1 and `toPositiveIntOrFallback` falls back instead. Nothing in the names says which one a caller gets. Inline copies of `toNonNegativeInt` appear at `core/src/theme.ts:74-82`, `core/src/theme/spacing.ts:13`, `core/src/primitives/layout/grid.tsx:102-103` and `core/src/surfaces/frame/pane.tsx:119-120,143,148-149`, and of `toPositiveInt` at `components/navigation/tree-nav.tsx:78`, `primitives/layout/grid.tsx:39` and `chrome/components.tsx:130-131`.
+- [special] `core/src/primitives/layout/scroll-view.tsx:25` and `core/src/components/navigation/pager.tsx:15` wrap `toPositiveInt` in a redundant `Math.max(1, …)`.
+- [special] `core/src/components/data/table.tsx:13,26` hard-codes `maxWidth = 120` and a 40-column cap per column.
+- [special] `core/src/components/data/key-value.tsx:17` starts `maxKey` at 1 and uses `.padEnd` instead of the kit's `padRight`.
+- [special] `core/src/components/navigation/tree-nav.tsx:81-84` hand-rolls `clampIndex` (`clampNumber(toNonNegativeInt(…))`) with its own empty guard.
+
+#### Styled-text models
+
+- [hidden] There are three run types for coloured text: `RichTextRun` (`core/src/primitives/display/rich-text.tsx:6-14`), `StatusAtom` (`core/src/components/feedback/status-line.tsx:20-26`) and `SyntaxToken` (`core/src/primitives/display/syntax-token-line.tsx:8-11`), each with its own renderer (`RichTextLine`, `SegmentedStatusLine` at `status-line.tsx:70-97`, `SyntaxTokenLine`). install-docs adds a fourth local `SyntaxToken` (`install-docs/presentation/ink/blocks/code-block.tsx:18-21`) and converts between them.
+- [hidden] `core/src/primitives/display/link.tsx:21-49` `linkRuns` and `:51-82` `UiLink` each re-implement the selected/unselected intent choice and the href-suffix rule (`:22-25` vs `:70`), with different underline and bold defaults.
+- [hidden] `core/src/primitives/display/syntax-token-line.tsx:32-42` `pushToken` is copied as `pushSyntaxToken` in `install-docs/presentation/ink/blocks/code-block.tsx:27-37`.
+- [special] `core/src/primitives/display/rich-text.tsx:45-50` returns before calling `useTuiTheme`/`useTuiColors`, so the hook order changes when `runs` goes from empty to non-empty (a rules-of-hooks violation that React reports at runtime).
+- [special] `core/src/primitives/display/text.tsx:17-29`: an `if (typeof children === "string")` branch renders exactly the same element as the fallthrough.
+- [special] `core/src/primitives/display/heading.tsx:5,9`: `level` accepts `1 | 2 | 3`, but 2 and 3 render identically.
+- [special] `core/src/components/feedback/progress.ts:43` is the one component built with `createElement` in a `.ts` file instead of TSX.
+
+#### Viewport and terminal size
+
+- [hidden] `core/src/app/app-provider.tsx:40-43` reads `process.stdout.columns/rows` directly on every render as a fallback, next to Ink's `useStdout()`. `core/src/runtime/terminal/screen-size.ts:42-50` `getTerminalSize` is a third reader of the same global.
+- [hidden] `core/src/app/app-provider.tsx:48-54` and `:61-67` are the same compare-and-set block, copied.
+- [surplus] `core/src/hooks/use-measure.ts:5-7` `useMeasure` only returns `useTuiViewport()`. Its name suggests element measurement, but it returns the terminal size.
+- [surplus] `core/src/runtime/terminal/screen-size.ts:13-15` `normalizeDimension` only calls `toPositiveIntOrFallback`.
+
+#### App bootstrap and providers
+
+- [needless] Layout and display primitives (`UiText`, `Divider`, `Panel`, `RichTextLine`, `SyntaxTokenLine`, `UiLink`, `Grid`) all call `useTuiApp`-backed hooks (`core/src/primitives/display/text.tsx:13-14`, etc.), which throw outside `AppProvider` (`core/src/app/app-provider.tsx:24-26`). The lowest-level atoms depend on the app shell, and only `renderApp` mounts that provider.
+- [surplus] `core/src/app/create-app.tsx:24-36` plus `core/src/app/render-app.tsx:33-41`: `renderApp` can build the app itself from the same options, yet all three apps call `createTuiApp` and then pass `{ app }` (`disk-plan/app/bootstrap.tsx:11-15`, `recab/app/bootstrap.tsx:9-13`, `install-docs/app/bootstrap.tsx:29-46`). There are two ways to do one step.
+- [hidden] `core/src/app/render-app.tsx:7-10,34-41`: `RenderAppOptions` takes both `app` and `title`/`theme`/`colorMode`, and when `app` is given the others are silently ignored.
+- [surplus] `core/src/app/create-app.tsx:17` `TuiApp` is only an alias of `TuiAppContextValue`.
+- [surplus] `core/src/app/render-app.tsx:60-62` wraps `handle.waitUntilExit()` in an async function that returns the same promise result.
+- [special] `core/src/app/render-app.tsx:28` plus `core/src/app/error-boundary.tsx:29-39` wrap every app in an `ErrorBoundary` with no `onError`. A render crash is swallowed into a red one-line message, the stack is lost, and the process keeps running in raw mode instead of exiting non-zero.
+- [special] `core/src/app/create-app.tsx:21`, `core/src/patterns/page-frame.tsx:15`, `core/src/surfaces/frame/surface-frame.tsx:191`, `core/src/theme.ts:174` and `core/src/components/feedback/status-line.tsx:100` each have their own fallback label (`"tui-kit"`, `"tui-kit"`, `"tui"`, `"tui"`, `"tui"`).
+- [special] `core/src/app/app-provider.tsx:73-77` falls back from `stdout.off` to `removeListener?.` for a stream shape that only the hand-written `globals.d.ts` allows.
+
+#### Patterns (wizard and review)
+
+- [hidden] `core/src/patterns/wizard-flow.tsx:41-101` `WizardFlow` and `:123-220` `AsyncWizardFlow` duplicate the selection state, the up/down/enter/cancel bindings and the card rendering (`:77-90` vs `:181-209`), and both duplicate `Select` (`components/forms/select.tsx`).
+- [hidden] `core/src/patterns/wizard-flow.tsx:159` makes the refresh key configurable (`refreshKeys`), but `:193,200` hard-code "Press r to retry/refresh", so the text drifts from the binding.
+- [hidden] `core/src/patterns/wizard-flow.tsx:138` `useAsyncTask(load, [])` and `core/src/hooks/use-async-task.ts:66` put `load` in effect deps. Callers must memoise `load` (and `toCard`, `:179`) or the task reloads every render, and nothing tells them.
+- [special] `core/src/hooks/use-async-task.ts:38`: `Promise.resolve(load(...))` doesn't catch a synchronous throw from `load`, which escapes the effect instead of landing in `error`.
+- [special] `core/src/patterns/wizard-flow.tsx:146,153,164`: the same `task.loading || task.error || items.length === 0` guard is repeated in three handlers instead of using `isActive`.
+- [needless] `core/src/patterns/wizard-flow.tsx` holds four unrelated screens (`WizardFlow`, `AsyncWizardFlow`, `TextEntryScreen`, `ReviewScreenFlow`) in one file named after one of them.
+
+#### Components: small items
+
+- [special] `core/src/components/navigation/tree-nav.tsx:210,217,228`, `core/src/primitives/display/rich-text.tsx:46,63`: each renders `" "` in place of empty text, the same Ink workaround repeated at each site.
+- [special] `core/src/components/navigation/section-list.tsx:31` and `core/src/components/forms/select.tsx:19` each hard-code `"(no items)"`, while `core/src/patterns/wizard-flow.tsx:81,198` say `"No items available."`.
+- [special] `core/src/components/feedback/spinner.tsx:4` uses ASCII frames `- \ | /`, separate from the kit's glyph sets.
+- [special] `core/src/components/navigation/selectable-grid.tsx:32-38` `widthForColumns` sizes items at `floor(100/columns)%`, ignoring `gapX`, so rows with gaps overflow.
+- [special] `core/src/components/navigation/selectable-grid.tsx:6-9`: `RenderItemContext` isn't exported but appears in the exported `SelectableGridProps.renderItem` type.
+
+### B — install-docs findings
+
+Area: `tui/apps/live-tools/install-docs` plus the xtask code that drives it and its ISO bundling.
+Path convention: `install-docs/...` = `tui/apps/live-tools/install-docs/...`; `src/...` = `install-docs/src/...`; `ink/...` = `src/presentation/ink/...`. Every other path is relative to the repo root.
+
+#### Measure vs render: every block's layout computed twice
+
+- [hidden] `ink/blocks/code-block.tsx:98-103` and `ink/blocks/code-block.tsx:170-178` compute the same inner width, line-number digits and gutter width separately for render and for measure. Nothing ties them together, so a change to one makes the scroll math wrong.
+- [hidden] `ink/blocks/command-block.tsx:28-32` and `ink/blocks/command-block.tsx:74-79` wrap the description and output separately for render and for measure.
+- [hidden] `ink/blocks/command-block.tsx:24-27` appends `  [COPY]` to the first command line when selected, and `ink/blocks/command-block.tsx:45-51` renders command lines unwrapped at full length. Measure (`command-block.tsx:75`) counts exactly one row per line, so a long line or the selection suffix wraps in Ink and the line count no longer matches what is drawn.
+- [hidden] `ink/blocks/list-block.tsx:89-105` measures with the kit's plain-text `prefixWrappedText`, while render (`list-block.tsx:27-35`, via `ink/primitives/prefixed-rich-list-item.tsx:34-40`) wraps with the app's own `wrapRichTextRuns`. Two wrap algorithms are in use for one layout.
+- [hidden] `ink/blocks/conversation-block.tsx:82-95` measures with the kit's `prefixWrappedText`, while render (`conversation-block.tsx:28-56`) uses `PrefixedRichListItem`/`wrapRichTextRuns`. Same two-algorithm split.
+- [hidden] `src/rendering/plan/line-metrics.ts:29-31` measures the intro with the kit's `wrapBoundedText`, while `ink/document/intro-item.tsx:23-29` renders it with the app's `RichTextRenderer` word-wrapper. The measured and drawn line counts can differ.
+- [hidden] `ink/blocks/list-block.tsx:23` and `list-block.tsx:87` build the ordered/bullet marker twice. `list-block.tsx:57` and `list-block.tsx:103` subtract the child indent `2` twice.
+- [hidden] `ink/blocks/conversation-block.tsx:23` and `conversation-block.tsx:81` derive the role label twice. `conversation-block.tsx:50` and `conversation-block.tsx:92` each subtract the list indent `2`.
+- [hidden] `ink/blocks/qa-block.tsx:36` and `qa-block.tsx:82` each compute the question width `safeWidth - 2`. `qa-block.tsx:46` and `qa-block.tsx:89` each hard-code the nested answer indent `2`. `qa-block.tsx:49-53` and `qa-block.tsx:85-86` each handle the empty answer. `qa-block.tsx:54` and `qa-block.tsx:93` each add the spacer row. Every QA layout rule is written twice.
+- [hidden] `ink/blocks/qa-block.tsx:76` ignores `_indent` in measure and `qa-block.tsx:36` ignores `indent` for the question width. A nested QA silently overflows, and nothing marks that the two must agree.
+- [hidden] `ink/blocks/note-block.tsx:69` and `note-block.tsx:127` repeat the narrow-width cutoff `< 4`, which `ink/primitives/admonition-frame.tsx:23` repeats a third time. `note-block.tsx:85` and `note-block.tsx:130` each derive the text width as `width - 4`, which must equal `admonition-frame.tsx:32-34` (two border columns plus two padding columns).
+- [hidden] `ink/blocks/note-block.tsx:132` assumes the admonition frame adds exactly 3 rows (top, label, bottom). That number belongs to `ink/primitives/admonition-frame.tsx:43-70`.
+- [hidden] `ink/blocks/table-block.tsx:46-51` and `table-block.tsx:120-127` each build the plain-text cell matrix and `computeColumnWidths`. Measure uses it only to detect an empty table, matching the early `return null` at `table-block.tsx:52-54`.
+- [hidden] `ink/blocks/interactive-block.tsx:74` counts one row per step command, but `interactive-block.tsx:35-40` renders it unwrapped and padded through `SyntaxLine`. Long commands wrap in Ink and the count is wrong.
+- [hidden] `ink/blocks/text-block.tsx:42-44` re-derives `contentWidth - indent` for measure, mirroring `text-block.tsx:16-17`.
+- [hidden] `src/rendering/plan/line-metrics.ts:91-93` (one blank line between items), `ink/document/docs-content-view.tsx:33` (the spacer `<UiText>`) and `ink/screens/install-viewer.tsx:181-183` (the cursor `+1`) encode the same inter-item gap three times.
+- [hidden] `src/rendering/plan/line-metrics.ts:45-46`, `line-metrics.ts:74-75` and `ink/document/renderer-registry.tsx:74-77` each normalise `indent` with the same finite/non-negative guard.
+
+#### Rendering layering: one feature spread across adapters/domain/rendering/presentation
+
+- [needless] `src/rendering/plan/line-metrics.ts:4` imports `DEFAULT_INSTALL_BLOCK_PLUGINS` from `presentation/ink/blocks/plugins`, so the "rendering" layer depends on React/Ink presentation modules. The import goes against the advertised layer order.
+- [hidden] Adding or changing a block type touches `ink/blocks/<type>-block.tsx` (render and measure), `ink/blocks/plugins.tsx:13-23`, `src/rendering/plan/line-metrics.ts:47-50`, `ink/document/renderer-registry.tsx:67-72` and `ink/screens/install-viewer.tsx:80-143` (link extraction). The folder layout hides that these files change together.
+- [hidden] `ink/screens/install-viewer.tsx:80-143` (`extractBlockLinks`) walks every block type's inline fields by hand, mirroring which fields each block plugin renders. Its `default: return []` (`install-viewer.tsx:140-141`) silently drops links from any new block type.
+- [needless] `src/rendering/pipeline/viewport.ts:27-49` (`resolveInitialDocSelection`) is navigation logic that lives in the rendering pipeline. Its only caller is `ink/hooks/use-install-navigation.ts:5`.
+- [needless] `src/domain/render/types.ts:1-32` sits in `domain/` but holds render-plan types consumed only by `rendering/` and `presentation/`.
+- [needless] `src/domain/content/contracts.ts:9` and `contracts.ts:26-29` make the "domain" layer import `@levitate/tui-kit` types (`ColorRuntime`, `TuiTheme`) for `DocsRenderStyleContext`.
+- [hidden] `ink/screens/install-viewer.tsx:145-186` (`deriveActionableTargets`) re-walks the plan with `measureDocItemLines` to rebuild line positions that `src/rendering/plan/line-metrics.ts:79-96` (`countRenderPlanLines`) already computes. Two cursors must stay in step.
+- [hidden] `ink/screens/install-viewer.tsx:252-263` calls `resolveSurfaceFrameGeometry` itself with hard-coded `leftTitleRows: 2`, `rightTitleRows: 2`, `hasFooter: true` and `hasHeader: false`. These copy what `tui/kit/core/src/surfaces/frame/surface-frame.tsx:172-184` derives internally via `paneTitleRows()`. If the kit's title-row or guard rules change, the app's content row and column counts diverge from the actual pane.
+- [needless] `ink/components/content-pane.tsx:18-38` renders every item of the document every frame and clips it with a negative `marginTop` (`content-pane.tsx:28`). Correct scrolling depends on the measured line totals matching Ink's layout exactly.
+
+#### Plugin/registry extension points with one implementation
+
+- [surplus] `ink/document/renderer-registry.tsx:94-101` (`createInstallDocsRendererRegistry(overrides)`): `overrides` is never passed. `src/app/bootstrap.tsx:33` builds the only registry, which is then threaded through `InstallViewerScreen` → `InstallContentPane` → `DocsContentView` → `renderDocItemWithRegistry` as a prop.
+- [needless] `ink/document/renderer-registry.tsx:67` reads block plugins from the module-global `DEFAULT_INSTALL_BLOCK_PLUGINS` while node plugins come from the injected registry. The extension point covers only the 3 node kinds, not blocks.
+- [surplus] `ink/document/renderer-registry.tsx:17-29` and `renderer-registry.tsx:49-92` form a typed plugin map with a redundant `kind` field per entry, for exactly three fixed node kinds (`intro`, `section`, `block`).
+- [special] `ink/document/renderer-registry.tsx:40-45`, `renderer-registry.tsx:68-72` and `src/rendering/plan/line-metrics.ts:47-50` throw "missing plugin" at runtime for maps whose types (`DocNodePluginMap`, `BlockPluginMap`) are already total. That is three hand-written copies of the same remediation text.
+- [surplus] `ink/blocks/contracts.ts:43-45` (`defineBlockPlugins`) is an identity function.
+- [surplus] `ink/blocks/contracts.ts:6-9` (`BlockHotkeyHint`) and `contracts.ts:36` (`hotkeysHelp`) are declared and never implemented or read.
+- [surplus] `ink/blocks/contracts.ts:25` (`rendererKey`) is set by every plugin (`text-block.tsx:33`, `code-block.tsx:165`, `command-block.tsx:63`, `table-block.tsx:110`, `list-block.tsx:73`, `conversation-block.tsx:67`, `interactive-block.tsx:58`, `qa-block.tsx:64`, `note-block.tsx:116`) and never read.
+- [hidden] `ink/blocks/shared/renderer-key.ts:5-7` formats keys as `docs:block:<type>`, while `docs/content/src/render-contract.ts:44-46` defines `defaultDocsBlockRendererKey` as `block.<type>`. These are two "default renderer key" functions with different formats. `docs/content/src/types.ts:47-52` says renderers should honour `block.rendererKey`, and the app dispatches on `block.type` only.
+- [hidden] `ink/blocks/contracts.ts:4` and `ink/blocks/shared/renderer-key.ts:3` each re-declare `DocsBlockType`, which `docs/content/src/render-contract.ts:3` already exports. `ink/blocks/contracts.ts:39-41` (`BlockPluginMap`) re-implements `DocsBlockRendererMap` from `render-contract.ts:31-33`.
+- [hidden] `ink/document/renderer-registry.tsx:103-114` (`nestedBlockNode`) fabricates a `DocBlockItem` with sentinel values (`sectionIndex: -1`, `sectionTitle: "(nested)"`, `blockIndex: -1`) and a non-unique key `nested-block-${type}`. `renderer-registry.tsx:123-129` passes `selectedItemKey: undefined`, so `renderer-registry.tsx:84-86` never matches. Links inside QA answers are made actionable by `ink/screens/install-viewer.tsx:132-134` but are never highlighted when selected.
+- [hidden] `ink/blocks/types.ts:12` (`RenderNestedBlock`, `indent` required) re-declares `ink/blocks/contracts.ts:13` (`renderBlock`, `indent` optional). `ink/blocks/qa-block.tsx:71-73` wraps one in the other.
+- [surplus] `ink/blocks/types.ts:4-10` (`BlockComponentProps`) and `ink/blocks/contracts.ts:11-16` (`BlockRenderContext`) carry the same fields. Each plugin's `render` (e.g. `text-block.tsx:34-41`) only copies context fields into props.
+
+#### Type re-declarations and pass-through wrappers around docs-content
+
+- [surplus] `src/domain/content/contracts.ts:11` re-exports `DocsPageMeta`, `DocsProduct`, `DocsScope` and `NavSection` from `@levitate/docs-content` unchanged.
+- [surplus] `src/domain/content/contracts.ts:31-32` (`DocsContentLike = DocsContent`, `RichTextLike = RichText`) are pure aliases. `RichTextLike` is never used.
+- [hidden] `src/domain/content/contracts.ts:13-17` (`DocsSource`) hand-copies the shape of `docsNav`/`contentBySlug`/`metaBySlug` exported by `docs/content/src/generated` (`docs/content/src/index.ts:17`).
+- [surplus] `src/adapters/docs-content/mapper.ts:4-6` (`createMappedDocsSource`) only calls `loadDocsSource()` and maps nothing.
+- [surplus] `src/adapters/docs-content/source.ts:4-10` packs three imports into an object. `metaBySlug` (`source.ts:8`) is never read anywhere.
+- [surplus] `src/domain/render/types.ts:30-32` (`DocRenderPlan = { items }`) wraps one array. Callers immediately unwrap `.items` (`src/rendering/pipeline/viewport.ts:69`).
+- [surplus] `src/domain/render/types.ts:14` and `types.ts:21-24` (`sectionIndex`, `sectionTitle`, `sectionLevel`, `blockIndex`) are written by `src/rendering/plan/build-doc-plan.ts:33-44` and never read.
+- [surplus] `ink/primitives/rich-paragraph.tsx:14-30` (`RichParagraph`) passes every prop straight to `RichTextRenderer`, renaming `intent` to `defaultIntent`.
+- [surplus] `ink/primitives/command-line-series.tsx:14-36` adds only the first-line/continuation prefix choice over `CommandLineRow`.
+- [hidden] `ink/document/intro-item.tsx:13-31` and `ink/blocks/text-block.tsx:10-29` are the same component (Box with padding, `RichParagraph`, width minus indent) except for the intent.
+- [needless] `ink/components/content-pane.tsx:6-41` and `ink/document/docs-content-view.tsx:15-38` form a two-level wrapper chain over `renderDocItemWithRegistry`, each re-receiving the same `renderers`/`selectedItemKey`/`selectedLinkHref` props.
+- [hidden] `ink/blocks/shared/content-utils.ts:9-33` validates `highlightedLines`/`highlightedCommandLines` at render time, and `content-utils.ts:5` points at `bun run build` in docs/content. These fields are optional in `docs/content/src/types.ts:68` and `:128`, so the app depends on a docs-content build step that the type does not declare.
+- [hidden] `ink/blocks/shared/content-utils.ts:9-20` and `content-utils.ts:22-33` are line-for-line copies for code and command blocks.
+- [hidden] `ink/screens/install-viewer.tsx:59-61` copies the raw `block.command` to the clipboard, while display and measure use `highlightedCommandLines` (`ink/blocks/command-block.tsx:23`, `:75`). These are two sources for one command, and nothing checks that they agree.
+
+#### Rich text: app re-implements kit and repeats itself
+
+- [hidden] `src/rendering/plan/line-metrics.ts:6-17` (`inlineNodeToPlain`), `ink/blocks/shared/rich-text-renderer.tsx:63-74` (`plainTextForInlineNode`), `tui/kit/core/src/primitives/display/link.tsx:24-46` (`linkRuns`) and `link.tsx:70` (`UiLink`) each encode "show link as `text (href)` when href differs". If one changes, measured widths stop matching drawn widths.
+- [hidden] `src/rendering/plan/line-metrics.ts:19-27` (`inlineContentToPlainText`) duplicates `ink/blocks/shared/rich-text-renderer.tsx:273-281` under the same name.
+- [hidden] `ink/blocks/shared/rich-text-renderer.tsx:28-37` (`sameRunStyle`) and `rich-text-renderer.tsx:39-49` (`cloneRun`) enumerate every field of the kit's `RichTextRun` (`tui/kit/core/src/primitives/display/rich-text.tsx:6-14`). A new run field in the kit is silently dropped here.
+- [hidden] `ink/blocks/shared/rich-text-renderer.tsx:39-49` (`cloneRun`, explicit fields) and `ink/primitives/rich-text-runs.ts:7-9` (`cloneRuns`, spread) clone runs in two different ways.
+- [needless] `ink/blocks/shared/rich-text-renderer.tsx:100-102` renders inline `code` with the `warning` intent, so recolouring warnings recolours inline code.
+- [needless] `ink/blocks/shared/rich-text-renderer.tsx:299-308` (`wrapRichTextPlainLines`) takes a `defaultIntent` that cannot affect plain-text output. Callers still pass `"text"`/`"dimText"` (`note-block.tsx:131`, `interactive-block.tsx:71`, `qa-block.tsx:82`).
+- [surplus] `ink/blocks/shared/rich-text-renderer.tsx:310-316` (`richTextRuns`) is exported and never imported.
+- [needless] `ink/blocks/shared/rich-text-renderer.tsx:145-264` is a generic rich-run word-wrapper living in an app, while the kit owns `wrapText`/`prefixWrappedText` (`tui/kit/core/src/utils/strings.ts:120-147`) for plain text. CLAUDE.md rule 4 says generic primitives go in the kit.
+- [surplus] `ink/primitives/rich-text-runs.ts:63-68` (`withBackgroundIntent`) ignores its `_backgroundIntent` and returns a clone. Callers that rely on it for backgrounds (`interactive-block.tsx:29`, `:45`; `prefixed-rich-list-item.tsx:40`; `rich-table-row.tsx:31`) get no background.
+- [surplus] `ink/primitives/rich-text-runs.ts:38` and `rich-text-runs.ts:74` accept `_backgroundIntent` and never use it. `ink/primitives/rich-table-row.tsx:34` and `:75` pass it anyway.
+- [special] `ink/primitives/rich-table-row.tsx:28-29` wraps each cell and then keeps only the first wrapped line, so long cells are silently truncated. `ink/blocks/table-block.tsx:131` measures `2 + rows.length` to match, and neither says so.
+- [hidden] `ink/primitives/prefixed-rich-list-item.tsx:44` passes a `ColorIntent` name (`"sectionSubheading"`, `"dimText"`, `"info"`, `"accent"`, `"text"`) to Ink's `color` prop. Ink's colorize (`node_modules/ink/build/colorize.js`) treats unknown names as no colour, so list markers and conversation role labels (`conversation-block.tsx:24`, `:33`) render uncoloured and nothing reports it.
+
+#### Syntax/code rendering duplicating kit
+
+- [hidden] `ink/blocks/shared/syntax-line.tsx:23-94` (`SyntaxLine`) re-implements the kit's `SyntaxTokenLine` (`tui/kit/core/src/primitives/display/syntax-token-line.tsx:101-120`), adding padding and background.
+- [hidden] `ink/blocks/code-block.tsx:18-21` re-declares the kit's exported `SyntaxToken` type (`syntax-token-line.tsx:8-11`). `code-block.tsx:27-37` (`pushSyntaxToken`) copies the kit's private `pushToken` (`syntax-token-line.tsx:32-42`).
+- [surplus] `ink/blocks/shared/syntax-line.tsx:17-21` (`syntaxTokenColors`) is never used.
+- [needless] `ink/blocks/shared/syntax-line.tsx:9-10` accepts both `backgroundIntent` and `backgroundColor`, and `backgroundColor` always wins (`syntax-line.tsx:34-39`). Its only caller, `ink/primitives/command-line-row.tsx:35-36`, passes both.
+- [hidden] `ink/blocks/interactive-block.tsx:35-40` feeds raw `step.command` (plain text per `docs/content/src/types.ts:111`) through `SyntaxLine` → `parseSyntaxTokenLine`. Any literal `[[` in a command is parsed as colour markup.
+- [hidden] `ink/blocks/code-block.tsx:107-158` and `ink/primitives/admonition-frame.tsx:31-71` assemble box frames by string concatenation of glyphs instead of using the kit chrome (`ChromeFrame`/`ChromeGrid`). That contradicts `install-docs/chrome-architecture.md:4`.
+
+#### Glyphs and colours hand-copied outside theme/kit
+
+- [hidden] `ink/blocks/note-block.tsx:24-47` hard-codes note label, foreground, background and border hex colours outside the theme. They bypass the colour runtime (passed raw to Ink at `note-block.tsx:72-73` and through `AdmonitionFrame`), so mono/NO_COLOR/ansi16 modes still emit hex colours.
+- [special] `ink/blocks/note-block.tsx:66-67` falls back to `cardBackground` when `palette.backgroundColor` is empty, but every palette entry is non-empty, so the fallback never runs.
+- [hidden] `ink/primitives/command-line-row.tsx:16` and `:28`: `useIntentColor("commandBarBackground")` always returns `undefined`, because `commandBarBackground` is in the inherit set at `ink/blocks/shared/intent-color.ts:11`. The `#000000` fallback is therefore always used, and the theme's `commandBarBackground` (`ink/theme/index.ts:66`) never has an effect.
+- [hidden] `ink/blocks/shared/intent-color.ts:3-14` hand-lists the intents that "inherit terminal background", duplicating the `"default"` values in `ink/theme/index.ts:6`, `:17-21`, `:66`, `:68`, `:72`. The lists have already diverged: `sidebarItemActiveBackground` is in the set but the theme gives it `#1f4acc` (`theme/index.ts:37-41`).
+- [special] `ink/blocks/shared/intent-color.ts:17-19` returns before calling `useTuiTheme`/`useTuiColors`, so the hook count depends on the intent value. `ink/blocks/shared/syntax-line.tsx:37-39` calls `useIntentColor` only when `backgroundIntent` is set. `ink/blocks/table-block.tsx:52-58` calls `useIntentColor` after an early `return null`. All three call hooks conditionally.
+- [hidden] `ink/theme/index.ts:8-16`: `border` and `sidebarBorder` have identical values. `theme/index.ts:44-53`: `accent` and `linkText` are identical. `theme/index.ts:37-41` vs `:59-63`: active backgrounds share ansi256 `26`. These are copies with no shared source.
+- [hidden] `ink/blocks/code-block.tsx:107` hard-codes `resolveChromeGlyphSet("single")` and `ink/primitives/admonition-frame.tsx:31` hard-codes `"round"`, ignoring `theme.chrome.borderGlyphSet` (`ink/theme/index.ts:81`).
+- [hidden] `ink/blocks/table-block.tsx:17` (`"─┼─"`, `"─"`) and `ink/primitives/rich-table-row.tsx:19` (`" │ "`) hand-copy box glyphs instead of using the kit glyph set.
+- [surplus] `ink/components/sidebar.tsx:33-36` and `:39-42` pass `emptyLabel="(no docs pages)"`, `▾`, `▸`, `▸`, `dimText`, `sidebarItemText`, `sidebarItemActiveText` and `sidebarItemActiveBackground`. These are identical to the kit `TreeNav` defaults (`tui/kit/core/src/components/navigation/tree-nav.tsx:85-87`, `:96`, `:175-178`).
+- [needless] `tui/kit/core/src/components/navigation/tree-nav.tsx:96` uses the kit default empty label `"(no docs pages)"`. That is install-docs vocabulary inside a generic kit component.
+- [hidden] `ink/document/section-heading-item.tsx:17` (`◆`/`›`), `ink/blocks/command-block.tsx:48` (`▸ ` selection prefix) and `ink/components/sidebar.tsx:34-36` (`▾`/`▸`) are hand-picked glyphs with no shared table.
+- [hidden] `ink/blocks/table-block.tsx:34` caps column width at the magic number `32`, which is unrelated to `theme.layout.sidebarWidth` `32` (`theme/index.ts:75`) but reads the same.
+
+#### Session, slug and default-page logic (fallbacks vs "fail fast")
+
+- [hidden] `src/cli/parse-args.ts:29-34`, `parse-args.ts:41-46` and `src/domain/navigation/slug-guard.ts:9-12` each check for an empty slug with the identical message `"Flag '--slug' requires a non-empty page slug."`.
+- [special] `src/cli/parse-args.ts:41` rejects any `--slug` value that starts with `-`.
+- [special] `src/app/session.ts:15-35` (`resolveDefaultSlug`) has three fallback levels (profile default, first nav item, first allowed slug). The final throw (`session.ts:30-32`) is unreachable because `session.ts:43-45` already threw on empty.
+- [special] `src/app/session.ts:42` and `session.ts:47` each call `flattenDocsNav` through `resolveAllowedSlugs`/`resolveAllowedSlugSet`. `session.ts:48` (`buildInstallNavItems`) flattens a third time.
+- [hidden] `src/domain/scope/allowed-slugs.ts:13-18` dedupes slugs, but `src/domain/navigation/nav-model.ts:44` (`filterNavItemsByAllowedSlugs`) keeps duplicates. `allowedSlugs` and `navItems` can disagree on the same source.
+- [special] `src/domain/content/index.ts:4-14` (`missingPage` fallback) is unreachable, because `navItems` are already filtered to slugs with content (`allowed-slugs.ts:9`). It is also the kind of hidden fallback `install-docs/CLAUDE.md:31` forbids.
+- [special] `ink/hooks/use-install-navigation.ts:26-30` builds an "unknown slug, showing …" startup note. It is unreachable because `src/app/session.ts:53` already throws on an unknown slug, and it contradicts `install-docs/CLAUDE.md:30`.
+- [special] `ink/screens/install-viewer.tsx:224-249` renders a whole alternate "no docs pages" frame that `src/app/session.ts:49-51` makes unreachable. It duplicates the pane config at `install-viewer.tsx:498-522` and returns before the hooks at `install-viewer.tsx:276-330` (a conditional hook count).
+- [surplus] `src/rendering/pipeline/viewport.ts:51-56` (`resolveInitialDocIndex`) is never used.
+- [special] `src/domain/navigation/nav-model.ts:20` maps an empty href to the literal slug `"index"`, a page the nav does not have.
+- [hidden] `src/domain/navigation/nav-model.ts:3-21` (`docsSlugFromHref`, `/docs/<slug>`) and `xtask/src/tasks/inspect_docs.rs:157` (regex `"/docs/([a-z0-9][a-z0-9\-]*)"`) each derive slugs from hrefs. `inspect_docs.rs:174-175` validates a third slug grammar the app itself never enforces.
+- [surplus] `src/domain/navigation/nav-model.ts:40-52`: `filterNavItemsByAllowedSlugs` and `buildInstallNavItems` are one-line wrappers.
+
+#### Distro identity: a profile system that does nothing
+
+- [surplus] `src/domain/distro/levitate-profile.ts:4-17` (`ALLOWED_PRODUCTS`, `ALLOWED_SCOPES`, `isAllowedProduct`, `isAllowedScope`) and `levitate-profile.ts:25-29` (`allowsMeta`) are never called. No code reads `allowedProducts`, `allowedScopes` or `allowsMeta` (`src/domain/distro/profile.ts:8-11`). The live sidebar therefore shows every docs section (Package Manager, Helpers, Architecture, Rec Tooling; `snapshots/inspect/120x36/001-installation-disk.txt:4-20`) under the title "Installation Docs".
+- [surplus] `src/domain/distro/registry.ts:6-13`: the `acorn` profile (`allowsMeta: () => false`) cannot be selected. `src/cli/run.ts:20` never passes `distro`, and AcornOS ships a plain-text `less` frontend instead (`distro/variants/acorn/ring2/products.toml:128-129`, `distro/builder/src/pipeline/live_tools.rs:446-497`).
+- [surplus] `src/app/bootstrap.tsx:13-14` and `bootstrap.tsx:18`: the `distro?: DistroId` option is never supplied, so the profile is always `"levitate"`. Neither argv, env nor the ISO build (`live_tools.rs:438-444` uses `distro_id` only in an error message) carries a distro.
+- [surplus] `src/domain/distro/profile.ts:1-12`, `levitate-profile.ts` and `registry.ts` are three files for one profile whose only live fields are `defaultSlug` and `id` (used in error text, `src/app/session.ts:31`, `:44`, `:50`).
+- [hidden] `src/domain/distro/levitate-profile.ts:21` (`"LevitateOS Field Manual"`) and `ink/screens/install-viewer.tsx:202` (default `title`) are copies. Neither is ever shown: `install-viewer.tsx:497-499` passes `title` to `SurfaceFrame` with `showHeader={false}` (`tui/kit/core/src/surfaces/frame/surface-frame.tsx:187-205` uses it only for the header).
+- [hidden] Distro and app identity is hard-coded in separate places that must agree: `src/cli/help.ts:3` ("LevitateOS Docs TUI"), `src/app/bootstrap.tsx:30` ("levitate-install-docs"), `ink/screens/install-viewer.tsx:232` and `:501` ("Installation Docs", twice), `install-docs/package.json:2` (`@levitate/docs-tui`) and `package.json:7` (`levitate-install-docs`).
+- [hidden] `src/domain/distro/levitate-profile.ts:24` (`defaultSlug: "installation"`) is repeated in `distro/builder/src/pipeline/live_tools.rs:609` (`docs-tui --slug installation`), `distro/builder/src/artifact/live_overlay.rs:368`, `README.md:52` (root) and `src/install-viewer.chrome.pty.test.ts:39`.
+
+#### Screen: keymap, focus and actions
+
+- [hidden] The keymap is written four times: `ink/screens/install-viewer.tsx:409-469` (bindings), `ink/components/status-bar.tsx:26-40` (labels), `src/cli/help.ts:11-21` (help) and `install-docs/README.md:19-25`. They already disagree: `b`/`space`/arrows are bound but absent from help, and README lacks Tab/m/[ ]/Enter/c/y.
+- [needless] `ink/screens/install-viewer.tsx:441-466` gates `pageup`/`pagedown`/`g`/`G` with inline `if (!focus.isContent) return`, while `install-viewer.tsx:412-440` and `:467-469` use the `isActive` option. Two mechanisms do one job.
+- [special] `ink/screens/install-viewer.tsx:215-216` and `:290-318` keep refs (`contentNavLock`, `contentNavAllowedIndex`) that undo page changes made while content focus is active, with a runtime note "blocked navigation mutation…". This guards against a state the `isActive`-gated hotkeys should already prevent.
+- [hidden] `ink/screens/install-viewer.tsx:401-402` must set `contentNavAllowedIndex.current` before `navigation.setPage`, or the lock effect at `install-viewer.tsx:300-318` reverts the jump. Nothing states this call-order rule.
+- [special] `ink/screens/install-viewer.tsx:188-196` (`copyToClipboardOsc52`) writes raw OSC 52 to `process.stdout` underneath Ink and swallows any exception (`install-viewer.tsx:193`). A generic terminal capability is implemented in the app rather than the kit.
+- [surplus] `ink/screens/install-viewer.tsx:276-279`: the `useMemo` depends on `docsViewport.visibleItems`, a new array every render (`src/rendering/pipeline/viewport.ts:68-69`), so it recomputes every render.
+- [hidden] `ink/screens/install-viewer.tsx:170-178` gives every link target the whole block's `startLine`/`endLine`. `install-viewer.tsx:345-359` (`focusActionable`) therefore scrolls to the block, not the link. `selectedLinkHref` matching by href (`rich-text-renderer.tsx:86-88`) highlights every link with that href in the item.
+- [surplus] `ink/screens/install-viewer.tsx:37` and `:204`, `:219`: `onExit` is never passed.
+- [needless] `ink/components/status-bar.tsx:11-18` (`installStatusBar`) takes six positional parameters, two optional with defaults the only caller always overrides (`status-bar.tsx:21`; caller `install-viewer.tsx:480-487`).
+- [hidden] `ink/components/status-bar.tsx:45` and `ink/screens/install-viewer.tsx:380-381` each format the `i/n` action counter.
+- [surplus] `ink/components/status-bar.tsx:34` adds a second `tab` segment ("tab content") next to `status-bar.tsx:27` ("tab toggle pane").
+- [special] `src/app/bootstrap.tsx:45` sets `exitOnCtrlC: false` only because `ink/screens/install-viewer.tsx:223` binds `C-c` itself.
+- [hidden] `ink/theme/index.ts:76` (`minColumns: 88`) together with `sidebarWidth: 32` (`theme/index.ts:75`) assumes a wide pane. The live split pane gives the docs app 50% of the console minus borders (`distro/builder/install-split-pane/src/main.rs:31-32`, `:708-716`). Below 88 columns, `SurfaceFrame` replaces the viewer with "Terminal too small" (`tui/kit/core/src/surfaces/frame/surface-frame.tsx:153-170`), and no check runs at the real pane width.
+
+#### Viewport naming and dead parameters
+
+- [needless] `src/rendering/pipeline/viewport.ts:78-79`: `visibleItems` holds all items, not the visible ones, and `totalItems` holds total lines. `viewport.ts:74-75` `startItem`/`endItem` are line numbers. Callers (`install-viewer.tsx:488`) must know the names are wrong.
+- [surplus] `src/rendering/pipeline/viewport.ts:60` (`_slug`) and `viewport.ts:64` (`_styleContext`) are unused parameters. `DocsRenderStyleContext` (`src/domain/content/contracts.ts:26-29`) exists only for the latter.
+- [surplus] `ink/document/section-heading-item.tsx:8` and `:14` (`indent`) are never passed.
+- [surplus] `ink/primitives/command-line-row.tsx:9` and `:27` (`rowIndex`, consumed by `void rowIndex`), plus `ink/primitives/command-line-series.tsx:8` (`startRowIndex`, used only for React keys; passed by `interactive-block.tsx:38`).
+- [surplus] `ink/primitives/command-line-row.tsx:11-12` (`fallbackIntent`, `backgroundIntent`) are never passed by any caller.
+- [surplus] `src/app/errors.ts:3` and `:8` (`AppError.code`) are never read. `errors.ts:5` defaults `exitCode = 2`, and `src/app/bootstrap.tsx:26` passes `2` explicitly anyway.
+- [hidden] `src/app/bootstrap.tsx:25` inlines the body of `formatErrorMessage` (`src/app/errors.ts:13-19`).
+- [surplus] `ink/primitives/index.ts:1-7` is a barrel nothing imports (it appears in the zero fan-in list, `.artifacts/untangle-ui/map/fanin.txt`).
+- [surplus] `ink/primitives/rich-text-runs.ts:3-5` (`runsLength`) and `:7-9` (`cloneRuns`) are exported but only used inside the file.
+- [special] `ink/blocks/qa-block.tsx:7-8` imports from `./shared/rich-text-renderer` twice.
+
+#### CLI: removed flags still referenced; argv/env contract implicit
+
+- [surplus] `src/cli/parse-args.ts:1` keeps a `REMOVED_FLAGS` list (`--list`, `-l`, `--page`, `-p`, `--all`, `-a`, `--tmux-mode`), and `parse-args.ts:20-25` prints a special message for them.
+- [surplus] `src/cli/help.ts:23` and `install-docs/README.md:17` still describe removed legacy flags.
+- [hidden] `src/cli/parse-args.ts:39` accepts `-s` as an alias that `src/cli/help.ts:5-9` and README do not mention.
+- [hidden] The app reads no environment variables itself (`src/cli/run.ts:6` reads only argv). Colour depends on `TERM`/`COLORTERM`/`FORCE_COLOR`/`NO_COLOR` as interpreted by `tui/kit/core/src/theme/colors.ts:230-265`. That contract appears only in the launchers that force it: `distro/builder/src/pipeline/live_tools.rs:389-398`, `live_tools.rs:466-475`, `distro/builder/install-split-pane/src/main.rs:550-568`, `xtask/src/util/pty_capture.rs:114-131` and `xtask/src/tasks/tui.rs:318`. That is five copies with three different NO_COLOR treatments: unset if non-empty, set to `""`, and `env_remove`.
+- [hidden] Every launcher forces `FORCE_COLOR=3` (truecolor). In ansi256 mode the kit returns bare numbers like `"111"` (`tui/kit/core/src/theme/colors.ts:334-335`, `:294-304`), and Ink's colorize ignores them, so colour vanishes. The forced env silently hides this.
+- [hidden] `distro/builder/src/pipeline/live_tools.rs:612` exports `LEVITATE_DOCS_PLAIN=1` for the serial console. Only the AcornOS plain-text launcher reads it (`live_tools.rs:478`). The Bun app ignores it, so on LevitateOS the serial console still gets the full-colour TUI, and nothing indicates the variable is a no-op there.
+- [hidden] `distro/builder/src/pipeline/live_tools.rs:400` (`exec bun "$APP" "$@"`) and `live_tools.rs:502` (`docs-tui` → `levitate-install-docs "$@"`) forward argv into `src/cli/parse-args.ts`. The plain-text launcher (`live_tools.rs:461-488`) silently ignores the same `--slug installation` argv. One command name now has two argv contracts.
+
+#### ISO bundling (`install_bun_docs_tui_payload`)
+
+- [hidden] `distro/builder/src/pipeline/live_tools.rs:319` and `:326` (bundle dir and file path) are repeated as a string literal at `live_tools.rs:383`. `live_tools.rs:361` (`usr/local/bin/bun`) is repeated at `live_tools.rs:400`.
+- [hidden] `distro/builder/src/pipeline/live_tools.rs:330` bundles `src/main.ts`, the same entry hard-coded in `xtask/src/tasks/inspect_docs.rs:226`, `xtask/src/tasks/inspect_tui.rs:122`, `xtask/src/tasks/tui.rs:317`, `install-docs/bin/levitate-install-docs-split:45` and `install-docs/package.json:7`, `:10`.
+- [hidden] The app directory path `tui/apps/live-tools/install-docs` is hard-coded in `distro/builder/src/pipeline/live_tools.rs:279`, `:282`, `xtask/src/tasks/inspect_docs.rs:24`, `xtask/src/tasks/tui.rs:314`, `xtask/src/tasks/inspect_tui.rs:121`, `xtask/src/tasks/check.rs:361` and `install-docs/scripts/verify-inspect-snapshots.sh:5`.
+- [hidden] `distro/builder/src/pipeline/live_tools.rs:295` checks `node_modules/@levitate/tui-kit/package.json` to decide whether to run `bun install`, while `xtask/src/tasks/check.rs:406` checks for `node_modules/`. These are two different "deps present" rules for one app.
+- [hidden] `distro/builder/src/pipeline/live_tools.rs:287` and `:366` copy whatever `bun` is on the builder's PATH into the ISO. The ISO runtime version is set by the host and pinned nowhere (root `package.json` says `bun@1.2.17`, the baseline ran bun 1.4.2, and `.github/workflows/bun-ci.yml` uses `latest`).
+- [hidden] Naming drift for one artifact: package `@levitate/docs-tui` (`install-docs/package.json:2`), directory `install-docs`, bin `levitate-install-docs` (`package.json:7`), bundle dir `docs-tui` (`live_tools.rs:319`), alias `docs-tui` (`live_tools.rs:435`) and `.gitignore` entry `levitate-docs` (`install-docs/.gitignore:5`).
+
+#### xtask drivers
+
+- [hidden] `xtask/src/tasks/inspect_docs.rs:187-298` copies `create_run_dir`, `transcript_path`, `parse_plain_screen`, `parse_formatted_screen`, `parse_screen`, `trim_line_trailing_spaces`, `strip_script_bookends`, `find_subslice` and `unix_timestamp` from `xtask/src/tasks/inspect_tui.rs:200-322`.
+- [hidden] `xtask/src/tasks/inspect_docs.rs:38-44` and `xtask/src/tasks/inspect_tui.rs:39-45` each clamp `seconds == 0 → 1` and `columns/rows.max(1)`, which `xtask/src/util/pty_capture.rs:24-25` and `:56` clamp a third time.
+- [surplus] `xtask/src/tasks/inspect_docs.rs` (`inspect docs`) and `xtask/src/tasks/inspect_tui.rs:119-123` (`inspect tui install-docs`) are two commands that render the same app headlessly.
+- [hidden] `xtask/src/tasks/inspect_docs.rs:150-170` scrapes `docs/content/src/generated/index.ts` with a regex on `"href": "/docs/…"`. It depends on the generated file's JSON-ish formatting and on every `/docs/` href in that file being a nav entry, while the app gets nav from the `docsNav` export.
+- [surplus] `xtask/src/tasks/inspect_docs.rs:133-143` loops over a one-element tool list `["bun"]`.
+- [hidden] `xtask/src/tasks/tui.rs:315` runs `ensure_node_modules` before launching, but `xtask/src/tasks/inspect_docs.rs:20-36` and `inspect_tui.rs:29-37` do not. Inspect fails on a fresh checkout where `tui` works.
+- [special] `xtask/src/tasks/inspect_docs.rs:91` and `inspect_tui.rs:85` discard the `remove_file` error. `inspect_docs.rs:296` and `inspect_tui.rs:320` map a clock error to `0`.
+- [hidden] `xtask/src/tasks/inspect_docs.rs:63-64` passes the unclamped `options.columns`/`options.rows` into `transcript_path`, while capture uses the clamped values (`inspect_docs.rs:43-44`). `inspect_tui.rs:51-52` does the same.
+- [hidden] `xtask/src/tasks/check.rs:383-397` "check" runs only typecheck for install-docs, while `install-docs/package.json:18` defines a different `check` (typecheck, lint, format, inspect). Root `package.json` `turbo check` runs the latter.
+
+#### Checks and scripts that are broken or would not catch real bugs
+
+- [special] `src/install-viewer.chrome.pty.test.ts:51-52` invokes `levitate-xtask docs inspect`, which was renamed to `inspect docs` (`xtask/src/cli/types.rs:346`), so `test:e2e` fails 3/3 (`baseline/install-docs-test_e2e.log`).
+- [hidden] `install-docs/snapshots/inspect/120x36/001-installation-disk.txt:36` embeds the total docs page count (`page 3/37`, now `3/35`) from the status bar. Any docs-content nav change unrelated to the viewer breaks `inspect:check`, which is the current failure (`baseline/install-docs-inspect_check.log`).
+- [hidden] `install-docs/scripts/verify-inspect-snapshots.sh:8-18` hand-copies columns, rows, seconds, slugs and the expected `NNN-<slug>.txt` names. `snapshots/inspect/120x36/manifest.txt:1-5` holds the same values and nothing reads it. The file numbering depends on `xtask/src/tasks/inspect_docs.rs:79`.
+- [special] `install-docs/scripts/verify-inspect-snapshots.sh:10` assigns bash's special `SECONDS` variable (the shell's elapsed-time counter), so the value passed at `:30` is `2 +` elapsed seconds.
+- [special] `install-docs/scripts/verify-inspect-snapshots.sh:9-10` and `:27-36` (with `xtask/src/tasks/inspect_docs.rs:218-237`) rely on a fixed 2-second capture window: the snapshot is whatever Ink drew before a timed kill.
+- [special] `install-docs/scripts/verify-inspect-snapshots.sh:36` discards xtask stdout. `:54` runs `diff -u … >/dev/null`, so a mismatch reports only a filename, never the diff.
+- [hidden] `install-docs/scripts/verify-inspect-snapshots.sh:4` resolves the repo root by `../../../../..` from its own location, coupling it to the directory depth.
+- [hidden] The inspect snapshots are plain text of the first screen at 120x36 with navigation focus. They cannot catch colour or theme regressions (always-black command rows, uncoloured list markers, hex note colours under NO_COLOR), content-focus behaviour, link activation, scrolling and measure drift below the fold, or the real split-pane width where `minColumns: 88` applies. The status line is also truncated at 120 columns (`001-installation-disk.txt:36`).
+- [hidden] `src/install-viewer.chrome.pty.test.ts:35` derives the repo root from `process.cwd()`, so the test only works when run from the app directory. `:99` hard-codes `target/debug/levitate-xtask`, ignoring `CARGO_TARGET_DIR` (which `xtask/src/tasks/tui.rs:332-334` honours).
+- [special] `src/install-viewer.chrome.pty.test.ts:36` runs `cargo build -p levitate-xtask` at module import time.
+- [hidden] `src/install-viewer.chrome.pty.test.ts:92` depends on xtask's transcript naming `{index:03}-{slug}.transcript` (`xtask/src/tasks/inspect_docs.rs:206`). `:204` splits frames on `ESC[H`, which depends on Ink's redraw escape sequence.
+- [hidden] `src/install-viewer.chrome.pty.test.ts:144` matches code fences with `/┌\s+[A-Z][A-Z0-9_. -]*\s+/`, coupled to `ink/blocks/code-block.tsx:107-114` (single glyph set, upper-cased language label). `:131`, `:175`, `:179` and `:359-361` hard-code single-weight glyphs although `:29-33` accepts every weight. Changing `theme.chrome.borderGlyphSet` (`ink/theme/index.ts:81`) fails the test without any bug.
+- [hidden] `src/install-viewer.chrome.pty.test.ts:396-401` depends on the literal pane title "Installation Docs" (`ink/screens/install-viewer.tsx:501`). `:415` depends on docs-content page `helpers-commands` having a complete code fence in its first screen.
+- [special] `src/install-viewer.chrome.pty.test.ts:28` and `:295`: when the structural title row is not found, the fallback title search uses `/[A-Za-z]/`, which matches almost any line, so the title check cannot fail.
+- [special] `src/install-viewer.chrome.pty.test.ts:217` inspects only the first two frames.
+- [surplus] `src/install-viewer.chrome.pty.test.ts:380-381` and `:397-398` capture the same `installation` run twice per width. `:38-44` (`runPtyCapture`, `runPtyCaptureSlug`) are wrappers over `runDocsInspectCapture`.
+- [hidden] The PTY test only checks frame glyph shapes at 96 and 120 columns. It would not catch wrong content, wrong scroll math, broken focus/actions, missing colour, or the narrow split-pane case.
+- [surplus] `install-docs/.github/workflows/ci.yml:1-18` sits in a subdirectory of the `tui` repository, which has no root `.github/workflows`. GitHub never runs it, and the reusable `bun-ci.yml` it calls would only typecheck anyway.
+- [surplus] `install-docs/tsconfig.json:11-12` (`declaration`, `outDir: dist`) configure emit for a package that only runs `tsc --noEmit` and `bun build`.
+- [surplus] `install-docs/.gitignore:5` ignores a `levitate-docs` binary that nothing produces.
+- [surplus] `install-docs/design/design_goal.png` is referenced by no doc or code.
+
+#### Docs that contradict the code
+
+- [hidden] `install-docs/README.md:22-25` says `j`/`k` scroll and `PgUp`/`PgDn`/`g`/`G` work unconditionally. In content focus `j`/`k` cycle actions (`ink/screens/install-viewer.tsx:426-437`), and PgUp/PgDn/g/G only work in content focus (`install-viewer.tsx:441-466`).
+- [hidden] `install-docs/README.md:29-35` advertises `test:e2e`, `inspect:check` and `check` as the development loop, and all three are broken (see above).
+- [hidden] `install-docs/README.md:12` and `install-docs/bin/levitate-install-docs-split:1-52` describe a tmux split launcher named `levitate-install-docs-split`. The shipped split pane is the Rust binary of the same name (`distro/builder/install-split-pane/Cargo.toml:6-7`, `distro/variants/levitate/ring2/products.toml:195-196`). This is the same name with two implementations, and the tmux one hard-codes the dev entry `bun src/main.ts` (`bin/levitate-install-docs-split:24`, `:45`).
+- [hidden] `tui/README.md:7` says install-docs is "the live ISO's install guide and split-pane install session". The split-pane session lives in `distro/builder/install-split-pane`.
+- [hidden] `install-docs/CLAUDE.md:31` ("No hidden fallbacks") is contradicted by `src/domain/content/index.ts:4-14`, `src/app/session.ts:24-34` and `ink/hooks/use-install-navigation.ts:26-30`.
+- [hidden] `install-docs/CLAUDE.md:32` ("Keep generic runtime/UI primitives in tui/kit/core") is contradicted by `ink/blocks/shared/rich-text-renderer.tsx`, `ink/blocks/shared/syntax-line.tsx`, `ink/primitives/rich-text-runs.ts`, `ink/primitives/admonition-frame.tsx` and the OSC 52 clipboard at `ink/screens/install-viewer.tsx:188-196`.
+- [hidden] `install-docs/CLAUDE.md:29` ("renders the full docs navigation tree") matches the code, but the domain profile (`src/domain/distro/levitate-profile.ts:4-5`, scopes `["install"]`) and the pane title "Installation Docs" (`ink/screens/install-viewer.tsx:232`, `:501`) both claim install-only scoping.
+- [hidden] `install-docs/style-map.md:3` and `install-docs/chrome-architecture.md:45` refer to the old path `docs/tui`. `chrome-architecture.md:45` names the component `InstallViewer`; it is `InstallViewerScreen` (`ink/screens/install-viewer.tsx:198`).
+- [hidden] `install-docs/style-map.md:10` and `:47` ("Change colors globally: edit theme intents") are contradicted by the hex colours in `ink/blocks/note-block.tsx:24-47` and `ink/primitives/command-line-row.tsx:16`.
+- [hidden] `install-docs/style-map.md:31` ("full-row background") and `style-map.md:35` ("pad/truncate/background") describe background behaviour that `ink/primitives/rich-text-runs.ts:63-68` turns into a no-op and that `command-line-row.tsx:28` forces to black.
+- [hidden] `install-docs/chrome-architecture.md:1-49` documents `@levitate/tui-kit` internals (`ChromeGrid`, `ChromeLayer`, glyph sets, the `SurfacePane` contract) from the app folder, so it changes with the kit, not with this app. `chrome-architecture.md:4` ("rendered from deterministic coordinates, not content layout") does not hold for the app's own frames (`ink/blocks/code-block.tsx:107-158`, `ink/primitives/admonition-frame.tsx:31-71`).
+- [hidden] `install-docs/README.md:1` and `CLAUDE.md:1` use the name `docs-tui`, while the directory, bin and live command are `install-docs`/`levitate-install-docs`.
+
+### C. disk-plan + recab TUIs (and the xtask code that drives them)
+
+Scope: `tui/apps/install/disk-plan/**`, `tui/apps/runtime/recab/**`, `xtask/src/tasks/{tui,inspect_tui,check,generate}.rs`, `xtask/src/cli/types.rs` (TuiApp). Paths below are relative to the repo root; `dp/` = `tui/apps/install/disk-plan/`, `rc/` = `tui/apps/runtime/recab/`.
+
+Checked live: `cargo xtask inspect tui install-disk-plan --input 'n'` and `--input 'j'` both leave the app on the welcome page, and the keys show up as printed text (`nn`) at the bottom of the screen (see the inspect entries). `oxfmt --check` fails on `dp/src/contract/recpart.ts`, `dp/src/presentation/disk-plan-screen.tsx` and `rc/domain/contract.ts`. `rc/node_modules/@levitate/tui-kit/node_modules/react` is a second React next to `rc/node_modules/react`.
+
+#### Who the apps are for (not shipped, distro-blind)
+
+- [hidden] `dp/README.md:3` ("Canonical install disk-planning UI owner"), `tools/recpart/README.md:12-14` and `tools/recpart/REQUIREMENTS.md:116-117` name disk-plan as the installer UI, but no ISO ships it (`distro/builder/src/pipeline/live_tools.rs:279` ships only install-docs). The guidance users actually get is the docs' raw `recpart` and `recstrap`/`recfstab` steps (`docs/content/src/content/05-rec-tooling/10-recpart.ts`, `01-getting-started/04-installation-base.ts:66`). Two owners of the install flow, and the layout hides which one users see.
+- [hidden] `tui/README.md:3` says the apps are "for the LevitateOS live ISO and installer". disk-plan and recab are on neither live ISO and on no installed system, so nothing ties them to a product that would make them change.
+- [hidden] `dp/src/presentation/disk-plan-screen.tsx:814,832,816-819` says "`ab` is the default and recommended mode for LevitateOS" and argues for it with LevitateOS's LLM-assisted recipe workflow. AcornOS installs in `mutable`, so the app's advice follows one distro's policy while the tool (`recpart`) is shared.
+- [hidden] `dp/src/presentation/disk-plan-screen.tsx:1154` hard-codes the frame title "LevitateOS Disk Plan". Distro identity is a copied string, not read from the distro being installed.
+
+#### recpart facts copied into disk-plan
+
+- [hidden] `dp/src/cli/parse-args.ts:18` defaults `mode` to `"ab"`, copying recpart's `default_value_t = InstallMode::Ab` (`tools/recpart/src/cli.rs:40`, REQ-MODE-001). It is repeated in the help text (`parse-args.ts:70` "mode defaults to 'ab'"), in `disk-plan-screen.tsx:814,832` ("default, recommended") and in `dp/README.md:29`. The generated contract carries `INSTALL_MODES` but not the default.
+- [hidden] `dp/src/presentation/disk-plan-screen.tsx:808-853` draws exactly two hard-coded mode cards (`ab`, `mutable`) with their own descriptions, while `toggleMode` (`:464-471`) cycles the generated `INSTALL_MODES`. A third recpart mode would toggle into a state with no card.
+- [hidden] The mode descriptions at `disk-plan-screen.tsx:834-836,849-851` restate recpart's layout semantics (`tools/recpart/README.md:19-21`) in a separate wording.
+- [hidden] `dp/src/app/plan-runner.ts:55` (`json: exitCode === 0 ? stdout : stderr`) relies on recpart writing its error JSON to stderr and its result to stdout (`tools/recpart/src/main.rs:13`). The convention is noted only in a comment (`plan-runner.ts:16`). If recpart changes it, `parseRecpartJson` silently returns null and diagnostics fall back to raw text.
+- [hidden] `dp/src/app/plan-runner.ts:85-86`: a failing `recpart list-disks --json` prints its `ErrorPayload` JSON on stderr, but `listDisks` throws `recpart list-disks failed: ${run.stderr}`, so the target-disk page (`disk-plan-screen.tsx:756`) shows a raw pretty-printed JSON blob. The plan, dry-run and apply failures go through `setFailureFromRun`/`ERROR_SCHEMA_VERSION` (`:209-221`). Two handlings of one recpart error contract.
+- [hidden] `dp/src/presentation/disk-plan-screen.tsx:930` "Apply would refuse this disk" copies recpart's text-mode heading (`tools/recpart/src/cli.rs:148`), and `:91-94`/`:387` treat `warnings` as "refusals". The meaning (dry-run warnings = what apply refuses) is set in `tools/recpart/src/exec.rs:67-77` and is not part of the contract types (`ApplyResult.warnings: Array<string>`).
+- [hidden] `dp/src/presentation/disk-plan-screen.tsx:139-145` `nextInstallSteps` spells the `recstrap <t>`, `recfstab <t> >> <t>/etc/fstab` and `recchroot <t>` syntax plus "set a root password and install the bootloader". These are a copy of the docs' manual sequence (`docs/content/src/content/05-rec-tooling/02-installation-tools-overview.ts:83`, `06-recfstab.ts:55`), and the generated `TOOL_HELP` exists for exactly these CLIs.
+- [hidden] `dp/src/presentation/disk-plan-screen.tsx:1118-1122` renders `mode_context.install_target_slot`/`inactive_slot_hint` as free strings (`dp/src/contract/recpart.ts:51` `string | null`). They are the same `"A"`/`"B"` letters as recab's generated `Slot` (`rc/domain/contract.ts:3`), with no shared type (`tools/recpart/src/handoff.rs:24-28`).
+- [hidden] `dp/src/presentation/disk-plan-screen.tsx:788` labels every non-rotational disk "ssd", but the contract says `rotational` is "`false` for SSDs and virtual disks" (`dp/src/contract/recpart.ts:8-11`). The UI's meaning of the field drifts from the producer's.
+- [hidden] The apply command (`plan-runner.ts:35`) never passes `--mount-root`, so it depends on recpart's default `/mnt` (`tools/recpart/src/cli.rs:53`). The handoff target that `nextInstallSteps` uses is derived from that default. This is B019, kept by the prior untangle and still implicit.
+
+#### Command lines and process running
+
+- [hidden] `dp/src/presentation/disk-plan-screen.tsx:869` "Running recpart plan --json ..." and `dp/src/cli/parse-args.ts:72` "command runs: recpart plan --disk <disk> --mode <mode> --json" hand-write a command that `buildPlanCommand` (`plan-runner.ts:26-28`) owns. `dp/README.md:12-13` is a third copy.
+- [hidden] `dp/src/presentation/disk-plan-screen.tsx:918-919,969,1043-1045` rebuild the displayed commands from `flow.disk`/`flow.mode` with `buildPlanCommand`/`buildApplyCommand`, separately from the runs that actually executed. `RecpartRunResult.command` (`plan-runner.ts:12`) carries the executed argv but is read only in an error string (`disk-plan-screen.tsx:132`).
+- [hidden] `dp/src/presentation/disk-plan-screen.tsx:917` heading "Exact Command Sequence (No Hidden Commands)" lists the plan and dry-run invocations but not `recpart list-disks --json` (`plan-runner.ts:84`) or the real `apply --confirm DESTROY` (`plan-runner.ts:70`). The UI text contradicts what the app runs.
+- [hidden] `dp/src/app/plan-runner.ts:27,35,84` run a bare `recpart` from PATH. `rc/cli/parse-args.ts:10,22-30` take `--recab-bin` with default `recab` from PATH. Two binary-discovery conventions for sibling apps, and disk-plan only works against this checkout because `xtask/src/tasks/tui.rs:34-42` prepends `target/debug` to PATH.
+- [hidden] `dp/src/app/plan-runner.ts:44-58` (`Bun.spawn`; a missing binary throws, so the screen gets an `error` state) and `rc/app/recab-runner.ts:5-48` (`node:child_process.spawn`; a missing binary becomes `exitCode: null` plus a stderr message) are two process runners with different failure semantics for the same job.
+- [surplus] `dp/src/app/plan-runner.ts:60-71` `runRecpartPlan`/`runRecpartDryRun`/`startRecpartApply` are one-line wrappers that each pair a builder with `spawnRecpart`.
+- [surplus] `rc/app/recab-runner.ts:14` passes `env: process.env`, which is spawn's default.
+- [hidden] `rc/app/recab-runner.ts:14` relies on the inherited environment to carry recab's `RECAB_*` path overrides (`tools/recab/src/lib.rs:148-149`), which is how the prior untangle "verified" the TUI against a scratch tree. Nothing in the TUI states that.
+
+#### Page flow: one list, many copies
+
+- [hidden] `dp/src/domain/flow.ts:3-14` `DISK_PLAN_PAGES` is copied by hand in the welcome page (`disk-plan-screen.tsx:721-731`, "Flow (10 pages)" plus ten literal lines) and in `dp/README.md:9-18`. Adding or reordering a page needs all three.
+- [hidden] The flow is a branch (apply → result-handoff | failure-diagnostics; F → failure → back), but `flow.ts:41-53` models it as a linear list with `nextPage`/`prevPage`. The screen patches it with index jumps (`disk-plan-screen.tsx:491-500,505-511,643-644`). Side effects: Next on `result-handoff` lands on `failure-diagnostics` ("No failure captured."), and Back from an apply failure lands on `result-handoff` ("No successful apply result available.").
+- [hidden] `dp/src/presentation/disk-plan-screen.tsx:409-411,514` derive the apply lock-out from page positions (`applyStarted && flow.pageIndex - 1 <= confirmIndex`). Reordering `DISK_PLAN_PAGES` changes safety behaviour without any type error.
+- [hidden] `dp/src/domain/guards.ts:12-32` maps page → context flag, and the screen maps flag → state predicate (`disk-plan-screen.tsx:476-483` using `isPlanReady` etc. at `:83-98`). `startApply` (`:420-426`) re-checks the same plan/dry-run/preflight predicates on its own. One rule ("may we go past page X") is split across three places.
+- [needless] `dp/src/domain/guards.ts:3-10` `AdvanceContext` is a shallow interface. Every new gate changes the type, the `if` chain in `canAdvancePage` and the object literal in the screen together.
+- [surplus] `dp/src/domain/guards.ts:25-27` the `destructive-confirm` → `confirmUnlocked` guard never lets anything advance, because `onNext` returns on that page anyway (`disk-plan-screen.tsx:487-490`).
+- [special] `dp/src/presentation/disk-plan-screen.tsx:487-501` `onNext` has an `if` per page (`destructive-confirm`, `apply-progress`) on top of the guard table.
+- [needless] `dp/src/domain/flow.ts:1`, `dp/src/app/bootstrap.tsx:2` and `disk-plan-screen.tsx:17` import `DiskMode` from `cli/parse-args`, so domain and presentation depend on the CLI module for a type that is just the generated `InstallMode` (`parse-args.ts:3`).
+- [surplus] `dp/src/cli/parse-args.ts:3` `DiskMode = InstallMode` is an alias with no meaning of its own.
+- [surplus] `dp/src/domain/flow.ts:55-60` `setMode` is a one-field spread with one caller (`disk-plan-screen.tsx:466`).
+- [surplus] `dp/src/domain/flow.ts:24-35` `clampPageIndex` handles non-finite and fractional input that never occurs (indices are integer ±1 or `indexOf` results) and re-implements the kit's `clampIndex` (`tui/kit/core/src/utils/clamp.ts:35-41`).
+- [surplus] `dp/src/domain/flow.ts:38` `?? "welcome"` fallback is unreachable after clamping.
+- [hidden] `dp/README.md:4-18` "Implemented thin shell pages" and `dp/src/cli/parse-args.ts:62` "thin shell" describe a design that the 1176-line screen no longer is.
+
+#### One screen component holding flow, IO and rendering
+
+- [needless] `dp/src/presentation/disk-plan-screen.tsx:151-1176` mixes in one function: all flow state (`:153-175`), disk listing IO (`:227-275`), three recpart-running effects (`:314-406`), the destructive apply launcher (`:413-450`), navigation rules (`:474-518`), eleven hotkey bindings (`:526-645`), the footer (`:647-695`) and ten page renderers (`:711-1150`). Changing any one page's rendering means editing the file that owns the destructive-apply safety logic.
+- [hidden] `dp/src/presentation/disk-plan-screen.tsx:314-341`, `:343-370` and `:372-406` are three copies of one effect shape: guard on page, set running, run, `runState`, `setFailureFromRun`, a `.catch` with the error-message idiom, and a cancel flag. The kit already has `useAsyncTask` with cancellation (`tui/kit/core/src/hooks/use-async-task.ts:13-75`), unused here.
+- [hidden] `dp/src/presentation/disk-plan-screen.tsx:343-370` (command-preview) and `:372-406` (preflight-checks) run the identical `recpart apply --dry-run` and both show its `warnings` (`:926-936` and `:971-975`). They gate differently, though: `commandPreviewReady` ignores warnings, `preflightPassing` requires none. Two pages over one result, each with its own reading of it.
+- [hidden] `dp/src/presentation/disk-plan-screen.tsx:59` (`AsyncState.failure.raw`) and `:211` restate `RecpartRunResult`'s fields (`plan-runner.ts:11-18`), and `dp/src/presentation/page-text.ts:13-18` restates `FailureDiagnostic` (`disk-plan-screen.tsx:63-68`) structurally. Three hand-kept shapes for one record.
+- [surplus] `dp/src/presentation/disk-plan-screen.tsx:59,211-213` type `json` as `string | null` and test `run.json ? … : null`, but `RecpartRunResult.json` is always a string.
+- [surplus] `dp/src/presentation/disk-plan-screen.tsx:83-89` `isPlanReady`/`isDryRunReady` only wrap `kind === "success"`.
+- [hidden] Step-line formats are written three ways: `[phase] command` (`disk-plan-screen.tsx:923`), `[pending] phase :: command` (`:1053`) and `progressStepLine`'s `[PLANNED|OK|FAIL] phase :: command` (`page-text.ts:8-11`). "Not yet run" is spelled both `pending` and `PLANNED`.
+- [hidden] `dp/src/presentation/page-text.ts:19-33` returns lines whose first entry is the title by convention, and `disk-plan-screen.tsx:1141-1146` splits `lines[0]` off as a red heading. Callers must know the position rule.
+- [surplus] `dp/src/presentation/page-text.ts:3-34` holds three single-caller string helpers (`confirmStatusLine`, `progressStepLine`, `failureDiagnosticLines`) split from the screen. The split has no second caller and they change only with the screen; it is left over from when unit tests imported them.
+- [hidden] `dp/src/presentation/disk-plan-screen.tsx:75-81` `limitLines` and `rc/presentation/runtime-recab-screen.tsx:27-39` `compactOutput` are two copies of the same "first N lines + `... (k more lines)`" truncation, with different defaults (16 and 10).
+- [hidden] The error-message idiom `error instanceof Error ? error.message : String(error)` is repeated at `dp/src/cli/run.ts:24`, `disk-plan-screen.tsx:236,335,364,400,444`, `rc/cli/run.ts:22` and `rc/app/recab-runner.ts:28`. install-docs has a helper (`tui/apps/live-tools/install-docs/src/app/errors.ts`) and the kit does it inside `useAsyncTask`.
+
+#### Disk selection
+
+- [hidden] `flow.disk` has three writers: the listing effect (`disk-plan-screen.tsx:257-259,266-270`), the grid-sync effect (`:282-291`) and `selectDiskAtIndex` (`:197-207`, called on Enter at `:624-626`). The comment at `:223-224` explains the ordering, but nothing enforces it.
+- [special] `dp/src/domain/recpart.ts:47-62` `unlistedDisk` fabricates a `DiskInventory` with `size_bytes: 0` and `"unknown"` strings for an explicit `--disk` recpart didn't list (`disk-plan-screen.tsx:248-251`). This is B126, kept.
+- [hidden] The screen recognises that stand-in by the `size_bytes > 0` sentinel (`disk-plan-screen.tsx:781` "(not listed by recpart)", `:1018`). `unlistedDisk`'s zero and the screen's check must change together.
+- [special] `dp/src/presentation/disk-plan-screen.tsx:100-107` `displayVendor` hides the vendors `ATA`/`NVME`/`SCSI` (B127, kept).
+- [special] `dp/src/presentation/disk-plan-screen.tsx:225-237` uses `disksListedRef` as a run-once latch on an effect that depends on `[setDiskIndex]`, plus `initialDiskRef` to freeze the prop. This works around the effect's dependency list instead of following from it.
+- [special] `dp/src/presentation/disk-plan-screen.tsx:179-188` disk-grid breakpoints `110`/`180` and `leftWidth={38}` (`:1156`) are free layout numbers.
+- [hidden] `dp/src/presentation/disk-plan-screen.tsx:799-801` shows "Missing --disk value." whenever no disk is selected, but `--disk` is optional (`parse-args.ts:71`). With an empty or failed listing, the message names the wrong cause.
+
+#### Hotkeys, footer and help text
+
+- [hidden] Footer hotkey strings (`disk-plan-screen.tsx:648-684`) are written separately from the `useHotkeys` bindings (`:526-645`) and are wrong in nav focus. "back" is shown as `tab`, but `tab` toggles the pane and back is `h`/`k`/`←`/`↑`. `mode m/h/l` and `pick enter/h/j/k/l` are shown in nav focus, where `h`/`l`/`j`/`k` move between pages. Confirmed on the rendered welcome footer (`j/k/h/l next | tab back`).
+- [hidden] `dp/README.md:34-37` keybinds ("Enter / n / → / l: next page", "p / ← / h: previous page") match neither binding. `n`/`p` act only in content focus (`disk-plan-screen.tsx:534-545`), Enter in nav focus opens the content pane (`:614-620`), and tab/j/k/`F` are missing.
+- [hidden] `dp/src/presentation/disk-plan-screen.tsx:293-312`: on the confirm page every letter typed goes into the token and also reaches `useHotkeys` (`n`, `p`, `m`, `h`/`j`/`k`/`l`, `q`, `F`). The generated `CONFIRM_TOKEN` (`DESTROY`) happens to share no letter with those keys. A token change in recpart (`tools/recpart/src/types.rs:12`) could make typing it navigate or quit.
+- [hidden] Enter on the confirm page fires both `useInput` → `startApply` (`:301-303`) and `useHotkeys(["enter"])` → `onNext` or the pane switch (`:614-628`). Correctness depends on both handlers' early returns.
+- [special] `dp/src/presentation/disk-plan-screen.tsx:308-311` accepts only `[a-zA-Z]`, upper-cases, and truncates to the token length (B128, partly kept). This silently assumes the token is upper-case letters.
+- [hidden] `rc/cli/parse-args.ts:53-56` help lists "j/k, arrows", "enter" and "q, esc, ctrl-c" separately from the bindings in `rc/presentation/runtime-recab-screen.tsx:141-157` and the footer (`:181-188`). Only the per-action hotkeys come from the table.
+- [hidden] `rc/flows/index.ts:37` derives each set-next hotkey from the slot letter (`a`, `b`), next to fixed `r`/`c`/`x` (`:29,45,53`) and quit `q` (`runtime-recab-screen.tsx:141`). A new slot letter colliding with an action key is not detected.
+- [hidden] `rc/presentation/runtime-recab-screen.tsx:158-161` registers hooks in a loop over `RUNTIME_RECAB_ACTIONS`. It is valid only while the table is static, which only a comment says.
+
+#### Apply and failure handling (special cases)
+
+- [special] `dp/src/presentation/disk-plan-screen.tsx:452-458`: `quit` silently ignores q/Esc/Ctrl-C while apply runs, with no message. recab's `quit` (`runtime-recab-screen.tsx:141`) exits during a running mutating action. The two apps follow different policies for the same situation.
+- [special] `dp/src/presentation/disk-plan-screen.tsx:387-394` turns dry-run warnings into a synthetic `FailureDiagnostic` with a hard-coded remediation ("Resolve what recpart reports, then re-enter this page."). `:218-219` has a second hard-coded fallback remediation.
+- [hidden] `dp/src/presentation/disk-plan-screen.tsx:167,209-221`: `failure` holds only the last failure and is never cleared when a later run succeeds, so `F` and the footer `fail` segment keep showing a fixed problem.
+- [surplus] `dp/src/presentation/disk-plan-screen.tsx:414,417`: `startApply` re-checks `page !== "destructive-confirm"` (its only caller, `useInput`, already returned for other pages) and checks both `applyRunRef.current` and `applyStarted` for the same fact.
+- [special] `dp/src/presentation/disk-plan-screen.tsx:1096` "Waiting to start apply..." is the `idle` branch of a page reachable only after apply starts.
+
+#### disk-plan entrypoints and exports
+
+- [surplus] `dp/src/index.ts:3-5` re-exports `buildPlanCommand`, `runRecpartPlan`, `cliHelpText`, `parseCliArgs` and `runCli`. No package imports `@levitate/tui-install-disk-plan`, and `package.json` declares no `main`/`exports`.
+- [hidden] `dp/src/index.ts:1,9-11` is both the library barrel and the executable (`import.meta.main`). recab splits the same roles into `rc/index.ts` + `rc/main.ts`, and install-docs uses `src/main.ts`. xtask has to know each app's launch form (`tui.rs:19,41`, `inspect_tui.rs:122,127`).
+- [surplus] `dp/package.json:7` `build` (tsc emit to `dist/`) and `dp/tsconfig.json:10` `outDir`: nothing runs `dist/`. Bun runs the sources.
+- [surplus] `dp/tsconfig.json:15` excludes `src/**/*.test.ts(x)`. No tests exist, and unit tests are prohibited.
+- [surplus] `dp/bun.lock:1-28` is a stale lockfile for a package named `recpart-frontend` depending on `blessed`. disk-plan is a root workspace member, so the file is never used and describes a different app.
+- [surplus] `dp/.gitignore:3` `.turbo/`. disk-plan defines no turbo-specific outputs.
+
+#### recab TUI: copies of recab's CLI and data
+
+- [hidden] `rc/flows/index.ts:10,36,43,50` spell recab's CLI (`status --json`, `set-next <SLOT>`, `commit`, `rollback`) as free strings, separate from clap's `Command` (`tools/recab/src/main.rs:16-35`). The prior untangle listed this as left over (`docs/history/UNTANGLE.md:1062`), and it is still true.
+- [hidden] `rc/flows/index.ts:27,35,43,51` action descriptions restate recab's clap doc comments (`tools/recab/src/main.rs:17,24,30,33`) and already disagree. Rollback is "Set next/default target back to known-good slot" in the TUI and "Configure next boot to previously known-good slot" in recab.
+- [hidden] `rc/presentation/runtime-recab-screen.tsx:41-49` `STATUS_ROWS` restates `Status`'s fields and recab's text labels (`tools/recab/src/main.rs:74-98`) with different empty spellings (`(none)` via `formatSlot` vs recab's `unknown`/`none`). B023 was kept as "the TUI's own presentation", but adding a `Status` field still requires editing this table by hand.
+- [hidden] `rc/presentation/runtime-recab-screen.tsx:205` "Mutating actions require root." and `rc/flows/index.ts:14` `section: "Read" | "Mutating"` restate recab's privilege rule (`ErrorClass::Permission`, `tools/recab/src/lib.rs:52`).
+- [hidden] `rc/domain/recab.ts:17-24` `parseRecabStatusJson` accepts any object whose `active_slot` is a slot and casts it to `Status`. recab's status JSON has no `schema_version` (`tools/recab/src/lib.rs:138-146`), unlike every recpart document, so a shape change is undetectable. The comment's "only its shape is confirmed" overstates a one-field check.
+- [hidden] `rc/presentation/runtime-recab-screen.tsx:113,121,124` build notices as `recab ${action.args[0]}`. That assumes `args[0]` is the subcommand name and hard-codes `recab` while the binary is `recabBin`.
+
+#### recab TUI: screen and runner
+
+- [hidden] `rc/presentation/runtime-recab-screen.tsx:115-122` and `:83`: after a successful mutating action, `refreshStatus` overwrites `lastResult` and `notice`. "Last Command" then shows `status --json` instead of the `commit`/`set-next`/`rollback` that just ran, so the result of the mutation is never shown.
+- [special] `rc/presentation/runtime-recab-screen.tsx:108-111` `if (action.id === "status-refresh")` routes one table entry around the generic action path.
+- [hidden] `rc/app/recab-runner.ts:57-63` returns `parseError: null` on non-zero exit, and the screen re-checks `exitCode` (`runtime-recab-screen.tsx:85-90`) before `parseError` (`:91-96`). The `?? "status JSON parse failed"` fallback at `:92` is unreachable. The branching is split between runner and screen.
+- [needless] `rc/app/recab-runner.ts:3` imports `STATUS_ARGS` from `flows` (the UI action table), so the IO layer depends on the presentation-level action list.
+- [special] `rc/presentation/runtime-recab-screen.tsx:137-139` effect depends on `[recabBin]`, a prop that never changes after mount.
+- [surplus] `rc/domain/recab.ts:26-28` `formatSlot` wraps `?? "(none)"`.
+- [hidden] `rc/presentation/runtime-recab-screen.tsx:201,235`: the sidebar `maxWidth={36}` must fit inside `leftWidth={40}`. Two coupled numbers with nothing linking them.
+
+#### recab packaging: why it crashes, and its surplus entrypoints
+
+- [hidden] `package.json:4-12` (root workspaces) omits `tui/apps/runtime/recab`, so recab installs its own tree. Its `file:../../../kit/core` dependency (`rc/package.json:20`) is copied with the kit's own `node_modules/react` (`tui/kit/core/package.json` lists `react` under `dependencies`, not `peerDependencies`). That gives two Reacts and the launch crash. The workspace list, the `file:` link and the kit's dependency kind must agree, and nothing shows it.
+- [hidden] `rc/bun.lock:1-177` pins a private dependency tree for recab alone, while disk-plan and install-docs resolve through the root lockfile. React/ink versions can drift per app.
+- [surplus] `rc/index.ts:1-6` barrel re-exports the runner, CLI, domain and flows. Nothing imports it, and `rc/package.json` has no `main`/`exports`.
+- [surplus] `rc/app/index.ts:1-2` and `rc/presentation/index.ts:1` are barrels nothing imports (`bootstrap.tsx:2` and `rc/index.ts:1-2` import the files directly).
+- [surplus] `rc/domain/index.ts:1-2` is a pass-through barrel that `rc/flows/index.ts:1` and `rc/domain/recab.ts:1` bypass by importing `./contract` directly.
+- [surplus] `rc/package.json:5-7` `"bin": {"levitate-runtime-recab": "./main.ts"}`. Nothing installs or links the package.
+- [surplus] `rc/tsconfig.json:10-11` `resolveJsonModule` (no JSON imports) and `declaration: true` (an app nobody imports), plus `rc/package.json:10` `build`, which emits `dist/` that nothing runs.
+- [hidden] `rc/cli/parse-args.ts:44-46` help gives only `bun run main.ts` usages. There is no `cargo xtask tui` route for recab (`xtask/src/cli/types.rs:336-342`), unlike disk-plan (`dp/src/cli/parse-args.ts:65-66`).
+
+#### Cross-app copies (disk-plan, recab, install-docs, kit)
+
+- [hidden] `dp/src/cli/run.ts:4-28`, `rc/cli/run.ts:4-26` and `tui/apps/live-tools/install-docs/src/cli/run.ts:6-34` are near-identical CLI runners (help → exit 2 on error → TTY check → `waitUntilExit().catch` → exit 1). The kit offers `renderApp` but no runner, so a change to exit-code policy needs three edits.
+- [hidden] `dp/src/cli/parse-args.ts:16-58` and `rc/cli/parse-args.ts:9-38` copy the same hand-rolled argv loop ("requires a value", `startsWith("-")`, "unknown argument").
+- [hidden] `dp/src/app/bootstrap.tsx:10-16` and `rc/app/bootstrap.tsx:8-14` copy `createTuiApp({title}) + renderApp(..., {exitOnCtrlC: false})`. Each app also re-implements Ctrl-C quitting via `useHotkeys(["q","escape","C-c"])` (`disk-plan-screen.tsx:526`, `runtime-recab-screen.tsx:141`).
+- [hidden] App identity strings are repeated per app: `"levitate-install-disk-plan"` (`dp/src/app/bootstrap.tsx:11`), `"install-disk-plan"` (`disk-plan-screen.tsx:651`, `xtask/src/cli/types.rs:339`, `xtask/src/tasks/inspect_tui.rs:125`), `"@levitate/tui-install-disk-plan"` (`dp/package.json:2`). recab has the same spread: `"levitate-runtime-recab"` (`rc/app/bootstrap.tsx:9`, `rc/package.json:6`) and `"runtime-recab"` (`runtime-recab-screen.tsx:174`).
+- [hidden] The TTY requirement is checked twice for disk-plan: by xtask (`xtask/src/tasks/tui.rs:9-12` `require_terminal`) and by the app (`dp/src/cli/run.ts:15-18`), with different messages and exit paths.
+
+#### xtask: tui.rs / inspect_tui.rs / types.rs
+
+- [hidden] App directory paths are hard-coded separately in `xtask/src/tasks/tui.rs:16,32`, `xtask/src/tasks/inspect_tui.rs:121,126`, `xtask/src/tasks/check.rs:8-14`, `xtask/src/tasks/generate.rs:96,102` and root `package.json:7`. Moving or renaming an app needs five edits across the superproject/submodule boundary.
+- [hidden] Launch commands are duplicated between `xtask/src/tasks/tui.rs:19,41` (`bun src/main.ts`, `bun run start --`) and `xtask/src/tasks/inspect_tui.rs:122,127` (`bun src/main.ts`, `bun run start -- --disk /dev/sda`). Both depend on each app's `package.json` `start` script or file layout.
+- [hidden] `xtask/src/tasks/inspect_tui.rs:124-128` runs disk-plan without what `tui.rs:23-42` does first: building recpart, putting `target/debug` on PATH and `ensure_node_modules`. The inspect snapshot runs whatever `recpart` is on the host PATH (none here, so listing fails), and the two commands drift.
+- [special] `xtask/src/tasks/inspect_tui.rs:127` hard-codes `--disk /dev/sda` into the preset. That is where the "default disk /dev/sda" in the baseline comes from: a real device path on many dev hosts, injected into a destructive tool's UI.
+- [hidden] `xtask/src/tasks/inspect_tui.rs:240-243` delivers `--input` keys with `printf '%b' … > /dev/tty`. Inside the PTY that writes to the terminal's output, not the app's stdin, so the keys are drawn on screen (`nn` in the snapshot) and never reach the app. `--input` cannot drive any app, and the documented `cargo xtask inspect tui install-disk-plan --input 'n'` (`xtask/README.md:34`) does nothing. The prior untangle noticed "keys do not navigate" (`docs/history/UNTANGLE.md:1031`) but not why.
+- [special] `xtask/src/tasks/inspect_tui.rs:242` sends the same key sequence twice (`sleep N; printf …; sleep 1; printf …`), a sleep-and-retry for timing.
+- [special] `xtask/src/tasks/inspect_tui.rs:39-43` maps `--seconds 0` to 1, and `:85` swallows the transcript removal error (`let _ =`).
+- [surplus] `xtask/src/tasks/inspect_tui.rs:287-315` `strip_script_bookends`/`find_subslice` strip `script(1)` "Script started/done" banners, but capture now uses `portable_pty` (`xtask/src/util/pty_capture.rs:20-40`), which emits none.
+- [hidden] `xtask/src/tasks/inspect_tui.rs:200-322` (`create_run_dir`, `transcript_path`, `parse_plain_screen`, `parse_formatted_screen`, `parse_screen`, `trim_line_trailing_spaces`, `strip_script_bookends`, `find_subslice`, `unix_timestamp`) are copies of the same functions in `xtask/src/tasks/inspect_docs.rs:187-293`.
+- [surplus] `xtask/src/tasks/inspect_tui.rs:73,77,218` prefix the single snapshot with `001-`, a numbering scheme with only one entry.
+- [special] `xtask/src/tasks/tui.rs:23-44`: only the disk-plan arm builds a Rust tool and edits PATH. The "app needs a binary from this checkout" rule is an `if` for one app, and recab (needing `recab`) has no arm.
+- [hidden] `xtask/src/tasks/tui.rs:34-36` and `xtask/src/tasks/generate.rs:133-135` (also `xtask/src/util/distro_builder.rs:24`) each re-derive `CARGO_TARGET_DIR`-or-`target` + `debug`.
+- [hidden] `xtask/src/cli/types.rs:336-342` `TuiApp` lists install-docs and install-disk-plan only. recab, a typechecked app (`check.rs:13`) with a generated contract (`generate.rs:98-102`), cannot be launched or inspected by preset. That is why the crash went unseen.
+
+#### xtask: check.rs
+
+- [hidden] `xtask/src/tasks/check.rs:56-61` `ensure_node_modules` runs a bare `bun install` in any package dir lacking `node_modules`. For recab (outside the workspace) that is exactly the install that produces the duplicate-React tree.
+- [special] `xtask/src/tasks/check.rs:57` treats "node_modules exists" as "dependencies installed", so stale or partial installs, like recab's nested React, are never refreshed.
+- [hidden] `xtask/src/tasks/check.rs:43-48`: "typecheck recab" passes while the app crashes on its first render. The only TS check xtask runs cannot catch a broken dependency graph, and nothing renders recab.
+
+#### xtask: generate.rs and the generated contracts
+
+- [hidden] `xtask/src/tasks/generate.rs:96,102` write into the `tui` submodule (`dp/src/contract/recpart.ts`, `rc/domain/contract.ts`) from the superproject. A contract change means a commit in `tools/recpart|recab`, in `xtask`, and in `tui`, with the generator holding the app paths.
+- [hidden] `xtask/src/tasks/generate.rs:70-85` hand-lists every recpart type to emit, in dependency order. A new nested output type in `tools/recpart/src/types.rs` must also be added here, and the generator does not follow references.
+- [hidden] `xtask/src/tasks/generate.rs:142,169-178` emit TS that oxfmt rejects (`dp/src/contract/recpart.ts` and `rc/domain/contract.ts` fail `format:check`). Formatting them makes `cargo xtask gen --check` (`check.rs:38`) report them as stale. The two checks contradict each other on the same files.
+- [hidden] The generated contract locations differ per app: `dp/src/contract/recpart.ts` vs `rc/domain/contract.ts`. recab's sits inside `domain/`, which also holds hand-written code, so "generated, do not edit" and app code share a folder in one app and not the other.
+- [surplus] `xtask/src/tasks/generate.rs:88` emits `HANDOFF_SCHEMA_VERSION` (`dp/src/contract/recpart.ts:65`). Nothing in disk-plan reads it: the handoff arrives inside the apply document and is never version-checked on its own.
+- [hidden] `xtask/src/tasks/generate.rs:3` says the declarations go "into the TUI that reads that JSON" (singular). It writes to two TUIs.
+
+#### Tooling scripts and checks that are broken or cannot catch bugs
+
+- [hidden] `dp/package.json:13-14` and `rc/package.json:16-17`: `format:check`, and therefore `check`, always fails. The failing files are the generated contracts plus `disk-plan-screen.tsx`, so `bun run check` and the root `turbo check` (`package.json:14`, which reaches disk-plan only) cannot pass.
+- [hidden] `dp/package.json:10-13` and `rc/package.json:13-16` call `bunx oxlint`/`bunx oxfmt` without a devDependency, so the tool version is whatever `bunx` resolves (root's `oxlint 1.39.0` for disk-plan, the kit copy's or a download for recab). The kit pins both.
+- [hidden] `dp/README.md:28-30` and `xtask/README.md:34` are the documented ways to exercise disk-plan. The inspect example cannot send keys (see inspect entry), and the interactive one requires a human. No scripted check ever walks past the welcome page, so the flow branches above are unverified by anything.
+
+#### Docs and comments that contradict the code
+
+- [hidden] `dp/README.md:24` "schema version must match expected value (`schema_version = 1`)". Apply and handoff are schema 2 (`dp/src/contract/recpart.ts:63,65`), and each document is checked against its own generated constant.
+- [hidden] `dp/README.md:12-13` describe plan-preview as "runs `recpart plan --json`" and command-preview as "displays exact emitted step commands". Preflight also re-runs the dry-run, and `list-disks` runs on mount, so neither is listed as a command the app runs.
+- [hidden] `tools/recpart/docs/frontend-handoff/README.md:20` says the plan flow renders "partition summary + script preview". disk-plan never shows `sfdisk_script` (`disk-plan-screen.tsx:867-887`).
+- [hidden] `tui/README.md:17-18` "Run an app with `cargo xtask tui <app>`, render one headlessly with `cargo xtask inspect tui <app>`". Neither works for recab (`xtask/src/cli/types.rs:336-342`), and inspect `--input` drives nothing.
+- [hidden] `tui/README.md:14` "kit/presets-install: install UX compositions shared by the apps". disk-plan, the install app, does not depend on it (`dp/package.json:16-20`).
+- [hidden] `dp/src/presentation/disk-plan-screen.tsx:472-473` comment "there are no unguarded page jumps", while `:493,496-497,509,644` and `:433` set `pageIndex` directly (the F jump, the apply-result branch and the startApply jump) outside `canAdvancePage`.
+- [hidden] `dp/src/presentation/disk-plan-screen.tsx:734-737` welcome "Safety Controls" claims ("Preflight must pass before destructive apply") restate the gates in `startApply`/guards as prose that does not follow them if they change.
+
+#### Prior untangle (docs/history/UNTANGLE.md) claims vs current code
+
+- [hidden] `docs/history/UNTANGLE.md:1031` (F21) records the recab TUI moving to the real `@levitate/tui-kit`, verified by "typecheck and lint" and a runner test only. The TUI was never rendered after the switch and now crashes at launch (duplicate React; see packaging). The claimed "one recab TUI" is one TUI that does not run.
+- [hidden] `docs/history/UNTANGLE.md:1031` and `:1062` leave "the recab TUI spells CLI arguments outside the contract and restates `Status` fields" open. That is still the case at `rc/flows/index.ts:10,36,43,50` and `rc/presentation/runtime-recab-screen.tsx:41-49`.
+- [hidden] `docs/history/UNTANGLE.md:686` B014 (mode values re-declared) is closed by F21 via `INSTALL_MODES`, but the default and the two-card layout (`dp/src/cli/parse-args.ts:18,70`, `disk-plan-screen.tsx:808-853`) still hard-code `ab`/`mutable`.
+- [hidden] `docs/history/UNTANGLE.md:689` B018 (command lines rendered by hand) is closed by F21, but `disk-plan-screen.tsx:869`, `parse-args.ts:72` and `dp/README.md:12-13` still spell recpart command lines by hand.
+- [hidden] `docs/history/UNTANGLE.md:1031` "TUI page navigation could not be driven by `xtask tui inspect` (keys do not navigate, also before this change)" was left as a curiosity. The cause is `xtask/src/tasks/inspect_tui.rs:242` writing keys to the PTY output, which is still there.
+- [hidden] `docs/history/UNTANGLE.md:1031` "`cargo xtask contracts` writes …" and "`just tui-install-disk-plan` builds and puts this checkout's recpart on PATH". The command is now `cargo xtask gen` (`xtask/src/tasks/generate.rs:1`) and the build/PATH step lives in `xtask/src/tasks/tui.rs:24-42`. The history is accurate as history, but neither name exists now. (Checked: no live doc still uses the old names.)
+- [hidden] `docs/history/UNTANGLE.md:1037` (F27) makes "the installer TUI own its next-steps text on the handoff page" (`disk-plan-screen.tsx:139-145`). The TUI ships nowhere, so the guidance users get is the docs' copy, which F27 assigned a different scope.
+- Verified done, nothing left: B010 (`CONFIRM_TOKEN` generated, `dp/src/contract/recpart.ts:71`), B013 (schema versions generated), B015/B016 (no inventory/preflight re-implementation; `listDisks` and the dry-run are used), B021 (no `REPO_ROOT`), B039/B040 (no postinstall-tools, no kit shim), B060/B046/B047 (no hand validators), B080–B083 (removed), B130 (`exitCode: null`). Kept items B019, B023, B126, B127, B128 are still present and are listed above.
+
+---
+
+Counts: [hidden] 94, [needless] 4, [surplus] 25, [special] 16. Total 139 (plus one "verified done" note).
+
+### D — Rust/shell wiring: live login → install screen
+
+Scope: `distro/builder/install-split-pane/`, `recipes/install-split-pane.rhai`, `src/recipe/tools.rs`,
+`src/pipeline/{live_tools,config,overlay,products}.rs`, `src/live_ux.rs`, `src/artifact/live_overlay.rs`,
+contract `schema.rs`/`variant.rs`, variant `products.toml`/`scenarios.toml`/`install-guide.txt`/`overlays/`,
+and consumers in `testing/install-tests` and `xtask`. Audit only, read from the code; nothing was built or booted,
+so every runtime claim below comes from reading the code. Paths are relative to the repo root; `builder/` = `distro/builder/`.
+
+#### Who launches the install UX (tty, command, env): five places, two per distro
+
+- [hidden] `builder/src/pipeline/live_tools.rs:605-617` (profile hook `30-install-ux.sh`) and `builder/src/artifact/live_overlay.rs:107-111` (OpenRC `serial-autologin`) both decide "launch the UX on the serial console when `LEVITATE_INSTALL_SERIAL_UX=1`", each with its own condition, and nothing ties the two together.
+- [hidden] `builder/src/artifact/live_overlay.rs:442-446` is a third copy of the serial launch block (systemd `serial-autologin`), identical to `:107-111`, with nothing linking them.
+- [surplus] `builder/src/artifact/live_overlay.rs:412-453`: the systemd `serial-autologin` script is written but nothing runs it. The serial getty drop-in at `:455` uses `agetty --autologin root` with no `-l`/`--login-program`, and `grep serial-autologin` finds no other user on the systemd side. Its UX launch, `LEVITATE_INSTALL_SERIAL_VERBOSE` printk handling, `LANG=C` and ready marker are all dead.
+- [hidden] On LevitateOS the serial UX actually goes through the profile hook's ttyS0 branch (`live_tools.rs:607-613`). That branch sets `LEVITATE_INSTALL_RIGHT_CMD="docs-tui --slug installation"` and `LEVITATE_DOCS_PLAIN=1`. On AcornOS the serial UX goes through `live_overlay.rs:107-111`, which sets neither variable. So the same flag gives each distro a different serial UX (different right-pane command, different env), and the code doesn't show the difference.
+- [surplus] `builder/src/pipeline/live_tools.rs:607-613`: on AcornOS this ttyS0 branch can't be reached. With `LEVITATE_INSTALL_SERIAL_UX=1`, the OpenRC autologin execs the entrypoint first and sets `LEVITATE_INSTALL_UX_LAUNCHED=1`, which makes the hook return at `:592`.
+- [special] `builder/src/pipeline/live_tools.rs:605-606`: the hook hard-codes `/dev/tty1` as the only VT that launches the UX. On AcornOS, tty1 has no autologin (`live_overlay.rs:156` plain `getty 38400 tty1`), so the UX starts only after a manual root login. LevitateOS autologins tty1 (`live_overlay.rs:405-410`). That distro difference comes from init-specific code paths, not from config.
+- [hidden] `xtask/src/tasks/scenarios.rs:157-163` decides from CLI mode (`!ssh && !no_shell && no window`) that "the install UX runs on" serial, and injects the literal `LEVITATE_INSTALL_SERIAL_UX=1`. The guest-side readers (`live_tools.rs:607`, `live_overlay.rs:107`, `live_overlay.rs:442`) repeat the literal, and there is no shared constant (`live_ux.rs` has none for it).
+- [special] `xtask/src/tasks/scenarios.rs:157-159` injects `LEVITATE_INSTALL_SERIAL_UX=1` for the `live-boot` product too. That ISO has no install entrypoint, so the flag only works because each reader guards with `[ -x @INSTALL_ENTRYPOINT@ ]`.
+- [surplus] `xtask/src/tasks/scenarios.rs:160-162` injects `LEVITATE_INSTALL_SERIAL_VERBOSE=1` for `--verbose`. Its only reader is the dead systemd serial-autologin (`live_overlay.rs:426`), and the OpenRC script never reads it, so `--verbose` has no effect on either distro.
+- [hidden] `builder/src/pipeline/live_tools.rs:620` and `builder/src/artifact/live_overlay.rs:110,445` `exec` the entrypoint in place of the login shell, and the entrypoint `exec`s the helper (`live_tools.rs:555`). If the helper exits or fails (missing bun, raw-mode error, a write to an exited pane), the login session ends and getty/inittab respawns autologin, which runs the UX again. No fallback shell exists, and the respawn loop is only implied by how the pieces fit together.
+- [hidden] `builder/src/pipeline/live_tools.rs:585-620` relies on profile.d's lexical order. `00-serial-test.sh` (`live_overlay.rs:691-698`, recqemu `guest/serial-test.sh:10-15`) runs first on ttyS0: it turns echo off, empties PS1 and prints the shell-ready marker. Then `25-shell-color.sh` rewrites TERM. Only after that does `30-install-ux.sh` replace the shell with the UX. So the serial readiness marker announces a shell that never exists, and the numeric file names are the only thing that shows the order.
+
+#### Environment-variable protocol with no owner
+
+- [hidden] `LEVITATE_INSTALL_UX_LAUNCHED` is set at `live_tools.rs:619`, `live_overlay.rs:109` and `live_overlay.rs:444`, and read at `live_tools.rs:592`. It's a string literal at every site, with no constant and no doc.
+- [hidden] The profile hook writes `LEVITATE_INSTALL_LEFT_CMD` at `live_tools.rs:597-604`, and `install-split-pane/src/main.rs:104` reads it. The writer and reader are in different crates, and both repeat the variable name as a literal.
+- [hidden] `LEVITATE_INSTALL_RIGHT_CMD` is written at `live_tools.rs:608-611` and read at `install-split-pane/src/main.rs:114`. Its value, `docs-tui --slug installation`, is a shell string that has to be a valid command line for whichever docs frontend the variant ships. Under PlainText the launcher ignores `--slug`, and nothing says so.
+- [surplus] `LEVITATE_DOCS_PLAIN`: set at `live_tools.rs:612` (reachable only on LevitateOS, see above) and read only at `live_tools.rs:478`, the AcornOS plain-text launcher. The LevitateOS Bun docs app never reads it (no `process.env` use of it in `tui/apps/live-tools/install-docs/src`), so where it's set nothing reads it, and where it's read nothing sets it.
+- [hidden] `builder/src/live_ux.rs:19` gives only `SMOKE_ENV` a constant. The other six env vars of the same protocol (`…_UX_LAUNCHED`, `…_LEFT_CMD`, `…_RIGHT_CMD`, `…_SERIAL_UX`, `…_SERIAL_VERBOSE`, `LEVITATE_DOCS_PLAIN`) are literals scattered across builder, overlay, split-pane and xtask.
+- [hidden] `builder/src/pipeline/live_tools.rs:594-604`: the boot-injection import and the `LEVITATE_INSTALL_LEFT_CMD` export run before the tty check at `:605`. Every interactive login on any tty, SSH included, therefore gets every boot-injection key exported (e.g. `SSH_AUTHORIZED_KEY`), plus `LEFT_CMD`, `TTY`, `line`, `key` and `value` leaked into its environment. A file that should only start the UX changes every login shell.
+- [needless] `LEVITATE_INSTALL_LEFT_CMD` and `LEVITATE_INSTALL_RIGHT_CMD` (`main.rs:536-537`, `main.rs:572`) are untyped shell strings concatenated into `/bin/sh -lc "exec …"`. Profile-hook callers have to know the split pane's quoting rules and that it prefixes `exec`.
+
+#### Choosing the shell: five independent decisions
+
+- [hidden] Five places pick the interactive shell independently: `interactive_shell` in `products.toml` (`acorn:127` `/bin/sh`, `levitate:188` `/bin/bash`); the profile hook's own `/bin/bash`-else-`/bin/sh` probe (`live_tools.rs:597-603`), which ignores `interactive_shell`; `main.rs:143-159` `resolved_shell_path` (`$SHELL`, then bash, then sh); the OpenRC autologin `exec /bin/sh -l` (`live_overlay.rs:115`, `overlay.rs:283`); and the systemd autologin `exec /bin/bash -il` (`live_overlay.rs:448`). They agree only by accident. On AcornOS, if bash is present, the left pane runs bash although the variant declares `/bin/sh`.
+- [surplus] `interactive_shell` (`schema.rs:252`, `variant.rs:1233`, `config.rs:261-280`) is only the fallback inside `${SHELL:-…}` at `live_tools.rs:488,559,572`. A login always sets `SHELL`, so the configured value almost never takes effect.
+- [hidden] `install-split-pane/src/main.rs:535-540`: real UX launches always pass `LEFT_CMD` (`live_tools.rs:597-604`), so `Config.shell` and `resolved_shell_path` matter only for `--smoke` (run over SSH without the profile hook) and for a log line. The smoke test exercises a different left-pane command than real users get.
+- [needless] `install-split-pane/src/main.rs:542-545`: every pane is wrapped in `/bin/sh -lc`, which sources `/etc/profile` once more as a non-interactive login. The left pane then runs `/bin/bash -il`, which sources it a third time. The split pane's wrapper is tied to how the profile.d scripts guard themselves (`*i*`, `LEVITATE_INSTALL_UX_LAUNCHED`).
+
+#### Command names, paths and branding: constants vs literals
+
+- [hidden] `levitate-install-docs-split` is spelled out independently in `install-split-pane/Cargo.toml:7`, `main.rs:76-77`, `recipes/install-split-pane.rhai:14,22,26,35,45,57,79`, `recipe/tools.rs:195-196`, `variants/levitate/ring2/products.toml:195-196`, `variants/acorn/ring2/products.toml:135,137` and `live_ux.rs:16`, plus a tmux script of the same name in `tui/apps/live-tools/install-docs/bin/levitate-install-docs-split`. Only `live_ux.rs` is shared, by the entrypoint and the tests.
+- [hidden] `variants/*/ring2/products.toml` `destination = "usr/local/bin/levitate-install-docs-split"` (levitate:196, acorn:137) has to equal the `/usr/local/bin/{split}` the entrypoint hard-codes at `live_tools.rs:518-519`. Change the TOML destination and the entrypoint silently falls back to `command -v`, or to docs only.
+- [hidden] `live_ux.rs:12` defines `INSTALL_DOCS`, yet the command name `levitate-install-docs` is retyped as a literal at `live_tools.rs:480` and `:526`, `main.rs:124`, `:163` and `:573`, and in the tui `package.json:7` bin name.
+- [hidden] The Bun bundle path `usr/local/share/levitate/docs-tui/levitate-install-docs.js` is built at `live_tools.rs:319,326` and retyped inside the launcher script at `:383`. The bun path `usr/local/bin/bun` is likewise copied at `:361` and `:400`. None of them are in `live_ux.rs`.
+- [hidden] The `docs-tui` alias path `usr/local/bin/docs-tui` (`live_tools.rs:435`) is a literal, and its users (`live_tools.rs:609`, `live_overlay.rs:368` live-help text) depend on that name with no shared constant.
+- [hidden] `live_ux.rs:21` defines `SPLIT_SMOKE_OK = "split-smoke:ok"`, but the producer at `main.rs:226` prints its own literal `"split-smoke:ok left=…"`. The constant's comment points at the binary, but the binary can't import it.
+- [hidden] `recipes/install-split-pane.rhai:24-28` verifies the built binary by grepping `--help` output for `"levitate-install-docs-split --smoke"`, which ties the recipe to the wording of `main.rs:74-81` `print_help`. Rewording the help text breaks the build.
+- [special] `live_ux.rs:5,7,12,14`, `live_tools.rs:319,383` and `live_tools.rs:480` ship LevitateOS-branded paths and commands on AcornOS: `/usr/lib/levitate/install-experience`, `levitate-install-entrypoint`, `levitate-install-docs`, `/usr/local/share/levitate/…`, `LEVITATE_*` env, and the message "Run 'levitate-install-docs' to reopen it".
+- [special] `live_overlay.rs:360-378` (live-help text "LevitateOS Live Quick Help") and `:535` ("Levitate live network setup") hard-code the brand in the systemd overlay, though `os_name` is a config parameter. "systemd" is treated as meaning "LevitateOS".
+- [hidden] `live_overlay.rs:370-372` (live-help), `variants/acorn/ring2/install-guide.txt:5-6` ("Ctrl-g switches panes") and `main.rs:587-590` (footer) each restate the key bindings that only `main.rs:307-314` implements.
+
+#### Terminal/colour forcing done four times
+
+- [hidden] The TERM normalisation rule (`""|dumb|vt100|vt102|linux` → `xterm-256color`) is copied four times: `live_tools.rs:389-393` (Bun launcher), `live_tools.rs:466-470` (plain launcher), `live_tools.rs:643-650` (25-shell-color, ttyS*/ttyN only) and `main.rs:551-561` (`apply_common_env`). Nothing says they must agree.
+- [hidden] NO_COLOR gets three incompatible meanings. `main.rs:567` sets it to `""` (still set); the launchers at `live_tools.rs:396-398,473-475` `unset` it; and `25-shell-color.sh` at `live_tools.rs:641` treats only `NO_COLOR=1` as opt-out. The split pane and the scripts each override the user's choice in their own way.
+- [hidden] `live_tools.rs:652-655` (`25-shell-color.sh`) and `live_overlay.rs:386-389` (`20-live-shell-ux.sh`, systemd only) both export `PAGER` and `LESS`. Both also set PS1: `live_overlay.rs:391-393` sets it if empty, then `live_tools.rs:685` overwrites it for bash, so the systemd one is dead for bash.
+- [hidden] `live_tools.rs:654` exports `LESS=-FRSX` from the colour profile. The value flows through the split-pane host into the AcornOS plain-text docs pager (`live_tools.rs:478-479`): `-F` quits at once when the guide fits and `-S` chops long lines. A colour-defaults file changes how the install guide behaves, and the result depends on whether busybox `less` honours `LESS`.
+- [needless] `live_tools.rs:426-431`: `install_shell_color_profile` (generic shell colours, PS1, bash history and completion) is written by `install_mode_payload`, so shell defaults change with the install-UX action and only exist on live-tools ISOs.
+
+#### Shell scripts as Rust strings
+
+- [hidden] `live_tools.rs:461-491` and `:513-575` build scripts with `format!` and `{{`/`}}` escaping, while `:585-620` uses a plain string with `@PLACEHOLDER@` substitution through `fill_guest_script`. That's two templating schemes in one function, and every edit has to know which escaping applies. None of these scripts can be run or shellchecked without building a rootfs.
+- [hidden] `live_overlay.rs:512-513`: the `live-net-setup` awk programs sit in a raw string `r#"…"#` but use escapes meant for a normal string (`\\.`, `\"dev\"`). The shell therefore gets `/^10\\.0\\.2\\.15\\//` and `$i==\"dev\"`, and gawk rejects both (verified: "syntax error" and "backslash not last character on line"). `stable_ok` never increments, the unit loops 45 × `sleep 1` and exits 1, and it is ordered `Before=sshd.service`.
+- [needless] `live_tools.rs:621` (pipeline) calls `crate::artifact::live_overlay::fill_guest_script` just to substitute placeholders. Meanwhile `live_overlay.rs:703-717` (artifact layer) imports the install-UX constant `crate::live_ux::INSTALL_ENTRYPOINT`. Each module reaches into the other.
+- [hidden] `live_overlay.rs:703-717` `fill_guest_script` runs all three substitutions on every script. A misspelt placeholder in any caller survives into the guest as literal text, and nothing checks that all placeholders were replaced.
+
+#### Entrypoint script and its fallback ladders
+
+- [special] `live_tools.rs:517-531` `choose_install_helper` tries an absolute path, then `command -v` for the split helper, then falls back to `levitate-install-docs` alone. The last rung gives a docs-only UX that the install test (`testing/install-tests/src/scenarios/mod.rs:954`) rejects as a failure.
+- [special] `live_tools.rs:533-541` (`--probe`) and `:548-554` (`LEVITATE_INSTALL_ENTRYPOINT_SMOKE=1` → `--smoke`) are test-only branches compiled into the shipped entrypoint, which matches helper names by shell `case` patterns.
+- [special] `live_tools.rs:558-559` falls back to a login shell when no helper exists. `main.rs:573` (right-pane fallback) and `live_tools.rs:488` (plain launcher after `less`) each `exec` their own login shell too, so there are three separately written "drop to shell" fallbacks.
+- [hidden] `live_tools.rs:488`: the plain-text docs launcher ends with `exec "${SHELL:-…}" -l`, so `levitate-install-docs` acts as a pane host rather than a docs command. If the user runs it from the shell, as its own message at `:480` suggests, every reopen nests another login shell. The Bun launcher (`:400`) just exits, which leaves an "(exited)" pane. The two frontends behind the same command name have different lifetimes.
+- [special] `live_tools.rs:543` prints `[{distro}]` using `distro_id` (e.g. `acorn`) where every other user-facing string uses `os_name`.
+
+#### Contract and variant config
+
+- [surplus] `schema.rs:16-29` `InstallExperience::AutomatedSsh`, `live_tools.rs:566-575` (its entrypoint), `config.rs:161-163`, `schema.rs:262` `automated_ssh_actions` and `variant.rs:1115-1121,1697` `runtime_profiles_automated_ssh`: neither variant selects `automated_ssh` (`levitate/scenarios/scenarios.toml:79`, `acorn/scenarios/scenarios.toml:72` are both `"ux"`) and neither declares `runtime_profiles_automated_ssh`. The whole branch is speculative.
+- [hidden] The UX/automated split happens twice. Profile groups pick actions (`config.rs:158-164`, `runtime_profiles_ux` → the split helper), but `install_mode_payload` sits in `live_tools_common` (`acorn/ring2/products.toml:125-129`, `levitate/ring2/products.toml:186-189`) and branches on `install_experience` in code (`live_tools.rs:433,512,583`). The docs payload is "common" yet only written for UX, while the split helper is "ux".
+- [needless] `config.rs:110` and `products.rs:133,478`: the builder takes `install_experience` from `contract.scenarios.live_tools` (the test-scenario file `scenarios.toml`) and uses it to shape the shipped product. Build output depends on test-scenario config, while the payload it selects lives in `products.toml`.
+- [needless] `live_tools.rs:42,105`: `add_required_tools` takes `install_experience` only to pass it on to the one action that uses it, so every other action's signature carries it as well.
+- [needless] `schema.rs:251-254` `InstallModePayload` requires `ux_docs_frontend` even under `AutomatedSsh`, where `live_tools.rs:433` ignores it.
+- [hidden] Each field is validated twice. `variant.rs:1233-1237` (`normalize_absolute_string`) and `config.rs:264-280` both check that `interactive_shell` is non-empty, absolute and has no `..`. `variant.rs` `normalize_relative_string` and `config.rs:191-212` both check `destination`. `ux_docs_guide` is checked only in `variant.rs:1241`, and `live_tools.rs:447` trusts it. Tighten one copy and the other doesn't follow.
+- [needless] `schema.rs:227-232` `InstallDocsFrontend::PlainText { guide }` is a repo-relative path resolved at build time (`live_tools.rs:447`), so the contract type depends on the repo checkout layout.
+- [hidden] `variant.rs:1743-1765` `VariantRing2RuntimeAction` lacks `#[serde(deny_unknown_fields)]`, unlike its sibling structs (`variant.rs:1548…1739`). A misspelt `ux_docs_guide` on a `bun_bundle` action, or any unknown key on another action, is silently dropped.
+- [surplus] `schema.rs:191`, `variant.rs:971,1774`, `config.rs:366-368` and `overlay.rs:39-41`: `issue_message` is configurable but neither variant sets it. OpenRC ignores it entirely (`config.rs:369-385` drops it and `overlay.rs:58` always passes the banner).
+- [hidden] `issue_message` (`overlay.rs:39-41`) can replace `/etc/issue`, but `testing/install-tests/src/qemu/serial/mod.rs:71` waits for `LIVE_LOGIN_HINT`, which only appears in the default banner. Setting the config option breaks live-tools readiness detection.
+- [hidden] `products.rs:473-480` passes `live_overlay_dir` as the `tool_payload_dir` parameter (`live_tools.rs:40`). As a result, `ToolPayloadWorkspaceBinary` writes to the overlay while `RootfsWorkspaceBinary` (split helper) and `install_mode_payload` write to the rootfs. Which layer a file lands in comes from argument order, not from the name.
+- [hidden] `live_overlay.rs:107,442` (overlay layer) guard on `[ -x /usr/local/bin/levitate-install-entrypoint ]`, a file written into the rootfs layer by `live_tools.rs:511-582`. The overlay script depends on another module having written that rootfs file.
+
+#### Build wiring for the split-pane binary and docs payload
+
+- [hidden] `recipe/tools.rs:12-16` (`prepare_tool_source`) and `recipe/tools.rs:190-199` (`build_tool_program`) each keep their own package map. c015d4d added `recpart` to the second but not the first, so `build_tool_program("recpart")` reaches `prepare_tool_source`, which bails "no live-tool source producer declared for recpart". Both variants' `live_tools_common` declare `recpart` (`levitate/ring2/products.toml:168-170`, `acorn/ring2/products.toml:100-102`), so the live-tools build should fail at that step (not run, read from code).
+- [hidden] The supported Rust targets are listed three times: `recipe/tools.rs:204-210`, `recipes/install-split-pane.rhai:17-19` and `recipes/install-tools.rhai:23-25`, plus the per-variant `target =` in `products.toml`.
+- [hidden] `recipes/install-split-pane.rhai` and `recipes/install-tools.rhai:30-130` are near-identical recipes (acquire/build/install/cleanup, musl linker flags, GNU host check) that differ only in name and `_verify`. A change to the build flags has to be made in both.
+- [needless] `recipe/tools.rs:225` always passes the `BIN` define, but `install-split-pane.rhai` never reads it, since only `install-tools.rhai:10` does. The general function carries a parameter that only one recipe understands.
+- [hidden] `recipe/tools.rs:165-167` bails on `workspace = true` dependencies. `install-split-pane/Cargo.toml:10-15` has to spell versions and `edition` out rather than inherit from `[workspace.package]` like other members, and nothing in that manifest says why.
+- [hidden] `install-split-pane/` is a guest runtime program but lives under `distro/builder/`, the build tool, and is a root workspace member (`Cargo.toml:6`). The other half of the install UX (`tui/apps/live-tools/install-docs`) lives in `tui/`, and its own tmux `bin/levitate-install-docs-split` (`package.json:11`) is a second, parallel implementation of the same helper.
+- [special] `live_tools.rs:591` `[ -n "${TMUX:-}" ] && return 0` is a special case left over from the tmux-based split launcher. Nothing on the live ISO ships tmux.
+- [hidden] `live_tools.rs:279,295,330` hard-code the tui app's layout: the directory `tui/apps/live-tools/install-docs`, the entry `src/main.ts` and `node_modules/@levitate/tui-kit/package.json` as the "deps installed" probe. Moving or renaming the tui package or its dependency breaks the builder.
+- [special] `live_tools.rs:287-292,361-378`: the host's own `bun` from `PATH` is copied into the guest as `/usr/local/bin/bun`. That's a host toolchain binary of unknown version and libc in the ISO, bypassing recipes, which by `AGENTS.md` own acquisition/build.
+- [special] `live_tools.rs:296-317` runs `bun install` (network) during the ISO build when `node_modules` is missing. The build therefore depends on the developer's checkout state.
+- [hidden] `live_tools.rs:192-215` (`copy_executable`), `:691-703` (`write_executable`), `:373-378` (bun chmod inline), `live_overlay.rs:681-687` (`write_executable`) and `overlay.rs:289-295` (inline chmod) are five copies of "write and chmod 0755".
+- [hidden] `live_tools.rs:136-164` and `:166-190` are near-identical functions (build via `build_tool_program`, then copy) that differ only in destination, with identical error-context strings.
+- [special] `live_tools.rs:120-128` adds `bin` to the destination list only when the rootfs `/bin` is a real directory, a special case for non-merged-/usr roots (AcornOS).
+- [special] `live_tools.rs:222-231,242`: `ensure_apk_packages` copies the host's `/etc/resolv.conf` into the shipped rootfs and never removes it, then runs `apk add --no-cache --no-check-certificate` over the network inside `unshare` + `chroot`. The ISO contents depend on host DNS and an unverified mirror at build time.
+
+#### Split-pane internals (`install-split-pane/src/main.rs`)
+
+- [hidden] `main.rs:259-262` (startup) and `:323-325` (resize) size the PTYs from the full terminal `Rect(0,0,cols,rows)`, while `draw` at `:578-583` lays the panes out in `root[0]`, one row shorter because of the footer. Each child's PTY is one row taller than its visible area, and `render_styled_rows` (`:625`) drops the top row. The two `pane_layout` calls must stay in step, and nothing shows it.
+- [surplus] `main.rs:366,371-386,406,410,413-415`: `App.logs` is filled and trimmed but never drawn or read, so it's dead state.
+- [surplus] `main.rs:339-359` `FocusPane` and `:467-471` `PaneId` are two identical Left/Right enums, mapped by hand at `:584-585` and `:419-422`.
+- [surplus] `main.rs:33,443`: `PTY_SCROLLBACK = 10_000` is allocated for each pane, but no key or code ever scrolls, so the scrollback can't be seen.
+- [surplus] `main.rs:31-32`: `LEFT_PANE_PERCENT` and `RIGHT_PANE_PERCENT` are two constants for one fixed 50/50 split that nothing changes.
+- [special] `main.rs:253`: the cursor is hidden once, and the vt100 cursor position (`screen().cursor_position()`/`hide_cursor()`) is never rendered, so the focused shell pane shows no cursor.
+- [special] `main.rs:317,321` (`write_to_focused(...)?`) and `:325` (`resize(...)?`): one failed write to an exited child's PTY, or a failed resize, ends the whole UI with an error. Combined with the `exec` chain, that kills the login session.
+- [special] `main.rs:404-411`: when a pane's child exits, the only reaction is an "(exited)" title. With both panes dead the app keeps running until Ctrl-q, and nothing restarts a pane.
+- [special] `main.rs:511-514`: any read error other than EINTR is reported as `Closed`, so the error is swallowed. `:220-223` and `:332-335` discard kill/wait results with `let _ =`.
+- [special] `main.rs:799`: function keys and any other unmapped `KeyCode` are silently dropped (`_ => return None`), so the docs TUI never receives them.
+- [special] `main.rs:307-314`: Ctrl-q and Ctrl-g are always taken by the host and can't reach a child (Ctrl-G is `less`'s file-info key).
+- [special] `main.rs:300` `POLL_INTERVAL` 16 ms: the loop redraws every iteration whether or not anything changed.
+- [special] `main.rs:62-64`: `Args::parse` calls `process::exit(0)` from inside the parser.
+- [hidden] `main.rs:116-121`: if `LEVITATE_INSTALL_RIGHT_CMD`'s first token isn't on PATH, the setting is silently ignored and the default docs command used, while `resolve_left_command` (`:103-111`) runs whatever it's given unchecked. The two pane configs have opposite validation, and a misconfiguration never surfaces.
+- [special] `main.rs:243`: `truncate_for_error` slices `&s[s.len()-MAX..]` by byte offset on a `from_utf8_lossy` string. If that offset lands inside a multi-byte character (box drawing, colour prompts), it panics, turning a smoke failure into a panic.
+- [hidden] `main.rs:163,573` hard-code the default docs command's name in user-facing error text, separately from `:124`.
+
+#### Smoke mode and the install-test harness
+
+- [hidden] `main.rs:187-205`: the left-pane smoke check sends `printf '__LEVITATE_SPLIT_LEFT_OK__\n'` and passes as soon as the marker shows up in the PTY output. The tty line discipline echoes the typed input, marker included, before any shell runs, so the check passes even if the left shell never starts. It can't catch a broken shell.
+- [hidden] `main.rs:177-182`: the right-pane smoke check only runs `command -v levitate-install-docs`, the same existence check `resolve_right_command` (`:118`) already made. It never runs the docs command, so a missing Bun bundle, a broken `bun` or a missing `/usr/local/share/levitate/install-docs.txt` all pass.
+- [hidden] `main.rs:43-45` vs `:247-286`: `--smoke` never touches `run_ui`. It doesn't exercise raw mode, alternate screen, layout, rendering, key forwarding or resize, which is everything that can break in the real UX.
+- [special] `main.rs:35,178,199`: smoke relies on an 8 s timeout, a `sleep 0.2` inside the right probe and a 100 ms `recv_timeout` poll.
+- [hidden] `testing/install-tests/src/scenarios/mod.rs:944-976` runs `LEVITATE_INSTALL_ENTRYPOINT_SMOKE=1 /usr/local/bin/levitate-install-entrypoint` over SSH. The profile hook, the tty1/ttyS0 selection, `LEFT_CMD`/`RIGHT_CMD`, autologin and the serial UX path are never exercised, so the test checks the smoke stand-in rather than the real launch.
+- [hidden] `testing/install-tests/src/scenarios/mod.rs:975` reports "install UX split-pane smoke verified (shell-left + docs-right)", although the smoke verifies neither a running shell nor rendered docs.
+- [hidden] `testing/install-tests/src/scenarios/mod.rs:446-449` only checks `test -r 30-install-ux.sh`. The hook's content and whether it launches anything aren't tested.
+- [surplus] `live_tools.rs:419-425` + `live_ux.rs:4-5`: the install-experience marker file exists only so `testing/install-tests/src/scenarios/mod.rs:426-438` can compare it with `scenarios.toml`, the same source the builder wrote it from. The check can only catch a stale ISO.
+- [hidden] `testing/install-tests/src/scenarios/mod.rs:479-480` says "the serial console may run the install UX rather than a shell", but the same scenario then runs `console.exec` on serial (`:402` → `verify_live_overlay_behavior`, `:1201-1216`), which needs a shell. The comment contradicts the code, and the scenario would fail if serial UX actually ran.
+- [special] `testing/install-tests/src/qemu/serial/mod.rs:62-80` (`wait_for_live_tools_with_context`) adds `serial_ready_patterns` plus `LIVE_LOGIN_HINT` as readiness patterns for a "serial runs the UX" case the harness never triggers, because it never injects `LEVITATE_INSTALL_SERIAL_UX`.
+- [needless] `testing/install-tests/src/scenarios/mod.rs:28-31` and `qemu/serial/mod.rs:71`: the test crate depends on the whole `distro-builder` crate (`testing/install-tests/Cargo.toml:18`) to read the string constants in `live_ux.rs`. The UX's guest-facing interface lives inside the builder's internals.
+- [hidden] `testing/install-tests/src/scenarios/mod.rs:954` accepts both `SPLIT_HELPER` and `*/SPLIT_HELPER`, mirroring the two `choose_install_helper` rungs at `live_tools.rs:518-528`. Change the ladder and the test has to change too.
+
+#### Live overlay duplicates the UX depends on
+
+- [hidden] OpenRC `serial-autologin` is written twice. `pipeline/overlay.rs:278-295` puts a rootfs version with no UX launch and no boot-injection import into the live-boot rootfs, which the live-tools product inherits (`extends`). `artifact/live_overlay.rs:92-120` puts an overlay version with the UX launch on top of it. Only the overlay copy runs, but someone fixing the rootfs one can't tell.
+- [hidden] OpenRC `/etc/inittab` is written twice with the same getty lines: `pipeline/overlay.rs:294-322` (rootfs) and `artifact/live_overlay.rs:148-200` (overlay). The `serial-autologin` path and the baud/TERM arguments have to match in both.
+- [hidden] `/etc/issue` is written by three generators: `overlay.rs:328-337` ("Boot Live"), `live_overlay.rs:123-131` (OpenRC default) and `live_overlay.rs:622-630` (systemd default). All three must carry `LIVE_LOGIN_HINT` for the test at `qemu/serial/mod.rs:71`.
+- [surplus] `live_overlay.rs:123-127` and `:622-626`: the `default_issue` fallbacks are dead because the only caller always passes `Some(...)` (`overlay.rs:39-41,58`).
+- [special] `overlay.rs:355-358` + `bin/workflows/parse.rs:146,158`: the banner format `"{os} {label} Live"` combined with labels "Live Boot"/"Live Tools" yields "AcornOS Live Tools Live".
+- [hidden] `/etc/shadow` has three writers. `variants/acorn/ring2/overlays/live/etc/shadow` (seed, with `sshd`/`chrony` entries and `lastchg=19000`) is copied first at `live_overlay.rs:72-84`, then overwritten unconditionally at `:138-142`. `overlay.rs:339-350` writes a third copy into the rootfs. The seed file is dead, and the `sshd`/`chrony` entries are lost.
+- [hidden] `live_overlay.rs:138` (OpenRC, root `lastchg=0`) vs `:658-663` (systemd, `lastchg=20000`). The systemd comment explains that 0 forces a password change at first login, yet the OpenRC copy (and `overlay.rs:342`) keeps 0. Only one of the copies got the fix.
+- [hidden] `live_overlay.rs:405-410` (`getty@tty1.service.d/autologin.conf`) vs `:455-463` (`getty@.service.d/zz-autologin.conf`). systemd merges template and instance drop-ins sorted by file name, so `zz-` wins for tty1: tty1 likely runs agetty with `--keep-baud … vt100` and the `autologin.conf` drop-in is dead (inferred from systemd drop-in ordering, not booted). `25-shell-color.sh` (`live_tools.rs:643-649`) then silently repairs `TERM=vt100` on `/dev/tty[0-9]*`.
+- [hidden] `live_overlay.rs:102-105` (OpenRC, marker to stdout, `/dev/console` and `/dev/kmsg`) vs `:423` (systemd, stdout only) vs `overlay.rs:281-283` (rootfs OpenRC, all three): three copies of "announce shell ready", now different.
+- [surplus] `live_overlay.rs:45,47,49,52` + `overlay.rs:42-45`: `masked_units` (always `&[]`), `write_serial_test_profile` (always `true`), `machine_id` (always `Some`) and `enforce_utf8_locale_profile` (always `false`) are config knobs that never vary. The locale branch at `live_overlay.rs:636-646` is dead.
+- [hidden] `live_overlay.rs:88` (OpenRC: serial test profile always written) vs `:632-634` (systemd: behind a flag that's always true). The same requirement is expressed two ways.
+- [special] `live_overlay.rs:360-403`: `live-help` and `20-live-shell-ux.sh` exist only on the systemd overlay, so AcornOS has no live-help. The distro difference comes from the init-system code path.
+- [special] `live_overlay.rs:493-525` (`live-net-setup`): a 45-iteration `sleep 1` retry loop with hard-coded slirp addresses `10.0.2.15`/`10.0.2.2` ships in every LevitateOS live ISO, including on real hardware.
+
+#### Comments and docs that contradict the code
+
+- [hidden] `live_overlay.rs:419-420` says the systemd serial autologin handles `LEVITATE_INSTALL_SERIAL_UX`, but nothing invokes that script (see `:455`).
+- [hidden] `live_overlay.rs:93` ("Autologin for serial console testing") and `:163-164` ("Serial console with autologin for test harness"): the same script is also the interactive serial install-UX launcher.
+- [hidden] `live_overlay.rs:50-51` describes `enforce_utf8_locale_profile` as a "strict UTF-8 locale profile", but the branch (`:636-645`) writes `LANG=C`.
+- [hidden] `live_overlay.rs:330-336`: the systemd overlay doc lists four contents and leaves out live-help, the shell UX profile, the network-setup and shutdown units, the serial-autologin script, the locale profile, tmpfiles and machine-id.
+- [hidden] `live_tools.rs:501` calls the `docs-tui` alias "Canonical docs-tui command alias for split-pane right-side launchers", but the split pane's default right command is `levitate-install-docs` (`main.rs:124`). `docs-tui` is only used by the LevitateOS serial branch (`live_tools.rs:609`) and the live-help text.
+- [hidden] `schema.rs:357-359` documents `serial_ready_patterns` as the readiness lines when "the serial console runs the install UX", but the harness never runs serial UX (see the install-test entries above).
+- [hidden] `schema.rs:228-230` says `PlainText` is "shown in a pager", but the launcher also falls back to `cat` (`live_tools.rs:481-482`) and then execs a shell (`:488`).
+- [hidden] `variants/acorn/ring2/install-guide.txt:4-6` ("Left pane: root shell. Right pane: this guide. Ctrl-g switches panes … q closes it") assumes the split pane. The same text also shows up full-screen (entrypoint fallback `live_tools.rs:526-528`, or reopened from the shell), where it's wrong, and after `q` the "closed" pane becomes a shell (`live_tools.rs:488`).
+- [hidden] `variants/acorn/ring2/install-guide.txt:35-50`: lines are up to 52 columns wide, but the right pane on an 80-column console has 38 columns (`main.rs:31-32` 50% minus borders at `:716`). With `LESS=-S` (`live_tools.rs:654`) the install commands get cut off. The guide's wrap width depends on the pane split, and nothing records that.
+- [surplus] `distro/builder/docs/03_MIGRATION_STAGELESS.md:690-703` lists owner files that no longer exist (`testing/install-tests/src/stages/mod.rs`, `xtask/src/tasks/testing/scenarios.rs`) and markers (`stage02-entrypoint-helper=*`) for an already-ticked item.
+
+---
+
+Counts: hidden 72, needless 10, surplus 15, special 27 (124 entries). Every runtime claim (respawn loop, tty1 drop-in precedence, the recpart build failure, smoke vacuity) is inferred from code; nothing was booted. The two awk programs were run through host gawk.
+
+
+### Completeness pass
+
+Two fresh agents that had not seen this list re-audited the highest-churn files: R1 the builder payload (`live_tools.rs`, `live_overlay.rs`; 101 entries) and R2 the three screens (`disk-plan-screen.tsx`, install-docs `presentation/ink`, `runtime-recab-screen.tsx`; 134 entries). Both saw a few lines of this file through a repo-wide grep; each says it re-verified overlapping items against the code. Compared by file:line overlap (`.artifacts/untangle-ui/scripts/novel.py`), then by hand.
+
+- R1 added 11. The pattern: the first pass read `live_overlay.rs` only for its install-UX parts and missed the generic live-overlay special cases. R1 read both files whole, which closes that gap.
+- R2 added 2 (about 1.5%), so the screens' list has converged.
+
+- [hidden] `distro/builder/src/artifact/live_overlay.rs:569` and `:579` hardcode `/live-overlay /rootfs /run/live-media` and `/dev/loop1 /dev/loop0` from the live init's mount layout; `recinit::live::LIVE_MEDIA_DIR` (`tools/recinit/src/live.rs:56`) exists but is not used.
+- [hidden] The tmpfs `/var/log` mount is declared twice in the OpenRC overlay, with the option string copied: `distro/builder/src/artifact/live_overlay.rs:207-213` (fstab) and `:218-245` (`local.d/00-volatile-log.start`).
+- [surplus] `distro/builder/src/pipeline/live_tools.rs:267-272` (`find_executable_in_path`) re-implements `distro/builder/src/process.rs:286` (`which`).
+- [surplus] `distro/builder/src/pipeline/live_tools.rs:8`: `pub(crate) use distro_contract::{InstallDocsFrontend, InstallExperience}` re-exports contract types so `distro/builder/src/pipeline/products.rs:13` can import `InstallExperience` from `live_tools`; a pass-through.
+- [surplus] `distro/builder/src/lib.rs:76-79` publicly re-exports `create_openrc_live_overlay`, `create_systemd_live_overlay`, `InittabVariant`, `LiveOverlayConfig`, `SystemdLiveOverlayConfig`; the only users are in-crate (`distro/builder/src/pipeline/overlay.rs:8-11`, `distro/builder/src/pipeline/config.rs:14`).
+- [special] `distro/builder/src/artifact/live_overlay.rs:658-660`: root `lastchg` is set to 20000 to dodge the forced password change, in the systemd copy only.
+- [special] `distro/builder/src/artifact/live_overlay.rs:239`: `mkdir -p /var/log/chrony` for one service inside the generic volatile-log script.
+- [special] `distro/builder/src/artifact/live_overlay.rs:585-587`: `/media/cdrom` unmount (an Alpine mount point) in the systemd shutdown cleanup.
+- [special] `distro/builder/src/artifact/live_overlay.rs:468-475`: `serial-getty@ttyS0` is enabled from both `basic.target.wants` and `getty.target.wants`, with no comment on why it needs the earlier target.
+- [special] `distro/builder/src/pipeline/overlay.rs:13`, `:44`: every live ISO gets the fixed machine-id `0123456789abcdef0123456789abcdef`.
+- [special] `distro/builder/src/pipeline/overlay.rs:209-253`: OpenRC service wiring has one hand-written branch per service name (`sshd`, `networking`, `dhcpcd`), each with its own runlevel; any other name bails.
+- [special] `tui/apps/install/disk-plan/src/domain/recpart.ts:21-23` swallows the JSON parse error (`// not JSON`) and returns null, so callers can't tell "not JSON" from "wrong schema".
+- [special] `tui/apps/runtime/recab/presentation/runtime-recab-screen.tsx:191` pushes the literal text "status-error" as the segment body, a one-off segment for one state.
+
+## Fixes
+
+## Progress

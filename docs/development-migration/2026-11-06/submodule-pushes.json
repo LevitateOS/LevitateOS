@@ -1,0 +1,96 @@
+[
+  {
+    "path": "/home/vince/Projects/LevitateOS/tools/recipe",
+    "command": [
+      "git",
+      "-C",
+      "/home/vince/Projects/LevitateOS/tools/recipe",
+      "--work-tree=/home/vince/Projects/LevitateOS/tools/recipe",
+      "push",
+      "--porcelain",
+      "origin",
+      "refs/heads/codex/streamline-development:refs/heads/codex/streamline-development",
+      "refs/heads/ginux-recipe/r01-protocol:refs/heads/ginux-recipe/r01-protocol",
+      "refs/heads/ginux-recipe/r02-worker:refs/heads/ginux-recipe/r02-worker",
+      "refs/heads/ginux-recipe/r03-checkpoints:refs/heads/ginux-recipe/r03-checkpoints",
+      "refs/heads/ginux-recipe/r04-backend:refs/heads/ginux-recipe/r04-backend",
+      "refs/heads/ginux-recipe/r06-launch:refs/heads/ginux-recipe/r06-launch",
+      "refs/heads/master:refs/heads/master"
+    ],
+    "exit_code": 0,
+    "stdout": "To github.com:LevitateOS/recipe.git\n \trefs/heads/ginux-recipe/r06-launch:refs/heads/ginux-recipe/r06-launch\t73047d8..4056374\n \trefs/heads/master:refs/heads/master\t6dd4774..ce3cae5\n*\trefs/heads/codex/streamline-development:refs/heads/codex/streamline-development\t[new branch]\n*\trefs/heads/ginux-recipe/r01-protocol:refs/heads/ginux-recipe/r01-protocol\t[new branch]\n*\trefs/heads/ginux-recipe/r02-worker:refs/heads/ginux-recipe/r02-worker\t[new branch]\n*\trefs/heads/ginux-recipe/r03-checkpoints:refs/heads/ginux-recipe/r03-checkpoints\t[new branch]\n*\trefs/heads/ginux-recipe/r04-backend:refs/heads/ginux-recipe/r04-backend\t[new branch]\nDone\n",
+    "stderr": "",
+    "heads": [
+      {
+        "branch": "codex/streamline-development",
+        "local": "18db12ce75c38fdfd741151b242a0fa60350cb2b",
+        "state": "new remote branch from existing local branch"
+      },
+      {
+        "branch": "ginux-recipe/r01-protocol",
+        "local": "0b7875b9f27521bd9e6de5132eb3bee4b01b724d",
+        "state": "new remote branch from existing local branch"
+      },
+      {
+        "branch": "ginux-recipe/r02-worker",
+        "local": "80e45dfca4e2e19082437863ea5acdee8d70bda7",
+        "state": "new remote branch from existing local branch"
+      },
+      {
+        "branch": "ginux-recipe/r03-checkpoints",
+        "local": "e957651099dbd15fd3a1af504e6355283b8aafbd",
+        "state": "new remote branch from existing local branch"
+      },
+      {
+        "branch": "ginux-recipe/r04-backend",
+        "local": "61a742bf299c8bd5920fdc27b900e03c840d2164",
+        "state": "new remote branch from existing local branch"
+      },
+      {
+        "branch": "ginux-recipe/r06-launch",
+        "local": "4056374758ba2de8517b2faf3438c64380611992",
+        "state": "fast-forward push"
+      },
+      {
+        "branch": "master",
+        "local": "ce3cae5f7b979cadedfeb12cfcfb7b2b0a25b6a5",
+        "state": "fast-forward push"
+      }
+    ]
+  },
+  {
+    "path": "/home/vince/Projects/LevitateOS/tools/ginux",
+    "command": [
+      "git",
+      "-C",
+      "/home/vince/Projects/LevitateOS/tools/ginux",
+      "--work-tree=/home/vince/Projects/LevitateOS/tools/ginux",
+      "push",
+      "--porcelain",
+      "origin",
+      "refs/heads/codex/ginux-recipe-local-integration:refs/heads/codex/ginux-recipe-local-integration",
+      "refs/heads/ginux-recipe/i04-m5-writable:refs/heads/ginux-recipe/i04-m5-writable",
+      "refs/heads/ginux-recipe/i04-m7-alias:refs/heads/ginux-recipe/i04-m7-alias"
+    ],
+    "exit_code": 0,
+    "stdout": "To github.com:LevitateOS/ginux.git\n*\trefs/heads/codex/ginux-recipe-local-integration:refs/heads/codex/ginux-recipe-local-integration\t[new branch]\n*\trefs/heads/ginux-recipe/i04-m5-writable:refs/heads/ginux-recipe/i04-m5-writable\t[new branch]\n*\trefs/heads/ginux-recipe/i04-m7-alias:refs/heads/ginux-recipe/i04-m7-alias\t[new branch]\nDone\n",
+    "stderr": "",
+    "heads": [
+      {
+        "branch": "codex/ginux-recipe-local-integration",
+        "local": "7cf2638adaf2fd3b783be636fe2a05b2d60458c5",
+        "state": "new remote branch from existing local branch"
+      },
+      {
+        "branch": "ginux-recipe/i04-m5-writable",
+        "local": "ebd68025d4db318e903867f12d0574e41f2511ce",
+        "state": "new remote branch from existing local branch"
+      },
+      {
+        "branch": "ginux-recipe/i04-m7-alias",
+        "local": "022294a9e983dd4097dcae6e198f6ecd87c1047a",
+        "state": "new remote branch from existing local branch"
+      }
+    ]
+  }
+]

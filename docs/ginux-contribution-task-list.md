@@ -10,6 +10,16 @@ runtime evidence; [the completed Recipe plan](recipe-simplification-implementati
 owns T01–T27. Neither is reopened by this document. Keep this downstream planning
 record in this superproject, outside Ginux contributions.
 
+## Migration-only publication exception
+
+The user's 2026-11-06 request to commit and push everything for a computer migration
+authorizes origin backups of current development state and recovery artifacts.
+It does not resume the paused implementation goal, approve any Ginux PR, change
+readiness claims or authorize upstream maintainer messages. See
+[the migration recovery record](development-migration/2026-11-06/README.md).
+Earlier no-push instructions continue to govern contribution delivery after this
+specific migration backup.
+
 ## Outcome and boundaries
 
 Prepare the smallest useful, general Ginux contributions, review and fix each,
@@ -709,13 +719,27 @@ it is explicitly retained for future extraction rather than silently assumed.
 Every original policy/security/current-main independence hold remains. No
 publication occurred.
 
-Exact next action: **review remaining actual consumer requirements and current
-Recipe code** against the frozen combined source. Keep G07 unready thread/shared
-argument work with DaybreakBlue, plus G01/G02 native policy and G25 native clamp
-excluded. Actual compiler, SQLite/Cargo, APK/RPM package and fresh complete
-applicable Recipe acceptance remain F02/F03 work; do not reuse historical suite
-passes as new closure. F04 remains user inspection before any publication. No
-branches/refs/pushes/PRs/maintainer messages are authorized.
+F02 also passes the actual SQLite two-process contention/commit/data-integrity
+consumer in source/clean. F03 ordinary verification has started on a separate
+fresh Recipe snapshot `bde746221988094d4a0b80bb46808beab447e3dc` plus hashed tracked dirty overlays;
+[progress/evidence](ginux-contributions/f03-review.md) records135 current scenarios,
+new immutable binaries and1/1 first managed case passing. The12-case ordinary
+batch was interrupted at the user’s pause; inspect saved state/logs on resume. Full suite,
+compiler/Cargo/APK/RPM and security acceptance remain open.
+
+**Goal paused by the user.** The active F03 batch is stopped; partial results
+are7 passed,4 failed and1 interrupted/unreported, plus the first ordinary
+probe passed. These are not full-suite results. The C dependency/Bash paths expose
+reader-thread creation ENOSYS while G07 is excluded; logs preserve all failures.
+
+Exact next action **only after explicit resume**: inspect F03 state/logs and the
+remaining case; continue authorized ordinary consumer work without disguising
+G07/security dependencies. The supplementary candidate-integrity refresh stopped
+on a missing source_patch key in an older manifest row; it made no candidate
+changes or proof claim. Preserve current source/candidate/Recipe snapshots and
+concurrent live edits. G07 and all security/policy/full CI/current-main holds
+remain. F04 inspection precedes any publication; no branches/refs/pushes/PRs/
+maintainer messages are authorized.
 
 Active skill: `hdae-development`, discovered at
 `/home/vince/.codex/worktrees/ginux-pr-combination-check/ginux/.agents/skills/hdae-development/SKILL.md`.

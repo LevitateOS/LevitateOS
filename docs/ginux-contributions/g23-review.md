@@ -71,3 +71,13 @@ Patch, generic draft, commands, receipts, hashes and helpers are retained under
 .artifacts/ginux-contribution-preparation/G23/. No real Ginux branch, index,
 checkout/ref, remote human text or maintainer message changed. F04 remains the
 user inspection stop before publication.
+
+## F02 actual SQLite consumer
+
+Combined per-process dfebda7c passes actual installed SQLite library with two
+real forked clients in source and strict clean replay. The first owns an
+IMMEDIATE transaction; the second receives SQLite's real BUSY result, then
+commits after release. Final sum33 and integrity_check succeed. No locking or
+VFS bypass is configured. Receipts, hashed library closure and C consumer are
+retained with F02. This proves the combined ordinary SQLite path; actual Cargo,
+G07 thread/security and standalone current-main/full CI remain pending.
