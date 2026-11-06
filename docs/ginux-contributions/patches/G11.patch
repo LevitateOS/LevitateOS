@@ -1,0 +1,1577 @@
+From 0798d991ab2d652e54682750acb4fdd9f1e6d9ac Mon Sep 17 00:00:00 2001
+From: vince <vincepaul.liem@gmail.com>
+Date: Fri, 6 Nov 2026 13:21:46 +0100
+Subject: [PATCH] feat(launch): execute owned scripts through bounded
+ interpreter chains
+
+Resolve up to four owned scripts to an owned ELF or permitted image
+interpreter. Preserve virtual names and optional arguments on the new
+exec stack; reopen public owned descriptor names with fresh offsets.
+Keep pin and private backing cleanup with the existing exec transaction.
+
+Signed-off-by: vince <vincepaul.liem@gmail.com>
+---
+ .github/workflows/check.yml                |   3 +-
+ Makefile                                   |   8 +
+ README.md                                  |  29 +-
+ crates/ginux-init/src/descriptors.rs       |  55 +++-
+ crates/ginux-init/src/exec_image.rs        |   6 +-
+ crates/ginux-init/src/exec_script.rs       | 335 +++++++++++++++++++++
+ crates/ginux-init/src/fs_hooks.rs          | 109 ++++++-
+ crates/ginux-init/src/launch_tasks.rs      | 173 +++++++++--
+ crates/ginux-init/src/main.rs              |   1 +
+ crates/ginux-init/src/path_hooks.rs        |  57 +++-
+ crates/ginux-vfs/src/lib.rs                |  81 +++++
+ scripts/test-launch-owned-exec.py          |  19 ++
+ scripts/test-launch-scripts.py             |  95 ++++++
+ tests/fixtures/launch-owned-exec-fixture.c |  45 ++-
+ tests/fixtures/launch-script-fixture.c     | 203 +++++++++++++
+ 15 files changed, 1162 insertions(+), 57 deletions(-)
+ create mode 100644 crates/ginux-init/src/exec_script.rs
+ create mode 100644 scripts/test-launch-scripts.py
+ create mode 100644 tests/fixtures/launch-script-fixture.c
+
+diff --git a/.github/workflows/check.yml b/.github/workflows/check.yml
+index 83f16959..1db61bc9 100644
+--- a/.github/workflows/check.yml
++++ b/.github/workflows/check.yml
+@@ -24,7 +24,7 @@ jobs:
+     steps:
+       - uses: actions/checkout@v5
+       - run: rustup target add x86_64-unknown-linux-gnu
+-      - run: make build build-launch-fixture build-launch-storage-fixture build-launch-device-fixture build-launch-pipe-fixture build-launch-fd-fixture build-launch-task-fixture build-launch-exec-fixture build-launch-directory-fixture build-launch-owned-exec-fixture build-process-fixtures build-gate1-fixture
++      - run: make build build-launch-fixture build-launch-storage-fixture build-launch-device-fixture build-launch-pipe-fixture build-launch-fd-fixture build-launch-task-fixture build-launch-exec-fixture build-launch-directory-fixture build-launch-owned-exec-fixture build-process-fixtures build-gate1-fixture build-launch-script-fixture
+       - run: sudo make test-launch
+       - run: sudo make test-launch-storage
+       - run: sudo make test-launch-devices
+@@ -37,3 +37,4 @@ jobs:
+       - run: make test-process-native
+       - run: sudo make test-gate1-setup
+       - run: sudo make test-launch-owned-exec
++      - run: sudo make test-launch-scripts
+diff --git a/Makefile b/Makefile
+index f29b73ff..b3b7bd9a 100644
+--- a/Makefile
++++ b/Makefile
+@@ -259,3 +259,11 @@ build-launch-owned-exec-fixture:
+ 
+ test-launch-owned-exec:
+ 	python3 scripts/test-launch-owned-exec.py $(GINUX) .artifacts/launch/launch-owned-exec-fixture
++
++.PHONY: build-launch-script-fixture test-launch-scripts
++build-launch-script-fixture:
++	mkdir -p .artifacts/launch
++	$(CC) -nostdlib -static -fno-stack-protector -fno-builtin -O2 -Wall -Wextra -Werror tests/fixtures/launch-script-fixture.c -o .artifacts/launch/launch-script-fixture
++
++test-launch-scripts:
++	python3 scripts/test-launch-scripts.py $(GINUX) .artifacts/launch/launch-script-fixture
+diff --git a/README.md b/README.md
+index 28d22c77..28d3e9b4 100644
+--- a/README.md
++++ b/README.md
+@@ -282,7 +282,7 @@ Owned executable files with an execute bit and no open writers may be replaced
+ through execve or execveat, including an owned directory FD or an unlinked read
+ FD with AT_EMPTY_PATH. The VFS pins the bytes; a private sealed memfd supplies
+ them to the native kernel ELF loader. Paths and ELF interpreter metadata use the
+-same assignment checks as image execution. Owned scripts are not supported yet.
++same assignment checks as image execution.
+ No writable host pathname is used for generated program bytes. Writable opens
+ and truncation report ETXTBSY while the program is pinned; unlink/rename retain
+ identity until the last process releases it. Fork retains the executable pin;
+@@ -293,8 +293,26 @@ Readlink of /proc/self/exe and /proc/thread-self/exe returns the current domain
+ executable name, with a deleted suffix for an unlinked owned executable; native
+ memfd names and supervisor prefixes are not part of that interface.
+ 
++Owned shebang programs support up to four consecutive owned scripts followed
++by an owned ELF or an image interpreter chain. Each shebang has one optional
++argument, including spaces. Owned script bytes stay pinned until exec commits;
++the final owned ELF retains the running executable pin. The new exec stack
++restores the virtual script name in argv and AT_EXECFN; existing arguments and
++environment are preserved, with argv[0] replaced as for kernel shebang execution.
++Image interpreters use a transient non-CLOEXEC script backing, retired before
++the interpreter's first syscall. Stack reconstruction is bounded to 4096 caller
++arguments, 4096 environment entries and 64 auxiliary pairs. Unsupported stack
++layouts fail the domain after exec rather than resuming a replaced address space.
++Descriptor-based scripts require a non-CLOEXEC public file or directory descriptor;
++otherwise execveat fails with ENOENT. The interpreter can reopen /dev/fd/<public>
++(or an owned directory suffix) read-only through the virtual descriptor owner,
++with a fresh offset, including after unlink/rename. This never imports native
++or private descriptors. Other /dev/fd operations remain unsupported. Threads,
++owned ELF dynamic loaders, guest file mappings and owned cwd remain unsupported.
++
+ The configured `/dev` view is an immutable virtual directory, empty by default;
+-image entries beneath it are hidden. `[devices].assignments = ["null"]` exposes
++image entries beneath it are hidden. The script descriptor reopen operation
++described above is separate from directory enumeration. `[devices].assignments = ["null"]` exposes
+ `/dev/null` through the existing device registry: reads return EOF and writes
+ discard up to 4096 bytes per call. Stat/fstat/fstatat/statx report a character
+ device with domain-owned identity and major/minor 1:3. Open access modes,
+@@ -339,9 +357,10 @@ before the launcher reports completion.
+ Subsequent exec supports image paths and native image descriptors with
+ `execveat(AT_EMPTY_PATH)`. Descriptor synchronization precedes native exec;
+ CLOEXEC retirement commits at the observed successful exec event. Failed exec
+-restores public arguments and descriptor state. Owned-file execution is not
+-implemented. Script and ELF interpreter paths must resolve to the same permitted
+-image object in both the configured and native namespaces; hidden assignments
++restores public arguments and descriptor state. Owned ELF/script execution uses
++the separate pinned-byte transaction described above. Native script and ELF
++interpreter paths must resolve to the same permitted image object in both the
++configured and native namespaces; hidden assignments
+ cannot be bypassed through a kernel-selected interpreter. Interpreter metadata
+ is bounded to x86-64 ELF headers, 256-byte paths and 16 script-chain inspections;
+ unsupported or ambiguous chains fail explicitly. The initial executable has the
+diff --git a/crates/ginux-init/src/descriptors.rs b/crates/ginux-init/src/descriptors.rs
+index 889d3b8a..05def3f9 100644
+--- a/crates/ginux-init/src/descriptors.rs
++++ b/crates/ginux-init/src/descriptors.rs
+@@ -182,6 +182,9 @@ impl DescriptorTable {
+     pub fn exec_path_dirfd(&self, pid: usize, fd: u64, address: u64) -> Result<u64, i64> {
+         self.path_handle(pid, fd, address)
+     }
++    pub fn exec_cloexec(&self, fd: u64) -> Result<bool, i64> {
++        Ok(self.get(fd)?.cloexec)
++    }
+ 
+     /// PTRACE_EVENT_EXEC is the commit point. Failed exec never calls this.
+     pub fn exec_completed(&mut self, backends: &mut Backends) -> Result<(), &'static [u8]> {
+@@ -430,7 +433,9 @@ impl DescriptorTable {
+         } else {
+             r.rdx &= !CLOEXEC;
+         }
+-        let decision = if r.orig_rax == 257 {
++        let decision = if let Some(decision) = self.open_descriptor_path(pid, r, backends) {
++            decision
++        } else if r.orig_rax == 257 {
+             self.path_descriptor(pid, r, backends)
+         } else {
+             Ok(backends.claim(pid, r))
+@@ -459,6 +464,54 @@ impl DescriptorTable {
+         }
+     }
+ 
++    fn open_descriptor_path(
++        &self,
++        pid: usize,
++        r: &UserRegs,
++        backends: &mut Backends,
++    ) -> Option<Result<NativeDecision, i64>> {
++        let address = if r.orig_rax == 2 { r.rdi } else { r.rsi };
++        let path = match read_path(pid, address) {
++            Ok(path) => path,
++            Err(error) => return Some(Err(error)),
++        };
++        let suffix = path.as_bytes().strip_prefix(b"/dev/fd/")?;
++        Some((|| {
++            let end = suffix
++                .iter()
++                .position(|b| *b == b'/')
++                .unwrap_or(suffix.len());
++            if end == 0 {
++                return Err(-2);
++            }
++            let mut fd = 0u64;
++            for digit in &suffix[..end] {
++                if !digit.is_ascii_digit() {
++                    return Err(-2);
++                }
++                fd = fd
++                    .checked_mul(10)
++                    .and_then(|n| n.checked_add((digit - b'0') as u64))
++                    .ok_or(-2)?;
++            }
++            // Path digits are names, not an i32 syscall argument. Never let a
++            // larger number wrap onto a different public descriptor.
++            if fd >= LIMIT as u64 {
++                return Err(-2);
++            }
++            let handle = match self.get(fd).map_err(|_| -2)?.handle {
++                Handle::Owned(handle) if (1048576..1048640).contains(&handle) => handle,
++                _ => return Err(-95),
++            };
++            let flags = if r.orig_rax == 2 { r.rsi } else { r.rdx };
++            let tail = &suffix[end..];
++            let handle = backends
++                .filesystem
++                .open_descriptor(pid, handle, tail, flags)?;
++            Ok(ready(handle))
++        })())
++    }
++
+     fn pipe(
+         &mut self,
+         pid: usize,
+diff --git a/crates/ginux-init/src/exec_image.rs b/crates/ginux-init/src/exec_image.rs
+index 63ae9dd6..04947977 100644
+--- a/crates/ginux-init/src/exec_image.rs
++++ b/crates/ginux-init/src/exec_image.rs
+@@ -1,7 +1,8 @@
+ //! Populate a freshly injected tracee memfd from pinned VFS bytes. The host
+ //! proc path is constructed only from a registered stopped task and its kernel
+ //! memfd result, never a guest path or public descriptor. No named output file
+-//! is created. The tracee cannot run until this backing is sealed and closed.
++//! is created. The tracee cannot run until this backing is sealed and the host
++//! fd is closed. Script backings retire before the interpreter's first syscall.
+ 
+ use crate::fs_hooks::LaunchFs;
+ use crate::supervisor::{syscall1, syscall2, syscall3, syscall4};
+@@ -56,7 +57,8 @@ pub fn populate(host: usize, descriptor: u32, fs: &LaunchFs, image: Executable)
+             return Err(mode as i64);
+         }
+         // Old kernels do not know F_SEAL_EXEC. The write/grow/shrink seals
+-        // remain mandatory; the descriptor is private until exec closes it.
++        // remain mandatory; the descriptor stays private until the exec owner
++        // closes it (at commit for ELF, before the first syscall for scripts).
+         let mut seals = 0x2f;
+         let mut result = unsafe { syscall3(72, fd, 1033, seals) };
+         if result == -22 {
+diff --git a/crates/ginux-init/src/exec_script.rs b/crates/ginux-init/src/exec_script.rs
+new file mode 100644
+index 00000000..032b490b
+--- /dev/null
++++ b/crates/ginux-init/src/exec_script.rs
+@@ -0,0 +1,335 @@
++//! Restore the domain script name after kernel binfmt dispatch. Only the new
++//! exec stack is changed: fork/vfork's old address space is never used as scratch.
++use crate::fs_hooks::LaunchFs;
++use crate::supervisor::UserRegs;
++use crate::tracee_io::{copy_memory, read_path};
++use ginux_domain::Text;
++use ginux_vfs::{Executable, MAX_PATH};
++
++const ARGUMENTS: usize = 4096;
++const AUX_PAIRS: usize = 64;
++const STACK_WORDS: usize = 2 * ARGUMENTS + 2 * AUX_PAIRS + 32;
++const SCRIPTS: usize = 4;
++type Path = Text<MAX_PATH>;
++
++#[derive(Clone, Copy)]
++struct Segment {
++    path: Path,
++    argument: Option<Path>,
++}
++
++fn read_header(
++    fs: &LaunchFs,
++    image: Executable,
++) -> Result<Option<crate::path_hooks::ScriptHeader>, i64> {
++    let mut bytes = [0; 256];
++    let n = fs.read_executable(image, 0, &mut bytes)?;
++    crate::path_hooks::script_metadata(&bytes[..n])
++}
++
++#[derive(Clone, Copy)]
++pub struct Script {
++    path: Text<MAX_PATH>,
++    original_argc: usize,
++    segments: [Segment; SCRIPTS],
++    count: usize,
++    leaf: Path,
++    pub kernel_script: bool,
++    held: [Option<Executable>; SCRIPTS],
++}
++
++fn word(host: usize, address: u64) -> Result<u64, i64> {
++    let mut bytes = [0u8; 8];
++    if copy_memory(host, address, &mut bytes, false) != Ok(8) {
++        return Err(-14);
++    }
++    Ok(u64::from_ne_bytes(bytes))
++}
++
++fn count(host: usize, address: u64) -> Result<usize, i64> {
++    if address == 0 {
++        return Ok(0);
++    }
++    for n in 0..=ARGUMENTS {
++        if word(host, address.checked_add((n * 8) as u64).ok_or(-14)?)? == 0 {
++            return Ok(n);
++        }
++    }
++    Err(-7)
++}
++
++impl Script {
++    pub fn prepare(host: usize, r: &UserRegs) -> Result<Self, i64> {
++        let (path, argv, env) = if r.orig_rax == 59 {
++            (r.rdi, r.rsi, r.rdx)
++        } else {
++            (r.rsi, r.rdx, r.r10)
++        };
++        let mut path = read_path(host, path)?;
++        if r.orig_rax == 322
++            && (path.is_empty() || (path.as_bytes()[0] != b'/' && r.rdi as i32 != -100))
++        {
++            // The interpreter reopens a public descriptor name, never the
++            // private memfd or the filesystem backend's integer handle.
++            let mut bytes = [0u8; MAX_PATH];
++            bytes[..8].copy_from_slice(b"/dev/fd/");
++            let mut digits = [0u8; 10];
++            let mut n = r.rdi as u32;
++            let mut length = 0;
++            loop {
++                digits[length] = b'0' + (n % 10) as u8;
++                length += 1;
++                n /= 10;
++                if n == 0 {
++                    break;
++                }
++            }
++            let mut end = 8;
++            for digit in digits[..length].iter().rev() {
++                bytes[end] = *digit;
++                end += 1;
++            }
++            if !path.is_empty() {
++                bytes[end] = b'/';
++                end += 1;
++                let next = end
++                    .checked_add(path.as_bytes().len())
++                    .filter(|end| *end < MAX_PATH)
++                    .ok_or(-36)?;
++                bytes[end..next].copy_from_slice(path.as_bytes());
++                end = next;
++            }
++            path = Text::from_bytes(&bytes[..end]).map_err(|_| -36)?;
++        }
++        let original_argc = count(host, argv)?.max(1);
++        count(host, env)?;
++        Ok(Self {
++            path,
++            original_argc,
++            segments: [Segment {
++                path: Path::empty(),
++                argument: None,
++            }; SCRIPTS],
++            count: 0,
++            leaf: Path::empty(),
++            kernel_script: false,
++            held: [None; SCRIPTS],
++        })
++    }
++
++    /// Consumes the initial executable reference, including on failure. Keep
++    /// every owned script pinned until commit; only the actual ELF keeps its
++    /// execution lifetime after the interpreter starts.
++    pub fn resolve(
++        fs: &mut LaunchFs,
++        host: usize,
++        r: &UserRegs,
++        image: Executable,
++    ) -> Result<(Executable, Option<Self>), i64> {
++        let mut images = [None; SCRIPTS + 1];
++        images[0] = Some(image);
++        let mut used = 1;
++        let result = (|| {
++            let Some(mut header) = read_header(fs, image)? else {
++                return Ok(None);
++            };
++            let mut script = Self::prepare(host, r)?;
++            let mut name = script.path;
++            loop {
++                if script.count == SCRIPTS {
++                    return Err(-40);
++                }
++                script.segments[script.count] = Segment {
++                    path: name,
++                    argument: header.argument,
++                };
++                script.count += 1;
++                match fs.exec_interpreter(host, header.interpreter.as_bytes())? {
++                    Some(next) => {
++                        images[used] = Some(next);
++                        used += 1;
++                        name = header.interpreter;
++                        match read_header(fs, next)? {
++                            Some(next) => header = next,
++                            None => {
++                                script.leaf = name;
++                                break;
++                            }
++                        }
++                    }
++                    None => {
++                        script.kernel_script = true;
++                        break;
++                    }
++                }
++            }
++            Ok(Some(script))
++        })();
++        match result {
++            Ok(mut script) => {
++                let image = images[used - 1].take().unwrap();
++                if let Some(script) = script.as_mut() {
++                    script.held.copy_from_slice(&images[..SCRIPTS]);
++                }
++                Ok((image, script))
++            }
++            Err(error) => {
++                for image in images.into_iter().flatten() {
++                    fs.release_executable(image)
++                        .expect("interpreter resolution pin release");
++                }
++                Err(error)
++            }
++        }
++    }
++
++    pub fn release_held(self, fs: &mut LaunchFs) -> Result<(), i64> {
++        for image in self.held.into_iter().flatten() {
++            fs.release_executable(image)?;
++        }
++        Ok(())
++    }
++
++    pub fn restore(self, host: usize, fd: u32, r: &mut UserRegs) -> Result<(), i64> {
++        let argc = word(host, r.rsp)? as usize;
++        if argc > ARGUMENTS + 16 {
++            return Err(-7);
++        }
++        let prefix = if self.kernel_script {
++            let prefix = argc
++                .checked_sub(self.original_argc)
++                .filter(|n| *n > 0)
++                .ok_or(-5)?;
++            let actual = read_path(host, word(host, r.rsp + ((prefix + 1) * 8) as u64)?)?;
++            let mut expected = [0u8; 32];
++            expected[..8].copy_from_slice(b"/dev/fd/");
++            let mut digits = [0u8; 10];
++            let mut n = fd;
++            let mut len = 0;
++            loop {
++                digits[len] = b'0' + (n % 10) as u8;
++                len += 1;
++                n /= 10;
++                if n == 0 {
++                    break;
++                }
++            }
++            for (i, digit) in digits[..len].iter().rev().enumerate() {
++                expected[8 + i] = *digit;
++            }
++            if actual.as_bytes() != &expected[..8 + len] {
++                return Err(-5);
++            }
++            prefix
++        } else {
++            if argc != self.original_argc {
++                return Err(-5);
++            }
++            0
++        };
++        let mut words = [0u64; STACK_WORDS];
++        let mut strings = [0u8; (2 * SCRIPTS + 1) * MAX_PATH];
++        let mut strings_len: usize = 0;
++        let mut patched = [0usize; 2 * SCRIPTS + 1];
++        let mut patches = 0;
++        let mut used = 1;
++        // Keep any prefix the kernel produced through immutable interpreters.
++        for n in 0..prefix {
++            words[used] = word(host, r.rsp + ((n + 1) * 8) as u64)?;
++            used += 1;
++        }
++        let mut append = |path: Path| -> Result<(), i64> {
++            let bytes = path.as_bytes();
++            let end = strings_len
++                .checked_add(bytes.len() + 1)
++                .filter(|n| *n <= strings.len())
++                .ok_or(-7)?;
++            strings[strings_len..end - 1].copy_from_slice(bytes);
++            words[used] = strings_len as u64;
++            patched[patches] = used;
++            patches += 1;
++            used += 1;
++            strings_len = end;
++            Ok(())
++        };
++        if !self.kernel_script {
++            append(self.leaf)?;
++        }
++        for index in (0..self.count).rev() {
++            // The kernel already supplied the last owned script's shebang arg.
++            if !(self.kernel_script && index + 1 == self.count) {
++                if let Some(argument) = self.segments[index].argument {
++                    append(argument)?;
++                }
++            }
++            append(self.segments[index].path)?;
++        }
++        // The last inserted string is always the originally invoked script.
++        let execfn = words[patched[patches - 1]];
++        for n in prefix + 1..argc {
++            words[used] = word(host, r.rsp + ((n + 1) * 8) as u64)?;
++            used += 1;
++        }
++        words[0] = (used - 1) as u64;
++        used += 1; // argv terminator
++        if word(host, r.rsp + ((argc + 1) * 8) as u64)? != 0 {
++            return Err(-5);
++        }
++        let mut cursor = argc + 2;
++        let mut envc = 0;
++        loop {
++            if envc > ARGUMENTS || used >= STACK_WORDS {
++                return Err(-7);
++            }
++            let value = word(host, r.rsp.checked_add((cursor * 8) as u64).ok_or(-14)?)?;
++            cursor += 1;
++            words[used] = value;
++            used += 1;
++            if value == 0 {
++                break;
++            }
++            envc += 1;
++        }
++        let aux = used;
++        for n in 0..AUX_PAIRS {
++            if used + 2 > STACK_WORDS {
++                return Err(-7);
++            }
++            words[used] = word(host, r.rsp.checked_add((cursor * 8) as u64).ok_or(-14)?)?;
++            words[used + 1] = word(
++                host,
++                r.rsp.checked_add(((cursor + 1) * 8) as u64).ok_or(-14)?,
++            )?;
++            cursor += 2;
++            used += 2;
++            if words[used - 2] == 0 {
++                break;
++            }
++            if n + 1 == AUX_PAIRS {
++                return Err(-7);
++            }
++        }
++        // Place the expanded pointers and new strings entirely below the old
++        // pointer block. Existing argv/env/aux data stay intact above it.
++        let bytes = (used * 8 + strings_len).next_multiple_of(16) as u64;
++        let start = r.rsp.checked_sub(bytes).ok_or(-14)?;
++        let names = start + (used * 8) as u64;
++        for &index in &patched[..patches] {
++            words[index] += names;
++        }
++        for pair in words[aux..used].as_chunks_mut::<2>().0 {
++            if pair[0] == 31 {
++                pair[1] = names + execfn;
++            }
++        }
++        let pointers =
++            unsafe { core::slice::from_raw_parts_mut(words.as_mut_ptr().cast::<u8>(), used * 8) };
++        if copy_memory(host, start, pointers, true) != Ok(pointers.len() as i64)
++            || copy_memory(host, names, &mut strings[..strings_len], true) != Ok(strings_len as i64)
++        {
++            return Err(-14);
++        }
++        r.rsp = start;
++        Ok(())
++    }
++}
+diff --git a/crates/ginux-init/src/fs_hooks.rs b/crates/ginux-init/src/fs_hooks.rs
+index 31be412c..09b7c8f0 100644
+--- a/crates/ginux-init/src/fs_hooks.rs
++++ b/crates/ginux-init/src/fs_hooks.rs
+@@ -164,20 +164,7 @@ impl LaunchFs {
+                 .ok_or(-9)?;
+             self.fs.directory_path(fd as i32 + 3).map_err(errno)?
+         };
+-        let mut bytes = [0; MAX_PATH];
+-        let separator = usize::from(!base.is_empty() && base != b"/");
+-        let end = base
+-            .len()
+-            .checked_add(separator)
+-            .and_then(|n| n.checked_add(text.as_bytes().len()))
+-            .filter(|n| *n < MAX_PATH)
+-            .ok_or(-36)?;
+-        bytes[..base.len()].copy_from_slice(base);
+-        if separator != 0 {
+-            bytes[base.len()] = b'/';
+-        }
+-        bytes[base.len() + separator..end].copy_from_slice(text.as_bytes());
+-        Path::from_bytes(&bytes[..end]).map_err(|_| -36)
++        join_path(base, text.as_bytes())
+     }
+ 
+     fn resolve(&self, pid: usize, path: &[u8], follow: bool, missing: bool) -> Result<Path, i64> {
+@@ -397,6 +384,8 @@ impl LaunchFs {
+         Err(-40)
+     }
+ 
++    /// Assigned paths yield pinned program bytes; image paths retain the native
++    /// readonly loader. Neither may fall through into the other's namespace.
+     pub fn exec_path(
+         &mut self,
+         pid: usize,
+@@ -427,11 +416,48 @@ impl LaunchFs {
+         self.check_exec(pid, image)
+     }
+ 
++    /// Readonly reopening through a public descriptor resolved by its owner.
++    /// It cannot import a native fd or grant host filesystem write authority.
++    pub fn open_descriptor(
++        &mut self,
++        pid: usize,
++        handle: u32,
++        suffix: &[u8],
++        flags: u64,
++    ) -> Result<i64, i64> {
++        let fd = handle
++            .checked_sub(FD_BASE as u32)
++            .filter(|n| *n < 64)
++            .ok_or(-95)? as i32
++            + 3;
++        const ALLOWED: u64 = 0o4000 | 0o100000 | 0o200000 | 0o400000 | 0o2000000;
++        if flags & !ALLOWED != 0 {
++            return Err(-13);
++        }
++        if !suffix.is_empty() {
++            let directory = self.fs.directory_path(fd).map_err(errno)?;
++            let joined = join_path(directory, &suffix[1..])?;
++            let path = self.resolve(pid, joined.as_bytes(), true, false)?;
++            if !self.owns_path(path.as_bytes()) {
++                return Err(-95);
++            }
++            return self.open(path.as_bytes(), flags, 0);
++        }
++        let metadata = self.fs.fstat(fd).map_err(errno)?;
++        if flags & 0o200000 != 0 && metadata.kind != NodeKind::Directory {
++            return Err(-20);
++        }
++        let status = if flags & 0o2000000 != 0 { O_CLOEXEC } else { 0 }
++            | if flags & 0o4000 != 0 { O_NONBLOCK } else { 0 };
++        let reopened = self.fs.reopen_readonly(fd, status).map_err(errno)?;
++        Ok(FD_BASE as i64 + reopened as i64 - 3)
++    }
++
+     fn check_exec(&mut self, pid: usize, image: Executable) -> Result<Executable, i64> {
+         let mut header = [0u8; 64];
+         let result = self.read_executable(image, 0, &mut header).and_then(|n| {
+             if header.starts_with(b"#!") {
+-                Err(-95)
++                Ok(image)
+             } else if n < 64
+                 || &header[..4] != b"\x7fELF"
+                 || header[4] != 2
+@@ -463,6 +489,42 @@ impl LaunchFs {
+         result
+     }
+ 
++    pub fn is_script(&self, image: Executable) -> Result<bool, i64> {
++        let mut header = [0; 2];
++        self.read_executable(image, 0, &mut header)?;
++        Ok(header == *b"#!")
++    }
++
++    /// Resolve an implicit interpreter through the same component and
++    /// assignment owner as an explicit program. Native chains must also match
++    /// the image kernel will traverse; owned scripts are resolved separately.
++    pub fn exec_interpreter(&mut self, pid: usize, name: &[u8]) -> Result<Option<Executable>, i64> {
++        let cwd;
++        let base = if name.first() == Some(&b'/') {
++            b"".as_slice()
++        } else {
++            cwd = crate::tracee_io::image_cwd(pid)?;
++            cwd.as_bytes()
++        };
++        let joined = join_path(base, name)?;
++        let path = self.resolve(pid, joined.as_bytes(), true, false)?;
++        if self.owns_path(path.as_bytes()) {
++            let image = self.fs.pin_executable(path.as_bytes()).map_err(errno)?;
++            return self.check_exec(pid, image).map(Some);
++        }
++        self.check_exec_owner(path.as_bytes())?;
++        let image = crate::path_hooks::ImageRoot::new(pid)?;
++        let mut physical = [0; MAX_PATH];
++        let n = image
++            .resolve_image(joined.as_bytes(), &mut physical)
++            .map_err(errno)?;
++        if physical[..n] != *path.as_bytes() {
++            return Err(-95);
++        }
++        self.check_interpreters(pid, path)?;
++        Ok(None)
++    }
++
+     pub fn read_executable(
+         &self,
+         image: Executable,
+@@ -947,3 +1009,20 @@ pub fn claims(_: u64) -> bool {
+ pub fn claim(_: u64, _: u64, _: u64, _: u64) -> Option<i64> {
+     None
+ }
++
++fn join_path(base: &[u8], name: &[u8]) -> Result<Path, i64> {
++    let mut bytes = [0; MAX_PATH];
++    let separator = usize::from(!base.is_empty() && base != b"/");
++    let end = base
++        .len()
++        .checked_add(separator)
++        .and_then(|n| n.checked_add(name.len()))
++        .filter(|n| *n < MAX_PATH)
++        .ok_or(-36)?;
++    bytes[..base.len()].copy_from_slice(base);
++    if separator != 0 {
++        bytes[base.len()] = b'/';
++    }
++    bytes[base.len() + separator..end].copy_from_slice(name);
++    Path::from_bytes(&bytes[..end]).map_err(|_| -36)
++}
+diff --git a/crates/ginux-init/src/launch_tasks.rs b/crates/ginux-init/src/launch_tasks.rs
+index 305f52a7..cba23d46 100644
+--- a/crates/ginux-init/src/launch_tasks.rs
++++ b/crates/ginux-init/src/launch_tasks.rs
+@@ -44,6 +44,8 @@ enum ExecStage {
+     Close,
+     Kernel,
+     Completed,
++    Retire,
++    RetireReenter,
+ }
+ 
+ #[derive(Clone, Copy)]
+@@ -53,6 +55,7 @@ struct Exec {
+     next_native: usize,
+     stage: ExecStage,
+     owned: Option<OwnedExec>,
++    retire: Option<u32>,
+ }
+ 
+ #[derive(Clone, Copy)]
+@@ -62,6 +65,7 @@ struct OwnedExec {
+     descriptor: Option<u32>,
+     legacy_create: bool,
+     failure: Option<i64>,
++    script: Option<crate::exec_script::Script>,
+ }
+ 
+ struct Task {
+@@ -237,7 +241,12 @@ pub fn supervise(
+             if s.task(index).exec.is_some_and(|e| {
+                 matches!(
+                     e.stage,
+-                    ExecStage::Sync | ExecStage::Reenter | ExecStage::Create | ExecStage::Close
++                    ExecStage::Sync
++                        | ExecStage::Reenter
++                        | ExecStage::Create
++                        | ExecStage::Close
++                        | ExecStage::Retire
++                        | ExecStage::RetireReenter
+                 )
+             }) {
+                 s.fail(domain, b"signal interrupted exec descriptor setup");
+@@ -375,6 +384,40 @@ impl Supervisor<'_> {
+                     return;
+                 }
+                 ExecStage::Completed => {
++                    if let Some(fd) = exec.retire {
++                        let mut instruction = [0u8; 2];
++                        if r.rip < 2
++                            || copy_memory(
++                                self.task(index).host,
++                                r.rip - 2,
++                                &mut instruction,
++                                false,
++                            ) != Ok(2)
++                            || instruction != [0x0f, 0x05]
++                        {
++                            self.fail(
++                                domain,
++                                b"script descriptor retirement requires a syscall instruction",
++                            );
++                        }
++                        let state = self.task_mut(index).exec.as_mut().unwrap();
++                        state.original = *r;
++                        state.stage = ExecStage::Retire;
++                        r.orig_rax = 3;
++                        r.rax = 3;
++                        r.rdi = fd as u64;
++                        self.run(index, r, domain);
++                        return;
++                    }
++                    self.task_mut(index).exec = None;
++                }
++                ExecStage::RetireReenter => {
++                    if r.orig_rax != exec.original.orig_rax || r.rip != exec.original.rip {
++                        self.fail(
++                            domain,
++                            b"script descriptor retirement replay left its syscall instruction",
++                        );
++                    }
+                     self.task_mut(index).exec = None;
+                 }
+                 _ => self.fail(domain, b"unexpected entry during exec"),
+@@ -720,17 +763,47 @@ impl Supervisor<'_> {
+                 native_dirfd = r.rdi;
+             }
+         }
++        let mut image = image;
++        let script = if let Some(initial) = image {
++            let check = (|| {
++                if self.objects.filesystem.is_script(initial)? && r.orig_rax == 322 {
++                    let path = crate::tracee_io::read_path(host, r.rsi)?;
++                    if (path.is_empty() || (path.as_bytes()[0] != b'/' && r.rdi as i32 != -100))
++                        && self.task(index).descriptors.exec_cloexec(r.rdi)?
++                    {
++                        return Err(-2);
++                    }
++                }
++                Ok(())
++            })();
++            if let Err(error) = check {
++                self.objects
++                    .filesystem
++                    .release_executable(initial)
++                    .expect("script setup release");
++                return Err(error);
++            }
++            // Resolution consumes the initial pin on both success and failure.
++            let (resolved, script) =
++                crate::exec_script::Script::resolve(self.objects.filesystem, host, r, initial)?;
++            image = Some(resolved);
++            script
++        } else {
++            None
++        };
+         self.task_mut(index).exec = Some(Exec {
+             original: *r,
+             native_dirfd,
+             next_native: 0,
+             stage: ExecStage::Reenter,
++            retire: None,
+             owned: image.map(|image| OwnedExec {
+                 image,
+                 empty_path,
+                 descriptor: None,
+                 legacy_create: false,
+                 failure: None,
++                script,
+             }),
+         });
+         Ok(())
+@@ -807,7 +880,10 @@ impl Supervisor<'_> {
+                     r.orig_rax = 319;
+                     r.rax = 319;
+                     r.rdi = owned.empty_path;
+-                    r.rsi = if owned.legacy_create { 3 } else { 0x13 };
++                    // binfmt_script requires its backing to survive the kernel
++                    // exec. Retire it before the interpreter's first syscall.
++                    r.rsi = if owned.legacy_create { 2 } else { 0x12 }
++                        | u64::from(!owned.script.is_some_and(|script| script.kernel_script));
+                     self.task_mut(index).exec.as_mut().unwrap().stage = ExecStage::Create;
+                 }
+             }
+@@ -836,6 +912,12 @@ impl Supervisor<'_> {
+     ) {
+         let exec = self.task_mut(index).exec.take().unwrap();
+         if let Some(owned) = exec.owned {
++            if owned
++                .script
++                .is_some_and(|script| script.release_held(self.objects.filesystem).is_err())
++            {
++                self.fail(domain, b"failed interpreter reference release failed");
++            }
+             if self
+                 .objects
+                 .filesystem
+@@ -868,14 +950,50 @@ impl Supervisor<'_> {
+         if self.processes.exec(self.task(index).id).is_err() {
+             self.fail(domain, b"virtual exec transition failed");
+         }
+-        let image = self
+-            .task_mut(index)
+-            .exec
+-            .as_mut()
+-            .unwrap()
+-            .owned
+-            .take()
+-            .map(|owned| owned.image);
++        let owned = self.task(index).exec.as_ref().unwrap().owned;
++        let image = if let Some(owned) = owned {
++            if let Some(script) = owned.script {
++                let mut r = self.registers(index, domain);
++                let fd = owned.descriptor.unwrap();
++                if script.restore(self.task(index).host, fd, &mut r).is_err() {
++                    // The kernel has replaced the mm. Returning a fabricated
++                    // exec errno here would resume the wrong address space.
++                    self.fail(domain, b"new script stack restoration failed");
++                }
++                if ptrace(
++                    PTRACE_SETREGS,
++                    self.task(index).host,
++                    0,
++                    &r as *const _ as usize,
++                ) < 0
++                {
++                    self.fail(domain, b"new script stack register update failed");
++                }
++                if script.release_held(self.objects.filesystem).is_err() {
++                    self.fail(domain, b"committed interpreter references release failed");
++                }
++                if script.kernel_script {
++                    self.task_mut(index).exec.as_mut().unwrap().retire = Some(fd);
++                    if self
++                        .objects
++                        .filesystem
++                        .release_executable(owned.image)
++                        .is_err()
++                    {
++                        self.fail(domain, b"committed script reference release failed");
++                    }
++                    None
++                } else {
++                    Some(owned.image)
++                }
++            } else {
++                self.task_mut(index).exec.as_mut().unwrap().owned = None;
++                Some(owned.image)
++            }
++        } else {
++            None
++        };
++        self.task_mut(index).exec.as_mut().unwrap().owned = None;
+         let old = core::mem::replace(&mut self.task_mut(index).image, image);
+         if let Some(old) = old {
+             if self.objects.filesystem.release_executable(old).is_err() {
+@@ -1041,9 +1159,26 @@ impl Supervisor<'_> {
+                     self.finish_exec_failure(index, r, error, domain);
+                 }
+                 ExecStage::Completed => {
+-                    self.task_mut(index).exec = None;
++                    // This can be the kernel's exec syscall exit, before the
++                    // interpreter has entered userspace. Keep retirement state.
++                    if exec.retire.is_none() {
++                        self.task_mut(index).exec = None;
++                    }
++                }
++                ExecStage::Retire => {
++                    if r.orig_rax != 3 || r.rax != 0 {
++                        self.fail(domain, b"script private descriptor close failed");
++                    }
++                    let mut replay = exec.original;
++                    replay.rip -= 2;
++                    replay.rax = replay.orig_rax;
++                    self.task_mut(index).exec.as_mut().unwrap().stage = ExecStage::RetireReenter;
++                    self.run(index, &replay, domain);
++                    return;
++                }
++                ExecStage::Reenter | ExecStage::RetireReenter => {
++                    self.fail(domain, b"unexpected exit during exec replay")
+                 }
+-                ExecStage::Reenter => self.fail(domain, b"unexpected exit during exec replay"),
+             }
+         }
+         if let Some(rewrite) = self.task_mut(index).path_rewrite.take() {
+@@ -1207,12 +1342,14 @@ impl Supervisor<'_> {
+         }
+     }
+     fn release_task_images(&mut self, index: usize, domain: &mut Domain) {
+-        let pending = self
+-            .task_mut(index)
+-            .exec
+-            .take()
+-            .and_then(|exec| exec.owned)
+-            .map(|owned| owned.image);
++        let owned = self.task_mut(index).exec.take().and_then(|exec| exec.owned);
++        if owned
++            .and_then(|owned| owned.script)
++            .is_some_and(|script| script.release_held(self.objects.filesystem).is_err())
++        {
++            self.fail(domain, b"task interpreter reference release failed");
++        }
++        let pending = owned.map(|owned| owned.image);
+         let committed = self.task_mut(index).image.take();
+         for image in [pending, committed].into_iter().flatten() {
+             if self.objects.filesystem.release_executable(image).is_err() {
+diff --git a/crates/ginux-init/src/main.rs b/crates/ginux-init/src/main.rs
+index 7f1ac1b0..463b5d4a 100644
+--- a/crates/ginux-init/src/main.rs
++++ b/crates/ginux-init/src/main.rs
+@@ -13,6 +13,7 @@ mod descriptors;
+ mod device_hooks;
+ mod dispatch;
+ mod exec_image;
++mod exec_script;
+ mod fs_hooks;
+ mod launch;
+ mod launch_tasks;
+diff --git a/crates/ginux-init/src/path_hooks.rs b/crates/ginux-init/src/path_hooks.rs
+index 49e7ec27..be18b74c 100644
+--- a/crates/ginux-init/src/path_hooks.rs
++++ b/crates/ginux-init/src/path_hooks.rs
+@@ -188,26 +188,55 @@ impl Drop for ImageRoot {
+     }
+ }
+ 
++pub(crate) struct ScriptHeader {
++    pub interpreter: ginux_domain::Text<MAX_PATH>,
++    pub argument: Option<ginux_domain::Text<MAX_PATH>>,
++}
++
++/// Linux's bounded shebang line has one optional argument, including spaces.
++/// Inspect only bytes actually read, stopping at newline or the first NUL.
++pub(crate) fn script_metadata(bytes: &[u8]) -> Result<Option<ScriptHeader>, i64> {
++    if !bytes.starts_with(b"#!") {
++        return Ok(None);
++    }
++    let line_end = bytes
++        .iter()
++        .position(|b| matches!(b, 0 | b'\n'))
++        .unwrap_or(bytes.len());
++    let mut end = line_end;
++    while end > 2 && matches!(bytes[end - 1], b' ' | b'\t') {
++        end -= 1;
++    }
++    let start = (2..end)
++        .find(|n| !matches!(bytes[*n], b' ' | b'\t'))
++        .ok_or(-8)?;
++    let separator = (start..end)
++        .find(|n| matches!(bytes[*n], b' ' | b'\t'))
++        .unwrap_or(end);
++    if separator == start || separator == bytes.len() && bytes.len() == 256 {
++        return Err(-8);
++    }
++    let interpreter = ginux_domain::Text::from_bytes(&bytes[start..separator]).map_err(|_| -36)?;
++    let argument = (separator..end)
++        .find(|n| !matches!(bytes[*n], b' ' | b'\t'))
++        .map(|first| ginux_domain::Text::from_bytes(&bytes[first..end]).map_err(|_| -36))
++        .transpose()?;
++    Ok(Some(ScriptHeader {
++        interpreter,
++        argument,
++    }))
++}
++
+ pub(crate) fn interpreter_metadata(
+     mut read: impl FnMut(u64, &mut [u8]) -> Result<usize, i64>,
+     output: &mut [u8; MAX_PATH],
+ ) -> Result<Option<(usize, bool)>, i64> {
+     let mut first = [0; 256];
+     let n = read(0, &mut first).map_err(|error| if error == -21 { -13 } else { error })?;
+-    if first[..n].starts_with(b"#!") {
+-        let mut start = 2;
+-        while start < n && matches!(first[start], b' ' | b'\t') {
+-            start += 1;
+-        }
+-        let mut end = start;
+-        while end < n && !matches!(first[end], 0 | b' ' | b'\t' | b'\n') {
+-            end += 1;
+-        }
+-        if start == end || end == first.len() {
+-            return Err(-8);
+-        }
+-        output[..end - start].copy_from_slice(&first[start..end]);
+-        return Ok(Some((end - start, true)));
++    if let Some(header) = script_metadata(&first[..n])? {
++        let name = header.interpreter.as_bytes();
++        output[..name.len()].copy_from_slice(name);
++        return Ok(Some((name.len(), true)));
+     }
+     if n < 4 || &first[..4] != b"\x7fELF" {
+         return Ok(None);
+diff --git a/crates/ginux-vfs/src/lib.rs b/crates/ginux-vfs/src/lib.rs
+index 0ec4b0e0..c162abc9 100644
+--- a/crates/ginux-vfs/src/lib.rs
++++ b/crates/ginux-vfs/src/lib.rs
+@@ -630,6 +630,46 @@ impl<
+         Ok(slot as i32 + 3)
+     }
+ 
++    /// Reopen the same object with a fresh read offset, including an unlinked
++    /// file. This is not dup: status flags and offsets belong to the new open
++    /// description. The caller supplies authority through an existing handle.
++    pub fn reopen_readonly(&mut self, descriptor: i32, flags: u32) -> Result<i32, VfsError> {
++        if flags & !(O_CLOEXEC | O_NONBLOCK) != 0 {
++            return Err(VfsError::InvalidPath);
++        }
++        let source = self.descriptors[self.descriptor(descriptor)?];
++        if !source.readable {
++            return Err(VfsError::PermissionDenied);
++        }
++        let slot = self
++            .descriptors
++            .iter()
++            .position(|fd| !fd.open)
++            .ok_or(VfsError::DescriptorLimit)?;
++        let position = (0..FDS)
++            .find(|position| {
++                !self
++                    .descriptors
++                    .iter()
++                    .any(|fd| fd.open && fd.position == *position)
++            })
++            .ok_or(VfsError::DescriptorLimit)?;
++        self.positions[position] = 0;
++        self.descriptors[slot] = Descriptor {
++            open: true,
++            overlay: source.overlay,
++            object: source.object,
++            position,
++            readable: true,
++            writable: false,
++            close_on_exec: flags & O_CLOEXEC != 0,
++            append: false,
++            directory: source.directory,
++            nonblocking: flags & O_NONBLOCK != 0,
++        };
++        Ok(slot as i32 + 3)
++    }
++
+     /// Open a directory description. Enumeration cookies share this object
+     /// through the launcher's aliases, just like ordinary file offsets.
+     pub fn open_directory(&mut self, path: &[u8], flags: u32) -> Result<i32, VfsError> {
+@@ -2428,6 +2468,47 @@ mod tests {
+         assert_eq!(fs.metadata(b"/work/empty"), Err(VfsError::NotFound));
+     }
+ 
++    #[test]
++    fn readonly_reopen_retains_deleted_objects_with_independent_offsets() {
++        let bytes = index_bytes();
++        let mut vfs: VirtualFs<'_, Reader, 4, 32, 4> =
++            VirtualFs::new(Index::new(&bytes).unwrap(), Reader(*b"BASETOOL"));
++        let original = vfs.open(b"/program", O_CREATE | O_READ | O_WRITE).unwrap();
++        vfs.write(original, b"old bytes").unwrap();
++        let reopened = vfs
++            .reopen_readonly(original, O_CLOEXEC | O_NONBLOCK)
++            .unwrap();
++        let inode = vfs.fstat(reopened).unwrap().inode;
++        assert_eq!(vfs.seek(original, 0, 1), Ok(9));
++        let mut output = [0u8; 9];
++        assert_eq!(vfs.read(reopened, &mut output[..3]), Ok(3));
++        assert_eq!(&output[..3], b"old");
++        assert_eq!(vfs.seek(original, 0, 1), Ok(9));
++        assert_eq!(vfs.write(reopened, b"no"), Err(VfsError::PermissionDenied));
++        assert_eq!(vfs.truncate(reopened, 0), Err(VfsError::PermissionDenied));
++        vfs.unlink(b"/program").unwrap();
++        vfs.close(original).unwrap();
++        let replacement = vfs.open(b"/program", O_CREATE | O_WRITE).unwrap();
++        vfs.write(replacement, b"new").unwrap();
++        assert_ne!(vfs.fstat(replacement).unwrap().inode, inode);
++        vfs.close(replacement).unwrap();
++        let again = vfs.reopen_readonly(reopened, 0).unwrap();
++        vfs.close(reopened).unwrap();
++        assert_eq!(vfs.read(again, &mut output), Ok(9));
++        assert_eq!(&output, b"old bytes");
++        vfs.close(again).unwrap();
++        assert_eq!(
++            vfs.reopen_readonly(again, 0),
++            Err(VfsError::InvalidDescriptor)
++        );
++        let directory = vfs.open_directory(b"/", 0).unwrap();
++        let other = vfs.reopen_readonly(directory, 0).unwrap();
++        vfs.seek(directory, 1, 0).unwrap();
++        assert_eq!(vfs.seek(other, 0, 1), Ok(0));
++        vfs.close(directory).unwrap();
++        vfs.close(other).unwrap();
++    }
++
+     #[test]
+     fn executable_pins_exclude_writers_and_retain_unlinked_bytes() {
+         let bytes = index_bytes();
+diff --git a/scripts/test-launch-owned-exec.py b/scripts/test-launch-owned-exec.py
+index 7661b9a2..656c63c0 100644
+--- a/scripts/test-launch-owned-exec.py
++++ b/scripts/test-launch-owned-exec.py
+@@ -92,6 +92,25 @@ def main():
+                         proc.kill()
+                         proc.communicate(timeout=5)
+             print('PASS owned exec ' + mode, flush=True)
++        for mode in (() if sys.argv[3:] else ('interpreter', 'joined-interpreters', 'kernel-interpreter', 'limit-interpreters')):
++            path = work / f'{mode}.toml'
++            path.write_text(config.replace('args = []', 'args = ' + json.dumps([mode])))
++            with (work / f'{mode}.audit').open('wb') as audit:
++                proc = subprocess.Popen([binary, 'launch', str(path), str(root)],
++                    stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=audit)
++                try:
++                    assert select.select([proc.stdout], [], [], 10)[0], mode
++                    assert proc.stdout.readline() == b'script-ready\n', (mode, (work / f'{mode}.audit').read_text())
++                    target, = children(proc.pid)
++                    assert sorted(int(p.name) for p in Path(f'/proc/{target}/fd').iterdir()) == [0, 1, 2]
++                    stdout, _ = proc.communicate(b'G', timeout=10)
++                    assert proc.returncode == 0 and stdout == b'script-chain: PASS\n', (mode, proc.returncode, stdout)
++                    assert b'teardown tasks=0 owned-handles=0' in (work / f'{mode}.audit').read_bytes()
++                finally:
++                    if proc.poll() is None:
++                        proc.kill()
++                        proc.communicate(timeout=5)
++            print('PASS script chain ' + mode, flush=True)
+         print('test-launch-owned-exec: PASS (' + (', '.join(sys.argv[3:]) if sys.argv[3:] else 'full scenarios') + ')')
+ 
+ 
+diff --git a/scripts/test-launch-scripts.py b/scripts/test-launch-scripts.py
+new file mode 100644
+index 00000000..d55d2d08
+--- /dev/null
++++ b/scripts/test-launch-scripts.py
+@@ -0,0 +1,95 @@
++#!/usr/bin/env python3
++"""Consume built artifacts to verify named owned scripts and exec rollback."""
++import json
++import os
++from pathlib import Path
++import select
++import shutil
++import subprocess
++import sys
++import tempfile
++
++
++def children(pid):
++    return [int(p) for p in Path(f'/proc/{pid}/task/{pid}/children').read_text().split()]
++
++
++def main():
++    if len(sys.argv) < 3 or os.geteuid() != 0:
++        sys.exit('usage (as root): test-launch-scripts.py <ginux> <script-fixture> [scenario ...]')
++    binary, fixture = [str(Path(p).resolve()) for p in sys.argv[1:3]]
++    template = (Path(__file__).resolve().parent.parent / 'config/domain-gate5.toml').read_text()
++    with tempfile.TemporaryDirectory(prefix='ginux-scripts-') as directory:
++        work = Path(directory)
++        root = work / 'root'
++        (root / 'bin').mkdir(parents=True)
++        (root / 'work').mkdir()
++        for name in ('fixture', 'interpreter'):
++            shutil.copyfile(fixture, root / 'bin' / name)
++            (root / 'bin' / name).chmod(0o755)
++        (root / 'bin/wrapper').write_text('#!/bin/interpreter nested option\n')
++        (root / 'bin/wrapper').chmod(0o755)
++        (root / 'input').write_bytes(b'Q')
++        config = template.replace('init = "/bin/bash"', 'init = "/bin/fixture"\nworkdir = "/"')
++        config = config.replace('[storage]\nassignments = []', '[storage]\nassignments = ["memory:/work"]')
++        fork_modes = ('fork', 'vfork', 'clone', 'fd-fork', 'fd-vfork')
++        full_modes = ('plain', 'optional', 'nested', 'relative', 'at', 'fork', 'vfork', 'clone', 'many',
++                     'descriptor', 'unlinked', 'dir-relative', 'dir-renamed', 'fd-fork', 'fd-vfork')
++        ordinary_modes = ('ordinary-plain', 'ordinary-option', 'ordinary-nested', 'ordinary-relative',
++                          'ordinary-at', 'ordinary-fd', 'ordinary-unlinked', 'ordinary-dir',
++                          'ordinary-renamed', 'ordinary-fork', 'ordinary-vfork', 'ordinary-owned', 'ordinary-chain', 'ordinary-joined')
++        modes = sys.argv[3:] or (*full_modes, *ordinary_modes)
++        assert set(modes) <= set(full_modes + ordinary_modes), modes
++        for mode in modes:
++            path, result, audit_path = [work / (mode + suffix) for suffix in ('.toml', '.json', '.audit')]
++            path.write_text(config.replace('args = []', 'args = ' + json.dumps([mode])))
++            if mode in ordinary_modes:
++                with audit_path.open('wb') as audit:
++                    proc = subprocess.run([binary, 'launch', str(path), str(root), '--result-file', str(result)],
++                                          input=b'', stdout=subprocess.PIPE, stderr=audit, timeout=15)
++                expected = b'script: PASS\n' + (b'parent: PASS\n' if mode in ('ordinary-fork', 'ordinary-vfork') else b'')
++                assert proc.returncode == 0 and proc.stdout == expected, (mode, proc.returncode, proc.stdout, audit_path.read_text())
++                assert json.loads(result.read_text()) == dict(version=1, outcome='exited', code=0, signal=None, generation=None)
++                assert b'teardown tasks=0 owned-handles=0' in audit_path.read_bytes()
++                assert list((root / 'work').iterdir()) == [] and (root / 'input').read_bytes() == b'Q'
++                print('PASS owned script ' + mode, flush=True)
++                continue
++            with audit_path.open('wb') as audit:
++                proc = subprocess.Popen([binary, 'launch', str(path), str(root), '--result-file', str(result)],
++                                        stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=audit)
++                try:
++                    assert select.select([proc.stdout], [], [], 10)[0], (mode, 'rollback stalled', audit_path.read_text())
++                    assert proc.stdout.readline() == b'failed-ready\n', (mode, audit_path.read_text())
++                    roots = children(proc.pid)
++                    assert len(roots) == 1, roots
++                    initial = roots[0]
++                    assert sorted(int(p.name) for p in Path(f'/proc/{initial}/fd').iterdir()) == [0, 1, 2, 3]
++                    proc.stdin.write(b'G'); proc.stdin.flush()
++                    assert select.select([proc.stdout], [], [], 10)[0], (mode, 'script exec stalled', audit_path.read_text())
++                    assert proc.stdout.readline() == b'script-ready\n', (mode, audit_path.read_text())
++                    target = initial
++                    if mode in fork_modes:
++                        descendants = children(initial)
++                        assert len(descendants) == 1, descendants
++                        target = descendants[0]
++                    assert sorted(int(p.name) for p in Path(f'/proc/{target}/fd').iterdir()) == [0, 1, 2], ('private fd leaked', mode)
++                    assert Path(f'/proc/{target}/exe').read_bytes() == Path(fixture).read_bytes()
++                    stdout, _ = proc.communicate(b'G', timeout=10)
++                    expected = b'script: PASS\n' + (b'parent: PASS\n' if mode in fork_modes else b'')
++                    assert proc.returncode == 0 and stdout == expected, (mode, proc.returncode, stdout, audit_path.read_text())
++                    record = json.loads(result.read_text())
++                    assert record == dict(version=1, outcome='exited', code=0, signal=None, generation=None), record
++                    assert b'teardown tasks=0 owned-handles=0' in audit_path.read_bytes()
++                    assert not Path(f'/proc/{target}').exists() and not Path(f'/proc/{initial}').exists()
++                    assert list((root / 'work').iterdir()) == []
++                    assert (root / 'input').read_bytes() == b'Q'
++                finally:
++                    if proc.poll() is None:
++                        proc.kill()
++                        proc.communicate(timeout=5)
++            print('PASS owned script ' + mode, flush=True)
++        print('test-launch-scripts: PASS (' + ', '.join(modes) + ')')
++
++
++if __name__ == '__main__':
++    main()
+diff --git a/tests/fixtures/launch-owned-exec-fixture.c b/tests/fixtures/launch-owned-exec-fixture.c
+index 33b455e6..fad39c6a 100644
+--- a/tests/fixtures/launch-owned-exec-fixture.c
++++ b/tests/fixtures/launch-owned-exec-fixture.c
+@@ -89,6 +89,22 @@ long owned_exec_main(word *stack)
+     char **argv=(char **)(stack+1), **env=argv+argc+1;
+     char mode=argc>1 ? argv[1][0] : 's';
+     if(mode=='o') return ordinary_exec(stack);
++    if (mode=='b') {
++        CHECK(argc==5 || argc==7 || argc==11,100);
++        int native=equal(argv[argc-1],"native");
++        CHECK(equal(argv[0],native?"/bin/payload":"/work/program") && equal(argv[1],"beta"),101);
++        if (argc==7) CHECK(equal(argv[2],"/work/middle") && equal(argv[3],"alpha option"),102);
++        if (argc==11) CHECK(equal(argv[2],"/work/fourth") && equal(argv[3],"delta") && equal(argv[4],"/work/third") && equal(argv[5],"gamma") && equal(argv[6],"/work/middle") && equal(argv[7],"alpha option"),120);
++        CHECK(equal(argv[argc-3],"/work/script") && equal(argv[argc-2],"spaced argument"),103);
++        CHECK(env[0] && equal(env[0],"OWNED=yes") && !env[1],104);
++        CHECK(DO(2,"/work/program",1,0)==(native?3:-26),105);
++        if (native) CHECK(DO(3,3,0,0)==0,106);
++        CHECK(DO(2,"/work/script",1,0)==3 && DO(3,3,0,0)==0,107);
++        if (argc>=7) CHECK(DO(2,"/work/middle",1,0)==3 && DO(3,3,0,0)==0,108);
++        if (argc==11) CHECK(DO(2,"/work/third",1,0)==3 && DO(3,3,0,0)==0 && DO(2,"/work/fourth",1,0)==3 && DO(3,3,0,0)==0,121);
++        CHECK(DO(1,1,"script-ready\n",13)==13 && DO(0,0,buffer,1)==1,109);
++        DO(1,1,"script-chain: PASS\n",19); return 0;
++    }
+     if (mode=='r' && argc>2 && argv[1][1]=='e') {
+         CHECK(DO(2,"/work/program",1,0)==-26,10); // Forked child still owns the executable.
+         CHECK(DO(1,9,"Z",1)==1 && DO(3,9,0,0)==0,11);
+@@ -132,6 +148,33 @@ long owned_exec_main(word *stack)
+         CHECK(DO(1,dest,buffer,count)==count,32);
+     }
+     CHECK(DO(91,dest,0755,0)==0 && DO(3,source,0,0)==0 && DO(3,dest,0,0)==0,33);
++    if (mode=='i' || mode=='j' || mode=='k' || mode=='l') {
++        char *args[]={"ignored argv zero","spaced argument",mode=='k'?"native":"owned",0};
++        char *values[]={"OWNED=yes",0};
++        const char direct[]="#!/work/program beta\n";
++        const char outer[]="#!/work/middle alpha option\n";
++        const char native[]="#!/bin/payload beta\n";
++        const char cycle[]="#!/work/loop\n";
++        CHECK(publish("/work/loop",cycle,sizeof cycle-1)==0,110);
++        CHECK(DO(59,"/work/loop",args,values)==-40,111);
++        CHECK(DO(2,"/work/loop",1,0)==3 && DO(3,3,0,0)==0,112);
++        CHECK(publish("/work/script",direct,sizeof direct-1)==0,113);
++        CHECK(DO(90,"/work/program",0644,0)==0 && DO(59,"/work/script",args,values)==-13,114);
++        CHECK(DO(90,"/work/program",0755,0)==0,115);
++        CHECK(DO(2,"/work/script",1,0)==3 && DO(3,3,0,0)==0,116);
++        if (mode!='i') {
++            CHECK(publish("/work/middle",mode=='k'?native:direct,mode=='k'?sizeof native-1:sizeof direct-1)==0,117);
++            CHECK(publish("/work/script",outer,sizeof outer-1)==0,118);
++        }
++        if (mode=='l') {
++            const char middle[]="#!/work/third gamma\n", third[]="#!/work/fourth delta\n";
++            CHECK(publish("/work/middle",middle,sizeof middle-1)==0 && publish("/work/third",third,sizeof third-1)==0 && publish("/work/fourth",direct,sizeof direct-1)==0,122);
++            const char too_many[]="#!/work/script\n";
++            CHECK(publish("/work/fifth",too_many,sizeof too_many-1)==0 && DO(59,"/work/fifth",args,values)==-40,123);
++            CHECK(DO(2,"/work/fifth",1,0)==3 && DO(3,3,0,0)==0,124);
++        }
++        DO(59,"/work/script",args,values); return 119;
++    }
+     CHECK(DO(2,"/work/program",02000000,0)==3,34);
+     CHECK(DO(2,"/work/keep",0102,0600)==4 && DO(1,4,"K",1)==1,35);
+     CHECK(DO(2,"/work/drop",02000102,0600)==5 && DO(1,5,"C",1)==1,36);
+@@ -148,7 +191,7 @@ long owned_exec_main(word *stack)
+     }
+     CHECK(DO(8,3,0,0)==0 && DO(0,3,buffer,64)==64,44);
+     CHECK(publish("/work/bad-elf",buffer,64)==0 && DO(59,"/work/bad-elf",next,next_env)==-8 && intact(),45);
+-    CHECK(publish("/work/script","#!/bin/payload\n",15)==0 && DO(59,"/work/script",next,next_env)==-95 && intact(),46);
++    CHECK(publish("/work/script","#!/bin/missing\n",15)==0 && DO(59,"/work/script",next,next_env)==-2 && intact(),46);
+     CHECK(DO(1,1,"failed-ready\n",13)==13 && DO(0,0,buffer,1)==1 && buffer[0]=='G',47);
+     if (mode=='c' || mode=='v' || mode=='m') {
+         long child=mode=='m' ? DO(56,0x4111,0,0) : DO(mode=='v'?58:57,0,0,0);
+diff --git a/tests/fixtures/launch-script-fixture.c b/tests/fixtures/launch-script-fixture.c
+new file mode 100644
+index 00000000..8a3b6ba0
+--- /dev/null
++++ b/tests/fixtures/launch-script-fixture.c
+@@ -0,0 +1,203 @@
++/* Kernel shebang argv, named paths, rollback and private descriptor lifetime. */
++typedef unsigned long word;
++static long call(long n, word a, word b, word c, word d, word e)
++{
++    register word r10 __asm__("r10")=d, r8 __asm__("r8")=e;
++    long result;
++    __asm__ volatile("syscall" : "=a"(result) : "a"(n), "D"(a), "S"(b), "d"(c),
++                     "r"(r10), "r"(r8) : "rcx", "r11", "memory");
++    return result;
++}
++#define DO(n,a,b,c) call(n,(word)(a),(word)(b),(word)(c),0,0)
++#define CHECK(expr,code) do { if (!(expr)) return code; } while (0)
++static char buffer[4096];
++static char *many[4098];
++static word length(const char *s) { word n=0; while(s[n]) ++n; return n; }
++static int equal(const char *a, const char *b) {
++    while (*a && *a==*b) { ++a; ++b; } return *a==*b;
++}
++static long publish(const char *path, const char *data) {
++    long fd=DO(2,path,0102,0600); if (fd<0) return fd;
++    if (DO(1,fd,data,length(data))!=(long)length(data) || DO(91,fd,0755,0) || DO(3,fd,0,0)) return -1;
++    return 0;
++}
++static int intact(void) { return DO(72,3,1,0)==1 && DO(72,4,1,0)==0 && DO(72,5,1,0)==1; }
++static int ordinary_mode(const char *s) {
++    const char *prefix="ordinary-";
++    while(*prefix && *prefix==*s) { ++prefix; ++s; }
++    return !*prefix;
++}
++static int copy_program(void) {
++    long input=DO(2,"/bin/interpreter",0,0), output=DO(2,"/work/interpreter",0102,0600);
++    if(input<0 || output<0) return -1;
++    long n;
++    while((n=DO(0,input,buffer,sizeof buffer))>0) {
++        if(DO(1,output,buffer,n)!=n) return -1;
++    }
++    if(n<0 || DO(91,output,0755,0) || DO(3,output,0,0) || DO(3,input,0,0)) return -1;
++    return 0;
++}
++static long ordinary(word argc, char **argv, char **env) {
++    const char *mode=argv[argc-1];
++    int descriptor=equal(mode,"ordinary-fd") || equal(mode,"ordinary-unlinked");
++    int directory=equal(mode,"ordinary-dir") || equal(mode,"ordinary-renamed");
++    int chain=equal(mode,"ordinary-chain");
++    int owned=chain || equal(mode,"ordinary-owned");
++    int nested=equal(mode,"ordinary-nested") || equal(mode,"ordinary-joined");
++    int plain=equal(mode,"ordinary-plain");
++    if(!equal(argv[0],"/bin/fixture")) {
++        CHECK(equal(argv[0],owned?"/work/interpreter":"/bin/interpreter"),70);
++        CHECK(env[0] && equal(env[0],"SCRIPT_ENV=present") && env[1] && equal(env[1],"SECOND=two words") && !env[2],71);
++        CHECK(argc==(word)(chain?10:(nested?6:(plain?3:4))),72);
++        const char *name=argv[argc-2];
++        CHECK(equal(name,descriptor?"/dev/fd/6":(directory?"/dev/fd/6/program":(equal(mode,"ordinary-relative")?"work/program":"/work/program"))),73);
++        if(chain) {
++            CHECK(equal(argv[1],"fourth option") && equal(argv[2],"/work/fourth") &&
++                  equal(argv[3],"third option") && equal(argv[4],"/work/third") &&
++                  equal(argv[5],"second option") && equal(argv[6],"/work/second") && equal(argv[7],"option with spaces"),74);
++        } else {
++            if(!plain) CHECK(equal(argv[nested?3:1],"option with spaces"),75);
++            if(nested) CHECK(equal(argv[1],"nested option") && equal(argv[2],equal(mode,"ordinary-joined")?"/work/middle":"/bin/wrapper"),76);
++        }
++        CHECK(DO(72,3,1,0)==-9 && DO(72,5,1,0)==-9 && DO(72,4,1,0)==0,77);
++        CHECK(DO(8,4,0,0)==0 && DO(0,4,buffer,1)==1 && buffer[0]=='K',78);
++        long fd=DO(2,name,0,0); CHECK(fd>=3 && DO(0,fd,buffer,2)==2 && buffer[0]=='#' && buffer[1]=='!' && DO(3,fd,0,0)==0,79);
++        if(descriptor) CHECK(DO(8,6,0,1)==7,80);
++        // Script bytes become writable data after the interpreter commits.
++        if(!descriptor && !directory) {
++            fd=DO(2,name,1,0); CHECK(fd>=3 && DO(3,fd,0,0)==0,81);
++        }
++        CHECK(DO(1,1,"script: PASS\n",13)==13,82); return 0;
++    }
++    CHECK(argc==2,83);
++    if(owned) CHECK(copy_program()==0,84);
++    CHECK(publish("/work/program",plain?"#!/bin/interpreter\nbody\n":
++          (nested?(equal(mode,"ordinary-joined")?"#!/work/middle option with spaces\nbody\n":"#!/bin/wrapper option with spaces\nbody\n"):
++          (chain?"#!/work/second option with spaces\nbody\n":
++          (owned?"#!/work/interpreter option with spaces\nbody\n":"#! \t/bin/interpreter\toption with spaces \t\nbody\n"))))==0,85);
++    if(equal(mode,"ordinary-joined")) CHECK(publish("/work/middle","#!/bin/interpreter nested option\n")==0,95);
++    if(chain) CHECK(publish("/work/second","#!/work/third second option\n")==0 &&
++                    publish("/work/third","#!/work/fourth third option\n")==0 &&
++                    publish("/work/fourth","#!/work/interpreter fourth option\n")==0,86);
++    CHECK(DO(2,"/work/drop",02000102,0600)==3 && DO(2,"/work/keep",0102,0600)==4 && DO(1,4,"K",1)==1 && DO(2,"/input",02000000,0)==5,87);
++    if(descriptor) {
++        CHECK(DO(2,"/work/program",0,0)==6 && DO(8,6,7,0)==7,88);
++        if(equal(mode,"ordinary-unlinked")) CHECK(DO(87,"/work/program",0,0)==0,89);
++    }
++    if(directory) {
++        CHECK(DO(2,"/work",0200000,0)==6,90);
++        if(equal(mode,"ordinary-renamed")) {
++            CHECK(DO(83,"/work/sub",0755,0)==0 && DO(82,"/work/program","/work/sub/program",0)==0 &&
++                  DO(3,6,0,0)==0 && DO(2,"/work/sub",0200000,0)==6 && DO(82,"/work/sub","/work/moved",0)==0,91);
++        }
++    }
++    if(equal(mode,"ordinary-fork") || equal(mode,"ordinary-vfork")) {
++        long child=DO(equal(mode,"ordinary-vfork")?58:57,0,0,0); CHECK(child>=0,92);
++        if(child) { int status=-1; CHECK(DO(61,child,&status,0)==child && status==0 && intact(),93);
++            DO(1,1,"parent: PASS\n",13); return 0; }
++    }
++    char *next[]={"ignored-argv-zero",(char *)mode,0};
++    char *next_env[]={"SCRIPT_ENV=present","SECOND=two words",0};
++    if(descriptor) call(322,6,(word)"",(word)next,(word)next_env,0x1000);
++    else if(directory) call(322,6,(word)"program",(word)next,(word)next_env,0);
++    else if(equal(mode,"ordinary-at")) call(322,-999,(word)"/work/program",(word)next,(word)next_env,0);
++    else DO(59,equal(mode,"ordinary-relative")?"work/program":"/work/program",next,next_env);
++    return 94;
++}
++long script_main(word *stack)
++{
++    word argc=*stack;
++    char **argv=(char **)(stack+1), **env=argv+argc+1;
++    if(argc && ordinary_mode(argv[argc-1])) return ordinary(argc,argv,env);
++    if (equal(argv[0],"/bin/interpreter")) {
++        CHECK(env[0] && equal(env[0],"SCRIPT_ENV=present") && env[1] && equal(env[1],"SECOND=two words") && !env[2],10);
++        const char *mode=argv[argc-1];
++        int large=equal(mode,"many");
++        const char *name=argv[large?2:argc-2];
++        int plain=equal(mode,"plain");
++        int nested=equal(mode,"nested");
++        int descriptor=equal(mode,"descriptor") || equal(mode,"unlinked") || equal(mode,"fd-fork") || equal(mode,"fd-vfork");
++        int directory=equal(mode,"dir-relative") || equal(mode,"dir-renamed");
++        CHECK(argc==(word)(large?4098:(plain?3:(nested?6:4))),11);
++        if(large) for(word n=3;n<argc-1;++n) CHECK(equal(argv[n],"padding"),23);
++        if (!plain) CHECK(equal(argv[nested?3:1],"option with spaces"),12);
++        if (nested) CHECK(equal(argv[1],"nested option") && equal(argv[2],"/bin/wrapper"),13);
++        CHECK(equal(name,descriptor?"/dev/fd/6":(directory?"/dev/fd/6/program":(equal(mode,"relative")?"work/program":"/work/program"))),14);
++        word *aux=(word *)(env+3); int found=0;
++        while(aux[0]) { if(aux[0]==31) { CHECK(equal((char *)aux[1],name),15); found=1; } aux+=2; }
++        CHECK(found,16);
++        CHECK(DO(72,3,1,0)==-9 && DO(72,5,1,0)==-9,17);
++        CHECK(DO(8,4,0,0)==0 && DO(0,4,buffer,1)==1 && buffer[0]=='K',18);
++        long fd=DO(2,name,0,0); CHECK(fd>=3,19);
++        CHECK(DO(0,fd,buffer,sizeof buffer)>2 && buffer[0]=='#' && buffer[1]=='!' && DO(3,fd,0,0)==0,20);
++        // A script is readable data once its interpreter starts, not a running ELF pin.
++        fd=DO(2,name,1,0);
++        if(descriptor || directory) CHECK(fd==-13,21);
++        else CHECK(fd>=3 && DO(3,fd,0,0)==0,21);
++        if(descriptor) CHECK(DO(8,6,0,1)==7,24);
++        CHECK(DO(1,1,"script-ready\n",13)==13 && DO(0,0,buffer,1)==1 && buffer[0]=='G',22);
++        DO(1,1,"script: PASS\n",13); return 0;
++    }
++    CHECK(argc==2,30);
++    const char *mode=argv[1];
++    CHECK(publish("/work/program",equal(mode,"plain")?"#!/bin/interpreter\nbody\n":
++        (equal(mode,"nested")?"#!/bin/wrapper option with spaces\nbody\n":"#! \t/bin/interpreter\toption with spaces \t\nbody\n"))==0,31);
++    CHECK(DO(2,"/work/drop",02000102,0600)==3 && DO(2,"/work/keep",0102,0600)==4 && DO(1,4,"K",1)==1,32);
++    CHECK(DO(2,"/input",02000000,0)==5,33);
++    char *next[]={"ignored-argv-zero",(char *)mode,0};
++    char *next_env[]={"SCRIPT_ENV=present","SECOND=two words",0};
++    CHECK(DO(90,"/work/program",0644,0)==0 && DO(59,"/work/program",next,next_env)==-13 && intact(),34);
++    CHECK(DO(90,"/work/program",0755,0)==0,35);
++    for(word n=0;n<4097;++n) many[n]="padding";
++    CHECK(DO(59,"/work/program",many,next_env)==-7 && intact(),48);
++    CHECK(DO(59,"/work/program",next,many)==-7 && intact(),49);
++    CHECK(DO(59,"/work/program",next,1)==-14 && intact(),50);
++    long fd=DO(2,"/work/program",1,0); CHECK(fd==6 && DO(59,"/work/program",next,next_env)==-26 && DO(3,fd,0,0)==0,36);
++    for(int n=0;n<3;++n) {
++        CHECK(DO(59,"/work/program",1,next_env)==-14 && intact(),37);
++        fd=DO(2,"/work/program",1,0); CHECK(fd==6 && DO(3,fd,0,0)==0,38);
++        CHECK(publish("/work/missing","#!/bin/missing\n")==0 && DO(59,"/work/missing",next,next_env)==-2 && intact(),39);
++    }
++    CHECK(publish("/work/invalid","#! \t\n")==0 && DO(59,"/work/invalid",next,next_env)==-8 && intact(),40);
++    CHECK(publish("/work/owned-interpreter","#!/work/owned-interpreter\n")==0 && DO(59,"/work/owned-interpreter",next,next_env)==-40 && intact(),41);
++    fd=DO(2,"/work/program",02000000,0);
++    CHECK(fd==6 && call(322,fd,(word)"",(word)next,(word)next_env,0x1000)==-2 && intact(),42);
++    CHECK(DO(72,fd,2,0)==0 && DO(8,fd,7,0)==7,43);
++    long reopened=DO(257,-999,"/dev/fd/6",02000000);
++    CHECK(reopened==7 && DO(72,reopened,1,0)==1 && DO(0,reopened,buffer,2)==2 && buffer[0]=='#' && buffer[1]=='!',52);
++    CHECK(DO(2,"/dev/fd/4294967302",0,0)==-2,61);
++    CHECK(DO(8,fd,0,1)==7 && DO(2,"/dev/fd/6",1,0)==-13 && DO(3,reopened,0,0)==0 && DO(3,fd,0,0)==0,53);
++    CHECK(DO(2,"/dev/fd/6",0,0)==-2 && DO(2,"/dev/fd/5",0,0)==-95 && DO(2,"/dev/fd/nope",0,0)==-2,54);
++    fd=DO(2,"/work",02200000,0);
++    CHECK(fd==6 && call(322,fd,(word)"program",(word)next,(word)next_env,0)==-2 && DO(3,fd,0,0)==0,51);
++    CHECK(DO(1,1,"failed-ready\n",13)==13 && DO(0,0,buffer,1)==1 && buffer[0]=='G',44);
++    int descriptor=equal(mode,"descriptor") || equal(mode,"unlinked") || equal(mode,"fd-fork") || equal(mode,"fd-vfork");
++    int directory=equal(mode,"dir-relative") || equal(mode,"dir-renamed");
++    if(descriptor) {
++        CHECK(DO(2,"/work/program",0,0)==6 && DO(8,6,7,0)==7,55);
++        if(equal(mode,"unlinked")) CHECK(DO(87,"/work/program",0,0)==0,56);
++    }
++    if(directory) {
++        CHECK(DO(2,"/work",0200000,0)==6,57);
++        CHECK(DO(2,"/dev/fd/6/../../input",0,0)==-95,58);
++        if(equal(mode,"dir-renamed")) {
++            CHECK(DO(83,"/work/sub",0755,0)==0 && DO(82,"/work/program","/work/sub/program",0)==0,59);
++            CHECK(DO(3,6,0,0)==0 && DO(2,"/work/sub",0200000,0)==6 && DO(82,"/work/sub","/work/moved",0)==0,60);
++        }
++    }
++    if(equal(mode,"fork") || equal(mode,"vfork") || equal(mode,"clone") || equal(mode,"fd-fork") || equal(mode,"fd-vfork")) {
++        long child=equal(mode,"clone")?DO(56,0x4111,0,0):DO((equal(mode,"vfork") || equal(mode,"fd-vfork"))?58:57,0,0,0);
++        CHECK(child>=0,45);
++        if(child) {
++            int status=-1; CHECK(DO(61,child,&status,0)==child && status==0 && intact(),46);
++            DO(1,1,"parent: PASS\n",13); return 0;
++        }
++    }
++    if(descriptor) call(322,6,(word)"",(word)next,(word)next_env,0x1000);
++    else if(directory) call(322,6,(word)"program",(word)next,(word)next_env,0);
++    else if(equal(mode,"many")) { many[4095]=(char *)mode; many[4096]=0; DO(59,"/work/program",many,next_env); }
++    else if(equal(mode,"at")) call(322,-999,(word)"/work/program",(word)next,(word)next_env,0);
++    else DO(59,equal(mode,"relative")?"work/program":"/work/program",next,next_env);
++    return 47;
++}
++__asm__(".global _start\n_start:\nmov %rsp,%rdi\nandq $-16,%rsp\ncall script_main\nmov %rax,%rdi\nmov $60,%rax\nsyscall\nud2\n");

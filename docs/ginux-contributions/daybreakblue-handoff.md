@@ -141,3 +141,35 @@ six controlled ELF execution scenarios plus image-cwd/storage controls in both
 source and clean replay. It is security-held; ordinary success is not adversarial
 acceptance. Include older-kernel memfd/seal fallback behavior in the pending
 low-level checks. Full/default runtime probes were preserved and not run here.
+
+
+## G11 interpreter chains and new exec stack validation
+
+Extraction starts from G10 candidate14866b1d and donors73593745/a08aff7a/cda76faa.
+Script support rewrites only the newly committed exec stack, restores virtual
+script names/AT_EXECFN and retires the private script memfd before the first
+interpreter syscall. This resembles argument/code injection: low-level security
+review and adversarial verification belong to DaybreakBlue. Locally, perform
+source adaptation/builds and ordinary controlled script execution only.
+
+Validate bounded owned/image interpreter selection, malformed/truncated shebangs,
+recursive chains, argv/env/auxv bounds and arithmetic, hostile/protected buffers,
+private descriptor closure and failure rollback, descriptor-based script lifetime,
+no host/native FD importing, and permissions/namespace traversal for /dev/fd
+reopening. Include shared argument capture inherited from G07/G10. Preserve the
+existing full fixtures/default CI; excluded security checks remain unperformed,
+not passed. Pin the final G11 retained revision before monitored validation.
+No dispatch or external message is authorized by this written handoff.
+
+
+### G11 exact retained revision
+
+Validate candidate0798d991ab2d652e54682750acb4fdd9f1e6d9ac on G1014866b1de07bc8474557396c09f74275e8fb6bf5. The
+[review](g11-review.md) records92 passing units and14 selected ordinary script
+scenarios in source and strict clean replay, plus ELF/cwd/storage controls.
+Current source shares the shebang reader and component resolver, supplies fresh
+VFS reopen positions and cleans intermediate pins through exec/death ownership.
+These are source/functional results only. Low-level stack/AT_EXECFN, private
+script-FD retirement, malformed/cyclic chains, authority and shared-argument
+security verification remain unrun. Default full fixtures remain available;
+no cloud agent was dispatched. Do not infer security acceptance from this record.

@@ -463,15 +463,26 @@ Current goal-turn classification: **progress**. The full goal remains active;
 security-held G07, later packets, policy acceptance, interactions and Recipe
 closure remain incomplete. F04 remains the user inspection stop.
 
-Exact next task: **G11 — owned scripts and bounded interpreter chains**, starting
-from G10's locally retained14866b1d. Inspect73593745/a08aff7a/cda76faa before source
-extraction. Preserve the common interpreter metadata owner, typed waits, strict
-copyout, exec pin cleanup, current image/owned component resolution and native
-exec failure/scratch restoration. Prepare only ordinary script execution checks
-locally; write low-level argument injection, interpreter authority, malformed
-chains and security validation down for DaybreakBlue. G11 inherits G10's security
-hold, and G07/G08 remain excluded. Do not mark dependent candidates ready or
-publish anything while those conditions remain unresolved.
+G11 source and ordinary validation are retained at `0798d991` on
+G1014866b1d. [Review/evidence](ginux-contributions/g11-review.md) records92
+units,177-path strict replay and14 ordinary script scenarios, plus ELF/cwd/storage
+controls passing in source/clean exports. Current metadata/component/FD/task owners
+replace donor lexical parsing, obsolete offsets and thread-group assumptions.
+Full/default security fixtures and CI wiring are retained; low-level stack/private
+FD/chain authority verification remains unrun with DaybreakBlue. The exact G10
+binary fails the focused valid-script case. G11 inherits the security hold and is
+not standalone/publication-ready. No Ginux branches, checkouts/indexes or remotes changed.
+
+Exact next task: **G12 — owned mappings**. Inspect32e2c85f (memfd backing deferred
+from G09),868862bc/680d5081 before extraction on G110798d991. Trace actual
+mapping/backing/task dependencies; preserve growable-storage quotas, VFS aliasing,
+exec pins, new script cleanup and current namespace resolution. G07's unresolved
+shared-argument/thread ownership security hold remains: do not treat nonleader
+mapping acceptance as satisfied or import the unready G07 snapshot as validated.
+Prepare independent source/ordinary mapping behavior where possible and explicitly
+retain held joins/verification. Write low-level map/injection/protection/confinement
+security work down for DaybreakBlue before doing it. KeepG01/G02/G08 policy holds,
+all downstream ownership boundaries and the F04 publication stop intact.
 
 Active skill: `hdae-development`, discovered at
 `/home/vince/.codex/worktrees/ginux-pr-combination-check/ginux/.agents/skills/hdae-development/SKILL.md`.
