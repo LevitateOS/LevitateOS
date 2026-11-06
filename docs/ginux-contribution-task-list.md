@@ -532,13 +532,22 @@ replay and ordinary positioned/alias/sparse/append/quota/directory checks passin
 in source/clean copies. Exact G09d rejects pwrite. This part has no G18/mapping
 prerequisite. G17 remains partial; security/full CI/upstream holds remain.
 
-Exact next task: **G17b — private backing descriptors and public FD budgets**.
-Compose only the actual G12 memfd and G18 dynamic metadata prerequisites in a
-disposable export; inspect53a2c9cc/d5357101. Capture the public limit before raising
-the supervisor soft limit, never raise its hard limit, and bound the tracee by the
-captured capacity. Verify ordinary low-limit storage and nonempty-file scaling.
-Keep private-FD authority, protected-copy and race probes with DaybreakBlue.
-Preserve all existing work; no publication before F04.
+G17b is locally prepared at `6fcdd618` on composition `f41ed1b0`
+(G12/G18). [Review/evidence](ginux-contributions/g17b-review.md) records94 units,
+178-path strict replay, public/native limit8 with20 private-backed files, rejected
+insufficient hard capacity and5000 nonempty files launched under soft64, plus
+mapping/script/ELF/storage controls in source/clean exports. Exact prerequisite
+fails both new limit/scale fixtures. The outdated mapping fixture assertion is
+corrected in its prerequisite owner and retained for F01/F02. G17a/G17b ordinary
+preparation is retained; inherited security/full CI/upstream holds remain pending.
+
+Exact next task: **G19 — flush and quiesced export**. Inspect53dec6b3/48b26f8d and
+allocate c541a67f static fixes to actual owners. Trace the minimal storage/task
+settlement prerequisites; keep held G07 threading/security joins explicit. Prepare
+ordinary fsync/fdatasync and successful/failed workload/export behavior without
+importing downstream protocols or unrelated archives/control. Do not run hostile
+export/path/race probes here; record those for DaybreakBlue. Preserve tests,
+current typed process cleanup and all existing work. No publication before F04.
 
 Active skill: `hdae-development`, discovered at
 `/home/vince/.codex/worktrees/ginux-pr-combination-check/ginux/.agents/skills/hdae-development/SKILL.md`.

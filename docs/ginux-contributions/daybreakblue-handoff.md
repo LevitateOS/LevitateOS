@@ -355,3 +355,10 @@ This written handoff dispatches no agent; exact revisions will be appended later
 G17a exact retained revision: 94baebbec5e887ae659718c3f6162d08ca267b99 on 85b53fe15a64041f451ec7e7aa1e77d08cb2c18a.89 routine units and
 ordinary positioned/alias/sparse/append/quota checks pass in source/clean replay.
 Protected-copy/race acceptance remains pending; no cloud agent dispatched.
+
+G17b exact retained revision: 6fcdd6183703768a2f4ed1cc48380eaa50da547c on f41ed1b093044b10d45fcab771687dfb089ed3a5 (G12+G18).
+94 routine units and selected ordinary low-limit/20-file/5000-file/mapping/exec
+checks pass in source and clean replay. Independently validate private FD leakage,
+inherited FD overhead beyond the fixed128 allowance, bootstrap/transient state,
+protected copy, failure injection and races. No cloud dispatch or security
+acceptance is claimed. Full FD width/authority and mapping inspection modes remain.

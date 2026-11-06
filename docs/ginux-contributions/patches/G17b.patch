@@ -1,0 +1,248 @@
+From 6fcdd6183703768a2f4ed1cc48380eaa50da547c Mon Sep 17 00:00:00 2001
+From: vince <vincepaul.liem@gmail.com>
+Date: Fri, 6 Nov 2026 15:10:14 +0100
+Subject: [PATCH] fix(launch): reserve private backing FDs without widening
+ public limits
+
+Capture the operator public descriptor capacity before reserving bounded
+storage backing. Raise only the supervisor soft limit within the existing
+hard limit, and apply the captured public capacity to the workload.
+
+Signed-off-by: vince <vincepaul.liem@gmail.com>
+---
+ README.md                            |  7 ++--
+ crates/ginux-init/src/descriptors.rs |  4 +++
+ crates/ginux-init/src/fs_hooks.rs    | 24 ++++++++++++++
+ crates/ginux-init/src/launch.rs      | 11 ++++---
+ scripts/test-launch-fds.py           | 48 +++++++++++++++++-----------
+ scripts/test-launch-storage.py       |  7 +++-
+ tests/fixtures/launch-fd-fixture.c   |  6 ++++
+ 7 files changed, 80 insertions(+), 27 deletions(-)
+
+diff --git a/README.md b/README.md
+index 2e1a0e55..814844a7 100644
+--- a/README.md
++++ b/README.md
+@@ -250,8 +250,11 @@ scratch area or overlapping output buffer returns EFAULT. This is a bounded
+ storage adapter, not a complete unified image/overlay filesystem. IO is bounded
+ to 4096 bytes per call. Metadata defaults to 32 objects (including seeded directories) and 64 independently
+ opened files. `[storage].max_objects` permits 1–1000000 namespace slots. Bounded
+-supervisor allocations hold namespace and backing metadata; their page-rounded
+-bytes are charged before file data. Optional positive `[storage].max_bytes` caps
++supervisor allocations hold namespace and backing metadata. Before workload
++startup, assigned storage reserves `max_objects + 128` private descriptors by raising
++only the supervisor soft limit within its existing hard limit; insufficient hard
++capacity rejects launch. The public descriptor capacity is captured beforehand
++and applied to the tracee. Page-rounded metadata bytes are charged before file data. Optional positive `[storage].max_bytes` caps
+ file-data capacity. Data plus metadata must fit `[resources].memory_mib`; without
+ max_bytes, data uses the remainder. Removed names with live descriptions retain
+ their slots until final close. Bytes grow on demand in anonymous
+diff --git a/crates/ginux-init/src/descriptors.rs b/crates/ginux-init/src/descriptors.rs
+index 42230eff..00109b4e 100644
+--- a/crates/ginux-init/src/descriptors.rs
++++ b/crates/ginux-init/src/descriptors.rs
+@@ -134,6 +134,10 @@ impl DescriptorTable {
+         Ok(table)
+     }
+ 
++    pub fn capacity(&self) -> usize {
++        self.capacity
++    }
++
+     pub fn fork_copy(&self, refs: &mut ObjectReferences) -> Result<Self, &'static [u8]> {
+         if self.pending.is_some() || self.saved_args.is_some() {
+             return Err(b"cannot inherit unfinished descriptor syscall");
+diff --git a/crates/ginux-init/src/fs_hooks.rs b/crates/ginux-init/src/fs_hooks.rs
+index cf2e706a..f350fd76 100644
+--- a/crates/ginux-init/src/fs_hooks.rs
++++ b/crates/ginux-init/src/fs_hooks.rs
+@@ -115,6 +115,30 @@ impl LaunchFs {
+             }
+             limit
+         };
++        if count != 0 {
++            // One backing FD per possible object plus bounded supervisor work.
++            // The launcher captures the public limit before this reservation.
++            let required = objects
++                .checked_add(128)
++                .ok_or(b"storage descriptor budget overflow".as_slice())?;
++            let mut limits = [0usize; 2];
++            if unsafe { crate::supervisor::syscall4(302, 0, 7, 0, limits.as_mut_ptr() as usize) }
++                != 0
++            {
++                return Err(b"cannot inspect storage descriptor budget");
++            }
++            if limits[0] < required {
++                if limits[1] < required {
++                    return Err(b"storage descriptor budget exceeds host hard limit");
++                }
++                limits[0] = required;
++                if unsafe { crate::supervisor::syscall4(302, 0, 7, limits.as_ptr() as usize, 0) }
++                    != 0
++                {
++                    return Err(b"cannot reserve storage descriptor budget");
++                }
++            }
++        }
+         let namespace = MappedArray::new(objects, ginux_vfs::OverlayFile::empty())
+             .map_err(|_| b"storage namespace allocation failed".as_slice())?;
+         let mut fs = MemoryFs::with_namespace(
+diff --git a/crates/ginux-init/src/launch.rs b/crates/ginux-init/src/launch.rs
+index 40f7837c..be40ddb1 100644
+--- a/crates/ginux-init/src/launch.rs
++++ b/crates/ginux-init/src/launch.rs
+@@ -289,11 +289,12 @@ pub fn launch_main(config_path: *const u8, root_path: *const u8, result_path: *c
+     launch_validate(&config);
+     let mut devices = crate::device_hooks::LaunchDevices::prepare(&config)
+         .unwrap_or_else(|reason| launch_startup_fail(reason));
++    // Capture the public operator limit before reserving private backing FDs.
++    let descriptors = crate::descriptors::DescriptorTable::new()
++        .unwrap_or_else(|reason| launch_startup_fail(reason));
+     let mut filesystem = crate::fs_hooks::LaunchFs::prepare(&config)
+         .unwrap_or_else(|reason| launch_startup_fail(reason));
+     let mut channels = crate::channel_hooks::LaunchChannels::new();
+-    let descriptors = crate::descriptors::DescriptorTable::new()
+-        .unwrap_or_else(|reason| launch_startup_fail(reason));
+     print_launch_config(&config);
+     let mut domain = Domain::create(config);
+     if domain.start().is_err() {
+@@ -308,7 +309,7 @@ pub fn launch_main(config_path: *const u8, root_path: *const u8, result_path: *c
+         launch_domain_fail(&mut domain, b"launch tracee fork failed");
+     }
+     if child == 0 {
+-        launch_tracee(root_path);
++        launch_tracee(root_path, descriptors.capacity());
+     }
+     supervise_launch(
+         child as usize,
+@@ -790,12 +791,12 @@ pub(crate) fn finish_signaled(signal: u64) {
+     exit_process(128 + signal as usize)
+ }
+ 
+-fn launch_tracee(root_path: *const u8) -> ! {
++fn launch_tracee(root_path: *const u8, descriptor_limit: usize) -> ! {
+     static ROOT: &[u8] = b"/\0";
+     // Host descriptors (including the result file) must not grant the
+     // workload authority outside the supplied root. Only stdio is shared.
+     const SYS_CLOSE_RANGE: usize = 436;
+-    if !crate::tracee_io::reserve_native_descriptors(crate::descriptors::LIMIT) {
++    if !crate::tracee_io::reserve_native_descriptors(descriptor_limit) {
+         tracee_setup_fail(
+             b"ginux: launch bootstrap failed: descriptor namespace unavailable\n",
+             130,
+diff --git a/scripts/test-launch-fds.py b/scripts/test-launch-fds.py
+index 7eb3f5a3..bc807ed9 100644
+--- a/scripts/test-launch-fds.py
++++ b/scripts/test-launch-fds.py
+@@ -11,9 +11,11 @@ import tempfile
+ 
+ 
+ def main():
+-    if len(sys.argv)!=3 or os.geteuid()!=0:
+-        sys.exit('usage (as root): test-launch-fds.py <ginux> <fd-fixture>')
+-    binary,fixture=[str(Path(p).resolve()) for p in sys.argv[1:]]
++    if len(sys.argv) not in (3,4) or os.geteuid()!=0:
++        sys.exit('usage (as root): test-launch-fds.py <ginux> <fd-fixture> [limits]')
++    binary,fixture=[str(Path(p).resolve()) for p in sys.argv[1:3]]
++    only_limits = len(sys.argv)==4
++    if only_limits and sys.argv[3]!='limits': sys.exit('unknown fd scenario')
+     template=(Path(__file__).resolve().parent.parent/'config/domain-gate5.toml').read_text()
+     with tempfile.TemporaryDirectory(prefix='ginux-fds-') as directory:
+         work=Path(directory)
+@@ -28,30 +30,38 @@ def main():
+         config=config.replace('[storage]\nassignments = []','[storage]\nassignments = ["memory:/work"]')
+         config=config.replace('[devices]\nassignments = []','[devices]\nassignments = ["null"]')
+         (work/'launch.toml').write_text(config)
+-        for i in range(2):
+-            result=work/f'{i}.json'
+-            proc=subprocess.run([binary,'launch',str(work/'launch.toml'),str(root),'--result-file',str(result)],capture_output=True,timeout=20)
+-            record=json.loads(result.read_text())
+-            assert proc.returncode==0,(proc.returncode,proc.stderr,record)
+-            assert record['outcome']=='exited' and record['code']==0 and record['generation'] is None,record
+-            assert proc.stdout==b'shared-fds: PASS\n',proc.stdout
+-            assert not (root/'work/data').exists()
+-        (work/'width.toml').write_text(config.replace('args = []','args = ["width"]'))
+-        result=work/'width.json'
+-        proc=subprocess.run([binary,'launch',str(work/'width.toml'),str(root),'--result-file',str(result)],capture_output=True,timeout=20)
+-        assert proc.returncode==0,(proc.returncode,proc.stderr)
+-        assert proc.stdout==b'resource-width: PASS\n',proc.stdout
+-        assert json.loads(result.read_text())['code']==0
++        if not only_limits:
++            for i in range(2):
++                result=work/f'{i}.json'
++                proc=subprocess.run([binary,'launch',str(work/'launch.toml'),str(root),'--result-file',str(result)],capture_output=True,timeout=20)
++                record=json.loads(result.read_text())
++                assert proc.returncode==0,(proc.returncode,proc.stderr,record)
++                assert record['outcome']=='exited' and record['code']==0 and record['generation'] is None,record
++                assert proc.stdout==b'shared-fds: PASS\n',proc.stdout
++                assert not (root/'work/data').exists()
++            (work/'width.toml').write_text(config.replace('args = []','args = ["width"]'))
++            result=work/'width.json'
++            proc=subprocess.run([binary,'launch',str(work/'width.toml'),str(root),'--result-file',str(result)],capture_output=True,timeout=20)
++            assert proc.returncode==0,(proc.returncode,proc.stderr)
++            assert proc.stdout==b'resource-width: PASS\n',proc.stdout
++            assert json.loads(result.read_text())['code']==0
+         # A lower operator limit remains effective for both native and public FDs.
+         (work/'low.toml').write_text(config.replace('args = []','args = ["low"]'))
+         def lower_limit():
+-            resource.setrlimit(resource.RLIMIT_NOFILE,(8,8))
++            _, hard = resource.getrlimit(resource.RLIMIT_NOFILE)
++            resource.setrlimit(resource.RLIMIT_NOFILE,(8,hard))
+         result=work/'low.json'
+         proc=subprocess.run([binary,'launch',str(work/'low.toml'),str(root),'--result-file',str(result)],capture_output=True,timeout=20,preexec_fn=lower_limit)
+         assert proc.returncode==0,(proc.returncode,proc.stderr)
+         assert proc.stdout==b'lower-limit: PASS\n',proc.stdout
+         assert json.loads(result.read_text())['code']==0
+-        print('test-launch-fds: PASS (small numbers, cross-owner aliases, native reuse/mmap, limits, registers)')
++        def insufficient_hard_limit():
++            resource.setrlimit(resource.RLIMIT_NOFILE,(8,8))
++        result=work/'hard.json'
++        proc=subprocess.run([binary,'launch',str(work/'low.toml'),str(root),'--result-file',str(result)],capture_output=True,timeout=20,preexec_fn=insufficient_hard_limit)
++        assert proc.returncode==2 and b'storage descriptor budget exceeds host hard limit' in proc.stderr,(proc.returncode,proc.stderr)
++        assert json.loads(result.read_text())['outcome']=='supervisor-error'
++        print('test-launch-fds: PASS (' + ('low public limit, private storage capacity, hard-limit failure' if only_limits else 'small numbers, cross-owner aliases, native reuse/mmap, limits, registers') + ')')
+ 
+ 
+ if __name__=='__main__':
+diff --git a/scripts/test-launch-storage.py b/scripts/test-launch-storage.py
+index 1ff707fe..9751c88a 100644
+--- a/scripts/test-launch-storage.py
++++ b/scripts/test-launch-storage.py
+@@ -2,6 +2,7 @@
+ """Real configured-launch storage checks against explicit existing binaries."""
+ import json
+ import os
++import resource
+ from pathlib import Path
+ import shutil
+ import select
+@@ -62,7 +63,11 @@ def main():
+                 proc.stdout = stdout
+                 proc.stderr = (work / 'mapping.audit').read_bytes()
+             else:
+-                proc = subprocess.run(command, capture_output=True, timeout=20)
++                def bounded_host_fds():
++                    _, hard = resource.getrlimit(resource.RLIMIT_NOFILE)
++                    resource.setrlimit(resource.RLIMIT_NOFILE, (min(64, hard), hard))
++                proc = subprocess.run(command, capture_output=True, timeout=20,
++                                      preexec_fn=bounded_host_fds if args == ['namespace'] else None)
+             record = json.loads(result.read_text())
+             if proc.returncode != expected:
+                 sys.exit(f'launch failed: {proc.returncode}\n{proc.stderr.decode()}\n{record}')
+diff --git a/tests/fixtures/launch-fd-fixture.c b/tests/fixtures/launch-fd-fixture.c
+index 0ccfd68e..930df590 100644
+--- a/tests/fixtures/launch-fd-fixture.c
++++ b/tests/fixtures/launch-fd-fixture.c
+@@ -25,6 +25,12 @@ long fd_main(word *stack)
+     if (*stack>1) {
+         word limits[2];
+         CHECK(call(302,0,7,0,(word)limits,0,0)==0 && limits[0]==8 && limits[1]==8,43);
++        char path[]="/work/item-00";
++        for(word n=0;n<20;++n) {
++            path[11]='0'+n/10; path[12]='0'+n%10;
++            long fd=DO(2,path,0102,0600); CHECK(fd==3,56);
++            CHECK(DO(1,fd,"data",4)==4 && DO(3,fd,0,0)==0,57);
++        }
+         for(word i=3;i<8;++i) CHECK(DO(32,1,0,0)==(long)i,44);
+         CHECK(DO(32,1,0,0)==-24,45);
+         for(word i=3;i<8;++i) CHECK(DO(3,i,0,0)==0,46);

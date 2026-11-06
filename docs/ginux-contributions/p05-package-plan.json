@@ -577,7 +577,8 @@
       "ordinary_mapping_scenarios": 2,
       "held_thread_join": "held-thread-join.patch",
       "evidence": "g12-review.md",
-      "source_patch": "patches/G12.patch"
+      "source_patch": "patches/G12.patch",
+      "composition_note": "G17b prerequisite f41ed1b0 corrects outdated full FD mapping fixture assertion using existing supported owned readonly mmap; preserve this mapping-owner join at F01/F02. Full fixture/security remains unrun."
     },
     {
       "packet": "G13",
@@ -857,10 +858,11 @@
       ],
       "acceptance": "Private reservations do not consume or raise public limits; lower operator limits work, pwrite respects offset/alias semantics and all resources close on failure.",
       "planned_delivery": "one coherent change plus its generic docs and focused regression fixtures; split coupled responsibilities only as recorded by P04",
-      "status": "partial: G17a pwrite prepared; G17b private backing/public budgets next",
+      "status": "G17a/G17b source and ordinary validation prepared; security/full CI/standalone independence pending",
       "artifact_directory": ".artifacts/ginux-contribution-preparation/G17",
       "subpackets": [
-        "G17a"
+        "G17a",
+        "G17b"
       ]
     },
     {
@@ -1110,6 +1112,56 @@
       "artifact_directory": ".artifacts/ginux-contribution-preparation/G17a",
       "evidence": "g17a-review.md",
       "source_patch": "patches/G17a.patch"
+    },
+    {
+      "packet": "G17b",
+      "base": "f41ed1b093044b10d45fcab771687dfb089ed3a5",
+      "head": "6fcdd6183703768a2f4ed1cc48380eaa50da547c",
+      "tree": "4a08c6a7c1735664b46e5fc8675518cb4e1c6bc1",
+      "changed_files": [
+        "README.md",
+        "crates/ginux-init/src/fs_hooks.rs",
+        "crates/ginux-init/src/descriptors.rs",
+        "crates/ginux-init/src/launch.rs",
+        "scripts/test-launch-storage.py",
+        "scripts/test-launch-fds.py",
+        "tests/fixtures/launch-fd-fixture.c"
+      ],
+      "dependencies": [
+        "G12",
+        "G18"
+      ],
+      "standalone": false,
+      "status": "source separately self-reviewed; ordinary source/clean static/unit/build/runtime checks pass; security/full CI/current-main independence pending",
+      "patch_sha256": "e84b6ca96a588b9607ff8dbda350b9695ee3437e37868df65e158e6328e93b68",
+      "deferred_joins": [
+        "G07 thread ownership and security",
+        "G13-G16 interaction composition",
+        "private-FD authority/failure/race verification"
+      ],
+      "unit_tests": 94,
+      "vfs_tests": 35,
+      "clean_matched_paths": 178,
+      "review": "separate self-review; no independent reviewer/security acceptance",
+      "remote_ci": "not run",
+      "security_handoff": "daybreakblue-handoff.md",
+      "source_binary_sha256": "1d85f84f073a62055333f1fa1f6a1aa3ab3cf847ab56ba763e127867c79bbe92",
+      "clean_binary_sha256": "1d85f84f073a62055333f1fa1f6a1aa3ab3cf847ab56ba763e127867c79bbe92",
+      "fixture_sha256": {
+        "launch-storage-fixture": "3181afd6d38dcbbc5b6780f93ba16e04d1d4d6e7c9cfc4454413165f945db3e0",
+        "launch-directory-fixture": "c07d2fe17d870fceb7237cb65fa4962e33aa4f454d0aaa4861440e2760e761e8",
+        "launch-script-fixture": "bbf5f27163c9fa1edb0042719da1fe8d31065fbc35ef221fec608370f4821953",
+        "launch-owned-exec-fixture": "ac70dd24534767b47ee52d088575f6d3d4a1e95f71b526bb3589daaf2e5ddf90",
+        "launch-fd-fixture": "06b5384b5b483fd2b018be133b85819e0b31657550e72296d119f725311b8d03"
+      },
+      "purpose": "Private backing descriptors without widening public limits",
+      "source_commits": [
+        "53a2c9cc6ee842e97d0ca8214cc1205547b0ab65",
+        "d5357101e9ce7b268235a9377a9366a33cd92813"
+      ],
+      "artifact_directory": ".artifacts/ginux-contribution-preparation/G17b",
+      "evidence": "g17b-review.md",
+      "source_patch": "patches/G17b.patch"
     }
   ]
 }
