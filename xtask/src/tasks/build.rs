@@ -61,7 +61,7 @@ pub fn require_iso(distro: Distro, product: Product) -> Result<PathBuf> {
 fn product_isos(product: Product, distros: &[Distro]) -> Result<()> {
     let root = crate::util::repo::repo_root()?;
     for &distro in distros {
-        let kernel = crate::tasks::kernels::common::target_for(distro);
+        let kernel = crate::tasks::kernels::common::target_for(distro)?;
         if !crate::tasks::kernels::common::kernel_is_built(&root, &kernel) {
             return Err(crate::util::exit::missing(
                 format!("the {} kernel is not built", distro.id()),

@@ -2,12 +2,12 @@ use anyhow::{Context, Result};
 
 pub fn run(distro: crate::cli::Distro, refresh: bool) -> Result<()> {
     let root = crate::util::repo::repo_root()?;
-    let t = super::common::target_for(distro);
+    let t = super::common::target_for(distro)?;
 
     eprintln!("[info] Repo: {}", root.display());
     eprintln!(
         "[info] Target: {} ({}{})",
-        t.distro_id, t.kernel.version, t.kernel.localversion
+        t.distro_id, t.version, t.localversion
     );
 
     if !refresh && super::common::kernel_is_built(&root, &t) {

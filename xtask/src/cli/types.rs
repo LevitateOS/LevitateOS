@@ -20,18 +20,13 @@ impl Distro {
         }
     }
 
-    pub fn pretty_name(self) -> &'static str {
-        match self {
-            Self::Levitate => distro_spec::levitate::OS_NAME,
-            Self::Acorn => distro_spec::acorn::OS_NAME,
-        }
-    }
-
-    pub fn kernel_source(self) -> &'static distro_spec::shared::KernelSource {
-        match self {
-            Self::Levitate => &distro_spec::levitate::KERNEL_SOURCE,
-            Self::Acorn => &distro_spec::acorn::KERNEL_SOURCE,
-        }
+    /// The variant's display name (its contract's `identity.os_name`).
+    pub fn pretty_name(self) -> String {
+        crate::util::repo::repo_root()
+            .ok()
+            .and_then(|root| distro_contract::load_variant_contract_for_distro_from(&root, self.id()).ok())
+            .map(|contract| contract.identity.os_name)
+            .unwrap_or_else(|| self.id().to_string())
     }
 }
 

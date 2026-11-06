@@ -10,7 +10,7 @@ anyhow = "1"
 clap = { version = "4", features = ["derive"] }
 distro-contract = { path = "../distro/contract" }
 distro-builder = { path = "../distro/builder" }
-distro-spec = { path = "../distro/spec" }
+recinit = { path = "../tools/recinit" }
 which = "7"
 regex = "1"
 serde = { version = "1", features = ["derive"] }

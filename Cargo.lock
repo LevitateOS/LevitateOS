@@ -572,10 +572,10 @@ dependencies = [
  "anyhow",
  "dirs",
  "distro-contract",
- "distro-spec",
  "fs2",
  "leviso-elf",
  "libc",
+ "recinit",
  "recqemu",
  "serde",
  "serde_json",
@@ -595,14 +595,6 @@ version = "0.1.0"
 dependencies = [
  "serde",
  "toml",
-]
-
-[[package]]
-name = "distro-spec"
-version = "0.1.0"
-dependencies = [
- "libc",
- "smallvec",
 ]
 
 [[package]]
@@ -727,11 +719,11 @@ dependencies = [
  "anyhow",
  "clap",
  "colored",
- "distro-spec",
  "flate2",
  "humansize",
  "libc",
  "recinit",
+ "reciso",
  "tempfile",
 ]
 
@@ -1065,8 +1057,8 @@ dependencies = [
  "colored",
  "distro-builder",
  "distro-contract",
- "distro-spec",
  "fsdbg",
+ "recinit",
  "recpart",
  "recqemu",
  "recshuttle",
@@ -1185,11 +1177,11 @@ dependencies = [
  "clap",
  "distro-builder",
  "distro-contract",
- "distro-spec",
  "install-tests",
  "libc",
  "portable-pty",
  "recab",
+ "recinit",
  "recpart",
  "recqemu",
  "recshuttle",
@@ -1577,7 +1569,6 @@ version = "0.2.0"
 dependencies = [
  "anyhow",
  "clap",
- "distro-spec",
  "flate2",
  "leviso-elf",
  "tempfile",
@@ -1590,7 +1581,7 @@ version = "0.2.0"
 dependencies = [
  "anyhow",
  "clap",
- "distro-spec",
+ "recinit",
  "recuki",
  "tempfile",
 ]
@@ -1600,7 +1591,6 @@ name = "recpart"
 version = "0.2.0"
 dependencies = [
  "clap",
- "distro-spec",
  "libc",
  "schemars",
  "serde",
@@ -1629,9 +1619,9 @@ name = "recstrap"
 version = "0.2.0"
 dependencies = [
  "clap",
- "distro-spec",
  "libc",
  "nix 0.29.0",
+ "recinit",
  "tempfile",
 ]
 

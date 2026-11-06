@@ -61,7 +61,7 @@ acquire/build/install hooks, run inside an isolated build domain. See
 ## Repository layout
 
 ```
-distro/      builder (products and ISOs), contract, spec, elf, variants (per-distro declarations)
+distro/      builder (products and ISOs), contract and variants (per-distro declarations), elf
 tools/       recipe, the rec* install and boot tools, ginux (upstream build domains)
 testing/     install-tests (boot/install scenarios), fsdbg, rootfs-tests, hardware-compat
 tui/         terminal apps for the live ISO and installer

@@ -1,5 +1,5 @@
 use anyhow::{Context, Result, bail};
-use distro_spec::shared::live_boot::{BOOT_INJECTION_DIR, BOOT_INJECTION_ENV};
+use recinit::live::{BOOT_INJECTION_DIR, BOOT_INJECTION_ENV};
 use install_tests::boot_injection::BootInjection;
 use install_tests::scenarios::{ScenarioId, resolve_latest_install_runtime};
 use crate::cli::{BootArgs, Distro, Product, RunArgs, RunScenario, TestArgs, TestScenario};

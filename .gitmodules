@@ -14,10 +14,6 @@
 	path = testing/install-tests
 	url = git@github.com:LevitateOS/install-tests.git
 	branch = master
-[submodule "distro-spec"]
-	path = distro/spec
-	url = git@github.com:LevitateOS/distro-spec.git
-	branch = master
 [submodule "recstrap"]
 	path = tools/recstrap
 	url = git@github.com:LevitateOS/recstrap.git

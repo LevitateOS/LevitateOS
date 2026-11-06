@@ -4,10 +4,12 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-#[derive(Clone, Copy)]
+/// A distro's kernel, as its variant contract (`build-host.toml`) declares it.
+#[derive(Clone)]
 pub(crate) struct KernelTarget {
     pub distro_id: &'static str,
-    pub kernel: &'static distro_spec::shared::KernelSource,
+    pub version: String,
+    pub localversion: String,
 }
 
 /// How `build kernel` compiles.
@@ -28,11 +30,17 @@ pub(crate) struct AutoFixOptions {
     pub(crate) llm_profile: Option<String>,
 }
 
-pub(crate) fn target_for(d: crate::cli::Distro) -> KernelTarget {
-    KernelTarget {
+pub(crate) fn target_for(d: crate::cli::Distro) -> Result<KernelTarget> {
+    let root = crate::util::repo::repo_root()?;
+    let kernel = distro_contract::load_variant_contract_for_distro_from(&root, d.id())
+        .with_context(|| format!("loading the {} variant contract", d.id()))?
+        .build
+        .kernel;
+    Ok(KernelTarget {
         distro_id: d.id(),
-        kernel: d.kernel_source(),
-    }
+        version: kernel.version,
+        localversion: kernel.localversion,
+    })
 }
 
 /// Kernel compiles run 23:00-10:00 so they do not tie up the machine during
@@ -75,21 +83,21 @@ pub(crate) fn verify_one(root: &Path, t: &KernelTarget) -> Result<String> {
         fs::read_to_string(&rel_file).with_context(|| format!("Reading {}", rel_file.display()))?;
     let rel = rel.trim_end_matches(['\n', '\r']).to_string();
 
-    if !t.kernel.version.is_empty() && !rel.starts_with(t.kernel.version) {
+    if !t.version.is_empty() && !rel.starts_with(&t.version) {
         bail!(
-            "{} kernel.release '{}' does not start with '{}' (expected kernel version from distro-spec)",
+            "{} kernel.release '{}' does not start with '{}' (expected the kernel version from build-host.toml)",
             t.distro_id,
             rel,
-            t.kernel.version
+            t.version
         );
     }
 
-    if !rel.ends_with(t.kernel.localversion) {
+    if !rel.ends_with(&t.localversion) {
         bail!(
             "{} kernel.release '{}' does not end with '{}' (wrong kernel localversion; expected a distro-specific kernel build)",
             t.distro_id,
             rel,
-            t.kernel.localversion
+            t.localversion
         );
     }
 

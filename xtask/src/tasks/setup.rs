@@ -153,7 +153,7 @@ fn checks(root: &Path) -> Vec<Check> {
         checks.push(Check::new(
             format!("{} kernel", distro.id()),
             false,
-            crate::tasks::kernels::common::verify_one(root, &target).map_err(|_| {
+            target.and_then(|t| crate::tasks::kernels::common::verify_one(root, &t)).map_err(|_| {
                 (
                     "not built".into(),
                     format!(

@@ -2,10 +2,10 @@ use anyhow::{Context, Result};
 
 pub fn run(distro: crate::cli::Distro, k: &super::common::KernelBuild) -> Result<()> {
     let root = crate::util::repo::repo_root()?;
-    let t = super::common::target_for(distro);
+    let t = super::common::target_for(distro)?;
     eprintln!(
         "[info] Kernel: {} ({}{})",
-        t.distro_id, t.kernel.version, t.kernel.localversion
+        t.distro_id, t.version, t.localversion
     );
 
     if !k.rebuild && super::common::kernel_is_built(&root, &t) {
