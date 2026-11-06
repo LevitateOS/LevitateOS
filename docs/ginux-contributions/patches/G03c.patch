@@ -1,6 +1,6 @@
-From b36e0752caa1c91e4bbbe112c589c85915a6ce6d Mon Sep 17 00:00:00 2001
+From e9c0a4d494cb9c2c2080289aa198dda42dd65b08 Mon Sep 17 00:00:00 2001
 From: vince <vincepaul.liem@gmail.com>
-Date: Fri, 6 Nov 2026 10:00:21 +0100
+Date: Fri, 6 Nov 2026 22:32:20 +0100
 Subject: [PATCH] feat(launch): add assigned ephemeral memory storage
 
 Keep configured writable files in supervisor memory, with bounded data,
@@ -28,7 +28,7 @@ Signed-off-by: vince <vincepaul.liem@gmail.com>
  create mode 100644 tests/fixtures/launch-storage-fixture.c
 
 diff --git a/.github/workflows/check.yml b/.github/workflows/check.yml
-index d7f05af2..9a0bec5e 100644
+index d7f05af2ca5133210b171d3093acb3e9e89ec61a..9a0bec5e0c254eda4e7519074b8e622a724e0755 100644
 --- a/.github/workflows/check.yml
 +++ b/.github/workflows/check.yml
 @@ -24,8 +24,9 @@ jobs:
@@ -43,10 +43,10 @@ index d7f05af2..9a0bec5e 100644
        - run: make test-process-native
        - run: sudo make test-gate1-setup
 diff --git a/Makefile b/Makefile
-index 47835b3c..a0f56acf 100644
+index e9c91163fee05b54effdcaa118320bb29d102884..138b4fd83ddf99c409bf9729e6ea2051527b0aab 100644
 --- a/Makefile
 +++ b/Makefile
-@@ -183,7 +183,7 @@ clean:
+@@ -225,7 +225,7 @@ clean:
  	cargo clean
  	@./scripts/clean-build.sh
  
@@ -55,7 +55,7 @@ index 47835b3c..a0f56acf 100644
  build-launch-fixture:
  	mkdir -p .artifacts/launch
  	$(CC) -nostdlib -static -fno-stack-protector -fno-builtin -O2 -Wall -Wextra -Werror tests/fixtures/launch-fixture.c -o .artifacts/launch/launch-fixture
-@@ -194,3 +194,10 @@ test-launch:
+@@ -236,3 +236,10 @@ test-launch:
  
  test-native-supervision:
  	python3 scripts/test-native-supervision.py $(GINUX) .artifacts/launch/native-fixture
@@ -67,10 +67,10 @@ index 47835b3c..a0f56acf 100644
 +test-launch-storage:
 +	python3 scripts/test-launch-storage.py $(GINUX) .artifacts/launch/launch-storage-fixture
 diff --git a/README.md b/README.md
-index 1700a0a4..ac0e8b46 100644
+index 83ff833f13389cd775d0e65195cdf0790f776b1f..f36d0cf70d0bcb1c42e1741380f4dcba9952b910 100644
 --- a/README.md
 +++ b/README.md
-@@ -196,8 +196,8 @@ executes `[domain].init` with the configured arguments and environment inside
+@@ -273,8 +273,8 @@ executes `[domain].init` with the configured arguments and environment inside
  the supplied host root directory. The bootstrap requires chroot and credential
  change privileges, and a kernel with `close_range` (Linux 5.9 or later).
  It drops to UID/GID 1000 before executing the workload. The configuration must
@@ -81,7 +81,7 @@ index 1700a0a4..ac0e8b46 100644
  
  `[domain].workdir` is optional and defaults to `/work`; `/` is also supported.
  The bootstrap creates the working directory if its parent exists, then enters
-@@ -215,6 +215,40 @@ child supervision is implemented. Non-x86-64 syscall ABIs and job-control
+@@ -292,6 +292,40 @@ child supervision is implemented. Non-x86-64 syscall ABIs and job-control
  group stops fail explicitly. Audit output is capped at 64 KiB plus a truncation
  notice. This path does not implement resource quotas from the domain metadata.
  
@@ -122,7 +122,7 @@ index 1700a0a4..ac0e8b46 100644
  When requested, the result file is reserved exclusively before launch, with
  mode 0600 and a maximum path length of 512 bytes. Existing files are never
  overwritten. After completion, it contains one synced JSON object:
-@@ -238,6 +272,8 @@ make build-gate1-fixture
+@@ -315,6 +349,8 @@ make build-gate1-fixture
  sudo make test-gate1-setup
  sudo make test-launch
  sudo make test-native-supervision
@@ -132,7 +132,7 @@ index 1700a0a4..ac0e8b46 100644
  
  ## Native process scenarios
 diff --git a/crates/ginux-init/src/fs_hooks.rs b/crates/ginux-init/src/fs_hooks.rs
-index b75d7015..8034a09d 100644
+index b75d7015b15ef694937004d3d6605bbe72c32a95..8034a09dc04f7c86f954d1800a01b6c65dc6ab96 100644
 --- a/crates/ginux-init/src/fs_hooks.rs
 +++ b/crates/ginux-init/src/fs_hooks.rs
 @@ -1,18 +1,589 @@
@@ -740,10 +740,10 @@ index b75d7015..8034a09d 100644
      None
  }
 diff --git a/crates/ginux-init/src/launch.rs b/crates/ginux-init/src/launch.rs
-index 533b12fa..f0a586d0 100644
+index cb499f89bee64001d71a3288116461f20d2af0d3..2c70f336b0b4cc5138e437e072afceccf9446451 100644
 --- a/crates/ginux-init/src/launch.rs
 +++ b/crates/ginux-init/src/launch.rs
-@@ -296,6 +296,8 @@ pub fn launch_main(config_path: *const u8, root_path: *const u8, result_path: *c
+@@ -337,6 +337,8 @@ pub fn launch_main(config_path: *const u8, root_path: *const u8, result_path: *c
      stage_result_path(result_path);
      let config = launch_load_config(config_path);
      launch_validate(&config);
@@ -752,7 +752,7 @@ index 533b12fa..f0a586d0 100644
      print_launch_config(&config);
      let mut domain = Domain::create(config);
      if domain.start().is_err() {
-@@ -307,9 +309,9 @@ pub fn launch_main(config_path: *const u8, root_path: *const u8, result_path: *c
+@@ -348,9 +350,9 @@ pub fn launch_main(config_path: *const u8, root_path: *const u8, result_path: *c
          launch_domain_fail(&mut domain, b"launch tracee fork failed");
      }
      if child == 0 {
@@ -764,7 +764,7 @@ index 533b12fa..f0a586d0 100644
  }
  
  fn launch_validate(config: &DomainConfig) {
-@@ -318,8 +320,8 @@ fn launch_validate(config: &DomainConfig) {
+@@ -359,8 +361,8 @@ fn launch_validate(config: &DomainConfig) {
      {
          launch_startup_fail(b"launch requires profile=balanced backend=ptrace-native");
      }
@@ -775,7 +775,7 @@ index 533b12fa..f0a586d0 100644
      }
      if config.id.as_bytes().is_empty() || config.id.as_bytes().len() > 64 {
          launch_startup_fail(b"domain id length invalid");
-@@ -790,11 +792,17 @@ fn finish_signaled(signal: u64) {
+@@ -831,11 +833,17 @@ fn finish_signaled(signal: u64) {
      exit_process(128 + signal as usize)
  }
  
@@ -794,7 +794,7 @@ index 533b12fa..f0a586d0 100644
      if unsafe { syscall3(SYS_CLOSE_RANGE, 3, u32::MAX as usize, 0) } < 0 {
          tracee_setup_fail(
              b"ginux: launch bootstrap failed: descriptor cleanup failed\n",
-@@ -874,7 +882,11 @@ fn tracee_setup_fail(message: &[u8], code: usize) -> ! {
+@@ -915,7 +923,11 @@ fn tracee_setup_fail(message: &[u8], code: usize) -> ! {
      }
  }
  
@@ -807,7 +807,7 @@ index 533b12fa..f0a586d0 100644
      let mut status = 0i32;
      if wait(pid, &mut status) < 0 {
          launch_fail(domain, pid, b"launch tracee wait after exec failed");
-@@ -894,6 +906,7 @@ fn supervise_launch(pid: usize, domain: &mut Domain) -> ! {
+@@ -935,6 +947,7 @@ fn supervise_launch(pid: usize, domain: &mut Domain) -> ! {
  
      let mut sequence = 0u64;
      let mut awaiting_exit = false;
@@ -815,7 +815,7 @@ index 533b12fa..f0a586d0 100644
      let mut override_exit = false;
      let mut override_result = 0i64;
      loop {
-@@ -942,11 +955,19 @@ fn supervise_launch(pid: usize, domain: &mut Domain) -> ! {
+@@ -983,11 +996,19 @@ fn supervise_launch(pid: usize, domain: &mut Domain) -> ! {
          let mut registers = unsafe { registers.assume_init() };
  
          if awaiting_exit {
@@ -838,7 +838,7 @@ index 533b12fa..f0a586d0 100644
              }
              audit_write(b"ginux: audit sequence=");
              audit_u64(sequence);
-@@ -978,7 +999,29 @@ fn supervise_launch(pid: usize, domain: &mut Domain) -> ! {
+@@ -1019,7 +1040,29 @@ fn supervise_launch(pid: usize, domain: &mut Domain) -> ! {
          }
          sequence += 1;
          let syscall = registers.orig_rax;
@@ -869,7 +869,7 @@ index 533b12fa..f0a586d0 100644
              NativeDecision::Contract(decision) => decision,
              NativeDecision::Hooked { lane, result } => {
                  let lane_name: &[u8] = match lane {
-@@ -1106,6 +1149,7 @@ fn launch_exit_reason(code: i32) -> &'static [u8] {
+@@ -1147,6 +1190,7 @@ fn launch_exit_reason(code: i32) -> &'static [u8] {
          127 => b"exec of configured domain init failed",
          128 => b"configured domain workdir unavailable",
          129 => b"descriptor cleanup failed",
@@ -878,10 +878,10 @@ index 533b12fa..f0a586d0 100644
      }
  }
 diff --git a/crates/ginux-init/src/main.rs b/crates/ginux-init/src/main.rs
-index 8ad7f5cb..151a3fec 100644
+index 7226409fbb69d7c7c9d84b363f80d41e8e108a3c..7cb8610a0117036e217d094f45d358a227f93be1 100644
 --- a/crates/ginux-init/src/main.rs
 +++ b/crates/ginux-init/src/main.rs
-@@ -12,6 +12,7 @@ mod channel_hooks;
+@@ -14,6 +14,7 @@ mod channel_hooks;
  mod dispatch;
  mod fs_hooks;
  mod launch;
@@ -891,7 +891,7 @@ index 8ad7f5cb..151a3fec 100644
  
 diff --git a/crates/ginux-init/src/path_hooks.rs b/crates/ginux-init/src/path_hooks.rs
 new file mode 100644
-index 00000000..d967bc1d
+index 0000000000000000000000000000000000000000..d967bc1dcee354b1df6b160b75d8587e3acaceea
 --- /dev/null
 +++ b/crates/ginux-init/src/path_hooks.rs
 @@ -0,0 +1,188 @@
@@ -1084,7 +1084,7 @@ index 00000000..d967bc1d
 +    }
 +}
 diff --git a/crates/ginux-vfs/src/lib.rs b/crates/ginux-vfs/src/lib.rs
-index 48170e5b..a480b7bd 100644
+index 48170e5b2fbe7f708326ae9ac33b7c250a129897..a480b7bda562788cdfdf4e2e9585f159da5fa78b 100644
 --- a/crates/ginux-vfs/src/lib.rs
 +++ b/crates/ginux-vfs/src/lib.rs
 @@ -220,6 +220,19 @@ impl Path {
@@ -1109,7 +1109,7 @@ index 48170e5b..a480b7bd 100644
  fn resolve_components(
 diff --git a/scripts/test-launch-storage.py b/scripts/test-launch-storage.py
 new file mode 100644
-index 00000000..a42386ab
+index 0000000000000000000000000000000000000000..a42386ab4df6500014b52d823a15e0fdc5931f1d
 --- /dev/null
 +++ b/scripts/test-launch-storage.py
 @@ -0,0 +1,71 @@
@@ -1186,7 +1186,7 @@ index 00000000..a42386ab
 +    main()
 diff --git a/tests/fixtures/launch-storage-fixture.c b/tests/fixtures/launch-storage-fixture.c
 new file mode 100644
-index 00000000..51b373f9
+index 0000000000000000000000000000000000000000..51b373f90424a0b624be6e7791c09c2d5834969e
 --- /dev/null
 +++ b/tests/fixtures/launch-storage-fixture.c
 @@ -0,0 +1,180 @@

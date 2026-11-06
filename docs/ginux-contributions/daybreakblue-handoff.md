@@ -743,3 +743,18 @@ snapshot and G07 finding remain exact historical inputs, not proof about the
 new source. Reconcile new native owners and typed network fields before choosing
 the final combined revision for monitored validation. No new security probe,
 cloud dispatch or security acceptance occurred during this refresh.
+
+
+## Refreshed G03c security revision — 2026-11-06
+
+Current local G03c is `e9c0a4d494cb9c2c2080289aa198dda42dd65b08`, based on
+`6c35957d17c54dde9d98e5a91e49d37465d13a6d` (refreshed G03b/G03a on observed main
+`8a475e8b`). [Current review](g03c-review.md) records 85 units and eleven ordinary
+controls in source/clean replay; it does not establish security acceptance.
+Revalidate assignment/path/descriptor authority and native canonical rewriting,
+protected/partial/overlapping buffer and scratch restoration, and indirect/shared
+argument capture on this exact revision or an explicitly recorded successor.
+The complete preserved `test-launch-storage`, `test-launch`, native/process and
+setup suites remain pending where they contain these probes. No such probes
+were run in this refresh and no DaybreakBlue agent was dispatched. Earlier
+source-machine security results are historical and must not satisfy this hold.

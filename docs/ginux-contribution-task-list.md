@@ -783,8 +783,9 @@ Earlier P02/P03 and candidate results remain historical records; current-main
 reconciliation is required before final closure.
 
 Exact next action: refresh R04's current-main prerequisite serially, continuing
-with G03c's configured-storage adapter on refreshed G03b/G03a. This local dependency preparation
-stays blocked for standalone delivery until G05a actually merges upstream.
+with G04's virtual null-device adapter on refreshed G03c. Local dependent
+preparation stays blocked for standalone delivery until its prerequisites
+actually merge upstream.
 G05a is refreshed at
 `936d0eb7a9b46e58ade5219705c12d3d476dfae9`, solely on observed main `8a475e8b`:
 three exact-base regressions fail, all 76 units/static/build and eight ordinary
@@ -803,15 +804,24 @@ all three exact-base adoption regressions fail; all 76 units/static/build and
 eight ordinary controls pass in source/clean, preserving new upstream job-control
 coverage. The one-file +118 scope is unchanged and binaries match.
 [Review](ginux-contributions/g06a-review.md) keeps full default/runtime/macOS
-checks pending. Initial 37-patch integrity results remain historical;
-the new `upstream-refresh-2026-11-06/current-inventory.json` verifies all 37
-currently retained patch/head hashes and exact-parent replays, including the initial
-three refreshed heads. G03b's fresh manifest separately verifies its new head. G03b is now refreshed at `5fb12ab4a56efd365d7d451d181f6e2a41c9d31d` on refreshed G05a:
+checks pending. G03b is refreshed at
+`5fb12ab4a56efd365d7d451d181f6e2a41c9d31d` on refreshed G05a:
 all 85 units/static/build and eight ordinary controls pass in source/clean,
 with all 187 tracked paths and both binaries matching. Its one-file +425/-6
 delta is unchanged. [Review](ginux-contributions/g03b-review.md) keeps actual
 G05a upstream merge, full default/runtime/security and macOS acceptance pending.
-The other 33 still need current-main reconciliation;
+G03c is refreshed at `e9c0a4d494cb9c2c2080289aa198dda42dd65b08` on refreshed
+G03b/G03a composition `6c35957d17c54dde9d98e5a91e49d37465d13a6d`:
+all 85 units/static/build and eleven ordinary controls pass in source/clean,
+all 190 tracked paths and both binaries match, and the exact prerequisite rejects
+the identical valid storage fixture. The ten-file +1140/-28 delta preserves new
+upstream native/domain/network additions. [Review](ginux-contributions/g03c-review.md)
+and [security handoff](ginux-contributions/daybreakblue-handoff.md) retain full
+required runtime/security/macOS CI and actual upstream-merge holds.
+Initial 37-patch integrity results remain historical. The refreshed
+`upstream-refresh-2026-11-06/current-inventory.json` records each currently retained
+patch/head and exact-parent replay. Five packets now have current-main source/
+ordinary preparation; the other 32 still need current-main reconciliation;
 integrity is not source/runtime acceptance. The fresh preserved-worktree report
 also confirms all six restored HEAD, raw-index and staged/unstaged/conflict-status
 fingerprints are unchanged. Reconcile the

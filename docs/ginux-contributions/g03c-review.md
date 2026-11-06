@@ -1,6 +1,11 @@
 # G03c — configured ephemeral memory storage
 
-Local feature commit `b36e0752caa1c91e4bbbe112c589c85915a6ce6d`.
+Current retained local commit `e9c0a4d494cb9c2c2080289aa198dda42dd65b08`, based on
+composition `6c35957d17c54dde9d98e5a91e49d37465d13a6d` of refreshed G03b and G03a,
+rooted at observed main `8a475e8b`. The current-main refresh below owns fresh
+evidence and pending checks; earlier results remain historical.
+
+Earlier local feature commit `b36e0752caa1c91e4bbbe112c589c85915a6ce6d`.
 Local base `603391c66d37915f3db2c9cec63d1c3e832216a6` composes reviewed
 G03b785bfb9d (including G05a) and G03a0b563cf8 on upstream3f2fe7df.
 [Retained source patch](patches/G03c.patch). Ten files,+1140/-28.
@@ -77,3 +82,53 @@ A final introductory README correction removes the obsolete blanket rejection of
 storage assignments and clarifies the owned-symlink exclusion. The final object
 differs from the runtime-tested5ee45634 only in README; all executable source
 bytes are identical. A fresh final patch application matches all153 paths.
+
+## Current-main refresh — 2026-11-06
+
+The exact local prerequisite combines refreshed G03b `5fb12ab4` (including G05a)
+and G03a `c28dd132`; both parent identities are recorded. Only this storage patch
+is then applied. It remains ten files, +1140/-28; all added/removed source lines
+match the previous corrected extraction. Current upstream native/systemd/domain/
+network additions remain intact. Configuration storage still uses the same
+eight bounded entries, and configured `launch` still has its own bootstrap and
+supervisor; the newer native storage support does not replace this owner.
+
+A separate self-review reread the full proposed diff and current configuration,
+VFS, dispatch, bootstrap, syscall completion and failure/teardown callers.
+The one-time root index is immutable after preparation; descriptor reservation
+remains confined to enabled assignments, owned operations reuse the bounded VFS,
+and unclaimed native operations retain the upstream contract. The shared walker
+is exported without changing its implementation. Path scratch and kernel-consumed
+arguments retain their existing security review requirements; ordinary success
+does not prove authority or race safety. No new blocking source correction was
+identified, and independent reviewer coverage is not claimed.
+
+Both the candidate and independent clean prerequisite-plus-only-G03c export pass:
+
+- `make check test-unit build build-launch-fixture build-launch-storage-fixture build-process-fixtures build-gate1-fixture`, including all 85 current unit tests and 24 VFS tests.
+- Eight ordinary configured-launch/valid-wait controls and three ordinary storage
+  controls per export. The latter exercise valid 64 KiB byte-checked I/O, relative
+  creation, pread/seek, sparse/append behavior, metadata/modes/CLOEXEC, open-unlinked
+  lifetime, truncation, fresh-launch repetition and bounded object exhaustion.
+
+The exact prerequisite is separately built and rejects the same trusted valid
+storage fixture with exit 2 and `launch does not support storage or device
+assignments`. Candidate and clean replay execute those identical fixture bytes
+successfully. The ordinary fixture is a downstream verification artifact;
+existing complete Ginux fixtures and default CI remain unchanged and enabled.
+
+All 190 tracked source paths match the candidate in both exports. Both binaries
+hash `932c0cc094cc8d331a39311d0cd50c8bfc9d270ada41e29f77b8d3915af5d20b`.
+Source/clean/base builds use separate target directories. Exact commands, logs,
+receipts, source exports, previous/current patches, manifest and concise draft
+are retained under
+`.artifacts/ginux-contribution-preparation/upstream-refresh-2026-11-06/G03c/`.
+No real Ginux branch, shared index, checkout or remote text was changed.
+
+Full default storage/launch/native/setup suites include authority, protected,
+fault and scratch probes and remain unrun under the written security boundary.
+Their required validation remains assigned downstream to DaybreakBlue; no agent
+has been dispatched. macOS/remote CI is also unrun. R03 retains those checks;
+R04 standalone delivery waits for actual G05a/G03a/G03b upstream merges, followed
+by extraction/revalidation. Do not publish this local composition as a stack.
+The broader combined F02/F03 closure remains pending at its final revisions.

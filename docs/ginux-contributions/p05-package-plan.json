@@ -123,19 +123,25 @@
         "G03a",
         "G03b"
       ],
-      "base": "603391c66d37915f3db2c9cec63d1c3e832216a6",
-      "head": "b36e0752caa1c91e4bbbe112c589c85915a6ce6d",
-      "tree": "053fbd99a8f32321283bbe7c6f2d894d0502aa15",
-      "upstream_base": "3f2fe7dfadd4b40e235d982a6a3d386dc6490177",
+      "base": "6c35957d17c54dde9d98e5a91e49d37465d13a6d",
+      "head": "e9c0a4d494cb9c2c2080289aa198dda42dd65b08",
+      "tree": "a6c791adb05dfebb641ddc9c43e44ab02aa3b655",
+      "upstream_base": "8a475e8b2318425fd2fc15246a5c6f4bca6caf86",
       "source_commits": [
         "10091e4e48bb14dcf9f0ee20e62f471fb7d0cf2f",
         "1da0ce137de73e13b66a331de8f7ff7b12903925"
       ],
-      "status": "source reviewed and locally validated on explicit prerequisites; standalone delivery waits for their upstream merge",
+      "status": "current-main local-prerequisite source reviewed; all 85 units/static/build and 11 ordinary controls pass in source/clean; standalone delivery/security/full default runtime/macOS CI remain pending",
       "evidence": "g03c-review.md",
       "source_patch": "patches/G03c.patch",
       "standalone": false,
-      "artifact_directory": ".artifacts/ginux-contribution-preparation/G03c"
+      "artifact_directory": ".artifacts/ginux-contribution-preparation/upstream-refresh-2026-11-06/G03c",
+      "previous_head": "b36e0752caa1c91e4bbbe112c589c85915a6ce6d",
+      "patch_sha256": "33dfc23b948cab074b135fa59a05a9efd010b66f0322e707673acac73bd9496a",
+      "unit_tests": 85,
+      "vfs_tests": 24,
+      "historical_artifact_directory": ".artifacts/development-migration/2026-11-06/recovery/evidence/ginux-contribution-preparation/G03c",
+      "remote_ci": "not run"
     },
     {
       "packet": "G03",
