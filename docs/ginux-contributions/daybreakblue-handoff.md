@@ -173,3 +173,36 @@ These are source/functional results only. Low-level stack/AT_EXECFN, private
 script-FD retirement, malformed/cyclic chains, authority and shared-argument
 security verification remain unrun. Default full fixtures remain available;
 no cloud agent was dispatched. Do not infer security acceptance from this record.
+
+
+## G12 private mapping transfer and backing lifetime
+
+Source preparation starts on G11 candidate0798d991 with donors32e2c85f,
+868862bc and680d5081. This mechanism uses ptrace syscall replay, temporary
+socketpair/SCM_RIGHTS descriptors and pidfd_getfd to obtain a read-only mapping
+reference to supervisor-owned memfd storage. These low-level mechanisms resemble
+injection/FD extraction: assign their security review and adversarial verification
+to DaybreakBlue. Ordinary source/build and controlled valid mapping functionality
+may be prepared locally; do not execute attack, protection-bypass, proc/private-FD
+inspection or hostile mapping/scratch scenarios here.
+
+Review shared argument/scratch mutation, kernel FD table authority and collisions,
+nonleader/leader-exit handling, interruption/death/rollback, fixed mappings near
+replay/scratch regions, mprotect/mremap permissions, writable-shared denial,
+unlinked mapping lifetime, backing resize/quota arithmetic and private-FD cleanup.
+G07's unresolved thread/shared-argument hold remains; no thread mapping acceptance
+is implied by the per-process functional candidate. Preserve all default tests,
+record exact retained source, and keep unperformed security acceptance pending.
+This is a written handoff only; no cloud dispatch or maintainer message.
+
+
+### G12 exact per-process revision and held thread join
+
+Validate candidate83072ec3ddab3e4712ce8db9ba232a10342557de on G110798d991ab2d652e54682750acb4fdd9f1e6d9ac. The
+[review](g12-review.md) records92 units and two selected valid ordinary mapping
+scenarios, plus storage/ELF/script controls, in source and clean replay. Default
+protection/SIGBUS/fixed-region/private-FD cases remain unrun. Nonleader fixture
+hunks from680d5081 are retained as held-thread-join.patch in the G12 artifact
+directory; no G07 thread capability or acceptance was imported. Review backing
+resize/unlinked lifetime and the absence of aggregate mapping/COW accounting.
+No monitored cloud dispatch has occurred; security and thread joins remain pending.

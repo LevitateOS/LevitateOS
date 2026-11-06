@@ -473,16 +473,24 @@ FD/chain authority verification remains unrun with DaybreakBlue. The exact G10
 binary fails the focused valid-script case. G11 inherits the security hold and is
 not standalone/publication-ready. No Ginux branches, checkouts/indexes or remotes changed.
 
-Exact next task: **G12 — owned mappings**. Inspect32e2c85f (memfd backing deferred
-from G09),868862bc/680d5081 before extraction on G110798d991. Trace actual
-mapping/backing/task dependencies; preserve growable-storage quotas, VFS aliasing,
-exec pins, new script cleanup and current namespace resolution. G07's unresolved
-shared-argument/thread ownership security hold remains: do not treat nonleader
-mapping acceptance as satisfied or import the unready G07 snapshot as validated.
-Prepare independent source/ordinary mapping behavior where possible and explicitly
-retain held joins/verification. Write low-level map/injection/protection/confinement
-security work down for DaybreakBlue before doing it. KeepG01/G02/G08 policy holds,
-all downstream ownership boundaries and the F04 publication stop intact.
+G12's per-process mapping portion is retained at `83072ec3` on
+G110798d991. [Review/evidence](ginux-contributions/g12-review.md) records92
+units,178-path strict replay, two valid mapping scenarios and storage/ELF/script
+controls passing in source/clean exports; exact G11 fails the mapping fixture.
+Memfd identity from32e2c85f now travels with its real mapping consumer. G12 remains
+partial: G07 thread ownership/nonleader fixture join, security/full CI and actual
+upstream independence remain pending. The thread-only fixture patch is preserved
+separately, and low-level mapping checks are written down for DaybreakBlue.
+
+Exact next task: **G13 — owned symlink traversal and mutation**. Inspect909399b4,
+aa8becf2/8b14578c and relevant d7f628cc documentation against upstream#218's
+already-retained component resolution. Start from the smallest actual prerequisite
+(G110798d991 if mapping capability is unused); do not add an accidental G12
+ancestry dependency. Preserve link-before-parent semantics, assignment precedence,
+new script metadata/name restoration, VFS alias/whiteout/pin lifetime and native
+scratch cleanup. Prepare ordinary valid link functionality locally; record security
+confinement/loop/malformed-path probing for DaybreakBlue. G07/G12 thread and inherited
+security holds remain explicit, and no publication or external messages are authorized.
 
 Active skill: `hdae-development`, discovered at
 `/home/vince/.codex/worktrees/ginux-pr-combination-check/ginux/.agents/skills/hdae-development/SKILL.md`.

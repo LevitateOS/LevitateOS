@@ -1,0 +1,1048 @@
+From 83072ec3ddab3e4712ce8db9ba232a10342557de Mon Sep 17 00:00:00 2001
+From: vince <vincepaul.liem@gmail.com>
+Date: Fri, 6 Nov 2026 13:31:11 +0100
+Subject: [PATCH] feat(storage): map owned files through read-only backing
+ references
+
+Retain anonymous file identity across mediated writes and resizing.
+Join private/read-only shared mapping to the current per-process task
+transaction, retiring temporary descriptors and scratch before return.
+Keep existing storage charging and native mapping behavior.
+
+Signed-off-by: vince <vincepaul.liem@gmail.com>
+---
+ README.md                               |  15 +-
+ crates/ginux-init/src/descriptors.rs    |  18 ++
+ crates/ginux-init/src/file_mapping.rs   | 313 ++++++++++++++++++++++++
+ crates/ginux-init/src/fs_hooks.rs       |  14 +-
+ crates/ginux-init/src/launch_tasks.rs   | 119 ++++++++-
+ crates/ginux-init/src/main.rs           |   1 +
+ crates/ginux-init/src/storage_memory.rs | 143 ++++++-----
+ crates/ginux-vfs/src/lib.rs             |   9 +
+ scripts/test-launch-storage.py          |  30 ++-
+ tests/fixtures/launch-storage-fixture.c |  81 ++++++
+ 10 files changed, 663 insertions(+), 80 deletions(-)
+ create mode 100644 crates/ginux-init/src/file_mapping.rs
+
+diff --git a/README.md b/README.md
+index 28d3e9b4..f451e894 100644
+--- a/README.md
++++ b/README.md
+@@ -308,7 +308,20 @@ otherwise execveat fails with ENOENT. The interpreter can reopen /dev/fd/<public
+ (or an owned directory suffix) read-only through the virtual descriptor owner,
+ with a fresh offset, including after unlink/rename. This never imports native
+ or private descriptors. Other /dev/fd operations remain unsupported. Threads,
+-owned ELF dynamic loaders, guest file mappings and owned cwd remain unsupported.
++owned ELF dynamic loaders and owned cwd remain unsupported.
++
++Owned regular files support private mappings and read-only shared mappings.
++Mediated writes/truncation use the same anonymous file backing; private writes
++remain copy-on-write, and unlink/recreation preserves existing mapping identity.
++Writable shared mappings are unsupported. A temporary read-only descriptor
++transfer requires host pidfd_open/pidfd_getfd and ptrace access. Temporary native
++descriptors and stack scratch retire before the original mmap returns. Fixed
++maps cannot replace the replay instruction or scratch region. Transfer failure,
++signal interruption or death stops the domain if cleanup cannot complete safely.
++Threads remain unsupported in configured launch; nonleader mapping integration
++is not provided here. File capacity charging remains unchanged, but guest mappings,
++private COW pages and mappings retained after unlink are not aggregate RAM-accounted.
++No retention, mapping budget or wider Linux compatibility is promised.
+ 
+ The configured `/dev` view is an immutable virtual directory, empty by default;
+ image entries beneath it are hidden. The script descriptor reopen operation
+diff --git a/crates/ginux-init/src/descriptors.rs b/crates/ginux-init/src/descriptors.rs
+index 05def3f9..42230eff 100644
+--- a/crates/ginux-init/src/descriptors.rs
++++ b/crates/ginux-init/src/descriptors.rs
+@@ -170,6 +170,24 @@ impl DescriptorTable {
+         None
+     }
+ 
++    pub fn native_descriptor_set(&self) -> [bool; LIMIT] {
++        let mut used = [false; LIMIT];
++        for descriptor in self.entries.iter().flatten() {
++            if let Handle::Native { fd, .. } = descriptor.handle {
++                used[fd as usize] = true;
++            }
++        }
++        used
++    }
++
++    pub fn mapping_file(&self, fd: u64) -> Result<Option<u32>, i64> {
++        match self.get(fd)?.handle {
++            Handle::Native { .. } => Ok(None),
++            Handle::Owned(handle) if (1048576..1048640).contains(&handle) => Ok(Some(handle)),
++            _ => Err(-95),
++        }
++    }
++
+     pub fn exec_descriptor(&self, fd: u64) -> Result<ExecDescriptor, i64> {
+         match self.get(fd)?.handle {
+             Handle::Native { fd, console: false } => Ok(ExecDescriptor::Native(fd)),
+diff --git a/crates/ginux-init/src/file_mapping.rs b/crates/ginux-init/src/file_mapping.rs
+new file mode 100644
+index 00000000..470463b4
+--- /dev/null
++++ b/crates/ginux-init/src/file_mapping.rs
+@@ -0,0 +1,313 @@
++//! Private mapping transaction for an owned file. The existing descriptor owner
++//! validates the public fd; a readonly backing reference crosses an internal
++//! socket only while the task is stopped. All three temporary native descriptors
++//! and the scratch stack bytes are retired before user code can resume.
++use crate::supervisor::{syscall1, syscall2, syscall3, syscall4, UserRegs};
++use crate::tracee_io::copy_memory;
++
++#[derive(Clone, Copy)]
++enum Stage {
++    Pair,
++    Receive,
++    Map,
++    Close(usize),
++}
++
++pub enum Progress {
++    Run(UserRegs),
++    Done(UserRegs),
++}
++
++pub struct MappingCall {
++    original: UserRegs,
++    scratch: u64,
++    saved: [u8; 256],
++    native: [Option<u32>; 3],
++    backing: usize,
++    existing: [bool; crate::descriptors::LIMIT],
++    stage: Stage,
++    result: i64,
++}
++
++impl Drop for MappingCall {
++    fn drop(&mut self) {
++        unsafe {
++            syscall1(3, self.backing);
++        }
++    }
++}
++
++impl MappingCall {
++    /// Takes ownership of the supervisor's readonly backing reference.
++    pub fn new(
++        host: usize,
++        original: UserRegs,
++        backing: usize,
++        existing: [bool; crate::descriptors::LIMIT],
++    ) -> Result<Self, &'static [u8]> {
++        let mut call = Self {
++            original,
++            scratch: original.rsp.saturating_sub(512),
++            saved: [0; 256],
++            native: [None; 3],
++            backing,
++            existing,
++            stage: Stage::Pair,
++            result: -5,
++        };
++        let mut instruction = [0u8; 2];
++        if original.rsp < 512
++            || original.rip < 2
++            || copy_memory(host, original.rip - 2, &mut instruction, false) != Ok(2)
++            || instruction != [0x0f, 0x05]
++            || copy_memory(host, call.scratch, &mut call.saved, false) != Ok(256)
++        {
++            return Err(b"mapping injection requires a readable syscall frame");
++        }
++        let mut frame = [0u8; 256];
++        put(&mut frame, 48, call.scratch + 96); // msghdr.msg_iov
++        put(&mut frame, 56, 1);
++        put(&mut frame, 64, call.scratch + 128); // msg_control
++        put(&mut frame, 72, 24);
++        put(&mut frame, 96, call.scratch + 112); // iovec
++        put(&mut frame, 104, 1);
++        if copy_memory(host, call.scratch, &mut frame, true) != Ok(256) {
++            // The caller fails the domain: a partial scratch write cannot be
++            // returned as an ordinary mmap error while peer threads survive.
++            return Err(b"mapping injection scratch copy failed");
++        }
++        Ok(call)
++    }
++
++    pub fn entry(&self, r: &UserRegs) -> Result<UserRegs, &'static [u8]> {
++        if r.orig_rax != 9 || r.rip != self.original.rip {
++            return Err(b"mapping replay left its syscall instruction");
++        }
++        let mut next = self.original;
++        match self.stage {
++            Stage::Pair => {
++                next.orig_rax = 53;
++                next.rdi = 1;
++                next.rsi = 0x80005;
++                next.rdx = 0;
++                next.r10 = self.scratch;
++            }
++            Stage::Receive => {
++                next.orig_rax = 47;
++                next.rdi = self.native[1].unwrap() as u64;
++                next.rsi = self.scratch + 32;
++                next.rdx = 0x40000000;
++            }
++            Stage::Map => {
++                next.r8 = self.native[2].unwrap() as u64;
++            }
++            Stage::Close(i) => {
++                next.orig_rax = 3;
++                next.rdi = self.native[i].unwrap() as u64;
++            }
++        }
++        next.rax = next.orig_rax;
++        Ok(next)
++    }
++
++    pub fn exit(&mut self, host: usize, r: &UserRegs) -> Result<Progress, &'static [u8]> {
++        let expected = match self.stage {
++            Stage::Pair => 53,
++            Stage::Receive => 47,
++            Stage::Map => 9,
++            Stage::Close(_) => 3,
++        };
++        if r.orig_rax != expected {
++            return Err(b"mapping transaction lost its syscall");
++        }
++        match self.stage {
++            Stage::Pair => {
++                if (r.rax as i64) < 0 {
++                    self.result = r.rax as i64;
++                    return self.done(host);
++                }
++                let mut bytes = [0u8; 8];
++                if r.rax != 0 || copy_memory(host, self.scratch, &mut bytes, false) != Ok(8) {
++                    return Err(b"mapping socket pair copy failed");
++                }
++                for i in 0..2 {
++                    let fd = u32::from_ne_bytes(bytes[i * 4..i * 4 + 4].try_into().unwrap());
++                    if fd >= crate::descriptors::LIMIT as u32 || self.existing[fd as usize] {
++                        return Err(b"mapping private fd exceeds bound");
++                    }
++                    self.native[i] = Some(fd);
++                }
++                if self.native[0] == self.native[1] {
++                    return Err(b"mapping socket pair aliases itself");
++                }
++                if send_backing(host, self.native[0].unwrap(), self.backing).is_err() {
++                    self.result = -95;
++                    self.stage = Stage::Close(0);
++                } else {
++                    self.stage = Stage::Receive;
++                }
++            }
++            Stage::Receive => {
++                let mut frame = [0u8; 256];
++                if r.rax != 1
++                    || copy_memory(host, self.scratch, &mut frame, false) != Ok(256)
++                    || get(&frame, 72) != 24
++                    || frame[112] != b'G'
++                    || get(&frame, 128) != 20
++                    || u32::from_ne_bytes(frame[136..140].try_into().unwrap()) != 1
++                    || u32::from_ne_bytes(frame[140..144].try_into().unwrap()) != 1
++                    || u32::from_ne_bytes(frame[80..84].try_into().unwrap()) & !0x40000000 != 0
++                {
++                    return Err(b"mapping backing receipt failed");
++                }
++                let fd = u32::from_ne_bytes(frame[144..148].try_into().unwrap());
++                if fd >= crate::descriptors::LIMIT as u32
++                    || self.existing[fd as usize]
++                    || self.native[..2].contains(&Some(fd))
++                {
++                    return Err(b"mapping received invalid private descriptor");
++                }
++                self.native[2] = Some(fd);
++                self.stage = Stage::Map;
++            }
++            Stage::Map => {
++                self.result = r.rax as i64;
++                self.stage = Stage::Close(0);
++            }
++            Stage::Close(i) => {
++                if r.rax != 0 {
++                    return Err(b"mapping private descriptor close failed");
++                }
++                self.native[i] = None;
++                if let Some(next) = (i + 1..3).find(|&n| self.native[n].is_some()) {
++                    self.stage = Stage::Close(next);
++                } else {
++                    return self.done(host);
++                }
++            }
++        }
++        let mut replay = self.original;
++        replay.rip -= 2;
++        replay.rax = replay.orig_rax;
++        Ok(Progress::Run(replay))
++    }
++
++    fn done(&mut self, host: usize) -> Result<Progress, &'static [u8]> {
++        if copy_memory(host, self.scratch, &mut self.saved, true) != Ok(256) {
++            return Err(b"mapping scratch restoration failed");
++        }
++        let mut result = self.original;
++        result.rax = self.result as u64;
++        Ok(Progress::Done(result))
++    }
++}
++
++fn put(bytes: &mut [u8], at: usize, value: u64) {
++    bytes[at..at + 8].copy_from_slice(&value.to_ne_bytes());
++}
++fn get(bytes: &[u8], at: usize) -> u64 {
++    u64::from_ne_bytes(bytes[at..at + 8].try_into().unwrap())
++}
++
++#[repr(C)]
++struct IoVec {
++    address: usize,
++    length: usize,
++}
++#[repr(C)]
++struct Message {
++    name: usize,
++    name_len: u64,
++    iov: usize,
++    iov_len: usize,
++    control: usize,
++    control_len: usize,
++    flags: u64,
++}
++
++fn send_backing(host: usize, socket: u32, backing: usize) -> Result<(), ()> {
++    // The stopped caller may be a nonleader thread, including after its leader
++    // exited. Address that task's live fd table rather than the process leader.
++    let mut pidfd = unsafe { syscall2(434, host, 0x80) }; // PIDFD_THREAD
++    if pidfd == -22 {
++        // Older kernels can still support mappings by process leaders.
++        pidfd = unsafe { syscall2(434, host, 0) };
++    }
++    if pidfd < 0 {
++        return Err(());
++    }
++    let endpoint = unsafe { syscall3(438, pidfd as usize, socket as usize, 0) };
++    unsafe {
++        syscall1(3, pidfd as usize);
++    }
++    if endpoint < 0 {
++        return Err(());
++    }
++    let mut control = [0u64; 3];
++    control[0] = 20;
++    control[1] = 1 | (1u64 << 32);
++    control[2] = backing as u64;
++    let marker = b'G';
++    let iov = IoVec {
++        address: &marker as *const _ as usize,
++        length: 1,
++    };
++    let message = Message {
++        name: 0,
++        name_len: 0,
++        iov: &iov as *const _ as usize,
++        iov_len: 1,
++        control: control.as_ptr() as usize,
++        control_len: 24,
++        flags: 0,
++    };
++    let result = loop {
++        let result =
++            unsafe { syscall3(46, endpoint as usize, &message as *const _ as usize, 0x4000) };
++        if result != -4 {
++            break result;
++        }
++    };
++    unsafe {
++        syscall1(3, endpoint as usize);
++    }
++    if result == 1 {
++        Ok(())
++    } else {
++        Err(())
++    }
++}
++
++/// Obtain a readonly reference to a supervisor fd, never a guest-supplied path.
++pub fn readonly_reference(fd: i32) -> Result<usize, i64> {
++    let mut path = [0u8; 64];
++    path[..14].copy_from_slice(b"/proc/self/fd/");
++    let mut digits = [0u8; 10];
++    let mut value = fd as u32;
++    let mut count = 0;
++    loop {
++        digits[count] = b'0' + (value % 10) as u8;
++        count += 1;
++        value /= 10;
++        if value == 0 {
++            break;
++        }
++    }
++    for n in 0..count {
++        path[14 + n] = digits[count - n - 1];
++    }
++    let result = unsafe {
++        syscall4(
++            257,
++            (-100isize) as usize,
++            path.as_ptr() as usize,
++            0x80000,
++            0,
++        )
++    };
++    if result < 0 {
++        Err(result as i64)
++    } else {
++        Ok(result as usize)
++    }
++}
+diff --git a/crates/ginux-init/src/fs_hooks.rs b/crates/ginux-init/src/fs_hooks.rs
+index 09b7c8f0..2eaa5926 100644
+--- a/crates/ginux-init/src/fs_hooks.rs
++++ b/crates/ginux-init/src/fs_hooks.rs
+@@ -1,7 +1,7 @@
+ //! Configured-launch ephemeral memory storage. Bytes and descriptors belong to
+ //! the supervisor; no writable host descriptor is installed in the workload.
+-//! Executable references share the VFS owner; retained storage and guest file
+-//! mappings are not provided.
++//! Executable references share the VFS owner. File mappings use a private
++//! read-only backing transfer; retained storage is not provided.
+ 
+ use crate::storage_memory::MemoryStorage;
+ use crate::supervisor::UserRegs;
+@@ -544,6 +544,16 @@ impl LaunchFs {
+         self.fs.release_executable(image).map_err(errno)
+     }
+ 
++    pub fn mapping_reference(&mut self, handle: u32) -> Result<usize, i64> {
++        let slot = handle
++            .checked_sub(FD_BASE as u32)
++            .filter(|n| *n < 64)
++            .ok_or(-9)?;
++        let (storage, object) = self.fs.readable_storage(slot as i32 + 3).map_err(errno)?;
++        let fd = storage.backing(object).map_err(errno)?;
++        crate::file_mapping::readonly_reference(fd)
++    }
++
+     pub fn executable_name(&self, image: Executable) -> Result<ExecutableName, i64> {
+         let (name, deleted) = self.fs.executable_name(image).map_err(errno)?;
+         let suffix = if deleted {
+diff --git a/crates/ginux-init/src/launch_tasks.rs b/crates/ginux-init/src/launch_tasks.rs
+index cba23d46..2ee9b69d 100644
+--- a/crates/ginux-init/src/launch_tasks.rs
++++ b/crates/ginux-init/src/launch_tasks.rs
+@@ -81,6 +81,7 @@ struct Task {
+     blocked: Option<UserRegs>,
+     sequence: u64,
+     exec: Option<Exec>,
++    mapping: Option<crate::file_mapping::MappingCall>,
+     path_rewrite: Option<crate::path_hooks::Rewrite>,
+ }
+ 
+@@ -93,6 +94,7 @@ struct Supervisor<'a> {
+     retired_next: usize,
+     sequence: u64,
+     wake_needed: bool,
++    tearing_down: bool,
+ }
+ 
+ pub fn supervise(
+@@ -148,6 +150,7 @@ pub fn supervise(
+         retired_next: 0,
+         sequence: 0,
+         wake_needed: false,
++        tearing_down: false,
+     };
+     s.tasks[0] = Some(Task {
+         id,
+@@ -162,6 +165,7 @@ pub fn supervise(
+         blocked: None,
+         sequence: 0,
+         exec: None,
++        mapping: None,
+         path_rewrite: None,
+     });
+     if ptrace(PTRACE_SETOPTIONS, root, 0, OPTIONS) < 0 {
+@@ -238,17 +242,19 @@ pub fn supervise(
+         }
+         let signal = ((status >> 8) & 255) as usize;
+         if signal != 133 {
+-            if s.task(index).exec.is_some_and(|e| {
+-                matches!(
+-                    e.stage,
+-                    ExecStage::Sync
+-                        | ExecStage::Reenter
+-                        | ExecStage::Create
+-                        | ExecStage::Close
+-                        | ExecStage::Retire
+-                        | ExecStage::RetireReenter
+-                )
+-            }) {
++            if s.task(index).mapping.is_some()
++                || s.task(index).exec.is_some_and(|e| {
++                    matches!(
++                        e.stage,
++                        ExecStage::Sync
++                            | ExecStage::Reenter
++                            | ExecStage::Create
++                            | ExecStage::Close
++                            | ExecStage::Retire
++                            | ExecStage::RetireReenter
++                    )
++                })
++            {
+                 s.fail(domain, b"signal interrupted exec descriptor setup");
+             }
+             let mut info = [0u64; 16];
+@@ -374,6 +380,14 @@ impl Supervisor<'_> {
+         self.run(index, r, domain);
+     }
+     fn entry(&mut self, index: usize, r: &mut UserRegs, domain: &mut Domain) {
++        if let Some(mapping) = &self.task(index).mapping {
++            match mapping.entry(r) {
++                Ok(next) => self.run(index, &next, domain),
++                Err(reason) => self.fail(domain, reason),
++            }
++            return;
++        }
++
+         if let Some(exec) = self.task(index).exec {
+             match exec.stage {
+                 ExecStage::Reenter => {
+@@ -434,6 +448,68 @@ impl Supervisor<'_> {
+         audit_write(b" action=");
+         let original = *r;
+         let id = self.task(index).id;
++        if r.orig_rax == 9 && r.r10 & 0x20 == 0 {
++            match self.task(index).descriptors.mapping_file(r.r8) {
++                Ok(Some(handle)) => {
++                    if r.r10 & 3 == 0 || r.r10 & 3 != 2 && r.rdx & 2 != 0 {
++                        self.emulate(index, r, -95, domain);
++                        return;
++                    }
++                    if r.rsi == 0 || r.r9 & 4095 != 0 {
++                        self.emulate(index, r, -22, domain);
++                        return;
++                    }
++                    // Cleanup replays the syscall and restores private stack
++                    // scratch. A fixed map must not replace either region.
++                    if r.r10 & 0x10 != 0 {
++                        let end = r
++                            .rsi
++                            .checked_add(4095)
++                            .map(|n| n & !4095)
++                            .and_then(|n| r.rdi.checked_add(n));
++                        let Some(end) = end else {
++                            self.emulate(index, r, -22, domain);
++                            return;
++                        };
++                        if r.rdi < r.rsp.saturating_sub(256) && end > r.rsp.saturating_sub(512)
++                            || r.rdi < r.rip && end > r.rip.saturating_sub(2)
++                        {
++                            self.emulate(index, r, -95, domain);
++                            return;
++                        }
++                    }
++                    let backing = match self.objects.filesystem.mapping_reference(handle) {
++                        Ok(fd) => fd,
++                        Err(error) => {
++                            self.emulate(index, r, error, domain);
++                            return;
++                        }
++                    };
++                    let mapping = match crate::file_mapping::MappingCall::new(
++                        self.task(index).host,
++                        original,
++                        backing,
++                        self.task(index).descriptors.native_descriptor_set(),
++                    ) {
++                        Ok(mapping) => mapping,
++                        Err(reason) => self.fail(domain, reason),
++                    };
++                    let next = match mapping.entry(r) {
++                        Ok(next) => next,
++                        Err(reason) => self.fail(domain, reason),
++                    };
++                    self.task_mut(index).mapping = Some(mapping);
++                    audit_write(b"mediate surface=owned-file-mapping\n");
++                    self.run(index, &next, domain);
++                    return;
++                }
++                Err(error) => {
++                    self.emulate(index, r, error, domain);
++                    return;
++                }
++                Ok(None) => {}
++            }
++        }
+         match r.orig_rax {
+             89 | 267 => {
+                 let host = self.task(index).host;
+@@ -596,6 +672,7 @@ impl Supervisor<'_> {
+                     blocked: None,
+                     sequence: 0,
+                     exec: None,
++                    mapping: None,
+                     path_rewrite: None,
+                 });
+                 self.task_mut(index).pending = Pending::Fork {
+@@ -1064,6 +1141,21 @@ impl Supervisor<'_> {
+         self.resume(parent, 0, domain);
+     }
+     fn syscall_exit(&mut self, index: usize, r: &mut UserRegs, domain: &mut Domain) {
++        if let Some(mut mapping) = self.task_mut(index).mapping.take() {
++            match mapping.exit(self.task(index).host, r) {
++                Ok(crate::file_mapping::Progress::Run(next)) => {
++                    self.task_mut(index).mapping = Some(mapping);
++                    self.run(index, &next, domain);
++                }
++                Ok(crate::file_mapping::Progress::Done(next)) => {
++                    self.wake_needed = true;
++                    self.run(index, &next, domain);
++                }
++                Err(reason) => self.fail(domain, reason),
++            }
++            return;
++        }
++
+         if let Some(exec) = self.task(index).exec {
+             match exec.stage {
+                 ExecStage::Sync => {
+@@ -1380,6 +1472,10 @@ impl Supervisor<'_> {
+         }
+         self.release_task_images(index, domain);
+         self.task_mut(index).alive = false;
++        let mapping_aborted = self.task_mut(index).mapping.take().is_some();
++        if mapping_aborted && !self.tearing_down {
++            self.fail(domain, b"task died during private mapping transaction");
++        }
+         self.task_mut(index).wait_status = Some(status);
+         self.task_mut(index).blocked = None;
+         let result = if exited(status) {
+@@ -1405,6 +1501,7 @@ impl Supervisor<'_> {
+         audit_write(b"\n");
+     }
+     fn teardown(&mut self, domain: &mut Domain) {
++        self.tearing_down = true;
+         for t in self
+             .tasks
+             .iter()
+diff --git a/crates/ginux-init/src/main.rs b/crates/ginux-init/src/main.rs
+index 463b5d4a..ab6e95e9 100644
+--- a/crates/ginux-init/src/main.rs
++++ b/crates/ginux-init/src/main.rs
+@@ -14,6 +14,7 @@ mod device_hooks;
+ mod dispatch;
+ mod exec_image;
+ mod exec_script;
++mod file_mapping;
+ mod fs_hooks;
+ mod launch;
+ mod launch_tasks;
+diff --git a/crates/ginux-init/src/storage_memory.rs b/crates/ginux-init/src/storage_memory.rs
+index 77d2cf3a..12a7e8b8 100644
+--- a/crates/ginux-init/src/storage_memory.rs
++++ b/crates/ginux-init/src/storage_memory.rs
+@@ -1,7 +1,8 @@
+-//! Supervisor-owned anonymous overlay bytes. No host file or mapping handle is
+-//! installed in a tracee. Capacity is charged across all live overlay objects.
++//! Supervisor-owned anonymous file backing. Capacity is charged across live
++//! overlay objects; no pathname or writable host descriptor is exported.
++//! Memfd identity keeps private mappings coherent with mediated writes/truncate.
+ 
+-use crate::supervisor::{syscall2, syscall5, syscall6};
++use crate::supervisor::{syscall1, syscall2, syscall6};
+ use ginux_vfs::{OverlayStorage, VfsError};
+ 
+ const PAGE: usize = 4096;
+@@ -10,6 +11,16 @@ const PAGE: usize = 4096;
+ struct Mapping {
+     address: usize,
+     capacity: usize,
++    length: usize,
++    descriptor: i32,
++}
++impl Mapping {
++    const EMPTY: Self = Self {
++        address: 0,
++        capacity: 0,
++        length: 0,
++        descriptor: -1,
++    };
+ }
+ 
+ pub struct MemoryStorage<const FILES: usize> {
+@@ -21,15 +32,11 @@ pub struct MemoryStorage<const FILES: usize> {
+ impl<const FILES: usize> MemoryStorage<FILES> {
+     pub const fn new(limit: usize) -> Self {
+         Self {
+-            files: [Mapping {
+-                address: 0,
+-                capacity: 0,
+-            }; FILES],
++            files: [Mapping::EMPTY; FILES],
+             limit,
+             allocated: 0,
+         }
+     }
+-
+     pub fn allocated_bytes(&self) -> usize {
+         self.allocated
+     }
+@@ -41,68 +48,80 @@ impl<const FILES: usize> MemoryStorage<FILES> {
+             .ok_or(VfsError::FileTooLarge)
+     }
+ 
+-    fn grow(&mut self, slot: usize, length: usize) -> Result<(), VfsError> {
+-        let file = self.files[slot];
+-        if length <= file.capacity {
+-            return Ok(());
+-        }
+-        let needed = Self::pages(length)?;
+-        let available = self.limit - self.allocated + file.capacity;
+-        if needed > available {
+-            return Err(VfsError::OverlayLimit);
+-        }
+-        let capacity = needed.max(file.capacity.saturating_mul(2)).min(available) & !(PAGE - 1);
+-        let address = unsafe {
+-            if file.capacity == 0 {
+-                syscall6(9, 0, capacity, 3, 0x22, usize::MAX, 0)
+-            } else {
+-                syscall5(25, file.address, file.capacity, capacity, 1, 0) // MREMAP_MAYMOVE
++    /// The returned descriptor remains supervisor-owned. Consumers must obtain
++    /// their own reference before the overlay object can be released.
++    pub fn backing(&mut self, slot: usize) -> Result<i32, VfsError> {
++        let file = self
++            .files
++            .get_mut(slot)
++            .ok_or(VfsError::InvalidDescriptor)?;
++        if file.descriptor < 0 {
++            let fd = unsafe { syscall2(319, c"ginux-storage".as_ptr() as usize, 1) };
++            if fd < 0 {
++                return Err(VfsError::Io);
+             }
+-        };
+-        if address < 0 {
+-            // A failed anonymous allocation/remap leaves the old object intact.
+-            return Err(VfsError::OverlayLimit);
++            file.descriptor = fd as i32;
+         }
+-        self.files[slot] = Mapping {
+-            address: address as usize,
+-            capacity,
+-        };
+-        self.allocated += capacity - file.capacity;
+-        Ok(())
++        Ok(file.descriptor)
+     }
+ }
+ 
+ impl<const FILES: usize> OverlayStorage for MemoryStorage<FILES> {
+     fn resize(&mut self, slot: usize, old_len: usize, new_len: usize) -> Result<(), VfsError> {
+-        let previous = self.files[slot];
+-        if old_len > previous.capacity {
++        let old = self.files[slot];
++        if old_len != old.length {
+             return Err(VfsError::Io);
+         }
+-        if new_len == 0 {
+-            self.clear(slot);
++        let needed = Self::pages(new_len)?;
++        let available = self.limit - self.allocated + old.capacity;
++        if needed > available {
++            return Err(VfsError::OverlayLimit);
++        }
++        if old_len == new_len {
+             return Ok(());
+         }
+-        self.grow(slot, new_len)?;
+-        let file = self.files[slot];
+-        if new_len > old_len {
+-            // New anonymous pages are already zero. Only reused capacity can
+-            // contain bytes hidden by an earlier truncate; zero that range.
+-            let end = new_len.min(previous.capacity);
+-            if end > old_len {
++        let capacity = if new_len < old_len {
++            needed
++        } else if needed <= old.capacity {
++            old.capacity
++        } else {
++            needed.max(old.capacity.saturating_mul(2)).min(available) & !(PAGE - 1)
++        };
++        let fd = self.backing(slot)?;
++        let changed = capacity != old.capacity;
++        // Establish a replacement address first. A failed map or truncate
++        // preserves the old file bytes, address and charged capacity.
++        let address = if changed && capacity != 0 {
++            let mapped = unsafe { syscall6(9, 0, capacity, 3, 1, fd as usize, 0) };
++            if mapped < 0 {
++                return Err(VfsError::OverlayLimit);
++            }
++            mapped as usize
++        } else if changed {
++            0
++        } else {
++            old.address
++        };
++        let result = unsafe { syscall2(77, fd as usize, new_len) };
++        if result < 0 {
++            if changed && capacity != 0 {
+                 unsafe {
+-                    core::ptr::write_bytes((file.address + old_len) as *mut u8, 0, end - old_len);
++                    syscall2(11, address, capacity);
+                 }
+             }
+-        } else if new_len < old_len {
+-            let capacity = Self::pages(new_len)?;
+-            if capacity < file.capacity {
+-                let result =
+-                    unsafe { syscall2(11, file.address + capacity, file.capacity - capacity) };
+-                assert_eq!(result, 0, "overlay shrink unmap failed");
+-                self.files[slot].capacity = capacity;
+-                self.allocated -= file.capacity - capacity;
+-            }
++            return Err(VfsError::Io);
++        }
++        if changed && old.capacity != 0 {
++            let result = unsafe { syscall2(11, old.address, old.capacity) };
++            assert_eq!(result, 0, "overlay replacement unmap failed");
+         }
++        self.files[slot] = Mapping {
++            address,
++            capacity,
++            length: new_len,
++            descriptor: fd,
++        };
++        self.allocated = self.allocated - old.capacity + capacity;
+         Ok(())
+     }
+ 
+@@ -111,7 +130,7 @@ impl<const FILES: usize> OverlayStorage for MemoryStorage<FILES> {
+         let end = offset
+             .checked_add(output.len())
+             .ok_or(VfsError::FileTooLarge)?;
+-        if end > file.capacity {
++        if end > file.length {
+             return Err(VfsError::Io);
+         }
+         if !output.is_empty() {
+@@ -131,7 +150,7 @@ impl<const FILES: usize> OverlayStorage for MemoryStorage<FILES> {
+         let end = offset
+             .checked_add(input.len())
+             .ok_or(VfsError::FileTooLarge)?;
+-        if end > file.capacity {
++        if end > file.length {
+             return Err(VfsError::Io);
+         }
+         if !input.is_empty() {
+@@ -147,15 +166,15 @@ impl<const FILES: usize> OverlayStorage for MemoryStorage<FILES> {
+     }
+ 
+     fn clear(&mut self, slot: usize) {
+-        let file = self.files[slot];
++        let file = core::mem::replace(&mut self.files[slot], Mapping::EMPTY);
+         if file.capacity != 0 {
+             let result = unsafe { syscall2(11, file.address, file.capacity) };
+             assert_eq!(result, 0, "overlay release unmap failed");
+             self.allocated -= file.capacity;
+-            self.files[slot] = Mapping {
+-                address: 0,
+-                capacity: 0,
+-            };
++        }
++        if file.descriptor >= 0 {
++            let result = unsafe { syscall1(3, file.descriptor as usize) };
++            assert_eq!(result, 0, "overlay backing close failed");
+         }
+     }
+ }
+diff --git a/crates/ginux-vfs/src/lib.rs b/crates/ginux-vfs/src/lib.rs
+index c162abc9..45a200e3 100644
+--- a/crates/ginux-vfs/src/lib.rs
++++ b/crates/ginux-vfs/src/lib.rs
+@@ -520,6 +520,15 @@ impl<
+         }
+     }
+ 
++    /// Readable regular-file backing for an adapter-owned mapping reference.
++    pub fn readable_storage(&mut self, descriptor: i32) -> Result<(&mut S, usize), VfsError> {
++        let fd = self.descriptors[self.descriptor(descriptor)?];
++        if !fd.overlay || fd.directory || !fd.readable {
++            return Err(VfsError::PermissionDenied);
++        }
++        Ok((&mut self.storage, fd.object))
++    }
++
+     pub fn storage(&self) -> &S {
+         &self.storage
+     }
+diff --git a/scripts/test-launch-storage.py b/scripts/test-launch-storage.py
+index 4cf64e17..97d13e31 100644
+--- a/scripts/test-launch-storage.py
++++ b/scripts/test-launch-storage.py
+@@ -4,6 +4,7 @@ import json
+ import os
+ from pathlib import Path
+ import shutil
++import select
+ import subprocess
+ import sys
+ import tempfile
+@@ -11,7 +12,7 @@ import tempfile
+ 
+ def main():
+     if len(sys.argv) < 3 or os.geteuid() != 0:
+-        sys.exit('usage (as root): test-launch-storage.py <ginux> <storage-fixture> [growth|bounds|quota|view-probes ...]')
++        sys.exit('usage (as root): test-launch-storage.py <ginux> <storage-fixture> [scenario ...]')
+     binary, fixture = [str(Path(p).resolve()) for p in sys.argv[1:3]]
+     template = (Path(__file__).resolve().parent.parent / 'config/domain-gate5.toml').read_text()
+     with tempfile.TemporaryDirectory(prefix='ginux-storage-') as directory:
+@@ -38,8 +39,26 @@ def main():
+             path.write_text(config)
+             result = work / 'result.json'
+             result.unlink(missing_ok=True)
+-            proc = subprocess.run([binary, 'launch', str(path), str(root), '--result-file', str(result)],
+-                                  capture_output=True, timeout=20)
++            command = [binary, 'launch', str(path), str(root), '--result-file', str(result)]
++            if args == ['mapping']:
++                with (work / 'mapping.audit').open('wb') as audit:
++                    proc = subprocess.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=audit)
++                    try:
++                        assert select.select([proc.stdout], [], [], 10)[0], 'mapping workload did not become ready'
++                        assert proc.stdout.readline() == b'mapping-ready\n'
++                        children = Path(f'/proc/{proc.pid}/task/{proc.pid}/children').read_text().split()
++                        assert len(children) == 1, children
++                        native = sorted(p.name for p in Path(f'/proc/{children[0]}/fd').iterdir())
++                        assert native == ['0', '1', '2'], ('mapping leaked native fds', native)
++                        stdout, _ = proc.communicate(b'G', timeout=10)
++                    finally:
++                        if proc.poll() is None:
++                            proc.kill()
++                            proc.communicate(timeout=5)
++                proc.stdout = stdout
++                proc.stderr = (work / 'mapping.audit').read_bytes()
++            else:
++                proc = subprocess.run(command, capture_output=True, timeout=20)
+             record = json.loads(result.read_text())
+             if proc.returncode != expected:
+                 sys.exit(f'launch failed: {proc.returncode}\n{proc.stderr.decode()}\n{record}')
+@@ -54,7 +73,7 @@ def main():
+ 
+         if sys.argv[3:]:
+             for mode in sys.argv[3:]:
+-                if mode not in ('growth', 'bounds', 'quota', 'view-probes'):
++                if mode not in ('growth', 'bounds', 'quota', 'view-probes', 'mapping', 'ordinary-mapping', 'ordinary-unlinked-mapping'):
+                     sys.exit('unknown selected storage scenario')
+                 invoke(['memory:/work', 'memory:/work/build', 'memory:/out'], [mode],
+                        memory=16 if mode == 'bounds' else 256)
+@@ -71,6 +90,9 @@ def main():
+             invoke(['memory:/work', 'memory:/work/build', 'memory:/out'], [])
+         invoke(['memory:/work', 'memory:/work/build', 'memory:/out'], ['quota'])
+         invoke(['memory:/work', 'memory:/work/build', 'memory:/out'], ['bounds'], memory=16)
++        invoke(['memory:/work', 'memory:/out'], ['mapping'])
++        invoke(['memory:/work', 'memory:/out'], ['ordinary-mapping'])
++        invoke(['memory:/work', 'memory:/out'], ['ordinary-unlinked-mapping'])
+         invoke([], ['no-storage'])
+         for assignment in ['disk0', 'memory:/', 'memory:/proc', 'memory:/sys/x', 'memory:/dev',
+                            'memory:/bin', 'memory:/work/../out', 'memory:/work/', 'memory:work']:
+diff --git a/tests/fixtures/launch-storage-fixture.c b/tests/fixtures/launch-storage-fixture.c
+index e553487a..8bb66926 100644
+--- a/tests/fixtures/launch-storage-fixture.c
++++ b/tests/fixtures/launch-storage-fixture.c
+@@ -24,6 +24,39 @@ __asm__(".global scratch_stat\nscratch_stat:\n"
+         "mov %rsi,%rdi\nmov %rdx,%rsi\nmov $4,%rax\nsyscall\n"
+         "cmp %r13,%rdi\njne 1f\ncmp %r14,%rsi\nje 2f\n"
+         "1: mov $-123,%rax\n2: mov %r12,%rsp\npop %r14\npop %r13\npop %r12\nret\n");
++static int equal(const char *a, const char *b) {
++    while(*a && *a==*b) { ++a; ++b; } return *a==*b;
++}
++/* Ordinary data/coherence checks use only valid mappings and trusted buffers. */
++static long ordinary_mapping(int unlink_mode) {
++    long fd=DO(2,"/work/mapped",0102,0600);
++    CHECK(fd==3 && DO(77,fd,8192,0)==0,150);
++    CHECK(DO(1,fd,"old",3)==3 && DO(8,fd,4096,0)==4096 && DO(1,fd,"second",6)==6,151);
++    long mapped=call(9,0,8192,3,2,fd,0);
++    CHECK(mapped>0,152);
++    volatile char *bytes=(volatile char *)mapped;
++    CHECK(bytes[0]=='o' && bytes[4096]=='s' && bytes[8191]==0 && DO(8,fd,0,1)==4102,153);
++    long shared=call(9,0,4096,1,1,fd,4096);
++    CHECK(shared>0 && *(volatile char *)shared=='s',154);
++    CHECK(DO(8,fd,0,0)==0 && DO(1,fd,"new",3)==3 && bytes[0]=='n',155);
++    bytes[0]='C';
++    CHECK(DO(8,fd,0,0)==0 && DO(0,fd,output,3)==3 && output[0]=='n',156);
++    long child=DO(57,0,0,0); CHECK(child>=0,157);
++    if(!child) {
++        CHECK(DO(8,fd,4096,0)==4096 && DO(1,fd,"fresh",5)==5,158);
++        DO(60,0,0,0); __builtin_unreachable();
++    }
++    int status=-1; CHECK(DO(61,child,&status,0)==child && status==0 && bytes[4096]=='f' && *(volatile char *)shared=='f',159);
++    CHECK(DO(11,mapped,8192,0)==0 && DO(11,shared,4096,0)==0,160);
++    CHECK(DO(77,fd,0,0)==0 && DO(77,fd,8192,0)==0 && DO(8,fd,0,0)==0 && DO(1,fd,"kept",4)==4,161);
++    mapped=call(9,0,4096,1,2,fd,0); CHECK(mapped>0 && *(volatile char *)mapped=='k',162);
++    if(unlink_mode) {
++        CHECK(DO(87,"/work/mapped",0,0)==0 && DO(3,fd,0,0)==0,163);
++        fd=DO(2,"/work/mapped",0102,0600); CHECK(fd==3 && DO(1,fd,"other",5)==5 && *(volatile char *)mapped=='k',164);
++    }
++    CHECK(DO(11,mapped,4096,0)==0 && DO(3,fd,0,0)==0,165);
++    return 0;
++}
+ long storage_main(word *stack)
+ {
+     word argc = *stack;
+@@ -75,6 +108,54 @@ long storage_main(word *stack)
+         CHECK(DO(3,alias,0,0)==0,140);
+         return 0;
+     }
++    if (argc > 1 && equal(argv[1],"ordinary-mapping")) return ordinary_mapping(0);
++    if (argc > 1 && equal(argv[1],"ordinary-unlinked-mapping")) return ordinary_mapping(1);
++    if (argc > 1 && argv[1][0] == 'm') {
++        long fd=DO(2,"/work/mapped",0102,0600);
++        CHECK(fd==3 && DO(77,fd,8192,0)==0,110);
++        CHECK(DO(1,fd,"old",3)==3 && DO(8,fd,4096,0)==4096 && DO(1,fd,"second",6)==6,111);
++        CHECK(call(9,0,8192,3,1,fd,0)==-95,112);
++        long shared=call(9,0,4096,1,1,fd,0);
++        CHECK(shared>0 && *(volatile char *)shared=='o',132);
++        CHECK(DO(10,shared,4096,3)==-13 && DO(11,shared,4096,0)==0,133);
++        CHECK(call(9,0,8192,3,2,fd,1)==-22,113);
++        word stack_pointer; __asm__ volatile("mov %%rsp,%0":"=r"(stack_pointer));
++        CHECK(call(9,(stack_pointer-16384)&~4095UL,32768,3,0x12,fd,0)==-95,134);
++        long mapped=call(9,0,8192,3,2,fd,0);
++        CHECK(mapped>0,114);
++        volatile char *bytes=(volatile char *)mapped;
++        CHECK(bytes[0]=='o' && bytes[4096]=='s' && bytes[8191]==0,115);
++        CHECK(DO(8,fd,0,1)==4102,116);
++        CHECK(DO(8,fd,0,0)==0 && DO(1,fd,"new",3)==3 && bytes[0]=='n',117);
++        bytes[0]='C';
++        CHECK(DO(8,fd,0,0)==0 && DO(0,fd,output,3)==3 && output[0]=='n',118);
++        long child=DO(57,0,0,0);
++        CHECK(child>=0,119);
++        if (!child) {
++            CHECK(DO(8,fd,4096,0)==4096 && DO(1,fd,"fresh",5)==5,120);
++            DO(60,0,0,0); __builtin_unreachable();
++        }
++        int status;
++        CHECK(DO(61,child,&status,0)==child && status==0 && bytes[4096]=='f',121);
++        child=DO(57,0,0,0);
++        CHECK(child>=0,122);
++        if (!child) {
++            CHECK(DO(77,fd,0,0)==0,123);
++            volatile char fault=bytes[4096]; (void)fault;
++            DO(60,99,0,0); __builtin_unreachable();
++        }
++        CHECK(DO(61,child,&status,0)==child && (status&127)==7,124);
++        CHECK(DO(77,fd,8192,0)==0 && bytes[4096]==0,125);
++        CHECK(DO(11,mapped,8192,0)==0,126);
++        CHECK(DO(8,fd,0,0)==0 && DO(1,fd,"kept",4)==4,127);
++        mapped=call(9,0,4096,1,2,fd,0); CHECK(mapped>0,128);
++        CHECK(DO(87,"/work/mapped",0,0)==0 && DO(3,fd,0,0)==0,129);
++        fd=DO(2,"/work/mapped",0102,0600);
++        CHECK(fd==3 && DO(1,fd,"other",5)==5 && *(volatile char *)mapped=='k',130);
++        CHECK(DO(11,mapped,4096,0)==0 && DO(3,fd,0,0)==0,131);
++        CHECK(DO(1,1,"mapping-ready\n",14)==14 && DO(0,0,output,1)==1 && output[0]=='G',135);
++        return 0;
++    }
+     if (argc > 1 && argv[1][0] == 'n') {
+         CHECK(DO(2, "/work/new", 0101, 0644) < 0, 10);
+         return 0;

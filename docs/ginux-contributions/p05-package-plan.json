@@ -535,18 +535,49 @@
       "packet": "G12",
       "purpose": "Owned file mappings (`868862bc`, `680d5081`)",
       "dependencies": [
-        "G07",
-        "G09",
-        "G10"
+        "G11"
       ],
       "source_commits": [
+        "32e2c85fc7445da3e1e379bb6bf0dce6293dc3d7",
         "868862bce0627b1bc8b579a0cc8c761dfbec88f1",
         "680d5081e58b4e1e4ca2a86190505ba867645ab7"
       ],
       "acceptance": "Mapping offsets/permissions/aliasing, resize and private-copy behavior, nonleader mappings and cleanup; backing remains supervisor-owned.",
       "planned_delivery": "one coherent change plus its generic docs and focused regression fixtures; split coupled responsibilities only as recorded by P04",
-      "status": "pending extraction and R01-R04 review",
-      "artifact_directory": ".artifacts/ginux-contribution-preparation/G12"
+      "status": "per-process source separately self-reviewed; static/unit/build and ordinary runtime pass in source/clean replay; G07 thread join, security/full CI/current-main independence pending",
+      "artifact_directory": ".artifacts/ginux-contribution-preparation/G12",
+      "base": "0798d991ab2d652e54682750acb4fdd9f1e6d9ac",
+      "head": "83072ec3ddab3e4712ce8db9ba232a10342557de",
+      "tree": "4943047fea72e3e814ca38794fc573e9bd050238",
+      "changed_files": [
+        "README.md",
+        "crates/ginux-init/src/descriptors.rs",
+        "crates/ginux-init/src/file_mapping.rs",
+        "crates/ginux-init/src/fs_hooks.rs",
+        "crates/ginux-init/src/launch_tasks.rs",
+        "crates/ginux-init/src/main.rs",
+        "crates/ginux-init/src/storage_memory.rs",
+        "crates/ginux-vfs/src/lib.rs",
+        "scripts/test-launch-storage.py",
+        "tests/fixtures/launch-storage-fixture.c"
+      ],
+      "held_dependencies": [
+        "G07 nonleader/thread ownership and shared-argument security acceptance"
+      ],
+      "standalone": false,
+      "patch_sha256": "528b05833a472e45c6c935419b05767ddf78145627c01a956c616a1d36200bcd",
+      "unit_tests": 92,
+      "vfs_tests": 34,
+      "clean_matched_paths": 178,
+      "review": "separate self-review; no independent reviewer/security coverage claimed",
+      "remote_ci": "not run",
+      "security_handoff": "daybreakblue-handoff.md",
+      "source_binary_sha256": "cab7a0daf11ce3f927e495a0c285dd537675941aa9d99e7cd2b3d0c355c711c8",
+      "clean_binary_sha256": "cab7a0daf11ce3f927e495a0c285dd537675941aa9d99e7cd2b3d0c355c711c8",
+      "ordinary_mapping_scenarios": 2,
+      "held_thread_join": "held-thread-join.patch",
+      "evidence": "g12-review.md",
+      "source_patch": "patches/G12.patch"
     },
     {
       "packet": "G13",
