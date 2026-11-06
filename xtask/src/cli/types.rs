@@ -354,16 +354,16 @@ pub struct InspectArgs {
     #[arg(long)]
     pub all_pages: bool,
     /// Terminal columns.
-    #[arg(long, default_value_t = 140)]
+    #[arg(long, default_value_t = crate::tasks::tui::inspect::DEFAULT_SIZE.columns)]
     pub columns: u16,
     /// Terminal rows.
-    #[arg(long, default_value_t = 40)]
+    #[arg(long, default_value_t = crate::tasks::tui::inspect::DEFAULT_SIZE.rows)]
     pub rows: u16,
     /// Milliseconds without output that count as "drawn".
-    #[arg(long, default_value_t = 500)]
+    #[arg(long, default_value_t = crate::tasks::tui::inspect::DEFAULT_WAIT.settle.as_millis() as u64)]
     pub settle_ms: u64,
     /// Give up if the screen never settles within this many seconds.
-    #[arg(long, default_value_t = 30)]
+    #[arg(long, default_value_t = crate::tasks::tui::inspect::DEFAULT_WAIT.timeout.as_secs())]
     pub timeout_seconds: u64,
     /// Base directory; a timestamped run folder is created under it.
     #[arg(long, value_name = "PATH")]

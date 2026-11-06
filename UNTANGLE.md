@@ -1100,7 +1100,41 @@ The entrypoint has no test branches (`--probe`, `LEVITATE_INSTALL_ENTRYPOINT_SMO
 **Depends on:** F19, F23.
 
 
+### F25. Re-audit round 1: payload layer, TUI bugs, surplus, safer checks.
+
+Fresh subagents re-audited the changed code (TUI kit and apps; the builder's install-UX wiring; xtask's TUI tooling) without the log. What they found and is fixed here:
+
+- `N002` [hidden] `install_ux::write_payload` and the split pane's runtime action wrote the install screen (launcher, docs bundle, bun, `install-split`) into the live **rootfs**, which `recstrap` installs, so every installed system carried it. Now it goes into the overlay.
+- `N003` [hidden] Each variant declared `install-split`'s rootfs destination by hand, which had to equal `install_ux::SPLIT`. The action is now an overlay tool payload (`usr/bin/install-split`); the builder fails if it's missing.
+- `N004` [special] The systemd overlay accepted any `ttyS*` install-UX console but only ever enables `serial-getty@ttyS0`; it now accepts only tty1 and ttyS0.
+- `N005` [surplus] `openrc_inittab` (`desktop_with_serial`/`serial_only`) never varied (no variant uses `serial_only`); four near-identical init types were converted twice (`OverlayKind`+`OpenRcInittab` → `BootOverlayPolicy` → `InitSystem`+`InittabVariant`). Gone: the knob, `OpenRcInittab`, `InittabVariant`, `BootOverlayPolicy`; the builder uses `InitSystem` throughout.
+- `N006` [surplus] AcornOS got an ACPI handler and an elogind drop-in, but neither acpid nor elogind is installed; the "disable suspend" sysctl only set `kernel.sysrq=1`. Now only `50-live-sysrq.conf`.
+- `N007` [hidden] install-docs: opening a link set "opened docs page …", then the page-change effect cleared it after render, so the note never showed. Page changes reset state in `showPage` only.
+- `N008` [surplus] install-docs' status line added the "action" segment twice with content focused.
+- `N009` [special] recab-tui's Refresh ran `recab status`, then bumped the refresh counter, which ran it again; Refresh now only re-reads the status panel.
+- `N010` [hidden] recab-tui's busy guard read state from a closure, so two keys in one batch could start two mutations; it's a ref now.
+- `N011` [surplus] Kit exports no app imports (`useTuiViewport`, `hotkeyStatusSegment`, `resolveColor`, `clampNumber`, `padRight`, `keyHint`, `keymapHelp`, `errorMessage`, several types) and helpers with no caller at all (`horizontalRule`, `prefixWrappedText`, `wrapText`, `toNonNegativeInt`); `errorMessage` written three times; the grid hook's unused returns and `disabled` option.
+- `N012` [surplus] Theme intents nothing reads: `border`, `background`, `headerBackground`, `footerSeparator`.
+- `N013` [surplus] Stale docs: install-docs' `style-map.md` named about 20 files that don't exist; the kit README's layout section; install-docs' README listed removed flags.
+- `N014` [surplus] An unused `pushToken` export and `FlatDocsNavItem.href`; disk-plan's two unreachable `applyStarted` branches; recab-tui's `runActionById` and never-passed `maxLines`.
+- `N015` [special] `check tui` hard-coded the docs-pane app (`install-docs`), rendered its default page, and used console sizes (80×25, 128×48) the ISO doesn't have (`video=1920x1080`). It now renders each variant's `[install_ux]` docs app at its page in the docs pane of an 80×24 serial terminal and a 240×67 framebuffer console.
+- `N016` [hidden] `inspect` didn't check that `inspect.path` folders exist; a typo would let disk-plan's walk (which types `DESTROY`) run the real `recpart` that `tools_path` builds. Missing folders are an error now.
+- `N017` [hidden] `inspect` defaulted to 140×40 and its own 500 ms/30 s, `check tui` to 120×36 and copies of the waits; both use `inspect::DEFAULT_SIZE`/`DEFAULT_WAIT` now.
+- `N018` [surplus] `inspect.args` in the app manifest: no app sets it, and `pages()` and `xtask tui` ignored it.
+- `N019` [hidden] The builder hard-coded `--slug` for the docs page; it uses the app manifest's `inspect.pages.arg`.
+- `N020` [hidden] `cargo xtask gen` formats with the workspace's oxfmt but never installed the workspace; `cargo xtask check` runs `gen` before `bun install`, so it failed on a fresh clone.
+
+**Done when:** these are gone and `cargo xtask check tui` passes.
+
 ### Leave as is
+
+Left from the re-audit (round 1), with reasons:
+
+- The keyboard model: each app works out by hand which keymaps are active for its footer and `--help` (disk-plan's footer lists mode and confirm keys while the failure view is up), repeats key lists to tell back from forward (three copies), and on disk-plan's mode page NAV_KEYS and MODE_KEYS both bind j/k/h/l, so hook call order decides. Pages branch on `pageId` in the screen instead of declaring their body and keymap; the "▸" marker and selected-card border are copied by hand; quit and focus bindings are copied per app; `navWidth` is a second way past the theme. The fix is one kit model (keymaps registered with the keyboard provider, bindings with a direction, pages that own their keys) that the footer and help render; that is a redesign of the kit's input and page layer, and the next step of the planned install-UI overhaul, not a cleanup.
+- disk-plan's list-disks goes through its own path (throw → async task → two re-encodings) instead of `useRecpartRun`; folding it in belongs with the page model above.
+- recab-tui's `inspect.refuse` must list every mutating action by hand, and install-docs' snapshot mask regex matches the status line's wording. Both are one manifest line beside the code they guard; tying them needs the manifest to reference app code.
+- The builder: the boot-injection serial key and the launcher's `--probe`/split pane `--smoke` are test hooks until F24; the slirp addresses in `live-net-setup`, the cleanup script's hard-coded mount points and the rootfs/overlay duplicate writers predate this scope (see the F21 paragraph); recstrap built twice and the live-tools spec reloading the boot spec are in another session's lines in `products.rs`/products.toml; the shell named in three places (install screen, serial autologin, passwd) and live-help in the boot-only overlay are small.
+- xtask: the 38×22 snapshot's size is copied by hand from the layout (the render step checks the real size); recab-tui's only check is a render (it has no fixture yet); `BROKEN`'s "Terminal too small" repeats the kit's text across languages; `Options` copies `InspectArgs`; `check tui` reinstalls the workspace per app; each walk step relaunches and retypes; a generated type takes three entries in `generate.rs`; disk-plan's recpart stand-in isn't validated against the generated schemas; walk/mask/refuse live in the contract crate; unused turbo/biome entries in the root package.json. Each is real but small, or touches files other sessions are changing.
 
 F24 was not applied: rewriting the install tests to drive the real serial launch needs a booting QEMU, and this machine can't even prepare products without root. Replacing `--probe`/`--smoke` with a check that can't be run here would drop the UX coverage the tests have today. The launcher (F19) and split pane (F23) keep both test branches working; the new check is: boot one live-tools ISO with `INSTALL_UX_SERIAL=1`, and on the serial console's composed screen expect the docs title and a shell that answers after Ctrl-].
 
@@ -1291,3 +1325,8 @@ Commits land on the checked-out branches (superproject `master`, submodules `cod
 - [ ] F24 — Install tests exercise the real launch, not a smoke stand-in. Not applied: needs a booting QEMU; its problems moved to Leave as is.
 - [x] Comments — tui `cda8ec0`, builder `796dbf9`, superproject commit "Comments and tests…". 10 comments removed that restated the code they sat on (disk-plan, install-docs, recab-tui, kit `run-app.tsx`, xtask `generate.rs` and `pty_capture.rs`, `acpi-handler.sh`, whose "let other events through" sat on an empty case). Most comments left in scope describe something outside the code (PTY EIO, how terminals report Ctrl-], chalk ignoring NO_COLOR, apk DNS, virtio NIC names) or a public item's purpose.
 - [x] Tests — `check tui` stops looking for "Unhandled TUI error": nothing prints it since the kit's crash handling exits non-zero, which a capture already reports, so that check could never fail. The rest stays: the docs-pane renders, the install-docs snapshots and disk-plan's walks fail on visible regressions, and xtask's CLI tests check exit-code behaviour. Unit tests are banned in this repo, and the install tests' smoke stand-ins stay until F24 can be done.
+- [x] F25 — Re-audit round 1. contract `8fa3c31`, builder `362c651`, tui `98b94e7`, superproject commit "F25: re-audit round 1". N002–N020 fixed; the rest left with reasons under Leave as is.
+  - **Bug fixed:** installed systems carried the install screen and bun (N002).
+  - **Bugs fixed:** the "opened docs page" note never showed (N007); recab-tui ran `recab status` twice per refresh (N009) and could start two mutations from one batch of keys (N010).
+  - Behaviour change: recab-tui's Refresh no longer adds a log entry; the status panel shows the result or the error.
+  - Verified: builder, contract and xtask compile; both variants load and validate; `cargo xtask check tui` passes, including install-docs at LevitateOS's `installation` page in the docs pane of 80×24 (38×21) and 240×67 (118×64) consoles; overlays render with only the ACPI/elogind/sysctl change.

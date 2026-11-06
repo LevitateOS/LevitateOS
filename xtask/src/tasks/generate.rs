@@ -44,6 +44,8 @@ impl Out {
 
 pub fn run(check: bool) -> Result<()> {
     let mut out = Out { check, stale: Vec::new(), written: 0 };
+    // The output is formatted with the workspace's oxfmt.
+    crate::tasks::check::install_js_workspace(&crate::util::repo::repo_root()?)?;
     generate(&mut out)?;
     if !out.stale.is_empty() {
         for path in &out.stale {

@@ -1,8 +1,9 @@
 //! `check tui`: the checks that tell whether the terminal apps work.
 //!
 //! For every TUI package: typecheck, lint and format check. For every app: it must
-//! draw at a full console size without crashing; install-docs must also draw at the
-//! size the install screen's docs pane really has; snapshots under an app's
+//! draw at a full console size without crashing; an app a variant shows in its
+//! install screen (`[install_ux]` docs) must also draw, at that variant's page, at the
+//! size the docs pane really has on each console; snapshots under an app's
 //! `snapshots/<columns>x<rows>/<page>.txt` must match; and each app's declared walk
 //! (keys typed in turn, text each screen must show) must hold.
 
@@ -11,28 +12,19 @@ use regex::Regex;
 use std::fs;
 use std::path::Path;
 use std::process::Command;
-use std::time::Duration;
 
 use super::inspect::{CaptureError, Launch, Shot, Size, Wait};
 use crate::util::pty_capture::parse_keys;
 use distro_contract::tui_apps::{self, TuiApp};
 
-/// Console sizes the install screen runs on: VGA text mode and a 1024x768 framebuffer.
-const CONSOLES: &[(u16, u16)] = &[(80, 25), (128, 48)];
-/// A roomy terminal, as a developer runs the apps.
-const FULL: Size = Size {
-    columns: 120,
-    rows: 36,
-};
-const WAIT: Wait = Wait {
-    settle: Duration::from_millis(500),
-    timeout: Duration::from_secs(30),
-};
+/// Console sizes the install screen runs on: a serial terminal, and the 1920x1080
+/// framebuffer the live kernel command line asks for (`video=1920x1080`) in 8x16 cells.
+const CONSOLES: &[(u16, u16)] = &[(80, 24), (240, 67)];
+const FULL: Size = super::inspect::DEFAULT_SIZE;
+const WAIT: Wait = super::inspect::DEFAULT_WAIT;
 /// Screens that mean the app is broken even though it is still running. (A crash
 /// exits non-zero, which a capture already reports.)
 const BROKEN: &[&str] = &["Terminal too small", "Invalid hook call"];
-/// The app shown in the install screen's docs pane.
-const DOCS_PANE_APP: &str = "install-docs";
 
 pub fn run(bless: bool) -> Result<()> {
     let root = crate::util::repo::repo_root()?;
@@ -53,6 +45,7 @@ pub fn run(bless: bool) -> Result<()> {
         }
     }
 
+    let hosted = install_screen_docs(&root)?;
     for app in tui_apps::discover(&root)? {
         let name = app.name.clone();
         let launch = match Launch::prepare(&root, app) {
@@ -63,17 +56,20 @@ pub fn run(bless: bool) -> Result<()> {
             }
         };
         step(format!("render {name} {}x{}", FULL.columns, FULL.rows), render(&launch, &[], FULL));
-        if name == DOCS_PANE_APP {
+        for (variant, page) in hosted.iter().filter(|(_, (app, _))| *app == name).map(|(v, (_, p))| (v, p)) {
+            let args = match page {
+                Some(page) => vec![page_arg(&launch.app)?, page.clone()],
+                None => Vec::new(),
+            };
             for &(columns, rows) in CONSOLES {
-                let (pane_columns, pane_rows) =
-                    install_split_pane::docs_pane_size(columns, rows);
+                let (pane_columns, pane_rows) = install_split_pane::docs_pane_size(columns, rows);
                 let size = Size {
                     columns: pane_columns,
                     rows: pane_rows,
                 };
                 step(
-                    format!("render {name} in the docs pane of a {columns}x{rows} console ({pane_columns}x{pane_rows})"),
-                    render(&launch, &[], size),
+                    format!("render {name} as {variant}'s docs pane on a {columns}x{rows} console ({pane_columns}x{pane_rows})"),
+                    render(&launch, &args, size),
                 );
             }
         }
@@ -90,6 +86,28 @@ pub fn run(bless: bool) -> Result<()> {
         bail!("{} check(s) failed: {}", failed.len(), failed.join(", "));
     }
     Ok(())
+}
+
+/// Each variant whose install screen shows a TUI app: variant, (app, page).
+fn install_screen_docs(root: &Path) -> Result<Vec<(String, (String, Option<String>))>> {
+    let mut hosted = Vec::new();
+    let mut variants: Vec<_> = fs::read_dir(root.join("distro/variants"))?
+        .collect::<std::io::Result<_>>()?;
+    variants.sort_by_key(|entry| entry.file_name());
+    for entry in variants {
+        let name = entry.file_name().to_string_lossy().into_owned();
+        if name.starts_with('_') || !entry.path().join("ring2/products.toml").is_file() {
+            continue;
+        }
+        let contract = distro_contract::load_variant_contract_for_distro_from(root, &name)
+            .with_context(|| format!("loading variant '{name}'"))?;
+        if let distro_contract::InstallDocs::TuiApp { app, page } =
+            contract.product_config.install_ux.docs
+        {
+            hosted.push((name, (app, page)));
+        }
+    }
+    Ok(hosted)
 }
 
 fn bun_run(dir: &Path, script: &str) -> Result<()> {

@@ -95,6 +95,17 @@ pub fn run(options: Options) -> Result<()> {
     Ok(())
 }
 
+/// A roomy terminal, as a developer runs the apps; `inspect`'s default and the size
+/// `check tui` renders at, so a failing check reproduces without flags.
+pub const DEFAULT_SIZE: Size = Size {
+    columns: 120,
+    rows: 36,
+};
+pub const DEFAULT_WAIT: Wait = Wait {
+    settle: Duration::from_millis(500),
+    timeout: Duration::from_secs(30),
+};
+
 #[derive(Clone, Copy)]
 pub struct Size {
     pub columns: u16,
@@ -136,6 +147,10 @@ impl Launch {
             .unwrap_or_else(|| std::env::var_os("PATH").unwrap_or_default());
         if !app.inspect.path.is_empty() {
             let mut paths: Vec<PathBuf> = app.inspect.path.iter().map(|dir| app.dir.join(dir)).collect();
+            // A missing stand-in folder would let the real tool run instead.
+            if let Some(missing) = paths.iter().find(|dir| !dir.is_dir()) {
+                bail!("{}: inspect.path folder '{}' does not exist", app.name, missing.display());
+            }
             paths.extend(std::env::split_paths(&path));
             path = std::env::join_paths(paths)?;
         }
@@ -154,7 +169,6 @@ impl Launch {
 
     pub fn argv(&self, args: &[String]) -> Vec<String> {
         let mut argv = vec!["bun".to_string(), self.app.entry.display().to_string()];
-        argv.extend(self.app.inspect.args.iter().cloned());
         argv.extend(args.iter().cloned());
         argv
     }

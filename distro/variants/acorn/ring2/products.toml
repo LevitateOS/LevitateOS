@@ -16,7 +16,6 @@ description = "Canonical base root filesystem tree"
 logical_name = "product.payload.live_overlay"
 description = "Read-only live overlay payload tree"
 overlay_kind = "openrc"
-openrc_inittab = "desktop_with_serial"
 
 [ring2_products.boot_live]
 logical_name = "product.payload.boot.live"
@@ -143,12 +142,12 @@ kind = "apk_packages"
 packages = ["curl", "pciutils", "smartmontools", "hdparm", "vim", "htop"]
 
 [ring2_runtime_profiles.live_tools_ux]
+# The install screen's split pane; live only, so it goes into the overlay.
 [[ring2_runtime_profiles.live_tools_ux.actions]]
-kind = "rootfs_workspace_binary"
+kind = "tool_payload_workspace_binary"
 package = "install-split-pane"
 binary = "install-split"
 target = "x86_64-unknown-linux-musl"
-destination = "usr/local/bin/install-split"
 
 [ring2_products.kernel_staging]
 logical_name = "product.kernel.staging"

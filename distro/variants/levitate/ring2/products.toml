@@ -203,11 +203,11 @@ package = "recstrap"
 destination = "usr/bin/recstrap"
 
 [ring2_runtime_profiles.live_tools_ux]
+# The install screen's split pane; live only, so it goes into the overlay.
 [[ring2_runtime_profiles.live_tools_ux.actions]]
-kind = "rootfs_workspace_binary"
+kind = "tool_payload_workspace_binary"
 package = "install-split-pane"
 binary = "install-split"
-destination = "usr/local/bin/install-split"
 
 [ring2_products.kernel_staging]
 logical_name = "product.kernel.staging"
