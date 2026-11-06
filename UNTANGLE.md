@@ -70,7 +70,11 @@ Views (rerun with the scripts in Scope): skeleton `.artifacts/untangle-ui/skelet
 
 Totals: **649 entries — 364 hidden, 47 needless, 130 surplus, 108 special** (636 from the area passes after dropping 9 cross-area duplicates, plus 13 from the completeness pass). The special-case count, 108, is the number the refactor works to bring down.
 
-**Biggest clusters** (detail under `## Fixes`):
+**Biggest clusters** (detail under `### Found during the refactor
+
+- [hidden] N001 `docs/content` highlighted code ends a backslash-continued line with `\[[/]]`; the `[[fg=]]` markup reads `\[[` as an escaped `[[`, so code blocks show a literal `[[/]]` (seen in cli-reference's "Inputs and Results"). The producer's escaping and the parser's grammar disagree, and nothing checks them against each other.
+
+## Fixes`):
 1. **The launch chain from login to install screen has no owner.** tty selection, command choice, shell choice and env (`LEVITATE_INSTALL_*`, `LEVITATE_DOCS_PLAIN`, TERM/COLORTERM/FORCE_COLOR/NO_COLOR) are decided separately in the profile hook, serial autologin, entrypoint, split pane, docs launcher scripts and xtask, all as Rust format strings or copies; paths differ per distro and two are dead (systemd agetty has no `-l`; Acorn's ttyS0 branch can't run).
 2. **The UI can't fit where it's shown and lies about colour.** The docs app needs 88 columns but gets half the console (verified: "Terminal too small"); ansi256 colours are emitted as bare numbers Ink ignores, hidden by forcing `FORCE_COLOR=3` in five places; `LEVITATE_DOCS_PLAIN` is never read.
 3. **Checks that can't catch anything.** lint/format point at missing configs; the PTY test calls a renamed xtask subcommand; snapshots embed the page count; `inspect tui --input` writes keys to the screen, not the app; split-pane `--smoke` passes on tty echo; recab is typechecked but crashes on launch (kit lists React as a dependency, recab isn't a workspace member).
@@ -1206,7 +1210,11 @@ Commits land on the checked-out branches (superproject `master`, submodules `cod
   - Behaviour change on purpose: recab-tui's action list now uses the same nav list as the docs sidebar (section markers, highlighted selection) instead of a plain `>`/`::` text block.
   - Verified: snapshots unchanged; 256-colour code counts unchanged (installation-disk 229).
   - Moved to F12: A150 (`useScrollState` taking its maximum once) needs the docs line model, where the maximum is known before the offset.
-- [ ] F12 — install-docs lays each block out once: block → lines.
+- [x] F12 — install-docs lays each block out once. tui `dd7b090`. New `src/layout/page.ts` (`layoutPage`, `Line`, `Anchor`) and `src/layout/syntax-markup.ts`; the viewer draws lines from it. Deleted `rendering/`, `domain/render/`, `presentation/ink/{blocks,document,primitives}/`, `components/content-pane.tsx`; install-docs is 1,436 lines (from 4.3k at the audit). Kit `useScrollState(maxScroll)` (A150, moved here from F11).
+  - **Bugs fixed:** scroll drift from measure/render disagreement (long command lines, the `[COPY]` suffix, interactive steps); QA-answer links never highlighted; link targets scrolled to the block, not the link's line; all links sharing an href highlighted together; table cells cut to one line; interactive step commands parsed as colour markup.
+  - Verified: `G` lands on each page's last line (installation-disk, faq, helpers-overview, cli-reference, variants); snapshot changes limited to tables (cells wrap; the divider spans the columns only).
+  - Behaviour changes on purpose: a selected command shows `▸` instead of `$` and no longer grows a `[COPY]` suffix (the status bar says Enter copies), so selecting never moves the layout.
+  - Found, not fixed here (logged under Problems as N001): docs-content's highlighted lines end a `\`-continued line with `\[[/]]`, which the markup grammar reads as an escaped `[[`, so `[[/]]` shows in code blocks (also before this fix).
 - [ ] F13 — Apps get distro identity from their launcher, and install-docs fails fast.
 - [ ] F14 — Facts owned by recpart and recab reach the TUIs only through `cargo xtask gen`.
 - [ ] F15 — disk-plan as an explicit flow graph, with IO kept apart from pages.
