@@ -88,6 +88,15 @@ verification remain with the written DaybreakBlue handoff, without dispatch.
 New evidence is separate from the preserved recovery logs:
 `.artifacts/ginux-contribution-preparation/F03/resume-2026-11-06/` contains
 `verify-integrity.py`, `integrity.json`, and fingerprints of all six restored
-worktree indexes/statuses. The interrupted ordinary state-restore scenario is
-being rerun with the destination harness, one case at a time, using the documented
-privileged coordinator. Its result remains pending until the harness finishes.
+worktree indexes/statuses. The previously interrupted ordinary state-restore
+scenario now **passes 1/1 in 328.38 seconds** on the destination harness, using
+the documented privileged coordinator. It covers initial alpha installation,
+restored alpha reuse, an independent readiness query and a changed beta define,
+checking nested state, product bytes, saved generations and unchanged sources.
+This replaces only that case's interrupted status; the four thread-related
+failures and all other unperformed criteria remain open.
+
+Three further source-reviewed ordinary cases are running serially: independent
+custom readiness, 128 KiB file publication and nested-directory copy/move/cleanup.
+Their receipts remain pending until each complete scenario finishes. This is
+selected ordinary verification, not complete applicable-suite acceptance.
