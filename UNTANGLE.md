@@ -1197,7 +1197,10 @@ Commits land on the checked-out branches (superproject `master`, submodules `cod
   - Also: disk-plan's disk cards used `"cyan"`/`"gray"` and Ink's own `single` box (missed by F6).
   - Unchanged: 120x36 snapshots identical; F9's empty-nav frame in the viewer (B090) was deleted early because it was the only other `SurfaceFrame` user and is unreachable.
   - Moved to F11: A184 (blank lines rendered as `" "` per site) needs the one line renderer F11 builds.
-- [ ] F10 — The kit owns the app lifecycle: args, TTY, errors, exit codes and processes.
+- [x] F10 — The kit owns the app lifecycle. tui `c53f1d6`. Kit `app/run-app.tsx` (`runApp`, `UsageError`, `errorMessage`, flag spec → `--help`), `app/command.ts` (`startCommand`, `runCommand`), `useAppName`. Each app's `src/main.tsx` is one `runApp` call; `cli/` directories, bootstraps and install-docs' `errors.ts` are gone; disk-plan's `DiskMode` alias became `InstallMode` (C030/C031 done early) and its recpart wrappers became `runRecpart`/`startRecpart` over the kit runner.
+  - **Bugs fixed:** a render error exited 0 (verified in a PTY for an error in the first frame and in a later one: now exit 1 with Ink's error screen and the stack on stderr). Cause found on the way: when the first frame throws, Ink unmounts before `waitUntilExit` is attached and that promise never settles, so the kit records the crash in a boundary and sets the status on `exit`. `--slug -x` was rejected as a missing value (B084).
+  - Behaviour changes on purpose: recab-tui has no `--recab-bin` (tools come from PATH, as xtask sets it); every app's usage errors print `<name>: <message> (see --help)` and exit 2; the docs footer reads `[install-docs]` (snapshots re-blessed).
+  - Deferred to F15: `useAsyncTask` (A180/A181) is written with disk-plan's hooks, its only user.
 - [ ] F11 — One generic component per job in the kit.
 - [ ] F12 — install-docs lays each block out once: block → lines.
 - [ ] F13 — Apps get distro identity from their launcher, and install-docs fails fast.
