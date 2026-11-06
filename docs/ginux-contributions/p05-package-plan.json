@@ -632,8 +632,6 @@
       "packet": "G14",
       "purpose": "Owned current directories (`6a45d8f8`)",
       "dependencies": [
-        "G06",
-        "G09",
         "G13"
       ],
       "source_commits": [
@@ -641,9 +639,43 @@
       ],
       "acceptance": "chdir/fchdir/getcwd, relative paths across fork/exec and directory mutations; no host cwd leakage.",
       "planned_delivery": "one coherent change plus its generic docs and focused regression fixtures; split coupled responsibilities only as recorded by P04",
-      "status": "pending extraction and R01-R04 review",
+      "status": "per-process source separately self-reviewed; static/unit/build and ordinary runtime pass in source/clean replay; G07 thread-sharing join, security/full CI/current-main independence pending",
       "artifact_directory": ".artifacts/ginux-contribution-preparation/G14",
-      "policy_hold": "issue179; prepare/review existing local material only; no publication or assumption of upstream consent"
+      "policy_hold": "issue179; prepare/review existing local material only; no publication or assumption of upstream consent",
+      "base": "5c3ae8e5068b5da21d2c37f9545c0f7b10eba147",
+      "head": "ec6f9c480b7de187350672478500448e59a54ea3",
+      "tree": "8bb7106066f2fdfdbbc1f2e2a872b3c1cdf2ade7",
+      "changed_files": [
+        "README.md",
+        "crates/ginux-init/src/fs_hooks.rs",
+        "crates/ginux-init/src/launch_tasks.rs",
+        "scripts/test-launch-directories.py",
+        "tests/fixtures/launch-directory-fixture.c"
+      ],
+      "held_dependencies": [
+        "G07 thread-shared cwd and shared-argument security acceptance"
+      ],
+      "standalone": false,
+      "patch_sha256": "fa31f4db9308ccf8aaea71fea271d78fb423a3b785c551b92289de6f7699eff9",
+      "held_thread_join": "held-thread-join.patch",
+      "unit_tests": 95,
+      "vfs_tests": 37,
+      "clean_matched_paths": 177,
+      "review": "separate self-review; no independent reviewer/security coverage claimed",
+      "remote_ci": "not run",
+      "security_handoff": "daybreakblue-handoff.md",
+      "source_binary_sha256": "62ed29c4cdab304bef11763980557928961a0dace223dc118831109f0a62afaf",
+      "clean_binary_sha256": "62ed29c4cdab304bef11763980557928961a0dace223dc118831109f0a62afaf",
+      "ordinary_cwd_scenarios": 2,
+      "final_clean_export": "verified-head-reclaim",
+      "fixture_sha256": {
+        "launch-directory-fixture": "249e8def3ab4a9ebf56dccd1e06b1720d11aa0784a11b452f50a9335c593d5e8",
+        "launch-storage-fixture": "ac2322103b62819f8d0eb0a44536059608615cce3e153d9f8189f9ab086a129e",
+        "launch-script-fixture": "b644cedb25fdadad8fee88ce1c60756dac8810b0e09c4e1941e2245769962c27",
+        "launch-owned-exec-fixture": "ac70dd24534767b47ee52d088575f6d3d4a1e95f71b526bb3589daaf2e5ddf90"
+      },
+      "evidence": "g14-review.md",
+      "source_patch": "patches/G14.patch"
     },
     {
       "packet": "G15",

@@ -491,15 +491,23 @@ The exact G11 binary rejects the link fixture. Archive/restore joins remain with
 G19/G21/G22; runtime readlink/confinement/adversarial checks remain with DaybreakBlue.
 G13 inherits security/full CI/upstream prerequisite holds and is not publication-ready.
 
-Exact next task: **G14 — owned current directories**. Inspect6a45d8f8 before
-extraction on G135c3ae8e5; trace cwd identity, directory-FD lifetime, fork/exec
-inheritance, rename/removal and interpreter lookup. Preserve current per-process
-tasks and shared component resolution; do not import G07 threads or G12 mappings
-as accidental prerequisites. Keep native per-process cwd/scratch restoration and
-G13 final-entry semantics. Prepare normal chdir/fchdir/getcwd and relative-operation
-functionality locally; write low-level host-path leakage, race and protection
-validation down for DaybreakBlue. G07/G12 security/thread joins and policy holds
-remain explicit. No publication, branch changes or external messages are authorized.
+G14 per-process cwd source/ordinary preparation is retained at `ec6f9c48` on
+G135c3ae8e5. [Review/evidence](ginux-contributions/g14-review.md) records95
+units,177-path strict replay and ordinary chdir/fchdir/getcwd, fork/exec and directory
+identity, plus32 failed fork reservations and four one-slot child reclamations.
+Current link/script/ELF/storage/directory controls pass in source/clean exports;
+exact G13 fails the owned-cwd fixture. Thread-shared cwd stays with G07's held
+join, and security/full CI/current-main independence remain pending. No publication.
+
+Exact next task: **G15 — shared hardlink inode identity**. Inspect9e2a39e8 and trace
+its actual VFS path/object/FD dependencies before extracting on the smallest base
+(G135c3ae8e5 if G14 cwd capability is unused). Preserve shared duplicate
+positions, reopened offsets, whiteout replacement, executable pins, link-before-
+parent traversal and final-entry mutations. Reconcile cwd directory references
+when composing G14, without adding accidental stack ancestry. Prepare ordinary
+alias bytes/metadata, unlink/relink and quota/lifetime checks locally; write
+adversarial namespace, host authority and race validation down for DaybreakBlue.
+Do not revive the held G07/G12 joins as validated or publish anything before F04.
 
 Active skill: `hdae-development`, discovered at
 `/home/vince/.codex/worktrees/ginux-pr-combination-check/ginux/.agents/skills/hdae-development/SKILL.md`.

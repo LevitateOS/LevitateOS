@@ -1,0 +1,499 @@
+From ec6f9c480b7de187350672478500448e59a54ea3 Mon Sep 17 00:00:00 2001
+From: vince <vincepaul.liem@gmail.com>
+Date: Fri, 6 Nov 2026 14:04:15 +0100
+Subject: [PATCH] feat(launch): retain owned current directories per process
+
+Use VFS directory references for chdir, fchdir and getcwd. Copy them
+through fork, preserve them through exec, and retire them on successful
+image cwd changes, failed reservations or death. Preserve native scratch
+restoration and report renamed/removed directory identity accurately.
+
+Signed-off-by: vince <vincepaul.liem@gmail.com>
+---
+ README.md                                 |  15 ++-
+ crates/ginux-init/src/fs_hooks.rs         |  84 ++++++++++++++---
+ crates/ginux-init/src/launch_tasks.rs     | 109 +++++++++++++++++++---
+ scripts/test-launch-directories.py        |   6 +-
+ tests/fixtures/launch-directory-fixture.c |  72 ++++++++++++++
+ 5 files changed, 252 insertions(+), 34 deletions(-)
+
+diff --git a/README.md b/README.md
+index 9fffd909..b3dec331 100644
+--- a/README.md
++++ b/README.md
+@@ -238,11 +238,18 @@ chmod and stat/fstat/fstatat/statx metadata. Access and readlink probes stay in
+ the owned namespace; regular files accept O_NOCTTY. Directory cookies and inode
+ identity follow open descriptions across aliases, fork, rename and removal.
+ Namespace changes validate types, capacity and replacement before mutation.
+-Relative AT_FDCWD paths follow the calling process's image cwd; owned directory
++Relative AT_FDCWD paths follow the calling process's cwd; owned directory
+ FDs resolve relative operations through their current VFS identity. Image chdir,
+-getcwd and relative image exec retain native per-process cwd semantics. Entering
+-owned directories as cwd, relative image-directory FD access, hardlinks and
+-guest file mappings remain unsupported.
++getcwd and relative image exec retain native per-process cwd semantics.
++Relative image-directory FD access, hardlinks and guest file mappings remain
++unsupported. Owned chdir/fchdir/getcwd keep a private VFS directory reference per
++process. Fork copies that reference; exec keeps it; successful image chdir/fchdir
++releases it. Rename updates the reported path, and a removed cwd reports ENOENT
++for getcwd and relative operations until an absolute directory change. Private
++cwd references consume the existing 64-entry VFS open-description capacity.
++Relative owned scripts/interpreters use that cwd; relative fallback into the image
++and native kernel-selected relative interpreters from owned cwd remain unsupported.
++Configured-launch threads and shared cwd groups remain unsupported.
+ Owned symlink/symlinkat and readlink/readlinkat support bounded targets and
+ nofollow metadata. Link expansion precedes later parent components; mutations
+ name the final link itself, including directory requirements on trailing slashes.
+diff --git a/crates/ginux-init/src/fs_hooks.rs b/crates/ginux-init/src/fs_hooks.rs
+index 05b0499c..33d5ac4c 100644
+--- a/crates/ginux-init/src/fs_hooks.rs
++++ b/crates/ginux-init/src/fs_hooks.rs
+@@ -34,6 +34,7 @@ pub struct LaunchFs {
+     fs: MemoryFs,
+     prefixes: [Path; 8],
+     count: usize,
++    cwd: Option<i32>,
+     init: Path,
+     null: bool,
+ }
+@@ -115,6 +116,7 @@ impl LaunchFs {
+             fs,
+             prefixes,
+             count,
++            cwd: None,
+             null: config
+                 .devices
+                 .as_slice()
+@@ -155,7 +157,7 @@ impl LaunchFs {
+         let base = if absolute {
+             b"".as_slice()
+         } else if dirfd as i32 == -100 {
+-            cwd = crate::tracee_io::image_cwd(pid)?;
++            cwd = self.cwd_path(pid)?;
+             cwd.as_bytes()
+         } else {
+             let fd = (dirfd as u32)
+@@ -289,7 +291,7 @@ impl LaunchFs {
+         } else {
+             self.resolve(pid, path.as_bytes(), follow, missing)?
+         };
+-        if dirfd as i32 != -100
++        if (dirfd as i32 != -100 || self.cwd.is_some())
+             && read_path(pid, address)?.as_bytes().first() != Some(&b'/')
+             && !self.owns_path(path.as_bytes())
+         {
+@@ -317,19 +319,71 @@ impl LaunchFs {
+         Ok(Some((argument, path)))
+     }
+ 
+-    pub fn image_chdir(&self, pid: usize, address: u64) -> Result<(), i64> {
++    pub fn chdir(&mut self, pid: usize, address: u64) -> Result<Option<i32>, i64> {
++        let raw = read_path(pid, address)?;
+         let path = self.path(pid, address, (-100i64) as u64)?;
+         let path = self.resolve(pid, path.as_bytes(), true, false)?;
+         if self.owns_path(path.as_bytes()) {
++            return self
++                .fs
++                .open_directory(path.as_bytes(), 0)
++                .map(Some)
++                .map_err(errno);
++        }
++        self.check_exec_owner(path.as_bytes())?;
++        if self.cwd.is_some() && raw.as_bytes().first() != Some(&b'/') {
+             return Err(-95);
+         }
+-        if [b"/dev".as_slice(), b"/proc", b"/sys"]
+-            .iter()
+-            .any(|prefix| within(path.as_bytes(), prefix))
+-        {
+-            return Err(-13);
++        Ok(None)
++    }
++
++    // Borrow the caller's cwd for this syscall; the task owns its reference.
++    pub fn select_cwd(&mut self, descriptor: Option<i32>) {
++        self.cwd = descriptor;
++    }
++
++    pub fn cwd_path(&self, pid: usize) -> Result<Path, i64> {
++        match self.cwd {
++            Some(fd) => {
++                Path::from_bytes(self.fs.directory_path(fd).map_err(errno)?).map_err(|_| -36)
++            }
++            None => crate::tracee_io::image_cwd(pid),
+         }
+-        Ok(())
++    }
++
++    pub fn copy_cwd(&mut self, fd: i32) -> Result<i32, i64> {
++        self.fs.duplicate(fd, false).map_err(errno)
++    }
++
++    pub fn close_cwd(&mut self, fd: i32) -> Result<(), i64> {
++        self.fs.close(fd).map_err(errno)
++    }
++
++    pub fn descriptor_cwd(&mut self, handle: u32) -> Result<i32, i64> {
++        let fd = handle
++            .checked_sub(FD_BASE as u32)
++            .filter(|n| *n < 64)
++            .ok_or(-20)? as i32
++            + 3;
++        self.fs.directory_path(fd).map_err(errno)?;
++        self.copy_cwd(fd)
++    }
++
++    pub fn getcwd(&self, pid: usize, address: u64, capacity: u64) -> Result<i64, i64> {
++        let path = self.cwd_path(pid)?;
++        let n = path.as_bytes().len();
++        if capacity == 0 {
++            return Err(-22);
++        }
++        if capacity <= n as u64 {
++            return Err(-34);
++        }
++        let mut bytes = [0; MAX_PATH + 1];
++        bytes[..n].copy_from_slice(path.as_bytes());
++        if copy_memory(pid, address, &mut bytes[..n + 1], true)? != (n + 1) as i64 {
++            return Err(-14);
++        }
++        Ok((n + 1) as i64)
+     }
+ 
+     /// Image execution never reopens assigned paths, including implicit script
+@@ -404,12 +458,15 @@ impl LaunchFs {
+             let Some((length, script)) = next else {
+                 return Ok(());
+             };
++            if self.cwd.is_some() && name.first() != Some(&b'/') {
++                return Err(-95);
++            }
+             let mut joined = [0; MAX_PATH];
+             let cwd;
+             let base = if name.first() == Some(&b'/') {
+                 b"".as_slice()
+             } else {
+-                cwd = crate::tracee_io::image_cwd(pid)?;
++                cwd = self.cwd_path(pid)?;
+                 cwd.as_bytes()
+             };
+             let separator = usize::from(!base.is_empty() && base != b"/");
+@@ -457,7 +514,7 @@ impl LaunchFs {
+             let image = self.fs.pin_executable(path.as_bytes()).map_err(errno)?;
+             return self.check_exec(pid, image).map(Some);
+         }
+-        if dirfd as i32 != -100 && raw.as_bytes().first() != Some(&b'/') {
++        if (dirfd as i32 != -100 || self.cwd.is_some()) && raw.as_bytes().first() != Some(&b'/') {
+             return Err(-95);
+         }
+         self.native_exec_path(pid, address, follow)?;
+@@ -560,7 +617,7 @@ impl LaunchFs {
+         let base = if name.first() == Some(&b'/') {
+             b"".as_slice()
+         } else {
+-            cwd = crate::tracee_io::image_cwd(pid)?;
++            cwd = self.cwd_path(pid)?;
+             cwd.as_bytes()
+         };
+         let joined = join_path(base, name)?;
+@@ -569,6 +626,9 @@ impl LaunchFs {
+             let image = self.fs.pin_executable(path.as_bytes()).map_err(errno)?;
+             return self.check_exec(pid, image).map(Some);
+         }
++        if self.cwd.is_some() && name.first() != Some(&b'/') {
++            return Err(-95);
++        }
+         self.check_exec_owner(path.as_bytes())?;
+         let image = crate::path_hooks::ImageRoot::new(pid)?;
+         let mut physical = [0; MAX_PATH];
+diff --git a/crates/ginux-init/src/launch_tasks.rs b/crates/ginux-init/src/launch_tasks.rs
+index cba23d46..9c95583a 100644
+--- a/crates/ginux-init/src/launch_tasks.rs
++++ b/crates/ginux-init/src/launch_tasks.rs
+@@ -76,6 +76,8 @@ struct Task {
+     wait_status: Option<i32>,
+     descriptors: DescriptorTable,
+     image: Option<Executable>,
++    cwd: Option<i32>,
++    image_chdir: Option<u64>,
+     pending: Pending,
+     override_result: Option<i64>,
+     blocked: Option<UserRegs>,
+@@ -157,6 +159,8 @@ pub fn supervise(
+         wait_status: None,
+         descriptors,
+         image: None,
++        cwd: None,
++        image_chdir: None,
+         pending: Pending::None,
+         override_result: None,
+         blocked: None,
+@@ -374,6 +378,7 @@ impl Supervisor<'_> {
+         self.run(index, r, domain);
+     }
+     fn entry(&mut self, index: usize, r: &mut UserRegs, domain: &mut Domain) {
++        self.objects.filesystem.select_cwd(self.task(index).cwd);
+         if let Some(exec) = self.task(index).exec {
+             match exec.stage {
+                 ExecStage::Reenter => {
+@@ -476,26 +481,56 @@ impl Supervisor<'_> {
+                 }
+             }
+             79 => {
+-                audit_write(b"mediate surface=image-cwd\n");
+-                self.run(index, r, domain);
++                let result = self
++                    .objects
++                    .filesystem
++                    .getcwd(self.task(index).host, r.rdi, r.rsi)
++                    .unwrap_or_else(|error| error);
++                self.emulate(index, r, result, domain);
+                 return;
+             }
+             80 => {
+                 let host = self.task(index).host;
+-                let result = self
+-                    .objects
+-                    .filesystem
+-                    .image_chdir(host, r.rdi)
+-                    .and_then(|_| {
+-                        crate::path_hooks::Rewrite::prepare(self.objects.filesystem, host, r)
+-                    });
+-                match result {
+-                    Ok(rewrite) => {
+-                        self.task_mut(index).path_rewrite = rewrite;
+-                        audit_write(b"mediate surface=image-cwd\n");
+-                        self.run(index, r, domain);
++                match self.objects.filesystem.chdir(host, r.rdi) {
++                    Ok(Some(fd)) => {
++                        self.replace_cwd(index, Some(fd), domain);
++                        self.emulate(index, r, 0, domain);
++                    }
++                    Ok(None) => {
++                        let original = r.rdi;
++                        match crate::path_hooks::Rewrite::prepare(self.objects.filesystem, host, r)
++                        {
++                            Ok(rewrite) => {
++                                self.task_mut(index).path_rewrite = rewrite;
++                                self.task_mut(index).image_chdir = Some(original);
++                                audit_write(b"mediate surface=image-cwd\n");
++                                self.run(index, r, domain);
++                            }
++                            Err(-5) => self.fail(domain, b"chdir path scratch restoration failed"),
++                            Err(error) => self.emulate(index, r, error, domain),
++                        }
++                    }
++                    Err(error) => self.emulate(index, r, error, domain),
++                }
++                return;
++            }
++            81 => {
++                match self.task(index).descriptors.exec_descriptor(r.rdi) {
++                    Ok(ExecDescriptor::Owned(handle)) => {
++                        match self.objects.filesystem.descriptor_cwd(handle) {
++                            Ok(fd) => {
++                                self.replace_cwd(index, Some(fd), domain);
++                                self.emulate(index, r, 0, domain);
++                            }
++                            Err(error) => self.emulate(index, r, error, domain),
++                        }
++                    }
++                    Ok(ExecDescriptor::Native(fd)) => {
++                        self.task_mut(index).image_chdir = Some(r.rdi);
++                        let mut native = *r;
++                        native.rdi = fd as u64;
++                        self.run(index, &native, domain);
+                     }
+-                    Err(-5) => self.fail(domain, b"chdir path scratch restoration failed"),
+                     Err(error) => self.emulate(index, r, error, domain),
+                 }
+                 return;
+@@ -583,6 +618,28 @@ impl Supervisor<'_> {
+                         self.fail(domain, b"fork executable retain failed");
+                     }
+                 }
++                let cwd = match self.task(index).cwd {
++                    Some(fd) => match self.objects.filesystem.copy_cwd(fd) {
++                        Ok(fd) => Some(fd),
++                        Err(error) => {
++                            if let Some(image) = image {
++                                if self.objects.filesystem.release_executable(image).is_err() {
++                                    self.fail(domain, b"cwd-limited fork image rollback failed");
++                                }
++                            }
++                            let mut table = table;
++                            if let Err(reason) = table.release_exited(&mut self.objects) {
++                                self.fail(domain, reason);
++                            }
++                            if self.processes.cancel_fork(id, child).is_err() {
++                                self.fail(domain, b"cwd-limited fork rollback failed");
++                            }
++                            self.emulate(index, r, error, domain);
++                            return;
++                        }
++                    },
++                    None => None,
++                };
+                 self.tasks[slot] = Some(Task {
+                     id: child,
+                     host: 0,
+@@ -591,6 +648,8 @@ impl Supervisor<'_> {
+                     wait_status: None,
+                     descriptors: table,
+                     image,
++                    cwd,
++                    image_chdir: None,
+                     pending: Pending::None,
+                     override_result: None,
+                     blocked: None,
+@@ -1265,6 +1324,12 @@ impl Supervisor<'_> {
+         if let Some(result) = self.task_mut(index).override_result.take() {
+             r.rax = result as u64;
+         }
++        if let Some(original) = self.task_mut(index).image_chdir.take() {
++            r.rdi = original;
++            if r.rax == 0 {
++                self.replace_cwd(index, None, domain);
++            }
++        }
+         let result = self.tasks[index].as_mut().unwrap().descriptors.finish(r);
+         if let Err(reason) = result {
+             self.fail(domain, reason)
+@@ -1276,6 +1341,15 @@ impl Supervisor<'_> {
+         audit_write(b"\n");
+         self.run(index, r, domain);
+     }
++    fn replace_cwd(&mut self, index: usize, next: Option<i32>, domain: &mut Domain) {
++        let old = core::mem::replace(&mut self.task_mut(index).cwd, next);
++        if let Some(fd) = old {
++            if self.objects.filesystem.close_cwd(fd).is_err() {
++                self.fail(domain, b"cwd reference release failed");
++            }
++        }
++    }
++
+     fn wait_entry(&mut self, index: usize, r: &mut UserRegs, domain: &mut Domain) {
+         let selector = r.rdi as i32;
+         if selector != -1 && selector <= 0 || r.rdx & !1 != 0 || r.r10 != 0 {
+@@ -1342,6 +1416,11 @@ impl Supervisor<'_> {
+         }
+     }
+     fn release_task_images(&mut self, index: usize, domain: &mut Domain) {
++        if let Some(fd) = self.task_mut(index).cwd.take() {
++            if self.objects.filesystem.close_cwd(fd).is_err() {
++                self.fail(domain, b"task cwd release failed");
++            }
++        }
+         let owned = self.task_mut(index).exec.take().and_then(|exec| exec.owned);
+         if owned
+             .and_then(|owned| owned.script)
+diff --git a/scripts/test-launch-directories.py b/scripts/test-launch-directories.py
+index 3fb6aa36..ee44b976 100644
+--- a/scripts/test-launch-directories.py
++++ b/scripts/test-launch-directories.py
+@@ -11,7 +11,7 @@ import tempfile
+ 
+ def main():
+     if len(sys.argv)<3 or os.geteuid()!=0:
+-        sys.exit('usage (as root): test-launch-directories.py <ginux> <directory-fixture> [all|functional|cwd ...]')
++        sys.exit('usage (as root): test-launch-directories.py <ginux> <directory-fixture> [scenario ...]')
+     binary,fixture=[str(Path(p).resolve()) for p in sys.argv[1:3]]
+     template=(Path(__file__).resolve().parent.parent/'config/domain-gate5.toml').read_text()
+     with tempfile.TemporaryDirectory(prefix='ginux-directories-') as directory:
+@@ -29,8 +29,8 @@ def main():
+         config=template.replace('init = "/bin/bash"','init = "/bin/fixture"')
+         config=config.replace('[storage]\nassignments = []','[storage]\nassignments = ["memory:/work", "memory:/work/seed"]')
+         config=config.replace('[devices]\nassignments = []','[devices]\nassignments = ["null"]')
+-        for mode in (sys.argv[3:] or ['all', 'cwd']):
+-            if mode not in ('all', 'functional', 'cwd'):
++        for mode in (sys.argv[3:] or ['all', 'cwd', 'owned-cwd', 'ordinary-owned-cwd', 'ordinary-cwd-budget']):
++            if mode not in ('all', 'functional', 'cwd', 'owned-cwd', 'ordinary-owned-cwd', 'ordinary-cwd-budget'):
+                 sys.exit('unknown directory scenario')
+             # Each launch creates fresh domain storage; image cwd stays kernel-owned.
+             (work/'launch.toml').write_text(config.replace('args = []', 'args = ' + json.dumps([] if mode == 'all' else [mode])))
+diff --git a/tests/fixtures/launch-directory-fixture.c b/tests/fixtures/launch-directory-fixture.c
+index 0cd125f8..e02d58cf 100644
+--- a/tests/fixtures/launch-directory-fixture.c
++++ b/tests/fixtures/launch-directory-fixture.c
+@@ -25,9 +25,81 @@ static long create(const char *path, const char *data)
+     if (DO(3,fd,0,0)!=0) return -1;
+     return 0;
+ }
++static int copy_fixture(void) {
++    long source=DO(2,"/bin/fixture",0,0), dest=DO(2,"program",0102,0600);
++    if(source<0 || dest<0) return -1;
++    long n; while((n=DO(0,source,buffer,sizeof buffer))>0) if(DO(1,dest,buffer,n)!=n) return -1;
++    if(n<0 || DO(91,dest,0755,0) || DO(3,dest,0,0) || DO(3,source,0,0)) return -1;
++    return 0;
++}
++static long owned_cwd(int functional) {
++    CHECK(DO(83,"/work/cwd",0755,0)==0 && DO(83,"/work/cwd/nested",0755,0)==0,120);
++    CHECK(DO(80,"/work/cwd",0,0)==0 && DO(79,buffer,sizeof buffer,0)==10 && equal(buffer,"/work/cwd"),121);
++    if(!functional) CHECK(DO(79,buffer,9,0)==-34 && DO(79,buffer,0,0)==-22 && DO(79,1,4096,0)==-14,122);
++    CHECK(create("relative","owned")==0 && DO(80,"relative",0,0)==-20,123);
++    long native_file=DO(2,"/image",0,0);
++    CHECK(native_file>=3 && DO(81,native_file,0,0)==-20 && DO(3,native_file,0,0)==0,160);
++    CHECK(DO(80,"/image",0,0)==-20 && DO(79,buffer,sizeof buffer,0)==10 && equal(buffer,"/work/cwd"),161);
++    long cwd=DO(2,".",0200000,0); CHECK(cwd>=3,124);
++    CHECK(DO(81,12345,0,0)==-9 && DO(80,"missing",0,0)==-2,125);
++    long child=DO(57,0,0,0); CHECK(child>=0,126);
++    if(!child) {
++        CHECK(DO(80,"nested",0,0)==0 && create("child","child")==0,127);
++        CHECK(DO(79,buffer,sizeof buffer,0)==17 && equal(buffer,"/work/cwd/nested"),128);
++        return 0;
++    }
++    int status=-1; CHECK(DO(61,child,&status,0)==child && status==0,129);
++    CHECK(DO(79,buffer,sizeof buffer,0)==10 && equal(buffer,"/work/cwd"),130);
++    CHECK(DO(82,"/work/cwd","/work/cwd-moved",0)==0 && DO(79,buffer,sizeof buffer,0)==16 && equal(buffer,"/work/cwd-moved"),131);
++    CHECK(DO(80,"/bin",0,0)==0 && DO(79,buffer,sizeof buffer,0)==5 && equal(buffer,"/bin"),132);
++    CHECK(DO(81,cwd,0,0)==0 && DO(3,cwd,0,0)==0,133);
++    CHECK(copy_fixture()==0 && create("script","#!program optional\n")==0 && DO(90,"script",0755,0)==0,134);
++    for(int mode=0;mode<3;++mode) {
++        child=DO(57,0,0,0); CHECK(child>=0,135);
++        if(!child) {
++            char *args[]={"fixture",mode==2?"owned-cwd-script-child":"owned-cwd-exec-child",0}, *env[]={0};
++            DO(59,mode==0?"/bin/fixture":(mode==1?"program":"script"),args,env);
++            return 136;
++        }
++        CHECK(DO(61,child,&status,0)==child && status==0,137);
++    }
++    CHECK(DO(4,"exec-output",meta,0)==0 && *(word *)(meta+48)==4,138);
++    CHECK(DO(83,"empty",0755,0)==0 && DO(80,"empty",0,0)==0 && DO(84,"/work/cwd-moved/empty",0,0)==0,139);
++    CHECK(DO(79,buffer,sizeof buffer,0)==-2 && create("missing-parent","bad")==-2,140);
++    CHECK(DO(80,"/bin",0,0)==0,141);
++    long bin=DO(2,"/bin",0200000,0); CHECK(bin>=3,142);
++    CHECK(DO(80,"/work",0,0)==0 && DO(81,bin,0,0)==0 && DO(3,bin,0,0)==0,143);
++    CHECK(DO(79,buffer,sizeof buffer,0)==5 && equal(buffer,"/bin"),144);
++    CHECK(DO(1,1,"owned-directories: PASS\n",24)==24,145);
++    return 0;
++}
++static long cwd_budget(void) {
++    CHECK(DO(80,"/work",0,0)==0,150);
++    long fds[64],n=0,fd;
++    while((fd=DO(2,".",0200000,0))>=0) { CHECK(n<64,151); fds[n++]=fd; }
++    CHECK(n==63 && fd==-24,152);
++    for(int i=0;i<32;++i) CHECK(DO(57,0,0,0)==-24,153);
++    CHECK(DO(3,fds[--n],0,0)==0,154);
++    for(int pass=0;pass<4;++pass) {
++    long child=DO(57,0,0,0); CHECK(child>=0,155);
++    if(!child) return 0;
++    int status=-1; CHECK(DO(61,child,&status,0)==child && status==0,156);
++    }
++    while(n) CHECK(DO(3,fds[--n],0,0)==0,157);
++    CHECK(DO(80,"/bin",0,0)==0 && create("/work/after-budget","ok")==0,158);
++    DO(1,1,"owned-directories: PASS\n",24); return 0;
++}
+ long directory_main(word *stack)
+ {
+     char **argv=(char **)(stack+1);
++    if(stack[0]>1 && (equal(argv[stack[0]-1],"owned-cwd-exec-child") || equal(argv[stack[0]-1],"owned-cwd-script-child"))) {
++        if(equal(argv[stack[0]-1],"owned-cwd-script-child")) CHECK(stack[0]==4 && equal(argv[0],"program") && equal(argv[1],"optional") && equal(argv[2],"script"),146);
++        CHECK(DO(79,buffer,sizeof buffer,0)==16 && equal(buffer,"/work/cwd-moved") && create("exec-output","exec")==0,147);
++        return 0;
++    }
++    if(stack[0]>1 && equal(argv[1],"ordinary-owned-cwd")) return owned_cwd(1);
++    if(stack[0]>1 && equal(argv[1],"owned-cwd")) return owned_cwd(0);
++    if(stack[0]>1 && equal(argv[1],"ordinary-cwd-budget")) return cwd_budget();
+     int functional=stack[0]>1 && equal(argv[1],"functional");
+     if(stack[0]>1 && equal(argv[1],"cwd-child")) {
+         CHECK(DO(79,buffer,sizeof buffer,0)==11 && equal(buffer,"/image-dir"),90);

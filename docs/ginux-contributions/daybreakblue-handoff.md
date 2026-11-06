@@ -235,3 +235,28 @@ remain unrun. Current shared component walker is unchanged, and whiteout/mkdir
 capacity regressions are corrected. Review the assigned-storage traversal gate,
 final-entry mutations and kernel-consumed arguments independently. No monitored
 agent has been dispatched, and security acceptance remains pending.
+
+
+## G14 current-directory authority and lifecycle validation
+
+Prepare owned cwd on G13 candidate5c3ae8e from donor6a45d8f8, using the current
+per-process Task owner rather than the held G07 thread groups. Ordinary cwd,
+relative file operations, fork/exec and directory rename/removal can be checked
+locally. Assign low-level host cwd/path leakage, protected getcwd buffers,
+namespace/descriptor races, implicit relative interpreter authority and teardown
+under interrupted transitions to DaybreakBlue. Thread-shared cwd remains a held
+G07 join; preserve donor fixture hunks without claiming they ran. Keep G13
+component and final-entry semantics and G10's shared-argument security hold.
+No cloud dispatch, publication or maintainer message is implied.
+
+
+### G14 exact per-process revision
+
+Validate candidateec6f9c480b7de187350672478500448e59a54ea3 on G135c3ae8e5068b5da21d2c37f9545c0f7b10eba147.
+[Review/evidence](g14-review.md) records95 routine units and ordinary cwd/fork/
+exec/rename/removal plus capacity rollback/reclamation, in source/clean replay.
+Protected getcwd, host-path leakage, raced namespace/FD/argument state and native
+relative-interpreter authority remain unrun. Thread-sharing hunks remain in the
+G14 held-thread-join.patch artifact for G07. Review the transient cwd selector,
+success-only native cwd commit, failed-fork rollback and deferred shared-thread
+ownership independently. No monitored agent was dispatched; security remains pending.
