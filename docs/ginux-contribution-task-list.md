@@ -996,3 +996,20 @@ membership and the existing bounded audit writer before implementing the join.
 Keep actual upstream semantics and source owners; do not count a clean apply or
 old passing runtime check as the missing policy integration. G07/F02/F03/F04 and
 security acceptance remain pending.
+
+
+G03c's unverified source preview now exists at
+`upstream-contract-refresh-2026-11-06/G03c/source`, based on local G03b/G03a
+composition `85ee433afd71c9985cb714246c343145c2cdfb01`, preview tree
+`e72f1f95535a23ab4d03da5c7fb031a5111bb17a`. Its retained proposal remains the
+previous reviewed head until the required join is implemented and verified.
+The preview applies cleanly, but no G03c build/runtime acceptance is claimed.
+Complete storage/path owners, configured supervisor/audit, fixtures/README/CI
+and relevant catalog checks have been read. Source findings: policy must precede
+filesystem effects and scratch rewrite; implemented lstat6/fchmodat268 lack
+catalog entries; preserve existing native-denial/core-catalog coverage when
+adding configured-only operations. Extend the existing64KiB audit writer through
+its owner. Exact next action: implement that join, then static/unit/build and
+ordinary source/clean verification; preserve all default/security checks and
+keep their monitored acceptance pending. `G03c/state.json` records the source
+read position. Do not dispatch DaybreakBlue or rerun adversarial probes.

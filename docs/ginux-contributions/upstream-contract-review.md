@@ -103,3 +103,13 @@ catalog membership for newly implemented configured syscalls as well as guarding
 hook dispatch before effects; preserve all existing catalog/core consistency
 coverage and configured audit bounds. Actual upstream prerequisite merges and
 security/full CI remain required.
+
+
+The unverified G03c source preview is prepared on latest G03b/G03a composition
+85ee433a. Its actual adapter implements lstat6/fchmodat268, absent from upstream's
+catalog. Its filesystem claims and path rewriting also precede any resolved
+contract check. Reconcile these through existing contract/catalog and launch/
+audit owners, preserving native denials and all existing consistency assertions
+for previously cataloged operations. No preview build/runtime check has run;
+no G03c readiness claim or retained-head replacement is made. Exact source/read
+position is in the preview's state.json.
