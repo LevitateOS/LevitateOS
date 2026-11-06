@@ -288,3 +288,29 @@ reclamation and ordinary donor regression comparisons. Adversarial namespace,
 FD/private backing, protected copy, shared arguments and low-level executable-name
 validation remain pending. No cloud agent was dispatched and no security
 acceptance is claimed. G14 cwd/G12 mappings still need the later combined review.
+
+
+## G16 — cross-image/owned traversal and interpreter routing (in progress)
+
+Candidate is being ported on G14ec6f9c48, excluding G15/G12/G07 ancestry.
+Ordinary local work covers image reads through owned links, image directory-FD
+relative operations, virtual cwd parent traversal and valid script interpreter
+aliases. The existing component walker and private syscall scratch owner remain.
+DaybreakBlue must independently validate adversarial cross-boundary links and
+namespace mutation, hidden device/proc/sys paths, directory/FD authority and
+replacement races, protected/overlapping syscall scratch, implicit interpreter
+selection, sealed script-header canonicalization and argv/AT_EXECFN restoration.
+Do not infer confinement or race safety from these ordinary checks. Retain full
+security fixtures and CI; they are not run here. No cloud dispatch is authorized
+or implied. Exact revision will be appended after source/ordinary preparation.
+
+
+### G16 exact retained revision
+
+Candidate 4682b0b0535d5a2f16b8ed55634ad7b3a7b26dd7 on G14 ec6f9c480b7de187350672478500448e59a54ea3 has95 routine units, three new ordinary
+path/exec modes and five new valid script-interpreter modes passing in source and
+clean replay, plus existing controls. [Review/evidence](g16-review.md) records the
+canonical-token rejection added through source review; its adversarial validation
+and the previously listed boundary/FD/race/stack checks remain pending. VFS walker
+and native lookup are preserved. Full cross modes remain present and unrun here.
+No monitored agent was dispatched; security acceptance is still pending.

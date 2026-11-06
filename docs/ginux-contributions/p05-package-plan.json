@@ -735,8 +735,6 @@
       "packet": "G16",
       "purpose": "Unified image/owned traversal (`1da0ce13`, `93a1a56d`)",
       "dependencies": [
-        "G04",
-        "G13",
         "G14"
       ],
       "source_commits": [
@@ -745,9 +743,53 @@
       ],
       "acceptance": "Cross-boundary links/parents/exec, assignment precedence and confinement; hidden `/dev` paths retain absent semantics.",
       "planned_delivery": "one coherent change plus its generic docs and focused regression fixtures; split coupled responsibilities only as recorded by P04",
-      "status": "pending extraction and R01-R04 review",
+      "status": "source separately self-reviewed; static/unit/build and selected ordinary runtime pass in source/clean replay; security/full CI/current-main independence pending",
       "artifact_directory": ".artifacts/ginux-contribution-preparation/G16",
-      "extraction_note": "G03c already requires the existing component walker, ImageRoot and bounded native Rewrite for initial assignment isolation. Later owned-link/cwd/device/exec joins remain here; do not duplicate earlier primitives."
+      "extraction_note": "G03c already requires the existing component walker, ImageRoot and bounded native Rewrite for initial assignment isolation. Later owned-link/cwd/device/exec joins remain here; do not duplicate earlier primitives.",
+      "base": "ec6f9c480b7de187350672478500448e59a54ea3",
+      "head": "4682b0b0535d5a2f16b8ed55634ad7b3a7b26dd7",
+      "tree": "90eca06a2790cc43995a5fcc1808f4e5218ce142",
+      "changed_files": [
+        "README.md",
+        "crates/ginux-init/src/descriptors.rs",
+        "crates/ginux-init/src/fs_hooks.rs",
+        "crates/ginux-init/src/tracee_io.rs",
+        "crates/ginux-init/src/path_hooks.rs",
+        "crates/ginux-init/src/exec_script.rs",
+        "crates/ginux-init/src/exec_image.rs",
+        "crates/ginux-init/src/launch_tasks.rs",
+        "scripts/test-launch-directories.py",
+        "tests/fixtures/launch-directory-fixture.c",
+        "scripts/test-launch-scripts.py",
+        "tests/fixtures/launch-script-fixture.c",
+        "tests/fixtures/launch-storage-fixture.c"
+      ],
+      "standalone": false,
+      "patch_sha256": "0a9d5f4418d8147cde34b65369a3ba619898424547c2304e29db7dd57b178c4f",
+      "deferred_joins": [
+        "G15 hardlink composition",
+        "G12 mapping composition",
+        "G07 thread/shared-argument security acceptance"
+      ],
+      "unit_tests": 95,
+      "vfs_tests": 37,
+      "clean_matched_paths": 177,
+      "review": "separate self-review; no independent reviewer/security acceptance claimed",
+      "remote_ci": "not run",
+      "security_handoff": "daybreakblue-handoff.md",
+      "source_binary_sha256": "1a09998bf3c1a3b16ac46f8fa2d681740cf8c41840bfb9490d9e70022c024210",
+      "clean_binary_sha256": "1a09998bf3c1a3b16ac46f8fa2d681740cf8c41840bfb9490d9e70022c024210",
+      "final_clean_export": "verified-head",
+      "new_ordinary_directory_scenarios": 3,
+      "new_ordinary_script_scenarios": 5,
+      "fixture_sha256": {
+        "launch-directory-fixture": "34d49ad635f57b8594d892bb64b4fb6c0726c44e753fb3b036e656c16366a4f0",
+        "launch-storage-fixture": "3c179aaf9b583cecf9233b6ef49f4659e7dd7db5032000b9327b6bfa6dbe9e59",
+        "launch-script-fixture": "ebdce35df631942c886a2536fba6504fef99d8caf5b73fd0f4f3c45131d5eaf1",
+        "launch-owned-exec-fixture": "ac70dd24534767b47ee52d088575f6d3d4a1e95f71b526bb3589daaf2e5ddf90"
+      },
+      "evidence": "g16-review.md",
+      "source_patch": "patches/G16.patch"
     },
     {
       "packet": "G18",

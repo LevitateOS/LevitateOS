@@ -508,14 +508,23 @@ count regressions are reproduced and corrected. Exact G13 rejects the valid-link
 fixture. G19/G22 export joins and G14/G12 interactions remain explicitly assigned;
 security/full CI/upstream prerequisites remain pending. Nothing was published.
 
-Exact next task: **G16 — unified image/owned traversal**. Inspect1da0ce13 and
-93a1a56d against existing G03c/G13 walker and G14 cwd owners. Extract on the
-smallest proven capability base; exclude accidental G15/G12/G07 ancestry unless a
-real consumer requires it. Preserve link-before-parent semantics, assignment
-precedence, executable/script identity, native rewrites and hidden /dev behavior.
-Perform ordinary cross-boundary path/parent/exec checks; record exploit-like
-namespace, authority, race and protected-buffer probes for DaybreakBlue. Keep all
-inherited security and standalone prerequisites pending; no publication before F04.
+G16 source/ordinary preparation is retained at `4682b0b0` on G14ec6f9c48.
+[Review/evidence](ginux-contributions/g16-review.md) records95 units,177-path strict
+replay, three new ordinary cross-path/FD/cwd/exec modes and five script-interpreter
+alias modes, plus existing controls in source/clean exports. The current walker,
+image lookup and native rewrite owners are reused; canonical script targets with
+shebang separators now fail explicitly. Exact G14 rejects the new valid-cross
+fixture. G15/G12/G07 joins and security/full CI/current-main independence remain
+pending. No Ginux checkout, branch/index, remote or human text changed.
+
+Exact next task: **G18 — configurable bounded namespace capacity**, before G17.
+Inspect38fa14fd and derive the minimum actual configuration/VFS/storage capability
+base. Preserve shared data/alias charging, checked namespace and byte accounting,
+whiteouts, cwd/exec references and failure rollback; do not import accidental
+thread/mapping/archive ancestry. Implement and run ordinary nonempty-file scale
+and exhaustion checks. Record adversarial overflow/allocation/authority probes
+for DaybreakBlue. Then continue G17 in approved dependency order; no publication
+before F04, and inherited security holds remain pending.
 
 Active skill: `hdae-development`, discovered at
 `/home/vince/.codex/worktrees/ginux-pr-combination-check/ginux/.agents/skills/hdae-development/SKILL.md`.

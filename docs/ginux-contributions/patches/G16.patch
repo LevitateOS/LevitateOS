@@ -1,0 +1,774 @@
+From 4682b0b0535d5a2f16b8ed55634ad7b3a7b26dd7 Mon Sep 17 00:00:00 2001
+From: vince <vincepaul.liem@gmail.com>
+Date: Fri, 6 Nov 2026 14:47:03 +0100
+Subject: [PATCH] feat(launch): join image and owned path traversal
+
+Resolve owned links into readonly image paths and registered image-directory
+relative operations through the existing component walker. Preserve task cwd,
+script names and native syscall restoration while canonicalizing only private
+script execution copies. Keep device absence and assignment precedence.
+
+Signed-off-by: vince <vincepaul.liem@gmail.com>
+---
+ README.md                                 | 20 ++++--
+ crates/ginux-init/src/descriptors.rs      |  2 +-
+ crates/ginux-init/src/exec_image.rs       | 51 ++++++++++----
+ crates/ginux-init/src/exec_script.rs      | 81 +++++++++++++++++++++--
+ crates/ginux-init/src/fs_hooks.rs         | 74 ++++++++-------------
+ crates/ginux-init/src/launch_tasks.rs     | 16 ++++-
+ crates/ginux-init/src/path_hooks.rs       |  9 +++
+ crates/ginux-init/src/tracee_io.rs        | 20 ++++++
+ scripts/test-launch-directories.py        | 11 ++-
+ scripts/test-launch-scripts.py            |  2 +-
+ tests/fixtures/launch-directory-fixture.c | 47 ++++++++++++-
+ tests/fixtures/launch-script-fixture.c    | 21 ++++--
+ tests/fixtures/launch-storage-fixture.c   |  5 +-
+ 13 files changed, 274 insertions(+), 85 deletions(-)
+
+diff --git a/README.md b/README.md
+index b3dec331..6d099997 100644
+--- a/README.md
++++ b/README.md
+@@ -241,21 +241,27 @@ Namespace changes validate types, capacity and replacement before mutation.
+ Relative AT_FDCWD paths follow the calling process's cwd; owned directory
+ FDs resolve relative operations through their current VFS identity. Image chdir,
+ getcwd and relative image exec retain native per-process cwd semantics.
+-Relative image-directory FD access, hardlinks and guest file mappings remain
+-unsupported. Owned chdir/fchdir/getcwd keep a private VFS directory reference per
+-process. Fork copies that reference; exec keeps it; successful image chdir/fchdir
++Relative image-directory FD paths join the same namespace. Hardlinks and guest
++file mappings remain unsupported. Owned chdir/fchdir/getcwd keep a private VFS
++directory reference per process. Fork copies that reference; exec keeps it; successful image chdir/fchdir
+ releases it. Rename updates the reported path, and a removed cwd reports ENOENT
+ for getcwd and relative operations until an absolute directory change. Private
+ cwd references consume the existing 64-entry VFS open-description capacity.
+-Relative owned scripts/interpreters use that cwd; relative fallback into the image
+-and native kernel-selected relative interpreters from owned cwd remain unsupported.
++Relative owned scripts/interpreters and explicit image paths use that cwd.
++Native kernel-selected relative interpreters from owned cwd remain unsupported.
+ Configured-launch threads and shared cwd groups remain unsupported.
+ Owned symlink/symlinkat and readlink/readlinkat support bounded targets and
+ nofollow metadata. Link expansion precedes later parent components; mutations
+ name the final link itself, including directory requirements on trailing slashes.
+ Exclusive create and O_NOFOLLOW keep their separate failure behavior. Owned links
+-resolve within assigned storage; entering the native image through an owned link
+-remains unsupported. Image aliases into storage retain assignment precedence.
++may lead to readonly image paths or assigned virtual devices; image links may lead
++into owned storage. Directory descriptors and cwd use the same assignment
++precedence. Image mutations remain unsupported; hidden device paths retain absent
++semantics. Owned script
++interpreter aliases are canonicalized only in the sealed execution copy; original
++script bytes and interpreter names in argv remain unchanged. Kernel-selected
++nested native interpreters must still match the image namespace. Canonical script
++interpreter targets containing shebang separators are unsupported.
+ Link target bytes consume the same owned storage capacity as regular data.
+ Component-wise image-link traversal preserves assignment
+ precedence, missing components and non-directory errors. Native image operations
+diff --git a/crates/ginux-init/src/descriptors.rs b/crates/ginux-init/src/descriptors.rs
+index f00dfa8e..e5be7681 100644
+--- a/crates/ginux-init/src/descriptors.rs
++++ b/crates/ginux-init/src/descriptors.rs
+@@ -410,7 +410,7 @@ impl DescriptorTable {
+             }
+             Handle::Native { fd, .. } if path.is_empty() => Ok(fd as u64),
+             Handle::Owned(_) => Err(-20),
+-            Handle::Native { .. } => Err(-95),
++            Handle::Native { fd, .. } => Ok(crate::fs_hooks::IMAGE_DIR_BASE + fd as u64),
+             Handle::Reserved => Err(-9),
+         }
+     }
+diff --git a/crates/ginux-init/src/exec_image.rs b/crates/ginux-init/src/exec_image.rs
+index 04947977..d30e06ac 100644
+--- a/crates/ginux-init/src/exec_image.rs
++++ b/crates/ginux-init/src/exec_image.rs
+@@ -8,7 +8,13 @@ use crate::fs_hooks::LaunchFs;
+ use crate::supervisor::{syscall1, syscall2, syscall3, syscall4};
+ use ginux_vfs::Executable;
+ 
+-pub fn populate(host: usize, descriptor: u32, fs: &LaunchFs, image: Executable) -> Result<(), i64> {
++pub fn populate(
++    host: usize,
++    descriptor: u32,
++    fs: &LaunchFs,
++    image: Executable,
++    script: Option<&crate::exec_script::Script>,
++) -> Result<(), i64> {
+     let mut path = [0u8; 64];
+     path[..6].copy_from_slice(b"/proc/");
+     let mut end = 6;
+@@ -32,24 +38,19 @@ pub fn populate(host: usize, descriptor: u32, fs: &LaunchFs, image: Executable)
+     let result = (|| {
+         let mut buffer = [0u8; 4096];
+         let mut offset = 0;
++        if let Some(script) = script {
++            let mut header = [0; 256];
++            if let Some((length, skip)) = script.private_header(&mut header)? {
++                write_bytes(fd, &header[..length])?;
++                offset = skip;
++            }
++        }
+         while offset < image.size {
+             let count = fs.read_executable(image, offset, &mut buffer)?;
+             if count == 0 {
+                 return Err(-5);
+             }
+-            let mut written = 0;
+-            while written < count {
+-                let result = unsafe {
+-                    syscall3(1, fd, buffer[written..].as_ptr() as usize, count - written)
+-                };
+-                if result == -4 {
+-                    continue;
+-                }
+-                if result <= 0 {
+-                    return Err(if result == 0 { -5 } else { result as i64 });
+-                }
+-                written += result as usize;
+-            }
++            write_bytes(fd, &buffer[..count])?;
+             offset += count;
+         }
+         let mode = unsafe { syscall2(91, fd, 0o500) };
+@@ -81,6 +82,28 @@ pub fn populate(host: usize, descriptor: u32, fs: &LaunchFs, image: Executable)
+     result
+ }
+ 
++fn write_bytes(fd: usize, bytes: &[u8]) -> Result<(), i64> {
++    let mut written = 0;
++    while written < bytes.len() {
++        let count = unsafe {
++            syscall3(
++                1,
++                fd,
++                bytes[written..].as_ptr() as usize,
++                bytes.len() - written,
++            )
++        };
++        if count == -4 {
++            continue;
++        }
++        if count <= 0 {
++            return Err(if count == 0 { -5 } else { count as i64 });
++        }
++        written += count as usize;
++    }
++    Ok(())
++}
++
+ fn number(output: &mut [u8], end: &mut usize, mut value: usize) {
+     let mut reverse = [0u8; 20];
+     let mut count = 0;
+diff --git a/crates/ginux-init/src/exec_script.rs b/crates/ginux-init/src/exec_script.rs
+index 032b490b..f7e64149 100644
+--- a/crates/ginux-init/src/exec_script.rs
++++ b/crates/ginux-init/src/exec_script.rs
+@@ -24,7 +24,13 @@ fn read_header(
+ ) -> Result<Option<crate::path_hooks::ScriptHeader>, i64> {
+     let mut bytes = [0; 256];
+     let n = fs.read_executable(image, 0, &mut bytes)?;
+-    crate::path_hooks::script_metadata(&bytes[..n])
++    let mut header = crate::path_hooks::script_metadata(&bytes[..n])?;
++    if !bytes[..n].contains(&b'\n') {
++        if let Some(header) = header.as_mut() {
++            header.payload = image.size;
++        }
++    }
++    Ok(header)
+ }
+ 
+ #[derive(Clone, Copy)]
+@@ -36,6 +42,8 @@ pub struct Script {
+     leaf: Path,
+     pub kernel_script: bool,
+     held: [Option<Executable>; SCRIPTS],
++    native_header: Option<crate::path_hooks::ScriptHeader>,
++    native_name: Option<Path>,
+ }
+ 
+ fn word(host: usize, address: u64) -> Result<u64, i64> {
+@@ -114,6 +122,8 @@ impl Script {
+             leaf: Path::empty(),
+             kernel_script: false,
+             held: [None; SCRIPTS],
++            native_header: None,
++            native_name: None,
+         })
+     }
+ 
+@@ -158,6 +168,14 @@ impl Script {
+                         }
+                     }
+                     None => {
++                        let resolved = fs.interpreter_path(host, header.interpreter.as_bytes())?;
++                        if resolved != header.interpreter {
++                            script.native_name = Some(header.interpreter);
++                            script.native_header = Some(crate::path_hooks::ScriptHeader {
++                                interpreter: resolved,
++                                ..header
++                            });
++                        }
+                         script.kernel_script = true;
+                         break;
+                     }
+@@ -183,6 +201,45 @@ impl Script {
+         }
+     }
+ 
++    /// Canonicalize only the sealed private copy passed to binfmt. Owned
++    /// script bytes and the interpreter name reported in argv remain intact.
++    pub fn private_header(&self, output: &mut [u8; 256]) -> Result<Option<(usize, usize)>, i64> {
++        let Some(header) = self.native_header else {
++            return Ok(None);
++        };
++        let interpreter = header.interpreter.as_bytes();
++        // A canonical target must remain one binfmt interpreter token.
++        if interpreter
++            .iter()
++            .any(|b| matches!(b, b' ' | b'\t' | b'\n' | 0))
++        {
++            return Err(-95);
++        }
++        let argument = header.argument.as_ref().map_or(&[][..], |p| p.as_bytes());
++        let length = 2
++            + interpreter.len()
++            + if argument.is_empty() {
++                0
++            } else {
++                1 + argument.len()
++            }
++            + 1;
++        if length > 255 {
++            return Err(-7);
++        }
++        output[..2].copy_from_slice(b"#!");
++        output[2..2 + interpreter.len()].copy_from_slice(interpreter);
++        let mut end = 2 + interpreter.len();
++        if !argument.is_empty() {
++            output[end] = b' ';
++            end += 1;
++            output[end..end + argument.len()].copy_from_slice(argument);
++            end += argument.len();
++        }
++        output[end] = b'\n';
++        Ok(Some((end + 1, header.payload)))
++    }
++
+     pub fn release_held(self, fs: &mut LaunchFs) -> Result<(), i64> {
+         for image in self.held.into_iter().flatten() {
+             fs.release_executable(image)?;
+@@ -233,10 +290,26 @@ impl Script {
+         let mut patched = [0usize; 2 * SCRIPTS + 1];
+         let mut patches = 0;
+         let mut used = 1;
+-        // Keep any prefix the kernel produced through immutable interpreters.
++        // The kernel may have expanded further immutable script headers.
++        // Replace the requested leaf interpreter at its known prefix position,
++        // retaining the final interpreter and any intermediate argument pairs.
++        let replaced = self
++            .native_header
++            .and_then(|header| prefix.checked_sub(1 + usize::from(header.argument.is_some())));
+         for n in 0..prefix {
+-            words[used] = word(host, r.rsp + ((n + 1) * 8) as u64)?;
+-            used += 1;
++            if Some(n) == replaced {
++                let name = self.native_name.ok_or(-5)?;
++                let bytes = name.as_bytes();
++                strings[..bytes.len()].copy_from_slice(bytes);
++                strings_len = bytes.len() + 1;
++                words[used] = 0;
++                patched[patches] = used;
++                patches += 1;
++                used += 1;
++            } else {
++                words[used] = word(host, r.rsp + ((n + 1) * 8) as u64)?;
++                used += 1;
++            }
+         }
+         let mut append = |path: Path| -> Result<(), i64> {
+             let bytes = path.as_bytes();
+diff --git a/crates/ginux-init/src/fs_hooks.rs b/crates/ginux-init/src/fs_hooks.rs
+index 33d5ac4c..3bc37331 100644
+--- a/crates/ginux-init/src/fs_hooks.rs
++++ b/crates/ginux-init/src/fs_hooks.rs
+@@ -15,6 +15,8 @@ use ginux_vfs::{
+ };
+ 
+ pub const FD_BASE: usize = 1 << 20;
++// Internal tag for a registered native image directory, never a public FD.
++pub const IMAGE_DIR_BASE: u64 = 0x0800_0000;
+ const IO_SIZE: usize = 4096;
+ type Path = Text<MAX_PATH>;
+ type ExecutableName = Text<{ MAX_PATH + 10 }>;
+@@ -159,6 +161,18 @@ impl LaunchFs {
+         } else if dirfd as i32 == -100 {
+             cwd = self.cwd_path(pid)?;
+             cwd.as_bytes()
++        } else if (IMAGE_DIR_BASE..IMAGE_DIR_BASE + 256).contains(&dirfd) {
++            cwd = crate::tracee_io::image_fd_path(pid, (dirfd - IMAGE_DIR_BASE) as u32)?;
++            let image = crate::path_hooks::ImageRoot::new(pid)?;
++            if image
++                .lookup(cwd.as_bytes(), &mut [0; MAX_PATH])
++                .map_err(errno)?
++                .0
++                != NodeKind::Directory
++            {
++                return Err(-20);
++            }
++            cwd.as_bytes()
+         } else {
+             let fd = (dirfd as u32)
+                 .checked_sub(FD_BASE as u32)
+@@ -172,8 +186,6 @@ impl LaunchFs {
+     fn resolve(&self, pid: usize, path: &[u8], follow: bool, missing: bool) -> Result<Path, i64> {
+         let image = crate::path_hooks::ImageRoot::new(pid)?;
+         let mut output = [0; MAX_PATH];
+-        let mut owned_link = false;
+-        let mut crossed = false;
+         let n = ginux_vfs::resolve_namespace(path, follow, missing, &mut output, |path, target| {
+             if self.owns_path(path)
+                 || path != b"/"
+@@ -183,20 +195,12 @@ impl LaunchFs {
+             {
+                 let metadata = self.fs.metadata_no_follow(path)?;
+                 let n = if metadata.kind == NodeKind::Symlink {
+-                    owned_link = true;
+                     self.fs.read_link(path, target)?
+                 } else {
+                     0
+                 };
+                 return Ok((metadata.kind, n));
+             }
+-            // Owned links remain in assigned storage until the image/owned
+-            // traversal join is supported. Image aliases into storage retain
+-            // their existing assignment precedence.
+-            if owned_link {
+-                crossed = true;
+-                return Err(VfsError::PermissionDenied);
+-            }
+             if path == b"/dev" {
+                 return Ok((NodeKind::Directory, 0));
+             }
+@@ -206,12 +210,15 @@ impl LaunchFs {
+             if within(path, b"/dev") {
+                 return Err(VfsError::NotFound);
+             }
++            if [b"/proc".as_slice(), b"/sys"]
++                .iter()
++                .any(|p| within(path, p))
++            {
++                return Err(VfsError::PermissionDenied);
++            }
+             image.lookup(path, target)
+         })
+-        .map_err(|error| if crossed { -95 } else { errno(error) })?;
+-        if owned_link && !self.owns_path(&output[..n]) {
+-            return Err(-95);
+-        }
++        .map_err(errno)?;
+         Path::from_bytes(&output[..n]).map_err(|_| -36)
+     }
+ 
+@@ -291,12 +298,6 @@ impl LaunchFs {
+         } else {
+             self.resolve(pid, path.as_bytes(), follow, missing)?
+         };
+-        if (dirfd as i32 != -100 || self.cwd.is_some())
+-            && read_path(pid, address)?.as_bytes().first() != Some(&b'/')
+-            && !self.owns_path(path.as_bytes())
+-        {
+-            return Err(-95);
+-        }
+         Ok(Some((argument, path)))
+     }
+ 
+@@ -320,7 +321,6 @@ impl LaunchFs {
+     }
+ 
+     pub fn chdir(&mut self, pid: usize, address: u64) -> Result<Option<i32>, i64> {
+-        let raw = read_path(pid, address)?;
+         let path = self.path(pid, address, (-100i64) as u64)?;
+         let path = self.resolve(pid, path.as_bytes(), true, false)?;
+         if self.owns_path(path.as_bytes()) {
+@@ -331,9 +331,6 @@ impl LaunchFs {
+                 .map_err(errno);
+         }
+         self.check_exec_owner(path.as_bytes())?;
+-        if self.cwd.is_some() && raw.as_bytes().first() != Some(&b'/') {
+-            return Err(-95);
+-        }
+         Ok(None)
+     }
+ 
+@@ -388,9 +385,7 @@ impl LaunchFs {
+ 
+     /// Image execution never reopens assigned paths, including implicit script
+     /// and ELF interpreters selected by the native kernel loader.
+-    pub fn native_exec_path(&self, pid: usize, address: u64, follow: bool) -> Result<(), i64> {
+-        let path = self.path(pid, address, (-100i64) as u64)?;
+-        let path = self.resolve(pid, path.as_bytes(), follow, true)?;
++    fn native_exec_resolved(&self, pid: usize, path: Path, follow: bool) -> Result<(), i64> {
+         self.check_exec_owner(path.as_bytes())?;
+         if !follow {
+             let image = crate::path_hooks::ImageRoot::new(pid)?;
+@@ -507,17 +502,13 @@ impl LaunchFs {
+         dirfd: u64,
+         follow: bool,
+     ) -> Result<Option<Executable>, i64> {
+-        let raw = read_path(pid, address)?;
+         let path = self.path(pid, address, dirfd)?;
+         let path = self.resolve(pid, path.as_bytes(), follow, false)?;
+         if self.owns_path(path.as_bytes()) {
+             let image = self.fs.pin_executable(path.as_bytes()).map_err(errno)?;
+             return self.check_exec(pid, image).map(Some);
+         }
+-        if (dirfd as i32 != -100 || self.cwd.is_some()) && raw.as_bytes().first() != Some(&b'/') {
+-            return Err(-95);
+-        }
+-        self.native_exec_path(pid, address, follow)?;
++        self.native_exec_resolved(pid, path, follow)?;
+         Ok(None)
+     }
+ 
+@@ -612,7 +603,7 @@ impl LaunchFs {
+     /// Resolve an implicit interpreter through the same component and
+     /// assignment owner as an explicit program. Native chains must also match
+     /// the image kernel will traverse; owned scripts are resolved separately.
+-    pub fn exec_interpreter(&mut self, pid: usize, name: &[u8]) -> Result<Option<Executable>, i64> {
++    pub fn interpreter_path(&self, pid: usize, name: &[u8]) -> Result<Path, i64> {
+         let cwd;
+         let base = if name.first() == Some(&b'/') {
+             b"".as_slice()
+@@ -621,23 +612,16 @@ impl LaunchFs {
+             cwd.as_bytes()
+         };
+         let joined = join_path(base, name)?;
+-        let path = self.resolve(pid, joined.as_bytes(), true, false)?;
++        self.resolve(pid, joined.as_bytes(), true, false)
++    }
++
++    pub fn exec_interpreter(&mut self, pid: usize, name: &[u8]) -> Result<Option<Executable>, i64> {
++        let path = self.interpreter_path(pid, name)?;
+         if self.owns_path(path.as_bytes()) {
+             let image = self.fs.pin_executable(path.as_bytes()).map_err(errno)?;
+             return self.check_exec(pid, image).map(Some);
+         }
+-        if self.cwd.is_some() && name.first() != Some(&b'/') {
+-            return Err(-95);
+-        }
+         self.check_exec_owner(path.as_bytes())?;
+-        let image = crate::path_hooks::ImageRoot::new(pid)?;
+-        let mut physical = [0; MAX_PATH];
+-        let n = image
+-            .resolve_image(joined.as_bytes(), &mut physical)
+-            .map_err(errno)?;
+-        if physical[..n] != *path.as_bytes() {
+-            return Err(-95);
+-        }
+         self.check_interpreters(pid, path)?;
+         Ok(None)
+     }
+diff --git a/crates/ginux-init/src/launch_tasks.rs b/crates/ginux-init/src/launch_tasks.rs
+index 9c95583a..ddbccd91 100644
+--- a/crates/ginux-init/src/launch_tasks.rs
++++ b/crates/ginux-init/src/launch_tasks.rs
+@@ -774,6 +774,8 @@ impl Supervisor<'_> {
+         {
+             return Err(-95);
+         }
++        let original = *r;
++        let mut translated = *r;
+         let mut native_dirfd = r.rdi;
+         let (image, empty_path) = if r.orig_rax == 59 {
+             let path = crate::tracee_io::read_path(host, r.rdi)?;
+@@ -809,6 +811,7 @@ impl Supervisor<'_> {
+                     .descriptors
+                     .exec_path_dirfd(host, r.rdi, r.rsi)?;
+                 native_dirfd = (-100i64) as u64;
++                translated.rdi = dirfd;
+                 self.objects
+                     .filesystem
+                     .exec_path(host, r.rsi, dirfd, r.r8 & 0x100 == 0)?
+@@ -816,8 +819,16 @@ impl Supervisor<'_> {
+             (image, end)
+         };
+         if image.is_none() {
+-            let rewrite = crate::path_hooks::Rewrite::prepare(self.objects.filesystem, host, r)?;
+-            self.task_mut(index).path_rewrite = rewrite;
++            let rewrite = crate::path_hooks::Rewrite::prepare(
++                self.objects.filesystem,
++                host,
++                &mut translated,
++            )?;
++            if let Some(mut rewrite) = rewrite {
++                rewrite.original_args(&original);
++                self.task_mut(index).path_rewrite = Some(rewrite);
++                *r = translated;
++            }
+             if r.orig_rax == 59 {
+                 native_dirfd = r.rdi;
+             }
+@@ -1173,6 +1184,7 @@ impl Supervisor<'_> {
+                             fd,
+                             self.objects.filesystem,
+                             owned.image,
++                            owned.script.as_ref(),
+                         ) {
+                             self.task_mut(index)
+                                 .exec
+diff --git a/crates/ginux-init/src/path_hooks.rs b/crates/ginux-init/src/path_hooks.rs
+index be18b74c..a909a2ce 100644
+--- a/crates/ginux-init/src/path_hooks.rs
++++ b/crates/ginux-init/src/path_hooks.rs
+@@ -188,9 +188,11 @@ impl Drop for ImageRoot {
+     }
+ }
+ 
++#[derive(Clone, Copy)]
+ pub(crate) struct ScriptHeader {
+     pub interpreter: ginux_domain::Text<MAX_PATH>,
+     pub argument: Option<ginux_domain::Text<MAX_PATH>>,
++    pub payload: usize,
+ }
+ 
+ /// Linux's bounded shebang line has one optional argument, including spaces.
+@@ -224,6 +226,10 @@ pub(crate) fn script_metadata(bytes: &[u8]) -> Result<Option<ScriptHeader>, i64>
+     Ok(Some(ScriptHeader {
+         interpreter,
+         argument,
++        payload: bytes
++            .iter()
++            .position(|b| *b == b'\n')
++            .map_or(bytes.len(), |n| n + 1),
+     }))
+ }
+ 
+@@ -390,6 +396,9 @@ impl Rewrite {
+             args,
+         }))
+     }
++    pub fn original_args(&mut self, r: &UserRegs) {
++        self.args = [r.rdi, r.rsi, r.rdx, r.r10, r.r8, r.r9, r.orig_rax];
++    }
+     pub fn finish(mut self, pid: usize, r: &mut UserRegs) -> Result<(), &'static [u8]> {
+         if copy_memory(pid, self.address, &mut self.saved, true) != Ok(self.saved.len() as i64) {
+             return Err(b"native path scratch restoration failed");
+diff --git a/crates/ginux-init/src/tracee_io.rs b/crates/ginux-init/src/tracee_io.rs
+index 81f392c6..e7fae891 100644
+--- a/crates/ginux-init/src/tracee_io.rs
++++ b/crates/ginux-init/src/tracee_io.rs
+@@ -65,6 +65,26 @@ pub fn image_cwd(pid: usize) -> Result<Path, i64> {
+     image_link(pid, b"/cwd")
+ }
+ 
++pub fn image_fd_path(pid: usize, fd: u32) -> Result<Path, i64> {
++    let mut member = [0u8; 24];
++    member[..4].copy_from_slice(b"/fd/");
++    let mut digits = [0; 10];
++    let mut n = fd;
++    let mut count = 0;
++    loop {
++        digits[count] = b'0' + (n % 10) as u8;
++        count += 1;
++        n /= 10;
++        if n == 0 {
++            break;
++        }
++    }
++    for i in 0..count {
++        member[4 + i] = digits[count - 1 - i];
++    }
++    image_link(pid, &member[..4 + count])
++}
++
+ pub fn image_link(pid: usize, member: &[u8]) -> Result<Path, i64> {
+     fn link(pid: usize, suffix: &[u8], output: &mut [u8]) -> Result<usize, i64> {
+         let mut name = [0u8; 64];
+diff --git a/scripts/test-launch-directories.py b/scripts/test-launch-directories.py
+index ee44b976..513514a8 100644
+--- a/scripts/test-launch-directories.py
++++ b/scripts/test-launch-directories.py
+@@ -26,11 +26,15 @@ def main():
+         shutil.copyfile(fixture,root/'bin/fixture')
+         (root/'bin/fixture').chmod(0o755)
+         (root/'image').write_bytes(b'immutable image')
++        (root/'image-work').symlink_to('/work')
++        (root/'image-cycle').symlink_to('/work/cycle')
++        (root/'work/hidden').write_bytes(b'hidden image bytes')
++        (root/'private').mkdir(mode=0)
+         config=template.replace('init = "/bin/bash"','init = "/bin/fixture"')
+         config=config.replace('[storage]\nassignments = []','[storage]\nassignments = ["memory:/work", "memory:/work/seed"]')
+         config=config.replace('[devices]\nassignments = []','[devices]\nassignments = ["null"]')
+-        for mode in (sys.argv[3:] or ['all', 'cwd', 'owned-cwd', 'ordinary-owned-cwd', 'ordinary-cwd-budget']):
+-            if mode not in ('all', 'functional', 'cwd', 'owned-cwd', 'ordinary-owned-cwd', 'ordinary-cwd-budget'):
++        for mode in (sys.argv[3:] or ['all', 'cwd', 'owned-cwd', 'ordinary-owned-cwd', 'ordinary-cwd-budget', 'ordinary-cross', 'ordinary-cross-exec', 'ordinary-image-dir-exec', 'cross']):
++            if mode not in ('all', 'functional', 'cwd', 'owned-cwd', 'ordinary-owned-cwd', 'ordinary-cwd-budget', 'ordinary-cross', 'ordinary-cross-exec', 'ordinary-image-dir-exec', 'cross'):
+                 sys.exit('unknown directory scenario')
+             # Each launch creates fresh domain storage; image cwd stays kernel-owned.
+             (work/'launch.toml').write_text(config.replace('args = []', 'args = ' + json.dumps([] if mode == 'all' else [mode])))
+@@ -42,7 +46,8 @@ def main():
+                 assert record['outcome']=='exited' and record['code']==0 and record['generation'] is None,record
+                 assert proc.stdout==b'owned-directories: PASS\n',proc.stdout
+                 assert b'ginux: teardown tasks=0 owned-handles=0' in proc.stderr,proc.stderr
+-                assert list((root/'work').iterdir())==[]
++                assert sorted(p.name for p in (root/'work').iterdir())==['hidden']
++                assert (root/'work/hidden').read_bytes()==b'hidden image bytes'
+                 assert (root/'image').read_bytes()==b'immutable image'
+             print(f'PASS launch directories: {mode}')
+         print('test-launch-directories: PASS (' + (', '.join(sys.argv[3:]) if sys.argv[3:] else 'full directory scenarios') + ')')
+diff --git a/scripts/test-launch-scripts.py b/scripts/test-launch-scripts.py
+index f256ed88..29c55cd0 100644
+--- a/scripts/test-launch-scripts.py
++++ b/scripts/test-launch-scripts.py
+@@ -37,7 +37,7 @@ def main():
+                      'descriptor', 'unlinked', 'dir-relative', 'dir-renamed', 'fd-fork', 'fd-vfork')
+         ordinary_modes = ('ordinary-plain', 'ordinary-option', 'ordinary-nested', 'ordinary-relative',
+                           'ordinary-at', 'ordinary-fd', 'ordinary-unlinked', 'ordinary-dir',
+-                          'ordinary-renamed', 'ordinary-fork', 'ordinary-vfork', 'ordinary-owned', 'ordinary-chain', 'ordinary-joined', 'ordinary-script-link', 'ordinary-interpreter-link')
++                          'ordinary-renamed', 'ordinary-fork', 'ordinary-vfork', 'ordinary-owned', 'ordinary-chain', 'ordinary-joined', 'ordinary-script-link', 'ordinary-interpreter-link', 'ordinary-cross', 'ordinary-cross-nested', 'ordinary-cross-relative', 'ordinary-cross-cwd', 'ordinary-cross-plain')
+         modes = sys.argv[3:] or (*full_modes, *ordinary_modes)
+         assert set(modes) <= set(full_modes + ordinary_modes), modes
+         for mode in modes:
+diff --git a/tests/fixtures/launch-directory-fixture.c b/tests/fixtures/launch-directory-fixture.c
+index e02d58cf..4cd5628e 100644
+--- a/tests/fixtures/launch-directory-fixture.c
++++ b/tests/fixtures/launch-directory-fixture.c
+@@ -89,9 +89,53 @@ static long cwd_budget(void) {
+     CHECK(DO(80,"/bin",0,0)==0 && create("/work/after-budget","ok")==0,158);
+     DO(1,1,"owned-directories: PASS\n",24); return 0;
+ }
++static long cross_paths(int execute, int full) {
++    CHECK(create("/work/data","owned")==0,170);
++    CHECK(DO(88,"/image","/work/image-link",0)==0,171);
++    long fd=DO(2,"/work/image-link",0,0); CHECK(fd>=3,172);
++    CHECK(DO(0,fd,buffer,9)==9 && buffer[0]=='i' && DO(3,fd,0,0)==0,173);
++    CHECK(DO(88,"/bin","/work/bin-link",0)==0,174);
++    fd=DO(2,"/work/bin-link/../image",0,0); CHECK(fd>=3 && DO(3,fd,0,0)==0,175);
++    CHECK(create("/image-work/through-image","safe")==0,176);
++    long image_dir=DO(2,"/bin",0200000,0); CHECK(image_dir>=3,177);
++    fd=DO(257,image_dir,"../image-work/through-image",0); CHECK(fd>=3,178);
++    CHECK(DO(0,fd,buffer,4)==4 && buffer[0]=='s' && DO(3,fd,0,0)==0,179);
++    fd=DO(257,image_dir,"../image",0); CHECK(fd>=3 && DO(0,fd,buffer,9)==9 && DO(3,fd,0,0)==0,180);
++    CHECK(call(262,image_dir,(word)"../image",(word)meta,0,0,0)==0 && *(word *)(meta+48)==15,181);
++    CHECK(call(332,image_dir,(word)"../image",0,0x7ff,(word)meta,0)==0 && *(word *)(meta+40)==15,182);
++    CHECK(DO(258,image_dir,"../image-work/new-dir",0755)==0,183);
++    CHECK(DO(80,"/work/new-dir",0,0)==0 && DO(79,buffer,sizeof buffer,0)==14 && equal(buffer,"/work/new-dir"),184);
++    fd=DO(2,"../../image",0,0); CHECK(fd>=3 && DO(3,fd,0,0)==0,185);
++    if(execute) {
++        char *args[]={"fixture","cross-exec-child",0},*env[]={0};
++        if(execute==1) DO(59,"../bin-link/fixture",args,env);
++        else call(322,image_dir,(word)"fixture",(word)args,(word)env,0,0);
++        return 186;
++    }
++    CHECK(DO(80,"../../bin",0,0)==0 && DO(79,buffer,sizeof buffer,0)==5 && equal(buffer,"/bin"),187);
++    CHECK(DO(3,image_dir,0,0)==0,188);
++    if(full) {
++        CHECK(DO(2,"/work/image-link",0400000,0)==-40 && DO(2,"/work/image-link",01001,0600)<0,191);
++        CHECK(DO(2,"/image-work/hidden",0,0)==-2,192);
++        CHECK(DO(2,"/private/../image",0,0)==-13 && DO(2,"/image/../image",0,0)==-20,193);
++        CHECK(DO(88,"/image-cycle","/work/cycle",0)==0 && DO(2,"/image-cycle",0,0)==-40,194);
++        CHECK(DO(88,"../../../../image","/work/escape",0)==0 && DO(2,"/work/escape",0,0)<0,195);
++        CHECK(DO(88,"/dev/hidden","/work/hidden-device",0)==0 && DO(2,"/work/hidden-device",0,0)==-2,196);
++    }
++    DO(1,1,"owned-directories: PASS\n",24); return 0;
++}
+ long directory_main(word *stack)
+ {
+     char **argv=(char **)(stack+1);
++    if(stack[0]>1 && equal(argv[1],"cross-exec-child")) {
++        CHECK(DO(79,buffer,sizeof buffer,0)==14 && equal(buffer,"/work/new-dir"),189);
++        long fd=DO(2,"../../image",0,0); CHECK(fd>=3 && DO(0,fd,buffer,9)==9 && DO(3,fd,0,0)==0,190);
++        DO(1,1,"owned-directories: PASS\n",24); return 0;
++    }
++    if(stack[0]>1 && equal(argv[1],"cross")) return cross_paths(0,1);
++    if(stack[0]>1 && equal(argv[1],"ordinary-cross")) return cross_paths(0,0);
++    if(stack[0]>1 && equal(argv[1],"ordinary-cross-exec")) return cross_paths(1,0);
++    if(stack[0]>1 && equal(argv[1],"ordinary-image-dir-exec")) return cross_paths(2,0);
+     if(stack[0]>1 && (equal(argv[stack[0]-1],"owned-cwd-exec-child") || equal(argv[stack[0]-1],"owned-cwd-script-child"))) {
+         if(equal(argv[stack[0]-1],"owned-cwd-script-child")) CHECK(stack[0]==4 && equal(argv[0],"program") && equal(argv[1],"optional") && equal(argv[2],"script"),146);
+         CHECK(DO(79,buffer,sizeof buffer,0)==16 && equal(buffer,"/work/cwd-moved") && create("exec-output","exec")==0,147);
+@@ -170,7 +214,8 @@ long directory_main(word *stack)
+     CHECK(DO(257,file,"child",0)==-20,37);
+     if(!functional) {
+         CHECK(DO(257,1048576,"file",0)==-9,37);
+-        CHECK(DO(257,dir,"../../image",0)==-95,38);
++        long crossing=DO(257,dir,"../../image",0);
++        CHECK(crossing>=3 && DO(0,crossing,buffer,9)==9 && buffer[0]=='i' && DO(3,crossing,0,0)==0,38);
+     }
+     long absolute=DO(257,123,"/image",0); CHECK(absolute>=3 && DO(3,absolute,0,0)==0,39);
+     CHECK(DO(263,alias,"file",0)==0 && DO(4,"/work/dir/file",meta,0)==-2,40);
+diff --git a/tests/fixtures/launch-script-fixture.c b/tests/fixtures/launch-script-fixture.c
+index bb108dbf..1e5d0d62 100644
+--- a/tests/fixtures/launch-script-fixture.c
++++ b/tests/fixtures/launch-script-fixture.c
+@@ -41,12 +41,13 @@ static long ordinary(word argc, char **argv, char **env) {
+     const char *mode=argv[argc-1];
+     int descriptor=equal(mode,"ordinary-fd") || equal(mode,"ordinary-unlinked");
+     int directory=equal(mode,"ordinary-dir") || equal(mode,"ordinary-renamed");
++    int cross=equal(mode,"ordinary-cross") || equal(mode,"ordinary-cross-nested") || equal(mode,"ordinary-cross-relative") || equal(mode,"ordinary-cross-cwd") || equal(mode,"ordinary-cross-plain");
+     int chain=equal(mode,"ordinary-chain");
+     int owned=chain || equal(mode,"ordinary-owned") || equal(mode,"ordinary-interpreter-link");
+-    int nested=equal(mode,"ordinary-nested") || equal(mode,"ordinary-joined");
+-    int plain=equal(mode,"ordinary-plain");
++    int nested=equal(mode,"ordinary-nested") || equal(mode,"ordinary-joined") || equal(mode,"ordinary-cross-nested");
++    int plain=equal(mode,"ordinary-plain") || equal(mode,"ordinary-cross-plain");
+     if(!equal(argv[0],"/bin/fixture")) {
+-        CHECK(equal(argv[0],owned?(equal(mode,"ordinary-interpreter-link")?"/work/interpreter-link":"/work/interpreter"):"/bin/interpreter"),70);
++        CHECK(equal(argv[0],owned?(equal(mode,"ordinary-interpreter-link")?"/work/interpreter-link":"/work/interpreter"):(cross && !nested?(equal(mode,"ordinary-cross-cwd")?"interpreter-link":(equal(mode,"ordinary-cross-relative")?"work/interpreter-link":"/work/interpreter-link")):"/bin/interpreter")),70);
+         CHECK(env[0] && equal(env[0],"SCRIPT_ENV=present") && env[1] && equal(env[1],"SECOND=two words") && !env[2],71);
+         CHECK(argc==(word)(chain?10:(nested?6:(plain?3:4))),72);
+         const char *name=argv[argc-2];
+@@ -57,11 +58,16 @@ static long ordinary(word argc, char **argv, char **env) {
+                   equal(argv[5],"second option") && equal(argv[6],"/work/second") && equal(argv[7],"option with spaces"),74);
+         } else {
+             if(!plain) CHECK(equal(argv[nested?3:1],"option with spaces"),75);
+-            if(nested) CHECK(equal(argv[1],"nested option") && equal(argv[2],equal(mode,"ordinary-joined")?"/work/middle":"/bin/wrapper"),76);
++            if(nested) CHECK(equal(argv[1],"nested option") && equal(argv[2],equal(mode,"ordinary-joined")?"/work/middle":(equal(mode,"ordinary-cross-nested")?"/work/interpreter-link":"/bin/wrapper")),76);
+         }
+         CHECK(DO(72,3,1,0)==-9 && DO(72,5,1,0)==-9 && DO(72,4,1,0)==0,77);
+         CHECK(DO(8,4,0,0)==0 && DO(0,4,buffer,1)==1 && buffer[0]=='K',78);
+-        long fd=DO(2,name,0,0); CHECK(fd>=3 && DO(0,fd,buffer,2)==2 && buffer[0]=='#' && buffer[1]=='!' && DO(3,fd,0,0)==0,79);
++        long fd=DO(2,name,0,0); CHECK(fd>=3 && DO(0,fd,buffer,2)==2 && buffer[0]=='#' && buffer[1]=='!',79);
++        if(cross) {
++            CHECK(DO(0,fd,buffer,5)==5,100);
++            CHECK(buffer[0]==(equal(mode,"ordinary-cross-cwd")?'i':(equal(mode,"ordinary-cross-relative")?'w':'/')),101);
++        }
++        CHECK(DO(3,fd,0,0)==0,79);
+         if(descriptor) CHECK(DO(8,6,0,1)==7,80);
+         // Script bytes become writable data after the interpreter commits.
+         if(!descriptor && !directory) {
+@@ -75,6 +81,10 @@ static long ordinary(word argc, char **argv, char **env) {
+           (nested?(equal(mode,"ordinary-joined")?"#!/work/middle option with spaces\nbody\n":"#!/bin/wrapper option with spaces\nbody\n"):
+           (chain?"#!/work/second option with spaces\nbody\n":
+           (owned?(equal(mode,"ordinary-interpreter-link")?"#!/work/interpreter-link option with spaces\nbody\n":"#!/work/interpreter option with spaces\nbody\n"):"#! \t/bin/interpreter\toption with spaces \t\nbody\n"))))==0,85);
++    if(cross) {
++        CHECK(DO(88,equal(mode,"ordinary-cross-nested")?"/bin/wrapper":"/bin/interpreter","/work/interpreter-link",0)==0,98);
++        CHECK(publish("/work/program",equal(mode,"ordinary-cross-cwd")?"#!interpreter-link option with spaces\nbody\n":(equal(mode,"ordinary-cross-plain")?"#!/work/interpreter-link\nbody\n":(equal(mode,"ordinary-cross-relative")?"#!work/interpreter-link option with spaces\nbody\n":"#!/work/interpreter-link option with spaces\nbody\n")))==0,99);
++    }
+     if(equal(mode,"ordinary-joined")) CHECK(publish("/work/middle","#!/bin/interpreter nested option\n")==0,95);
+     if(equal(mode,"ordinary-script-link")) CHECK(DO(88,"program","/work/alias",0)==0,96);
+     if(equal(mode,"ordinary-interpreter-link")) CHECK(DO(88,"interpreter","/work/interpreter-link",0)==0,97);
+@@ -98,6 +108,7 @@ static long ordinary(word argc, char **argv, char **env) {
+         if(child) { int status=-1; CHECK(DO(61,child,&status,0)==child && status==0 && intact(),93);
+             DO(1,1,"parent: PASS\n",13); return 0; }
+     }
++    if(equal(mode,"ordinary-cross-cwd")) CHECK(DO(80,"/work",0,0)==0,102);
+     char *next[]={"ignored-argv-zero",(char *)mode,0};
+     char *next_env[]={"SCRIPT_ENV=present","SECOND=two words",0};
+     if(descriptor) call(322,6,(word)"",(word)next,(word)next_env,0x1000);
+diff --git a/tests/fixtures/launch-storage-fixture.c b/tests/fixtures/launch-storage-fixture.c
+index 54cd19f8..ae230437 100644
+--- a/tests/fixtures/launch-storage-fixture.c
++++ b/tests/fixtures/launch-storage-fixture.c
+@@ -118,9 +118,10 @@ long storage_main(word *stack)
+         CHECK(DO(88,"../link","/work/dir/chain",0)==0,174);
+         CHECK(DO(2,"/work/dir/chain/../fresh",0101,0600)==3 && DO(3,3,0,0)==0,175);
+         CHECK(DO(4,"/work/fresh",meta,0)==0 && DO(4,"/work/dir/fresh",meta,0)==-2,176);
+-        CHECK(DO(88,"/image","/work/image",0)==0 && DO(2,"/work/image",0,0)<0,177);
++        CHECK(DO(88,"/image","/work/image",0)==0 && DO(2,"/work/image",0,0)==3,177);
++        CHECK(DO(0,3,output,9)==9 && output[0]=='i' && DO(3,3,0,0)==0,216);
+         CHECK(DO(88,"/","/work/root",0)==0 && DO(2,"/work/root/escape",0101,0600)<0,178);
+-        CHECK(DO(2,"/work/root/../image",0,0)<0 && DO(2,"/work/link/../../image",0,0)<0,179);
++        CHECK(DO(2,"/work/root/../image",0,0)<0 && DO(2,"/work/link/../../image",0,0)==3 && DO(3,3,0,0)==0,179);
+         CHECK(DO(2,"/work/dir",0200000,0)==3,180);
+         CHECK(DO(266,"file",3,"relative")==0,181);
+         CHECK(call(267,3,(word)"relative",(word)output,64,0,0)==4 && output[0]=='f',182);
