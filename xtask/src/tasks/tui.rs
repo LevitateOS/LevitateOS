@@ -1,51 +1,56 @@
 //! `tui <app>`: run a terminal app from tui/ in this terminal.
 
 use anyhow::{Context, Result, bail};
+use std::path::Path;
 use std::process::Command;
 
-use crate::cli::TuiApp;
+use distro_contract::tui_apps::{self, TuiApp};
 
-pub fn run(app: TuiApp, args: Vec<String>) -> Result<()> {
+pub fn run(name: String, args: Vec<String>) -> Result<()> {
     crate::util::exit::require_terminal(
         "`cargo xtask tui`",
         "cargo xtask inspect tui <app> --stdout renders it without one",
     )?;
     let root = crate::util::repo::repo_root()?;
-    let mut cmd = match app {
-        TuiApp::InstallDocs => {
-            let dir = root.join("tui/apps/live-tools/install-docs");
-            crate::tasks::check::install_js_workspace(&root)?;
-            let mut cmd = Command::new("bun");
-            cmd.current_dir(dir).arg("src/main.ts");
-            cmd.env_remove("NO_COLOR").env("FORCE_COLOR", "3");
-            cmd
-        }
-        TuiApp::InstallDiskPlan => {
-            // The app runs this checkout's recpart.
-            let status = Command::new("cargo")
-                .current_dir(&root)
-                .args(["build", "-q", "-p", "recpart"])
-                .status()?;
-            if !status.success() {
-                bail!("building recpart failed");
-            }
-            let dir = root.join("tui/apps/install/disk-plan");
-            crate::tasks::check::install_js_workspace(&root)?;
-            let target_dir = std::env::var_os("CARGO_TARGET_DIR")
-                .map(std::path::PathBuf::from)
-                .unwrap_or_else(|| root.join("target"));
-            let mut paths = vec![target_dir.join("debug")];
-            paths.extend(std::env::split_paths(&std::env::var_os("PATH").unwrap_or_default()));
-            let mut cmd = Command::new("bun");
-            cmd.current_dir(dir)
-                .arg("src/main.ts")
-                .env("PATH", std::env::join_paths(paths)?);
-            cmd
-        }
-    };
+    let app = tui_apps::find(&root, &name)?;
+    let mut cmd = app_command(&root, &app)?;
+    cmd.env_remove("NO_COLOR").env("FORCE_COLOR", "3");
     let status = cmd.args(&args).status().context("running bun")?;
     if !status.success() {
-        bail!("the app exited with {status}");
+        bail!("{name} exited with {status}");
     }
     Ok(())
+}
+
+/// `bun <entry>` in the app's directory, after installing the workspace and
+/// building the app's Rust tools onto the front of PATH.
+pub fn app_command(root: &Path, app: &TuiApp) -> Result<Command> {
+    crate::tasks::check::install_js_workspace(root)?;
+    let mut cmd = Command::new("bun");
+    cmd.current_dir(&app.dir).arg(&app.entry);
+    if let Some(path) = tools_path(root, app)? {
+        cmd.env("PATH", path);
+    }
+    Ok(cmd)
+}
+
+/// PATH with this checkout's builds of the app's tools first, or None if it needs none.
+pub fn tools_path(root: &Path, app: &TuiApp) -> Result<Option<std::ffi::OsString>> {
+    if app.tools.is_empty() {
+        return Ok(None);
+    }
+    let mut build = Command::new("cargo");
+    build.current_dir(root).args(["build", "-q"]);
+    for tool in &app.tools {
+        build.args(["-p", tool]);
+    }
+    if !build.status()?.success() {
+        bail!("building {} for {} failed", app.tools.join(", "), app.name);
+    }
+    let target_dir = std::env::var_os("CARGO_TARGET_DIR")
+        .map(std::path::PathBuf::from)
+        .unwrap_or_else(|| root.join("target"));
+    let mut paths = vec![target_dir.join("debug")];
+    paths.extend(std::env::split_paths(&std::env::var_os("PATH").unwrap_or_default()));
+    Ok(Some(std::env::join_paths(paths)?))
 }

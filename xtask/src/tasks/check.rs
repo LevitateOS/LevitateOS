@@ -4,15 +4,6 @@ use anyhow::{Context, Result, bail};
 use std::path::Path;
 use std::process::Command;
 
-/// TypeScript packages with a `typecheck` script.
-const TS_PACKAGES: &[&str] = &[
-    "docs/content",
-    "tui/kit/core",
-    "tui/apps/install/disk-plan",
-    "tui/apps/live-tools/install-docs",
-    "tui/apps/runtime/recab",
-];
-
 pub fn run() -> Result<()> {
     let root = crate::util::repo::repo_root()?;
     if which::which("bun").is_err() {
@@ -41,10 +32,12 @@ pub fn run() -> Result<()> {
         command(&root.join("docs/content"), "bun", &["run", "build"]),
     );
     step("bun install --frozen-lockfile", install_js_workspace(&root));
-    for package in TS_PACKAGES {
-        let dir = root.join(package);
+    let mut packages = vec![root.join("docs/content")];
+    packages.extend(distro_contract::tui_apps::tui_packages(&root)?);
+    for dir in packages {
+        let name = dir.strip_prefix(&root).unwrap_or(&dir).display().to_string();
         step(
-            &format!("typecheck {package}"),
+            &format!("typecheck {name}"),
             command(&dir, "bun", &["run", "typecheck"]),
         );
     }

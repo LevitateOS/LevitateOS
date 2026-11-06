@@ -93,13 +93,14 @@ fn generate(out: &mut Out) -> Result<()> {
         "INSTALL_MODES",
         <recpart::InstallMode as clap::ValueEnum>::value_variants(),
     )?;
-    recpart_ts.write(out, &root.join("tui/apps/install/disk-plan/src/contract/recpart.ts"))?;
+    let app_dir = |name: &str| distro_contract::tui_apps::find(&root, name).map(|app| app.dir);
+    recpart_ts.write(out, &app_dir("disk-plan")?.join("src/contract/recpart.ts"))?;
 
     let mut recab_ts = Declarations::new(&cfg);
     recab_ts.types::<recab::Slot>();
     recab_ts.types::<recab::Status>();
     recab_ts.constant("SLOTS", <recab::Slot as clap::ValueEnum>::value_variants())?;
-    recab_ts.write(out, &root.join("tui/apps/runtime/recab/src/domain/contract.ts"))?;
+    recab_ts.write(out, &app_dir("recab-tui")?.join("src/domain/contract.ts"))?;
 
     write_tool_help(out, &root)?;
     Ok(())

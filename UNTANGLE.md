@@ -1166,7 +1166,9 @@ Commits land on the checked-out branches (superproject `master`, submodules `cod
   - **Bug fixed:** recab TUI crashed on launch (duplicate React); it renders now.
   - recab's runner moved to `Bun.spawn` early (its `node:child_process` typings broke without `@types/node`); same failure semantics. The PTY test's unused `expect` import was dropped so lint passes.
   - Known until F14: the generated contracts are now formatted, so `cargo xtask gen --check` reports them stale.
-- [ ] F2 — One app manifest: each app declares its name, entry and needs once, and xtask and the builder read it.
+- [x] F2 — One app manifest. contract `c239381` (`distro_contract::tui_apps`, reads root workspaces and each app's `package.json`), builder `ae1609b`, tui `93d9bfb`, superproject commit "One app manifest…". Apps are `install-docs`, `disk-plan` and `recab-tui` (recab's TUI is renamed so its command can't clash with the `recab` tool); xtask's `TuiApp` enum, per-app arms and `TS_PACKAGES` are gone, and `cargo xtask tui|inspect tui <name>` works for every app, building the app's declared tools onto PATH.
+  - Fixed early: B135 — the builder now runs the same `bun install --frozen-lockfile` at the root instead of probing `node_modules/@levitate/tui-kit`.
+  - Deferred: the live ISO still names the command `levitate-install-docs` (F19 renames guest commands); C097's per-app title/scope strings now all use the one name but are still literals until F10's `runApp({name})`; disk-plan's inspect args still carry `--disk /dev/sda` (now in its manifest) until F3's fixture recpart.
 - [ ] F3 — One xtask TUI driver for run, inspect and capture.
 - [ ] F4 — Checks that fail on real bugs: `cargo xtask check tui`.
 - [ ] F5 — Delete the kit surface no app uses.

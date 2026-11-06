@@ -109,8 +109,8 @@ pub enum Cmd {
 
     /// Launch a terminal app from tui/ in this terminal.
     Tui {
-        #[arg(value_enum)]
-        app: TuiApp,
+        /// App name: the `bin` name in its package.json (e.g. install-docs, disk-plan, recab-tui).
+        app: String,
         /// Arguments passed to the app.
         #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
         args: Vec<String>,
@@ -331,15 +331,6 @@ pub struct TestArgs {
     pub boot: BootArgs,
 }
 
-/// A terminal app under tui/.
-#[derive(Clone, Copy, Debug, ValueEnum)]
-pub enum TuiApp {
-    #[value(name = "install-docs")]
-    InstallDocs,
-    #[value(name = "install-disk-plan")]
-    InstallDiskPlan,
-}
-
 #[derive(Subcommand)]
 pub enum InspectCmd {
     /// Render install-docs pages and write plain-text snapshots.
@@ -353,9 +344,8 @@ pub enum InspectCmd {
 
     /// Render a terminal app and write snapshots.
     Tui {
-        /// Preset app. Without it, give --cwd and --command.
-        #[arg(value_enum)]
-        app: Option<TuiApp>,
+        /// App name (its package.json `bin`). Without it, give --cwd and --command.
+        app: Option<String>,
         /// Working directory for a custom target.
         #[arg(long, value_name = "PATH")]
         cwd: Option<PathBuf>,

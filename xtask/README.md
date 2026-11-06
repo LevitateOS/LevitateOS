@@ -31,7 +31,7 @@ cargo xtask check                              # cargo check, generated files cu
 
 cargo xtask tui install-docs                   # run a terminal app from tui/
 cargo xtask inspect docs --slug installation-disk --stdout
-cargo xtask inspect tui install-disk-plan --input 'n'
+cargo xtask inspect tui disk-plan --input 'n'
 ```
 
 `just <command>` is a short alias for each of these.

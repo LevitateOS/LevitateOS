@@ -5,7 +5,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 #[derive(Debug, Clone)]
 pub struct Options {
-    pub app: Option<crate::cli::TuiApp>,
+    pub app: Option<String>,
     pub cwd: Option<PathBuf>,
     pub command: Option<String>,
     pub input: Option<String>,
@@ -111,21 +111,24 @@ pub fn run(options: Options) -> Result<()> {
 }
 
 fn resolve_target(root: &Path, options: &Options) -> Result<Target> {
-    if let Some(app) = options.app {
+    if let Some(name) = &options.app {
         if options.cwd.is_some() || options.command.is_some() {
-            bail!("tui inspect: --app cannot be combined with --cwd/--command");
+            bail!("tui inspect: an app name cannot be combined with --cwd/--command");
         }
-        return Ok(match app {
-            crate::cli::TuiApp::InstallDocs => Target {
-                name: "install-docs".to_string(),
-                cwd: root.join("tui/apps/live-tools/install-docs"),
-                command: "bun src/main.ts".to_string(),
-            },
-            crate::cli::TuiApp::InstallDiskPlan => Target {
-                name: "install-disk-plan".to_string(),
-                cwd: root.join("tui/apps/install/disk-plan"),
-                command: "bun src/main.ts --disk /dev/sda".to_string(),
-            },
+        let app = distro_contract::tui_apps::find(root, name)?;
+        crate::tasks::check::install_js_workspace(root)?;
+        let mut command = format!("bun {}", app.entry.display());
+        for arg in &app.inspect_args {
+            command.push(' ');
+            command.push_str(&sh_quote(arg));
+        }
+        if let Some(path) = crate::tasks::tui::tools_path(root, &app)? {
+            command = format!("PATH={} {command}", sh_quote(&path.to_string_lossy()));
+        }
+        return Ok(Target {
+            name: app.name,
+            cwd: app.dir,
+            command,
         });
     }
 
@@ -254,6 +257,10 @@ fn render_transcript(
         seconds,
         transcript_path,
     })
+}
+
+fn sh_quote(input: &str) -> String {
+    format!("'{}'", sh_single_quote(input))
 }
 
 fn sh_single_quote(input: &str) -> String {

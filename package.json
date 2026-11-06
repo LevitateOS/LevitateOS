@@ -7,7 +7,7 @@
     "tui/kit/core",
     "tui/apps/install/disk-plan",
     "tui/apps/live-tools/install-docs",
-    "tui/apps/runtime/recab"
+    "tui/apps/runtime/recab-tui"
   ],
   "scripts": {
     "dev": "turbo dev",
