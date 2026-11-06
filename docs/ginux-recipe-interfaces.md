@@ -80,7 +80,9 @@ Resource enforcement is specific: Ginux applies `memory_mib` as inherited
 child CPU affinity to at most the requested available CPUs. This is not aggregate
 domain RSS or cumulative CPU time. Owned storage has separate byte/metadata
 accounting, with explicit object/data limits; shared hardlink bytes count once.
-Public descriptors and tasks remain bounded. Supervisor-private backing FDs
+If `max_bytes` is omitted, the actual data cap subtracts page-rounded namespace/backing-table
+metadata from the selected memory budget. Recipe uses the full memory value only
+as a conservative outer archive bound. Public descriptors and tasks remain bounded. Supervisor-private backing FDs
 reserve capacity independently of the public descriptor table and respect the
 host hard limit. Unsupported operations fail; this is not complete Linux ABI
 coverage. Large source consumers select sufficient explicit storage/memory policy
@@ -90,7 +92,7 @@ Outbound networking requires repeated `--network-host HOST:PORT` grants (or
 library `ExecutionOptions`). Empty policy produces `network.backend="none"`.
 The coordinator resolves at most eight numeric TCP endpoints before launch,
 with bounded resolver time/output, and writes an immutable hostname map inside
-the private root. Ginux enforces destination, connection (16) and cumulative
+the private root. Ginux enforces destination, simultaneous connection (16) and cumulative
 send+receive byte budgets (default8GiB); aliases/fork retain ownership and teardown
 revokes sockets. No proxy inheritance, arbitrary DNS, UDP or listening access is
 provided. Redirect destinations need their own grant. **An IP:port grant cannot
@@ -136,7 +138,9 @@ claims, acknowledging generation0. It does not enable source rewriting.
 
 Snapshots use validated USTAR with GNU longname/longlink extensions, regular
 files, directories, symlinks and hardlink references to prior regular objects.
-Hardlinks require matching mode/mtime. Paths are bounded to255 bytes; headers
+Hardlinks require matching mode/mtime. Absolute domain paths are bounded to255 bytes including their leading slash
+(tar member names at most254); individual file sizes must fit the USTAR size
+field (less than8GiB). Headers
 are bounded by `3 * max_objects`, total bytes by
 `max_storage_bytes + 3072 * max_objects + 1024`. Traversal, conflicting parents,
 forward/invalid aliases and malformed metadata fail without publication. Export,
