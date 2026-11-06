@@ -68,3 +68,22 @@ has been performed here. A written handoff is not evidence of dispatch or fix.
   and clean replay. Full storage suite retains the older confinement/protected
   buffer scenarios; these were not rerun by this agent. The configured thread
   snapshot is deliberately excluded from this candidate.
+
+## G09d pending security scenarios and automatic-review boundary
+
+G09d is retained at85b53fe15a64041f451ec7e7aa1e77d08cb2c18a in the disposable source export at
+`/tmp/ginux-contribution-preparation/G09d/source`; use that exact retained
+revision or record any refresh before security validation. Full directory/default storage suites have
+not been run here. Their protected/unmapped/cross-page getdents buffers, private
+FD authority, cross-assignment directory traversal and rename confinement cases
+remain for DaybreakBlue. Preserve the existing default scenarios and tests.
+
+Automatic approval review rejected a proposed privileged run containing
+`view-probes`: access/readlink checks were classified as authority-related
+security validation conflicting with the user's handoff boundary. That command
+did not run. Those scenarios remain pending for DaybreakBlue and must not be
+retried indirectly here. A safer selection excluding view-probes was approved:
+ordinary directory/cwd plus growth/bounds/quota scenarios pass; this provides no
+substitute security evidence. No cloud dispatch or request for extra privilege
+is implied. Review new kernel-owned cwd/proc-link handling and its namespace
+checks alongside G07's unresolved shared-argument capture problem.

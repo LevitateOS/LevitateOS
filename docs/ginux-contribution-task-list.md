@@ -435,18 +435,30 @@ mutation failure. Directory runtime integration, full CI/security and actual
 upstream independence remain pending. Pair this review subpacket with its
 runtime adapter before proposing a useful contribution.
 
+G09d's directory/cwd runtime is retained at85b53fe1 on G09b/G09c composition
+300fe207. [Review/evidence](ginux-contributions/g09d-review.md) records89 units,
+source/clean builds,171-path strict replay, ordinary directory/cwd scenarios and
+storage growth/bounds/quota. G09b fails the new ABI fixtures; the final join passes.
+Access/readlink and security probes remain unrun for DaybreakBlue, including the
+view-probes run rejected by automatic approval review. G09c/G09d must travel
+together with their enum/runtime errno join; the intermediate composition must
+not be published. G09 source/selected functional preparation is retained across
+four review subpackets, with explicit security/full CI/upstream holds. Memfd
+identity moves to G12; unsupported /dev/fd reopening tests move to their later
+executable/descriptor owner. No PR or policy text entered Ginux.
+
 Current goal-turn classification: **progress**. The full goal remains active;
 security-held G07, later packets, policy acceptance, interactions and Recipe
 closure remain incomplete. F04 remains the user inspection stop.
 
-Exact next task: **G09d — configured directory runtime and basic path joins**.
-Compose G09c with reviewed G09b, then adapt9ba6a1d4's runtime/tests/build/docs and
-G09's noctty/access/relative-cwd fixes8752f708/d9490772/37ca30cb/adc79f0a. Preserve
-current component resolution and strict copies. Directory-fd/cwd translation
-must use the existing path owner, not the obsolete lexical donor. Memfd identity
-32e2c85f stays with G12. G07/G08 remain held; do not import their pending code.
-Full security probes belong in the written DaybreakBlue handoff; ordinary
-functional checks stay local. No publication is authorized.
+Exact next task: **G10 — execution of owned ELF files**, starting from reviewed
+G09d85b53fe1, with G07/G08 excluded. Inspect c5ae1c5d/32ba41e9, source ownership,
+private executable backing, exec transaction and cleanup before extraction.
+Record low-level executable-injection/security validation for DaybreakBlue;
+ordinary implementation/source review/functional program execution may continue.
+Do not replay memfd mapping identity32e2c85f prematurely or import G12/G17 just to
+compile the donor. Preserve G06 strict TID/wait semantics and successful-exec-only
+CLOEXEC retirement. Full security and CI remain pending; no publication authorized.
 
 Active skill: `hdae-development`, discovered at
 `/home/vince/.codex/worktrees/ginux-pr-combination-check/ginux/.agents/skills/hdae-development/SKILL.md`.

@@ -1,0 +1,953 @@
+From 85b53fe15a64041f451ec7e7aa1e77d08cb2c18a Mon Sep 17 00:00:00 2001
+From: vince <vincepaul.liem@gmail.com>
+Date: Fri, 6 Nov 2026 12:33:14 +0100
+Subject: [PATCH] feat(launch): join owned directory and image cwd operations
+
+Translate public directory descriptors through their VFS owner for
+enumeration, relative paths, rename and removal. Resolve image-relative
+paths and exec against the calling process cwd, preserving native fork
+semantics and the existing configured namespace boundary.
+
+Signed-off-by: vince <vincepaul.liem@gmail.com>
+---
+ .github/workflows/check.yml               |   3 +-
+ Makefile                                  |   8 +
+ README.md                                 |  21 +-
+ crates/ginux-init/src/descriptors.rs      |  52 +++--
+ crates/ginux-init/src/fs_hooks.rs         | 247 +++++++++++++++++++---
+ crates/ginux-init/src/launch_tasks.rs     |  25 +++
+ crates/ginux-init/src/tracee_io.rs        |  56 +++++
+ scripts/test-launch-directories.py        |  52 +++++
+ scripts/test-launch-storage.py            |   5 +-
+ tests/fixtures/launch-directory-fixture.c | 151 +++++++++++++
+ tests/fixtures/launch-storage-fixture.c   |  15 ++
+ 11 files changed, 582 insertions(+), 53 deletions(-)
+ create mode 100644 scripts/test-launch-directories.py
+ create mode 100644 tests/fixtures/launch-directory-fixture.c
+
+diff --git a/.github/workflows/check.yml b/.github/workflows/check.yml
+index 0c5b117a..acc81abe 100644
+--- a/.github/workflows/check.yml
++++ b/.github/workflows/check.yml
+@@ -24,13 +24,14 @@ jobs:
+     steps:
+       - uses: actions/checkout@v5
+       - run: rustup target add x86_64-unknown-linux-gnu
+-      - run: make build build-launch-fixture build-launch-storage-fixture build-launch-device-fixture build-launch-pipe-fixture build-launch-fd-fixture build-launch-task-fixture build-launch-exec-fixture build-process-fixtures build-gate1-fixture
++      - run: make build build-launch-fixture build-launch-storage-fixture build-launch-device-fixture build-launch-pipe-fixture build-launch-fd-fixture build-launch-task-fixture build-launch-exec-fixture build-launch-directory-fixture build-process-fixtures build-gate1-fixture
+       - run: sudo make test-launch
+       - run: sudo make test-launch-storage
+       - run: sudo make test-launch-devices
+       - run: sudo make test-launch-pipes
+       - run: sudo make test-launch-fds
+       - run: sudo make test-launch-tasks
++      - run: sudo make test-launch-directories
+       - run: sudo make test-launch-exec
+       - run: sudo make test-native-supervision
+       - run: make test-process-native
+diff --git a/Makefile b/Makefile
+index 4623d95d..15c55879 100644
+--- a/Makefile
++++ b/Makefile
+@@ -243,3 +243,11 @@ build-launch-exec-fixture:
+ 
+ test-launch-exec:
+ 	python3 scripts/test-launch-exec.py $(GINUX) .artifacts/launch/launch-exec-fixture .artifacts/launch/launch-interpreter-fixture .artifacts/launch/launch-interpreter-allowed-fixture
++
++.PHONY: build-launch-directory-fixture test-launch-directories
++build-launch-directory-fixture:
++	mkdir -p .artifacts/launch
++	$(CC) -nostdlib -static -fno-stack-protector -fno-builtin -O2 -Wall -Wextra -Werror tests/fixtures/launch-directory-fixture.c -o .artifacts/launch/launch-directory-fixture
++
++test-launch-directories:
++	python3 scripts/test-launch-directories.py $(GINUX) .artifacts/launch/launch-directory-fixture
+diff --git a/README.md b/README.md
+index f46b73b5..a3982c7c 100644
+--- a/README.md
++++ b/README.md
+@@ -232,11 +232,18 @@ storage. Paths must be canonical, unique, and cannot cover init, `/`, `/proc`,
+ Without assignments, native image access remains read-only.
+ 
+ This backend supports regular-file open/create/exclusive-create/truncate/append,
+-read/write/pread, ftruncate, seek, close, basic descriptor flags, mkdir, file
+-unlink, chmod,
+-and stat/fstat/fstatat/statx metadata. Relative paths use the configured workdir;
+-directory descriptors, directory enumeration/removal, owned symlinks, hardlinks,
+-rename, file mappings and execution of generated files are unsupported. Component-wise image-link traversal preserves assignment
++read/write/pread, ftruncate, seek, close, descriptor flags, mkdir/unlink/rmdir,
++owned directory descriptions/getdents64, rename/renameat/renameat2 with NOREPLACE,
++chmod and stat/fstat/fstatat/statx metadata. Access and readlink probes stay in
++the owned namespace; regular files accept O_NOCTTY. Directory cookies and inode
++identity follow open descriptions across aliases, fork, rename and removal.
++Namespace changes validate types, capacity and replacement before mutation.
++Relative AT_FDCWD paths follow the calling process's image cwd; owned directory
++FDs resolve relative operations through their current VFS identity. Image chdir,
++getcwd and relative image exec retain native per-process cwd semantics. Entering
++owned directories as cwd, relative image-directory FD access, owned symlinks,
++hardlinks, mappings and generated-file execution remain unsupported.
++Component-wise image-link traversal preserves assignment
+ precedence, missing components and non-directory errors. Native image operations
+ use a temporary canonical path below the stopped workload's stack; an unavailable
+ scratch area or overlapping output buffer returns EFAULT. This is a bounded
+@@ -265,8 +272,8 @@ lower operator limits. Allocation respects that lower soft limit; runtime
+ NOFILE-limit changes are currently denied. Reported limits are not inflated to
+ accommodate backend handle ranges. Fork copies public descriptor tables while
+ sharing open descriptions and owned-object lifetimes. Successful exec closes
+-CLOEXEC entries; failed exec preserves the table. Relative directory-fd access
+-and descriptor polling remain unsupported.
++CLOEXEC entries; failed exec preserves the table. Owned directory-fd operations
++are supported; descriptor polling remains unsupported.
+ Guest-memory copies respect page protections, including partial read copyout.
+ No writable host descriptor is exposed. Data disappears at domain teardown;
+ there is no retention, export, storage generation or separate storage-quota setting.
+diff --git a/crates/ginux-init/src/descriptors.rs b/crates/ginux-init/src/descriptors.rs
+index cb69292d..17dc0bb1 100644
+--- a/crates/ginux-init/src/descriptors.rs
++++ b/crates/ginux-init/src/descriptors.rs
+@@ -353,7 +353,11 @@ impl DescriptorTable {
+                     Err(e) => Err(e),
+                 }
+             }
+-            258 | 262 | 263 | 268 | 269 | 332 | 439 => {
++            264 | 316 => {
++                self.save(r);
++                self.rename_paths(pid, r, backends)
++            }
++            258 | 262 | 263 | 267 | 268 | 269 | 332 | 439 => {
+                 self.save(r);
+                 self.path_descriptor(pid, r, backends)
+             }
+@@ -368,27 +372,37 @@ impl DescriptorTable {
+         r: &mut UserRegs,
+         backends: &mut Backends,
+     ) -> Result<NativeDecision, i64> {
+-        let path = read_path(pid, r.rsi)?;
++        r.rdi = self.path_handle(pid, r.rdi, r.rsi)?;
++        Ok(backends.claim(pid, r))
++    }
++
++    fn path_handle(&self, pid: usize, dirfd: u64, address: u64) -> Result<u64, i64> {
++        let path = read_path(pid, address)?;
+         if path.as_bytes().first() == Some(&b'/') {
+-            r.rdi = (-100i64) as u64;
+-        } else if r.rdi as i32 != -100 {
+-            let entry = self.get(r.rdi)?;
+-            if path.is_empty() {
+-                match entry.handle {
+-                    Handle::Native { fd, .. } => r.rdi = fd as u64,
+-                    Handle::Owned(handle) => r.rdi = handle as u64,
+-                    Handle::Reserved => return Err(-9),
+-                }
+-            } else {
+-                // Relative directory descriptors require resolved directory
+-                // views; never interpret a backend integer as a public fd.
+-                return Err(if matches!(entry.handle, Handle::Native { .. }) {
+-                    -95
+-                } else {
+-                    -20
+-                });
++            return Ok((-100i64) as u64);
++        }
++        if dirfd as i32 == -100 {
++            return Ok(dirfd);
++        }
++        match self.get(dirfd)?.handle {
++            Handle::Owned(handle) if path.is_empty() || (1048576..1048640).contains(&handle) => {
++                Ok(handle as u64)
+             }
++            Handle::Native { fd, .. } if path.is_empty() => Ok(fd as u64),
++            Handle::Owned(_) => Err(-20),
++            Handle::Native { .. } => Err(-95),
++            Handle::Reserved => Err(-9),
+         }
++    }
++
++    fn rename_paths(
++        &self,
++        pid: usize,
++        r: &mut UserRegs,
++        backends: &mut Backends,
++    ) -> Result<NativeDecision, i64> {
++        r.rdi = self.path_handle(pid, r.rdi, r.rsi)?;
++        r.rdx = self.path_handle(pid, r.rdx, r.r10)?;
+         Ok(backends.claim(pid, r))
+     }
+ 
+diff --git a/crates/ginux-init/src/fs_hooks.rs b/crates/ginux-init/src/fs_hooks.rs
+index f739af55..6dd53976 100644
+--- a/crates/ginux-init/src/fs_hooks.rs
++++ b/crates/ginux-init/src/fs_hooks.rs
+@@ -1,7 +1,6 @@
+ //! Configured-launch ephemeral memory storage. Bytes and descriptors belong to
+ //! the supervisor; no writable host descriptor is installed in the workload.
+-//! Retained storage, directory descriptors, mappings and generated-file exec
+-//! are not provided.
++//! Retained storage, mappings and generated-file exec are not provided.
+ 
+ use crate::storage_memory::MemoryStorage;
+ use crate::supervisor::UserRegs;
+@@ -10,7 +9,7 @@ use core::sync::atomic::{AtomicBool, Ordering};
+ use ginux_domain::{DomainConfig, Text};
+ use ginux_vfs::{
+     BaseReader, Entry, FileMetadata, Index, NodeKind, VfsError, VirtualFs, HEADER_SIZE, MAX_PATH,
+-    O_APPEND, O_CLOEXEC, O_CREATE, O_EXCLUSIVE, O_READ, O_TRUNC, O_WRITE, RECORD_SIZE,
++    O_APPEND, O_CLOEXEC, O_CREATE, O_EXCLUSIVE, O_NONBLOCK, O_READ, O_TRUNC, O_WRITE, RECORD_SIZE,
+ };
+ 
+ pub const FD_BASE: usize = 1 << 20;
+@@ -32,7 +31,6 @@ pub struct LaunchFs {
+     fs: MemoryFs,
+     prefixes: [Path; 8],
+     count: usize,
+-    cwd: Path,
+     init: Path,
+     null: bool,
+ }
+@@ -121,8 +119,6 @@ impl LaunchFs {
+                 .any(|name| name.as_bytes() == b"null"),
+             init: Path::from_bytes(config.init.as_bytes())
+                 .map_err(|_| b"init path exceeds bound".as_slice())?,
+-            cwd: Path::from_bytes(config.workdir.as_bytes())
+-                .map_err(|_| b"storage workdir exceeds bound".as_slice())?,
+         })
+     }
+ 
+@@ -147,19 +143,20 @@ impl LaunchFs {
+             return Err(-2);
+         }
+         let absolute = text.as_bytes().first() == Some(&b'/');
+-        if !absolute && dirfd as i32 != -100 {
+-            return Err(if dirfd as i32 >= FD_BASE as i32 {
+-                -20
+-            } else {
+-                -9
+-            });
+-        }
+-        let mut bytes = [0; MAX_PATH];
++        let cwd;
+         let base = if absolute {
+             b"".as_slice()
++        } else if dirfd as i32 == -100 {
++            cwd = crate::tracee_io::image_cwd(pid)?;
++            cwd.as_bytes()
+         } else {
+-            self.cwd.as_bytes()
++            let fd = (dirfd as u32)
++                .checked_sub(FD_BASE as u32)
++                .filter(|slot| *slot < 64)
++                .ok_or(-9)?;
++            self.fs.directory_path(fd as i32 + 3).map_err(errno)?
+         };
++        let mut bytes = [0; MAX_PATH];
+         let separator = usize::from(!base.is_empty() && base != b"/");
+         let end = base
+             .len()
+@@ -218,14 +215,15 @@ impl LaunchFs {
+                 r.rdx & 0o400000 == 0 && r.rdx & 0o300 != 0o300,
+                 r.rdx & 0o100 != 0,
+             ),
++            80 => (0, r.rdi, (-100i64) as u64, true, false),
+             59 => (0, r.rdi, (-100i64) as u64, true, false),
+             322 => (1, r.rsi, r.rdi, r.r8 & 0x100 == 0, false),
+             4 | 21 | 90 => (0, r.rdi, (-100i64) as u64, true, false),
+-            6 | 87 | 89 => (0, r.rdi, (-100i64) as u64, false, false),
++            6 | 84 | 87 | 89 => (0, r.rdi, (-100i64) as u64, false, false),
+             83 => (0, r.rdi, (-100i64) as u64, false, true),
+             258 => (1, r.rsi, r.rdi, false, true),
+             262 => (1, r.rsi, r.rdi, r.r10 & 0x100 == 0, false),
+-            263 => (1, r.rsi, r.rdi, false, false),
++            263 | 267 => (1, r.rsi, r.rdi, false, false),
+             268 | 269 => (1, r.rsi, r.rdi, true, false),
+             332 => (1, r.rsi, r.rdi, r.rdx & 0x100 == 0, false),
+             439 => (1, r.rsi, r.rdi, r.r10 & 0x100 == 0, false),
+@@ -238,8 +236,17 @@ impl LaunchFs {
+             return Ok(None);
+         }
+         let path = self.path(pid, address, dirfd)?;
+-        self.resolve(pid, path.as_bytes(), follow, missing)
+-            .map(|p| Some((argument, p)))
++        if (r.orig_rax == 84 || r.orig_rax == 263 && r.rdx == 0x200) && dot_entry(path.as_bytes()) {
++            return Err(-22);
++        }
++        let path = self.resolve(pid, path.as_bytes(), follow, missing)?;
++        if dirfd as i32 != -100
++            && read_path(pid, address)?.as_bytes().first() != Some(&b'/')
++            && !self.owns_path(path.as_bytes())
++        {
++            return Err(-95);
++        }
++        Ok(Some((argument, path)))
+     }
+ 
+     /// Canonical image paths preserve assignment precedence even through links
+@@ -258,6 +265,21 @@ impl LaunchFs {
+         Ok(Some((argument, path)))
+     }
+ 
++    pub fn image_chdir(&self, pid: usize, address: u64) -> Result<(), i64> {
++        let path = self.path(pid, address, (-100i64) as u64)?;
++        let path = self.resolve(pid, path.as_bytes(), true, false)?;
++        if self.owns_path(path.as_bytes()) {
++            return Err(-95);
++        }
++        if [b"/dev".as_slice(), b"/proc", b"/sys"]
++            .iter()
++            .any(|prefix| within(path.as_bytes(), prefix))
++        {
++            return Err(-13);
++        }
++        Ok(())
++    }
++
+     /// Image execution never reopens assigned paths, including implicit script
+     /// and ELF interpreters selected by the native kernel loader.
+     pub fn native_exec_path(&self, pid: usize, address: u64, follow: bool) -> Result<(), i64> {
+@@ -331,10 +353,12 @@ impl LaunchFs {
+                 return Ok(());
+             };
+             let mut joined = [0; MAX_PATH];
++            let cwd;
+             let base = if name.first() == Some(&b'/') {
+                 b"".as_slice()
+             } else {
+-                self.cwd.as_bytes()
++                cwd = crate::tracee_io::image_cwd(pid)?;
++                cwd.as_bytes()
+             };
+             let separator = usize::from(!base.is_empty() && base != b"/");
+             let end = base
+@@ -367,15 +391,35 @@ impl LaunchFs {
+ 
+     /// Configured-launch dispatch only; demo paths keep their existing contract.
+     pub fn claim(&mut self, pid: usize, r: &UserRegs) -> Option<i64> {
++        if matches!(r.orig_rax, 82 | 264 | 316) {
++            return Some(self.rename(pid, r).unwrap_or_else(|error| error));
++        }
+         let fd = r.rdi as i32;
+         if matches!(
+             r.orig_rax,
+-            0 | 1 | 3 | 5 | 8 | 16 | 17 | 18 | 19 | 20 | 32 | 33 | 72 | 74 | 75 | 77 | 91 | 292
++            0 | 1
++                | 3
++                | 5
++                | 8
++                | 16
++                | 17
++                | 18
++                | 19
++                | 20
++                | 32
++                | 33
++                | 72
++                | 74
++                | 75
++                | 77
++                | 91
++                | 217
++                | 292
+         ) && fd >= FD_BASE as i32
+         {
+             return Some(self.descriptor_call(pid, r, fd - FD_BASE as i32 + 3));
+         }
+-        if matches!(r.orig_rax, 262 | 332) {
++        if matches!(r.orig_rax, 262 | 332 | 439) {
+             match read_path(pid, r.rsi) {
+                 Ok(p) if p.is_empty() && fd >= FD_BASE as i32 => {
+                     return Some(self.descriptor_call(pid, r, fd - FD_BASE as i32 + 3))
+@@ -397,6 +441,12 @@ impl LaunchFs {
+             2 => self.open(path.as_bytes(), r.rsi, r.rdx),
+             257 => self.open(path.as_bytes(), r.rdx, r.r10),
+             4 | 6 => self.stat(pid, path.as_bytes(), r.rsi, false),
++            21 | 269 | 439 => self
++                .fs
++                .metadata(path.as_bytes())
++                .map_err(errno)
++                .and_then(|metadata| access(metadata, r)),
++            89 | 267 => Err(-22),
+             262 => {
+                 if r.r10 & !0x1900 != 0 {
+                     Err(-22)
+@@ -422,8 +472,11 @@ impl LaunchFs {
+                 .map(|_| 0)
+                 .map_err(errno),
+             87 => self.fs.unlink(path.as_bytes()).map(|_| 0).map_err(errno),
++            84 => self.remove_directory(path.as_bytes()),
+             263 => {
+-                if r.rdx != 0 {
++                if r.rdx == 0x200 {
++                    self.remove_directory(path.as_bytes())
++                } else if r.rdx != 0 {
+                     Err(-95)
+                 } else {
+                     self.fs.unlink(path.as_bytes()).map(|_| 0).map_err(errno)
+@@ -447,10 +500,36 @@ impl LaunchFs {
+     fn open(&mut self, path: &[u8], flags: u64, mode: u64) -> Result<i64, i64> {
+         // NOFOLLOW is valid because this backend has no symlinks. Unsupported
+         // directory/path-only behavior never falls through to native storage.
+-        const ALLOWED: u64 = 3 | 0o100 | 0o200 | 0o1000 | 0o2000 | 0o100000 | 0o400000 | 0o2000000;
++        const ALLOWED: u64 = 3
++            | 0o100
++            | 0o200
++            | 0o400
++            | 0o1000
++            | 0o2000
++            | 0o4000
++            | 0o100000
++            | 0o200000
++            | 0o400000
++            | 0o2000000;
+         if flags & !ALLOWED != 0 || flags & 3 == 3 {
+             return Err(-95);
+         }
++        if flags & (0o200000 | 0o100) == (0o200000 | 0o100) {
++            return Err(-22);
++        }
++        let metadata = self.fs.metadata(path);
++        if metadata.is_ok_and(|m| m.kind == NodeKind::Directory) {
++            if flags & (3 | 0o100 | 0o1000 | 0o2000) != 0 {
++                return Err(-21);
++            }
++            let status = if flags & 0o2000000 != 0 { O_CLOEXEC } else { 0 }
++                | if flags & 0o4000 != 0 { O_NONBLOCK } else { 0 };
++            let fd = self.fs.open_directory(path, status).map_err(errno)?;
++            return Ok(FD_BASE as i64 + fd as i64 - 3);
++        }
++        if flags & 0o200000 != 0 {
++            return Err(metadata.err().map(errno).unwrap_or(-20));
++        }
+         let mut translated = match flags & 3 {
+             0 => O_READ,
+             1 => O_WRITE,
+@@ -461,6 +540,7 @@ impl LaunchFs {
+             (0o200, O_EXCLUSIVE),
+             (0o1000, O_TRUNC),
+             (0o2000, O_APPEND),
++            (0o4000, O_NONBLOCK),
+             (0o2000000, O_CLOEXEC),
+         ] {
+             if flags & native != 0 {
+@@ -475,6 +555,60 @@ impl LaunchFs {
+         Ok(FD_BASE as i64 + fd as i64 - 3)
+     }
+ 
++    fn remove_directory(&mut self, path: &[u8]) -> Result<i64, i64> {
++        if self.assignment_root(path) {
++            return Err(-16);
++        }
++        self.fs.remove_directory(path).map(|_| 0).map_err(errno)
++    }
++
++    fn assignment_root(&self, path: &[u8]) -> bool {
++        self.prefixes[..self.count]
++            .iter()
++            .any(|p| p.as_bytes() == path)
++            && !self.prefixes[..self.count]
++                .iter()
++                .any(|p| p.as_bytes() != path && within(path, p.as_bytes()))
++    }
++
++    fn rename(&mut self, pid: usize, r: &UserRegs) -> Result<i64, i64> {
++        let (source, destination, flags) = if r.orig_rax == 82 {
++            (
++                self.path(pid, r.rdi, (-100i64) as u64)?,
++                self.path(pid, r.rsi, (-100i64) as u64)?,
++                0,
++            )
++        } else {
++            (
++                self.path(pid, r.rsi, r.rdi)?,
++                self.path(pid, r.r10, r.rdx)?,
++                if r.orig_rax == 316 { r.r8 } else { 0 },
++            )
++        };
++        if dot_entry(source.as_bytes()) || dot_entry(destination.as_bytes()) {
++            return Err(-22);
++        }
++        let source = self.resolve(pid, source.as_bytes(), false, false)?;
++        let destination = self.resolve(pid, destination.as_bytes(), false, true)?;
++        if flags > 1 {
++            return Err(-95);
++        }
++        if !self.owns_path(source.as_bytes()) || !self.owns_path(destination.as_bytes()) {
++            return Err(-18);
++        }
++        if self.prefixes[..self.count].iter().any(|prefix| {
++            self.assignment_root(prefix.as_bytes())
++                && (within(prefix.as_bytes(), source.as_bytes())
++                    || within(prefix.as_bytes(), destination.as_bytes()))
++        }) {
++            return Err(-16);
++        }
++        self.fs
++            .rename(source.as_bytes(), destination.as_bytes(), flags == 1)
++            .map(|_| 0)
++            .map_err(errno)
++    }
++
+     fn stat(&self, pid: usize, path: &[u8], destination: u64, statx: bool) -> Result<i64, i64> {
+         copy_metadata(
+             pid,
+@@ -503,6 +637,17 @@ impl LaunchFs {
+             91 => self.fs.fchmod(fd, r.rsi as u32).map(|_| 0).map_err(errno),
+             77 if r.rsi as i64 >= 0 => self.fs.truncate(fd, r.rsi).map(|_| 0).map_err(errno),
+             77 => Err(-22),
++            217 => self.getdents(pid, fd, r.rsi, r.rdx),
++            439 => {
++                if r.r10 & 0x1000 == 0 {
++                    Err(-2)
++                } else {
++                    self.fs
++                        .fstat(fd)
++                        .map_err(errno)
++                        .and_then(|metadata| access(metadata, r))
++                }
++            }
+             72 => self
+                 .fs
+                 .descriptor_flags(fd)
+@@ -580,12 +725,65 @@ impl LaunchFs {
+             .map(|n| n as i64)
+             .map_err(errno)
+     }
++    fn getdents(&mut self, pid: usize, fd: i32, address: u64, length: u64) -> Result<i64, i64> {
++        if self.fs.fstat(fd).map_err(errno)?.kind != NodeKind::Directory {
++            return Err(-20);
++        }
++        let mut cookie = self.fs.seek(fd, 0, 1).map_err(errno)?;
++        let mut buffer = [0u8; IO_SIZE];
++        let capacity = length.min(IO_SIZE as u64) as usize;
++        let mut used = 0;
++        while let Some(entry) = self.fs.directory_entry(fd, cookie).map_err(errno)? {
++            let size = (19 + entry.name.len() + 1 + 7) & !7;
++            if size > capacity - used {
++                if used == 0 {
++                    return Err(-22);
++                }
++                break;
++            }
++            let record = &mut buffer[used..used + size];
++            record[..8].copy_from_slice(&entry.inode.to_ne_bytes());
++            record[8..16].copy_from_slice(&entry.next.to_ne_bytes());
++            record[16..18].copy_from_slice(&(size as u16).to_ne_bytes());
++            record[18] = match entry.kind {
++                NodeKind::File => 8,
++                NodeKind::Directory => 4,
++                NodeKind::Symlink => 10,
++            };
++            record[19..19 + entry.name.len()].copy_from_slice(entry.name);
++            used += size;
++            cookie = entry.next;
++        }
++        if copy_memory(pid, address, &mut buffer[..used], true)? != used as i64 {
++            return Err(-14);
++        }
++        self.fs.seek(fd, cookie as i64, 0).map_err(errno)?;
++        Ok(used as i64)
++    }
+ }
+ 
+ pub(crate) fn valid_statx(flags: u64, mask: u64) -> bool {
+     flags & !0x7900 == 0 && flags & 0x6000 != 0x6000 && mask & 0x8000_0000 == 0
+ }
+ 
++fn access(metadata: FileMetadata, r: &UserRegs) -> Result<i64, i64> {
++    let mode = if r.orig_rax == 21 { r.rsi } else { r.rdx };
++    let flags = if r.orig_rax == 439 { r.r10 } else { 0 };
++    if mode & !7 != 0 || flags & !0x1300 != 0 {
++        return Err(-22);
++    }
++    if mode & 1 != 0 && metadata.kind != NodeKind::Directory && metadata.mode & 0o111 == 0 {
++        return Err(-13);
++    }
++    Ok(0)
++}
++
++fn dot_entry(path: &[u8]) -> bool {
++    path.rsplit(|byte| *byte == b'/')
++        .find(|component| !component.is_empty())
++        .is_some_and(|component| matches!(component, b"." | b".."))
++}
++
+ fn within(path: &[u8], prefix: &[u8]) -> bool {
+     path == prefix
+         || path
+@@ -623,6 +821,7 @@ fn errno(error: VfsError) -> i64 {
+         VfsError::NotFound => -2,
+         VfsError::NotDirectory => -20,
+         VfsError::IsDirectory => -21,
++        VfsError::DirectoryNotEmpty => -39,
+         VfsError::AlreadyExists => -17,
+         VfsError::PermissionDenied => -13,
+         VfsError::InvalidDescriptor => -9,
+diff --git a/crates/ginux-init/src/launch_tasks.rs b/crates/ginux-init/src/launch_tasks.rs
+index e9ff5688..c9c494b2 100644
+--- a/crates/ginux-init/src/launch_tasks.rs
++++ b/crates/ginux-init/src/launch_tasks.rs
+@@ -375,6 +375,31 @@ impl Supervisor<'_> {
+         let original = *r;
+         let id = self.task(index).id;
+         match r.orig_rax {
++            79 => {
++                audit_write(b"mediate surface=image-cwd\n");
++                self.run(index, r, domain);
++                return;
++            }
++            80 => {
++                let host = self.task(index).host;
++                let result = self
++                    .objects
++                    .filesystem
++                    .image_chdir(host, r.rdi)
++                    .and_then(|_| {
++                        crate::path_hooks::Rewrite::prepare(self.objects.filesystem, host, r)
++                    });
++                match result {
++                    Ok(rewrite) => {
++                        self.task_mut(index).path_rewrite = rewrite;
++                        audit_write(b"mediate surface=image-cwd\n");
++                        self.run(index, r, domain);
++                    }
++                    Err(-5) => self.fail(domain, b"chdir path scratch restoration failed"),
++                    Err(error) => self.emulate(index, r, error, domain),
++                }
++                return;
++            }
+             59 | 322 => {
+                 let result = self.prepare_exec(index, r);
+                 if result == Err(-5) {
+diff --git a/crates/ginux-init/src/tracee_io.rs b/crates/ginux-init/src/tracee_io.rs
+index bff07887..548cc955 100644
+--- a/crates/ginux-init/src/tracee_io.rs
++++ b/crates/ginux-init/src/tracee_io.rs
+@@ -58,6 +58,62 @@ pub fn read_path(pid: usize, address: u64) -> Result<Path, i64> {
+     Err(-36)
+ }
+ 
++/// Kernel-owned image cwd, expressed relative to the tracee's chroot. Reading
++/// the two proc links does not let a workload select a supervisor host path.
++/// Fork and CLONE_FS sharing retain their native directory semantics.
++pub fn image_cwd(pid: usize) -> Result<Path, i64> {
++    fn link(pid: usize, suffix: &[u8], output: &mut [u8]) -> Result<usize, i64> {
++        let mut name = [0u8; 64];
++        name[..6].copy_from_slice(b"/proc/");
++        let mut digits = [0u8; 20];
++        let mut number = pid;
++        let mut count = 0;
++        loop {
++            digits[count] = b'0' + (number % 10) as u8;
++            count += 1;
++            number /= 10;
++            if number == 0 {
++                break;
++            }
++        }
++        for n in 0..count {
++            name[6 + n] = digits[count - n - 1];
++        }
++        name[6 + count..6 + count + suffix.len()].copy_from_slice(suffix);
++        let result = unsafe {
++            crate::supervisor::syscall3(
++                89,
++                name.as_ptr() as usize,
++                output.as_mut_ptr() as usize,
++                output.len(),
++            )
++        };
++        if result < 0 {
++            return Err(result as i64);
++        }
++        if result as usize == output.len() {
++            return Err(-36);
++        }
++        Ok(result as usize)
++    }
++    let mut root = [0u8; 4096];
++    let mut cwd = [0u8; 4096];
++    let root_len = link(pid, b"/root", &mut root)?;
++    let cwd_len = link(pid, b"/cwd", &mut cwd)?;
++    let relative = if &root[..root_len] == b"/" {
++        &cwd[..cwd_len]
++    } else {
++        cwd[..cwd_len].strip_prefix(&root[..root_len]).ok_or(-13)?
++    };
++    if relative.is_empty() {
++        return Path::from_bytes(b"/").map_err(|_| -36);
++    }
++    if relative[0] != b'/' || relative.ends_with(b" (deleted)") {
++        return Err(-2);
++    }
++    Path::from_bytes(relative).map_err(|_| -36)
++}
++
+ /// Linux file type bits are part of mode; identities belong to the domain.
+ pub struct Stat {
+     pub inode: u64,
+diff --git a/scripts/test-launch-directories.py b/scripts/test-launch-directories.py
+new file mode 100644
+index 00000000..3fb6aa36
+--- /dev/null
++++ b/scripts/test-launch-directories.py
+@@ -0,0 +1,52 @@
++#!/usr/bin/env python3
++"""Exercise owned directory descriptions through actual configured launch."""
++import json
++import os
++from pathlib import Path
++import shutil
++import subprocess
++import sys
++import tempfile
++
++
++def main():
++    if len(sys.argv)<3 or os.geteuid()!=0:
++        sys.exit('usage (as root): test-launch-directories.py <ginux> <directory-fixture> [all|functional|cwd ...]')
++    binary,fixture=[str(Path(p).resolve()) for p in sys.argv[1:3]]
++    template=(Path(__file__).resolve().parent.parent/'config/domain-gate5.toml').read_text()
++    with tempfile.TemporaryDirectory(prefix='ginux-directories-') as directory:
++        work=Path(directory)
++        root=work/'root'
++        (root/'bin').mkdir(parents=True)
++        (root/'work').mkdir()
++        (root/'image-dir').mkdir()
++        shutil.copyfile(fixture,root/'image-dir/fixture')
++        (root/'image-dir/fixture').chmod(0o755)
++        (root/'image-dir/input').write_bytes(b'image-child')
++        shutil.copyfile(fixture,root/'bin/fixture')
++        (root/'bin/fixture').chmod(0o755)
++        (root/'image').write_bytes(b'immutable image')
++        config=template.replace('init = "/bin/bash"','init = "/bin/fixture"')
++        config=config.replace('[storage]\nassignments = []','[storage]\nassignments = ["memory:/work", "memory:/work/seed"]')
++        config=config.replace('[devices]\nassignments = []','[devices]\nassignments = ["null"]')
++        for mode in (sys.argv[3:] or ['all', 'cwd']):
++            if mode not in ('all', 'functional', 'cwd'):
++                sys.exit('unknown directory scenario')
++            # Each launch creates fresh domain storage; image cwd stays kernel-owned.
++            (work/'launch.toml').write_text(config.replace('args = []', 'args = ' + json.dumps([] if mode == 'all' else [mode])))
++            for i in range(2):
++                result=work/f'{mode}-{i}.json'
++                proc=subprocess.run([binary,'launch',str(work/'launch.toml'),str(root),'--result-file',str(result)],capture_output=True,timeout=20)
++                record=json.loads(result.read_text())
++                assert proc.returncode==0,(proc.returncode,proc.stderr,record)
++                assert record['outcome']=='exited' and record['code']==0 and record['generation'] is None,record
++                assert proc.stdout==b'owned-directories: PASS\n',proc.stdout
++                assert b'ginux: teardown tasks=0 owned-handles=0' in proc.stderr,proc.stderr
++                assert list((root/'work').iterdir())==[]
++                assert (root/'image').read_bytes()==b'immutable image'
++            print(f'PASS launch directories: {mode}')
++        print('test-launch-directories: PASS (' + (', '.join(sys.argv[3:]) if sys.argv[3:] else 'full directory scenarios') + ')')
++
++
++if __name__=='__main__':
++    main()
+diff --git a/scripts/test-launch-storage.py b/scripts/test-launch-storage.py
+index 5a93640f..4cf64e17 100644
+--- a/scripts/test-launch-storage.py
++++ b/scripts/test-launch-storage.py
+@@ -11,7 +11,7 @@ import tempfile
+ 
+ def main():
+     if len(sys.argv) < 3 or os.geteuid() != 0:
+-        sys.exit('usage (as root): test-launch-storage.py <ginux> <storage-fixture> [growth|bounds|quota ...]')
++        sys.exit('usage (as root): test-launch-storage.py <ginux> <storage-fixture> [growth|bounds|quota|view-probes ...]')
+     binary, fixture = [str(Path(p).resolve()) for p in sys.argv[1:3]]
+     template = (Path(__file__).resolve().parent.parent / 'config/domain-gate5.toml').read_text()
+     with tempfile.TemporaryDirectory(prefix='ginux-storage-') as directory:
+@@ -54,12 +54,13 @@ def main():
+ 
+         if sys.argv[3:]:
+             for mode in sys.argv[3:]:
+-                if mode not in ('growth', 'bounds', 'quota'):
++                if mode not in ('growth', 'bounds', 'quota', 'view-probes'):
+                     sys.exit('unknown selected storage scenario')
+                 invoke(['memory:/work', 'memory:/work/build', 'memory:/out'], [mode],
+                        memory=16 if mode == 'bounds' else 256)
+                 print(f'PASS launch storage: {mode}')
+             return
++        invoke(['memory:/work'], ['view-probes'])
+         invoke(['memory:/work', 'memory:/work/build', 'memory:/out'], ['growth'])
+         for mode in ['path-owned', 'missing-owned', 'image-parent', 'alias-shadow']:
+             invoke(['memory:/work'], [mode])
+diff --git a/tests/fixtures/launch-directory-fixture.c b/tests/fixtures/launch-directory-fixture.c
+new file mode 100644
+index 00000000..0cd125f8
+--- /dev/null
++++ b/tests/fixtures/launch-directory-fixture.c
+@@ -0,0 +1,151 @@
++/* Public owned directory handles, x86-64 dirents and relative operations. */
++typedef unsigned long word;
++static long call(long n, word a, word b, word c, word d, word e, word f)
++{
++    register word r10 __asm__("r10") = d;
++    register word r8 __asm__("r8") = e;
++    register word r9 __asm__("r9") = f;
++    long result;
++    __asm__ volatile("syscall" : "=a"(result) : "a"(n), "D"(a), "S"(b), "d"(c),
++                     "r"(r10), "r"(r8), "r"(r9) : "rcx", "r11", "memory");
++    return result;
++}
++#define DO(n,a,b,c) call(n,(word)(a),(word)(b),(word)(c),0,0,0)
++#define CHECK(expr,code) if (!(expr)) return code
++static char buffer[4096] __attribute__((aligned(8)));
++static char meta[256] __attribute__((aligned(8)));
++static const char readonly_buffer[64] = "readonly";
++static int equal(const char *a, const char *b)
++{ while (*a && *a==*b) { ++a; ++b; } return *a==*b; }
++static long create(const char *path, const char *data)
++{
++    long fd=DO(2,path,0102,0600); if (fd<0) return fd;
++    word n=0; while (data[n]) ++n;
++    if (DO(1,fd,data,n)!=(long)n) return -1;
++    if (DO(3,fd,0,0)!=0) return -1;
++    return 0;
++}
++long directory_main(word *stack)
++{
++    char **argv=(char **)(stack+1);
++    int functional=stack[0]>1 && equal(argv[1],"functional");
++    if(stack[0]>1 && equal(argv[1],"cwd-child")) {
++        CHECK(DO(79,buffer,sizeof buffer,0)==11 && equal(buffer,"/image-dir"),90);
++        long fd=DO(2,"input",0,0);
++        CHECK(fd>=3 && DO(0,fd,buffer,11)==11 && buffer[0]=='i',91);
++        CHECK(DO(3,fd,0,0)==0 && create("/work/after-exec","ok")==0,92);
++        CHECK(DO(1,1,"owned-directories: PASS\n",24)==24,93);
++        return 0;
++    }
++    if(stack[0]>1 && equal(argv[1],"cwd")) {
++        CHECK(DO(80,"/image-dir",0,0)==0,94);
++        CHECK(DO(79,buffer,sizeof buffer,0)==11 && equal(buffer,"/image-dir"),95);
++        long child=DO(57,0,0,0);
++        if(child==0) {
++            long code=DO(80,"/",0,0)==0 && create("work/child","ok")==0 ? 17:1;
++            DO(60,code,0,0); __builtin_unreachable();
++        }
++        int status=0;
++        CHECK(child>1 && DO(61,child,&status,0)==child && status==(17<<8),96);
++        CHECK(DO(79,buffer,sizeof buffer,0)==11 && equal(buffer,"/image-dir"),97);
++        long fd=DO(2,"../work/child",0,0);
++        CHECK(fd>=3 && DO(0,fd,buffer,2)==2 && buffer[0]=='o',98);
++        CHECK(DO(3,fd,0,0)==0,99);
++        char *args[]={"fixture","cwd-child",0},*env[]={0};
++        DO(59,"fixture",args,env);
++        return 100;
++    }
++    CHECK(DO(83,"/work/dir",0755,0)==0 && DO(83,"/work/dir/sub",0755,0)==0,10);
++    CHECK(create("/work/dir/file","file-content")==0 && create("/work/dir/sub/leaf","leaf")==0,11);
++    CHECK(DO(2,"/work/dir/file",0200000,0)==-20 && DO(2,"/work/missing",0200000,0)==-2,12);
++    CHECK(DO(2,"/work/dir",1,0)==-21 && DO(2,"/work/dir",0200100,0)==-22,13);
++    long dir=DO(2,"/work/dir",02204000,0), alias=DO(32,dir,0,0);
++    CHECK(dir>=3 && alias>=3 && DO(72,dir,1,0)==1 && DO(72,dir,3,0)==04000,14);
++    CHECK(DO(5,dir,meta,0)==0 && (*(unsigned int *)(meta+24)&0170000)==0040000,15);
++    word inode=*(word *)(meta+8);
++    CHECK(DO(0,dir,buffer,1)==-21 && DO(217,dir,buffer,1)==-22 && DO(8,dir,0,1)==0,16);
++    if(!functional) {
++    CHECK(DO(217,dir,1,sizeof buffer)==-14 && DO(217,dir,readonly_buffer,64)==-14,17);
++    CHECK(DO(8,alias,0,1)==0,18);
++    long pages=call(9,0,8192,3,0x22,-1,0);
++    CHECK(pages>0 && DO(10,pages+4096,4096,0)==0,19);
++    CHECK(DO(217,dir,pages+4094,4096)==-14 && DO(8,dir,0,1)==0,20);
++    CHECK(DO(11,pages,8192,0)==0,21);
++    }
++    CHECK(DO(217,dir,buffer,24)==24 && equal(buffer+19,".") && *(word *)buffer==inode,22);
++    CHECK(DO(217,alias,buffer,24)==24 && equal(buffer+19,".."),23);
++    CHECK(DO(8,dir,0,0)==0,24);
++    long count=DO(217,alias,buffer,sizeof buffer); CHECK(count>0,25);
++    unsigned int names=0;
++    for (word offset=0;offset<(word)count;) {
++        char *entry=buffer+offset;
++        word length=*(unsigned short *)(entry+16);
++        CHECK(length>=24 && length%8==0 && offset+length<=(word)count,26);
++        CHECK(*(word *)entry>0 && *(word *)entry<=4097,27);
++        if (equal(entry+19,".")) { names|=1; CHECK(entry[18]==4,28); }
++        else if (equal(entry+19,"..")) { names|=2; CHECK(entry[18]==4,29); }
++        else if (equal(entry+19,"sub")) { names|=4; CHECK(entry[18]==4,30); }
++        else if (equal(entry+19,"file")) { names|=8; CHECK(entry[18]==8,31); }
++        else return 32;
++        offset+=length;
++    }
++    CHECK(names==15 && DO(217,dir,buffer,4096)==0,33);
++    if(!functional) CHECK(DO(217,dir,1,4096)==0,33);
++    long file=DO(257,dir,"file",0);
++    CHECK(file>=3 && DO(0,file,buffer,12)==12 && equal(buffer,"file-content"),34);
++    CHECK(call(262,dir,(word)"sub/leaf",(word)meta,0,0,0)==0 && *(word *)(meta+48)==4,35);
++    CHECK(DO(258,alias,"next",0755)==0,36);
++    CHECK(DO(257,file,"child",0)==-20,37);
++    if(!functional) {
++        CHECK(DO(257,1048576,"file",0)==-9,37);
++        CHECK(DO(257,dir,"../../image",0)==-95,38);
++    }
++    long absolute=DO(257,123,"/image",0); CHECK(absolute>=3 && DO(3,absolute,0,0)==0,39);
++    CHECK(DO(263,alias,"file",0)==0 && DO(4,"/work/dir/file",meta,0)==-2,40);
++    CHECK(DO(8,file,0,0)==0 && DO(0,file,buffer,12)==12 && DO(3,file,0,0)==0,41);
++    CHECK(DO(8,dir,0,0)==0,42);
++    long child=DO(57,0,0,0); CHECK(child>=0,43);
++    if (child==0) return DO(217,alias,buffer,24)==24 && equal(buffer+19,".") ? 0 : 44;
++    int status=-1;
++    CHECK(DO(61,child,&status,0)==child && status==0,45);
++    CHECK(DO(217,dir,buffer,24)==24 && equal(buffer+19,".."),46);
++    CHECK(create("/work/dir/from","new-source")==0 && create("/work/target","old-target")==0,48);
++    long from=DO(2,"/work/dir/from",0,0), target=DO(2,"/work/target",0,0);
++    CHECK(from>=3 && target>=3 && DO(5,from,meta,0)==0,49);
++    word from_inode=*(word *)(meta+8);
++    CHECK(DO(82,"/work/dir/from","/work/target",0)==0 && DO(4,"/work/dir/from",meta,0)==-2,50);
++    CHECK(DO(4,"/work/target",meta,0)==0 && *(word *)(meta+8)==from_inode,51);
++    CHECK(DO(0,target,buffer,10)==10 && buffer[0]=='o',52);
++    CHECK(DO(0,from,buffer,10)==10 && buffer[0]=='n' && DO(3,target,0,0)==0 && DO(3,from,0,0)==0,53);
++    CHECK(DO(82,"/work/dir","/work/moved",0)==0,54);
++    CHECK(DO(84,"/work/moved/.",0,0)==-22,101);
++    CHECK(DO(82,"/work/moved/.","/work/unmoved",0)==-22,102);
++    CHECK(DO(4,"/work/moved",meta,0)==0,103);
++    CHECK(DO(5,dir,meta,0)==0 && *(word *)(meta+8)==inode,55);
++    long leaf=DO(257,alias,"sub/leaf",0); CHECK(leaf>=3 && DO(0,leaf,buffer,4)==4 && buffer[0]=='l',56);
++    CHECK(DO(3,leaf,0,0)==0 && DO(4,"/work/dir/sub/leaf",meta,0)==-2,57);
++    CHECK(DO(258,dir,"later",0755)==0 && DO(84,"/work/moved",0,0)==-39,58);
++    CHECK(DO(84,"/work",0,0)==-16 && DO(84,"/work/target",0,0)==-20 && DO(87,"/work/moved",0,0)==-21,59);
++    CHECK(DO(82,"/work/moved","/work/moved/sub/bad",0)==-22,60);
++    CHECK(DO(83,"/work/full",0755,0)==0 && create("/work/full/block","block")==0,61);
++    CHECK(DO(82,"/work/moved","/work/full",0)==-39 && DO(82,"/work/target","/work/full",0)==-21,62);
++    CHECK(DO(82,"/work/moved","/work/target",0)==-20,63);
++    if(!functional) CHECK(DO(82,1,"/work/no-effect",0)==-14,63);
++    long full=DO(2,"/work/full",0200000,0), sub=DO(257,dir,"sub",0200000);
++    CHECK(full>=3 && sub>=3,64);
++    CHECK(call(264,dir,(word)"sub/leaf",full,(word)"renamed-leaf",0,0)==0,65);
++    CHECK(DO(263,dir,"sub",0x200)==0 && DO(217,sub,buffer,4096)==0,66);
++    CHECK(DO(5,sub,meta,0)==0 && (*(unsigned int *)(meta+24)&0170000)==0040000,67);
++    CHECK(DO(257,sub,"new-child",0101)==-2 && DO(3,sub,0,0)==0,68);
++    CHECK(call(316,dir,(word)"later",full,(word)"block",1,0)==-17,69);
++    CHECK(call(316,dir,(word)"later",full,(word)"block",2,0)==-95,70);
++    CHECK(call(316,dir,(word)"later",full,(word)"fresh",1,0)==0 && DO(263,full,"fresh",0x200)==0,71);
++    if(!functional) CHECK(DO(82,"/work/moved","/image",0)==-18 && DO(82,"/work","/work-other",0)==-18,72);
++    CHECK(DO(84,"/work/seed",0,0)==0 && DO(83,"/work/seed",0755,0)==0,73);
++    CHECK(DO(91,full,0040750,0)==0 && DO(5,full,meta,0)==0 && (*(unsigned int *)(meta+24)&0777)==0750,74);
++    CHECK(DO(91,full,04755,0)==-13,75);
++    CHECK(DO(3,full,0,0)==0 && DO(3,alias,0,0)==0 && DO(3,dir,0,0)==0,47);
++    DO(1,1,"owned-directories: PASS\n",24);
++    return 0;
++}
++__asm__(".global _start\n_start:\nmov %rsp,%rdi\nandq $-16,%rsp\ncall directory_main\nmov %rax,%rdi\nmov $60,%rax\nsyscall\nud2\n");
+diff --git a/tests/fixtures/launch-storage-fixture.c b/tests/fixtures/launch-storage-fixture.c
+index bfc3c9c0..e553487a 100644
+--- a/tests/fixtures/launch-storage-fixture.c
++++ b/tests/fixtures/launch-storage-fixture.c
+@@ -28,6 +28,21 @@ long storage_main(word *stack)
+ {
+     word argc = *stack;
+     char **argv = (char **)(stack + 1);
++    if (argc > 1 && argv[1][0] == 'v') {
++        long fd=DO(2,"/work/probe",0102|0400,0600);
++        CHECK(fd>=3 && DO(1,fd,"ok",2)==2,145);
++        CHECK(DO(21,"/work/probe",0,0)==0 && DO(21,"/work/probe",6,0)==0,146);
++        CHECK(DO(21,"/work/probe",1,0)==-13,147);
++        CHECK(DO(269,-100,"/work/probe",4)==0,148);
++        CHECK(call(439,fd,(word)"",4,0x1000,0,0)==0,149);
++        CHECK(DO(91,fd,0700,0)==0 && DO(21,"/work/probe",1,0)==0,150);
++        CHECK(DO(89,"/work/probe",output,16)==-22,151);
++        CHECK(call(267,-100,(word)"/work/probe",(word)output,16,0,0)==-22,152);
++        long reader=DO(2,"/work/probe",0400,0);
++        CHECK(reader>=3 && DO(0,reader,output,2)==2 && output[0]=='o',153);
++        CHECK(DO(3,reader,0,0)==0 && DO(3,fd,0,0)==0,154);
++        return 0;
++    }
+     if (argc > 1 && argv[1][0] == 'g') {
+         long fd=DO(2,"/out/growing",0102,0600);
+         CHECK(fd>=3,120);
