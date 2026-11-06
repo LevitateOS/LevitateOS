@@ -16,27 +16,26 @@ REPO_ROOT="$(CDPATH= cd -- "$SCRIPT_DIR/../../../.." && pwd)"
 : "${EMERGENCY_UKI_FILENAME:?missing EMERGENCY_UKI_FILENAME}"
 : "${DEBUG_UKI_FILENAME:?missing DEBUG_UKI_FILENAME}"
 
-OUTPUT_DIR="${REPO_ROOT}/.artifacts/out/${DISTRO_ID}"
-KERNEL_OUTPUT_DIR="${KERNEL_OUTPUT_DIR:-${REPO_ROOT}/.artifacts/kernel/${DISTRO_ID}/current}"
-PRODUCT_DIRNAME="${PRODUCT_DIRNAME:-${PRODUCT_NAME}}"
-PRODUCT_ARTIFACT_TAG="${PRODUCT_ARTIFACT_TAG:-${PRODUCT_NAME}}"
-RELEASE_ROOT_DIR="${RELEASE_ROOT_DIR:-${OUTPUT_DIR}/releases/${PRODUCT_DIRNAME}}"
-RELEASE_RUN_DIR="${RELEASE_RUN_DIR:-${RELEASE_ROOT_DIR}/adhoc}"
-RELEASE_OUTPUT_DIR="${RELEASE_OUTPUT_DIR:-${RELEASE_RUN_DIR}}"
+# The release hook (distro-builder) passes every path and name below.
+: "${KERNEL_OUTPUT_DIR:?missing KERNEL_OUTPUT_DIR}"
+: "${PRODUCT_DIRNAME:?missing PRODUCT_DIRNAME}"
+: "${PRODUCT_ARTIFACT_TAG:?missing PRODUCT_ARTIFACT_TAG}"
+: "${PRODUCT_BOOT_LABEL:?missing PRODUCT_BOOT_LABEL}"
+: "${RELEASE_OUTPUT_DIR:?missing RELEASE_OUTPUT_DIR}"
 FORCE_COLOR="${FORCE_COLOR:-0}"
 ARTIFACT_NAME_WIDTH="${ARTIFACT_NAME_WIDTH:-8}"
 
 # Color policy: NO_COLOR disables color globally; FORCE_COLOR enables in non-TTY contexts.
-KERNEL_RELEASE_PATH="${KERNEL_RELEASE_PATH:-${KERNEL_OUTPUT_DIR}/kernel-build/include/config/kernel.release}"
+: "${KERNEL_RELEASE_PATH:?missing KERNEL_RELEASE_PATH}"
 : "${KERNEL_IMAGE_PATH:?set by the release workflow from the build contract (kernel_image_path)}"
-ISO_FILENAME="${ISO_FILENAME:-$(default_iso_filename)}"
-ISO_PATH="${ISO_PATH:-${RELEASE_OUTPUT_DIR}/${ISO_FILENAME}}"
+: "${ISO_FILENAME:?missing ISO_FILENAME}"
+: "${ISO_PATH:?missing ISO_PATH}"
 ISO_SHA="${ISO_SHA:-${ISO_PATH%.iso}.sha512}"
-ROOTFS_FILENAME="${ROOTFS_FILENAME:-$(default_rootfs_filename)}"
-INITRAMFS_LIVE_FILENAME="${INITRAMFS_LIVE_FILENAME:-$(default_initramfs_live_filename)}"
-LIVE_OVERLAY_DIRNAME="${LIVE_OVERLAY_DIRNAME:-$(default_live_overlay_dirname)}"
-LIVE_OVERLAY_IMAGE_FILENAME="${LIVE_OVERLAY_IMAGE_FILENAME:-$(default_live_overlay_image_filename)}"
-ROOTFS_SOURCE_POINTER_FILENAME="${ROOTFS_SOURCE_POINTER_FILENAME:-$(default_rootfs_source_pointer_filename)}"
+: "${ROOTFS_FILENAME:?missing ROOTFS_FILENAME}"
+: "${INITRAMFS_LIVE_FILENAME:?missing INITRAMFS_LIVE_FILENAME}"
+: "${LIVE_OVERLAY_DIRNAME:?missing LIVE_OVERLAY_DIRNAME}"
+: "${LIVE_OVERLAY_IMAGE_FILENAME:?missing LIVE_OVERLAY_IMAGE_FILENAME}"
+: "${ROOTFS_SOURCE_POINTER_FILENAME:?missing ROOTFS_SOURCE_POINTER_FILENAME}"
 
 ROOTFS_PATH="${RELEASE_OUTPUT_DIR}/${ROOTFS_FILENAME}"
 INITRAMFS_LIVE_PATH="${RELEASE_OUTPUT_DIR}/${INITRAMFS_LIVE_FILENAME}"
@@ -50,7 +49,6 @@ ISO_LABEL="${IDENTITY_ISO_LABEL}"
 OS_NAME="${IDENTITY_OS_NAME}"
 OS_ID="${IDENTITY_OS_ID}"
 OS_VERSION="${IDENTITY_OS_VERSION}"
-PRODUCT_BOOT_LABEL="${PRODUCT_BOOT_LABEL:-$(product_boot_label "$PRODUCT_NAME")}"
 RELEASE_LOG_PATH="${RELEASE_OUTPUT_DIR}/build-log.json"
 BUILD_STARTED_AT_UTC="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
 BUILD_FINISHED_AT_UTC=""
@@ -65,35 +63,6 @@ cleanup_tmp_artifacts() {
 
 json_escape() {
     printf '%s' "$1" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g'
-}
-
-default_iso_filename() {
-    case "${PRODUCT_NAME:-}" in
-        base-rootfs) printf '%s\n' "${IDENTITY_OS_ID}-x86_64.iso" ;;
-        live-boot) printf '%s\n' "${IDENTITY_OS_ID}-x86_64-live-boot.iso" ;;
-        live-tools) printf '%s\n' "${IDENTITY_OS_ID}-x86_64-live-tools.iso" ;;
-        *) echo "unsupported PRODUCT_NAME for default_iso_filename: ${PRODUCT_NAME:-}" >&2; exit 64 ;;
-    esac
-}
-
-default_rootfs_filename() {
-    printf '%s\n' "filesystem.erofs"
-}
-
-default_initramfs_live_filename() {
-    printf '%s\n' "initramfs-live.cpio.gz"
-}
-
-default_live_overlay_dirname() {
-    printf '%s\n' "live-overlay"
-}
-
-default_live_overlay_image_filename() {
-    printf '%s\n' "overlayfs.erofs"
-}
-
-default_rootfs_source_pointer_filename() {
-    printf '%s\n' ".live-rootfs-source.path"
 }
 
 file_size_bytes() {

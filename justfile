@@ -167,13 +167,13 @@ _boot_scenario target distro="levitate" inject="" inject_file="" ssh="false" no_
     }
     trap cleanup_tmp EXIT
 
-    # Boot injection is read by the live init only; the installed system gets none.
-    if [ "{{target}}" = installed-boot ] || [ "{{target}}" = installed_boot ]; then
-      if [ -n "{{inject_file}}{{inject}}" ]; then
-        echo "installed-boot does not take boot injection (--inject/--inject-file)" >&2
-        exit 2
-      fi
-    elif [ -n "{{inject_file}}" ]; then
+    # Boot injection is read by the live init only: installed-boot gets no
+    # default injection, and xtask rejects an explicit one.
+    case "{{target}}" in
+      installed-boot|installed_boot) live=false ;;
+      *) live=true ;;
+    esac
+    if [ -n "{{inject_file}}" ]; then
       if [ -n "$inject_append" ]; then
         tmp=$(mktemp)
         cat "{{inject_file}}" > "$tmp"
@@ -188,13 +188,13 @@ _boot_scenario target distro="levitate" inject="" inject_file="" ssh="false" no_
       else
         args+=(--inject "{{inject}}")
       fi
-    elif [ -f "{{ssh_pubkey}}" ]; then
+    elif [ "$live" = true ] && [ -f "{{ssh_pubkey}}" ]; then
       tmp=$(mktemp)
       key="$(tr -d '\n' < "{{ssh_pubkey}}")"
       printf 'SSH_AUTHORIZED_KEY=%s\n' "$key" > "$tmp"
       [ -n "$inject_append" ] && append_inject_lines "$inject_append" >> "$tmp"
       args+=(--inject-file "$tmp")
-    elif [ -n "$inject_append" ]; then
+    elif [ "$live" = true ] && [ -n "$inject_append" ]; then
       args+=(--inject "$inject_append")
     fi
 
@@ -220,43 +220,9 @@ scenario-ssh target distro="levitate" inject="" inject_file="" ssh_pubkey=(env("
     just _boot_scenario {{target}} {{distro}} "{{inject}}" "{{inject_file}}" true false false "{{ssh_pubkey}}" "{{ssh_privkey}}" "{{ssh_port}}" ""
 
 # Boot a scenario with a local QEMU GUI window in foreground mode (Ctrl-C to stop).
-[script, no-exit-message]
+[no-exit-message]
 scenario-window target distro="levitate" inject="" inject_file="" ssh_pubkey=(env("HOME") + "/.ssh/id_ed25519.pub"):
-    #!/usr/bin/env bash
-    set -euo pipefail
-    CARGO_BIN="${CARGO_BIN:-cargo}"
-    if ! command -v "$CARGO_BIN" >/dev/null 2>&1; then
-      if [ -n "${HOME:-}" ] && [ -x "${HOME}/.cargo/bin/cargo" ]; then
-        CARGO_BIN="${HOME}/.cargo/bin/cargo"
-      else
-        echo "cargo not found in PATH for scenario-window." >&2
-        echo "Remediation: source \"\$HOME/.cargo/env\" (or install Rust), then rerun." >&2
-        exit 127
-      fi
-    fi
-
-    export LEVITATE_SCENARIO_WINDOW_MODE=local
-    args=("$CARGO_BIN" xtask scenarios boot {{target}} "{{distro}}" --window)
-
-    # Boot injection is read by the live init only; the installed system gets none.
-    if [ "{{target}}" = installed-boot ] || [ "{{target}}" = installed_boot ]; then
-      if [ -n "{{inject_file}}{{inject}}" ]; then
-        echo "installed-boot does not take boot injection (--inject/--inject-file)" >&2
-        exit 2
-      fi
-    elif [ -n "{{inject_file}}" ]; then
-      args+=(--inject-file "{{inject_file}}")
-    elif [ -n "{{inject}}" ]; then
-      args+=(--inject "{{inject}}")
-    elif [ -f "{{ssh_pubkey}}" ]; then
-      tmp=$(mktemp)
-      trap 'rm -f "$tmp"' EXIT
-      key="$(tr -d '\n' < "{{ssh_pubkey}}")"
-      printf 'SSH_AUTHORIZED_KEY=%s\n' "$key" > "$tmp"
-      args+=(--inject-file "$tmp")
-    fi
-
-    "${args[@]}"
+    LEVITATE_SCENARIO_WINDOW_MODE=local just _boot_scenario {{target}} {{distro}} "{{inject}}" "{{inject_file}}" false false true "{{ssh_pubkey}}" "" 2222 ""
 
 # Boot a scenario with a remote VNC window endpoint in foreground mode (Ctrl-C to stop).
 [no-exit-message]

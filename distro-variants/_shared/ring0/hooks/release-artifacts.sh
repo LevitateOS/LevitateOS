@@ -100,20 +100,6 @@ build_overlayfs_erofs() {
     run_distro_builder artifact build-overlayfs-erofs "$1" "$2"
 }
 
-product_boot_label() {
-    if [ "$#" -ne 1 ]; then
-        echo "product_boot_label requires <product_name>" >&2
-        exit 64
-    fi
-
-    case "$1" in
-        base-rootfs) printf '%s\n' "Base Rootfs" ;;
-        live-boot) printf '%s\n' "Live Boot" ;;
-        live-tools) printf '%s\n' "Live Tools" ;;
-        *) echo "unsupported PRODUCT_NAME for product_boot_label: $1" >&2; exit 64 ;;
-    esac
-}
-
 merge_uki_cmdline() {
     if [ "$#" -ne 1 ]; then
         echo "merge_uki_cmdline requires <stage_specific_cmdline>" >&2

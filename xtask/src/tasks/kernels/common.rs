@@ -21,10 +21,7 @@ pub(crate) struct AutoFixOptions {
 pub(crate) fn target_for(d: crate::cli::Distro) -> KernelTarget {
     KernelTarget {
         distro_id: d.id(),
-        kernel: match d {
-            crate::cli::Distro::Levitate => &distro_spec::levitate::KERNEL_SOURCE,
-            crate::cli::Distro::Acorn => &distro_spec::acorn::KERNEL_SOURCE,
-        },
+        kernel: d.kernel_source(),
     }
 }
 

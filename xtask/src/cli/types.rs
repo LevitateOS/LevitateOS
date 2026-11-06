@@ -24,6 +24,13 @@ impl Distro {
             Self::Acorn => distro_spec::acorn::OS_NAME,
         }
     }
+
+    pub fn kernel_source(self) -> &'static distro_spec::shared::KernelSource {
+        match self {
+            Self::Levitate => &distro_spec::levitate::KERNEL_SOURCE,
+            Self::Acorn => &distro_spec::acorn::KERNEL_SOURCE,
+        }
+    }
 }
 
 #[derive(Parser)]
