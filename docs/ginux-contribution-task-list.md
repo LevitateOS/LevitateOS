@@ -650,21 +650,24 @@ records82 units,170-path strict replay and five ordinary poll/peer/alias/EOF/tim
 modes passing in source/clean. Poll layouts are snapshotted and internal arithmetic
 checked. No thread/socketpair/FIONBIO, guest clock or shared native poll policy is
 imported. G08's remaining scope/security/#179/#207/full CI remain open.
-[G29 progress](ginux-contributions/g29-review.md) records unfixed source receive
-copyout/retained-data and consumed-SO_ERROR state findings. G29 itself has no
-candidate or runtime validation yet; it is not complete.
+G29 `26fbfef2` is retained on G08a/G28 composition `2ba7c894`.
+[Review/evidence](ginux-contributions/g29-review.md) records173-path strict replay,
+84 selected routine units and five ordinary TCP/five poll modes passing in
+source/clean. Receive tails and failed connection state are now retained; shared
+vector copies and frozen deadlines replace the donor's divergent handling.
+Actual curl IPv4/IPv6 HTTP and verified local TLS pass. Actual Git fails before
+transport at absent getcwd; preserve for G14/F02/F03, without a workaround or
+false closure. Three default-enabled policy/security units/full security modes,
+G07/G20/G24/G25 joins, network policy and full CI/upstream independence remain
+pending. G29 is partial, not publication-ready. No publication occurred.
 
-Exact next task: **continue G29 — compose G08a+G28 and extract TCP integration**.
-Use G08a `fe27c693bf2629166ee82da2efefb62b298bb567` plus G28 `0a3cf5f5ab7e77080eb9491cb6bffd5ba642cb68`;
-retain prerequisite test/CI ownership in an unreferenced local composition. Port
-66de2880 config/device/FD/network joins against those per-process owners. Reuse
-G25's bounded IoVectors helper without regular-file/pwrite ancestry; fix receive
-staging/partial copyout and async connect/error state before runtime validation.
-Review SIGPIPE/timeout/alias cleanup. Carry G24 Stat fields when their owner joins
-at F02 rather than importing archives now. Keep policy/security holds, preserve
-all negative/default fixtures, and use only trusted local ordinary HTTP/TLS/Git
-checks. Preserve G08 and G23–G28/F02/F03 acceptance. No publication or maintainer
-messages before F04.
+Exact next task: **G30 — trace and extract virtual root ownership**.
+Inspect7cf2638a against the existing inode/path/descriptor owners and prove its
+smallest actual prerequisites before composing. Keep correct uid/gid zero or
+unchanged semantics and nofollow/absence/error behavior; test actual trusted cpio
+extraction with the needed reviewed consumer capabilities. Preserve every G08,
+G23–G29/F02/F03 open criterion. Then reconcile G31 and perform F01/F02/F03/F04.
+No branch/ref/publication or maintainer messages before user inspection.
 
 Active skill: `hdae-development`, discovered at
 `/home/vince/.codex/worktrees/ginux-pr-combination-check/ginux/.agents/skills/hdae-development/SKILL.md`.

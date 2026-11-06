@@ -596,8 +596,28 @@ unknown/native/closed/reused FD authority, thread/call snapshots, interruption/
 cancellation/death races, rollback and clock/bounds failures. #179/#207 and full
 runtime/remote CI remain pending; no cloud dispatch.
 
-G29 has source-only receive ownership/copyout and consumed SO_ERROR/state findings,
-plus vector/SIGPIPE review work, in [G29 progress](g29-review.md). No G29 extraction
-or runtime evidence exists yet. During later validation, route hostile endpoint,
-buffer, FD/assignment bypass and network/race/failure probes here. Ordinary local
-HTTP/TLS/Git remains authorized. [G08a evidence](g08a-review.md).
+## G29 — configured TCP integration (partial)
+
+Head `26fbfef2ecc4d3192ff605b23c9a4bb02e781171` on G08a/G28 composition `2ba7c8942e1530048904db5a63c5b9de2e1c0298`.
+84 selected routine units, ordinary source/clean TCP/poll modes and actual curl
+IPv4/IPv6 HTTP and trusted TLS pass. Actual Git remains blocked before transport
+by absent getcwd until G14/F02/F03. No negative TLS/foreign endpoint or hostile
+buffer probes ran. [Review/evidence](g29-review.md).
+
+Initial source findings are corrected: receive data is staged until copied,
+failed connection state survives SO_ERROR consumption, canonical vector copies
+are reused and deadlines persist across retries. These fixes have source review
+and ordinary functional evidence, not adversarial verification.
+
+DaybreakBlue must validate partial/protected/mutable scalar/vector receive and
+send buffers, retained tails across aliases and exhausted budget, zero/EOF and
+copy-error ordering, address/aggregate overflow, malformed/denied/foreign numeric
+endpoints/families/scope/mapped representations, SO_ERROR refusal/reset/poll/retry
+races and consumable versus persistent state, SIGPIPE/MSG_NOSIGNAL and thread
+signal targeting, private-FD/CLOEXEC/assignment authority, stale/reused/closed
+handles, concurrent fork/exec/close/cancel/revoke, shutdown/error/timeout edges,
+quota/connection exhaustion and injected backend failures. Preserve full default
+fixture modes deny/quota/hold/hold-kill/slots/off and the3 new policy/security
+units; all remain enabled and locally unrun. G07 shared-path/thread hold still
+applies. No cloud dispatch or security acceptance occurred; policy/full CI/fresh
+upstream independence and final consumer closure remain pending.

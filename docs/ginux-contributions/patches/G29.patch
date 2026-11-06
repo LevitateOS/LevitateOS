@@ -1,0 +1,1333 @@
+From 26fbfef2ecc4d3192ff605b23c9a4bb02e781171 Mon Sep 17 00:00:00 2001
+From: vince <vincepaul.liem@gmail.com>
+Date: Fri, 6 Nov 2026 18:39:08 +0100
+Subject: [PATCH] feat(launch): mediate configured TCP through public
+ descriptors
+
+Connect only explicitly granted numeric endpoints through bounded supervisor
+sockets. Reuse descriptor aliases, process ownership, readiness and strict
+vector copies. Retain undelivered receive bytes and failed connection state,
+and preserve per-call deadlines while the supervisor waits for progress.
+
+Signed-off-by: vince <vincepaul.liem@gmail.com>
+---
+ .github/workflows/check.yml             |   3 +-
+ Makefile                                |   8 +
+ README.md                               |  27 ++
+ crates/ginux-domain/src/lib.rs          | 107 ++++-
+ crates/ginux-init/src/descriptors.rs    | 100 ++++-
+ crates/ginux-init/src/device_hooks.rs   |   7 +-
+ crates/ginux-init/src/dispatch.rs       |  10 +
+ crates/ginux-init/src/main.rs           |   1 +
+ crates/ginux-init/src/network_hooks.rs  | 507 ++++++++++++++++++++++++
+ crates/ginux-init/src/tracee_io.rs      |  62 +++
+ scripts/test-launch-network.py          | 123 ++++++
+ tests/fixtures/launch-network-fixture.c |  80 ++++
+ 12 files changed, 1022 insertions(+), 13 deletions(-)
+ create mode 100644 crates/ginux-init/src/network_hooks.rs
+ create mode 100644 scripts/test-launch-network.py
+ create mode 100644 tests/fixtures/launch-network-fixture.c
+
+diff --git a/.github/workflows/check.yml b/.github/workflows/check.yml
+index dc19543b..4de0e0a6 100644
+--- a/.github/workflows/check.yml
++++ b/.github/workflows/check.yml
+@@ -25,7 +25,7 @@ jobs:
+       - uses: actions/checkout@v5
+       - run: rustup target add x86_64-unknown-linux-gnu
+       - run: RUSTFLAGS='' CARGO_TARGET_DIR=.artifacts/unit cargo test -p ginux-devices --lib
+-      - run: make build build-launch-fixture build-launch-storage-fixture build-launch-device-fixture build-launch-pipe-fixture build-launch-fd-fixture build-launch-task-fixture build-launch-exec-fixture build-process-fixtures build-gate1-fixture build-launch-poll-fixture
++      - run: make build build-launch-fixture build-launch-storage-fixture build-launch-device-fixture build-launch-pipe-fixture build-launch-fd-fixture build-launch-task-fixture build-launch-exec-fixture build-process-fixtures build-gate1-fixture build-launch-poll-fixture build-launch-network-fixture
+       - run: sudo make test-launch
+       - run: sudo make test-launch-storage
+       - run: sudo make test-launch-devices
+@@ -37,3 +37,4 @@ jobs:
+       - run: make test-process-native
+       - run: sudo make test-gate1-setup
+       - run: sudo make test-launch-poll
++      - run: sudo make test-launch-network
+diff --git a/Makefile b/Makefile
+index 17cf341f..c9ed7cd1 100644
+--- a/Makefile
++++ b/Makefile
+@@ -251,3 +251,11 @@ build-launch-poll-fixture:
+ 
+ test-launch-poll:
+ 	python3 scripts/test-launch-poll.py $(GINUX) .artifacts/launch/launch-poll-fixture
++
++.PHONY: build-launch-network-fixture test-launch-network
++build-launch-network-fixture:
++	mkdir -p .artifacts/launch
++	$(CC) -nostdlib -static -fno-stack-protector -fno-builtin -O2 -Wall -Wextra -Werror tests/fixtures/launch-network-fixture.c -o .artifacts/launch/launch-network-fixture
++
++test-launch-network:
++	python3 scripts/test-launch-network.py $(GINUX) .artifacts/launch/launch-network-fixture
+diff --git a/README.md b/README.md
+index 12f91c62..33b30918 100644
+--- a/README.md
++++ b/README.md
+@@ -410,3 +410,30 @@ change configured-launch networking or the default-denied guest socket contract.
+ Callers must grant endpoints explicitly before use. It is not a general network
+ namespace or firewall implementation. Linux device tests exercise real local
+ peers; the portable static/unit job remains unchanged.
++
++## Configured TCP grants
++
++Networking is disabled with `[network].backend = "none"`. A configured launch
++may select `backend = "mediated"` with up to eight numeric `endpoints`, such as
++`["192.0.2.10:443", "[2001:db8::1]:443"]`, `max_connections` between 1 and 16,
++and a positive `max_bytes` aggregate sent/received budget. Hostname resolution
++and TLS verification belong to the caller and workload respectively; Ginux
++never expands the endpoint grant. IP/port grants do not isolate HTTP paths or
++hostnames sharing an address. Connect outside the set fails before a host
++connection is created. Datagram, listening and arbitrary socket operations
++remain denied.
++
++TCP descriptors share the existing public descriptor, alias and fork owners.
++Their private nonblocking host sockets remain in the supervisor. Blocking and
++nonblocking connect/read/write, vectored IO, poll/ppoll, SO_ERROR, socket names,
++TCP_NODELAY, receive/send timeouts and shutdown use the bounded backend and task
++scheduler. Transfer accounting counts successful bytes once across all aliases;
++exhaustion is EDQUOT, socket capacity exhaustion is EMFILE, and teardown closes
++connecting and connected sockets. Receive bytes that cannot be copied out remain
++with the shared socket until delivered or closed. SO_ERROR consumption does not
++turn a failed connection into a successful one. Socket names require a started
++connection; ppoll accepts a null signal mask and rounds positive timeouts up to
++milliseconds without modifying the supplied timespec. General signal interruption
++and restart behavior is not implemented. Live sockets are never exported or restored.
++The focused scenario is `make build-launch-network-fixture` followed by
++`sudo make test-launch-network`.
+diff --git a/crates/ginux-domain/src/lib.rs b/crates/ginux-domain/src/lib.rs
+index d0077a7e..c3af2592 100644
+--- a/crates/ginux-domain/src/lib.rs
++++ b/crates/ginux-domain/src/lib.rs
+@@ -132,10 +132,29 @@ pub struct DomainConfig {
+     pub storage: TextList<ASSIGNMENT_ITEMS, ASSIGNMENT_BYTES>,
+     pub devices: TextList<ASSIGNMENT_ITEMS, ASSIGNMENT_BYTES>,
+     pub network_backend: NetworkBackend,
++    pub network_endpoints: TextList<ASSIGNMENT_ITEMS, ASSIGNMENT_BYTES>,
++    pub network_max_connections: u64,
++    pub network_max_bytes: u64,
+     pub audit_mode: AuditMode,
+     pub failure_policy: FailurePolicy,
+ }
+ 
++/// Numeric destination parsing does not consult host DNS or interface state.
++pub fn parse_network_endpoint(text: &[u8]) -> Result<core::net::SocketAddr, ConfigError> {
++    let text = core::str::from_utf8(text).map_err(|_| ConfigError::InvalidValue)?;
++    let endpoint = text
++        .parse::<core::net::SocketAddr>()
++        .map_err(|_| ConfigError::InvalidValue)?;
++    if endpoint.port() == 0
++        || endpoint.ip().is_unspecified()
++        || endpoint.ip().is_multicast()
++        || matches!(endpoint, core::net::SocketAddr::V6(v6) if v6.scope_id() != 0 || v6.flowinfo() != 0)
++    {
++        return Err(ConfigError::InvalidValue);
++    }
++    Ok(endpoint)
++}
++
+ #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+ pub enum ConfigError {
+     InvalidUtf8,
+@@ -210,6 +229,9 @@ struct ConfigBuilder {
+     storage: TextList<ASSIGNMENT_ITEMS, ASSIGNMENT_BYTES>,
+     devices: TextList<ASSIGNMENT_ITEMS, ASSIGNMENT_BYTES>,
+     network_backend: NetworkBackend,
++    network_endpoints: TextList<ASSIGNMENT_ITEMS, ASSIGNMENT_BYTES>,
++    network_max_connections: u64,
++    network_max_bytes: u64,
+     audit_mode: AuditMode,
+     failure_policy: FailurePolicy,
+ }
+@@ -233,6 +255,9 @@ impl ConfigBuilder {
+             storage: TextList::empty(),
+             devices: TextList::empty(),
+             network_backend: NetworkBackend::None,
++            network_endpoints: TextList::empty(),
++            network_max_connections: 0,
++            network_max_bytes: 0,
+             audit_mode: AuditMode::Stderr,
+             failure_policy: FailurePolicy::Stop,
+         }
+@@ -273,6 +298,9 @@ impl ConfigBuilder {
+             storage: self.storage,
+             devices: self.devices,
+             network_backend: self.network_backend,
++            network_endpoints: self.network_endpoints,
++            network_max_connections: self.network_max_connections,
++            network_max_bytes: self.network_max_bytes,
+             audit_mode: self.audit_mode,
+             failure_policy: self.failure_policy,
+         };
+@@ -321,6 +349,32 @@ impl DomainConfig {
+             validate_domain_path(self.workdir.as_bytes())?;
+         }
+         validate_identifier(self.contract_profile.as_bytes())?;
++        let endpoints = self.network_endpoints.as_slice();
++        if self.network_backend == NetworkBackend::None
++            && (!endpoints.is_empty()
++                || self.network_max_connections != 0
++                || self.network_max_bytes != 0)
++        {
++            return Err(ConfigError::InvalidValue);
++        }
++        if !endpoints.is_empty() || self.network_max_connections != 0 || self.network_max_bytes != 0
++        {
++            if endpoints.is_empty()
++                || !(1..=16).contains(&self.network_max_connections)
++                || self.network_max_bytes == 0
++            {
++                return Err(ConfigError::InvalidValue);
++            }
++            for (index, text) in endpoints.iter().enumerate() {
++                let endpoint = parse_network_endpoint(text.as_bytes())?;
++                if endpoints[..index]
++                    .iter()
++                    .any(|prior| parse_network_endpoint(prior.as_bytes()) == Ok(endpoint))
++                {
++                    return Err(ConfigError::InvalidValue);
++                }
++            }
++        }
+         if !(1..=64).contains(&self.vcpus) || !(16..=1_048_576).contains(&self.memory_mib) {
+             return Err(ConfigError::InvalidValue);
+         }
+@@ -397,6 +451,14 @@ impl DomainConfig {
+             NetworkBackend::None => b"none",
+             NetworkBackend::Mediated => b"mediated",
+         })?;
++        if !self.network_endpoints.as_slice().is_empty() {
++            output.raw(b"\nendpoints = ")?;
++            output.list(self.network_endpoints.as_slice())?;
++            output.raw(b"\nmax_connections = ")?;
++            output.number(self.network_max_connections)?;
++            output.raw(b"\nmax_bytes = ")?;
++            output.number(self.network_max_bytes)?;
++        }
+         output.raw(b"\n\n[audit]\nmode = ")?;
+         output.quoted(match self.audit_mode {
+             AuditMode::Stderr => b"stderr",
+@@ -421,7 +483,7 @@ const CONFIG_TEXT_BYTES: usize = IDENTIFIER_BYTES
+     + ENVIRONMENT_ITEMS * ENVIRONMENT_BYTES
+     + PATH_BYTES
+     + IDENTIFIER_BYTES
+-    + 2 * ASSIGNMENT_ITEMS * ASSIGNMENT_BYTES;
++    + 3 * ASSIGNMENT_ITEMS * ASSIGNMENT_BYTES;
+ /// Upper bound of `normalized()`: each text byte may be escaped to two
+ /// bytes; 1 KiB covers quotes, list separators, numbers, keys and enums
+ /// (about 500 bytes).
+@@ -602,6 +664,18 @@ fn parse_field(
+                 _ => return Err(ConfigError::InvalidValue),
+             };
+         }
++        (Section::Network, b"endpoints") => {
++            builder.mark(1 << 19)?;
++            builder.network_endpoints = parse_list(value)?;
++        }
++        (Section::Network, b"max_connections") => {
++            builder.mark(1 << 20)?;
++            builder.network_max_connections = parse_u64(value)?;
++        }
++        (Section::Network, b"max_bytes") => {
++            builder.mark(1 << 21)?;
++            builder.network_max_bytes = parse_u64(value)?;
++        }
+         (Section::Audit, b"mode") => {
+             builder.mark(1 << 14)?;
+             builder.audit_mode = match parse_string::<32>(value)?.as_bytes() {
+@@ -923,6 +997,37 @@ mode = "stderr"
+ policy = "stop"
+ "#;
+ 
++    #[test]
++    fn tcp_grants_are_numeric_bounded_and_complete() {
++        let fields = "backend = \"mediated\"\nendpoints = [\"127.0.0.1:443\", \"[::1]:8443\"]\nmax_connections = 2\nmax_bytes = 4096";
++        let text = VALID.replace("backend = \"none\"", fields);
++        let config = DomainConfig::parse(text.as_bytes()).unwrap();
++        assert_eq!(
++            DomainConfig::parse(config.normalized().unwrap().as_bytes()).unwrap(),
++            config
++        );
++        for field in [
++            "endpoints = [\"example.com:443\"]",
++            "endpoints = [\"127.0.0.1:0\"]",
++            "endpoints = [\"127.0.0.1:443\",\"127.0.0.1:443\"]",
++            "max_connections = 17",
++            "max_bytes = 0",
++        ] {
++            let original = if field.starts_with("endpoints") {
++                "endpoints = [\"127.0.0.1:443\", \"[::1]:8443\"]"
++            } else if field.starts_with("max_connections") {
++                "max_connections = 2"
++            } else {
++                "max_bytes = 4096"
++            };
++            let text = VALID.replace("backend = \"none\"", &fields.replace(original, field));
++            assert!(DomainConfig::parse(text.as_bytes()).is_err());
++        }
++        assert!(parse_network_endpoint(b"example.com:443").is_err());
++        assert!(parse_network_endpoint(b"[fe80::1%1]:443").is_err());
++        assert!(parse_network_endpoint(b"0.0.0.0:443").is_err());
++    }
++
+     #[test]
+     fn parses_and_normalizes_versioned_config() {
+         let config = DomainConfig::parse(VALID.as_bytes()).unwrap();
+diff --git a/crates/ginux-init/src/descriptors.rs b/crates/ginux-init/src/descriptors.rs
+index 4d755920..b1f78920 100644
+--- a/crates/ginux-init/src/descriptors.rs
++++ b/crates/ginux-init/src/descriptors.rs
+@@ -33,17 +33,21 @@ enum Pending {
+ 
+ /// Owned backend handles are domain-wide; native kernel numbers are per task.
+ pub struct ObjectReferences {
+-    counts: [u16; 144],
++    counts: [u16; 144 + crate::network_hooks::FDS],
+ }
+ impl ObjectReferences {
+     pub const fn new() -> Self {
+-        Self { counts: [0; 144] }
++        Self {
++            counts: [0; 144 + crate::network_hooks::FDS],
++        }
+     }
+     pub fn active(&self) -> usize {
+         self.counts.iter().filter(|n| **n != 0).count()
+     }
+     fn index(handle: u32) -> usize {
+-        if (0x4000_0000..0x4000_0040).contains(&handle) {
++        if crate::network_hooks::LaunchNetwork::owns(handle) {
++            144 + (handle - crate::network_hooks::FD_BASE) as usize
++        } else if (0x4000_0000..0x4000_0040).contains(&handle) {
+             80 + (handle - 0x4000_0000) as usize
+         } else if (0x2000_0000..0x2000_0010).contains(&handle) {
+             64 + (handle - 0x2000_0000) as usize
+@@ -324,6 +328,10 @@ impl DescriptorTable {
+                 self.save(r);
+                 self.open(pid, r, backends)
+             }
++            41 => {
++                self.save(r);
++                self.socket(pid, r, backends)
++            }
+             22 | 293 => {
+                 self.save(r);
+                 self.pipe(pid, r, backends)
+@@ -356,7 +364,8 @@ impl DescriptorTable {
+                     },
+                 }
+             }
+-            0 | 1 | 5 | 8 | 16 | 17 | 18 | 19 | 20 | 74 | 75 | 77 | 78 | 91 | 217 => {
++            0 | 1 | 5 | 8 | 16 | 17 | 18 | 19 | 20 | 42 | 44 | 45 | 48 | 51 | 52 | 54 | 55 | 74
++            | 75 | 77 | 78 | 91 | 217 => {
+                 self.save(r);
+                 self.get(r.rdi)
+                     .and_then(|d| self.descriptor(pid, r, d, backends))
+@@ -379,12 +388,32 @@ impl DescriptorTable {
+                 self.save(r);
+                 self.path_descriptor(pid, r, backends)
+             }
+-            7 => self.poll(pid, r, backends),
++            7 | 271 => self.poll(pid, r, backends),
+             _ => Ok(backends.claim(pid, r)),
+         };
+         result.unwrap_or_else(ready)
+     }
+ 
++    fn socket(
++        &mut self,
++        pid: usize,
++        r: &UserRegs,
++        backends: &mut Backends,
++    ) -> Result<NativeDecision, i64> {
++        let slot = self.reserve(r.rsi & CLOEXEC != 0)?;
++        match backends.claim(pid, r) {
++            NativeDecision::Hooked { result, .. } if result >= 0 => {
++                backends.refs.retain(result as u32);
++                self.entries[slot].as_mut().unwrap().handle = Handle::Owned(result as u32);
++                Ok(ready(slot as i64))
++            }
++            decision => {
++                self.entries[slot] = None;
++                Ok(decision)
++            }
++        }
++    }
++
+     fn path_descriptor(
+         &mut self,
+         pid: usize,
+@@ -503,13 +532,24 @@ impl DescriptorTable {
+     }
+ 
+     fn descriptor(
+-        &self,
++        &mut self,
+         pid: usize,
+         r: &mut UserRegs,
+         entry: Descriptor,
+         backends: &mut Backends,
+     ) -> Result<NativeDecision, i64> {
+         let public_fd = r.rdi as u32;
++        let network = matches!(entry.handle, Handle::Owned(h) if crate::network_hooks::LaunchNetwork::owns(h));
++        if matches!(r.orig_rax, 42 | 44 | 45 | 48 | 51 | 52 | 54 | 55) && !network {
++            return Err(-88);
++        }
++        if network
++            && self
++                .poll_deadline
++                .is_some_and(|end| monotonic_nanoseconds().is_ok_and(|now| now >= end))
++        {
++            return Ok(ready(-11));
++        }
+         match entry.handle {
+             Handle::Native { fd, console } => {
+                 if console && matches!(r.orig_rax, 78 | 217) {
+@@ -536,7 +576,19 @@ impl DescriptorTable {
+             Handle::Reserved => return Err(-9),
+         }
+         Ok(match backends.claim(pid, r) {
+-            NativeDecision::Park { .. } => NativeDecision::Park { fd: public_fd },
++            NativeDecision::Park { .. } => {
++                if network {
++                    if !self.poll_tick {
++                        let timeout = backends.devices.network.timeout(r.rdi as u32, r.orig_rax);
++                        if timeout != 0 {
++                            self.poll_deadline =
++                                Some(monotonic_nanoseconds()?.checked_add(timeout).ok_or(-22)?);
++                        }
++                    }
++                    self.poll_tick = true;
++                }
++                NativeDecision::Park { fd: public_fd }
++            }
+             decision => decision,
+         })
+     }
+@@ -629,9 +681,33 @@ impl DescriptorTable {
+         &mut self,
+         pid: usize,
+         r: &UserRegs,
+-        backends: &Backends,
++        backends: &mut Backends,
+     ) -> Result<NativeDecision, i64> {
+-        let timeout = r.rdx as i32;
++        // Snapshot ppoll's relative timeout once, like the pollfd layout. A
++        // parked task must retain its original deadline across scheduler ticks.
++        let timeout = if self.poll_wait {
++            -1
++        } else if r.orig_rax == 271 {
++            if r.r10 != 0 {
++                return Err(-95);
++            }
++            if r.rdx == 0 {
++                -1
++            } else {
++                let mut time = [0u8; 16];
++                if copy_memory(pid, r.rdx, &mut time, false)? != 16 {
++                    return Err(-14);
++                }
++                let sec = i64::from_ne_bytes(time[..8].try_into().unwrap());
++                let ns = i64::from_ne_bytes(time[8..].try_into().unwrap());
++                if sec < 0 || !(0..1_000_000_000).contains(&ns) || sec > 300 {
++                    return Err(-22);
++                }
++                (sec * 1000 + (ns + 999999) / 1000000) as i32
++            }
++        } else {
++            r.rdx as i32
++        };
+         if r.rsi > 16 || timeout > 300000 {
+             return Err(-1);
+         }
+@@ -655,6 +731,7 @@ impl DescriptorTable {
+             revents: 0,
+         }; 16];
+         let mut ready_count = 0;
++        let mut network_wait = false;
+         for i in 0..count {
+             let entry = &mut bytes[i * 8..i * 8 + 8];
+             let fd = i32::from_ne_bytes(entry[..4].try_into().unwrap());
+@@ -686,6 +763,7 @@ impl DescriptorTable {
+                 }) => {
+                     // Assigned regular memory files/directories and null are
+                     // immediately ready. Pipes supply their own live state.
++                    network_wait |= crate::network_hooks::LaunchNetwork::owns(handle);
+                     let available = backends
+                         .channels
+                         .readiness(handle)
+@@ -724,7 +802,9 @@ impl DescriptorTable {
+         self.poll_wait = true;
+         // Infinite owned-object waits need no timer: object progress/death
+         // already wakes them. External console IO needs periodic observation.
+-        self.poll_tick = timeout > 0 || consoles[..count].iter().any(|fd| fd.fd >= 0);
++        self.poll_tick = network_wait
++            || self.poll_deadline.is_some()
++            || consoles[..count].iter().any(|fd| fd.fd >= 0);
+         Ok(NativeDecision::ParkPoll)
+     }
+ }
+diff --git a/crates/ginux-init/src/device_hooks.rs b/crates/ginux-init/src/device_hooks.rs
+index c7c0a746..087024a1 100644
+--- a/crates/ginux-init/src/device_hooks.rs
++++ b/crates/ginux-init/src/device_hooks.rs
+@@ -14,13 +14,17 @@ const CLOEXEC: u32 = 0o2000000;
+ const ACCESS_MODE: u32 = 3;
+ 
+ pub struct LaunchDevices {
++    pub network: crate::network_hooks::LaunchNetwork,
+     registry: DeviceRegistry<1, FDS>,
+     flags: [Option<u32>; FDS],
+     enabled: bool,
+ }
+ 
+ impl LaunchDevices {
+-    pub fn readiness(&self, handle: u32) -> Option<u16> {
++    pub fn readiness(&mut self, handle: u32) -> Option<u16> {
++        if crate::network_hooks::LaunchNetwork::owns(handle) {
++            return self.network.readiness(handle);
++        }
+         let slot = handle.checked_sub(FD_BASE)? as usize;
+         // Configured launch currently assigns only null, whose reads/writes
+         // never wait. Future device kinds must supply their own readiness.
+@@ -43,6 +47,7 @@ impl LaunchDevices {
+                 .map_err(|_| b"duplicate launch device assignment".as_slice())?;
+         }
+         Ok(Self {
++            network: crate::network_hooks::LaunchNetwork::prepare(config)?,
+             registry,
+             flags: [None; FDS],
+             enabled: !config.devices.as_slice().is_empty(),
+diff --git a/crates/ginux-init/src/dispatch.rs b/crates/ginux-init/src/dispatch.rs
+index 7212dbbb..57dcdd13 100644
+--- a/crates/ginux-init/src/dispatch.rs
++++ b/crates/ginux-init/src/dispatch.rs
+@@ -101,6 +101,16 @@ pub fn decide_objects(
+             },
+             crate::channel_hooks::ChannelResult::Blocked { fd } => NativeDecision::Park { fd },
+         }
++    } else if let Some(result) = devices.network.claim(pid, registers) {
++        match result {
++            crate::network_hooks::Result::Ready(result) => NativeDecision::Hooked {
++                lane: Lane::Device,
++                result,
++            },
++            crate::network_hooks::Result::Blocked => NativeDecision::Park {
++                fd: registers.rdi as u32,
++            },
++        }
+     } else if let Some(result) = devices.claim(pid, registers, filesystem) {
+         NativeDecision::Hooked {
+             lane: Lane::Device,
+diff --git a/crates/ginux-init/src/main.rs b/crates/ginux-init/src/main.rs
+index dccbc476..df256c52 100644
+--- a/crates/ginux-init/src/main.rs
++++ b/crates/ginux-init/src/main.rs
+@@ -15,6 +15,7 @@ mod dispatch;
+ mod fs_hooks;
+ mod launch;
+ mod launch_tasks;
++mod network_hooks;
+ mod path_hooks;
+ mod process_hooks;
+ mod supervisor;
+diff --git a/crates/ginux-init/src/network_hooks.rs b/crates/ginux-init/src/network_hooks.rs
+new file mode 100644
+index 00000000..5183d901
+--- /dev/null
++++ b/crates/ginux-init/src/network_hooks.rs
+@@ -0,0 +1,507 @@
++//! Configured TCP ownership. Only pre-granted numeric destinations can acquire
++//! a supervisor socket; the workload never receives its private descriptor.
++use crate::supervisor::{syscall2, UserRegs, SYS_KILL};
++use crate::tracee_io::{copy_memory, write_stat, IoVectors, Stat};
++use ginux_devices::{BoundedTcp, LinuxTcpBackend, NetworkError, TcpEndpoint, TcpFamily};
++use ginux_domain::{DomainConfig, NetworkBackend};
++
++pub const FD_BASE: u32 = 0x6000_0000;
++pub const FDS: usize = 16;
++const IO: usize = 4096;
++#[derive(Clone, Copy)]
++struct Socket {
++    flags: u32,
++    connecting: bool,
++    connected: bool,
++    // SO_ERROR is consumed by the guest; failed connection state is not.
++    failure: i32,
++    error: i32,
++    nodelay: bool,
++    read_timeout: u64,
++    write_timeout: u64,
++}
++struct Receive {
++    bytes: [u8; IO],
++    at: usize,
++    end: usize,
++}
++impl Receive {
++    const fn new() -> Self {
++        Self {
++            bytes: [0; IO],
++            at: 0,
++            end: 0,
++        }
++    }
++}
++pub enum Result {
++    Ready(i64),
++    Blocked,
++}
++pub struct LaunchNetwork {
++    network: Option<BoundedTcp<LinuxTcpBackend, 8, FDS>>,
++    sockets: [Option<Socket>; FDS],
++    received: [Receive; FDS],
++}
++impl LaunchNetwork {
++    pub fn prepare(config: &DomainConfig) -> core::result::Result<Self, &'static [u8]> {
++        let mut network = None;
++        if config.network_backend == NetworkBackend::Mediated {
++            let mut endpoints = [TcpEndpoint {
++                family: TcpFamily::Ipv4,
++                address: [0; 16],
++                port: 1,
++            }; 8];
++            let texts = config.network_endpoints.as_slice();
++            for (index, text) in texts.iter().enumerate() {
++                let address = ginux_domain::parse_network_endpoint(text.as_bytes())
++                    .map_err(|_| b"invalid numeric network endpoint".as_slice())?;
++                endpoints[index] = match address {
++                    core::net::SocketAddr::V4(v4) => TcpEndpoint::ipv4(v4.ip().octets(), v4.port()),
++                    core::net::SocketAddr::V6(v6) => TcpEndpoint::ipv6(v6.ip().octets(), v6.port()),
++                }
++                .map_err(|_| b"invalid TCP endpoint".as_slice())?;
++            }
++            network = Some(
++                BoundedTcp::new(
++                    LinuxTcpBackend,
++                    &endpoints[..texts.len()],
++                    config.network_max_connections as usize,
++                    config.network_max_bytes,
++                )
++                .map_err(|_| b"mediated TCP requires endpoints and explicit budgets".as_slice())?,
++            );
++        }
++        Ok(Self {
++            network,
++            sockets: [None; FDS],
++            received: [const { Receive::new() }; FDS],
++        })
++    }
++    pub fn owns(handle: u32) -> bool {
++        (FD_BASE..FD_BASE + FDS as u32).contains(&handle)
++    }
++    pub fn timeout(&self, handle: u32, syscall: u64) -> u64 {
++        self.sockets[(handle - FD_BASE) as usize]
++            .map(|s| {
++                if matches!(syscall, 0 | 19 | 45) {
++                    s.read_timeout
++                } else {
++                    s.write_timeout
++                }
++            })
++            .unwrap_or(0)
++    }
++    pub fn readiness(&mut self, handle: u32) -> Option<u16> {
++        if !Self::owns(handle) {
++            return None;
++        }
++        let slot = (handle - FD_BASE) as usize;
++        let state = self.sockets[slot]?;
++        if !state.connecting && !state.connected && state.failure == 0 {
++            return Some(4 | 16); // An unconnected stream cannot wait for data.
++        }
++        // Completion consumes the private SO_ERROR only once and retains it.
++        let _ = self.complete(slot);
++        let pending = &self.received[slot];
++        Some(match self.network.as_mut()?.readiness(slot as u32) {
++            Ok(r) => {
++                u16::from(r.readable || pending.at < pending.end)
++                    | (u16::from(r.writable) * 4)
++                    | (u16::from(r.error || self.sockets[slot]?.error != 0) * 8)
++                    | (u16::from(r.hangup) * 16)
++            }
++            Err(_) => 8,
++        })
++    }
++    fn complete(&mut self, slot: usize) -> core::result::Result<bool, i64> {
++        let state = self.sockets[slot].ok_or(-9)?;
++        if state.failure != 0 {
++            return Err(-(state.failure as i64));
++        }
++        if !state.connecting {
++            return Ok(state.connected);
++        }
++        let net = self.network.as_mut().ok_or(-9)?;
++        let ready = net.readiness(slot as u32).map_err(errno)?;
++        if !ready.writable && !ready.error && !ready.hangup {
++            return Ok(false);
++        }
++        let error = net.socket_error(slot as u32).map_err(errno)?;
++        let state = self.sockets[slot].as_mut().unwrap();
++        state.connecting = false;
++        if error != 0 {
++            state.failure = error;
++            state.error = error;
++            return Err(-(error as i64));
++        }
++        state.connected = true;
++        Ok(true)
++    }
++    pub fn claim(&mut self, pid: usize, r: &UserRegs) -> Option<Result> {
++        if r.orig_rax == 41 {
++            return Some(Result::Ready(self.open(r).unwrap_or_else(|e| e)));
++        }
++        if !Self::owns(r.rdi as u32) {
++            return None;
++        }
++        let slot = (r.rdi as u32 - FD_BASE) as usize;
++        let state = self.sockets[slot];
++        let outcome = self.operation(pid, slot, r);
++        Some(match outcome {
++            Err(-11)
++                if state.is_some_and(|s| s.flags & 0o4000 == 0)
++                    && matches!(r.orig_rax, 0 | 1 | 19 | 20 | 42 | 44 | 45)
++                    && !(matches!(r.orig_rax, 44 | 45) && r.r10 & 0x40 != 0) =>
++            {
++                Result::Blocked
++            }
++            value => Result::Ready(value.unwrap_or_else(|e| e)),
++        })
++    }
++    fn open(&mut self, r: &UserRegs) -> core::result::Result<i64, i64> {
++        let family = match r.rdi {
++            2 => TcpFamily::Ipv4,
++            10 => TcpFamily::Ipv6,
++            _ => return Err(-97),
++        };
++        if r.rsi & !(0o4000 | 0o2000000 | 1) != 0 || r.rsi & 15 != 1 || !matches!(r.rdx, 0 | 6) {
++            return Err(-93);
++        }
++        let slot = self
++            .network
++            .as_mut()
++            .ok_or(-13)?
++            .open(family)
++            .map_err(errno)?;
++        self.sockets[slot as usize] = Some(Socket {
++            flags: 2 | r.rsi as u32 & 0o4000,
++            connected: false,
++            connecting: false,
++            failure: 0,
++            error: 0,
++            nodelay: false,
++            read_timeout: 0,
++            write_timeout: 0,
++        });
++        self.received[slot as usize] = Receive::new();
++        Ok((FD_BASE + slot) as i64)
++    }
++    fn operation(
++        &mut self,
++        pid: usize,
++        slot: usize,
++        r: &UserRegs,
++    ) -> core::result::Result<i64, i64> {
++        let state = self.sockets[slot].ok_or(-9)?;
++        let handle = slot as u32;
++        match r.orig_rax {
++            3 => {
++                self.network
++                    .as_mut()
++                    .ok_or(-9)?
++                    .close(handle)
++                    .map_err(errno)?;
++                self.received[slot] = Receive::new();
++                self.sockets[slot] = None;
++                Ok(0)
++            }
++            42 => {
++                if state.connected {
++                    return Err(-106);
++                }
++                if state.failure != 0 {
++                    return Err(-(state.failure as i64));
++                }
++                if !state.connecting {
++                    let endpoint = read_endpoint(pid, r.rsi, r.rdx)?;
++                    let net = self.network.as_mut().ok_or(-9)?;
++                    net.connect(handle, endpoint).map_err(errno)?;
++                    self.sockets[slot].as_mut().unwrap().connecting = true;
++                    if state.nodelay {
++                        net.set_nodelay(handle, true).map_err(errno)?;
++                    }
++                    if state.flags & 0o4000 != 0 {
++                        return Err(-115);
++                    }
++                } else if state.flags & 0o4000 != 0 {
++                    if self.complete(slot)? {
++                        return Err(-106);
++                    }
++                    return Err(-114);
++                }
++                if self.complete(slot)? {
++                    Ok(0)
++                } else {
++                    Err(-11)
++                }
++            }
++            0 | 1 | 19 | 20 | 44 | 45 => {
++                if matches!(r.orig_rax, 44 | 45)
++                    && (r.r10 & !(0x4000 | 0x40) != 0 || r.r8 != 0 || r.r9 != 0)
++                {
++                    return Err(-95);
++                }
++                let write = matches!(r.orig_rax, 1 | 20 | 44);
++                let vectors = if matches!(r.orig_rax, 19 | 20) {
++                    IoVectors::read(pid, r.rsi, r.rdx)?
++                } else {
++                    IoVectors::single(r.rsi, r.rdx)
++                };
++                let length = vectors.length.min(IO);
++                if length == 0 {
++                    return Ok(0);
++                }
++                // Preserve already received bytes even after the shared transport
++                // budget is exhausted. Only backend transfers spend that budget.
++                if write {
++                    if !self.complete(slot)? {
++                        return Err(if state.connecting { -11 } else { -107 });
++                    }
++                    let mut buffer = [0u8; IO];
++                    let copied = vectors.copy(pid, &mut buffer[..length], false)?;
++                    let result = self
++                        .network
++                        .as_mut()
++                        .ok_or(-9)?
++                        .write(handle, &buffer[..copied])
++                        .map_err(errno);
++                    if result == Err(-32) && !(r.orig_rax == 44 && r.r10 & 0x4000 != 0) {
++                        // The backend suppresses host SIGPIPE; signal its guest caller.
++                        let _ = unsafe { syscall2(SYS_KILL, pid, 13) };
++                    }
++                    return result.map(|n| n as i64);
++                }
++                if self.received[slot].at == self.received[slot].end {
++                    if !self.complete(slot)? {
++                        return Err(if state.connecting { -11 } else { -107 });
++                    }
++                    let pending = &mut self.received[slot];
++                    let n = self
++                        .network
++                        .as_mut()
++                        .ok_or(-9)?
++                        .read(handle, &mut pending.bytes[..length])
++                        .map_err(errno)?;
++                    pending.at = 0;
++                    pending.end = n;
++                }
++                let pending = &mut self.received[slot];
++                let end = pending.end.min(pending.at + length);
++                // No copyin/preflight of a receive destination. Advance only by
++                // the copied prefix; a failed copy leaves the bytes for aliases.
++                let copied = vectors.copy(pid, &mut pending.bytes[pending.at..end], true)?;
++                pending.at += copied;
++                Ok(copied as i64)
++            }
++            48 => {
++                if r.rsi > 2 {
++                    return Err(-22);
++                }
++                self.network
++                    .as_mut()
++                    .ok_or(-9)?
++                    .shutdown(handle, r.rsi != 1, r.rsi != 0)
++                    .map_err(errno)?;
++                Ok(0)
++            }
++            51 | 52 => {
++                let endpoint = self
++                    .network
++                    .as_mut()
++                    .ok_or(-9)?
++                    .endpoint(handle, r.orig_rax == 52)
++                    .map_err(errno)?;
++                write_endpoint(pid, r.rsi, r.rdx, endpoint)
++            }
++            54 => {
++                if r.rdi > u32::MAX as u64 {
++                    return Err(-9);
++                }
++                if r.rsi == 6 && r.rdx == 1 && r.r8 == 4 {
++                    let mut value = [0u8; 4];
++                    if copy_memory(pid, r.r10, &mut value, false)? != 4 {
++                        return Err(-14);
++                    }
++                    let enabled = i32::from_ne_bytes(value) != 0;
++                    if state.connecting || state.connected {
++                        self.network
++                            .as_mut()
++                            .ok_or(-9)?
++                            .set_nodelay(handle, enabled)
++                            .map_err(errno)?;
++                    }
++                    self.sockets[slot].as_mut().unwrap().nodelay = enabled;
++                    return Ok(0);
++                }
++                if r.rsi != 1 || !matches!(r.rdx, 20 | 21) || r.r8 != 16 {
++                    return Err(-92);
++                }
++                let mut value = [0u8; 16];
++                if copy_memory(pid, r.r10, &mut value, false)? != 16 {
++                    return Err(-14);
++                }
++                let sec = i64::from_ne_bytes(value[..8].try_into().unwrap());
++                let usec = i64::from_ne_bytes(value[8..].try_into().unwrap());
++                if sec < 0 || !(0..1000000).contains(&usec) {
++                    return Err(-33);
++                }
++                let timeout = (sec as u64)
++                    .checked_mul(1_000_000_000)
++                    .and_then(|n| n.checked_add(usec as u64 * 1000))
++                    .ok_or(-22)?;
++                let socket = self.sockets[slot].as_mut().unwrap();
++                if r.rdx == 20 {
++                    socket.read_timeout = timeout;
++                } else {
++                    socket.write_timeout = timeout;
++                }
++                Ok(0)
++            }
++            55 => {
++                if r.rsi != 1 || !matches!(r.rdx, 3 | 4) {
++                    return Err(-92);
++                }
++                if r.rdx == 4 {
++                    let _ = self.complete(slot);
++                    if self.sockets[slot].unwrap().connected {
++                        let error = self
++                            .network
++                            .as_mut()
++                            .ok_or(-9)?
++                            .socket_error(handle)
++                            .map_err(errno)?;
++                        if error != 0 {
++                            self.sockets[slot].as_mut().unwrap().error = error;
++                        }
++                    }
++                }
++                let value = if r.rdx == 3 {
++                    1
++                } else {
++                    self.sockets[slot].unwrap().error
++                };
++                let mut length = [0u8; 4];
++                if copy_memory(pid, r.r8, &mut length, false)? != 4 {
++                    return Err(-14);
++                }
++                let count = (u32::from_ne_bytes(length) as usize).min(4);
++                let mut bytes = value.to_ne_bytes();
++                if count != 0 && copy_memory(pid, r.r10, &mut bytes[..count], true)? != count as i64
++                {
++                    return Err(-14);
++                }
++                length.copy_from_slice(&(count as u32).to_ne_bytes());
++                if copy_memory(pid, r.r8, &mut length, true)? != 4 {
++                    return Err(-14);
++                }
++                if r.rdx == 4 {
++                    self.sockets[slot].as_mut().unwrap().error = 0;
++                }
++                Ok(0)
++            }
++            72 => match r.rsi {
++                3 => Ok(state.flags as i64),
++                4 if r.rdx & !(2 | 0o4000) == 0 => {
++                    self.sockets[slot].as_mut().unwrap().flags = r.rdx as u32;
++                    Ok(0)
++                }
++                _ => Err(-95),
++            },
++            16 if r.rsi == 0x5421 => {
++                let mut bytes = [0; 4];
++                if copy_memory(pid, r.rdx, &mut bytes, false)? != 4 {
++                    return Err(-14);
++                }
++                self.sockets[slot].as_mut().unwrap().flags = 2
++                    | if i32::from_ne_bytes(bytes) != 0 {
++                        0o4000
++                    } else {
++                        0
++                    };
++                Ok(0)
++            }
++            5 => write_stat(
++                pid,
++                r.rsi,
++                Stat {
++                    inode: 0x60000000 + slot as u64,
++                    mode: 0o140600,
++                    size: 0,
++                    device_major: 0,
++                    device_minor: 0,
++                },
++                false,
++            ),
++            8 => Err(-29),
++            _ => Err(-95),
++        }
++    }
++}
++fn read_endpoint(pid: usize, address: u64, length: u64) -> core::result::Result<TcpEndpoint, i64> {
++    if !(2..=128).contains(&length) {
++        return Err(-22);
++    }
++    let mut bytes = [0u8; 28];
++    let n = (length as usize).min(bytes.len());
++    if copy_memory(pid, address, &mut bytes[..n], false)? != n as i64 {
++        return Err(-14);
++    }
++    let family = u16::from_ne_bytes(bytes[..2].try_into().unwrap());
++    let port = u16::from_be_bytes(bytes[2..4].try_into().unwrap());
++    match family {
++        2 if length >= 16 => {
++            TcpEndpoint::ipv4(bytes[4..8].try_into().unwrap(), port).map_err(errno)
++        }
++        10 if length >= 28 && bytes[4..8] == [0; 4] && bytes[24..28] == [0; 4] => {
++            TcpEndpoint::ipv6(bytes[8..24].try_into().unwrap(), port).map_err(errno)
++        }
++        _ => Err(-97),
++    }
++}
++fn write_endpoint(
++    pid: usize,
++    address: u64,
++    length_address: u64,
++    endpoint: TcpEndpoint,
++) -> core::result::Result<i64, i64> {
++    let mut bytes = [0u8; 28];
++    let length = if endpoint.family == TcpFamily::Ipv4 {
++        16
++    } else {
++        28
++    };
++    bytes[..2].copy_from_slice(&(if length == 16 { 2u16 } else { 10 }).to_ne_bytes());
++    bytes[2..4].copy_from_slice(&endpoint.port.to_be_bytes());
++    if length == 16 {
++        bytes[4..8].copy_from_slice(&endpoint.address[..4]);
++    } else {
++        bytes[8..24].copy_from_slice(&endpoint.address);
++    }
++    let mut supplied = [0u8; 4];
++    if copy_memory(pid, length_address, &mut supplied, false)? != 4 {
++        return Err(-14);
++    }
++    let n = (u32::from_ne_bytes(supplied) as usize).min(length);
++    if n != 0 && copy_memory(pid, address, &mut bytes[..n], true)? != n as i64 {
++        return Err(-14);
++    }
++    supplied.copy_from_slice(&(length as u32).to_ne_bytes());
++    if copy_memory(pid, length_address, &mut supplied, true)? != 4 {
++        return Err(-14);
++    }
++    Ok(0)
++}
++fn errno(error: NetworkError) -> i64 {
++    match error {
++        NetworkError::PermissionDenied => -13,
++        NetworkError::DescriptorLimit => -24,
++        NetworkError::InvalidDescriptor | NetworkError::Closed => -9,
++        NetworkError::AlreadyConnected => -106,
++        NetworkError::NotConnected => -107,
++        NetworkError::WouldBlock => -11,
++        NetworkError::ByteLimit => -122,
++        NetworkError::Backend(n) => -(n as i64),
++        NetworkError::InvalidEndpoint => -22,
++    }
++}
+diff --git a/crates/ginux-init/src/tracee_io.rs b/crates/ginux-init/src/tracee_io.rs
+index bff07887..225a77ec 100644
+--- a/crates/ginux-init/src/tracee_io.rs
++++ b/crates/ginux-init/src/tracee_io.rs
+@@ -153,3 +153,65 @@ pub fn store_u32(pid: usize, address: u64, value: u32) -> Result<(), i64> {
+     }
+     Ok(())
+ }
++
++/// Bounded scatter/gather layout shared by owned byte-stream backends.
++pub struct IoVectors {
++    entries: [(u64, usize); 16],
++    pub length: usize,
++}
++impl IoVectors {
++    pub fn single(address: u64, length: u64) -> Self {
++        let mut entries = [(0, 0); 16];
++        entries[0] = (address, length as usize);
++        Self {
++            entries,
++            length: length as usize,
++        }
++    }
++    pub fn read(pid: usize, address: u64, count: u64) -> Result<Self, i64> {
++        if count > 16 {
++            return Err(-22);
++        }
++        let mut output = Self::single(0, 0);
++        let mut bytes = [0u8; 16 * 16];
++        let size = count as usize * 16;
++        if size != 0 && copy_memory(pid, address, &mut bytes[..size], false)? != size as i64 {
++            return Err(-14);
++        }
++        for (index, entry) in output.entries[..count as usize].iter_mut().enumerate() {
++            let address = u64::from_ne_bytes(bytes[index * 16..index * 16 + 8].try_into().unwrap());
++            let length =
++                u64::from_ne_bytes(bytes[index * 16 + 8..index * 16 + 16].try_into().unwrap())
++                    as usize;
++            output.length = output.length.checked_add(length).ok_or(-22)?;
++            if output.length > isize::MAX as usize {
++                return Err(-22);
++            }
++            *entry = (address, length);
++        }
++        Ok(output)
++    }
++    pub fn copy(&self, pid: usize, buffer: &mut [u8], to_tracee: bool) -> Result<usize, i64> {
++        let mut copied = 0;
++        for (address, length) in self.entries {
++            let count = length.min(buffer.len() - copied);
++            if count == 0 {
++                continue;
++            }
++            match copy_memory(pid, address, &mut buffer[copied..copied + count], to_tracee) {
++                Ok(n) => {
++                    copied += n as usize;
++                    if n as usize != count {
++                        break;
++                    }
++                }
++                Err(error) if copied == 0 => return Err(error),
++                Err(_) => break,
++            }
++            if copied == buffer.len() {
++                break;
++            }
++        }
++        Ok(copied)
++    }
++}
+diff --git a/scripts/test-launch-network.py b/scripts/test-launch-network.py
+new file mode 100644
+index 00000000..e4ab88d3
+--- /dev/null
++++ b/scripts/test-launch-network.py
+@@ -0,0 +1,123 @@
++#!/usr/bin/env python3
++"""Real configured numeric TCP grants, ownership, readiness and quota checks."""
++import json
++import os
++from pathlib import Path
++import shutil
++import select
++import socket
++import subprocess
++import sys
++import tempfile
++import threading
++import time
++
++
++def main():
++    if len(sys.argv) < 3 or os.geteuid() != 0:
++        sys.exit('usage (as root): test-launch-network.py <ginux> <network-fixture> [modes...]')
++    binary, fixture = [str(Path(p).resolve()) for p in sys.argv[1:3]]
++    modes = ('io', 'nonblock', 'deny', 'quota', 'timeout', 'hold', 'hold-kill', 'slots', 'off', 'ordinary-hold', 'budget')
++    selected = sys.argv[3:] or modes
++    if any(mode not in modes for mode in selected):
++        sys.exit('unknown configured TCP mode')
++    template = (Path(__file__).resolve().parent.parent/'config/domain-gate5.toml').read_text()
++    with tempfile.TemporaryDirectory(prefix='ginux-network-') as directory:
++        work = Path(directory)
++        root = work/'root'
++        (root/'bin').mkdir(parents=True)
++        (root/'work').mkdir()
++        shutil.copyfile(fixture, root/'bin/fixture')
++        (root/'bin/fixture').chmod(0o755)
++        for mode in selected:
++            with socket.socket() as server, socket.socket() as forbidden:
++                server.bind(('127.0.0.1', 0))
++                forbidden.bind(('127.0.0.1', 0))
++                server.listen()
++                forbidden.listen()
++                port = server.getsockname()[1]
++                observed = []
++                failure = []
++                def echo():
++                    try:
++                        server.settimeout(5)
++                        stream, _ = server.accept()
++                        with stream:
++                            observed.append('connect')
++                            if mode == 'timeout':
++                                time.sleep(.15)
++                                return
++                            while True:
++                                data = stream.recv(4096)
++                                if not data:
++                                    break
++                                observed.append(data)
++                                if mode == 'nonblock':
++                                    time.sleep(.08)
++                                stream.sendall(data)
++                    except Exception as error:
++                        failure.append(repr(error))
++                thread = None
++                if mode in ('io', 'nonblock', 'quota', 'timeout', 'hold', 'hold-kill', 'ordinary-hold', 'budget'):
++                    thread = threading.Thread(target=echo, daemon=True)
++                    thread.start()
++                config = template.replace('init = "/bin/bash"', 'init = "/bin/fixture"')
++                connect_port = forbidden.getsockname()[1] if mode == 'deny' else port
++                config = config.replace('args = []', 'args = '+json.dumps([mode, str(connect_port)]))
++                if mode != 'off':
++                    network = (f'backend = "mediated"\nendpoints = ["127.0.0.1:{port}"]\n'
++                               f'max_connections = 2\nmax_bytes = {8 if mode in ("quota", "budget") else 1048576}')
++                    config = config.replace('backend = "none"', network)
++                path, result = work/'domain.toml', work/'result.json'
++                path.write_text(config)
++                result.unlink(missing_ok=True)
++                command = [binary, 'launch', str(path), str(root), '--result-file', str(result)]
++                if mode.startswith('hold') or mode == 'ordinary-hold':
++                    audit = work/(mode+'.audit')
++                    with audit.open('wb') as errors:
++                        proc = subprocess.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=errors)
++                        try:
++                            assert select.select([proc.stdout], [], [], 5)[0], 'network readiness handshake timed out'
++                            assert proc.stdout.readline() == b'network-ready\n'
++                            if mode != 'ordinary-hold':
++                                children = Path(f'/proc/{proc.pid}/task/{proc.pid}/children').read_text().split()
++                                assert len(children) == 1, children
++                                assert sorted(p.name for p in Path(f'/proc/{children[0]}/fd').iterdir()) == ['0', '1', '2']
++                            if mode == 'hold-kill':
++                                proc.kill()
++                                proc.communicate(timeout=5)
++                            else:
++                                proc.communicate(b'G', timeout=5)
++                                assert proc.returncode == 0, audit.read_text()
++                        finally:
++                            if proc.poll() is None:
++                                proc.kill()
++                                proc.communicate(timeout=5)
++                    if mode in ('hold', 'ordinary-hold'):
++                        assert json.loads(result.read_text())['code'] == 0
++                        assert b'teardown tasks=0 owned-handles=0' in audit.read_bytes()
++                else:
++                    before = time.monotonic()
++                    proc = subprocess.run(command, capture_output=True, timeout=10)
++                    assert proc.returncode == 0, (mode, proc.returncode, proc.stdout, proc.stderr.decode(), result.read_text())
++                    if mode == 'timeout':
++                        assert .03 < time.monotonic() - before < 2
++                    assert json.loads(result.read_text())['code'] == 0
++                    assert b'teardown tasks=0 owned-handles=0' in proc.stderr
++                if thread:
++                    thread.join(6)
++                    assert not thread.is_alive() and not failure, (mode, failure)
++                    assert observed[0] == 'connect'
++                forbidden.setblocking(False)
++                try:
++                    unallowed, _ = forbidden.accept()
++                except BlockingIOError:
++                    pass
++                else:
++                    unallowed.close()
++                    raise AssertionError('denied endpoint received a connection')
++                print(f'PASS configured TCP: {mode}')
++    print('test-launch-network: PASS ('+', '.join(selected)+')')
++
++if __name__ == '__main__':
++    main()
+diff --git a/tests/fixtures/launch-network-fixture.c b/tests/fixtures/launch-network-fixture.c
+new file mode 100644
+index 00000000..ac82d4a8
+--- /dev/null
++++ b/tests/fixtures/launch-network-fixture.c
+@@ -0,0 +1,80 @@
++/* Real configured TCP calls; the runner owns a bounded loopback server. */
++typedef unsigned long word;
++static long call(long n, word a, word b, word c, word d, word e, word f)
++{
++    register word r10 __asm__("r10")=d, r8 __asm__("r8")=e, r9 __asm__("r9")=f;
++    long result;
++    __asm__ volatile("syscall":"=a"(result):"a"(n),"D"(a),"S"(b),"d"(c),"r"(r10),"r"(r8),"r"(r9):"rcx","r11","memory");
++    return result;
++}
++#define DO(n,a,b,c) call(n,(word)(a),(word)(b),(word)(c),0,0,0)
++#define CHECK(x,c) if(!(x))return c
++static char buffer[64];
++static unsigned char address[16]={2,0,0,0,127,0,0,1};
++long network_main(word *stack)
++{
++    char **argv=(char **)(stack+1); char mode=argv[1][0];
++    unsigned port=0; for(char *p=argv[2];*p;++p)port=port*10+*p-'0';
++    address[2]=port>>8; address[3]=port;
++    if(mode=='o' && argv[1][1]=='f'){CHECK(DO(41,2,1,0)==-13,10);return 0;}
++    long fd=DO(41,2,1|(mode=='n'?04000:0)|02000000,0); CHECK(fd>=3,11);
++    CHECK(DO(72,fd,1,0)==1,12);
++    if(mode=='s'){
++        long second=DO(41,2,1,0);CHECK(second>=3 && DO(41,2,1,0)==-24,13);
++        CHECK(DO(3,second,0,0)==0 && DO(41,2,1,0)==second,14);return 0;
++    }
++    if(mode=='d'){
++        CHECK(DO(42,fd,address,16)==-13,15);
++        CHECK(DO(41,1,1,0)==-97 && DO(41,2,2,0)==-93,16);
++        CHECK(DO(49,fd,address,16)<0 && DO(50,fd,1,0)<0,17);return 0;
++    }
++    int enabled=1;
++    CHECK(call(54,fd,6,1,(word)&enabled,4,0)==0,18);
++    long connected=DO(42,fd,address,16);
++    struct {int fd;short events,revents;} pollfd={(int)fd,4,0};
++    if(mode=='n'){
++        CHECK(connected==-115,19);
++        CHECK(DO(7,&pollfd,1,5000)==1 && (pollfd.revents&4),20);
++        int error=-1;unsigned size=4;
++        CHECK(call(55,fd,1,4,(word)&error,(word)&size,0)==0 && error==0 && size==4,21);
++    }else CHECK(connected==0,22);
++    unsigned length=sizeof buffer;
++    CHECK(DO(51,fd,buffer,&length)==0 && length==16 && buffer[0]==2,23);
++    length=sizeof buffer;
++    CHECK(DO(52,fd,buffer,&length)==0 && length==16 && buffer[4]==127,24);
++    if(mode=='h' || mode=='o'){
++        CHECK(DO(1,1,"network-ready\n",14)==14 && DO(0,0,buffer,1)==1 && buffer[0]=='G',40);
++        CHECK(DO(3,fd,0,0)==0,41); return 0;
++    }
++    if(mode=='t'){
++        word timeout[2]={0,50000};
++        CHECK(call(54,fd,1,20,(word)timeout,16,0)==0,25);
++        CHECK(DO(0,fd,buffer,1)==-11,26);return 0;
++    }
++    struct {const char *base;word length;} vectors[2]={{"pi",2},{"ng",2}};
++    CHECK(DO(20,fd,vectors,2)==4,27);
++    if(mode=='n'){
++        CHECK(call(45,fd,(word)buffer,4,0x40,0,0)==-11,28);
++        pollfd.events=1;word timeout[2]={5,0};
++        CHECK(call(271,(word)&pollfd,1,(word)timeout,0,8,0)==1 && (pollfd.revents&1),29);
++    }
++    CHECK(DO(0,fd,buffer,0)==0 && DO(1,fd,buffer,0)==0,42);
++    if(mode=='i'){
++        struct {char *base;word length;} output[3]={{buffer,1},{buffer+1,0},{buffer+1,1}};
++        long got=DO(19,fd,output,3); CHECK(got>0 && got<=2,43);
++        while(got<4){long n=DO(0,fd,buffer+got,4-got);CHECK(n>0 && n<=4-got,44);got+=n;}
++        CHECK(buffer[0]=='p' && buffer[1]=='i' && buffer[2]=='n' && buffer[3]=='g',45);
++    }else CHECK(DO(0,fd,buffer,4)==4 && buffer[0]=='p' && buffer[3]=='g',30);
++    if(mode=='b')return 0;
++    if(mode=='q'){CHECK(DO(1,fd,"x",1)==-122,31);return 0;}
++    long alias=DO(32,fd,0,0);CHECK(alias>=3 && DO(3,fd,0,0)==0,32);
++    CHECK(DO(72,alias,4,2)==0,33);
++    long child=DO(57,0,0,0);CHECK(child>=0,34);
++    if(child==0)return DO(1,alias,"fork",4)==4?0:35;
++    int status=-1;CHECK(DO(61,child,&status,0)==child && status==0,36);
++    CHECK(DO(0,alias,buffer,4)==4 && buffer[0]=='f' && buffer[3]=='k',37);
++    CHECK(DO(48,alias,1,0)==0 && DO(0,alias,buffer,1)==0,38);
++    CHECK(DO(3,alias,0,0)==0,39);
++    return 0;
++}
++__asm__(".global _start\n_start:\nmov %rsp,%rdi\nandq $-16,%rsp\ncall network_main\nmov %rax,%rdi\nmov $60,%rax\nsyscall\nud2\n");
