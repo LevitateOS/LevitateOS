@@ -72,6 +72,27 @@
       "artifact_directory": ".artifacts/ginux-contribution-preparation/G03a"
     },
     {
+      "packet": "G03b",
+      "parent_packet": "G03",
+      "purpose": "bounded writable VFS metadata, directories and positioning",
+      "dependencies": [
+        "G05a"
+      ],
+      "base": "bb2c82bf18bb30a7ebc514af5131fa5b03a5fcc5",
+      "head": "785bfb9d6b7fcfb901d9f5efb8a845c8d9d4d53a",
+      "tree": "08c3afe079551e23275042949abeecc953ce9e91",
+      "upstream_base": "3f2fe7dfadd4b40e235d982a6a3d386dc6490177",
+      "source_commits": [
+        "222d29ffd26e95c1574895d393c95b1fb295fa80",
+        "10091e4e48bb14dcf9f0ee20e62f471fb7d0cf2f"
+      ],
+      "status": "source reviewed and locally validated on explicit G05a prerequisite; blocked for standalone delivery until prerequisite is upstream",
+      "evidence": "g03b-review.md",
+      "source_patch": "patches/G03b.patch",
+      "standalone": false,
+      "artifact_directory": ".artifacts/ginux-contribution-preparation/G03b"
+    },
+    {
       "packet": "G03",
       "purpose": "Configured writable storage and file metadata (`222d29ff`, `10091e4e`)",
       "dependencies": [],

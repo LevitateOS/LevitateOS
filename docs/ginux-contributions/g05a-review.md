@@ -5,6 +5,8 @@ Sole parent: upstream main `3f2fe7dfadd4b40e235d982a6a3d386dc6490177`.
 One file, `crates/ginux-vfs/src/lib.rs`, +95/-21. No prerequisite proposal,
 branch creation/switch, existing source-tree mutation, push or PR.
 
+[Retained source patch](patches/G05a.patch).
+
 ## Reviewed behavior
 
 Each independent open reserves an unused bounded position slot before any

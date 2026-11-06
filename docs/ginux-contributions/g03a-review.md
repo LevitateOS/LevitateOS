@@ -19,6 +19,8 @@ behavior remain in their original owners. No new syscall surface is granted to
 the workload. Files retain their upstream modes. This was reviewed by the author
 in a separate pass; no independent reviewer is claimed.
 
+[Retained source patch](patches/G03a.patch).
+
 ## Verification
 
 The new real launch scenario fails against an unmodified upstream3f2fe7df binary:

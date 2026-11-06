@@ -338,18 +338,25 @@ Linux runtime checks passing in both candidate and clean-applied source. Its sol
 parent is upstream3f2fe7df; patch/draft/logs are retained with the package. The
 larger G03 feature is still incomplete.
 
-Current goal-turn classification: **progress**. P03–P05 are complete; two actual
-standalone candidates now have full local review, negative/positive evidence and
-clean-apply validation. No publication occurred and the integration remains
-unchanged at7cf2638a. Goal remains active with the complete original scope.
+G03b's VFS foundation is extracted, corrected and locally validated at785bfb9d
+on the explicit G05a prerequisite. [Review/evidence](ginux-contributions/g03b-review.md)
+records four failing original-donor cases,24 passing current VFS tests,77 total
+unit tests and both complete Linux runtime replays. Its patch is retained in
+this superproject's docs alongside G05a/G03a. It is **not standalone-ready** until
+G05a merges upstream; the local composition must not be published as a stack.
 
-Exact next task: **G03 — remaining writable-storage/metadata extraction**.
-Start with the VFS metadata/seek/mkdir/chmod/append/exclusive API in222d29ff,
-reconcile current #216–#218 semantics and G05a offset sharing, then the controlled
-LaunchFs runtime join in10091e4e. Separate the now-prepared mkdirat fix from those
-patches. Fully review/test before moving on. Existing G01/G02 policy holds and
-G02's missing standalone runtime acceptance remain visible. F04 is the user
-checkpoint before publication.
+Previous goal turn: progress (two standalone fixes). Current goal turn: progress
+(G03b source extraction, reviewed corrections, fresh validation and source package).
+The full goal remains active; broader G03 and later packets are incomplete.
+
+Exact next task: **G03c — controlled configured-storage runtime adapter**.
+Extract the actual LaunchFs join from10091e4e on an explicit local composition of
+G03b and G03a. Preserve current supervisor #221 copyout helpers, native behavior,
+unit/CI coverage and component-wise path semantics. Reproduce and fix any ownership,
+path-classification or copy-failure defect before declaring the adapter reviewed.
+Do not start G04 while G03's required local preparation remains unfinished. G01/G02
+policy holds and G02's missing standalone acceptance remain visible. F04 is the
+user inspection checkpoint before publication.
 
 Active skill: `hdae-development`, discovered at
 `/home/vince/.codex/worktrees/ginux-pr-combination-check/ginux/.agents/skills/hdae-development/SKILL.md`.
