@@ -142,7 +142,7 @@ small generic documentation in that packet; never defer essential coverage to G3
 | G19 | Flush and quiesced export (`53dec6b3`, `48b26f8d`, relevant static fixes `c541a67f`) | G06, G07, G09 | fsync/fdatasync reach owned backing, live writers settle before successful export, failed workload/export cannot publish partial output. Allocate static fixes to their owning packets. |
 | G20 | Private checkpoint control and event-driven waiting (`2b306eff`, `990fbb7a`) | G06, G07, G19 | Checkpoint acknowledgment follows consistent capture; opaque bounded control, malformed frames, dead peers, cancellation and simultaneous task events behave correctly. |
 | G21 | Validated startup restore (`1d9e00e0`) | G09, G19 | Restore occurs before workload execution; reject malformed/traversing/oversized snapshots and occupied destinations without corrupting previous state. |
-| G22 | Bounded archives with hardlink identity (`e3374593`) | G13, G15, G18, G21 | Export/restore preserves aliases and symbolic links; >2 GiB payload and 5,000 nonempty files; reject unsafe paths, conflicting entries, invalid forward aliases and inconsistent link metadata. |
+| G22 | Bounded archives with hardlink identity (`e3374593`) | G13, G15, G18, G17b (memfd scale), G21 | Export/restore preserves aliases and symbolic links; >2 GiB payload and 5,000 nonempty files; reject unsafe paths, conflicting entries, invalid forward aliases and inconsistent link metadata. |
 | G23 | Owned file locks (`26784843`) | G06, G07, G15, G17 | Real simultaneous SQLite/Cargo clients contend correctly, locks release under close/exit, ownership follows defined descriptor/process semantics; no disabled-lock workaround. |
 | G24 | Inode timestamps and archive mtime (`d21d26c8`) | G15, G22 | Explicit timestamps survive alias access/checkpoint/restart, invalid/no-follow cases are correct; document seconds-only persistence. |
 | G25 | Vectored and chunked regular I/O (`88fa4749`, `7d556b4e`, `74835089`) | G05, G09, G17 | readv/writev bounds, short I/O, invalid buffers, offsets and partial effects; real APK/RPM and >1 MiB reads/writes complete without assuming pipes are regular files. |
@@ -571,15 +571,25 @@ Essential G31 restore wiring is folded into its introducing packet. Exact G19
 exports the archive but rejects restore. Security/full CI/upstream independence
 and G18/G13/G15/G20 combined joins remain pending; no publication occurred.
 
-Exact next task: **G22 — bounded archives with link identity**.
-Inspect e3374593 and join only the reviewed G13/G15/G18/G21 storage/archive owners
-in a disposable composition. Preserve G19 staging/publication and G21 startup
-cleanup, without importing G20 or held thread/policy capabilities accidentally.
-Review alias/symlink identity and dynamic capacity in the shared owners; run
-ordinary archive roundtrips/scale as resources permit. Record hostile paths,
-forward aliases, conflicting metadata, oversized/malformed input and races for
-DaybreakBlue instead of executing security probes. No publication or maintainer
-messages before F04.
+G22 source/ordinary preparation is retained at `7b2adc4f` on reviewed
+G13/G15/G18/G17b/G21 composition `9caccb3d`. [Review/evidence](ginux-contributions/g22-review.md)
+records100 units,181-path strict replay and link/alias/long-target identity,
+5000 nonempty files and a complete2 GiB+1 restore/export with every payload byte
+compared by streaming digest, plus existing controls, passing in source/clean.
+G17b supplies this memfd composition's required private FD budget; no G20/thread/
+held policy code is imported. Source review fixed silent symlink-mode changes.
+G19 atomic export and G21 startup cleanup remain. Existing restore CI wiring
+covers the new fixtures. Security/full CI/upstream independence and remaining
+F02 interactions are pending; nothing was published.
+
+Exact next task: **G23 — owned file locks**.
+Inspect26784843 against current descriptor/process identities and shared G15 inode
+ownership. Distinguish process record locks from open-description flock lifetime;
+retain blocking/cancellation/close/exit behavior without importing held threads
+or readiness policy. Run ordinary real simultaneous clients and the existing
+SQLite/Cargo consumer scenarios where dependencies permit. Record adversarial
+FD/lock ownership, copy and race probes for DaybreakBlue. No publication or
+maintainer messages before F04.
 
 Active skill: `hdae-development`, discovered at
 `/home/vince/.codex/worktrees/ginux-pr-combination-check/ginux/.agents/skills/hdae-development/SKILL.md`.

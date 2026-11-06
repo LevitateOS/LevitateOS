@@ -19,7 +19,7 @@ removed only when the resulting source and fixtures actually work without it.
 | G19 export | `LaunchFs::export_snapshot`, `storage_export::Archive`, successful task teardown | Core export/flush needs storage and settled task/thread ownership. It can exist without file mappings or enlarged private descriptor budgets; add mapping consistency tests when G12 is composed. |
 | G20 control | `checkpoint_control::{prepare,readiness,poll}`, `launch_tasks::wait_events` | Host-owned inherited Unix stream, closed in the workload; no dependency on G08 guest socketpairs/poll policy. It does require consistent capture and settled processes/threads. |
 | G21 restore | `storage_restore::restore` called in launch_main before workload fork | Startup archive import does not require a checkpoint-control transport. It requires compatible archive data and filesystem identity/bounds. Do not wait for G20 merely because the original implementation followed it. |
-| G22 archive alias/large bounds | `RestoreEntry`, `LaunchFs::restore_entry/export_snapshot`, Archive::hardlink | Requires hardlink identities, symlinks, dynamic capacity and matching export/import. This is one coupled archive contract; splitting producer and consumer into incompatible standalone proposals is misleading. |
+| G22 archive alias/large bounds | `RestoreEntry`, `LaunchFs::restore_entry/export_snapshot`, Archive::hardlink | Requires hardlink identities, symlinks, dynamic capacity and matching export/import. The selected memfd composition also needs G17b private backing reservations for 5,000 live files. This is one coupled archive contract; splitting producer and consumer into incompatible standalone proposals is misleading. |
 
 ## Packet ownership and joins
 

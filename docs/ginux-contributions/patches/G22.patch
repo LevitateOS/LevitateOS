@@ -1,0 +1,763 @@
+From 7b2adc4f75acca26f2b356fbf9a47a9644c39bc8 Mon Sep 17 00:00:00 2001
+From: vince <vincepaul.liem@gmail.com>
+Date: Fri, 6 Nov 2026 16:19:17 +0100
+Subject: [PATCH] feat(storage): preserve link identity across bounded archives
+
+Export regular hardlinks as one payload with earlier-name aliases and
+roundtrip symbolic links with bounded long names and targets. Restore uses
+exact entry identity and configured namespace/data budgets without a fixed
+2 GiB ceiling. Preserve atomic publication and startup failure cleanup.
+
+Signed-off-by: vince <vincepaul.liem@gmail.com>
+---
+ README.md                                |  31 +++--
+ crates/ginux-init/src/fs_hooks.rs        | 142 ++++++++++++++++++-----
+ crates/ginux-init/src/storage_export.rs  |  73 +++++++++++-
+ crates/ginux-init/src/storage_restore.rs |  93 +++++++++++----
+ crates/ginux-vfs/src/lib.rs              |   7 ++
+ scripts/test-launch-restore.py           |  86 +++++++++++++-
+ tests/fixtures/launch-storage-fixture.c  |  46 ++++++++
+ 7 files changed, 401 insertions(+), 77 deletions(-)
+
+diff --git a/README.md b/README.md
+index 83807f79..a12cb5af 100644
+--- a/README.md
++++ b/README.md
+@@ -477,18 +477,25 @@ write, sync and close. Failed workloads cancel staging. Export failures fail the
+ launch; an existing destination is preserved. Abrupt supervisor death can leave a
+ private staging file, which is never a published archive. Consumers must require
+ both successful completion and a valid archive. This is final export, without
+-retained storage, live checkpoint control, symlink or hardlink archive support.
++retained storage or live checkpoint control.
+ Owned regular files support fsync/fdatasync against their supervisor backing;
+ these calls do not imply persistence after the in-memory domain ends.
+ 
+-`--restore-file <snapshot tar>` imports owned files before workload startup. It
+-restores regular files, directories, permission bits and GNU long names into the
+-new memory view. The current32-slot namespace (including prepared assignment
+-parents), configured byte capacity and2 GiB archive payload bound all apply.
+-The input must be a bounded regular file opened without following a symlink;
+-import never changes it. Invalid paths, duplicate entries, links, invalid metadata,
+-checksums/terminators and truncated data fail launch and discard the new view.
+-The archive must have exactly two zero terminator blocks and no trailing data.
+-This is filesystem reconstruction, without process memory, handles or matching
+-runtime state; the host must select and verify the intended snapshot. It does
+-not require a checkpoint control socket.
++`--restore-file <snapshot tar>` reconstructs the owned filesystem before workload
++startup. Regular files, directories, symlinks, modes and GNU long names/targets
++are supported. Regular hardlinks export one payload followed by zero-size aliases
++to an earlier name; restore preserves shared bytes and inode identity. Symbolic
++link targets are stored as data and are never followed during import. Their
++permission mode is fixed at 0777; imports with another symlink mode are rejected.
++
++Import uses the configured namespace and data budgets, including prepared
++assignment parents. Archive bytes are bounded by the data budget plus 3072 bytes
++per namespace slot and a 1024-byte terminator. There is no fixed 2 GiB payload
++ceiling; ustar octal size fields limit each file to below 8 GiB. Hardlink aliases
++consume namespace capacity and share the original data charge. Invalid paths,
++forward hardlinks, conflicting alias modes, symlink parents, duplicate entries,
++metadata, checksums, truncation or trailing data fail launch. The source must be
++a bounded regular file opened without following a symlink; it remains unchanged.
++Failure discards the new memory view. The host must verify the chosen snapshot
++and matching runtime state: process memory and live handles are not restored,
++and no checkpoint control socket is required.
+diff --git a/crates/ginux-init/src/fs_hooks.rs b/crates/ginux-init/src/fs_hooks.rs
+index 25c4ef79..ea5d13c2 100644
+--- a/crates/ginux-init/src/fs_hooks.rs
++++ b/crates/ginux-init/src/fs_hooks.rs
+@@ -18,7 +18,6 @@ pub const FD_BASE: usize = 1 << 20;
+ const IO_SIZE: usize = 4096;
+ type Path = Text<MAX_PATH>;
+ type ExecutableName = Text<{ MAX_PATH + 10 }>;
+-pub(crate) const OBJECTS: usize = 32;
+ type MemoryFs =
+     VirtualFs<'static, EmptyReader, 0, 0, 64, MemoryStorage, MappedArray<ginux_vfs::OverlayFile>>;
+ static mut ROOT_INDEX: [u8; HEADER_SIZE + RECORD_SIZE] = [0; HEADER_SIZE + RECORD_SIZE];
+@@ -31,8 +30,18 @@ impl BaseReader for EmptyReader {
+     }
+ }
+ 
++pub struct RestoreEntry<'a> {
++    pub path: &'a [u8],
++    pub kind: NodeKind,
++    pub link: &'a [u8],
++    pub mode: u32,
++    pub length: usize,
++    pub hardlink: bool,
++}
++
+ pub struct LaunchFs {
+     fs: MemoryFs,
++    byte_limit: usize,
+     prefixes: [Path; 8],
+     count: usize,
+     init: Path,
+@@ -162,6 +171,7 @@ impl LaunchFs {
+         }
+         Ok(Self {
+             fs,
++            byte_limit: limit,
+             prefixes,
+             count,
+             null: config
+@@ -174,15 +184,29 @@ impl LaunchFs {
+         })
+     }
+ 
++    pub fn byte_limit(&self) -> u64 {
++        self.byte_limit as u64
++    }
++
++    pub fn capacity(&self) -> usize {
++        self.fs.namespace_capacity()
++    }
++
+     pub fn restore_entry(
+         &mut self,
+-        path: &[u8],
+-        directory: bool,
+-        mode: u32,
+-        length: usize,
+-        seen: &mut [bool; OBJECTS],
++        entry: RestoreEntry<'_>,
++        seen: &mut [bool],
+         mut read: impl FnMut(&mut [u8]) -> Result<(), &'static [u8]>,
+     ) -> Result<(), &'static [u8]> {
++        let RestoreEntry {
++            path,
++            kind,
++            link,
++            mode,
++            length,
++            hardlink,
++        } = entry;
++        let directory = kind == NodeKind::Directory;
+         // The archive parser has already validated absolute path components.
+         if !self.owns_path(path)
+             && !(directory
+@@ -199,6 +223,15 @@ impl LaunchFs {
+                     Ok(()) | Err(VfsError::AlreadyExists) => {}
+                     Err(_) => return Err(b"restore parent creation failed"),
+                 }
++                if self
++                    .fs
++                    .metadata_no_follow(&path[..end])
++                    .map_err(|_| b"restore parent lookup failed".as_slice())?
++                    .kind
++                    != NodeKind::Directory
++                {
++                    return Err(b"restore parent is not a directory");
++                }
+             }
+         }
+         if directory {
+@@ -208,7 +241,7 @@ impl LaunchFs {
+             }
+             if self
+                 .fs
+-                .metadata(path)
++                .metadata_no_follow(path)
+                 .map_err(|_| b"restore directory lookup failed".as_slice())?
+                 .kind
+                 != NodeKind::Directory
+@@ -218,6 +251,45 @@ impl LaunchFs {
+             self.fs
+                 .chmod(path, mode)
+                 .map_err(|_| b"restore directory mode failed".as_slice())?;
++        } else if hardlink {
++            if link.is_empty()
++                || link[0] == b'/'
++                || link.contains(&0)
++                || link
++                    .split(|b| *b == b'/')
++                    .any(|p| p.is_empty() || p == b"." || p == b"..")
++            {
++                return Err(b"invalid restore hardlink target");
++            }
++            let mut target = [0u8; MAX_PATH];
++            if link.len() + 1 >= MAX_PATH {
++                return Err(b"restore hardlink target exceeds path bound");
++            }
++            target[0] = b'/';
++            target[1..1 + link.len()].copy_from_slice(link);
++            let target = &target[..link.len() + 1];
++            let slot = self
++                .fs
++                .named_overlay_slot(target)
++                .ok_or(b"restore hardlink target is not a prior entry".as_slice())?;
++            let (_, metadata) = self
++                .fs
++                .overlay_entry(slot)
++                .ok_or(b"restore hardlink target missing".as_slice())?;
++            if !seen[slot]
++                || metadata.kind != NodeKind::File
++                || metadata.mode != mode
++                || !self.owns_path(target)
++            {
++                return Err(b"restore hardlink target or mode is invalid");
++            }
++            self.fs
++                .hard_link(target, path, false)
++                .map_err(|_| b"restore hardlink creation failed".as_slice())?;
++        } else if kind == NodeKind::Symlink {
++            self.fs
++                .symlink(link, path)
++                .map_err(|_| b"restore link creation failed".as_slice())?;
+         } else {
+             let fd = self
+                 .fs
+@@ -250,17 +322,11 @@ impl LaunchFs {
+             result?;
+             closed.map_err(|_| b"restore file close failed".as_slice())?;
+         }
+-        // This launch view has a one-entry immutable root; live owned inode
+-        // numbers are stable slot+2 for the duration of startup import.
+-        let inode = self
++        // Track exact names rather than canonical inodes, since aliases share data.
++        let slot = self
+             .fs
+-            .metadata(path)
+-            .map_err(|_| b"restore entry lookup failed".as_slice())?
+-            .inode;
+-        let slot = inode
+-            .checked_sub(2)
+-            .filter(|slot| *slot < OBJECTS as u64)
+-            .ok_or(b"invalid restored inode".as_slice())? as usize;
++            .named_overlay_slot(path)
++            .ok_or(b"restore entry lookup failed".as_slice())?;
+         if seen[slot] {
+             return Err(b"duplicate restore entry");
+         }
+@@ -269,21 +335,37 @@ impl LaunchFs {
+     }
+ 
+     pub fn export(&self) -> Result<(), &'static [u8]> {
+-        crate::storage_export::finish(|archive| {
+-            for slot in 0..self.fs.namespace_capacity() {
+-                if let Some((path, metadata)) = self.fs.overlay_entry(slot) {
+-                    if metadata.links > 1 {
+-                        return Err(b"hardlink archive identity is not implemented");
+-                    }
+-                    archive.entry(path, metadata, |offset, buffer| {
+-                        self.fs
+-                            .read_overlay(slot, offset, buffer)
+-                            .map_err(|_| b"export read failed".as_slice())
+-                    })?;
++        crate::storage_export::finish(|archive| self.write_archive(archive))
++    }
++
++    fn write_archive(
++        &self,
++        archive: &mut crate::storage_export::Archive,
++    ) -> Result<(), &'static [u8]> {
++        for slot in 0..self.fs.namespace_capacity() {
++            if let Some((path, metadata)) = self.fs.overlay_entry(slot) {
++                let prior = if metadata.kind == NodeKind::File && metadata.links > 1 {
++                    (0..slot)
++                        .filter_map(|slot| self.fs.overlay_entry(slot))
++                        .find(|(_, prior)| {
++                            prior.kind == NodeKind::File && prior.inode == metadata.inode
++                        })
++                        .map(|(path, _)| path)
++                } else {
++                    None
++                };
++                if let Some(target) = prior {
++                    archive.hardlink(path, metadata, target)?;
++                    continue;
+                 }
++                archive.entry(path, metadata, |offset, buffer| {
++                    self.fs
++                        .read_overlay(slot, offset, buffer)
++                        .map_err(|_| b"export read failed".as_slice())
++                })?;
+             }
+-            Ok(())
+-        })
++        }
++        Ok(())
+     }
+ 
+     pub fn teardown(&mut self) {
+diff --git a/crates/ginux-init/src/storage_export.rs b/crates/ginux-init/src/storage_export.rs
+index 2c06b62a..7d208227 100644
+--- a/crates/ginux-init/src/storage_export.rs
++++ b/crates/ginux-init/src/storage_export.rs
+@@ -202,6 +202,25 @@ impl Archive {
+         &mut self,
+         path: &[u8],
+         metadata: FileMetadata,
++        read: impl FnMut(usize, &mut [u8]) -> Result<(), Error>,
++    ) -> Result<(), Error> {
++        self.entry_data(path, metadata, None, read)
++    }
++    pub fn hardlink(
++        &mut self,
++        path: &[u8],
++        metadata: FileMetadata,
++        target: &[u8],
++    ) -> Result<(), Error> {
++        self.entry_data(path, metadata, Some(target), |_, _| {
++            Err(b"hardlink has no payload")
++        })
++    }
++    fn entry_data(
++        &mut self,
++        path: &[u8],
++        metadata: FileMetadata,
++        hardlink: Option<&[u8]>,
+         mut read: impl FnMut(usize, &mut [u8]) -> Result<(), Error>,
+     ) -> Result<(), Error> {
+         let name = path
+@@ -214,23 +233,57 @@ impl Archive {
+         {
+             return Err(b"invalid export path");
+         }
+-        let (kind, length) = match metadata.kind {
+-            NodeKind::File => (b'0', metadata.size),
+-            NodeKind::Directory => (b'5', 0),
+-            _ => return Err(b"unsupported export entry kind"),
++        let (kind, length) = if hardlink.is_some() {
++            (b'1', 0)
++        } else {
++            match metadata.kind {
++                NodeKind::File => (b'0', metadata.size),
++                NodeKind::Directory => (b'5', 0),
++                NodeKind::Symlink => (b'2', 0),
++            }
+         };
+         if name.len() > 100 {
+             // GNU long names preserve any normalized VFS path, including a
+             // single component longer than ustar's 100-byte name field.
+-            self.header(b"././@LongLink", 0, (name.len() + 1) as u64, b'L')?;
++            self.header(b"././@LongLink", 0, (name.len() + 1) as u64, b'L', b"")?;
+             self.bytes(name)?;
+             self.bytes(&[0; 512][..512 - name.len()])?;
+         }
++        let mut target = [0; ginux_vfs::MAX_PATH];
++        let target = if let Some(target) = hardlink {
++            let target = target
++                .strip_prefix(b"/")
++                .ok_or(b"invalid hardlink export target".as_slice())?;
++            if target.is_empty()
++                || target
++                    .split(|b| *b == b'/')
++                    .any(|p| p.is_empty() || p == b"." || p == b"..")
++            {
++                return Err(b"invalid hardlink export target");
++            }
++            target
++        } else if metadata.kind == NodeKind::Symlink {
++            let length =
++                usize::try_from(metadata.size).map_err(|_| b"invalid export link".as_slice())?;
++            if length == 0 || length > target.len() {
++                return Err(b"invalid export link");
++            }
++            read(0, &mut target[..length])?;
++            &target[..length]
++        } else {
++            &[]
++        };
++        if target.len() > 100 {
++            self.header(b"././@LongLink", 0, (target.len() + 1) as u64, b'K', b"")?;
++            self.bytes(target)?;
++            self.bytes(&[0; 512][..512 - target.len()])?;
++        }
+         self.header(
+             &name[..name.len().min(100)],
+             (metadata.mode & 0o777) as u64,
+             length,
+             kind,
++            &target[..target.len().min(100)],
+         )?;
+         let mut buffer = [0u8; 4096];
+         let mut offset = 0usize;
+@@ -243,7 +296,14 @@ impl Archive {
+         let padding = (512 - (length % 512)) % 512;
+         self.bytes(&[0; 512][..padding as usize])
+     }
+-    fn header(&mut self, name: &[u8], mode: u64, length: u64, kind: u8) -> Result<(), Error> {
++    fn header(
++        &mut self,
++        name: &[u8],
++        mode: u64,
++        length: u64,
++        kind: u8,
++        link: &[u8],
++    ) -> Result<(), Error> {
+         let mut header = [0u8; 512];
+         header[..name.len()].copy_from_slice(name);
+         octal(&mut header[100..108], mode)?;
+@@ -253,6 +313,7 @@ impl Archive {
+         octal(&mut header[136..148], 0)?;
+         header[148..156].fill(b' ');
+         header[156] = kind;
++        header[157..157 + link.len()].copy_from_slice(link);
+         header[257..263].copy_from_slice(b"ustar\0");
+         header[263..265].copy_from_slice(b"00");
+         let checksum = header.iter().map(|b| *b as u64).sum();
+diff --git a/crates/ginux-init/src/storage_restore.rs b/crates/ginux-init/src/storage_restore.rs
+index ccfc2a1d..11bb52a6 100644
+--- a/crates/ginux-init/src/storage_restore.rs
++++ b/crates/ginux-init/src/storage_restore.rs
+@@ -1,9 +1,10 @@
+ //! Bounded startup import of an owned-filesystem snapshot. All entries are
+ //! validated before a workload starts; failures discard this new memory view.
+-use crate::fs_hooks::{LaunchFs, OBJECTS};
++use crate::fs_hooks::{LaunchFs, RestoreEntry};
++use crate::storage_memory::MappedArray;
+ use crate::supervisor::{syscall1, syscall2, syscall3, syscall4};
++use ginux_vfs::NodeKind;
+ type Error = &'static [u8];
+-const LIMIT: u64 = 2 * 1024 * 1024 * 1024;
+ struct Input(usize);
+ impl Drop for Input {
+     fn drop(&mut self) {
+@@ -64,7 +65,7 @@ pub fn restore(path: *const u8, files: &mut LaunchFs) -> Result<(), Error> {
+             257,
+             (-100isize) as usize,
+             path as usize,
+-            // O_NONBLOCK prevents a non-regular source blocking before fstat.
++            // Reject non-regular sources without blocking before fstat.
+             0x80000 | 0x20000 | 0x800,
+             0,
+         )
+@@ -74,22 +75,34 @@ pub fn restore(path: *const u8, files: &mut LaunchFs) -> Result<(), Error> {
+     }
+     let mut input = Input(fd as usize);
+     let mut stat = [0u64; 18];
++    let archive_bound = files
++        .byte_limit()
++        .checked_add(
++            (files.capacity() as u64)
++                .checked_mul(3072)
++                .ok_or(b"restore archive bound overflow".as_slice())?,
++        )
++        .and_then(|n| n.checked_add(1024))
++        .ok_or(b"restore archive bound overflow".as_slice())?;
+     if unsafe { syscall2(5, input.0, stat.as_mut_ptr() as usize) } < 0
+         || stat[3] & 0o170000 != 0o100000
+-        || stat[6] > LIMIT + 8 * 1024 * 1024
++        || stat[6] > archive_bound
+     {
+         return Err(b"restore archive is not a bounded regular file");
+     }
+-    let mut seen = [false; OBJECTS];
++    let mut seen = MappedArray::new(files.capacity(), false)
++        .map_err(|_| b"restore metadata allocation failed".as_slice())?;
+     let mut long_name = [0u8; 256];
+     let mut long_len = 0;
++    let mut long_link = [0u8; 256];
++    let mut link_len = 0;
+     let mut total = 0u64;
+-    for _ in 0..=OBJECTS * 2 {
++    for _ in 0..=files.capacity() * 3 {
+         let mut header = [0u8; 512];
+         input.exact(&mut header)?;
+         if header.iter().all(|b| *b == 0) {
+-            if long_len != 0 {
+-                return Err(b"restore long name has no entry");
++            if long_len != 0 || link_len != 0 {
++                return Err(b"restore long name or link has no entry");
+             }
+             input.exact(&mut header)?;
+             if header.iter().any(|b| *b != 0) || input.read(&mut header[..1])? != 0 {
+@@ -113,30 +126,55 @@ pub fn restore(path: *const u8, files: &mut LaunchFs) -> Result<(), Error> {
+             return Err(b"invalid restore header");
+         }
+         let size = octal(&header[124..136])?;
+-        if header[156] == b'L' {
+-            if long_len != 0 || !(2..=256).contains(&size) {
+-                return Err(b"invalid restore long name");
++        if matches!(header[156], b'L' | b'K') {
++            let (buffer, length) = if header[156] == b'L' {
++                (&mut long_name, &mut long_len)
++            } else {
++                (&mut long_link, &mut link_len)
++            };
++            if *length != 0 || !(2..=256).contains(&size) {
++                return Err(b"invalid restore long name or link");
+             }
+-            input.exact(&mut long_name[..size as usize])?;
+-            if long_name[size as usize - 1] != 0 {
+-                return Err(b"unterminated restore long name");
++            input.exact(&mut buffer[..size as usize])?;
++            if buffer[size as usize - 1] != 0 || buffer[..size as usize - 1].contains(&0) {
++                return Err(b"unterminated restore long name or link");
+             }
+-            long_len = size as usize - 1;
++            *length = size as usize - 1;
+             input.padding(size as usize)?;
+             continue;
+         }
+-        let directory = match header[156] {
+-            b'5' => true,
+-            b'0' | 0 => false,
++        let kind = match header[156] {
++            b'5' => NodeKind::Directory,
++            b'0' | 0 | b'1' => NodeKind::File,
++            b'2' => NodeKind::Symlink,
+             _ => return Err(b"unsupported restore entry kind"),
+         };
++        let directory = kind == NodeKind::Directory;
++        let hardlink = header[156] == b'1';
++        if link_len != 0 && kind != NodeKind::Symlink && !hardlink {
++            return Err(b"restore link target on non-link");
++        }
++        let target = if link_len != 0 {
++            &long_link[..link_len]
++        } else {
++            field(&header[157..257])
++        };
+         let mode = octal(&header[100..108])?;
+-        if mode & !0o777 != 0 || (directory && size != 0) {
++        if mode & !0o777 != 0
++            || (kind == NodeKind::Symlink && mode != 0o777)
++            || ((kind != NodeKind::File || hardlink) && size != 0)
++        {
+             return Err(b"invalid restore metadata");
+         }
+         total = total
+-            .checked_add(size)
+-            .filter(|n| *n <= LIMIT)
++            .checked_add(
++                size + if kind == NodeKind::Symlink {
++                    target.len() as u64
++                } else {
++                    0
++                },
++            )
++            .filter(|n| *n <= files.byte_limit())
+             .ok_or(b"restore archive byte bound exceeded".as_slice())?;
+         let mut path = [0u8; 256];
+         path[0] = b'/';
+@@ -163,13 +201,18 @@ pub fn restore(path: *const u8, files: &mut LaunchFs) -> Result<(), Error> {
+             return Err(b"invalid restore entry path");
+         }
+         files.restore_entry(
+-            &path[..end],
+-            directory,
+-            mode as u32,
+-            size as usize,
++            RestoreEntry {
++                path: &path[..end],
++                kind,
++                link: target,
++                mode: mode as u32,
++                length: size as usize,
++                hardlink,
++            },
+             &mut seen,
+             |bytes| input.exact(bytes),
+         )?;
++        link_len = 0;
+         input.padding(size as usize)?;
+     }
+     Err(b"restore archive entry bound exceeded")
+diff --git a/crates/ginux-vfs/src/lib.rs b/crates/ginux-vfs/src/lib.rs
+index 51ca1c57..d546d39b 100644
+--- a/crates/ginux-vfs/src/lib.rs
++++ b/crates/ginux-vfs/src/lib.rs
+@@ -1224,6 +1224,13 @@ impl<
+         self.descriptors.fill(Descriptor::empty());
+     }
+ 
++    /// Exact live namespace identity for archive duplicate detection. This
++    /// never follows a symlink or resolves an alternate name for the caller.
++    pub fn named_overlay_slot(&self, path: &[u8]) -> Option<usize> {
++        self.find_overlay(path)
++            .filter(|slot| self.overlay[*slot].state != 2)
++    }
++
+     /// Enumerate live writable entries while the caller has quiesced mutation.
+     /// Slots are opaque and stable only until the next filesystem mutation.
+     pub fn overlay_entry(&self, slot: usize) -> Option<(&[u8], FileMetadata)> {
+diff --git a/scripts/test-launch-restore.py b/scripts/test-launch-restore.py
+index 0d130019..8d5513cb 100644
+--- a/scripts/test-launch-restore.py
++++ b/scripts/test-launch-restore.py
+@@ -1,6 +1,7 @@
+ #!/usr/bin/env python3
+ """Startup filesystem reconstruction against explicit existing binaries."""
+ import io
++import hashlib
+ import json
+ import os
+ from pathlib import Path
+@@ -32,15 +33,19 @@ def main():
+         config_path = work / 'config.toml'
+         result = work / 'result.json'
+ 
+-        def launch(mode, archive=None, exported=None, failure=False, assignments='memory:/out'):
+-            config_path.write_text(config.replace('args = []', 'args = ' + json.dumps([mode])).replace('memory:/out', assignments))
++        def launch(mode, archive=None, exported=None, failure=False, assignments='memory:/out', objects=None, memory=256):
++            effective = config.replace('args = []', 'args = ' + json.dumps([mode])).replace('memory:/out', assignments)
++            effective = effective.replace('memory_mib = 256', 'memory_mib = ' + str(memory))
++            if objects is not None:
++                effective = effective.replace('[storage]\n', '[storage]\nmax_objects = ' + str(objects) + '\n')
++            config_path.write_text(effective)
+             result.unlink(missing_ok=True)
+             command = [binary, 'launch', str(config_path), str(root), '--result-file', str(result)]
+             if archive is not None:
+                 command += ['--restore-file', str(archive)]
+             if exported is not None:
+                 command += ['--export-file', str(exported)]
+-            proc = subprocess.run(command, capture_output=True, timeout=10)
++            proc = subprocess.run(command, capture_output=True, timeout=120)
+             assert proc.returncode == (2 if failure else 0), proc.stderr.decode()
+             assert proc.stdout == (b'restored: PASS\n' if mode.startswith('restore') and not failure else b''), proc.stdout
+             record = json.loads(result.read_text())
+@@ -81,6 +86,60 @@ def main():
+         large.write_bytes(stream.getvalue()[:size+1024])
+         launch('restore-large', large)
+ 
++        linked = work/'links.tar'
++        launch('archive-create', exported=linked)
++        linked_original = linked.read_bytes()
++        with tarfile.open(linked) as tar:
++            assert tar.getmember('out/product-alias').islnk()
++            assert tar.getmember('out/product-alias').linkname == 'out/product'
++            assert tar.getmember('out/long-alias').linkname == 'out/' + 'a'*120 + '/' + 'b'*80
++            assert tar.getmember('out/product-link').issym()
++            assert tar.getmember('out/product-link').linkname == 'product'
++            assert tar.getmember('out/long-link').linkname == '/out/' + 'a'*120 + '/' + 'b'*80
++            assert tar.extractfile('out/surviving').read() == b'orphan'
++            assert 'out/temporary' not in tar.getnames()
++        updated = work/'links-updated.tar'
++        launch('restore-links', linked, updated)
++        assert linked.read_bytes() == linked_original
++        with tarfile.open(updated) as tar:
++            assert tar.extractfile('out/product-alias').read() == b'changed'
++            assert tar.getmember('out/product-alias').islnk()
++
++        namespace = work/'namespace.tar'
++        launch('namespace', exported=namespace, objects=5001, memory=64)
++        with tarfile.open(namespace) as tar:
++            assert sum(member.isfile() for member in tar.getmembers()) == 5000
++        launch('restore-namespace', namespace, objects=5001, memory=64)
++
++        # A complete valid payload crosses the old2 GiB ceiling. Sparse host
++        # construction avoids writing the source's zero bytes twice.
++        big, big_export = work/'big.tar', work/'big-export.tar'
++        entry = tarfile.TarInfo('out/big')
++        entry.mode, entry.size = 0o600, 2*1024*1024*1024+1
++        with big.open('wb') as stream:
++            stream.write(entry.tobuf(format=tarfile.USTAR_FORMAT))
++            stream.seek(512+entry.size-1)
++            stream.write(b'Z')
++            stream.write(bytes((-entry.size)%512+1024))
++        launch('restore-big', big, big_export, memory=4096)
++        with tarfile.open(big_export) as tar:
++            member = tar.getmember('out/big')
++            assert member.size == entry.size
++            contents = tar.extractfile(member)
++            assert contents.read(1) == b'\0'
++            contents.seek(entry.size-2)
++            assert contents.read(2) == b'\0Z'
++            contents.seek(0)
++            actual, expected = hashlib.sha256(), hashlib.sha256()
++            for chunk in iter(lambda: contents.read(1024*1024), b''):
++                actual.update(chunk)
++            zeros = bytes(1024*1024)
++            for _ in range(2048):
++                expected.update(zeros)
++            expected.update(b'Z')
++            assert actual.digest() == expected.digest(), 'large payload bytes changed'
++        big.unlink(); big_export.unlink()
++
+         if not ordinary:
+             launch('restore', snapshot, work/'outside.tar', failure=True, assignments='memory:/work')
+             for name, data in (('truncated', original[:-512]), ('checksum', b'x' + original[1:])):
+@@ -98,11 +157,30 @@ def main():
+                     if kind == 'duplicate':
+                         tar.addfile(entry)
+                 launch('restore', archive, work/f'{kind}-export.tar', failure=True)
++            for name, target, target_type, extra in (
++                    ('forward-hardlink', 'out/future', None, None),
++                    ('absolute-hardlink', '/out/product', None, None),
++                    ('traversing-hardlink', 'out/../product', None, None),
++                    ('directory-hardlink', 'out/dir', tarfile.DIRTYPE, None),
++                    ('symlink-hardlink', 'out/sym', tarfile.SYMTYPE, None),
++                    ('hardlink-mode', 'out/source', tarfile.REGTYPE, 0o700)):
++                archive = work/(name+'.tar')
++                with tarfile.open(archive, 'w', format=tarfile.USTAR_FORMAT) as tar:
++                    if target_type is not None:
++                        entry = tarfile.TarInfo(target)
++                        entry.type, entry.mode = target_type, 0o600
++                        if target_type == tarfile.SYMTYPE:
++                            entry.linkname, entry.mode = '/out/source', 0o777
++                        tar.addfile(entry)
++                    entry = tarfile.TarInfo('out/bad-alias')
++                    entry.type, entry.linkname, entry.mode = tarfile.LNKTYPE, target, extra or 0o600
++                    tar.addfile(entry)
++                launch('restore', archive, failure=True)
+             link = work / 'snapshot-link.tar'
+             link.symlink_to(snapshot)
+             launch('restore', link, failure=True)
+             assert not (work / 'escaped').exists()
+-        print('test-launch-restore: PASS (' + ('ordinary roundtrip, data, modes, long paths, restart and parent ordering' if ordinary else 'roundtrip, startup isolation, parent ordering and malformed inputs') + ')')
++        print('test-launch-restore: PASS (' + ('ordinary roundtrip, links,5000 nonempty files and complete >2 GiB payload' if ordinary else 'roundtrip, startup isolation, parent ordering and malformed inputs') + ')')
+ 
+ 
+ if __name__ == '__main__':
+diff --git a/tests/fixtures/launch-storage-fixture.c b/tests/fixtures/launch-storage-fixture.c
+index 03fc4fa6..a9729287 100644
+--- a/tests/fixtures/launch-storage-fixture.c
++++ b/tests/fixtures/launch-storage-fixture.c
+@@ -172,10 +172,56 @@ static long restore_data(int large) {
+     }
+     CHECK(DO(1,1,"restored: PASS\n",15)==15,233); return 0;
+ }
++static long archive_links(int restore) {
++    char path[208]="/out/";
++    for(word i=5;i<125;++i) path[i]='a';
++    path[125]='/';
++    for(word i=126;i<206;++i) path[i]='b';
++    path[206]=0;
++    if(!restore) {
++        long status=export_data("export"); CHECK(status==0,status);
++        CHECK(DO(86,"/out/product","/out/product-alias",0)==0 && DO(86,path,"/out/long-alias",0)==0,234);
++        CHECK(DO(88,"product","/out/product-link",0)==0 && DO(88,path,"/out/long-link",0)==0,235);
++        CHECK(DO(2,"/out/temporary",0101,0600)==3 && DO(1,3,"orphan",6)==6 && DO(3,3,0,0)==0,236);
++        CHECK(DO(86,"/out/temporary","/out/surviving",0)==0 && DO(87,"/out/temporary",0,0)==0,237);
++    } else {
++        long status=restore_data(0); CHECK(status==0,status);
++        CHECK(DO(4,"/out/product",meta,0)==0 && *(word *)(meta+16)==2,238);
++        word inode=*(word *)(meta+8);
++        CHECK(DO(4,"/out/product-alias",meta,0)==0 && *(word *)(meta+8)==inode && *(word *)(meta+16)==2,239);
++        CHECK(DO(2,"/out/product-alias",0,0)==3 && DO(0,3,output,7)==7 && output[0]=='c' && DO(3,3,0,0)==0,240);
++        CHECK(DO(2,"/out/product-link",0,0)==3 && DO(0,3,output,7)==7 && output[0]=='c' && DO(3,3,0,0)==0,241);
++        CHECK(DO(2,"/out/long-alias",0,0)==3 && DO(0,3,output,4)==4 && output[0]=='l' && DO(3,3,0,0)==0,242);
++        CHECK(DO(2,"/out/long-link",0,0)==3 && DO(0,3,output,4)==4 && output[0]=='l' && DO(3,3,0,0)==0,243);
++        CHECK(DO(2,"/out/surviving",0,0)==3 && DO(0,3,output,6)==6 && output[0]=='o' && DO(3,3,0,0)==0,244);
++    }
++    return 0;
++}
++static long restore_namespace(void) {
++    char path[]="/out/file-0000";
++    for(word n=0;n<4999;++n) {
++        numbered(path,n); long fd=DO(2,path,0,0); CHECK(fd==3,245);
++        CHECK(DO(0,fd,output,4)==4,246);
++        for(word i=0;i<4;++i) CHECK(output[i]==path[10+i],247);
++        CHECK(DO(3,fd,0,0)==0,248);
++    }
++    CHECK(DO(2,"/out/replacement",0,0)==3 && DO(0,3,output,3)==3 && output[0]=='n' && DO(3,3,0,0)==0,249);
++    CHECK(DO(1,1,"restored: PASS\n",15)==15,250); return 0;
++}
++static long restore_big(void) {
++    long fd=DO(2,"/out/big",0,0); CHECK(fd==3 && DO(5,fd,meta,0)==0 && *(word *)(meta+48)==2147483649UL,251);
++    CHECK(DO(0,fd,output,1)==1 && output[0]==0,252);
++    CHECK(DO(8,fd,2147483647UL,0)==2147483647UL && DO(0,fd,output,2)==2 && output[0]==0 && output[1]=='Z',253);
++    CHECK(DO(3,fd,0,0)==0 && DO(1,1,"restored: PASS\n",15)==15,254); return 0;
++}
+ long storage_main(word *stack)
+ {
+     word argc = *stack;
+     char **argv = (char **)(stack + 1);
++    if(argc>1 && equal(argv[1],"archive-create")) return archive_links(0);
++    if(argc>1 && equal(argv[1],"restore-links")) return archive_links(1);
++    if(argc>1 && equal(argv[1],"restore-namespace")) return restore_namespace();
++    if(argc>1 && equal(argv[1],"restore-big")) return restore_big();
+     if(argc>1 && equal(argv[1],"namespace")) return namespace_scale();
+     if(argc>1 && equal(argv[1],"restore")) return restore_data(0);
+     if(argc>1 && equal(argv[1],"restore-large")) return restore_data(1);

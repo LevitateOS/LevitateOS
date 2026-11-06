@@ -430,3 +430,26 @@ malformed/traversal/duplicate/authority fixtures remain unrun. Independently
 validate archive and assignment bounds, hostile input/replacement, resource and
 close/read failures and shared-mutation behavior. No cloud dispatch or security
 acceptance; [review/evidence](g21-review.md).
+
+## G22 — bounded archives with link identity (in progress)
+
+Porting e3374593 on a disposable G13/G15/G18/G17b/G21 composition, preserving
+G19 atomic final publication and G21 startup cleanup without G20 or held threads.
+Ordinary local verification will use legitimate linked files/symlinks, long
+names/targets, an unlinked original with a surviving alias, 5000 nonempty files
+and a complete valid2 GiB+1 payload within an explicit4 GiB memory budget.
+These positive archive/consumer checks do not validate hostile input handling.
+DaybreakBlue must validate unsafe paths and assignment authority, forward or
+conflicting aliases, nonregular parents/targets, duplicate/conflicting metadata,
+malformed/oversized headers and payloads, hostile source changes, arithmetic
+bounds, FD/read/write/close failure injection and concurrent mutation. Full
+negative defaults are retained but not executed here. No cloud dispatch occurs.
+
+G22 exact retained revision: 7b2adc4f75acca26f2b356fbf9a47a9644c39bc8 on composition 9caccb3dd0b9d9866726c186cde04c4962152f4c.
+100 routine units and selected ordinary link/alias/long-target,5000-file and
+complete2 GiB+1 restore/export with full streaming digest pass in source/clean.
+Unsupported symlink modes now reject rather than silently becoming0777, based on
+source review; that adversarial rejection remains unrun. Validate archive/alias/
+assignment authority, malformed and oversized input, conflicting metadata,
+hostile source changes, failure injection and races independently. No security
+acceptance or cloud dispatch; [review/evidence](g22-review.md).

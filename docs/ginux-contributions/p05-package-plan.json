@@ -1042,6 +1042,7 @@
         "G13",
         "G15",
         "G18",
+        "G17b",
         "G21"
       ],
       "source_commits": [
@@ -1049,8 +1050,51 @@
       ],
       "acceptance": "Export/restore preserves aliases and symbolic links; >2 GiB payload and 5,000 nonempty files; reject unsafe paths, conflicting entries, invalid forward aliases and inconsistent link metadata.",
       "planned_delivery": "one coherent change plus its generic docs and focused regression fixtures; split coupled responsibilities only as recorded by P04",
-      "status": "pending extraction and R01-R04 review",
-      "artifact_directory": ".artifacts/ginux-contribution-preparation/G22"
+      "status": "source separately self-reviewed; selected ordinary source/clean checks pass; security/full CI/upstream independence pending",
+      "artifact_directory": ".artifacts/ginux-contribution-preparation/G22",
+      "base": "9caccb3dd0b9d9866726c186cde04c4962152f4c",
+      "head": "7b2adc4f75acca26f2b356fbf9a47a9644c39bc8",
+      "tree": "6326910808a3f9c64b9cbbf158e22220705c4d5a",
+      "changed_files": [
+        "README.md",
+        "crates/ginux-init/src/fs_hooks.rs",
+        "crates/ginux-init/src/storage_export.rs",
+        "crates/ginux-init/src/storage_restore.rs",
+        "crates/ginux-vfs/src/lib.rs",
+        "scripts/test-launch-restore.py",
+        "tests/fixtures/launch-storage-fixture.c"
+      ],
+      "standalone": false,
+      "patch_sha256": "5021a1ea039ce8cf031dae90d22b4b3060ba8f517dab36b2d9eaabb80d9fe86f",
+      "deferred_joins": [
+        "G07 shared-argument security",
+        "G20 control composition at F02",
+        "G14/G16 remaining filesystem interactions"
+      ],
+      "unit_tests": 100,
+      "vfs_tests": 41,
+      "clean_matched_paths": 181,
+      "review": "separate self-review; no independent reviewer or security acceptance",
+      "remote_ci": "not run",
+      "security_handoff": "daybreakblue-handoff.md",
+      "held_dependencies": [
+        "inherited G07 shared-argument security; no thread code imported"
+      ],
+      "source_binary_sha256": "5d0132cce0c5b42476ed8d89bc2e8d34c5c35a183e5c8dc8053caee2a2e012f5",
+      "clean_binary_sha256": "5d0132cce0c5b42476ed8d89bc2e8d34c5c35a183e5c8dc8053caee2a2e012f5",
+      "fixture_sha256": {
+        "launch-storage-fixture": "8a0ea5382a5f9d48258c922a6b83096748eefbd06f1cca9f39b3323e911c631f",
+        "launch-directory-fixture": "d6f6fd948a7d72b8822ebc1b165a132a5f1912cc88e48eca6b0e738d7e74ef7f",
+        "launch-script-fixture": "b644cedb25fdadad8fee88ce1c60756dac8810b0e09c4e1941e2245769962c27",
+        "launch-owned-exec-fixture": "566f74cdadd00eac9266de8307c882e5ac6f8912e53dc46fc560058914478b88",
+        "launch-fd-fixture": "06b5384b5b483fd2b018be133b85819e0b31657550e72296d119f725311b8d03"
+      },
+      "prerequisite_patch_sha256": "136d374b4634233476da999bdb4ba964f7c55bd9789a77ee96f87cc53a999a34",
+      "large_payload_bytes": 2147483649,
+      "large_payload_integrity": "complete restored/re-exported payload compared with expected streaming SHA256 in source/clean",
+      "nonempty_namespace_files": 5000,
+      "evidence": "g22-review.md",
+      "source_patch": "patches/G22.patch"
     },
     {
       "packet": "G23",
