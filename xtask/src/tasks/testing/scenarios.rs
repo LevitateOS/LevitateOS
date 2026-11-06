@@ -5,7 +5,7 @@ use install_tests::scenarios::{
 };
 use std::fs::OpenOptions;
 use std::fs::{self, File};
-use std::io::{Read, Write};
+use std::io::Write;
 use std::net::{IpAddr, Ipv4Addr, TcpListener, UdpSocket};
 use std::os::fd::AsRawFd;
 use std::path::{Path, PathBuf};
@@ -600,61 +600,10 @@ fn emit_new_log_lines(log_path: &Path, line_cursor: &mut usize) -> Result<()> {
         let _ = line;
     }
     for line in lines {
-        println!("{}", strip_ansi_escapes(&line));
+        println!("{}", recqemu::serial::strip_ansi_codes(&line));
     }
     *line_cursor = total_lines;
     Ok(())
-}
-
-fn strip_ansi_escapes(raw: &str) -> String {
-    let bytes = raw.as_bytes();
-    let mut out = String::with_capacity(raw.len());
-    let mut i = 0usize;
-
-    while i < bytes.len() {
-        if bytes[i] != b'\x1b' {
-            out.push(bytes[i] as char);
-            i += 1;
-            continue;
-        }
-
-        if i + 1 >= bytes.len() {
-            break;
-        }
-
-        match bytes[i + 1] {
-            b'[' => {
-                i += 2;
-                while i < bytes.len() {
-                    let b = bytes[i];
-                    if (0x40..=0x7e).contains(&b) {
-                        i += 1;
-                        break;
-                    }
-                    i += 1;
-                }
-            }
-            b']' => {
-                i += 2;
-                while i < bytes.len() {
-                    if bytes[i] == 0x07 {
-                        i += 1;
-                        break;
-                    }
-                    if bytes[i] == b'\x1b' && i + 1 < bytes.len() && bytes[i + 1] == b'\\' {
-                        i += 2;
-                        break;
-                    }
-                    i += 1;
-                }
-            }
-            _ => {
-                i += 2;
-            }
-        }
-    }
-
-    out
 }
 
 fn run_interactive_ssh(
@@ -751,35 +700,16 @@ fn boot_installed_disk(
     let runtime = resolve_latest_install_runtime(cfg.distro_id)?;
     let disk = runtime.disk_path;
     let vars = runtime.ovmf_vars_path;
-    let disk_format = detect_disk_image_format(&disk)?;
+    let disk_format = recqemu::disk_image_format(&disk);
     let ovmf = crate::util::repo::ovmf_path(root)?;
 
-    let mut cmd = qemu_command_for_window(window)?;
-    cmd.args([
-        "-enable-kvm",
-        "-cpu",
-        "host",
-        "-smp",
-        "4",
-        "-m",
-        "4G",
-        "-drive",
-        &format!(
-            "file={},format={},if=virtio",
-            disk.display(),
-            disk_format.as_str()
-        ),
-        "-drive",
-        &format!("if=pflash,format=raw,readonly=on,file={}", ovmf.display()),
-        "-drive",
-        &format!("if=pflash,format=raw,file={}", vars.display()),
-        "-boot",
-        "c",
-        "-netdev",
-        "user,id=net0",
-        "-device",
-        "virtio-net-pci,netdev=net0",
-    ]);
+    let mut cmd = qemu_builder_for_window(window)?
+        .disk(&disk)
+        .uefi(ovmf)
+        .uefi_vars(&vars)
+        .boot_order("c")
+        .user_network()
+        .build();
     if window.is_some() {
         eprintln!(
             "Booting installed {} from install scenario run {} in window mode... (Ctrl-C to stop)",
@@ -794,44 +724,12 @@ fn boot_installed_disk(
     eprintln!("  disk: {}", disk.display());
     eprintln!("  disk format: {}", disk_format);
     eprintln!("  ovmf vars: {}", vars.display());
-    if disk_format != "qcow2" {
-        eprintln!(
-            "  warning: install scenario produced non-qcow2 disk format '{}'; investigate qemu-img availability for strict qcow2 parity.",
-            disk_format
-        );
-    }
-    apply_qemu_console_mode(&mut cmd, window);
-    cmd.arg("-no-reboot");
 
     apply_qemu_runtime_env(&mut cmd, root, window)?;
     if let Some(window_cfg) = window {
         run_window_mode_foreground(&mut cmd, window_cfg)
     } else {
         run_checked(&mut cmd)
-    }
-}
-
-fn detect_disk_image_format(path: &Path) -> Result<String> {
-    // qcow2 images begin with ASCII 'QFI' + 0xfb.
-    const QCOW2_MAGIC: [u8; 4] = [0x51, 0x46, 0x49, 0xFB];
-
-    let mut file = File::open(path).with_context(|| {
-        format!(
-            "opening disk image for format detection '{}'",
-            path.display()
-        )
-    })?;
-    let mut header = [0u8; 4];
-    file.read_exact(&mut header).with_context(|| {
-        format!(
-            "reading disk image header for format detection '{}'",
-            path.display()
-        )
-    })?;
-    if header == QCOW2_MAGIC {
-        Ok("qcow2".to_string())
-    } else {
-        Ok("raw".to_string())
     }
 }
 
@@ -886,93 +784,60 @@ fn qemu_base_command(
     ssh_port: Option<u16>,
     window: Option<&WindowConfig>,
 ) -> Result<Command> {
-    let ovmf = crate::util::repo::ovmf_path(root)?;
-    let mut cmd = qemu_command_for_window(window)?;
-    cmd.args([
-        "-enable-kvm",
-        "-cpu",
-        "host",
-        "-smp",
-        "4",
-        "-m",
-        "4G",
-        "-device",
-        "virtio-scsi-pci,id=scsi0",
-        "-device",
-        "scsi-cd,drive=cdrom0,bus=scsi0.0",
-        "-drive",
-        &format!(
-            "id=cdrom0,if=none,format=raw,readonly=on,file={}",
-            iso_path.display()
-        ),
-        "-drive",
-        &format!("if=pflash,format=raw,readonly=on,file={}", ovmf.display()),
-    ]);
-    apply_qemu_console_mode(&mut cmd, window);
-    cmd.arg("-no-reboot");
+    let mut builder = qemu_builder_for_window(window)?
+        .cdrom(iso_path)
+        .cdrom_as_disk()
+        .uefi(crate::util::repo::ovmf_path(root)?);
     if let Some(injection) = injection {
-        let fw_cfg = format!(
-            "name={},file={}",
+        builder = builder.fw_cfg_file(
             distro_spec::shared::live_boot::BOOT_INJECTION_FW_CFG,
-            injection.path.display()
+            &injection.path,
         );
-        cmd.args(["-fw_cfg", &fw_cfg]);
         if let Some(media_iso) = &injection.media_iso {
-            cmd.args([
-                "-device",
-                "virtio-scsi-pci,id=scsi2",
-                "-device",
-                "scsi-cd,drive=inject0,bus=scsi2.0",
-                "-drive",
-                &format!(
-                    "id=inject0,if=none,format=raw,readonly=on,file={}",
-                    media_iso.display()
-                ),
-            ]);
+            builder = builder.extra_cdrom(media_iso);
         }
     }
-    if let Some(ssh_port) = ssh_port {
-        cmd.args([
-            "-netdev",
-            &format!("user,id=net0,hostfwd=tcp:127.0.0.1:{ssh_port}-:22"),
-            "-device",
-            "virtio-net-pci,netdev=net0",
-        ]);
-    } else {
-        cmd.args(["-netdev", "user,id=net0"]);
-        cmd.args(["-device", "virtio-net-pci,netdev=net0"]);
-    }
-
+    builder = match ssh_port {
+        Some(port) => builder.user_network_with_hostfwd(port, 22),
+        None => builder.user_network(),
+    };
+    let mut cmd = builder.build();
     apply_qemu_runtime_env(&mut cmd, root, window)?;
     Ok(cmd)
 }
 
-fn apply_qemu_console_mode(cmd: &mut Command, window: Option<&WindowConfig>) {
-    if let Some(window_cfg) = window {
-        match window_cfg.mode {
-            WindowMode::RemoteVnc => {
-                let display_arg = window_cfg
-                    .qemu_display_arg()
-                    .expect("internal error: remote window mode missing VNC display configuration");
-                cmd.args(["-vga", "none", "-device", "secondary-vga"]);
-                cmd.arg("-display").arg(display_arg);
-                cmd.arg("-serial")
-                    .arg(format!("file:{}", window_cfg.serial_log.display()));
-                cmd.args(["-monitor", "none"]);
-            }
-            WindowMode::LocalGui => {
-                let display_backend = window_cfg
-                    .local_display_backend
-                    .expect("internal error: local window mode missing local display backend");
-                cmd.args(["-display", display_backend.qemu_arg(), "-vga", "virtio"]);
-                cmd.arg("-serial")
-                    .arg(format!("file:{}", window_cfg.serial_log.display()));
-                cmd.args(["-monitor", "none"]);
-            }
+/// The QEMU console for a boot: serial on stdio, or a window (VNC or local
+/// GUI) with serial logged to a file.
+fn qemu_builder_for_window(window: Option<&WindowConfig>) -> Result<recqemu::QemuBuilder> {
+    let builder = recqemu::QemuBuilder::new().no_reboot();
+    let Some(window_cfg) = window else {
+        return Ok(builder.nographic().serial_stdio());
+    };
+    let builder = builder.serial_file(&window_cfg.serial_log).no_monitor();
+    Ok(match window_cfg.mode {
+        WindowMode::RemoteVnc => {
+            let display_arg = window_cfg
+                .qemu_display_arg()
+                .context("remote window mode has no VNC display configuration")?;
+            builder
+                .vga("none")
+                .device("secondary-vga")
+                .display(&display_arg)
         }
-    } else {
-        cmd.args(["-vga", "none", "-nographic", "-serial", "mon:stdio"]);
-    }
+        WindowMode::LocalGui => {
+            let display_backend = window_cfg
+                .local_display_backend
+                .context("local window mode has no local display backend")?;
+            let qemu_bin = window_cfg
+                .local_qemu_bin
+                .as_ref()
+                .context("local window mode has no detected qemu binary")?;
+            builder
+                .program(qemu_bin)
+                .display(display_backend.qemu_arg())
+                .vga("virtio")
+        }
+    })
 }
 
 fn run_window_mode_foreground(cmd: &mut Command, window_cfg: &WindowConfig) -> Result<()> {
@@ -1046,18 +911,6 @@ fn detect_window_mode() -> Result<WindowMode> {
             other
         ),
     }
-}
-
-fn qemu_command_for_window(window: Option<&WindowConfig>) -> Result<Command> {
-    if let Some(window_cfg) = window {
-        if window_cfg.mode == WindowMode::LocalGui {
-            let qemu_bin = window_cfg.local_qemu_bin.as_ref().ok_or_else(|| {
-                anyhow::anyhow!("local window mode missing detected qemu binary path")
-            })?;
-            return Ok(Command::new(qemu_bin));
-        }
-    }
-    Ok(Command::new("qemu-system-x86_64"))
 }
 
 fn apply_qemu_runtime_env(
