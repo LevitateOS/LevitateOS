@@ -130,6 +130,9 @@ pub enum Cmd {
         /// Don't open the page in a browser.
         #[arg(long)]
         no_open: bool,
+        /// Record every story and write one self-contained HTML file instead of serving.
+        #[arg(long, value_name = "FILE")]
+        export: Option<PathBuf>,
     },
 }
 

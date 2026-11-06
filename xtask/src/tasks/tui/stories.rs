@@ -34,6 +34,8 @@ const KEY_SETTLE: Duration = Duration::from_millis(300);
 pub struct Options {
     pub port: u16,
     pub open: bool,
+    /// Instead of serving, record every story and write one self-contained page here.
+    pub export: Option<PathBuf>,
 }
 
 /// One entry in the catalog: a program to start in a PTY and the keys that reach the story.
@@ -52,6 +54,9 @@ pub fn run(options: Options) -> Result<()> {
     let xterm = root.join("node_modules/@xterm/xterm");
     if !xterm.join("lib/xterm.js").is_file() {
         bail!("xterm.js is missing from node_modules (bun install at the repo root)");
+    }
+    if let Some(path) = &options.export {
+        return export(&catalog, &xterm, path);
     }
     // Any machine on the network can reach the port, and a tile can run a shell, so
     // every request must carry this token; the printed URL has it.
@@ -95,6 +100,106 @@ pub fn run(options: Options) -> Result<()> {
         });
     }
     Ok(())
+}
+
+/// The size a story opens at: the install screen on a serial console, the rest roomy.
+fn default_size(story: &Story) -> (u16, u16) {
+    if story.group == "install screen" {
+        (80, 24)
+    } else {
+        let size = super::inspect::DEFAULT_SIZE;
+        (size.columns, size.rows)
+    }
+}
+
+/// Records every story (the real app in a PTY, its keys typed as the screen settles) and
+/// writes one page that replays the recordings in xterm.js, with nothing to serve.
+fn export(catalog: &[Story], xterm: &Path, path: &Path) -> Result<()> {
+    let wait = super::inspect::DEFAULT_WAIT;
+    let mut recorded = Vec::new();
+    for (index, story) in catalog.iter().enumerate() {
+        eprintln!(
+            "[stories] {}/{} {} / {}",
+            index + 1,
+            catalog.len(),
+            story.group,
+            story.name
+        );
+        let (cols, rows) = default_size(story);
+        let mut session = crate::util::pty_capture::PtySession::spawn(
+            &format!("story {}", story.name),
+            &story.cwd,
+            &story.argv,
+            &story.env,
+            cols,
+            rows,
+        )?;
+        let mut note = None;
+        for step in 0..=story.keys.len() {
+            match session.settle(wait.settle, wait.timeout, step == 0) {
+                Ok(crate::util::pty_capture::Settled::Quiet) => {}
+                Ok(crate::util::pty_capture::Settled::Exited(status)) => {
+                    note = Some(format!("the program exited ({status:?})"));
+                    break;
+                }
+                Err(error) => {
+                    note = Some(format!("{error:#}"));
+                    break;
+                }
+            }
+            if let Some(key) = story.keys.get(step) {
+                session.send_key(key)?;
+            }
+        }
+        recorded.push(serde_json::json!({
+            "id": index,
+            "group": story.group,
+            "name": story.name,
+            "cols": cols,
+            "rows": rows,
+            "data": base64(session.transcript()),
+            "note": note,
+        }));
+        session.finish()?;
+    }
+    let js = std::fs::read_to_string(xterm.join("lib/xterm.js"))?.replace("</script", "<\\/script");
+    let css = std::fs::read_to_string(xterm.join("css/xterm.css"))?;
+    let data = serde_json::to_string(&recorded)?.replace("</", "<\\/");
+    let page = PAGE
+        .replace(
+            r#"<link rel="stylesheet" href="/xterm.css">"#,
+            &format!("<style>{css}</style>"),
+        )
+        .replace(
+            r#"<script src="/xterm.js"></script>"#,
+            &format!("<script>{js}</script>\n<script>window.RECORDED = {data};</script>"),
+        );
+    std::fs::write(path, page).with_context(|| format!("writing '{}'", path.display()))?;
+    println!(
+        "stories: recorded {} stories into {}",
+        recorded.len(),
+        path.display()
+    );
+    Ok(())
+}
+
+fn base64(bytes: &[u8]) -> String {
+    const ALPHABET: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let mut out = String::with_capacity(bytes.len().div_ceil(3) * 4);
+    for chunk in bytes.chunks(3) {
+        let n = chunk
+            .iter()
+            .enumerate()
+            .fold(0u32, |n, (i, b)| n | (u32::from(*b) << (16 - 8 * i)));
+        for i in 0..4 {
+            if i <= chunk.len() {
+                out.push(ALPHABET[(n >> (18 - 6 * i) & 63) as usize] as char);
+            } else {
+                out.push('=');
+            }
+        }
+    }
+    out
 }
 
 fn catalog(root: &Path) -> Result<Vec<Story>> {

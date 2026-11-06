@@ -36,13 +36,16 @@
 <body>
 <nav>
   <h1>TUI stories</h1>
-  <p class="hint">Each tile runs the real app in a real terminal. Click a tile to type into it.</p>
+  <p class="hint" id="hint">Each tile runs the real app in a real terminal. Click a tile to type into it.</p>
   <div id="list"></div>
 </nav>
 <main id="tiles"></main>
 <script src="/xterm.js"></script>
 <script>
 const TOKEN = new URLSearchParams(location.search).get("token") ?? "";
+// Set when the page was exported with recordings (cargo xtask stories --export): tiles replay
+// what the real app drew instead of connecting to a live terminal.
+const RECORDED = window.RECORDED;
 const SIZES = [
   ["120x36", "120×36 dev terminal"],
   ["80x24", "80×24 serial console"],
@@ -73,7 +76,16 @@ function openTile(story) {
   sizeSelect.value = defaultSize(story);
   let term, socket;
 
+  function replay() {
+    if (term) term.dispose();
+    term = new Terminal({ cols: story.cols, rows: story.rows, fontSize: 13, fontFamily: "ui-monospace, Menlo, Consolas, monospace", disableStdin: true });
+    term.open(tile.querySelector(".term"));
+    term.write(Uint8Array.from(atob(story.data), (c) => c.charCodeAt(0)));
+    if (story.note) term.write(`\r\n\x1b[2m[${story.note}]\x1b[0m`);
+  }
+
   function start() {
+    if (RECORDED) return replay();
     if (socket) socket.close();
     if (term) term.dispose();
     const [cols, rows] = sizeSelect.value.split("x").map(Number);
@@ -90,6 +102,11 @@ function openTile(story) {
     term.textarea.addEventListener("blur", () => tile.classList.remove("focus"));
   }
 
+  if (RECORDED) {
+    sizeSelect.replaceWith(Object.assign(document.createElement("span"), { textContent: `${story.cols}×${story.rows} recording` }));
+    tile.querySelector(".nocolor").parentElement.remove();
+    tile.querySelector(".restart").textContent = "Replay";
+  }
   sizeSelect.onchange = start;
   tile.querySelector(".nocolor").onchange = start;
   tile.querySelector(".restart").onclick = start;
@@ -97,7 +114,8 @@ function openTile(story) {
   start();
 }
 
-fetch(`/catalog.json?token=${TOKEN}`).then((r) => r.json()).then((stories) => {
+if (RECORDED) document.getElementById("hint").textContent = "Recorded from the real apps in a real terminal (cargo xtask stories --export).";
+(RECORDED ? Promise.resolve(RECORDED) : fetch(`/catalog.json?token=${TOKEN}`).then((r) => r.json())).then((stories) => {
   const list = document.getElementById("list");
   const groups = new Map();
   for (const story of stories) {

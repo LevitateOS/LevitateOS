@@ -20,9 +20,12 @@ pub fn run(cli: crate::cli::Cli) -> Result<()> {
         } => crate::tasks::tui::check::run(bless),
         Cmd::Tui { app, args } => crate::tasks::tui::run(app, args),
         Cmd::Inspect(args) => crate::tasks::tui::inspect::run(args),
-        Cmd::Stories { port, no_open } => crate::tasks::tui::stories::run(crate::tasks::tui::stories::Options {
-            port,
-            open: !no_open,
-        }),
+        Cmd::Stories { port, no_open, export } => {
+            crate::tasks::tui::stories::run(crate::tasks::tui::stories::Options {
+                port,
+                open: !no_open,
+                export,
+            })
+        }
     }
 }
