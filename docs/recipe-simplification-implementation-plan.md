@@ -83,8 +83,8 @@ rootfs and VM validation share one operator to avoid host resource contention.
 
 ## Remaining tasks in dependency order
 
-Completed focused tasks: **T01, T02, T03, T05, T06, T07, T08, T09, T10, T11, T12, T13, T16, T17, T18, T20, T21**.
-Active or partial: **T04, T14, T15, T19, T22, T23, T24, T25, T26**.
+Completed focused tasks: **T01, T02, T03, T04, T05, T06, T07, T08, T09, T10, T11, T12, T13, T15, T16, T17, T18, T20, T21**.
+Active or partial: **T14, T19, T22, T23, T24, T25, T26**.
 Other tasks remain todo; partial source preparation is not runtime acceptance. Dependencies refer to completed implementation and
 the stated evidence, not merely a draft or a compiling helper. The list is a
 valid topological order; lane availability also constrains execution. Source
@@ -189,115 +189,104 @@ pending PRs. Publishing requires a later explicit user instruction.
 ## Current checkpoint
 
 Goal active: complete T01–T27 with four rolling lanes. Root implements C;
-`lane_a_runtime`, `lane_b_acquisition`, `lane_d_consumers` own A/B/D. No new
-branch, Ginux publication or maintainer message is authorized.
+`lane_a_runtime`, `lane_b_acquisition`, `lane_d_consumers` own A/B/D. The user
+approved direct execution; no new branches, Ginux publication or maintainer
+messages are authorized. The current [interface record](ginux-recipe-interfaces.md)
+describes the implemented contract. Existing compatibility prose is historical.
 
-- T02 reconciled upstream `2a82f61e` in local `8b5cf5dd`, preserving unit tests;
-  configured launch/storage/exec/checkpoint checks and static/unit suites pass.
-- T05 `6a45d8f8`, T06 `9e2a39e8`, T10 `38fa14fd`: owned cwd, shared hardlink
-  backing and scalable bounded storage pass their focused real-program cases.
-  Storage defaults to 16,384 objects with configurable data/metadata budgets;
-  an 8,192-object exhaustion fixture proves this replaces the 4,096-slot limit.
-- T03/T08: numeric TCP grants, immutable hostname mapping, connection/byte
-  budgets, no proxies/UDP/listening; backend commits `8ff83d64`–`9a70427b`.
-  T13 central Ginux dispatch `66de2880` passes supervised socket/readiness,
-  denial/quota/timeout/fork/revocation cases; real HTTP then exposed missing
-  owned-file fsync, fixed in `53dec6b3`. Recipe HTTP/TLS acceptance is running.
-  Endpoint grants do not isolate virtual hosts sharing a granted IP/port.
-- Recipe `fb3b38e`: sole API2 engine, protocol6, explicit invocation environment,
-  no backend/persistence aliases, canonical verified acquisition helpers and
-  loader-owned non-evaluating metadata. T20 actual CLI scenarios: 3 pass.
-  T01 managed input batch: 33/34 pass; the remaining fixture lacked the strict
-  API marker and was corrected to reach its intended filesystem boundary.
-  Retained-state batch: 12/12 pass, including changed input identity, separate
-  state/files recovery and simultaneous destination users.
-- T09 fresh selected-target seeding and T11 Recipe archive joins are in progress.
-  Initial target fixture found GNU-header/USTAR mismatch, corrected at the
-  writer; a selected-file trailing-slash publication bug is also corrected.
-  Ginux T11 archive half `e3374593` preserves aliases across export/restart and
-  rejects invalid link targets; it validates an above-2GiB header under explicit
-  4GiB capacity, but no actual above-2GiB payload has been demonstrated yet.
-- D prepared canonical offline/source-rootfs, kernel and preseed sources/callers
-  in distro-builder `3cb94ef`–`45d7f5e`, distro-contract `ceecd63`, AcornOS
-  `40dc9a0`/`3e0db2b`, and leviso `b423f9b`–`6d15e89`. Affected Rust callers and
-  all retained Rhai sources compile. Current inventory: original35 +2canonical
-  tools -4unused entries =33 paths; 11 legacy executable facades still require
-  actual caller cutover/removal through T14/T23. Kernel/rootfs/acquisition
-  acceptance stays partial. Acorn live-tools still requires explicit musl
-  compiler-image support; GNU output is not an acceptable silent substitution.
-- T18 network-independent argument acceptance passes five actual domain cases.
-  Real Git2.52 image is prepared from a pinned git-core RPM, without changing
-  the original compiler image. Exact image SHA256:
-  `8bd5ad2e715c163ea201cc629856fb7ee970104f31e7d899913e185e56d3117b`.
-  Fixture-only CA image SHA256:
-  `fcc70d8c3052ff988a2223839a1050e5305c19ad6344f80cb3bd369c8b3132b8`.
-  TLS/Git startup and full positive transfer scenarios are not yet accepted.
+Implementation and focused evidence:
 
-Later verified progress superseding the pending items above:
+- Recipe `fb3b38e` establishes sole API2, protocol6, mandatory Ginux, explicit
+  invocation environment/options and canonical verified acquisition. `bc4f51a`
+  adds selected target seeding, network policy, files/links, durable logs and
+  cancellation; `4a2a12e` bounds retention; `5b3bd6e` adds explicit coordinator
+  repair/retry. `921bb66` demonstrates actual large publication.
+- Recipe `dbce038` completes current CLI/fixture/helper cutover, carries machine
+  events into the worker, resolves recipe names despite same-name directories,
+  validates host-path values structurally and checkpoints successful failure
+  cleanup without hiding the original error. Corrected actual seven-case batch:
+  `/tmp/recipe-recovery-managed.log`, all7pass. `2459171` preserves mtime across
+  named publication, with actual hardlink/mode/symlink/restart1pass at
+  `/tmp/recipe-time-managed.log`. Kernel consumer fixtures `067d420` are current.
+- T01 actual input33/34 plus corrected strict-marker case1pass; retained-state
+ 12/12. T09 target4pass. T11 **actual2GiB+4096-byte payload**, **5000 nonempty
+  files** and source/link/restart3pass (`/tmp/recipe-t11-large-managed-v2.log`).
+  T16 silent/deadline/interruption3 and partial-frame1pass. T17 retention1pass
+  across five identities. T21 controlled repair/protected-edit/ordinary-run3pass.
+  Log paths: `/tmp/recipe-t{09-publication,16-managed,17-managed,21-managed-current}.log`.
+- Local Ginux reconciles upstream `2a82f61e` in `8b5cf5dd`, preserving upstream
+  tests. Owned cwd `6a45d8f8`, hardlinks `9e2a39e8`, scalable storage `38fa14fd`,
+  archive `e3374593`, resolver `1da0ce13`, duplicate task death `07c949db`, private
+  FDs/pwrite `53a2c9cc`, locking `26784843`, timestamps `d21d26c8`, descriptor
+  budgets `d5357101`, vector IO `88fa4749`, resources `0c571cbb`, virtual uname
+  `9cf265ba` and chunked regular writes `7d556b4e` resolve actual consumer gaps.
+  CPU affinity and inherited **per-process virtual AS** are enforced; this is
+  not aggregate domain RSS/cumulative CPU time. Storage accounting is separate.
+- Ginux `93a1a56d` corrects hidden-device absence through the shared resolver;
+  existing device expectations are preserved. All15 configured/native suites,
+  upstream repeated process cases, teardown, full `make check` and `test-unit`
+  pass: `/tmp/ginux-t24-final-{a,b,check}.log`,
+  `/tmp/ginux-t24-process-native.log`, `/tmp/ginux-t24-gate1.log`.
+  Actual8192-object/nonempty, task/FD/AS/CPU/TCP exhaustion and concurrent Cargo
+  cache then compile/run are covered. T24's final delta is the live cpio owner
+  preservation gap, now assigned A; do not mistake old green checks for that fix.
+- T04/T23 inventory is now19 retained Rhai paths:14 API2 producers,3 facts modules,
+  2 kernel declarations. Obsolete facades/callers are deleted, not aliased.
+  Distro-builder `141d1c7` prepares four offline production source closures;
+  actual native and musl recfstab, recstrap and recchroot compile/use/publish.
+  The remaining split-pane build is being repeated with the current supervisor;
+  an old-v5 rustc failure is preserved, not accepted as a current result.
+- T14 actual custom-rootfs lifecycle and recfstab lifecycle pass (install, custom
+  check, remove, reinstall, cleanup, changed inputs, immutable earlier products).
+  `/tmp/recipe-t14-custom-rootfs.log`, `/tmp/recipe-t14-recfstab-{native,musl}.log`.
+  T15 both-variant prepared kernel readiness/removal/cleanup3pass and offline
+  acquisition1pass (`/tmp/recipe-t15-kernel-{readiness-2,acquisition-v5}.log`).
+  No kernel compilation. T19 final prepared preseed integrity cases are running.
+- T13/T18/T22 real managed hash/publication4, resume/range9, interrupted/cache4,
+  TLS trust/hostname3, pinned local Git and actual HTTPS Git pass. New grant-aware
+  redirect/budget and concurrent single-fetch/offline reuse cases pass in
+  Recipe `708b3bd`. Actual authenticated Alpine apk-tools3.0.9-r0 HTTPS→extract→
+  install→execute→publish passes after vector IO, with exact real version output.
+  Production seven-RPM QEMU acquisition passes; rpm2cpio now succeeds after real
+  uname/write fixes. Actual cpio then exposed a missing image binary (explicitly
+  added from a pinned package), followed by the owned chown ABI gap. No host
+  extraction fallback, suppressed error or fabricated output is accepted.
+- Explicit source policy committed distro-contract `0d066d9`, distro-builder
+  `1cb8efd` and root `f663734`: Fedora8192MiB/Alpine4096MiB plus endpoint grants,
+  named product selection and current xtask/just callers. Four affected packages
+  and AcornOS/leviso all-target compilation passes. No full Fedora ISO/VM claim.
+- Current docs/README/manpages and examples use one interface; Rhai snippets and
+  rendered manpages pass. Root interface record committed `f5ea5ae`. Final T26
+  acceptance follows T25; T27 local provenance/pins/demonstration is still open.
 
-- Recipe `bc4f51a`: T09 target4, T11 links/modes/restart1, T16 interruption,
-  silent work and deadline3 plus partial-frame1 scenarios pass. Diagnostics and
-  machine outcomes are durable under state/logs rather than invocation scratch.
-- `4a2a12e`: T17 actual CLI retention passes across five input identities;
-  retain current/previous generations across four identities and 32 inactive
-  logs. OS-held diagnostic leases and unrecognized operator files survive pruning.
-- `5b3bd6e`: T21 actual failed-domain→controlled-provider→patch→retry passes;
-  the patch creates a fresh identity, protected readiness edits are rejected and
-  ordinary execution never invokes a provider. Provider IO/descendants are
-  bounded; profiles stay coordinator-owned. No external provider/credential run.
-- `921bb66`: T11 actual **2GiB+4096-byte payload** and **5,000 nonempty files**
-  are restored/exported/published successfully under explicit bounds, alongside
-  the hardlink/mode/restart case. Initial failures exposed positional-write and
-  host soft-FD limits, fixed in local Ginux `53a2c9cc`; no old cap was hidden.
-- Local Ginux `1da0ce13` completes T07 cross-image/owned traversal, including the
-  previously failing relative exec; `07c949db` fixes duplicate native task death
-  found by actual Git failure cleanup. `26784843` implements POSIX and flock
-  ownership: two actual simultaneous offline Cargo fetches plus default
-  incremental compilation/run have no SQLite cache warnings. `d21d26c8`
-  implements real timestamps; USTAR persists seconds and validates alias metadata.
-  Static/unit and relevant runtime suites pass at each recorded revision.
-- T13 actual HTTP/TLS clients pass; T18 canonical helper argument/path cases
-  pass. Actual transfer matrix: four hash/publication, nine resume/range, four
-  truncated-transfer/cache cases; three TLS trust/hostname cases; pinned local
-  Git checkout/preservation and real Git-over-HTTPS all pass. Missing-commit
-  cleanup passes after `07c949db`. T22 still includes extraction/use and final
-  combined coverage, not merely transfer.
-- D's actual T14 offline recfstab install/check/remove/reinstall/cleanup and
-  custom-rootfs lifecycle pass, preserving source and earlier publications.
-  T15 source/prebuilt readiness/removal/cleanup matrix passes for both variants
-  without compiling kernels. Source cutover removed all API1 production recipes;
-  current inventory22 Rhai paths. Distro-builder `141d1c7`, `f1b1e98`, `a868ef7`,
-  `492e745`; distro-contract `a8ea9c7`; AcornOS `58766dc`; leviso `7bfd4c5`.
-- Actual Alpine apk-tools3.0.9-r0 HTTPS acquisition verifies publisher-authenticated
-  SHA256 `ea77b2533566e70c9566c03748199b79348010c3199ba02d97e0634cf0fa9ef7`;
-  extraction now works with timestamps, executable output remains under diagnosis.
-  QEMU's seven pinned RPM downloads pass, but actual rpm2cpio exits139; A/B own
-  that live failure. No native-host extraction substitution or success claim.
-- A fresh Git+musl compiler image is built, SHA256
-  `9f220633d34efff68b1535375fbb4fa3c4c2c8843917859fd68d8f6edec27ff4`, using
-  publisher-verified Rust1.99 musl std. Actual musl linker/use acceptance is pending.
-  T24 is also auditing precisely which CPU/memory bounds the native backend
-  enforces; do not equate resource views or storage budgets with total tracee RAM.
+Final integration currently running: all132 real Recipe CLI/runtime scenarios,
+immutable `/tmp/recipe-t25-{bin,e2e}`, Ginux `/tmp/ginux-t24-hidden-devices`
+(`93a1a56d`, binary SHA256 `641db1d511ae0ba9ce538eb0bf764ab63cae20a5e015a8cb949c519009503df3`),
+Git+musl image SHA256 `9f220633d34efff68b1535375fbb4fa3c4c2c8843917859fd68d8f6edec27ff4`.
+Log `/tmp/recipe-t25-final-managed.log`. The earlier interrupted
+`/tmp/recipe-t25-managed.log` is not full-suite acceptance. Public-library and
+image-producer actual CLI checks are separately logged under `/tmp/recipe-t25-*`.
+Immutable artifacts prevent concurrent builds from changing a running workload.
 
-Exact next actions: A finishes descriptor-budget regression, real RPM/tool ABI
-and resource checks; B completes acquisition→extraction→use and musl-image
-acceptance; D finishes typed QEMU/tool selection, consumer cases and operator
-documentation. C completes the remaining current-interface fixtures, timestamp
-publication and combined validation, then records local delivery/provenance.
-No Ginux publication. Validation uses immutable copied CLI/worker/supervisor
-artifacts so concurrent builds cannot corrupt a run. Current C fixture batch:
-`/tmp/recipe-t23-managed.log` (26 scenarios, still running).
-Fresh evidence: `/tmp/recipe-t11-large-managed-v2.log` (3pass),
-`/tmp/recipe-t16-managed.log` (3+1pass), `/tmp/recipe-t17-managed.log` (1pass),
-`/tmp/recipe-t21-managed-current.log` (3pass),
-`/tmp/recipe-t14-custom-rootfs.log`, `/tmp/recipe-t15-kernel-readiness-2.log`,
-`/tmp/ginux-cargo-lock/concurrent-cache.log`, `/tmp/recipe-lane-b-network/`.
-Earlier failed logs remain failures; rerun paths above identify the corrected
-versions. Final combined acceptance has not run and T27 delivery remains open.
-Active existing planning skill: `hdae-development`; discovery path
+Fresh acquisition image adds pinned official cpio while preserving GNU/Git/musl:
+SHA256 `c089f95c462582cc0fcc2a8b2ba86c7d2d64c22c82efa499ce20e3704a7fe15e`.
+B records its manifest/provenance and is repeating real TLS/Git/APK/RPM pipelines
+with final binaries. Fixture CA image remains explicit and separate; host trust
+is unchanged. Images/cache are not committed.
+
+Exact next actions: A finishes virtual ownership preservation for actual cpio and
+its focused/full upstream checks; B finishes final acquisition pipeline/durable
+bootstrap inputs; D completes current-snapshot split-pane/QEMU selection, preseed
+cases and current docs; C waits for actual full-suite outcomes, fixes demonstrated
+failures, then records local commits/pins/provenance and closes T25–T27. Preserve
+original untracked outputs and Acorn lockfile; original tools/ginux checkout and
+its selected branch stay untouched. No Ginux publication.
+
+Active planning skill: `hdae-development`; discovery path
 `/home/vince/.codex/worktrees/ginux-pr-combination-check/ginux/.agents/skills/hdae-development/SKILL.md`.
-Reload after context shifts. The user's direct-work/no-bureaucracy instructions
-apply; this queue does not introduce approval gates.
+Reload the whole skill, required references and this checkpoint after context
+shifts. The user's direct-work/no-bureaucracy instructions apply; this queue
+introduces no approval ceremonies.
 
 ## Earlier implementation evidence
 
