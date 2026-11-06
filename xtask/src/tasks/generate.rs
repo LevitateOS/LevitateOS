@@ -86,7 +86,6 @@ fn generate(out: &mut Out) -> Result<()> {
     recab_ts.types_from::<recab::Status>();
     recab_ts.value_enum::<recab::Slot>("SLOTS", "SLOT_HELP")?;
 
-    // Each app gets the module of every tool its manifest says it runs.
     let modules = [("recpart", &recpart_ts), ("recab", &recab_ts)];
     for app in distro_contract::tui_apps::discover(&root)? {
         for (tool, module) in &modules {

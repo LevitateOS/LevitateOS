@@ -27,7 +27,6 @@ pub struct PtySession {
 pub enum Settled {
     /// No output for the quiet period.
     Quiet,
-    /// The program exited.
     Exited(portable_pty::ExitStatus),
 }
 

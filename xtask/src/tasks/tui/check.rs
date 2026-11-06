@@ -28,8 +28,9 @@ const WAIT: Wait = Wait {
     settle: Duration::from_millis(500),
     timeout: Duration::from_secs(30),
 };
-/// Screens that mean the app is broken even though it is still running.
-const BROKEN: &[&str] = &["Unhandled TUI error", "Terminal too small", "Invalid hook call"];
+/// Screens that mean the app is broken even though it is still running. (A crash
+/// exits non-zero, which a capture already reports.)
+const BROKEN: &[&str] = &["Terminal too small", "Invalid hook call"];
 /// The app shown in the install screen's docs pane.
 const DOCS_PANE_APP: &str = "install-docs";
 
