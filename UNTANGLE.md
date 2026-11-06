@@ -1234,7 +1234,10 @@ Commits land on the checked-out branches (superproject `master`, submodules `cod
   - **Bugs fixed:** the status refresh after a successful mutation overwrote its result (C079); the footer printed the literal "status-error" (R013).
   - Verified headlessly: pressing `c` logs "Commit active slot: recab commit (exit 97 …refused…)" while the status panel keeps its own error.
   - Note: another session edits recab and recab-tui's status rows (`d1f0b39`, the `committed`/`rollback` rows); `STATUS_ROWS` was left as they have it.
-- [ ] F17 — Guest scripts are files, with one placeholder scheme that is checked.
+- [x] F17 — Guest scripts are files. builder `1fd3d2c` (`guest/live/*`, `guest/install-ux/*`, `src/guest.rs`), superproject commit "Guest scripts are files…" (`cargo xtask check` runs `sh -n` over `distro/builder/guest/`).
+  - **Bug fixed:** live-net-setup's awk programs (D039) were rejected by gawk; the extracted file's programs print the interface for sample `ip` output.
+  - Verified: both live overlays rendered through the builder's public functions (scratch harness, not committed) are byte-identical to before apart from that fix; every guest file passes `sh -n`. No shellcheck on this host.
+  - Boot behaviour is unverified on this machine: products can't be prepared without root (kernel and output dirs are root-owned).
 - [ ] F18 — The install experience is declared once, in the variant's products.toml.
 - [ ] F19 — One owner for the chain from login to install screen.
 - [ ] F20 — The program that owns the terminal sets TERM, and nothing forces colour.

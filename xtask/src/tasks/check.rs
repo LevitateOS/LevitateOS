@@ -27,6 +27,7 @@ pub fn run() -> Result<()> {
         command(&root, "cargo", &["check", "-q", "--workspace", "--all-targets"]),
     );
     step("generated files current", crate::tasks::generate::run(true));
+    step("guest scripts parse (sh -n)", guest_scripts_parse(&root));
     step(
         "docs content builds",
         command(&root.join("docs/content"), "bun", &["run", "build"]),
@@ -44,6 +45,30 @@ pub fn run() -> Result<()> {
 
     if !failed.is_empty() {
         bail!("{} check(s) failed: {}", failed.len(), failed.join(", "));
+    }
+    Ok(())
+}
+
+/// Every script the builder writes into the guest is a file under
+/// `distro/builder/guest/`; each must at least parse as shell.
+fn guest_scripts_parse(root: &Path) -> Result<()> {
+    let mut failures = Vec::new();
+    let mut stack = vec![root.join("distro/builder/guest")];
+    while let Some(dir) = stack.pop() {
+        for entry in std::fs::read_dir(&dir).with_context(|| format!("reading {}", dir.display()))? {
+            let path = entry?.path();
+            if path.is_dir() {
+                stack.push(path);
+                continue;
+            }
+            let output = Command::new("sh").arg("-n").arg(&path).output()?;
+            if !output.status.success() {
+                failures.push(format!("{}: {}", path.display(), String::from_utf8_lossy(&output.stderr).trim()));
+            }
+        }
+    }
+    if !failures.is_empty() {
+        bail!("{}", failures.join("\n"));
     }
     Ok(())
 }
