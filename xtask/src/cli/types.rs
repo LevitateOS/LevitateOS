@@ -74,12 +74,6 @@ pub enum Cmd {
         cmd: ScenariosCmd,
     },
 
-    /// Repository policy checks.
-    Policy {
-        #[command(subcommand)]
-        cmd: PolicyCmd,
-    },
-
     /// Docs tooling tasks.
     Docs {
         #[command(subcommand)]
@@ -259,13 +253,6 @@ pub enum ScenariosCmd {
         #[arg(value_enum, default_value_t = Distro::Levitate)]
         distro: Distro,
     },
-}
-
-#[derive(Subcommand)]
-pub enum PolicyCmd {
-    /// Fail if forbidden legacy bindings appear in code/config for product wiring.
-    #[command(name = "audit-legacy-bindings")]
-    AuditLegacyBindings,
 }
 
 #[derive(Subcommand)]

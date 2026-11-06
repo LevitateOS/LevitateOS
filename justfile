@@ -31,10 +31,6 @@ tools-install:
 tools:
     just tools-install
 
-# Fail fast on forbidden legacy artifact/rootfs bindings.
-policy-legacy:
-    cargo xtask policy audit-legacy-bindings
-
 # Install/remove the optional whitespace-only pre-commit hook.
 hooks-install:
     cargo xtask hooks install

@@ -1,7 +1,6 @@
 use anyhow::Result;
 
 pub fn run(cli: crate::cli::Cli) -> Result<()> {
-    enforce_policy_guard_placement(&cli.cmd)?;
     match cli.cmd {
         crate::cli::Cmd::Env { shell } => crate::tasks::tooling::env::run(shell),
         crate::cli::Cmd::Doctor => crate::tasks::tooling::doctor::run(),
@@ -86,11 +85,6 @@ pub fn run(cli: crate::cli::Cli) -> Result<()> {
                 crate::tasks::testing::scenarios::reset(distro)
             }
         },
-        crate::cli::Cmd::Policy { cmd } => match cmd {
-            crate::cli::PolicyCmd::AuditLegacyBindings => {
-                crate::tasks::tooling::policy::audit_legacy_bindings()
-            }
-        },
         crate::cli::Cmd::Docs { cmd } => match cmd {
             crate::cli::DocsCmd::Inspect {
                 slug,
@@ -142,24 +136,4 @@ pub fn run(cli: crate::cli::Cli) -> Result<()> {
             }),
         },
     }
-}
-
-fn enforce_policy_guard_placement(cmd: &crate::cli::Cmd) -> Result<()> {
-    use crate::cli::{Cmd, KernelsCmd, ScenariosCmd};
-
-    let requires_guard = matches!(
-        cmd,
-        Cmd::Kernels {
-            cmd: KernelsCmd::Build { .. }
-                | KernelsCmd::BuildAll { .. }
-                | KernelsCmd::Prebuilt { .. }
-        } | Cmd::Scenarios {
-            cmd: ScenariosCmd::Boot { .. } | ScenariosCmd::Test { .. }
-        }
-    );
-    if !requires_guard {
-        return Ok(());
-    }
-
-    crate::tasks::tooling::policy::audit_legacy_bindings()
 }
