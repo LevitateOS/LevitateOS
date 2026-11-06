@@ -129,9 +129,9 @@ pub(crate) fn build_kernel_via_recipe(
 ) -> Result<()> {
     let bundle = load_variant_contract_bundle_for_distro_from(root, distro_id)
         .with_context(|| format!("loading canonical variant contract for '{}'", distro_id))?;
-    let recipe_rhai = root.join("distro-builder/recipes/linux.rhai");
+    let recipe_rhai = root.join("distro/builder/recipes/linux.rhai");
     let build_dir = distro_builder::recipe::recipe_work_dir(root, distro_id)?;
-    let recipes_path = root.join("distro-builder/recipes");
+    let recipes_path = root.join("distro/builder/recipes");
     let kconfig_path = bundle
         .paths
         .build_host_declared_path(&bundle.contract.build.kernel.kconfig_path);
@@ -174,7 +174,7 @@ pub(crate) fn build_kernel_via_recipe(
         cmd.args(["--autofix"]);
         cmd.args(["--autofix-attempts", &autofix.attempts.max(1).to_string()]);
         cmd.args(["--autofix-cwd", root.to_string_lossy().as_ref()]);
-        cmd.args(["--autofix-allow-path", "distro-builder/recipes"]);
+        cmd.args(["--autofix-allow-path", "distro/builder/recipes"]);
         if let Some(p) = autofix.prompt_file.as_deref() {
             cmd.args(["--autofix-prompt-file", p.to_string_lossy().as_ref()]);
         }
@@ -189,9 +189,9 @@ pub(crate) fn install_prebuilt_kernel_via_recipe(
     distro_id: &str,
     force_redownload: bool,
 ) -> Result<()> {
-    let recipe_rhai = root.join("distro-builder/recipes/linux-prebuilt.rhai");
+    let recipe_rhai = root.join("distro/builder/recipes/linux-prebuilt.rhai");
     let build_dir = distro_builder::recipe::recipe_work_dir(root, distro_id)?;
-    let recipes_path = root.join("distro-builder/recipes");
+    let recipes_path = root.join("distro/builder/recipes");
     let kernel_artifact_root = distro_builder::run_history::kernel_output_dir(root, distro_id);
 
     let mut cmd = Command::new(recipe_bin);

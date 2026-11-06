@@ -1,0 +1,11 @@
+schema_version = 6
+
+[ring3_sources.rootfs_source]
+memory_mib = 4096
+preseed_memory_mib = 4096
+network_hosts = []
+preseed_network_hosts = ["dl-cdn.alpinelinux.org:443"]
+kind = "recipe_custom"
+recipe_script = "distro/builder/recipes/alpine-live-source-rootfs.rhai"
+preseed_recipe_script = "distro/builder/recipes/alpine-preseed-source-assets.rhai"
+preseed_outputs = { iso = "file", apk_tools = "file" }

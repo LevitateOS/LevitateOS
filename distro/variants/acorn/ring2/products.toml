@@ -1,0 +1,140 @@
+schema_version = 6
+
+[ring2_products.rootfs_base]
+logical_name = "product.rootfs.base"
+description = "Canonical base root filesystem tree"
+
+[ring2_products.live_overlay]
+logical_name = "product.payload.live_overlay"
+description = "Read-only live overlay payload tree"
+overlay_kind = "openrc"
+openrc_inittab = "desktop_with_serial"
+seed_overlay = "distro/variants/acorn/ring2/overlays/live"
+
+[ring2_products.boot_live]
+logical_name = "product.payload.boot.live"
+description = "Live boot payload inputs"
+extends = "product.rootfs.base"
+payload_profile = "boot_baseline"
+
+[ring2_products.live_tools]
+logical_name = "product.payload.live_tools"
+description = "Live tools payload tree"
+extends = "product.payload.boot.live"
+runtime_profiles = ["live_tools_common"]
+runtime_profiles_ux = ["live_tools_ux"]
+
+[ring2_products.boot_installed]
+logical_name = "product.payload.boot.installed"
+description = "Installed-system boot payload inputs"
+extends = "product.rootfs.base"
+payload_profile = "boot_baseline"
+
+[ring2_payload_profiles.boot_baseline]
+[[ring2_payload_profiles.boot_baseline.producers]]
+kind = "write_text"
+path = ".live-payload-role"
+content = "rootfs\n"
+
+[[ring2_payload_profiles.boot_baseline.producers]]
+kind = "copy_tree"
+source = "bin"
+destination = "bin"
+
+[[ring2_payload_profiles.boot_baseline.producers]]
+kind = "copy_tree"
+source = "sbin"
+destination = "sbin"
+
+[[ring2_payload_profiles.boot_baseline.producers]]
+kind = "copy_tree"
+source = "lib"
+destination = "lib"
+
+[[ring2_payload_profiles.boot_baseline.producers]]
+kind = "copy_tree"
+source = "etc"
+destination = "etc"
+
+[[ring2_payload_profiles.boot_baseline.producers]]
+kind = "copy_tree"
+source = "usr/bin"
+destination = "usr/bin"
+
+[[ring2_payload_profiles.boot_baseline.producers]]
+kind = "copy_tree"
+source = "usr/sbin"
+destination = "usr/sbin"
+
+[[ring2_payload_profiles.boot_baseline.producers]]
+kind = "copy_tree"
+source = "usr/lib"
+destination = "usr/lib"
+
+[[ring2_payload_profiles.boot_baseline.producers]]
+kind = "copy_tree"
+source = "usr/libexec"
+destination = "usr/libexec"
+
+[[ring2_payload_profiles.boot_baseline.producers]]
+kind = "copy_tree"
+source = "usr/share/empty.sshd"
+destination = "usr/share/empty.sshd"
+
+[[ring2_payload_profiles.boot_baseline.producers]]
+kind = "copy_tree"
+source = "usr/share/i18n/locales/musl"
+destination = "usr/share/i18n/locales/musl"
+
+[[ring2_payload_profiles.boot_baseline.producers]]
+kind = "copy_tree"
+source = "var/empty"
+destination = "var/empty"
+
+[[ring2_payload_profiles.boot_baseline.producers]]
+kind = "copy_tree"
+source = "var/lib"
+destination = "var/lib"
+
+[ring2_runtime_profiles.live_tools_common]
+[[ring2_runtime_profiles.live_tools_common.actions]]
+kind = "tool_payload_workspace_binary"
+package = "recpart"
+
+[[ring2_runtime_profiles.live_tools_common.actions]]
+kind = "tool_payload_workspace_binary"
+package = "recstrap"
+target = "x86_64-unknown-linux-musl"
+
+[[ring2_runtime_profiles.live_tools_common.actions]]
+kind = "tool_payload_workspace_binary"
+package = "recstrap"
+binary = "recfstab"
+target = "x86_64-unknown-linux-musl"
+
+[[ring2_runtime_profiles.live_tools_common.actions]]
+kind = "tool_payload_workspace_binary"
+package = "recstrap"
+binary = "recchroot"
+target = "x86_64-unknown-linux-musl"
+
+[[ring2_runtime_profiles.live_tools_common.actions]]
+kind = "apk_packages"
+packages = ["curl", "pciutils", "smartmontools", "hdparm", "vim", "htop"]
+
+[[ring2_runtime_profiles.live_tools_common.actions]]
+kind = "install_mode_payload"
+interactive_shell = "/bin/sh"
+ux_docs_frontend = "plain_text"
+
+[ring2_runtime_profiles.live_tools_ux]
+[[ring2_runtime_profiles.live_tools_ux.actions]]
+kind = "rootfs_workspace_binary"
+package = "install-split-pane"
+binary = "levitate-install-docs-split"
+target = "x86_64-unknown-linux-musl"
+destination = "usr/local/bin/levitate-install-docs-split"
+
+[ring2_products.kernel_staging]
+logical_name = "product.kernel.staging"
+description = "Kernel image and modules staging product"

@@ -61,7 +61,7 @@ LevitateOS uses the vanilla Linux kernel with configuration-only customization:
 
   - Version: 6.18.x-levitate (CONFIG_LOCALVERSION="-levitate")
   - Patches: None (vanilla kernel)
-  - Configuration: distro-variants/*/build-host/kernel/kconfig
+  - Configuration: distro/variants/*/build-host/kernel/kconfig
 
 GPL-2.0 compliance is satisfied through:
 
@@ -72,7 +72,7 @@ GPL-2.0 compliance is satisfied through:
     https://github.com/LevitateOS/linux
 
 No modifications to kernel source are distributed; only the kernel
-configuration files (distro-variants/*/build-host/kernel/kconfig), which are MIT OR Apache-2.0 licensed.
+configuration files (distro/variants/*/build-host/kernel/kconfig), which are MIT OR Apache-2.0 licensed.
 
 
 5. RUST DEPENDENCIES

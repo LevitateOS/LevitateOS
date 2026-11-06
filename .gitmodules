@@ -15,7 +15,7 @@
 	url = git@github.com:LevitateOS/install-tests.git
 	branch = master
 [submodule "distro-spec"]
-	path = distro-spec
+	path = distro/spec
 	url = git@github.com:LevitateOS/distro-spec.git
 	branch = master
 [submodule "recstrap"]
@@ -27,7 +27,7 @@
 	url = git@github.com:LevitateOS/rootfs-test.git
 	branch = master
 [submodule "leviso-elf"]
-	path = leviso-elf
+	path = distro/elf
 	url = git@github.com:LevitateOS/leviso-elf.git
 	branch = main
 [submodule "testing/hardware-compat"]
@@ -35,7 +35,7 @@
 	url = git@github.com:LevitateOS/hardware-compat.git
 	branch = main
 [submodule "distro-builder"]
-	path = distro-builder
+	path = distro/builder
 	url = git@github.com:LevitateOS/distro-builder.git
 	branch = main
 [submodule "tools/recinit"]
@@ -59,7 +59,7 @@
 	url = git@github.com:LevitateOS/fsdbg.git
 	branch = main
 [submodule "distro-contract"]
-	path = distro-contract
+	path = distro/contract
 	url = git@github.com:LevitateOS/distro-contract.git
 	branch = master
 [submodule "tools/recab"]

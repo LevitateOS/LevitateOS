@@ -1,7 +1,7 @@
 use clap::{Args, Parser, Subcommand, ValueEnum};
 use std::path::PathBuf;
 
-/// A LevitateOS variant (`distro-variants/<id>`).
+/// A LevitateOS variant (`distro/variants/<id>`).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, ValueEnum)]
 pub enum Distro {
     #[value(name = "levitate")]

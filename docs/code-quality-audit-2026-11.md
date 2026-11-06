@@ -2,7 +2,7 @@
 
 ## Executive summary
 
-**Overall maturity: early beta.** The active ring pipeline compiles and is mostly clippy-clean: `justfile` runs `distro-builder`, which runs `distro-variants/_shared/ring0/hooks/build-release.sh`, which calls recinit and reciso. `distro-contract` gives the build a typed manifest layer. Unit-test policy compliance is close to complete. Most of the risk sits at the edges: tools that touch disks and the host, what goes into shipped images, and checks that report success without checking anything. Release maturity is low. Lockfiles are not committed, superproject CI does not run on most changes, and releases carry no provenance.
+**Overall maturity: early beta.** The active ring pipeline compiles and is mostly clippy-clean: `justfile` runs `distro-builder`, which runs `distro/variants/_shared/ring0/hooks/build-release.sh`, which calls recinit and reciso. `distro-contract` gives the build a typed manifest layer. Unit-test policy compliance is close to complete. Most of the risk sits at the edges: tools that touch disks and the host, what goes into shipped images, and checks that report success without checking anything. Release maturity is low. Lockfiles are not committed, superproject CI does not run on most changes, and releases carry no provenance.
 
 Top themes:
 - **Destructive-op boundaries are unsafe.**
@@ -52,7 +52,7 @@ Top themes:
   - Mounts are not rolled back on failure.
   - `is_protected_path` is an exact string match, and recpart does not canonicalize before calling it.
   - One failing device aborts `list-disks`, and zram devices are offered as targets.
-- **Where:** `tools/recpart/src/exec.rs:93-100,133-142,398-415,448-477`; `tools/recpart/src/preflight.rs:133-155,209-254,462-476`; `distro-spec/src/shared/paths.rs:83-97`
+- **Where:** `tools/recpart/src/exec.rs:93-100,133-142,398-415,448-477`; `tools/recpart/src/preflight.rs:133-155,209-254,462-476`; `distro/spec/src/shared/paths.rs:83-97`
 - **Fix:**
   - Wait once, after sfdisk plus `udevadm settle`, and check that the PARTUUIDs match the plan.
   - Drop `--force`. Check `/sys/block/*/holders`, `/proc/swaps` and an `O_EXCL` open before wiping.
@@ -87,12 +87,12 @@ Top themes:
   - The ISO ships the host's `bun` (found on PATH) and the host's `systemd-bootx64.efi`.
   - recstrap, recfstab, recchroot and install-split-pane are built in debug profile from a hardcoded `target/debug` path, which breaks when `CARGO_TARGET_DIR` is set.
 - **Where:**
-  - `distro-builder/src/pipeline/live_tools.rs:260-308,310-397,398-509`
-  - `distro-builder/recipes/alpine-live-source-rootfs.rhai:357-371`
-  - `distro-builder/recipes/dvd-source-deps.rhai:11,31-45`
-  - `distro-builder/recipes/qemu-deps.rhai:10-18,52-67`
+  - `distro/builder/src/pipeline/live_tools.rs:260-308,310-397,398-509`
+  - `distro/builder/recipes/alpine-live-source-rootfs.rhai:357-371`
+  - `distro/builder/recipes/dvd-source-deps.rhai:11,31-45`
+  - `distro/builder/recipes/qemu-deps.rhai:10-18,52-67`
   - `tools/reciso/src/lib.rs:299-306,345`
-  - `distro-variants/acorn/ring2/products.toml:116-117`
+  - `distro/variants/acorn/ring2/products.toml:116-117`
 - **Fix:**
   - Install `ALPINE_KEYS`, then drop `--allow-untrusted` and `--no-check-certificate`.
   - Swap resolv.conf in only for the apk call, with a guard that restores it on error too.
@@ -108,7 +108,7 @@ Top themes:
   - The install-docs bundle in the ISO is built from caret ranges, with a plain `bun install`.
   - Stale per-member locks are committed and ignored. `disk-plan/bun.lock` even belongs to the old blessed-based frontend.
   - `hashFiles('**/Cargo.lock')` hashes nothing in a clean checkout.
-- **Where:** `.gitignore:47,78-79`; `.github/workflows/ci.yml:56`; `distro-builder/src/pipeline/live_tools.rs:427-449`; `tui/apps/install/disk-plan/bun.lock`; `tools/recstrap/Cargo.lock`; `tools/recchroot/Cargo.lock`; `leviso/Cargo.lock`; `testing/install-tests/Cargo.lock`
+- **Where:** `.gitignore:47,78-79`; `.github/workflows/ci.yml:56`; `distro/builder/src/pipeline/live_tools.rs:427-449`; `tui/apps/install/disk-plan/bun.lock`; `tools/recstrap/Cargo.lock`; `tools/recchroot/Cargo.lock`; `leviso/Cargo.lock`; `testing/install-tests/Cargo.lock`
 - **Fix:**
   - Remove the ignore lines and commit the root `Cargo.lock` and `bun.lock`.
   - Delete the member locks of crates that only build inside the workspace.
@@ -120,7 +120,7 @@ Top themes:
 - **Why it matters:** AGENTS.md bans mandatory policy-audit pipelines and process-only blockers.
   - Every distro-builder command, including the nested calls the release hooks make, every `xtask kernels build`, every scenario and every qmp run shells out to `cargo xtask policy audit-legacy-bindings`. That nests cargo up to three levels deep and needs a source checkout plus a toolchain.
   - `enforce_build_hours()` calls `process::exit(3)` outside 23:00–10:00, and nothing overrides it.
-- **Where:** `distro-builder/src/bin/distro-builder.rs:57-62`; `distro-builder/src/bin/workflows/build.rs:38-56`; `distro-builder/src/bin/workflows/commands.rs:39`; `xtask/src/app.rs:4,146-164`; `xtask/src/tasks/kernels/common.rs:37-59`; `testing/install-tests/src/lib.rs:46-69`; `testing/install-tests/src/bin/scenarios.rs:54-57`; `testing/install-tests/src/bin/qmp.rs:46`
+- **Where:** `distro/builder/src/bin/distro-builder.rs:57-62`; `distro/builder/src/bin/workflows/build.rs:38-56`; `distro/builder/src/bin/workflows/commands.rs:39`; `xtask/src/app.rs:4,146-164`; `xtask/src/tasks/kernels/common.rs:37-59`; `testing/install-tests/src/lib.rs:46-69`; `testing/install-tests/src/bin/scenarios.rs:54-57`; `testing/install-tests/src/bin/qmp.rs:46`
 - **Fix:**
   - Delete the guard functions and their call sites, and keep `just policy-legacy` as an explicit command.
   - Delete the build-hours gate.
@@ -136,7 +136,7 @@ Top themes:
   - Lint runs clippy in 8 crates (leviso among them), not xtask, distro-builder, distro-contract or rec{ab,part,qemu,shuttle}. There is no fmt check, and xtask currently has 11 warnings.
 - **Where:** `.github/workflows/detect-changes.yml:29-37,64`; `.github/workflows/ci.yml:24-27,43-48,82-88,130-175`; `.github/workflows/license-check.yml:12-13`; `deny.toml:20-39`; `.github/workflows/tui-matrix.yml:5-53`; `xtask/src/util/repo.rs:19-67`; `xtask/src/util/tools_env.rs:9-24`
 - **Fix:**
-  - Drop the paths filter for the superproject, or add the gitlink paths plus `distro-variants/**`, `**/*.{rhai,toml,sh}`, `justfile` and `**/kconfig`.
+  - Drop the paths filter for the superproject, or add the gitlink paths plus `distro/variants/**`, `**/*.{rhai,toml,sh}`, `justfile` and `**/kconfig`.
   - Make the tools prefix optional (fall back to recqemu's `find_ovmf` and `OVMF_PATH`), or add `just tools-install` to CI.
   - Use `submodules: recursive` and move deny.toml to `version = 2`.
   - Point tui-matrix at `tui/**`.
@@ -169,7 +169,7 @@ Top themes:
   - docs/tui and shared/tui-kit are diverged forks that CI targets and that leviso builds from.
 - **Where:** `leviso/src/lib.rs:11-20`; `leviso/src/rebuild.rs:43-127`; `leviso/Cargo.toml:9-35`; `AcornOS/src/main.rs:124-198`; `tools/recart/Cargo.toml:17-19`; `tools/recart/src/main.rs:143-516`; `tools/recart/src/server.rs:222-235,932-1248`; `.gitmodules:21-23,109-111`
 - **Fix:**
-  - Have recart store only keys recorded at build time, from distro-variants and the run layout, and drive one table of ingest steps for both the CLI and the server. Exit non-zero on any failure.
+  - Have recart store only keys recorded at build time, from distro/variants and the run layout, and drive one table of ingest steps for both the CLI and the server. Exit non-zero on any failure.
   - Then drop leviso and AcornOS from the members and delete them, along with their uncompiled modules, `leviso/deps/`, kconfig copies, profiles and init templates.
   - Remove the two TUI submodules and point the leviso docs recipe, `LICENSE:17` and the docs at `tui/`.
 - **Effort:** L
@@ -182,7 +182,7 @@ Top themes:
   - 7 ViolationCodes are never emitted.
   - Scenario tool lists, patterns and users are hardcoded in install-tests.
   - distro-spec, which is marked DEPRECATED, is still a dependency of 12 active crates, and its UKI cmdline has already drifted from the TOML.
-- **Where:** `distro-variants/*/ring1/transforms.toml:21-42`; `distro-variants/levitate/ring0/release.toml:16-20`; `distro-spec/src/shared/kernel.rs:44-55`; `xtask/src/tasks/kernels/common.rs:22-35,66-72,139-149`; `distro-contract/src/variant.rs:298-312`; `distro-contract/src/error.rs:46-53`; `testing/install-tests/src/distro/{levitate.rs:230-252,acorn.rs:122-152}`; `distro-spec/src/{levitate,acorn}/paths.rs`; `distro-spec/src/acorn/uki.rs:17-50`
+- **Where:** `distro/variants/*/ring1/transforms.toml:21-42`; `distro/variants/levitate/ring0/release.toml:16-20`; `distro/spec/src/shared/kernel.rs:44-55`; `xtask/src/tasks/kernels/common.rs:22-35,66-72,139-149`; `distro/contract/src/variant.rs:298-312`; `distro/contract/src/error.rs:46-53`; `testing/install-tests/src/distro/{levitate.rs:230-252,acorn.rs:122-152}`; `distro/spec/src/{levitate,acorn}/paths.rs`; `distro/spec/src/acorn/uki.rs:17-50`
 - **Fix:**
   - Have the loader return a `ValidatedContract` newtype, so consumers cannot take an unvalidated one.
   - Drive xtask kernels from `contract.build.kernel` and delete the distro-spec kernel and identity constants.
@@ -279,7 +279,7 @@ Top themes:
   - `SOURCE_DATE_EPOCH` is not used anywhere.
   - CI uploads the ISO without its `.sha512`, and there is no ISO release workflow.
   - `rust-release.yml` makes a patch bump, pushes to the default branch, tags and runs `cargo publish` on every non-bump push. It has no `concurrency:` group and no `--locked`, and uses `action-gh-release@v1`. This affects leviso-elf, recipe, hardware-compat and others. The bump input works, but only through the caller's `workflow_dispatch`.
-- **Where:** `distro-builder/src/bin/distro-builder.rs:34-46`; `distro-builder/src/bin/workflows/{build.rs:99-115,release_hook.rs:89-142}`; `.github/workflows/rust-release.yml:3-148`; `.github/workflows/ci.yml:119-125`; `leviso-elf/.github/workflows/ci.yml:22-44`
+- **Where:** `distro/builder/src/bin/distro-builder.rs:34-46`; `distro/builder/src/bin/workflows/{build.rs:99-115,release_hook.rs:89-142}`; `.github/workflows/rust-release.yml:3-148`; `.github/workflows/ci.yml:119-125`; `distro/elf/.github/workflows/ci.yml:22-44`
 - **Fix:**
   - Record superproject and submodule revisions, a dirty flag, per-output sha256 and the kernel release in the run manifest.
   - Export `SOURCE_DATE_EPOCH` and pass it to xorriso, mkfs.erofs and mkfs.fat with deterministic UUIDs.
@@ -292,15 +292,15 @@ Top themes:
 ### Destructive-op & host safety
 | Severity | Finding | Location | Fix | Effort |
 |---|---|---|---|---|
-| medium | Recipes run `rm -rf`, `7z x` and `chmod` on unquoted concatenated paths, and hide failures with `2>/dev/null` and or-true (#4 #425) | distro-builder/recipes/fedora-dvd-source-rootfs.rhai:223-235,344; custom-source-rootfs.rhai:51-52; linux.rhai:160-161 | Use native rm/extract helpers or a `shell_quote()` helper; stop suppressing errors | M |
+| medium | Recipes run `rm -rf`, `7z x` and `chmod` on unquoted concatenated paths, and hide failures with `2>/dev/null` and or-true (#4 #425) | distro/builder/recipes/fedora-dvd-source-rootfs.rhai:223-235,344; custom-source-rootfs.rhai:51-52; linux.rhai:160-161 | Use native rm/extract helpers or a `shell_quote()` helper; stop suppressing errors | M |
 | medium | The sync script resets branches with `checkout -B origin/$branch`, discarding unpushed commits (the superproject is currently 5 ahead) (#87) | tools/sync-submodules-default-branches.sh:48,63,94 | Refuse when the branch is ahead or the tree is dirty; use `switch` then `merge --ff-only` | S |
 | medium | Window mode serves VNC on 0.0.0.0 with no password, giving a root shell (#88) | xtask/src/tasks/testing/scenarios.rs:96-99,1047-1051,1166-1174 | Bind to 127.0.0.1 by default; require an explicit opt-in for wider binds | S |
 | medium | recipe `rm()` deletes by glob recursively with no guard against `/`, `/*` or an empty prefix (#120) | tools/recipe/src/helpers/install/filesystem.rs:40-52 | Refuse root, top-level and $HOME targets and empty leading components | S |
 | medium | The autofix patch path check can be bypassed (quoted paths, `x/`/`y/` prefixes, rename and copy headers); the default cwd is the caller's git repo (#125) | tools/recipe/src/core/autofix/{parser.rs:3-33,patch.rs:168-182,prompt.rs:53-73} | Get the authoritative path list from `git apply --numstat -z --check`; default to the recipe's own dir | M |
 | medium | recstrap mount cleanup does not run on Ctrl-C; it uses a fixed `/tmp/recstrap-erofs-mount` and calls `remove_dir_all` after an unchecked umount (#144 #386) | tools/recstrap/src/rootfs.rs:52-104 | mkdtemp with mode 0700; `remove_dir` only after a successful umount; handle signals | S |
-| medium | reciso and recinit `rm -rf` fixed-name scratch dirs next to the output (#150) | tools/reciso/src/lib.rs:198-208,467-526; distro-builder/src/artifact/iso_utils.rs:35-39; tools/recinit/src/tiny.rs:121-125 | Use a `TempDir`; never delete paths the tool did not create | S |
-| low | Run pruning deletes by the run_id read from the manifest, ignores status, never prunes manifest-less dirs, and pid bits overlap in run ids (#11 #388) | distro-builder/src/run_history.rs:34-83,115-131 | Prune by directory entry name; validate it is one component; skip runs still building | S |
-| low | `product prepare` removes subdirs of any user-supplied dir; the migration-era cleanup still runs (#12) | distro-builder/src/pipeline/io.rs:6-43; source.rs:126-149 | Require `.artifacts` or a marker file; delete `cleanup_legacy_provider_dir` | S |
+| medium | reciso and recinit `rm -rf` fixed-name scratch dirs next to the output (#150) | tools/reciso/src/lib.rs:198-208,467-526; distro/builder/src/artifact/iso_utils.rs:35-39; tools/recinit/src/tiny.rs:121-125 | Use a `TempDir`; never delete paths the tool did not create | S |
+| low | Run pruning deletes by the run_id read from the manifest, ignores status, never prunes manifest-less dirs, and pid bits overlap in run ids (#11 #388) | distro/builder/src/run_history.rs:34-83,115-131 | Prune by directory entry name; validate it is one component; skip runs still building | S |
+| low | `product prepare` removes subdirs of any user-supplied dir; the migration-era cleanup still runs (#12) | distro/builder/src/pipeline/io.rs:6-43; source.rs:126-149 | Require `.artifacts` or a marker file; delete `cleanup_legacy_provider_dir` | S |
 | low | The justfile interpolates `{{target}}`, `{{inject}}` and `{{distro}}` raw into bash (#96) | justfile:108,121,139,179-184 | `set positional-arguments` or `quote()` | S |
 | low | `product-erofs` runs `rm -rf` on a path built from unvalidated arguments (#98) | justfile:334-342 | Validate against `^[a-z0-9-]+$`, or let distro-builder own the dir | S |
 | low | The tui inspect preset targets host `/dev/sda`, and the input wrapper sends keystrokes twice (#101) | xtask/src/tasks/tui/inspect.rs:124-128,238-244 | Use a loop or fake device; send once | S |
@@ -313,9 +313,9 @@ Top themes:
 ### Supply chain & shipped-artifact integrity
 | Severity | Finding | Location | Fix | Effort |
 |---|---|---|---|---|
-| medium | The release hook curls busybox straight to its final path, so a bad file wedges every later run; it runs `cargo run` mid-release. recinit's curl has no `--fail`, custom URLs skip the checksum, and initrd-release is hardcoded to LevitateOS (#53 #352 #164) | distro-variants/_shared/ring0/hooks/build-release.sh:46-48,264-313,349-350; tools/recinit/src/busybox.rs:52-82; tools/recinit/src/install.rs:146-164 | Acquire busybox through a recipe; temp file, verify, rename; pass resolved binary paths and branding in | M |
-| medium | `LoaderConfig` defaults to `editor: true`, so the boot cmdline is editable (for example `init=/bin/sh`) (#81) | distro-spec/src/shared/boot.rs:195-220; tools/reciso/src/lib.rs:442-449; leviso/src/artifact/qcow2/partitions.rs:57 | Default to false; build the cmdline in one helper | S |
-| medium | The EROFS image is written straight to its final path, and source files without owner-read are silently chmodded (#10) | distro-builder/src/artifact/rootfs.rs:71-134,156-209 | Write a temp file and rename it; fail or log permission changes | S |
+| medium | The release hook curls busybox straight to its final path, so a bad file wedges every later run; it runs `cargo run` mid-release. recinit's curl has no `--fail`, custom URLs skip the checksum, and initrd-release is hardcoded to LevitateOS (#53 #352 #164) | distro/variants/_shared/ring0/hooks/build-release.sh:46-48,264-313,349-350; tools/recinit/src/busybox.rs:52-82; tools/recinit/src/install.rs:146-164 | Acquire busybox through a recipe; temp file, verify, rename; pass resolved binary paths and branding in | M |
+| medium | `LoaderConfig` defaults to `editor: true`, so the boot cmdline is editable (for example `init=/bin/sh`) (#81) | distro/spec/src/shared/boot.rs:195-220; tools/reciso/src/lib.rs:442-449; leviso/src/artifact/qcow2/partitions.rs:57 | Default to false; build the cmdline in one helper | S |
+| medium | The EROFS image is written straight to its final path, and source files without owner-read are silently chmodded (#10) | distro/builder/src/artifact/rootfs.rs:71-134,156-209 | Write a temp file and rename it; fail or log permission changes | S |
 
 ### Install tools correctness
 | Severity | Finding | Location | Fix | Effort |
@@ -330,22 +330,22 @@ Top themes:
 ### Build pipeline & orchestration correctness
 | Severity | Finding | Location | Fix | Effort |
 |---|---|---|---|---|
-| medium | leviso-elf `copy_dir_recursive` follows directory symlinks and writes through destination symlinks; this is on the live overlay path (#27) | leviso-elf/src/copy.rs:56-70 | Classify with `file_type()`; unlink a destination symlink before copying | S |
-| medium | The readelf analysis matches English stderr, so it depends on the locale, and it returns Ok(empty) for unreadable files (#31) | leviso-elf/src/analyze.rs:30-48 | Set `LC_ALL=C`; resolve symlinks inside the source root; warn; consider goblin | M |
-| low | `copy_library_to` classifies on the absolute path, unwraps, and follows dangling symlinks (#32) | leviso-elf/src/copy.rs:102-148 | Use `strip_prefix`, contexts and `symlink_metadata` | S |
-| low | The host `ldd` decides target library deps, and failures and missing libraries are skipped silently (#17 #346) | distro-builder/src/executor/binaries.rs:17-28,78-136 | Use leviso-elf rooted at the source rootfs; fail on missing libraries | M |
-| medium | The repo root is resolved three ways, so `build-all` breaks outside the repo root (#14) | distro-builder/src/bin/workflows/{layout.rs:5-17,build.rs:57-74,artifacts.rs:162} | Resolve once in `main` and pass it down | S |
+| medium | leviso-elf `copy_dir_recursive` follows directory symlinks and writes through destination symlinks; this is on the live overlay path (#27) | distro/elf/src/copy.rs:56-70 | Classify with `file_type()`; unlink a destination symlink before copying | S |
+| medium | The readelf analysis matches English stderr, so it depends on the locale, and it returns Ok(empty) for unreadable files (#31) | distro/elf/src/analyze.rs:30-48 | Set `LC_ALL=C`; resolve symlinks inside the source root; warn; consider goblin | M |
+| low | `copy_library_to` classifies on the absolute path, unwraps, and follows dangling symlinks (#32) | distro/elf/src/copy.rs:102-148 | Use `strip_prefix`, contexts and `symlink_metadata` | S |
+| low | The host `ldd` decides target library deps, and failures and missing libraries are skipped silently (#17 #346) | distro/builder/src/executor/binaries.rs:17-28,78-136 | Use leviso-elf rooted at the source rootfs; fail on missing libraries | M |
+| medium | The repo root is resolved three ways, so `build-all` breaks outside the repo root (#14) | distro/builder/src/bin/workflows/{layout.rs:5-17,build.rs:57-74,artifacts.rs:162} | Resolve once in `main` and pass it down | S |
 | medium | `LD_LIBRARY_PATH` pointing at bundled Rocky libraries is exported to every just recipe and to nested cargo (#99) | justfile:5-9; xtask/src/util/tools_env.rs:19-21; xtask/src/tasks/testing/scenarios.rs:871-883 | Set it only on the QEMU child process | S |
 | medium | Interactive installed-boot writes to the install disk and OVMF vars, and drops `--inject` silently (#100 #357) | xtask/src/tasks/testing/scenarios.rs:162-170,754-792 | Boot a qcow2 overlay or use `-snapshot`; bail when inject is passed | S |
 | low | xtask passes `-enable-kvm -cpu host` unconditionally (#358) | xtask/src/tasks/testing/scenarios.rs:767-775,899-908 | Use recqemu's KVM detection and OVMF lookup | S |
 | low | The serial log tail prints partial lines, turns bytes into mojibake, re-reads the whole file every second and leaks temp files (#103) | xtask/src/tasks/testing/scenarios.rs:504-534,588-617,1338-1343 | Track a byte offset; use vt100; use tempfile | S |
 | low | `doctor` stops at the tools-prefix check and only checks for `just` (#106) | xtask/src/tasks/tooling/doctor.rs:3-41 | Report every check; iterate the contract's tools | S |
-| low | The artifact store unlinks a lock it still holds, and `gc` runs without a lock alongside `put` (legacy users only) (#6) | distro-builder/src/artifact_store/mod.rs:561-591,669-745,875-887 | Keep lock files; add a store-wide reader/writer lock | M |
-| low | Blobs are hardlinked into output dirs, so an in-place write corrupts the store (#7) | distro-builder/src/artifact_store/mod.rs:217-277,975-1000 | Use reflink, or make blobs 0444 | S |
-| low | The recipe runner can read a stale `.recipe-output.json` and prefers a stale `target/` recipe binary (#9) | distro-builder/src/recipe/mod.rs:130-159,317-375 | Delete the file before spawning; build via cargo | S |
-| low | Disk assembly does not check that images fit, discards sfdisk stderr, uses random UUIDs and writes zeros densely (#22 #385) | distro-builder/src/artifact/disk/{assembly.rs:21-96,helpers.rs:12-41} | Size checks; capture stderr with `Cmd`; deterministic UUIDs; `conv=sparse` | M |
-| low | install-split-pane can panic slicing a UTF-8 string; it has cast warnings and no license (#23) | distro-builder/install-split-pane/src/main.rs:244-250,448,461 | Cut on a char boundary | S |
-| low | The hook's `json_escape` is incomplete, `MODULES_DIR` falls back to `lib/modules`, and the sed banner rewrite is unescaped (#60) | distro-variants/_shared/ring0/hooks/build-release.sh:75-77,223-245,293-299 | Escape properly or emit from Rust; remove the fallback | S |
+| low | The artifact store unlinks a lock it still holds, and `gc` runs without a lock alongside `put` (legacy users only) (#6) | distro/builder/src/artifact_store/mod.rs:561-591,669-745,875-887 | Keep lock files; add a store-wide reader/writer lock | M |
+| low | Blobs are hardlinked into output dirs, so an in-place write corrupts the store (#7) | distro/builder/src/artifact_store/mod.rs:217-277,975-1000 | Use reflink, or make blobs 0444 | S |
+| low | The recipe runner can read a stale `.recipe-output.json` and prefers a stale `target/` recipe binary (#9) | distro/builder/src/recipe/mod.rs:130-159,317-375 | Delete the file before spawning; build via cargo | S |
+| low | Disk assembly does not check that images fit, discards sfdisk stderr, uses random UUIDs and writes zeros densely (#22 #385) | distro/builder/src/artifact/disk/{assembly.rs:21-96,helpers.rs:12-41} | Size checks; capture stderr with `Cmd`; deterministic UUIDs; `conv=sparse` | M |
+| low | install-split-pane can panic slicing a UTF-8 string; it has cast warnings and no license (#23) | distro/builder/install-split-pane/src/main.rs:244-250,448,461 | Cut on a char boundary | S |
+| low | The hook's `json_escape` is incomplete, `MODULES_DIR` falls back to `lib/modules`, and the sed banner rewrite is unescaped (#60) | distro/variants/_shared/ring0/hooks/build-release.sh:75-77,223-245,293-299 | Escape properly or emit from Rust; remove the fallback | S |
 
 ### Recipe engine
 | Severity | Finding | Location | Fix | Effort |
@@ -364,22 +364,22 @@ Top themes:
 ### Contract & variant manifests
 | Severity | Finding | Location | Fix | Effort |
 |---|---|---|---|---|
-| medium | Empty `output_names` panics the loader before validation can report it (#51 #63) | distro-contract/src/variant.rs:1361-1380 | `.first()` plus a load error | S |
-| low | Only build-host.toml's `schema_version` is checked (#50 #67) | distro-contract/src/variant.rs:572,1516-1531 | Check every manifest | S |
-| medium | The derived `ArtifactIdentity` and the injected base defaults make some validator checks unreachable (#71) | distro-contract/src/variant.rs:577,1383-1497; distro-contract/src/validate.rs:193-311 | Drop the mirror; pick one policy for base defaults | M |
-| medium | Ring2 tagged enums accept unknown fields; two enums are parsed by hand from strings (#72) | distro-contract/src/variant.rs:924-985,1632-1702 | `deny_unknown_fields`; serde enums | S |
-| medium | The live-boot runtime check guesses the init system from the rootfs, ignores the declared overlay kind and duplicates the locale check (#74) | distro-contract/src/runtime.rs:747-1134 | Branch on `OverlayKind`; iterate services generically | M |
-| medium | `required_build_tools` is inaccurate and never checked against the host; a separate REQUIRED_TOOLS list exists (#55 #359) | distro-variants/*/build-host/build-host.toml:4-17; distro-builder/src/preflight/mod.rs:29-85 | Have preflight read the contract's list | S |
-| low | The kernel.release check is a prefix match, and the version token check is loose (#68) | distro-contract/src/runtime.rs:322-352; distro-contract/src/validate.rs:584-596 | Exact match after stripping localversion | S |
-| low | The same defect produces duplicate violations (#69) | distro-contract/src/validate.rs:131-190,932,1169-1170 | Call each check once | S |
-| low | Logical names are unvalidated strings, and product and scenario names are redefined per crate (#73 #366) | distro-contract/src/schema.rs:113-130,228-239; distro-builder/src/pipeline/planner.rs:243-280; testing/install-tests/src/scenarios/mod.rs:38-93 | Shared enum in distro-contract; validate references | M |
-| low | Runtime validators invent default paths when contract data is missing (#76) | distro-contract/src/runtime.rs:81-126,192-207,385-386 | Report a violation instead | S |
-| low | The recipe declaration check is a substring match; kernel.rhai never runs; the evidence script is redundant; `human:` notes are unresolved (#57 #77) | distro-contract/src/{variant.rs:486-517,build_host.rs:14-34}; distro-variants/*/build-host/{recipes/kernel.rhai,evidence/build-capability.sh} | Remove the ceremony or use a structural field | S |
-| low | Path validators accept `..` and `./x`; there is a dead loop tail; iso_label and hostname are not checked (#78) | distro-contract/src/validate.rs:534-578,1029-1036,1144-1157 | Use `Path::components`; add RFC checks | S |
-| low | Some scenarios report under the wrong `ContractScope` (#86) | distro-contract/src/error.rs:6-15; distro-contract/src/validate.rs:131-146,1206-1256 | Add the missing scopes | S |
-| low | The Acorn seed `etc/shadow` is dead; live-docs.sh launches tmux and acorn-docs, which are absent; a missing seed_overlay is skipped (#54) | distro-variants/acorn/ring2/overlays/live/etc/{shadow,profile.d/live-docs.sh:12-30}; distro-builder/src/artifact/live_overlay.rs:73-153 | Delete the seed shadow; fix the launcher; make a missing overlay a load error | S |
-| low | `inst.sshd=0` is forced onto Acorn through the base invariants (#61) | distro-contract/src/schema.rs:9; distro-contract/src/variant.rs:1474-1488 | Move it to levitate's scenarios.toml | S |
-| low | Levitate's boot_baseline repeats `copy_file` for files already copied by `copy_tree` (#62) | distro-variants/levitate/ring2/products.toml:57-165 | Use an explicit `require_file` kind | S |
+| medium | Empty `output_names` panics the loader before validation can report it (#51 #63) | distro/contract/src/variant.rs:1361-1380 | `.first()` plus a load error | S |
+| low | Only build-host.toml's `schema_version` is checked (#50 #67) | distro/contract/src/variant.rs:572,1516-1531 | Check every manifest | S |
+| medium | The derived `ArtifactIdentity` and the injected base defaults make some validator checks unreachable (#71) | distro/contract/src/variant.rs:577,1383-1497; distro/contract/src/validate.rs:193-311 | Drop the mirror; pick one policy for base defaults | M |
+| medium | Ring2 tagged enums accept unknown fields; two enums are parsed by hand from strings (#72) | distro/contract/src/variant.rs:924-985,1632-1702 | `deny_unknown_fields`; serde enums | S |
+| medium | The live-boot runtime check guesses the init system from the rootfs, ignores the declared overlay kind and duplicates the locale check (#74) | distro/contract/src/runtime.rs:747-1134 | Branch on `OverlayKind`; iterate services generically | M |
+| medium | `required_build_tools` is inaccurate and never checked against the host; a separate REQUIRED_TOOLS list exists (#55 #359) | distro/variants/*/build-host/build-host.toml:4-17; distro/builder/src/preflight/mod.rs:29-85 | Have preflight read the contract's list | S |
+| low | The kernel.release check is a prefix match, and the version token check is loose (#68) | distro/contract/src/runtime.rs:322-352; distro/contract/src/validate.rs:584-596 | Exact match after stripping localversion | S |
+| low | The same defect produces duplicate violations (#69) | distro/contract/src/validate.rs:131-190,932,1169-1170 | Call each check once | S |
+| low | Logical names are unvalidated strings, and product and scenario names are redefined per crate (#73 #366) | distro/contract/src/schema.rs:113-130,228-239; distro/builder/src/pipeline/planner.rs:243-280; testing/install-tests/src/scenarios/mod.rs:38-93 | Shared enum in distro-contract; validate references | M |
+| low | Runtime validators invent default paths when contract data is missing (#76) | distro/contract/src/runtime.rs:81-126,192-207,385-386 | Report a violation instead | S |
+| low | The recipe declaration check is a substring match; kernel.rhai never runs; the evidence script is redundant; `human:` notes are unresolved (#57 #77) | distro/contract/src/{variant.rs:486-517,build_host.rs:14-34}; distro/variants/*/build-host/{recipes/kernel.rhai,evidence/build-capability.sh} | Remove the ceremony or use a structural field | S |
+| low | Path validators accept `..` and `./x`; there is a dead loop tail; iso_label and hostname are not checked (#78) | distro/contract/src/validate.rs:534-578,1029-1036,1144-1157 | Use `Path::components`; add RFC checks | S |
+| low | Some scenarios report under the wrong `ContractScope` (#86) | distro/contract/src/error.rs:6-15; distro/contract/src/validate.rs:131-146,1206-1256 | Add the missing scopes | S |
+| low | The Acorn seed `etc/shadow` is dead; live-docs.sh launches tmux and acorn-docs, which are absent; a missing seed_overlay is skipped (#54) | distro/variants/acorn/ring2/overlays/live/etc/{shadow,profile.d/live-docs.sh:12-30}; distro/builder/src/artifact/live_overlay.rs:73-153 | Delete the seed shadow; fix the launcher; make a missing overlay a load error | S |
+| low | `inst.sshd=0` is forced onto Acorn through the base invariants (#61) | distro/contract/src/schema.rs:9; distro/contract/src/variant.rs:1474-1488 | Move it to levitate's scenarios.toml | S |
+| low | Levitate's boot_baseline repeats `copy_file` for files already copied by `copy_tree` (#62) | distro/variants/levitate/ring2/products.toml:57-165 | Use an explicit `require_file` kind | S |
 
 ### Testing harness reliability
 | Severity | Finding | Location | Fix | Effort |
@@ -398,7 +398,7 @@ Top themes:
 | low | Automated login uses root and ignores the contract's username and prompt (#204) | testing/install-tests/src/scenarios/mod.rs:716,755 | Use the contract values, or remove the unused fields | S |
 | low | Preflight's "required" resolvers require nothing, and the first `*.iso` in read_dir order can be substituted (#207) | testing/install-tests/src/preflight.rs:462-494,622-644,702-716 | Bail with the expected path | S |
 | low | The shell scenario library exits at the first failure under `set -e`, so the summary never prints; scripts use bash-isms under `#!/bin/sh` (#208) | testing/install-tests/test-scripts/lib/common.sh:99-149 | Record failures and return 0; use printf | S |
-| low | Broad substring fatal patterns, copied in 5+ places; leviso treats "Reached target" as boot success (#210 #344) | testing/install-tests/src/distro/{openrc_base.rs:42,levitate.rs:37-115}; leviso/src/qemu.rs:19-266; distro-builder/src/qemu.rs:14-31 | Keep one anchored list in recqemu or the contract | S |
+| low | Broad substring fatal patterns, copied in 5+ places; leviso treats "Reached target" as boot success (#210 #344) | testing/install-tests/src/distro/{openrc_base.rs:42,levitate.rs:37-115}; leviso/src/qemu.rs:19-266; distro/builder/src/qemu.rs:14-31 | Keep one anchored list in recqemu or the contract | S |
 | low | The install scenario leaves runs stuck in "building", and a prune error turns a pass into a failure (#212) | testing/install-tests/src/scenarios/mod.rs:521-532,633-637,1166-1184 | Put all post-start work inside the closure; best-effort prune | S |
 | low | Boot-injection payloads and ISOs pile up in /tmp, possibly with keys (#213) | testing/install-tests/src/boot_injection.rs:24-103; testing/install-tests/src/qemu/session.rs:139-148 | Build once per run in the run dir | S |
 | low | `#[cheat_aware]` defaults every field, so empty metadata compiles (#231) | testing/cheat-test/src/lib.rs:91-176 | Required keys; validate the allowed values | S |
@@ -411,10 +411,10 @@ Top themes:
 ### Error handling & CLI contracts
 | Severity | Finding | Location | Fix | Effort |
 |---|---|---|---|---|
-| medium | The kernel pre-install check reports every failure as "not preinstalled" and drops the error chain (#8) | distro-builder/src/pipeline/kernel.rs:23-90 | Format with `{e:#}`; give rebuild advice only on a real "not installed" | S |
+| medium | The kernel pre-install check reports every failure as "not preinstalled" and drops the error chain (#8) | distro/builder/src/pipeline/kernel.rs:23-90 | Format with `{e:#}`; give rebuild advice only on a real "not installed" | S |
 | medium | A failed SSH host-key regeneration is silent under `--quiet`, and the install exits 0 (#145) | tools/recstrap/src/main.rs:436-445; tools/recstrap/src/helpers.rs:139-146 | Always warn; offer `--require-ssh-keys` | S |
 | medium | recfstab falls back to `/dev/sdX` paths silently and swallows swap read errors (#156) | tools/recfstab/src/device.rs:90-124; tools/recfstab/src/lib.rs:136-144; tools/recfstab/src/swap.rs:22-25 | Warn on stderr; propagate errors other than NotFound | S |
-| low | Hand-rolled CLI with undocumented aliases, still used by the hooks (#25) | distro-builder/src/bin/workflows/{commands.rs:4-115,parse.rs:36-64}; distro-variants/_shared/ring0/hooks/release-artifacts.sh:47 | Move to clap; delete the aliases | M |
+| low | Hand-rolled CLI with undocumented aliases, still used by the hooks (#25) | distro/builder/src/bin/workflows/{commands.rs:4-115,parse.rs:36-64}; distro/variants/_shared/ring0/hooks/release-artifacts.sh:47 | Move to clap; delete the aliases | M |
 | low | Error codes and exit codes mean different things in each rec* CLI; recchroot passes child exits straight through (#158) | tools/recstrap/src/error.rs:72-74; tools/recchroot/src/main.rs:14-23,369-371; tools/recfstab/src/main.rs:199-205 | Shared ToolErrorCode; 128+N for signals | M |
 | low | recab exit codes come from matching message text, and status and rollback disagree on the known-good slot (#180) | tools/recab/src/lib.rs:65-105,317-359,1062 | Typed error enum with downcast | S |
 | low | reciso ignores `mmd` exit status (#153) | tools/reciso/src/lib.rs:476-509 | Use the checked `Cmd` wrapper | S |
@@ -422,23 +422,23 @@ Top themes:
 | low | The recstrap cheat-guard banner prints to end users even with `--quiet`; the check count is hardcoded to 14 (#167) | tools/recstrap/src/validation.rs:17-54; tools/recstrap/src/main.rs:401 | Show it only under a debug env var; count the checks run | S |
 | low | A missing firmware dir yields dozens of per-pattern failures; `--profile` substring-matches and picks the first hit; the default path is Levitate-only and cwd-relative (#243 #244 #252) | testing/hardware-compat/src/main.rs:12-56 | Validate input; stable ids; `--distro` | S |
 | low | hardware-compat has no JSON output, and High failures exit 0 (#247) | testing/hardware-compat/src/report.rs:78-139; testing/hardware-compat/src/main.rs:69-72 | `--format json`; `--fail-on` | M |
-| low | No structured logging (about 1,300 println calls); recipe machine events share stderr with human narration (#131 #369) | tools/recipe/src/core/output/logging.rs:69-79; distro-builder/src/cache.rs:28-33 | tracing with env-filter; `--events-fd` | M |
+| low | No structured logging (about 1,300 println calls); recipe machine events share stderr with human narration (#131 #369) | tools/recipe/src/core/output/logging.rs:69-79; distro/builder/src/cache.rs:28-33 | tracing with env-filter; `--events-fd` | M |
 
 ### Duplication / ownership
 | Severity | Finding | Location | Fix | Effort |
 |---|---|---|---|---|
-| medium | Four QEMU builders and three OVMF lookup rules; distro-builder's qemu.rs leaks children; recqemu's boot loop is copy-pasted (#18 #190 #343) | distro-builder/src/qemu.rs:14-560; tools/recqemu/src/lib.rs:49-466; tools/recqemu/src/serial/boot.rs; xtask/src/tasks/testing/scenarios.rs:768-792 | Make recqemu the single owner; delete distro-builder/src/qemu.rs | M |
-| medium | Shell scripts embedded as Rust strings; two divergent inittab and autologin generators (#19) | distro-builder/src/pipeline/{live_tools.rs:513-842,overlay.rs:262-323}; distro-builder/src/artifact/live_overlay.rs:95-473 | Move them to `distro-variants/*/overlays` as files | M |
-| medium | The release hook re-implements naming and output layout that Rust owns (#52 #353) | distro-variants/_shared/ring0/hooks/build-release.sh:19-44,79-106,240-350; distro-variants/_shared/ring0/hooks/release-artifacts.sh:103-115 | Use `${VAR:?}`; move the steps into distro-builder | L |
-| medium | About 600 lines of Variant* serde types mirror schema.rs (#70) | distro-contract/src/variant.rs:520-886,1382-1852 | Derive Deserialize on the schema types | L |
-| medium | The run-manifest format lives in 5 structs, with a second "latest successful run" resolver (#214 #354) | distro-builder/src/{run_history.rs:14-72,bin/run_history.rs}; testing/install-tests/src/{preflight.rs:327-329,scenarios/mod.rs:1302-1305} | One pub RunManifest with a status enum | M |
+| medium | Four QEMU builders and three OVMF lookup rules; distro-builder's qemu.rs leaks children; recqemu's boot loop is copy-pasted (#18 #190 #343) | distro/builder/src/qemu.rs:14-560; tools/recqemu/src/lib.rs:49-466; tools/recqemu/src/serial/boot.rs; xtask/src/tasks/testing/scenarios.rs:768-792 | Make recqemu the single owner; delete distro/builder/src/qemu.rs | M |
+| medium | Shell scripts embedded as Rust strings; two divergent inittab and autologin generators (#19) | distro/builder/src/pipeline/{live_tools.rs:513-842,overlay.rs:262-323}; distro/builder/src/artifact/live_overlay.rs:95-473 | Move them to `distro/variants/*/overlays` as files | M |
+| medium | The release hook re-implements naming and output layout that Rust owns (#52 #353) | distro/variants/_shared/ring0/hooks/build-release.sh:19-44,79-106,240-350; distro/variants/_shared/ring0/hooks/release-artifacts.sh:103-115 | Use `${VAR:?}`; move the steps into distro-builder | L |
+| medium | About 600 lines of Variant* serde types mirror schema.rs (#70) | distro/contract/src/variant.rs:520-886,1382-1852 | Derive Deserialize on the schema types | L |
+| medium | The run-manifest format lives in 5 structs, with a second "latest successful run" resolver (#214 #354) | distro/builder/src/{run_history.rs:14-72,bin/run_history.rs}; testing/install-tests/src/{preflight.rs:327-329,scenarios/mod.rs:1302-1305} | One pub RunManifest with a status enum | M |
 | medium | xtask scenarios.rs is a 1,446-line god module with 10–12-argument functions (#102 #364) | xtask/src/tasks/testing/scenarios.rs:103-1446 | Split into modules; options struct; reuse recqemu and recshuttle | M |
 | medium | install_once is about 450 lines with three copy-pasted phase blocks (#124) | tools/recipe/src/core/executor/private/flow.rs:14-458; tools/recipe/src/core/build_deps.rs:15-23 | `run_lifecycle_phase()` | M |
 | medium | hardware-compat holds 789 requirement literals for 217 options, with drifting severities (#241) | testing/hardware-compat/src/profiles/*.rs | Component table in TOML plus per-profile overrides | L |
-| low | Output layout and distro-id aliases are hardcoded in about 20 places; `write_json_atomic` exists three times (#13 #355 #428) | distro-builder/src/artifact_store/mod.rs:755-772; distro-builder/src/bin/artifact_paths.rs:3-27; distro-builder/src/pipeline/io.rs:76-116; distro-contract/src/runtime.rs:16-19 | Public `paths` module in distro-builder or distro-contract | M |
-| low | Four PATH lookup helpers, duplicated signal decoding, and the `which` crate barely used (#26) | distro-builder/src/process.rs:34-301; distro-builder/src/preflight/mod.rs:29-35 | One `which` | S |
-| low | Rootfs cache validity depends on hand-bumped version strings; trust-marker helpers are copied across four recipes (#20) | distro-builder/recipes/{alpine-live-source-rootfs.rhai:32,fedora-dvd-source-rootfs.rhai:23-59,fedora-preseed-iso.rhai:22-54} | Stamp from a hash of the recipe file; includable module | M |
-| low | AcornOS BOOT_MODULES hand-copies two shared lists (#85) | distro-spec/src/acorn/boot.rs:14-79 | Chain the shared lists | S |
+| low | Output layout and distro-id aliases are hardcoded in about 20 places; `write_json_atomic` exists three times (#13 #355 #428) | distro/builder/src/artifact_store/mod.rs:755-772; distro/builder/src/bin/artifact_paths.rs:3-27; distro/builder/src/pipeline/io.rs:76-116; distro/contract/src/runtime.rs:16-19 | Public `paths` module in distro-builder or distro-contract | M |
+| low | Four PATH lookup helpers, duplicated signal decoding, and the `which` crate barely used (#26) | distro/builder/src/process.rs:34-301; distro/builder/src/preflight/mod.rs:29-35 | One `which` | S |
+| low | Rootfs cache validity depends on hand-bumped version strings; trust-marker helpers are copied across four recipes (#20) | distro/builder/recipes/{alpine-live-source-rootfs.rhai:32,fedora-dvd-source-rootfs.rhai:23-59,fedora-preseed-iso.rhai:22-54} | Stamp from a hash of the recipe file; includable module | M |
+| low | AcornOS BOOT_MODULES hand-copies two shared lists (#85) | distro/spec/src/acorn/boot.rs:14-79 | Chain the shared lists | S |
 | low | The justfile repeats the SSH-key injection block 5 times (#97) | justfile:108-312 | `--ssh-pubkey` on xtask | M |
 | low | Three identical distro enums in xtask (#104) | xtask/src/cli/types.rs:4-37 | One validated id | S |
 | low | docs inspect and tui inspect duplicate the capture pipeline, including dead `script(1)` handling (#105) | xtask/src/tasks/docs/inspect.rs:187-298; xtask/src/tasks/tui/inspect.rs:263-322 | Move into `util/pty_capture.rs` | S |
@@ -451,16 +451,16 @@ Top themes:
 ### Dead & legacy code
 | Severity | Finding | Location | Fix | Effort |
 |---|---|---|---|---|
-| medium | Dead modules in distro-builder: build/kernel.rs (541 LOC, every function deprecated, including an "atomic swap" that deletes staging); a shell `build_cpio`; `unimplemented!()` initramfs and ISO stubs; byte-identical alpine/timing.rs; a mock recipe (#15 #163 #349 #350 #351 #367 #379 #380 #420) | distro-builder/src/{build/kernel.rs,artifact/cpio.rs,artifact/initramfs.rs:16-98,artifact/iso.rs:86-92,alpine/timing.rs}; distro-builder/recipes/mock-build-stdout-test.rhai | Delete them | S |
+| medium | Dead modules in distro-builder: build/kernel.rs (541 LOC, every function deprecated, including an "atomic swap" that deletes staging); a shell `build_cpio`; `unimplemented!()` initramfs and ISO stubs; byte-identical alpine/timing.rs; a mock recipe (#15 #163 #349 #350 #351 #367 #379 #380 #420) | distro/builder/src/{build/kernel.rs,artifact/cpio.rs,artifact/initramfs.rs:16-98,artifact/iso.rs:86-92,alpine/timing.rs}; distro/builder/recipes/mock-build-stdout-test.rhai | Delete them | S |
 | medium | install-tests' numbered phase1–6 step framework (about 2.8k LOC), the Executor trait and the `run` command that only bails (#205 #383 #421) | testing/install-tests/src/{steps/,executor.rs,bin/install-tests.rs} | Delete them | S |
-| low | distro-builder's public API is mostly legacy support (alpine, component, executor, recipe::linux bound to `downloads/`) (#16) | distro-builder/src/lib.rs:1-113; distro-builder/src/recipe/{mod.rs:389-483,linux.rs:31-140} | Move into the legacy crates or a `legacy` module | L |
+| low | distro-builder's public API is mostly legacy support (alpine, component, executor, recipe::linux bound to `downloads/`) (#16) | distro/builder/src/lib.rs:1-113; distro/builder/src/recipe/{mod.rs:389-483,linux.rs:31-140} | Move into the legacy crates or a `legacy` module | L |
 | low | Bugs in leviso's dead pipeline: unverified ISO renamed into place, ISO_LABEL mismatch, rpm2cpio shell strings, recipe lookup, unused common helpers, `unsafe set_var`, drifted rebuild inputs (#34 #37 #38 #41 #43 #44 #347) | leviso/src/{artifact/iso.rs,build/libdeps.rs,resolve.rs,common/,config.rs,rebuild.rs}; AcornOS/src/artifact/iso.rs:33 | Delete them with leviso | S |
 | low | AcornOS writes a placeholder recstrap script and skips recfstab and recchroot silently (#381) | AcornOS/src/component/custom/live.rs:98-188 | Delete with AcornOS | S |
 | low | Hardcoded `/home/vince` paths persisted into tracked recipes; `persist_ctx` defaults to true (#40 #426) | leviso/deps/{rocky,recstrap,recchroot}.rhai; tools/recipe/src/lib.rs:167 | Delete `leviso/deps`; default persist_ctx to false | S |
 | low | leviso stale docs and tracked junk (#42) | leviso/{CLAUDE.md,README.md,SUBSYSTEM_AUDIT.md,build.log} | Delete them | S |
 | low | The leviso docs-tui recipe builds a missing `src/index.tsx` (#284) | leviso/deps/docs-tui.rhai:17,117 | Delete it | S |
-| low | Dead flat-layout and legacy-filename handling in the loader (#56 #75) | distro-contract/src/variant.rs:33-75,599-815 | Delete it | S |
-| low | Unused distro-spec shell-string helpers (useradd, mount, services) and an unused CHROOT_BIND_MOUNTS "source of truth" (#80 #391) | distro-spec/src/shared/{users.rs:61-77,chroot.rs:13-75,services.rs:25-43} | Delete them | S |
+| low | Dead flat-layout and legacy-filename handling in the loader (#56 #75) | distro/contract/src/variant.rs:33-75,599-815 | Delete it | S |
+| low | Unused distro-spec shell-string helpers (useradd, mount, services) and an unused CHROOT_BIND_MOUNTS "source of truth" (#80 #391) | distro/spec/src/shared/{users.rs:61-77,chroot.rs:13-75,services.rs:25-43} | Delete them | S |
 | low | Dead recipe helpers (ShellCmd, url_utils, most of fs_utils, check_throws) (#123) | tools/recipe/src/helpers/internal/{cmd.rs,url_utils.rs} | Delete them; make `internal` `pub(crate)` | S |
 | low | Dead cheat API (`cheat_check!`, CheckResult, canary "detection") (#230) | testing/cheat-guard/src/lib.rs:172-231; testing/cheat-test/src/lib.rs:343-473 | Delete it | S |
 | low | Dead hardware-compat API (categories, recommended_*, Value, Serialize) (#245) | testing/hardware-compat/src/{profiles/mod.rs:10-100,kernel.rs:7,27} | Delete it | S |
@@ -475,7 +475,7 @@ Top themes:
 | Severity | Finding | Location | Fix | Effort |
 |---|---|---|---|---|
 | medium | leviso has 25 `#[test] #[ignore]` artifact tests aimed at an `output/initramfs-root` that nothing produces (#33 #365 #413 #422) | leviso/tests/{validation_tests.rs,helpers.rs,README.md} | Delete them (fsdbg checklists already cover this) | S |
-| low | Runnable ```rust doctests remain in distro-spec (#84) | distro-spec/src/lib.rs:23-36; distro-spec/src/acorn/packages.rs:14-20 | Change to ```text, or delete | S |
+| low | Runnable ```rust doctests remain in distro-spec (#84) | distro/spec/src/lib.rs:23-36; distro/spec/src/acorn/packages.rs:14-20 | Change to ```text, or delete | S |
 | low | The recguard spec prescribes minimum coverage and a traceability matrix (#169) | tools/recguard/REQUIREMENTS.md:278-306 | Replace with a list of scenarios | S |
 | low | Empty leftover unit-test dirs (#253 #298) | testing/hardware-compat/tests/; shared/tui-kit/tests/unit/; tui/kit/core/tests/unit/ | Delete them | S |
 
@@ -485,9 +485,9 @@ The gates (#3 #95 #206 #382 #419) are in Top priority 6. Process rules in the pu
 | Severity | Finding | Location | Fix | Effort |
 |---|---|---|---|---|
 | medium | leviso-cheat-guard and leviso-cheat-test are built twice, from the path and from crates.io (#107 #229 #323 #361 #423) | testing/cheat-guard/Cargo.toml:16; testing/rootfs-tests/Cargo.toml:10; Cargo.lock:1963-1995 | Path deps with a version, or `[patch.crates-io]` | S |
-| medium | Missing or inconsistent licenses: MIT-only crates under a dual-license root; no license on install-split-pane, which ships in the ISO; missing LICENSE files; stale root LICENSE text (#195 #326 #405 #431) | distro-builder/install-split-pane/Cargo.toml; testing/{hardware-compat,rootfs-tests,cheat-*}/Cargo.toml; tools/recfstab; tools/{recpart,recshuttle}; LICENSE:9-65 | Inherit `MIT OR Apache-2.0` from the workspace; add LICENSE files; fix the root text | S |
+| medium | Missing or inconsistent licenses: MIT-only crates under a dual-license root; no license on install-split-pane, which ships in the ISO; missing LICENSE files; stale root LICENSE text (#195 #326 #405 #431) | distro/builder/install-split-pane/Cargo.toml; testing/{hardware-compat,rootfs-tests,cheat-*}/Cargo.toml; tools/recfstab; tools/{recpart,recshuttle}; LICENSE:9-65 | Inherit `MIT OR Apache-2.0` from the workspace; add LICENSE files; fix the root text | S |
 | medium | librqbit pulls in about 290 of recipe's 391 deps, including a second HTTP/TLS stack and aws-lc (#329) | tools/recipe/Cargo.toml:33,40 | Put torrent behind an optional feature | M |
-| low | No `[workspace.dependencies]`; duplicate majors (which 5/7, thiserror 1/2, nix, bitflags) (#324 #362) | Cargo.toml:30-31; distro-builder/Cargo.toml:26; leviso/Cargo.toml:35 | Workspace deps; unify versions | M |
+| low | No `[workspace.dependencies]`; duplicate majors (which 5/7, thiserror 1/2, nix, bitflags) (#324 #362) | Cargo.toml:30-31; distro/builder/Cargo.toml:26; leviso/Cargo.toml:35 | Workspace deps; unify versions | M |
 | low | `[workspace.package]` is never inherited; editions are mixed (2021 and 2024); MSRV is set on only about 10 crates; the README says Rust 1.75+ (#325) | Cargo.toml:30; xtask/Cargo.toml:4; tools/recipe/Cargo.toml:4; README.md:81 | Inherit edition, MSRV and license; add rust-toolchain.toml | M |
 | low | Wrong repository URLs in the recipe and cheat crate manifests (#133 #327) | tools/recipe/Cargo.toml:7-9; tools/recipe/scripts/build-apk.sh:50; testing/cheat-{guard,test}/Cargo.toml:8 | Match `.gitmodules` | S |
 | low | Confirmed unused deps (recipe sha3 and semver; leviso dirs, walkdir and sha2; fsdbg colored, humansize and cheat-guard; hardware-compat serde_json, thiserror, walkdir and regex; install-tests libc) (#234 #246 #328) | tools/recipe/Cargo.toml:24,36; testing/fsdbg/Cargo.toml:18-20; testing/hardware-compat/Cargo.toml:9-16 | Remove them; confirm with cargo-machete | S |
@@ -498,7 +498,7 @@ The gates (#3 #95 #206 #382 #419) are in Top priority 6. Process rules in the pu
 | Severity | Finding | Location | Fix | Effort |
 |---|---|---|---|---|
 | medium | Standalone submodule CI cannot resolve its `../../` path deps (recstrap, recchroot, recpart, recipe, leviso, install-tests, docs/website `workspace:*`), so release jobs never fire; reusable workflows are pinned to `@master` (#121 #157 #310 #332 #395 #418) | tools/recstrap/{Cargo.toml:21-33,.github/workflows/ci.yml:29-116}; tools/recipe/{Cargo.toml:52-53,.github/workflows/ci.yml}; docs/website/{package.json:18,.github/workflows/ci.yml:12-23} | Build only from the superproject (delete the standalone CI), or check out the superproject; pin to a tag or SHA | M |
-| medium | `contents: write` granted to every job, including PR jobs; actions and toolchains are unpinned (#403) | leviso-elf/.github/workflows/ci.yml:17-18; tools/recipe/.github/workflows/ci.yml:17-18; .github/workflows/bun-ci.yml:32-34 | Read-only at the top level; write only on release; SHA pins | S |
+| medium | `contents: write` granted to every job, including PR jobs; actions and toolchains are unpinned (#403) | distro/elf/.github/workflows/ci.yml:17-18; tools/recipe/.github/workflows/ci.yml:17-18; .github/workflows/bun-ci.yml:32-34 | Read-only at the top level; write only on release; SHA pins | S |
 | low | Tags are inconsistent (`v.0.1.0-alpha`, `0.0.0-pre-alpha`, mixed `v` prefixes), and the recipe CHANGELOG has gaps (#404) | git tags; tools/recipe/CHANGELOG.md:8-23 | One format, `vX.Y.Z` | S |
 | low | Submodule URLs mix https and ssh; repo names differ from paths; `push.recurseSubmodules` is unset (#406) | .gitmodules:1-123 | https or relative URLs; set `push.recurseSubmodules check` | S |
 | low | Dead CI env vars (`REC_BUILD_RELEASE`, `RECIPE_BINARY`) (#409) | .github/workflows/ci.yml:11-12,31 | Remove them | S |
@@ -512,12 +512,12 @@ The gates (#3 #95 #206 #382 #419) are in Top priority 6. Process rules in the pu
 | medium | The homepage claims a local SmolLM3 model powers the recipe assistant; recipe only shells out to Codex or Claude (#305) | docs/website/src/pages/index.astro:165-167,457 | Correct the claim, or mark it as planned | S |
 | medium | Retired appliance variants and past release dates are still published (#306) | docs/content/src/content/04-architecture/03-atomic-updates.ts:63-69; docs/content/src/content/01-getting-started/01-getting-started.ts:34-41; docs/website/src/pages/download.astro:25-27 | Remove or update them | S |
 | medium | The public FAQ publishes agent-process rules that contradict AGENTS.md, "every commit is tested", and a link to a missing SUPPLY_CHAIN.md (#307) | docs/content/src/content/04-architecture/01-faq.ts:113,161,493-560 | Remove them | S |
-| medium | README and distro-spec say the base is Rocky; the product builds from Fedora 43; the Quick Start is leviso-era with broken `\\` continuations (#111 #427) | README.md:25-28,73-99,148-202; distro-spec/src/lib.rs:40 | Rewrite around `just release-build` | S |
+| medium | README and distro-spec say the base is Rocky; the product builds from Fedora 43; the Quick Start is leviso-era with broken `\\` continuations (#111 #427) | README.md:25-28,73-99,148-202; distro/spec/src/lib.rs:40 | Rewrite around `just release-build` | S |
 | medium | hardware-compat docs claim CI verification, CPU, UEFI and Secure Boot checks that do not exist (#250) | testing/hardware-compat/{README.md:7-21,CLAUDE.md:9-11,PLAN.md} | Rewrite; delete PLAN.md | S |
 | low | The recipe helper reference leaves out about 30 registered helpers, including the dnf, apk and rpm family (#318) | docs/content/src/content/03-helpers/01-overview.ts | Add a package-source helpers page | M |
-| low | distro-builder's README, lib.rs header and migration index describe an architecture that no longer exists (#24) | distro-builder/{README.md:9-77,src/lib.rs:1-56,docs/00_MIGRATION_INDEX.md:15-29} | Rewrite around the ring pipeline | S |
-| low | Variant READMEs and AcornOS/CLAUDE.md are wrong (#58 #368) | distro-variants/{levitate,acorn}/README.md; AcornOS/CLAUDE.md; leviso/CLAUDE.md:30-44; testing/install-tests/CLAUDE.md:45-49 | One distro-variants README; point at AGENTS.md | S |
-| low | distro-spec's README and CLAUDE.md misdescribe the crate (no_std, "Acorn stubbed"); the `std` feature does nothing (#83) | distro-spec/README.md:24-85 | Rewrite; drop the feature | S |
+| low | distro-builder's README, lib.rs header and migration index describe an architecture that no longer exists (#24) | distro/builder/{README.md:9-77,src/lib.rs:1-56,docs/00_MIGRATION_INDEX.md:15-29} | Rewrite around the ring pipeline | S |
+| low | Variant READMEs and AcornOS/CLAUDE.md are wrong (#58 #368) | distro/variants/{levitate,acorn}/README.md; AcornOS/CLAUDE.md; leviso/CLAUDE.md:30-44; testing/install-tests/CLAUDE.md:45-49 | One distro/variants README; point at AGENTS.md | S |
+| low | distro-spec's README and CLAUDE.md misdescribe the crate (no_std, "Acorn stubbed"); the `std` feature does nothing (#83) | distro/spec/README.md:24-85 | Rewrite; drop the feature | S |
 | low | Recipe lib.rs helper list, `--autofix-cwd` help text and APOLOGY.md are stale (#138) | tools/recipe/src/lib.rs:44-92; tools/recipe/src/bin/recipe/cli.rs:64-65; tools/recipe/APOLOGY.md | Fix or delete | S |
 | low | recpart docs describe a removed TUI and cargo-test baselines; unused tool requirements and error codes (#183) | tools/recpart/docs/installer-production-readiness-gaps.md; tools/recpart/REQUIREMENTS.md:118-142; tools/recpart/src/preflight.rs:52-61 | Delete or move them | S |
 | low | install-tests CLAUDE.md, FAIL_FAST_POLICY.md and APOLOGY.md describe a harness that no longer exists (#211) | testing/install-tests/{CLAUDE.md:28-53,docs/FAIL_FAST_POLICY.md:73-80,APOLOGY.md} | Rewrite or delete | S |
@@ -570,12 +570,12 @@ The gates (#3 #95 #206 #382 #419) are in Top priority 6. Process rules in the pu
 - **superproject (CI, justfile, root config): D.** CI does not run on submodule bumps, lockfiles are gitignored, and the policy gates are forced.
 - **distro-builder: C.** The active pipeline is sound, but supply chain in the payload, the forced policy gate and legacy library bloat drag it down.
 - **distro-contract: B.** It is the right owner, but validation is opt-in, parts of the schema are never validated, and it carries about 600 lines of serde mirror types.
-- **distro-variants: B-.** The manifests are clean but declare outputs nothing builds, and the shared hook re-implements logic Rust owns.
+- **distro/variants: B-.** The manifests are clean but declare outputs nothing builds, and the shared hook re-implements logic Rust owns.
 - **distro-spec: C.** Marked deprecated but load-bearing, it duplicates kernel and identity facts and defaults the boot editor to on.
 - **xtask: C.** A 1,446-line scenarios module, process gates, and VNC on 0.0.0.0.
 - **leviso: D.** Dead, uncompiled code with ignored tests, kept alive only by recart.
 - **leviso-elf: C.** Copy follows symlinks, readelf parsing depends on locale, and it auto-publishes on every push.
-- **AcornOS: D.** Broken at runtime, duplicates distro-variants, and is still a workspace member.
+- **AcornOS: D.** Broken at runtime, duplicates distro/variants, and is still a workspace member.
 - **tools/recipe: C.** ctx persistence and scope drift, tar hard links, and standalone CI that cannot build.
 - **tools/recstrap: C.** Plaintext password script, and `--force` overrides every guard.
 - **tools/recfstab: B.** Drops `ro` and `noatime`, and falls back to `/dev/sdX` silently.

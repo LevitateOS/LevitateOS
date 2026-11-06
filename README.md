@@ -25,7 +25,7 @@ By default, LevitateOS is **A/B immutable**: recipes compose changes into the in
 | **Base** | Rocky Linux RPMs | Alpine Linux APKs |
 | **Best for** | Maximum compatibility | Smaller, simpler base |
 
-Both share the same recipe system and build tooling. Variant specs live in `distro-spec/src/{levitate,acorn}/`.
+Both share the same recipe system and build tooling. Variant specs live in `distro/spec/src/{levitate,acorn}/`.
 
 ## Recipe System
 
@@ -154,7 +154,7 @@ tools/
   recstrap/       # System extractor (like pacstrap)
   recfstab/       # Fstab generator (like genfstab)
   recchroot/      # Chroot helper (like arch-chroot)
-distro-spec/      # Shared specifications
+distro/spec/      # Shared specifications
 testing/          # E2E test suites
 AcornOS/          # Alpine-based variant
 ```

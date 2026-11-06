@@ -1,7 +1,7 @@
 # leviso Consolidation Checklist
 
 **Date:** 2026-02-10
-**Goal:** Eliminate all code duplication between `leviso/` and `distro-builder/`, converging leviso into a thin wrapper like AcornOS.
+**Goal:** Eliminate all code duplication between `leviso/` and `distro/builder/`, converging leviso into a thin wrapper like AcornOS.
 
 **Current state:** leviso is ~11,348 LoC reimplementing what distro-builder already provides. AcornOS is ~2,000 LoC thin wrappers. The end state is leviso at a similar size.
 
@@ -31,7 +31,7 @@ These are copy-pasted modules that can be deleted and replaced with imports. No 
 **Files:**
 | Delete | Replace with |
 |--------|-------------|
-| `leviso/src/timing.rs` | `distro-builder/src/alpine/timing.rs` |
+| `leviso/src/timing.rs` | `distro/builder/src/alpine/timing.rs` |
 
 **Details:** 100% identical. Same `Timer` struct, same `Display` impl, same `elapsed()` method. Zero risk swap.
 
@@ -48,7 +48,7 @@ These are copy-pasted modules that can be deleted and replaced with imports. No 
 **Files:**
 | Delete | Replace with |
 |--------|-------------|
-| `leviso/src/cache.rs` | `distro-builder/src/cache.rs` |
+| `leviso/src/cache.rs` | `distro/builder/src/cache.rs` |
 
 **Details:** 99% identical. Functions: `hash_files()`, `needs_rebuild()`, `write_cached_hash()`, `is_newer()`. Only difference is minor formatting. May need to verify distro-builder re-exports `cache` module publicly.
 
@@ -64,7 +64,7 @@ These are copy-pasted modules that can be deleted and replaced with imports. No 
 **Files:**
 | Delete | Replace with |
 |--------|-------------|
-| `leviso/src/build/executor/directories.rs` | `distro-builder/src/executor/directories.rs` |
+| `leviso/src/build/executor/directories.rs` | `distro/builder/src/executor/directories.rs` |
 
 **Details:** 100% identical code. Direct drop-in.
 
@@ -81,7 +81,7 @@ These are copy-pasted modules that can be deleted and replaced with imports. No 
 **Files:**
 | Delete | Replace with |
 |--------|-------------|
-| `leviso/src/build/executor/files.rs` | `distro-builder/src/executor/files.rs` |
+| `leviso/src/build/executor/files.rs` | `distro/builder/src/executor/files.rs` |
 
 **Details:** 95% identical. Minor differences in error messages only.
 
@@ -93,7 +93,7 @@ These require more thought — leviso's types are structurally similar but not i
 
 ### 2.1 BuildContext Unification
 
-- [ ] Compare `leviso/src/build/context.rs` fields with `distro-builder/src/context.rs`
+- [ ] Compare `leviso/src/build/context.rs` fields with `distro/builder/src/context.rs`
 - [ ] Document field differences (if any)
 - [ ] If distro-builder's BuildContext is a superset: delete leviso's, import distro-builder's
 - [ ] If leviso has extra fields: either add them to distro-builder (if generic) or create a leviso wrapper struct that holds `distro_builder::BuildContext` + extras
@@ -105,13 +105,13 @@ These require more thought — leviso's types are structurally similar but not i
 **Files:**
 | leviso | distro-builder |
 |--------|---------------|
-| `leviso/src/build/context.rs` | `distro-builder/src/context.rs` |
+| `leviso/src/build/context.rs` | `distro/builder/src/context.rs` |
 
 **Details:** Both hold base_dir, output, staging paths. leviso may have Rocky/systemd-specific fields that need accommodation.
 
 ### 2.2 EROFS Rootfs Builder
 
-- [ ] Compare `leviso/src/artifact/rootfs.rs` API with `distro-builder/src/artifact/erofs.rs`
+- [ ] Compare `leviso/src/artifact/rootfs.rs` API with `distro/builder/src/artifact/erofs.rs`
 - [ ] Document differences (Rocky vs Alpine paths, compression options, etc.)
 - [ ] If distro-builder's is configurable enough: switch leviso to use it
 - [ ] If not: extend distro-builder's erofs builder to support leviso's needs, then switch
@@ -123,11 +123,11 @@ These require more thought — leviso's types are structurally similar but not i
 **Files:**
 | leviso | distro-builder |
 |--------|---------------|
-| `leviso/src/artifact/rootfs.rs` | `distro-builder/src/artifact/erofs.rs` |
+| `leviso/src/artifact/rootfs.rs` | `distro/builder/src/artifact/erofs.rs` |
 
 ### 2.3 CPIO / Initramfs Builder
 
-- [ ] Compare `leviso/src/artifact/initramfs.rs` with `distro-builder/src/artifact/cpio.rs`
+- [ ] Compare `leviso/src/artifact/initramfs.rs` with `distro/builder/src/artifact/cpio.rs`
 - [ ] Document differences (busybox-based tiny init vs systemd-based)
 - [ ] leviso builds TWO initramfs (tiny live + systemd install) — verify distro-builder supports both patterns
 - [ ] Switch to distro-builder's cpio builder
@@ -139,7 +139,7 @@ These require more thought — leviso's types are structurally similar but not i
 **Files:**
 | leviso | distro-builder |
 |--------|---------------|
-| `leviso/src/artifact/initramfs.rs` | `distro-builder/src/artifact/cpio.rs` |
+| `leviso/src/artifact/initramfs.rs` | `distro/builder/src/artifact/cpio.rs` |
 
 ### 2.4 ISO Builder
 
@@ -179,7 +179,7 @@ This is the largest change. leviso's bespoke component system (~2,500 LoC) gets 
 
 ### 3.1 Understand the Installable Pattern
 
-- [ ] Read `distro-builder/src/installable.rs` — understand `Installable` trait and `Op` enum
+- [ ] Read `distro/builder/src/installable.rs` — understand `Installable` trait and `Op` enum
 - [ ] Read AcornOS component definitions to see how they declare components as `Vec<Op>`
 - [ ] Document the mapping: which leviso `component/custom/*.rs` functions map to which `Op` variants
 
@@ -234,7 +234,7 @@ For each component file, determine the migration path:
 
 ### 3.5 Build Orchestration
 
-- [ ] Compare `leviso/src/build/mod.rs` with `distro-builder/src/builder.rs`
+- [ ] Compare `leviso/src/build/mod.rs` with `distro/builder/src/builder.rs`
 - [ ] Migrate leviso's build sequencing to use distro-builder's `Builder` abstraction
 - [ ] Delete leviso's custom orchestration code
 - [ ] Rebuild ISO + stage 1 passes
@@ -256,11 +256,11 @@ These are the key refactoring efforts in distro-builder / AcornOS that leviso di
 
 1. **Installable trait + Op enum** — Replaced per-component functions with declarative component definitions. AcornOS adopted; leviso still uses procedural `component/custom/*.rs`. (Phase 3)
 
-2. **Shared artifact builders** — `distro-builder/src/artifact/erofs.rs` and `cpio.rs` extracted from AcornOS. leviso still has its own in `artifact/`. (Phase 2.2-2.4)
+2. **Shared artifact builders** — `distro/builder/src/artifact/erofs.rs` and `cpio.rs` extracted from AcornOS. leviso still has its own in `artifact/`. (Phase 2.2-2.4)
 
-3. **Shared executor** — `distro-builder/src/executor/` extracted directory/file/user operations. leviso has identical code in `build/executor/`. (Phase 1.3-1.4)
+3. **Shared executor** — `distro/builder/src/executor/` extracted directory/file/user operations. leviso has identical code in `build/executor/`. (Phase 1.3-1.4)
 
-4. **Cache module extraction** — `distro-builder/src/cache.rs` extracted for shared use. leviso still has its own copy. (Phase 1.2)
+4. **Cache module extraction** — `distro/builder/src/cache.rs` extracted for shared use. leviso still has its own copy. (Phase 1.2)
 
 5. **BuildContext unification** — distro-builder's `BuildContext` became the standard. leviso still has its own. (Phase 2.1)
 
@@ -272,7 +272,7 @@ These are the key refactoring efforts in distro-builder / AcornOS that leviso di
 
 When all boxes are checked:
 - leviso is a ~2,000-4,000 LoC thin wrapper
-- `distro-spec/src/levitate/` provides all LevitateOS constants
-- `distro-builder/` provides all build logic
+- `distro/spec/src/levitate/` provides all LevitateOS constants
+- `distro/builder/` provides all build logic
 - leviso only contains LevitateOS-specific wiring (which distro-spec constants to use, build order, CLI)
 - Removing AcornOS leaves LevitateOS unbroken (and vice versa)

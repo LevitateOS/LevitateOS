@@ -189,7 +189,7 @@ owned by the coordinator and publication parents remain private; privileged
 production does not automatically make a product accessible to an ordinary user.
 
 For real compilation use `distro-builder artifact prepare-tool-source recfstab
-.artifacts/recfstab-source`, then the canonical `distro-builder/recipes/recfstab.rhai`
+.artifacts/recfstab-source`, then the canonical `distro/builder/recipes/recfstab.rhai`
 with `--input source=...`; the recipe compiles inside Ginux. For QEMU preparation
 use `cargo xtask setup`; boot scenarios consume the selected existing product.
 

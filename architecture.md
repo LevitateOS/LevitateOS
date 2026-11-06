@@ -1,6 +1,6 @@
 # Builds and scenarios
 
-LevitateOS and AcornOS use ring-owned manifests under `distro-variants/<distro>/`.
+LevitateOS and AcornOS use ring-owned manifests under `distro/variants/<distro>/`.
 
 | Owner | Responsibility | Manifest |
 |---|---|---|

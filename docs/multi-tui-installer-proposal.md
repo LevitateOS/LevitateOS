@@ -12,7 +12,7 @@ This proposal intentionally avoids a monolithic, highly-branching installer flow
 
 ## Scope Gate (live-tools Policy)
 
-This proposal applies only to distro variants that declare live-tools `install_experience = "ux"` in `distro-variants/*/scenarios/scenarios.toml` under `[scenarios.live_tools]`.
+This proposal applies only to distro variants that declare live-tools `install_experience = "ux"` in `distro/variants/*/scenarios/scenarios.toml` under `[scenarios.live_tools]`.
 
 - In-scope UX variants: `levitate`, `acorn`
 

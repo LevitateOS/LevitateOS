@@ -32,7 +32,7 @@ These rules apply to every directory and submodule, recursively, across Git repo
 - For releases, produce reproducible artifacts and validate declared products, provenance, and relevant integration/e2e behavior. Development convenience is not release evidence.
 
 ## Code ownership
-- Prefer `distro-variants/*`, `distro-builder`, `distro-contract`, `distro-spec`, `testing/*`, `tools/*`, `tui`, and `xtask` for active work. Edit legacy crates when the requested work requires it.
+- Active work lives in `distro/*` (builder, contract, spec, elf, variants), `testing/*`, `tools/*`, `tui`, and `xtask`.
 - Keep JavaScript/TypeScript ESM-only.
 - Run workflows through `cargo xtask` (`cargo xtask --help` lists them; `just` has short aliases). Direct commands are fine.
 - When asked to commit everything, commit changed submodules first, then the superproject pointers.

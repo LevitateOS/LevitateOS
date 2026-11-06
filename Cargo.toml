@@ -1,11 +1,11 @@
 [workspace]
 resolver = "2"
 members = [
-    "distro-spec",
-    "distro-contract",
-    "distro-builder",
-    "distro-builder/install-split-pane",
-    "leviso-elf",
+    "distro/spec",
+    "distro/contract",
+    "distro/builder",
+    "distro/builder/install-split-pane",
+    "distro/elf",
     "xtask",
     "tools/recipe",
     "tools/recinit",
