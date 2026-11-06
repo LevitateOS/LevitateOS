@@ -1099,6 +1099,11 @@ The entrypoint has no test branches (`--probe`, `LEVITATE_INSTALL_ENTRYPOINT_SMO
 
 **Depends on:** F19, F23.
 
+
+### Leave as is
+
+F24 was not applied: rewriting the install tests to drive the real serial launch needs a booting QEMU, and this machine can't even prepare products without root. Replacing `--probe`/`--smoke` with a check that can't be run here would drop the UX coverage the tests have today. The launcher (F19) and split pane (F23) keep both test branches working; the new check is: boot one live-tools ISO with `INSTALL_UX_SERIAL=1`, and on the serial console's composed screen expect the docs title and a shell that answers after Ctrl-].
+
 - `D008` [special] `xtask/src/tasks/scenarios.rs:157-159` injects `LEVITATE_INSTALL_SERIAL_UX=1` for the `live-boot` product too. That ISO has no install entrypoint, so the flag only works because each reader guards with `[ -x @INSTALL_ENTRYPOINT@ ]`.
 - `D028` [hidden] `live_ux.rs:21` defines `SPLIT_SMOKE_OK = "split-smoke:ok"`, but the producer at `main.rs:226` prints its own literal `"split-smoke:ok left=…"`. The constant's comment points at the binary, but the binary can't import it.
 - `D043` [special] `live_tools.rs:533-541` (`--probe`) and `:548-554` (`LEVITATE_INSTALL_ENTRYPOINT_SMOKE=1` → `--smoke`) are test-only branches compiled into the shipped entrypoint, which matches helper names by shell `case` patterns.
@@ -1115,8 +1120,6 @@ The entrypoint has no test branches (`--probe`, `LEVITATE_INSTALL_ENTRYPOINT_SMO
 - `D099` [needless] `testing/install-tests/src/scenarios/mod.rs:28-31` and `qemu/serial/mod.rs:71`: the test crate depends on the whole `distro-builder` crate (`testing/install-tests/Cargo.toml:18`) to read the string constants in `live_ux.rs`. The UX's guest-facing interface lives inside the builder's internals.
 - `D100` [hidden] `testing/install-tests/src/scenarios/mod.rs:954` accepts both `SPLIT_HELPER` and `*/SPLIT_HELPER`, mirroring the two `choose_install_helper` rungs at `live_tools.rs:518-528`. Change the ladder and the test has to change too.
 - `D119` [hidden] `schema.rs:357-359` documents `serial_ready_patterns` as the readiness lines when "the serial console runs the install UX", but the harness never runs serial UX (see the install-test entries above).
-
-### Leave as is
 
 Left from F22: pinning bun and building the docs bundle offline need a new acquisition recipe (a pinned bun release with its checksum, and the root workspace's JS dependencies as an offline input). The recipe runner needs host privileges this machine doesn't have, and other sessions are reworking package acquisition (Fedora RPM base), so this is its own task. Until then the builder copies the host's bun and runs `bun install --frozen-lockfile` (B136, D067, D068). apk packages still come over the network inside `unshare` + `chroot` (D072), for the same reason; the host resolv.conf no longer stays in the image. The split pane's manifest still spells out its dependency versions (D063): the source producer refuses `workspace = true` dependencies, and teaching it inheritance isn't worth it for one manifest.
 
@@ -1285,4 +1288,4 @@ Commits land on the checked-out branches (superproject `master`, submodules `cod
   - argv parsing returns `Help`/`Version`/`Run` and `main` acts on it (no exit inside the parser). Not clap: `--left PROGRAM ARGS... --right PROGRAM ARGS...` takes everything up to `--right`, which clap expresses only through a value terminator.
   - **Bug fixed:** Ctrl-] and the other control characters terminals report as Ctrl-digit (0x1C–0x1F) were sent to panes as the wrong byte (Ctrl-5 became Ctrl-U).
   - Verified in a PTY (scratch vt100 driver): both panes draw at 80×16 with the shell cursor at the prompt; Ctrl-] moves focus; F5 reaches the docs pane as `^[[15~`; a docs program exiting 3 shows "Docs (exit 3) Enter restarts" and Enter starts it again with a new PID; Ctrl-q exits 0; `--smoke` passes; a missing pane program fails with "right pane: 'nosuch' is not a program on PATH".
-- [ ] F24 — Install tests exercise the real launch, not a smoke stand-in.
+- [ ] F24 — Install tests exercise the real launch, not a smoke stand-in. Not applied: needs a booting QEMU; its problems moved to Leave as is.
