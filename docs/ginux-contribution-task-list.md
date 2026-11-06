@@ -782,8 +782,8 @@ source/runtime acceptance. Exact source and context previews are retained in
 Earlier P02/P03 and candidate results remain historical records; current-main
 reconciliation is required before final closure.
 
-Exact next action: refresh R04's current-main prerequisite serially, starting
-with G03b's VFS foundation on refreshed G05a. This local dependency preparation
+Exact next action: refresh R04's current-main prerequisite serially, continuing
+with G03c's configured-storage adapter on refreshed G03b/G03a. This local dependency preparation
 stays blocked for standalone delivery until G05a actually merges upstream.
 G05a is refreshed at
 `936d0eb7a9b46e58ade5219705c12d3d476dfae9`, solely on observed main `8a475e8b`:
@@ -805,8 +805,13 @@ coverage. The one-file +118 scope is unchanged and binaries match.
 [Review](ginux-contributions/g06a-review.md) keeps full default/runtime/macOS
 checks pending. Initial 37-patch integrity results remain historical;
 the new `upstream-refresh-2026-11-06/current-inventory.json` verifies all 37
-currently retained patch/head hashes and exact-parent replays, including these
-three refreshed heads. The other 34 still need current-main reconciliation;
+currently retained patch/head hashes and exact-parent replays, including the initial
+three refreshed heads. G03b's fresh manifest separately verifies its new head. G03b is now refreshed at `5fb12ab4a56efd365d7d451d181f6e2a41c9d31d` on refreshed G05a:
+all 85 units/static/build and eight ordinary controls pass in source/clean,
+with all 187 tracked paths and both binaries matching. Its one-file +425/-6
+delta is unchanged. [Review](ginux-contributions/g03b-review.md) keeps actual
+G05a upstream merge, full default/runtime/security and macOS acceptance pending.
+The other 33 still need current-main reconciliation;
 integrity is not source/runtime acceptance. The fresh preserved-worktree report
 also confirms all six restored HEAD, raw-index and staged/unstaged/conflict-status
 fingerprints are unchanged. Reconcile the

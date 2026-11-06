@@ -1,6 +1,11 @@
 # G03b — bounded writable VFS primitives
 
-Local feature commit `785bfb9d6b7fcfb901d9f5efb8a845c8d9d4d53a`.
+Current retained local commit `5fb12ab4a56efd365d7d451d181f6e2a41c9d31d` on refreshed G05a
+`936d0eb7a9b46e58ade5219705c12d3d476dfae9`, rooted at observed main `8a475e8b`.
+The current-main refresh below owns fresh evidence and pending checks; earlier
+results remain historical.
+
+Earlier local feature commit `785bfb9d6b7fcfb901d9f5efb8a845c8d9d4d53a`.
 Explicit local prerequisite: G05a `bb2c82bf18bb30a7ebc514af5131fa5b03a5fcc5`.
 Underlying upstream baseline: `3f2fe7df`. One file, +425/-6 relative to G05a.
 [Retained source patch](patches/G03b.patch).
@@ -65,3 +70,46 @@ not a PR against current main and must not be published as a stack. After that
 merge, refresh this isolated feature on main and repeat affected checks before
 publication. macOS Actions/full Rocky VM checks are unrun. The broader G03 storage
 adapter remains pending. No real Git index/ref/worktree/remote was modified.
+
+## Current-main refresh — 2026-11-06
+
+The retained patch still changes only `crates/ginux-vfs/src/lib.rs`, +425/-6
+relative to refreshed G05a. Its full source delta is byte-identical to the
+previous corrected extraction. All current upstream VFS tests and the three
+G05a offset tests remain, along with nine capability/boundary tests. The new
+native/domain/network code and CI wiring are unchanged.
+
+A separate self-review reread the complete diff, component resolver,
+lookup/open/read/write/unlink/copy-up owners and existing `vfs_main` caller.
+Directory creation reserves the existing bounded overlay owner; metadata uses
+virtual IDs, seek updates G05a's shared position only after validation, append
+uses current EOF and sparse writes zero holes. Exclusive creation checks the
+final entry without following links. Mode updates and CLOEXEC use their existing
+object/descriptor owners. No new blocking source correction was identified;
+independent reviewer or security acceptance is not claimed.
+
+Both source and independent clean G05a-plus-only-G03b replay pass:
+
+- `make check test-unit build build-launch-fixture build-process-fixtures build-gate1-fixture`, including all 85 current unit tests and 24 VFS tests.
+- Eight selected ordinary configured-launch/valid-wait controls per export.
+
+The nine added VFS cases demonstrate directories/metadata, sparse/append I/O,
+shared alias seek, final-link exclusive creation, capacity failure without
+mutation, unlinked-object lifetime, mode/CLOEXEC separation and discarded-byte
+handling. These are library capability evidence; the configured runtime adapter
+is a separate G03c packet and is not established by these checks.
+
+All 187 tracked paths match the retained commit in source and clean exports.
+Both binaries hash `fd6d6987625672f8d2e7c8a3619459bab6428f9d5cc431e187c65e8f97b67706`.
+Exact commands, logs, receipts, earlier/new patches, source exports, manifest and
+concise draft are retained under
+`.artifacts/ginux-contribution-preparation/upstream-refresh-2026-11-06/G03b/`.
+Builds use separate target directories and no real branch/index/checkout or remote
+text was changed.
+
+Standalone delivery remains blocked until G05a actually merges upstream; this
+local composition must not be published as a stack. Full default Linux runtime
+jobs contain authority/protected/fault cases and remain unrun under the written
+security boundary. macOS/remote CI also remains unrun. R03/R04 keep those
+acceptance and prerequisite requirements pending; ordinary success is not full
+CI, security acceptance or publication authorization.

@@ -1,6 +1,6 @@
-From 785bfb9d6b7fcfb901d9f5efb8a845c8d9d4d53a Mon Sep 17 00:00:00 2001
+From 5fb12ab4a56efd365d7d451d181f6e2a41c9d31d Mon Sep 17 00:00:00 2001
 From: vince <vincepaul.liem@gmail.com>
-Date: Fri, 6 Nov 2026 09:22:20 +0100
+Date: Fri, 6 Nov 2026 22:28:25 +0100
 Subject: [PATCH] feat(vfs): add bounded writable metadata and file positioning
 
 Add virtual inode metadata, owned directories, mode changes, seek,
@@ -16,7 +16,7 @@ Signed-off-by: vince <vincepaul.liem@gmail.com>
  1 file changed, 425 insertions(+), 6 deletions(-)
 
 diff --git a/crates/ginux-vfs/src/lib.rs b/crates/ginux-vfs/src/lib.rs
-index f196ad13..48170e5b 100644
+index f196ad13c82f69327a8859cb8042fa4a6e51a3be..48170e5b2fbe7f708326ae9ac33b7c250a129897 100644
 --- a/crates/ginux-vfs/src/lib.rs
 +++ b/crates/ginux-vfs/src/lib.rs
 @@ -11,6 +11,8 @@ pub const O_WRITE: u32 = 2;
