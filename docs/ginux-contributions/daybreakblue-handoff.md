@@ -206,3 +206,32 @@ hunks from680d5081 are retained as held-thread-join.patch in the G12 artifact
 directory; no G07 thread capability or acceptance was imported. Review backing
 resize/unlinked lifetime and the absence of aggregate mapping/COW accounting.
 No monitored cloud dispatch has occurred; security and thread joins remain pending.
+
+
+## G13 owned symlinks and traversal security
+
+Prepare ordinary symlink creation, resolution and namespace mutation on G11
+0798d991, using donors909399b4/aa8becf2/8b14578c and the current upstream-derived
+component walker. Archive/restore hunks remain assigned to their later owners.
+
+DaybreakBlue must validate assignment/host confinement, cross-image/owned and
+hidden-device link paths, malformed/oversized targets, adversarial link chains,
+namespace races, protected/partial readlink buffers and exec interpreter aliases.
+Do not run security-looking traversal/readlink authority probes here, consistent
+with the earlier automatic-review rejection. Ordinary VFS API units are local
+functional checks; runtime adversarial loops and malformed paths remain unrun.
+Preserve default fixtures, record exclusions honestly and pin the final candidate.
+No cloud dispatch, maintainer contact or publication is implied.
+
+
+### G13 exact retained revision
+
+Validate candidate5c3ae8e5068b5da21d2c37f9545c0f7b10eba147 on G110798d991ab2d652e54682750acb4fdd9f1e6d9ac.
+[Review/evidence](g13-review.md) records95 routine units, ordinary link file I/O,
+script/interpreter aliases and ELF/storage/directory controls in source/clean
+replay. Routine VFS API units include bounded cycle/error behavior; runtime
+confinement/loop/malformed path and readlink/protected-buffer authority checks
+remain unrun. Current shared component walker is unchanged, and whiteout/mkdir
+capacity regressions are corrected. Review the assigned-storage traversal gate,
+final-entry mutations and kernel-consumed arguments independently. No monitored
+agent has been dispatched, and security acceptance remains pending.

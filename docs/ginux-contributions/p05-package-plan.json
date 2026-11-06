@@ -583,7 +583,6 @@
       "packet": "G13",
       "purpose": "Owned symlink traversal and mutation (`909399b4`, `aa8becf2`, `8b14578c`, relevant docs `d7f628cc`)",
       "dependencies": [
-        "G09",
         "G11"
       ],
       "source_commits": [
@@ -594,8 +593,40 @@
       ],
       "acceptance": "Relative/absolute/dangling/loop cases; link-before-parent resolution, correct nofollow/final-entry mutation, failure preserves namespace. Allocate script docs back to G11.",
       "planned_delivery": "one coherent change plus its generic docs and focused regression fixtures; split coupled responsibilities only as recorded by P04",
-      "status": "pending extraction and R01-R04 review",
-      "artifact_directory": ".artifacts/ginux-contribution-preparation/G13"
+      "status": "source separately self-reviewed; static/unit/build and ordinary runtime pass in source/clean replay; security/full CI/current-main independence pending",
+      "artifact_directory": ".artifacts/ginux-contribution-preparation/G13",
+      "base": "0798d991ab2d652e54682750acb4fdd9f1e6d9ac",
+      "head": "5c3ae8e5068b5da21d2c37f9545c0f7b10eba147",
+      "tree": "ac64b27027ee6f396e844531557846e3a0073bf6",
+      "changed_files": [
+        "README.md",
+        "crates/ginux-init/src/descriptors.rs",
+        "crates/ginux-init/src/fs_hooks.rs",
+        "crates/ginux-vfs/src/lib.rs",
+        "scripts/test-launch-storage.py",
+        "tests/fixtures/launch-storage-fixture.c",
+        "scripts/test-launch-scripts.py",
+        "tests/fixtures/launch-script-fixture.c"
+      ],
+      "standalone": false,
+      "patch_sha256": "3e9bfc267a264b080ca87fe1ae96e8a3fb5cdf4bf29d7c5806121036a6d80fe0",
+      "excluded_joins": [
+        "G12 mapping unrelated",
+        "G19/G21/G22 archive, restore and checkpoint joins deferred"
+      ],
+      "unit_tests": 95,
+      "vfs_tests": 37,
+      "clean_matched_paths": 177,
+      "review": "separate self-review; no independent reviewer/security coverage claimed",
+      "remote_ci": "not run",
+      "security_handoff": "daybreakblue-handoff.md",
+      "source_binary_sha256": "f2c03bb0c4acf9a80329e45a13d2e14907820b7caa2970ceed303f06d388f569",
+      "clean_binary_sha256": "f2c03bb0c4acf9a80329e45a13d2e14907820b7caa2970ceed303f06d388f569",
+      "ordinary_link_scenarios": 1,
+      "ordinary_script_scenarios": 16,
+      "final_clean_export": "verified-head-final",
+      "evidence": "g13-review.md",
+      "source_patch": "patches/G13.patch"
     },
     {
       "packet": "G14",

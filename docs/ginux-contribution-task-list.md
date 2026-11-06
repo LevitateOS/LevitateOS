@@ -482,15 +482,24 @@ partial: G07 thread ownership/nonleader fixture join, security/full CI and actua
 upstream independence remain pending. The thread-only fixture patch is preserved
 separately, and low-level mapping checks are written down for DaybreakBlue.
 
-Exact next task: **G13 — owned symlink traversal and mutation**. Inspect909399b4,
-aa8becf2/8b14578c and relevant d7f628cc documentation against upstream#218's
-already-retained component resolution. Start from the smallest actual prerequisite
-(G110798d991 if mapping capability is unused); do not add an accidental G12
-ancestry dependency. Preserve link-before-parent semantics, assignment precedence,
-new script metadata/name restoration, VFS alias/whiteout/pin lifetime and native
-scratch cleanup. Prepare ordinary valid link functionality locally; record security
-confinement/loop/malformed-path probing for DaybreakBlue. G07/G12 thread and inherited
-security holds remain explicit, and no publication or external messages are authorized.
+G13 source/ordinary preparation is retained at `5c3ae8e5` directly on
+G110798d991, without unrelated G12 ancestry. [Review/evidence](ginux-contributions/g13-review.md)
+records95 units,177-path strict replay, ordinary link I/O,16 script modes and
+ELF/storage/directory controls passing in source/clean exports. The shared walker
+is unchanged; reproduced whiteout and mkdir-capacity regressions are corrected.
+The exact G11 binary rejects the link fixture. Archive/restore joins remain with
+G19/G21/G22; runtime readlink/confinement/adversarial checks remain with DaybreakBlue.
+G13 inherits security/full CI/upstream prerequisite holds and is not publication-ready.
+
+Exact next task: **G14 — owned current directories**. Inspect6a45d8f8 before
+extraction on G135c3ae8e5; trace cwd identity, directory-FD lifetime, fork/exec
+inheritance, rename/removal and interpreter lookup. Preserve current per-process
+tasks and shared component resolution; do not import G07 threads or G12 mappings
+as accidental prerequisites. Keep native per-process cwd/scratch restoration and
+G13 final-entry semantics. Prepare normal chdir/fchdir/getcwd and relative-operation
+functionality locally; write low-level host-path leakage, race and protection
+validation down for DaybreakBlue. G07/G12 security/thread joins and policy holds
+remain explicit. No publication, branch changes or external messages are authorized.
 
 Active skill: `hdae-development`, discovered at
 `/home/vince/.codex/worktrees/ginux-pr-combination-check/ginux/.agents/skills/hdae-development/SKILL.md`.

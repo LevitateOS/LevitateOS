@@ -1,0 +1,923 @@
+From 5c3ae8e5068b5da21d2c37f9545c0f7b10eba147 Mon Sep 17 00:00:00 2001
+From: vince <vincepaul.liem@gmail.com>
+Date: Fri, 6 Nov 2026 13:46:51 +0100
+Subject: [PATCH] feat(storage): support owned symbolic link operations
+
+Use the existing component walker for owned symlink traversal, link
+metadata and target bytes. Preserve final namespace entries during
+mutation, independent descriptor positions and pinned/whiteout identity.
+Join configured symlink calls and keep owned traversal within assigned
+storage until image/owned traversal is supported.
+
+Signed-off-by: vince <vincepaul.liem@gmail.com>
+---
+ README.md                               |  11 +-
+ crates/ginux-init/src/descriptors.rs    |   7 +
+ crates/ginux-init/src/fs_hooks.rs       | 129 ++++++++-
+ crates/ginux-vfs/src/lib.rs             | 352 +++++++++++++++++++++---
+ scripts/test-launch-scripts.py          |   2 +-
+ scripts/test-launch-storage.py          |   4 +-
+ tests/fixtures/launch-script-fixture.c  |  12 +-
+ tests/fixtures/launch-storage-fixture.c |  57 ++++
+ 8 files changed, 516 insertions(+), 58 deletions(-)
+
+diff --git a/README.md b/README.md
+index 28d3e9b4..9fffd909 100644
+--- a/README.md
++++ b/README.md
+@@ -241,8 +241,15 @@ Namespace changes validate types, capacity and replacement before mutation.
+ Relative AT_FDCWD paths follow the calling process's image cwd; owned directory
+ FDs resolve relative operations through their current VFS identity. Image chdir,
+ getcwd and relative image exec retain native per-process cwd semantics. Entering
+-owned directories as cwd, relative image-directory FD access, owned symlinks,
+-hardlinks and guest file mappings remain unsupported.
++owned directories as cwd, relative image-directory FD access, hardlinks and
++guest file mappings remain unsupported.
++Owned symlink/symlinkat and readlink/readlinkat support bounded targets and
++nofollow metadata. Link expansion precedes later parent components; mutations
++name the final link itself, including directory requirements on trailing slashes.
++Exclusive create and O_NOFOLLOW keep their separate failure behavior. Owned links
++resolve within assigned storage; entering the native image through an owned link
++remains unsupported. Image aliases into storage retain assignment precedence.
++Link target bytes consume the same owned storage capacity as regular data.
+ Component-wise image-link traversal preserves assignment
+ precedence, missing components and non-directory errors. Native image operations
+ use a temporary canonical path below the stopped workload's stack; an unavailable
+diff --git a/crates/ginux-init/src/descriptors.rs b/crates/ginux-init/src/descriptors.rs
+index 05def3f9..f00dfa8e 100644
+--- a/crates/ginux-init/src/descriptors.rs
++++ b/crates/ginux-init/src/descriptors.rs
+@@ -370,6 +370,13 @@ impl DescriptorTable {
+                 self.save(r);
+                 self.rename_paths(pid, r, backends)
+             }
++            266 => {
++                self.save(r);
++                self.path_handle(pid, r.rsi, r.rdx).map(|handle| {
++                    r.rsi = handle;
++                    backends.claim(pid, r)
++                })
++            }
+             258 | 262 | 263 | 267 | 268 | 269 | 332 | 439 => {
+                 self.save(r);
+                 self.path_descriptor(pid, r, backends)
+diff --git a/crates/ginux-init/src/fs_hooks.rs b/crates/ginux-init/src/fs_hooks.rs
+index 09b7c8f0..05b0499c 100644
+--- a/crates/ginux-init/src/fs_hooks.rs
++++ b/crates/ginux-init/src/fs_hooks.rs
+@@ -170,6 +170,8 @@ impl LaunchFs {
+     fn resolve(&self, pid: usize, path: &[u8], follow: bool, missing: bool) -> Result<Path, i64> {
+         let image = crate::path_hooks::ImageRoot::new(pid)?;
+         let mut output = [0; MAX_PATH];
++        let mut owned_link = false;
++        let mut crossed = false;
+         let n = ginux_vfs::resolve_namespace(path, follow, missing, &mut output, |path, target| {
+             if self.owns_path(path)
+                 || path != b"/"
+@@ -177,7 +179,21 @@ impl LaunchFs {
+                         .iter()
+                         .any(|prefix| within(prefix.as_bytes(), path))
+             {
+-                return self.fs.metadata(path).map(|m| (m.kind, 0));
++                let metadata = self.fs.metadata_no_follow(path)?;
++                let n = if metadata.kind == NodeKind::Symlink {
++                    owned_link = true;
++                    self.fs.read_link(path, target)?
++                } else {
++                    0
++                };
++                return Ok((metadata.kind, n));
++            }
++            // Owned links remain in assigned storage until the image/owned
++            // traversal join is supported. Image aliases into storage retain
++            // their existing assignment precedence.
++            if owned_link {
++                crossed = true;
++                return Err(VfsError::PermissionDenied);
+             }
+             if path == b"/dev" {
+                 return Ok((NodeKind::Directory, 0));
+@@ -190,10 +206,39 @@ impl LaunchFs {
+             }
+             image.lookup(path, target)
+         })
+-        .map_err(errno)?;
++        .map_err(|error| if crossed { -95 } else { errno(error) })?;
++        if owned_link && !self.owns_path(&output[..n]) {
++            return Err(-95);
++        }
+         Path::from_bytes(&output[..n]).map_err(|_| -36)
+     }
+ 
++    fn mutation_path(&self, pid: usize, path: &[u8], missing: bool) -> Result<Path, i64> {
++        let mut end = path.len();
++        while end > 1 && path[end - 1] == b'/' {
++            end -= 1;
++        }
++        let resolved = self.resolve(pid, &path[..end], false, missing)?;
++        if end != path.len() {
++            let kind = if self.owns_path(resolved.as_bytes()) {
++                self.fs
++                    .metadata_no_follow(resolved.as_bytes())
++                    .map(|m| m.kind)
++            } else {
++                crate::path_hooks::ImageRoot::new(pid)?
++                    .lookup(resolved.as_bytes(), &mut [0; MAX_PATH])
++                    .map(|m| m.0)
++            };
++            match kind {
++                Ok(NodeKind::Directory) => {}
++                Err(VfsError::NotFound) if missing => {}
++                Err(error) => return Err(errno(error)),
++                _ => return Err(-20),
++            }
++        }
++        Ok(resolved)
++    }
++
+     pub(crate) fn request_path(&self, pid: usize, r: &UserRegs) -> Result<Option<(u8, Path)>, i64> {
+         let (argument, address, dirfd, follow, missing) = match r.orig_rax {
+             2 => (
+@@ -216,6 +261,8 @@ impl LaunchFs {
+             4 | 21 | 90 => (0, r.rdi, (-100i64) as u64, true, false),
+             6 | 84 | 87 | 89 => (0, r.rdi, (-100i64) as u64, false, false),
+             83 => (0, r.rdi, (-100i64) as u64, false, true),
++            88 => (1, r.rsi, (-100i64) as u64, false, true),
++            266 => (2, r.rdx, r.rsi, false, true),
+             258 => (1, r.rsi, r.rdi, false, true),
+             262 => (1, r.rsi, r.rdi, r.r10 & 0x100 == 0, false),
+             263 | 267 => (1, r.rsi, r.rdi, false, false),
+@@ -234,7 +281,14 @@ impl LaunchFs {
+         if (r.orig_rax == 84 || r.orig_rax == 263 && r.rdx == 0x200) && dot_entry(path.as_bytes()) {
+             return Err(-22);
+         }
+-        let path = self.resolve(pid, path.as_bytes(), follow, missing)?;
++        if matches!(r.orig_rax, 88 | 266) && path.as_bytes().ends_with(b"/") {
++            return Err(-2);
++        }
++        let path = if matches!(r.orig_rax, 83 | 84 | 87 | 258 | 263) {
++            self.mutation_path(pid, path.as_bytes(), missing)?
++        } else {
++            self.resolve(pid, path.as_bytes(), follow, missing)?
++        };
+         if dirfd as i32 != -100
+             && read_path(pid, address)?.as_bytes().first() != Some(&b'/')
+             && !self.owns_path(path.as_bytes())
+@@ -247,6 +301,9 @@ impl LaunchFs {
+     /// Canonical image paths preserve assignment precedence even through links
+     /// and parent components; the kernel never follows a hidden image subtree.
+     pub fn native_path(&self, pid: usize, r: &UserRegs) -> Result<Option<(u8, Path)>, i64> {
++        if matches!(r.orig_rax, 88 | 266) {
++            return Ok(None);
++        }
+         let Some((argument, path)) = self.request_path(pid, r)? else {
+             return Ok(None);
+         };
+@@ -611,10 +668,37 @@ impl LaunchFs {
+             4 | 6 => self.stat(pid, path.as_bytes(), r.rsi, false),
+             21 | 269 | 439 => self
+                 .fs
+-                .metadata(path.as_bytes())
++                .metadata_no_follow(path.as_bytes())
+                 .map_err(errno)
+                 .and_then(|metadata| access(metadata, r)),
+-            89 | 267 => Err(-22),
++            88 | 266 => read_path(pid, r.rdi).and_then(|target| {
++                self.fs
++                    .symlink(target.as_bytes(), path.as_bytes())
++                    .map(|_| 0)
++                    .map_err(errno)
++            }),
++            89 | 267 => {
++                let (address, length) = if r.orig_rax == 89 {
++                    (r.rsi, r.rdx)
++                } else {
++                    (r.rdx, r.r10)
++                };
++                if length == 0 {
++                    Err(-22)
++                } else {
++                    let mut target = [0; MAX_PATH];
++                    let count = (length as usize).min(target.len());
++                    self.fs
++                        .read_link(path.as_bytes(), &mut target[..count])
++                        .map_err(errno)
++                        .and_then(|n| {
++                            if copy_memory(pid, address, &mut target[..n], true) != Ok(n as i64) {
++                                return Err(-14);
++                            }
++                            Ok(n as i64)
++                        })
++                }
++            }
+             262 => {
+                 if r.r10 & !0x1900 != 0 {
+                     Err(-22)
+@@ -666,8 +750,7 @@ impl LaunchFs {
+     }
+ 
+     fn open(&mut self, path: &[u8], flags: u64, mode: u64) -> Result<i64, i64> {
+-        // NOFOLLOW is valid because this backend has no symlinks. Unsupported
+-        // directory/path-only behavior never falls through to native storage.
++        // Unsupported directory/path-only behavior never falls through to native storage.
+         const ALLOWED: u64 = 3
+             | 0o100
+             | 0o200
+@@ -685,6 +768,13 @@ impl LaunchFs {
+         if flags & (0o200000 | 0o100) == (0o200000 | 0o100) {
+             return Err(-22);
+         }
++        let entry = self.fs.metadata_no_follow(path);
++        if flags & (0o100 | 0o200) == (0o100 | 0o200) && entry.is_ok() {
++            return Err(-17);
++        }
++        if flags & 0o400000 != 0 && entry.is_ok_and(|m| m.kind == NodeKind::Symlink) {
++            return Err(-40);
++        }
+         let metadata = self.fs.metadata(path);
+         if metadata.is_ok_and(|m| m.kind == NodeKind::Directory) {
+             if flags & (3 | 0o100 | 0o1000 | 0o2000) != 0 {
+@@ -756,14 +846,25 @@ impl LaunchFs {
+         if dot_entry(source.as_bytes()) || dot_entry(destination.as_bytes()) {
+             return Err(-22);
+         }
+-        let source = self.resolve(pid, source.as_bytes(), false, false)?;
+-        let destination = self.resolve(pid, destination.as_bytes(), false, true)?;
++        let directory_destination = destination.as_bytes().ends_with(b"/");
++        let source = self.mutation_path(pid, source.as_bytes(), false)?;
++        let destination = self.mutation_path(pid, destination.as_bytes(), true)?;
+         if flags > 1 {
+             return Err(-95);
+         }
+         if !self.owns_path(source.as_bytes()) || !self.owns_path(destination.as_bytes()) {
+             return Err(-18);
+         }
++        if directory_destination
++            && self
++                .fs
++                .metadata_no_follow(source.as_bytes())
++                .map_err(errno)?
++                .kind
++                != NodeKind::Directory
++        {
++            return Err(-20);
++        }
+         if self.prefixes[..self.count].iter().any(|prefix| {
+             self.assignment_root(prefix.as_bytes())
+                 && (within(prefix.as_bytes(), source.as_bytes())
+@@ -781,7 +882,7 @@ impl LaunchFs {
+         copy_metadata(
+             pid,
+             destination,
+-            self.fs.metadata(path).map_err(errno)?,
++            self.fs.metadata_no_follow(path).map_err(errno)?,
+             statx,
+         )
+     }
+@@ -971,10 +1072,10 @@ fn copy_metadata(
+         crate::tracee_io::Stat {
+             inode: metadata.inode,
+             mode: metadata.mode
+-                | if metadata.kind == NodeKind::Directory {
+-                    0o40000
+-                } else {
+-                    0o100000
++                | match metadata.kind {
++                    NodeKind::Directory => 0o40000,
++                    NodeKind::Symlink => 0o120000,
++                    _ => 0o100000,
+                 },
+             size: metadata.size,
+             device_major: 0,
+diff --git a/crates/ginux-vfs/src/lib.rs b/crates/ginux-vfs/src/lib.rs
+index c162abc9..91c1f6f0 100644
+--- a/crates/ginux-vfs/src/lib.rs
++++ b/crates/ginux-vfs/src/lib.rs
+@@ -570,6 +570,7 @@ impl<
+                 overlay = true;
+             }
+             Some(index) if self.overlay[index].state == 3 => return Err(VfsError::IsDirectory),
++            Some(index) if self.overlay[index].state == 4 => return Err(VfsError::SymlinkLoop),
+             Some(index) => {
+                 if writable && self.overlay[index].executions != 0 {
+                     return Err(VfsError::TextBusy);
+@@ -781,17 +782,17 @@ impl<
+             } else {
+                 let object = ordinal - self.index.len();
+                 let entry = &self.overlay[object];
+-                if !matches!(entry.state, 1 | 3) {
++                if !matches!(entry.state, 1 | 3 | 4) {
+                     continue;
+                 }
+                 if let Some(name) = child_name(path, entry.path.as_bytes()) {
+                     return Ok(Some(DirectoryEntry {
+                         name,
+                         inode: (self.index.len() + object + 1) as u64,
+-                        kind: if entry.state == 3 {
+-                            NodeKind::Directory
+-                        } else {
+-                            NodeKind::File
++                        kind: match entry.state {
++                            3 => NodeKind::Directory,
++                            4 => NodeKind::Symlink,
++                            _ => NodeKind::File,
+                         },
+                         next: ordinal as u64 + 3,
+                     }));
+@@ -927,7 +928,7 @@ impl<
+     }
+ 
+     pub fn unlink(&mut self, path: &[u8]) -> Result<(), VfsError> {
+-        let path = self.resolved_path(path, false, false)?;
++        let path = self.namespace_path(path, false)?;
+         if let Some(index) = self.find_overlay(path.as_bytes()) {
+             if self.overlay[index].state == 2 {
+                 return Err(VfsError::NotFound);
+@@ -1071,6 +1072,106 @@ impl<
+         self.overlay.iter().filter(|entry| entry.state == 1).count()
+     }
+ 
++    pub fn canonical_path(
++        &self,
++        path: &[u8],
++        follow_final: bool,
++        allow_missing: bool,
++        output: &mut [u8; MAX_PATH],
++    ) -> Result<usize, VfsError> {
++        let resolved = self.resolved_path(path, follow_final, allow_missing)?;
++        output[..resolved.len].copy_from_slice(resolved.as_bytes());
++        Ok(resolved.len)
++    }
++
++    fn namespace_path(&self, path: &[u8], missing: bool) -> Result<Path, VfsError> {
++        let mut end = path.len();
++        while end > 1 && path[end - 1] == b'/' {
++            end -= 1;
++        }
++        let resolved = self.resolved_path(&path[..end], false, missing)?;
++        if end != path.len() {
++            match self.metadata_at(resolved.as_bytes()) {
++                Ok(metadata) if metadata.kind == NodeKind::Directory => {}
++                Ok(_) => return Err(VfsError::NotDirectory),
++                Err(VfsError::NotFound) if missing => {}
++                Err(error) => return Err(error),
++            }
++        }
++        Ok(resolved)
++    }
++
++    pub fn symlink(&mut self, target: &[u8], name: &[u8]) -> Result<(), VfsError> {
++        if target.is_empty() || target.len() > MAX_PATH || target.contains(&0) {
++            return Err(VfsError::InvalidPath);
++        }
++        if name.ends_with(b"/") {
++            return Err(VfsError::NotFound);
++        }
++        let path = self.resolved_path(name, false, true)?;
++        match self.metadata_no_follow(path.as_bytes()) {
++            Ok(_) => return Err(VfsError::AlreadyExists),
++            Err(VfsError::NotFound) => {}
++            Err(error) => return Err(error),
++        }
++        self.require_parent(path.as_bytes())?;
++        let slot = match self.find_overlay(path.as_bytes()) {
++            Some(slot)
++                if self.overlay[slot].state == 2
++                    && self.overlay[slot].executions == 0
++                    && !self.referenced(slot) =>
++            {
++                slot
++            }
++            _ => self.allocate_overlay()?,
++        };
++        self.storage.clear(slot);
++        if let Err(error) = self
++            .storage
++            .resize(slot, 0, target.len())
++            .and_then(|_| self.storage.write(slot, 0, target))
++        {
++            self.storage.clear(slot);
++            return Err(error);
++        }
++        self.overlay[slot] = OverlayFile {
++            state: 4,
++            path,
++            mode: 0o777,
++            len: target.len(),
++            executions: 0,
++        };
++        Ok(())
++    }
++
++    pub fn read_link(&self, name: &[u8], output: &mut [u8]) -> Result<usize, VfsError> {
++        let path = self.resolved_path(name, false, false)?;
++        if let Some(slot) = self.find_overlay(path.as_bytes()) {
++            let entry = &self.overlay[slot];
++            if entry.state == 2 {
++                return Err(VfsError::NotFound);
++            }
++            if entry.state != 4 {
++                return Err(VfsError::InvalidPath);
++            }
++            let count = entry.len.min(output.len());
++            self.storage.read(slot, 0, &mut output[..count])?;
++            return Ok(count);
++        }
++        let entry = self.index.lookup_exact(path.as_bytes())?;
++        if entry.kind != NodeKind::Symlink {
++            return Err(VfsError::InvalidPath);
++        }
++        let count = entry.link.len().min(output.len());
++        output[..count].copy_from_slice(&entry.link[..count]);
++        Ok(count)
++    }
++
++    pub fn metadata_no_follow(&self, path: &[u8]) -> Result<FileMetadata, VfsError> {
++        let path = self.resolved_path(path, false, false)?;
++        self.metadata_at(path.as_bytes())
++    }
++
+     /// Follow image links in component order and inspect the current namespace.
+     pub fn metadata(&self, path: &[u8]) -> Result<FileMetadata, VfsError> {
+         let path = self.resolved_path(path, true, false)?;
+@@ -1085,10 +1186,10 @@ impl<
+             }
+             return Ok(FileMetadata {
+                 inode: (self.index.len() + index + 1) as u64,
+-                kind: if file.state == 3 {
+-                    NodeKind::Directory
+-                } else {
+-                    NodeKind::File
++                kind: match file.state {
++                    3 => NodeKind::Directory,
++                    4 => NodeKind::Symlink,
++                    _ => NodeKind::File,
+                 },
+                 mode: file.mode,
+                 size: file.len as u64,
+@@ -1102,7 +1203,11 @@ impl<
+                 + 1) as u64,
+             kind: entry.kind,
+             mode: entry.mode,
+-            size: entry.size,
++            size: if entry.kind == NodeKind::Symlink {
++                entry.link.len() as u64
++            } else {
++                entry.size
++            },
+         })
+     }
+ 
+@@ -1132,11 +1237,7 @@ impl<
+     }
+ 
+     pub fn mkdir(&mut self, path: &[u8], mode: u32) -> Result<(), VfsError> {
+-        let mut end = path.len();
+-        while end > 1 && path[end - 1] == b'/' {
+-            end -= 1;
+-        }
+-        let path = self.resolved_path(&path[..end], false, true)?;
++        let path = self.namespace_path(path, true)?;
+         match self.metadata_at(path.as_bytes()) {
+             Ok(_) => return Err(VfsError::AlreadyExists),
+             Err(VfsError::NotFound) => {}
+@@ -1150,7 +1251,7 @@ impl<
+ 
+     fn has_children(&self, path: &[u8]) -> Result<bool, VfsError> {
+         if self.overlay.iter().any(|entry| {
+-            matches!(entry.state, 1 | 3) && child_name(path, entry.path.as_bytes()).is_some()
++            matches!(entry.state, 1 | 3 | 4) && child_name(path, entry.path.as_bytes()).is_some()
+         }) {
+             return Ok(true);
+         }
+@@ -1169,7 +1270,7 @@ impl<
+         if dot_entry(path) {
+             return Err(VfsError::InvalidPath);
+         }
+-        let path = self.resolved_path(path, false, false)?;
++        let path = self.namespace_path(path, false)?;
+         if self.metadata_at(path.as_bytes())?.kind != NodeKind::Directory {
+             return Err(VfsError::NotDirectory);
+         }
+@@ -1198,9 +1299,13 @@ impl<
+         if dot_entry(source) || dot_entry(destination) {
+             return Err(VfsError::InvalidPath);
+         }
+-        let source = self.resolved_path(source, false, false)?;
+-        let destination = self.resolved_path(destination, false, true)?;
++        let directory_destination = destination.ends_with(b"/");
++        let source = self.namespace_path(source, false)?;
++        let destination = self.namespace_path(destination, true)?;
+         let metadata = self.metadata_at(source.as_bytes())?;
++        if directory_destination && metadata.kind != NodeKind::Directory {
++            return Err(VfsError::NotDirectory);
++        }
+         if source.as_bytes() == destination.as_bytes() {
+             return if no_replace {
+                 Err(VfsError::AlreadyExists)
+@@ -1251,7 +1356,8 @@ impl<
+         };
+         // Check every new descendant path before changing any namespace entry.
+         for entry in &self.overlay {
+-            if matches!(entry.state, 1 | 3) && beneath(entry.path.as_bytes(), source.as_bytes()) {
++            if matches!(entry.state, 1 | 3 | 4) && beneath(entry.path.as_bytes(), source.as_bytes())
++            {
+                 let suffix = entry.path.len - source.len;
+                 if destination
+                     .len
+@@ -1267,7 +1373,8 @@ impl<
+             self.release_unlinked(target);
+         }
+         for entry in &mut self.overlay {
+-            if matches!(entry.state, 1 | 3) && beneath(entry.path.as_bytes(), source.as_bytes()) {
++            if matches!(entry.state, 1 | 3 | 4) && beneath(entry.path.as_bytes(), source.as_bytes())
++            {
+                 let mut path = destination;
+                 path.extend(&entry.path.as_bytes()[source.len..])?; // Preflight above guarantees capacity.
+                 entry.path = path;
+@@ -1357,7 +1464,7 @@ impl<
+     fn find_overlay(&self, path: &[u8]) -> Option<usize> {
+         self.overlay
+             .iter()
+-            .position(|entry| matches!(entry.state, 1 | 3) && entry.path.as_bytes() == path)
++            .position(|entry| matches!(entry.state, 1 | 3 | 4) && entry.path.as_bytes() == path)
+             .or_else(|| {
+                 self.overlay
+                     .iter()
+@@ -1374,7 +1481,8 @@ impl<
+                     entry.state == 2
+                         && entry.executions == 0
+                         && !self.referenced(slot)
+-                        && (self.index.resolve(entry.path.as_bytes()) == Err(VfsError::NotFound)
++                        && (self.index.lookup_exact(entry.path.as_bytes())
++                            == Err(VfsError::NotFound)
+                             || self.overlay.iter().enumerate().any(|(other, candidate)| {
+                                 other != slot
+                                     && candidate.state != 0
+@@ -1458,20 +1566,24 @@ impl<
+     ) -> Result<Path, VfsError> {
+         resolve_components(path, follow_final, allow_missing, |name, target| {
+             if let Some(slot) = self.find_overlay(name) {
+-                return if self.overlay[slot].state == 2 {
+-                    Err(VfsError::NotFound)
+-                } else {
+-                    Ok((
+-                        if self.overlay[slot].state == 3 {
+-                            NodeKind::Directory
+-                        } else {
+-                            NodeKind::File
+-                        },
+-                        0,
+-                    ))
++                let entry = &self.overlay[slot];
++                return match entry.state {
++                    2 => Err(VfsError::NotFound),
++                    3 => Ok((NodeKind::Directory, 0)),
++                    4 => {
++                        if entry.len > target.len() {
++                            return Err(VfsError::InvalidPath);
++                        }
++                        self.storage.read(slot, 0, &mut target[..entry.len])?;
++                        Ok((NodeKind::Symlink, entry.len))
++                    }
++                    _ => Ok((NodeKind::File, 0)),
+                 };
+             }
+             let entry = self.index.lookup_exact(name)?;
++            if entry.link.len() > target.len() {
++                return Err(VfsError::InvalidPath);
++            }
+             target[..entry.link.len()].copy_from_slice(entry.link);
+             Ok((entry.kind, entry.link.len()))
+         })
+@@ -1664,6 +1776,176 @@ mod tests {
+         assert_eq!(index.resolve(b"/../../base"), Err(VfsError::InvalidPath));
+     }
+ 
++    #[test]
++    fn owned_links_resolve_components_and_preserve_namespace_operations() {
++        let bytes = index_bytes();
++        let index = Index::new(&bytes).unwrap();
++        let mut fs: VirtualFs<'_, Reader, 16, 64, 4> = VirtualFs::new(index, Reader(*b"BASETOOL"));
++        fs.mkdir(b"/work", 0o755).unwrap();
++        fs.mkdir(b"/work/deep", 0o755).unwrap();
++        fs.symlink(b"deep", b"/work/link").unwrap();
++        fs.symlink(b"../link", b"/work/deep/chain").unwrap();
++        fs.symlink(b"/work/loop", b"/work/loop").unwrap();
++        let mut path = [0u8; MAX_PATH];
++        let n = fs
++            .canonical_path(b"/work/deep/chain/../fresh", true, true, &mut path)
++            .unwrap();
++        assert_eq!(&path[..n], b"/work/fresh");
++        assert_eq!(
++            fs.canonical_path(b"/work/loop", true, false, &mut path),
++            Err(VfsError::SymlinkLoop)
++        );
++        let n = fs
++            .canonical_path(b"/work/link", false, false, &mut path)
++            .unwrap();
++        assert_eq!(&path[..n], b"/work/link");
++        assert_eq!(
++            fs.metadata_no_follow(b"/work/link").unwrap().kind,
++            NodeKind::Symlink
++        );
++        assert_eq!(fs.open(b"/work/link", O_READ), Err(VfsError::IsDirectory));
++        assert_eq!(fs.read_link(b"/work/link", &mut path[..2]).unwrap(), 2);
++        assert_eq!(&path[..2], b"de");
++        fs.rename(b"/work/link", b"/work/renamed", false).unwrap();
++        assert_eq!(fs.read_link(b"/work/renamed", &mut path).unwrap(), 4);
++        fs.unlink(b"/work/renamed").unwrap();
++        assert_eq!(
++            fs.read_link(b"/work/renamed", &mut path),
++            Err(VfsError::NotFound)
++        );
++        assert_eq!(
++            fs.remove_directory(b"/work/deep"),
++            Err(VfsError::DirectoryNotEmpty)
++        );
++        fs.symlink(b"/usr/bin/tool", b"/work/image").unwrap();
++        let n = fs
++            .canonical_path(b"/work/image", true, false, &mut path)
++            .unwrap();
++        assert_eq!(&path[..n], b"/usr/bin/tool");
++        assert_eq!(
++            fs.canonical_path(b"/work/image/..", true, false, &mut path),
++            Err(VfsError::NotDirectory)
++        );
++        // Parent lookup follows the link before consuming .., in the base too.
++        assert_eq!(
++            fs.index.resolve(b"/bin/../bin/tool").unwrap().path,
++            b"/usr/bin/tool"
++        );
++        fs.teardown();
++    }
++
++    #[test]
++    fn link_io_follows_targets_but_namespace_changes_do_not() {
++        let bytes = index_bytes();
++        let mut fs: VirtualFs<'_, Reader, 16, 16, 4> =
++            VirtualFs::new(Index::new(&bytes).unwrap(), Reader(*b"BASETOOL"));
++        assert_eq!(fs.metadata_no_follow(b"/bin").unwrap().size, 7);
++        fs.mkdir(b"/work", 0o755).unwrap();
++        fs.mkdir(b"/work/sub", 0o755).unwrap();
++        fs.symlink(b"sub", b"/work/dir").unwrap();
++        assert_eq!(
++            fs.remove_directory(b"/work/dir/"),
++            Err(VfsError::NotDirectory)
++        );
++        assert_eq!(
++            fs.rename(b"/work/dir/", b"/work/moved", false),
++            Err(VfsError::NotDirectory)
++        );
++        assert_eq!(fs.metadata(b"/work/sub").unwrap().kind, NodeKind::Directory);
++        assert_eq!(
++            fs.remove_directory(b"/work/dir/."),
++            Err(VfsError::InvalidPath)
++        );
++        assert_eq!(
++            fs.rename(b"/work/dir/.", b"/work/moved", false),
++            Err(VfsError::InvalidPath)
++        );
++        fs.mkdir(b"/work/new/", 0o755).unwrap();
++        fs.remove_directory(b"/work/new/").unwrap();
++
++        fs.symlink(b"missing", b"/work/dir/link").unwrap();
++        assert_eq!(fs.metadata(b"/work/sub/link"), Err(VfsError::NotFound));
++        assert_eq!(
++            fs.open(b"/work/sub/link", O_CREATE | O_EXCLUSIVE | O_WRITE),
++            Err(VfsError::AlreadyExists)
++        );
++        assert_eq!(
++            fs.mkdir(b"/work/sub/link", 0o755),
++            Err(VfsError::AlreadyExists)
++        );
++        let fd = fs.open(b"/work/dir/link", O_CREATE | O_WRITE).unwrap();
++        fs.write(fd, b"content").unwrap();
++        fs.close(fd).unwrap();
++        assert_eq!(
++            fs.metadata(b"/work/sub/link").unwrap(),
++            fs.metadata(b"/work/sub/missing").unwrap()
++        );
++        let fd = fs.open(b"/work/sub/link", O_READ).unwrap();
++        fs.unlink(b"/work/sub/link").unwrap();
++        let mut data = [0; 7];
++        assert_eq!(fs.read(fd, &mut data).unwrap(), 7);
++        assert_eq!(&data, b"content");
++        fs.close(fd).unwrap();
++        fs.symlink(b"missing", b"/work/sub/link").unwrap();
++        let fd = fs.open(b"/work/sub/link", O_WRITE | O_TRUNC).unwrap();
++        fs.close(fd).unwrap();
++        assert_eq!(fs.metadata(b"/work/sub/missing").unwrap().size, 0);
++        assert_eq!(
++            fs.remove_directory(b"/work/dir"),
++            Err(VfsError::NotDirectory)
++        );
++        assert_eq!(
++            fs.symlink(b"target-over-capacity", b"/work/large"),
++            Err(VfsError::FileTooLarge)
++        );
++        assert_eq!(
++            fs.metadata_no_follow(b"/work/large"),
++            Err(VfsError::NotFound)
++        );
++        fs.symlink(b"sub/link", b"/work/large").unwrap();
++        fs.unlink(b"/bin").unwrap();
++        fs.symlink(b"/work/sub", b"/bin").unwrap();
++        assert_eq!(fs.metadata(b"/bin/missing").unwrap().size, 0);
++        fs.teardown();
++    }
++
++    #[test]
++    fn dangling_image_link_whiteout_stays_reserved_and_can_be_replaced() {
++        let mut bytes = index_bytes();
++        let mut entry = Index::new(&bytes).unwrap().entry(2).unwrap();
++        entry.link = b"absent";
++        let mut record = [0; RECORD_SIZE];
++        encode_record(entry, &mut record).unwrap();
++        bytes[HEADER_SIZE + 2 * RECORD_SIZE..HEADER_SIZE + 3 * RECORD_SIZE]
++            .copy_from_slice(&record);
++        let mut fs: VirtualFs<'_, Reader, 1, 16, 2> =
++            VirtualFs::new(Index::new(&bytes).unwrap(), Reader(*b"BASETOOL"));
++        fs.unlink(b"/bin").unwrap();
++        assert_eq!(
++            fs.open(b"/fresh", O_CREATE | O_WRITE),
++            Err(VfsError::OverlayLimit)
++        );
++        assert_eq!(fs.metadata_no_follow(b"/bin"), Err(VfsError::NotFound));
++        assert_eq!(
++            fs.symlink(b"target-beyond-backing-capacity", b"/bin"),
++            Err(VfsError::FileTooLarge)
++        );
++        assert_eq!(fs.metadata_no_follow(b"/bin"), Err(VfsError::NotFound));
++        fs.symlink(b"base", b"/bin").unwrap();
++        let fd = fs.open(b"/bin", O_READ).unwrap();
++        let mut output = [0; 4];
++        assert_eq!(fs.read(fd, &mut output), Ok(4));
++        assert_eq!(&output, b"BASE");
++        fs.close(fd).unwrap();
++        fs.teardown();
++        fs.unlink(b"/bin").unwrap();
++        fs.mkdir(b"/bin", 0o755).unwrap();
++        assert_eq!(
++            fs.metadata_no_follow(b"/bin").unwrap().kind,
++            NodeKind::Directory
++        );
++    }
++
+     #[test]
+     fn descriptors_never_equal_base_authority_and_overlay_is_disposable() {
+         let bytes = index_bytes();
+diff --git a/scripts/test-launch-scripts.py b/scripts/test-launch-scripts.py
+index d55d2d08..f256ed88 100644
+--- a/scripts/test-launch-scripts.py
++++ b/scripts/test-launch-scripts.py
+@@ -37,7 +37,7 @@ def main():
+                      'descriptor', 'unlinked', 'dir-relative', 'dir-renamed', 'fd-fork', 'fd-vfork')
+         ordinary_modes = ('ordinary-plain', 'ordinary-option', 'ordinary-nested', 'ordinary-relative',
+                           'ordinary-at', 'ordinary-fd', 'ordinary-unlinked', 'ordinary-dir',
+-                          'ordinary-renamed', 'ordinary-fork', 'ordinary-vfork', 'ordinary-owned', 'ordinary-chain', 'ordinary-joined')
++                          'ordinary-renamed', 'ordinary-fork', 'ordinary-vfork', 'ordinary-owned', 'ordinary-chain', 'ordinary-joined', 'ordinary-script-link', 'ordinary-interpreter-link')
+         modes = sys.argv[3:] or (*full_modes, *ordinary_modes)
+         assert set(modes) <= set(full_modes + ordinary_modes), modes
+         for mode in modes:
+diff --git a/scripts/test-launch-storage.py b/scripts/test-launch-storage.py
+index 4cf64e17..dbe669f0 100644
+--- a/scripts/test-launch-storage.py
++++ b/scripts/test-launch-storage.py
+@@ -54,7 +54,7 @@ def main():
+ 
+         if sys.argv[3:]:
+             for mode in sys.argv[3:]:
+-                if mode not in ('growth', 'bounds', 'quota', 'view-probes'):
++                if mode not in ('growth', 'bounds', 'quota', 'view-probes', 'symlinks', 'ordinary-symlinks'):
+                     sys.exit('unknown selected storage scenario')
+                 invoke(['memory:/work', 'memory:/work/build', 'memory:/out'], [mode],
+                        memory=16 if mode == 'bounds' else 256)
+@@ -71,6 +71,8 @@ def main():
+             invoke(['memory:/work', 'memory:/work/build', 'memory:/out'], [])
+         invoke(['memory:/work', 'memory:/work/build', 'memory:/out'], ['quota'])
+         invoke(['memory:/work', 'memory:/work/build', 'memory:/out'], ['bounds'], memory=16)
++        invoke(['memory:/work', 'memory:/out'], ['symlinks'])
++        invoke(['memory:/work', 'memory:/out'], ['ordinary-symlinks'])
+         invoke([], ['no-storage'])
+         for assignment in ['disk0', 'memory:/', 'memory:/proc', 'memory:/sys/x', 'memory:/dev',
+                            'memory:/bin', 'memory:/work/../out', 'memory:/work/', 'memory:work']:
+diff --git a/tests/fixtures/launch-script-fixture.c b/tests/fixtures/launch-script-fixture.c
+index 8a3b6ba0..bb108dbf 100644
+--- a/tests/fixtures/launch-script-fixture.c
++++ b/tests/fixtures/launch-script-fixture.c
+@@ -42,15 +42,15 @@ static long ordinary(word argc, char **argv, char **env) {
+     int descriptor=equal(mode,"ordinary-fd") || equal(mode,"ordinary-unlinked");
+     int directory=equal(mode,"ordinary-dir") || equal(mode,"ordinary-renamed");
+     int chain=equal(mode,"ordinary-chain");
+-    int owned=chain || equal(mode,"ordinary-owned");
++    int owned=chain || equal(mode,"ordinary-owned") || equal(mode,"ordinary-interpreter-link");
+     int nested=equal(mode,"ordinary-nested") || equal(mode,"ordinary-joined");
+     int plain=equal(mode,"ordinary-plain");
+     if(!equal(argv[0],"/bin/fixture")) {
+-        CHECK(equal(argv[0],owned?"/work/interpreter":"/bin/interpreter"),70);
++        CHECK(equal(argv[0],owned?(equal(mode,"ordinary-interpreter-link")?"/work/interpreter-link":"/work/interpreter"):"/bin/interpreter"),70);
+         CHECK(env[0] && equal(env[0],"SCRIPT_ENV=present") && env[1] && equal(env[1],"SECOND=two words") && !env[2],71);
+         CHECK(argc==(word)(chain?10:(nested?6:(plain?3:4))),72);
+         const char *name=argv[argc-2];
+-        CHECK(equal(name,descriptor?"/dev/fd/6":(directory?"/dev/fd/6/program":(equal(mode,"ordinary-relative")?"work/program":"/work/program"))),73);
++        CHECK(equal(name,descriptor?"/dev/fd/6":(directory?"/dev/fd/6/program":(equal(mode,"ordinary-relative")?"work/program":(equal(mode,"ordinary-script-link")?"/work/alias":"/work/program")))),73);
+         if(chain) {
+             CHECK(equal(argv[1],"fourth option") && equal(argv[2],"/work/fourth") &&
+                   equal(argv[3],"third option") && equal(argv[4],"/work/third") &&
+@@ -74,8 +74,10 @@ static long ordinary(word argc, char **argv, char **env) {
+     CHECK(publish("/work/program",plain?"#!/bin/interpreter\nbody\n":
+           (nested?(equal(mode,"ordinary-joined")?"#!/work/middle option with spaces\nbody\n":"#!/bin/wrapper option with spaces\nbody\n"):
+           (chain?"#!/work/second option with spaces\nbody\n":
+-          (owned?"#!/work/interpreter option with spaces\nbody\n":"#! \t/bin/interpreter\toption with spaces \t\nbody\n"))))==0,85);
++          (owned?(equal(mode,"ordinary-interpreter-link")?"#!/work/interpreter-link option with spaces\nbody\n":"#!/work/interpreter option with spaces\nbody\n"):"#! \t/bin/interpreter\toption with spaces \t\nbody\n"))))==0,85);
+     if(equal(mode,"ordinary-joined")) CHECK(publish("/work/middle","#!/bin/interpreter nested option\n")==0,95);
++    if(equal(mode,"ordinary-script-link")) CHECK(DO(88,"program","/work/alias",0)==0,96);
++    if(equal(mode,"ordinary-interpreter-link")) CHECK(DO(88,"interpreter","/work/interpreter-link",0)==0,97);
+     if(chain) CHECK(publish("/work/second","#!/work/third second option\n")==0 &&
+                     publish("/work/third","#!/work/fourth third option\n")==0 &&
+                     publish("/work/fourth","#!/work/interpreter fourth option\n")==0,86);
+@@ -101,7 +103,7 @@ static long ordinary(word argc, char **argv, char **env) {
+     if(descriptor) call(322,6,(word)"",(word)next,(word)next_env,0x1000);
+     else if(directory) call(322,6,(word)"program",(word)next,(word)next_env,0);
+     else if(equal(mode,"ordinary-at")) call(322,-999,(word)"/work/program",(word)next,(word)next_env,0);
+-    else DO(59,equal(mode,"ordinary-relative")?"work/program":"/work/program",next,next_env);
++    else DO(59,equal(mode,"ordinary-relative")?"work/program":(equal(mode,"ordinary-script-link")?"/work/alias":"/work/program"),next,next_env);
+     return 94;
+ }
+ long script_main(word *stack)
+diff --git a/tests/fixtures/launch-storage-fixture.c b/tests/fixtures/launch-storage-fixture.c
+index e553487a..54cd19f8 100644
+--- a/tests/fixtures/launch-storage-fixture.c
++++ b/tests/fixtures/launch-storage-fixture.c
+@@ -24,6 +24,31 @@ __asm__(".global scratch_stat\nscratch_stat:\n"
+         "mov %rsi,%rdi\nmov %rdx,%rsi\nmov $4,%rax\nsyscall\n"
+         "cmp %r13,%rdi\njne 1f\ncmp %r14,%rsi\nje 2f\n"
+         "1: mov $-123,%rax\n2: mov %r12,%rsp\npop %r14\npop %r13\npop %r12\nret\n");
++static int named(const char *a, const char *b) { while(*a && *a==*b) { ++a; ++b; } return *a==*b; }
++static long ordinary_symlinks(void) {
++    CHECK(DO(83,"/work/dir",0755,0)==0 && DO(88,"dir","/work/link",0)==0,200);
++    CHECK(DO(2,"/work/link/file",0102,0600)==3 && DO(1,3,"data",4)==4 && DO(3,3,0,0)==0,201);
++    CHECK(DO(2,"/work/dir/file",0,0)==3 && DO(0,3,output,4)==4 && output[0]=='d' && DO(3,3,0,0)==0,202);
++    CHECK(DO(6,"/work/link",meta,0)==0 && (*(word *)(meta+24)&0170000)==0120000 && *(word *)(meta+48)==3,203);
++    CHECK(DO(4,"/work/link",meta,0)==0 && (*(word *)(meta+24)&0170000)==0040000,204);
++    CHECK(DO(88,"../link","/work/dir/chain",0)==0,205);
++    CHECK(DO(2,"/work/dir/chain/../fresh",0101,0600)==3 && DO(3,3,0,0)==0 && DO(4,"/work/fresh",meta,0)==0,206);
++    CHECK(DO(88,"/work/dir/file","/work/absolute",0)==0 && DO(2,"/work/absolute",0,0)==3 && DO(0,3,output,4)==4 && output[0]=='d' && DO(3,3,0,0)==0,207);
++    CHECK(DO(88,"created","/work/dangling",0)==0 && DO(2,"/work/dangling",0102,0600)==3 && DO(1,3,"new",3)==3 && DO(3,3,0,0)==0,208);
++    CHECK(DO(2,"/work/created",0,0)==3 && DO(0,3,output,3)==3 && output[0]=='n' && DO(3,3,0,0)==0,209);
++    CHECK(DO(2,"/work/dir",0200000,0)==3 && DO(266,"file",3,"relative")==0,210);
++    CHECK(DO(257,3,"relative",0)==4 && DO(0,4,output,4)==4 && output[0]=='d' && DO(3,4,0,0)==0,211);
++    long n=DO(217,3,output,sizeof output); CHECK(n>0,213);
++    int found=0; for(word at=0;at<(word)n;) {
++        unsigned short size=*(unsigned short *)(output+at+16);
++        CHECK(size>=24 && at+size<=(word)n,214);
++        if(named(output+at+19,"relative")) { CHECK(output[at+18]==10,215); found=1; }
++        at+=size;
++    }
++    CHECK(found && DO(3,3,0,0)==0,216);
++    CHECK(DO(82,"/work/link","/work/renamed",0)==0 && DO(87,"/work/renamed",0,0)==0 && DO(4,"/work/dir/file",meta,0)==0,212);
++    return 0;
++}
+ long storage_main(word *stack)
+ {
+     word argc = *stack;
+@@ -75,6 +100,38 @@ long storage_main(word *stack)
+         CHECK(DO(3,alias,0,0)==0,140);
+         return 0;
+     }
++    if (argc > 1 && named(argv[1],"ordinary-symlinks")) return ordinary_symlinks();
++    if (argc > 1 && named(argv[1],"symlinks")) {
++        CHECK(DO(83,"/work/dir",0755,0)==0,166);
++        CHECK(DO(88,"dir","/work/link",0)==0,167);
++        CHECK(DO(84,"/work/link/",0,0)==-20 && DO(87,"/work/link/",0,0)==-20,199);
++        CHECK(DO(82,"/work/link/","/work/moved",0)==-20 && DO(4,"/work/dir",meta,0)==0,200);
++        CHECK(DO(83,"/work/new/",0755,0)==0 && DO(84,"/work/new/",0,0)==0,201);
++        CHECK(DO(84,"/work/link/.",0,0)==-22 && DO(82,"/work/link/.","/work/moved",0)==-22,202);
++        CHECK(DO(4,"/work/dir",meta,0)==0,203);
++        CHECK(DO(2,"/work/link/file",0102,0600)==3 && DO(1,3,"data",4)==4 && DO(3,3,0,0)==0,168);
++        CHECK(DO(2,"/work/dir/file",0,0)==3 && DO(0,3,output,4)==4 && output[0]=='d' && DO(3,3,0,0)==0,169);
++        CHECK(DO(6,"/work/link",meta,0)==0 && (*(word *)(meta+24)&0170000)==0120000,170);
++        CHECK(DO(4,"/work/link",meta,0)==0 && (*(word *)(meta+24)&0170000)==0040000,171);
++        CHECK(DO(89,"/work/link",output,2)==2 && output[0]=='d' && output[1]=='i',172);
++        CHECK(DO(2,"/work/link",0400000,0)==-40 && DO(2,"/work/link",0301,0600)==-17,173);
++        CHECK(DO(88,"../link","/work/dir/chain",0)==0,174);
++        CHECK(DO(2,"/work/dir/chain/../fresh",0101,0600)==3 && DO(3,3,0,0)==0,175);
++        CHECK(DO(4,"/work/fresh",meta,0)==0 && DO(4,"/work/dir/fresh",meta,0)==-2,176);
++        CHECK(DO(88,"/image","/work/image",0)==0 && DO(2,"/work/image",0,0)<0,177);
++        CHECK(DO(88,"/","/work/root",0)==0 && DO(2,"/work/root/escape",0101,0600)<0,178);
++        CHECK(DO(2,"/work/root/../image",0,0)<0 && DO(2,"/work/link/../../image",0,0)<0,179);
++        CHECK(DO(2,"/work/dir",0200000,0)==3,180);
++        CHECK(DO(266,"file",3,"relative")==0,181);
++        CHECK(call(267,3,(word)"relative",(word)output,64,0,0)==4 && output[0]=='f',182);
++        CHECK(call(262,3,(word)"relative",(word)meta,0x100,0,0)==0 && (*(word *)(meta+24)&0170000)==0120000,183);
++        CHECK(DO(257,3,"relative",0)==4 && DO(0,4,output,4)==4 && output[0]=='d' && DO(3,4,0,0)==0,184);
++        CHECK(DO(3,3,0,0)==0,185);
++        CHECK(DO(82,"/work/link","/work/renamed",0)==0 && DO(87,"/work/renamed",0,0)==0,186);
++        CHECK(DO(4,"/work/dir/file",meta,0)==0,187);
++        CHECK(DO(88,"cycle","/work/cycle",0)==0 && DO(2,"/work/cycle",0,0)==-40,188);
++        return 0;
++    }
+     if (argc > 1 && argv[1][0] == 'n') {
+         CHECK(DO(2, "/work/new", 0101, 0644) < 0, 10);
+         return 0;
