@@ -29,13 +29,23 @@ checkpoint, exec, scripts, network and device suites pass. Logs:
 The full Recipe run uses the stated baseline; later focused results are
 separately recorded rather than relabeled as a whole-suite final-HEAD run.
 
-The actual combined CLI/worker binary is `/tmp/recipe-t25-bin`, SHA256
+The initial complete-run CLI/worker binary is `/tmp/recipe-t25-bin`, SHA256
 `48f9c4ba2a30f857ea23a7481b3f28bfe4f2c510653a5ae562fcec3033edd3ff`.
 Actual CLI harness `/tmp/recipe-t25-e2e` SHA256
 `e9bf97b2cad48d330edbf3dc20990d92a133167733336c221560aab5a12968a4`.
 It includes the current preseed closure fixture, committed as `a6ac832`.
 Coherent implementation commits and source HEADs are recorded in the task
 checkpoint; immutable executable hashes distinguish runs during parallel builds.
+
+
+Final selected superproject revisions are Recipe`022e91c`, distro-builder`97c55e3`,
+distro-contract`0d066d9`, AcornOS`c3ddd4a`, leviso`fbad656` and docs-content`06ffaa0`.
+AcornOS already contained `d1777d3` before this batch; its unrelated untracked
+lockfile is preserved. Original untracked task outputs are not committed.
+Ginux's intended tested local dependency is the full7cf2638a worktree commit
+above; its old checkout/gitlink is intentionally not rewritten. Both original
+Ginux stashes remain. Standalone HTTP/TLS fixtures were individually stopped
+successfully after validation; diagnostic/provenance artifacts remain.
 
 ## Prepared images and provenance
 
@@ -84,12 +94,45 @@ sudo -n env \
   /tmp/recipe-t25-e2e --test-threads=6
 ```
 
-The full132-scenario result is **pending**, log
-`/tmp/recipe-t25-final-managed.log`; an earlier interrupted run is not acceptance.
-Separate real public-library execution with spoofed ambient worker markers
-passes1/1 (`/tmp/recipe-t25-library.log`); the actual image-producer composition
-and rejection scenario passes1/1 (`/tmp/recipe-t25-image-producer.log`).
-All six affected Rust packages pass all-target compilation.
+The initial complete132-case run finished **120passed/12failed** in1859.87s,
+`/tmp/recipe-t25-final-managed.log`; it is not a green full-suite result. Eleven
+failures were stale query/state fixture expectations. One exposed a real
+finalization bug: the coordinator killed a successful worker's still-exporting
+supervisor after10 seconds, leaving an empty result file. Isolated large-payload
+controls passed, but an actual-supervisor delayed-completion marker reproduced
+premature killing reliably (`/tmp/recipe-t25-completion-marker-repro.log`).
+
+Recipe `022e91c` lets valid final export use the remaining execution deadline,
+keeps error/cancellation teardown short, and prevents a killed/nonzero launcher
+from publishing even after worker success. Query fixtures `dc24694` use API2
+and unchanged-source/JSON-state assertions; `f01ae3a` verifies disabled recovery
+without incorrectly forbidding durable diagnostics.
+
+The final concurrent regression batch passes **26/26** in147.38s, covering all
+corrected failures, actual2GiB+4096 payload,5000 nonempty files, mode/link/mtime
+restart, all16 query cases, cancellation/deadlines/partial frames and two new
+real-supervisor completion/exit-status cases. Log:
+`/tmp/recipe-t25-final-corrections-managed.log`, CLI SHA256
+`6fd538039524e054cf333f3f85e9a16bdb41d7b03db31d9db8f4cf18229ccbda`,
+harness SHA256 `8f0aa949d1499faf2586ea36648dd24877d7ac32f9ea695619c0cd6643069200`.
+The final catalog has134 scenarios. This is complete baseline coverage plus
+focused corrected-path revalidation, not a second all134-case run.
+
+Final committed Recipe is `022e91c5049350bf449847a2bc1365d067f1c290`.
+Delivery executables: `/tmp/recipe-local-final-bin`, SHA256
+`94d6b95654608f7f3abc34c7d4a40afa3578e628e11d6784094fc783f228972f`,
+and `/tmp/recipe-local-final-e2e`, SHA256
+`784e74d3ac37f6fc97da1cb9c1ef3f8247c3bca7c89d95936f077c26b0a264c5`.
+After the26-case run, two post-worker supervisor-error messages were corrected;
+no other runtime logic changed. The committed binary builds and the shipped
+hello demo passes again (`/tmp/recipe-local-final-build.log`,
+`/tmp/recipe-t27-hello-final.log`).
+
+Separate real public-library execution with spoofed worker markers passes1/1
+(`/tmp/recipe-t25-library.log`); actual image-producer composition/rejection
+passes1/1 (`/tmp/recipe-t25-image-producer.log`). All six affected Rust packages
+pass all-target compilation (`/tmp/recipe-t25-final-joined-source-check.log`);
+the final diagnostic-only edit also passes all Recipe targets.
 
 Actual managed TLS (trusted, wrong hostname, untrusted CA), HTTPS pinned Git and
 publisher-pinned Alpine acquisition→extraction→execution→publication pass again
@@ -105,8 +148,23 @@ SHA256 `cba3b1f95298902f87c9730c61f746651282f326b126bd1ba964b4c61f866cde`,
 independently matching the pinned RPM metadata. Source RPM is unchanged;
 no ownership flag/error was suppressed. Proof:
 `/tmp/recipe-lane-b-network/rpm-repro/published-validation.json` and
-`stderr-owned-root-corrected.log`. Full QEMU package closure/typed selection and
-split-pane remain with the consumer lane, as recorded in the queue.
+`stderr-owned-root-corrected.log`. All four actual musl live-tool
+builds now pass; split-pane correction log
+`/tmp/recipe-t14-split-pane-musl-large-read.log`,4 acknowledged checkpoints,
+1,582,848-byte static executable SHA256
+`a929913760b34d7daa2bf4b0897baff24beb106a7408e17df07b2b6f8d3e6393`.
+This proves the version/help entry, not interactive PTY or VM behavior.
+
+QEMU's full15-RPM selected-product pipeline now passes in distro-builder
+`97c55e3`: verified acquisition, checked conversion/extraction, strict version
+checks, named publication and atomic `.artifacts/tools/current` selection. Its
+runtime library closure is explicit, and the unused privileged host bridge
+helper is explicitly excluded. Actual selected host consumers report10.0.0,
+empty stderr, matching executable hashes/firmware, and create/inspect a disposable
+1MiB qcow2 file. Evidence: `/tmp/recipe-qemu-typed-libraries.log` and
+`/tmp/recipe-qemu-selected-consumer.json`. Unsuppressed Ginux epoll warnings during
+inside-domain version startup do not establish QEMU workload execution in Ginux.
+The actual host-consumer checks have no such warning. No VM boot is claimed.
 
 ## Working demonstration
 
@@ -125,7 +183,8 @@ This actual local invocation passed with one acknowledged checkpoint and intact
 source. Its named program is mode0755, exact payload
 `#!/bin/sh\nprintf 'hello\\n'\n`, SHA256
 `f869aed15d808e5e860a3202973185b70255b03ebd936437b381aa3eed6c18c5`.
-Evidence: `/tmp/recipe-t27-hello.log` and the result JSON. Products/state remain
+Evidence: `/tmp/recipe-t27-hello-final.log` and `hello-result-final.json` (earlier
+`hello-result.json` and publication are retained). Products/state remain
 owned by the coordinator and publication parents remain private; privileged
 production does not automatically make a product accessible to an ordinary user.
 
@@ -142,8 +201,9 @@ package transfers do not claim a full Fedora ISO materialization or VM boot.
 Repair mechanics use a controlled provider, not external credentials.
 Ginux's inherited per-process address-space/CPU-affinity limits are not aggregate
 RSS or CPU-time accounting. Endpoint grants do not isolate cohosted virtual names.
-The current tasks must resolve their actual extraction/build failures before this
-record or the goal may be marked complete.
+All demonstrated extraction/build/finalization failures have been resolved with
+recorded actual rechecks. Full-ISO, VM, interactive PTY and broader Linux metadata
+coverage remain outside this implementation's demonstrated scope.
 
 ## Future Ginux contribution candidates
 

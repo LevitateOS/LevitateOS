@@ -25,6 +25,10 @@ descriptors are coordinator-owned; recipes cannot choose them. The launcher
 result is authoritative alongside the worker protocol. Missing/malformed records,
 contradictory exits, incomplete frames or missing terminal results fail explicitly.
 A supervisor failure after worker activity is distinguished from startup failure.
+A successful worker frame precedes final archive export: the coordinator awaits
+actual launcher completion within the remaining execution deadline. The short
+teardown grace applies to errors/cancellation. A killed/nonzero launcher cannot
+publish products even if the worker and an existing result file reported success.
 
 `GINUX_BIN` selects the launcher. `GINUX_ROOTFS` selects an assembled uncompressed
 tar; `GINUX_ROOT=oci:NAME@sha256:DIGEST` identifies those exact tar bytes, not an
@@ -146,6 +150,11 @@ are bounded by `3 * max_objects`, total bytes by
 forward/invalid aliases and malformed metadata fail without publication. Export,
 restart and publication preserve mode, hardlink identity and mtime seconds.
 USTAR does not persist nanoseconds or atime; unsupported timestamps fail export.
+Owned objects currently project virtual uid/gid0; chown preserves0 or unchanged
+IDs and rejects other owners. The supported archive mode contract is basic
+permission bits, not arbitrary Linux ownership/setuid metadata. The canonical
+QEMU payload excludes its unused privileged host bridge helper explicitly.
+Prepared rootfs cases do not establish complete distribution metadata fidelity.
 
 Diagnostics carry bytes without checkpoint or result authority. Shared sender
 locking prevents interleaved frames. Chunks≤768 bytes, total16MiB or32,768 frames,
