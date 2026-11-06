@@ -783,8 +783,8 @@ Earlier P02/P03 and candidate results remain historical records; current-main
 reconciliation is required before final closure.
 
 Exact next action: refresh R04's current-main prerequisite serially, continuing
-with G09c's VFS directory owner on refreshed G09a, followed by its paired
-G09d runtime adapter on refreshed G09b/G09c. G07's preserved
+with G09d's runtime adapter on refreshed G09b/G09c, including the required
+enum/runtime errno join. G07's preserved
 unready snapshot still needs DaybreakBlue correction/validation; do not import it. Local dependent
 preparation stays blocked for standalone delivery until its prerequisites
 actually merge upstream.
@@ -856,10 +856,16 @@ and both binaries match. The exact prerequisite fails the identical growth
 fixture at workload exit 121 beyond 64 KiB. Its seven-file +281/-13 delta is
 unchanged. [Review](ginux-contributions/g09b-review.md) keeps the useful G09a/G09b
 pair, security/full CI and actual upstream prerequisite holds explicit. Initial
-37-patch integrity results remain historical. The refreshed
+37-patch integrity results remain historical. G09c is refreshed at
+`1e34ef3641c9a2d93f449818692692ac2b561ebc` on G09a: all93 units/static/build
+and eight ordinary controls pass in source/clean, all187 paths and both binaries
+match, and the one-file +491/-2 production/four-test delta is unchanged. Only
+append context adapts around preserved G09a chunk-copy coverage.
+[Review](ginux-contributions/g09c-review.md) keeps G09d pairing, its errno join,
+security/full CI and actual upstream prerequisites pending. The refreshed
 `upstream-refresh-2026-11-06/current-inventory.json` records each currently retained
-patch/head and exact-parent replay. Ten packets now have current-main source/
-ordinary preparation; the other 27 still need current-main reconciliation;
+patch/head and exact-parent replay. Eleven packets now have current-main source/
+ordinary preparation; the other 26 still need current-main reconciliation;
 integrity is not source/runtime acceptance. The fresh preserved-worktree report
 also confirms all six restored HEAD, raw-index and staged/unstaged/conflict-status
 fingerprints are unchanged. Reconcile the

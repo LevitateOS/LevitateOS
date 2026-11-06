@@ -35,3 +35,30 @@ pending. No remote green or independent security review is claimed.
 Patch/draft/logs/manifests and initial failing review case are retained under
 `.artifacts/ginux-contribution-preparation/G09c/`. No real Ginux checkout/index,
 branch or remote changed; no PR or maintainer message was created.
+
+## Current-main refresh — 2026-11-06
+
+Refreshed head `1e34ef3641c9a2d93f449818692692ac2b561ebc`, tree
+`d75ce26c93b8d8f102f7b3e7d6ffce9bc6ee60e1`, on refreshed G09a
+`648ec32a34ece2f1cd7d37b10271e4166eb14683`, incorporating observed main
+`8a475e8b2318425fd2fc15246a5c6f4bca6caf86`. The historical evidence above
+remains historical. Only test-append context changed: production and all four
+added directory tests are byte-identical, and G09a's new chunk-copy unit remains.
+A separate self-review reread the complete delta and existing component resolver,
+metadata, alias positions, storage release and namespace allocation callers.
+Independent reviewer coverage is not claimed. Scope remains one VFS file,+491/-2.
+
+Both source and strict clean replay pass `make check test-unit build
+build-launch-fixture build-process-fixtures build-gate1-fixture`: 93 units,
+including32 VFS tests, with no removed upstream coverage. Eight ordinary
+configured-launch/valid wait-status controls pass per export. All187 tracked
+paths match the final head; both binaries have SHA256
+`41c7556ebe8d8bc3525248ff5d5c88d6750fa9ce0e039da108f2ee5db65d5a81`.
+Logs, exact command receipts, patch, draft and manifest are retained in
+`.artifacts/ginux-contribution-preparation/upstream-refresh-2026-11-06/G09c/`.
+
+This is local source/ordinary preparation only. Pair G09c with G09d's runtime
+adapter and DirectoryNotEmpty errno join; do not publish an intermediate stack.
+Actual upstream prerequisite merges, runtime adapter verification, full default
+runtime/security, macOS and remote CI remain pending. No branches or remote
+publication changed.

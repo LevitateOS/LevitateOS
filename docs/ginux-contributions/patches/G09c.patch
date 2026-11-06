@@ -1,6 +1,6 @@
-From 94fbfc2d2c67f90efb08f99ed18dee91188ceb17 Mon Sep 17 00:00:00 2001
+From 1e34ef3641c9a2d93f449818692692ac2b561ebc Mon Sep 17 00:00:00 2001
 From: vince <vincepaul.liem@gmail.com>
-Date: Fri, 6 Nov 2026 12:21:57 +0100
+Date: Fri, 6 Nov 2026 23:20:03 +0100
 Subject: [PATCH] feat(vfs): own directory descriptions and namespace mutations
 
 Keep directory identity and shared enumeration offsets across aliases,
@@ -13,7 +13,7 @@ Signed-off-by: vince <vincepaul.liem@gmail.com>
  1 file changed, 491 insertions(+), 2 deletions(-)
 
 diff --git a/crates/ginux-vfs/src/lib.rs b/crates/ginux-vfs/src/lib.rs
-index 2dfbc43d..576d5b61 100644
+index 4cb0e3dae976f703a015e257dbd51912a9cf046b..2ffe3b2d018837a5c62a3578b511f8b3877bead5 100644
 --- a/crates/ginux-vfs/src/lib.rs
 +++ b/crates/ginux-vfs/src/lib.rs
 @@ -13,6 +13,7 @@ pub const O_TRUNC: u32 = 8;
@@ -92,10 +92,10 @@ index 2dfbc43d..576d5b61 100644
              append: flags & O_APPEND != 0,
 +            directory: false,
 +            nonblocking: flags & O_NONBLOCK != 0,
-         };
-         Ok(slot as i32 + 3)
-     }
- 
++        };
++        Ok(slot as i32 + 3)
++    }
++
 +    /// Open a directory description. Enumeration cookies share this object
 +    /// through the launcher's aliases, just like ordinary file offsets.
 +    pub fn open_directory(&mut self, path: &[u8], flags: u32) -> Result<i32, VfsError> {
@@ -139,10 +139,10 @@ index 2dfbc43d..576d5b61 100644
 +            append: false,
 +            directory: true,
 +            nonblocking: flags & O_NONBLOCK != 0,
-+        };
-+        Ok(slot as i32 + 3)
-+    }
-+
+         };
+         Ok(slot as i32 + 3)
+     }
+ 
 +    pub fn directory_path(&self, descriptor: i32) -> Result<&[u8], VfsError> {
 +        let state = self.descriptors[self.descriptor(descriptor)?];
 +        if !state.directory {
@@ -413,9 +413,9 @@ index 2dfbc43d..576d5b61 100644
              state.close_on_exec,
          ))
      }
-@@ -1786,4 +2098,181 @@ mod tests {
-         assert_eq!(fs.read(replacement, &mut data), Ok(2));
-         assert_eq!(&data[..2], &[0, 0]);
+@@ -1855,4 +2167,181 @@ mod tests {
+             }
+         }
      }
 +
 +    #[test]
