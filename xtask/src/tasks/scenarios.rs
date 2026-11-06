@@ -221,6 +221,16 @@ fn require_inputs(distro: Distro, scenario: ScenarioId) -> Result<()> {
         ScenarioId::BuildPreflight => Product::BaseRootfs,
         ScenarioId::LiveBoot => Product::LiveBoot,
         ScenarioId::LiveTools | ScenarioId::Install => Product::LiveTools,
+        ScenarioId::AbUpdate => {
+            // The install disk to update, and the release to update it with.
+            resolve_latest_install_runtime(distro.id()).map_err(|_| {
+                crate::util::exit::missing(
+                    format!("ab-update needs a disk from the install scenario, and there is none for {}", distro.id()),
+                    format!("cargo xtask test install {}", distro.id()),
+                )
+            })?;
+            Product::LiveTools
+        }
         ScenarioId::InstalledBoot | ScenarioId::AutomatedLogin | ScenarioId::Runtime => {
             return resolve_latest_install_runtime(distro.id()).map(|_| ()).map_err(|_| {
                 crate::util::exit::missing(
@@ -250,6 +260,7 @@ fn scenarios_for(scenario: TestScenario) -> Vec<ScenarioId> {
         TestScenario::InstalledBoot => vec![ScenarioId::InstalledBoot],
         TestScenario::AutomatedLogin => vec![ScenarioId::AutomatedLogin],
         TestScenario::Runtime => vec![ScenarioId::Runtime],
+        TestScenario::AbUpdate => vec![ScenarioId::AbUpdate],
     }
 }
 

@@ -183,6 +183,18 @@ kind = "tool_payload_workspace_binary"
 package = "recstrap"
 binary = "recchroot"
 
+# A/B updates on the installed system: recab stages the inactive slot with
+# recstrap. Both go into the rootfs, which is what the installer extracts.
+[[ring2_runtime_profiles.live_tools_common.actions]]
+kind = "rootfs_workspace_binary"
+package = "recab"
+destination = "usr/bin/recab"
+
+[[ring2_runtime_profiles.live_tools_common.actions]]
+kind = "rootfs_workspace_binary"
+package = "recstrap"
+destination = "usr/bin/recstrap"
+
 [[ring2_runtime_profiles.live_tools_common.actions]]
 kind = "install_mode_payload"
 interactive_shell = "/bin/bash"

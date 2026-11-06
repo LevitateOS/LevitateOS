@@ -1059,6 +1059,7 @@ dependencies = [
  "distro-builder",
  "distro-contract",
  "fsdbg",
+ "recab",
  "recinit",
  "recpart",
  "recqemu",

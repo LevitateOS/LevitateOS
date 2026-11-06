@@ -313,6 +313,10 @@ pub enum TestScenario {
     #[value(name = "automated-login")]
     AutomatedLogin,
     Runtime,
+    /// On a copy of the install disk: stage the release into slot B, then trial
+    /// boot, fallback, commit and rollback (A/B installs only).
+    #[value(name = "ab-update")]
+    AbUpdate,
 }
 
 #[derive(Args)]
