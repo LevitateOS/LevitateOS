@@ -1,6 +1,11 @@
 # G05 — public descriptor ownership and anonymous pipes
 
-Local feature commit `8c1a579aafb873be289b49259b961ee2cb6532eb`.
+Current retained local commit `51b2c751af4a68d78261e7b63e731672e0b13240`, on refreshed G04
+`09fdb1b0f2caae3432846966815dcb7444a3c0e2`, rooted at observed main `8a475e8b`.
+The current-main refresh below owns fresh evidence and pending checks; earlier
+results remain historical.
+
+Earlier local feature commit `8c1a579aafb873be289b49259b961ee2cb6532eb`.
 Explicit local prerequisite G04 `5036b7e8a61c4cf1e18abad8746208d03d268ea5`
 (with its G03/G05a prerequisites), underlying upstream3f2fe7df.
 [Retained source patch](patches/G05.patch). Seventeen files,+1297/-76.
@@ -77,3 +82,58 @@ no public stack. macOS Actions/full Rocky VM checks are unrun. Bounds are256 pub
 FDs,8 pipes of64KiB and4096-byte I/O/atomic writes. Children/threads, descriptor
 polling, owned mappings, directory FDs and exec-time CLOEXEC are later packets.
 No real Git branch/index/worktree/remote was changed.
+
+## Current-main refresh — 2026-11-06
+
+The retained scope remains seventeen files, +1297/-76. Upstream changed the
+`main.rs` module context and moved the native dispatch under a systemd/native
+selection. Only the descriptors declaration and unexpected configured-Park error
+arm are placed in the current native match; the systemd branch and task owners
+remain intact. Other sixteen files apply unchanged. Added/removed source lines
+match the previous corrected extraction apart from indentation in that arm.
+
+A separate full-diff self-review reread descriptor reservation/get/dup/close/
+finish, channel allocation/ring/lifetime, backend dispatch, bootstrap limits,
+path/argument restoration and current native completion/failure callers. Aliases
+retain one open object; last-alias close retires the backend. Pending opens free
+failed reservations and public allocation precedes mutations. Path scratch is
+restored before public argument restoration. Pipe data changes only after the
+existing copy result; no native pipe or descriptor authority is added. Core
+contract bytes are unchanged. No new blocking source correction was identified;
+independent reviewer or security acceptance is not claimed.
+
+Candidate and independent clean G04-plus-only-G05 replay both pass:
+
+- `make check test-unit build build-launch-fixture build-launch-storage-fixture build-launch-device-fixture build-launch-pipe-fixture build-launch-fd-fixture build-process-fixtures build-gate1-fixture`, including all 85 current unit tests and 24 VFS tests.
+- Twenty-three ordinary controls per export: eight launch/valid-wait, three
+  storage, three null-device, six public-FD/pipe and three pipe lifecycle modes.
+  They check shared offsets/CLOEXEC across owners, native FD reuse and original
+  read-argument restoration, public exhaustion without truncation, lower
+  operator limit 8, 64 KiB byte-checked pipe transfer, atomic nonblocking capacity,
+  shared endpoint flags, EOF after the final writer, eight-pipe capacity/reuse,
+  mixed assignments and repeated fresh launches. SIGPIPE terminates normally;
+  both parked-operation fixtures terminate and are reaped after SIGKILL directed
+  only to their owned pidfds.
+
+On the exact recorded G04 binary, identical valid pipe and public-FD fixtures
+exit 10 (pipe creation missing) and 11 (common public allocation missing).
+These demonstrate new capabilities, not regressions in a prerequisite that never
+promised them. Separate ordinary storage/device fixtures use the new documented
+public numbers; existing complete source fixtures retain their data/path/copy
+assertions and are adjusted only for this public ABI.
+
+All 199 tracked paths match the candidate in source and clean exports. Both
+binaries hash `78e05c5aa1a7e684e28828cb47756dc5d552573392da86d5a061ad09541079ce`.
+Exact source, commands, receipts, logs, old/new patches, manifest and concise
+draft are retained under
+`.artifacts/ginux-contribution-preparation/upstream-refresh-2026-11-06/G05/`.
+Build targets are isolated and the snapshot commit is local/unreferenced. No real
+Ginux branch/index/checkout or remote text changed.
+
+Full default FD/pipe/storage/device/launch/native/setup suites retain protected,
+fault, private-backend authority and scratch cases. Those probes remain unrun
+under the downstream DaybreakBlue boundary; ordinary lifecycle success does not
+satisfy their acceptance. No agent was dispatched. macOS/remote CI is unrun.
+R03/R04 retain full required validation and actual G04/prerequisite upstream
+merges before standalone extraction/revalidation. No stacked publication or
+combined F02/F03 closure is implied; child/thread integration remains later work.

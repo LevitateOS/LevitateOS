@@ -771,3 +771,17 @@ protected/partial buffers and shared canonical-path scratch independently.
 Complete default fixtures stay present and enabled; their security probes were
 not executed during this refresh. Keep acceptance pending until monitored results
 exist on the final revision. No DaybreakBlue agent has been dispatched.
+
+
+## Refreshed G05 security revision — 2026-11-06
+
+Current local G05 is `51b2c751af4a68d78261e7b63e731672e0b13240` on refreshed G04
+`09fdb1b0f2caae3432846966815dcb7444a3c0e2`. [Current review](g05-review.md) records
+85 units and twenty-three ordinary controls in source/clean replay, including
+normal SIGPIPE and owned parked-fixture termination/reaping. The existing
+G03c–G06b security handoff applies: validate public/private backend authority,
+protected/partial pipe-pair copyout rollback, atomic input-copy faults and read
+partial effects, translated arguments and canonical scratch independently.
+Complete default fixtures and CI remain present; their fault/authority probes
+were not run here. Shared-argument/thread safety and G07 acceptance remain pending.
+No DaybreakBlue agent has been dispatched and no security pass is claimed.
