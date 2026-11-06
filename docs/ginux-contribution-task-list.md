@@ -912,3 +912,19 @@ Exact next action: inspect the complete upstream delta and current configured
 launch/contract callers in a separate source export, then reconcile candidates
 serially in dependency order. Preserve all prior exact-revision results and
 restored worktrees. No branch/ref rewrite or publication is authorized.
+
+The exactff926d0c object/source and43-path delta are now retained separately in
+`.artifacts/ginux-contribution-preparation/upstream-contract-refresh-2026-11-06/`;
+no real checkout or submodule pin changed. Initial source review confirms the
+new EffectiveContract/AuditBudget join is in upstream native_main/supervise_native;
+configured launch remains a separate supervisor. Trace its dispatch and Recipe
+callers explicitly rather than assuming a clean replay inherits enforcement.
+The complete contract library/tool and remaining delta review are unfinished;
+`review-progress.json` records the exact read position. Latest-main baseline
+compilation/unit/ordinary evidence is recorded separately from every candidate.
+
+[Upstream contract review](ginux-contributions/upstream-contract-review.md) owns
+this new prerequisite. The exactff926d0c baseline now passes83 units/static/build,
+generated contract-document consistency and eight ordinary controls; this does
+not validate a refreshed contribution or configured contract enforcement. Read
+its complete remaining source/callers before choosing the minimal adjustment.
