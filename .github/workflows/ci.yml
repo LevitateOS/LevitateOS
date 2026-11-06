@@ -134,6 +134,12 @@ jobs:
         with:
           components: clippy, rustfmt
 
+      - name: Install Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: cargo check, generated files, TypeScript typecheck
+        run: cargo xtask check
+
       - name: Clippy - recipe
         working-directory: tools/recipe
         run: cargo clippy -- -D warnings

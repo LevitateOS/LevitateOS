@@ -6,17 +6,9 @@
 	path = tools/recipe
 	url = git@github.com:LevitateOS/recipe.git
 	branch = master
-[submodule "llm-toolkit"]
-	path = llm-toolkit
-	url = git@github.com:LevitateOS/llm-toolkit.git
-	branch = master
 [submodule "docs-content"]
 	path = docs/content
 	url = git@github.com:LevitateOS/docs-content.git
-	branch = master
-[submodule "docs-tui"]
-	path = docs/tui
-	url = git@github.com:LevitateOS/docs-tui.git
 	branch = master
 [submodule "install-tests"]
 	path = testing/install-tests
@@ -78,14 +70,6 @@
 	path = tools/recpart
 	url = git@github.com:LevitateOS/recpart.git
 	branch = main
-[submodule "tools/recguard"]
-	path = tools/recguard
-	url = git@github.com:LevitateOS/recguard.git
-	branch = main
-[submodule "shared/tui-kit"]
-	path = shared/tui-kit
-	url = git@github.com:LevitateOS/tui-kit.git
-	branch = master
 [submodule "tui"]
 	path = tui
 	url = git@github.com:LevitateOS/tui-root.git

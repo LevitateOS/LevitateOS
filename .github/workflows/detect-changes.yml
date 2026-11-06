@@ -4,7 +4,7 @@ on:
   workflow_call:
     inputs:
       type:
-        description: 'Project type: rust, python, or bun'
+        description: 'Project type: rust or bun'
         required: true
         type: string
     outputs:
@@ -16,7 +16,7 @@ jobs:
   detect:
     runs-on: ubuntu-latest
     outputs:
-      has_changes: ${{ steps.rust.outputs.code || steps.python.outputs.code || steps.bun.outputs.code }}
+      has_changes: ${{ steps.rust.outputs.code || steps.bun.outputs.code }}
     steps:
       - uses: actions/checkout@v4
 
@@ -31,20 +31,6 @@ jobs:
               - '**/*.rs'
               - '**/Cargo.toml'
               - '**/Cargo.lock'
-              - '.github/workflows/**'
-
-      - name: Detect Python changes
-        if: inputs.type == 'python'
-        uses: dorny/paths-filter@v3
-        id: python
-        with:
-          base: ${{ github.ref }}
-          filters: |
-            code:
-              - '**/*.py'
-              - 'requirements.txt'
-              - 'pyproject.toml'
-              - 'setup.py'
               - '.github/workflows/**'
 
       - name: Detect Bun/TypeScript changes

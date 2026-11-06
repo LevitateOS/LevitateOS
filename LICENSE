@@ -14,8 +14,7 @@ You may choose either license. See LICENSE-MIT and LICENSE-APACHE.
 
 This includes:
   - Rust crates (distro-builder, distro-spec, tools/*, etc.)
-  - TypeScript packages (docs/content, docs/tui, docs/website)
-  - Python code (llm-toolkit)
+  - TypeScript packages (docs/content, docs/website, tui/*)
 
 Contributions are accepted under the same dual license (inbound = outbound).
 
