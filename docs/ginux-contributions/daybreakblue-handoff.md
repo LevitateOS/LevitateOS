@@ -561,3 +561,25 @@ uname is denied; candidate succeeds. Treat that as observed functional evidence,
 not an exploitability conclusion; no hostile input or crash exploitation ran.
 No cloud dispatch occurred. #179 identity policy, full CI and G06/F02 task-loop
 join remain pending; [review/evidence](g27-review.md).
+
+## G28 — supervisor TCP backend (partial)
+
+Exact `0a3cf5f5ab7e77080eb9491cb6bffd5ba642cb68` on recorded main `3f2fe7dfadd4b40e235d982a6a3d386dc6490177`.
+Static/build and67 selected routine units pass in source/clean, including real
+IPv4/IPv6 metadata, nonblocking I/O, budget/half-close and normal close/drop/revoke.
+Only trusted controlled local peers were contacted; no scans or foreign endpoints.
+
+Default-enabled but unrun donor tests:
+`tcp_endpoint_slots_budget_and_revocation_use_real_connections` and
+`tcp_drop_closes_connecting_handles_and_invalid_policy_never_opens`.
+Local unit commands use explicit filters solely for these two new tests;
+unfiltered make test-unit/new Linux CI remains pending, not green.
+
+DaybreakBlue must validate denied/foreign/malformed endpoints and family/scope
+representations, policy/assignment bypass, revoked/stale/reused handles and public
+alias authority, concurrent revoke/close/connect and failed/in-progress cleanup,
+backend error/short-count failures, byte-accounting boundaries and adversarial
+network/race/failure probes. Check async SO_ERROR consumption when G29 integrates
+it. Host descriptor/CLOEXEC authority and guest confinement need that join too.
+No cloud dispatch occurred; upstream network policy/full CI and final consumer
+acceptance remain pending; [review/evidence](g28-review.md).

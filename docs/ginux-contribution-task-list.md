@@ -634,14 +634,25 @@ sysinfo/#219 remain unchanged. Exact main lacks the ABI and its RPM query fails.
 #179 identity policy, security/full CI, fresh upstream acceptance and G06/F02
 runtime-owner join remain pending. No publication occurred.
 
-Exact next task: **G28 — bounded TCP device backend**.
-Inspect8ff83d64/539c1c77/9a70427b against current device assignment/backend owners.
-Keep useful backend-only behavior separate from G29 syscall/readiness policy.
-Review exact endpoint/connection/byte budgets and cleanup; use controlled trusted
-local peers for ordinary functional checks. Record scanning, denied/foreign
-endpoints, bypass/authority/revocation attacks and adversarial network/race probes
-for DaybreakBlue. Preserve all pending G23–G27/F02/F03 acceptance and public policy
-holds. No publication or maintainer messages before F04.
+G28 backend-only source preparation is retained at `0a3cf5f5` directly on
+recorded main. [Review/evidence](ginux-contributions/g28-review.md) records150-path
+strict replay, static/build and67 selected routine units passing in source/clean,
+including real IPv4/IPv6 metadata, synchronized nonblocking I/O, half-close,
+cumulative budget and close/drop/normal revoke. Linux-only device coverage now
+has a Linux CI invocation with the correct unit flags. Two new donor policy/
+security tests remain enabled but unrun; unfiltered make test-unit/full CI is
+pending, not green. Network contract/security and fresh upstream review still
+hold delivery. No G29 guest networking, remote mutation or publication occurred.
+
+Exact next task: **G29 — configured TCP syscall/readiness integration**.
+Trace66de2880 against prepared G28, public descriptor/task owners and G08 readiness.
+Prove the minimal actual capability base and preserve separate policy holds;
+do not import thread/global-clock/scalar-clamp ancestry gratuitously. Use trusted
+local HTTP/TLS/Git peers for ordinary acceptance where dependencies permit. Carry
+G24 timestamp Stat initialization into the new network encoder and preserve
+SO_ERROR/partial I/O/close ownership. Record hostile endpoint/buffer/FD/authority/
+race/cancellation probes for DaybreakBlue. Preserve all pending G23–G28/F02/F03
+acceptance. No publication or maintainer messages before F04.
 
 Active skill: `hdae-development`, discovered at
 `/home/vince/.codex/worktrees/ginux-pr-combination-check/ginux/.agents/skills/hdae-development/SKILL.md`.

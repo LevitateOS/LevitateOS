@@ -94,3 +94,10 @@ raw390-byte ABI/max-valid IDs, actual RPM identity queries and ordinary valid
 native wait-status copying pass in source/clean. G06 task-loop emulation join is
 F02 work; #179, security/full CI and fresh upstream acceptance remain pending.
 Sysinfo/#219 stays outside this identity contribution; [review](g27-review.md).
+
+G28 `0a3cf5f5` is independent library source directly on recorded main.
+Public API callers use real IPv4/IPv6 peers, metadata, budgets and lifecycle;
+no G29/domain/FD/task/readiness policy code is imported. Linux-only coverage now
+has an explicit Linux CI step with existing unit flags.67 routine units pass in
+source/clean; two donor policy/security tests remain enabled and unrun. Full CI,
+network contract and security still hold delivery; [review](g28-review.md).
