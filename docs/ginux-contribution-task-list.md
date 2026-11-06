@@ -199,7 +199,7 @@ pass never substitutes for the candidate's own review.
 
 ## Cross-candidate review and user checkpoint
 
-- [ ] **F01 — Account for the complete queue.** Depends on P03/P04 and every
+- [x] **F01 — Account for the complete queue.** Depends on P03/P04 and every
   retained G packet's local review. Every local hunk and old-fork-only change has
   a disposition; all 13 original areas below are covered. List real candidate
   count, replaced/upstream items, unresolved policy and prerequisite holds.
@@ -678,32 +678,33 @@ make test-unit/all7 packages remain, ordinary runtime receipts already pass on
 those exact heads. No separate wiring-only patch/PR is needed. Full/default,
 combined owner and remote CI evidence remains pending; nothing published.
 
-F01 is in progress: [inventory/review](ginux-contributions/f01-review.md) now verifies
-37 distinct patches/heads and their hashes, maps all66 integration commits and
-retains all49 other-fork dispositions/6 dirty/stash records. The canonical P03
-261-hunk digest matches. Six patches are based on recorded main; this is not a
-PR count or a fresh readiness claim. G07 and policy/security/actual consumer
-criteria remain held. Final semantic hunk accounting remains open.
+F01's inventory/dispositions are accounted: [review/evidence](ginux-contributions/f01-review.md)
+verifies37 patch/head hashes, all66 integration commits,49 old-fork dispositions,
+2 reconciliation merges,6 preserved dirty/stash records and every original261
+hunk. All13 original areas have source/disposition coverage. Source checks on37
+prepared heads plus unready G07 preserve all65 original named tests, all7 unit
+package commands/required CI, native fixture/caller bodies and exact native core
+contract. G08b fixes the source gap, G31 is folded, and no old native helper/test
+reversions or accidental native clock/poll/getcwd grants are imported.
 
-The initial F01 source gap is corrected: G08b `bc34cf66` on G08a retains
-packet pairs/FIONBIO/nested stream capacity. [Review/evidence](ginux-contributions/g08b-review.md)
-records82 units,170-path strict replay, ordinary packets/aliases/EOF/peers,
-FIONBIO/accepted metadata flags,12 child/grandchild streams and poll controls
-passing in source/clean. Exact G08a fails the new valid capabilities; a donor
-metadata-flag regression was reproduced and corrected. All default security
-coverage remains enabled/unrun; actual compiler/thread/vector/network joins,
-policy/security/full CI/current-main independence remain pending. There are now
-37 retained patch units, not37 PRs. No publication occurred.
+This completes accounting only. G07 remains unready with DaybreakBlue; policy,
+security/full CI/current-main independence, actual compiler/SQLite/Cargo/APK/RPM/
+Git and complete current Recipe acceptance remain open.37 patches is not a PR
+count, and no publication is authorized.
 
-Exact next action: **finish F01 semantic hunk/old-fork reconciliation**.
-The refreshed inventory includes G08b. Reconcile every original
-261-hunk/P03 commit disposition against actual final owners and explicitly retain
-G07/policy/security/consumer holds. Then compose/review shared owners at F02,
-run fresh complete current Recipe and actual consumers at F03, and present F04
-for user inspection. G29 socket demux must continue supporting local packet
-send/recv, and network reference offsets must follow the enlarged channel/device
-range. Preserve G25 helper/vector and G24 Stat joins; all open G07/G08/G23–G30
-acceptance remains active. No branch/ref/push/PR/maintainer messages before review.
+Exact next action: **F02 — compose and review shared owners**.
+Use a disposable local source tree and temporary index/unreferenced commits,
+preserving all real branches/checkouts/indexes/stashes. Compose the currently
+source-prepared per-process candidates; keep G07's unready thread/security work
+separate until a monitored correction is available. Exclude G01/G02 held native
+rules and G25 held native clamp. Resolve shared G14/G16 path/cwd, G15/G18 archive,
+G20 event wait plus finite G08/G29 ticks, G24 Stat fields, G25 canonical vectors/
+IoVectors, G26 resource queries and G27 configured identity in the G06 task loop.
+G29 must preserve local packet send/recv and place network references after the
+enlarged channel/device range. Run relevant ordinary combined scenarios and
+actual consumers as capabilities join; retain every unrun thread/security/full
+criterion. Then F03 fresh complete applicable Recipe/consumer closure and F04
+user inspection. No branches/refs/pushes/PRs/maintainer messages before approval.
 
 Active skill: `hdae-development`, discovered at
 `/home/vince/.codex/worktrees/ginux-pr-combination-check/ginux/.agents/skills/hdae-development/SKILL.md`.
