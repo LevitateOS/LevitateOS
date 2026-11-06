@@ -437,10 +437,9 @@
     },
     {
       "packet": "G10",
-      "purpose": "Execution of owned ELF files (`c5ae1c5d`, `32ba41e9`)",
+      "purpose": "configured owned ELF execution and virtual executable identity",
       "dependencies": [
-        "G06",
-        "G09"
+        "G09d"
       ],
       "source_commits": [
         "c5ae1c5d1da287486c6330965deae3744997fbdf",
@@ -448,8 +447,40 @@
       ],
       "acceptance": "Valid ELF executes from owned backing, malformed input fails, executable identity is virtual, pins release at death and no host-path reopening occurs.",
       "planned_delivery": "one coherent change plus its generic docs and focused regression fixtures; split coupled responsibilities only as recorded by P04",
-      "status": "pending extraction and R01-R04 review",
-      "artifact_directory": ".artifacts/ginux-contribution-preparation/G10"
+      "status": "source separately self-reviewed; static/unit/build and selected ordinary runtime checks pass in source/clean replay; security-held and full CI/current-main independence pending",
+      "artifact_directory": ".artifacts/ginux-contribution-preparation/G10",
+      "base": "85b53fe15a64041f451ec7e7aa1e77d08cb2c18a",
+      "head": "14866b1de07bc8474557396c09f74275e8fb6bf5",
+      "tree": "6fe2f90d36faa7c50143004505d283bab176ad90",
+      "standalone": false,
+      "changed_files": [
+        ".github/workflows/check.yml",
+        "Makefile",
+        "README.md",
+        "crates/ginux-init/src/descriptors.rs",
+        "crates/ginux-init/src/exec_image.rs",
+        "crates/ginux-init/src/fs_hooks.rs",
+        "crates/ginux-init/src/launch_tasks.rs",
+        "crates/ginux-init/src/main.rs",
+        "crates/ginux-init/src/path_hooks.rs",
+        "crates/ginux-init/src/tracee_io.rs",
+        "crates/ginux-vfs/src/lib.rs",
+        "scripts/test-launch-owned-exec.py",
+        "tests/fixtures/launch-exec-fixture.c",
+        "tests/fixtures/launch-owned-exec-fixture.c"
+      ],
+      "patch_sha256": "5d431da7baae926e97311db39ea7508dafe341b333115407a905c67ac49e0f1b",
+      "security_handoff": "daybreakblue-handoff.md",
+      "unit_tests": 91,
+      "vfs_tests": 33,
+      "clean_matched_paths": 174,
+      "review": "separate self-review; no independent reviewer/security coverage claimed",
+      "remote_ci": "not run",
+      "fixture_bytes": 83288,
+      "source_binary_sha256": "fe88112af7cbaf39d729315a80eb66b5a930af58ef188f1f1704145829be7c97",
+      "clean_binary_sha256": "fe88112af7cbaf39d729315a80eb66b5a930af58ef188f1f1704145829be7c97",
+      "evidence": "g10-review.md",
+      "source_patch": "patches/G10.patch"
     },
     {
       "packet": "G11",

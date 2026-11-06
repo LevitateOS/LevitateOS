@@ -87,3 +87,57 @@ ordinary directory/cwd plus growth/bounds/quota scenarios pass; this provides no
 substitute security evidence. No cloud dispatch or request for extra privilege
 is implied. Review new kernel-owned cwd/proc-link handling and its namespace
 checks alongside G07's unresolved shared-argument capture problem.
+
+## G10 low-level executable backing and security validation
+
+Upcoming extraction uses existing donors c5ae1c5d/32ba41e9 on reviewed G09d85b53fe1.
+The implementation stages owned program bytes in a private sealed memfd and uses
+supervisor-chosen ptrace syscall transactions to execute it. Those mechanisms
+can resemble code injection; this record explicitly assigns their low-level
+security review and adversarial validation to DaybreakBlue. No G10 runtime has
+been executed yet. Ordinary source adaptation/build and functional execution of
+controlled compiled fixtures remain the local implementation scope.
+
+Validate private descriptor authority, sealing and transient descriptor cleanup;
+pinned-file lifetime and writer exclusion; malformed ELF and implicit interpreter
+selection; failure rollback and successful-exec-only CLOEXEC retirement; virtual
+executable-name projection and resistance to host-path/fd leakage. Readlink and
+proc executable authority checks remain for DaybreakBlue, consistent with the
+prior automatic-review rejection. Do not use an unmonitored workaround to run
+those scenarios here. Pin the final retained candidate before validation; keep
+unperformed checks and G07's shared-argument race explicitly unresolved. This
+written request does not dispatch an agent, publish code or contact maintainers.
+
+### G10 source findings and remaining checks
+
+The retained source is being finalized from the G09d base. Source-only review
+found that the old donor checked owned ELF magic/machine but did not join its
+PT_INTERP metadata to the existing image interpreter authority check. The new
+source shares that metadata reader and namespace check; no hostile-interpreter
+runtime validation was performed here. Confirm this correction independently.
+
+Also validate transient kernel-consumed exec arguments against the shared-memory
+capture problem already recorded for G07, including the empty pathname used by
+injected memfd/execveat transactions. Excluding thread support does not prove
+shared writable argument mappings are safe across other permitted processes.
+The functional candidate remains security-held until stable argument authority
+and associated adversarial checks are resolved. Do not infer safety from its
+successful ordinary execution scenarios.
+
+Executable-name source now prefers the VFS name for owned programs even when
+the tracee root is '/', and reserves room for a deleted-name suffix. The existing
+allowed-ELF interpreter fixture needs its main executable name '/allowed-elf',
+not a blanket '/bin/' prefix; this source assertion was corrected without running
+its readlink validation here. Review exact-name, maximum-length, deletion and
+protected-buffer behavior in the monitored environment. Sealed executable copies
+are additional memory beyond the documented writable-file backing bound; no
+aggregate RAM quota is claimed. No DaybreakBlue dispatch has occurred.
+
+### G10 exact retained revision
+
+Validate candidate14866b1de07bc8474557396c09f74275e8fb6bf5 (baseG09d85b53fe1).
+[Source review and ordinary evidence](g10-review.md) records91 passing units and
+six controlled ELF execution scenarios plus image-cwd/storage controls in both
+source and clean replay. It is security-held; ordinary success is not adversarial
+acceptance. Include older-kernel memfd/seal fallback behavior in the pending
+low-level checks. Full/default runtime probes were preserved and not run here.

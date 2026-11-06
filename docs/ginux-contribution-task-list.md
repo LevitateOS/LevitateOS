@@ -447,18 +447,31 @@ four review subpackets, with explicit security/full CI/upstream holds. Memfd
 identity moves to G12; unsupported /dev/fd reopening tests move to their later
 executable/descriptor owner. No PR or policy text entered Ginux.
 
+G10 source and selected ordinary validation are retained at `14866b1d` on
+G09d85b53fe1. [Review/evidence](ginux-contributions/g10-review.md) records91 units,
+174-path strict replay, six ordinary owned-ELF scenarios with an 83,288-byte compiled
+fixture and image-cwd/storage controls passing in source/clean exports. It fixes
+pinned-whiteout reuse and preserves interpreter authority through the existing
+metadata reader. The exact prerequisite fails the focused valid-exec scenario.
+Readlink/private-FD/seal/malformed-input and shared-argument security acceptance
+remain with DaybreakBlue; G10 is explicitly security-held and not publication
+ready. Full CI/current-main independence remain pending. Internal routing text
+was also removed from the one local agent-authored public draft that contained
+it; no remote text was edited.
+
 Current goal-turn classification: **progress**. The full goal remains active;
 security-held G07, later packets, policy acceptance, interactions and Recipe
 closure remain incomplete. F04 remains the user inspection stop.
 
-Exact next task: **G10 — execution of owned ELF files**, starting from reviewed
-G09d85b53fe1, with G07/G08 excluded. Inspect c5ae1c5d/32ba41e9, source ownership,
-private executable backing, exec transaction and cleanup before extraction.
-Record low-level executable-injection/security validation for DaybreakBlue;
-ordinary implementation/source review/functional program execution may continue.
-Do not replay memfd mapping identity32e2c85f prematurely or import G12/G17 just to
-compile the donor. Preserve G06 strict TID/wait semantics and successful-exec-only
-CLOEXEC retirement. Full security and CI remain pending; no publication authorized.
+Exact next task: **G11 — owned scripts and bounded interpreter chains**, starting
+from G10's locally retained14866b1d. Inspect73593745/a08aff7a/cda76faa before source
+extraction. Preserve the common interpreter metadata owner, typed waits, strict
+copyout, exec pin cleanup, current image/owned component resolution and native
+exec failure/scratch restoration. Prepare only ordinary script execution checks
+locally; write low-level argument injection, interpreter authority, malformed
+chains and security validation down for DaybreakBlue. G11 inherits G10's security
+hold, and G07/G08 remain excluded. Do not mark dependent candidates ready or
+publish anything while those conditions remain unresolved.
 
 Active skill: `hdae-development`, discovered at
 `/home/vince/.codex/worktrees/ginux-pr-combination-check/ginux/.agents/skills/hdae-development/SKILL.md`.

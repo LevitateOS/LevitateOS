@@ -1,0 +1,1791 @@
+From 14866b1de07bc8474557396c09f74275e8fb6bf5 Mon Sep 17 00:00:00 2001
+From: vince <vincepaul.liem@gmail.com>
+Date: Fri, 6 Nov 2026 13:01:02 +0100
+Subject: [PATCH] feat(launch): execute pinned owned ELF files through private
+ backing
+
+Retain VFS executable identity through fork, unlink, replacement and
+exit. Stage immutable bytes through sealed memfds and preserve public
+descriptors until successful exec. Validate kernel-selected interpreters
+through the existing bounded metadata and namespace owner.
+
+Signed-off-by: vince <vincepaul.liem@gmail.com>
+---
+ .github/workflows/check.yml                |   3 +-
+ Makefile                                   |   8 +
+ README.md                                  |  17 +-
+ crates/ginux-init/src/descriptors.rs       |  14 +-
+ crates/ginux-init/src/exec_image.rs        |  97 ++++++
+ crates/ginux-init/src/fs_hooks.rs          | 115 ++++++-
+ crates/ginux-init/src/launch_tasks.rs      | 360 ++++++++++++++++++---
+ crates/ginux-init/src/main.rs              |   1 +
+ crates/ginux-init/src/path_hooks.rs        | 157 ++++-----
+ crates/ginux-init/src/tracee_io.rs         |   6 +-
+ crates/ginux-vfs/src/lib.rs                | 228 ++++++++++++-
+ scripts/test-launch-owned-exec.py          |  99 ++++++
+ tests/fixtures/launch-exec-fixture.c       |  20 +-
+ tests/fixtures/launch-owned-exec-fixture.c | 171 ++++++++++
+ 14 files changed, 1165 insertions(+), 131 deletions(-)
+ create mode 100644 crates/ginux-init/src/exec_image.rs
+ create mode 100644 scripts/test-launch-owned-exec.py
+ create mode 100644 tests/fixtures/launch-owned-exec-fixture.c
+
+diff --git a/.github/workflows/check.yml b/.github/workflows/check.yml
+index acc81abe..83f16959 100644
+--- a/.github/workflows/check.yml
++++ b/.github/workflows/check.yml
+@@ -24,7 +24,7 @@ jobs:
+     steps:
+       - uses: actions/checkout@v5
+       - run: rustup target add x86_64-unknown-linux-gnu
+-      - run: make build build-launch-fixture build-launch-storage-fixture build-launch-device-fixture build-launch-pipe-fixture build-launch-fd-fixture build-launch-task-fixture build-launch-exec-fixture build-launch-directory-fixture build-process-fixtures build-gate1-fixture
++      - run: make build build-launch-fixture build-launch-storage-fixture build-launch-device-fixture build-launch-pipe-fixture build-launch-fd-fixture build-launch-task-fixture build-launch-exec-fixture build-launch-directory-fixture build-launch-owned-exec-fixture build-process-fixtures build-gate1-fixture
+       - run: sudo make test-launch
+       - run: sudo make test-launch-storage
+       - run: sudo make test-launch-devices
+@@ -36,3 +36,4 @@ jobs:
+       - run: sudo make test-native-supervision
+       - run: make test-process-native
+       - run: sudo make test-gate1-setup
++      - run: sudo make test-launch-owned-exec
+diff --git a/Makefile b/Makefile
+index 15c55879..f29b73ff 100644
+--- a/Makefile
++++ b/Makefile
+@@ -251,3 +251,11 @@ build-launch-directory-fixture:
+ 
+ test-launch-directories:
+ 	python3 scripts/test-launch-directories.py $(GINUX) .artifacts/launch/launch-directory-fixture
++
++.PHONY: build-launch-owned-exec-fixture test-launch-owned-exec
++build-launch-owned-exec-fixture:
++	mkdir -p .artifacts/launch
++	$(CC) -nostdlib -static -fno-stack-protector -fno-builtin -O2 -Wall -Wextra -Werror tests/fixtures/launch-owned-exec-fixture.c -o .artifacts/launch/launch-owned-exec-fixture
++
++test-launch-owned-exec:
++	python3 scripts/test-launch-owned-exec.py $(GINUX) .artifacts/launch/launch-owned-exec-fixture
+diff --git a/README.md b/README.md
+index a3982c7c..28d22c77 100644
+--- a/README.md
++++ b/README.md
+@@ -242,7 +242,7 @@ Relative AT_FDCWD paths follow the calling process's image cwd; owned directory
+ FDs resolve relative operations through their current VFS identity. Image chdir,
+ getcwd and relative image exec retain native per-process cwd semantics. Entering
+ owned directories as cwd, relative image-directory FD access, owned symlinks,
+-hardlinks, mappings and generated-file execution remain unsupported.
++hardlinks and guest file mappings remain unsupported.
+ Component-wise image-link traversal preserves assignment
+ precedence, missing components and non-directory errors. Native image operations
+ use a temporary canonical path below the stopped workload's stack; an unavailable
+@@ -278,6 +278,21 @@ Guest-memory copies respect page protections, including partial read copyout.
+ No writable host descriptor is exposed. Data disappears at domain teardown;
+ there is no retention, export, storage generation or separate storage-quota setting.
+ 
++Owned executable files with an execute bit and no open writers may be replaced
++through execve or execveat, including an owned directory FD or an unlinked read
++FD with AT_EMPTY_PATH. The VFS pins the bytes; a private sealed memfd supplies
++them to the native kernel ELF loader. Paths and ELF interpreter metadata use the
++same assignment checks as image execution. Owned scripts are not supported yet.
++No writable host pathname is used for generated program bytes. Writable opens
++and truncation report ETXTBSY while the program is pinned; unlink/rename retain
++identity until the last process releases it. Fork retains the executable pin;
++exit or successful replacement releases it. Failed exec closes its temporary
++backing, releases its proposed pin and preserves public descriptors. CLOEXEC
++retirement still commits only after successful exec. Threads remain unsupported.
++Readlink of /proc/self/exe and /proc/thread-self/exe returns the current domain
++executable name, with a deleted suffix for an unlinked owned executable; native
++memfd names and supervisor prefixes are not part of that interface.
++
+ The configured `/dev` view is an immutable virtual directory, empty by default;
+ image entries beneath it are hidden. `[devices].assignments = ["null"]` exposes
+ `/dev/null` through the existing device registry: reads return EOF and writes
+diff --git a/crates/ginux-init/src/descriptors.rs b/crates/ginux-init/src/descriptors.rs
+index 17dc0bb1..889d3b8a 100644
+--- a/crates/ginux-init/src/descriptors.rs
++++ b/crates/ginux-init/src/descriptors.rs
+@@ -10,6 +10,10 @@ use crate::tracee_io::{copy_memory, read_path};
+ use ginux_core::decide_balanced;
+ 
+ pub const LIMIT: usize = 256;
++pub enum ExecDescriptor {
++    Native(u32),
++    Owned(u32),
++}
+ const CLOEXEC: u64 = 0o2000000;
+ 
+ #[derive(Clone, Copy, PartialEq, Eq)]
+@@ -166,12 +170,18 @@ impl DescriptorTable {
+         None
+     }
+ 
+-    pub fn exec_native_descriptor(&self, fd: u64) -> Result<u32, i64> {
++    pub fn exec_descriptor(&self, fd: u64) -> Result<ExecDescriptor, i64> {
+         match self.get(fd)?.handle {
+-            Handle::Native { fd, console: false } => Ok(fd),
++            Handle::Native { fd, console: false } => Ok(ExecDescriptor::Native(fd)),
++            Handle::Owned(handle) if (1048576..1048640).contains(&handle) => {
++                Ok(ExecDescriptor::Owned(handle))
++            }
+             _ => Err(-95),
+         }
+     }
++    pub fn exec_path_dirfd(&self, pid: usize, fd: u64, address: u64) -> Result<u64, i64> {
++        self.path_handle(pid, fd, address)
++    }
+ 
+     /// PTRACE_EVENT_EXEC is the commit point. Failed exec never calls this.
+     pub fn exec_completed(&mut self, backends: &mut Backends) -> Result<(), &'static [u8]> {
+diff --git a/crates/ginux-init/src/exec_image.rs b/crates/ginux-init/src/exec_image.rs
+new file mode 100644
+index 00000000..63ae9dd6
+--- /dev/null
++++ b/crates/ginux-init/src/exec_image.rs
+@@ -0,0 +1,97 @@
++//! Populate a freshly injected tracee memfd from pinned VFS bytes. The host
++//! proc path is constructed only from a registered stopped task and its kernel
++//! memfd result, never a guest path or public descriptor. No named output file
++//! is created. The tracee cannot run until this backing is sealed and closed.
++
++use crate::fs_hooks::LaunchFs;
++use crate::supervisor::{syscall1, syscall2, syscall3, syscall4};
++use ginux_vfs::Executable;
++
++pub fn populate(host: usize, descriptor: u32, fs: &LaunchFs, image: Executable) -> Result<(), i64> {
++    let mut path = [0u8; 64];
++    path[..6].copy_from_slice(b"/proc/");
++    let mut end = 6;
++    number(&mut path, &mut end, host);
++    path[end..end + 4].copy_from_slice(b"/fd/");
++    end += 4;
++    number(&mut path, &mut end, descriptor as usize);
++    let fd = unsafe {
++        syscall4(
++            257,
++            (-100isize) as usize,
++            path.as_ptr() as usize,
++            0x80002,
++            0,
++        )
++    };
++    if fd < 0 {
++        return Err(fd as i64);
++    }
++    let fd = fd as usize;
++    let result = (|| {
++        let mut buffer = [0u8; 4096];
++        let mut offset = 0;
++        while offset < image.size {
++            let count = fs.read_executable(image, offset, &mut buffer)?;
++            if count == 0 {
++                return Err(-5);
++            }
++            let mut written = 0;
++            while written < count {
++                let result = unsafe {
++                    syscall3(1, fd, buffer[written..].as_ptr() as usize, count - written)
++                };
++                if result == -4 {
++                    continue;
++                }
++                if result <= 0 {
++                    return Err(if result == 0 { -5 } else { result as i64 });
++                }
++                written += result as usize;
++            }
++            offset += count;
++        }
++        let mode = unsafe { syscall2(91, fd, 0o500) };
++        if mode < 0 {
++            return Err(mode as i64);
++        }
++        // Old kernels do not know F_SEAL_EXEC. The write/grow/shrink seals
++        // remain mandatory; the descriptor is private until exec closes it.
++        let mut seals = 0x2f;
++        let mut result = unsafe { syscall3(72, fd, 1033, seals) };
++        if result == -22 {
++            seals = 0xf;
++            result = unsafe { syscall3(72, fd, 1033, seals) };
++        }
++        if result < 0 {
++            return Err(result as i64);
++        }
++        let actual = unsafe { syscall3(72, fd, 1034, 0) };
++        if actual < 0 || actual as usize & seals != seals {
++            return Err(-5);
++        }
++        Ok(())
++    })();
++    let closed = unsafe { syscall1(3, fd) };
++    if closed < 0 {
++        return Err(closed as i64);
++    }
++    result
++}
++
++fn number(output: &mut [u8], end: &mut usize, mut value: usize) {
++    let mut reverse = [0u8; 20];
++    let mut count = 0;
++    loop {
++        reverse[count] = b'0' + (value % 10) as u8;
++        count += 1;
++        value /= 10;
++        if value == 0 {
++            break;
++        }
++    }
++    for byte in reverse[..count].iter().rev() {
++        output[*end] = *byte;
++        *end += 1;
++    }
++}
+diff --git a/crates/ginux-init/src/fs_hooks.rs b/crates/ginux-init/src/fs_hooks.rs
+index 6dd53976..31be412c 100644
+--- a/crates/ginux-init/src/fs_hooks.rs
++++ b/crates/ginux-init/src/fs_hooks.rs
+@@ -1,6 +1,7 @@
+ //! Configured-launch ephemeral memory storage. Bytes and descriptors belong to
+ //! the supervisor; no writable host descriptor is installed in the workload.
+-//! Retained storage, mappings and generated-file exec are not provided.
++//! Executable references share the VFS owner; retained storage and guest file
++//! mappings are not provided.
+ 
+ use crate::storage_memory::MemoryStorage;
+ use crate::supervisor::UserRegs;
+@@ -8,13 +9,15 @@ use crate::tracee_io::{copy_memory, read_path};
+ use core::sync::atomic::{AtomicBool, Ordering};
+ use ginux_domain::{DomainConfig, Text};
+ use ginux_vfs::{
+-    BaseReader, Entry, FileMetadata, Index, NodeKind, VfsError, VirtualFs, HEADER_SIZE, MAX_PATH,
+-    O_APPEND, O_CLOEXEC, O_CREATE, O_EXCLUSIVE, O_NONBLOCK, O_READ, O_TRUNC, O_WRITE, RECORD_SIZE,
++    BaseReader, Entry, Executable, FileMetadata, Index, NodeKind, VfsError, VirtualFs, HEADER_SIZE,
++    MAX_PATH, O_APPEND, O_CLOEXEC, O_CREATE, O_EXCLUSIVE, O_NONBLOCK, O_READ, O_TRUNC, O_WRITE,
++    RECORD_SIZE,
+ };
+ 
+ pub const FD_BASE: usize = 1 << 20;
+ const IO_SIZE: usize = 4096;
+ type Path = Text<MAX_PATH>;
++type ExecutableName = Text<{ MAX_PATH + 10 }>;
+ const OBJECTS: usize = 32;
+ type MemoryFs = VirtualFs<'static, EmptyReader, OBJECTS, 0, 64, MemoryStorage<OBJECTS>>;
+ static mut ROOT_INDEX: [u8; HEADER_SIZE + RECORD_SIZE] = [0; HEADER_SIZE + RECORD_SIZE];
+@@ -123,6 +126,11 @@ impl LaunchFs {
+     }
+ 
+     pub fn teardown(&mut self) {
++        assert_eq!(
++            self.fs.executable_pins(),
++            0,
++            "overlay teardown retained executable references"
++        );
+         self.fs.teardown();
+         assert_eq!(
+             self.fs.storage().allocated_bytes(),
+@@ -137,7 +145,7 @@ impl LaunchFs {
+             .any(|p| within(path, p.as_bytes()))
+     }
+ 
+-    fn path(&self, pid: usize, address: u64, dirfd: u64) -> Result<Path, i64> {
++    pub(crate) fn path(&self, pid: usize, address: u64, dirfd: u64) -> Result<Path, i64> {
+         let text = read_path(pid, address)?;
+         if text.is_empty() {
+             return Err(-2);
+@@ -389,6 +397,104 @@ impl LaunchFs {
+         Err(-40)
+     }
+ 
++    pub fn exec_path(
++        &mut self,
++        pid: usize,
++        address: u64,
++        dirfd: u64,
++        follow: bool,
++    ) -> Result<Option<Executable>, i64> {
++        let raw = read_path(pid, address)?;
++        let path = self.path(pid, address, dirfd)?;
++        let path = self.resolve(pid, path.as_bytes(), follow, false)?;
++        if self.owns_path(path.as_bytes()) {
++            let image = self.fs.pin_executable(path.as_bytes()).map_err(errno)?;
++            return self.check_exec(pid, image).map(Some);
++        }
++        if dirfd as i32 != -100 && raw.as_bytes().first() != Some(&b'/') {
++            return Err(-95);
++        }
++        self.native_exec_path(pid, address, follow)?;
++        Ok(None)
++    }
++
++    pub fn exec_descriptor(&mut self, pid: usize, handle: u32) -> Result<Executable, i64> {
++        let fd = handle
++            .checked_sub(FD_BASE as u32)
++            .filter(|n| *n < 64)
++            .ok_or(-95)?;
++        let image = self.fs.pin_executable_fd(fd as i32 + 3).map_err(errno)?;
++        self.check_exec(pid, image)
++    }
++
++    fn check_exec(&mut self, pid: usize, image: Executable) -> Result<Executable, i64> {
++        let mut header = [0u8; 64];
++        let result = self.read_executable(image, 0, &mut header).and_then(|n| {
++            if header.starts_with(b"#!") {
++                Err(-95)
++            } else if n < 64
++                || &header[..4] != b"\x7fELF"
++                || header[4] != 2
++                || header[5] != 1
++                || header[18..20] != [62, 0]
++            {
++                Err(-8)
++            } else {
++                let mut name = [0; MAX_PATH];
++                let next = crate::path_hooks::interpreter_metadata(
++                    |offset, output| {
++                        self.read_executable(
++                            image,
++                            usize::try_from(offset).map_err(|_| -8)?,
++                            output,
++                        )
++                    },
++                    &mut name,
++                )?;
++                let root = crate::path_hooks::ImageRoot::new(pid)?;
++                self.check_interpreter_chain(pid, &root, name, next)?;
++                Ok(image)
++            }
++        });
++        if result.is_err() {
++            self.release_executable(image)
++                .expect("invalid executable pin release");
++        }
++        result
++    }
++
++    pub fn read_executable(
++        &self,
++        image: Executable,
++        offset: usize,
++        output: &mut [u8],
++    ) -> Result<usize, i64> {
++        self.fs
++            .read_executable(image, offset, output)
++            .map_err(errno)
++    }
++
++    pub fn retain_executable(&mut self, image: Executable) -> Result<(), i64> {
++        self.fs.retain_executable(image).map_err(errno)
++    }
++
++    pub fn release_executable(&mut self, image: Executable) -> Result<(), i64> {
++        self.fs.release_executable(image).map_err(errno)
++    }
++
++    pub fn executable_name(&self, image: Executable) -> Result<ExecutableName, i64> {
++        let (name, deleted) = self.fs.executable_name(image).map_err(errno)?;
++        let suffix = if deleted {
++            b" (deleted)".as_slice()
++        } else {
++            b""
++        };
++        let mut bytes = [0; MAX_PATH + 10];
++        bytes[..name.len()].copy_from_slice(name);
++        bytes[name.len()..name.len() + suffix.len()].copy_from_slice(suffix);
++        ExecutableName::from_bytes(&bytes[..name.len() + suffix.len()]).map_err(|_| -36)
++    }
++
+     /// Configured-launch dispatch only; demo paths keep their existing contract.
+     pub fn claim(&mut self, pid: usize, r: &UserRegs) -> Option<i64> {
+         if matches!(r.orig_rax, 82 | 264 | 316) {
+@@ -822,6 +928,7 @@ fn errno(error: VfsError) -> i64 {
+         VfsError::NotDirectory => -20,
+         VfsError::IsDirectory => -21,
+         VfsError::DirectoryNotEmpty => -39,
++        VfsError::TextBusy => -26,
+         VfsError::AlreadyExists => -17,
+         VfsError::PermissionDenied => -13,
+         VfsError::InvalidDescriptor => -9,
+diff --git a/crates/ginux-init/src/launch_tasks.rs b/crates/ginux-init/src/launch_tasks.rs
+index c9c494b2..305f52a7 100644
+--- a/crates/ginux-init/src/launch_tasks.rs
++++ b/crates/ginux-init/src/launch_tasks.rs
+@@ -1,7 +1,7 @@
+ //! Task ownership for configured native launch. A newborn never runs before
+ //! its process identity and descriptor snapshot are installed.
+ 
+-use crate::descriptors::{Backends, DescriptorTable};
++use crate::descriptors::{Backends, DescriptorTable, ExecDescriptor};
+ use crate::dispatch::{
+     balanced_surface_name, decide_launch, native_arguments_allowed, NativeDecision,
+ };
+@@ -14,6 +14,7 @@ use crate::tracee_io::copy_memory;
+ use ginux_core::{balanced_identity_result, balanced_surface, Action};
+ use ginux_domain::Domain;
+ use ginux_process::{Credentials, ProcessError, ProcessTable, TaskId, WaitTarget};
++use ginux_vfs::Executable;
+ 
+ const TASKS: usize = 16;
+ const WALL: usize = 0x4000_0000;
+@@ -39,6 +40,8 @@ enum Pending {
+ enum ExecStage {
+     Sync,
+     Reenter,
++    Create,
++    Close,
+     Kernel,
+     Completed,
+ }
+@@ -49,6 +52,16 @@ struct Exec {
+     native_dirfd: u64,
+     next_native: usize,
+     stage: ExecStage,
++    owned: Option<OwnedExec>,
++}
++
++#[derive(Clone, Copy)]
++struct OwnedExec {
++    image: Executable,
++    empty_path: u64,
++    descriptor: Option<u32>,
++    legacy_create: bool,
++    failure: Option<i64>,
+ }
+ 
+ struct Task {
+@@ -58,6 +71,7 @@ struct Task {
+     adopted_reaped: bool,
+     wait_status: Option<i32>,
+     descriptors: DescriptorTable,
++    image: Option<Executable>,
+     pending: Pending,
+     override_result: Option<i64>,
+     blocked: Option<UserRegs>,
+@@ -138,6 +152,7 @@ pub fn supervise(
+         adopted_reaped: false,
+         wait_status: None,
+         descriptors,
++        image: None,
+         pending: Pending::None,
+         override_result: None,
+         blocked: None,
+@@ -219,10 +234,12 @@ pub fn supervise(
+         }
+         let signal = ((status >> 8) & 255) as usize;
+         if signal != 133 {
+-            if s.task(index)
+-                .exec
+-                .is_some_and(|e| matches!(e.stage, ExecStage::Sync | ExecStage::Reenter))
+-            {
++            if s.task(index).exec.is_some_and(|e| {
++                matches!(
++                    e.stage,
++                    ExecStage::Sync | ExecStage::Reenter | ExecStage::Create | ExecStage::Close
++                )
++            }) {
+                 s.fail(domain, b"signal interrupted exec descriptor setup");
+             }
+             let mut info = [0u64; 16];
+@@ -375,6 +392,46 @@ impl Supervisor<'_> {
+         let original = *r;
+         let id = self.task(index).id;
+         match r.orig_rax {
++            89 | 267 => {
++                let host = self.task(index).host;
++                let (address, output, size, dirfd) = if r.orig_rax == 89 {
++                    (r.rdi, r.rsi, r.rdx, (-100i64) as u64)
++                } else {
++                    (r.rsi, r.rdx, r.r10, r.rdi)
++                };
++                let path = self.objects.filesystem.path(host, address, dirfd);
++                if path.as_ref().is_ok_and(|path| {
++                    matches!(
++                        path.as_bytes(),
++                        b"/proc/self/exe" | b"/proc/thread-self/exe"
++                    )
++                }) {
++                    let result = (|| {
++                        if size == 0 {
++                            return Err(-22);
++                        }
++                        let name = if let Some(image) = self.task(index).image {
++                            self.objects.filesystem.executable_name(image)?
++                        } else {
++                            let image = crate::tracee_io::image_link(host, b"/exe")?;
++                            ginux_domain::Text::<{ ginux_vfs::MAX_PATH + 10 }>::from_bytes(
++                                image.as_bytes(),
++                            )
++                            .map_err(|_| -36)?
++                        };
++                        let count = name.as_bytes().len().min(size as usize);
++                        let mut bytes = [0; ginux_vfs::MAX_PATH + 10];
++                        bytes[..count].copy_from_slice(&name.as_bytes()[..count]);
++                        if copy_memory(host, output, &mut bytes[..count], true)? != count as i64 {
++                            return Err(-14);
++                        }
++                        Ok(count as i64)
++                    })()
++                    .unwrap_or_else(|error| error);
++                    self.emulate(index, r, result, domain);
++                    return;
++                }
++            }
+             79 => {
+                 audit_write(b"mediate surface=image-cwd\n");
+                 self.run(index, r, domain);
+@@ -473,6 +530,16 @@ impl Supervisor<'_> {
+                     Ok(table) => table,
+                     Err(reason) => self.fail(domain, reason),
+                 };
++                let image = self.task(index).image;
++                if let Some(image) = image {
++                    if self.objects.filesystem.retain_executable(image).is_err() {
++                        let mut table = table;
++                        if let Err(reason) = table.release_exited(&mut self.objects) {
++                            self.fail(domain, reason);
++                        }
++                        self.fail(domain, b"fork executable retain failed");
++                    }
++                }
+                 self.tasks[slot] = Some(Task {
+                     id: child,
+                     host: 0,
+@@ -480,6 +547,7 @@ impl Supervisor<'_> {
+                     adopted_reaped: false,
+                     wait_status: None,
+                     descriptors: table,
++                    image,
+                     pending: Pending::None,
+                     override_result: None,
+                     blocked: None,
+@@ -593,51 +661,77 @@ impl Supervisor<'_> {
+     }
+     fn prepare_exec(&mut self, index: usize, r: &mut UserRegs) -> Result<(), i64> {
+         let host = self.task(index).host;
++        let mut instruction = [0; 2];
++        if copy_memory(
++            host,
++            r.rip.checked_sub(2).ok_or(-95)?,
++            &mut instruction,
++            false,
++        ) != Ok(2)
++            || instruction != [0x0f, 0x05]
++        {
++            return Err(-95);
++        }
+         let mut native_dirfd = r.rdi;
+-        if r.orig_rax == 59 {
+-            self.objects
++        let (image, empty_path) = if r.orig_rax == 59 {
++            let path = crate::tracee_io::read_path(host, r.rdi)?;
++            let end = r.rdi.checked_add(path.as_bytes().len() as u64).ok_or(-14)?;
++            let image = self
++                .objects
+                 .filesystem
+-                .native_exec_path(host, r.rdi, true)?;
++                .exec_path(host, r.rdi, (-100i64) as u64, true)?;
++            (image, end)
+         } else {
+             if r.r8 & !0x1100 != 0 {
+                 return Err(-22);
+             }
+             let path = crate::tracee_io::read_path(host, r.rsi)?;
+-            if path.is_empty() {
++            let end = r.rsi.checked_add(path.as_bytes().len() as u64).ok_or(-14)?;
++            let image = if path.is_empty() {
+                 if r.r8 & 0x1000 == 0 {
+                     return Err(-2);
+                 }
+-                native_dirfd = self.task(index).descriptors.exec_native_descriptor(r.rdi)? as u64;
+-                self.objects
+-                    .filesystem
+-                    .native_exec_fd(host, native_dirfd as u32)?;
+-            } else {
+-                if path.as_bytes()[0] != b'/' && r.rdi as i32 != -100 {
+-                    return Err(-95);
++                match self.task(index).descriptors.exec_descriptor(r.rdi)? {
++                    ExecDescriptor::Native(fd) => {
++                        native_dirfd = fd as u64;
++                        self.objects.filesystem.native_exec_fd(host, fd)?;
++                        None
++                    }
++                    ExecDescriptor::Owned(handle) => {
++                        Some(self.objects.filesystem.exec_descriptor(host, handle)?)
++                    }
+                 }
++            } else {
++                let dirfd = self
++                    .task(index)
++                    .descriptors
++                    .exec_path_dirfd(host, r.rdi, r.rsi)?;
++                native_dirfd = (-100i64) as u64;
+                 self.objects
+                     .filesystem
+-                    .native_exec_path(host, r.rsi, r.r8 & 0x100 == 0)?;
+-                native_dirfd = (-100i64) as u64;
++                    .exec_path(host, r.rsi, dirfd, r.r8 & 0x100 == 0)?
++            };
++            (image, end)
++        };
++        if image.is_none() {
++            let rewrite = crate::path_hooks::Rewrite::prepare(self.objects.filesystem, host, r)?;
++            self.task_mut(index).path_rewrite = rewrite;
++            if r.orig_rax == 59 {
++                native_dirfd = r.rdi;
+             }
+         }
+-        let mut instruction = [0u8; 2];
+-        let address = r.rip.checked_sub(2).ok_or(-95)?;
+-        if copy_memory(host, address, &mut instruction, false) != Ok(2)
+-            || instruction != [0x0f, 0x05]
+-        {
+-            return Err(-95);
+-        }
+-        let rewrite = crate::path_hooks::Rewrite::prepare(self.objects.filesystem, host, r)?;
+-        self.task_mut(index).path_rewrite = rewrite;
+-        if r.orig_rax == 59 {
+-            native_dirfd = r.rdi;
+-        }
+         self.task_mut(index).exec = Some(Exec {
+             original: *r,
+             native_dirfd,
+             next_native: 0,
+             stage: ExecStage::Reenter,
++            owned: image.map(|image| OwnedExec {
++                image,
++                empty_path,
++                descriptor: None,
++                legacy_create: false,
++                failure: None,
++            }),
+         });
+         Ok(())
+     }
+@@ -664,6 +758,59 @@ impl Supervisor<'_> {
+             audit_write(b" close-on-exec=");
+             audit_u64(cloexec as u64);
+             audit_write(b"\n");
++        } else if let Some(owned) = exec.owned {
++            *r = exec.original;
++            if owned.failure.is_some() {
++                r.orig_rax = 3;
++                r.rax = 3;
++                r.rdi = owned.descriptor.unwrap() as u64;
++                self.task_mut(index).exec.as_mut().unwrap().stage = ExecStage::Close;
++            } else {
++                let mut empty = [1u8];
++                if copy_memory(self.task(index).host, owned.empty_path, &mut empty, false) != Ok(1)
++                    || empty[0] != 0
++                {
++                    self.task_mut(index)
++                        .exec
++                        .as_mut()
++                        .unwrap()
++                        .owned
++                        .as_mut()
++                        .unwrap()
++                        .failure = Some(-14);
++                    if owned.descriptor.is_some() {
++                        self.exec_step(index, r, domain);
++                        return;
++                    }
++                    self.finish_exec_failure(index, r, -14, domain);
++                    self.emulate(index, r, -14, domain);
++                    return;
++                }
++                if let Some(fd) = owned.descriptor {
++                    r.orig_rax = 322;
++                    r.rax = 322;
++                    r.rdi = fd as u64;
++                    r.rsi = owned.empty_path;
++                    r.rdx = if exec.original.orig_rax == 59 {
++                        exec.original.rsi
++                    } else {
++                        exec.original.rdx
++                    };
++                    r.r10 = if exec.original.orig_rax == 59 {
++                        exec.original.rdx
++                    } else {
++                        exec.original.r10
++                    };
++                    r.r8 = 0x1000;
++                    self.task_mut(index).exec.as_mut().unwrap().stage = ExecStage::Kernel;
++                } else {
++                    r.orig_rax = 319;
++                    r.rax = 319;
++                    r.rdi = owned.empty_path;
++                    r.rsi = if owned.legacy_create { 3 } else { 0x13 };
++                    self.task_mut(index).exec.as_mut().unwrap().stage = ExecStage::Create;
++                }
++            }
+         } else {
+             *r = exec.original;
+             r.rdi = exec.native_dirfd;
+@@ -672,6 +819,36 @@ impl Supervisor<'_> {
+         self.run(index, r, domain);
+     }
+ 
++    fn replay_exec(&mut self, index: usize, domain: &mut Domain) {
++        let mut replay = self.task(index).exec.unwrap().original;
++        replay.rip -= 2;
++        replay.rax = replay.orig_rax;
++        self.task_mut(index).exec.as_mut().unwrap().stage = ExecStage::Reenter;
++        self.run(index, &replay, domain);
++    }
++
++    fn finish_exec_failure(
++        &mut self,
++        index: usize,
++        r: &mut UserRegs,
++        error: i64,
++        domain: &mut Domain,
++    ) {
++        let exec = self.task_mut(index).exec.take().unwrap();
++        if let Some(owned) = exec.owned {
++            if self
++                .objects
++                .filesystem
++                .release_executable(owned.image)
++                .is_err()
++            {
++                self.fail(domain, b"failed exec reference release failed");
++            }
++        }
++        *r = exec.original;
++        r.rax = error as u64;
++    }
++
+     fn exec_completed(&mut self, index: usize, domain: &mut Domain) {
+         if !self
+             .task(index)
+@@ -691,6 +868,20 @@ impl Supervisor<'_> {
+         if self.processes.exec(self.task(index).id).is_err() {
+             self.fail(domain, b"virtual exec transition failed");
+         }
++        let image = self
++            .task_mut(index)
++            .exec
++            .as_mut()
++            .unwrap()
++            .owned
++            .take()
++            .map(|owned| owned.image);
++        let old = core::mem::replace(&mut self.task_mut(index).image, image);
++        if let Some(old) = old {
++            if self.objects.filesystem.release_executable(old).is_err() {
++                self.fail(domain, b"replaced executable release failed");
++            }
++        }
+         // Exec replaced the address space: the old path scratch no longer exists.
+         self.task_mut(index).path_rewrite = None;
+         self.task_mut(index).exec.as_mut().unwrap().stage = ExecStage::Completed;
+@@ -768,20 +959,86 @@ impl Supervisor<'_> {
+                     self.run(index, &replay, domain);
+                     return;
+                 }
++                ExecStage::Create => {
++                    if r.orig_rax != 319 {
++                        self.fail(domain, b"exec private descriptor creation lost its syscall");
++                    }
++                    let owned = exec.owned.unwrap();
++                    if r.rax as i64 == -22 && !owned.legacy_create {
++                        self.task_mut(index)
++                            .exec
++                            .as_mut()
++                            .unwrap()
++                            .owned
++                            .as_mut()
++                            .unwrap()
++                            .legacy_create = true;
++                        self.replay_exec(index, domain);
++                        return;
++                    }
++                    if (r.rax as i64) < 0 {
++                        self.finish_exec_failure(index, r, r.rax as i64, domain);
++                    } else {
++                        if r.rax >= crate::descriptors::LIMIT as u64 {
++                            self.fail(domain, b"exec private descriptor outside table bound");
++                        }
++                        let fd = r.rax as u32;
++                        self.task_mut(index)
++                            .exec
++                            .as_mut()
++                            .unwrap()
++                            .owned
++                            .as_mut()
++                            .unwrap()
++                            .descriptor = Some(fd);
++                        if let Err(error) = crate::exec_image::populate(
++                            self.task(index).host,
++                            fd,
++                            self.objects.filesystem,
++                            owned.image,
++                        ) {
++                            self.task_mut(index)
++                                .exec
++                                .as_mut()
++                                .unwrap()
++                                .owned
++                                .as_mut()
++                                .unwrap()
++                                .failure = Some(error);
++                        }
++                        self.replay_exec(index, domain);
++                        return;
++                    }
++                }
++                ExecStage::Close => {
++                    if r.orig_rax != 3 || r.rax != 0 {
++                        self.fail(domain, b"exec private descriptor close failed");
++                    }
++                    self.finish_exec_failure(
++                        index,
++                        r,
++                        exec.owned.unwrap().failure.unwrap(),
++                        domain,
++                    );
++                }
+                 ExecStage::Kernel => {
+                     if r.rax as i64 >= 0 {
+                         self.fail(domain, b"exec success missing its ownership event");
+                     }
+-                    let old = exec.original;
+-                    r.rdi = old.rdi;
+-                    r.rsi = old.rsi;
+-                    r.rdx = old.rdx;
+-                    r.r10 = old.r10;
+-                    r.r8 = old.r8;
+-                    r.r9 = old.r9;
+-                    r.orig_rax = old.orig_rax;
+-                    // Public descriptors, aliases and owned refs are unchanged.
+-                    self.task_mut(index).exec = None;
++                    if exec.owned.is_some() {
++                        self.task_mut(index)
++                            .exec
++                            .as_mut()
++                            .unwrap()
++                            .owned
++                            .as_mut()
++                            .unwrap()
++                            .failure = Some(r.rax as i64);
++                        self.replay_exec(index, domain);
++                        return;
++                    }
++                    let error = r.rax as i64;
++                    self.finish_exec_failure(index, r, error, domain);
+                 }
+                 ExecStage::Completed => {
+                     self.task_mut(index).exec = None;
+@@ -816,6 +1073,7 @@ impl Supervisor<'_> {
+                     {
+                         self.fail(domain, b"fork rollback failed")
+                     }
++                    self.release_task_images(child, domain);
+                     self.tasks[child] = None;
+                 } else {
+                     if self.task(child).host == 0 || r.rax as usize != self.task(child).host {
+@@ -843,6 +1101,7 @@ impl Supervisor<'_> {
+                     }
+                     self.retired[self.retired_next] = (self.task(child).host, id.pid);
+                     self.retired_next = (self.retired_next + 1) % TASKS;
++                    self.release_task_images(child, domain);
+                     self.tasks[child] = None;
+                     r.rax = id.pid as u64;
+                     if original[1] != 0 {
+@@ -947,6 +1206,21 @@ impl Supervisor<'_> {
+             self.entry(index, &mut r, domain);
+         }
+     }
++    fn release_task_images(&mut self, index: usize, domain: &mut Domain) {
++        let pending = self
++            .task_mut(index)
++            .exec
++            .take()
++            .and_then(|exec| exec.owned)
++            .map(|owned| owned.image);
++        let committed = self.task_mut(index).image.take();
++        for image in [pending, committed].into_iter().flatten() {
++            if self.objects.filesystem.release_executable(image).is_err() {
++                self.fail(domain, b"task executable release failed");
++            }
++        }
++    }
++
+     fn died(&mut self, index: usize, status: i32, domain: &mut Domain) {
+         self.wake_needed = true;
+         if !self.task(index).alive {
+@@ -967,6 +1241,7 @@ impl Supervisor<'_> {
+             }
+             self.fail(domain, b"inconsistent repeated task death");
+         }
++        self.release_task_images(index, domain);
+         self.task_mut(index).alive = false;
+         self.task_mut(index).wait_status = Some(status);
+         self.task_mut(index).blocked = None;
+@@ -1035,6 +1310,11 @@ impl Supervisor<'_> {
+                 self.died(index, status, domain);
+             }
+         }
++        for index in 0..TASKS {
++            if self.tasks[index].is_some() {
++                self.release_task_images(index, domain);
++            }
++        }
+         for task in self.tasks.iter_mut().flatten() {
+             if let Err(reason) = task.descriptors.release_exited(&mut self.objects) {
+                 supervision_error(domain, reason)
+diff --git a/crates/ginux-init/src/main.rs b/crates/ginux-init/src/main.rs
+index d9f42132..7f1ac1b0 100644
+--- a/crates/ginux-init/src/main.rs
++++ b/crates/ginux-init/src/main.rs
+@@ -12,6 +12,7 @@ mod channel_hooks;
+ mod descriptors;
+ mod device_hooks;
+ mod dispatch;
++mod exec_image;
+ mod fs_hooks;
+ mod launch;
+ mod launch_tasks;
+diff --git a/crates/ginux-init/src/path_hooks.rs b/crates/ginux-init/src/path_hooks.rs
+index fefa7ff0..49e7ec27 100644
+--- a/crates/ginux-init/src/path_hooks.rs
++++ b/crates/ginux-init/src/path_hooks.rs
+@@ -188,91 +188,96 @@ impl Drop for ImageRoot {
+     }
+ }
+ 
+-struct ImageFile(usize);
+-impl ImageFile {
+-    fn interpreter(&self, output: &mut [u8; MAX_PATH]) -> Result<Option<(usize, bool)>, i64> {
+-        let mut first = [0; 256];
+-        let n = self
+-            .read(0, &mut first)
+-            .map_err(|error| if error == -21 { -13 } else { error })?;
+-        if first[..n].starts_with(b"#!") {
+-            let mut start = 2;
+-            while start < n && matches!(first[start], b' ' | b'\t') {
+-                start += 1;
+-            }
+-            let mut end = start;
+-            while end < n && !matches!(first[end], 0 | b' ' | b'\t' | b'\n') {
+-                end += 1;
+-            }
+-            if start == end || end == first.len() {
+-                return Err(-8);
+-            }
+-            output[..end - start].copy_from_slice(&first[start..end]);
+-            return Ok(Some((end - start, true)));
+-        }
+-        if n < 4 || &first[..4] != b"\x7fELF" {
+-            return Ok(None);
+-        }
+-        if n < 64 {
+-            return Err(-8);
++pub(crate) fn interpreter_metadata(
++    mut read: impl FnMut(u64, &mut [u8]) -> Result<usize, i64>,
++    output: &mut [u8; MAX_PATH],
++) -> Result<Option<(usize, bool)>, i64> {
++    let mut first = [0; 256];
++    let n = read(0, &mut first).map_err(|error| if error == -21 { -13 } else { error })?;
++    if first[..n].starts_with(b"#!") {
++        let mut start = 2;
++        while start < n && matches!(first[start], b' ' | b'\t') {
++            start += 1;
+         }
+-        if first[4] != 2 || first[5] != 1 {
+-            return Err(-95);
++        let mut end = start;
++        while end < n && !matches!(first[end], 0 | b' ' | b'\t' | b'\n') {
++            end += 1;
+         }
+-        if u16::from_le_bytes(first[18..20].try_into().unwrap()) != 62 {
++        if start == end || end == first.len() {
+             return Err(-8);
+         }
+-        let offset = u64::from_le_bytes(first[32..40].try_into().unwrap());
+-        let size = u16::from_le_bytes(first[54..56].try_into().unwrap());
+-        let count = u16::from_le_bytes(first[56..58].try_into().unwrap()) as usize;
+-        if size != 56 {
++        output[..end - start].copy_from_slice(&first[start..end]);
++        return Ok(Some((end - start, true)));
++    }
++    if n < 4 || &first[..4] != b"\x7fELF" {
++        return Ok(None);
++    }
++    if n < 64 {
++        return Err(-8);
++    }
++    if first[4] != 2 || first[5] != 1 {
++        return Err(-95);
++    }
++    if u16::from_le_bytes(first[18..20].try_into().unwrap()) != 62 {
++        return Err(-8);
++    }
++    let offset = u64::from_le_bytes(first[32..40].try_into().unwrap());
++    let size = u16::from_le_bytes(first[54..56].try_into().unwrap());
++    let count = u16::from_le_bytes(first[56..58].try_into().unwrap()) as usize;
++    if size != 56 {
++        return Err(-8);
++    }
++    offset.checked_add((count * 56) as u64).ok_or(-8)?;
++    let mut buffer = [0; 56 * 73];
++    let mut index = 0;
++    let mut interpreter = None;
++    while index < count {
++        let headers = (count - index).min(73);
++        let bytes = headers * 56;
++        if read(offset + (index * 56) as u64, &mut buffer[..bytes])? != bytes {
+             return Err(-8);
+         }
+-        offset.checked_add((count * 56) as u64).ok_or(-8)?;
+-        let mut buffer = [0; 56 * 73];
+-        let mut index = 0;
+-        let mut interpreter = None;
+-        while index < count {
+-            let headers = (count - index).min(73);
+-            let bytes = headers * 56;
+-            if self.read(offset + (index * 56) as u64, &mut buffer[..bytes])? != bytes {
+-                return Err(-8);
++        for header in buffer[..bytes].as_chunks::<56>().0 {
++            if u32::from_le_bytes(header[..4].try_into().unwrap()) != 3 {
++                continue;
+             }
+-            for header in buffer[..bytes].as_chunks::<56>().0 {
+-                if u32::from_le_bytes(header[..4].try_into().unwrap()) != 3 {
+-                    continue;
+-                }
+-                if interpreter.is_some() {
+-                    return Err(-8);
+-                }
+-                interpreter = Some((
+-                    u64::from_le_bytes(header[8..16].try_into().unwrap()),
+-                    u64::from_le_bytes(header[32..40].try_into().unwrap()),
+-                ));
++            if interpreter.is_some() {
++                return Err(-8);
+             }
+-            index += headers;
+-        }
+-        let Some((offset, length)) = interpreter else {
+-            return Ok(None);
+-        };
+-        if length == 0 {
+-            return Err(-8);
+-        }
+-        if length > MAX_PATH as u64 {
+-            return Err(-36);
+-        }
+-        let length = length as usize;
+-        if self.read(offset, &mut output[..length])? != length || output[length - 1] != 0 {
+-            return Err(-8);
+-        }
+-        let end = output[..length]
+-            .iter()
+-            .position(|byte| *byte == 0)
+-            .ok_or(-8)?;
+-        if end == 0 {
+-            return Err(-8);
++            interpreter = Some((
++                u64::from_le_bytes(header[8..16].try_into().unwrap()),
++                u64::from_le_bytes(header[32..40].try_into().unwrap()),
++            ));
+         }
+-        Ok(Some((end, false)))
++        index += headers;
++    }
++    let Some((offset, length)) = interpreter else {
++        return Ok(None);
++    };
++    if length == 0 {
++        return Err(-8);
++    }
++    if length > MAX_PATH as u64 {
++        return Err(-36);
++    }
++    let length = length as usize;
++    if read(offset, &mut output[..length])? != length || output[length - 1] != 0 {
++        return Err(-8);
++    }
++    let end = output[..length]
++        .iter()
++        .position(|byte| *byte == 0)
++        .ok_or(-8)?;
++    if end == 0 {
++        return Err(-8);
++    }
++    Ok(Some((end, false)))
++}
++
++struct ImageFile(usize);
++impl ImageFile {
++    fn interpreter(&self, output: &mut [u8; MAX_PATH]) -> Result<Option<(usize, bool)>, i64> {
++        interpreter_metadata(|offset, buffer| self.read(offset, buffer), output)
+     }
+ 
+     fn read(&self, offset: u64, output: &mut [u8]) -> Result<usize, i64> {
+diff --git a/crates/ginux-init/src/tracee_io.rs b/crates/ginux-init/src/tracee_io.rs
+index 548cc955..81f392c6 100644
+--- a/crates/ginux-init/src/tracee_io.rs
++++ b/crates/ginux-init/src/tracee_io.rs
+@@ -62,6 +62,10 @@ pub fn read_path(pid: usize, address: u64) -> Result<Path, i64> {
+ /// the two proc links does not let a workload select a supervisor host path.
+ /// Fork and CLONE_FS sharing retain their native directory semantics.
+ pub fn image_cwd(pid: usize) -> Result<Path, i64> {
++    image_link(pid, b"/cwd")
++}
++
++pub fn image_link(pid: usize, member: &[u8]) -> Result<Path, i64> {
+     fn link(pid: usize, suffix: &[u8], output: &mut [u8]) -> Result<usize, i64> {
+         let mut name = [0u8; 64];
+         name[..6].copy_from_slice(b"/proc/");
+@@ -99,7 +103,7 @@ pub fn image_cwd(pid: usize) -> Result<Path, i64> {
+     let mut root = [0u8; 4096];
+     let mut cwd = [0u8; 4096];
+     let root_len = link(pid, b"/root", &mut root)?;
+-    let cwd_len = link(pid, b"/cwd", &mut cwd)?;
++    let cwd_len = link(pid, member, &mut cwd)?;
+     let relative = if &root[..root_len] == b"/" {
+         &cwd[..cwd_len]
+     } else {
+diff --git a/crates/ginux-vfs/src/lib.rs b/crates/ginux-vfs/src/lib.rs
+index f1ffb93d..0ec4b0e0 100644
+--- a/crates/ginux-vfs/src/lib.rs
++++ b/crates/ginux-vfs/src/lib.rs
+@@ -31,6 +31,7 @@ pub enum VfsError {
+     NotDirectory,
+     IsDirectory,
+     DirectoryNotEmpty,
++    TextBusy,
+     SymlinkLoop,
+     PermissionDenied,
+     InvalidDescriptor,
+@@ -328,6 +329,14 @@ pub struct FileMetadata {
+     pub size: u64,
+ }
+ 
++/// A VFS-owned executable reference. Retain/release explicitly when process
++/// ownership changes; an unlinked executable cannot be recycled while pinned.
++#[derive(Clone, Copy)]
++pub struct Executable {
++    object: usize,
++    pub size: usize,
++}
++
+ pub struct DirectoryEntry<'a> {
+     pub name: &'a [u8],
+     pub inode: u64,
+@@ -363,6 +372,7 @@ struct OverlayFile {
+     path: Path,
+     mode: u32,
+     len: usize,
++    executions: usize,
+ }
+ 
+ impl OverlayFile {
+@@ -372,6 +382,7 @@ impl OverlayFile {
+             path: Path::new(),
+             mode: 0,
+             len: 0,
++            executions: 0,
+         }
+     }
+ }
+@@ -560,6 +571,9 @@ impl<
+             }
+             Some(index) if self.overlay[index].state == 3 => return Err(VfsError::IsDirectory),
+             Some(index) => {
++                if writable && self.overlay[index].executions != 0 {
++                    return Err(VfsError::TextBusy);
++                }
+                 object = index;
+                 overlay = true;
+             }
+@@ -787,6 +801,9 @@ impl<
+         if !state.writable || !state.overlay {
+             return Err(VfsError::PermissionDenied);
+         }
++        if self.overlay[state.object].executions != 0 {
++            return Err(VfsError::TextBusy);
++        }
+         if input.is_empty() {
+             return Ok(0);
+         }
+@@ -845,7 +862,10 @@ impl<
+     }
+ 
+     fn release_unlinked(&mut self, object: usize) {
+-        if self.overlay[object].state == 2 && !self.referenced(object) {
++        if self.overlay[object].state == 2
++            && self.overlay[object].executions == 0
++            && !self.referenced(object)
++        {
+             self.storage.clear(object);
+             self.overlay[object].len = 0;
+         }
+@@ -856,6 +876,9 @@ impl<
+         if !state.overlay || !state.writable {
+             return Err(VfsError::PermissionDenied);
+         }
++        if self.overlay[state.object].executions != 0 {
++            return Err(VfsError::TextBusy);
++        }
+         let length = usize::try_from(length).map_err(|_| VfsError::FileTooLarge)?;
+         self.storage
+             .resize(state.object, self.overlay[state.object].len, length)?;
+@@ -887,6 +910,115 @@ impl<
+         Ok(())
+     }
+ 
++    pub fn pin_executable(&mut self, path: &[u8]) -> Result<Executable, VfsError> {
++        let path = self.resolved_path(path, true, false)?;
++        let metadata = self.metadata_at(path.as_bytes())?;
++        if metadata.kind != NodeKind::File {
++            return Err(VfsError::PermissionDenied);
++        }
++        let object = self
++            .find_overlay(path.as_bytes())
++            .ok_or(VfsError::PermissionDenied)?;
++        self.pin_object(object)
++    }
++
++    pub fn pin_executable_fd(&mut self, descriptor: i32) -> Result<Executable, VfsError> {
++        let state = self.descriptors[self.descriptor(descriptor)?];
++        if !state.overlay || state.directory {
++            return Err(VfsError::PermissionDenied);
++        }
++        self.pin_object(state.object)
++    }
++
++    fn pin_object(&mut self, object: usize) -> Result<Executable, VfsError> {
++        if self.overlay[object].mode & 0o111 == 0 {
++            return Err(VfsError::PermissionDenied);
++        }
++        if self
++            .descriptors
++            .iter()
++            .any(|fd| fd.open && fd.overlay && fd.object == object && fd.writable)
++        {
++            return Err(VfsError::TextBusy);
++        }
++        let image = Executable {
++            object,
++            size: self.overlay[object].len,
++        };
++        self.overlay[object].executions = self.overlay[object]
++            .executions
++            .checked_add(1)
++            .ok_or(VfsError::OverlayLimit)?;
++        Ok(image)
++    }
++
++    pub fn retain_executable(&mut self, image: Executable) -> Result<(), VfsError> {
++        let object = self
++            .overlay
++            .get_mut(image.object)
++            .ok_or(VfsError::InvalidDescriptor)?;
++        if object.executions == 0 || object.len != image.size {
++            return Err(VfsError::InvalidDescriptor);
++        }
++        object.executions = object
++            .executions
++            .checked_add(1)
++            .ok_or(VfsError::OverlayLimit)?;
++        Ok(())
++    }
++
++    pub fn release_executable(&mut self, image: Executable) -> Result<(), VfsError> {
++        let object = self
++            .overlay
++            .get_mut(image.object)
++            .ok_or(VfsError::InvalidDescriptor)?;
++        if object.len != image.size {
++            return Err(VfsError::InvalidDescriptor);
++        }
++        object.executions = object
++            .executions
++            .checked_sub(1)
++            .ok_or(VfsError::InvalidDescriptor)?;
++        self.release_unlinked(image.object);
++        Ok(())
++    }
++
++    pub fn read_executable(
++        &self,
++        image: Executable,
++        offset: usize,
++        output: &mut [u8],
++    ) -> Result<usize, VfsError> {
++        let object = self
++            .overlay
++            .get(image.object)
++            .ok_or(VfsError::InvalidDescriptor)?;
++        if object.executions == 0 || object.len != image.size {
++            return Err(VfsError::InvalidDescriptor);
++        }
++        let count = output.len().min(image.size.saturating_sub(offset));
++        if count != 0 {
++            self.storage
++                .read(image.object, offset, &mut output[..count])?;
++        }
++        Ok(count)
++    }
++
++    pub fn executable_name(&self, image: Executable) -> Result<(&[u8], bool), VfsError> {
++        let object = self
++            .overlay
++            .get(image.object)
++            .ok_or(VfsError::InvalidDescriptor)?;
++        if object.executions == 0 || object.len != image.size {
++            return Err(VfsError::InvalidDescriptor);
++        }
++        Ok((object.path.as_bytes(), object.state == 2))
++    }
++
++    pub fn executable_pins(&self) -> usize {
++        self.overlay.iter().map(|object| object.executions).sum()
++    }
++
+     pub fn teardown(&mut self) {
+         for slot in 0..FILES {
+             self.storage.clear(slot);
+@@ -1200,6 +1332,7 @@ impl<
+             .or_else(|| {
+                 self.overlay.iter().enumerate().position(|(slot, entry)| {
+                     entry.state == 2
++                        && entry.executions == 0
+                         && !self.referenced(slot)
+                         && (self.index.resolve(entry.path.as_bytes()) == Err(VfsError::NotFound)
+                             || self.overlay.iter().enumerate().any(|(other, candidate)| {
+@@ -1216,7 +1349,13 @@ impl<
+         // A whiteout can become the same live name again only after its old
+         // descriptions close. Whiteouts for other image names remain reserved.
+         let index = match self.find_overlay(path.as_bytes()) {
+-            Some(slot) if self.overlay[slot].state == 2 && !self.referenced(slot) => slot,
++            Some(slot)
++                if self.overlay[slot].state == 2
++                    && self.overlay[slot].executions == 0
++                    && !self.referenced(slot) =>
++            {
++                slot
++            }
+             _ => self.allocate_overlay()?,
+         };
+         self.storage.clear(index);
+@@ -2288,4 +2427,89 @@ mod tests {
+         fs.remove_directory(b"/work/empty/").unwrap();
+         assert_eq!(fs.metadata(b"/work/empty"), Err(VfsError::NotFound));
+     }
++
++    #[test]
++    fn executable_pins_exclude_writers_and_retain_unlinked_bytes() {
++        let bytes = index_bytes();
++        let mut vfs: VirtualFs<'_, Reader, 2, 32, 4> =
++            VirtualFs::new(Index::new(&bytes).unwrap(), Reader(*b"BASETOOL"));
++        let writer = vfs.open(b"/program", O_CREATE | O_READ | O_WRITE).unwrap();
++        vfs.write(writer, b"executable-bytes").unwrap();
++        assert!(matches!(
++            vfs.pin_executable(b"/program"),
++            Err(VfsError::PermissionDenied)
++        ));
++        vfs.fchmod(writer, 0o755).unwrap();
++        assert!(matches!(
++            vfs.pin_executable(b"/program"),
++            Err(VfsError::TextBusy)
++        ));
++        vfs.close(writer).unwrap();
++        let reader = vfs.open(b"/program", O_READ).unwrap();
++        vfs.seek(reader, 4, 0).unwrap();
++        let image = vfs.pin_executable_fd(reader).unwrap();
++        assert_eq!(vfs.executable_pins(), 1);
++        assert_eq!(
++            vfs.open(b"/program", O_WRITE | O_TRUNC),
++            Err(VfsError::TextBusy)
++        );
++        let mut output = [0u8; 32];
++        assert_eq!(vfs.read_executable(image, 0, &mut output), Ok(16));
++        assert_eq!(&output[..16], b"executable-bytes");
++        assert_eq!(vfs.seek(reader, 0, 1), Ok(4));
++        vfs.retain_executable(image).unwrap(); // A forked process owns another reference.
++        vfs.rename(b"/program", b"/moved", false).unwrap();
++        vfs.unlink(b"/moved").unwrap();
++        vfs.close(reader).unwrap();
++        let replacement = vfs.open(b"/moved", O_CREATE | O_WRITE).unwrap();
++        vfs.write(replacement, b"new").unwrap();
++        vfs.close(replacement).unwrap();
++        assert_eq!(
++            vfs.open(b"/other", O_CREATE | O_WRITE),
++            Err(VfsError::OverlayLimit)
++        );
++        vfs.release_executable(image).unwrap();
++        assert_eq!(vfs.executable_pins(), 1);
++        assert_eq!(
++            vfs.open(b"/other", O_CREATE | O_WRITE),
++            Err(VfsError::OverlayLimit)
++        );
++        assert_eq!(vfs.read_executable(image, 0, &mut output), Ok(16));
++        assert_eq!(&output[..16], b"executable-bytes");
++        vfs.release_executable(image).unwrap();
++        assert_eq!(vfs.executable_pins(), 0);
++        let reused = vfs.open(b"/other", O_CREATE | O_READ | O_WRITE).unwrap();
++        assert_eq!(vfs.read(reused, &mut output), Ok(0));
++    }
++    #[test]
++    fn executable_name_follows_namespace_while_pinned_bytes_stay_stable() {
++        let bytes = index_bytes();
++        let mut fs: VirtualFs<'_, Reader, 2, 32, 4> =
++            VirtualFs::new(Index::new(&bytes).unwrap(), Reader(*b"BASETOOL"));
++        let writer = fs.open(b"/program", O_READ | O_WRITE | O_CREATE).unwrap();
++        fs.write(writer, b"old").unwrap();
++        fs.fchmod(writer, 0o755).unwrap();
++        fs.close(writer).unwrap();
++        let reader = fs.open(b"/program", O_READ).unwrap();
++        fs.seek(reader, 1, 0).unwrap();
++        let image = fs.pin_executable_fd(reader).unwrap();
++        assert_eq!(
++            fs.executable_name(image),
++            Ok((b"/program".as_slice(), false))
++        );
++        fs.rename(b"/program", b"/moved", false).unwrap();
++        assert_eq!(fs.executable_name(image), Ok((b"/moved".as_slice(), false)));
++        fs.unlink(b"/moved").unwrap();
++        assert_eq!(fs.executable_name(image), Ok((b"/moved".as_slice(), true)));
++        fs.close(reader).unwrap();
++        let replacement = fs.open(b"/moved", O_WRITE | O_CREATE).unwrap();
++        fs.write(replacement, b"new").unwrap();
++        fs.close(replacement).unwrap();
++        let mut output = [0; 3];
++        assert_eq!(fs.read_executable(image, 0, &mut output), Ok(3));
++        assert_eq!(&output, b"old");
++        fs.release_executable(image).unwrap();
++        assert_eq!(fs.executable_name(image), Err(VfsError::InvalidDescriptor));
++        assert_eq!(fs.executable_pins(), 0);
++    }
+ }
+diff --git a/scripts/test-launch-owned-exec.py b/scripts/test-launch-owned-exec.py
+new file mode 100644
+index 00000000..7661b9a2
+--- /dev/null
++++ b/scripts/test-launch-owned-exec.py
+@@ -0,0 +1,99 @@
++#!/usr/bin/env python3
++"""Consume built launch/payload artifacts to check owned ELF replacement."""
++import json
++import fcntl
++import os
++from pathlib import Path
++import select
++import shutil
++import subprocess
++import sys
++import tempfile
++
++
++def children(pid):
++    return [int(p) for p in Path(f'/proc/{pid}/task/{pid}/children').read_text().split()]
++
++
++def main():
++    if len(sys.argv) < 3 or os.geteuid() != 0:
++        sys.exit('usage (as root): test-launch-owned-exec.py <ginux> <owned-exec-fixture> [scenario ...]')
++    binary, fixture = [str(Path(p).resolve()) for p in sys.argv[1:3]]
++    template = (Path(__file__).resolve().parent.parent / 'config/domain-gate5.toml').read_text()
++    with tempfile.TemporaryDirectory(prefix='ginux-owned-exec-') as directory:
++        work = Path(directory)
++        root = work / 'root'
++        (root / 'bin').mkdir(parents=True)
++        (root / 'work').mkdir()
++        for name in ('fixture', 'payload'):
++            shutil.copyfile(fixture, root / 'bin' / name)
++            (root / 'bin' / name).chmod(0o755)
++        (root / 'input').write_bytes(b'Q')
++        config = template.replace('init = "/bin/bash"', 'init = "/bin/fixture"')
++        config = config.replace('[storage]\nassignments = []', '[storage]\nassignments = ["memory:/work"]')
++        ordinary = ('ordinary-path', 'ordinary-fd', 'ordinary-unlinked', 'ordinary-relative', 'ordinary-child', 'ordinary-reexec')
++        full = ('success', 'descriptor', 'unlinked', 'relative', 'child', 'vfork', 'mixed-clone')
++        for mode in (sys.argv[3:] or (*full, *ordinary)):
++            if mode not in (*full, *ordinary):
++                sys.exit('unknown owned exec scenario')
++            path, result, audit_path = [work / (mode + suffix) for suffix in ('.toml', '.json', '.audit')]
++            path.write_text(config.replace('args = []', 'args = ' + json.dumps([mode])))
++            if mode in ordinary:
++                proc = subprocess.run([binary, 'launch', str(path), str(root), '--result-file', str(result)],
++                                      capture_output=True, timeout=15)
++                audit_path.write_bytes(proc.stderr)
++                expected = b'owned-ordinary: PASS\n' * (2 if mode == 'ordinary-child' else 1)
++                assert proc.returncode == 0 and proc.stdout == expected, (mode, proc.returncode, proc.stdout, proc.stderr)
++                assert json.loads(result.read_text()) == dict(version=1, outcome='exited', code=0, signal=None, generation=None)
++                assert b'teardown tasks=0 owned-handles=0' in proc.stderr
++                assert list((root / 'work').iterdir()) == []
++                assert (root / 'input').read_bytes() == b'Q'
++                print('PASS owned exec ' + mode, flush=True)
++                continue
++            with audit_path.open('wb') as audit:
++                proc = subprocess.Popen([binary, 'launch', str(path), str(root), '--result-file', str(result)],
++                                        stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=audit)
++                try:
++                    assert select.select([proc.stdout], [], [], 10)[0], ('failed-exec checks stalled', mode, audit_path.read_text())
++                    ready = proc.stdout.readline()
++                    assert ready == b'failed-ready\n', (mode, ready, audit_path.read_text())
++                    roots = children(proc.pid)
++                    assert len(roots) == 1, roots
++                    initial = roots[0]
++                    fds = sorted(int(p.name) for p in Path(f'/proc/{initial}/fd').iterdir())
++                    assert fds == [0, 1, 2, 3], ('failed exec leaked private descriptors', mode, fds)
++                    proc.stdin.write(b'G'); proc.stdin.flush()
++                    assert select.select([proc.stdout], [], [], 10)[0], ('owned exec stalled', mode, audit_path.read_text())
++                    ready = proc.stdout.readline()
++                    assert ready == b'owned-ready\n', (mode, ready, audit_path.read_text())
++                    target = initial
++                    if mode in ('child', 'vfork', 'mixed-clone'):
++                        descendants = children(initial)
++                        assert len(descendants) == 1, descendants
++                        target = descendants[0]
++                    fds = sorted(int(p.name) for p in Path(f'/proc/{target}/fd').iterdir())
++                    assert fds == [0, 1, 2, 3], ('successful exec leaked private descriptors', mode, fds)
++                    with open(f'/proc/{target}/exe', 'rb') as executable:
++                        assert executable.read() == Path(fixture).read_bytes(), 'executed bytes differ from the owned ELF'
++                        seals = fcntl.fcntl(executable.fileno(), 1034)
++                        assert seals & 0xf == 0xf, ('execution backing is not sealed', seals)
++                        assert os.fstat(executable.fileno()).st_mode & 0o777 == 0o500
++                    stdout, _ = proc.communicate(b'G', timeout=10)
++                    expected = b'owned-exec: PASS\n' + (b'owned-parent: PASS\n' if mode in ('child', 'vfork', 'mixed-clone') else b'')
++                    assert proc.returncode == 0 and stdout == expected, (mode, proc.returncode, stdout, audit_path.read_text())
++                    record = json.loads(result.read_text())
++                    assert record == dict(version=1, outcome='exited', code=0, signal=None, generation=None), record
++                    assert b'teardown tasks=0 owned-handles=0' in audit_path.read_bytes()
++                    assert not Path(f'/proc/{target}').exists() and not Path(f'/proc/{initial}').exists()
++                    assert list((root / 'work').iterdir()) == [], 'owned bytes reached the host tree'
++                    assert (root / 'input').read_bytes() == b'Q'
++                finally:
++                    if proc.poll() is None:
++                        proc.kill()
++                        proc.communicate(timeout=5)
++            print('PASS owned exec ' + mode, flush=True)
++        print('test-launch-owned-exec: PASS (' + (', '.join(sys.argv[3:]) if sys.argv[3:] else 'full scenarios') + ')')
++
++
++if __name__ == '__main__':
++    main()
+diff --git a/tests/fixtures/launch-exec-fixture.c b/tests/fixtures/launch-exec-fixture.c
+index 61563a90..c30c3dd3 100644
+--- a/tests/fixtures/launch-exec-fixture.c
++++ b/tests/fixtures/launch-exec-fixture.c
+@@ -20,11 +20,23 @@ static int intact(void)
+     if (DO(8,4,0,0)!=0 || DO(0,4,buffer,1)!=1 || buffer[0]!='C') return 0;
+     return DO(1,6,"discard",7)==7 && DO(8,11,0,1)==1;
+ }
++static int path_is(const char *a, const char *b)
++{ while (*a && *a==*b) { ++a; ++b; } return *a==*b; }
+ long exec_main(word *stack)
+ {
+     word argc=*stack;
+     char **argv=(char **)(stack+1), **env=argv+argc+1;
+     char mode=argc>1 ? argv[1][0] : 's';
++    char exe[64];
++    long length=DO(89,"/proc/self/exe",exe,sizeof exe);
++    if (mode=='/' && path_is(argv[1],"/allowed-elf")) { /* The allowed ELF's PT_INTERP runs this fixture. */
++        const char expected[]="/allowed-elf";
++        CHECK(length==sizeof expected-1,90);
++        for(word i=0;i<sizeof expected-1;++i) CHECK(exe[i]==expected[i],94);
++    } else CHECK(length>5 && exe[0]=='/' && exe[1]=='b' && exe[2]=='i' && exe[3]=='n' && exe[4]=='/',90);
++    CHECK(call(267,-100,(word)"/proc/self/exe",(word)exe,4,0,0)==4,91);
++    CHECK(DO(89,"/proc/self/exe",exe,0)==-22,92);
++    CHECK(DO(89,"/proc/self/exe",1,8)==-14,93);
+     if (mode=='/') return 77; // Interpreter of the allowed image script.
+     if (mode=='u') {
+         char *args[]={"probe",0};
+@@ -92,16 +104,16 @@ long exec_main(word *stack)
+         CHECK(DO(59,"/malformed",next,next_env)==-8 && intact(),42);
+         CHECK(DO(59,"/bin/second",1,next_env)==-14 && intact(),43);
+         CHECK(DO(59,1,next,next_env)==-14 && intact(),44);
+-        CHECK(DO(59,"/work/closed",next,next_env)==-95 && intact(),45);
+-        CHECK(DO(59,"/work/hidden",next,next_env)==-95 && intact(),46);
+-        CHECK(DO(59,"/owned-link",next,next_env)==-95 && intact(),70);
++        CHECK(DO(59,"/work/closed",next,next_env)==-13 && intact(),45);
++        CHECK(DO(59,"/work/hidden",next,next_env)==-2 && intact(),46);
++        CHECK(DO(59,"/owned-link",next,next_env)==-2 && intact(),70);
+         CHECK(call(322,-100,(word)"/bin/link",(word)next,(word)next_env,0x100,0)==-40 && intact(),71);
+         long failed=59;
+         word path=(word)"/work/../bin/second", arguments=1, environment=(word)next_env;
+         __asm__ volatile("syscall":"+a"(failed),"+D"(path),"+S"(arguments),"+d"(environment)::"rcx","r11","memory");
+         CHECK(failed==-14 && path==(word)"/work/../bin/second" && arguments==1 && environment==(word)next_env && intact(),72);
+         CHECK(DO(59,"/dev/null",next,next_env)==-13 && intact(),47);
+-        CHECK(call(322,4,(word)"",(word)next,(word)next_env,0x1000,0)==-95 && intact(),48);
++        CHECK(call(322,4,(word)"",(word)next,(word)next_env,0x1000,0)==-13 && intact(),48);
+     }
+     if (mode=='c') {
+         long child=DO(57,0,0,0);
+diff --git a/tests/fixtures/launch-owned-exec-fixture.c b/tests/fixtures/launch-owned-exec-fixture.c
+new file mode 100644
+index 00000000..33b455e6
+--- /dev/null
++++ b/tests/fixtures/launch-owned-exec-fixture.c
+@@ -0,0 +1,171 @@
++/* Generated ELF replacement, private-fd cleanup and VFS executable lifetime. */
++typedef unsigned long word;
++static long call(long n, word a, word b, word c, word d, word e, word f)
++{
++    register word r10 __asm__("r10") = d;
++    register word r8 __asm__("r8") = e;
++    register word r9 __asm__("r9") = f;
++    long result;
++    __asm__ volatile("syscall" : "=a"(result) : "a"(n), "D"(a), "S"(b), "d"(c),
++                     "r"(r10), "r"(r8), "r"(r9) : "rcx", "r11", "memory");
++    return result;
++}
++#define DO(n,a,b,c) call(n,(word)(a),(word)(b),(word)(c),0,0,0)
++#define CHECK(expr,code) if (!(expr)) return code
++static char buffer[4096];
++static volatile unsigned char ordinary_data[65536] = {1};
++static char *empty_env[]={0};
++static int intact(void)
++{
++    return DO(72,3,1,0)==1 && DO(72,5,1,0)==1 && DO(72,6,1,0)==1 && DO(72,7,1,0)==0
++        && DO(8,5,0,0)==0 && DO(0,5,buffer,1)==1 && buffer[0]=='C';
++}
++static long publish(const char *path, const char *data, word size)
++{
++    long fd=DO(2,path,0102,0600); if (fd<0) return fd;
++    if (DO(1,fd,data,size)!=(long)size || DO(91,fd,0755,0)!=0 || DO(3,fd,0,0)!=0) return -1;
++    return 0;
++}
++static int equal(const char *a, const char *b)
++{ while (*a && *a==*b) { ++a; ++b; } return *a==*b; }
++static long ordinary_exec(word *stack)
++{
++    char **argv=(char **)(stack+1);
++    static const char message[]="owned-ordinary: PASS\n";
++    if(equal(argv[1],"ordinary-released")) {
++        long writer=DO(2,"/work/program",1,0);
++        CHECK(writer>=3 && DO(3,writer,0,0)==0,110);
++        CHECK(DO(1,1,message,sizeof message-1)==sizeof message-1,111);
++        return 0;
++    }
++    if(equal(argv[1],"ordinary-after")) {
++        CHECK(ordinary_data[0]==1 && ordinary_data[sizeof ordinary_data-1]==0,131);
++        CHECK(stack[0]==3 && DO(8,3,0,0)==0 && DO(0,3,buffer,1)==1 && buffer[0]=='K',112);
++        CHECK(DO(72,4,1,0)==-9,113); /* Successful exec retired a public CLOEXEC file. */
++        if(equal(argv[2],"ordinary-reexec")) {
++            char *next[]={"payload","ordinary-released",argv[2],0};
++            DO(59,"/bin/payload",next,empty_env); return 114;
++        }
++        CHECK(DO(1,1,message,sizeof message-1)==sizeof message-1,115);
++        return 0;
++    }
++    long source=DO(2,"/bin/payload",0,0),dest=DO(2,"/work/program",0102,0600);
++    CHECK(source>=3 && dest>=3,116);
++    for(;;) {
++        long n=DO(0,source,buffer,sizeof buffer); CHECK(n>=0,117);
++        if(!n) break;
++        CHECK(DO(1,dest,buffer,n)==n,118);
++    }
++    CHECK(DO(91,dest,0755,0)==0 && DO(3,source,0,0)==0 && DO(3,dest,0,0)==0,119);
++    CHECK(DO(2,"/work/keep",0102,0600)==3 && DO(1,3,"K",1)==1,120);
++    CHECK(DO(2,"/work/drop",02000102,0600)==4,121);
++    char *next[]={"payload","ordinary-after",argv[1],0};
++    if(equal(argv[1],"ordinary-reexec")) {
++        CHECK(DO(59,"/work/missing",next,empty_env)==-2 && DO(72,4,1,0)==1,129);
++        CHECK(DO(8,3,0,1)==1,130);
++    }
++    if(equal(argv[1],"ordinary-child")) {
++        long child=DO(57,0,0,0); CHECK(child>=0,122);
++        if(child) {
++            int status=-1;
++            CHECK(DO(61,child,&status,0)==child && status==0,123);
++            CHECK(DO(1,1,message,sizeof message-1)==sizeof message-1,124);
++            return 0;
++        }
++    }
++    if(equal(argv[1],"ordinary-fd") || equal(argv[1],"ordinary-unlinked")) {
++        long fd=DO(2,"/work/program",02000000,0); CHECK(fd>=5,125);
++        if(equal(argv[1],"ordinary-unlinked")) CHECK(DO(87,"/work/program",0,0)==0,126);
++        call(322,fd,(word)"",(word)next,(word)empty_env,0x1000,0);
++    } else if(equal(argv[1],"ordinary-relative")) {
++        long dir=DO(2,"/work",02200000,0); CHECK(dir>=5,127);
++        call(322,dir,(word)"program",(word)next,(word)empty_env,0,0);
++    } else DO(59,"/work/program",next,empty_env);
++    return 128;
++}
++long owned_exec_main(word *stack)
++{
++    word argc=*stack;
++    char **argv=(char **)(stack+1), **env=argv+argc+1;
++    char mode=argc>1 ? argv[1][0] : 's';
++    if(mode=='o') return ordinary_exec(stack);
++    if (mode=='r' && argc>2 && argv[1][1]=='e') {
++        CHECK(DO(2,"/work/program",1,0)==-26,10); // Forked child still owns the executable.
++        CHECK(DO(1,9,"Z",1)==1 && DO(3,9,0,0)==0,11);
++        int status=-1; CHECK(DO(61,-1,&status,0)>0 && status==0,12);
++        long fd=DO(2,"/work/program",1,0); CHECK(fd>=3 && DO(3,fd,0,0)==0,13);
++        DO(1,1,"owned-exec: PASS\n",17); return 0;
++    }
++    if (mode=='a') {
++        const char *expected=argv[2][0]=='u'?"/work/program (deleted)":"/work/program";
++        long length=DO(89,"/proc/self/exe",buffer,sizeof buffer);
++        long wanted=argv[2][0]=='u'?23:13;
++        CHECK(length==wanted,90);
++        for(long i=0;i<length;i++) CHECK(buffer[i]==expected[i],91);
++        CHECK(argc==3 && env[0] && env[0][0]=='O' && env[0][6]=='y' && !env[1],14);
++        CHECK(DO(72,3,1,0)==-9 && DO(72,5,1,0)==-9 && DO(72,6,1,0)==-9 && DO(72,8,1,0)==-9,15);
++        CHECK(DO(8,4,0,0)==0 && DO(0,4,buffer,1)==1 && buffer[0]=='K',16);
++        CHECK(DO(0,7,buffer,1)==1 && buffer[0]=='Q',17);
++        CHECK(DO(1,1,"owned-ready\n",12)==12 && DO(0,0,buffer,1)==1 && buffer[0]=='G',18);
++        if (argv[2][0]=='u') {
++            CHECK(publish("/work/program","new",3)==0,19); // Deleted running object is distinct from new name.
++            DO(1,1,"owned-exec: PASS\n",17); return 0;
++        }
++        CHECK(DO(2,"/work/program",1,0)==-26,20);
++        int pair[2]; CHECK(DO(22,pair,0,0)==0 && pair[0]==3 && pair[1]==5,21);
++        CHECK(DO(33,pair[0],8,0)==8 && DO(33,pair[1],9,0)==9,22);
++        CHECK(DO(3,pair[0],0,0)==0 && DO(3,pair[1],0,0)==0,23);
++        long child=DO(57,0,0,0); CHECK(child>=0,24);
++        if (!child) {
++            CHECK(DO(3,9,0,0)==0 && DO(0,8,buffer,1)==1 && buffer[0]=='Z',25);
++            return 0;
++        }
++        CHECK(DO(3,8,0,0)==0,26);
++        char *next[]={"payload","released",argv[2],0};
++        DO(59,"/bin/payload",next,empty_env); return 27;
++    }
++    long source=DO(2,"/bin/payload",0,0), dest=DO(2,"/work/program",0102,0600);
++    CHECK(source>=3 && dest>=3,30);
++    for (;;) {
++        long count=DO(0,source,buffer,sizeof buffer); CHECK(count>=0,31);
++        if (!count) break;
++        CHECK(DO(1,dest,buffer,count)==count,32);
++    }
++    CHECK(DO(91,dest,0755,0)==0 && DO(3,source,0,0)==0 && DO(3,dest,0,0)==0,33);
++    CHECK(DO(2,"/work/program",02000000,0)==3,34);
++    CHECK(DO(2,"/work/keep",0102,0600)==4 && DO(1,4,"K",1)==1,35);
++    CHECK(DO(2,"/work/drop",02000102,0600)==5 && DO(1,5,"C",1)==1,36);
++    CHECK(DO(2,"/input",02000000,0)==6 && DO(32,6,0,0)==7,37);
++    char *next[]={"payload","after",argv[1],0}, *next_env[]={"OWNED=yes",0};
++    CHECK(DO(59,"/work/missing",next,next_env)==-2 && intact(),38);
++    CHECK(DO(90,"/work/program",0644,0)==0 && DO(59,"/work/program",next,next_env)==-13 && intact(),39);
++    CHECK(DO(90,"/work/program",0755,0)==0,40);
++    long writer=DO(2,"/work/program",2,0);
++    CHECK(writer==8 && DO(59,"/work/program",next,next_env)==-26 && DO(3,writer,0,0)==0 && intact(),41);
++    for (int i=0;i<3;++i) {
++        CHECK(DO(59,"/work/program",1,next_env)==-14 && intact(),42);
++        writer=DO(2,"/work/program",1,0); CHECK(writer==8 && DO(3,writer,0,0)==0,43); // Failed exec released its pin.
++    }
++    CHECK(DO(8,3,0,0)==0 && DO(0,3,buffer,64)==64,44);
++    CHECK(publish("/work/bad-elf",buffer,64)==0 && DO(59,"/work/bad-elf",next,next_env)==-8 && intact(),45);
++    CHECK(publish("/work/script","#!/bin/payload\n",15)==0 && DO(59,"/work/script",next,next_env)==-95 && intact(),46);
++    CHECK(DO(1,1,"failed-ready\n",13)==13 && DO(0,0,buffer,1)==1 && buffer[0]=='G',47);
++    if (mode=='c' || mode=='v' || mode=='m') {
++        long child=mode=='m' ? DO(56,0x4111,0,0) : DO(mode=='v'?58:57,0,0,0);
++        CHECK(child>=0,48);
++        if (child) {
++            int status=-1; CHECK(DO(61,child,&status,0)==child && status==0 && intact() && DO(8,3,0,1)==64,49);
++            writer=DO(2,"/work/program",1,0); CHECK(writer>=3 && DO(3,writer,0,0)==0,50);
++            DO(1,1,"owned-parent: PASS\n",19); return 0;
++        }
++    }
++    if (mode=='d' || mode=='u') {
++        if (mode=='u') CHECK(DO(87,"/work/program",0,0)==0,51);
++        call(322,3,(word)"",(word)next,(word)next_env,0x1000,0);
++    } else if (mode=='r') {
++        CHECK(DO(2,"/work",02200000,0)==8,52);
++        call(322,8,(word)"program",(word)next,(word)next_env,0,0);
++    } else DO(59,"/work/program",next,next_env);
++    return 53;
++}
++__asm__(".global _start\n_start:\nmov %rsp,%rdi\nandq $-16,%rsp\ncall owned_exec_main\nmov %rax,%rdi\nmov $60,%rax\nsyscall\nud2\n");
