@@ -1181,7 +1181,10 @@ Commits land on the checked-out branches (superproject `master`, submodules `cod
 - [x] F5 — Delete the kit surface no app uses. tui `02ee744`. Kit: 84 files / 5,511 lines → 38 / ~3,960. `src/index.ts` lists exactly the 42 names the apps import; everything unreachable from it was deleted, then unused exports were un-exported and dead declarations removed until lint was clean. `useAsyncTask` was deleted too (nothing used it; F10 writes the version disk-plan needs, which also fixes A180/A181).
   - **Bug fixed (by deletion):** `AsyncWizardFlow` ignored `defaultIndex` (A152).
   - Verified: `cargo xtask check tui` passes except the two expected docs-pane renders; snapshots unchanged; the README Quick Start typechecks and renders.
-- [ ] F6 — One colour pipeline from theme intent to Ink.
+- [x] F6 — One colour pipeline from theme intent to Ink. tui `55010ff`. A `ThemeColor` is `#rrggbb` or `"inherit"`; `resolveColor`/`resolveIntentColor` return hex or undefined; `detectColorRuntime(env)` only reads `NO_COLOR` (chalk's supports-color decides the level and ignores `NO_COLOR`). `createTheme` merges colours by spread. Docs theme names shared colours once; note colours are `NOTE_COLORS`; inline code uses the new `code` intent; disk-plan's `"red"`/`"cyan"`/… are now `error`/`accent`/`warning`/`success` intents.
+  - **Bugs fixed:** colours vanished on 256-colour terminals without `COLORTERM`/`FORCE_COLOR` (installation-disk page: 20 → 229 colour codes; verified with `script`); `NO_COLOR=1` still printed hex note/syntax colours (now 0 colour codes); command rows always black; `withBackgroundIntent` dropped its background; list markers and conversation role labels rendered uncoloured; conditional hook calls in `intent-color.ts`, `syntax-line.tsx`, `table-block.tsx`.
+  - Behaviour change on purpose: command rows take the theme's `commandBarBackground` (`inherit` in the docs theme) instead of black.
+  - Still open, in their own fixes: `rich-text.tsx` returns before its hooks (A162, F11); launchers still force `FORCE_COLOR=3` (F20), now harmless.
 - [ ] F7 — Keymap as data, with one dispatcher and focus scopes.
 - [ ] F8 — No app vocabulary in the kit.
 - [ ] F9 — One frame and width model, and one app shell that fits the space it gets.
