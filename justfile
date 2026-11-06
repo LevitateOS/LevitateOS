@@ -1,8 +1,8 @@
 # LevitateOS development commands
 
 # QEMU tools environment
-# The tooling cache lives under .artifacts/tools/.tools.
-tools_prefix := join(justfile_directory(), ".artifacts/tools/.tools")
+# The tooling cache lives under .artifacts/tools/current.
+tools_prefix := join(justfile_directory(), ".artifacts/tools/current")
 export PATH := tools_prefix / "usr/bin" + ":" + tools_prefix / "usr/libexec" + ":" + env("PATH")
 export LD_LIBRARY_PATH := tools_prefix / "usr/lib64"
 export OVMF_PATH := tools_prefix / "usr/share/edk2/ovmf/OVMF_CODE.fd"
@@ -23,9 +23,9 @@ env shell="bash":
 doctor:
     cargo xtask doctor
 
-# Install canonical QEMU/OVMF helper tooling into .artifacts/tools/.tools.
+# Install canonical QEMU/OVMF helper tooling into .artifacts/tools/current.
 tools-install:
-    cargo run -p levitate-recipe --bin recipe -- install --build-dir {{join(justfile_directory(), ".artifacts/tools")}} --recipes-path distro-builder/recipes --no-persist-ctx --define TOOLS_PREFIX={{tools_prefix}} qemu-deps
+    cargo run -p distro-builder --bin distro-builder -- artifact prepare-qemu-tools
 
 # Short alias for tools-install.
 tools:

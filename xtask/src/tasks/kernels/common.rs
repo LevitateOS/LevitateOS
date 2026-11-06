@@ -155,18 +155,27 @@ pub(crate) fn build_kernel_via_recipe(
         .arg(recipe_rhai)
         .args(["--build-dir", build_dir.to_string_lossy().as_ref()])
         .args(["--recipes-path", recipes_path.to_string_lossy().as_ref()])
-        .args([
-            "--define",
-            &format!("KERNEL_KCONFIG_PATH={}", kconfig_path.display()),
-        ])
-        .args([
-            "--define",
-            &format!("KERNEL_ARTIFACT_ROOT={}", kernel_artifact_root.display()),
-        ])
-        .args([
-            "--define",
-            &format!("KERNEL_FORCE_REBUILD={}", if force_rebuild { 1 } else { 0 }),
+        .args(["--define", &format!("KERNEL_TARGET={distro_id}")])
+        .args(["--input", &format!("kconfig={}", kconfig_path.display())]);
+    let fragments = kconfig_path
+        .parent()
+        .context("kconfig has no parent")?
+        .join("kconfig.d");
+    if fragments.is_dir() {
+        cmd.args([
+            "--input",
+            &format!("kconfig_fragments={}", fragments.display()),
         ]);
+    }
+    if kernel_artifact_root.is_dir() {
+        cmd.args([
+            "--input",
+            &format!("target={}", kernel_artifact_root.display()),
+        ]);
+    }
+    if force_rebuild {
+        cmd.args(["--force-build", "--force-install"]);
+    }
 
     if autofix.enabled {
         cmd.args(["--autofix"]);
@@ -178,7 +187,7 @@ pub(crate) fn build_kernel_via_recipe(
         }
     }
 
-    run_cmd(&mut cmd)
+    run_kernel_and_select(&mut cmd, &build_dir, &kernel_artifact_root)
 }
 
 pub(crate) fn install_prebuilt_kernel_via_recipe(
@@ -201,19 +210,29 @@ pub(crate) fn install_prebuilt_kernel_via_recipe(
         .arg(recipe_rhai)
         .args(["--build-dir", build_dir.to_string_lossy().as_ref()])
         .args(["--recipes-path", recipes_path.to_string_lossy().as_ref()])
-        .args([
-            "--define",
-            &format!("KERNEL_ARTIFACT_ROOT={}", kernel_artifact_root.display()),
-        ])
-        .args([
-            "--define",
-            &format!(
-                "KERNEL_FORCE_REBUILD={}",
-                if force_redownload { 1 } else { 0 }
-            ),
+        .args(["--define", &format!("KERNEL_TARGET={distro_id}")]);
+    if kernel_artifact_root.is_dir() {
+        cmd.args([
+            "--input",
+            &format!("target={}", kernel_artifact_root.display()),
         ]);
+    }
+    if force_redownload {
+        cmd.args(["--force-acquire", "--force-install"]);
+    }
+    run_kernel_and_select(&mut cmd, &build_dir, &kernel_artifact_root)
+}
 
-    run_cmd(&mut cmd)
+fn run_kernel_and_select(command: &mut Command, work: &Path, destination: &Path) -> Result<()> {
+    fs::create_dir_all(work)?;
+    let result = tempfile::Builder::new()
+        .prefix(".kernel-result-")
+        .suffix(".json")
+        .tempfile_in(work)?;
+    command.arg("--json-output").arg(result.path());
+    run_cmd(command)?;
+    let ctx: serde_json::Value = serde_json::from_slice(&fs::read(result.path())?)?;
+    distro_builder::recipe::linux::select_kernel_bundle(&ctx, destination)
 }
 
 fn run_capture(prog: &str, args: &[&str]) -> Result<String> {

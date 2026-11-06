@@ -5,6 +5,7 @@ edition = "2024"
 publish = false
 
 [dependencies]
+tempfile = "3"
 anyhow = "1"
 clap = { version = "4", features = ["derive"] }
 distro-contract = { path = "../distro-contract" }
