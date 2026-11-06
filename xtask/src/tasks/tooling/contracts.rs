@@ -31,6 +31,7 @@ pub fn run() -> Result<()> {
     recpart_ts.types::<recpart::DiskListResult>();
     recpart_ts.types::<recpart::LayoutRequest>();
     recpart_ts.types::<recpart::ResolvedLayout>();
+    recpart_ts.types::<recpart::types::Filesystem>();
     recpart_ts.types::<recpart::types::PartitionTemplate>();
     recpart_ts.types::<recpart::PartitionPlan>();
     recpart_ts.types::<recpart::types::MountMapping>();
@@ -47,14 +48,14 @@ pub fn run() -> Result<()> {
     recpart_ts.constant("CONFIRM_TOKEN", &recpart::types::CONFIRM_TOKEN)?;
     recpart_ts.constant(
         "INSTALL_MODES",
-        &[recpart::InstallMode::Ab, recpart::InstallMode::Mutable],
+        <recpart::InstallMode as clap::ValueEnum>::value_variants(),
     )?;
     recpart_ts.write(&root.join("tui/apps/install/disk-plan/src/contract/recpart.ts"))?;
 
     let mut recab_ts = Declarations::new(&cfg);
     recab_ts.types::<recab::Slot>();
     recab_ts.types::<recab::Status>();
-    recab_ts.constant("SLOTS", &[recab::Slot::A, recab::Slot::B])?;
+    recab_ts.constant("SLOTS", <recab::Slot as clap::ValueEnum>::value_variants())?;
     recab_ts.write(&root.join("tui/apps/runtime/recab/domain/contract.ts"))?;
 
     write_tool_help(&root)?;
@@ -86,7 +87,10 @@ fn write_tool_help(root: &Path) -> Result<()> {
     );
     for (_, binaries) in DOCUMENTED_TOOLS {
         for binary in *binaries {
-            let output = std::process::Command::new(root.join("target/debug").join(binary))
+            let target_dir = std::env::var_os("CARGO_TARGET_DIR")
+                .map(std::path::PathBuf::from)
+                .unwrap_or_else(|| root.join("target"));
+            let output = std::process::Command::new(target_dir.join("debug").join(binary))
                 .arg("--help")
                 .output()
                 .with_context(|| format!("running {binary} --help"))?;
