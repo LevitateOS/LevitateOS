@@ -20,8 +20,8 @@ behavior owners; do not add frameworks or broad Linux compatibility promises.
 
 The earlier **13 areas are not the complete PR inventory**. They describe recent
 changes layered onto older local foundations. This plan covers those foundations
-as well: 31 provisional change packets, plus preparation, review and delivery
-tasks. A packet is a review/work unit, not a promised PR. Upstream reconciliation
+as well: 31 original change packets plus the confirmed standalone G05a subpacket,
+and preparation, review and delivery tasks. A packet is a review/work unit, not a promised PR. Upstream reconciliation
 may eliminate, split or combine packets. The final PR count remains unknown.
 
 Standalone publication can require several waves: a prerequisite must merge
@@ -86,7 +86,7 @@ its affected packet and dependents, not unrelated fixes.
   historical invalid-command fix `4632b5b2` was reported covered by #165; verify
   that and exclude duplicate delivery. Merge `8b5cf5dd` is reconciliation history,
   not its own feature. Assign every remaining hunk, fixture, doc and build change.
-- [ ] **P04 — Verify dependency and policy map.** Trace task/FD/storage/namespace
+- [x] **P04 — Verify dependency and policy map.** Trace task/FD/storage/namespace
   ownership, configuration schemas, archive formats, syscall dispatch and fixtures.
   Verify the edges below against P02's main. Identify capability prerequisites,
   not accidental commit ancestry. Separate pure fixes from feature additions and
@@ -109,7 +109,8 @@ small generic documentation in that packet; never defer essential coverage to G3
 | ID | Packet and source references | Capability prerequisites after P05 | Required observable evidence |
 | --- | --- | --- | --- |
 | G01 | Assigned-console bounded polling (`3dd05f42`, `f8235d56`) | Current configured launch; reconcile #207/#179 policy first | Assigned descriptors wait/wake within bounds; denied/unassigned descriptors stay denied; interruption and timeout work without busy looping. |
-| G02 | Virtual clock reads and interruptible sleeps (`9ec95527`) | Approved upstream clock/sleep contract | Virtual clock values, deadline expiry and signal interruption; no unintended host identity or time-source exposure. |
+| G02 | Restricted global clock reads and interruptible sleeps (`9ec95527`) | Approved upstream clock/sleep contract | Only the chosen realtime/monotonic clock IDs, deadline expiry and signal interruption; document native global-clock visibility honestly, and deny fd/PID CPU-clock encodings. |
+| G05a | Shared offsets for duplicated VFS descriptors (`b500f859`, relevant semantics from `7bc0ee04`) | Current upstream VFS only | The direct duplicate-read regression fails on upstream and integration, passes old review fix; extract current-main correction, test aliases, independent opens, reused slots and CLOEXEC. No configured-storage prerequisite. |
 | G03 | Configured writable storage and file metadata (`222d29ff`, `10091e4e`) | Current configured launch/VFS and approved storage assignment contract | Explicit mounts only; correct read/write/seek/stat/truncate and quota failure; unassigned paths cannot fall through to host writes. |
 | G04 | Explicit virtual null devices (`e3458063`) | Configured launch and device assignment contract | Assigned null semantics, denied absent devices, correct path metadata and teardown. |
 | G05 | Owned pipes and unified public descriptor ownership (`7f072f2c`, `3b00c1c8`, fixture correction `f1c6419e`) | G03, G04 | Correct alias/refcount/dup/close/CLOEXEC behavior, EOF/backpressure, invalid-pointer rollback and FD exhaustion. Reassess whether pipes and descriptor core can split coherently. |
@@ -123,12 +124,12 @@ small generic documentation in that packet; never defer essential coverage to G3
 | G13 | Owned symlink traversal and mutation (`909399b4`, `aa8becf2`, `8b14578c`, relevant docs `d7f628cc`) | G09, G11; cross-check #218 overlap | Relative/absolute/dangling/loop cases; link-before-parent resolution, correct nofollow/final-entry mutation, failure preserves namespace. Allocate script docs back to G11. |
 | G14 | Owned current directories (`6a45d8f8`) | G06, G09, G13 | chdir/fchdir/getcwd, relative paths across fork/exec and directory mutations; no host cwd leakage. |
 | G15 | Shared hardlink inode identity (`9e2a39e8`) | G05, G09, G13 | Aliases share bytes/metadata and open-file lifetime; unlink/relink, quota charging and final close remain correct. |
-| G16 | Unified image/owned traversal (`1da0ce13`, `93a1a56d`) | G04, G13, G14, G15 | Cross-boundary links/parents/exec, assignment precedence and confinement; hidden `/dev` paths retain absent semantics. |
-| G17 | Private backing descriptors, public FD budgets and positioned writes (`53a2c9cc`, `d5357101`) | G05, G09, G12 | Private reservations do not consume or raise public limits; lower operator limits work, pwrite respects offset/alias semantics and all resources close on failure. |
-| G18 | Configurable bounded namespace capacity (`38fa14fd`) | G09, G15, G17 | Thousands of actual nonempty objects; checked allocation arithmetic, metadata/data accounting, configured exhaustion and shared-byte charging. |
-| G19 | Flush and quiesced export (`53dec6b3`, `48b26f8d`, relevant static fixes `c541a67f`) | G06, G09, G12, G17 | fsync/fdatasync reach owned backing, live writers settle before successful export, failed workload/export cannot publish partial output. Allocate static fixes to their owning packets. |
-| G20 | Private checkpoint control and event-driven waiting (`2b306eff`, `990fbb7a`) | G08, G19 | Checkpoint acknowledgment follows consistent capture; opaque bounded control, malformed frames, dead peers, cancellation and simultaneous task events behave correctly. |
-| G21 | Validated startup restore (`1d9e00e0`) | G19, G20 | Restore occurs before workload execution; reject malformed/traversing/oversized snapshots and occupied destinations without corrupting previous state. |
+| G16 | Unified image/owned traversal (`1da0ce13`, `93a1a56d`) | G04, G13, G14 | Cross-boundary links/parents/exec, assignment precedence and confinement; hidden `/dev` paths retain absent semantics. |
+| G18 | Configurable bounded namespace capacity (`38fa14fd`) | G09 | Thousands of actual nonempty objects; checked allocation arithmetic, metadata/data accounting, configured exhaustion and shared-byte charging. |
+| G17 | Private backing descriptors, public FD budgets and positioned writes (`53a2c9cc`, `d5357101`) | G05, G09, G12, G18 | Private reservations do not consume or raise public limits; lower operator limits work, pwrite respects offset/alias semantics and all resources close on failure. |
+| G19 | Flush and quiesced export (`53dec6b3`, `48b26f8d`, relevant static fixes `c541a67f`) | G06, G07, G09 | fsync/fdatasync reach owned backing, live writers settle before successful export, failed workload/export cannot publish partial output. Allocate static fixes to their owning packets. |
+| G20 | Private checkpoint control and event-driven waiting (`2b306eff`, `990fbb7a`) | G06, G07, G19 | Checkpoint acknowledgment follows consistent capture; opaque bounded control, malformed frames, dead peers, cancellation and simultaneous task events behave correctly. |
+| G21 | Validated startup restore (`1d9e00e0`) | G09, G19 | Restore occurs before workload execution; reject malformed/traversing/oversized snapshots and occupied destinations without corrupting previous state. |
 | G22 | Bounded archives with hardlink identity (`e3374593`) | G13, G15, G18, G21 | Export/restore preserves aliases and symbolic links; >2 GiB payload and 5,000 nonempty files; reject unsafe paths, conflicting entries, invalid forward aliases and inconsistent link metadata. |
 | G23 | Owned file locks (`26784843`) | G06, G07, G15, G17 | Real simultaneous SQLite/Cargo clients contend correctly, locks release under close/exit, ownership follows defined descriptor/process semantics; no disabled-lock workaround. |
 | G24 | Inode timestamps and archive mtime (`d21d26c8`) | G15, G22 | Explicit timestamps survive alias access/checkpoint/restart, invalid/no-follow cases are correct; document seconds-only persistence. |
@@ -139,6 +140,11 @@ small generic documentation in that packet; never defer essential coverage to G3
 | G29 | Configured TCP syscall/readiness integration (`66de2880`) | G05, G06, G07, G08, G28 | Default-denied real connections; authorized HTTP/TLS/Git, refused endpoints, readiness, byte/connection exhaustion, cancellation/revocation; no host-network fallback. |
 | G30 | Virtual root ownership on owned objects (`7cf2638a`) | G09, G13, G15, G25 | Actual cpio extraction with uid/gid zero or unchanged IDs; invalid IDs, absent objects and nofollow fail correctly; no claim of arbitrary Linux ownership. |
 | G31 | Checkpoint/restore CI coverage (`5e20a65f`) | G20, G21 and fixtures included in those proposals | Actual runner builds and executes checkpoint/restore checks; static-and-unit still runs all existing modules. Prefer folding this small wiring into the feature that introduces the fixtures. |
+
+[P04's source-derived dependency record](ginux-contributions/p04-dependencies.md)
+explains removed false dependencies, required splitting inside G17/G25/G26/G27,
+policy holds and the current-main standalone G05a correction. Source fixture
+registration and generic documentation stay with each implementing change.
 
 The exact upstream prerequisite for each packet is a **capability**, not all local
 changes listed before it. G27 and G28 can start immediately after P05 when their
@@ -301,9 +307,19 @@ The upstream merge preview identifies conflicts in supervisor.rs and VFSlib.rs;
 new #221 helpers/fixtures and #217/#218 changes must be preserved. No source/index/
 branch/remote was modified by the preview or regression probes.
 
-Active task and exact next action: **P04 — verify capability dependencies**,
-beginning with G17/G18's backing/capacity ordering and standalone G05 extraction.
-Run only one task at a time; F04 remains the user checkpoint before publication.
+P04 complete. [Dependency and extraction boundaries](ginux-contributions/p04-dependencies.md)
+correct G17/G18 ordering, separate private checkpoint control from workload
+channels, remove restore's false checkpoint prerequisite, and identify G05a as
+independent on current main. G02's clocks are native global clocks, not a virtual
+timer implementation. Relevant policy restrictions remain explicit.
+
+Active task: **P05 — freeze extraction packets**. Prepare local patch/source
+snapshots without creating or switching branches; the user authorized sequential
+preparation, while publication remains after F04. Preserve all existing dirty
+worktrees and use new disposable source directories under /tmp for extraction.
+Exact next action: define the package manifest, starting with the current-main
+G05a VFS fix and keeping dependent feature patches labeled with their actual
+prerequisite composition. No remote actions are authorized.
 
 Active skill: `hdae-development`, discovered at
 `/home/vince/.codex/worktrees/ginux-pr-combination-check/ginux/.agents/skills/hdae-development/SKILL.md`.
