@@ -124,7 +124,7 @@ pub enum Cmd {
 
     /// Open a web page of live terminals, one per story, each running the real app.
     Stories {
-        /// Local port to serve on (127.0.0.1 only).
+        /// Port to serve on, on every address (the printed URL carries the access token).
         #[arg(long, default_value_t = 7681)]
         port: u16,
         /// Don't open the page in a browser.

@@ -8,6 +8,8 @@
 //! same environment `inspect` and `check tui` use, types the story's keys as the
 //! screen settles, then passes the browser's keys through. Nothing here draws UI of
 //! its own.
+//!
+//! It listens on every address; each request needs the token in the URL it prints.
 
 use anyhow::{Context, Result, bail};
 use portable_pty::{CommandBuilder, PtySize, native_pty_system};
@@ -45,16 +47,21 @@ struct Story {
 }
 
 pub fn run(options: Options) -> Result<()> {
-    let port = options.port;
     let root = crate::util::repo::repo_root()?;
     let catalog = Arc::new(catalog(&root)?);
     let xterm = root.join("node_modules/@xterm/xterm");
     if !xterm.join("lib/xterm.js").is_file() {
         bail!("xterm.js is missing from node_modules (bun install at the repo root)");
     }
-    let listener = TcpListener::bind(("127.0.0.1", options.port))
-        .with_context(|| format!("listening on 127.0.0.1:{}", options.port))?;
-    let url = format!("http://127.0.0.1:{}/", options.port);
+    // Any machine on the network can reach the port, and a tile can run a shell, so
+    // every request must carry this token; the printed URL has it.
+    let token: Arc<str> = random_token()?.into();
+    let listener = TcpListener::bind(("0.0.0.0", options.port))
+        .with_context(|| format!("listening on port {}", options.port))?;
+    let host = std::fs::read_to_string("/proc/sys/kernel/hostname")
+        .map(|name| name.trim().to_string())
+        .unwrap_or_else(|_| "localhost".to_string());
+    let url = format!("http://{host}:{}/?token={token}", options.port);
     println!("stories: {} stories at {url} (Ctrl-C stops)", catalog.len());
     if options.open {
         let _ = std::process::Command::new("xdg-open").arg(&url).spawn();
@@ -63,8 +70,9 @@ pub fn run(options: Options) -> Result<()> {
         let Ok(stream) = stream else { continue };
         let catalog = Arc::clone(&catalog);
         let xterm = xterm.clone();
+        let token = Arc::clone(&token);
         thread::spawn(move || {
-            if let Err(error) = serve(stream, &catalog, &xterm, port) {
+            if let Err(error) = serve(stream, &catalog, &xterm, &token) {
                 eprintln!("stories: {error:#}");
             }
         });
@@ -185,14 +193,36 @@ fn build_split_pane(root: &Path) -> Result<PathBuf> {
     Ok(crate::util::repo::cargo_target_dir(root).join("debug/install-split"))
 }
 
-fn serve(stream: TcpStream, catalog: &[Story], xterm: &Path, port: u16) -> Result<()> {
+fn random_token() -> Result<String> {
+    let mut bytes = [0u8; 16];
+    std::fs::File::open("/dev/urandom")
+        .and_then(|mut random| random.read_exact(&mut bytes))
+        .context("reading /dev/urandom")?;
+    Ok(bytes.iter().map(|b| format!("{b:02x}")).collect())
+}
+
+fn query_param(query: &str, key: &str) -> Option<String> {
+    query
+        .split('&')
+        .filter_map(|pair| pair.split_once('='))
+        .find(|(k, _)| *k == key)
+        .map(|(_, v)| v.to_string())
+}
+
+fn serve(stream: TcpStream, catalog: &[Story], xterm: &Path, token: &str) -> Result<()> {
     let mut head = [0u8; 4096];
     let n = stream.peek(&mut head)?;
     let request = String::from_utf8_lossy(&head[..n]).into_owned();
     let target = request.split_whitespace().nth(1).unwrap_or("/").to_string();
     let (path, query) = target.split_once('?').unwrap_or((&target, ""));
+    // The page and xterm.js are public; what can run a program needs the token.
+    let needs_token = matches!(path, "/pty" | "/catalog.json");
+    if needs_token && query_param(query, "token").as_deref() != Some(token) {
+        let refusal = b"open the URL cargo xtask stories printed (it has the access token)";
+        return respond_status(stream, "403 Forbidden", "text/plain", refusal);
+    }
     match path {
-        "/pty" => terminal(accept_from_page(stream, port)?, catalog, query),
+        "/pty" => terminal(accept_from_page(stream)?, catalog, query),
         "/" => respond(stream, "text/html; charset=utf-8", PAGE.as_bytes()),
         "/catalog.json" => {
             let entries: Vec<_> = catalog
@@ -220,20 +250,17 @@ fn serve(stream: TcpStream, catalog: &[Story], xterm: &Path, port: u16) -> Resul
     }
 }
 
-/// Accepts the WebSocket only from this page: a tile can run a shell, and any website
-/// open in a browser on this machine could otherwise connect to it.
-fn accept_from_page(stream: TcpStream, port: u16) -> Result<WebSocket<TcpStream>> {
+/// Accepts the WebSocket only from this page (same origin as the address it was loaded
+/// from): a tile can run a shell, and another site's page must not reach it.
+fn accept_from_page(stream: TcpStream) -> Result<WebSocket<TcpStream>> {
     use tungstenite::handshake::server::{ErrorResponse, Request, Response};
-    let allowed = [
-        format!("http://127.0.0.1:{port}"),
-        format!("http://localhost:{port}"),
-    ];
     let check = |request: &Request, response: Response| -> Result<Response, ErrorResponse> {
-        let origin = request
-            .headers()
-            .get("origin")
-            .and_then(|v| v.to_str().ok());
-        if origin.is_some_and(|origin| allowed.iter().any(|a| a == origin)) {
+        let header = |name: &str| request.headers().get(name).and_then(|v| v.to_str().ok());
+        let same_origin = matches!(
+            (header("origin"), header("host")),
+            (Some(origin), Some(host)) if origin == format!("http://{host}")
+        );
+        if same_origin {
             Ok(response)
         } else {
             let mut refusal = ErrorResponse::new(Some("only the stories page may connect".into()));
@@ -271,13 +298,7 @@ fn respond_status(
 /// Runs one story in a PTY and bridges it to the WebSocket until either side ends.
 /// Query: `id`, `cols`, `rows`, and `nocolor=1` to set `NO_COLOR`.
 fn terminal(mut ws: WebSocket<TcpStream>, catalog: &[Story], query: &str) -> Result<()> {
-    let param = |key: &str| {
-        query
-            .split('&')
-            .filter_map(|pair| pair.split_once('='))
-            .find(|(k, _)| *k == key)
-            .map(|(_, v)| v.to_string())
-    };
+    let param = |key: &str| query_param(query, key);
     let story = param("id")
         .and_then(|id| id.parse::<usize>().ok())
         .and_then(|id| catalog.get(id))

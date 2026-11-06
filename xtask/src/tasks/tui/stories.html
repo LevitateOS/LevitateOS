@@ -42,6 +42,7 @@
 <main id="tiles"></main>
 <script src="/xterm.js"></script>
 <script>
+const TOKEN = new URLSearchParams(location.search).get("token") ?? "";
 const SIZES = [
   ["120x36", "120×36 dev terminal"],
   ["80x24", "80×24 serial console"],
@@ -79,7 +80,7 @@ function openTile(story) {
     term = new Terminal({ cols, rows, fontSize: 13, fontFamily: "ui-monospace, Menlo, Consolas, monospace", cursorBlink: true, allowProposedApi: true });
     term.open(tile.querySelector(".term"));
     const nocolor = tile.querySelector(".nocolor").checked ? 1 : 0;
-    socket = new WebSocket(`ws://${location.host}/pty?id=${story.id}&cols=${cols}&rows=${rows}&nocolor=${nocolor}`);
+    socket = new WebSocket(`ws://${location.host}/pty?token=${TOKEN}&id=${story.id}&cols=${cols}&rows=${rows}&nocolor=${nocolor}`);
     socket.binaryType = "arraybuffer";
     socket.onmessage = (e) => term.write(typeof e.data === "string" ? e.data : new Uint8Array(e.data));
     socket.onclose = () => term.write("\r\n\x1b[2m[disconnected]\x1b[0m");
@@ -96,7 +97,7 @@ function openTile(story) {
   start();
 }
 
-fetch("/catalog.json").then((r) => r.json()).then((stories) => {
+fetch(`/catalog.json?token=${TOKEN}`).then((r) => r.json()).then((stories) => {
   const list = document.getElementById("list");
   const groups = new Map();
   for (const story of stories) {
