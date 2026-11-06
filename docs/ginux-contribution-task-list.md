@@ -364,16 +364,25 @@ null-I/O boundary checks. The full patch is retained downstream. G04's actual
 runtime dependency is shared configured namespace/copy code, now explicit; it is
 not standalone-ready before G03c and its prerequisites merge.
 
-Current goal-turn classification: **progress**. The full goal remains active;
-G05 and later packets, cross-candidate interaction and Recipe closure are incomplete.
+G05 is locally prepared at8c1a579a on G04, with pipes/public descriptor ownership
+kept coherent to avoid a temporary public backend-handle ABI. [Review/evidence](ginux-contributions/g05-review.md)
+records cross-owner aliases, failed-open reservation rollback, translated openat
+register restoration, pipe copy/atomicity/EOF/SIGPIPE/parked termination,77 unit
+tests and all applicable Linux suites passing in candidate and clean replay.
+The source patch is retained. Held G01/G02 code and future task/network joins
+are excluded; core policy remains unchanged. Standalone delivery waits for G04.
 
-Exact next task: **G05 — owned pipes and public descriptor ownership**. Trace
-7f072f2c/3b00c1c8 and the f1c6419e fixture correction; assess a coherent primitive
-versus runtime split, extract only required backend joins, and retain G03/G04 path,
-copy, offset and ownership fixes. Do not import future network/task changes solely
-because they appear in the integration donor. No G06 implementation until this
-packet's required local preparation is finished. G01/G02 holds remain explicit.
-F04 is the user inspection checkpoint before any publication.
+Current goal-turn classification: **progress**. The full goal remains active;
+G06 and later packets, cross-candidate interaction and Recipe closure are incomplete.
+
+Exact next task: **G06 — configured children/exec/death accounting**. Recheck
+current process-related upstream changes/discussion (including #224/#226), then
+extract the smallest coherent lifecycle change from ccd62ca1/8f768700/9279e71b/
+d693ae63/07c949db on the reviewed descriptor owner. Preserve current #221 helpers
+and task tests, G03–G05 path/copy/alias corrections, failed-exec/CLOEXEC rollback,
+adoption/death accounting and all existing native behavior. Do not import future
+threads/network/mappings simply because integration donors reference them.
+G01/G02 holds remain explicit. F04 remains the inspection stop before publication.
 
 Active skill: `hdae-development`, discovered at
 `/home/vince/.codex/worktrees/ginux-pr-combination-check/ginux/.agents/skills/hdae-development/SKILL.md`.

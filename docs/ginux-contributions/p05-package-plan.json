@@ -158,7 +158,6 @@
       "packet": "G05",
       "purpose": "Owned pipes and unified public descriptor ownership (`7f072f2c`, `3b00c1c8`, fixture correction `f1c6419e`)",
       "dependencies": [
-        "G03",
         "G04"
       ],
       "source_commits": [
@@ -167,9 +166,16 @@
         "3b00c1c8802cef6ed69350aee53f97ff6715f233"
       ],
       "acceptance": "Correct alias/refcount/dup/close/CLOEXEC behavior, EOF/backpressure, invalid-pointer rollback and FD exhaustion. Reassess whether pipes and descriptor core can split coherently.",
-      "planned_delivery": "one coherent change plus its generic docs and focused regression fixtures; split coupled responsibilities only as recorded by P04",
-      "status": "pending extraction and R01-R04 review",
-      "artifact_directory": ".artifacts/ginux-contribution-preparation/G05"
+      "planned_delivery": "pipes and public descriptor ownership remain one coherent package to avoid a temporary exposed backend-handle pipe ABI",
+      "status": "fully reviewed and locally validated on explicit G04 prerequisite; standalone delivery waits for prerequisite merges",
+      "artifact_directory": ".artifacts/ginux-contribution-preparation/G05",
+      "base": "5036b7e8a61c4cf1e18abad8746208d03d268ea5",
+      "head": "8c1a579aafb873be289b49259b961ee2cb6532eb",
+      "tree": "3f2f0a72146faa8846c64d091677e499e0f71106",
+      "upstream_base": "3f2fe7dfadd4b40e235d982a6a3d386dc6490177",
+      "evidence": "g05-review.md",
+      "source_patch": "patches/G05.patch",
+      "standalone": false
     },
     {
       "packet": "G06",
