@@ -1525,10 +1525,17 @@
       ],
       "acceptance": "Actual runner builds and executes checkpoint/restore checks; static-and-unit still runs all existing modules. Prefer folding this small wiring into the feature that introduces the fixtures.",
       "planned_delivery": "one coherent change plus its generic docs and focused regression fixtures; split coupled responsibilities only as recorded by P04",
-      "status": "pending extraction and R01-R04 review",
+      "status": "source disposition complete: folded into G20/G21; exact source/clean wiring verified, full/default/combined/remote CI remains pending with feature owners",
       "artifact_directory": ".artifacts/ginux-contribution-preparation/G31",
       "checkpoint_wiring": "Folded into G20 introducing packet; full/default runtime and remote CI unrun. Restore wiring remains with G21.",
-      "restore_wiring": "Folded into G21 introducing packet; full/default/remote runtime unrun. G20 checkpoint wiring retained separately; combined join remains F02."
+      "restore_wiring": "Folded into G21 introducing packet; full/default/remote runtime unrun. G20 checkpoint wiring retained separately; combined join remains F02.",
+      "evidence": "g31-review.md",
+      "folded_into": {
+        "G20": "7afa833d1babcc5dd62ef326f81c52835f9aa349",
+        "G21": "33bf08a746bd64306e0375f8d419af4744d31064"
+      },
+      "separate_candidate": false,
+      "remote_ci": "not run"
     },
     {
       "packet": "G17a",

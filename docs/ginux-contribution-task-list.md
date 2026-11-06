@@ -671,13 +671,21 @@ and corrected. No G25/G24/G14 ancestry or ownership-suppression flag is needed.
 Security/full default runtime/remote CI/current-main independence and actual
 combined package/Recipe closure remain pending. No publication occurred.
 
-Exact next task: **G31 — reconcile checkpoint/restore coverage into its owners**.
-Trace5e20a65f against retained G20/G21 CI/Make/runner evidence and account for its
-single coverage line without a duplicate wiring-only packet. Preserve all unit
-modules and default runner scenarios. Then proceed F01 complete hunk accounting,
-F02 combined owners, F03 fresh Recipe/actual consumers and F04 user inspection.
-All G08/G23–G30/security/policy/consumer open criteria remain active. No branches,
-refs, pushes, PRs or maintainer messages before user inspection.
+G31's one-line CI change is fully assigned to the introducing G20/G21 owners;
+[review/evidence](ginux-contributions/g31-review.md) verifies exact workflow/Make/
+runner/fixture bytes and wiring dry runs in both source/clean exports. Required
+make test-unit/all7 packages remain, ordinary runtime receipts already pass on
+those exact heads. No separate wiring-only patch/PR is needed. Full/default,
+combined owner and remote CI evidence remains pending; nothing published.
+
+Exact next task: **F01 — complete queue/hunk accounting**.
+Join the P03 catalog/hunks and P05 extraction manifests; enumerate actual retained
+patches, folded/upstream/superseded material, policy/security holds and incomplete
+G07/G08 source/consumer work. Do not mistake source-only dispositions or ordinary
+fixtures for complete acceptance. Retain or finish every remaining useful hunk
+before declaring the queue accounted. Then perform F02 combined owner review,
+F03 fresh complete Recipe/actual consumer checks and F04 user inspection. No
+branches/refs/pushes/PRs/maintainer messages before user inspection.
 
 Active skill: `hdae-development`, discovered at
 `/home/vince/.codex/worktrees/ginux-pr-combination-check/ginux/.agents/skills/hdae-development/SKILL.md`.
