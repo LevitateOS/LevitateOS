@@ -432,13 +432,10 @@ tui-install-disk-plan *args:
     #!/usr/bin/env bash
     set -euo pipefail
 
-    echo "NOTICE: running install disk-plan TUI (tui/apps/install/disk-plan)." >&2
+    echo "NOTICE: running install disk-plan TUI (tui/apps/install/disk-plan) with this checkout's recpart." >&2
 
-    if [ ! -t 0 ] || [ ! -t 1 ]; then
-      echo "tui-install-disk-plan requires interactive TTY stdin/stdout. Run from a terminal." >&2
-      exit 2
-    fi
-
+    cargo build -q -p recpart
+    export PATH="$PWD/target/debug:$PATH"
     cd tui/apps/install/disk-plan
     exec bun run start -- {{args}}
 

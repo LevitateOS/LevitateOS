@@ -94,6 +94,10 @@ pub enum Cmd {
         #[command(subcommand)]
         cmd: TuiCmd,
     },
+
+    /// Regenerate recpart's and recab's JSON Schemas and the TUIs'
+    /// TypeScript declarations from the tools' output types.
+    Contracts,
 }
 
 #[derive(Subcommand)]

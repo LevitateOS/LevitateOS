@@ -5,6 +5,7 @@ pub fn run(cli: crate::cli::Cli) -> Result<()> {
     match cli.cmd {
         crate::cli::Cmd::Env { shell } => crate::tasks::tooling::env::run(shell),
         crate::cli::Cmd::Doctor => crate::tasks::tooling::doctor::run(),
+        crate::cli::Cmd::Contracts => crate::tasks::tooling::contracts::run(),
         crate::cli::Cmd::Kernels { cmd } => match cmd {
             crate::cli::KernelsCmd::Build {
                 distro,

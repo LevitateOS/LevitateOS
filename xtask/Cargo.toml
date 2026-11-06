@@ -20,3 +20,7 @@ libc = "0.2"
 vt100 = "0.15"
 install-tests = { path = "../testing/install-tests" }
 portable-pty = "0.8"
+recpart = { path = "../tools/recpart", features = ["contracts"] }
+recab = { path = "../tools/recab", features = ["contracts"] }
+schemars = "1"
+ts-rs = "12"
