@@ -10,7 +10,6 @@ pub fn run(name: String, args: Vec<String>) -> Result<()> {
     let root = crate::util::repo::repo_root()?;
     let app = tui_apps::find(&root, &name)?;
     let mut cmd = app_command(&root, &app)?;
-    cmd.env_remove("NO_COLOR").env("FORCE_COLOR", "3");
     let status = cmd.args(&args).status().context("running bun")?;
     if !status.success() {
         bail!("{name} exited with {status}");

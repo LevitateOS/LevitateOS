@@ -1252,7 +1252,10 @@ Commits land on the checked-out branches (superproject `master`, submodules `cod
   - **Bug fixed:** the AcornOS text guide was cut at the pane edge (`LESS=-S` from the colour profile) and `-F` closed it at once when it fit; it now wraps to the pane width with its own pager settings and exits like the TUI docs. Changed the default docs page on tty1 to `installation` (serial already used it).
   - `xtask boot --verbose` is removed: its only effect was the dead `SERIAL_VERBOSE` key.
   - Verified: workspace builds; both variants load; the rendered launcher, run in a PTY on this host, probes, smoke-tests, draws both panes with the docs app on the Installation page, and after Ctrl-q leaves a working `/bin/bash` login shell; the text docs wrap to 38 columns and quit on `q`; overlays with no install-UX consoles match F18 apart from comments, live-help and tty1's drop-in name; all guest scripts pass `sh -n`. Booting is unverified here (no root for products, no QEMU run).
-- [ ] F20 — The program that owns the terminal sets TERM, and nothing forces colour.
+- [x] F20 — The program that owns the terminal sets TERM, and nothing forces colour. builder `2de4f4e`, superproject commit "F20: the program that owns the terminal…".
+  - `rg 'FORCE_COLOR|COLORTERM|NO_COLOR' distro/builder xtask/src` finds only reads, plus xtask's capture host removing the three variables so the developer's shell can't change a capture (that clears, it doesn't force).
+  - **Bug fixed:** `NO_COLOR` was overridden everywhere on the live ISO (set to "" by the split pane, unset by the launchers); it now reaches the docs app, and the shell colour profile treats any non-empty value as off, as the kit and no-color.org do.
+  - Verified: in a PTY with outer `TERM=linux NO_COLOR=1`, a pane sees `TERM=xterm-256color NO_COLOR=1` and no `COLORTERM`; `cargo xtask check tui` passes (renders, docs-pane sizes, walks, snapshots).
 - [ ] F21 — Each live-ISO file has one writer, and init and distro differences come from config.
 - [ ] F22 — ISO payload is built by recipes and one generic TUI-app action.
 - [ ] F23 — The split pane is a robust terminal host.

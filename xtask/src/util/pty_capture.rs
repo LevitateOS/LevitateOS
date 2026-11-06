@@ -6,7 +6,6 @@
 
 use anyhow::{Context, Result, anyhow};
 use portable_pty::{Child, CommandBuilder, MasterPty, PtySize, native_pty_system};
-use std::env;
 use std::io::{Read, Write};
 use std::path::Path;
 use std::sync::mpsc::{Receiver, RecvTimeoutError, channel};
@@ -260,22 +259,12 @@ fn kill_process_group(master: &dyn MasterPty) {
 #[cfg(not(unix))]
 fn kill_process_group(_: &dyn MasterPty) {}
 
+/// The terminal is the vt100 screen here, an xterm with 256 colours, whatever the
+/// developer's own terminal is; colour settings from the developer's shell don't
+/// reach the program, so a capture is the same everywhere.
 fn apply_terminal_env(cmd: &mut CommandBuilder) {
-    let mut term = env::var("TERM").unwrap_or_else(|_| "xterm-256color".to_string());
-    let normalized = term.trim().to_ascii_lowercase();
-    if normalized.is_empty()
-        || normalized == "dumb"
-        || normalized == "vt100"
-        || normalized == "vt102"
-        || normalized == "linux"
-    {
-        term = "xterm-256color".to_string();
+    cmd.env("TERM", "xterm-256color");
+    for inherited in ["COLORTERM", "FORCE_COLOR", "NO_COLOR"] {
+        cmd.env_remove(inherited);
     }
-
-    cmd.env("TERM", term);
-    let colorterm = env::var("COLORTERM").unwrap_or_else(|_| "truecolor".to_string());
-    cmd.env("COLORTERM", colorterm);
-    let force_color = env::var("FORCE_COLOR").unwrap_or_else(|_| "3".to_string());
-    cmd.env("FORCE_COLOR", force_color);
-    cmd.env_remove("NO_COLOR");
 }
