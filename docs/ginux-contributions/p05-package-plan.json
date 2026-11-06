@@ -22,8 +22,9 @@
       ],
       "acceptance": "Assigned descriptors wait/wake within bounds; denied/unassigned descriptors stay denied; interruption and timeout work without busy looping.",
       "planned_delivery": "one coherent change plus its generic docs and focused regression fixtures; split coupled responsibilities only as recorded by P04",
-      "status": "existing PR207, held; review/disposition pending, no new PR or head modification",
-      "artifact_directory": ".artifacts/ginux-contribution-preparation/G01"
+      "status": "existing PR accounted and source-reviewed; unchanged policy hold; no new candidate",
+      "artifact_directory": ".artifacts/ginux-contribution-preparation/G01",
+      "evidence": "policy-held-packets.md"
     },
     {
       "packet": "G02",
@@ -34,9 +35,10 @@
       ],
       "acceptance": "Only the chosen realtime/monotonic clock IDs, deadline expiry and signal interruption; document native global-clock visibility honestly, and deny fd/PID CPU-clock encodings.",
       "planned_delivery": "one coherent change plus its generic docs and focused regression fixtures; split coupled responsibilities only as recorded by P04",
-      "status": "pending extraction and R01-R04 review",
+      "status": "existing donor source reviewed; policy hold; standalone interruption/runtime evidence pending",
       "artifact_directory": ".artifacts/ginux-contribution-preparation/G02",
-      "policy_hold": "issue179; prepare/review existing local material only; no publication or assumption of upstream consent"
+      "policy_hold": "issue179; prepare/review existing local material only; no publication or assumption of upstream consent",
+      "evidence": "policy-held-packets.md"
     },
     {
       "packet": "G05a",
@@ -47,8 +49,11 @@
       ],
       "acceptance": "The direct duplicate-read regression fails on upstream and integration, passes old review fix; extract current-main correction, test aliases, independent opens, reused slots and CLOEXEC. No configured-storage prerequisite.",
       "planned_delivery": "one coherent change plus its generic docs and focused regression fixtures; split coupled responsibilities only as recorded by P04",
-      "status": "pending extraction and R01-R04 review",
-      "artifact_directory": ".artifacts/ginux-contribution-preparation/G05a"
+      "status": "reviewed and locally validated standalone candidate; user inspection and remote CI pending",
+      "artifact_directory": ".artifacts/ginux-contribution-preparation/G05a",
+      "head": "bb2c82bf18bb30a7ebc514af5131fa5b03a5fcc5",
+      "tree": "52ee94c026ab416303d0ba1320a78d27906f0036",
+      "evidence": "g05a-review.md"
     },
     {
       "packet": "G03",

@@ -318,13 +318,24 @@ records all32 rows, exact source commits, dependencies, acceptance and R01–R04
 requirements. It is an execution manifest, not proof of extraction or completed
 review. Use disposable /tmp source snapshots; no branch creation/switch is needed.
 
-Next sequential work: account for G01's existing held PR without changing it,
-prepare G02's existing local policy delta with its hold explicit, then start
-G05a's confirmed independent VFS correction. Each packet gets its own source,
-regression, validation and draft evidence; do not start the next implementation
-while its predecessor's in-scope review/checks remain unfinished. A policy-held
-packet can receive a recorded local-review disposition without inventing upstream
-approval or waiting idly for an external decision. F04 must show such holds.
+G01's existing held PR and G02's local policy delta have explicit
+[review/hold dispositions](ginux-contributions/policy-held-packets.md). G02 still
+needs standalone interrupted-sleep/runtime acceptance; it is not marked passed.
+
+G05a is fully prepared and locally reviewed/validated as a standalone candidate
+`bb2c82bf`, with current upstream3f2fe7df as its sole parent. [Review/evidence](ginux-contributions/g05a-review.md):
+three baseline failures become passes,15 VFS/68 total unit tests pass, and all
+required Linux launch/native/process/setup commands pass in both the candidate
+and an independent clean main-plus-patch source export. Draft/patch/logs live under
+`.artifacts/ginux-contribution-preparation/G05a/`. macOS remote CI is pending.
+No branch/index/worktree/remote was changed; only local commit objects and exports
+were created.
+
+Exact next task: **G03 — configured writable storage and file metadata**.
+Extract its smallest library/runtime boundaries against upstream, preserve G05a
+as an independent optional composition, and fully review/test before moving on.
+Existing policy-held packets stay in the final package with their unresolved
+acceptance visible. F04 remains the user checkpoint before publication.
 
 Active skill: `hdae-development`, discovered at
 `/home/vince/.codex/worktrees/ginux-pr-combination-check/ginux/.agents/skills/hdae-development/SKILL.md`.
