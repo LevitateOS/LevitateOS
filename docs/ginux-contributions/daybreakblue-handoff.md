@@ -801,3 +801,15 @@ Those probes remain unrun; ordinary successful exec and virtual CLOEXEC checks
 are not private-kernel-FD or authority acceptance. G07's old unready snapshot and
 shared-path finding remain unresolved; it is not refreshed or imported here.
 No DaybreakBlue agent has been dispatched and no security pass is claimed.
+
+
+## Refreshed G09a security revision — 2026-11-06
+
+Current VFS subpacket G09a is `648ec32a34ece2f1cd7d37b10271e4166eb14683` on refreshed
+G03b `5fb12ab4a56efd365d7d451d181f6e2a41c9d31d`. [Current review](g09a-review.md) records
+89 units and eight ordinary controls in source/clean replay, plus the exact-base
+truncation failure. A new ordinary unit covers multi-chunk data and trusted
+reader-error cleanup; it does not validate malformed image offsets or adversarial
+backend/range behavior. Those existing security checks remain pending alongside
+full default suites. Runtime growth remains G09b; no thread/security acceptance
+or DaybreakBlue dispatch is implied.

@@ -1,6 +1,6 @@
-From d29381c72352c33e33a4f164258f9ac80239ee85 Mon Sep 17 00:00:00 2001
+From 648ec32a34ece2f1cd7d37b10271e4166eb14683 Mon Sep 17 00:00:00 2001
 From: vince <vincepaul.liem@gmail.com>
-Date: Fri, 6 Nov 2026 12:10:08 +0100
+Date: Fri, 6 Nov 2026 23:04:49 +0100
 Subject: [PATCH] feat(vfs): separate owned byte storage and support truncation
 
 Keep inline backing as the default while allowing bounded external
@@ -9,11 +9,11 @@ objects; avoid copying image contents discarded by O_TRUNC.
 
 Signed-off-by: vince <vincepaul.liem@gmail.com>
 ---
- crates/ginux-vfs/src/lib.rs | 245 ++++++++++++++++++++++++++++++++----
- 1 file changed, 220 insertions(+), 25 deletions(-)
+ crates/ginux-vfs/src/lib.rs | 314 +++++++++++++++++++++++++++++++++---
+ 1 file changed, 289 insertions(+), 25 deletions(-)
 
 diff --git a/crates/ginux-vfs/src/lib.rs b/crates/ginux-vfs/src/lib.rs
-index 48170e5b..2dfbc43d 100644
+index 48170e5b2fbe7f708326ae9ac33b7c250a129897..4cb0e3dae976f703a015e257dbd51912a9cf046b 100644
 --- a/crates/ginux-vfs/src/lib.rs
 +++ b/crates/ginux-vfs/src/lib.rs
 @@ -314,22 +314,20 @@ pub struct FileMetadata {
@@ -293,7 +293,7 @@ index 48170e5b..2dfbc43d 100644
              self.overlay[index] = OverlayFile::empty();
              return Err(error);
          }
-@@ -1591,4 +1705,85 @@ mod tests {
+@@ -1591,4 +1705,154 @@ mod tests {
          assert_eq!(fs.read(fd, &mut contents), Ok(4));
          assert_eq!(&contents, b"\0\0\0x");
      }
@@ -377,5 +377,74 @@ index 48170e5b..2dfbc43d 100644
 +        fs.truncate(replacement, 2).unwrap();
 +        assert_eq!(fs.read(replacement, &mut data), Ok(2));
 +        assert_eq!(&data[..2], &[0, 0]);
++    }
++
++    #[test]
++    fn chunked_copy_up_preserves_all_bytes_and_reclaims_partial_failure() {
++        struct ChunkReader {
++            fail_second: bool,
++        }
++        impl BaseReader for ChunkReader {
++            fn read_at(&mut self, offset: u64, output: &mut [u8]) -> Result<(), VfsError> {
++                if self.fail_second && offset >= 4096 {
++                    return Err(VfsError::Io);
++                }
++                for (i, byte) in output.iter_mut().enumerate() {
++                    *byte = ((offset as usize + i) % 251) as u8;
++                }
++                Ok(())
++            }
++        }
++        let mut bytes = std::vec![0; HEADER_SIZE + 2 * RECORD_SIZE];
++        encode_header(2, (&mut bytes[..HEADER_SIZE]).try_into().unwrap());
++        for (i, (path, kind, size)) in [
++            (b"/".as_slice(), NodeKind::Directory, 0),
++            (b"/large".as_slice(), NodeKind::File, 9000),
++        ]
++        .into_iter()
++        .enumerate()
++        {
++            let start = HEADER_SIZE + i * RECORD_SIZE;
++            encode_record(
++                Entry {
++                    path,
++                    kind,
++                    mode: 0o777,
++                    uid: 0,
++                    gid: 0,
++                    size,
++                    data_offset: 0,
++                    link: b"",
++                },
++                (&mut bytes[start..start + RECORD_SIZE]).try_into().unwrap(),
++            )
++            .unwrap();
++        }
++        for fail_second in [false, true] {
++            let mut fs: VirtualFs<'_, ChunkReader, 1, 16, 2, InlineStorage<1, 12000>> =
++                VirtualFs::with_storage(
++                    Index::new(&bytes).unwrap(),
++                    ChunkReader { fail_second },
++                    InlineStorage::default(),
++                );
++            let opened = fs.open(b"/large", O_READ | O_WRITE);
++            if fail_second {
++                assert_eq!(opened, Err(VfsError::Io));
++                assert_eq!(fs.overlay_files(), 0);
++                let new = fs.open(b"/new", O_READ | O_WRITE | O_CREATE).unwrap();
++                assert_eq!(fs.write(new, b"ok"), Ok(2));
++                fs.seek(new, 0, 0).unwrap();
++                let mut output = [0; 2];
++                assert_eq!(fs.read(new, &mut output), Ok(2));
++                assert_eq!(&output, b"ok");
++            } else {
++                let fd = opened.unwrap();
++                let mut output = [0; 9000];
++                assert_eq!(fs.read(fd, &mut output), Ok(9000));
++                for (i, byte) in output.into_iter().enumerate() {
++                    assert_eq!(byte, (i % 251) as u8);
++                }
++            }
++        }
 +    }
  }
