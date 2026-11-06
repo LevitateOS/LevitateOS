@@ -922,7 +922,8 @@ fn qemu_base_command(
     cmd.arg("-no-reboot");
     if let Some(injection) = injection {
         let fw_cfg = format!(
-            "name=opt/levitate/boot-injection,file={}",
+            "name={},file={}",
+            distro_spec::shared::live_boot::BOOT_INJECTION_FW_CFG,
             injection.path.display()
         );
         cmd.args(["-fw_cfg", &fw_cfg]);
@@ -1271,7 +1272,11 @@ fn create_boot_injection_iso(payload_path: &Path) -> Result<PathBuf> {
             ],
         ),
     ] {
-        args.push(format!("boot-injection.env={}", payload_path.display()));
+        args.push(format!(
+            "{}={}",
+            distro_spec::shared::live_boot::BOOT_INJECTION_FILE,
+            payload_path.display()
+        ));
         match Command::new(tool).args(&args).status() {
             Ok(status) if status.success() => return Ok(iso_path),
             Ok(status) => {

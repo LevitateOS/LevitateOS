@@ -42,7 +42,6 @@ ROOTFS_PATH="${RELEASE_OUTPUT_DIR}/${ROOTFS_FILENAME}"
 INITRAMFS_LIVE_PATH="${RELEASE_OUTPUT_DIR}/${INITRAMFS_LIVE_FILENAME}"
 LIVE_OVERLAY_DIR="${RELEASE_OUTPUT_DIR}/${LIVE_OVERLAY_DIRNAME}"
 LIVE_OVERLAY_IMAGE="${RELEASE_OUTPUT_DIR}/${LIVE_OVERLAY_IMAGE_FILENAME}"
-INIT_TEMPLATE="${REPO_ROOT}/tools/recinit/templates/init_tiny.template"
 BUSYBOX_URL="${BUSYBOX_URL:-https://busybox.net/downloads/binaries/1.35.0-x86_64-linux-musl/busybox}"
 BUSYBOX_PATH="${BUSYBOX_PATH:-${REPO_ROOT}/.artifacts/tools/busybox-static}"
 BUSYBOX_SHA256="${BUSYBOX_SHA256:-6e123e7f3202a8c1e9b1f94d8941580a25135382b99e8d3e34fb858bba311348}"
@@ -57,16 +56,8 @@ BUILD_STARTED_AT_UTC="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
 BUILD_FINISHED_AT_UTC=""
 BUILD_STATUS="failed"
 
-TMP_RELEASE_INIT_TEMPLATE=""
-TMP_RELEASE_INIT_TEMPLATE_EDIT=""
 TMP_ARTIFACT_LIST=""
 cleanup_tmp_artifacts() {
-    if [ -n "${TMP_RELEASE_INIT_TEMPLATE:-}" ] && [ -f "${TMP_RELEASE_INIT_TEMPLATE}" ]; then
-        rm -f "${TMP_RELEASE_INIT_TEMPLATE}"
-    fi
-    if [ -n "${TMP_RELEASE_INIT_TEMPLATE_EDIT:-}" ] && [ -f "${TMP_RELEASE_INIT_TEMPLATE_EDIT}" ]; then
-        rm -f "${TMP_RELEASE_INIT_TEMPLATE_EDIT}"
-    fi
     if [ -n "${TMP_ARTIFACT_LIST:-}" ] && [ -f "${TMP_ARTIFACT_LIST}" ]; then
         rm -f "${TMP_ARTIFACT_LIST}"
     fi
@@ -248,7 +239,6 @@ if [ ! -d "$MODULES_DIR" ]; then
     exit 1
 fi
 
-need_file "$INIT_TEMPLATE"
 calc_sha256() {
     target="$1"
     if command -v sha256sum >/dev/null 2>&1; then
@@ -287,30 +277,15 @@ need_file "$BUSYBOX_PATH"
 verify_busybox_sha256 "$BUSYBOX_PATH"
 
 rm -f "$INITRAMFS_LIVE_PATH"
-TMP_RELEASE_INIT_TEMPLATE="$(mktemp "${RELEASE_OUTPUT_DIR}/.tmp-${PRODUCT_ARTIFACT_TAG}-init.XXXXXX")"
-cp "$INIT_TEMPLATE" "$TMP_RELEASE_INIT_TEMPLATE"
-printf '\n# product-artifact-tag: %s\n' "$PRODUCT_ARTIFACT_TAG" >> "$TMP_RELEASE_INIT_TEMPLATE"
-expected_init_msg="msg \"${OS_NAME} ${PRODUCT_BOOT_LABEL} initramfs starting...\""
-placeholder_init_msg='msg "LevitateOS initramfs starting..."'
-if grep -Fq "$placeholder_init_msg" "$TMP_RELEASE_INIT_TEMPLATE"; then
-    TMP_RELEASE_INIT_TEMPLATE_EDIT="${TMP_RELEASE_INIT_TEMPLATE}.edit"
-    sed "s|$placeholder_init_msg|$expected_init_msg|" \
-        "$TMP_RELEASE_INIT_TEMPLATE" > "$TMP_RELEASE_INIT_TEMPLATE_EDIT"
-    mv -f "$TMP_RELEASE_INIT_TEMPLATE_EDIT" "$TMP_RELEASE_INIT_TEMPLATE"
-fi
-if ! grep -Fq "$expected_init_msg" "$TMP_RELEASE_INIT_TEMPLATE"; then
-    echo "failed to materialize init template banner; expected line not found: $expected_init_msg" >&2
-    exit 1
-fi
 
 need_cmd cargo
 cargo run -q -p recinit -- build-tiny \
     --modules-dir "$MODULES_DIR" \
     --busybox "$BUSYBOX_PATH" \
-    --template "$TMP_RELEASE_INIT_TEMPLATE" \
     --output "$INITRAMFS_LIVE_PATH" \
     --iso-label "$ISO_LABEL" \
-    --rootfs-path "live/filesystem.erofs"
+    --set "BOOT_BANNER=${OS_NAME} ${PRODUCT_BOOT_LABEL} initramfs starting..." \
+    --set "PRODUCT_TAG=${PRODUCT_ARTIFACT_TAG}"
 need_file "$INITRAMFS_LIVE_PATH"
 
 rm -f "$LIVE_OVERLAY_IMAGE"
