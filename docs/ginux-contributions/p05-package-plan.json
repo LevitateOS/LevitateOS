@@ -56,6 +56,22 @@
       "evidence": "g05a-review.md"
     },
     {
+      "packet": "G03a",
+      "parent_packet": "G03",
+      "purpose": "correct the existing launch bootstrap mkdirat syscall",
+      "dependencies": [],
+      "source_commits": [
+        "10091e4e48bb14dcf9f0ee20e62f471fb7d0cf2f"
+      ],
+      "acceptance": "real absent-workdir launch fails at upstream and passes with correction; directory is created; existing suite preserved",
+      "status": "reviewed and locally validated standalone candidate; user inspection and remote CI pending",
+      "base": "3f2fe7dfadd4b40e235d982a6a3d386dc6490177",
+      "head": "0b563cf87a3c0e83a20a22eee3af8ffdb7adf015",
+      "tree": "ea3e2dd5025937f84abf5f4112e35871501e4410",
+      "evidence": "g03a-review.md",
+      "artifact_directory": ".artifacts/ginux-contribution-preparation/G03a"
+    },
+    {
       "packet": "G03",
       "purpose": "Configured writable storage and file metadata (`222d29ff`, `10091e4e`)",
       "dependencies": [],

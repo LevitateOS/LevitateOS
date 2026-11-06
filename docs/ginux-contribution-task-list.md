@@ -314,7 +314,7 @@ independent on current main. G02's clocks are native global clocks, not a virtua
 timer implementation. Relevant policy restrictions remain explicit.
 
 P05 complete. The [frozen package plan](ginux-contributions/p05-package-plan.json)
-records all32 rows, exact source commits, dependencies, acceptance and R01–R04
+records the original32 rows plus extracted subpackets, exact source commits, dependencies, acceptance and R01–R04
 requirements. It is an execution manifest, not proof of extraction or completed
 review. Use disposable /tmp source snapshots; no branch creation/switch is needed.
 
@@ -328,14 +328,28 @@ three baseline failures become passes,15 VFS/68 total unit tests pass, and all
 required Linux launch/native/process/setup commands pass in both the candidate
 and an independent clean main-plus-patch source export. Draft/patch/logs live under
 `.artifacts/ginux-contribution-preparation/G05a/`. macOS remote CI is pending.
-No branch/index/worktree/remote was changed; only local commit objects and exports
-were created.
+No Ginux branch/index/worktree/remote was changed; only local commit objects and
+source exports were created.
 
-Exact next task: **G03 — configured writable storage and file metadata**.
-Extract its smallest library/runtime boundaries against upstream, preserve G05a
-as an independent optional composition, and fully review/test before moving on.
-Existing policy-held packets stay in the final package with their unresolved
-acceptance visible. F04 remains the user checkpoint before publication.
+G03a is a second independent candidate, extracted from the existing G03 donor:
+correct the mkdirat syscall for an absent configured workdir. [Review/evidence](ginux-contributions/g03a-review.md)
+records exact upstream failure, candidate0b563cf8,65 unit tests and all required
+Linux runtime checks passing in both candidate and clean-applied source. Its sole
+parent is upstream3f2fe7df; patch/draft/logs are retained with the package. The
+larger G03 feature is still incomplete.
+
+Current goal-turn classification: **progress**. P03–P05 are complete; two actual
+standalone candidates now have full local review, negative/positive evidence and
+clean-apply validation. No publication occurred and the integration remains
+unchanged at7cf2638a. Goal remains active with the complete original scope.
+
+Exact next task: **G03 — remaining writable-storage/metadata extraction**.
+Start with the VFS metadata/seek/mkdir/chmod/append/exclusive API in222d29ff,
+reconcile current #216–#218 semantics and G05a offset sharing, then the controlled
+LaunchFs runtime join in10091e4e. Separate the now-prepared mkdirat fix from those
+patches. Fully review/test before moving on. Existing G01/G02 policy holds and
+G02's missing standalone runtime acceptance remain visible. F04 is the user
+checkpoint before publication.
 
 Active skill: `hdae-development`, discovered at
 `/home/vince/.codex/worktrees/ginux-pr-combination-check/ginux/.agents/skills/hdae-development/SKILL.md`.
