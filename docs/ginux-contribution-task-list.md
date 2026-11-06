@@ -1146,18 +1146,28 @@ paused Recipe inputs. No G07 import, adversarial probes, DaybreakBlue dispatch,
 branches/remote mutations or publication is authorized. F02/F03/F04 remain open.
 
 
-### Ownership change — 2026-11-07 (authoritative; supersedes the resume steps above)
+### Ownership split — 2026-11-07 (authoritative)
 
-The user transferred ownership of the Ginux contribution queue to Claude. Codex continues
-implementation only from prompts the user relays from Claude. The sequential HDAE goal,
-the R01–R04/F01–F04 ceremony and the "on explicit resume" steps above are retired; earlier
-sections remain as history and evidence.
+Two owners, two goals:
 
-Current state lives in [the PR inventory](ginux-contributions/pr-inventory.md):
-- Wave 1 is published upstream as #232 (G05a), #233 (G03a) and #234 (G06a), reworked after
-  independent review, with green CI. The heads are `5e79a172`, `44b3f89c` and `78a534c1` on fork
-  branches `fix/*`. Do not refresh, replace or duplicate these packets.
-- G03b failed independent review. G03b and G03c are rebuilt as one configured-storage
-  feature per [the redesign spec](ginux-contributions/storage-redesign-spec.md). The G04–G05
-  refreshes from 2026-11-06/07 and the G06b preview stay paused until that redesign is reviewed.
-- Held upstream issues (#163, #178, #179, #219) have no work requested by the maintainer.
+- **Codex keeps its goal: finish integrating Ginux into Recipe.** It continues the local
+  Ginux→Recipe integration and consumer work (F03 and what Recipe needs from Ginux) on its own
+  local integration source. It may change that local Ginux source wherever Recipe needs it.
+- **Claude owns upstream Ginux pull requests**: choosing, extracting, reviewing, reworking,
+  publishing and following them up on gmkurtzer/ginux. Where the two overlap, Claude's PR
+  work takes precedence.
+
+What this means for Codex:
+- Stop preparing upstream packets: no refreshing G-packets onto upstream main, and no
+  R01–R04/F04 publication work. The 2026-11-06/07 G03b–G05 refreshes and the G06b preview
+  stay as history; Claude decides what becomes a PR.
+- When the integration needs a new Ginux fix or behavior, commit it on the integration
+  source with a clear message so Claude can extract it as a PR later.
+- Do not push to the LevitateOS/ginux fork, open PRs or comment upstream. Do not touch the
+  `fix/*` or `prep/*` branches, or the worktrees `/home/vince/Projects/ginux-review` and
+  `/home/vince/Projects/ginux-storage`.
+- Upstream PRs change upstream main. When one merges, the integration rebases onto it.
+
+Current upstream state lives in [the PR inventory](ginux-contributions/pr-inventory.md).
+Wave 1 is open as #232 (G05a), #233 (G03a) and #234 (G06a). Claude is redesigning G03b+G03c
+as one configured-storage feature ([spec](ginux-contributions/storage-redesign-spec.md)).

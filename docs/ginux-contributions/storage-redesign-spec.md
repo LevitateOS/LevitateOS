@@ -1,6 +1,6 @@
 # Configured storage redesign (replaces G03b + G03c)
 
-Owner: Claude. Implementer: Codex. Written 2026-11-07 after G03b failed independent review.
+Owner and implementer: Claude (upstream PR work). Written 2026-11-07 after G03b failed independent review.
 
 ## Why
 
@@ -16,9 +16,8 @@ Compose exactly, in this order, onto upstream main `ff926d0c`:
 1. `5e79a172` — fix(vfs): share offsets between duplicated descriptors (open as upstream #232)
 2. `44b3f89c` — fix(launch): use mkdirat when creating the workload directory (open as #233)
 
-These are the published PR heads. Do not modify them; if a change is needed there, report
-it instead. Reuse your existing contract integration (the #231 EffectiveContract/catalog/audit
-join in the G03c refresh, ginux `3801fd45`) rather than redoing it.
+These are the published PR heads; changes to them go through their PRs. Reuse the existing
+#231 contract integration from the G03c refresh (ginux `3801fd45`) rather than redoing it.
 
 ## Required design changes (each from a verified review finding)
 
@@ -73,12 +72,10 @@ storage behavior, run by the commands in `.github/workflows/check.yml`.
   `Signed-off-by: vince <vincepaul.liem@gmail.com>`.
 - Verify with `make check`, `make test-unit`, the check.yml build and launch-integration
   commands, and the storage fixture suite. Report actual results only.
-- Write a short report (under one page) to `docs/ginux-contributions/storage-redesign-report.md`:
-  branch head, what changed against each numbered item above, test results, open questions.
+- Record the result in the PR inventory: branch head, how each numbered item was handled,
+  test results, open questions.
 
 ## Out of bounds
 
-No push, no PR, no GitHub comments or issues. Do not touch `fix/*` branches or
-`/home/vince/Projects/ginux-review`. Do not refresh G04 or later packets, the G06b preview or
-G07 until this redesign is reviewed. No R01–R04/F01–F04 receipts, manifests or hash
-inventories: code, tests and the short report are the deliverable.
+Prepared locally only; publication waits for the upstream prerequisites (#232, #233) and the
+user's go-ahead. G04 and later packets are not refreshed until this redesign is reviewed.
