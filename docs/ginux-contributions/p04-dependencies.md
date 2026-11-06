@@ -27,7 +27,7 @@ removed only when the resulting source and fixtures actually work without it.
 | --- | --- | --- |
 | G01 | `channel_hooks::bootstrap_poll_allowed`, balanced poll shape, focused launch fixture | Existing #207, held at e7f5f552. Account/review it without replacing its head or opening a duplicate. |
 | G03 | VFS file metadata/positioning; LaunchFs assignment validation, controlled tracee I/O, configured dispatch | Extract reusable library operations first where useful; runtime joins must reject host fallthrough and preserve existing read-only launch semantics. |
-| G04 | LaunchDevices/DeviceRegistry and configured assignment setup | Device path identity/absence belongs here; retain new resolver interactions in G16. |
+| G04 | LaunchDevices/DeviceRegistry and configured assignment setup | Runtime extraction reuses G03c namespace/copy helpers; device alias hiding belongs here already, while later owned-link/cwd/exec joins stay G16. |
 | G05 | DescriptorTable/DescriptorCall/ObjectReferences plus LaunchChannels pipe lifetime | Separate public slot flags from shared open-object state. Bring only required backend adapters; current references to network_hooks are G29 joins, not baseline dependencies. |
 | G06 | launch_tasks process creation, waits, exec events, cleanup plus existing ProcessTable | Preserve current upstream native supervision and #221 helpers/tests. Review #224/#226 overlap before shipping. Lost-stop and duplicate-death fixes belong with this owner. |
 | G07 | per-task DescriptorCall and shared DescriptorGroup ownership | Thread state must not overwrite another task's syscall transaction; no parallel second process table. |

@@ -136,14 +136,23 @@
     {
       "packet": "G04",
       "purpose": "Explicit virtual null devices (`e3458063`)",
-      "dependencies": [],
+      "dependencies": [
+        "G03c"
+      ],
       "source_commits": [
         "e3458063812a07cc548d2237d92c22142b587cad"
       ],
       "acceptance": "Assigned null semantics, denied absent devices, correct path metadata and teardown.",
-      "planned_delivery": "one coherent change plus its generic docs and focused regression fixtures; split coupled responsibilities only as recorded by P04",
-      "status": "pending extraction and R01-R04 review",
-      "artifact_directory": ".artifacts/ginux-contribution-preparation/G04"
+      "planned_delivery": "runtime device feature reusing reviewed namespace/copy owners; wait for their upstream merge before standalone extraction",
+      "status": "fully reviewed and locally validated on explicit G03c prerequisite; standalone delivery waits for prerequisite merges",
+      "artifact_directory": ".artifacts/ginux-contribution-preparation/G04",
+      "base": "b36e0752caa1c91e4bbbe112c589c85915a6ce6d",
+      "head": "5036b7e8a61c4cf1e18abad8746208d03d268ea5",
+      "tree": "7e060fb6df2543a6f267d7f30fea1a7e2ff6ec80",
+      "upstream_base": "3f2fe7dfadd4b40e235d982a6a3d386dc6490177",
+      "evidence": "g04-review.md",
+      "source_patch": "patches/G04.patch",
+      "standalone": false
     },
     {
       "packet": "G05",

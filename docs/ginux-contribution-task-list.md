@@ -30,8 +30,9 @@ all local material first does not make dependent PRs simultaneously standalone.
 Do not duplicate a prerequisite across PRs or hide a stack by setting every base
 to main. Do not turn all packets into one large integration PR.
 
-No pushes, new PRs, maintainer messages, existing remote-body edits, branch
-creation/switching or source changes occur during this planning task. Preserve
+Preparation uses disposable local source exports and retained patches. No pushes,
+new PRs, maintainer messages, existing remote-body edits or branch creation/switching
+are authorized; existing checkouts remain preserved. Preserve
 human-authored text verbatim. The Recipe zero-users/no-compatibility decision
 does not authorize breaking Ginux's upstream interfaces or adopting downstream
 policy there. Retain useful upstream defaults and resolve public contract changes
@@ -101,8 +102,9 @@ its affected packet and dependents, not unrelated fixes.
 
 ## Change packets in dependency order
 
-All rows are **pending extraction/review**, even where integrated implementation
-and tests already exist. Source references locate implementation, not a prescribed
+Rows describe the complete queue; the checkpoint and package manifests record
+completed extractions and reviews. Existing integrated implementation/tests alone
+do not establish a reviewed candidate. Source references locate implementation, not a prescribed
 cherry-pick sequence. Include each packet's meaningful tests, build wiring and
 small generic documentation in that packet; never defer essential coverage to G31.
 
@@ -112,7 +114,7 @@ small generic documentation in that packet; never defer essential coverage to G3
 | G02 | Restricted global clock reads and interruptible sleeps (`9ec95527`) | Approved upstream clock/sleep contract | Only the chosen realtime/monotonic clock IDs, deadline expiry and signal interruption; document native global-clock visibility honestly, and deny fd/PID CPU-clock encodings. |
 | G05a | Shared offsets for duplicated VFS descriptors (`b500f859`, relevant semantics from `7bc0ee04`) | Current upstream VFS only | The direct duplicate-read regression fails on upstream and integration, passes old review fix; extract current-main correction, test aliases, independent opens, reused slots and CLOEXEC. No configured-storage prerequisite. |
 | G03 | Configured writable storage and file metadata (`222d29ff`, `10091e4e`) | Current configured launch/VFS and approved storage assignment contract | Explicit mounts only; correct read/write/seek/stat/truncate and quota failure; unassigned paths cannot fall through to host writes. |
-| G04 | Explicit virtual null devices (`e3458063`) | Configured launch and device assignment contract | Assigned null semantics, denied absent devices, correct path metadata and teardown. |
+| G04 | Explicit virtual null devices (`e3458063`) | G03c configured namespace/copy owner and device assignment contract | Assigned null semantics, denied absent devices, correct path metadata and teardown. |
 | G05 | Owned pipes and unified public descriptor ownership (`7f072f2c`, `3b00c1c8`, fixture correction `f1c6419e`) | G03, G04 | Correct alias/refcount/dup/close/CLOEXEC behavior, EOF/backpressure, invalid-pointer rollback and FD exhaustion. Reassess whether pipes and descriptor core can split coherently. |
 | G06 | Configured child/exec lifecycle and death accounting (`ccd62ca1`, `8f768700`, `9279e71b`, `d693ae63`, `07c949db`) | G05; reconcile existing process PRs | Fork/exec/wait/signal/exit, failed exec retains FDs, CLOEXEC commits only on success, adopted children reaped once, repeated races leave no surviving tasks. Extract portable standalone fixes separately when main supports them. |
 | G07 | Thread ownership and per-task transactions (`928dc9a1`, `e59e2e61`) | G06 | Shared FD lifetime, independent syscall transactions, clone failure rollback, nonleader/leader exit and supported thread exec constraints. |
@@ -354,15 +356,24 @@ moves forward from G16 because assignment isolation requires it; later G16 joins
 remain pending. G03's three extracted parts are locally prepared, with explicit
 upstream prerequisite waits. No publication or existing-PR modification occurred.
 
-Current goal-turn classification: **progress**. The full goal remains active;
-G04 and later packets, cross-candidate interaction and Recipe closure are incomplete.
+G04 is locally prepared at5036b7e8 on the explicit G03c prerequisite.
+[Review/evidence](ginux-contributions/g04-review.md) records the original donor's
+hidden-device alias failure, corrected empty-path descriptor routing,77 unit tests,
+all applicable Linux runtime suites in both candidate/clean sources, and final
+null-I/O boundary checks. The full patch is retained downstream. G04's actual
+runtime dependency is shared configured namespace/copy code, now explicit; it is
+not standalone-ready before G03c and its prerequisites merge.
 
-Exact next task: **G04 — explicit virtual null devices**. Trace e3458063's actual
-runtime/shared-copy dependencies and extract the smallest coherent device feature.
-Preserve G03c's path/copy corrections if a local composition is required; label all
-local prerequisites honestly. Do not silently duplicate them in a standalone PR.
-G01/G02 policy holds and G02's missing standalone acceptance remain visible. F04 is
-the user inspection checkpoint before any publication.
+Current goal-turn classification: **progress**. The full goal remains active;
+G05 and later packets, cross-candidate interaction and Recipe closure are incomplete.
+
+Exact next task: **G05 — owned pipes and public descriptor ownership**. Trace
+7f072f2c/3b00c1c8 and the f1c6419e fixture correction; assess a coherent primitive
+versus runtime split, extract only required backend joins, and retain G03/G04 path,
+copy, offset and ownership fixes. Do not import future network/task changes solely
+because they appear in the integration donor. No G06 implementation until this
+packet's required local preparation is finished. G01/G02 holds remain explicit.
+F04 is the user inspection checkpoint before any publication.
 
 Active skill: `hdae-development`, discovered at
 `/home/vince/.codex/worktrees/ginux-pr-combination-check/ginux/.agents/skills/hdae-development/SKILL.md`.
