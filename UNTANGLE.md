@@ -1178,7 +1178,9 @@ Commits land on the checked-out branches (superproject `master`, submodules `cod
   - Verified: the walk reaches disk-plan's preflight page; editing a snapshot fails the check with a diff; recab's old crash text and "Terminal too small" are failure markers.
   - Expected failures until F9: both docs-pane renders ("Terminal too small: got 38x22, need 88x24").
   - Not done here: disk-plan's walk drives the host's real `recpart` read-only (list/plan/dry-run; the shim refuses `apply --confirm`), so it stops at preflight on a host whose disk is mounted and can't cover the apply outcomes; a recorded recpart fixture belongs with F15. recab-tui renders against the host's real `recab` (exit 21 off an A/B system) rather than a fixture.
-- [ ] F5 — Delete the kit surface no app uses.
+- [x] F5 — Delete the kit surface no app uses. tui `02ee744`. Kit: 84 files / 5,511 lines → 38 / ~3,960. `src/index.ts` lists exactly the 42 names the apps import; everything unreachable from it was deleted, then unused exports were un-exported and dead declarations removed until lint was clean. `useAsyncTask` was deleted too (nothing used it; F10 writes the version disk-plan needs, which also fixes A180/A181).
+  - **Bug fixed (by deletion):** `AsyncWizardFlow` ignored `defaultIndex` (A152).
+  - Verified: `cargo xtask check tui` passes except the two expected docs-pane renders; snapshots unchanged; the README Quick Start typechecks and renders.
 - [ ] F6 — One colour pipeline from theme intent to Ink.
 - [ ] F7 — Keymap as data, with one dispatcher and focus scopes.
 - [ ] F8 — No app vocabulary in the kit.
