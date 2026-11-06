@@ -593,14 +593,26 @@ consumer prerequisites at F02/F03, full CI and upstream independence are pending
 Do not substitute these fixtures or historical integrated logs for that consumer
 acceptance. Existing Make/CI wiring includes the new cases; no publication.
 
-Exact next task: **G24 — inode timestamps and archive mtime**.
-Inspect d21d26c8 on the reviewed G15/G22 metadata/archive owners, preserving shared
-inode identity and matching export/import fields. Keep seconds-only persistence
-explicit and avoid importing unrelated process/network/readiness policy. Run
-ordinary explicit times across aliases and archive restart; record malformed,
-no-follow/authority and clock-boundary security checks for DaybreakBlue. Preserve
-G23's still-pending application/thread joins for F02/F03. No publication or
-maintainer messages before F04.
+G24 explicit-time source/ordinary preparation is retained at `b33fbd24` on
+G227b2adc4f. [Review/evidence](ginux-contributions/g24-review.md) records100
+units,181-path strict replay, nanosecond/stat/statx/OMIT and alias/descriptor
+updates, contained symlink metadata, whole-second archive restart and existing
+large/scale/storage/exec controls passing in source/clean. A valid futimens
+null-path adapter failure is fixed at the shared path owner. Atime/nanoseconds
+are not persisted and IO does not update times implicitly. Ordinary NOW/null-times
+calls also pass; native-realtime/#179 policy, security/full CI and upstream independence remain pending; no consent is inferred.
+The absent network Stat field join is assigned to G29. G23's actual application/
+thread closure remains pending for F02/F03; nothing was published.
+
+Exact next task: **G25 — vectored and chunked regular I/O**.
+Inspect88fa4749/7d556b4e/74835089 against current public descriptor, tracee-copy and
+owned regular-file/channel owners. Separate useful owned vector/chunk handling
+from native scalar clamping policy held by #178/#163; do not import that policy
+or treat pipe semantics as regular-file behavior. Include ordinary real vectors,
+short transfers/offsets and large regular I/O, then actual APK/RPM consumer paths
+when their dependencies permit. Record protected/mutable iovecs/buffers, partial
+faults, authority and races for DaybreakBlue. Preserve all pending G23/G24/F02/F03
+requirements. No publication or maintainer messages before F04.
 
 Active skill: `hdae-development`, discovered at
 `/home/vince/.codex/worktrees/ginux-pr-combination-check/ginux/.agents/skills/hdae-development/SKILL.md`.

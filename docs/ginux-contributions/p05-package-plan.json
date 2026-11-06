@@ -1154,7 +1154,6 @@
       "packet": "G24",
       "purpose": "Inode timestamps and archive mtime (`d21d26c8`)",
       "dependencies": [
-        "G15",
         "G22"
       ],
       "source_commits": [
@@ -1162,8 +1161,64 @@
       ],
       "acceptance": "Explicit timestamps survive alias access/checkpoint/restart, invalid/no-follow cases are correct; document seconds-only persistence.",
       "planned_delivery": "one coherent change plus its generic docs and focused regression fixtures; split coupled responsibilities only as recorded by P04",
-      "status": "pending extraction and R01-R04 review",
-      "artifact_directory": ".artifacts/ginux-contribution-preparation/G24"
+      "status": "source separately self-reviewed; selected ordinary source-clean checks including NOW pass; security/policy/full CI/upstream independence pending",
+      "artifact_directory": ".artifacts/ginux-contribution-preparation/G24",
+      "base": "7b2adc4f75acca26f2b356fbf9a47a9644c39bc8",
+      "head": "b33fbd24ace566d8db20c8e2d7a295680084ac7b",
+      "tree": "b72397b4a78e5363279b1884628752c0da67f709",
+      "changed_files": [
+        "README.md",
+        "crates/ginux-init/src/channel_hooks.rs",
+        "crates/ginux-init/src/descriptors.rs",
+        "crates/ginux-init/src/device_hooks.rs",
+        "crates/ginux-init/src/fs_hooks.rs",
+        "crates/ginux-init/src/storage_export.rs",
+        "crates/ginux-init/src/storage_restore.rs",
+        "crates/ginux-init/src/tracee_io.rs",
+        "crates/ginux-vfs/src/lib.rs",
+        "scripts/test-launch-storage.py",
+        "scripts/test-launch-restore.py",
+        "tests/fixtures/launch-storage-fixture.c"
+      ],
+      "standalone": false,
+      "patch_sha256": "fe383ddf9c22eed9237a7f5972cf3a57e2fbde5cd0d899a8fcb44deb0e22b2c8",
+      "deferred_joins": [
+        "G02/#179 native realtime policy for UTIME_NOW",
+        "G07 shared-argument security",
+        "G20/G23 composition and G29 network stat encoder at F02"
+      ],
+      "dependency_note": "G22 contains reviewed G15 inode identity; G23 is independent",
+      "unit_tests": 100,
+      "vfs_tests": 41,
+      "clean_matched_paths": 181,
+      "review": "separate self-review; no independent reviewer/security acceptance",
+      "remote_ci": "not run",
+      "security_handoff": "daybreakblue-handoff.md",
+      "held_dependencies": [
+        "G07 shared-argument security"
+      ],
+      "policy_disposition": "UTIME_NOW reads native supervisor realtime; recorded #179 policy needs refresh/disposition before publication; no core clock rule changed",
+      "unrun_clock_modes": [],
+      "deferred_owner_hunks": [
+        {
+          "source": "d21d26c879ad53b96652b2f9677c928e7ac2183c",
+          "path": "crates/ginux-init/src/network_hooks.rs",
+          "owner": "G29",
+          "reason": "network stat encoder does not exist in this candidate; initialize new timestamp fields when introduced"
+        }
+      ],
+      "source_binary_sha256": "cf48a3b0da6cad2016f0f4b47faf1461ea32671b8228a0087441257a259a8f37",
+      "clean_binary_sha256": "cf48a3b0da6cad2016f0f4b47faf1461ea32671b8228a0087441257a259a8f37",
+      "fixture_sha256": {
+        "launch-storage-fixture": "3a3581bc15b143d7fa2143b3ae14650e8b820b3f554504a76b3d71ba8054f42b",
+        "launch-directory-fixture": "d6f6fd948a7d72b8822ebc1b165a132a5f1912cc88e48eca6b0e738d7e74ef7f",
+        "launch-script-fixture": "b644cedb25fdadad8fee88ce1c60756dac8810b0e09c4e1941e2245769962c27",
+        "launch-owned-exec-fixture": "566f74cdadd00eac9266de8307c882e5ac6f8912e53dc46fc560058914478b88",
+        "launch-fd-fixture": "06b5384b5b483fd2b018be133b85819e0b31657550e72296d119f725311b8d03"
+      },
+      "evidence": "g24-review.md",
+      "source_patch": "patches/G24.patch",
+      "native_now_validation": "ordinary UTIME_NOW and null-times use current realtime; null-times sets both fields from one capture; clock-boundary/failure injection remains unrun"
     },
     {
       "packet": "G25",

@@ -1,0 +1,639 @@
+From b33fbd24ace566d8db20c8e2d7a295680084ac7b Mon Sep 17 00:00:00 2001
+From: vince <vincepaul.liem@gmail.com>
+Date: Fri, 6 Nov 2026 17:04:58 +0100
+Subject: [PATCH] feat(vfs): retain explicit inode timestamps and archive mtime
+
+Keep access and modification times with owned inode identity, expose them
+through stat/statx, and support explicit utimensat/futimens updates.
+Persist representable whole-second modification times in bounded archives
+and verify matching hardlink metadata during startup restore.
+
+Signed-off-by: vince <vincepaul.liem@gmail.com>
+---
+ README.md                                |  9 +++
+ crates/ginux-init/src/channel_hooks.rs   |  2 +
+ crates/ginux-init/src/descriptors.rs     |  7 +-
+ crates/ginux-init/src/device_hooks.rs    |  2 +
+ crates/ginux-init/src/fs_hooks.rs        | 92 +++++++++++++++++++++++-
+ crates/ginux-init/src/storage_export.rs  |  9 ++-
+ crates/ginux-init/src/storage_restore.rs |  1 +
+ crates/ginux-init/src/tracee_io.rs       | 16 +++++
+ crates/ginux-vfs/src/lib.rs              | 79 ++++++++++++++++++++
+ scripts/test-launch-restore.py           |  7 +-
+ scripts/test-launch-storage.py           |  9 ++-
+ tests/fixtures/launch-storage-fixture.c  | 36 ++++++++++
+ 12 files changed, 261 insertions(+), 8 deletions(-)
+
+diff --git a/README.md b/README.md
+index a12cb5af..ed027d7d 100644
+--- a/README.md
++++ b/README.md
+@@ -499,3 +499,12 @@ a bounded regular file opened without following a symlink; it remains unchanged.
+ Failure discards the new memory view. The host must verify the chosen snapshot
+ and matching runtime state: process memory and live handles are not restored,
+ and no checkpoint control socket is required.
++
++Owned inode access and modification timestamps can be set explicitly through
++`utimensat` and descriptor `futimens`, including no-follow, nanoseconds and
++`UTIME_OMIT`/`UTIME_NOW`. Aliases share times; stat/statx return them. New owned objects
++and VFS index metadata start at zero; reads/writes do not update times automatically.
++`UTIME_NOW` uses the supervisor's native realtime clock, without allowing new
++workload clock syscalls. These operations require existing owned objects.
++Archives retain only whole-second nonnegative USTAR mtime. Access time and runtime
++nanoseconds are not persisted; unrepresentable mtimes fail export explicitly.
+diff --git a/crates/ginux-init/src/channel_hooks.rs b/crates/ginux-init/src/channel_hooks.rs
+index 10072cee..81ab6a27 100644
+--- a/crates/ginux-init/src/channel_hooks.rs
++++ b/crates/ginux-init/src/channel_hooks.rs
+@@ -289,6 +289,8 @@ impl LaunchChannels {
+             pid,
+             address,
+             Stat {
++                accessed: ginux_vfs::Timestamp::ZERO,
++                modified: ginux_vfs::Timestamp::ZERO,
+                 links: 1,
+                 inode: 0x2_0000_0000 + pipe as u64,
+                 mode: 0o10600,
+diff --git a/crates/ginux-init/src/descriptors.rs b/crates/ginux-init/src/descriptors.rs
+index fd2f3cf0..4d5416cd 100644
+--- a/crates/ginux-init/src/descriptors.rs
++++ b/crates/ginux-init/src/descriptors.rs
+@@ -350,6 +350,11 @@ impl DescriptorTable {
+                 self.save(r);
+                 self.dup(pid, r, backends)
+             }
++            280 if r.rsi == 0 => {
++                self.save(r);
++                self.get(r.rdi)
++                    .and_then(|d| self.descriptor(pid, r, d, backends))
++            }
+             72 => {
+                 self.save(r);
+                 match self.get(r.rdi) {
+@@ -399,7 +404,7 @@ impl DescriptorTable {
+                     backends.claim(pid, r)
+                 })
+             }
+-            258 | 262 | 263 | 267 | 268 | 269 | 332 | 439 => {
++            258 | 262 | 263 | 267 | 268 | 269 | 280 | 332 | 439 => {
+                 self.save(r);
+                 self.path_descriptor(pid, r, backends)
+             }
+diff --git a/crates/ginux-init/src/device_hooks.rs b/crates/ginux-init/src/device_hooks.rs
+index 9ac45a5b..ecb66848 100644
+--- a/crates/ginux-init/src/device_hooks.rs
++++ b/crates/ginux-init/src/device_hooks.rs
+@@ -223,6 +223,8 @@ impl LaunchDevices {
+             pid,
+             destination,
+             Stat {
++                accessed: ginux_vfs::Timestamp::ZERO,
++                modified: ginux_vfs::Timestamp::ZERO,
+                 links: 1,
+                 inode: if dir { 0x1_0000_0000 } else { 0x1_0000_0001 },
+                 mode: if dir { 0o40555 } else { 0o20666 },
+diff --git a/crates/ginux-init/src/fs_hooks.rs b/crates/ginux-init/src/fs_hooks.rs
+index ea5d13c2..1c7e1d14 100644
+--- a/crates/ginux-init/src/fs_hooks.rs
++++ b/crates/ginux-init/src/fs_hooks.rs
+@@ -37,6 +37,7 @@ pub struct RestoreEntry<'a> {
+     pub mode: u32,
+     pub length: usize,
+     pub hardlink: bool,
++    pub modified: u64,
+ }
+ 
+ pub struct LaunchFs {
+@@ -205,6 +206,7 @@ impl LaunchFs {
+             mode,
+             length,
+             hardlink,
++            modified,
+         } = entry;
+         let directory = kind == NodeKind::Directory;
+         // The archive parser has already validated absolute path components.
+@@ -279,6 +281,7 @@ impl LaunchFs {
+             if !seen[slot]
+                 || metadata.kind != NodeKind::File
+                 || metadata.mode != mode
++                || metadata.modified.seconds != modified as i64
+                 || !self.owns_path(target)
+             {
+                 return Err(b"restore hardlink target or mode is invalid");
+@@ -322,6 +325,17 @@ impl LaunchFs {
+             result?;
+             closed.map_err(|_| b"restore file close failed".as_slice())?;
+         }
++        self.fs
++            .set_times(
++                path,
++                false,
++                None,
++                Some(ginux_vfs::Timestamp {
++                    seconds: modified as i64,
++                    nanoseconds: 0,
++                }),
++            )
++            .map_err(|_| b"restore timestamp failed".as_slice())?;
+         // Track exact names rather than canonical inodes, since aliases share data.
+         let slot = self
+             .fs
+@@ -483,6 +497,11 @@ impl LaunchFs {
+     }
+ 
+     pub(crate) fn request_path(&self, pid: usize, r: &UserRegs) -> Result<Option<(u8, Path)>, i64> {
++        // Descriptor futimens has no pathname; its public descriptor owner
++        // validates/translates the handle before the filesystem claim.
++        if r.orig_rax == 280 && r.rsi == 0 {
++            return Ok(None);
++        }
+         let (argument, address, dirfd, follow, missing) = match r.orig_rax {
+             2 => (
+                 0,
+@@ -507,7 +526,7 @@ impl LaunchFs {
+             88 => (1, r.rsi, (-100i64) as u64, false, true),
+             266 => (2, r.rdx, r.rsi, false, true),
+             258 => (1, r.rsi, r.rdi, false, true),
+-            262 => (1, r.rsi, r.rdi, r.r10 & 0x100 == 0, false),
++            262 | 280 => (1, r.rsi, r.rdi, r.r10 & 0x100 == 0, false),
+             263 | 267 => (1, r.rsi, r.rdi, false, false),
+             268 | 269 => (1, r.rsi, r.rdi, true, false),
+             332 => (1, r.rsi, r.rdi, r.rdx & 0x100 == 0, false),
+@@ -876,6 +895,13 @@ impl LaunchFs {
+             return Some(self.rename(pid, r).unwrap_or_else(|error| error));
+         }
+         let fd = r.rdi as i32;
++        if r.orig_rax == 280 && r.rsi == 0 {
++            return Some(if (FD_BASE as i32..FD_BASE as i32 + 64).contains(&fd) {
++                self.descriptor_call(pid, r, fd - FD_BASE as i32 + 3)
++            } else {
++                -9
++            });
++        }
+         if matches!(
+             r.orig_rax,
+             0 | 1
+@@ -922,6 +948,12 @@ impl LaunchFs {
+             2 => self.open(path.as_bytes(), r.rsi, r.rdx),
+             257 => self.open(path.as_bytes(), r.rdx, r.r10),
+             4 | 6 => self.stat(pid, path.as_bytes(), r.rsi, false),
++            280 => self.timestamps(pid, r).and_then(|times| {
++                self.fs
++                    .set_times(path.as_bytes(), false, times[0], times[1])
++                    .map(|_| 0)
++                    .map_err(errno)
++            }),
+             21 | 269 | 439 => self
+                 .fs
+                 .metadata_no_follow(path.as_bytes())
+@@ -1215,6 +1247,13 @@ impl LaunchFs {
+                         .and_then(|metadata| access(metadata, r))
+                 }
+             }
++            280 if r.r10 == 0 => self.timestamps(pid, r).and_then(|times| {
++                self.fs
++                    .fset_times(fd, times[0], times[1])
++                    .map(|_| 0)
++                    .map_err(errno)
++            }),
++            280 => Err(-22),
+             72 => self
+                 .fs
+                 .descriptor_flags(fd)
+@@ -1254,6 +1293,55 @@ impl LaunchFs {
+         result.unwrap_or_else(|error| error)
+     }
+ 
++    fn timestamps(
++        &self,
++        pid: usize,
++        r: &UserRegs,
++    ) -> Result<[Option<ginux_vfs::Timestamp>; 2], i64> {
++        if r.r10 & !0x100 != 0 {
++            return Err(-22);
++        }
++        let mut bytes = [0u8; 32];
++        if r.rdx != 0 && copy_memory(pid, r.rdx, &mut bytes, false)? != 32 {
++            return Err(-14);
++        }
++        let mut times = [None; 2];
++        let mut now = None;
++        for (index, time) in times.iter_mut().enumerate() {
++            let seconds = i64::from_ne_bytes(bytes[index * 16..index * 16 + 8].try_into().unwrap());
++            let nanos = if r.rdx == 0 {
++                (1 << 30) - 1
++            } else {
++                i64::from_ne_bytes(bytes[index * 16 + 8..index * 16 + 16].try_into().unwrap())
++            };
++            *time = match nanos {
++                1_073_741_822 => None,
++                1_073_741_823 => {
++                    if now.is_none() {
++                        let mut clock = [0i64; 2];
++                        if unsafe {
++                            crate::supervisor::syscall2(228, 0, clock.as_mut_ptr() as usize)
++                        } != 0
++                        {
++                            return Err(-5);
++                        }
++                        now = Some(ginux_vfs::Timestamp {
++                            seconds: clock[0],
++                            nanoseconds: clock[1] as u32,
++                        });
++                    }
++                    now
++                }
++                0..=999_999_999 => Some(ginux_vfs::Timestamp {
++                    seconds,
++                    nanoseconds: nanos as u32,
++                }),
++                _ => return Err(-22),
++            };
++        }
++        Ok(times)
++    }
++
+     fn read(
+         &mut self,
+         pid: usize,
+@@ -1368,6 +1456,8 @@ fn copy_metadata(
+         pid,
+         address,
+         crate::tracee_io::Stat {
++            accessed: metadata.accessed,
++            modified: metadata.modified,
+             inode: metadata.inode,
+             links: metadata.links,
+             mode: metadata.mode
+diff --git a/crates/ginux-init/src/storage_export.rs b/crates/ginux-init/src/storage_export.rs
+index 7d208227..43135e6c 100644
+--- a/crates/ginux-init/src/storage_export.rs
++++ b/crates/ginux-init/src/storage_export.rs
+@@ -245,7 +245,7 @@ impl Archive {
+         if name.len() > 100 {
+             // GNU long names preserve any normalized VFS path, including a
+             // single component longer than ustar's 100-byte name field.
+-            self.header(b"././@LongLink", 0, (name.len() + 1) as u64, b'L', b"")?;
++            self.header(b"././@LongLink", 0, (name.len() + 1) as u64, b'L', b"", 0)?;
+             self.bytes(name)?;
+             self.bytes(&[0; 512][..512 - name.len()])?;
+         }
+@@ -274,7 +274,7 @@ impl Archive {
+             &[]
+         };
+         if target.len() > 100 {
+-            self.header(b"././@LongLink", 0, (target.len() + 1) as u64, b'K', b"")?;
++            self.header(b"././@LongLink", 0, (target.len() + 1) as u64, b'K', b"", 0)?;
+             self.bytes(target)?;
+             self.bytes(&[0; 512][..512 - target.len()])?;
+         }
+@@ -284,6 +284,8 @@ impl Archive {
+             length,
+             kind,
+             &target[..target.len().min(100)],
++            u64::try_from(metadata.modified.seconds)
++                .map_err(|_| b"export timestamp is negative".as_slice())?,
+         )?;
+         let mut buffer = [0u8; 4096];
+         let mut offset = 0usize;
+@@ -303,6 +305,7 @@ impl Archive {
+         length: u64,
+         kind: u8,
+         link: &[u8],
++        modified: u64,
+     ) -> Result<(), Error> {
+         let mut header = [0u8; 512];
+         header[..name.len()].copy_from_slice(name);
+@@ -310,7 +313,7 @@ impl Archive {
+         octal(&mut header[108..116], 0)?;
+         octal(&mut header[116..124], 0)?;
+         octal(&mut header[124..136], length)?;
+-        octal(&mut header[136..148], 0)?;
++        octal(&mut header[136..148], modified)?;
+         header[148..156].fill(b' ');
+         header[156] = kind;
+         header[157..157 + link.len()].copy_from_slice(link);
+diff --git a/crates/ginux-init/src/storage_restore.rs b/crates/ginux-init/src/storage_restore.rs
+index 11bb52a6..83ca3ce6 100644
+--- a/crates/ginux-init/src/storage_restore.rs
++++ b/crates/ginux-init/src/storage_restore.rs
+@@ -206,6 +206,7 @@ pub fn restore(path: *const u8, files: &mut LaunchFs) -> Result<(), Error> {
+                 kind,
+                 link: target,
+                 mode: mode as u32,
++                modified: octal(&header[136..148])?,
+                 length: size as usize,
+                 hardlink,
+             },
+diff --git a/crates/ginux-init/src/tracee_io.rs b/crates/ginux-init/src/tracee_io.rs
+index de987848..5373e46a 100644
+--- a/crates/ginux-init/src/tracee_io.rs
++++ b/crates/ginux-init/src/tracee_io.rs
+@@ -120,6 +120,8 @@ pub fn image_link(pid: usize, member: &[u8]) -> Result<Path, i64> {
+ 
+ /// Linux file type bits are part of mode; identities belong to the domain.
+ pub struct Stat {
++    pub accessed: ginux_vfs::Timestamp,
++    pub modified: ginux_vfs::Timestamp,
+     pub inode: u64,
+     pub links: u64,
+     pub mode: u32,
+@@ -154,6 +156,20 @@ pub fn write_stat(pid: usize, address: u64, metadata: Stat, statx: bool) -> Resu
+             | ((major & !0xfff) << 32);
+         bytes[40..48].copy_from_slice(&rdev.to_le_bytes());
+     }
++    for (index, time) in [metadata.accessed, metadata.modified].iter().enumerate() {
++        let offset = if statx {
++            64 + index * 48
++        } else {
++            72 + index * 16
++        };
++        bytes[offset..offset + 8].copy_from_slice(&time.seconds.to_le_bytes());
++        if statx {
++            bytes[offset + 8..offset + 12].copy_from_slice(&time.nanoseconds.to_le_bytes());
++        } else {
++            bytes[offset + 8..offset + 16]
++                .copy_from_slice(&(time.nanoseconds as u64).to_le_bytes());
++        }
++    }
+     bytes[ino..ino + 8].copy_from_slice(&metadata.inode.to_le_bytes());
+     if let Some(mode_at) = mode_at {
+         bytes[mode_at..mode_at + 4].copy_from_slice(&mode.to_le_bytes());
+diff --git a/crates/ginux-vfs/src/lib.rs b/crates/ginux-vfs/src/lib.rs
+index d546d39b..9d49b961 100644
+--- a/crates/ginux-vfs/src/lib.rs
++++ b/crates/ginux-vfs/src/lib.rs
+@@ -322,9 +322,24 @@ pub trait BaseReader {
+     fn read_at(&mut self, offset: u64, output: &mut [u8]) -> Result<(), VfsError>;
+ }
+ 
++/// Explicit domain inode timestamps, independent of host file identities.
++#[derive(Clone, Copy, Debug, Eq, PartialEq)]
++pub struct Timestamp {
++    pub seconds: i64,
++    pub nanoseconds: u32,
++}
++impl Timestamp {
++    pub const ZERO: Self = Self {
++        seconds: 0,
++        nanoseconds: 0,
++    };
++}
++
+ /// Image/overlay metadata using only virtual inode identities.
+ #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+ pub struct FileMetadata {
++    pub accessed: Timestamp,
++    pub modified: Timestamp,
+     pub inode: u64,
+     pub kind: NodeKind,
+     pub mode: u32,
+@@ -372,6 +387,8 @@ fn child_name<'a>(directory: &[u8], path: &'a [u8]) -> Option<&'a [u8]> {
+ 
+ #[derive(Clone, Copy)]
+ pub struct OverlayFile {
++    accessed: Timestamp,
++    modified: Timestamp,
+     state: u8,
+     path: Path,
+     mode: u32,
+@@ -385,6 +402,8 @@ pub struct OverlayFile {
+ impl OverlayFile {
+     pub const fn empty() -> Self {
+         Self {
++            accessed: Timestamp::ZERO,
++            modified: Timestamp::ZERO,
+             state: 0,
+             path: Path::new(),
+             mode: 0,
+@@ -1324,6 +1343,8 @@ impl<
+             return Err(error);
+         }
+         self.overlay[slot] = OverlayFile {
++            accessed: Timestamp::ZERO,
++            modified: Timestamp::ZERO,
+             state: 4,
+             path,
+             mode: 0o777,
+@@ -1363,6 +1384,8 @@ impl<
+         let object = self.object(slot);
+         let entry = &self.overlay[object];
+         FileMetadata {
++            accessed: entry.accessed,
++            modified: entry.modified,
+             inode: (self.index.len() + object + 1) as u64,
+             kind: match self.overlay[slot].state {
+                 3 => NodeKind::Directory,
+@@ -1436,6 +1459,8 @@ impl<
+         }
+         let entry = self.index.lookup_exact(path)?;
+         Ok(FileMetadata {
++            accessed: Timestamp::ZERO,
++            modified: Timestamp::ZERO,
+             links: 1,
+             inode: (self
+                 .find_base_record(entry.path)
+@@ -1456,6 +1481,8 @@ impl<
+         if state.overlay {
+             let file = &self.overlay[state.object];
+             Ok(FileMetadata {
++                accessed: file.accessed,
++                modified: file.modified,
+                 links: self.link_count(state.object),
+                 inode: (self.index.len() + state.object + 1) as u64,
+                 kind: if state.directory {
+@@ -1469,6 +1496,8 @@ impl<
+         } else {
+             let entry = self.index.entry(state.object)?;
+             Ok(FileMetadata {
++                accessed: Timestamp::ZERO,
++                modified: Timestamp::ZERO,
+                 links: 1,
+                 inode: (state.object + 1) as u64,
+                 kind: entry.kind,
+@@ -1649,6 +1678,56 @@ impl<
+         Ok(())
+     }
+ 
++    pub fn set_times(
++        &mut self,
++        path: &[u8],
++        follow: bool,
++        accessed: Option<Timestamp>,
++        modified: Option<Timestamp>,
++    ) -> Result<(), VfsError> {
++        let path = self.resolved_path(path, follow, false)?;
++        let slot = self
++            .find_overlay(path.as_bytes())
++            .ok_or(VfsError::PermissionDenied)?;
++        if self.overlay[slot].state == 2 {
++            return Err(VfsError::NotFound);
++        }
++        self.set_object_times(self.object(slot), accessed, modified)
++    }
++    pub fn fset_times(
++        &mut self,
++        fd: i32,
++        accessed: Option<Timestamp>,
++        modified: Option<Timestamp>,
++    ) -> Result<(), VfsError> {
++        let descriptor = self.descriptors[self.descriptor(fd)?];
++        if !descriptor.overlay {
++            return Err(VfsError::PermissionDenied);
++        }
++        self.set_object_times(descriptor.object, accessed, modified)
++    }
++    fn set_object_times(
++        &mut self,
++        object: usize,
++        accessed: Option<Timestamp>,
++        modified: Option<Timestamp>,
++    ) -> Result<(), VfsError> {
++        if [accessed, modified]
++            .iter()
++            .flatten()
++            .any(|time| time.nanoseconds >= 1_000_000_000)
++        {
++            return Err(VfsError::InvalidPath);
++        }
++        if let Some(time) = accessed {
++            self.overlay[object].accessed = time;
++        }
++        if let Some(time) = modified {
++            self.overlay[object].modified = time;
++        }
++        Ok(())
++    }
++
+     pub fn fchmod(&mut self, descriptor: i32, mode: u32) -> Result<(), VfsError> {
+         let mode = mode & 0o7777;
+         let state = self.descriptors[self.descriptor(descriptor)?];
+diff --git a/scripts/test-launch-restore.py b/scripts/test-launch-restore.py
+index 8d5513cb..03880ab8 100644
+--- a/scripts/test-launch-restore.py
++++ b/scripts/test-launch-restore.py
+@@ -92,6 +92,9 @@ def main():
+         with tarfile.open(linked) as tar:
+             assert tar.getmember('out/product-alias').islnk()
+             assert tar.getmember('out/product-alias').linkname == 'out/product'
++            assert tar.getmember('out/product').mtime == 123456789
++            assert tar.getmember('out/product-alias').mtime == 123456789
++            assert tar.getmember('out/product-link').mtime == 222
+             assert tar.getmember('out/long-alias').linkname == 'out/' + 'a'*120 + '/' + 'b'*80
+             assert tar.getmember('out/product-link').issym()
+             assert tar.getmember('out/product-link').linkname == 'product'
+@@ -163,7 +166,8 @@ def main():
+                     ('traversing-hardlink', 'out/../product', None, None),
+                     ('directory-hardlink', 'out/dir', tarfile.DIRTYPE, None),
+                     ('symlink-hardlink', 'out/sym', tarfile.SYMTYPE, None),
+-                    ('hardlink-mode', 'out/source', tarfile.REGTYPE, 0o700)):
++                    ('hardlink-mode', 'out/source', tarfile.REGTYPE, 0o700),
++                    ('hardlink-mtime', 'out/source', tarfile.REGTYPE, None)):
+                 archive = work/(name+'.tar')
+                 with tarfile.open(archive, 'w', format=tarfile.USTAR_FORMAT) as tar:
+                     if target_type is not None:
+@@ -174,6 +178,7 @@ def main():
+                         tar.addfile(entry)
+                     entry = tarfile.TarInfo('out/bad-alias')
+                     entry.type, entry.linkname, entry.mode = tarfile.LNKTYPE, target, extra or 0o600
++                    if name == 'hardlink-mtime': entry.mtime = 1
+                     tar.addfile(entry)
+                 launch('restore', archive, failure=True)
+             link = work / 'snapshot-link.tar'
+diff --git a/scripts/test-launch-storage.py b/scripts/test-launch-storage.py
+index 24389630..7f6e4a3b 100644
+--- a/scripts/test-launch-storage.py
++++ b/scripts/test-launch-storage.py
+@@ -106,6 +106,10 @@ def main():
+                     with tarfile.open(archive) as tar:
+                         names = tar.getnames()
+                         assert len(names) == len(set(names)), names
++                        if args in (['timestamps'], ['ordinary-times']):
++                            assert tar.getmember('work/time-alias').mtime == 123456789
++                            assert tar.getmember('work/time-link').mtime == 222
++                            return
+                         assert 'out/deleted' not in names and 'image' not in names
+                         assert tar.extractfile('out/product').read() == b'result\0data'
+                         assert tar.getmember('out/product').mode == 0o700
+@@ -128,12 +132,12 @@ def main():
+                     invoke(['disk0'], ['export'], expected=2, export=True)
+                     print('PASS launch storage: bad-export-config')
+                     continue
+-                if mode not in ('growth', 'bounds', 'quota', 'namespace', 'symlinks', 'ordinary-symlinks', 'flush', 'export', 'export-wait', 'failed-export', 'child-export', 'bad-export-config', 'invalid-export-config', 'view-probes', 'mapping', 'ordinary-mapping', 'ordinary-unlinked-mapping'):
++                if mode not in ('growth', 'bounds', 'quota', 'timestamps', 'ordinary-times', 'namespace', 'symlinks', 'ordinary-symlinks', 'flush', 'export', 'export-wait', 'failed-export', 'child-export', 'bad-export-config', 'invalid-export-config', 'view-probes', 'mapping', 'ordinary-mapping', 'ordinary-unlinked-mapping'):
+                     sys.exit('unknown selected storage scenario')
+                 invoke(['memory:/work', 'memory:/work/build', 'memory:/out'], [mode],
+                        expected=2 if mode == 'invalid-export-config' else (7 if mode == 'failed-export' else 0),
+                        memory=32 if mode == 'bounds' else (64 if mode == 'namespace' else 256),
+-                       export=mode in ('export', 'export-wait', 'failed-export', 'child-export', 'invalid-export-config'))
++                       export=mode in ('export', 'export-wait', 'failed-export', 'child-export', 'invalid-export-config', 'timestamps', 'ordinary-times'))
+                 print(f'PASS launch storage: {mode}')
+             return
+         invoke(['memory:/work'], ['view-probes'])
+@@ -151,6 +155,7 @@ def main():
+         invoke(['memory:/work', 'memory:/out'], ['ordinary-mapping'])
+         invoke(['memory:/work', 'memory:/out'], ['ordinary-unlinked-mapping'])
+         invoke(['memory:/work', 'memory:/work/build', 'memory:/out'], ['namespace'], memory=64)
++        invoke(['memory:/work', 'memory:/out'], ['timestamps'], export=True)
+         invoke(['memory:/work', 'memory:/out'], ['symlinks'])
+         invoke(['memory:/work', 'memory:/out'], ['ordinary-symlinks'])
+         invoke(['memory:/work', 'memory:/out'], ['flush'])
+diff --git a/tests/fixtures/launch-storage-fixture.c b/tests/fixtures/launch-storage-fixture.c
+index a9729287..281f2152 100644
+--- a/tests/fixtures/launch-storage-fixture.c
++++ b/tests/fixtures/launch-storage-fixture.c
+@@ -184,7 +184,13 @@ static long archive_links(int restore) {
+         CHECK(DO(88,"product","/out/product-link",0)==0 && DO(88,path,"/out/long-link",0)==0,235);
+         CHECK(DO(2,"/out/temporary",0101,0600)==3 && DO(1,3,"orphan",6)==6 && DO(3,3,0,0)==0,236);
+         CHECK(DO(86,"/out/temporary","/out/surviving",0)==0 && DO(87,"/out/temporary",0,0)==0,237);
++        long times[4]={11,123,123456789,987654321};
++        CHECK(call(280,-100,(word)"/out/product",(word)times,0,0,0)==0,85);
++        times[2]=222; times[3]=333;
++        CHECK(call(280,-100,(word)"/out/product-link",(word)times,0x100,0,0)==0,86);
+     } else {
++        CHECK(DO(4,"/out/product",meta,0)==0 && *(long *)(meta+72)==0 && *(long *)(meta+88)==123456789 && *(long *)(meta+96)==0,87);
++        CHECK(DO(6,"/out/product-link",meta,0)==0 && *(long *)(meta+88)==222 && *(long *)(meta+96)==0,88);
+         long status=restore_data(0); CHECK(status==0,status);
+         CHECK(DO(4,"/out/product",meta,0)==0 && *(word *)(meta+16)==2,238);
+         word inode=*(word *)(meta+8);
+@@ -214,10 +220,40 @@ static long restore_big(void) {
+     CHECK(DO(8,fd,2147483647UL,0)==2147483647UL && DO(0,fd,output,2)==2 && output[0]==0 && output[1]=='Z',253);
+     CHECK(DO(3,fd,0,0)==0 && DO(1,1,"restored: PASS\n",15)==15,254); return 0;
+ }
++static long timestamp_data(int ordinary) {
++    long fd=DO(2,"/work/time",0102,0600); CHECK(fd==3,70);
++    CHECK(DO(86,"/work/time","/work/time-alias",0)==0 && DO(88,"time","/work/time-link",0)==0,71);
++    long times[4]={11,123,123456789,987654321};
++    CHECK(call(280,fd,0,(word)times,0,0,0)==0 && DO(5,fd,meta,0)==0,72);
++    CHECK(*(long *)(meta+72)==11 && *(long *)(meta+80)==123 && *(long *)(meta+88)==123456789 && *(long *)(meta+96)==987654321,73);
++    CHECK(DO(4,"/work/time-alias",meta,0)==0 && *(long *)(meta+88)==123456789,74);
++    CHECK(call(332,-100,(word)"/work/time",0,0x7ff,(word)meta,0)==0 && *(long *)(meta+112)==123456789 && *(unsigned *)(meta+120)==987654321,75);
++    times[0]=99; times[1]=1073741822; times[3]=555;
++    CHECK(call(280,fd,0,(word)times,0,0,0)==0 && DO(5,fd,meta,0)==0 && *(long *)(meta+72)==11 && *(long *)(meta+80)==123 && *(long *)(meta+96)==555,76);
++    if(!ordinary) {
++        times[3]=1000000000;
++        CHECK(call(280,fd,0,(word)times,0,0,0)==-22 && call(280,fd,0,1,0,0,0)==-14,77);
++    }
++    times[3]=1073741823;
++    CHECK(call(280,fd,0,(word)times,0,0,0)==0 && DO(5,fd,meta,0)==0 && *(long *)(meta+72)==11 && *(long *)(meta+88)>1000000000,78);
++    CHECK(call(280,fd,0,0,0,0,0)==0 && DO(5,fd,meta,0)==0,89);
++    CHECK(*(long *)(meta+72)>1000000000 && *(long *)(meta+72)==*(long *)(meta+88) && *(long *)(meta+80)==*(long *)(meta+96),90);
++    times[0]=11; times[1]=123; times[2]=123456789; times[3]=987654321;
++    CHECK(call(280,-100,(word)"/work/time-alias",(word)times,0,0,0)==0,79);
++    times[2]=222; times[3]=333;
++    CHECK(call(280,-100,(word)"/work/time-link",(word)times,0x100,0,0)==0,80);
++    CHECK(DO(6,"/work/time-link",meta,0)==0 && *(long *)(meta+88)==222 && DO(5,fd,meta,0)==0 && *(long *)(meta+88)==123456789,81);
++    CHECK(DO(87,"/work/time",0,0)==0,82);
++    times[0]=13; times[1]=456; times[2]=123456789; times[3]=987654321;
++    CHECK(call(280,fd,0,(word)times,0,0,0)==0 && DO(4,"/work/time-alias",meta,0)==0 && *(long *)(meta+72)==13,83);
++    CHECK(DO(3,fd,0,0)==0,84); return 0;
++}
+ long storage_main(word *stack)
+ {
+     word argc = *stack;
+     char **argv = (char **)(stack + 1);
++    if(argc>1 && equal(argv[1],"timestamps")) return timestamp_data(0);
++    if(argc>1 && equal(argv[1],"ordinary-times")) return timestamp_data(1);
+     if(argc>1 && equal(argv[1],"archive-create")) return archive_links(0);
+     if(argc>1 && equal(argv[1],"restore-links")) return archive_links(1);
+     if(argc>1 && equal(argv[1],"restore-namespace")) return restore_namespace();

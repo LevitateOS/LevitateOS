@@ -474,3 +474,37 @@ confirmed blocking/wakeup, supported SIGKILL cancellation, exec/CLOEXEC/final-cl
 and existing controls pass in source/clean. Full pointer/authority/race/capacity
 and thread acceptance remain unrun; actual SQLite/Cargo closure is still F02/F03
 work. No cloud dispatch or security acceptance; [review/evidence](g23-review.md).
+
+## G24 — inode timestamps and archive mtime (in progress)
+
+Porting d21d26c8 directly on reviewed G22/G15 metadata/archive ownership, without
+G23 locks, G20 control, network stat encoders or held public clock policy. Ordinary
+checks use explicit trusted times, UTIME_OMIT, owned alias/descriptor identity,
+valid no-follow updates to a contained owned symlink, and whole-second mtime
+restart while atime/nanoseconds are deliberately not persisted.
+DaybreakBlue must validate protected/mutable time structs, invalid flags/fields,
+no-follow/assignment bypass or races, dangling/unlinked/reused identity authority,
+negative/unrepresentable archive times, alias metadata conflicts, clock-boundary
+and failure-injection behavior. Do not run those adversarial probes here.
+UTIME_NOW reads native supervisor realtime; ordinary NOW/implicit-time calls now have functional coverage. #179 policy
+and clock-boundary/failure validation remain pending.
+Retain full/default invalid-pointer/NOW/metadata checks; no cloud dispatch occurs.
+
+G24 initial retained revision before ordinary NOW coverage: 2dbbcb02731350c6b12a4225829f5d012845f85c on G22 7b2adc4f75acca26f2b356fbf9a47a9644c39bc8.
+100 routine units and selected ordinary explicit/OMIT, alias/descriptor/stat,
+contained symlink metadata and whole-second archive restart plus existing
+large/scale/storage/exec controls pass in source/clean. A valid futimens null-path
+adapter failure was reproduced and corrected in the shared resolver. Native NOW,
+invalid/protected/mutable inputs, authority/races, unrepresentable archive times
+and conflicting alias timestamps remain unrun. No cloud dispatch or security
+acceptance; [review/evidence](g24-review.md).
+
+G24 exact retained revision: b33fbd24ace566d8db20c8e2d7a295680084ac7b on G22 7b2adc4f75acca26f2b356fbf9a47a9644c39bc8.
+100 routine units and selected ordinary explicit/OMIT, alias/descriptor/stat,
+contained symlink metadata and whole-second archive restart plus existing
+large/scale/storage/exec controls pass in source/clean. A valid futimens null-path
+adapter failure was reproduced and corrected in the shared resolver. Ordinary
+NOW/null-times checks also pass. Clock-boundary/failure and invalid/protected/
+mutable inputs, authority/races, unrepresentable archive times
+and conflicting alias timestamps remain unrun. No cloud dispatch or security
+acceptance; [review/evidence](g24-review.md).
