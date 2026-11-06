@@ -38,6 +38,16 @@ does not authorize breaking Ginux's upstream interfaces or adopting downstream
 policy there. Retain useful upstream defaults and resolve public contract changes
 against upstream's own decisions.
 
+## Security validation handoff
+
+The user's 2026-11-06 continuation adds a boundary: record security work that
+looks like hacking for DaybreakBlue, the monitored blue-team cloud agent, rather
+than performing it here. Ordinary implementation, source review and functional
+checks continue locally. [DaybreakBlue handoff](ginux-contributions/daybreakblue-handoff.md)
+records adversarial validation separately; unperformed checks remain pending and
+must not be described as passing. This does not remove tests or weaken upstream
+coverage. No cloud dispatch or outgoing message is implied by this written handoff.
+
 ## Evidence used to order the work
 
 - Inspected local Ginux: `7cf2638adaf2fd3b783be636fe2a05b2d60458c5`, clean checkout
