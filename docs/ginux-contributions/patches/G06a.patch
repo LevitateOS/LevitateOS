@@ -1,6 +1,6 @@
-From b2347523d460b8cbeee2284fd1089509bf9f920c Mon Sep 17 00:00:00 2001
+From 01f22e0615e54fdcf3b85f8cc3b3542fb88b1a27 Mon Sep 17 00:00:00 2001
 From: vince <vincepaul.liem@gmail.com>
-Date: Fri, 6 Nov 2026 10:29:17 +0100
+Date: Fri, 6 Nov 2026 22:18:32 +0100
 Subject: [PATCH] fix(process): adopt orphans after the last parent thread
  exits
 
@@ -18,7 +18,7 @@ Signed-off-by: vince <vincepaul.liem@gmail.com>
  1 file changed, 118 insertions(+)
 
 diff --git a/crates/ginux-process/src/lib.rs b/crates/ginux-process/src/lib.rs
-index 01fa64ea..5e855832 100644
+index ef5ab50307fb0f19f71063b747c23b056cf06d72..a182328b59ac23806754b411b0ba391f7bd5d0a9 100644
 --- a/crates/ginux-process/src/lib.rs
 +++ b/crates/ginux-process/src/lib.rs
 @@ -437,6 +437,7 @@ impl<const TASKS: usize> ProcessTable<TASKS> {
@@ -61,7 +61,7 @@ index 01fa64ea..5e855832 100644
      fn is_waitable_child(&self, task: &Task, parent_pid: u32, target: WaitTarget) -> bool {
          // Thread-group members are joined over a futex, never reaped: only
          // leaders (tgid == pid) are waitable children.
-@@ -1586,6 +1609,101 @@ mod tests {
+@@ -1623,6 +1646,101 @@ mod tests {
          assert!(replacement.pid > child.pid);
      }
  

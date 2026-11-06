@@ -783,7 +783,9 @@ Earlier P02/P03 and candidate results remain historical records; current-main
 reconciliation is required before final closure.
 
 Exact next action: refresh R04's current-main prerequisite serially, starting
-with the independent G06a process-table correction. G05a is refreshed at
+with G03b's VFS foundation on refreshed G05a. This local dependency preparation
+stays blocked for standalone delivery until G05a actually merges upstream.
+G05a is refreshed at
 `936d0eb7a9b46e58ade5219705c12d3d476dfae9`, solely on observed main `8a475e8b`:
 three exact-base regressions fail, all 76 units/static/build and eight ordinary
 controls pass in source and strict 187-path clean replay. The one-file VFS diff
@@ -795,7 +797,13 @@ the exact base exits 2 for the missing workdir; source and strict clean replay
 create it and exit 0. All 73 units/static/build and nine ordinary controls pass
 in each export; the two-file +4/-1 scope and upstream CI coverage are preserved.
 [Review](ginux-contributions/g03a-review.md) retains all unrun default/runtime/
-macOS checks. Initial 37-patch integrity results remain historical;
+macOS checks. G06a is refreshed at
+`01f22e0615e54fdcf3b85f8cc3b3542fb88b1a27`, solely on `8a475e8b`:
+all three exact-base adoption regressions fail; all 76 units/static/build and
+eight ordinary controls pass in source/clean, preserving new upstream job-control
+coverage. The one-file +118 scope is unchanged and binaries match.
+[Review](ginux-contributions/g06a-review.md) keeps full default/runtime/macOS
+checks pending. Initial 37-patch integrity results remain historical;
 the final aggregate inventory must use each refreshed head. Reconcile the
 remaining source owners before rebuilding the final F02/F03 revisions. Keep
 reader/progress-thread-dependent consumers pending on G07. Do not import

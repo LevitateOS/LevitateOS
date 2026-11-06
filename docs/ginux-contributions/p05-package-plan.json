@@ -198,18 +198,24 @@
       "parent_packet": "G06",
       "purpose": "process-table orphan adoption after final parent-thread retirement",
       "dependencies": [],
-      "base": "3f2fe7dfadd4b40e235d982a6a3d386dc6490177",
-      "head": "b2347523d460b8cbeee2284fd1089509bf9f920c",
-      "tree": "f9854648b87e2c8e4f270a93fc40bd1b15b3f35e",
+      "base": "8a475e8b2318425fd2fc15246a5c6f4bca6caf86",
+      "head": "01f22e0615e54fdcf3b85f8cc3b3542fb88b1a27",
+      "tree": "5b926de1bff2b17ecf38feecdeb08e97e8336ecc",
       "upstream_base": "3f2fe7dfadd4b40e235d982a6a3d386dc6490177",
       "source_commits": [
         "ccd62ca146550e81c54fec2c49d8e642948a1e8a"
       ],
-      "status": "fully reviewed and locally validated standalone candidate on pinned main; user inspection and remote CI pending",
+      "status": "current-main source reviewed; three exact-base regressions fail, all 76 units/static/build and 8 ordinary controls pass in source/clean; full default runtime/macOS CI remain pending",
       "evidence": "g06a-review.md",
       "source_patch": "patches/G06a.patch",
       "standalone": true,
-      "artifact_directory": ".artifacts/ginux-contribution-preparation/G06a"
+      "artifact_directory": ".artifacts/ginux-contribution-preparation/upstream-refresh-2026-11-06/G06a",
+      "previous_head": "b2347523d460b8cbeee2284fd1089509bf9f920c",
+      "historical_artifact_directory": ".artifacts/development-migration/2026-11-06/recovery/evidence/ginux-contribution-preparation/G06a",
+      "patch_sha256": "06e37b7bb4202a379184b3b69ed65b936cb15ec5d002b578098e2f8246f70fd8",
+      "unit_tests": 76,
+      "process_tests": 16,
+      "remote_ci": "not run"
     },
     {
       "packet": "G06",

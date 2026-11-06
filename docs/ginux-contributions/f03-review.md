@@ -185,8 +185,11 @@ selected ordinary source/clean evidence, with default runtime/macOS checks pendi
 G03a's independent configured-workdir correction is now refreshed at
 `c28dd1321f024ec6b5d2087fd489457f31f20e2c`; its
 [review](g03a-review.md) records the exact-base failure, successful source/clean
-regression and pending checks. Exact next action: continue R04's current-main
-prerequisite one packet at a time with G06a's process-table correction.
+regression and pending checks. G06a is now refreshed at
+`01f22e0615e54fdcf3b85f8cc3b3542fb88b1a27`; its
+[review](g06a-review.md) records preserved new job-control coverage and remaining
+checks. Exact next action: prepare G03b on refreshed G05a, retaining its upstream
+merge prerequisite for standalone delivery, then continue the other owners.
 Then reconcile remaining owners before rebuilding the final F02 composition and
 rerunning applicable F03 checks. Keep G07, monitored security,
 actual compiler/Cargo/APK/RPM, full/default platform CI and current-main
