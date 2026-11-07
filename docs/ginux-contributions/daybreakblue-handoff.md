@@ -1332,3 +1332,8 @@ Unchanged `scripts/test-launch-storage.py` and fixture selected `mapping`, `ordi
 ### Current guarded-source configured view probes — 2026-11-07
 
 The existing `view-probes` storage selector passed on immutable guarded binary SHA-256 `0d8c6c0305da8d5c2e57bcb4da7458aaa3fe04a0a0427118f9137e50d8fbbb5d`. `ginux-g09-view-probes-current-guarded.json/.log` records exact command, hashes, exit 0 and output. Fixture assertions include owned-file access permissions, AT-style and fd empty-path checks, regular-file readlink rejection and a permitted read. This is one current-source configured-view check, not exhaustive namespace or symlink authority validation. Exact next action: symlink/cross-assignment checks and remaining G07/G12 private-transfer controls. No upstream action occurred.
+
+
+### Full guarded-source configured storage suite — 2026-11-07
+
+The unchanged full Ginux storage runner passed on immutable guarded binary SHA-256 `0d8c6c0305da8d5c2e57bcb4da7458aaa3fe04a0a0427118f9137e50d8fbbb5d` in 6.186 s, exit 0. `ginux-g09-storage-full-current-guarded.json/.log` has exact command, hashes and output. It includes default cross-boundary/hidden path, image/owned symlink, scratch restoration, view/access/readlink, mapping, bounds/quota and namespace cases. Selected `symlinks` and `ordinary-symlinks` also passed. This is current-source fixture evidence, not exhaustive hostile namespace-race or all G07/G12/Daybreak security criteria. Exact next action: source-specific remaining shared-argument and authority gaps, then other documented security surfaces. No upstream action occurred.
