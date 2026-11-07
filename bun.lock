@@ -61,6 +61,24 @@
         "typescript": "^5.9.2",
       },
     },
+    "tui/apps/install/install-hub": {
+      "name": "@levitate/install-hub",
+      "version": "0.1.0",
+      "bin": {
+        "install-hub": "./src/main.tsx",
+      },
+      "dependencies": {
+        "@levitate/install-state": "workspace:*",
+        "@levitate/tui-kit": "workspace:*",
+        "ink": "^6.8.0",
+        "react": "^19.2.0",
+      },
+      "devDependencies": {
+        "@types/bun": "^1.2.17",
+        "@types/react": "^19.2.0",
+        "typescript": "^5.9.2",
+      },
+    },
     "tui/apps/live-tools/install-docs": {
       "name": "@levitate/install-docs",
       "version": "0.2.0",
@@ -331,6 +349,8 @@
     "@levitate/docs-content": ["@levitate/docs-content@workspace:docs/content"],
 
     "@levitate/install-docs": ["@levitate/install-docs@workspace:tui/apps/live-tools/install-docs"],
+
+    "@levitate/install-hub": ["@levitate/install-hub@workspace:tui/apps/install/install-hub"],
 
     "@levitate/install-state": ["@levitate/install-state@workspace:tui/kit/install-state"],
 

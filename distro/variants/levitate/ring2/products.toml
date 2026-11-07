@@ -9,6 +9,8 @@ shell = "/bin/bash"
 docs = { tui_app = "install-docs", page = "installation" }
 # TUI apps on the live ISO besides the docs, as commands for the shell beside them.
 apps = ["disk-plan"]
+# The left pane: the install steps in order, with the shell one key away.
+hub = "install-hub"
 
 [ring2_products.rootfs_base]
 logical_name = "product.rootfs.base"

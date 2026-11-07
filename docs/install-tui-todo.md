@@ -72,11 +72,20 @@ Agreed on 2026-11-07: the first option in each.
 - [x] **Bring the docs in line with the tools.** Both guides use disk-plan or recpart, with
   the manual route as the fallback. recpart now mounts the target at its `--mount-root`
   (`/mnt`) itself, not `/mnt/sysroot`, so the guides' `recstrap /mnt` is right.
-- [ ] **Hand state from one app to the next (decision 1).** Use a state file under `/run`,
+- [x] **Hand state from one app to the next (decision 1).** Done (2026-11-07) as
+  `tui/kit/install-state` (`@levitate/install-state`): `/run/levitate-install/state.json`,
+  `LEVITATE_INSTALL_STATE` to point elsewhere, written atomically; recording a step drops
+  the later ones. The original note: use a state file under `/run`,
   say `/run/levitate-install/state.json`. It holds the disk handoff from recpart (target,
   mounts, slot A and B devices) and what each later step did, so later apps don't ask again,
   and a crashed app can resume.
-- [ ] **The install hub.** It shows the steps with done, current and pending marks, starts
+- [x] **The install hub** (2026-11-07): `tui/apps/install/install-hub`, the left pane on both
+  variants (`[install_ux] hub = "install-hub"`). Enter does the selected step: it starts
+  disk-plan, runs the guide's commands for the base system, boot and finish (filled in from
+  the disk step, then recorded), or opens a shell for the configuration (marked done with
+  m); `s` is a shell at any time. The kit's `runApp` gained `afterExit`, which runs a
+  program with the terminal to itself and shows the screen again. Until the base, setup and
+  boot apps exist, those steps are the guide's commands. The original note: it shows the steps with done, current and pending marks, starts
   each step's app, shows its result, and lets you go back to a finished step while that is
   still safe. It needs a key that drops to the shell and returns. The install screen runs the
   hub in the left pane in place of a bare shell.
@@ -160,7 +169,8 @@ Agreed on 2026-11-07: the first option in each.
   `record.sh`). With `RECPART_FIXTURE_LIVE=<recpart binary>`, it plans any layout with the
   real recpart against the fixture disks, for trying the editor by hand.
 - [ ] **A swap file option** in the editor (recpart supports `swap_file`; the UI doesn't yet).
-- [ ] **At the end, write the recpart handoff to the install state file**, so the base step
+- [x] **At the end, write the recpart handoff to the install state file** (2026-11-07: disk,
+  mode, target, mounts, slot and root devices), so the base step
   knows the target and the slots.
 
 ## 3. Before the disk: keyboard, network, clock
