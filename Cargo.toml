@@ -4,7 +4,6 @@ members = [
     "distro/contract",
     "distro/builder",
     "distro/builder/install-split-pane",
-    "distro/elf",
     "xtask",
     "tools/recipe",
     "tools/recinit",
@@ -17,8 +16,6 @@ members = [
     "tools/recshuttle",
     "testing/fsdbg",
     "testing/install-tests",
-    "testing/hardware-compat",
-    "testing/rootfs-tests",
 ]
 
 [workspace.package]

@@ -18,18 +18,6 @@
 	path = tools/recstrap
 	url = git@github.com:LevitateOS/recstrap.git
 	branch = master
-[submodule "rootfs-tests"]
-	path = testing/rootfs-tests
-	url = git@github.com:LevitateOS/rootfs-test.git
-	branch = master
-[submodule "leviso-elf"]
-	path = distro/elf
-	url = git@github.com:LevitateOS/leviso-elf.git
-	branch = main
-[submodule "testing/hardware-compat"]
-	path = testing/hardware-compat
-	url = git@github.com:LevitateOS/hardware-compat.git
-	branch = main
 [submodule "distro-builder"]
 	path = distro/builder
 	url = git@github.com:LevitateOS/distro-builder.git

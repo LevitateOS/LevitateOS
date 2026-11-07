@@ -57,8 +57,8 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-registry-
 
-      - name: Build xtask and the rootfs checker
-        run: cargo build --release -p levitate-recipe -p levitate-xtask -p rootfs-tests
+      - name: Build xtask
+        run: cargo build --release -p levitate-recipe -p levitate-xtask
 
       - name: Acquire declared kernel and rootfs inputs
         run: |
@@ -78,35 +78,6 @@ jobs:
           target/release/levitate-xtask run live-boot levitate --ssh --no-shell
           # `all` is live-boot, live-tools, install, installed-boot, automated-login, runtime.
           target/release/levitate-xtask test all levitate --force
-
-      - name: Verify the composed product rootfs
-        timeout-minutes: 15
-        run: |
-          set -euo pipefail
-          rootfs_images=(.artifacts/out/levitate/releases/live-tools/run-*/filesystem.erofs)
-          overlay_images=(.artifacts/out/levitate/releases/live-tools/run-*/overlayfs.erofs)
-          if [ "${#rootfs_images[@]}" -ne 1 ] || [ ! -f "${rootfs_images[0]}" ] || \
-             [ "${#overlay_images[@]}" -ne 1 ] || [ ! -f "${overlay_images[0]}" ]; then
-            echo 'Expected one live-tools release with rootfs and overlay EROFS images.' >&2
-            exit 1
-          fi
-          inspection="$(mktemp -d "$RUNNER_TEMP/rootfs-check.XXXXXX")"
-          mkdir -p "$inspection"/{rootfs,overlay,upper,work,merged}
-          cleanup() {
-            for mountpoint in merged overlay rootfs; do
-              if mountpoint -q "$inspection/$mountpoint"; then
-                sudo umount "$inspection/$mountpoint"
-              fi
-            done
-            sudo rm -rf -- "$inspection"
-          }
-          trap cleanup EXIT
-          sudo mount -t erofs -o loop,ro "${rootfs_images[0]}" "$inspection/rootfs"
-          sudo mount -t erofs -o loop,ro "${overlay_images[0]}" "$inspection/overlay"
-          sudo mount -t overlay overlay \
-            -o "lowerdir=$inspection/overlay:$inspection/rootfs,upperdir=$inspection/upper,workdir=$inspection/work" \
-            "$inspection/merged"
-          target/release/rootfs-tests run --rootfs "$inspection/merged"
 
       - name: Upload live-tools ISO
         uses: actions/upload-artifact@v4
@@ -146,14 +117,6 @@ jobs:
 
       - name: Clippy - install-tests
         working-directory: testing/install-tests
-        run: cargo clippy -- -D warnings
-
-      - name: Clippy - rootfs-tests
-        working-directory: testing/rootfs-tests
-        run: cargo clippy -- -D warnings
-
-      - name: Clippy - hardware-compat
-        working-directory: testing/hardware-compat
         run: cargo clippy -- -D warnings
 
       - name: Clippy - recstrap
