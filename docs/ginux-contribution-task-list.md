@@ -1,8 +1,9 @@
 # Ginux contribution task list
 
-Updated: 2026-11-07. Status: preparation active under the user’s sequential goal authorization;
-extraction, new reviews and publication below are pending. This request authorizes this task list, not
-opening PRs. The user will inspect the prepared changes before publication.
+Updated: 2026-11-07. Status: local Ginux→Recipe integration and consumer verification active.
+The authoritative ownership split below gives Claude all upstream PR work. Codex's earlier
+packet/publication queue remains historical; its current work is F03 and the local fixes Recipe
+needs. No Codex push, PR, upstream comment or security-agent dispatch is authorized.
 
 This is the remaining contribution queue for the completed local Ginux→Recipe
 implementation. [Local validation](recipe-local-validation.md) owns the previous

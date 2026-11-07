@@ -1,4 +1,24 @@
-# F03 — fresh Recipe consumer verification (partial)
+# F03 — local Recipe consumer verification (partial)
+
+Current local Ginux source is `436c4ae5843e4d50f4833158d351523f35669909`, based on
+upstream `59e2f7aa`, at `/home/vince/levitate-development/ginux-recipe-integration`.
+Current Recipe is `0c4f0d4e9d1f84ab7f638611e895dbf799500e7a`. Release commands
+and the existing e2e harness use separate build directories. Exact source/binary hashes and
+receipts live under that Ginux source's `.artifacts/recipe-integration/`.
+
+Actual SQLite, pinned Git, RPM, APK and concurrent GNU/musl Cargo consumers pass this source.
+The final102-case ordinary e2e run is active in `umask-ordinary-state.json`; its receipts,
+not this historical narrative, determine what has passed. Earlier20/eight-case batches are
+historical after the creation-mask correction. Thirty-three monitored-review e2e cases and
+mixed library/image targets remain unrun. Security/full-suite acceptance is pending.
+
+The latest local fixes address measured musl clone flags (`e9a2f8a0`), blocking pipe truncation
+(`6a19a70a`), configured creation masks (`436c4ae5`) and Recipe's explicit-tool/fixed-PATH
+collision (`0c4f0d4`). Earlier local thread/task-capacity and instance adaptations remain
+prerequisites. These commits are local extraction material for Claude; Codex performs no
+upstream packet/publication work. See the latest checkpoints below for failures and limits.
+
+## Historical preparation and checkpoints
 
 Recipe snapshot `bde746221988094d4a0b80bb46808beab447e3dc` plus exact tracked dirty overlays
 `.gitignore` and `tests/e2e/preseed_recipes.rs` is exported to
