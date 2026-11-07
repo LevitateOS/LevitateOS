@@ -139,6 +139,11 @@ Agreed on 2026-11-07: the first option in each.
 - [x] **Size input:** `20G`, `512M`, `1.5T`, `50%` or `rest` (a bare number is GiB), shown
   as a size while you type, with the minimum (from recpart's `min_size_bytes`) and the
   maximum (the partition plus the free space after it). Enter refuses an answer outside them.
+- [x] **A guided editor** (2026-11-07): a Next step box says the one thing to do (shrink
+  the partition with the most room, then press a), a quick setup fills the free space with
+  the mode's partitions at recpart's default sizes and reuses an existing EFI partition,
+  roles have plain names (System slot A, State (/var)), and the selected row lists what can
+  be done to it.
 - [x] **Live checks:** every change re-runs `recpart plan --layout`, and the page shows
   "recpart accepts this layout" or what recpart wants next ("Give one partition role
   efi."). Refusals don't link to the docs yet.
