@@ -1724,3 +1724,26 @@ are still incomplete. Exact next action: source-review and controlled focused
 validation of the remaining Ginux shared-argument, contract/authority,
 copyout, concurrency, transport and restore security requirements, retaining
 G02 and Claude's upstream ownership boundaries.
+
+### G07 shared-path security reproduction — 2026-11-07
+
+The current `6d290d48` integration binary **fails** the recovered G07
+shared-path race on controlled disposable image files. The distinguished
+variant returned guest99 for reading a byte from an image file hidden by the
+`memory:/work` assignment; a separate guest100 thread/join error did not
+occur. Protected clone-TID fault/rollback and concurrent public descriptor
+alias scenarios passed independently on the same binary, with exact per-run
+receipts and fixture hashes in the [Daybreak handoff](ginux-contributions/daybreakblue-handoff.md).
+No Ginux source or remote was changed by these probes.
+
+G07 security acceptance is failed, not merely unrun. The next dependent step
+is to make kernel-consumed native path and indirect arguments stable across
+shared-VM threads without removing Recipe's threaded image/native filesystem
+capability, then rerun the controlled failure and Ginux/Recipe regressions.
+The tracee's original path and current stack scratch are both shared writable
+memory; copying between them alone cannot satisfy that invariant. Independent
+handoff checks may continue while this correction is designed. The G02 hold,
+Claude upstream ownership and no-push boundary remain in force. Active skill:
+`hdae-development` at `.agents/skills/hdae-development/SKILL.md`; reload the
+skill, required reference, applicable instructions and this checkpoint after a
+context shift. Goal active/incomplete.

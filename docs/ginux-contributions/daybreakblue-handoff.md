@@ -1185,3 +1185,43 @@ remain historical evidence on `436c4ae5`; one G02 case failed there and one
 other G02-dependent case remains unrun. The current-revision security selection
 therefore does not imply a complete 135-case suite pass. Broader Ginux
 security criteria in this handoff remain open as listed above.
+
+### Current-source G07 controlled security checks — 2026-11-07
+
+The original G07 `x-path` fixture was reconstructed from the retained
+`G07/unready-source.patch` into disposable local fixture/runner copies, with
+only controlled image files. On immutable Ginux `6d290d48` (SHA-256
+`c40cd3a75c5f479f1e761d53d02e3f12c4b748efc0f4b13eeefa2850cd8d7324`),
+the scenario returned guest exit 99. A diagnostic-only fixture variant made
+thread/join error exit 100 and hidden-byte exposure exit 99; it again returned
+99. The running writer alternated `/allowed` (image byte `A`) and `/work/hh`
+(image byte `S`, hidden by `memory:/work`). The reader saw `S`. This is a
+current-revision reproduction of the shared writable pathname authority gap,
+not just the historical source concern. The exact fixture/runner sources,
+commands, binary and source hashes, and complete failing logs are under the
+local evidence directory as `g07-xpath-*` and
+`ginux-g07-xpath-distinguished-6d290d48.json`. The Ginux source tree was not
+changed for this probe.
+
+The recovered G07 `qfault` scenario passed on the same binary: unmapped,
+read-only and cross-page clone child-TID copyout was rejected with `EFAULT`,
+the probed bytes remained unchanged, and a valid thread joined afterward.
+The recovered `dup-race` scenario also passed: concurrent open/read/close and
+public descriptor alias operations completed within their expected results.
+Exact separate receipts are `ginux-g07-qfault-6d290d48.json` and
+`ginux-g07-dup-race-6d290d48.json`. Each run used its own recorded disposable
+fixture hash; they do not make the shared-path criterion pass. Teardown,
+indirect kernel arguments, SIGCHLD disposition and broader concurrency
+criteria remain separately unverified on this source.
+
+The source still gives the kernel a pointer into writable tracee memory for
+native pathname operations. `path_hooks::Rewrite` also uses tracee stack
+scratch, which threads sharing the VM can write. An ordinary copy to another
+writable tracee address would not close this race. Security acceptance of G07
+is **failed** pending a design that stabilizes every kernel-consumed pathname
+and indirect argument across shared-VM threads, followed by the controlled
+race and regression suites on the corrected revision. Do not replace the
+existing image/native filesystem behavior with blanket denial: Recipe's
+threaded compiler consumers use it. Keep the correction local to the
+integration source if needed for Recipe; Claude owns upstream extraction and
+publication. No push, PR, upstream comment or agent dispatch occurred.
