@@ -120,8 +120,9 @@ pub enum Cmd {
     ///
     /// To try an app's cases by hand without touching anything real, add `--stand-ins`: the
     /// app runs with its stand-in tools (its manifest's `inspect.path`), as headless runs do.
-    /// `--story NAME` (implies it) starts it with that story's arguments and environment,
-    /// and you drive it. Both go before any `--`; the rest of the line goes to the app.
+    /// `--story NAME` (or its number in `cargo xtask tui list <APP>`; implies `--stand-ins`)
+    /// starts it with that story's arguments and environment, and you drive it. Both go
+    /// before any `--`; the rest of the line goes to the app.
     ///
     /// `cargo xtask tui list` lists the apps with what each is for, where it lives, the tools
     /// it runs, its pages and its stories; `cargo xtask tui list <APP>` lists that app's

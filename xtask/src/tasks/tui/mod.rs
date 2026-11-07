@@ -59,14 +59,13 @@ pub fn run(name: String, line: Vec<String>) -> Result<()> {
         }
         cmd.env("PATH", inspect::stand_in_path(&app)?);
         if let Some(story) = &options.story {
-            let story = app
-                .inspect
-                .stories
-                .iter()
-                .find(|s| &s.name == story)
+            let stories = &app.inspect.stories;
+            // A number counts from 1 in `cargo xtask tui list <app>`.
+            let by_number = story.parse::<usize>().ok().and_then(|n| n.checked_sub(1)).and_then(|i| stories.get(i));
+            let story = by_number
+                .or_else(|| stories.iter().find(|s| &s.name == story))
                 .with_context(|| {
-                    let names: Vec<&str> = app.inspect.stories.iter().map(|s| s.name.as_str()).collect();
-                    format!("{name} has no story '{story}' (stories: {})", names.join(", "))
+                    format!("{name} has no story '{story}'; `cargo xtask tui list {name}` lists them")
                 })?;
             args.extend(story.args.iter().cloned());
             cmd.envs(story.env.iter());
@@ -118,37 +117,66 @@ pub fn list() -> Result<()> {
     Ok(())
 }
 
-/// One app's stories in detail: what each shows, how it starts, and its steps.
+/// Bold, dim and colour on a terminal; plain text in a pipe or a file.
+struct Style(bool);
+
+impl Style {
+    fn paint(&self, codes: &str, text: &str) -> String {
+        if self.0 { format!("\x1b[{codes}m{text}\x1b[0m") } else { text.to_string() }
+    }
+    fn title(&self, text: &str) -> String {
+        self.paint("1;36", text)
+    }
+    fn heading(&self, text: &str) -> String {
+        self.paint("1", text)
+    }
+    fn dim(&self, text: &str) -> String {
+        self.paint("2", text)
+    }
+    fn command(&self, text: &str) -> String {
+        self.paint("32", text)
+    }
+    fn number(&self, text: &str) -> String {
+        self.paint("1;33", text)
+    }
+}
+
+/// One app's stories in detail: each one's number and name as a heading, what it shows,
+/// the command that opens it, how it starts and its steps; then every name again in a
+/// short numbered list, the part left on screen.
 pub fn stories(name: &str) -> Result<()> {
+    use std::io::IsTerminal;
+    let style = Style(std::io::stdout().is_terminal());
     let root = crate::util::repo::repo_root()?;
     let app = tui_apps::find(&root, name)?;
     let dir = app.dir.strip_prefix(&root).unwrap_or(&app.dir);
-    println!("{}: {}", app.name, app.description);
-    println!("{}", dir.display());
-    if !app.tools.is_empty() {
-        println!(
-            "runs {}; stories use the stand-ins from {}, so nothing real is changed",
-            app.tools.join(", "),
-            app.inspect.path.join(", ")
-        );
-    }
+    println!("{} {}", style.title(&app.name), style.dim(&format!("· {}", app.description)));
+    println!("{}", style.dim(&dir.display().to_string()));
     let stories = &app.inspect.stories;
     if stories.is_empty() {
         println!("\nNo stories (levitate.inspect.stories in its package.json).");
         return Ok(());
     }
-    println!(
-        "\n{} stories. Drive one yourself, or render it headlessly:\n  cargo xtask tui {name} --story NAME\n  cargo xtask inspect {name} --story NAME",
-        stories.len()
-    );
-    for story in stories {
-        println!("\n{}", story.name);
+    let digits = stories.len().to_string().len();
+    let open = |story: &str| format!("cargo xtask tui {name} --story {}", shell_word(story));
+    for (n, story) in stories.iter().enumerate() {
+        let number = format!("{:>digits$}", n + 1);
+        let indent = " ".repeat(digits + 2);
+        println!("\n{}", style.dim(&"─".repeat(72)));
+        println!("{}  {}", style.number(&number), style.heading(&story.name));
         if let Some(about) = &story.about {
-            println!("  {about}");
+            println!("{indent}{about}");
         }
-        let starts = if story.args.is_empty() { "no arguments".to_string() } else { story.args.join(" ") };
+        println!("{indent}{} {}", style.dim("open:"), style.command(&open(&story.name)));
         let env: Vec<String> = story.env.iter().map(|(k, v)| format!("{k}={v}")).collect();
-        println!("  starts with  {starts}{}", if env.is_empty() { String::new() } else { format!(" · {}", env.join(" ")) });
+        let starts = [story.args.join(" "), env.join(" ")]
+            .into_iter()
+            .filter(|part| !part.is_empty())
+            .collect::<Vec<_>>()
+            .join(" · ");
+        if !starts.is_empty() {
+            println!("{indent}{} {starts}", style.dim("with:"));
+        }
         let keys: Vec<String> = story
             .steps
             .iter()
@@ -159,13 +187,47 @@ pub fn stories(name: &str) -> Result<()> {
                 _ => readable_keys(&step.keys),
             })
             .collect();
+        if keys.is_empty() {
+            continue;
+        }
+        println!("{indent}{}", style.dim("steps (keys → what the screen shows):"));
         let width = keys.iter().map(|k| k.chars().count()).max().unwrap_or(0);
         for (i, (step, keys)) in story.steps.iter().zip(&keys).enumerate() {
-            let shows = step.expect.as_deref().map(|e| format!("  →  \"{}\"", e.trim())).unwrap_or_default();
-            println!("  {:>2}. {keys:<width$}{shows}", i + 1);
+            let shows = step
+                .expect
+                .as_deref()
+                .map(|e| format!("  {}  {}", style.dim("→"), e.trim().trim_start_matches('│')))
+                .unwrap_or_default();
+            println!("{indent}  {} {keys:<width$}{shows}", style.dim(&format!("{:>2}.", i + 1)));
         }
-        println!("  cargo xtask tui {name} --story {}", shell_word(&story.name));
     }
+    println!("\n{}", style.dim(&"─".repeat(72)));
+    println!(
+        "{} {}",
+        style.title(&format!("{} stories", stories.len())),
+        style.dim(&format!("(details above) · stand-in {} from {}: nothing real is changed", app.tools.join(", "), app.inspect.path.join(", ")))
+    );
+    let name_width = stories.iter().map(|s| s.name.chars().count()).max().unwrap_or(0);
+    for (n, story) in stories.iter().enumerate() {
+        let about = story.about.as_deref().unwrap_or("");
+        let short: String = if about.chars().count() > 60 {
+            format!("{}…", about.chars().take(59).collect::<String>().trim_end())
+        } else {
+            about.to_string()
+        };
+        println!(
+            "  {}  {}  {}",
+            style.number(&format!("{:>digits$}", n + 1)),
+            style.heading(&format!("{:<name_width$}", story.name)),
+            style.dim(&short)
+        );
+    }
+    println!(
+        "\n{} {}   {}",
+        style.dim("open one:"),
+        style.command(&format!("cargo xtask tui {name} --story <number or name>")),
+        style.dim(&format!("e.g. --story 1 or --story {}", shell_word(&stories[0].name)))
+    );
     Ok(())
 }
 
