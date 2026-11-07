@@ -121,9 +121,11 @@ Agreed on 2026-11-07: the first option in each.
 
 ### disk-plan UI
 
-- [x] **Choose guided or manual.** The layout page offers four choices: `ab` or `mutable`,
-  each as "erase the disk" (recpart's template) or "edit the partitions" (the editor).
-- [ ] **Editable template sizes.** "Erase the disk" still uses recpart's default sizes;
+- [x] **Choose guided or manual,** as two pages (2026-11-07; one page of four choices was
+  unclear): System asks how the system is updated (A/B or mutable, with the partitions each
+  needs), then Disk use asks what happens to the disk (erase all of it, or keep some in the
+  editor) and lists what is on it now, in red when erasing.
+- [ ] **Editable template sizes.** "Erase the whole disk" still uses recpart's default sizes;
   disk-plan doesn't pass `--efi-size-mb`, `--root-a-size-mb` and so on.
 - [x] **A partition table view** (`src/presentation/partition-editor.tsx`). Partitions and
   free gaps, in disk order, under a bar that draws the selected one solid. Columns: size,
