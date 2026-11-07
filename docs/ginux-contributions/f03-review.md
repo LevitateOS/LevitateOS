@@ -350,3 +350,35 @@ No upstream packet refresh/publication, forbidden branch/worktree edits, fork
 push, upstream comment or agent dispatch occurred. core.worktree remains in
 config.worktree. Preserve unrelated inventory/UI/untangle edits. Active HDAE
 skill and context-reload requirements remain as above. Goal active/incomplete.
+
+
+### Cargo task-capacity cause fixed — 2026-11-07
+
+Local Ginux `12c4ea80` adds one bounded resource diagnostic after audit truncation.
+The unchanged Cargo fixture then confirms the cause: the16 configured task
+slots fill during rust-lld's ordinary process/thread tree. Local fix
+`062fb5ef53ab0db6ab14f995b4ec87d1d97ccf2b` keeps a fixed32-task bound, including
+unreaped children. CPU/memory/descriptor limits and compiler/cache checks are
+unchanged. Process/thread fixtures prove exact capacity, EAGAIN beyond it, full
+reaping and slot reuse. Existing forbidden-clone assertions remain in the full
+default case; an ordinary capacity selector avoids running those probes locally.
+Static/build,121 routine units and the ordinary thread/process/resource/lock
+checks pass on this final source. The three preserved security units remain unrun.
+
+Actual offline concurrent Cargo now passes in85.39s on Recipef70b35d: both clients
+succeed, logs prove one compilation and real cache/build-directory lock waiting,
+and the compiled Rust executable creates a thread and returns `compiled rust 42`
+inside Ginux. Its523736-byte executable is published with mode0755, two matching
+checkpoints acknowledged, and both compiler logs checked. No capture, progress,
+locking, validation or compiler-thread workaround was introduced. Earlier failed
+receipts remain under cargo-fixture/, cargo-instance-fixture/ and
+cargo-diagnostic-fixture/. The passing command/receipt is cargo-capacity32-fixture/.
+
+The final-revision eight-case serial Recipe batch is running on
+Ginux062fb5ef/Recipef70b35d; `.artifacts/recipe-integration/final-ordinary-state.json`
+and final-consumer-provenance.json own the live progress and exact hashes.
+Next: inspect that batch, diagnose failures honestly, then run remaining
+source-reviewed ordinary consumers and actual APK/RPM paths. Current full-suite,
+security/default/platform CI and required acceptance remain pending. No remote
+changes or security dispatch occurred. Active HDAE/reload procedure remains as
+recorded above. Goal active/incomplete; no current-case process was interrupted.

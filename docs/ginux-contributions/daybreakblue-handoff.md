@@ -947,3 +947,10 @@ is still unresolved; public/private descriptor authority, copyout faults and
 concurrent transaction/teardown attacks have not been rerun. Known storage B1–B3
 remain unchanged. Pin any later local source before monitored verification.
 This note neither dispatches DaybreakBlue nor accepts those pending criteria.
+
+
+The local integration now descends from upstream59e2f7aa. Latest functional
+source062fb5ef adds bounded task-creation diagnostics and32 task slots for the
+measured ordinary Cargo process tree; shared-argument/authority/copyout security
+criteria above remain pending. Read the local integration state.json for any
+later source before monitored validation. No security agent was dispatched.
