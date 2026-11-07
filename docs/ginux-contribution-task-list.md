@@ -1430,3 +1430,24 @@ remaining ordinary consumer coverage/source review. Security/full/default/platfo
 acceptance remains pending, and no DaybreakBlue dispatch is authorized. No pushes,
 PRs, upstream comments or forbidden source/branch edits occurred. Goal active and
 incomplete. Active HDAE skill/reload procedure remains as recorded above.
+
+
+### Ordinary lifecycle queue complete — 2026-11-07
+
+All20 selected state/target/lifecycle/cleanup/hash cases now pass on local
+Ginux6a19a70a/Recipe0c4f0d4, with exact one-case receipts in
+remaining-ordinary-{state,receipts}.json. Positive real Git clone, exact-commit
+reuse and switching also pass. The first positive fixture incorrectly declared
+is_built ready and skipped acquisition; its failed receipt is retained. Corrected
+readiness causes actual clone/selection/publication, without a product change.
+
+Final-source actual SQLite and GNU/musl compiler consumers are now running
+serially. Their results remain pending. The complete135-case catalog is mapped
+in ordinary-coverage-selection.json:20 just passed,82 further ordinary cases
+selected/unrun,33 held for downstream monitored authority/fault/escape/spoofing
+review. Original mixed cases stay intact; no partial test is counted as passing.
+Library/image test targets also contain held spoofing/unsafe-path cases and are
+unrun. Next: inspect actual consumer receipts, fix actual failures, then execute
+the82 ordinary cases serially. Current security/full-suite acceptance remains
+pending. Goal active/incomplete; no upstream action or security dispatch.
+Active HDAE skill/reload procedure remains as recorded above.
