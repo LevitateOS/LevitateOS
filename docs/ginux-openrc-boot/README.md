@@ -72,6 +72,9 @@ parent in `poll` with SIGCHLD caught, not blocked and not pending, and the
 tracer already detached from the zombie. Ginux's configured-process path
 already delivers SIGCHLD ("resume carrying the host SIGCHLD so delivery is
 observed"); delivering it the same way in native mode fixed the boot.
+Raised upstream as
+[gmkurtzer/ginux#242](https://github.com/gmkurtzer/ginux/pull/242), with a
+`test-native-supervision` scenario that fails on `59e2f7aa`.
 
 **3. Interrupted waits (`ERESTART_RESTARTBLOCK`).** musl's `poll` and
 `nanosleep`, interrupted by a signal, return -516 and the kernel continues them
