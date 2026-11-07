@@ -1,10 +1,9 @@
 use anyhow::{Context, Result, bail};
-use distro_contract::load_variant_contract_bundle_for_distro_from;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-/// A distro's kernel, as its variant contract (`build-host.toml`) declares it.
+/// A distro's kernel, as its variant contract (`distro.toml`) declares it.
 #[derive(Clone)]
 pub(crate) struct KernelTarget {
     pub distro_id: &'static str,
@@ -32,10 +31,7 @@ pub(crate) struct AutoFixOptions {
 
 pub(crate) fn target_for(d: crate::cli::Distro) -> Result<KernelTarget> {
     let root = crate::util::repo::repo_root()?;
-    let kernel = distro_contract::load_variant_contract_for_distro_from(&root, d.id())
-        .with_context(|| format!("loading the {} variant contract", d.id()))?
-        .build
-        .kernel;
+    let kernel = distro_contract::load(&root, d.id())?.contract.build.kernel;
     Ok(KernelTarget {
         distro_id: d.id(),
         version: kernel.version,
@@ -69,8 +65,8 @@ pub(crate) fn kernel_is_built(root: &Path, t: &KernelTarget) -> bool {
 
 pub(crate) fn verify_one(root: &Path, t: &KernelTarget) -> Result<String> {
     let kernel_root = distro_builder::run_history::kernel_output_dir(root, t.distro_id);
-    let rel_file = kernel_root.join("kernel-build/include/config/kernel.release");
-    let vmlinuz = kernel_root.join("staging/boot/vmlinuz");
+    let rel_file = kernel_root.join(distro_builder::kernel::KERNEL_RELEASE_PATH);
+    let vmlinuz = kernel_root.join(distro_builder::kernel::KERNEL_IMAGE_PATH);
 
     if !rel_file.is_file() {
         bail!("Missing kernel.release: {}", rel_file.display());
@@ -85,7 +81,7 @@ pub(crate) fn verify_one(root: &Path, t: &KernelTarget) -> Result<String> {
 
     if !t.version.is_empty() && !rel.starts_with(&t.version) {
         bail!(
-            "{} kernel.release '{}' does not start with '{}' (expected the kernel version from build-host.toml)",
+            "{} kernel.release '{}' does not start with '{}' (expected the kernel version from distro.toml)",
             t.distro_id,
             rel,
             t.version
@@ -101,14 +97,9 @@ pub(crate) fn verify_one(root: &Path, t: &KernelTarget) -> Result<String> {
         );
     }
 
-    let m1 = kernel_root.join(format!("staging/lib/modules/{rel}"));
-    let m2 = kernel_root.join(format!("staging/usr/lib/modules/{rel}"));
-    if !m1.is_dir() && !m2.is_dir() {
-        bail!(
-            "Missing modules dir for {} ({}) under staging/{{lib,usr/lib}}/modules/",
-            t.distro_id,
-            rel
-        );
+    let modules = kernel_root.join(distro_builder::kernel::KERNEL_MODULES_DIR).join(&rel);
+    if !modules.is_dir() {
+        bail!("Missing modules dir for {} ({}): {}", t.distro_id, rel, modules.display());
     }
 
     Ok(rel)
@@ -125,14 +116,11 @@ pub(crate) fn build_kernel_via_recipe(
     force_rebuild: bool,
     autofix: &AutoFixOptions,
 ) -> Result<()> {
-    let bundle = load_variant_contract_bundle_for_distro_from(root, distro_id)
-        .with_context(|| format!("loading canonical variant contract for '{}'", distro_id))?;
+    let variant = distro_contract::load(root, distro_id)?;
     let recipe_rhai = root.join("distro/builder/recipes/linux.rhai");
     let build_dir = distro_builder::recipe::recipe_work_dir(root, distro_id)?;
     let recipes_path = root.join("distro/builder/recipes");
-    let kconfig_path = bundle
-        .paths
-        .build_host_declared_path(&bundle.contract.build.kernel.kconfig_path);
+    let (kconfig_path, fragments) = distro_builder::kernel::kconfig_inputs(&variant);
     let kernel_artifact_root = distro_builder::run_history::kernel_output_dir(root, distro_id);
 
     let mut cmd = Command::new(recipe_bin);
@@ -148,11 +136,7 @@ pub(crate) fn build_kernel_via_recipe(
         .args(["--recipes-path", recipes_path.to_string_lossy().as_ref()])
         .args(["--define", &format!("KERNEL_TARGET={distro_id}")])
         .args(["--input", &format!("kconfig={}", kconfig_path.display())]);
-    let fragments = kconfig_path
-        .parent()
-        .context("kconfig has no parent")?
-        .join("kconfig.d");
-    if fragments.is_dir() {
+    if let Some(fragments) = fragments {
         cmd.args([
             "--input",
             &format!("kconfig_fragments={}", fragments.display()),
@@ -186,7 +170,7 @@ pub(crate) fn install_prebuilt_kernel_via_recipe(
     distro_id: &str,
     force_redownload: bool,
 ) -> Result<()> {
-    let recipe_rhai = root.join("distro/builder/recipes/linux-prebuilt.rhai");
+    let recipe_rhai = root.join(distro_builder::kernel::KERNEL_RECIPE);
     let build_dir = distro_builder::recipe::recipe_work_dir(root, distro_id)?;
     let recipes_path = root.join("distro/builder/recipes");
     let kernel_artifact_root = distro_builder::run_history::kernel_output_dir(root, distro_id);

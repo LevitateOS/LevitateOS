@@ -49,8 +49,7 @@ pub fn lock_path(root: &Path, distro: Distro) -> PathBuf {
 
 pub fn lock(distro: Distro, check: bool) -> Result<()> {
     let root = crate::util::repo::repo_root()?;
-    let bundle = distro_contract::load_variant_contract_bundle_for_distro_from(&root, distro.id())
-        .with_context(|| format!("loading the {} variant contract", distro.id()))?;
+    let bundle = distro_contract::load(&root, distro.id())?;
     let Some(base) = bundle.contract.sources.rootfs_source.rpm_base.clone() else {
         return Err(crate::util::exit::usage(format!(
             "{} does not take its rootfs from an RPM base (no rpm_base in its contract)",
@@ -97,7 +96,7 @@ pub fn lock(distro: Distro, check: bool) -> Result<()> {
 
     let cache = root.join(".artifacts/rpm-cache").join(format!("fedora-{release}"));
     let files = download_verified(&cache, newest.values())?;
-    let key = bundle.paths.variant_dir.join(&base.signing_key);
+    let key = bundle.path(&base.signing_key);
     check_signatures(&key, &files)?;
 
     fs::write(&path, render_lock(distro, release, &newest)?)

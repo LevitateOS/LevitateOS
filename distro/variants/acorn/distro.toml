@@ -1,0 +1,343 @@
+# AcornOS variant contract. Its shape is `distro_contract::ConformanceContract`;
+# `distro_contract::load` reads and validates it. Paths are relative to the repo
+# root unless a comment says otherwise.
+schema_version = 7
+
+[identity]
+os_name = "AcornOS"
+os_id = "acornos"
+iso_label = "ACORNOS"
+os_version = "1.0"
+default_hostname = "acornos"
+
+# The kernel is built from `kconfig` beside this file.
+[build.kernel]
+version = "7.3.3"
+sha256 = "79c66dde66cd96877fcde8f7d36aec946b1f423d2b97b5a7b1751b75c764f3d1"
+localversion = "-acorn"
+
+[sources.rootfs_source]
+storage_max_objects = 131072
+inputs = { system_setup = "distro/builder/guest/installed/system-setup.sh" }
+memory_mib = 4096
+preseed_memory_mib = 4096
+network_hosts = []
+preseed_network_hosts = ["dl-cdn.alpinelinux.org:443"]
+kind = "recipe_custom"
+recipe_script = "distro/builder/recipes/alpine-live-source-rootfs.rhai"
+preseed_recipe_script = "distro/builder/recipes/alpine-preseed-source-assets.rhai"
+preseed_outputs = { iso = "file", apk_tools = "file", extra_apks = "directory" }
+
+[products.rootfs_base]
+logical_name = "product.rootfs.base"
+description = "Canonical base root filesystem tree"
+
+[products.live_overlay]
+logical_name = "product.payload.live_overlay"
+description = "Read-only live overlay payload tree"
+
+[products.boot_live]
+logical_name = "product.payload.boot.live"
+description = "Live boot payload inputs"
+extends = "product.rootfs.base"
+
+[products.live_tools]
+logical_name = "product.payload.live_tools"
+description = "Live tools payload tree"
+extends = "product.payload.boot.live"
+
+[products.boot_installed]
+logical_name = "product.payload.boot.installed"
+description = "Installed-system boot payload inputs"
+extends = "product.rootfs.base"
+
+[products.kernel_staging]
+logical_name = "product.kernel.staging"
+description = "Kernel image and modules staging product"
+
+[product_config.live_overlay]
+kind = "openrc"
+
+# Recipe owns the complete system filesystem. Product assembly consumes that
+# published tree without maintaining a second package/file selection here.
+[[product_config.boot_live.producers]]
+kind = "copy_tree"
+source = "."
+destination = "."
+
+[[product_config.boot_live.producers]]
+kind = "write_text"
+path = ".live-payload-role"
+content = "rootfs\n"
+
+[[product_config.boot_installed.producers]]
+kind = "copy_tree"
+source = "."
+destination = "."
+
+[[product_config.boot_installed.producers]]
+kind = "write_text"
+path = ".live-payload-role"
+content = "rootfs\n"
+
+[[product_config.live_tools_actions]]
+kind = "tool_payload_workspace_binary"
+package = "recpart"
+
+[[product_config.live_tools_actions]]
+kind = "tool_payload_workspace_binary"
+package = "recstrap"
+target = "x86_64-unknown-linux-musl"
+
+[[product_config.live_tools_actions]]
+kind = "tool_payload_workspace_binary"
+package = "recstrap"
+binary = "recfstab"
+target = "x86_64-unknown-linux-musl"
+
+[[product_config.live_tools_actions]]
+kind = "tool_payload_workspace_binary"
+package = "recstrap"
+binary = "recchroot"
+target = "x86_64-unknown-linux-musl"
+
+[[product_config.live_tools_actions]]
+kind = "tool_payload_workspace_binary"
+package = "recstrap"
+binary = "recsetup"
+target = "x86_64-unknown-linux-musl"
+
+# A/B updates on the installed system: recab stages the inactive slot with
+# recstrap. Both go into the rootfs, which is what the installer extracts.
+[[product_config.live_tools_actions]]
+kind = "rootfs_workspace_binary"
+package = "recab"
+target = "x86_64-unknown-linux-musl"
+destination = "usr/bin/recab"
+
+[[product_config.live_tools_actions]]
+kind = "rootfs_workspace_binary"
+package = "recstrap"
+target = "x86_64-unknown-linux-musl"
+destination = "usr/bin/recstrap"
+
+# The install screen's split pane; live only, so it goes into the overlay.
+[[product_config.live_tools_actions]]
+kind = "tool_payload_workspace_binary"
+package = "install-split-pane"
+binary = "install-split"
+target = "x86_64-unknown-linux-musl"
+
+# The live ISO's install screen: this shell beside the install docs. getty
+# starts it on each console listed; the serial console runs it only when the
+# boot asks for it (the INSTALL_UX_SERIAL boot-injection key).
+[product_config.install_ux]
+consoles = ["tty1", "ttyS0"]
+shell = "/bin/sh"
+docs = { app = "install-docs", page = "acorn-installation", args = ["--product", "acorn"] }
+# TUI apps on the live ISO besides the docs, as commands for the shell beside them.
+apps = ["disk-plan", "base-system"]
+# The left pane: the install steps in order, with the shell one key away.
+hub = "install-hub"
+
+[transforms.rootfs_image]
+logical_name = "artifact.rootfs.erofs"
+dependencies = ["product.rootfs.base"]
+output_names = ["filesystem.erofs"]
+format = "erofs"
+
+[transforms.overlay_image]
+logical_name = "artifact.overlay.erofs"
+dependencies = ["product.payload.live_overlay"]
+output_names = ["overlayfs.erofs"]
+format = "erofs"
+
+[transforms.initramfs_live]
+logical_name = "artifact.initramfs.live"
+dependencies = ["product.payload.boot.live", "product.kernel.staging"]
+output_names = ["initramfs-live.cpio.gz"]
+format = "cpio.gz"
+
+# Outputs in order: live, emergency, debug.
+[transforms.live_uki]
+logical_name = "artifact.uki.live"
+dependencies = ["product.payload.boot.live", "product.kernel.staging"]
+output_names = ["acornos-live.efi", "acornos-emergency.efi", "acornos-debug.efi"]
+format = "uki"
+extra_cmdline = "video=1920x1080"
+
+[transforms.installed_uki]
+logical_name = "artifact.uki.installed"
+dependencies = ["product.payload.boot.installed", "product.kernel.staging"]
+output_names = ["acornos.efi", "acornos-recovery.efi"]
+format = "uki"
+
+[transforms.iso]
+logical_name = "artifact.iso"
+dependencies = [
+  "artifact.rootfs.erofs",
+  "artifact.overlay.erofs",
+  "artifact.initramfs.live",
+  "artifact.uki.live",
+]
+output_names = ["acornos-x86_64.iso"]
+format = "iso"
+
+[scenarios.live_boot]
+# The serial test protocol's readiness marker always means success; the
+# rootfs-missing message of the live init (live_boot::ROOTFS_MISSING_MESSAGE)
+# is always fatal.
+success_patterns = []
+fatal_patterns = [
+  "No bootable device",
+  "Boot Failed",
+  "Default Boot Device Missing",
+  "Shell>",
+  "ASSERT_EFI_ERROR",
+  "map: Cannot find",
+  "systemd-boot: Failed",
+  "loader: Failed",
+  "vmlinuz: not found",
+  "initramfs: not found",
+  "Error loading",
+  "File not found",
+  "Kernel panic",
+  "not syncing",
+  "VFS: Cannot open root device",
+  "No init found",
+  "Attempted to kill init",
+  "can't find /init",
+  "No root device",
+  "EROFS:",
+  "ERROR: cannot start",
+  "ERROR: ",
+  "fatal error",
+  "Segmentation fault",
+  "core dumped",
+]
+service_failure_patterns = []
+# `audit=1` and `inst.sshd=0` (keeps Anaconda's sshd off port 22) are on every
+# live boot of every variant.
+required_kernel_cmdline = [
+  "console=ttyS0,115200n8",
+  "console=tty0",
+  "audit=1",
+  "inst.sshd=0",
+]
+# Every variant's live boot runs sshd.
+required_live_services = ["networking", "dhcpcd", "sshd"]
+
+[scenarios.live_boot.evidence]
+script_path = "live-boot.sh"
+pass_marker = "LIVE BOOT PASSED"
+
+[scenarios.live_environment]
+required_services = ["networking", "dhcpcd", "sshd"]
+
+[scenarios.live_tools]
+required_tools = [
+  "recpart",
+  "recstrap",
+  "recfstab",
+  "recchroot",
+  "recsetup",
+  "sfdisk",
+  "mkfs.ext4",
+  "mount",
+  "ip",
+  "ping",
+  "curl",
+  "lspci",
+  "lsusb",
+  "smartctl",
+  "hdparm",
+  "vim",
+  "less",
+  "htop",
+  "grep",
+  "find",
+]
+serial_ready_patterns = [" login:"]
+
+[scenarios.live_tools.evidence]
+script_path = "live-tools.sh"
+pass_marker = "LIVE TOOLS PASSED"
+
+[scenarios.install]
+required_tools = ["recpart", "recstrap", "recfstab", "recchroot", "sfdisk", "mkfs.ext4"]
+required_services = ["networking", "dhcpcd", "sshd"]
+
+[scenarios.install.evidence]
+script_path = "install.sh"
+pass_marker = "INSTALL PASSED"
+
+[scenarios.installed_boot]
+success_patterns = ["acornos login:", "login:", "Welcome to AcornOS"]
+fatal_patterns = [
+  "No bootable device",
+  "Boot Failed",
+  "Default Boot Device Missing",
+  "Shell>",
+  "ASSERT_EFI_ERROR",
+  "map: Cannot find",
+  "systemd-boot: Failed",
+  "loader: Failed",
+  "vmlinuz: not found",
+  "initramfs: not found",
+  "Error loading",
+  "File not found",
+  "Kernel panic",
+  "not syncing",
+  "VFS: Cannot open root device",
+  "No init found",
+  "Attempted to kill init",
+  "can't find /init",
+  "No root device",
+  "EROFS:",
+  "fatal error",
+  "Segmentation fault",
+  "core dumped",
+]
+service_failure_patterns = ["ERROR: cannot start", "* ERROR:", "crashed"]
+required_kernel_cmdline = []
+required_live_services = []
+
+[scenarios.installed_boot.evidence]
+script_path = "installed-boot.sh"
+pass_marker = "INSTALLED BOOT PASSED"
+
+[scenarios.automated_login]
+auth_mode = "default_password_login"
+default_username = "acorn"
+default_password = "acorn"
+login_prompt_pattern = "acornos login:"
+
+[scenarios.automated_login.evidence]
+script_path = "automated-login.sh"
+pass_marker = "AUTOMATED LOGIN PASSED"
+
+[scenarios.installed_tools]
+required_tools = ["doas", "ip", "ssh", "ash", "mount", "umount", "dmesg", "ps", "ls", "cat", "recab", "recstrap"]
+
+[scenarios.installed_tools.evidence]
+script_path = "installed-tools.sh"
+pass_marker = "INSTALLED TOOLS PASSED"
+
+[scenarios.runtime_policy]
+# "immutable" installs the A/B layout (two root slots, shared /var) that recab
+# updates and rolls back; each slot's root is still mounted read-write.
+rootfs_mutability = "immutable"
+mutable_required_rw_paths = []
+immutable_required_ro_paths = []
+
+[release]
+primary_outputs = ["acornos-x86_64.iso"]
+supporting_artifacts = ["filesystem.erofs", "initramfs-live.cpio.gz"]
+metadata_outputs = []
+metadata_facts = [
+  "kernel_source.version",
+  "kernel_source.sha256",
+  "kernel_source.localversion",
+  "artifact.rootfs_name",
+  "artifact.iso_filename",
+]

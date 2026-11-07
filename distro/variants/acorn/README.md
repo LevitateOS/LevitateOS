@@ -1,9 +1,5 @@
-# Acorn Variant (Build-Host Scaffold)
+# AcornOS variant
 
-Required build-host files:
-- `build-host/build-host.toml`
-- `build-host/kernel/kconfig`
-- `build-host/recipes/kernel.rhai`
-- `build-host/evidence/build-capability.sh`
-
-`build-host/build-host.toml` is the canonical build-host source of truth for Acorn.
+- `distro.toml`: the whole variant contract (identity, kernel pin, sources, products, transforms, scenarios, release). Its shape is `distro_contract::ConformanceContract`; `distro_contract::load` reads and validates it.
+- `kconfig`: the kernel configuration.
+- `hooks/`: the release hooks the builder runs for each release ISO (they call `../_shared/hooks/build-release.sh`).

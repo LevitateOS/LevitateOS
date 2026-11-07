@@ -1,0 +1,521 @@
+# LevitateOS variant contract. Its shape is `distro_contract::ConformanceContract`;
+# `distro_contract::load` reads and validates it. Paths are relative to the repo
+# root unless a comment says otherwise.
+schema_version = 7
+
+[identity]
+os_name = "LevitateOS"
+os_id = "levitateos"
+iso_label = "LEVITATEOS"
+os_version = "1.0"
+default_hostname = "levitateos"
+
+# The kernel is built from `kconfig` beside this file.
+[build.kernel]
+version = "6.12.116"
+sha256 = "cb3ed3dfdd47e6ade49dc933db334fd86e24cadee920da612c262b0e9b6a511b"
+localversion = "-levitate"
+
+[sources.rootfs_source]
+storage_max_objects = 131072
+inputs = { system_setup = "distro/builder/guest/installed/system-setup.sh" }
+memory_mib = 8192
+preseed_memory_mib = 8192
+network_hosts = []
+preseed_network_hosts = ["dl.fedoraproject.org:443"]
+kind = "recipe_rpm_set"
+recipe_script = "distro/builder/recipes/fedora-rpm-source-rootfs.rhai"
+preseed_recipe_script = "distro/builder/recipes/fedora-rpm-preseed.rhai"
+preseed_outputs = { rpms = "directory" }
+
+# What the rootfs takes from Fedora. `cargo xtask base lock levitate` resolves
+# the newest signed build of each from the release and updates repositories
+# into distro/builder/recipes/sources/levitate-rpm-lock.rhai.
+[sources.rootfs_source.rpm_base]
+fedora_release = 45
+# Relative to this directory.
+signing_key = "keys/RPM-GPG-KEY-fedora-45-primary"
+packages = [
+  # Root filesystem skeleton and core runtime.
+  "filesystem",
+  "setup",
+  "bash",
+  "bash-completion",
+  "coreutils",
+  "coreutils-common",
+  "findutils",
+  "grep",
+  "gawk",
+  "ncurses-libs",
+  "sed",
+  "diffutils",
+  # System boot/service runtime for live boot.
+  "systemd",
+  "systemd-libs",
+  "systemd-udev",
+  # Fedora 45 ships systemd-sysusers apart from systemd; without it the system
+  # users and groups (systemd-journal, ...) are never made and boots end degraded.
+  "systemd-sysusers",
+  "iproute",
+  "kmod",
+  "util-linux",
+  "util-linux-core",
+  # Installing to disk and A/B updates: recpart formats ext4 and FAT, recab
+  # stage formats a slot, and bootctl install copies systemd-boot's EFI binary.
+  "e2fsprogs",
+  "e2fsprogs-libs",
+  "libss",
+  "dosfstools",
+  "systemd-boot-unsigned",
+  "iputils",
+  "curl",
+  "libcurl",
+  "libidn2",
+  "libunistring",
+  "libnghttp2",
+  "libssh",
+  "libpsl",
+  "openldap",
+  "libbrotli",
+  "libevent",
+  "cyrus-sasl-lib",
+  "pciutils",
+  "pciutils-libs",
+  "usbutils",
+  "libusb1",
+  "less",
+  # vi, which the live tools and the docs expect.
+  "vim-minimal",
+  "vim-data",
+  "libfdisk",
+  "readline",
+  "kmod-libs",
+  "libmount",
+  "libblkid",
+  "libsmartcols",
+  "libuuid",
+  "shadow-utils",
+  "sudo",
+  # SSH + service wiring expectations.
+  "openssh-server",
+  "openssh",
+  "openssh-clients",
+  # RPM dependency solving is not active in this extraction path; include
+  # OpenSSH Kerberos runtime libs explicitly for sshd-session.
+  "krb5-libs",
+  "keyutils-libs",
+  "libverto",
+  "libcom_err",
+  "dbus",
+  "dbus-common",
+  "dbus-daemon",
+  "dbus-broker",
+  "expat",
+  # Locale + console essentials.
+  "glibc",
+  "glibc-common",
+  "glibc-minimal-langpack",
+  "kbd",
+  "kbd-misc",
+  # Common runtime libs used by copied binaries.
+  "libgcc",
+  "libstdc++",
+  "pam",
+  "pam-libs",
+  "libacl",
+  "libattr",
+  "libcap-ng",
+  "libeconf",
+  "libseccomp",
+  "pcre2",
+  "libxcrypt",
+  "libcap",
+  "libbpf",
+  "elfutils-libelf",
+  "libmnl",
+  "libzstd",
+  "audit-libs",
+  "audit",
+  "libselinux",
+  "openssl-libs",
+  "zlib-ng-compat",
+  "xz-libs",
+  "procps-ng",
+  # Shared libraries the packages above link against. The lock takes no RPM
+  # dependency solving, so every library a locked binary loads is named here:
+  # without them systemctl/bootctl (systemd-shared), useradd (libsemanage) and
+  # the rest fail with "error while loading shared libraries".
+  "systemd-shared",
+  "cryptsetup-libs",
+  "device-mapper-libs",
+  "json-c",
+  "tpm2-tss",
+  "libxml2",
+  "libsemanage",
+  "libsepol",
+  "bzip2-libs",
+  "liblastlog2",
+  "libnsl2",
+  "libtirpc",
+  "gdbm-libs",
+  "dbus-libs",
+  "fuse3-libs",
+  "gmp",
+  "mpfr",
+  "libedit",
+  "libfido2",
+  "libcbor",
+  "libnghttp3",
+  "ngtcp2",
+  "ngtcp2-crypto-ossl",
+  "libtool-ltdl",
+  "libxkbcommon",
+  "sqlite-libs",
+  # What the install docs configure: time zones under /usr/share/zoneinfo,
+  # compiled English locales, and NetworkManager with its libraries.
+  "tzdata",
+  "glibc-langpack-en",
+  "NetworkManager",
+  "NetworkManager-libnm",
+  "glib2",
+  "gnutls",
+  "nettle",
+  "libtasn1",
+  "p11-kit",
+  "libffi",
+  "libndp",
+]
+
+[products.rootfs_base]
+logical_name = "product.rootfs.base"
+description = "Canonical base root filesystem tree"
+
+[products.live_overlay]
+logical_name = "product.payload.live_overlay"
+description = "Read-only live overlay payload tree"
+
+[products.boot_live]
+logical_name = "product.payload.boot.live"
+description = "Live boot payload inputs"
+extends = "product.rootfs.base"
+
+[products.live_tools]
+logical_name = "product.payload.live_tools"
+description = "Live tools payload tree"
+extends = "product.payload.boot.live"
+
+[products.boot_installed]
+logical_name = "product.payload.boot.installed"
+description = "Installed-system boot payload inputs"
+extends = "product.rootfs.base"
+
+[products.kernel_staging]
+logical_name = "product.kernel.staging"
+description = "Kernel image and modules staging product"
+
+[product_config.live_overlay]
+kind = "systemd"
+
+# Recipe owns the complete system filesystem. Product assembly consumes that
+# published tree without maintaining a second package/file selection here.
+[[product_config.boot_live.producers]]
+kind = "copy_tree"
+source = "."
+destination = "."
+
+[[product_config.boot_live.producers]]
+kind = "write_text"
+path = ".live-payload-role"
+content = "rootfs\n"
+
+[[product_config.boot_installed.producers]]
+kind = "copy_tree"
+source = "."
+destination = "."
+
+[[product_config.boot_installed.producers]]
+kind = "write_text"
+path = ".live-payload-role"
+content = "rootfs\n"
+
+[[product_config.live_tools_actions]]
+kind = "tool_payload_workspace_binary"
+package = "recpart"
+
+[[product_config.live_tools_actions]]
+kind = "tool_payload_workspace_binary"
+package = "recstrap"
+
+[[product_config.live_tools_actions]]
+kind = "tool_payload_workspace_binary"
+package = "recstrap"
+binary = "recfstab"
+
+[[product_config.live_tools_actions]]
+kind = "tool_payload_workspace_binary"
+package = "recstrap"
+binary = "recchroot"
+
+[[product_config.live_tools_actions]]
+kind = "tool_payload_workspace_binary"
+package = "recstrap"
+binary = "recsetup"
+
+# A/B updates on the installed system: recab stages the inactive slot with
+# recstrap. Both go into the rootfs, which is what the installer extracts.
+[[product_config.live_tools_actions]]
+kind = "rootfs_workspace_binary"
+package = "recab"
+destination = "usr/bin/recab"
+
+[[product_config.live_tools_actions]]
+kind = "rootfs_workspace_binary"
+package = "recstrap"
+destination = "usr/bin/recstrap"
+
+# The install screen's split pane; live only, so it goes into the overlay.
+[[product_config.live_tools_actions]]
+kind = "tool_payload_workspace_binary"
+package = "install-split-pane"
+binary = "install-split"
+
+# The live ISO's install screen: this shell beside the install docs. getty
+# starts it on each console listed; the serial console runs it only when the
+# boot asks for it (the INSTALL_UX_SERIAL boot-injection key).
+[product_config.install_ux]
+consoles = ["tty1", "ttyS0"]
+shell = "/bin/bash"
+docs = { app = "install-docs", page = "installation" }
+# TUI apps on the live ISO besides the docs, as commands for the shell beside them.
+apps = ["disk-plan", "base-system"]
+# The left pane: the install steps in order, with the shell one key away.
+hub = "install-hub"
+
+[transforms.rootfs_image]
+logical_name = "artifact.rootfs.erofs"
+dependencies = ["product.rootfs.base"]
+output_names = ["filesystem.erofs"]
+format = "erofs"
+
+[transforms.overlay_image]
+logical_name = "artifact.overlay.erofs"
+dependencies = ["product.payload.live_overlay"]
+output_names = ["overlayfs.erofs"]
+format = "erofs"
+
+[transforms.initramfs_live]
+logical_name = "artifact.initramfs.live"
+dependencies = ["product.payload.boot.live", "product.kernel.staging"]
+output_names = ["initramfs-live.cpio.gz"]
+format = "cpio.gz"
+
+[transforms.initramfs_installed]
+logical_name = "artifact.initramfs.installed"
+dependencies = ["product.payload.boot.installed", "product.kernel.staging"]
+output_names = ["initramfs-installed.img"]
+format = "img"
+
+# Outputs in order: live, emergency, debug.
+[transforms.live_uki]
+logical_name = "artifact.uki.live"
+dependencies = ["product.payload.boot.live", "product.kernel.staging"]
+output_names = [
+  "levitateos-live.efi",
+  "levitateos-emergency.efi",
+  "levitateos-debug.efi",
+]
+format = "uki"
+extra_cmdline = "video=1920x1080"
+
+[transforms.installed_uki]
+logical_name = "artifact.uki.installed"
+dependencies = ["product.payload.boot.installed", "product.kernel.staging"]
+output_names = ["levitateos.efi", "levitateos-recovery.efi"]
+format = "uki"
+
+[transforms.iso]
+logical_name = "artifact.iso"
+dependencies = [
+  "artifact.rootfs.erofs",
+  "artifact.overlay.erofs",
+  "artifact.initramfs.live",
+  "artifact.uki.live",
+]
+output_names = ["levitateos-x86_64.iso"]
+format = "iso"
+
+[scenarios.live_boot]
+# The serial test protocol's readiness marker always means success; the
+# rootfs-missing message of the live init (live_boot::ROOTFS_MISSING_MESSAGE)
+# is always fatal.
+success_patterns = []
+fatal_patterns = [
+  "No bootable device",
+  "Boot Failed",
+  "Default Boot Device Missing",
+  "Shell>",
+  "ASSERT_EFI_ERROR",
+  "map: Cannot find",
+  "systemd-boot: Failed",
+  "loader: Failed",
+  "vmlinuz: not found",
+  "initramfs: not found",
+  "Error loading",
+  "File not found",
+  "Kernel panic",
+  "not syncing",
+  "VFS: Cannot open root device",
+  "No init found",
+  "Attempted to kill init",
+  "can't find /init",
+  "No root device",
+  "EROFS:",
+  "SQUASHFS error",
+  "emergency shell",
+  "Emergency shell",
+  "emergency.target",
+  "rescue.target",
+  "Timed out waiting for device",
+  "fatal error",
+  "Segmentation fault",
+  "core dumped",
+  "Failed to start sshd.service",
+  "sshd.service: Failed with result",
+]
+service_failure_patterns = []
+# `audit=1` and `inst.sshd=0` (keeps Anaconda's sshd off port 22) are on every
+# live boot of every variant.
+required_kernel_cmdline = [
+  "console=ttyS0,115200n8",
+  "console=tty0",
+  "selinux=0",
+  "audit=1",
+  "audit_backlog_limit=8192",
+  "loglevel=3",
+  "systemd.show_status=0",
+  "rd.systemd.show_status=0",
+  "inst.sshd=0",
+]
+# Every variant's live boot runs sshd.
+required_live_services = ["sshd"]
+
+[scenarios.live_boot.evidence]
+script_path = "live-boot.sh"
+pass_marker = "LIVE BOOT PASSED"
+
+[scenarios.live_environment]
+required_services = ["sshd", "auditd"]
+
+[scenarios.live_tools]
+required_tools = [
+  "recpart",
+  "recstrap",
+  "recfstab",
+  "recchroot",
+  "recsetup",
+  "sfdisk",
+  "mkfs.ext4",
+  "ip",
+  "ping",
+  "curl",
+  "lspci",
+  "lsusb",
+  "vi",
+  "less",
+  "grep",
+  "find",
+]
+serial_ready_patterns = [" login:"]
+
+[scenarios.live_tools.evidence]
+script_path = "live-tools.sh"
+pass_marker = "LIVE TOOLS PASSED"
+
+[scenarios.install]
+required_tools = ["recpart", "recstrap", "recfstab", "recchroot", "sfdisk", "mkfs.ext4"]
+required_services = ["sshd", "auditd"]
+
+[scenarios.install.evidence]
+script_path = "install.sh"
+pass_marker = "INSTALL PASSED"
+
+[scenarios.installed_boot]
+success_patterns = ["levitateos login:", "multi-user.target"]
+fatal_patterns = [
+  "No bootable device",
+  "Boot Failed",
+  "Default Boot Device Missing",
+  "Shell>",
+  "ASSERT_EFI_ERROR",
+  "map: Cannot find",
+  "systemd-boot: Failed",
+  "loader: Failed",
+  "vmlinuz: not found",
+  "initramfs: not found",
+  "Error loading",
+  "File not found",
+  "Kernel panic",
+  "not syncing",
+  "VFS: Cannot open root device",
+  "No init found",
+  "Attempted to kill init",
+  "can't find /init",
+  "No root device",
+  "EROFS:",
+  "SQUASHFS error",
+  "emergency shell",
+  "Emergency shell",
+  "emergency.target",
+  "rescue.target",
+  "Timed out waiting for device",
+  "fatal error",
+  "Segmentation fault",
+  "core dumped",
+]
+service_failure_patterns = ["Failed to start", "[FAILED]", "Dependency failed"]
+required_kernel_cmdline = []
+required_live_services = []
+
+[scenarios.installed_boot.evidence]
+script_path = "installed-boot.sh"
+pass_marker = "INSTALLED BOOT PASSED"
+
+[scenarios.automated_login]
+auth_mode = "default_password_login"
+default_username = "levitate"
+default_password = "levitate"
+login_prompt_pattern = "levitateos login:"
+
+[scenarios.automated_login.evidence]
+script_path = "automated-login.sh"
+pass_marker = "AUTOMATED LOGIN PASSED"
+
+[scenarios.installed_tools]
+required_tools = ["sudo", "ip", "ssh", "bash", "mount", "umount", "dmesg", "ps", "ls", "cat", "recab", "recstrap"]
+
+[scenarios.installed_tools.evidence]
+script_path = "installed-tools.sh"
+pass_marker = "INSTALLED TOOLS PASSED"
+
+[scenarios.runtime_policy]
+# "immutable" installs the A/B layout (two root slots, shared /var) that recab
+# updates and rolls back; each slot's root is still remounted read-write.
+rootfs_mutability = "immutable"
+mutable_required_rw_paths = []
+immutable_required_ro_paths = []
+
+[release]
+primary_outputs = ["levitateos-x86_64.iso"]
+supporting_artifacts = [
+  "filesystem.erofs",
+  "initramfs-live.cpio.gz",
+  "initramfs-installed.img",
+]
+metadata_outputs = []
+metadata_facts = [
+  "kernel_source.version",
+  "kernel_source.sha256",
+  "kernel_source.localversion",
+  "artifact.rootfs_name",
+  "artifact.iso_filename",
+]
