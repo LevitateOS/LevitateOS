@@ -48,9 +48,10 @@
       "name": "@levitate/disk-plan",
       "version": "0.1.0",
       "bin": {
-        "disk-plan": "./src/main.ts",
+        "disk-plan": "./src/main.tsx",
       },
       "dependencies": {
+        "@levitate/docs-content": "workspace:*",
         "@levitate/tui-kit": "workspace:*",
         "ink": "^6.8.0",
         "react": "^19.2.0",
