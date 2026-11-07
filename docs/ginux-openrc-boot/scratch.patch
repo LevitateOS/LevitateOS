@@ -86,7 +86,7 @@ index d919f4eb..19694494 100644
      } else if matches!(
          syscall,
 diff --git a/crates/ginux-init/src/main.rs b/crates/ginux-init/src/main.rs
-index 8705d926..357cc4a8 100644
+index 8705d926..b16db3fc 100644
 --- a/crates/ginux-init/src/main.rs
 +++ b/crates/ginux-init/src/main.rs
 @@ -4551,7 +4551,7 @@ fn supervise_native(
@@ -98,7 +98,23 @@ index 8705d926..357cc4a8 100644
      const AUDIT_PREFIX: &[u8] = b"GINUX_NATIVE_AUDIT: sequence=";
      let audit_mode = instance.config().audit_mode;
      let audit_instance_id = instance.config().id;
-@@ -5043,6 +5043,14 @@ fn supervise_native(
+@@ -4932,7 +4932,14 @@ fn supervise_native(
+             continue;
+         }
+         if signal == 17 {
+-            if ptrace(PTRACE_SYSCALL, host_pid, 0, 0) < 0 {
++            // Deliver it, as the configured path does: a parent that catches
++            // SIGCHLD with a handler (OpenRC, busybox, shells) waits for it.
++            // systemd blocks SIGCHLD and reads a signalfd, so it never stops here.
++            write_all(b"GINUX_NATIVE_PROCESS_AUDIT: sigchld delivered parent=");
++            write_u64(task.virtual_id.pid as u64);
++            write_all(b"\n");
++            tasks[task_index] = Some(task);
++            if ptrace(PTRACE_SYSCALL, host_pid, 0, 17) < 0 {
+                 native_fail(instance, pid, b"native SIGCHLD resume failed");
+             }
+             continue;
+@@ -5043,6 +5050,14 @@ fn supervise_native(
                  if ptrace(PTRACE_SETREGS, host_pid, 0, &registers as *const _ as usize) < 0 {
                      native_fail(instance, pid, b"native result override failed");
                  }
@@ -113,7 +129,7 @@ index 8705d926..357cc4a8 100644
              }
              write_all(b"GINUX_NATIVE_AUDIT: sequence=");
              write_u64(sequence);
-@@ -5190,7 +5198,7 @@ fn supervise_native(
+@@ -5190,7 +5205,7 @@ fn supervise_native(
                  }
                  task.pending_getsockname = 0;
              }
@@ -122,7 +138,7 @@ index 8705d926..357cc4a8 100644
                  let read_fd = read_tracee_u32(host_pid, task.pipe2_address);
                  let write_fd = read_tracee_u32(host_pid, task.pipe2_address + 4);
                  let Some((read_fd, write_fd)) = read_fd.zip(write_fd) else {
-@@ -5697,6 +5705,11 @@ fn supervise_native(
+@@ -5697,6 +5712,11 @@ fn supervise_native(
                          SYS_GETPID | ginux_core::SYS_GETTID => view.id.pid as i64,
                          ginux_core::SYS_GETPPID => view.parent as i64,
                          ginux_core::SYS_GETPGRP => view.process_group as i64,
@@ -134,7 +150,7 @@ index 8705d926..357cc4a8 100644
                          ginux_core::SYS_GETUID | ginux_core::SYS_GETEUID => {
                              i64::from(view.credentials.uid)
                          }
-@@ -6677,7 +6690,7 @@ fn supervise_native(
+@@ -6677,7 +6697,7 @@ fn supervise_native(
                  if mode == 3
                      && syscall == 292
                      && registers.rdi <= INSTANCE_CONSOLE_FD as u64
@@ -143,7 +159,7 @@ index 8705d926..357cc4a8 100644
                      && registers.rdx & !0x8_0000 == 0 =>
              {
                  line(b"mediate surface=virtual-console-dup result=pending");
-@@ -6702,7 +6715,7 @@ fn supervise_native(
+@@ -6702,7 +6722,7 @@ fn supervise_native(
                  if mode == 3
                      && syscall == 33
                      && registers.rdi <= INSTANCE_CONSOLE_FD as u64
@@ -152,7 +168,7 @@ index 8705d926..357cc4a8 100644
              {
                  line(b"mediate surface=virtual-console-dup result=pending");
                  task.awaiting_exit = true;
-@@ -6984,7 +6997,7 @@ fn supervise_native(
+@@ -6984,7 +7004,7 @@ fn supervise_native(
                      native_fail(instance, pid, b"native proc self open failed");
                  }
              }
@@ -161,7 +177,7 @@ index 8705d926..357cc4a8 100644
                  line(b"mediate surface=task-pipe result=pending");
                  task.pipe2_address = registers.rdi as usize;
                  task.awaiting_exit = true;
-@@ -7207,7 +7220,8 @@ fn supervise_native(
+@@ -7207,7 +7227,8 @@ fn supervise_native(
                  }
                  if mode == 3 && syscall == 61 {
                      let selector = registers.rdi as u32 as i32;
@@ -171,7 +187,7 @@ index 8705d926..357cc4a8 100644
                          registers.rdi = u64::MAX;
                      } else if selector > 0 {
                          let selected = selector as u32;
-@@ -7312,6 +7326,7 @@ fn native_identity_result(syscall: u64, mode: usize) -> Option<i64> {
+@@ -7312,6 +7333,7 @@ fn native_identity_result(syscall: u64, mode: usize) -> Option<i64> {
              SYS_GETPID | ginux_core::SYS_GETTID => Some(1),
              ginux_core::SYS_GETPPID => Some(0),
              ginux_core::SYS_GETPGRP => Some(1),
@@ -179,7 +195,7 @@ index 8705d926..357cc4a8 100644
              _ => balanced_identity_result(syscall),
          }
      } else {
-@@ -7339,6 +7354,7 @@ fn native_arguments_allowed(syscall: u64, registers: &UserRegs, mode: usize) ->
+@@ -7339,6 +7361,7 @@ fn native_arguments_allowed(syscall: u64, registers: &UserRegs, mode: usize) ->
          match syscall {
              ginux_core::SYS_PIDFD_OPEN => registers.rdi > 0 && registers.rsi == 0,
              293 => registers.rdi != 0 && registers.rsi & !(0x8_0000 | 0x800) == 0,

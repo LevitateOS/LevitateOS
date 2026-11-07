@@ -29,6 +29,7 @@ printf 'MemTotal:        1048576 kB\nMemFree:          524288 kB\nMemAvailable: 
 printf 'none / proc rw,nosuid,nodev,noexec,relatime 0 0\n' >"$R/proc/mounts"
 printf '0.00 0.00 0.00 1/1 1\n' >"$R/proc/loadavg"
 : >"$R/proc/cpuinfo"
+printf 'nodev\tproc\nnodev\ttmpfs\nnodev\tdevpts\n\text4\n' >"$R/proc/filesystems"
 printf 'Ginux userspace kernel 0.1.0 (Linux ABI personality 6.12.0-ginux-abi1; x86_64)\n' >"$R/proc/version"
 printf '1048576\n' >"$R/proc/sys/fs/nr_open"
 printf '40\n' >"$R/proc/sys/kernel/cap_last_cap"
