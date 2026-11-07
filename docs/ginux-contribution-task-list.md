@@ -1204,3 +1204,30 @@ Keep B1–B3 recorded; do not redesign storage or run adversarial probes here.
 The requested #207 conflict-push explanation is appended to pr-inventory.md,
 preserving Claude's current uncommitted edits; push nothing further to the fork.
 Active HDAE skill/reload procedure remains as recorded above; no cloud dispatch.
+
+
+### Local configured threads — 2026-11-07
+
+Local integration commit `78f96df1` (on `91e244c1`) adds the libc thread clone
+shape through the existing process owner. Threads share descriptor/cwd/executable
+lifetimes; pending syscall results and blocked-IO pins remain per task. Fork
+snapshot publication, concurrent child waits, leader-first exit and thread-slot
+retirement retain explicit ownership. Exec remains limited to a single process
+leader. This is local consumer work for Claude to extract, with no upstream push.
+
+Static/build and103 routine Ginux units pass; the three preserved policy/security
+units remain unrun. Eight ordinary thread modes plus signal/failure teardown pass,
+as do selected process, pipe/vector, poll, cwd, owned ELF and script regressions.
+The saved Recipe Bash/output-reader case now passes1/1 in83.76s on binary
+`d76807581abb74a37c32c80fc3719f6a49c7bebf5d5783e0ce22b14ba71f5b13`.
+Earlier failed receipts are retained. This is ordinary capability evidence, not
+G07 shared-argument security acceptance or full/current Recipe-suite passage.
+
+Two ordinary saved tar/progress cases are running serially; current Recipe CLI
+and e2e harness are building in a separate target directory. Exact logs/receipts
+and source head live in the integration source's `.artifacts/recipe-integration/`.
+Next: inspect completed tar results, diagnose any ordinary failures, then finish
+current-Recipe consumer verification. Known B1–B3 storage defects remain unchanged;
+security work stays downstream and pending without dispatch. Preserve all six
+historical restored worktrees. Active HDAE skill and reload procedure remain as
+recorded above. The goal is active and incomplete.
