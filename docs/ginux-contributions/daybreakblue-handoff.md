@@ -1171,3 +1171,17 @@ symlink authority, protected copyout, negative transport and restore inputs.
 The G02 clock-dependent five cases remain held/unrun or failed as previously
 recorded. Claude's upstream storage redesign remains separate. No remote
 push, PR, upstream comment or agent dispatch occurred.
+
+### Current-revision Recipe security selection complete — 2026-11-07
+
+`security-ledger-6d290d48.json` reconciles all 33 previously unrun Recipe
+security e2e names against the immutable Ginux `6d290d48` binary: **29 pass**
+with individual exit-zero, one-test/one-pass logs and matching binary hashes;
+**four remain unrun** because they directly invoke guest sleep under the
+user's G02 hold. Two of those 29 had passed on this revision before the batch;
+the other 27 were rerun individually. No case failed or timed out in this
+current-revision security selection. The original 100 ordinary Recipe passes
+remain historical evidence on `436c4ae5`; one G02 case failed there and one
+other G02-dependent case remains unrun. The current-revision security selection
+therefore does not imply a complete 135-case suite pass. Broader Ginux
+security criteria in this handoff remain open as listed above.

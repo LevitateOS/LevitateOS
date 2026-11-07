@@ -1710,3 +1710,17 @@ revision-specific validation. Exact next action: review those independent
 security families against this source and run focused checks in dependency
 order; preserve the G02 hold and Claude's upstream ownership. No push, PR or
 upstream comment is authorized or made.
+
+The current-revision Recipe security selection has now finished. The
+machine-checked `security-ledger-6d290d48.json` in the local evidence
+directory reconciles the 33 security names: **29 pass** individually against
+the immutable `6d290d48` binary, **four remain unrun** because of the held
+guest-sleep dependency, and none of the 29 failed or timed out. This
+supersedes the earlier note that 27 security cases still needed a current-source
+rerun. The historical ordinary 100 passes remain on `436c4ae5`; the one
+observed G02 failure and one other held G02 case remain. Full 135-case
+current-revision acceptance and the separate Ginux security handoff criteria
+are still incomplete. Exact next action: source-review and controlled focused
+validation of the remaining Ginux shared-argument, contract/authority,
+copyout, concurrency, transport and restore security requirements, retaining
+G02 and Claude's upstream ownership boundaries.
