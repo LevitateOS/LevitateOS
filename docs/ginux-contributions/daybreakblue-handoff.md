@@ -1261,12 +1261,14 @@ publication. No push, PR, upstream comment or agent dispatch occurred.
 
 The unchanged `x-path` fixture ran once on configured binary from integration
 `158e11a6` and reported PASS across its 2,048 selected calls. This stochastic
-negative run does not override the earlier `6d290d48` hidden-byte exposure or
-the current source path: `Rewrite::prepare` still writes the translated pathname
-into tracee stack memory that a shared peer can change. The ignored
-`ginux-current-g07-xpath-selected-158e11a6/` bundle records exact inputs and
-output. G07 authority acceptance remains failed until a stable kernel-argument
-design and stronger retest are verified.
+negative result alone does not prove G07 acceptance. The earlier `6d290d48`
+hidden-byte exposure predates local commit `e0519b48`, which stops peers before
+pathname classification and holds them through the kernel syscall. Source review
+shows that the current stack scratch is protected by this guard; the earlier
+current-source implication that writable scratch alone left this race open was
+incorrect. The paired scratch regression below provides stronger evidence. The
+ignored `ginux-current-g07-xpath-selected-158e11a6/` bundle records exact
+inputs and output. Broader G07 authority remains partial.
 
 ### Current-source storage prerequisite and stack checks — 2026-11-07
 
@@ -2251,3 +2253,22 @@ The ignored local `ginux-current-assignment-ancestor-oracle-158e11a6/` evidence 
 On clean local integration `158e11a6` and configured runtime SHA-256 `e019cc90bfd6682a8d4ab420eaa17de245c2e18f80b49a9f2603ac17f01344b8`, authorized disposable launches compared process `RLIMIT_STACK` values with core dumps disabled. The same `memory:/work` owned-script fixture passed at 8 MiB and 3 MiB (launcher exit 0, `exited/0`, `owned-vector-pointee: PASS`, complete teardown), but the 2 MiB launch died from SIGSEGV (subprocess return `-11`) before any audit bytes or result file. A separate no-storage-assignment static init exited 77 with `exited/77` at 8 MiB and likewise died from SIGSEGV before audit/result creation at 2 MiB. Thus a **low-stack launch reliability criterion fails** on the current revision, including without an assignment. The selected threshold is bracketed between 2 and 3 MiB; this does not establish the exact minimum or the faulting instruction.
 
 The current source uses `MappedArray` for storage namespace and backing metadata, while `launch.rs` constructs `LaunchChannels` in the launch frame and `channel_hooks.rs` defines sixteen 65,536-byte pipe buffers. Those source facts make the earlier “2 MiB MemoryFs on stack” attribution unproven for this revision; a crash-level diagnosis has not been completed. The ignored local `ginux-current-storage-stack-boundary-158e11a6/` evidence directory retains the three exact runners and receipts, configs, full successful audits, empty failure audits, fixture/runtime hashes, and the initial no-assignment wrapper receipt. The initial wrapper incorrectly asserted launcher exit 0 for a guest that intentionally exited 77; it failed after recording the valid observations, and the corrected wrapper reran and passed. Corrected no-assignment runner SHA-256 `87b3bb9c9408683b7ab1c5e76804d2c55aeb054dcbd677dc29fa21c81f58bc5d`; assigned 3 MiB and 2 MiB runner hashes `0938263691982d67783cfb51716923353df64793d224f507259cea3f0ef3b9d9` and `79fb80707a6e1507b23b0c3e638de9b816c3699f9d1daf9f9bdf2cde5a142e79`. No local redesign is undertaken absent a blocking Recipe case; Claude owns upstream Ginux PR decisions. G03c assignment confinement and G03c/G12 descriptor canonicality remain failed; G02 clock policy held. The separate Recipe e2e process was live at the last direct host check, with 13 failures in its partial log and no final result. Exact next action: inspect the final e2e result and diagnose whether a Recipe case is blocked by the low-stack failure; then retest changed Ginux source after upstream merges. No runtime source change, upstream push, PR or comment occurred.
+
+### Current G07 native pathname scratch regression — 2026-11-07
+
+Local integration commit `f4b2e240` adds `X-scratch` to Ginux's existing thread
+fixture and runner. A shared peer overwrites the exact `rsp-512` pathname scratch
+with image `/work/hh`, hidden by `memory:/work`, while the owner opens constant
+`/./allowed`. The fixture uses two vCPUs and requires a valid allowed `A` read.
+The final fixture on preserved pre-guard binary `f9a584e9` observed hidden `S`
+and exited 205 (runner 1); on current guarded binary SHA-256
+`12fea894f0545d447e48750e5a8a55a06577a503dc2a62ccbd8e4ffab9fa6c79`
+it passed (runner 0). Full thread runner, `make check`, release build and full
+storage runner also passed. Exact source, binary, hashes, commands, logs and exit
+statuses are in ignored `ginux-current-g07-scratch-regression-f4b2e240/`.
+This establishes one native path-scratch protection on the current revision;
+other indirect arguments, mapping/exec interleavings and private descriptor
+checks remain partial. The previous `6d290d48` exposure is historical and does
+not establish a current failure. A FIFO peer-stop diagnostic was unrun as a
+guard check because FIFO metadata was denied; it is not a security failure.
+No upstream action occurred.
