@@ -121,19 +121,6 @@ pub enum Cmd {
 
     /// Render a terminal app headlessly (optionally typing keys) and write its screen.
     Inspect(InspectArgs),
-
-    /// Open a web page of live terminals, one per story, each running the real app.
-    Stories {
-        /// Port to serve on, on every address (the printed URL carries the access token).
-        #[arg(long, default_value_t = 7681)]
-        port: u16,
-        /// Don't open the page in a browser.
-        #[arg(long)]
-        no_open: bool,
-        /// Record every story and write one self-contained HTML file instead of serving.
-        #[arg(long, value_name = "FILE")]
-        export: Option<PathBuf>,
-    },
 }
 
 #[derive(Subcommand)]

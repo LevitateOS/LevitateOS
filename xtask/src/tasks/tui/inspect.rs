@@ -154,11 +154,6 @@ impl Launch {
         })
     }
 
-    /// The environment headless runs add (PATH with the stand-ins first).
-    pub fn env(&self) -> &[(String, String)] {
-        &self.env
-    }
-
     /// The story the manifest names `name`.
     pub fn story(&self, name: &str) -> Result<&Story> {
         self.app.inspect.stories.iter().find(|story| story.name == name).with_context(|| {

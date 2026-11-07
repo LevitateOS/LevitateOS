@@ -28,4 +28,3 @@ recshuttle = { path = "../tools/recshuttle" }
 recqemu = { path = "../tools/recqemu" }
 schemars = "1"
 ts-rs = "12"
-tungstenite = { version = "0.26", default-features = false, features = ["handshake"] }
