@@ -110,17 +110,47 @@ pub enum Cmd {
         what: Option<CheckCmd>,
     },
 
-    /// Launch a terminal app from tui/ in this terminal.
+    /// Run a terminal app from tui/ in this terminal, or list them.
+    ///
+    /// `cargo xtask tui <APP> [ARGS]...` runs the app in this terminal (it needs one). First
+    /// it installs the root JavaScript workspace and builds the Rust tools the app's manifest
+    /// lists, which go first on PATH: these are the real tools, so disk-plan's apply really
+    /// partitions and recab-tui's actions really change boot entries. ARGS go to the app;
+    /// `cargo xtask tui <APP> --help` prints its own flags and keys.
+    ///
+    /// `cargo xtask tui list` lists the apps with what each is for, where it lives, the tools
+    /// it runs, its pages and its stories.
+    ///
+    /// Without a terminal, or without the real tools: `cargo xtask inspect <APP>` renders a
+    /// screen headlessly with stand-in tools (`--story NAME` opens a story, `--input` types
+    /// keys), and `cargo xtask check tui` runs every TUI check.
+    ///
+    /// Examples:
+    ///   cargo xtask tui list
+    ///   cargo xtask tui install-docs --slug installation
+    ///   cargo xtask tui disk-plan --help
+    #[command(
+        verbatim_doc_comment,
+        arg_required_else_help = true,
+        disable_help_subcommand = true,
+        override_usage = "cargo xtask tui <APP> [ARGS]...\n       cargo xtask tui list"
+    )]
     Tui {
-        /// App name: the `bin` name in its package.json (e.g. install-docs, disk-plan, recab-tui).
-        app: String,
-        /// Arguments passed to the app.
-        #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
-        args: Vec<String>,
+        #[command(subcommand)]
+        cmd: TuiCmd,
     },
 
     /// Render a terminal app headlessly (optionally typing keys) and write its screen.
     Inspect(InspectArgs),
+}
+
+#[derive(Subcommand)]
+pub enum TuiCmd {
+    /// List the apps under tui/apps.
+    List,
+    /// Any other name runs that app, with the rest of the line as its arguments.
+    #[command(external_subcommand)]
+    Run(Vec<String>),
 }
 
 #[derive(Subcommand)]

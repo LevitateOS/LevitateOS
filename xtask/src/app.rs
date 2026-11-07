@@ -1,6 +1,6 @@
 use anyhow::Result;
 
-use crate::cli::{BaseCmd, CheckCmd, Cmd};
+use crate::cli::{BaseCmd, CheckCmd, Cmd, TuiCmd};
 
 pub fn run(cli: crate::cli::Cli) -> Result<()> {
     match cli.cmd {
@@ -18,7 +18,11 @@ pub fn run(cli: crate::cli::Cli) -> Result<()> {
         Cmd::Check {
             what: Some(CheckCmd::Tui { bless }),
         } => crate::tasks::tui::check::run(bless),
-        Cmd::Tui { app, args } => crate::tasks::tui::run(app, args),
+        Cmd::Tui { cmd: TuiCmd::List } => crate::tasks::tui::list(),
+        Cmd::Tui { cmd: TuiCmd::Run(mut line) } => {
+            let app = line.remove(0);
+            crate::tasks::tui::run(app, line)
+        }
         Cmd::Inspect(args) => crate::tasks::tui::inspect::run(args),
     }
 }
