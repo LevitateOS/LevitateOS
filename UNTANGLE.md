@@ -2742,3 +2742,13 @@ Solves **56** problems (2 parity, 4 special, 43 hidden, 7 surplus).
   - **Why left:** the two-orchestrator overlap belongs to the xtask / testing-vm orchestrator fix; nothing in recipes or guest scripts changes for it. (builder-recipes-guest)
 
 ## Progress
+
+Refactor started 2026-11-07. Per AGENTS.md there are no branches: each fix is committed straight to each repo's one branch (submodules first, then the superproject pointer), so each fix is one commit per repo it touches and can be reviewed or reverted on its own.
+
+**Re-run baseline before the refactor** (superproject `37673d7`). `cargo xtask check` now passes: "generated files current" is fixed since the audit baseline. `cargo xtask check tui` fails 6 checks, all from other sessions' commits after the audit:
+- disk-plan stories "apply succeeds", "apply fails", "apply refused: the disk changed", "disk refused" and "edit: dual boot by hand" fail (tui `28714e5` "disk-plan: a state machine").
+- The install-docs snapshot differs (docs/content `8cda564` "Install guides: base-system for steps 6-8").
+
+These are the reference failures for the final comparison (`.artifacts/untangle-repo/refactor/check*-pre.txt`).
+
+- [x] G01 — Delete the pre-Recipe build engine. builder `edb30dc`, superproject commit "G01: …". Removed 4.5k lines: `alpine/`, `artifact_store/`, `artifact/disk/`, `artifact/iso.rs`, `build/`, `cache`, `component/`, `contracts/`, `executor/`, `preflight/`, `timing`, `atomic_move`, `recipe::clear_cache`; the `fs2`, `sha2`, `tar`, `zstd` and `dirs` dependencies and the crates.io metadata. `cargo check --workspace --all-targets` passes. Left for later fixes: the legacy `leviso` names in `pipeline/{plan,paths}.rs` (G06), the PATH fallback that uses `which` (G09), and the builder docs (G32).

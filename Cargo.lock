@@ -570,9 +570,7 @@ name = "distro-builder"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "dirs",
  "distro-contract",
- "fs2",
  "leviso-elf",
  "levitate-recipe",
  "libc",
@@ -580,14 +578,11 @@ dependencies = [
  "recqemu",
  "serde",
  "serde_json",
- "sha2",
- "tar",
  "tempfile",
  "time",
  "toml",
  "walkdir",
  "which 5.0.0",
- "zstd",
 ]
 
 [[package]]
