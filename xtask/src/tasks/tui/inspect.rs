@@ -125,6 +125,24 @@ pub struct CaptureError {
     pub shot: Option<Shot>,
 }
 
+/// PATH with the app's stand-in tools (its manifest's `inspect.path`) first. Every tool
+/// the app runs must have one, so a run on this PATH never reaches a real tool.
+pub fn stand_in_path(app: &TuiApp) -> Result<std::ffi::OsString> {
+    let stand_ins: Vec<PathBuf> = app.inspect.path.iter().map(|dir| app.dir.join(dir)).collect();
+    for tool in &app.tools {
+        if !stand_ins.iter().any(|dir| dir.join(tool).is_file()) {
+            bail!(
+                "{}: no stand-in for '{tool}' in inspect.path ({}); stand-in runs never run the real tool",
+                app.name,
+                app.inspect.path.join(", ")
+            );
+        }
+    }
+    let mut paths = stand_ins;
+    paths.extend(std::env::split_paths(&std::env::var_os("PATH").unwrap_or_default()));
+    Ok(std::env::join_paths(paths)?)
+}
+
 /// An app ready to run headlessly: workspace installed, its stand-in tools first on PATH.
 pub struct Launch {
     pub app: TuiApp,
@@ -134,20 +152,7 @@ pub struct Launch {
 impl Launch {
     pub fn prepare(root: &Path, app: TuiApp) -> Result<Self> {
         crate::tasks::check::install_js_workspace(root)?;
-        let stand_ins: Vec<PathBuf> = app.inspect.path.iter().map(|dir| app.dir.join(dir)).collect();
-        // A headless run must never reach a real tool: each one the app runs needs a stand-in.
-        for tool in &app.tools {
-            if !stand_ins.iter().any(|dir| dir.join(tool).is_file()) {
-                bail!(
-                    "{}: no stand-in for '{tool}' in inspect.path ({}); headless runs never run the real tool",
-                    app.name,
-                    app.inspect.path.join(", ")
-                );
-            }
-        }
-        let mut paths = stand_ins;
-        paths.extend(std::env::split_paths(&std::env::var_os("PATH").unwrap_or_default()));
-        let path = std::env::join_paths(paths)?;
+        let path = stand_in_path(&app)?;
         Ok(Self {
             app,
             env: vec![("PATH".to_string(), path.to_string_lossy().into_owned())],

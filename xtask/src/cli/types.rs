@@ -118,6 +118,11 @@ pub enum Cmd {
     /// partitions and recab-tui's actions really change boot entries. ARGS go to the app;
     /// `cargo xtask tui <APP> --help` prints its own flags and keys.
     ///
+    /// To try an app's cases by hand without touching anything real, add `--stand-ins`: the
+    /// app runs with its stand-in tools (its manifest's `inspect.path`), as headless runs do.
+    /// `--story NAME` (implies it) starts it with that story's arguments and environment,
+    /// and you drive it. Both go before any `--`; the rest of the line goes to the app.
+    ///
     /// `cargo xtask tui list` lists the apps with what each is for, where it lives, the tools
     /// it runs, its pages and its stories.
     ///
@@ -129,11 +134,14 @@ pub enum Cmd {
     ///   cargo xtask tui list
     ///   cargo xtask tui install-docs --slug installation
     ///   cargo xtask tui disk-plan --help
+    ///   cargo xtask tui disk-plan --story "edit: nothing can shrink"
+    ///   RECPART_FIXTURE_DISKS=all cargo xtask tui disk-plan --stand-ins
+    ///   cargo xtask tui recab-tui --story "running a trial"
     #[command(
         verbatim_doc_comment,
         arg_required_else_help = true,
         disable_help_subcommand = true,
-        override_usage = "cargo xtask tui <APP> [ARGS]...\n       cargo xtask tui list"
+        override_usage = "cargo xtask tui <APP> [--stand-ins | --story NAME] [ARGS]...\n       cargo xtask tui list"
     )]
     Tui {
         #[command(subcommand)]

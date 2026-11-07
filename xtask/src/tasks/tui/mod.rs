@@ -6,7 +6,39 @@ use std::process::Command;
 
 use distro_contract::tui_apps::{self, TuiApp};
 
-pub fn run(name: String, args: Vec<String>) -> Result<()> {
+/// xtask's own options on an app's line (before any `--`): `--stand-ins` runs the app
+/// with its stand-in tools instead of the real ones, `--story NAME` (which implies it)
+/// also starts it with that story's arguments and environment, for you to drive.
+struct RunOptions {
+    stand_ins: bool,
+    story: Option<String>,
+    args: Vec<String>,
+}
+
+fn run_options(line: Vec<String>) -> Result<RunOptions> {
+    let mut options = RunOptions { stand_ins: false, story: None, args: Vec::new() };
+    let mut line = line.into_iter();
+    while let Some(arg) = line.next() {
+        match arg.as_str() {
+            "--" => {
+                options.args.extend(line);
+                break;
+            }
+            "--stand-ins" => options.stand_ins = true,
+            "--story" => {
+                options.story = Some(line.next().context("--story needs a story name")?);
+            }
+            _ => match arg.strip_prefix("--story=") {
+                Some(name) => options.story = Some(name.to_string()),
+                None => options.args.push(arg),
+            },
+        }
+    }
+    options.stand_ins |= options.story.is_some();
+    Ok(options)
+}
+
+pub fn run(name: String, line: Vec<String>) -> Result<()> {
     // Before installing or building anything: without a terminal the app
     // would refuse anyway, and only xtask can name the headless alternative.
     crate::util::exit::require_terminal(
@@ -15,7 +47,33 @@ pub fn run(name: String, args: Vec<String>) -> Result<()> {
     )?;
     let root = crate::util::repo::repo_root()?;
     let app = tui_apps::find(&root, &name)?;
+    let options = run_options(line)?;
     let mut cmd = app_command(&root, &app)?;
+    let mut args = Vec::new();
+    if options.stand_ins {
+        // app_command built the real tools; they stay reachable for stand-ins that defer
+        // to them for what nothing recorded (disk-plan's recpart plans an edited layout
+        // with the real one, and never applies).
+        if !app.tools.is_empty() {
+            cmd.env("LEVITATE_REAL_TOOLS", crate::util::repo::cargo_target_dir(&root).join("debug"));
+        }
+        cmd.env("PATH", inspect::stand_in_path(&app)?);
+        if let Some(story) = &options.story {
+            let story = app
+                .inspect
+                .stories
+                .iter()
+                .find(|s| &s.name == story)
+                .with_context(|| {
+                    let names: Vec<&str> = app.inspect.stories.iter().map(|s| s.name.as_str()).collect();
+                    format!("{name} has no story '{story}' (stories: {})", names.join(", "))
+                })?;
+            args.extend(story.args.iter().cloned());
+            cmd.envs(story.env.iter());
+        }
+        eprintln!("{name}: stand-in tools from {}; nothing real is changed", app.inspect.path.join(", "));
+    }
+    args.extend(options.args);
     let status = cmd.args(&args).status().context("running bun")?;
     if !status.success() {
         bail!("{name} exited with {status}");
@@ -37,7 +95,7 @@ pub fn list() -> Result<()> {
         if !app.tools.is_empty() {
             let stand_ins = app.inspect.path.join(", ");
             println!(
-                "{indent}runs: {} (the real ones here; stand-ins from {} for inspect and check)",
+                "{indent}runs: {} (the real ones here; stand-ins from {} for --stand-ins, inspect and check)",
                 app.tools.join(", "),
                 if stand_ins.is_empty() { "nowhere" } else { &stand_ins },
             );
