@@ -184,8 +184,8 @@ Agreed on 2026-11-07: the first option in each.
   passphrase. LevitateOS's guide uses `iwctl` (iwd), which its package set lacks. AcornOS
   ships wpa_supplicant and iw (2026-11-07; iwd needs a D-Bus daemon AcornOS doesn't run),
   with tzdata and kbd-bkeymaps beside them. Neither ships WiFi firmware yet, so most cards
-  stay dark, and AcornOS's rootfs has no `/lib/modules`, so no modular driver (WiFi's
-  among them) can load. Then test that the network works.
+  stay dark (both now ship the kernel's modules, so the drivers load; 2026-11-07). Then
+  test that the network works.
 
 ## 4. Base system: steps 6–9
 
