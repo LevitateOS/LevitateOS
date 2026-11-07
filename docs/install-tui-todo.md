@@ -121,29 +121,36 @@ Agreed on 2026-11-07: the first option in each.
 
 ### disk-plan UI
 
-- [ ] **Choose guided or manual.** Guided keeps the current templates: erase the whole disk
-  with the `ab` or `mutable` layout, now with editable sizes. Today disk-plan doesn't even
-  expose recpart's size options (`--efi-size-mb`, `--root-a-size-mb` and so on). Manual
-  opens the partition editor.
-- [ ] **A partition table view.** It lists the selected disk's partitions and free gaps
-  under the disk bar, with number, size, filesystem, label, role and mountpoint, plus a mark
-  for what will change (new, resized, formatted, deleted, kept). Moving the selection
-  highlights the matching part of the bar.
-- [ ] **Actions on the selected row:** new (in free space), delete, resize, format (pick a
-  filesystem and label), set role or mountpoint, and keep as is. Undo the last action, and
-  reset to what's on disk.
-- [ ] **Size input** that accepts MiB, GiB, % or "rest of the space". It shows the minimum
-  and maximum allowed for that partition (from its used space and the free space next to it)
-  and refuses anything outside them as you type.
-- [ ] **Live checks** while you edit: recpart's layout check runs on every change, and its
-  refusals show beside the table, each with its docs link (the same blocks as the current
-  Refusal and ReadDocs).
-- [ ] **A confirm page** built from the per-partition summary. It lists the erased
-  partitions in danger colours, says which disks and partitions are touched, and keeps the
-  typed confirmation.
-- [ ] **Stories** for each action and each refusal: manual layout, shrink, a dual-boot reuse
-  of the EFI partition, a refused shrink, and a disk with no partition table. Each needs a
-  fixture disk in the recpart stand-in.
+- [x] **Choose guided or manual.** The layout page offers four choices: `ab` or `mutable`,
+  each as "erase the disk" (recpart's template) or "edit the partitions" (the editor).
+- [ ] **Editable template sizes.** "Erase the disk" still uses recpart's default sizes;
+  disk-plan doesn't pass `--efi-size-mb`, `--root-a-size-mb` and so on.
+- [x] **A partition table view** (`src/presentation/partition-editor.tsx`). Partitions and
+  free gaps, in disk order, under a bar that draws the selected one solid. Columns: size,
+  filesystem, role, change and details. Erased partitions are listed under it, and a
+  checklist shows which roles the mode still needs.
+- [x] **Actions on the selected row:** new (in free space), delete, resize, format
+  (filesystem and label), use as (role, or a mount point for `other`), and leave as is.
+  Undo, and undo all. Giving a partition a root or state role formats it, as recpart
+  requires, and the editor says so. The model is in `src/domain/layout.ts`; it places
+  partitions by recpart's rules and writes the explicit layout recpart plans from.
+- [x] **Size input:** `20G`, `512M`, `1.5T`, `50%` or `rest` (a bare number is GiB), shown
+  as a size while you type, with the minimum (from recpart's `min_size_bytes`) and the
+  maximum (the partition plus the free space after it). Enter refuses an answer outside them.
+- [x] **Live checks:** every change re-runs `recpart plan --layout`, and the page shows
+  "recpart accepts this layout" or what recpart wants next ("Give one partition role
+  efi."). Refusals don't link to the docs yet.
+- [x] **A confirm page** built from the per-partition summary: the change of each partition,
+  with erased and formatted ones in danger colours, and a title that says whether anything is
+  erased. The plan page shows the same summary, and its bar shows the whole disk after
+  the plan, free space included.
+- [ ] **Stories for each action and each refusal.** Done: "edit: dual boot" (keep EFI,
+  shrink Windows, create the slots and state) and "edit: incomplete layout". Still to do:
+  a refused shrink, a disk with no partition table, and the new-table and format actions.
+  The stand-in answers a layout by its content (`fixtures/layouts/`, recorded with
+  `record.sh`). With `RECPART_FIXTURE_LIVE=<recpart binary>`, it plans any layout with the
+  real recpart against the fixture disks, for trying the editor by hand.
+- [ ] **A swap file option** in the editor (recpart supports `swap_file`; the UI doesn't yet).
 - [ ] **At the end, write the recpart handoff to the install state file**, so the base step
   knows the target and the slots.
 
