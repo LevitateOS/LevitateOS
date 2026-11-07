@@ -1,0 +1,30 @@
+# LevitateOS under Ginux. Required: multi-user.target is active and every
+# failed unit is one of these known gaps. Remove a line when its unit stops
+# failing (the check says so).
+#
+# systemd 262 sets up unit credentials with the new mount API (fsopen); Ginux
+# denies it (ENOSYS), and every unit with credentials fails at that step.
+gap systemd-journald.service                 credentials: fsopen is ENOSYS
+gap systemd-tmpfiles-setup.service           credentials: fsopen is ENOSYS
+gap systemd-tmpfiles-setup-dev.service       credentials: fsopen is ENOSYS
+gap systemd-tmpfiles-setup-dev-early.service credentials: fsopen is ENOSYS
+gap systemd-sysusers.service                 credentials: fsopen is ENOSYS
+gap systemd-firstboot.service                credentials: fsopen is ENOSYS
+gap systemd-network-generator.service        credentials: fsopen is ENOSYS
+gap systemd-udev-load-credentials.service    credentials: fsopen is ENOSYS
+gap systemd-userdb-load-credentials.service  credentials: fsopen is ENOSYS
+# Follow from journald failing.
+gap systemd-journal-flush.service            needs journald
+gap systemd-journald.socket                  needs journald
+gap systemd-journald-dev-log.socket          needs journald
+gap systemd-journalctl.socket                needs journald
+gap systemd-journalctl-metrics.socket        needs journald
+# Others.
+gap dbus-broker.service                      "Failed to drop capabilities: No such process" (capset)
+gap dbus-daemon.service                      exits 1; its error goes to the journal
+gap dbus.socket                              needs dbus-broker
+gap systemd-homed.service                    exits 1; its error goes to the journal
+gap systemd-homed-firstboot.service          needs systemd-homed
+gap auditd.service                           no kernel audit under Ginux
+gap tmp.mount                                tmpfs mount refused (exit 32)
+gap sshd.service                             exits 255; likely image ownership, as on AcornOS

@@ -1,6 +1,8 @@
 # AcornOS under Ginux: how far OpenRC boots
 
-Experiment, 2026-11-07. Question: how far is Ginux from booting AcornOS's
+Experiment, 2026-11-07. It is now a repeatable check that covers LevitateOS
+too: [testing/ginux-boot](../../testing/ginux-boot/README.md), with the
+staging and config that were here. Question: how far is Ginux from booting AcornOS's
 userspace (musl, busybox, OpenRC) with its real init as PID 1, the way Gate 9
 boots Rocky's systemd? This is the use that would let `testing/rootfs-tests`
 drop `sudo systemd-nspawn` and give AcornOS init-level tests.
@@ -150,6 +152,7 @@ the program runs; that is the audit label, not a denial.
 - `scratch.patch`: the experiment's changes to Ginux `59e2f7aa`. Scratch
   quality: it shows what is missing, it is not the fix (the audit cap,
   `wait4(0)` and dup-target changes in particular).
-- `stage.sh SRC ROOT [busybox|openrc-init]`: stage a root, as root.
-- `instance.toml`, `instance-network.toml`, `probe.sh`: the configs and the
-  state probe used.
+- `instance-network.toml`, `probe.sh`: the shared-network config and the
+  state probe used here. The staging and `instance.toml` moved to
+  `testing/ginux-boot/acorn/`; staging now chowns the root to the host
+  nobody user, as upstream Ginux runs root-launched workloads since `39731fc2`.

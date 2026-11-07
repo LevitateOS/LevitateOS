@@ -1,0 +1,6 @@
+# AcornOS under Ginux. Required: OpenRC reaches the default runlevel and every
+# service it lists is started, except these known gaps. Remove a line when its
+# service starts (the check says so).
+gap networking  needs the hostname service; sethostname is ENOSYS under Ginux
+gap sshd        image files stat as the host owner, not virtual root: "/var/empty must be owned by root"
+gap dhcpcd      crashes: the instance has no network

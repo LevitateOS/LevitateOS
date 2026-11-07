@@ -1,0 +1,11 @@
+[Unit]
+Description=Ginux boot probe
+After=multi-user.target
+
+[Service]
+# exec, not oneshot: a oneshot job would keep the system "starting".
+Type=exec
+ExecStart=/usr/local/sbin/ginux-probe
+
+[Install]
+WantedBy=multi-user.target

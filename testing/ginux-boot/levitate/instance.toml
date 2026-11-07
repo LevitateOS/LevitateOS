@@ -1,0 +1,38 @@
+schema_version = 1
+
+# Gate 9's shape (tools/ginux config/instance-gate9.toml) for a LevitateOS
+# root. `ginux native CONFIG ROOT` boots ROOT; `root` here is not used.
+[instance]
+id = "levitate-systemd"
+root = "docker.io/rockylinux/rockylinux@sha256:7a18ce2c9c1e0d8735f3e72685f9666150af25036e7f7b5ee4eede3754496f8c"
+init = "/sbin/init"
+args = ["--system", "--unit=multi-user.target"]
+environment = ["container=ginux"]
+
+[resources]
+vcpus = 2
+memory_mib = 1024
+
+[execution]
+profile = "balanced"
+backend = "ptrace-native"
+
+[contract]
+profile = "gate9-systemd-v1"
+
+[storage]
+assignments = ["root-overlay"]
+
+# systemd needs sockets (notify, private bus, journal); the systemd profile
+# grants them only with the shared network, as in Gate 9.
+[devices]
+assignments = ["console", "null", "zero", "random", "net0"]
+
+[network]
+backend = "shared"
+
+[audit]
+mode = "stderr"
+
+[failure]
+policy = "stop"
