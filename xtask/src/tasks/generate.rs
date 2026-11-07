@@ -70,6 +70,10 @@ fn generate(out: &mut Out) -> Result<()> {
     write_schema::<recpart::ApplyResult>(out, &schemas, "apply-result")?;
     write_schema::<recpart::types::ErrorPayload>(out, &schemas, "error")?;
     write_schema::<recab::Status>(out, &root.join("tools/recab/docs"), "status")?;
+    let install_docs = root.join("tools/recstrap/docs/schemas");
+    write_schema::<install_tools::output::StrapEvent>(out, &install_docs, "recstrap-event")?;
+    write_schema::<install_tools::output::FstabResult>(out, &install_docs, "recfstab-result")?;
+    write_schema::<install_tools::output::ErrorPayload>(out, &install_docs, "error")?;
 
     let cfg = Config::new().with_large_int("number");
     let mut recpart_ts = Declarations::new(&cfg);
@@ -94,7 +98,16 @@ fn generate(out: &mut Out) -> Result<()> {
     recab_ts.types_from::<recab::Status>();
     recab_ts.value_enum::<recab::Slot>("SLOTS", "SLOT_HELP")?;
 
-    let modules = [("recpart", &recpart_ts), ("recab", &recab_ts)];
+    let mut recstrap_ts = Declarations::new(&cfg);
+    recstrap_ts.types_from::<install_tools::output::StrapEvent>();
+    recstrap_ts.types_from::<install_tools::output::FstabResult>();
+    recstrap_ts.types_from::<install_tools::output::ErrorPayload>();
+    recstrap_ts.constant("STRAP_SCHEMA_VERSION", &install_tools::output::STRAP_SCHEMA_VERSION)?;
+    recstrap_ts.constant("FSTAB_SCHEMA_VERSION", &install_tools::output::FSTAB_SCHEMA_VERSION)?;
+    recstrap_ts.constant("ERROR_SCHEMA_VERSION", &install_tools::output::ERROR_SCHEMA_VERSION)?;
+    recstrap_ts.raw(RECSTRAP_OUTPUT);
+
+    let modules = [("recpart", &recpart_ts), ("recab", &recab_ts), ("recstrap", &recstrap_ts)];
     for app in distro_contract::tui_apps::discover(&root)? {
         for (tool, module) in &modules {
             if app.tools.iter().any(|t| t == tool) {
@@ -179,6 +192,34 @@ export function readRecpartOutput<T extends { schema_version: number }>(
 		return { kind: "unreadable", reason: `recpart printed schema ${String(value?.schema_version)}, expected ${expected}` };
 	}
 	return ok ? { kind: "ok", value: value as T } : { kind: "error", error: value as unknown as ErrorPayload };
+}
+"#;
+
+const RECSTRAP_OUTPUT: &str = r#"
+/** One line of `recstrap --json`; null when the line isn't one. */
+export function readStrapEvent(line: string): StrapEvent | null {
+	try {
+		const value = JSON.parse(line) as { event?: unknown };
+		return typeof value?.event === "string" ? (value as StrapEvent) : null;
+	} catch {
+		return null;
+	}
+}
+
+/** A failed recstrap or recfstab run's error: the last JSON object on stderr (messages
+ * from mount or cp can come before it); null when there is none. */
+export function readErrorPayload(stderr: string): ErrorPayload | null {
+	const trimmed = stderr.trim();
+	const start = trimmed.lastIndexOf("\n{");
+	const text = start >= 0 ? trimmed.slice(start + 1) : trimmed.startsWith("{") ? trimmed : "";
+	try {
+		const value = JSON.parse(text) as Partial<ErrorPayload>;
+		return value?.schema_version === ERROR_SCHEMA_VERSION && typeof value.code === "string"
+			? (value as ErrorPayload)
+			: null;
+	} catch {
+		return null;
+	}
 }
 "#;
 

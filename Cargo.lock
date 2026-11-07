@@ -1191,6 +1191,7 @@ dependencies = [
  "recpart",
  "recqemu",
  "recshuttle",
+ "recstrap",
  "regex",
  "schemars",
  "serde",
@@ -1639,9 +1640,11 @@ dependencies = [
  "libc",
  "nix 0.29.0",
  "recinit",
+ "schemars",
  "serde",
  "serde_json",
  "tempfile",
+ "ts-rs",
 ]
 
 [[package]]

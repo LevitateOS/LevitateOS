@@ -13,7 +13,7 @@ would rather type the commands.
 | Install screen | split pane: bash + install-docs TUI | split pane: sh + install-docs TUI (AcornOS pages) |
 | Keyboard, network, clock (1, WiFi) | commands in the docs (no iwd or WiFi firmware ships, so the `iwctl` steps fail) | commands in the docs (`loadkmap`, wpa_supplicant; no WiFi firmware) |
 | Disk (2–5) | disk-plan, or `recpart` by hand (`fdisk` as the manual fallback) | disk-plan, or `recpart` by hand (`sfdisk` as the manual fallback) |
-| Base system (6–9) | `recstrap`, `recfstab`, `recchroot` by hand | same |
+| Base system (6–9) | base-system, or `recstrap` and `recfstab` by hand | same |
 | Configuration (10–14) | `recsetup` and `passwd` by hand | same |
 | Boot (15–18) | `recsetup --boot` by hand | same |
 | Installed system | recab-tui exists (redone 2026-11-07) but doesn't ship | same |
@@ -189,11 +189,29 @@ Agreed on 2026-11-07: the first option in each.
 
 ## 4. Base system: steps 6–9
 
-- [ ] **Progress output from recstrap** (it has no JSON or progress output today): bytes or
-  files done out of the total, so the TUI can show a progress bar.
-- [ ] **Base app:** run recstrap with progress, then recfstab, and show the generated fstab
-  for review, flagging any problems, before appending it. It reads the target from the state
-  file.
+- [x] **Progress output from recstrap** (2026-11-07): `recstrap --json` prints one event
+  per line (`start` with the image's entry count and size, `progress` about five times a
+  second, `verify`, `done`), `--check --json` one `checked` event, and errors go to stderr
+  as the shared error document (`install_tools::output`, also used by recsetup now).
+  *Checked:* as root on loop filesystems with a real EROFS image
+  (`tests/recstrap.rs` `json_progress_on_a_mounted_layout`, ignored without root).
+- [x] **recfstab JSON and write** (2026-11-07): `--json` lists the entries, the target
+  fstab's active lines (marked where they describe the same mount point) and warnings (no
+  ESP at /boot, nothing at the root, no /etc yet); `--write` appends and refuses
+  duplicates (E036), `--write --replace` swaps them. *Checked:* as root,
+  `tests/recfstab.rs` `write_appends_refuses_duplicates_and_replaces`.
+- [x] **recstrap accepts the layout disk-plan mounts** (2026-11-07): the empty-target check
+  refused `/mnt` once `/mnt/boot` (and `/mnt/var`) were mounted inside it, so the guide's
+  plain `recstrap /mnt` failed after disk-plan (the install tests pass `--force`). Empty
+  filesystems mounted inside the target now count as empty.
+- [x] **The base-system app** (2026-11-07): `tui/apps/install/base-system`, on both ISOs
+  and started by the hub. It reads the target from the disk step (or `--target`), runs the
+  check, copies with a progress bar (files, bytes, elapsed, time left), shows the fstab
+  entries and the lines they would replace (asking before it replaces any), writes them
+  and records the base step. Eight stories on stand-ins, including a full disk, a refused
+  target, an earlier fstab and no ESP. *Not checked:* a real run on the live ISO (needs an
+  ISO build).
+- [ ] recstrap can't be stopped from the app half-way; quitting is refused while it copies.
 
 ## 5. Configuration: steps 10–14
 
@@ -233,8 +251,8 @@ Agreed on 2026-11-07: the first option in each.
   Every change shows its effect before it runs, asks for a yes (writing a system: the slot's
   name and the image paths, with Tab completion), and shows the slots before and after.
   recab's errors come with what to do. The fixture keeps state, so the stories see effects.
-- [ ] recab-tui can't show live progress for `recab stage` (the kit's `startCommand` returns
-  output only at the end).
+- [ ] recab-tui can't show live progress for `recab stage`: the kit's `startCommand` now
+  streams lines (`onLine`), but recab prints no progress.
 - [ ] **Ship recab-tui in the rootfs of both variants,** built per target as in section 1, so
   slot status, set-next, and rollback have a UI after install.
 - [ ] Decide whether the installed system needs a first-boot screen (none planned).

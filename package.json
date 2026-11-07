@@ -6,6 +6,7 @@
     "docs/content",
     "tui/kit/core",
     "tui/kit/install-state",
+    "tui/apps/install/base-system",
     "tui/apps/install/disk-plan",
     "tui/apps/install/install-hub",
     "tui/apps/live-tools/install-docs",
