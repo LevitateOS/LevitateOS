@@ -168,23 +168,29 @@ Agreed on 2026-11-07: the first option in each.
 
 ## 5. Configuration: steps 10–14
 
-- [ ] **The configuration backend (decision 2),** with plan/apply JSON and `--root /mnt`. It
+- [x] **The configuration backend (decision 2),** with plan/apply JSON and `--root /mnt`. It
   sets the timezone (`/etc/localtime`), locale (systemd: `locale.gen`, `locale-gen` and
   `locale.conf`; AcornOS: `LANG` only, since musl has no `locale-gen`), the console keymap
   (systemd: `vconsole.conf`; OpenRC: `conf.d/keymaps`), the hostname (and hosts), the root
   password, and users with groups, shell and the admin group (wheel, with sudo or doas,
   whichever the variant ships).
+  Done as `recsetup` (in the recstrap crate, on both live ISOs): `inspect --json` lists the
+  time zones, locales, keymaps, shells, groups and services; `plan` and `apply` take flags
+  or `--request` JSON, and passwords come from stdin. On LevitateOS only UTC and `C.UTF-8`
+  can be chosen: its package set has no tzdata and no locale sources.
 - [ ] **Setup app:** a searchable timezone list grouped by region, the locale list, the
   keymap (pre-filled from preflight), the hostname (validated), the root password entered
   twice (masked, with a strength hint), a user form, and a summary page before apply.
 
 ## 6. Boot and finish: steps 15–18
 
-- [ ] **Boot backend:** install systemd-boot (LevitateOS: `bootctl install`; AcornOS: the
+- [x] **Boot backend:** install systemd-boot (LevitateOS: `bootctl install`; AcornOS: the
   manual copy its guide does now), then `recab init` with the slot devices from the state
   file (the `ab` mode) or one boot entry (the `mutable` mode). Also the machine id, and the
   services for each init system (`systemctl enable` or `rc-update add`), such as the network.
   This could be part of the configuration backend.
+  Done in `recsetup` (`--boot ab|mutable`, `--machine-id`, `--service`). Until the state file
+  exists (section 1), the slot or root devices come in the request.
 - [ ] **Boot app:** show the boot entries it will write, the default slot and the services,
   then apply. A finish page offers to unmount and reboot, and reminds you to remove the
   install media.

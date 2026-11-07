@@ -53,6 +53,7 @@ required_tools = [
   "recstrap",
   "recfstab",
   "recchroot",
+  "recsetup",
   "sfdisk",
   "mkfs.ext4",
   "mount",

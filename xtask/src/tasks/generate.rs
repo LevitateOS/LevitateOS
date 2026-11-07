@@ -107,7 +107,7 @@ const DOCUMENTED_TOOLS: &[(&str, &[&str])] = &[
     ("recinit", &["recinit"]),
     ("reciso", &["reciso"]),
     ("recpart", &["recpart"]),
-    ("recstrap", &["recstrap", "recchroot", "recfstab"]),
+    ("recstrap", &["recstrap", "recchroot", "recfstab", "recsetup"]),
     ("recuki", &["recuki"]),
 ];
 

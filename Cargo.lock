@@ -1638,6 +1638,8 @@ dependencies = [
  "libc",
  "nix 0.29.0",
  "recinit",
+ "serde",
+ "serde_json",
  "tempfile",
 ]
 
