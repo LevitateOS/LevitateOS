@@ -2371,3 +2371,8 @@ A disposable baseline on integration `f4b2e240` (configured runtime SHA-256 `12f
 ### Current G10 private backing close baseline — 2026-11-07
 
 A disposable successful owned exec on clean `f4b2e240` traced the supervisor's private-memfd `close(10)` as the third post-handshake close, returning 0. The launcher/result exited 0 with `owned-exec: PASS`. Ignored `ginux-current-g10-backing-close-baseline-f4b2e240/` retains runner, full audit, trace and receipt (trace SHA-256 `b2091a193f2152f0668eaf104d67b0a1800bd4f1fe99b79e0dcd420a0428e2a9`). **No close fault ran**; close-error lifetime remains unverified. Open, seal and write fault checks above are narrower. G02 remains held and G03c/G12 authority failed pending Claude; no upstream action occurred.
+
+
+### Current G06b selected copyouts — 2026-11-07
+
+On clean integration `f4b2e240`/configured runtime SHA-256 `12fea894f0545d447e48750e5a8a55a06577a503dc2a62ccbd8e4ffab9fa6c79`, the existing byte-identical task fixture and runner passed `qfault`, `protected-child-tid` and `x-child-tid` (exit 0, empty stderr). These selected cases cover four wait-status fault destinations with `EFAULT`, consumed-child `ECHILD` and sentinel checks, plus protected and cross-page child-TID destinations. Ignored `ginux-current-g06b-copyout-f4b2e240/` retains exact command, sources, fixture binary, output and hashes (receipt SHA-256 `7b65c83d5e9563944846e6d7cb47218fa79d0448db3e595518a6b3e919df94a1`). Parent-TID birth failure, other clone flags and broader concurrency remain unverified; G06b/G07 acceptance stays partial. G02 held and G03c/G12 authority failed pending Claude. No upstream action occurred.
