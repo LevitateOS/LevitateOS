@@ -1231,3 +1231,37 @@ current-Recipe consumer verification. Known B1–B3 storage defects remain uncha
 security work stays downstream and pending without dispatch. Preserve all six
 historical restored worktrees. Active HDAE skill and reload procedure remain as
 recorded above. The goal is active and incomplete.
+
+
+### Fresh current Recipe consumer batch — 2026-11-07
+
+Current Recipe `d0fafc199640b6c9e71b9589c75378e2a7345b32` is clean and newly
+built with its e2e harness in `/home/vince/levitate-development/recipe-consumer-target`.
+Only AGENTS.md and the versioned balanced-profile choice differ from the saved
+snapshot (apart from its standalone lock). Full source hashes, workspace lock,
+binary hashes and135 exact catalog names are recorded in the integration source's
+`.artifacts/recipe-integration/current-recipe-provenance.json`.
+
+On local Ginux `78f96df1`, the fresh serial batch passes8/8: real C transitive
+dependency compile/execute/reuse (175.36s), Bash capture (83.05s), owned ELF
+(87.61s), modes/links/timestamps plus restart identity (173.95s), tar symlink
+(83.10s), tar hardlink (86.92s), executable zip (86.20s), and retained-link
+publication without rebuilding (174.74s). Every exact selection ran one test and
+completed with exit0. `current-ordinary-{state,receipts}.json` and per-case logs
+preserve commands and results. Original failures/interrupted receipts remain
+unchanged; this is a selected current-source batch, not a whole135-case pass.
+
+The actual ordinary offline Cargo/cache consumer is now running: two clients
+share a target directory, then a compiled Rust program starts a thread and
+returns verified output. Its result remains pending until the whole command and
+product checks finish. Remaining ordinary consumer/full-suite checks, security
+acceptance and integration rebase remain open. Read-only GitHub still reports
+#232–#234 open/unmerged on upstreamff926d0c. The current integration deliberately
+retains its F02 base plus the two local fixes; it is not latest-main/contract
+acceptance. All six restored worktrees match HEAD, raw index and NUL-delimited
+status fingerprints. core.worktree remains in config.worktree. No push, PR,
+upstream comment, forbidden branch/worktree edit or security dispatch occurred.
+
+Next: inspect Cargo's receipt/logs, fix actual ordinary causes in existing local
+owners, then continue remaining source-reviewed Recipe consumers. Active HDAE
+skill/reload procedure remains as recorded above; goal active and incomplete.

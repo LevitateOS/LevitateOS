@@ -932,3 +932,18 @@ Default fixtures and CI remain intact and unrun where adversarial. Earlier G05
 security requirements still apply; G06b early task hooks need the same contract
 ordering. G07 remains unready. No DaybreakBlue agent was dispatched; acceptance
 stays pending.
+
+
+## Local configured-thread consumer source — 2026-11-07
+
+The ownership split allows ordinary local Recipe integration while Claude owns
+upstream work. Codex local source
+`/home/vince/levitate-development/ginux-recipe-integration` now has `91e244c1`
+(per-task descriptor transactions) and `78f96df1` (bounded libc threads, shared
+descriptor/cwd/executable groups and blocked-IO pins), on preserved F02dfebda7c.
+Ordinary lifecycle, process/exec and Recipe Bash/tar consumers pass. These are
+functional results only. The shared-path/indirect-argument capture finding above
+is still unresolved; public/private descriptor authority, copyout faults and
+concurrent transaction/teardown attacks have not been rerun. Known storage B1–B3
+remain unchanged. Pin any later local source before monitored verification.
+This note neither dispatches DaybreakBlue nor accepts those pending criteria.
