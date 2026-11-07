@@ -194,6 +194,18 @@ security verification remain unrun. Default full fixtures remain available;
 no cloud agent was dispatched. Do not infer security acceptance from this record.
 
 
+### Current selected G11 cross-page vector-table result — 2026-11-07
+
+On configured runtime from integration `158e11a6`, an owned-script exec with
+its argv pointer table split across a writable and `PROT_NONE` page returned
+`EFAULT`; the analogous envp table did too. The envp first pointer stayed
+unchanged. A later valid owned-script exec in a child exited 77 and was reaped;
+launcher result and complete teardown passed. The ignored
+`ginux-current-owned-vector-crosspage-158e11a6/` bundle retains exact source,
+runner, audit and hashes. The checkout had the later VFS-only `b168c2c5` fix,
+but the pinned runtime binary did not. This selected boundary leaves shared
+mutation, other alignments, pointee/auxv limits and full G11 acceptance open.
+
 ## G12 private mapping transfer and backing lifetime
 
 Source preparation starts on G11 candidate0798d991 with donors32e2c85f,
