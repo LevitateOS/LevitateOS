@@ -48,7 +48,8 @@ wpa_supplicant firefox systemd-pam`, resolved without weak dependencies.
   PipeWire sockets fail and there is no audio), `pipewire.socket`,
   `pipewire-pulse.socket`, `wireplumber.service`; mask `unity-gtk-module.service`.
 - Branding: the tree shows Fedora's wallpaper and start-menu logo. Replace
-  them with LevitateOS's.
+  them with LevitateOS's; [desktop-theming.md](desktop-theming.md) lists every
+  piece for both desktops.
 
 ### AcornOS (LXQt)
 
