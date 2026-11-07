@@ -16,7 +16,7 @@ would rather type the commands.
 | Base system (6–9) | `recstrap`, `recfstab`, `recchroot` by hand | same |
 | Configuration (10–14) | `ln`, `sed`, `locale-gen`, `passwd`, `useradd` by hand | hostname and `passwd` by hand |
 | Boot (15–18) | `bootctl`, `recab init`, `systemctl enable` by hand | `cp` of the EFI binary, `recab init` by hand |
-| Installed system | recab-tui exists but doesn't ship | same |
+| Installed system | recab-tui exists (redone 2026-11-07) but doesn't ship | same |
 
 disk-plan today only offers a disk and a fixed layout (`ab` or `mutable`, wiping the whole
 disk). recpart, underneath it, works the same way: it can't see existing partitions,
@@ -204,6 +204,15 @@ Agreed on 2026-11-07: the first option in each.
 
 ## 7. Installed system
 
+- [x] **recab-tui redone like disk-plan** (2026-11-07): an overview of both slots (which
+  runs, is known-good, boots by default and next, the rollback target, the last trial), the
+  boot order, and each change (try the other slot, commit, roll back, write a new system,
+  reboot) marked with whether recab would make it now, refuse it, or find nothing to change.
+  Every change shows its effect before it runs, asks for a yes (writing a system: the slot's
+  name and the image paths, with Tab completion), and shows the slots before and after.
+  recab's errors come with what to do. The fixture keeps state, so the stories see effects.
+- [ ] recab-tui can't show live progress for `recab stage` (the kit's `startCommand` returns
+  output only at the end).
 - [ ] **Ship recab-tui in the rootfs of both variants,** built per target as in section 1, so
   slot status, set-next, and rollback have a UI after install.
 - [ ] Decide whether the installed system needs a first-boot screen (none planned).
