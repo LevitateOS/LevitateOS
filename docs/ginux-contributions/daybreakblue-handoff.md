@@ -58,15 +58,32 @@ has been performed here. A written handoff is not evidence of dispatch or fix.
 
 ## G09 security validation pending
 
-- G09a d29381c7: review malformed image offsets and backend failure contracts;
-  checked copy-up extent arithmetic is implemented, but adversarial index probes
-  have not been run here. Ordinary VFS data/truncation/rollback units pass.
+- G09a d29381c7: review malformed image offsets and backend failure contracts.
+  A selected current-revision offset-wrap probe failed before local fix `b168c2c5`
+  and passed after it. Other adversarial index and backend cases remain pending;
+  ordinary VFS data/truncation/rollback units are separate evidence.
 - G09b 297ad8dd: validate anonymous mmap/mremap rollback and indirect memory-copy
   protections under adversarial workloads, plus inherited namespace confinement.
   Ordinary growth, quota, zero-fill and forked-alias checks pass in both source
   and clean replay. Full storage suite retains the older confinement/protected
   buffer scenarios; these were not rerun by this agent. The configured thread
   snapshot is deliberately excluded from this candidate.
+
+### G09a current malformed file extent result — 2026-11-07
+
+A disposable two-record image index on local integration `158e11a6` declared a
+2-byte file starting at `u64::MAX`. The valid offset-zero control read backing
+byte `B` at file position 1. The malformed index was accepted and the same read
+returned backing byte `A` at offset zero, showing release-build arithmetic wrap.
+Local integration commit `b168c2c5` makes `Index::new` reject a file extent whose
+`data_offset + size` overflows. The corrected release probe returned
+`Err(InvalidIndex)` for the malformed record, while the valid read still returned
+`B`; a byte-identical copied VFS crate ran all 42 unit tests successfully.
+The ignored `ginux-current-g09a-offset-wrap-b168c2c5/` evidence bundle retains
+both probe sources and outputs, source snapshots, test logs, exact hashes and
+commands. This checks one arithmetic fault only; backend length, other malformed
+records and configured runtime behavior remain unverified. The integration fix
+is local extraction material for Claude, with no upstream push, PR or comment.
 
 ## G09d pending security scenarios and automatic-review boundary
 
