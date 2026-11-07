@@ -36,6 +36,9 @@ packages = [
   "systemd",
   "systemd-libs",
   "systemd-udev",
+  # Fedora 45 ships systemd-sysusers apart from systemd; without it the system
+  # users and groups (systemd-journal, ...) are never made and boots end degraded.
+  "systemd-sysusers",
   "iproute",
   "kmod",
   "util-linux",
@@ -64,6 +67,9 @@ packages = [
   "usbutils",
   "libusb1",
   "less",
+  # vi, which the live tools and the docs expect.
+  "vim-minimal",
+  "vim-data",
   "libfdisk",
   "readline",
   "kmod-libs",
