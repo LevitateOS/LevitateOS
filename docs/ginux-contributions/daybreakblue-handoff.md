@@ -1312,3 +1312,8 @@ Local Ginux integration test commit `836061e13cf72ee05ca45c57b546de034c8e7855` a
 ### Private socketpair EMFILE cleanup — 2026-11-07
 
 Local Ginux integration test commit `20b246ce955466dfc801b074d05164573fc8232b` adds `a-pair-fail`. A runner handshake lowers only the disposable tracee's soft `RLIMIT_NOFILE` to 5. The private mapping Pair stage returns `-EMFILE`; the live tracee has native FDs `[0, 1, 2, 3]` both before and after, its stack sentinel survives, and an ordinary owned mapping succeeds after the limit is restored. The focused case, full thread suite and `make check build` pass on unchanged binary SHA-256 `0d8c6c0305da8d5c2e57bcb4da7458aaa3fe04a0a0427118f9137e50d8fbbb5d`. `ginux-g12-pair-emfile-rollback.json/.log` records exact command, hashes and output. This is only the Pair-stage resource-error path; malformed Receive and injected send/close failures are pending. Exact next action: inspect and exercise those later stages. No upstream action occurred.
+
+
+### Current guarded-source clone/wait copyout controls — 2026-11-07
+
+The unchanged `scripts/test-launch-tasks.py` and task fixture passed selected `junk-child-tid`, `protected-child-tid`, `x-child-tid`, `rollback` and `qfault` scenarios on immutable guarded Ginux binary SHA-256 `0d8c6c0305da8d5c2e57bcb4da7458aaa3fe04a0a0427118f9137e50d8fbbb5d`. `ginux-g06b-copyout-current-guarded.json/.log` records exact command, hashes, exit 0 and output. This refreshes current-revision evidence for these five fixtures; other indirect copyout paths and G07 acceptance remain open. Exact next action: later-stage mapping receipt/failure checks and remaining indirect-argument surfaces. No upstream action occurred.
