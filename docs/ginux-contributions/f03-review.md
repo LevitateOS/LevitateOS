@@ -195,3 +195,37 @@ rerunning applicable F03 checks. Keep G07, monitored security,
 actual compiler/Cargo/APK/RPM, full/default platform CI and current-main
 independence requirements open. F04 remains dependent on required F02/F03 work;
 the goal is active, incomplete, and not publication-authorized.
+
+
+## Local consumer ownership resumed — 2026-11-07
+
+The authoritative ownership split ends Codex's upstream packet preparation and
+publication-review work. Claude owns that work. Codex resumes local integration
+and Recipe consumers on `/home/vince/levitate-development/ginux-recipe-integration`,
+initially preserved F02dfebda7c, now local commit
+`91e244c175ad73aaef2d5e574045282fe770df98`. It separates pending descriptor results,
+restored arguments and poll snapshots/deadlines into each existing Task before
+shared-table thread support. Static/build checks,102 existing routine units and
+selected ordinary pipe/vector, readiness/deadline and task/exec/lock checks pass.
+Three existing policy/security unit tests remain enabled/unrun. No thread
+capability or full CI/security passage is claimed from this prerequisite.
+
+The previously interrupted
+`managed_state::managed_state_restores_and_publishes_links_without_rebuilding`
+now passes1/1 in166.17s using this exact local binary
+(`3cdc1e1c1fcdaa96961b73835dc2016515e0c68bb6eaad8fffa3e123eb1e6ac2`), saved
+Recipe source/destination commands/harness and the same verified prepared image.
+Both managed invocations check retained state, distinct publication paths, actual
+link targets and bytes without rebuilding. Receipt/logs are in the integration
+source's `.artifacts/recipe-integration/recipe-retained-links.{json,log}`. Earlier
+interrupted evidence is preserved. This is saved-snapshot consumer evidence;
+current final Recipe source/binaries and all applicable cases remain pending.
+
+Next is shared descriptor-group/executable/cwd lifetime and supported thread
+creation, then the actual failed output-reader/progress consumers. Do not disable
+capture/progress, redesign known B1–B3 storage behavior speculatively, count unrun
+checks as passes, import the unready snapshot or dispatch a security agent.
+Known security checks remain downstream and pending. Wave1 #232–#234 remain open;
+rebase local integration when upstream merges. No fork push or upstream message
+is authorized. Old packet-refresh/standalone-publication next actions above are
+historical and superseded by the ownership split.

@@ -1171,3 +1171,36 @@ What this means for Codex:
 Current upstream state lives in [the PR inventory](ginux-contributions/pr-inventory.md).
 Wave 1 is open as #232 (G05a), #233 (G03a) and #234 (G06a). Claude is redesigning G03b+G03c
 as one configured-storage feature ([spec](ginux-contributions/storage-redesign-spec.md)).
+
+
+### Local consumer integration resumed — 2026-11-07
+
+The user's ownership split supersedes every earlier packet-refresh/publication
+next action. The active goal is local Ginux→Recipe integration and consumer
+verification; Claude owns upstream extraction, review, fixes and publication.
+Wave1 #232–#234 were checked read-only and remain open/unmerged. Rebase the local
+integration when they merge. No fix/* or prep/* branch/worktree was touched.
+
+Codex's integration source is `/home/vince/levitate-development/ginux-recipe-integration`,
+created separately from preserved F02dfebda7c. Local commit
+`91e244c175ad73aaef2d5e574045282fe770df98` moves pending descriptor results,
+restored arguments and poll snapshots/deadlines into each traced Task, preparing
+shared-table thread support without importing the unready thread snapshot.
+Static/build,102 routine Ginux units and selected ordinary pipe/vector, polling/
+deadline, task/exec/lock checks pass. Three existing policy/security unit tests
+remain enabled/unrun; no full CI/security/thread-consumer passage is claimed.
+
+The previously interrupted ordinary Recipe retained-links case now passes1/1
+in166.17s on this binary and the destination-built saved Recipe harness. Both
+managed invocations restore/publish link bytes and targets without rebuilding.
+Its exact receipt/logs are in the integration source's
+`.artifacts/recipe-integration/`; no test process remains active. The source
+state.json owns the exact local head/binary/verification. This is one saved
+Recipe-snapshot case, not a final/current whole-suite pass.
+Next: shared descriptor-group, executable and cwd lifetime, then bounded thread
+creation using the new per-task transactions. Verify ordinary thread behavior
+before rerunning failed Recipe output-reader/progress consumers.
+Keep B1–B3 recorded; do not redesign storage or run adversarial probes here.
+The requested #207 conflict-push explanation is appended to pr-inventory.md,
+preserving Claude's current uncommitted edits; push nothing further to the fork.
+Active HDAE skill/reload procedure remains as recorded above; no cloud dispatch.
