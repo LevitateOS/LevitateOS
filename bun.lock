@@ -50,6 +50,7 @@
       },
       "dependencies": {
         "@levitate/docs-content": "workspace:*",
+        "@levitate/install-state": "workspace:*",
         "@levitate/tui-kit": "workspace:*",
         "ink": "^6.8.0",
         "react": "^19.2.0",
@@ -111,6 +112,14 @@
       "peerDependencies": {
         "ink": "^6.8.0",
         "react": "^19.2.0",
+      },
+    },
+    "tui/kit/install-state": {
+      "name": "@levitate/install-state",
+      "version": "0.1.0",
+      "devDependencies": {
+        "@types/bun": "^1.2.17",
+        "typescript": "^5.9.2",
       },
     },
   },
@@ -322,6 +331,8 @@
     "@levitate/docs-content": ["@levitate/docs-content@workspace:docs/content"],
 
     "@levitate/install-docs": ["@levitate/install-docs@workspace:tui/apps/live-tools/install-docs"],
+
+    "@levitate/install-state": ["@levitate/install-state@workspace:tui/kit/install-state"],
 
     "@levitate/recab-tui": ["@levitate/recab-tui@workspace:tui/apps/runtime/recab-tui"],
 
