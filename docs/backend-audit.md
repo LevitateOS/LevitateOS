@@ -11,7 +11,7 @@ Fix order proposed at the end.
 ## recpart (tools/recpart, at 0fb0e80)
 
 ### High
-- ✔ **Apply isn't tied to the plan that was confirmed** (cli.rs:272-292, plan.rs:217,
+- ✅ fixed (recpart 7e60a2e, `apply --expect`; disk-plan passes it) · ✔ **Apply isn't tied to the plan that was confirmed** (cli.rs:272-292, plan.rs:217,
   manual.rs:187). `apply` re-plans from the live disk; template mode checks no identity at
   all, and manual mode's `table_id` is optional (null for `new_table`, and a blank disk has
   none). A USB stick plugged in between listing and apply can make `/dev/sdb` another disk,
@@ -19,7 +19,7 @@ Fix order proposed at the end.
   `delete 3` deletes whatever is number 3 now. Fix: `apply --plan plan.json` that checks
   serial, size, table id and every `summary[].before` against a fresh inspect, then runs that
   exact plan; at least `--expect-serial`/`--expect-table-id` in every mode.
-- ✔ **Signatures on the whole disk are invisible** (inspect.rs:100-122). Only `pttype` and
+- ✅ fixed (recpart 7e60a2e; disk-plan shows them) · ✔ **Signatures on the whole disk are invisible** (inspect.rs:100-122). Only `pttype` and
   `ptuuid` of the disk row are read. A LUKS container, btrfs or LVM PV on the bare disk shows
   as an empty disk with table `none`; the Confirm page lists nothing lost; `wipefs -a`
   destroys it. Fix: report disk-level signatures (`wipefs -n -J`) and list them as erased.
@@ -77,7 +77,7 @@ correct nvme/mmcblk names; 4Kn math; rollback of mounts and swaps on failure.
 ## recab (tools/recab, at 8f76ddf)
 
 ### High
-- ✔ **A stale boot selection can go live after `stage`: a reboot loop** (systemd_boot.rs:
+- ✅ fixed (recab 5505421) · ✔ **A stale boot selection can go live after `stage`: a reboot loop** (systemd_boot.rs:
   116-127, init.rs:101-106). `read()` drops a `LoaderEntryDefault`/`OneShot` that names an
   entry it can't boot, and stage's checks use only that filtered view; `init` skips resetting
   the variables when efivars aren't available. A reinstall without efivars leaves
@@ -85,7 +85,7 @@ correct nvme/mmcblk names; 4Kn math; rollback of mounts and swaps on failure.
   firmware variable makes B the default, not as a trial, with `rd.emergency=reboot` on its
   entry. Fix: check the raw variables in `stage` and `set-next` (refuse or reset), make
   `init` fail or warn without efivars, show raw and effective default in status.
-- ✔ **`stage` destroys the slot before checking its inputs** (stage.rs:87-96, 139-161). Only
+- ✅ fixed (recab 5505421) · ✔ **`stage` destroys the slot before checking its inputs** (stage.rs:87-96, 139-161). Only
   existence is checked; the slot's kernel directory is removed and the partition formatted
   before anything verifies the image. `--rootfs vmlinuz` formats the slot, recstrap fails,
   the rollback target is gone, exit 1 untagged; `--kernel /boot/<id>-b/vmlinuz` deletes its
@@ -131,24 +131,24 @@ root and mounted partitions; trial judges only what `set-next` scheduled; typed 
 ## recstrap, recfstab, recchroot, recsetup (tools/recstrap, at d7695ae)
 
 ### High
-- ✔ **A killed recchroot or recstrap leaves mounts behind** (session.rs:18). Only SIGINT,
+- ✅ fixed (recstrap 5e6aa42, private mount namespace) · ✔ **A killed recchroot or recstrap leaves mounts behind** (session.rs:18). Only SIGINT,
   SIGTERM and SIGQUIT are handled; SIGHUP (an SSH drop, a TUI closing its pty) skips cleanup,
   leaving binds of the host's `/dev`, `/sys`, `/proc`, `/run` under `/mnt`, where a later
   `rm -rf /mnt/*` deletes host device nodes. recsetup runs a recchroot per step. Fix: a
   private mount namespace per run (mounts vanish with the process); at least handle SIGHUP.
-- ✔ **The host-root guard misses `/home` on btrfs or its own partition**
+- ✅ fixed (recstrap 5e6aa42) · ✔ **The host-root guard misses `/home` on btrfs or its own partition**
   (bin/recstrap/guards.rs:148-156): it compares `st_dev` with `/`, and every btrfs subvolume
   (Fedora's `/home`) has its own. `recstrap --force ~/x` passes, the case the guard exists
   for. Fix: refuse anything the host has mounted that isn't under the install mount
   (`/proc/self/mountinfo`).
-- ✔ **The default initrd is the live initramfs** (bin/recsetup/plan.rs:422-429). On systemd,
+- ⏳ open: needs the ISO to carry the installed initramfs (builder work) · ✔ **The default initrd is the live initramfs** (bin/recsetup/plan.rs:422-429). On systemd,
   recsetup defaults to `/run/live-media/boot/initramfs.img`, which the ISO fills from
   `initramfs-live`; the live init looks for the live medium and only reports `root=`. The
   build makes `initramfs-installed.img` but ships it beside the ISO, not on it. The E2E test
   passes the same path, so it can't catch this. Very likely an installed system that doesn't
   boot, or boots the live system again; needs one boot to confirm. Fix: put the installed
   initramfs on the ISO and default to it, or take it from the target.
-- **Boot devices aren't checked against what is mounted** (plan.rs:498-546): a wrong
+- ✅ fixed (recstrap 5e6aa42, E011/E035) · **Boot devices aren't checked against what is mounted** (plan.rs:498-546): a wrong
   `--root-device` gives an entry pointing at another disk. Fix: require it to be the source of
   `--root` (`findmnt`), and the ESP on the same disk.
 
