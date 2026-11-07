@@ -1595,3 +1595,26 @@ G02, dispatch DaybreakBlue or resume upstream-packet/publication work under this
 checkpoint. Active skill: hdae-development at
 `.agents/skills/hdae-development/SKILL.md`; after a context shift reload the full
 skill, required references, applicable instructions and this checkpoint.
+
+
+### Acceptance blocked after revalidation — 2026-11-07
+
+The same acceptance impasse has recurred for three consecutive goal turns,
+including the final independent-work turn and two automatic continuations.
+The previous/current continuation is no progress, not a verified live-process
+wait. Current repository evidence still has Ginux436c4ae5 and Recipe2ad833c;
+the ledger remains100 passes, one held clock failure and34 unrun e2e cases,
+with six actual consumers passing. No independent implementation/check remains.
+
+Fresh read-only upstream evidence still reports main59e2f7aa and unchanged
+#179 comments holding policy implementation. No authorized monitored results
+have arrived. The user explicitly retained G02 and has not authorized security
+dispatch. Further required work therefore needs user direction or an actual
+external change. The goal is blocked, not complete; all criteria remain open
+as previously recorded. No source, remote, forbidden worktree or test changed.
+
+The local fixes remain available for inspection through the current F03 review.
+On explicit resume, reload the complete active HDAE skill/references/instructions
+and this checkpoint, begin a fresh blocked audit, inspect actual upstream and
+monitored evidence, then take only the newly enabled local integration step.
+Do not infer permission for G02, security dispatch or upstream publication.
