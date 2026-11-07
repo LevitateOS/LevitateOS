@@ -35,26 +35,30 @@ disk, erasing it. Run them in the left pane.
 4. Generate fstab
    recfstab /mnt >> /mnt/etc/fstab
 
-5. Install systemd-boot
-   recchroot /mnt -- sh -c 'set -e
-     E=/usr/lib/systemd/boot/efi/systemd-bootx64.efi
-     mkdir -p /boot/EFI/BOOT /boot/EFI/systemd
-     cp $E /boot/EFI/BOOT/BOOTX64.EFI
-     cp $E /boot/EFI/systemd/'
+5. Inspect and configure the installed system
+   Stay in the live shell:
+     recsetup inspect --root /mnt --json
+     recsetup apply --root /mnt --hostname acornos
+   Recipe supplies OpenRC, wired DHCP,
+   locale defaults, and the doas wheel rule.
+   Its installed setup program applies
+   your machine's choices.
 
-6. Set up the A/B boot layout
-   recab init --root /mnt \
-     --slot-a /dev/sdX2 --slot-b /dev/sdX3 \
-     --kernel /run/live-media/boot/vmlinuz
-   It writes a boot entry per slot, copies
-   the kernel for slot A, makes slot A the
-   default, and enables recab-trial, which
-   keeps a healthy update and reboots out
-   of a failed one.
+6. Install systemd-boot and the A/B layout
+   Use the slot devices from recpart:
+     recsetup apply --root /mnt --boot ab \
+       --slot-a /dev/sdX2 --slot-b /dev/sdX3 \
+       --machine-id
+   This uses the live media's kernel,
+   without an initramfs. recab writes slot
+   entries and enables its packaged trial
+   service for healthy-boot commit and
+   rollback.
 
-7. Set hostname and root password
-   echo acornos > /mnt/etc/hostname
-   recchroot /mnt -- passwd
+7. Set the root password
+   The installed root account starts locked:
+     recchroot /mnt -- passwd
+   Live-session autologin stays on the ISO.
 
 8. Reboot into AcornOS
    reboot

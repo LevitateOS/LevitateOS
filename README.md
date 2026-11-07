@@ -45,7 +45,9 @@ From the live ISO, the install tools work like Arch's:
 recpart apply --disk /dev/nvme0n1 --confirm DESTROY   # A/B layout, mounted at /mnt (--mode mutable for one root)
 recstrap /mnt                                          # extract the system
 recfstab /mnt >> /mnt/etc/fstab
-recchroot /mnt                                         # finish configuration inside the new system
+recsetup inspect --root /mnt --json                    # choose target configuration
+recsetup apply --root /mnt --hostname myhostname        # apply machine settings
+recchroot /mnt -- passwd                               # set the installed root password
 ```
 
 The live ISO boots into the install screen, a shell beside the full guide

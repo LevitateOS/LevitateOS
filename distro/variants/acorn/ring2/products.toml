@@ -37,71 +37,18 @@ description = "Installed-system boot payload inputs"
 extends = "product.rootfs.base"
 payload_profile = "boot_baseline"
 
+# Recipe owns the complete system filesystem. Product assembly consumes that
+# published tree without maintaining a second package/file selection here.
 [ring2_payload_profiles.boot_baseline]
+[[ring2_payload_profiles.boot_baseline.producers]]
+kind = "copy_tree"
+source = "."
+destination = "."
+
 [[ring2_payload_profiles.boot_baseline.producers]]
 kind = "write_text"
 path = ".live-payload-role"
 content = "rootfs\n"
-
-[[ring2_payload_profiles.boot_baseline.producers]]
-kind = "copy_tree"
-source = "bin"
-destination = "bin"
-
-[[ring2_payload_profiles.boot_baseline.producers]]
-kind = "copy_tree"
-source = "sbin"
-destination = "sbin"
-
-[[ring2_payload_profiles.boot_baseline.producers]]
-kind = "copy_tree"
-source = "lib"
-destination = "lib"
-
-[[ring2_payload_profiles.boot_baseline.producers]]
-kind = "copy_tree"
-source = "etc"
-destination = "etc"
-
-[[ring2_payload_profiles.boot_baseline.producers]]
-kind = "copy_tree"
-source = "usr/bin"
-destination = "usr/bin"
-
-[[ring2_payload_profiles.boot_baseline.producers]]
-kind = "copy_tree"
-source = "usr/sbin"
-destination = "usr/sbin"
-
-[[ring2_payload_profiles.boot_baseline.producers]]
-kind = "copy_tree"
-source = "usr/lib"
-destination = "usr/lib"
-
-[[ring2_payload_profiles.boot_baseline.producers]]
-kind = "copy_tree"
-source = "usr/libexec"
-destination = "usr/libexec"
-
-[[ring2_payload_profiles.boot_baseline.producers]]
-kind = "copy_tree"
-source = "usr/share/empty.sshd"
-destination = "usr/share/empty.sshd"
-
-[[ring2_payload_profiles.boot_baseline.producers]]
-kind = "copy_tree"
-source = "usr/share/i18n/locales/musl"
-destination = "usr/share/i18n/locales/musl"
-
-[[ring2_payload_profiles.boot_baseline.producers]]
-kind = "copy_tree"
-source = "var/empty"
-destination = "var/empty"
-
-[[ring2_payload_profiles.boot_baseline.producers]]
-kind = "copy_tree"
-source = "var/lib"
-destination = "var/lib"
 
 [ring2_runtime_profiles.live_tools_common]
 [[ring2_runtime_profiles.live_tools_common.actions]]
