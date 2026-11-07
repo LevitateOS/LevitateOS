@@ -202,7 +202,7 @@ The redesign moved every entry from here to its fix under `## Fixes` (or to `###
 
 Built by 10 area designers (`.artifacts/untangle-repo/redesign/area-*.md`). Each read its area's full problem list, derived requirements from the special cases and proposed fixes; their 165 area fixes are merged here into 32. Every global fix names the area designs it merges, and their detail is in those files. Where a parity problem was placed by both an area designer and the parity designer, the area designer's placement is used; the parity designer's alternative is in `area-parity-all.json`.
 
-**Not yet reviewed by the user.** The decisions below carry defaults; the refactor applies the defaults unless the user changes them.
+**Reviewed with the user 2026-11-07.** They confirmed auditd on both (D3) and one shared busybox initramfs (D5). They chose **Recipe as the package manager on both systems** (D7). They accepted the rest as planned, but want to inspect the plan and keep room to change their mind. So the refactor applies the structural fixes first, and re-confirms each user-visible decision (D1, D2, D4, D6, D8–D16) with the user right before the fix that applies it.
 
 ### Requirements (from the special cases)
 
@@ -239,11 +239,11 @@ The refactor applies the default unless the user picks otherwise. Every one is u
 |---|---|---|---|
 | D1 | Login and install shell | bash on both | G07 |
 | D2 | Live and installed tool set | the union on both: LevitateOS gains vim, htop, smartctl, hdparm, tar, gzip | G07 |
-| D3 | auditd (designers disagreed) | on both (AcornOS already boots with `audit=1`); alternative: on neither | G07 |
+| D3 | auditd (designers disagreed) | **decided: on both** | G07 |
 | D4 | Network stack | NetworkManager + wpa_supplicant on both, live and installed; AcornOS drops ifupdown/dhcpcd | G28 |
-| D5 | Installed initramfs | both boot through one shared busybox recinit initramfs; replaces LevitateOS's systemd initramfs. Alternative: a busybox backend for AcornOS only | G15 |
+| D5 | Installed initramfs | **decided: one shared busybox recinit initramfs for both**, replacing LevitateOS's systemd initramfs | G15 |
 | D6 | Firmware | a curated firmware set in both rootfs trees | G15 |
-| D7 | Package manager on the installed system | none on either; updates by A/B image only (AcornOS drops apk; LevitateOS docs stop advertising `recipe`) | G29 |
+| D7 | Package manager on the installed system | **decided: Recipe on both** ("the heart of the OS"); the base system still updates by A/B image; AcornOS drops apk | G29 |
 | D8 | Kernel policy | one shared kconfig (PREEMPT_DYNAMIC, HZ=1000, ZRAM on both); only the version line differs | G11 |
 | D9 | Live session | autologin on tty1–6, sysrq and quiet boot on both; drop `inst.sshd=0` and `selinux=0` | G13 |
 | D10 | Installed services | chrony on both; sshd installed but off; serial console only when asked for | G07 |
@@ -2438,14 +2438,14 @@ Solves **9** problems (7 parity, 2 hidden).
 - [hidden] PA1110 `testing/fsdbg/src/oracle/bins.rs:156,380` and `oracle/units.rs:114` expect `wpa_supplicant`/NetworkManager-wifi on LevitateOS ("iwctl (iwd) is not in the base repos; WiFi uses NetworkManager-wifi"), the LevitateOS docs (`03-installation-disk.ts:57-63`) tell users to run `iwctl`, and the locked RPM set ships neither; three places disagree on LevitateOS's WiFi tool.
 - [hidden] U109 `docs/content/src/content/01-getting-started/15-acorn-installation-boot.ts:39` promises the installed AcornOS `networking`, `dhcpcd` and `sshd`, a hand-written list tied neither to `distro/builder/recipes/installed-system.rhai:111-113` (which sets up the installed runlevels) nor to the scenario (`distro/variants/acorn/scenarios/scenarios.toml:80`); the same three names are also the live overlay's OpenRC allowlist (`live-overlay.rhai:85`, noted in `docs/desktop.md:92`), so the three lists match only by coincidence.
 
-### G29 One update story on both: A/B images, no package manager in the image
+### G29 One update story on both: Recipe is the package manager, A/B images update the system
 
 Solves **15** problems (12 parity, 1 special, 2 hidden).
 
-- **Design:** Both installed systems update by A/B image through recab; neither ships a package manager in the image (AcornOS drops `apk-tools`/`alpine-conf`, LevitateOS docs stop advertising `recipe`); the same trial and tools on both.
-- **Done when:** No `/etc/apk/repositories` pointing at a build-host path; the docs describe one update procedure.
+- **Design:** Recipe is the package manager on both installed systems (user decision, 2026-11-07: "it's the heart of the OS"): both images ship the `recipe` binary and its state/config so the user installs software with it, and the docs describe it once for both. The base system itself updates by A/B image through recab, with the same trial and tools on both. AcornOS stops shipping `apk-tools`/`alpine-conf` and the build-host `/etc/apk/repositories`. `tools/recipe` stays out of scope: this fix packages and configures Recipe, it does not change it.
+- **Done when:** `recipe` runs on both installed systems (checked by a scenario on both); no `/etc/apk/repositories` pointing at a build-host path; the docs describe one package procedure and one update procedure.
 - **Depends on:** G08, G15, G19
-- **Decisions:** **User-visible.** No package manager on either installed system (default). Alternative: a package manager on both. recab-tui on the installed system: neither for now (default).
+- **Decisions:** **Decided:** Recipe on both. Open: whether Recipe builds as a static musl binary for both (else it needs each base's libc); recab-tui on the installed system: neither for now (default).
 - **Merges area designs:** PA-09 (parity-all), RG-06 (builder-recipes-guest), UD-16 (tui-docs) — detail in `.artifacts/untangle-repo/redesign/area-<area>.md`
 
 - [parity] P010 `alpine-live-source-rootfs.rhai:58` installs `alpine-base`, which brings `apk-tools` and `alpine-conf` (`setup-alpine`, `setup-disk`, `lbu`) into AcornOS's live and installed system: an Alpine installer and package manager the user can run beside recpart/recstrap; LevitateOS has neither `rpm` nor `dnf`.
