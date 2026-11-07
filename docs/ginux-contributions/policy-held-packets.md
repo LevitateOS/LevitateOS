@@ -21,3 +21,14 @@ under #179; its patch and review limitations are retained in
 Proceed one task at a time with independent ready work while these publication
 contracts remain unresolved. F04 must distinguish these holds and missing checks
 from the independently validated G05a correction.
+
+
+## Local consumer decision — 2026-11-07
+
+On local Ginux436c4ae5, the ordinary Recipe sleep/deadline case fails because
+coreutils sleep cannot read the realtime clock (ENOSYS). Upstream #179 still
+retains the contract hold. The user explicitly chose to keep clock policy held
+and continue independent cases. No local configured clock/sleep fix was added.
+That failed case and the unrun shared-destination case using sleep remain
+required/pending; neither is counted as passing or waived. See the latest F03
+checkpoint and clock-held-independent-selection.json for the exact evidence.

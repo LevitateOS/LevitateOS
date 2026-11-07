@@ -1487,3 +1487,34 @@ source/consumer review. Security/full/default/platform acceptance remains pendin
 No upstream packet/publication work, push/comment, forbidden worktree/branch edit
 or security dispatch occurred. Goal active/incomplete. Active HDAE skill and
 required context-reload procedure remain as recorded above.
+
+
+### User retains G02 clock hold — 2026-11-07
+
+The final-source102-case run stopped after51 passes at
+`managed_cancellation::managed_deadline_allows_silent_work_beyond_frame_timeout_and_keeps_logs`.
+The saved failure is `/usr/bin/sleep 3`: “cannot read realtime clock: Function
+not implemented”, not a Recipe frame/deadline failure. All original receipts
+remain. Upstream #179 still asks to hold implementation pending contract choice.
+After seeing this evidence and the configured-only option, the user explicitly
+chose **“Keep clock policy held; continue independent cases.”** No clock/sleep
+implementation or native grant was added. This criterion stays failed/pending.
+
+`managed_state::managed_state_serializes_different_inputs_sharing_a_destination`
+also calls guest sleep3 and remains unrun for that same dependency. The other49
+unrun ordinary cases are continuing serially on unchanged Ginux436c4ae5 and
+Recipe0c4f0d4. clock-held-independent-{selection,state,receipts}.json owns this
+continuation; it preserves both clock-dependent criteria and the33 monitored
+security holds separately. The original102-case batch is not a pass.
+
+All six actual consumers remain passed on this source. The six recovery
+worktrees match recorded destination raw indexes, original staged/conflict
+entries, HEAD/status and every recorded changed-file byte; the original source
+index stat caches differ from the already-recorded destination caches, not from
+new work here. All83 upstream named units remain present. Preservation receipts
+are umask-preserved-worktrees.json and umask-unit-source-preservation.json.
+
+Next: inspect the49-case independent run and fix actual in-scope ordinary causes,
+then finish the local review with clock/security acceptance explicitly pending.
+No push, PR, upstream comment, forbidden branch/worktree edit or security dispatch.
+Goal active/incomplete. Active HDAE skill/reload procedure remains as recorded.
