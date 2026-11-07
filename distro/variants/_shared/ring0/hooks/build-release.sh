@@ -200,10 +200,6 @@ mkdir -p "$RELEASE_OUTPUT_DIR"
 ROOTFS_SOURCE_DIR="$(prepare_release_inputs "$PRODUCT_NAME" "$DISTRO_ID" "$RELEASE_OUTPUT_DIR")"
 need_dir "$LIVE_OVERLAY_DIR"
 
-rm -f "$ROOTFS_PATH"
-build_rootfs_erofs "$ROOTFS_SOURCE_DIR" "$ROOTFS_PATH"
-need_file "$ROOTFS_PATH"
-
 KERNEL_RELEASE="$(tr -d '\n' < "$KERNEL_RELEASE_PATH")"
 MODULES_DIR="${KERNEL_OUTPUT_DIR}/staging/usr/lib/modules/${KERNEL_RELEASE}"
 if [ ! -d "$MODULES_DIR" ]; then
@@ -213,6 +209,18 @@ if [ ! -d "$MODULES_DIR" ]; then
     echo "missing modules dir for recinit: $MODULES_DIR" >&2
     exit 1
 fi
+
+# The kernel's modules go into the system the ISO runs and installs, beside the kernel
+# it boots; without them no modular driver (WiFi's among them) can load. lib/modules is
+# /usr/lib/modules where /lib links to usr/lib, and busybox's modprobe reads /lib/modules.
+rm -rf "${ROOTFS_SOURCE_DIR}/lib/modules/${KERNEL_RELEASE}"
+mkdir -p "${ROOTFS_SOURCE_DIR}/lib/modules"
+cp -a "$MODULES_DIR" "${ROOTFS_SOURCE_DIR}/lib/modules/"
+need_file "${ROOTFS_SOURCE_DIR}/lib/modules/${KERNEL_RELEASE}/modules.dep"
+
+rm -f "$ROOTFS_PATH"
+build_rootfs_erofs "$ROOTFS_SOURCE_DIR" "$ROOTFS_PATH"
+need_file "$ROOTFS_PATH"
 
 calc_sha256() {
     target="$1"
