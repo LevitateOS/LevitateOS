@@ -32,7 +32,8 @@ testing/ginux-boot/ginux-boot.sh levitate --rootfs ROOTFS --ginux GINUX_CHECKOUT
   as root, as Ginux's own tests do), `script` and `cargo`.
 
 The recorded runs used roots built on the host from the same pinned inputs
-(AcornOS with `apk.static` from the pinned ISO and extra apks; LevitateOS by
+(AcornOS with `apk.static` from the pinned ISO and extra apks, offline, as
+the rootfs recipe does; LevitateOS by
 unpacking the locked Fedora 45 RPMs with the recipe's steps), because
 Recipe's builds under Ginux are blocked on the `tools/ginux` pin.
 
@@ -52,7 +53,7 @@ Recipe's builds under Ginux are blocked on the `tools/ginux` pin.
 
 | OS | Init reached | Time to probe | Working | Known gaps |
 | --- | --- | --- | --- | --- |
-| AcornOS (Alpine 3.23, OpenRC 0.63) | default runlevel | 10 s | fsck, root, localmount | 3 |
+| AcornOS (Alpine 3.24.4, OpenRC 0.63.2) | default runlevel | 6 s | fsck, root, localmount | 3 |
 | LevitateOS (Fedora 45, systemd 262) | multi-user.target ("degraded") | 29 s | logind, udevd, userdbd, getty | 22 units, 6 causes |
 
 Gate 9's Rocky 10 image (systemd 257) boots to `multi-user.target` with no
