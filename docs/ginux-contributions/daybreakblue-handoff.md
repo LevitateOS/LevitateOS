@@ -1089,3 +1089,18 @@ Claude's storage redesign; enumerate the remaining handoff criteria against
 current-source fixtures and run focused, controlled checks where the owner and
 revision are clear. Recheck Recipe on any later integration source before a
 current-revision claim. Keep G02-dependent cases held and acceptance open.
+
+### Current-revision focused reruns — 2026-11-07
+
+After the local descriptor-reopen correction, two exact Recipe e2e cases passed
+on Ginux `c7b4b73a`: owned executable permission rejection and generated
+owned/image interpreter chains. Their `*-c7b4b73a.json` receipts and complete
+logs are in the evidence directory above. The unchanged storage runner exposes
+24 selectable modes. Each of the 23 modes other than `view-probes` passed
+independently on `c7b4b73a`, including bounds, quota, mapping, symlinks,
+namespace scale, ownership, positioned/vector/large I/O, timestamps, flush,
+export and failure paths. Every mode has its own command, exit code and log
+receipt (`ginux-storage-<mode>-c7b4b73a.json`). The `view-probes` failure
+persists; default-only path/assignment and no-storage controls remain unrun
+because the full runner stops at that failure. These selected passes cannot
+make the full storage suite pass.

@@ -1660,3 +1660,11 @@ remaining handoff requirements against this exact source, run controlled
 independent checks, and rerun affected Recipe cases before claiming acceptance
 for a later integration revision. Preserve Claude's inventory edits and all
 historical recovery worktrees.
+
+Current-source follow-up: two focused Recipe cases (owned executable permission
+rejection; generated owned/image interpreter chains) passed on `c7b4b73a`.
+All 23 selectable storage modes other than `view-probes` also passed separately
+on that source with exact per-mode receipts. The full default storage suite
+still fails at `view-probes`, and default-only path/assignment/no-storage
+controls remain unrun after its early stop. Keep storage acceptance pending;
+see the handoff's current-revision addendum for the receipt location.
