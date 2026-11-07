@@ -1,0 +1,189 @@
+diff --git a/crates/ginux-contract/src/lib.rs b/crates/ginux-contract/src/lib.rs
+index 8cba630c..2390759a 100644
+--- a/crates/ginux-contract/src/lib.rs
++++ b/crates/ginux-contract/src/lib.rs
+@@ -1319,6 +1319,54 @@ pub static CATALOG: &[Operation] = &[
+         "instance descriptor",
+         "test-systemd"
+     ),
++    syscall!(
++        "lstat",
++        6,
++        Partial,
++        Action::Mediate,
++        "instance filesystem",
++        "test-process"
++    ),
++    syscall!(
++        "getgroups",
++        115,
++        Partial,
++        Action::Emulate,
++        "virtual identity",
++        "test-process"
++    ),
++    syscall!(
++        "pipe",
++        22,
++        Partial,
++        Action::Mediate,
++        "validated flags",
++        "test-process"
++    ),
++    syscall!(
++        "nanosleep",
++        35,
++        Partial,
++        Action::Mediate,
++        "bounded wait",
++        "test-process"
++    ),
++    syscall!(
++        "getsid",
++        124,
++        Partial,
++        Action::Emulate,
++        "virtual identity",
++        "test-process"
++    ),
++    syscall!(
++        "faccessat",
++        269,
++        Partial,
++        Action::Mediate,
++        "instance filesystem",
++        "test-process"
++    ),
+     syscall!(
+         "pipe2",
+         293,
+diff --git a/crates/ginux-core/src/lib.rs b/crates/ginux-core/src/lib.rs
+index d919f4eb..19694494 100644
+--- a/crates/ginux-core/src/lib.rs
++++ b/crates/ginux-core/src/lib.rs
+@@ -87,7 +87,9 @@ pub const fn decide_systemd(syscall: u64, shared_network: bool) -> Decision {
+     let action = match syscall {
+         63 | 92 | 93 | 94 | 109 | 112 | 153 | 165 | 166 | 260 | SYS_GETPRIORITY
+         | SYS_SETPRIORITY | SYS_GETTID | SYS_SETUID | SYS_SETGID | SYS_SETREUID | SYS_SETREGID
+-        | SYS_SETGROUPS | SYS_SETRESUID | SYS_SETRESGID | SYS_REBOOT => Action::Emulate,
++        | SYS_SETGROUPS | SYS_SETRESUID | SYS_SETRESGID | SYS_REBOOT | 115 | 124 => Action::Emulate,
++        // musl variants: pipe, nanosleep, faccessat (glibc: pipe2, clock_nanosleep, faccessat2).
++        6 | 22 | 35 | 269 => Action::Mediate,
+         7
+         | 15
+         | 16
+@@ -178,7 +180,11 @@ pub const fn systemd_surface(syscall: u64, shared_network: bool) -> BalancedSurf
+         BalancedSurface::Network
+     } else if syscall == SYS_REBOOT {
+         BalancedSurface::Lifecycle
+-    } else if matches!(syscall, SYS_GETPRIORITY | SYS_SETPRIORITY) {
++    } else if matches!(syscall, 22 | 35) {
++        BalancedSurface::Task
++    } else if matches!(syscall, 6 | 269) {
++        BalancedSurface::ImageRead
++    } else if matches!(syscall, SYS_GETPRIORITY | SYS_SETPRIORITY | 115 | 124) {
+         BalancedSurface::VirtualIdentity
+     } else if matches!(
+         syscall,
+diff --git a/crates/ginux-init/src/main.rs b/crates/ginux-init/src/main.rs
+index 8705d926..357cc4a8 100644
+--- a/crates/ginux-init/src/main.rs
++++ b/crates/ginux-init/src/main.rs
+@@ -4551,7 +4551,7 @@ fn supervise_native(
+     root_descriptor: usize,
+     contract: EffectiveContract,
+ ) -> ! {
+-    const AUDIT_EVENT_LIMIT: u64 = 8192;
++    const AUDIT_EVENT_LIMIT: u64 = 1_000_000; // scratch: see the whole boot
+     const AUDIT_PREFIX: &[u8] = b"GINUX_NATIVE_AUDIT: sequence=";
+     let audit_mode = instance.config().audit_mode;
+     let audit_instance_id = instance.config().id;
+@@ -5043,6 +5043,14 @@ fn supervise_native(
+                 if ptrace(PTRACE_SETREGS, host_pid, 0, &registers as *const _ as usize) < 0 {
+                     native_fail(instance, pid, b"native result override failed");
+                 }
++            } else if registers.rax as i64 == -516 {
++                // scratch: ERESTART_RESTARTBLOCK (interrupted poll/nanosleep) would make
++                // the kernel issue restart_syscall, whose state Ginux cannot see.
++                // Report EINTR instead, which POSIX permits for both.
++                registers.rax = (-4i64) as u64;
++                if ptrace(PTRACE_SETREGS, host_pid, 0, &registers as *const _ as usize) < 0 {
++                    native_fail(instance, pid, b"native restart rewrite failed");
++                }
+             }
+             write_all(b"GINUX_NATIVE_AUDIT: sequence=");
+             write_u64(sequence);
+@@ -5190,7 +5198,7 @@ fn supervise_native(
+                 }
+                 task.pending_getsockname = 0;
+             }
+-            if task.syscall == 293 && registers.rax as i64 == 0 && task.pipe2_address != 0 {
++            if matches!(task.syscall, 22 | 293) && registers.rax as i64 == 0 && task.pipe2_address != 0 {
+                 let read_fd = read_tracee_u32(host_pid, task.pipe2_address);
+                 let write_fd = read_tracee_u32(host_pid, task.pipe2_address + 4);
+                 let Some((read_fd, write_fd)) = read_fd.zip(write_fd) else {
+@@ -5697,6 +5705,11 @@ fn supervise_native(
+                         SYS_GETPID | ginux_core::SYS_GETTID => view.id.pid as i64,
+                         ginux_core::SYS_GETPPID => view.parent as i64,
+                         ginux_core::SYS_GETPGRP => view.process_group as i64,
++                        124 if registers.rdi == 0 || registers.rdi == u64::from(view.id.pid) => {
++                            view.session as i64
++                        }
++                        124 => -3, // ESRCH: other processes' sessions are not visible
++                        115 => 0, // getgroups: no supplementary groups
+                         ginux_core::SYS_GETUID | ginux_core::SYS_GETEUID => {
+                             i64::from(view.credentials.uid)
+                         }
+@@ -6677,7 +6690,7 @@ fn supervise_native(
+                 if mode == 3
+                     && syscall == 292
+                     && registers.rdi <= INSTANCE_CONSOLE_FD as u64
+-                    && registers.rsi <= 2
++                    && registers.rsi < INSTANCE_NULL_FD as u64 // scratch: was <= 2
+                     && registers.rdx & !0x8_0000 == 0 =>
+             {
+                 line(b"mediate surface=virtual-console-dup result=pending");
+@@ -6702,7 +6715,7 @@ fn supervise_native(
+                 if mode == 3
+                     && syscall == 33
+                     && registers.rdi <= INSTANCE_CONSOLE_FD as u64
+-                    && registers.rsi <= 2 =>
++                    && registers.rsi < INSTANCE_NULL_FD as u64 => // scratch: was <= 2
+             {
+                 line(b"mediate surface=virtual-console-dup result=pending");
+                 task.awaiting_exit = true;
+@@ -6984,7 +6997,7 @@ fn supervise_native(
+                     native_fail(instance, pid, b"native proc self open failed");
+                 }
+             }
+-            Action::Mediate if mode == 3 && syscall == 293 => {
++            Action::Mediate if mode == 3 && matches!(syscall, 22 | 293) => {
+                 line(b"mediate surface=task-pipe result=pending");
+                 task.pipe2_address = registers.rdi as usize;
+                 task.awaiting_exit = true;
+@@ -7207,7 +7220,8 @@ fn supervise_native(
+                 }
+                 if mode == 3 && syscall == 61 {
+                     let selector = registers.rdi as u32 as i32;
+-                    if selector == -1 {
++                    // scratch: wait4(0) approximated as any child (musl ash, OpenRC).
++                    if selector == -1 || selector == 0 {
+                         registers.rdi = u64::MAX;
+                     } else if selector > 0 {
+                         let selected = selector as u32;
+@@ -7312,6 +7326,7 @@ fn native_identity_result(syscall: u64, mode: usize) -> Option<i64> {
+             SYS_GETPID | ginux_core::SYS_GETTID => Some(1),
+             ginux_core::SYS_GETPPID => Some(0),
+             ginux_core::SYS_GETPGRP => Some(1),
++            124 | 115 => Some(1),
+             _ => balanced_identity_result(syscall),
+         }
+     } else {
+@@ -7339,6 +7354,7 @@ fn native_arguments_allowed(syscall: u64, registers: &UserRegs, mode: usize) ->
+         match syscall {
+             ginux_core::SYS_PIDFD_OPEN => registers.rdi > 0 && registers.rsi == 0,
+             293 => registers.rdi != 0 && registers.rsi & !(0x8_0000 | 0x800) == 0,
++            22 => registers.rdi != 0,
+             ginux_core::SYS_CLOSE_RANGE => true,
+             452 => {
+                 registers.rdi < INSTANCE_NULL_FD as u64
