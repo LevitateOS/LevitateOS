@@ -2,25 +2,41 @@
 
 Current local Ginux source is `436c4ae5843e4d50f4833158d351523f35669909`, based on
 upstream `59e2f7aa`, at `/home/vince/levitate-development/ginux-recipe-integration`.
-Current Recipe is `0c4f0d4e9d1f84ab7f638611e895dbf799500e7a`. Release commands
-and the existing e2e harness use separate build directories. Exact source/binary hashes and
-receipts live under that Ginux source's `.artifacts/recipe-integration/`.
+Current Recipe checkout is `2ad833cc93f0e209fe205adb4186a822a13caaea`; its last
+change updates two CLI fixture files. Production source/release commands remain exactly
+`0c4f0d4e9d1f84ab7f638611e895dbf799500e7a`. Exact source, binary and retained-harness
+identities are recorded under the Ginux source's `.artifacts/recipe-integration/`.
 
-Actual SQLite, pinned Git, RPM, APK and concurrent GNU/musl Cargo consumers pass this source.
-The final102-case ordinary run stopped after51 passes because guest sleep requires the
-held G02 clock capability. The user explicitly retained that hold. One other clock-dependent
-case remains unrun. The independent continuation passed30 cases, then exposed an outdated
-Alpine asset fixture. Its corrected refresh passes;18 remaining independent cases plus four
-affected download reruns are active in `preseed-remaining-state.json`. Original failures stay
-in `umask-ordinary-state.json` and `clock-held-independent-state.json`. Earlier20/eight-case batches are
-historical after the creation-mask correction. Thirty-three monitored-review e2e cases and
-mixed library/image targets remain unrun. Clock/security/full-suite acceptance is pending.
+**Final local ordinary result:100 passed,1 failed,34 unrun from the135-case catalog.**
+All100 independent ordinary cases pass with exact one-test/exit0 receipts. The failure is
+`/usr/bin/sleep 3` needing the held G02 guest clock capability. The user explicitly retained
+that hold; one other sleep-dependent case stays unrun. The remaining33 unrun cases and mixed
+library/image targets await monitored review. Clock/security/full-suite acceptance remains
+pending; the integration goal is incomplete.
 
-The latest local fixes address measured musl clone flags (`e9a2f8a0`), blocking pipe truncation
-(`6a19a70a`), configured creation masks (`436c4ae5`) and Recipe's explicit-tool/fixed-PATH
-collision (`0c4f0d4`). Earlier local thread/task-capacity and instance adaptations remain
-prerequisites. These commits are local extraction material for Claude; Codex performs no
-upstream packet/publication work. See the latest checkpoints below for failures and limits.
+Actual SQLite, pinned Git, RPM, APK and concurrent GNU/musl Cargo consumers all pass.
+The final ledger is `final-local-review.json`; source/binary identities are in
+`preseed-consumer-provenance.json`, with the six actual consumers in
+`umask-real-consumer-receipts.json`. Earlier failures remain in their original receipt files.
+Old harness bytes are retained for replay; unchanged case modules were checked against the
+final test source, and all affected ordinary download/preseed cases ran on the new harness.
+
+Latest local corrections for inspection:
+
+| Commit | Actual cause and corrected owner |
+| --- | --- |
+| Ginux `e9a2f8a0` | Accept musl's exact pthread clone flags through the existing thread owner. |
+| Ginux `6a19a70a` | Retain blocking pipe write progress across the fixed buffer; actual rpm2cpio no longer truncates at4096 bytes. |
+| Ginux `436c4ae5` | Share/copy/preserve process-group creation masks; actual GCC/SQLite publishes mode0755. |
+| Recipe `0c4f0d4` | Distinguish the complete generated image PATH from an imported tool's identically named host parent. |
+| Recipe `2ad833c` | Follow the full current Alpine asset facts in real CLI fixtures, retaining validation and publication-preservation checks. |
+
+Earlier per-task transactions, shared threads,32-task capacity and direct instance-schema
+adaptations remain prerequisites in the local history. The active source includes upstream's
+major instance rename; a final read-only check still finds main59e2f7aa and #232–#234 open.
+Claude owns extraction and upstream decisions. No pushes, PRs, upstream comments or security
+agent dispatch occurred. Human-authored remote text, forbidden branches/worktrees and all
+six historical recovery states remain preserved. core.worktree remains in config.worktree.
 
 ## Historical preparation and checkpoints
 
@@ -601,3 +617,45 @@ by the user's explicit choice; its two criteria,33 monitored e2e criteria, mixed
 library/image targets and security/full-suite acceptance stay pending. No pushes,
 PRs, upstream comments or security dispatch. Goal active/incomplete. Active HDAE
 skill and required reload procedure remain as recorded above.
+
+
+### Final independent local review — 2026-11-07
+
+The final ledger reconciles all135 e2e names: **100 independent cases passed,
+1 required clock-dependent case failed,34 cases unrun** (33 monitored-review
+cases and one other G02-dependent case). The user explicitly retained the clock
+hold. Every counted pass has exact one-test selection, exit0 and one-passed
+summary; failed/interrupted/unrun records are never promoted. The original
+clock and preseed failures remain, with the corrected current-asset preseed
+refresh and all three affected ordinary preseed cases passing separately. All
+four affected download cases reran successfully after their HTTP helper change.
+
+Recipe fixture commit `2ad833cc93f0e209fe205adb4186a822a13caaea` is clean; only
+tests/e2e/{downloads,preseed_recipes}.rs differ from runtime0c4f0d4. Old harness
+bytes were retained before rebuilding. Final aggregation checks their hashes,
+all original unchanged case modules, current binaries and source identities.
+Actual SQLite/Git/RPM/APK/GNU/musl receipts remain passed on Ginux436c4ae5.
+Static/build and focused ordinary Ginux ownership checks pass; all83 upstream
+named units and existing CI remain. No full/default/security/platform-CI pass
+is claimed. All six historical worktrees retain recorded destination index
+bytes, original staged/conflict entries and changed-file contents. No test or
+build process remains running.
+
+Final source/provenance/receipt review is in the current F03 summary above
+and the local source's `.artifacts/recipe-integration/final-local-review.json`.
+The final read-only upstream check still reports59e2f7aa and Wave1 #232–#234
+open/unmerged; no further rebase is needed now. The config location check confirms
+core.worktree exists only in config.worktree. No fork push, PR, upstream comment,
+forbidden branch/worktree edit or security dispatch occurred. Unrelated inventory
+and untangle edits remain preserved.
+
+The goal remains **incomplete**: required G02 and monitored-security/default
+acceptance are unresolved. The current turn made progress and finished all
+authorized independent ordinary verification. Exact next action: use the
+recorded local sources for human inspection; when upstream resolves the retained
+clock policy or authorized monitored results arrive, rebase only Codex's local
+integration as needed and rerun the affected pending criteria. Do not implement
+G02, dispatch DaybreakBlue or resume upstream-packet/publication work under this
+checkpoint. Active skill: hdae-development at
+`.agents/skills/hdae-development/SKILL.md`; after a context shift reload the full
+skill, required references, applicable instructions and this checkpoint.

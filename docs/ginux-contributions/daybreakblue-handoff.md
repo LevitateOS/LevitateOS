@@ -989,3 +989,18 @@ as does actual GCC/SQLite mode0755. Review concurrent creation/mask changes,
 policy admission/audit and existing mode/authority criteria on this source before
 monitored acceptance. Earlier early-task/resolved-contract and shared-argument
 holds still apply. No adversarial enforcement probe or security dispatch occurred.
+
+
+### Final local source for monitored work — 2026-11-07
+
+Pin Ginux436c4ae5843e4d50f4833158d351523f35669909 (binary96fd7dfa43cda4f051cb7b819cf00a104e2b4cceb91d2ab065e7d19e544e77db),
+Recipe runtime0c4f0d4e9d1f84ab7f638611e895dbf799500e7a and test source
+2ad833cc93f0e209fe205adb4186a822a13caaea. final-local-review.json reconciles
+100 independent passes, one clock-policy failure and34 unrun e2e cases. The33
+monitored cases and mixed library/image targets remain enabled/unrun; the two
+G02-dependent criteria are separately held by explicit user choice. Native
+clock policy was not changed. Current preseed fixtures follow all nine additional
+Alpine APK facts and preserve the original hostile quoted-path case for monitored
+work. Earlier shared-argument, contract/authority, storage B1–B3, protected copy,
+concurrency/teardown and negative transport requirements remain pending. No agent
+was contacted or dispatched, and ordinary results are not security acceptance.

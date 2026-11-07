@@ -1,6 +1,6 @@
 # Ginux contribution task list
 
-Updated: 2026-11-07. Status: local Ginux→Recipe integration and consumer verification active.
+Updated: 2026-11-07. Status: independent local verification complete; required clock/security acceptance pending.
 The authoritative ownership split below gives Claude all upstream PR work. Codex's earlier
 packet/publication queue remains historical; its current work is F03 and the local fixes Recipe
 needs. No Codex push, PR, upstream comment or security-agent dispatch is authorized.
@@ -1553,3 +1553,45 @@ by the user's explicit choice; its two criteria,33 monitored e2e criteria, mixed
 library/image targets and security/full-suite acceptance stay pending. No pushes,
 PRs, upstream comments or security dispatch. Goal active/incomplete. Active HDAE
 skill and required reload procedure remain as recorded above.
+
+
+### Final independent local review — 2026-11-07
+
+The final ledger reconciles all135 e2e names: **100 independent cases passed,
+1 required clock-dependent case failed,34 cases unrun** (33 monitored-review
+cases and one other G02-dependent case). The user explicitly retained the clock
+hold. Every counted pass has exact one-test selection, exit0 and one-passed
+summary; failed/interrupted/unrun records are never promoted. The original
+clock and preseed failures remain, with the corrected current-asset preseed
+refresh and all three affected ordinary preseed cases passing separately. All
+four affected download cases reran successfully after their HTTP helper change.
+
+Recipe fixture commit `2ad833cc93f0e209fe205adb4186a822a13caaea` is clean; only
+tests/e2e/{downloads,preseed_recipes}.rs differ from runtime0c4f0d4. Old harness
+bytes were retained before rebuilding. Final aggregation checks their hashes,
+all original unchanged case modules, current binaries and source identities.
+Actual SQLite/Git/RPM/APK/GNU/musl receipts remain passed on Ginux436c4ae5.
+Static/build and focused ordinary Ginux ownership checks pass; all83 upstream
+named units and existing CI remain. No full/default/security/platform-CI pass
+is claimed. All six historical worktrees retain recorded destination index
+bytes, original staged/conflict entries and changed-file contents. No test or
+build process remains running.
+
+Final source/provenance/receipt review is in [F03](ginux-contributions/f03-review.md)
+and the local source's `.artifacts/recipe-integration/final-local-review.json`.
+The final read-only upstream check still reports59e2f7aa and Wave1 #232–#234
+open/unmerged; no further rebase is needed now. The config location check confirms
+core.worktree exists only in config.worktree. No fork push, PR, upstream comment,
+forbidden branch/worktree edit or security dispatch occurred. Unrelated inventory
+and untangle edits remain preserved.
+
+The goal remains **incomplete**: required G02 and monitored-security/default
+acceptance are unresolved. The current turn made progress and finished all
+authorized independent ordinary verification. Exact next action: use the
+recorded local sources for human inspection; when upstream resolves the retained
+clock policy or authorized monitored results arrive, rebase only Codex's local
+integration as needed and rerun the affected pending criteria. Do not implement
+G02, dispatch DaybreakBlue or resume upstream-packet/publication work under this
+checkpoint. Active skill: hdae-development at
+`.agents/skills/hdae-development/SKILL.md`; after a context shift reload the full
+skill, required references, applicable instructions and this checkpoint.
