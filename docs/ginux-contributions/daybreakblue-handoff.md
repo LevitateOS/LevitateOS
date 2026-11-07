@@ -1245,6 +1245,17 @@ threaded compiler consumers use it. Keep the correction local to the
 integration source if needed for Recipe; Claude owns upstream extraction and
 publication. No push, PR, upstream comment or agent dispatch occurred.
 
+### Current selected G07 race run — 2026-11-07
+
+The unchanged `x-path` fixture ran once on configured binary from integration
+`158e11a6` and reported PASS across its 2,048 selected calls. This stochastic
+negative run does not override the earlier `6d290d48` hidden-byte exposure or
+the current source path: `Rewrite::prepare` still writes the translated pathname
+into tracee stack memory that a shared peer can change. The ignored
+`ginux-current-g07-xpath-selected-158e11a6/` bundle records exact inputs and
+output. G07 authority acceptance remains failed until a stable kernel-argument
+design and stronger retest are verified.
+
 ### Current-source storage prerequisite and stack checks — 2026-11-07
 
 On the immutable `6d290d48` binary, a disposable image containing `/link -> /work` and an assignment `memory:/link/nest` launched successfully (result `exited/0`). The exact source script, SHA-256 `d20c40eaa5d1cb81fa7d73aa50134beffcba4abfb50408cea81742efc3443fcd`, and `ginux-b1-assignment-precondition-6d290d48.json/.log` are in the local Daybreak evidence directory. Current `LaunchFs::prepare` checks assignment spelling and reserved prefixes but does not reject an image symlink above an assignment. This proves **acceptance of the configuration**, not a host filesystem oracle or a guest read across that boundary. The existing resolver and its source-specific behavior still require separate examination. Claude's upstream storage redesign proposes startup rejection; do not import that design here or claim it already protects this integration revision.
