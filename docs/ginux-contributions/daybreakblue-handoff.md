@@ -2366,3 +2366,8 @@ On pinned integration `f4b2e240`/configured binary SHA-256 `12fea894f0545d447e48
 ### Current G10 private backing write fault — 2026-11-07
 
 A disposable baseline on integration `f4b2e240` (configured runtime SHA-256 `12fea894f0545d447e48750e5a8a55a06577a503dc2a62ccbd8e4ffab9fa6c79`) identified the first 4 KiB private-memfd write as post-handshake `write` call seven. A separate one-shot `EIO` injection hit that exact call. Guest owned exec returned `-EIO`, passed image rollback, then retried successfully. Launcher/result exited 0, image bytes stayed intact, host-observed tracee FDs stayed `[0, 1, 2, 3]` before/after fault/after retry, and full audit showed complete teardown. Ignored `ginux-current-g10-backing-write-fault-f4b2e240/` retains exact sources, traces, audits and receipts (fault receipt SHA-256 `c4a40d7ed7c4ab11190a022fecabb477673a0589cf23d67331d7daa5af68835e`). This covers one initial write error, not later/short writes, close errors or every transient descriptor state; G10 remains partial. G02 held and G03c/G12 failed pending Claude. No upstream action occurred.
+
+
+### Current G10 private backing close baseline — 2026-11-07
+
+A disposable successful owned exec on clean `f4b2e240` traced the supervisor's private-memfd `close(10)` as the third post-handshake close, returning 0. The launcher/result exited 0 with `owned-exec: PASS`. Ignored `ginux-current-g10-backing-close-baseline-f4b2e240/` retains runner, full audit, trace and receipt (trace SHA-256 `b2091a193f2152f0668eaf104d67b0a1800bd4f1fe99b79e0dcd420a0428e2a9`). **No close fault ran**; close-error lifetime remains unverified. Open, seal and write fault checks above are narrower. G02 remains held and G03c/G12 authority failed pending Claude; no upstream action occurred.
