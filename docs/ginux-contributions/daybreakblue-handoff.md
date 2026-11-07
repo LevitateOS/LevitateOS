@@ -966,3 +966,16 @@ from a host source directory with the same spelling (/usr/bin/cpio imports).
 The proposed narrow exemption matches the entire fixed PATH assignment; other
 paths retain prefix checking. Review host-path enforcement on its final recorded
 source before monitored acceptance. No adversarial probe or dispatch occurred.
+
+
+### Bounded pipe progress source — 2026-11-07
+
+Local Ginux6a19a70a now retains blocking write/vector progress in DescriptorCall
+through full-buffer waits; partial publication wakes readers, admitted mode and
+vector layout stay fixed, and descriptor pins retain the existing task lifetime.
+A196733-byte ordinary write/writev and real RPM pipeline pass. Review protected
+and partial-copy handling, peer/endpoint flag changes, multiple concurrent writers,
+close/termination/reuse and indirect-buffer authority on this final source before
+monitored acceptance. Existing tests remain enabled; those adversarial probes
+were not run here. Recipe0c4f0d4 is the final fixed-PATH guard change referenced
+above. No security dispatch occurred; required acceptance stays pending.

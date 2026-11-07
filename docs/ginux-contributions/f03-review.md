@@ -417,3 +417,41 @@ forbidden worktree/branch changes or security dispatch occurred. Full/security
 acceptance remains pending; goal active/incomplete. Active skill:
 hdae-development at `.agents/skills/hdae-development/SKILL.md`; reload the full
 skill, required references and this checkpoint after a context shift.
+
+
+### Actual RPM/APK consumers pass — 2026-11-07
+
+Recipe commit `0c4f0d4e9d1f84ab7f638611e895dbf799500e7a` fixes imported
+/usr/bin/cpio input preparation by recognizing only its own complete fixed PATH.
+Other path values still undergo prefix scanning. Its ordinary temporary-root
+regression and real imported-tool execution pass. A first check used a retained
+nonexecutable binary copy and failed before launch; the corrected build selection
+passed. Both logs remain. No host-path bypass probe ran.
+
+The unchanged RPM pipeline then exposed real owned-pipe truncation: rpm2cpio
+produces170444 bytes into an owned file, but only4096 through a blocking pipe.
+Local Ginux commit `6a19a70a8c2ff8ad469b8127a2b8a1a5244fa714` retains task-owned
+write/vector progress across bounded-buffer waits and wakes peer readers after
+partial publication. The64KiB buffer and nonblocking/packet short transfers stay
+bounded. A196733-byte forked write/writev regression fails on the previous binary
+and passes here; all five ordinary pipe groups, polling and nine thread modes
+plus teardown pass. Final static/build passes. No existing tests/CI were removed.
+
+The original RPM pipeline now passes7.66s on this source and Recipe0c4f0d4:
+expected169536-byte library digest, mode0755, UID/GID0 and both symlinks verified.
+Actual APK managed HTTPS acquisition, pinned digest, native APK extraction and
+static apk-tools3.0.9-r0 execution pass8.88s with three acknowledged checkpoints.
+No host downloader/extractor substituted for managed execution. All earlier
+failures and diagnostic file-based runs remain separately recorded. Exact source
+and binary hashes live in `blocking-pipe-final-provenance.json`; Ginux binary
+SHA256 is717e5c13f284f2edd9485ab71ca22c718850efeaa6decba34be0462ce141fad4.
+
+Read-only upstream check still reports main59e2f7aa and #232/#233/#234 open/unmerged.
+No further rebase is currently needed. The source-reviewed20-case ordinary
+state/target/lifecycle/cleanup/hash queue is now running serially using release
+commands and the existing e2e harness; remaining-ordinary-{state,receipts}.json
+own actual status. Next: inspect its receipts, fix actual failures, then finish
+remaining ordinary consumer coverage/source review. Security/full/default/platform
+acceptance remains pending, and no DaybreakBlue dispatch is authorized. No pushes,
+PRs, upstream comments or forbidden source/branch edits occurred. Goal active and
+incomplete. Active HDAE skill/reload procedure remains as recorded above.
