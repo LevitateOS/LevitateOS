@@ -1327,3 +1327,8 @@ Disposable `g12-malformed-receipt-host-probe.py` and `g12-mapping-death-host-pro
 ### Current guarded-source mapping protection/lifetime controls — 2026-11-07
 
 Unchanged `scripts/test-launch-storage.py` and fixture selected `mapping`, `ordinary-mapping` and `ordinary-unlinked-mapping` all passed on guarded binary SHA-256 `0d8c6c0305da8d5c2e57bcb4da7458aaa3fe04a0a0427118f9137e50d8fbbb5d`. `ginux-g12-mapping-current-guarded.json/.log` records exact command and hashes. The fixture tests writable-shared and executable-write denial, offset/fixed-region checks, shared/private aliasing, resize/SIGBUS, copy-on-write, unlinked backing lifetime and a live native-FD snapshot after mapping. These are bounded current-source results, not exhaustive G12 security acceptance. Remaining private send/close errors and other indirect-argument authority controls stay pending. No upstream action occurred.
+
+
+### Current guarded-source configured view probes — 2026-11-07
+
+The existing `view-probes` storage selector passed on immutable guarded binary SHA-256 `0d8c6c0305da8d5c2e57bcb4da7458aaa3fe04a0a0427118f9137e50d8fbbb5d`. `ginux-g09-view-probes-current-guarded.json/.log` records exact command, hashes, exit 0 and output. Fixture assertions include owned-file access permissions, AT-style and fd empty-path checks, regular-file readlink rejection and a permitted read. This is one current-source configured-view check, not exhaustive namespace or symlink authority validation. Exact next action: symlink/cross-assignment checks and remaining G07/G12 private-transfer controls. No upstream action occurred.
