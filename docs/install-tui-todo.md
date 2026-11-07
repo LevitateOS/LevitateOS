@@ -23,9 +23,9 @@ disk). recpart, underneath it, works the same way: it can't see existing partiti
 keep them, resize them, or plan anything except its two templates. A real partition
 editor needs recpart work first (section 2).
 
-## Decisions to make first
+## Decisions
 
-Each one changes what gets built. My recommendation comes first.
+Agreed on 2026-11-07: the first option in each.
 
 1. **How the step apps fit together.** An `install` hub on the install screen walks the
    steps in order and starts each step's app (disk-plan, base, setup, boot). Each app writes
@@ -46,21 +46,30 @@ Each one changes what gets built. My recommendation comes first.
 
 ## 1. Platform: shipping the apps on both ISOs
 
-- [ ] **Bundle any install app, not just the docs.** Today `install_ux.rs` bundles only the
-  docs app. The variant should list its apps in `[install_ux]`, and the builder puts each one
-  on the live overlay, together with the tools it declares in its manifest (`tools`).
+- [x] **Bundle any install app, not just the docs.** `[install_ux] apps = [...]` lists them,
+  and the builder refuses an app whose manifest `tools` the variant's live tools don't ship.
+  Both variants now list `disk-plan`, and both install guides point to it.
   *Done when:* adding an app to a variant's list is the only change needed to ship it.
-- [ ] **Build per target (decision 3).** Each app becomes a single compiled binary for glibc
-  and one for musl. Stop copying `usr/local/bin/bun` from the host.
-  *Done when:* install-docs runs on an AcornOS live ISO.
+- [x] **Build per target (decision 3).** `distro/builder/src/tui_binary.rs` compiles every app
+  an ISO carries into one binary (`/usr/local/libexec/levitate-tui`, about 76 MB, 28 MB
+  compressed). It runs the app named by `argv[0]`, and each app gets a command in
+  `/usr/local/bin`. The target is read from the rootfs's dynamic loader, so AcornOS gets the
+  musl build (which needs libstdc++). Nothing is copied from the host's bun any more.
+  *Checked:* the musl binary runs disk-plan and install-docs with AcornOS's own loader and
+  libraries. Not yet checked on a booted ISO, because this machine can't build one: the
+  kernel link under `.artifacts` is root-owned and dangling.
 - [ ] **Make the docs know which distro they're on.** install-docs shows AcornOS pages on
   AcornOS: OpenRC instead of systemd, sh, no `locale-gen`, and its own boot steps. Then
-  delete `distro/variants/acorn/ring2/install-guide.txt` and its `text` docs path.
+  delete `distro/variants/acorn/ring2/install-guide.txt` and its `text` docs path. Until
+  then, disk-plan's "Read in the docs" lines point to `install-docs --slug`, which the
+  AcornOS text guide ignores.
   *Done when:* both variants set `docs = { tui_app = "install-docs", ... }`, and no
   LevitateOS-only command shows up on AcornOS.
 - [ ] **Bring the docs in line with the tools.** The LevitateOS disk chapter teaches `fdisk`
   keystrokes, while the AcornOS guide uses recpart. Both should use recpart, with the manual
-  route as the fallback.
+  route as the fallback. Bug found along the way: recpart mounts the target at
+  `/mnt/sysroot` (its `--mount-root` plus `sysroot`), but the AcornOS guide says `/mnt` and
+  then runs `recstrap /mnt`.
 - [ ] **Hand state from one app to the next (decision 1).** Use a state file under `/run`,
   say `/run/levitate-install/state.json`. It holds the disk handoff from recpart (target,
   mounts, slot A and B devices) and what each later step did, so later apps don't ask again,

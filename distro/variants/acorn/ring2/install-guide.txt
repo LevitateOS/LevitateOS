@@ -11,6 +11,8 @@ disk, erasing it. Run them in the left pane.
 
 1. Pick the target disk
    recpart list-disks
+   Or run disk-plan: it does steps 1 and 2
+   interactively, with recpart's checks.
 
 2. Partition, format and mount it at /mnt
    AcornOS installs two system slots, A
