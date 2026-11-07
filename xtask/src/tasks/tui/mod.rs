@@ -118,6 +118,111 @@ pub fn list() -> Result<()> {
     Ok(())
 }
 
+/// One app's stories in detail: what each shows, how it starts, and its steps.
+pub fn stories(name: &str) -> Result<()> {
+    let root = crate::util::repo::repo_root()?;
+    let app = tui_apps::find(&root, name)?;
+    let dir = app.dir.strip_prefix(&root).unwrap_or(&app.dir);
+    println!("{}: {}", app.name, app.description);
+    println!("{}", dir.display());
+    if !app.tools.is_empty() {
+        println!(
+            "runs {}; stories use the stand-ins from {}, so nothing real is changed",
+            app.tools.join(", "),
+            app.inspect.path.join(", ")
+        );
+    }
+    let stories = &app.inspect.stories;
+    if stories.is_empty() {
+        println!("\nNo stories (levitate.inspect.stories in its package.json).");
+        return Ok(());
+    }
+    println!(
+        "\n{} stories. Drive one yourself, or render it headlessly:\n  cargo xtask tui {name} --story NAME\n  cargo xtask inspect {name} --story NAME",
+        stories.len()
+    );
+    for story in stories {
+        println!("\n{}", story.name);
+        if let Some(about) = &story.about {
+            println!("  {about}");
+        }
+        let starts = if story.args.is_empty() { "no arguments".to_string() } else { story.args.join(" ") };
+        let env: Vec<String> = story.env.iter().map(|(k, v)| format!("{k}={v}")).collect();
+        println!("  starts with  {starts}{}", if env.is_empty() { String::new() } else { format!(" · {}", env.join(" ")) });
+        let keys: Vec<String> = story
+            .steps
+            .iter()
+            .enumerate()
+            .map(|(i, step)| match (i, step.keys.is_empty()) {
+                (0, true) => "(as it opens)".to_string(),
+                (_, true) => "(no keys)".to_string(),
+                _ => readable_keys(&step.keys),
+            })
+            .collect();
+        let width = keys.iter().map(|k| k.chars().count()).max().unwrap_or(0);
+        for (i, (step, keys)) in story.steps.iter().zip(&keys).enumerate() {
+            let shows = step.expect.as_deref().map(|e| format!("  →  \"{}\"", e.trim())).unwrap_or_default();
+            println!("  {:>2}. {keys:<width$}{shows}", i + 1);
+        }
+        println!("  cargo xtask tui {name} --story {}", shell_word(&story.name));
+    }
+    Ok(())
+}
+
+/// A story's keys (printf escapes) as names: `jj Enter ↓ Enter`.
+fn readable_keys(keys: &str) -> String {
+    const NAMED: &[(&str, &str)] = &[
+        ("\\x1b[A", "↑"),
+        ("\\x1b[B", "↓"),
+        ("\\x1b[C", "→"),
+        ("\\x1b[D", "←"),
+        ("\\x1b", "Esc"),
+        ("\\e", "Esc"),
+        ("\\x7f", "Backspace"),
+        ("\\r", "Enter"),
+        ("\\n", "Enter"),
+        ("\\t", "Tab"),
+    ];
+    let mut words: Vec<String> = Vec::new();
+    let mut text = String::new();
+    let mut rest = keys;
+    'next: while !rest.is_empty() {
+        for (escape, name) in NAMED {
+            if let Some(after) = rest.strip_prefix(escape) {
+                if !text.is_empty() {
+                    words.push(std::mem::take(&mut text));
+                }
+                words.push((*name).to_string());
+                rest = after;
+                continue 'next;
+            }
+        }
+        let c = rest.chars().next().unwrap_or_default();
+        if c == ' ' {
+            if !text.is_empty() {
+                words.push(std::mem::take(&mut text));
+            }
+            words.push("Space".to_string());
+        } else {
+            text.push(c);
+        }
+        rest = &rest[c.len_utf8()..];
+    }
+    if !text.is_empty() {
+        words.push(text);
+    }
+    words.join(" ")
+}
+
+/// `name` quoted for a shell when it needs it.
+fn shell_word(name: &str) -> String {
+    if name.chars().all(|c| c.is_ascii_alphanumeric() || "-_./".contains(c)) {
+        name.to_string()
+    } else {
+        format!("\"{}\"", name.replace('"', "\\\""))
+    }
+}
+
 /// `bun <entry>` in the app's directory, after installing the workspace and
 /// building the app's Rust tools onto the front of PATH.
 pub fn app_command(root: &Path, app: &TuiApp) -> Result<Command> {

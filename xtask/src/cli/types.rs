@@ -124,7 +124,8 @@ pub enum Cmd {
     /// and you drive it. Both go before any `--`; the rest of the line goes to the app.
     ///
     /// `cargo xtask tui list` lists the apps with what each is for, where it lives, the tools
-    /// it runs, its pages and its stories.
+    /// it runs, its pages and its stories; `cargo xtask tui list <APP>` lists that app's
+    /// stories in detail: what each shows, how it starts, its keys and what they must show.
     ///
     /// Without a terminal, or without the real tools: `cargo xtask inspect <APP>` renders a
     /// screen headlessly with stand-in tools (`--story NAME` opens a story, `--input` types
@@ -132,6 +133,7 @@ pub enum Cmd {
     ///
     /// Examples:
     ///   cargo xtask tui list
+    ///   cargo xtask tui list disk-plan
     ///   cargo xtask tui install-docs --slug installation
     ///   cargo xtask tui disk-plan --help
     ///   cargo xtask tui disk-plan --story "edit: nothing can shrink"
@@ -141,7 +143,7 @@ pub enum Cmd {
         verbatim_doc_comment,
         arg_required_else_help = true,
         disable_help_subcommand = true,
-        override_usage = "cargo xtask tui <APP> [--stand-ins | --story NAME] [ARGS]...\n       cargo xtask tui list"
+        override_usage = "cargo xtask tui <APP> [--stand-ins | --story NAME] [ARGS]...\n       cargo xtask tui list [APP]"
     )]
     Tui {
         #[command(subcommand)]
@@ -154,8 +156,11 @@ pub enum Cmd {
 
 #[derive(Subcommand)]
 pub enum TuiCmd {
-    /// List the apps under tui/apps.
-    List,
+    /// List the apps under tui/apps, or one app's stories in detail.
+    List {
+        /// An app: list its stories (what each shows, how it starts, its steps).
+        app: Option<String>,
+    },
     /// Any other name runs that app, with the rest of the line as its arguments.
     #[command(external_subcommand)]
     Run(Vec<String>),

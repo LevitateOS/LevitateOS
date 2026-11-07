@@ -18,7 +18,8 @@ pub fn run(cli: crate::cli::Cli) -> Result<()> {
         Cmd::Check {
             what: Some(CheckCmd::Tui { bless }),
         } => crate::tasks::tui::check::run(bless),
-        Cmd::Tui { cmd: TuiCmd::List } => crate::tasks::tui::list(),
+        Cmd::Tui { cmd: TuiCmd::List { app: None } } => crate::tasks::tui::list(),
+        Cmd::Tui { cmd: TuiCmd::List { app: Some(app) } } => crate::tasks::tui::stories(&app),
         Cmd::Tui { cmd: TuiCmd::Run(mut line) } => {
             let app = line.remove(0);
             crate::tasks::tui::run(app, line)
