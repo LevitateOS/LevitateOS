@@ -11,7 +11,7 @@ would rather type the commands.
 | Step (docs numbering) | LevitateOS | AcornOS |
 |---|---|---|
 | Install screen | split pane: bash + install-docs TUI | split pane: sh + install-docs TUI (AcornOS pages) |
-| Keyboard, network, clock (1, WiFi) | commands in the docs | commands in the docs (US keymap only, wired only) |
+| Keyboard, network, clock (1, WiFi) | commands in the docs (no iwd or WiFi firmware ships, so the `iwctl` steps fail) | commands in the docs (`loadkmap`, wpa_supplicant; no WiFi firmware) |
 | Disk (2–5) | disk-plan, or `recpart` by hand (`fdisk` as the manual fallback) | disk-plan, or `recpart` by hand (`sfdisk` as the manual fallback) |
 | Base system (6–9) | `recstrap`, `recfstab`, `recchroot` by hand | same |
 | Configuration (10–14) | `recsetup` and `passwd` by hand | same |
@@ -181,8 +181,11 @@ Agreed on 2026-11-07: the first option in each.
 - [ ] **Keyboard layout:** a searchable list. It sets the layout for the live session
   (`loadkeys`) and records it for the installed system.
 - [ ] **Network:** shows wired status, and lets you pick a WiFi network and enter its
-  passphrase. LevitateOS uses `iwctl` (iwd). On AcornOS, decide between iwd and
-  wpa_supplicant and confirm which one the live ISO ships. Then test that the network works.
+  passphrase. LevitateOS's guide uses `iwctl` (iwd), which its package set lacks. AcornOS
+  ships wpa_supplicant and iw (2026-11-07; iwd needs a D-Bus daemon AcornOS doesn't run),
+  with tzdata and kbd-bkeymaps beside them. Neither ships WiFi firmware yet, so most cards
+  stay dark, and AcornOS's rootfs has no `/lib/modules`, so no modular driver (WiFi's
+  among them) can load. Then test that the network works.
 
 ## 4. Base system: steps 6–9
 
