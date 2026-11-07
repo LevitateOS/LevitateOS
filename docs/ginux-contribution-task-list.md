@@ -1518,3 +1518,38 @@ Next: inspect the49-case independent run and fix actual in-scope ordinary causes
 then finish the local review with clock/security acceptance explicitly pending.
 No push, PR, upstream comment, forbidden branch/worktree edit or security dispatch.
 Goal active/incomplete. Active HDAE skill/reload procedure remains as recorded.
+
+
+### Current Alpine asset closure fixture — 2026-11-07
+
+The49-case independent continuation passed30 cases, including the payload above
+2GiB,5,000 entries, modes/links/restart identity and imported-target validation.
+It then failed Alpine preseed refresh because the existing fixture provided only
+ISO/apk-tools while current builder206e875 requires nine additional pinned APKs.
+The actual recipe/facts are authoritative; no package or producer check was removed.
+The original failure remains in clock-held-independent-state.json and its log.
+
+A local Recipe test-fixture correction (two uncommitted integration-test files on
+0c4f0d4) reads the trusted pure Alpine facts, stages the entire asset closure, and
+serves the package set on one ordinary HTTP origin within existing endpoint bounds.
+ISO/apk-tools corruption assertions remain; refresh adds bad-extra-APK preservation,
+and explicit rootfs inputs now include the extra APK directory. No production
+source, limits or runtime binaries changed. The fixture uses small named data for
+integrity/lifecycle checks; it does not claim those bytes are usable ISO/APK tools.
+Actual pinned APK/RPM consumers remain separately verified.
+
+The rebuilt harness compiles without warnings and focused Alpine refresh passes
+1/1 in62.41s, including success and all three failure types with previous inputs
+and publications preserved. Its19-case remainder (including that focused pass)
+and four affected ordinary download checks are being verified. The currently
+running batch has22 cases:18 not-yet-run independent cases plus those four reruns.
+preseed-remaining-{selection,state,receipts}.json owns actual status. Original
+harness/command bytes are retained in bin/ with preseed-original-harness-retention.json;
+preseed-consumer-provenance.json records current test source and unchanged runtime.
+
+Next: inspect this batch, fix actual ordinary causes if any, then commit the
+verified two-file fixture correction and finish local review. G02 remains held
+by the user's explicit choice; its two criteria,33 monitored e2e criteria, mixed
+library/image targets and security/full-suite acceptance stay pending. No pushes,
+PRs, upstream comments or security dispatch. Goal active/incomplete. Active HDAE
+skill and required reload procedure remain as recorded above.
