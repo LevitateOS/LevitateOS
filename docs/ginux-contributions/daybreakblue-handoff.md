@@ -81,9 +81,12 @@ Local integration commit `b168c2c5` makes `Index::new` reject a file extent whos
 `B`; a byte-identical copied VFS crate ran all 42 unit tests successfully.
 The ignored `ginux-current-g09a-offset-wrap-b168c2c5/` evidence bundle retains
 both probe sources and outputs, source snapshots, test logs, exact hashes and
-commands. This checks one arithmetic fault only; backend length, other malformed
-records and configured runtime behavior remain unverified. The integration fix
-is local extraction material for Claude, with no upstream push, PR or comment.
+commands. A separate `ginux-current-g09a-backend-failure-b168c2c5/` control
+returned `Err(Io)` for a simulated short backing read without advancing the VFS
+position, then read `AB` after the second byte became available. It did not run
+a real host short-read or concurrent mutation. Other malformed records and
+configured runtime behavior remain unverified. The integration fix is local
+extraction material for Claude, with no upstream push, PR or comment.
 
 ## G09d pending security scenarios and automatic-review boundary
 
