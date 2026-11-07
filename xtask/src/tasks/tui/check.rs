@@ -47,7 +47,7 @@ pub fn run(bless: bool) -> Result<()> {
 
     let hosted = install_screen_docs(&root)?;
     let apps = tui_apps::discover(&root)?;
-    for (variant, (app, _)) in &hosted {
+    for (variant, (app, _, _)) in &hosted {
         if !apps.iter().any(|known| &known.name == app) {
             step(
                 format!("{variant}'s install screen docs"),
@@ -65,11 +65,11 @@ pub fn run(bless: bool) -> Result<()> {
             }
         };
         step(format!("render {name} {}x{}", FULL.columns, FULL.rows), render(&launch, &[], FULL));
-        for (variant, page) in hosted.iter().filter(|(_, (app, _))| *app == name).map(|(v, (_, p))| (v, p)) {
-            let args = match page {
-                Some(page) => vec![page_arg(&launch.app)?, page.clone()],
-                None => Vec::new(),
-            };
+        for (variant, (_, page, docs_args)) in hosted.iter().filter(|(_, (app, _, _))| *app == name) {
+            let mut args = docs_args.clone();
+            if let Some(page) = page {
+                args.extend([page_arg(&launch.app)?, page.clone()]);
+            }
             for &(columns, rows) in CONSOLES {
                 let (pane_columns, pane_rows) = install_split_pane::docs_pane_size(columns, rows);
                 let size = Size {
@@ -97,17 +97,14 @@ pub fn run(bless: bool) -> Result<()> {
     Ok(())
 }
 
-/// Each variant whose install screen shows a TUI app: variant, (app, page).
-fn install_screen_docs(root: &Path) -> Result<Vec<(String, (String, Option<String>))>> {
+/// Each variant's install screen docs: variant, (app, page, args).
+fn install_screen_docs(root: &Path) -> Result<Vec<(String, (String, Option<String>, Vec<String>))>> {
     let mut hosted = Vec::new();
     for distro in crate::cli::Distro::ALL {
         let contract = distro_contract::load_variant_contract_for_distro_from(root, distro.id())
             .with_context(|| format!("loading variant '{}'", distro.id()))?;
-        if let distro_contract::InstallDocs::TuiApp { app, page } =
-            contract.product_config.install_ux.docs
-        {
-            hosted.push((distro.id().to_string(), (app, page)));
-        }
+        let docs = contract.product_config.install_ux.docs;
+        hosted.push((distro.id().to_string(), (docs.app, docs.page, docs.args)));
     }
     Ok(hosted)
 }

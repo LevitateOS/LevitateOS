@@ -10,12 +10,12 @@ would rather type the commands.
 
 | Step (docs numbering) | LevitateOS | AcornOS |
 |---|---|---|
-| Install screen | split pane: bash + install-docs TUI | split pane: sh + `install-guide.txt` in a pager |
-| Keyboard, network, clock (1, WiFi) | commands in the docs | commands in the guide |
-| Disk (2–5) | the docs tell you to use `fdisk` by hand; disk-plan exists but doesn't ship | `recpart` by hand; disk-plan doesn't ship |
+| Install screen | split pane: bash + install-docs TUI | split pane: sh + install-docs TUI (AcornOS pages) |
+| Keyboard, network, clock (1, WiFi) | commands in the docs | commands in the docs (US keymap only, wired only) |
+| Disk (2–5) | disk-plan, or `recpart` by hand (`fdisk` as the manual fallback) | disk-plan, or `recpart` by hand (`sfdisk` as the manual fallback) |
 | Base system (6–9) | `recstrap`, `recfstab`, `recchroot` by hand | same |
-| Configuration (10–14) | `ln`, `sed`, `locale-gen`, `passwd`, `useradd` by hand | hostname and `passwd` by hand |
-| Boot (15–18) | `bootctl`, `recab init`, `systemctl enable` by hand | `cp` of the EFI binary, `recab init` by hand |
+| Configuration (10–14) | `recsetup` and `passwd` by hand | same |
+| Boot (15–18) | `recsetup --boot` by hand | same |
 | Installed system | recab-tui exists (redone 2026-11-07) but doesn't ship | same |
 
 disk-plan today only offers a disk and a fixed layout (`ab` or `mutable`, wiping the whole
@@ -58,18 +58,20 @@ Agreed on 2026-11-07: the first option in each.
   *Checked:* the musl binary runs disk-plan and install-docs with AcornOS's own loader and
   libraries. Not yet checked on a booted ISO, because this machine can't build one: the
   kernel link under `.artifacts` is root-owned and dangling.
-- [ ] **Make the docs know which distro they're on.** install-docs shows AcornOS pages on
-  AcornOS: OpenRC instead of systemd, sh, no `locale-gen`, and its own boot steps. Then
-  delete `distro/variants/acorn/ring2/install-guide.txt` and its `text` docs path. Until
-  then, disk-plan's "Read in the docs" lines point to `install-docs --slug`, which the
-  AcornOS text guide ignores.
-  *Done when:* both variants set `docs = { tui_app = "install-docs", ... }`, and no
-  LevitateOS-only command shows up on AcornOS.
-- [ ] **Bring the docs in line with the tools.** The LevitateOS disk chapter teaches `fdisk`
-  keystrokes, while the AcornOS guide uses recpart. Both should use recpart, with the manual
-  route as the fallback. Bug found along the way: recpart mounts the target at
-  `/mnt/sysroot` (its `--mount-root` plus `sysroot`), but the AcornOS guide says `/mnt` and
-  then runs `recstrap /mnt`.
+- [x] **Make the docs know which distro they're on** (2026-11-07). docs-content has AcornOS
+  pages (`acorn-getting-started` … `acorn-troubleshooting`, `product: "acorn"`), and the
+  install tools, recipe helpers, atomic-updates and variants pages are `shared`.
+  install-docs shows one distro's pages plus the shared ones: `--product levitate|acorn`,
+  by default the running system's (`ID` in `/etc/os-release`). A slug or link of the other
+  distro opens its counterpart (`installation-disk` → `acorn-installation-disk` on
+  AcornOS), so disk-plan's `install-docs --slug` lines work on both. AcornOS sets
+  `docs = { tui_app = "install-docs", page = "acorn-installation", args = ["--product",
+  "acorn"] }`; the text guide and the contract's `text` docs path are gone.
+  *Checked:* `cargo xtask check tui` renders AcornOS's docs pane at both console sizes and
+  its stories pass. Not checked on a booted AcornOS ISO (no live ISO builds here).
+- [x] **Bring the docs in line with the tools.** Both guides use disk-plan or recpart, with
+  the manual route as the fallback. recpart now mounts the target at its `--mount-root`
+  (`/mnt`) itself, not `/mnt/sysroot`, so the guides' `recstrap /mnt` is right.
 - [ ] **Hand state from one app to the next (decision 1).** Use a state file under `/run`,
   say `/run/levitate-install/state.json`. It holds the disk handoff from recpart (target,
   mounts, slot A and B devices) and what each later step did, so later apps don't ask again,

@@ -6,7 +6,7 @@ schema_version = 6
 [install_ux]
 consoles = ["tty1", "ttyS0"]
 shell = "/bin/sh"
-docs = { text = "install-guide.txt" }
+docs = { tui_app = "install-docs", page = "acorn-installation", args = ["--product", "acorn"] }
 # TUI apps on the live ISO besides the docs, as commands for the shell beside them.
 apps = ["disk-plan"]
 
