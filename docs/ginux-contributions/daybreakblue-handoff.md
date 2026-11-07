@@ -1255,6 +1255,19 @@ The old G03c B3 description does not describe this exact source: `LaunchFs` hold
 
 The unchanged `qfault` task fixture passed on immutable Ginux `6d290d48` through the existing `scripts/test-launch-tasks.py` selector (`PASS launch tasks: qfault`, exit 0). Its fixture asserts four protected/unmapped/cross-page wait-status destinations return `EFAULT`, that a second wait reports the child already consumed (`ECHILD`), and that protected and adjacent sentinel bytes remain unchanged. Exact binary, fixture and runner hashes, command and log are in `ginux-g06b-wait-qfault-6d290d48.json/.log` in the local Daybreak evidence directory. This is current-revision evidence for those four fixture cases; it does not resolve G07's shared-path failure or all indirect-copyout requirements.
 
+### Selected current G06b copyout rerun — 2026-11-07
+
+The existing task fixture/runner selected `qfault`, `protected-child-tid` and
+`x-child-tid` on configured binary from integration `158e11a6`; all three passed
+with result `exited/0` and complete teardown. `qfault` covers four wait-status
+fault destinations, `EFAULT`, consumed-child `ECHILD` and unchanged sentinel
+bytes. The child-TID cases cover a protected word and a writable/read-only
+cross-page word with unchanged child sentinel. The ignored
+`ginux-current-g06b-copyout-158e11a6/` bundle retains exact fixture/runner,
+logs, hashes and receipt. The later VFS-only local fix `b168c2c5` was not built
+into this runtime. These selected checks leave shared-path authority, clone
+flag combinations and broader rollback acceptance unresolved.
+
 ### G07 inherited SIGCHLD and teardown controls — 2026-11-07
 
 On `6d290d48`, the existing `clone` task fixture passed with Ginux alone inheriting ignored `SIGCHLD` (`ginux-g07-clone-sigchld-childonly-6d290d48.json`; corrected runner source and hash saved beside it). A recovered true-thread fixture then passed `basic` and both `teardown` modes (external SIGKILL and supervisor-failure SIGSTOP): the runner asserted the expected launch result and that all tracee TIDs disappeared. Exact receipts are `ginux-g07-basic-sigchld-childonly-6d290d48.json` and `ginux-g07-teardown-sigchld-childonly-6d290d48.json`; the disposable runner source and SHA-256 `0a81e33e4c47a46a6d41583d9063f6dad911ad08b40fef6240b34b23df624553` are saved beside them.
