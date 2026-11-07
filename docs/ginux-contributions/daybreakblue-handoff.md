@@ -1134,3 +1134,40 @@ to tracee stack memory before the kernel consumes it, so the documented
 shared-VM thread mutation issue remains source-visible and requires a
 revision-specific correction and adversarial verification. No new runtime
 thread-race probe or acceptance is claimed here.
+
+### Empty-path descriptor routing correction — 2026-11-07
+
+A temporary diagnostic build proved that Ginux's filesystem hook was never
+entered for the failing owned-file `faccessat2(fd, "", R_OK, AT_EMPTY_PATH)`.
+The earlier device hook handled empty paths for `fstatat` and `statx`, but not
+`faccessat2`; it called the generic path resolver, which returned `ENOENT`
+before the owned-file descriptor hook could claim the call. The diagnostic
+source was restored exactly after the run. Local integration commit
+`6d290d484f7c47d979e847f6daa8049781977860` extends the device hook's
+empty-path descriptor routing to `faccessat2` and handles live device
+`faccessat2` descriptors there. The existing device fixture now asserts
+allowed read access and denied execute access through `AT_EMPTY_PATH`.
+The separate fixture dispatch correction remains `b4c69551`.
+
+The immutable final runtime binary is
+`/home/vince/levitate-development/ginux-recipe-integration/.artifacts/recipe-integration/bin/ginux-6d290d48`
+(SHA-256 `c40cd3a75c5f479f1e761d53d02e3f12c4b748efc0f4b13eeefa2850cd8d7324`).
+`make check build`, the existing full Ginux unit suite, and the unchanged full
+storage, device and FD launch suites pass on the corrected source/binary.
+The full storage suite now reaches all of its path, namespace, mapping,
+copy-protection, quota, export, and invalid-assignment controls; its historical
+`view-probes` failure is fixed on this revision, not erased from prior receipts.
+Three focused Recipe e2e cases also pass on this binary: absolute host-path
+write rejection, owned executable permission rejection, and generated
+owned/image interpreter chains. Exact commands, exit-zero receipts, hashes
+and logs are in the local evidence directory above. The other 27 security
+Recipe passes remain on the older `436c4ae5` binary; no current-revision
+135-case ledger pass is claimed.
+
+The broader Daybreak requirements still need revision-specific source review
+and focused adversarial work, especially shared writable syscall arguments,
+thread/descriptors/teardown races, contract admission and audit, assignment
+symlink authority, protected copyout, negative transport and restore inputs.
+The G02 clock-dependent five cases remain held/unrun or failed as previously
+recorded. Claude's upstream storage redesign remains separate. No remote
+push, PR, upstream comment or agent dispatch occurred.

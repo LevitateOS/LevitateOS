@@ -1682,3 +1682,31 @@ source-visible shared-thread native-path scratch risk and the absent canonical
 G03c ancestry. Exact next action remains the current `view-probes` diagnosis
 and focused independent security checks, with G02 held and security acceptance
 open. No upstream publication or Claude inventory edit was made.
+
+### Current local storage correction — 2026-11-07
+
+The full storage failure is now diagnosed and fixed in its existing owner.
+A temporary diagnostic showed that the device hook returned `ENOENT` before
+the filesystem hook could claim owned-file `faccessat2` with `AT_EMPTY_PATH`.
+Local Ginux integration commit `6d290d48` routes that empty-path form by
+its descriptor owner and adds allowed/denied device fixture controls.
+The immutable binary `bin/ginux-6d290d48` has SHA-256
+`c40cd3a75c5f479f1e761d53d02e3f12c4b748efc0f4b13eeefa2850cd8d7324`.
+The unchanged **full** storage, device and FD launch suites pass on that
+binary; Ginux `make check build` and its full unit suite pass on the same
+source. The historical failed storage receipts remain evidence of the old
+revision. Three focused Recipe consumers pass on the new binary, including
+absolute host-path write rejection and owned executable permission denial.
+The earlier 29 security Recipe passes were on `436c4ae5`; two of those have
+now passed again on `6d290d48`, while 27 still need current-source reruns
+before a current-revision suite claim. Four security cases and one other case
+remain G02-dependent and held/unrun, with the observed G02 failure retained.
+
+Current Ginux integration source is clean `6d290d48`. Security acceptance
+remains incomplete: shared-thread writable syscall arguments, contract
+admission/audit, assignment symlink authority, protected copyout, races,
+negative transport, restore inputs and other handoff criteria still need
+revision-specific validation. Exact next action: review those independent
+security families against this source and run focused checks in dependency
+order; preserve the G02 hold and Claude's upstream ownership. No push, PR or
+upstream comment is authorized or made.
