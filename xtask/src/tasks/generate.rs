@@ -229,7 +229,12 @@ impl<'a> Declarations<'a> {
         for variant in E::value_variants() {
             let value = variant.to_possible_value().context("hidden enum value")?;
             let text = value.get_help().map(|h| h.to_string()).unwrap_or_default();
-            docs.insert(value.get_name().to_string(), text.into());
+            // Keyed by the serialized name, the one `values` lists (clap's may differ).
+            let name = serde_json::to_value(variant)?
+                .as_str()
+                .context("a unit enum variant serializes as a string")?
+                .to_string();
+            docs.insert(name, text.into());
         }
         self.constant(help, &docs)
     }
