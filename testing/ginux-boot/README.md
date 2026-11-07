@@ -66,12 +66,12 @@ failed units on the same branch; upstream `53a54add` also reaches login.
 | --- | --- | --- | --- |
 | deliver SIGCHLD to native tracees | OpenRC, busybox and shells never saw their children exit | AcornOS | [#242](https://github.com/gmkurtzer/ginux/pull/242) |
 | scratch: musl and OpenRC syscall support | musl's syscall variants, shell fd targets, `wait4(0)`, restart → `EINTR`, audit cap | AcornOS | not as is; see `docs/ginux-openrc-boot` |
-| TCGETS2 on the virtual console | glibc 2.42 `tcgetattr` uses it | LevitateOS | candidate |
-| `waitid(P_PIDFD)` | systemd 258+ waits this way, no fallback: PID 1 exited at its first child | LevitateOS | candidate |
-| clone3 `CLONE_INTO_CGROUP` | glibc 2.41+ `posix_spawn`: every service spawn failed (EBADF) | LevitateOS | candidate |
-| `PIDFD_GET_INFO` → ENOTTY | leaked host pids; systemd lost track of every service | LevitateOS | candidate |
-| release children reaped by `waitid` | process slots leaked; an instance died after 128 processes | LevitateOS | candidate |
-| cgroup mkdir creates interface files | units in `/etc`, slices and templates failed at 219/CGROUP | LevitateOS | candidate |
+| TCGETS2 on the virtual console | audit label only: unknown ioctls already pass through | LevitateOS | not needed |
+| `waitid(P_PIDFD)` | systemd 258+ waits this way, no fallback: PID 1 exited at its first child | LevitateOS | [#244](https://github.com/gmkurtzer/ginux/pull/244) |
+| clone3 `CLONE_INTO_CGROUP` | glibc 2.41+ `posix_spawn`: every service spawn failed (EBADF) | LevitateOS | [#245](https://github.com/gmkurtzer/ginux/pull/245) |
+| `PIDFD_GET_INFO` → ENOTTY | leaked host pids; systemd lost track of every service | LevitateOS | [#246](https://github.com/gmkurtzer/ginux/pull/246) |
+| release children reaped by `waitid` | process slots leaked; an instance died after 128 processes | LevitateOS | [#247](https://github.com/gmkurtzer/ginux/pull/247) |
+| cgroup mkdir creates interface files | units in `/etc`, slices and templates failed at 219/CGROUP | LevitateOS | [#248](https://github.com/gmkurtzer/ginux/pull/248) |
 
 Everything systemd-specific that LevitateOS needed comes from systemd 258+
 and glibc 2.41+, which Gate 9's Rocky 10 (systemd 257, glibc 2.39) does not
