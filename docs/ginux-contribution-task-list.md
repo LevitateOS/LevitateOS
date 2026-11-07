@@ -1357,3 +1357,38 @@ source-reviewed ordinary consumers and actual APK/RPM paths. Current full-suite,
 security/default/platform CI and required acceptance remain pending. No remote
 changes or security dispatch occurred. Active HDAE/reload procedure remains as
 recorded above. Goal active/incomplete; no current-case process was interrupted.
+
+
+### Musl consumer and package-path checkpoint — 2026-11-07
+
+The final062fb5ef/f70b35d eight-case ordinary batch finished8/8 with exit0
+and exact one-case receipts. Results remain tied to that source. Workspace
+release Recipe commands preserve the existing profile and reduce the unchanged
+GNU Cargo fixture from85.39s to9.28s, producing the identical executable hash.
+
+Actual musl compilation/linking succeeded, but its program could not start a
+thread: musl uses clone flags0x7d0f00, while the local owner accepted only0x3d0f00.
+Local Ginux commit `e9a2f8a07e8e34d2de9281e1b3de1f33d5a30377` admits that exact
+additional native thread form. Static/build and nine ordinary thread modes plus
+teardown pass. The unchanged real musl Cargo/cache consumer now passes9.05s: both
+clients succeed, one compilation, cache/target locking, static ELF and an actual
+started/joined Rust thread returning42. No linker-thread suppression is used.
+Recipe documentation commit0d412c8 corrects GNU/musl compiler guidance; runtime
+source remainsf70b35d. Original musl failure and passing receipts are retained.
+
+The actual pinned Fedora RPM fixture failed before runtime launch: importing
+/usr/bin/cpio makes the host-path guard mistake its own fixed image PATH for a
+leak. A minimal Recipe input-owner correction is being built: use the same fixed
+PATH producer and exempt only its complete canonical PATH assignment, retaining
+prefix scanning on other values. No bypass/escape probe was run; this defensive
+join needs downstream monitored review. The initial failed RPM receipt is kept.
+APK runtime acquisition/extraction remains unrun. Exact evidence is under the
+local integration source's `.artifacts/recipe-integration/`.
+
+Next: finish the input-owner build, run the unchanged RPM pipeline on a new
+receipt, fix actual ordinary causes if needed, then pinned APK and remaining
+source-reviewed ordinary consumers serially. No upstream work/publication,
+forbidden worktree/branch changes or security dispatch occurred. Full/security
+acceptance remains pending; goal active/incomplete. Active skill:
+hdae-development at `.agents/skills/hdae-development/SKILL.md`; reload the full
+skill, required references and this checkpoint after a context shift.

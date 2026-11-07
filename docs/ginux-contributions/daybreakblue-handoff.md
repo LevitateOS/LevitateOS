@@ -954,3 +954,15 @@ source062fb5ef adds bounded task-creation diagnostics and32 task slots for the
 measured ordinary Cargo process tree; shared-argument/authority/copyout security
 criteria above remain pending. Read the local integration state.json for any
 later source before monitored validation. No security agent was dispatched.
+
+
+### Local musl and Recipe fixed PATH join — 2026-11-07
+
+Local Ginuxe9a2f8a0 accepts musl's exact pthread clone flags0x7d0f00 through
+the existing group owner; real static Rust compilation, execution and joining
+pass ordinary checks. Existing shared-argument/copyout/authority holds remain.
+Recipe input preparation also needs its canonical, generated PATH distinguished
+from a host source directory with the same spelling (/usr/bin/cpio imports).
+The proposed narrow exemption matches the entire fixed PATH assignment; other
+paths retain prefix checking. Review host-path enforcement on its final recorded
+source before monitored acceptance. No adversarial probe or dispatch occurred.
