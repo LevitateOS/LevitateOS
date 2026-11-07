@@ -1668,3 +1668,17 @@ on that source with exact per-mode receipts. The full default storage suite
 still fails at `view-probes`, and default-only path/assignment/no-storage
 controls remain unrun after its early stop. Keep storage acceptance pending;
 see the handoff's current-revision addendum for the receipt location.
+
+Default-only storage isolation found an existing fixture selector collision:
+`missing-owned` entered the earlier mapping branch. Local Ginux integration
+commit `b4c69551` makes only `mapping` exact; both affected selections pass
+with the rebuilt fixture. A corrected-fixture rerun of the unchanged full
+storage runner still fails first at `view-probes` (guest149, runner1). The
+current Ginux source is clean `b4c69551`; its immutable runtime remains the
+`c7b4b73a` binary because `b4c69551` changes only fixture source. Eighteen
+other default-only scenario selections passed through a disposable runner
+copy; their receipts are not a full-suite pass. The downstream handoff records
+source-visible shared-thread native-path scratch risk and the absent canonical
+G03c ancestry. Exact next action remains the current `view-probes` diagnosis
+and focused independent security checks, with G02 held and security acceptance
+open. No upstream publication or Claude inventory edit was made.

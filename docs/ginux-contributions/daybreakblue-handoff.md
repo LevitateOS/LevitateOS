@@ -1104,3 +1104,33 @@ receipt (`ginux-storage-<mode>-c7b4b73a.json`). The `view-probes` failure
 persists; default-only path/assignment and no-storage controls remain unrun
 because the full runner stops at that failure. These selected passes cannot
 make the full storage suite pass.
+
+### Default-only storage selection and fixture correction — 2026-11-07
+
+A disposable selection copy of the existing storage runner isolated its
+19 default-only scenario labels without changing the storage fixture body or
+Ginux runtime. Eighteen initially passed; `missing-owned` instead entered the
+earlier generic mapping branch and exited 135 while awaiting mapping input.
+The source had two `argv[1][0] == 'm'` branches, making the intended
+`missing-owned` branch unreachable. Local integration commit
+`b4c6955116bcbfd186f2e9a03430b7a5815bca3b` changes only the earlier
+branch to an exact `mapping` comparison. The pre-correction fixture binary is
+preserved in `bin/launch-storage-fixture-pre-dispatch`; the corrected fixture
+was rebuilt with the existing Make target. Independent `mapping` and
+`missing-owned` selections both pass afterward, with exact receipts and logs
+under the evidence directory. The other 18 default-only selection receipts
+remain from the preceding fixture revision; the one-line dispatch correction
+does not alter their branch bodies. The full unchanged storage runner was
+rerun with the corrected fixture and still fails first at `view-probes`
+(guest exit 149, runner exit 1). This is a fixture selection fix, not
+storage security acceptance or a runtime fix. No remote change was made.
+
+Current local Ginux integration HEAD is `b4c69551`; the immutable runtime
+binary is still from `c7b4b73a`, since the later commit changes only fixture
+source. Source ancestry checks show neither canonical G03c `3801fd45` nor
+the later resolved-contract variant `37ddb461` is an ancestor of this HEAD.
+Current `path_hooks::Rewrite::prepare` still writes the chosen native pathname
+to tracee stack memory before the kernel consumes it, so the documented
+shared-VM thread mutation issue remains source-visible and requires a
+revision-specific correction and adversarial verification. No new runtime
+thread-race probe or acceptance is claimed here.
