@@ -146,4 +146,17 @@ packages = [
   "libtool-ltdl",
   "libxkbcommon",
   "sqlite-libs",
+  # What the install docs configure: time zones under /usr/share/zoneinfo,
+  # compiled English locales, and NetworkManager with its libraries.
+  "tzdata",
+  "glibc-langpack-en",
+  "NetworkManager",
+  "NetworkManager-libnm",
+  "glib2",
+  "gnutls",
+  "nettle",
+  "libtasn1",
+  "p11-kit",
+  "libffi",
+  "libndp",
 ]
