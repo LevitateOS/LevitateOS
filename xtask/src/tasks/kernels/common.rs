@@ -115,17 +115,7 @@ pub(crate) fn verify_one(root: &Path, t: &KernelTarget) -> Result<String> {
 }
 
 pub(crate) fn build_recipe_bin(root: &Path) -> Result<PathBuf> {
-    run_cmd(
-        Command::new("cargo")
-            .current_dir(root)
-            .args(["build", "-p", "levitate-recipe"]),
-    )?;
-
-    let recipe_bin = root.join("target/debug/recipe");
-    if !recipe_bin.is_file() {
-        bail!("Expected recipe binary at {}", recipe_bin.display());
-    }
-    Ok(recipe_bin)
+    Ok(distro_builder::recipe::find_recipe(root)?.path)
 }
 
 pub(crate) fn build_kernel_via_recipe(
