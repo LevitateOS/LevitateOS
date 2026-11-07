@@ -137,10 +137,6 @@ package = "recstrap"
 target = "x86_64-unknown-linux-musl"
 destination = "usr/bin/recstrap"
 
-[[ring2_runtime_profiles.live_tools_common.actions]]
-kind = "apk_packages"
-packages = ["curl", "pciutils", "smartmontools", "hdparm", "vim", "htop"]
-
 [ring2_runtime_profiles.live_tools_ux]
 # The install screen's split pane; live only, so it goes into the overlay.
 [[ring2_runtime_profiles.live_tools_ux.actions]]
