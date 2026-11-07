@@ -84,11 +84,11 @@ Agreed on 2026-11-07: the first option in each.
 
 ### recpart backend
 
-- [ ] **Read what's on the disk.** `list-disks --json` (or a new `inspect --disk`) also
+- [x] **Read what's on the disk.** `list-disks --json` (or a new `inspect --disk`) also
   reports the partition table: type (GPT, MBR, none), every partition (number, start, size,
   type GUID, label, filesystem, filesystem label, UUID, used space where readable, current
-  mountpoint) and the free gaps.
-- [ ] **Plan from an explicit layout.** Next to the `ab` and `mutable` templates, accept a
+  mountpoint) and the free gaps. Done as `recpart inspect --disk X --json`.
+- [x] **Plan from an explicit layout.** Next to the `ab` and `mutable` templates, accept a
   layout request that lists the actions:
   - keep a partition as it is;
   - delete one;
@@ -100,23 +100,23 @@ Agreed on 2026-11-07: the first option in each.
 
   The plan still gives the exact sfdisk or sgdisk script and every command, in order, as it
   does today.
-- [ ] **Resize filesystems.** Shrink and grow ext4 (`e2fsck` + `resize2fs`, offline), FAT,
+- [x] **Resize filesystems.** Shrink and grow ext4 (`e2fsck` + `resize2fs`, offline), FAT,
   and NTFS (`ntfsresize`) for dual boot. Refuse, with an `E0NN` code, any filesystem it can't
   resize safely, and any shrink below the space in use.
-- [ ] **Check the layout against the install mode.** An `ab` install needs EFI, two root
+- [x] **Check the layout against the install mode.** An `ab` install needs EFI, two root
   slots of the same size and a state partition. A `mutable` install needs EFI and a root.
   Check partition alignment, the minimum sizes, that the EFI partition is FAT and big enough
   to hold both slots' kernels, and that no mountpoint is used twice. Every refusal gets a code
   and a remediation, like the existing ones.
-- [ ] **Reuse an existing EFI partition** (dual boot) without formatting it. Check it has
+- [x] **Reuse an existing EFI partition** (dual boot) without formatting it. Check it has
   room for the kernels.
-- [ ] **Swap:** a partition, or a swap file on var or root. Its fstab entry comes from
+- [x] **Swap:** a partition, or a swap file on var or root. Its fstab entry comes from
   recfstab.
-- [ ] **A per-partition summary for the confirm step:** which partitions get erased, which
+- [x] **A per-partition summary for the confirm step:** which partitions get erased, which
   get resized and which stay untouched, so the confirm page can say exactly what's lost.
 - [ ] **Later: disk encryption (LUKS2).** An encrypted root and var, the unlock prompt in the
   initramfs (recinit), and the crypttab and kernel cmdline to go with it.
-- [ ] **Regenerate the JSON schemas and TS types** (`docs/frontend-handoff/schemas/`,
+- [x] **Regenerate the JSON schemas and TS types** (`docs/frontend-handoff/schemas/`,
   disk-plan's `generated/recpart.ts`). Add scenario fixtures for each new refusal.
 
 ### disk-plan UI

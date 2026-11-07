@@ -64,6 +64,8 @@ fn generate(out: &mut Out) -> Result<()> {
 
     let schemas = root.join("tools/recpart/docs/frontend-handoff/schemas");
     write_schema::<recpart::DiskListResult>(out, &schemas, "list-disks")?;
+    write_schema::<recpart::InspectResult>(out, &schemas, "inspect")?;
+    write_schema::<recpart::ManualLayout>(out, &schemas, "layout")?;
     write_schema::<recpart::PartitionPlan>(out, &schemas, "plan-result")?;
     write_schema::<recpart::ApplyResult>(out, &schemas, "apply-result")?;
     write_schema::<recpart::types::ErrorPayload>(out, &schemas, "error")?;
@@ -72,6 +74,8 @@ fn generate(out: &mut Out) -> Result<()> {
     let cfg = Config::new().with_large_int("number");
     let mut recpart_ts = Declarations::new(&cfg);
     recpart_ts.types_from::<recpart::DiskListResult>();
+    recpart_ts.types_from::<recpart::InspectResult>();
+    recpart_ts.types_from::<recpart::ManualLayout>();
     recpart_ts.types_from::<recpart::PartitionPlan>();
     recpart_ts.types_from::<recpart::ApplyResult>();
     recpart_ts.types_from::<recpart::types::ErrorPayload>();
@@ -79,9 +83,11 @@ fn generate(out: &mut Out) -> Result<()> {
     recpart_ts.constant("APPLY_SCHEMA_VERSION", &recpart::types::APPLY_SCHEMA_VERSION)?;
     recpart_ts.constant("ERROR_SCHEMA_VERSION", &recpart::types::ERROR_SCHEMA_VERSION)?;
     recpart_ts.constant("DISK_LIST_SCHEMA_VERSION", &recpart::types::DISK_LIST_SCHEMA_VERSION)?;
+    recpart_ts.constant("INSPECT_SCHEMA_VERSION", &recpart::types::INSPECT_SCHEMA_VERSION)?;
     recpart_ts.constant("CONFIRM_TOKEN", &recpart::types::CONFIRM_TOKEN)?;
     recpart_ts.value_enum::<recpart::InstallMode>("INSTALL_MODES", "INSTALL_MODE_HELP")?;
     recpart_ts.constant("DEFAULT_INSTALL_MODE", &recpart::InstallMode::default())?;
+    recpart_ts.value_enum::<recpart::Role>("ROLES", "ROLE_HELP")?;
     recpart_ts.raw(RECPART_OUTPUT);
 
     let mut recab_ts = Declarations::new(&cfg);
