@@ -1618,3 +1618,45 @@ On explicit resume, reload the complete active HDAE skill/references/instruction
 and this checkpoint, begin a fresh blocked audit, inspect actual upstream and
 monitored evidence, then take only the newly enabled local integration step.
 Do not infer permission for G02, security dispatch or upstream publication.
+
+### Daybreak local security continuation — 2026-11-07
+
+The user authorized this session to perform the documented local low-level
+security checks. The previous no-dispatch/no-local-probe checkpoint is therefore
+superseded for this session only; Claude still owns upstream PR work, G02 clock
+policy remains held, and no upstream push/comment/PR or storage redesign is
+authorized. Active skill: `hdae-development` at
+`.agents/skills/hdae-development/SKILL.md`; reload it, its required reference,
+repository instructions and this checkpoint after a context shift.
+
+[Daybreak handoff](ginux-contributions/daybreakblue-handoff.md) now records the
+exact local receipts and failures. Of the previous 33 unrun security Recipe e2e
+cases, 29 independently passed on pinned Ginux `436c4ae5` and Recipe test
+`2ad833c`; four directly invoke guest sleep and remain unrun under G02. The
+historical complete ledger is therefore 129 passed receipts, one observed
+clock-policy failure and five unrun cases (four security, one other clock
+case), across its original 135 names. This is **not** a complete current-source
+suite pass. Two mixed Recipe negative-control targets passed separately.
+
+Current local Ginux integration source is clean commit `c7b4b73a`, a narrow
+`/dev/fd` namespace-escape errno fix for Claude's potential extraction. The
+unchanged full script suite, `make check build`, all existing Ginux units,
+native supervision and process-native pass on this source. Most other full
+Ginux fixture families passed on the prior pinned source. The full storage
+suite **fails** at `view-probes` on both revisions: `faccessat2` empty-path
+access to an owned, open file returns `ENOENT`; the minimal trace confirms
+open, write and fstat succeed. Storage symlink, mapping, ownership and
+timestamp modes pass independently. No failing or unrun check is promoted.
+
+A current-source ancestry check also shows the separate G03c resolved-contract
+commit is absent from this local integration HEAD; G03c-specific B2 must not
+be called a current runtime reproduction. The current source uses mapped
+storage arrays, so B3 requires its own revision-specific audit. These findings
+and the full remaining security scope are in the downstream handoff. Security
+acceptance, G02, full storage, shared-argument and other focused adversarial
+criteria remain open. The goal has made progress and remains **incomplete**.
+Exact next action: investigate the current `view-probes` failure, audit the
+remaining handoff requirements against this exact source, run controlled
+independent checks, and rerun affected Recipe cases before claiming acceptance
+for a later integration revision. Preserve Claude's inventory edits and all
+historical recovery worktrees.

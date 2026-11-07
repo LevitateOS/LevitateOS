@@ -1021,3 +1021,71 @@ unrun. One other G02-dependent case remains unrun and the observed G02 case
 remains failed under the user's explicit clock-policy hold. Known B1–B3 and
 other Ginux security checks remain unresolved. No Ginux source change, upstream
 push, PR, maintainer contact or agent dispatch occurred.
+
+### Local Daybreak security continuation — 2026-11-07
+
+The user explicitly authorized this session to perform the documented local
+low-level security work. This supersedes this handoff's earlier local-probe
+boundary for this session; it does not authorize upstream publication, remote
+messages, another agent, the held G02 clock policy, or a redesign of storage.
+This is local evidence, not a monitored-cloud result.
+
+Recipe test source is `2ad833cc93f0e209fe205adb4186a822a13caaea`;
+runtime source is `0c4f0d4e9d1f84ab7f638611e895dbf799500e7a`.
+The 29 independently selected security e2e cases with exact exit-zero,
+one-test/one-pass receipts ran against Ginux `436c4ae5843e4d50f4833158d351523f35669909`
+(binary SHA-256 `96fd7dfa43cda4f051cb7b819cf00a104e2b4cceb91d2ab065e7d19e544e77db`).
+The receipt directory is
+`/home/vince/levitate-development/ginux-recipe-integration/.artifacts/recipe-integration/daybreak-local-security-2026-11-07/`.
+The historical 135-case ledger therefore has 100 earlier ordinary passes,
+29 additional security passes, one observed G02 failure, and five unrun cases;
+this arithmetic combines receipts on the old pinned Ginux revision and is not
+a fresh complete-suite result on the current revision. The five unrun cases
+comprise four security cases that directly invoke guest `/usr/bin/sleep` and one
+other G02-dependent state case. The user's clock-policy hold remains in force;
+none of these cases passed or were substituted. The mixed Recipe library
+backend spoofing and image producer negative controls also passed separately
+with their own receipts.
+
+Ginux's unchanged full device, pipe, task, FD, thread, poll, network, basic
+launch, directory, owned-exec, exec, checkpoint, restore, native supervision,
+and process-native suites passed in local runs. The restore suite includes
+malformed archives and the complete >2 GiB payload. The full storage suite
+**failed** at `view-probes`: an owned `/work/probe` opens and passes `fstat`, but
+`faccessat2(fd, "", R_OK, AT_EMPTY_PATH)` returns `ENOENT` instead of zero.
+A disposable minimal trace confirmed the same result on the current Ginux
+revision `c7b4b73ae141cf6bea44995898f9d8c84fe6e282`; the diagnostic's
+root-owned result-file read failed, but its guest stdout and audit were saved
+in `view-probe-debug.log`. The separate `symlinks`, `mapping`, `ownership`, and
+`timestamps` storage modes passed. No storage redesign or acceptance claim
+follows from those passes.
+
+The unchanged full script suite initially failed two `/dev/fd/<directory>/../../`
+namespace-escape cases on `436c4ae5`, returning `EINVAL` where the existing
+fixture requires `EOPNOTSUPP`. The smallest local integration correction maps
+only the above-root resolution error at that descriptor-reopen boundary;
+commit `c7b4b73ae141cf6bea44995898f9d8c84fe6e282` records it for Claude to
+extract if appropriate. The complete unchanged script suite then passed on
+that revision (binary SHA-256
+`e064480ac41f78724b661ce893e9ebb737f36c01aaf2d5029e1f1c9c4daa6fa4`),
+as did `make check build`, all existing Ginux unit tests, native supervision,
+and process-native including its repetitions. The current source remains clean.
+
+Source audit found that this local integration HEAD descends from upstream
+`59e2f7aa` and does **not** contain the separate resolved configured-contract
+commit `37ddb461` (`git merge-base --is-ancestor` exits 1). Thus the G03c
+contract-descriptor truncation finding in the upstream packet must not be
+reported as a current local-runtime reproduction. The local source still
+routes configured filesystem claims through the descriptor table and launch
+filesystem. Its current storage uses mapped namespace arrays and `MemoryStorage`;
+the earlier packet's stack-overflow finding also needs a revision-specific
+recheck before being asserted here. The image symlink/assignment concern and
+all untested shared-argument, policy, copyout, race, teardown, transport, and
+source-review requirements remain pending. Do not treat passing broad fixture
+families as proof of every handoff criterion.
+
+Exact next action: investigate the current `view-probes` result without changing
+Claude's storage redesign; enumerate the remaining handoff criteria against
+current-source fixtures and run focused, controlled checks where the owner and
+revision are clear. Recheck Recipe on any later integration source before a
+current-revision claim. Keep G02-dependent cases held and acceptance open.
