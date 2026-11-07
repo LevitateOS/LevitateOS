@@ -23,6 +23,9 @@ CONFIG_SCHED_CLASS_EXT=y
 # Full preemption: kernel can be preempted almost anywhere.
 # Higher throughput cost (~2-3%) but dramatically lower latency.
 CONFIG_PREEMPT=y
+# Since 6.13 x86 defaults to the scheduler-controlled PREEMPT_LAZY model, which
+# wins the choice unless cleared.
+CONFIG_PREEMPT_LAZY=n
 CONFIG_X86_X2APIC=y
 CONFIG_X86_TSC=y
 CONFIG_X86_MSR=y
