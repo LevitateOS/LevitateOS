@@ -1,6 +1,7 @@
 schema_version = 6
 
 [ring3_sources.rootfs_source]
+storage_max_objects = 131072
 inputs = { system_setup = "distro/builder/guest/installed/system-setup.sh" }
 memory_mib = 4096
 preseed_memory_mib = 4096

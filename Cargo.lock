@@ -574,6 +574,7 @@ dependencies = [
  "distro-contract",
  "fs2",
  "leviso-elf",
+ "levitate-recipe",
  "libc",
  "recinit",
  "recqemu",
