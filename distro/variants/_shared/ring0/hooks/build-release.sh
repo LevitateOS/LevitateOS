@@ -39,6 +39,10 @@ ISO_SHA="${ISO_SHA:-${ISO_PATH%.iso}.sha512}"
 
 ROOTFS_PATH="${RELEASE_OUTPUT_DIR}/${ROOTFS_FILENAME}"
 INITRAMFS_LIVE_PATH="${RELEASE_OUTPUT_DIR}/${INITRAMFS_LIVE_FILENAME}"
+# The installed system's own initramfs (systemd; mounts root=), shipped on the ISO at
+# boot/ for recsetup to install. The live one only finds the live medium.
+INITRAMFS_INSTALLED_FILENAME="${INITRAMFS_INSTALLED_FILENAME:-initramfs-installed.img}"
+INITRAMFS_INSTALLED_PATH="${RELEASE_OUTPUT_DIR}/${INITRAMFS_INSTALLED_FILENAME}"
 LIVE_OVERLAY_DIR="${RELEASE_OUTPUT_DIR}/${LIVE_OVERLAY_DIRNAME}"
 LIVE_OVERLAY_IMAGE="${RELEASE_OUTPUT_DIR}/${LIVE_OVERLAY_IMAGE_FILENAME}"
 BUSYBOX_URL="${BUSYBOX_URL:-https://busybox.net/downloads/binaries/1.35.0-x86_64-linux-musl/busybox}"
@@ -153,6 +157,7 @@ write_build_log_json() {
     BUILD_FINISHED_AT_UTC="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
     rootfs_size="$(file_size_bytes "$ROOTFS_PATH")"
     initramfs_size="$(file_size_bytes "$INITRAMFS_LIVE_PATH")"
+    initramfs_installed_size="$(file_size_bytes "$INITRAMFS_INSTALLED_PATH")"
     overlay_size="$(file_size_bytes "$LIVE_OVERLAY_IMAGE")"
     iso_size="$(file_size_bytes "$ISO_PATH")"
     sha_path="${ISO_SHA:-}"
@@ -172,6 +177,7 @@ write_build_log_json() {
   "artifacts": {
     "rootfs_erofs": { "path": "$(json_escape "$ROOTFS_PATH")", "size_bytes": $rootfs_size },
     "initramfs_live": { "path": "$(json_escape "$INITRAMFS_LIVE_PATH")", "size_bytes": $initramfs_size },
+    "initramfs_installed": { "path": "$(json_escape "$INITRAMFS_INSTALLED_PATH")", "size_bytes": $initramfs_installed_size },
     "overlay_erofs": { "path": "$(json_escape "$LIVE_OVERLAY_IMAGE")", "size_bytes": $overlay_size },
     "iso": { "path": "$(json_escape "$ISO_PATH")", "size_bytes": $iso_size },
     "iso_sha512": { "path": "$(json_escape "$sha_path")", "size_bytes": $sha_size }
@@ -257,6 +263,19 @@ cargo run -q -p recinit -- build-tiny \
     --set "PRODUCT_TAG=${PRODUCT_ARTIFACT_TAG}"
 need_file "$INITRAMFS_LIVE_PATH"
 
+# Built from the same rootfs the ISO installs, so its systemd, udev and modules match the
+# installed system. A rootfs without systemd (AcornOS: OpenRC boots without an
+# initramfs) needs none.
+rm -f "$INITRAMFS_INSTALLED_PATH"
+if [ -e "${ROOTFS_SOURCE_DIR}/usr/lib/systemd/systemd" ]; then
+    cargo run -q -p recinit -- build-install \
+        --rootfs "$ROOTFS_SOURCE_DIR" \
+        --modules-dir "$MODULES_DIR" \
+        --busybox "$BUSYBOX_PATH" \
+        --output "$INITRAMFS_INSTALLED_PATH"
+    need_file "$INITRAMFS_INSTALLED_PATH"
+fi
+
 rm -f "$LIVE_OVERLAY_IMAGE"
 build_overlayfs_erofs "$LIVE_OVERLAY_DIR" "$LIVE_OVERLAY_IMAGE"
 need_file "$LIVE_OVERLAY_IMAGE"
@@ -282,6 +301,9 @@ set -- \
     --overlay-image "$LIVE_OVERLAY_IMAGE"
 
 set -- "$@" --live-payload-layout iso-files
+if [ -f "$INITRAMFS_INSTALLED_PATH" ]; then
+    set -- "$@" --extra-file "${INITRAMFS_INSTALLED_PATH}:boot/${INITRAMFS_INSTALLED_FILENAME}"
+fi
 
 need_cmd cargo
 cargo run -q -p reciso -- "$@"

@@ -141,7 +141,7 @@ root and mounted partitions; trial judges only what `set-next` scheduled; typed 
   (Fedora's `/home`) has its own. `recstrap --force ~/x` passes, the case the guard exists
   for. Fix: refuse anything the host has mounted that isn't under the install mount
   (`/proc/self/mountinfo`).
-- ⏳ open: needs the ISO to carry the installed initramfs (builder work) · ✔ **The default initrd is the live initramfs** (bin/recsetup/plan.rs:422-429). On systemd,
+- ✅ fixed in code (release hook builds `initramfs-installed.img` onto the ISO; recsetup 5ce612c defaults to it and refuses the live one); not yet proven by a release build and boot · ✔ **The default initrd is the live initramfs** (bin/recsetup/plan.rs:422-429). On systemd,
   recsetup defaults to `/run/live-media/boot/initramfs.img`, which the ISO fills from
   `initramfs-live`; the live init looks for the live medium and only reports `root=`. The
   build makes `initramfs-installed.img` but ships it beside the ISO, not on it. The E2E test
