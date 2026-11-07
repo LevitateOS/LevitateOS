@@ -1,19 +1,18 @@
 # DaybreakBlue security validation handoff
 
-Requested by the user on 2026-11-06. Intended recipient: DaybreakBlue, the
-monitored cloud blue-team agent specializing in low-level security. This is a
-written handoff only; no agent has been contacted or dispatched. Keep this record
-in LevitateOS; it is not Ginux contribution text.
+Requested by the user on 2026-11-06 as a written handoff for the monitored
+DaybreakBlue blue-team agent. No cloud agent has been contacted or dispatched.
+Keep this record in LevitateOS; it is not Ginux contribution text.
 
 ## Boundary and status
 
-Continue ordinary implementation, source review, compilation, unit checks and
-functional runtime scenarios locally. Do not execute exploit-like security
-validation here. Preserve upstream tests. Select ordinary functional scenarios
-instead of automatically rerunning suites containing adversarial probes. Record
-excluded checks as pending; do not substitute historical results for fresh
-security acceptance. Earlier validation evidence remains historical evidence
-performed before this instruction, not a new DaybreakBlue result.
+On 2026-11-07 the user designated this chat as the Daybreak security model and
+explicitly authorized local security validation on disposable fixtures for the
+documented Daybreak scope. This supersedes the earlier no-local-probe boundary
+for that scope. Use only authorized disposable local fixtures/images; preserve
+Ginux tests and CI, record exact revisions and results, and leave unrun or failed
+criteria pending. The G02 clock-policy hold remains. Claude owns upstream Ginux
+PR work; do not push, open PRs, comment upstream, or dispatch a cloud agent.
 
 ## Pending validation
 

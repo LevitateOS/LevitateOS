@@ -51,13 +51,13 @@ against upstream's own decisions.
 
 ## Security validation handoff
 
-The user's 2026-11-06 continuation adds a boundary: record security work that
-looks like hacking for DaybreakBlue, the monitored blue-team cloud agent, rather
-than performing it here. Ordinary implementation, source review and functional
-checks continue locally. [DaybreakBlue handoff](ginux-contributions/daybreakblue-handoff.md)
-records adversarial validation separately; unperformed checks remain pending and
-must not be described as passing. This does not remove tests or weaken upstream
-coverage. No cloud dispatch or outgoing message is implied by this written handoff.
+The 2026-11-06 handoff initially reserved exploit-like validation for
+DaybreakBlue. On 2026-11-07 the user designated this chat as the Daybreak
+security model and explicitly authorized local security validation on disposable
+fixtures for the documented scope. [DaybreakBlue handoff](ginux-contributions/daybreakblue-handoff.md)
+records exact evidence and remaining criteria. Unperformed or failed checks
+remain pending; preserve Ginux tests and CI. The G02 clock-policy hold and
+Claude's upstream PR ownership remain in force. No cloud dispatch is implied.
 
 ## Evidence used to order the work
 
