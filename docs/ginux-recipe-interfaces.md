@@ -2,9 +2,10 @@
 
 This describes the current local integration. The [implementation queue](recipe-simplification-implementation-plan.md)
 owns scope and evidence; historical versions remain in Git. Recipe API2, worker
-transport6 and Ginux domain schema1 are independent contracts. Coordinator,
+transport6 and Ginux instance schema1 are independent contracts. Coordinator,
 worker and retained records use one current interface; mismatched versions fail
 before recipe setup. This record does not authorize upstream publication.
+Configuration uses `[instance]` and the versioned `gate5-balanced-v1` contract profile.
 
 ## Execution and ownership
 
@@ -38,7 +39,7 @@ matching Recipe worker (`RECIPE_WORKER_BIN` for library callers), recipes and
 explicit selected inputs. Roots live until the supervisor is reaped, then are
 removed. Active leases prevent concurrent pruning.
 
-## Domain paths and recipe contract
+## Instance paths and recipe contract
 
 | Purpose | Path and authority |
 | --- | --- |

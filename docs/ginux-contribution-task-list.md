@@ -1265,3 +1265,63 @@ upstream comment, forbidden branch/worktree edit or security dispatch occurred.
 Next: inspect Cargo's receipt/logs, fix actual ordinary causes in existing local
 owners, then continue remaining source-reviewed Recipe consumers. Active HDAE
 skill/reload procedure remains as recorded above; goal active and incomplete.
+
+
+### Upstream main moved — 2026-11-07
+
+The user directs pulling Ginux's major main update when appropriate. No ordinary
+test process remains active. Upstream main is now
+`59e2f7aa6a03a1afe2b6579815654ad63fc6c1b6`,15 commits beyondff926d0c, including
+instance terminology/config/crate renames. Fetch the exact object without changing
+shared branch refs, inspect the delta, and update only Codex's local integration
+source and its Recipe consumer. Do not refresh upstream G-packets, touch Claude's
+fix/prep branches/worktrees, publish, or alter the worktree Git configuration.
+
+Before this update the actual offline Cargo/cache fixture failed in88.75s: the
+first rust-lld invocation threw std::system_error/EAGAIN during thread creation;
+the second Cargo client later compiled successfully. Both clients are required
+to succeed, so the fixture correctly failed; no compiled-product acceptance is
+claimed. The saved supervisor audit reaches its unchanged64KiB budget before
+the linker, so it does not identify the precise exhausted resource. Diagnose
+that actual cause after the upstream owner reconciliation; do not suppress
+linker threads or raise limits merely to turn the check green. Exact command,
+fixture, stderr and receipt are retained under the integration source's
+`.artifacts/recipe-integration/cargo-fixture/`. Eight prior fresh Recipe case
+passes remain evidence only for78f96df1/d0fafc1, not the coming rebased source.
+Active HDAE skill/reload requirement remains as above. Goal active/incomplete.
+
+
+### Instance-main integration checkpoint — 2026-11-07
+
+Codex's detached local integration is now rebased onto upstream main
+`59e2f7aa6a03a1afe2b6579815654ad63fc6c1b6`. The original F02 source and old
+local commits remain intact. Rebased commits are0c4eb9d9 (composition),12c176d4
+(per-task descriptor transactions),4a8d50f7 (shared configured threads), then
+`8981bf774af386bb51e5126d1d54cc0e00a5e449` (local instance adaptation).
+Upstream native/systemd paths and its memmove correction are retained. Local
+storage/network fields join the new instance owner with noncolliding bits36–40;
+normalization and CLI overrides share that owner. All upstream fields, units and
+CI remain. An initial conflict-parser truncation was caught before verification;
+that local attempt was aborted, the complete files restored from recorded
+commits, and the rebase rerun with corrected parsing. No remote history changed.
+
+Ginux static/build (including terminology checks),121 routine units and the
+selected ordinary thread/process/pipe/poll/cwd/ELF/script groups pass. Three
+existing security units and full/default/platform CI remain unrun. The fresh
+Recipe renderer change is committed as `f70b35d`: it emits `[instance]` and
+uses InstanceConfig directly, with no old-schema adapter. Its new CLI/harness
+builds and the real Bash/output-reader case passes1/1 in86.54s with the verified
+prepared image. Exact current source/binary hashes and logs live in the local
+integration source's `.artifacts/recipe-integration/instance-recipe-provenance.json`
+and state.json. Earlier eight-case results remain historical for the old source.
+
+The unchanged actual Cargo/cache fixture is now rechecking these rebased
+revisions in `cargo-instance-fixture/`; its result remains pending. The earlier
+linker EAGAIN remains a failure, not overridden by the second client's success.
+Next: inspect that recheck; if it fails, identify the actual exhausted resource
+using bounded diagnostics, then fix its local owner and rerun without disabling
+checks. Remaining current ordinary consumers and security acceptance stay open.
+No upstream packet refresh/publication, forbidden branch/worktree edits, fork
+push, upstream comment or agent dispatch occurred. core.worktree remains in
+config.worktree. Preserve unrelated inventory/UI/untangle edits. Active HDAE
+skill and context-reload requirements remain as above. Goal active/incomplete.
