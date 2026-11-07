@@ -1004,3 +1004,20 @@ Alpine APK facts and preserve the original hostile quoted-path case for monitore
 work. Earlier shared-argument, contract/authority, storage B1–B3, protected copy,
 concurrency/teardown and negative transport requirements remain pending. No agent
 was contacted or dispatched, and ordinary results are not security acceptance.
+
+### Local security-role check — 2026-11-07
+
+The user authorized this Codex session to perform local low-level security work.
+The first four isolated Recipe e2e cases passed against Ginux
+`436c4ae5843e4d50f4833158d351523f35669909` and Recipe test source
+`2ad833cc93f0e209fe205adb4186a822a13caaea`: private worker bootstrap
+rejection, public worker environment spoofing rejection, unsafe ZIP member
+rejection, and existing ZIP symlink-component rejection. Exact commands, binary
+hashes, exit codes and logs are in the local integration artifact
+`daybreak-local-security-2026-11-07/summary.json`. This is local evidence, not
+a monitored-cloud result. The prior `final-local-review.json` remains a historical
+100/1/34 ledger; the four new passes make 29 of its 33 security e2e cases still
+unrun. One other G02-dependent case remains unrun and the observed G02 case
+remains failed under the user's explicit clock-policy hold. Known B1–B3 and
+other Ginux security checks remain unresolved. No Ginux source change, upstream
+push, PR, maintainer contact or agent dispatch occurred.
