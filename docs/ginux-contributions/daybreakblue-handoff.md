@@ -979,3 +979,13 @@ close/termination/reuse and indirect-buffer authority on this final source befor
 monitored acceptance. Existing tests remain enabled; those adversarial probes
 were not run here. Recipe0c4f0d4 is the final fixed-PATH guard change referenced
 above. No security dispatch occurred; required acceptance stays pending.
+
+
+### Configured creation-mask source — 2026-11-07
+
+Local Ginux436c4ae5 adds process-group umask state for owned creation. Ordinary
+file/directory modes, thread sharing, fork isolation and exec retention pass,
+as does actual GCC/SQLite mode0755. Review concurrent creation/mask changes,
+policy admission/audit and existing mode/authority criteria on this source before
+monitored acceptance. Earlier early-task/resolved-contract and shared-argument
+holds still apply. No adversarial enforcement probe or security dispatch occurred.

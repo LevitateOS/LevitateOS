@@ -1451,3 +1451,38 @@ unrun. Next: inspect actual consumer receipts, fix actual failures, then execute
 the82 ordinary cases serially. Current security/full-suite acceptance remains
 pending. Goal active/incomplete; no upstream action or security dispatch.
 Active HDAE skill/reload procedure remains as recorded above.
+
+
+### SQLite creation-mask fix and final consumer run — 2026-11-07
+
+The20-case queue passed on6a19a70a. The actual SQLite client compiled, contended
+correctly, committed sum33 and passed integrity checks, but its ELF had mode0645
+instead of0755; host validation correctly failed. Configured umask95 returned
+ENOSYS and binutils used that value as the prior mask. Local Ginux commit
+`436c4ae5843e4d50f4833158d351523f35669909` tracks the creation mask in the
+existing process group and applies it to owned file/directory creation. Default022,
+thread sharing, fork copying and exec retention pass focused checks. Native lane
+and catalog behavior are unchanged; this is not Claude's storage redesign.
+The mask regression fails on6a19a70a and passes here. Static/build and affected
+ordinary task/lock/resource/thread/pipe groups pass. An initial C indentation
+warning was fixed without changing compiler flags or assertions.
+
+All six actual consumers now pass on436c4ae5/Recipe0c4f0d4: SQLite7.84s (including
+mode0755, two-client contention, sum33 and integrity); pinned Git8.92s; RPM9.43s;
+APK9.87s; GNU Cargo9.80s; musl Cargo10.00s. Both Cargo clients succeed, compile
+once, retain lock/cache checks, and execute a Rust program that starts/joins a
+thread. No --threads=1 workaround. Previous failed receipts remain unchanged.
+Exact evidence: umask-real-consumer-receipts.json and umask-consumer-provenance.json
+under the local integration source's `.artifacts/recipe-integration/`. Ginux
+binary SHA256 is96fd7dfa43cda4f051cb7b819cf00a104e2b4cceb91d2ab065e7d19e544e77db.
+
+The final-source102-case ordinary e2e queue is now running serially; prior20/eight
+results remain historical after this creation-mode change. umask-ordinary-
+{selection,state,receipts}.json owns actual progress and33 unchanged monitored
+review holds; other mixed library/image targets remain unrun. Never count an
+unrun, failed or interrupted selection as passed. Next: inspect the running queue,
+fix actual ordinary causes and reverify final source, then complete the local
+source/consumer review. Security/full/default/platform acceptance remains pending.
+No upstream packet/publication work, push/comment, forbidden worktree/branch edit
+or security dispatch occurred. Goal active/incomplete. Active HDAE skill and
+required context-reload procedure remain as recorded above.
