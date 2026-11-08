@@ -77,6 +77,15 @@ disposition of a proven required capability.
 
 ## Current review boundary
 
+The [local storage rehearsal](prd07-storage-rehearsal.md) now composes the
+reviewed fixes without waiting idle: foundation `04857f38` passes original CI
+and 101 units; typed storage `16dd447e` passes original CI, 141 units and the
+complete 40-case storage runner. Original PRD03 runtime implementation is
+preserved; the delta is retained tests and catalog docs. These remain local
+compositions of open prerequisites, not upstream delivery or actual PRD05
+merged-source integration. Next local extraction is G09a/b generic/growable
+backing, preserving T-02 and the typed VFS's newer semantics.
+
 The TCP, zero-fill and catalog candidates and all six existing prerequisite compositions pass current
 Linux static/build/unit/launch/native/process/setup checks. Complete patches,
 findings, exact source/tree identities and commands are in the
@@ -89,8 +98,10 @@ editing existing heads, comments, native policy or a source-packaging choice.
 
 Active skill: `hdae-development` at `.agents/skills/hdae-development/SKILL.md`.
 Reload the full skill, reference, instructions and current queue after context
-shift. Exact next action: continue authorized local storage prerequisite
-extraction/integration and retain the no-publication boundary. Resolve the
+shift. Exact next action: port G09a/b onto local storage `16dd447e` in
+`ginux-prd07-growable`, preserving all tests and T-02's 9,000-byte/4,096-byte
+rollback oracle, then review and validate the exact source. Retain the
+no-publication boundary. Resolve the
 pending export commit-point decision before claiming export/PRD04 acceptance.
 Inspect upstream foundation changes and actual merges when they arrive; no
 dependent stack is called standalone before its real base exists. PRD07 stays
