@@ -245,7 +245,6 @@ pub fn parse_keys(spec: &str) -> Result<Vec<Vec<u8>>> {
     Ok(keys)
 }
 
-#[cfg(unix)]
 fn kill_process_group(master: &dyn MasterPty) {
     if let Some(pgid) = master.process_group_leader() {
         // SAFETY: kill(2) with a negative pid signals that process group; no memory is touched.
@@ -255,14 +254,11 @@ fn kill_process_group(master: &dyn MasterPty) {
     }
 }
 
-#[cfg(not(unix))]
-fn kill_process_group(_: &dyn MasterPty) {}
-
-/// The terminal is the vt100 screen here, an xterm with 256 colours, whatever the
-/// developer's own terminal is; colour settings from the developer's shell don't
-/// reach the program, so a capture is the same everywhere.
+/// The terminal is the vt100 screen here, with the `TERM` the install screen gives
+/// its panes, whatever the developer's own terminal is; colour settings from the
+/// developer's shell don't reach the program, so a capture is the same everywhere.
 fn apply_terminal_env(cmd: &mut CommandBuilder) {
-    cmd.env("TERM", "xterm-256color");
+    cmd.env("TERM", distro_contract::install_ux::PANE_TERM);
     for inherited in ["COLORTERM", "FORCE_COLOR", "NO_COLOR"] {
         cmd.env_remove(inherited);
     }

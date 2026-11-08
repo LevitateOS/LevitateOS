@@ -1,41 +1,154 @@
-//! `tui <app>`: run a terminal app from tui/ in this terminal; `tui list`: list them.
+//! The TUI harness: `tui <app>` runs a terminal app from tui/ in this terminal, `tui list`
+//! lists them, `inspect` renders one headlessly and `check tui` checks them all.
+//!
+//! All three start an app the one way [`Launch`] defines: the same environment (PATH
+//! with the real tools or the stand-ins, and what the stand-ins read), the distro's
+//! facts through the flags the app's manifest declares, and one story lookup.
 
 use anyhow::{Context, Result, bail};
+use clap::Parser;
 use std::path::Path;
 use std::process::Command;
 
-use distro_contract::tui_apps::{self, TuiApp};
+use distro_builder::tui_apps::{Story, TuiApp, Workspace};
+use distro_contract::install_ux::SHELL;
 
-/// xtask's own options on an app's line (before any `--`): `--stand-ins` runs the app
-/// with its stand-in tools instead of the real ones, `--story NAME` (which implies it)
-/// also starts it with that story's arguments and environment, for you to drive.
-struct RunOptions {
-    stand_ins: bool,
-    story: Option<String>,
-    args: Vec<String>,
+use crate::cli::Distro;
+
+/// Which tools an app finds on PATH.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum Tools {
+    /// This checkout's builds of the binaries the manifest lists: disk-plan's apply
+    /// really partitions and recab-tui's actions really change boot entries.
+    Real,
+    /// The manifest's stand-ins (`inspect.path`) first, one for every binary it lists,
+    /// so nothing real is reached; stand-ins that defer what nothing recorded to the
+    /// real tool (disk-plan's recpart plans an edited layout, and never applies) find
+    /// this checkout's builds through `LEVITATE_REAL_TOOLS`.
+    StandIns,
 }
 
-fn run_options(line: Vec<String>) -> Result<RunOptions> {
-    let mut options = RunOptions { stand_ins: false, story: None, args: Vec::new() };
-    let mut line = line.into_iter();
-    while let Some(arg) = line.next() {
-        match arg.as_str() {
-            "--" => {
-                options.args.extend(line);
-                break;
+/// An app ready to start: its environment and how its command line begins.
+pub struct Launch<'a> {
+    pub app: &'a TuiApp,
+    env: Vec<(String, String)>,
+}
+
+impl<'a> Launch<'a> {
+    /// Installs the workspace and sets up `app`'s environment for `tools`.
+    pub fn new(root: &Path, app: &'a TuiApp, tools: Tools) -> Result<Self> {
+        crate::tasks::check::install_js_workspace(root)?;
+        let mut first = Vec::new();
+        let mut env = Vec::new();
+        if tools == Tools::StandIns {
+            for dir in &app.inspect.path {
+                first.push(app.dir.join(dir));
             }
-            "--stand-ins" => options.stand_ins = true,
-            "--story" => {
-                options.story = Some(line.next().context("--story needs a story name")?);
+            for tool in &app.tools {
+                if !first.iter().any(|dir| dir.join(tool).is_file()) {
+                    bail!(
+                        "{}: no stand-in for '{tool}' in levitate.inspect.path ({}); \
+                         stand-in runs never run the real tool",
+                        app.name,
+                        app.inspect.path.join(", ")
+                    );
+                }
             }
-            _ => match arg.strip_prefix("--story=") {
-                Some(name) => options.story = Some(name.to_string()),
-                None => options.args.push(arg),
-            },
         }
+        if !app.tools.is_empty() {
+            let real = build_tools(root, app)?;
+            match tools {
+                Tools::Real => first.push(real),
+                Tools::StandIns => env.push((
+                    "LEVITATE_REAL_TOOLS".to_string(),
+                    real.to_string_lossy().into_owned(),
+                )),
+            }
+        }
+        if !first.is_empty() {
+            first.extend(std::env::split_paths(&std::env::var_os("PATH").unwrap_or_default()));
+            let path = std::env::join_paths(first)?;
+            env.push(("PATH".to_string(), path.to_string_lossy().into_owned()));
+        }
+        Ok(Self { app, env })
     }
-    options.stand_ins |= options.story.is_some();
-    Ok(options)
+
+    /// The environment the app gets on top of xtask's.
+    pub fn env(&self) -> &[(String, String)] {
+        &self.env
+    }
+
+    /// `bun <entry> <args>`, run in the app's directory.
+    pub fn argv(&self, args: &[String]) -> Vec<String> {
+        let mut argv = vec!["bun".to_string(), self.app.entry.display().to_string()];
+        argv.extend(args.iter().cloned());
+        argv
+    }
+
+    /// The arguments that tell the app it runs on `distro` (the flags its manifest
+    /// declares, as the install screen passes them).
+    pub fn distro_args(&self, distro: &Distro) -> Vec<String> {
+        self.app.distro_argv(distro.name(), SHELL)
+    }
+
+    /// What a run starts with: a story's arguments and environment, or, without one,
+    /// the distro's facts, which an app that declares flags for them needs.
+    pub fn start(&self, story: Option<&Story>, distro: Option<&Distro>) -> Result<Start> {
+        if let Some(story) = story {
+            return Ok(Start {
+                args: story.args.clone(),
+                env: story.env.clone().into_iter().collect(),
+            });
+        }
+        let declared = self.app.distro_args.os_name.is_some() || self.app.distro_args.shell.is_some();
+        let args = match distro {
+            Some(distro) => self.distro_args(distro),
+            None if declared => bail!(
+                "{} is told which distro it runs on: give --distro ({}) or a --story",
+                self.app.name,
+                crate::cli::distro_ids().join("|")
+            ),
+            None => Vec::new(),
+        };
+        Ok(Start { args, env: Vec::new() })
+    }
+}
+
+/// The start of a run: arguments before the caller's, and extra environment.
+pub struct Start {
+    pub args: Vec<String>,
+    pub env: Vec<(String, String)>,
+}
+
+/// Builds the binaries `app` runs and returns the directory holding them.
+fn build_tools(root: &Path, app: &TuiApp) -> Result<std::path::PathBuf> {
+    let mut build = Command::new("cargo");
+    build.current_dir(root).args(["build", "-q"]);
+    for tool in &app.tools {
+        build.args(["--bin", tool]);
+    }
+    if !build.status().context("running cargo build")?.success() {
+        bail!("building {} for {} failed", app.tools.join(", "), app.name);
+    }
+    Ok(crate::util::repo::cargo_target_dir(root).join("debug"))
+}
+
+/// xtask's own options on an app's line; the rest goes to the app.
+#[derive(Parser)]
+#[command(name = "cargo xtask tui <APP>", disable_help_flag = true, disable_version_flag = true)]
+struct RunLine {
+    /// Run with the app's stand-in tools instead of the real ones.
+    #[arg(long)]
+    stand_ins: bool,
+    /// Start with this story's arguments and environment (implies --stand-ins).
+    #[arg(long, value_name = "NAME|NUMBER")]
+    story: Option<String>,
+    /// The distro the app is told it runs on, for an app that takes one.
+    #[arg(long, value_name = "ID")]
+    distro: Option<String>,
+    /// Arguments for the app.
+    #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
+    args: Vec<String>,
 }
 
 pub fn run(name: String, line: Vec<String>) -> Result<()> {
@@ -45,35 +158,26 @@ pub fn run(name: String, line: Vec<String>) -> Result<()> {
         "`cargo xtask tui`",
         &format!("cargo xtask inspect {name} renders it without one"),
     )?;
+    let options = RunLine::try_parse_from(std::iter::once(name.clone()).chain(line))?;
     let root = crate::util::repo::repo_root()?;
-    let app = tui_apps::find(&root, &name)?;
-    let options = run_options(line)?;
-    let mut cmd = app_command(&root, &app)?;
-    let mut args = Vec::new();
-    if options.stand_ins {
-        // app_command built the real tools; they stay reachable for stand-ins that defer
-        // to them for what nothing recorded (disk-plan's recpart plans an edited layout
-        // with the real one, and never applies).
-        if !app.tools.is_empty() {
-            cmd.env("LEVITATE_REAL_TOOLS", crate::util::repo::cargo_target_dir(&root).join("debug"));
-        }
-        cmd.env("PATH", inspect::stand_in_path(&app)?);
-        if let Some(story) = &options.story {
-            let stories = &app.inspect.stories;
-            // A number counts from 1 in `cargo xtask tui list <app>`.
-            let by_number = story.parse::<usize>().ok().and_then(|n| n.checked_sub(1)).and_then(|i| stories.get(i));
-            let story = by_number
-                .or_else(|| stories.iter().find(|s| &s.name == story))
-                .with_context(|| {
-                    format!("{name} has no story '{story}'; `cargo xtask tui list {name}` lists them")
-                })?;
-            args.extend(story.args.iter().cloned());
-            cmd.envs(story.env.iter());
-        }
+    let workspace = Workspace::load(&root)?;
+    let app = workspace.app(&name)?;
+    let story = options.story.as_deref().map(|story| app.story(story)).transpose()?;
+    let tools = if options.stand_ins || story.is_some() { Tools::StandIns } else { Tools::Real };
+    let launch = Launch::new(&root, app, tools)?;
+    let distro = options.distro.as_deref().map(Distro::load).transpose()?;
+    let start = launch.start(story, distro.as_ref())?;
+    if tools == Tools::StandIns {
         eprintln!("{name}: stand-in tools from {}; nothing real is changed", app.inspect.path.join(", "));
     }
-    args.extend(options.args);
-    let status = cmd.args(&args).status().context("running bun")?;
+    let argv = launch.argv(&[start.args, options.args].concat());
+    let status = Command::new(&argv[0])
+        .args(&argv[1..])
+        .current_dir(&app.dir)
+        .envs(launch.env().iter().map(|(k, v)| (k, v)))
+        .envs(start.env.iter().map(|(k, v)| (k, v)))
+        .status()
+        .context("running bun")?;
     if !status.success() {
         bail!("{name} exited with {status}");
     }
@@ -83,11 +187,12 @@ pub fn run(name: String, line: Vec<String>) -> Result<()> {
 /// Every app under tui/apps, as its manifest describes it.
 pub fn list() -> Result<()> {
     let root = crate::util::repo::repo_root()?;
-    let apps = tui_apps::discover(&root)?;
+    let workspace = Workspace::load(&root)?;
+    let apps = &workspace.apps;
     let width = apps.iter().map(|app| app.name.len()).max().unwrap_or(0) + 3;
     let indent = " ".repeat(2 + width);
     println!("Apps under tui/apps; run one with `cargo xtask tui <NAME> [ARGS]`:\n");
-    for app in &apps {
+    for app in apps {
         println!("  {:<width$}{}", app.name, app.description);
         let dir = app.dir.strip_prefix(&root).unwrap_or(&app.dir);
         println!("{indent}{}", dir.display());
@@ -98,6 +203,14 @@ pub fn list() -> Result<()> {
                 app.tools.join(", "),
                 if stand_ins.is_empty() { "nowhere" } else { &stand_ins },
             );
+        }
+        let flags: Vec<&str> = [&app.distro_args.os_name, &app.distro_args.shell]
+            .into_iter()
+            .flatten()
+            .map(String::as_str)
+            .collect();
+        if !flags.is_empty() {
+            println!("{indent}told the distro by: {} (--distro ID passes them)", flags.join(", "));
         }
         if let Some(pages) = &app.inspect.pages {
             println!(
@@ -148,7 +261,8 @@ pub fn stories(name: &str) -> Result<()> {
     use std::io::IsTerminal;
     let style = Style(std::io::stdout().is_terminal());
     let root = crate::util::repo::repo_root()?;
-    let app = tui_apps::find(&root, name)?;
+    let workspace = Workspace::load(&root)?;
+    let app = workspace.app(name)?;
     let dir = app.dir.strip_prefix(&root).unwrap_or(&app.dir);
     println!("{} {}", style.title(&app.name), style.dim(&format!("· {}", app.description)));
     println!("{}", style.dim(&dir.display().to_string()));
@@ -182,11 +296,11 @@ pub fn stories(name: &str) -> Result<()> {
             .iter()
             .enumerate()
             .map(|(i, step)| match (i, step.keys.is_empty()) {
-                (0, true) => "(as it opens)".to_string(),
-                (_, true) => "(no keys)".to_string(),
+                (0, true) => Ok("(as it opens)".to_string()),
+                (_, true) => Ok("(no keys)".to_string()),
                 _ => readable_keys(&step.keys),
             })
-            .collect();
+            .collect::<Result<_>>()?;
         if keys.is_empty() {
             continue;
         }
@@ -231,49 +345,38 @@ pub fn stories(name: &str) -> Result<()> {
     Ok(())
 }
 
-/// A story's keys (printf escapes) as names: `jj Enter ↓ Enter`.
-fn readable_keys(keys: &str) -> String {
-    const NAMED: &[(&str, &str)] = &[
-        ("\\x1b[A", "↑"),
-        ("\\x1b[B", "↓"),
-        ("\\x1b[C", "→"),
-        ("\\x1b[D", "←"),
-        ("\\x1b", "Esc"),
-        ("\\e", "Esc"),
-        ("\\x7f", "Backspace"),
-        ("\\r", "Enter"),
-        ("\\n", "Enter"),
-        ("\\t", "Tab"),
-    ];
+/// A story's keys (printf escapes, as `parse_keys` reads them) as names: `jj Enter ↓ Enter`.
+fn readable_keys(spec: &str) -> Result<String> {
     let mut words: Vec<String> = Vec::new();
     let mut text = String::new();
-    let mut rest = keys;
-    'next: while !rest.is_empty() {
-        for (escape, name) in NAMED {
-            if let Some(after) = rest.strip_prefix(escape) {
-                if !text.is_empty() {
-                    words.push(std::mem::take(&mut text));
+    for key in crate::util::pty_capture::parse_keys(spec)? {
+        let name = match key.as_slice() {
+            b"\x1b[A" | b"\x1bOA" => "↑".to_string(),
+            b"\x1b[B" | b"\x1bOB" => "↓".to_string(),
+            b"\x1b[C" | b"\x1bOC" => "→".to_string(),
+            b"\x1b[D" | b"\x1bOD" => "←".to_string(),
+            b"\x1b" => "Esc".to_string(),
+            b"\x7f" => "Backspace".to_string(),
+            b"\r" | b"\n" => "Enter".to_string(),
+            b"\t" => "Tab".to_string(),
+            b" " => "Space".to_string(),
+            other => match std::str::from_utf8(other) {
+                Ok(c) if !c.chars().any(char::is_control) => {
+                    text.push_str(c);
+                    continue;
                 }
-                words.push((*name).to_string());
-                rest = after;
-                continue 'next;
-            }
+                _ => other.escape_ascii().to_string(),
+            },
+        };
+        if !text.is_empty() {
+            words.push(std::mem::take(&mut text));
         }
-        let c = rest.chars().next().unwrap_or_default();
-        if c == ' ' {
-            if !text.is_empty() {
-                words.push(std::mem::take(&mut text));
-            }
-            words.push("Space".to_string());
-        } else {
-            text.push(c);
-        }
-        rest = &rest[c.len_utf8()..];
+        words.push(name);
     }
     if !text.is_empty() {
         words.push(text);
     }
-    words.join(" ")
+    Ok(words.join(" "))
 }
 
 /// `name` quoted for a shell when it needs it.
@@ -283,36 +386,6 @@ fn shell_word(name: &str) -> String {
     } else {
         format!("\"{}\"", name.replace('"', "\\\""))
     }
-}
-
-/// `bun <entry>` in the app's directory, after installing the workspace and
-/// building the app's Rust tools onto the front of PATH.
-pub fn app_command(root: &Path, app: &TuiApp) -> Result<Command> {
-    crate::tasks::check::install_js_workspace(root)?;
-    let mut cmd = Command::new("bun");
-    cmd.current_dir(&app.dir).arg(&app.entry);
-    if let Some(path) = tools_path(root, app)? {
-        cmd.env("PATH", path);
-    }
-    Ok(cmd)
-}
-
-/// PATH with this checkout's builds of the app's tools first, or None if it needs none.
-pub fn tools_path(root: &Path, app: &TuiApp) -> Result<Option<std::ffi::OsString>> {
-    if app.tools.is_empty() {
-        return Ok(None);
-    }
-    let mut build = Command::new("cargo");
-    build.current_dir(root).args(["build", "-q"]);
-    for tool in &app.tools {
-        build.args(["-p", tool]);
-    }
-    if !build.status()?.success() {
-        bail!("building {} for {} failed", app.tools.join(", "), app.name);
-    }
-    let mut paths = vec![crate::util::repo::cargo_target_dir(root).join("debug")];
-    paths.extend(std::env::split_paths(&std::env::var_os("PATH").unwrap_or_default()));
-    Ok(Some(std::env::join_paths(paths)?))
 }
 
 pub mod check;

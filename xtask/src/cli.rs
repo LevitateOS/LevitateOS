@@ -226,8 +226,10 @@ pub enum Cmd {
     /// To try an app's cases by hand without touching anything real, add `--stand-ins`: the
     /// app runs with its stand-in tools (its manifest's `inspect.path`), as headless runs do.
     /// `--story NAME` (or its number in `cargo xtask tui list <APP>`; implies `--stand-ins`)
-    /// starts it with that story's arguments and environment, and you drive it. Both go
-    /// before any `--`; the rest of the line goes to the app.
+    /// starts it with that story's arguments and environment, and you drive it. An app that
+    /// is told which distro it runs on (as the install screen tells the hub and the docs)
+    /// needs `--distro ID` or a story. These go before the app's own arguments; after a
+    /// `--`, everything goes to the app.
     ///
     /// `cargo xtask tui list` lists the apps with what each is for, where it lives, the tools
     /// it runs, its pages and its stories; `cargo xtask tui list <APP>` lists that app's
@@ -239,17 +241,15 @@ pub enum Cmd {
     ///
     /// Examples:
     ///   cargo xtask tui list
-    ///   cargo xtask tui list disk-plan
-    ///   cargo xtask tui install-docs --slug installation
-    ///   cargo xtask tui disk-plan --help
-    ///   cargo xtask tui disk-plan --story "edit: nothing can shrink"
-    ///   RECPART_FIXTURE_DISKS=all cargo xtask tui disk-plan --stand-ins
-    ///   cargo xtask tui recab-tui --story "running a trial"
+    ///   cargo xtask tui list <APP>
+    ///   cargo xtask tui <APP> --help
+    ///   cargo xtask tui <APP> --story 1
+    ///   cargo xtask tui <APP> --distro <ID> --stand-ins
     #[command(
         verbatim_doc_comment,
         arg_required_else_help = true,
         disable_help_subcommand = true,
-        override_usage = "cargo xtask tui <APP> [--stand-ins | --story NAME] [ARGS]...\n       cargo xtask tui list [APP]"
+        override_usage = "cargo xtask tui <APP> [--stand-ins | --story NAME] [--distro ID] [ARGS]...\n       cargo xtask tui list [APP]"
     )]
     Tui {
         #[command(subcommand)]
@@ -480,14 +480,24 @@ pub enum CheckCmd {
     },
 }
 
+/// A roomy terminal, as a developer runs the apps (columns, rows): `inspect`'s default
+/// and the size `check tui` renders at, so a failing check reproduces without flags.
+pub const INSPECT_SIZE: (u16, u16) = (120, 36);
+/// How long a screen must stay quiet to count as drawn (ms), and how long to wait
+/// for that (s).
+pub const INSPECT_WAIT: (u64, u64) = (500, 30);
+
 #[derive(Args)]
 pub struct InspectArgs {
     /// App name (its package.json `bin`).
     pub app: String,
-    /// Open one of the app's stories (its manifest's `inspect.stories`): its arguments,
-    /// environment and keys come first.
-    #[arg(long, value_name = "NAME")]
+    /// Open one of the app's stories (its manifest's `inspect.stories`), by name or number:
+    /// its arguments, environment and keys come first.
+    #[arg(long, value_name = "NAME|NUMBER")]
     pub story: Option<String>,
+    /// The distro the app is told it runs on, for an app that takes one (without a story).
+    #[arg(long, value_name = "ID", value_parser = DistroParser)]
+    pub distro: Option<Distro>,
     /// Keys to type once it has drawn, one at a time (printf escapes: '\n', '\e[B', 'jj').
     #[arg(long, value_name = "KEYS")]
     pub input: Option<String>,
@@ -495,18 +505,19 @@ pub struct InspectArgs {
     #[arg(long)]
     pub all_pages: bool,
     /// Terminal columns.
-    #[arg(long, default_value_t = crate::tasks::tui::inspect::DEFAULT_SIZE.columns)]
+    #[arg(long, default_value_t = INSPECT_SIZE.0, value_parser = clap::value_parser!(u16).range(1..))]
     pub columns: u16,
     /// Terminal rows.
-    #[arg(long, default_value_t = crate::tasks::tui::inspect::DEFAULT_SIZE.rows)]
+    #[arg(long, default_value_t = INSPECT_SIZE.1, value_parser = clap::value_parser!(u16).range(1..))]
     pub rows: u16,
     /// Milliseconds without output that count as "drawn".
-    #[arg(long, default_value_t = crate::tasks::tui::inspect::DEFAULT_WAIT.settle.as_millis() as u64)]
+    #[arg(long, default_value_t = INSPECT_WAIT.0, value_parser = clap::value_parser!(u64).range(1..))]
     pub settle_ms: u64,
     /// Give up if the screen never settles within this many seconds.
-    #[arg(long, default_value_t = crate::tasks::tui::inspect::DEFAULT_WAIT.timeout.as_secs())]
+    #[arg(long, default_value_t = INSPECT_WAIT.1, value_parser = clap::value_parser!(u64).range(1..))]
     pub timeout_seconds: u64,
-    /// Base directory; a timestamped run folder is created under it.
+    /// Base directory (default `.artifacts/tui-inspect`); a new run folder is created
+    /// under it, named by the app and the time.
     #[arg(long, value_name = "PATH")]
     pub out_dir: Option<PathBuf>,
     /// Also print the plain screen(s).

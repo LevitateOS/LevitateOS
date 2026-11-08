@@ -1,10 +1,11 @@
 //! `check tui`: the checks that tell whether the terminal apps work.
 //!
 //! For every TUI package: typecheck, lint and format check. For every app: it must
-//! draw at a full console size without crashing; an app a variant shows in its
-//! install screen (`[install_ux]` docs) must also draw, at that variant's page, at the
-//! size the docs pane really has on each console; snapshots under an app's
-//! `snapshots/<columns>x<rows>/<page>.txt` must match; and each app's declared story
+//! draw at a full console size without crashing (on every distro, for an app that is
+//! told its distro); the install screen's hub and docs must also draw, on every
+//! distro, at the size their pane really has on each console (the docs at their
+//! page); snapshots under an app's `snapshots/[<distro>/]<columns>x<rows>/<page>.txt`
+//! must match, at sizes the app is really shown at; and each app's declared story
 //! (keys typed in turn, text the screens must show) must hold.
 
 use anyhow::{Context, Result, bail};
@@ -13,15 +14,24 @@ use std::fs;
 use std::path::Path;
 use std::process::Command;
 
-use super::inspect::{CaptureError, Launch, Shot, Size, Wait};
+use super::inspect::{CaptureError, Shot, Size, Wait, capture};
+use super::{Launch, Tools};
+use crate::cli::{Distro, INSPECT_SIZE, INSPECT_WAIT};
 use crate::util::pty_capture::parse_keys;
-use distro_contract::tui_apps::{self, TuiApp};
+use distro_builder::tui_apps::{Story, TuiApp, Workspace};
+use distro_contract::install_ux::{DOCS, DOCS_PAGE, HUB};
 
 /// Console sizes the install screen runs on: a serial terminal, and the 1920x1080
 /// framebuffer the live kernel command line asks for (`video=1920x1080`) in 8x16 cells.
 const CONSOLES: &[(u16, u16)] = &[(80, 24), (240, 67)];
-const FULL: Size = super::inspect::DEFAULT_SIZE;
-const WAIT: Wait = super::inspect::DEFAULT_WAIT;
+const FULL: Size = Size {
+    columns: INSPECT_SIZE.0,
+    rows: INSPECT_SIZE.1,
+};
+const WAIT: Wait = Wait {
+    settle: std::time::Duration::from_millis(INSPECT_WAIT.0),
+    timeout: std::time::Duration::from_secs(INSPECT_WAIT.1),
+};
 /// Screens that mean the app is broken even though it is still running. (A crash
 /// exits non-zero, which a capture already reports.)
 const BROKEN: &[&str] = &["Terminal too small", "Invalid hook call"];
@@ -29,6 +39,8 @@ const BROKEN: &[&str] = &["Terminal too small", "Invalid hook call"];
 pub fn run(bless: bool) -> Result<()> {
     let root = crate::util::repo::repo_root()?;
     crate::tasks::check::install_js_workspace(&root)?;
+    let workspace = Workspace::load(&root)?;
+    let distros = Distro::all()?;
     let mut failed = Vec::new();
     let mut step = |name: String, result: Result<()>| match result {
         Ok(()) => eprintln!("[ok]   {name}"),
@@ -38,56 +50,74 @@ pub fn run(bless: bool) -> Result<()> {
         }
     };
 
-    for dir in tui_apps::tui_packages(&root)? {
-        let name = dir.strip_prefix(&root).unwrap_or(&dir).display().to_string();
+    for dir in &workspace.packages {
+        let name = dir.strip_prefix(&root).unwrap_or(dir).display().to_string();
         for script in ["typecheck", "lint", "format:check"] {
-            step(format!("{script} {name}"), bun_run(&dir, script));
+            step(format!("{script} {name}"), bun_run(dir, script));
         }
     }
 
-    let hosted = install_screen_docs(&root)?;
-    let apps = tui_apps::discover(&root)?;
-    for (variant, (app, _, _)) in &hosted {
-        if !apps.iter().any(|known| &known.name == app) {
-            step(
-                format!("{variant}'s install screen docs"),
-                Err(anyhow::anyhow!("no TUI app named '{app}' under tui/apps")),
-            );
-        }
-    }
-    for app in apps {
-        let name = app.name.clone();
-        let launch = match Launch::prepare(&root, app) {
+    step(
+        "install screen apps".to_string(),
+        distro_builder::install_ux::Screen::resolve(&workspace).map(drop),
+    );
+    for app in &workspace.apps {
+        let name = &app.name;
+        let launch = match Launch::new(&root, app, Tools::StandIns) {
             Ok(launch) => launch,
             Err(e) => {
                 step(format!("prepare {name}"), Err(e));
                 continue;
             }
         };
-        step(format!("render {name} {}x{}", FULL.columns, FULL.rows), render(&launch, &[], FULL));
-        for (variant, (_, page, docs_args)) in hosted.iter().filter(|(_, (app, _, _))| *app == name) {
-            let mut args = docs_args.clone();
-            if let Some(page) = page {
-                args.extend([page_arg(&launch.app)?, page.clone()]);
+        let told = told_distro(app);
+        for distro in told.then_some(&distros[..]).unwrap_or(&[]) {
+            let args = launch.distro_args(distro);
+            step(
+                format!("render {name} on {} {}x{}", distro.id(), FULL.columns, FULL.rows),
+                render(&launch, &args, FULL),
+            );
+        }
+        if !told {
+            step(format!("render {name} {}x{}", FULL.columns, FULL.rows), render(&launch, &[], FULL));
+        }
+        let pane = match name.as_str() {
+            HUB => Some(0),
+            DOCS => Some(1),
+            _ => None,
+        };
+        for (pane, distro) in pane.into_iter().flat_map(|pane| distros.iter().map(move |d| (pane, d))) {
+            let mut args = launch.distro_args(distro);
+            if pane == 1 {
+                args.extend([app.page_arg()?.to_string(), DOCS_PAGE.to_string()]);
             }
             for &(columns, rows) in CONSOLES {
-                let (pane_columns, pane_rows) = install_split_pane::docs_pane_size(columns, rows);
+                let (pane_columns, pane_rows) = install_split_pane::pane_sizes(columns, rows)[pane];
                 let size = Size {
                     columns: pane_columns,
                     rows: pane_rows,
                 };
                 step(
-                    format!("render {name} as {variant}'s docs pane on a {columns}x{rows} console ({pane_columns}x{pane_rows})"),
+                    format!("render {name} in {}'s install screen on a {columns}x{rows} console ({pane_columns}x{pane_rows})", distro.id()),
                     render(&launch, &args, size),
                 );
             }
         }
-        for story_spec in &launch.app.inspect.stories {
+        for story_spec in &app.inspect.stories {
             step(format!("story {name}: {}", story_spec.name), story(&launch, story_spec));
         }
-        let snapshots = launch.app.dir.join("snapshots");
+        let snapshots = app.dir.join("snapshots");
         if snapshots.is_dir() {
-            step(format!("snapshots {name}"), compare_snapshots(&launch, &snapshots, bless));
+            if told {
+                for distro in &distros {
+                    step(
+                        format!("snapshots {name} on {}", distro.id()),
+                        compare_snapshots(&launch, &snapshots.join(&distro.id()), Some(distro), bless),
+                    );
+                }
+            } else {
+                step(format!("snapshots {name}"), compare_snapshots(&launch, &snapshots, None, bless));
+            }
         }
     }
 
@@ -97,14 +127,9 @@ pub fn run(bless: bool) -> Result<()> {
     Ok(())
 }
 
-/// Each variant's install screen docs: variant, (app, page, args).
-fn install_screen_docs(root: &Path) -> Result<Vec<(String, (String, Option<String>, Vec<String>))>> {
-    let mut hosted = Vec::new();
-    for id in distro_contract::distro_ids(root) {
-        let docs = distro_contract::load(root, &id)?.contract.install_ux.docs;
-        hosted.push((id, (docs.app, docs.page, docs.args)));
-    }
-    Ok(hosted)
+/// Whether the app is told which distro it runs on (its manifest declares the flags).
+fn told_distro(app: &TuiApp) -> bool {
+    app.distro_args.os_name.is_some() || app.distro_args.shell.is_some()
 }
 
 fn bun_run(dir: &Path, script: &str) -> Result<()> {
@@ -123,7 +148,7 @@ fn bun_run(dir: &Path, script: &str) -> Result<()> {
 }
 
 fn render(launch: &Launch, args: &[String], size: Size) -> Result<()> {
-    let shot = launch.capture(args, &[], &[], size, WAIT).map_err(capture_error)?;
+    let shot = capture(launch, args, &[], &[], size, WAIT).map_err(capture_error)?;
     healthy(&shot)
 }
 
@@ -143,13 +168,13 @@ fn capture_error(error: CaptureError) -> anyhow::Error {
 
 /// Runs the story: the screen must be healthy after its keys, and show each step's
 /// expected text once that step's keys are typed.
-fn story(launch: &Launch, spec: &distro_contract::tui_apps::Story) -> Result<()> {
-    let env: Vec<(String, String)> = spec.env.clone().into_iter().collect();
+fn story(launch: &Launch, spec: &Story) -> Result<()> {
+    let start = launch.start(Some(spec), None)?;
     let mut keys = Vec::new();
     let mut typed = String::new();
     let last = spec.steps.len().saturating_sub(1);
     if spec.steps.is_empty() {
-        let shot = launch.capture(&spec.args, &env, &keys, FULL, WAIT).map_err(capture_error)?;
+        let shot = capture(launch, &start.args, &start.env, &keys, FULL, WAIT).map_err(capture_error)?;
         return healthy(&shot);
     }
     for (index, step) in spec.steps.iter().enumerate() {
@@ -158,7 +183,7 @@ fn story(launch: &Launch, spec: &distro_contract::tui_apps::Story) -> Result<()>
         if step.expect.is_none() && index != last {
             continue;
         }
-        let shot = launch.capture(&spec.args, &env, &keys, FULL, WAIT).map_err(capture_error)?;
+        let shot = capture(launch, &start.args, &start.env, &keys, FULL, WAIT).map_err(capture_error)?;
         healthy(&shot)?;
         if let Some(expect) = &step.expect {
             if !shot.plain.contains(expect) {
@@ -173,10 +198,12 @@ fn story(launch: &Launch, spec: &distro_contract::tui_apps::Story) -> Result<()>
     Ok(())
 }
 
-/// `snapshots/<columns>x<rows>/<page>.txt`: render each page at that size and compare.
-fn compare_snapshots(launch: &Launch, dir: &Path, bless: bool) -> Result<()> {
-    let masks = launch
-        .app
+/// `<dir>/<columns>x<rows>/<page>.txt`: render each page at that size (on `distro`)
+/// and compare. A size the app is not shown at (the full size, or for the docs a pane
+/// size of a console) is stale.
+fn compare_snapshots(launch: &Launch, dir: &Path, distro: Option<&Distro>, bless: bool) -> Result<()> {
+    let app = launch.app;
+    let masks = app
         .inspect
         .mask
         .iter()
@@ -187,23 +214,41 @@ fn compare_snapshots(launch: &Launch, dir: &Path, bless: bool) -> Result<()> {
             .iter()
             .fold(text.to_string(), |text, re| re.replace_all(&text, "<masked>").into_owned())
     };
-    let page_arg = page_arg(&launch.app)?;
+    let mut shown = vec![(FULL.columns, FULL.rows)];
+    if app.name == DOCS {
+        shown.extend(CONSOLES.iter().map(|&(columns, rows)| install_split_pane::docs_pane_size(columns, rows)));
+    }
+    let distro_args = distro.map(|distro| launch.distro_args(distro)).unwrap_or_default();
+    let page_arg = app.page_arg()?.to_string();
     let mut mismatches = Vec::new();
-    let mut sizes: Vec<_> = fs::read_dir(dir)?.collect::<std::io::Result<_>>()?;
+    let mut sizes: Vec<_> = fs::read_dir(dir)
+        .with_context(|| format!("reading '{}'", dir.display()))?
+        .collect::<std::io::Result<_>>()?;
     sizes.sort_by_key(|entry| entry.file_name());
     for size_dir in sizes {
         let size_name = size_dir.file_name().to_string_lossy().into_owned();
         let size = parse_size(&size_name)
             .with_context(|| format!("snapshot directory '{size_name}' is not <columns>x<rows>"))?;
+        if !shown.contains(&(size.columns, size.rows)) {
+            let shown: Vec<String> = shown.iter().map(|(c, r)| format!("{c}x{r}")).collect();
+            bail!(
+                "snapshots at {size_name}, a size {} is not shown at (it is at {}): move them",
+                app.name,
+                shown.join(", ")
+            );
+        }
         let mut pages: Vec<_> = fs::read_dir(size_dir.path())?.collect::<std::io::Result<_>>()?;
         pages.sort_by_key(|entry| entry.file_name());
         for page_file in pages {
             let path = page_file.path();
+            if path.extension().and_then(|e| e.to_str()) != Some("txt") {
+                continue;
+            }
             let Some(page) = path.file_stem().and_then(|s| s.to_str()).map(str::to_string) else {
                 continue;
             };
-            let args = vec![page_arg.clone(), page.clone()];
-            let shot = launch.capture(&args, &[], &[], size, WAIT).map_err(capture_error)?;
+            let args = [distro_args.clone(), vec![page_arg.clone(), page.clone()]].concat();
+            let shot = capture(launch, &args, &[], &[], size, WAIT).map_err(capture_error)?;
             let actual = format!("{}\n", mask(&shot.plain));
             if bless {
                 fs::write(&path, &actual)?;
@@ -226,14 +271,6 @@ fn compare_snapshots(launch: &Launch, dir: &Path, bless: bool) -> Result<()> {
         );
     }
     Ok(())
-}
-
-fn page_arg(app: &TuiApp) -> Result<String> {
-    app.inspect
-        .pages
-        .as_ref()
-        .map(|pages| pages.arg.clone())
-        .with_context(|| format!("{} declares no inspect.pages to open a page with", app.name))
 }
 
 fn parse_size(name: &str) -> Option<Size> {
