@@ -393,7 +393,7 @@ index 80ddc4db..63eb516a 100644
                      crate::dispatch::Lane::Contract => b"contract",
                  };
 diff --git a/crates/ginux-init/src/launch_storage.rs b/crates/ginux-init/src/launch_storage.rs
-index 4e6c329d..0235f9a6 100644
+index 4e6c329d..756aebde 100644
 --- a/crates/ginux-init/src/launch_storage.rs
 +++ b/crates/ginux-init/src/launch_storage.rs
 @@ -1,9 +1,10 @@
@@ -514,11 +514,12 @@ index 4e6c329d..0235f9a6 100644
              let root = self.root.as_ref().unwrap();
              let in_memory = |path: &[u8]| self.in_memory(path);
              ginux_vfs::resolve_namespace_checked(
-@@ -539,15 +549,20 @@ impl LaunchFs {
+@@ -539,15 +549,21 @@ impl LaunchFs {
                  call.create,
                  &mut output,
                  |path, target| {
 +                    if LaunchDevices::owns(path) {
++                        touched = true;
 +                        return self.devices.lookup(path);
 +                    }
                      if in_memory(path) {
@@ -538,7 +539,7 @@ index 4e6c329d..0235f9a6 100644
                      } else {
                          root.search_directory(path)
                      }
-@@ -560,7 +575,9 @@ impl LaunchFs {
+@@ -560,7 +576,9 @@ impl LaunchFs {
                      Ok(canonical) => canonical,
                      Err(_) => return Route::Fail(-linux::ENAMETOOLONG),
                  };
@@ -549,7 +550,7 @@ index 4e6c329d..0235f9a6 100644
                      Route::Memory(canonical)
                  } else if touched || raw.as_bytes().first() != Some(&b'/') {
                      Route::Rewrite(canonical)
-@@ -591,7 +608,7 @@ impl LaunchFs {
+@@ -591,7 +609,7 @@ impl LaunchFs {
              linux::NEWFSTATAT => self.stat_path(pid, path, r.rdx, false),
              linux::STATX => self.stat_path(pid, path, r.r8, true),
              linux::ACCESS => self.access(path, assigned, r.rsi),
@@ -558,7 +559,7 @@ index 4e6c329d..0235f9a6 100644
              // Memory holds no links.
              linux::READLINK | linux::READLINKAT => {
                  self.memory().metadata(path).map_err(errno)?;
-@@ -1225,6 +1242,12 @@ impl PathCall {
+@@ -1225,6 +1243,12 @@ impl PathCall {
                  }
                  call(0, r.rdi, None, true, false)
              }
@@ -571,7 +572,7 @@ index 4e6c329d..0235f9a6 100644
              linux::FACCESSAT2 => {
                  let valid = linux::AT_SYMLINK_NOFOLLOW | linux::AT_EACCESS | linux::AT_EMPTY_PATH;
                  if r.r10 & !valid != 0 || r.rdx & !7 != 0 {
-@@ -1387,7 +1410,7 @@ fn join(base: &[u8], relative: &[u8]) -> Result<Path, i64> {
+@@ -1387,7 +1411,7 @@ fn join(base: &[u8], relative: &[u8]) -> Result<Path, i64> {
      Path::from_bytes(&bytes[..length]).map_err(|_| -linux::ENAMETOOLONG)
  }
  
@@ -580,7 +581,7 @@ index 4e6c329d..0235f9a6 100644
      flags & !0x7900 == 0 && flags & 0x6000 != 0x6000 && mask & 0x8000_0000 == 0
  }
  
-@@ -1449,7 +1472,7 @@ pub(crate) fn copy_memory(
+@@ -1449,7 +1473,7 @@ pub(crate) fn copy_memory(
  }
  
  /// The workload's NUL-terminated path, read in one copy where possible.
@@ -589,7 +590,7 @@ index 4e6c329d..0235f9a6 100644
      let mut buffer = [0u8; MAX_PATH];
      let copied = copy_memory(pid, address, &mut buffer, false)? as usize;
      match buffer[..copied].iter().position(|byte| *byte == 0) {
-@@ -1465,7 +1488,6 @@ fn copy_metadata(
+@@ -1465,7 +1489,6 @@ fn copy_metadata(
      metadata: FileMetadata,
      statx: bool,
  ) -> Result<i64, i64> {
@@ -597,7 +598,7 @@ index 4e6c329d..0235f9a6 100644
      let directory = metadata.kind == NodeKind::Directory;
      let mode = metadata.mode
          | if directory {
-@@ -1473,7 +1495,37 @@ fn copy_metadata(
+@@ -1473,7 +1496,37 @@ fn copy_metadata(
          } else {
              linux::S_IFREG
          };
@@ -636,7 +637,7 @@ index 4e6c329d..0235f9a6 100644
      let (ino, mode_at, size_at, blocks_at, length) = if statx {
          bytes[..4].copy_from_slice(&0x7ffu32.to_le_bytes());
          bytes[4..8].copy_from_slice(&4096u32.to_le_bytes());
-@@ -1485,6 +1537,18 @@ fn copy_metadata(
+@@ -1485,6 +1538,18 @@ fn copy_metadata(
          bytes[56..64].copy_from_slice(&4096u64.to_le_bytes());
          (8, Some(24), 48, 64, 144)
      };
@@ -655,7 +656,7 @@ index 4e6c329d..0235f9a6 100644
      bytes[ino..ino + 8].copy_from_slice(&metadata.inode.to_le_bytes());
      if let Some(mode_at) = mode_at {
          bytes[mode_at..mode_at + 4].copy_from_slice(&mode.to_le_bytes());
-@@ -1492,7 +1556,7 @@ fn copy_metadata(
+@@ -1492,7 +1557,7 @@ fn copy_metadata(
      bytes[size_at..size_at + 8].copy_from_slice(&metadata.size.to_le_bytes());
      bytes[blocks_at..blocks_at + 8].copy_from_slice(&metadata.size.div_ceil(512).to_le_bytes());
      if copy_memory(pid, address, &mut bytes[..length], true)? != length as i64 {
@@ -686,10 +687,10 @@ index 599cfb43..738507c2 100644
                      };
 diff --git a/scripts/test-launch-devices.py b/scripts/test-launch-devices.py
 new file mode 100644
-index 00000000..c146f165
+index 00000000..1bb2f3d3
 --- /dev/null
 +++ b/scripts/test-launch-devices.py
-@@ -0,0 +1,64 @@
+@@ -0,0 +1,89 @@
 +#!/usr/bin/env python3
 +"""Real configured-launch device ownership checks using explicit built artifacts."""
 +import json
@@ -716,32 +717,55 @@ index 00000000..c146f165
 +        (root / 'alias-dev').symlink_to('/dev')
 +        for name in ['null', 'image-device']:
 +            (root / 'dev' / name).write_bytes(b'image device bytes must stay untouched')
++        (root / 'image').write_bytes(b'ROOT')
++        (root / 'nested/d').mkdir(parents=True)
++        (root / 'nested/image').write_bytes(b'WRNG')
 +        shutil.copyfile(fixture, root / 'bin/fixture')
 +        (root / 'bin/fixture').chmod(0o755)
 +        counter = 0
 +
-+        def invoke(devices, storage=False, expected=0):
++        def invoke(devices, storage=False, expected=0, args=None, dev_kind=None):
 +            nonlocal counter
 +            counter += 1
 +            config = template.replace('init = "/bin/bash"', 'init = "/bin/fixture"')
 +            config = config.replace('[devices]\nassignments = []', '[devices]\nassignments = ' + json.dumps(devices))
-+            if not devices:
++            if args is not None:
++                config = config.replace('args = []', 'args = ' + json.dumps(args))
++            elif not devices:
 +                config = config.replace('args = []', 'args = ["none"]')
 +            if storage:
 +                config = config.replace('[storage]\nassignments = []', '[storage]\nassignments = ["memory:/work"]')
 +            path = work / f'{counter}.toml'
 +            path.write_text(config)
 +            result = work / f'{counter}.json'
-+            proc = subprocess.run([binary, 'launch', str(path), str(root), '--result-file', str(result)],
-+                                  capture_output=True, timeout=20)
++            if dev_kind is not None:
++                (root / 'dev').rename(root / 'saved-dev')
++                if dev_kind == 'symlink':
++                    (root / 'dev').symlink_to('/nested/d')
++                else:
++                    (root / 'dev').write_bytes(b'image dev is a file')
++            try:
++                proc = subprocess.run([binary, 'launch', str(path), str(root), '--result-file', str(result)],
++                                      capture_output=True, timeout=20)
++            finally:
++                if dev_kind is not None:
++                    if dev_kind == 'symlink':
++                        assert (root / 'dev').is_symlink() and os.readlink(root / 'dev') == '/nested/d'
++                    else:
++                        assert (root / 'dev').read_bytes() == b'image dev is a file'
++                    (root / 'dev').unlink()
++                    (root / 'saved-dev').rename(root / 'dev')
 +            record = json.loads(result.read_text())
 +            assert proc.returncode == expected, (proc.returncode, proc.stderr, record)
 +            assert record['outcome'] == ('exited' if expected == 0 else 'supervisor-error'), record
 +            if expected == 0:
 +                assert record['code'] == 0 and record['generation'] is None, record
-+                assert proc.stdout == (b'null-device: PASS\n' if devices else b''), proc.stdout
++                wanted = b'dev-parent: PASS\n' if args == ['virtual-parent'] else (b'null-device: PASS\n' if devices else b'')
++                assert proc.stdout == wanted, proc.stdout
 +            for name in ['null', 'image-device']:
 +                assert (root / 'dev' / name).read_bytes() == b'image device bytes must stay untouched'
++            assert (root / 'image').read_bytes() == b'ROOT'
++            assert (root / 'nested/image').read_bytes() == b'WRNG'
 +
 +        invoke([])
 +        invoke(['null'])
@@ -749,6 +773,8 @@ index 00000000..c146f165
 +        invoke(['null'])  # No descriptors survive a fresh supervisor.
 +        for devices in [['zero'], ['null', 'null'], ['null', 'console'], ['disk0']]:
 +            invoke(devices, expected=2)
++        for dev_kind in ('symlink', 'file'):
++            invoke([], args=['virtual-parent'], dev_kind=dev_kind)
 +        print('test-launch-devices: PASS (assignment, IO, metadata, bounds, isolation)')
 +
 +
@@ -756,10 +782,10 @@ index 00000000..c146f165
 +    main()
 diff --git a/tests/fixtures/launch-device-fixture.c b/tests/fixtures/launch-device-fixture.c
 new file mode 100644
-index 00000000..aba21f08
+index 00000000..cdabe1bc
 --- /dev/null
 +++ b/tests/fixtures/launch-device-fixture.c
-@@ -0,0 +1,106 @@
+@@ -0,0 +1,115 @@
 +/* Real configured-launch null-device checks, without libc or host devices. */
 +typedef unsigned long word;
 +static long call(long n, word a, word b, word c, word d, word e, word f)
@@ -783,6 +809,15 @@ index 00000000..aba21f08
 +    CHECK(call(262,-100,(word)"",(word)meta,0x1000,0,0) == 0, 69);
 +    CHECK(DO(4,"/dev",meta,0) == 0, 10);
 +    CHECK((*(unsigned int *)(meta+24) & 0170000) == 0040000, 11);
++    if (argc > 1 && argv[1][0] == 'v') {
++        long file = DO(2,"/dev/../image",0,0);
++        CHECK(file >= 0, 77);
++        CHECK(DO(0,file,meta,4) == 4 && meta[0]=='R' && meta[1]=='O'
++              && meta[2]=='O' && meta[3]=='T', 78);
++        CHECK(DO(3,file,0,0) == 0, 79);
++        DO(1,1,"dev-parent: PASS\n",17);
++        return 0;
++    }
 +    if (argc > 1 && argv[1][0] == 'n') {
 +        CHECK(DO(2,"/dev/null",0,0) == -2, 12);
 +        CHECK(DO(4,"/dev/null",meta,0) == -2, 13);

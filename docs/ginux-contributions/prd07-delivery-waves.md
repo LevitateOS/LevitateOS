@@ -78,10 +78,12 @@ disposition of a proven required capability.
 ## Current review boundary
 
 [G04 assigned null-device extraction](prd07-devices-review.md) is prepared at
-`c8d6a826` over local storage `16dd447e`. Full diff/failure review, static checks,
+`0bd9b4bb` over local storage `16dd447e`. Full diff/failure review, static checks,
 141 units and all original Linux plus storage/device suites pass. Its complete
 donor/test disposition includes the old image-device assertion replaced by the
-authorized default-hidden view. This remains a local dependent composition;
+authorized default-hidden view. A further virtual `/dev/..` namespace mismatch
+is corrected with a pinned failing control and both symlink/file regressions;
+all ten device configurations pass. This remains a local dependent composition;
 G05 global/public ownership and G06 exec/task behavior still need their own joins.
 
 The [local storage rehearsal](prd07-storage-rehearsal.md) now composes the
@@ -108,7 +110,7 @@ editing existing heads, comments, native policy or a source-packaging choice.
 Active skill: `hdae-development` at `.agents/skills/hdae-development/SKILL.md`.
 Reload the full skill, reference, instructions and current queue after context
 shift. Exact next action: extract and review G05's public descriptor/pipe owner
-onto local G04 `c8d6a826`, retaining the actual ABI/deny classification, all lower
+onto local G04 `0bd9b4bb`, retaining the actual ABI/deny classification, all lower
 operator limits, partial-progress/cancellation and original fixtures. Then join
 G06 before G09b's full runtime. Preserve
 G09a/T-02's 9,000-byte/4,096-byte rollback oracle; the clean
