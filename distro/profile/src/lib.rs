@@ -84,14 +84,6 @@ fact! {
 }
 
 impl Libc {
-    /// The Rust target the image's programs are built for.
-    pub fn rust_target(self) -> &'static str {
-        match self {
-            Libc::Glibc => "x86_64-unknown-linux-gnu",
-            Libc::Musl => "x86_64-unknown-linux-musl",
-        }
-    }
-
     /// The `bun build --compile` target for the image.
     pub fn bun_target(self) -> &'static str {
         match self {

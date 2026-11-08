@@ -15,8 +15,8 @@ os_version = "1.0"
 # builder writes them into the image's /etc/os-release as REC_* fields, which
 # the install tools read on the target. The ISO label (`os_id` in capitals),
 # default hostname (`os_id`), login prompt (`<os_id> login:`) and kernel
-# localversion (`-<variant id>`) follow from the identity, and every tool is
-# built for the libc. `kernel_line` picks the kernel: its exact version is
+# localversion (`-<variant id>`) follow from the identity, and the bun TUI binary
+# is built for the libc. `kernel_line` picks the kernel: its exact version is
 # pinned in distro/builder/recipes/kernel/metadata.rhai, its configuration is
 # ../_shared/kconfig plus `kconfig` beside this file.
 [profile]
@@ -28,8 +28,6 @@ desktop = "lxqt"
 kernel_line = "latest"
 
 [sources.rootfs_source]
-inputs = { capabilities = "distro/contract/capabilities.txt" }
-kind = "recipe_custom"
 recipe_script = "distro/builder/recipes/alpine-live-source-rootfs.rhai"
 preseed_recipe_script = "distro/builder/recipes/alpine-preseed-source-assets.rhai"
 
@@ -77,12 +75,12 @@ packages = [
   "iproute2",
   "iputils",
   "curl",
-  "dhcpcd",
   "networkmanager",
   "networkmanager-cli",
   "networkmanager-wifi",
   "wpa_supplicant",
   "iw",
+  "wireless-regdb",
   "pciutils",
   "usbutils",
   "smartmontools",
@@ -93,16 +91,8 @@ packages = [
   "dbus",
 ]
 
-# What the live system adds to what every variant's has (the installed
-# system's services and sshd). Every system's commands are
-# distro/contract/capabilities.txt; every boot's kernel command line is
-# distro_builder::release::kernel_cmdline.
-[live]
-services = ["network"]
-
 # What the live-desktop product adds (docs/desktop.md): LXQt on X11 with SDDM
-# (decision D16: Alpine 3.24 has no lxqt-wayland-session). NetworkManager
-# replaces dhcpcd/networking on the desktop.
+# (decision D16: Alpine 3.24 has no lxqt-wayland-session).
 [desktop]
 display_manager = "sddm"
 packages = [

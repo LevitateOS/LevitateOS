@@ -168,9 +168,10 @@ fn checks(root: &Path) -> Vec<Check> {
 fn base_lock_check(root: &Path, distro: &Distro) -> Option<Check> {
     let contract = distro_contract::load(root, distro.id()).ok()?.contract;
     let base = &contract.sources.rootfs_source.base;
-    let (what, asked) = match contract.profile.packages {
-        distro_contract::profile::PackageBackend::Rpm => ("Fedora", base.release.clone()),
-        distro_contract::profile::PackageBackend::Apk => ("Alpine", base.release.clone()),
+    let asked = base.release.clone();
+    let what = match contract.profile.packages {
+        distro_contract::profile::PackageBackend::Rpm => "Fedora",
+        distro_contract::profile::PackageBackend::Apk => "Alpine",
     };
     let fix = format!("cargo xtask base lock {}", distro.id());
     let path = crate::tasks::base::lock_path(root, distro, contract.profile.packages);
