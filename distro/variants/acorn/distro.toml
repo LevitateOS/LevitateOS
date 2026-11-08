@@ -91,10 +91,13 @@ packages = [
   "dbus",
 ]
 
-# What the live-desktop product adds (docs/desktop.md): LXQt on X11 with SDDM
-# (decision D16: Alpine 3.24 has no lxqt-wayland-session).
+# The desktop system, the rootfs of the live-desktop product (docs/desktop.md):
+# the base packages plus these, LXQt on X11 with SDDM (decision D16: Alpine 3.24
+# has no lxqt-wayland-session). `cargo xtask base lock acorn` locks what they
+# need beyond the base lock; the preseed downloads that desktop lock.
 [desktop]
 display_manager = "sddm"
+preseed_recipe_script = "distro/builder/recipes/alpine-desktop-preseed.rhai"
 packages = [
   "lxqt-desktop", "lximage-qt", "pavucontrol-qt", "screengrab", "sddm", "xorg-server",
   "xf86-input-libinput", "eudev", "udev-init-scripts", "udev-init-scripts-openrc",

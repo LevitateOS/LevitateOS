@@ -107,6 +107,13 @@ fn write_distros(out: &mut Out, root: &Path) -> Result<()> {
             "defaultHostname": c.identity.default_hostname,
             "loginPrompt": c.identity.login_prompt,
             "isoFile": c.artifacts.release_iso,
+            "desktop": {
+                "isoFile": c.artifacts.iso(distro_contract::ProductId::LiveDesktop),
+                "displayManager": c.desktop.display_manager,
+                "liveUser": distro_contract::install_ux::LIVE_DESKTOP_USER,
+                "livePassword": distro_contract::install_ux::LIVE_DESKTOP_PASSWORD,
+                "installScreen": format!("/{}", distro_contract::install_ux::LAUNCHER),
+            },
             "installedInitramfs": c.artifacts.initramfs_installed,
             "installShell": distro_contract::install_ux::SHELL,
             "kernel": { "version": kernel.version, "localversion": kernel.localversion },

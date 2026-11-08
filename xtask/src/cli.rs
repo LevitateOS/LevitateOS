@@ -101,13 +101,23 @@ impl<T: Clone + Send + Sync + 'static> TypedValueParser for Choices<T> {
 /// What `cargo xtask test` runs.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum TestSelection {
-    /// Every scenario, in order; each runs against the artifacts that exist.
+    /// Every scenario `ScenarioId::in_test_all` takes, in order; each runs
+    /// against the artifacts that exist.
     All,
     One(ScenarioId),
 }
 
 fn test_selections() -> Vec<(&'static str, &'static str, TestSelection)> {
-    std::iter::once(("all", "every scenario below, in order, each on its own", TestSelection::All))
+    let left_out: Vec<&str> = ScenarioId::ALL
+        .into_iter()
+        .filter(|scenario| !scenario.in_test_all())
+        .map(ScenarioId::key)
+        .collect();
+    let all = format!(
+        "every scenario below but {}, in order, each on its own",
+        left_out.join(" and ")
+    );
+    std::iter::once(("all", &*all.leak(), TestSelection::All))
         .chain(
             ScenarioId::ALL
                 .into_iter()
@@ -302,6 +312,10 @@ pub enum BuildCmd {
     RootfsSource {
         #[arg(value_parser = DistroParser)]
         distro: Distro,
+        /// The desktop lock's packages instead, which live-desktop builds
+        /// the desktop system from (beside the base lock's).
+        #[arg(long)]
+        desktop: bool,
         /// Download it again even if it is present.
         #[arg(long)]
         refresh: bool,

@@ -81,6 +81,7 @@ pub fn test(args: TestArgs) -> Result<()> {
     let scenarios = match args.scenario {
         TestSelection::All => ScenarioId::ALL
             .into_iter()
+            .filter(|scenario| scenario.in_test_all())
             .filter(|scenario| {
                 // ab-update updates an A/B install; `all` leaves it out of other modes.
                 let skip = *scenario == ScenarioId::AbUpdate && args.mode != recpart::InstallMode::Ab;

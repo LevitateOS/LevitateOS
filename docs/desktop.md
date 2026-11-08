@@ -73,9 +73,29 @@ networkmanager-wifi network-manager-applet breeze-icons font-noto firefox`.
   sddm failed while the session runs. Acorn needs its own start_post for
   autologin, or the scenarios' `ERROR:` pattern will flag it.
 
+## In the pipeline (2026-11-08, not built or booted yet)
+
+- `live-desktop` builds the **desktop system** (`REC_FLAVOUR=desktop` in its
+  os-release): the variant's rootfs recipe installs the base lock and the
+  desktop lock (`sources/<id>-<backend>-desktop-lock.rhai`, downloaded by
+  `cargo xtask build rootfs-source <id> --desktop`) into one tree, and
+  `installed-system.rhai`'s desktop policy does the packages' setup (caches,
+  accounts, user units), enables the display manager and boots to it. That
+  tree is the ISO's `filesystem.erofs`, so a desktop install is that system.
+  The overlay adds the live user `live` (password `live`) and SDDM's autologin
+  (`/etc/sddm.conf.d/live-autologin.conf`, the same on both inits); tty1 is
+  the display manager's on both, so the install screen runs on ttyS0 and from
+  a terminal. On OpenRC the sddm service's conf.d makes its start_post wait
+  for the greeter succeed, so an autologin boot leaves no failed service.
+- `recab stage` refuses an image of the other flavour unless `--change-flavour`.
+- `cargo xtask test desktop-boot <id>` boots it in 6 GiB (it is not in
+  `test all`: its ISO is a build of its own).
+
+The plan below is what the prototypes taught.
+
 ## Fitting it into the pipeline
 
-- **Product**: a `live-desktop` product per variant that extends `live-tools`.
+- **Product**: a `live-desktop` product per variant (it builds its own rootfs, the desktop system, rather than extending `live-tools`).
   Desktop packages go into `filesystem.erofs` (the installer copies only that),
   live-session policy (autologin, live user) into the overlay.
 - **Locks**: desktop packages declared beside `rpm_base`; `cargo xtask base lock

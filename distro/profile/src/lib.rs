@@ -83,6 +83,36 @@ fact! {
     KernelLine { Lts => "lts", Latest => "latest" }
 }
 
+fact! {
+    /// Which system an image is: the base system, or the base system with
+    /// the variant's desktop. Unlike the profile, it is a fact of the image,
+    /// not of the variant: a variant builds both.
+    Flavour { Base => "base", Desktop => "desktop" }
+}
+
+impl Desktop {
+    /// The display manager's session for this desktop: `<session>.desktop`
+    /// under `/usr/share/wayland-sessions` or `/usr/share/xsessions`.
+    pub fn session(self) -> &'static str {
+        match self {
+            Desktop::Plasma => "plasma",
+            Desktop::Lxqt => "lxqt",
+        }
+    }
+}
+
+impl Flavour {
+    /// The image's `REC_FLAVOUR` line of `/etc/os-release`, ending in a newline.
+    pub fn os_release_line(self) -> String {
+        format!("{REC_FLAVOUR}={}\n", self.as_str())
+    }
+
+    /// The flavour in `os_release` (the text of an `/etc/os-release`).
+    pub fn from_os_release(os_release: &str) -> Result<Self, ProfileError> {
+        os_release_fact(os_release, REC_FLAVOUR)
+    }
+}
+
 impl Libc {
     /// The `bun build --compile` target for the image.
     pub fn bun_target(self) -> &'static str {
@@ -140,6 +170,8 @@ pub const REC_LIBC: &str = "REC_LIBC";
 pub const REC_PRIVILEGE: &str = "REC_PRIVILEGE";
 pub const REC_DESKTOP: &str = "REC_DESKTOP";
 pub const REC_KERNEL_LINE: &str = "REC_KERNEL_LINE";
+/// The image's [`Flavour`]; written beside the profile's fields.
+pub const REC_FLAVOUR: &str = "REC_FLAVOUR";
 
 /// A variant's base facts.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]

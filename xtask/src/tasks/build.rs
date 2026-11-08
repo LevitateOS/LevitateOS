@@ -5,15 +5,20 @@ use std::path::PathBuf;
 
 use crate::cli::{BuildCmd, Distro, ProductBuild};
 use distro_builder::cli::Command;
+use distro_contract::profile::Flavour;
 use distro_contract::ProductId;
 
 pub fn run(what: BuildCmd) -> Result<()> {
     match what {
         BuildCmd::Product(ProductBuild { product, distros }) => product_isos(product, &distros.distros()?),
         BuildCmd::Kernel(args) => crate::tasks::kernels::build(args),
-        BuildCmd::RootfsSource { distro, refresh } => crate::util::distro_builder::run(
+        BuildCmd::RootfsSource { distro, desktop, refresh } => crate::util::distro_builder::run(
             &crate::util::repo::repo_root()?,
-            &Command::PreseedRootfsSource { distro: distro.id().to_string(), refresh },
+            &Command::PreseedRootfsSource {
+                distro: distro.id().to_string(),
+                flavour: if desktop { Flavour::Desktop } else { Flavour::Base },
+                refresh,
+            },
         ),
         BuildCmd::Erofs { product, distro } => erofs(product, &distro),
     }

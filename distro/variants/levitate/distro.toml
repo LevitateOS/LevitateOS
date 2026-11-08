@@ -220,11 +220,14 @@ packages = [
   "libndp",
 ]
 
-# What the live-desktop product adds (docs/desktop.md): KDE Plasma on Wayland
-# with SDDM. systemd-pam is required: without pam_systemd.so logind registers no
-# session and Wayland gets no seat.
+# The desktop system, the rootfs of the live-desktop product (docs/desktop.md):
+# the base packages plus these, KDE Plasma on Wayland with SDDM. systemd-pam is
+# required: without pam_systemd.so logind registers no session and Wayland gets
+# no seat. `cargo xtask base lock levitate` locks what they need beyond the base
+# lock; the preseed downloads that desktop lock.
 [desktop]
 display_manager = "sddm"
+preseed_recipe_script = "distro/builder/recipes/fedora-rpm-desktop-preseed.rhai"
 packages = [
   "plasma-desktop", "plasma-workspace", "kwin", "sddm", "sddm-breeze", "sddm-wayland-plasma",
   "xorg-x11-server-Xwayland", "konsole", "dolphin", "kwrite", "ark", "spectacle",
