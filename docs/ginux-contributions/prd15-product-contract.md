@@ -96,8 +96,14 @@ Do not count it as support until both new products run it successfully.
   `/home/vince/.codex/worktrees/prd15-owned-fd-path/ginux-prd11`, clean base
   `a498e4f6148d5d94ce4ba8edb79588b7883f6a0f`. Implement the bounded view there,
   using the public descriptor table and existing filesystem/image path owners;
-  do not edit the concurrently integrating original worktree. No correction is
-  implemented or verified yet at this checkpoint.
+  do not edit the concurrently integrating original worktree. FD-path correction
+  is now committed locally at `2477c0d4`, launcher SHA-256
+  `a4e0c6a4b08856bca1818be8a6acf5b3ba726d737cb3c8d0c33cf78de87097ee`.
+  Baseline fails the new ordinary controls; candidate passes image/owned names,
+  aliases, rename/unlink, fork/exec, bounded numeric names, truncation and explicit
+  denial. All existing FD controls and all 43 VFS units pass. Initial fixture
+  compiler/output-length mistakes remain recorded separately. Native policy and
+  catalog digests are unchanged; adversarial/final-source security is not closed.
 - **Mutable launcher incident:** Acorn live-tools and Levitate base-rootfs
   stopped at a later launch when catalog 2's digest changed from `121cb495…` to
   `ac6e693e…`. Those runs fail and remain preserved. The shared launcher path was
@@ -139,9 +145,29 @@ Do not count it as support until both new products run it successfully.
   This does not certify the new product, all apps, Ginux PTYs or a full
   UI-driven disk install. The diagnostic guest was closed normally.
 
-Exact next action: implement the approved self-FD readlink view in the isolated
-Ginux candidate, add focused ordinary owner/lifetime and consumer checks, rerun
-the actual Bun compilation, then finish and wire the Recipe-owned TUI producer.
+- **Next actual Bun requirement:** the FD-path correction gets beyond directory
+  resolution. Actual compilation then fails at event-loop initialization.
+  `bun-direct-fd-path.stderr` records syscall 291 (`epoll_create1`) and 290
+  (`eventfd2`) returning ENOSYS; the generic Bun message about FD exhaustion is
+  not an observed limit failure. The user explicitly **approved bounded
+  configured-only event counters and epoll readiness over already-owned public
+  descriptors**, preserving existing public resource limits, native policy and
+  host-FD/network denial, with final security verification still required.
+  This IPC support is not implemented yet. Other denied crash-report calls in
+  the log (ptrace/process-memory reads, etc.) are not granted by that approval.
+- **Recipe-owned acquisition commit:** builder `bb14537` contains the complete
+  standalone Bun toolchain producer. Its actual fresh install, installed check
+  and fresh-coordinator reuse all pass on frozen `0dd243fa…`; reuse verifies
+  published hashes and performs no acquisition. Compiler/runtime byte identities
+  are in `bun-public-payloads.json`. TUI compilation, dependency acquisition and
+  direct builder wiring remain unfinished.
+
+Exact next action: implement the approved bounded configured eventfd/epoll
+owners in the isolated Ginux candidate, with public descriptor ownership and
+existing resource limits intact. Reuse the current channel/readiness owners;
+preserve real flags, buffered input, alias/fork/close/exec lifetimes, finite waits,
+edge/one-shot behavior and explicit-denial ordering. Verify functional controls
+and rerun actual Bun compilation, then finish and wire the Recipe-owned TUI producer.
 Rebuild affected complete products and run both distros' required libvirt
 scenarios/actual PTY controls on that exact combination. Preserve existing red
 runs; obtain required final-source/security evidence before closure.
