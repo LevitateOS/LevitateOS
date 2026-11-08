@@ -373,10 +373,64 @@ packages under Bun's isolated linker layout. Native compilation of the same
 source/lock/layout succeeds (567 modules, `tui-native-compile-control.json`);
 that native output is diagnostic only and is never a product input. Pinned Bun
 `src/resolver/lib.rs` opens symlink targets using Linux O_PATH in this path;
-configured Ginux does not implement O_PATH. The user explicitly chose **use and
-verify a hoisted TUI layout**, rather than adding configured path descriptors.
-O_PATH stays unsupported; no such kernel expansion is authorized or implemented.
+configured Ginux did not implement O_PATH. The user initially chose **use and
+verify a hoisted TUI layout**. Subsequent evidence and authorization below
+supersede that initial O_PATH exclusion; the hoisted layout remains selected.
 The producer now explicitly passes `--linker=hoisted`; its full run is
 `tui-system-producer-gnu-hoisted`. No success is claimed before it completes.
 Workspace TypeScript configs are self-contained and already copied; the
 speculative extra root-config input was removed before executing the caller.
+
+### Authorized metadata path references and current producer checkpoint
+
+Fresh full hoisted installation also fails all eight workspace links; a native
+control succeeds with the same pinned source/lock. The smaller two-local-package
+offline fixture reproduces the difference, and a separate bounded diagnostic
+records O_PATH opens of the valid workspace directories (flags 2129920).
+Receipts: `tui-system-gnu-hoisted-fresh.json`, `hoisted-local-managed.json`,
+`hoisted-local-native-install.json`, and `hoisted-path-diagnostic.patch`.
+Diagnostic changes were removed before the delivery implementation.
+
+The user explicitly **authorized bounded configured O_PATH**: metadata references,
+with data I/O, mmap and execution denied, existing public FD/filesystem limits
+and native policy preserved. Local Ginux commit
+`3cd1e2de49cfc16c0d22804849a82a5d24cf22d8` implements that immutable descriptor kind
+through the existing descriptor/VFS owners. Only O_DIRECTORY, O_CLOEXEC,
+O_LARGEFILE and O_NOCTTY may accompany O_PATH; O_NOFOLLOW and other combinations
+remain unsupported. Relative metadata works; a metadata directory does not
+authorize relative data open, exec or mutation. FD-path reopen, fchdir, mutation,
+directory enumeration and status modification are denied. Dup/fork/exec lifetime,
+close-on-exec and existing lower resource limits are retained. No catalog or
+native-policy expansion is included. The source contract documents these limits.
+
+`opath-final-source.json` binds the clean revision to launcher SHA-256
+`fb87792d5b4363ca669d20935ce6f3d3f6d08fb97ee0cdc74e60bc324c200e6e`;
+the exact committed rebuild matches the initial candidate byte-for-byte.
+`opath-runtime-final.log` passes native common-subset, configured metadata,
+denial, lifetime/copy-fault and lower-budget controls. All affected FD/task/exec/
+script/poll/event/thread/network runners pass (`opath-affected-2.log`), as does
+strict Clippy (`opath-clippy.log`). The first fixture expected EBADF from a
+catalog-unsupported fchmodat; corrected to its actual earlier ENOSYS denial.
+The first affected runner omitted building an exec fixture; the completed
+second runner builds all fixtures. Both initial failures are preserved.
+
+The offline complete Recipe install now passes (`hoisted-local-opath-root.json`,
+two checkpoints). Its first launch lacked required coordinator privilege and
+correctly failed chroot (`hoisted-local-opath.json`); the retry elevates the
+whole coordinator/worker, with no launcher-only wrapper or host fallback.
+The full fresh GNU graph `tui-system-gnu-opath` completes 106-package frozen
+hoisted acquisition, 567-module compile, hash-checked publication and three
+acknowledged checkpoints. Ginux exits zero with no remaining tasks/handles;
+the coordinator is still completing durable filesystem writes at this
+checkpoint, so final successful invocation acceptance waits for its receipt.
+`tui-system-musl-opath` is running the separate fresh musl graph on the same
+launcher/Recipe/image. No native cache or native compiled output is an input.
+
+Exact next action: inspect both producer results (sessions 57151 and 11153),
+verify successful install/readiness/reuse and the real builder source-preparation
+caller for both libc targets, then complete both product chains and required
+session-libvirt/PTY/install/A/B scenarios. Final Daybreak verification of these
+new boundaries and the final combined source remains required. The Recipe caller
+migration is still uncommitted until runtime acceptance. No publication occurred;
+PRD15 and PRD19 acceptance remain open. Shared staged queue/handoff changes retain
+SHA-256 `f4d8c81be2612a4d8d472564b25c7ffab6e7043e06b0f2b2176cba78dad5a47e`.
