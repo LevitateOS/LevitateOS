@@ -1,6 +1,6 @@
 # PRD04 — storage and descriptor findings (in progress)
 
-**PRD04 remains open after a failed authorized Daybreak item 5.** Returned
+**PRD04 remains open pending the export commit-point contract decision.** Returned
 results are reconciled below; this chat has not executed the security probes.
 The [pinned request](prd04-daybreak-request.md) supplies the exact candidate,
 comparison source, all recorded failure criteria and required receipts. No
@@ -16,9 +16,20 @@ a final backing-close error returns structured supervisor-error but leaves a
 complete 2,560-byte export at its requested final path. Export runs before
 backing teardown discovers that error. The user requested a separate correction
 without changing this pinned candidate, then a new revision/binary hash and
-focused authorized Daybreak retest. No correction or retest has occurred yet;
-PRD04 remains open. The latest user task is PRD06 reconciliation, which must
-retain this defect explicitly rather than hiding it behind these selected passes.
+focused authorized Daybreak retest. That separate correction is now verified:
+`2e88c9ad89c487d3fc7c29ba35efba3911587737`, binary SHA-256
+`576ee03c8d3a7db19a057306d8223841bc536cbd51b91087fe1e7c2e57f616ed`.
+The [follow-up and exact focused receipts](prd04-export-followup.md) establish
+absence of the final archive on backing-close failure, with the frozen source
+still reproducing F-01. Workload-time close, checkpoint refusal, ordinary and
+affected publication controls also pass. All 313 evidence files verify.
+
+Post-publication inode/parent reference-close failures still leave the complete
+archive while reporting supervisor-error. This existing behavior needs an
+explicit commit-point disposition; the question is pending with the user.
+The original backing-close symptom is corrected, but this record does not
+silently treat every failed export as acceptable or close PRD04. PRD07 remains
+active for local extraction/integration, without upstream publication.
 
 ## Exact source and local corrections
 
@@ -100,11 +111,12 @@ In `.artifacts/prd04/` under the candidate worktree:
 No high-bit/private-FD probe, assignment-prefix security runner, inherited-pressure
 probe or close-error injection was executed in this chat. The user selected
 Daybreak rather than authorizing a verifier here. No required product decision
-is currently missing. Returned verification found F-01; its separate correction
-and focused authorized retest are outstanding. The queue stays unchecked.
+was missing for the original six-item verification. F-01's separate correction
+and focused authorized retest now pass, while the late reference-close
+publication contract is a pending user decision. The queue stays unchecked.
 
 Active skill: `hdae-development` at `.agents/skills/hdae-development/SKILL.md`.
 Reload the complete skill, required reference, applicable instructions and current
-queue after a context shift. Exact next action: correct final export publication
-in a separate revision, preserve frozen `5449e2a1`, provide source/binary hashes
-and request focused authorized Daybreak item-5/affected-export retest before closure.
+queue after a context shift. Exact next action: resolve the late reference-close
+commit-point decision before claiming PRD04/export acceptance; preserve both
+frozen `5449e2a1` and separately verified `2e88c9ad` and their exact receipts.

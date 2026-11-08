@@ -1,0 +1,548 @@
+diff --git a/config/instance-configured.toml b/config/instance-configured.toml
+new file mode 100644
+index 00000000..265eaa09
+--- /dev/null
++++ b/config/instance-configured.toml
+@@ -0,0 +1,37 @@
++schema_version = 1
++
++[instance]
++id = "gate5-demo"
++root = "docker.io/rockylinux/rockylinux@sha256:e372170ca8630f0f03e9b70fdd0bf4a3ce3426b0de7cdba615f06337389de176"
++init = "/bin/bash"
++args = []
++environment = ["container=ginux"]
++
++[resources]
++# Resource metadata; enforcement depends on the execution backend.
++# Maximum eligible logical CPUs within the operator affinity mask.
++vcpus = 1
++# Per-process virtual address-space bound, not aggregate RSS.
++memory_mib = 256
++
++[execution]
++profile = "balanced"
++backend = "ptrace-native"
++
++[contract]
++profile = "configured-balanced-v2"
++
++[storage]
++assignments = []
++
++[devices]
++assignments = []
++
++[network]
++backend = "none"
++
++[audit]
++mode = "stderr"
++
++[failure]
++policy = "stop"
+diff --git a/crates/ginux-contract/src/lib.rs b/crates/ginux-contract/src/lib.rs
+index 6cea1127..a82cd1e4 100644
+--- a/crates/ginux-contract/src/lib.rs
++++ b/crates/ginux-contract/src/lib.rs
+@@ -166,6 +166,91 @@ macro_rules! operation {
+     };
+ }
+ 
++/// Explicit configured-launch catalog additions; catalog 1 stays unchanged.
++pub const CONFIGURED_CATALOG_VERSION: u32 = 2;
++pub static CONFIGURED_OPERATIONS: &[Operation] = &[
++    syscall!(
++        "lstat",
++        6,
++        Partial,
++        Action::Mediate,
++        "instance path",
++        "test-launch-directories"
++    ),
++    syscall!(
++        "readv",
++        19,
++        Partial,
++        Action::Mediate,
++        "bounded instance vectors",
++        "test-launch-pipes"
++    ),
++    syscall!(
++        "pipe",
++        22,
++        Partial,
++        Action::Mediate,
++        "owned bounded pipe",
++        "test-launch-pipes"
++    ),
++    syscall!(
++        "nanosleep",
++        35,
++        Partial,
++        Action::Mediate,
++        "bounded configured monotonic wait",
++        "test-launch"
++    ),
++    syscall!(
++        "link",
++        86,
++        Partial,
++        Action::Mediate,
++        "owned shared inode",
++        "test-launch-directories"
++    ),
++    syscall!(
++        "sched_getaffinity",
++        204,
++        Partial,
++        Action::Mediate,
++        "virtual task and operator CPU mask",
++        "test-launch-tasks"
++    ),
++    syscall!(
++        "clock_getres",
++        229,
++        Partial,
++        Action::Mediate,
++        "supported global clocks only",
++        "test-launch"
++    ),
++    syscall!(
++        "faccessat",
++        269,
++        Partial,
++        Action::Mediate,
++        "instance path and access mode",
++        "test-launch-storage"
++    ),
++    syscall!(
++        "renameat2",
++        316,
++        Partial,
++        Action::Mediate,
++        "owned paths and validated flags",
++        "test-launch-directories"
++    ),
++    syscall!(
++        "execveat",
++        322,
++        Partial,
++        Action::Mediate,
++        "owned or image executable",
++        "test-launch-exec"
++    ),
++];
++
+ pub static CATALOG: &[Operation] = &[
+     syscall!(
+         "read",
+@@ -1654,6 +1739,7 @@ pub enum ContractError {
+     TooManyOperations,
+     DuplicateOperation,
+     UnsupportedPromotion,
++    UnknownCatalog,
+ }
+ 
+ impl fmt::Display for ContractError {
+@@ -1666,6 +1752,7 @@ impl fmt::Display for ContractError {
+             Self::TooManyOperations => "contract-operation-capacity",
+             Self::DuplicateOperation => "duplicate-catalog-operation",
+             Self::UnsupportedPromotion => "unsupported-contract-promotion",
++            Self::UnknownCatalog => "unsupported-contract-catalog",
+         })
+     }
+ }
+@@ -1768,6 +1855,7 @@ const EMPTY_RULE: EffectiveRule = EffectiveRule {
+ 
+ #[derive(Clone, Copy)]
+ pub struct EffectiveContract {
++    catalog_version: u32,
+     rules: [EffectiveRule; MAX_OPERATIONS],
+     len: usize,
+     digest: [u8; DIGEST_HEX_BYTES],
+@@ -1776,12 +1864,17 @@ pub struct EffectiveContract {
+ impl EffectiveContract {
+     pub const fn empty() -> Self {
+         Self {
++            catalog_version: CATALOG_VERSION,
+             rules: [EMPTY_RULE; MAX_OPERATIONS],
+             len: 0,
+             digest: [0; DIGEST_HEX_BYTES],
+         }
+     }
+ 
++    pub const fn catalog_version(&self) -> u32 {
++        self.catalog_version
++    }
++
+     pub fn rules(&self) -> &[EffectiveRule] {
+         &self.rules[..self.len]
+     }
+@@ -1807,15 +1900,30 @@ impl EffectiveContract {
+     }
+ }
+ 
++fn catalog_operations(version: u32) -> impl Iterator<Item = &'static Operation> {
++    CATALOG.iter().chain(
++        if version == CONFIGURED_CATALOG_VERSION {
++            CONFIGURED_OPERATIONS
++        } else {
++            &[]
++        }
++        .iter(),
++    )
++}
++
+ pub fn validate_catalog() -> Result<(), ContractError> {
+-    if CATALOG.len() > MAX_OPERATIONS {
++    if CATALOG.len() + CONFIGURED_OPERATIONS.len() > MAX_OPERATIONS {
+         return Err(ContractError::TooManyOperations);
+     }
+-    for (index, operation) in CATALOG.iter().enumerate() {
+-        if CATALOG[..index].iter().any(|existing| {
+-            existing.id == operation.id
+-                || (operation.abi_number.is_some() && existing.abi_number == operation.abi_number)
+-        }) {
++    for (index, operation) in catalog_operations(CONFIGURED_CATALOG_VERSION).enumerate() {
++        if catalog_operations(CONFIGURED_CATALOG_VERSION)
++            .take(index)
++            .any(|existing| {
++                existing.id == operation.id
++                    || (operation.abi_number.is_some()
++                        && existing.abi_number == operation.abi_number)
++            })
++        {
+             return Err(ContractError::DuplicateOperation);
+         }
+     }
+@@ -1829,8 +1937,14 @@ pub fn resolve(
+     deny: &[&[u8]],
+ ) -> Result<EffectiveContract, ContractError> {
+     validate_catalog()?;
++    let catalog = if profile == b"configured-balanced-v2" {
++        CONFIGURED_CATALOG_VERSION
++    } else {
++        CATALOG_VERSION
++    };
+     let mut effective = EffectiveContract::empty();
+-    for operation in CATALOG {
++    effective.catalog_version = catalog;
++    for operation in catalog_operations(catalog) {
+         effective.rules[effective.len] = EffectiveRule {
+             operation,
+             action: Action::Deny(38),
+@@ -1867,9 +1981,20 @@ pub fn resolve(
+ }
+ 
+ pub fn resolve_recipe(recipe: Recipe<'_>) -> Result<EffectiveContract, ContractError> {
++    resolve_recipe_catalog(CATALOG_VERSION, recipe)
++}
++
++pub fn resolve_recipe_catalog(
++    catalog: u32,
++    recipe: Recipe<'_>,
++) -> Result<EffectiveContract, ContractError> {
++    if !matches!(catalog, CATALOG_VERSION | CONFIGURED_CATALOG_VERSION) {
++        return Err(ContractError::UnknownCatalog);
++    }
+     validate_catalog()?;
+     let mut effective = EffectiveContract::empty();
+-    for operation in CATALOG {
++    effective.catalog_version = catalog;
++    for operation in catalog_operations(catalog) {
+         effective.rules[effective.len] = EffectiveRule {
+             operation,
+             action: Action::Deny(38),
+@@ -2153,9 +2278,11 @@ fn apply_profile(effective: &mut EffectiveContract, profile: &[u8]) -> Result<()
+                 )?;
+             }
+         }
+-        b"gate5-balanced-v1" | b"gate9-systemd-v1" => {
++        b"gate5-balanced-v1" | b"gate9-systemd-v1" | b"configured-balanced-v2" => {
+             let source = if profile == b"gate5-balanced-v1" {
+                 "gate5-balanced-v1"
++            } else if profile == b"configured-balanced-v2" {
++                "configured-balanced-v2"
+             } else {
+                 "gate9-systemd-v1"
+             };
+@@ -2262,7 +2389,7 @@ fn contract_digest(contract: &EffectiveContract) -> [u8; DIGEST_HEX_BYTES] {
+     // FNV-1a is used only as a stable identity, not as a trust primitive. The
+     // catalog and normalized configuration remain the authoritative inputs.
+     let mut hash = 0xcbf29ce484222325u64;
+-    hash = hash_bytes(hash, &CATALOG_VERSION.to_le_bytes());
++    hash = hash_bytes(hash, &contract.catalog_version.to_le_bytes());
+     for rule in contract.rules() {
+         hash = hash_bytes(hash, rule.operation.id.as_bytes());
+         hash = hash_bytes(hash, rule.action.name().as_bytes());
+@@ -2299,6 +2426,84 @@ const fn hash_bytes(mut hash: u64, bytes: &[u8]) -> u64 {
+ mod tests {
+     use super::*;
+ 
++    #[test]
++    fn configured_catalog_requires_an_explicit_opt_in() {
++        let original = resolve(b"gate5-balanced-v1", &[], &[], &[]).unwrap();
++        let configured = resolve(b"configured-balanced-v2", &[], &[], &[]).unwrap();
++        assert_eq!(original.catalog_version(), 1);
++        assert_eq!(configured.catalog_version(), 2);
++        assert_ne!(original.digest(), configured.digest());
++        for operation in CONFIGURED_OPERATIONS {
++            let number = operation.abi_number.unwrap();
++            assert!(original.syscall_rule(number).is_none());
++            assert_eq!(configured.syscall_action(number), Action::Mediate);
++            assert_eq!(
++                ginux_core::decide_systemd(number, true).action,
++                ginux_core::Action::Deny(38)
++            );
++        }
++        for (old, new) in original.rules().iter().zip(configured.rules()) {
++            assert_eq!(old.operation.id, new.operation.id);
++            assert_eq!(old.action, new.action);
++        }
++        assert_eq!(
++            resolve(b"gate5-balanced-v1", &[], &[b"syscall.nanosleep"], &[]).err(),
++            Some(ContractError::UnmatchedSelector)
++        );
++    }
++
++    #[test]
++    fn configured_recipe_catalog_keeps_wildcards_bounded_and_denials_last() {
++        let all = &[b"**".as_slice()];
++        let recipe = Recipe {
++            read: all,
++            write: all,
++            execute: all,
++            connect: all,
++            listen: all,
++            process: all,
++            system: all,
++            deny: &[],
++            exact_allow: &[],
++            exact_deny: &[],
++        };
++        let original = resolve_recipe(recipe).unwrap();
++        let configured = resolve_recipe_catalog(2, recipe).unwrap();
++        for operation in CONFIGURED_OPERATIONS {
++            assert!(original.operation_rule(operation.id).is_none());
++            assert_eq!(
++                configured.operation_rule(operation.id).unwrap().action,
++                Action::Mediate
++            );
++        }
++        let denied = resolve_recipe_catalog(
++            2,
++            Recipe {
++                deny: &[b"syscall.readv"],
++                exact_allow: &[b"syscall.readv", b"syscall.nanosleep"],
++                exact_deny: &[b"syscall.nanosleep"],
++                ..recipe
++            },
++        )
++        .unwrap();
++        assert_eq!(denied.syscall_action(19), Action::Deny(1));
++        assert_eq!(
++            denied.syscall_rule(19).unwrap().provenance,
++            Provenance::RecipeDeny
++        );
++        assert_eq!(denied.syscall_action(35), Action::Deny(1));
++        assert_eq!(
++            denied.syscall_rule(35).unwrap().provenance,
++            Provenance::ExactDeny
++        );
++        for catalog in [0, 3, u32::MAX] {
++            assert_eq!(
++                resolve_recipe_catalog(catalog, recipe).err(),
++                Some(ContractError::UnknownCatalog)
++            );
++        }
++    }
++
+     #[test]
+     fn catalog_is_unique_and_bounded() {
+         validate_catalog().unwrap();
+diff --git a/crates/ginux-init/src/main.rs b/crates/ginux-init/src/main.rs
+index 2c98d488..d6f2b55c 100644
+--- a/crates/ginux-init/src/main.rs
++++ b/crates/ginux-init/src/main.rs
+@@ -7840,7 +7840,9 @@ fn instance_validate_main(config_path: *const u8) -> ! {
+         .unwrap_or_else(|error| config_rejected(error));
+     write_all(b"Contract valid: instance=");
+     write_all(config.id.as_bytes());
+-    write_all(b" catalog=1 digest=");
++    write_all(b" catalog=");
++    write_u64(contract.catalog_version() as u64);
++    write_all(b" digest=");
+     write_all(contract.digest());
+     write_all(b" operations=");
+     write_u64(contract.rules().len() as u64);
+@@ -7859,7 +7861,7 @@ fn instance_explain_main(config_path: *const u8, operation: *const u8) -> ! {
+         .iter()
+         .find(|rule| rule.operation.id.as_bytes() == operation)
+     else {
+-        line(b"Contract operation is not present in catalog version 1.");
++        line(b"Contract operation is not present in the selected catalog.");
+         exit_process(2)
+     };
+     write_all(b"Operation: ");
+@@ -7889,15 +7891,30 @@ fn instance_diff_main(left_path: *const u8, right_path: *const u8) -> ! {
+         .effective_contract()
+         .unwrap_or_else(|error| config_rejected(error));
+     let mut changes = 0u64;
+-    for (left_rule, right_rule) in left.rules().iter().zip(right.rules()) {
+-        if left_rule.action != right_rule.action {
++    for left_rule in left.rules() {
++        match right.operation_rule(left_rule.operation.id) {
++            Some(right_rule) if left_rule.action == right_rule.action => {}
++            Some(right_rule) => {
++                changes += 1;
++                write_all(b"Changed: ");
++                write_all(left_rule.operation.id.as_bytes());
++                write_all(b" ");
++                write_all(left_rule.action.name().as_bytes());
++                write_all(b" -> ");
++                line(right_rule.action.name().as_bytes());
++            }
++            None => {
++                changes += 1;
++                write_all(b"Removed: ");
++                line(left_rule.operation.id.as_bytes());
++            }
++        }
++    }
++    for rule in right.rules() {
++        if left.operation_rule(rule.operation.id).is_none() {
+             changes += 1;
+-            write_all(b"Changed: ");
+-            write_all(left_rule.operation.id.as_bytes());
+-            write_all(b" ");
+-            write_all(left_rule.action.name().as_bytes());
+-            write_all(b" -> ");
+-            line(right_rule.action.name().as_bytes());
++            write_all(b"Added: ");
++            line(rule.operation.id.as_bytes());
+         }
+     }
+     write_all(b"Contract differences: ");
+@@ -7923,7 +7940,9 @@ fn instance_inspect_main(config_path: *const u8) -> ! {
+     }
+     write_all(b"Contract: instance=");
+     write_all(config.id.as_bytes());
+-    write_all(b" catalog=1 digest=");
++    write_all(b" catalog=");
++    write_u64(contract.catalog_version() as u64);
++    write_all(b" digest=");
+     write_all(contract.digest());
+     write_all(b"\nDecisions: emulate=");
+     write_u64(emulate);
+diff --git a/crates/ginux-instance/src/lib.rs b/crates/ginux-instance/src/lib.rs
+index efb836bb..96ca5049 100644
+--- a/crates/ginux-instance/src/lib.rs
++++ b/crates/ginux-instance/src/lib.rs
+@@ -664,7 +664,7 @@ impl InstanceConfig {
+                 return Err(ConfigError::InvalidContract);
+             }
+         } else if self.contract_recipe_version != 1
+-            || self.contract_catalog_version != ginux_contract::CATALOG_VERSION as u64
++            || !matches!(self.contract_catalog_version, 1 | 2)
+             || !self.contract_profile.is_empty()
+             || !self.contract_templates.as_slice().is_empty()
+             || !self.contract_allow.as_slice().is_empty()
+@@ -822,18 +822,21 @@ impl InstanceConfig {
+             let (deny, deny_len) = text_list_refs(&self.contract_recipe_deny);
+             let (exact_allow, exact_allow_len) = text_list_refs(&self.contract_exact_allow);
+             let (exact_deny, exact_deny_len) = text_list_refs(&self.contract_exact_deny);
+-            return ginux_contract::resolve_recipe(ginux_contract::Recipe {
+-                read: &read[..read_len],
+-                write: &write[..write_len],
+-                execute: &execute[..execute_len],
+-                connect: &connect[..connect_len],
+-                listen: &listen[..listen_len],
+-                process: &process[..process_len],
+-                system: &system[..system_len],
+-                deny: &deny[..deny_len],
+-                exact_allow: &exact_allow[..exact_allow_len],
+-                exact_deny: &exact_deny[..exact_deny_len],
+-            })
++            return ginux_contract::resolve_recipe_catalog(
++                self.contract_catalog_version as u32,
++                ginux_contract::Recipe {
++                    read: &read[..read_len],
++                    write: &write[..write_len],
++                    execute: &execute[..execute_len],
++                    connect: &connect[..connect_len],
++                    listen: &listen[..listen_len],
++                    process: &process[..process_len],
++                    system: &system[..system_len],
++                    deny: &deny[..deny_len],
++                    exact_allow: &exact_allow[..exact_allow_len],
++                    exact_deny: &exact_deny[..exact_deny_len],
++                },
++            )
+             .map_err(|_| ConfigError::InvalidContract);
+         }
+         let mut templates = [&[][..]; ASSIGNMENT_ITEMS];
+@@ -2008,6 +2011,37 @@ policy = "stop"
+         );
+     }
+ 
++    #[test]
++    fn configured_recipe_catalog_round_trips_and_rejects_unknown_versions() {
++        let recipe = VALID.replace(
++            "[contract]\nprofile = \"minimal-v1\"",
++            "[userspace.contract]\nversion = 1\ncatalog = 2\ndefault = \"deny\"\nexact_allow = [\"syscall.nanosleep\"]",
++        );
++        let config = InstanceConfig::parse(recipe.as_bytes()).unwrap();
++        assert_eq!(config.contract_catalog_version, 2);
++        assert_eq!(
++            config.effective_contract().unwrap().syscall_action(35),
++            ginux_contract::Action::Mediate
++        );
++        let normalized = config.normalized().unwrap();
++        assert_eq!(
++            InstanceConfig::parse(normalized.as_bytes()).unwrap(),
++            config
++        );
++        for version in [0, 3, 4_294_967_298u64, u64::MAX] {
++            let invalid = recipe.replace("catalog = 2", &std::format!("catalog = {version}"));
++            assert_eq!(
++                InstanceConfig::parse(invalid.as_bytes()),
++                Err(ConfigError::InvalidContract)
++            );
++        }
++        let old = recipe.replace("catalog = 2", "catalog = 1");
++        assert_eq!(
++            InstanceConfig::parse(old.as_bytes()),
++            Err(ConfigError::InvalidContract)
++        );
++    }
++
+     #[test]
+     fn contract_inputs_fail_closed_and_digest_tracks_policy() {
+         let base = InstanceConfig::parse(VALID.as_bytes()).unwrap();
+diff --git a/docs/configurable-contract.md b/docs/configurable-contract.md
+index ad5ec2d7..9bd4d2c2 100644
+--- a/docs/configurable-contract.md
++++ b/docs/configurable-contract.md
+@@ -60,6 +60,21 @@ The derived digest includes every final action and its provenance. Catalog
+ version changes require explicit revalidation, so a saved recipe cannot
+ silently acquire a newly cataloged operation.
+ 
++Catalog 1 remains the default and keeps its existing operation set. Explicit
++`catalog = 2` selects the configured-operation extension: `lstat`, `readv`,
++`pipe`, `nanosleep`, `link`, `sched_getaffinity`, `clock_getres`, `faccessat`,
++`renameat2` and `execveat`. The legacy `configured-balanced-v2` profile selects
++the same catalog. Catalog 1 wildcards never acquire these operations; unknown
++catalog versions fail validation. The selected version participates in the
++digest, and instance inspection and diff report the selected operation set.
++
++Catalog selection compiles authority, not an implementation of these calls.
++The execution backend still determines which operations it supports and must
++apply its own argument and resource checks. This extension does not implement
++configured storage, clocks, networking or process supervision, and does not
++expand native policy. Its fixture names identify the intended owning features;
++those runtime contributions remain separate from catalog versioning.
++
+ Gate 10 `[contract]` profiles and templates remain accepted internally for
+ migration and regression comparison, but they cannot be mixed with
+ `[userspace.contract]`. New saved examples use the self-contained form. Copy a

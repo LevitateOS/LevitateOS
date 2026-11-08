@@ -1,6 +1,8 @@
 # PRD07 first proposed publication: bounded TCP library
 
-**Unpublished; permission required.** Intended fork branch:
+**Unpublished; user decision: keep this wave local. No publication authorized.**
+Retain this reviewed proposal for future direction; do not re-request the same
+unchanged publication. Intended fork branch if later authorized:
 `LevitateOS/ginux:contrib/bounded-tcp-backend`; target `gmkurtzer/ginux:main`.
 Open one ordinary PR after pushing the exact two commits ending at
 `59f855ae7dbd60bacb93ef865928701b04305df9`. No upstream comment or change to an

@@ -8,7 +8,7 @@ candidate results; actual merges and final-source acceptance remain required.
 
 | Candidate | Exact source / complete diff | Dependencies and disposition |
 | --- | --- | --- |
-| Bounded supervisor TCP library | `59f855ae7dbd60bacb93ef865928701b04305df9`, tree `05eed3bf673c89bc8c50b42af4f76d7fdc7362a5`; [816-line addition across three files](patches/PRD07-tcp.patch) | Directly on current main. Two commits: `2aa33b2e` feature extraction from retained G28 `0a3cf5f5`, then `59f855ae` review corrections. No storage, task, configured catalog or native-policy dependency. Ready to request permission for one PR; unpublished. |
+| Bounded supervisor TCP library | `59f855ae7dbd60bacb93ef865928701b04305df9`, tree `05eed3bf673c89bc8c50b42af4f76d7fdc7362a5`; [816-line addition across three files](patches/PRD07-tcp.patch) | Directly on current main. Two commits: `2aa33b2e` feature extraction from retained G28 `0a3cf5f5`, then `59f855ae` review corrections. No storage, task, configured catalog or native-policy dependency. User directed this wave to remain local; no publication. |
 | Truncation write gaps / empty writes | `a6dd2f9abc95f36f255808fa8353b0c96f00ade6`; [one-file +43/-1 diff](patches/PRD07-zero.patch) | Directly on main; retained `7a7e8b5c` adapted to the current descriptor shape. Conflicts textually with #232's write-path change. Hold publication until actual #232 merge, then adapt to shared offsets and revalidate. This is not a missing runtime dependency of the present standalone candidate. |
 
 Both worktrees are clean under `/home/vince/levitate-development/`:

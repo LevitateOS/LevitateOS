@@ -1,0 +1,124 @@
+diff --git a/crates/ginux-init/src/fs_hooks.rs b/crates/ginux-init/src/fs_hooks.rs
+index 1d0a0ce7..0461a604 100644
+--- a/crates/ginux-init/src/fs_hooks.rs
++++ b/crates/ginux-init/src/fs_hooks.rs
+@@ -450,8 +450,10 @@ impl LaunchFs {
+         Ok(())
+     }
+ 
+-    pub fn export(&self) -> Result<(), &'static [u8]> {
+-        crate::storage_export::finish(|archive| self.write_archive(archive))
++    pub fn stage_export(
++        &self,
++    ) -> Result<Option<crate::storage_export::PendingExport>, &'static [u8]> {
++        crate::storage_export::stage(|archive| self.write_archive(archive))
+     }
+ 
+     pub fn snapshot(&self, path: *const u8) -> Result<(), &'static [u8]> {
+diff --git a/crates/ginux-init/src/launch_tasks.rs b/crates/ginux-init/src/launch_tasks.rs
+index 0480cc22..5b0c6f6a 100644
+--- a/crates/ginux-init/src/launch_tasks.rs
++++ b/crates/ginux-init/src/launch_tasks.rs
+@@ -2543,16 +2543,31 @@ impl Supervisor<'_> {
+         let settled = control_closed
+             .and(event_closed)
+             .and(self.objects.filesystem.cleanup_error().map_or(Ok(()), Err));
+-        let exported = settled.and_then(|_| {
++        let staged = settled.and_then(|_| {
+             if export {
+-                self.objects.filesystem.export()
++                self.objects.filesystem.stage_export()
+             } else {
+-                crate::storage_export::cancel()
++                crate::storage_export::cancel().map(|_| None)
+             }
+         });
+         let released = self.objects.filesystem.teardown();
++        // Capture needs live backing bytes; publication must wait until their
++        // final release has succeeded. A backing release failure must leave no
++        // final archive name.
++        let exported = match (staged, released) {
++            (Ok(Some(archive)), Ok(())) => archive.publish(),
++            (Ok(Some(archive)), Err(reason)) => {
++                let _ = archive.cancel();
++                Err(reason)
++            }
++            (Ok(None), result) => result,
++            (Err(reason), _) => {
++                let _ = crate::storage_export::cancel();
++                Err(reason)
++            }
++        };
+         line_stderr(b"ginux: teardown tasks=0 owned-handles=0");
+-        if let Err(reason) = exported.and(released) {
++        if let Err(reason) = exported {
+             supervision_error(instance, reason);
+         }
+     }
+diff --git a/crates/ginux-init/src/storage_export.rs b/crates/ginux-init/src/storage_export.rs
+index dcc6b484..90e1ff28 100644
+--- a/crates/ginux-init/src/storage_export.rs
++++ b/crates/ginux-init/src/storage_export.rs
+@@ -235,24 +235,46 @@ pub fn cancel() -> Result<(), Error> {
+     Ok(())
+ }
+ 
+-pub fn finish(write: impl FnOnce(&mut Archive) -> Result<(), Error>) -> Result<(), Error> {
++/// A synced archive whose writer has closed, but which has no published name.
++/// Its caller must publish or cancel it after settling owned storage cleanup.
++#[must_use = "publish or cancel the staged archive"]
++pub struct PendingExport(Export);
++
++impl PendingExport {
++    pub fn cancel(self) -> Result<(), Error> {
++        let inode_closed = close(self.0.inode_fd);
++        let parent_closed = close(self.0.parent_fd);
++        if inode_closed != 0 || parent_closed != 0 {
++            return Err(b"export-file reference close failed");
++        }
++        Ok(())
++    }
++
++    pub fn publish(self) -> Result<(), Error> {
++        publish(self.0)
++    }
++}
++
++pub fn stage(
++    write: impl FnOnce(&mut Archive) -> Result<(), Error>,
++) -> Result<Option<PendingExport>, Error> {
+     let Some(state) = take() else {
+-        return Ok(());
++        return Ok(None);
+     };
+-    complete(state, write)
++    complete(state, write).map(Some)
+ }
+ 
+ pub fn capture(
+     path: *const u8,
+     write: impl FnOnce(&mut Archive) -> Result<(), Error>,
+ ) -> Result<(), Error> {
+-    complete(create(path)?, write)
++    complete(create(path)?, write)?.publish()
+ }
+ 
+ fn complete(
+     state: Export,
+     write: impl FnOnce(&mut Archive) -> Result<(), Error>,
+-) -> Result<(), Error> {
++) -> Result<PendingExport, Error> {
+     let mut archive = Archive(state.fd);
+     let result = write(&mut archive)
+         .and_then(|_| archive.bytes(&[0; 1024]))
+@@ -274,6 +296,10 @@ fn complete(
+         close(state.parent_fd);
+         return Err(b"export-file close failed");
+     }
++    Ok(PendingExport(state))
++}
++
++fn publish(state: Export) -> Result<(), Error> {
+     if !parent_is_current(&state) {
+         close(state.inode_fd);
+         close(state.parent_fd);
