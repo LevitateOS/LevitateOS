@@ -1,7 +1,9 @@
-# PRD04 — storage and descriptor findings (in progress)
+# PRD04 — recorded storage/descriptor failures resolved within scope
 
-**PRD04 remains open pending the export commit-point contract decision.** Returned
-results are reconciled below; this chat has not executed the security probes.
+**The recorded PRD04 failures have source-bound closure.** The returned Daybreak
+results and the 2026-11-08 user decision establish the supported export boundary.
+Final joined-source security acceptance remains PRD09, not a claim made here.
+This chat has not executed the security probes.
 The [pinned request](prd04-daybreak-request.md) supplies the exact candidate,
 comparison source, all recorded failure criteria and required receipts. No
 publication or runtime/gitlink replacement is authorized by this preparation.
@@ -24,12 +26,16 @@ absence of the final archive on backing-close failure, with the frozen source
 still reproducing F-01. Workload-time close, checkpoint refusal, ordinary and
 affected publication controls also pass. All 313 evidence files verify.
 
-Post-publication inode/parent reference-close failures still leave the complete
-archive while reporting supervisor-error. This existing behavior needs an
-explicit commit-point disposition; the question is pending with the user.
-The original backing-close symptom is corrected, but this record does not
-silently treat every failed export as acceptable or close PRD04. PRD07 remains
-active for local extraction/integration, without upstream publication.
+The user now explicitly chose **link publication as commit point; reject
+non-success**. Post-publication inode/parent reference-close failures may leave
+the complete archive but must report supervisor-error, and consumers must reject
+it as a successful invocation. Pre-publication backing-close failure still must
+leave no archive. Existing reporting/cancellation decisions remain intact. This
+closes the last PRD04 contract question without unsafe pathname rollback or a
+limit increase. Items 1–4/selected 6 remain exact-source passes on `5449e2a1`;
+item 5 is corrected and independently verified on `2e88c9ad`. The original red
+artifact stays preserved. Broader unrun schedules and the new composition remain
+open in [PRD09](prd09-security-acceptance.md); PRD07 delivery is not closed.
 
 ## Exact source and local corrections
 
@@ -65,7 +71,7 @@ identity. Internal backend tags and private native FDs must remain inaccessible
 through that table. Tightening the API to reject all high-bit aliases would
 change this ABI rather than repair the recorded observation.
 
-A genuine independent gap exists in the current source: `read` and `readv` on
+A genuine independent gap existed in base `5300f5ef`: `read` and `readv` on
 non-console/non-TCP public FDs had no filesystem-read semantic classification,
 so the syscall grant could survive a filesystem-read denial. This is fixed in
 source. The new `policy-read` fixture obtains an owned read/write descriptor
@@ -82,7 +88,12 @@ supports retiring the owner once, recording failure and stopping the instance.
 A strace injection that skips close is a useful completion-path test, not proof
 that a real Linux late-close error leaves that same FD live.
 
-## Recorded failures and required closure
+## Recorded failures and returned closure criteria
+
+The required-results column records the original request. Returned items 1–4
+and selected 6 satisfy those scoped checks on `5449e2a1`; focused item 5 passes
+on `2e88c9ad` under the now-approved commit-point contract. It does not assert
+all PRD09 schedules or acceptance on a future typed-storage/source join.
 
 | Record | Current disposition | Required fresh result |
 | --- | --- | --- |
@@ -111,12 +122,12 @@ In `.artifacts/prd04/` under the candidate worktree:
 No high-bit/private-FD probe, assignment-prefix security runner, inherited-pressure
 probe or close-error injection was executed in this chat. The user selected
 Daybreak rather than authorizing a verifier here. No required product decision
-was missing for the original six-item verification. F-01's separate correction
-and focused authorized retest now pass, while the late reference-close
-publication contract is a pending user decision. The queue stays unchecked.
+was missing for the original six-item verification. F-01's separate correction and focused authorized retest pass. The user has
+resolved late reference-close publication semantics as above; there is no pending
+PRD04 decision. PRD09 final-source acceptance remains unchecked.
 
 Active skill: `hdae-development` at `.agents/skills/hdae-development/SKILL.md`.
 Reload the complete skill, required reference, applicable instructions and current
-queue after a context shift. Exact next action: resolve the late reference-close
-commit-point decision before claiming PRD04/export acceptance; preserve both
-frozen `5449e2a1` and separately verified `2e88c9ad` and their exact receipts.
+queue after a context shift. Exact next action: carry these corrections, exact receipts and the approved
+commit point into PRD05/PRD09. Preserve frozen `5449e2a1` and separately verified
+`2e88c9ad`. No broader security acceptance or publication is implied.

@@ -1,4 +1,4 @@
-# PRD04 F-01: backing-close correction verified; commit-point decision open
+# PRD04 F-01: correction verified and publication boundary agreed
 
 The frozen candidate `5449e2a184bb1147cf618b140a29196b74206b13` and its binaries
 and failed Daybreak receipts remain unchanged. This corrective source is local,
@@ -31,16 +31,16 @@ the pinned archive and the host replacement marker; no unsafe host unlink is
 inferred as an acceptable rollback. All these are selected exact-source results;
 synthetic skipped closes do not establish real Linux error-time FD lifetime.
 
-**Open contract decision:** after successful link publication, an injected close
-error on either inode/parent reference reports supervisor-error but leaves the
-valid final archive. The follow-up preserved this existing behavior. It differs
-from the corrected pre-publication backing-close failure. The user has been
-asked whether publication is the commit point (late cleanup error remains
-reported and callers must reject non-success), or these errors also require
-absence of the final archive and further publication/protocol work. Do not
-silently weaken the earlier no-accepted-export criterion or mark PRD04 complete
-before resolving this boundary. The original F-01 symptom is verified corrected;
-overall export acceptance and PRD04 remain open for the decision.
+**Resolved user decision, 2026-11-08:** link publication is the commit point.
+A late inode/parent reference-close error may leave the intact final archive but
+must report supervisor-error; consumers must reject non-success. This preserves
+the user's earlier reporting and cancellation-error decisions. Pre-publication
+backing-close failure still requires absence, as the focused receipts prove.
+No unsafe pathname rollback or silent error suppression is authorized. The
+existing corrected source matches this decision; no further publication/protocol
+rewrite is required for the recorded symptom. Scoped PRD04 failure closure is
+complete; recomposition/final security acceptance remains [PRD09](prd09-security-acceptance.md),
+and PRD07 delivery/publication remains separate.
 
 ## Exact candidate and ordinary validation
 
@@ -99,6 +99,6 @@ failed control. Preserve the old failed artifact and original six-item receipts.
    do not infer a pass from a structured error alone.
 
 Return exact source/binary/runner/config/fixture identities, commands, exits,
-result/audit hashes and per-control findings. PRD04 F-01 and PRD07's export wave
-remain open until the authorized results establish their disposition. This
+result/audit hashes and per-control findings. The returned results above and approved commit point establish the scoped
+PRD04 F-01 disposition. PRD07 delivery and final-source PRD09 remain open. This
 focused request does not reopen unrelated items 1–4 or assert all PRD09 schedules.
