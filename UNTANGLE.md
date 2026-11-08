@@ -2968,3 +2968,70 @@ These are the reference failures for the final comparison (`.artifacts/untangle-
   - **Bugs fixed:** disk-plan showed 1024-based sizes as GB; the hub ignored a step app's exit status; a signal left disk-plan's temp files behind; recab-tui reported EACCES/ELOOP as "doesn't exist".
   - **Left:** UD1111 (spawn failure as a result kind in `runCommand`) waits on the generated `readRecpartOutput`/`readToolOutput` taking `exitCode: number | null` (xtask gen). UD2068 (disk-plan writes its layout and plan files in `useMemo`) and UD1100 (`--disk` realpath: the stand-in disks don't exist on the host, so it can't fail at startup). UD2029 (declared env passthrough) needs a manifest field in distro/contract. UD2059 (`20GB` parsed as GiB), UD1099 (`failedAt`), UD1098 (`destructive-confirm` rail exception), UD2060 (editor hotkeys), UD2066 and the remaining inline key lists in disk-plan (UD2031) are not done. U115 (install-docs' own palette) left: it changes every docs render. U099 (the split pane's keys restated on the website) needs the key table generated. **For the lead:** UD-11's decision default was Enter for "mark done"; I used `d` because Enter already opens the step's shell. Builder `572e476` accidentally took another session's uncommitted `install_ux.rs` (it uses `guest::Value`, not yet committed); `da0f59a` restores the committed file plus `--shell`. That session's version is still staged in `distro/builder`'s index and its working tree, as they left it.
   - **Housekeeping (G22):** the G22 superproject commit was also pushed to a stray remote branch `origin/main` by mistake. It only contains master's `7e764cf`; deleting it is left to the user (`git push origin --delete main`).
+- [x] G13 (Rust half) — builder `4b72293`, `ef02230` (guest renderer, launcher), `d8b5e16` (shared with G14), superproject `740bf1a` (builder pointer; both `distro.toml` drop the `system_setup` input). Paths: `src/{guest,install_ux}.rs`, `src/pipeline/{overlay,products,source}.rs`, `recipes/live-overlay.rhai`, and a minimal change to `recipes/installed-system.rhai` (`identity()` writes `etc/os-release` from the new `os_release` input, called first in `apply`).
+  - **Renderer:** `guest.rs` embeds every guest file (`GuestFile`: install-ux, the three live files, `system-setup.sh`) and is the only renderer. It matches `@[A-Za-z0-9_]+@`, so a mixed-case leftover is refused (BC3157). Values are typed: `Word` (refused unless one plain shell word), `Argv` (shell-quoted), `Text` (one line). The launcher's left pane is now a real argv, the hub's or `[shell, -l]`, instead of `"$SHELL" -l` (BC1161, BC3103). The recipes' `asset()`/`is_placeholder` renderer is gone; the overlay recipe reads each rendered file as its own input (`shell_ux`, `live_help`, `shutdown_cleanup`). The rootfs recipe gets `system_setup` rendered by the builder, so the variants no longer name it (BP091, BP092, BR052, RG1076).
+  - **Live session:** `LiveSession::new(variant, product)` is the overlay recipe's whole `config` (BP090):
+    - os name, product label, hint, init, services (`contract.live_service_units()`);
+    - install consoles and `launcher`, only when the product has `install_screen` (`launcher` is `null` otherwise; BP094);
+    - `live_media_dir` from `recinit::live::LIVE_MEDIA_DIR`, so the recipe no longer sets it (Z005);
+    - the role file and role.
+    
+    `create_live_overlay(variant, session, rootfs, overlay)` (BP059). The recipe forms `/etc/issue` from these fields (BP093). `shell_ready_marker` is gone: no live file used it.
+  - **Issue hint:** `LIVE_LOGIN_HINT` = "root is logged in on every console (no password)", which is true on both distros now that every live console autologins (PA3065, RG1070 in part).
+  - **Live-only guard:** derived from the overlay. A non-empty regular overlay file that the rootfs also has, with the same content, is a leak; it runs after the whole overlay, install screen included. It replaces the hand list, the `inittab` substring match, its `unwrap_or_default` and the dead template-drop-in check (BP067, BP068, BP069, BC1082, PA1106 builder half).
+  - **Identity (BC-09):** `source::os_release(contract)` gives `NAME`, `ID`, `VERSION_ID`, `VERSION`, `PRETTY_NAME` (double-quoted and escaped) plus the profile's `REC_*` lines. It goes to the rootfs recipe as input `os_release`, and the system recipe writes it once. Gone: the base producers, `product-manifest.json`, `apply_system_payload`'s save/restore of os-release and its `levitate_recipe::target` metadata edit (BP064, BP065, BP066, BC1087, BC1088, BC2041).
+  - **Verified:**
+    - `cargo check -p distro-builder --all-targets` is clean on the working tree. That tree includes G21's uncommitted adaptation of my files.
+    - My commits were built so that HEAD stays consistent with HEAD's `install_ux.rs`. That was checked by reading, not by compiling: other agents' WIP in recab and install_ux blocks a HEAD-only build.
+    - A Python scan of the placeholders in every guest file.
+    - xtask and install-tests could not be checked (recab WIP); I grepped their uses (`live_session`, `LIVE_LOGIN_HINT`) instead.
+    - **No recipe, ISO or VM run.**
+  - **Behaviour changes:**
+    - os-release gains `VERSION_ID`/`VERSION`, quoted values, and is written in the recipe. On Fedora the write goes through the packaged `/etc/os-release` symlink into `usr/lib/os-release` (unverified, risk).
+    - New issue text.
+    - Recipe's rootfs source marker ignores the new `os_release` input, so the first base-rootfs after this fails the new identity check until the rootfs source is rebuilt (remove its recipe tree; it is the same force-rebuild the recipe-half note asks for).
+  - **Left:**
+    - `distro-builder` still depends on recqemu for `guest_profile()` (the serial test profile). `SHELL_READY_MARKER` is not in `recinit::live` yet (Z025 in part, RG2059/G17).
+    - BP070: `usr/libexec/recipe-system-setup` is spelled in `products.rs`, the recipe, recsetup and `installed-boot.sh` (needs a contract runtime constant).
+    - RG2087 (three hints) and RG2053 (system-setup's runlevel table).
+    - The producers' init literal (RG-01, G12) and CV-13.
+    - `installed-boot.sh`'s leak check and `qemu/serial` readiness (testing).
+- [x] G14 — Every product is the installable system rootfs plus layers. builder `d8b5e16` "G13/G14: …", superproject `740bf1a`. Paths: `src/pipeline/{products,source,live_tools,io,mod}.rs`, `src/product.rs`, `src/lib.rs`; `plan.rs` and `config.rs` deleted. Call sites in `src/bin/workflows/{artifacts,mod,release_hook}.rs`; `prepared_products.rs` deleted (agent B's area; small and unavoidable). The dead `create_unique_output_dir` in `io.rs` (agent A's file) is deleted.
+  - **One routine:** `distro_builder::prepare_product(variant, product, dir) -> PreparedProduct` prepares every product (BP053–056, BP063, BP087–089, BR134, CL3051, CL1047):
+    - the rootfs tree: base-rootfs builds the system, and a derived product extracts its parent's latest image (resolved inside, so there is no `Option` and no "workflow must resolve" error; BC1157);
+    - the overlay, from the product table: `live_session` adds the live overlay, and the new `install_screen` adds the overlay tools and the install screen;
+    - the live-only check, the rootfs pointer file the hooks read, and the typed manifest.
+    
+    The manifest is `.prepared-product.json`, written with `runs::write_atomic`. `PreparedProduct::read` refuses tree paths outside the dir (`target::relative`), a missing tree and an empty rootfs (CL3062, CL2047). The `rootfs-source` name is spelled once (BR137, BR139). The binary imports no layout structs and makes no planner-mismatch check (CL1045). Its remediation text is gone (CL1048).
+  - **base-rootfs is the whole system:**
+    - the rootfs recipe's tree, from `RootfsSourceContract` used directly (no policy copy struct, no `Option`, no `kind`, no `retain(WriteText)`; BP057, BC2058, BC2138);
+    - `.live-payload-role` = rootfs;
+    - the rootfs tools (recab, recstrap; `add_tools(..., ToolLayer::Rootfs)`).
+    
+    `check_installable` runs on it last, and on every extracted parent: the setup program exists, and `/etc/os-release` equals the contract's. live-boot, live-tools and installed-boot do not touch the rootfs. `carries_installed_system` is gone, so every product's ISO carries the installed initramfs.
+  - **Done as a consequence:**
+    - The source is materialized once, by base-rootfs (BP072).
+    - live-tools inherits the rootfs and the live overlay recipe, and its tools no longer land after the check (BP060–062).
+    - Producer kinds and their `matches!` copies are gone (BP056, BC3077).
+    - No "Ring 2"/live-boot wording and no second path validator (BP071, BP082, BC2051).
+    - Unused parameters are gone (BP058), and so is `pub` asymmetry (BC1079).
+    - The install-screen doc no longer leans on recstrap (BC1160).
+    - The preseed command reads the contract (BC2138).
+  - **Verified:** `cargo check -p distro-builder --all-targets` clean (working tree). **No ISO, prepare or VM run** (quiet hours).
+  - **Behaviour changes:**
+    - The base-rootfs prepare runs the rootfs recipe, and its ISO is the full system with recab/recstrap and the installed initramfs.
+    - The live-boot rootfs gains recab/recstrap.
+    - live-boot and installed-boot no longer re-run the rootfs recipe.
+    - installed-boot's rootfs is base-rootfs's: content-identical to what live-tools installs, `.live-payload-role` included, which every recstrap install already carried (C078 reverses).
+    - A stale parent (an old 4 KB base-rootfs, or a mismatched os-release) is refused with "rebuild <parent>".
+    - The manifest format changed, so re-prepare old prepared dirs.
+    - prepare still writes only its two subdirs of `dir`, because the release hook passes the run dir.
+  - **Bug fixed:** installed-boot booted a different system from the install result (BP062).
+  - **Left:**
+    - Byte-identical image reuse. The release hook still adds kernel modules and re-packs each product's rootfs from the extracted tree, so derived images are content-equal, not byte-equal (G16 release assembly).
+    - CL2039: the binary still calls `ensure_release_prerequisites` before prepare resolves the parent.
+    - CL3151: the hook's `need_dir`.
+    - CL3152: xtask still deletes the prepared dir.
+    - BR136: the EROFS wrapper fns in bin.
+    - BC1107/BC2061: `create_empty_overlay_dir` and `extract_erofs_rootfs` each remove and recreate a dir; io.rs is G06's.
+    - **Run order for the daytime batch:** force-rebuild both rootfs sources, then base-rootfs → live-boot → live-tools, then `xtask build erofs installed-boot`.
