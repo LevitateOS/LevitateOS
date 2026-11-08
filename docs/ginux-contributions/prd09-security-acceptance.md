@@ -1,8 +1,8 @@
 # PRD09 — security acceptance open
 
 Updated 2026-11-08. The current task is to close required security acceptance,
-not to declare a handoff complete. **Acceptance is not closed.** No security
-probe or adversarial runner has been executed in this general engineering chat.
+not to declare a handoff complete. **Acceptance is not closed.** No new security probe or adversarial runner has been executed for this PRD09
+task in the general engineering chat.
 The separate Daybreak chat's permission is not inherited here. Local source
 review, composition, compilation and receipt-file integrity checks below do not
 replace authorized security verification.
