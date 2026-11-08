@@ -32,7 +32,7 @@ sha256 = "cb3ed3dfdd47e6ade49dc933db334fd86e24cadee920da612c262b0e9b6a511b"
 
 [sources.rootfs_source]
 storage_max_objects = 131072
-inputs = { system_setup = "distro/builder/guest/installed/system-setup.sh" }
+inputs = { system_setup = "distro/builder/guest/installed/system-setup.sh", capabilities = "distro/contract/capabilities.txt" }
 memory_mib = 8192
 preseed_memory_mib = 8192
 network_hosts = []
@@ -98,9 +98,26 @@ packages = [
   "usbutils",
   "libusb1",
   "less",
-  # vi, which the live tools and the docs expect.
+  # vi (vim-minimal) and vim.
   "vim-minimal",
   "vim-data",
+  "vim-enhanced",
+  "vim-common",
+  "vim-filesystem",
+  "xxd",
+  "which",
+  "gpm-libs",
+  "libsodium",
+  "pixman",
+  # Archives and disk/system diagnostics.
+  "tar",
+  "gzip",
+  "htop",
+  "hwloc-libs",
+  "smartmontools",
+  "hdparm",
+  # Time sync.
+  "chrony",
   "libfdisk",
   "readline",
   "kmod-libs",
@@ -131,6 +148,8 @@ packages = [
   "glibc-minimal-langpack",
   "kbd",
   "kbd-misc",
+  # The console keymaps loadkeys loads.
+  "kbd-legacy",
   # Common runtime libs used by copied binaries.
   "libgcc",
   "libstdc++",
@@ -188,7 +207,19 @@ packages = [
   # What the install docs configure: time zones under /usr/share/zoneinfo,
   # compiled English locales, and NetworkManager with its libraries.
   "tzdata",
+  "glibc-langpack-cs",
+  "glibc-langpack-de",
   "glibc-langpack-en",
+  "glibc-langpack-es",
+  "glibc-langpack-fi",
+  "glibc-langpack-fr",
+  "glibc-langpack-it",
+  "glibc-langpack-nb",
+  "glibc-langpack-nl",
+  "glibc-langpack-pt",
+  "glibc-langpack-ru",
+  "glibc-langpack-sr",
+  "glibc-langpack-sv",
   "NetworkManager",
   "NetworkManager-libnm",
   "glib2",
@@ -212,15 +243,11 @@ apps = ["disk-plan", "base-system"]
 # The left pane: the install steps in order, with the shell one key away.
 hub = "install-hub"
 
-# What the live system adds to what every variant's has (sshd, the shared
-# kernel command line and the init system's, the shared live tools).
+# What the live system adds to what every variant's has (the installed
+# system's services, sshd, the shared kernel command line and the init
+# system's). Every system's commands are distro/contract/capabilities.txt.
 [live]
-services = ["audit"]
 kernel_cmdline = ["selinux=0", "audit_backlog_limit=8192", "loglevel=3"]
-tools = ["vi"]
 
-# What the installed system adds to what every variant's has (the shared
-# tools and the privilege tool).
 [installed]
 initramfs = true
-tools = ["bash"]

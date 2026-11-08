@@ -32,7 +32,7 @@ sha256 = "79c66dde66cd96877fcde8f7d36aec946b1f423d2b97b5a7b1751b75c764f3d1"
 
 [sources.rootfs_source]
 storage_max_objects = 131072
-inputs = { system_setup = "distro/builder/guest/installed/system-setup.sh" }
+inputs = { system_setup = "distro/builder/guest/installed/system-setup.sh", capabilities = "distro/contract/capabilities.txt" }
 memory_mib = 4096
 preseed_memory_mib = 4096
 network_hosts = []
@@ -54,14 +54,12 @@ apps = ["disk-plan", "base-system"]
 # The left pane: the install steps in order, with the shell one key away.
 hub = "install-hub"
 
-# What the live system adds to what every variant's has (sshd, the shared
-# kernel command line and the init system's, the shared live tools).
+# What the live system adds to what every variant's has (the installed
+# system's services, sshd, the shared kernel command line and the init
+# system's). Every system's commands are distro/contract/capabilities.txt.
 [live]
 services = ["network"]
-tools = ["mount", "smartctl", "hdparm", "vim", "htop"]
 
-# What the installed system adds to what every variant's has (the shared
-# tools and the privilege tool). It boots without an initramfs.
+# It boots without an initramfs.
 [installed]
 initramfs = false
-tools = ["ash"]
