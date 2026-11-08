@@ -1,6 +1,7 @@
 # Brief for an image-generation agent: desktop wallpapers (round 2)
 
 Hand this whole file to the agent as its instructions. It is self-contained.
+Every choice below is decided. Follow it exactly; do not substitute your own.
 
 ---
 
@@ -9,135 +10,161 @@ You are making the default desktop wallpapers for two Linux distributions:
 desktop). You produce artwork only. Logos, text and interface are added by the
 system, never painted into the image.
 
-## What went wrong in round 1
+## Round 1 was rejected
 
-Round 1 (`.artifacts/desktop-art/*.png`) asked for minimal, dark, architectural
-stone-and-wood studies. The user rejected all twelve as ugly and unsettling. Do
-not reuse that direction: no brooding empty planes, no cold stone, no uncanny
-or oppressive mood, no minimalism. These are **scenes**: rich, detailed,
-warm, places you would want to be. Peaceful and inviting, never eerie.
+Round 1 (`.artifacts/desktop-art/*.png`) made minimal, dark, architectural
+stone-and-wood studies. The user rejected all twelve as ugly and unsettling.
+Drop that direction completely. These are **scenes**: rich, detailed and warm,
+places you want to be. Peaceful and inviting. Nothing eerie, empty or cold.
 
-## Three styles
+## Positions
 
-Every scene is made in all three styles. Keep the scene and composition the
-same across the three, so they read as one picture painted three ways.
+Positions are given as percent of image width from the left (x) and of image
+height from the top (y).
 
-1. **Realistic.** A photograph: natural light, real materials, believable depth
-   of field. Not a 3D render, not over-processed HDR, not oversaturated.
-2. **Western professionally drawn.** Hand-drawn and painted illustration in
-   the Western tradition: a skilled storybook, editorial or animation
-   background painter (gouache, watercolour or painterly digital with visible,
-   confident drawing). Not anime or manga, not cel-shaded, not clip art, not
-   vector-flat.
-3. **Dutch abstract.** In the spirit of De Stijl (Mondrian, van Doesburg): the
-   scene reduced to horizontal and vertical black lines and flat rectangular
-   colour planes. Mondrian's own tree studies, which move step by step from a
-   painted tree to pure grid, show how a landscape becomes this language. The
-   scene must still be recognisable in its structure (the treehouse, the row of
-   trees, the horizon; the table, the trunks). Do not copy any existing
-   painting. You may use the brand colours below in place of pure primaries.
+## The three styles
 
-## LevitateOS: the treehouse (6 images)
+Each scene is made in all three styles, with the identical composition, so
+they read as one picture made three ways.
 
-A **treehouse** in a large, healthy tree, with **no people**. Behind it lies a
-**farm**: fields, perhaps a barn or fences, nothing industrial. Far in the
-background a **row of trees** runs along the horizon. **The sky is visible**
-and takes a real share of the picture.
+1. **Realistic.** A photograph taken on a tripod, full-frame camera, 35 mm
+   lens, f/8, eye level 1 m above the ground. Natural colour, natural
+   contrast. Not a 3D render, not HDR, not oversaturated.
+2. **Drawn.** A Western storybook illustration: gouache on paper over a
+   visible, confident pencil underdrawing, with the soft edges and flat-ish
+   colour of a professional picture-book background painter. Not anime, not
+   manga, not cel-shaded, not vector, not clip art.
+3. **Abstract.** De Stijl (Mondrian, van Doesburg): only horizontal and
+   vertical lines in ink `#14221A`, and flat rectangles of colour. No
+   diagonals, no curves, no gradients, no texture. The scene's structure stays
+   readable through the placement of the rectangles, as in Mondrian's tree
+   studies, but copy no existing painting. Use only the colours listed for each
+   scene.
 
-In the **foreground**, a single **leaf hovers just above the ground**. It is
-about to land and doesn't: it fails, or refuses, to touch down. Show a clear
-small gap between leaf and ground, with its shadow on the grass below it. This
-is the heart of the LevitateOS identity (the logo is a leaf above a curved
-ground line). It should be noticeable but not huge, off centre, and quietly
-impossible rather than magical: no glow, no sparkles.
+## LevitateOS: the treehouse (6 images: 3 styles × light and dark)
 
-Two versions of each style:
+**Scene, all six images:**
 
-- **Light: daytime, nice weather.** Clear or lightly clouded sky, soft sun,
-  green summer fields.
-- **Dark: night.** The same scene lit by **soft artificial light**: warm
-  lamplight in the treehouse windows, perhaps a lantern or a string of small
-  lights along the treehouse. Stars or a deep blue sky. Calm and cosy, still
-  clearly readable, not pitch black.
+- **Tree:** one large old beech, trunk at x 70%, crown filling the upper right
+  from x 55% to the right edge and down to y 35%.
+- **Treehouse:** in that beech, platform at y 45%, centred on x 68%. A small
+  cabin of natural pine planks, pitched roof of wooden shingles, two square
+  windows facing the viewer, a narrow deck with a railing on the left side, a
+  rope ladder hanging to the ground. No people, no animals.
+- **Farm, behind:** horizon at y 58%. Left of the tree: green pasture with a
+  wooden post-and-rail fence running from x 15% to x 50%, then rows of a crop
+  field. One barn at x 32%, painted red `#B22F27`, white trim, gable facing
+  the viewer. This barn is the only red in the image. Nothing industrial: no
+  silos, machines, power lines or roads.
+- **Tree row:** one straight row of Lombardy poplars along the horizon across
+  the full width, small with distance.
+- **Sky:** everything above the horizon not covered by the beech; about half
+  of the image.
+- **The leaf:** one beech leaf in the foreground at x 38%, y 80%, about 6% of
+  the image width long, lying flat and level, tip pointing right. It hangs in
+  the air a third of its own length above the grass, completely still, with
+  its sharp shadow on the grass directly below. It is about to land and
+  refuses to. It is sharp and in focus. No glow, no sparkles, no motion lines:
+  it is quietly impossible, not magical.
+- **Ground:** short summer grass with a few clover and daisies, with no other
+  fallen leaves anywhere.
 
-Colour lean: greens toward pine `#214438` and pale pine `#C7D9BA`; warm
-lamplight toward amber.
+**Light:** late morning in midsummer. Sun high from the left, deep blue sky
+with three or four small white cumulus clouds above the farm, crisp green
+grass.
 
-## AcornOS: the picnic table (3 images)
+**Dark:** one hour after sunset, clear night. Sky deep blue, lighter toward
+the horizon, with stars and no moon. The treehouse windows glow warm amber
+from inside. A string of small warm bulbs runs along the deck railing. One
+lamp burns over the barn door. The treehouse light reaches the foreground
+faintly: the leaf and its shadow are visible. Everything else is soft blue
+night, clearly readable, never black.
 
-Deep inside a **forest in deep autumn**: rich reds, burnt orange, ochre and
-brown leaves, on the trees and thick on the ground. A wooden **picnic table**
-stands in a clearing, **not centred**.
+**Abstract colours:** ink `#14221A` (lines), paper `#F2EEE4`, pine `#214438`,
+pale pine `#C7D9BA`, red `#B22F27` (the barn only), and for the dark version
+also night blue `#22324F` and amber `#E0A43A` (the windows, bulbs and barn
+lamp). Light version: paper ground, sky as large pale-pine and paper
+rectangles, the beech as a cluster of pine rectangles at the upper right, the
+barn as the single red rectangle, the horizon as one long ink line. The leaf is
+a small pine rectangle floating above a short ink line, with a band of paper
+between them. Dark version: the same grid with the sky in night blue, the
+ground in pine and ink, and small amber squares for the lights.
 
-A **family of squirrels is rushing** past or around the table. Show them
-with **motion blur**, as if the photograph used a longer exposure (slow
-shutter): the table, trunks and leaves are sharp, and the squirrels are
-streaks of movement that are still clearly squirrels. **No acorns are visible
-anywhere**, yet the viewer should sense the squirrels are after acorns that are
-close by: their direction, urgency and where they're heading (one diving into
-the leaf litter, one darting toward the base of a large oak) tell the story.
+## AcornOS: the picnic table (6 images: 3 styles × light and dark)
 
-In the drawn style, show the motion with the painter's means (drybrush
-streaks, repeated outlines, speed in the brushwork). In the Dutch abstract
-style, show it with a staccato run of small coloured rectangles stepping
-along the grid lines (the device of Mondrian's late New York work), heading
-toward one spot.
+**Scene, all six images:**
 
-Only one version per style. LXQt does not switch wallpaper with a light/dark
-scheme, so it needs no separate night image.
+- **Forest:** a mature oak forest in deep autumn, with a few maples for red.
+  Leaves in burnt orange, ochre, rust and brown, still on the trees and a thick
+  carpet on the ground. Trunks fade into depth behind the clearing.
+- **Picnic table:** one weathered wooden picnic table with attached benches,
+  centred on x 35%, y 65%, seen at a three-quarter angle, its long side
+  running away to the left. Fallen leaves on the tabletop.
+- **The oak:** one large oak, trunk at x 76%, roots spreading into the leaf
+  litter.
+- **Squirrels:** a family of four Eurasian red squirrels (russet coats, ear
+  tufts), two adults and two young, all rushing right toward the base of the
+  oak. One adult mid-leap off the right end of the tabletop; two running on the
+  ground in front of the benches; one young squirrel diving head first into the
+  leaf litter at x 70%, just short of the oak's roots. **No acorns are visible
+  anywhere.** Their urgency, their shared direction and the dive tell the
+  viewer the acorns are right there, under the leaves.
+- **Motion:** realistic version, shutter 1/8 s: table, trunks and leaves are
+  sharp; the squirrels are horizontal motion-blur streaks, each still clearly a
+  squirrel (head and tail readable). Drawn version: drybrush streaks trailing
+  left behind each squirrel and a faint repeated outline of the leaping one.
+  Abstract version: a staccato run of small russet and red squares stepping
+  along one horizontal ink line from the table toward the oak's vertical bar.
 
-Colour lean: browns toward acorn brown `#644532` and pale acorn `#E4CBA6`,
-with autumn reds and orange.
+**Light:** mid-afternoon in late October. Low golden sun from the back left,
+shafts of light through the canopy, lit leaves glowing. No fog or mist.
 
-## Brand colours (for the abstract style, and as a lean elsewhere)
+**Dark:** blue hour, fifteen minutes after sunset. Deep blue light under the
+trees and the sky through the canopy. One brass storm lantern stands lit on
+the right end of the table, its warm glow catching the nearest leaves, the
+bench and the squirrel streaks. Calm and cosy, clearly readable, never black,
+no fog.
 
-| Role | Hex |
-|---|---|
-| Ink (deepest dark, the De Stijl black lines) | `#14221A` |
-| Pine, LevitateOS | `#214438` |
-| Pale pine | `#C7D9BA` |
-| Acorn brown | `#644532` |
-| Pale acorn | `#E4CBA6` |
-| Paper (the De Stijl white) | `#F2EEE4` |
-| Red | `#B22F27` |
+**Abstract colours:** ink `#14221A` (lines), paper `#F2EEE4`, acorn brown
+`#644532`, pale acorn `#E4CBA6`, red `#B22F27`, burnt orange `#C8642A`, ochre
+`#D8A23A`, and for the dark version also night blue `#22324F` and amber
+`#E0A43A` (the lantern). Light version: paper ground with large orange, ochre
+and pale-acorn rectangles for the canopy and leaf carpet, the table as a brown
+rectangle at the left, the oak as one tall brown vertical bar at the right.
+Dark version: the same grid with night blue replacing paper and one amber
+square for the lantern.
 
-## Composition rules (all images)
+## Composition rules (all twelve images)
 
-A wallpaper sits behind windows and a taskbar, and screens of different shapes
-crop it.
-
-- **Format:** 16:9 landscape, at the largest native size your tool produces.
-  Report the actual size; do not upscale (that is a separate step).
-- **Crop-safe:** the image must still work when cropped to the centre 4:3 area
-  and to the centre 21:9 band. Keep the key subjects (treehouse, hovering
-  leaf, picnic table, squirrels) out of the outer 12% at left and right and out
-  of the top and bottom 8%.
-- **Taskbar:** the bottom 6% sits under the panel. Nothing important there; the
-  hovering leaf must sit clearly above it.
-- **Readability:** desktop icons may sit in the upper-left quarter. Keep that
-  area moderate in detail (sky or canopy work well).
-- **Never:** text, letters, numbers, logos, user-interface elements, people,
-  signatures, watermarks, borders or frames, lens flare. No visible acorns in
-  the AcornOS images. No people in any image.
+- **Format:** 16:9 landscape at the largest native size your tool produces.
+  Report the actual size. Do not upscale; that is a separate step.
+- **Crop-safe:** the positions above already keep every key subject inside
+  the centre 4:3 area and the centre 21:9 band. Keep them there.
+- **Taskbar:** the bottom 6% sits under the panel: grass or leaf litter only.
+- **Desktop icons:** the upper-left quarter holds desktop icons: sky
+  (LevitateOS) or soft canopy (AcornOS) only, moderate detail.
+- **Never:** text, letters, numbers, logos, interface elements, people,
+  signatures, watermarks, borders, frames, lens flare, fog. No acorns in the
+  AcornOS images.
 
 ## Deliverables
 
 Write everything into `.artifacts/desktop-art/round-2/` in the LevitateOS
-checkout (git-ignored; the user picks the finals from there). Leave round 1
-where it is.
+checkout (git-ignored; the user picks the finals there). Leave round 1 where
+it is.
 
-Two candidates per image, 18 files in all:
+Two generations per image from the same prompt, 24 files, named
+`<distro>-<style>-<light|dark>-<n>.png` with style `realistic`, `drawn` or
+`abstract`:
 
-- `levitate-realistic-light-1.png`, `-2.png`; `levitate-realistic-dark-1.png`, `-2.png`
-- `levitate-drawn-light-…`, `levitate-drawn-dark-…`
-- `levitate-abstract-light-…`, `levitate-abstract-dark-…`
-- `acorn-realistic-1.png`, `-2.png`; `acorn-drawn-…`; `acorn-abstract-…`
+- `levitate-realistic-light-1.png`, `-2.png`, `levitate-realistic-dark-1.png`, `-2.png`, then the same for `drawn` and `abstract`
+- `acorn-realistic-light-1.png`, `-2.png`, `acorn-realistic-dark-1.png`, `-2.png`, then the same for `drawn` and `abstract`
 
 PNG, sRGB, metadata stripped, no processing after generation (no crop,
 retouching or colour grading).
 
-Also write `GENERATION.md` in that folder: the tool and model used, the exact
-prompt for each image, the size each file actually came out at, and anything
-from this brief you could not meet.
+Write `GENERATION.md` in that folder: the tool and model used, the exact
+prompt for each image, the size each file came out at, and every point of this
+brief an image misses.
 
-Do not edit anything else in the repository.
+Edit nothing else in the repository.

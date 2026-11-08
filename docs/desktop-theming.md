@@ -86,10 +86,10 @@ Openbox "Clearlooks" window decoration. Alpine 3.24 also has `breeze`
 
 | Item | Path | Content |
 |---|---|---|
-| LXQt theme | `/usr/share/lxqt/themes/acornos/` | panel, runner, notification and leave-dialog QSS edited from `light`/`dark` to the Acorn colours; `mainmenu.svg` = acorn mark (this is the menu button icon); `wallpaper.cfg`; `preview.png` |
-| Defaults | `/etc/xdg/lxqt/lxqt.conf` | `theme=acornos`, `icon_theme=breeze`, `[Qt] style=Breeze`, font Noto Sans |
+| LXQt themes | `/usr/share/lxqt/themes/acornos-light/`, `acornos-dark/` | panel, runner, notification and leave-dialog QSS edited from LXQt's `light`/`dark` to the Acorn colours; `mainmenu.svg` = acorn mark (this is the menu button icon); `wallpaper.cfg` naming that theme's light or dark wallpaper, so switching the LXQt theme switches the wallpaper too; `preview.png` |
+| Defaults | `/etc/xdg/lxqt/lxqt.conf` | `theme=acornos-dark`, `icon_theme=breeze`, `[Qt] style=Breeze`, font Noto Sans |
 | Palette | `/usr/share/lxqt/palettes/AcornOS` | Qt palette in Acorn browns and paper (LXQt applies it with `palette_override`) |
-| Wallpaper | `/usr/share/wallpapers/AcornOS/…` + `/etc/xdg/pcmanfm-qt/lxqt/settings.conf` | `Wallpaper=` the Acorn wallpaper, `WallpaperMode=zoom` |
+| Wallpaper | `/usr/share/wallpapers/AcornOS/…` + `/etc/xdg/pcmanfm-qt/lxqt/settings.conf` | `Wallpaper=` the dark Acorn wallpaper (the default theme's), `WallpaperMode=zoom` |
 | Window decoration | `/usr/share/themes/AcornOS/openbox-3/themerc` + `/etc/xdg/openbox/lxqt-rc.xml` (`<theme><name>AcornOS</name>`) | Openbox themes are plain text (colours, fonts, button bitmaps); start from `Clearlooks` |
 | GTK apps (Firefox) | `/etc/gtk-3.0/settings.ini` | `gtk-theme-name=Breeze`, `gtk-icon-theme-name=breeze` |
 | Login screen | `/usr/share/sddm/themes/acornos/` + `/etc/sddm.conf.d/10-theme.conf` | from `sddm-breeze` (add it to the Acorn desktop set), with the Acorn lockup and wallpaper |
