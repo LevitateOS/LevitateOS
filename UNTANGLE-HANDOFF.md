@@ -60,7 +60,7 @@ All G01–G32 have commits (G30 partial), the leftovers sweep is done, committed
 4. **Daytime batch only (after 10:00; build fans are too loud at night).** This is listed at the end of `## Progress` ("Deferred to a daytime batch") and in the G11 entry:
    - force-rebuild both rootfs sources, then base-rootfs, live-boot, live-tools and installed-boot for both distros, through `/tmp/iso-run-fixed.sh target/debug/distro-builder release build iso <product> <distro>` (as root, with the Ginux/Recipe env);
    - check the `REC_*` lines in each image's `/etc/os-release`;
-   - rebuild and republish both kernels under the converged kconfig (the memory note on kernel publishing has the steps);
+   - ~~rebuild and republish both kernels~~ done 2026-11-08 (see Progress "Kernel republish"); still open: Recipe's kernel e2e fixture digest (`tools/recipe/tests/e2e/kernel_acquisition.rs:69`) and a Recipe/Ginux pair that grants NEEDS network;
    - run every scenario on both distros (`cargo xtask test all <distro>`, `test ab-update <distro>`) once G26 has removed preflight's privileged Recipe kernel check;
    - compare against `## Baseline`. Every difference must be a recorded behaviour change or bug fix.
 5. **Re-audit:** fresh reviewers, using `.artifacts/untangle-repo/BRIEF.md`'s checklist on the changed code. Add what they find under a fix, apply, and repeat until nothing worth fixing is left. Then the final report: fixes landed, special cases before (613) and after, bugs fixed, what was left as is.
