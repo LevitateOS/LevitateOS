@@ -1,0 +1,70 @@
+diff --git a/crates/ginux-vfs/src/lib.rs b/crates/ginux-vfs/src/lib.rs
+index 99574ff4..98274326 100644
+--- a/crates/ginux-vfs/src/lib.rs
++++ b/crates/ginux-vfs/src/lib.rs
+@@ -476,6 +476,9 @@ impl<'a, R: BaseReader, const FILES: usize, const FILE_SIZE: usize, const FDS: u
+         if !state.writable || !state.overlay {
+             return Err(VfsError::PermissionDenied);
+         }
++        if input.is_empty() {
++            return Ok(0);
++        }
+         let end = state
+             .offset
+             .checked_add(input.len())
+@@ -483,8 +486,12 @@ impl<'a, R: BaseReader, const FILES: usize, const FILE_SIZE: usize, const FDS: u
+         if end > FILE_SIZE {
+             return Err(VfsError::FileTooLarge);
+         }
++        let previous = self.overlay[state.object].len;
++        if state.offset > previous {
++            self.overlay[state.object].data[previous..state.offset].fill(0);
++        }
+         self.overlay[state.object].data[state.offset..end].copy_from_slice(input);
+-        self.overlay[state.object].len = self.overlay[state.object].len.max(end);
++        self.overlay[state.object].len = previous.max(end);
+         self.descriptors[slot].offset = end;
+         Ok(input.len())
+     }
+@@ -1075,6 +1082,41 @@ mod tests {
+         assert_eq!(vfs.open(b"/base", O_READ), Err(VfsError::NotFound));
+     }
+ 
++    #[test]
++    fn writes_past_a_truncated_end_read_back_zeros() {
++        let bytes = index_bytes();
++        let mut vfs: VirtualFs<'_, Reader, 4, 32, 4> =
++            VirtualFs::new(Index::new(&bytes).unwrap(), Reader(*b"BASETOOL"));
++        let writer = vfs.open(b"/new", O_WRITE | O_CREATE).unwrap();
++        assert_eq!(vfs.write(writer, b"secret"), Ok(6));
++        let truncated = vfs.open(b"/new", O_WRITE | O_TRUNC).unwrap();
++        vfs.close(truncated).unwrap();
++        assert_eq!(vfs.write(writer, b"x"), Ok(1));
++        let reader = vfs.open(b"/new", O_READ).unwrap();
++        let mut contents = [0xff; 8];
++        assert_eq!(vfs.read(reader, &mut contents), Ok(7));
++        assert_eq!(&contents[..7], b"\0\0\0\0\0\0x");
++    }
++
++    #[test]
++    fn empty_and_rejected_writes_after_truncation_leave_the_file_empty() {
++        let bytes = index_bytes();
++        let mut vfs: VirtualFs<'_, Reader, 4, 32, 4> =
++            VirtualFs::new(Index::new(&bytes).unwrap(), Reader(*b"BASETOOL"));
++        let writer = vfs.open(b"/new", O_WRITE | O_CREATE).unwrap();
++        assert_eq!(vfs.write(writer, b"secret"), Ok(6));
++        let truncated = vfs.open(b"/new", O_WRITE | O_TRUNC).unwrap();
++        vfs.close(truncated).unwrap();
++        assert_eq!(vfs.write(writer, b""), Ok(0));
++        assert_eq!(vfs.write(writer, &[0xff; 32]), Err(VfsError::FileTooLarge));
++        let reader = vfs.open(b"/new", O_READ).unwrap();
++        let mut contents = [0xff; 8];
++        assert_eq!(vfs.read(reader, &mut contents), Ok(0));
++        assert_eq!(vfs.write(writer, b"x"), Ok(1));
++        assert_eq!(vfs.read(reader, &mut contents), Ok(7));
++        assert_eq!(&contents[..7], b"\0\0\0\0\0\0x");
++    }
++
+     #[test]
+     fn overlays_are_isolated_between_instances() {
+         let bytes = index_bytes();
