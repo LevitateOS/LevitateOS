@@ -357,3 +357,12 @@ The next action is to obtain successful full Recipe-owned TUI acquisition and
 compilation, fix actual failures, then verify readiness/reuse, the builder's real
 source-preparation caller and both libc/product paths. Final security/guest/ISO/
 installer/install/A/B requirements remain open; no publication occurred.
+
+Actual frozen npm acquisition now completes all 98 packages under the normal
+notification-corrected Ginux candidate with the explicit 32,768-object request
+(`real-tui-npm-object-budget.log`, Bun exit success, 96.72 seconds). The diagnostic
+Recipe invocation then correctly fails because its placeholder `is_built` always
+returns needs_work; that fixture is not a successful install/publication receipt.
+Do not hide or count that overall failure. The real TUI producer has hash/marker
+readiness and is running the complete path. Its next result, not that diagnostic
+phase alone, determines producer acceptance.
