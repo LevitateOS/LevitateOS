@@ -22,7 +22,7 @@ Written 2026-11-08 ~03:00 when the Claude token budget ran low. Several Claude s
   | G21 | `xtask/src/tasks/tui/**`, `install-split-pane`, builder `tui_binary.rs`, `install_ux.rs`, `tui_apps.rs` (new, untracked), the contract `install_ux` type | commits exist. **xtask HEAD does not build until `distro/builder/src/tui_apps.rs` is committed** |
   | G29 (Recipe as the package manager on both) | `recipes/install-tools.rhai`, Recipe config/state in the rootfs, docs/content package and update pages | none |
   | G16 (release assembly in Rust; hooks deleted; cmdline as a build fact) | `distro/variants/*/hooks`, `_shared/hooks`, builder `bin/workflows/release_hook.rs`, a new release module, busybox recipe, contract cmdline | none |
-  | G15 (one busybox installed initramfs for both; modules and firmware in the rootfs) | `tools/recinit`, `[installed] initramfs` | none |
+  | G15 (one busybox installed initramfs for both) | recinit side landed (`d81ebe9`); remaining: rootfs packages and modules (agent E), release hook (G16), recstrap `plan.rs` and install-tests `preflight.rs` "always initramfs" (see the G15 Progress entry) | recinit side done |
 
 - **Not started:** G28 (NetworkManager and WiFi on both), G30 (desktop as a product layer), the rest of G32 (root `README.md`, `architecture.md`, `xtask/README.md`, docs/content architecture pages, tui docs; once the code has settled). TO-14 (each tool declares the external commands it runs, and the builder checks them; format proposed in `merged-progress-G09.md`).
 - **Leftovers named in Progress entries.** Each "Left:" line names the fix it belongs to; sweep them after the fixes. For example:
