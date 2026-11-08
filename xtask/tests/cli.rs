@@ -24,7 +24,7 @@ fn status_json_reports_every_scenario_and_the_latest_isos_for_both_distros() {
         assert!(output.status.success(), "{}", diagnostic(&output));
         let json: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
         let scenarios = json["scenarios"].as_array().unwrap();
-        assert_eq!(scenarios.len(), 8, "{json}");
+        assert_eq!(scenarios.len(), install_tests::scenarios::ScenarioId::ALL.len(), "{json}");
         for scenario in scenarios {
             let status = scenario["status"].as_str().unwrap();
             assert!(["not-run", "pass", "fail", "stale", "error"].contains(&status), "{json}");

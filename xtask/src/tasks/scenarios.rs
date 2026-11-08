@@ -79,7 +79,17 @@ pub fn test(args: TestArgs) -> Result<()> {
     let root = crate::util::repo::repo_root()?;
     let distro = &args.distro;
     let scenarios = match args.scenario {
-        TestSelection::All => ScenarioId::ALL.to_vec(),
+        TestSelection::All => ScenarioId::ALL
+            .into_iter()
+            .filter(|scenario| {
+                // ab-update updates an A/B install; `all` leaves it out of other modes.
+                let skip = *scenario == ScenarioId::AbUpdate && args.mode != recpart::InstallMode::Ab;
+                if skip {
+                    eprintln!("skipping {}: it needs --mode {}", scenario.key(), recpart::InstallMode::Ab);
+                }
+                !skip
+            })
+            .collect(),
         TestSelection::One(scenario) => vec![scenario],
     };
     let options = RunOptions {
