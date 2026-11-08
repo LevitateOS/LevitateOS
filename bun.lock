@@ -49,6 +49,7 @@
         "base-system": "./src/main.tsx",
       },
       "dependencies": {
+        "@levitate/docs-content": "workspace:*",
         "@levitate/install-state": "workspace:*",
         "@levitate/tui-kit": "workspace:*",
         "ink": "^6.8.0",
@@ -86,6 +87,7 @@
         "install-hub": "./src/main.tsx",
       },
       "dependencies": {
+        "@levitate/docs-content": "workspace:*",
         "@levitate/install-state": "workspace:*",
         "@levitate/tui-kit": "workspace:*",
         "ink": "^6.8.0",
@@ -154,6 +156,9 @@
     "tui/kit/install-state": {
       "name": "@levitate/install-state",
       "version": "0.1.0",
+      "dependencies": {
+        "@levitate/docs-content": "workspace:*",
+      },
       "devDependencies": {
         "@types/bun": "^1.2.17",
         "typescript": "^5.9.2",
