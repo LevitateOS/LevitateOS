@@ -1,6 +1,6 @@
 # Builds and scenarios
 
-LevitateOS and AcornOS each declare themselves in one file, `distro/variants/<distro>/distro.toml`, beside the kernel configuration (`kconfig`), signing keys (`keys/`) and release hooks (`hooks/`). `distro_contract::load` reads and validates it; the file's shape is the `ConformanceContract` type.
+LevitateOS and AcornOS each declare themselves in one file, `distro/variants/<distro>/distro.toml`, beside the kernel configuration (`kconfig`) and signing keys (`keys/`). `distro_contract::load` reads and validates it; the file's shape is the `ConformanceContract` type.
 
 | Section | Responsibility |
 |---|---|

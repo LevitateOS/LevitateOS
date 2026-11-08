@@ -4,4 +4,3 @@
 - `kconfig`: the kernel options of its kernel line only, applied after
   `../_shared/kconfig` (the kernel policy every variant shares).
 - `keys/`: the Fedora RPM signing key `rpm_base.signing_key` names.
-- `hooks/`: the release hooks the builder runs for each release ISO (they call `../_shared/hooks/build-release.sh`).

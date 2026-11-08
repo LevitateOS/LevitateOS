@@ -241,10 +241,10 @@ apps = ["disk-plan", "base-system"]
 hub = "install-hub"
 
 # What the live system adds to what every variant's has (the installed
-# system's services, sshd, the shared kernel command line and the init
-# system's). Every system's commands are distro/contract/capabilities.txt.
+# system's services and sshd). Every system's commands are
+# distro/contract/capabilities.txt; every boot's kernel command line is
+# distro_builder::release::kernel_cmdline.
 [live]
-kernel_cmdline = ["selinux=0", "audit_backlog_limit=8192", "loglevel=3"]
 
 [installed]
 initramfs = true
