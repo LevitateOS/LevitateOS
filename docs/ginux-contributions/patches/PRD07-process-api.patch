@@ -1,0 +1,131 @@
+diff --git a/crates/ginux-process/src/lib.rs b/crates/ginux-process/src/lib.rs
+index ef5ab503..650993ef 100644
+--- a/crates/ginux-process/src/lib.rs
++++ b/crates/ginux-process/src/lib.rs
+@@ -394,6 +394,26 @@ impl<const TASKS: usize> ProcessTable<TASKS> {
+         Ok(child)
+     }
+ 
++    /// Roll back a reserved birth only before publishing it to execution.
++    pub fn cancel_fork(&mut self, parent: TaskId, child: TaskId) -> Result<(), ProcessError> {
++        let parent_task = self.tasks[self.index(parent)?];
++        let index = self.index(child)?;
++        let task = self.tasks[index];
++        if parent_task.state != TaskState::Running
++            || task.id.pid != task.tgid
++            || task.parent != parent_task.tgid
++            || task.state != TaskState::Running
++            || task.exec_epoch != 0
++            || self.tasks.iter().any(|t| {
++                t.occupied && (t.parent == child.pid || t.tgid == child.pid && t.id != child)
++            })
++        {
++            return Err(ProcessError::InvalidState);
++        }
++        self.tasks[index] = Task::empty();
++        Ok(())
++    }
++
+     pub fn clone_thread(&mut self, leader: TaskId) -> Result<TaskId, ProcessError> {
+         let leader = self.tasks[self.index(leader)?];
+         if leader.state != TaskState::Running {
+@@ -533,6 +553,20 @@ impl<const TASKS: usize> ProcessTable<TASKS> {
+         &mut self,
+         parent: TaskId,
+         target: WaitTarget,
++        options: u32,
++    ) -> Result<WaitResult, ProcessError> {
++        let result = self.peek_wait(parent, target, options)?;
++        let index = self.index(result.child)?;
++        self.tasks[index] = Task::empty();
++        Ok(result)
++    }
++
++    /// Inspect a typed child outcome without consuming it. Uses the same
++    /// selection and supported outcome/options contract as `wait`.
++    pub fn peek_wait(
++        &self,
++        parent: TaskId,
++        target: WaitTarget,
+         _options: u32,
+     ) -> Result<WaitResult, ProcessError> {
+         let parent_index = self.index(parent)?;
+@@ -551,7 +585,6 @@ impl<const TASKS: usize> ProcessTable<TASKS> {
+                 TaskState::Signaled(signal) => ChildStatus::Signaled(signal),
+                 _ => return Err(ProcessError::InvalidState),
+             };
+-            self.tasks[index] = Task::empty();
+             return Ok(WaitResult {
+                 child: task.id,
+                 status,
+@@ -1623,6 +1656,70 @@ mod tests {
+         assert!(replacement.pid > child.pid);
+     }
+ 
++    #[test]
++    fn fork_reservation_cancellation_preserves_published_state() {
++        let mut table: ProcessTable<8> = ProcessTable::new();
++        let init = table.create_init(Credentials::root()).unwrap();
++        let reserved = table.fork(init).unwrap();
++        let other = table.fork(init).unwrap();
++        assert_eq!(
++            table.cancel_fork(other, reserved),
++            Err(ProcessError::InvalidState)
++        );
++        table.cancel_fork(init, reserved).unwrap();
++        assert_eq!(table.view(reserved), Err(ProcessError::InvalidTask));
++        let executed = table.fork(init).unwrap();
++        table.exec(executed).unwrap();
++        assert_eq!(
++            table.cancel_fork(init, executed),
++            Err(ProcessError::InvalidState)
++        );
++        let threaded = table.fork(init).unwrap();
++        let thread = table.clone_thread(threaded).unwrap();
++        assert_eq!(
++            table.cancel_fork(init, threaded),
++            Err(ProcessError::InvalidState)
++        );
++        assert_eq!(
++            table.cancel_fork(init, thread),
++            Err(ProcessError::InvalidState)
++        );
++        let parent = table.fork(init).unwrap();
++        let child = table.fork(parent).unwrap();
++        assert_eq!(
++            table.cancel_fork(init, parent),
++            Err(ProcessError::InvalidState)
++        );
++        assert_eq!(table.view(child).unwrap().parent, parent.pid);
++        assert_eq!(table.active(), 7);
++    }
++
++    #[test]
++    fn wait_inspection_preserves_typed_outcomes_until_consumed() {
++        let mut table: ProcessTable<4> = ProcessTable::new();
++        let init = table.create_init(Credentials::root()).unwrap();
++        let thread = table.clone_thread(init).unwrap();
++        let child = table.fork(thread).unwrap();
++        table.signaled(child, 15).unwrap();
++        let report = table.peek_wait(thread, WaitTarget::Group(1), 0).unwrap();
++        assert_eq!(report.child, child);
++        assert_eq!(report.status, ChildStatus::Signaled(15));
++        assert_eq!(
++            table.peek_wait(init, WaitTarget::Specific(child.pid), 0),
++            Ok(report)
++        );
++        assert_eq!(table.active(), 3);
++        assert_eq!(
++            table.wait(thread, WaitTarget::Specific(child.pid), 0),
++            Ok(report)
++        );
++        assert_eq!(
++            table.peek_wait(init, WaitTarget::Specific(child.pid), 0),
++            Err(ProcessError::NotChild)
++        );
++        assert_eq!(table.has_waitable_child(init, WaitTarget::Any), Ok(false));
++    }
++
+     #[test]
+     fn threads_groups_and_sessions_remain_virtual() {
+         let mut table: ProcessTable<8> = ProcessTable::new();

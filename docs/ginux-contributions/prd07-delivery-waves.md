@@ -97,6 +97,19 @@ verifies console-alias/redirected-stdout and file/pipe denials. G06/G07 child,
 exec and concurrent wakeup/argument holds remain required; this single-task
 candidate does not establish them or final-source Daybreak acceptance.
 
+[G06's pure process-library prerequisites](prd07-process-api-review.md) are
+independently prepared directly on current main at `4690d87f`: complete one-file
+diff, retained birth-cancellation/wait-inspection tests, base compile control,
+static checks, 91 units and original Linux CI pass. The explicit #234
+compatibility composition `20700e10` passes 97 units and both native orphan
+scenarios, retaining all six exact orphan tests. No published head changed.
+The further local G05 + #234 + API composition is `1ad8af6e`, with 149 units and
+all thirteen G05 CI command groups passing. This is the clean next runtime base;
+configured child execution is still disabled. Full diff and diagnostic conflict
+dispositions are in the API review and artifacts. T-03's six cases now also run
+in this local storage/FD composition; the eventual configured runtime join must
+retain them and the current aggregate tests.
+
 The [local storage rehearsal](prd07-storage-rehearsal.md) now composes the
 reviewed fixes without waiting idle: foundation `04857f38` passes original CI
 and 101 units; typed storage `16dd447e` passes original CI, 141 units and the
@@ -121,9 +134,11 @@ editing existing heads, comments, native policy or a source-packaging choice.
 Active skill: `hdae-development` at `.agents/skills/hdae-development/SKILL.md`.
 Reload the full skill, reference, instructions and current queue after context
 shift. Exact next action: extract and review G06's configured task/exec owner
-onto local G05 `997ffae2`, join #234 orphan accounting and carry the mature
+onto local foundation `1ad8af6e` in `ginux-prd07-tasks` (#234 and its exact orphan
+suite plus the independently extracted APIs are already joined). Carry the mature
 shared-argument/kernel-use holds when concurrency first becomes possible.
-Preserve birth rollback, per-task transactions, inherited descriptions, operator
+Preserve typed-storage cwd/directory identity per process, birth rollback,
+per-task transactions, inherited descriptions, operator
 limits, signal-mask clearing and thread-directed SIGPIPE. Join G07's current
 owner rather than the obsolete partial snapshot before claiming concurrency.
 G06 is required before G09b's full runtime. Preserve
