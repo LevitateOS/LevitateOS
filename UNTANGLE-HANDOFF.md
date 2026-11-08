@@ -53,6 +53,8 @@ Written 2026-11-08 ~03:00 when the Claude token budget ran low. Several Claude s
 5. **Re-audit:** fresh reviewers, using `.artifacts/untangle-repo/BRIEF.md`'s checklist on the changed code. Add what they find under a fix, apply, and repeat until nothing worth fixing is left. Then the final report: fixes landed, special cases before (613) and after, bugs fixed, what was left as is.
 
 ## Open items for the user
+- **Recipe on the installed system (G29):** `/usr/bin/recipe` ships on both, but `recipe install` cannot work on a target yet. It needs a Ginux launcher and a root image (the compiler image is 1.27 GB), and it publishes under `$PWD/.artifacts` instead of into the running system. Closing that is Recipe work (`tools/recipe`, out of scope). Also a one-line `tools/recipe` change, `libc::syscall(SYS_renameat2…)` in `publication.rs:292`, would let the musl link shim in `install-tools.rhai` go.
+- **Bug being fixed at handoff:** `/home` was inside the A/B slot, so updates hid user files. The fix makes `/home` a symlink to `var/home` on STATE (see `progress-home-fix.md`, or the Progress entry once merged).
 - Recipe's e2e tests (`tools/recipe/tests/e2e/preseed_recipes.rs`, out of scope) still expect the old Alpine preseed outputs and `sources/alpine.rhai` (G08). They need updating by whoever owns Recipe.
 - Delete two stray remote branches pushed by mistake (both contain only commits already on the right branch):
   - `git -C . push origin --delete main` (superproject; its branch is `master`);
