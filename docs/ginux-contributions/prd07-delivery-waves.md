@@ -83,8 +83,10 @@ and 101 units; typed storage `16dd447e` passes original CI, 141 units and the
 complete 40-case storage runner. Original PRD03 runtime implementation is
 preserved; the delta is retained tests and catalog docs. These remain local
 compositions of open prerequisites, not upstream delivery or actual PRD05
-merged-source integration. Next local extraction is G09a/b generic/growable
-backing, preserving T-02 and the typed VFS's newer semantics.
+merged-source integration. G09a's pure library can be extracted separately;
+the complete G09b runtime growth/fork fixture requires the G04/G05/G06 device,
+descriptor and task owners first. Preserve T-02 and every fork/offset oracle,
+rather than declaring the growable pair standalone prematurely.
 
 The TCP, zero-fill and catalog candidates and all six existing prerequisite compositions pass current
 Linux static/build/unit/launch/native/process/setup checks. Complete patches,
@@ -98,9 +100,10 @@ editing existing heads, comments, native policy or a source-packaging choice.
 
 Active skill: `hdae-development` at `.agents/skills/hdae-development/SKILL.md`.
 Reload the full skill, reference, instructions and current queue after context
-shift. Exact next action: port G09a/b onto local storage `16dd447e` in
-`ginux-prd07-growable`, preserving all tests and T-02's 9,000-byte/4,096-byte
-rollback oracle, then review and validate the exact source. Retain the
+shift. Exact next action: extract G04's assigned null-device owner onto local
+storage `16dd447e`, then G05/G06 before G09b's full runtime join. Preserve
+G09a/T-02's 9,000-byte/4,096-byte rollback oracle; the clean
+`ginux-prd07-growable` worktree is reserved for that subsequent port. Retain the
 no-publication boundary. Resolve the
 pending export commit-point decision before claiming export/PRD04 acceptance.
 Inspect upstream foundation changes and actual merges when they arrive; no

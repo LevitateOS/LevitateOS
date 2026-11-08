@@ -71,8 +71,13 @@ storage composition. The existing receipt runner accepts `foundation` and
 `storage` labels and records those exact runs. Original PRD03 evidence stays at
 `9802ef03`; no pin or published head is rewritten.
 
-Next local owner: port retained G09a/b generic/growable backing onto this typed
-VFS without reverting slots, modes, search checks, live copy-up identity or
-directory/data-slot separation. Preserve T-02's full 9,000-byte copy and
-mid-4,096 failure/reclaim oracle. This work is independent of the pending
-post-publication export commit-point decision; export acceptance stays open.
+The G09a library can be ported independently onto this typed VFS, preserving
+slots, modes, search checks, live copy-up identity and directory/data-slot
+separation. Preserve T-02's full 9,000-byte copy and mid-4,096 failure/reclaim
+oracle. Inspecting the complete G09b donor confirms its growth fixture also
+requires fork/wait/shared public offsets; its full runtime delivery must follow
+G04/G05/G06, as the original coverage map requires. Do not drop that fork oracle
+to call the pair standalone earlier. Next local integration follows those
+device/descriptor/task prerequisites, then the complete growable owner. This
+work is independent of the pending post-publication export commit-point
+decision; export acceptance stays open.
