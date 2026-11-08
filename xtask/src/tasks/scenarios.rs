@@ -31,6 +31,7 @@ fn run_options(boot: &BootArgs, force: bool) -> Result<RunOptions> {
         force,
         injection,
         login_key: boot.ssh_key.clone(),
+        install_mode: Default::default(),
     })
 }
 
@@ -82,7 +83,10 @@ pub fn test(args: TestArgs) -> Result<()> {
         TestSelection::All => ScenarioId::ALL.to_vec(),
         TestSelection::One(scenario) => vec![scenario],
     };
-    let options = run_options(&args.boot, args.force)?;
+    let options = RunOptions {
+        install_mode: args.mode,
+        ..run_options(&args.boot, args.force)?
+    };
     let outcomes = install_tests::scenarios::run(&root, distro.id(), &scenarios, &options)?;
 
     let label = |outcome: &Outcome| match outcome {

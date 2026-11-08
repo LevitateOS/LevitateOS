@@ -65,7 +65,7 @@ acquire/build/install hooks, run inside an isolated build domain. See
 ```
 distro/      builder (products and ISOs), contract and variants (per-distro declarations)
 tools/       recipe, the rec* install and boot tools, ginux (upstream build domains)
-testing/     install-tests (boot/install scenarios), fsdbg (its artifact readers)
+testing/     install-tests (boot/install scenarios)
 tui/         terminal apps for the live ISO and installer
 docs/        content (site and live docs), website, design notes, history
 xtask/       the cargo xtask front door

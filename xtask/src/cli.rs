@@ -461,6 +461,10 @@ pub struct TestArgs {
     /// Print a JSON summary of the results on stdout (progress goes to stderr).
     #[arg(long)]
     pub json: bool,
+    /// The layout install installs, and the install run the installed-system
+    /// scenarios boot (ab-update needs ab).
+    #[arg(long, value_enum, default_value_t = recpart::InstallMode::Ab)]
+    pub mode: recpart::InstallMode,
     #[command(flatten)]
     pub boot: BootArgs,
 }

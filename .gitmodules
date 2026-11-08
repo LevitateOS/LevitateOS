@@ -38,10 +38,6 @@
 	path = tools/recqemu
 	url = git@github.com:LevitateOS/recqemu.git
 	branch = main
-[submodule "testing/fsdbg"]
-	path = testing/fsdbg
-	url = git@github.com:LevitateOS/fsdbg.git
-	branch = main
 [submodule "distro-contract"]
 	path = distro/contract
 	url = git@github.com:LevitateOS/distro-contract.git

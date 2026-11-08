@@ -16,7 +16,6 @@ members = [
     "tools/recpart",
     "tools/recqemu",
     "tools/recshuttle",
-    "testing/fsdbg",
     "testing/install-tests",
 ]
 
