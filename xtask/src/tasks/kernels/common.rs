@@ -6,7 +6,7 @@ use std::process::Command;
 /// A distro's kernel, as its variant contract (`distro.toml`) declares it.
 #[derive(Clone)]
 pub(crate) struct KernelTarget {
-    pub distro_id: &'static str,
+    pub distro_id: String,
     pub version: String,
     pub localversion: String,
 }
@@ -29,11 +29,11 @@ pub(crate) struct AutoFixOptions {
     pub(crate) llm_profile: Option<String>,
 }
 
-pub(crate) fn target_for(d: crate::cli::Distro) -> Result<KernelTarget> {
+pub(crate) fn target_for(d: &crate::cli::Distro) -> Result<KernelTarget> {
     let root = crate::util::repo::repo_root()?;
     let kernel = distro_contract::load(&root, d.id())?.contract.build.kernel;
     Ok(KernelTarget {
-        distro_id: d.id(),
+        distro_id: d.id().to_string(),
         version: kernel.version,
         localversion: kernel.localversion,
     })
@@ -64,7 +64,7 @@ pub(crate) fn kernel_is_built(root: &Path, t: &KernelTarget) -> bool {
 }
 
 pub(crate) fn verify_one(root: &Path, t: &KernelTarget) -> Result<String> {
-    let kernel_root = distro_builder::run_history::kernel_output_dir(root, t.distro_id);
+    let kernel_root = distro_builder::run_history::kernel_output_dir(root, &t.distro_id);
     let rel_file = kernel_root.join(distro_builder::kernel::KERNEL_RELEASE_PATH);
     let vmlinuz = kernel_root.join(distro_builder::kernel::KERNEL_IMAGE_PATH);
 

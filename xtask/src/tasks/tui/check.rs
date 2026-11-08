@@ -100,10 +100,9 @@ pub fn run(bless: bool) -> Result<()> {
 /// Each variant's install screen docs: variant, (app, page, args).
 fn install_screen_docs(root: &Path) -> Result<Vec<(String, (String, Option<String>, Vec<String>))>> {
     let mut hosted = Vec::new();
-    for distro in crate::cli::Distro::ALL {
-        let contract = distro_contract::load(root, distro.id())?.contract;
-        let docs = contract.product_config.install_ux.docs;
-        hosted.push((distro.id().to_string(), (docs.app, docs.page, docs.args)));
+    for id in distro_contract::distro_ids(root) {
+        let docs = distro_contract::load(root, &id)?.contract.install_ux.docs;
+        hosted.push((id, (docs.app, docs.page, docs.args)));
     }
     Ok(hosted)
 }

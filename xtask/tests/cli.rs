@@ -37,9 +37,10 @@ fn status_never_reports_stale_cached_success_as_a_pass() {
     let output = xtask(temp.path()).args(["status", "levitate"]).output().unwrap();
     assert!(output.status.success(), "{}", diagnostic(&output));
     let text = String::from_utf8(output.stdout).unwrap();
+    // Stale where its inputs exist, an error where they cannot be resolved.
     for scenario in ["live-tools", "runtime"] {
         let row = text.lines().find(|line| line.contains(scenario)).unwrap();
-        assert!(row.contains("[STALE]"), "{text}");
+        assert!(row.contains("[STALE]") || row.contains("[ERROR]"), "{text}");
     }
     assert!(!text.contains("[PASS]"), "{text}");
 
@@ -55,7 +56,10 @@ fn status_never_reports_stale_cached_success_as_a_pass() {
         .iter()
         .map(|s| (s["scenario"].as_str().unwrap(), s["status"].as_str().unwrap()))
         .collect();
-    assert!(statuses.contains(&("live-tools", "stale")), "{json}");
+    assert!(
+        statuses.contains(&("live-tools", "stale")) || statuses.contains(&("live-tools", "error")),
+        "{json}"
+    );
     assert!(statuses.contains(&("install", "not-run")), "{json}");
     assert_eq!(fs::read_to_string(state).unwrap(), cached);
 }

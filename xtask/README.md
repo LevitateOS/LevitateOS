@@ -26,7 +26,7 @@ for `run`): watch and manage it in Cockpit (Virtual Machines) or with
 `virsh -c qemu:///session list`. Its screen is a VNC display Cockpit shows; its
 serial transcript is in `$XDG_RUNTIME_DIR/levitate-vm/<name>.serial.log`.
 
-cargo xtask test all levitate [--force] [--json]   # live-boot … runtime, in order, stop at first failure
+cargo xtask test all levitate [--force] [--json]   # every scenario, in order, each on its own
 cargo xtask test install levitate
 cargo xtask status levitate [--json]
 cargo xtask reset levitate
@@ -54,4 +54,4 @@ cargo xtask inspect disk-plan --input 'jj'     # type keys once it has drawn, th
 
 ## Layout
 
-`src/cli/types.rs` defines every command; `src/app.rs` dispatches; each command group has one file under `src/tasks/` (`setup.rs`, `build.rs`, `scenarios.rs`, `generate.rs`, `check.rs`, `tui.rs`, `inspect_*.rs`, `kernels/`). Shared helpers live in `src/util/`. `tests/cli.rs` checks the CLI contract (status, reset, exit codes).
+`src/cli.rs` defines every command (over the variants it finds and the product and scenario registry); `src/app.rs` dispatches; each command group has one file under `src/tasks/` (`setup.rs`, `build.rs`, `scenarios.rs`, `generate.rs`, `check.rs`, `tui.rs`, `inspect_*.rs`, `kernels/`). Shared helpers live in `src/util/`. `tests/cli.rs` checks the CLI contract (status, reset, exit codes).

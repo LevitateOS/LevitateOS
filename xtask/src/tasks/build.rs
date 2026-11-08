@@ -3,19 +3,12 @@
 use anyhow::Result;
 use std::path::PathBuf;
 
-use crate::cli::{BuildCmd, Distro, KernelArgs, Product};
-use install_tests::scenarios::{ScenarioId, resolve_iso_artifact_for_scenario};
+use crate::cli::{BuildCmd, Distro, KernelArgs, ProductBuild};
+use distro_contract::ProductId;
 
 pub fn run(what: BuildCmd) -> Result<()> {
-    if let Some((product, args)) = what.product() {
-        let distros = if args.all {
-            Distro::ALL.to_vec()
-        } else {
-            vec![args.distro.unwrap_or(Distro::Levitate)]
-        };
-        return product_isos(product, &distros);
-    }
     match what {
+        BuildCmd::Product(ProductBuild { product, distros }) => product_isos(product, &distros.distros()?),
         BuildCmd::Kernel(args) => kernel(args),
         BuildCmd::RootfsSource { distro, refresh } => {
             let root = crate::util::repo::repo_root()?;
@@ -25,42 +18,28 @@ pub fn run(what: BuildCmd) -> Result<()> {
             }
             crate::util::distro_builder::run(&root, &args)
         }
-        BuildCmd::Erofs { product, distro } => erofs(product, distro),
-        _ => unreachable!("product builds are handled above"),
-    }
-}
-
-/// The scenario that boots a product's ISO.
-fn scenario_for(product: Product) -> ScenarioId {
-    match product {
-        Product::BaseRootfs => ScenarioId::BuildPreflight,
-        Product::LiveBoot => ScenarioId::LiveBoot,
-        Product::LiveTools => ScenarioId::LiveTools,
+        BuildCmd::Erofs { product, distro } => erofs(product, &distro),
     }
 }
 
 /// The ISO of the latest successful build of a product, if any.
-pub fn latest_iso(distro: Distro, product: Product) -> Option<PathBuf> {
-    resolve_iso_artifact_for_scenario(distro.id(), scenario_for(product))
-        .ok()
-        .flatten()
-        .map(|iso| iso.path)
-        .filter(|path| path.is_file())
+pub fn latest_iso(distro: &Distro, product: ProductId) -> Option<PathBuf> {
+    install_tests::scenarios::resolve_release_iso(distro.id(), product).ok()
 }
 
 /// The latest ISO of `product`, or a missing-prerequisite error naming the build.
-pub fn require_iso(distro: Distro, product: Product) -> Result<PathBuf> {
+pub fn require_iso(distro: &Distro, product: ProductId) -> Result<PathBuf> {
     latest_iso(distro, product).ok_or_else(|| {
         crate::util::exit::missing(
-            format!("no {} ISO has been built for {}", product.id(), distro.id()),
-            format!("cargo xtask build {} {}", product.id(), distro.id()),
+            format!("no {product} ISO has been built for {}", distro.id()),
+            format!("cargo xtask build {product} {}", distro.id()),
         )
     })
 }
 
-fn product_isos(product: Product, distros: &[Distro]) -> Result<()> {
+fn product_isos(product: ProductId, distros: &[Distro]) -> Result<()> {
     let root = crate::util::repo::repo_root()?;
-    for &distro in distros {
+    for distro in distros {
         let kernel = crate::tasks::kernels::common::target_for(distro)?;
         if !crate::tasks::kernels::common::kernel_is_built(&root, &kernel) {
             return Err(crate::util::exit::missing(
@@ -72,29 +51,27 @@ fn product_isos(product: Product, distros: &[Distro]) -> Result<()> {
             ));
         }
     }
-    for &distro in distros {
+    for distro in distros {
         crate::util::distro_builder::run(
             &root,
-            &["release", "build", "iso", product.id(), distro.id()],
+            &["release", "build", "iso", product.name(), distro.id()],
         )?;
         if let Some(iso) = latest_iso(distro, product) {
             println!("built: {}", iso.display());
         }
-        println!(
-            "next:  cargo xtask test {} {}",
-            scenario_for(product).key(),
-            distro.id()
-        );
+        if let Some(scenario) = product.next_scenario() {
+            println!("next:  cargo xtask test {scenario} {}", distro.id());
+        }
     }
     Ok(())
 }
 
-fn erofs(product: Product, distro: Distro) -> Result<()> {
+fn erofs(product: ProductId, distro: &Distro) -> Result<()> {
     let root = crate::util::repo::repo_root()?;
     let prepared = root
         .join(".artifacts/prepared")
         .join(distro.id())
-        .join(product.id());
+        .join(product.name());
     if prepared.exists() {
         std::fs::remove_dir_all(&prepared)?;
     }
@@ -102,7 +79,7 @@ fn erofs(product: Product, distro: Distro) -> Result<()> {
     let prepared_arg = prepared.to_string_lossy();
     crate::util::distro_builder::run(
         &root,
-        &["product", "prepare", product.id(), distro.id(), &prepared_arg],
+        &["product", "prepare", product.name(), distro.id(), &prepared_arg],
     )?;
     crate::util::distro_builder::run(
         &root,
@@ -113,11 +90,7 @@ fn erofs(product: Product, distro: Distro) -> Result<()> {
 }
 
 fn kernel(args: KernelArgs) -> Result<()> {
-    let distros = if args.all {
-        Distro::ALL.to_vec()
-    } else {
-        vec![args.distro.expect("clap requires a distro without --all")]
-    };
+    let distros = args.distros.distros()?;
     let k = crate::tasks::kernels::common::KernelBuild {
         rebuild: args.rebuild,
         now: args.now,
@@ -128,7 +101,7 @@ fn kernel(args: KernelArgs) -> Result<()> {
             llm_profile: args.llm_profile,
         },
     };
-    for distro in distros {
+    for distro in &distros {
         if args.prebuilt {
             crate::tasks::kernels::prebuilt::run(distro, args.rebuild)?;
         } else {

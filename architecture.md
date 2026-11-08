@@ -8,10 +8,10 @@ LevitateOS and AcornOS each declare themselves in one file, `distro/variants/<di
 | `profile` | The base facts the variants differ in: package backend, init, libc, privilege tool, desktop, kernel line (written into the image's os-release as `REC_*`) |
 | `build.kernel` | Kernel version and checksum |
 | `sources` | Recipe selection and source acquisition |
-| `products`, `product_config` | Filesystem composition and runtime payloads |
-| `transforms` | EROFS, initramfs, UKI and ISO artifacts |
-| `release` | Release outputs and metadata |
-| `scenarios` | Boot, installation and runtime expectations |
+| `install_ux` | The live ISO's install screen |
+| `live`, `installed` | What the variant's live and installed systems add to the shared lists: services, kernel command line, tools, the installed initramfs |
+
+The products (`base-rootfs`, `live-boot`, `live-tools`, `installed-boot`) and the scenarios are one registry, `distro_contract::registry`, the same for every variant; artifact names follow from `os_id` (`<os_id>-x86_64-<product>.iso`, `<os_id>-live.efi`, `filesystem.erofs`, ...), and what each scenario expects follows from the scenario, the init system and the identity (`install_tests::expect`).
 
 Recipes own package/source facts and acquire/build/install behavior. Orchestration owns product dependencies, output locations and execution. Product dependencies form a build graph; they do not impose an ordered test ladder.
 
@@ -46,7 +46,7 @@ cargo xtask run live-tools levitate     # interactive
 cargo xtask status levitate
 ```
 
-Available scenarios are `build-preflight`, `live-boot`, `live-tools`, `install`, `installed-boot`, `automated-login` and `runtime`. Select any scenario directly. Each consumes existing artifacts and performs its required preflight; it does not build missing artifacts or require earlier scenario pass records. Installed-system scenarios require a completed install disk because that is their actual input. Create that input explicitly with the `install` scenario when needed.
+`cargo xtask test --help` lists the scenarios; `all` runs every one, each on its own, and does not stop at a failure. Select any scenario directly. Each consumes existing artifacts and performs its required preflight; it does not build missing artifacts or require earlier scenario pass records. Installed-system scenarios require a completed install disk because that is their actual input. Create that input explicitly with the `install` scenario when needed.
 
 Each cached result is bound to its own resolved input fingerprint. A changed input invalidates that result, and status reports stale results separately from passes. `--force` reruns only the selected scenario. `cargo xtask reset <distro>` removes saved results. Set `LEVITATE_SCENARIO_STATE_DIR` to keep separate state for CI or another local run.
 

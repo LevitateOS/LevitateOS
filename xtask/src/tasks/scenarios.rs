@@ -4,7 +4,7 @@ use recqemu::libvirt::{runtime_dir, Domain, DomainSpec, SerialTarget, UefiVars};
 use recqemu::serial::Console;
 use install_tests::boot_injection::BootInjection;
 use install_tests::scenarios::{ScenarioId, resolve_latest_install_runtime};
-use crate::cli::{BootArgs, Distro, Product, RunArgs, RunScenario, TestArgs, TestScenario};
+use crate::cli::{BootArgs, Distro, RunArgs, TestArgs, TestSelection};
 use crate::util::exit::usage;
 use std::fs::OpenOptions;
 use std::fs;
@@ -18,12 +18,8 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 pub fn run(args: RunArgs) -> Result<()> {
     let root = crate::util::repo::repo_root()?;
-    let distro = args.distro;
-    let key = match args.scenario {
-        RunScenario::LiveBoot => "live-boot",
-        RunScenario::LiveTools => "live-tools",
-        RunScenario::InstalledBoot => "installed-boot",
-    };
+    let distro = &args.distro;
+    let key = args.scenario.key();
     if !args.no_shell {
         crate::util::exit::require_terminal(
             "`cargo xtask run` (it hands you the guest's console)",
@@ -34,23 +30,20 @@ pub fn run(args: RunArgs) -> Result<()> {
         )?;
     }
 
-    let product = match args.scenario {
-        RunScenario::LiveBoot => Product::LiveBoot,
-        RunScenario::LiveTools => Product::LiveTools,
-        RunScenario::InstalledBoot => {
-            if args.ssh || args.no_shell {
-                return Err(usage(format!(
-                    "installed-boot opens the installed system's console; to check it without one use cargo xtask test installed-boot {}",
-                    distro.id()
-                )));
-            }
-            if args.boot.inject.is_some() || args.boot.inject_file.is_some() || args.boot.ssh_key.is_some() {
-                return Err(usage(
-                    "installed-boot takes no boot injection: the live init reads it, the installed system does not",
-                ));
-            }
-            return boot_installed_disk(distro);
+    // A runnable scenario boots its ISO, or else the latest install's disk.
+    let Some(product) = args.scenario.input().iso else {
+        if args.ssh || args.no_shell {
+            return Err(usage(format!(
+                "{key} opens the installed system's console; to check it without one use cargo xtask test {key} {}",
+                distro.id()
+            )));
         }
+        if args.boot.inject.is_some() || args.boot.inject_file.is_some() || args.boot.ssh_key.is_some() {
+            return Err(usage(format!(
+                "{key} takes no boot injection: the live init reads it, the installed system does not",
+            )));
+        }
+        return boot_installed_disk(distro, key);
     };
     let iso = crate::tasks::build::require_iso(distro, product)?;
 
@@ -76,7 +69,7 @@ pub fn run(args: RunArgs) -> Result<()> {
     match ssh_key.filter(|_| args.ssh) {
         Some(key) => boot_live_iso_ssh(
             distro,
-            product.id(),
+            args.scenario.key(),
             &iso,
             injection,
             args.ssh_port,
@@ -84,7 +77,7 @@ pub fn run(args: RunArgs) -> Result<()> {
             args.no_shell,
             &key,
         ),
-        None => boot_live_iso_serial(distro, product.id(), &iso, injection, args.no_shell),
+        None => boot_live_iso_serial(distro, key, &iso, injection, args.no_shell),
     }
 }
 
@@ -120,60 +113,35 @@ fn injection_payload(pairs: &[String], boot: &BootArgs) -> Result<Option<tempfil
     Ok(Some(file))
 }
 
-/// What a scenario needs built or run first.
-fn require_inputs(distro: Distro, scenario: ScenarioId) -> Result<()> {
-    let product = match scenario {
-        ScenarioId::BuildPreflight => Product::BaseRootfs,
-        ScenarioId::LiveBoot => Product::LiveBoot,
-        ScenarioId::LiveTools | ScenarioId::Install => Product::LiveTools,
-        ScenarioId::AbUpdate => {
-            // The install disk to update, and the release to update it with.
-            resolve_latest_install_runtime(distro.id()).map_err(|_| {
-                crate::util::exit::missing(
-                    format!("ab-update needs a disk from the install scenario, and there is none for {}", distro.id()),
-                    format!("cargo xtask test install {}", distro.id()),
-                )
-            })?;
-            Product::LiveTools
-        }
-        ScenarioId::InstalledBoot | ScenarioId::AutomatedLogin | ScenarioId::Runtime => {
-            return resolve_latest_install_runtime(distro.id()).map(|_| ()).map_err(|_| {
-                crate::util::exit::missing(
-                    format!("{} needs a disk from the install scenario, and there is none for {}", scenario.key(), distro.id()),
-                    format!("cargo xtask test install {}", distro.id()),
-                )
-            });
-        }
-    };
-    crate::tasks::build::require_iso(distro, product).map(|_| ())
-}
-
-fn scenarios_for(scenario: TestScenario) -> Vec<ScenarioId> {
-    match scenario {
-        TestScenario::All => vec![
-            ScenarioId::LiveBoot,
-            ScenarioId::LiveTools,
-            ScenarioId::Install,
-            ScenarioId::InstalledBoot,
-            ScenarioId::AutomatedLogin,
-            ScenarioId::Runtime,
-        ],
-        TestScenario::BuildPreflight => vec![ScenarioId::BuildPreflight],
-        TestScenario::LiveBoot => vec![ScenarioId::LiveBoot],
-        TestScenario::LiveTools => vec![ScenarioId::LiveTools],
-        TestScenario::Install => vec![ScenarioId::Install],
-        TestScenario::InstalledBoot => vec![ScenarioId::InstalledBoot],
-        TestScenario::AutomatedLogin => vec![ScenarioId::AutomatedLogin],
-        TestScenario::Runtime => vec![ScenarioId::Runtime],
-        TestScenario::AbUpdate => vec![ScenarioId::AbUpdate],
+/// What a scenario needs built or run first (`ScenarioId::input`).
+fn require_inputs(distro: &Distro, scenario: ScenarioId) -> Result<()> {
+    let input = scenario.input();
+    if input.install_run {
+        resolve_latest_install_runtime(distro.id()).map_err(|_| {
+            crate::util::exit::missing(
+                format!("{scenario} needs a disk from the install scenario, and there is none for {}", distro.id()),
+                format!("cargo xtask test install {}", distro.id()),
+            )
+        })?;
     }
+    if let Some(product) = input.iso {
+        crate::tasks::build::require_iso(distro, product)?;
+    }
+    Ok(())
 }
 
+/// Runs the selected scenarios. Each runs on its own against the artifacts
+/// that exist: one failing, or missing its inputs, does not stop the rest.
 pub fn test(args: TestArgs) -> Result<()> {
     let root = crate::util::repo::repo_root()?;
-    let distro = args.distro;
-    let scenarios = scenarios_for(args.scenario);
-    require_inputs(distro, scenarios[0])?;
+    let distro = &args.distro;
+    let scenarios = match args.scenario {
+        TestSelection::All => ScenarioId::ALL.to_vec(),
+        TestSelection::One(scenario) => {
+            require_inputs(distro, scenario)?;
+            vec![scenario]
+        }
+    };
     crate::util::tools_env::apply_to_process(&root)?;
     let (key, public) = crate::util::ssh::resolve(&root, args.boot.ssh_key.as_deref())?;
     let payload = injection_payload(&[format!("SSH_AUTHORIZED_KEY={public}")], &args.boot)?
@@ -187,38 +155,56 @@ pub fn test(args: TestArgs) -> Result<()> {
 
     let mut results = Vec::new();
     for scenario in scenarios {
-        require_inputs(distro, scenario)?;
-        let passed = if args.force {
-            install_tests::scenarios::run_scenario_forced(distro.id(), scenario)?
-        } else {
-            install_tests::scenarios::run_scenario(distro.id(), scenario)?
-        };
-        results.push((scenario, passed));
-        if !passed {
-            break;
+        let result = require_inputs(distro, scenario)
+            .and_then(|()| install_tests::scenarios::run_scenario(distro.id(), scenario, args.force));
+        if let Err(err) = &result {
+            // A scenario's own failure is already reported by the run.
+            if crate::util::exit::code_for(err) == 3 {
+                eprintln!("[MISSING] {scenario}: {err:#}");
+            }
         }
+        results.push((scenario, result));
     }
 
     if args.json {
         let summary: Vec<_> = results
             .iter()
-            .map(|(scenario, passed)| serde_json::json!({ "scenario": scenario.key(), "passed": passed }))
+            .map(|(scenario, result)| {
+                serde_json::json!({
+                    "scenario": scenario.key(),
+                    "passed": result.is_ok(),
+                    "error": result.as_ref().err().map(|err| format!("{err:#}")),
+                })
+            })
             .collect();
         println!("{}", serde_json::to_string_pretty(&summary)?);
     }
-    if let Some((scenario, _)) = results.iter().find(|(_, passed)| !passed) {
-        bail!("scenario {} failed for {}", scenario.key(), distro.id());
+    let failed: Vec<&str> = results
+        .iter()
+        .filter(|(_, result)| result.is_err())
+        .map(|(scenario, _)| scenario.key())
+        .collect();
+    let count = failed.len();
+    let names = failed.join(", ");
+    match results.into_iter().find_map(|(_, result)| result.err()) {
+        None => Ok(()),
+        Some(first) if count == 1 => Err(first),
+        Some(first) => Err(first.context(format!(
+            "{count} scenarios failed for {}: {names} (the first one's error follows)",
+            distro.id()
+        ))),
     }
-    Ok(())
 }
 
-pub fn status(distro: Distro, json: bool) -> Result<()> {
+pub fn status(distro: &Distro, json: bool) -> Result<()> {
     if !json {
         return install_tests::scenarios::print_status(distro.id());
     }
     let scenarios: Vec<_> = install_tests::scenarios::scenario_statuses(distro.id())?
         .into_iter()
-        .map(|(scenario, status)| serde_json::json!({ "scenario": scenario.key(), "status": status }))
+        .map(|(scenario, status)| {
+            serde_json::json!({ "scenario": scenario.key(), "status": status.label(), "error": status.error() })
+        })
         .collect();
     println!(
         "{}",
@@ -227,12 +213,12 @@ pub fn status(distro: Distro, json: bool) -> Result<()> {
     Ok(())
 }
 
-pub fn reset(distro: Distro) -> Result<()> {
+pub fn reset(distro: &Distro) -> Result<()> {
     install_tests::scenarios::reset_state(distro.id())
 }
 
 fn boot_live_iso_serial(
-    distro: crate::cli::Distro,
+    distro: &Distro,
     scenario_label: &str,
     iso_path: &Path,
     injection: Option<BootInjection>,
@@ -249,13 +235,13 @@ fn boot_live_iso_serial(
     if no_shell {
         return monitor_live_iso_serial(&vm, &LiveBootPatterns::load(distro.id())?);
     }
-    eprintln!("Booting {} live ISO...", distro.pretty_name());
+    eprintln!("Booting {} {scenario_label}...", distro.name());
     attach_console(vm)
 }
 
-/// What the live-boot console output means, from the variant's scenario
-/// contract (plus the serial test protocol's marker and the live init's
-/// rootfs-missing message).
+/// What the live-boot console output means: the live boot's derived
+/// expectations (`install_tests::expect`) plus the serial test protocol's
+/// readiness marker.
 struct LiveBootPatterns {
     success: Vec<String>,
     fatal: Vec<String>,
@@ -264,11 +250,10 @@ struct LiveBootPatterns {
 impl LiveBootPatterns {
     fn load(distro_id: &str) -> Result<Self> {
         let root = crate::util::repo::repo_root()?;
-        let live = distro_contract::load(&root, distro_id)?.contract.scenarios.live_boot;
-        let fatal = install_tests::qemu::serial::live_fatal(&live);
-        let mut success = live.success_patterns;
+        let live = install_tests::expect::live_boot(&distro_contract::load(&root, distro_id)?);
+        let mut success = live.success;
         success.push(recqemu::serial::protocol::SHELL_READY_MARKER.to_string());
-        Ok(Self { success, fatal })
+        Ok(Self { success, fatal: live.fatal })
     }
 
     fn first_in<'a>(list: &'a [String], log_path: &Path) -> Option<&'a str> {
@@ -314,7 +299,7 @@ fn monitor_live_iso_serial(vm: &RunVm, patterns: &LiveBootPatterns) -> Result<()
 }
 
 fn boot_live_iso_ssh(
-    distro: crate::cli::Distro,
+    distro: &Distro,
     scenario_label: &str,
     iso_path: &Path,
     injection: Option<BootInjection>,
@@ -325,7 +310,7 @@ fn boot_live_iso_ssh(
 ) -> Result<()> {
     eprintln!(
         "Booting {} {} with SSH wait (port {}:{ssh_port})...",
-        distro.pretty_name(),
+        distro.name(),
         scenario_label,
         recqemu::HOSTFWD_ADDRESS
     );
@@ -518,18 +503,18 @@ fn common_ssh_args(key: &Path, ssh_port: u16, known_hosts: &Path) -> Vec<String>
     ]
 }
 
-fn boot_installed_disk(distro: crate::cli::Distro) -> Result<()> {
+fn boot_installed_disk(distro: &Distro, scenario_label: &str) -> Result<()> {
     let runtime = resolve_latest_install_runtime(distro.id())?;
     eprintln!(
         "Booting installed {} from install scenario run {}...",
-        distro.pretty_name(),
+        distro.name(),
         runtime.run_id
     );
     eprintln!("  disk: {}", runtime.disk_path.display());
     eprintln!("  ovmf vars: {}", runtime.ovmf_vars_path.display());
     let vm = start_vm(
         distro,
-        "installed-boot",
+        scenario_label,
         Boot::Disk {
             disk: &runtime.disk_path,
             vars: &runtime.ovmf_vars_path,
@@ -561,7 +546,7 @@ struct RunVm {
 /// visible in Cockpit. `interactive` gives it a pty serial port for
 /// `virsh console`; otherwise this process reads the serial port.
 fn start_vm(
-    distro: crate::cli::Distro,
+    distro: &Distro,
     scenario: &str,
     boot: Boot<'_>,
     injection: Option<&BootInjection>,
@@ -587,7 +572,7 @@ fn start_vm(
     };
     let mut spec = DomainSpec {
         name: name.clone(),
-        title: format!("{} {scenario} (cargo xtask run)", distro.pretty_name()),
+        title: format!("{} {scenario} (cargo xtask run)", distro.name()),
         // The host's OVMF, matching the variable stores and libvirt's QEMU.
         uefi_code: recqemu::find_ovmf()?,
         uefi_vars,
@@ -665,7 +650,7 @@ fn collect_guest_ssh_debug(vm: &mut RunVm) -> Result<()> {
     Ok(())
 }
 
-/// A fatal live-boot pattern from the contract.
+/// A fatal live-boot pattern.
 fn detect_boot_regression(log_path: &Path, patterns: &LiveBootPatterns) -> Result<Option<String>> {
     Ok(LiveBootPatterns::first_in(&patterns.fatal, log_path).map(str::to_string))
 }

@@ -4,7 +4,8 @@ use anyhow::Result;
 use serde::Serialize;
 use std::path::Path;
 
-use crate::cli::{Distro, Product};
+use crate::cli::Distro;
+use distro_contract::ProductId;
 
 pub fn setup() -> Result<()> {
     let root = crate::util::repo::repo_root()?;
@@ -164,7 +165,19 @@ fn checks(root: &Path) -> Vec<Check> {
             .ok_or_else(|| ("none of xorriso/genisoimage/mkisofs (boot injection media)".into(), "install xorriso".into())),
     ));
 
-    for distro in Distro::ALL {
+    for id in crate::cli::distro_ids() {
+        let distro = match Distro::load(&id) {
+            Ok(distro) => distro,
+            Err(err) => {
+                checks.push(Check::new(
+                    format!("{id} variant"),
+                    true,
+                    Err((format!("{err:#}"), format!("fix distro/variants/{id}/distro.toml"))),
+                ));
+                continue;
+            }
+        };
+        let distro = &distro;
         if let Some(check) = base_lock_check(root, distro) {
             checks.push(check);
         }
@@ -182,16 +195,16 @@ fn checks(root: &Path) -> Vec<Check> {
                 )
             }),
         ));
-        for product in [Product::LiveBoot, Product::LiveTools] {
+        for product in ProductId::releases() {
             checks.push(Check::new(
-                format!("{} {} ISO", distro.id(), product.id()),
+                format!("{} {product} ISO", distro.id()),
                 false,
                 crate::tasks::build::latest_iso(distro, product)
                     .map(|p| p.display().to_string())
                     .ok_or_else(|| {
                         (
                             "not built".into(),
-                            format!("cargo xtask build {} {}", product.id(), distro.id()),
+                            format!("cargo xtask build {product} {}", distro.id()),
                         )
                     }),
             ));
@@ -201,7 +214,7 @@ fn checks(root: &Path) -> Vec<Check> {
 }
 
 /// How current a variant's Fedora base lock is (none for a non-RPM base).
-fn base_lock_check(root: &Path, distro: Distro) -> Option<Check> {
+fn base_lock_check(root: &Path, distro: &Distro) -> Option<Check> {
     let contract = distro_contract::load(root, distro.id()).ok()?.contract;
     let base = contract.sources.rootfs_source.rpm_base?;
     let fix = format!("cargo xtask base lock {}", distro.id());

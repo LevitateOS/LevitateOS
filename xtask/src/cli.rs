@@ -1,49 +1,154 @@
-use clap::{Args, Parser, Subcommand, ValueEnum};
+//! The command line: clap types over the variants (discovered under
+//! `distro/variants`) and the registry of products and scenarios
+//! (`distro_contract::{ProductId, ScenarioId}`); nothing here lists either.
+
+use clap::builder::{PossibleValue, PossibleValuesParser, TypedValueParser};
+use clap::error::ErrorKind;
+use clap::{Arg, ArgMatches, Args, Command, FromArgMatches, Parser, Subcommand};
+use distro_contract::{ProductId, ScenarioId};
+use std::ffi::OsStr;
 use std::path::PathBuf;
 
-/// A LevitateOS variant (`distro/variants/<id>`).
-#[derive(Clone, Copy, Debug, PartialEq, Eq, ValueEnum)]
-pub enum Distro {
-    #[value(name = "levitate")]
-    Levitate,
-    #[value(name = "acorn")]
-    Acorn,
+/// A variant: a directory under `distro/variants` with a `distro.toml`,
+/// loaded (and so validated) when the argument is parsed.
+#[derive(Clone, Debug)]
+pub struct Distro {
+    id: String,
+    os_name: String,
 }
 
 impl Distro {
-    pub const ALL: [Distro; 2] = [Distro::Levitate, Distro::Acorn];
+    pub fn load(id: &str) -> anyhow::Result<Self> {
+        let root = crate::util::repo::repo_root()?;
+        let variant = distro_contract::load(&root, id)?;
+        Ok(Self {
+            id: variant.id,
+            os_name: variant.contract.identity.os_name,
+        })
+    }
 
-    pub fn id(self) -> &'static str {
-        match self {
-            Self::Levitate => "levitate",
-            Self::Acorn => "acorn",
-        }
+    /// Every variant.
+    pub fn all() -> anyhow::Result<Vec<Self>> {
+        distro_ids().iter().map(|id| Self::load(id)).collect()
+    }
+
+    pub fn id(&self) -> &str {
+        &self.id
     }
 
     /// The variant's display name (its contract's `identity.os_name`).
-    pub fn pretty_name(self) -> String {
-        crate::util::repo::repo_root()
-            .ok()
-            .and_then(|root| distro_contract::load(&root, self.id()).ok())
-            .map(|variant| variant.contract.identity.os_name)
-            .unwrap_or_else(|| self.id().to_string())
+    pub fn name(&self) -> &str {
+        &self.os_name
     }
 }
 
-const AFTER_HELP: &str = "\
-Typical loop:
+/// The variant ids of this checkout (none outside one).
+pub fn distro_ids() -> Vec<String> {
+    crate::util::repo::repo_root()
+        .map(|root| distro_contract::distro_ids(&root))
+        .unwrap_or_default()
+}
+
+/// A name that lives as long as the process: clap's possible values need one.
+fn leak(name: String) -> &'static str {
+    Box::leak(name.into_boxed_str())
+}
+
+/// Parses a variant id into its loaded `Distro`; `--help` lists the ids.
+#[derive(Clone)]
+struct DistroParser;
+
+impl TypedValueParser for DistroParser {
+    type Value = Distro;
+
+    fn parse_ref(&self, cmd: &Command, arg: Option<&Arg>, value: &OsStr) -> Result<Distro, clap::Error> {
+        let id = PossibleValuesParser::new(self.possible_values().into_iter().flatten())
+            .parse_ref(cmd, arg, value)?;
+        Distro::load(&id).map_err(|err| clap::Error::raw(ErrorKind::ValueValidation, format!("{err:#}\n")))
+    }
+
+    fn possible_values(&self) -> Option<Box<dyn Iterator<Item = PossibleValue> + '_>> {
+        Some(Box::new(distro_ids().into_iter().map(|id| PossibleValue::new(leak(id)))))
+    }
+}
+
+/// One of a fixed set of named values, each with its help line.
+#[derive(Clone)]
+struct Choices<T: Clone + Send + Sync + 'static>(fn() -> Vec<(&'static str, &'static str, T)>);
+
+impl<T: Clone + Send + Sync + 'static> TypedValueParser for Choices<T> {
+    type Value = T;
+
+    fn parse_ref(&self, cmd: &Command, arg: Option<&Arg>, value: &OsStr) -> Result<T, clap::Error> {
+        let name = PossibleValuesParser::new(self.possible_values().into_iter().flatten())
+            .parse_ref(cmd, arg, value)?;
+        (self.0)()
+            .into_iter()
+            .find(|(choice, _, _)| *choice == name)
+            .map(|(_, _, value)| value)
+            .ok_or_else(|| clap::Error::new(ErrorKind::InvalidValue).with_cmd(cmd))
+    }
+
+    fn possible_values(&self) -> Option<Box<dyn Iterator<Item = PossibleValue> + '_>> {
+        Some(Box::new(
+            (self.0)()
+                .into_iter()
+                .map(|(name, help, _)| PossibleValue::new(name).help(help)),
+        ))
+    }
+}
+
+/// What `cargo xtask test` runs.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum TestSelection {
+    /// Every scenario, in order; each runs against the artifacts that exist.
+    All,
+    One(ScenarioId),
+}
+
+fn test_selections() -> Vec<(&'static str, &'static str, TestSelection)> {
+    std::iter::once(("all", "every scenario below, in order, each on its own", TestSelection::All))
+        .chain(
+            ScenarioId::ALL
+                .into_iter()
+                .map(|scenario| (scenario.key(), scenario.summary(), TestSelection::One(scenario))),
+        )
+        .collect()
+}
+
+fn runnable_scenarios() -> Vec<(&'static str, &'static str, ScenarioId)> {
+    ScenarioId::ALL
+        .into_iter()
+        .filter(|scenario| scenario.is_runnable())
+        .map(|scenario| (scenario.key(), scenario.summary(), scenario))
+        .collect()
+}
+
+fn release_products() -> Vec<(&'static str, &'static str, ProductId)> {
+    ProductId::releases()
+        .map(|product| (product.name(), product.title(), product))
+        .collect()
+}
+
+fn after_help() -> String {
+    format!(
+        "Typical loop, for a distro (<distro>: {}):
   cargo xtask setup                       once: QEMU tools, firmware, SSH key
-  cargo xtask build kernel levitate --prebuilt
-  cargo xtask build live-tools levitate
-  cargo xtask test all levitate
-  cargo xtask status levitate
+  cargo xtask build kernel <distro> --prebuilt
+  cargo xtask build live-tools <distro>
+  cargo xtask test all <distro>
+  cargo xtask status <distro>
 
 Exit codes: 0 ok, 1 failed, 2 bad usage, 3 missing prerequisite (the message names the command that provides it).
-Nothing waits for input unless it needs a terminal; without one it stops and names the command that works without it.";
+Nothing waits for input unless it needs a terminal; without one it stops and names the command that works without it.",
+        distro_ids().join(", ")
+    )
+}
 
-/// The LevitateOS workspace front door: set up, build, boot, test and check.
+/// The workspace front door for the LevitateOS family's variants: set up,
+/// build, boot, test and check.
 #[derive(Parser)]
-#[command(name = "xtask", bin_name = "cargo xtask", after_help = AFTER_HELP)]
+#[command(name = "xtask", bin_name = "cargo xtask", after_help = after_help())]
 pub struct Cli {
     #[command(subcommand)]
     pub cmd: Cmd,
@@ -84,7 +189,7 @@ pub enum Cmd {
 
     /// Show which scenarios pass, fail, are stale or have not run.
     Status {
-        #[arg(value_enum, default_value_t = Distro::Levitate)]
+        #[arg(value_parser = DistroParser)]
         distro: Distro,
         /// Print the statuses as JSON.
         #[arg(long)]
@@ -93,7 +198,7 @@ pub enum Cmd {
 
     /// Forget saved scenario results for a distro.
     Reset {
-        #[arg(value_enum, default_value_t = Distro::Levitate)]
+        #[arg(value_parser = DistroParser)]
         distro: Distro,
     },
 
@@ -171,7 +276,7 @@ pub enum TuiCmd {
 pub enum BaseCmd {
     /// Resolve the newest signed build of each base package (release + updates) and write the lock.
     Lock {
-        #[arg(value_enum, default_value_t = Distro::Levitate)]
+        #[arg(value_parser = DistroParser)]
         distro: Distro,
         /// Only report packages with newer builds (exit 1 if any).
         #[arg(long)]
@@ -179,44 +284,17 @@ pub enum BaseCmd {
     },
 }
 
-/// A product ISO.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, ValueEnum)]
-pub enum Product {
-    #[value(name = "base-rootfs")]
-    BaseRootfs,
-    #[value(name = "live-boot")]
-    LiveBoot,
-    #[value(name = "live-tools")]
-    LiveTools,
-}
-
-impl Product {
-    pub fn id(self) -> &'static str {
-        match self {
-            Self::BaseRootfs => "base-rootfs",
-            Self::LiveBoot => "live-boot",
-            Self::LiveTools => "live-tools",
-        }
-    }
-}
-
 #[derive(Subcommand)]
 pub enum BuildCmd {
-    /// The base-rootfs ISO.
-    #[command(name = "base-rootfs")]
-    BaseRootfs(ProductArgs),
-    /// The live-boot ISO.
-    #[command(name = "live-boot")]
-    LiveBoot(ProductArgs),
-    /// The live-tools ISO (the one the install scenarios use).
-    #[command(name = "live-tools")]
-    LiveTools(ProductArgs),
+    /// A release product's ISO (one subcommand per release product).
+    #[command(flatten)]
+    Product(ProductBuild),
     /// The kernel: compiled from source, or downloaded with --prebuilt.
     Kernel(KernelArgs),
     /// Download (or refresh) the rootfs source that product builds start from.
     #[command(name = "rootfs-source")]
     RootfsSource {
-        #[arg(value_enum, default_value_t = Distro::Levitate)]
+        #[arg(value_parser = DistroParser)]
         distro: Distro,
         /// Download it again even if it is present.
         #[arg(long)]
@@ -224,41 +302,94 @@ pub enum BuildCmd {
     },
     /// Prepare a product and build its rootfs and overlay EROFS images (no ISO).
     Erofs {
-        #[arg(value_enum)]
-        product: Product,
-        #[arg(value_enum, default_value_t = Distro::Levitate)]
+        #[arg(value_parser = Choices(release_products))]
+        product: ProductId,
+        #[arg(value_parser = DistroParser)]
         distro: Distro,
     },
 }
 
-impl BuildCmd {
-    pub fn product(&self) -> Option<(Product, &ProductArgs)> {
-        match self {
-            Self::BaseRootfs(args) => Some((Product::BaseRootfs, args)),
-            Self::LiveBoot(args) => Some((Product::LiveBoot, args)),
-            Self::LiveTools(args) => Some((Product::LiveTools, args)),
-            _ => None,
+/// `cargo xtask build <product> <distro>`: a subcommand per release product.
+pub struct ProductBuild {
+    pub product: ProductId,
+    pub distros: DistroSelection,
+}
+
+/// "The live-tools ISO (input of the live-tools, install and ab-update scenarios)".
+fn product_about(product: ProductId) -> String {
+    let scenarios: Vec<&str> = product.scenarios().map(ScenarioId::key).collect();
+    let list = match scenarios.split_last() {
+        Some((last, [])) => format!("the {last} scenario"),
+        Some((last, rest)) => format!("the {} and {last} scenarios", rest.join(", ")),
+        None => return format!("The {product} ISO"),
+    };
+    format!("The {product} ISO (input of {list})")
+}
+
+impl FromArgMatches for ProductBuild {
+    fn from_arg_matches(matches: &ArgMatches) -> Result<Self, clap::Error> {
+        let (name, sub) = matches
+            .subcommand()
+            .ok_or_else(|| clap::Error::new(ErrorKind::MissingSubcommand))?;
+        let product = ProductId::from_name(name)
+            .filter(|product| product.is_release())
+            .ok_or_else(|| clap::Error::new(ErrorKind::InvalidSubcommand))?;
+        Ok(Self {
+            product,
+            distros: DistroSelection::from_arg_matches(sub)?,
+        })
+    }
+
+    fn update_from_arg_matches(&mut self, matches: &ArgMatches) -> Result<(), clap::Error> {
+        *self = Self::from_arg_matches(matches)?;
+        Ok(())
+    }
+}
+
+impl Subcommand for ProductBuild {
+    fn augment_subcommands(cmd: Command) -> Command {
+        ProductId::releases().fold(cmd, |cmd, product| {
+            cmd.subcommand(
+                DistroSelection::augment_args(Command::new(product.name()))
+                    .about(product_about(product))
+                    .long_about(None),
+            )
+        })
+    }
+
+    fn augment_subcommands_for_update(cmd: Command) -> Command {
+        Self::augment_subcommands(cmd)
+    }
+
+    fn has_subcommand(name: &str) -> bool {
+        ProductId::from_name(name).is_some_and(ProductId::is_release)
+    }
+}
+
+/// A distro, or every distro with `--all`.
+#[derive(Args)]
+pub struct DistroSelection {
+    #[arg(value_parser = DistroParser, required_unless_present = "all")]
+    pub distro: Option<Distro>,
+    /// Every distro.
+    #[arg(long, conflicts_with = "distro")]
+    pub all: bool,
+}
+
+impl DistroSelection {
+    pub fn distros(&self) -> anyhow::Result<Vec<Distro>> {
+        match (&self.distro, self.all) {
+            (_, true) => Distro::all(),
+            (Some(distro), false) => Ok(vec![distro.clone()]),
+            (None, false) => Err(crate::util::exit::usage("name a distro, or --all for every distro")),
         }
     }
 }
 
 #[derive(Args)]
-pub struct ProductArgs {
-    /// Defaults to levitate.
-    #[arg(value_enum)]
-    pub distro: Option<Distro>,
-    /// Build it for every distro.
-    #[arg(long, conflicts_with = "distro")]
-    pub all: bool,
-}
-
-#[derive(Args)]
 pub struct KernelArgs {
-    #[arg(value_enum, required_unless_present = "all")]
-    pub distro: Option<Distro>,
-    /// Every distro.
-    #[arg(long, conflicts_with = "distro")]
-    pub all: bool,
+    #[command(flatten)]
+    pub distros: DistroSelection,
     /// Download the distro's prebuilt kernel instead of compiling.
     #[arg(long, conflicts_with = "autofix")]
     pub prebuilt: bool,
@@ -282,23 +413,12 @@ pub struct KernelArgs {
     pub llm_profile: Option<String>,
 }
 
-/// A scenario that boots for interactive use.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, ValueEnum)]
-pub enum RunScenario {
-    #[value(name = "live-boot")]
-    LiveBoot,
-    #[value(name = "live-tools")]
-    LiveTools,
-    /// The disk the latest install scenario produced.
-    #[value(name = "installed-boot")]
-    InstalledBoot,
-}
-
 #[derive(Args)]
 pub struct RunArgs {
-    #[arg(value_enum)]
-    pub scenario: RunScenario,
-    #[arg(value_enum, default_value_t = Distro::Levitate)]
+    /// A scenario whose input it boots: its ISO, or the latest install's disk.
+    #[arg(value_parser = Choices(runnable_scenarios))]
+    pub scenario: ScenarioId,
+    #[arg(value_parser = DistroParser)]
     pub distro: Distro,
     /// Wait for SSH on a forwarded port and open a shell over it (live scenarios).
     #[arg(long)]
@@ -331,34 +451,12 @@ pub struct BootArgs {
     pub ssh_key: Option<PathBuf>,
 }
 
-/// An automated scenario, or all of the ones that boot (in run order).
-#[derive(Clone, Copy, Debug, PartialEq, Eq, ValueEnum)]
-pub enum TestScenario {
-    /// live-boot, live-tools, install, installed-boot, automated-login, runtime.
-    All,
-    #[value(name = "build-preflight")]
-    BuildPreflight,
-    #[value(name = "live-boot")]
-    LiveBoot,
-    #[value(name = "live-tools")]
-    LiveTools,
-    Install,
-    #[value(name = "installed-boot")]
-    InstalledBoot,
-    #[value(name = "automated-login")]
-    AutomatedLogin,
-    Runtime,
-    /// On a copy of the install disk: stage the release into slot B, then trial
-    /// boot, fallback, commit and rollback (A/B installs only).
-    #[value(name = "ab-update")]
-    AbUpdate,
-}
-
 #[derive(Args)]
 pub struct TestArgs {
-    #[arg(value_enum)]
-    pub scenario: TestScenario,
-    #[arg(value_enum, default_value_t = Distro::Levitate)]
+    /// A scenario, or all of them.
+    #[arg(value_parser = Choices(test_selections))]
+    pub scenario: TestSelection,
+    #[arg(value_parser = DistroParser)]
     pub distro: Distro,
     /// Rerun even if the cached result for the same inputs passed.
     #[arg(long)]
