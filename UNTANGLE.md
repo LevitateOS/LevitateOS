@@ -2765,3 +2765,32 @@ These are the reference failures for the final comparison (`.artifacts/untangle-
   - **Verified:** a `{:#?}` dump of the loaded contract for both distros, taken before and after, differs only in `schema_version` 6→7, the removed build fields, and `signing_key` `ring3/keys/…` → `keys/…`. Invalid files (bad console name, absolute path, `..`, unknown field, duplicate app) each give one error. `cargo xtask check` passes. `check tui` gives the same failure as the re-run baseline: the install-docs snapshot. The five disk-plan stories now pass. An AcornOS live-tools ISO built through the new contract and hooks (`A1KLTLnNeq5gN1qS`).
   - **Behaviour change:** every caller now fails on an invalid variant; the load checks that recipe, input, kconfig and key paths exist and that output counts are exact. distro-builder takes the repo root from its working directory.
   - **Kept for later fixes:** `extends` and `installed_uki`, so the dump stays equivalent (dropping them is the D17 decision); the positional live/emergency/debug UKI order (G16); the `leviso`/`acornos` aliases (G06); the distro lists in xtask and install-tests (G05); the builder's migration docs (G32).
+- [x] G04 — Each variant declares its distro profile once. contract `b6e5546`, builder `e068584`, recstrap `911a7a4`, recab `82bdb4d`, install-tests `81a3cd7`, tui `fe052ae`, docs/content `b08f830`, superproject commit "G04: …".
+  - **New leaf crate `distro/profile`** (`distro-profile`): `PackageBackend`, `InitSystem`, `Libc` (and the Rust and bun targets that follow from it), `PrivilegeTool`, `Desktop`, `KernelLine`, `Profile`. Its `REC_*` os-release fields are written into each image's `/etc/os-release` by the base product, and `Profile::from_os_release` reads them back.
+  - **Contract:** `[profile]` in `distro.toml`. The iso label, default hostname, login prompt and kernel localversion are derived from the id, with the same values. `OverlayKind` and the per-action `target` are gone.
+  - **Readers stop probing and name-matching:**
+    - the builder's live tools, tool targets and bun target;
+    - `system-setup.sh`;
+    - recsetup and recstrap (privilege tool, user tool, init, locale);
+    - recab's init system;
+    - install-tests, where `DistroContext` and `src/distro/{levitate,acorn}.rs` are replaced by the loaded variant;
+    - xtask gen, which writes `docs/content/src/distros.ts` for the TUIs.
+  - **Behaviour change:**
+    - recsetup, recab and `system-setup.sh` refuse a target whose os-release lacks the `REC_*` fields.
+    - recstrap validates an extracted tree by its profile instead of `ESSENTIAL_DIRS`.
+    - New users get root's shell from the target's passwd.
+    - Only compiled glibc or musl locales are offered (no `localedef`/`locale-gen` path; neither distro used one).
+    - OpenRC keymaps go through `loadkmap` only.
+    - `UTC` needs the zoneinfo file like any other zone.
+  - **Bug fixed along the way:** turning the systemd probe in the release hook into the declared fact exposed that base-rootfs is not the whole system (G14). base-rootfs now explicitly doesn't carry the installed initramfs (`carries_installed_system`), as the probe had silently arranged.
+  - **Verified:**
+    - `cargo xtask check` passes; `check tui` shows only the known install-docs snapshot difference.
+    - The contract dump differs only by `[profile]` and the removed `live_overlay.kind` and `target` fields.
+    - base-rootfs, live-boot and live-tools ISOs build for both distros, and base-rootfs's `/etc/os-release` carries the profile (`REC_INIT=openrc`/`systemd`, …).
+    - The live-boot/live-tools ISOs built in this run predate the base-rootfs rebuild, so they still carry the old os-release. They need rebuilding (deferred list below) before recsetup or recab can be tried in them.
+  - **Left:** P009 and P022 (product decisions, G07); TL016, TO3145 and Z016 partly (keymap and service backends, G13); CL3153 (the recipe's `BIN` default stays: public recipes take no required defines); C084 (UKI/ISO names, G05). U011, U015, U037–U041, U080–U082, U092, U093, UD1032, UD1048 and UD1135 now have generated data and move to G22/G23.
+
+**Deferred to a daytime batch (after 10:00; the build fans are too loud at night).** Run in one go, in this order:
+1. Rebuild for both distros: `release build iso live-boot <distro>`, then `live-tools`. That's ~45 min through `/tmp/iso-run-fixed.sh target/debug/distro-builder …`.
+2. Check `/etc/os-release` in each live rootfs for the `REC_*` lines (`dump.erofs --cat --path=/etc/os-release`).
+3. Run the VM scenarios once G26 drops preflight's privileged Recipe kernel check. Until then, scenarios can't run in this environment: as vince, the check needs Ginux host privileges; as root, the libvirt session VM can't start.

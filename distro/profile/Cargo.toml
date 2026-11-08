@@ -1,0 +1,11 @@
+[package]
+name = "distro-profile"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+description = "The base facts that make the LevitateOS variants differ (packages, init, libc, privilege tool, desktop, kernel line) and their os-release form"
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }

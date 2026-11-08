@@ -119,9 +119,10 @@
       "name": "@levitate/recab-tui",
       "version": "0.1.0",
       "bin": {
-        "recab-tui": "./src/main.ts",
+        "recab-tui": "./src/main.tsx",
       },
       "dependencies": {
+        "@levitate/docs-content": "workspace:*",
         "@levitate/tui-kit": "workspace:*",
         "ink": "^6.8.0",
         "react": "^19.2.0",

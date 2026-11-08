@@ -6,15 +6,26 @@ schema_version = 7
 [identity]
 os_name = "LevitateOS"
 os_id = "levitateos"
-iso_label = "LEVITATEOS"
 os_version = "1.0"
-default_hostname = "levitateos"
+
+# The base facts this variant differs in (`distro_profile::Profile`). The
+# builder writes them into the image's /etc/os-release as REC_* fields, which
+# the install tools read on the target. The ISO label (`os_id` in capitals),
+# default hostname (`os_id`), login prompt (`<os_id> login:`) and kernel
+# localversion (`-<variant id>`) follow from the identity, and every tool is
+# built for the libc.
+[profile]
+packages = "rpm"
+init = "systemd"
+libc = "glibc"
+privilege = "sudo"
+desktop = "plasma"
+kernel_line = "lts"
 
 # The kernel is built from `kconfig` beside this file.
 [build.kernel]
 version = "6.12.116"
 sha256 = "cb3ed3dfdd47e6ade49dc933db334fd86e24cadee920da612c262b0e9b6a511b"
-localversion = "-levitate"
 
 [sources.rootfs_source]
 storage_max_objects = 131072
@@ -212,9 +223,6 @@ extends = "product.rootfs.base"
 [products.kernel_staging]
 logical_name = "product.kernel.staging"
 description = "Kernel image and modules staging product"
-
-[product_config.live_overlay]
-kind = "systemd"
 
 # Recipe owns the complete system filesystem. Product assembly consumes that
 # published tree without maintaining a second package/file selection here.
@@ -484,7 +492,6 @@ pass_marker = "INSTALLED BOOT PASSED"
 auth_mode = "default_password_login"
 default_username = "levitate"
 default_password = "levitate"
-login_prompt_pattern = "levitateos login:"
 
 [scenarios.automated_login.evidence]
 script_path = "automated-login.sh"

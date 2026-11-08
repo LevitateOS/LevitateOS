@@ -263,7 +263,8 @@ struct LiveBootPatterns {
 
 impl LiveBootPatterns {
     fn load(distro_id: &str) -> Result<Self> {
-        let live = install_tests::distro::load_scenarios(distro_id)?.live_boot;
+        let root = crate::util::repo::repo_root()?;
+        let live = distro_contract::load(&root, distro_id)?.contract.scenarios.live_boot;
         let fatal = install_tests::qemu::serial::live_fatal(&live);
         let mut success = live.success_patterns;
         success.push(recqemu::serial::protocol::SHELL_READY_MARKER.to_string());

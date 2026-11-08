@@ -6,15 +6,26 @@ schema_version = 7
 [identity]
 os_name = "AcornOS"
 os_id = "acornos"
-iso_label = "ACORNOS"
 os_version = "1.0"
-default_hostname = "acornos"
+
+# The base facts this variant differs in (`distro_profile::Profile`). The
+# builder writes them into the image's /etc/os-release as REC_* fields, which
+# the install tools read on the target. The ISO label (`os_id` in capitals),
+# default hostname (`os_id`), login prompt (`<os_id> login:`) and kernel
+# localversion (`-<variant id>`) follow from the identity, and every tool is
+# built for the libc.
+[profile]
+packages = "apk"
+init = "openrc"
+libc = "musl"
+privilege = "doas"
+desktop = "lxqt"
+kernel_line = "latest"
 
 # The kernel is built from `kconfig` beside this file.
 [build.kernel]
 version = "7.3.3"
 sha256 = "79c66dde66cd96877fcde8f7d36aec946b1f423d2b97b5a7b1751b75c764f3d1"
-localversion = "-acorn"
 
 [sources.rootfs_source]
 storage_max_objects = 131072
@@ -55,9 +66,6 @@ extends = "product.rootfs.base"
 logical_name = "product.kernel.staging"
 description = "Kernel image and modules staging product"
 
-[product_config.live_overlay]
-kind = "openrc"
-
 # Recipe owns the complete system filesystem. Product assembly consumes that
 # published tree without maintaining a second package/file selection here.
 [[product_config.boot_live.producers]]
@@ -87,38 +95,32 @@ package = "recpart"
 [[product_config.live_tools_actions]]
 kind = "tool_payload_workspace_binary"
 package = "recstrap"
-target = "x86_64-unknown-linux-musl"
 
 [[product_config.live_tools_actions]]
 kind = "tool_payload_workspace_binary"
 package = "recstrap"
 binary = "recfstab"
-target = "x86_64-unknown-linux-musl"
 
 [[product_config.live_tools_actions]]
 kind = "tool_payload_workspace_binary"
 package = "recstrap"
 binary = "recchroot"
-target = "x86_64-unknown-linux-musl"
 
 [[product_config.live_tools_actions]]
 kind = "tool_payload_workspace_binary"
 package = "recstrap"
 binary = "recsetup"
-target = "x86_64-unknown-linux-musl"
 
 # A/B updates on the installed system: recab stages the inactive slot with
 # recstrap. Both go into the rootfs, which is what the installer extracts.
 [[product_config.live_tools_actions]]
 kind = "rootfs_workspace_binary"
 package = "recab"
-target = "x86_64-unknown-linux-musl"
 destination = "usr/bin/recab"
 
 [[product_config.live_tools_actions]]
 kind = "rootfs_workspace_binary"
 package = "recstrap"
-target = "x86_64-unknown-linux-musl"
 destination = "usr/bin/recstrap"
 
 # The install screen's split pane; live only, so it goes into the overlay.
@@ -126,7 +128,6 @@ destination = "usr/bin/recstrap"
 kind = "tool_payload_workspace_binary"
 package = "install-split-pane"
 binary = "install-split"
-target = "x86_64-unknown-linux-musl"
 
 # The live ISO's install screen: this shell beside the install docs. getty
 # starts it on each console listed; the serial console runs it only when the
@@ -310,7 +311,6 @@ pass_marker = "INSTALLED BOOT PASSED"
 auth_mode = "default_password_login"
 default_username = "acorn"
 default_password = "acorn"
-login_prompt_pattern = "acornos login:"
 
 [scenarios.automated_login.evidence]
 script_path = "automated-login.sh"

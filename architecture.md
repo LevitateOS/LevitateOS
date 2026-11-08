@@ -4,8 +4,9 @@ LevitateOS and AcornOS each declare themselves in one file, `distro/variants/<di
 
 | Section | Responsibility |
 |---|---|
-| `identity` | OS name, id, ISO label, hostname |
-| `build.kernel` | Kernel version, checksum and localversion |
+| `identity` | OS name, id and version (the ISO label, hostname, login prompt and kernel localversion are derived from the ids) |
+| `profile` | The base facts the variants differ in: package backend, init, libc, privilege tool, desktop, kernel line (written into the image's os-release as `REC_*`) |
+| `build.kernel` | Kernel version and checksum |
 | `sources` | Recipe selection and source acquisition |
 | `products`, `product_config` | Filesystem composition and runtime payloads |
 | `transforms` | EROFS, initramfs, UKI and ISO artifacts |

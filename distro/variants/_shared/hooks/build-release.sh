@@ -39,10 +39,14 @@ ISO_SHA="${ISO_SHA:-${ISO_PATH%.iso}.sha512}"
 
 ROOTFS_PATH="${RELEASE_OUTPUT_DIR}/${ROOTFS_FILENAME}"
 INITRAMFS_LIVE_PATH="${RELEASE_OUTPUT_DIR}/${INITRAMFS_LIVE_FILENAME}"
-# The installed system's own initramfs (systemd; mounts root=), shipped on the ISO at
-# boot/ for recsetup to install. The live one only finds the live medium.
-INITRAMFS_INSTALLED_FILENAME="${INITRAMFS_INSTALLED_FILENAME:-initramfs-installed.img}"
-INITRAMFS_INSTALLED_PATH="${RELEASE_OUTPUT_DIR}/${INITRAMFS_INSTALLED_FILENAME}"
+# The installed system's own initramfs (it mounts root=), when the variant declares
+# one (empty otherwise); shipped on the ISO at boot/ for recsetup to install. The
+# live one only finds the live medium.
+: "${INITRAMFS_INSTALLED_FILENAME?missing INITRAMFS_INSTALLED_FILENAME}"
+INITRAMFS_INSTALLED_PATH=
+if [ -n "$INITRAMFS_INSTALLED_FILENAME" ]; then
+    INITRAMFS_INSTALLED_PATH="${RELEASE_OUTPUT_DIR}/${INITRAMFS_INSTALLED_FILENAME}"
+fi
 LIVE_OVERLAY_DIR="${RELEASE_OUTPUT_DIR}/${LIVE_OVERLAY_DIRNAME}"
 LIVE_OVERLAY_IMAGE="${RELEASE_OUTPUT_DIR}/${LIVE_OVERLAY_IMAGE_FILENAME}"
 BUSYBOX_URL="${BUSYBOX_URL:-https://busybox.net/downloads/binaries/1.35.0-x86_64-linux-musl/busybox}"
@@ -272,10 +276,9 @@ cargo run -q -p recinit -- build-tiny \
 need_file "$INITRAMFS_LIVE_PATH"
 
 # Built from the same rootfs the ISO installs, so its systemd, udev and modules match the
-# installed system. A rootfs without systemd (AcornOS: OpenRC boots without an
-# initramfs) needs none.
-rm -f "$INITRAMFS_INSTALLED_PATH"
-if [ -e "${ROOTFS_SOURCE_DIR}/usr/lib/systemd/systemd" ]; then
+# installed system. A variant that boots without an initramfs declares none.
+if [ -n "$INITRAMFS_INSTALLED_PATH" ]; then
+    rm -f "$INITRAMFS_INSTALLED_PATH"
     cargo run -q -p recinit -- build-install \
         --rootfs "$ROOTFS_SOURCE_DIR" \
         --modules-dir "$MODULES_DIR" \

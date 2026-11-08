@@ -188,9 +188,10 @@ Evidence: `/tmp/recipe-t27-hello-final.log` and `hello-result-final.json` (earli
 owned by the coordinator and publication parents remain private; privileged
 production does not automatically make a product accessible to an ordinary user.
 
-For real compilation use `distro-builder artifact prepare-tool-source recfstab
-.artifacts/recfstab-source`, then the canonical `distro/builder/recipes/recfstab.rhai`
-with `--input source=...`; the recipe compiles inside Ginux. For QEMU preparation
+For real compilation use `distro-builder artifact prepare-tool-source recstrap
+.artifacts/recstrap-source`, then the canonical `distro/builder/recipes/install-tools.rhai`
+with `--input source=...` and `--define BIN=recfstab` (with `RUST_TARGET` and
+`INIT_SYSTEM` for the image's profile); the recipe compiles inside Ginux. For QEMU preparation
 use `cargo xtask setup`; boot scenarios consume the selected existing product.
 
 ## Verification limits
