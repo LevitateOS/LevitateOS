@@ -64,7 +64,7 @@ pub(crate) fn kernel_is_built(root: &Path, t: &KernelTarget) -> bool {
 }
 
 pub(crate) fn verify_one(root: &Path, t: &KernelTarget) -> Result<String> {
-    let kernel_root = distro_builder::run_history::kernel_output_dir(root, &t.distro_id);
+    let kernel_root = distro_contract::runs::kernel_dir(root, &t.distro_id);
     let rel_file = kernel_root.join(distro_builder::kernel::KERNEL_RELEASE_PATH);
     let vmlinuz = kernel_root.join(distro_builder::kernel::KERNEL_IMAGE_PATH);
 
@@ -121,7 +121,7 @@ pub(crate) fn build_kernel_via_recipe(
     let build_dir = distro_builder::recipe::recipe_work_dir(root, distro_id)?;
     let recipes_path = root.join("distro/builder/recipes");
     let (kconfig_path, fragments) = distro_builder::kernel::kconfig_inputs(&variant);
-    let kernel_artifact_root = distro_builder::run_history::kernel_output_dir(root, distro_id);
+    let kernel_artifact_root = distro_contract::runs::kernel_dir(root, distro_id);
 
     let mut cmd = Command::new(recipe_bin);
     cmd.current_dir(root);
@@ -173,7 +173,7 @@ pub(crate) fn install_prebuilt_kernel_via_recipe(
     let recipe_rhai = root.join(distro_builder::kernel::KERNEL_RECIPE);
     let build_dir = distro_builder::recipe::recipe_work_dir(root, distro_id)?;
     let recipes_path = root.join("distro/builder/recipes");
-    let kernel_artifact_root = distro_builder::run_history::kernel_output_dir(root, distro_id);
+    let kernel_artifact_root = distro_contract::runs::kernel_dir(root, distro_id);
 
     let mut cmd = Command::new(recipe_bin);
     cmd.current_dir(root)

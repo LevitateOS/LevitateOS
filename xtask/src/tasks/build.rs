@@ -23,13 +23,14 @@ pub fn run(what: BuildCmd) -> Result<()> {
 }
 
 /// The ISO of the latest successful build of a product, if any.
-pub fn latest_iso(distro: &Distro, product: ProductId) -> Option<PathBuf> {
-    install_tests::scenarios::resolve_release_iso(distro.id(), product).ok()
+pub fn latest_iso(distro: &Distro, product: ProductId) -> Result<Option<PathBuf>> {
+    let root = crate::util::repo::repo_root()?;
+    Ok(distro_contract::runs::latest_release_iso(&root, distro.id(), product)?)
 }
 
 /// The latest ISO of `product`, or a missing-prerequisite error naming the build.
 pub fn require_iso(distro: &Distro, product: ProductId) -> Result<PathBuf> {
-    latest_iso(distro, product).ok_or_else(|| {
+    latest_iso(distro, product)?.ok_or_else(|| {
         crate::util::exit::missing(
             format!("no {product} ISO has been built for {}", distro.id()),
             format!("cargo xtask build {product} {}", distro.id()),
@@ -56,7 +57,7 @@ fn product_isos(product: ProductId, distros: &[Distro]) -> Result<()> {
             &root,
             &["release", "build", "iso", product.name(), distro.id()],
         )?;
-        if let Some(iso) = latest_iso(distro, product) {
+        if let Some(iso) = latest_iso(distro, product)? {
             println!("built: {}", iso.display());
         }
         if let Some(scenario) = product.next_scenario() {
@@ -68,10 +69,7 @@ fn product_isos(product: ProductId, distros: &[Distro]) -> Result<()> {
 
 fn erofs(product: ProductId, distro: &Distro) -> Result<()> {
     let root = crate::util::repo::repo_root()?;
-    let prepared = root
-        .join(".artifacts/prepared")
-        .join(distro.id())
-        .join(product.name());
+    let prepared = distro_contract::runs::prepared_dir(&root, distro.id(), product);
     if prepared.exists() {
         std::fs::remove_dir_all(&prepared)?;
     }

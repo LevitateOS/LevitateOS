@@ -199,14 +199,11 @@ fn checks(root: &Path) -> Vec<Check> {
             checks.push(Check::new(
                 format!("{} {product} ISO", distro.id()),
                 false,
-                crate::tasks::build::latest_iso(distro, product)
-                    .map(|p| p.display().to_string())
-                    .ok_or_else(|| {
-                        (
-                            "not built".into(),
-                            format!("cargo xtask build {product} {}", distro.id()),
-                        )
-                    }),
+                match crate::tasks::build::latest_iso(distro, product) {
+                    Ok(Some(iso)) => Ok(iso.display().to_string()),
+                    Ok(None) => Err(("not built".into(), format!("cargo xtask build {product} {}", distro.id()))),
+                    Err(err) => Err((format!("{err:#}"), format!("cargo xtask build {product} {}", distro.id()))),
+                },
             ));
         }
     }

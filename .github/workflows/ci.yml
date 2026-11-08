@@ -79,11 +79,14 @@ jobs:
           # `all` is live-boot, live-tools, install, installed-boot, automated-login, runtime.
           target/release/levitate-xtask test all levitate --force
 
+      - name: Locate the live-tools ISO
+        run: echo "LIVE_TOOLS_ISO=$(target/release/levitate-xtask status levitate --json | jq -r '.artifacts["live-tools"]')" >> "$GITHUB_ENV"
+
       - name: Upload live-tools ISO
         uses: actions/upload-artifact@v4
         with:
           name: levitateos-live-tools-iso
-          path: .artifacts/out/levitate/releases/live-tools/run-*/*.iso
+          path: ${{ env.LIVE_TOOLS_ISO }}
           if-no-files-found: error
           retention-days: 7
 

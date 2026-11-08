@@ -3,7 +3,7 @@ use recinit::live::{BOOT_INJECTION_DIR, BOOT_INJECTION_ENV};
 use recqemu::libvirt::{runtime_dir, Domain, DomainSpec, SerialTarget, UefiVars};
 use recqemu::serial::Console;
 use install_tests::boot_injection::BootInjection;
-use install_tests::scenarios::{ScenarioId, resolve_latest_install_runtime};
+use install_tests::scenarios::{ScenarioId, resolve_latest_install_run};
 use crate::cli::{BootArgs, Distro, RunArgs, TestArgs, TestSelection};
 use crate::util::exit::usage;
 use std::fs::OpenOptions;
@@ -117,7 +117,7 @@ fn injection_payload(pairs: &[String], boot: &BootArgs) -> Result<Option<tempfil
 fn require_inputs(distro: &Distro, scenario: ScenarioId) -> Result<()> {
     let input = scenario.input();
     if input.install_run {
-        resolve_latest_install_runtime(distro.id()).map_err(|_| {
+        resolve_latest_install_run(&crate::util::repo::repo_root()?, distro.id()).map_err(|_| {
             crate::util::exit::missing(
                 format!("{scenario} needs a disk from the install scenario, and there is none for {}", distro.id()),
                 format!("cargo xtask test install {}", distro.id()),
@@ -156,7 +156,7 @@ pub fn test(args: TestArgs) -> Result<()> {
     let mut results = Vec::new();
     for scenario in scenarios {
         let result = require_inputs(distro, scenario)
-            .and_then(|()| install_tests::scenarios::run_scenario(distro.id(), scenario, args.force));
+            .and_then(|()| install_tests::scenarios::run_scenario(&root, distro.id(), scenario, args.force));
         if let Err(err) = &result {
             // A scenario's own failure is already reported by the run.
             if crate::util::exit::code_for(err) == 3 {
@@ -197,24 +197,33 @@ pub fn test(args: TestArgs) -> Result<()> {
 }
 
 pub fn status(distro: &Distro, json: bool) -> Result<()> {
+    let root = crate::util::repo::repo_root()?;
     if !json {
-        return install_tests::scenarios::print_status(distro.id());
+        return install_tests::scenarios::print_status(&root, distro.id());
     }
-    let scenarios: Vec<_> = install_tests::scenarios::scenario_statuses(distro.id())?
+    let scenarios: Vec<_> = install_tests::scenarios::scenario_statuses(&root, distro.id())?
         .into_iter()
         .map(|(scenario, status)| {
             serde_json::json!({ "scenario": scenario.key(), "status": status.label(), "error": status.error() })
         })
         .collect();
+    // The latest ISO of each release product, for scripts (CI uploads them).
+    let mut artifacts = serde_json::Map::new();
+    for product in distro_contract::ProductId::releases() {
+        let iso = distro_contract::runs::latest_release_iso(&root, distro.id(), product)?;
+        artifacts.insert(product.name().to_string(), serde_json::json!(iso));
+    }
     println!(
         "{}",
-        serde_json::to_string_pretty(&serde_json::json!({ "distro": distro.id(), "scenarios": scenarios }))?
+        serde_json::to_string_pretty(
+            &serde_json::json!({ "distro": distro.id(), "scenarios": scenarios, "artifacts": artifacts })
+        )?
     );
     Ok(())
 }
 
 pub fn reset(distro: &Distro) -> Result<()> {
-    install_tests::scenarios::reset_state(distro.id())
+    install_tests::scenarios::reset_state(&crate::util::repo::repo_root()?, distro.id())
 }
 
 fn boot_live_iso_serial(
@@ -504,11 +513,11 @@ fn common_ssh_args(key: &Path, ssh_port: u16, known_hosts: &Path) -> Vec<String>
 }
 
 fn boot_installed_disk(distro: &Distro, scenario_label: &str) -> Result<()> {
-    let runtime = resolve_latest_install_runtime(distro.id())?;
+    let runtime = resolve_latest_install_run(&crate::util::repo::repo_root()?, distro.id())?;
     eprintln!(
         "Booting installed {} from install scenario run {}...",
         distro.name(),
-        runtime.run_id
+        runtime.run.run_id
     );
     eprintln!("  disk: {}", runtime.disk_path.display());
     eprintln!("  ovmf vars: {}", runtime.ovmf_vars_path.display());
