@@ -15,6 +15,7 @@ macro_rules! fact {
     ($(#[$meta:meta])* $name:ident { $($(#[$vmeta:meta])* $variant:ident => $text:literal),+ $(,)? }) => {
         $(#[$meta])*
         #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+        #[cfg_attr(feature = "contracts", derive(schemars::JsonSchema, ts_rs::TS))]
         #[serde(rename_all = "snake_case")]
         pub enum $name {
             $($(#[$vmeta])* $variant),+

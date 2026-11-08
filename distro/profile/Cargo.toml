@@ -9,3 +9,9 @@ description = "The base facts that make the LevitateOS variants differ (packages
 
 [dependencies]
 serde = { workspace = true }
+schemars = { workspace = true, optional = true }
+ts-rs = { workspace = true, optional = true }
+
+[features]
+# JSON Schema and TypeScript derives for the tools that export a contract.
+contracts = ["dep:schemars", "dep:ts-rs"]
