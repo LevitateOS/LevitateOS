@@ -24,6 +24,7 @@ Written 2026-11-08 ~03:00 when the Claude token budget ran low. Several Claude s
   | G16 (release assembly in Rust; hooks deleted; cmdline as a build fact) | `distro/variants/*/hooks`, `_shared/hooks`, builder `bin/workflows/release_hook.rs`, a new release module, busybox recipe, contract cmdline | none |
   | G15 (one busybox installed initramfs for both) | recinit side landed (`d81ebe9`); remaining: rootfs packages and modules (agent E), release hook (G16), recstrap `plan.rs` and install-tests `preflight.rs` "always initramfs" (see the G15 Progress entry) | recinit side done |
 
+- **G07, G12 and G08** landed (see Progress). G08 left: the xtask wiring for `base lock acorn`, the doctor row for both distros, and removing the stopgap `rpm_base` field (steps in the G08 entry); AcornOS keymaps via `loadkeys` (recstrap and `system-setup.sh`).
 - **G28** recipe and docs half landed (see Progress). The Alpine NetworkManager packages are agent E's; `recsetup --copy-network` is a follow-up.
 - **Not started:** G30 (desktop as a product layer), the rest of G32 (root `README.md`, `architecture.md`, `xtask/README.md`, docs/content architecture pages, tui docs; once the code has settled). TO-14 (each tool declares the external commands it runs, and the builder checks them; format proposed in `merged-progress-G09.md`).
 - **Leftovers named in Progress entries.** Each "Left:" line names the fix it belongs to; sweep them after the fixes. For example:
@@ -52,6 +53,7 @@ Written 2026-11-08 ~03:00 when the Claude token budget ran low. Several Claude s
 5. **Re-audit:** fresh reviewers, using `.artifacts/untangle-repo/BRIEF.md`'s checklist on the changed code. Add what they find under a fix, apply, and repeat until nothing worth fixing is left. Then the final report: fixes landed, special cases before (613) and after, bugs fixed, what was left as is.
 
 ## Open items for the user
+- Recipe's e2e tests (`tools/recipe/tests/e2e/preseed_recipes.rs`, out of scope) still expect the old Alpine preseed outputs and `sources/alpine.rhai` (G08). They need updating by whoever owns Recipe.
 - Delete two stray remote branches pushed by mistake (both contain only commits already on the right branch):
   - `git -C . push origin --delete main` (superproject; its branch is `master`);
   - `git -C distro/builder push origin --delete master` (builder; its branch is `main`).

@@ -3162,3 +3162,128 @@ These are the reference failures for the final comparison (`.artifacts/untangle-
   - **Behaviour change:** AcornOS installed boots NetworkManager instead of networking+dhcpcd; the guide's AcornOS WiFi step is now nmcli.
   - **Left:** (1) agent E: rootfs packages `networkmanager`, `networkmanager-wifi`, `networkmanager-openrc`, `wpa_supplicant`, drop `dhcpcd`/`iw`/`ifupdown` and `etc/network/interfaces` (in the Alpine rootfs producer; not found in my paths); (2) the carry is a manual `cp -a` step in the docs, not a recsetup option; (3) `pages.ts` also holds another agent's `RECIPE` hunk, committed with mine; (4) 08-troubleshooting is the other agent's file but now reads correctly through `network(d)`; (5) fsdbg WiFi expectation (PA1110), scenarios requiring `networking`/`dhcpcd` on AcornOS (`distro/variants/acorn/scenarios/scenarios.toml:80`), and `live-boot.sh` route check (G26) need updating.
   - **Follow-up (PA-03):** replace the manual `cp -a` WiFi carry step with a `recsetup --copy-network` option; it belongs with the leftovers sweep.
+- [x] G07 — One shared capability set that both images provide. contract `411d7f2`, builder `69323a7`, install-tests `ab03a48` (its message has literal `\n`s: a quoting slip, and a force-push to fix it was refused), superproject `46a121e` "G07: …" (pointers, both `distro.toml`). D4 follow-up: contract `3f28232`, builder `3cb2c86`, superproject `75aa67e`. Paths: `distro/contract/{capabilities.txt,src/{schema,lib,validate,runtime}.rs}`, `recipes/installed-system.rhai` (G13's file; G13 left D1/D10 to G07), `recipes/sources/levitate-rpm-lock.rhai`, `test-scripts/{live-tools,runtime}.sh`, the `[sources.rootfs_source].inputs`, `rpm_base.packages`, `[live]` and `[installed]` sections of both `distro.toml`. Each commit holds only my hunks: the G11 and builder-renderer agents had uncommitted edits in the same files, so they were committed from a temporary index.
+  - **One list:** `distro/contract/capabilities.txt` lists `command <name>` (36: shell and userland, vi/vim, loadkeys, disk tools, network, diagnostics) and `locale <name>` (musl-locales' 16 languages) that every live and installed system has.
+    - The contract reads it with `include_str!` (`system_commands()`, `locales()`).
+    - `installed_tools()` = privilege tool + `UPDATE_TOOLS` (recab, recstrap) + the commands. `live_tools()` = `INSTALL_TOOLS` + the installed ones. Both variants now get the same 37/41 tools.
+    - `[live].tools`, `[installed].tools`, `LIVE_TOOLS`/`INSTALLED_TOOLS` and the `command` rule are gone.
+    - `validate_live_boot_runtime` (build-preflight) checks that each command and the privilege tool is on PATH in the built rootfs, and each locale is there (glibc `usr/lib/locale/<l>.utf8|<l>/LC_CTYPE`, musl `usr/share/i18n/locales/musl/<l>.UTF-8`).
+    - Both variants pass the file to the rootfs source as input `capabilities`. G12's shared readiness check reads it.
+  - **Services:** `installed-system.rhai` `capability_services(init)` enables `chronyd` and `auditd` on both, plus `dbus` on OpenRC (systemd starts D-Bus from the socket the RPM backend links). The service-present check covers them. The live system is the rootfs plus the overlay, so it runs them too. `LiveService::Audit` is gone, and LevitateOS's `[live].services = ["audit"]` with it.
+  - **Shell:** the policy sets root's login shell to `/bin/bash` and adds it to `/etc/shells`. recsetup gives new users root's shell, so new users get bash. AcornOS's install-screen shell moves to bash with G08, when bash is in its package set.
+  - **Serial:** OpenRC's installed inittab runs `/usr/local/libexec/serial-login ttyS0`. That script starts getty only when `/proc/cmdline` names the port as a console, the same rule as systemd's getty generator. Live consoles are unchanged.
+  - **LevitateOS packages** (in `distro.toml` and the lock): vim-enhanced, vim-common, vim-filesystem, xxd, which, gpm-libs, libsodium, pixman, tar, gzip, htop, hwloc-libs, smartmontools, hdparm, chrony, kbd-legacy, and glibc-langpack-{cs,de,es,fi,fr,it,nb,nl,pt,ru,sr,sv}.
+    - dnf repoquery against the Fedora 45 release and updates repos resolved them, with their library closure.
+    - I downloaded the 28 new RPMs, checked them with `rpmkeys --checksig` against `keys/RPM-GPG-KEY-fedora-45-primary` (all OK), and added them to `levitate-rpm-lock.rhai` with their sha256, sorted as xtask writes them. The lock now equals the package list (158/158). The other rows and `locked_on` are unchanged, so the daytime `cargo xtask base lock levitate` run still refreshes them.
+  - **Scripts:** `live-tools.sh` keeps only the live environment checks (PATH, block subsystem, modules, iwlwifi, interfaces, PCI probe), because the harness runs every contract tool. `runtime.sh` checks the privilege policy (`visudo -c` / `doas -C`) by `REC_PRIVILEGE`, not by the os-release `ID`.
+  - **Verified:**
+    - In a scratch copy of HEAD + these changes: `cargo check --all-targets` of the contract passes, and both variants load (`live_tools`/`installed_tools` printed and equal apart from sudo/doas).
+    - All recipes compile under Rhai 1.19.
+    - A stubbed-fs Rhai run of `installed::apply(…, "openrc")` gave the expected passwd, shells, inittab, serial-login and runlevels.
+    - `sh -n` passes on both scripts.
+    - The superproject's `cargo check -p distro-builder` fails in other agents' uncommitted `overlay.rs`/`products.rs`/`live_tools.rs`, not in these files. **No build or VM run.**
+  - **Behaviour changes:**
+    - LevitateOS gains vim, htop, smartctl, hdparm, tar, gzip, chrony, console keymaps and 15 more locales.
+    - Both installed systems run chronyd and auditd. AcornOS's also runs dbus (LevitateOS's already had socket-activated D-Bus).
+    - Root's shell is bash on both.
+    - AcornOS's installed serial login appears only with `console=ttyS0`.
+    - Every live and installed scenario checks 36 more commands.
+    - LevitateOS live-tools no longer fails on `vi` (P068).
+  - **Bugs fixed:**
+    - LevitateOS shipped no console keymaps: `kbd` has none, they are in `kbd-legacy`.
+    - The docs' `timedatectl set-ntp` had no NTP client behind it (PA1138, client side).
+  - **AcornOS:** the decisions' AcornOS packages (bash, GNU sed/gawk/diffutils/procps-ng, kbd, usbutils, audit, chrony, dbus, tar, gzip) land with G08's lock, because the hand-pinned APK list cannot take them. **Until G08's commit, an AcornOS rootfs build fails at "installed system lacks the openrc service chronyd".**
+  - **Left:**
+    - The builder's Rust tool table `pipeline/live_tools.rs` still names the rec* binaries beside `INSTALL_TOOLS`/`UPDATE_TOOLS`. Another agent is editing that file, and it belongs to builder-core.
+    - TV-03's Rust half is agent A's, in install-tests `mod.rs`:
+      - one `check_tools` for both transports (TV1040);
+      - quoting the tool name (TV2031);
+      - `tool_run_command` arms for `recsetup` (TV1043);
+      - deleting `test_tool` from `common.sh` and the README (TI110). No script uses it now.
+    - kbd keymaps through `loadkeys` on AcornOS need recsetup's `keymap_dirs`/`keymap_loader` (`tools/recstrap/src/bin/recsetup/target.rs`, OpenRC: `usr/share/kbd/keymaps`… and `etc/init.d/loadkeys`) and `system-setup.sh`'s keymap verb (`etc/conf.d/loadkeys keymap=`, `rc-update add loadkeys boot`) to switch together. recstrap has another agent's uncommitted edits, so kbd-bkeymaps stays until then (PA2110, PA-07).
+    - Docs: PA1138's `timedatectl` step and PA2021's "adds sshd" sentence (docs-content).
+    - PA2112 (Alpine motd/alpine-release), PA3082 (the OpenRC base list vs systemd's static wants), PA3077 (synthetic UTC) and PA2057 (`openrc-init`, removed from the package set in G08; recab's branch remains, tools/recab).
+    - **D4 (lead):** NetworkManager over wpa_supplicant on both. `capabilities.txt` gains `nmcli` and `iw`, and LevitateOS takes NetworkManager-wifi, wpa_supplicant, wireless-regdb, libnl3, pkcs11-provider and iw (signature-checked, 164/164 in the lock). `wpa_supplicant` itself is not a listed command, because its probe would be `-v`, not `--version`. AcornOS's NetworkManager/wpa_supplicant/iw land with G08. It keeps dhcpcd/ifupdown, because `installed-system.rhai` `network_services` and contract `LiveService::Network` still name them; G28 switches those. WiFi firmware is G15. AcornOS's `[live].services = ["network"]` is still redundant with the installed network links (G28).
+- [x] G12 (recipe half) — One rootfs producer lifecycle with RPM and APK backends. builder `68fdf3f`, superproject `25debdd` (builder pointer). Paths: `recipes/{rootfs-producer,fedora-rpm-source-rootfs,alpine-live-source-rootfs}.rhai`, `recipes/sources/alpine.rhai` (`mirror`), and `recipes/installed-system.rhai` (`busybox_applets` moved out; G13 left it to G12).
+  - **Lifecycle (`rootfs-producer.rhai`):** each producer starts with `//! extends: rootfs-producer.rhai` (Recipe's one-level base), sets `ctx.init` and supplies `verify_inputs(ctx)`, `unpack(ctx, root)` and `package_effects(ctx, root)`.
+    - The base owns `is_acquired`/`acquire` (verify once per phase; `build` no longer re-hashes), `is_built`, `build`, `is_installed`, `install`, `cleanup` and `remove`.
+    - `build` = wipe → unpack → package effects → drop `var/cache`/`var/log` → `target_finalize` → `var/log/audit` 0700 → `installed::apply` → `target_finalize` → completeness check (throws) → stamp. Both backends follow the same protocol: finalize once after the packages' accounts exist (it resolves file owners against them) and once after policy (RG2165). Both now wipe and rebuild in `build` (BR016).
+    - **One completeness rule:** every `command` of the `capabilities` input (`distro/contract/capabilities.txt`, G07), `mkfs.fat` (recpart; its `--version` probe fails, so it is not a scenario command) and systemd-boot's EFI binary (bootctl). It replaces Fedora's 45-path list (sonames, its own writes, the contract's SSH files) and Alpine's `_rootfs_valid` chain (BR013, RG1023, RG2012, RG2032, RG3027, RG1025, RG1026).
+    - **Freshness:** the hand-bumped `"fedora-rpm-set-v4-…"` and `"alpine-source-v12-…"` markers and `.source-rootfs.recipe-version` inside the tree are gone (BR014, BR015, BR031).
+      - Recipe's retained-state identity (`tools/recipe/src/retained.rs`) already hashes the recipe, its `extends` base, every import (lock, facts, `installed-system.rhai`) and every input (`system_setup`, `os_release`, `capabilities`, preseed outputs). Any change therefore starts from an empty `/out` and rebuilds.
+      - `rootfs.built` beside the tree only records that a build finished.
+  - **RPM backend:**
+    - The `filesystem` package's layout is checked: `usr/sbin` must be the ghost link to `bin`, and `/bin`, `/sbin`, `/lib` and `/lib64` must be its merged-/usr links. A mismatch is an error, not a silent skip (RG2169). The six links that never fired, the `sh` link, the eleven `mkdir -p` calls and `_extract_rpm_into_rootfs` are gone (RG1031, RG1033, BR021, BR027, BR028). The unquoted `chmod -R`/`rm -rf` are gone too (BR029).
+    - Accounts come from the packages' own `usr/lib/sysusers.d`, made as systemd-sysusers makes them: groups first, then users, existing names kept, `-` takes the highest free id below 1000. The hand-typed sshd 74/dbus 81 lines are gone (BR022, RG1036). This also gives chrony (G07), systemd-coredump, -oom, -timesync and tss their accounts.
+    - PAM: systemd's factory `system-auth` (an error if missing), plus `password-auth` and `postlogin` written always (BR023, RG2030).
+    - dbus-broker's activation links; `sudoers.d/10-wheel` (still the profile's `config_file()`, so it stays; RG2168 is left).
+    - `gnu-smoke` is gone: the capability check covers the commands (RG3027, BR012).
+  - **APK backend:**
+    - One `sbin/apk.static` path (checked in the pinned apk-tools-static; RG2018).
+    - The ISO is extracted afresh in each build through `xorriso` only. The 7z fallback and the reuse of a partly extracted `iso-contents` are gone (BR019, RG2163).
+    - `--repository <iso>/apks` replaces writing the ISO path into the image's `/etc/apk/repositories`, which now names only the release branch's `main` and `community` from `sources/alpine.rhai`'s `mirror` (RG1015).
+    - `busybox_applets` now lives here (RG1044). The package effects are the applets, `doas.conf` and the interfaces/dhcpcd config the OpenRC network services read.
+    - `locale.conf` and `empty.sshd` are gone: the policy writes them.
+    - The unused ctx fields and the "acorn" profile switch are gone (BR018, BR017). The names say "system rootfs", not "live" (RG1051 partly: the file name stays, see below).
+  - **Verified:**
+    - Every recipe compiles under Rhai 1.19.
+    - A scratch harness merged base + child as Recipe does (`base_ast += child`), with Recipe's fs helpers stubbed onto the real filesystem and `target_extract_rpm` as `rpm2cpio | cpio`. It ran `fedora-rpm-source-rootfs` over the **real 164 locked RPMs**: is_acquired ready → is_built needs work → build → is_built ready → is_installed ready, in 16 s.
+    - That tree had sysusers accounts (chrony 998, dbus 81, sshd 74 with home `/usr/share/empty.sshd`, tss 59, the systemd users), the PAM stack, auditd/chronyd/NetworkManager enabled, bash in `/etc/shells`, the 16 locales and the merged-/usr links.
+    - The Alpine backend was only compiled and setup-run (no ISO here). **No Recipe/Ginux, ISO or VM run.**
+  - **Behaviour changes:**
+    - sshd's home is `/usr/share/empty.sshd` (the package's), not `/run/sshd`.
+    - System accounts' shell is `/usr/sbin/nologin` as sysusers declares it.
+    - More system accounts exist up front.
+    - The AcornOS image's `/etc/apk/repositories` no longer names the build's ISO path.
+    - Every rootfs build re-extracts the Alpine ISO.
+  - **Risk for the daytime run:** the first `target_finalize` now runs after `package_effects`. On Alpine, `busybox_applets` reads `etc/busybox-paths.d/busybox` and writes links before staging access is granted. apk installs as uid 1000, owning the files, so this should hold, but it is the first build that checks it.
+  - **Left:**
+    - **tools/recipe (not mine):** `tests/e2e/preseed_recipes.rs` `cli_rootfs_consumers_reject_changed_explicit_assets` copies only `installed-system.rhai` and the consumer into its scratch recipe dir. It now also needs `rootfs-producer.rhai`, and after G08 the alpine lock in place of `sources/alpine.rhai` facts. File names are unchanged because those tests and the rootfs-source work dir (keyed by recipe stem) use them.
+    - **Builder Rust (BC-14, CL-10; other agents are editing those files):** BC3151, BC3154, BC1092, BC3072, BP073, BP129, BP130, BC1067, BR095, CL3087, CL1093, CL1095, CL1096, BR093, BR135, BR092 (`defines`), and RG1021 (products.rs).
+    - Live overlay (`live-overlay.rhai`, another agent's): BR053, BR054, RG2081 (`.recipe-live-overlay` inside the overlay), RG1078. BR105 (install-tools).
+    - P013 in part: the scriptlet effects are now in one place per backend, but with no shared list. RG1023's library completeness by `distro/elf` is not done; the scenarios' tool probes catch a missing library.
+    - RG-01: the init and the privilege config are still each backend's literal. The `os_release` input (REC_INIT/REC_PRIVILEGE) could supply them.
+- [x] G08 (builder, recipe and variant half; the xtask wiring is left, see below) — Both package sets are declared the same way and locked by one tool. contract `d2269f0`, builder `b3a2839`, superproject `d947052` (pointers, both `distro.toml`, `acorn/keys/`, and G15's AcornOS `[installed] initramfs = true` line, as the lead asked). Each commit holds only my hunks, made through a temporary index: other agents had uncommitted edits in `schema.rs`, `validate.rs`, `variant.rs` and both `distro.toml`.
+  - **One shape:** `[sources.rootfs_source.base]` = `release` (Fedora `"45"`, Alpine `"v3.24"`), `signing_key` (under the variant's `keys/`) and `packages` (what the system needs). It is `PackageBaseContract`, validated by one rule set for both, plus "release is a number" for RPM.
+    - Every variant needs a preseed now.
+    - `rpm_base` (`RpmBaseContract`, `fedora_release: u32`) is no longer in the file. It is derived at load for an RPM variant, so `xtask/src/tasks/{base,setup}.rs` compile unchanged.
+    - C090 and C109 are done: AcornOS declares `keys/alpine-devel@lists.alpinelinux.org-6165ee59.rsa.pub`. CV1034 is done, and CV3109 in part: the tool-fact comments are reworded to what the package groups are.
+  - **AcornOS lock** (`recipes/sources/acorn-apk-lock.rhai`, the same module shape as `levitate-rpm-lock.rhai`): `release()`, `locked_on()`, `mirror()`, `signing_key()` ([file name, PEM]), `apk_tools()` and `packages()`, as [name, name-version, URL, sha256] rows.
+    - It is the closure of `base.packages` (45 names, including G07's bash, GNU sed/gawk/diffutils/procps-ng/tar/gzip, kbd + kbd-legacy, usbutils, audit, chrony, dbus, and D4's networkmanager(-cli, -wifi) + wpa_supplicant + iw) over v3.24 main+community, as apk resolves it: dependencies, provides and install_if, so the `-openrc` service files come with their packages. That is 189 APKs plus apk-tools-static (3.0.9-r0, the same pin as before).
+    - **Every APK was verified with `apk.static --keys-dir … verify` against the variant's key: all OK.**
+    - It includes the real `e2fsprogs` and util-linux `blkid` that G15's initramfs copies.
+    - `openrc-init` (PA2057) and `pixman` (RG1013, now a vim dependency) are no longer hand pins. Packages are now v3.24's current builds, not the ISO 3.24.4 point release: security updates, by the G08 decision.
+    - **Written tonight by a scratch resolver** that follows the algorithm the xtask command must implement (`.artifacts/untangle-repo/refactor/apklock-G08.py`: APKINDEX parse, provider choice by name, then `k:` priority, then version, install_if to a fixpoint, sha256 of each download, apk verify). The header names `cargo xtask base lock acorn`, which does not exist yet.
+  - **APK producer:**
+    - It installs only the locked files with the locked apk.static. The release key goes in `etc/apk/keys/` and apk checks every signature: no `--allow-untrusted` (RG1142).
+    - No ISO, xorriso or `iso-contents` (BR019, RG2163). No `_profile_packages` or `sources/alpine.rhai` (deleted; BR002, BR017, RG1012, RG2144). The image's `/etc/apk/repositories` comes from `lock::mirror()` (RG1015).
+    - Because package scripts do not run, the backend makes the accounts the packages' `.pre-install`/`.post-install` add: klogd (busybox), chrony, messagebus (dbus), dhcpcd, and group plugdev (NetworkManager). Each takes the lowest free system id from 100, with uid = gid where both are free.
+    - Shells, var/log/audit and the applets are covered elsewhere (G07/G12).
+  - **One preseed:** `recipes/locked-preseed.rhai` holds the one download/verify loop (file name = the URL's basename, in one place; RG1137, BR033). Each lock's preseed is a 10-line child naming its lock and its output: `fedora-rpm-preseed` → `rpms`, `alpine-preseed-source-assets` → `apks`.
+    - The refresh hint no longer names a command or distro (BR034).
+    - AcornOS's `preseed_outputs` is `{ apks = "directory" }`, which ties the three name places down to two (BR032 partly).
+  - **Verified:**
+    - Contract: HEAD + these edits compile, and both variants load in a scratch copy, minus G21's pending `[install_ux]` removal. Each variant has 43 live / 39 installed tools; LevitateOS has a derived rpm_base.
+    - Every recipe compiles under Rhai 1.19.
+    - The stubbed-fs harness ran the **APK producer over the real 190 locked files with the real apk.static** on this host (usermode, signature-checked): build → is_built ready. The tree has every capability command, the accounts, bash in `/etc/shells`, root's shell bash, the 16 musl locales, auditd/chronyd/dbus/dhcpcd in default, and the busybox `vi`.
+    - `alpine-preseed-source-assets` reached is_acquired/is_installed ready over the same files. `fedora-rpm-preseed` ran acquire.
+    - The workspace `cargo check -p levitate-xtask` stops in install-tests `preflight.rs` on another agent's pending `rootfs_source_pointer` rename, not here. **No Recipe/Ginux, ISO or VM run.**
+  - **Behaviour changes:**
+    - AcornOS packages are v3.24's current builds; it gains the G07/D4 sets, rootfs grows to about 106 MiB installed.
+    - The AcornOS preseed downloads 45 MiB of APKs instead of the 1 GB extended ISO, so the first AcornOS build re-preseeds (new output names).
+    - An Alpine package with a bad signature now fails the build.
+  - **Left, xtask wiring.** `git log -- xtask/src/tasks/base.rs` has no "G10:" commit (the last is G09 `bf4c27b`), so I left it as instructed. Precise steps:
+    1. `base.rs` reads `contract.sources.rootfs_source.base` and dispatches on `profile.packages`. RPM is the current resolver, keeping `release.parse::<u32>()`. APK is `apklock-G08.py`'s algorithm over `<mirror>/<release>/{main,community}/x86_64/APKINDEX.tar.gz`, after checking the index signature with the variant key. It downloads every row to `.artifacts/apk-cache/<release>`, runs `apk.static verify` with `--keys-dir <variant>/keys` (absolute path), and writes `acorn-apk-lock.rhai` in this file's exact format: `apk_tools()` = newest `apk-tools-static`; the key PEM from `base.signing_key`.
+    2. Delete the derived `rpm_base`/`RpmBaseContract` (contract `schema.rs`, `variant.rs`, `lib.rs`).
+    3. `cli.rs` `base lock` takes every distro; the help stops saying "Fedora" (X005).
+    4. `setup.rs` doctor gets a lock-age row for both, reading `locked_on()`/`release()` (X006, X079, XT1062).
+    5. `--check` should compare the lock's names with `base.packages` (RG2177). No recipe can see `distro.toml`, so xtask is the place.
+  - **Left, elsewhere:**
+    - **tools/recipe (not mine):** `tests/e2e/preseed_recipes.rs` drives these recipes with the old ISO/`extra_apks` facts and `sources/alpine.rhai`. Those tests must move to the `apks` output and `acorn-apk-lock.rhai` rows, and copy `locked-preseed.rhai`/`rootfs-producer.rhai`.
+    - Docs: `docs/recipe-declared-needs.md` (iso/apk_tools/extra_apks) and `docs/desktop.md:86` (extra_apks) are stale. Also PA3124 and X116 (`architecture.md`).
+    - LevitateOS still hand-lists libraries: the RPM resolver resolves no dependencies (BR004, `dnf --resolve` in xtask step 1).
+    - RG2162: systemd-boot is 260.2 vs 262.1, and Alpine v3.24 has no newer build.
+    - BR037/C085/C069 (memory sizes, `storage_max_objects`, `network_hosts = []` per variant), CV1069/BR092 (`defines`), BR035 (preseed host vs lock URLs), and `kind` (the builder still reads it; builder-core).
+    - RG-11's `linux-deps.rhai` (RG1125, RG1126, BR072, RG3074) is the kernel owner's (G11). RG1136/RG1138: the preseed still re-hashes in `is_built`/`is_installed`, because Recipe's e2e tests expect every action to catch corruption.
+    - X069–X072, XT1060, XT1061, XT2079 and XT2081 sit in base.rs's resolver code (xtask step 1).
+    - G15: `usr/lib/modules/<release>` and the curated firmware come from the kernel/firmware producers, not these package sets.
