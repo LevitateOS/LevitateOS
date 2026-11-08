@@ -32,7 +32,7 @@ sha256 = "79c66dde66cd96877fcde8f7d36aec946b1f423d2b97b5a7b1751b75c764f3d1"
 
 [sources.rootfs_source]
 storage_max_objects = 131072
-inputs = { system_setup = "distro/builder/guest/installed/system-setup.sh", capabilities = "distro/contract/capabilities.txt" }
+inputs = { capabilities = "distro/contract/capabilities.txt" }
 memory_mib = 4096
 preseed_memory_mib = 4096
 network_hosts = []
