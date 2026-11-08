@@ -1,196 +1,158 @@
-# PRD14 — bootstrap, packaging and fresh host
+# PRD14 — reproducible bootstrap, packages and fresh host
 
-**In progress: maintained-source reproduction.** On 2026-11-08 the user
-explicitly authorized keeping the working version in our own repositories,
-keeping upstream Ginux leading, and completing PRD14 against it. This replaces
-the earlier local-only source-delivery hold. Publish the prepared history to
-`LevitateOS/ginux:main` and `LevitateOS/recipe:master`, then verify fresh network
-checkouts and a disposable Rocky host. No upstream PRs/comments, package
-publication or hosted job dispatch are authorized. macOS remains indefinitely
-deferred. Product kernels are not rebuilt.
+**Complete on the maintained source pair.** The selected maintained sources are
+Ginux `28f4368f6fd70d0e485386892a08d6734b5988dd` and Recipe
+`e7bfc166343164989794c917e67f187d0ac49ba8`. See
+[delivery-sources.json](delivery-sources.json) for the complete source/artifact
+selection. Our repositories supply both histories; no upstream PRs/comments,
+crate publication, release tag, package publication or hosted workflow dispatch
+were performed. macOS is indefinitely deferred.
 
-The source, packaging and execution receipts below describe the completed
-preparation run. They remain bound to those exact revisions; the new obtainable
-source run will have separate receipts before PRD14 is marked complete.
+The user explicitly authorized maintaining our working version in our own
+repository, keeping upstream Ginux leading, and including Gate 11 PR #249.
+Ginux contains every commit of current upstream main `53a54adde` and PR #249
+head `9759daaec`. The last refresh found those unchanged. PR #249 is still open;
+its performance gate is partial and no accepted performance baseline is claimed.
+New upstream changes remain authoritative; replace/drop downstream changes as
+upstream supplies their behavior. This replaces the previous source-delivery
+hold. Superproject gitlinks and HTTPS source URLs now select the obtainable pair.
 
-## Sources and identities
+## Exact fresh-host combination
 
-| Component | Exact identity |
+The new transient `qemu:///session` domain `rocky-prd14-delivery` used the verified
+stock Rocky 10.2 cloud base, kernel 6.12 and glibc 2.39. Both repositories were
+cloned/fetched over public HTTPS inside the guest, without credentials, local
+source archives, Git alternates or developer Cargo caches. Its registry/rustup
+caches were absent initially. All fourteen RPM/Rust inputs were downloaded anew
+from their documented publishers; all twelve RPM signatures passed with Rocky's
+stock key. The dated Rust channel manifest matched both SDK/component hashes.
+OCI objects were independently fetched, verified and assembled by the maintained
+Ginux scripts, with no prebuilt helper override. No product kernel was rebuilt.
+
+| Role | Exact identity |
 | --- | --- |
-| Recipe candidate | `124f378063ce449e3799aad9b43dfac9404754f1` |
-| Executed Recipe core | `2e20a031268309b7016898ff71a005b07b995819`; all final Rust bytes unchanged |
-| Public OCI assembler | Fresh upstream clone `53a54addea67969abaa240ea478def1b94130eee` |
-| Provisional configured runtime | `a498e4f6148d5d94ce4ba8edb79588b7883f6a0f`, production `f7f0d14c` |
-| Runtime binary | `0dd243fa90ea12117448dfdfbfd170ac8260e0ab3116f116acaa37c40c263ce3` |
-| RPM/archive coordinator and matching worker | `506397afa70f3bd717da7c1c1227e1233bdd8a2607bafbd92a6e73fe60e5d97b` |
-| RPM/host image producer | `7de227aa9a387f59638e42a826f566c7ee37e23828fe1fcb793ec309ee27455f` |
-| VM source/crate-installed coordinator and worker | `e7cf94abfe426c61135e9ea63e362fe504f77edea97498bc602fe3889bb83c1d` |
-| VM source/crate-installed image producer | `3f108d729ca73a6f3a71a8891548b45c0c49b3397a226e115b281894bf5f0459` |
-| Release Cargo.lock | `48c776bdeb1cf63378e7132fd1dfbc1a819db09a95a23fa3f7ecb1b676e85f65` |
-
-The source and crate/RPM metadata changed after core execution; source and binary
-comparisons explicitly establish equivalence. The original and completed RPMs
-contain identical executable bytes. No passes from different runtime/worker/
-image combinations are combined into a full-suite claim. PRD10/PRD13's earlier
-152-case results remain bound to their recorded `c089…` image and source.
-
-## Fresh bootstrap reproduction
-
-Acquisition began in a new empty task-owned directory. Current official
-BaseOS/AppStream primary metadata was fetched, its SHA-256 checked against
-repomd.xml, and all twelve pinned RPM hashes matched. Both Rust archive hashes
-matched the official dated 1.99.0 channel manifest. The newly downloaded cloud
-image matched the official checksum and tracked pin. OCI index, manifest,
-config, layer and uncompressed diff identities were verified by upstream's own
-fetch/prepare producers. No old global input/image cache supplied these bytes.
-
-The fresh Rocky 10.2 VM started without a Cargo registry or rustup cache. It
-used its normal CA store and stock Rocky signing key to verify all twelve RPM
-signatures. It independently cloned/built the public assembler and downloaded/
-prepared the OCI objects. The resulting base matches the host byte-for-byte.
-
-| Derived output | SHA-256 |
-| --- | --- |
-| Public assembled base | `b93bfd0f6deea2a7a96216655cda3ebbd87a445231548ff491ee30aed20a36ab` |
+| Ginux launcher | `360d22582219d6910fe616d724d4dfb690af24fd891926fa422e4283b6e34cb6` |
+| Recipe coordinator and matching worker | `901543ff7462db3348371eee1f84fa9e3a9f056e43b3e48f21a5beac3c39bbc1` |
+| Recipe image producer | `104cce02442d530e7d8e62ad902ec78206ecf40639d8a4c72166ee8395720c59` |
+| Standalone Cargo.lock | `48c776bdeb1cf63378e7132fd1dfbc1a819db09a95a23fa3f7ecb1b676e85f65` |
+| Assembled public base | `b93bfd0f6deea2a7a96216655cda3ebbd87a445231548ff491ee30aed20a36ab` |
 | Compiler image | `a8edd8faecd8125a19a70356e8969209f9f78efcf1333c250de6c6afc1807776` |
-| Acquisition/musl/ISO-tools image | `ffe04d8671e45036ac77acc958fb6cfd3c24a939075dc7e6c5437b69d7f05c15` |
+| Acquisition/musl image | `ffe04d8671e45036ac77acc958fb6cfd3c24a939075dc7e6c5437b69d7f05c15` |
+| Source crate | `0e3d19bba5dee6d9eaade4ce171336181c15c48e70376a3af250659c5c883c4b` |
+| Local RPM | `dcff3100c1901445d2e20af479dee5952922be1a590e5b7ff4b8cc3afab9d67e` |
+| Local binary archive | `46a49861cf771f4b3b888d58f7b205fa99f5a9aff7178e6afe1893b7d0be19e8` |
 
-Both compiler and acquisition images match across host and VM producers, and
-again when composed by the installed RPM producer with **PATH=/usr/bin:/bin**.
-That last path excludes the installed Rust toolchain/private build outputs.
-Host Rust is 1.99.1; VM Rust is the verified 1.99.0 SDK; both use RPM 4.19.1.1.
-Every provenance input/hash/size is checked against the selected manifests and
-actual outputs. The image producer is always built from current source or
-installed from its actual package; no migration executable or fixture CA is used.
+The guest used the pinned official Rust 1.99.0 GNU SDK and RPM 4.19.1.1. Both
+images match the independent prior host/VM producer outputs byte-for-byte. The
+installed RPM producer reproduces them again with **PATH=/usr/bin:/bin**, as the
+ordinary operator, without Rust or private producer binaries in that path. Every
+provenance input/hash/size matches its manifest and actual input/output bytes.
+Fresh produced images and package artifacts were copied back and rehashed.
 
-## Findings and concrete dispositions
+## Required outcomes and evidence
 
-| Finding | Disposition |
+New evidence root: `.artifacts/ginux-contribution-preparation/prd14-delivery/`.
+
+| Required outcome | Exact-source evidence |
 | --- | --- |
-| F14-1: Fresh source cannot build with --locked because Cargo.lock was ignored | Reproduced exit 101 in a new external export. `1e83d06` retains the independently resolved/tested lock; the locked build passes. Separate fresh unlocked stable/MSRV CI exports preserve independent resolution coverage. Workspace Cargo.lock was not replaced. |
-| F14-2: Upstream prepare's fallback assembler inherits native -nostdlib flags | Initial standard-library link failure retained. Build the existing public host assembler with RUSTFLAGS='' and use its GINUX_VFS_INDEX override. Both environments reproduce successfully without an unpublished assembler patch. |
-| F14-3: Recorded derived base pin 1026f8d3… is not declared public producer output | Two independent host assemblies and the fresh VM all produce b93bfd0f… from the exact pinned OCI objects. The verified raw layer is f0c7ff1a…. `2e20a03` corrects both manifests and the default bare-root reference; it completes all twelve input URLs. Default-bare execution and wrong-root identity rejection pass. No private old base was substituted. The historical B21 default-image finding now has a reproducible pin; bare-image lack of compilers is explicitly documented. |
-| F14-4: Rocky has no rpm2cpio-named package | Failed package-list attempt retained; corrected setup installs normal signed tools and checks both rpm2archive/rpm2cpio commands. |
-| F14-5: RPM omitted required image producer/bootstrap material | `124f378` adds recipe-image, the rpm converter dependency and setup/author docs, manifests and examples. Automatic ELF requirements stay enabled. The real RPM reinstalls with DNF, rpm -V passes, both files match built binaries, and its producer independently reproduces both images as the ordinary operator. |
-| F14-6: Documentation overpromised no final directory after every producer error | Corrected to the actual atomic non-replacing publication contract. Pre-publication failures leave no fresh output; a late error after rename may leave a complete fresh directory and callers must reject non-success. No rollback/late-fault runtime acceptance is fabricated. |
-| F14-7: Output usability for the actual privileged operator | Image outputs are operator-owned. Coordinator state/logs/generations are root-owned/private. Privileged inspection/execution works; an explicit administrator copy produces an ordinary-user-owned executable which runs without sudo. No unsafe SUDO_UID-based chown or rootless promise is introduced. |
+| Obtain/build the maintained source without private worktrees | `vm-runtime-build.log`, corrected `vm-runtime-verify.log`, `vm-recipe-build.log`, source availability receipts and final clean-source identities |
+| Public pinned inputs and ordinary publisher trust | `vm-inputs.log`, `public-inputs.json`, dated Rust metadata, stock RPM signature checks; independent OCI verify/assemble output |
+| Real compiler/acquisition production and provenance | `vm-producer-controls.log`, both retained `fresh-images/*/rootfs.tar` and provenance; installed-RPM reproduction in `vm-followups.log` |
+| Failure preservation | Existing output, wrong input digest and missing converter all fail; both prior valid images/provenance stay unchanged, no fresh failed output or private temporary directories; `failure-controls/results.json` |
+| Crate, binary and RPM packaging | `cargo package --locked` verifies the real crate; source-crate cargo install builds both bins in a separate empty target; actual RPM/DNF install and rpm -V pass; required recipe-image/docs/manifests/examples/converter dependency and automatic ELF requirements remain |
+| Hello/build/restart/public network | `operator/execution-receipt.json`: all thirteen requirements pass on one tuple, including hello, actual GNU Cargo build and six joined threads, readiness/reuse, pinned public HTTPS and Git acquisition, and fresh denied-network acquisition |
+| Actual musl program and installed producer | `rpm-complete-receipt.json`: static ELF has no INTERP, runs with `threaded-hello:42`, install/reinstall/readiness preserve one build/install; normal locks/linker threading remain |
+| Matching worker, public library and package execution | Real extracted-crate external Rust library consumer and installed source-crate/binary-archive CLI executions in `vm-followups.log`; matching worker selected explicitly for each CLI |
+| Operator ownership and defaults | Ordinary image outputs; root-private coordinator state/generations; explicit administrator copy executes as ordinary user; default bare root succeeds and wrong root digest fails; ownership/default and user-export receipts |
+| Catalog migration regression | All eleven NEEDS integration cases pass on the final pair, plus library_backend and image_producer; Ginux's 47 configured allow/deny cases and four native dispatch controls pass |
+| Build/static regression | Ginux make check, 140 retained unit cases, contract-doc and benchmark-report checks pass. Recipe fmt and strict Clippy for lib/bins/three integration targets pass. No Recipe unit tests or unit doctests were added or run |
 
-The real producer's existing-output, wrong-input-hash and missing-converter
-negative controls all preserve both valid images/provenance, leave no fresh
-failed publication, and clean their private temporary directories. Raw commands,
-errors and before/after hashes are in `failure-controls/results.json`. Signal
-interruptions may leave private temporary data as documented; automatic signal
-cleanup and exhaustive I/O fault coverage are not claimed.
+## Findings and disposition
 
-Probe-authoring failures are preserved separately: an unquoted `package` key
-is reserved in Rhai, and unconditional build readiness correctly bypasses lower
-acquisition phases. Corrected acquisition probes use `artifact` and source-based
-readiness. Neither is hidden as a product failure/pass or bypassed by an engine
-change. An initial ownership probe's stdout field was overwritten by its local
-variable reuse; `user-export-verification.json` independently captures the
-actual successful ordinary-user execution.
+| Finding | Concrete disposition |
+| --- | --- |
+| Fresh source lacked a tracked release lock | `1e83d06`, retained in Recipe e7bfc166: standalone lock and locked fresh builds; independent unlocked CI resolution coverage retained |
+| OCI fallback helper inherited freestanding linker flags | Ginux `a538e178`, retained in 28f4368f: build the std host tool with RUSTFLAGS=''; fresh guest prepares the base without GINUX_VFS_INDEX or a temporary helper binary |
+| Historical base pin 1026f8d3 did not reproduce | Recipe `2e20a03` pins actual public-derived b93bfd0f in both manifests and default bare root. New fresh OCI assembly agrees; wrong root identity is rejected |
+| Incorrect Rocky setup/package contents | Normal signed tools provide rpm2archive/rpm2cpio. Recipe `124f378` supplies both bins, rpm dependency, bootstrap material and docs/examples, retaining automatic ABI dependencies. Actual package installation and verification pass |
+| Overpromised failure/output ownership | Documented real publication boundary and explicit privileged coordinator/user export. The real producer's bounded failures preserve valid outputs; ordinary user execution after explicit export passes |
+| Gate 11 owns upstream catalog number 2 | Retired the conflicting local number. Explicit downstream catalog 1002 contains upstream 2 plus the ten configured forms, 193 total operations. Recipe migrates rendering, pinned reviewed network/non-network digests, tests and documentation. Known Recipe callers select the new catalog explicitly and reject incompatible digests |
+| Gate 11 dispatch parser reused a local field bit | Dispatch moves to unused bit 57, preserving storage/network fields and strict duplicate rejection. All 25 instance tests and round trips pass |
+| Gate 11 explicit yield denial failed startup | Reproduced on the disposable VM. Only allowed mediated yield creates a notification broker; denied yield follows the ordinary contract owner. Retained regression verifies allowed and denied yield in selective and paranoid modes |
+| Probe/command mistakes | Preserve the nested Cargo workspace refusal, nonexistent redundant fixture target, stdin-only shell wrapper that ran no child checks, and missing required spoof environment on the first library harness attempt. Corrected commands execute successfully on unchanged candidate source. Unrun/failed attempts are not passes; successful NEEDS cases were not needlessly repeated |
 
-## Actual execution and packaging outcomes
+## Reproduce
 
-The supported host exercised is stock Rocky 10.2, x86-64, kernel 6.12, glibc 2.39,
-under transient `qemu:///session` libvirt. No direct QEMU launch was used.
+Use the supported [Linux setup](../../tools/recipe/docs/setup-linux.md),
+[bootstrap input URLs and manifests](../../tools/recipe/bootstrap/README.md), and
+[versioned threaded example](../../tools/recipe/examples/threaded-hello.rhai).
+Start outside another Cargo workspace, install the documented signed host tools
+and verified official SDK, then obtain the exact pair:
 
-- Actual crate packaging/verification, source-crate cargo install of both bins,
-  release binary archive inspection/execution and RPM generation/requirements/
-  installation/verification pass. Local RPMs are explicitly unsigned candidates;
-  their integrity checks do not constitute release authentication.
-- Thirteen fixed-tuple requirements pass: hello install/restart/readiness; real
-  offline GNU Cargo build, joined-thread execution and cache/state reuse; actual
-  pinned public Rocky HTTPS and upstream Git HTTPS acquisition, restart and
-  readiness; and fresh denied-network acquisition. The successful public
-  acquisitions use stock publisher trust, not loopback servers or fixture CAs.
-- An external Rust public-library consumer built against the extracted crate
-  launches the configured worker even with spoofed worker environment flags;
-  its actual runtime path is /inputs. The source-crate-installed CLI and binary-
-  archive CLI each execute with their matching worker.
-- The exact versioned threaded example passes install/restart/readiness. A real
-  musl-target Cargo build and statically linked program execution also pass;
-  readelf confirms no INTERP. Cargo locks, default linker threading, metadata
-  validation and isolation remain active.
-- Root default selection uses the actual public-derived bare base; an incorrect
-  image digest fails. Root-private output ownership and explicit user export are
-  recorded, not silently presented as ordinary-user accessibility.
-- Package fmt, strict Clippy including all three integration targets, and actual
-  locked MSRV 1.93 checking pass after the base correction. No Recipe unit tests
-  or unit doctests were added or run.
+```sh
+git clone https://github.com/LevitateOS/ginux.git ginux
+git -C ginux checkout --detach 28f4368f6fd70d0e485386892a08d6734b5988dd
+git clone https://github.com/LevitateOS/recipe.git recipe
+git -C recipe checkout --detach e7bfc166343164989794c917e67f187d0ac49ba8
+(cd ginux && make build)
+(cd recipe && cargo build --locked --release --bins)
+(cd recipe && cargo package --locked)
+cargo install cargo-generate-rpm --version 0.21.1 --locked
+(cd recipe && cargo generate-rpm)
+```
 
-See Recipe [Linux setup](../../tools/recipe/docs/setup-linux.md), its
-[bootstrap input guide](../../tools/recipe/bootstrap/README.md), and the tested
-[threaded example](../../tools/recipe/examples/threaded-hello.rhai). The binary
-archive contains the coordinator/worker; the completed RPM and source crate
-provide its image producer. All roles and privileges are explicit.
+Acquire and verify the manifest's inputs into a new directory, run Ginux's
+`fetch-rocky-oci.sh`/`prepare-rocky-oci.sh` with its documented cache/work directory
+overrides, then run each actual recipe-image producer. Select that image's
+provenance SHA, the built Ginux launcher and the identical coordinator/worker
+binary. Run the whole coordinator with the documented bootstrap privileges.
+All exact VM scripts and commands are retained with the evidence; no source or
+bootstrap binary in the procedure depends on a private checkout.
 
-## Evidence and remaining required input
+## Limits and evidence retention
 
-Evidence root: `.artifacts/ginux-contribution-preparation/prd14/`.
-The final SHA-256 manifest verifies all **587 regular files**, with four recorded
-symlinks and zero special files; build caches and .git stores are excluded while
-exact source tar archives are retained. Manifest SHA-256:
-`d16e82728cfeb3fb878a09b074d23444ccc07768bafea088464d3a126effeae9`.
-It contains
-fresh acquisition records and publisher metadata, the initial failures and
-corrections, public assembler sources/logs, exact candidate archives, both
-produced images/provenance, package artifacts and metadata, static logs,
-source/binary equivalence, all VM scripts/transcripts and retrieved state.
-`final-source-packaging.json` pins current source and artifact hashes.
+This closes PRD14 bootstrap/package/fresh-host reproduction only. It does not
+close the complete current e2e catalog, hosted Linux CI, Daybreak/PRD09 security,
+or either distro's boot/installer/PTY/A-B product acceptance. Old 152-case receipts
+keep their original source and c089 image identities. Gate 11's performance
+budget failures are retained upstream and remain explicit. macOS stays deferred.
 
-Canonical final VM evidence archive SHA-256:
-`487146afb9eb07fa47e6b683746c32027a089e213077778800f989b40a771f5f`.
-It was independently verified before the disposable host was destroyed. Its
-312 members retain original metadata; `vm-evidence/` is a safe data-filtered
-review view, not a claim to preserve the guest's UID/GID on extraction. The
-canonical archive and recorded stat/ownership receipts are authoritative.
-The task domain, owned writable disk, NVRAM and private SSH key are removed;
-other domains were preserved. Publisher inputs/base image remain retained.
+Local RPMs are unsigned candidates, not authenticated published releases. The
+publisher inputs used ordinary CA/key trust; no fixture CA or metadata/locking/
+isolation bypass was used. The coordinator remains privileged; private output
+state is accessed/exported explicitly. Late errors after atomic publication may
+leave a complete final path: consumers reject non-success. Signal interruption
+may leave private temporary data; automatic signal cleanup and exhaustive I/O
+fault coverage are not claimed. Versioned publisher URLs may disappear; pinned
+hashes must never be silently substituted.
 
-## Maintained source run (in progress)
+The previous preparation manifest (587 regular files, SHA-256
+`d16e82728cfeb3fb878a09b074d23444ccc07768bafea088464d3a126effeae9`)
+remains historical evidence for its own provisional revisions. New exact-source
+receipts independently establish this maintained pair; earlier passes were not
+combined to claim a new full-suite pass.
 
-The user superseded the earlier local-only direction and authorized our own
-maintained repositories, with all current upstream main changes and Gate 11
-PR #249 included. The selected pair is pinned in
-[delivery-sources.json](delivery-sources.json). Both histories were pushed to
-our repositories without a force push, PR, upstream comment or package release.
-Push CI was skipped; no hosted/macOS verification is claimed.
+Canonical final VM evidence is `evidence-final.tar.gz`, **858 members**, SHA-256
+`fb38051284e8a053f075f5628ec4ec4dafbe27863cb8125974f4ec45b1de3ca1`.
+Its embedded final-source receipt agrees with the independently fetched JSON.
+The new SHA-256 manifest verifies **118 regular files**, zero symlinks and zero
+special files (2,698,425,447 logical bytes). Manifest SHA-256 is
+`b913d2361300e6888dedd0335e27df28b18c2d5bfe5a4a9ba115de9657b98f96`.
+Run `sha256sum --check --status .artifacts/ginux-contribution-preparation/prd14-delivery/SHA256SUMS`
+from the superproject root. Intermediate checkout/Git stores and Python bytecode
+are excluded; final exact source archives remain included.
 
-Ginux `28f4368f` includes upstream main `53a54adde` and Gate 11 head
-`9759daaec`. Gate 11 is unmerged upstream and partial on its performance budget;
-we do not treat expected future merging as an accomplished fact. Three actual
-integration findings were resolved: the upstream/local catalog-2 collision
-(migrate local configuration to downstream catalog **1002**), the duplicate
-parser seen-field bit (dispatch uses bit 57), and startup failure when yield is
-explicitly denied (route denied yield through the ordinary contract owner;
-create a notification broker only for an allowed mediated yield). Capacity is
-193 operations, the exact upstream-plus-configured inventory. Recipe pins
-reviewed network/non-network contract digests and matching integration assertions.
-
-The denied-yield startup failure was reproduced on the new disposable VM before
-the correction. Allowed and denied yields now pass in selective and paranoid
-modes; Ginux make check, retained unit tests, generated contract documentation
-and benchmark-report checks pass. Fresh HTTPS source acquisition in the VM,
-all fourteen public RPM/Rust inputs, stock RPM signature checks, independent
-OCI fetching/assembly and runtime build have passed. The resulting launcher is
-`360d22582219d6910fe616d724d4dfb690af24fd891926fa422e4283b6e34cb6`;
-the assembled base remains `b93bfd0f…`. Recipe/package/consumer reproduction is
-still running and PRD14 remains unchecked until it finishes successfully.
-
-New evidence: `.artifacts/ginux-contribution-preparation/prd14-delivery/`.
-Initial command-authoring errors are retained: a nested host checkout triggered
-Cargo's parent-workspace check (moved outside the workspace without editing its
-manifest), and a nonexistent redundant fixture target was replaced by the actual
-`build-launch-fixture` owner. Neither interrupted attempt counts as a pass.
-
-These checks do not close final-source hosted Linux, wider distro products or
-PRD09 security acceptance. The new ordinary regression checks are not inherited
-Daybreak adversarial authorization. The previously sealed preparation manifest
-remains authoritative for its earlier source only.
+The archive retains guest UID/GID/modes; no extracted review view is asserted to
+retain that metadata. The final source receipt verifies clean published sources,
+launcher/coordinator/worker/producer and harness hashes, all required outcomes,
+and no remaining task Ginux/worker processes. The archive and copied package/
+image digests were independently verified before destroying the disposable VM.
+Its transient domain, writable disk, NVRAM and private SSH key are removed;
+other domains were untouched. Public inputs/base and exact source archives remain.
 
 Active skill: `hdae-development`, discovered at
-`.agents/skills/hdae-development/SKILL.md`; reload it, its required reference,
-applicable AGENTS and this checkpoint after context shifts. Root instructions
-supersede skill process requirements. Continue the fresh maintained-source VM
-packaging/execution run, fix any real failure and record its exact evidence.
+`.agents/skills/hdae-development/SKILL.md`; reload the complete skill, required
+reference, repository instructions and this checkpoint after context shifts.
+Root instructions supersede skill ceremony. No PRD14 decision or required
+verification remains open. Other named release/security/product tasks retain
+their own acceptance requirements.

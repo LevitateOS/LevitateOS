@@ -1,5 +1,15 @@
 # PRD01 — runtime source delivery is incomplete
 
+Current source-delivery update (2026-11-08): the user explicitly authorized our
+maintained repositories, with current upstream main and Gate 11 PR #249
+included. [delivery-sources.json](delivery-sources.json) pins the obtainable pair,
+Ginux `28f4368f` and Recipe `e7bfc166`; the superproject pins those revisions over
+HTTPS. Fresh network source acquisition, launcher/worker builds and both image
+producers now pass on a new Rocky VM. The older missing-source/decision hold
+below is historical and superseded. PRD14's new package/consumer run is complete on that exact pair; source publication does not close security, hosted CI or distro boot
+acceptance. No upstream PR/comment or package release was published.
+
+
 The approved preference remains upstream Ginux, which always takes precedence.
 No maintained downstream release source has been selected or published. The old
 `tools/ginux` pin is demonstrably incompatible; neither moving it to today's

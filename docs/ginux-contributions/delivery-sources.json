@@ -3,7 +3,10 @@
   "recipe": {
     "repository": "https://github.com/LevitateOS/recipe.git",
     "revision": "e7bfc166343164989794c917e67f187d0ac49ba8",
-    "branch": "master"
+    "branch": "master",
+    "coordinator_and_worker_sha256_rust_1_99_0": "901543ff7462db3348371eee1f84fa9e3a9f056e43b3e48f21a5beac3c39bbc1",
+    "image_producer_sha256_rust_1_99_0": "104cce02442d530e7d8e62ad902ec78206ecf40639d8a4c72166ee8395720c59",
+    "standalone_lock_sha256": "48c776bdeb1cf63378e7132fd1dfbc1a819db09a95a23fa3f7ecb1b676e85f65"
   },
   "ginux": {
     "repository": "https://github.com/LevitateOS/ginux.git",
