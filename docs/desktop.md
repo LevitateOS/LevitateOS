@@ -5,18 +5,15 @@ the desktop and installs a desktop system. The base ISO does not change.
 
 ## Status (2026-11-07)
 
-Both desktops were built on the host the way the recipes build a rootfs
-(Fedora RPMs unpacked without their scriptlets; Alpine APKs installed with
-`apk.static --usermode`), then booted under libvirt with the distribution's
-own kernel. Both reach an autologged-in desktop. The real pipeline cannot
-build them yet: no live ISO currently builds, because Recipe fails to extract
-the Fedora RPMs inside Ginux (see `tools/recab/README.md`).
+Both desktops were built on the host the way the recipes build a rootfs, then
+booted under libvirt with the distribution's own kernel, and both reach an
+autologged-in desktop. The real pipeline cannot build them yet: no live ISO
+currently builds, because Recipe fails to extract the Fedora RPMs inside Ginux
+(see `tools/recab/README.md`).
 
 | | LevitateOS | AcornOS |
 |---|---|---|
-| Desktop | Plasma 6.8 on Wayland, SDDM | LXQt 2.4 on X11 (Alpine 3.24 has no `lxqt-wayland-session`), SDDM |
-| Packages (base included) | 800 RPMs | 459 APKs |
-| Tree | 2.6 GB, 116,515 files | 1.0 GB, 52,815 files |
+| Desktop | Plasma on Wayland, SDDM | LXQt on X11 (Alpine has no `lxqt-wayland-session`), SDDM |
 | Result | No failed units; logind session type `wayland` | Desktop up; OpenRC marks sddm failed (see below) |
 
 ## What the desktop recipes must do

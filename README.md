@@ -9,55 +9,33 @@ recipes that declare how to acquire, build and install each piece of software,
 and the installed system updates atomically: A/B slots are the default, a
 mutable install is an explicit opt-in.
 
-## Variants
+## Two sibling distros
 
-| | LevitateOS | AcornOS |
-|---|---|---|
-| **Stack** | glibc / systemd / GNU | musl / OpenRC / busybox |
-| **Base packages** | Fedora RPMs | Alpine APKs |
-| **Best for** | Maximum compatibility | A smaller, simpler base |
+LevitateOS and AcornOS are built by the same pipeline and offer the same
+features: the same install flow, the same A/B updates, the same recipes, and a
+live ISO with and without a desktop. They differ only in the facts each one
+declares in its own `distro/variants/<id>/distro.toml`: package backend (Fedora
+RPMs or Alpine APKs), libc and init, the admin tool (sudo or doas), the desktop
+(Plasma or LXQt) and the kernel line (LTS or latest). `distro_contract::load`
+reads and validates that file; the `[profile]` section holds the differing
+facts.
 
-Both are built by the same pipeline from their own declarations under
-[`distro/variants/`](distro/variants).
+## Working in the repository
 
-## Building and testing
-
-Everything runs through `cargo xtask` (`just <command>` is a short alias):
-
-```bash
-cargo xtask setup                              # repo SSH key, then a doctor report
-cargo xtask build kernel levitate --prebuilt   # or compile it: build kernel levitate
-cargo xtask build live-tools levitate          # the live ISO with the install tools
-cargo xtask run live-tools levitate            # boot it on a serial console
-cargo xtask test all levitate                  # boot, install, reboot and check the installed system
-cargo xtask check                              # quick sweep before committing
-```
-
-`cargo xtask --help` lists every command; [`xtask/README.md`](xtask/README.md)
-explains the exit codes and defaults, and [`architecture.md`](architecture.md)
-describes products, scenarios and where outputs go.
+Everything runs through `cargo xtask`; `cargo xtask --help` is the command
+reference and [`xtask/README.md`](xtask/README.md) says what xtask owns.
+[`architecture.md`](architecture.md) says where each fact lives (products,
+scenarios, outputs).
 
 ## Installing
 
-From the live ISO, the install tools work like Arch's:
-
-```bash
-recpart apply --disk /dev/nvme0n1 --confirm DESTROY   # A/B layout, mounted at /mnt (--mode mutable for one root)
-recstrap /mnt                                          # extract the system
-recfstab /mnt >> /mnt/etc/fstab
-recsetup inspect --root /mnt --json                    # choose target configuration
-recsetup apply --root /mnt --hostname myhostname        # apply machine settings
-recchroot /mnt -- passwd                               # set the installed root password
-```
-
-The live ISO boots into the install screen, a shell beside the full guide
-(`install-docs` opens the guide on its own), and the same pages are on the website.
+The live ISO boots into the install screen: a guide beside a shell, using the
+`rec*` install tools. The same pages are on the website and in
+[`docs/content`](docs/content).
 
 ## Recipes
 
-A recipe is a Rhai script with package facts, readiness checks and
-acquire/build/install hooks, run inside an isolated build domain. See
-[`docs/package-recipe-format.md`](docs/package-recipe-format.md) and
+See [`docs/package-recipe-format.md`](docs/package-recipe-format.md) and
 [`tools/recipe/WRITING_RECIPES.md`](tools/recipe/WRITING_RECIPES.md).
 
 ## Repository layout
@@ -70,11 +48,6 @@ tui/         terminal apps for the live ISO and installer
 docs/        content (site and live docs), website, design notes, history
 xtask/       the cargo xtask front door
 ```
-
-## Hardware
-
-x86-64-v3 (Haswell or newer), UEFI, 16 GB RAM and an NVMe disk are the
-baseline the distribution targets.
 
 ## License
 
