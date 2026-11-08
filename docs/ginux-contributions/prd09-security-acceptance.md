@@ -22,7 +22,7 @@ upstream publication or broader native policy is selected by this task.
 | Latest NEEDS Ginux donor | `e9b7ce0b40136f4a30892a072e28e65746a37e3b`, binary `bd0c09928c886245fb9a531b4b2d69e39995e804e9f6f232dd25b390ef41d118`. Source review confirms it still omitted the PRD04 corrections listed below. Its ordinary green checks are not final security acceptance. Preserved unchanged. |
 | Frozen PRD04 | `5449e2a184bb1147cf618b140a29196b74206b13`, binary `95bc570e92491b1d30c7a14ef66593b0cfa05249b1424ffbd0047e6ea7866eb0`. Authorized items 1–4 and selected 6 pass; item 5 is an exact red control. Preserved unchanged. |
 | PRD04 F-01 correction | `2e88c9ad89c487d3fc7c29ba35efba3911587737`, binary `576ee03c8d3a7db19a057306d8223841bc536cbd51b91087fe1e7c2e57f616ed`. Authorized backing-close/affected export controls pass; post-publication link commit point is now explicitly approved. Preserved unchanged. |
-| New provisional composition | `/home/vince/levitate-development/ginux-prd09`, clean `fa8be950b4382a8f92c92d90c8df069c36fdb198`, tree `de9b7ad6cf1d40197e2f86597ae44f54daad04a7`, launcher `441de671c8e0f353319e8944fbbdb6817851722ab46acd1b1bd2263739c507d2`. Includes NEEDS diagnostics, authorized PRD08 behavior and all five PRD04 corrections. Built/static-checked; authorized security verification has not run. It is not a selected release source. |
+| New provisional composition | `/home/vince/levitate-development/ginux-prd09`, clean `fa8be950b4382a8f92c92d90c8df069c36fdb198`, tree `de9b7ad6cf1d40197e2f86597ae44f54daad04a7`, launcher `441de671c8e0f353319e8944fbbdb6817851722ab46acd1b1bd2263739c507d2`. Includes NEEDS diagnostics, authorized PRD08 behavior and all five PRD04 corrections. Built/static-checked; returned Daybreak verification is partial (S09-A–G), with S09-H unverified at runtime. It is not a selected release source. |
 | Typed storage foundation | PRD03 `9802ef036d53ae1ee5276fe59cc719389dda5879` remains separate. The actual PRD05 typed-storage/later-owner integration is absent. No catalog-3 migration, T-01/T-02/T-03 port or final owner replacement is claimed here. |
 
 A fresh read-only GitHub check still finds main
@@ -108,6 +108,29 @@ not silently added to this security scope.
   a per-criterion returned disposition. No old negative, CI summary, broad test
   count or written request is upgraded to final-source acceptance.
 
+## Returned Daybreak results — 2026-11-08
+
+The user returned [Daybreak's exact provisional-source receipts](/home/vince/levitate-development/ginux-prd09/.artifacts/prd09/daybreak-2026-11-08/receipts.md)
+for frozen `fa8be950`, tree `de9b7ad6…`, launcher `441de671…`.
+Read-only integrity verification from that evidence directory confirms **562/562**
+files, manifest SHA-256 `0e73b62369734877e0fbc9374c2d43d8799d306c1213c12c1e75925da6242c90`.
+The 17 selected runners and affected joined-source F-01 controls passed; no
+candidate behavior defect was observed in that selected verification. **S09-A–G
+remain partial; S09-H is unverified at runtime.** The test-only T-01 shared-offset
+oracle passes but is not ported into the tracked fixture. T-02, T-03,
+reserved-clone peer-death schedule, remaining persistence races and paired
+Ginux–Recipe checks remain unverified. Preserve the report's narrower per-row
+limits; do not turn this partial result into final acceptance.
+
+Ordinary [PRD11 consumers](prd11-consumers.md) subsequently found a real held-stop
+terminal-event collision on the same source, outside those selected Daybreak
+checks, and a Recipe Git/libcurl resolver integration failure. Separate local
+Ginux `f7f0d14c` and Recipe `8014c9b` correct them; all six ordinary consumers
+pass on that pair. This does not contradict the bounded Daybreak observations
+or transfer their security result to the correction. Affected S09-B/H checks
+still need authorized verification on the future exact source. Frozen `fa8be950`
+and its binary remain unchanged.
+
 ## Outstanding authorized verification and agreed publication boundary
 
 The app exposes thread read/list/wait but **no send-to-chat tool**. Recent and
@@ -117,8 +140,8 @@ not an authorization substitute. No cloud scan, agent or external message was
 started. No direct app-state or terminal-message workaround was used.
 
 The user explicitly chose **Return Daybreak results** for S09-A–H on 2026-11-08.
-Security execution remains unauthorized in this chat. Await the returned exact
-receipts; do not infer that choosing this route is itself a verification result. A result must identify
+Security execution remains unauthorized in this chat. The returned partial receipts above are actual verification results; await the
+remaining criterion-specific results and affected correction checks. A result must identify
 source/tree, launcher/worker/image/config/fixture/runner hashes, exact commands,
 exits/results, observations and postconditions; classify each material criterion
 as passed, failed or unverified with its actual limit. For races, use a stated
@@ -148,7 +171,7 @@ that runtime receipt.
 
 Active skill: `hdae-development` at `.agents/skills/hdae-development/SKILL.md`;
 reload fully with required reference, repository instructions and this record
-after context shift. Exact next action: receive Daybreak's S09-A–H results for the exact candidate,
-correct any blocking finding and obtain affected retests through that context;
+after context shift. Exact next action: carry forward the returned partial receipts,
+close the remaining criterion-specific gaps and obtain affected correction retests through that context;
 preserve all frozen sources and existing staging. Await actual upstream/source integration before final security closure.
 **PRD09 remains unchecked; this record is not completion.**
