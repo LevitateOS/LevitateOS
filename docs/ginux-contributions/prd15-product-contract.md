@@ -7,9 +7,11 @@ complete live-boot/live-tools ISOs, guest installer interaction, installation,
 installed operation and recab A/B recovery. Desktop products, macOS, rebuilding
 kernels and external AI-provider interoperability are not added by this task.
 
-The user retains upstream precedence and keep-local/wait-for-maintained-source
-delivery. No publication or source-adoption choice is authorized. Local product
-checks cannot close PRD01/PRD05 or final delivered-source acceptance.
+The source decision was subsequently resolved in the shared queue: the user
+authorized maintained own-repository delivery with upstream Gate 11 included.
+`delivery-sources.json` pins Ginux `28f4368f` and Recipe `e7bfc166`. No new
+publication is performed or requested by this task. Local corrections below
+still require delivery and final-combination consumer/security/product acceptance.
 
 ## Active checkpoint
 
@@ -153,7 +155,7 @@ Do not count it as support until both new products run it successfully.
   configured-only event counters and epoll readiness over already-owned public
   descriptors**, preserving existing public resource limits, native policy and
   host-FD/network denial, with final security verification still required.
-  This IPC support is not implemented yet. Other denied crash-report calls in
+  The bounded IPC support is now implemented and verified as recorded below. Other denied crash-report calls in
   the log (ptrace/process-memory reads, etc.) are not granted by that approval.
 - **Recipe-owned acquisition commit:** builder `bb14537` contains the complete
   standalone Bun toolchain producer. Its actual fresh install, installed check
@@ -162,19 +164,90 @@ Do not count it as support until both new products run it successfully.
   are in `bun-public-payloads.json`. TUI compilation, dependency acquisition and
   direct builder wiring remain unfinished.
 
-Exact next action: implement the approved bounded configured eventfd/epoll
-owners in the isolated Ginux candidate, with public descriptor ownership and
-existing resource limits intact. Reuse the current channel/readiness owners;
-preserve real flags, buffered input, alias/fork/close/exec lifetimes, finite waits,
-edge/one-shot behavior and explicit-denial ordering. Verify functional controls
-and rerun actual Bun compilation, then finish and wire the Recipe-owned TUI producer.
-Rebuild affected complete products and run both distros' required libvirt
-scenarios/actual PTY controls on that exact combination. Preserve existing red
-runs; obtain required final-source/security evidence before closure.
+## Current continuation: Gate 11, IPC and Bun stack discovery
 
-Next: identify current product input/provenance and failure owners, exercise
-the public producer paths with the explicit candidate tuple, audit author/
-operator/helper/man/interface/examples documentation against code, and record
-each included product outcome, fixing in-scope failures and rerunning affected
-checks. Installer PTY, all named scenarios and A/B remain unverified on the
-current combination until actual receipts establish them.
+The maintained source now exists. The earlier source-delivery hold above and
+in historical receipts is superseded by the queue's recorded user decision.
+Both local corrections were rebased onto Ginux `28f4368f` without conflicts:
+`ef8d5d4a` (owned FD names) and `5eaf5f2e0970c8dc3acd4fcb4b2e1ee95561547e`
+(bounded eventfd/epoll). The clean IPC candidate's sealed launcher is
+`bin/ginux-event-current`, SHA-256
+`566381213c73f9fa10230f329e21d160f916185b5bdb6ff96fadcf81bad6c270`.
+Earlier commits `2477c0d4`/`4eddb013` and their binary receipts remain historical
+source-bound evidence; they are not combined into a final current-source claim.
+
+- **IPC implementation:** counters/epoll share the existing 16-object channel
+  pool and 256-slot public table, honoring lower operator limits. Epoll watches
+  owned channels/counters and granted TCP only, with 16 registrations, weak
+  generation-bound identities, alias/fork/close/exec handling, level/edge/one-shot
+  readiness, finite/infinite waits and round-robin delivery. RDHUP observes real
+  TCP half-close; it is not synthesized from pipe HUP. A non-null pwait mask is
+  supported only when equal to the task's existing mask; other masks are denied.
+  Kernel-internal futex restart-block results become EINTR for normal userspace
+  retry; restart_syscall remains ungranted. Native policy and public limits stay
+  unchanged. The documented support remains bounded, not general Linux ABI.
+- **IPC verification:** all 16 new ordinary functional modes pass, including
+  bad-buffer state preservation, explicit deny and lower FD limit. Existing
+  FD/task/thread/poll/network runners pass on the Gate 11-based candidate
+  (`event-current-runtime.log`); strict Clippy and release build pass. Core,
+  contract and device units pass, and the retained runtime contract runner passes.
+  A mistaken Make target name was corrected; its failed command remains recorded.
+  Final adversarial/security acceptance is still required.
+- **Compiler evidence:** compilation/publishing succeeds. The first probe lost
+  the source extension at `/inputs/source`, so Bun bundled an inert asset; native
+  execution exited silently and was not counted as success. Preserving `.ts`
+  produces an actual executable printing `bun-compiled-output:42` natively
+  (`real-bun-compile-publish-ts.json`, `bun-published-native-ts.json`). A native
+  compiler control corroborates the loader distinction. This is diagnostic
+  compiler evidence, not full TUI or guest acceptance.
+- **Bounded DNS decision and correction:** the user approved deterministic
+  address selection after registry.npmjs.org resolved to 24 addresses, exceeding
+  the existing eight-endpoint cap. Recipe `e28a60ab05393325a95dee14e2a4a7361e598aa5`
+  preserves explicit numeric grants, reserves one address per sorted hostname,
+  then fills remaining slots round-robin in numeric address order. Only selected
+  addresses appear in Ginux grants, immutable hosts and `authority.json`.
+  Overflow warns; a grant set unable to fit still fails. No limit, TLS check,
+  workload DNS authority or native policy changes. The real managed regression
+  runs NSS against a private child mount namespace, leaves host configuration
+  untouched, reverses answer order and checks all three views agree. It passes;
+  all 12 affected NEEDS CLI/runtime cases pass on the same sealed CLI/worker and
+  launcher (`network-subset-needs-regression.log`). Strict Clippy passes. CLI/
+  matching worker SHA-256 is `5ca87251f17567c757499b097e710908f55a0bdcbb3ee98da70f5f918bdee8b3`.
+- **Own-stack decision:** frozen npm install then reports false lockfile stack
+  overflow; Bun JavaScript initialization also crashes. Pinned Bun parser source
+  uses StackCheck; matching glibc 2.39 `pthread_getattr_np` reads
+  `/proc/self/maps` for the initial thread. The same ordinary pthread query
+  succeeds natively but returns EACCES in configured Ginux. The user approved
+  a bounded configured-only own-stack view, with no other mappings or host paths,
+  native-policy change or broader proc access. Source reads and hashes are in
+  `bun-source-upstream/stack-source-reads.json`.
+- **Own-stack implementation in progress:** `stack_view.rs` reads only the
+  registered stopped task's maps, scans at most 1 MiB with a 512-byte line bound,
+  and emits one canonical `[stack]` range. Open creates an immutable anonymous
+  snapshot through existing VFS object/byte/descriptor budgets; no namespace or
+  export entry is retained. Path/FD metadata is deterministic. Reopen/mmap and
+  metadata mutation are unsupported. Alias/fork/exec and final close use the
+  existing public descriptor owner. Native policy and broader proc denial remain.
+  The pthread query now passes. Snapshot/deny controls pass, including repeated
+  opens, shared offsets/pread, failed read preservation and fork/exec. Source
+  bundle and binary identity are in `stack-candidate-2-source/`; implementation
+  remains uncommitted pending affected checks. Initial metadata adapter build
+  errors and an owner-routing failure are preserved and corrected.
+- **Acquisition remains unaccepted:** a probe first used invalid kind `dir`;
+  corrected to `directory`. `cp -a` requests unsupported archive-mode metadata;
+  using the existing input-mode-preserving `copy_tree_contents` helper corrects
+  that probe without changing package/target metadata policy. With the stack view,
+  actual frozen npm install passes lockfile parsing but is still waiting; no
+  successful acquisition or product is claimed. Its deadline is 600 seconds.
+  Live supervisor ptrace inspection is denied by the existing runtime boundary;
+  it was not bypassed. A smaller direct diagnostic first exceeded argv bounds;
+  the script-input retry is retained separately. Interrupted/timed-out diagnostic
+  runs never count as passes.
+
+Exact next action: inspect the current own-stack affected checks and the bounded
+npm diagnostic/status; resolve any actual functional failure without widening
+native policy or resource limits. Finish and wire Recipe-owned TUI dependency
+acquisition/compilation/publication for both layers, then rebuild both complete
+product chains and execute both distros' required session-libvirt/PTY/install/A/B
+scenarios on one exact combination. Obtain required final-source/security results
+through Daybreak before closure. PRD15 and product acceptance remain open.
