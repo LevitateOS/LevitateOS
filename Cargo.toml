@@ -27,6 +27,27 @@ rust-version = "1.93"
 license = "MIT OR Apache-2.0"
 authors = ["LevitateOS Contributors"]
 
+# Versions of the crates two or more members use; a member takes one with
+# `name = { workspace = true }` and adds its own features or `optional` there.
+[workspace.dependencies]
+anyhow = "1.0"
+clap = { version = "4.5", features = ["derive"] }
+flate2 = "1"
+libc = "0.2"
+schemars = "1"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+sha2 = "0.10"
+tempfile = "3"
+toml = "0.8"
+ts-rs = "12"
+walkdir = "2"
+which = "7"
+# The headless TUI capture (xtask) and the shipped install split pane must emulate
+# the same terminal.
+portable-pty = "0.8"
+vt100 = "0.15"
+
 [profile.release]
 strip = true
 lto = true

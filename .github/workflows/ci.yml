@@ -1,5 +1,8 @@
 name: CI
 
+# Every job is a `cargo xtask` call, the same front door as a local run: CI states
+# no repo facts of its own (crate lists, release paths, host packages, scenario lists).
+
 on:
   push:
     branches: [master, main]
@@ -8,44 +11,63 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
-  # Build rec* tools in release mode for ISO
-  REC_BUILD_RELEASE: "1"
 
 jobs:
-  # ===========================================================================
-  # Stage 0: Detect changes (skip expensive jobs for docs-only commits)
-  # ===========================================================================
   changes:
     uses: ./.github/workflows/detect-changes.yml
     with:
-      type: rust
+      type: any
 
-  # Build explicit products once; all runtime checks consume those artifacts.
-  product-integration:
-    name: Products and Integration Tests
+  # The quick checks: exactly what `cargo xtask check` and `cargo xtask check tui` run locally.
+  check:
+    name: cargo xtask check
     needs: changes
     if: needs.changes.outputs.has_changes == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 90
-    env:
-      RECIPE_BINARY: ${{ github.workspace }}/target/release/recipe
     steps:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
 
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
 
-      - name: Install Bun
-        uses: oven-sh/setup-bun@v2
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: package.json
 
-      - name: Install host tools
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y erofs-utils xorriso mtools dosfstools cpio zstd \
-            qemu-system-x86 qemu-utils ovmf systemd-container systemd-ukify
-          bun install --ignore-scripts
+      # The guest-script check parses every script in AcornOS's shell too.
+      - name: Install busybox
+        run: sudo apt-get update && sudo apt-get install -y busybox
+
+      - run: cargo xtask check
+
+      - run: cargo xtask check tui
+
+  # Each distro's products, built once, then every scenario against them.
+  products:
+    name: Products and scenarios (${{ matrix.distro }})
+    needs: changes
+    if: needs.changes.outputs.has_changes == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      matrix:
+        distro: [levitate, acorn]
+    env:
+      DISTRO: ${{ matrix.distro }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: package.json
 
       - name: Cache cargo registry
         uses: actions/cache@v4
@@ -53,76 +75,39 @@ jobs:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
-          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('Cargo.lock') }}
           restore-keys: |
             ${{ runner.os }}-cargo-registry-
 
-      - name: Build xtask
-        run: cargo build --release -p levitate-recipe -p levitate-xtask
-
-      - name: Acquire declared kernel and rootfs inputs
+      - name: Install host tools
         run: |
-          target/release/levitate-xtask build kernel levitate --prebuilt
-          target/release/levitate-xtask build rootfs-source levitate
+          sudo apt-get update
+          # shellcheck disable=SC2046 # one word per package
+          sudo apt-get install -y $(cargo xtask doctor --packages apt)
 
-      - name: Build live products explicitly
+      - name: Acquire the kernel and the rootfs source
         run: |
-          target/release/levitate-xtask build live-boot levitate
-          target/release/levitate-xtask build live-tools levitate
+          cargo xtask build kernel "$DISTRO" --prebuilt
+          cargo xtask build rootfs-source "$DISTRO"
 
-      - name: Verify serial, SSH, installation and runtime behavior
-        timeout-minutes: 30
+      - name: Build every release product
         run: |
           set -euo pipefail
-          target/release/levitate-xtask run live-boot levitate --no-shell
-          target/release/levitate-xtask run live-boot levitate --ssh --no-shell
-          # `all` is live-boot, live-tools, install, installed-boot, automated-login, runtime.
-          target/release/levitate-xtask test all levitate --force
+          for product in $(cargo xtask status "$DISTRO" --json | jq -r '.artifacts | keys_unsorted[]'); do
+            cargo xtask build "$product" "$DISTRO"
+          done
+
+      - name: Run every scenario
+        timeout-minutes: 90
+        run: cargo xtask test all "$DISTRO" --force
 
       - name: Locate the live-tools ISO
-        run: echo "LIVE_TOOLS_ISO=$(target/release/levitate-xtask status levitate --json | jq -r '.artifacts["live-tools"]')" >> "$GITHUB_ENV"
+        run: echo "LIVE_TOOLS_ISO=$(cargo xtask status "$DISTRO" --json | jq -r '.artifacts["live-tools"]')" >> "$GITHUB_ENV"
 
-      - name: Upload live-tools ISO
+      - name: Upload the live-tools ISO
         uses: actions/upload-artifact@v4
         with:
-          name: levitateos-live-tools-iso
+          name: ${{ matrix.distro }}-live-tools-iso
           path: ${{ env.LIVE_TOOLS_ISO }}
           if-no-files-found: error
           retention-days: 7
-
-  # ===========================================================================
-  # Lint and check all crates
-  # ===========================================================================
-  lint:
-    name: Lint
-    needs: changes
-    if: needs.changes.outputs.has_changes == 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          submodules: recursive
-
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          components: clippy, rustfmt
-
-      - name: Install Bun
-        uses: oven-sh/setup-bun@v2
-
-      - name: cargo check, generated files, TypeScript typecheck
-        run: cargo xtask check
-
-      - name: Clippy - recipe
-        working-directory: tools/recipe
-        run: cargo clippy -- -D warnings
-
-      - name: Clippy - install-tests
-        working-directory: testing/install-tests
-        run: cargo clippy -- -D warnings
-
-      - name: Clippy - recstrap
-        working-directory: tools/recstrap
-        run: cargo clippy -- -D warnings
-

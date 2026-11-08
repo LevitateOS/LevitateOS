@@ -1,31 +1,34 @@
 [package]
 name = "levitate-xtask"
 version = "0.1.0"
+# xtask alone is written for edition 2024; it inherits the rest of the workspace metadata.
 edition = "2024"
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
 publish = false
 
 [dependencies]
-tempfile = "3"
-anyhow = "1"
-clap = { version = "4", features = ["derive"] }
+tempfile = { workspace = true }
+anyhow = { workspace = true }
+clap = { workspace = true }
 distro-contract = { path = "../distro/contract" }
 distro-builder = { path = "../distro/builder" }
 install-split-pane = { path = "../distro/builder/install-split-pane" }
 recinit = { path = "../tools/recinit" }
-which = "7"
+which = { workspace = true }
 regex = "1"
 quick-xml = "0.37"
-sha2 = "0.10"
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
-libc = "0.2"
-vt100 = "0.15"
+sha2 = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+libc = { workspace = true }
+vt100 = { workspace = true }
 install-tests = { path = "../testing/install-tests" }
-portable-pty = "0.8"
+portable-pty = { workspace = true }
 recpart = { path = "../tools/recpart", features = ["contracts"] }
 recab = { path = "../tools/recab", features = ["contracts"] }
 recstrap = { path = "../tools/recstrap", features = ["contracts"] }
-recshuttle = { path = "../tools/recshuttle" }
 recqemu = { path = "../tools/recqemu" }
-schemars = "1"
-ts-rs = "12"
+schemars = { workspace = true }
+ts-rs = { workspace = true }

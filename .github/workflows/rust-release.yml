@@ -7,6 +7,18 @@ on:
         required: false
         default: '.'
         type: string
+      version-bump:
+        description: 'Which part of the version to bump: major, minor or patch'
+        required: false
+        default: 'patch'
+        type: string
+      release-commit-prefix:
+        description: >-
+          Start of the version-bump commit's message. The job skips a push whose head
+          commit is one, so callers need no guard of their own.
+        required: false
+        default: 'chore: Bump version to'
+        type: string
       create-binary-artifact:
         description: 'Create tar.gz binary artifact (for binaries)'
         required: false
@@ -39,6 +51,7 @@ on:
 jobs:
   release:
     name: Release
+    if: ${{ !startsWith(github.event.head_commit.message, inputs.release-commit-prefix) }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -58,34 +71,36 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-      - name: Get current version
-        id: current
-        run: |
-          VERSION=$(grep '^version' Cargo.toml | head -1 | sed 's/.*"\(.*\)"/\1/')
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-edit
 
+      # cargo metadata and cargo set-version read and write the version wherever the
+      # manifest keeps it, an inherited `version.workspace = true` included.
       - name: Bump version
         id: bump
+        env:
+          BUMP: ${{ inputs.version-bump }}
         run: |
-          CURRENT="${{ steps.current.outputs.version }}"
-          BUMP_TYPE="${{ github.event.inputs.version_bump || 'patch' }}"
-          IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT"
-          case "$BUMP_TYPE" in
-            major) MAJOR=$((MAJOR + 1)); MINOR=0; PATCH=0 ;;
-            minor) MINOR=$((MINOR + 1)); PATCH=0 ;;
-            patch|*) PATCH=$((PATCH + 1)) ;;
+          set -euo pipefail
+          case "$BUMP" in
+            major|minor|patch) ;;
+            *) echo "version-bump must be major, minor or patch, not '$BUMP'" >&2; exit 1 ;;
           esac
-          NEW_VERSION="$MAJOR.$MINOR.$PATCH"
-          echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
-          sed -i "s/^version = \"$CURRENT\"/version = \"$NEW_VERSION\"/" Cargo.toml
+          cargo set-version --bump "$BUMP"
+          NEW_VERSION=$(cargo metadata --no-deps --format-version 1 \
+            | jq -r --arg manifest "$PWD/Cargo.toml" '.packages[] | select(.manifest_path == $manifest) | .version')
+          echo "version=$NEW_VERSION" >> "$GITHUB_OUTPUT"
 
       - run: cargo check
 
       - name: Commit version bump
+        env:
+          PREFIX: ${{ inputs.release-commit-prefix }}
+          VERSION: ${{ steps.bump.outputs.version }}
         run: |
-          git add Cargo.toml
-          git add Cargo.lock 2>/dev/null || true
-          git commit -m "chore: Bump version to ${{ steps.bump.outputs.version }} [skip ci]"
+          git add -u
+          git commit -m "$PREFIX $VERSION [skip ci]"
           git push
 
       - name: Create and push tag
@@ -136,7 +151,7 @@ jobs:
           } >> "$GITHUB_OUTPUT"
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ steps.bump.outputs.version }}
           name: v${{ steps.bump.outputs.version }}

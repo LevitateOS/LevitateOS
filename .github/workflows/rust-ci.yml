@@ -4,9 +4,11 @@ on:
   workflow_call:
     inputs:
       msrv:
-        description: 'Minimum supported Rust version'
+        description: >-
+          Minimum supported Rust version. Default: the `rust-version` the crate's
+          Cargo.toml declares (or inherits), so the number lives in one place.
         required: false
-        default: '1.93'
+        default: ''
         type: string
       working-directory:
         description: 'Working directory for cargo commands'
@@ -88,15 +90,31 @@ jobs:
       - run: cargo fmt -- --check
 
   msrv:
-    name: MSRV (${{ inputs.msrv }})
+    name: MSRV
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: ${{ inputs.working-directory }}
     steps:
       - uses: actions/checkout@v4
+      - name: Read the MSRV
+        id: msrv
+        env:
+          MSRV: ${{ inputs.msrv }}
+        run: |
+          set -euo pipefail
+          if [ -z "$MSRV" ]; then
+            MSRV=$(cargo metadata --no-deps --format-version 1 \
+              | jq -r --arg manifest "$PWD/Cargo.toml" \
+                '[.packages[] | select(.manifest_path == $manifest) | .rust_version] + [.packages[].rust_version] | map(select(. != null)) | first // empty')
+          fi
+          if [ -z "$MSRV" ]; then
+            echo "no msrv input and no rust-version in Cargo.toml" >&2
+            exit 1
+          fi
+          echo "version=$MSRV" >> "$GITHUB_OUTPUT"
       - uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: ${{ inputs.msrv }}
-      - run: rm -f Cargo.lock
+          toolchain: ${{ steps.msrv.outputs.version }}
+      # With the committed Cargo.lock, if any: the MSRV check validates the versions the build uses.
       - run: cargo check --verbose

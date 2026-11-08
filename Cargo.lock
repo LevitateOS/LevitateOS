@@ -1157,7 +1157,6 @@ dependencies = [
  "recinit",
  "recpart",
  "recqemu",
- "recshuttle",
  "recstrap",
  "regex",
  "schemars",

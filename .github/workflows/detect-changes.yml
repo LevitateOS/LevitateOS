@@ -1,10 +1,17 @@
 name: Detect Code Changes
 
+# Whether the pushed commits (or the pull request) change anything the caller's CI
+# checks, so documentation-only changes skip it.
+
 on:
   workflow_call:
     inputs:
       type:
-        description: 'Project type: rust or bun'
+        description: >-
+          What the caller checks: 'rust' (Rust sources and manifests), 'bun'
+          (TypeScript/JavaScript sources, package.json, bun.lock) or 'any'
+          (every file except Markdown: a build reads variants, recipes, guest scripts,
+          kconfigs and TUI code as well as code).
         required: true
         type: string
     outputs:
@@ -16,36 +23,32 @@ jobs:
   detect:
     runs-on: ubuntu-latest
     outputs:
-      has_changes: ${{ steps.rust.outputs.code || steps.bun.outputs.code }}
+      has_changes: ${{ steps.filter.outputs.code }}
     steps:
       - uses: actions/checkout@v4
-
-      - name: Detect Rust changes
-        if: inputs.type == 'rust'
-        uses: dorny/paths-filter@v3
-        id: rust
         with:
-          base: ${{ github.ref }}
-          filters: |
-            code:
-              - '**/*.rs'
-              - '**/Cargo.toml'
-              - '**/Cargo.lock'
-              - '.github/workflows/**'
+          fetch-depth: 0
 
-      - name: Detect Bun/TypeScript changes
-        if: inputs.type == 'bun'
-        uses: dorny/paths-filter@v3
-        id: bun
+      - name: Select the filter
+        id: select
+        env:
+          TYPE: ${{ inputs.type }}
+        run: |
+          quantifier=some
+          case "$TYPE" in
+            rust) filter='["**/*.rs", "**/Cargo.toml", "**/Cargo.lock", ".github/workflows/**"]' ;;
+            bun) filter='["**/*.ts", "**/*.tsx", "**/*.js", "**/*.jsx", "**/*.astro", "**/package.json", "**/bun.lock", ".github/workflows/**"]' ;;
+            # A file counts when it matches both patterns.
+            any) filter='["**", "!**/*.md"]'; quantifier=every ;;
+            *) echo "unknown type '$TYPE' (rust, bun or any)" >&2; exit 1 ;;
+          esac
+          echo "filters=code: $filter" >> "$GITHUB_OUTPUT"
+          echo "quantifier=$quantifier" >> "$GITHUB_OUTPUT"
+
+      # A push compares against the commit before it; a pull request against its base.
+      - uses: dorny/paths-filter@v3
+        id: filter
         with:
-          base: ${{ github.ref }}
-          filters: |
-            code:
-              - '**/*.ts'
-              - '**/*.tsx'
-              - '**/*.js'
-              - '**/*.jsx'
-              - '**/*.astro'
-              - 'package.json'
-              - 'bun.lockb'
-              - '.github/workflows/**'
+          base: ${{ github.event_name == 'push' && github.event.before || github.event.pull_request.base.sha }}
+          predicate-quantifier: ${{ steps.select.outputs.quantifier }}
+          filters: ${{ steps.select.outputs.filters }}

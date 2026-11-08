@@ -28,8 +28,9 @@ status *args:
 gen:
     cargo xtask gen
 
-check:
-    cargo xtask check
+# The quick checks CI runs: `just check`, then `just check tui`.
+check *args:
+    cargo xtask check {{args}}
 
 # e.g. `just tui install-docs`
 tui *args:

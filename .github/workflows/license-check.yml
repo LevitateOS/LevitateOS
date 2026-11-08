@@ -9,5 +9,11 @@ jobs:
   cargo-deny:
     runs-on: ubuntu-latest
     steps:
+      # The workspace's members include submodules.
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      # deny.toml is a license policy.
       - uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          command: check licenses
