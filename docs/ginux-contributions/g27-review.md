@@ -1,5 +1,10 @@
 # G27 — configured virtual uname identity
 
+Current release contract: [PRD08](prd08-public-contracts.md) records the user's
+configured downstream approval and explicit limits, independently of upstream
+holds. The candidate/evidence below remains historical; its security, current-
+main delivery and final-source acceptance are not upgraded by that decision.
+
 Head `1eb3e189525670e1056e89ef4bc49ab7f0d481dd`, tree `813671c521217a42b97e8471513e3d5b44ab0e6b`, solely on recorded main
 `3f2fe7dfadd4b40e235d982a6a3d386dc6490177`. [Patch](patches/G27.patch):6 files,+119/-16.
 Ordinary source preparation, including actual RPM identity queries, is retained;

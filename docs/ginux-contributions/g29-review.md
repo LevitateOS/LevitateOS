@@ -1,5 +1,10 @@
 # G29 — configured TCP integration (partial)
 
+Current release contract: [PRD08](prd08-public-contracts.md) records the user's
+configured downstream approval and explicit limits, independently of upstream
+holds. The candidate/evidence below remains historical; its security, current-
+main delivery and final-source acceptance are not upgraded by that decision.
+
 Head `26fbfef2ecc4d3192ff605b23c9a4bb02e781171`, tree `089f3da2f0ebf26996ce3635cfea1c1c90142dc9`, on local prerequisite
 composition `2ba7c8942e1530048904db5a63c5b9de2e1c0298` of G08a `fe27c693` and G28 `0a3cf5f5`.
 [Patch](patches/G29.patch):12 files,+1022/-13, adapted from66de2880 to current

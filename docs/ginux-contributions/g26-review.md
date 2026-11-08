@@ -1,5 +1,10 @@
 # G26 — inherited process resource bounds (partial)
 
+Current release contract: [PRD08](prd08-public-contracts.md) records the user's
+configured downstream approval and explicit limits, independently of upstream
+holds. The candidate/evidence below remains historical; its security, current-
+main delivery and final-source acceptance are not upgraded by that decision.
+
 Two source packets are retained from0c571cbb. They are work units, not a promise
 of two PRs. Public metadata-to-enforcement policy, thread/security acceptance,
 full CI and refreshed upstream disposition remain pending.

@@ -1,5 +1,10 @@
 # G28 — bounded supervisor TCP backend (partial)
 
+Current release contract: [PRD08](prd08-public-contracts.md) records the user's
+configured downstream approval and explicit limits, independently of upstream
+holds. The candidate/evidence below remains historical; its security, current-
+main delivery and final-source acceptance are not upgraded by that decision.
+
 Head `0a3cf5f5ab7e77080eb9491cb6bffd5ba642cb68`, tree `0256d004e560c8764907844e4f143d01374c9fb9`, solely on recorded main
 `3f2fe7dfadd4b40e235d982a6a3d386dc6490177`. [Patch](patches/G28.patch):3 files,+769.
 Ordinary source preparation is retained; two new donor security tests, upstream
