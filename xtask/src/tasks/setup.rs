@@ -5,6 +5,7 @@ use serde::Serialize;
 use std::path::Path;
 
 use crate::cli::Distro;
+use distro_builder::process::{HostFamily, HostNeed, HOST_TOOLS};
 use distro_contract::ProductId;
 
 pub fn setup() -> Result<()> {
@@ -42,6 +43,16 @@ impl Check {
             Err((detail, fix)) => Self { check, ok: false, required, detail, fix: Some(fix) },
         }
     }
+}
+
+/// `doctor --packages <dnf|apt>`: the host packages that provide every host tool, on one
+/// line (CI installs them).
+pub fn packages(family: &str) -> Result<()> {
+    let family = HostFamily::from_name(family).ok_or_else(|| {
+        crate::util::exit::usage(format!("unknown host package manager '{family}'; expected dnf or apt"))
+    })?;
+    println!("{}", distro_builder::process::host_packages(family).join(" "));
+    Ok(())
 }
 
 pub fn doctor(json: bool) -> Result<()> {
@@ -98,32 +109,11 @@ fn checks(root: &Path) -> Vec<Check> {
     // Scenario VMs are libvirt domains on the user session (Cockpit shows them).
     let uri = recqemu::libvirt::uri();
     checks.push(Check::new(
-        "libvirt (virsh)",
-        true,
-        which::which("virsh")
-            .map(|p| p.display().to_string())
-            .map_err(|_| ("not on PATH; scenario VMs run under libvirt".into(), "install libvirt-client and libvirt-daemon-kvm".into())),
-    ));
-    checks.push(Check::new(
         format!("libvirt connection {uri}"),
         true,
         recqemu::libvirt::virsh(&uri, &["version"])
             .map(|out| out.lines().find(|l| l.contains("hypervisor")).unwrap_or("connected").trim().to_string())
             .map_err(|e| (format!("{e:#}"), "install libvirt-daemon-kvm (the session daemon starts on demand)".into())),
-    ));
-    checks.push(Check::new(
-        "passt",
-        true,
-        which::which("passt")
-            .map(|p| p.display().to_string())
-            .map_err(|_| ("not on PATH (user networking and the SSH forward of scenario VMs)".into(), "install passt".into())),
-    ));
-    checks.push(Check::new(
-        "qemu-img",
-        true,
-        which::which("qemu-img")
-            .map(|p| p.display().to_string())
-            .map_err(|_| ("not on PATH (scenario disk images)".into(), "cargo xtask setup (or install qemu-img)".into())),
     ));
     checks.push(Check::new(
         "OVMF firmware",
@@ -142,28 +132,19 @@ fn checks(root: &Path) -> Vec<Check> {
             Err((format!("missing {}", key.display()), "cargo xtask setup".into()))
         },
     ));
-    for (tool, required, why) in [
-        ("ssh", true, "logs in to scenario guests"),
-        ("ssh-keygen", true, "creates the repo SSH key"),
-        ("bun", false, "TypeScript apps, docs and `cargo xtask check`"),
-    ] {
+    // The host tools: the one list the build checks and CI installs from.
+    let family = HostFamily::detect();
+    for tool in HOST_TOOLS {
+        // Only `cargo xtask base lock` needs a base-lock-only tool.
+        let required = tool.needs != [HostNeed::BaseLock];
         checks.push(Check::new(
-            tool,
+            tool.program,
             required,
-            which::which(tool)
+            tool.status()
                 .map(|p| p.display().to_string())
-                .map_err(|_| (format!("not on PATH ({why})"), format!("install {tool}"))),
+                .map_err(|why| (why, tool.fix(family))),
         ));
     }
-    checks.push(Check::new(
-        "ISO tool",
-        true,
-        ["xorriso", "genisoimage", "mkisofs"]
-            .into_iter()
-            .find_map(|t| which::which(t).ok())
-            .map(|p| p.display().to_string())
-            .ok_or_else(|| ("none of xorriso/genisoimage/mkisofs (boot injection media)".into(), "install xorriso".into())),
-    ));
 
     for id in crate::cli::distro_ids() {
         let distro = match Distro::load(&id) {

@@ -56,6 +56,8 @@ pub fn lock(distro: &Distro, check: bool) -> Result<()> {
             distro.id()
         )));
     };
+    distro_builder::process::check_host_tools(distro_builder::process::HostNeed::BaseLock)
+        .map_err(|e| crate::util::exit::missing(format!("{e:#}"), "cargo xtask doctor"))?;
     let release = base.fedora_release;
     let wanted: HashSet<String> = base.packages.iter().cloned().collect();
 
@@ -115,7 +117,7 @@ fn curl(url: &str, out: &Path) -> Result<()> {
         .arg(out)
         .arg(url)
         .status()
-        .map_err(|_| crate::util::exit::missing("curl is not installed", "install curl"))?;
+        .context("running curl")?;
     if !status.success() {
         bail!("downloading {url} failed ({status})");
     }
@@ -160,7 +162,7 @@ fn primary_index(repo: &str, wanted: &HashSet<String>) -> Result<Vec<Rpm>> {
         .arg(&index)
         .stdout(Stdio::piped())
         .spawn()
-        .map_err(|_| crate::util::exit::missing(format!("{decompress} is not installed"), format!("install {decompress}")))?;
+        .with_context(|| format!("running {decompress}"))?;
     let rpms = parse_primary(BufReader::new(child.stdout.take().unwrap()), repo, wanted)?;
     if !child.wait()?.success() {
         bail!("decompressing {href} failed");
@@ -412,7 +414,7 @@ fn check_signatures(key: &Path, files: &[PathBuf]) -> Result<()> {
             .arg(db.path())
             .args(args)
             .output()
-            .map_err(|_| crate::util::exit::missing("rpmkeys is not installed (RPM signature checks)", "install rpm"))
+            .context("running rpmkeys")
     };
     let import = rpmkeys(&["--import".as_ref(), key.as_os_str()])?;
     if !import.status.success() {

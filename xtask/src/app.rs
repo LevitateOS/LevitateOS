@@ -5,7 +5,8 @@ use crate::cli::{BaseCmd, CheckCmd, Cmd, TuiCmd};
 pub fn run(cli: crate::cli::Cli) -> Result<()> {
     match cli.cmd {
         Cmd::Setup => crate::tasks::setup::setup(),
-        Cmd::Doctor { json } => crate::tasks::setup::doctor(json),
+        Cmd::Doctor { json, packages: None } => crate::tasks::setup::doctor(json),
+        Cmd::Doctor { packages: Some(family), .. } => crate::tasks::setup::packages(&family),
         Cmd::Env => crate::tasks::setup::env(),
         Cmd::Build { what } => crate::tasks::build::run(what),
         Cmd::Base { what: BaseCmd::Lock { distro, check } } => crate::tasks::base::lock(&distro, check),

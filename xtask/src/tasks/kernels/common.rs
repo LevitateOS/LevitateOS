@@ -106,7 +106,7 @@ pub(crate) fn verify_one(root: &Path, t: &KernelTarget) -> Result<String> {
 }
 
 pub(crate) fn build_recipe_bin(root: &Path) -> Result<PathBuf> {
-    Ok(distro_builder::recipe::find_recipe(root)?.path)
+    Ok(distro_builder::recipe::binary(root)?.to_path_buf())
 }
 
 pub(crate) fn build_kernel_via_recipe(
@@ -206,7 +206,7 @@ fn run_kernel_and_select(command: &mut Command, work: &Path, destination: &Path)
         .tempfile_in(work)?;
     command.arg("--json-output").arg(result.path());
     run_cmd(command)?;
-    let ctx: serde_json::Value = serde_json::from_slice(&fs::read(result.path())?)?;
+    let ctx = distro_builder::recipe::RecipeResult::from_json(&fs::read(result.path())?)?;
     distro_builder::recipe::linux::select_kernel_bundle(&ctx, destination)
 }
 

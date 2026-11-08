@@ -164,6 +164,9 @@ pub enum Cmd {
         /// Print the checks as JSON.
         #[arg(long)]
         json: bool,
+        /// Only print the host packages that provide every host tool, for a dnf or apt host.
+        #[arg(long, value_name = "dnf|apt")]
+        packages: Option<String>,
     },
 
     /// Print shell exports for the repo's QEMU tools: eval "$(cargo xtask env)".
