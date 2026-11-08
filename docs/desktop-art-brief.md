@@ -196,7 +196,7 @@ Desktop wallpaper for AcornOS, a Linux operating system: the realistic photograp
 
 Scene: A picnic table inside a forest in deep autumn, placed off-centre.
 
-A family of squirrels rushes through the scene, all heading the same way: they are after acorns hidden close by under the fallen leaves. The squirrels are motion-blurred by a long exposure while the table and trees stay sharp.
+A family of squirrels rushes through the scene in the same direction: they are after acorns hidden close by under the fallen leaves. Each squirrel is a different individual: two larger adults and three or four smaller young ones, each in its own pose and stride (one leaping, one bounding low, one halfway over the table bench, one glancing back), spread out at different distances, some partly hidden by leaves or the table legs, with differences in fur colour and tail shape. The squirrels are motion-blurred by a long exposure while the table and trees stay sharp.
 
 Light: Autumn daytime, the whole scene in warm browns.
 
@@ -212,7 +212,7 @@ Format: a 16:9 landscape desktop wallpaper. The main subjects sit within the cen
 Negative:
 
 ```text
-acorns, nuts, centred table, symmetrical composition, people, person, food on the table, picnic basket, 3d render, CGI, illustration, painting, drawing, cartoon, HDR, halo, oversharpened, airbrushed, multicoloured, rainbow colours, many hues, clashing colours, high contrast, oversaturated, neon, candy colours, busy composition, out of focus, low detail, smeared texture, plastic look, noise, jpeg artifacts, text, letters, words, numbers, logo, watermark, signature, user interface, border, frame, vignette
+identical squirrels, cloned squirrels, duplicated animals, repeated pattern, same pose, same size, squirrels in a row, evenly spaced, acorns, nuts, centred table, symmetrical composition, people, person, food on the table, picnic basket, 3d render, CGI, illustration, painting, drawing, cartoon, HDR, halo, oversharpened, airbrushed, multicoloured, rainbow colours, many hues, clashing colours, high contrast, oversaturated, neon, candy colours, busy composition, out of focus, low detail, smeared texture, plastic look, noise, jpeg artifacts, text, letters, words, numbers, logo, watermark, signature, user interface, border, frame, vignette
 ```
 
 ### 8. AcornOS, realistic photograph, dark
@@ -224,7 +224,7 @@ Desktop wallpaper for AcornOS, a Linux operating system: the realistic photograp
 
 Scene: A picnic table inside a forest in deep autumn, placed off-centre.
 
-A family of squirrels rushes through the scene, all heading the same way: they are after acorns hidden close by under the fallen leaves. The squirrels are motion-blurred by a long exposure while the table and trees stay sharp.
+A family of squirrels rushes through the scene in the same direction: they are after acorns hidden close by under the fallen leaves. Each squirrel is a different individual: two larger adults and three or four smaller young ones, each in its own pose and stride (one leaping, one bounding low, one halfway over the table bench, one glancing back), spread out at different distances, some partly hidden by leaves or the table legs, with differences in fur colour and tail shape. The squirrels are motion-blurred by a long exposure while the table and trees stay sharp.
 
 Light: Dusk or evening in deep brown tones, with a soft warm light such as a lantern on the table as the one bright accent. Every part of the scene is still clearly readable.
 
@@ -240,7 +240,7 @@ Format: a 16:9 landscape desktop wallpaper. The main subjects sit within the cen
 Negative:
 
 ```text
-acorns, nuts, centred table, symmetrical composition, people, person, food on the table, picnic basket, pitch black, harsh floodlights, 3d render, CGI, illustration, painting, drawing, cartoon, HDR, halo, oversharpened, airbrushed, multicoloured, rainbow colours, many hues, clashing colours, high contrast, oversaturated, neon, candy colours, busy composition, out of focus, low detail, smeared texture, plastic look, noise, jpeg artifacts, text, letters, words, numbers, logo, watermark, signature, user interface, border, frame, vignette
+identical squirrels, cloned squirrels, duplicated animals, repeated pattern, same pose, same size, squirrels in a row, evenly spaced, acorns, nuts, centred table, symmetrical composition, people, person, food on the table, picnic basket, pitch black, harsh floodlights, 3d render, CGI, illustration, painting, drawing, cartoon, HDR, halo, oversharpened, airbrushed, multicoloured, rainbow colours, many hues, clashing colours, high contrast, oversaturated, neon, candy colours, busy composition, out of focus, low detail, smeared texture, plastic look, noise, jpeg artifacts, text, letters, words, numbers, logo, watermark, signature, user interface, border, frame, vignette
 ```
 
 ### 9. AcornOS, oil painting, light
@@ -252,7 +252,7 @@ Desktop wallpaper for AcornOS, a Linux operating system: the oil painting, light
 
 Scene: A picnic table inside a forest in deep autumn, placed off-centre.
 
-A family of squirrels rushes through the scene, all heading the same way: they are after acorns hidden close by under the fallen leaves. The squirrels' speed shows in the painter's brushwork.
+A family of squirrels rushes through the scene in the same direction: they are after acorns hidden close by under the fallen leaves. Each squirrel is a different individual: two larger adults and three or four smaller young ones, each in its own pose and stride (one leaping, one bounding low, one halfway over the table bench, one glancing back), spread out at different distances, some partly hidden by leaves or the table legs, with differences in fur colour and tail shape. The squirrels' speed shows in the painter's brushwork.
 
 Light: Autumn daytime, the whole scene in warm browns.
 
@@ -268,7 +268,7 @@ Format: a 16:9 landscape desktop wallpaper. The main subjects sit within the cen
 Negative:
 
 ```text
-acorns, nuts, centred table, symmetrical composition, people, person, food on the table, picnic basket, photograph, photorealistic, storybook, picture book, cartoon, anime, manga, cel shading, vector art, flat digital art, watercolour, gouache, multicoloured, rainbow colours, many hues, clashing colours, high contrast, oversaturated, neon, candy colours, busy composition, out of focus, low detail, smeared texture, plastic look, noise, jpeg artifacts, text, letters, words, numbers, logo, watermark, signature, user interface, border, frame, vignette
+identical squirrels, cloned squirrels, duplicated animals, repeated pattern, same pose, same size, squirrels in a row, evenly spaced, acorns, nuts, centred table, symmetrical composition, people, person, food on the table, picnic basket, photograph, photorealistic, storybook, picture book, cartoon, anime, manga, cel shading, vector art, flat digital art, watercolour, gouache, multicoloured, rainbow colours, many hues, clashing colours, high contrast, oversaturated, neon, candy colours, busy composition, out of focus, low detail, smeared texture, plastic look, noise, jpeg artifacts, text, letters, words, numbers, logo, watermark, signature, user interface, border, frame, vignette
 ```
 
 ### 10. AcornOS, oil painting, dark
@@ -280,7 +280,7 @@ Desktop wallpaper for AcornOS, a Linux operating system: the oil painting, dark 
 
 Scene: A picnic table inside a forest in deep autumn, placed off-centre.
 
-A family of squirrels rushes through the scene, all heading the same way: they are after acorns hidden close by under the fallen leaves. The squirrels' speed shows in the painter's brushwork.
+A family of squirrels rushes through the scene in the same direction: they are after acorns hidden close by under the fallen leaves. Each squirrel is a different individual: two larger adults and three or four smaller young ones, each in its own pose and stride (one leaping, one bounding low, one halfway over the table bench, one glancing back), spread out at different distances, some partly hidden by leaves or the table legs, with differences in fur colour and tail shape. The squirrels' speed shows in the painter's brushwork.
 
 Light: Dusk or evening in deep brown tones, with a soft warm light such as a lantern on the table as the one bright accent. Every part of the scene is still clearly readable.
 
@@ -296,7 +296,7 @@ Format: a 16:9 landscape desktop wallpaper. The main subjects sit within the cen
 Negative:
 
 ```text
-acorns, nuts, centred table, symmetrical composition, people, person, food on the table, picnic basket, pitch black, harsh floodlights, photograph, photorealistic, storybook, picture book, cartoon, anime, manga, cel shading, vector art, flat digital art, watercolour, gouache, multicoloured, rainbow colours, many hues, clashing colours, high contrast, oversaturated, neon, candy colours, busy composition, out of focus, low detail, smeared texture, plastic look, noise, jpeg artifacts, text, letters, words, numbers, logo, watermark, signature, user interface, border, frame, vignette
+identical squirrels, cloned squirrels, duplicated animals, repeated pattern, same pose, same size, squirrels in a row, evenly spaced, acorns, nuts, centred table, symmetrical composition, people, person, food on the table, picnic basket, pitch black, harsh floodlights, photograph, photorealistic, storybook, picture book, cartoon, anime, manga, cel shading, vector art, flat digital art, watercolour, gouache, multicoloured, rainbow colours, many hues, clashing colours, high contrast, oversaturated, neon, candy colours, busy composition, out of focus, low detail, smeared texture, plastic look, noise, jpeg artifacts, text, letters, words, numbers, logo, watermark, signature, user interface, border, frame, vignette
 ```
 
 ### 11. AcornOS, Dutch abstract, light
@@ -308,7 +308,7 @@ Desktop wallpaper for AcornOS, a Linux operating system: the Dutch abstract, lig
 
 Scene: A picnic table inside a forest in deep autumn, placed off-centre.
 
-A family of squirrels rushes through the scene, all heading the same way: they are after acorns hidden close by under the fallen leaves. The squirrels' speed shows as a quick run of small rectangles heading the same way.
+A family of squirrels rushes through the scene in the same direction: they are after acorns hidden close by under the fallen leaves. Each squirrel is a different individual: two larger adults and three or four smaller young ones, each in its own pose and stride (one leaping, one bounding low, one halfway over the table bench, one glancing back), spread out at different distances, some partly hidden by leaves or the table legs, with differences in fur colour and tail shape. The squirrels' speed shows as a quick run of small rectangles of different sizes heading the same way.
 
 Light: Autumn daytime, the whole scene in warm browns.
 
@@ -324,7 +324,7 @@ Format: a 16:9 landscape desktop wallpaper. The main subjects sit within the cen
 Negative:
 
 ```text
-acorns, nuts, centred table, symmetrical composition, people, person, food on the table, picnic basket, photograph, photorealistic, realistic detail, diagonal lines, curves, circles, gradients, perspective, 3d, shading, cartoon, multicoloured, rainbow colours, many hues, clashing colours, high contrast, oversaturated, neon, candy colours, busy composition, out of focus, low detail, smeared texture, plastic look, noise, jpeg artifacts, text, letters, words, numbers, logo, watermark, signature, user interface, border, frame, vignette
+identical squirrels, cloned squirrels, duplicated animals, repeated pattern, same pose, same size, squirrels in a row, evenly spaced, acorns, nuts, centred table, symmetrical composition, people, person, food on the table, picnic basket, photograph, photorealistic, realistic detail, diagonal lines, curves, circles, gradients, perspective, 3d, shading, cartoon, multicoloured, rainbow colours, many hues, clashing colours, high contrast, oversaturated, neon, candy colours, busy composition, out of focus, low detail, smeared texture, plastic look, noise, jpeg artifacts, text, letters, words, numbers, logo, watermark, signature, user interface, border, frame, vignette
 ```
 
 ### 12. AcornOS, Dutch abstract, dark
@@ -336,7 +336,7 @@ Desktop wallpaper for AcornOS, a Linux operating system: the Dutch abstract, dar
 
 Scene: A picnic table inside a forest in deep autumn, placed off-centre.
 
-A family of squirrels rushes through the scene, all heading the same way: they are after acorns hidden close by under the fallen leaves. The squirrels' speed shows as a quick run of small rectangles heading the same way.
+A family of squirrels rushes through the scene in the same direction: they are after acorns hidden close by under the fallen leaves. Each squirrel is a different individual: two larger adults and three or four smaller young ones, each in its own pose and stride (one leaping, one bounding low, one halfway over the table bench, one glancing back), spread out at different distances, some partly hidden by leaves or the table legs, with differences in fur colour and tail shape. The squirrels' speed shows as a quick run of small rectangles of different sizes heading the same way.
 
 Light: Dusk or evening in deep brown tones, with a soft warm light such as a lantern on the table as the one bright accent. Every part of the scene is still clearly readable.
 
@@ -352,5 +352,5 @@ Format: a 16:9 landscape desktop wallpaper. The main subjects sit within the cen
 Negative:
 
 ```text
-acorns, nuts, centred table, symmetrical composition, people, person, food on the table, picnic basket, pitch black, harsh floodlights, photograph, photorealistic, realistic detail, diagonal lines, curves, circles, gradients, perspective, 3d, shading, cartoon, multicoloured, rainbow colours, many hues, clashing colours, high contrast, oversaturated, neon, candy colours, busy composition, out of focus, low detail, smeared texture, plastic look, noise, jpeg artifacts, text, letters, words, numbers, logo, watermark, signature, user interface, border, frame, vignette
+identical squirrels, cloned squirrels, duplicated animals, repeated pattern, same pose, same size, squirrels in a row, evenly spaced, acorns, nuts, centred table, symmetrical composition, people, person, food on the table, picnic basket, pitch black, harsh floodlights, photograph, photorealistic, realistic detail, diagonal lines, curves, circles, gradients, perspective, 3d, shading, cartoon, multicoloured, rainbow colours, many hues, clashing colours, high contrast, oversaturated, neon, candy colours, busy composition, out of focus, low detail, smeared texture, plastic look, noise, jpeg artifacts, text, letters, words, numbers, logo, watermark, signature, user interface, border, frame, vignette
 ```
