@@ -318,3 +318,42 @@ The accidental report commit that included those files was corrected immediately
 they remain staged exactly as before. Continue the required producer/product work
 and obtain final security results through the authorized Daybreak context; no
 publication has been performed by this task and acceptance remains open.
+
+### Eventfd wakeup root cause and explicit producer quota
+
+Pinned uSockets `packages/bun-usockets/src/eventing/epoll_kqueue.c` sets
+`leave_poll_ready=1` and EPOLLET for its wake eventfd, intentionally leaving the
+counter unread. It expects each successful write to notify again. The draft's
+readiness-transition-only model loses subsequent completion wakeups. This is a
+current implementation defect, not a user/network hold. Commit
+`f98281d9f2e362d86fd3a1d702ada8f0a8c1344c` notifies IN on successful counter writes
+and OUT on successful reads, while one-shot admission, copy faults and existing
+allocation limits remain intact. The exact undrained/alias/error regression
+passes natively and on the correction; the former 32-watch candidate fails it.
+All 18 event controls and all affected FD/task/thread/poll/network runners pass;
+strict Clippy passes. Sealed normal launcher `bin/ginux-counter-notify` SHA-256
+`796f70e9a17a4a80d28812e0a2ee2dbb56645a8152c3d9cb6a196fc774e9b76e`.
+No diagnostic logging changes remain in source.
+
+The separate native control succeeds with 98 packages and an independently empty
+cache (`npm-native-control.json`). Those files are not producer inputs. With the
+notification correction, managed frozen install now exits with an explicit VFS
+ENOSPC instead of hanging (`real-tui-npm-notify`). Its 16,384 default object quota
+is too small: the native control counts 10,149 install entries plus 9,745 cache
+entries before source/build scratch. The TUI producer now explicitly requests
+32,768 objects within the existing supported resource contract; no Ginux public
+limit is raised. Both its standalone acquisition probe (`real-tui-npm-object-budget`)
+and full GNU system producer (`tui-system-producer-gnu-objects`) are running.
+The first full producer verified/acquired/published its pinned toolchain, then
+hit the same parent quota. It is retained as a failure; an unpublished draft or
+that dependency success does not complete the producer. The earlier HTTP-bound
+and 16-watch filtered acquisitions were deliberately cancelled after the proven
+findings and are not passes.
+
+Current sessions: 6380 (object-budget acquisition probe), 20192 (earlier GNU
+producer, may have completed its quota failure), and the new GNU producer session
+from the adjacent tool result. Inspect logs/results before repeating anything.
+The next action is to obtain successful full Recipe-owned TUI acquisition and
+compilation, fix actual failures, then verify readiness/reuse, the builder's real
+source-preparation caller and both libc/product paths. Final security/guest/ISO/
+installer/install/A/B requirements remain open; no publication occurred.
