@@ -1,9 +1,12 @@
-# Wallpaper assignments for an image-generation agent
+# Wallpaper assignments
 
 Twelve wallpapers: LevitateOS (KDE Plasma) and AcornOS (LXQt), each in three
-styles, each in light and dark. Each assignment below is **standalone**: paste
-one as it is into the model that writes the image prompt. It refers to nothing
-outside itself.
+styles, each in light and dark. Each assignment is **standalone** and comes in
+two parts:
+
+- **Positive:** the brief for the model that writes the image prompt. It
+  describes only what should be in the image.
+- **Negative:** the negative prompt, ready to paste into ComfyUI as it is.
 
 Once you have picked a final image, save it as
 `<distro>-<style>-<light|dark>.png` (for example `levitate-painted-dark.png`)
@@ -16,242 +19,338 @@ unsettling) and a children's-book look with ordinary colour (round 2).
 
 ### 1. LevitateOS, realistic photograph, light
 
+Positive:
+
 ```text
 Desktop wallpaper for LevitateOS, a Linux operating system: the realistic photograph, light version.
 
-Scene: A treehouse in a large tree, with no people anywhere. Make the treehouse well built and beautiful, not a kids' den. Behind it is a farm, and far in the background a row of trees runs along the horizon. The sky is visible.
+Scene: A treehouse in a large tree, finely crafted and beautiful, like a small piece of architecture. Behind it is a farm, and far in the background a row of trees runs along the horizon under an open, visible sky.
 
-In the foreground, a single leaf hovers just above the ground: it is about to land and fails, or refuses, to touch down. You can see the small gap between leaf and ground. This leaf is the heart of the picture (the LevitateOS logo is a leaf floating above a curved ground line). Keep it noticeable but quiet, impossible rather than magical: no glow, no sparkles.
+In the foreground, a single leaf hovers just above the ground, with a small, clear gap between the leaf and the ground and its shadow on the grass below. It is about to land and refuses to touch down. This leaf is the heart of the picture (the LevitateOS logo is a leaf floating above a curved ground line): noticeable but quiet, impossible in a calm, matter-of-fact way.
 
-Light: Daytime with nice weather.
+Light: Daytime with fine, clear weather.
 
-Style: A detailed, high-end landscape photograph: sharp, rich and believable, with real light. Not a 3D render, not HDR-looking, not an illustration.
+Style: A detailed, high-end landscape photograph: sharp, rich and believable, with real light and real optics.
 
-Feel: mature, refined and luxurious. Deep, rich colour with shadows that keep their colour, warm golds rather than yellows, nothing washed out or candy-bright; think of a fine library or a luxury catalogue, not a postcard. Directional light with depth and soft falloff. Fine, tactile texture (wood grain, bark, fur, leaf veins) that holds up at full screen size. Calm, assured and adult. Never cute, naive, cartoonish or like a children's book.
+Feel: mature, refined and luxurious. Deep, rich, jewel-like colour, with shadows that keep their colour and warm gold highlights, like a fine library or a luxury catalogue. Directional light with depth and soft falloff. Fine, tactile texture (wood grain, bark, leaf veins, fur) that stays crisp at full screen size. Calm, assured and adult.
 
-Let the colours lean toward deep greens (pine #214438, pale pine #C7D9BA).
+Colour lean: deep greens, pine (#214438) and pale sage (#C7D9BA).
 
-Practical limits: 16:9 landscape, at the largest size you can make. It is a desktop wallpaper: screens of other shapes crop the left and right edges, a taskbar covers a strip along the bottom, and desktop icons sit at the top left, so keep the main subjects away from those areas. No text, letters, logos, user-interface elements, people, signatures or watermarks.
+Format: a 16:9 landscape desktop wallpaper. The main subjects sit within the central area, away from the far left and right edges (other screen shapes crop them); the strip along the bottom edge (a taskbar covers it) and the top-left corner (desktop icons sit there) stay calm and simple.
+```
+
+Negative:
+
+```text
+people, person, children, kids' den, playground, toys, glow, sparkles, magic effects, leaf lying on the ground, many floating leaves, 3d render, CGI, illustration, painting, drawing, cartoon, HDR, halo, oversharpened, airbrushed, washed out, desaturated, muddy colours, candy colours, neon, oversaturated, flat lighting, cute, naive, childish, children's book, cheap, postcard, kitsch, out of focus, low detail, smeared texture, plastic look, noise, jpeg artifacts, text, letters, words, numbers, logo, watermark, signature, user interface, border, frame, vignette
 ```
 
 ### 2. LevitateOS, realistic photograph, dark
 
+Positive:
+
 ```text
 Desktop wallpaper for LevitateOS, a Linux operating system: the realistic photograph, dark version.
 
-Scene: A treehouse in a large tree, with no people anywhere. Make the treehouse well built and beautiful, not a kids' den. Behind it is a farm, and far in the background a row of trees runs along the horizon. The sky is visible.
+Scene: A treehouse in a large tree, finely crafted and beautiful, like a small piece of architecture. Behind it is a farm, and far in the background a row of trees runs along the horizon under an open, visible sky.
 
-In the foreground, a single leaf hovers just above the ground: it is about to land and fails, or refuses, to touch down. You can see the small gap between leaf and ground. This leaf is the heart of the picture (the LevitateOS logo is a leaf floating above a curved ground line). Keep it noticeable but quiet, impossible rather than magical: no glow, no sparkles.
+In the foreground, a single leaf hovers just above the ground, with a small, clear gap between the leaf and the ground and its shadow on the grass below. It is about to land and refuses to touch down. This leaf is the heart of the picture (the LevitateOS logo is a leaf floating above a curved ground line): noticeable but quiet, impossible in a calm, matter-of-fact way.
 
-Light: Night, lit by soft artificial light, such as warm light from the treehouse windows. Deep blue night, still clearly readable, not black.
+Light: Night, lit by soft warm artificial light, such as the treehouse windows. Deep blue night sky, every part of the scene still clearly readable.
 
-Style: A detailed, high-end landscape photograph: sharp, rich and believable, with real light. Not a 3D render, not HDR-looking, not an illustration.
+Style: A detailed, high-end landscape photograph: sharp, rich and believable, with real light and real optics.
 
-Feel: mature, refined and luxurious. Deep, rich colour with shadows that keep their colour, warm golds rather than yellows, nothing washed out or candy-bright; think of a fine library or a luxury catalogue, not a postcard. Directional light with depth and soft falloff. Fine, tactile texture (wood grain, bark, fur, leaf veins) that holds up at full screen size. Calm, assured and adult. Never cute, naive, cartoonish or like a children's book.
+Feel: mature, refined and luxurious. Deep, rich, jewel-like colour, with shadows that keep their colour and warm gold highlights, like a fine library or a luxury catalogue. Directional light with depth and soft falloff. Fine, tactile texture (wood grain, bark, leaf veins, fur) that stays crisp at full screen size. Calm, assured and adult.
 
-Let the colours lean toward deep greens (pine #214438, pale pine #C7D9BA).
+Colour lean: deep greens, pine (#214438) and pale sage (#C7D9BA).
 
-Practical limits: 16:9 landscape, at the largest size you can make. It is a desktop wallpaper: screens of other shapes crop the left and right edges, a taskbar covers a strip along the bottom, and desktop icons sit at the top left, so keep the main subjects away from those areas. No text, letters, logos, user-interface elements, people, signatures or watermarks.
+Format: a 16:9 landscape desktop wallpaper. The main subjects sit within the central area, away from the far left and right edges (other screen shapes crop them); the strip along the bottom edge (a taskbar covers it) and the top-left corner (desktop icons sit there) stay calm and simple.
+```
+
+Negative:
+
+```text
+people, person, children, kids' den, playground, toys, glow, sparkles, magic effects, leaf lying on the ground, many floating leaves, pitch black, grey night, harsh floodlights, 3d render, CGI, illustration, painting, drawing, cartoon, HDR, halo, oversharpened, airbrushed, washed out, desaturated, muddy colours, candy colours, neon, oversaturated, flat lighting, cute, naive, childish, children's book, cheap, postcard, kitsch, out of focus, low detail, smeared texture, plastic look, noise, jpeg artifacts, text, letters, words, numbers, logo, watermark, signature, user interface, border, frame, vignette
 ```
 
 ### 3. LevitateOS, oil painting, light
 
+Positive:
+
 ```text
 Desktop wallpaper for LevitateOS, a Linux operating system: the oil painting, light version.
 
-Scene: A treehouse in a large tree, with no people anywhere. Make the treehouse well built and beautiful, not a kids' den. Behind it is a farm, and far in the background a row of trees runs along the horizon. The sky is visible.
+Scene: A treehouse in a large tree, finely crafted and beautiful, like a small piece of architecture. Behind it is a farm, and far in the background a row of trees runs along the horizon under an open, visible sky.
 
-In the foreground, a single leaf hovers just above the ground: it is about to land and fails, or refuses, to touch down. You can see the small gap between leaf and ground. This leaf is the heart of the picture (the LevitateOS logo is a leaf floating above a curved ground line). Keep it noticeable but quiet, impossible rather than magical: no glow, no sparkles.
+In the foreground, a single leaf hovers just above the ground, with a small, clear gap between the leaf and the ground and its shadow on the grass below. It is about to land and refuses to touch down. This leaf is the heart of the picture (the LevitateOS logo is a leaf floating above a curved ground line): noticeable but quiet, impossible in a calm, matter-of-fact way.
 
-Light: Daytime with nice weather.
+Light: Daytime with fine, clear weather.
 
-Style: A refined oil painting in the tradition of the 19th-century Western landscape painters (the Hudson River School, the Barbizon painters): luminous glazes, confident brushwork, atmospheric depth, visible canvas texture. Gallery-worthy. Not storybook, not cartoon, not digital-flat.
+Style: A refined oil painting in the tradition of the 19th-century Western landscape painters (the Hudson River School, the Barbizon painters): luminous glazes, confident brushwork, atmospheric depth, visible canvas texture. Gallery-worthy.
 
-Feel: mature, refined and luxurious. Deep, rich colour with shadows that keep their colour, warm golds rather than yellows, nothing washed out or candy-bright; think of a fine library or a luxury catalogue, not a postcard. Directional light with depth and soft falloff. Fine, tactile texture (wood grain, bark, fur, leaf veins) that holds up at full screen size. Calm, assured and adult. Never cute, naive, cartoonish or like a children's book.
+Feel: mature, refined and luxurious. Deep, rich, jewel-like colour, with shadows that keep their colour and warm gold highlights, like a fine library or a luxury catalogue. Directional light with depth and soft falloff. Fine, tactile texture (wood grain, bark, leaf veins, fur) that stays crisp at full screen size. Calm, assured and adult.
 
-Let the colours lean toward deep greens (pine #214438, pale pine #C7D9BA).
+Colour lean: deep greens, pine (#214438) and pale sage (#C7D9BA).
 
-Practical limits: 16:9 landscape, at the largest size you can make. It is a desktop wallpaper: screens of other shapes crop the left and right edges, a taskbar covers a strip along the bottom, and desktop icons sit at the top left, so keep the main subjects away from those areas. No text, letters, logos, user-interface elements, people, signatures or watermarks.
+Format: a 16:9 landscape desktop wallpaper. The main subjects sit within the central area, away from the far left and right edges (other screen shapes crop them); the strip along the bottom edge (a taskbar covers it) and the top-left corner (desktop icons sit there) stay calm and simple.
+```
+
+Negative:
+
+```text
+people, person, children, kids' den, playground, toys, glow, sparkles, magic effects, leaf lying on the ground, many floating leaves, photograph, photorealistic, storybook, picture book, cartoon, anime, manga, cel shading, vector art, flat digital art, watercolour, gouache, washed out, desaturated, muddy colours, candy colours, neon, oversaturated, flat lighting, cute, naive, childish, children's book, cheap, postcard, kitsch, out of focus, low detail, smeared texture, plastic look, noise, jpeg artifacts, text, letters, words, numbers, logo, watermark, signature, user interface, border, frame, vignette
 ```
 
 ### 4. LevitateOS, oil painting, dark
 
+Positive:
+
 ```text
 Desktop wallpaper for LevitateOS, a Linux operating system: the oil painting, dark version.
 
-Scene: A treehouse in a large tree, with no people anywhere. Make the treehouse well built and beautiful, not a kids' den. Behind it is a farm, and far in the background a row of trees runs along the horizon. The sky is visible.
+Scene: A treehouse in a large tree, finely crafted and beautiful, like a small piece of architecture. Behind it is a farm, and far in the background a row of trees runs along the horizon under an open, visible sky.
 
-In the foreground, a single leaf hovers just above the ground: it is about to land and fails, or refuses, to touch down. You can see the small gap between leaf and ground. This leaf is the heart of the picture (the LevitateOS logo is a leaf floating above a curved ground line). Keep it noticeable but quiet, impossible rather than magical: no glow, no sparkles.
+In the foreground, a single leaf hovers just above the ground, with a small, clear gap between the leaf and the ground and its shadow on the grass below. It is about to land and refuses to touch down. This leaf is the heart of the picture (the LevitateOS logo is a leaf floating above a curved ground line): noticeable but quiet, impossible in a calm, matter-of-fact way.
 
-Light: Night, lit by soft artificial light, such as warm light from the treehouse windows. Deep blue night, still clearly readable, not black.
+Light: Night, lit by soft warm artificial light, such as the treehouse windows. Deep blue night sky, every part of the scene still clearly readable.
 
-Style: A refined oil painting in the tradition of the 19th-century Western landscape painters (the Hudson River School, the Barbizon painters): luminous glazes, confident brushwork, atmospheric depth, visible canvas texture. Gallery-worthy. Not storybook, not cartoon, not digital-flat.
+Style: A refined oil painting in the tradition of the 19th-century Western landscape painters (the Hudson River School, the Barbizon painters): luminous glazes, confident brushwork, atmospheric depth, visible canvas texture. Gallery-worthy.
 
-Feel: mature, refined and luxurious. Deep, rich colour with shadows that keep their colour, warm golds rather than yellows, nothing washed out or candy-bright; think of a fine library or a luxury catalogue, not a postcard. Directional light with depth and soft falloff. Fine, tactile texture (wood grain, bark, fur, leaf veins) that holds up at full screen size. Calm, assured and adult. Never cute, naive, cartoonish or like a children's book.
+Feel: mature, refined and luxurious. Deep, rich, jewel-like colour, with shadows that keep their colour and warm gold highlights, like a fine library or a luxury catalogue. Directional light with depth and soft falloff. Fine, tactile texture (wood grain, bark, leaf veins, fur) that stays crisp at full screen size. Calm, assured and adult.
 
-Let the colours lean toward deep greens (pine #214438, pale pine #C7D9BA).
+Colour lean: deep greens, pine (#214438) and pale sage (#C7D9BA).
 
-Practical limits: 16:9 landscape, at the largest size you can make. It is a desktop wallpaper: screens of other shapes crop the left and right edges, a taskbar covers a strip along the bottom, and desktop icons sit at the top left, so keep the main subjects away from those areas. No text, letters, logos, user-interface elements, people, signatures or watermarks.
+Format: a 16:9 landscape desktop wallpaper. The main subjects sit within the central area, away from the far left and right edges (other screen shapes crop them); the strip along the bottom edge (a taskbar covers it) and the top-left corner (desktop icons sit there) stay calm and simple.
 ```
 
-### 5. LevitateOS, dutch abstract, light
+Negative:
 
 ```text
-Desktop wallpaper for LevitateOS, a Linux operating system: the dutch abstract, light version.
-
-Scene: A treehouse in a large tree, with no people anywhere. Make the treehouse well built and beautiful, not a kids' den. Behind it is a farm, and far in the background a row of trees runs along the horizon. The sky is visible.
-
-In the foreground, a single leaf hovers just above the ground: it is about to land and fails, or refuses, to touch down. You can see the small gap between leaf and ground. This leaf is the heart of the picture (the LevitateOS logo is a leaf floating above a curved ground line). Keep it noticeable but quiet, impossible rather than magical: no glow, no sparkles.
-
-Light: Daytime with nice weather.
-
-Style: Dutch abstraction in the spirit of De Stijl (Mondrian, van Doesburg): the scene reduced to horizontal and vertical lines and rectangles of colour, with a fine hand-painted surface on linen. The scene should still be faintly recognisable, the way Mondrian's tree studies stay recognisable. Do not copy any existing painting. Gold leaf for any lights is a nice touch.
-
-Feel: mature, refined and luxurious. Deep, rich colour with shadows that keep their colour, warm golds rather than yellows, nothing washed out or candy-bright; think of a fine library or a luxury catalogue, not a postcard. Directional light with depth and soft falloff. Fine, tactile texture (wood grain, bark, fur, leaf veins) that holds up at full screen size. Calm, assured and adult. Never cute, naive, cartoonish or like a children's book.
-
-Let the colours lean toward deep greens (pine #214438, pale pine #C7D9BA).
-
-Practical limits: 16:9 landscape, at the largest size you can make. It is a desktop wallpaper: screens of other shapes crop the left and right edges, a taskbar covers a strip along the bottom, and desktop icons sit at the top left, so keep the main subjects away from those areas. No text, letters, logos, user-interface elements, people, signatures or watermarks.
+people, person, children, kids' den, playground, toys, glow, sparkles, magic effects, leaf lying on the ground, many floating leaves, pitch black, grey night, harsh floodlights, photograph, photorealistic, storybook, picture book, cartoon, anime, manga, cel shading, vector art, flat digital art, watercolour, gouache, washed out, desaturated, muddy colours, candy colours, neon, oversaturated, flat lighting, cute, naive, childish, children's book, cheap, postcard, kitsch, out of focus, low detail, smeared texture, plastic look, noise, jpeg artifacts, text, letters, words, numbers, logo, watermark, signature, user interface, border, frame, vignette
 ```
 
-### 6. LevitateOS, dutch abstract, dark
+### 5. LevitateOS, Dutch abstract, light
+
+Positive:
 
 ```text
-Desktop wallpaper for LevitateOS, a Linux operating system: the dutch abstract, dark version.
+Desktop wallpaper for LevitateOS, a Linux operating system: the Dutch abstract, light version.
 
-Scene: A treehouse in a large tree, with no people anywhere. Make the treehouse well built and beautiful, not a kids' den. Behind it is a farm, and far in the background a row of trees runs along the horizon. The sky is visible.
+Scene: A treehouse in a large tree, finely crafted and beautiful, like a small piece of architecture. Behind it is a farm, and far in the background a row of trees runs along the horizon under an open, visible sky.
 
-In the foreground, a single leaf hovers just above the ground: it is about to land and fails, or refuses, to touch down. You can see the small gap between leaf and ground. This leaf is the heart of the picture (the LevitateOS logo is a leaf floating above a curved ground line). Keep it noticeable but quiet, impossible rather than magical: no glow, no sparkles.
+In the foreground, a single leaf hovers just above the ground, with a small, clear gap between the leaf and the ground and its shadow on the grass below. It is about to land and refuses to touch down. This leaf is the heart of the picture (the LevitateOS logo is a leaf floating above a curved ground line): noticeable but quiet, impossible in a calm, matter-of-fact way.
 
-Light: Night, lit by soft artificial light, such as warm light from the treehouse windows. Deep blue night, still clearly readable, not black.
+Light: Daytime with fine, clear weather.
 
-Style: Dutch abstraction in the spirit of De Stijl (Mondrian, van Doesburg): the scene reduced to horizontal and vertical lines and rectangles of colour, with a fine hand-painted surface on linen. The scene should still be faintly recognisable, the way Mondrian's tree studies stay recognisable. Do not copy any existing painting. Gold leaf for any lights is a nice touch.
+Style: Dutch abstraction in the spirit of De Stijl (Mondrian, van Doesburg): the scene reduced to horizontal and vertical lines and rectangles of colour, with a fine hand-painted surface on linen and gold leaf for any lights. An original composition in which the scene is still faintly recognisable, the way Mondrian's tree studies stay recognisable.
 
-Feel: mature, refined and luxurious. Deep, rich colour with shadows that keep their colour, warm golds rather than yellows, nothing washed out or candy-bright; think of a fine library or a luxury catalogue, not a postcard. Directional light with depth and soft falloff. Fine, tactile texture (wood grain, bark, fur, leaf veins) that holds up at full screen size. Calm, assured and adult. Never cute, naive, cartoonish or like a children's book.
+Feel: mature, refined and luxurious. Deep, rich, jewel-like colour, with shadows that keep their colour and warm gold highlights, like a fine library or a luxury catalogue. Directional light with depth and soft falloff. Fine, tactile texture (wood grain, bark, leaf veins, fur) that stays crisp at full screen size. Calm, assured and adult.
 
-Let the colours lean toward deep greens (pine #214438, pale pine #C7D9BA).
+Colour lean: deep greens, pine (#214438) and pale sage (#C7D9BA).
 
-Practical limits: 16:9 landscape, at the largest size you can make. It is a desktop wallpaper: screens of other shapes crop the left and right edges, a taskbar covers a strip along the bottom, and desktop icons sit at the top left, so keep the main subjects away from those areas. No text, letters, logos, user-interface elements, people, signatures or watermarks.
+Format: a 16:9 landscape desktop wallpaper. The main subjects sit within the central area, away from the far left and right edges (other screen shapes crop them); the strip along the bottom edge (a taskbar covers it) and the top-left corner (desktop icons sit there) stay calm and simple.
+```
+
+Negative:
+
+```text
+people, person, children, kids' den, playground, toys, glow, sparkles, magic effects, leaf lying on the ground, many floating leaves, photograph, photorealistic, realistic detail, diagonal lines, curves, circles, gradients, perspective, 3d, shading, cartoon, washed out, desaturated, muddy colours, candy colours, neon, oversaturated, flat lighting, cute, naive, childish, children's book, cheap, postcard, kitsch, out of focus, low detail, smeared texture, plastic look, noise, jpeg artifacts, text, letters, words, numbers, logo, watermark, signature, user interface, border, frame, vignette
+```
+
+### 6. LevitateOS, Dutch abstract, dark
+
+Positive:
+
+```text
+Desktop wallpaper for LevitateOS, a Linux operating system: the Dutch abstract, dark version.
+
+Scene: A treehouse in a large tree, finely crafted and beautiful, like a small piece of architecture. Behind it is a farm, and far in the background a row of trees runs along the horizon under an open, visible sky.
+
+In the foreground, a single leaf hovers just above the ground, with a small, clear gap between the leaf and the ground and its shadow on the grass below. It is about to land and refuses to touch down. This leaf is the heart of the picture (the LevitateOS logo is a leaf floating above a curved ground line): noticeable but quiet, impossible in a calm, matter-of-fact way.
+
+Light: Night, lit by soft warm artificial light, such as the treehouse windows. Deep blue night sky, every part of the scene still clearly readable.
+
+Style: Dutch abstraction in the spirit of De Stijl (Mondrian, van Doesburg): the scene reduced to horizontal and vertical lines and rectangles of colour, with a fine hand-painted surface on linen and gold leaf for any lights. An original composition in which the scene is still faintly recognisable, the way Mondrian's tree studies stay recognisable.
+
+Feel: mature, refined and luxurious. Deep, rich, jewel-like colour, with shadows that keep their colour and warm gold highlights, like a fine library or a luxury catalogue. Directional light with depth and soft falloff. Fine, tactile texture (wood grain, bark, leaf veins, fur) that stays crisp at full screen size. Calm, assured and adult.
+
+Colour lean: deep greens, pine (#214438) and pale sage (#C7D9BA).
+
+Format: a 16:9 landscape desktop wallpaper. The main subjects sit within the central area, away from the far left and right edges (other screen shapes crop them); the strip along the bottom edge (a taskbar covers it) and the top-left corner (desktop icons sit there) stay calm and simple.
+```
+
+Negative:
+
+```text
+people, person, children, kids' den, playground, toys, glow, sparkles, magic effects, leaf lying on the ground, many floating leaves, pitch black, grey night, harsh floodlights, photograph, photorealistic, realistic detail, diagonal lines, curves, circles, gradients, perspective, 3d, shading, cartoon, washed out, desaturated, muddy colours, candy colours, neon, oversaturated, flat lighting, cute, naive, childish, children's book, cheap, postcard, kitsch, out of focus, low detail, smeared texture, plastic look, noise, jpeg artifacts, text, letters, words, numbers, logo, watermark, signature, user interface, border, frame, vignette
 ```
 
 ## AcornOS
 
 ### 7. AcornOS, realistic photograph, light
 
+Positive:
+
 ```text
 Desktop wallpaper for AcornOS, a Linux operating system: the realistic photograph, light version.
 
-Scene: A picnic table inside a forest in deep autumn colours. The table is not in the centre of the picture.
+Scene: A picnic table inside a forest in deep autumn colours, placed off-centre.
 
-A family of squirrels is rushing through the scene, blurred as if the photograph had a longer exposure. No acorns are visible anywhere, but you can tell the squirrels are after acorns and that the acorns are close.
+A family of squirrels rushes through the scene, all heading the same way: they are after acorns hidden close by under the fallen leaves. The squirrels are motion-blurred by a long exposure while the table and trees stay sharp.
 
 Light: Autumn daytime.
 
-Style: A detailed, high-end landscape photograph: sharp, rich and believable, with real light. Not a 3D render, not HDR-looking, not an illustration.
+Style: A detailed, high-end landscape photograph: sharp, rich and believable, with real light and real optics.
 
-Feel: mature, refined and luxurious. Deep, rich colour with shadows that keep their colour, warm golds rather than yellows, nothing washed out or candy-bright; think of a fine library or a luxury catalogue, not a postcard. Directional light with depth and soft falloff. Fine, tactile texture (wood grain, bark, fur, leaf veins) that holds up at full screen size. Calm, assured and adult. Never cute, naive, cartoonish or like a children's book.
+Feel: mature, refined and luxurious. Deep, rich, jewel-like colour, with shadows that keep their colour and warm gold highlights, like a fine library or a luxury catalogue. Directional light with depth and soft falloff. Fine, tactile texture (wood grain, bark, leaf veins, fur) that stays crisp at full screen size. Calm, assured and adult.
 
-Let the colours lean toward rich browns (acorn brown #644532, pale acorn #E4CBA6) among the autumn reds and oranges.
+Colour lean: rich browns, acorn brown (#644532) and pale acorn (#E4CBA6), among deep autumn reds and oranges.
 
-Practical limits: 16:9 landscape, at the largest size you can make. It is a desktop wallpaper: screens of other shapes crop the left and right edges, a taskbar covers a strip along the bottom, and desktop icons sit at the top left, so keep the main subjects away from those areas. No text, letters, logos, user-interface elements, people, signatures or watermarks.
+Format: a 16:9 landscape desktop wallpaper. The main subjects sit within the central area, away from the far left and right edges (other screen shapes crop them); the strip along the bottom edge (a taskbar covers it) and the top-left corner (desktop icons sit there) stay calm and simple.
+```
+
+Negative:
+
+```text
+acorns, nuts, centred table, symmetrical composition, people, person, food on the table, picnic basket, 3d render, CGI, illustration, painting, drawing, cartoon, HDR, halo, oversharpened, airbrushed, washed out, desaturated, muddy colours, candy colours, neon, oversaturated, flat lighting, cute, naive, childish, children's book, cheap, postcard, kitsch, out of focus, low detail, smeared texture, plastic look, noise, jpeg artifacts, text, letters, words, numbers, logo, watermark, signature, user interface, border, frame, vignette
 ```
 
 ### 8. AcornOS, realistic photograph, dark
 
+Positive:
+
 ```text
 Desktop wallpaper for AcornOS, a Linux operating system: the realistic photograph, dark version.
 
-Scene: A picnic table inside a forest in deep autumn colours. The table is not in the centre of the picture.
+Scene: A picnic table inside a forest in deep autumn colours, placed off-centre.
 
-A family of squirrels is rushing through the scene, blurred as if the photograph had a longer exposure. No acorns are visible anywhere, but you can tell the squirrels are after acorns and that the acorns are close.
+A family of squirrels rushes through the scene, all heading the same way: they are after acorns hidden close by under the fallen leaves. The squirrels are motion-blurred by a long exposure while the table and trees stay sharp.
 
-Light: Dusk or evening, with a soft warm light such as a lantern on the table. Deep blue evening, still clearly readable, not black.
+Light: Dusk or evening, with a soft warm light such as a lantern on the table. Deep blue evening, every part of the scene still clearly readable.
 
-Style: A detailed, high-end landscape photograph: sharp, rich and believable, with real light. Not a 3D render, not HDR-looking, not an illustration.
+Style: A detailed, high-end landscape photograph: sharp, rich and believable, with real light and real optics.
 
-Feel: mature, refined and luxurious. Deep, rich colour with shadows that keep their colour, warm golds rather than yellows, nothing washed out or candy-bright; think of a fine library or a luxury catalogue, not a postcard. Directional light with depth and soft falloff. Fine, tactile texture (wood grain, bark, fur, leaf veins) that holds up at full screen size. Calm, assured and adult. Never cute, naive, cartoonish or like a children's book.
+Feel: mature, refined and luxurious. Deep, rich, jewel-like colour, with shadows that keep their colour and warm gold highlights, like a fine library or a luxury catalogue. Directional light with depth and soft falloff. Fine, tactile texture (wood grain, bark, leaf veins, fur) that stays crisp at full screen size. Calm, assured and adult.
 
-Let the colours lean toward rich browns (acorn brown #644532, pale acorn #E4CBA6) among the autumn reds and oranges.
+Colour lean: rich browns, acorn brown (#644532) and pale acorn (#E4CBA6), among deep autumn reds and oranges.
 
-Practical limits: 16:9 landscape, at the largest size you can make. It is a desktop wallpaper: screens of other shapes crop the left and right edges, a taskbar covers a strip along the bottom, and desktop icons sit at the top left, so keep the main subjects away from those areas. No text, letters, logos, user-interface elements, people, signatures or watermarks.
+Format: a 16:9 landscape desktop wallpaper. The main subjects sit within the central area, away from the far left and right edges (other screen shapes crop them); the strip along the bottom edge (a taskbar covers it) and the top-left corner (desktop icons sit there) stay calm and simple.
+```
+
+Negative:
+
+```text
+acorns, nuts, centred table, symmetrical composition, people, person, food on the table, picnic basket, pitch black, grey dusk, harsh floodlights, 3d render, CGI, illustration, painting, drawing, cartoon, HDR, halo, oversharpened, airbrushed, washed out, desaturated, muddy colours, candy colours, neon, oversaturated, flat lighting, cute, naive, childish, children's book, cheap, postcard, kitsch, out of focus, low detail, smeared texture, plastic look, noise, jpeg artifacts, text, letters, words, numbers, logo, watermark, signature, user interface, border, frame, vignette
 ```
 
 ### 9. AcornOS, oil painting, light
 
+Positive:
+
 ```text
 Desktop wallpaper for AcornOS, a Linux operating system: the oil painting, light version.
 
-Scene: A picnic table inside a forest in deep autumn colours. The table is not in the centre of the picture.
+Scene: A picnic table inside a forest in deep autumn colours, placed off-centre.
 
-A family of squirrels is rushing through the scene, blurred as if the photograph had a longer exposure. No acorns are visible anywhere, but you can tell the squirrels are after acorns and that the acorns are close. Show the squirrels' speed with the painter's brushwork.
+A family of squirrels rushes through the scene, all heading the same way: they are after acorns hidden close by under the fallen leaves. The squirrels' speed shows in the painter's brushwork.
 
 Light: Autumn daytime.
 
-Style: A refined oil painting in the tradition of the 19th-century Western landscape painters (the Hudson River School, the Barbizon painters): luminous glazes, confident brushwork, atmospheric depth, visible canvas texture. Gallery-worthy. Not storybook, not cartoon, not digital-flat.
+Style: A refined oil painting in the tradition of the 19th-century Western landscape painters (the Hudson River School, the Barbizon painters): luminous glazes, confident brushwork, atmospheric depth, visible canvas texture. Gallery-worthy.
 
-Feel: mature, refined and luxurious. Deep, rich colour with shadows that keep their colour, warm golds rather than yellows, nothing washed out or candy-bright; think of a fine library or a luxury catalogue, not a postcard. Directional light with depth and soft falloff. Fine, tactile texture (wood grain, bark, fur, leaf veins) that holds up at full screen size. Calm, assured and adult. Never cute, naive, cartoonish or like a children's book.
+Feel: mature, refined and luxurious. Deep, rich, jewel-like colour, with shadows that keep their colour and warm gold highlights, like a fine library or a luxury catalogue. Directional light with depth and soft falloff. Fine, tactile texture (wood grain, bark, leaf veins, fur) that stays crisp at full screen size. Calm, assured and adult.
 
-Let the colours lean toward rich browns (acorn brown #644532, pale acorn #E4CBA6) among the autumn reds and oranges.
+Colour lean: rich browns, acorn brown (#644532) and pale acorn (#E4CBA6), among deep autumn reds and oranges.
 
-Practical limits: 16:9 landscape, at the largest size you can make. It is a desktop wallpaper: screens of other shapes crop the left and right edges, a taskbar covers a strip along the bottom, and desktop icons sit at the top left, so keep the main subjects away from those areas. No text, letters, logos, user-interface elements, people, signatures or watermarks.
+Format: a 16:9 landscape desktop wallpaper. The main subjects sit within the central area, away from the far left and right edges (other screen shapes crop them); the strip along the bottom edge (a taskbar covers it) and the top-left corner (desktop icons sit there) stay calm and simple.
+```
+
+Negative:
+
+```text
+acorns, nuts, centred table, symmetrical composition, people, person, food on the table, picnic basket, photograph, photorealistic, storybook, picture book, cartoon, anime, manga, cel shading, vector art, flat digital art, watercolour, gouache, washed out, desaturated, muddy colours, candy colours, neon, oversaturated, flat lighting, cute, naive, childish, children's book, cheap, postcard, kitsch, out of focus, low detail, smeared texture, plastic look, noise, jpeg artifacts, text, letters, words, numbers, logo, watermark, signature, user interface, border, frame, vignette
 ```
 
 ### 10. AcornOS, oil painting, dark
 
+Positive:
+
 ```text
 Desktop wallpaper for AcornOS, a Linux operating system: the oil painting, dark version.
 
-Scene: A picnic table inside a forest in deep autumn colours. The table is not in the centre of the picture.
+Scene: A picnic table inside a forest in deep autumn colours, placed off-centre.
 
-A family of squirrels is rushing through the scene, blurred as if the photograph had a longer exposure. No acorns are visible anywhere, but you can tell the squirrels are after acorns and that the acorns are close. Show the squirrels' speed with the painter's brushwork.
+A family of squirrels rushes through the scene, all heading the same way: they are after acorns hidden close by under the fallen leaves. The squirrels' speed shows in the painter's brushwork.
 
-Light: Dusk or evening, with a soft warm light such as a lantern on the table. Deep blue evening, still clearly readable, not black.
+Light: Dusk or evening, with a soft warm light such as a lantern on the table. Deep blue evening, every part of the scene still clearly readable.
 
-Style: A refined oil painting in the tradition of the 19th-century Western landscape painters (the Hudson River School, the Barbizon painters): luminous glazes, confident brushwork, atmospheric depth, visible canvas texture. Gallery-worthy. Not storybook, not cartoon, not digital-flat.
+Style: A refined oil painting in the tradition of the 19th-century Western landscape painters (the Hudson River School, the Barbizon painters): luminous glazes, confident brushwork, atmospheric depth, visible canvas texture. Gallery-worthy.
 
-Feel: mature, refined and luxurious. Deep, rich colour with shadows that keep their colour, warm golds rather than yellows, nothing washed out or candy-bright; think of a fine library or a luxury catalogue, not a postcard. Directional light with depth and soft falloff. Fine, tactile texture (wood grain, bark, fur, leaf veins) that holds up at full screen size. Calm, assured and adult. Never cute, naive, cartoonish or like a children's book.
+Feel: mature, refined and luxurious. Deep, rich, jewel-like colour, with shadows that keep their colour and warm gold highlights, like a fine library or a luxury catalogue. Directional light with depth and soft falloff. Fine, tactile texture (wood grain, bark, leaf veins, fur) that stays crisp at full screen size. Calm, assured and adult.
 
-Let the colours lean toward rich browns (acorn brown #644532, pale acorn #E4CBA6) among the autumn reds and oranges.
+Colour lean: rich browns, acorn brown (#644532) and pale acorn (#E4CBA6), among deep autumn reds and oranges.
 
-Practical limits: 16:9 landscape, at the largest size you can make. It is a desktop wallpaper: screens of other shapes crop the left and right edges, a taskbar covers a strip along the bottom, and desktop icons sit at the top left, so keep the main subjects away from those areas. No text, letters, logos, user-interface elements, people, signatures or watermarks.
+Format: a 16:9 landscape desktop wallpaper. The main subjects sit within the central area, away from the far left and right edges (other screen shapes crop them); the strip along the bottom edge (a taskbar covers it) and the top-left corner (desktop icons sit there) stay calm and simple.
 ```
 
-### 11. AcornOS, dutch abstract, light
+Negative:
 
 ```text
-Desktop wallpaper for AcornOS, a Linux operating system: the dutch abstract, light version.
+acorns, nuts, centred table, symmetrical composition, people, person, food on the table, picnic basket, pitch black, grey dusk, harsh floodlights, photograph, photorealistic, storybook, picture book, cartoon, anime, manga, cel shading, vector art, flat digital art, watercolour, gouache, washed out, desaturated, muddy colours, candy colours, neon, oversaturated, flat lighting, cute, naive, childish, children's book, cheap, postcard, kitsch, out of focus, low detail, smeared texture, plastic look, noise, jpeg artifacts, text, letters, words, numbers, logo, watermark, signature, user interface, border, frame, vignette
+```
 
-Scene: A picnic table inside a forest in deep autumn colours. The table is not in the centre of the picture.
+### 11. AcornOS, Dutch abstract, light
 
-A family of squirrels is rushing through the scene, blurred as if the photograph had a longer exposure. No acorns are visible anywhere, but you can tell the squirrels are after acorns and that the acorns are close. Show the squirrels' speed in the abstract language, for example a quick run of small rectangles heading the same way.
+Positive:
+
+```text
+Desktop wallpaper for AcornOS, a Linux operating system: the Dutch abstract, light version.
+
+Scene: A picnic table inside a forest in deep autumn colours, placed off-centre.
+
+A family of squirrels rushes through the scene, all heading the same way: they are after acorns hidden close by under the fallen leaves. The squirrels' speed shows as a quick run of small rectangles heading the same way.
 
 Light: Autumn daytime.
 
-Style: Dutch abstraction in the spirit of De Stijl (Mondrian, van Doesburg): the scene reduced to horizontal and vertical lines and rectangles of colour, with a fine hand-painted surface on linen. The scene should still be faintly recognisable, the way Mondrian's tree studies stay recognisable. Do not copy any existing painting. Gold leaf for any lights is a nice touch.
+Style: Dutch abstraction in the spirit of De Stijl (Mondrian, van Doesburg): the scene reduced to horizontal and vertical lines and rectangles of colour, with a fine hand-painted surface on linen and gold leaf for any lights. An original composition in which the scene is still faintly recognisable, the way Mondrian's tree studies stay recognisable.
 
-Feel: mature, refined and luxurious. Deep, rich colour with shadows that keep their colour, warm golds rather than yellows, nothing washed out or candy-bright; think of a fine library or a luxury catalogue, not a postcard. Directional light with depth and soft falloff. Fine, tactile texture (wood grain, bark, fur, leaf veins) that holds up at full screen size. Calm, assured and adult. Never cute, naive, cartoonish or like a children's book.
+Feel: mature, refined and luxurious. Deep, rich, jewel-like colour, with shadows that keep their colour and warm gold highlights, like a fine library or a luxury catalogue. Directional light with depth and soft falloff. Fine, tactile texture (wood grain, bark, leaf veins, fur) that stays crisp at full screen size. Calm, assured and adult.
 
-Let the colours lean toward rich browns (acorn brown #644532, pale acorn #E4CBA6) among the autumn reds and oranges.
+Colour lean: rich browns, acorn brown (#644532) and pale acorn (#E4CBA6), among deep autumn reds and oranges.
 
-Practical limits: 16:9 landscape, at the largest size you can make. It is a desktop wallpaper: screens of other shapes crop the left and right edges, a taskbar covers a strip along the bottom, and desktop icons sit at the top left, so keep the main subjects away from those areas. No text, letters, logos, user-interface elements, people, signatures or watermarks.
+Format: a 16:9 landscape desktop wallpaper. The main subjects sit within the central area, away from the far left and right edges (other screen shapes crop them); the strip along the bottom edge (a taskbar covers it) and the top-left corner (desktop icons sit there) stay calm and simple.
 ```
 
-### 12. AcornOS, dutch abstract, dark
+Negative:
 
 ```text
-Desktop wallpaper for AcornOS, a Linux operating system: the dutch abstract, dark version.
+acorns, nuts, centred table, symmetrical composition, people, person, food on the table, picnic basket, photograph, photorealistic, realistic detail, diagonal lines, curves, circles, gradients, perspective, 3d, shading, cartoon, washed out, desaturated, muddy colours, candy colours, neon, oversaturated, flat lighting, cute, naive, childish, children's book, cheap, postcard, kitsch, out of focus, low detail, smeared texture, plastic look, noise, jpeg artifacts, text, letters, words, numbers, logo, watermark, signature, user interface, border, frame, vignette
+```
 
-Scene: A picnic table inside a forest in deep autumn colours. The table is not in the centre of the picture.
+### 12. AcornOS, Dutch abstract, dark
 
-A family of squirrels is rushing through the scene, blurred as if the photograph had a longer exposure. No acorns are visible anywhere, but you can tell the squirrels are after acorns and that the acorns are close. Show the squirrels' speed in the abstract language, for example a quick run of small rectangles heading the same way.
+Positive:
 
-Light: Dusk or evening, with a soft warm light such as a lantern on the table. Deep blue evening, still clearly readable, not black.
+```text
+Desktop wallpaper for AcornOS, a Linux operating system: the Dutch abstract, dark version.
 
-Style: Dutch abstraction in the spirit of De Stijl (Mondrian, van Doesburg): the scene reduced to horizontal and vertical lines and rectangles of colour, with a fine hand-painted surface on linen. The scene should still be faintly recognisable, the way Mondrian's tree studies stay recognisable. Do not copy any existing painting. Gold leaf for any lights is a nice touch.
+Scene: A picnic table inside a forest in deep autumn colours, placed off-centre.
 
-Feel: mature, refined and luxurious. Deep, rich colour with shadows that keep their colour, warm golds rather than yellows, nothing washed out or candy-bright; think of a fine library or a luxury catalogue, not a postcard. Directional light with depth and soft falloff. Fine, tactile texture (wood grain, bark, fur, leaf veins) that holds up at full screen size. Calm, assured and adult. Never cute, naive, cartoonish or like a children's book.
+A family of squirrels rushes through the scene, all heading the same way: they are after acorns hidden close by under the fallen leaves. The squirrels' speed shows as a quick run of small rectangles heading the same way.
 
-Let the colours lean toward rich browns (acorn brown #644532, pale acorn #E4CBA6) among the autumn reds and oranges.
+Light: Dusk or evening, with a soft warm light such as a lantern on the table. Deep blue evening, every part of the scene still clearly readable.
 
-Practical limits: 16:9 landscape, at the largest size you can make. It is a desktop wallpaper: screens of other shapes crop the left and right edges, a taskbar covers a strip along the bottom, and desktop icons sit at the top left, so keep the main subjects away from those areas. No text, letters, logos, user-interface elements, people, signatures or watermarks.
+Style: Dutch abstraction in the spirit of De Stijl (Mondrian, van Doesburg): the scene reduced to horizontal and vertical lines and rectangles of colour, with a fine hand-painted surface on linen and gold leaf for any lights. An original composition in which the scene is still faintly recognisable, the way Mondrian's tree studies stay recognisable.
+
+Feel: mature, refined and luxurious. Deep, rich, jewel-like colour, with shadows that keep their colour and warm gold highlights, like a fine library or a luxury catalogue. Directional light with depth and soft falloff. Fine, tactile texture (wood grain, bark, leaf veins, fur) that stays crisp at full screen size. Calm, assured and adult.
+
+Colour lean: rich browns, acorn brown (#644532) and pale acorn (#E4CBA6), among deep autumn reds and oranges.
+
+Format: a 16:9 landscape desktop wallpaper. The main subjects sit within the central area, away from the far left and right edges (other screen shapes crop them); the strip along the bottom edge (a taskbar covers it) and the top-left corner (desktop icons sit there) stay calm and simple.
+```
+
+Negative:
+
+```text
+acorns, nuts, centred table, symmetrical composition, people, person, food on the table, picnic basket, pitch black, grey dusk, harsh floodlights, photograph, photorealistic, realistic detail, diagonal lines, curves, circles, gradients, perspective, 3d, shading, cartoon, washed out, desaturated, muddy colours, candy colours, neon, oversaturated, flat lighting, cute, naive, childish, children's book, cheap, postcard, kitsch, out of focus, low detail, smeared texture, plastic look, noise, jpeg artifacts, text, letters, words, numbers, logo, watermark, signature, user interface, border, frame, vignette
 ```
