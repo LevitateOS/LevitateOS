@@ -1,14 +1,16 @@
 schema_version = 1
 
-# Gate 9's shape (tools/ginux config/instance-gate9.toml) for a LevitateOS
-# root. `ginux native CONFIG ROOT` boots ROOT; `root` here is not used.
+# Ginux's instance schema, in the shape of Ginux's Gate 9 instance; the same
+# for both OSes. `ginux native instance.toml ROOT` boots ROOT, so `root` is not
+# used, but the schema requires it.
 [instance]
-id = "levitate-systemd"
+id = "ginux-boot"
 root = "docker.io/rockylinux/rockylinux@sha256:7a18ce2c9c1e0d8735f3e72685f9666150af25036e7f7b5ee4eede3754496f8c"
 init = "/sbin/init"
-args = ["--system", "--unit=multi-user.target"]
+args = []
 environment = ["container=ginux"]
 
+# stage.sh derives the guest's /proc/meminfo from memory_mib.
 [resources]
 vcpus = 2
 memory_mib = 1024
@@ -17,20 +19,22 @@ memory_mib = 1024
 profile = "balanced"
 backend = "ptrace-native"
 
+# Ginux's only boot profile; it is not systemd-only in effect.
 [contract]
 profile = "gate9-systemd-v1"
 
 [storage]
 assignments = ["root-overlay"]
 
-# systemd needs sockets (notify, private bus, journal); the systemd profile
-# grants them only with the shared network, as in Gate 9.
+# systemd needs sockets (notify, private bus, journal), which the profile
+# grants only with the shared network.
 [devices]
 assignments = ["console", "null", "zero", "random", "net0"]
 
 [network]
 backend = "shared"
 
+# ginux-boot.sh saves Ginux's stderr as audit.log.
 [audit]
 mode = "stderr"
 

@@ -1,6 +1,8 @@
-# AcornOS under Ginux. Required: OpenRC reaches the default runlevel and every
-# service it lists is started, except these known gaps. Remove a line when its
-# service starts (the check says so).
+# AcornOS's known gaps under Ginux. Format: one `gap NAME REASON` line per
+# service that recab's boot-health verdict lists as failed; `#` lines are
+# comments. A run passes when the failed services are exactly these: a listed
+# gap that no longer fails fails the run too, so remove its line.
+#
+# Not yet re-recorded since the shared staging (the product's own runlevels,
+# a network for every instance) and the recab verdict.
 gap networking  needs the hostname service; sethostname is ENOSYS under Ginux
-gap sshd        image files stat as the host owner, not virtual root: "/var/empty must be owned by root"
-gap dhcpcd      crashes: the instance has no network

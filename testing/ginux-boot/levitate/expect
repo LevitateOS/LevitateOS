@@ -1,6 +1,10 @@
-# LevitateOS under Ginux. Required: multi-user.target is active and every
-# failed unit is one of these known gaps. Remove a line when its unit stops
-# failing (the check says so).
+# LevitateOS's known gaps under Ginux. Format: one `gap NAME REASON` line per
+# unit that recab's boot-health verdict lists as failed; `#` lines are
+# comments. A run passes when the failed units are exactly these: a listed gap
+# that no longer fails fails the run too, so remove its line.
+#
+# Not yet re-recorded since the shared staging (the product's default target)
+# and the recab verdict.
 #
 # systemd 262 sets up unit credentials with the new mount API (fsopen); Ginux
 # denies it (ENOSYS), and every unit with credentials fails at that step.
@@ -27,4 +31,4 @@ gap systemd-homed.service                    exits 1; its error goes to the jour
 gap systemd-homed-firstboot.service          needs systemd-homed
 gap auditd.service                           no kernel audit under Ginux
 gap tmp.mount                                tmpfs mount refused (exit 32)
-gap sshd.service                             exits 255; likely image ownership, as on AcornOS
+gap sshd.service                             exits 255; likely Ginux running the image as the host nobody (stage.sh), so files are not root's
