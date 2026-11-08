@@ -65,7 +65,7 @@ fn enforce_build_hours(now: bool) -> Result<()> {
         return Ok(());
     }
     let (hour, minute) = local_time()?;
-    if hour >= 23 || hour < 10 || (hour, minute) == (10, 0) {
+    if !(10..23).contains(&hour) || (hour, minute) == (10, 0) {
         return Ok(());
     }
     Err(crate::util::exit::missing(

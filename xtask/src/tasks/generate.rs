@@ -244,7 +244,8 @@ fn write_tool_help(out: &mut Out, root: &Path) -> Result<()> {
         text.push_str(&format!("\t{binary}: {},\n", serde_json::to_string(help.trim_end())?));
     }
     text.push_str("} as const\n");
-    out.emit(&root.join("docs/content/src/tool-help.ts"), &text)
+    let path = root.join("docs/content/src/tool-help.ts");
+    out.emit(&path, &format_ts(root, &path, &text)?)
 }
 
 fn format_ts(root: &Path, path: &Path, text: &str) -> Result<String> {

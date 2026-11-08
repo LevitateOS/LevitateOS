@@ -22,11 +22,10 @@ fn run_options(boot: &BootArgs, force: bool) -> Result<RunOptions> {
     if let Some(raw) = &boot.inject {
         injection.extend(install_tests::boot_injection::parse_pairs(raw).map_err(|e| usage(format!("--inject: {e:#}")))?);
     }
-    if let Some(key) = &boot.ssh_key {
-        if !key.is_file() {
+    if let Some(key) = &boot.ssh_key
+        && !key.is_file() {
             return Err(usage(format!("--ssh-key {} is not a file", key.display())));
         }
-    }
     Ok(RunOptions {
         force,
         injection,

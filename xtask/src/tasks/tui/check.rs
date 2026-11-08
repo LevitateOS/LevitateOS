@@ -71,7 +71,7 @@ pub fn run(bless: bool) -> Result<()> {
             }
         };
         let told = told_distro(app);
-        for distro in told.then_some(&distros[..]).unwrap_or(&[]) {
+        for distro in if told { &distros[..] } else { &[] } {
             let args = launch.distro_args(distro);
             step(
                 format!("render {name} on {} {}x{}", distro.id(), FULL.columns, FULL.rows),
@@ -112,7 +112,7 @@ pub fn run(bless: bool) -> Result<()> {
                 for distro in &distros {
                     step(
                         format!("snapshots {name} on {}", distro.id()),
-                        compare_snapshots(&launch, &snapshots.join(&distro.id()), Some(distro), bless),
+                        compare_snapshots(&launch, &snapshots.join(distro.id()), Some(distro), bless),
                     );
                 }
             } else {
@@ -185,15 +185,14 @@ fn story(launch: &Launch, spec: &Story) -> Result<()> {
         }
         let shot = capture(launch, &start.args, &start.env, &keys, FULL, WAIT).map_err(capture_error)?;
         healthy(&shot)?;
-        if let Some(expect) = &step.expect {
-            if !shot.plain.contains(expect) {
+        if let Some(expect) = &step.expect
+            && !shot.plain.contains(expect) {
                 bail!(
                     "step {} (keys so far '{typed}'): expected '{expect}' on screen:\n{}",
                     index + 1,
                     shot.plain
                 );
             }
-        }
     }
     Ok(())
 }

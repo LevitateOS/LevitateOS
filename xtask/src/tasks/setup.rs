@@ -92,7 +92,7 @@ fn checks(root: &Path) -> Vec<Check> {
     checks.push(Check::new(
         format!("libvirt connection {uri}"),
         true,
-        recqemu::libvirt::virsh(&uri, &["version"])
+        recqemu::libvirt::virsh(uri, &["version"])
             .map(|out| out.lines().find(|l| l.contains("hypervisor")).unwrap_or("connected").trim().to_string())
             .map_err(|e| (format!("{e:#}"), "install libvirt-daemon-kvm (the session daemon starts on demand)".into())),
     ));

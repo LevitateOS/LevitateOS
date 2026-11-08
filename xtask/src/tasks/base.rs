@@ -259,16 +259,14 @@ fn parse_primary(reader: impl std::io::BufRead, repo: &str, wanted: &HashSet<Str
             }
             Event::End(e) => {
                 field = None;
-                if e.name().as_ref() == b"package" {
-                    if let Some(rpm) = current.take() {
-                        if wanted.contains(&rpm.name)
+                if e.name().as_ref() == b"package"
+                    && let Some(rpm) = current.take()
+                        && wanted.contains(&rpm.name)
                             && (rpm.arch == "x86_64" || rpm.arch == "noarch")
                             && !rpm.sha256.is_empty()
                         {
                             out.push(rpm);
                         }
-                    }
-                }
             }
             Event::Eof => break,
             _ => {}
