@@ -4,6 +4,9 @@
 use anyhow::{Context, Result, bail};
 use distro_builder::kernel::{self, Autofix, KernelStatus, Source};
 
+mod publish;
+pub use publish::publish;
+
 use crate::cli::{Distro, KernelArgs};
 
 /// The command that installs `distro`'s kernel.
@@ -58,18 +61,18 @@ pub fn build(args: KernelArgs) -> Result<()> {
     Ok(())
 }
 
-/// Kernel compiles run 23:00-10:00 so they do not tie up the machine during
-/// the day; `--now` overrides.
-fn enforce_build_hours(now: bool) -> Result<()> {
+/// Kernel compiles run 10:00-23:00 so the build's fan noise stays out of the
+/// night; `--now` overrides.
+pub(crate) fn enforce_build_hours(now: bool) -> Result<()> {
     if now {
         return Ok(());
     }
     let (hour, minute) = local_time()?;
-    if !(10..23).contains(&hour) || (hour, minute) == (10, 0) {
+    if (10..23).contains(&hour) {
         return Ok(());
     }
     Err(crate::util::exit::missing(
-        format!("kernel compiles run between 23:00 and 10:00 (it is {hour:02}:{minute:02})"),
+        format!("kernel compiles run between 10:00 and 23:00 (it is {hour:02}:{minute:02})"),
         "add --now to compile anyway, or use --prebuilt to download it",
     ))
 }

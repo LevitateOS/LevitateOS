@@ -175,6 +175,12 @@ pub enum Cmd {
         what: BuildCmd,
     },
 
+    /// Kernel maintenance: publish a new product kernel.
+    Kernel {
+        #[command(subcommand)]
+        what: KernelCmd,
+    },
+
     /// Boot a scenario for interactive use (needs a terminal unless --no-shell).
     Run(RunArgs),
 
@@ -386,6 +392,40 @@ impl DistroSelection {
     }
 }
 
+#[derive(Subcommand)]
+pub enum KernelCmd {
+    /// Fetch, configure, build, package and boot-test the pinned kernel; with --upload, publish it.
+    ///
+    /// Steps: fetch, config, build, package, boot, upload. It runs in the foreground, logs each
+    /// step under .artifacts/kernel/<distro>/<release>/, prints a heartbeat every minute during
+    /// the build, kills a build whose log stalls for 10 minutes (120 minute hard limit), and ends
+    /// with a `[fail] <step>: <reason> (log: <path>)` line and a nonzero exit on failure. A rerun
+    /// skips the steps that finished (state.json); --from redoes a step and the ones after it.
+    /// Without --upload it stops after the boot test and prints what upload would do.
+    Publish(PublishArgs),
+}
+
+#[derive(Args, Clone)]
+pub struct PublishArgs {
+    #[arg(value_parser = DistroParser)]
+    pub distro: Distro,
+    /// Also upload the assets to the GitHub release and repoint linux-prebuilt.rhai's digest.
+    #[arg(long)]
+    pub upload: bool,
+    /// Redo this step and every step after it.
+    #[arg(long, value_name = "STEP", value_parser = ["fetch", "config", "build", "package", "boot", "upload"])]
+    pub from: Option<String>,
+    /// Compile even outside the 10:00-23:00 kernel build window.
+    #[arg(long)]
+    pub now: bool,
+    /// make -j (default: half the CPUs).
+    #[arg(long, value_name = "N", value_parser = clap::value_parser!(usize))]
+    pub jobs: Option<usize>,
+    /// A static busybox for the boot test (default: the one Recipe's busybox-static installs).
+    #[arg(long, value_name = "PATH")]
+    pub busybox: Option<PathBuf>,
+}
+
 #[derive(Args)]
 pub struct KernelArgs {
     #[command(flatten)]
@@ -396,7 +436,7 @@ pub struct KernelArgs {
     /// Build (or download) again even if verified artifacts are present.
     #[arg(long)]
     pub rebuild: bool,
-    /// Compile even outside the 23:00-10:00 kernel build window.
+    /// Compile even outside the 10:00-23:00 kernel build window.
     #[arg(long, conflicts_with = "prebuilt")]
     pub now: bool,
     /// On failure, let recipe ask the configured LLM for a patch and retry.
