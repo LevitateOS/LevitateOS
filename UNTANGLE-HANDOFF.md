@@ -40,6 +40,9 @@ Written 2026-11-08 ~03:00 when the Claude token budget ran low. Several Claude s
   - delete the recuki binary after its docs page `13-recuki.ts` goes;
   - commit `docs/content/src/distros.ts` after a fresh `cargo xtask gen`.
 
+## State after the daytime batch (2026-11-08 ~12:30)
+Step 4 ran on an export of committed HEADs: base-rootfs, live-boot and live-tools build for both distros, and `test all` passes 8/8 on acorn and on levitate. One fix (builder `4c5da14`). Left: re-run on the current HEAD (the PRD18 NEEDS commits landed during the run and need a Recipe worker that reads NEEDS), kernel republish, step 5 (re-audit), G30's remainder. See the "Daytime batch" Progress entry.
+
 ## State at the end of the night run
 All G01–G32 have commits (G30 partial), the leftovers sweep is done, committed HEADs compile together, and `cargo xtask check` passes. What remains is step 4 (the daytime batch), step 5 (the re-audit loop) and G30's remainder.
 
