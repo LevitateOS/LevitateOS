@@ -1,19 +1,17 @@
 # PRD14 — bootstrap, packaging and fresh host
 
-**Incomplete; waiting for obtainable maintained source.** The user retains the
-upstream-first/keep-local direction. A fresh anonymous Recipe clone still has
-published master `43d9dd4e1296799467f42b2c026aa107c3022d8d`; exact corrected
-`git fetch origin 2e20a031268309b7016898ff71a005b07b995819` fails with **not our ref**.
-The required configured Ginux source also remains an unpublished integration,
-not a selected upstream delivery. PRD01/PRD05 remain actual dependencies. No
-local source archive, candidate RPM or successful preparation substitutes for
-released-input obtainability. PRD14 stays unchecked.
+**In progress: maintained-source reproduction.** On 2026-11-08 the user
+explicitly authorized keeping the working version in our own repositories,
+keeping upstream Ginux leading, and completing PRD14 against it. This replaces
+the earlier local-only source-delivery hold. Publish the prepared history to
+`LevitateOS/ginux:main` and `LevitateOS/recipe:master`, then verify fresh network
+checkouts and a disposable Rocky host. No upstream PRs/comments, package
+publication or hosted job dispatch are authorized. macOS remains indefinitely
+deferred. Product kernels are not rebuilt.
 
-The user authorized fresh pinned Rocky OCI/cloud/RPM downloads and official
-verification metadata, plus tool installation in a disposable session-libvirt
-VM. Rust/crate download and GitHub read approvals remain applicable. No push,
-publication, hosted job, upstream comment or downstream source adoption occurred.
-macOS is indefinitely deferred. Product kernels were not rebuilt.
+The source, packaging and execution receipts below describe the completed
+preparation run. They remain bound to those exact revisions; the new obtainable
+source run will have separate receipts before PRD14 is marked complete.
 
 ## Sources and identities
 
