@@ -228,23 +228,27 @@ packages = [
   "libndp",
 ]
 
-# The live ISO's install screen: this shell beside the install docs. getty
-# starts it on each console listed; the serial console runs it only when the
-# boot asks for it (the INSTALL_UX_SERIAL boot-injection key).
-[install_ux]
-consoles = ["tty1", "ttyS0"]
-shell = "/bin/bash"
-docs = { app = "install-docs", page = "installation" }
-# TUI apps on the live ISO besides the docs, as commands for the shell beside them.
-apps = ["disk-plan", "base-system"]
-# The left pane: the install steps in order, with the shell one key away.
-hub = "install-hub"
-
 # What the live system adds to what every variant's has (the installed
 # system's services and sshd). Every system's commands are
 # distro/contract/capabilities.txt; every boot's kernel command line is
 # distro_builder::release::kernel_cmdline.
 [live]
+
+# What the live-desktop product adds (docs/desktop.md): KDE Plasma on Wayland
+# with SDDM. systemd-pam is required: without pam_systemd.so logind registers no
+# session and Wayland gets no seat.
+[desktop]
+display_manager = "sddm"
+packages = [
+  "plasma-desktop", "plasma-workspace", "kwin", "sddm", "sddm-breeze", "sddm-wayland-plasma",
+  "xorg-x11-server-Xwayland", "konsole", "dolphin", "kwrite", "ark", "spectacle",
+  "plasma-systemmonitor", "plasma-nm", "plasma-pa", "powerdevil", "kscreen", "kinfocenter",
+  "kde-gtk-config", "breeze-gtk", "breeze-icon-theme", "xdg-desktop-portal-kde", "polkit-kde",
+  "kwalletmanager5", "pipewire", "pipewire-pulseaudio", "pipewire-alsa", "wireplumber",
+  "mesa-dri-drivers", "mesa-vulkan-drivers", "google-noto-sans-fonts",
+  "google-noto-sans-mono-fonts", "google-noto-color-emoji-fonts", "NetworkManager-wifi",
+  "wpa_supplicant", "firefox", "systemd-pam",
+]
 
 [installed]
 initramfs = true

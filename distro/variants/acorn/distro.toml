@@ -46,7 +46,12 @@ preseed_outputs = { apks = "directory" }
 release = "v3.24"
 signing_key = "keys/alpine-devel@lists.alpinelinux.org-6165ee59.rsa.pub"
 packages = [
-  "alpine-base",
+  "alpine-baselayout",
+  "alpine-release",
+  "busybox-mdev-openrc",
+  "busybox-openrc",
+  "busybox-suid",
+  "musl-utils",
   "busybox",
   "openrc",
   "doas",
@@ -94,24 +99,25 @@ packages = [
   "dbus",
 ]
 
-# The live ISO's install screen: this shell beside the install docs. getty
-# starts it on each console listed; the serial console runs it only when the
-# boot asks for it (the INSTALL_UX_SERIAL boot-injection key).
-[install_ux]
-consoles = ["tty1", "ttyS0"]
-shell = "/bin/sh"
-docs = { app = "install-docs", page = "installation" }
-# TUI apps on the live ISO besides the docs, as commands for the shell beside them.
-apps = ["disk-plan", "base-system"]
-# The left pane: the install steps in order, with the shell one key away.
-hub = "install-hub"
-
 # What the live system adds to what every variant's has (the installed
 # system's services and sshd). Every system's commands are
 # distro/contract/capabilities.txt; every boot's kernel command line is
 # distro_builder::release::kernel_cmdline.
 [live]
 services = ["network"]
+
+# What the live-desktop product adds (docs/desktop.md): LXQt on X11 with SDDM
+# (decision D16: Alpine 3.24 has no lxqt-wayland-session). NetworkManager
+# replaces dhcpcd/networking on the desktop.
+[desktop]
+display_manager = "sddm"
+packages = [
+  "lxqt-desktop", "lximage-qt", "pavucontrol-qt", "screengrab", "sddm", "xorg-server",
+  "xf86-input-libinput", "eudev", "udev-init-scripts", "udev-init-scripts-openrc",
+  "mesa-dri-gallium", "elogind", "polkit-elogind", "dbus", "dbus-x11", "pipewire",
+  "wireplumber", "pipewire-pulse", "pipewire-alsa", "networkmanager", "networkmanager-wifi",
+  "network-manager-applet", "breeze-icons", "font-noto", "firefox",
+]
 
 # Boots through the same busybox initramfs recinit builds for every variant.
 [installed]
