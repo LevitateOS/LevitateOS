@@ -40,6 +40,9 @@ Written 2026-11-08 ~03:00 when the Claude token budget ran low. Several Claude s
   - delete the recuki binary after its docs page `13-recuki.ts` goes;
   - commit `docs/content/src/distros.ts` after a fresh `cargo xtask gen`.
 
+## State at the end of the night run
+All G01–G32 have commits (G30 partial), the leftovers sweep is done, committed HEADs compile together, and `cargo xtask check` passes. What remains is step 4 (the daytime batch), step 5 (the re-audit loop) and G30's remainder.
+
 ## How to resume
 1. **Inventory the half-done work:** in the superproject and every submodule (except `tools/recipe`, `tools/ginux`), run `git status --short` and `git diff --cached --stat`. Map each changed file to its fix with the path table above. `git log --oneline --since=yesterday --grep='^Gxx:'` in each repo shows what each fix already committed.
 2. **Finish one fix at a time, in this order:** G21 (it unblocks xtask's build), G06/G25/G26, G07/G12/G08, G16, G15, G29, G28, G30, TO-14, G32, then the leftovers. For each fix:
