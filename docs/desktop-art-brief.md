@@ -2,9 +2,8 @@
 
 Twelve wallpapers: LevitateOS (KDE Plasma) and AcornOS (LXQt), each in three
 styles, each in light and dark. Each assignment below is **standalone**: paste
-one into the image service as it is. It refers to nothing outside itself. Each
-asks for three versions, then waits for you to pick one and direct changes
-before you move on to the next.
+one as it is into the model that writes the image prompt. It refers to nothing
+outside itself.
 
 Once you have picked a final image, save it as
 `<distro>-<style>-<light|dark>.png` (for example `levitate-painted-dark.png`)
@@ -33,8 +32,6 @@ Feel: mature, refined and luxurious. Deep, rich colour with shadows that keep th
 Let the colours lean toward deep greens (pine #214438, pale pine #C7D9BA).
 
 Practical limits: 16:9 landscape, at the largest size you can make. It is a desktop wallpaper: screens of other shapes crop the left and right edges, a taskbar covers a strip along the bottom, and desktop icons sit at the top left, so keep the main subjects away from those areas. No text, letters, logos, user-interface elements, people, signatures or watermarks.
-
-Make 3 different versions of this image, so I can choose. Then wait: I will pick one and tell you what to change.
 ```
 
 ### 2. LevitateOS, realistic photograph, dark
@@ -55,8 +52,6 @@ Feel: mature, refined and luxurious. Deep, rich colour with shadows that keep th
 Let the colours lean toward deep greens (pine #214438, pale pine #C7D9BA).
 
 Practical limits: 16:9 landscape, at the largest size you can make. It is a desktop wallpaper: screens of other shapes crop the left and right edges, a taskbar covers a strip along the bottom, and desktop icons sit at the top left, so keep the main subjects away from those areas. No text, letters, logos, user-interface elements, people, signatures or watermarks.
-
-Make 3 different versions of this image, so I can choose. Then wait: I will pick one and tell you what to change.
 ```
 
 ### 3. LevitateOS, oil painting, light
@@ -77,8 +72,6 @@ Feel: mature, refined and luxurious. Deep, rich colour with shadows that keep th
 Let the colours lean toward deep greens (pine #214438, pale pine #C7D9BA).
 
 Practical limits: 16:9 landscape, at the largest size you can make. It is a desktop wallpaper: screens of other shapes crop the left and right edges, a taskbar covers a strip along the bottom, and desktop icons sit at the top left, so keep the main subjects away from those areas. No text, letters, logos, user-interface elements, people, signatures or watermarks.
-
-Make 3 different versions of this image, so I can choose. Then wait: I will pick one and tell you what to change.
 ```
 
 ### 4. LevitateOS, oil painting, dark
@@ -99,8 +92,6 @@ Feel: mature, refined and luxurious. Deep, rich colour with shadows that keep th
 Let the colours lean toward deep greens (pine #214438, pale pine #C7D9BA).
 
 Practical limits: 16:9 landscape, at the largest size you can make. It is a desktop wallpaper: screens of other shapes crop the left and right edges, a taskbar covers a strip along the bottom, and desktop icons sit at the top left, so keep the main subjects away from those areas. No text, letters, logos, user-interface elements, people, signatures or watermarks.
-
-Make 3 different versions of this image, so I can choose. Then wait: I will pick one and tell you what to change.
 ```
 
 ### 5. LevitateOS, dutch abstract, light
@@ -121,8 +112,6 @@ Feel: mature, refined and luxurious. Deep, rich colour with shadows that keep th
 Let the colours lean toward deep greens (pine #214438, pale pine #C7D9BA).
 
 Practical limits: 16:9 landscape, at the largest size you can make. It is a desktop wallpaper: screens of other shapes crop the left and right edges, a taskbar covers a strip along the bottom, and desktop icons sit at the top left, so keep the main subjects away from those areas. No text, letters, logos, user-interface elements, people, signatures or watermarks.
-
-Make 3 different versions of this image, so I can choose. Then wait: I will pick one and tell you what to change.
 ```
 
 ### 6. LevitateOS, dutch abstract, dark
@@ -143,8 +132,6 @@ Feel: mature, refined and luxurious. Deep, rich colour with shadows that keep th
 Let the colours lean toward deep greens (pine #214438, pale pine #C7D9BA).
 
 Practical limits: 16:9 landscape, at the largest size you can make. It is a desktop wallpaper: screens of other shapes crop the left and right edges, a taskbar covers a strip along the bottom, and desktop icons sit at the top left, so keep the main subjects away from those areas. No text, letters, logos, user-interface elements, people, signatures or watermarks.
-
-Make 3 different versions of this image, so I can choose. Then wait: I will pick one and tell you what to change.
 ```
 
 ## AcornOS
@@ -167,8 +154,6 @@ Feel: mature, refined and luxurious. Deep, rich colour with shadows that keep th
 Let the colours lean toward rich browns (acorn brown #644532, pale acorn #E4CBA6) among the autumn reds and oranges.
 
 Practical limits: 16:9 landscape, at the largest size you can make. It is a desktop wallpaper: screens of other shapes crop the left and right edges, a taskbar covers a strip along the bottom, and desktop icons sit at the top left, so keep the main subjects away from those areas. No text, letters, logos, user-interface elements, people, signatures or watermarks.
-
-Make 3 different versions of this image, so I can choose. Then wait: I will pick one and tell you what to change.
 ```
 
 ### 8. AcornOS, realistic photograph, dark
@@ -189,8 +174,6 @@ Feel: mature, refined and luxurious. Deep, rich colour with shadows that keep th
 Let the colours lean toward rich browns (acorn brown #644532, pale acorn #E4CBA6) among the autumn reds and oranges.
 
 Practical limits: 16:9 landscape, at the largest size you can make. It is a desktop wallpaper: screens of other shapes crop the left and right edges, a taskbar covers a strip along the bottom, and desktop icons sit at the top left, so keep the main subjects away from those areas. No text, letters, logos, user-interface elements, people, signatures or watermarks.
-
-Make 3 different versions of this image, so I can choose. Then wait: I will pick one and tell you what to change.
 ```
 
 ### 9. AcornOS, oil painting, light
@@ -211,8 +194,6 @@ Feel: mature, refined and luxurious. Deep, rich colour with shadows that keep th
 Let the colours lean toward rich browns (acorn brown #644532, pale acorn #E4CBA6) among the autumn reds and oranges.
 
 Practical limits: 16:9 landscape, at the largest size you can make. It is a desktop wallpaper: screens of other shapes crop the left and right edges, a taskbar covers a strip along the bottom, and desktop icons sit at the top left, so keep the main subjects away from those areas. No text, letters, logos, user-interface elements, people, signatures or watermarks.
-
-Make 3 different versions of this image, so I can choose. Then wait: I will pick one and tell you what to change.
 ```
 
 ### 10. AcornOS, oil painting, dark
@@ -233,8 +214,6 @@ Feel: mature, refined and luxurious. Deep, rich colour with shadows that keep th
 Let the colours lean toward rich browns (acorn brown #644532, pale acorn #E4CBA6) among the autumn reds and oranges.
 
 Practical limits: 16:9 landscape, at the largest size you can make. It is a desktop wallpaper: screens of other shapes crop the left and right edges, a taskbar covers a strip along the bottom, and desktop icons sit at the top left, so keep the main subjects away from those areas. No text, letters, logos, user-interface elements, people, signatures or watermarks.
-
-Make 3 different versions of this image, so I can choose. Then wait: I will pick one and tell you what to change.
 ```
 
 ### 11. AcornOS, dutch abstract, light
@@ -255,8 +234,6 @@ Feel: mature, refined and luxurious. Deep, rich colour with shadows that keep th
 Let the colours lean toward rich browns (acorn brown #644532, pale acorn #E4CBA6) among the autumn reds and oranges.
 
 Practical limits: 16:9 landscape, at the largest size you can make. It is a desktop wallpaper: screens of other shapes crop the left and right edges, a taskbar covers a strip along the bottom, and desktop icons sit at the top left, so keep the main subjects away from those areas. No text, letters, logos, user-interface elements, people, signatures or watermarks.
-
-Make 3 different versions of this image, so I can choose. Then wait: I will pick one and tell you what to change.
 ```
 
 ### 12. AcornOS, dutch abstract, dark
@@ -277,6 +254,4 @@ Feel: mature, refined and luxurious. Deep, rich colour with shadows that keep th
 Let the colours lean toward rich browns (acorn brown #644532, pale acorn #E4CBA6) among the autumn reds and oranges.
 
 Practical limits: 16:9 landscape, at the largest size you can make. It is a desktop wallpaper: screens of other shapes crop the left and right edges, a taskbar covers a strip along the bottom, and desktop icons sit at the top left, so keep the main subjects away from those areas. No text, letters, logos, user-interface elements, people, signatures or watermarks.
-
-Make 3 different versions of this image, so I can choose. Then wait: I will pick one and tell you what to change.
 ```
