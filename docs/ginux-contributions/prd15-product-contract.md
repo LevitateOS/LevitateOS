@@ -434,3 +434,70 @@ new boundaries and the final combined source remains required. The Recipe caller
 migration is still uncommitted until runtime acceptance. No publication occurred;
 PRD15 and PRD19 acceptance remain open. Shared staged queue/handoff changes retain
 SHA-256 `f4d8c81be2612a4d8d472564b25c7ffab6e7043e06b0f2b2176cba78dad5a47e`.
+
+
+### 2026-11-09 returned security results and caller corrections
+
+The user returned [Daybreak's exact-source receipts](/home/vince/.codex/worktrees/prd15-owned-fd-path/ginux-prd11/.artifacts/prd15/daybreak-2026-11-08/receipts.md)
+for Ginux `3cd1e2de`, Recipe `e28a60ab`, launcher `fb87792d` and the pinned
+CLI/worker/image above. Independent read-only manifest verification succeeds
+**504/504**. Selected FD-name, own-stack, O_PATH, all 18 event modes, twelve
+selected affected runners, the test-only T-01 oracle and focused persistence
+controls pass. Two actual Recipe coordinator runs select the same eight endpoints
+under reversed resolver ordering; four negatives reject before authority.
+No candidate behavior failure was observed in those completed controls.
+
+**All six requested items and S09-A–H remain partial.** Outstanding criteria
+include synchronized lifecycle/parked-pin/revoke/reuse races; full path, flag,
+copy-fault, quota and cleanup matrices; T-01's tracked port, T-02/T-03; reserved
+clone nonleader peer death; actual close-time transfer/lifetime evidence;
+remaining hostile persistence/cancellation schedules; paired launcher-failure
+consumer rejection; lock/time/resource/identity matrices; transport, protected
+inputs/autofix, TLS and graph-authority/security checks. Source-only consumer
+rejection and synthetic skipped-close injection are not runtime ownership
+proofs. The resolver's later one-address-per-host overflow branch was not reached
+by nine-declaration negatives; its public reachability needs an explicit source
+reconciliation. No execution authorization is transferred from Daybreak here.
+
+Both standalone fresh GNU and musl TUI graph installs now have final exit-zero
+receipts (`tui-system-{gnu,musl}-opath.json`), as do both fresh-coordinator
+installed-cache reuse runs. The documented author and manual examples pass on
+the same tuple (`documented-{author,man}-opath.json`). These remain standalone
+producer/example receipts, not completed product/guest/security acceptance.
+
+Actual product calls exposed two further integration gaps. First, product
+preflight still required host Bun after migration; that obsolete requirement
+was removed. Both initial preflight failures remain retained. Second, the real
+source-preparation caller rejects checked-in fixture command symlinks even
+though Recipe's immutable input/copy owners support confined links. Its local
+correction preserves only relative links whose canonical targets remain within
+the authored workspace member; it never follows links to import host files or
+caches. Special files and escaping/absolute links still fail. It compiles, but
+actual product completion remains pending. Acorn's first real caller fails at
+that symlink; Levitate's existing package/tool build is still running.
+
+Standalone GNU `isinstalled` also fails (`tui-system-gnu-opath-readiness.json`):
+manual operations omit dependency products from the parent's input identity,
+so the matching install state/files are not restored. This is an integration
+failure, not a successful readiness receipt. The user chose **require matching
+cached dependencies; never install them**. The local Recipe correction checks
+cached dependencies in graph order with `is_installed`, imports their checked
+products using the existing input owner, then checks the parent with the same
+input identity. Missing/changed cached products fail explicitly without running
+dependency acquire/build/install hooks. New managed CLI coverage includes both
+runtime/build dependencies, all three checks, changed typed inputs, rejection
+without hooks and preservation of the older matching generation. No unit test
+is added. The correction is still uncommitted pending that actual regression.
+
+The new provisional matching CLI/worker `bin/recipe-manual-cache-1` has SHA-256
+`467140e9b036a8ed20b58f87020ad7a63cfe7c68d311dc8e19cfe51c464cf9ef`;
+`recipe-manual-cache-1-source.json` and its patch bind the source. Daybreak's
+Recipe results remain bound to e28a60ab/5ca87251, and do not automatically cover
+this correction. Ginux source and its sealed binary remain unchanged.
+
+Exact next action: run the new real dependency-cache regression on old and new
+CLIs, resolve any failures, rerun affected NEEDS/dependency checks, then rerun
+standalone producer/readiness/reuse and both real product chains with one final
+matching CLI/worker. Continue both session-libvirt/PTY/install/A/B checks and
+obtain outstanding authorized final-source security results before closure.
+PRD15/19 remains open; no publication occurred. Shared staging is preserved.
