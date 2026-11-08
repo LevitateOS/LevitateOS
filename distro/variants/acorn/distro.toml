@@ -40,8 +40,7 @@ preseed_recipe_script = "distro/builder/recipes/alpine-preseed-source-assets.rha
 preseed_outputs = { apks = "directory" }
 
 # What the rootfs takes from Alpine's v3.24 branch; `cargo xtask base lock
-# acorn` locks it with every dependency. kbd-bkeymaps stays until recsetup
-# lists kbd's keymaps on OpenRC.
+# acorn` locks it with every dependency.
 [sources.rootfs_source.base]
 release = "v3.24"
 signing_key = "keys/alpine-devel@lists.alpinelinux.org-6165ee59.rsa.pub"
@@ -70,7 +69,6 @@ packages = [
   "vim",
   "kbd",
   "kbd-legacy",
-  "kbd-bkeymaps",
   "musl-locales",
   "musl-locales-lang",
   "tzdata",

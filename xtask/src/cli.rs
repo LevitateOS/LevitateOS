@@ -178,7 +178,7 @@ pub enum Cmd {
     /// Boot a scenario for interactive use (needs a terminal unless --no-shell).
     Run(RunArgs),
 
-    /// The packages a variant takes from its Fedora base.
+    /// The packages a variant takes from its distribution base.
     Base {
         #[command(subcommand)]
         what: BaseCmd,
@@ -274,7 +274,7 @@ pub enum TuiCmd {
 
 #[derive(Subcommand)]
 pub enum BaseCmd {
-    /// Resolve the newest signed build of each base package (release + updates) and write the lock.
+    /// Resolve the newest signed build of each base package (and, for Alpine, its dependencies) and write the lock.
     Lock {
         #[arg(value_parser = DistroParser)]
         distro: Distro,

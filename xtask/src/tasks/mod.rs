@@ -1,3 +1,4 @@
+pub mod apk_lock;
 pub mod base;
 pub mod build;
 pub mod check;

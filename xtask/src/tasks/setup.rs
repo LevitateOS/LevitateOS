@@ -164,13 +164,17 @@ fn checks(root: &Path) -> Vec<Check> {
     checks
 }
 
-/// How current a variant's Fedora base lock is (none for a non-RPM base).
+/// How current a variant's base lock is, for either package backend.
 fn base_lock_check(root: &Path, distro: &Distro) -> Option<Check> {
     let contract = distro_contract::load(root, distro.id()).ok()?.contract;
-    let base = contract.sources.rootfs_source.rpm_base?;
+    let base = &contract.sources.rootfs_source.base;
+    let (what, asked) = match contract.profile.packages {
+        distro_contract::profile::PackageBackend::Rpm => ("Fedora", base.release.clone()),
+        distro_contract::profile::PackageBackend::Apk => ("Alpine", base.release.clone()),
+    };
     let fix = format!("cargo xtask base lock {}", distro.id());
-    let path = crate::tasks::base::lock_path(root, distro);
-    let name = format!("{} Fedora base lock", distro.id());
+    let path = crate::tasks::base::lock_path(root, distro, contract.profile.packages);
+    let name = format!("{} {what} base lock", distro.id());
     let Ok(text) = std::fs::read_to_string(&path) else {
         return Some(Check::new(name, true, Err(("missing".into(), fix))));
     };
@@ -180,11 +184,11 @@ fn base_lock_check(root: &Path, distro: &Distro) -> Option<Check> {
             .map(|v| v.trim_matches('"').to_string())
     };
     let release = field("release").unwrap_or_default();
-    if release != base.fedora_release.to_string() {
+    if release != asked {
         return Some(Check::new(
             name,
             true,
-            Err((format!("locks Fedora {release}, the contract asks for {}", base.fedora_release), fix)),
+            Err((format!("locks {what} {release}, the contract asks for {asked}"), fix)),
         ));
     }
     let locked_on = field("locked_on").unwrap_or_default();
@@ -198,8 +202,8 @@ fn base_lock_check(root: &Path, distro: &Distro) -> Option<Check> {
         name,
         false,
         match age_days {
-            Some(days) if days <= 30 => Ok(format!("Fedora {release}, locked {locked_on}")),
-            Some(days) => Err((format!("Fedora {release}, locked {days} days ago; updates are likely waiting"), fix)),
+            Some(days) if days <= 30 => Ok(format!("{what} {release}, locked {locked_on}")),
+            Some(days) => Err((format!("{what} {release}, locked {days} days ago; updates are likely waiting"), fix)),
             None => Err((format!("cannot read the lock date in {}", path.display()), fix)),
         },
     ))

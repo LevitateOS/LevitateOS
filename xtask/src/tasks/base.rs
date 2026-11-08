@@ -1,10 +1,12 @@
-//! `base lock`: lock the RPMs a variant takes from its Fedora base.
+//! `base lock`: lock the packages a variant takes from its distribution base.
 //!
-//! The variant contract (`rpm_base`) names the Fedora release and the
-//! packages; this resolves the newest build of each from the release and
-//! updates repositories, checks every RPM against the repository checksum and
-//! the release's signing key, and writes the lock the rootfs recipes import.
-//! Rerunning it is how a build takes Fedora's updates.
+//! The variant contract (`sources.rootfs_source.base`) names the release, its
+//! signing key and the packages. For an RPM variant this resolves the newest
+//! build of each from Fedora's release and updates repositories, checks every
+//! RPM against the repository checksum and the release's signing key; an APK
+//! variant goes through `apk_lock` (the packages and their closure). Either
+//! writes the lock the rootfs recipes import. Rerunning it is how a build
+//! takes the distribution's updates.
 
 use anyhow::{Context, Result, bail};
 use sha2::{Digest, Sha256};
@@ -16,6 +18,7 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
 use crate::cli::Distro;
+use distro_contract::profile::PackageBackend;
 
 const MIRROR: &str = "https://dl.fedoraproject.org/pub/fedora/linux";
 
@@ -42,23 +45,28 @@ impl Rpm {
 }
 
 /// The lock file the rootfs recipes import.
-pub fn lock_path(root: &Path, distro: &Distro) -> PathBuf {
+pub fn lock_path(root: &Path, distro: &Distro, backend: PackageBackend) -> PathBuf {
     root.join("distro/builder/recipes/sources")
-        .join(format!("{}-rpm-lock.rhai", distro.id()))
+        .join(format!("{}-{backend}-lock.rhai", distro.id()))
 }
 
 pub fn lock(distro: &Distro, check: bool) -> Result<()> {
     let root = crate::util::repo::repo_root()?;
     let bundle = distro_contract::load(&root, distro.id())?;
-    let Some(base) = bundle.contract.sources.rootfs_source.rpm_base.clone() else {
-        return Err(crate::util::exit::usage(format!(
-            "{} does not take its rootfs from an RPM base (no rpm_base in its contract)",
-            distro.id()
-        )));
-    };
     distro_builder::process::check_host_tools(distro_builder::process::HostNeed::BaseLock)
         .map_err(|e| crate::util::exit::missing(format!("{e:#}"), "cargo xtask doctor"))?;
-    let release = base.fedora_release;
+    match bundle.contract.profile.packages {
+        PackageBackend::Rpm => lock_rpm(&root, distro, &bundle, check),
+        PackageBackend::Apk => super::apk_lock::lock(&root, distro, &bundle, check),
+    }
+}
+
+fn lock_rpm(root: &Path, distro: &Distro, bundle: &distro_contract::Variant, check: bool) -> Result<()> {
+    let base = &bundle.contract.sources.rootfs_source.base;
+    let release: u32 = base
+        .release
+        .parse()
+        .with_context(|| format!("base.release {:?} is not a Fedora release number", base.release))?;
     let wanted: HashSet<String> = base.packages.iter().cloned().collect();
 
     let mut newest: BTreeMap<String, Rpm> = BTreeMap::new();
@@ -84,13 +92,13 @@ pub fn lock(distro: &Distro, check: bool) -> Result<()> {
         );
     }
 
-    let path = lock_path(&root, distro);
+    let path = lock_path(root, distro, PackageBackend::Rpm);
     let locked = read_locked(&path);
     let changes = report_changes(&locked, &newest);
 
     if check {
         if changes == 0 {
-            println!("{} is current with Fedora {release} updates", rel(&root, &path));
+            println!("{} is current with Fedora {release} updates", rel(root, &path));
             return Ok(());
         }
         bail!("{changes} package(s) have newer builds; run cargo xtask base lock {}", distro.id());
@@ -103,15 +111,15 @@ pub fn lock(distro: &Distro, check: bool) -> Result<()> {
 
     fs::write(&path, render_lock(distro, release, &newest)?)
         .with_context(|| format!("writing {}", path.display()))?;
-    println!("wrote {} ({} packages, {changes} changed)", rel(&root, &path), newest.len());
+    println!("wrote {} ({} packages, {changes} changed)", rel(root, &path), newest.len());
     Ok(())
 }
 
-fn rel(root: &Path, path: &Path) -> String {
+pub(super) fn rel(root: &Path, path: &Path) -> String {
     path.strip_prefix(root).unwrap_or(path).display().to_string()
 }
 
-fn curl(url: &str, out: &Path) -> Result<()> {
+pub(super) fn curl(url: &str, out: &Path) -> Result<()> {
     let status = Command::new("curl")
         .args(["-fsSL", "--retry", "3", "-o"])
         .arg(out)
@@ -124,7 +132,7 @@ fn curl(url: &str, out: &Path) -> Result<()> {
     Ok(())
 }
 
-fn sha256_file(path: &Path) -> Result<String> {
+pub(super) fn sha256_file(path: &Path) -> Result<String> {
     let mut hasher = Sha256::new();
     let mut file = fs::File::open(path).with_context(|| format!("opening {}", path.display()))?;
     std::io::copy(&mut file, &mut hasher)?;
@@ -347,11 +355,12 @@ fn skip_separators(s: &[u8]) -> &[u8] {
 }
 
 /// name -> NEVRA of the current lock, if there is one.
-fn read_locked(path: &Path) -> BTreeMap<String, String> {
+pub(super) fn read_locked(path: &Path) -> BTreeMap<String, String> {
     let Ok(text) = fs::read_to_string(path) else {
         return BTreeMap::new();
     };
     text.lines()
+        .skip_while(|line| !line.starts_with("fn packages()"))
         .filter_map(|line| {
             let line = line.trim().strip_prefix("[\"")?;
             let mut parts = line.split("\", \"");
