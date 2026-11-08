@@ -24,7 +24,8 @@ Written 2026-11-08 ~03:00 when the Claude token budget ran low. Several Claude s
   | G16 (release assembly in Rust; hooks deleted; cmdline as a build fact) | `distro/variants/*/hooks`, `_shared/hooks`, builder `bin/workflows/release_hook.rs`, a new release module, busybox recipe, contract cmdline | none |
   | G15 (one busybox installed initramfs for both) | recinit side landed (`d81ebe9`); remaining: rootfs packages and modules (agent E), release hook (G16), recstrap `plan.rs` and install-tests `preflight.rs` "always initramfs" (see the G15 Progress entry) | recinit side done |
 
-- **Not started:** G28 (NetworkManager and WiFi on both), G30 (desktop as a product layer), the rest of G32 (root `README.md`, `architecture.md`, `xtask/README.md`, docs/content architecture pages, tui docs; once the code has settled). TO-14 (each tool declares the external commands it runs, and the builder checks them; format proposed in `merged-progress-G09.md`).
+- **G28** recipe and docs half landed (see Progress). The Alpine NetworkManager packages are agent E's; `recsetup --copy-network` is a follow-up.
+- **Not started:** G30 (desktop as a product layer), the rest of G32 (root `README.md`, `architecture.md`, `xtask/README.md`, docs/content architecture pages, tui docs; once the code has settled). TO-14 (each tool declares the external commands it runs, and the builder checks them; format proposed in `merged-progress-G09.md`).
 - **Leftovers named in Progress entries.** Each "Left:" line names the fix it belongs to; sweep them after the fixes. For example:
   - drop the `RUST_TARGET` define in `distro/builder/src/recipe/tools.rs`;
   - delete `PrepareQemuTools`, `recipe/qemu.rs` and `qemu-tools.rhai` once G25's setup change is in;
