@@ -1,17 +1,23 @@
 # Recipe: declared needs and an explainable contract
 
-Draft design note, 2026-11-07. A proposal, not part of the
-[Recipe task queue](recipe-simplification-implementation-plan.md); nothing here
-is authorized work until it is put on that queue. It borrows the ideas, not the
-syntax, of Ginux [PR #237](https://github.com/gmkurtzer/ginux/pull/237),
-"Gate 10.5: intuitive self-contained contract configuration". Interfaces it
-builds on are in [ginux-recipe-interfaces.md](ginux-recipe-interfaces.md).
+Implemented and locally verified release design, 2026-11-08. The user explicitly
+included the full proposal in [PRD18](ginux-contribution-task-list.md).
+[The implementation record](ginux-contributions/prd18-implementation.md) owns
+exact sources, checks, finding dispositions and separate release dependencies. API 2 is the sole recipe interface. Local configured
+contract work is authorized separately from held upstream/native policy and any
+source-delivery/publication choice. Ginux upstream takes precedence; no upstream
+publication is authorized here.
 
-## The problem
+This carries over principles from Ginux PR #237: self-contained authority,
+finite compiled rules, deny precedence and explanations. The historical baseline
+below explains the move; current code uses a versioned downstream catalog-2
+contract and the [Ginux/Recipe boundary](ginux-recipe-interfaces.md).
 
-What a recipe may do is decided everywhere except the recipe:
+## Historical problem (before NEEDS)
 
-| Authority | Where it is set today |
+Authority was selected outside the recipe:
+
+| Authority | Historical owner |
 | --- | --- |
 | Network hosts | `--network-host`, from `network_hosts`/`preseed_network_hosts` in a variant's `sources.toml`, or hard-coded by a Rust caller |
 | Memory, storage, time | `--memory-mib` etc., from `memory_mib`/`preseed_memory_mib` or caller defaults |
@@ -44,7 +50,7 @@ adds `validate`, `inspect`, `explain` and `diff`.
 | The contract lives in the file it governs | A recipe declares its needs in the recipe (`const NEEDS`) |
 | Human terms compiled to an exact table | Needs in Recipe's terms (inputs, outputs, hosts, limits) compiled to the Ginux instance config, including its contract |
 | Default deny; nothing silently widens | Callers supply what is declared and may narrow it, never widen it |
-| Fail before launch; no rule may match nothing | Undeclared inputs, missing inputs, unused grants are errors before launch |
+| Fail before launch; no rule may match nothing | Undeclared/missing inputs and malformed/zero-match derived grants fail before launch; unused effective endpoints warn after observation |
 | Every decision names its rule | Every grant names its `NEEDS` field; a Ginux denial is traced back to it |
 | `validate`, `inspect`, `explain`, `diff` | The same four commands for recipes |
 
@@ -60,10 +66,11 @@ A literal map, read from the AST like `deps` (`declared_metadata` in
 ```rhai
 const RECIPE_API = 2;
 const NEEDS = #{
-    inputs: #{ iso: "file", apk_tools: "file", extra_apks: "directory" },
+    inputs: #{ apks: "directory", capabilities: "file",
+               system_setup: "file", os_release: "file" },
     outputs: #{ rootfs: "directory" },
-    network: [],
     memory_mib: 4096,
+    storage_max_objects: 131072,
 };
 ```
 
@@ -71,7 +78,8 @@ The preseed that feeds it:
 
 ```rhai
 const NEEDS = #{
-    outputs: #{ iso: "file", apk_tools: "file", extra_apks: "directory" },
+    inputs: #{ target: "directory?" },
+    outputs: #{ apks: "directory" },
     network: ["dl-cdn.alpinelinux.org:443"],
     memory_mib: 4096,
 };
@@ -79,12 +87,16 @@ const NEEDS = #{
 
 Fields (all optional; an absent field means none, or Recipe's default limit):
 
-- `inputs`: name → `"file"` | `"directory"`. Exactly these appear under
-  `/inputs/NAME`.
+- `inputs`: name → `"file"` | `"directory"` | `"file?"` | `"directory?"`.
+  Required bindings must exist; optional bindings may be omitted but retain
+  their type when supplied. Explicit assets appear under `/inputs/NAME`; code,
+  worker metadata and declared dependency products have separate reserved
+  coordinator-owned input names.
 - `outputs`: name → `"file"` | `"directory"`. `ctx.outputs` must publish
   exactly these.
 - `network`: `HOST:PORT` endpoints, the same form `--network-host` takes.
-- `memory_mib`, `storage_max_objects`, `storage_max_bytes`, `timeout_secs`:
+- `memory_mib`, `storage_max_objects`, `storage_max_bytes`, `timeout_secs`,
+  `network_max_bytes` (default 8 GiB):
   upper limits, defaulting to Recipe's current defaults.
 
 `NEEDS` joins `RESERVED_NAMES` in `src/recipes.rs`. It must be a literal. A computed value is an error, not a dynamic field:
@@ -97,16 +109,21 @@ own `NEEDS`; a parent never lends its grants to a dependency.
   `--input` naming anything else fails before launch.
 - `--network-host` and the limit flags may only narrow: a subset of `network`,
   lower limits. Asking for more fails with the field to edit. Widening
-  authority means editing the recipe, so it shows up in review.
-- After a successful phase, `ctx.outputs` must have exactly the declared names
-  with the declared kinds.
+  authority means editing the recipe, so it shows up in review. Explicit caller
+  restrictions must be valid lowerings/subsets for the named recipe, then cover
+  the full dependency graph: each dependency keeps the lower
+  of its own limit and the caller ceiling, and intersects its own endpoints with
+  the caller subset. A restriction never lends parent grants.
+- Completed installation and installed-cache reuse require exactly the declared
+  output names and kinds. Intermediate phases may expose a subset; every present
+  output is checked before checkpoint/publication.
 - A declared network endpoint the invocation never connects to is a warning
   in `inspect` and the result, not an error: mirrors are sometimes unused on a
   warm cache.
 
 ### What moves out of callers
 
-- `sources.toml` loses `memory_mib`, `preseed_memory_mib`, `network_hosts`,
+- Variant `distro.toml` (`[sources.rootfs_source]`) loses `memory_mib`, `preseed_memory_mib`, `network_hosts`,
   `preseed_network_hosts` and `preseed_outputs`; it keeps which recipe to run
   and which repo paths to bind to its declared inputs.
 - The builder reads output names and kinds from the recipe's `NEEDS` instead of
@@ -119,8 +136,8 @@ caller, with no compatibility path.
 
 ## 2. A contract derived per recipe
 
-Once #237 merges, the profile reference Recipe renders is legacy. Recipe then
-renders `[userspace.contract]` from `NEEDS` instead:
+The user authorized a versioned downstream configured contract while upstream
+decisions remain separate. Recipe renders `[userspace.contract]` from NEEDS:
 
 - a fixed base for build work: read, write and execute within the paths the
   instance assigns (`/inputs`, `/work`, `/out`), processes and signals;
@@ -129,10 +146,13 @@ renders `[userspace.contract]` from `NEEDS` instead:
 - no `listen`, ever;
 - a fixed `deny` list: direct MMIO, DMA, raw packets.
 
-The exact selectors must come from the pinned catalog and are an open item
-below. Recipe pins the catalog version, so a Ginux catalog bump cannot quietly
+The catalog-2 selectors and the two expected operation-table digests are pinned
+in `tools/recipe/src/needs/contract.rs`; the checkpoint records real Ginux
+validation. Owned local-packet send/receive call numbers are admitted separately
+from TCP connect, which still requires its semantic grant and pinned endpoint. Recipe pins the catalog version, so a Ginux catalog bump cannot quietly
 grant a recipe more. Before launch, Recipe runs `ginux instance validate` on
-the rendered config and records the contract digest in the invocation result.
+the rendered config and records the contract digest in the completed context as `runtime.contract` and
+in the retained invocation receipt.
 
 Most build recipes will get nearly the same contract. What changes is that
 each grant is derived from a declaration that can be pointed to.
@@ -146,15 +166,15 @@ literal and well-formed, that supplied inputs match it (names, kinds, existence)
 that the rendered instance config compiles, and that dependency recipes
 validate too.
 
-**`recipe inspect RECIPE`** prints the resolved authority:
+**`recipe inspect RECIPE`** prints resolved authority as JSON, schematically:
 
 ```text
 alpine-live-source-rootfs  (RECIPE_API 2)
-  inputs   iso (file), apk_tools (file), extra_apks (directory)
+  inputs   apks (directory), capabilities/system_setup/os_release (file)
   outputs  rootfs (directory)
   network  none
-  limits   memory 4096 MiB, storage 16384 objects, timeout 3600 s
-  contract userspace catalog 1, digest 3f2a…  (connect: not granted)
+  limits   memory 4096 MiB, storage 131072 objects, timeout 3600 s
+  contract userspace catalog 2, digest 121cb4…  (connect: not granted)
 ```
 
 **`recipe explain INVOCATION|RECIPE OPERATION`** traces a decision across both
@@ -167,7 +187,7 @@ produced it:
 denied  network.connect dl-cdn.alpinelinux.org:443
   Ginux    no connect grant (default deny)
   Recipe   NEEDS.network is empty in alpine-live-source-rootfs.rhai
-  phase    build, while running apk.static
+  phase    uncorrelated when the retained streams do not establish it
   fix      declare the endpoint in NEEDS.network, or provide the file as an input
 ```
 
@@ -179,26 +199,25 @@ A denial with no corresponding `NEEDS` field to edit is a Ginux question, and
 and the contract digest. It is meant for review: "this change now reaches a
 new host" is visible without reading the hooks.
 
-## Order of work
+## Implementation and release dependencies
 
-0. **Unblock Ginux execution.** Recipe renders `[instance]` (after Gate 10.25,
-   upstream #235); the pinned `tools/ginux` (`2eac10bf`) parses only `[domain]`
-   and rejects every launch with `unknown-section`. Move the pin to a Ginux that
-   has the rename plus the local integration commits.
-1. **`NEEDS` and `validate`/`inspect`.** Recipe and its callers only; no Ginux
-   change.
-2. **Derived `[userspace.contract]`.** After #237 merges.
-3. **`explain`.** Needs #237's audit provenance at runtime.
-4. **`diff`.** Any time after 1.
+Implementation is complete locally, with exact-source results in the linked checkpoint.
+Dependencies use separate Ginux instances and bind their own inputs as
+`DEP::NAME`; declared products are snapshotted into the consumer. `tools`
+directory outputs contribute to its private tools prefix. Parent grants are
+never lent. Operation-table digests and diagnostic capabilities are checked
+before launch. Worker transport 9 rejects older coordinator/worker combinations.
 
-## Open questions
+The user resolved the remaining semantics on 2026-11-08: complete outputs at
+install/installed reuse with typed intermediate subsets, and graph-wide caller
+ceilings/intersections. Manual checks, remove and cleanup act on the named
+recipe's own retained files without installing or checking installation readiness
+of dependencies. Declaration/source/input preflight still covers the full graph.
+Code, direct callers, tests and documentation reflect these decisions. No PRD18
+semantic decision remains open; the linked record retains original failed runs
+and the concrete passing replacements, rather than claiming a green full suite.
 
-- Which catalog selectors make up the build base, and whether any build tool
-  needs `system` grants beyond memory (for example `cgroup` reads by `nproc`).
-- Whether `NEEDS.network` should carry a byte budget, or keep the caller's
-  `--network-max-bytes`, which can only narrow.
-- Whether optional inputs are needed (the kernel recipe's `kconfig_fragments`
-  is passed only sometimes). A `"file?"`/`"directory?"` kind would cover it.
-- Naming: #237 calls the Ginux instance TOML an "instance recipe". With a
-  project named Recipe on top of Ginux, that will confuse readers of both;
-  worth raising on the PR.
+PRD01 maintained-source delivery and PRD05 required integration joins remain
+separate release dependencies. Local implementations and fixture checks do not
+establish fresh-checkout delivery, final-source security acceptance or either
+distro's production/boot/install/A/B claims.

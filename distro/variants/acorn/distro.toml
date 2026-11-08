@@ -28,16 +28,10 @@ desktop = "lxqt"
 kernel_line = "latest"
 
 [sources.rootfs_source]
-storage_max_objects = 131072
 inputs = { capabilities = "distro/contract/capabilities.txt" }
-memory_mib = 4096
-preseed_memory_mib = 4096
-network_hosts = []
-preseed_network_hosts = ["dl-cdn.alpinelinux.org:443"]
 kind = "recipe_custom"
 recipe_script = "distro/builder/recipes/alpine-live-source-rootfs.rhai"
 preseed_recipe_script = "distro/builder/recipes/alpine-preseed-source-assets.rhai"
-preseed_outputs = { apks = "directory" }
 
 # What the rootfs takes from Alpine's v3.24 branch; `cargo xtask base lock
 # acorn` locks it with every dependency.

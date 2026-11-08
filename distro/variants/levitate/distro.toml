@@ -28,16 +28,10 @@ desktop = "plasma"
 kernel_line = "lts"
 
 [sources.rootfs_source]
-storage_max_objects = 131072
 inputs = { capabilities = "distro/contract/capabilities.txt" }
-memory_mib = 8192
-preseed_memory_mib = 8192
-network_hosts = []
-preseed_network_hosts = ["dl.fedoraproject.org:443"]
 kind = "recipe_rpm_set"
 recipe_script = "distro/builder/recipes/fedora-rpm-source-rootfs.rhai"
 preseed_recipe_script = "distro/builder/recipes/fedora-rpm-preseed.rhai"
-preseed_outputs = { rpms = "directory" }
 
 # What the rootfs takes from Fedora 45; `cargo xtask base lock levitate` locks it.
 [sources.rootfs_source.base]
