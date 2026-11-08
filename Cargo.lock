@@ -1159,12 +1159,11 @@ dependencies = [
  "recqemu",
  "recstrap",
  "regex",
- "schemars",
  "serde",
  "serde_json",
  "sha2",
  "tempfile",
- "ts-rs",
+ "tool-contract",
  "vt100",
  "which 7.0.3",
 ]
@@ -1534,11 +1533,14 @@ dependencies = [
  "clap",
  "distro-profile",
  "libc",
+ "recinit",
+ "recpart",
  "schemars",
  "serde",
  "serde_json",
  "target-root",
  "tempfile",
+ "tool-contract",
  "ts-rs",
 ]
 
@@ -1569,6 +1571,7 @@ dependencies = [
 name = "recpart"
 version = "0.2.0"
 dependencies = [
+ "anyhow",
  "clap",
  "libc",
  "schemars",
@@ -1576,6 +1579,7 @@ dependencies = [
  "serde_json",
  "target-root",
  "tempfile",
+ "tool-contract",
  "ts-rs",
 ]
 
@@ -1599,16 +1603,19 @@ dependencies = [
 name = "recstrap"
 version = "0.2.0"
 dependencies = [
+ "anyhow",
  "clap",
  "distro-profile",
  "libc",
  "nix 0.29.0",
  "recinit",
+ "recpart",
  "schemars",
  "serde",
  "serde_json",
  "target-root",
  "tempfile",
+ "tool-contract",
  "ts-rs",
 ]
 
@@ -2368,6 +2375,18 @@ name = "toml_write"
 version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5d99f8c9a7727884afe522e9bd5edbfc91a3312b36a77b5fb8926e4c31a41801"
+
+[[package]]
+name = "tool-contract"
+version = "0.2.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "schemars",
+ "serde",
+ "serde_json",
+ "ts-rs",
+]
 
 [[package]]
 name = "ts-rs"

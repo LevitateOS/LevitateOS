@@ -28,7 +28,7 @@ install-tests = { path = "../testing/install-tests" }
 portable-pty = { workspace = true }
 recpart = { path = "../tools/recpart", features = ["contracts"] }
 recab = { path = "../tools/recab", features = ["contracts"] }
-recstrap = { path = "../tools/recstrap", features = ["contracts"] }
+# recstrap's library is `install_tools`.
+install_tools = { package = "recstrap", path = "../tools/recstrap", features = ["contracts"] }
+tool-contract = { path = "../tools/recstrap/tool-contract" }
 recqemu = { path = "../tools/recqemu" }
-schemars = { workspace = true }
-ts-rs = { workspace = true }
