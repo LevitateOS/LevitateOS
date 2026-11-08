@@ -1,0 +1,885 @@
+diff --git a/.github/workflows/check.yml b/.github/workflows/check.yml
+index 9a0bec5e..e77aa9cd 100644
+--- a/.github/workflows/check.yml
++++ b/.github/workflows/check.yml
+@@ -24,9 +24,10 @@ jobs:
+     steps:
+       - uses: actions/checkout@v5
+       - run: rustup target add x86_64-unknown-linux-gnu
+-      - run: make build build-launch-fixture build-launch-storage-fixture build-process-fixtures build-gate1-fixture
++      - run: make build build-launch-fixture build-launch-storage-fixture build-launch-device-fixture build-process-fixtures build-gate1-fixture
+       - run: sudo make test-launch
+       - run: sudo make test-launch-storage
++      - run: sudo make test-launch-devices
+       - run: sudo make test-native-supervision
+       - run: make test-process-native
+       - run: sudo make test-gate1-setup
+diff --git a/Makefile b/Makefile
+index 76485369..c84b7b59 100644
+--- a/Makefile
++++ b/Makefile
+@@ -280,3 +280,11 @@ build-launch-storage-fixture:
+ 
+ test-launch-storage:
+ 	python3 scripts/test-launch-storage.py $(GINUX) .artifacts/launch/launch-storage-fixture
++
++.PHONY: build-launch-device-fixture test-launch-devices
++build-launch-device-fixture:
++	mkdir -p .artifacts/launch
++	$(CC) -nostdlib -static -fno-stack-protector -fno-builtin -O2 -Wall -Wextra -Werror tests/fixtures/launch-device-fixture.c -o .artifacts/launch/launch-device-fixture
++
++test-launch-devices:
++	python3 scripts/test-launch-devices.py $(GINUX) .artifacts/launch/launch-device-fixture
+diff --git a/README.md b/README.md
+index 7ec5cd04..a41b05c0 100644
+--- a/README.md
++++ b/README.md
+@@ -458,3 +458,24 @@ checks for syscall ABI dispatch, clone restrictions, descriptor inheritance,
+ thread reuse, successful and failed worker exec, signals, wait-status writes,
+ nonblocking waits, and vfork. The existing native fork fixture also runs. These
+ checks do not claim complete libc, job-control, or systemd compatibility.
++
++### Assigned virtual null devices
++
++Configured launch presents an immutable virtual `/dev`, empty by default.
++`[devices].assignments = ["null"]` exposes `/dev/null` through the existing
++device registry. Reads return EOF; writes discard at most 4,096 bytes per call
++without reading the ignored input buffer. Access modes, close, seek, descriptor
++flags and stat/statx metadata use virtual state, with at most 64 open device
++handles. Null-device directory opens fail with ENOTDIR. Device-directory
++descriptors, enumeration and mutation are unsupported in this contribution.
++
++Device paths share the configured namespace resolver with assigned storage.
++Image aliases cannot bypass the virtual view or expose hidden image devices.
++Metadata copies respect workload page protections. No host device is opened
++or passed to the workload; unsupported or duplicate assignments fail before it
++starts. The configured contract is checked before device effects. Catalog 1
++and native policy are unchanged; this contribution does not introduce general
++device passthrough or shared public-descriptor/exec ownership.
++
++Build with `make build-launch-device-fixture`, then run the independent
++`sudo make test-launch-devices` scenario against the existing launcher binary.
+diff --git a/crates/ginux-init/src/device_hooks.rs b/crates/ginux-init/src/device_hooks.rs
+new file mode 100644
+index 00000000..989f4aa4
+--- /dev/null
++++ b/crates/ginux-init/src/device_hooks.rs
+@@ -0,0 +1,273 @@
++//! Explicitly assigned character devices for configured native launch.
++//! All IO uses ginux-devices objects; no host device node or descriptor is used.
++
++use crate::launch_storage::{read_path, write_stat, Stat};
++use crate::supervisor::UserRegs;
++use ginux_devices::{DeviceError, DeviceKind, DeviceName, DeviceRegistry};
++use ginux_instance::InstanceConfig;
++
++const INSTANCE: u64 = 1; // One instance per configured supervisor process.
++const FD_BASE: u32 = 0x4000_0000;
++const FDS: usize = 64;
++const CLOEXEC: u32 = 0o2000000;
++const ACCESS_MODE: u32 = 3;
++
++pub struct LaunchDevices {
++    registry: DeviceRegistry<1, FDS>,
++    flags: [Option<u32>; FDS],
++    enabled: bool,
++}
++
++impl LaunchDevices {
++    pub fn prepare(config: &InstanceConfig) -> Result<Self, &'static [u8]> {
++        let mut registry = DeviceRegistry::new();
++        for device in config.devices.as_slice() {
++            if device.as_bytes() != b"null" {
++                return Err(b"unsupported launch device assignment");
++            }
++            registry
++                .assign(
++                    INSTANCE,
++                    1,
++                    DeviceName::new(b"null").unwrap(),
++                    DeviceKind::Null,
++                )
++                .map_err(|_| b"duplicate launch device assignment".as_slice())?;
++        }
++        Ok(Self {
++            registry,
++            flags: [None; FDS],
++            enabled: !config.devices.as_slice().is_empty(),
++        })
++    }
++
++    pub fn descriptor_dispatch(&mut self, pid: usize, r: &UserRegs) -> Option<i64> {
++        let fd = r.rdi as u32;
++        if (fd as i32) >= FD_BASE as i32
++            && matches!(
++                r.orig_rax,
++                0 | 1 | 3 | 5 | 8 | 16 | 17 | 18 | 19 | 20 | 32 | 33 | 72 | 74 | 75 | 77 | 91 | 292
++            )
++        {
++            return Some(
++                self.descriptor_call(pid, fd, r)
++                    .unwrap_or_else(|error| error),
++            );
++        }
++        if matches!(r.orig_rax, 262 | 332) {
++            let flags = if r.orig_rax == 262 { r.r10 } else { r.rdx };
++            let path = if r.rsi == 0 && flags & 0x1000 != 0 {
++                ginux_instance::Text::from_bytes(b"").map_err(|_| -14)
++            } else {
++                read_path(pid, r.rsi)
++            };
++            match path {
++                Ok(path) if path.is_empty() && (fd as i32) >= FD_BASE as i32 => {
++                    if flags & 0x1000 == 0 {
++                        return Some(-2);
++                    }
++                    return Some(
++                        self.descriptor_call(pid, fd, r)
++                            .unwrap_or_else(|error| error),
++                    );
++                }
++                Ok(path) if path.is_empty() => return None,
++                Err(error) => return Some(error),
++                _ => {}
++            }
++        }
++        None
++    }
++
++    pub fn enabled(&self) -> bool {
++        self.enabled
++    }
++
++    pub fn owns(path: &[u8]) -> bool {
++        path == b"/dev" || path.starts_with(b"/dev/")
++    }
++
++    pub fn lookup(&self, path: &[u8]) -> Result<(ginux_vfs::NodeKind, usize), ginux_vfs::VfsError> {
++        match path {
++            b"/dev" => Ok((ginux_vfs::NodeKind::Directory, 0)),
++            b"/dev/null" if self.enabled => Ok((ginux_vfs::NodeKind::File, 0)),
++            _ => Err(ginux_vfs::VfsError::NotFound),
++        }
++    }
++
++    pub fn path_dispatch(&mut self, pid: usize, r: &UserRegs, path: &[u8]) -> i64 {
++        if path != b"/dev" && !path.starts_with(b"/dev/") {
++            return -2;
++        }
++        let null = path == b"/dev/null";
++        let dir = path == b"/dev";
++        if (!null && !dir) || (null && !self.enabled) {
++            return -2;
++        }
++        let result = match r.orig_rax {
++            2 | 257 => {
++                let flags = if r.orig_rax == 2 { r.rsi } else { r.rdx };
++                if dir {
++                    Err(-21)
++                } else {
++                    self.open(flags)
++                }
++            }
++            4 | 6 => Self::stat(pid, r.rsi, false, dir),
++            262 => {
++                if r.r10 & !0x1900 != 0 {
++                    Err(-22)
++                } else {
++                    Self::stat(pid, r.rdx, false, dir)
++                }
++            }
++            332 => {
++                if !crate::launch_storage::valid_statx(r.rdx, r.r10) {
++                    Err(-22)
++                } else {
++                    Self::stat(pid, r.r8, true, dir)
++                }
++            }
++            21 | 269 | 439 => {
++                let mode = if r.orig_rax == 21 { r.rsi } else { r.rdx };
++                let flags = if r.orig_rax == 439 { r.r10 } else { 0 };
++                if mode & !7 != 0 || flags & !0x100 != 0 {
++                    Err(-22)
++                } else if (dir && mode & 2 != 0) || (!dir && mode & 1 != 0) {
++                    Err(-13)
++                } else {
++                    Ok(0)
++                }
++            }
++            89 | 267 => Err(-22), // Character devices are not symlinks.
++            _ => Err(-30),        // Assignment metadata is immutable.
++        };
++        result.unwrap_or_else(|error| error)
++    }
++
++    fn open(&mut self, flags: u64) -> Result<i64, i64> {
++        if flags & 0o200000 != 0 {
++            return Err(-20);
++        }
++        const ALLOWED: u64 = 3
++            | 0o100
++            | 0o200
++            | 0o400
++            | 0o1000
++            | 0o2000
++            | 0o4000
++            | 0o100000
++            | 0o400000
++            | CLOEXEC as u64;
++        if flags & !ALLOWED != 0 || flags & 3 == 3 {
++            return Err(-95);
++        }
++        if flags & 0o300 == 0o300 {
++            return Err(-17);
++        }
++        let fd = self
++            .registry
++            .open(INSTANCE, b"null")
++            .map_err(device_errno)?;
++        // Creation and truncation do not mutate an existing character device.
++        self.flags[(fd - FD_BASE) as usize] = Some(flags as u32 & !0o1300);
++        Ok(fd as i64)
++    }
++
++    fn descriptor_call(&mut self, pid: usize, fd: u32, r: &UserRegs) -> Result<i64, i64> {
++        let slot = (fd - FD_BASE) as usize;
++        let flags = self.flags.get(slot).copied().flatten().ok_or(-9)?;
++        match r.orig_rax {
++            0 => {
++                if flags & ACCESS_MODE == 1 {
++                    Err(-9)
++                } else {
++                    self.registry
++                        .read(INSTANCE, fd, &mut [])
++                        .map(|n| n as i64)
++                        .map_err(device_errno)
++                }
++            }
++            1 => {
++                if flags & ACCESS_MODE == 0 {
++                    Err(-9)
++                } else {
++                    // Null consumes no input bytes; an ignored guest buffer is never
++                    // dereferenced. Bound discarded bytes per IO just like file IO.
++                    let count = r.rdx.min(4096) as usize;
++                    self.registry
++                        .write(INSTANCE, fd, &[0; 4096][..count])
++                        .map(|n| n as i64)
++                        .map_err(device_errno)
++                }
++            }
++            3 => {
++                self.registry.close(INSTANCE, fd).map_err(device_errno)?;
++                self.flags[slot] = None;
++                Ok(0)
++            }
++            5 => Self::stat(pid, r.rsi, false, false),
++            8 => {
++                if r.rdx <= 4 {
++                    Ok(0)
++                } else {
++                    Err(-22)
++                }
++            }
++            72 => match r.rsi {
++                1 => Ok(i64::from(flags & CLOEXEC != 0)),
++                2 if r.rdx & !1 == 0 => {
++                    self.flags[slot] =
++                        Some((flags & !CLOEXEC) | if r.rdx == 1 { CLOEXEC } else { 0 });
++                    Ok(0)
++                }
++                3 => Ok((flags & !CLOEXEC) as i64),
++                _ => Err(-95),
++            },
++            262 | 332 => {
++                let flags = if r.orig_rax == 262 { r.r10 } else { r.rdx };
++                let valid = if r.orig_rax == 262 {
++                    flags & !0x1900 == 0
++                } else {
++                    crate::launch_storage::valid_statx(flags, r.r10)
++                };
++                if flags & 0x1000 == 0 || !valid {
++                    Err(-22)
++                } else {
++                    Self::stat(
++                        pid,
++                        if r.orig_rax == 262 { r.rdx } else { r.r8 },
++                        r.orig_rax == 332,
++                        false,
++                    )
++                }
++            }
++            16 => Err(-25),
++            _ => Err(-95),
++        }
++    }
++
++    fn stat(pid: usize, destination: u64, statx: bool, dir: bool) -> Result<i64, i64> {
++        write_stat(
++            pid,
++            destination,
++            Stat {
++                inode: if dir { 0x1_0000_0000 } else { 0x1_0000_0001 },
++                mode: if dir { 0o40555 } else { 0o20666 },
++                size: 0,
++                device_major: if dir { 0 } else { 1 },
++                device_minor: if dir { 0 } else { 3 },
++            },
++            statx,
++        )
++    }
++}
++
++fn device_errno(error: DeviceError) -> i64 {
++    match error {
++        DeviceError::DescriptorLimit => -24,
++        DeviceError::InvalidDescriptor => -9,
++        DeviceError::NotAssigned | DeviceError::UnknownDevice => -2,
++        _ => -5,
++    }
++}
+diff --git a/crates/ginux-init/src/dispatch.rs b/crates/ginux-init/src/dispatch.rs
+index efdea903..08436700 100644
+--- a/crates/ginux-init/src/dispatch.rs
++++ b/crates/ginux-init/src/dispatch.rs
+@@ -14,6 +14,7 @@ use crate::supervisor::UserRegs;
+ pub enum Lane {
+     Process,
+     Filesystem,
++    Device,
+     Channel,
+     Contract,
+ }
+@@ -76,7 +77,7 @@ pub fn decide_native(syscall: u64, rdi: u64, rsi: u64, rdx: u64) -> NativeDecisi
+             },
+             None => NativeDecision::Contract(decide_balanced(syscall)),
+         },
+-        Lane::Contract => NativeDecision::Contract(decide_balanced(syscall)),
++        Lane::Device | Lane::Contract => NativeDecision::Contract(decide_balanced(syscall)),
+     }
+ }
+ 
+diff --git a/crates/ginux-init/src/launch.rs b/crates/ginux-init/src/launch.rs
+index 80ddc4db..63eb516a 100644
+--- a/crates/ginux-init/src/launch.rs
++++ b/crates/ginux-init/src/launch.rs
+@@ -410,9 +410,6 @@ fn launch_validate(config: &InstanceConfig) {
+     {
+         launch_startup_fail(b"launch requires profile=balanced backend=ptrace-native");
+     }
+-    if !config.devices.as_slice().is_empty() {
+-        launch_startup_fail(b"launch does not support device assignments");
+-    }
+     if config.id.as_bytes().is_empty() || config.id.as_bytes().len() > 64 {
+         launch_startup_fail(b"instance id length invalid");
+     }
+@@ -1148,6 +1145,10 @@ fn supervise_launch(
+             // Storage acts only after the contract admits the call.
+             ContractAction::Emulate | ContractAction::Mediate => {
+                 match storage.dispatch(pid, &mut registers) {
++                    Dispatch::Device(result) => NativeDecision::Hooked {
++                        lane: crate::dispatch::Lane::Device,
++                        result,
++                    },
+                     Dispatch::Handled(result) => NativeDecision::Hooked {
+                         lane: crate::dispatch::Lane::Filesystem,
+                         result,
+@@ -1173,6 +1174,7 @@ fn supervise_launch(
+                 let lane_name: &[u8] = match lane {
+                     crate::dispatch::Lane::Process => b"process",
+                     crate::dispatch::Lane::Filesystem => b"filesystem",
++                    crate::dispatch::Lane::Device => b"device",
+                     crate::dispatch::Lane::Channel => b"channel",
+                     crate::dispatch::Lane::Contract => b"contract",
+                 };
+diff --git a/crates/ginux-init/src/launch_storage.rs b/crates/ginux-init/src/launch_storage.rs
+index 4e6c329d..0235f9a6 100644
+--- a/crates/ginux-init/src/launch_storage.rs
++++ b/crates/ginux-init/src/launch_storage.rs
+@@ -1,9 +1,10 @@
+-//! Ephemeral memory storage for `ginux launch`. Files assigned with
+-//! `memory:/path` live in supervisor memory; no writable host descriptor
+-//! reaches the workload and nothing outlives the instance. Directory
+-//! descriptors, links, rename, mappings and execution of created files are
+-//! not provided.
++//! Configured memory and virtual-device namespace for `ginux launch`.
++//! `memory:/path` files and directory descriptors live in supervisor memory;
++//! assigned null devices use the device registry. No writable host descriptor
++//! reaches the workload and nothing outlives the instance. Owned links, rename,
++//! file mappings and execution of created files are not provided.
+ 
++use crate::device_hooks::LaunchDevices;
+ use crate::launch_paths::{check_assignment, proc_path, ImageRoot, Rewrite, RewriteError};
+ use crate::supervisor::{
+     syscall2, syscall4, syscall6, UserRegs, SYS_PROCESS_VM_READV, SYS_PROCESS_VM_WRITEV,
+@@ -71,6 +72,7 @@ pub(crate) mod linux {
+     pub const UNLINKAT: u64 = 263;
+     pub const READLINKAT: u64 = 267;
+     pub const FCHMODAT: u64 = 268;
++    pub const FACCESSAT: u64 = 269;
+     pub const DUP3: u64 = 292;
+     pub const STATX: u64 = 332;
+     pub const FACCESSAT2: u64 = 439;
+@@ -146,11 +148,14 @@ pub enum Dispatch {
+     Rewritten,
+     /// Storage completed it with this result.
+     Handled(i64),
++    /// An explicitly assigned virtual device completed the call.
++    Device(i64),
+     /// A scratch area could not be restored; the instance must stop.
+     Lost,
+ }
+ 
+ pub struct LaunchFs {
++    devices: LaunchDevices,
+     memory: Option<&'static mut MemoryFs>,
+     assignments: [Path; MAX_ASSIGNMENTS],
+     count: usize,
+@@ -189,6 +194,7 @@ enum Anchor {
+ enum Route {
+     Native(Path),
+     Memory(Path),
++    Device(Path),
+     Rewrite(Path),
+     Descriptor(i32),
+     Fail(i64),
+@@ -230,6 +236,7 @@ impl LaunchFs {
+         let cwd = Path::from_bytes(config.workdir.as_bytes())
+             .map_err(|_| b"storage workdir exceeds bound".as_slice())?;
+         let mut storage = Self {
++            devices: LaunchDevices::prepare(config)?,
+             memory: None,
+             assignments,
+             count,
+@@ -304,7 +311,7 @@ impl LaunchFs {
+     /// Lower the workload's descriptor limits below the memory range, so no
+     /// native descriptor can take a memory descriptor's number.
+     pub fn reserve_descriptors(&self) -> bool {
+-        if !self.enabled() {
++        if !self.enabled() && !self.devices.enabled() {
+             return true;
+         }
+         let mut limits = [0u64; 2];
+@@ -333,11 +340,11 @@ impl LaunchFs {
+         }
+     }
+ 
+-    /// Whether this call operates on a memory descriptor (any descriptor at or
+-    /// above `FD_BASE`, read as the kernel reads it).
++    /// Whether this call operates within the memory descriptor range, read as
++    /// the kernel reads it. Device descriptors have a distinct owner.
+     fn on_memory_descriptor(&self, registers: &UserRegs) -> bool {
+         self.enabled()
+-            && (registers.rdi as u32) >= FD_BASE
++            && (FD_BASE..FD_BASE + MEMORY_FDS as u32).contains(&(registers.rdi as u32))
+             && descriptor_family(registers.orig_rax).is_some()
+     }
+ 
+@@ -352,8 +359,8 @@ impl LaunchFs {
+ 
+     /// Complete a storage call, or say how the supervisor runs it natively.
+     pub fn dispatch(&mut self, pid: usize, registers: &mut UserRegs) -> Dispatch {
+-        if !self.enabled() {
+-            return Dispatch::Native;
++        if let Some(result) = self.devices.descriptor_dispatch(pid, registers) {
++            return Dispatch::Device(result);
+         }
+         if registers.orig_rax == linux::GETCWD {
+             return Dispatch::Handled(
+@@ -393,6 +400,9 @@ impl LaunchFs {
+                 self.empty_path_call(pid, registers, fd)
+                     .unwrap_or_else(|error| error),
+             ),
++            Route::Device(path) => {
++                Dispatch::Device(self.devices.path_dispatch(pid, registers, path.as_bytes()))
++            }
+             Route::Memory(path) => Dispatch::Handled(
+                 self.memory_call(pid, registers, &path)
+                     .unwrap_or_else(|error| error),
+@@ -452,7 +462,7 @@ impl LaunchFs {
+     fn anchor(&mut self, dirfd: Option<i32>) -> Anchor {
+         match dirfd {
+             None | Some(linux::AT_FDCWD) => Anchor::Cwd,
+-            Some(fd) if fd as u32 >= FD_BASE => {
++            Some(fd) if fd as u32 >= FD_BASE && self.enabled() => {
+                 let fd = memory_descriptor(fd as u64);
+                 match self.memory().fstat(fd) {
+                     Ok(_) => Anchor::Memory(fd),
+@@ -530,7 +540,7 @@ impl LaunchFs {
+         let mut touched = false;
+         let mut output = [0u8; MAX_PATH];
+         let resolved = {
+-            let memory = self.memory.as_deref().unwrap();
++            let memory = self.memory.as_deref();
+             let root = self.root.as_ref().unwrap();
+             let in_memory = |path: &[u8]| self.in_memory(path);
+             ginux_vfs::resolve_namespace_checked(
+@@ -539,15 +549,20 @@ impl LaunchFs {
+                 call.create,
+                 &mut output,
+                 |path, target| {
++                    if LaunchDevices::owns(path) {
++                        return self.devices.lookup(path);
++                    }
+                     if in_memory(path) {
+                         touched = true;
+-                        return memory.metadata(path).map(|m| (m.kind, 0));
++                        return memory.unwrap().metadata(path).map(|m| (m.kind, 0));
+                     }
+                     root.lookup(path, target)
+                 },
+                 |path| {
+-                    if in_memory(path) {
+-                        memory.search_directory(path)
++                    if LaunchDevices::owns(path) {
++                        self.devices.lookup(path).map(|_| ())
++                    } else if in_memory(path) {
++                        memory.unwrap().search_directory(path)
+                     } else {
+                         root.search_directory(path)
+                     }
+@@ -560,7 +575,9 @@ impl LaunchFs {
+                     Ok(canonical) => canonical,
+                     Err(_) => return Route::Fail(-linux::ENAMETOOLONG),
+                 };
+-                if self.in_memory(canonical.as_bytes()) {
++                if LaunchDevices::owns(canonical.as_bytes()) {
++                    Route::Device(canonical)
++                } else if self.in_memory(canonical.as_bytes()) {
+                     Route::Memory(canonical)
+                 } else if touched || raw.as_bytes().first() != Some(&b'/') {
+                     Route::Rewrite(canonical)
+@@ -591,7 +608,7 @@ impl LaunchFs {
+             linux::NEWFSTATAT => self.stat_path(pid, path, r.rdx, false),
+             linux::STATX => self.stat_path(pid, path, r.r8, true),
+             linux::ACCESS => self.access(path, assigned, r.rsi),
+-            linux::FACCESSAT2 => self.access(path, assigned, r.rdx),
++            linux::FACCESSAT | linux::FACCESSAT2 => self.access(path, assigned, r.rdx),
+             // Memory holds no links.
+             linux::READLINK | linux::READLINKAT => {
+                 self.memory().metadata(path).map_err(errno)?;
+@@ -1225,6 +1242,12 @@ impl PathCall {
+                 }
+                 call(0, r.rdi, None, true, false)
+             }
++            linux::FACCESSAT => {
++                if r.rdx & !7 != 0 {
++                    return invalid;
++                }
++                call(1, r.rsi, at, true, false)
++            }
+             linux::FACCESSAT2 => {
+                 let valid = linux::AT_SYMLINK_NOFOLLOW | linux::AT_EACCESS | linux::AT_EMPTY_PATH;
+                 if r.r10 & !valid != 0 || r.rdx & !7 != 0 {
+@@ -1387,7 +1410,7 @@ fn join(base: &[u8], relative: &[u8]) -> Result<Path, i64> {
+     Path::from_bytes(&bytes[..length]).map_err(|_| -linux::ENAMETOOLONG)
+ }
+ 
+-fn valid_statx(flags: u64, mask: u64) -> bool {
++pub(crate) fn valid_statx(flags: u64, mask: u64) -> bool {
+     flags & !0x7900 == 0 && flags & 0x6000 != 0x6000 && mask & 0x8000_0000 == 0
+ }
+ 
+@@ -1449,7 +1472,7 @@ pub(crate) fn copy_memory(
+ }
+ 
+ /// The workload's NUL-terminated path, read in one copy where possible.
+-fn read_path(pid: usize, address: u64) -> Result<Path, i64> {
++pub(crate) fn read_path(pid: usize, address: u64) -> Result<Path, i64> {
+     let mut buffer = [0u8; MAX_PATH];
+     let copied = copy_memory(pid, address, &mut buffer, false)? as usize;
+     match buffer[..copied].iter().position(|byte| *byte == 0) {
+@@ -1465,7 +1488,6 @@ fn copy_metadata(
+     metadata: FileMetadata,
+     statx: bool,
+ ) -> Result<i64, i64> {
+-    let mut bytes = [0u8; 256];
+     let directory = metadata.kind == NodeKind::Directory;
+     let mode = metadata.mode
+         | if directory {
+@@ -1473,7 +1495,37 @@ fn copy_metadata(
+         } else {
+             linux::S_IFREG
+         };
+-    let links: u64 = if directory { 2 } else { 1 };
++    write_stat(
++        pid,
++        address,
++        Stat {
++            inode: metadata.inode,
++            mode,
++            size: metadata.size,
++            device_major: 0,
++            device_minor: 0,
++        },
++        statx,
++    )
++}
++
++pub(crate) struct Stat {
++    pub inode: u64,
++    pub mode: u32,
++    pub size: u64,
++    pub device_major: u32,
++    pub device_minor: u32,
++}
++
++pub(crate) fn write_stat(
++    pid: usize,
++    address: u64,
++    metadata: Stat,
++    statx: bool,
++) -> Result<i64, i64> {
++    let mut bytes = [0u8; 256];
++    let mode = metadata.mode;
++    let links: u64 = if mode & 0o170000 == 0o040000 { 2 } else { 1 };
+     let (ino, mode_at, size_at, blocks_at, length) = if statx {
+         bytes[..4].copy_from_slice(&0x7ffu32.to_le_bytes());
+         bytes[4..8].copy_from_slice(&4096u32.to_le_bytes());
+@@ -1485,6 +1537,18 @@ fn copy_metadata(
+         bytes[56..64].copy_from_slice(&4096u64.to_le_bytes());
+         (8, Some(24), 48, 64, 144)
+     };
++    if statx {
++        bytes[128..132].copy_from_slice(&metadata.device_major.to_le_bytes());
++        bytes[132..136].copy_from_slice(&metadata.device_minor.to_le_bytes());
++    } else {
++        let major = metadata.device_major as u64;
++        let minor = metadata.device_minor as u64;
++        let rdev = (minor & 0xff)
++            | ((major & 0xfff) << 8)
++            | ((minor & !0xff) << 12)
++            | ((major & !0xfff) << 32);
++        bytes[40..48].copy_from_slice(&rdev.to_le_bytes());
++    }
+     bytes[ino..ino + 8].copy_from_slice(&metadata.inode.to_le_bytes());
+     if let Some(mode_at) = mode_at {
+         bytes[mode_at..mode_at + 4].copy_from_slice(&mode.to_le_bytes());
+@@ -1492,7 +1556,7 @@ fn copy_metadata(
+     bytes[size_at..size_at + 8].copy_from_slice(&metadata.size.to_le_bytes());
+     bytes[blocks_at..blocks_at + 8].copy_from_slice(&metadata.size.div_ceil(512).to_le_bytes());
+     if copy_memory(pid, address, &mut bytes[..length], true)? != length as i64 {
+-        return Err(-linux::EFAULT);
++        return Err(-14);
+     }
+     Ok(0)
+ }
+diff --git a/crates/ginux-init/src/main.rs b/crates/ginux-init/src/main.rs
+index 599cfb43..738507c2 100644
+--- a/crates/ginux-init/src/main.rs
++++ b/crates/ginux-init/src/main.rs
+@@ -13,6 +13,7 @@ use ginux_core::{
+ use ginux_instance::{AuditMode, HookFailurePolicy};
+ 
+ mod channel_hooks;
++mod device_hooks;
+ mod dispatch;
+ mod fs_hooks;
+ mod launch;
+@@ -5448,6 +5449,7 @@ fn supervise_native(
+                     let lane_name: &[u8] = match lane {
+                         Lane::Process => b"process",
+                         Lane::Filesystem => b"filesystem",
++                        Lane::Device => b"device",
+                         Lane::Channel => b"channel",
+                         Lane::Contract => b"contract",
+                     };
+diff --git a/scripts/test-launch-devices.py b/scripts/test-launch-devices.py
+new file mode 100644
+index 00000000..c146f165
+--- /dev/null
++++ b/scripts/test-launch-devices.py
+@@ -0,0 +1,64 @@
++#!/usr/bin/env python3
++"""Real configured-launch device ownership checks using explicit built artifacts."""
++import json
++import os
++from pathlib import Path
++import shutil
++import subprocess
++import sys
++import tempfile
++
++
++def main():
++    if len(sys.argv) != 3 or os.geteuid() != 0:
++        sys.exit('usage (as root): test-launch-devices.py <ginux> <device-fixture>')
++    binary, fixture = [str(Path(p).resolve()) for p in sys.argv[1:]]
++    template = (Path(__file__).resolve().parent.parent / 'config/instance-storage.toml').read_text()
++    with tempfile.TemporaryDirectory(prefix='ginux-devices-') as directory:
++        work = Path(directory)
++        root = work / 'root'
++        (root / 'bin').mkdir(parents=True)
++        (root / 'work').mkdir()
++        (root / 'dev').mkdir()
++        (root / 'alias-null').symlink_to('/dev/null')
++        (root / 'alias-dev').symlink_to('/dev')
++        for name in ['null', 'image-device']:
++            (root / 'dev' / name).write_bytes(b'image device bytes must stay untouched')
++        shutil.copyfile(fixture, root / 'bin/fixture')
++        (root / 'bin/fixture').chmod(0o755)
++        counter = 0
++
++        def invoke(devices, storage=False, expected=0):
++            nonlocal counter
++            counter += 1
++            config = template.replace('init = "/bin/bash"', 'init = "/bin/fixture"')
++            config = config.replace('[devices]\nassignments = []', '[devices]\nassignments = ' + json.dumps(devices))
++            if not devices:
++                config = config.replace('args = []', 'args = ["none"]')
++            if storage:
++                config = config.replace('[storage]\nassignments = []', '[storage]\nassignments = ["memory:/work"]')
++            path = work / f'{counter}.toml'
++            path.write_text(config)
++            result = work / f'{counter}.json'
++            proc = subprocess.run([binary, 'launch', str(path), str(root), '--result-file', str(result)],
++                                  capture_output=True, timeout=20)
++            record = json.loads(result.read_text())
++            assert proc.returncode == expected, (proc.returncode, proc.stderr, record)
++            assert record['outcome'] == ('exited' if expected == 0 else 'supervisor-error'), record
++            if expected == 0:
++                assert record['code'] == 0 and record['generation'] is None, record
++                assert proc.stdout == (b'null-device: PASS\n' if devices else b''), proc.stdout
++            for name in ['null', 'image-device']:
++                assert (root / 'dev' / name).read_bytes() == b'image device bytes must stay untouched'
++
++        invoke([])
++        invoke(['null'])
++        invoke(['null'], storage=True)
++        invoke(['null'])  # No descriptors survive a fresh supervisor.
++        for devices in [['zero'], ['null', 'null'], ['null', 'console'], ['disk0']]:
++            invoke(devices, expected=2)
++        print('test-launch-devices: PASS (assignment, IO, metadata, bounds, isolation)')
++
++
++if __name__ == '__main__':
++    main()
+diff --git a/tests/fixtures/launch-device-fixture.c b/tests/fixtures/launch-device-fixture.c
+new file mode 100644
+index 00000000..aba21f08
+--- /dev/null
++++ b/tests/fixtures/launch-device-fixture.c
+@@ -0,0 +1,106 @@
++/* Real configured-launch null-device checks, without libc or host devices. */
++typedef unsigned long word;
++static long call(long n, word a, word b, word c, word d, word e, word f)
++{
++    register word r10 __asm__("r10") = d;
++    register word r8 __asm__("r8") = e;
++    register word r9 __asm__("r9") = f;
++    long result;
++    __asm__ volatile("syscall" : "=a"(result) : "a"(n), "D"(a), "S"(b), "d"(c),
++                     "r"(r10), "r"(r8), "r"(r9) : "rcx", "r11", "memory");
++    return result;
++}
++#define DO(n,a,b,c) call(n,(word)(a),(word)(b),(word)(c),0,0,0)
++#define CHECK(expr,code) if (!(expr)) return code
++static char meta[256] __attribute__((aligned(8)));
++static const char immutable[] = "do not write into this";
++long device_main(word *stack)
++{
++    word argc = *stack;
++    char **argv = (char **)(stack + 1);
++    CHECK(call(262,-100,(word)"",(word)meta,0x1000,0,0) == 0, 69);
++    CHECK(DO(4,"/dev",meta,0) == 0, 10);
++    CHECK((*(unsigned int *)(meta+24) & 0170000) == 0040000, 11);
++    if (argc > 1 && argv[1][0] == 'n') {
++        CHECK(DO(2,"/dev/null",0,0) == -2, 12);
++        CHECK(DO(4,"/dev/null",meta,0) == -2, 13);
++        CHECK(DO(2,"/dev/image-device",0,0) == -2, 14);
++        CHECK(DO(2,"/alias-null",0,0) == -2, 55);
++        CHECK(DO(4,"/alias-dev/image-device",meta,0) == -2, 56);
++        return 0;
++    }
++    CHECK(DO(2,"/dev/image-device",0,0) == -2, 15);
++    CHECK(DO(2,"/alias-dev/image-device",0,0) == -2, 57);
++    CHECK(DO(2,"/dev/null/../null",0,0) == -20, 58);
++    CHECK(DO(2,"/dev/missing/../null",0,0) == -2, 59);
++    long alias = DO(2,"/alias-null",2,0);
++    CHECK(alias >= 0x40000000, 60);
++    CHECK(DO(5,alias,meta,0) == 0, 61);
++    CHECK((*(unsigned int *)(meta+24) & 0170000) == 0020000, 62);
++    CHECK(call(262,alias,(word)"",(word)meta,0x1900,0,0) == 0, 63);
++    CHECK(call(262,alias,(word)"",(word)meta,0,0,0) == -2, 73);
++    CHECK(DO(2,"/dev/null",0200000,0) == -20, 74);
++    CHECK(DO(89,"/dev/null",meta,8) == -22, 75);
++    CHECK(call(267,-100,(word)"/dev/null",(word)meta,8,0,0) == -22, 76);
++    CHECK(call(332,-100,(word)"/alias-null",0x2900,0x7ff,(word)meta,0) == 0, 64);
++    CHECK(call(332,alias,(word)"",0x5900,0x7ff,(word)meta,0) == 0, 65);
++    CHECK(call(332,alias,(word)"",0x1000,0x80000000,(word)meta,0) == -22, 66);
++    CHECK(call(332,-100,(word)"/dev/null",0x6000,0x7ff,(word)meta,0) == -22, 67);
++    CHECK(DO(3,alias,0,0) == 0, 68);
++    CHECK(DO(2,"/dev/null",0300,0644) == -17, 16);
++    long fd = DO(2,"/dev/null",2|02000000,0);
++    CHECK(fd == 0x40000000, 17);
++    CHECK(DO(0,fd,1,4096) == 0, 70);
++    CHECK(DO(1,fd,1,5000) == 4096, 71);
++    CHECK(DO(0,fd,immutable,10) == 0, 18);
++    CHECK(DO(1,fd,immutable,10) == 10, 19);
++    CHECK(DO(8,fd,123,0) == 0, 20);
++    CHECK(DO(72,fd,1,0) == 1, 21);
++    CHECK(DO(72,fd,2,0) == 0, 22);
++    CHECK(DO(72,fd,1,0) == 0, 23);
++    CHECK((DO(72,fd,3,0) & 3) == 2, 24);
++    CHECK(DO(16,fd,0,0) == -25, 25);
++    CHECK(DO(5,fd,1,0) == -14, 26);
++    CHECK(DO(5,fd,immutable,0) == -14, 27);
++    CHECK(DO(5,fd,meta,0) == 0, 28);
++    CHECK((*(unsigned int *)(meta+24) & 0170000) == 0020000, 29);
++    CHECK(*(word *)(meta+40) == 0x103, 30);
++    word inode = *(word *)(meta+8);
++    CHECK(call(332,-100,(word)"/dev/null",0,0x7ff,(word)meta,0) == 0, 31);
++    CHECK(*(unsigned int *)(meta+128) == 1 && *(unsigned int *)(meta+132) == 3, 32);
++    CHECK(*(word *)(meta+32) == inode, 33);
++    CHECK(call(262,fd,(word)"",(word)meta,0x1000,0,0) == 0, 34);
++    CHECK(*(word *)(meta+8) == inode, 35);
++    CHECK(DO(3,fd,0,0) == 0, 36);
++    CHECK(DO(0,fd,meta,1) == -9, 37);
++    long ro = DO(2,"/dev/null",0,0);
++    CHECK(DO(1,ro,immutable,1) == -9, 38);
++    CHECK(DO(3,ro,0,0) == 0, 39);
++    long wo = call(257,-100,(word)"../dev/null",1,0,0,0);
++    CHECK(wo >= 0, 40);
++    CHECK(DO(0,wo,meta,1) == -9, 41);
++    CHECK(DO(3,wo,0,0) == 0, 42);
++    // Device-only configs must reserve the descriptor namespace too.
++    word limits[2];
++    CHECK(call(302,0,7,0,(word)limits,0,0) == 0, 43);
++    CHECK(limits[1] <= 1048576, 44);
++    long fds[64];
++    for (word i=0;i<64;++i) {
++        fds[i]=DO(2,"/dev/null",0,0);
++        CHECK(fds[i] >= 0x40000000, 45);
++    }
++    CHECK(DO(2,"/dev/null",0,0) == -24, 46);
++    for (word i=0;i<64;++i) CHECK(DO(3,fds[i],0,0) == 0, 47);
++    CHECK(DO(21,"/dev/null",4,0) == 0, 48);
++    CHECK(call(269,-100,(word)"/dev/null",4,0,0,0) == 0, 72);
++    CHECK(DO(21,"/dev/null",1,0) == -13, 49);
++    CHECK(DO(87,"/dev/null",0,0) == -30, 50);
++    CHECK(DO(4,"/dev/null",meta,0) == 0, 51);
++    fd = DO(2,"/dev/null",01101,0644);
++    CHECK(fd >= 0x40000000, 52);
++    CHECK(DO(1,fd,immutable,10) == 10, 53);
++    CHECK(DO(3,fd,0,0) == 0, 54);
++    DO(1,1,"null-device: PASS\n",18);
++    return 0;
++}
++__asm__(".global _start\n_start:\nmov %rsp,%rdi\nandq $-16,%rsp\ncall device_main\nmov %rax,%rdi\nmov $60,%rax\nsyscall\nud2\n");
+diff --git a/tests/fixtures/launch-storage-fixture.c b/tests/fixtures/launch-storage-fixture.c
+index b04493b3..be4d7933 100644
+--- a/tests/fixtures/launch-storage-fixture.c
++++ b/tests/fixtures/launch-storage-fixture.c
+@@ -137,9 +137,10 @@ long storage_main(word *stack)
+         long native = call(257, dir, (word)"fixture", 0, 0, 0, 0);
+         CHECK(native >= 0 && DO(3, native, 0, 0) == 0, 131);
+         CHECK(call(262, dir, (word)"fixture", (word)meta, 0, 0, 0) == 0, 132);
+-        /* Image devices, private directories and "/.." behave as without storage. */
++        /* Unassigned image devices are hidden by the virtual view; native
++         * private-directory metadata and "/.." retain their behavior. */
+         long null = DO(2, "/dev/null", 0, 0);
+-        CHECK(null >= 0 && DO(3, null, 0, 0) == 0, 133);
++        CHECK(null == -2, 133);
+         CHECK(DO(4, "/private", meta, 0) == 0 && DO(4, "/..", meta, 0) == 0, 134);
+         /* mkdir takes a trailing slash; access and readlink answer for memory. */
+         CHECK(DO(83, "/work/d/", 0755, 0) == 0, 135);

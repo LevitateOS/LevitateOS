@@ -77,6 +77,13 @@ disposition of a proven required capability.
 
 ## Current review boundary
 
+[G04 assigned null-device extraction](prd07-devices-review.md) is prepared at
+`c8d6a826` over local storage `16dd447e`. Full diff/failure review, static checks,
+141 units and all original Linux plus storage/device suites pass. Its complete
+donor/test disposition includes the old image-device assertion replaced by the
+authorized default-hidden view. This remains a local dependent composition;
+G05 global/public ownership and G06 exec/task behavior still need their own joins.
+
 The [local storage rehearsal](prd07-storage-rehearsal.md) now composes the
 reviewed fixes without waiting idle: foundation `04857f38` passes original CI
 and 101 units; typed storage `16dd447e` passes original CI, 141 units and the
@@ -100,8 +107,10 @@ editing existing heads, comments, native policy or a source-packaging choice.
 
 Active skill: `hdae-development` at `.agents/skills/hdae-development/SKILL.md`.
 Reload the full skill, reference, instructions and current queue after context
-shift. Exact next action: extract G04's assigned null-device owner onto local
-storage `16dd447e`, then G05/G06 before G09b's full runtime join. Preserve
+shift. Exact next action: extract and review G05's public descriptor/pipe owner
+onto local G04 `c8d6a826`, retaining the actual ABI/deny classification, all lower
+operator limits, partial-progress/cancellation and original fixtures. Then join
+G06 before G09b's full runtime. Preserve
 G09a/T-02's 9,000-byte/4,096-byte rollback oracle; the clean
 `ginux-prd07-growable` worktree is reserved for that subsequent port. Retain the
 no-publication boundary. Resolve the
