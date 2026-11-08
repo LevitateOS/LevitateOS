@@ -231,18 +231,25 @@ source-bound evidence; they are not combined into a final current-source claim.
   The pthread query now passes. Snapshot/deny controls pass, including repeated
   opens, shared offsets/pread, failed read preservation and fork/exec. Source
   bundle and binary identity are in `stack-candidate-2-source/`; implementation
-  remains uncommitted pending affected checks. Initial metadata adapter build
+  is committed at `7a291c0470ad476e8c68d11a669e4b9aa0298e41`; strict Clippy
+  and all affected FD/IPC/task/thread/network runners pass. Initial metadata adapter build
   errors and an owner-routing failure are preserved and corrected.
 - **Acquisition remains unaccepted:** a probe first used invalid kind `dir`;
   corrected to `directory`. `cp -a` requests unsupported archive-mode metadata;
   using the existing input-mode-preserving `copy_tree_contents` helper corrects
   that probe without changing package/target metadata policy. With the stack view,
-  actual frozen npm install passes lockfile parsing but is still waiting; no
-  successful acquisition or product is claimed. Its deadline is 600 seconds.
+  actual frozen npm install passes lockfile parsing but reaches its 600-second
+  execution deadline and fails (`real-tui-npm-stack.json`); no successful
+  acquisition or product is claimed. The task-owned processes are gone.
   Live supervisor ptrace inspection is denied by the existing runtime boundary;
   it was not bypassed. A smaller direct diagnostic first exceeded argv bounds;
-  the script-input retry is retained separately. Interrupted/timed-out diagnostic
-  runs never count as passes.
+  the script-input retry is retained separately. A smaller source-copy loader
+  retains the frozen package/lock/workspace manifests while reducing startup
+  trace noise. Its first direct contract omitted Recipe's syscall connect grant;
+  corrected to match the actual derived contract before diagnosing the candidate.
+  A separate bounded diagnostic binary increases trace/record capacity only for
+  diagnosis; its patch is retained and immediately removed from committed source.
+  Interrupted/timed-out diagnostic runs never count as passes.
 
 Exact next action: inspect the current own-stack affected checks and the bounded
 npm diagnostic/status; resolve any actual functional failure without widening
