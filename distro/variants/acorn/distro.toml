@@ -37,7 +37,62 @@ preseed_network_hosts = ["dl-cdn.alpinelinux.org:443"]
 kind = "recipe_custom"
 recipe_script = "distro/builder/recipes/alpine-live-source-rootfs.rhai"
 preseed_recipe_script = "distro/builder/recipes/alpine-preseed-source-assets.rhai"
-preseed_outputs = { iso = "file", apk_tools = "file", extra_apks = "directory" }
+preseed_outputs = { apks = "directory" }
+
+# What the rootfs takes from Alpine's v3.24 branch; `cargo xtask base lock
+# acorn` locks it with every dependency. kbd-bkeymaps stays until recsetup
+# lists kbd's keymaps on OpenRC.
+[sources.rootfs_source.base]
+release = "v3.24"
+signing_key = "keys/alpine-devel@lists.alpinelinux.org-6165ee59.rsa.pub"
+packages = [
+  "alpine-base",
+  "busybox",
+  "openrc",
+  "doas",
+  "bash",
+  "bash-completion",
+  "coreutils",
+  "findutils",
+  "grep",
+  "sed",
+  "gawk",
+  "diffutils",
+  "procps-ng",
+  "tar",
+  "gzip",
+  "less",
+  "vim",
+  "kbd",
+  "kbd-legacy",
+  "kbd-bkeymaps",
+  "musl-locales",
+  "musl-locales-lang",
+  "tzdata",
+  "util-linux",
+  "e2fsprogs",
+  "dosfstools",
+  "systemd-boot",
+  "openssh",
+  "openssh-server",
+  "iproute2",
+  "iputils",
+  "curl",
+  "dhcpcd",
+  "networkmanager",
+  "networkmanager-cli",
+  "networkmanager-wifi",
+  "wpa_supplicant",
+  "iw",
+  "pciutils",
+  "usbutils",
+  "smartmontools",
+  "hdparm",
+  "htop",
+  "audit",
+  "chrony",
+  "dbus",
+]
 
 # The live ISO's install screen: this shell beside the install docs. getty
 # starts it on each console listed; the serial console runs it only when the
@@ -57,6 +112,6 @@ hub = "install-hub"
 [live]
 services = ["network"]
 
-# It boots without an initramfs.
+# Boots through the same busybox initramfs recinit builds for every variant.
 [installed]
-initramfs = false
+initramfs = true

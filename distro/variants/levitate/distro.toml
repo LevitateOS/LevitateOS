@@ -39,12 +39,9 @@ recipe_script = "distro/builder/recipes/fedora-rpm-source-rootfs.rhai"
 preseed_recipe_script = "distro/builder/recipes/fedora-rpm-preseed.rhai"
 preseed_outputs = { rpms = "directory" }
 
-# What the rootfs takes from Fedora. `cargo xtask base lock levitate` resolves
-# the newest signed build of each from the release and updates repositories
-# into distro/builder/recipes/sources/levitate-rpm-lock.rhai.
-[sources.rootfs_source.rpm_base]
-fedora_release = 45
-# Relative to this directory.
+# What the rootfs takes from Fedora 45; `cargo xtask base lock levitate` locks it.
+[sources.rootfs_source.base]
+release = "45"
 signing_key = "keys/RPM-GPG-KEY-fedora-45-primary"
 packages = [
   # Root filesystem skeleton and core runtime.
@@ -71,8 +68,7 @@ packages = [
   "kmod",
   "util-linux",
   "util-linux-core",
-  # Installing to disk and A/B updates: recpart formats ext4 and FAT, recab
-  # stage formats a slot, and bootctl install copies systemd-boot's EFI binary.
+  # Disks, filesystems and the boot loader.
   "e2fsprogs",
   "e2fsprogs-libs",
   "libss",
@@ -128,8 +124,7 @@ packages = [
   "openssh-server",
   "openssh",
   "openssh-clients",
-  # RPM dependency solving is not active in this extraction path; include
-  # OpenSSH Kerberos runtime libs explicitly for sshd-session.
+  # The Kerberos libraries sshd-session loads.
   "krb5-libs",
   "keyutils-libs",
   "libverto",
@@ -171,10 +166,8 @@ packages = [
   "zlib-ng-compat",
   "xz-libs",
   "procps-ng",
-  # Shared libraries the packages above link against. The lock takes no RPM
-  # dependency solving, so every library a locked binary loads is named here:
-  # without them systemctl/bootctl (systemd-shared), useradd (libsemanage) and
-  # the rest fail with "error while loading shared libraries".
+  # Shared libraries the packages above load: the lock adds no dependencies
+  # (yet), so each is named here.
   "systemd-shared",
   "cryptsetup-libs",
   "device-mapper-libs",
