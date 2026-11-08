@@ -16,7 +16,9 @@ os_version = "1.0"
 # the install tools read on the target. The ISO label (`os_id` in capitals),
 # default hostname (`os_id`), login prompt (`<os_id> login:`) and kernel
 # localversion (`-<variant id>`) follow from the identity, and every tool is
-# built for the libc.
+# built for the libc. `kernel_line` picks the kernel: its exact version is
+# pinned in distro/builder/recipes/kernel/metadata.rhai, its configuration is
+# ../_shared/kconfig plus `kconfig` beside this file.
 [profile]
 packages = "rpm"
 init = "systemd"
@@ -24,11 +26,6 @@ libc = "glibc"
 privilege = "sudo"
 desktop = "plasma"
 kernel_line = "lts"
-
-# The kernel is built from `kconfig` beside this file.
-[build.kernel]
-version = "6.12.116"
-sha256 = "cb3ed3dfdd47e6ade49dc933db334fd86e24cadee920da612c262b0e9b6a511b"
 
 [sources.rootfs_source]
 storage_max_objects = 131072

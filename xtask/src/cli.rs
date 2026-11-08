@@ -400,13 +400,13 @@ pub struct KernelArgs {
     #[arg(long)]
     pub rebuild: bool,
     /// Compile even outside the 23:00-10:00 kernel build window.
-    #[arg(long)]
+    #[arg(long, conflicts_with = "prebuilt")]
     pub now: bool,
     /// On failure, let recipe ask the configured LLM for a patch and retry.
     #[arg(long)]
     pub autofix: bool,
     /// Autofix attempts per failing build.
-    #[arg(long, default_value_t = 2, requires = "autofix")]
+    #[arg(long, default_value_t = 2, requires = "autofix", value_parser = clap::value_parser!(u8).range(1..))]
     pub autofix_attempts: u8,
     /// Extra instructions appended to the autofix prompt.
     #[arg(long, value_name = "PATH", requires = "autofix")]

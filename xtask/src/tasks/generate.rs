@@ -133,6 +133,7 @@ fn write_distros(out: &mut Out, root: &Path) -> Result<()> {
     for id in distro_contract::distro_ids(root) {
         let variant = distro_contract::load(root, &id)?;
         let c = &variant.contract;
+        let kernel = distro_builder::kernel::pin(&variant)?;
         let privilege = c.profile.privilege;
         distros.push(json!({
             "id": variant.id,
@@ -145,7 +146,7 @@ fn write_distros(out: &mut Out, root: &Path) -> Result<()> {
             "isoFile": c.artifacts.release_iso,
             "installedInitramfs": c.artifacts.initramfs_installed,
             "installShell": c.install_ux.shell,
-            "kernel": { "version": c.build.kernel.version, "localversion": c.build.kernel.localversion },
+            "kernel": { "version": kernel.version, "localversion": kernel.localversion },
             "profile": c.profile,
             "privilegeTool": {
                 "configFile": privilege.config_file(),

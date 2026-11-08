@@ -162,19 +162,11 @@ fn checks(root: &Path) -> Vec<Check> {
         if let Some(check) = base_lock_check(root, distro) {
             checks.push(check);
         }
-        let target = crate::tasks::kernels::common::target_for(distro);
+        let kernel = crate::tasks::kernels::status(distro).unwrap_or_else(|err| Err(format!("{err:#}")));
         checks.push(Check::new(
             format!("{} kernel", distro.id()),
             false,
-            target.and_then(|t| crate::tasks::kernels::common::verify_one(root, &t)).map_err(|_| {
-                (
-                    "not built".into(),
-                    format!(
-                        "cargo xtask build kernel {0} --prebuilt (download) or cargo xtask build kernel {0}",
-                        distro.id()
-                    ),
-                )
-            }),
+            kernel.map_err(|reason| (reason, crate::tasks::kernels::fix(distro))),
         ));
         for product in ProductId::releases() {
             checks.push(Check::new(

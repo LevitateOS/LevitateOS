@@ -16,7 +16,9 @@ os_version = "1.0"
 # the install tools read on the target. The ISO label (`os_id` in capitals),
 # default hostname (`os_id`), login prompt (`<os_id> login:`) and kernel
 # localversion (`-<variant id>`) follow from the identity, and every tool is
-# built for the libc.
+# built for the libc. `kernel_line` picks the kernel: its exact version is
+# pinned in distro/builder/recipes/kernel/metadata.rhai, its configuration is
+# ../_shared/kconfig plus `kconfig` beside this file.
 [profile]
 packages = "apk"
 init = "openrc"
@@ -24,11 +26,6 @@ libc = "musl"
 privilege = "doas"
 desktop = "lxqt"
 kernel_line = "latest"
-
-# The kernel is built from `kconfig` beside this file.
-[build.kernel]
-version = "7.3.3"
-sha256 = "79c66dde66cd96877fcde8f7d36aec946b1f423d2b97b5a7b1751b75c764f3d1"
 
 [sources.rootfs_source]
 storage_max_objects = 131072

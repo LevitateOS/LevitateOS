@@ -1,15 +1,15 @@
-//! `build`: products through distro-builder, kernels through recipe.
+//! `build`: products and kernels through distro-builder.
 
 use anyhow::Result;
 use std::path::PathBuf;
 
-use crate::cli::{BuildCmd, Distro, KernelArgs, ProductBuild};
+use crate::cli::{BuildCmd, Distro, ProductBuild};
 use distro_contract::ProductId;
 
 pub fn run(what: BuildCmd) -> Result<()> {
     match what {
         BuildCmd::Product(ProductBuild { product, distros }) => product_isos(product, &distros.distros()?),
-        BuildCmd::Kernel(args) => kernel(args),
+        BuildCmd::Kernel(args) => crate::tasks::kernels::build(args),
         BuildCmd::RootfsSource { distro, refresh } => {
             let root = crate::util::repo::repo_root()?;
             let mut args = vec!["artifact", "preseed-rootfs-source", distro.id()];
@@ -41,14 +41,10 @@ pub fn require_iso(distro: &Distro, product: ProductId) -> Result<PathBuf> {
 fn product_isos(product: ProductId, distros: &[Distro]) -> Result<()> {
     let root = crate::util::repo::repo_root()?;
     for distro in distros {
-        let kernel = crate::tasks::kernels::common::target_for(distro)?;
-        if !crate::tasks::kernels::common::kernel_is_built(&root, &kernel) {
+        if let Err(reason) = crate::tasks::kernels::status(distro)? {
             return Err(crate::util::exit::missing(
-                format!("the {} kernel is not built", distro.id()),
-                format!(
-                    "cargo xtask build kernel {0} --prebuilt (download) or cargo xtask build kernel {0}",
-                    distro.id()
-                ),
+                format!("the {} kernel is {reason}", distro.id()),
+                crate::tasks::kernels::fix(distro),
             ));
         }
     }
@@ -84,27 +80,5 @@ fn erofs(product: ProductId, distro: &Distro) -> Result<()> {
         &["transform", "build", "product-erofs", &prepared_arg],
     )?;
     println!("built: {}", prepared.display());
-    Ok(())
-}
-
-fn kernel(args: KernelArgs) -> Result<()> {
-    let distros = args.distros.distros()?;
-    let k = crate::tasks::kernels::common::KernelBuild {
-        rebuild: args.rebuild,
-        now: args.now,
-        autofix: crate::tasks::kernels::common::AutoFixOptions {
-            enabled: args.autofix,
-            attempts: args.autofix_attempts,
-            prompt_file: args.autofix_prompt_file,
-            llm_profile: args.llm_profile,
-        },
-    };
-    for distro in &distros {
-        if args.prebuilt {
-            crate::tasks::kernels::prebuilt::run(distro, args.rebuild)?;
-        } else {
-            crate::tasks::kernels::build::run(distro, &k)?;
-        }
-    }
     Ok(())
 }
