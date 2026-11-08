@@ -9,6 +9,7 @@ members = [
     "tools/recipe",
     "tools/recinit",
     "tools/recstrap",
+    "tools/recstrap/target-root",
     "tools/recuki",
     "tools/reciso",
     "tools/recab",

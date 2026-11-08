@@ -1538,6 +1538,7 @@ dependencies = [
  "schemars",
  "serde",
  "serde_json",
+ "target-root",
  "tempfile",
  "ts-rs",
 ]
@@ -1549,6 +1550,7 @@ dependencies = [
  "anyhow",
  "clap",
  "flate2",
+ "target-root",
  "tempfile",
  "walkdir",
 ]
@@ -1573,6 +1575,7 @@ dependencies = [
  "schemars",
  "serde",
  "serde_json",
+ "target-root",
  "tempfile",
  "ts-rs",
 ]
@@ -1605,6 +1608,7 @@ dependencies = [
  "schemars",
  "serde",
  "serde_json",
+ "target-root",
  "tempfile",
  "ts-rs",
 ]
@@ -2198,6 +2202,13 @@ dependencies = [
  "filetime",
  "libc",
  "xattr",
+]
+
+[[package]]
+name = "target-root"
+version = "0.2.0"
+dependencies = [
+ "libc",
 ]
 
 [[package]]

@@ -271,8 +271,7 @@ cargo run -q -p recinit -- build-tiny \
     --busybox "$BUSYBOX_PATH" \
     --output "$INITRAMFS_LIVE_PATH" \
     --iso-label "$ISO_LABEL" \
-    --set "BOOT_BANNER=${OS_NAME} ${PRODUCT_BOOT_LABEL} initramfs starting..." \
-    --set "PRODUCT_TAG=${PRODUCT_ARTIFACT_TAG}"
+    --boot-banner "${OS_NAME} ${PRODUCT_BOOT_LABEL} initramfs starting..."
 need_file "$INITRAMFS_LIVE_PATH"
 
 # Built from the same rootfs the ISO installs, so its systemd, udev and modules match the
