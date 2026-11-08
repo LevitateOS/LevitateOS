@@ -366,3 +366,17 @@ returns needs_work; that fixture is not a successful install/publication receipt
 Do not hide or count that overall failure. The real TUI producer has hash/marker
 readiness and is running the complete path. Its next result, not that diagnostic
 phase alone, determines producer acceptance.
+
+The full GNU producer with 32,768 objects completes its frozen 98-package acquire
+and acknowledges its checkpoint, then compilation fails resolving transitive
+packages under Bun's isolated linker layout. Native compilation of the same
+source/lock/layout succeeds (567 modules, `tui-native-compile-control.json`);
+that native output is diagnostic only and is never a product input. Pinned Bun
+`src/resolver/lib.rs` opens symlink targets using Linux O_PATH in this path;
+configured Ginux does not implement O_PATH. The user explicitly chose **use and
+verify a hoisted TUI layout**, rather than adding configured path descriptors.
+O_PATH stays unsupported; no such kernel expansion is authorized or implemented.
+The producer now explicitly passes `--linker=hoisted`; its full run is
+`tui-system-producer-gnu-hoisted`. No success is claimed before it completes.
+Workspace TypeScript configs are self-contained and already copied; the
+speculative extra root-config input was removed before executing the caller.
