@@ -21,13 +21,28 @@ repository instructions and this checkpoint after a context shift. Root
 instructions prohibit mandatory process gates and Recipe unit tests; existing
 CLI/integration/product owners provide verification.
 
+Current local pair: Ginux `b81f30b52e523d142071603f477c6891c7fd9df9`
+adds only retained tests after runtime commit `3cd1e2de`; its clean exact rebuild
+remains launcher `fb87792d5b4363ca669d20935ce6f3d3f6d08fb97ee0cdc74e60bc324c200e6e`.
+Recipe is clean `91068391cdc7e0e8ef10c59e2b8b1bcc65521554`, matching CLI/worker
+`467140e9b036a8ed20b58f87020ad7a63cfe7c68d311dc8e19cfe51c464cf9ef`;
+image remains `ffe04d86…`. Standalone fresh GNU/musl production passes. The
+cached-dependency manual-readiness correction passes old-fail/new-pass, all
+13 NEEDS and four dependency cases. Explicit dependent-recipe remove/cleanup
+remains unresolved by user decision; it is not repaired or accepted here.
+The corrected builder is still uncommitted pending real product completion.
+Both product builds are running; no new full ISO/guest/install/A/B pass is claimed.
+Returned Daybreak follow-up has 743 verified evidence files and 20/20 selected
+Recipe passes, including paired non-success publication rejection. All six
+security items and S09-A–H remain partial. See the latest checkpoint below.
+
 Evidence is under `.artifacts/ginux-contribution-preparation/prd15/`.
 `sources-initial.json` and adjacent patches pin the initial checkout, including
 pre-existing local edits. Shared staging is preserved. Current builder/contract/
 xtask and their linked consumers compile with `cargo build --locked -p
 levitate-xtask` (`caller-build.log`). This establishes compilation only.
 
-Recipe documentation is committed at `cca5bb7` (preceded by `a53c247`) over candidate
+Initial-baseline Recipe documentation was committed at `cca5bb7` (preceded by `a53c247`) over candidate
 `124f378063ce449e3799aad9b43dfac9404754f1` (production Rust unchanged); configured
 Ginux is `a498e4f6148d5d94ce4ba8edb79588b7883f6a0f`. The PRD14 compiler and
 acquisition images are respectively `a8edd8fa…` and `ffe04d86…`; their durable
@@ -501,3 +516,80 @@ standalone producer/readiness/reuse and both real product chains with one final
 matching CLI/worker. Continue both session-libvirt/PTY/install/A/B checks and
 obtain outstanding authorized final-source security results before closure.
 PRD15/19 remains open; no publication occurred. Shared staging is preserved.
+
+
+### 2026-11-09 continuation: exact pair, retained tests and second Daybreak receipt
+
+Recipe's manual-readiness correction is committed at `91068391` and clean. Its
+exact committed release rebuild matches sealed CLI/worker `467140e9` byte for
+byte (`recipe-manual-cache-final-source.json`). The old CLI fails the new managed
+regression; the corrected CLI passes it and all **13 NEEDS + four dependency**
+cases. Formatting and strict Clippy pass. The author/operator/interface/man
+contract is updated; the manual renders without warnings. The user separately
+chose **keep explicit dependent-recipe remove/cleanup unresolved for a separate
+decision**. That known cache-selection gap is documented and not implemented.
+Automatic cleanup inside install is unchanged.
+
+The user returned [Daybreak's follow-up receipts](/home/vince/.codex/worktrees/prd15-owned-fd-path/ginux-prd11/.artifacts/prd15/daybreak-followup-2026-11-09/receipts.md).
+Read-only manifest verification passes **743/743**. On the exact 3cd1e2de/91068391
+pair, **20/20** selected whole-coordinator tests, four pre-authority endpoint
+negatives and additional Ginux task/thread/TCP/pipe controls pass. A paired
+runtime control supplies a complete actual Ginux archive plus authoritative
+supervisor-error/nonzero exit; Recipe refuses final publication. Its retained
+checkpoint is correctly distinct from a final product. The wrapper controls the
+consumer decision; it is not a real post-link kernel-close error. Source review
+resolves the later one-address-per-host overflow branch as publicly unreachable
+under the eight-declaration limit. These two earlier gaps have concrete new
+evidence; all six security items and S09-A–H **still remain partial**. Remaining
+race, ownership, transfer, persistence, TLS, transport, resource/identity and
+lease criteria in that receipt remain open. No security permission transfers here.
+
+The retained-test gaps now have local ports without runtime changes:
+
+- T-01: `03d4e00948e5df02d58e3cb19f1439dd4991d7c7` puts the exact previously
+  test-only shared-offset/native-FD-reuse mmap oracle into the tracked FD fixture.
+  Source SHA-256 `81092713ffccd80b852441b3ae5346f1ee5dea087934ffb61c365aeb5566ca8b`
+  matches Daybreak's donor; the ordinary FD runner passes.
+- T-02/T-03: `b81f30b52e523d142071603f477c6891c7fd9df9` retains the full
+  9,000-byte patterned copy-up and error after 4,096, provisional slot recovery,
+  and added preservation of an already-open image description's bytes/offset/
+  metadata. It also carries all six upstream #234 orphan model cases verbatim,
+  alongside the current aggregate tests. All **44 VFS and 25 process** units pass
+  under the explicit Ginux-only unit-test exception. These are owner-model
+  results, not new adversarial runtime/race acceptance.
+- `.artifacts/prd15/functional-t01/retained-ports-receipt.json` in the Ginux
+  worktree binds the source, tests and unchanged production prefixes. The exact
+  b81f30b5 release rebuild still hashes to `fb87792d`. Prior direct-Ginux receipts
+  retain their exact runtime code/binary identity through this test-only change.
+  Final typed-storage/delivery joins still require their own reconciliation.
+
+Fresh GNU and musl graphs both pass on the corrected 91068391 CLI/worker
+(`tui-system-{gnu,musl}-manual-cache.json`), each with frozen 106-package hoisted
+acquisition, 567-module compile, checked output and clean completion. Explicit
+installed checks on these same destinations are running or completing under
+`tui-system-{gnu,musl}-manual-cache-readiness`; inspect final receipts before
+counting them. Actual Acorn source preparation now preserves confined fixture
+links, completes managed acquisition and compiles/publishes its TUI workload;
+coordinator/product completion is still pending. Both previous full caller runs
+failed at the source-link rejection and remain failed. The older mutable-xtask
+wrapper may also reject its changed executable hash; no pass is inferred.
+
+Current product verification uses sealed `bin/distro-builder-manual-cache-1`
+SHA-256 `4d5928b73c54c8d2a692fe3f31bd9a9b055977d4ef304abc1cfd1b582adebfc4`;
+`manual-cache-product-sources.json` captures its source/recipe inputs. It calls
+the actual builder grammar directly, equivalent to xtask's typed builder call,
+so later Cargo rebuilds cannot mutate the selected caller executable. No host
+Bun or host node_modules is imported. `base-rootfs-{acorn,levitate}-manual-cache`
+are still running on the one sealed Ginux/Recipe/image combination. Their actual
+pinned APK/RPM paths and prebuilt kernels are retained. On 2026-11-09 read-only
+remote checks still report upstream main `53a54addea67969abaa240ea478def1b94130eee`
+and maintained main `28f4368f6fd70d0e485386892a08d6734b5988dd`; no upstream/source
+publication was performed.
+
+Exact next action: inspect those two product and two readiness final receipts,
+run successful fresh-coordinator TUI reuse, complete both product chains and
+session-libvirt/PTY/install/A/B acceptance, and finish required exact-source
+security verification through Daybreak. Preserve the open remove/cleanup decision
+and final-source/delivery dependencies; no checkbox or partial receipt closes
+PRD15/19. Shared staged queue/handoff SHA-256 remains
+`f4d8c81be2612a4d8d472564b25c7ffab6e7043e06b0f2b2176cba78dad5a47e`.

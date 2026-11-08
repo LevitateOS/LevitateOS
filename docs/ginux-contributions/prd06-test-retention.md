@@ -6,7 +6,23 @@ fixture version, source ID, line/hash, owner and replacement. Exact source objec
 and the tracked historical patches remain available. PRD05/PRD07 must carry the
 following oracles into the actual integrated candidate.
 
-## Required ports that current source does not contain
+## Latest local port disposition (2026-11-09)
+
+Local candidate `b81f30b52e523d142071603f477c6891c7fd9df9` now contains all three
+required ports below. T-01 landed at `03d4e009`, source-identical to Daybreak's
+verified test-only oracle; the tracked FD runner passes. T-02 retains the full
+9,000-byte/after-4,096 failure and storage-slot reuse oracle and additionally
+checks a preexisting image description's metadata/offset/bytes on failure.
+T-03 retains all six upstream #234 model tests verbatim alongside the current
+aggregate cases. The VFS/process suites pass 44/25 cases. No production prefix
+or launcher bytes changed; launcher remains `fb87792d`. Source and results are
+bound in the Ginux worktree's `.artifacts/prd15/functional-t01/retained-ports-receipt.json`.
+These local ports close the tracked-fixture omissions on this candidate, not
+security/race, upstream-merge or final typed-storage/delivery acceptance. The
+[PRD15 checkpoint](prd15-product-contract.md) records the exact pair and limits.
+The versioned inventory below retains its original source snapshot.
+
+## Original required ports (before the local candidate above)
 
 **T-01, G12 public-alias mapping offset.** Historical
 `3fac8e0598193218d6bcda4d7e0813ee60d96238`,
