@@ -10,7 +10,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use super::base::{curl, read_locked, rel, sha256_file};
+use super::base::{Layer, curl, read_locked, rel, sha256_file};
 use crate::cli::Distro;
 use distro_contract::profile::PackageBackend;
 
@@ -105,9 +105,8 @@ impl Index {
             .expect("candidates are never empty")
     }
 
-    /// The closure of `wanted`, as package indexes by name.
-    fn resolve(&self, wanted: &[String]) -> Result<BTreeMap<String, usize>> {
-        let mut chosen: BTreeMap<String, usize> = BTreeMap::new();
+    /// The closure of `wanted` over `chosen`, as package indexes by name.
+    fn resolve(&self, wanted: &[String], mut chosen: BTreeMap<String, usize>) -> Result<BTreeMap<String, usize>> {
         let satisfied = |chosen: &BTreeMap<String, usize>, n: &str| {
             chosen.contains_key(n)
                 || chosen
@@ -179,53 +178,64 @@ pub fn lock(root: &Path, distro: &Distro, bundle: &distro_contract::Variant, che
     let mirror = format!("{MIRROR}/{release}");
     let tmp = tempfile::tempdir()?;
     let index = fetch_index(tmp.path(), &mirror)?;
-    let chosen = index.resolve(&base.packages)?;
+    let base_set = index.resolve(&base.packages, BTreeMap::new())?;
+    let mut desktop_set = index.resolve(&bundle.contract.desktop.packages, base_set.clone())?;
+    desktop_set.retain(|n, _| !base_set.contains_key(n));
     let apk_tools = index
         .by_name
         .get("apk-tools-static")
         .map(|c| index.latest(c))
         .with_context(|| format!("{release} has no apk-tools-static"))?;
-
-    let rows: Vec<(&str, String, String)> = chosen
-        .iter()
-        .map(|(name, &i)| row(&index.pkgs[i], &mirror).map(|(nv, url)| (name.as_str(), nv, url)))
-        .collect::<Result<_>>()?;
-    let path = super::base::lock_path(root, distro, PackageBackend::Apk);
-    let locked = read_locked(&path);
-    let changes = report_changes(&locked, &rows);
-
-    if check {
-        if changes == 0 {
-            println!("{} is current with Alpine {release}", rel(root, &path));
-            return Ok(());
-        }
-        bail!("{changes} package(s) differ from the lock; run cargo xtask base lock {}", distro.id());
-    }
-
-    let cache = root.join(".artifacts/apk-cache").join(release);
-    fs::create_dir_all(&cache)?;
     let (tools_nv, tools_url) = row(&index.pkgs[apk_tools], &mirror)?;
-    let mut downloads = Vec::new();
-    for url in std::iter::once(&tools_url).chain(rows.iter().map(|r| &r.2)) {
-        let file = cache.join(url.rsplit('/').next().unwrap_or(url));
-        if !file.is_file() {
-            let partial = file.with_extension("part");
-            curl(url, &partial)?;
-            fs::rename(&partial, &file)?;
+
+    let mut stale = 0;
+    for (layer, set) in [(Layer::Base, &base_set), (Layer::Desktop, &desktop_set)] {
+        let rows: Vec<(&str, String, String)> = set
+            .iter()
+            .map(|(name, &i)| row(&index.pkgs[i], &mirror).map(|(nv, url)| (name.as_str(), nv, url)))
+            .collect::<Result<_>>()?;
+        let path = super::base::lock_path(root, distro, PackageBackend::Apk, layer);
+        let locked = read_locked(&path);
+        let changes = report_changes(&locked, &rows);
+
+        if check {
+            if changes == 0 {
+                println!("{} is current with Alpine {release}", rel(root, &path));
+            }
+            stale += changes;
+            continue;
         }
-        downloads.push((url.clone(), sha256_file(&file)?, file));
-    }
 
-    let key = bundle.path(&base.signing_key);
-    let keys_dir = key.parent().context("signing key has no directory")?.canonicalize()?;
-    verify(&keys_dir, tmp.path(), &mirror, &downloads)?;
+        let cache = root.join(".artifacts/apk-cache").join(release);
+        fs::create_dir_all(&cache)?;
+        let mut downloads = Vec::new();
+        for url in std::iter::once(&tools_url).chain(rows.iter().map(|r| &r.2)) {
+            let file = cache.join(url.rsplit('/').next().unwrap_or(url));
+            if !file.is_file() {
+                let partial = file.with_extension("part");
+                curl(url, &partial)?;
+                fs::rename(&partial, &file)?;
+            }
+            downloads.push((url.clone(), sha256_file(&file)?, file));
+        }
 
-    let pem = fs::read_to_string(&key).with_context(|| format!("reading {}", key.display()))?;
-    let key_name = key.file_name().unwrap_or_default().to_string_lossy().into_owned();
-    let sha_of = |url: &str| downloads.iter().find(|d| d.0 == url).map(|d| d.1.clone()).unwrap_or_default();
-    fs::write(&path, render_lock(distro, release, &mirror, (&key_name, &pem), (&tools_nv, &tools_url, &sha_of(&tools_url)), &rows, &sha_of)?)
+        let key = bundle.path(&base.signing_key);
+        let keys_dir = key.parent().context("signing key has no directory")?.canonicalize()?;
+        verify(&keys_dir, tmp.path(), &mirror, &downloads)?;
+
+        let pem = fs::read_to_string(&key).with_context(|| format!("reading {}", key.display()))?;
+        let key_name = key.file_name().unwrap_or_default().to_string_lossy().into_owned();
+        let sha_of = |url: &str| downloads.iter().find(|d| d.0 == url).map(|d| d.1.clone()).unwrap_or_default();
+        fs::write(
+            &path,
+            render_lock(distro, layer, release, &mirror, (&key_name, &pem), (&tools_nv, &tools_url, &sha_of(&tools_url)), &rows, &sha_of)?,
+        )
         .with_context(|| format!("writing {}", path.display()))?;
-    println!("wrote {} ({} packages, {changes} changed)", rel(root, &path), rows.len());
+        println!("wrote {} ({} packages, {changes} changed)", rel(root, &path), rows.len());
+    }
+    if stale > 0 {
+        bail!("{stale} package(s) differ from the locks; run cargo xtask base lock {}", distro.id());
+    }
     Ok(())
 }
 
@@ -306,6 +316,7 @@ fn verify(keys_dir: &Path, tmp: &Path, mirror: &str, downloads: &[(String, Strin
 
 fn render_lock(
     distro: &Distro,
+    layer: Layer,
     release: &str,
     mirror: &str,
     key: (&str, &str),
@@ -316,7 +327,7 @@ fn render_lock(
     let today = String::from_utf8(Command::new("date").arg("+%F").output()?.stdout)?;
     let mut text = format!(
         "// Generated by `cargo xtask base lock {id}` from the Alpine {release} main and\n\
-         // community repositories: the variant's packages and everything they need,\n\
+         // community repositories: {what},\n\
          // as apk resolves them (dependencies, provides, install_if). Every APK\n\
          // verified against the release signing key below. Do not edit: rerun the\n\
          // command.\n\
@@ -334,6 +345,10 @@ fn render_lock(
          // [name, name-version, URL, SHA256]\n\
          fn packages() {{\n    [\n",
         id = distro.id(),
+        what = match layer {
+            Layer::Base => "the variant's packages and everything they need",
+            Layer::Desktop => "what the desktop packages need beyond the base lock",
+        },
         date = today.trim(),
         key_name = key.0,
         pem = key.1.replace('\n', "\\n"),

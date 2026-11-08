@@ -164,8 +164,9 @@ fn checks(root: &Path) -> Vec<Check> {
     checks
 }
 
-/// How current a variant's base lock is, for either package backend.
+/// How current a variant's locks (base and desktop) are, for either package backend.
 fn base_lock_check(root: &Path, distro: &Distro) -> Option<Check> {
+    use crate::tasks::base::Layer;
     let contract = distro_contract::load(root, distro.id()).ok()?.contract;
     let base = &contract.sources.rootfs_source.base;
     let asked = base.release.clone();
@@ -174,38 +175,53 @@ fn base_lock_check(root: &Path, distro: &Distro) -> Option<Check> {
         distro_contract::profile::PackageBackend::Apk => "Alpine",
     };
     let fix = format!("cargo xtask base lock {}", distro.id());
-    let path = crate::tasks::base::lock_path(root, distro, contract.profile.packages);
-    let name = format!("{} {what} base lock", distro.id());
-    let Ok(text) = std::fs::read_to_string(&path) else {
-        return Some(Check::new(name, true, Err(("missing".into(), fix))));
-    };
-    let field = |f: &str| {
-        text.lines()
-            .find_map(|l| l.trim().strip_prefix(&format!("fn {f}() {{ "))?.strip_suffix(" }"))
-            .map(|v| v.trim_matches('"').to_string())
-    };
-    let release = field("release").unwrap_or_default();
-    if release != asked {
-        return Some(Check::new(
-            name,
-            true,
-            Err((format!("locks {what} {release}, the contract asks for {asked}"), fix)),
-        ));
+    let name = format!("{} {what} locks", distro.id());
+    let mut oldest: Option<i64> = None;
+    let mut locked_on_oldest = String::new();
+    for layer in Layer::ALL {
+        let path = crate::tasks::base::lock_path(root, distro, contract.profile.packages, layer);
+        let Ok(text) = std::fs::read_to_string(&path) else {
+            return Some(Check::new(name, true, Err((format!("{} lock missing", layer.name()), fix))));
+        };
+        let field = |f: &str| {
+            text.lines()
+                .find_map(|l| l.trim().strip_prefix(&format!("fn {f}() {{ "))?.strip_suffix(" }"))
+                .map(|v| v.trim_matches('"').to_string())
+        };
+        let release = field("release").unwrap_or_default();
+        if release != asked {
+            return Some(Check::new(
+                name,
+                true,
+                Err((format!("{} lock is {what} {release}, the contract asks for {asked}", layer.name()), fix)),
+            ));
+        }
+        let locked_on = field("locked_on").unwrap_or_default();
+        let then = std::process::Command::new("date")
+            .args(["-d", &locked_on, "+%s"])
+            .output()
+            .ok()
+            .and_then(|o| String::from_utf8(o.stdout).ok()?.trim().parse::<i64>().ok());
+        let Some(then) = then else {
+            return Some(Check::new(name, false, Err((format!("cannot read the lock date in {}", path.display()), fix))));
+        };
+        if oldest.is_none_or(|o| then < o) {
+            oldest = Some(then);
+            locked_on_oldest = locked_on;
+        }
     }
-    let locked_on = field("locked_on").unwrap_or_default();
-    let age_days = std::process::Command::new("date")
-        .args(["-d", &locked_on, "+%s"])
-        .output()
-        .ok()
-        .and_then(|o| String::from_utf8(o.stdout).ok()?.trim().parse::<i64>().ok())
-        .map(|then| (std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs() as i64).unwrap_or(then) - then) / 86_400);
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs() as i64)
+        .unwrap_or(0);
+    let days = (now - oldest.unwrap_or(now)) / 86_400;
     Some(Check::new(
         name,
         false,
-        match age_days {
-            Some(days) if days <= 30 => Ok(format!("{what} {release}, locked {locked_on}")),
-            Some(days) => Err((format!("{what} {release}, locked {days} days ago; updates are likely waiting"), fix)),
-            None => Err((format!("cannot read the lock date in {}", path.display()), fix)),
+        if days <= 30 {
+            Ok(format!("{what} {asked}, base + desktop, locked {locked_on_oldest}"))
+        } else {
+            Err((format!("{what} {asked}, locked {days} days ago; updates are likely waiting"), fix))
         },
     ))
 }

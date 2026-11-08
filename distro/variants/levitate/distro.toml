@@ -31,10 +31,14 @@ kernel_line = "lts"
 recipe_script = "distro/builder/recipes/fedora-rpm-source-rootfs.rhai"
 preseed_recipe_script = "distro/builder/recipes/fedora-rpm-preseed.rhai"
 
-# What the rootfs takes from Fedora 45; `cargo xtask base lock levitate` locks it.
+# What the rootfs takes from Fedora 45; `cargo xtask base lock levitate` locks
+# it with every dependency.
 [sources.rootfs_source.base]
 release = "45"
 signing_key = "keys/RPM-GPG-KEY-fedora-45-primary"
+# The image writes its own os-release; `setup` asks for a `system-release`
+# package, which would pull fedora-release and its repo files.
+provided_elsewhere = ["system-release"]
 packages = [
   # Root filesystem skeleton and core runtime.
   "filesystem",
@@ -158,8 +162,8 @@ packages = [
   "zlib-ng-compat",
   "xz-libs",
   "procps-ng",
-  # Shared libraries the packages above load: the lock adds no dependencies
-  # (yet), so each is named here.
+  # Shared libraries the packages above load. The lock resolves them as
+  # dependencies, so naming them is redundant.
   "systemd-shared",
   "cryptsetup-libs",
   "device-mapper-libs",
