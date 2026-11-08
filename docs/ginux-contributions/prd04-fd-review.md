@@ -1,10 +1,24 @@
 # PRD04 — storage and descriptor findings (in progress)
 
-**PRD04 remains open pending authorized Daybreak verification.** The user will
-obtain Daybreak results; this chat has not executed the requested security probes.
+**PRD04 remains open after a failed authorized Daybreak item 5.** Returned
+results are reconciled below; this chat has not executed the security probes.
 The [pinned request](prd04-daybreak-request.md) supplies the exact candidate,
 comparison source, all recorded failure criteria and required receipts. No
 publication or runtime/gitlink replacement is authorized by this preparation.
+
+## Returned Daybreak result — 2026-11-08
+
+Daybreak completed the [six-item verification](/home/vince/levitate-development/ginux-prd04/.artifacts/prd04/daybreak-2026-11-08/receipts.md)
+on unchanged `5449e2a1`: items 1–4 and selected item 6 controls pass, including
+the ABI adjudication, policy red/green, original inherited-budget cases,
+assignment prefixes and valid small-stack controls. **Item 5 remains failed:**
+a final backing-close error returns structured supervisor-error but leaves a
+complete 2,560-byte export at its requested final path. Export runs before
+backing teardown discovers that error. The user requested a separate correction
+without changing this pinned candidate, then a new revision/binary hash and
+focused authorized Daybreak retest. No correction or retest has occurred yet;
+PRD04 remains open. The latest user task is PRD06 reconciliation, which must
+retain this defect explicitly rather than hiding it behind these selected passes.
 
 ## Exact source and local corrections
 
@@ -18,7 +32,7 @@ This is a local integration correction, not the future PRD05 merged-source join.
 | Commit | Correction and owner |
 | --- | --- |
 | `75d5dcc3` | [Configured startup](/home/vince/levitate-development/ginux-prd04/crates/ginux-init/src/launch.rs:539) closes undeclared inherited FDs before private reservation; keeps stdio, explicit coordinator channel and result. Captured public limits, storage/object capacities and host hard limits are unchanged. |
-| `e91bba31` | [Semantic classification](/home/vince/levitate-development/ginux-prd04/crates/ginux-init/src/launch.rs:1400) includes regular read/readv after console/TCP identity. The actual table lookup still narrows Linux FD arguments to 32 bits. A real low/high-bit denial fixture is built, awaiting Daybreak execution. |
+| `e91bba31` | [Semantic classification](/home/vince/levitate-development/ginux-prd04/crates/ginux-init/src/launch.rs:1400) includes regular read/readv after console/TCP identity. The actual table lookup still narrows Linux FD arguments to 32 bits. Returned Daybreak low/high-bit red/green and private-handle controls pass. |
 | `eb4a342e` | [Assignment check](/home/vince/levitate-development/ginux-prd04/crates/ginux-init/src/fs_hooks.rs:202) ports PRD03's no-symlink/no-file prefix precondition to the integration before restore/init, preserving the existing namespace, argument-hold, mappings and exec owners. |
 | `5449e2a1` | [Memory backing cleanup](/home/vince/levitate-development/ginux-prd04/crates/ginux-init/src/storage_memory.rs:103) latches a failed close instead of panicking. [Resume](/home/vince/levitate-development/ginux-prd04/crates/ginux-init/src/launch_tasks.rs:682) stops before guest continuation; teardown propagates the error through the existing structured completion path. No numeric close retry. |
 
@@ -86,11 +100,11 @@ In `.artifacts/prd04/` under the candidate worktree:
 No high-bit/private-FD probe, assignment-prefix security runner, inherited-pressure
 probe or close-error injection was executed in this chat. The user selected
 Daybreak rather than authorizing a verifier here. No required product decision
-is currently missing; exact-source security results are the outstanding input.
-The queue stays unchecked until those results support each disposition above.
+is currently missing. Returned verification found F-01; its separate correction
+and focused authorized retest are outstanding. The queue stays unchecked.
 
 Active skill: `hdae-development` at `.agents/skills/hdae-development/SKILL.md`.
 Reload the complete skill, required reference, applicable instructions and current
-queue after a context shift. Exact next action: receive the Daybreak receipts,
-inspect their identities/oracles, correct any genuine remaining failure and
-request the corresponding authorized retest before closure.
+queue after a context shift. Exact next action: correct final export publication
+in a separate revision, preserve frozen `5449e2a1`, provide source/binary hashes
+and request focused authorized Daybreak item-5/affected-export retest before closure.

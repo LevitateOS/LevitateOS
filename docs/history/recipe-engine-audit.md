@@ -1,5 +1,9 @@
 # Recipe Engine Audit — 2026-02-10
 
+> Historical audit. These checkboxes and the old WONTFIX are not current
+> acceptance. See [PRD06 reconciliation](../ginux-contributions/prd06-reconciliation.md#all-historical-recipe-audit-findings)
+> for all 13 current dispositions, exact-source evidence and open work.
+
 Bug and gap audit of `tools/recipe/` and related recipe infrastructure.
 
 ## Critical

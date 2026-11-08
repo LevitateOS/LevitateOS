@@ -1,5 +1,10 @@
 # Remaining-change reconciliation — P03
 
+Historical source snapshot. [PRD06](prd06-reconciliation.md) supersedes its
+current-status implications: shared offsets belong to pending #232/PRD03, live
+copy-up identity is corrected in PRD03, and the missing alias-offset test remains
+explicit T-01. Retain the original evidence and failed-source receipts below.
+
 P03 complete as inventory/classification, against upstream `3f2fe7df` and local
 integration `7cf2638a`. Full candidate source review and acceptance remain pending.
 [Catalog](p03-catalog.json) assigns all66 integration commits,49 additional commits
