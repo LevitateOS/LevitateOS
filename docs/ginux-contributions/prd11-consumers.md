@@ -103,7 +103,9 @@ Fixture failures were corrected rather than hidden:
   diagnostics are absent from the final source and normal audit bounds remain.
 - The Recipe build reused an existing build cache. Its old PRD18 executable
   bytes were preserved and restored at their historical path; SHA-256 remains
-  `470e3bb2…`. New runs use only the separate immutable corrected binary.
+  `470e3bb2…`. The affected Cargo binary fingerprint was invalidated so a future
+  current-source build must relink instead of reusing those restored historical
+  bytes. New runs use only the separate immutable corrected binary.
 
 ## Checks, reproduction and remaining delivery dependency
 
