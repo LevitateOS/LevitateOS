@@ -187,7 +187,7 @@ export function distroByOsId(osId: string): Distro | undefined {
 
 /// The packages whose CLIs the docs site shows (`--help` of every binary each
 /// builds, as `cargo metadata` lists them).
-const DOCUMENTED_PACKAGES: &[&str] = &["recab", "recinit", "reciso", "recpart", "recstrap", "recuki"];
+const DOCUMENTED_PACKAGES: &[&str] = &["recab", "recinit", "reciso", "recpart", "recstrap"];
 
 /// Each documented package's binaries, from `cargo metadata`.
 fn documented_binaries(root: &Path) -> Result<Vec<String>> {

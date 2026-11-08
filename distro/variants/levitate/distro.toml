@@ -249,6 +249,3 @@ packages = [
   "google-noto-sans-mono-fonts", "google-noto-color-emoji-fonts", "NetworkManager-wifi",
   "wpa_supplicant", "firefox", "systemd-pam",
 ]
-
-[installed]
-initramfs = true

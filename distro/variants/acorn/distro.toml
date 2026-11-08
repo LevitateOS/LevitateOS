@@ -116,7 +116,3 @@ packages = [
   "wireplumber", "pipewire-pulse", "pipewire-alsa", "networkmanager", "networkmanager-wifi",
   "network-manager-applet", "breeze-icons", "font-noto", "firefox",
 ]
-
-# Boots through the same busybox initramfs recinit builds for every variant.
-[installed]
-initramfs = true
