@@ -3050,3 +3050,51 @@ These are the reference failures for the final comparison (`.artifacts/untangle-
   - **Mistake to undo:** a push of the builder to `HEAD:master` created a stray branch `master` on `LevitateOS/distro-builder` (its branch is `main`, which also has `8f8e455`). Deleting it was refused by the permission classifier; the user needs to run `git -C distro/builder push origin --delete master`.
   - **Housekeeping (G11):** the builder was also pushed to a stray remote branch `master` on LevitateOS/distro-builder (its branch is `main`). Deleting it is left to the user (`git -C distro/builder push origin --delete master`).
   - **Daytime batch additions:** rebuild and republish both kernels under the converged policy (D8, about 30 min of `make -j8` each). Add `kernel-build/.config` to the runtime tarball so the config check also covers prebuilt kernels. Run Recipe's kernel e2e tests (root, about 27 min).
+- [x] G27 — One check sweep, run the same locally and in CI for both distros. superproject `64cfecd` (workflows, justfile, root `Cargo.toml`, `xtask/Cargo.toml`, `check.rs`, profile manifest, Cargo.lock line) and `9add8d5` (pointers). Submodules: contract `c742583`, builder `199113e` (install-split-pane manifest), recstrap `717f176` (target-root), recuki `cc4a5b4`, recpart `754516d`, recqemu `05ae9df`, recshuttle `79bb779`, fsdbg `7714a82`, install-tests `12d3464`, docs/content `20b3208`, docs/website `3e348b4`.
+  - **Sweep (`xtask/src/tasks/check.rs`):**
+    - Every step is recorded and the sweep never stops early. The tui_packages `?` is gone (XT3070).
+    - `cargo clippy --workspace --all-targets --exclude levitate-recipe -D warnings` is a step now (XT1007, XT1008).
+    - Guest scripts are the `#!/bin/sh` files under `guest/` (X089). Each one is parsed by `bash --posix -n` and by `busybox sh -n` (XT1116). Without busybox it falls back to `sh -n` and prints a note.
+    - Without bun, the JS steps print `[skip]` and the sweep exits with missing-prereq (code 3). cargo check, clippy and the guest-script parse still run (X088).
+    - The JS order is explicit: install, gen check, docs-content build, then each package from the root `package.json` `workspaces` (docs/website included). Each package runs each `PACKAGE_SCRIPTS` script (`typecheck`, `lint`, `format:check`) it defines, through one `command` helper (X086, X087, X093, XT1021).
+    - `install_js_workspace` runs `bun install --frozen-lockfile` once per xtask process, so gen, check tui and inspect reuse that one install (X103).
+    - The stale "Nothing runs it for you" doc is gone (XT1112).
+  - **CI (`.github/workflows`):**
+    - `ci.yml` has a `check` job (`cargo xtask check` + `cargo xtask check tui`, plus busybox) (X090, XT2132, XT3094). It also has a `products` matrix `[levitate, acorn]` (D14). The matrix runs `doctor --packages apt` for host packages, `build kernel --prebuilt`, `build rootfs-source`, every release product (from `status --json` `.artifacts` keys) and `test all --force`, then uploads the live-tools ISO path from `status --json` (XT1001, TV1177, PA3104, XT1009, TV1179, TV1178/XT1005: no hand overlay).
+    - `REC_BUILD_RELEASE`, `RECIPE_BINARY`, `-p levitate-recipe` and the per-crate clippy are gone (XT1002, XT1008).
+    - detect-changes adds an `any` type (every file except Markdown; superproject) and watches `**/bun.lock` and `**/package.json`. `base` is set explicitly: `event.before` for a push, the PR base for a pull request (XT1010, XT1011, XT1012).
+    - license-check checks out submodules and runs `check licenses` (XT1022, XT2140).
+    - rust-ci's MSRV defaults to the crate's `rust-version` through `cargo metadata` and keeps Cargo.lock (XT1014, XT1015).
+    - rust-release declares `version-bump` and `release-commit-prefix`, skips its own bump commits, and bumps with `cargo set-version` and `cargo metadata`. It stages with `git add -u`, and action-gh-release is v2 (XT1016–XT1019).
+    - bun-ci reads bun from `packageManager`, installs `--frozen-lockfile` and declares a `scripts` input (XT1020, XT1021, XT3094).
+    - docs/content and docs/website pin the workflows `@64cfecd…` (XT1013). install-tests' standalone CI is deleted (TI162).
+  - **Manifests:**
+    - `[workspace.dependencies]` sets anyhow, clap 4.5, flate2, libc, schemars, serde, serde_json, sha2, tempfile, toml, ts-rs, walkdir, which 7, portable-pty and vt100 (XT3088, XT3089).
+    - These members inherit them, plus edition, rust-version, license and authors: contract, install-split-pane, xtask (edition 2024 kept explicit), target-root, recuki, recpart, recqemu, recshuttle, fsdbg, install-tests and profile (X105, XT3087).
+    - xtask drops the unused `recshuttle` (X104).
+    - There are no per-crate lock files.
+    - `just check *args` covers `check tui`.
+  - **Verified:**
+    - Python yaml and actionlint 1.7.12 pass on all superproject and caller workflows (no shellcheck on host).
+    - A snapshot of HEAD plus these changes passes `cargo check --workspace --all-targets` and clippy on xtask.
+    - `cargo xtask check` in that snapshot ran every step:
+      - Its fails are real or from other sessions: clippy -D warnings (recqemu `WaitingFor` prefix, recab, fsdbg, contract), format:check of docs/content (generated `src/generated/index.ts` and `src/tool-help.ts`), base-system `pages.tsx` and recab-tui `recab-runner.ts`.
+      - gen also failed, on acorn `distro.toml` at line 61 against the HEAD contract.
+    - The real tree did not compile during the run (recab and builder work in progress elsewhere).
+    - busybox is not on the host, so `sh -n` was used.
+  - **Behaviour change:**
+    - CI builds and tests AcornOS too (about twice the time). `check` runs clippy, lint and format:check for every workspace package and parses guest scripts in two shells.
+    - CI runs `check tui`.
+    - CI xtask is the dev profile (`cargo xtask`).
+    - Super CI is triggered by any non-Markdown change.
+    - recipe's `workflow_dispatch` `version_bump` is no longer read: callers pass `version-bump`.
+  - **Left:**
+    - XT1147 (`[profile.release]` LTO; outside the sections I own) → G27 follow-up in the root `Cargo.toml`.
+    - `which` 5 vs 7: `distro/builder/Cargo.toml` has others' uncommitted edits, so builder, recinit, recstrap, reciso and recab are not switched to `workspace = true` (recab changed underfoot). install-tests' new `tempfile = "3"` and install-split-pane's `distro-contract` dep belong to other sessions.
+    - X110 (deny.toml OpenSSL; deny.toml has others' edits).
+    - XT3071 (gnu-smoke inline in rhai) → builder recipes.
+    - XT1113 and XT1132: `tui/check.rs` still runs typecheck, lint and format over the TUI packages and has its own `bun_run`. G21 can drop both and call `check::command`.
+    - XT1149, XT1150 and XT3093 (package.json and turbo.json; docs-owner decision).
+    - busybox should go into `HOST_TOOLS` so CI's explicit apt line can go.
+    - The matrix list `[levitate, acorn]` is static.
+    - TV-15's crate deletion is already done (rootfs-tests is gone). PA1114, PA1115 and TI15x belong to testing-static/ginux-boot.
