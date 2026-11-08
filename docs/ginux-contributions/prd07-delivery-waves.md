@@ -84,7 +84,18 @@ donor/test disposition includes the old image-device assertion replaced by the
 authorized default-hidden view. A further virtual `/dev/..` namespace mismatch
 is corrected with a pinned failing control and both symlink/file regressions;
 all ten device configurations pass. This remains a local dependent composition;
-G05 global/public ownership and G06 exec/task behavior still need their own joins.
+The G06 exec/task join remains outstanding.
+
+[G05 public descriptors and pipes](prd07-fds-review.md) is now locally extracted
+at `997ffae2` directly over G04. The full eighteen-file diff, donor/test
+disposition, reviewed failure paths and draft are recorded. Static checks,
+141 units, original Linux suites, all 40 storage cases, ten device, seven FD and
+six pipe configurations pass on that exact clean source. The port preserves
+modern directory anchors and #238 EPERM, fixes fcntl command-width ownership,
+prevents unsupported owned operations from using native backend integers, and
+verifies console-alias/redirected-stdout and file/pipe denials. G06/G07 child,
+exec and concurrent wakeup/argument holds remain required; this single-task
+candidate does not establish them or final-source Daybreak acceptance.
 
 The [local storage rehearsal](prd07-storage-rehearsal.md) now composes the
 reviewed fixes without waiting idle: foundation `04857f38` passes original CI
@@ -109,10 +120,13 @@ editing existing heads, comments, native policy or a source-packaging choice.
 
 Active skill: `hdae-development` at `.agents/skills/hdae-development/SKILL.md`.
 Reload the full skill, reference, instructions and current queue after context
-shift. Exact next action: extract and review G05's public descriptor/pipe owner
-onto local G04 `0bd9b4bb`, retaining the actual ABI/deny classification, all lower
-operator limits, partial-progress/cancellation and original fixtures. Then join
-G06 before G09b's full runtime. Preserve
+shift. Exact next action: extract and review G06's configured task/exec owner
+onto local G05 `997ffae2`, join #234 orphan accounting and carry the mature
+shared-argument/kernel-use holds when concurrency first becomes possible.
+Preserve birth rollback, per-task transactions, inherited descriptions, operator
+limits, signal-mask clearing and thread-directed SIGPIPE. Join G07's current
+owner rather than the obsolete partial snapshot before claiming concurrency.
+G06 is required before G09b's full runtime. Preserve
 G09a/T-02's 9,000-byte/4,096-byte rollback oracle; the clean
 `ginux-prd07-growable` worktree is reserved for that subsequent port. Retain the
 no-publication boundary. Resolve the

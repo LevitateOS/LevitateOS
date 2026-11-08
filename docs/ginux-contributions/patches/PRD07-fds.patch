@@ -1,0 +1,2015 @@
+diff --git a/.github/workflows/check.yml b/.github/workflows/check.yml
+index e77aa9cd..8043a736 100644
+--- a/.github/workflows/check.yml
++++ b/.github/workflows/check.yml
+@@ -24,10 +24,12 @@ jobs:
+     steps:
+       - uses: actions/checkout@v5
+       - run: rustup target add x86_64-unknown-linux-gnu
+-      - run: make build build-launch-fixture build-launch-storage-fixture build-launch-device-fixture build-process-fixtures build-gate1-fixture
++      - run: make build build-launch-fixture build-launch-storage-fixture build-launch-device-fixture build-launch-pipe-fixture build-launch-fd-fixture build-process-fixtures build-gate1-fixture
+       - run: sudo make test-launch
+       - run: sudo make test-launch-storage
+       - run: sudo make test-launch-devices
++      - run: sudo make test-launch-pipes
++      - run: sudo make test-launch-fds
+       - run: sudo make test-native-supervision
+       - run: make test-process-native
+       - run: sudo make test-gate1-setup
+diff --git a/Makefile b/Makefile
+index c84b7b59..56e2a228 100644
+--- a/Makefile
++++ b/Makefile
+@@ -288,3 +288,18 @@ build-launch-device-fixture:
+ 
+ test-launch-devices:
+ 	python3 scripts/test-launch-devices.py $(GINUX) .artifacts/launch/launch-device-fixture
++.PHONY: build-launch-pipe-fixture test-launch-pipes
++build-launch-pipe-fixture:
++	mkdir -p .artifacts/launch
++	$(CC) -nostdlib -static -fno-stack-protector -fno-builtin -O2 -Wall -Wextra -Werror tests/fixtures/launch-pipe-fixture.c -o .artifacts/launch/launch-pipe-fixture
++
++test-launch-pipes:
++	python3 scripts/test-launch-pipes.py $(GINUX) .artifacts/launch/launch-pipe-fixture
++
++.PHONY: build-launch-fd-fixture test-launch-fds
++build-launch-fd-fixture:
++	mkdir -p .artifacts/launch
++	$(CC) -nostdlib -static -fno-stack-protector -fno-builtin -O2 -Wall -Wextra -Werror tests/fixtures/launch-fd-fixture.c -o .artifacts/launch/launch-fd-fixture
++
++test-launch-fds:
++	python3 scripts/test-launch-fds.py $(GINUX) .artifacts/launch/launch-fd-fixture
+diff --git a/README.md b/README.md
+index a41b05c0..4e4055da 100644
+--- a/README.md
++++ b/README.md
+@@ -292,7 +292,8 @@ When started by root, it drops to host UID/GID 65534 before executing the
+ workload; otherwise it retains the caller’s non-root identity. The configuration
+ must select `backend = "ptrace-native"` and a compatible balanced contract.
+ Memory storage requires the explicit `configured-storage-v3` profile or
+-`[userspace.contract] catalog = 3`; device assignments are rejected.
++`[userspace.contract] catalog = 3`. The only supported device assignment is
++`null`; the virtual `/dev` is empty without it.
+ See `config/instance-storage.toml` for a complete launch example.
+ 
+ `[instance].workdir` is optional and defaults to `/work`; `/` is also supported.
+@@ -356,7 +357,7 @@ working directory inside an assignment is not created in the image. Paths must
+ be canonical and unique and cannot cover init, `/`, `/proc`, `/sys` or `/dev`;
+ at most eight are accepted, and none may pass through an image link or file
+ above its last component. Without assignments, image access stays read-only and
+-launch behaves exactly as before.
++the virtual device namespace still applies without memory assignments.
+ 
+ With assignments, the supervisor resolves every path call first, one component
+ at a time, in the kernel's order and with its search-permission rule for the
+@@ -382,7 +383,8 @@ fchdir and getdents64. Directory enumeration merges visible children; cookies
+ are meaningful only while the namespace is unchanged. Removed open directories
+ retain fstat identity but cannot anchor new path operations. Memory dup and
+ `F_DUPFD`/`F_DUPFD_CLOEXEC` share offsets and append status; close-on-exec is
+-descriptor-local. dup2/dup3 between memory and native descriptors remain unsupported.
++descriptor-local. The common public table supports dup2/dup3 across memory,
++native image, device and pipe owners, closing only the last backend alias.
+ 
+ Modes preserve 07777; new objects use fixed umask 022. Memory modes use a
+ common class: any read/write/search bit grants that operation, irrespective of
+@@ -396,8 +398,35 @@ mappings and execution of memory-created files. Capacity is 32 objects
+ Directories consume object capacity but no file-data slot. Unlinked data remains
+ allocated until its last open description closes.
+ 
+-Memory descriptors start at 1048576, and the bootstrap lowers the native
+-descriptor limits below that range. Copies to and from workload memory respect
++Configured launch allocates the lowest free public descriptor from a shared
++256-slot table, including stdio, immutable-image files, memory files, devices
++and pipes. Backend handles stay private. Native opens reserve a public slot
++before effects, and translated syscall arguments are restored at exit. The
++bootstrap lowers native soft/hard NOFILE limits to at most 256; an operator's
++lower inherited limits remain effective, and runtime NOFILE changes are denied.
++Native/memory directory anchors remain supported. Native file mappings are
++supported; owned file mappings and successful subsequent exec are not.
++Native locks, leases and signal ownership are denied, including the existing
++EPERM refusal of signal-driven IO. Unsupported owned descriptor operations
++return EOPNOTSUPP without sending a private handle to the kernel.
++
++Console identity follows the bootstrap open object through duplication; writing
++through redirected stdout uses its new owner's file authority. Other read/readv
++calls use filesystem read authority. Explicit console-input denial remains a
++startup refusal: the table does not prove all alternate input paths enforce it.
++
++Configured `pipe`/`pipe2` use supervisor memory: eight pipes of 65,536 bytes,
++with read/write direction, EOF, SIGPIPE, metadata, shared status flags and aliases.
++`pipe2` accepts only O_CLOEXEC/O_NONBLOCK. Transfers are bounded to 4,096 bytes
++per call, and writes of at most 4,096 bytes are atomic. Reads consume only bytes
++successfully copied out. Nonblocking empty/full IO returns EAGAIN. A blocking
++operation remains stopped at entry; this single-task stage cannot run a peer or
++promise signal interruption/restart. SIGKILL termination and reaping are covered.
++Multi-task wakeups, descriptor polling, inheritance and exec-time CLOEXEC
++retirement require later task integration. `pipe` requires the explicit
++`configured-balanced-v2` or `configured-storage-v3` contract; catalog 1 is unchanged.
++
++Copies to and from workload memory respect
+ its page protections, including partial copies. Data disappears at instance
+ teardown; there is no retention, export or storage quota.
+ 
+@@ -426,6 +455,8 @@ sudo make test-launch
+ sudo make test-native-supervision
+ make build-launch-storage-fixture
+ sudo make test-launch-storage
++make build-launch-device-fixture build-launch-pipe-fixture build-launch-fd-fixture
++sudo make test-launch-devices test-launch-pipes test-launch-fds
+ ```
+ 
+ ## Native process scenarios
+diff --git a/crates/ginux-init/src/channel_hooks.rs b/crates/ginux-init/src/channel_hooks.rs
+index 522d9bf7..291af5d8 100644
+--- a/crates/ginux-init/src/channel_hooks.rs
++++ b/crates/ginux-init/src/channel_hooks.rs
+@@ -1,9 +1,7 @@
+ //! Native channel-lane dispatch hooks.
+ //!
+-//! Owner: G-files/channel adapter lane (serialized with G-files changes).
+-//! Next task: G14 supplies the generic opaque transport the §4 frames ride
+-//! on. Until then every hook declines and the supervisor keeps its existing
+-//! behavior byte-identical.
++//! Native hooks decline without changing the balanced policy. Configured
++//! launch separately owns bounded anonymous pipes behind public descriptors.
+ 
+ /// Lane membership by syscall number. Reserved for G14.
+ pub const fn claims(syscall: u64) -> bool {
+@@ -17,3 +15,292 @@ pub fn claim(syscall: u64, rdi: u64, rsi: u64, rdx: u64) -> Option<i64> {
+     let _ = (syscall, rdi, rsi, rdx);
+     None
+ }
++use crate::launch_storage::{copy_memory, read_path, write_stat, Stat};
++use crate::supervisor::{syscall2, UserRegs, SYS_KILL};
++
++pub const PIPE_FD_BASE: u32 = 0x2000_0000;
++const FDS: usize = 2 * PIPES;
++const PIPES: usize = 8;
++const CAPACITY: usize = 65536;
++const IO_SIZE: usize = 4096;
++const CLOEXEC: u32 = 0o2000000;
++const NONBLOCK: u32 = 0o4000;
++const APPEND: u32 = 0o2000;
++
++#[derive(Clone, Copy)]
++struct Pipe {
++    live: bool,
++    data: [u8; CAPACITY],
++    head: usize,
++    len: usize,
++    readers: u16,
++    writers: u16,
++    read_flags: u32,
++    write_flags: u32,
++}
++
++impl Pipe {
++    const fn empty() -> Self {
++        Self {
++            live: false,
++            data: [0; CAPACITY],
++            head: 0,
++            len: 0,
++            readers: 0,
++            writers: 0,
++            read_flags: 0,
++            write_flags: 1,
++        }
++    }
++}
++
++#[derive(Clone, Copy)]
++struct PipeFd {
++    pipe: usize,
++    write: bool,
++}
++
++pub enum ChannelResult {
++    Ready(i64),
++    /// No bytes were consumed or published. The task must remain stopped until
++    /// peer progress, an interrupt, or termination; this is not guest EAGAIN.
++    Blocked {
++        fd: u32,
++    },
++}
++
++pub struct LaunchChannels {
++    pipes: [Pipe; PIPES],
++    descriptors: [Option<PipeFd>; FDS],
++}
++
++impl LaunchChannels {
++    pub const fn new() -> Self {
++        Self {
++            pipes: [Pipe::empty(); PIPES],
++            descriptors: [None; FDS],
++        }
++    }
++
++    pub fn claim(&mut self, pid: usize, r: &UserRegs) -> Option<ChannelResult> {
++        let fd = r.rdi as u32;
++        if !(PIPE_FD_BASE..PIPE_FD_BASE + FDS as u32).contains(&fd) {
++            return None;
++        }
++        let slot = (fd - PIPE_FD_BASE) as usize;
++        if matches!(r.orig_rax, 262 | 332) {
++            let flags = if r.orig_rax == 262 { r.r10 } else { r.rdx };
++            let path = if r.rsi == 0 && flags & 0x1000 != 0 {
++                ginux_instance::Text::from_bytes(b"").map_err(|_| -14)
++            } else {
++                read_path(pid, r.rsi)
++            };
++            match path {
++                Ok(path) if !path.is_empty() => return None, // Absolute paths ignore dirfd.
++                Err(error) => return Some(ChannelResult::Ready(error)),
++                _ => {}
++            }
++        } else if !matches!(
++            r.orig_rax,
++            0 | 1 | 3 | 5 | 8 | 16 | 17 | 18 | 19 | 20 | 32 | 33 | 72 | 74 | 75 | 77 | 91 | 292
++        ) {
++            return None;
++        }
++        let entry = match self.entry(slot) {
++            Ok(entry) => entry,
++            Err(error) => return Some(ChannelResult::Ready(error)),
++        };
++        if matches!(r.orig_rax, 0 | 1) {
++            return Some(match self.io(pid, slot, entry, r) {
++                Ok(result) => result,
++                Err(error) => ChannelResult::Ready(error),
++            });
++        }
++        let result = match r.orig_rax {
++            3 => {
++                self.close(slot);
++                Ok(0)
++            }
++            5 => Self::stat(pid, r.rsi, false, entry.pipe),
++            8 | 17 | 18 => Err(-29),
++            16 => Err(-25),
++            72 => match r.rsi {
++                3 => Ok(self.flags(entry) as i64),
++                4 if r.rdx & !((NONBLOCK | APPEND | 3) as u64) == 0 => {
++                    let flags = (r.rdx as u32 & (NONBLOCK | APPEND)) | u32::from(entry.write);
++                    if entry.write {
++                        self.pipes[entry.pipe].write_flags = flags;
++                    } else {
++                        self.pipes[entry.pipe].read_flags = flags;
++                    }
++                    Ok(0)
++                }
++                1032 => Ok(CAPACITY as i64),
++                _ => Err(-95),
++            },
++            262 | 332 => {
++                let flags = if r.orig_rax == 262 { r.r10 } else { r.rdx };
++                let valid = if r.orig_rax == 262 {
++                    flags & !0x1900 == 0
++                } else {
++                    crate::launch_storage::valid_statx(flags, r.r10)
++                };
++                if flags & 0x1000 == 0 {
++                    Err(-2)
++                } else if !valid {
++                    Err(-22)
++                } else {
++                    Self::stat(
++                        pid,
++                        if r.orig_rax == 262 { r.rdx } else { r.r8 },
++                        r.orig_rax == 332,
++                        entry.pipe,
++                    )
++                }
++            }
++            _ => Err(-95),
++        };
++        Some(ChannelResult::Ready(result.unwrap_or_else(|e| e)))
++    }
++
++    pub fn allocate(&mut self, flags: u64) -> Result<[u32; 2], i64> {
++        if flags & !((CLOEXEC | NONBLOCK) as u64) != 0 {
++            return Err(-22);
++        }
++        let pipe = self.pipes.iter().position(|p| !p.live).ok_or(-24)?;
++        let first = self
++            .descriptors
++            .iter()
++            .position(|fd| fd.is_none())
++            .ok_or(-24)?;
++        let second = self
++            .descriptors
++            .iter()
++            .enumerate()
++            .find_map(|(i, fd)| (i != first && fd.is_none()).then_some(i))
++            .ok_or(-24)?;
++        let p = &mut self.pipes[pipe];
++        p.live = true;
++        p.head = 0;
++        p.len = 0;
++        p.readers = 1;
++        p.writers = 1;
++        p.read_flags = flags as u32 & NONBLOCK;
++        p.write_flags = 1 | p.read_flags;
++        self.descriptors[first] = Some(PipeFd { pipe, write: false });
++        self.descriptors[second] = Some(PipeFd { pipe, write: true });
++        Ok([PIPE_FD_BASE + first as u32, PIPE_FD_BASE + second as u32])
++    }
++
++    pub fn release(&mut self, handle: u32) {
++        self.close((handle - PIPE_FD_BASE) as usize);
++    }
++
++    fn entry(&self, slot: usize) -> Result<PipeFd, i64> {
++        self.descriptors.get(slot).copied().flatten().ok_or(-9)
++    }
++
++    fn flags(&self, entry: PipeFd) -> u32 {
++        if entry.write {
++            self.pipes[entry.pipe].write_flags
++        } else {
++            self.pipes[entry.pipe].read_flags
++        }
++    }
++
++    fn close(&mut self, slot: usize) {
++        if let Some(entry) = self.descriptors[slot].take() {
++            let p = &mut self.pipes[entry.pipe];
++            if entry.write {
++                p.writers -= 1;
++            } else {
++                p.readers -= 1;
++            }
++            if p.readers == 0 && p.writers == 0 {
++                p.live = false;
++                p.len = 0;
++                p.head = 0;
++            }
++        }
++    }
++
++    fn io(
++        &mut self,
++        pid: usize,
++        slot: usize,
++        entry: PipeFd,
++        r: &UserRegs,
++    ) -> Result<ChannelResult, i64> {
++        let writing = r.orig_rax == 1;
++        if writing != entry.write {
++            return Err(-9);
++        }
++        if r.rdx == 0 {
++            return Ok(ChannelResult::Ready(0));
++        }
++        let nonblock = self.flags(entry) & NONBLOCK != 0;
++        let fd = PIPE_FD_BASE + slot as u32;
++        let mut buffer = [0u8; IO_SIZE];
++        let p = &mut self.pipes[entry.pipe];
++        if writing {
++            if p.readers == 0 {
++                // Deliver the ordinary SIGPIPE to this supervised caller, not
++                // to the supervisor. Its disposition determines the outcome.
++                let _ = unsafe { syscall2(SYS_KILL, pid, 13) };
++                return Err(-32);
++            }
++            let available = CAPACITY - p.len;
++            let atomic = r.rdx <= IO_SIZE as u64;
++            if available == 0 || (atomic && available < r.rdx as usize) {
++                return Ok(if nonblock {
++                    ChannelResult::Ready(-11)
++                } else {
++                    ChannelResult::Blocked { fd }
++                });
++            }
++            let count = r.rdx.min(IO_SIZE as u64).min(available as u64) as usize;
++            let copied = copy_memory(pid, r.rsi, &mut buffer[..count], false)? as usize;
++            if atomic && copied != count {
++                return Err(-14);
++            }
++            for byte in &buffer[..copied] {
++                p.data[(p.head + p.len) % CAPACITY] = *byte;
++                p.len += 1;
++            }
++            Ok(ChannelResult::Ready(copied as i64))
++        } else {
++            if p.len == 0 {
++                return Ok(if p.writers == 0 {
++                    ChannelResult::Ready(0)
++                } else if nonblock {
++                    ChannelResult::Ready(-11)
++                } else {
++                    ChannelResult::Blocked { fd }
++                });
++            }
++            let count = r.rdx.min(IO_SIZE as u64).min(p.len as u64) as usize;
++            for (i, byte) in buffer[..count].iter_mut().enumerate() {
++                *byte = p.data[(p.head + i) % CAPACITY];
++            }
++            let copied = copy_memory(pid, r.rsi, &mut buffer[..count], true)? as usize;
++            p.head = (p.head + copied) % CAPACITY;
++            p.len -= copied;
++            Ok(ChannelResult::Ready(copied as i64))
++        }
++    }
++
++    fn stat(pid: usize, address: u64, statx: bool, pipe: usize) -> Result<i64, i64> {
++        write_stat(
++            pid,
++            address,
++            Stat {
++                inode: 0x2_0000_0000 + pipe as u64,
++                mode: 0o10600,
++                size: 0,
++                device_major: 0,
++                device_minor: 0,
++            },
++            statx,
++        )
++    }
++}
+diff --git a/crates/ginux-init/src/descriptors.rs b/crates/ginux-init/src/descriptors.rs
+new file mode 100644
+index 00000000..8f643e34
+--- /dev/null
++++ b/crates/ginux-init/src/descriptors.rs
+@@ -0,0 +1,503 @@
++//! Configured-launch public descriptors. Backend handles never cross this ABI.
++//! Aliases share an open object; descriptor flags belong to each public slot.
++
++use crate::channel_hooks::LaunchChannels;
++use crate::dispatch::{decide_objects, Lane, NativeDecision};
++use crate::launch_storage::LaunchFs;
++use crate::launch_storage::{copy_memory, read_path};
++use crate::supervisor::{syscall3, syscall4, UserRegs};
++use ginux_core::decide_balanced;
++
++pub const LIMIT: usize = 256;
++const CLOEXEC: u64 = 0o2000000;
++
++#[derive(Clone, Copy, PartialEq, Eq)]
++enum Handle {
++    Reserved,
++    Native { fd: u32, console: bool },
++    Owned(u32),
++}
++
++#[derive(Clone, Copy)]
++struct Descriptor {
++    handle: Handle,
++    cloexec: bool,
++}
++
++#[derive(Clone, Copy)]
++enum Pending {
++    Open { slot: usize },
++    Close { result: Option<i64> },
++}
++
++pub struct DescriptorTable {
++    entries: [Option<Descriptor>; LIMIT],
++    capacity: usize,
++    pending: Option<Pending>,
++    saved_args: Option<[u64; 7]>,
++}
++
++impl DescriptorTable {
++    pub fn new() -> Result<Self, &'static [u8]> {
++        let mut limits = [0u64; 2];
++        if unsafe { syscall4(302, 0, 7, 0, limits.as_mut_ptr() as usize) } < 0 {
++            return Err(b"descriptor limit query failed");
++        }
++        let mut table = Self {
++            entries: [None; LIMIT],
++            capacity: limits[0].min(LIMIT as u64) as usize,
++            pending: None,
++            saved_args: None,
++        };
++        for fd in 0..3 {
++            // Closed bootstrap stdio must not invent an open public handle.
++            if unsafe { syscall3(72, fd, 1, 0) } >= 0 {
++                table.entries[fd] = Some(Descriptor {
++                    handle: Handle::Native {
++                        fd: fd as u32,
++                        console: true,
++                    },
++                    cloexec: false,
++                });
++            }
++        }
++        Ok(table)
++    }
++
++    fn get(&self, fd: u64) -> Result<Descriptor, i64> {
++        let fd = fd as i32;
++        if fd < 0 {
++            return Err(-9);
++        }
++        self.entries
++            .get(fd as usize)
++            .copied()
++            .flatten()
++            .filter(|d| d.handle != Handle::Reserved)
++            .ok_or(-9)
++    }
++
++    fn free(&self, minimum: u64) -> Result<usize, i64> {
++        if minimum > i32::MAX as u64 || minimum as usize >= self.capacity {
++            return Err(-22);
++        }
++        self.entries[..self.capacity]
++            .iter()
++            .enumerate()
++            .skip(minimum as usize)
++            .find_map(|(i, d)| d.is_none().then_some(i))
++            .ok_or(-24)
++    }
++
++    fn reserve(&mut self, cloexec: bool) -> Result<usize, i64> {
++        let slot = self.free(0)?;
++        self.entries[slot] = Some(Descriptor {
++            handle: Handle::Reserved,
++            cloexec,
++        });
++        Ok(slot)
++    }
++
++    fn save(&mut self, r: &UserRegs) {
++        self.saved_args = Some([r.rdi, r.rsi, r.rdx, r.r10, r.r8, r.r9, r.orig_rax]);
++    }
++
++    /// Called at the matching syscall exit, including emulated exits. Never
++    /// restore memory/TLS or signal state: only the arguments we translated.
++    pub fn finish(&mut self, r: &mut UserRegs) -> Result<bool, &'static [u8]> {
++        let mut changed = false;
++        if let Some(pending) = self.pending.take() {
++            match pending {
++                Pending::Open { slot } => {
++                    if r.rax as i64 >= 0 {
++                        if r.rax >= LIMIT as u64 {
++                            return Err(b"native descriptor outside bounded table");
++                        }
++                        self.entries[slot].as_mut().unwrap().handle = Handle::Native {
++                            fd: r.rax as u32,
++                            console: false,
++                        };
++                        r.rax = slot as u64;
++                    } else {
++                        self.entries[slot] = None;
++                    }
++                }
++                Pending::Close { result } => {
++                    // Native handles are known live; EBADF means ownership drift.
++                    if r.rax as i64 == -9 {
++                        return Err(b"native descriptor close lost ownership");
++                    }
++                    if let Some(result) = result {
++                        r.rax = result as u64;
++                    }
++                }
++            }
++            changed = true;
++        }
++        if let Some(args) = self.saved_args.take() {
++            r.rdi = args[0];
++            r.rsi = args[1];
++            r.rdx = args[2];
++            r.r10 = args[3];
++            r.r8 = args[4];
++            r.r9 = args[5];
++            r.orig_rax = args[6];
++            changed = true;
++        }
++        Ok(changed)
++    }
++
++    /// Bootstrap console identity belongs to the open object, including aliases.
++    pub fn console_descriptor(&self, fd: u64) -> bool {
++        matches!(
++            self.get(fd),
++            Ok(Descriptor {
++                handle: Handle::Native { console: true, .. },
++                ..
++            })
++        )
++    }
++
++    pub fn enter(
++        &mut self,
++        pid: usize,
++        r: &mut UserRegs,
++        fs: &mut LaunchFs,
++        channels: &mut LaunchChannels,
++    ) -> NativeDecision {
++        if ginux_core::signal_driven_io(r.orig_rax, r.rsi, r.rdx) {
++            return ready(-1);
++        }
++        // Resource changes cannot silently invalidate the public allocator.
++        if r.orig_rax == 302 && r.rsi == 7 && r.rdx != 0 {
++            return ready(-1);
++        }
++        let result = match r.orig_rax {
++            2 | 257 => {
++                self.save(r);
++                self.open(pid, r, fs, channels)
++            }
++            22 | 293 => {
++                self.save(r);
++                self.pipe(pid, r, channels)
++            }
++            3 => {
++                self.save(r);
++                self.get(r.rdi)
++                    .and_then(|_| self.close(r.rdi as u32 as usize, r, pid, fs, channels))
++            }
++            32 | 33 | 292 => {
++                self.save(r);
++                self.dup(pid, r, fs, channels)
++            }
++            72 => {
++                self.save(r);
++                // Linux reads fcntl's command as an unsigned 32-bit value.
++                // Normalize before choosing duplication/descriptor ownership.
++                r.rsi = r.rsi as u32 as u64;
++                match self.get(r.rdi) {
++                    Err(e) => Err(e),
++                    Ok(entry) => match r.rsi {
++                        0 | 1030 => self.dup(pid, r, fs, channels),
++                        1 => Ok(ready(entry.cloexec as i64)),
++                        2 if r.rdx & !1 == 0 => {
++                            self.entries[r.rdi as u32 as usize]
++                                .as_mut()
++                                .unwrap()
++                                .cloexec = r.rdx != 0;
++                            Ok(ready(0))
++                        }
++                        2 => Err(-22),
++                        _ => self.descriptor(pid, r, entry, fs, channels),
++                    },
++                }
++            }
++            0 | 1 | 5 | 8 | 16 | 17 | 18 | 19 | 20 | 74 | 75 | 77 | 78 | 81 | 91 | 217 => {
++                self.save(r);
++                self.get(r.rdi)
++                    .and_then(|d| self.descriptor(pid, r, d, fs, channels))
++            }
++            9 if r.r10 & 0x20 == 0 => {
++                self.save(r);
++                match self.get(r.r8) {
++                    Ok(Descriptor {
++                        handle: Handle::Native { fd, console: false },
++                        ..
++                    }) => {
++                        r.r8 = fd as u64;
++                        Ok(decide_objects(pid, r, fs, channels))
++                    }
++                    Ok(_) => Err(-95),
++                    Err(e) => Err(e),
++                }
++            }
++            258 | 262 | 263 | 267 | 268 | 269 | 332 | 439 => {
++                self.save(r);
++                self.path_descriptor(pid, r, fs, channels)
++            }
++            _ => Ok(decide_objects(pid, r, fs, channels)),
++        };
++        result.unwrap_or_else(ready)
++    }
++
++    fn path_descriptor(
++        &mut self,
++        pid: usize,
++        r: &mut UserRegs,
++        fs: &mut LaunchFs,
++        channels: &mut LaunchChannels,
++    ) -> Result<NativeDecision, i64> {
++        let empty = match r.orig_rax {
++            262 => r.r10 & 0x1000 != 0,
++            332 => r.rdx & 0x1000 != 0,
++            _ => false,
++        };
++        let path = if r.rsi == 0 && empty {
++            ginux_instance::Text::from_bytes(b"").map_err(|_| -14)?
++        } else {
++            read_path(pid, r.rsi)?
++        };
++        if path.as_bytes().first() == Some(&b'/') {
++            r.rdi = (-100i64) as u64;
++        } else if r.rdi as i32 != -100 {
++            let entry = self.get(r.rdi)?;
++            if path.is_empty() {
++                match entry.handle {
++                    Handle::Native { fd, .. } => r.rdi = fd as u64,
++                    Handle::Owned(handle) => r.rdi = handle as u64,
++                    Handle::Reserved => return Err(-9),
++                }
++            } else {
++                // The composed resolver already supports native and memory
++                // directory descriptors. Pass only their selected backend.
++                match entry.handle {
++                    Handle::Native { fd, .. } => r.rdi = fd as u64,
++                    Handle::Owned(handle) if fs.memory_handle(handle) => r.rdi = handle as u64,
++                    _ => return Err(-20),
++                }
++            }
++        }
++        Ok(decide_objects(pid, r, fs, channels))
++    }
++
++    fn open(
++        &mut self,
++        pid: usize,
++        r: &mut UserRegs,
++        fs: &mut LaunchFs,
++        channels: &mut LaunchChannels,
++    ) -> Result<NativeDecision, i64> {
++        let flags = if r.orig_rax == 2 { r.rsi } else { r.rdx };
++        // Reserve before any create/truncate or native open can occur.
++        let slot = self.reserve(flags & CLOEXEC != 0)?;
++        if r.orig_rax == 2 {
++            r.rsi &= !CLOEXEC;
++        } else {
++            r.rdx &= !CLOEXEC;
++        }
++        let decision = if r.orig_rax == 257 {
++            self.path_descriptor(pid, r, fs, channels)
++        } else {
++            Ok(decide_objects(pid, r, fs, channels))
++        };
++        match decision {
++            Ok(NativeDecision::Hooked { lane, result }) => {
++                if result >= 0 {
++                    self.entries[slot].as_mut().unwrap().handle = Handle::Owned(result as u32);
++                } else {
++                    self.entries[slot] = None;
++                }
++                Ok(NativeDecision::Hooked {
++                    lane,
++                    result: if result >= 0 { slot as i64 } else { result },
++                })
++            }
++            Ok(NativeDecision::Contract(decision)) => {
++                self.pending = Some(Pending::Open { slot });
++                Ok(NativeDecision::Contract(decision))
++            }
++            other => {
++                self.entries[slot] = None;
++                other
++            }
++        }
++    }
++
++    fn pipe(
++        &mut self,
++        pid: usize,
++        r: &UserRegs,
++        channels: &mut LaunchChannels,
++    ) -> Result<NativeDecision, i64> {
++        let flags = if r.orig_rax == 293 { r.rsi } else { 0 };
++        if flags & !(CLOEXEC | 0o4000) != 0 {
++            return Err(-22);
++        }
++        let first = self.reserve(flags & CLOEXEC != 0)?;
++        let second = match self.reserve(flags & CLOEXEC != 0) {
++            Ok(s) => s,
++            Err(e) => {
++                self.entries[first] = None;
++                return Err(e);
++            }
++        };
++        let handles = match channels.allocate(flags & !CLOEXEC) {
++            Ok(handles) => handles,
++            Err(e) => {
++                self.entries[first] = None;
++                self.entries[second] = None;
++                return Err(e);
++            }
++        };
++        let mut bytes = [0u8; 8];
++        bytes[..4].copy_from_slice(&(first as u32).to_le_bytes());
++        bytes[4..].copy_from_slice(&(second as u32).to_le_bytes());
++        let copied = copy_memory(pid, r.rdi, &mut bytes, true);
++        if copied != Ok(8) {
++            channels.release(handles[0]);
++            channels.release(handles[1]);
++            self.entries[first] = None;
++            self.entries[second] = None;
++            return Err(-14);
++        }
++        self.entries[first].as_mut().unwrap().handle = Handle::Owned(handles[0]);
++        self.entries[second].as_mut().unwrap().handle = Handle::Owned(handles[1]);
++        Ok(ready(0))
++    }
++
++    fn descriptor(
++        &self,
++        pid: usize,
++        r: &mut UserRegs,
++        entry: Descriptor,
++        fs: &mut LaunchFs,
++        channels: &mut LaunchChannels,
++    ) -> Result<NativeDecision, i64> {
++        let public_fd = r.rdi as u32;
++        match entry.handle {
++            Handle::Native { fd, console } => {
++                if console && matches!(r.orig_rax, 78 | 217) {
++                    return Err(-20);
++                }
++                if r.orig_rax == 72 {
++                    // Duplication and descriptor flags are handled above.
++                    // Never broker native locks, leases or signal ownership.
++                    if !matches!(r.rsi, 3 | 4) {
++                        return Err(-95);
++                    }
++                    const STATUS_FLAGS: u64 =
++                        3 | 0o2000 | 0o4000 | 0o100000 | 0o200000 | 0o400000 | 0o10000000;
++                    if r.rsi == 4 && r.rdx & !STATUS_FLAGS != 0 {
++                        return Err(-95);
++                    }
++                }
++                if !console && matches!(r.orig_rax, 1 | 20 | 18 | 77 | 91) {
++                    return Err(-9);
++                }
++                r.rdi = fd as u64;
++            }
++            Handle::Owned(handle) => {
++                if r.orig_rax == 81 && !fs.memory_handle(handle) {
++                    return Err(-20);
++                }
++                r.rdi = handle as u64;
++            }
++            Handle::Reserved => return Err(-9),
++        }
++        Ok(match decide_objects(pid, r, fs, channels) {
++            NativeDecision::Park { .. } => NativeDecision::Park { fd: public_fd },
++            // An unimplemented owned operation must never run on a private
++            // backend integer as though it were a native descriptor.
++            NativeDecision::Contract(_) if matches!(entry.handle, Handle::Owned(_)) => ready(-95),
++            decision => decision,
++        })
++    }
++
++    fn close(
++        &mut self,
++        slot: usize,
++        r: &mut UserRegs,
++        pid: usize,
++        fs: &mut LaunchFs,
++        channels: &mut LaunchChannels,
++    ) -> Result<NativeDecision, i64> {
++        let result = if r.orig_rax == 3 {
++            None
++        } else {
++            Some(slot as i64)
++        };
++        let entry = self.entries[slot].take().ok_or(-9)?;
++        if self
++            .entries
++            .iter()
++            .flatten()
++            .any(|d| d.handle == entry.handle)
++        {
++            return Ok(ready(result.unwrap_or(0)));
++        }
++        match entry.handle {
++            Handle::Native { fd, .. } => {
++                r.orig_rax = 3;
++                r.rdi = fd as u64;
++                self.pending = Some(Pending::Close { result });
++                Ok(NativeDecision::Contract(decide_balanced(3)))
++            }
++            Handle::Owned(handle) => {
++                let mut close = *r;
++                close.orig_rax = 3;
++                close.rdi = handle as u64;
++                match decide_objects(pid, &mut close, fs, channels) {
++                    NativeDecision::Hooked { result: 0, .. } => Ok(ready(result.unwrap_or(0))),
++                    NativeDecision::Lost => Ok(NativeDecision::Lost),
++                    _ => Err(-5),
++                }
++            }
++            Handle::Reserved => Err(-9),
++        }
++    }
++
++    fn dup(
++        &mut self,
++        pid: usize,
++        r: &mut UserRegs,
++        fs: &mut LaunchFs,
++        channels: &mut LaunchChannels,
++    ) -> Result<NativeDecision, i64> {
++        let source = r.rdi as i32;
++        let mut entry = self.get(r.rdi)?;
++        let (target, cloexec) = match r.orig_rax {
++            32 => (self.free(0)?, false),
++            72 => (self.free(r.rdx)?, r.rsi == 1030),
++            33 | 292 => {
++                let target = r.rsi as i32;
++                if target < 0 || target as usize >= self.capacity {
++                    return Err(-9);
++                }
++                if r.orig_rax == 292 && (target == source || r.rdx & !CLOEXEC != 0) {
++                    return Err(-22);
++                }
++                if target == source {
++                    return Ok(ready(target as i64));
++                }
++                (target as usize, r.orig_rax == 292 && r.rdx != 0)
++            }
++            _ => return Err(-22),
++        };
++        entry.cloexec = cloexec;
++        // Preserve the source in its own slot until target retirement completes.
++        let decision = if self.entries[target].is_some() {
++            self.close(target, r, pid, fs, channels)?
++        } else {
++            ready(target as i64)
++        };
++        self.entries[target] = Some(entry);
++        Ok(decision)
++    }
++}
++
++fn ready(result: i64) -> NativeDecision {
++    NativeDecision::Hooked {
++        lane: Lane::Filesystem,
++        result,
++    }
++}
+diff --git a/crates/ginux-init/src/device_hooks.rs b/crates/ginux-init/src/device_hooks.rs
+index 989f4aa4..35c8d982 100644
+--- a/crates/ginux-init/src/device_hooks.rs
++++ b/crates/ginux-init/src/device_hooks.rs
+@@ -79,10 +79,6 @@ impl LaunchDevices {
+         None
+     }
+ 
+-    pub fn enabled(&self) -> bool {
+-        self.enabled
+-    }
+-
+     pub fn owns(path: &[u8]) -> bool {
+         path == b"/dev" || path.starts_with(b"/dev/")
+     }
+diff --git a/crates/ginux-init/src/dispatch.rs b/crates/ginux-init/src/dispatch.rs
+index 08436700..0d256788 100644
+--- a/crates/ginux-init/src/dispatch.rs
++++ b/crates/ginux-init/src/dispatch.rs
+@@ -34,6 +34,10 @@ pub const fn classify(syscall: u64) -> Lane {
+ 
+ /// Outcome of dispatching one native entry.
+ pub enum NativeDecision {
++    /// An owned channel waits at syscall entry.
++    Park { fd: u32 },
++    /// A protected path rewrite could not be restored. Stop the instance.
++    Lost,
+     /// A lane hook claimed the entry; emulate it with this result.
+     Hooked { lane: Lane, result: i64 },
+     /// No hook claimed the entry; apply the shared contract decision.
+@@ -81,6 +85,44 @@ pub fn decide_native(syscall: u64, rdi: u64, rsi: u64, rdx: u64) -> NativeDecisi
+     }
+ }
+ 
++/// Dispatch configured objects through their current namespace owner before
++/// applying the unchanged native balanced implementation surface.
++pub fn decide_objects(
++    pid: usize,
++    registers: &mut UserRegs,
++    filesystem: &mut crate::launch_storage::LaunchFs,
++    channels: &mut crate::channel_hooks::LaunchChannels,
++) -> NativeDecision {
++    if let Some(result) = channels.claim(pid, registers) {
++        return match result {
++            crate::channel_hooks::ChannelResult::Ready(result) => NativeDecision::Hooked {
++                lane: Lane::Channel,
++                result,
++            },
++            crate::channel_hooks::ChannelResult::Blocked { fd } => NativeDecision::Park { fd },
++        };
++    }
++    match filesystem.dispatch(pid, registers) {
++        crate::launch_storage::Dispatch::Device(result) => NativeDecision::Hooked {
++            lane: Lane::Device,
++            result,
++        },
++        crate::launch_storage::Dispatch::Handled(result) => NativeDecision::Hooked {
++            lane: Lane::Filesystem,
++            result,
++        },
++        crate::launch_storage::Dispatch::Native | crate::launch_storage::Dispatch::Rewritten => {
++            decide_native(
++                registers.orig_rax,
++                registers.rdi,
++                registers.rsi,
++                registers.rdx,
++            )
++        }
++        crate::launch_storage::Dispatch::Lost => NativeDecision::Lost,
++    }
++}
++
+ /// Dispatch one process-supervision entry through the process-lane hook.
+ /// `None` keeps the existing entry match in the supervision loop.
+ pub fn process_entry(syscall: u64, rdi: u64, rsi: u64, rdx: u64) -> Option<i64> {
+diff --git a/crates/ginux-init/src/launch.rs b/crates/ginux-init/src/launch.rs
+index 63eb516a..f3027d77 100644
+--- a/crates/ginux-init/src/launch.rs
++++ b/crates/ginux-init/src/launch.rs
+@@ -16,10 +16,7 @@ use ginux_instance::{
+     AuditMode, ConfigError, ExecutionBackend, ExecutionProfile, Instance, InstanceConfig,
+ };
+ 
+-use crate::dispatch::{
+-    balanced_surface_name, decide_native, native_arguments_allowed, NativeDecision,
+-};
+-use crate::launch_storage::Dispatch;
++use crate::dispatch::{balanced_surface_name, native_arguments_allowed, NativeDecision};
+ use crate::supervisor::{
+     exit_process, line, managed_host_identity, ptrace, standard_stream_refusal, stopped, syscall0,
+     syscall1, syscall2, syscall3, syscall4, syscall5, wait, write_all, UserRegs, AT_FDCWD,
+@@ -388,6 +385,9 @@ pub fn launch_main(config_path: *const u8, root_path: *const u8, result_path: *c
+     storage
+         .check_image(root_path)
+         .unwrap_or_else(|reason| launch_startup_fail(reason));
++    let mut channels = crate::channel_hooks::LaunchChannels::new();
++    let mut descriptors = crate::descriptors::DescriptorTable::new()
++        .unwrap_or_else(|reason| launch_startup_fail(reason));
+     print_launch_config(&config);
+     let mut instance = Instance::create(config);
+     if instance.start().is_err() {
+@@ -401,7 +401,14 @@ pub fn launch_main(config_path: *const u8, root_path: *const u8, result_path: *c
+     if child == 0 {
+         launch_tracee(root_path, &storage);
+     }
+-    supervise_launch(child as usize, &mut instance, &contract, &mut storage)
++    supervise_launch(
++        child as usize,
++        &mut instance,
++        &contract,
++        &mut storage,
++        &mut channels,
++        &mut descriptors,
++    )
+ }
+ 
+ fn launch_validate(config: &InstanceConfig) {
+@@ -920,7 +927,7 @@ fn launch_tracee(root_path: *const u8, storage: &crate::launch_storage::LaunchFs
+     // Host descriptors (including the result file) must not grant the
+     // workload authority outside the supplied root. Only stdio is shared.
+     const SYS_CLOSE_RANGE: usize = 436;
+-    if !storage.reserve_descriptors() {
++    if !crate::launch_storage::reserve_native_descriptors(crate::descriptors::LIMIT) {
+         tracee_setup_fail(
+             b"ginux: launch bootstrap failed: descriptor namespace unavailable\n",
+             130,
+@@ -1017,6 +1024,8 @@ fn supervise_launch(
+     instance: &mut Instance,
+     contract: &EffectiveContract,
+     storage: &mut crate::launch_storage::LaunchFs,
++    channels: &mut crate::channel_hooks::LaunchChannels,
++    descriptors: &mut crate::descriptors::DescriptorTable,
+ ) -> ! {
+     let mut status = 0i32;
+     if wait(pid, &mut status) < 0 {
+@@ -1096,7 +1105,10 @@ fn supervise_launch(
+             if override_exit {
+                 registers.rax = override_result as u64;
+             }
+-            if (override_exit || rewritten)
++            let descriptor_change = descriptors
++                .finish(&mut registers)
++                .unwrap_or_else(|reason| launch_fail(instance, pid, reason));
++            if (override_exit || rewritten || descriptor_change)
+                 && ptrace(PTRACE_SETREGS, pid, 0, &registers as *const _ as usize) < 0
+             {
+                 launch_fail(instance, pid, b"launch result override failed");
+@@ -1133,42 +1145,31 @@ fn supervise_launch(
+         let syscall = registers.orig_rax;
+         // The resolved instance contract is checked first: its denials apply
+         // before any effect, and its allowances never widen the balanced surface.
+-        let semantic = storage
+-            .descriptor_operation(&registers)
+-            .or_else(|| launch_semantic_operation(&registers));
++        let semantic = configured_semantic_operation(&registers, descriptors);
+         let rule = contract.runtime_rule(syscall, semantic);
+         let native = match rule.map_or(ContractAction::Deny(38), |rule| rule.action) {
+             ContractAction::Deny(errno) => NativeDecision::Contract(ginux_core::Decision {
+                 syscall,
+                 action: Action::Deny(errno),
+             }),
+-            // Storage acts only after the contract admits the call.
+             ContractAction::Emulate | ContractAction::Mediate => {
+-                match storage.dispatch(pid, &mut registers) {
+-                    Dispatch::Device(result) => NativeDecision::Hooked {
+-                        lane: crate::dispatch::Lane::Device,
+-                        result,
+-                    },
+-                    Dispatch::Handled(result) => NativeDecision::Hooked {
+-                        lane: crate::dispatch::Lane::Filesystem,
+-                        result,
+-                    },
+-                    Dispatch::Rewritten => {
+-                        if ptrace(PTRACE_SETREGS, pid, 0, &registers as *const _ as usize) < 0 {
+-                            launch_fail(instance, pid, b"launch path translation failed");
+-                        }
+-                        decide_native(syscall, registers.rdi, registers.rsi, registers.rdx)
+-                    }
+-                    Dispatch::Native => {
+-                        decide_native(syscall, registers.rdi, registers.rsi, registers.rdx)
+-                    }
+-                    Dispatch::Lost => {
+-                        launch_fail(instance, pid, b"launch path scratch restoration failed")
+-                    }
+-                }
++                descriptors.enter(pid, &mut registers, storage, channels)
+             }
+         };
+         let decision = match native {
++            NativeDecision::Lost => {
++                launch_fail(instance, pid, b"launch path scratch restoration failed")
++            }
++            NativeDecision::Park { fd } => {
++                audit_write(b"ginux: park surface=lane-channel fd=");
++                audit_u64(fd as u64);
++                audit_write(b" syscall=");
++                audit_u64(syscall);
++                audit_write(b"\n");
++                // There is no runnable peer in this bounded single-task stage.
++                // SIGKILL still produces terminal status and is reaped.
++                continue;
++            }
+             NativeDecision::Contract(decision) => decision,
+             NativeDecision::Hooked { lane, result } => {
+                 let lane_name: &[u8] = match lane {
+@@ -1229,9 +1230,9 @@ fn supervise_launch(
+                     launch_fail(instance, pid, b"launch exit resume failed");
+                 }
+             }
+-            Action::Mediate if native_arguments_allowed(syscall, &registers) => {
++            Action::Mediate if native_arguments_allowed(registers.orig_rax, &registers) => {
+                 audit_write(b"mediate surface=");
+-                audit_line(balanced_surface_name(balanced_surface(syscall)));
++                audit_line(balanced_surface_name(balanced_surface(registers.orig_rax)));
+                 awaiting_exit = true;
+                 // A host result that is the caller's host tid is replaced
+                 // at the exit stop.
+@@ -1239,7 +1240,9 @@ fn supervise_launch(
+                     override_exit = true;
+                     override_result = result;
+                 }
+-                if ptrace(PTRACE_SYSCALL, pid, 0, 0) < 0 {
++                if ptrace(PTRACE_SETREGS, pid, 0, &registers as *const _ as usize) < 0
++                    || ptrace(PTRACE_SYSCALL, pid, 0, 0) < 0
++                {
+                     launch_fail(instance, pid, b"launch mediated syscall failed");
+                 }
+             }
+@@ -1335,6 +1338,35 @@ fn launch_cannot_enforce(rule: &EffectiveRule) -> bool {
+         }
+ }
+ 
++/// Classify the public owner before any fd or argument translation. Console
++/// aliases retain console authority; other read/readv calls use file authority.
++fn configured_semantic_operation(
++    registers: &UserRegs,
++    descriptors: &crate::descriptors::DescriptorTable,
++) -> Option<&'static str> {
++    match registers.orig_rax {
++        0 | 19 if descriptors.console_descriptor(registers.rdi) => Some("device.console.read"),
++        1 | 20 if descriptors.console_descriptor(registers.rdi) => Some("device.console.write"),
++        0 | 4 | 5 | 6 | 17 | 19 | 21 | 78 | 79 | 80 | 81 | 89 | 217 | 262 | 267 | 269 | 332
++        | 439 => Some("filesystem.path.read"),
++        1
++        | 18
++        | 20
++        | 76
++        | 77
++        | 82..=88
++        | 90..=94
++        | 132
++        | 258
++        | 260
++        | 263..=266
++        | 268
++        | 280
++        | 316 => Some("filesystem.path.write"),
++        _ => launch_semantic_operation(registers),
++    }
++}
++
+ /// The semantic operation of a launch syscall, from its registers alone.
+ /// Descriptors are compared as the kernel reads them, as 32-bit values.
+ fn launch_semantic_operation(registers: &UserRegs) -> Option<&'static str> {
+diff --git a/crates/ginux-init/src/launch_storage.rs b/crates/ginux-init/src/launch_storage.rs
+index 756aebde..ac7a13f1 100644
+--- a/crates/ginux-init/src/launch_storage.rs
++++ b/crates/ginux-init/src/launch_storage.rs
+@@ -308,36 +308,9 @@ impl LaunchFs {
+         self.memory.is_some()
+     }
+ 
+-    /// Lower the workload's descriptor limits below the memory range, so no
+-    /// native descriptor can take a memory descriptor's number.
+-    pub fn reserve_descriptors(&self) -> bool {
+-        if !self.enabled() && !self.devices.enabled() {
+-            return true;
+-        }
+-        let mut limits = [0u64; 2];
+-        if unsafe {
+-            syscall4(
+-                linux::SYS_PRLIMIT64,
+-                0,
+-                linux::RLIMIT_NOFILE,
+-                0,
+-                limits.as_mut_ptr() as usize,
+-            )
+-        } < 0
+-        {
+-            return false;
+-        }
+-        limits[0] = limits[0].min(FD_BASE as u64);
+-        limits[1] = limits[1].min(FD_BASE as u64);
+-        unsafe {
+-            syscall4(
+-                linux::SYS_PRLIMIT64,
+-                0,
+-                linux::RLIMIT_NOFILE,
+-                limits.as_ptr() as usize,
+-                0,
+-            ) == 0
+-        }
++    /// Whether a private handle belongs to this memory backend.
++    pub fn memory_handle(&self, handle: u32) -> bool {
++        self.enabled() && (FD_BASE..FD_BASE + MEMORY_FDS as u32).contains(&handle)
+     }
+ 
+     /// Whether this call operates within the memory descriptor range, read as
+@@ -348,15 +321,6 @@ impl LaunchFs {
+             && descriptor_family(registers.orig_rax).is_some()
+     }
+ 
+-    /// The contract operation of a call on a memory descriptor. Path calls
+-    /// are classified by `path_operation`.
+-    pub fn descriptor_operation(&self, registers: &UserRegs) -> Option<&'static str> {
+-        if !self.on_memory_descriptor(registers) {
+-            return None;
+-        }
+-        descriptor_family(registers.orig_rax).flatten()
+-    }
+-
+     /// Complete a storage call, or say how the supervisor runs it natively.
+     pub fn dispatch(&mut self, pid: usize, registers: &mut UserRegs) -> Dispatch {
+         if let Some(result) = self.devices.descriptor_dispatch(pid, registers) {
+@@ -462,7 +426,7 @@ impl LaunchFs {
+     fn anchor(&mut self, dirfd: Option<i32>) -> Anchor {
+         match dirfd {
+             None | Some(linux::AT_FDCWD) => Anchor::Cwd,
+-            Some(fd) if fd as u32 >= FD_BASE && self.enabled() => {
++            Some(fd) if self.memory_handle(fd as u32) => {
+                 let fd = memory_descriptor(fd as u64);
+                 match self.memory().fstat(fd) {
+                     Ok(_) => Anchor::Memory(fd),
+@@ -1591,3 +1555,32 @@ fn descriptor_errno(error: VfsError) -> i64 {
+         error => errno(error),
+     }
+ }
++
++/// Keep native descriptors inside the public bound without raising an
++/// operator's inherited soft or hard limit.
++pub fn reserve_native_descriptors(limit: usize) -> bool {
++    let mut limits = [0u64; 2];
++    if unsafe {
++        syscall4(
++            linux::SYS_PRLIMIT64,
++            0,
++            linux::RLIMIT_NOFILE,
++            0,
++            limits.as_mut_ptr() as usize,
++        )
++    } < 0
++    {
++        return false;
++    }
++    limits[0] = limits[0].min(limit as u64);
++    limits[1] = limits[1].min(limit as u64);
++    unsafe {
++        syscall4(
++            linux::SYS_PRLIMIT64,
++            0,
++            linux::RLIMIT_NOFILE,
++            limits.as_ptr() as usize,
++            0,
++        ) == 0
++    }
++}
+diff --git a/crates/ginux-init/src/main.rs b/crates/ginux-init/src/main.rs
+index 738507c2..2991350b 100644
+--- a/crates/ginux-init/src/main.rs
++++ b/crates/ginux-init/src/main.rs
+@@ -13,6 +13,7 @@ use ginux_core::{
+ use ginux_instance::{AuditMode, HookFailurePolicy};
+ 
+ mod channel_hooks;
++mod descriptors;
+ mod device_hooks;
+ mod dispatch;
+ mod fs_hooks;
+@@ -5444,6 +5445,9 @@ fn supervise_native(
+             decide_systemd(syscall, shared_network)
+         } else {
+             match decide_native(syscall, registers.rdi, registers.rsi, registers.rdx) {
++                NativeDecision::Park { .. } | NativeDecision::Lost => {
++                    native_fail(instance, pid, b"unexpected configured object state")
++                }
+                 NativeDecision::Contract(decision) => decision,
+                 NativeDecision::Hooked { lane, result } => {
+                     let lane_name: &[u8] = match lane {
+diff --git a/crates/ginux-init/src/supervisor.rs b/crates/ginux-init/src/supervisor.rs
+index 4706b6cc..f658c301 100644
+--- a/crates/ginux-init/src/supervisor.rs
++++ b/crates/ginux-init/src/supervisor.rs
+@@ -108,6 +108,7 @@ pub fn managed_host_identity() -> ManagedHostIdentity {
+ }
+ 
+ #[repr(C)]
++#[derive(Clone, Copy)]
+ pub struct UserRegs {
+     pub r15: u64,
+     pub r14: u64,
+diff --git a/scripts/test-launch-fds.py b/scripts/test-launch-fds.py
+new file mode 100644
+index 00000000..8b1ba2ea
+--- /dev/null
++++ b/scripts/test-launch-fds.py
+@@ -0,0 +1,71 @@
++#!/usr/bin/env python3
++"""Exercise a shared public descriptor table through actual configured launch."""
++import json
++import os
++from pathlib import Path
++import shutil
++import resource
++import subprocess
++import sys
++import tempfile
++
++
++def main():
++    if len(sys.argv)!=3 or os.geteuid()!=0:
++        sys.exit('usage (as root): test-launch-fds.py <ginux> <fd-fixture>')
++    binary,fixture=[str(Path(p).resolve()) for p in sys.argv[1:]]
++    template=(Path(__file__).resolve().parent.parent/'config/instance-gate5.toml').read_text()
++    with tempfile.TemporaryDirectory(prefix='ginux-fds-') as directory:
++        work=Path(directory)
++        root=work/'root'
++        (root/'bin').mkdir(parents=True)
++        (root/'work').mkdir()
++        (root/'sealed').write_bytes(b'unreadable image file')
++        (root/'sealed').chmod(0)
++        shutil.copyfile(fixture,root/'bin/fixture')
++        (root/'bin/fixture').chmod(0o755)
++        config=template.replace('init = "/bin/bash"','init = "/bin/fixture"')
++        config=config.replace('profile = "gate5-balanced-v1"', 'profile = "configured-storage-v3"').replace('[storage]\nassignments = []','[storage]\nassignments = ["memory:/work"]')
++        config=config.replace('[devices]\nassignments = []','[devices]\nassignments = ["null"]')
++        (work/'launch.toml').write_text(config)
++        for i in range(2):
++            result=work/f'{i}.json'
++            proc=subprocess.run([binary,'launch',str(work/'launch.toml'),str(root),'--result-file',str(result)],capture_output=True,timeout=20)
++            record=json.loads(result.read_text())
++            assert proc.returncode==0,(proc.returncode,proc.stderr,record)
++            assert record['outcome']=='exited' and record['code']==0 and record['generation'] is None,record
++            assert proc.stdout==b'shared-fds: PASS\n',proc.stdout
++            assert not (root/'work/data').exists()
++        (work/'width.toml').write_text(config.replace('args = []','args = ["width"]'))
++        result=work/'width.json'
++        proc=subprocess.run([binary,'launch',str(work/'width.toml'),str(root),'--result-file',str(result)],capture_output=True,timeout=20)
++        assert proc.returncode==0,(proc.returncode,proc.stderr)
++        assert proc.stdout==b'resource-width: PASS\n',proc.stdout
++        assert json.loads(result.read_text())['code']==0
++        for mode, operation in [('deny-read', 'filesystem.path.read'),
++                                ('console', 'device.console.write'),
++                                ('Deny-write', 'filesystem.path.write')]:
++            policy=config.replace('args = []', 'args = '+json.dumps([mode]))
++            policy=policy.replace('profile = "configured-storage-v3"',
++                                  'profile = "configured-storage-v3"\ndeny = ["'+operation+'"]')
++            path=work/(mode+'.toml'); path.write_text(policy)
++            result=work/(mode+'.json')
++            proc=subprocess.run([binary,'launch',str(path),str(root),'--result-file',str(result)],capture_output=True,timeout=20)
++            assert proc.returncode==0,(mode,proc.returncode,proc.stderr)
++            assert proc.stdout==b'',(mode,proc.stdout)
++            assert json.loads(result.read_text())['outcome']=='exited' and json.loads(result.read_text())['code']==0
++            assert not (root/'work/data').exists()
++        # A lower operator limit remains effective for both native and public FDs.
++        (work/'low.toml').write_text(config.replace('args = []','args = ["low"]'))
++        def lower_limit():
++            resource.setrlimit(resource.RLIMIT_NOFILE,(8,8))
++        result=work/'low.json'
++        proc=subprocess.run([binary,'launch',str(work/'low.toml'),str(root),'--result-file',str(result)],capture_output=True,timeout=20,preexec_fn=lower_limit)
++        assert proc.returncode==0,(proc.returncode,proc.stderr)
++        assert proc.stdout==b'lower-limit: PASS\n',proc.stdout
++        assert json.loads(result.read_text())['code']==0
++        print('test-launch-fds: PASS (small numbers, cross-owner aliases, native reuse/mmap, limits, registers)')
++
++
++if __name__=='__main__':
++    main()
+diff --git a/scripts/test-launch-pipes.py b/scripts/test-launch-pipes.py
+new file mode 100644
+index 00000000..766168cc
+--- /dev/null
++++ b/scripts/test-launch-pipes.py
+@@ -0,0 +1,88 @@
++#!/usr/bin/env python3
++"""Run real configured-launch anonymous pipe checks against existing artifacts."""
++import json
++import os
++from pathlib import Path
++import shutil
++import signal
++import subprocess
++import sys
++import tempfile
++import time
++
++
++def main():
++    if len(sys.argv) != 3 or os.geteuid() != 0:
++        sys.exit('usage (as root): test-launch-pipes.py <ginux> <pipe-fixture>')
++    binary, fixture = [str(Path(p).resolve()) for p in sys.argv[1:]]
++    template = (Path(__file__).resolve().parent.parent / 'config/instance-gate5.toml').read_text()
++    with tempfile.TemporaryDirectory(prefix='ginux-pipes-') as directory:
++        work = Path(directory)
++        root = work / 'root'
++        (root / 'bin').mkdir(parents=True)
++        (root / 'work').mkdir()
++        shutil.copyfile(fixture, root / 'bin/fixture')
++        (root / 'bin/fixture').chmod(0o755)
++        counter = 0
++
++        def invoke(args=(), *, assigned=False, sig=None, park=False):
++            nonlocal counter
++            counter += 1
++            config = template.replace('init = "/bin/bash"', 'init = "/bin/fixture"')
++            config = config.replace('profile = "gate5-balanced-v1"', 'profile = "configured-balanced-v2"')
++            config = config.replace('args = []', 'args = ' + json.dumps(list(args)))
++            if assigned:
++                config = config.replace('profile = "configured-balanced-v2"', 'profile = "configured-storage-v3"').replace('[storage]\nassignments = []', '[storage]\nassignments = ["memory:/work"]')
++                config = config.replace('[devices]\nassignments = []', '[devices]\nassignments = ["null"]')
++            path, result = work / f'{counter}.toml', work / f'{counter}.json'
++            path.write_text(config)
++            command = [binary, 'launch', str(path), str(root), '--result-file', str(result)]
++            if park:
++                audit_path = work / f'{counter}.audit'
++                with audit_path.open('wb') as audit:
++                    proc = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=audit)
++                    child = None
++                    try:
++                        deadline = time.monotonic() + 5
++                        while time.monotonic() < deadline:
++                            # Read through a separate open file description;
++                            # seeking the inherited stderr would move its writer.
++                            if b'ginux: park surface=lane-channel' in audit_path.read_bytes():
++                                children = Path(f'/proc/{proc.pid}/task/{proc.pid}/children').read_text().split()
++                                assert len(children) == 1, children
++                                child = int(children[0])
++                                break
++                            assert proc.poll() is None, f'blocking call returned early: {proc.returncode}'
++                            time.sleep(0.01)
++                        assert child is not None, 'blocking pipe operation did not park'
++                        os.kill(child, signal.SIGKILL)
++                        stdout, _ = proc.communicate(timeout=5)
++                        assert not Path(f'/proc/{child}').exists(), 'terminated workload was not reaped'
++                    finally:
++                        if proc.poll() is None:
++                            proc.kill()
++                            proc.communicate(timeout=5)
++            else:
++                proc = subprocess.run(command, capture_output=True, timeout=20)
++                stdout = proc.stdout
++                assert proc.returncode == (128 + sig if sig else 0), (proc.returncode, proc.stderr)
++            record = json.loads(result.read_text())
++            if sig:
++                assert proc.returncode == 128 + sig, (proc.returncode, record)
++                assert record['outcome'] == 'signaled' and record['signal'] == sig, record
++            else:
++                assert record['outcome'] == 'exited' and record['code'] == 0, record
++                assert stdout == b'owned-pipes: PASS\n', stdout
++            assert record['generation'] is None
++
++        invoke()
++        invoke(assigned=True)
++        invoke(['sigpipe'], sig=signal.SIGPIPE)
++        invoke(['blocked-read'], sig=signal.SIGKILL, park=True)
++        invoke(['write-full'], sig=signal.SIGKILL, park=True)
++        invoke()  # Fresh launch: no live pipe state or buffered bytes.
++        print('test-launch-pipes: PASS (data, atomicity, copyout, aliases, EOF, bounds, blocking, SIGPIPE)')
++
++
++if __name__ == '__main__':
++    main()
+diff --git a/scripts/test-launch-storage.py b/scripts/test-launch-storage.py
+index 190df707..b669708f 100644
+--- a/scripts/test-launch-storage.py
++++ b/scripts/test-launch-storage.py
+@@ -104,7 +104,7 @@ def main():
+         # Calls storage completes are audited like any other entry.
+         if not re.search(rb"^ginux: audit sequence=\d+ phase=entry syscall=257 "
+                          rb"operation=syscall\.openat policy-source=\S+ policy-rule=\d+ "
+-                         rb"action=emulate surface=lane-filesystem result=1048576$", proc.stderr, re.M):
++                         rb"action=emulate surface=lane-filesystem result=3$", proc.stderr, re.M):
+             sys.exit('storage call has no audit entry record')
+         # A working directory held in memory is not created in the image.
+         invoke(['memory:/mem-work'], ['workdir'], workdir='/mem-work')
+diff --git a/tests/fixtures/launch-device-fixture.c b/tests/fixtures/launch-device-fixture.c
+index cdabe1bc..89103f44 100644
+--- a/tests/fixtures/launch-device-fixture.c
++++ b/tests/fixtures/launch-device-fixture.c
+@@ -43,7 +43,7 @@ long device_main(word *stack)
+     CHECK(DO(2,"/dev/null/../null",0,0) == -20, 58);
+     CHECK(DO(2,"/dev/missing/../null",0,0) == -2, 59);
+     long alias = DO(2,"/alias-null",2,0);
+-    CHECK(alias >= 0x40000000, 60);
++    CHECK(alias >= 3, 60);
+     CHECK(DO(5,alias,meta,0) == 0, 61);
+     CHECK((*(unsigned int *)(meta+24) & 0170000) == 0020000, 62);
+     CHECK(call(262,alias,(word)"",(word)meta,0x1900,0,0) == 0, 63);
+@@ -58,7 +58,7 @@ long device_main(word *stack)
+     CHECK(DO(3,alias,0,0) == 0, 68);
+     CHECK(DO(2,"/dev/null",0300,0644) == -17, 16);
+     long fd = DO(2,"/dev/null",2|02000000,0);
+-    CHECK(fd == 0x40000000, 17);
++    CHECK(fd == 3, 17);
+     CHECK(DO(0,fd,1,4096) == 0, 70);
+     CHECK(DO(1,fd,1,5000) == 4096, 71);
+     CHECK(DO(0,fd,immutable,10) == 0, 18);
+@@ -92,11 +92,11 @@ long device_main(word *stack)
+     // Device-only configs must reserve the descriptor namespace too.
+     word limits[2];
+     CHECK(call(302,0,7,0,(word)limits,0,0) == 0, 43);
+-    CHECK(limits[1] <= 1048576, 44);
++    CHECK(limits[1] <= 256, 44);
+     long fds[64];
+     for (word i=0;i<64;++i) {
+         fds[i]=DO(2,"/dev/null",0,0);
+-        CHECK(fds[i] >= 0x40000000, 45);
++        CHECK(fds[i] >= 3, 45);
+     }
+     CHECK(DO(2,"/dev/null",0,0) == -24, 46);
+     for (word i=0;i<64;++i) CHECK(DO(3,fds[i],0,0) == 0, 47);
+@@ -106,7 +106,7 @@ long device_main(word *stack)
+     CHECK(DO(87,"/dev/null",0,0) == -30, 50);
+     CHECK(DO(4,"/dev/null",meta,0) == 0, 51);
+     fd = DO(2,"/dev/null",01101,0644);
+-    CHECK(fd >= 0x40000000, 52);
++    CHECK(fd >= 3, 52);
+     CHECK(DO(1,fd,immutable,10) == 10, 53);
+     CHECK(DO(3,fd,0,0) == 0, 54);
+     DO(1,1,"null-device: PASS\n",18);
+diff --git a/tests/fixtures/launch-fd-fixture.c b/tests/fixtures/launch-fd-fixture.c
+new file mode 100644
+index 00000000..410e453d
+--- /dev/null
++++ b/tests/fixtures/launch-fd-fixture.c
+@@ -0,0 +1,129 @@
++/* Public descriptor namespace and cross-owner lifetime/register checks. */
++typedef unsigned long word;
++static long call(long n, word a, word b, word c, word d, word e, word f)
++{
++    register word r10 __asm__("r10")=d;
++    register word r8 __asm__("r8")=e;
++    register word r9 __asm__("r9")=f;
++    long result;
++    __asm__ volatile("syscall":"=a"(result):"a"(n),"D"(a),"S"(b),"d"(c),"r"(r10),"r"(r8),"r"(r9):"rcx","r11","memory");
++    return result;
++}
++#define DO(n,a,b,c) call(n,(word)(a),(word)(b),(word)(c),0,0,0)
++#define CHECK(expr,code) if (!(expr)) return code
++static char bytes[256];
++static char meta[256] __attribute__((aligned(8)));
++long fd_main(word *stack)
++{
++    if (*stack>1 && ((char **)(stack+1))[1][0]=='w') {
++        word limits[2]={3,256};
++        CHECK(call(302,0,(1UL<<32)|7,(word)limits,0,0,0)==-1,49);
++        CHECK(call(302,0,7,0,(word)limits,0,0)==0 && limits[0]==256 && limits[1]==256,50);
++        DO(1,1,"resource-width: PASS\n",21);
++        return 0;
++    }
++    if (*stack>1 && ((char **)(stack+1))[1][0]=='l') {
++        word limits[2];
++        CHECK(call(302,0,7,0,(word)limits,0,0)==0 && limits[0]==8 && limits[1]==8,43);
++        for(word i=3;i<8;++i) CHECK(DO(32,1,0,0)==(long)i,44);
++        CHECK(DO(32,1,0,0)==-24,45);
++        for(word i=3;i<8;++i) CHECK(DO(3,i,0,0)==0,46);
++        DO(1,1,"lower-limit: PASS\n",18);
++        return 0;
++    }
++    if (*stack>1 && ((char **)(stack+1))[1][0]=='d') {
++        long file=DO(2,"/work/data",0102,0644);
++        CHECK(file>=3 && DO(1,file,"ABC",3)==3,55);
++        CHECK(DO(8,file,0,0)==0,56);
++        struct { word base, length; } vector={(word)bytes,1};
++        CHECK(DO(0,file,bytes,1)==-1 && DO(19,file,&vector,1)==-1,57);
++        CHECK(DO(8,file,0,1)==0,58); // Denied reads do not consume bytes.
++        CHECK(DO(5,file,meta,0)==-1 && DO(2,"/bin/fixture",0,0)==-1,59);
++        CHECK(DO(3,file,0,0)==0,60);
++        return 0;
++    }
++    if (*stack>1 && ((char **)(stack+1))[1][0]=='c') {
++        long console=DO(32,1,0,0);
++        CHECK(console>=3 && DO(1,console,"hidden",6)==-1,61);
++        long file=DO(2,"/work/data",0101,0644);
++        CHECK(file>=3 && DO(33,file,1,0)==1,62);
++        CHECK(DO(1,1,"X",1)==1 && DO(5,file,meta,0)==0 && *(word *)(meta+48)==1,63);
++        CHECK(DO(33,console,1,0)==1 && DO(3,console,0,0)==0 && DO(3,file,0,0)==0,64);
++        return 0;
++    }
++    if (*stack>1 && ((char **)(stack+1))[1][0]=='D') {
++        int ends[2];
++        CHECK(DO(293,ends,04000,0)==0,65);
++        CHECK(DO(1,ends[1],"X",1)==-1 && DO(0,ends[0],bytes,1)==-11,66);
++        CHECK(DO(2,"/work/data",0101,0644)==-1,67);
++        CHECK(DO(3,ends[0],0,0)==0 && DO(3,ends[1],0,0)==0,68);
++        return 0;
++    }
++    for (word i=0;i<260;++i) CHECK(DO(2,"/sealed",0,0)==-13,51);
++    long translated=257;
++    word directory=(word)-77, path=(word)"/work/../bin/fixture", flags=02000000;
++    register word mode __asm__("r10")=0;
++    __asm__ volatile("syscall":"+a"(translated),"+D"(directory),"+S"(path),"+d"(flags),"+r"(mode)::"rcx","r11","memory");
++    CHECK(translated==3 && directory==(word)-77 && path==(word)"/work/../bin/fixture" && flags==02000000 && mode==0,52);
++    CHECK(DO(72,translated,1,0)==1,53);
++    CHECK(DO(3,translated,0,0)==0,54);
++    long image=DO(2,"/bin/fixture",02000000,0);
++    long null=DO(2,"/dev/null",2|02000000,0);
++    long memory=DO(2,"/work/data",0102|02000000,0644);
++    int pipe[2];
++    CHECK(image==3 && null==4 && memory==5,10);
++    CHECK(DO(293,pipe,02004000,0)==0 && pipe[0]==6 && pipe[1]==7,11);
++    word limits[2];
++    CHECK(call(302,0,7,0,(word)limits,0,0)==0 && limits[0]==256 && limits[1]==256,12);
++    CHECK(DO(72,image,1,0)==1 && DO(72,null,1,0)==1 && DO(72,memory,1,0)==1,13);
++    CHECK(DO(72,image,3,0)>=0 && DO(72,image,8,1234)==-1,47);
++    CHECK(DO(1,memory,"ABC",3)==3 && DO(8,memory,0,0)==0,14);
++    long command_alias=DO(72,memory,(1UL<<32)|1030,10);
++    CHECK(command_alias==10 && DO(72,command_alias,1,0)==1,69);
++    CHECK(DO(3,command_alias,0,0)==0,70);
++    CHECK(DO(33,memory,(1UL<<32)|10,0)==10 && DO(3,10,0,0)==0,71);
++    CHECK(DO(81,null,0,0)==-20 && DO(81,pipe[0],0,0)==-20,72);
++    CHECK(DO(217,pipe[0],bytes,sizeof bytes)==-95,73);
++    CHECK(call(262,pipe[0],0,(word)meta,0x1000,0,0)==0,74);
++    long alias=DO(32,memory,0,0);
++    CHECK(alias==8 && DO(72,alias,1,0)==0,15);
++    CHECK(DO(0,memory,bytes,1)==1 && bytes[0]=='A',16);
++    CHECK(DO(0,alias,bytes,1)==1 && bytes[0]=='B',17); // Shared offset, including writable files.
++    CHECK(DO(33,memory,image,0)==image,18); // Last native reference closes its private fd.
++    CHECK(DO(0,image,bytes,1)==1 && bytes[0]=='C',19);
++    long reopened=DO(2,"/bin/fixture",0,0);
++    CHECK(reopened==9,20); // Native backend fd 3 is reused; public fd 3 still means memory.
++    word argument=reopened;
++    long count=0;
++    __asm__ volatile("syscall":"+a"(count),"+D"(argument):"S"(bytes),"d"(4):"rcx","r11","memory");
++    CHECK(count==4 && argument==(word)reopened && bytes[0]==127 && bytes[1]=='E',21);
++    long mapped=call(9,0,4096,1,2,reopened,0);
++    CHECK(mapped>0 && *(unsigned char *)mapped==127,22);
++    CHECK(DO(11,mapped,4096,0)==0,23);
++    CHECK(call(9,0,4096,1,2,memory,0)==-95,24); // Owned files never become native mmap handles.
++    CHECK(call(9,0,4096,1,2,0,0)==-95 && DO(217,0,bytes,sizeof bytes)==-20,48);
++    CHECK(DO(33,null,reopened,0)==reopened,25);
++    CHECK(DO(0,reopened,bytes,1)==0,26);
++    CHECK(DO(3,null,0,0)==0 && DO(1,reopened,"discard",7)==7,27);
++    CHECK(DO(3,alias,0,0)==0 && DO(3,memory,0,0)==0,28);
++    CHECK(DO(8,image,0,0)==0 && DO(0,image,bytes,3)==3 && bytes[0]=='A',29);
++    CHECK(DO(1,pipe[1],"pipe",4)==4 && DO(33,pipe[0],reopened,0)==reopened,30);
++    CHECK(DO(3,pipe[0],0,0)==0 && DO(0,reopened,bytes,4)==4 && bytes[0]=='p',31);
++    CHECK(DO(3,pipe[1],0,0)==0 && DO(0,reopened,bytes,1)==0,32);
++    CHECK(DO(3,reopened,0,0)==0 && DO(3,image,0,0)==0,33);
++    // Private backend numbers are not public authority.
++    CHECK(DO(0,1048576,bytes,1)==-9 && DO(5,0x40000000,meta,0)==-9,34);
++    CHECK(DO(3,(1UL<<32)|99,0,0)==-9,35);
++    memory=DO(2,"/work/data",0,0);
++    CHECK(memory==3,36);
++    long aliases[252];
++    for(word i=0;i<252;++i){ aliases[i]=DO(32,1,0,0);CHECK(aliases[i]>=0 && aliases[i]<256,37); }
++    CHECK(DO(2,"/work/data",01001,0644)==-24,38); // No truncate on public-table exhaustion.
++    CHECK(DO(2,"/bin/fixture",0,0)==-24,39);
++    CHECK(DO(5,memory,meta,0)==0 && *(word *)(meta+48)==3,40);
++    for(word i=0;i<252;++i) CHECK(DO(3,aliases[i],0,0)==0,41);
++    CHECK(DO(3,(1UL<<32)|(word)memory,0,0)==0,42); // Linux fd arguments use the low 32 bits.
++    DO(1,1,"shared-fds: PASS\n",17);
++    return 0;
++}
++__asm__(".global _start\n_start:\nmov %rsp,%rdi\nandq $-16,%rsp\ncall fd_main\nmov %rax,%rdi\nmov $60,%rax\nsyscall\nud2\n");
+diff --git a/tests/fixtures/launch-pipe-fixture.c b/tests/fixtures/launch-pipe-fixture.c
+new file mode 100644
+index 00000000..7fd408e0
+--- /dev/null
++++ b/tests/fixtures/launch-pipe-fixture.c
+@@ -0,0 +1,117 @@
++/* Real configured-launch anonymous pipe checks. No native pipe descriptors. */
++typedef unsigned long word;
++static long call(long n, word a, word b, word c, word d, word e, word f)
++{
++    register word r10 __asm__("r10") = d;
++    register word r8 __asm__("r8") = e;
++    register word r9 __asm__("r9") = f;
++    long result;
++    __asm__ volatile("syscall" : "=a"(result) : "a"(n), "D"(a), "S"(b), "d"(c),
++                     "r"(r10), "r"(r8), "r"(r9) : "rcx", "r11", "memory");
++    return result;
++}
++#define DO(n,a,b,c) call(n,(word)(a),(word)(b),(word)(c),0,0,0)
++#define CHECK(expr,code) if (!(expr)) return code
++static const char immutable[] = "read-only guest buffer";
++static char buffer[65536];
++static char data[65536];
++static char meta[256] __attribute__((aligned(8)));
++long pipe_main(word *stack)
++{
++    word argc = *stack;
++    char **argv = (char **)(stack + 1);
++    int pair[2];
++    if (argc > 1 && argv[1][0] == 'b') {
++        CHECK(DO(293,pair,0,0) == 0, 10);
++        return DO(0,pair[0],buffer,1) == -11 ? 11 : 12;
++    }
++    if (argc > 1 && argv[1][0] == 'w') {
++        CHECK(DO(22,pair,0,0) == 0, 13);
++        for (word i=0;i<65536;i+=4096) CHECK(DO(1,pair[1],data,4096) == 4096, 14);
++        return DO(1,pair[1],data,1) == -11 ? 15 : 16;
++    }
++    if (argc > 1 && argv[1][0] == 's') {
++        CHECK(DO(293,pair,0,0) == 0, 17);
++        CHECK(DO(3,pair[0],0,0) == 0, 18);
++        DO(1,pair[1],data,1);
++        return 19; // Default SIGPIPE must terminate the caller.
++    }
++    CHECK(DO(293,pair,1UL<<32,0) == -22, 20);
++    CHECK(DO(293,pair,040000,0) == -22, 21);
++    CHECK(DO(293,1,0,0) == -14, 22);
++    CHECK(DO(293,immutable,0,0) == -14, 23);
++    long pages=call(9,0,8192,3,0x22,-1,0);
++    CHECK(pages>0 && DO(10,pages+4096,4096,0) == 0, 24);
++    CHECK(DO(293,pages+4092,0,0) == -14, 25);
++    CHECK(DO(293,pair,02004000,0) == 0, 26);
++    CHECK(pair[0] == 3 && pair[1] == 4, 27);
++    CHECK(DO(0,pair[0],buffer,1) == -11, 28);
++    CHECK(DO(1,pair[0],data,1) == -9 && DO(0,pair[1],buffer,1) == -9, 29);
++    CHECK(DO(72,pair[0],1,0) == 1 && DO(72,pair[1],1032,0) == 65536, 30);
++    CHECK(DO(5,pair[0],meta,0) == 0, 31);
++    CHECK((*(unsigned int *)(meta+24) & 0170000) == 0010000, 32);
++    word inode=*(word *)(meta+8);
++    CHECK(call(332,pair[1],(word)"",0x1000,0x7ff,(word)meta,0) == 0, 33);
++    CHECK(*(word *)(meta+32) == inode, 34);
++    CHECK(DO(8,pair[0],0,0) == -29, 35);
++    CHECK(DO(1,pair[1],1,5) == -14, 36);
++    CHECK(DO(0,pair[0],buffer,1) == -11, 37);
++    CHECK(DO(1,pair[1],"hello",5) == 5, 38);
++    CHECK(DO(0,pair[0],immutable,5) == -14, 39);
++    CHECK(DO(0,pair[0],pages+4094,5) == 2, 40);
++    CHECK(DO(0,pair[0],buffer,5) == 3 && buffer[0] == 'l' && buffer[2] == 'o', 41);
++    CHECK(DO(1,pair[1],pages+4094,5) == -14, 42);
++    CHECK(DO(0,pair[0],buffer,1) == -11, 43);
++    CHECK(DO(11,pages,8192,0) == 0, 44);
++    for (word i=0;i<sizeof data;++i) data[i]=i%251;
++    for (word i=0;i<61440;i+=4096) CHECK(DO(1,pair[1],data+i,4096) == 4096, 45);
++    CHECK(DO(1,pair[1],data+61440,4095) == 4095, 46);
++    CHECK(DO(1,pair[1],"xx",2) == -11, 47); // Atomic write cannot consume the final byte.
++    CHECK(DO(1,pair[1],data+65535,1) == 1, 48);
++    CHECK(DO(1,pair[1],data,1) == -11, 49);
++    for (word i=0;i<65536;i+=4096) CHECK(DO(0,pair[0],buffer+i,4096) == 4096, 50);
++    for (word i=0;i<65536;++i) CHECK(buffer[i] == data[i], 51);
++    long alias=DO(32,pair[1],0,0);
++    CHECK(alias == 5, 52);
++    CHECK(DO(72,alias,1,0) == 0, 53);
++    CHECK(DO(72,alias,4,1) == 0 && DO(72,pair[1],3,0) == 1, 54);
++    CHECK(DO(72,pair[1],4,04001) == 0 && DO(72,alias,3,0) == 04001, 55);
++    CHECK(DO(3,pair[1],0,0) == 0, 56);
++    CHECK(DO(0,pair[0],buffer,1) == -11, 57);
++    CHECK(DO(1,alias,"bye",3) == 3, 58);
++    CHECK(DO(3,alias,0,0) == 0, 59);
++    CHECK(DO(0,pair[0],buffer,5) == 3 && buffer[0] == 'b', 60);
++    CHECK(DO(0,pair[0],buffer,1) == 0, 61);
++    CHECK(DO(3,pair[0],0,0) == 0, 62);
++    CHECK(DO(3,pair[0],0,0) == -9, 63);
++    CHECK(DO(293,pair,04000,0) == 0, 72);
++    long reader=DO(32,pair[0],0,0);
++    CHECK(reader >= 0 && DO(292,pair[1],pair[1],02000000) == -22, 73);
++    long saved_stdout=DO(32,1,0,0);
++    CHECK(saved_stdout>=0 && DO(33,pair[1],1,0) == 1, 74);
++    CHECK(DO(1,1,"redirect",8) == 8 && DO(0,reader,buffer,8) == 8 && buffer[0] == 'r', 82);
++    CHECK(DO(33,saved_stdout,1,0) == 1 && DO(3,saved_stdout,0,0) == 0, 83);
++    CHECK(DO(292,pair[1],pair[0],02000000) == pair[0], 75);
++    CHECK(DO(72,pair[0],1,0) == 1, 76);
++    CHECK(DO(3,pair[1],0,0) == 0, 77);
++    CHECK(DO(1,pair[0],"Q",1) == 1 && DO(0,reader,buffer,1) == 1 && buffer[0] == 'Q', 78);
++    CHECK(DO(3,pair[0],0,0) == 0 && DO(0,reader,buffer,1) == 0, 79);
++    CHECK(DO(3,reader,0,0) == 0, 80);
++    int all[8][2];
++    for (word i=0;i<8;++i) CHECK(DO(293,all[i],04000,0) == 0, 64);
++    CHECK(DO(293,pair,0,0) == -24, 65);
++    for (word i=0;i<8;++i) {
++        CHECK(DO(3,all[i][0],0,0) == 0 && DO(3,all[i][1],0,0) == 0, 66);
++    }
++    // Exhaust descriptors via aliases without falsely closing the original end.
++    CHECK(DO(293,pair,04000,0) == 0, 67);
++    long aliases[251];
++    for (word i=0;i<251;++i) { aliases[i]=DO(72,pair[1],1030,0); CHECK(aliases[i]>=0,68); }
++    CHECK(DO(72,aliases[0],1,0) == 1 && DO(72,pair[1],1,0) == 0, 81);
++    CHECK(DO(32,pair[1],0,0) == -24, 69);
++    for (word i=0;i<251;++i) CHECK(DO(3,aliases[i],0,0) == 0, 70);
++    CHECK(DO(3,pair[0],0,0) == 0 && DO(3,pair[1],0,0) == 0, 71);
++    DO(1,1,"owned-pipes: PASS\n",18);
++    return 0;
++}
++__asm__(".global _start\n_start:\nmov %rsp,%rdi\nandq $-16,%rsp\ncall pipe_main\nmov %rax,%rdi\nmov $60,%rax\nsyscall\nud2\n");
+diff --git a/tests/fixtures/launch-storage-fixture.c b/tests/fixtures/launch-storage-fixture.c
+index be4d7933..acc4798e 100644
+--- a/tests/fixtures/launch-storage-fixture.c
++++ b/tests/fixtures/launch-storage-fixture.c
+@@ -30,7 +30,7 @@ long storage_main(word *stack)
+     char **argv = (char **)(stack + 1);
+     if (argc > 1 && argv[1][0] == 'C') {
+         long fd = DO(2, "/work/catalog", 0102, 0600);
+-        CHECK(fd >= 1048576, 222);
++        CHECK(fd >= 3, 222);
+         CHECK(call(268, -100, (word)"/work/catalog", 0777, 0, 0, 0) == -1, 223);
+         CHECK(DO(5, fd, meta, 0) == 0 && (*(unsigned int *)(meta+24)&07777) == 0600, 224);
+         CHECK(DO(3, fd, 0, 0) == 0, 225);
+@@ -41,11 +41,11 @@ long storage_main(word *stack)
+         CHECK(DO(83, "/work/dir", 07777, 0) == 0, 171);
+         CHECK(DO(4, "/work/dir", meta, 0) == 0 && (*(unsigned int *)(meta+24)&07777) == 07755, 172);
+         long dir = DO(2, "/work/dir", 0200000, 0);
+-        CHECK(dir >= 1048576, 173);
++        CHECK(dir >= 3, 173);
+         CHECK(DO(0, dir, output, 1) == -21, 174);
+         CHECK(DO(2, "/work/dir", 0300, 0600) == -17, 175);
+         long fd = call(257, dir, (word)"child", 0102, 0600, 0, 0);
+-        CHECK(fd >= 1048576 && DO(1, fd, "x", 1) == 1, 176);
++        CHECK(fd >= 3 && DO(1, fd, "x", 1) == 1, 176);
+         CHECK(DO(2, "/work/dir/child", 0200000, 0) == -20, 177);
+         CHECK(DO(84, "/work/dir", 0, 0) == -39, 178);
+         CHECK(DO(217, dir, output, 1) == -22, 179);
+@@ -70,7 +70,7 @@ long storage_main(word *stack)
+         CHECK(DO(3, dir, 0, 0) == 0, 196);
+         CHECK(DO(80, "/bin", 0, 0) == 0 && DO(4, "fixture", meta, 0) == 0, 197);
+         long image_dir = DO(2, "/bin", 0200000, 0);
+-        CHECK(image_dir >= 3 && image_dir < 1048576, 198);
++        CHECK(image_dir >= 3 && image_dir < 256, 198);
+         CHECK(DO(80, "/work", 0, 0) == 0 && DO(81, image_dir, 0, 0) == 0, 199);
+         CHECK(DO(79, output, 512, 0) == 5 && output[1] == 'b', 200);
+         CHECK(DO(3, image_dir, 0, 0) == 0, 201);
+@@ -79,15 +79,15 @@ long storage_main(word *stack)
+     if (argc > 1 && argv[1][0] == 'S') {
+         /* Append is shared by dup aliases, close-on-exec is descriptor-local. */
+         long fd = DO(2, "/work/status", 0102, 0600);
+-        CHECK(fd >= 1048576 && DO(1, fd, "abc", 3) == 3, 202);
++        CHECK(fd >= 3 && DO(1, fd, "abc", 3) == 3, 202);
+         long alias = DO(32, fd, 0, 0);
+         CHECK(alias > fd && DO(72, alias, 4, 02000) == 0, 203);
+         CHECK(DO(72, fd, 3, 0) == (0100000 | 02000 | 2), 204);
+         CHECK(DO(8, fd, 0, 0) == 0 && DO(1, alias, "d", 1) == 1 && DO(8, fd, 0, 1) == 4, 205);
+         CHECK(DO(72, fd, 2, 1) == 0 && DO(72, alias, 1, 0) == 0, 206);
+         CHECK(DO(72, alias, 4, 0) == 0 && DO(72, fd, 3, 0) == (0100000 | 2), 207);
+-        long high = DO(72, fd, 1030, 1048586);
+-        CHECK(high == 1048586 && DO(72, high, 1, 0) == 1, 208);
++        long high = DO(72, fd, 1030, 10);
++        CHECK(high == 10 && DO(72, high, 1, 0) == 1, 208);
+         CHECK(DO(8, high, 0, 0) == 0 && DO(1, fd, "z", 1) == 1, 209);
+         CHECK(DO(0, alias, output, 3) == 3 && output[0] == 'b' && output[2] == 'd', 210);
+         CHECK(DO(3, high, 0, 0) == 0 && DO(3, alias, 0, 0) == 0 && DO(3, fd, 0, 0) == 0, 211);
+@@ -96,7 +96,7 @@ long storage_main(word *stack)
+     if (argc > 1 && argv[1][0] == 'M') {
+         /* Mode changes constrain new opens; existing open rights persist. */
+         long fd = DO(2, "/work/mode", 0102, 0600);
+-        CHECK(fd >= 1048576 && DO(91, fd, 07777, 0) == 0, 212);
++        CHECK(fd >= 3 && DO(91, fd, 07777, 0) == 0, 212);
+         CHECK(DO(5, fd, meta, 0) == 0 && (*(unsigned int *)(meta+24)&07777) == 07777, 213);
+         CHECK(DO(91, fd, 0, 0) == 0 && DO(1, fd, "ok", 2) == 2, 214);
+         CHECK(DO(2, "/work/mode", 0, 0) == -13 && DO(2, "/work/mode", 1, 0) == -13, 215);
+@@ -109,11 +109,11 @@ long storage_main(word *stack)
+         CHECK(DO(3, fd, 0, 0) == 0, 221);
+         CHECK(DO(83, "/work/parent", 0700, 0) == 0, 227);
+         long child = DO(2, "/work/parent/file", 0101, 0600);
+-        CHECK(child >= 1048576 && DO(3, child, 0, 0) == 0, 228);
++        CHECK(child >= 3 && DO(3, child, 0, 0) == 0, 228);
+         CHECK(DO(87, "/work/parent/file", 0, 0) == 0 && DO(90, "/work/parent", 0500, 0) == 0, 229);
+         CHECK(DO(2, "/work/parent/file", 0101, 0600) == -13, 230);
+         long writeonly = DO(2, "/work/writeonly", 0101, 0200);
+-        CHECK(writeonly >= 1048576 && DO(1, writeonly, "keep", 4) == 4, 231);
++        CHECK(writeonly >= 3 && DO(1, writeonly, "keep", 4) == 4, 231);
+         CHECK(DO(2, "/work/writeonly", 01000, 0) == -13, 232);
+         CHECK(DO(5, writeonly, meta, 0) == 0 && *(word *)(meta+48) == 4, 233);
+         CHECK(DO(3, writeonly, 0, 0) == 0, 234);
+@@ -121,7 +121,7 @@ long storage_main(word *stack)
+     }
+     if (argc > 1 && argv[1][0] == 'd') {
+         long fd = DO(2, "/work/metadata", 0102, 0600);
+-        CHECK(fd >= 1048576 && DO(1, fd, "ok", 2) == 2, 111);
++        CHECK(fd >= 3 && DO(1, fd, "ok", 2) == 2, 111);
+         CHECK(DO(5, fd, meta, 0) == 0, 112);
+         word inode = *(word *)(meta+8);
+         CHECK(DO(6, "/work/metadata", meta, 0) == 0 && *(word *)(meta+8) == inode, 113);
+@@ -148,7 +148,7 @@ long storage_main(word *stack)
+         CHECK(DO(89, "/work/d", output, 64) == -22, 137);
+         /* Harmless open flags are accepted; wrong-access calls fail with EBADF. */
+         long fd = DO(2, "/work/t", 01 | 0100 | 04000 | 0400, 0644);
+-        CHECK(fd >= 1048576, 138);
++        CHECK(fd >= 3, 138);
+         CHECK(DO(0, fd, output, 1) == -9, 139);
+         struct { word base, length; } iov[2] = {{(word)"ab", 2}, {(word)"cd", 2}};
+         CHECK(DO(20, fd, iov, 2) == 4, 140);
+@@ -178,7 +178,7 @@ long storage_main(word *stack)
+     if (argc > 1 && argv[1][0] == 'x') {
+         /* With filesystem.path.read denied, high descriptor bits cannot evade it. */
+         long fd = DO(2, "/work/r", 0102, 0644);
+-        CHECK(fd >= 1048576 && DO(1, fd, "abc", 3) == 3, 153);
++        CHECK(fd >= 3 && DO(1, fd, "abc", 3) == 3, 153);
+         CHECK(DO(0, fd, output, 3) == -1, 154);
+         CHECK(DO(0, fd | (1UL << 32), output, 3) == -1, 155);
+         CHECK(DO(5, fd | (1UL << 32), meta, 0) == -1, 156);
+@@ -186,7 +186,7 @@ long storage_main(word *stack)
+     }
+     if (argc > 1 && argv[1][0] == 'w') {
+         /* A working directory held in memory anchors relative paths. */
+-        CHECK(DO(2, "made", 0102, 0644) >= 1048576, 165);
++        CHECK(DO(2, "made", 0102, 0644) >= 3, 165);
+         CHECK(DO(4, "/mem-work/made", meta, 0) == 0, 166);
+         return 0;
+     }
+@@ -209,12 +209,12 @@ long storage_main(word *stack)
+         return 0;
+     }
+     if (argc > 1 && argv[1][0] == 'p') {
+-        CHECK(DO(2, "/work/file", 0102, 0644) >= 1048576, 80);
++        CHECK(DO(2, "/work/file", 0102, 0644) >= 3, 80);
+         CHECK(DO(2, "/work/file/../created", 0102, 0644) == -20, 81);
+         return 0;
+     }
+     if (argc > 1 && argv[1][0] == 'm') {
+-        CHECK(DO(2, "/work/file", 0102, 0644) >= 1048576, 85);
++        CHECK(DO(2, "/work/file", 0102, 0644) >= 3, 85);
+         CHECK(DO(4, "/work/missing/../file", meta, 0) == -2, 82);
+         return 0;
+     }
+@@ -228,7 +228,7 @@ long storage_main(word *stack)
+     }
+     if (argc > 1 && argv[1][0] == 'c') {
+         long fd = DO(2, "/virtual/../image", 0, 0);
+-        CHECK(fd >= 3 && fd < 1048576, 86);
++        CHECK(fd >= 3 && fd < 256, 86);
+         CHECK(DO(0, fd, output, 15) == 15 && output[0] == 'i', 87);
+         CHECK(call(262,fd,(word)"",(word)meta,0x1000,0,0) == 0, 88);
+         CHECK(*(word *)(meta+48) == 15, 89);
+@@ -257,7 +257,7 @@ long storage_main(word *stack)
+     }
+     if (argc > 1 && argv[1][0] == 't') {
+         long fd = DO(2, "/work/file", 0102, 0644);
+-        CHECK(fd >= 1048576, 103);
++        CHECK(fd >= 3, 103);
+         CHECK(call(262,-100,(word)"/work/file",(word)meta,0x1900,0,0) == 0, 104);
+         CHECK(call(262,fd,(word)"",(word)meta,0x1900,0,0) == 0, 105);
+         CHECK(call(332,-100,(word)"/work/file",0x2900,0x7ff,(word)meta,0) == 0, 106);
+@@ -274,14 +274,14 @@ long storage_main(word *stack)
+             path[11] = '0' + i % 10;
+             long fd = DO(2, path, 0101, 0644);
+             if (fd == -28) return i > 0 && i < 32 ? 0 : 61;
+-            CHECK(fd >= 1048576, 62);
++            CHECK(fd >= 3, 62);
+             CHECK(DO(3, fd, 0, 0) == 0, 63);
+         }
+         return 64;
+     }
+     word limits[2];
+     CHECK(call(302,0,7,0,(word)limits,0,0) == 0, 65);
+-    CHECK(limits[0] <= 1048576 && limits[1] <= 1048576, 66);
++    CHECK(limits[0] <= 256 && limits[1] <= 256, 66);
+     limits[0] = limits[1] = 1048577;
+     CHECK(call(302,0,7,(word)limits,0,0,0) < 0, 67);
+     CHECK(DO(4, "/work", meta, 0) == 0, 11);
+@@ -292,7 +292,7 @@ long storage_main(word *stack)
+     CHECK(DO(2, 1, 0, 0) == -14, 16);
+     CHECK(DO(83, "/work/build/nested", 0755, 0) == 0, 17);
+     long fd = call(257, -100, (word)"build/nested/file", 0102|02000000, 0644, 0, 0);
+-    CHECK(fd == 1048576, 18);
++    CHECK(fd == 3, 18);
+     CHECK(DO(1, fd, "hello", 5) == 5, 19);
+     CHECK(DO(72, fd, 1, 0) == 1, 20);
+     CHECK(DO(72, fd, 2, 0) == 0, 21);
+@@ -348,13 +348,13 @@ long storage_main(word *stack)
+     long fds[64];
+     for (word i = 0; i < 64; ++i) {
+         fds[i] = DO(2, "/work/build/nested/file", 2, 0);
+-        CHECK(fds[i] >= 1048576, 46);
++        CHECK(fds[i] >= 3, 46);
+     }
+     CHECK(DO(2, "/work/build/nested/file", 01002, 0) == -24, 47);
+     CHECK(DO(5, fds[0], meta, 0) == 0 && *(word *)(meta+48) == 5, 48);
+     for (word i = 0; i < 64; ++i) CHECK(DO(3, fds[i], 0, 0) == 0, 49);
+     fd = DO(2, "/out/product", 0102, 0644);
+-    CHECK(fd >= 1048576, 50);
++    CHECK(fd >= 3, 50);
+     for (word i = 0; i < sizeof data; ++i) data[i] = i % 251;
+     for (word i = 0; i < sizeof data; i += 4096) CHECK(DO(1, fd, data+i, 4096) == 4096, 51);
+     CHECK(DO(1, fd, "x", 1) == -27, 52);
