@@ -1,106 +1,143 @@
-# Brief for an image-generation agent: desktop wallpapers
+# Brief for an image-generation agent: desktop wallpapers (round 2)
 
 Hand this whole file to the agent as its instructions. It is self-contained.
 
 ---
 
-You are making the default desktop wallpapers for two Linux distributions that
-share one visual identity, "Field Notes": **LevitateOS** (KDE Plasma desktop)
-and its sibling **AcornOS** (LXQt desktop). You produce artwork only. Logos,
-text and interface are added by the system, never painted into the image.
+You are making the default desktop wallpapers for two Linux distributions:
+**LevitateOS** (KDE Plasma desktop) and its sibling **AcornOS** (LXQt
+desktop). You produce artwork only. Logos, text and interface are added by the
+system, never painted into the image.
 
-## Read first
+## What went wrong in round 1
 
-- `docs/website/design/field-notes-v3/levitate-frame-original.png`: the
-  existing LevitateOS artwork, a frame of dark pine-green stone and blackened
-  green metal with leaf-vein relief, warm amber edge light and one small
-  lacquer-red inlay. Your work must look like it belongs to the same family:
-  same materials, light and restraint. Do not copy its layout. It is a frame
-  with an empty centre; you are making full-bleed wallpapers.
-- `docs/website/design/field-notes-v3/GENERATION.md`: the brief that produced
-  it.
-- `docs/website/public/brand/levitate-ink.svg` and `acorn-ink.svg`: the two
-  marks, a hovering leaf above a curved ground line and a tilted, sculpted
-  acorn. They are for recognising the motifs only. **Do not draw either mark,
-  or any logo, in the artwork.**
+Round 1 (`.artifacts/desktop-art/*.png`) asked for minimal, dark, architectural
+stone-and-wood studies. The user rejected all twelve as ugly and unsettling. Do
+not reuse that direction: no brooding empty planes, no cold stone, no uncanny
+or oppressive mood, no minimalism. These are **scenes**: rich, detailed,
+warm, places you would want to be. Peaceful and inviting, never eerie.
 
-## Palette
+## Three styles
+
+Every scene is made in all three styles. Keep the scene and composition the
+same across the three, so they read as one picture painted three ways.
+
+1. **Realistic.** A photograph: natural light, real materials, believable depth
+   of field. Not a 3D render, not over-processed HDR, not oversaturated.
+2. **Western professionally drawn.** Hand-drawn and painted illustration in
+   the Western tradition: a skilled storybook, editorial or animation
+   background painter (gouache, watercolour or painterly digital with visible,
+   confident drawing). Not anime or manga, not cel-shaded, not clip art, not
+   vector-flat.
+3. **Dutch abstract.** In the spirit of De Stijl (Mondrian, van Doesburg): the
+   scene reduced to horizontal and vertical black lines and flat rectangular
+   colour planes. Mondrian's own tree studies, which move step by step from a
+   painted tree to pure grid, show how a landscape becomes this language. The
+   scene must still be recognisable in its structure (the treehouse, the row of
+   trees, the horizon; the table, the trunks). Do not copy any existing
+   painting. You may use the brand colours below in place of pure primaries.
+
+## LevitateOS: the treehouse (6 images)
+
+A **treehouse** in a large, healthy tree, with **no people**. Behind it lies a
+**farm**: fields, perhaps a barn or fences, nothing industrial. Far in the
+background a **row of trees** runs along the horizon. **The sky is visible**
+and takes a real share of the picture.
+
+In the **foreground**, a single **leaf hovers just above the ground**. It is
+about to land and doesn't: it fails, or refuses, to touch down. Show a clear
+small gap between leaf and ground, with its shadow on the grass below it. This
+is the heart of the LevitateOS identity (the logo is a leaf above a curved
+ground line). It should be noticeable but not huge, off centre, and quietly
+impossible rather than magical: no glow, no sparkles.
+
+Two versions of each style:
+
+- **Light: daytime, nice weather.** Clear or lightly clouded sky, soft sun,
+  green summer fields.
+- **Dark: night.** The same scene lit by **soft artificial light**: warm
+  lamplight in the treehouse windows, perhaps a lantern or a string of small
+  lights along the treehouse. Stars or a deep blue sky. Calm and cosy, still
+  clearly readable, not pitch black.
+
+Colour lean: greens toward pine `#214438` and pale pine `#C7D9BA`; warm
+lamplight toward amber.
+
+## AcornOS: the picnic table (3 images)
+
+Deep inside a **forest in deep autumn**: rich reds, burnt orange, ochre and
+brown leaves, on the trees and thick on the ground. A wooden **picnic table**
+stands in a clearing, **not centred**.
+
+A **family of squirrels is rushing** past or around the table. Show them
+with **motion blur**, as if the photograph used a longer exposure (slow
+shutter): the table, trunks and leaves are sharp, and the squirrels are
+streaks of movement that are still clearly squirrels. **No acorns are visible
+anywhere**, yet the viewer should sense the squirrels are after acorns that are
+close by: their direction, urgency and where they're heading (one diving into
+the leaf litter, one darting toward the base of a large oak) tell the story.
+
+In the drawn style, show the motion with the painter's means (drybrush
+streaks, repeated outlines, speed in the brushwork). In the Dutch abstract
+style, show it with a staccato run of small coloured rectangles stepping
+along the grid lines (the device of Mondrian's late New York work), heading
+toward one spot.
+
+Only one version per style. LXQt does not switch wallpaper with a light/dark
+scheme, so it needs no separate night image.
+
+Colour lean: browns toward acorn brown `#644532` and pale acorn `#E4CBA6`,
+with autumn reds and orange.
+
+## Brand colours (for the abstract style, and as a lean elsewhere)
 
 | Role | Hex |
 |---|---|
-| Ink (deepest dark) | `#14221A` |
+| Ink (deepest dark, the De Stijl black lines) | `#14221A` |
 | Pine, LevitateOS | `#214438` |
-| Pale pine, LevitateOS on dark | `#C7D9BA` |
+| Pale pine | `#C7D9BA` |
 | Acorn brown | `#644532` |
-| Pale acorn, AcornOS on dark | `#E4CBA6` |
-| Paper | `#F2EEE4` |
-| Red accent (at most one small touch per image) | `#B22F27` |
-| Amber light | a warm material light grazing edges, never a flat UI colour |
+| Pale acorn | `#E4CBA6` |
+| Paper (the De Stijl white) | `#F2EEE4` |
+| Red | `#B22F27` |
 
-## The four images
+## Composition rules (all images)
 
-Two per distribution: a dark one (the default) and a light one (Plasma swaps
-to it when the user picks a light colour scheme).
+A wallpaper sits behind windows and a taskbar, and screens of different shapes
+crop it.
 
-1. **LevitateOS, dark.** Substantial planes of dark pine-green stone and
-   blackened green metal, meeting at precise asymmetric bevels and deep shadow
-   cuts. Large, restrained leaf-vein relief carved into one or two of the
-   planes. Warm amber light grazes a few edges. A sense of something resting
-   just above the ground. The leaf "levitates", but show this through light and
-   shadow (a thin band of light under a plane), not a floating object. Mood:
-   calm, intimidating competence, warmth, weight, exactness.
-2. **LevitateOS, light.** The same scene and materials translated to warm paper
-   and pale limestone (`#F2EEE4` and slightly darker), with the relief and
-   bevels in soft pine shadow. Low contrast overall: dark text and icons must
-   stay readable anywhere on it.
-3. **AcornOS, dark.** The same architectural language in a different
-   material: dark oiled oak and walnut planes, carved bark grain, and as relief
-   the overlapping scale pattern of an acorn cup (cupule). Browns from ink
-   through `#644532`, amber light on the edges. **No leaves and no leaf veins**.
-   Those belong to LevitateOS. Slightly smaller and simpler in feel than
-   LevitateOS ("a smaller, simpler base"), with fewer planes and more quiet
-   surface.
-4. **AcornOS, light.** Image 3 translated to pale wood and paper (`#F2EEE4`,
-   `#E4CBA6`), relief in soft brown shadow, low contrast.
-
-## Composition rules
-
-Windows and a taskbar sit on top of a wallpaper, and screens of many shapes crop
-it. So:
-
-- **Format:** 16:9 landscape. Target 3840×2160. If your tool cannot produce
-  at least 2560×1440, say so and deliver the largest it can. Do not upscale
-  it yourself.
-- **Crop-safe:** the image must still look intentional when cropped to the
-  centre 4:3 area and to the centre 21:9 band. Put no essential detail in the
-  outer 12% at left and right.
-- **Quiet zones:** the bottom 6% is covered by the panel. Keep it plain and
-  even. The upper-left quarter may hold desktop icons with white labels on the
-  dark images and dark labels on the light ones; keep it low in detail.
-- **Where the detail goes:** concentrate the richest material and relief in one
-  area off centre (for example lower right into centre), and let the rest fall
-  away into large calm planes. The middle of the screen is where windows open,
-  so avoid strong focal points or high-contrast texture there.
-- **Restraint:** no busy pattern, no repeating tiles, no noise or grain strong
-  enough to show at 100% zoom. Detail should read at full screen and still
-  look calm at a thumbnail.
-- **Never:** text, letters, numbers, logos or marks, user-interface elements,
-  people, animals, signatures, watermarks, borders or frames around the image,
-  lens flare, bokeh, neon, gradients that band.
+- **Format:** 16:9 landscape, at the largest native size your tool produces.
+  Report the actual size; do not upscale (that is a separate step).
+- **Crop-safe:** the image must still work when cropped to the centre 4:3 area
+  and to the centre 21:9 band. Keep the key subjects (treehouse, hovering
+  leaf, picnic table, squirrels) out of the outer 12% at left and right and out
+  of the top and bottom 8%.
+- **Taskbar:** the bottom 6% sits under the panel. Nothing important there; the
+  hovering leaf must sit clearly above it.
+- **Readability:** desktop icons may sit in the upper-left quarter. Keep that
+  area moderate in detail (sky or canopy work well).
+- **Never:** text, letters, numbers, logos, user-interface elements, people,
+  signatures, watermarks, borders or frames, lens flare. No visible acorns in
+  the AcornOS images. No people in any image.
 
 ## Deliverables
 
-Write everything into `.artifacts/desktop-art/` in the LevitateOS checkout (it
-is git-ignored; the user picks the final images from there):
+Write everything into `.artifacts/desktop-art/round-2/` in the LevitateOS
+checkout (git-ignored; the user picks the finals from there). Leave round 1
+where it is.
 
-- For each of the four images, **three candidates**:
-  `levitate-dark-1.png` … `levitate-dark-3.png`, `levitate-light-1.png` …,
-  `acorn-dark-1.png` …, `acorn-light-1.png` ….
-  PNG, sRGB, metadata stripped, no other processing (no crop, retouching or
-  colour grading after generation).
-- `GENERATION.md` in the same folder, in the same shape as
-  `docs/website/design/field-notes-v3/GENERATION.md`: the tool and model used,
-  the exact prompt for each image, the size each file actually came out at, and
-  anything you could not meet from this brief.
+Two candidates per image, 18 files in all:
+
+- `levitate-realistic-light-1.png`, `-2.png`; `levitate-realistic-dark-1.png`, `-2.png`
+- `levitate-drawn-light-…`, `levitate-drawn-dark-…`
+- `levitate-abstract-light-…`, `levitate-abstract-dark-…`
+- `acorn-realistic-1.png`, `-2.png`; `acorn-drawn-…`; `acorn-abstract-…`
+
+PNG, sRGB, metadata stripped, no processing after generation (no crop,
+retouching or colour grading).
+
+Also write `GENERATION.md` in that folder: the tool and model used, the exact
+prompt for each image, the size each file actually came out at, and anything
+from this brief you could not meet.
 
 Do not edit anything else in the repository.
