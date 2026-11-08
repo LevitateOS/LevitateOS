@@ -5,9 +5,8 @@
 ## Commands
 
 ```bash
-cargo xtask setup                              # QEMU/OVMF tools into .artifacts/tools, repo SSH key, doctor
+cargo xtask setup                              # repo SSH key, doctor
 cargo xtask doctor [--json]                    # what is missing, with the command that fixes it
-eval "$(cargo xtask env)"                      # the repo QEMU tools in your shell
 
 cargo xtask build kernel levitate --prebuilt   # or compile: build kernel levitate [--now] [--rebuild]
 cargo xtask build rootfs-source levitate [--refresh]
@@ -46,9 +45,9 @@ cargo xtask inspect disk-plan --input 'jj'     # type keys once it has drawn, th
 
 - **Exit codes:** 0 ok, 1 failed, 2 bad usage, 3 missing prerequisite. A prerequisite error ends with `fix: <command>`.
 - **No hidden waiting:** `run` and `tui` need a terminal; without one they exit 2 and name the command that works without one. `test` never waits for input.
-- **SSH keys:** guests trust the repo key in `.artifacts/ssh` (created on first use), or `--ssh-key <private key>`. Nothing reads `~/.ssh`.
-- **Boot injection:** `--inject KEY=VALUE[,...]` and `--inject-file PATH` add to what xtask injects itself (the SSH key, and the serial install UX for `run`).
-- **QEMU:** the repo tools from `cargo xtask setup` when installed, otherwise the host's `qemu-system-x86_64` and OVMF.
+- **SSH keys:** live boots trust the repo key in `.artifacts/ssh` (created on first use), or `--ssh-key <private key>`. SSH runs with `-F /dev/null` and a known-hosts file of its own, so nothing reads `~/.ssh`.
+- **Boot injection:** `--inject KEY=VALUE[,...]` and `--inject-file PATH` add to what every live boot gets (the SSH key, and the serial install screen for an interactive `run`). Installed systems get none.
+- **VMs:** `test` and `run` boot through install-tests' one launcher, as libvirt domains named `<distro>-<scenario>` on the host's QEMU, OVMF and qemu-img. A second run of a scenario whose domain is still running fails instead of stopping it.
 - **Nothing expensive by surprise:** kernel compiles run 23:00-10:00 unless `--now`; LLM autofix only with `--autofix`.
 - **What next:** builds print what they made and the command that tests it.
 

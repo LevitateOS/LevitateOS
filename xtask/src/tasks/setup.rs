@@ -1,4 +1,5 @@
-//! `setup`, `doctor` and `env`: getting a checkout ready to build and boot.
+//! `setup` and `doctor`: getting a checkout ready to build and boot. VMs run
+//! under the host's libvirt, so its QEMU, OVMF and qemu-img are the VM tools.
 
 use anyhow::Result;
 use serde::Serialize;
@@ -10,17 +11,9 @@ use distro_contract::ProductId;
 
 pub fn setup() -> Result<()> {
     let root = crate::util::repo::repo_root()?;
-    eprintln!("[step] Install the QEMU/OVMF tools into .artifacts/tools");
-    crate::util::distro_builder::run_bare(&root, &distro_builder::cli::Command::PrepareQemuTools)?;
     eprintln!("[step] Repo SSH key");
-    crate::util::ssh::ensure_repo_key(&root)?;
+    install_tests::scenarios::ensure_login_key(&root)?;
     doctor(false)
-}
-
-pub fn env() -> Result<()> {
-    let root = crate::util::repo::repo_root()?;
-    print!("{}", crate::util::tools_env::shell_exports(&root)?);
-    Ok(())
 }
 
 #[derive(Serialize)]
@@ -76,36 +69,24 @@ pub fn doctor(json: bool) -> Result<()> {
     }
 
     let missing: Vec<&Check> = checks.iter().filter(|c| c.required && !c.ok).collect();
-    if let Some(first) = missing.first() {
+    if !missing.is_empty() {
+        let mut fixes: Vec<String> = missing.iter().filter_map(|c| c.fix.clone()).collect();
+        fixes.dedup();
         return Err(crate::util::exit::missing(
-            format!("{} required check(s) failed", missing.len()),
-            first.fix.clone().unwrap_or_default(),
+            format!(
+                "{} required check(s) failed: {}",
+                missing.len(),
+                missing.iter().map(|c| c.check.as_str()).collect::<Vec<_>>().join(", ")
+            ),
+            fixes.join("; "),
         ));
     }
     Ok(())
 }
 
-/// A failed prerequisite as (detail, fix).
-fn gap(error: &anyhow::Error) -> (String, String) {
-    match error.downcast_ref::<crate::util::exit::MissingPrereq>() {
-        Some(missing) => (missing.what.clone(), missing.fix.clone()),
-        None => (format!("{error:#}"), "cargo xtask setup".into()),
-    }
-}
-
 fn checks(root: &Path) -> Vec<Check> {
     let mut checks = Vec::new();
 
-    let repo_tools = crate::util::repo::repo_tools(root);
-    checks.push(Check::new(
-        "repo QEMU tools",
-        false,
-        match &repo_tools {
-            Ok(Some(path)) => Ok(path.display().to_string()),
-            Ok(None) => Err(("not installed; the host's QEMU is used".into(), "cargo xtask setup".into())),
-            Err(e) => Err(gap(e)),
-        },
-    ));
     // Scenario VMs are libvirt domains on the user session (Cockpit shows them).
     let uri = recqemu::libvirt::uri();
     checks.push(Check::new(
@@ -122,7 +103,7 @@ fn checks(root: &Path) -> Vec<Check> {
             .map(|p| p.display().to_string())
             .map_err(|e| (format!("{e:#}"), "install edk2-ovmf".into())),
     ));
-    let key = crate::util::ssh::repo_key_path(root);
+    let key = distro_contract::runs::ssh_key(root);
     checks.push(Check::new(
         "repo SSH key",
         true,

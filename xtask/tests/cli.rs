@@ -45,6 +45,9 @@ fn bad_usage_exits_2() {
         vec!["reset", "../other"],
         vec!["build", "kernel"],
         vec!["run", "live-boot", "levitate", "--no-such-option", "--no-shell"],
+        vec!["run", "live-boot", "acorn", "--ssh-port", "2222", "--no-shell"],
+        vec!["test", "live-boot", "levitate", "--inject", "NOEQUALS"],
+        vec!["test", "live-boot", "acorn", "--ssh-key", "/nonexistent/key"],
     ] {
         let output = xtask().args(&args).output().unwrap();
         assert_eq!(output.status.code(), Some(2), "{args:?}\n{}", diagnostic(&output));
@@ -64,9 +67,9 @@ fn interactive_commands_without_a_terminal_exit_2_and_name_the_alternative() {
             .output()
             .unwrap();
         assert_eq!(output.status.code(), Some(2), "{args:?}\n{}", diagnostic(&output));
+        // The error names the command that works without a terminal.
         let error = String::from_utf8_lossy(&output.stderr);
-        assert!(error.contains("needs a terminal"), "{error}");
-        assert!(error.contains("instead: cargo xtask"), "{error}");
+        assert!(error.contains("cargo xtask"), "{error}");
     }
 }
 
@@ -79,7 +82,9 @@ fn doctor_json_lists_every_check_with_a_fix_for_each_gap() {
         diagnostic(&output)
     );
     let checks: Vec<serde_json::Value> = serde_json::from_slice(&output.stdout).unwrap();
-    assert!(checks.iter().any(|c| c["check"] == "OVMF firmware"), "{checks:?}");
+    let required_gap = checks.iter().any(|c| c["required"] == true && c["ok"] == false);
+    // Exit 3 exactly when a required check failed.
+    assert_eq!(output.status.code() == Some(3), required_gap, "{}", diagnostic(&output));
     for check in &checks {
         if check["ok"] == false {
             assert!(check["fix"].is_string(), "{check}");

@@ -7,7 +7,6 @@ pub fn run(cli: crate::cli::Cli) -> Result<()> {
         Cmd::Setup => crate::tasks::setup::setup(),
         Cmd::Doctor { json, packages: None } => crate::tasks::setup::doctor(json),
         Cmd::Doctor { packages: Some(family), .. } => crate::tasks::setup::packages(&family),
-        Cmd::Env => crate::tasks::setup::env(),
         Cmd::Build { what } => crate::tasks::build::run(what),
         Cmd::Base { what: BaseCmd::Lock { distro, check } } => crate::tasks::base::lock(&distro, check),
         Cmd::Run(args) => crate::tasks::scenarios::run(args),

@@ -42,8 +42,25 @@ pub fn usage(message: impl Into<String>) -> anyhow::Error {
     Usage(message.into()).into()
 }
 
+/// The command that provides what a producer reported missing.
+pub fn fix_for(missing: &distro_contract::Missing) -> String {
+    match missing {
+        distro_contract::Missing::ReleaseIso { distro, product } => format!("cargo xtask build {product} {distro}"),
+        distro_contract::Missing::InstallRun { distro } => format!("cargo xtask test install {distro}"),
+    }
+}
+
+/// The `fix:` line for an error a producer raised (xtask's own prerequisite
+/// errors carry theirs in their message).
+pub fn producer_fix(error: &anyhow::Error) -> Option<String> {
+    error.chain().find_map(|e| e.downcast_ref::<distro_contract::Missing>()).map(fix_for)
+}
+
 pub fn code_for(error: &anyhow::Error) -> i32 {
-    if error.chain().any(|e| e.is::<MissingPrereq>()) {
+    if error
+        .chain()
+        .any(|e| e.is::<MissingPrereq>() || e.is::<distro_contract::Missing>())
+    {
         3
     } else if error.chain().any(|e| e.is::<Usage>()) {
         2

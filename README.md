@@ -25,7 +25,7 @@ Both are built by the same pipeline from their own declarations under
 Everything runs through `cargo xtask` (`just <command>` is a short alias):
 
 ```bash
-cargo xtask setup                              # QEMU/OVMF tools, repo SSH key, then a doctor report
+cargo xtask setup                              # repo SSH key, then a doctor report
 cargo xtask build kernel levitate --prebuilt   # or compile it: build kernel levitate
 cargo xtask build live-tools levitate          # the live ISO with the install tools
 cargo xtask run live-tools levitate            # boot it on a serial console

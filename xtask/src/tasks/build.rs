@@ -25,16 +25,6 @@ pub fn latest_iso(distro: &Distro, product: ProductId) -> Result<Option<PathBuf>
     Ok(distro_contract::runs::latest_release_iso(&root, distro.id(), product)?)
 }
 
-/// The latest ISO of `product`, or a missing-prerequisite error naming the build.
-pub fn require_iso(distro: &Distro, product: ProductId) -> Result<PathBuf> {
-    latest_iso(distro, product)?.ok_or_else(|| {
-        crate::util::exit::missing(
-            format!("no {product} ISO has been built for {}", distro.id()),
-            format!("cargo xtask build {product} {}", distro.id()),
-        )
-    })
-}
-
 fn product_isos(product: ProductId, distros: &[Distro]) -> Result<()> {
     let root = crate::util::repo::repo_root()?;
     for distro in distros {

@@ -156,7 +156,7 @@ pub struct Cli {
 
 #[derive(Subcommand)]
 pub enum Cmd {
-    /// Install the QEMU/OVMF tools into .artifacts/tools, create the repo SSH key, then run doctor.
+    /// Create the repo SSH key guests trust, then run doctor.
     Setup,
 
     /// Check tools, firmware, kernels and ISOs; print the command that fixes each gap.
@@ -168,9 +168,6 @@ pub enum Cmd {
         #[arg(long, value_name = "dnf|apt")]
         packages: Option<String>,
     },
-
-    /// Print shell exports for the repo's QEMU tools: eval "$(cargo xtask env)".
-    Env,
 
     /// Build a product ISO, a kernel, the rootfs source, or a product's EROFS images.
     Build {
@@ -199,7 +196,7 @@ pub enum Cmd {
         json: bool,
     },
 
-    /// Forget saved scenario results for a distro.
+    /// Remove a distro's scenario runs (their results and disks).
     Reset {
         #[arg(value_parser = DistroParser)]
         distro: Distro,
@@ -431,12 +428,9 @@ pub struct RunArgs {
     pub no_shell: bool,
     #[command(flatten)]
     pub boot: BootArgs,
-    /// Host port forwarded to the guest's SSH (with --ssh).
-    #[arg(long, default_value_t = 2222)]
-    pub ssh_port: u16,
-    /// Seconds to wait for SSH (with --ssh).
-    #[arg(long, default_value_t = 90)]
-    pub ssh_timeout: u64,
+    /// Host port forwarded to the guest's SSH (with --ssh). Default: a free one.
+    #[arg(long, requires = "ssh")]
+    pub ssh_port: Option<u16>,
 }
 
 /// Boot injection and the SSH key the guest trusts.
@@ -448,8 +442,8 @@ pub struct BootArgs {
     /// Extra boot injection from a KEY=VALUE file.
     #[arg(long, value_name = "PATH")]
     pub inject_file: Option<PathBuf>,
-    /// Private key to log in with (its .pub is injected). Default: the repo key in
-    /// .artifacts/ssh, created on first use.
+    /// Private key to log in with (its .pub is injected into live boots). Default:
+    /// the repo key in .artifacts/ssh, created on first use.
     #[arg(long, value_name = "PATH")]
     pub ssh_key: Option<PathBuf>,
 }
@@ -464,7 +458,7 @@ pub struct TestArgs {
     /// Rerun even if the cached result for the same inputs passed.
     #[arg(long)]
     pub force: bool,
-    /// Print a JSON summary of the results at the end.
+    /// Print a JSON summary of the results on stdout (progress goes to stderr).
     #[arg(long)]
     pub json: bool,
     #[command(flatten)]
