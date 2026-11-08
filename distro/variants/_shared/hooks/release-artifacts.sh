@@ -23,19 +23,9 @@ need_cmd() {
     fi
 }
 
+# The release build that runs this hook passes its own binary and checkout.
 run_distro_builder() {
-    if [ -n "${DISTRO_BUILDER_BIN:-}" ] && [ -x "${DISTRO_BUILDER_BIN}" ]; then
-        "${DISTRO_BUILDER_BIN}" "$@"
-        return
-    fi
-
-    if command -v distro-builder >/dev/null 2>&1; then
-        distro-builder "$@"
-        return
-    fi
-
-    need_cmd cargo
-    cargo run -q -p distro-builder --bin distro-builder -- "$@"
+    "${DISTRO_BUILDER_BIN:?set by distro-builder}" --repo-root "${REPO_ROOT:?set by distro-builder}" "$@"
 }
 
 build_rootfs_erofs() {
@@ -44,7 +34,7 @@ build_rootfs_erofs() {
         exit 64
     fi
 
-    run_distro_builder artifact build-rootfs-erofs "$1" "$2"
+    run_distro_builder transform build rootfs-erofs "$1" "$2"
 }
 
 prepare_product_inputs() {
@@ -97,7 +87,7 @@ build_overlayfs_erofs() {
         exit 64
     fi
 
-    run_distro_builder artifact build-overlayfs-erofs "$1" "$2"
+    run_distro_builder transform build overlayfs-erofs "$1" "$2"
 }
 
 merge_uki_cmdline() {

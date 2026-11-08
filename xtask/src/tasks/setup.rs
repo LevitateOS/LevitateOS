@@ -11,7 +11,7 @@ use distro_contract::ProductId;
 pub fn setup() -> Result<()> {
     let root = crate::util::repo::repo_root()?;
     eprintln!("[step] Install the QEMU/OVMF tools into .artifacts/tools");
-    crate::util::distro_builder::run_bare(&root, &["artifact", "prepare-qemu-tools"])?;
+    crate::util::distro_builder::run_bare(&root, &distro_builder::cli::Command::PrepareQemuTools)?;
     eprintln!("[step] Repo SSH key");
     crate::util::ssh::ensure_repo_key(&root)?;
     doctor(false)

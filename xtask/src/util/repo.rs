@@ -16,6 +16,22 @@ pub fn cargo_target_dir(root: &Path) -> PathBuf {
         .unwrap_or_else(|| root.join("target"))
 }
 
+/// Build the workspace binary `bin` of `package` with xtask's own profile (debug or
+/// release, as xtask was built) and return its path. Recipe, built by the builder,
+/// follows the same rule.
+pub fn cargo_bin(root: &Path, package: &str, bin: &str) -> Result<PathBuf> {
+    let release = !cfg!(debug_assertions);
+    let mut build = std::process::Command::new("cargo");
+    build.current_dir(root).args(["build", "-q", "-p", package, "--bin", bin]);
+    if release {
+        build.arg("--release");
+    }
+    if !build.status().context("running cargo build")?.success() {
+        anyhow::bail!("building {bin} failed");
+    }
+    Ok(cargo_target_dir(root).join(if release { "release" } else { "debug" }).join(bin))
+}
+
 /// The repo's QEMU tools (`cargo xtask setup`), or `None` when they are not
 /// installed and the host's QEMU and OVMF are used instead.
 pub fn repo_tools(root: &Path) -> Result<Option<PathBuf>> {

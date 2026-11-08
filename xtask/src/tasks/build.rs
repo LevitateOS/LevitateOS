@@ -4,20 +4,17 @@ use anyhow::Result;
 use std::path::PathBuf;
 
 use crate::cli::{BuildCmd, Distro, ProductBuild};
+use distro_builder::cli::Command;
 use distro_contract::ProductId;
 
 pub fn run(what: BuildCmd) -> Result<()> {
     match what {
         BuildCmd::Product(ProductBuild { product, distros }) => product_isos(product, &distros.distros()?),
         BuildCmd::Kernel(args) => crate::tasks::kernels::build(args),
-        BuildCmd::RootfsSource { distro, refresh } => {
-            let root = crate::util::repo::repo_root()?;
-            let mut args = vec!["artifact", "preseed-rootfs-source", distro.id()];
-            if refresh {
-                args.push("--refresh");
-            }
-            crate::util::distro_builder::run(&root, &args)
-        }
+        BuildCmd::RootfsSource { distro, refresh } => crate::util::distro_builder::run(
+            &crate::util::repo::repo_root()?,
+            &Command::PreseedRootfsSource { distro: distro.id().to_string(), refresh },
+        ),
         BuildCmd::Erofs { product, distro } => erofs(product, &distro),
     }
 }
@@ -51,7 +48,7 @@ fn product_isos(product: ProductId, distros: &[Distro]) -> Result<()> {
     for distro in distros {
         crate::util::distro_builder::run(
             &root,
-            &["release", "build", "iso", product.name(), distro.id()],
+            &Command::ReleaseBuild { product, distro: distro.id().to_string() },
         )?;
         if let Some(iso) = latest_iso(distro, product)? {
             println!("built: {}", iso.display());
@@ -70,15 +67,11 @@ fn erofs(product: ProductId, distro: &Distro) -> Result<()> {
         std::fs::remove_dir_all(&prepared)?;
     }
     std::fs::create_dir_all(&prepared)?;
-    let prepared_arg = prepared.to_string_lossy();
     crate::util::distro_builder::run(
         &root,
-        &["product", "prepare", product.name(), distro.id(), &prepared_arg],
+        &Command::ProductPrepare { product, distro: distro.id().to_string(), output: prepared.clone() },
     )?;
-    crate::util::distro_builder::run(
-        &root,
-        &["transform", "build", "product-erofs", &prepared_arg],
-    )?;
+    crate::util::distro_builder::run(&root, &Command::ProductErofs { prepared: prepared.clone() })?;
     println!("built: {}", prepared.display());
     Ok(())
 }
