@@ -4,7 +4,7 @@
 	branch = master
 [submodule "recipe"]
 	path = tools/recipe
-	url = git@github.com:LevitateOS/recipe.git
+	url = https://github.com/LevitateOS/recipe.git
 	branch = master
 [submodule "docs-content"]
 	path = docs/content
@@ -60,5 +60,5 @@
 	branch = master
 [submodule "tools/ginux"]
 	path = tools/ginux
-	url = git@github.com:LevitateOS/ginux.git
+	url = https://github.com/LevitateOS/ginux.git
 	branch = main

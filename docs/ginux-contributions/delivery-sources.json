@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "recipe": {
+    "repository": "https://github.com/LevitateOS/recipe.git",
+    "revision": "e7bfc166343164989794c917e67f187d0ac49ba8",
+    "branch": "master"
+  },
+  "ginux": {
+    "repository": "https://github.com/LevitateOS/ginux.git",
+    "revision": "28f4368f6fd70d0e485386892a08d6734b5988dd",
+    "branch": "main",
+    "upstream_repository": "https://github.com/gmkurtzer/ginux.git",
+    "upstream_main": "53a54addea67969abaa240ea478def1b94130eee",
+    "included_unmerged_pr": {
+      "url": "https://github.com/gmkurtzer/ginux/pull/249",
+      "revision": "9759daaec8589a7e2d2cc9e1c9ec1f398b6e958f"
+    },
+    "launcher_sha256_rust_1_99_0": "360d22582219d6910fe616d724d4dfb690af24fd891926fa422e4283b6e34cb6"
+  },
+  "contract": {
+    "upstream_catalog": 2,
+    "configured_catalog": 1002,
+    "configured_operations": 193
+  },
+  "images": {
+    "base_sha256": "b93bfd0f6deea2a7a96216655cda3ebbd87a445231548ff491ee30aed20a36ab",
+    "compiler_sha256": "a8edd8faecd8125a19a70356e8969209f9f78efcf1333c250de6c6afc1807776",
+    "acquisition_sha256": "ffe04d8671e45036ac77acc958fb6cfd3c24a939075dc7e6c5437b69d7f05c15",
+    "producer": "Recipe recipe-image; bootstrap manifests and public input URLs in the pinned source"
+  },
+  "worker": "The identical recipe binary used by the coordinator; explicitly set RECIPE_WORKER_BIN",
+  "maintenance": "Upstream main leads. Preserve its history, reconcile new upstream changes, and replace downstream changes when upstream covers them. PR #249 is included by explicit user request before upstream merge; its performance gate is partial. No upstream publication authorized."
+}

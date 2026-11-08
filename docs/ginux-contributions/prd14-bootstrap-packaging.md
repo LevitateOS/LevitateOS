@@ -148,19 +148,49 @@ canonical archive and recorded stat/ownership receipts are authoritative.
 The task domain, owned writable disk, NVRAM and private SSH key are removed;
 other domains were preserved. Publisher inputs/base image remain retained.
 
-The missing required input is an approved, remotely obtainable maintained
-Recipe/Ginux source pair with the integrated capabilities. A private candidate
-transfer intentionally tests preparation; it is not fresh release-source
-acquisition. Under the user's keep-local direction, do not publish as a shortcut,
-select an unapproved maintained fork, or ask again for the same declined push.
-When maintained source becomes available, reconcile PRD01/PRD05, rebuild the
-actual delivered pair and repeat affected setup/consumer/packaging verification
-on that exact source/toolchain/image combination. These receipts do not close
-final-source CI, wider distro/product or PRD09 security acceptance.
+## Maintained source run (in progress)
+
+The user superseded the earlier local-only direction and authorized our own
+maintained repositories, with all current upstream main changes and Gate 11
+PR #249 included. The selected pair is pinned in
+[delivery-sources.json](delivery-sources.json). Both histories were pushed to
+our repositories without a force push, PR, upstream comment or package release.
+Push CI was skipped; no hosted/macOS verification is claimed.
+
+Ginux `28f4368f` includes upstream main `53a54adde` and Gate 11 head
+`9759daaec`. Gate 11 is unmerged upstream and partial on its performance budget;
+we do not treat expected future merging as an accomplished fact. Three actual
+integration findings were resolved: the upstream/local catalog-2 collision
+(migrate local configuration to downstream catalog **1002**), the duplicate
+parser seen-field bit (dispatch uses bit 57), and startup failure when yield is
+explicitly denied (route denied yield through the ordinary contract owner;
+create a notification broker only for an allowed mediated yield). Capacity is
+193 operations, the exact upstream-plus-configured inventory. Recipe pins
+reviewed network/non-network contract digests and matching integration assertions.
+
+The denied-yield startup failure was reproduced on the new disposable VM before
+the correction. Allowed and denied yields now pass in selective and paranoid
+modes; Ginux make check, retained unit tests, generated contract documentation
+and benchmark-report checks pass. Fresh HTTPS source acquisition in the VM,
+all fourteen public RPM/Rust inputs, stock RPM signature checks, independent
+OCI fetching/assembly and runtime build have passed. The resulting launcher is
+`360d22582219d6910fe616d724d4dfb690af24fd891926fa422e4283b6e34cb6`;
+the assembled base remains `b93bfd0f…`. Recipe/package/consumer reproduction is
+still running and PRD14 remains unchecked until it finishes successfully.
+
+New evidence: `.artifacts/ginux-contribution-preparation/prd14-delivery/`.
+Initial command-authoring errors are retained: a nested host checkout triggered
+Cargo's parent-workspace check (moved outside the workspace without editing its
+manifest), and a nonexistent redundant fixture target was replaced by the actual
+`build-launch-fixture` owner. Neither interrupted attempt counts as a pass.
+
+These checks do not close final-source hosted Linux, wider distro products or
+PRD09 security acceptance. The new ordinary regression checks are not inherited
+Daybreak adversarial authorization. The previously sealed preparation manifest
+remains authoritative for its earlier source only.
 
 Active skill: `hdae-development`, discovered at
 `.agents/skills/hdae-development/SKILL.md`; reload it, its required reference,
 applicable AGENTS and this checkpoint after context shifts. Root instructions
-supersede skill process requirements. Exact next action: wait for maintained
-source availability as directed; retain PRD14 unchecked and all publication
-permissions unchanged.
+supersede skill process requirements. Continue the fresh maintained-source VM
+packaging/execution run, fix any real failure and record its exact evidence.
