@@ -258,3 +258,63 @@ acquisition/compilation/publication for both layers, then rebuild both complete
 product chains and execute both distros' required session-libvirt/PTY/install/A/B
 scenarios on one exact combination. Obtain required final-source/security results
 through Daybreak before closure. PRD15 and product acceptance remain open.
+
+### Latest continuation checkpoint
+
+- Own-stack correction is committed at `7a291c04`; the next consumer finding is
+  concrete epoll ENOSPC with the first 16-watch draft. The existing contract can
+  allocate 16 TCP sockets plus channel wake objects. Local commit
+  `45b1f478ac79ccc6893b1f512e0382f875c11f08` sizes the new bounded watch table to
+  32, covering those existing owners. It changes no public FD/TCP/channel
+  allocation limit. All 17 functional modes pass, including 31 distinct live
+  objects watched together, fairness/cap rejection, and rejection of a
+  seventeenth TCP socket (`epoll-combined-runtime-final.log`). Strict Clippy
+  passes. The normal sealed launcher `bin/ginux-epoll-combined-1` SHA-256 is
+  `672e56678ac60b871ed048a30b0cfd0ec5dc413fae424a2eb3b8145fc45c5859`.
+- A separate bounded trace confirms the 32-watch correction removes epoll
+  registration errors and actual TCP receives progress. Full acquisition is
+  still not accepted: the original 16-watch invocation timed out; its filtered
+  rerun was deliberately cancelled after the finding; the first 32-watch run
+  also reaches its deadline. These are failures/interruptions, never passes.
+- Pinned Bun has a separate HTTP-thread ceiling, read from
+  `BUN_CONFIG_MAX_HTTP_REQUESTS` in `src/http/AsyncHTTP.rs::load_env`.
+  `real-tui-npm-bounded-http` sets it to four as well as the explicit install
+  concurrency flags, preserving Ginux's 16-socket cap. It is still running at
+  this checkpoint. Source reads/hashes and the uSockets epoll owner are retained
+  under `bun-source-upstream/`. Runtime reports show main/event workers parked
+  with four TCP watches, all other workers waiting in native futexes; no guard
+  is held. The separate diagnostic binaries/patches are not delivery candidates;
+  normal source has been restored and the isolated Git worktree is clean.
+- A disposable native control is running the identical pinned frozen workspace
+  installation with a separate initially empty cache. Its purpose is to
+  distinguish Ginux behavior from package/network behavior. Neither its
+  node_modules nor its cache will be used as producer inputs. Result is
+  `npm-native-control.json` when finished; native success cannot certify managed
+  production.
+- **Builder migration is uncommitted and unaccepted:** new
+  `recipes/tui-binary.rhai` declares a typed source/target and program output,
+  a separate `bun-toolchain` dependency, frozen TUI-graph acquisition with
+  bounded HTTP settings, compile with the pinned target runtime, hash-checked
+  readiness/reuse and publication. Corrected declaration inspection passes;
+  the first inspection accidentally selected an older ambient launcher and was
+  rejected, retained separately. `src/tui_binary.rs` now prepares authored
+  source/manifests/entry without host caches and calls the producer directly,
+  passing explicit parent/child target inputs. Host Bun/runtime downloads and
+  node_modules dependence are removed from that draft caller. Current builder
+  compilation passes (`tui-caller-migration-build.log`), which is not runtime
+  acceptance. The root packageManager is aligned to pinned Bun 1.4.2 locally.
+  Do not commit/adopt the migration as working until the actual producer and
+  resulting products pass. Builder README still needs its final contract edit.
+
+Exact next resumable action: inspect `npm-native-control.json`,
+`real-tui-npm-bounded-http` and `bun-npm-state-diagnostic` results; diagnose the
+remaining managed acquisition wait using their exact source/inputs. Active tool
+sessions at this checkpoint are 81798 (90-second native control), 23257
+(600-second bounded managed install), and 10443 (35-second task-state diagnostic;
+may already be finished). The isolated Ginux source is clean at `45b1f478`;
+there are no intended live VMs. Preserve the shared staged queue/handoff patch
+hash `f4d8c81be2612a4d8d472564b25c7ffab6e7043e06b0f2b2176cba78dad5a47e`.
+The accidental report commit that included those files was corrected immediately;
+they remain staged exactly as before. Continue the required producer/product work
+and obtain final security results through the authorized Daybreak context; no
+publication has been performed by this task and acceptance remains open.
