@@ -219,6 +219,13 @@ packages = [
   "glibc-langpack-sv",
   "NetworkManager",
   "NetworkManager-libnm",
+  # WiFi: NetworkManager's wifi plugin over wpa_supplicant, and iw.
+  "NetworkManager-wifi",
+  "wpa_supplicant",
+  "wireless-regdb",
+  "libnl3",
+  "pkcs11-provider",
+  "iw",
   "glib2",
   "gnutls",
   "nettle",
