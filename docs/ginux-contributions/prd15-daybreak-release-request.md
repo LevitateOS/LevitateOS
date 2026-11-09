@@ -11,15 +11,28 @@ The active [product checkpoint](prd15-product-contract.md) owns ordinary progres
   `/home/vince/.codex/worktrees/prd15-owned-fd-path/ginux-prd11`.
 - Launcher: `/home/vince/Projects/LevitateOS/.artifacts/ginux-contribution-preparation/prd15/bin/ginux-native-sigchld-1`,
   SHA-256 `21a54e60bd54a4dd2b07957cf2e139a268eb050cb73929e0b8666b31f60c2333`.
-- Recipe source: `176395aeaa5bb8999c1a6289d18e53c8012ecdf9`,
-  `/home/vince/Projects/LevitateOS/tools/recipe`. Production/Cargo inputs equal
-  91068391; all Rust tests equal 3828500. Later changes are documentation only.
+- Compiled Recipe source: `176395aeaa5bb8999c1a6289d18e53c8012ecdf9`.
+  Current clean checkout `/home/vince/Projects/LevitateOS/tools/recipe` is
+  `b185e0363ceba1290201ba84593aefb313a85cc4`: only README and WRITING_RECIPES
+  changed after the frozen run. `prd15/author-documentation-join.json` records
+  unchanged Rust/Cargo/test/runner inputs. Production inputs equal 91068391;
+  Rust tests equal 3828500. Retain actual compiled identity rather than requiring
+  the checkout to undo the documentation correction.
 - Matching optimized CLI and worker:
   `/home/vince/Projects/LevitateOS/.artifacts/ginux-contribution-preparation/prd15/bin/recipe-release-176395a`,
   SHA-256 `e7073fc17ec0bb029927d0c2e901ca37e0867a7cfdc4c5641d1d6c9b14bb5c03`.
 - Acquisition image: `/home/vince/Projects/LevitateOS/.artifacts/ginux-contribution-preparation/prd14/ginux-acquisition-image/rootfs.tar`,
   SHA-256 `ffe04d8671e45036ac77acc958fb6cfd3c24a939075dc7e6c5437b69d7f05c15`.
 - `GINUX_ROOT=oci:recipe-acquisition@sha256:ffe04d8671e45036ac77acc958fb6cfd3c24a939075dc7e6c5437b69d7f05c15`.
+
+Later producer/documentation joins do not change these runtime bytes: builder
+9468d26 removes only forced linker `--threads=1`, verified by an actual managed
+two-CPU build yielding the same 13f6a3da recstrap as both metadata guest controls.
+Recipe b185e036 and docs/content d938493 correct author/operator pages. The
+current source guards are `prd15/normal-linker-combination-sources.json`;
+`normal-linker-recipe-join.json` and `embedded-documentation-join.json` identify
+all changed inputs. Original full-catalog source/fixture receipts remain intact.
+The new six-product/guest wave is ordinary verification, not security acceptance.
 
 The complete source/build/harness map is
 `/home/vince/Projects/LevitateOS/.artifacts/ginux-contribution-preparation/prd15/release-runtime-candidate.json`.
