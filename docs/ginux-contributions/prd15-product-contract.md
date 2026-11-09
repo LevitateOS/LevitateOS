@@ -24,7 +24,7 @@ CLI/integration/product owners provide verification.
 Current runtime pair: Ginux clean `b81f30b52e523d142071603f477c6891c7fd9df9`
 (test-only additions over runtime 3cd1e2de), sealed launcher
 `fb87792d5b4363ca669d20935ce6f3d3f6d08fb97ee0cdc74e60bc324c200e6e`;
-Recipe clean `3828500` (three fixture-only
+Recipe clean `3828500d0564f98045f26ef284efeed54ebe3b4d` (three fixture-only
 corrections over 91068391; production/Cargo inputs identical), sealed matching
 CLI/worker `467140e9b036a8ed20b58f87020ad7a63cfe7c68d311dc8e19cfe51c464cf9ef`;
 image `ffe04d8671e45036ac77acc958fb6cfd3c24a939075dc7e6c5437b69d7f05c15`.
@@ -62,8 +62,9 @@ Evidence is under `.artifacts/ginux-contribution-preparation/prd15/`; security
 returns and interrupted CLI are in the Ginux worktree's `.artifacts/prd15/`.
 Active jobs: 55290 failed/in-progress old catalog; **65760** queues the new
 3828500 complete catalog after the old result and failure-list review; 60000
-corrected product chains; **32358** final scenario driver waiting for each new
-chain; **64665** documented examples and checks. Consumer job 23586 completed.
+corrected product chains; **55602** final scenario driver waits for all product
+and corrected-catalog I/O to finish. Consumer job 23586, documentation job 64665
+and strict Recipe Clippy job 98019 completed successfully.
 Final scenario harness is sealed at `dc43b8da…`; its source map is
 `final-product-scenario-sources.json`. Do not rebuild normal target/debug/levitate-
 xtask during the final cargo xtask runs. The scenario driver checks exact new
@@ -900,3 +901,45 @@ rerun under `documented-current-*`, retaining fresh checks/reuse and actual
 produced-program execution. The security hardware-key question, explicit remove/
 cleanup decision and upstream/source-delivery dependencies remain open. No push,
 PR/comment, hosted job or security-execution fallback occurred.
+
+
+### Completed documentation checks and corrected Acorn base
+
+All **16** `documented-current-*` commands finish successfully on the sealed
+runtime tuple. `documented-current-results.json` and
+`documented-current-source-map.json` retain the exact current author/man example
+blocks, public hello/threaded recipes, install/readiness/fresh reuse and static
+validate/inspect/explain/diff results. All three executable products print their
+expected output; threaded compilation/execution also occurs inside the managed
+build hook. The man example publishes its declared plain file. Exact 3828500
+formatting and strict `clippy --all-targets -- -D warnings` pass; no unit tests
+are run.
+
+Corrected Acorn base-rootfs **A1MQo3zVHViKU8C4** passes
+`base-rootfs-acorn-recab-final.json`. ISO SHA-256 is
+`fd00afc0e8602498dbee331316acfd189530079e0489db738f7a402423220ff4`.
+`acorn-corrected-base-source-proof.json` verifies its real recab program
+`6d2971b926546ec215a8ff1bb6a62557f6ccc2615a096183a93b7a15e7ff95c6`
+and service `80ccf52a48656885160df32fac3a1e77cc85709f9b50ebb6bcae947d166fb6d0`
+match the actual Recipe producer and successful guest service/cancellation
+control byte-for-byte. Live-boot assembly has started; the other five final
+products and all final scenario acceptance remain incomplete.
+
+The quiet coordinator was observed waiting in host XFS `xlog_wait_on_iclog`
+inside fsync; `product-fsync-observation.json` retains its own stack/I/O data.
+It completed naturally with no durability operation skipped. There is adequate
+artifact storage. Before **any** final scenario command had started, the empty
+waiter was rescheduled so final guest acceptance follows all six producer runs
+and the corrected complete catalog. `final-scenario-scheduling-change.json`
+records that no test case was interrupted; all guest budgets/assertions and
+source checks remain intact. New waiter session **55602** runs
+`run-final-scenarios-after-heavy-io.py`; source bytes stay sealed at dc43b8da…
+and PTY-script SHA-256 6c0d4c1b…. Do not rebuild the normal cargo xtask executable
+during those eventual commands. Scheduler 65760 separately guards the new full
+catalog against any unreviewed old-run finding.
+
+Next: finish producer/catalog runs, inspect final receipts rather than inferring
+success, complete both new whole scenario sets plus explicit A/B commands,
+retain the tested host timeout bounds and reconcile final delivery. Security
+still needs hardware-key authentication/original-context results; remove/cleanup
+and actual upstream/source joins stay open. No publication occurred.
