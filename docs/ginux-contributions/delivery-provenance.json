@@ -586,5 +586,10 @@
     "Public source acquisition is verified for all sixteen commits. Parent publication requires separate permission.",
     "ISO hashes identify verified outputs; bit-for-bit ISO rebuild determinism is not established.",
     "Security acceptance, held dependent remove/cleanup, required upstream merges and hosted Linux acceptance remain open."
-  ]
+  ],
+  "superproject_pin_commit": "89863d5e1ba09d85c2dd9729f415ab49d781955b",
+  "selected_parent_verification": {
+    "path": ".artifacts/ginux-contribution-preparation/prd16/selected-parent-verification.json",
+    "sha256": "75ff90593e7e109ff4cca9746a7207471a4ca772a8fb26818c965624f2c47e43"
+  }
 }

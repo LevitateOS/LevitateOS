@@ -203,8 +203,9 @@ produces exactly the selected **21a54e60…** launcher bytes, without the separa
 worktree as its source (`local-maintained-ginux-join.json`). The first command
 wrongly required an attached main branch, made no source change and built the
 old pin; its failed guard/old build are retained separately, never counted for
-e4d95de1. No branch/ref or remote was changed; parent gitlink/public origin remain
-at 28f4368f until actual source delivery is authorized and reconciled.
+e4d95de1. That local build proof changed no branch/ref or remote. At that earlier
+checkpoint the parent/public source was still 28f4368f; authorized PRD16 source
+publication and pin commit 89863d5 now supersede that delivery status.
 
 Maintained Recipe **b185e036** standalone build **78347 passed**, from its exact
 Git archive, tracked standalone lock and Rust 1.99.0, using a fresh target and
@@ -218,7 +219,7 @@ compiler and full hashes. The first invocation mistakenly gave rustup
 is preserved. No selected runtime or frozen receipt is replaced. Archive
 SHA-256 is **7d8098e4…**, `maintained-recipe-b185e036.tar`.
 
-**Local delivery review is prepared**, not published or adopted:
+**Earlier local delivery review, before the authorized PRD16 publication:**
 `prd15/delivery-review/manifest.json` identifies all ten current source owners,
 their recorded parent gitlinks and nine complete binary patches. The proposed
 parent pin/lock patch is **02178705…**. Current heads and every patch hash were
@@ -302,8 +303,8 @@ application. Runtime binaries/harnesses remain the exact verified 176395a builds
    ordinary product/guest/catalog/static/example/producer jobs are complete;
    do not restart without a concrete affected change.
 2. Source delivery now belongs to [PRD16](prd16-delivery.md), with its exact
-   [candidate provenance](prd16-delivery-candidate.json), nine-source permission
-   request and independent fresh-checkout/build receipts. Public HTTPS submodule
+   [immutable candidate proposal](prd16-delivery-candidate.json), completed
+   authorized nine-source publication and independent fresh-checkout/build receipts. Public HTTPS submodule
    URLs are committed as 46c7e25; final parent gitlinks remain unchanged pending
    final parent integration. The nine exact source pushes and their automatic
    CI were explicitly authorized and completed; anonymous fetches pass 16/16.

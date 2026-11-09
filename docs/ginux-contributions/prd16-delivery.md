@@ -1,11 +1,13 @@
 # PRD16 — final source pins and artifact provenance
 
-**Source delivery verified; final parent integration is being checked.** The
+**Source delivery and final parent integration verified; parent publication awaits permission.** The
 user authorized the nine exact source pushes and normal automatic CI. All nine
 fast-forward pushes succeeded, with exact before/after ref checks. Anonymous
 HTTPS fetches now obtain all sixteen selected commits and matching source trees.
-Final root pins, tested lock and provenance are prepared together; parent
-publication still requires a separate exact permission. Production acceptance
+Root pin commit **89863d5e1ba09d85c2dd9729f415ab49d781955b** joins all selected
+gitlinks, tested lock and provenance. Its clean recursive checkout obtains all
+sixteen selected submodules from their public HTTPS URLs and passes locked
+workspace metadata; parent publication still needs a separate exact permission. Production acceptance
 remains open in its owning tasks.
 
 Active skill: `hdae-development`, discovered at
@@ -116,8 +118,12 @@ receipts remain bound to that earlier baseline. PRD15's full catalog keeps its
 actual 176395a/e707 source/build identity; independent builds from the selected
 b185e036 reproduce those bytes. No old execution is renamed.
 
-The delivery verification will record the exact parent pin commit after it is
-created. From that selected checkout, initialize exact submodules with
+`selected-parent-verification.json` records exact pin commit
+**89863d5e1ba09d85c2dd9729f415ab49d781955b**, sixteen actual recursive public
+checkouts, clean status, exact trees/lock/provenance and successful locked Cargo
+metadata. Its parent was restored from a HEAD-only bundle because publication
+was not authorized; every submodule was fetched from its real public URL.
+From that selected checkout, initialize exact submodules with
 `git submodule update --init --recursive`, never `--remote`. URLs are public
 HTTPS. Build Ginux with `make build` in `tools/ginux`. Build Recipe from an exact
 standalone archive or independent clone, with its tracked lock/profile and
@@ -132,10 +138,9 @@ ffe04d86. No migration executable, fixture trust or private cache is a required
 input. Root package/product facts remain owned by their recipes; the candidate
 records the actual six product outputs and their input/scenario receipts.
 
-The source-only isolated restoration and fresh launcher/Recipe builds already
-pass. Final parent verification must recursively obtain every selected submodule
-from its public HTTPS source, compare exact revisions/trees and the workspace
-lock/provenance, and retain the complete parent diff. Moving delivery refs alone
+The source-only isolated restoration, fresh launcher/Recipe builds and final
+parent recursive checkout now pass. The complete parent diff is retained for
+publication review. Moving delivery refs alone
 does not change source or convert old execution into a new run; revalidate
 behavior if source changes during reconciliation. Root publication is a separate
 permission after that exact commit and diff are concrete.
@@ -149,5 +154,6 @@ all recovery worktrees and historical evidence remain intact.
 Security authentication/results, the user-held dependent-recipe remove/cleanup
 decision, PRD05's actual upstream merge requirement and hosted Linux acceptance
 remain open in their owning tasks. PRD16 source delivery does not waive them or
-claim production acceptance. **Next action: verify the final parent pin commit and request permission for its
-exact publication. Do not infer parent publication from the nine-source approval.**
+claim production acceptance. **Next action: request permission for the concrete parent head and automatic
+workflow effects, then verify anonymous parent acquisition. Do not infer parent
+publication from the nine-source approval.**

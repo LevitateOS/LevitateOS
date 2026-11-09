@@ -171,7 +171,7 @@
   "historical_baseline_manifest": "delivery-sources-2026-11-08-baseline.json",
   "product_provenance": {
     "path": "delivery-provenance.json",
-    "sha256": "9002a3eb71c63a7bf87b96821c74ac98e6d736607bc14dc3d3b315140bd4e07c"
+    "sha256": "dccf37ce217ee79923ec32a3f8a7c55682aa2c872406fb03d1589fafbbe8a0cc"
   },
   "authorization": "Nine exact source pushes and normal automatic CI explicitly authorized; no upstream PR/comment, parent publication, separate workflow dispatch, release/tag/package/ISO publication.",
   "remaining_acceptance": [
@@ -180,5 +180,10 @@
     "PRD05 actual upstream merge requirement",
     "Hosted Linux required results",
     "Production acceptance/publication under PRD17"
-  ]
+  ],
+  "superproject": {
+    "source_pin_commit": "89863d5e1ba09d85c2dd9729f415ab49d781955b",
+    "publication": "Exact parent publication requires separate user permission; source commits already public and anonymous recursive checkout passed.",
+    "checkout_rule": "Initialize exact gitlinks with git submodule update --init --recursive, never --remote."
+  }
 }
