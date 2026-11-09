@@ -3,10 +3,11 @@
 PRD07 is active and remains **open**. Preparation, a draft, a published PR and a
 merged/upstream-equivalent capability are distinct states. Completion requires
 actual delivery dispositions for every required capability; no collection of
-local green results closes this item. No push, PR or upstream comment is yet
-authorized in this task. The user declined the proposed wave-1 TCP publication
-and directed that wave to stay local; do not ask again for the unchanged wave
-or treat that answer as final maintained-downstream delivery approval. The user
+local green results closes this item. No new push, PR or upstream comment is
+authorized. The user declined the original wave-1 TCP publication and directed
+that wave to stay local; do not ask again for the unchanged upstream wave. Later
+explicit authorization separately established maintained own-repository delivery
+with Gate 11; that source decision is resolved and its baseline is published. The user
 clarified that local extraction and integration should continue, with no PRs
 sent, and that **upstream Ginux always takes precedence**. This is not a
 stop-work request. Reassess every candidate against upstream's foundation
@@ -15,6 +16,17 @@ favor of the upstream owner. Continuing local work authorizes no push, PR or
 upstream comment, and does not fix the future upstream architecture/catalog.
 
 ## Current source and publication boundary
+
+The obtainable maintained baseline is Ginux 28f4368f / Recipe e7bfc166,
+verified under [PRD14](prd14-bootstrap-packaging.md). Its configured catalog is
+**1002**: Gate 11 consumes upstream catalog 2, so the earlier local 2/3 choices
+in the frozen extraction rehearsal below are not the shipping allocation.
+They remain exact-source preparation records against main 53a54adde. Any
+subsequent extraction must reconcile the upstream owner and current allocation;
+no old catalog draft overrides the maintained contract. Later corrected
+candidate e4d95de1 / Recipe 176395a is local and tracked in
+[the active checkpoint](prd15-product-contract.md); new publication/security
+and final delivery acceptance remain open.
 
 Read-only refresh finds main `53a54addea67969abaa240ea478def1b94130eee`.
 Required existing #232/#233/#234/#236/#238/#243 remain open. Each maintainer
