@@ -19,6 +19,7 @@ These rules apply to every directory and submodule, recursively, across Git repo
 - Unit testing, including assertion-based unit doctests, is prohibited. Do not add, retain, run, require, or replace unit tests with renamed equivalents, snapshots of isolated helpers, or mock-only unit suites.
 - Remove unit tests and their runners rather than marking them ignored or reporting them as passing.
 - Use compilation, typechecking, and focused integration, CLI, boot, install, or runtime checks when they help establish the changed behavior. Choose checks appropriate to the work; do not run a full suite for every edit or commit.
+- Do not build after each change. Rootfs, ISO and kernel builds and VM scenario runs take hours, and the next change invalidates them. A change to a declaration (a package list, a capability, a pin, a kconfig line, a recipe, docs) is done when it is edited and committed: make it, check it by reading and with checks that take seconds, commit it, say it is unbuilt, and take the next request. Start a build or a scenario run only when the user asks for one; it then covers every change since the last build. Never make the user wait on a build to get the next change in.
 - No mandatory build, lint, test, or policy-audit pipeline on local commits. Keep those commands available explicitly.
 - Report failures and unverified behavior honestly. Fix causes; do not fabricate success, suppress failures, or silently substitute outputs.
 
