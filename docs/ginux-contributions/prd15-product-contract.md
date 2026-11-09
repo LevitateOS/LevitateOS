@@ -21,40 +21,61 @@ repository instructions and this checkpoint after a context shift. Root
 instructions prohibit mandatory process gates and Recipe unit tests; existing
 CLI/integration/product owners provide verification.
 
-Current local pair: Ginux `b81f30b52e523d142071603f477c6891c7fd9df9`
-adds only retained tests after runtime commit `3cd1e2de`; its clean exact rebuild
-remains launcher `fb87792d5b4363ca669d20935ce6f3d3f6d08fb97ee0cdc74e60bc324c200e6e`.
-Recipe is clean `91068391cdc7e0e8ef10c59e2b8b1bcc65521554`, matching CLI/worker
-`467140e9b036a8ed20b58f87020ad7a63cfe7c68d311dc8e19cfe51c464cf9ef`;
-image remains `ffe04d86…`. Standalone fresh GNU/musl production passes. The
-cached-dependency manual-readiness correction passes old-fail/new-pass, all
-13 NEEDS and four dependency cases. Explicit dependent-recipe remove/cleanup
-remains unresolved by user decision; it is not repaired or accepted here.
-The corrected builder is committed at `34172e7bc2dfef947143467d878a357ec3f08041`.
-Both base/live-boot products and Acorn live-tools have built; the first current
-Acorn all-scenarios run passes boot/tools/real PTY but fails installation at the
-combined 30-second sync/unmount deadline. No install/installed/A/B pass is claimed.
-Returned Daybreak follow-up has 743 verified evidence files and 20/20 selected
-Recipe passes, including paired non-success publication rejection. All six
-security items and S09-A–H remain partial. See the latest checkpoint below.
+Current runtime pair: Ginux clean `b81f30b52e523d142071603f477c6891c7fd9df9`
+(test-only additions over runtime 3cd1e2de), sealed launcher
+`fb87792d5b4363ca669d20935ce6f3d3f6d08fb97ee0cdc74e60bc324c200e6e`;
+Recipe clean `85bba068e95b0709a7df53624c48ab2bc0b41ece` (two fixture-only
+corrections over 91068391; production/Cargo inputs identical), sealed matching
+CLI/worker `467140e9b036a8ed20b58f87020ad7a63cfe7c68d311dc8e19cfe51c464cf9ef`;
+image `ffe04d8671e45036ac77acc958fb6cfd3c24a939075dc7e6c5437b69d7f05c15`.
 
-Evidence is under `.artifacts/ginux-contribution-preparation/prd15/`.
-`sources-initial.json` and adjacent patches pin the initial checkout, including
-pre-existing local edits. Shared staging is preserved. Current builder/contract/
-xtask and their linked consumers compile with `cargo build --locked -p
-levitate-xtask` (`caller-build.log`). This establishes compilation only.
+Consumer sources: builder `34172e7`, recab **61b859c4**, recshuttle **dfe9ef1**,
+recqemu f0364bb, install-tests **d55c089** plus two uncommitted host timeout bounds.
+Recipe-owned GNU/musl TUI production/readiness/reuse passes. Both earlier full
+ISO chains build and actual PTY controls pass on both. Their first whole scenario
+runs remain failed: Acorn exposed the now-corrected recab OpenRC defect; Levitate
+exposed the now-corrected guest-script test dependency. Actual Acorn diagnostic
+service completion/cancellation and all 24 recab CLI lifecycle checks pass.
+**Both corrected ISO chains and final whole scenarios are still running/waiting.**
 
-Initial-baseline Recipe documentation was committed at `cca5bb7` (preceded by `a53c247`) over candidate
-`124f378063ce449e3799aad9b43dfac9404754f1` (production Rust unchanged); configured
-Ginux is `a498e4f6148d5d94ce4ba8edb79588b7883f6a0f`. The PRD14 compiler and
-acquisition images are respectively `a8edd8fa…` and `ffe04d86…`; their durable
-input and fresh-host preparation evidence remains in the PRD14 report. These
-are provisional local candidates, not a released combination.
+The old complete catalog is **149/152 failed**; all three affected cases now
+pass. New exact 152-case run on 85bba06 is in progress; do not assemble a full
+claim from prior results. Fresh library_backend and image_producer pass on this
+source/tuple. All six ordinary PRD11 consumers are being replayed on it, with
+fresh directories and normal locks/threading/metadata/isolation.
 
-Existing product/scenario manifests include successful runs produced in another
-checkout and older input combinations. They must retain their original source
-bindings. A recent Levitate base-rootfs attempt failed. None of these is being
-promoted to current final-source acceptance.
+Returned Daybreak manifests independently verify 504/504, 743/743, 131/131 and
+170/170 files; their selected results and precise open criteria remain source
+bound. **Security acceptance remains open.** The user authorized own CLI with
+Daybreak's original model settings. That invocation requested gpt-6-sol/high/
+daybreak_blue and was rejected for missing hardware-key authentication. It is
+retained, not completed evidence; no standard-access fallback. A required user
+reauthentication/original-context-results question is pending. Explicit dependent-
+recipe remove/cleanup remains a separate unresolved user decision. The maintained
+source/delivery joins and PRD05's actual-upstream requirement remain open; no
+new push, PR/comment or hosted run is authorized.
+
+Evidence is under `.artifacts/ginux-contribution-preparation/prd15/`; security
+returns and interrupted CLI are in the Ginux worktree's `.artifacts/prd15/`.
+Active jobs: 55290 full catalog; 60000 corrected product chains; **32358** final
+scenario driver waiting for each new chain; **23586** all six ordinary consumers.
+Final scenario harness is sealed at `dc43b8da…`; its source map is
+`final-product-scenario-sources.json`. Do not rebuild normal target/debug/levitate-
+xtask during the final cargo xtask runs. The scenario driver checks exact new
+ISO, recab/service, script and harness bytes before all/explicit-A/B commands.
+
+**Exact next action:** inspect those jobs' logs/final JSONs before restarting;
+resolve any genuine failures, obtain successful final whole catalog and both new
+product/scenario chains, then retain the tested timeout bounds and reconcile
+sources/documentation. Wait for required security authentication/results and
+the separately held decisions; partial evidence cannot close PRD15/19. Preserve
+shared staged queue/handoff patch SHA-256 f4d8c81be2612a4d8d472564b25c7ffab6e7043e06b0f2b2176cba78dad5a47e.
+
+## Historical progression and source-bound evidence
+
+The following records preserve earlier findings, corrections and failed
+attempts. Their source bindings remain valid; superseded checkpoints are not
+current release acceptance. The active checkpoint above governs resumption.
 
 ## Current evidence and findings
 
