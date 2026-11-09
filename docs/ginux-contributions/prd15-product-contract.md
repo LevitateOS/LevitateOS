@@ -91,17 +91,49 @@ product success is substituted and no source/trust change made. Levitate fresh
 products and all new guest stages are **not run**.
 
 The first independent release catalog **3804** failed **4/152 passed**, with
-148 setup failures because the task runner omitted creation of its requested
-`RECIPE_TEST_ARTIFACTS` parent. This is a runner mistake, not product execution
-evidence; the complete failed log/receipt remain. The corrected runner creates
-an empty task-owned artifact directory before invoking the same frozen harness.
-A complete **152-case** rerun is now executing under **23362**,
-`run-release-catalog-retry1.py` / `release-catalog-retry1-progress.json`. No
-source, binary, image, assertion or deadline changed. It is not a passed catalog
-yet. This separates independent local verification from remote acquisition. Heavy stages remain serialized
-after observing XFS journal contention. Every wrapper snapshots sources and
-verifies all selected artifact/source hashes before and after. The original
-pipeline failure and all earlier receipts remain immutable.
+148 setup failures because the task runner omitted the requested artifact parent.
+Its complete failed receipt/log remain. The corrected **23362** rerun finished
+**152/152 e2e passed**, zero failed/ignored/measured/filtered, in 2300.95 seconds.
+Combined with the fresh library_backend and image_producer controls on these
+exact same runtime bytes, this is **154/154** current required integration cases.
+`complete-catalog-release-retry1.json/.log` and
+`release-retry1-complete-catalog.json` retain inventory/name equality, frozen
+actual producer recipes and before/after source/artifact hashes. No old pass is
+added to this count.
+
+Post-catalog resource observation passes: no matching task processes, mounts or
+loop devices, all **702** checked regular lease files unheld, no inspection
+errors (`release-catalog-resource-observation.json`). This is bounded ordinary
+accounting, not independent adversarial security acceptance.
+
+Actual new metadata deployment also passes on **both pinned kernels** under
+operator `qemu:///session`: new EROFS **dbe1e993…**, actual Acorn base's static
+recstrap **13f6a3da…** (clean observed source 5de6647), and unchanged C controller
+**fc182144…**. The unchanged guest assertions verify UID/GID, setuid/setgid/sticky,
+hardlink identity, absolute symlink, payload, capability bytes and epoch mtimes.
+Both transient guests shut down; metadata inputs stay unchanged.
+`metadata-release-deployment.json/.log` and `release-metadata-deployment/` retain
+commands/inputs/consoles. The existing fixture producer now inspects ELF INTERP
+before selecting dynamic libraries, so the actual static PIE can be tested;
+no guest oracle or deployer guard is removed. This is not whole-distro acceptance.
+
+**New product finding:** `distro/builder/recipes/install-tools.rhai` forces
+`-C link-arg=--threads=1`. That violates the requested normal linker-threading
+boundary for actual tool producers, even though the six consumer controls pass
+without that flag. Remove this workaround in its existing owner, keep locks,
+metadata, isolation and public limits, then validate actual affected tools and
+fresh products. No native policy expansion is authorized. Current product
+receipts cannot close this finding.
+
+Guarded continuation **47148** completed resource/metadata checks and confirmed
+the pinned Bun endpoint recovered (HTTP 302→200). It started Acorn live-tools
+retry **1051618** before the linker finding was observed. Future orchestration
+parent **1051306 is paused**; its active product child continues unchanged.
+Watcher **58514** waits for `live-tools-acorn-release-retry1.json`, then terminates
+only that paused parent. Do not mutate builder/Recipe source before the child
+writes its exact receipt. `linker-finding-scheduling.json` owns the transition;
+no active case is intentionally interrupted. Subsequent products/guests must use
+a new explicit product selection/source map after the correction.
 
 Current Recipe compiler checks pass: independent disposable stable 1.99.1
 unlocked binary build/fmt/strict all-target Clippy; independent MSRV 1.93.0
@@ -163,31 +195,27 @@ then record documentation-only source equivalence and final source identity;
 this finding must not disappear behind earlier documentation checks.
 
 **Exact next actions:**
-1. Inspect full release catalog **23362** and its eventual exact-source receipt
-   before starting heavy I/O. Original **85702** stopped after actual HTTP 504
-   acquisition failure; independently check recovery of the pinned GitHub asset
-   before a bounded Acorn live-tools retry under a new label. Preserve the failed
-   receipt, reuse only unchanged-tuple successful products, and explicitly map
-   any retry receipt into the product/scenario driver. No blind whole-pipeline
-   rerun or success copied over a failed receipt. Guarded waiter **47148**
-   starts `run-release-resumed.py` only after that complete catalog succeeds; it
-   checks real pinned-asset HTTP recovery before attempting products. Explicit
-   `release-product-selection.json` maps the failed Acorn live-tools replacement
-   to a new retry label and retains all unchanged-tuple successful receipts.
-2. Finish all six release-final products, complete release catalog and both
-   `cargo xtask test all <distro> --force` plus explicit `ab-update` commands.
-   The prepared driver runs these only on current actual products and latest
-   same-batch install IDs. Retain normal scenario harness dc43b8da, script
-   fd9d1e07 and Facts 66a017cb; never rebuild normal xtask during those commands.
-3. Required security auth/results remain pending; the new exact request is
-   [the release verification request](prd15-daybreak-release-request.md). Old
-   fb87792d/467140e9 receipts stay provisional and cannot silently close the new
-   native/optimized-worker source join. No standard-access fallback.
-4. Reconcile final maintained source/delivery pins and publication permission
-   only after a concrete reviewable candidate. Fresh read-only upstream metadata
-   at 2026-11-09 06:44 UTC confirms main still 53a54adde, Gate 11 still open at
-   9759daa, and all six required PRD05 PRs still open/unmerged. Their synthetic
-   merge commit fields are not actual merge evidence. PRD05 remains incomplete.
+1. Inspect active old-source Acorn retry **1051618**, waiter **58514** and its
+   final JSON. Only after it finishes and paused parent 1051306 is stopped,
+   correct the forced linker flag and apply the queued author-doc patch. Preserve
+   their actual results and all prior failures. Ordinary 154-case runtime and
+   both metadata guest checks above completed successfully on the frozen tuple.
+2. Verify corrected tool production with normal linker defaults; create explicit
+   new source/recipe selection and rerun all affected products. The runtime bytes
+   need not change for a recipe/docs-only correction, but do not relabel old
+   input receipts. Keep manifest/source/byte equivalence evidence precise.
+   Finish both `cargo xtask test all <distro> --force` plus explicit `ab-update`.
+   Retain scenario harness dc43b8da, script fd9d1e07 and Facts 66a017cb; never
+   rebuild normal xtask during the guest commands.
+3. Required security auth/results remain pending; use [the exact release request](prd15-daybreak-release-request.md)
+   after actual hardware-key reauthentication. No standard-access fallback or
+   old-result closure of the new optimized/native source join.
+4. Reconcile final maintained source/delivery and hosted Linux permission only
+   after a concrete reviewable candidate. Latest read-only metadata **08:11 UTC**
+   (`Ginux .artifacts/prd15/current-ci/upstream-later.json`) still finds main
+   53a54adde, Gate 11 open at 9759daa and all six required PRD05 PRs unmerged.
+   Synthetic merge-commit fields are not actual merge evidence. PRD05 remains
+   incomplete; the maintained-repository choice itself is resolved.
 
 Evidence root: `.artifacts/ginux-contribution-preparation/prd15/`; current Ginux
 CI/security artifacts are in its worktree `.artifacts/prd15/`. Preserve shared

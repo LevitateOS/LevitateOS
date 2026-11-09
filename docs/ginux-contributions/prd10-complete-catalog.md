@@ -1,13 +1,17 @@
-# PRD10 — current release catalog pending; prior results retained
+# PRD10 — current 154/154 local catalog; delivery acceptance open
 
 Updated 2026-11-09. **PRD10 remains open.** The current exact optimized candidate
 is Ginux e4d95de1 / `21a54e60…`, Recipe 176395a / matching CLI-worker
 `e7073fc1…`, image `ffe04d86…`. Its current inventory is **152 e2e + 1
 library_backend + 1 image_producer = 154 required cases**. Fresh library_backend
 and image_producer each pass on that tuple. The complete 152-case release e2e
-rerun is executing; no complete current-combination success is claimed.
+rerun also passes: **154/154**, zero failed/ignored/measured/filtered. Inventory
+and observed-name equality, exact before/after artifact/source hashes, all logs
+and the first failed runner-setup attempt remain retained. Post-run observation
+finds no matching task process/mount/loop, 702 checked leases unheld and no
+inspection error. This is one runtime tuple, not passes assembled across revisions.
 [The active checkpoint](prd15-product-contract.md) owns the full identity map,
-receipts, retained runner-setup failure and actual ongoing run. Older results
+receipts, retained runner-setup failure and completed run. Older results
 below are historical, never added to the new count.
 
 The maintained baseline 28f4368f/e7bfc166 is publicly obtainable and independently

@@ -15,6 +15,10 @@ for tool in ['mount','umount','cp','sh','sha256sum']:
  files['usr/bin/'+tool]=Path('/usr/bin/'+tool).resolve()
 for source in list(files.values()):
  if source==a.image.resolve():continue
+ # The real product tools are static PIEs; only dynamic ELF inputs need a
+ # loader/library closure. Inspect ELF headers instead of accepting ldd errors.
+ headers=subprocess.check_output(['readelf','--program-headers',str(source)],text=True)
+ if not re.search(r'^\s*INTERP\s',headers,re.M):continue
  libraries=subprocess.check_output(['ldd',str(source)],text=True)
  for path in re.findall(r'(/[^\s()]+)',libraries):files[path.lstrip('/')]=Path(path)
 entries={}

@@ -15,12 +15,31 @@ baseline condition is superseded. Later correction delivery and PRD05's required
 actual merges remain open. Current main is still 53a54adde; #232/#233/#234/#236/
 #238/#243 remain open/unmerged. No new user hold is inferred.
 
-The current optimized release combination and in-progress full catalog are
-recorded in [the active product checkpoint](prd15-product-contract.md). Its
-lifecycle/storage/metadata cases must establish current behavior; the 57-case
-receipts below are retained with their original source. New distro/product and
-deployment acceptance cannot be silently inferred from them. Any source-backed
-reuse must identify unchanged behavior owners and applicable bytes explicitly.
+The current optimized release combination is recorded in
+[the active product checkpoint](prd15-product-contract.md): Ginux e4d95de1 /
+21a54e60, Recipe 176395a / matching e7073fc1, image ffe04d86. Its complete **152
+e2e + library_backend + image_producer = 154/154** run passes, including the
+lifecycle/storage/metadata cases. Exact source/inventory/hash/resource receipts
+are retained under `prd15/`; bounded observation reports no matching process,
+mount or loop, 702 regular leases unheld and no inspection error.
+
+Fresh actual deployment of that run's **dbe1e993… EROFS** by the newly produced
+static **13f6a3da… recstrap** passes all existing target metadata oracles on
+**both pinned product kernels** under transient operator session-libvirt.
+`prd15/metadata-release-deployment.json` binds the unchanged runtime tuple;
+`prd15/release-metadata-deployment/receipt.json` records exact inputs, controller,
+consoles, clean observed deployer source 5de6647 and both guest results. The
+controller source/assertions and fc182144 compiled bytes are unchanged. The
+fixture producer now checks ELF INTERP before collecting dynamic libraries,
+supporting the actual static PIE while retaining loader failures for dynamic
+inputs. No installer/mount guard is bypassed; both guests power off normally.
+
+These new receipts establish current runtime/metadata outcomes. Whole product,
+final maintained-source delivery/security and the user-held dependent-recipe
+remove/cleanup policy remain open. A newly found forced `--threads=1` in the
+product tool recipe must be corrected and affected product bytes validated;
+this new metadata receipt is reusable only if those actual bytes remain equal.
+The older 57-case receipts below retain their original source and counts.
 
 ## Exact source and artifacts
 
