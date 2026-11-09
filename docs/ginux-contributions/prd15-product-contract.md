@@ -775,3 +775,57 @@ reconcile delivery sources. Security waits for hardware-key authentication or
 returned original-context results. Dependent-recipe remove/cleanup stays a
 separate unresolved user decision. No push, PR/comment, hosted run or publication
 is authorized/performed by these corrections. Shared staging remains preserved.
+
+
+### Current exact checkpoint after functional corrections
+
+- Recipe is clean **`85bba068e95b0709a7df53624c48ab2bc0b41ece`**. Only the two
+  integration fixtures differ from 91068391; `src`, Cargo.toml and Cargo.lock
+  are identical. The original full run remains **149/152 failed**. Its three
+  findings now have passing affected receipts: `fixture-corrections-3` passes
+  kernel readiness and target metadata; `preseed-fixture-correction-4` passes
+  corruption rejection for both real rootfs consumers with their complete
+  imported closure and base-flavour input. No production check is weakened.
+- A new complete **152-case** run is active under `complete-catalog-85bba06-run`.
+  Its sealed e2e harness is `bin/e2e-85bba06`, SHA-256
+  `d365c3226df80400271487a9f1414046e55ac49b92458b06ab03b4a3a2d35933`.
+  `complete-catalog-85bba06.json` retains every enumerated name, both lock
+  hashes, the sealed builder and a frozen/hash-inventoried production recipe
+  closure at `catalog-85bba06-recipes/`. The wrapper verifies harness/builder
+  and all runtime bytes before/after. This run is **not yet complete**.
+  Fresh library_backend/image_producer checks on the same source are also
+  active, with `final-extra-harnesses-85bba06.json` binding their actual bytes.
+- Portable actual installer PTY checks now pass **both** current products:
+  `live-tools-{levitate,acorn}-ssh-pty-2.json`. They use SSH's actual guest PTY
+  and separate SSH reads of shell-written files; no extra guest package is
+  required. recshuttle `dfe9ef1` and install-tests `d55c089` commit those working
+  owners and the verified install-flush stage. A final two-line host timeout
+  bound is still uncommitted and will be included in final scenario reruns.
+- recab is clean **`61b859c4b0bec5337b6dced96d033a8847d966ce`**. All **24**
+  real CLI lifecycle integration cases pass (`recab-lifecycle-final.log`).
+  `recab-openrc-managed-producer-2.json` passes actual static musl compilation,
+  package/service generation and publication through Recipe on the pinned tuple.
+  In a real disposable Acorn session-libvirt guest,
+  `recab-openrc-guest-control.json` passes successful asynchronous completion to
+  OpenRC inactive, actual health `running` with no failed services, and stop
+  cancellation while a startup marker holds the trial: helper and child both
+  disappear. This corrects both observed faults without ignoring failures.
+  `recab-openrc-final-source.json` binds its exact committed source and receipt.
+  This was a diagnostic guest update, **not** acceptance of a rebuilt ISO.
+- `run-corrected-products.py` is executing the real base-rootfs, live-boot and
+  live-tools producers for Acorn then Levitate with the new recab source. Labels
+  are `<product>-<distro>-recab-final`; inspect final JSONs before counting them.
+  The diagnostic Acorn guest powered off; SSH's expected connection reset is
+  not a clean interactive-CLI exit and is not counted as a scenario pass. No
+  domains remain. Final whole scenario sets and both explicit A/B commands must
+  consume the new products, a final sealed harness and current PTY script.
+
+Active sessions at this checkpoint: **55290** complete catalog; **60000** both
+corrected product chains; **69378** fresh library/image integrations. Inspect
+logs/JSON before restarting anything. Runtime remains Ginux b81f30b5 / launcher
+fb87792d, matching Recipe CLI/worker 467140e9 and image ffe04d86. No runtime binary
+was changed for the fixture-only Recipe commit. Security remains blocked on the
+pending hardware-key reauthentication or original-context results; do not retry
+Daybreak with standard access. Its interrupted CLI evidence is preserved without
+acceptance claims. The user-held dependent-recipe remove/cleanup decision and
+actual source-delivery joins remain open. No remote publication is authorized.
