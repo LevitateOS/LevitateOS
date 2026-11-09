@@ -116,3 +116,49 @@ A written handoff or partial stochastic sample is not completion. Stop for a
 genuinely missing decision/permission/environment and state it precisely.
 Final source delivery, hosted Linux and the ordinary product/catalog pipeline
 remain separate dependencies; do not claim them from security checks.
+
+
+## PRD17 corrected dependency lifecycle — superseding runtime identity
+
+For the renewed final-source verification use Recipe
+**16141938f5b82e09b93051cd4fab87fde4642e68**, CLI and identical worker
+`/home/vince/Projects/LevitateOS/.artifacts/ginux-contribution-preparation/prd17/bin/recipe-final-1614193`,
+SHA-256 **e3e2845715179ae0c7de78846ca6649d1400bb4d256cf05391d60f42ee937292**.
+Its exact clean standalone archive build, lock, commands, frozen harnesses and
+actual paths are in prd17/final-runtime-build.json. The image producer is
+`prd17/bin/recipe-image-final-1614193`, SHA-256
+**55b9e50a2b88fa78151fbc8123ea35ad292b912391eccee7c178c08c8caea5eb**.
+Ginux e4d95de1 / launcher 21a54e60 and acquisition image ffe04d86 remain unchanged.
+Do not use the old e7073fc1 worker implicitly.
+
+The user has now resolved the formerly held remove/cleanup decision: require
+matching cached dependency products, validate them with installed checks and
+never run dependency install hooks. Recipe ef07382 implements this in the
+existing backend for all non-install graph operations, including nested build
+and runtime dependencies. The later 16141938 commit changes CI/bootstrap only.
+The complete ten-file public-base-to-candidate diff is retained as
+prd17/tools-recipe-publication.patch; inspect its backend ownership and callers.
+A real same-harness red/green CLI control establishes changed-input refusal
+before parent hooks, prior-publication preservation, correct saved state/files
+and durable remove/cleanup effects. The complete new runtime catalog is still
+running and has two old kernel-fixture prerequisite mismatches; these are not a
+full acceptance pass. An isolated corrected fixture passes both affected checks.
+Only test-source correction is planned while production bytes stay frozen.
+
+Carry forward **every** material remaining six-item and S09-A–H criterion and
+all prior source-backed limitations. Include cached-only manual graph identity,
+caller restrictions, stale/missing/changed dependency products and no implicit
+installation, paired authoritative non-success/publication rejection, protected
+transport/input/autofix and scratch/lease interleavings. Reconcile N-01/N-02
+against actual selected native contract/dispatch owners, preserving native
+policy rather than inheriting a historical draft's action/audit behavior. No
+selected old negative, ordinary full-suite pass or written request closes those
+criteria. Return criterion-level exact-source evidence and remaining limitations.
+
+The original own-CLI Daybreak authorization and hardware-key authentication
+requirement remain exactly as above. No authenticated result or new permission
+is inferred from this update. Do not retry the rejected invocation unchanged,
+use an ordinary model fallback, bypass authentication or run the adversarial
+matrix in the parent. Receipt destination for the renewed candidate is the
+Ginux worktree `.artifacts/prd17/daybreak-final/`. No remote publication, hosted
+dispatch, host-clock mutation or broader native/product scope is authorized.

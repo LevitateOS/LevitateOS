@@ -17,6 +17,17 @@ upstream comment, and does not fix the future upstream architecture/catalog.
 
 ## Current source and publication boundary
 
+**2026-11-09 delivery update:** the nine exact PRD16 source pushes were
+explicitly authorized and completed. Maintained Ginux e4d95de1 and Recipe
+b185e036 are now publicly obtainable; e4d95de1's required hosted Linux job passes.
+The PRD17 audit has later local Recipe16141938/docs-content bb3a1102 corrections,
+whose exact publication request is still pending. See the [current acceptance
+checkpoint](prd17-production-acceptance.md). The extraction rehearsal below and
+its upstream dependencies remain source-bound; authorized own-repository source
+delivery is separate from upstream merge/PR acceptance. No upstream write is
+authorized. Later local-source wording below records the earlier preparation
+state and does not negate the completed exact source pushes.
+
 The obtainable maintained baseline is Ginux 28f4368f / Recipe e7bfc166,
 verified under [PRD14](prd14-bootstrap-packaging.md). Its configured catalog is
 **1002**: Gate 11 consumes upstream catalog 2, so the earlier local 2/3 choices
