@@ -2,7 +2,7 @@
 
 A graphical app beside `recab-tui` for the desktop images: KDE Plasma on
 LevitateOS and LXQt on AcornOS. Nothing below is built. The toolkit is decided;
-two decisions are open (marked **Decide**).
+so is `pkexec` for changes; one decision is open (marked **Decide**).
 
 ## What it is
 
@@ -66,9 +66,9 @@ desktops).
   reason, after-state). The GUI holds labels and layout only, no slot rules.
 - **Changes:** runs `recab <command>` through `pkexec`, with a polkit policy
   file (`org.levitateos.recab.policy`) so the desktop's own agent asks for the
-  password and says what for. **Decide:** this, or a D-Bus helper started by
-  the system bus. `pkexec` is far less to build and audit; the helper only pays
-  off if actions should be allowed without a prompt.
+  password and says what for. Decided (2026-11-10): `pkexec`, not a D-Bus
+  helper started by the system bus. It is far less to build and audit; the
+  helper would only pay off if actions should be allowed without a prompt.
 - **Errors:** recab's JSON error (tag, message, help) shown as is.
 - **Destructive write:** the same guard as the TUI, typing the slot's name.
 - **Running from a checkout:** the TUI's stand-ins (`fixtures/recab`,
@@ -121,9 +121,9 @@ environment, not a second mechanism beside it.
 
 ## Order of work
 
-1. The two open decisions.
-2. Run recab gaps 2 and 3 on a booted desktop of each distro (they can end the
-   `pkexec` design), and close gap 1.
+1. The open decision (where the source lives).
+2. Run recab gaps 2 and 3 on a booted desktop of each distro (a failure there
+   reopens the `pkexec` decision), and close gap 1.
 3. The build recipe, proven with a window that only prints `recab status`.
 4. Status page and the four quick actions (try, commit, roll back, reboot).
 5. Writing a system: picking a medium or image, the typed confirmation,
