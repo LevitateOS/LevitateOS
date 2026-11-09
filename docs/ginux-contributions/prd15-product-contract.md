@@ -24,7 +24,7 @@ CLI/integration/product owners provide verification.
 Current runtime pair: Ginux clean `b81f30b52e523d142071603f477c6891c7fd9df9`
 (test-only additions over runtime 3cd1e2de), sealed launcher
 `fb87792d5b4363ca669d20935ce6f3d3f6d08fb97ee0cdc74e60bc324c200e6e`;
-Recipe clean `85bba068e95b0709a7df53624c48ab2bc0b41ece` (two fixture-only
+Recipe clean `3828500` (three fixture-only
 corrections over 91068391; production/Cargo inputs identical), sealed matching
 CLI/worker `467140e9b036a8ed20b58f87020ad7a63cfe7c68d311dc8e19cfe51c464cf9ef`;
 image `ffe04d8671e45036ac77acc958fb6cfd3c24a939075dc7e6c5437b69d7f05c15`.
@@ -39,10 +39,13 @@ service completion/cancellation and all 24 recab CLI lifecycle checks pass.
 **Both corrected ISO chains and final whole scenarios are still running/waiting.**
 
 The old complete catalog is **149/152 failed**; all three affected cases now
-pass. New exact 152-case run on 85bba06 is in progress; do not assemble a full
-claim from prior results. Fresh library_backend and image_producer pass on this
-source/tuple. All six ordinary PRD11 consumers are being replayed on it, with
-fresh directories and normal locks/threading/metadata/isolation.
+pass. The 85bba06 full run is still in progress and has three HTTP fixture-startup
+failures; its 120-second listener expired before image preparation completed.
+A focused corrected case passes with actual GET evidence. Fresh complete
+3828500 coverage is queued after reviewing that completed failed run; do not
+assemble a full claim from prior results. Fresh library_backend/image_producer
+and **all six ordinary PRD11 consumers** pass on the unchanged production tuple,
+with normal locks/threading/metadata/isolation.
 
 Returned Daybreak manifests independently verify 504/504, 743/743, 131/131 and
 170/170 files; their selected results and precise open criteria remain source
@@ -57,8 +60,10 @@ new push, PR/comment or hosted run is authorized.
 
 Evidence is under `.artifacts/ginux-contribution-preparation/prd15/`; security
 returns and interrupted CLI are in the Ginux worktree's `.artifacts/prd15/`.
-Active jobs: 55290 full catalog; 60000 corrected product chains; **32358** final
-scenario driver waiting for each new chain; **23586** all six ordinary consumers.
+Active jobs: 55290 failed/in-progress old catalog; **65760** queues the new
+3828500 complete catalog after the old result and failure-list review; 60000
+corrected product chains; **32358** final scenario driver waiting for each new
+chain; **64665** documented examples and checks. Consumer job 23586 completed.
 Final scenario harness is sealed at `dc43b8da…`; its source map is
 `final-product-scenario-sources.json`. Do not rebuild normal target/debug/levitate-
 xtask during the final cargo xtask runs. The scenario driver checks exact new
@@ -850,3 +855,48 @@ pending hardware-key reauthentication or original-context results; do not retry
 Daybreak with standard access. Its interrupted CLI evidence is preserved without
 acceptance claims. The user-held dependent-recipe remove/cleanup decision and
 actual source-delivery joins remain open. No remote publication is authorized.
+
+
+### HTTP startup finding and completed six-consumer replay
+
+All six current ordinary consumers have final exit-zero receipts on the same
+fb87792d / 467140e9 / ffe04d86 tuple. `current-consumers-exact-source.json`
+reconciles their identical runtime identities; `consumers-85bba06/SHA256SUMS`
+binds 161 retained files. SQLite contention, concurrent GNU/musl shared Cargo
+cache/target locking and built threaded execution, pinned Git HTTP/HTTPS,
+actual RPM bytes/metadata/links and signed APK installation/execution pass.
+The separate consumer report preserves original and current source bindings;
+no delivery or security acceptance is inferred.
+
+The 85bba06 complete catalog reports three HTTP fixture-startup failures:
+interrupted download, resumed download and digest verification. Each server
+exits its 120-second pre-connect wait under concurrent whole-image preparation.
+The retained CAABGH worker result records an actual permitted endpoint attempt,
+not connected, with ECONNREFUSED after that listener exit, and successful prior-
+destination cleanup. It never exercises the intended truncated response. This
+is not counted as an interruption-preservation pass or silently retried away.
+
+Recipe **3828500** changes only the integration fixture: allow up to 600 seconds
+for coordinator/image startup before connection, retain the five-second HTTP
+read timeout and all production deadlines/limits, and require/capture the actual
+GET before accepting interrupted-download preservation. The focused case passes
+all four prefix/resume combinations in 179.76 seconds. Its exact source and
+harness are bound by `http-fixture-startup-source.json`; failure evidence remains
+in the old full run. No application download timeout or integrity assertion is
+weakened. All source/lock/build inputs outside the three fixture files remain
+identical to production 91068391.
+
+The old full catalog is allowed to finish to retain other possible findings.
+`run-final-catalog-after-failed-run.py` then requires all 152 cases accounted for,
+unchanged selected binaries/image and **only** those three diagnosed failures
+before starting a fresh complete 152-case run on sealed 3828500. Any different
+failure stops that scheduler for review. No old pass is combined into the new
+full-suite claim. The new source/harness/name/recipe-closure inventory is
+`complete-catalog-3828500.json`; session **65760** awaits the old final receipt.
+
+Both corrected ISO chains and their queued exact-harness whole/explicit-A/B
+scenarios remain incomplete. Current author/man/public examples are also being
+rerun under `documented-current-*`, retaining fresh checks/reuse and actual
+produced-program execution. The security hardware-key question, explicit remove/
+cleanup decision and upstream/source-delivery dependencies remain open. No push,
+PR/comment, hosted job or security-execution fallback occurred.
