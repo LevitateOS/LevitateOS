@@ -1,0 +1,778 @@
+{
+  "schema_version": 1,
+  "status": "prepared locally; source publication and final superproject adoption not authorized",
+  "observed_at": 1794223295.6222658,
+  "superproject_base": "46c7e25a7c01076bc8128bfbdf487095e4f039b6",
+  "proposed_tree": "57688d3b27f3967c806ddbca2f7e3b0964dfb463",
+  "sources": [
+    {
+      "path": "docs/website",
+      "repository": "LevitateOS/website",
+      "branch": "master",
+      "url": "https://github.com/LevitateOS/website.git",
+      "revision": "4d1d93550b59fba02c25eefeee5fe954e76f6d84",
+      "tree": "ed78fdd491f67f5a481481ff76fcaa16ee0db4a4",
+      "recorded_gitlink": "4d1d93550b59fba02c25eefeee5fe954e76f6d84",
+      "observed_remote_revision": "4d1d93550b59fba02c25eefeee5fe954e76f6d84",
+      "remote_status": "unchanged selected gitlink; remote availability requires fresh fetch",
+      "bundle": ".artifacts/ginux-contribution-preparation/prd16/docs-website.bundle",
+      "bundle_sha256": "6080568899d13768e6895175def67d7e3ab2167a67d431b9c7bb2158c8f1f764",
+      "availability": "public selected revision",
+      "full_patch": null
+    },
+    {
+      "path": "tools/recipe",
+      "repository": "LevitateOS/recipe",
+      "branch": "master",
+      "url": "https://github.com/LevitateOS/recipe.git",
+      "revision": "b185e0363ceba1290201ba84593aefb313a85cc4",
+      "tree": "dc30fe4c65f6da8f83abe2fffbc995f3a9cf11f7",
+      "recorded_gitlink": "e7bfc166343164989794c917e67f187d0ac49ba8",
+      "observed_remote_revision": "e7bfc166343164989794c917e67f187d0ac49ba8",
+      "remote_status": "selected descendant needs push permission",
+      "bundle": ".artifacts/ginux-contribution-preparation/prd16/tools-recipe.bundle",
+      "bundle_sha256": "c9d54380c3a3e19f021042c06d58ba97bafd6bc2fc516abc761cf80e6b42af48",
+      "patch": "tools-recipe.patch",
+      "patch_sha256": "4ade3eba4fae0e30a00962cf2af1fd599dff192827c1fce4ad2dfc59c0e5b449",
+      "commits": [
+        "b185e0363ceba1290201ba84593aefb313a85cc4 docs: align dependency authoring with separate instance authority",
+        "176395aeaa5bb8999c1a6289d18e53c8012ecdf9 docs: bound configured compiler metadata and event capabilities",
+        "2755ec60751c13250dff0bc4936195ae504b5632 docs: distinguish delivered baseline from pending consumer corrections",
+        "d2eb4acd3eac52e094cd362591600cd9e622dc2d docs: name the configured downstream contract catalog",
+        "3828500d0564f98045f26ef284efeed54ebe3b4d test: keep HTTP fixtures alive through managed startup",
+        "85bba068e95b0709a7df53624c48ab2bc0b41ece test: prepare cached kernel prerequisites and complete rootfs inputs",
+        "91068391cdc7e0e8ef10c59e2b8b1bcc65521554 fix: check matching cached dependencies before manual readiness",
+        "e28a60ab05393325a95dee14e2a4a7361e598aa5 Bound hostname grants to recorded numeric address subsets",
+        "cca5bb7af832cca9d2bf13ea35438f3c745d3a16 Make runnable examples and timestamp limits explicit"
+      ],
+      "availability": "awaiting exact push authorization",
+      "full_patch": ".artifacts/ginux-contribution-preparation/prd16/tools-recipe.patch"
+    },
+    {
+      "path": "docs/content",
+      "repository": "LevitateOS/docs-content",
+      "branch": "master",
+      "url": "https://github.com/LevitateOS/docs-content.git",
+      "revision": "d9384939cfcecf6af37d45040c0404f50dbf69f7",
+      "tree": "0d8e85a683eb134a8ebd6609261b1a4e48ed4f1a",
+      "recorded_gitlink": "795bf864fc15c79785b2bd1ab0d2ef3c03287cd3",
+      "observed_remote_revision": "795bf864fc15c79785b2bd1ab0d2ef3c03287cd3",
+      "remote_status": "selected descendant needs push permission",
+      "bundle": ".artifacts/ginux-contribution-preparation/prd16/docs-content.bundle",
+      "bundle_sha256": "421e739ec837c0f093a9fbfb1d2c435752e44381dbc37c31ceb2a551cedef98c",
+      "patch": "docs-content.patch",
+      "patch_sha256": "ee2a5edd5a7c09cf8a454ff0e551a876f72734763ff7d1f0a14bb9b56a6d00e6",
+      "commits": [
+        "d9384939cfcecf6af37d45040c0404f50dbf69f7 docs: align embedded Recipe guides with declared NEEDS"
+      ],
+      "availability": "awaiting exact push authorization",
+      "full_patch": ".artifacts/ginux-contribution-preparation/prd16/docs-content.patch"
+    },
+    {
+      "path": "testing/install-tests",
+      "repository": "LevitateOS/install-tests",
+      "branch": "master",
+      "url": "https://github.com/LevitateOS/install-tests.git",
+      "revision": "056a46b008c7be433b6493676c44aed6603e52ba",
+      "tree": "fbd41efb6c2e9422a081bbc2ac34ed407a81d0f9",
+      "recorded_gitlink": "453751c6398104fa6d87e54d781c2d32e84eb20f",
+      "observed_remote_revision": "453751c6398104fa6d87e54d781c2d32e84eb20f",
+      "remote_status": "selected descendant needs push permission",
+      "bundle": ".artifacts/ginux-contribution-preparation/prd16/testing-install-tests.bundle",
+      "bundle_sha256": "aaff620da5e3ff3d74ac6ff6d4356e5c75d233d4820fb4b6a977ae07caf67e19",
+      "patch": "testing-install-tests.patch",
+      "patch_sha256": "301a1cd09987686749ecda4a7d283e6dd2b6840b9b87be710f75705b5eeb56a6",
+      "commits": [
+        "056a46b008c7be433b6493676c44aed6603e52ba test: bound PTY control waits and reject duplicate row keys",
+        "d55c089b79c2c5b2007acd51c103350bbe05050e test: exercise installer PTYs and flush complete install stages"
+      ],
+      "availability": "awaiting exact push authorization",
+      "full_patch": ".artifacts/ginux-contribution-preparation/prd16/testing-install-tests.patch"
+    },
+    {
+      "path": "tools/recstrap",
+      "repository": "LevitateOS/recstrap",
+      "branch": "master",
+      "url": "https://github.com/LevitateOS/recstrap.git",
+      "revision": "5de6647a4927f99bf1635585c203cb0ea3dcbaeb",
+      "tree": "0bc1fb7833ed7864704413698b9e2ba8cef5ee5c",
+      "recorded_gitlink": "5de6647a4927f99bf1635585c203cb0ea3dcbaeb",
+      "observed_remote_revision": "5de6647a4927f99bf1635585c203cb0ea3dcbaeb",
+      "remote_status": "selected head already public",
+      "bundle": ".artifacts/ginux-contribution-preparation/prd16/tools-recstrap.bundle",
+      "bundle_sha256": "c0a33461a12d66d05430dbd788af9dd84e4c1226c7edb30b67c56040a35210de",
+      "availability": "public selected revision",
+      "full_patch": null
+    },
+    {
+      "path": "distro/builder",
+      "repository": "LevitateOS/distro-builder",
+      "branch": "main",
+      "url": "https://github.com/LevitateOS/distro-builder.git",
+      "revision": "9468d26e4782f3dc556e609432f62292431c3c0c",
+      "tree": "782f4d272bbc59a87e321b29781286418347232b",
+      "recorded_gitlink": "2d55a5481ba157752d3eac39d13314810f275cc0",
+      "observed_remote_revision": "2d55a5481ba157752d3eac39d13314810f275cc0",
+      "remote_status": "selected descendant needs push permission",
+      "bundle": ".artifacts/ginux-contribution-preparation/prd16/distro-builder.bundle",
+      "bundle_sha256": "1d0ae62e0a05f6c029bd056a75068b04376e226dd19d0493fda6c3855ce68e1b",
+      "patch": "distro-builder.patch",
+      "patch_sha256": "fd242df3409ec86d40a205f5f70e415092c36847d66ae317c221d93651d5052b",
+      "commits": [
+        "9468d26e4782f3dc556e609432f62292431c3c0c fix: preserve normal linker threading in managed tool production",
+        "34172e7bc2dfef947143467d878a357ec3f08041 build: produce installed and live TUI programs through Recipe",
+        "bb14537222bf772a45d04c51646abf8d49ab1d0c Acquire verified TUI compiler and runtimes through Recipe"
+      ],
+      "availability": "awaiting exact push authorization",
+      "full_patch": ".artifacts/ginux-contribution-preparation/prd16/distro-builder.patch"
+    },
+    {
+      "path": "tools/recinit",
+      "repository": "LevitateOS/recinit",
+      "branch": "main",
+      "url": "https://github.com/LevitateOS/recinit.git",
+      "revision": "0ea7cd7dbfed5786ace49839a648d453f38edb9d",
+      "tree": "0c3197a5228985c63bbca8a096463b169e0cb782",
+      "recorded_gitlink": "0ea7cd7dbfed5786ace49839a648d453f38edb9d",
+      "observed_remote_revision": "0ea7cd7dbfed5786ace49839a648d453f38edb9d",
+      "remote_status": "unchanged selected gitlink; remote availability requires fresh fetch",
+      "bundle": ".artifacts/ginux-contribution-preparation/prd16/tools-recinit.bundle",
+      "bundle_sha256": "ff94c35d73ecef523ee09b376dc250b2641cda7e42214610e90096191b916333",
+      "availability": "public selected revision",
+      "full_patch": null
+    },
+    {
+      "path": "tools/recuki",
+      "repository": "LevitateOS/recuki",
+      "branch": "main",
+      "url": "https://github.com/LevitateOS/recuki.git",
+      "revision": "8a4c907f0bc5900f883cae6dccd26cef696bc350",
+      "tree": "b2d8d613b6ece364af91c4ff5d2c4eaf063384d6",
+      "recorded_gitlink": "8a4c907f0bc5900f883cae6dccd26cef696bc350",
+      "observed_remote_revision": "8a4c907f0bc5900f883cae6dccd26cef696bc350",
+      "remote_status": "unchanged selected gitlink; remote availability requires fresh fetch",
+      "bundle": ".artifacts/ginux-contribution-preparation/prd16/tools-recuki.bundle",
+      "bundle_sha256": "54aae54dc0af01d06b59a680eed4ec06e484212c0153ab1f21f2e1ee0415ea6d",
+      "availability": "public selected revision",
+      "full_patch": null
+    },
+    {
+      "path": "tools/reciso",
+      "repository": "LevitateOS/reciso",
+      "branch": "main",
+      "url": "https://github.com/LevitateOS/reciso.git",
+      "revision": "1219638a8f45ec0a8dc484e32b9e830aadaab189",
+      "tree": "067c5a624b7f5075aeaf6d39bdb85c2fd423b9ed",
+      "recorded_gitlink": "1219638a8f45ec0a8dc484e32b9e830aadaab189",
+      "observed_remote_revision": "1219638a8f45ec0a8dc484e32b9e830aadaab189",
+      "remote_status": "unchanged selected gitlink; remote availability requires fresh fetch",
+      "bundle": ".artifacts/ginux-contribution-preparation/prd16/tools-reciso.bundle",
+      "bundle_sha256": "cf5f1230072348c7044168fea877e093ea4662b2cb6bd84a5bc01f0958b7836c",
+      "availability": "public selected revision",
+      "full_patch": null
+    },
+    {
+      "path": "tools/recqemu",
+      "repository": "LevitateOS/recqemu",
+      "branch": "main",
+      "url": "https://github.com/LevitateOS/recqemu.git",
+      "revision": "f0364bbf8c3a6093132729f73420bde848466f7b",
+      "tree": "84746ba64868ea6f0a58066ca6c47b1c2c265883",
+      "recorded_gitlink": "5f21e8b4ecfc8b9bd8a5c7508b32fca004d2ae9c",
+      "observed_remote_revision": "5f21e8b4ecfc8b9bd8a5c7508b32fca004d2ae9c",
+      "remote_status": "selected descendant needs push permission",
+      "bundle": ".artifacts/ginux-contribution-preparation/prd16/tools-recqemu.bundle",
+      "bundle_sha256": "094a12f34119523bfbe96ab3f52bdd22e684865a87d1d0bc0442b4c9b11e9608",
+      "patch": "tools-recqemu.patch",
+      "patch_sha256": "98cde27e73b74c835f85b6f2f1ba8804e37d96ff085bff715165f826333b74bc",
+      "commits": [
+        "f0364bbf8c3a6093132729f73420bde848466f7b docs: describe SELinux input labels for session VMs"
+      ],
+      "availability": "awaiting exact push authorization",
+      "full_patch": ".artifacts/ginux-contribution-preparation/prd16/tools-recqemu.patch"
+    },
+    {
+      "path": "distro/contract",
+      "repository": "LevitateOS/distro-contract",
+      "branch": "master",
+      "url": "https://github.com/LevitateOS/distro-contract.git",
+      "revision": "285be82b47767f832eeb98166e1c54f506f6a371",
+      "tree": "236ec8944811540c7d9b73b9c9a02335fb8001a3",
+      "recorded_gitlink": "285be82b47767f832eeb98166e1c54f506f6a371",
+      "observed_remote_revision": "285be82b47767f832eeb98166e1c54f506f6a371",
+      "remote_status": "unchanged selected gitlink; remote availability requires fresh fetch",
+      "bundle": ".artifacts/ginux-contribution-preparation/prd16/distro-contract.bundle",
+      "bundle_sha256": "629e5ac28a0f81c8a38fec36b534fbbbf131be9c697094249ef231fa78abee28",
+      "availability": "public selected revision",
+      "full_patch": null
+    },
+    {
+      "path": "tools/recab",
+      "repository": "LevitateOS/recab",
+      "branch": "main",
+      "url": "https://github.com/LevitateOS/recab.git",
+      "revision": "61b859c4b0bec5337b6dced96d033a8847d966ce",
+      "tree": "07027c3259142a7cac9b19023803cf5cfb54385a",
+      "recorded_gitlink": "de02cfa8e1223cbc358da4328dc2100cc10ed086",
+      "observed_remote_revision": "de02cfa8e1223cbc358da4328dc2100cc10ed086",
+      "remote_status": "selected descendant needs push permission",
+      "bundle": ".artifacts/ginux-contribution-preparation/prd16/tools-recab.bundle",
+      "bundle_sha256": "cd5fa8fe1a0a42374d405aa303a9952095387dd4bde8e8f7cc7111055e1cd08b",
+      "patch": "tools-recab.patch",
+      "patch_sha256": "d720adcf8dabc6801d4e897bfb158d4d6b5b3b1508c1dd86cb1a30f5617c4c90",
+      "commits": [
+        "61b859c4b0bec5337b6dced96d033a8847d966ce fix: preserve OpenRC trial health and one-shot lifetime"
+      ],
+      "availability": "awaiting exact push authorization",
+      "full_patch": ".artifacts/ginux-contribution-preparation/prd16/tools-recab.patch"
+    },
+    {
+      "path": "tools/recpart",
+      "repository": "LevitateOS/recpart",
+      "branch": "main",
+      "url": "https://github.com/LevitateOS/recpart.git",
+      "revision": "a0a44df82b59637fd847dc0ec2f5394925e0a2d0",
+      "tree": "100ee9a8c5ec9ca820660c142a03a96e84be24c6",
+      "recorded_gitlink": "a0a44df82b59637fd847dc0ec2f5394925e0a2d0",
+      "observed_remote_revision": "a0a44df82b59637fd847dc0ec2f5394925e0a2d0",
+      "remote_status": "unchanged selected gitlink; remote availability requires fresh fetch",
+      "bundle": ".artifacts/ginux-contribution-preparation/prd16/tools-recpart.bundle",
+      "bundle_sha256": "fcb918a3ba4d55bcb5cc71c54ee04ecfa1d6d05c2a6d257022527798dcb78bf7",
+      "availability": "public selected revision",
+      "full_patch": null
+    },
+    {
+      "path": "tui",
+      "repository": "LevitateOS/tui-root",
+      "branch": "master",
+      "url": "https://github.com/LevitateOS/tui-root.git",
+      "revision": "ade4d9aa649cc7806f899a826723881ed4263296",
+      "tree": "ee680d9427019e8cf8f0077453bef00f73304b95",
+      "recorded_gitlink": "54849054327437e3649cebc1ad1939cc62e9330d",
+      "observed_remote_revision": "54849054327437e3649cebc1ad1939cc62e9330d",
+      "remote_status": "selected descendant needs push permission",
+      "bundle": ".artifacts/ginux-contribution-preparation/prd16/tui.bundle",
+      "bundle_sha256": "710681f7437aa0ff6de1acb44caed9bf3ce99b834e4541808d12302f02da2807",
+      "patch": "tui.patch",
+      "patch_sha256": "d4cb039ce79bdda7a15cdb0a966bc8503f2136924f13d10b8602005381f84e68",
+      "commits": [
+        "ade4d9aa649cc7806f899a826723881ed4263296 fix: keep repeated fact labels distinct in terminal rows"
+      ],
+      "availability": "awaiting exact push authorization",
+      "full_patch": ".artifacts/ginux-contribution-preparation/prd16/tui.patch"
+    },
+    {
+      "path": "tools/recshuttle",
+      "repository": "LevitateOS/recshuttle",
+      "branch": "master",
+      "url": "https://github.com/LevitateOS/recshuttle.git",
+      "revision": "dfe9ef12ea7ba3956738a4e05df6a16630808f4e",
+      "tree": "8820a76be52b6a23dbe8f994a2cd4c5cb3682fe3",
+      "recorded_gitlink": "6391e9630b3a9917ceabbc734c1c18a6bae77821",
+      "observed_remote_revision": "6391e9630b3a9917ceabbc734c1c18a6bae77821",
+      "remote_status": "selected descendant needs push permission",
+      "bundle": ".artifacts/ginux-contribution-preparation/prd16/tools-recshuttle.bundle",
+      "bundle_sha256": "6da59f36148bf1c0fdb1bd62eaccc4a4208161ebefdbe2d341be9f1f6fadf5e7",
+      "patch": "tools-recshuttle.patch",
+      "patch_sha256": "ff4dd2fa0ccfd263ecd0cba171e5585332aea7c6620c38877c8e6bfea130c09c",
+      "commits": [
+        "dfe9ef12ea7ba3956738a4e05df6a16630808f4e feat: expose the configured SSH guest terminal command"
+      ],
+      "availability": "awaiting exact push authorization",
+      "full_patch": ".artifacts/ginux-contribution-preparation/prd16/tools-recshuttle.patch"
+    },
+    {
+      "path": "tools/ginux",
+      "repository": "LevitateOS/ginux",
+      "branch": "main",
+      "url": "https://github.com/LevitateOS/ginux.git",
+      "revision": "e4d95de10520aa8e91bc2ec69e64da004443e2da",
+      "tree": "47b8f2479deed14463b484ec00859237e2fdae27",
+      "recorded_gitlink": "28f4368f6fd70d0e485386892a08d6734b5988dd",
+      "observed_remote_revision": "28f4368f6fd70d0e485386892a08d6734b5988dd",
+      "remote_status": "selected descendant needs push permission",
+      "bundle": ".artifacts/ginux-contribution-preparation/prd16/tools-ginux.bundle",
+      "bundle_sha256": "37a93958c416822dfd32f2b651185c396fd97bbc16334b48d1646669daebb2e1",
+      "patch": "tools-ginux.patch",
+      "patch_sha256": "bf48d9e468605e2ad9565ce043298276e9ab86b6d87c13e78882d49eddf0af6b",
+      "commits": [
+        "e4d95de10520aa8e91bc2ec69e64da004443e2da fix: preserve native dispatch phase when delivering SIGCHLD",
+        "b81f30b52e523d142071603f477c6891c7fd9df9 test: retain chunked copy-up rollback and orphan adoption cases",
+        "03d4e00948e5df02d58e3cb19f1439dd4991d7c7 test(launch): retain shared-offset mmap regression",
+        "3cd1e2de49cfc16c0d22804849a82a5d24cf22d8 feat(launch): retain metadata-only configured path references",
+        "f98281d9f2e362d86fd3a1d702ada8f0a8c1344c fix(launch): notify epoll on every successful counter transfer",
+        "45b1f478ac79ccc6893b1f512e0382f875c11f08 fix(launch): cover combined TCP and channel epoll watches",
+        "7a291c0470ad476e8c68d11a669e4b9aa0298e41 feat(launch): expose a bounded read-only process stack view",
+        "5eaf5f2e0970c8dc3acd4fcb4b2e1ee95561547e feat(launch): support bounded owned event counters and epoll",
+        "ef8d5d4aa4ce7b4f8d45a3c09fb638226f49051e feat(launch): expose owned filesystem descriptor names"
+      ],
+      "availability": "awaiting exact push authorization",
+      "full_patch": ".artifacts/ginux-contribution-preparation/prd16/tools-ginux.patch"
+    }
+  ],
+  "runtime": {
+    "ginux": {
+      "source": "e4d95de10520aa8e91bc2ec69e64da004443e2da",
+      "path": "/home/vince/Projects/LevitateOS/.artifacts/ginux-contribution-preparation/prd15/bin/ginux-native-sigchld-1",
+      "sha256": "21a54e60bd54a4dd2b07957cf2e139a268eb050cb73929e0b8666b31f60c2333"
+    },
+    "recipe": {
+      "path": "/home/vince/Projects/LevitateOS/.artifacts/ginux-contribution-preparation/prd15/bin/recipe-release-176395a",
+      "sha256": "e7073fc17ec0bb029927d0c2e901ca37e0867a7cfdc4c5641d1d6c9b14bb5c03",
+      "original_path": "/tmp/prd15-release-runtime-nesm5ue5/recipe/target/release/recipe"
+    },
+    "worker": "Identical to recipe coordinator",
+    "recipe_image": {
+      "path": "/home/vince/Projects/LevitateOS/.artifacts/ginux-contribution-preparation/prd15/bin/recipe-image-release-176395a",
+      "sha256": "aa13ac9b58671cfda9c4126ecdb56c42a5e3d77b13137bb15030ee90921dd8a6",
+      "original_path": "/tmp/prd15-release-runtime-nesm5ue5/recipe/target/release/recipe-image"
+    },
+    "acquisition_image": {
+      "path": "/home/vince/Projects/LevitateOS/.artifacts/ginux-contribution-preparation/prd14/ginux-acquisition-image/rootfs.tar",
+      "sha256": "ffe04d8671e45036ac77acc958fb6cfd3c24a939075dc7e6c5437b69d7f05c15"
+    },
+    "compiled_recipe_revision": "176395aeaa5bb8999c1a6289d18e53c8012ecdf9",
+    "selected_recipe_revision": "b185e0363ceba1290201ba84593aefb313a85cc4",
+    "recipe_join": "Selected b185e036 source independently builds byte-identical CLI/worker and image producer. Original 176395a execution identity is retained.",
+    "rust_toolchain": "1.99.0",
+    "recipe_lock_sha256": "48c776bdeb1cf63378e7132fd1dfbc1a819db09a95a23fa3f7ecb1b676e85f65",
+    "workspace_lock_sha256": "36066e42bd9397dc9583f97afc227514f62164f7232ce9496a2384c20f9e28b2",
+    "builder": {
+      "path": "/home/vince/Projects/LevitateOS/.artifacts/ginux-contribution-preparation/prd15/bin/distro-builder-manual-cache-1",
+      "sha256": "4d5928b73c54c8d2a692fe3f31bd9a9b055977d4ef304abc1cfd1b582adebfc4"
+    },
+    "scenario_harness": {
+      "path": "/home/vince/Projects/LevitateOS/target/debug/levitate-xtask",
+      "sha256": "dc43b8dab5927d91f47b4b3334425e0764d310b85c75481229cec316ebe6de0e"
+    }
+  },
+  "images": {
+    "base_sha256": "b93bfd0f6deea2a7a96216655cda3ebbd87a445231548ff491ee30aed20a36ab",
+    "compiler_sha256": "a8edd8faecd8125a19a70356e8969209f9f78efcf1333c250de6c6afc1807776",
+    "acquisition_sha256": "ffe04d8671e45036ac77acc958fb6cfd3c24a939075dc7e6c5437b69d7f05c15",
+    "producer": "Recipe recipe-image; bootstrap manifests and public input URLs in the pinned source"
+  },
+  "contract": {
+    "upstream_catalog": 2,
+    "configured_catalog": 1002,
+    "configured_operations": 193
+  },
+  "image_inputs": {
+    "ginux-acquisition-image.json": {
+      "path": "tools/recipe/bootstrap/ginux-acquisition-image.json",
+      "sha256": "03a84bd16141ffb9fecfc4c9c907cf4a892391b8d65e65cd66f78a978db1409e"
+    },
+    "ginux-build-image.json": {
+      "path": "tools/recipe/bootstrap/ginux-build-image.json",
+      "sha256": "aadfa59ef79d58f640e6117245742db222d5b6ff89273d6857656dfc21933c1d"
+    }
+  },
+  "products": {
+    "acorn": {
+      "product_ids": {
+        "base-rootfs": "A1My9Q1kl3g1ooze",
+        "live-boot": "A1MzccgZQTOQDJVy",
+        "live-tools": "A1Mzhthmceb3c7Vy"
+      },
+      "products": {
+        "base-rootfs": {
+          "path": ".artifacts/out/acorn/releases/base-rootfs/A1My9Q1kl3g1ooze/acornos-x86_64-base-rootfs.iso",
+          "sha256": "17d82b2854589f20c72ff8a6af8182561a66e68562213dab2f2f7b562b2839d3",
+          "size": 282081280,
+          "run_manifest": {
+            "path": ".artifacts/out/acorn/releases/base-rootfs/A1My9Q1kl3g1ooze/run-manifest.json",
+            "sha256": "dc1da6a33119f9599c5146e1408bd7285f282b4ce8acd35382c0dcc988f4873c"
+          }
+        },
+        "live-boot": {
+          "path": ".artifacts/out/acorn/releases/live-boot/A1MzccgZQTOQDJVy/acornos-x86_64-live-boot.iso",
+          "sha256": "e54c39d13f0f48cb4beaa1862c92ddd24601ed132c897f552694f63b26c97328",
+          "size": 282089472,
+          "run_manifest": {
+            "path": ".artifacts/out/acorn/releases/live-boot/A1MzccgZQTOQDJVy/run-manifest.json",
+            "sha256": "841a6285b4b56834cce3e4da6028355336d2ac2509c82df7288316d5878e10b2"
+          }
+        },
+        "live-tools": {
+          "path": ".artifacts/out/acorn/releases/live-tools/A1Mzhthmceb3c7Vy/acornos-x86_64-live-tools.iso",
+          "sha256": "961cc46a6773ebd6079d59d8ac0a0bf0ed308bb3f9d14f3167dda2faf400ab85",
+          "size": 317483008,
+          "run_manifest": {
+            "path": ".artifacts/out/acorn/releases/live-tools/A1Mzhthmceb3c7Vy/run-manifest.json",
+            "sha256": "2656fddd6908c18112fd916d9929194ce449166caaca8913a10986f7cfc97e5e"
+          }
+        }
+      },
+      "scenarios": {
+        "install": {
+          "run_id": "A1N55dy6zUgDfEuN",
+          "manifest": {
+            "path": ".artifacts/out/acorn/scenarios/install/A1N55dy6zUgDfEuN/run-manifest.json",
+            "sha256": "0fd92767f3f26eeb438472f91a4f9fcd65f5169ad47edf7ed509e41a9bf3b9a1"
+          },
+          "inputs": [
+            {
+              "target_kind": "release-product",
+              "target_name": "live-tools",
+              "run_id": "A1Mzhthmceb3c7Vy"
+            }
+          ]
+        },
+        "ab-update": {
+          "run_id": "A1N5AWvGsoTy3U4l",
+          "manifest": {
+            "path": ".artifacts/out/acorn/scenarios/ab-update/A1N5AWvGsoTy3U4l/run-manifest.json",
+            "sha256": "fedc768c3abe56354333f0463c069853eea8b5e16f1cb1178eec18e98db33b4c"
+          },
+          "inputs": [
+            {
+              "target_kind": "release-product",
+              "target_name": "live-tools",
+              "run_id": "A1Mzhthmceb3c7Vy"
+            },
+            {
+              "target_kind": "scenario",
+              "target_name": "install",
+              "run_id": "A1N55dy6zUgDfEuN"
+            }
+          ]
+        },
+        "live-boot": {
+          "run_id": "A1N52MjJAuZjo8TX",
+          "manifest": {
+            "path": ".artifacts/out/acorn/scenarios/live-boot/A1N52MjJAuZjo8TX/run-manifest.json",
+            "sha256": "8fede9e1e7420a3c16a0097c8e204c95a67aa79f41e2b34cb3eb2566fdcbfd96"
+          },
+          "inputs": [
+            {
+              "target_kind": "release-product",
+              "target_name": "live-boot",
+              "run_id": "A1MzccgZQTOQDJVy"
+            }
+          ]
+        },
+        "build-preflight": {
+          "run_id": "A1N52MXb1S26rXdv",
+          "manifest": {
+            "path": ".artifacts/out/acorn/scenarios/build-preflight/A1N52MXb1S26rXdv/run-manifest.json",
+            "sha256": "1bc1c31f56d844ec749e35696977df0fb96edfc2b7cd9de733de6d73833f3101"
+          },
+          "inputs": [
+            {
+              "target_kind": "release-product",
+              "target_name": "base-rootfs",
+              "run_id": "A1My9Q1kl3g1ooze"
+            }
+          ]
+        },
+        "live-tools": {
+          "run_id": "A1N53Lndf4UlDMAR",
+          "manifest": {
+            "path": ".artifacts/out/acorn/scenarios/live-tools/A1N53Lndf4UlDMAR/run-manifest.json",
+            "sha256": "b4b583e8367044ee41be7825b5210256c3f3deb5b043af2e834f0abded918de3"
+          },
+          "inputs": [
+            {
+              "target_kind": "release-product",
+              "target_name": "live-tools",
+              "run_id": "A1Mzhthmceb3c7Vy"
+            }
+          ]
+        },
+        "installed-boot": {
+          "run_id": "A1N57CpUCiNbdnHD",
+          "manifest": {
+            "path": ".artifacts/out/acorn/scenarios/installed-boot/A1N57CpUCiNbdnHD/run-manifest.json",
+            "sha256": "a8579fbf4b7a5592b0212bd7e4a714d51a43452b15c739cab4b03a39b8e9a365"
+          },
+          "inputs": [
+            {
+              "target_kind": "scenario",
+              "target_name": "install",
+              "run_id": "A1N55dy6zUgDfEuN"
+            }
+          ]
+        },
+        "automated-login": {
+          "run_id": "A1N58KaPSY9cHtCh",
+          "manifest": {
+            "path": ".artifacts/out/acorn/scenarios/automated-login/A1N58KaPSY9cHtCh/run-manifest.json",
+            "sha256": "03c4ec847c1c3cb765cee764c68a4c1e240384c9065e2dab5669601b51576bbe"
+          },
+          "inputs": [
+            {
+              "target_kind": "scenario",
+              "target_name": "install",
+              "run_id": "A1N55dy6zUgDfEuN"
+            }
+          ]
+        },
+        "runtime": {
+          "run_id": "A1N59NZbLgRmN0sh",
+          "manifest": {
+            "path": ".artifacts/out/acorn/scenarios/runtime/A1N59NZbLgRmN0sh/run-manifest.json",
+            "sha256": "93c438ee62f0dec8680a4e322c24ab3baaed39b057a8369fbbee9ed76ab77368"
+          },
+          "inputs": [
+            {
+              "target_kind": "scenario",
+              "target_name": "install",
+              "run_id": "A1N55dy6zUgDfEuN"
+            }
+          ]
+        }
+      },
+      "explicit_ab": "A1N5LJyWNSRU3K7o",
+      "explicit_ab_manifest": {
+        "path": ".artifacts/out/acorn/scenarios/ab-update/A1N5LJyWNSRU3K7o/run-manifest.json",
+        "sha256": "5e32d0f4746fe467658b16d88c0554c46c5e7f2a48825f909c319a7d71534a52"
+      },
+      "pty_transcript": {
+        "path": ".artifacts/out/acorn/scenarios/live-tools/A1N53Lndf4UlDMAR/install-pty.log",
+        "sha256": "3a2889567b1065ffc6e80956da56fc68984385976192814f1b20699a1a70b26b"
+      }
+    },
+    "levitate": {
+      "product_ids": {
+        "base-rootfs": "A1N0nAIeA6xJQl5D",
+        "live-boot": "A1N3koWnCN7n6CCL",
+        "live-tools": "A1N3t5Bs0nxI0K6X"
+      },
+      "products": {
+        "base-rootfs": {
+          "path": ".artifacts/out/levitate/releases/base-rootfs/A1N0nAIeA6xJQl5D/levitateos-x86_64-base-rootfs.iso",
+          "sha256": "6022051b9c72b0446c53272c66337e2ed3f976e4e20ba05ecc869599146d0794",
+          "size": 390621184,
+          "run_manifest": {
+            "path": ".artifacts/out/levitate/releases/base-rootfs/A1N0nAIeA6xJQl5D/run-manifest.json",
+            "sha256": "3950ecde25f1584924668b5c99041ee914893b6ec9329d2d63a70aac6bc5f149"
+          }
+        },
+        "live-boot": {
+          "path": ".artifacts/out/levitate/releases/live-boot/A1N3koWnCN7n6CCL/levitateos-x86_64-live-boot.iso",
+          "sha256": "a61dcf583067761999257204d22a49267dacc285d25c3ae32e582445c28e5b2b",
+          "size": 390633472,
+          "run_manifest": {
+            "path": ".artifacts/out/levitate/releases/live-boot/A1N3koWnCN7n6CCL/run-manifest.json",
+            "sha256": "9d009fae1677c81020edf0fbc454c56204d74fd100c129fb825e19d69642813a"
+          }
+        },
+        "live-tools": {
+          "path": ".artifacts/out/levitate/releases/live-tools/A1N3t5Bs0nxI0K6X/levitateos-x86_64-live-tools.iso",
+          "sha256": "5886ee9718db943976d5068d9b20bf85e4b9ec9a717286f5ab99d5b51dfa52ad",
+          "size": 428517376,
+          "run_manifest": {
+            "path": ".artifacts/out/levitate/releases/live-tools/A1N3t5Bs0nxI0K6X/run-manifest.json",
+            "sha256": "b6efc8aaee16332671b544fd9c0186c46685a811c31fb049183b168ba08ed270"
+          }
+        }
+      },
+      "scenarios": {
+        "install": {
+          "run_id": "A1N5ZrRMEMJ2QYuI",
+          "manifest": {
+            "path": ".artifacts/out/levitate/scenarios/install/A1N5ZrRMEMJ2QYuI/run-manifest.json",
+            "sha256": "5d54457d297abf3b68ba4c743012425c1ad411de89b498f58eff9950a19efb35"
+          },
+          "inputs": [
+            {
+              "target_kind": "release-product",
+              "target_name": "live-tools",
+              "run_id": "A1N3t5Bs0nxI0K6X"
+            }
+          ]
+        },
+        "ab-update": {
+          "run_id": "A1N5fqMmDWpGgOIE",
+          "manifest": {
+            "path": ".artifacts/out/levitate/scenarios/ab-update/A1N5fqMmDWpGgOIE/run-manifest.json",
+            "sha256": "9d0a1d9923876734f488a9c94213525a3d2f13ecf817f6552b12a06911ce61fb"
+          },
+          "inputs": [
+            {
+              "target_kind": "release-product",
+              "target_name": "live-tools",
+              "run_id": "A1N3t5Bs0nxI0K6X"
+            },
+            {
+              "target_kind": "scenario",
+              "target_name": "install",
+              "run_id": "A1N5ZrRMEMJ2QYuI"
+            }
+          ]
+        },
+        "live-boot": {
+          "run_id": "A1N5WSLa7HBVAI9a",
+          "manifest": {
+            "path": ".artifacts/out/levitate/scenarios/live-boot/A1N5WSLa7HBVAI9a/run-manifest.json",
+            "sha256": "b010ad0590cebff8a60b77fa6ce8ee14e08b4245c40e8241ad448d5bd46fbbda"
+          },
+          "inputs": [
+            {
+              "target_kind": "release-product",
+              "target_name": "live-boot",
+              "run_id": "A1N3koWnCN7n6CCL"
+            }
+          ]
+        },
+        "build-preflight": {
+          "run_id": "A1N5WSDWeU0pOzuc",
+          "manifest": {
+            "path": ".artifacts/out/levitate/scenarios/build-preflight/A1N5WSDWeU0pOzuc/run-manifest.json",
+            "sha256": "26dec14fe99dfd46cfbd0c8a6842d5d99a01a553f2292e7a4ca7cf14765dd22b"
+          },
+          "inputs": [
+            {
+              "target_kind": "release-product",
+              "target_name": "base-rootfs",
+              "run_id": "A1N0nAIeA6xJQl5D"
+            }
+          ]
+        },
+        "live-tools": {
+          "run_id": "A1N5XTEDumiPckbC",
+          "manifest": {
+            "path": ".artifacts/out/levitate/scenarios/live-tools/A1N5XTEDumiPckbC/run-manifest.json",
+            "sha256": "3eea0127f0e55f1242fe311c4bca51f3a0926c961aa50a0c813c0f10f627b8f0"
+          },
+          "inputs": [
+            {
+              "target_kind": "release-product",
+              "target_name": "live-tools",
+              "run_id": "A1N3t5Bs0nxI0K6X"
+            }
+          ]
+        },
+        "installed-boot": {
+          "run_id": "A1N5bWK8L6f9JAZW",
+          "manifest": {
+            "path": ".artifacts/out/levitate/scenarios/installed-boot/A1N5bWK8L6f9JAZW/run-manifest.json",
+            "sha256": "262bea862c713fed375a867fd9b2ff524ceb10d47d8dcb188d791b2d94083084"
+          },
+          "inputs": [
+            {
+              "target_kind": "scenario",
+              "target_name": "install",
+              "run_id": "A1N5ZrRMEMJ2QYuI"
+            }
+          ]
+        },
+        "automated-login": {
+          "run_id": "A1N5cuh9tQLKgNSc",
+          "manifest": {
+            "path": ".artifacts/out/levitate/scenarios/automated-login/A1N5cuh9tQLKgNSc/run-manifest.json",
+            "sha256": "b3f3af60d556801cf2927e6e9dba66f020c8d877d07835b2e27e767cc9c34ca3"
+          },
+          "inputs": [
+            {
+              "target_kind": "scenario",
+              "target_name": "install",
+              "run_id": "A1N5ZrRMEMJ2QYuI"
+            }
+          ]
+        },
+        "runtime": {
+          "run_id": "A1N5eIIw7kEVxqlG",
+          "manifest": {
+            "path": ".artifacts/out/levitate/scenarios/runtime/A1N5eIIw7kEVxqlG/run-manifest.json",
+            "sha256": "5271ce0be93bf256f747bde49e278aae69c0da156afc2af5336f8b28ef0a095e"
+          },
+          "inputs": [
+            {
+              "target_kind": "scenario",
+              "target_name": "install",
+              "run_id": "A1N5ZrRMEMJ2QYuI"
+            }
+          ]
+        }
+      },
+      "explicit_ab": "A1N5yaraoiUrgcUu",
+      "explicit_ab_manifest": {
+        "path": ".artifacts/out/levitate/scenarios/ab-update/A1N5yaraoiUrgcUu/run-manifest.json",
+        "sha256": "4bb0e99c7f0855ce175fbae4cca49ae5fd1c184bf8ef8beb1f782b71425a8546"
+      },
+      "pty_transcript": {
+        "path": ".artifacts/out/levitate/scenarios/live-tools/A1N5XTEDumiPckbC/install-pty.log",
+        "sha256": "c314409b7fe5ec4cf0f8efd486dfb4b08b155fc5cc92bda62297055bc9879ad1"
+      }
+    }
+  },
+  "evidence": {
+    "final-product-manifest-evidence.json": {
+      "path": ".artifacts/ginux-contribution-preparation/prd15/final-product-manifest-evidence.json",
+      "sha256": "ad10c9eace24f7530278c975f51ba1db321ecd788d19ce6202c4d431181500e6"
+    },
+    "normal-linker-combination-sources.json": {
+      "path": ".artifacts/ginux-contribution-preparation/prd15/normal-linker-combination-sources.json",
+      "sha256": "5b28b889b6df8c380dddb7e356c13c8eae66b958a233f89c81d10bba4e9a1557"
+    },
+    "release-retry1-complete-catalog.json": {
+      "path": ".artifacts/ginux-contribution-preparation/prd15/release-retry1-complete-catalog.json",
+      "sha256": "ef3634af01d98d357d35b96d90cfce511dc6bd74e14ec770a5a984a15c61fb26"
+    },
+    "release-library-backend.json": {
+      "path": ".artifacts/ginux-contribution-preparation/prd15/release-library-backend.json",
+      "sha256": "0c4a9760fd7dad26b63ddd0e2d257eda146dd9bcc13e9e1ece2c3bcf24eb239f"
+    },
+    "release-image-producer.json": {
+      "path": ".artifacts/ginux-contribution-preparation/prd15/release-image-producer.json",
+      "sha256": "1247adf5f9b95e159690b979b7b76cbef302708f693cf7f438bf080f3f04ae74"
+    },
+    "release-consumer-progress.json": {
+      "path": ".artifacts/ginux-contribution-preparation/prd15/release-consumer-progress.json",
+      "sha256": "6771443e7beec45bd2b8220534937e2e825274230690cea6169ba1ef2ee3958e"
+    },
+    "author-documentation-join.json": {
+      "path": ".artifacts/ginux-contribution-preparation/prd15/author-documentation-join.json",
+      "sha256": "0240cc839e256974118e13b8a12b30d352d03db8de14d1e5a33a945ece742bab"
+    },
+    "maintained-recipe-build-corrected.json": {
+      "path": ".artifacts/ginux-contribution-preparation/prd15/maintained-recipe-build-corrected.json",
+      "sha256": "0e893be76c3ae55fd9dd6fa85521f65991fc0d7bd3c753f3c3529beb9ffb20bb"
+    },
+    "local-maintained-ginux-join.json": {
+      "path": ".artifacts/ginux-contribution-preparation/prd15/local-maintained-ginux-join.json",
+      "sha256": "b4ff070efffcc8c4bc51f7a6eb61095515c4e395f7e1be3269b711e454158965"
+    },
+    "normal-linker-recipe-join.json": {
+      "path": ".artifacts/ginux-contribution-preparation/prd15/normal-linker-recipe-join.json",
+      "sha256": "8b7503807b72b5f26a17747b8d9664b587aa0f73ce577395a2e630ebeb781582"
+    },
+    "workspace-lock-reconciliation.json": {
+      "path": ".artifacts/ginux-contribution-preparation/prd15/workspace-lock-reconciliation.json",
+      "sha256": "0613af67e2804c3393f60f4f009352e6a1822fe3be0943e5cfb7d89c30f37816"
+    }
+  },
+  "preparation": {
+    "path": ".artifacts/ginux-contribution-preparation/prd16/preparation.json",
+    "sha256": "e0f87d347d29cd7e56f2a28da0d1033956010f7bf8350a54f420d79a32f7695d"
+  },
+  "remote_observation": {
+    "path": ".artifacts/ginux-contribution-preparation/prd16/all-remote-heads.json",
+    "sha256": "d5252090b27ff6c0b86ef2430cba9f9e17013558340174228a7de137ad0fe01e"
+  },
+  "proposed_superproject_patch": {
+    "path": ".artifacts/ginux-contribution-preparation/prd16/proposed-superproject-pins-and-lock-https-base.patch",
+    "sha256": "02178705f6d1b0c64cbda05373d5451961e94416adab96c49eb557345a7c482b"
+  },
+  "limitations": [
+    "Local bundles are recovery material, not publication or a substituted delivery choice.",
+    "ISO hashes identify actual verified products; bit-for-bit ISO rebuild determinism is not established.",
+    "The final superproject pins remain unchanged until selected source commits are durably available through authorized delivery.",
+    "No tags, packages, ISO uploads, PRs, comments, hosted dispatches or production/security acceptance are authorized by this record.",
+    "Preserve pending security authentication/results, dependent remove/cleanup decision, actual upstream merge requirement and hosted Linux acceptance.",
+    "Keep prior delivery-sources.json and historical receipts unchanged until the final available tuple can be adopted."
+  ],
+  "fresh_builds": {
+    "path": ".artifacts/ginux-contribution-preparation/prd16/fresh-builds.json",
+    "sha256": "885a1c242f44e22df6ef8787b3151dbe8f936c4ac03437e37181480e0f446fd2"
+  },
+  "public_source_urls": {
+    "path": ".artifacts/ginux-contribution-preparation/prd16/public-source-urls.json",
+    "sha256": "a20448b26ad12caec43739d90ebd9c15e4d4256a631b2e3fbae58ee007647998"
+  },
+  "isolated_checkout_url_patch": {
+    "path": ".artifacts/ginux-contribution-preparation/prd16/public-https-urls.patch",
+    "sha256": "e2de2d89a24db0b2b3526390485b7c4837cf27ee68266cabc727ec40322e1506"
+  }
+}

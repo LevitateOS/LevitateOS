@@ -295,16 +295,18 @@ files, unchanged compiled inputs and local-link validation. It is not pending
 application. Runtime binaries/harnesses remain the exact verified 176395a builds.
 
 **Exact next actions:**
-1. Inspect standalone maintained Recipe build **78347** and its corrected result.
-   Compare built bytes with e7073fc1/aa13ac9b; preserve the actual source/archive/
-   command and do not relabel old checks as executing different bytes. Ordinary
-   product/guest wave 94168 and all prior catalog/static/example/producer jobs
-   are complete; do not restart them without a concrete affected change.
-2. Prepare exact local delivery diffs/source/pin/lock disposition on the reviewable
-   candidate. Own-repository source choice is resolved, but new publication and
-   hosted Linux actions are not authorized. The old public baseline remains
-   28f4368f/e7bfc166; parent gitlinks/pins must not claim private source obtainable.
-   Preserve unrelated edits and shared staged patch f4d8c81b…; no PR/comment/push.
+1. Completed: maintained-source build **78347** and the independent PRD16
+   sixteen-repository restoration both reproduce selected runtime bytes. All
+   ordinary product/guest/catalog/static/example/producer jobs are complete;
+   do not restart without a concrete affected change.
+2. Source delivery now belongs to [PRD16](prd16-delivery.md), with its exact
+   [candidate provenance](prd16-delivery-candidate.json), nine-source permission
+   request and independent fresh-checkout/build receipts. Public HTTPS submodule
+   URLs are committed as 46c7e25; final parent gitlinks remain unchanged pending
+   source publication permission and actual availability. Own-repository source
+   choice is resolved. Preserve shared staged patch f4d8c81b… and all unrelated
+   work; hosted Linux dispatch, PRs/comments and release publication remain
+   separately unauthorized.
 3. Required security hardware-key auth/results remain pending. Use the corrected
    [Daybreak release request](prd15-daybreak-release-request.md) after actual
    reauthentication; it records current b185e036 source locator with unchanged
