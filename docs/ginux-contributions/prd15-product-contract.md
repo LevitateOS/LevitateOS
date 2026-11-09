@@ -120,27 +120,56 @@ commands/inputs/consoles. The existing fixture producer now inspects ELF INTERP
 before selecting dynamic libraries, so the actual static PIE can be tested;
 no guest oracle or deployer guard is removed. This is not whole-distro acceptance.
 
-**New product finding:** `distro/builder/recipes/install-tools.rhai` forces
-`-C link-arg=--threads=1`. That violates the requested normal linker-threading
-boundary for actual tool producers, even though the six consumer controls pass
-without that flag. The flag is now removed in the existing recipe owner; this
-single builder-recipe change is **uncommitted pending validation**. Actual
-normal-default recstrap compilation with **two eligible CPUs** runs under
-**93398**, `verify-normal-linker-producer.py` / `normal-linker-producer/receipt.json`.
-It uses the existing public offline source producer and frozen e707/21a/ffe
-runtime, retains locks/metadata/isolation/public limits, and does not expand
-native policy. Fresh affected products remain required; no pass is claimed yet.
+**Product linker finding corrected:** builder **9468d26e4782f3dc556e609432f62292431c3c0c**
+removes only `-C link-arg=--threads=1` from `recipes/install-tools.rhai`.
+The actual managed source-preparation/build/install producer passes with normal
+linker defaults and **two eligible CPUs**, unchanged locks/metadata/isolation/
+limits. Its program is **13f6a3da…**, byte-identical to both fresh metadata guest
+inputs. `normal-linker-producer/receipt.json` is immutable;
+`normal-linker-recipe-join.json` binds the tested file bytes to the clean commit.
+All compiled builder inputs and frozen 4d5928b7 executable are unchanged.
 
-Guarded continuation **47148** completed resource/metadata checks and confirmed
-the pinned Bun endpoint recovered (HTTP 302→200). Its Acorn live-tools retry
-**1051618** finished **exit zero**, run **A1MvL15O5k2zwpl4**, with no interrupted
-case. Watcher **58514** then terminated only paused future-orchestration parent
-1051306; both sessions are finished. `linker-finding-scheduling.json` records
-the completed child and **case_interrupted=false**. These three older Acorn
-products remain source-bound preparation evidence, not acceptance of the
-corrected linker recipe. Levitate fresh products and all whole-product final
-guest commands have not run. Do not restart the old continuation: it expects
-obsolete checkout identities and the original recipe.
+The older Acorn retry **1051618** finished exit zero, run **A1MvL15O5k2zwpl4**.
+Watcher **58514** stopped only paused future orchestrator 1051306 afterward;
+**case_interrupted=false**. Both old sessions 47148/58514 are finished. No old
+product receipt is substituted for the corrected recipe's required acceptance.
+The GitHub 504 recovered through the normal pinned URL/trust; no digest or grant
+was changed.
+
+**Embedded guide finding corrected:** docs/content clean source
+**d9384939cfcecf6af37d45040c0404f50dbf69f7** updates seven CLI/format/helper/FAQ/
+troubleshooting pages. Every executable recipe requires literal NEEDS, inputs/
+outputs have kinds, recipes own grants, callers narrow graph-wide, dependency
+instances/state are separate, manual readiness is cached-only, and dependent
+remove/cleanup stays unresolved. Fictitious complete examples were replaced by
+three actual offline examples. All three pass managed validate/install/reuse/
+readiness and real published program execution; defined no-dependency removals
+preserve prior publications. Missing NEEDS and explicit-empty undeclared outputs
+are rejected for their precise reasons. `embedded-examples-v2/receipt.json`
+retains exact code/page hashes, all commands/logs and failures. The first verifier
+expected a later error and failed; it is preserved with an explicit disposition,
+not counted as a pass. Illustrative acquisition/HTTP fragments are marked as
+non-standalone placeholders, not claimed successful downloads. Generation (34
+pages), typechecking, installed lint and cached formatting pass. No downloads,
+unit tests or publication were needed for those static checks.
+
+**New corrected wave is running under 94168**: `run-normal-linker-products.py`,
+`normal-linker-product-progress.json`, new `<product>-<distro>-linker-final`
+labels. Every affected base/live-boot/live-tools product is rebuilt for Acorn
+then Levitate. Only after all six succeed does `run-normal-linker-scenarios.py`
+run both whole and explicit A/B guest commands, with fresh labels
+`final-all-<distro>-linker` / `final-explicit-ab-<distro>-linker`.
+`normal-linker-combination-sources.json` captures builder 9468d26, Recipe b185e036,
+docs/content d938493 and recstrap 5de6647 alongside prior unchanged owners.
+`run-normal-linker-combination.py` guards every source/artifact before and after.
+Do not run the obsolete original continuation/source guards.
+
+The complete 154-case run retains its actual 176395a runtime/harness and frozen
+fixture-recipe inputs. No claim is made that it executed the changed install-tools
+recipe or embedded docs. Those are verified separately through the real managed
+producer, actual examples and this fresh product wave. Runtime/harness bytes stay
+identical; source equivalence and changed inputs are explicit, not mixed-case
+arithmetic. Final new products/whole guests have not yet passed.
 
 Current Recipe compiler checks pass: independent disposable stable 1.99.1
 unlocked binary build/fmt/strict all-target Clippy; independent MSRV 1.93.0
@@ -199,28 +228,26 @@ files, unchanged compiled inputs and local-link validation. It is not pending
 application. Runtime binaries/harnesses remain the exact verified 176395a builds.
 
 **Exact next actions:**
-1. Inspect normal-linker producer **93398** and its complete actual result.
-   Fix genuine failures without reinstating forced linker threading, weakening
-   locks/isolation or widening public limits. Commit the single builder-recipe
-   correction only after its tested bytes work. Old Acorn retry/watcher and the
-   complete 154-case catalog/metadata jobs are finished.
-2. Create a new explicit source/recipe selection for Recipe b185e036 and the
-   corrected builder head, preserving original source and test receipts. Build
-   all six affected products with normal linker defaults; execute actual changed
-   binaries, reusing metadata controls only for byte-identical deployers. Complete
-   both `cargo xtask test all <distro> --force` and explicit `ab-update` commands.
-   Keep the 176395a core runtime tuple and source-equivalence evidence explicit;
-   no case count assembled from different bytes. Retain scenario harness dc43b8da,
-   script fd9d1e07 and Facts 66a017cb; never rebuild normal xtask during guests.
+1. Inspect corrected wave **94168** and its per-product JSON/logs. Fix genuine
+   failures without restoring forced linker threading or weakening limits/locks/
+   metadata/isolation. Original sources/receipts and both metadata guest passes
+   remain preserved. No current product/VM is counted passed before completion.
+2. Finish all six `*-linker-final` products and both whole/explicit A/B commands.
+   Keep core runtime e4d95de1/176395a/e7073fc1/ffe04d86 and the source-only joins
+   explicit. If any newly produced recab/deployer bytes differ from existing
+   accepted control bytes, verify them rather than relaxing the guard. Retain
+   scenario harness dc43b8da, script fd9d1e07 and Facts 66a017cb; do not rebuild
+   normal xtask during guest commands. Active current wave owns all future work;
+   old catalog 23362 and examples/static/producer jobs 8163/56211/93398 are done.
 3. Required security auth/results remain pending; use [the exact release request](prd15-daybreak-release-request.md)
-   after actual hardware-key reauthentication. No standard-access fallback or
-   old-result closure of the new optimized/native source join.
+   after actual hardware-key reauthentication. Update its current checkout/source
+   locator with Recipe's documentation-only b185e036 join while retaining actual
+   compiled 176395a/e707 bytes. No standard-access fallback or old-result closure.
 4. Reconcile final maintained source/delivery and hosted Linux permission only
    after a concrete reviewable candidate. Latest read-only metadata **08:11 UTC**
    (`Ginux .artifacts/prd15/current-ci/upstream-later.json`) still finds main
    53a54adde, Gate 11 open at 9759daa and all six required PRD05 PRs unmerged.
-   Synthetic merge-commit fields are not actual merge evidence. PRD05 remains
-   incomplete; the maintained-repository choice itself is resolved.
+   PRD05 remains incomplete; the maintained-repository choice itself is resolved.
 
 Evidence root: `.artifacts/ginux-contribution-preparation/prd15/`; current Ginux
 CI/security artifacts are in its worktree `.artifacts/prd15/`. Preserve shared
