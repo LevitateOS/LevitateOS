@@ -163,3 +163,14 @@ scenario acceptance and eventual source-delivery joins remain required.
 Return the criterion map, exact commands/source/bytes, findings, retained hashes
 and all still-unverified results. No new security execution permission is
 requested in the product-build chat, and no publication is authorized.
+
+
+## Corrected optimized-release identity (2026-11-09)
+
+The later native CI finding is corrected in Ginux e4d95de1 / launcher 21a54e60,
+paired with optimized Recipe CLI/worker e7073fc1 from source 176395a and image
+ffe04d86. The [new exact-source request](prd15-daybreak-release-request.md)
+supersedes the runtime identity above, preserving all material remaining
+criteria and prior evidence. Hardware-key authentication is still required for
+the authorized own-CLI Daybreak route; no standard-access fallback. Older
+fb87792d/467140e9 results do not silently close this new source join.

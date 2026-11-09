@@ -43,28 +43,48 @@ The preceding XFS CI batch was **13/20 passed**, with six timeout failures plus
 the now-fixed native failure. Namespace diagnostics preserve completed workload
 exit zero / zero tasks and owned handles, followed by host XFS fsync blocking
 past the unchanged 20-second harness limit. The same old launcher and namespace
-case pass on tmpfs. **All six XFS timeout dispositions remain open until quiet
-original-deadline real-XFS retests** (storage, restore, threads, directories,
-poll, owned-exec). The other five were not independently traced to fsync.
-Do not waive them or count timeouts as passes.
+case pass on tmpfs. **All six complete quiet-XFS retests now pass** with original deadlines and
+assertions: storage 5.32 s, restore 30.41 s, threads 11.38 s (all modes; original
+10 s per invocation), directories 0.70 s, poll/events 0.81 s, owned-exec 0.36 s.
+`ginux-quiet-xfs-retests.json` preserves each command/result. The original failures
+remain; only namespace has an independent fsync trace. These observations close
+the ordinary CI timeout findings as load-sensitive harness timing; none was
+waived or counted as a pass. Required final-source/security acceptance remains
+separate.
 
 Recipe is clean **176395aeaa5bb8999c1a6289d18e53c8012ecdf9**: production/Cargo
 inputs exactly match 91068391; all Rust tests exactly match 3828500. Later changes
 are only five documentation files (`current-production-source-equivalence.json`).
 Old selected CLI/worker is `467140e9b036a8ed20b58f87020ad7a63cfe7c68d311dc8e19cfe51c464cf9ef`;
 image remains `ffe04d8671e45036ac77acc958fb6cfd3c24a939075dc7e6c5437b69d7f05c15`.
-The old complete 3828500 catalog is **still running** under job **65760**, last
-observed 130 passes / zero failures; it must finish all 152. Its three former
+The older complete 3828500 catalog **finished 152/152 passed**, zero failures,
+ignored/measured/filtered cases, with before/after artifact hashes equal. Its three former
 HTTP fixture-startup failures now pass in this same run. Both earlier complete
 catalogs were 149/152 failed and remain preserved. New source/native acceptance
 must use a fresh complete combination; do not assemble it from those passes.
 
-To match documented release packaging, **68344** now prepares optimized Recipe
-CLI/matching worker/image producer and all three existing integration harnesses
-from a fresh standalone source export and its tracked lock, Rust 1.99.0. It
-writes `release-runtime-candidate.json`; status prepared is **not runtime
-acceptance**. The next combination must pin those resulting bytes with the new
-launcher, same image and complete source/harness inventory before execution.
+The optimized release combination is prepared and now executing under **85702**
+(`run-release-pipeline.py`, `release-pipeline-progress.json`). Recipe CLI and
+matching worker are **e7073fc17ec0bb029927d0c2e901ca37e0867a7cfdc4c5641d1d6c9b14bb5c03**,
+image producer **aa13ac9b58671cfda9c4126ecdb56c42a5e3d77b13137bb15030ee90921dd8a6**;
+e2e release harness **893441b898da1a0e3462e56ac90c70cce3ee08ed19cf305e3e258cf95d5bf65a**.
+All were built from a fresh exact 176395a export, tracked lock, Rust 1.99.0 release
+profile. `release-runtime-candidate.json` pins all three harnesses and actual
+image-producer path; the harness inventory exactly matches all current 152 names.
+
+On this **new** 21a54e60/e7073fc1/ffe04d86 tuple, fresh library_backend and
+image_producer pass (1/1 each), all **16 documented commands** pass including
+actual produced-program execution, and all **six required real consumers** pass
+with normal locks/linker threading/metadata/isolation. Their new receipts are
+`release-library-backend.json`, `release-image-producer.json`,
+`documented-release-results.json`, `release-consumer-progress.json` and
+`consumers-release-final/`. No old tuple pass is relabeled. Fresh six-product
+`<product>-<distro>-release-final` builds are running; last stage is Acorn base.
+After these actual products complete, the same pipeline runs a fresh complete
+152-case release e2e catalog, then both whole and explicit A/B guest commands.
+Heavy stages are serialized after observing XFS journal contention. The final
+new e2e/catalog and guest stages have **not yet run**. Every command snapshots
+sources and verifies all selected artifact/source hashes before and after.
 
 Current Recipe compiler checks pass: independent disposable stable 1.99.1
 unlocked binary build/fmt/strict all-target Clippy; independent MSRV 1.93.0
@@ -115,24 +135,24 @@ acceptance remain explicit. macOS and external AI-provider interoperability are
 excluded. Original frozen PRD04 candidates remain unchanged.
 
 **Exact next actions:**
-1. Inspect completed RAM CI/unmount receipts and release build 68344. Finish the
-   old complete catalog 65760; retain its actual final JSON without a new-source
-   claim. Ensure compiler/product I/O has finished, then rerun all six failed
-   XFS targets on the corrected binary with original deadlines and account for
-   any survivors/failures. Fix genuine defects; do not just retry away errors.
-2. After those findings close, prepare the new source/binary tuple and restart
-   fresh six UI product builds, six required consumers, documented examples,
-   complete 152 e2e plus library_backend/image_producer. No passes from different
-   tuples may be combined into a full-suite claim. Products/consumer I/O should
-   precede final catalog and guest timing acceptance where practical.
-3. Run both `cargo xtask test all <distro> --force` and explicit
-   `cargo xtask test ab-update <distro> --force` under session libvirt on the new
-   actual products. Preserve harness `dc43b8da…`, PTY-script `fd9d1e07…`, Facts
-   `66a017cb…` and exact source maps; do not rebuild normal target/debug/levitate-
-   xtask during commands. Scope SELinux virt_content_t changes to public ISO
-   artifacts only. All outcomes and latest same-batch install IDs must be real.
-4. Obtain required Daybreak authentication/results; reconcile final delivery
-   sources and publication permission only after a concrete reviewable candidate.
+1. Inspect pipeline **85702**, its progress and final per-stage JSONs before
+   restarting anything. Close genuine failures and rerun affected verification;
+   old successful cases do not fill a new-source gap. Compiler jobs 5032/65945,
+   old producer/catalog 60000/65760 and corrected CI jobs 71218/86738 are complete.
+2. Finish all six release-final products, complete release catalog and both
+   `cargo xtask test all <distro> --force` plus explicit `ab-update` commands.
+   The prepared driver runs these only on current actual products and latest
+   same-batch install IDs. Retain normal scenario harness dc43b8da, script
+   fd9d1e07 and Facts 66a017cb; never rebuild normal xtask during those commands.
+3. Required security auth/results remain pending; the new exact request is
+   [the release verification request](prd15-daybreak-release-request.md). Old
+   fb87792d/467140e9 receipts stay provisional and cannot silently close the new
+   native/optimized-worker source join. No standard-access fallback.
+4. Reconcile final maintained source/delivery pins and publication permission
+   only after a concrete reviewable candidate. Fresh read-only upstream metadata
+   at 2026-11-09 06:44 UTC confirms main still 53a54adde, Gate 11 still open at
+   9759daa, and all six required PRD05 PRs still open/unmerged. Their synthetic
+   merge commit fields are not actual merge evidence. PRD05 remains incomplete.
 
 Evidence root: `.artifacts/ginux-contribution-preparation/prd15/`; current Ginux
 CI/security artifacts are in its worktree `.artifacts/prd15/`. Preserve shared
