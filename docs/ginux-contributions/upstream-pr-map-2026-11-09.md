@@ -28,6 +28,23 @@ Titles are working titles in upstream's style.
    downstream. How configured-launch operations enter upstream's catalog is a
    maintainer decision, and stage C cannot be cut without it.
 
+### Update, same night: storage design ported
+
+Point 2 above is largely resolved locally. Seven commits on the `tools/ginux`
+checkout (`0ea4f83c`..`157fb48e`, on top of `1b7257be`) bring the redesign's
+rules into our storage: named slot states, typed seek, status flags on the
+open description, one inode across copy-up, positional I/O in the VFS, 33 of
+the redesign's 41 tests, and our storage owner in its own `launch_storage.rs`
+with `fs_hooks.rs` byte-identical to upstream again. All launch targets and
+the six Recipe consumers pass at `157fb48e`. Not on `main`, not pushed.
+
+Still open: whether special mode bits are accepted; mode-bit enforcement
+(the redesign enforces, main follows a uid 0 workload and does not); `..`
+above the root and the link-depth limit. The candidate `9802ef03` still has
+to be rebased onto current upstream before stage C can be cut, and
+`channel_hooks.rs` carries our code inside an upstream-reserved file the same
+way `fs_hooks.rs` did.
+
 ## Stage A — already open (13 PRs, nothing to prepare)
 
 All mergeable with green CI except #207.
