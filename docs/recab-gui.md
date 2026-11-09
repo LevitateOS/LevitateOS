@@ -1,8 +1,8 @@
 # recab GUI: plan (2026-11-10, not started)
 
 A graphical app beside `recab-tui` for the desktop images: KDE Plasma on
-LevitateOS and LXQt on AcornOS. Nothing below is built. The toolkit is decided;
-so is `pkexec` for changes; one decision is open (marked **Decide**).
+LevitateOS and LXQt on AcornOS. Nothing below is built. Its three decisions are made
+(toolkit, how changes get root, where the source lives); work has not started.
 
 ## What it is
 
@@ -110,8 +110,9 @@ environment, not a second mechanism beside it.
 
 ## In the pipeline
 
-- Source: a `gui/` workspace beside `tui/` (**Decide:** there, or its own
-  repository like the `tools/*` submodules).
+- Source: a `gui/` folder in this repository, beside `tui/` (decided
+  2026-11-10; not a repository of its own like the `tools/*` submodules). When
+  it exists, `AGENTS.md` names it among the places active work lives.
 - Contract: a list of desktop apps beside `SYSTEM_TUI_APPS`, the same on every
   distro; the desktop product carries the binary, a `.desktop` entry, an icon
   and the polkit policy.
@@ -121,14 +122,13 @@ environment, not a second mechanism beside it.
 
 ## Order of work
 
-1. The open decision (where the source lives).
-2. Run recab gaps 2 and 3 on a booted desktop of each distro (a failure there
+1. Run recab gaps 2 and 3 on a booted desktop of each distro (a failure there
    reopens the `pkexec` decision), and close gap 1.
-3. The build recipe, proven with a window that only prints `recab status`.
-4. Status page and the four quick actions (try, commit, roll back, reboot).
-5. Writing a system: picking a medium or image, the typed confirmation,
+2. The build recipe, proven with a window that only prints `recab status`.
+3. Status page and the four quick actions (try, commit, roll back, reboot).
+4. Writing a system: picking a medium or image, the typed confirmation,
    progress.
-6. Contract, desktop product and the `desktop-boot` check.
+5. Contract, desktop product and the `desktop-boot` check.
 
 Later, not in the first version: a notification after a trial boot ("kept" or
 "rolled back"), a tray icon, finding an inserted release medium by itself,
