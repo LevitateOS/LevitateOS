@@ -1,4 +1,20 @@
-# PRD05 — waiting for actual upstream merges
+# PRD05 — required storage integration remains incomplete
+
+**2026-11-09 source update:** [the requested upstream pull and authorized caller
+migration](upstream-integration-2026-11-09.md) integrate upstream main 55b719db
+into local Ginux ef1b538f, with Recipe 2a786826 / CI-pin commit 9f161138.
+#249's Gate 11 head is now an ancestor of actual upstream main. The six storage/
+process/contract prerequisite heads listed below are still not ancestors; the
+incoming diff changes no ginux-vfs source or launch_paths/launch_storage owner.
+That source inspection does not constitute a new GitHub merge-state query or
+exclude an unreviewed equivalent elsewhere. It does not close the required
+storage replacement map or final-source PRD05 acceptance. The schema replacement,
+retained owners, fixed integration findings and actual focused checks are in the
+new record. No source push or upstream PR/comment is performed.
+
+The following earlier absence-of-merges checkpoint is retained as exact
+historical evidence for 2026-11-08, not as current upstream-main metadata.
+
 
 **Incomplete; integration has not begun.** Read-only GitHub refresh on
 2026-11-08 at 07:10:27 UTC finds upstream main still at

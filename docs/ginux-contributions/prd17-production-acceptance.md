@@ -1,5 +1,16 @@
 # PRD17 — production acceptance is incomplete
 
+**Newer source checkpoint (2026-11-09):** the user requested an upstream pull
+and explicitly authorized migrating Recipe/callers to the new contract format.
+[The upstream integration record](upstream-integration-2026-11-09.md) now owns
+the local source and focused verification status: Ginux ef1b538f includes actual
+upstream main 55b719db; Recipe 2a786826 implements the migration and 9f161138
+adds the matching CI source pin. Earlier tuple-specific receipts and source
+facts below remain historical. #249 has now reached upstream history; required
+storage-chain acceptance, final-source security, full products/hosted checks,
+durable publication and pending release decisions remain open. This new local
+integration does not establish production readiness.
+
 Recipe is **not production ready**. Audit in progress against selected Ginux
 e4d95de1 / launcher 21a54e60, Recipe c3a40a51 / CLI-worker e3e28457,
 image producer 55b9e50a and acquisition image ffe04d86. The two corrected owning heads are still local; delivery-sources.json and
