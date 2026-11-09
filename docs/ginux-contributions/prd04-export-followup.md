@@ -1,84 +1,3 @@
-# PRD04 F-01 — renewed focused verification open
-
-## Current renewed request — 2026-11-09: PRD04 OPEN
-
-The user explicitly renewed PRD04: preserve 5449e2a1, validate the separate export
-correction and obtain a focused Daybreak retest. The existing corrective commit
-**2e88c9ad89c487d3fc7c29ba35efba3911587737** already is the new revision directly
-after frozen 5449e2a184bb1147cf618b140a29196b74206b13. Its complete three-file
-+54/-11 fix stages the synced unnamed archive while backing is live, releases
-backing, then publishes only on successful release. No no-op source revision
-was manufactured and no newer integration was substituted for this candidate.
-The historical scoped closure/313-file return below remains preserved; it is
-not represented as a response to this renewed request. **Keep the active PRD04
-queue open until the requested focused return passes.** Broader final-source
-security remains PRD09 independently.
-
-Fresh ordinary validation on this exact clean candidate passes: make check,
-make test-unit, make build build-launch-storage-fixture, the eight ordinary
-storage/export modes listed below, ordinary checkpoint and ordinary restore.
-The rebuilt launcher remains **576ee03c8d3a7db19a057306d8223841bc536cbd51b91087fe1e7c2e57f616ed**.
-Frozen HEAD/tree/cleanliness and launcher
-**95bc570e92491b1d30c7a14ef66593b0cfa05249b1424ffbd0047e6ea7866eb0**
-are unchanged before/after. Prior 313 hashes reverify; no fault-injection runner
-was executed here. Exact commands, exits, hashes, complete diff, retained
-candidate launcher and before/after identities are in
-`.artifacts/ginux-contribution-preparation/prd04/export-renewal-2026-11-09/validation.json`
-and its SHA256SUMS. Reproduction driver: /tmp/prd04-renewed-validation.py; its
-ordinary command list is retained verbatim in validation.json.
-
-### Focused Daybreak request to return
-
-Use `/home/vince/levitate-development/ginux-prd04-export` at exact 2e88c9ad,
-tree ab48409d6b8b86866d64f3f1eb7d3ba9d52563ca, launcher 576ee03c above.
-Use a new task-owned evidence directory, for example
-`.artifacts/prd04/daybreak-f01-renewal-2026-11-09/`, and return receipts.md plus
-verified SHA256SUMS. Preserve all original candidates, failed archives and
-returned evidence. Recalculate any injection ordinal from the actual current
-baseline trace; do not assume the old 13/15 ordinals still name the right owner.
-
-1. **Recorded item 5 / final backing close:** repeat the exact failing control
-   against frozen 5449e2a1 without editing/rebuilding it or overwriting its old
-   artifacts. Require the corrected candidate to report exit 1 and parseable
-   supervisor-error, no panic, settled tasks/references and **no requested final
-   archive** after backing-close failure. Record real baseline success and the
-   exact injected backing object/trace; a structured error alone is insufficient.
-2. **Affected workload/control ordering:** final unlinked backing-close failure
-   must prevent guest continuation, accepted checkpoint/ack and final export.
-   Preserve primary backing-error precedence when reference cleanup also fails.
-3. **Affected positive controls:** ordinary export/child quiescence/timestamps,
-   checkpoint acknowledgements and restore/alias/large-file controls must still
-   produce the required payload/metadata and successful authoritative results.
-4. **Affected export failures:** write, sync and writer-close errors and prelink
-   parent mutation must not publish. Keep pinned-inode/parent identity and host
-   replacement-marker controls. Report final-path presence/type separately from
-   result status for each case. **Existing user decision remains binding:** link
-   is the commit point; late postlink inode/parent reference-close failure may
-   leave the intact archive, but must report supervisor-error and consumers must
-   reject non-success. Do not perform unsafe pathname rollback or invent a new
-   requirement that every postlink error removes the final name.
-
-Return exact source/tree/binary/runner/config/fixture identities, commands,
-exits, authoritative results, audit/trace/archive hashes, per-control findings
-and cleanup accounting. Distinguish a skipped synthetic close from real Linux
-close-time ownership proof; the latter remains in PRD09 unless actually proven.
-No unrelated ABI/inherited-FD/assignment items 1–4 are reopened by this focused
-request. No push, upstream comment/PR, tag, source-delivery choice, host-clock
-change or broader security execution is authorized. Use the authorized Daybreak
-context; this general context does not execute its fault/race matrix. The app
-exposes no send-to-Daybreak tool, and the separate own-CLI route still requires
-its pending authorized hardware-key authentication. Do not retry that rejection
-unchanged or use an ordinary-model fallback. The user relay can return the actual
-focused receipts here. **PRD04 remains OPEN awaiting that return.**
-
-Active skill: hdae-development at
-`.agents/skills/hdae-development/SKILL.md`; reload it, required reference, applicable
-instructions and this current request after context recovery. Exact next action:
-obtain/verify the focused renewed return against these immutable identities;
-fix any actual finding separately, revalidate and retest before closing PRD04.
-
-## Historical source-bound correction and return
-
 # PRD04 F-01: correction verified and publication boundary agreed
 
 The frozen candidate `5449e2a184bb1147cf618b140a29196b74206b13` and its binaries
@@ -86,6 +5,39 @@ and failed Daybreak receipts remain unchanged. This corrective source is local,
 not a standalone current-main contribution or accepted security closure. The
 user authorizes local work and prohibits upstream PR publication; upstream
 Ginux takes precedence when its foundation changes land.
+
+## Current request reconciled — 2026-11-09
+
+The requested new revision already exists as **2e88c9ad**, directly over frozen
+**5449e2a1**, and the requested focused Daybreak retest already passed on its
+exact **576ee03c…** launcher. Fresh validation rechecked all 313 retained evidence
+hashes and rebuilt the same launcher from the same clean tree. Frozen HEAD,
+tree, tracked status and 95bc570e… launcher are unchanged before/after. The
+complete three-file +54/-11 correction below is the actual implementation;
+no no-op revision is needed merely to change a commit hash.
+
+`make check`, `make test-unit`, build/fixture, all eight ordinary storage/export
+modes, ordinary checkpoint and restore pass again. Exact commands, exits,
+source/tree/binary/fixture hashes and the retained launcher are in
+`.artifacts/ginux-contribution-preparation/prd04/export-renewal-2026-11-09/validation.json`.
+`acceptance-reconciliation.json` and ACCEPTANCE-SHA256SUMS bind this fresh check
+to the existing focused return. The old validation workflow label requesting a
+renewal remains historical; its actual test results are unchanged. The duplicate
+renewal question is withdrawn: no additional return is required for unchanged
+source/bytes and the already-agreed contract. This does not represent old tests
+as new execution or claim security probes ran in this general context.
+
+**The user's open-until-retest-passes condition is satisfied by the actual
+verified focused return. Scoped PRD04 closure stands.** Final-source PRD09,
+real close-time ownership and wider schedules/delivery remain open. Preserve
+both exact candidates and every original failed/passing receipt.
+
+Active skill: hdae-development at
+`.agents/skills/hdae-development/SKILL.md`; reload it, required reference,
+applicable instructions and this checkpoint after context recovery. Exact next
+action: retain this scoped correction/verification in the downstream source and
+reconcile any actual new finding or changed final-source owner through PRD09.
+No push, upstream PR/comment, tag, release or new source-delivery choice occurred.
 
 ## Returned focused Daybreak verification
 

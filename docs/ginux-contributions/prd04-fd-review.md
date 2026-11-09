@@ -1,12 +1,13 @@
 # PRD04 — recorded storage/descriptor failures resolved within scope
 
-**Latest 2026-11-09: PRD04 is OPEN for the user's renewed focused export retest.**
-The prior source-bound closure below remains historical. Separate corrective
-2e88c9ad and frozen 5449e2a1 are unchanged; fresh exact-candidate ordinary checks
-pass and all 313 prior evidence hashes reverify. The [renewed request](prd04-export-followup.md)
-pins the exact revision/launcher and acceptance controls. Do not close the active
-queue from the old return or ordinary checks; wait for the renewed focused
-Daybreak response. This does not reopen unrelated items or close PRD09.
+**2026-11-09 exact-source recheck:** the separate 2e88c9ad export correction,
+its existing focused Daybreak return and unchanged frozen 5449e2a1 were verified
+again. All 313 evidence hashes and fresh ordinary checks pass; launcher remains
+576ee03c…. The latest request's focused-retest condition is already met. The
+initial duplicate-renewal requirement in this turn was unnecessary and is
+withdrawn; do not impose it as a new hold. See the [reconciliation and exact
+receipts](prd04-export-followup.md). This is scoped PRD04 closure; PRD09 remains
+open and no new security execution/publication is implied.
 
 
 **The recorded PRD04 failures have source-bound closure.** The returned Daybreak
