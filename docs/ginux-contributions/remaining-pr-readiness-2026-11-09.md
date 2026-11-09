@@ -2,9 +2,9 @@
 
 **Title follow-up complete:** #238 now names both balanced/native paths;
 #244 names the remaining pidfd selector/error/audit corrections; #248 names
-test-only virtual cgroup API/containment coverage. #207 is untouched. #250
-remains open; closure as superseded by merged #256 is recommended, with no
-closure or comment performed.
+test-only virtual cgroup API/containment coverage. #207 is untouched. Under the
+user's subsequent explicit instruction, #250 is now closed as superseded by
+merged #256, with one short replacement-link comment.
 
 **Description follow-up complete:** under the user's subsequent authorization,
 the bodies of #233/#236/#238/#242/#243/#244/#245/#246/#247/#248 now match their
@@ -197,3 +197,15 @@ state and comments were left unchanged. Any closure or public comment needs
 its own instruction.
 
 [Before metadata](/home/vince/.codex/worktrees/ginux-pr-updates/ginux-prd11/.artifacts/pr-title-updates-2026-11-09/before.json), [verified title updates](/home/vince/.codex/worktrees/ginux-pr-updates/ginux-prd11/.artifacts/pr-title-updates-2026-11-09/after.json), [untouched PRs](/home/vince/.codex/worktrees/ginux-pr-updates/ginux-prd11/.artifacts/pr-title-updates-2026-11-09/untouched-after.json), [#250 equivalence and disposition](/home/vince/.codex/worktrees/ginux-pr-updates/ginux-prd11/.artifacts/pr-title-updates-2026-11-09/250-disposition.json), [preservation receipt](/home/vince/.codex/worktrees/ginux-pr-updates/ginux-prd11/.artifacts/pr-title-updates-2026-11-09/preservation.json).
+
+## #250 closure
+
+The user subsequently authorized closing #250 as superseded by #256 and posting
+a short linking comment. #256 was verified merged, one comment was posted, and
+#250 was closed without merging. Readback verified the closed state and exact
+comment. #250's title, description and source head are unchanged; #207's title,
+body, state, head and comment counts are unchanged. No source push or branch
+deletion occurred. Earlier recommendations above are historical.
+
+[Closure comment](https://github.com/gmkurtzer/ginux/pull/250#issuecomment-6749722532).
+[Before/after receipts](/home/vince/.codex/worktrees/ginux-pr-updates/ginux-prd11/.artifacts/pr250-closure-2026-11-09/after.json).
