@@ -287,10 +287,41 @@ version, ISO byte-determinism, Daybreak authentication/results and publication
 permissions remain pending. Required actual upstream merges remain absent.
 These are explicit release dependencies, not completed by queued work.
 
+## Current guarded release-path correction
+
+Session **63840**, /tmp/prd17-fix-release-route.py, waits for the complete
+immutable c3a40a51 catalog/consumer/docs/image/metadata chain. It then verifies
+clean exact c3a40a51, applies only the reviewed CI/README correction, parses
+preserved validation jobs/read-only permissions, checks the complete diff and
+commits it in Recipe. It stops on a failed prerequisite or changed owner and
+performs no remote action or version selection. Inspect
+release-route-correction-progress.json before applying the patch manually;
+its recorded new head and src/Cargo/test/producer equality own the later join.
+The patch is still unapplied while this chain runs. Shared workflows and every
+ordinary validation job remain intact.
+
+The two longer manual dependency controls were observed waiting in XFS buffered
+writes under balance_dirty_pages, using read-only inspection only of this task's
+runner and descendants. manual-controls-progress-observation.json retains the
+actual stacks/I/O/start identities. Both later passed; no deadline, assertion,
+fsync or durability step was changed. The complete current run is still partial
+until all 155 and final integrity/resource receipts finish.
+
+The current task-list PRD06 dispositions now explicitly distinguish closed F-01,
+retained tracked T-01/T-02/T-03, supported-domain path handling and excluded
+source-kernel quoting, functional coordinator lease/death/recovery checks,
+dedicated stalled-Git proof and still-open native/security/source joins.
+**PRD14's current final-source checkbox is reopened**, retaining its prior
+baseline completion: later source/version/package/fresh-host joins are missing.
+These targeted task-list edits remain unstaged in the mixed shared file; the
+original f4d8c81b staged patch remains unchanged. Do not commit that mixed file
+wholesale with the independent checkpoint/source corrections.
+
 ## Exact next actions
 
 Inspect session 59069 and full-runtime-corrected/, then session 97141's consumers/
-docs/image and session 13704's independent metadata. These are c3a40a51 functional
+docs/image, session 13704's independent metadata and session 63840's guarded CI
+correction. These are c3a40a51 functional
 checks; they cannot silently accept a later version/source. Keep Recipe and its
 actual targets frozen until the whole guarded chain settles. Fix any observed
 failure without weakening assertions or relabeling interrupted/unrun work.
