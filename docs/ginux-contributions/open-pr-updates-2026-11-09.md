@@ -1,5 +1,10 @@
 # Local Ginux PR updates — 2026-11-09
 
+**Follow-up:** the #245 clone-argument and #247 null-siginfo gaps recorded below
+are superseded by the [tested local corrections](pr245-pr247-followup-2026-11-09.md).
+That follow-up uses a new validation branch excluding #207. The original heads
+and results below remain historical evidence. Nothing was pushed or commented.
+
 Prepared against current upstream main **55b719db9c52889543fbb177fab4cf2b2f90955e**,
 confirmed again with `git ls-remote upstream refs/heads/main` after testing.
 **No push, PR update, comment, closure or hosted run occurred.** This is local
