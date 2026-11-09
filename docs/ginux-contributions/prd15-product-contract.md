@@ -102,6 +102,16 @@ user-held remove/cleanup boundary. Its unrelated existing hunks remain uncommitt
 `interface-contract-current.patch` and `catalog-doc-correction-source.json` retain
 the source disposition. No previous pass is relabeled as a new execution.
 
+Both additional required harnesses were also rebuilt and **executed afresh** from
+Recipe 2755ec6: `final-library-backend-current.json` and
+`final-image-producer-current.json` exit zero. Their exact bytes equal the earlier
+unchanged harnesses; the new receipts independently bind the same launcher,
+matching worker/image and actual image-producer bytes before/after. The library
+run retains the worker-environment spoof control. `final-harness-root-source.json`
+records unchanged root manifest/lock/config hashes and the sealed scenario harness;
+its existing uncommitted workspace lock remains a final integration concern,
+not an implied fresh-public-checkout delivery claim.
+
 ## Historical progression and source-bound evidence
 
 The following records preserve earlier findings, corrections and failed
