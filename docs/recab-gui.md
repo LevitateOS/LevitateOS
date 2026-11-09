@@ -1,8 +1,8 @@
 # recab GUI: plan (2026-11-10, not started)
 
 A graphical app beside `recab-tui` for the desktop images: KDE Plasma on
-LevitateOS and LXQt on AcornOS. Nothing below is built. Three decisions are open
-(marked **Decide**); the rest follows from them.
+LevitateOS and LXQt on AcornOS. Nothing below is built. The toolkit is decided;
+two decisions are open (marked **Decide**).
 
 ## What it is
 
@@ -33,7 +33,7 @@ reads and changes slot state.
 
 ## Toolkit
 
-**Decide.** Recommended: **Qt 6 Widgets, in C++**.
+Decided (2026-11-10): **Qt 6 Widgets, in C++**.
 
 - It is the one toolkit both desktops are made of. The app takes each desktop's
   own style (Breeze on Plasma, LXQt's configured style), file dialogs and
@@ -46,13 +46,13 @@ reads and changes slot state.
 Its cost: a C++ program in a Rust and TypeScript repository, and a build per
 distro against that distro's Qt and libc (see Build).
 
-Alternative: **Slint, in Rust**. It stays in the cargo workspace and needs no
+Not chosen: **Slint, in Rust**. It stays in the cargo workspace and needs no
 Qt at build time, but it does not look or behave like either desktop, and a
 musl build that loads the system's Wayland and X11 libraries at run time is its
 own toolchain problem (the Rust tools are static musl today and cannot load
 libraries).
 
-Not recommended: Python with PyQt (AcornOS's desktop has no Python; it would
+Also set aside: Python with PyQt (AcornOS's desktop has no Python; it would
 add the interpreter and bindings), a local web page (a root-capable service on
 localhost, and no window of its own in Firefox), GTK (foreign to both
 desktops).
@@ -80,12 +80,15 @@ desktops).
    it formats and extracts. recstrap already has JSON events; `recab stage`
    needs to pass them on (`--json` on stderr), or the GUI shows an indefinite
    bar for minutes.
-2. **Reading without root.** Check that `recab status` works as the desktop user
-   on both distros (ESP and state partition permissions). If it does not,
-   either fix the permissions or read through the same polkit action with
+2. **Reading without root.** By reading the code it should work: `status` has
+   no root check (only the changing commands take `require_root`), the ESP is
+   mounted with `defaults` and recab creates its state directory with the
+   default mode. Not yet run as a desktop user on either distro. If it fails
+   there, fix the permissions or read through the same polkit action with
    `allow_active=yes`.
-3. **`pkexec`.** Both locks have polkit 127; confirm each package ships the
-   `pkexec` binary and that it works under elogind on AcornOS.
+3. **`pkexec`.** Both locked packages ship it setuid: Fedora's `polkit` and
+   Alpine's `polkit-common` (`/usr/bin/pkexec`). Still to confirm: that it
+   authorizes under elogind on AcornOS.
 4. **Types.** `cargo xtask gen` writes the TUI's TypeScript types from recab's
    Rust types. Add the same for the GUI (field names as a generated header), so
    a changed status shape fails the GUI's compile instead of its first run.
@@ -118,8 +121,9 @@ environment, not a second mechanism beside it.
 
 ## Order of work
 
-1. The three decisions above.
-2. recab gaps 2 and 3 (they can end the `pkexec` design) and gap 1.
+1. The two open decisions.
+2. Run recab gaps 2 and 3 on a booted desktop of each distro (they can end the
+   `pkexec` design), and close gap 1.
 3. The build recipe, proven with a window that only prints `recab status`.
 4. Status page and the four quick actions (try, commit, roll back, reboot).
 5. Writing a system: picking a medium or image, the typed confirmation,
