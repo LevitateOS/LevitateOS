@@ -338,6 +338,16 @@ docs/image and metadata 13704 follow it. Session 63840 applies the narrow local
 CI correction only after the frozen whole chain succeeds. Final packaging is
 still stopped; no source/tag/release publication has occurred.
 
+The six actual current consumers have now all passed on that identical
+c3a40a51/e3e28457/21a54e60/ffe04d86 tuple: SQLite contention; simultaneous GNU/
+musl Cargo/cache and threaded execution; pinned Git HTTP/HTTPS; RPM; APK.
+current-six-consumer-summary.json independently reconciles each actual consumer
+receipt, source/artifact guard, matching coordinator/worker/launcher/image and
+per-log hashes. No lock, linker-threading, metadata, trust or isolation check
+was disabled. Session 97141 has advanced to the 16 current author/man commands;
+embedded examples and actual new producer follow. These are candidate-specific
+passes; final version, public source, security and product acceptance stay open.
+
 ## Exact next actions
 
 Inspect session 59069 and full-runtime-corrected/, then session 97141's consumers/
