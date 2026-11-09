@@ -1,5 +1,11 @@
 # Remaining upstream PR readiness — 2026-11-09
 
+**Title follow-up complete:** #238 now names both balanced/native paths;
+#244 names the remaining pidfd selector/error/audit corrections; #248 names
+test-only virtual cgroup API/containment coverage. #207 is untouched. #250
+remains open; closure as superseded by merged #256 is recommended, with no
+closure or comment performed.
+
 **Description follow-up complete:** under the user's subsequent authorization,
 the bodies of #233/#236/#238/#242/#243/#244/#245/#246/#247/#248 now match their
 published revisions. Useful original failure and boot context is retained as
@@ -165,3 +171,29 @@ comment was posted or PR was created/closed. Existing exact-source CI receipts
 were reused and labelled accordingly.
 
 [Original bodies](/home/vince/.codex/worktrees/ginux-pr-updates/ginux-prd11/.artifacts/pr-description-updates-2026-11-09/before.json), [replacement bodies](/home/vince/.codex/worktrees/ginux-pr-updates/ginux-prd11/.artifacts/pr-description-updates-2026-11-09/proposed.json), [verified readback](/home/vince/.codex/worktrees/ginux-pr-updates/ginux-prd11/.artifacts/pr-description-updates-2026-11-09/after.json), [unchanged PRs](/home/vince/.codex/worktrees/ginux-pr-updates/ginux-prd11/.artifacts/pr-description-updates-2026-11-09/untouched-after.json), [reused CI evidence](/home/vince/.codex/worktrees/ginux-pr-updates/ginux-prd11/.artifacts/pr-description-updates-2026-11-09/checks.json) and [preservation proof](/home/vince/.codex/worktrees/ginux-pr-updates/ginux-prd11/.artifacts/pr-description-updates-2026-11-09/preservation.json). Per-PR body diffs are retained in the same evidence directory.
+
+## Title follow-up and #250 disposition
+
+Under the user's subsequent title-update instruction, the verified current
+titles are:
+
+- #238: `fix(core): refuse signal-driven I/O in balanced and native paths`
+- #244: `fix(init): correct pidfd wait selectors, errors and audit completion`
+- #248: `test(init): retain virtual cgroup API and containment coverage`
+
+All other titles already match their current contributions. #248's body also
+lost only the obsolete sentence saying its original title was retained; the
+rest of the approved descriptions are preserved. Titles and that minimal
+consistency edit were read back exactly. Heads, bases, states, comments and
+all origin branches are unchanged. #207 remains separate and untouched. No
+source push, CI dispatch or new test execution occurred for metadata edits.
+
+#250 is still open. #256 explicitly replaced it and is merged at
+`55b719db9c52889543fbb177fab4cf2b2f90955e`. Fresh comparison confirms that
+current main and #250 have identical workflow, classifier and classifier-test
+blobs. Close #250 as superseded by #256; no duplicate rebase or implementation
+update is needed. The user requested a recommendation, so #250's title, body,
+state and comments were left unchanged. Any closure or public comment needs
+its own instruction.
+
+[Before metadata](/home/vince/.codex/worktrees/ginux-pr-updates/ginux-prd11/.artifacts/pr-title-updates-2026-11-09/before.json), [verified title updates](/home/vince/.codex/worktrees/ginux-pr-updates/ginux-prd11/.artifacts/pr-title-updates-2026-11-09/after.json), [untouched PRs](/home/vince/.codex/worktrees/ginux-pr-updates/ginux-prd11/.artifacts/pr-title-updates-2026-11-09/untouched-after.json), [#250 equivalence and disposition](/home/vince/.codex/worktrees/ginux-pr-updates/ginux-prd11/.artifacts/pr-title-updates-2026-11-09/250-disposition.json), [preservation receipt](/home/vince/.codex/worktrees/ginux-pr-updates/ginux-prd11/.artifacts/pr-title-updates-2026-11-09/preservation.json).
