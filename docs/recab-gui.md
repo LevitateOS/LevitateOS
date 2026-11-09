@@ -1,0 +1,131 @@
+# recab GUI: plan (2026-11-10, not started)
+
+A graphical app beside `recab-tui` for the desktop images: KDE Plasma on
+LevitateOS and LXQt on AcornOS. Nothing below is built. Three decisions are open
+(marked **Decide**); the rest follows from them.
+
+## What it is
+
+One window that shows the A/B slots and offers the changes `recab-tui` offers:
+try the other slot, commit, roll back, write a system into the other slot,
+reboot. It ships only in the desktop system (`live-desktop`); the base system
+keeps the command line, and on LevitateOS the TUI.
+
+It is not a second implementation of recab. recab stays the only thing that
+reads and changes slot state.
+
+## What exists to build on
+
+- `recab status --json` already carries everything a front end shows: the slots,
+  the next boot, the trial state, and for each action recab's own verdict, its
+  reason when refused, and the state it would leave (`ActionView`, `After` in
+  `tools/recab/src/status.rs`). It has a `schema_version` and a JSON Schema
+  (the `contracts` feature). A failing command prints its error as one JSON
+  object on stderr.
+- `recab-tui` (`tui/apps/runtime/recab-tui`, about 1,600 lines of TypeScript on
+  ink) is the model for scope and wording: its pages, its before/after table,
+  and typing the slot's name before a write that formats it.
+- Both desktop locks carry the same toolkit: Qt 6.11 (`qt6-qtbase`,
+  `qt6-qtdeclarative`, `qt6-qtwayland`), polkit 127 with an authentication
+  agent (`polkit-kde`, `lxqt-policykit`) and `polkit-qt6`.
+- Plasma runs on Wayland, LXQt on X11 (Alpine 3.24 has no LXQt Wayland
+  session). The app must run on both.
+
+## Toolkit
+
+**Decide.** Recommended: **Qt 6 Widgets, in C++**.
+
+- It is the one toolkit both desktops are made of. The app takes each desktop's
+  own style (Breeze on Plasma, LXQt's configured style), file dialogs and
+  fonts, and runs on Wayland and X11 with no code for either.
+- It adds nothing to either image but the binary: every library it needs is
+  already in both desktop locks. Widgets needs only `qt6-qtbase`.
+- Widgets, not Qt Quick: LXQt is a Widgets desktop, and a status table, five
+  buttons and a few dialogs gain nothing from QML.
+
+Its cost: a C++ program in a Rust and TypeScript repository, and a build per
+distro against that distro's Qt and libc (see Build).
+
+Alternative: **Slint, in Rust**. It stays in the cargo workspace and needs no
+Qt at build time, but it does not look or behave like either desktop, and a
+musl build that loads the system's Wayland and X11 libraries at run time is its
+own toolchain problem (the Rust tools are static musl today and cannot load
+libraries).
+
+Not recommended: Python with PyQt (AcornOS's desktop has no Python; it would
+add the interpreter and bindings), a local web page (a root-capable service on
+localhost, and no window of its own in Firefox), GTK (foreign to both
+desktops).
+
+## How it works
+
+- **Reads:** runs `recab status --json` as the desktop user, on start, after
+  every change and when the window regains focus. It checks `schema_version`
+  and refuses to guess on another one.
+- **What each action would do:** from the status' own action views (verdict,
+  reason, after-state). The GUI holds labels and layout only, no slot rules.
+- **Changes:** runs `recab <command>` through `pkexec`, with a polkit policy
+  file (`org.levitateos.recab.policy`) so the desktop's own agent asks for the
+  password and says what for. **Decide:** this, or a D-Bus helper started by
+  the system bus. `pkexec` is far less to build and audit; the helper only pays
+  off if actions should be allowed without a prompt.
+- **Errors:** recab's JSON error (tag, message, help) shown as is.
+- **Destructive write:** the same guard as the TUI, typing the slot's name.
+- **Running from a checkout:** the TUI's stand-ins (`fixtures/recab`,
+  `fixtures/reboot`) on PATH, so every state can be shown without a machine.
+
+## Gaps in recab to close first
+
+1. **Progress for `stage`.** It runs `recstrap --quiet` and prints nothing while
+   it formats and extracts. recstrap already has JSON events; `recab stage`
+   needs to pass them on (`--json` on stderr), or the GUI shows an indefinite
+   bar for minutes.
+2. **Reading without root.** Check that `recab status` works as the desktop user
+   on both distros (ESP and state partition permissions). If it does not,
+   either fix the permissions or read through the same polkit action with
+   `allow_active=yes`.
+3. **`pkexec`.** Both locks have polkit 127; confirm each package ships the
+   `pkexec` binary and that it works under elogind on AcornOS.
+4. **Types.** `cargo xtask gen` writes the TUI's TypeScript types from recab's
+   Rust types. Add the same for the GUI (field names as a generated header), so
+   a changed status shape fails the GUI's compile instead of its first run.
+
+## Build
+
+The Rust tools are one static musl binary for both distros and the TUI is
+compiled by bun per libc. A Qt program fits neither: it must be compiled and
+linked against each distro's own Qt 6.11 and C++ runtime (glibc and libstdc++
+16 on Fedora 45, musl and libstdc++ 15 on Alpine 3.24).
+
+Plan: a recipe that builds it inside a tree made from the distro's own
+packages: the desktop lock plus a small build lock (compiler, CMake, Qt
+development files), the way the rootfs recipes already assemble a tree and run
+the packages' setup in it. The binary is copied out; the build tree is not
+shipped. This is the largest piece of new work and should reuse whatever the
+Recipe and Ginux integration settles on for building in a distro's
+environment, not a second mechanism beside it.
+
+## In the pipeline
+
+- Source: a `gui/` workspace beside `tui/` (**Decide:** there, or its own
+  repository like the `tools/*` submodules).
+- Contract: a list of desktop apps beside `SYSTEM_TUI_APPS`, the same on every
+  distro; the desktop product carries the binary, a `.desktop` entry, an icon
+  and the polkit policy.
+- Check: `desktop-boot` starts the app in the logged-in session and takes a
+  screenshot of the status page, on both distros. From a checkout it runs
+  against the stand-ins with Qt's offscreen platform.
+
+## Order of work
+
+1. The three decisions above.
+2. recab gaps 2 and 3 (they can end the `pkexec` design) and gap 1.
+3. The build recipe, proven with a window that only prints `recab status`.
+4. Status page and the four quick actions (try, commit, roll back, reboot).
+5. Writing a system: picking a medium or image, the typed confirmation,
+   progress.
+6. Contract, desktop product and the `desktop-boot` check.
+
+Later, not in the first version: a notification after a trial boot ("kept" or
+"rolled back"), a tray icon, finding an inserted release medium by itself,
+translations.
