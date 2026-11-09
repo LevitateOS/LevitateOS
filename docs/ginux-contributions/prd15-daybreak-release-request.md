@@ -162,3 +162,14 @@ use an ordinary model fallback, bypass authentication or run the adversarial
 matrix in the parent. Receipt destination for the renewed candidate is the
 Ginux worktree `.artifacts/prd17/daybreak-final/`. No remote publication, hosted
 dispatch, host-clock mutation or broader native/product scope is authorized.
+
+
+Current test-only source join: Recipe c3a40a5138f8e0e9a6d7cbb18c6d7a14042898fa
+retains identical production Rust/Cargo inputs to16141938 and corrects only the
+kernel manual-operation fixtures to prepare their cached dependency explicitly.
+The original full155 run finished153 passed/two fixture failures with intact
+source/artifacts/resources. A clean c3a40a51 build and separate complete rerun
+are underway; prd17/corrected-runtime-build.json and fixture-join-progress.json
+retain their actual status. This does not change the approved runtime contract
+or close security acceptance. Reconcile the exact new build's bytes before
+using it; do not promote the old failed catalog or infer authentication.

@@ -200,6 +200,48 @@ No final tag, package/ISO release, upstream PR/comment, root push, repository-
 variable write or separate hosted dispatch is authorized. Missing acceptance
 is not resolved by preparing a publication draft.
 
+## Latest exact-source execution checkpoint
+
+The frozen first run completed **155/155 accounted for: 153 passed, two failed**
+(the diagnosed kernel fixture prerequisites), zero interrupted, zero missing,
+no remaining owned process/scratch and unchanged source/artifacts. It is not a
+full-suite pass. full-runtime/results.json and integrity.json own this record.
+After it ended, Recipe **c3a40a5138f8e0e9a6d7cbb18c6d7a14042898fa** committed
+only the passing kernel fixture correction. All production Rust/Cargo inputs
+remain identical to 16141938; kernel-fixture-correction.patch is the complete
+additional diff. The new clean source rebuild is recorded separately in
+corrected-runtime-build.json; its queued full155 run uses full-runtime-corrected/
+with new exact source/harness identities. Do not edit Recipe or either actual
+target while those cases execute. Session **59069** owns this guarded join/run;
+fixture-join-progress.json records each step and stops for any unexplained
+failure, changed source, interrupted case or process/scratch leak.
+
+Session **97141**, /tmp/prd17-follow-on.py, waits for the complete corrected
+catalog before running the existing six consumers, 16 author/man commands,
+three complete embedded examples and actual final 55b9e50a image producer.
+Session **85206**, /tmp/prd17-package-final.py, follows those results with normal
+Cargo package verification, the tracked RPM producer/ELF dependencies, existing
+CLI binary-archive layout and actual extracted-package managed execution. It
+uses a standalone /tmp source; its previous waiting scheduler was replaced
+before any checks began, not interrupted during a required case. The standard
+public cargo-generate-rpm0.21.1 installed successfully into a task-owned /tmp
+root. Neither scheduler publishes or executes dependent ISO work.
+
+The isolated fixture's strict Clippy passed. Session **69715** additionally
+checks its harness at MSRV and records a bytewise Rust/Cargo join to c3a40a51 in
+kernel-fixture-source-join.json. Earlier locked and disposable stable/MSRV
+unlocked-resolution checks passed on unchanged 16141938 production inputs.
+Actual docs-content exports were rebuilt, generated-check and typecheck passed
+with pinned Bun1.4.2; bb3a1102 remains clean. New compiler source/provenance and
+all eventual check exits must be read from receipts, not inferred from queues.
+
+The current final Recipe source is now c3a40a51, not the earlier 16141938 in the
+still-pending two-source push request. That exact earlier request grants no
+permission to push c3a40a51. No new source or parent has been pushed. Assemble the
+new complete diff and request exact final refs only after their verification.
+The ISO reproducibility question, Daybreak hardware-key/results, actual upstream
+merges and final publication/acceptance decisions still require input/results.
+
 ## Exact next actions
 
 Finish the exact 155-case replay and inspect every case/resource/integrity result.
