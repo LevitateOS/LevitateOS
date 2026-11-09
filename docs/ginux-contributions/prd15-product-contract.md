@@ -699,3 +699,79 @@ flush correction with the complete Acorn scenario set, finish Levitate live-tool
 and both complete scenario/A/B sets, repair the stale kernel integration fixture
 and rerun the exact complete catalog. Obtain remaining required security results
 through Daybreak before any acceptance claim.
+
+
+### Overnight continuation: returned criteria, CLI access and product corrections
+
+The returned [170-file Daybreak criterion map](/home/vince/.codex/worktrees/prd15-owned-fd-path/ginux-prd11/.artifacts/prd15/daybreak-remaining-2026-11-09/receipts.md)
+independently verifies **170/170**. Twelve thread modes, two teardown modes,
+eleven task modes and configured zero-sysinfo/virtual-uname controls pass. The
+prior exact event receipt already proves actual TCP EPOLLRDHUP; its earlier
+unverified label is corrected. All six items and S09-A–H remain partial, with
+precise remaining owner/callsite dispositions in that map.
+
+The user authorized running our own Codex CLI with Daybreak's model choice.
+Read-only original turn metadata identifies `gpt-6-sol`, high reasoning and
+`daybreak_blue`; the CLI requested those exact settings with automatic approval
+review and normal sandboxing. It exited 1 with the server error: “You're approved
+for Daybreak Blue, but this response cannot be shown as this session was not
+authenticated with one of your authorized hardware keys. Please re-authenticate
+with your hardware key and try your request again.” The user has a pending
+reauthentication/original-context-results request. No standard-access fallback
+is authorized or attempted. The interrupted CLI's request/events/partial work,
+authentication error and parent accounting are hashed under the Ginux worktree's
+`.artifacts/prd15/daybreak-cli-2026-11-09/`; no complete verification is claimed.
+No task-owned Ginux subprocess remains after its termination.
+
+All six current base/live-boot/live-tools ISO builds now have exit-zero receipts.
+Levitate live-tools is `A1MM58XBtv4kcuhh` (408.7 MiB). Both complete Acorn and
+Levitate scenario batches ran on the sealed runtime pair. Acorn installation
+passes with separated flush/unmount (`A1MN4xhMaeJN5nNS`); login and 40 installed
+tools pass. Installed boot fails on crashed recab-trial, and A/B's degraded trial
+fails to reboot. Levitate installation/installed boot/login/runtime and the
+seven-boot A/B update pass individually, but live-tools fails because the initial
+PTY driver requires unshipped guest `script(1)`. Its batch is failed. Rebuilding
+the mutable normal harness while that already-failed batch finished also means
+its outer before/after harness guard cannot establish a final batch identity;
+no complete same-harness acceptance is claimed. New diagnostic drivers use sealed
+harness copies. Final whole scenario sets must run after all corrections.
+
+The PTY driver is being corrected to use the existing SSH transport's real guest
+PTY (`-tt`), retaining terminal output and independent guest-written file checks.
+No guest package/lock change is needed. A first portable attempt wrongly expected
+a contiguous success string through terminal repainting; its failed transcript
+is retained. The second uses a separate real SSH file observation. It must pass
+both distros before the harness changes are accepted.
+
+Actual Acorn session-libvirt inspection confirms a production recab defect:
+OpenRC 0.63.2 `rc-status --crashed` returns **1 with empty output when none
+crashed, 0 with names when there are crashes**, as its [pinned manual](https://raw.githubusercontent.com/OpenRC/openrc/0.63.2/man/rc-status.8)
+also states. recab incorrectly rejected the healthy result, killing its trial
+service. The asynchronous one-shot also needs to mark successful completion
+inactive rather than leave a finished daemon marked crashed. Local corrections
+preserve unexpected status/diagnostic errors, actual failed-service reporting
+and shutdown cancellation. Both affected real recab CLI integration cases pass;
+the corrected static tool/service is now building through the actual managed
+Recipe producer (`recab-openrc-managed-producer`), before guest and product retest.
+The diagnostic guest powered off; it was an overlay, not an install mutation.
+
+The first complete Recipe catalog is **149/152**, with all 152 cases run and
+three failures (no skipped/interrupted pass claim). The kernel fixture's explicit
+managed dependency preparation now passes all original release/config/modules
+and preservation checks, and verifies that manual checks do not install it.
+Its first correction mistakenly disabled persistence; that failure is retained.
+The target-metadata case passes when its required actual sealed builder and repo
+are explicitly selected. The integrity fixture additionally needs both imported
+desktop lock modules and a valid `REC_FLAVOUR=base` control input before it can
+reach corrupt-byte rejection. The current focused retry is
+`preseed-fixture-correction-4`; no production recipe validation is bypassed.
+After all affected cases pass, commit only the test corrections and run the
+entire enumerated 152-case harness again on one exact source/binary/image tuple.
+
+Next: inspect the managed recab producer and portable PTY results, complete the
+remaining integration fixture check and whole catalog rerun, verify recab on real
+Acorn boot/trial plus both final scenario sets and explicit A/B commands, and
+reconcile delivery sources. Security waits for hardware-key authentication or
+returned original-context results. Dependent-recipe remove/cleanup stays a
+separate unresolved user decision. No push, PR/comment, hosted run or publication
+is authorized/performed by these corrections. Shared staging remains preserved.
