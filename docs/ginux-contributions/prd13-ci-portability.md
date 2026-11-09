@@ -13,29 +13,53 @@ actual upstream merges remain separate open dependencies.
 
 ## Current candidate verification (2026-11-09)
 
-The maintained-own-repository decision and baseline delivery were subsequently
-resolved under PRD14, including upstream Gate 11. Later consumer corrections
-remain local; no new push/hosted-job permission is inferred. The active
-[PRD15/19 checkpoint](prd15-product-contract.md) owns final combination progress.
-The older sources/results below are historical, not current acceptance.
+The maintained-own-repository decision and baseline delivery were resolved under
+PRD14, including upstream Gate 11. Subsequent corrections remain local; no new
+push/hosted-job permission is inferred. The active [PRD15/19 checkpoint](prd15-product-contract.md)
+owns current source/combination scheduling. Older results below are historical.
 
-On clean Ginux `b81f30b52e523d142071603f477c6891c7fd9df9`, current `make check`
-passes and all eight complete unit packages pass **147 tests, zero ignored**.
-Source and lock remain unchanged. Recipe `176395aeaa5bb8999c1a6289d18e53c8012ecdf9`
-is independently exported twice without a lock; the real workspace locks remain
-untouched. Stable Rust 1.99.1 unlocked binary build, formatting and strict
-all-target Clippy pass. MSRV 1.93.0 unlocked check/locked build are **running**;
-none is counted as passed before its result. After compilation, current Ginux
-build/fixtures and all 20 existing Linux runtime targets are queued on the
-unchanged `fb87792d…` launcher, with original assertions/deadlines.
+Recipe `176395aeaa5bb8999c1a6289d18e53c8012ecdf9` passes independent disposable
+stable 1.99.1 unlocked binary build/fmt/strict all-target Clippy and MSRV 1.93.0
+unlocked check/build. Both also pass binary builds against the actual tracked
+lock `48c776bd…`. Independently resolved `a4eda69a…` differs only in itoa
+1.0.18→1.0.19; that lock is compatibility evidence, **not adopted**. Workspace
+locks remain unchanged. Logs/commands/diff are in `recipe-current-checks.json`,
+`recipe-tracked-lock-checks.json` and `recipe-lock-resolution.diff`.
 
-Exact commands, source archive, logs and receipts live at
-`/home/vince/.codex/worktrees/prd15-owned-fd-path/ginux-prd11/.artifacts/prd15/current-ci/`
-(`ginux-check.json`, `ginux-current-linux.json`, `recipe-current-checks.json`).
-The fresh complete Recipe catalog remains in progress on its sealed 3828500
-harness / 467140e9 CLI+worker / fb87792d launcher / ffe04d86 image. It is separate
-from these compiler checks. No hosted Linux success or security closure is
-claimed. macOS remains indefinitely excluded.
+Ginux b81f30b5 static checks and 147 unit tests passed. Its full real-XFS runtime
+batch was **13/20 passed**, not a complete pass. The native finding is corrected
+in **e4d95de10520aa8e91bc2ec69e64da004443e2da**, frozen launcher SHA-256
+`21a54e60bd54a4dd2b07957cf2e139a268eb050cb73929e0b8666b31f60c2333`.
+A userspace-SIGCHLD control fails on old fb87792d and passes on the correction;
+full native controls pass on XFS. The existing pending-exit state now selects
+PTRACE_SYSCALL versus PTRACE_CONT; no grants or native policy are widened.
+Static checks, all 147 units (zero ignored) and all **20 existing Linux runtime
+targets** pass on the corrected source using an empty **8 GiB tmpfs**, with
+original deadlines/assertions. The tmpfs was unmounted and removed.
+
+| Recorded failure | Current disposition |
+| --- | --- |
+| Native SIGCHLD “unexpected native syscall-exit stop” | Fixed with retained old-fail/new-pass regression and all native controls. Final-source security verification remains separate. |
+| Storage namespace, 20 seconds | Diagnostic captures completed workload exit zero, zero tasks/handles, then host XFS fsync beyond the harness limit. Old binary passes the same case on tmpfs. Corrected full storage target passes on tmpfs; quiet original-deadline XFS retest pending. |
+| Restore big payload, 120 seconds | Full target passes on tmpfs with all >2 GiB byte/hash assertions. Quiet original-deadline XFS retest pending; no independent fsync trace for the original timeout. |
+| Threads z-race, 10 seconds | Full target passes on tmpfs; quiet original-deadline XFS retest pending. |
+| Directories all-1, 20 seconds | Full target passes on tmpfs; quiet original-deadline XFS retest pending. |
+| Poll all, 10 seconds | Full poll/event target passes on tmpfs; quiet original-deadline XFS retest pending. |
+| Owned execution success, 10 seconds | Full target passes on tmpfs; quiet original-deadline XFS retest pending. |
+
+The exact failed-fixture process observation finds no surviving process after
+teardown (`timeout-process-observation-v2.json`; v1 accidentally included its
+observer shell and is explicitly corrected). This does not turn timed-out
+cases into passes or establish all security lifetime criteria. All six XFS
+findings remain open until their required retests/dispositions are complete.
+
+Exact source archive, commands, logs and receipts live at
+`/home/vince/.codex/worktrees/prd15-owned-fd-path/ginux-prd11/.artifacts/prd15/current-ci/`.
+The older fb87792d/467140e9 complete Recipe catalog is still finishing. A new
+optimized release CLI/worker and three integration harnesses are being prepared
+for a fresh complete corrected combination, not a mixed-revision pass claim.
+No Recipe unit tests, hosted Linux success, macOS work or security closure is
+claimed. Hosted Linux remains pending authorization on the final reviewable source.
 
 ## Historical local sources and outcomes
 
@@ -162,6 +186,7 @@ complete commands, with root privileges confined to the tracked launch runners.
 Active skill: `hdae-development`, discovered at
 `.agents/skills/hdae-development/SKILL.md`; reload it, required references,
 applicable AGENTS and this checkpoint after context shifts. Root instructions
-supersede skill process requirements. Next: wait for maintained-source direction;
-resume final-source Linux CI/integration only when that source and required
-remote authorization exist. Keep PRD13 unchecked. macOS is indefinitely deferred.
+supersede skill process requirements. Resume from the current candidate section
+and linked PRD15 checkpoint: close the six XFS findings, finish the corrected
+source combination, then obtain the required exact-source hosted Linux approval.
+Keep PRD13 unchecked. macOS is indefinitely deferred.
