@@ -72,3 +72,57 @@ criterion-by-criterion disposition, source evidence where used, deterministic
 controls and their results, concrete findings and every failed/unverified item.
 The product-build chat continues independent producer/ISO/guest checks. No
 product, final delivery or security acceptance is inferred from this request.
+
+
+## Focused next controls after the 743-file return
+
+The [returned continuation](/home/vince/.codex/worktrees/prd15-owned-fd-path/ginux-prd11/.artifacts/prd15/daybreak-followup-2026-11-09/receipts.md)
+verifies 743/743 files, 20/20 selected Recipe tests, the unreachable endpoint
+branch and paired non-success publication rejection. Preserve those concrete
+results. Please address the following still-unverified endpoint/TLS controls
+without repeating the already-passed graph set:
+
+1. **Live untrusted TLS, with real traffic and intact ordinary trust.** Run a
+   disposable loopback TLS server with a self-signed certificate absent from the
+   pinned image's normal trust store. Serve a fixed payload whose correct digest
+   the recipe declares. Grant its exact numeric TCP endpoint. The actual Recipe
+   download helper must reject certificate verification, preserve prior
+   destination bytes and avoid publishing new payload. Record the actual TLS
+   handshake/alert and no HTTP request, so timeout, connect denial or an
+   intentionally wrong digest cannot impersonate certificate rejection.
+   Preserve the standard trust store and use no insecure client option. Existing
+   successful pinned public Bun/GitHub downloads provide the ordinary publisher
+   positive control; keep their exact source/pin distinction explicit.
+2. **An unselected numeric address cannot bypass the selected host map.** Adapt
+   the existing reversed-resolver managed fixture using a private mount
+   namespace, with more than eight loopback candidates for one declared host.
+   Have a selected-address server provide a successful fixed-payload control.
+   Also listen on a numerically later, omitted 127/8 address at the same port;
+   an actual workload connection/download to that numeric address must fail
+   under the host declaration, without a connection reaching the omitted
+   server. Retain the actual workload exit, supervisor audit, server observations
+   and exact matching host/grant/authority subsets. Do not substitute
+   --no-network or a declaration-preflight failure for the attempted connection.
+3. **No ambient workload resolver capability.** Exercise immutable hosts and
+   the actual unsupported UDP/native-resolver path alongside the allowed TCP
+   control; bind the observation to current network/socket owner source. This
+   means no ambient resolver authority. It does not claim protocol inspection
+   or forbid DNS bytes over an explicitly granted TCP endpoint.
+
+Ginux runtime remains the exact `3cd1e2de` source and `fb87792d` bytes. Local
+HEAD is now `b81f30b52e523d142071603f477c6891c7fd9df9`: `03d4e009` ports T-01
+into the tracked FD fixture, and b81f30b5 ports the complete T-02 chunked-copy
+oracle plus all six upstream T-03 model tests. Existing tests remain. The
+tracked T-01 source matches your donor SHA-256 `81092713…`; its ordinary FD
+runner passes. All 44 VFS and 25 process units pass. No production prefix
+changed, and the exact rebuilt launcher remains byte-identical. The worktree's
+`.artifacts/prd15/functional-t01/retained-ports-receipt.json` binds these ports.
+Please reconcile those tracked-test gaps separately from the still-open runtime
+races and eventual source joins; they are no longer absent from this candidate.
+Recipe stays clean 91068391 with matching CLI/worker 467140e9 and image ffe04d86.
+Explicit dependent-recipe remove/cleanup stays unresolved by user decision.
+
+These are bounded remaining checks in the already-requested authorized context.
+Return exact source/commands/fixtures/hashes and criterion dispositions. Other
+S09 gaps remain open; these controls cannot by themselves close total security
+acceptance or the product task.
