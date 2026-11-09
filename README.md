@@ -20,6 +20,10 @@ RPMs or Alpine APKs), libc and init, the admin tool (sudo or doas), the desktop
 reads and validates that file; the `[profile]` section holds the differing
 facts.
 
+Each has its own purpose. LevitateOS is the daily-driver workstation: glibc and
+systemd, so software built for mainstream Linux runs. AcornOS is the small,
+strict system: musl, OpenRC and the fewest parts that do the job.
+
 ## Working in the repository
 
 Everything runs through `cargo xtask`; `cargo xtask --help` is the command
