@@ -153,33 +153,70 @@ non-standalone placeholders, not claimed successful downloads. Generation (34
 pages), typechecking, installed lint and cached formatting pass. No downloads,
 unit tests or publication were needed for those static checks.
 
-**New corrected wave is running under 94168**: `run-normal-linker-products.py`,
-`normal-linker-product-progress.json`, new `<product>-<distro>-linker-final`
-labels. Every affected base/live-boot/live-tools product is rebuilt for Acorn
-then Levitate. Only after all six succeed does `run-normal-linker-scenarios.py`
-run both whole and explicit A/B guest commands, with fresh labels
-`final-all-<distro>-linker` / `final-explicit-ab-<distro>-linker`.
-`normal-linker-combination-sources.json` captures builder 9468d26, Recipe b185e036,
-docs/content d938493 and recstrap 5de6647 alongside prior unchanged owners.
-`run-normal-linker-combination.py` guards every source/artifact before and after.
-Do not run the obsolete original continuation/source guards.
+**Corrected product/guest wave 94168 completed successfully.** All six
+`<product>-<distro>-linker-final` ISO builds pass, with normal linker defaults and
+the corrected embedded guides. Both `cargo xtask test all <distro> --force`
+commands pass **all eight named scenarios**: preflight, live boot, live tools,
+install, installed boot, login, runtime and A/B. Both separately invoked
+`ab-update` commands also pass. Each A/B invocation verifies **seven actual
+boots**, including degraded-trial automatic rollback, healthy commit with machine
+identity, staging/commit of the other slot and rollback. No required command was
+interrupted or omitted. Both actual installer PTYs and their warning/marker
+contracts pass; the earlier duplicate Facts-key defect is absent.
 
-The complete 154-case run retains its actual 176395a runtime/harness and frozen
-fixture-recipe inputs. No claim is made that it executed the changed install-tools
-recipe or embedded docs. Those are verified separately through the real managed
-producer, actual examples and this fresh product wave. Runtime/harness bytes stay
-identical; source equivalence and changed inputs are explicit, not mixed-case
-arithmetic. All **three corrected Acorn products pass**; base run A1My9Q1kl3g1ooze and
-live-tools A1Mzhthmceb3c7Vy. `normal-linker-acorn-base-byte-proof.json` verifies
-actual 13f6a3da recstrap, 6d2971b9 recab and the OpenRC service match their
-concrete controls. Levitate base is running; its three final products and every
-whole/explicit A-B guest command have not yet passed.
+`final-product-manifest-evidence.json` independently reconciles every actual
+manifest/time window/input: all scenario releases are the six current products,
+and both explicit A/B runs consume the same current successful installs.
+Acorn install **A1N55dy6zUgDfEuN**, explicit A/B **A1N5LJyWNSRU3K7o**; Levitate
+install **A1N5ZrRMEMJ2QYuI**, explicit A/B **A1N5yaraoiUrgcUu**. The actual retained
+PTY transcripts are hashed there. `normal-linker-product-progress.json` and
+`normal-linker-scenario-progress.json` retain all commands and complete outcomes.
+No old case is substituted. ISO hashes are unchanged after scoped `virt_content_t`
+labelling; host SELinux remains enforcing. Every VM used transient operator
+`qemu:///session`, and the final domain listing is empty.
 
-Current builder failure preservation independently passes on a mutable copy of
-the current metadata fixture (`current-builder-failure-preservation.json` and
-`current-producer-preservation/receipt.json`): precise stale privileged-content
-rejection, both prior EROFS hashes and directory entries unchanged, no staging
-leftover. Original frozen fixture/guest inputs are checked unchanged.
+Current source guards are `normal-linker-combination-sources.json`: builder
+9468d26, Recipe b185e036, docs/content d938493, recstrap 5de6647 and the unchanged
+other owners. Actual new products contain the same **13f6a3da recstrap** verified
+on both pinned kernels and **6d2971b9 recab** from the concrete controls;
+`normal-linker-{acorn,levitate}-base-byte-proof.json` records this. Core runtime
+and harness bytes remain the completed **154/154** tuple compiled at 176395a;
+this does not relabel that catalog as executing changed external recipe/docs
+inputs. Those changed inputs have their own actual managed build/example/product
+and guest receipts.
+
+`final-product-resource-observation.json` passes after completion: **42** exact
+producer diagnostic directories present, **796** checked regular lease files
+unheld, no matching task process/FD, mount or loop and zero inspection errors.
+This is bounded ordinary accounting, not independent adversarial acceptance.
+Current actual builder failure preservation also passes on a mutable fixture copy
+(`current-builder-failure-preservation.json`): precise stale privileged-content
+rejection, both old EROFS hashes and directory entries unchanged, no staging
+leftover, original frozen fixture/guest inputs untouched.
+
+**Local source integration:** ordinary `tools/ginux` is now clean detached
+**e4d95de1**, replacing its old local 28f4368f checkout. Ordinary `make build`
+produces exactly the selected **21a54e60…** launcher bytes, without the separate
+worktree as its source (`local-maintained-ginux-join.json`). The first command
+wrongly required an attached main branch, made no source change and built the
+old pin; its failed guard/old build are retained separately, never counted for
+e4d95de1. No branch/ref or remote was changed; parent gitlink/public origin remain
+at 28f4368f until actual source delivery is authorized and reconciled.
+
+Maintained Recipe B185 standalone build **78347** is still being checked from its
+exact Git archive, tracked standalone lock and Rust 1.99.0. The first invocation
+mistakenly gave rustup `+toolchain` syntax to a direct Cargo executable; no build
+ran and that failure is preserved. The corrected command uses the pinned Cargo
+path on unchanged source. `maintained-recipe-build-corrected.json/.log` own the
+result; no selected runtime or frozen receipt is replaced. Archive SHA-256 is
+**7d8098e4…**, `maintained-recipe-b185e036.tar`.
+
+The tested workspace lock **36066e42…** passes `cargo metadata --locked --offline`
+on current manifests. Its diff changes only five local package records
+(distro-builder, distro-profile, removed fsdbg, install-tests, recab); every
+registry/git package entry is unchanged. `workspace-lock-reconciliation.json`
+records exact edges and commands. Keep it with the matching obtainable source
+pins during final delivery; it remains uncommitted and unchanged during checks.
 
 Current Recipe compiler checks pass: independent disposable stable 1.99.1
 unlocked binary build/fmt/strict all-target Clippy; independent MSRV 1.93.0
@@ -238,26 +275,27 @@ files, unchanged compiled inputs and local-link validation. It is not pending
 application. Runtime binaries/harnesses remain the exact verified 176395a builds.
 
 **Exact next actions:**
-1. Inspect corrected wave **94168** and its per-product JSON/logs. Fix genuine
-   failures without restoring forced linker threading or weakening limits/locks/
-   metadata/isolation. Original sources/receipts and both metadata guest passes
-   remain preserved. No current product/VM is counted passed before completion.
-2. Finish all six `*-linker-final` products and both whole/explicit A/B commands.
-   Keep core runtime e4d95de1/176395a/e7073fc1/ffe04d86 and the source-only joins
-   explicit. If any newly produced recab/deployer bytes differ from existing
-   accepted control bytes, verify them rather than relaxing the guard. Retain
-   scenario harness dc43b8da, script fd9d1e07 and Facts 66a017cb; do not rebuild
-   normal xtask during guest commands. Active current wave owns all future work;
-   old catalog 23362 and examples/static/producer jobs 8163/56211/93398 are done.
-3. Required security auth/results remain pending; use [the exact release request](prd15-daybreak-release-request.md)
-   after actual hardware-key reauthentication. Update its current checkout/source
-   locator with Recipe's documentation-only b185e036 join while retaining actual
+1. Inspect standalone maintained Recipe build **78347** and its corrected result.
+   Compare built bytes with e7073fc1/aa13ac9b; preserve the actual source/archive/
+   command and do not relabel old checks as executing different bytes. Ordinary
+   product/guest wave 94168 and all prior catalog/static/example/producer jobs
+   are complete; do not restart them without a concrete affected change.
+2. Prepare exact local delivery diffs/source/pin/lock disposition on the reviewable
+   candidate. Own-repository source choice is resolved, but new publication and
+   hosted Linux actions are not authorized. The old public baseline remains
+   28f4368f/e7bfc166; parent gitlinks/pins must not claim private source obtainable.
+   Preserve unrelated edits and shared staged patch f4d8c81b…; no PR/comment/push.
+3. Required security hardware-key auth/results remain pending. Use the corrected
+   [Daybreak release request](prd15-daybreak-release-request.md) after actual
+   reauthentication; it records current b185e036 source locator with unchanged
    compiled 176395a/e707 bytes. No standard-access fallback or old-result closure.
-4. Reconcile final maintained source/delivery and hosted Linux permission only
-   after a concrete reviewable candidate. Latest read-only metadata **08:11 UTC**
-   (`Ginux .artifacts/prd15/current-ci/upstream-later.json`) still finds main
+   Dependent-recipe explicit remove/cleanup remains held for the separate user
+   decision; do not implement, waive or silently exclude it.
+4. Latest read-only upstream metadata **10:31:50 UTC** (`Ginux worktree
+   .artifacts/prd15/current-ci/upstream-after-products.json`) still finds main
    53a54adde, Gate 11 open at 9759daa and all six required PRD05 PRs unmerged.
-   PRD05 remains incomplete; the maintained-repository choice itself is resolved.
+   PRD05 remains incomplete. Final release acceptance stays open despite all
+   ordinary local product/runtime checks passing.
 
 Evidence root: `.artifacts/ginux-contribution-preparation/prd15/`; current Ginux
 CI/security artifacts are in its worktree `.artifacts/prd15/`. Preserve shared
