@@ -151,6 +151,17 @@ actual source delivery/joins, PRD05 actual-merge requirement and hosted Linux
 acceptance remain explicit. macOS and external AI-provider interoperability are
 excluded. Original frozen PRD04 candidates remain unchanged.
 
+A later author-documentation finding is prepared at
+`pending-author-doc-fixes.patch` (SHA-256
+`8987c0bbcf0f5dc9fcc1dc8bbe0a9c9c26045987082899f1f2984b502b9b47d7`).
+README's short dependency summary and WRITING_RECIPES' older dependency section
+still contain shared-generation/unchecked manual-check wording. The patch uses
+the actual separate-instance NEEDS/product snapshot contract and cached-only
+manual readiness rule, retaining unresolved remove/cleanup. **Not applied yet**:
+the running tuple keeps Recipe 176395a clean. Apply after ordinary frozen checks,
+then record documentation-only source equivalence and final source identity;
+this finding must not disappear behind earlier documentation checks.
+
 **Exact next actions:**
 1. Inspect full release catalog **23362** and its eventual exact-source receipt
    before starting heavy I/O. Original **85702** stopped after actual HTTP 504
@@ -158,7 +169,11 @@ excluded. Original frozen PRD04 candidates remain unchanged.
    before a bounded Acorn live-tools retry under a new label. Preserve the failed
    receipt, reuse only unchanged-tuple successful products, and explicitly map
    any retry receipt into the product/scenario driver. No blind whole-pipeline
-   rerun or success copied over a failed receipt.
+   rerun or success copied over a failed receipt. Guarded waiter **47148**
+   starts `run-release-resumed.py` only after that complete catalog succeeds; it
+   checks real pinned-asset HTTP recovery before attempting products. Explicit
+   `release-product-selection.json` maps the failed Acorn live-tools replacement
+   to a new retry label and retains all unchanged-tuple successful receipts.
 2. Finish all six release-final products, complete release catalog and both
    `cargo xtask test all <distro> --force` plus explicit `ab-update` commands.
    The prepared driver runs these only on current actual products and latest
