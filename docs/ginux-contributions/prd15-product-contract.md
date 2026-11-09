@@ -30,8 +30,10 @@ image remains `ffe04d86…`. Standalone fresh GNU/musl production passes. The
 cached-dependency manual-readiness correction passes old-fail/new-pass, all
 13 NEEDS and four dependency cases. Explicit dependent-recipe remove/cleanup
 remains unresolved by user decision; it is not repaired or accepted here.
-The corrected builder is still uncommitted pending real product completion.
-Both product builds are running; no new full ISO/guest/install/A/B pass is claimed.
+The corrected builder is committed at `34172e7bc2dfef947143467d878a357ec3f08041`.
+Both base/live-boot products and Acorn live-tools have built; the first current
+Acorn all-scenarios run passes boot/tools/real PTY but fails installation at the
+combined 30-second sync/unmount deadline. No install/installed/A/B pass is claimed.
 Returned Daybreak follow-up has 743 verified evidence files and 20/20 selected
 Recipe passes, including paired non-success publication rejection. All six
 security items and S09-A–H remain partial. See the latest checkpoint below.
@@ -647,3 +649,53 @@ still-unverified live TLS, omitted endpoint and ambient resolver boundaries;
 other required S09 criteria remain explicit. The user-held dependent-recipe
 remove/cleanup decision and final delivery/source joins remain open. No release
 or security completion, remote push, PR/comment or hosted job is claimed.
+
+
+### Returned focused network evidence and current failures
+
+[Daybreak's focused network receipt](/home/vince/.codex/worktrees/prd15-owned-fd-path/ginux-prd11/.artifacts/prd15/daybreak-network-2026-11-09/receipts.md)
+independently verifies **131/131** manifest entries. It binds clean Ginux
+`b81f30b5`, the unchanged `fb87792d` launcher, clean Recipe `91068391`, matching
+`467140e9` CLI/worker and pinned `ffe04d86` image. All three requested controls
+pass: actual untrusted TLS rejection under normal trust with UnknownIssuer,
+ClientHello/unknown-CA alert and no HTTP or publication; selected TCP success
+alongside EACCES for a listening omitted address; and immutable guest hosts,
+absent ambient-name resolution and unsupported UDP alongside allowed TCP.
+The complete Recipe audit reached its 64 KiB cap before the omitted connection.
+A separate same-launcher/same-eight-pin Ginux invocation supplies the exact
+connect-denial audit; it is explicitly a separate launch. No protocol inspection
+or prohibition of DNS bytes over an explicitly granted TCP endpoint is claimed.
+These bounded S09-C/H outcomes pass; all other material security gaps and the
+final-source join remain open. No Daybreak execution authority transfers here.
+
+Acorn's current `cargo xtask test all acorn --force` run has a final failure
+receipt (`scenarios-all-acorn-current.json`). Its base preflight, live boot and
+live tools pass, including all 44 tools and the actual guest installer PTY
+interaction retained in scenario `A1MMZlWKYe8asr18/install-pty.log`. Installation
+`A1MMe0fpKdpN0Ci2` finishes the shipped partition/rootfs/fstab/setup steps and
+install evidence, then exceeds the combined **30-second `sync && umount`**
+command budget. Installed boot/login/runtime/A/B are **not run** in that batch.
+The corrective harness separates the flush (existing 900-second disk-stage
+budget) from unmount (existing 30-second command budget), preserving both error
+checks and making the stalled operation observable. A rerun must establish
+actual successful flush, unmount and clean shutdown; this change alone is not
+an installation pass.
+
+The ongoing single 152-case Recipe catalog has reported a kernel-readiness
+failure: source `linux` now correctly requires its `linux-deps` cached installed
+products before a manual check; the old synthetic kernel fixture did not prepare
+them. Its missing `flex` failure is preserved. The production dependency check
+must remain enforced. The fixture needs explicit prerequisite preparation while
+retaining release/config/modules/input-preservation assertions. The complete
+catalog remains incomplete/failed, regardless of other passing cases. Separate
+library_backend and image_producer passes remain exact-source selected results.
+
+Root package-manager alignment is committed at `9c9a46e`; builder Recipe-owned
+TUI migration is `34172e7`; recqemu documentation correction is `f0364bb`.
+Levitate live-tools is still producing real tool payloads. No push, upstream
+PR/comment, hosted run or publication occurred. Explicit dependent-recipe
+remove/cleanup remains unresolved by user direction. Next: validate the isolated
+flush correction with the complete Acorn scenario set, finish Levitate live-tools
+and both complete scenario/A/B sets, repair the stale kernel integration fixture
+and rerun the exact complete catalog. Obtain remaining required security results
+through Daybreak before any acceptance claim.
