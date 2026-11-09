@@ -57,14 +57,28 @@ has a direct fsync trace. No timed-out run is counted as passed.
 
 Exact source archive, commands, logs and receipts live at
 `/home/vince/.codex/worktrees/prd15-owned-fd-path/ginux-prd11/.artifacts/prd15/current-ci/`.
-The older fb87792d/467140e9 Recipe catalog finished **152/152 passed**, with no
-ignored/filtered cases. The fresh optimized 21a54e60/e7073fc1 combination is now
-executing under `prd15/release-pipeline-progress.json`: library/image controls,
-16 documented commands and all six consumers pass; new products, complete e2e
-and guest acceptance remain in progress. Their results are not mixed with older
-bytes. Release builds/harnesses use exact 176395a, tracked lock and Rust 1.99.0.
+The exact optimized 21a54e60/e7073fc1/ffe04d86 combination now passes the
+complete current **152 e2e + 1 library_backend + 1 image_producer = 154/154**:
+zero failed/ignored/measured/filtered, matching inventories and unchanged
+before/after artifacts. Its first missing-artifact-directory runner failure is
+retained, never added to the count. The 702-lease/process/mount/loop observation
+and both fresh metadata guest controls pass. Six real consumer and sixteen
+documented-command receipts use the same actual runtime bytes.
+
+Current clean Recipe b185e036 adds only README/WRITING_RECIPES text after compiled
+176395a; all Rust/Cargo/test/runner inputs remain equal, explicitly recorded in
+`author-documentation-join.json`. Builder 9468d26 removes only forced linker
+`--threads=1` from its actual tool recipe; a fresh managed two-CPU producer passes
+with normal defaults. All compiled builder inputs/binary remain unchanged.
+Embedded docs/content d938493 passes generation/typechecking/lint/format and all
+three actual complete managed examples. Those changed product inputs are checked
+separately; the completed catalog is not relabeled as executing the new tool
+recipe or embedded pages. Fresh six-product/whole-guest wave 94168 uses explicit
+new labels/source guards; all three Acorn products pass and Levitate is running.
+
 No Recipe unit tests, hosted Linux success, macOS work or security closure is
-claimed. Hosted Linux remains pending authorization on the final reviewable source.
+claimed. Hosted Linux remains pending authorization on the final reviewable
+source. All old receipts below retain their actual source and case counts.
 
 ## Historical local sources and outcomes
 

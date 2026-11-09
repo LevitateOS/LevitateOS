@@ -169,7 +169,17 @@ fixture-recipe inputs. No claim is made that it executed the changed install-too
 recipe or embedded docs. Those are verified separately through the real managed
 producer, actual examples and this fresh product wave. Runtime/harness bytes stay
 identical; source equivalence and changed inputs are explicit, not mixed-case
-arithmetic. Final new products/whole guests have not yet passed.
+arithmetic. All **three corrected Acorn products pass**; base run A1My9Q1kl3g1ooze and
+live-tools A1Mzhthmceb3c7Vy. `normal-linker-acorn-base-byte-proof.json` verifies
+actual 13f6a3da recstrap, 6d2971b9 recab and the OpenRC service match their
+concrete controls. Levitate base is running; its three final products and every
+whole/explicit A-B guest command have not yet passed.
+
+Current builder failure preservation independently passes on a mutable copy of
+the current metadata fixture (`current-builder-failure-preservation.json` and
+`current-producer-preservation/receipt.json`): precise stale privileged-content
+rejection, both prior EROFS hashes and directory entries unchanged, no staging
+leftover. Original frozen fixture/guest inputs are checked unchanged.
 
 Current Recipe compiler checks pass: independent disposable stable 1.99.1
 unlocked binary build/fmt/strict all-target Clippy; independent MSRV 1.93.0

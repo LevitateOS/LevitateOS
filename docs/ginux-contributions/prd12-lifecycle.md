@@ -36,10 +36,20 @@ inputs. No installer/mount guard is bypassed; both guests power off normally.
 
 These new receipts establish current runtime/metadata outcomes. Whole product,
 final maintained-source delivery/security and the user-held dependent-recipe
-remove/cleanup policy remain open. A newly found forced `--threads=1` in the
-product tool recipe must be corrected and affected product bytes validated;
-this new metadata receipt is reusable only if those actual bytes remain equal.
+remove/cleanup policy remain open. The forced `--threads=1` product workaround is corrected in builder 9468d26.
+An actual managed two-CPU normal-linker build and the fresh corrected Acorn base
+produce the exact same 13f6a3da recstrap; metadata-control reuse is therefore
+bound to identical actual bytes, not a presumed source equivalence. The fresh
+six-product/whole-guest wave remains in progress.
 The older 57-case receipts below retain their original source and counts.
+
+Fresh failure preservation on the **current 4d5928b7 builder** also passes:
+`prd15/current-builder-failure-preservation.json` binds its current source guards,
+and `prd15/current-producer-preservation/receipt.json` records the precise stale
+privileged-content rejection, identical prior target/overlay image hashes and
+identical directory entries after failure. The test used a `cp -a` mutable copy;
+original catalog/metadata guest inputs are independently checked unchanged. This
+replaces reliance on the older cc403cf1 producer result for that outcome.
 
 ## Exact source and artifacts
 
