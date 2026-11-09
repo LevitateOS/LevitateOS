@@ -17,128 +17,131 @@ still require delivery and final-combination consumer/security/product acceptanc
 
 Active skill: `hdae-development`, discovered at
 `.agents/skills/hdae-development/SKILL.md`; reload it, required references,
-repository instructions and this checkpoint after a context shift. Root
-instructions prohibit mandatory process gates and Recipe unit tests; existing
-CLI/integration/product owners provide verification.
+repository instructions and this checkpoint after a context shift. Root rules
+prohibit mandatory process gates and Recipe unit tests. Existing actual
+integration/CLI/product owners provide verification. No publication is authorized.
 
-Current runtime pair: Ginux clean `b81f30b52e523d142071603f477c6891c7fd9df9`
-(test-only additions over runtime 3cd1e2de), sealed launcher
-`fb87792d5b4363ca669d20935ce6f3d3f6d08fb97ee0cdc74e60bc324c200e6e`;
-Recipe clean `176395aeaa5bb8999c1a6289d18e53c8012ecdf9` (documentation-only over
-harness source 3828500, three fixture-only corrections over 91068391; all
-production/Cargo inputs identical), sealed matching
-CLI/worker `467140e9b036a8ed20b58f87020ad7a63cfe7c68d311dc8e19cfe51c464cf9ef`;
-image `ffe04d8671e45036ac77acc958fb6cfd3c24a939075dc7e6c5437b69d7f05c15`.
+**New candidate, not release acceptance:** Ginux **e4d95de10520aa8e91bc2ec69e64da004443e2da**, launcher
+`21a54e60bd54a4dd2b07957cf2e139a268eb050cb73929e0b8666b31f60c2333`, frozen at
+`bin/ginux-native-sigchld-1`. The prior b81f30b5 / `fb87792d…` source and frozen
+`bin/ginux-opath-1` remain intact as historical/control evidence. The old running
+jobs still select fb87792d; do not silently relabel them as new-candidate passes.
 
-Consumer sources: builder `34172e7`, recab **61b859c4**, recshuttle **dfe9ef1**,
-recqemu f0364bb, install-tests **056a46b0**, TUI **ade4d9aa** (all clean).
-Recipe-owned GNU/musl TUI production/readiness/reuse passes. Both earlier full
-ISO chains build and actual PTY controls pass on both. Their first whole scenario
-runs remain failed: Acorn exposed the now-corrected recab OpenRC defect; Levitate
-exposed the now-corrected guest-script test dependency. Actual Acorn diagnostic
-service completion/cancellation and all 24 recab CLI lifecycle checks pass.
-**Both final ISO chains and final whole scenarios are still running/waiting.**
-The recab-corrected chain now has **five of six** exit-zero products: all three
-Acorn products, Levitate base `A1MZqU4qyO1yqlJr` and Levitate live-boot. Levitate
-live-tools is active. The actual Levitate base recab bytes match the corrected
-managed producer and real Acorn guest control; `levitate-corrected-base-source-proof.json`
-records ISO SHA-256 `beb38e3e3702a1667ae323d854b73560b243dc34f63aca29f1cfca09fdac7509`.
-The quiet system-TUI coordinator waited in host XFS fsync and then completed
-naturally; `product-observation-levitate-system-tui.json` retains the observation.
-No durability operation was interrupted. The new six-product UI-final chain is
-still queued, and no final VM scenario has started.
+The complete Linux CI replay exposed an inherited Gate 11 native SIGCHLD resume
+bug: it requested PTRACE_SYSCALL while no exit was pending, creating an unexpected
+entry stop before seccomp dispatch. A retained userspace-signal regression fails
+on the old launcher and passes on the new one. The correction chooses the resume
+mode from the existing pending-exit state; no grant/native policy is expanded.
+Full native controls and static fmt/Clippy pass. The new candidate also passes
+all **147 Ginux unit tests (zero ignored)** and all **20 existing Linux runtime
+targets** on an empty **8 GiB tmpfs**, with original assertions/deadlines. The
+scratch mount is unmounted and its mountpoint removed. Exact source, command,
+old-fail/new-pass and runtime receipts are under the Ginux worktree's
+`.artifacts/prd15/current-ci/`.
 
-Actual PTY output additionally exposed repeated Facts labels producing duplicate
-React keys. TUI ade4d9aa keys rows by position and label; install-tests 056a46b0
-commits bounded host SSH waits and rejects that warning in the actual guest
-transcript. The old transcript is a retained failing control. No corrected UI
-product or final guest acceptance is claimed before those reruns.
+The preceding XFS CI batch was **13/20 passed**, with six timeout failures plus
+the now-fixed native failure. Namespace diagnostics preserve completed workload
+exit zero / zero tasks and owned handles, followed by host XFS fsync blocking
+past the unchanged 20-second harness limit. The same old launcher and namespace
+case pass on tmpfs. **All six XFS timeout dispositions remain open until quiet
+original-deadline real-XFS retests** (storage, restore, threads, directories,
+poll, owned-exec). The other five were not independently traced to fsync.
+Do not waive them or count timeouts as passes.
 
-Both earlier complete catalogs finished **149/152 failed**, with all cases
-accounted for and no ignored/measured/filtered cases. The 85bba06 run has exactly
-the three diagnosed HTTP fixture-startup failures; its other 149 pass, including
-the first run's corrected kernel/dependency and rootfs-input fixtures. The guarded
-scheduler reviewed that exact list and started a **fresh complete 152-case
-3828500 run**, sealed harness `746b5dd1…`, under session 65760. No earlier pass
-is combined into this new full-suite claim. All three former HTTP startup
-failures now pass in this single fresh run; total 79 cases pass so far, with
-zero failures. Remaining cases must finish before any full-suite claim. Fresh library_backend/image_producer
-and all six ordinary PRD11 consumers pass on unchanged production artifacts,
-with normal locks/threading/metadata/isolation.
+Recipe is clean **176395aeaa5bb8999c1a6289d18e53c8012ecdf9**: production/Cargo
+inputs exactly match 91068391; all Rust tests exactly match 3828500. Later changes
+are only five documentation files (`current-production-source-equivalence.json`).
+Old selected CLI/worker is `467140e9b036a8ed20b58f87020ad7a63cfe7c68d311dc8e19cfe51c464cf9ef`;
+image remains `ffe04d8671e45036ac77acc958fb6cfd3c24a939075dc7e6c5437b69d7f05c15`.
+The old complete 3828500 catalog is **still running** under job **65760**, last
+observed 130 passes / zero failures; it must finish all 152. Its three former
+HTTP fixture-startup failures now pass in this same run. Both earlier complete
+catalogs were 149/152 failed and remain preserved. New source/native acceptance
+must use a fresh complete combination; do not assemble it from those passes.
 
-Returned Daybreak manifests independently verify 504/504, 743/743, 131/131 and
-170/170 files; their selected results and precise open criteria remain source
-bound. **Security acceptance remains open.** The user authorized own CLI with
-Daybreak's original model settings. That invocation requested gpt-6-sol/high/
-daybreak_blue and was rejected for missing hardware-key authentication. It is
-retained, not completed evidence; no standard-access fallback. A required user
-reauthentication/original-context-results question is pending. Explicit dependent-
-recipe remove/cleanup remains a separate unresolved user decision. The maintained
-source/delivery joins and PRD05's actual-upstream requirement remain open; no
-new push, PR/comment or hosted run is authorized.
+To match documented release packaging, **68344** now prepares optimized Recipe
+CLI/matching worker/image producer and all three existing integration harnesses
+from a fresh standalone source export and its tracked lock, Rust 1.99.0. It
+writes `release-runtime-candidate.json`; status prepared is **not runtime
+acceptance**. The next combination must pin those resulting bytes with the new
+launcher, same image and complete source/harness inventory before execution.
 
-Evidence is under `.artifacts/ginux-contribution-preparation/prd15/`; security
-returns and interrupted CLI are in the Ginux worktree's `.artifacts/prd15/`.
-Active jobs: **65760** runs the fresh complete 3828500 catalog after the
-85bba06 final failure-list review; old job 55290 is complete and failed.
-60000 finishes the recab-corrected product chain. **64859** then builds a fresh
-six-product `ui-final` chain so the early Acorn products cannot retain old TUI
-source. **65780** waits for all six final products and catalog I/O before both
-whole distro scenarios and explicit A/B commands. Previous empty VM waiters
-were stopped before any scenario command; no test case was interrupted.
-Consumer job 23586, documentation job 64665, library/image job 69378 and strict
-Recipe Clippy job 98019 completed successfully. Final scenario harness remains
-sealed at `dc43b8da…` (the PTY script is runtime data); source map is
-`final-ui-scenario-sources.json`, PTY SHA-256 `fd9d1e07…`, Facts SHA-256
-`66a017cb…`. Do not rebuild normal target/debug/levitate-xtask during those
-final cargo xtask runs. The driver guards ISO, recab/service, source/script and
-harness identities before actual all/explicit-A/B commands.
+Current Recipe compiler checks pass: independent disposable stable 1.99.1
+unlocked binary build/fmt/strict all-target Clippy; independent MSRV 1.93.0
+unlocked check/locked build; and both stable/MSRV binary builds against the
+actual tracked lock. The two independently resolved locks are `a4eda69a…`,
+differing only in itoa 1.0.18→1.0.19 from tracked `48c776bd…`. They are compatibility
+evidence and **not adopted**. Workspace locks and selected runtime are untouched.
+`recipe-tracked-lock-checks.json` records the explicit disposition. No Recipe
+units or macOS checks run; hosted Linux still requires final-source authorization.
 
-**Exact next action:** inspect those jobs' logs/final JSONs before restarting;
-resolve any genuine failures, obtain successful final whole catalog and both new
-product/scenario chains, then reconcile
-sources/documentation. The timeout bounds and observed UI correction are committed;
-their final product/runtime verification remains required. Wait for required security authentication/results and
-the separately held decisions; partial evidence cannot close PRD15/19. Preserve
-shared staged queue/handoff patch SHA-256 f4d8c81be2612a4d8d472564b25c7ffab6e7043e06b0f2b2176cba78dad5a47e.
+Consumer sources: builder 34172e7, recab 61b859c4, recshuttle dfe9ef1, recqemu
+f0364bb, install-tests 056a46b0, TUI ade4d9aa (all committed/clean). All **six
+recab-corrected base/live-boot/live-tools ISO builds now pass** on the older tuple.
+`levitate-corrected-base-source-proof.json` records Levitate base A1MZqU4qyO1yqlJr,
+ISO `beb38e3e…`; actual recab bytes `6d2971b9…` match the managed producer and
+real Acorn guest completion/cancellation control. All 24 recab CLI integrations
+pass. The old whole guest batches remain failed; no final new guest acceptance.
 
+Actual earlier PTY transcripts exposed duplicate React keys for repeated Facts
+labels. TUI ade4d9aa fixes keys by position+label. Install-tests 056a46b0 commits
+bounded host SSH waits and rejects the warning in the actual guest transcript;
+old failing transcript is retained. **Neither final UI product nor final whole
+VM acceptance is claimed yet.** The fresh six-product UI and final VM waiters
+were stopped while empty after the native finding: `native-fix-scheduling.json`
+records **no test/product case interrupted**. Old sessions 64859/65780 are now
+superseded. Do not expect their final receipts. Old producer 60000 finished;
+inspect its six exit-zero JSONs before restarting anything.
 
-The author guide now names configured downstream catalog 1002, matching
-`src/needs/contract.rs:9`; upstream Gate 11 catalog 2 stays separate. Recipe
-d2eb4ac changes only that explanatory sentence; 2755ec6 corrects the stale
-old-pin claim and pins both already-delivered baseline revisions in setup. The
-changed man page renders without warnings. Current executable example blocks,
-production/Cargo and complete catalog inputs remain unchanged. The mixed existing
-root interface document also corrects the catalog and explicitly preserves the
-user-held remove/cleanup boundary. Its unrelated existing hunks remain uncommitted;
-`interface-contract-current.patch` and `catalog-doc-correction-source.json` retain
-the source disposition. No previous pass is relabeled as a new execution.
+Earlier same-old-tuple receipts remain useful provisional evidence: six PRD11
+consumers (normal locks/linker threading/metadata/isolation), 16 documented
+commands including actual produced-program execution, plus freshly executed
+library_backend and image_producer. They are not a full new-native/release tuple
+claim. Exact docs/catalog corrections and source-equivalence proofs are retained;
+the mixed root interface edit remains uncommitted alongside unrelated existing
+hunks. The delivered baseline is explicitly e7bfc166/28f4368f; it does not include
+all later corrections or close final source/product/security acceptance.
 
-Both additional required harnesses were also rebuilt and **executed afresh** from
-Recipe 2755ec6: `final-library-backend-current.json` and
-`final-image-producer-current.json` exit zero. Their exact bytes equal the earlier
-unchanged harnesses; the new receipts independently bind the same launcher,
-matching worker/image and actual image-producer bytes before/after. The library
-run retains the worker-environment spoof control. `final-harness-root-source.json`
-records unchanged root manifest/lock/config hashes and the sealed scenario harness;
-its existing uncommitted workspace lock remains a final integration concern,
-not an implied fresh-public-checkout delivery claim. Recipe 176395a adds only
-operator documentation of approved compiler FD/path/stack/event limits and their
-pending final delivery. `current-production-source-equivalence.json` verifies
-all Rust test inputs equal 3828500 and all production/Cargo inputs equal
-91068391; the new documentation is not embedded in the executable. No ordinary
-receipt is converted into security acceptance.
+**Security stays open.** Returned Daybreak manifests independently verify
+504/504, 743/743, 131/131 and 170/170 files, with selected passes and precise
+remaining criteria. Own CLI used authorized gpt-6-sol/high/daybreak_blue but was
+rejected for missing authorized hardware-key authentication. A user reauth/
+original-context-results question is pending. No standard-access fallback or
+parent adversarial matrix is authorized by that error. Preserve the interrupted
+CLI evidence; new native source/binary needs affected verification and final-source
+join, not an inherited old receipt. User-held dependent-recipe remove/cleanup,
+actual source delivery/joins, PRD05 actual-merge requirement and hosted Linux
+acceptance remain explicit. macOS and external AI-provider interoperability are
+excluded. Original frozen PRD04 candidates remain unchanged.
 
-Current-source CI validation continues under the already requested PRD13 Linux
-scope. Ginux b81f30b5 `make check` and all eight unit packages pass **147 tests,
-zero ignored**; source and lock are unchanged. Recipe 176395a stable 1.99.1
-unlocked standalone build, fmt and strict all-target Clippy pass. Independent
-MSRV export/check/build is active (**5032**). Ginux job **66455** passed units
-and waits for compilation before its exact build/fixtures and 20 existing Linux
-runtime targets. Receipts are in the Ginux worktree's
-`.artifacts/prd15/current-ci/`; [PRD13 reconciliation](prd13-ci-portability.md)
-records these provisional local outcomes. No Recipe units, hosted run or macOS
-work is performed. Remaining runtime/compiler cases are not assumed passed.
+**Exact next actions:**
+1. Inspect completed RAM CI/unmount receipts and release build 68344. Finish the
+   old complete catalog 65760; retain its actual final JSON without a new-source
+   claim. Ensure compiler/product I/O has finished, then rerun all six failed
+   XFS targets on the corrected binary with original deadlines and account for
+   any survivors/failures. Fix genuine defects; do not just retry away errors.
+2. After those findings close, prepare the new source/binary tuple and restart
+   fresh six UI product builds, six required consumers, documented examples,
+   complete 152 e2e plus library_backend/image_producer. No passes from different
+   tuples may be combined into a full-suite claim. Products/consumer I/O should
+   precede final catalog and guest timing acceptance where practical.
+3. Run both `cargo xtask test all <distro> --force` and explicit
+   `cargo xtask test ab-update <distro> --force` under session libvirt on the new
+   actual products. Preserve harness `dc43b8da…`, PTY-script `fd9d1e07…`, Facts
+   `66a017cb…` and exact source maps; do not rebuild normal target/debug/levitate-
+   xtask during commands. Scope SELinux virt_content_t changes to public ISO
+   artifacts only. All outcomes and latest same-batch install IDs must be real.
+4. Obtain required Daybreak authentication/results; reconcile final delivery
+   sources and publication permission only after a concrete reviewable candidate.
+
+Evidence root: `.artifacts/ginux-contribution-preparation/prd15/`; current Ginux
+CI/security artifacts are in its worktree `.artifacts/prd15/`. Preserve shared
+staged queue/handoff patch SHA-256
+`f4d8c81be2612a4d8d472564b25c7ffab6e7043e06b0f2b2176cba78dad5a47e`.
+The existing uncommitted workspace Cargo.lock/config hashes are recorded in
+`final-harness-root-source.json`; preserve unrelated edits and reconcile final
+pins/lock rather than claiming a fresh public checkout already reproduces these
+later private candidates. No push, PR/comment, hosted run or release occurred.
 
 ## Historical progression and source-bound evidence
 
