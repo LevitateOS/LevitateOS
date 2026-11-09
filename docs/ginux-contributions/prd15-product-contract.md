@@ -593,3 +593,57 @@ security verification through Daybreak. Preserve the open remove/cleanup decisio
 and final-source/delivery dependencies; no checkbox or partial receipt closes
 PRD15/19. Shared staged queue/handoff SHA-256 remains
 `f4d8c81be2612a4d8d472564b25c7ffab6e7043e06b0f2b2176cba78dad5a47e`.
+
+
+### Current product/scenario continuation
+
+Both real base products now pass on the sealed b81f30b5-runtime/91068391/image
+combination: Acorn `A1MDzswoTkZc0NI6` (269 MiB ISO) and Levitate
+`A1MEAGuorOMmL3Vr` (372.5 MiB ISO). Both include Recipe-owned system TUI
+production and actual rootfs/EROFS/tool paths. Acorn's new live-boot parent
+`A1MGcVH1xcurJ16u` also builds successfully. Standalone GNU and musl production,
+explicit installed readiness and fresh-coordinator installed reuse all have
+exit-zero receipts on this same pair.
+
+The first operator-session Acorn live-boot attempt fails at QEMU's ISO open.
+The file is mode 0644 and readable by the operator; QEMU-specific SELinux AVC
+identifies `svirt_t` denial against `user_home_t`. This is not an ISO-byte or
+kernel boot failure. Applying `virt_content_t` only to that public read-only ISO
+allows the exact same image to boot, reach its live shell and pass SSH and
+`live-boot.sh` (`live-boot-acorn-recipe-tui-selinux.json`). SHA-256 remains
+`d0d87ac5ac8ed0d30c24aaf4241e4990f34ae08cfe781c8cd13fd68a4aa6d727`
+before/after, with SELinux still Enforcing. No private Recipe permissions or
+host SELinux policy is changed. The failed first receipt remains failed.
+recqemu commit `f0364bb` corrects its false no-relabel documentation/comment;
+builder documentation now includes this exercised operator preparation.
+
+The complete current Recipe catalog is a single ongoing **152-case** run:
+`complete-catalog-91068391-run`, sealed harness `bin/e2e-91068391` SHA-256
+`089ceae2ed6366de396b9874cd369a5c73d9537103e5de0b0c13ec6046a2dfde`.
+The enumerated names, lock hashes and final combination are retained in
+`complete-catalog-91068391.json`; source/test artifacts are retained separately.
+Do not infer completion before every case and the command finish. Separate
+`library_backend` and `image_producer` integration harnesses pass on the same
+pair, including the spoofed worker environment and reproducible image/failure
+controls; `final-local-integration-harnesses.json` binds their actual binaries.
+These are the user's explicitly requested existing integration catalogs; no
+Recipe unit tests or extra adversarial security execution is performed here.
+
+Acorn live-tools build is still running after successful managed installer-TUI
+acquisition/compile/publication phases. Levitate's live-boot build has started.
+Current sessions: 22052 (Acorn live-tools), 99936 (Levitate live-boot), 32215
+(full Recipe catalog); each may already have completed by resume. Inspect their
+final JSON/logs before repeating. The scenario harness is currently sealed at
+`3adeecc26f50aeb421cea87b681b3b423dba8692304b56e4b37b9aae8e5420e3`;
+rebuild/pin it after the recqemu documentation-only source change before final
+full scenario acceptance. The actual builder is sealed at `4d5928b7` and its
+migration remains uncommitted until product completion.
+
+Next: finish both live-tools chains, apply the documented per-ISO SELinux type
+where required, run both distros' actual PTY/install/installed/A/B scenarios,
+and finish the single complete Recipe catalog plus remaining required checks.
+The focused next security controls in `prd15-daybreak-followup.md` cover the
+still-unverified live TLS, omitted endpoint and ambient resolver boundaries;
+other required S09 criteria remain explicit. The user-held dependent-recipe
+remove/cleanup decision and final delivery/source joins remain open. No release
+or security completion, remote push, PR/comment or hosted job is claimed.
