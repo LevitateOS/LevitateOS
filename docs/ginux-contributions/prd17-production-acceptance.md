@@ -1,7 +1,7 @@
 # PRD17 — production acceptance is incomplete
 
 Recipe is **not production ready**. Audit in progress against selected Ginux
-e4d95de1 / launcher 21a54e60, Recipe 16141938 / CLI-worker e3e28457,
+e4d95de1 / launcher 21a54e60, Recipe c3a40a51 / CLI-worker e3e28457,
 image producer 55b9e50a and acquisition image ffe04d86. The two corrected owning heads are still local; delivery-sources.json and
 delivery-provenance.json retain the previous public selection and products.
 They must not be relabeled as acceptance of this new combination.
@@ -210,7 +210,7 @@ After it ended, Recipe **c3a40a5138f8e0e9a6d7cbb18c6d7a14042898fa** committed
 only the passing kernel fixture correction. All production Rust/Cargo inputs
 remain identical to 16141938; kernel-fixture-correction.patch is the complete
 additional diff. The new clean source rebuild is recorded separately in
-corrected-runtime-build.json; its queued full155 run uses full-runtime-corrected/
+corrected-runtime-build.json; its queued full 155 run uses full-runtime-corrected/
 with new exact source/harness identities. Do not edit Recipe or either actual
 target while those cases execute. Session **59069** owns this guarded join/run;
 fixture-join-progress.json records each step and stops for any unexplained
@@ -241,6 +241,51 @@ permission to push c3a40a51. No new source or parent has been pushed. Assemble t
 new complete diff and request exact final refs only after their verification.
 The ISO reproducibility question, Daybreak hardware-key/results, actual upstream
 merges and final publication/acceptance decisions still require input/results.
+
+## Release version is a required pending decision
+
+Read-only GitHub release metadata establishes that **Recipe 0.1.4 is already
+published** (2026-03-13); release-metadata.json retains the actual response.
+The source still declares 0.1.4. The user has been asked to choose a new version,
+with 0.2.0 recommended for the changed managed/NEEDS contract and 0.1.5 offered as
+the existing-minor alternative. **No answer yet.** Preserve the existing tag,
+release, assets and human-authored public text. Do not choose a version, reuse
+the existing release identity, prepare final packages or publish while pending.
+
+The c3a40a51 clean rebuild completed. CLI/worker are byte-identical e3e28457,
+producer 55b9e50a, library harness f08df5c2, image harness c5b0e8e9 and e2e harness
+02e83e90. The new actual source/targets are under
+/tmp/prd17-corrected-source-r__pdhfl/{recipe,target}; retain them during execution.
+MSRV compilation of the corrected fixture also passed with all Rust/Cargo bytes
+joined to c3a40a51. The complete current source patch is
+prd17/tools-recipe-publication-c3a40a5.patch, SHA-256
+**aae73fa96091452d098fefee7e660834fe6dd6a729a59f25d8d991bfad3efa4e**;
+correction-publication-candidate-c3a40a5.json records its 11 files, source and hashes.
+It is review preparation, not permission or final acceptance.
+
+The running c3a40a51 catalog and queued consumer/documentation/image checks remain
+useful exact-source functional evidence. They do not choose the release version
+or establish acceptance of a later source/binary revision. After the decision,
+reconcile version/locks/callers, rebuild exact final bytes and rerun the required
+complete final combination; do not combine c3a40a51 passes into a different
+revision's full-suite claim.
+
+**The idle final packaging scheduler 85206 was stopped before any package check
+started.** packaging-progress.json now explicitly blocks on this decision; the
+packaging script remains available for the eventual exact final source. No
+package case was interrupted or counted passed. The old metadata waiter 90635
+was also replaced before any case started. Current metadata session **13704**
+waits for the c3a40a51 consumers/image and then exercises only independent
+functional EROFS deployment/failure preservation. It uses the actual c3a40a51
+image and unchanged verified recstrap 5de6647a/13f6a3da with both pinned kernels,
+under operator session-libvirt. It does not prove new ISO/product acceptance,
+choose ISO determinism or imply a fresh final release revision.
+
+Active ordinary sessions: 59069 complete c3a40a51 catalog; 97141 current candidate
+consumers/docs/image; 13704 current candidate metadata after those checks. New
+version, ISO byte-determinism, Daybreak authentication/results and publication
+permissions remain pending. Required actual upstream merges remain absent.
+These are explicit release dependencies, not completed by queued work.
 
 ## Exact next actions
 
