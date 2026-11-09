@@ -63,7 +63,8 @@ HTTP fixture-startup failures now pass in this same run. Both earlier complete
 catalogs were 149/152 failed and remain preserved. New source/native acceptance
 must use a fresh complete combination; do not assemble it from those passes.
 
-The optimized release combination is prepared and now executing under **85702**
+The optimized release combination is prepared. Original pipeline **85702**
+stopped at the retained Acorn live-tools acquisition failure described below
 (`run-release-pipeline.py`, `release-pipeline-progress.json`). Recipe CLI and
 matching worker are **e7073fc17ec0bb029927d0c2e901ca37e0867a7cfdc4c5641d1d6c9b14bb5c03**,
 image producer **aa13ac9b58671cfda9c4126ecdb56c42a5e3d77b13137bb15030ee90921dd8a6**;
@@ -78,13 +79,29 @@ actual produced-program execution, and all **six required real consumers** pass
 with normal locks/linker threading/metadata/isolation. Their new receipts are
 `release-library-backend.json`, `release-image-producer.json`,
 `documented-release-results.json`, `release-consumer-progress.json` and
-`consumers-release-final/`. No old tuple pass is relabeled. Fresh six-product
-`<product>-<distro>-release-final` builds are running; last stage is Acorn base.
-After these actual products complete, the same pipeline runs a fresh complete
-152-case release e2e catalog, then both whole and explicit A/B guest commands.
-Heavy stages are serialized after observing XFS journal contention. The final
-new e2e/catalog and guest stages have **not yet run**. Every command snapshots
-sources and verifies all selected artifact/source hashes before and after.
+`consumers-release-final/`. No old tuple pass is relabeled. Fresh Acorn base and
+live-boot pass. **Acorn live-tools failed** when the Recipe-owned Bun toolchain
+received HTTP 504 from GitHub for its pinned compiler archive. The invocation
+connected to its granted GitHub endpoint, returned workload exit zero with
+authoritative worker failure, and attempted no release-assets endpoint. A
+separate HEAD request, including a diagnostic query variant, also received 504;
+the same fresh tuple had downloaded and hash-verified this archive during Acorn
+base. `bun-acquisition-504-diagnostic.json` records the environmental failure; no
+product success is substituted and no source/trust change made. Levitate fresh
+products and all new guest stages are **not run**.
+
+The first independent release catalog **3804** failed **4/152 passed**, with
+148 setup failures because the task runner omitted creation of its requested
+`RECIPE_TEST_ARTIFACTS` parent. This is a runner mistake, not product execution
+evidence; the complete failed log/receipt remain. The corrected runner creates
+an empty task-owned artifact directory before invoking the same frozen harness.
+A complete **152-case** rerun is now executing under **23362**,
+`run-release-catalog-retry1.py` / `release-catalog-retry1-progress.json`. No
+source, binary, image, assertion or deadline changed. It is not a passed catalog
+yet. This separates independent local verification from remote acquisition. Heavy stages remain serialized
+after observing XFS journal contention. Every wrapper snapshots sources and
+verifies all selected artifact/source hashes before and after. The original
+pipeline failure and all earlier receipts remain immutable.
 
 Current Recipe compiler checks pass: independent disposable stable 1.99.1
 unlocked binary build/fmt/strict all-target Clippy; independent MSRV 1.93.0
@@ -135,10 +152,13 @@ acceptance remain explicit. macOS and external AI-provider interoperability are
 excluded. Original frozen PRD04 candidates remain unchanged.
 
 **Exact next actions:**
-1. Inspect pipeline **85702**, its progress and final per-stage JSONs before
-   restarting anything. Close genuine failures and rerun affected verification;
-   old successful cases do not fill a new-source gap. Compiler jobs 5032/65945,
-   old producer/catalog 60000/65760 and corrected CI jobs 71218/86738 are complete.
+1. Inspect full release catalog **23362** and its eventual exact-source receipt
+   before starting heavy I/O. Original **85702** stopped after actual HTTP 504
+   acquisition failure; independently check recovery of the pinned GitHub asset
+   before a bounded Acorn live-tools retry under a new label. Preserve the failed
+   receipt, reuse only unchanged-tuple successful products, and explicitly map
+   any retry receipt into the product/scenario driver. No blind whole-pipeline
+   rerun or success copied over a failed receipt.
 2. Finish all six release-final products, complete release catalog and both
    `cargo xtask test all <distro> --force` plus explicit `ab-update` commands.
    The prepared driver runs these only on current actual products and latest
