@@ -13,7 +13,28 @@ The original 2026-11-08 run checked upstream main `53a54add` and found
 Its original `upstream.json` retains exact heads/time. That historical dependency
 record is not a fresh merge check or a new user hold on local work.
 
-## Current PRD15 replay — 2026-11-09
+## Current optimized-release replay — 2026-11-09
+
+All six consumers pass afresh on Ginux **e4d95de1 / 21a54e60…**, Recipe
+**176395a / e7073fc1…** (identical optimized CLI and worker), and image **ffe04d86…**.
+The native SIGCHLD correction preserves policy; release source/lock/toolchain
+and all selected artifact hashes are pinned by
+`prd15/release-runtime-candidate.json` and `prd15/release-combination-sources.json`.
+`prd15/release-consumers-exact-source.json` verifies identical complete before/
+after artifact maps for all six exit-zero receipts. Actual per-consumer evidence
+is in `prd15/consumers-release-final/{sqlite,cargo,git-http,git-https,rpm,apk}/receipt.json`.
+These paths are under `.artifacts/ginux-contribution-preparation/`.
+
+SQLite contention/integrity, four concurrent GNU/musl Cargo clients sharing
+normal caches/targets with normal linker threading and actual built threaded
+program execution, pinned Git HTTP/HTTPS with normal trust, full RPM bytes/
+metadata/links and signed APK installation/execution all pass on this one tuple.
+No lock, linker threading, metadata check or isolation was disabled. Final
+maintained source delivery, actual upstream dependencies and required security/
+hosted acceptance remain open; the separate current release e2e/product/VM
+pipeline is still running. These six receipts do not substitute for it.
+
+## Previous PRD15 replay — 2026-11-09
 
 All six ordinary consumers also pass on the current sealed combination:
 Ginux `b81f30b5` / launcher `fb87792d`, Recipe `85bba06` / matching CLI and worker
@@ -32,9 +53,10 @@ SQLite contention and database integrity, four actual shared-cache GNU/musl
 Cargo clients and both built threaded programs, exact pinned HTTP/HTTPS Git
 publication, RPM bytes/ownership/modes/links, and signed APK installation under
 virtual UID/GID 1000 plus execution all pass. Locks, normal linker threading,
-TLS/publisher trust, metadata checks and isolation remain enabled. The full
-current e2e catalog is a separate run and remains failed/incomplete; these six
-ordinary consumer receipts do not close it or the security matrix.
+TLS/publisher trust, metadata checks and isolation remain enabled. At that
+checkpoint the separate e2e catalog remained failed/incomplete; it subsequently
+passed 152/152 on those older bytes. Neither it nor these receipts closes the
+new optimized-release catalog or security matrix.
 
 The source-bound original result follows unchanged.
 

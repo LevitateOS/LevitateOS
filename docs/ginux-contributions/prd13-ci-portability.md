@@ -40,24 +40,29 @@ original deadlines/assertions. The tmpfs was unmounted and removed.
 | Recorded failure | Current disposition |
 | --- | --- |
 | Native SIGCHLD “unexpected native syscall-exit stop” | Fixed with retained old-fail/new-pass regression and all native controls. Final-source security verification remains separate. |
-| Storage namespace, 20 seconds | Diagnostic captures completed workload exit zero, zero tasks/handles, then host XFS fsync beyond the harness limit. Old binary passes the same case on tmpfs. Corrected full storage target passes on tmpfs; quiet original-deadline XFS retest pending. |
-| Restore big payload, 120 seconds | Full target passes on tmpfs with all >2 GiB byte/hash assertions. Quiet original-deadline XFS retest pending; no independent fsync trace for the original timeout. |
-| Threads z-race, 10 seconds | Full target passes on tmpfs; quiet original-deadline XFS retest pending. |
-| Directories all-1, 20 seconds | Full target passes on tmpfs; quiet original-deadline XFS retest pending. |
-| Poll all, 10 seconds | Full poll/event target passes on tmpfs; quiet original-deadline XFS retest pending. |
-| Owned execution success, 10 seconds | Full target passes on tmpfs; quiet original-deadline XFS retest pending. |
+| Storage namespace, 20 seconds | Diagnostic captures completed workload exit zero, zero tasks/handles, then host XFS fsync beyond the harness limit. Old binary passes the same case on tmpfs. Corrected full target passes on tmpfs and quiet XFS (5.32 s total), with original 20 s per-invocation deadline. |
+| Restore big payload, 120 seconds | Full target passes on tmpfs with all >2 GiB byte/hash assertions. Quiet full XFS target also passes (30.41 s total) with original 120 s per-invocation deadline; no independent fsync trace for the original timeout. |
+| Threads z-race, 10 seconds | Full target passes on tmpfs and quiet XFS with original per-invocation deadline. |
+| Directories all-1, 20 seconds | Full target passes on tmpfs and quiet XFS with original per-invocation deadline. |
+| Poll all, 10 seconds | Full poll/event target passes on tmpfs and quiet XFS with original deadlines. |
+| Owned execution success, 10 seconds | Full target passes on tmpfs and quiet XFS with original per-invocation deadline. |
 
 The exact failed-fixture process observation finds no surviving process after
 teardown (`timeout-process-observation-v2.json`; v1 accidentally included its
 observer shell and is explicitly corrected). This does not turn timed-out
-cases into passes or establish all security lifetime criteria. All six XFS
-findings remain open until their required retests/dispositions are complete.
+cases into passes or establish all security lifetime criteria. All six complete quiet-XFS retests now pass with their original deadlines and
+assertions, after task-owned heavy I/O finished (`ginux-quiet-xfs-retests.json`).
+Initial failures remain retained as load-sensitive harness timing; only namespace
+has a direct fsync trace. No timed-out run is counted as passed.
 
 Exact source archive, commands, logs and receipts live at
 `/home/vince/.codex/worktrees/prd15-owned-fd-path/ginux-prd11/.artifacts/prd15/current-ci/`.
-The older fb87792d/467140e9 complete Recipe catalog is still finishing. A new
-optimized release CLI/worker and three integration harnesses are being prepared
-for a fresh complete corrected combination, not a mixed-revision pass claim.
+The older fb87792d/467140e9 Recipe catalog finished **152/152 passed**, with no
+ignored/filtered cases. The fresh optimized 21a54e60/e7073fc1 combination is now
+executing under `prd15/release-pipeline-progress.json`: library/image controls,
+16 documented commands and all six consumers pass; new products, complete e2e
+and guest acceptance remain in progress. Their results are not mixed with older
+bytes. Release builds/harnesses use exact 176395a, tracked lock and Rust 1.99.0.
 No Recipe unit tests, hosted Linux success, macOS work or security closure is
 claimed. Hosted Linux remains pending authorization on the final reviewable source.
 
@@ -187,6 +192,6 @@ Active skill: `hdae-development`, discovered at
 `.agents/skills/hdae-development/SKILL.md`; reload it, required references,
 applicable AGENTS and this checkpoint after context shifts. Root instructions
 supersede skill process requirements. Resume from the current candidate section
-and linked PRD15 checkpoint: close the six XFS findings, finish the corrected
-source combination, then obtain the required exact-source hosted Linux approval.
+and linked PRD15 checkpoint: finish the corrected optimized source combination,
+then obtain the required exact-source hosted Linux approval.
 Keep PRD13 unchecked. macOS is indefinitely deferred.
