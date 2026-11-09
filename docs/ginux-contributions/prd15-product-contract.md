@@ -9,9 +9,11 @@ kernels and external AI-provider interoperability are not added by this task.
 
 The source decision was subsequently resolved in the shared queue: the user
 authorized maintained own-repository delivery with upstream Gate 11 included.
-`delivery-sources.json` pins Ginux `28f4368f` and Recipe `e7bfc166`. No new
-publication is performed or requested by this task. Local corrections below
-still require delivery and final-combination consumer/security/product acceptance.
+The original public baseline was Ginux `28f4368f` / Recipe `e7bfc166`.
+The separately authorized [PRD16 delivery](prd16-delivery.md) now publishes the
+corrected e4d95de1 / b185e036 sources and records final parent verification.
+`delivery-sources.json` owns the current exact selection. Local source/ordinary
+product outcomes below do not establish security or production acceptance.
 
 ## Active checkpoint
 
@@ -303,8 +305,9 @@ application. Runtime binaries/harnesses remain the exact verified 176395a builds
    [candidate provenance](prd16-delivery-candidate.json), nine-source permission
    request and independent fresh-checkout/build receipts. Public HTTPS submodule
    URLs are committed as 46c7e25; final parent gitlinks remain unchanged pending
-   source publication permission and actual availability. Own-repository source
-   choice is resolved. Preserve shared staged patch f4d8c81b… and all unrelated
+   final parent integration. The nine exact source pushes and their automatic
+   CI were explicitly authorized and completed; anonymous fetches pass 16/16.
+   Own-repository source choice is resolved. Preserve shared staged patch f4d8c81b… and all unrelated
    work; hosted Linux dispatch, PRs/comments and release publication remain
    separately unauthorized.
 3. Required security hardware-key auth/results remain pending. Use the corrected

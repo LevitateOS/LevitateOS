@@ -575,11 +575,13 @@ dependencies = [
  "levitate-recipe",
  "libc",
  "recinit",
+ "reciso",
  "recqemu",
+ "recuki",
+ "rhai",
  "serde",
  "serde_json",
  "tempfile",
- "time",
  "toml",
  "walkdir",
  "which 5.0.0",
@@ -599,7 +601,9 @@ dependencies = [
 name = "distro-profile"
 version = "0.2.0"
 dependencies = [
+ "schemars",
  "serde",
+ "ts-rs",
 ]
 
 [[package]]
@@ -715,16 +719,6 @@ checksum = "9564fc758e15025b46aa6643b1b77d047d1a56a1aea6e01002ac0c7026876213"
 dependencies = [
  "libc",
  "winapi",
-]
-
-[[package]]
-name = "fsdbg"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "flate2",
- "recinit",
- "reciso",
 ]
 
 [[package]]
@@ -1035,7 +1029,6 @@ dependencies = [
  "colored",
  "distro-builder",
  "distro-contract",
- "fsdbg",
  "recab",
  "recinit",
  "recpart",
@@ -1043,6 +1036,7 @@ dependencies = [
  "recshuttle",
  "serde",
  "serde_json",
+ "tempfile",
 ]
 
 [[package]]
@@ -1539,6 +1533,7 @@ dependencies = [
  "schemars",
  "serde",
  "serde_json",
+ "sha2",
  "target-root",
  "tempfile",
  "tool-contract",

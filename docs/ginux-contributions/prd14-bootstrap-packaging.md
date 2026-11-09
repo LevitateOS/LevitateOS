@@ -3,8 +3,10 @@
 **Complete on the maintained source pair.** The selected maintained sources are
 Ginux `28f4368f6fd70d0e485386892a08d6734b5988dd` and Recipe
 `e7bfc166343164989794c917e67f187d0ac49ba8`. See
-[delivery-sources.json](delivery-sources.json) for the complete source/artifact
-selection. Our repositories supply both histories; no upstream PRs/comments,
+[the preserved baseline manifest](delivery-sources-2026-11-08-baseline.json)
+for this exact source/artifact selection. [PRD16](prd16-delivery.md) owns the later
+corrected source delivery; these fresh-host/package results remain historical
+and are not relabeled as testing its new sources. Our repositories supply both histories; no upstream PRs/comments,
 crate publication, release tag, package publication or hosted workflow dispatch
 were performed. macOS is indefinitely deferred.
 
@@ -15,7 +17,8 @@ head `9759daaec`. The last refresh found those unchanged. PR #249 is still open;
 its performance gate is partial and no accepted performance baseline is claimed.
 New upstream changes remain authoritative; replace/drop downstream changes as
 upstream supplies their behavior. This replaces the previous source-delivery
-hold. Superproject gitlinks and HTTPS source URLs now select the obtainable pair.
+hold. At that baseline delivery, superproject gitlinks and HTTPS source URLs selected
+the obtainable pair. The current selection is now owned by PRD16.
 
 ## Exact fresh-host combination
 

@@ -1,23 +1,26 @@
-# PRD01 — maintained baseline verified; later correction delivery open
+# PRD01 — corrected maintained source delivered; final acceptance remains separate
 
-Current source-delivery update (2026-11-08): the user explicitly authorized our
-maintained repositories, with current upstream main and Gate 11 PR #249
-included. [delivery-sources.json](delivery-sources.json) pins the obtainable pair,
-Ginux `28f4368f` and Recipe `e7bfc166`; the superproject pins those revisions over
-HTTPS. Fresh network source acquisition, launcher/worker builds and both image
-producers now pass on a new Rocky VM. The older missing-source/decision hold
-below is historical and superseded. PRD14's new package/consumer run is complete on that exact pair; source publication does not close security, hosted CI or distro boot
-acceptance. No upstream PR/comment or package release was published.
+The maintained-source choice is resolved. The authorized PRD16 source delivery
+now publishes Ginux `e4d95de10520aa8e91bc2ec69e64da004443e2da` and Recipe
+`b185e0363ceba1290201ba84593aefb313a85cc4`; anonymous HTTPS fetches verify all
+sixteen selected owning commits and exact trees. [The current selection](delivery-sources.json)
+and [delivery record](prd16-delivery.md) own final pins, public availability and
+product provenance. Upstream Ginux leads; current upstream main and unmerged
+Gate 11 #249 history remain included. No upstream PR/comment was published.
 
+Fresh independent source builds reproduce the tested launcher **21a54e60…**,
+matching CLI/worker **e7073fc1…** and image producer **aa13ac9b…**. The pinned
+acquisition image remains **ffe04d86…**, produced from tracked manifests and
+ordinary public inputs. No private worktree or migration executable supplies
+source/build output. PRD16 records final parent verification/publication status.
+Security, required upstream merges, hosted Linux and production acceptance remain
+separate; source delivery does not close those criteria.
 
-Current correction candidate: Ginux e4d95de1 / launcher `21a54e60…`, Recipe
-176395a / optimized matching CLI-worker `e7073fc1…`, acquisition image
-`ffe04d86…`. These later corrections are local and not yet the publicly
-obtainable maintained release pair. [The active product checkpoint](prd15-product-contract.md)
-records exact hashes, current verification and remaining source/security/product
-dependencies. The approved maintained-repository choice is resolved; no new
-source-choice hold is inferred. No new publication is authorized. PRD01 remains
-open for delivery of the required final corrected combination.
+The earlier 28f4368f/e7bfc166 fresh-Rocky/package baseline is preserved in
+[its original manifest](delivery-sources-2026-11-08-baseline.json) and
+[PRD14](prd14-bootstrap-packaging.md). Those results are not relabeled as running
+the corrected pair. Later complete product/catalog receipts retain their actual
+source and executable identities in the [product checkpoint](prd15-product-contract.md).
 
 ## Historical old-pin investigation
 

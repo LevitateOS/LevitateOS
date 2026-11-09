@@ -1,11 +1,12 @@
 # PRD16 — final source pins and artifact provenance
 
-**In progress: exact source publication requires user permission.** The owning
-repositories already contain coherent, clean commits. Nine selected descendants
-are absent from their public delivery branches. Final parent gitlinks and the
-published-baseline `delivery-sources.json` are deliberately unchanged until the
-required source commits are durably available. Local recovery bundles and green
-builds do not complete PRD16.
+**Source delivery verified; final parent integration is being checked.** The
+user authorized the nine exact source pushes and normal automatic CI. All nine
+fast-forward pushes succeeded, with exact before/after ref checks. Anonymous
+HTTPS fetches now obtain all sixteen selected commits and matching source trees.
+Final root pins, tested lock and provenance are prepared together; parent
+publication still requires a separate exact permission. Production acceptance
+remains open in its owning tasks.
 
 Active skill: `hdae-development`, discovered at
 `.agents/skills/hdae-development/SKILL.md`; reload it, its required reference,
@@ -13,15 +14,17 @@ root instructions and this checkpoint after context recovery. The root rules
 prohibit mandatory process gates and Recipe unit tests. This task uses existing
 source/product owners and preserves the shared worktree and staging.
 
-## Exact delivery to authorize
+## Authorized exact source delivery
 
 The [candidate manifest](prd16-delivery-candidate.json) records all sixteen source
 repositories, source trees, original parent pins, observed public heads, complete
 patch hashes, actual products and their inputs. GitHub read-only branch/commit
 and repository metadata confirmed all sixteen repositories are public. Seven
-selected heads already match their delivery branches; nine need fast-forward
-publication. No source branch, commit, public discussion or remote text was
-rewritten.
+selected heads already matched their delivery branches; the nine fast-forward
+pushes below are now complete. No existing source commit, discussion or human
+public text was rewritten. The original proposal remains immutable in the
+candidate; [delivery-sources.json](delivery-sources.json) and
+[delivery-provenance.json](delivery-provenance.json) own the current selection.
 
 | Owning repository | Existing branch | Exact selected head | Commits since observed public head |
 | --- | --- | --- | ---: |
@@ -85,9 +88,13 @@ checks are under `.artifacts/ginux-contribution-preparation/prd16/`:
 `preparation.json`, `fresh-builds.json`, `provenance-validation.json`,
 `all-remote-heads.json`, and `public-source-urls.json`. The proposed parent pin/
 lock patch is **02178705…**; full SHA-256 values are in the candidate manifest.
-The source-only restoration used local bundles because the nine final heads
-are not yet public. Anonymous public obtainability of those heads is **not run**
-and cannot be inferred from local refs or a bundle restoration.
+The original source-only restoration used local bundles before publication.
+Subsequent `anonymous-source-fetch.json` verifies **16/16** exact public HTTPS
+fetches in empty independent repositories: no credentials, system/global Git
+configuration, local bundles, object alternates or private source paths.
+`authorized-source-pushes.json` records all nine exact authorized mutations.
+These later receipts supply actual public obtainability; it is not inferred
+from the earlier local restoration.
 
 The selected product wave is Acorn base/live-boot/live-tools
 `A1My9Q1kl3g1ooze` / `A1MzccgZQTOQDJVy` / `A1Mzhthmceb3c7Vy`, and Levitate
@@ -101,30 +108,37 @@ receipts, as recorded in the [product checkpoint](prd15-product-contract.md).
 
 ## Reproduction and remaining work
 
-1. Obtain explicit permission for the nine exact source pushes above, including
-   normal automatic CI effects. Until then, wait; do not substitute another
-   delivery approach or silently publish the old baseline as current.
-2. After permitted publication, fetch each exact commit anonymously over its
-   HTTPS URL into empty repositories with no local alternates or private source
-   paths. Verify revisions/trees and final source contract before adopting pins.
-3. Commit the selected root gitlinks, tested lock and final provenance together.
-   The existing `delivery-sources.json` identifies the historical public
-   28f4368f/e7bfc166 baseline until this step; preserve that old identity in
-   history. Reconcile its current pair with the candidate and source joins.
-4. Verify a fresh selected parent checkout obtains the exact source combination.
-   For a published root commit, initialize exact submodules with
-   `git submodule update --init --recursive`, never `--remote`. Build Ginux with
-   `make build` in `tools/ginux`. Build Recipe from an exact standalone archive
-   or independent clone, using its own Cargo.lock/profile, as above; the parent's
-   release profile intentionally differs. Reproduce the pinned acquisition image
-   through Recipe's tracked bootstrap manifests and ordinary public signed
-   inputs; retained PRD14 producer/fresh-host receipts remain source-backed.
-   Use the actual equal CLI as worker and verify the image digest ffe04d86.
-5. Preserve actual product receipts and their exact source/byte identities.
-   Revalidate affected behavior if source changes during reconciliation; moving
-   delivery refs alone does not turn old execution into a new run. Final parent
-   publication, if needed, requires a separate exact permission after its commit
-   and complete remote-relative diff are reviewable.
+Source publication and anonymous acquisition are complete. The final
+`delivery-sources.json` selects Ginux e4d95de1 / Recipe b185e036 and all sixteen
+owning commits; the earlier 28f4368f/e7bfc166 selection is preserved byte-for-byte
+in `delivery-sources-2026-11-08-baseline.json`. Original PRD14 fresh-host/package
+receipts remain bound to that earlier baseline. PRD15's full catalog keeps its
+actual 176395a/e707 source/build identity; independent builds from the selected
+b185e036 reproduce those bytes. No old execution is renamed.
+
+The delivery verification will record the exact parent pin commit after it is
+created. From that selected checkout, initialize exact submodules with
+`git submodule update --init --recursive`, never `--remote`. URLs are public
+HTTPS. Build Ginux with `make build` in `tools/ginux`. Build Recipe from an exact
+standalone archive or independent clone, with its tracked lock/profile and
+Rust 1.99.0, using `cargo build --locked --release --bins`. The parent's release
+profile intentionally differs. Select the same actual CLI as worker.
+
+Use Recipe's tracked `bootstrap/README.md`, `ginux-build-image.json` and
+`ginux-acquisition-image.json` to obtain ordinary public signed inputs and run
+its image producer. The unchanged input manifests and producer bytes retain
+valid PRD14 image-production/fresh-host evidence; acquisition image digest is
+ffe04d86. No migration executable, fixture trust or private cache is a required
+input. Root package/product facts remain owned by their recipes; the candidate
+records the actual six product outputs and their input/scenario receipts.
+
+The source-only isolated restoration and fresh launcher/Recipe builds already
+pass. Final parent verification must recursively obtain every selected submodule
+from its public HTTPS source, compare exact revisions/trees and the workspace
+lock/provenance, and retain the complete parent diff. Moving delivery refs alone
+does not change source or convert old execution into a new run; revalidate
+behavior if source changes during reconciliation. Root publication is a separate
+permission after that exact commit and diff are concrete.
 
 The original shared staged patch is **f4d8c81b…** and remains unchanged. Root
 review notes, mixed interface edits, deny.toml and other pending documentation
@@ -135,5 +149,5 @@ all recovery worktrees and historical evidence remain intact.
 Security authentication/results, the user-held dependent-recipe remove/cleanup
 decision, PRD05's actual upstream merge requirement and hosted Linux acceptance
 remain open in their owning tasks. PRD16 source delivery does not waive them or
-claim production acceptance. **Next action: request the bounded nine-source push
-permission and wait; final parent pins remain open until durable availability.**
+claim production acceptance. **Next action: verify the final parent pin commit and request permission for its
+exact publication. Do not infer parent publication from the nine-source approval.**
