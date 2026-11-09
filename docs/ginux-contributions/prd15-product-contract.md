@@ -24,8 +24,9 @@ CLI/integration/product owners provide verification.
 Current runtime pair: Ginux clean `b81f30b52e523d142071603f477c6891c7fd9df9`
 (test-only additions over runtime 3cd1e2de), sealed launcher
 `fb87792d5b4363ca669d20935ce6f3d3f6d08fb97ee0cdc74e60bc324c200e6e`;
-Recipe clean `3828500d0564f98045f26ef284efeed54ebe3b4d` (three fixture-only
-corrections over 91068391; production/Cargo inputs identical), sealed matching
+Recipe clean `d2eb4acd3eac52e094cd362591600cd9e622dc2d` (documentation-only over
+harness source 3828500, three fixture-only corrections over 91068391; all
+production/Cargo inputs identical), sealed matching
 CLI/worker `467140e9b036a8ed20b58f87020ad7a63cfe7c68d311dc8e19cfe51c464cf9ef`;
 image `ffe04d8671e45036ac77acc958fb6cfd3c24a939075dc7e6c5437b69d7f05c15`.
 
@@ -87,6 +88,16 @@ sources/documentation. The timeout bounds and observed UI correction are committ
 their final product/runtime verification remains required. Wait for required security authentication/results and
 the separately held decisions; partial evidence cannot close PRD15/19. Preserve
 shared staged queue/handoff patch SHA-256 f4d8c81be2612a4d8d472564b25c7ffab6e7043e06b0f2b2176cba78dad5a47e.
+
+
+The author guide now names configured downstream catalog 1002, matching
+`src/needs/contract.rs:9`; upstream Gate 11 catalog 2 stays separate. Recipe
+d2eb4ac changes only that explanatory sentence; the documented executable blocks,
+production/Cargo and complete catalog inputs remain unchanged. The mixed existing
+root interface document also corrects the catalog and explicitly preserves the
+user-held remove/cleanup boundary. Its unrelated existing hunks remain uncommitted;
+`interface-contract-current.patch` and `catalog-doc-correction-source.json` retain
+the source disposition. No previous pass is relabeled as a new execution.
 
 ## Historical progression and source-bound evidence
 
