@@ -1,6 +1,6 @@
 [submodule "website"]
 	path = docs/website
-	url = git@github.com:LevitateOS/website.git
+	url = https://github.com/LevitateOS/website.git
 	branch = master
 [submodule "recipe"]
 	path = tools/recipe
@@ -8,55 +8,55 @@
 	branch = master
 [submodule "docs-content"]
 	path = docs/content
-	url = git@github.com:LevitateOS/docs-content.git
+	url = https://github.com/LevitateOS/docs-content.git
 	branch = master
 [submodule "install-tests"]
 	path = testing/install-tests
-	url = git@github.com:LevitateOS/install-tests.git
+	url = https://github.com/LevitateOS/install-tests.git
 	branch = master
 [submodule "recstrap"]
 	path = tools/recstrap
-	url = git@github.com:LevitateOS/recstrap.git
+	url = https://github.com/LevitateOS/recstrap.git
 	branch = master
 [submodule "distro-builder"]
 	path = distro/builder
-	url = git@github.com:LevitateOS/distro-builder.git
+	url = https://github.com/LevitateOS/distro-builder.git
 	branch = main
 [submodule "tools/recinit"]
 	path = tools/recinit
-	url = git@github.com:LevitateOS/recinit.git
+	url = https://github.com/LevitateOS/recinit.git
 	branch = main
 [submodule "tools/recuki"]
 	path = tools/recuki
-	url = git@github.com:LevitateOS/recuki.git
+	url = https://github.com/LevitateOS/recuki.git
 	branch = main
 [submodule "tools/reciso"]
 	path = tools/reciso
-	url = git@github.com:LevitateOS/reciso.git
+	url = https://github.com/LevitateOS/reciso.git
 	branch = main
 [submodule "tools/recqemu"]
 	path = tools/recqemu
-	url = git@github.com:LevitateOS/recqemu.git
+	url = https://github.com/LevitateOS/recqemu.git
 	branch = main
 [submodule "distro-contract"]
 	path = distro/contract
-	url = git@github.com:LevitateOS/distro-contract.git
+	url = https://github.com/LevitateOS/distro-contract.git
 	branch = master
 [submodule "tools/recab"]
 	path = tools/recab
-	url = git@github.com:LevitateOS/recab.git
+	url = https://github.com/LevitateOS/recab.git
 	branch = main
 [submodule "tools/recpart"]
 	path = tools/recpart
-	url = git@github.com:LevitateOS/recpart.git
+	url = https://github.com/LevitateOS/recpart.git
 	branch = main
 [submodule "tui"]
 	path = tui
-	url = git@github.com:LevitateOS/tui-root.git
+	url = https://github.com/LevitateOS/tui-root.git
 	branch = master
 [submodule "tools/recshuttle"]
 	path = tools/recshuttle
-	url = git@github.com:LevitateOS/recshuttle.git
+	url = https://github.com/LevitateOS/recshuttle.git
 	branch = master
 [submodule "tools/ginux"]
 	path = tools/ginux
