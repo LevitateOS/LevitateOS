@@ -1,6 +1,6 @@
 # PRD13 — CI and portability
 
-**Open: waiting for maintained source and final-source hosted Linux acceptance.**
+**Open: final source delivery and final-source hosted Linux acceptance remain pending.**
 The user indefinitely deferred all macOS work. macOS CI/portability is excluded
 from release acceptance; existing upstream CI definitions remain preserved.
 
@@ -11,7 +11,33 @@ No push, dispatch, PR, upstream comment or release occurred. Do not repeat that
 permission request without changed direction. PRD01 source adoption and PRD05's
 actual upstream merges remain separate open dependencies.
 
-## Exact local sources and outcomes
+## Current candidate verification (2026-11-09)
+
+The maintained-own-repository decision and baseline delivery were subsequently
+resolved under PRD14, including upstream Gate 11. Later consumer corrections
+remain local; no new push/hosted-job permission is inferred. The active
+[PRD15/19 checkpoint](prd15-product-contract.md) owns final combination progress.
+The older sources/results below are historical, not current acceptance.
+
+On clean Ginux `b81f30b52e523d142071603f477c6891c7fd9df9`, current `make check`
+passes and all eight complete unit packages pass **147 tests, zero ignored**.
+Source and lock remain unchanged. Recipe `176395aeaa5bb8999c1a6289d18e53c8012ecdf9`
+is independently exported twice without a lock; the real workspace locks remain
+untouched. Stable Rust 1.99.1 unlocked binary build, formatting and strict
+all-target Clippy pass. MSRV 1.93.0 unlocked check/locked build are **running**;
+none is counted as passed before its result. After compilation, current Ginux
+build/fixtures and all 20 existing Linux runtime targets are queued on the
+unchanged `fb87792d…` launcher, with original assertions/deadlines.
+
+Exact commands, source archive, logs and receipts live at
+`/home/vince/.codex/worktrees/prd15-owned-fd-path/ginux-prd11/.artifacts/prd15/current-ci/`
+(`ginux-check.json`, `ginux-current-linux.json`, `recipe-current-checks.json`).
+The fresh complete Recipe catalog remains in progress on its sealed 3828500
+harness / 467140e9 CLI+worker / fb87792d launcher / ffe04d86 image. It is separate
+from these compiler checks. No hosted Linux success or security closure is
+claimed. macOS remains indefinitely excluded.
+
+## Historical local sources and outcomes
 
 | Component | Source or identity | Outcome |
 | --- | --- | --- |

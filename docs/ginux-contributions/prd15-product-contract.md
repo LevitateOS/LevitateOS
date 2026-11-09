@@ -129,6 +129,17 @@ all Rust test inputs equal 3828500 and all production/Cargo inputs equal
 91068391; the new documentation is not embedded in the executable. No ordinary
 receipt is converted into security acceptance.
 
+Current-source CI validation continues under the already requested PRD13 Linux
+scope. Ginux b81f30b5 `make check` and all eight unit packages pass **147 tests,
+zero ignored**; source and lock are unchanged. Recipe 176395a stable 1.99.1
+unlocked standalone build, fmt and strict all-target Clippy pass. Independent
+MSRV export/check/build is active (**5032**). Ginux job **66455** passed units
+and waits for compilation before its exact build/fixtures and 20 existing Linux
+runtime targets. Receipts are in the Ginux worktree's
+`.artifacts/prd15/current-ci/`; [PRD13 reconciliation](prd13-ci-portability.md)
+records these provisional local outcomes. No Recipe units, hosted run or macOS
+work is performed. Remaining runtime/compiler cases are not assumed passed.
+
 ## Historical progression and source-bound evidence
 
 The following records preserve earlier findings, corrections and failed
