@@ -24,7 +24,7 @@ CLI/integration/product owners provide verification.
 Current runtime pair: Ginux clean `b81f30b52e523d142071603f477c6891c7fd9df9`
 (test-only additions over runtime 3cd1e2de), sealed launcher
 `fb87792d5b4363ca669d20935ce6f3d3f6d08fb97ee0cdc74e60bc324c200e6e`;
-Recipe clean `2755ec60751c13250dff0bc4936195ae504b5632` (documentation-only over
+Recipe clean `176395aeaa5bb8999c1a6289d18e53c8012ecdf9` (documentation-only over
 harness source 3828500, three fixture-only corrections over 91068391; all
 production/Cargo inputs identical), sealed matching
 CLI/worker `467140e9b036a8ed20b58f87020ad7a63cfe7c68d311dc8e19cfe51c464cf9ef`;
@@ -50,7 +50,9 @@ the three diagnosed HTTP fixture-startup failures; its other 149 pass, including
 the first run's corrected kernel/dependency and rootfs-input fixtures. The guarded
 scheduler reviewed that exact list and started a **fresh complete 152-case
 3828500 run**, sealed harness `746b5dd1…`, under session 65760. No earlier pass
-is combined into this new full-suite claim. Fresh library_backend/image_producer
+is combined into this new full-suite claim. All three former HTTP startup
+failures now pass in this single fresh run; total 38 cases pass so far, with
+zero failures. Remaining cases must finish before any full-suite claim. Fresh library_backend/image_producer
 and all six ordinary PRD11 consumers pass on unchanged production artifacts,
 with normal locks/threading/metadata/isolation.
 
@@ -110,7 +112,12 @@ matching worker/image and actual image-producer bytes before/after. The library
 run retains the worker-environment spoof control. `final-harness-root-source.json`
 records unchanged root manifest/lock/config hashes and the sealed scenario harness;
 its existing uncommitted workspace lock remains a final integration concern,
-not an implied fresh-public-checkout delivery claim.
+not an implied fresh-public-checkout delivery claim. Recipe 176395a adds only
+operator documentation of approved compiler FD/path/stack/event limits and their
+pending final delivery. `current-production-source-equivalence.json` verifies
+all Rust test inputs equal 3828500 and all production/Cargo inputs equal
+91068391; the new documentation is not embedded in the executable. No ordinary
+receipt is converted into security acceptance.
 
 ## Historical progression and source-bound evidence
 
