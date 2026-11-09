@@ -4,7 +4,8 @@
 are superseded by the [tested local corrections](pr245-pr247-followup-2026-11-09.md).
 That follow-up uses a new validation branch excluding #207. The original heads
 and results below remain historical evidence. Its publication section records
-the subsequently authorized #245/#247 updates and the pending test-only fix.
+the authorized #245/#247 updates and test-only follow-up; both PRs now have
+all reported CI checks passing.
 
 Prepared against current upstream main **55b719db9c52889543fbb177fab4cf2b2f90955e**,
 confirmed again with `git ls-remote upstream refs/heads/main` after testing.
