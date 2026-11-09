@@ -30,13 +30,18 @@ CLI/worker `467140e9b036a8ed20b58f87020ad7a63cfe7c68d311dc8e19cfe51c464cf9ef`;
 image `ffe04d8671e45036ac77acc958fb6cfd3c24a939075dc7e6c5437b69d7f05c15`.
 
 Consumer sources: builder `34172e7`, recab **61b859c4**, recshuttle **dfe9ef1**,
-recqemu f0364bb, install-tests **d55c089** plus two uncommitted host timeout bounds.
+recqemu f0364bb, install-tests **056a46b0**, TUI **ade4d9aa** (all clean).
 Recipe-owned GNU/musl TUI production/readiness/reuse passes. Both earlier full
 ISO chains build and actual PTY controls pass on both. Their first whole scenario
 runs remain failed: Acorn exposed the now-corrected recab OpenRC defect; Levitate
 exposed the now-corrected guest-script test dependency. Actual Acorn diagnostic
 service completion/cancellation and all 24 recab CLI lifecycle checks pass.
-**Both corrected ISO chains and final whole scenarios are still running/waiting.**
+**Both final ISO chains and final whole scenarios are still running/waiting.**
+Actual PTY output additionally exposed repeated Facts labels producing duplicate
+React keys. TUI ade4d9aa keys rows by position and label; install-tests 056a46b0
+commits bounded host SSH waits and rejects that warning in the actual guest
+transcript. The old transcript is a retained failing control. No corrected UI
+product or final guest acceptance is claimed before those reruns.
 
 The old complete catalog is **149/152 failed**; all three affected cases now
 pass. The 85bba06 full run is still in progress and has three HTTP fixture-startup
@@ -60,20 +65,26 @@ new push, PR/comment or hosted run is authorized.
 
 Evidence is under `.artifacts/ginux-contribution-preparation/prd15/`; security
 returns and interrupted CLI are in the Ginux worktree's `.artifacts/prd15/`.
-Active jobs: 55290 failed/in-progress old catalog; **65760** queues the new
-3828500 complete catalog after the old result and failure-list review; 60000
-corrected product chains; **55602** final scenario driver waits for all product
-and corrected-catalog I/O to finish. Consumer job 23586, documentation job 64665
-and strict Recipe Clippy job 98019 completed successfully.
-Final scenario harness is sealed at `dc43b8da…`; its source map is
-`final-product-scenario-sources.json`. Do not rebuild normal target/debug/levitate-
-xtask during the final cargo xtask runs. The scenario driver checks exact new
-ISO, recab/service, script and harness bytes before all/explicit-A/B commands.
+Active jobs: 55290 finishes the diagnosed failed 85bba06 catalog; **65760**
+queues the new 3828500 complete catalog after its final failure-list review.
+60000 finishes the recab-corrected product chain. **64859** then builds a fresh
+six-product `ui-final` chain so the early Acorn products cannot retain old TUI
+source. **65780** waits for all six final products and catalog I/O before both
+whole distro scenarios and explicit A/B commands. Previous empty VM waiters
+were stopped before any scenario command; no test case was interrupted.
+Consumer job 23586, documentation job 64665, library/image job 69378 and strict
+Recipe Clippy job 98019 completed successfully. Final scenario harness remains
+sealed at `dc43b8da…` (the PTY script is runtime data); source map is
+`final-ui-scenario-sources.json`, PTY SHA-256 `fd9d1e07…`, Facts SHA-256
+`66a017cb…`. Do not rebuild normal target/debug/levitate-xtask during those
+final cargo xtask runs. The driver guards ISO, recab/service, source/script and
+harness identities before actual all/explicit-A/B commands.
 
 **Exact next action:** inspect those jobs' logs/final JSONs before restarting;
 resolve any genuine failures, obtain successful final whole catalog and both new
-product/scenario chains, then retain the tested timeout bounds and reconcile
-sources/documentation. Wait for required security authentication/results and
+product/scenario chains, then reconcile
+sources/documentation. The timeout bounds and observed UI correction are committed;
+their final product/runtime verification remains required. Wait for required security authentication/results and
 the separately held decisions; partial evidence cannot close PRD15/19. Preserve
 shared staged queue/handoff patch SHA-256 f4d8c81be2612a4d8d472564b25c7ffab6e7043e06b0f2b2176cba78dad5a47e.
 
