@@ -17,6 +17,31 @@ Exact heads/time are in `upstream.json` below. The ordinary sandbox's attempted
 `git ls-remote` failed DNS; the connected GitHub reads succeeded. This is an
 external integration dependency, not a new user hold on local work.
 
+## Current PRD15 replay — 2026-11-09
+
+All six ordinary consumers also pass on the current sealed combination:
+Ginux `b81f30b5` / launcher `fb87792d`, Recipe `85bba06` / matching CLI and worker
+`467140e9`, and the producer-built acquisition image `ffe04d86`. The maintained
+own-repository source choice is now approved; older statements below that it
+was undecided describe the historical run. These later corrections are still
+local, and PRD05's actual-upstream dependency and final security/delivery joins
+remain open. No publication is performed or acceptance checkbox closed here.
+
+`.artifacts/ginux-contribution-preparation/prd15/current-consumers-exact-source.json`
+verifies that **6/6** successful receipts use the same four artifact hashes.
+`consumers-85bba06/{sqlite,cargo,git-http,git-https,rpm,apk}/receipt.json` retains
+exact commands, fixture/input identities, logs and product oracles. Every outer
+wrapper also verifies the selected executable/image hashes before and after.
+SQLite contention and database integrity, four actual shared-cache GNU/musl
+Cargo clients and both built threaded programs, exact pinned HTTP/HTTPS Git
+publication, RPM bytes/ownership/modes/links, and signed APK installation under
+virtual UID/GID 1000 plus execution all pass. Locks, normal linker threading,
+TLS/publisher trust, metadata checks and isolation remain enabled. The full
+current e2e catalog is a separate run and remains failed/incomplete; these six
+ordinary consumer receipts do not close it or the security matrix.
+
+The source-bound original result follows unchanged.
+
 ## Exact tested local combination
 
 | Component | Source and built identity |
