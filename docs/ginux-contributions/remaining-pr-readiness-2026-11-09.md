@@ -1,5 +1,11 @@
 # Remaining upstream PR readiness — 2026-11-09
 
+**Description follow-up complete:** under the user's subsequent authorization,
+the bodies of #233/#236/#238/#242/#243/#244/#245/#246/#247/#248 now match their
+published revisions. Useful original failure and boot context is retained as
+historical evidence. #207 is untouched; all titles, heads, bases, states,
+comments and fork refs are unchanged. No source was pushed in this follow-up.
+
 **Publication complete:** the user authorized the eight exact source updates
 below, and their atomic lease-guarded push succeeded. Git and GitHub verified
 every resulting head. All **24 hosted checks passed**: changes, static-and-unit
@@ -98,11 +104,12 @@ and all other origin branches remained identical to the pre-push snapshot.
 All three hosted checks completed successfully on every approved revision.
 No manual workflow dispatch or rerun occurred.
 
-Public titles, descriptions and comments have not changed. The existing prose
-is historical: notably #243 describes the older schema, #244 the superseded
+During the source-only publication, public titles, descriptions and comments
+were preserved. At that point the prose was historical: notably #243 describes the older schema, #244 the superseded
 whole implementation/base dependency, and #248 host-backed materialization.
-The prepared local drafts describe the current candidates. A source-only push
-does not authorize rewriting human-authored prose. #248 must be identified to
+The prepared local drafts described the current candidates. That source-only
+push did not authorize rewriting human-authored prose; the subsequent explicit
+description-update instruction authorized the completed follow-up above. #248 must be identified to
 the user as a test-only replacement when approving its source push. Any later
 public explanation/title/body edit or superseded-PR disposition requires its
 own explicit permission.
@@ -116,8 +123,8 @@ security acceptance. macOS remains indefinitely deferred.
 
 Active skill: hdae-development via
 `.agents/skills/hdae-development/SKILL.md`; reload the full skill and required
-references after any context shift. The authorized source publication is complete. No authority for further
-source revisions, public prose edits or other upstream actions is inferred.
+references after any context shift. The authorized source publication and subsequent description updates are
+complete. No further source revisions or other upstream actions are inferred.
 
 ## Publication receipt
 
@@ -133,3 +140,28 @@ source revisions, public prose edits or other upstream actions is inferred.
 | #244 | `705e676c` | [3/3 passed](https://github.com/gmkurtzer/ginux/actions/runs/42683878955) |
 | #246 | `806ed7d4` | [3/3 passed](https://github.com/gmkurtzer/ginux/actions/runs/42683875553) |
 | #248 | `3ae81ac8` | [3/3 passed](https://github.com/gmkurtzer/ginux/actions/runs/42683876635) |
+
+## Description follow-up receipt
+
+The refreshed #243 body describes catalog 2, hierarchical selectors, deny
+precedence, audit bounds, unsupported-control refusal and its #238 dependency.
+#244 identifies upstream as the managed-child wait owner and describes only
+the remaining id/error/audit corrections and retained tests. #248 explicitly
+identifies its test-only replacement and virtual cgroup owner. #245 and #247
+now describe the published immutable-clone and lifetime-based reap fixes.
+The other refreshed bodies retain the original bug context while updating
+configuration, regression coverage and current-source limitations. Original
+Fedora/Rocky/OpenRC boot observations are explicitly historical, not presented
+as fresh results for these heads. Each body links its exact current head and
+successful hosted checks.
+
+These were description-only edits through the GitHub connector. Every body was
+checked against fresh metadata immediately before mutation and read back
+exactly afterward. Existing titles, base/head refs and SHAs, states, maintainer
+permissions and comment counts matched throughout. Untouched #207/#232/#234/
+#241/#250 were read back unchanged; all fork branch heads match the pre-edit
+snapshot. No code changed, new tests ran, workflow was manually dispatched,
+comment was posted or PR was created/closed. Existing exact-source CI receipts
+were reused and labelled accordingly.
+
+[Original bodies](/home/vince/.codex/worktrees/ginux-pr-updates/ginux-prd11/.artifacts/pr-description-updates-2026-11-09/before.json), [replacement bodies](/home/vince/.codex/worktrees/ginux-pr-updates/ginux-prd11/.artifacts/pr-description-updates-2026-11-09/proposed.json), [verified readback](/home/vince/.codex/worktrees/ginux-pr-updates/ginux-prd11/.artifacts/pr-description-updates-2026-11-09/after.json), [unchanged PRs](/home/vince/.codex/worktrees/ginux-pr-updates/ginux-prd11/.artifacts/pr-description-updates-2026-11-09/untouched-after.json), [reused CI evidence](/home/vince/.codex/worktrees/ginux-pr-updates/ginux-prd11/.artifacts/pr-description-updates-2026-11-09/checks.json) and [preservation proof](/home/vince/.codex/worktrees/ginux-pr-updates/ginux-prd11/.artifacts/pr-description-updates-2026-11-09/preservation.json). Per-PR body diffs are retained in the same evidence directory.
