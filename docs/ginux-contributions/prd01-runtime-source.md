@@ -1,4 +1,4 @@
-# PRD01 — runtime source delivery is incomplete
+# PRD01 — maintained baseline verified; later correction delivery open
 
 Current source-delivery update (2026-11-08): the user explicitly authorized our
 maintained repositories, with current upstream main and Gate 11 PR #249
@@ -10,11 +10,21 @@ below is historical and superseded. PRD14's new package/consumer run is complete
 acceptance. No upstream PR/comment or package release was published.
 
 
-The approved preference remains upstream Ginux, which always takes precedence.
-No maintained downstream release source has been selected or published. The old
-`tools/ginux` pin is demonstrably incompatible; neither moving it to today's
-upstream main nor pointing it at an unpublished integration establishes the
-required launcher/worker/image combination. PRD01 remains unchecked.
+Current correction candidate: Ginux e4d95de1 / launcher `21a54e60…`, Recipe
+176395a / optimized matching CLI-worker `e7073fc1…`, acquisition image
+`ffe04d86…`. These later corrections are local and not yet the publicly
+obtainable maintained release pair. [The active product checkpoint](prd15-product-contract.md)
+records exact hashes, current verification and remaining source/security/product
+dependencies. The approved maintained-repository choice is resolved; no new
+source-choice hold is inferred. No new publication is authorized. PRD01 remains
+open for delivery of the required final corrected combination.
+
+## Historical old-pin investigation
+
+The findings below predate the maintained-source decision and verified
+28f4368f/e7bfc166 fresh-host delivery. Old pin, availability and authorization
+statements describe that earlier investigation only; they do not describe the
+current repositories or override the decision above.
 
 ## Exact source and acquisition findings
 

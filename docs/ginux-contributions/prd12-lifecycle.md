@@ -8,13 +8,19 @@ builder invocation preserves both previous valid images. No live task-owned
 process, scratch invocation, host mount or loop device remains in the recorded
 observations; both transient guests powered off and disappeared.
 
-This closes the bounded local verification, not final release-source acceptance.
-[PRD01](prd01-runtime-source.md) still lacks the selected obtainable maintained
-runtime and [PRD05](prd05-integration.md) still requires actual upstream storage
-merges/integration. Fresh read-only GitHub inspection still finds main
-[`53a54addea67969abaa240ea478def1b94130eee`](https://github.com/gmkurtzer/ginux/commit/53a54addea67969abaa240ea478def1b94130eee)
-and #232/#233/#234/#236/#238/#243 open and unmerged. Exact heads/time are retained
-in `upstream.json`. No new user hold, delivery choice or publication is inferred.
+This closes that bounded local verification, not final release acceptance.
+The maintained baseline 28f4368f/e7bfc166 is now publicly obtainable and reproduced
+under [PRD14](prd14-bootstrap-packaging.md); the earlier source-choice/missing
+baseline condition is superseded. Later correction delivery and PRD05's required
+actual merges remain open. Current main is still 53a54adde; #232/#233/#234/#236/
+#238/#243 remain open/unmerged. No new user hold is inferred.
+
+The current optimized release combination and in-progress full catalog are
+recorded in [the active product checkpoint](prd15-product-contract.md). Its
+lifecycle/storage/metadata cases must establish current behavior; the 57-case
+receipts below are retained with their original source. New distro/product and
+deployment acceptance cannot be silently inferred from them. Any source-backed
+reuse must identify unchanged behavior owners and applicable bytes explicitly.
 
 ## Exact source and artifacts
 

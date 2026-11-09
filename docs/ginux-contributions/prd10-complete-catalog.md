@@ -1,18 +1,29 @@
-# PRD10 — 152/152 local catalog; final delivery acceptance open
+# PRD10 — current release catalog pending; prior results retained
 
-Updated 2026-11-08. **Every current local integration case passes on one frozen
-combination: 150 e2e + 1 library_backend + 1 image_producer = 152/152.** Zero
-failed, missing, ignored or interrupted required cases. Actual enumeration and
-receipt-name equality were checked; all 149 original e2e names remain, with one
-new stalled-Git case. No preparation or earlier-revision pass enters this total.
+Updated 2026-11-09. **PRD10 remains open.** The current exact optimized candidate
+is Ginux e4d95de1 / `21a54e60…`, Recipe 176395a / matching CLI-worker
+`e7073fc1…`, image `ffe04d86…`. Its current inventory is **152 e2e + 1
+library_backend + 1 image_producer = 154 required cases**. Fresh library_backend
+and image_producer each pass on that tuple. The complete 152-case release e2e
+rerun is executing; no complete current-combination success is claimed.
+[The active checkpoint](prd15-product-contract.md) owns the full identity map,
+receipts, retained runner-setup failure and actual ongoing run. Older results
+below are historical, never added to the new count.
 
-**PRD10 remains unchecked for final release-source acceptance.** PRD01 still
-lacks the selected obtainable maintained runtime, and PRD05 requires the actual
-upstream storage/source join. Fresh upstream inspection before the final freeze
-still found main `53a54addea67969abaa240ea478def1b94130eee`; the prerequisite
-merges remain absent. `upstream.json` records the read-only evidence. These
-local archives and binaries are verification evidence, not a fork-delivery
-choice, publication or replacement for required integration.
+The maintained baseline 28f4368f/e7bfc166 is publicly obtainable and independently
+reproduced under [PRD14](prd14-bootstrap-packaging.md). The source-choice question
+is resolved. Later correction delivery, final-source acceptance and PRD05's
+actual prerequisite merges remain open; current read-only inspection still finds
+main 53a54adde and those PRs open/unmerged. No publication or new user hold is
+inferred.
+
+## Historical complete 150-case e2e combination
+
+On the older frozen combination below, **150 e2e + 1 library_backend + 1
+image_producer = 152/152 passed**, with zero failed, missing, ignored or
+interrupted required cases. All 149 original e2e names remained and one
+stalled-Git case was added. These receipts establish that source only; later
+152-case e2e catalogs and final delivery require their own evidence.
 
 ## Frozen source and executed artifacts
 
