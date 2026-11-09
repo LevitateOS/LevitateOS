@@ -1,21 +1,17 @@
 # PRD11 — six local consumers pass; final delivery acceptance open
 
-Updated 2026-11-08. **PRD11 remains unchecked.** All six required ordinary
-consumer checks pass on one corrected local launcher/coordinator/worker/image.
-The delivered combination required by the queue is still absent:
-[PRD01](prd01-runtime-source.md) has no selected obtainable maintained runtime;
-[PRD05](prd05-integration.md) still requires actual upstream merges and semantic
-storage integration. Local preparation continues under the user's instruction;
-these results do not select a downstream delivery route or substitute for merges.
+Updated 2026-11-09. **PRD11 remains unchecked.** All six required ordinary
+consumers pass on the current local launcher/CLI/matching-worker/image, as
+recorded below. The user has approved maintained own-repository delivery; the
+current corrections are still local. Final source availability, PRD05's required
+actual-upstream integration and final security/delivery acceptance remain open.
 No publication, native-policy expansion, public-limit change or PRD09 security
-execution occurred in this task.
+execution occurred in this consumer replay.
 
-A fresh read-only GitHub check still finds upstream main
-[`53a54addea67969abaa240ea478def1b94130eee`](https://github.com/gmkurtzer/ginux/commit/53a54addea67969abaa240ea478def1b94130eee)
-and #232/#233/#234/#236/#238/#243 open, unmerged, with null merge timestamps.
-Exact heads/time are in `upstream.json` below. The ordinary sandbox's attempted
-`git ls-remote` failed DNS; the connected GitHub reads succeeded. This is an
-external integration dependency, not a new user hold on local work.
+The original 2026-11-08 run checked upstream main `53a54add` and found
+#232/#233/#234/#236/#238/#243 open, unmerged, with null merge timestamps.
+Its original `upstream.json` retains exact heads/time. That historical dependency
+record is not a fresh merge check or a new user hold on local work.
 
 ## Current PRD15 replay — 2026-11-09
 
