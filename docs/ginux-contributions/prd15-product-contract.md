@@ -52,9 +52,12 @@ the ordinary CI timeout findings as load-sensitive harness timing; none was
 waived or counted as a pass. Required final-source/security acceptance remains
 separate.
 
-Recipe is clean **176395aeaa5bb8999c1a6289d18e53c8012ecdf9**: production/Cargo
-inputs exactly match 91068391; all Rust tests exactly match 3828500. Later changes
-are only five documentation files (`current-production-source-equivalence.json`).
+Compiled Recipe source remains **176395aeaa5bb8999c1a6289d18e53c8012ecdf9**:
+production/Cargo inputs match 91068391 and all Rust tests match 3828500. Current
+clean checkout is **b185e0363ceba1290201ba84593aefb313a85cc4**, adding only README
+and WRITING_RECIPES corrections after the completed frozen checks.
+`author-documentation-join.json` verifies that all Rust/Cargo/test/runner inputs
+remain identical; no runtime/harness byte or earlier receipt is relabeled.
 Old selected CLI/worker is `467140e9b036a8ed20b58f87020ad7a63cfe7c68d311dc8e19cfe51c464cf9ef`;
 image remains `ffe04d8671e45036ac77acc958fb6cfd3c24a939075dc7e6c5437b69d7f05c15`.
 The older complete 3828500 catalog **finished 152/152 passed**, zero failures,
@@ -120,20 +123,24 @@ no guest oracle or deployer guard is removed. This is not whole-distro acceptanc
 **New product finding:** `distro/builder/recipes/install-tools.rhai` forces
 `-C link-arg=--threads=1`. That violates the requested normal linker-threading
 boundary for actual tool producers, even though the six consumer controls pass
-without that flag. Remove this workaround in its existing owner, keep locks,
-metadata, isolation and public limits, then validate actual affected tools and
-fresh products. No native policy expansion is authorized. Current product
-receipts cannot close this finding.
+without that flag. The flag is now removed in the existing recipe owner; this
+single builder-recipe change is **uncommitted pending validation**. Actual
+normal-default recstrap compilation with **two eligible CPUs** runs under
+**93398**, `verify-normal-linker-producer.py` / `normal-linker-producer/receipt.json`.
+It uses the existing public offline source producer and frozen e707/21a/ffe
+runtime, retains locks/metadata/isolation/public limits, and does not expand
+native policy. Fresh affected products remain required; no pass is claimed yet.
 
 Guarded continuation **47148** completed resource/metadata checks and confirmed
-the pinned Bun endpoint recovered (HTTP 302→200). It started Acorn live-tools
-retry **1051618** before the linker finding was observed. Future orchestration
-parent **1051306 is paused**; its active product child continues unchanged.
-Watcher **58514** waits for `live-tools-acorn-release-retry1.json`, then terminates
-only that paused parent. Do not mutate builder/Recipe source before the child
-writes its exact receipt. `linker-finding-scheduling.json` owns the transition;
-no active case is intentionally interrupted. Subsequent products/guests must use
-a new explicit product selection/source map after the correction.
+the pinned Bun endpoint recovered (HTTP 302→200). Its Acorn live-tools retry
+**1051618** finished **exit zero**, run **A1MvL15O5k2zwpl4**, with no interrupted
+case. Watcher **58514** then terminated only paused future-orchestration parent
+1051306; both sessions are finished. `linker-finding-scheduling.json` records
+the completed child and **case_interrupted=false**. These three older Acorn
+products remain source-bound preparation evidence, not acceptance of the
+corrected linker recipe. Levitate fresh products and all whole-product final
+guest commands have not run. Do not restart the old continuation: it expects
+obsolete checkout identities and the original recipe.
 
 Current Recipe compiler checks pass: independent disposable stable 1.99.1
 unlocked binary build/fmt/strict all-target Clippy; independent MSRV 1.93.0
@@ -183,30 +190,28 @@ actual source delivery/joins, PRD05 actual-merge requirement and hosted Linux
 acceptance remain explicit. macOS and external AI-provider interoperability are
 excluded. Original frozen PRD04 candidates remain unchanged.
 
-A later author-documentation finding is prepared at
-`pending-author-doc-fixes.patch` (SHA-256
-`8987c0bbcf0f5dc9fcc1dc8bbe0a9c9c26045987082899f1f2984b502b9b47d7`).
-README's short dependency summary and WRITING_RECIPES' older dependency section
-still contain shared-generation/unchecked manual-check wording. The patch uses
-the actual separate-instance NEEDS/product snapshot contract and cached-only
-manual readiness rule, retaining unresolved remove/cleanup. **Not applied yet**:
-the running tuple keeps Recipe 176395a clean. Apply after ordinary frozen checks,
-then record documentation-only source equivalence and final source identity;
-this finding must not disappear behind earlier documentation checks.
+Author documentation correction is now **committed in Recipe b185e036**:
+README and WRITING_RECIPES use separate-instance authority/product snapshots and
+cached-only manual readiness, retaining unresolved dependent remove/cleanup.
+The former `pending-author-doc-fixes.patch` is retained as exact change evidence
+(SHA-256 `8987c0bb…`), and `author-documentation-join.json` records the two changed
+files, unchanged compiled inputs and local-link validation. It is not pending
+application. Runtime binaries/harnesses remain the exact verified 176395a builds.
 
 **Exact next actions:**
-1. Inspect active old-source Acorn retry **1051618**, waiter **58514** and its
-   final JSON. Only after it finishes and paused parent 1051306 is stopped,
-   correct the forced linker flag and apply the queued author-doc patch. Preserve
-   their actual results and all prior failures. Ordinary 154-case runtime and
-   both metadata guest checks above completed successfully on the frozen tuple.
-2. Verify corrected tool production with normal linker defaults; create explicit
-   new source/recipe selection and rerun all affected products. The runtime bytes
-   need not change for a recipe/docs-only correction, but do not relabel old
-   input receipts. Keep manifest/source/byte equivalence evidence precise.
-   Finish both `cargo xtask test all <distro> --force` plus explicit `ab-update`.
-   Retain scenario harness dc43b8da, script fd9d1e07 and Facts 66a017cb; never
-   rebuild normal xtask during the guest commands.
+1. Inspect normal-linker producer **93398** and its complete actual result.
+   Fix genuine failures without reinstating forced linker threading, weakening
+   locks/isolation or widening public limits. Commit the single builder-recipe
+   correction only after its tested bytes work. Old Acorn retry/watcher and the
+   complete 154-case catalog/metadata jobs are finished.
+2. Create a new explicit source/recipe selection for Recipe b185e036 and the
+   corrected builder head, preserving original source and test receipts. Build
+   all six affected products with normal linker defaults; execute actual changed
+   binaries, reusing metadata controls only for byte-identical deployers. Complete
+   both `cargo xtask test all <distro> --force` and explicit `ab-update` commands.
+   Keep the 176395a core runtime tuple and source-equivalence evidence explicit;
+   no case count assembled from different bytes. Retain scenario harness dc43b8da,
+   script fd9d1e07 and Facts 66a017cb; never rebuild normal xtask during guests.
 3. Required security auth/results remain pending; use [the exact release request](prd15-daybreak-release-request.md)
    after actual hardware-key reauthentication. No standard-access fallback or
    old-result closure of the new optimized/native source join.
