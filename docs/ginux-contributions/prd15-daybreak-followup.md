@@ -126,3 +126,40 @@ These are bounded remaining checks in the already-requested authorized context.
 Return exact source/commands/fixtures/hashes and criterion dispositions. Other
 S09 gaps remain open; these controls cannot by themselves close total security
 acceptance or the product task.
+
+
+## Continuation after the 131-file focused network return
+
+The [focused network return](/home/vince/.codex/worktrees/prd15-owned-fd-path/ginux-prd11/.artifacts/prd15/daybreak-network-2026-11-09/receipts.md)
+is read and its manifest independently verifies **131/131**. Its three requested
+controls pass on b81f30b5 / fb87792d and Recipe 91068391 / 467140e9 / image
+ffe04d86. Preserve its normal-trust TLS result, paired allowed/omitted TCP
+result and bounded ambient-resolver result. The whole Recipe audit truncates;
+the exact omitted-connect audit belongs to the separately bound same-pin Ginux
+launch. Do not rerun these merely to produce another selected green set.
+T-01/T-02/T-03 tracked omissions have the concrete local disposition above;
+those tests do not stand in for the remaining runtime criteria.
+
+Please continue **every remaining material criterion** from the six-item and
+S09-A–H tables, using exact-source owner/callsite accounting, deterministic
+controls and justified existing-receipt reuse where appropriate. In particular,
+the reserved-clone nonleader peer-death/hold accounting, actual private backing
+transfer and real close-time ownership, event registration/park/revoke/reuse and
+failed-copyout/TCP-RDHUP schedules, hostile persistence/cancel/error ordering,
+remaining resource/identity and transport/protected-input/autofix/scratch-control
+lease interleavings still need concrete dispositions. Record why each source
+proof or reused receipt covers the current owner, and distinguish a missing
+oracle from an observed defect. Selected negatives, a synthetic skipped close
+and another written handoff cannot close the table.
+
+Ginux runtime and network owners, launcher, Recipe production source and
+CLI/worker/image remain the same. The general engineering chat is repairing a
+**test-fixture-only** kernel-readiness prerequisite mismatch: the disposable
+kernel metadata fixture must explicitly prepare its managed dependency before
+manual checks. It does not authorize dependency installation during checks,
+change production code, claim a source-kernel build or resolve remove/cleanup.
+Exact later test-source commits will be recorded separately. Both full product
+scenario acceptance and eventual source-delivery joins remain required.
+Return the criterion map, exact commands/source/bytes, findings, retained hashes
+and all still-unverified results. No new security execution permission is
+requested in the product-build chat, and no publication is authorized.
