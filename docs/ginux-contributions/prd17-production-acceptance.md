@@ -317,6 +317,27 @@ These targeted task-list edits remain unstaged in the mixed shared file; the
 original f4d8c81b staged patch remains unchanged. Do not commit that mixed file
 wholesale with the independent checkpoint/source corrections.
 
+## Complete current-candidate catalog — release still incomplete
+
+The separate c3a40a51 run now completes **155/155 passed**:153 e2e plus
+library_backend and image_producer, with zero failed/missing/interrupted cases,
+zero source/artifact changes and no observed live-process/owned-scratch leaks.
+Session 59069 exited 0. current-catalog-summary.json and current-catalog-SHA256SUMS
+bind every retained case receipt/stdout/stderr, catalogs, source/build identity
+and matching artifacts; every per-case log hash and selected binary/image hash
+was independently rechecked. The earlier 153-pass/two-failure run remains intact
+and contributes no passes to this complete run.
+
+The exact tuple remains clean Recipe c3a40a51 at development version 0.1.4,
+CLI/worker e3e28457, producer 55b9e50a, Ginux e4d95de1/21a54e60 and image ffe04d86.
+This is complete **current functional baseline** evidence, not a later release
+version's final-source pass or security/production acceptance. The new version
+and ISO scope are still unanswered; do not promote this result to different
+source/artifacts. Session 97141 has begun the actual six consumers on this tuple;
+docs/image and metadata 13704 follow it. Session 63840 applies the narrow local
+CI correction only after the frozen whole chain succeeds. Final packaging is
+still stopped; no source/tag/release publication has occurred.
+
 ## Exact next actions
 
 Inspect session 59069 and full-runtime-corrected/, then session 97141's consumers/
