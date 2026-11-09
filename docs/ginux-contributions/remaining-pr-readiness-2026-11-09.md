@@ -1,7 +1,10 @@
 # Remaining upstream PR readiness — 2026-11-09
 
-**Eight source updates are ready for explicit publication review against upstream
-`55b719db9c52889543fbb177fab4cf2b2f90955e`. Nothing was pushed or commented in this task.**
+**Publication complete:** the user authorized the eight exact source updates
+below, and their atomic lease-guarded push succeeded. Git and GitHub verified
+every resulting head. All **24 hosted checks passed**: changes, static-and-unit
+and launch-integration for each PR. Upstream remained
+`55b719db9c52889543fbb177fab4cf2b2f90955e` at publication.
 #207 remains separate and unchanged. #245/#247 are already published and have
 passing CI; their source and public text were preserved.
 
@@ -11,13 +14,13 @@ tables remain historical. This report governs the eight current candidates.
 
 ## Exact publication table
 
-All rows target existing `LevitateOS/ginux` branches and their existing upstream
-PRs. These are rewritten histories and require the exact remote leases below.
+All rows updated existing `LevitateOS/ginux` branches and their existing upstream
+PRs. These rewritten histories were published using the exact remote leases below.
 #243 contains #238 as its parent dependency; the other seven descend directly
 from upstream main. #248 changes purpose to retained tests under the upstream
 virtual cgroup owner, and must be presented as that test-only replacement.
 
-| PR | Existing fork branch | Expected published head (lease) | Proposed exact head |
+| PR | Existing fork branch | Previous published head (lease used) | Published exact head |
 | --- | --- | --- | --- |
 | [#233](https://github.com/gmkurtzer/ginux/pull/233) | `fix/launch-mkdirat` | `f751cd6f04f7d95487b0fba5e1c01b6540ab43a7` | `e3b93f44a64c9443af1826b039df4766cf7da524` |
 | [#236](https://github.com/gmkurtzer/ginux/pull/236) | `fix/stdio-directories` | `1f43d7fa1d2ea30975629356492e640e095b4d4e` | `f031ba75a8a106c11a342cfe2079787d672f33ab` |
@@ -88,11 +91,12 @@ remains `5ae058f2`. No native poll policy expansion is bundled here.
 
 ## Publication boundary and public text
 
-The proposed next action is only an exact, atomic, lease-guarded push of the
-eight rows above, with normal automatic PR CI. The command is prepared but
-has not run. Recheck upstream main and every published head immediately before
-execution. A changed base/head invalidates this publication table and requires
-reconciliation; do not overwrite a concurrent update.
+The user authorized exactly these eight source updates and normal automatic
+PR CI. Upstream main and every lease matched immediately before publication.
+The atomic push completed, every resulting head matched through Git and GitHub,
+and all other origin branches remained identical to the pre-push snapshot.
+All three hosted checks completed successfully on every approved revision.
+No manual workflow dispatch or rerun occurred.
 
 Public titles, descriptions and comments have not changed. The existing prose
 is historical: notably #243 describes the older schema, #244 the superseded
@@ -104,7 +108,7 @@ public explanation/title/body edit or superseded-PR disposition requires its
 own explicit permission.
 
 No manual hosted dispatch/rerun, PR creation, comment, closure, tag, release,
-maintained-source update or root publication is included. These bounded checks
+maintained-source update or root publication occurred. These bounded checks
 do not establish full systemd/VM boot, all adversarial schedules or release/global
 security acceptance. macOS remains indefinitely deferred.
 
@@ -112,6 +116,20 @@ security acceptance. macOS remains indefinitely deferred.
 
 Active skill: hdae-development via
 `.agents/skills/hdae-development/SKILL.md`; reload the full skill and required
-references after any context shift. Local readiness is complete. Publication
-is pending the user's exact decision; no publication authority is inferred
-from a readiness question.
+references after any context shift. The authorized source publication is complete. No authority for further
+source revisions, public prose edits or other upstream actions is inferred.
+
+## Publication receipt
+
+[Exact authorization](/home/vince/.codex/worktrees/ginux-pr-updates/ginux-prd11/.artifacts/pr-remaining-publication-2026-11-09/authorization.md), [atomic push log](/home/vince/.codex/worktrees/ginux-pr-updates/ginux-prd11/.artifacts/pr-remaining-publication-2026-11-09/push.log), [verified Git heads](/home/vince/.codex/worktrees/ginux-pr-updates/ginux-prd11/.artifacts/pr-remaining-publication-2026-11-09/origin-after.txt), [verified PR heads and unchanged text](/home/vince/.codex/worktrees/ginux-pr-updates/ginux-prd11/.artifacts/pr-remaining-publication-2026-11-09/api-after.json), [24 successful hosted checks](/home/vince/.codex/worktrees/ginux-pr-updates/ginux-prd11/.artifacts/pr-remaining-publication-2026-11-09/checks-final.json), [unchanged other PRs](/home/vince/.codex/worktrees/ginux-pr-updates/ginux-prd11/.artifacts/pr-remaining-publication-2026-11-09/other-prs-after.json) and [preservation proof](/home/vince/.codex/worktrees/ginux-pr-updates/ginux-prd11/.artifacts/pr-remaining-publication-2026-11-09/preservation.json).
+
+| PR | Published head | Automatic CI |
+| --- | --- | --- |
+| #233 | `e3b93f44` | [3/3 passed](https://github.com/gmkurtzer/ginux/actions/runs/42683874583) |
+| #236 | `f031ba75` | [3/3 passed](https://github.com/gmkurtzer/ginux/actions/runs/42683877334) |
+| #238 | `fd91bb33` | [3/3 passed](https://github.com/gmkurtzer/ginux/actions/runs/42683877994) |
+| #242 | `ed65a5fe` | [3/3 passed](https://github.com/gmkurtzer/ginux/actions/runs/42683876130) |
+| #243 | `607e93ea` | [3/3 passed](https://github.com/gmkurtzer/ginux/actions/runs/42683876669) |
+| #244 | `705e676c` | [3/3 passed](https://github.com/gmkurtzer/ginux/actions/runs/42683878955) |
+| #246 | `806ed7d4` | [3/3 passed](https://github.com/gmkurtzer/ginux/actions/runs/42683875553) |
+| #248 | `3ae81ac8` | [3/3 passed](https://github.com/gmkurtzer/ginux/actions/runs/42683876635) |
