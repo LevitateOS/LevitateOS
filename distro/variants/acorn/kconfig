@@ -1,5 +1,6 @@
-# Options of AcornOS's kernel line (latest stable) only, applied after
+# Options of AcornOS's kernel line (6.12 LTS) only, applied after
 # ../_shared/kconfig. The kernel policy itself is shared.
 
-# On this line the legacy iptables tables (IP_NF_IPTABLES_LEGACY) sit behind this.
-CONFIG_NETFILTER_XTABLES_LEGACY=y
+# Optimized SHA-2 (on later lines it is part of the crypto library).
+CONFIG_CRYPTO_SHA256_SSSE3=y
+CONFIG_CRYPTO_SHA512_SSSE3=y

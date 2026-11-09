@@ -25,7 +25,7 @@ init = "openrc"
 libc = "musl"
 privilege = "doas"
 desktop = "lxqt"
-kernel_line = "latest"
+kernel_line = "lts"
 
 [sources.rootfs_source]
 recipe_script = "distro/builder/recipes/alpine-live-source-rootfs.rhai"

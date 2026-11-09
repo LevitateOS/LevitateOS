@@ -16,7 +16,7 @@ features: the same install flow, the same A/B updates, the same recipes, and a
 live ISO with and without a desktop. They differ only in the facts each one
 declares in its own `distro/variants/<id>/distro.toml`: package backend (Fedora
 RPMs or Alpine APKs), libc and init, the admin tool (sudo or doas), the desktop
-(Plasma or LXQt) and the kernel line (LTS or latest). `distro_contract::load`
+(Plasma or LXQt) and the kernel line (latest or LTS). `distro_contract::load`
 reads and validates that file; the `[profile]` section holds the differing
 facts.
 

@@ -25,7 +25,7 @@ init = "systemd"
 libc = "glibc"
 privilege = "sudo"
 desktop = "plasma"
-kernel_line = "lts"
+kernel_line = "latest"
 
 [sources.rootfs_source]
 recipe_script = "distro/builder/recipes/fedora-rpm-source-rootfs.rhai"

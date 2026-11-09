@@ -115,4 +115,4 @@ The plan below is what the prototypes taught.
 - **Kernel**: both kconfigs start from `x86_64_defconfig` (evdev on). The
   prebuilt kernel in `.artifacts/kernel/levitate/current` (6.12.71) has no
   evdev, so it would boot the desktop without keyboard or mouse; it predates the
-  current 6.12.116 pin and needs rebuilding anyway.
+  current pin and needs rebuilding anyway.
