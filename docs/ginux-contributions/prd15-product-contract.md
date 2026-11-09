@@ -38,6 +38,16 @@ runs remain failed: Acorn exposed the now-corrected recab OpenRC defect; Levitat
 exposed the now-corrected guest-script test dependency. Actual Acorn diagnostic
 service completion/cancellation and all 24 recab CLI lifecycle checks pass.
 **Both final ISO chains and final whole scenarios are still running/waiting.**
+The recab-corrected chain now has **five of six** exit-zero products: all three
+Acorn products, Levitate base `A1MZqU4qyO1yqlJr` and Levitate live-boot. Levitate
+live-tools is active. The actual Levitate base recab bytes match the corrected
+managed producer and real Acorn guest control; `levitate-corrected-base-source-proof.json`
+records ISO SHA-256 `beb38e3e3702a1667ae323d854b73560b243dc34f63aca29f1cfca09fdac7509`.
+The quiet system-TUI coordinator waited in host XFS fsync and then completed
+naturally; `product-observation-levitate-system-tui.json` retains the observation.
+No durability operation was interrupted. The new six-product UI-final chain is
+still queued, and no final VM scenario has started.
+
 Actual PTY output additionally exposed repeated Facts labels producing duplicate
 React keys. TUI ade4d9aa keys rows by position and label; install-tests 056a46b0
 commits bounded host SSH waits and rejects that warning in the actual guest
@@ -51,7 +61,7 @@ the first run's corrected kernel/dependency and rootfs-input fixtures. The guard
 scheduler reviewed that exact list and started a **fresh complete 152-case
 3828500 run**, sealed harness `746b5dd1…`, under session 65760. No earlier pass
 is combined into this new full-suite claim. All three former HTTP startup
-failures now pass in this single fresh run; total 38 cases pass so far, with
+failures now pass in this single fresh run; total 79 cases pass so far, with
 zero failures. Remaining cases must finish before any full-suite claim. Fresh library_backend/image_producer
 and all six ordinary PRD11 consumers pass on unchanged production artifacts,
 with normal locks/threading/metadata/isolation.
