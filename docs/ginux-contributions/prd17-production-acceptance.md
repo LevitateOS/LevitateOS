@@ -289,18 +289,44 @@ These are explicit release dependencies, not completed by queued work.
 
 ## Exact next actions
 
-Finish the exact 155-case replay and inspect every case/resource/integrity result.
-Then run affected consumers, current examples, six real products, both distro
-whole scenarios plus explicit A/B, actual metadata deployment, final packaging
-and fresh execution on the new combination. Reuse only receipts whose exact
-source/input owners remain valid. Reconcile historical R-01 shell paths and
-R-02 leases against actual admitted paths and current owners; retain missing
-security races rather than promote selected controls. Update the PRD01–PRD19
-replacement/acceptance map and concrete publication package. If the two exact
-pushes are approved, recheck public bases/ancestry before mutation, verify public
-availability/automatic CI, then prepare a separately authorized exact parent.
-Wait for actual Daybreak authentication/results, required upstream merges and
-final user acceptance. Recipe is not production ready.
+Inspect session 59069 and full-runtime-corrected/, then session 97141's consumers/
+docs/image and session 13704's independent metadata. These are c3a40a51 functional
+checks; they cannot silently accept a later version/source. Keep Recipe and its
+actual targets frozen until the whole guarded chain settles. Fix any observed
+failure without weakening assertions or relabeling interrupted/unrun work.
+
+**R17-REL-01 remains a concrete release finding:** the currently referenced
+reusable release job bumps the version, does an unpinned check, pushes a
+skip-CI source commit and tag, then builds artifacts. It cannot publish the
+exact previously reviewed/tested source/artifacts. The exact pinned owner and
+failure-path disposition are in release-path-findings.json. No release dispatch
+is authorized. A minimal Recipe-owned correction is prepared in
+release-route-proposed.patch (SHA-256
+e1a70838bb714788e2b971bb8c78d85a82bb7d1928a49ac43655c5e6a2479071):
+keep all validation jobs/manual validation dispatch, remove self-mutating CI
+publication and document separately publishing reviewed exact artifacts. Shared
+workflows remain untouched. Apply/reconcile this actual correction after the
+immutable c3a40a51 chain, validate its complete diff and commit it in Recipe;
+a prepared patch alone does not close the finding.
+
+Wait for the **release-version** and **ISO byte-determinism** answers before
+performing their dependent changes or final packaging. After the version answer,
+update the actual owning version/locks/callers, rebuild exact selected sources,
+reconcile all source/harness/image/consumer identities and run the complete
+required final combination. The source will differ from the current 0.1.4
+candidate; do not combine their passes into a full-suite claim. Final products/
+reproducibility must follow the ISO decision. Final packaging is stopped; it is
+not still queued to run under the old version.
+
+After the concrete final source/diffs/checks are ready, request the exact new
+owning heads with their automatic CI effects. The earlier pending 16141938
+question authorizes no later head. Recheck public bases/ancestry before any
+approved write, verify anonymous availability/actual hosted jobs, then prepare
+separately authorized exact parent pins/provenance and the publication package.
+No tag, release, package/ISO upload, upstream PR/comment, root push, repository-
+variable write or separate hosted dispatch has been authorized. Actual upstream
+merges and Daybreak authentication/results remain required external dependencies;
+wait rather than waive them. **Recipe is not production ready.**
 
 Read-only source/CI metadata and selected logs are retained under
 .artifacts/ginux-contribution-preparation/prd17/initial-evidence.json and
