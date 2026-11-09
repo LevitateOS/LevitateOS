@@ -1,5 +1,2 @@
 # Options of LevitateOS's kernel line (latest stable) only, applied after
-# ../_shared/kconfig. The kernel policy itself is shared.
-
-# On this line the legacy iptables tables (IP_NF_IPTABLES_LEGACY) sit behind this.
-CONFIG_NETFILTER_XTABLES_LEGACY=y
+# ../_shared/kconfig. The kernel policy itself is shared. None at present.

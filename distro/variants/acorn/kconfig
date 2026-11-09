@@ -1,6 +1,2 @@
-# Options of AcornOS's kernel line (6.12 LTS) only, applied after
-# ../_shared/kconfig. The kernel policy itself is shared.
-
-# Optimized SHA-2 (on later lines it is part of the crypto library).
-CONFIG_CRYPTO_SHA256_SSSE3=y
-CONFIG_CRYPTO_SHA512_SSSE3=y
+# Options of AcornOS's kernel line (6.18 LTS) only, applied after
+# ../_shared/kconfig. The kernel policy itself is shared. None at present.
