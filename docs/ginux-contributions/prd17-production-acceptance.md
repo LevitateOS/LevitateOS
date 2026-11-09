@@ -348,47 +348,81 @@ was disabled. Session 97141 has advanced to the 16 current author/man commands;
 embedded examples and actual new producer follow. These are candidate-specific
 passes; final version, public source, security and product acceptance stay open.
 
+## Latest checkpoint — waiting for required decisions/results
+
+**All available current-code functional work is complete; PRD17 is incomplete.**
+Recipe master is clean **85a3fbcfc71cfa6fafa9782a8f3755cecdfee0ab**. Its only
+changes after the fully executed c3a40a51 source are CI and README; Rust, Cargo,
+tests, bootstrap and producers are unchanged. Do not relabel the c3a40a51 run as
+an execution of 85a3fbcf or of the future selected release version. All ordinary
+verification/correction sessions have ended; no background package job remains.
+
+- **155/155** current catalog passes on c3a40a51/e3e28457 +e4d95de1/21a54e60
+  +image ffe04d86, with intact source/artifact/resource accounting. The failed
+  first 155 run remains separate. current-catalog-summary.json and its 478-file
+  receipt/log/build manifest own this complete single-run evidence.
+- **Six actual consumers**, **16 documented commands**, and **21 checks across
+  three complete embedded examples** pass on that same tuple. Source/log/artifact
+  identities are independently rechecked. The standalone docs-content bb3a1102
+  frozen install/build/typecheck/lint/format and actual generated exports pass.
+- The actual new **55b9e50a** producer and tracked public CI input path reproduce
+  **ffe04d86**; provenance is ci-image-final-producer/provenance.json. Publisher
+  signatures/trust and earlier explicit failure-preservation controls remain
+  source-bound. No fixture/migration binary supplies this image.
+- The actual catalog EROFS **c4c530f1…** passes real recstrap deployment under
+  both pinned kernels in operator session-libvirt. The unchanged recstrap source
+  5de6647a/binary 13f6a3da comes from its verified earlier producer; that product
+  is only deployer origin and is not counted as a new ISO. Actual producer stale-
+  content refusal preserves both valid EROFS images and original inputs. The
+  first follow-up failed only its anchored marker lookup before any guest; the
+  unique real marker is prefixed by the single-case Rust harness. The corrected
+  lookup, both guests and preservation pass in new v2 directories. No assertion
+  or product byte was substituted. Original failure remains retained.
+- R17-REL-01 is **actually corrected locally** in 85a3fbcf: CI retains all four
+  validation jobs/manual validation dispatch and read-only permissions, with no
+  version bump/source push/tag/release job. Exact reviewed publication is separate.
+  Shared workflows and existing public text are untouched. Hosted validation of
+  this local source is still unrun and requires exact source permission.
+- Post-run checks find no matching live task test process or remaining task
+  libvirt domain. No new push, upstream PR/comment, tag, release, registry write,
+  hosted dispatch or repository-variable change occurred. macOS stays deferred.
+
+local-reconciliation-summary.json and current-supplementary-SHA256SUMS bind the
+actual supplementary outcomes. The complete current source diff is
+current-source-review-candidate.json / tools-recipe-publication-85a3fbc.patch;
+its full SHA256 is in those machine records. This packet is reviewable current
+local work, **not a final release or a permission request for an unknown later
+version**. The old exact 16141938 push question grants no permission for 85a3fbcf.
+
+Required inputs remain unanswered: **new Recipe version** (recommend 0.2.0;
+0.1.4 is already a published GitHub release) and **ISO byte-determinism scope**.
+Do not choose either or resume final packaging. No new ISO/product/PTY/A/B wave
+has been represented as passed on this new code. Earlier six-product/guest
+receipts retain their original source identities only. PRD14 is reopened for
+actual final-version package/fresh-public-source execution, retaining the earlier
+baseline proofs. Required upstream main is still 53a54adde and all seven observed
+PRs remain open/unmerged in the fresh upstream-final-local-check.json. Daybreak
+still lacks authorized hardware-key authentication or actual final-source
+results; all earlier S09 partial limitations remain open.
+
 ## Exact next actions
 
-Inspect session 59069 and full-runtime-corrected/, then session 97141's consumers/
-docs/image, session 13704's independent metadata and session 63840's guarded CI
-correction. These are c3a40a51 functional
-checks; they cannot silently accept a later version/source. Keep Recipe and its
-actual targets frozen until the whole guarded chain settles. Fix any observed
-failure without weakening assertions or relabeling interrupted/unrun work.
+Wait for the two pending user decisions and authorized security authentication/
+results. After the version answer, update only intended owning version/locks/
+callers, build exact sources/artifacts, validate the complete resulting tuple
+and affected actual consumers/products/package/fresh-host paths. Follow the ISO
+reproducibility answer; do not silently add or exclude byte determinism. Use the
+tracked CI image producer; preserve native policy, declared limits, ordinary
+trust, locks/threading, metadata and all meaningful tests.
 
-**R17-REL-01 remains a concrete release finding:** the currently referenced
-reusable release job bumps the version, does an unpinned check, pushes a
-skip-CI source commit and tag, then builds artifacts. It cannot publish the
-exact previously reviewed/tested source/artifacts. The exact pinned owner and
-failure-path disposition are in release-path-findings.json. No release dispatch
-is authorized. A minimal Recipe-owned correction is prepared in
-release-route-proposed.patch (SHA-256
-e1a70838bb714788e2b971bb8c78d85a82bb7d1928a49ac43655c5e6a2479071):
-keep all validation jobs/manual validation dispatch, remove self-mutating CI
-publication and document separately publishing reviewed exact artifacts. Shared
-workflows remain untouched. Apply/reconcile this actual correction after the
-immutable c3a40a51 chain, validate its complete diff and commit it in Recipe;
-a prepared patch alone does not close the finding.
-
-Wait for the **release-version** and **ISO byte-determinism** answers before
-performing their dependent changes or final packaging. After the version answer,
-update the actual owning version/locks/callers, rebuild exact selected sources,
-reconcile all source/harness/image/consumer identities and run the complete
-required final combination. The source will differ from the current 0.1.4
-candidate; do not combine their passes into a full-suite claim. Final products/
-reproducibility must follow the ISO decision. Final packaging is stopped; it is
-not still queued to run under the old version.
-
-After the concrete final source/diffs/checks are ready, request the exact new
-owning heads with their automatic CI effects. The earlier pending 16141938
-question authorizes no later head. Recheck public bases/ancestry before any
-approved write, verify anonymous availability/actual hosted jobs, then prepare
-separately authorized exact parent pins/provenance and the publication package.
-No tag, release, package/ISO upload, upstream PR/comment, root push, repository-
-variable write or separate hosted dispatch has been authorized. Actual upstream
-merges and Daybreak authentication/results remain required external dependencies;
-wait rather than waive them. **Recipe is not production ready.**
+Prepare the final exact owning-source diffs/ref/CI effects and ask permission
+before new source pushes; the earlier nine pushes and pending 16141938 request
+are not standing permission. Verify actual anonymous obtainability/hosted jobs
+before final parent pins/provenance and its separate exact permission. Required
+upstream merges and final authorized S09 acceptance cannot be waived by local
+green checks, source drafts or a written handoff. Preserve unrelated staging,
+worktrees and public text. **Never claim Recipe production ready while any of
+these completion criteria remains unresolved.**
 
 Read-only source/CI metadata and selected logs are retained under
 .artifacts/ginux-contribution-preparation/prd17/initial-evidence.json and
