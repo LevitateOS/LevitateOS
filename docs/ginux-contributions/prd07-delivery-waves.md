@@ -40,6 +40,23 @@ non-success; see the [follow-up record](prd04-export-followup.md). PRD05 owns ac
 composition. PRD01 owns final maintained-source packaging; PRD08 did not
 silently authorize a fork publication or replacing the upstream route.
 
+## Later Gate 11 correction retained locally
+
+Ginux **e4d95de1** corrects native SIGCHLD resumption in Gate 11's hybrid dispatch:
+PTRACE_CONT while no mediated exit is pending, PTRACE_SYSCALL while one is.
+Its complete three-file/three-hunk diff and old-fail/new-pass userspace handler
+regression are [accounted for in PRD06](prd06-reconciliation.md). Original
+blocked-poll controls remain. Current static checks, 147 units, all 20 Linux
+runtime targets and six quiet-XFS retests pass without weakened checks.
+
+Delivery disposition: **retained in the local approved Gate 11 integration**;
+no new upstream publication. It depends on #249's actual hybrid/seccomp owner,
+still open at 9759daaec. It is not a validated standalone correction for older
+pure-PTRACE main 53a54adde, and must be re-extracted/revalidated against the
+upstream foundation that actually lands. This is separate from the existing
+#242 contribution; its published head is unchanged. Required final-source
+security and maintained-delivery acceptance remain open.
+
 ## Concrete waves and every retained capability
 
 These are delivery boundaries, not permission to publish a batch. A wave may

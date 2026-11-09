@@ -10033,5 +10033,56 @@
   "exact_diff_equivalents_on_main": {},
   "upstream_native_preservation": {"identical_paths":["scripts/test-process-native.py","tests/fixtures/process-review-fixture.c"],"identical_main_functions":["supervise_process_native","wake_waiters_for_child","read_tracee_pipefds","store_wait_results","store_tracee_status","write_wait_fault","store_tracee_tid"],"historical_net":"original-donor net diff is replaced by current 5300f5ef composition; never replay its negative incoming native copyout/test hunks. Individual retained feature commits and current net diff are separately indexed."},
   "consumer_sources": {"recipe":"b41443880fe585a27bc799d80382c9ff5b07047b","builder":"0044634d616d7888b93d048b4bd39cb0d2db0241"},
-  "schema_notes": {"hunks":"Each hunk disposition is a map from semantic owner to retained/upstream/replaced/downstream; mixed hunks must be split by these owners, never blindly replayed.","tests":"A source-retained historical oracle is not a current runtime pass; replacement_tests names the actual replacement cases.","scope":"Every non-main non-merge ancestor of registered heads/refs is represented as a commit, packet or exact net diff. Counts intentionally overlap.","open_work":"prd06-reconciliation.md#concrete-open-work-no-acceptance-hidden-by-old-boxes"}
+  "schema_notes": {"hunks":"Each hunk disposition is a map from semantic owner to retained/upstream/replaced/downstream; mixed hunks must be split by these owners, never blindly replayed.","tests":"A source-retained historical oracle is not a current runtime pass; replacement_tests names the actual replacement cases.","scope":"Every non-main non-merge ancestor of registered heads/refs is represented as a commit, packet or exact net diff. Counts intentionally overlap.","open_work":"prd06-reconciliation.md#concrete-open-work-no-acceptance-hidden-by-old-boxes"},
+  "post_inventory_corrections": [
+    {
+      "base": "b81f30b52e523d142071603f477c6891c7fd9df9",
+      "head": "e4d95de10520aa8e91bc2ec69e64da004443e2da",
+      "patch_sha256": "4242c32a58904ac933fbd8e46faddcf6a613e6f6b25860ff164cc46de042ec40",
+      "disposition": "retained",
+      "files": [
+        {
+          "path": "crates/ginux-init/src/main.rs",
+          "hunks": [
+            {
+              "header": "@@ -5369,7 +5369,15 @@ fn supervise_native(",
+              "sha256": "8fa29053d7c1527be374f71f248e77d5860107086139ce8789e52885f684b66f",
+              "disposition": "retained",
+              "owner": "Gate 11 native-supervision dispatch phase"
+            }
+          ],
+          "disposition": "retained"
+        },
+        {
+          "path": "scripts/test-native-supervision.py",
+          "hunks": [
+            {
+              "header": "@@ -135,12 +135,16 @@ def main():",
+              "sha256": "013e7d2cc1aba26b110779d75d84f14e24c9e0673f912d025bf252b41161b6cd",
+              "disposition": "retained",
+              "owner": "existing native-supervision regression fixture/runner"
+            }
+          ],
+          "disposition": "retained"
+        },
+        {
+          "path": "tests/fixtures/native-fixture.c",
+          "hunks": [
+            {
+              "header": "@@ -149,14 +149,29 @@ long native_fixture_main(void)",
+              "sha256": "de7d968559c7d3d072ce1a8e052d3252e37979bf203c1ba45b29ab84edfc9c40",
+              "disposition": "retained",
+              "owner": "existing native-supervision regression fixture/runner"
+            }
+          ],
+          "disposition": "retained"
+        }
+      ],
+      "implementation": "Choose SIGCHLD resume mode from awaiting_exit; no grant/native-policy change.",
+      "tests": "Retain original blocked-poll SIGCHLD mode plus new pipe-gated userspace handler mode; old launcher fails new mode and corrected launcher passes complete native controls.",
+      "dependency": "Gate 11 hybrid/seccomp dispatch (#249, open at 9759daaec8589a7e2d2cc9e1c9ec1f398b6e958f); do not replay the PTRACE_CONT correction on older pure-PTRACE main.",
+      "validation": "Ginux worktree .artifacts/prd15/current-ci/: native-regression-old.json, native-regression-corrected.json, native-correction-check.json, ginux-native-correction-linux.json, ginux-quiet-xfs-retests.json. 147 units, all 20 Linux runtime targets and all six quiet-XFS retests pass original checks.",
+      "delivery": "Local exact candidate retained; no new push, PR, upstream comment or final security acceptance."
+    }
+  ]
 }

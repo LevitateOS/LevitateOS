@@ -11,6 +11,27 @@ No Ginux/Recipe implementation, branch, gitlink, upstream PR or remote was chang
 Downstream is an ownership disposition: configured clocks remain required in
 the release; scratch policy and optional refactors remain excluded until reviewed.
 
+## Later release correction: native SIGCHLD dispatch
+
+The original exhaustive counts below describe their named frozen inputs. The
+ledger's `post_inventory_corrections` additionally accounts for every one of the
+three implementation/test hunks in **b81f30b5→e4d95de1** (full patch SHA-256
+`4242c32a58904ac933fbd8e46faddcf6a613e6f6b25860ff164cc46de042ec40`).
+All three files are **retained**: native pending-exit resume owner, existing C
+fixture with new pipe-gated userspace handler mode, and existing Python runner
+retaining the blocked-poll case as well. Old-launcher failure, corrected complete
+native controls, 147 units, all 20 Linux targets and six quiet-XFS retests are
+recorded in the current product checkpoint and exact CI receipts.
+
+This correction depends on **Gate 11's hybrid/seccomp dispatch**, present in the
+approved local base through #249. It must not be blindly replayed on older
+pure-PTRACE upstream main. #249 remains open/unmerged; extraction for upstream
+must first reconcile that actual foundation. Native authority/policy is unchanged.
+Local retention is its current disposition, with publication and final independent
+security verification still open. Later consumer/compiler changes remain traced
+by [the active PRD15 checkpoint](prd15-product-contract.md), not certified by the
+older inventory counts or checkbox.
+
 ## Sources and completeness boundary
 
 The read-only GitHub refresh on 2026-11-08 found upstream main
