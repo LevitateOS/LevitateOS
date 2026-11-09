@@ -60,7 +60,6 @@ packages = [
   "tar",
   "gzip",
   "less",
-  "vim",
   "kbd",
   "kbd-legacy",
   "musl-locales",
