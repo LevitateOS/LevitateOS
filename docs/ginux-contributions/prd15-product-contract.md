@@ -82,16 +82,17 @@ actual produced-program execution, and all **six required real consumers** pass
 with normal locks/linker threading/metadata/isolation. Their new receipts are
 `release-library-backend.json`, `release-image-producer.json`,
 `documented-release-results.json`, `release-consumer-progress.json` and
-`consumers-release-final/`. No old tuple pass is relabeled. Fresh Acorn base and
-live-boot pass. **Acorn live-tools failed** when the Recipe-owned Bun toolchain
+`consumers-release-final/`. No old tuple pass is relabeled. At that earlier pipeline checkpoint, Acorn base and
+live-boot passed. **Acorn live-tools failed** when the Recipe-owned Bun toolchain
 received HTTP 504 from GitHub for its pinned compiler archive. The invocation
 connected to its granted GitHub endpoint, returned workload exit zero with
 authoritative worker failure, and attempted no release-assets endpoint. A
 separate HEAD request, including a diagnostic query variant, also received 504;
 the same fresh tuple had downloaded and hash-verified this archive during Acorn
 base. `bun-acquisition-504-diagnostic.json` records the environmental failure; no
-product success is substituted and no source/trust change made. Levitate fresh
-products and all new guest stages are **not run**.
+product success was substituted and no source/trust change made. Levitate fresh
+products and all new guest stages were then **not run**; the completed corrected
+wave below supersedes that status while preserving the failure.
 
 The first independent release catalog **3804** failed **4/152 passed**, with
 148 setup failures because the task runner omitted the requested artifact parent.
@@ -203,13 +204,31 @@ old pin; its failed guard/old build are retained separately, never counted for
 e4d95de1. No branch/ref or remote was changed; parent gitlink/public origin remain
 at 28f4368f until actual source delivery is authorized and reconciled.
 
-Maintained Recipe B185 standalone build **78347** is still being checked from its
-exact Git archive, tracked standalone lock and Rust 1.99.0. The first invocation
-mistakenly gave rustup `+toolchain` syntax to a direct Cargo executable; no build
-ran and that failure is preserved. The corrected command uses the pinned Cargo
-path on unchanged source. `maintained-recipe-build-corrected.json/.log` own the
-result; no selected runtime or frozen receipt is replaced. Archive SHA-256 is
-**7d8098e4…**, `maintained-recipe-b185e036.tar`.
+Maintained Recipe **b185e036** standalone build **78347 passed**, from its exact
+Git archive, tracked standalone lock and Rust 1.99.0, using a fresh target and
+`cargo build --locked --offline --release --bins`. Both actual outputs are
+byte-identical to the frozen verified combination: CLI/worker **e7073fc1…** and
+image producer **aa13ac9b…**. Stable copies are
+`bin/recipe-maintained-b185e036` and `bin/recipe-image-maintained-b185e036`.
+`maintained-recipe-build-corrected.json/.log` retain the exact command, source,
+compiler and full hashes. The first invocation mistakenly gave rustup
+`+toolchain` syntax to a direct Cargo executable; no build ran and that failure
+is preserved. No selected runtime or frozen receipt is replaced. Archive
+SHA-256 is **7d8098e4…**, `maintained-recipe-b185e036.tar`.
+
+**Local delivery review is prepared**, not published or adopted:
+`prd15/delivery-review/manifest.json` identifies all ten current source owners,
+their recorded parent gitlinks and nine complete binary patches. The proposed
+parent pin/lock patch is **02178705…**. Current heads and every patch hash were
+rechecked after creation. This packet records preparation; it does not imply
+remote availability, a new complete-diff review or release acceptance. The
+maintained repository choice is already authorized; publishing these exact later
+revisions still needs permission. Local workflow inspection finds automatic
+push-triggered CI for Ginux, Recipe and docs/content. Recipe release publication
+is explicitly opt-in; Ginux's unchanged upstream workflow also includes a macOS
+job, which has no release acceptance requirement here. Do not dispatch, focus on
+or claim macOS verification. Account for automatic workflows before seeking any
+future push authorization. No push, PR, comment, release or hosted run occurred.
 
 The tested workspace lock **36066e42…** passes `cargo metadata --locked --offline`
 on current manifests. Its diff changes only five local package records
@@ -233,13 +252,14 @@ recab-corrected base/live-boot/live-tools ISO builds now pass** on the older tup
 `levitate-corrected-base-source-proof.json` records Levitate base A1MZqU4qyO1yqlJr,
 ISO `beb38e3e…`; actual recab bytes `6d2971b9…` match the managed producer and
 real Acorn guest completion/cancellation control. All 24 recab CLI integrations
-pass. The old whole guest batches remain failed; no final new guest acceptance.
+pass. The old whole guest batches remain failed; current ordinary product/guest
+acceptance is the separate completed corrected wave above.
 
 Actual earlier PTY transcripts exposed duplicate React keys for repeated Facts
 labels. TUI ade4d9aa fixes keys by position+label. Install-tests 056a46b0 commits
 bounded host SSH waits and rejects the warning in the actual guest transcript;
-old failing transcript is retained. **Neither final UI product nor final whole
-VM acceptance is claimed yet.** The fresh six-product UI and final VM waiters
+old failing transcript is retained. At that earlier checkpoint, **neither final UI product nor final whole
+VM acceptance was claimed**. The fresh six-product UI and final VM waiters
 were stopped while empty after the native finding: `native-fix-scheduling.json`
 records **no test/product case interrupted**. Old sessions 64859/65780 are now
 superseded. Do not expect their final receipts. Old producer 60000 finished;

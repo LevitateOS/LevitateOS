@@ -15,9 +15,13 @@ The active [product checkpoint](prd15-product-contract.md) owns ordinary progres
   Current clean checkout `/home/vince/Projects/LevitateOS/tools/recipe` is
   `b185e0363ceba1290201ba84593aefb313a85cc4`: only README and WRITING_RECIPES
   changed after the frozen run. `prd15/author-documentation-join.json` records
-  unchanged Rust/Cargo/test/runner inputs. Production inputs equal 91068391;
-  Rust tests equal 3828500. Retain actual compiled identity rather than requiring
-  the checkout to undo the documentation correction.
+  unchanged Rust/Cargo/test/runner inputs. A subsequent fresh exact b185e036
+  archive build with tracked lock and Rust 1.99.0 reproduces the identical
+  e7073fc1 CLI/worker and aa13ac9b image-producer bytes;
+  `prd15/maintained-recipe-build-corrected.json` retains the complete hashes and
+  command. Production inputs equal 91068391; Rust tests equal 3828500. Retain
+  actual run/build identities rather than relabeling earlier execution or
+  requiring the checkout to undo the documentation correction.
 - Matching optimized CLI and worker:
   `/home/vince/Projects/LevitateOS/.artifacts/ginux-contribution-preparation/prd15/bin/recipe-release-176395a`,
   SHA-256 `e7073fc17ec0bb029927d0c2e901ca37e0867a7cfdc4c5641d1d6c9b14bb5c03`.
