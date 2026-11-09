@@ -24,7 +24,7 @@ CLI/integration/product owners provide verification.
 Current runtime pair: Ginux clean `b81f30b52e523d142071603f477c6891c7fd9df9`
 (test-only additions over runtime 3cd1e2de), sealed launcher
 `fb87792d5b4363ca669d20935ce6f3d3f6d08fb97ee0cdc74e60bc324c200e6e`;
-Recipe clean `d2eb4acd3eac52e094cd362591600cd9e622dc2d` (documentation-only over
+Recipe clean `2755ec60751c13250dff0bc4936195ae504b5632` (documentation-only over
 harness source 3828500, three fixture-only corrections over 91068391; all
 production/Cargo inputs identical), sealed matching
 CLI/worker `467140e9b036a8ed20b58f87020ad7a63cfe7c68d311dc8e19cfe51c464cf9ef`;
@@ -44,13 +44,14 @@ commits bounded host SSH waits and rejects that warning in the actual guest
 transcript. The old transcript is a retained failing control. No corrected UI
 product or final guest acceptance is claimed before those reruns.
 
-The old complete catalog is **149/152 failed**; all three affected cases now
-pass. The 85bba06 full run is still in progress and has three HTTP fixture-startup
-failures; its 120-second listener expired before image preparation completed.
-A focused corrected case passes with actual GET evidence. Fresh complete
-3828500 coverage is queued after reviewing that completed failed run; do not
-assemble a full claim from prior results. Fresh library_backend/image_producer
-and **all six ordinary PRD11 consumers** pass on the unchanged production tuple,
+Both earlier complete catalogs finished **149/152 failed**, with all cases
+accounted for and no ignored/measured/filtered cases. The 85bba06 run has exactly
+the three diagnosed HTTP fixture-startup failures; its other 149 pass, including
+the first run's corrected kernel/dependency and rootfs-input fixtures. The guarded
+scheduler reviewed that exact list and started a **fresh complete 152-case
+3828500 run**, sealed harness `746b5dd1…`, under session 65760. No earlier pass
+is combined into this new full-suite claim. Fresh library_backend/image_producer
+and all six ordinary PRD11 consumers pass on unchanged production artifacts,
 with normal locks/threading/metadata/isolation.
 
 Returned Daybreak manifests independently verify 504/504, 743/743, 131/131 and
@@ -66,8 +67,8 @@ new push, PR/comment or hosted run is authorized.
 
 Evidence is under `.artifacts/ginux-contribution-preparation/prd15/`; security
 returns and interrupted CLI are in the Ginux worktree's `.artifacts/prd15/`.
-Active jobs: 55290 finishes the diagnosed failed 85bba06 catalog; **65760**
-queues the new 3828500 complete catalog after its final failure-list review.
+Active jobs: **65760** runs the fresh complete 3828500 catalog after the
+85bba06 final failure-list review; old job 55290 is complete and failed.
 60000 finishes the recab-corrected product chain. **64859** then builds a fresh
 six-product `ui-final` chain so the early Acorn products cannot retain old TUI
 source. **65780** waits for all six final products and catalog I/O before both
@@ -92,7 +93,9 @@ shared staged queue/handoff patch SHA-256 f4d8c81be2612a4d8d472564b25c7ffab6e704
 
 The author guide now names configured downstream catalog 1002, matching
 `src/needs/contract.rs:9`; upstream Gate 11 catalog 2 stays separate. Recipe
-d2eb4ac changes only that explanatory sentence; the documented executable blocks,
+d2eb4ac changes only that explanatory sentence; 2755ec6 corrects the stale
+old-pin claim and pins both already-delivered baseline revisions in setup. The
+changed man page renders without warnings. Current executable example blocks,
 production/Cargo and complete catalog inputs remain unchanged. The mixed existing
 root interface document also corrects the catalog and explicitly preserves the
 user-held remove/cleanup boundary. Its unrelated existing hunks remain uncommitted;
