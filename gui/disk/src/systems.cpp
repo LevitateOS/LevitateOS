@@ -492,8 +492,8 @@ SystemsState SystemsState::fromJson(const QJsonObject &object, const QString &os
         s.otherRole = object["other"].toObject()["role"].toString();
         return s;
     }
-    if (schema != 7) {
-        s.problem = QObject::tr("recab answered in a form this window does not know (schema %1; it reads schema 7, "
+    if (schema != 7 && schema != 8 && schema != 9) {
+        s.problem = QObject::tr("recab answered in a form this window does not know (schema %1; it reads schemas 7, 8 and 9, "
                                 "recab's own, and schema 3, its stand-in's).")
                         .arg(schema);
         return s;

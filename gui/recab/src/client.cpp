@@ -52,7 +52,7 @@ bool RecabClient::understand(Run *finished, bool ok, Status *into, QString *erro
     if (schema == 3) {
         // The stand-in: it reports the lifecycle directly.
         *into = Status::fromJson(object);
-    } else if (schema == 7 || schema == 8) {
+    } else if (schema == 7 || schema == 8 || schema == 9) {
         // The real recab: two slots, a preparation and the state in one
         // word. It names no release.
         *into = Status::fromReal(object, osField(osRelease_, "NAME"), osField(osRelease_, "VERSION_ID"));
@@ -61,7 +61,7 @@ bool RecabClient::understand(Run *finished, bool ok, Status *into, QString *erro
             return false;
         }
     } else {
-        *error = tr("`%1 status --json` answered with schema %2. This window reads schemas 7 and 8, recab's own, and "
+        *error = tr("`%1 status --json` answered with schema %2. This window reads schemas 7, 8 and 9, recab's own, and "
                     "schema 3, its stand-in's.")
                      .arg(program_)
                      .arg(schema);
