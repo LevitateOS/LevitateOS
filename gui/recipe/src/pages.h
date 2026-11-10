@@ -3,6 +3,7 @@
 #pragma once
 
 #include "model.h"
+#include "page.h"
 
 #include <QDialog>
 #include <QMap>
@@ -18,16 +19,6 @@ class QTreeWidget;
 class QVBoxLayout;
 class Run;
 class StepMark;
-
-class Page : public QWidget {
-protected:
-    explicit Page(QWidget *parent = nullptr);
-    // Drops what the page showed and returns an empty column to fill.
-    QVBoxLayout *fresh();
-private:
-    QVBoxLayout *outer_;
-    QWidget *body_ = nullptr;
-};
 
 class BrowsePage : public Page {
     Q_OBJECT

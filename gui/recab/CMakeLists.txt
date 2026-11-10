@@ -18,6 +18,8 @@ qt_add_executable(recab-gui
     ../kit/look.cpp
     ../kit/run.cpp
     ../kit/words.cpp
+    ../kit/page.cpp
+    ../kit/work.cpp
 )
 target_include_directories(recab-gui PRIVATE ../kit)
 target_compile_options(recab-gui PRIVATE -Wall -Wextra)

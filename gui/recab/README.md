@@ -9,7 +9,7 @@ them, and an agent is handed the issue, the facts and the expected result.
 It holds no lifecycle rules. It runs `recab`, reads its status, and offers
 what recab says may be done.
 
-Qt 6 Widgets, C++20, CMake. Widgets shared with `gui/recipe` are in `gui/kit`.
+Qt 6 Widgets, C++20, CMake. Widgets shared with `gui/recipe` and `gui/disk` are in `gui/kit`.
 
 ## State (2026-11-10)
 
@@ -142,7 +142,7 @@ allowed to run, and whether it runs as the person or as root are not decided.
 | `src/shots.*` | the picture mode and flow check |
 | `fixtures/` | the stand-in recab, agent and reboot |
 | `data/` | the menu entry and the polkit action |
-| `../kit/` | shared widgets, the command runner, words, stand-in looks |
+| `../kit/` | shared with `gui/recipe` and `gui/disk`: widgets, the page base, the work page, the command runner, words, stand-in looks |
 
 ## Not done
 

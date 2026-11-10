@@ -1,0 +1,65 @@
+#!/usr/bin/env python3
+"""Makes a sample home folder for disk-gui: ordinary files and several kinds
+of mess, as long-but-empty files, so it shows gigabytes and takes no room.
+
+  make-sample FOLDER     (FOLDER must not exist)
+
+Run disk-gui on it with DISK_GUI_APPARENT=1 so lengths are counted.
+"""
+import os
+import sys
+import time
+
+MIB = 1 << 20
+DAY = 86400
+
+
+def make(root, path, mib, age_days=5):
+    full = os.path.join(root, path)
+    os.makedirs(os.path.dirname(full), exist_ok=True)
+    with open(full, "wb") as out:
+        out.truncate(int(mib * MIB))
+    when = time.time() - age_days * DAY
+    os.utime(full, (when, when))
+
+
+def main():
+    if len(sys.argv) != 2 or os.path.exists(sys.argv[1]):
+        sys.exit(__doc__)
+    root = sys.argv[1]
+    # What a person made and wants.
+    for index in range(1, 9):
+        make(root, "Pictures/2026/holiday-%02d.raw" % index, 48)
+    make(root, "Documents/thesis.odt", 6)
+    make(root, "Documents/accounts-2025.ods", 2)
+    make(root, "Music/album.flac", 310)
+    make(root, "Videos/wedding.mkv", 4200, age_days=40)
+    make(root, "Projects/shop/src/main.rs", 0.2)
+    make(root, "Projects/shop/Cargo.toml", 0.001)
+    make(root, "Projects/site/package.json", 0.001)
+    make(root, "Projects/site/index.html", 0.1)
+    make(root, "Projects/viewer/CMakeLists.txt", 0.001)
+    # Mess: what programs can make again.
+    for index in range(1, 7):
+        make(root, "Projects/shop/target/debug/deps/libshop-%d.rlib" % index, 420)
+    make(root, "Projects/shop/target/CACHEDIR.TAG", 0.001)
+    for index in range(1, 5):
+        make(root, "Projects/site/node_modules/pkg%d/bundle.js" % index, 95)
+    make(root, "Projects/viewer/build/CMakeCache.txt", 0.01)
+    make(root, "Projects/viewer/build/viewer", 180)
+    make(root, "Projects/viewer/build/objects.a", 260)
+    make(root, ".cache/mozilla/firefox/cache2/entries.bin", 1350)
+    make(root, ".cache/thumbnails/large/all.bin", 240)
+    make(root, ".cache/fontconfig/fonts.cache", 3)
+    make(root, ".cache/recipe/images/9b5d2c5d.tar", 1218)
+    make(root, ".local/state/recipe/htop/checkpoint.tar", 640)
+    make(root, ".local/share/Trash/files/old-export.zip", 730)
+    # Mess the person has to decide about.
+    make(root, "Downloads/LevitateOS-2026.09-x86_64.iso", 2100, age_days=200)
+    make(root, "Downloads/printer-driver.rpm", 64, age_days=300)
+    make(root, "Videos/screen-recording-2024.mkv", 3300, age_days=700)
+    print(root)
+
+
+if __name__ == "__main__":
+    main()

@@ -1,0 +1,75 @@
+#!/usr/bin/env python3
+"""A stand-in for the agent, for running disk-gui from a checkout.
+
+It reads the prompt on its input, goes through the listed places and reports
+as an agent would. It removes a place only when that place is inside
+DISK_STANDIN_ROOT (the sample tree); anywhere else it says what it would have
+done and touches nothing. Places marked "Ask me first" and places that belong
+to Recipe are left.
+"""
+import json
+import os
+import re
+import shutil
+import sys
+import time
+
+ROOT = os.environ.get("DISK_STANDIN_ROOT", "")
+SPEED = float(os.environ.get("DISK_STANDIN_SPEED", "1"))
+
+
+def emit(**event):
+    sys.stderr.write(json.dumps(event) + "\n")
+    sys.stderr.flush()
+
+
+def inside_sample(path):
+    if not ROOT:
+        return False
+    root = os.path.realpath(ROOT)
+    return os.path.realpath(path).startswith(root + os.sep)
+
+
+def main():
+    prompt = sys.stdin.read()
+    facts = prompt.split("The facts:", 1)[-1].split("The expected result:", 1)[0]
+    places = []
+    for line in facts.splitlines():
+        found = re.match(r"^- (/.+?) \([\d.,]+ (?:MiB|GiB)\): (.*)$", line.strip())
+        if found:
+            places.append((found.group(1), found.group(2)))
+
+    emit(event="plan", steps=[["read", "Read the list"], ["clear", "Clear what is sure"], ["check", "Check the result"]])
+    emit(event="step", step="read", status="running")
+    time.sleep(0.4 * SPEED)
+    emit(event="step", step="read", status="done")
+    emit(event="step", step="clear", status="running")
+    cleared = left = 0
+    for number, (path, why) in enumerate(places, 1):
+        emit(event="progress", step="clear", done=number, total=len(places))
+        if "Ask me first" in why:
+            emit(event="output", line="left, to ask first: %s" % path)
+            left += 1
+        elif "Recipe" in why:
+            emit(event="output", line="left for Recipe to clear: %s" % path)
+            left += 1
+        elif inside_sample(path):
+            if os.path.isdir(path) and not os.path.islink(path):
+                shutil.rmtree(path)
+            elif os.path.lexists(path):
+                os.remove(path)
+            emit(event="output", line="cleared: %s" % path)
+            cleared += 1
+        else:
+            emit(event="output", line="would clear (the stand-in removes nothing outside its sample): %s" % path)
+        time.sleep(0.15 * SPEED)
+    emit(event="step", step="clear", status="done")
+    emit(event="step", step="check", status="running")
+    time.sleep(0.3 * SPEED)
+    emit(event="step", step="check", status="done")
+    emit(event="agent", summary="it cleared %d places and left %d that need a yes or belong to Recipe" % (cleared, left))
+    emit(event="done")
+
+
+if __name__ == "__main__":
+    main()

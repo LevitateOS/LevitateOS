@@ -3,6 +3,8 @@
 #pragma once
 
 #include "model.h"
+#include "page.h"
+#include "work.h"
 
 #include <QDialog>
 #include <QMap>
@@ -10,23 +12,8 @@
 
 class PromptPanel;
 class QLabel;
-class QHBoxLayout;
-class QPlainTextEdit;
-class QProgressBar;
 class QPushButton;
 class QVBoxLayout;
-class Run;
-class StepMark;
-
-class Page : public QWidget {
-protected:
-    explicit Page(QWidget *parent = nullptr);
-    // Drops what the page showed and returns an empty column to fill.
-    QVBoxLayout *fresh();
-private:
-    QVBoxLayout *outer_;
-    QWidget *body_ = nullptr;
-};
 
 // The one page a person sees most: the running system, what is beside it, and
 // what can be done. Its shape follows recab's state.
@@ -58,32 +45,6 @@ public:
 signals:
     void back();
     void handOver(const QString &prompt);
-};
-
-// Something is being done to the next system: its steps, how far, its output.
-class WorkPage : public Page {
-    Q_OBJECT
-public:
-    using Page::Page;
-    void begin(const QString &title, const QString &subtitle, Run *run);
-signals:
-    void done(bool ok);
-    void back();
-    void activity(const QString &words);
-private:
-    void onEvent(const QJsonObject &event);
-    void onFinished(bool ok);
-
-    Run *run_ = nullptr;
-    QVBoxLayout *column_ = nullptr;
-    QHBoxLayout *steps_ = nullptr;
-    QMap<QString, StepMark *> marks_;
-    QMap<QString, QString> titles_;
-    QLabel *state_ = nullptr;
-    QProgressBar *bar_ = nullptr;
-    QPlainTextEdit *output_ = nullptr;
-    QPushButton *stop_ = nullptr;
-    QLabel *stopNote_ = nullptr;
 };
 
 // An update and a change clash: what the agent is given to settle it.

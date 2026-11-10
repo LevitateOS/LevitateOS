@@ -15,6 +15,7 @@ qt_add_executable(recipe-gui
     ../kit/look.cpp
     ../kit/run.cpp
     ../kit/words.cpp
+    ../kit/page.cpp
     src/pages.cpp
     src/window.cpp
     src/shots.cpp
