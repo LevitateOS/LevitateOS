@@ -1,56 +1,40 @@
 #include "window.h"
 
 #include "pages.h"
+#include "sources.h"
+
+#include "frame.h"
+#include "nextsystem.h"
 #include "parts.h"
 #include "refresh.h"
-#include "sources.h"
 #include "work.h"
 
 #include <QComboBox>
-#include <QHBoxLayout>
 #include <QLineEdit>
-#include <QListWidget>
 #include <QMessageBox>
+#include <QProcess>
 #include <QStackedWidget>
-#include <QStatusBar>
 #include <QTime>
 #include <QToolButton>
+
+namespace {
+
+// What Activity calls a run: the first line under "The request:", else the
+// first line of the prompt.
+QString requestTitle(const QString &prompt)
+{
+    const QString heading = QStringLiteral("The request:");
+    const qsizetype at = prompt.indexOf(heading);
+    const QString line = (at < 0 ? prompt : prompt.mid(at + heading.size())).trimmed().section(QLatin1Char('\n'), 0, 0).trimmed();
+    return line.size() > 90 ? line.left(89).trimmed() + QStringLiteral("…") : line;
+}
+
+} // namespace
 
 Window::Window(QWidget *parent)
     : QMainWindow(parent)
 {
     setWindowTitle(tr("Recipe"));
-
-    auto *centre = new QWidget;
-    auto *row = new QHBoxLayout(centre);
-    row->setContentsMargins(0, 0, 0, 0);
-    row->setSpacing(0);
-
-    auto *sidePane = new QWidget;
-    sidePane->setFixedWidth(216);
-    auto *sideColumn = new QVBoxLayout(sidePane);
-    sideColumn->setContentsMargins(8, 12, 8, 8);
-    sideColumn->setSpacing(8);
-    search_ = new QLineEdit;
-    search_->setPlaceholderText(tr("Search"));
-    search_->setClearButtonEnabled(true);
-    search_->setAccessibleName(tr("Search software"));
-    sideColumn->addWidget(search_);
-    // Which source's recipes are shown: all of them, or one.
-    from_ = new QComboBox;
-    from_->setAccessibleName(tr("Recipes from"));
-    sideColumn->addWidget(from_);
-    side_ = new QListWidget;
-    side_->setFrameShape(QFrame::NoFrame);
-    side_->setSpacing(1);
-    side_->viewport()->setAutoFillBackground(false);
-    sideColumn->addWidget(side_, 1);
-    row->addWidget(sidePane);
-
-    auto *edge = new QFrame;
-    edge->setFrameShape(QFrame::VLine);
-    edge->setFrameShadow(QFrame::Sunken);
-    row->addWidget(edge);
 
     stack_ = new QStackedWidget;
     browse_ = new BrowsePage;
@@ -66,35 +50,56 @@ Window::Window(QWidget *parent)
                           static_cast<QWidget *>(updates_), static_cast<QWidget *>(sources_),
                           static_cast<QWidget *>(wish_), static_cast<QWidget *>(work_)})
         stack_->addWidget(page);
-    row->addWidget(stack_, 1);
-    setCentralWidget(centre);
 
-    source_ = new QLabel;
-    activity_ = new QLabel(tr("Nothing is being built"));
-    statusBar()->addWidget(source_);
-    statusBar()->addPermanentWidget(activity_);
-    statusBar()->setSizeGripEnabled(false);
+    // The frame is the window: the rail, the pages in it, the strip about the
+    // next system, and the status line.
+    frame_ = new Frame(Frame::Recipe);
+    frame_->setContent(stack_);
+    frame_->addEntry(QStringLiteral("browse"), tr("Browse"));
+    frame_->addEntry(QStringLiteral("installed"), tr("Installed"));
+    frame_->addEntry(QStringLiteral("updates"), tr("Updates"));
+    frame_->addEntry(QStringLiteral("sources"), tr("Sources"));
+    frame_->select(QStringLiteral("browse"));
+    frame_->setAgent(client_.agentProgram());
+    updateStatus();
+    setCentralWidget(frame_);
 
-    connect(side_, &QListWidget::currentItemChanged, this, [this](QListWidgetItem *item) {
-        if (!item)
-            return;
-        const QString key = item->data(Qt::UserRole).toString();
-        if (key == QLatin1String("installed"))
+    // Only recab knows whether a next system holds changes; Recipe asks it.
+    next_ = new NextSystem(qEnvironmentVariable("RECIPE_GUI_RECAB", "recab"), this);
+    connect(next_, &NextSystem::known, this, [this] { frame_->setNextSystem(next_->titles()); });
+
+    connect(frame_, &Frame::chosen, this, [this](const QString &key) {
+        if (key == QLatin1String("browse"))
+            showBrowse(category_);
+        else if (key == QLatin1String("installed"))
             showInstalled(installedChoice_);
         else if (key == QLatin1String("updates"))
             showUpdates(updateChoice_);
         else if (key == QLatin1String("sources"))
             showSources();
-        else
-            showBrowse(key.mid(7));
     });
-    connect(search_, &QLineEdit::textChanged, this, [this] { showBrowse(); });
+    // The next system is finished in System, the way its button in the rail starts it.
+    connect(frame_, &Frame::finishRequested, this, [this] {
+        const QString program = qEnvironmentVariable("LEVITATE_APP_SYSTEM", "recab-gui");
+        if (program.isEmpty() || !QProcess::startDetached(program, {}))
+            frame_->flash(tr("System could not be started: %1 was not found or would not run.")
+                              .arg(program.isEmpty() ? QStringLiteral("recab-gui") : program));
+    });
+    connect(frame_, &Frame::goToRun, this, [this] {
+        frame_->select(QStringLiteral("browse"));
+        stack_->setCurrentWidget(work_);
+    });
+
+    connect(browse_->searchBox(), &QLineEdit::textChanged, this, [this] { showBrowse(category_); });
+    connect(browse_->categoryBox(), &QComboBox::activated, this,
+            [this](int index) { showBrowse(browse_->categoryBox()->itemData(index).toString()); });
+    connect(browse_->fromBox(), &QComboBox::activated, this,
+            [this](int index) { chooseSource(browse_->fromBox()->itemData(index).toString()); });
 
     connect(browse_, &BrowsePage::openRecipe, this, &Window::showRecipe);
     connect(browse_, &BrowsePage::install, this, [this](const QString &name) { startInstall(name); });
     connect(browse_, &BrowsePage::retry, this, [this] { reload([this] { showBrowse(); }); });
     connect(browse_, &BrowsePage::askFor, this, &Window::showWish);
-    connect(from_, &QComboBox::activated, this, [this](int index) { chooseSource(from_->itemData(index).toString()); });
     connect(updates_, &UpdatesPage::check, this, [this] { fetchSources(); });
     connect(sources_, &SourcesPage::refresh, this, &Window::fetchSources);
     connect(sources_, &SourcesPage::add, this, &Window::addSource);
@@ -106,11 +111,10 @@ Window::Window(QWidget *parent)
     connect(wish_, &WishPage::back, this, [this] { showBrowse(category_); });
     connect(wish_, &WishPage::handOver, this, &Window::askAgent);
     connect(work_, &WorkPage::back, this, [this] { reload([this] { showBrowse(category_); }); });
-    connect(work_, &WorkPage::activity, this, [this](const QString &words) {
-        activity_->setText(words.isEmpty() ? tr("Nothing is being built") : words);
-    });
+    connect(work_, &WorkPage::activity, this, [this](const QString &words) { frame_->setAgentNote(words); });
     connect(work_, &WorkPage::done, this, [this](bool ok) {
         run_ = nullptr;
+        frame_->setOwnRun(0); // Activity reads the run's record again
         if (!ok && !work_->stopped())
             return; // the work page says why, and offers the way back
         // The recipe it wrote is there to be read; nothing was installed.
@@ -127,12 +131,13 @@ Window::Window(QWidget *parent)
     // may have installed or written something in the meantime.
     refresher_ = new Refresher(this, 20);
     connect(refresher_, &Refresher::asked, this, [this](bool) { refresh(); });
+    connect(refresher_, &Refresher::asked, frame_, &Frame::readAgain);
     auto *again = new QToolButton;
     again->setText(tr("Read again"));
     again->setToolTip(tr("Read the recipes and what is installed again (F5)"));
     again->setAutoRaise(true);
     connect(again, &QToolButton::clicked, this, &Window::refresh);
-    statusBar()->addWidget(again);
+    frame_->addStatusWidget(again);
     connect(recipe_, &RecipePage::back, this, [this] { showBrowse(); });
     connect(recipe_, &RecipePage::install, this, [this](const QString &name) { startInstall(name); });
     connect(recipe_, &RecipePage::remove, this, &Window::askRemove);
@@ -140,11 +145,12 @@ Window::Window(QWidget *parent)
     connect(runPage_, &RunPage::back, this, [this] { showBrowse(); });
     connect(runPage_, &RunPage::retry, this, [this](const QString &name) { startInstall(name); });
     connect(runPage_, &RunPage::fix, this, &Window::startInstall);
-    connect(runPage_, &RunPage::note, this, [this](const QString &words) { statusBar()->showMessage(words, 20000); });
+    connect(runPage_, &RunPage::note, this, [this](const QString &words) { frame_->flash(words); });
     connect(runPage_, &RunPage::succeeded, this, [this](const QString &name) { runEnded(name, true); });
     connect(runPage_, &RunPage::failed, this, [this](const QString &name) { runEnded(name, false); });
     connect(runPage_, &RunPage::status, this, [this](const QString &words) {
-        activity_->setText(words.isEmpty() ? tr("Nothing is being built") : words);
+        buildingWords_ = words;
+        updateStatus();
     });
     connect(installed_, &InstalledPage::open, this, &Window::open);
     connect(installed_, &InstalledPage::goBack, this, &Window::goBack);
@@ -165,6 +171,17 @@ Window::Window(QWidget *parent)
     reload([this] { showBrowse(); });
 }
 
+void Window::updateStatus()
+{
+    frame_->setStatus(buildingWords_.isEmpty() ? readWords_ : tr("%1 · %2").arg(buildingWords_, readWords_));
+}
+
+void Window::clearFlash()
+{
+    frame_->flash(QString());
+    updateStatus();
+}
+
 void Window::reload(std::function<void()> then)
 {
     if (client_.loading())
@@ -174,10 +191,12 @@ void Window::reload(std::function<void()> then)
                              tr("Asking recipe what there is to install and what is installed already."));
         stack_->setCurrentWidget(browse_);
     }
-    source_->setText(tr("Reading the recipes…"));
+    readWords_ = tr("Reading the recipes…");
+    updateStatus();
     client_.load([this, then](bool ok, const Catalog &catalog, const QString &problem) {
         if (!ok) {
-            source_->setText(tr("The recipes could not be read"));
+            readWords_ = tr("The recipes could not be read");
+            updateStatus();
             browse_->showProblem(problem);
             stack_->setCurrentWidget(browse_);
             return;
@@ -185,16 +204,19 @@ void Window::reload(std::function<void()> then)
         catalog_ = catalog;
         read_ = true;
         refresher_->fresh();
-        QString source = tr("%1, read at %2")
-                             .arg(catalog_.originsWords(), QLocale().toString(QTime::currentTime(), QLocale::ShortFormat));
+        readWords_ = tr("%1, read at %2")
+                         .arg(catalog_.originsWords(), QLocale().toString(QTime::currentTime(), QLocale::ShortFormat));
         if (catalog_.unreadable)
-            source += tr(" · %1").arg(counted(catalog_.unreadable, tr("%1 recipe could not be read"),
-                                               tr("%1 recipes could not be read")));
-        source_->setText(source);
+            readWords_ += tr(" · %1").arg(counted(catalog_.unreadable, tr("%1 recipe could not be read"),
+                                                  tr("%1 recipes could not be read")));
+        updateStatus();
         if (!origin_.isEmpty() && !catalog_.origin(origin_))
             origin_.clear(); // the chosen source is gone
         fillSources();
-        fillSidebar();
+        fillCategories();
+        fillRail();
+        // The strip under every page: what the next system holds may have changed.
+        next_->read();
         if (then)
             then();
     });
@@ -209,79 +231,63 @@ void Window::refresh()
     QWidget *shown = stack_->currentWidget();
     const bool drawn = shown != runPage_ && shown != work_ && shown != wish_;
     reload([this, drawn] {
-        if (drawn && again_)
-            again_();
+        // A copy: drawing the page sets `again_` anew, and the one running must outlive that.
+        if (const auto draw = again_; drawn && draw)
+            draw();
     });
 }
 
 void Window::fillSources()
 {
-    const QSignalBlocker quiet(from_);
-    from_->clear();
-    from_->addItem(tr("From all sources"), QString());
+    QComboBox *from = browse_->fromBox();
+    const QSignalBlocker quiet(from);
+    from->clear();
+    from->addItem(tr("From all sources"), QString());
     for (const Origin &origin : catalog_.origins)
         if (catalog_.countFrom(origin.name) > 0)
-            from_->addItem(tr("From %1").arg(origin.shown()), origin.name);
-    from_->setCurrentIndex(qMax(0, from_->findData(origin_)));
+            from->addItem(tr("From %1").arg(origin.shown()), origin.name);
+    from->setCurrentIndex(qMax(0, from->findData(origin_)));
     // One source: nothing to choose between.
-    from_->setVisible(from_->count() > 2);
+    from->setVisible(from->count() > 2);
 }
 
 void Window::chooseSource(const QString &name)
 {
     origin_ = name;
-    const QSignalBlocker quiet(from_);
-    from_->setCurrentIndex(qMax(0, from_->findData(origin_)));
+    QComboBox *from = browse_->fromBox();
+    const QSignalBlocker quiet(from);
+    from->setCurrentIndex(qMax(0, from->findData(origin_)));
     if (stack_->currentWidget() == browse_)
         showBrowse(category_);
 }
 
-void Window::fillSidebar()
+void Window::fillCategories()
 {
-    const QString kept = side_->currentItem() ? side_->currentItem()->data(Qt::UserRole).toString() : QString();
-    QSignalBlocker quiet(side_);
-    side_->clear();
-    auto section = [this](const QString &title) {
-        auto *item = new QListWidgetItem(title, side_);
-        item->setFlags(Qt::NoItemFlags);
-        QFont small = item->font();
-        small.setPointSizeF(small.pointSizeF() * 0.9);
-        small.setBold(true);
-        item->setFont(small);
-    };
-    auto entry = [this](const QString &title, const QString &key) {
-        auto *item = new QListWidgetItem(title, side_);
-        item->setData(Qt::UserRole, key);
-        item->setSizeHint(QSize(0, 30));
-    };
-    section(tr("Browse"));
-    entry(tr("All software"), "browse:");
+    QComboBox *box = browse_->categoryBox();
+    const QSignalBlocker quiet(box);
+    box->clear();
+    box->addItem(tr("All kinds"), QString());
     for (const QString &category : catalog_.categories())
-        entry(categoryTitle(category), "browse:" + category);
-    section(tr("On this computer"));
-    entry(tr("Installed (%1)").arg(catalog_.installed.size()), "installed");
-    entry(catalog_.updates.isEmpty() ? tr("Updates") : tr("Updates (%1)").arg(catalog_.updates.size()), "updates");
-    entry(tr("Sources (%1)").arg(catalog_.origins.size()), "sources");
-    mark(kept.isEmpty() ? QStringLiteral("browse:") : kept);
+        box->addItem(categoryTitle(category), category);
+    box->setCurrentIndex(qMax(0, box->findData(category_)));
 }
 
-void Window::mark(const QString &key)
+void Window::fillRail()
 {
-    QSignalBlocker quiet(side_);
-    for (int index = 0; index < side_->count(); ++index)
-        if (side_->item(index)->data(Qt::UserRole).toString() == key) {
-            side_->setCurrentRow(index);
-            return;
-        }
+    frame_->setBadge(QStringLiteral("updates"), int(catalog_.updates.size()));
 }
 
 void Window::showBrowse(const QString &category)
 {
-    const QString search = search_->text().trimmed();
     category_ = category;
     again_ = [this, category] { showBrowse(category); };
-    mark("browse:" + (search.isEmpty() ? category : QString()));
-    browse_->show(catalog_, search.isEmpty() ? category : QString(), search, origin_);
+    {
+        QComboBox *box = browse_->categoryBox();
+        const QSignalBlocker quiet(box);
+        box->setCurrentIndex(qMax(0, box->findData(category)));
+    }
+    frame_->follow(QStringLiteral("browse"));
+    browse_->show(catalog_, category, browse_->searchBox()->text().trimmed(), origin_);
     stack_->setCurrentWidget(browse_);
 }
 
@@ -295,7 +301,7 @@ void Window::showRecipe(const QString &name)
 void Window::showInstalled(const QString &selected)
 {
     again_ = [this] { showInstalled(installedChoice_); };
-    mark("installed");
+    frame_->follow(QStringLiteral("installed"));
     installed_->show(catalog_, selected);
     stack_->setCurrentWidget(installed_);
 }
@@ -303,7 +309,7 @@ void Window::showInstalled(const QString &selected)
 void Window::showUpdates(const QString &selected)
 {
     again_ = [this] { showUpdates(updateChoice_); };
-    mark("updates");
+    frame_->follow(QStringLiteral("updates"));
     updates_->show(catalog_, selected);
     stack_->setCurrentWidget(updates_);
 }
@@ -311,7 +317,7 @@ void Window::showUpdates(const QString &selected)
 void Window::startInstall(const QString &name, const QString &agentPrompt)
 {
     if (run_) {
-        statusBar()->showMessage(tr("One thing at a time: wait for the running one, or stop it."), 6000);
+        frame_->flash(tr("One thing at a time: wait for the running one, or stop it."));
         stack_->setCurrentWidget(runPage_);
         return;
     }
@@ -351,20 +357,20 @@ void Window::runEnded(const QString &name, bool ok)
 void Window::showSources()
 {
     again_ = [this] { showSources(); };
-    mark("sources");
+    frame_->follow(QStringLiteral("sources"));
     sources_->show(catalog_);
     stack_->setCurrentWidget(sources_);
 }
 
 void Window::fetchSources(const QString &name)
 {
-    statusBar()->showMessage(name.isEmpty() ? tr("Fetching every source's list…") : tr("Fetching the list of %1…").arg(name));
+    frame_->flash(name.isEmpty() ? tr("Fetching every source's list…") : tr("Fetching the list of %1…").arg(name));
     quietChange(client_.refresh(name));
 }
 
 void Window::addSource(const QString &addressOrFolder)
 {
-    statusBar()->showMessage(tr("Adding the source…"));
+    frame_->flash(tr("Adding the source…"));
     quietChange(client_.addSource(addressOrFolder));
 }
 
@@ -396,11 +402,11 @@ void Window::showWish(const QString &wish)
 void Window::askAgent(const QString &prompt)
 {
     if (run_) {
-        statusBar()->showMessage(tr("One thing at a time: wait for the running one, or stop it."), 6000);
+        frame_->flash(tr("One thing at a time: wait for the running one, or stop it."));
         return;
     }
     written_.clear();
-    run_ = client_.agent(prompt);
+    run_ = client_.agent(prompt, requestTitle(prompt));
     // The agent names the recipe it wrote, so the window can open it.
     connect(run_, &Run::event, this, [this](const QJsonObject &event) {
         if (event["event"] == QLatin1String("agent") && !event["recipe"].toString().isEmpty())
@@ -410,6 +416,7 @@ void Window::askAgent(const QString &prompt)
                  tr("A half-written recipe is left in the folder"));
     stack_->setCurrentWidget(work_);
     run_->start();
+    frame_->setOwnRun(run_->pid());
 }
 
 bool Window::agentAsks() const
@@ -465,7 +472,7 @@ void Window::quietChange(Run *run)
     connect(run, &Run::finished, this, [this, run](bool ok) {
         setEnabled(true);
         --quiet_;
-        statusBar()->clearMessage();
+        clearFlash();
         if (!ok) {
             const QString reason = run->problem();
             QMessageBox::warning(this, tr("Recipe"),
@@ -473,8 +480,8 @@ void Window::quietChange(Run *run)
         }
         run->deleteLater();
         reload([this] {
-            if (again_)
-                again_();
+            if (const auto draw = again_)
+                draw();
         });
     });
     run->start();
@@ -486,5 +493,5 @@ void Window::open(const QString &name)
     if (!item || item->programs.isEmpty())
         return;
     if (!QProcess::startDetached(item->programs.first(), {}))
-        statusBar()->showMessage(tr("%1 could not be started").arg(item->programs.first()), 6000);
+        frame_->flash(tr("%1 could not be started").arg(item->programs.first()));
 }

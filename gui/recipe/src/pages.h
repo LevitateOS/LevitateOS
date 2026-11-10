@@ -10,8 +10,10 @@
 #include <QWidget>
 
 class QCheckBox;
+class QComboBox;
 class QGridLayout;
 class QLabel;
+class QLineEdit;
 class QPlainTextEdit;
 class QProgressBar;
 class QPushButton;
@@ -20,19 +22,34 @@ class QVBoxLayout;
 class Run;
 class StepMark;
 
+// The list of recipes under its own header, search and two boxes. Those stay
+// while the list is drawn again, so typing is not interrupted.
 class BrowsePage : public Page {
     Q_OBJECT
 public:
-    using Page::Page;
+    explicit BrowsePage(QWidget *parent = nullptr);
     // `origin`: only the recipes of this source; empty for all.
     void show(const Catalog &catalog, const QString &category, const QString &search, const QString &origin);
     void showProblem(const QString &problem);
+    // Reading or failing: the header and the boxes are not shown, the words are.
+    void showLoading(const QString &title, const QString &words);
+    QLineEdit *searchBox() const { return search_; }
+    QComboBox *fromBox() const { return from_; }
+    QComboBox *categoryBox() const { return category_; }
+    // The recipes the list shows now, in order, for a check.
+    QStringList listed() const { return listed_; }
 signals:
     void openRecipe(const QString &name);
     void install(const QString &name);
     void retry();
     // Ask the agent to write a recipe for this.
     void askFor(const QString &what);
+private:
+    QWidget *top_;
+    QLabel *title_, *subtitle_;
+    QLineEdit *search_;
+    QComboBox *from_, *category_;
+    QStringList listed_;
 };
 
 class RecipePage : public Page {

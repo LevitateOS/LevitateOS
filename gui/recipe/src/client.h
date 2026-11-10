@@ -42,9 +42,11 @@ public:
     Run *removeSource(const QString &name);
 
     // The agent, asked to write a recipe: the prompt on its input as one JSON
-    // line, its questions answered on the same input.
-    Run *agent(const QString &prompt);
-    QString agentName() const;
+    // line, its questions answered on the same input. `title` is what the
+    // Activity page lists the run under.
+    Run *agent(const QString &prompt, const QString &title);
+    // The program the window starts as its agent; the frame shows it.
+    QString agentProgram() const { return agent_; }
 
 private:
     using Answered = std::function<void(const QJsonObject &answer, const QString &problem)>;

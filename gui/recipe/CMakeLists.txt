@@ -18,6 +18,9 @@ qt_add_executable(recipe-gui
     ../kit/page.cpp
     ../kit/refresh.cpp
     ../kit/work.cpp
+    ../kit/frame.cpp
+    ../kit/activity.cpp
+    ../kit/nextsystem.cpp
     src/pages.cpp
     src/sources.cpp
     src/window.cpp

@@ -4,12 +4,14 @@
 #include "parts.h"
 
 #include <QCheckBox>
+#include <QComboBox>
 #include <QDialogButtonBox>
 #include <QFontDatabase>
 #include <QFormLayout>
 #include <QGridLayout>
 #include <QHeaderView>
 #include <QJsonArray>
+#include <QLineEdit>
 #include <QLocale>
 #include <QPlainTextEdit>
 #include <QProgressBar>
@@ -159,17 +161,63 @@ void clear(QLayout *layout)
 
 // ---------------------------------------------------------------- Browse
 
+BrowsePage::BrowsePage(QWidget *parent)
+    : Page(parent)
+{
+    top_ = new QWidget;
+    auto *column = new QVBoxLayout(top_);
+    column->setContentsMargins(28, 20, 28, 0);
+    column->setSpacing(14);
+    auto *words = new QVBoxLayout;
+    words->setSpacing(1);
+    title_ = heading(QString());
+    subtitle_ = dim(text(QString()));
+    words->addWidget(title_);
+    words->addWidget(subtitle_);
+    column->addLayout(words);
+    auto *row = new QHBoxLayout;
+    row->setSpacing(8);
+    search_ = new QLineEdit;
+    search_->setPlaceholderText(tr("Search by name or by what it does"));
+    search_->setClearButtonEnabled(true);
+    search_->setAccessibleName(tr("Search software"));
+    row->addWidget(search_, 1);
+    // Which source's recipes are shown: all of them, or one.
+    from_ = new QComboBox;
+    from_->setAccessibleName(tr("Recipes from"));
+    row->addWidget(from_);
+    category_ = new QComboBox;
+    category_->setAccessibleName(tr("Kind of software"));
+    row->addWidget(category_);
+    column->addLayout(row);
+    // Above the list, which `fresh` puts last; the header must not grow with the window.
+    top_->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Maximum);
+    static_cast<QVBoxLayout *>(layout())->insertWidget(0, top_);
+}
+
+void BrowsePage::showLoading(const QString &title, const QString &words)
+{
+    top_->hide();
+    listed_.clear();
+    Page::showLoading(title, words);
+}
+
 void BrowsePage::show(const Catalog &catalog, const QString &category, const QString &search, const QString &origin)
 {
     QVBoxLayout *column = fresh();
-    auto *top = new QVBoxLayout;
-    top->setSpacing(1);
-    top->addWidget(heading(!search.isEmpty() ? tr("Search: %1").arg(search)
-                           : category.isEmpty() ? tr("All software") : categoryTitle(category)));
+    // The header above has the page's top margin already: only the usual gap is left.
+    column->setContentsMargins(28, 14, 28, 16);
+    top_->show();
+    listed_.clear();
+    title_->setText(!search.isEmpty() ? tr("Search: %1").arg(search)
+                    : category.isEmpty() ? tr("All software") : categoryTitle(category));
     const Origin *from = origin.isEmpty() ? nullptr : catalog.origin(origin);
-    top->addWidget(dim(text(from ? tr("Only what %1 has. Each one is installed from a recipe you can read.").arg(from->shown())
-                                 : tr("Each one is installed from a recipe you can read."))));
-    column->addLayout(top);
+    QString subtitle = tr("Each one is installed from a recipe you can read.");
+    if (!search.isEmpty() && !category.isEmpty())
+        subtitle = tr("Only in %1. %2").arg(categoryTitle(category), subtitle);
+    if (from)
+        subtitle = tr("Only what %1 has. %2").arg(from->shown(), subtitle);
+    subtitle_->setText(subtitle);
     // More than one source: say on every line which one it is from.
     int sourcesWithRecipes = 0;
     for (const Origin &o : catalog.origins)
@@ -200,6 +248,7 @@ void BrowsePage::show(const Catalog &catalog, const QString &category, const QSt
             && !recipe.title.contains(search, Qt::CaseInsensitive)
             && !recipe.description.contains(search, Qt::CaseInsensitive))
             continue;
+        listed_ << recipe.name;
         if (row)
             grid->addWidget(rule(), row++, 0, 1, 5);
         grid->setRowMinimumHeight(row, 58);
@@ -258,6 +307,8 @@ void BrowsePage::show(const Catalog &catalog, const QString &category, const QSt
 void BrowsePage::showProblem(const QString &problem)
 {
     QVBoxLayout *column = fresh();
+    top_->hide();
+    listed_.clear();
     column->addWidget(heading(tr("The recipes could not be read")));
     column->addWidget(text(problem, true));
     auto *again = new QPushButton(tr("Try again"));

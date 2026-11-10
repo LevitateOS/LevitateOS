@@ -1,4 +1,4 @@
-// The one window: a sidebar, the pages, and the flows between them.
+// The one window: the shared frame, the pages in it, and the flows between them.
 #pragma once
 
 #include "client.h"
@@ -9,11 +9,9 @@
 #include <functional>
 
 class BrowsePage;
+class Frame;
 class InstalledPage;
-class QComboBox;
-class QLabel;
-class QLineEdit;
-class QListWidget;
+class NextSystem;
 class QStackedWidget;
 class RecipePage;
 class Refresher;
@@ -51,6 +49,8 @@ public:
     void chooseSource(const QString &name);
 
     const Catalog &catalog() const { return catalog_; }
+    Frame *frame() const { return frame_; }
+    BrowsePage *browsePage() const { return browse_; }
     bool busy() const { return run_ != nullptr || quiet_ > 0 || client_.loading(); }
     // From a checkout: remove without the question.
     void removeNow(const QString &name);
@@ -63,9 +63,14 @@ private:
     // Reads the catalog without holding the window up, then does `then`.
     // When it cannot be read, the page says why and `then` is not done.
     void reload(std::function<void()> then);
-    void fillSidebar();
+    // The boxes of the Browse page, and the number on Updates.
     void fillSources();
-    void mark(const QString &key);
+    void fillCategories();
+    void fillRail();
+    // The status line: where the recipes are from, and what is being built.
+    void updateStatus();
+    // Takes a said-for-a-moment line away at once.
+    void clearFlash();
     void open(const QString &name);
     void quietChange(Run *run);
     void runEnded(const QString &name, bool ok);
@@ -77,14 +82,15 @@ private:
     QStringList queue_;
     std::function<void()> again_;
     QString installedChoice_, updateChoice_;
-    QString origin_;    // the source chosen in the sidebar; empty: all
+    QString origin_;    // the source chosen on the Browse page; empty: all
     QString category_;  // the category last browsed
     bool read_ = false; // the catalog was read at least once
     QString written_;   // the recipe the agent said it wrote
     Refresher *refresher_;
+    QString readWords_, buildingWords_;
 
-    QLineEdit *search_;
-    QListWidget *side_;
+    Frame *frame_;
+    NextSystem *next_;
     QStackedWidget *stack_;
     BrowsePage *browse_;
     RecipePage *recipe_;
@@ -94,6 +100,4 @@ private:
     SourcesPage *sources_;
     WishPage *wish_;
     WorkPage *work_;
-    QComboBox *from_;
-    QLabel *source_, *activity_;
 };

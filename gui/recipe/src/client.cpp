@@ -230,14 +230,9 @@ Run *RecipeClient::removeSource(const QString &name)
     return change(QStringList{"source", "remove", name} + store());
 }
 
-Run *RecipeClient::agent(const QString &prompt)
+Run *RecipeClient::agent(const QString &prompt, const QString &title)
 {
     auto *run = new Run(agent_, {}, this);
-    run->setPrompt(prompt);
+    run->setPrompt(prompt, QStringLiteral("Recipe"), title);
     return run;
-}
-
-QString RecipeClient::agentName() const
-{
-    return QFileInfo(agent_).fileName();
 }

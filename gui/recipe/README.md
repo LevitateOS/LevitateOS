@@ -9,6 +9,29 @@ It holds no package rules. It runs `recipe`, reads its JSON and shows it.
 Qt 6 Widgets, C++20, CMake. It uses no stylesheet and no colours of its own
 beyond the red for "this went wrong", so it takes each desktop's own style.
 
+## The window: the shared frame
+
+The window is `gui/kit/frame.*` (see `../kit/README.md`): the rail on the left
+(the three apps, then Browse, Installed, Updates with the number of updates as
+its badge, Sources, then Activity, which the frame owns), the pages in the
+middle, a strip under them and a status line. There is no sidebar any more:
+the search, the box for the source and the box for the kind of software are
+the top of the Browse page. Storage, Settings and Help are not in the rail
+because those pages do not exist.
+
+- The status line says where the recipes are from and when they were read (and
+  what is being built); "Read again" sits beside it; the agent is the frame's
+  (`Agent: agent` for a stand-in, by its file name).
+- "Ask for software" hands the agent the app name "Recipe" and the first line of
+  the request as the run's title, so Activity lists it; "Go to it" on Activity
+  comes back to the run's page. "Let the agent fix it" is run by `recipe
+  --autofix`, not by this window's agent, so it is not in Activity.
+- The strip ("The next system holds N changes.") is read with `recab status
+  --json` (`RECIPE_GUI_RECAB`, default `recab`) after every read of the recipes.
+  It shows on every page; when recab cannot be run there is no strip and no
+  error. "Finish and restart…" starts System (`LEVITATE_APP_SYSTEM`, default
+  `recab-gui`), as System's button in the rail does.
+
 ## State (2026-11-10)
 
 Every page works against the stand-in in `fixtures/`, which answers in the
@@ -35,6 +58,9 @@ Needs the Qt 6 base and SVG development files (`qt6-qtbase-devel`,
 `qt6-qtsvg-devel` on Rocky and Fedora).
 
 - `RECIPE_GUI_RECIPE`: the `recipe` to run (default: `recipe` on `PATH`).
+- `RECIPE_GUI_AGENT`: the agent for "Ask for software" (default `levitate-agent`).
+- `RECIPE_GUI_RECAB`: the `recab` that tells the strip what the next system
+  holds (default: `recab` on `PATH`).
 - `RECIPE_GUI_ROOT_HELPER`: what changes are run through (default: `pkexec`;
   empty runs them directly, for the stand-in).
 - `RECIPE_GUI_RECIPES_PATH`: the collection to list and install from
@@ -52,9 +78,34 @@ QT_QPA_PLATFORM=offscreen RECIPE_GUI_RECIPE=$PWD/gui/recipe/fixtures/recipe \
   .artifacts/recipe-gui/build/recipe-gui --look acorn --shots /tmp/recipe-shots
 ```
 
+The story also checks the frame, Activity and the strip, so it needs the
+stand-in agent, a recab that speaks the real shape with a scratch state of its
+own, and the records Activity shows (stand-in Codex, never a real agent; build
+the agent first with `cmake --build .artifacts/agent/build`). Always name the
+stand-ins: the default agent starts Codex.
+
+```sh
+F=$PWD/gui/recipe/fixtures
+QT_QPA_PLATFORM=offscreen HOME=/tmp/recipe-shots-home \
+  RECIPE_GUI_RECIPE=$F/recipe RECIPE_GUI_AGENT=$F/agent RECIPE_GUI_ROOT_HELPER= \
+  RECIPE_STANDIN_STATE=/tmp/recipe-shots-state RECIPE_STANDIN_SPEED=0 \
+  RECIPE_GUI_RECAB=$PWD/gui/recab/fixtures/recab-real RECAB_STANDIN_STATE=/tmp/recipe-shots-recab \
+  RECAB_STANDIN_SPEED=0 RECIPE_GUI_RECORDS=$PWD/gui/agent/fixtures/records \
+  LEVITATE_ACTIVITY_AGENT=$PWD/.artifacts/agent/build/levitate-agent \
+  .artifacts/recipe-gui/build/recipe-gui --look levitate --shots /tmp/recipe-shots
+```
+
+Delete both state folders first (`/tmp/recipe-shots-state`,
+`/tmp/recipe-shots-recab`): the story expects no next system at the start, then
+makes one with one `prepare` and one `change`. Pictures: `1-…` to `14-…` are the
+flows; `f1`–`f4` Browse (also with a search and a kind), Installed, Updates and
+Sources in the frame; `s1`–`s3` the strip and a window with no recab; `a-*`
+Activity.
+
 The stand-in keeps what is "installed" in a state file
 (`RECIPE_STANDIN_STATE`, see the top of `fixtures/recipe`); delete it to start
-over.
+over. The stand-in agent writes the app name and title it was given to
+`last-prompt.json` there, which the story reads.
 
 Against the real `recipe` from the checkout, into a test store, with the
 Ginux launcher and image selected as `tools/recipe/README.md` describes.
@@ -80,9 +131,10 @@ QT_QPA_PLATFORM=offscreen RECIPE_GUI_RECIPE=$PWD/target/debug/recipe \
 | `src/model.*` | the data: recipes, what is installed, updates, as read from JSON |
 | `src/client.*` | the only code that runs `recipe`; a `Run` reports one change as events |
 | `../kit/` | shared with `gui/recab` and `gui/disk`: small widgets (step mark, letter tile, panels, the prompt handed to an agent), the page base, the work page, the command runner, sizes and counts as words, the stand-in looks |
-| `src/pages.*` | Browse, a recipe's page, a run, Installed, Updates, the remove question |
+| `../kit/frame.*`, `activity.*`, `nextsystem.*` | the window frame, the Activity page it owns, and the strip's reader |
+| `src/pages.*` | Browse (with its search and boxes), a recipe's page, a run, Installed, Updates, the remove question |
 | `src/sources.*` | the Sources page, and asking the agent for a recipe |
-| `src/window.*` | the sidebar and the flows between pages |
+| `src/window.*` | the frame, its rail and status, and the flows between pages |
 | `src/shots.*` | the stand-in looks and the picture mode |
 | `fixtures/` | the stand-in `recipe` with its sample catalog and sources, and the stand-in agent |
 | `data/` | the menu entry and the polkit action |
@@ -136,9 +188,9 @@ its first step arrives.
 
 The catalog is read as three commands in a row (`list`, `installed`,
 `updates`) without holding the window up. The first time, the page says
-"Reading the recipes"; later reads leave the page as it is, and the status bar
-says where the recipes are from and when they were read. It is read again
-after every change, on "Read again" in the status bar, on F5 or Ctrl+R, and
+"Reading the recipes"; later reads leave the page as it is, and the status line
+(the frame's) says where the recipes are from and when they were read. It is read again
+after every change, on "Read again" in the status line, on F5 or Ctrl+R, and
 when the person comes back to the window after 20 seconds or more. That reads
 what is on this computer; it fetches nothing. Fetching the sources' lists is
 "Check for updates" on the Updates page and "Fetch again" on the Sources page.
@@ -201,6 +253,11 @@ output" stay beside it. What the agent changed is reported when the run ends;
 there is no step yet where the person approves the change before it is used.
 
 ## Not done
+
+- Not in the frame: the "For this computer / For me" choice, the licence and
+  sort boxes of the design (nothing behind them), the Storage, Settings and Help
+  pages. The Installed page does not show its count in the rail any more.
+- The frame's checks were run offscreen against stand-ins; not on a real desktop.
 
 - A real agent for "Ask for software": Codex and Claude Code do not speak the
   lines above as they are. The stand-in writes no file.
