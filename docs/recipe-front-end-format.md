@@ -410,7 +410,8 @@ Step 3 changes what a recipe may do; it is where the number would go to 3
   to one.
 - Running Recipe for a desktop user without handing them root.
 - Several Git repositories as sources, and what happens when two hold the same
-  name.
+  name. Designed since in [recipe-sources.md](recipe-sources.md), which also
+  takes over `repo.toml`.
 - How an agent is asked for a recipe and how the person approves it.
 - What the two trials found in the sandbox itself: parallel `make` fails for
   want of `mkfifo` and `pselect`; every run costs about a minute and a half

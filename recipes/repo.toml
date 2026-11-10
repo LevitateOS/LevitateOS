@@ -1,0 +1,7 @@
+# What this catalog says about itself. `recipe index` copies it into the index
+# a source publishes; see docs/recipe-sources.md.
+name = "levitate"
+title = "LevitateOS recipes"
+about = "Software kept by the LevitateOS project."
+address = "https://github.com/LevitateOS/LevitateOS"
+keeper = "LevitateOS"

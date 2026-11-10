@@ -17,6 +17,10 @@ fixtures remain under `tools/recipe`. A public recipe runs without required
 builder-specific defines and publishes a directory output named `"package"`.
 That tree contains regular `bin/COMMAND` and `share/PATH` files for activation.
 
+[`repo.toml`](repo.toml) is what this catalog says about itself. `recipe index`
+copies it into the index a source of recipes publishes; nothing reads an index
+yet. See [the sources design](../docs/recipe-sources.md).
+
 From the workspace root, `recipe list --recipes-path ./recipes` selects this
 catalog. The OS builder selects its own collection and passes `--no-activate`.
 An explicit `--recipes-path` or `$RECIPE_PATH` selects only that collection.
