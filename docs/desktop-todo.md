@@ -39,10 +39,11 @@ Marks: `[x]` done (committed, unbuilt), `[ ]` to do, **L** LevitateOS,
   larger. Take the needed size from the image instead of a constant.
 - [ ] **L A** Lock generation needs an exclude list (`--exclude` for dnf), used
   below to drop Fedora's art packages.
-- [x] **A** The accounts Alpine's install scripts would add for the desktop
-  packages (Avahi's `avahi`, CUPS's `lpadmin`, `camera`, `scanner`, `saned`),
-  `pinentry`'s link, and the X core font indexes. Fedora's packages carry
-  `sysusers.d` files, which the RPM recipe reads, so they need no list.
+- [x] **A** The accounts Alpine's install scripts would add are read from
+  those scripts (apk keeps them in `lib/apk/db/scripts.tar.gz`): every
+  `addgroup`/`adduser` is carried out, and a form the recipe does not read
+  stops the build. Fedora's packages carry `sysusers.d` files, which the RPM
+  recipe reads. Also `pinentry`'s link and the X core font indexes.
 - [ ] **A** Carry owners and special modes from apk's database into the
   recipe's target metadata (setuid `dbus-daemon-launch-helper`,
   `polkit-agent-helper-1`, `doas`), if the apk backend does not already.
