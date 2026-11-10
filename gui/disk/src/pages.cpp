@@ -80,10 +80,9 @@ void MessPage::show(std::shared_ptr<Node> tree, const QList<Finding> &found, con
     top->setSpacing(1);
     head_ = heading(QString());
     top->addWidget(head_);
-    QString under = tr("In %1. %2 is free on this disk. Nothing has been removed.")
-                        .arg(roots.join(tr(", ")), bytesText(freeBytes));
-    if (freed > 0)
-        under = tr("%1 was freed by the agent. ").arg(bytesText(freed)) + under;
+    const QString under = (freed > 0 ? tr("The agent freed %1. In %2. %3 is free on this disk now.").arg(bytesText(freed))
+                                     : tr("In %1. %2 is free on this disk. Nothing has been removed."))
+                              .arg(roots.join(tr(", ")), bytesText(freeBytes));
     top->addWidget(dim(text(under, true)));
     header->addLayout(top, 1);
     auto *again = new QPushButton(tr("Look again"));
