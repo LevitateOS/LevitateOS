@@ -361,20 +361,50 @@ The desktop adds no other package manager, store or bundle format.
   login screen and logs in.
 - [ ] **L A** Screenshots of both desktops, light and dark, for the website.
 
-## Decisions waiting for the user
+## Decisions (the user, 2026-11-10)
 
-1. Light or dark as the default look on each system.
-2. How small AcornOS stays: Bluetooth, printing, scanning, a compositor, a
-   media player, input methods, a CJK font set and Orca each add a lot; `gvfs`
-   (already in) drags GTK 4 and GStreamer with it.
-3. Which apps ship in the image and which come only through Recipe
-   (section 5), and the first set of app recipes (section 6).
-4. Codecs: what ships, what is a recipe.
-5. NVIDIA's proprietary driver: supported or not.
-6. A firewall on the desktop, and sshd off on installed desktops.
-7. A graphical front-end for Recipe, and a first-login welcome.
-8. Boot splash (Plymouth) or console text.
-9. Supported languages and input methods.
-10. Breeze or Fusion as AcornOS's widget style, and which login theme.
-11. Whether the LevitateOS light and dark wallpapers are right, or the
-    original half-and-half picture should be one of them.
+The items above marked **decide** follow these; the marks are updated as each
+is carried out.
+
+1. **Look:** LevitateOS starts dark, AcornOS starts light.
+2. **AcornOS size:** Bluetooth ships (`bluez`, `blueman`, the service).
+   Printing, scanning, Orca, the CJK fonts and a compositor stay out. `gvfs`
+   goes: it was not kept, so pcmanfm-qt loses trash, phones and cameras and
+   mounts drives through udisks2 alone.
+3. **Apps in the image:** LevitateOS adds KCalc (Gwenview, Okular and a media
+   player are Recipe's). AcornOS adds `unzip` and `7zip`, a text editor
+   (Mousepad: GTK 3 is already in for Firefox; KWrite would bring KDE
+   Frameworks) and `qps`. KDE's crash handler (`drkonqi`) ships on
+   LevitateOS; `khelpcenter` does not. Scanning ships on LevitateOS
+   (`sane-backends`, Skanlite); not on AcornOS (decision 2). No mobile
+   broadband.
+4. **Codecs:** each image ships what its distribution ships; H.264, AAC and
+   the rest come as Recipe recipes.
+5. **NVIDIA:** supported as a Recipe recipe (the proprietary module built per
+   kernel); nouveau stays the default.
+6. **Firewall:** firewalld on both desktops, incoming connections blocked
+   except what a zone allows; Plasma's firewall settings page on LevitateOS.
+   sshd is off on installed desktops (still on for the live ISO).
+7. **Extras:** a graphical Recipe front-end (planned like the recab GUI), a
+   first-login welcome, and a Plymouth boot splash with the mark (needs the
+   recinit hook; also gives encrypted installs a graphical unlock prompt).
+8. **Languages:** the 13 glibc language packs LevitateOS has; no input
+   methods.
+9. **AcornOS style:** Fusion widgets with an Adwaita GTK look, and the own
+   Maldives-based login theme with the acorn added.
+10. **Baloo:** on, full content (Plasma's default).
+11. **Firefox homepage:** `https://levitateos.org` on LevitateOS, Firefox's
+    own on AcornOS.
+12. **Symbolic launcher icon:** drawn, for the user to review.
+13. **First recipes:** office (OnlyOffice, not LibreOffice), mail, media and
+    graphics, chat, developer tools. These are what a person can install,
+    and what the Recipe front-end lists.
+
+Still open:
+
+- Whether the LevitateOS light and dark wallpapers are right, or the
+  original half-and-half picture should be one of them.
+- XLibre in place of the X.Org server on AcornOS (the user's idea). Alpine
+  has no XLibre package in 3.24 or edge, so it would be a Recipe-built X
+  server, with `xf86-input-libinput` and any video driver rebuilt against
+  it. LevitateOS is unaffected (Wayland; Xwayland is a separate program).
