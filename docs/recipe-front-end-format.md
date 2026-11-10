@@ -188,6 +188,8 @@ What the front end still needs on top of that:
 For `library`: `sdk` (headers and libraries to build against, as the `ncurses`
 trial recipe does), never activated, and `package` as well if programs need
 its files when they run.
+[Self-contained packages](recipe-self-contained-packages.md) proposes that a
+program carries the libraries it uses, so a library is never activated.
 
 ## Change 4: events while it runs
 
