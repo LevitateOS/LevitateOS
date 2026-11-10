@@ -8,7 +8,7 @@ RecabClient::RecabClient(QObject *parent)
     : QObject(parent)
     , program_(qEnvironmentVariable("RECAB_GUI_RECAB", "recab"))
     , rootHelper_(qEnvironmentVariable("RECAB_GUI_ROOT_HELPER", "pkexec"))
-    , agent_(qEnvironmentVariable("RECAB_GUI_AGENT", "codex"))
+    , agent_(qEnvironmentVariable("RECAB_GUI_AGENT", "levitate-agent"))
     , reboot_(qEnvironmentVariable("RECAB_GUI_REBOOT", "reboot"))
     , osRelease_(qEnvironmentVariable("RECAB_GUI_OS_RELEASE", "/etc/os-release"))
 {

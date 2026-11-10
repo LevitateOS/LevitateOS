@@ -87,6 +87,13 @@ void WorkPage::onEvent(const QJsonObject &event)
 {
     const QString kind = event["event"].toString();
     if (kind == QLatin1String("plan")) {
+        // A plan sent again replaces the steps shown, it does not add to them.
+        while (QLayoutItem *old = steps_->takeAt(0)) {
+            delete old->widget();
+            delete old;
+        }
+        marks_.clear();
+        titles_.clear();
         int number = 0;
         for (const QJsonValue &value : event["steps"].toArray()) {
             const QJsonArray pair = value.toArray();

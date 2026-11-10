@@ -1,0 +1,149 @@
+#!/usr/bin/env python3
+"""A stand-in for `codex`, for checking levitate-agent without a real one.
+
+It answers `--version`, `login status`, `exec ...` and `exec resume ID ...`
+and prints JSON lines in the shapes of codex-rs/exec/src/exec_events.rs. The
+prompt is read from standard input, as `-` asks. What it does is chosen by
+LEVITATE_STANDIN_STORY (see the story list below); every call is appended to
+LEVITATE_STANDIN_LOG as one JSON line (arguments, prompt, which turn), so the
+check can see what levitate-agent really sent.
+
+Stories: plain, asks, administrator, run, shell, fails, signed-out, dies, hang.
+The turn is counted in a file next to the log, one count for the session.
+"""
+import json
+import os
+import subprocess
+import sys
+import time
+
+STORY = os.environ.get("LEVITATE_STANDIN_STORY", "plain")
+LOG = os.environ.get("LEVITATE_STANDIN_LOG", "/tmp/levitate-standin.log")
+THREAD = "standin-thread-1"
+_ids = [0]
+
+
+def out(**event):
+    sys.stdout.write(json.dumps(event) + "\n")
+    sys.stdout.flush()
+
+
+def item(phase, kind, **fields):
+    """An item event; the same id for the same thing, as Codex does."""
+    out(type="item." + phase, item=dict(fields, type=kind))
+
+
+def message(text):
+    _ids[0] += 1
+    item("completed", "agent_message", id="msg%d" % _ids[0], text=text)
+
+
+def todo(texts, done):
+    items = [{"text": t, "completed": i < done} for i, t in enumerate(texts)]
+    item("updated" if done else "started", "todo_list", id="todo1", items=items)
+
+
+def command(cid, text, output, code):
+    item("started", "command_execution", id=cid, command=text, aggregated_output="", exit_code=None,
+         status="in_progress")
+    item("completed", "command_execution", id=cid, command=text, aggregated_output=output, exit_code=code,
+         status="completed" if code == 0 else "failed")
+
+
+def turn_number():
+    path = LOG + ".turns"
+    count = int(open(path).read()) + 1 if os.path.exists(path) else 1
+    open(path, "w").write(str(count))
+    return count
+
+
+def begin():
+    out(type="thread.started", thread_id=THREAD)
+    out(type="turn.started")
+
+
+def end():
+    out(type="turn.completed", usage={"input_tokens": 1, "cached_input_tokens": 0, "output_tokens": 1})
+
+
+def story(turn, prompt):
+    begin()
+    if STORY == "plain":
+        steps = ["Look around", "Make the change", "Check it"]
+        todo(steps, 0)
+        item("completed", "reasoning", id="r1", text="thinking about it")
+        command("c1", "ls -l", "total 0\n", 0)
+        todo(steps, 1)
+        # Long output: the window must not be flooded with it.
+        command("c2", "seq 1 100", "\n".join(str(n) for n in range(1, 101)), 0)
+        item("completed", "file_change", id="f1", status="completed",
+             changes=[{"path": "/home/x/a.txt", "kind": "add"}, {"path": "/home/x/b.txt", "kind": "update"}])
+        item("completed", "web_search", id="w1", query="levitate recipe format")
+        todo(steps, 3)
+        message("Working on it.")
+        message("I made the change. Everything checks out.")
+    elif STORY == "asks":
+        if turn == 1:
+            message("I need to know one thing.\nASK: Which colour? | Red | Blue")
+        else:
+            message("I used the colour you chose: %s." % prompt.strip())
+    elif STORY == "administrator":
+        if turn == 1:
+            message("This needs the administrator.\nRUN-AS-ADMINISTRATOR: id -u\nBECAUSE: It shows which user the command ran as.")
+        elif "refused" in prompt:
+            message("Understood, I left it alone.")
+        else:
+            message("It ran. The prompt said: " + " ".join(prompt.split()))
+    elif STORY == "run":
+        if turn == 1:
+            message("RUN: echo hello from the person")
+        else:
+            message("It ran. " + " ".join(prompt.split()))
+    elif STORY == "shell":
+        if turn == 1:
+            message("RUN: ls | wc -l")
+        elif turn == 2:
+            message("RUN: echo plain" if "plain command" in prompt else "RUN: false")
+        else:
+            message("Done with the plain command.")
+    elif STORY == "fails":
+        out(type="turn.failed", error={"message": "The model is overloaded"})
+        sys.exit(1)
+    elif STORY == "dies":
+        out(type="error", message="Connection lost")
+        sys.stderr.write("stream closed\n")
+        sys.exit(1)
+    elif STORY == "hang":
+        child = subprocess.Popen(["sleep", "300"])
+        open(LOG + ".pids", "w").write("%d %d" % (os.getpid(), child.pid))
+        command("c1", "sleep 300", "", 0)
+        time.sleep(300)
+    end()
+
+
+def main():
+    args = sys.argv[1:]
+    if args[:1] == ["--version"]:
+        print("codex-cli 0.0.0-standin")
+        return
+    if args[:2] == ["login", "status"]:
+        if os.environ.get("LEVITATE_STANDIN_SIGNED_OUT"):
+            print("Not logged in")
+            sys.exit(1)
+        print("Logged in using the stand-in")
+        return
+    if args[:1] != ["exec"]:
+        sys.stderr.write("stand-in: unknown arguments\n")
+        sys.exit(2)
+    prompt = sys.stdin.read()
+    turn = turn_number() if STORY != "signed-out" else 1
+    with open(LOG, "a") as log:
+        log.write(json.dumps({"args": args, "prompt": prompt, "turn": turn, "cwd": os.getcwd()}) + "\n")
+    if STORY == "signed-out":
+        sys.stderr.write("Error: not signed in. Run `codex login` first.\n")
+        sys.exit(1)
+    story(turn, prompt)
+
+
+if __name__ == "__main__":
+    main()

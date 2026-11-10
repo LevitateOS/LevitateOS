@@ -1,0 +1,446 @@
+#!/usr/bin/env python3
+"""Drives the built levitate-agent through every story of the stand-in codex
+and checks the events it sends and the record it keeps.
+
+    gui/agent/fixtures/story [PATH-TO-levitate-agent]
+
+It points HOME and the XDG folders into .artifacts/agent/story, sets
+LEVITATE_AGENT_CODEX to fixtures/codex and the root helper to nothing (so an
+approved administrator command runs as the person, which is all a check may
+do). It prints a line for each expectation that does not hold, and ends with
+`all flows ended where they should` or the opposite; the exit code agrees.
+"""
+import json
+import os
+import select
+import shutil
+import signal
+import subprocess
+import sys
+import threading
+import time
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+ROOT = os.path.abspath(os.path.join(HERE, "..", "..", ".."))
+BINARY = sys.argv[1] if len(sys.argv) > 1 else os.path.join(ROOT, ".artifacts/agent/build/levitate-agent")
+STANDIN = os.path.join(HERE, "codex")
+DISK_AGENT = os.path.join(ROOT, "gui/disk/fixtures/agent")
+SCRATCH = os.path.join(ROOT, ".artifacts/agent/story")
+HOME = os.path.join(SCRATCH, "home")
+STATE = os.path.join(HOME, "state")
+RUNS = os.path.join(STATE, "levitate/agent/runs")
+
+failures = []
+
+
+def check(condition, words):
+    if not condition:
+        failures.append(words)
+        print("story: " + words)
+
+
+def environment(name, extra=None, config=None):
+    env = dict(os.environ)
+    for key in [k for k in env if k.startswith(("LEVITATE_", "XDG_"))]:
+        del env[key]
+    cfg = os.path.join(SCRATCH, "config-" + name)
+    shutil.rmtree(cfg, ignore_errors=True)
+    if config is not None:
+        os.makedirs(os.path.join(cfg, "levitate"))
+        json.dump(config, open(os.path.join(cfg, "levitate/agent.json"), "w"))
+    log = os.path.join(SCRATCH, name + ".log")
+    for suffix in ("", ".turns", ".pids"):
+        if os.path.exists(log + suffix):
+            os.remove(log + suffix)
+    env.update(HOME=HOME, XDG_STATE_HOME=STATE, XDG_CONFIG_HOME=cfg, LEVITATE_AGENT_CODEX=STANDIN,
+               LEVITATE_AGENT_ROOT_HELPER="", LEVITATE_STANDIN_LOG=log, LEVITATE_STANDIN_STORY=name)
+    env.update(extra or {})
+    return env, log
+
+
+class Run:
+    def __init__(self, env, log, prompt="Please do the thing", app="recab", title="A change", before=None):
+        self.env, self.log = env, log
+        self.events, self.lines = [], []
+        self.known = set(os.listdir(RUNS)) if os.path.isdir(RUNS) else set()
+        self.proc = subprocess.Popen([BINARY], stdin=subprocess.PIPE, stderr=subprocess.PIPE, stdout=subprocess.PIPE,
+                                     env=env, text=True)
+        request = {"prompt": prompt}
+        if app:
+            request["app"] = app
+        if title:
+            request["title"] = title
+        self.send(request)
+
+    def send(self, obj):
+        self.proc.stdin.write(json.dumps(obj) + "\n")
+        self.proc.stdin.flush()
+
+    def answer(self, question, text):
+        self.send({"question": question["id"], "answer": text})
+
+    def read(self, until=None, on_question=None, seconds=30):
+        """Reads events until the process ends, or `until(event)` holds."""
+        watchdog = threading.Timer(seconds, self.proc.kill)
+        watchdog.start()
+        try:
+            while True:
+                line = self.proc.stderr.readline()
+                if not line:
+                    break
+                line = line.rstrip("\n")
+                self.lines.append(line)
+                try:
+                    event = json.loads(line)
+                except ValueError:
+                    continue
+                self.events.append(event)
+                if event.get("event") == "question" and on_question:
+                    self.answer(event, on_question(event))
+                if until and until(event):
+                    return
+            self.code = self.proc.wait()
+        finally:
+            watchdog.cancel()
+
+    def finish(self, **kwargs):
+        self.read(**kwargs)
+        return self
+
+    def kinds(self):
+        return [e.get("event") for e in self.events]
+
+    def of(self, kind):
+        return [e for e in self.events if e.get("event") == kind]
+
+    def record(self):
+        new = sorted(set(os.listdir(RUNS)) - self.known)
+        if len(new) != 1:
+            return []
+        return [json.loads(line) for line in open(os.path.join(RUNS, new[0])) if line.strip()]
+
+    def calls(self):
+        if not os.path.exists(self.log):
+            return []
+        return [json.loads(line) for line in open(self.log) if line.strip()]
+
+
+def ends_with(run, state):
+    record = run.record()
+    check(bool(record) and record[0].get("record") == "request", "the record starts with the request")
+    check(bool(record) and record[-1].get("record") == "end" and record[-1].get("state") == state,
+          "the record ends in %s (got %s)" % (state, record[-1] if record else None))
+    check(all("t" in line for line in record), "every line of the record has a time")
+    return record
+
+
+def story_plain():
+    env, log = environment("plain")
+    run = Run(env, log, prompt="Install the thing", app="recipe", title="Install it").finish()
+    check(run.code == 0, "plain: exits 0 (got %s)" % run.code)
+    check(run.kinds()[-1] == "done" and "failed" not in run.kinds(), "plain: ends with done")
+    plan = run.of("plan")
+    check(len(plan) == 1 and plan[0]["steps"][0] == ["1", "Look around"] and len(plan[0]["steps"]) == 3,
+          "plain: one plan of three steps with id and title")
+    steps = [(e["step"], e["status"]) for e in run.of("step")]
+    check(steps[:2] == [("1", "running"), ("1", "done")] and ("2", "running") in steps and ("3", "done") in steps,
+          "plain: steps run and finish in order (%s)" % steps)
+    lines = [e["line"] for e in run.of("output")]
+    check("$ ls -l" in lines and "$ seq 1 100" in lines, "plain: commands are shown as $ lines")
+    check(len(lines) < 50 and any("more lines" in l for l in lines), "plain: long output is capped")
+    dids = run.of("did")
+    check([d["kind"] for d in dids] == ["command", "command", "write", "write", "search"],
+          "plain: one did for each thing done (%s)" % [d["kind"] for d in dids])
+    check(dids and dids[0]["exit_code"] == 0 and dids[0]["as_administrator"] is False and dids[0]["approved"] is True
+          and dids[0]["what"] == "ls -l", "plain: a command did has its fields")
+    check(dids[2]["what"] == "/home/x/a.txt" and dids[3]["what"] == "/home/x/b.txt", "plain: a did for each path")
+    check([e["text"] for e in run.of("say")] == ["Working on it.", "I made the change. Everything checks out."],
+          "plain: each message is said")
+    check(run.of("agent") and run.of("agent")[0]["summary"] == "I made the change. Everything checks out.",
+          "plain: the last message is the summary")
+    calls = run.calls()
+    check(len(calls) == 1, "plain: codex ran once")
+    if calls:
+        args = calls[0]["args"]
+        check(args[0] == "exec" and "--json" in args and "--skip-git-repo-check" in args and args[-1] == "-",
+              "plain: exec with --json, --skip-git-repo-check and the prompt on stdin")
+        check(args[args.index("-s") + 1] == "read-only", "plain: read-only unless commands are allowed")
+        check(args[args.index("-C") + 1] == HOME and calls[0]["cwd"] == HOME, "plain: started in the home folder")
+        check("Install the thing" in calls[0]["prompt"] and "RUN-AS-ADMINISTRATOR" in calls[0]["prompt"]
+              and "never use sudo" in calls[0]["prompt"].lower().replace("never use sudo, su", "never use sudo")
+              and "recipe" in calls[0]["prompt"], "plain: the prompt holds the preamble and the request")
+    record = ends_with(run, "done")
+    if record:
+        check(record[0].get("app") == "recipe" and record[0].get("title") == "Install it"
+              and record[0].get("prompt") == "Install the thing" and record[0].get("agent") == "codex"
+              and "t" in record[0], "plain: the request line holds app, title, prompt, agent and time")
+        check("done" in [l.get("event") for l in record], "plain: events are in the record")
+    return run
+
+
+def story_allowed():
+    # run_commands=allowed widens codex's own sandbox; a RUN request is still asked.
+    env, log = environment("run", config={"run_commands": "allowed"})
+    run = Run(env, log).finish(on_question=lambda e: "Approve")
+    calls = run.calls()
+    check(run.code == 0 and calls and calls[0]["args"][calls[0]["args"].index("-s") + 1] == "workspace-write",
+          "allowed: run_commands=allowed gives workspace-write")
+    q = run.of("question")
+    check(len(q) == 1 and q[0].get("kind") == "command", "allowed: a RUN request is still asked")
+
+
+def story_asks():
+    env, log = environment("asks")
+    run = Run(env, log, prompt="Paint it", title="Painting")
+    seen = {}
+
+    def waiting(event):
+        # The run is idle on a question: --list must say so.
+        listing = json.loads(subprocess.check_output([BINARY, "--list"], env=env))
+        mine = [r for r in listing["runs"] if r["title"] == "Painting"]
+        seen["state"] = mine[0]["state"] if mine else None
+        return "Blue"
+
+    run.finish(on_question=waiting)
+    questions = run.of("question")
+    check(len(questions) == 1 and questions[0]["text"] == "Which colour?" and questions[0]["choices"] == ["Red", "Blue"]
+          and "id" in questions[0], "asks: a question with text, choices and id")
+    check(seen.get("state") == "waiting", "asks: --list shows the run as waiting (%s)" % seen.get("state"))
+    calls = run.calls()
+    check(len(calls) == 2 and calls[1]["args"][:3] == ["exec", "resume", "standin-thread-1"],
+          "asks: the answer resumes the session")
+    check(len(calls) == 2 and calls[1]["prompt"] == "Blue", "asks: the answer is the prompt of the resume")
+    if len(calls) == 2:
+        args = calls[1]["args"]
+        check("--json" in args and args[-1] == "-" and "-s" not in args and "-C" not in args,
+              "asks: resume uses only options resume accepts")
+    check(run.code == 0 and run.kinds()[-1] == "done" and "Blue" in run.of("agent")[0]["summary"],
+          "asks: finishes after the answer")
+    check([e.get("text") for e in run.of("say") if "ASK:" in e.get("text", "")] == [], "asks: the ASK line is not said")
+    record = ends_with(run, "done")
+    check([l.get("event") for l in record if l.get("event") in ("question", "answer")] == ["question", "answer"],
+          "asks: the record has the question and the answer")
+
+
+def story_administrator(approve):
+    env, log = environment("administrator")
+    run = Run(env, log)
+    run.finish(on_question=lambda e: "Approve" if approve else "Refuse")
+    name = "administrator(%s)" % ("approved" if approve else "refused")
+    questions = run.of("question")
+    check(len(questions) == 1, name + ": one question")
+    if questions:
+        q = questions[0]
+        check(q.get("kind") == "administrator" and q.get("command") == "id -u" and q["choices"] == ["Approve", "Refuse"],
+              name + ": kind, command and choices")
+        check("id -u" in q["text"] and "which user the command ran as" in q["text"],
+              name + ": the text holds the command and the reason")
+    dids = run.of("did")
+    calls = run.calls()
+    check(run.code == 0 and run.kinds()[-1] == "done", name + ": ends with done")
+    check(len(dids) == 1 and dids[0]["as_administrator"] is True and dids[0]["approved"] is approve
+          and dids[0]["what"] == "id -u", name + ": one did with as_administrator and approved=%s" % approve)
+    if approve:
+        uid = str(os.getuid())
+        check(dids and dids[0]["exit_code"] == 0 and uid in [e["line"] for e in run.of("output")],
+              name + ": the command ran and its output was sent")
+        check(len(calls) == 2 and "Exit code: 0" in calls[1]["prompt"] and uid in calls[1]["prompt"],
+              name + ": the agent is told the exit code and the output")
+    else:
+        check(dids and dids[0]["exit_code"] is None, name + ": no exit code when refused")
+        check("$ id -u" not in [e["line"] for e in run.of("output")], name + ": nothing ran")
+        check(len(calls) == 2 and "refused" in calls[1]["prompt"], name + ": the agent is told the person refused")
+    ends_with(run, "done")
+
+
+def story_run():
+    env, log = environment("run")
+    run = Run(env, log)
+    run.finish(on_question=lambda e: "Approve")
+    q = run.of("question")
+    check(len(q) == 1 and q[0].get("kind") == "command" and q[0].get("command") == "echo hello from the person",
+          "run: a command question")
+    dids = run.of("did")
+    check(len(dids) == 1 and dids[0]["as_administrator"] is False and dids[0]["approved"] is True
+          and dids[0]["exit_code"] == 0, "run: one did, run as the person")
+    check("hello from the person" in [e["line"] for e in run.of("output")], "run: its output is sent")
+    check(run.code == 0 and "hello from the person" in run.calls()[1]["prompt"], "run: the agent gets the output")
+    ends_with(run, "done")
+
+
+def story_shell():
+    env, log = environment("shell")
+    run = Run(env, log)
+    run.finish(on_question=lambda e: "Approve")
+    q = run.of("question")
+    check(len(q) == 1 and q[0].get("command") == "echo plain", "shell: the person is asked only about the plain command")
+    calls = run.calls()
+    check(len(calls) == 3 and "plain command" in calls[1]["prompt"] and "ls | wc -l" in calls[1]["prompt"],
+          "shell: the agent is told to name one plain command")
+    check(run.code == 0 and run.kinds()[-1] == "done" and len(run.of("did")) == 1, "shell: finishes after the plain one")
+    ends_with(run, "done")
+
+
+def story_fails(name, words, state="failed"):
+    env, log = environment(name)
+    run = Run(env, log).finish()
+    check(run.code != 0 and run.code is not None, name + ": exits non-zero")
+    failed = run.of("failed")
+    check(len(failed) == 1 and words in failed[0].get("reason", ""),
+          "%s: failed with the reason (%s)" % (name, failed))
+    check(run.kinds()[-1] == "failed" and "done" not in run.kinds(), name + ": failed is the last event")
+    record = ends_with(run, state)
+    return failed[0].get("reason", "") if failed else ""
+
+
+def story_stop():
+    env, log = environment("hang")
+    run = Run(env, log)
+    run.read(until=lambda e: e.get("event") == "output" and e.get("line") == "$ sleep 300")
+    for _ in range(50):
+        if os.path.exists(log + ".pids"):
+            break
+        time.sleep(0.1)
+    pids = [int(p) for p in open(log + ".pids").read().split()] if os.path.exists(log + ".pids") else []
+    check(len(pids) == 2, "stop: the stand-in and its own child are running")
+    run.proc.send_signal(signal.SIGTERM)
+    try:
+        run.proc.wait(timeout=10)
+    except subprocess.TimeoutExpired:
+        run.proc.kill()
+        check(False, "stop: levitate-agent exits on SIGTERM")
+    run.proc.stderr.read()
+
+    def gone(pid):
+        for _ in range(30):
+            try:
+                if open("/proc/%d/stat" % pid).read().rsplit(")", 1)[1].split()[0] == "Z":
+                    return True
+            except OSError:
+                return True
+            time.sleep(0.1)
+        return False
+
+    check(all(gone(p) for p in pids), "stop: the agent and what it started are gone")
+    ends_with(run, "stopped")
+    return run
+
+
+def story_passthrough():
+    # An agent that already speaks the protocol: the disk app's own stand-in.
+    env, log = environment("passthrough", {"LEVITATE_AGENT": DISK_AGENT, "DISK_STANDIN_SPEED": "0"})
+    run = Run(env, log, prompt="What differs between this system and the other system?", app="disk", title="Compare").finish()
+    check(run.code == 0 and run.kinds()[-1] == "done", "passthrough: its events arrive and end with done")
+    check(run.of("plan") and run.of("agent") and "sshd_config" in run.of("agent")[0]["summary"],
+          "passthrough: its events arrive unchanged")
+    record = ends_with(run, "done")
+    check(record and record[0]["agent"] == DISK_AGENT, "passthrough: the record names the agent")
+
+    # Questions and answers pass both ways.
+    mini = os.path.join(SCRATCH, "mini-agent")
+    open(mini, "w").write(
+        "#!/usr/bin/env python3\nimport json, sys\n"
+        "json.loads(sys.stdin.readline())\n"
+        "sys.stderr.write(json.dumps({'event': 'question', 'id': '7', 'text': 'Well?', 'choices': ['A', 'B']}) + '\\n')\n"
+        "sys.stderr.flush()\n"
+        "answer = json.loads(sys.stdin.readline())\n"
+        "sys.stderr.write('a plain line\\n')\n"
+        "sys.stderr.write(json.dumps({'event': 'agent', 'summary': 'got ' + answer['answer'] + ' for ' + answer['question']}) + '\\n')\n"
+        "sys.stderr.write(json.dumps({'event': 'done'}) + '\\n')\n")
+    os.chmod(mini, 0o755)
+    env, log = environment("passthrough", {"LEVITATE_AGENT": mini})
+    run = Run(env, log).finish(on_question=lambda e: "B")
+    check(run.of("agent") and run.of("agent")[0]["summary"] == "got B for 7", "passthrough: answers reach the agent")
+    check("a plain line" in run.lines, "passthrough: a plain line passes through as it is")
+    record = ends_with(run, "done")
+    check(any(l.get("event") == "output" and l.get("line") == "a plain line" for l in record),
+          "passthrough: a plain line is recorded as output")
+
+    env, log = environment("passthrough", {"LEVITATE_AGENT": os.path.join(SCRATCH, "no-such-agent")})
+    run = Run(env, log).finish()
+    check(run.code != 0 and run.of("failed"), "passthrough: an agent that cannot be started fails")
+    ends_with(run, "failed")
+
+
+def story_config():
+    # The program named in agent.json is used when the environment names none.
+    mini = os.path.join(SCRATCH, "mini-agent")
+    env, log = environment("passthrough", config={"agent": mini})
+    run = Run(env, log).finish(on_question=lambda e: "A")
+    check(run.of("agent") and run.of("agent")[0]["summary"] == "got A for 7", "config: agent.json names the agent")
+
+
+def listing(expected_ids):
+    out = json.loads(subprocess.check_output([BINARY, "--list"], env=environment("list")[0]))
+    runs = out["runs"]
+    check(len(runs) >= 12, "list: every run is listed (%d)" % len(runs))
+    check([r["started"] for r in runs] == sorted((r["started"] for r in runs), reverse=True), "list: newest first")
+    keys = {"id", "app", "title", "state", "started", "ended", "summary"}
+    check(all(set(r) == keys for r in runs), "list: each run has id, app, title, state, started, ended, summary")
+    states = {r["state"] for r in runs}
+    check(states <= {"running", "waiting", "done", "failed", "stopped"} and {"done", "failed", "stopped"} <= states,
+          "list: states are the known ones and done, failed and stopped all occur (%s)" % sorted(states))
+    check(all(r["state"] != "running" and r["state"] != "waiting" for r in runs), "list: no run is left running")
+    first = [r for r in runs if r["app"] == "recipe" and r["title"] == "Install it"]
+    check(len(first) == 1 and first[0]["state"] == "done" and first[0]["summary"].startswith("I made the change")
+          and first[0]["ended"], "list: a finished run has its summary and end")
+    failed = [r for r in runs if r["state"] == "failed"]
+    check(failed and all(r["summary"] for r in failed), "list: a failed run's summary is its reason")
+
+    env = environment("show")[0]
+    run_id = first[0]["id"] if first else "00000000"
+    shown = json.loads(subprocess.check_output([BINARY, "--show", run_id], env=env))
+    check(isinstance(shown, list) and shown[0].get("record") == "request" and shown[-1].get("record") == "end"
+          and shown[-1].get("state") == "done", "show: the lines of the run, request first and end last")
+    missing = subprocess.run([BINARY, "--show", "../../etc"], env=env, capture_output=True)
+    check(missing.returncode != 0, "show: an unknown id is refused")
+
+
+def status():
+    env, _ = environment("status", {"LEVITATE_STANDIN_SIGNED_OUT": ""})
+    out = json.loads(subprocess.check_output([BINARY, "--status"], env=env))
+    codex = [a for a in out.get("agents", []) if a["id"] == "codex"]
+    check(out.get("chosen") == "codex" and len(codex) == 1, "status: chosen codex, listed once")
+    check(codex and codex[0] == {"id": "codex", "name": "Codex", "installed": True, "version": "0.0.0-standin",
+                                 "signed_in": True}, "status: installed, version and signed in (%s)" % codex)
+    env, _ = environment("status", {"LEVITATE_STANDIN_SIGNED_OUT": "1"})
+    out = json.loads(subprocess.check_output([BINARY, "--status"], env=env))
+    check(out["agents"][0]["signed_in"] is False, "status: signed out when login status fails")
+    env, _ = environment("status", {"LEVITATE_AGENT_CODEX": os.path.join(SCRATCH, "none")})
+    out = json.loads(subprocess.check_output([BINARY, "--status"], env=env))
+    check(out["agents"][0]["installed"] is False and out["agents"][0]["signed_in"] is None,
+          "status: not installed, signed_in unknown")
+    env, _ = environment("status", {"LEVITATE_AGENT": DISK_AGENT})
+    out = json.loads(subprocess.check_output([BINARY, "--status"], env=env))
+    check(out["chosen"] == DISK_AGENT and any(a["id"] == DISK_AGENT and a["installed"] for a in out["agents"]),
+          "status: a chosen program is named and found")
+
+
+def main():
+    if not os.access(BINARY, os.X_OK):
+        print("story: %s is not built" % BINARY)
+        return 1
+    shutil.rmtree(SCRATCH, ignore_errors=True)
+    os.makedirs(HOME)
+    story_plain()
+    story_allowed()
+    story_asks()
+    story_administrator(True)
+    story_administrator(False)
+    story_run()
+    story_shell()
+    story_fails("fails", "The model is overloaded")
+    reason = story_fails("signed-out", "sign")
+    check("codex login" in reason, "signed-out: the reason says to sign in")
+    story_fails("dies", "Connection lost")
+    story_stop()
+    story_passthrough()
+    story_config()
+    listing(None)
+    status()
+    print("all flows ended where they should" if not failures else "some flows did not end where they should (%d)" % len(failures))
+    return 0 if not failures else 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())

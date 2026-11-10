@@ -173,7 +173,8 @@ other.
 page where the person says what they want. It goes to the agent as `The
 request:`, `The issue:`, `The facts:` (where a person's own recipes go, how a
 recipe is checked, which recipes exist) and `The expected result:`, which the
-person can change. The agent is `RECIPE_GUI_AGENT` (default `codex`), handed
+person can change. The agent is `RECIPE_GUI_AGENT` (default `levitate-agent`, which starts Codex; see
+`gui/agent/README.md`), handed
 the prompt as one JSON line, `{"prompt": "..."}`, with its input left open. It
 reports with `plan`, `step`, `output`, `agent` and `done`; an `agent` event
 with a `recipe` names what it wrote, and the window opens that recipe to be

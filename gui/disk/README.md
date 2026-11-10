@@ -144,7 +144,7 @@ hands nothing to anyone and compares nothing.
 |---|---|---|
 | `DISK_GUI_ROOTS` | the folders to read, separated by `:` | the home folder, and `/var/lib/recipe` |
 | `DISK_GUI_HOME` | which folder the home rules apply to | the home folder |
-| `DISK_GUI_AGENT` | the agent program | `codex` |
+| `DISK_GUI_AGENT` | the agent program | `levitate-agent`, which starts Codex (`gui/agent/README.md`) |
 | `DISK_GUI_APPARENT` | `1`: count each file's length (the sample is made of empty-but-long files) | off |
 | `DISK_GUI_RECAB` | the program asked to compare the two systems | `recab` |
 | `DISK_GUI_ROOT_HELPER` | what runs it as root; empty: run it as the person | `pkexec` |

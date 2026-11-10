@@ -27,7 +27,7 @@
 Window::Window(QWidget *parent)
     : QMainWindow(parent)
     , home_(qEnvironmentVariable("DISK_GUI_HOME", QDir::homePath()))
-    , agent_(qEnvironmentVariable("DISK_GUI_AGENT", "codex"))
+    , agent_(qEnvironmentVariable("DISK_GUI_AGENT", "levitate-agent"))
     , recab_(qEnvironmentVariable("DISK_GUI_RECAB", "recab"))
     , rootHelper_(qEnvironmentVariable("DISK_GUI_ROOT_HELPER", "pkexec"))
     , systemApp_(qEnvironmentVariable("DISK_GUI_SYSTEM_APP", "recab-gui"))

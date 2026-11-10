@@ -14,7 +14,7 @@ RecipeClient::RecipeClient(QObject *parent)
     , rootHelper_(qEnvironmentVariable("RECIPE_GUI_ROOT_HELPER", "pkexec"))
     , recipesPath_(qEnvironmentVariable("RECIPE_GUI_RECIPES_PATH"))
     , packageRoot_(qEnvironmentVariable("RECIPE_GUI_PACKAGE_ROOT", "/var/lib/recipe"))
-    , agent_(qEnvironmentVariable("RECIPE_GUI_AGENT", "codex"))
+    , agent_(qEnvironmentVariable("RECIPE_GUI_AGENT", "levitate-agent"))
 {
 }
 

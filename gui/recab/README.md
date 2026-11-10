@@ -92,7 +92,7 @@ running elsewhere, finishing, setting the restart and cancelling it, the
 restart, the trial kept by hand, going back, the reset, discarding) runs against `fixtures/recab-real` with
 `--real`. It stops at once when the system cannot be read, before anything is
 asked of the agent. Always name a stand-in agent for it: the default agent is
-`codex`.
+`levitate-agent`, which starts Codex (see `gui/agent/README.md`).
 
 ```sh
 QT_QPA_PLATFORM=offscreen RECAB_GUI_RECAB=$F/recab-real RECAB_GUI_AGENT=$F/agent-real \
