@@ -166,12 +166,13 @@ packages = [
   "wpa_supplicant", "firefox", "systemd-pam",
   # Battery state and power profiles, mounting removable drives, and the
   # wallet unlocked at login (pam_kwallet5, which Fedora's SDDM PAM file loads).
-  "upower", "power-profiles-daemon", "udisks2", "kwallet-pam",
+  "upower", "power-profiles-daemon", "udisks2", "pam-kwallet",
   # Bluetooth, printing (CUPS with driverless network and IPP-over-USB
-  # printers, found through Avahi), video decoding, Thunderbolt, exFAT and NTFS
+  # printers, found through Avahi), Intel video decoding (Mesa's VA drivers
+  # are in mesa-dri-drivers), Thunderbolt, exFAT and NTFS
   # drives, OpenVPN, and the guest agents of the libvirt test VMs.
-  "bluez", "bluedevil", "cups", "cups-filters", "ipp-usb", "avahi", "print-manager",
-  "mesa-va-drivers", "intel-media-driver", "bolt", "plasma-thunderbolt", "exfatprogs", "ntfs-3g",
+  "bluez", "bluedevil", "cups", "cups-filters", "ipp-usb", "avahi", "plasma-print-manager",
+  "libva-intel-media-driver", "bolt", "plasma-thunderbolt", "exfatprogs", "ntfs-3g",
   "NetworkManager-openvpn", "plasma-nm-openvpn", "spice-vdagent", "qemu-guest-agent",
   # Fonts for documents and CJK text, file thumbnails, manual pages, the
   # screen reader.

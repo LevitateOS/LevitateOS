@@ -67,9 +67,9 @@ Details and paths are in [desktop-theming.md](desktop-theming.md).
   `f45-backgrounds-*`, `fedora-release*` if the desktop request pulls them in.
   When `kde-settings-plasma` goes, the start button step must set the icon
   through our own Global Theme instead of Fedora's scripts.
-- [ ] **L** Remove the two Fedora files inside packages we keep:
-  `usr/share/sddm/themes/01-breeze-fedora` and Firefox's
-  `firefox-redhat-default-prefs.js`.
+- [x] **L** Remove the two Fedora files inside packages we keep:
+  `usr/share/sddm/themes/01-breeze-fedora` (removed) and Firefox's
+  `firefox-redhat-default-prefs.js` (rewritten without Fedora's start page).
 - [ ] **L** Own SDDM theme `levitateos` (Breeze's QML with the lockup,
   `color=#14221A`), replacing the override of Breeze.
 - [ ] **L** About page: `/etc/xdg/kcm-about-distrorc` (logo, website, variant).
@@ -86,7 +86,11 @@ Details and paths are in [desktop-theming.md](desktop-theming.md).
   copy that is there now and `sddm-breeze` (**decide**).
 - [ ] **L A** `LOGO=<id>-logo-icon` and `HOME_URL` in os-release (builder,
   `pipeline/source.rs`), and the icon `<id>-logo-icon` in hicolor.
-- [ ] **L A** Firefox: homepage and default prefs file for each system.
+- [x] **L A** Firefox's default prefs file for each system: the OS as Firefox's
+  distribution, Fedora's start page gone from the packaged prefs (renamed
+  `<id>-default-prefs.js`).
+- [ ] **L A** Firefox homepage: `https://levitateos.org` for L; AcornOS has no
+  site of its own yet (**decide**).
 - [ ] **L A** Default user picture (keep Breeze's, or supply one).
 - [ ] **L A** Cursor theme set the same in SDDM, the session and GTK apps.
 - [ ] **L A** Boot splash: Plymouth is in neither lock; a theme also needs a
@@ -96,14 +100,14 @@ Details and paths are in [desktop-theming.md](desktop-theming.md).
 
 ### LevitateOS (Plasma on Wayland)
 
-- [ ] `upower` is not in the lock: no battery state, no low-battery action in
+- [x] `upower` is not in the lock: no battery state, no low-battery action in
   PowerDevil.
-- [ ] `power-profiles-daemon` (or `tuned-ppd`) is not in the lock: no power
-  profile switch.
-- [ ] `udisks2` is not in the lock: Dolphin and the device notifier cannot
-  mount USB drives. Add it, with `plasma-disks` for disk health if wanted.
-- [ ] `kwallet-pam` is not in the lock: the wallet does not unlock at login, so
-  Wi-Fi passwords prompt each time. Add it and its PAM lines for SDDM.
+- [x] `power-profiles-daemon` is in the lock and enabled: the power profile
+  switch.
+- [x] `udisks2` is in the lock: Dolphin and the device notifier mount USB
+  drives. (`plasma-disks` for disk health is left out.)
+- [x] `kwallet-pam` is in the lock; Fedora's SDDM PAM files already load
+  `pam_kwallet5`, so the wallet unlocks at login.
 - [ ] `plasma-systemmonitor`, `kscreen`, `powerdevil`, `plasma-nm`, `plasma-pa`
   are requested; check after the lock that `kde-gtk-config`'s daemon,
   `xdg-desktop-portal-kde` and `polkit-kde` start with the session.
@@ -117,29 +121,31 @@ Details and paths are in [desktop-theming.md](desktop-theming.md).
 
 ### AcornOS (LXQt on X11)
 
-- [ ] `udisks2` and `gvfs` are not in the lock: the panel's removable-media
-  button and pcmanfm-qt cannot mount drives, and there is no trash or network
-  browsing.
-- [ ] `setxkbmap` is not in the lock: LXQt's keyboard layout settings and the
+- [x] `udisks2` and `gvfs` are in the lock: the removable-media button and
+  pcmanfm-qt mount drives, with trash. (`gvfs-smb` / `gvfs-nfs` for network
+  browsing are left out; see section 4.)
+  Alpine's `gvfs` links against `gnome-online-accounts`, which brings GTK 4,
+  libadwaita and GStreamer's bad plug-ins (with `flite`): about 40 MB of the
+  202 packages this added. Part of decision 2: keep it, or drop `gvfs` and
+  lose trash, phones and cameras in pcmanfm-qt.
+- [x] `setxkbmap` is not in the lock: LXQt's keyboard layout settings and the
   layout indicator need it.
-- [ ] `xrandr` is not in the lock; `libkscreen` is, which LXQt's monitor
-  settings use. Check that its X11 backend is installed.
+- [x] `xrandr` is in the lock. Still to check: `libkscreen`'s X11 backend for
+  LXQt's monitor settings.
 - [ ] No compositor (`picom`) in the lock: no shadows or transparency, and
   tearing on some hardware (**decide**: add, or stay without).
-- [ ] Screen lock: `xscreensaver` is in the lock; set it as LXQt's lock command,
-  start it with the session, and give it the brown look instead of its default
-  dialog.
+- [x] Screen lock: `xscreensaver` is in the lock and `lxqt-session`'s autostart
+  entry starts it with the session; LXQt locks through it.
+- [ ] xscreensaver's unlock dialog in the brown look instead of its default.
 - [ ] Session autostart: confirm `lxqt-policykit`, `lxqt-powermanagement`,
   `lxqt-notificationd`, `nm-applet` and PipeWire start (their autostart files
   come from the packages; `nm-applet`'s must not be hidden in LXQt).
-- [ ] `xdg-desktop-portal` and a back-end (`xdg-desktop-portal-lxqt` or `-gtk`)
-  are not in the lock: Firefox's file dialogs and screen sharing fall back or
-  fail.
-- [ ] `libnotify` is not in the lock (`notify-send` for scripts).
-- [ ] gnome-keyring is in the lock: add its PAM lines for SDDM so it unlocks at
-  login (NetworkManager's applet stores Wi-Fi passwords in it).
-- [ ] X11 input defaults: tap-to-click and natural scrolling for touchpads
-  (`/etc/X11/xorg.conf.d/` for libinput).
+- [x] `xdg-desktop-portal` and `xdg-desktop-portal-lxqt` are in the lock.
+- [x] `libnotify` is not in the lock (`notify-send` for scripts).
+- [x] gnome-keyring unlocks at login: Alpine's SDDM PAM files already load
+  `pam_gnome_keyring` (from `gnome-keyring-pam`, in the lock).
+- [x] X11 input defaults: tap-to-click and natural scrolling for touchpads
+  (`/etc/X11/xorg.conf.d/40-touchpad.conf`).
 - [ ] Default panel layout (`/etc/xdg/lxqt/panel.conf`): decide the plug-ins
   (the desktop switcher and quick-launch defaults are upstream's).
 - [ ] Global shortcuts (`lxqt-globalkeys`): volume, brightness, screenshot,
@@ -152,42 +158,46 @@ Details and paths are in [desktop-theming.md](desktop-theming.md).
 
 ## 4. Hardware
 
-- [ ] **L A** Bluetooth: no `bluez` daemon in either lock. Add `bluez`, plus
-  `bluedevil` (L) or `blueman` (A), and enable the service (**decide** for A:
-  it is a large addition to a small system).
-- [ ] **L A** Printing: only the CUPS libraries are in the locks. Add `cups`,
-  `cups-filters`, driverless (IPP Everywhere) support, and `print-manager` (L)
-  or `system-config-printer` (A); enable `cups.socket` / `cupsd` (**decide**
-  for A).
+- [x] **L** Bluetooth: `bluez` and `bluedevil`, `bluetooth.service` enabled.
+- [ ] **A** Bluetooth: `bluez` and `blueman`, and the service (**decide**: it is
+  a large addition to a small system).
+- [x] **L** Printing: `cups`, `cups-filters`, `ipp-usb`, Avahi for finding
+  driverless printers, `print-manager`; `cups` and `avahi-daemon` enabled.
+- [ ] **A** Printing: the same with `system-config-printer` and `cupsd`
+  (**decide**).
 - [ ] **L A** Scanning: `sane-backends` with `skanlite` (L) or `simple-scan`
   (**decide**).
-- [ ] **L A** Video acceleration: `libva` is present but no driver. Add
+- [x] **L A** Video acceleration: `libva` is present but no driver. Add
   `mesa-va-drivers` and `intel-media-driver` (L), `mesa-va-gallium` and
   `intel-media-driver` (A).
-- [ ] **A** Vulkan: no loader or Mesa Vulkan drivers in the lock.
+- [x] **A** Vulkan: `vulkan-loader` with Mesa's Intel and AMD drivers.
 - [ ] **L A** NVIDIA: only the open kernel driver (nouveau) and, on L, the GPU
   firmware once the lock is regenerated. The proprietary driver is a Recipe
   job (**decide** whether to support it).
-- [ ] **A** `fwupd` is not in the lock (L has it); firmware updates for laptops
+- [x] **A** `fwupd` is in the lock (L had it); firmware updates for laptops
   and docks.
-- [ ] **L A** Thunderbolt (`bolt`, `plasma-thunderbolt` on L).
-- [ ] **L A** Phones and cameras: `libmtp` is on L through `kio-extras`; A has
-  nothing (needs `gvfs-mtp`, `gvfs-gphoto2`).
-- [ ] **L A** File systems on USB drives: neither lock has `exfatprogs` or
-  `ntfs-3g`; the kernel configs need exFAT and NTFS3 on.
+- [x] **L** Thunderbolt (`bolt`, `plasma-thunderbolt`).
+- [ ] **A** Thunderbolt (`bolt`; LXQt has no settings page for it).
+- [x] **L A** Phones and cameras: `libmtp` on L through `kio-extras`;
+  `gvfs-mtp` and `gvfs-gphoto2` on A.
+- [x] **L A** `exfatprogs` and `ntfs-3g` in both locks.
+- [ ] **L A** The kernel configs need exFAT and NTFS3 on (see the kernel
+  config item below).
 - [ ] **L A** Network shares: A has no SMB or NFS support; L has the Samba
   client libraries through `kio-extras`.
 - [ ] **L A** Mobile broadband: only the ModemManager libraries on L, nothing
   on A (**decide**).
-- [ ] **L A** VPN: no NetworkManager VPN plug-ins (WireGuard works in
-  NetworkManager itself; OpenVPN needs `NetworkManager-openvpn`).
+- [x] **L A** VPN: OpenVPN through `NetworkManager-openvpn` and
+  `plasma-nm-openvpn` (L), `networkmanager-openvpn` (A); WireGuard is in
+  NetworkManager itself.
 - [ ] **L A** Laptop basics: brightness keys, lid close, suspend and hibernate
   settings (logind / elogind configuration), battery thresholds.
 - [ ] **L A** Webcam: `libcamera` is on A only; check PipeWire camera support
   on both.
-- [ ] **L A** Virtual machine guests: neither lock has `spice-vdagent` or
-  `qemu-guest-agent`, so clipboard sharing and display resize do not work in
-  the libvirt test VMs.
+- [x] **L** Virtual machine guests: `spice-vdagent` and `qemu-guest-agent`,
+  started by their udev rules when the VM has the port.
+- [ ] **A** Virtual machine guests: Alpine's OpenRC services for both fail on
+  hardware without the VM's port; they need a start that checks for it first.
 - [ ] **L A** Kernel configs: confirm DRM drivers, evdev, HID multitouch,
   Bluetooth, USB audio, webcam (UVC), exFAT, NTFS3 and the Wi-Fi drivers the
   firmware above is for.
@@ -220,20 +230,21 @@ Small on purpose; everything else comes through Recipe (section 6).
 - [ ] **L A** Codecs: L has Fedora's `libavcodec-free` and `noopenh264`, so
   H.264 and AAC do not play; A has full ffmpeg libraries but no GStreamer.
   Decide what ships and what comes through Recipe (**decide**).
-- [ ] **L A** Fonts: Noto Sans, Mono and emoji on L, `font-noto` on A. Add
-  Noto Serif, a CJK set and metric-compatible fonts for documents
-  (Liberation or Carlito/Caladea).
-- [ ] **L A** Thumbnails: add `kdegraphics-thumbnailers` and
+- [x] **L** Fonts: Noto Serif, Noto Sans CJK and Liberation added.
+- [x] **A** Fonts: Liberation added (`font-noto` already has Serif).
+- [ ] **A** A CJK set (`font-noto-cjk`, large; part of decision 2).
+- [x] **L A** Thumbnails: add `kdegraphics-thumbnailers` and
   `ffmpegthumbs` (L); pcmanfm-qt needs `ffmpegthumbnailer` (A).
-- [ ] **L A** Spell checking: `hunspell-en-US` is on L only.
-- [ ] **L A** Default apps: `/usr/share/applications/mimeapps.list` (browser,
-  text, images, PDF, archives, folders).
-- [ ] **L A** Home folders: `xdg-user-dirs` is in both locks; make sure
-  `xdg-user-dirs-update` runs at first login (LXQt needs an autostart entry).
+- [x] **L A** Spell checking: `hunspell-en-US` on L, `hunspell-en` on A.
+- [x] **L A** Default apps: `/usr/share/applications/mimeapps.list` (browser,
+  text on L, images, PDF, archives, folders). Images open in Firefox on L
+  until an image viewer ships; A has no text editor.
+- [x] **L A** Home folders: `xdg-user-dirs` is in both locks and its own
+  autostart entry runs `xdg-user-dirs-update` at login on both desktops.
 - [ ] **L A** Menu clean-up: hide entries that make no sense for a user
   (duplicate settings modules, `lxqt-admin`'s user tool if recsetup owns users,
   Avahi browsers and the like).
-- [ ] **L A** Manual pages: neither lock has `man-db` or `mandoc`.
+- [x] **L A** Manual pages: `man-db` (L), `mandoc` and `man-pages` (A).
 
 ## 6. Software through Recipe
 
@@ -276,7 +287,8 @@ The desktop adds no other package manager, store or bundle format.
   (it is enabled by alias); show it as enabled.
 - [ ] **L A** First login: a short welcome (what the system is, how to get
   software with Recipe, how updates work) (**decide** if wanted).
-- [ ] **L A** The live session must not sleep or lock during an install.
+- [x] **L A** The live session must not sleep or lock during an install
+  (`stay_awake` in `live-overlay.rhai`; lid close still follows logind).
 - [ ] **L A** Live user's password `live` is shown nowhere on the desktop; put
   it in the welcome or on the lock screen hint.
 
@@ -303,8 +315,8 @@ The desktop adds no other package manager, store or bundle format.
   on A. Add fcitx5 or ibus if those languages are supported (**decide**).
 - [ ] **L A** Time zone: recsetup sets it; check the panel clocks follow, and
   decide on automatic time zone (geoclue is on L only).
-- [ ] **L A** Time sync: chrony is in both locks; make sure it is enabled on
-  the desktop system.
+- [x] **L A** Time sync: chronyd is enabled on every system
+  (`capability_services`).
 - [ ] **L A** Clock format, first day of the week and paper size follow the
   locale.
 
@@ -323,12 +335,14 @@ The desktop adds no other package manager, store or bundle format.
   password (mount a USB drive, connect to Wi-Fi, suspend, change time zone).
 - [ ] **L A** Encrypted installs: unlock prompt at boot is console text
   without Plymouth.
-- [ ] **L A** Firefox: telemetry and first-run pages (policy file).
+- [x] **L A** Firefox: `distribution/policies.json` turns off telemetry, studies,
+  first-run and what's-new pages and the built-in updater.
 
 ## 11. Accessibility
 
-- [ ] **L A** Screen reader: Orca is in neither lock (`at-spi2-core` is in
-  both).
+- [x] **L** Screen reader: Orca.
+- [ ] **A** Screen reader: Orca pulls GTK and Python into the small system
+  (part of decision 2).
 - [ ] **L A** On-screen keyboard: `plasma-keyboard` is on L; A has none.
 - [ ] **L A** High-contrast and large-text settings reachable from the login
   screen.
@@ -351,7 +365,8 @@ The desktop adds no other package manager, store or bundle format.
 
 1. Light or dark as the default look on each system.
 2. How small AcornOS stays: Bluetooth, printing, scanning, a compositor, a
-   media player and input methods each add a lot.
+   media player, input methods, a CJK font set and Orca each add a lot; `gvfs`
+   (already in) drags GTK 4 and GStreamer with it.
 3. Which apps ship in the image and which come only through Recipe
    (section 5), and the first set of app recipes (section 6).
 4. Codecs: what ships, what is a recipe.
