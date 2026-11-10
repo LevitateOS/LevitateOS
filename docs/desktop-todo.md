@@ -369,8 +369,8 @@ is carried out.
 1. **Look:** LevitateOS starts dark, AcornOS starts light.
 2. **AcornOS size:** Bluetooth ships (`bluez`, `blueman`, the service).
    Printing, scanning, Orca, the CJK fonts and a compositor stay out. `gvfs`
-   goes: it was not kept, so pcmanfm-qt loses trash, phones and cameras and
-   mounts drives through udisks2 alone.
+   stays, with the GTK 4 and GStreamer it brings: trash, phones and cameras
+   in pcmanfm-qt.
 3. **Apps in the image:** LevitateOS adds KCalc (Gwenview, Okular and a media
    player are Recipe's). AcornOS adds `unzip` and `7zip`, a text editor
    (Mousepad: GTK 3 is already in for Firefox; KWrite would bring KDE
