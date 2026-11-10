@@ -172,10 +172,11 @@ void SystemPage::show(const Status &s)
                "work, say which and leave it out."));
         auto *buttons = new QHBoxLayout;
         auto *again = new QPushButton(tr("Try the same again"));
-        auto *drop = new QPushButton(tr("Discard the next system…"));
+        auto *drop = new QPushButton(tr("Reset to the running system…"));
+        drop->setToolTip(tr("Gives up every change in the next system and makes it an exact copy of the running one"));
         auto *fixNow = primary(tr("Let the agent fix it"));
         connect(again, &QPushButton::clicked, this, &SystemPage::retry);
-        connect(drop, &QPushButton::clicked, this, &SystemPage::discard);
+        connect(drop, &QPushButton::clicked, this, &SystemPage::reset);
         connect(fixNow, &QPushButton::clicked, this, [this, prompt] { emit fix(prompt->prompt()); });
         buttons->addWidget(again);
         buttons->addWidget(drop);
@@ -211,7 +212,8 @@ void SystemPage::show(const Status &s)
             pair->addWidget(card(Card::Ready, Glyph::Check, tr("The next system"), under,
                                  titles + QStringList{tr("Ready: starts when you restart into it")}), 1);
         else
-            pair->addWidget(card(Card::Open, Glyph::Plus, tr("The next system"), under, titles,
+            pair->addWidget(card(Card::Open, Glyph::Plus, tr("The next system"), under,
+                                 plus ? titles : QStringList{tr("No change yet: exactly the running system")},
                                  tr("Open: not finished, cannot be started yet")), 1);
     } else if (s.otherRole == QLatin1String("previous")) {
         // The real recab does not name the release the other system holds.
@@ -293,15 +295,16 @@ void SystemPage::show(const Status &s)
                         tr("Go back…"), s.can("go_back")),
                     &QPushButton::clicked, this, &SystemPage::goBack);
     }
+    // Whatever state the next system is in, it can be made the running
+    // system again: every change given up, the partition an exact copy.
+    if (next)
+        connect(act(list, tr("Reset to the running system"),
+                    tr("Gives up every change in the next system and makes it an exact copy of the running system "
+                       "again. The running system is not touched."),
+                    tr("Reset…"), s.can("discard")),
+                &QPushButton::clicked, this, &SystemPage::reset);
     column->addWidget(group);
     column->addStretch();
-
-    if (next && s.state != QLatin1String("interrupted")) {
-        auto *drop = new ClickLabel(tr("Discard the next system's changes…"));
-        dim(drop);
-        connect(drop, &ClickLabel::clicked, this, &SystemPage::discard);
-        column->addWidget(drop, 0, Qt::AlignLeft);
-    }
 }
 
 // ---------------------------------------------------------------- Ask

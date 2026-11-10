@@ -161,7 +161,8 @@ Events, one JSON object per line on stderr:
 | the next system's changes | only `preparation.last_change` and `change`: recab's status names the last one, not all |
 | Make a change | allowed when a preparation is open, else by the verdict on `prepare` |
 | Finish | `recab finalize --preparation ID --revision N` |
-| Discard | `recab discard --preparation ID --revision N` |
+| Reset to the running system | `recab discard --preparation ID --revision N`, then `recab prepare`: discarding only forgets the next system and leaves its files; preparing again copies the running system over them. recab has no single command for it |
+| Discard (only after an interruption) | `recab discard --preparation ID --revision N` |
 | Continue (after an interruption) | `recab prepare --preparation ID --revision N` |
 | Restart into it | `recab set-next SLOT`, then the restart |
 | Go back | `recab rollback`, then the restart |

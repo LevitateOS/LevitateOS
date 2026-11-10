@@ -134,6 +134,20 @@ int takeShots(Window &window, const QString &folder)
     waitUntilIdle(window);
     expect("reading again keeps the state", window.status().state == "stable");
 
+    // A change, then the reset: the next system is the running one again.
+    window.handOver(asked(sshd), false);
+    for (int waited = 0; !window.agentAsks() && window.busy() && waited < 200; ++waited)
+        settle(50);
+    window.answerAgent(QStringLiteral("Leave it"));
+    waitUntilIdle(window);
+    expect("a change is there to be reset", window.status().changes.size() == 1);
+    window.reset(false);
+    waitUntilIdle(window);
+    expect("the reset leaves a next system without changes",
+           window.status().otherRole == "next" && window.status().changes.isEmpty()
+               && window.status().state == "preparing");
+    save(window, "12-reset");
+
     out << (ok ? "all flows ended where they should\n" : "some flows did not end where they should\n");
     return ok ? 0 : 1;
 }
@@ -200,12 +214,20 @@ int takeRealShots(Window &window, const QString &folder)
 
     window.handOver(asked(nvidia), false);
     waitUntilIdle(window);
-    expect("a second change opens a next system again", window.status().state == "preparing");
+    expect("a second change opens a next system again",
+           window.status().state == "preparing" && window.status().changes.size() == 1);
+    const QString before = window.status().preparationId;
+    window.reset(false);
+    waitUntilIdle(window);
+    expect("the reset leaves a new, empty next system",
+           window.status().state == "preparing" && window.status().changes.isEmpty()
+               && !window.status().preparationId.isEmpty() && window.status().preparationId != before);
+    save(window, "r6-reset");
     window.discard(false);
     waitUntilIdle(window);
     expect("discarding leaves no next system",
            window.status().state == "stable" && window.status().preparationId.isEmpty());
-    save(window, "r6-discarded");
+    save(window, "r7-discarded");
 
     out << (ok ? "all flows ended where they should\n" : "some flows did not end where they should\n");
     return ok ? 0 : 1;

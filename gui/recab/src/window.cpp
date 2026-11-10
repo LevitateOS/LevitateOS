@@ -39,6 +39,7 @@ Window::Window(QWidget *parent)
     connect(system_, &SystemPage::addUpdate, this, [this] { addUpdate(); });
     connect(system_, &SystemPage::goBack, this, [this] { goBack(); });
     connect(system_, &SystemPage::discard, this, [this] { discard(); });
+    connect(system_, &SystemPage::reset, this, [this] { reset(); });
     connect(system_, &SystemPage::finish, this, &Window::finish);
     connect(system_, &SystemPage::restart, this, &Window::restart);
     connect(system_, &SystemPage::retry, this, &Window::restart);
@@ -308,6 +309,43 @@ void Window::discard(bool askFirst)
             return;
     }
     chain({client_.change({"discard"})});
+}
+
+// recab has no single command for this: discarding forgets the next system
+// but leaves its files as they are; preparing again copies the running system
+// over them. Both together are the reset.
+void Window::reset(bool askFirst)
+{
+    if (askFirst) {
+        ConfirmDialog question(
+            tr("Reset"), tr("Reset the next system to the running one?"),
+            {tr("Every change in the next system is given up."),
+             tr("It becomes an exact copy of the running system again. Only what differs is copied.")},
+            tr("The running system is not touched. A system from before does not come back."), tr("Reset"), this);
+        if (question.exec() != QDialog::Accepted)
+            return;
+    }
+    Run *drop = client_.change({"discard"});
+    setEnabled(false);
+    ++quiet_;
+    connect(drop, &Run::finished, this, [this, drop](bool ok) {
+        setEnabled(true);
+        --quiet_;
+        const QString reason = drop->problem();
+        drop->deleteLater();
+        if (!ok) {
+            QMessageBox::warning(this, tr("System"), reason.isEmpty() ? tr("The next system was not reset.") : reason);
+            reload([this] { showMain(); });
+            return;
+        }
+        // Read first, so the copy is asked for as a new preparation. The
+        // copy is the long part and gets the work page.
+        reload([this] {
+            work(client_.change({"prepare"}), tr("Making the next system a copy of the running one"),
+                 tr("Only what differs is copied. The running system is not touched."), [this](bool) { showMain(); });
+        });
+    });
+    drop->start();
 }
 
 void Window::acceptProposal()

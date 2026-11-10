@@ -32,6 +32,8 @@ public:
     void addUpdate(bool askFirst = true);
     void goBack(bool askFirst = true);
     void discard(bool askFirst = true);
+    // Discards the next system, then makes it a copy of the running one again.
+    void reset(bool askFirst = true);
     void finish();
     void restart();
     void recover();

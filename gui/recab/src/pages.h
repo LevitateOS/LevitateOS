@@ -32,6 +32,9 @@ signals:
     void finish();
     void restart();
     void discard();
+    // Give up every change in the next system and make it an exact copy of
+    // the running system again.
+    void reset();
     void recover();
     void settle();
     void fix(const QString &prompt);
