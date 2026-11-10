@@ -19,7 +19,7 @@ use super::{Launch, Tools};
 use crate::cli::{Distro, INSPECT_SIZE, INSPECT_WAIT};
 use crate::util::pty_capture::parse_keys;
 use distro_builder::tui_apps::{Story, TuiApp, Workspace};
-use distro_contract::install_ux::{DOCS, DOCS_PAGE, HUB};
+use distro_contract::install_ux::{DOCS, DOCS_PAGE, DOCS_PANE, HUB};
 
 /// Console sizes the install screen runs on: a serial terminal, and the 1920x1080
 /// framebuffer the live kernel command line asks for (`video=1920x1080`) in 8x16 cells.
@@ -89,7 +89,7 @@ pub fn run(bless: bool) -> Result<()> {
         for (pane, distro) in pane.into_iter().flat_map(|pane| distros.iter().map(move |d| (pane, d))) {
             let mut args = launch.distro_args(distro);
             if pane == 1 {
-                args.extend([app.page_arg()?.to_string(), DOCS_PAGE.to_string()]);
+                args.extend([DOCS_PANE.to_string(), app.page_arg()?.to_string(), DOCS_PAGE.to_string()]);
             }
             for &(columns, rows) in CONSOLES {
                 let (pane_columns, pane_rows) = install_split_pane::pane_sizes(columns, rows)[pane];
