@@ -57,24 +57,16 @@ void clickButton(QWidget *inside, const QString &words)
             button->click();
 }
 
-bool railHas(Frame *frame, const QString &title)
-{
-    for (QAbstractButton *button : frame->findChildren<QAbstractButton *>())
-        if (button->text() == title && button->isVisible())
-            return true;
-    return false;
-}
-
 // What the window is as a frame: the rail, the pages in it and what the
 // Browse page's search and kinds still do. Pictures `f*`.
 void frameShots(Window &window, const Save &save, const Expect &expect)
 {
     Frame *frame = window.frame();
     for (const char *title : {"Browse", "Installed", "Updates", "Sources", "Activity"})
-        expect(QStringLiteral("the rail has %1").arg(title), railHas(frame, QString::fromLatin1(title)));
+        expect(QStringLiteral("the rail has %1").arg(title), frame->entryTitles().contains(QString::fromLatin1(title)));
     for (const char *title : {"Storage", "Settings", "Help"})
         expect(QStringLiteral("the rail has no %1: that page does not exist").arg(title),
-               !railHas(frame, QString::fromLatin1(title)));
+               !frame->entryTitles().contains(QString::fromLatin1(title)));
     expect(QStringLiteral("the window is 1100 by 700"), window.size() == QSize(1100, 700));
 
     window.chooseSource(QString());
@@ -179,15 +171,15 @@ void activityShots(Window &window, const QString &folder, const Save &save, cons
     frame->readAgain();
     waitFor([&] { return page->loaded() && frame->badge(Frame::activityKey()) > 0; });
     expect(QStringLiteral("the Activity entry counts the one run that waits"),
-           frame->badge(Frame::activityKey()) == 1 && frame->badgeWarns(Frame::activityKey()));
+           frame->badge(Frame::activityKey()) == 2 && frame->badgeWarns(Frame::activityKey()));
 
     frame->choose(Frame::activityKey());
-    waitFor([&] { return page->listedTitles().size() == 4 && !page->detailText().isEmpty(); });
+    waitFor([&] { return page->listedTitles().size() == 5 && !page->detailText().isEmpty(); });
     expect(QStringLiteral("Activity is showing and marked"), frame->activityShown() && frame->selected() == Frame::activityKey());
-    expect(QStringLiteral("Activity lists the four runs, newest first"),
+    expect(QStringLiteral("Activity lists the five runs, newest first"),
            page->listedTitles()
                == QStringList({"Install the NVIDIA driver", "Update Element", "Turn off password logins over ssh",
-                               "Install htop for this computer"}));
+                               "Install htop for this computer", "Install Krita for this computer"}));
     save(window, "a-activity-list");
 
     page->chooseTitle("Install htop for this computer");
@@ -199,7 +191,8 @@ void activityShots(Window &window, const QString &folder, const Save &save, cons
     // The run that waits is this window's own: Go to it leaves Activity for the work page.
     page->chooseTitle("Turn off password logins over ssh");
     waitFor([&] { return page->detailText().contains("It asks"); });
-    page->setOwnRun(waitingPid);
+    frame->setOwnRun(waitingPid);
+    expect(QStringLiteral("the frame knows the pid of this window's own run"), frame->ownRun() == waitingPid && waitingPid > 0);
     waitFor([&] { return page->offersGoTo(); });
     expect(QStringLiteral("this window's own live run offers Go to it"),
            page->offersGoTo() && page->detailText().contains("It waits in this window"));
@@ -209,12 +202,12 @@ void activityShots(Window &window, const QString &folder, const Save &save, cons
     expect(QStringLiteral("Go to it leaves Activity for Recipe's own pages"),
            !frame->activityShown() && frame->selected() == "browse");
     frame->choose(Frame::activityKey());
-    page->setOwnRun(0);
+    frame->setOwnRun(0);
     waitFor([&] { return page->loaded() && !page->offersGoTo(); });
 
     page->showOnlyThisApp(true);
     expect(QStringLiteral("only Recipe's runs are listed"),
-           page->listedTitles() == QStringList({"Update Element", "Install htop for this computer"}));
+           page->listedTitles() == QStringList({"Update Element", "Install htop for this computer", "Install Krita for this computer"}));
     save(window, "a-only-recipe");
     page->showOnlyThisApp(false);
 
@@ -235,7 +228,7 @@ void activityShots(Window &window, const QString &folder, const Save &save, cons
 
     QProcess::execute(script, {"--stop", where});
     qunsetenv("XDG_STATE_HOME");
-    page->setOwnRun(0);
+    frame->setOwnRun(0);
     window.showBrowse();
     settle(100);
 }

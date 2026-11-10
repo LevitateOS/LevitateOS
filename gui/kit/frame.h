@@ -69,6 +69,7 @@ public:
     // Something shown beside the words ("Read again"), in the order added.
     void addStatusWidget(QWidget *widget);
     // Said in the status line for a few seconds, in place of the app's words.
+    // An empty text ends a flash at once.
     void flash(const QString &words);
     // The agent the app starts. `levitate-agent` is asked for its status
     // (`--status`) without holding anything up; any other program is shown by
@@ -80,11 +81,19 @@ public:
     QString agentText() const;
     QString statusText() const;
 
+    // Starts an app's program detached, exactly as choosing it in the rail
+    // does (the same variables); the status line says when it cannot be started.
+    void startApp(App app);
+    // The titles of the rail's entries in order, the app's own and Activity,
+    // without the three apps.
+    QStringList entryTitles() const;
+
     // ---- Activity, which the frame owns.
     ActivityPage *activity() const { return activity_; }
     // The agent process this window started and waits for, or 0. Activity
     // offers "Go to it" for that run; setting 0 (the run ended) reads again.
     void setOwnRun(qint64 pid);
+    qint64 ownRun() const { return ownRun_; }
 
 public slots:
     // Reads Activity and the agent's status again. Connect the app's
@@ -121,4 +130,5 @@ private:
     QString statusWords_, flashWords_, agentName_, agentNote_, agentProgram_;
     Run *asking_ = nullptr;
     bool stripAllowed_ = true;
+    qint64 ownRun_ = 0;
 };

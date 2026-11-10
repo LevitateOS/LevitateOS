@@ -37,7 +37,10 @@ void setNextSystem(QStringList titles);  // the strip; empty hides it
 void setStripAllowed(bool);              // keep the strip away from the page that says it itself
 void setStatus(QString);                 // left of the status line: what was read and when
 void addStatusWidget(QWidget *);         // beside it, e.g. "Read again"
-void flash(QString);                     // said for a few seconds in place of the status
+void flash(QString);                     // said for a few seconds in place of the status; empty ends it at once
+void startApp(App);                      // starts another app as the rail does; says so when it cannot
+QStringList entryTitles() const;         // the rail's entries in order, without the three apps
+qint64 ownRun() const;                   // what setOwnRun was given
 void setAgent(QString program);          // right of the status line (see below)
 void setAgentNote(QString);              // while the agent works; empty restores its name
 void setOwnRun(qint64 pid);              // the agent process this window waits for; 0 when it ended

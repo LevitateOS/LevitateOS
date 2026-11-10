@@ -15,6 +15,7 @@
 #include <QPainter>
 #include <QPushButton>
 #include <QSignalBlocker>
+#include <QScrollArea>
 #include <QTreeWidget>
 #include <QTreeWidgetItemIterator>
 #include <QVBoxLayout>
@@ -437,7 +438,7 @@ QString Comparison::expected() const
 // One system as a frame that fills while it is read, or stands empty.
 class SideFrame : public QWidget {
 public:
-    SideFrame() { setMinimumSize(200, 120); }
+    SideFrame() { setMinimumSize(200, 150); }
     void set(double done, const QString &words)
     {
         done_ = done;
@@ -679,9 +680,6 @@ void SystemsPage::show(const Comparison &c, const QString &said, const QDateTime
 {
     QVBoxLayout *column = fresh();
     forget();
-    // Closer than the other pages: with the agent's answer shown, the maps and
-    // the list must still fit in 700 pixels beside the frame's strip.
-    column->setSpacing(8);
 
     auto *header = new QHBoxLayout;
     auto *top = new QVBoxLayout;
@@ -721,11 +719,24 @@ void SystemsPage::show(const Comparison &c, const QString &said, const QDateTime
     header->addWidget(again, 0, Qt::AlignBottom);
     column->addLayout(header);
 
+    // Only what is under the header scrolls: the maps and the list keep a size
+    // that can be read, and the header and the frame's strip stay in place.
+    auto *scroll = new QScrollArea;
+    scroll->setWidgetResizable(true);
+    scroll->setFrameShape(QFrame::NoFrame);
+    scroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    auto *inside = new QWidget;
+    auto *body = new QVBoxLayout(inside);
+    body->setContentsMargins(0, 0, 8, 0);
+    body->setSpacing(14);
+    scroll->setWidget(inside);
+    column->addWidget(scroll, 1);
+
     if (stale) {
         auto *old = new Card(Card::Open);
         old->column()->addWidget(strong(tr("The systems have changed since this was compared")));
         old->column()->addWidget(text(tr("What is shown is how they were then. Compare again to see how they are now."), true));
-        column->addWidget(old);
+        body->addWidget(old);
     }
 
     // The two systems as blocks, side by side, with one layout for both.
@@ -747,13 +758,13 @@ void SystemsPage::show(const Comparison &c, const QString &said, const QDateTime
     right->addWidget(there_, 1);
     sides->addLayout(left, 1);
     sides->addLayout(right, 1);
-    column->addLayout(sides, 5);
+    body->addLayout(sides, 5);
     for (DiskMap *map : {here_, there_}) {
-        map->setMinimumSize(200, 120);
+        map->setMinimumSize(200, 150);
         connect(map, &DiskMap::picked, this, [this](Node *node) { point(node); });
     }
     pointed_ = dim(text(QString(), true));
-    column->addWidget(pointed_);
+    body->addWidget(pointed_);
 
     QList<qint64> files(changeKinds().size(), 0);
     for (const Difference &difference : c.differences)
@@ -776,8 +787,8 @@ void SystemsPage::show(const Comparison &c, const QString &said, const QDateTime
     }
     legend->addStretch();
     if (!c.identical()) {
-        column->addWidget(explain);
-        column->addLayout(legend);
+        body->addWidget(explain);
+        body->addLayout(legend);
     } else {
         delete legend;
         delete explain;
@@ -787,7 +798,7 @@ void SystemsPage::show(const Comparison &c, const QString &said, const QDateTime
         auto *panel = new Panel;
         panel->column()->addWidget(strong(tr("What the agent says")));
         panel->column()->addWidget(text(said, true));
-        column->addWidget(panel);
+        body->addWidget(panel);
     }
 
     list_ = nullptr;
@@ -832,7 +843,9 @@ void SystemsPage::show(const Comparison &c, const QString &said, const QDateTime
             // A long folder stays folded: its count says enough until it is opened.
             head->setExpanded(group.value().size() <= 8);
         }
-        column->addWidget(list, 2);
+        // Room for six rows at least; the page scrolls when there is not more.
+        list->setMinimumHeight(list->header()->sizeHint().height() + 6 * (list->fontMetrics().height() + 10) + 4);
+        body->addWidget(list, 2);
         connect(list, &QTreeWidget::currentItemChanged, this, [this](QTreeWidgetItem *line) {
             if (line)
                 point(static_cast<Node *>(line->data(0, Qt::UserRole).value<void *>()), false);
@@ -855,7 +868,7 @@ void SystemsPage::show(const Comparison &c, const QString &said, const QDateTime
         connect(hand, &QPushButton::clicked, this, &SystemsPage::handOver);
         foot->addWidget(hand);
     }
-    column->addLayout(foot);
+    body->addLayout(foot);
 }
 
 void SystemsPage::point(Node *node, bool inList)

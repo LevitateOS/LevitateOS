@@ -39,7 +39,6 @@ Window::Window(QWidget *parent)
     , agent_(qEnvironmentVariable("DISK_GUI_AGENT", "levitate-agent"))
     , recab_(qEnvironmentVariable("DISK_GUI_RECAB", "recab"))
     , rootHelper_(qEnvironmentVariable("DISK_GUI_ROOT_HELPER", "pkexec"))
-    , systemApp_(qEnvironmentVariable("DISK_GUI_SYSTEM_APP", qEnvironmentVariable("LEVITATE_APP_SYSTEM", "recab-gui")))
     , osRelease_(qEnvironmentVariable("DISK_GUI_OS_RELEASE", "/etc/os-release"))
     , kept_(qEnvironmentVariable("DISK_GUI_KEPT",
                                  QStandardPaths::writableLocation(QStandardPaths::CacheLocation) + "/comparison.json"))
@@ -169,11 +168,10 @@ void Window::openFolder(const QString &path)
 }
 
 // The strip's button and "Open System…" are one thing: start the System app,
-// by the same variable the rail uses unless this window was told another.
+// as the rail does.
 void Window::openSystem()
 {
-    if (!QProcess::startDetached(systemApp_, {}))
-        frame_->flash(tr("%1 could not be started").arg(systemApp_));
+    frame_->startApp(Frame::System);
 }
 
 void Window::readStripFrom(const QString &recab)

@@ -6,21 +6,22 @@ page of an app has something to show in a picture or a story.
     gui/agent/fixtures/records --stop STATE-FOLDER
 
 It drives the built levitate-agent with the stand-in codex (fixtures/codex),
-never a real agent, and the root helper set to nothing. Four runs, from two
+never a real agent, and the root helper set to nothing. Five runs, from two
 apps:
 
+  Recipe  still running, not waiting (story "hang": a command it started)
   Recipe  done, with commands, file changes and a search (story "plain")
   System  waiting on a question, still alive (story "asks")
   Recipe  failed (story "fails")
   System  an administrator step the person refused (story "administrator")
 
-A record whose last line is a question is only "waiting" while its process
-lives, so the waiting run is left running: a small holder process keeps its
-input open. `--stop` ends it (its record then says stopped). Run `--stop`
+A record with no last line is only "waiting" or "running" while its process
+lives, so those two runs are left running: a small holder process keeps its
+input open. `--stop` ends them (their records then say stopped). Run `--stop`
 when the check is over.
 
 Prints one line: the folder to give the app as XDG_STATE_HOME, and the pid of
-the waiting agent, as `state=FOLDER/state waiting_pid=N`. Exits non-zero, with
+the waiting agent (the running one is the oldest run), as `state=FOLDER/state waiting_pid=N`. Exits non-zero, with
 the reason on standard error, when a run did not end where it should.
 """
 import json
@@ -50,8 +51,9 @@ def environment(folder, story):
     return env
 
 
-def drive(binary, folder, story, app, title, prompt, answer=None, keep=False):
-    """One run. Returns the process when `keep`, which is then waiting."""
+def drive(binary, folder, story, app, title, prompt, answer=None, keep=False, until="question"):
+    """One run. Returns the process when `keep`, once it has sent an event
+    named `until`: it is then waiting (a question) or running (a did)."""
     proc = subprocess.Popen([binary], stdin=subprocess.PIPE, stderr=subprocess.PIPE, stdout=subprocess.PIPE,
                             env=environment(folder, story), start_new_session=True)
     proc.stdin.write((json.dumps({"prompt": prompt, "app": app, "title": title}) + "\n").encode())
@@ -64,9 +66,9 @@ def drive(binary, folder, story, app, title, prompt, answer=None, keep=False):
             event = json.loads(line)
         except ValueError:
             continue
+        if keep and event.get("event") == until:
+            return proc
         if event.get("event") == "question":
-            if keep:
-                return proc
             proc.stdin.write((json.dumps({"question": event["id"], "answer": answer}) + "\n").encode())
             proc.stdin.flush()
     proc.wait(timeout=30)
@@ -114,6 +116,9 @@ def main():
     shutil.rmtree(folder, ignore_errors=True)
     os.makedirs(os.path.join(folder, "home"))
 
+    running = drive(binary, folder, "hang", "Recipe", "Install Krita for this computer",
+                    "The request:\nInstall Krita for this computer.\n", keep=True, until="did")
+    time.sleep(1.1)
     done = drive(binary, folder, "plain", "Recipe", "Install htop for this computer",
                  "The request:\nInstall htop for this computer.\n\nThe expected result:\nhtop starts from the menu "
                  "and nothing else changes.\n")
@@ -137,9 +142,10 @@ def main():
         sys.stderr.write("records: runs ended with %s, %s, %s (expected 0, 1, 0)\n"
                          % (done.returncode, failed.returncode, refused.returncode))
         waiting.kill()
+        running.kill()
         return 1
-    holder = hold(waiting, folder)
-    open(os.path.join(folder, "waiting.pids"), "w").write("%d %d" % (waiting.pid, holder))
+    holders = [hold(waiting, folder), hold(running, folder)]
+    open(os.path.join(folder, "waiting.pids"), "w").write(" ".join(str(p) for p in [waiting.pid, running.pid] + holders))
     print("state=%s waiting_pid=%d" % (os.path.join(folder, "state"), waiting.pid))
     return 0
 

@@ -41,17 +41,6 @@ void waitFor(const std::function<bool()> &holds, int seconds = 20)
     settle(150);
 }
 
-// What the rail offers, in order, without the badges: the checkable buttons
-// are the app's entries and Activity.
-QStringList railEntries(Frame *frame)
-{
-    QStringList names;
-    for (QAbstractButton *button : frame->findChildren<QAbstractButton *>())
-        if (button->isCheckable() && button->isVisible())
-            names << button->text();
-    return names;
-}
-
 QPushButton *buttonNamed(QWidget *inside, const QString &words)
 {
     for (QPushButton *button : inside->findChildren<QPushButton *>())
@@ -153,12 +142,12 @@ void activityShots(Window &window, const QString &folder, bool own, const Save &
     frame->readAgain();
     waitFor([&] { return page->loaded() && frame->badge(Frame::activityKey()) > 0; });
     expect(QStringLiteral("the Activity entry counts the one run that waits"),
-           frame->badge(Frame::activityKey()) == 1 && frame->badgeWarns(Frame::activityKey()));
+           frame->badge(Frame::activityKey()) == 2 && frame->badgeWarns(Frame::activityKey()));
     frame->choose(Frame::activityKey());
-    waitFor([&] { return page->listedTitles().size() == 4 && !page->detailText().isEmpty(); });
+    waitFor([&] { return page->listedTitles().size() == 5 && !page->detailText().isEmpty(); });
     expect(QStringLiteral("Activity is showing and marked"),
            frame->activityShown() && frame->selected() == Frame::activityKey());
-    expect(QStringLiteral("Activity lists the four runs"), page->listedTitles().size() == 4);
+    expect(QStringLiteral("Activity lists the five runs"), page->listedTitles().size() == 5);
     expect(QStringLiteral("the strip shows on Activity"), frame->stripShown());
     save(own ? QStringLiteral("a2-activity-while-the-agent-works") : QStringLiteral("a1-activity"));
 
@@ -171,7 +160,8 @@ void activityShots(Window &window, const QString &folder, bool own, const Save &
     // The agent this window waits for: Activity offers to go to it.
     page->chooseTitle("Turn off password logins over ssh");
     waitFor([&] { return page->detailText().contains("It asks"); });
-    page->setOwnRun(waitingPid);
+    frame->setOwnRun(waitingPid);
+    expect(QStringLiteral("the frame knows the pid of this window's own run"), frame->ownRun() == waitingPid && waitingPid > 0);
     waitFor([&] { return page->offersGoTo(); });
     expect(QStringLiteral("this window's own live run offers Go to it"), page->offersGoTo());
     if (QPushButton *go = buttonNamed(page, QStringLiteral("Go to it")))
@@ -179,7 +169,7 @@ void activityShots(Window &window, const QString &folder, bool own, const Save &
     settle(200);
     expect(QStringLiteral("Go to it leaves Activity for the work page, under the Mess entry"),
            !frame->activityShown() && frame->selected() == "mess" && window.showingWork());
-    page->setOwnRun(0);
+    frame->setOwnRun(0);
 }
 
 } // namespace
@@ -213,8 +203,8 @@ int takeShots(Window &window, const QString &folder, bool handOver)
     Frame *frame = window.frame();
     expect(QStringLiteral("the window is 1100 x 700"), window.width() == 1100 && window.height() == 700);
     expect(QStringLiteral("the rail offers Mess, The two systems and Activity, nothing else (%1)")
-               .arg(railEntries(frame).join(QStringLiteral(", "))),
-           railEntries(frame) == QStringList({"Mess", "The two systems", "Activity"}));
+               .arg(frame->entryTitles().join(QStringLiteral(", "))),
+           frame->entryTitles() == QStringList({"Mess", "The two systems", "Activity"}));
     expect(QStringLiteral("the Mess badge is the number of places listed (%1 and %2)")
                .arg(frame->badge("mess")).arg(window.found().size()),
            frame->badge("mess") == window.found().size() && window.found().size() > 0);

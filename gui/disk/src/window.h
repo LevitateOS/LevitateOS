@@ -87,7 +87,7 @@ private:
     QString entryOf(QWidget *page) const;
 
     QStringList roots_;
-    QString home_, agent_, recab_, rootHelper_, systemApp_, osRelease_, kept_;
+    QString home_, agent_, recab_, rootHelper_, osRelease_, kept_;
     bool apparent_;
 
     Scanner *scanner_ = nullptr;

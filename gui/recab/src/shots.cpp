@@ -3,6 +3,7 @@
 #include "activity.h"
 #include "frame.h"
 #include "look.h"
+#include "parts.h"
 #include "nextsystem.h"
 #include "pages.h"
 #include "window.h"
@@ -97,15 +98,15 @@ void activityShots(Window &window, const QString &folder, const QString &prefix,
     frame->readAgain();
     waitFor([&] { return page->loaded() && frame->badge(Frame::activityKey()) > 0; });
     expect(QStringLiteral("the Activity entry counts the one run that waits"),
-           frame->badge(Frame::activityKey()) == 1 && frame->badgeWarns(Frame::activityKey()));
+           frame->badge(Frame::activityKey()) == 2 && frame->badgeWarns(Frame::activityKey()));
 
     frame->choose(Frame::activityKey());
-    waitFor([&] { return page->listedTitles().size() == 4 && !page->detailText().isEmpty(); });
+    waitFor([&] { return page->listedTitles().size() == 5 && !page->detailText().isEmpty(); });
     expect(QStringLiteral("Activity is showing and marked"), frame->activityShown() && frame->selected() == Frame::activityKey());
-    expect(QStringLiteral("Activity lists the four runs, newest first"),
+    expect(QStringLiteral("Activity lists the five runs, newest first"),
            page->listedTitles()
                == QStringList({"Install the NVIDIA driver", "Update Element", "Turn off password logins over ssh",
-                               "Install htop for this computer"}));
+                               "Install htop for this computer", "Install Krita for this computer"}));
     expect(QStringLiteral("the newest run is chosen and shows the administrator step the person refused"),
            page->detailText().contains("you refused, so it was not run") && page->detailText().contains("id -u")
                && page->detailText().contains("The whole prompt"));
@@ -130,6 +131,26 @@ void activityShots(Window &window, const QString &folder, const QString &prefix,
                && !page->offersGoTo());
     save(window, prefix + "-a-run-that-waits");
 
+    // A run that is going, not waiting: counted as running, listed as such, and badged.
+    QStringList chips;
+    for (QLabel *label : page->findChildren<QLabel *>())
+        if (dynamic_cast<Chip *>(label))
+            chips << label->text();
+    page->chooseTitle("Install Krita for this computer");
+    waitFor([&] { return page->detailText().contains("is working on it"); });
+    expect(QStringLiteral("the page counts one run that waits and one that runs (%1)").arg(chips.join(", ")),
+           chips == QStringList({"1 waits for an answer", "1 running"}));
+    expect(QStringLiteral("a running run is described as working, with what it ran so far, and cannot be answered"),
+           page->detailText().contains("Codex is working on it") && page->detailText().contains("sleep 300")
+               && !page->detailText().contains("It asks") && !page->offersGoTo());
+    expect(QStringLiteral("the badge counts the waiting and the running run"),
+           frame->badge(Frame::activityKey()) == 2 && frame->badgeWarns(Frame::activityKey()));
+    expect(QStringLiteral("the list says it is running (%1)").arg(page->listedStates().join(" | ")),
+           page->listedStates().value(4) == "Running now");
+    save(window, prefix + "-a-run-that-runs");
+    page->chooseTitle("Turn off password logins over ssh");
+    waitFor([&] { return page->detailText().contains("It asks"); });
+
     // The same run is this window's own live run: it can be gone to.
     page->setOwnRun(waitingPid);
     waitFor([&] { return page->offersGoTo(); });
@@ -149,7 +170,7 @@ void activityShots(Window &window, const QString &folder, const QString &prefix,
     expect(QStringLiteral("only this app's runs are listed"),
            page->listedTitles() == QStringList({"Install the NVIDIA driver", "Turn off password logins over ssh"}));
     page->showOnlyThisApp(false);
-    expect(QStringLiteral("all apps again"), page->listedTitles().size() == 4);
+    expect(QStringLiteral("all apps again"), page->listedTitles().size() == 5);
 
     // The strip, here, while the next system holds changes.
     expect(QStringLiteral("the strip shows on Activity while the next system holds changes"),

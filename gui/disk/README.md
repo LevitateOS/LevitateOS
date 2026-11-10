@@ -62,7 +62,7 @@ holds N changes." with "Finish and restart…", is read from `recab status
 --json` (`DISK_GUI_RECAB`) and shown on every page; when recab cannot be read
 or answers in a shape the strip does not know, there is no strip and no error.
 The button and "Open System…" start the System app the same way
-(`DISK_GUI_SYSTEM_APP`, else `LEVITATE_APP_SYSTEM`, else `recab-gui`).
+(`LEVITATE_APP_SYSTEM`, else `recab-gui`; the frame starts it, as the rail does).
 
 "Open the folder" shows what is pointed at in the file manager. "Read again"
 in the status line, F5 and Ctrl+R look at the disk again on the Mess entry and
@@ -166,7 +166,7 @@ $R/recab-real --json change install htop --preparation p2 --revision 1
 QT_QPA_PLATFORM=offscreen DISK_GUI_ROOTS=$S/sample DISK_GUI_HOME=$S/sample DISK_GUI_APPARENT=1 \
   DISK_GUI_AGENT=$F/agent DISK_GUI_RECAB=$F/recab DISK_GUI_ROOT_HELPER= \
   DISK_STANDIN_ROOT=$S/sample DISK_STANDIN_SPEED=0 DISK_GUI_KEPT=$S/kept.json \
-  DISK_GUI_SYSTEM_APP=$S/system-app DISK_STANDIN_SYSTEM_MARK=$S/system-app-started \
+  LEVITATE_APP_SYSTEM=$S/system-app DISK_STANDIN_SYSTEM_MARK=$S/system-app-started \
   DISK_STANDIN_STRIP_RECAB=$R/recab-real \
   RECAB_GUI_RECORDS=$PWD/gui/agent/fixtures/records \
   LEVITATE_ACTIVITY_AGENT=$PWD/.artifacts/agent/build/levitate-agent \
@@ -195,7 +195,6 @@ hands nothing to anyone and compares nothing.
 | `DISK_GUI_APPARENT` | `1`: count each file's length (the sample is made of empty-but-long files) | off |
 | `DISK_GUI_RECAB` | the program asked to compare the two systems | `recab` |
 | `DISK_GUI_ROOT_HELPER` | what runs it as root; empty: run it as the person | `pkexec` |
-| `DISK_GUI_SYSTEM_APP` | what "Open System…" and the strip's "Finish and restart…" start | `LEVITATE_APP_SYSTEM`, else `recab-gui` |
 | `DISK_GUI_KEPT` | the file the last comparison is kept in | `comparison.json` in the person's cache |
 | `DISK_GUI_OS_RELEASE` | where the running system's name is read | `/etc/os-release` |
 

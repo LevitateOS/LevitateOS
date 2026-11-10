@@ -79,12 +79,7 @@ Window::Window(QWidget *parent)
             showSources();
     });
     // The next system is finished in System, the way its button in the rail starts it.
-    connect(frame_, &Frame::finishRequested, this, [this] {
-        const QString program = qEnvironmentVariable("LEVITATE_APP_SYSTEM", "recab-gui");
-        if (program.isEmpty() || !QProcess::startDetached(program, {}))
-            frame_->flash(tr("System could not be started: %1 was not found or would not run.")
-                              .arg(program.isEmpty() ? QStringLiteral("recab-gui") : program));
-    });
+    connect(frame_, &Frame::finishRequested, this, [this] { frame_->startApp(Frame::System); });
     connect(frame_, &Frame::goToRun, this, [this] {
         frame_->select(QStringLiteral("browse"));
         stack_->setCurrentWidget(work_);

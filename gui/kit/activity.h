@@ -31,6 +31,8 @@ public:
     // What the page shows, for a check: the runs listed (after the filter),
     // the id of the chosen one, and the words of the detail.
     QStringList listedTitles() const;
+    // The line of state under each title, in the same order.
+    QStringList listedStates() const;
     QString chosenId() const { return chosen_; }
     QString detailText() const;
     QString problem() const { return problem_; }

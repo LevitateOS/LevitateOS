@@ -300,14 +300,7 @@ Frame::Frame(App app, QWidget *parent)
         auto *button = new RailButton(RailButton::AppSwitch, tr(apps[at].name));
         button->setCurrent(at == app);
         button->setAccessibleDescription(at == app ? tr("This window") : tr("Opens %1").arg(tr(apps[at].name)));
-        connect(button, &QAbstractButton::clicked, this, [this, at] {
-            if (at == app_)
-                return;
-            const QString program = qEnvironmentVariable(apps[at].variable, QString::fromLatin1(apps[at].program));
-            if (program.isEmpty() || !QProcess::startDetached(program, {}))
-                flash(tr("%1 could not be started: %2 was not found or would not run.")
-                          .arg(tr(apps[at].name), program.isEmpty() ? QString::fromLatin1(apps[at].program) : program));
-        });
+        connect(button, &QAbstractButton::clicked, this, [this, at] { startApp(App(at)); });
         three->addWidget(button);
         order_ << button;
         connect(button, &RailButton::stepped, this, [this, button](int by) { step(button, by); });
@@ -556,9 +549,32 @@ void Frame::addStatusWidget(QWidget *widget)
 void Frame::flash(const QString &words)
 {
     flashWords_ = words;
-    status_->setText(words);
-    status_->setToolTip(words);
-    flashTimer_->start(8000);
+    const QString shown = words.isEmpty() ? statusWords_ : words;
+    status_->setText(shown);
+    status_->setToolTip(shown);
+    if (words.isEmpty())
+        flashTimer_->stop();
+    else
+        flashTimer_->start(8000);
+}
+
+void Frame::startApp(App app)
+{
+    if (app == app_)
+        return;
+    const QString program = qEnvironmentVariable(apps[app].variable, QString::fromLatin1(apps[app].program));
+    if (program.isEmpty() || !QProcess::startDetached(program, {}))
+        flash(tr("%1 could not be started: %2 was not found or would not run.")
+                  .arg(tr(apps[app].name), program.isEmpty() ? QString::fromLatin1(apps[app].program) : program));
+}
+
+QStringList Frame::entryTitles() const
+{
+    QStringList titles;
+    for (RailButton *button : order_)
+        if (button->parent() != appsRow_)
+            titles << button->text();
+    return titles;
 }
 
 void Frame::showAgent(const QString &words)
@@ -627,6 +643,7 @@ void Frame::readAgentStatus()
 
 void Frame::setOwnRun(qint64 pid)
 {
+    ownRun_ = pid;
     activity_->setOwnRun(pid);
     if (pid == 0)
         activity_->read();

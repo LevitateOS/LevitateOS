@@ -147,7 +147,9 @@ void SystemPage::show(const Status &s)
                         .arg(s.interruptedDuring.isEmpty() ? tr("working on the next system") : s.interruptedDuring);
         } else if (next) {
             title = counted(s.changes.size(), tr("The next system has %1 change"), tr("The next system has %1 changes"));
-            under = tr("They take effect when you restart into it. The running system is untouched until then.");
+            under = (s.changes.size() == 1 ? tr("It takes effect when you restart into it.")
+                                           : tr("They take effect when you restart into it."))
+                    + tr(" The running system is untouched until then.");
         } else if (s.trialOutcome == QLatin1String("kept")) {
             title = tr("You are on the new system");
             under = tr("It started properly, so it is kept, and locked like the one before. Your changes are in effect.");

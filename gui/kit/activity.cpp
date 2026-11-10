@@ -718,6 +718,15 @@ QStringList ActivityPage::listedTitles() const
     return titles;
 }
 
+QStringList ActivityPage::listedStates() const
+{
+    QStringList states;
+    if (list_)
+        for (int row = 0; row < list_->count(); ++row)
+            states << list_->item(row)->data(StateRole).toString();
+    return states;
+}
+
 QString ActivityPage::detailText() const
 {
     QStringList all;
