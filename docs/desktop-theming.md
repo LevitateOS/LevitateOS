@@ -61,7 +61,7 @@ recipe), owned by root, mode 0644:
 | Global Theme | `/usr/share/plasma/look-and-feel/org.levitateos.desktop/` | `metadata.json`; `contents/defaults` (colour scheme, icons `breeze`, cursor `breeze_cursors`, Plasma style `default`, window decoration Breeze, `[Wallpaper] Image=LevitateOS`, `[ksplashrc] Theme=org.levitateos.desktop`); `contents/layouts/org.kde.plasma.desktop-layout.js` (bottom panel, Kickoff with `icon=distributor-logo-levitateos`); `contents/splash/Splash.qml` (Breeze splash with our mark); `contents/previews/*` |
 | Default theme | `/etc/xdg/kdeglobals` | `[KDE] LookAndFeelPackage=org.levitateos.desktop`, `ColorScheme=LevitateOSDark`, Noto fonts |
 | Colour schemes | `/usr/share/color-schemes/LevitateOSLight.colors`, `LevitateOSDark.colors` | Breeze Light/Dark with the accent set to pine `#214438` / `#C7D9BA`; selection and focus follow the accent |
-| Wallpaper | `/usr/share/wallpapers/LevitateOS/` | `metadata.json` (`Id: LevitateOS`, licence), `contents/images/<W>x<H>.jpg` and `contents/images_dark/<W>x<H>.jpg`; Plasma picks the closest size and the dark set under a dark colour scheme. Also link `/usr/share/wallpapers/Default` → `LevitateOS` |
+| Wallpaper (done, unbuilt) | `/usr/share/wallpapers/LevitateOS/` | `metadata.json` (`Id: LevitateOS`), `contents/images/3840x2160.jpg` and `contents/images_dark/3840x2160.jpg`; Plasma scales the one size and shows the dark one under a dark colour scheme. `/usr/share/wallpapers/Default` links to `LevitateOS`, so Fedora's Global Theme (`Image=Fedora` → `Default`) already shows it; the Fedora background packages are still in the lock |
 | Login screen | `/usr/share/sddm/themes/levitateos/` + `/etc/sddm.conf.d/10-theme.conf` (`[Theme] Current=levitateos`) | copy of `sddm-breeze`'s QML with `theme.conf`: `showlogo=shown`, `logo=` the paper lockup, `background=` the dark wallpaper, `color=#14221A` |
 | Lock screen | — | follows the wallpaper; nothing extra |
 | Icons | `/usr/share/icons/hicolor/scalable/apps/distributor-logo-levitateos.svg`, `levitateos-logo-icon.svg`, `…/16x16/apps/…` (micro mark) | see "Icons" |
@@ -89,7 +89,7 @@ Openbox "Clearlooks" window decoration. Alpine 3.24 also has `breeze`
 | LXQt themes | `/usr/share/lxqt/themes/acornos-light/`, `acornos-dark/` | panel, runner, notification and leave-dialog QSS edited from LXQt's `light`/`dark` to the Acorn colours; `mainmenu.svg` = acorn mark (this is the menu button icon); `wallpaper.cfg` naming that theme's light or dark wallpaper, so switching the LXQt theme switches the wallpaper too; `preview.png` |
 | Defaults | `/etc/xdg/lxqt/lxqt.conf` | `theme=acornos-dark`, `icon_theme=breeze`, `[Qt] style=Breeze`, font Noto Sans |
 | Palette | `/usr/share/lxqt/palettes/AcornOS` | Qt palette in Acorn browns and paper (LXQt applies it with `palette_override`) |
-| Wallpaper | `/usr/share/wallpapers/AcornOS/…` + `/etc/xdg/pcmanfm-qt/lxqt/settings.conf` | `Wallpaper=` the dark Acorn wallpaper (the default theme's), `WallpaperMode=zoom` |
+| Wallpaper (done, unbuilt) | `/usr/share/wallpapers/AcornOS/` (same layout as Plasma's) + `/etc/xdg/pcmanfm-qt/lxqt/settings.conf` | the packaged `/usr/share/pcmanfm-qt/lxqt/settings.conf` with `Wallpaper=` the dark Acorn wallpaper and `WallpaperMode=zoom`. pcmanfm-qt reads one whole settings file, the first on the configuration path, so the file is a full copy. LXQt does not switch wallpaper with the look; the light one waits for the `acornos-light` theme's `wallpaper.cfg` |
 | Window decoration | `/usr/share/themes/AcornOS/openbox-3/themerc` + `/etc/xdg/openbox/lxqt-rc.xml` (`<theme><name>AcornOS</name>`) | Openbox themes are plain text (colours, fonts, button bitmaps); start from `Clearlooks` |
 | GTK apps (Firefox) | `/etc/gtk-3.0/settings.ini` | `gtk-theme-name=Breeze`, `gtk-icon-theme-name=breeze` |
 | Login screen | `/usr/share/sddm/themes/acornos/` + `/etc/sddm.conf.d/10-theme.conf` | from `sddm-breeze` (add it to the Acorn desktop set), with the Acorn lockup and wallpaper |
@@ -135,6 +135,18 @@ sizes are simpler and make the build reproducible.
 
 Where the sources live: `distro/variants/<distro>/branding/` (SVGs, wallpaper
 masters, QML, QSS, colour schemes), copied in by the desktop rootfs recipe.
+
+The wallpapers are there now: `branding/wallpaper-light.jpg` and
+`branding/wallpaper-dark.jpg`, 3840×2160 JPEG, the only size shipped. The
+contract requires both files (`distro_contract::WALLPAPERS`), the builder
+passes them to the rootfs recipe as `wallpaper_light` and `wallpaper_dark`, and
+`wallpaper()` in `installed-system.rhai` installs them. How they were made:
+the user picked one generated picture per distribution (kept, with a contact
+sheet, in `.artifacts/desktop-art/picked/`); Qwen Image 2.1 edit made the
+light and dark versions (AcornOS's dark one is the pick itself); Ultimate SD
+Upscale with Z-Image-Turbo and 4x-UltraSharp (2×, denoise 0.12, no content in
+the prompt) upscaled each; ImageMagick put the source's colours back and cut
+them to size.
 The website keeps its own copies of the marks. The brand files are small, so
 copying is simpler than sharing a path across repositories.
 
