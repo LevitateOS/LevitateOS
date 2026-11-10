@@ -126,6 +126,25 @@ packages = [
   "wpa_supplicant",
   "wireless-regdb",
   "iw",
+  # Firmware the kernel's drivers load from /usr/lib/firmware (.xz, which the
+  # kernel reads through FW_LOADER_COMPRESS_XZ): graphics, WiFi and Bluetooth,
+  # laptop audio, and linux-firmware for the rest. No CPU microcode: nothing
+  # puts it in front of the initramfs yet.
+  "linux-firmware",
+  "amd-gpu-firmware",
+  "intel-gpu-firmware",
+  "nvidia-gpu-firmware",
+  "iwlwifi-dvm-firmware",
+  "iwlwifi-mvm-firmware",
+  "iwlwifi-mld-firmware",
+  "iwlbluetooth-firmware",
+  "realtek-firmware",
+  "mt7xxx-firmware",
+  "atheros-firmware",
+  "brcmfmac-firmware",
+  "alsa-sof-firmware",
+  "intel-audio-firmware",
+  "cirrus-audio-firmware",
 ]
 
 # The desktop system, the rootfs of the live-desktop product (docs/desktop.md):

@@ -88,6 +88,33 @@ packages = [
   "audit",
   "chrony",
   "dbus",
+  # Firmware the kernel's drivers load from /lib/firmware (.zst, which the
+  # kernel reads through FW_LOADER_COMPRESS_ZSTD): graphics, WiFi and
+  # Bluetooth, laptop audio. Alpine's split packages, not the linux-firmware
+  # meta package, and no NVIDIA firmware (109 MB): the small system. No CPU
+  # microcode: nothing puts it in front of the initramfs yet.
+  "linux-firmware-amdgpu",
+  "linux-firmware-radeon",
+  "linux-firmware-i915",
+  "linux-firmware-xe",
+  "linux-firmware-intel",
+  "linux-firmware-rtw88",
+  "linux-firmware-rtw89",
+  "linux-firmware-rtlwifi",
+  "linux-firmware-rtl_nic",
+  "linux-firmware-rtl_bt",
+  "linux-firmware-mediatek",
+  "linux-firmware-ath9k_htc",
+  "linux-firmware-ath10k",
+  "linux-firmware-ath11k",
+  "linux-firmware-ath12k",
+  "linux-firmware-ar3k",
+  "linux-firmware-qca",
+  "linux-firmware-brcm",
+  "linux-firmware-cypress",
+  "linux-firmware-cirrus",
+  "linux-firmware-other",
+  "sof-firmware",
 ]
 
 # The desktop system, the rootfs of the live-desktop product (docs/desktop.md):
