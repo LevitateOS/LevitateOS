@@ -75,17 +75,19 @@ Window::Window(QWidget *parent)
     connect(search_, &QLineEdit::textChanged, this, [this] { showBrowse(); });
 
     connect(browse_, &BrowsePage::openRecipe, this, &Window::showRecipe);
-    connect(browse_, &BrowsePage::install, this, &Window::startInstall);
+    connect(browse_, &BrowsePage::install, this, [this](const QString &name) { startInstall(name); });
     connect(browse_, &BrowsePage::retry, this, [this] {
         if (reload())
             showBrowse();
     });
     connect(recipe_, &RecipePage::back, this, [this] { showBrowse(); });
-    connect(recipe_, &RecipePage::install, this, &Window::startInstall);
+    connect(recipe_, &RecipePage::install, this, [this](const QString &name) { startInstall(name); });
     connect(recipe_, &RecipePage::remove, this, &Window::askRemove);
     connect(recipe_, &RecipePage::open, this, &Window::open);
     connect(runPage_, &RunPage::back, this, [this] { showBrowse(); });
-    connect(runPage_, &RunPage::retry, this, &Window::startInstall);
+    connect(runPage_, &RunPage::retry, this, [this](const QString &name) { startInstall(name); });
+    connect(runPage_, &RunPage::fix, this, &Window::startInstall);
+    connect(runPage_, &RunPage::note, this, [this](const QString &words) { statusBar()->showMessage(words, 20000); });
     connect(runPage_, &RunPage::succeeded, this, [this](const QString &name) { runEnded(name, true); });
     connect(runPage_, &RunPage::failed, this, [this](const QString &name) { runEnded(name, false); });
     connect(runPage_, &RunPage::status, this, [this](const QString &words) {
@@ -94,9 +96,9 @@ Window::Window(QWidget *parent)
     connect(installed_, &InstalledPage::open, this, &Window::open);
     connect(installed_, &InstalledPage::goBack, this, &Window::goBack);
     connect(installed_, &InstalledPage::remove, this, &Window::askRemove);
-    connect(installed_, &InstalledPage::update, this, &Window::startInstall);
+    connect(installed_, &InstalledPage::update, this, [this](const QString &name) { startInstall(name); });
     connect(installed_, &InstalledPage::selected, this, [this](const QString &name) { installedChoice_ = name; });
-    connect(updates_, &UpdatesPage::update, this, &Window::startInstall);
+    connect(updates_, &UpdatesPage::update, this, [this](const QString &name) { startInstall(name); });
     connect(updates_, &UpdatesPage::selected, this, [this](const QString &name) { updateChoice_ = name; });
     connect(updates_, &UpdatesPage::updateAll, this, [this] {
         queue_.clear();
@@ -198,14 +200,16 @@ void Window::showUpdates(const QString &selected)
     stack_->setCurrentWidget(updates_);
 }
 
-void Window::startInstall(const QString &name)
+void Window::startInstall(const QString &name, const QString &agentPrompt)
 {
     if (run_) {
         statusBar()->showMessage(tr("One thing at a time: wait for the running one, or stop it."), 6000);
         stack_->setCurrentWidget(runPage_);
         return;
     }
-    run_ = catalog_.installedItem(name) ? client_.update(name) : client_.install(name);
+    const bool installed = catalog_.installedItem(name) != nullptr;
+    run_ = !agentPrompt.isEmpty() ? client_.fixWithAgent(name, agentPrompt, installed)
+           : installed ? client_.update(name) : client_.install(name);
     runPage_->begin(catalog_, name, run_);
     stack_->setCurrentWidget(runPage_);
     run_->start();

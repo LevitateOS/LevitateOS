@@ -70,13 +70,20 @@ def steps_of(item):
     return steps
 
 
-def play(item, refuse=None):
+def play(item, refuse=None, agent=False):
     name = item["name"]
     for hook in steps_of(item):
         emit(event="step", recipe=name, hook=hook, status="running")
         if hook == "acquire":
             total = max(item["needs"]["network_max_bytes"] // 4, 1 << 20)
             for part in range(1, 9):
+                if refuse and part == 3 and agent:
+                    # The sample repair: the agent reads the refusal and the prompt, and changes the recipe.
+                    emit(event="say", recipe=name, text="The agent is reading the failure and the recipe")
+                    pause(1.0)
+                    emit(event="agent", recipe=name, files=["%s.rhai" % name],
+                         summary="it now fetches the file from packages.element.io, which the recipe already allows")
+                    refuse = None
                 if refuse and part == 3:
                     emit(event="step", recipe=name, hook=hook, status="failed")
                     emit(event="failed", recipe=name, hook=hook,
@@ -102,7 +109,7 @@ def play(item, refuse=None):
         emit(event="step", recipe=name, hook=hook, status="done")
 
 
-def install(name):
+def install(name, agent=False):
     item = recipe(name)
     order = [recipe(dep) for dep in item["build_deps"]] + [item]
     emit(event="plan", recipes=[{"name": each["name"], "steps": steps_of(each)} for each in order])
@@ -111,7 +118,7 @@ def install(name):
     # The sample story: the newer Element recipe reaches for a host it has not declared.
     refuse = "cdn.example.net:443" if name == "element" and current else None
     for each in order:
-        play(each, refuse if each is item else None)
+        play(each, refuse if each is item else None, agent)
     about = item["about"].get("adds", {})
     entry = {
         "name": name, "version": item["version"],
@@ -172,7 +179,7 @@ def main(args):
     for arg in args:
         if skip:
             skip = False
-        elif arg in ("--recipes-path", "--package-root"):
+        elif arg in ("--recipes-path", "--package-root", "--autofix-prompt-file"):
             skip = True
         elif not arg.startswith("--"):
             words.append(arg)
@@ -185,7 +192,7 @@ def main(args):
     elif command == "updates":
         print(json.dumps({"schema_version": 1, "updates": updates()}))
     elif command in ("install", "update") and len(words) == 2:
-        install(words[1])
+        install(words[1], "--autofix" in args)
     elif command == "remove" and len(words) == 2:
         remove(words[1], "--clear-kept" in args)
     elif command == "go-back" and len(words) == 2:

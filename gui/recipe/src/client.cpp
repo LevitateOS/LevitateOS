@@ -3,7 +3,9 @@
 #include <QFileInfo>
 #include <QJsonArray>
 #include <QJsonDocument>
+#include <QDir>
 #include <QRegularExpression>
+#include <QTemporaryFile>
 
 Run::Run(const QString &program, const QStringList &arguments, QObject *parent)
     : QObject(parent)
@@ -197,6 +199,20 @@ Run *RecipeClient::install(const QString &name)
 Run *RecipeClient::update(const QString &name)
 {
     return change(QStringList{"update", name, "--machine-events"} + collection() + store());
+}
+
+Run *RecipeClient::fixWithAgent(const QString &name, const QString &prompt, bool installed)
+{
+    auto *file = new QTemporaryFile(QDir::tempPath() + "/recipe-gui-prompt-XXXXXX.txt");
+    if (file->open()) {
+        file->write(prompt.toUtf8());
+        file->close();
+    }
+    Run *run = change(QStringList{installed ? "update" : "install", name, "--machine-events", "--autofix",
+                                  "--autofix-prompt-file", file->fileName()}
+                      + collection() + store());
+    file->setParent(run); // removed with the run
+    return run;
 }
 
 Run *RecipeClient::remove(const QString &name, bool clearKept)

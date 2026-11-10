@@ -100,6 +100,8 @@ Changes, through the root helper, with events on stderr:
 | `recipe update NAME --machine-events` | exists |
 | `recipe remove NAME [--clear-kept] --machine-events` | exists, by the receipt; no `--clear-kept` |
 | `recipe go-back NAME --machine-events` | no such command; earlier profile generations are kept |
+| `recipe install NAME --autofix --autofix-prompt-file FILE --machine-events` | exists for `install`: Recipe's agent repair (Codex or Claude), with the front end's prompt appended to its own. Never run against a real agent |
+| `recipe update NAME --autofix --autofix-prompt-file FILE --machine-events` | `update` takes no such options yet |
 
 Events are one JSON object per line. The front end reads these; any other
 line is shown as output.
@@ -113,10 +115,29 @@ line is shown as output.
 | `say` | `recipe`, `text` |
 | `output` | `recipe`, `line` |
 | `failed` | `recipe`, `hook`, `reason`, and for a refused connection `refused`: `endpoint` and the `declared` list |
+| `agent` | `recipe`, `summary`, `files`: the agent changed the recipe during this run. Asked for; `recipe` sends nothing like it today |
 | `done` | `recipe` |
 
 Without a `plan`, the front end adds a row of three steps for each recipe as
 its first step arrives.
+
+## When a run stops: the agent fixes it
+
+Recipe's premise is that an agent does the maintenance. A stopped run is not
+handed back to the person to sort out. The page puts together what the agent
+is given, in three parts, and shows it:
+
+- **The issue**: what stopped, in one sentence.
+- **The facts**: what Recipe recorded (the refused endpoint and the allowed
+  list, Recipe's own message, the recipe's path, the output, what is still
+  installed).
+- **The expected result**: what should be true afterwards. The person can
+  change this part; it is the only part that is theirs to say.
+
+"Let the agent fix it" runs the same install or update again with Recipe's
+agent repair on and that text as its extra prompt. "Try again" and "Show the
+output" stay beside it. What the agent changed is reported when the run ends;
+there is no step yet where the person approves the change before it is used.
 
 ## Not done
 

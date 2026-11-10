@@ -27,7 +27,7 @@ public:
     void showRecipe(const QString &name);
     void showInstalled(const QString &selected = QString());
     void showUpdates(const QString &selected = QString());
-    void startInstall(const QString &name);
+    void startInstall(const QString &name, const QString &agentPrompt = QString());
     void askRemove(const QString &name);
     void stopRun();
 

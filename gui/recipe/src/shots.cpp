@@ -160,5 +160,9 @@ int takeShots(Window &window, const QString &folder)
 
     window.showUpdates("element");
     ok &= save(window, "7-updates");
+
+    window.startInstall("element", "The issue:\nThe update stopped.\n\nThe expected result:\nElement updates.\n");
+    waitUntilIdle(window);
+    ok &= save(window, "8-agent-fixed");
     return ok ? 0 : 1;
 }

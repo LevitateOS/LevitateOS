@@ -383,6 +383,7 @@ void RunPage::begin(const Catalog &catalog, const QString &name, Run *run)
     name_ = name;
     run_ = run;
     marks_.clear();
+    agentNote_.clear();
     stepsTotal_ = stepsStarted_ = 0;
     const Recipe *found = catalog_.recipe(name);
     const Recipe recipe = found ? *found : Recipe{};
@@ -421,7 +422,8 @@ void RunPage::begin(const Catalog &catalog, const QString &name, Run *run)
     planPanel->column()->addWidget(state_);
     column_->addWidget(planPanel);
 
-    column_->addWidget(strong(tr("Output")));
+    outputTitle_ = strong(tr("Output"));
+    column_->addWidget(outputTitle_);
     output_ = new QPlainTextEdit;
     output_->setReadOnly(true);
     output_->setMaximumBlockCount(5000);
@@ -526,6 +528,11 @@ void RunPage::onEvent(const QJsonObject &event)
         state_->setText(tr("Building %1: %2 of %3").arg(shown).arg(event["done"].toInt()).arg(event["total"].toInt()));
     } else if (kind == QLatin1String("say")) {
         state_->setText(event["text"].toString());
+    } else if (kind == QLatin1String("agent")) {
+        // The agent changed the recipe during this run: say what, where it can be seen.
+        agentNote_ = event["summary"].toString();
+        state_->setText(tr("The agent changed the recipe: %1").arg(agentNote_));
+        output_->appendPlainText(tr("agent: %1").arg(agentNote_));
     }
 }
 
@@ -533,6 +540,8 @@ void RunPage::onFinished(bool ok)
 {
     emit status(QString());
     if (ok) {
+        if (!agentNote_.isEmpty())
+            emit note(tr("The agent changed the recipe: %1").arg(agentNote_));
         emit succeeded(name_);
         return;
     }
@@ -540,64 +549,120 @@ void RunPage::onFinished(bool ok)
     const bool stoppedByUser = !stop_->isEnabled() && failure.isEmpty();
     const Recipe *found = catalog_.recipe(name_);
     const QString shown = found ? found->shown() : name_;
+    const QString version = found ? found->version : QString();
+    const QString name = name_;
     bar_->hide();
     stop_->hide();
     stopNote_->hide();
     state_->setText(stoppedByUser ? tr("Stopped") : tr("Stopped at this step"));
     title_->setText(shown);
 
-    auto *verdict = new Verdict;
-    verdict->setFrameShape(QFrame::NoFrame);
-    auto words = [](QLabel *label) { return label; };
+    // What happened, and what it left.
     QString what;
     if (stoppedByUser)
         what = tr("You stopped it");
     else if (updatingFrom_.isEmpty())
         what = tr("Installing %1 was stopped").arg(shown);
     else
-        what = tr("The update to %1 was stopped").arg(found ? found->version : QString());
-    verdict->column()->addWidget(words(strong(what)));
+        what = tr("The update to %1 was stopped").arg(version);
+    const QString unchanged = updatingFrom_.isEmpty()
+                                  ? tr("Nothing on this computer was changed.")
+                                  : tr("%1 %2 is still installed and works as before.").arg(shown, updatingFrom_);
+    auto *verdict = new Verdict;
+    verdict->setFrameShape(QFrame::NoFrame);
+    verdict->column()->addWidget(strong(what));
+    verdict->column()->addWidget(
+        text(stoppedByUser ? tr("What was already fetched and built is kept.") : unchanged, true));
+    column_->insertWidget(1, verdict);
 
-    const QJsonObject refused = failure["refused"].toObject();
-    const QString hook = failure["hook"].toString();
-    if (!refused.isEmpty()) {
-        const QString during = hook == QLatin1String("acquire") ? tr("fetching")
-                               : hook == QLatin1String("build") ? tr("building") : tr("installing");
-        verdict->column()->addWidget(words(text(
-            tr("While %1, the recipe tried to connect to %2. That host is not on the recipe's list, so the "
-               "sandbox refused the connection and the run ended.")
-                .arg(during, endpointText(refused["endpoint"].toString())),
-            true)));
-        QStringList declared;
-        for (const QJsonValue &value : refused["declared"].toArray())
-            declared << value.toString();
-        auto *form = new QFormLayout;
-        form->setHorizontalSpacing(16);
-        form->addRow(words(dim(text(tr("Step")))), words(text(hookTitle(hook))));
-        form->addRow(words(dim(text(tr("Tried")))), words(text(endpointText(refused["endpoint"].toString()))));
-        form->addRow(words(dim(text(tr("Allowed")))), words(text(endpointsText(declared), true)));
-        verdict->column()->addLayout(form);
-    } else if (stoppedByUser) {
-        verdict->column()->addWidget(words(text(tr("What was already fetched and built is kept."))));
-    } else {
-        const QString reason = failure["reason"].toString();
-        verdict->column()->addWidget(words(text(
-            reason.isEmpty() ? tr("The step failed. The output below ends with the reason.") : reason, true)));
-    }
-    verdict->column()->addWidget(words(dim(text(
-        updatingFrom_.isEmpty() ? tr("Nothing on this computer was changed.")
-                                : tr("%1 %2 is still installed and works as before.").arg(shown, updatingFrom_)))));
     auto *buttons = new QHBoxLayout;
     auto *again = new QPushButton(tr("Try again"));
     auto *leave = new QPushButton(tr("Back"));
-    const QString name = name_;
     connect(again, &QPushButton::clicked, this, [this, name] { emit retry(name); });
     connect(leave, &QPushButton::clicked, this, &RunPage::back);
+    if (stoppedByUser) {
+        buttons->addWidget(again);
+        buttons->addWidget(leave);
+        buttons->addStretch();
+        verdict->column()->addLayout(buttons);
+        emit failed(name_);
+        return;
+    }
+
+    // Recipe's premise is that an agent does the fixing. The page puts together
+    // what the agent is handed: the issue, the facts, and the expected result.
+    const QJsonObject refused = failure["refused"].toObject();
+    const QString hook = failure["hook"].toString();
+    const QString doing = updatingFrom_.isEmpty() ? tr("Installing %1 %2").arg(shown, version)
+                                                   : tr("Updating %1 from %2 to %3").arg(shown, updatingFrom_, version);
+    QString issue;
+    QStringList facts;
+    if (!refused.isEmpty()) {
+        const QString during = hook == QLatin1String("acquire") ? tr("fetching")
+                               : hook == QLatin1String("build") ? tr("building") : tr("installing");
+        QStringList declared;
+        for (const QJsonValue &value : refused["declared"].toArray())
+            declared << value.toString();
+        issue = tr("%1 stopped while %2. The recipe tried to connect to %3, which is not on its list, so the "
+                   "sandbox refused the connection.")
+                    .arg(doing, during, endpointText(refused["endpoint"].toString()));
+        facts << tr("The recipe allows: %1").arg(endpointsText(declared));
+    } else {
+        issue = hook.isEmpty() ? tr("%1 stopped.").arg(doing)
+                               : tr("%1 stopped in the %2 step.").arg(doing, hookTitle(hook).toLower());
+        if (!failure["reason"].toString().isEmpty())
+            facts << tr("Recipe's own message: %1").arg(failure["reason"].toString());
+    }
+    if (found && !found->path.isEmpty())
+        facts << tr("The recipe: %1").arg(found->path);
+    const int lines = output_->toPlainText().isEmpty() ? 0 : output_->blockCount();
+    if (lines)
+        facts << tr("The output of the run: %1").arg(counted(lines, tr("%1 line"), tr("%1 lines")));
+    facts << unchanged;
+
+    auto *prompt = new Panel;
+    auto *promptTitle = new QVBoxLayout;
+    promptTitle->setSpacing(0);
+    promptTitle->addWidget(strong(tr("What the agent is given")));
+    promptTitle->addWidget(dim(text(tr("You can change the expected result: it says what should be true afterwards."))));
+    prompt->column()->addLayout(promptTitle);
+    auto *form = new QFormLayout;
+    form->setHorizontalSpacing(16);
+    form->setVerticalSpacing(8);
+    form->addRow(strong(tr("The issue")), text(issue, true));
+    form->addRow(strong(tr("The facts")), text(QStringLiteral("• ") + facts.join(QStringLiteral("\n• ")), true));
+    auto *expected = new QPlainTextEdit(
+        tr("%1 %2 installs and its own check passes. What the recipe may use stays as it is; if that has to "
+           "change, say what and why, and stop.")
+            .arg(shown, version));
+    expected->setAccessibleName(tr("The expected result"));
+    expected->setFixedHeight(66);
+    form->addRow(strong(tr("The expected result")), expected);
+    prompt->column()->addLayout(form);
+
+    auto *fixNow = primary(tr("Let the agent fix it"));
+    connect(fixNow, &QPushButton::clicked, this, [this, name, issue, facts, expected] {
+        emit fix(name, tr("The issue:\n%1\n\nThe facts:\n- %2\n\nThe expected result:\n%3\n")
+                           .arg(issue, facts.join(QStringLiteral("\n- ")), expected->toPlainText().trimmed()));
+    });
+    auto *showOutput = new QPushButton(tr("Show the output"));
+    showOutput->setCheckable(true);
+    connect(showOutput, &QPushButton::toggled, this, [this](bool on) {
+        outputTitle_->setVisible(on);
+        output_->setVisible(on);
+    });
+    buttons->addWidget(showOutput);
     buttons->addWidget(again);
     buttons->addWidget(leave);
     buttons->addStretch();
-    verdict->column()->addLayout(buttons);
-    column_->insertWidget(1, verdict);
+    buttons->addWidget(fixNow);
+    prompt->column()->addLayout(buttons);
+    column_->insertWidget(2, prompt);
+
+    // The output stays one click away; the prompt already counts it among the facts.
+    outputTitle_->hide();
+    output_->hide();
+    column_->addStretch();
     emit failed(name_);
 }
 

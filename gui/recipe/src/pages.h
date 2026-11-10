@@ -61,6 +61,9 @@ public:
 signals:
     void back();
     void retry(const QString &name);
+    // Hand the failure to the agent: the issue, the facts and the expected result.
+    void fix(const QString &name, const QString &prompt);
+    void note(const QString &words);
     void succeeded(const QString &name);
     void failed(const QString &name);
     void status(const QString &words);
@@ -76,7 +79,8 @@ private:
     QVBoxLayout *column_ = nullptr;
     QGridLayout *plan_ = nullptr;
     QMap<QString, StepMark *> marks_;
-    QLabel *title_ = nullptr, *state_ = nullptr;
+    QLabel *title_ = nullptr, *state_ = nullptr, *outputTitle_ = nullptr;
+    QString agentNote_;
     QProgressBar *bar_ = nullptr;
     QPlainTextEdit *output_ = nullptr;
     QPushButton *stop_ = nullptr;

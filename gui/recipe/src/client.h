@@ -41,6 +41,9 @@ public:
 
     Run *install(const QString &name);
     Run *update(const QString &name);
+    // The same install or update with Recipe's agent repair on, and the
+    // prompt (issue, facts, expected result) handed to it.
+    Run *fixWithAgent(const QString &name, const QString &prompt, bool installed);
     Run *remove(const QString &name, bool clearKept);
     Run *goBack(const QString &name);
 
