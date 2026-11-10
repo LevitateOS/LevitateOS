@@ -38,6 +38,8 @@ public:
 signals:
     void rescan();
     void handOver();
+    // Show this folder (or the folder this file is in) in the file manager.
+    void openFolder(const QString &path);
 
 private:
     void fillList();
@@ -49,7 +51,7 @@ private:
     QString home_;
     Node *picked_ = nullptr;
     QLabel *progress_ = nullptr, *head_ = nullptr, *foot_ = nullptr, *where_ = nullptr;
-    QPushButton *add_ = nullptr, *hand_ = nullptr;
+    QPushButton *add_ = nullptr, *hand_ = nullptr, *open_ = nullptr;
     QTreeWidget *list_ = nullptr;
     DiskMap *map_ = nullptr;
 };

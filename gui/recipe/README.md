@@ -77,9 +77,10 @@ QT_QPA_PLATFORM=offscreen RECIPE_GUI_RECIPE=$PWD/target/debug/recipe \
 | `src/client.*` | the only code that runs `recipe`; a `Run` reports one change as events |
 | `../kit/` | shared with `gui/recab` and `gui/disk`: small widgets (step mark, letter tile, panels, the prompt handed to an agent), the page base, the work page, the command runner, sizes and counts as words, the stand-in looks |
 | `src/pages.*` | Browse, a recipe's page, a run, Installed, Updates, the remove question |
+| `src/sources.*` | the Sources page, and asking the agent for a recipe |
 | `src/window.*` | the sidebar and the flows between pages |
 | `src/shots.*` | the stand-in looks and the picture mode |
-| `fixtures/` | the stand-in `recipe` and its sample catalog |
+| `fixtures/` | the stand-in `recipe` with its sample catalog and sources, and the stand-in agent |
 | `data/` | the menu entry and the polkit action |
 
 ## What the front end asks of `recipe`
@@ -121,6 +122,52 @@ line is shown as output.
 Without a `plan`, the front end adds a row of three steps for each recipe as
 its first step arrives.
 
+## Reading and reading again
+
+The catalog is read as three commands in a row (`list`, `installed`,
+`updates`) without holding the window up. The first time, the page says
+"Reading the recipes"; later reads leave the page as it is, and the status bar
+says where the recipes are from and when they were read. It is read again
+after every change, on "Read again" in the status bar, on F5 or Ctrl+R, and
+when the person comes back to the window after 20 seconds or more. That reads
+what is on this computer; it fetches nothing. Fetching the sources' lists is
+"Check for updates" on the Updates page and "Fetch again" on the Sources page.
+
+## Sources
+
+`recipe list --json` names the sources (`sources`: `name`, `title`, `kind`,
+`address` or `path`, `commit`, `checked`, `problem`) and each recipe's
+`source`. The window shows one source's recipes or all (the box under the
+search, shown when more than one source has recipes), says on every recipe
+where it is from, and has a Sources page:
+
+| Action | Command |
+|---|---|
+| Fetch again, Fetch all again, Check for updates | `recipe refresh [NAME]`, as the person |
+| Add a source… (an address, or a folder) | `recipe source add ADDRESS` or `recipe source add --path FOLDER`, as root |
+| Remove… | `recipe source remove NAME`, as root |
+
+Installing and updating name the recipe as `SOURCE:NAME`. All of these exist in
+`recipe` (see `docs/recipe-sources.md`, steps 1 and 2); the window has run them
+against the stand-in only, and read the real `list --json`. Installing from a
+remote source is step 3 there and stops with a message until then. When two
+sources hold one name, the window shows the first and says nothing of the
+other.
+
+## Asking for software that has no recipe
+
+"Ask for software…" under the list, or "Ask for “…”…" after a search, opens a
+page where the person says what they want. It goes to the agent as `The
+request:`, `The issue:`, `The facts:` (where a person's own recipes go, how a
+recipe is checked, which recipes exist) and `The expected result:`, which the
+person can change. The agent is `RECIPE_GUI_AGENT` (default `codex`), handed
+the prompt as one JSON line, `{"prompt": "..."}`, with its input left open. It
+reports with `plan`, `step`, `output`, `agent` and `done`; an `agent` event
+with a `recipe` names what it wrote, and the window opens that recipe to be
+read. Nothing is installed. It may ask: a `question` event (`id`, `text`,
+`choices`) is shown with a button for each choice, and the answer goes back
+as `{"question": id, "answer": "..."}`.
+
 ## When a run stops: the agent fixes it
 
 Recipe's premise is that an agent does the maintenance. A stopped run is not
@@ -140,6 +187,13 @@ output" stay beside it. What the agent changed is reported when the run ends;
 there is no step yet where the person approves the change before it is used.
 
 ## Not done
+
+- A real agent for "Ask for software": Codex and Claude Code do not speak the
+  lines above as they are. The stand-in writes no file.
+- Answering the agent during "Let the agent fix it": that agent is started by
+  Recipe itself, which has no way to pass a question on.
+- The source commands and `refresh` against the real `recipe`; a source's
+  icons; two sources with one name.
 
 - Opening the recipe file itself, the list of sources (Git repositories) and
   choosing between them, asking an agent for a recipe.

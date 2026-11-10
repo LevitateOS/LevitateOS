@@ -368,7 +368,7 @@ double Comparison::alike() const
 
 QString Comparison::roleWords() const
 {
-    if (role == QLatin1String("before"))
+    if (role == QLatin1String("previous"))
         return QObject::tr("The other system is the one from before your last change. What differs is that change.");
     if (role == QLatin1String("next"))
         return QObject::tr("The other system holds a change that is not started yet. What differs is that change.");
@@ -433,41 +433,211 @@ QString Comparison::expected() const
 
 // ---------------------------------------------------------------- The page
 
-void SystemsPage::showStart(const QString &why)
+// One system as a frame that fills while it is read, or stands empty.
+class SideFrame : public QWidget {
+public:
+    SideFrame() { setMinimumSize(200, 150); }
+    void set(double done, const QString &words)
+    {
+        done_ = done;
+        words_ = words;
+        update();
+    }
+
+protected:
+    void paintEvent(QPaintEvent *) override
+    {
+        QPainter painter(this);
+        painter.fillRect(rect(), palette().color(QPalette::Base));
+        QColor ink = palette().color(QPalette::WindowText);
+        QColor fill = ink;
+        fill.setAlphaF(0.12f);
+        painter.fillRect(QRectF(0, 0, width() * qBound(0.0, done_, 1.0), height()), fill);
+        ink.setAlphaF(0.66f);
+        painter.setPen(ink);
+        painter.drawText(rect(), Qt::AlignCenter, words_);
+    }
+
+private:
+    double done_ = 0;
+    QString words_;
+};
+
+SystemsState SystemsState::fromJson(const QJsonObject &object)
 {
-    QVBoxLayout *column = fresh();
+    SystemsState s;
+    // The same status the System window reads; an older recab describes slots
+    // and staging, which does not say what the other system is.
+    if (object["schema_version"].toInt() != 3) {
+        s.problem = QObject::tr("recab answered in a form this window does not know (schema %1; it reads schema 3).")
+                        .arg(object["schema_version"].toInt());
+        return s;
+    }
+    s.known = true;
+    s.distro = object["distro"].toString();
+    s.revision = object["revision"].toInt(-1);
+    s.runningRelease = object["running"].toObject()["release"].toString();
+    s.otherRelease = object["other"].toObject()["release"].toString();
+    s.otherRole = object["other"].toObject()["role"].toString();
+    return s;
+}
+
+QString SystemsState::runningName() const
+{
+    return QStringLiteral("%1 %2").arg(distro, runningRelease).trimmed();
+}
+
+QString SystemsState::otherName() const
+{
+    return QStringLiteral("%1 %2").arg(distro, otherRelease).trimmed();
+}
+
+QString SystemsState::otherIs() const
+{
+    if (otherRole == QLatin1String("previous"))
+        return QObject::tr("The system from before.");
+    if (otherRole == QLatin1String("next"))
+        return QObject::tr("The next system, not started yet.");
+    return QObject::tr("The second copy.");
+}
+
+void SystemsPage::forget()
+{
     here_ = there_ = nullptr;
+    reading_[0] = reading_[1] = nullptr;
+    step_ = nullptr;
     pointed_ = nullptr;
     list_ = nullptr;
     blocks_.reset();
-    column->addWidget(heading(tr("Compare the two systems")));
-    column->addWidget(dim(text(tr("This computer holds its system twice: the one that is running, and another on its own "
-                                  "partition. Comparing them shows how alike they are and what differs, file by file."),
-                               true)));
+}
+
+// The two frames with their names over them, as on the compared page.
+static QLayout *twoFrames(const SystemsState &state, SideFrame *frames[2])
+{
+    auto *sides = new QHBoxLayout;
+    sides->setSpacing(14);
+    for (int side = 0; side < 2; ++side) {
+        auto *column = new QVBoxLayout;
+        column->setSpacing(4);
+        auto *title = new QVBoxLayout;
+        title->setSpacing(0);
+        title->addWidget(strong(side == 0 ? QObject::tr("This system") : QObject::tr("The other system")));
+        title->addWidget(dim(text(side == 0 ? QObject::tr("Running now. %1").arg(state.runningName())
+                                            : QObject::tr("%1 %2").arg(state.otherIs(), state.otherName()))));
+        column->addLayout(title);
+        frames[side] = new SideFrame;
+        column->addWidget(frames[side], 1);
+        sides->addLayout(column, 1);
+    }
+    return sides;
+}
+
+void SystemsPage::showState(const SystemsState &state, const QString &why)
+{
+    QVBoxLayout *column = fresh();
+    forget();
+    if (!state.known) {
+        column->addWidget(heading(tr("The two systems could not be read")));
+        column->addWidget(text(state.problem, true));
+        auto *again = new QPushButton(tr("Try again"));
+        again->setDefault(true);
+        connect(again, &QPushButton::clicked, this, &SystemsPage::readAgain);
+        column->addWidget(again, 0, Qt::AlignLeft);
+        column->addStretch();
+        return;
+    }
+    auto *header = new QHBoxLayout;
+    auto *top = new QVBoxLayout;
+    top->setSpacing(1);
+    top->addWidget(heading(tr("The two systems have not been compared")));
+    top->addWidget(dim(text(tr("This computer holds its system twice: the one that is running, and another on its own "
+                               "partition. Comparing them shows whether they are the same, block by block."),
+                            true)));
+    header->addLayout(top, 1);
+    auto *system = new QPushButton(tr("Open System…"));
+    system->setToolTip(tr("Changing, updating and going back are done there"));
+    connect(system, &QPushButton::clicked, this, &SystemsPage::openSystem);
+    header->addWidget(system, 0, Qt::AlignBottom);
+    column->addLayout(header);
+
     if (!why.isEmpty()) {
         auto *verdict = new Verdict;
         verdict->column()->addWidget(strong(tr("They could not be compared")));
         verdict->column()->addWidget(text(why, true));
         column->addWidget(verdict);
     }
-    auto *panel = new Panel;
-    panel->column()->addWidget(text(tr("Both systems are read from start to end, which takes a few minutes and needs the "
-                                       "administrator's password. Nothing is changed on either."),
-                                    true));
-    auto *row = new QHBoxLayout;
+    SideFrame *frames[2];
+    column->addLayout(twoFrames(state, frames), 1);
+    frames[0]->set(0, tr("Not read yet"));
+    frames[1]->set(0, tr("Not read yet"));
+
+    auto *foot = new QHBoxLayout;
+    foot->addWidget(dim(text(tr("Both systems are read from start to end, which takes a few minutes and needs the "
+                                "administrator's password. Nothing is changed on either."),
+                             true)),
+                    1);
     auto *go = new QPushButton(why.isEmpty() ? tr("Compare") : tr("Try again"));
     go->setDefault(true);
     connect(go, &QPushButton::clicked, this, &SystemsPage::compare);
-    row->addWidget(go);
-    row->addStretch();
-    panel->column()->addLayout(row);
-    column->addWidget(panel);
-    column->addStretch();
+    foot->addWidget(go);
+    column->addLayout(foot);
 }
 
-void SystemsPage::show(const Comparison &c, const QString &said)
+void SystemsPage::showComparing(const SystemsState &state)
 {
     QVBoxLayout *column = fresh();
+    forget();
+    auto *header = new QHBoxLayout;
+    auto *top = new QVBoxLayout;
+    top->setSpacing(1);
+    top->addWidget(heading(tr("Comparing the two systems")));
+    top->addWidget(dim(text(tr("Both are read from start to end. Nothing is changed on either."), true)));
+    header->addLayout(top, 1);
+    auto *halt = new QPushButton(tr("Stop"));
+    connect(halt, &QPushButton::clicked, this, [this, halt] {
+        halt->setEnabled(false);
+        emit stop();
+    });
+    header->addWidget(halt, 0, Qt::AlignBottom);
+    column->addLayout(header);
+
+    column->addLayout(twoFrames(state, reading_), 1);
+    reading_[0]->set(0, tr("Waiting for the administrator's password"));
+    reading_[1]->set(0, tr("Waiting"));
+    step_ = dim(text(tr("Starting"), true));
+    column->addWidget(step_);
+}
+
+void SystemsPage::progress(const QJsonObject &event)
+{
+    if (!reading_[0] || !step_)
+        return;
+    const QString kind = event["event"].toString(), step = event["step"].toString();
+    const int side = step == QLatin1String("running") ? 0 : step == QLatin1String("other") ? 1 : -1;
+    if (kind == QLatin1String("step")) {
+        const bool done = event["status"] == QLatin1String("done");
+        if (side >= 0)
+            reading_[side]->set(done ? 1 : 0, done ? tr("Read") : tr("Reading"));
+        if (step == QLatin1String("compare") && !done)
+            step_->setText(tr("Both are read. Setting them side by side."));
+        else if (side >= 0 && !done)
+            step_->setText(side == 0 ? tr("Reading the running system") : tr("Reading the other system"));
+    } else if (kind == QLatin1String("progress") && side >= 0) {
+        const qint64 done = event["done"].toInteger(), total = event["total"].toInteger();
+        if (total > 0) {
+            reading_[side]->set(double(done) / double(total),
+                                tr("Read %1 of %2").arg(bytesText(done), bytesText(total)));
+            step_->setText((side == 0 ? tr("Reading the running system: %1 of %2")
+                                      : tr("Reading the other system: %1 of %2"))
+                               .arg(bytesText(done), bytesText(total)));
+        }
+    }
+}
+
+void SystemsPage::show(const Comparison &c, const QString &said, const QDateTime &when, bool stale)
+{
+    QVBoxLayout *column = fresh();
+    forget();
 
     auto *header = new QHBoxLayout;
     auto *top = new QVBoxLayout;
@@ -488,18 +658,37 @@ void SystemsPage::show(const Comparison &c, const QString &said)
         under = tr("%1, %2 in all. ").arg(counted(c.count(), tr("%1 file differs"), tr("%1 files differ")),
                                           bytesText(c.differingBytes()))
                 + under;
+    if (when.isValid()) {
+        const QString time = QLocale().toString(when.time(), QLocale::ShortFormat);
+        under += QLatin1Char(' ')
+                 + (when.date() == QDate::currentDate()
+                        ? tr("Compared today at %1.").arg(time)
+                        : tr("Compared on %1 at %2.").arg(QLocale().toString(when.date(), QLocale::ShortFormat), time));
+    }
     top->addWidget(dim(text(under, true)));
     header->addLayout(top, 1);
+    auto *system = new QPushButton(tr("Open System…"));
+    system->setToolTip(tr("Changing, updating and going back are done there"));
+    connect(system, &QPushButton::clicked, this, &SystemsPage::openSystem);
+    header->addWidget(system, 0, Qt::AlignBottom);
     auto *again = new QPushButton(tr("Compare again"));
+    again->setDefault(stale);
     connect(again, &QPushButton::clicked, this, &SystemsPage::compare);
     header->addWidget(again, 0, Qt::AlignBottom);
     column->addLayout(header);
+
+    if (stale) {
+        auto *old = new Card(Card::Open);
+        old->column()->addWidget(strong(tr("The systems have changed since this was compared")));
+        old->column()->addWidget(text(tr("What is shown is how they were then. Compare again to see how they are now."), true));
+        column->addWidget(old);
+    }
 
     // The two systems as blocks, side by side, with one layout for both.
     blocks_ = Blocks::from(c);
     here_ = new SideMap(true, blocks_);
     there_ = new SideMap(false, blocks_);
-    const QString otherIs = c.role == QLatin1String("before") ? tr("The system from before.")
+    const QString otherIs = c.role == QLatin1String("previous") ? tr("The system from before.")
                             : c.role == QLatin1String("next") ? tr("The next system, not started yet.")
                                                                 : tr("The second copy.");
     auto *sides = new QHBoxLayout;
@@ -613,7 +802,7 @@ void SystemsPage::show(const Comparison &c, const QString &said)
     foot->addWidget(dim(text(notes.join(QLatin1Char(' ')), true)), 1);
     if (!c.identical()) {
         auto *hand = new QPushButton(tr("Ask the agent what differs…"));
-        hand->setDefault(said.isEmpty());
+        hand->setDefault(said.isEmpty() && !stale);
         connect(hand, &QPushButton::clicked, this, &SystemsPage::handOver);
         foot->addWidget(hand);
     }

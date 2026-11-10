@@ -6,6 +6,8 @@
 #include "scan.h"
 #include "systems.h"
 
+#include <QDateTime>
+#include <QJsonObject>
 #include <QMainWindow>
 
 #include <memory>
@@ -16,6 +18,7 @@ class QLabel;
 class QStackedWidget;
 class QTabBar;
 class QTimer;
+class Refresher;
 class Run;
 class WorkPage;
 
@@ -35,10 +38,21 @@ public:
 
     // The two systems: the page, the comparison, the question to the agent.
     void showSystems();
+    // Asks recab what the two systems are; quick, and changes nothing.
+    void readState();
     void compare();
+    void stopComparing();
     void showExplain();
+    // What F5 does: on the mess, look again; on the systems, read their state again.
+    void refresh();
+    // Whether the agent has asked something; and answering it.
+    bool agentAsks() const;
+    void answerAgent(const QString &words);
 
-    bool busy() const { return scanner_ != nullptr || run_ != nullptr; }
+    bool busy() const { return scanner_ != nullptr || run_ != nullptr || reading_ != nullptr; }
+    bool comparing() const { return job_ == Job::Comparing; }
+    const SystemsState &state() const { return state_; }
+    bool stale() const;
     const QList<Finding> &found() const { return found_; }
     qint64 scannedBytes() const { return tree_ ? tree_->bytes : 0; }
     qint64 freed() const { return freed_; }
@@ -52,14 +66,25 @@ private:
     void go(QWidget *page);
     void finished(bool ok);
     void leaveWork();
+    void compared(bool ok);
+    void drawSystems(const QString &why = QString());
+    void keep();
+    void recall();
+    void openFolder(const QString &path);
 
     QStringList roots_;
-    QString home_, agent_, recab_, rootHelper_;
+    QString home_, agent_, recab_, rootHelper_, systemApp_, kept_;
     bool apparent_;
 
     Scanner *scanner_ = nullptr;
-    Run *run_ = nullptr;
+    Run *run_ = nullptr, *reading_ = nullptr;
     Job job_ = Job::None;
+    SystemsState state_;
+    bool stateRead_ = false, stopped_ = false;
+    QDateTime comparedWhen_;
+    int comparedRevision_ = -1;
+    QJsonObject comparedAnswer_;
+    Refresher *refresher_;
     std::shared_ptr<Node> tree_;
     QList<Finding> found_;
     qint64 before_ = 0, freed_ = 0;

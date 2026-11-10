@@ -6,6 +6,7 @@
 
 #include <QHeaderView>
 #include <QPainter>
+#include <QProgressBar>
 #include <QPushButton>
 #include <QScrollArea>
 #include <QSet>
@@ -50,10 +51,16 @@ void MessPage::showScanning(const QStringList &roots)
     list_ = nullptr;
     map_ = nullptr;
     foot_ = head_ = where_ = nullptr;
-    add_ = hand_ = nullptr;
+    add_ = hand_ = open_ = nullptr;
     picked_ = nullptr;
     column->addWidget(heading(tr("Looking for mess")));
     column->addWidget(dim(text(tr("Reading %1. Nothing is changed.").arg(roots.join(tr(", "))), true)));
+    auto *bar = new QProgressBar;
+    bar->setRange(0, 0);
+    bar->setTextVisible(false);
+    bar->setFixedHeight(8);
+    bar->setMaximumWidth(360);
+    column->addWidget(bar);
     progress_ = text(tr("Starting"));
     column->addWidget(progress_);
     column->addStretch();
@@ -104,6 +111,12 @@ void MessPage::show(std::shared_ptr<Node> tree, const QList<Finding> &found, con
     where_->setAlignment(Qt::AlignLeft | Qt::AlignTop);
     where_->setMinimumHeight(2 * where_->fontMetrics().lineSpacing());
     pointed->addWidget(where_, 1);
+    open_ = new QPushButton(tr("Open the folder"));
+    connect(open_, &QPushButton::clicked, this, [this] {
+        if (picked_)
+            emit openFolder(picked_->dir ? picked_->path() : picked_->parent->path());
+    });
+    pointed->addWidget(open_, 0, Qt::AlignTop);
     add_ = new QPushButton(tr("Add to the list"));
     connect(add_, &QPushButton::clicked, this, &MessPage::addPicked);
     pointed->addWidget(add_, 0, Qt::AlignTop);
@@ -235,8 +248,10 @@ void MessPage::pick(Node *node)
         where_->setText(tr("Click anything on the map to see what it is. What the rules did not name can be added "
                            "to the list by hand."));
         add_->setEnabled(false);
+        open_->setEnabled(false);
         return;
     }
+    open_->setEnabled(true);
     // Every part of the path is a link to that folder.
     QStringList parts;
     int steps = 0;

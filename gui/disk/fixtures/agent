@@ -4,8 +4,8 @@
 It reads the prompt on its input, goes through the listed places and reports
 as an agent would. It removes a place only when that place is inside
 DISK_STANDIN_ROOT (the sample tree); anywhere else it says what it would have
-done and touches nothing. Places marked "Ask me first" and places that belong
-to Recipe are left.
+done and touches nothing. For a place marked "Ask me first" it asks, and
+removes it only on a yes. Places that belong to Recipe are left.
 """
 import json
 import os
@@ -52,8 +52,18 @@ def explain(prompt):
     emit(event="done")
 
 
+def ask(number, text, choices):
+    """Asks the person and waits. With nobody there, the careful answer: the last choice."""
+    emit(event="question", id=number, text=text, choices=choices)
+    try:
+        return json.loads(sys.stdin.readline())["answer"]
+    except (ValueError, KeyError):
+        return choices[-1]
+
+
 def main():
-    prompt = sys.stdin.read()
+    # The prompt arrives as one JSON line; the input stays open for answers.
+    prompt = json.loads(sys.stdin.readline())["prompt"]
     if "the other system" in prompt.split("The facts:", 1)[0]:
         explain(prompt)
         return
@@ -72,8 +82,9 @@ def main():
     cleared = left = 0
     for number, (path, why) in enumerate(places, 1):
         emit(event="progress", step="clear", done=number, total=len(places))
-        if "Ask me first" in why:
-            emit(event="output", line="left, to ask first: %s" % path)
+        if "Ask me first" in why and ask(str(number), "Remove %s? %s" % (path, why.replace(" Ask me first.", "")),
+                                         ["Remove it", "Keep it"]) != "Remove it":
+            emit(event="output", line="kept, as you said: %s" % path)
             left += 1
         elif "Recipe" in why:
             emit(event="output", line="left for Recipe to clear: %s" % path)
@@ -92,7 +103,7 @@ def main():
     emit(event="step", step="check", status="running")
     time.sleep(0.3 * SPEED)
     emit(event="step", step="check", status="done")
-    emit(event="agent", summary="it cleared %d places and left %d that need a yes or belong to Recipe" % (cleared, left))
+    emit(event="agent", summary="it cleared %d places and left %d that you kept or that belong to Recipe" % (cleared, left))
     emit(event="done")
 
 

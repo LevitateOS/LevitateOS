@@ -21,8 +21,8 @@ disk). Nothing has been handed to a real agent: `fixtures/agent` stands in for
 it and removes only inside a sample tree. How a real Codex or Claude Code is
 started, and that it answers with the events below, is not built.
 
-**The comparison of the two systems runs against a stand-in only.** recab has
-no `compare` command: it has `inventory`, which reads one system, and
+**The two-systems tab runs against a stand-in only.** recab has no `compare`
+command: it has `inventory`, which reads one system, and
 `prepare` finds the differences in order to copy them, not to show them.
 `fixtures/recab`
 plays the answer this window needs; what it needs is written down under "What
@@ -44,19 +44,32 @@ it asks of recab". No real pair of systems has been compared.
 4. **The hand-over.** The issue, the facts (one per ticked place: path, size,
    why it can go, how it should be cleared) and the expected result, which the
    person can change.
-5. **The agent works**, then the window reads the disk again and says what was
-   really freed.
+5. **The agent works.** Before it removes anything marked "asks first" it
+   asks, and the question is answered in the window. Then the window reads
+   the disk again and says what was really freed.
+
+"Open the folder" shows what is pointed at in the file manager. "Read again"
+in the status bar, F5 and Ctrl+R look at the disk again on the first tab and
+ask recab again on the second. Coming back to the window after a while asks
+recab again; the disk is only looked at again when asked, since that takes a
+while and drops what was ticked.
 
 On the second tab:
 
-1. **Compare.** Nothing is read until the person asks: both systems are read
-   from start to end, which takes minutes and needs the administrator's
-   password.
-2. **How alike they are.** A headline ("The two systems are identical", or
+1. **What is there.** On opening, recab is asked what the two systems are
+   (quick, no password): the page names both and shows two empty frames. If a
+   comparison was kept from before, it is shown instead, with when it was
+   made; when either system has changed since, it says so and offers to
+   compare again. "Open System…" starts the System window, where changing,
+   updating and going back are done.
+2. **Compare.** Both systems are read from start to end, which takes minutes
+   and needs the administrator's password. The tab stays: each frame fills as
+   its side is read, and Stop ends it.
+3. **How alike they are.** A headline ("The two systems are identical", or
    "99.9% the same", by room taken), how many files differ, and what the other
    system is: a copy, the system from before the last change, or the next
    system with a change that is not started.
-3. **The two systems as blocks, side by side.** Two maps, this system left
+4. **The two systems as blocks, side by side.** Two maps, this system left
    and the other right, drawn from one layout: every folder is a block in the
    same place on both sides, so two systems that are the same look the same.
    A block that holds files that differ is coloured, with the number of files
@@ -65,9 +78,9 @@ On the second tab:
    with dashes. A block that differs is drawn at least big enough to see,
    however little room the difference takes. A click on a block marks it on
    both sides and says whether it is the same in both.
-4. **The list** shows every difference by folder. Files that differ by design
+5. **The list** shows every difference by folder. Files that differ by design
    (each system names its own partition) are counted apart.
-5. **Ask the agent what differs.** The differences go to the agent as issue,
+6. **Ask the agent what differs.** The differences go to the agent as issue,
    facts and expected result. The agent changes nothing; what it answers is
    shown above the list.
 
@@ -134,6 +147,8 @@ hands nothing to anyone and compares nothing.
 | `DISK_GUI_APPARENT` | `1`: count each file's length (the sample is made of empty-but-long files) | off |
 | `DISK_GUI_RECAB` | the program asked to compare the two systems | `recab` |
 | `DISK_GUI_ROOT_HELPER` | what runs it as root; empty: run it as the person | `pkexec` |
+| `DISK_GUI_SYSTEM_APP` | what "Open System…" starts | `recab-gui` |
+| `DISK_GUI_KEPT` | the file the last comparison is kept in | `comparison.json` in the person's cache |
 
 The stand-in agent removes a place only when it lies inside
 `DISK_STANDIN_ROOT`; it leaves what is marked "Ask me first" and what belongs
@@ -146,7 +161,13 @@ default), `next` (the other holds a change not started yet), `identical`, or
 
 ## What it asks of recab
 
-One command, run as root, that reads both systems and changes neither:
+`recab status --json`, as the System window reads it (schema 3), for what the
+two systems are: `distro`, `running.release`, `other.release`, `other.role`
+(`previous`, `next`, or `copy`) and `revision`, a number that goes up with
+every change to either system. A comparison made at another revision is shown
+as out of date.
+
+And one command, run as root, that reads both systems and changes neither:
 
 ```
 recab compare --json --machine-events
@@ -160,7 +181,7 @@ When done it writes one JSON object on its standard output:
 |---|---|
 | `schema_version` | `1` |
 | `running`, `other` | each: `slot`, `device`, `files`, `bytes` |
-| `other.role` | `copy` (made as one, nothing changed since), `before` (the system from before the last change) or `next` (holds a change that is not started) |
+| `other.role` | `copy` (made as one, nothing changed since), `previous` (the system from before the last change) or `next` (holds a change that is not started) |
 | `same` | `files` and `bytes` that are the same in both |
 | `folders` | every folder down to the depth recab chooses, each with its whole size on both sides: `path`, `running_bytes`, `other_bytes`. The maps are drawn from this |
 | `own` | paths that differ by design, because each system names its own partition; not counted as differences |
@@ -174,12 +195,14 @@ both and set side by side.
 
 ## What it asks of the agent
 
-The agent is one program that reads the prompt on its input: `The issue:`,
-`The facts:` (one line per place: `- PATH (SIZE): why. how.`, with `Ask me
-first.` at the end where it applies) and `The expected result:`. It reports on
-its standard error, one JSON object per line, with the same events as the
-other two apps: `plan`, `step`, `progress`, `output`, `agent`, `failed`,
-`done`. When asked what differs between the two systems, what it says in
+The agent is one program handed the prompt as one JSON line on its input,
+`{"prompt": "..."}`, with the input left open: `The issue:`, `The facts:` (one
+line per place: `- PATH (SIZE): why. how.`, with `Ask me first.` at the end
+where it applies) and `The expected result:`. It reports on its standard
+error, one JSON object per line, with the same events as the other two apps:
+`plan`, `step`, `progress`, `output`, `agent`, `failed`, `done`. To ask, it
+sends `question` with an `id`, a `text` and `choices`; the answer comes back
+on its input as `{"question": id, "answer": "..."}`. When asked what differs between the two systems, what it says in
 `agent` is shown as its answer.
 
 ## The source
@@ -199,16 +222,20 @@ other two apps: `plan`, `step`, `progress`, `output`, `agent`, `failed`,
 
 ## Not done
 
-- `recab compare` does not exist. Until it does, the second tab ends in "It
-  stopped" on a real system.
+- `recab compare` does not exist, and the real `recab status` answers with
+  schema 2. Until both are there, the second tab says on a real system that
+  the two systems could not be read.
+- The kept comparison is one file in the person's cache
+  (`DISK_GUI_KEPT`); nothing checks that it belongs to this computer's disks
+  beyond recab's revision number.
+- Seeing what changed inside a file whose content differs; searching or
+  copying the list of differences.
 - Starting a real agent. `DISK_GUI_AGENT` is run with the prompt on its input
   and is expected to answer with the events above; Codex and Claude Code do
   not do that as they are.
 - Clearing Recipe's own folders "through Recipe": the prompt says so. Recipe
   has `recipe cleanup NAME` for one recipe's build files; whether anything
   clears its whole cache or its saved build steps was not checked.
-- The agent's questions for "asks first" places have no place in the window:
-  the work page shows what the agent says, and cannot answer it.
 - Mess inside the systems. The map reads only the home folder and
   `/var/lib/recipe`; the two systems are compared with each other, not searched
   for leftovers.

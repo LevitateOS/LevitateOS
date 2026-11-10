@@ -1,20 +1,27 @@
 #include "window.h"
 
 #include "pages.h"
+#include "refresh.h"
 #include "run.h"
 #include "work.h"
 
 #include <QDateTime>
+#include <QDesktopServices>
 #include <QDir>
+#include <QFile>
 #include <QFileInfo>
 #include <QJsonDocument>
 #include <QLabel>
+#include <QProcess>
 #include <QSignalBlocker>
+#include <QStandardPaths>
 #include <QStackedWidget>
 #include <QStatusBar>
 #include <QStorageInfo>
 #include <QTabBar>
 #include <QTimer>
+#include <QToolButton>
+#include <QUrl>
 #include <QVBoxLayout>
 
 Window::Window(QWidget *parent)
@@ -23,6 +30,9 @@ Window::Window(QWidget *parent)
     , agent_(qEnvironmentVariable("DISK_GUI_AGENT", "codex"))
     , recab_(qEnvironmentVariable("DISK_GUI_RECAB", "recab"))
     , rootHelper_(qEnvironmentVariable("DISK_GUI_ROOT_HELPER", "pkexec"))
+    , systemApp_(qEnvironmentVariable("DISK_GUI_SYSTEM_APP", "recab-gui"))
+    , kept_(qEnvironmentVariable("DISK_GUI_KEPT",
+                                 QStandardPaths::writableLocation(QStandardPaths::CacheLocation) + "/comparison.json"))
     , apparent_(qEnvironmentVariable("DISK_GUI_APPARENT") == QLatin1String("1"))
 {
     setWindowTitle(tr("Disk"));
@@ -79,6 +89,30 @@ Window::Window(QWidget *parent)
         else
             showSystems();
     });
+    connect(mess_, &MessPage::openFolder, this, &Window::openFolder);
+    connect(systems_, &SystemsPage::stop, this, &Window::stopComparing);
+    connect(systems_, &SystemsPage::readAgain, this, &Window::readState);
+    connect(systems_, &SystemsPage::openSystem, this, [this] {
+        if (!QProcess::startDetached(systemApp_, {}))
+            statusBar()->showMessage(tr("%1 could not be started").arg(systemApp_), 6000);
+    });
+
+    // F5 reads again what the tab shows. Coming back to the window reads the
+    // state of the two systems again, which is quick; the disk is only looked
+    // at again when asked, since that takes a while and drops what was ticked.
+    refresher_ = new Refresher(this, 20);
+    connect(refresher_, &Refresher::asked, this, [this](bool byHand) {
+        if (byHand)
+            refresh();
+        else if (!busy())
+            readState();
+    });
+    auto *again = new QToolButton;
+    again->setText(tr("Read again"));
+    again->setToolTip(tr("On the mess: look at the disk again. On the two systems: ask recab again. (F5)"));
+    again->setAutoRaise(true);
+    connect(again, &QToolButton::clicked, this, &Window::refresh);
+    statusBar()->addWidget(again);
     connect(mess_, &MessPage::rescan, this, [this] {
         before_ = 0;
         scan();
@@ -94,9 +128,29 @@ Window::Window(QWidget *parent)
     });
     connect(work_, &WorkPage::done, this, &Window::finished);
 
-    systems_->showStart();
+    recall();
+    systems_->showLoading(tr("Reading the two systems"), tr("Asking recab which system is running and what the other one is."));
     go(mess_);
     scan();
+    readState();
+}
+
+void Window::refresh()
+{
+    if (stack_->currentWidget() == mess_ && !scanner_ && !run_) {
+        before_ = 0;
+        scan();
+    } else if (stack_->currentWidget() == systems_ && !busy()) {
+        readState();
+    }
+}
+
+void Window::openFolder(const QString &path)
+{
+    const QFileInfo info(path);
+    const QString folder = info.isDir() ? path : info.absolutePath();
+    if (!QDesktopServices::openUrl(QUrl::fromLocalFile(folder)))
+        statusBar()->showMessage(tr("%1 could not be opened").arg(folder), 6000);
 }
 
 // Shows a page. The two things to look at have tabs; a hand-over and work
@@ -163,20 +217,133 @@ void Window::showSystems()
     go(systems_);
 }
 
+void Window::readState()
+{
+    if (reading_ || job_ == Job::Comparing)
+        return;
+    reading_ = new Run(recab_, {"status", "--json"}, this);
+    connect(reading_, &Run::finished, this, [this](bool ok) {
+        Run *run = reading_;
+        reading_ = nullptr;
+        run->deleteLater();
+        if (ok) {
+            state_ = SystemsState::fromJson(QJsonDocument::fromJson(run->answer()).object());
+        } else {
+            state_ = SystemsState();
+            state_.problem = tr("`%1 status --json` failed: %2").arg(recab_, run->problem());
+        }
+        stateRead_ = true;
+        refresher_->fresh();
+        // A page that is being worked on is left alone.
+        if (job_ == Job::None && stack_->currentWidget() != hand_)
+            drawSystems();
+    });
+    reading_->start();
+}
+
+// The comparison is out of date when either system has changed since.
+bool Window::stale() const
+{
+    return compared_ && state_.known && comparedRevision_ >= 0 && state_.revision != comparedRevision_;
+}
+
+// The systems page as things stand: the kept comparison when there is one,
+// else what recab says is there.
+void Window::drawSystems(const QString &why)
+{
+    if (compared_ && why.isEmpty())
+        systems_->show(comparison_, said_, comparedWhen_, stale());
+    else
+        systems_->showState(state_, why);
+}
+
 void Window::compare()
 {
-    if (run_)
+    if (run_ || reading_)
         return;
     // recab reads both systems; the other one can only be read as root.
     const QStringList arguments{"compare", "--json", "--machine-events"};
     run_ = rootHelper_.isEmpty() ? new Run(recab_, arguments, this)
                                  : new Run(rootHelper_, QStringList{recab_} + arguments, this);
     job_ = Job::Comparing;
+    stopped_ = false;
     said_.clear();
-    work_->begin(tr("Comparing the two systems"), tr("Both are read from start to end. Nothing is changed on either."),
-                 run_, tr("Nothing is kept: comparing starts over next time"));
-    go(work_);
+    // It stays on the tab: the two sides fill as they are read.
+    systems_->showComparing(state_);
+    go(systems_);
+    tabs_->setEnabled(false);
+    activity_->setText(tr("Comparing the two systems"));
+    connect(run_, &Run::event, systems_, &SystemsPage::progress);
+    connect(run_, &Run::finished, this, &Window::compared);
     run_->start();
+}
+
+void Window::stopComparing()
+{
+    if (run_ && job_ == Job::Comparing) {
+        stopped_ = true;
+        run_->stop();
+    }
+}
+
+void Window::compared(bool ok)
+{
+    Run *run = run_;
+    run_ = nullptr;
+    job_ = Job::None;
+    run->deleteLater();
+    tabs_->setEnabled(true);
+    activity_->setText(tr("Agent: %1").arg(QFileInfo(agent_).fileName()));
+    QString why;
+    if (stopped_) {
+        // Nothing to say: the person stopped it.
+    } else if (!ok) {
+        why = run->problem().isEmpty() ? tr("recab stopped without saying why.") : run->problem();
+    } else {
+        const QJsonObject answer = QJsonDocument::fromJson(run->answer()).object();
+        if (answer.isEmpty())
+            why = tr("recab finished without an answer this window can read.");
+        const Comparison comparison = why.isEmpty() ? Comparison::fromJson(answer, &why) : Comparison();
+        if (why.isEmpty()) {
+            comparison_ = comparison;
+            compared_ = true;
+            comparedWhen_ = QDateTime::currentDateTime();
+            comparedRevision_ = state_.known ? state_.revision : -1;
+            comparedAnswer_ = answer;
+            keep();
+        }
+    }
+    drawSystems(why);
+}
+
+// The last comparison is kept, so the window opens with it next time.
+void Window::keep()
+{
+    QDir().mkpath(QFileInfo(kept_).absolutePath());
+    QFile file(kept_);
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate))
+        return;
+    file.write(QJsonDocument(QJsonObject{{"when", comparedWhen_.toSecsSinceEpoch()},
+                                         {"revision", comparedRevision_},
+                                         {"answer", comparedAnswer_}})
+                   .toJson(QJsonDocument::Compact));
+}
+
+void Window::recall()
+{
+    QFile file(kept_);
+    if (!file.open(QIODevice::ReadOnly))
+        return;
+    const QJsonObject kept = QJsonDocument::fromJson(file.readAll()).object();
+    QString error;
+    const Comparison comparison = Comparison::fromJson(kept["answer"].toObject(), &error);
+    if (!error.isEmpty())
+        return;
+    comparison_ = comparison;
+    compared_ = true;
+    comparedAnswer_ = kept["answer"].toObject();
+    comparedWhen_ = QDateTime::fromSecsSinceEpoch(kept["when"].toInteger());
+    comparedRevision_ = kept["revision"].toInt(-1);
 }
 
 void Window::showExplain()
@@ -188,6 +355,16 @@ void Window::showExplain()
                 tr("The agent looks into the differences and says what they are. It changes nothing."),
                 comparison_.issue(), comparison_.facts(), comparison_.expected());
     go(hand_);
+}
+
+bool Window::agentAsks() const
+{
+    return run_ && stack_->currentWidget() == work_ && work_->asking();
+}
+
+void Window::answerAgent(const QString &words)
+{
+    work_->answer(words);
 }
 
 // ---------------------------------------------------------------- The agent
@@ -202,7 +379,7 @@ void Window::send(const QString &prompt)
     if (run_)
         return;
     run_ = new Run(agent_, {}, this);
-    run_->setInput(prompt.toUtf8());
+    run_->setPrompt(prompt); // its questions are answered on the same input
     if (handingSystems_) {
         job_ = Job::Explaining;
         said_.clear();
@@ -225,7 +402,6 @@ void Window::send(const QString &prompt)
 
 void Window::finished(bool ok)
 {
-    Run *run = run_;
     const Job job = job_;
     run_ = nullptr;
     job_ = Job::None;
@@ -245,24 +421,12 @@ void Window::finished(bool ok)
         scan(); // see what is really free now, not what the agent says
         go(mess_);
         break;
-    case Job::Comparing: {
-        QString error;
-        const QJsonObject answer = QJsonDocument::fromJson(run->answer()).object();
-        if (answer.isEmpty())
-            error = tr("recab finished without an answer this window can read.");
-        const Comparison comparison = error.isEmpty() ? Comparison::fromJson(answer, &error) : Comparison();
-        if (error.isEmpty()) {
-            comparison_ = comparison;
-            compared_ = true;
-            systems_->show(comparison_);
-        } else {
-            systems_->showStart(error);
-        }
-        go(systems_);
-        break;
-    }
+    case Job::Comparing:
+        break; // has its own end, on the systems page
     case Job::Explaining:
-        systems_->show(comparison_, said_.isEmpty() ? tr("The agent finished without saying anything.") : said_);
+        if (said_.isEmpty())
+            said_ = tr("The agent finished without saying anything.");
+        drawSystems();
         go(systems_);
         break;
     case Job::None:
@@ -279,6 +443,7 @@ void Window::leaveWork()
         scan(); // part of it may have been cleared
         go(mess_);
     } else {
+        drawSystems();
         go(systems_);
     }
 }

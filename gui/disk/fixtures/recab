@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
-"""A stand-in for `recab compare`, for running disk-gui from a checkout.
+"""A stand-in for recab, for running disk-gui from a checkout.
 
+  recab status --json
   recab compare --json --machine-events
 
 It plays reading both systems and answers as the Disk window expects (see
@@ -12,6 +13,8 @@ DISK_STANDIN_SYSTEMS picks the story:
   identical  the two were made as copies and nothing was changed since
   none       there is no second system
 DISK_STANDIN_SPEED scales the waiting (0: none).
+DISK_STANDIN_REVISION is the number recab gives the state of the two systems
+(default 7); another number than at the last comparison makes that one stale.
 """
 import json
 import os
@@ -116,9 +119,24 @@ def folders(found):
     return [{"path": path, "running_bytes": pair[0], "other_bytes": pair[1]} for path, pair in sorted(sizes.items())]
 
 
+def status():
+    """What the System window's stand-in answers too, as far as this window reads it."""
+    if STORY == "none":
+        sys.exit("Error: this computer has one system only: recab was set up without a second one")
+    role = {"before": "previous", "next": "next"}.get(STORY, "copy")
+    print(json.dumps({
+        "schema_version": 3, "distro": os.environ.get("DISK_STANDIN_DISTRO", "LevitateOS"), "state": "stable",
+        "revision": int(os.environ.get("DISK_STANDIN_REVISION", "7")),
+        "running": {"release": "2026.10" if role == "next" else "2026.11"},
+        "other": {"role": role, "release": {"previous": "2026.10", "next": "2026.11"}.get(role, "2026.11")},
+    }))
+
+
 def main():
+    if sys.argv[1:2] == ["status"]:
+        return status()
     if sys.argv[1:2] != ["compare"]:
-        sys.exit("the stand-in recab only knows `compare`")
+        sys.exit("the stand-in recab only knows `status` and `compare`")
     if STORY == "none":
         emit(event="failed", reason="This computer has one system only: recab was set up without a second one.")
         sys.exit(1)
@@ -135,7 +153,7 @@ def main():
     found = []
     if STORY == "before":
         found = differences("running")
-        other["role"] = "before"
+        other["role"] = "previous"
     elif STORY == "next":
         found = differences("other")
         other["role"] = "next"

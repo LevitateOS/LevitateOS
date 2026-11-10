@@ -122,13 +122,26 @@ Events, one JSON object per line on stderr:
 | `failed` | `reason` |
 | `done` | |
 
+## Reading and reading again
+
+`recab status --json` is run without holding the window up. The first time, the
+page says "Reading the system"; later reads leave the page as it is and the
+status bar says when the system was last read. It is read again after every
+change, on "Read again" in the status bar, on F5 or Ctrl+R, and when the person
+comes back to the window after 20 seconds or more, since an agent or a terminal
+may have changed the system meanwhile. When it cannot be read, the page says
+why and offers "Try again".
+
 ## What it asks of the agent
 
-The agent is one program that reads a prompt on its input and does the work
-by calling recab (and Recipe) for the next system only. The prompt has up to
-four headed parts: `The request:` (when the person asked for a change), `The
+The agent is one program that does the work by calling recab (and Recipe) for
+the next system only. It is handed the prompt as one JSON line on its input,
+`{"prompt": "..."}`, and the input stays open. The prompt has up to four
+headed parts: `The request:` (when the person asked for a change), `The
 issue:`, `The facts:`, `The expected result:`. It reports with the same
-events as above. How a real Codex or Claude Code is started, what it is
+events as above, and may ask: a `question` event with an `id`, a `text` and
+`choices` (a list, or none for a free answer) is shown on the work page, and
+the answer comes back on its input as `{"question": id, "answer": "..."}`. How a real Codex or Claude Code is started, what it is
 allowed to run, and whether it runs as the person or as root are not decided.
 
 ## The source
@@ -148,6 +161,11 @@ allowed to run, and whether it runs as the person or as root are not decided.
 
 - The real `recab` (its status is schema 2; most of the lifecycle is not built
   there yet, see `tools/recab/README.md`).
-- A real agent, and the approval of what it may do.
+- A real agent, and the approval of what it may do. Codex and Claude Code do
+  not speak the lines above as they are; something has to stand between.
+- Deciding several clashes by hand was written but never run: the stand-in
+  only ever makes one clash.
+- It does not notice a change made elsewhere while the window is in front and
+  nobody presses anything; it reads again on coming back to it.
 - Going back when no restart is wanted yet; a notice when an update appears or
   a trial was kept or failed; translations; shipping it in the desktop image.

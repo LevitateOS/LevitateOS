@@ -46,21 +46,48 @@ int takeShots(Window &window, const QString &folder, bool handOver)
     window.showHandOver();
     save("3-hand-over");
     if (!handOver) {
+        // What the tab opens with: the kept comparison when there is one,
+        // else what recab says is there.
         window.showSystems();
         save("4-systems");
+        out << "the two systems: " << (window.comparison() ? "a kept comparison is shown" : "not compared")
+            << (window.stale() ? ", marked as out of date" : "") << "\n";
         return ok ? 0 : 1;
     }
 
     window.sendShown();
-    waitUntilIdle(window, 300); // the agent, then the second look
+    // The agent asks before it removes what is marked for that: yes to the
+    // first, no to the rest.
+    int asked = 0;
+    for (QElapsedTimer clock = [] { QElapsedTimer t; t.start(); return t; }(); window.busy() && clock.elapsed() < 300000;) {
+        settle(50);
+        if (!window.agentAsks())
+            continue;
+        if (!asked)
+            save("3b-the-agent-asks");
+        window.answerAgent(asked++ ? QStringLiteral("Keep it") : QStringLiteral("Remove it"));
+    }
+    settle(200);
+    out << "the agent asked " << asked << " times\n";
+    ok &= asked > 0;
+    waitUntilIdle(window, 300); // the second look
     out << "the agent freed " << bytesText(window.freed()) << "; " << window.found().size() << " places of mess are left\n";
     ok &= window.freed() > 0;
     save("4-after");
 
     // The two systems: compare, then ask the agent what differs.
     window.showSystems();
+    waitUntilIdle(window, 30);
+    ok &= window.state().known;
     save("5-systems");
+    // Slowly once, to see the two sides fill while they are read.
+    const QByteArray speed = qgetenv("DISK_STANDIN_SPEED");
+    qputenv("DISK_STANDIN_SPEED", "1");
     window.compare();
+    settle(3200);
+    ok &= window.comparing();
+    save("5b-comparing");
+    qputenv("DISK_STANDIN_SPEED", speed);
     waitUntilIdle(window, 300);
     const Comparison *compared = window.comparison();
     if (!compared) {
