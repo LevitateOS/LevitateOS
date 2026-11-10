@@ -15,46 +15,42 @@ mock-up is sample data.
 
 ## The rules
 
-1. **One frame.** Band (whose system, which app, where you are), step line, rail,
-   content, keys: the same five parts in the same places. Nothing is boxed.
-2. **One opening.** A large glyph, a title, one line. The glyph is the step's number on
-   a step, a diamond on an overview, a tick when the app is done, a warning when
-   something stopped.
-3. **One rail.** A mark, a name, what was answered. Steps in order are joined by a
-   line; things to choose from are grouped under a small label. The current row is a
-   raised bar with the accent at its edge.
-4. **One set of marks.** ✓ done, ◉ you are here, ● ready, ○ not yet, ◐ running,
-   ✗ failed or refused.
-5. **One verdict.** A raised panel with a solid edge in its tone, directly under the
-   opening: green done, sand a question or warning, salmon a refusal or failure,
-   grey-green a note.
-6. **One way to ask.** A yes-or-no is the warning panel with its two keys in it.
-   Something destructive also asks for a typed word, in a field. Two choices are two
-   cards; many are a search field and a list.
-7. **One way to show data.** Facts are label and value; tables have a quiet header;
-   commands sit on the darker surface behind a prompt; a long job is a thick bar and
-   its figures.
-8. **One ending.** The large tick, what was done, the next step.
-9. **One line of keys.** Keycaps at the bottom left in the order you would press them;
-   what the screen is working on at the bottom right.
+1. **One frame.** Band, step line, rail, content, keys: the same five parts in the same
+   places. Nothing is boxed.
+2. **One thing to look at.** Each page has one picture of what it is doing, and only
+   that (the table below).
+3. **One thing to press, in one place.** An action is one bar, always on the same row at
+   the foot of the page; a page with nothing to press has one quiet line there.
+4. **A large figure only where it says something.** A step's number, a tick at the end,
+   a warning when something stopped, a percentage during a long job.
+5. **One rail, one set of marks.** ✓ done, ◉ you are here, ● ready, ○ not yet,
+   ◐ running, ✗ failed or refused.
+6. **Panels are for verdicts and questions.** Explanation is plain text.
+7. **Destructive steps ask for a word**, a cell a letter.
+8. **Few labels, short sentences.** A title and one line; small capitals only as table
+   headers.
+9. **One ending.** The tick, the thing made, the bar to the next step.
 10. **Two brands.** Only the band, the accent and the second accent differ.
 
-## The second pass: every page has its own picture
+The design went through three passes: one frame for everything, then a picture for each
+page, then balance: taking out what competed with the picture.
+
+## Each page's picture
 
 Inside the shared frame, each page is laid out for the one thing it does (`Deliberate`
 in `kit.py` holds the parts made for this):
 
 | Page | Its picture |
 |---|---|
-| Hub, the step you are at | a launch pad: what the app does, from what onto what, one bar |
+| Hub, the step you are at | from what onto what, and the bar |
 | Hub, a finished step | a receipt: what it left, drawn |
 | Hub, Finish | the machine you made, as a card |
-| Disk, Overview | the app as a map, with the line where writing starts |
+| Disk, Overview | the line where writing starts |
 | Disk, choosing a disk | each disk as a bar of what is on it |
 | Disk, System and Disk use | each choice as the disk it leaves |
 | Disk, Partitions | the selected stretch marked on the bar; what A/B still needs beside the table |
 | Disk, Plan and Confirm | now over after |
-| Disk, Commands and Apply | a numbered run sheet, the running command raised |
+| Disk, Commands and Apply | the run sheet, the running command raised |
 | Disk, Confirm | the word typed a letter a cell |
 | Base system, Overview | the image, an arrow, the target |
 | Base system, Check | room as a gauge; the twelve checks named |
@@ -64,14 +60,14 @@ in `kit.py` holds the parts made for this):
 | Configuration, Keyboard | the keys of the layout, and a line to try it on |
 | Configuration, Time zone | the place on a map, its clock now |
 | Configuration, Language | today's date, a time and a number as it will write them |
-| Configuration, Hostname | the prompt and the login line with the name in them |
-| Configuration, passwords | both entries with their state, a strength line, the keyboard in use |
+| Configuration, Hostname | the login line, the prompt and the network name with it in them |
+| Configuration, passwords | both entries, a strength line, what the choice means |
 | Configuration, User | the account as it will exist |
 | Updates, every page | the two slots as two blocks |
 | Updates, a trial | the next boot as a fork you can follow |
 | Updates, Write a system | a choice of release media, not three paths |
 | Updates, History | a line down the page |
-| Guide | a reading measure, numbered steps, where you are on the page |
+| Guide | a reading measure and numbered steps |
 
 ## What building it needs
 

@@ -13,16 +13,15 @@ APPS = [
     ("guide", "Guide", "The docs, beside the install steps or on their own."),
 ]
 RULES = [
-    ("Every page has its own picture", "Inside the shared frame, each page is laid out for the one thing it does: a disk is a bar, a choice between two futures is two bars, a copy is a figure three rows tall, a file about to be written is that file, a keyboard is its keys, a time zone is a place on a map, a trial boot is a fork you can follow."),
-    ("One frame", "Every screen is the same five parts in the same places: the band (whose system, which app, where you are), the step line, the rail, the content, the keys. Nothing is boxed; parts are told apart by their surface."),
-    ("One opening", "Every page opens with a large glyph, a title and one line. The glyph is the step's number on a step, a diamond on an overview, a tick when the app is done, a warning when something stopped."),
-    ("One rail", "The rail is always the same rows: a mark, a name, and what was answered. Steps in order are joined by a line; things to choose from are grouped under a small label. The row you are on is a raised bar with the accent at its edge."),
-    ("One set of marks", "✓ done, ◉ you are here, ● ready, ○ not yet, ◐ running, ✗ failed or refused. They mean the same in every app."),
-    ("One way to say how it stands", "A verdict is a raised panel with a solid edge in its tone: green for done, sand for a question or a warning, salmon for a refusal or a failure, grey-green for a note. It sits directly under the opening."),
-    ("One way to ask", "A yes-or-no is the warning panel with its two keys inside it. Something destructive also asks for a typed word, in a field. A choice between two is two cards; a choice from many is a search field and a list."),
-    ("One way to show data", "Facts are label and value. Tables have a quiet header. Commands sit on the darker surface behind a prompt. A long job is a thick bar and its figures."),
-    ("One ending", "Every app ends on the same page: the large tick, what was done, and the next step."),
-    ("One line of keys", "The keys are keycaps at the bottom left, in the order you would press them; what the screen is working on is at the bottom right."),
+    ("One frame", "Every screen is the same five parts in the same places: the band, the step line, the rail, the content, the keys. Nothing is boxed; parts are told apart by their surface."),
+    ("One thing to look at", "Each page has one picture of what it is doing: a disk is a bar, a choice is the disk it leaves, a copy is a percentage, a file about to be written is that file, a time zone is a place on a map. Whatever competed with that picture is gone."),
+    ("One thing to press, in one place", "When a page has an action it is one bar, always on the same row at the foot of the page. A page with nothing to press has one quiet line there instead. The keys below never contradict it."),
+    ("A large figure only where it says something", "A step's number, a tick when the app is done, a warning when something stopped, a percentage while a long job runs. Overviews and the updates app open with words alone."),
+    ("One rail, one set of marks", "A mark, a name, what was answered. ✓ done, ◉ you are here, ● ready, ○ not yet, ◐ running, ✗ failed or refused: the same in every app."),
+    ("Panels are for verdicts and questions", "A raised panel with an edge in its tone says how something stands or asks yes or no. Explanation is plain text, never a panel."),
+    ("Destructive steps ask for a word", "Writing a disk asks for DESTROY, formatting a slot for its letter, a cell a letter."),
+    ("Few labels, short sentences", "A page has a title and one line under it. Small capitals are used where a table needs a header, not to announce each block."),
+    ("One ending", "Every app ends the same way: the tick, the thing it made, and the bar to the next step."),
     ("Two brands", "LevitateOS is pine and sage, AcornOS acorn brown and sand. Only the band, the accent and the second accent change."),
 ]
 
@@ -76,7 +75,7 @@ open(sys.argv[1], "w").write(f"""<!doctype html>
   .term span {{ display: inline-block; white-space: pre; }}
 </style></head><body><main>
 <h1>Every screen, one design</h1>
-<p>{len(PAGES)} pages across the install screen and six apps, drawn as mock-ups from one set of parts, so that no page can drift from another. This is the second pass: the frame and the rules are the first pass's; inside them every page now has a layout of its own. They are designs, not captures: every value in them is sample data, and nothing here is built beyond what system-setup already has.</p>
+<p>{len(PAGES)} pages across the install screen and six apps, drawn as mock-ups from one set of parts, so that no page can drift from another. This is the third pass, for balance: each page keeps the one picture of what it does and loses what competed with it. They are designs, not captures: every value in them is sample data, and nothing here is built beyond what system-setup already has.</p>
 <nav>{''.join(f'<a href="#{key.replace(" ", "-")}">{html.escape(title)}</a>' for key, title, _ in APPS)}</nav>
 <ol class="rules">{''.join(f'<li><b>{html.escape(name)}</b>{html.escape(text)}</li>' for name, text in RULES)}</ol>
 {''.join(body)}

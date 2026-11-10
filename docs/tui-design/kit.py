@@ -35,10 +35,7 @@ PIXELS = {
     "9": [".###.", "#...#", "#...#", ".####", "....#", ".###."],
     "check": ["....#", "...##", "#.##.", "###..", ".#...", "....."],
     "bang": ["..#..", "..#..", "..#..", "..#..", ".....", "..#.."],
-    "diamond": ["..#..", ".###.", "#####", "#####", ".###.", "..#.."],
-    "slots": ["##.##", "##.##", "##.##", "##.##", "##.##", "##.##"],
-    "page": ["####.", "#..##", "#...#", "#...#", "#...#", "#####"],
-}
+    }
 
 
 def big(glyph):
@@ -216,11 +213,14 @@ class Page:
         return self
 
     def heading(self, glyph, title, sub="", colour=None):
-        """Every page opens with one: a large glyph (the step's number, or what the page
-        is), the title, one line under it."""
-        for i, line in enumerate(big(glyph)):
-            self.put(self.y + i, self.x, line, colour or self.accent)
-        indent = len(big(glyph)[0]) + 3
+        """Every page opens with a title and one line. A large figure stands beside them
+        only where it says something: a step's number, a tick at the end, a warning when
+        something stopped. Four rows either way, so every page's body starts on one row."""
+        indent = 0
+        if glyph is not None:
+            for i, line in enumerate(big(glyph)):
+                self.put(self.y + i, self.x, line, colour or self.accent)
+            indent = len(big(glyph)[0]) + 3
         self.put(self.y, self.x + indent, title, PAPER, bold=True)
         for i, line in enumerate(wrap(sub, self.w - indent)[:2]):
             self.put(self.y + 1 + i, self.x + indent, line, LICHEN)
@@ -441,26 +441,19 @@ class Deliberate(Page):
             self.fill(r, x, w, bg)
         return self
 
-    def button(self, label, key="Enter", width=None, x=None, colour=None):
-        """The page's one main action: a bar in the accent, its key at the end."""
-        x, width, colour = self.x if x is None else x, width or self.w, colour or self.accent
-        self.fill(self.y, x, width, colour)
-        self.put(self.y, x + 2, f"▶  {label}", NIGHT, colour, bold=True)
-        self.put(self.y, x + width - len(key) - 4, f" {key} ", colour, NIGHT, bold=True)
-        self.y += 2
+    def button(self, label, key="Enter", colour=None):
+        """The page's one action: a bar in the accent with its key at the end, always on
+        the same row near the foot of the page."""
+        colour = colour or self.accent
+        row = self.rows - 5
+        self.fill(row, self.x, self.w, colour)
+        self.put(row, self.x + 2, label, NIGHT, colour, bold=True)
+        self.put(row, self.x + self.w - len(key) - 4, f" {key} ", colour, NIGHT, bold=True)
         return self
 
-    def minipath(self, items, x=None, row=None):
-        """A few steps on one line: where this page sits in a short run."""
-        col, row = self.x if x is None else x, self.y if row is None else row
-        for i, (label, state) in enumerate(items):
-            mark, colour = MARKS[state]
-            col = self.put(row, col, mark, colour or self.accent, bold=True)
-            col = self.put(row, col + 1, label, LICHEN if state == "todo" else PAPER, bold=state in ("here", "ready"))
-            if i < len(items) - 1:
-                col = self.put(row, col + 1, "──", LEAF if state == "done" else HAIR) + 1
-        if row == self.y:
-            self.y += 1
+    def note(self, text, colour=LICHEN):
+        """One quiet line on the action's row, on a page that has no bar to press."""
+        self.put(self.rows - 5, self.x, text[: self.w], colour)
         return self
 
     def diskbar(self, parts, total, x=None, width=None, label="", selected=None, row=None):
@@ -583,14 +576,6 @@ class Deliberate(Page):
             self.put(self.y + 1, x + 13, detail, LICHEN)
             self.put(self.y + 2, x + 10, "│" if i < len(items) - 1 else " ", HAIR)
             self.y += 3
-        return self
-
-    def scrollbar(self, start, size):
-        """Where in a long page you are, down the content's right edge."""
-        top, height = self.HEADER + 1, self.rows - 2 - self.HEADER - 2
-        for r in range(height):
-            on = start * height <= r < (start + size) * height
-            self.put(top + r, self.cols - 2, "█" if on else "│", GUTTER if on else HAIR)
         return self
 
     def slotbox(self, x, y, w, h, name, lines, tag="", state="idle"):
