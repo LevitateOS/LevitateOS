@@ -10,6 +10,7 @@ schema_version = 8
 os_name = "LevitateOS"
 os_id = "levitateos"
 os_version = "1.0"
+home_url = "https://levitateos.org"
 
 # The base facts this variant differs in (`distro_profile::Profile`). The
 # builder writes them into the image's /etc/os-release as REC_* fields, which

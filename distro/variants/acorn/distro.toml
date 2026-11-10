@@ -152,4 +152,7 @@ packages = [
   "simple-scan", "bolt", "orca", "speech-dispatcher", "espeak-ng", "onboard", "font-noto-cjk",
   "spice-vdagent", "qemu-guest-agent", "firewalld", "firewalld-gui", "picom", "qalculate-qt",
   "mousepad", "qps", "unzip", "7zip",
+  # Windows and NFS shares in pcmanfm-qt, and the Adwaita cursor theme (the
+  # GTK look AcornOS takes; it had no cursor theme at all).
+  "gvfs-smb", "gvfs-nfs", "adwaita-icon-theme",
 ]

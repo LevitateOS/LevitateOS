@@ -46,10 +46,10 @@ Marks: `[x]` done (committed, unbuilt), `[ ]` to do, **L** LevitateOS,
   `addgroup`/`adduser` is carried out, and a form the recipe does not read
   stops the build. Fedora's packages carry `sysusers.d` files, which the RPM
   recipe reads. Also `pinentry`'s link and the X core font indexes.
-- [ ] **A** Carry owners and special modes from apk's database into the
-  recipe's target metadata (setuid `dbus-daemon-launch-helper`,
-  `polkit-agent-helper-1`, `doas`), if the apk backend does not already.
-  Without them polkit prompts and D-Bus activation fail.
+- [ ] **A** Owners and special modes of apk's files (setuid
+  `dbus-daemon-launch-helper`, `polkit-agent-helper-1`, `doas`): Recipe's
+  `target_capture_apks` reads them from each package's own archive, so this
+  is likely done; check the three files' modes in a built image.
 
 ## 2. Look and branding
 
@@ -63,8 +63,9 @@ Details and paths are in [desktop-theming.md](desktop-theming.md).
   layout, splash screen with the leaf, previews.
 - [ ] **L** Colour schemes `LevitateOSLight` and `LevitateOSDark` (Breeze with
   the pine accent).
-- [ ] **L** `/etc/xdg/kdeglobals`: the Global Theme and colour scheme as the
-  default, dark (decision 1).
+- [x] **L** `/etc/xdg/kdeglobals`: dark by default (decision 1) through
+  Fedora's dark Global Theme (Breeze Dark colours and icons, our wallpaper)
+  until our own Global Theme replaces it.
 - [ ] **L** A launcher icon that follows a light or dark panel
   (`distributor-logo-levitateos-symbolic`); approved, to be drawn and
   reviewed (decision 12).
@@ -79,27 +80,32 @@ Details and paths are in [desktop-theming.md](desktop-theming.md).
   `firefox-redhat-default-prefs.js` (rewritten without Fedora's start page).
 - [ ] **L** Own SDDM theme `levitateos` (Breeze's QML with the lockup,
   `color=#14221A`), replacing the override of Breeze.
-- [ ] **L** About page: `/etc/xdg/kcm-about-distrorc` (logo, website, variant).
+- [x] **L** About page: `/etc/xdg/kcm-about-distrorc` (the mark, the website,
+  "Desktop").
 - [ ] **A** LXQt themes `acornos-light` and `acornos-dark` (panel, runner,
   notification and leave-dialog QSS; `mainmenu.svg`; `wallpaper.cfg` so the
   wallpaper follows the theme; preview).
-- [ ] **A** `/etc/xdg/lxqt/lxqt.conf`: theme, icon theme, widget style, font.
-  Light by default (decision 1); Fusion widgets with an Adwaita GTK look
-  (decision 9).
+- [x] **A** LXQt's settings: its packaged `lxqt.conf` already is the decided
+  look (light theme, Fusion widgets, Breeze icons, Sans 11); left as packaged
+  until our LXQt themes exist.
 - [ ] **A** Qt palette `/usr/share/lxqt/palettes/AcornOS`.
 - [ ] **A** Openbox window decoration `AcornOS` and `/etc/xdg/openbox/lxqt-rc.xml`.
-- [ ] **A** GTK settings (`/etc/gtk-3.0/settings.ini`) so Firefox matches.
+- [x] **A** GTK settings (`/etc/gtk-3.0/` and `gtk-4.0/settings.ini`):
+  Adwaita with Breeze icons, the Adwaita cursor and Sans 11.
 - [ ] **A** Login screen: add the acorn lockup to the Maldives-based
   theme that is there now (decision 9).
-- [ ] **L A** `LOGO=<id>-logo-icon` and `HOME_URL` in os-release (builder,
-  `pipeline/source.rs`), and the icon `<id>-logo-icon` in hicolor.
+- [x] **L A** `LOGO=distributor-logo-<id>` in os-release (the icon the desktop
+  installs the mark as), and `HOME_URL` from the contract's new
+  `identity.home_url` (LevitateOS only).
 - [x] **L A** Firefox's default prefs file for each system: the OS as Firefox's
   distribution, Fedora's start page gone from the packaged prefs (renamed
   `<id>-default-prefs.js`).
-- [ ] **L A** Firefox homepage: `https://levitateos.org` for L; Firefox's own on
-  AcornOS (decision 11).
+- [x] **L A** Firefox homepage: `HOME_URL` where the OS has one
+  (`https://levitateos.org` on L); Firefox's own on AcornOS (decision 11).
 - [ ] **L A** Default user picture (keep Breeze's, or supply one).
-- [ ] **L A** Cursor theme set the same in SDDM, the session and GTK apps.
+- [x] **L A** One cursor theme for SDDM, the session, GTK and Qt (the `default`
+  icon theme): Breeze's on L, Adwaita's on A (`adwaita-icon-theme` added; A
+  had none).
 - [ ] **L A** Boot splash: Plymouth is in neither lock; a theme also needs a
   hook in recinit. Wanted, with the mark (decision 7).
 
@@ -154,11 +160,12 @@ Details and paths are in [desktop-theming.md](desktop-theming.md).
   (`/etc/X11/xorg.conf.d/40-touchpad.conf`).
 - [ ] Default panel layout (`/etc/xdg/lxqt/panel.conf`): decide the plug-ins
   (the desktop switcher and quick-launch defaults are upstream's).
-- [ ] Global shortcuts (`lxqt-globalkeys`): volume, brightness, screenshot,
-  terminal, lock.
-- [ ] OpenRC services for the desktop beyond `dbus elogind polkit
-  networkmanager sddm`: whatever sections 4 and 6 add (bluetooth, cupsd,
-  udisks is D-Bus activated).
+- [x] Global shortcuts: `lxqt-globalkeys`' packaged defaults already have
+  brightness, screenshot (Print), terminal (Ctrl+Alt+T) and lock
+  (Ctrl+Alt+L); the panel's volume plug-in takes the volume keys.
+- [x] OpenRC services for the desktop: `bluetooth`, `avahi-daemon`, `cupsd`,
+  `firewalld` and `vm-guest-agents` enabled; udisks, UPower, bolt and fwupd
+  are D-Bus activated.
 - [ ] Wayland: Alpine 3.24 has no `lxqt-wayland-session`; revisit at the next
   Alpine release.
 
@@ -185,25 +192,28 @@ Details and paths are in [desktop-theming.md](desktop-theming.md).
 - [x] **L A** Phones and cameras: `libmtp` on L through `kio-extras`;
   `gvfs-mtp` and `gvfs-gphoto2` on A.
 - [x] **L A** `exfatprogs` and `ntfs-3g` in both locks.
-- [ ] **L A** The kernel configs need exFAT and NTFS3 on (see the kernel
-  config item below).
-- [ ] **L A** Network shares: A has no SMB or NFS support; L has the Samba
-  client libraries through `kio-extras`.
+- [x] **L A** The kernel configs have exFAT (`=y`) and NTFS3 (`=m`).
+- [x] **L A** Network shares: `gvfs-smb` and `gvfs-nfs` on A; L has SMB
+  through `kio-extras`.
 - [x] **L A** Mobile broadband: not supported (decision 3).
 - [x] **L A** VPN: OpenVPN through `NetworkManager-openvpn` and
   `plasma-nm-openvpn` (L), `networkmanager-openvpn` (A); WireGuard is in
   NetworkManager itself.
-- [ ] **L A** Laptop basics: brightness keys, lid close, suspend and hibernate
-  settings (logind / elogind configuration), battery thresholds.
+- [x] **L A** Laptop basics: no hibernation (recinit cannot resume from it;
+  `sleep.conf.d` for logind and elogind), lid close and suspend keep their
+  defaults, brightness keys come with PowerDevil and LXQt's shortcuts.
+- [ ] **L A** Battery charge thresholds (PowerDevil has a setting on L; none on
+  A).
 - [ ] **L A** Webcam: `libcamera` is on A only; check PipeWire camera support
   on both.
 - [x] **L** Virtual machine guests: `spice-vdagent` and `qemu-guest-agent`,
   started by their udev rules when the VM has the port.
 - [x] **A** Virtual machine guests: `spice-vdagent` and `qemu-guest-agent`,
   started by the `vm-guest-agents` service only when the VM has their port.
-- [ ] **L A** Kernel configs: confirm DRM drivers, evdev, HID multitouch,
-  Bluetooth, USB audio, webcam (UVC), exFAT, NTFS3 and the Wi-Fi drivers the
-  firmware above is for.
+- [x] **L A** Kernel configs: i915, xe, amdgpu, nouveau, HID multitouch,
+  Bluetooth, USB audio, UVC, exFAT, NTFS3 and CIFS/NFS are on (evdev from the
+  defconfig).
+- [ ] **L A** Kernel configs: the Wi-Fi drivers the firmware above is for.
 
 ## 5. Apps that come in the image
 
@@ -242,9 +252,9 @@ Small on purpose; everything else comes through Recipe (section 6).
   until an image viewer ships; A has no text editor.
 - [x] **L A** Home folders: `xdg-user-dirs` is in both locks and its own
   autostart entry runs `xdg-user-dirs-update` at login on both desktops.
-- [ ] **L A** Menu clean-up: hide entries that make no sense for a user
-  (duplicate settings modules, `lxqt-admin`'s user tool if recsetup owns users,
-  Avahi browsers and the like).
+- [x] **L A** Menu clean-up: every visible entry on L is a real app; on A,
+  CUPS's web page, Hibernate and the bare XScreenSaver daemon are hidden
+  (`NoDisplay`). LXQt's Users and Groups stays.
 - [x] **L A** Manual pages: `man-db` (L), `mandoc` and `man-pages` (A).
 
 ## 6. Software through Recipe
@@ -269,9 +279,12 @@ The desktop adds no other package manager, store or bundle format.
 
 ## 7. Installing from the desktop ISO
 
-- [ ] **L A** "Install LevitateOS / AcornOS" launcher on the live desktop and
-  in the menu: opens a terminal running the installer; icon `<id>-install`
-  (mark plus an arrow into a disk, drawn as SVG). Live overlay only.
+- [x] **L A** "Install LevitateOS / AcornOS" in the live desktop's menu
+  (`<id>-install.desktop`, live overlay only): Konsole or QTerminal runs the
+  install screen through sudo or doas.
+- [ ] **L A** The launcher on the desktop itself, and its own icon
+  `<id>-install` (mark plus an arrow into a disk, as SVG; the theme's
+  installer icon stands in).
 - [ ] **L A** The installer inside a desktop terminal: check the TUI's size
   and colours in Konsole and QTerminal, and that it gets root (sudo / doas for
   the live user).
@@ -291,8 +304,8 @@ The desktop adds no other package manager, store or bundle format.
   software with Recipe, how updates work); wanted (decision 7).
 - [x] **L A** The live session must not sleep or lock during an install
   (`stay_awake` in `live-overlay.rhai`; lid close still follows logind).
-- [ ] **L A** Live user's password `live` is shown nowhere on the desktop; put
-  it in the welcome or on the lock screen hint.
+- [ ] **L A** Live user's password `live`: the Install entry's description
+  shows it; also put it in the welcome or on the lock screen hint.
 
 ## 8. System updates on the desktop
 
@@ -330,8 +343,9 @@ The desktop adds no other package manager, store or bundle format.
   `xss-lock` or LXQt's own setting).
 - [x] **L A** sshd is off on installed systems (it already was: only the live
   ISO enables it).
-- [ ] **L A** Polkit rules for the things a desktop user does without a
-  password (mount a USB drive, connect to Wi-Fi, suspend, change time zone).
+- [x] **L A** Polkit: mounting removable drives, connecting to networks and
+  suspending are the packages' defaults for a user at the machine; a rule
+  adds setting the time zone and saving a network for every user.
 - [ ] **L A** Encrypted installs: unlock prompt at boot is console text
   without Plymouth.
 - [x] **L A** Firefox: `distribution/policies.json` turns off telemetry, studies,
