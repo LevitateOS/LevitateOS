@@ -137,6 +137,9 @@ impl Index {
             add(&mut chosen, w)?;
         }
         // install_if packages join once all their conditions are installed.
+        // Growth is counted by the chosen set, not by attempts: a package whose
+        // name another chosen package already provides adds nothing, and
+        // counting it would loop forever.
         loop {
             let mut grew = false;
             for (i, p) in self.pkgs.iter().enumerate() {
@@ -145,8 +148,9 @@ impl Index {
                     && p.install_if.iter().all(|t| satisfied(&chosen, name_of(t)))
                     && self.latest(&self.by_name[&p.name]) == i
                 {
+                    let before = chosen.len();
                     add(&mut chosen, &p.name)?;
-                    grew = true;
+                    grew |= chosen.len() > before;
                 }
             }
             if !grew {
