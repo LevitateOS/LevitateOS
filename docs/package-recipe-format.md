@@ -8,7 +8,7 @@ custom readiness and acquire/build/install behavior.
 
 | Collection | Consumer | Output lifecycle |
 | --- | --- | --- |
-| [`distro/builder/os-recipes/`](../distro/builder/os-recipes/) | OS builder | Produces system trees, kernels, tools and live overlays. The builder assembles images; `recab` stages and activates system image updates. |
+| [`distro/builder/os-recipes/`](../distro/builder/os-recipes/) | OS builder | Produces system trees, kernels, tools and live overlays. The builder assembles images; `recab` owns system updates and A/B continuation, coordinating Recipe software operations. |
 | [`recipes/`](../recipes/) | User-managed software | Publishes a `package` directory for atomic profile activation. Recipe owns install, update and removal; ripgrep is the first package. |
 
 Both use the same engine in `tools/recipe`, the same API 2 declarations and the
@@ -22,6 +22,10 @@ of producer explicitly. Engine examples and test fixtures stay with the engine.
 An app included in the desktop image belongs to the OS lifecycle. Being a
 graphical app does not automatically make it independently user-managed.
 Likewise, `deps` and `build_deps` describe dependency phases, not OS/user ownership.
+System changes must target recab's prepared inactive system and survive an update
+applied to that same preparation. The current shared Recipe profile activates
+independent software; it does not yet implement that system-targeting contract.
+See [recab's lifecycle and implementation status](../tools/recab/README.md).
 
 The engine's `install` hook populates an owned output tree. A directory output
 named `"package"` tells the CLI to activate its regular `bin/COMMAND` and

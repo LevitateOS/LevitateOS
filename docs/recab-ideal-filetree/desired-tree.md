@@ -1,5 +1,7 @@
 # recab desired tree
 
+> Superseded scope, 2026-11-10: this is a historical refactoring snapshot, not the current recab product plan. Recab owns system updates and symmetric A/B continuation, including equivalent initial systems and incremental preparation that preserves pending changes through updates. Follow [the current requirements](../../tools/recab/REQUIREMENTS.md); retain the old findings below as historical evidence only.
+
 The complete target tree of `tools/recab`, every leaf with its owner slice and
 where its content comes from. Language: Rust stays (see
 [ideal-filetree-plan.md](ideal-filetree-plan.md#language-and-owner)). The tree

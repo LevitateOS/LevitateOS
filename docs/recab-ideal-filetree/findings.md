@@ -1,5 +1,7 @@
 # recab findings
 
+> Superseded scope, 2026-11-10: this is a historical refactoring snapshot, not the current recab product plan. Recab owns system updates and symmetric A/B continuation, including equivalent initial systems and incremental preparation that preserves pending changes through updates. Follow [the current requirements](../../tools/recab/REQUIREMENTS.md); retain the old findings below as historical evidence only.
+
 One shared queue, most severe first within each group. Each finding says what
 its evidence is: **observed** (read in the code or in command output),
 **contract** (code and README/REQUIREMENTS disagree) or **inferred** (follows

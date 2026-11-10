@@ -1,5 +1,7 @@
 # recab tasks and lanes
 
+> Superseded scope, 2026-11-10: this is a historical refactoring snapshot, not the current recab product plan. Recab owns system updates and symmetric A/B continuation, including equivalent initial systems and incremental preparation that preserves pending changes through updates. Follow [the current requirements](../../tools/recab/REQUIREMENTS.md); retain the old findings below as historical evidence only.
+
 Every finding in [findings.md](findings.md) and every allocation in
 [desired-tree.md](desired-tree.md) lands in exactly one task. Each task owns
 its files exclusively while it runs; tasks in different lanes never write the

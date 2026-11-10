@@ -129,8 +129,12 @@ The plan below is what the prototypes taught.
 - **Live overlay**: on the desktop ISO, tty1 belongs to the display manager;
   the install screen stays on ttyS0 and in a terminal. The overlay's OpenRC
   service list (`live-overlay.rhai`) only allows sshd/networking/dhcpcd.
-- **A/B**: `recab stage` does not check the flavour; staging a base image onto a
-  desktop install turns it back into the base system.
+- **A/B**: current `recab stage` checks the flavour and requires
+  `--change-flavour` to switch deliberately. It still replaces the inactive
+  system. The required update lifecycle must preserve local changes and updates
+  in one prepared continuation, in either direction, with equivalent initial
+  A/B systems. See [recab's contract](../tools/recab/REQUIREMENTS.md) for what
+  remains missing.
 - **Sizes**: libvirt VMs have 4 GiB RAM with a 50 % tmpfs upper; recstrap's
   free-space precheck is 2 GiB. Both need raising for the desktop.
 - **Kernel**: both kconfigs start from `x86_64_defconfig` (evdev on). The

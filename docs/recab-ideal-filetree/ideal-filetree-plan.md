@@ -1,5 +1,7 @@
 # recab ideal filetree plan
 
+> Superseded scope, 2026-11-10: this is a historical refactoring snapshot, not the current recab product plan. Recab owns system updates and symmetric A/B continuation, including equivalent initial systems and incremental preparation that preserves pending changes through updates. Follow [the current requirements](../../tools/recab/REQUIREMENTS.md); retain the old findings below as historical evidence only.
+
 Living plan for `tools/recab`: its slices, findings, target tree and the tasks
 that get there. It is a planning document someone asked for, not a gate:
 nothing here is required before a change to recab (superproject `AGENTS.md`).

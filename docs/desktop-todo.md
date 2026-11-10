@@ -313,6 +313,11 @@ The desktop adds no other package manager, store or bundle format.
 
 ## 8. System updates on the desktop
 
+- [ ] **L A** Recab's complete update lifecycle: equivalent personalized A/B
+  systems at installation, incremental continuation in either direction, Recipe
+  changes and downloaded updates in the same preparation, conflict handling,
+  finalization, trial and fallback. Today's destructive `stage` is incomplete;
+  follow [recab's requirements](../tools/recab/REQUIREMENTS.md).
 - [ ] **L A** recab GUI: planned in [recab-gui.md](recab-gui.md) (Qt 6
   Widgets, pkexec), not started; waits for the user's go.
 - [ ] **L A** A notice in the session when a new system image is available,

@@ -82,8 +82,13 @@ In the kit (`tui/kit/core`), beyond what is there since the first restyle:
 - `ready` drawn ● in `StepPath` (today ○).
 
 In the apps: every page laid out as its mock-up. system-setup is closest; the hub,
-disk-plan, base-system and recab keep their logic and change their pages; the guide
+disk-plan and base-system keep their logic and change their pages; the guide
 changes its page furniture (notes as panels, commands as blocks, numbered headings).
+Recab's current pages can inform the layout, but its backend and frontend also
+need the [required update and continuation lifecycle](../../tools/recab/REQUIREMENTS.md):
+matching initial systems, incremental preparation, changes and downloaded updates
+in one preparation, conflict handling and finalization in either direction.
+The existing destructive staging flow is not the final interaction model.
 
 In the install screen (`distro/builder/install-split-pane`, Rust): no boxes around the
 panes, the pane without the keyboard drawn quieter, and its own keys as keycaps on one

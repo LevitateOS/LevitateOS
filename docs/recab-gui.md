@@ -6,25 +6,28 @@ LevitateOS and LXQt on AcornOS. Nothing below is built. Its three decisions are 
 
 ## What it is
 
-One window that shows the A/B slots and offers the changes `recab-tui` offers:
-try the other slot, commit, roll back, write a system into the other slot,
-reboot. It ships only in the desktop system (`live-desktop`); the base system
-keeps the command line, and on LevitateOS the TUI.
+One window for recab's system update and continuation lifecycle: show both
+systems, prepare the inactive continuation, apply changes and downloaded updates
+without losing pending work, finalize, trial-boot, commit, roll back and reboot.
+A and B have identical capabilities. Today's TUI only exposes release-image
+staging and boot operations; that limited surface is not the GUI's final scope.
+It ships only in the desktop system (`live-desktop`); the base system keeps the
+command line, and on LevitateOS the TUI.
 
 It is not a second implementation of recab. recab stays the only thing that
 reads and changes slot state.
 
 ## What exists to build on
 
-- `recab status --json` already carries everything a front end shows: the slots,
+- `recab status --json` carries the existing boot-operation view: the slots,
   the next boot, the trial state, and for each action recab's own verdict, its
   reason when refused, and the state it would leave (`ActionView`, `After` in
   `tools/recab/src/status.rs`). It has a `schema_version` and a JSON Schema
   (the `contracts` feature). A failing command prints its error as one JSON
   object on stderr.
 - `recab-tui` (`tui/apps/runtime/recab-tui`, about 1,600 lines of TypeScript on
-  ink) is the model for scope and wording: its pages, its before/after table,
-  and typing the slot's name before a write that formats it.
+  ink) is a starting point for existing actions and wording: its pages, its
+  before/after table, and typing the slot's name before a write that formats it.
 - Both desktop locks carry the same toolkit: Qt 6.11 (`qt6-qtbase`,
   `qt6-qtdeclarative`, `qt6-qtwayland`), polkit 127 with an authentication
   agent (`polkit-kde`, `lxqt-policykit`) and `polkit-qt6`.
@@ -40,8 +43,8 @@ Decided (2026-11-10): **Qt 6 Widgets, in C++**.
   fonts, and runs on Wayland and X11 with no code for either.
 - It adds nothing to either image but the binary: every library it needs is
   already in both desktop locks. Widgets needs only `qt6-qtbase`.
-- Widgets, not Qt Quick: LXQt is a Widgets desktop, and a status table, five
-  buttons and a few dialogs gain nothing from QML.
+- Widgets: LXQt is a Widgets desktop, and status tables and update dialogs fit
+  the existing toolkit.
 
 Its cost: a C++ program in a Rust and TypeScript repository, and a build per
 distro against that distro's Qt and libc (see Build).
@@ -69,12 +72,22 @@ desktops).
   password and says what for. Decided (2026-11-10): `pkexec`, not a D-Bus
   helper started by the system bus. It is far less to build and audit; the
   helper would only pay off if actions should be allowed without a prompt.
-- **Errors:** recab's JSON error (tag, message, help) shown as is.
-- **Destructive write:** the same guard as the TUI, typing the slot's name.
+- **Errors:** recab's structured JSON class, exit code and message shown as is.
+- **Preparation and updates:** render recab's generation, pending changes,
+  conflicts, progress and readiness once its contract exposes them. Do not erase
+  an existing preparation when adding an update. Distinguish ordinary incremental
+  preparation from an explicit destructive replacement or discard.
 - **Running from a checkout:** the TUI's stand-ins (`fixtures/recab`,
   `fixtures/reboot`) on PATH, so every state can be shown without a machine.
 
 ## Gaps in recab to close first
+
+The backend first needs matching initial A/B systems, incremental continuation,
+preparation sessions, update discovery/download/application and Recipe targeting
+of the inactive system, with conflict handling and candidate finalization.
+Current destructive `stage` and the shared Recipe profile do not supply this.
+See [the lifecycle requirements](../tools/recab/REQUIREMENTS.md). The remaining
+items concern frontend integration and do not replace those backend requirements.
 
 1. **Progress for `stage`.** It runs `recstrap --quiet` and prints nothing while
    it formats and extracts. recstrap already has JSON events; `recab stage`
@@ -122,12 +135,14 @@ environment, not a second mechanism beside it.
 
 ## Order of work
 
-1. Run recab gaps 2 and 3 on a booted desktop of each distro (a failure there
-   reopens the `pkexec` decision), and close gap 1.
+1. Implement the required recab continuation/update lifecycle and its frontend
+   status contract. Run recab gaps 2 and 3 on a booted desktop of each distro
+   (a failure there reopens the `pkexec` decision), and close gap 1.
 2. The build recipe, proven with a window that only prints `recab status`.
 3. Status page and the four quick actions (try, commit, roll back, reboot).
-4. Writing a system: picking a medium or image, the typed confirmation,
-   progress.
+4. Continuation and updates: prepare/reopen the inactive system, retain pending
+   changes while obtaining and applying an update, report conflicts and progress,
+   then finalize. Expose destructive replacement/discard separately.
 5. Contract, desktop product and the `desktop-boot` check.
 
 Later, not in the first version: a notification after a trial boot ("kept" or

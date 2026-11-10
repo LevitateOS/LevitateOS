@@ -1,5 +1,7 @@
 # Untangle log
 
+> Recab scope correction, 2026-11-10: earlier recab findings and completion notes in this log describe historical implementation work. They do not supersede [recab's system-update and continuation requirements](tools/recab/REQUIREMENTS.md). Equivalent initial A/B systems, incremental continuation and preserving pending changes through an update remain required and incomplete.
+
 ## Scope
 
 - **Target:** the whole LevitateOS superproject and its submodules, **except `tools/ginux` and `tools/recipe`** (links from in-scope code to them still count as findings). Ignored as non-code: `docs/ginux*`, `docs/history`, `node_modules`, `target`.

@@ -1,5 +1,7 @@
 # recab inventory
 
+> Superseded scope, 2026-11-10: this is a historical refactoring snapshot, not the current recab product plan. Recab owns system updates and symmetric A/B continuation, including equivalent initial systems and incremental preparation that preserves pending changes through updates. Follow [the current requirements](../../tools/recab/REQUIREMENTS.md); retain the old findings below as historical evidence only.
+
 Every tracked path of `tools/recab` at `d4365a9e` (clean), with each mixed
 file's distinct duties by line range. Slice IDs are defined in
 [slices.md](slices.md). Line counts are `wc -l`.

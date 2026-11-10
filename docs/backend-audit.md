@@ -1,5 +1,7 @@
 # Audit of the installer's backends (2026-11-07)
 
+> Recab scope correction, 2026-11-10: recab owns system updates and symmetric A/B continuation. Its earlier boot-selection and destructive-staging scope below is historical. See [current requirements](../tools/recab/REQUIREMENTS.md); the recorded checks do not establish the missing continuation lifecycle.
+
 The TUIs run on three Rust tools: **recpart** (disk-plan), **recab** (recab-tui) and
 **recstrap**'s binaries (recstrap, recfstab, recchroot, recsetup), which the planned base,
 setup and boot apps will drive. Each was read in full. Clippy is clean on all three;

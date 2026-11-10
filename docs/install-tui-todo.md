@@ -9,6 +9,6 @@ Open work:
 - **Before the disk:** a preflight app (UEFI, install media, time sync) and a network/WiFi picker. The keyboard layout is chosen in system-setup, which loads it on the live console. Neither distro ships WiFi firmware yet, and LevitateOS lacks `iwd`.
 - **Base system:** recstrap cannot be stopped half-way from the app.
 - **Configuration:** system-setup creates one administrator; more users, groups, shells and services still go through `recsetup` by hand. Its recsetup types are written by hand: have `cargo xtask gen` write them.
-- **Boot and finish:** a boot app over `recsetup --boot`, and a finish page that offers unmount and reboot.
-- **Installed system:** ship recab-tui in both rootfs images; live progress for `recab stage`; decide whether a first-boot screen is needed.
+- **Boot and finish:** a boot app over `recsetup --boot`, and a finish page that offers unmount and reboot. Installation must finish with equivalent personalized systems and boot artifacts in A and B; current recab only populates A, so backend completion is still needed.
+- **Installed system:** ship recab-tui in both rootfs images and expose recab's full continuation/update lifecycle: incremental preparation in either direction, changes and downloaded updates in one preparation, conflicts, progress and finalization. Current destructive `stage` and boot actions are only part of that scope; see [recab's requirements](../tools/recab/REQUIREMENTS.md).
 - **Testing:** install tests that drive the TUIs over the serial console in guided and manual disk mode; keep the command-typing scenarios passing; stories for every new app.

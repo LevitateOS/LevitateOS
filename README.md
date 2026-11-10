@@ -50,7 +50,7 @@ One Rhai format and one engine, [`tools/recipe`](tools/recipe), serve two consum
 
 | Collection | Owner and purpose |
 | --- | --- |
-| [`distro/builder/os-recipes/`](distro/builder/os-recipes/) | The OS builder: acquire base packages, build the kernel and tools, and assemble system images and live overlays. `recab` stages and activates system image updates. |
+| [`distro/builder/os-recipes/`](distro/builder/os-recipes/) | The OS builder: acquire base packages, build the kernel and tools, and assemble system images and live overlays. `recab` owns system updates and A/B continuation, using Recipe for software operations. |
 | [`recipes/`](recipes/) | User-managed software: the application catalog, starting with ripgrep. Recipe activates packages and manages updates/removal independently of the OS image. |
 
 The split is about who consumes the output and manages its lifetime. Apps bundled
@@ -61,7 +61,12 @@ Ginux; there is no separate recipe language or execution engine.
 activates it. `recipe update ripgrep` uses the current catalog's pinned version;
 `recipe remove ripgrep` deactivates it using the installed receipt. The OS builder
 uses `--no-activate` to consume outputs without changing its host. Package profiles
-and override recipes persist on `/var`; image updates remain recab's responsibility.
+and override recipes currently persist on shared `/var`. System changes and updates
+belong to recab's A/B continuation lifecycle; shared profile activation is not a
+substitute for changing an inactive system. Matching initial slots, incremental
+continuation and Recipe targeting of the inactive system remain unimplemented.
+See [`tools/recab/README.md`](tools/recab/README.md) for the intended lifecycle
+and the current destructive image-staging limitations.
 
 See [`docs/package-recipe-format.md`](docs/package-recipe-format.md) for ownership
 and output semantics, and [`tools/recipe/WRITING_RECIPES.md`](tools/recipe/WRITING_RECIPES.md)
