@@ -30,14 +30,11 @@ Marks: `[x]` done (committed, unbuilt), `[ ]` to do, **L** LevitateOS,
 
 ## 1. Before anything else works
 
-- [ ] **L** Regenerate the locks. `distro.toml` asks for `linux-firmware`, the
-  GPU firmware packages and the Intel Wi-Fi firmware, but no firmware package
-  is in the lock, so the image has none.
-- [ ] **A** Firmware: the request names none and the lock has none. Add
-  `linux-firmware` (or the split packages for Intel, AMD, Realtek, Atheros,
-  MediaTek Wi-Fi and Bluetooth) and `sof-firmware` for laptop audio.
-- [ ] **L** `sof-firmware` and `alsa-sof-firmware` for laptop audio are not in
-  the lock (check after the lock is regenerated).
+- [x] **L A** Firmware is in both base locks (2026-11-10, builder `59e7065`):
+  graphics, Wi-Fi, Bluetooth and laptop audio (`alsa-sof-firmware` on L,
+  `sof-firmware` on A). AcornOS leaves NVIDIA's firmware out on purpose.
+- [ ] **L A** CPU microcode is in neither image: nothing puts it in front of
+  the initramfs yet (recinit / recuki).
 - [ ] **L A** recstrap's free-space check is 2 GiB; the desktop system is
   larger. Take the needed size from the image instead of a constant.
 - [ ] **L A** Lock generation needs an exclude list (`--exclude` for dnf), used
