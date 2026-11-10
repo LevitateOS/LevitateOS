@@ -179,4 +179,10 @@ packages = [
   "google-noto-serif-fonts", "google-noto-sans-cjk-fonts", "liberation-sans-fonts",
   "liberation-serif-fonts", "liberation-mono-fonts", "kdegraphics-thumbnailers", "ffmpegthumbs",
   "man-db", "orca",
+  # Orca's speech (the solver takes no weak dependencies, so the voice is
+  # named), a calculator, KDE's crash handler, scanning, and the firewall
+  # with Plasma's settings page for it.
+  "speech-dispatcher", "speech-dispatcher-espeak-ng", "espeak-ng", "kcalc", "plasma-drkonqi",
+  "sane-backends", "sane-backends-drivers-scanners", "skanlite", "firewalld", "plasma-firewall",
+  "plasma-firewall-firewalld",
 ]

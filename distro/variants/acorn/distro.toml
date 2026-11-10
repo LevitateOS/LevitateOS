@@ -91,7 +91,7 @@ packages = [
   # Firmware the kernel's drivers load from /lib/firmware (.zst, which the
   # kernel reads through FW_LOADER_COMPRESS_ZSTD): graphics, WiFi and
   # Bluetooth, laptop audio. Alpine's split packages, not the linux-firmware
-  # meta package, and no NVIDIA firmware (109 MB): the small system. No CPU
+  # meta package; NVIDIA's firmware too, as on LevitateOS. No CPU
   # microcode: nothing puts it in front of the initramfs yet.
   "linux-firmware-amdgpu",
   "linux-firmware-radeon",
@@ -114,6 +114,7 @@ packages = [
   "linux-firmware-cypress",
   "linux-firmware-cirrus",
   "linux-firmware-other",
+  "linux-firmware-nvidia",
   "sof-firmware",
 ]
 
@@ -141,4 +142,14 @@ packages = [
   # Metric-compatible fonts for documents, file thumbnails, spelling, manual
   # pages.
   "font-liberation", "ffmpegthumbnailer", "hunspell-en", "mandoc", "man-pages",
+  # The same desktop LevitateOS has, on AcornOS's own stack: Bluetooth,
+  # printing (CUPS, driverless printers found through Avahi), scanning,
+  # Thunderbolt, the screen reader with its speech, an on-screen keyboard,
+  # CJK fonts, the guest agents of the libvirt test VMs, the firewall and its
+  # settings, a compositor (KWin composites on LevitateOS), a calculator, a
+  # text editor, a task manager and the archive tools lxqt-archiver uses.
+  "bluez", "blueman", "cups", "cups-filters", "avahi", "system-config-printer", "sane-backends",
+  "simple-scan", "bolt", "orca", "speech-dispatcher", "espeak-ng", "onboard", "font-noto-cjk",
+  "spice-vdagent", "qemu-guest-agent", "firewalld", "firewalld-gui", "picom", "qalculate-qt",
+  "mousepad", "qps", "unzip", "7zip",
 ]
