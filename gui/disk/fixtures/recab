@@ -1,0 +1,125 @@
+#!/usr/bin/env python3
+"""A stand-in for `recab compare`, for running disk-gui from a checkout.
+
+  recab compare --json --machine-events
+
+It plays reading both systems and answers as the Disk window expects (see
+the README: "What it asks of recab"). It reads no disk.
+
+DISK_STANDIN_SYSTEMS picks the story:
+  before     the other system is the one from before the last change (default)
+  next       the other system holds a change that is not started yet
+  identical  the two were made as copies and nothing was changed since
+  none       there is no second system
+DISK_STANDIN_SPEED scales the waiting (0: none).
+"""
+import json
+import os
+import sys
+import time
+
+STORY = os.environ.get("DISK_STANDIN_SYSTEMS", "before")
+SPEED = float(os.environ.get("DISK_STANDIN_SPEED", "1"))
+KIB, MIB, GIB = 1 << 10, 1 << 20, 1 << 30
+
+
+def emit(**event):
+    sys.stderr.write(json.dumps(event) + "\n")
+    sys.stderr.flush()
+
+
+def read(step, total):
+    emit(event="step", step=step, status="running")
+    for part in range(1, 9):
+        time.sleep(0.25 * SPEED)
+        emit(event="progress", step=step, done=total * part // 8, total=total, unit="bytes")
+    emit(event="step", step=step, status="done")
+
+
+def only(side, path, size):
+    return {"path": path, "change": "only-" + side, side + "_bytes": size}
+
+
+def content(path, running, other):
+    return {"path": path, "change": "content", "running_bytes": running, "other_bytes": other}
+
+
+def differences(newer):
+    """What a change that added htop (and ncurses for it) and updated curl
+    leaves between the two systems. `newer` is the side that has the change."""
+    older = "other" if newer == "running" else "running"
+
+    def changed(path, new, old):
+        return content(path, new, old) if newer == "running" else content(path, old, new)
+
+    found = [
+        only(newer, "/usr/bin/htop", 412 * KIB),
+        only(newer, "/usr/share/applications/htop.desktop", 2 * KIB),
+        only(newer, "/usr/share/man/man1/htop.1.gz", 9 * KIB),
+        only(newer, "/usr/share/pixmaps/htop.png", 11 * KIB),
+        only(newer, "/usr/lib64/libncursesw.so.6.5", 486 * KIB),
+        only(newer, "/usr/lib64/libtinfo.so.6.5", 198 * KIB),
+        only(newer, "/usr/lib64/libpanelw.so.6.5", 22 * KIB),
+        changed("/usr/bin/curl", 318 * KIB, 302 * KIB),
+        changed("/usr/lib64/libcurl.so.4.8.0", 842 * KIB, 811 * KIB),
+        only(older, "/usr/lib64/libnghttp2.so.14.26.0", 174 * KIB),
+        only(newer, "/usr/lib64/libnghttp2.so.14.28.3", 181 * KIB),
+        changed("/usr/share/recipe/installed.json", 41 * KIB, 38 * KIB),
+        changed("/etc/ld.so.cache", 96 * KIB, 94 * KIB),
+        {"path": "/etc/ssh/sshd_config", "change": "metadata", "running_bytes": 3 * KIB, "other_bytes": 3 * KIB,
+         "detail": "mode 0600 here, 0644 in the other"},
+    ]
+    for number in range(1, 13):
+        found.append(only(newer, "/usr/share/terminfo/x/xterm-%d" % number, 3 * KIB))
+    return found
+
+
+def main():
+    if sys.argv[1:2] != ["compare"]:
+        sys.exit("the stand-in recab only knows `compare`")
+    if STORY == "none":
+        emit(event="failed", reason="This computer has one system only: recab was set up without a second one.")
+        sys.exit(1)
+
+    running = {"slot": "A", "device": "/dev/nvme0n1p2", "files": 61204, "bytes": int(8.14 * GIB)}
+    other = {"slot": "B", "device": "/dev/nvme0n1p3", "files": 61204, "bytes": int(8.14 * GIB)}
+    emit(event="plan", steps=[["running", "Read the running system"], ["other", "Read the other system"],
+                               ["compare", "Compare them"]])
+    read("running", running["bytes"])
+    read("other", other["bytes"])
+    emit(event="step", step="compare", status="running")
+    time.sleep(0.4 * SPEED)
+
+    found = []
+    if STORY == "before":
+        found = differences("running")
+        other["role"] = "before"
+    elif STORY == "next":
+        found = differences("other")
+        other["role"] = "next"
+    else:
+        other["role"] = "copy"
+    # Each side's files: what is the same, what differs in place, what only it has.
+    same_files = 61178
+    in_place = sum(1 for d in found if d["change"] in ("content", "metadata"))
+    same_bytes = int(8.14 * GIB)
+    for side, facts in (("running", running), ("other", other)):
+        mine = [d for d in found if d["change"] == "only-" + side]
+        facts["files"] = same_files + in_place + len(mine)
+        facts["bytes"] = same_bytes + sum(d.get(side + "_bytes", 0) for d in found)
+    answer = {
+        "schema_version": 1,
+        "running": running,
+        "other": other,
+        "same": {"files": same_files, "bytes": same_bytes},
+        "own": ["/etc/fstab", "/etc/recab/slot", "/etc/kernel/cmdline"],
+        "differences": found,
+        "more": 0,
+    }
+    emit(event="step", step="compare", status="done")
+    emit(event="done")
+    json.dump(answer, sys.stdout)
+
+
+if __name__ == "__main__":
+    main()

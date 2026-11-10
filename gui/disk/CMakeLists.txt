@@ -13,6 +13,7 @@ qt_add_executable(disk-gui
     src/mess.cpp
     src/map.cpp
     src/pages.cpp
+    src/systems.cpp
     src/window.cpp
     src/shots.cpp
     ../kit/parts.cpp

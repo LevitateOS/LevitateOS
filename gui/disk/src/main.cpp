@@ -16,14 +16,15 @@ int main(int argc, char **argv)
     QApplication::setWindowIcon(QIcon::fromTheme("drive-harddisk"));
 
     QCommandLineParser parser;
-    parser.setApplicationDescription(QObject::tr("See where the mess on the disk is, and hand it to the agent."));
+    parser.setApplicationDescription(QObject::tr("See where the mess on the disk is, and how alike the two systems are."));
     parser.addHelpOption();
     parser.addVersionOption();
     const QCommandLineOption look("look", "From a checkout: a stand-in look, levitate or acorn.", "name");
     const QCommandLineOption shots("shots", "From a checkout: look, save a picture of what was found and of the "
                                             "hand-over into this folder, then quit.",
                                    "folder");
-    const QCommandLineOption handOver("hand-over", "With --shots: also hand the mess to the agent and look again.");
+    const QCommandLineOption handOver("hand-over", "With --shots: also hand the mess to the agent, look again, "
+                                                   "compare the two systems and ask the agent what differs.");
     parser.addOptions({look, shots, handOver});
     parser.process(app);
     if (parser.isSet(look))

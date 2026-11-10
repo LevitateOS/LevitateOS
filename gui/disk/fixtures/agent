@@ -30,8 +30,33 @@ def inside_sample(path):
     return os.path.realpath(path).startswith(root + os.sep)
 
 
+def explain(prompt):
+    """Asked what differs between the two systems: it reads, and says. A real
+    agent would look at Recipe's record and at the files; this one answers
+    from the facts it was handed."""
+    emit(event="plan", steps=[["read", "Read the differences"], ["match", "Match them to changes"]])
+    emit(event="step", step="read", status="running")
+    time.sleep(0.4 * SPEED)
+    emit(event="step", step="read", status="done")
+    emit(event="step", step="match", status="running")
+    time.sleep(0.6 * SPEED)
+    emit(event="output", line="htop, its man page and menu entry: the recipe htop")
+    emit(event="output", line="libncursesw, libtinfo, libpanelw, terminfo: the recipe ncurses, needed by htop")
+    emit(event="output", line="curl, libcurl, libnghttp2: curl was updated")
+    emit(event="output", line="/etc/ssh/sshd_config: no change accounts for the different mode")
+    emit(event="step", step="match", status="done")
+    emit(event="agent", summary="All but one difference belong to one change: htop was installed, which brought "
+                                "ncurses, and curl was updated with it. One thing no change explains: "
+                                "/etc/ssh/sshd_config can be read by everyone in the other system and only by root "
+                                "in this one. Nothing was changed.")
+    emit(event="done")
+
+
 def main():
     prompt = sys.stdin.read()
+    if "the other system" in prompt.split("The facts:", 1)[0]:
+        explain(prompt)
+        return
     facts = prompt.split("The facts:", 1)[-1].split("The expected result:", 1)[0]
     places = []
     for line in facts.splitlines():

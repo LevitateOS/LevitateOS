@@ -317,12 +317,6 @@ void MessPage::updateFoot()
 
 void HandPage::show(const QList<Finding> &chosen, qint64 scannedBytes, const QStringList &roots)
 {
-    QVBoxLayout *column = fresh();
-    auto *backLink = new ClickLabel(tr("‹ Back"));
-    dim(backLink);
-    connect(backLink, &ClickLabel::clicked, this, &HandPage::back);
-    column->addWidget(backLink, 0, Qt::AlignLeft);
-
     qint64 certain = 0;
     QStringList facts;
     for (const Finding &finding : chosen) {
@@ -335,21 +329,32 @@ void HandPage::show(const QList<Finding> &chosen, qint64 scannedBytes, const QSt
             line += tr(" Ask me first.");
         facts << line;
     }
+    show(tr("Hand the mess to the agent"), tr("The agent clears it. This window only found it and says what it is."),
+         tr("%1 of %2 in %3 is taken by things that look like leftovers.")
+             .arg(bytesText(sum(chosen)), bytesText(scannedBytes), roots.join(tr(", "))),
+         facts,
+         tr("At least %1 is free again. Only the things listed are removed. Anything marked \"ask me first\" is asked "
+            "about before it goes. What belongs to Recipe is cleared through Recipe, not by deleting its files.")
+             .arg(bytesText(certain)));
+}
+
+void HandPage::show(const QString &title, const QString &subtitle, const QString &issue, const QStringList &facts,
+                    const QString &expected)
+{
+    QVBoxLayout *column = fresh();
+    auto *backLink = new ClickLabel(tr("‹ Back"));
+    dim(backLink);
+    connect(backLink, &ClickLabel::clicked, this, &HandPage::back);
+    column->addWidget(backLink, 0, Qt::AlignLeft);
 
     auto *top = new QVBoxLayout;
     top->setSpacing(1);
-    top->addWidget(heading(tr("Hand the mess to the agent")));
-    top->addWidget(dim(text(tr("The agent clears it. This window only found it and says what it is."), true)));
+    top->addWidget(heading(title));
+    top->addWidget(dim(text(subtitle, true)));
     column->addLayout(top);
 
-    auto *prompt = prompt_ = new PromptPanel(
-        tr("%1 of %2 in %3 is taken by things that look like leftovers.")
-            .arg(bytesText(sum(chosen)), bytesText(scannedBytes), roots.join(tr(", "))),
-        facts,
-        tr("At least %1 is free again. Only the things listed are removed. Anything marked \"ask me first\" is asked "
-           "about before it goes. What belongs to Recipe is cleared through Recipe, not by deleting its files.")
-            .arg(bytesText(certain)));
-    // The list of facts is as long as the mess: let it scroll.
+    auto *prompt = prompt_ = new PromptPanel(issue, facts, expected);
+    // The list of facts can be long: let it scroll.
     auto *scroll = new QScrollArea;
     scroll->setWidgetResizable(true);
     scroll->setFrameShape(QFrame::NoFrame);

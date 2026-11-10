@@ -18,7 +18,10 @@ class WorkPage : public Page {
     Q_OBJECT
 public:
     using Page::Page;
-    void begin(const QString &title, const QString &subtitle, Run *run);
+    // `stopNote` says what stopping means; by default, that what is done is kept.
+    void begin(const QString &title, const QString &subtitle, Run *run, const QString &stopNote = QString());
+    // Whether the person pressed Stop on the run shown.
+    bool stopped() const;
 signals:
     void done(bool ok);
     void back();

@@ -9,8 +9,11 @@ Run::Run(const QString &program, const QStringList &arguments, QObject *parent)
     process_.setProgram(program);
     process_.setArguments(arguments);
     connect(&process_, &QProcess::readyReadStandardError, this, &Run::drain);
+    connect(&process_, &QProcess::readyReadStandardOutput, this,
+            [this] { answer_ += process_.readAllStandardOutput(); });
     connect(&process_, &QProcess::finished, this, [this](int code, QProcess::ExitStatus status) {
         drain();
+        answer_ += process_.readAllStandardOutput();
         emit finished(status == QProcess::NormalExit && code == 0);
     });
     connect(&process_, &QProcess::errorOccurred, this, [this](QProcess::ProcessError error) {

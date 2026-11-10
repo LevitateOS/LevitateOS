@@ -11,7 +11,12 @@
 #include <QProgressBar>
 #include <QPushButton>
 
-void WorkPage::begin(const QString &title, const QString &subtitle, Run *run)
+bool WorkPage::stopped() const
+{
+    return stop_ && !stop_->isEnabled();
+}
+
+void WorkPage::begin(const QString &title, const QString &subtitle, Run *run, const QString &stopNote)
 {
     run_ = run;
     marks_.clear();
@@ -32,7 +37,7 @@ void WorkPage::begin(const QString &title, const QString &subtitle, Run *run)
         run->stop();
     });
     side->addWidget(stop_, 0, Qt::AlignRight);
-    stopNote_ = dim(text(tr("What is done is kept; you can continue later")));
+    stopNote_ = dim(text(stopNote.isEmpty() ? tr("What is done is kept; you can continue later") : stopNote));
     side->addWidget(stopNote_);
     header->addLayout(side);
     column_->addLayout(header);

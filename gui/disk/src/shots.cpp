@@ -45,13 +45,40 @@ int takeShots(Window &window, const QString &folder, bool handOver)
 
     window.showHandOver();
     save("3-hand-over");
-    if (!handOver)
+    if (!handOver) {
+        window.showSystems();
+        save("4-systems");
         return ok ? 0 : 1;
+    }
 
     window.sendShown();
     waitUntilIdle(window, 300); // the agent, then the second look
     out << "the agent freed " << bytesText(window.freed()) << "; " << window.found().size() << " places of mess are left\n";
     ok &= window.freed() > 0;
     save("4-after");
+
+    // The two systems: compare, then ask the agent what differs.
+    window.showSystems();
+    save("5-systems");
+    window.compare();
+    waitUntilIdle(window, 300);
+    const Comparison *compared = window.comparison();
+    if (!compared) {
+        out << "the two systems could not be compared\n";
+        save("6-compared");
+        return 1;
+    }
+    out << "the two systems: " << compared->count() << " differences, " << bytesText(compared->differingBytes())
+        << "; " << compared->sameFiles << " files the same\n";
+    save("6-compared");
+    if (compared->identical())
+        return ok ? 0 : 1;
+    window.showExplain();
+    save("7-ask");
+    window.sendShown();
+    waitUntilIdle(window, 300);
+    out << "the agent said: " << window.said() << "\n";
+    ok &= !window.said().isEmpty();
+    save("8-explained");
     return ok ? 0 : 1;
 }

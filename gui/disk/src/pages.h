@@ -60,6 +60,9 @@ class HandPage : public Page {
 public:
     using Page::Page;
     void show(const QList<Finding> &chosen, qint64 scannedBytes, const QStringList &roots);
+    // Any other hand-over: a title, a line under it, and the three parts.
+    void show(const QString &title, const QString &subtitle, const QString &issue, const QStringList &facts,
+              const QString &expected);
     // The text as it would be sent now, with the person's edits.
     QString prompt() const;
 signals:

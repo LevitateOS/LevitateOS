@@ -2,8 +2,8 @@
 Type=Application
 Name=Disk
 GenericName=Disk space
-Comment=See where the mess on the disk is, and hand it to the agent
+Comment=See where the mess on the disk is, and how alike the two systems are
 Exec=disk-gui
 Icon=drive-harddisk
 Categories=Qt;System;Filesystem;
-Keywords=disk;space;usage;clean;cache;full;
+Keywords=disk;space;usage;clean;cache;full;compare;system;

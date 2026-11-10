@@ -17,6 +17,8 @@ public:
     void start();
     void stop();
     QJsonObject failure() const { return failure_; }
+    // What the command wrote on its standard output, complete once finished.
+    QByteArray answer() const { return answer_; }
 
 signals:
     void event(const QJsonObject &event);
@@ -26,6 +28,6 @@ signals:
 private:
     void drain();
     QProcess process_;
-    QByteArray pending_, input_;
+    QByteArray pending_, input_, answer_;
     QJsonObject failure_;
 };
