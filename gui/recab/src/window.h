@@ -12,6 +12,7 @@ class AskPage;
 class ClashPage;
 class ConfirmDialog;
 class ProposedPage;
+class Refresher;
 class QLabel;
 class QStackedWidget;
 class SystemPage;
@@ -41,18 +42,28 @@ public:
     // The question shown before the place of the system from before is reused.
     ConfirmDialog *reuseQuestion();
 
+    // Reads the system again, as F5 does.
+    void refresh();
+    // Whether the agent has asked something; and answering it.
+    bool agentAsks() const;
+    void answerAgent(const QString &words);
+
     const Status &status() const { return status_; }
-    bool busy() const { return run_ != nullptr || quiet_ > 0; }
+    bool busy() const { return run_ != nullptr || quiet_ > 0 || reading_ != nullptr; }
 
 private:
-    bool reload();
+    // Reads the system without holding the window up, then does `then`. When
+    // it cannot be read, the page says why and `then` is not done.
+    void reload(std::function<void()> then);
     void work(Run *run, const QString &title, const QString &subtitle, std::function<void(bool)> then);
     void chain(QList<Run *> runs);
     void decideByHand();
 
     RecabClient client_;
     Status status_;
-    Run *run_ = nullptr;
+    Run *run_ = nullptr, *reading_ = nullptr;
+    bool read_ = false; // the system was read at least once
+    Refresher *refresher_;
     int quiet_ = 0;
     std::function<void(bool)> then_;
 

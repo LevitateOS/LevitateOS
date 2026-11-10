@@ -34,6 +34,7 @@ signals:
     void settle();
     void fix(const QString &prompt);
     void retry();
+    void readAgain();
 };
 
 // Say the change in words; an agent works out how.

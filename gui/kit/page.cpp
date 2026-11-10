@@ -1,5 +1,8 @@
 #include "page.h"
 
+#include "parts.h"
+
+#include <QProgressBar>
 #include <QVBoxLayout>
 
 Page::Page(QWidget *parent)
@@ -23,4 +26,18 @@ QVBoxLayout *Page::fresh()
     column->setContentsMargins(28, 20, 28, 16);
     column->setSpacing(14);
     return column;
+}
+
+void Page::showLoading(const QString &title, const QString &words)
+{
+    QVBoxLayout *column = fresh();
+    column->addWidget(heading(title));
+    column->addWidget(dim(text(words, true)));
+    auto *bar = new QProgressBar;
+    bar->setRange(0, 0);
+    bar->setTextVisible(false);
+    bar->setFixedHeight(8);
+    bar->setMaximumWidth(360);
+    column->addWidget(bar);
+    column->addStretch();
 }

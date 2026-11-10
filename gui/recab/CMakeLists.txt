@@ -19,6 +19,7 @@ qt_add_executable(recab-gui
     ../kit/run.cpp
     ../kit/words.cpp
     ../kit/page.cpp
+    ../kit/refresh.cpp
     ../kit/work.cpp
 )
 target_include_directories(recab-gui PRIVATE ../kit)

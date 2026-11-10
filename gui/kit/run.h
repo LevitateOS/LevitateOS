@@ -14,9 +14,17 @@ public:
     Run(const QString &program, const QStringList &arguments, QObject *parent);
     // Text the command reads on its standard input, then end of input.
     void setInput(const QByteArray &input) { input_ = input; }
+    // For an agent: the prompt as one JSON line, `{"prompt": "..."}`, with the
+    // input left open so its questions can be answered.
+    void setPrompt(const QString &prompt);
+    // Answers a `question` event: one JSON line, `{"question": id, "answer": "..."}`.
+    void reply(const QString &question, const QString &answer);
     void start();
     void stop();
     QJsonObject failure() const { return failure_; }
+    // Why it failed, in one text: the reason it gave, else what it wrote
+    // that was not an event, else that it could not be started.
+    QString problem() const;
     // What the command wrote on its standard output, complete once finished.
     QByteArray answer() const { return answer_; }
 
@@ -30,4 +38,6 @@ private:
     QProcess process_;
     QByteArray pending_, input_, answer_;
     QJsonObject failure_;
+    QStringList said_;
+    bool open_ = false;
 };

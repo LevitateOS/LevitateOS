@@ -13,7 +13,9 @@ class Run;
 class StepMark;
 
 // Something long is being done: its steps, how far it is, its output. It reads
-// the events of one Run (plan, step, progress, say, agent).
+// the events of one Run (plan, step, progress, say, agent, question). When
+// the agent asks something, the question is shown with its choices and the
+// answer goes back to the agent.
 class WorkPage : public Page {
     Q_OBJECT
 public:
@@ -22,12 +24,18 @@ public:
     void begin(const QString &title, const QString &subtitle, Run *run, const QString &stopNote = QString());
     // Whether the person pressed Stop on the run shown.
     bool stopped() const;
+    // Whether the agent has asked something and waits for the answer.
+    bool asking() const { return !question_.isEmpty(); }
+    QStringList choices() const { return choices_; }
+    // Answers what the agent asked, as a click on a choice would.
+    void answer(const QString &words);
 signals:
     void done(bool ok);
     void back();
     void activity(const QString &words);
 private:
     void onEvent(const QJsonObject &event);
+    void ask(const QJsonObject &event);
     void onFinished(bool ok);
 
     Run *run_ = nullptr;
@@ -40,4 +48,7 @@ private:
     QPlainTextEdit *output_ = nullptr;
     QPushButton *stop_ = nullptr;
     QLabel *stopNote_ = nullptr;
+    QString question_; // the id of what the agent asked, while it waits
+    QStringList choices_;
+    QWidget *asked_ = nullptr;
 };

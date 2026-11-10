@@ -80,6 +80,10 @@ void SystemPage::showProblem(const QString &problem)
     QVBoxLayout *column = fresh();
     column->addWidget(heading(tr("The system could not be read")));
     column->addWidget(text(problem, true));
+    auto *again = new QPushButton(tr("Try again"));
+    again->setDefault(true);
+    connect(again, &QPushButton::clicked, this, &SystemPage::readAgain);
+    column->addWidget(again, 0, Qt::AlignLeft);
     column->addStretch();
 }
 
@@ -346,8 +350,14 @@ void ClashPage::show(const Status &s)
     verdict->setFrameShape(QFrame::NoFrame);
     verdict->column()->addWidget(heading(tr("The update clashes with one of your changes")));
     verdict->column()->addWidget(text(
-        tr("%1 was added to the next system. One file was changed by you and by the update. Nothing was chosen for you.")
-            .arg(s.name(s.otherRelease)),
+        s.clashes.size() == 1
+            ? tr("%1 was added to the next system. One file was changed by you and by the update. Nothing was chosen "
+                 "for you.")
+                  .arg(s.name(s.otherRelease))
+            : tr("%1 was added to the next system. %2 files were changed by you and by the update. Nothing was "
+                 "chosen for you. This is the first; the others follow.")
+                  .arg(s.name(s.otherRelease))
+                  .arg(s.clashes.size()),
         true));
     column->addWidget(verdict);
 

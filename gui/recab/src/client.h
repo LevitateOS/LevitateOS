@@ -13,11 +13,15 @@ class RecabClient : public QObject {
 public:
     explicit RecabClient(QObject *parent = nullptr);
 
-    bool load(Status *into, QString *error);
+    // `recab status --json`, as a run that does not hold the window up; its
+    // answer is read with `understand`.
+    Run *read();
+    bool understand(Run *finished, bool ok, Status *into, QString *error) const;
 
     // `recab <arguments> --machine-events`.
     Run *change(const QStringList &arguments);
-    // The agent, with the prompt (issue, facts, expected result) on its input.
+    // The agent, with the prompt (issue, facts, expected result) on its input
+    // as one JSON line; its questions are answered on the same input.
     Run *agent(const QString &prompt);
     Run *reboot();
 

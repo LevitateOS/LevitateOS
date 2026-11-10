@@ -12,18 +12,18 @@ RecabClient::RecabClient(QObject *parent)
 {
 }
 
-bool RecabClient::load(Status *into, QString *error)
+Run *RecabClient::read()
 {
-    QProcess process;
-    process.start(program_, {"status", "--json"});
-    if (!process.waitForFinished(15000) || process.exitCode() != 0) {
-        *error = tr("`%1 status --json` failed: %2")
-                     .arg(program_, process.error() == QProcess::FailedToStart
-                                        ? process.errorString()
-                                        : QString::fromUtf8(process.readAllStandardError()).trimmed());
+    return new Run(program_, {"status", "--json"}, this);
+}
+
+bool RecabClient::understand(Run *finished, bool ok, Status *into, QString *error) const
+{
+    if (!ok) {
+        *error = tr("`%1 status --json` failed: %2").arg(program_, finished->problem());
         return false;
     }
-    const QJsonObject object = QJsonDocument::fromJson(process.readAllStandardOutput()).object();
+    const QJsonObject object = QJsonDocument::fromJson(finished->answer()).object();
     // The lifecycle this front end shows arrives with schema 3; an older recab
     // describes slots and staging, which this window cannot draw truthfully.
     if (object["schema_version"].toInt() != 3) {
@@ -48,7 +48,7 @@ Run *RecabClient::change(const QStringList &arguments)
 Run *RecabClient::agent(const QString &prompt)
 {
     auto *run = new Run(agent_, {}, this);
-    run->setInput(prompt.toUtf8());
+    run->setPrompt(prompt);
     return run;
 }
 

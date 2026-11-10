@@ -322,8 +322,20 @@ def section(prompt, title):
     return rest.strip()
 
 
+def ask(number, text, choices):
+    """Asks the person and waits for the answer, as an agent does when the
+    request leaves something open. With nobody there, the first choice."""
+    emit(event="question", id=number, text=text, choices=choices)
+    line = sys.stdin.readline()
+    try:
+        return json.loads(line)["answer"]
+    except (ValueError, KeyError):
+        return choices[0]
+
+
 def agent(s):
-    prompt = sys.stdin.read()
+    # The prompt arrives as one JSON line; the input stays open for answers.
+    prompt = json.loads(sys.stdin.readline())["prompt"]
     issue, request = section(prompt, "The issue"), section(prompt, "The request")
     expected = [part.strip() for part in section(prompt, "The expected result").replace("\n", " ").split(". ") if part.strip()]
 
@@ -367,12 +379,15 @@ def agent(s):
         return
 
     words = (request or prompt).lower()
+    question = None
     if "nvidia" in words:
         change = {"kind": "software", "title": "NVIDIA driver 580.95, installed"}
         chose = "it chose the recipe nvidia-driver 580.95"
     elif "ssh" in words or "password" in words:
         change = {"kind": "file", "title": "%s, edited" % SSHD, "path": SSHD}
         chose = "it turned password logins off in %s" % SSHD
+        question = ("root can still log in over ssh with a key. Leave that as it is, or turn root logins off too?",
+                    ["Leave it", "Turn it off too"])
     else:
         change = {"kind": "other", "title": (request or "A change").splitlines()[0][:60]}
         chose = "it made the change as asked"
@@ -381,6 +396,8 @@ def agent(s):
         step("level", "skipped")
     prepare(s)
     step("change", "running")
+    if question and ask("1", *question) != question[1][0]:
+        chose += ", and root logins too"
     emit(event="say", text="The agent: %s." % chose)
     if change["kind"] == "software":
         # A long step: what is half done is marked, so a stop or a power cut can be recovered.

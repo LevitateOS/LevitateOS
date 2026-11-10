@@ -2,11 +2,16 @@
 
 #include "pages.h"
 
+#include "refresh.h"
+
 #include <QLabel>
+#include <QLocale>
 #include <QMessageBox>
 #include <QPushButton>
 #include <QStackedWidget>
 #include <QStatusBar>
+#include <QTime>
+#include <QToolButton>
 
 Window::Window(QWidget *parent)
     : QMainWindow(parent)
@@ -51,11 +56,12 @@ Window::Window(QWidget *parent)
     });
     connect(work_, &WorkPage::done, this, [this](bool ok) {
         run_ = nullptr;
-        reload();
         auto then = then_;
         then_ = nullptr;
-        if (then)
-            then(ok);
+        reload([then, ok] {
+            if (then)
+                then(ok);
+        });
     });
 
     connect(clash_, &ClashPage::later, this, &Window::showMain);
@@ -67,19 +73,79 @@ Window::Window(QWidget *parent)
     connect(proposed_, &ProposedPage::askAgain, this, &Window::showClash);
     connect(proposed_, &ProposedPage::byHand, this, &Window::decideByHand);
 
-    if (reload())
-        showMain();
+    connect(system_, &SystemPage::readAgain, this, [this] { reload([this] { showMain(); }); });
+
+    // F5, and coming back to the window after a while: an agent or a terminal
+    // may have changed the system in the meantime.
+    refresher_ = new Refresher(this, 20);
+    connect(refresher_, &Refresher::asked, this, [this](bool byHand) {
+        if (stack_->currentWidget() == system_ || byHand)
+            refresh();
+    });
+    auto *again = new QToolButton;
+    again->setText(tr("Read again"));
+    again->setToolTip(tr("Read the system again (F5)"));
+    again->setAutoRaise(true);
+    connect(again, &QToolButton::clicked, this, &Window::refresh);
+    statusBar()->addWidget(again);
+
+    reload([this] { showMain(); });
 }
 
-bool Window::reload()
+void Window::refresh()
 {
-    QString problem;
-    if (!client_.load(&status_, &problem)) {
-        system_->showProblem(problem);
+    if (busy())
+        return;
+    // Only the main page is drawn from the state alone; a page being filled
+    // in is left as it is.
+    const bool main = stack_->currentWidget() == system_;
+    reload([this, main] {
+        if (main)
+            showMain();
+    });
+}
+
+void Window::reload(std::function<void()> then)
+{
+    if (reading_)
+        return;
+    reading_ = client_.read();
+    if (!read_) {
+        system_->showLoading(tr("Reading the system"),
+                             tr("Asking recab what is running, what is beside it and what can be done."));
         stack_->setCurrentWidget(system_);
-        return false;
     }
-    return true;
+    source_->setText(tr("Reading the system…"));
+    connect(reading_, &Run::finished, this, [this, then](bool ok) {
+        Run *run = reading_;
+        reading_ = nullptr;
+        run->deleteLater();
+        QString problem;
+        Status status;
+        if (!client_.understand(run, ok, &status, &problem)) {
+            source_->setText(tr("The system could not be read"));
+            system_->showProblem(problem);
+            stack_->setCurrentWidget(system_);
+            return;
+        }
+        status_ = status;
+        read_ = true;
+        refresher_->fresh();
+        source_->setText(tr("Read from recab at %1").arg(QLocale().toString(QTime::currentTime(), QLocale::ShortFormat)));
+        if (then)
+            then();
+    });
+    reading_->start();
+}
+
+bool Window::agentAsks() const
+{
+    return run_ && work_->asking();
+}
+
+void Window::answerAgent(const QString &words)
+{
+    work_->answer(words);
 }
 
 void Window::showMain()
@@ -128,8 +194,7 @@ void Window::work(Run *run, const QString &title, const QString &subtitle, std::
 void Window::chain(QList<Run *> runs)
 {
     if (runs.isEmpty()) {
-        if (reload())
-            showMain();
+        reload([this] { showMain(); });
         return;
     }
     Run *run = runs.takeFirst();
@@ -145,8 +210,7 @@ void Window::chain(QList<Run *> runs)
                 left->deleteLater();
             QMessageBox::warning(this, tr("System"),
                                  reason.isEmpty() ? tr("The change was not made.") : reason);
-            if (reload())
-                showMain();
+            reload([this] { showMain(); });
             return;
         }
         chain(runs);
@@ -243,23 +307,31 @@ void Window::acceptProposal()
     chain({client_.change({"resolve", status_.proposalPath, "--proposal"})});
 }
 
+// One question for each file that clashes, then all the answers at once.
 void Window::decideByHand()
 {
-    if (status_.clashes.isEmpty())
-        return;
-    const Clash clash = status_.clashes.first();
-    QMessageBox question(this);
-    question.setWindowTitle(tr("Decide by hand"));
-    question.setText(tr("Which %1 goes into the next system?").arg(clash.path));
-    question.setInformativeText(tr("Mine: %1.\nThe update's: %2.").arg(clash.local, clash.release));
-    QPushButton *mine = question.addButton(tr("Keep mine"), QMessageBox::AcceptRole);
-    QPushButton *theirs = question.addButton(tr("Take the update's"), QMessageBox::AcceptRole);
-    question.addButton(QMessageBox::Cancel);
-    question.exec();
-    if (question.clickedButton() == mine)
-        chain({client_.change({"resolve", clash.path, "--local"})});
-    else if (question.clickedButton() == theirs)
-        chain({client_.change({"resolve", clash.path, "--release"})});
+    QList<Run *> runs;
+    int number = 0;
+    for (const Clash &clash : status_.clashes) {
+        QMessageBox question(this);
+        question.setWindowTitle(status_.clashes.size() == 1
+                                    ? tr("Decide by hand")
+                                    : tr("Decide by hand (%1 of %2)").arg(++number).arg(status_.clashes.size()));
+        question.setText(tr("Which %1 goes into the next system?").arg(clash.path));
+        question.setInformativeText(tr("Mine: %1.\nThe update's: %2.").arg(clash.local, clash.release));
+        QPushButton *mine = question.addButton(tr("Keep mine"), QMessageBox::AcceptRole);
+        QPushButton *theirs = question.addButton(tr("Take the update's"), QMessageBox::AcceptRole);
+        question.addButton(QMessageBox::Cancel);
+        question.exec();
+        if (question.clickedButton() == mine)
+            runs << client_.change({"resolve", clash.path, "--local"});
+        else if (question.clickedButton() == theirs)
+            runs << client_.change({"resolve", clash.path, "--release"});
+        else
+            break; // what was decided so far is still carried out
+    }
+    if (!runs.isEmpty())
+        chain(runs);
 }
 
 void Window::stopRun()

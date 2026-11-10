@@ -21,6 +21,7 @@ qt_add_executable(disk-gui
     ../kit/run.cpp
     ../kit/words.cpp
     ../kit/page.cpp
+    ../kit/refresh.cpp
     ../kit/work.cpp
 )
 target_include_directories(disk-gui PRIVATE ../kit)

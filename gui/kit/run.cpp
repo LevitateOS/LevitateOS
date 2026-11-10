@@ -24,12 +24,35 @@ Run::Run(const QString &program, const QStringList &arguments, QObject *parent)
     });
 }
 
+void Run::setPrompt(const QString &prompt)
+{
+    input_ = QJsonDocument(QJsonObject{{"prompt", prompt}}).toJson(QJsonDocument::Compact) + '\n';
+    open_ = true;
+}
+
+void Run::reply(const QString &question, const QString &answer)
+{
+    if (process_.state() == QProcess::NotRunning)
+        return;
+    process_.write(QJsonDocument(QJsonObject{{"question", question}, {"answer", answer}}).toJson(QJsonDocument::Compact)
+                   + '\n');
+}
+
+QString Run::problem() const
+{
+    const QString reason = failure_["reason"].toString();
+    if (!reason.isEmpty())
+        return reason;
+    return said_.join(QLatin1Char('\n')).trimmed();
+}
+
 void Run::start()
 {
     process_.start();
     if (!input_.isEmpty())
         process_.write(input_);
-    process_.closeWriteChannel();
+    if (!open_)
+        process_.closeWriteChannel();
 }
 
 void Run::stop()
@@ -51,8 +74,12 @@ void Run::drain()
             const QString words = QString::fromUtf8(line).remove(colour);
             if (words.startsWith(QLatin1String("Error:")) && !failure_.contains("reason"))
                 failure_["reason"] = words.mid(6).trimmed();
-            if (!words.trimmed().isEmpty())
+            if (!words.trimmed().isEmpty()) {
+                said_ << words;
+                if (said_.size() > 40)
+                    said_.removeFirst();
                 emit output(words);
+            }
             continue;
         }
         if (object["event"] == QLatin1String("failed"))

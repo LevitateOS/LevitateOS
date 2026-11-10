@@ -7,6 +7,7 @@
 #include <QFontDatabase>
 #include <QHBoxLayout>
 #include <QJsonArray>
+#include <QLineEdit>
 #include <QPlainTextEdit>
 #include <QProgressBar>
 #include <QPushButton>
@@ -21,6 +22,9 @@ void WorkPage::begin(const QString &title, const QString &subtitle, Run *run, co
     run_ = run;
     marks_.clear();
     titles_.clear();
+    question_.clear();
+    choices_.clear();
+    asked_ = nullptr;
     column_ = fresh();
 
     auto *header = new QHBoxLayout;
@@ -127,12 +131,75 @@ void WorkPage::onEvent(const QJsonObject &event)
         output_->appendPlainText(event["text"].toString());
     } else if (kind == QLatin1String("agent")) {
         output_->appendPlainText(tr("agent: %1").arg(event["summary"].toString()));
+    } else if (kind == QLatin1String("question")) {
+        ask(event);
     }
+}
+
+// The agent asks and waits: the question, then a button for each choice, or
+// a line to type in when it gave none.
+void WorkPage::ask(const QJsonObject &event)
+{
+    if (asked_)
+        asked_->deleteLater();
+    question_ = event["id"].toString();
+    choices_.clear();
+    for (const QJsonValue &choice : event["choices"].toArray())
+        choices_ << choice.toString();
+    auto *panel = new Card(Card::Open);
+    asked_ = panel;
+    panel->column()->addWidget(strong(tr("The agent asks")));
+    panel->column()->addWidget(text(event["text"].toString(), true));
+    auto *row = new QHBoxLayout;
+    if (choices_.isEmpty()) {
+        auto *line = new QLineEdit;
+        auto *send = new QPushButton(tr("Answer"));
+        send->setDefault(true);
+        connect(send, &QPushButton::clicked, this, [this, line] { answer(line->text()); });
+        connect(line, &QLineEdit::returnPressed, send, &QPushButton::click);
+        row->addWidget(line, 1);
+        row->addWidget(send);
+    } else {
+        for (const QString &choice : choices_) {
+            auto *button = new QPushButton(choice);
+            connect(button, &QPushButton::clicked, this, [this, choice] { answer(choice); });
+            row->addWidget(button);
+        }
+        row->addStretch();
+    }
+    panel->column()->addLayout(row);
+    column_->insertWidget(1, panel);
+    bar_->setRange(0, 1);
+    bar_->setValue(0);
+    state_->setText(tr("Waiting for your answer"));
+    output_->appendPlainText(tr("agent asks: %1").arg(event["text"].toString()));
+    emit activity(tr("The agent is waiting for your answer"));
+}
+
+void WorkPage::answer(const QString &words)
+{
+    if (question_.isEmpty() || words.trimmed().isEmpty())
+        return;
+    run_->reply(question_, words.trimmed());
+    output_->appendPlainText(tr("you: %1").arg(words.trimmed()));
+    question_.clear();
+    choices_.clear();
+    if (asked_)
+        asked_->deleteLater();
+    asked_ = nullptr;
+    bar_->setRange(0, 0);
+    state_->setText(tr("The agent carries on"));
+    emit activity(tr("The agent carries on"));
 }
 
 void WorkPage::onFinished(bool ok)
 {
     emit activity(QString());
+    question_.clear();
+    choices_.clear();
+    if (asked_)
+        asked_->deleteLater();
+    asked_ = nullptr;
     const bool stoppedByUser = !stop_->isEnabled();
     const QString reason = run_->failure()["reason"].toString();
     if (ok || stoppedByUser) {

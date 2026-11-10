@@ -49,6 +49,9 @@ int takeShots(Window &window, const QString &folder)
         }
     };
     window.show();
+    // Before recab has answered: what a person sees while the state is read.
+    ok &= window.grab().save(QDir(folder).filePath("00-reading.png"));
+    waitUntilIdle(window);
 
     expect("starts stable", window.status().state == "stable");
     save(window, "01-stable");
@@ -78,6 +81,12 @@ int takeShots(Window &window, const QString &folder)
     expect("recovering finishes the change", window.status().changes.size() == 1);
 
     window.handOver(asked(sshd), false);
+    // The agent asks something on the way, and waits.
+    for (int waited = 0; !window.agentAsks() && window.busy() && waited < 200; ++waited)
+        settle(50);
+    expect("the agent asks about root logins", window.agentAsks());
+    save(window, "05b-the-agent-asks");
+    window.answerAgent(QStringLiteral("Leave it"));
     waitUntilIdle(window);
     expect("a second change joins the same next system", window.status().changes.size() == 2);
     save(window, "06-next-system");
@@ -119,6 +128,11 @@ int takeShots(Window &window, const QString &folder)
     waitUntilIdle(window);
     expect("the second restart is kept", window.status().state == "stable" && window.status().trialOutcome == "kept");
     save(window, "11-on-the-new-system");
+
+    // Reading again by hand, as F5 does, leaves the page where it was.
+    window.refresh();
+    waitUntilIdle(window);
+    expect("reading again keeps the state", window.status().state == "stable");
 
     out << (ok ? "all flows ended where they should\n" : "some flows did not end where they should\n");
     return ok ? 0 : 1;
