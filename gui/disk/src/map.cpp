@@ -115,6 +115,35 @@ void DiskMap::lay(Node *node, QRectF area, int depth)
     }
 }
 
+bool DiskMap::loud(const Node *node) const
+{
+    return node->kind >= 0;
+}
+
+QColor DiskMap::fillOf(const Node *node, int depth) const
+{
+    if (node->kind >= 0)
+        return messKinds().at(node->kind).colour;
+    // Quiet, with a little variation so neighbours can be told apart.
+    QColor fill = palette().color(QPalette::WindowText);
+    fill.setAlphaF(0.07f + 0.035f * float((depth + (qHash(node->name) & 3)) % 4));
+    return fill;
+}
+
+qint64 DiskMap::sizeOf(const Node *node) const
+{
+    return node->bytes;
+}
+
+QString DiskMap::tipOf(const Node *node) const
+{
+    return node->path() + QLatin1Char('\n') + bytesText(node->bytes);
+}
+
+void DiskMap::decorate(QPainter &, const Node *, const QRectF &) const
+{
+}
+
 void DiskMap::paintEvent(QPaintEvent *)
 {
     QPainter painter(this);
@@ -122,18 +151,10 @@ void DiskMap::paintEvent(QPaintEvent *)
     painter.fillRect(rect(), ground);
     const QColor ink = palette().color(QPalette::WindowText);
     for (const Tile &tile : tiles_) {
-        QColor fill;
-        if (tile.node->kind >= 0) {
-            fill = messKinds().at(tile.node->kind).colour;
-        } else {
-            // Quiet, with a little variation so neighbours can be told apart.
-            fill = ink;
-            fill.setAlphaF(0.07f + 0.035f * float((tile.depth + (qHash(tile.node->name) & 3)) % 4));
-        }
         const QRectF inner = tile.rect.adjusted(0.5, 0.5, -0.5, -0.5);
-        painter.fillRect(inner, fill);
+        painter.fillRect(inner, fillOf(tile.node, tile.depth));
         // Mess is always named when there is room; the rest only when it is large.
-        const bool mess = tile.node->kind >= 0;
+        const bool mess = loud(tile.node);
         if (inner.width() > 90 && inner.height() > (mess ? 22 : 60)) {
             QColor words = mess ? QColor(0x14, 0x18, 0x16) : ink;
             if (!mess)
@@ -148,8 +169,9 @@ void DiskMap::paintEvent(QPaintEvent *)
             // Two lines when they fit, otherwise the name alone.
             const bool both = room.height() >= 2 * metrics.lineSpacing();
             painter.drawText(room, Qt::AlignLeft | Qt::AlignTop,
-                             both ? name + QLatin1Char('\n') + bytesText(tile.node->bytes) : name);
+                             both ? name + QLatin1Char('\n') + bytesText(sizeOf(tile.node)) : name);
         }
+        decorate(painter, tile.node, inner);
     }
     QFont small = font();
     small.setPointSizeF(small.pointSizeF() * 0.9);
@@ -160,11 +182,11 @@ void DiskMap::paintEvent(QPaintEvent *)
     painter.setPen(words);
     for (const Tile &title : titles_) {
         const QRectF room = title.rect.adjusted(4, 0, -4, 0);
-        const QString size = bytesText(title.node->bytes);
+        const QString size = bytesText(sizeOf(title.node));
         const double sizeWidth = metrics.horizontalAdvance(size) + 10;
         // A root is named by its whole path; that is too long for a strip.
         QString name = title.node->name;
-        if (title.depth == 1)
+        if (title.depth == 1 && !name.section(QLatin1Char('/'), -1).isEmpty())
             name = name.section(QLatin1Char('/'), -1);
         painter.drawText(room, Qt::AlignLeft | Qt::AlignVCenter,
                          metrics.elidedText(name, Qt::ElideMiddle, room.width() - sizeWidth));
@@ -206,7 +228,7 @@ bool DiskMap::event(QEvent *event)
     if (event->type() == QEvent::ToolTip) {
         auto *help = static_cast<QHelpEvent *>(event);
         if (Node *node = at(help->pos()))
-            QToolTip::showText(help->globalPos(), node->path() + QLatin1Char('\n') + bytesText(node->bytes), this);
+            QToolTip::showText(help->globalPos(), tipOf(node), this);
         else
             QToolTip::hideText();
         return true;

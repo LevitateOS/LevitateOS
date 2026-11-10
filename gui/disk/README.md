@@ -55,12 +55,19 @@ On the second tab:
 2. **How alike they are.** A headline ("The two systems are identical", or
    "99.9% the same", by room taken), how many files differ, and what the other
    system is: a copy, the system from before the last change, or the next
-   system with a change that is not started. A bar shows the same against the
-   different; the list shows every difference by folder: only in this system,
-   only in the other, different content, or same content with other settings.
-   Files that differ by design (each system names its own partition) are
-   counted apart.
-3. **Ask the agent what differs.** The differences go to the agent as issue,
+   system with a change that is not started.
+3. **The two systems as blocks, side by side.** Two maps, this system left
+   and the other right, drawn from one layout: every folder is a block in the
+   same place on both sides, so two systems that are the same look the same.
+   A block that holds files that differ is coloured, with the number of files
+   on it: only on this side, different content, or same content with other
+   settings. A block where only the other side has something more is outlined
+   with dashes. A block that differs is drawn at least big enough to see,
+   however little room the difference takes. A click on a block marks it on
+   both sides and says whether it is the same in both.
+4. **The list** shows every difference by folder. Files that differ by design
+   (each system names its own partition) are counted apart.
+5. **Ask the agent what differs.** The differences go to the agent as issue,
    facts and expected result. The agent changes nothing; what it answers is
    shown above the list.
 
@@ -155,6 +162,7 @@ When done it writes one JSON object on its standard output:
 | `running`, `other` | each: `slot`, `device`, `files`, `bytes` |
 | `other.role` | `copy` (made as one, nothing changed since), `before` (the system from before the last change) or `next` (holds a change that is not started) |
 | `same` | `files` and `bytes` that are the same in both |
+| `folders` | every folder down to the depth recab chooses, each with its whole size on both sides: `path`, `running_bytes`, `other_bytes`. The maps are drawn from this |
 | `own` | paths that differ by design, because each system names its own partition; not counted as differences |
 | `differences` | one per path: `path`, `change`, `running_bytes`, `other_bytes`, and `detail` for `metadata` |
 | `more` | how many differences were left out of the list, if it was cut |
@@ -180,7 +188,7 @@ other two apps: `plan`, `step`, `progress`, `output`, `agent`, `failed`,
 |---|---|
 | `src/scan.*` | reads a folder tree from the disk into memory |
 | `src/mess.*` | the rules, and the finding for something picked by hand |
-| `src/map.*` | the map |
+| `src/map.*` | the map of blocks, used for the mess and for each of the two systems |
 | `src/pages.*` | the map with its list, and the hand-over |
 | `src/systems.*` | the comparison of the two systems: what recab answered, and its page |
 | `src/window.*` | the two tabs and the flows from each to the agent and back |

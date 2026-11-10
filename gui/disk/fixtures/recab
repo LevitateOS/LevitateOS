@@ -74,6 +74,48 @@ def differences(newer):
     return found
 
 
+# What a system holds, folder by folder, in MiB: the files directly in each.
+HOLDS = {
+    "/usr/bin": 420, "/usr/sbin": 86, "/usr/libexec": 264, "/usr/include": 38,
+    "/usr/lib64": 1310, "/usr/lib64/qt6": 640, "/usr/lib64/dri": 276, "/usr/lib64/gstreamer-1.0": 92,
+    "/usr/lib64/kf6": 148,
+    "/usr/lib": 96, "/usr/lib/modules": 1180, "/usr/lib/firmware": 760, "/usr/lib/systemd": 58,
+    "/usr/lib/python3.13": 236,
+    "/usr/share": 268, "/usr/share/icons": 418, "/usr/share/locale": 372, "/usr/share/fonts": 204,
+    "/usr/share/doc": 146, "/usr/share/man": 58, "/usr/share/wallpapers": 232, "/usr/share/terminfo": 9,
+    "/usr/share/applications": 2, "/usr/share/pixmaps": 3, "/usr/share/recipe": 1,
+    "/etc": 13, "/etc/ssh": 1, "/etc/recab": 1, "/etc/kernel": 1,
+    "/opt": 24, "/root": 2,
+}
+
+
+def folders(found):
+    """Every folder with its whole size on both sides: what it holds, what its
+    folders hold, and what differs in it."""
+    sizes = {}
+
+    def add(path, running, other):
+        while True:
+            entry = sizes.setdefault(path, [0, 0])
+            entry[0] += running
+            entry[1] += other
+            if path == "/":
+                return
+            path = os.path.dirname(path)
+
+    for path, mib in HOLDS.items():
+        add(path, mib * MIB, mib * MIB)
+    for d in found:
+        folder = os.path.dirname(d["path"])
+        while folder not in HOLDS and folder != "/":
+            folder = os.path.dirname(folder)
+        # What is the same was counted above; a file with other content
+        # replaces one of about that size, so only one-sided files add room.
+        if d["change"].startswith("only-"):
+            add(folder, d.get("running_bytes", 0), d.get("other_bytes", 0))
+    return [{"path": path, "running_bytes": pair[0], "other_bytes": pair[1]} for path, pair in sorted(sizes.items())]
+
+
 def main():
     if sys.argv[1:2] != ["compare"]:
         sys.exit("the stand-in recab only knows `compare`")
@@ -99,20 +141,22 @@ def main():
         other["role"] = "next"
     else:
         other["role"] = "copy"
+    tree = folders(found)
+    whole = next(f for f in tree if f["path"] == "/")
     # Each side's files: what is the same, what differs in place, what only it has.
     same_files = 61178
-    in_place = sum(1 for d in found if d["change"] in ("content", "metadata"))
-    same_bytes = int(8.14 * GIB)
+    in_place = [d for d in found if d["change"] in ("content", "metadata")]
+    same_bytes = sum(HOLDS.values()) * MIB - sum(max(d["running_bytes"], d["other_bytes"]) for d in in_place)
     for side, facts in (("running", running), ("other", other)):
-        mine = [d for d in found if d["change"] == "only-" + side]
-        facts["files"] = same_files + in_place + len(mine)
-        facts["bytes"] = same_bytes + sum(d.get(side + "_bytes", 0) for d in found)
+        facts["files"] = same_files + len(in_place) + sum(1 for d in found if d["change"] == "only-" + side)
+        facts["bytes"] = whole[side + "_bytes"]
     answer = {
         "schema_version": 1,
         "running": running,
         "other": other,
         "same": {"files": same_files, "bytes": same_bytes},
         "own": ["/etc/fstab", "/etc/recab/slot", "/etc/kernel/cmdline"],
+        "folders": tree,
         "differences": found,
         "more": 0,
     }

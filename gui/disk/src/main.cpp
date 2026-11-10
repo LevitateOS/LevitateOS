@@ -31,7 +31,7 @@ int main(int argc, char **argv)
         applyLook(parser.value(look));
 
     Window window;
-    window.resize(1000, 680);
+    window.resize(1040, 760);
     if (parser.isSet(shots))
         return takeShots(window, parser.value(shots), parser.isSet(handOver));
     window.show();

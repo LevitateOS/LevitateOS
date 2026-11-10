@@ -1,8 +1,11 @@
 #include "systems.h"
 
+#include "map.h"
 #include "parts.h"
+#include "scan.h"
 #include "words.h"
 
+#include <QHash>
 #include <QHeaderView>
 #include <QJsonArray>
 #include <QLabel>
@@ -10,7 +13,9 @@
 #include <QMap>
 #include <QPainter>
 #include <QPushButton>
+#include <QSignalBlocker>
 #include <QTreeWidget>
+#include <QTreeWidgetItemIterator>
 #include <QVBoxLayout>
 
 #include <algorithm>
@@ -68,54 +73,237 @@ Side sideFrom(const QJsonObject &object)
             object["bytes"].toInteger()};
 }
 
-// One bar for both systems: how much is the same, and how much differs in which way.
-class AlikeBar : public QWidget {
-public:
-    AlikeBar(qint64 same, const QList<qint64> &differing)
-        : same_(same)
-        , differing_(differing)
+QString parentOf(const QString &path)
+{
+    const qsizetype slash = path.lastIndexOf(QLatin1Char('/'));
+    return slash <= 0 ? QStringLiteral("/") : path.left(slash);
+}
+
+bool hasFolders(const Node *node)
+{
+    for (const auto &child : node->children)
+        if (child->dir)
+            return true;
+    return false;
+}
+
+} // namespace
+
+// What is known about one block, in both systems.
+struct BlockInfo {
+    QString path;
+    qint64 running = 0, other = 0;
+    int counts[4] = {0, 0, 0, 0}; // differences in it, by kind
+    int differing() const { return counts[0] + counts[1] + counts[2] + counts[3]; }
+};
+
+// Both systems as one tree. A block's place and area come from the bigger of
+// its two sizes, so the two maps have the same layout and can be compared by
+// eye; a block that holds a difference is at least big enough to be seen.
+struct Blocks {
+    std::shared_ptr<Node> top;
+    QHash<const Node *, BlockInfo> info;
+    QHash<QString, Node *> folder; // by path
+    QHash<QString, Node *> blockOf; // for each difference's path: the block it is drawn in
+
+    Node *ensure(const QString &path)
     {
-        setFixedHeight(14);
+        if (Node *known = folder.value(path))
+            return known;
+        Node *parent = path == QLatin1String("/") ? top.get() : ensure(parentOf(path));
+        auto node = std::make_unique<Node>();
+        node->dir = true;
+        node->name = path == QLatin1String("/") ? path : path.section(QLatin1Char('/'), -1);
+        node->parent = parent;
+        Node *raw = node.get();
+        parent->children.push_back(std::move(node));
+        folder.insert(path, raw);
+        info[raw].path = path;
+        return raw;
+    }
+
+    // The files directly in a folder that also has folders: one block of their own.
+    Node *filesOf(Node *of)
+    {
+        for (const auto &child : of->children)
+            if (!child->dir)
+                return child.get();
+        auto node = std::make_unique<Node>();
+        node->name = QObject::tr("(files)");
+        node->parent = of;
+        Node *raw = node.get();
+        of->children.push_back(std::move(node));
+        info[raw].path = info[of].path;
+        return raw;
+    }
+
+    // Sets every block's area and adds the differences up into the folders.
+    qint64 weigh(Node *node, qint64 least)
+    {
+        BlockInfo &mine = info[node];
+        if (node->children.empty()) {
+            node->bytes = std::max(mine.running, mine.other);
+            if (mine.differing())
+                node->bytes = std::max(node->bytes, least);
+            return node->bytes;
+        }
+        node->bytes = 0;
+        for (auto &child : node->children) {
+            node->bytes += weigh(child.get(), least);
+            for (int kind = 0; kind < 4; ++kind)
+                mine.counts[kind] += info[child.get()].counts[kind];
+        }
+        std::sort(node->children.begin(), node->children.end(),
+                  [](const auto &a, const auto &b) { return a->bytes > b->bytes; });
+        return node->bytes;
+    }
+
+    static std::shared_ptr<Blocks> from(const Comparison &c)
+    {
+        auto blocks = std::make_shared<Blocks>();
+        blocks->top = std::make_shared<Node>();
+        blocks->top->dir = true;
+        for (const FolderSize &size : c.folders) {
+            Node *node = blocks->ensure(size.path);
+            blocks->info[node].running = size.runningBytes;
+            blocks->info[node].other = size.otherBytes;
+        }
+        const QList<Node *> folders = blocks->folder.values();
+        for (Node *node : folders) {
+            if (!hasFolders(node))
+                continue;
+            qint64 running = blocks->info[node].running, other = blocks->info[node].other;
+            for (const auto &child : node->children) {
+                running -= blocks->info[child.get()].running;
+                other -= blocks->info[child.get()].other;
+            }
+            if (running > 0 || other > 0) {
+                Node *files = blocks->filesOf(node);
+                blocks->info[files].running = std::max<qint64>(0, running);
+                blocks->info[files].other = std::max<qint64>(0, other);
+            }
+        }
+        for (const Difference &difference : c.differences) {
+            QString path = parentOf(difference.path);
+            while (!blocks->folder.contains(path) && path != QLatin1String("/"))
+                path = parentOf(path);
+            Node *in = blocks->ensure(path);
+            Node *block = hasFolders(in) ? blocks->filesOf(in) : in;
+            ++blocks->info[block].counts[difference.change];
+            blocks->blockOf.insert(difference.path, block);
+        }
+        const BlockInfo whole = blocks->info.value(blocks->folder.value(QStringLiteral("/")));
+        blocks->weigh(blocks->top.get(), std::max(whole.running, whole.other) / 300);
+        return blocks;
+    }
+
+    // "3 only here, 1 different content", or that it is the same in both.
+    QString differencesIn(const Node *node) const
+    {
+        const BlockInfo &about = info[node];
+        if (!about.differing())
+            return QObject::tr("the same in both");
+        QStringList parts;
+        for (int kind = 0; kind < 4; ++kind)
+            if (about.counts[kind])
+                parts << QObject::tr("%1 %2").arg(about.counts[kind]).arg(changeKinds().at(kind).brief);
+        return parts.join(QObject::tr(", "));
+    }
+
+    QString nameOf(const Node *node) const
+    {
+        const BlockInfo &about = info[node];
+        return node->dir ? about.path : QObject::tr("the files directly in %1").arg(about.path);
+    }
+};
+
+namespace {
+
+// One system as a map. Both maps are given the same tree, so a block is in
+// the same place in both; each draws its own side of it.
+class SideMap : public DiskMap {
+public:
+    SideMap(bool running, std::shared_ptr<Blocks> blocks)
+        : running_(running)
+        , blocks_(std::move(blocks))
+    {
+        setTree(blocks_->top);
     }
 
 protected:
-    void paintEvent(QPaintEvent *) override
+    // The kind of difference this side shows for a block, or -1: the kind
+    // with the most files among those that can be seen from this side.
+    int shown(const Node *node) const
     {
-        QPainter painter(this);
-        qint64 total = same_;
-        for (qint64 part : differing_)
-            total += part;
-        if (total <= 0)
+        const BlockInfo &about = blocks_->info[node];
+        const int mine = running_ ? Difference::OnlyRunning : Difference::OnlyOther;
+        int best = -1;
+        for (int kind : {int(Difference::Content), mine, int(Difference::Metadata)})
+            if (about.counts[kind] > 0 && (best < 0 || about.counts[kind] > about.counts[best]))
+                best = kind;
+        return best;
+    }
+    // How many files the other side has here that this side lacks.
+    int missing(const Node *node) const
+    {
+        return blocks_->info[node].counts[running_ ? Difference::OnlyOther : Difference::OnlyRunning];
+    }
+
+    bool loud(const Node *node) const override { return shown(node) >= 0; }
+    QColor fillOf(const Node *node, int depth) const override
+    {
+        const int kind = shown(node);
+        return kind >= 0 ? changeKinds().at(kind).colour : DiskMap::fillOf(node, depth);
+    }
+    qint64 sizeOf(const Node *node) const override
+    {
+        return running_ ? blocks_->info[node].running : blocks_->info[node].other;
+    }
+    QString tipOf(const Node *node) const override
+    {
+        const BlockInfo &about = blocks_->info[node];
+        return QObject::tr("%1\n%2 here, %3 in the other\n%4")
+            .arg(blocks_->nameOf(node), bytesText(about.running), bytesText(about.other), blocks_->differencesIn(node));
+    }
+    void decorate(QPainter &painter, const Node *node, const QRectF &rect) const override
+    {
+        const BlockInfo &about = blocks_->info[node];
+        const int kind = shown(node);
+        if (kind < 0 && missing(node) > 0) {
+            // Nothing differs that this side has, but the other has more here.
+            const int theirs = running_ ? Difference::OnlyOther : Difference::OnlyRunning;
+            painter.setPen(QPen(changeKinds().at(theirs).colour, 2, Qt::DashLine));
+            painter.drawRect(rect.adjusted(1.5, 1.5, -1.5, -1.5));
             return;
-        QColor quiet = palette().color(QPalette::WindowText);
-        quiet.setAlphaF(0.22f);
-        // What differs is drawn at least a few pixels wide, or it could not be seen at all.
-        double x = width();
-        for (int kind = differing_.size() - 1; kind >= 0; --kind) {
-            if (differing_[kind] <= 0)
-                continue;
-            const double wide = std::max(4.0, double(differing_[kind]) / double(total) * width());
-            x -= wide;
-            painter.fillRect(QRectF(x, 0, wide - 1, height()), changeKinds().at(kind).colour);
         }
-        painter.fillRect(QRectF(0, 0, x - 1, height()), quiet);
+        if (kind < 0 || rect.width() < 18 || rect.height() < 15)
+            return;
+        // How many files differ here, as seen from this side.
+        const int mine = running_ ? Difference::OnlyRunning : Difference::OnlyOther;
+        const int count = about.counts[Difference::Content] + about.counts[mine] + about.counts[Difference::Metadata];
+        QFont small = font();
+        small.setPointSizeF(small.pointSizeF() * 0.85);
+        small.setBold(true);
+        painter.setFont(small);
+        painter.setPen(QColor(0x14, 0x18, 0x16));
+        painter.drawText(rect.adjusted(3, 2, -4, -2), Qt::AlignRight | Qt::AlignBottom, QString::number(count));
     }
 
 private:
-    qint64 same_;
-    QList<qint64> differing_;
+    bool running_;
+    std::shared_ptr<Blocks> blocks_;
 };
 
-QWidget *sideCard(Card::Tone tone, const QString &title, const QString &what, const Side &side)
+// The name of one system over its map.
+QLayout *sideTitle(const QString &title, const QString &what, const Side &side)
 {
-    auto *card = new Card(tone);
-    card->column()->setSpacing(2);
-    card->column()->addWidget(strong(title));
-    card->column()->addWidget(text(what, true));
-    card->column()->addWidget(dim(text(
-        QObject::tr("%1 in %2").arg(bytesText(side.bytes), counted(side.files, QObject::tr("%1 file"), QObject::tr("%1 files"))))));
-    card->column()->addWidget(dim(text(side.device)));
-    return card;
+    auto *column = new QVBoxLayout;
+    column->setSpacing(0);
+    column->addWidget(strong(title));
+    column->addWidget(dim(text(QObject::tr("%1 %2 in %3, on %4")
+                                   .arg(what, bytesText(side.bytes),
+                                        counted(side.files, QObject::tr("%1 file"), QObject::tr("%1 files")), side.device))));
+    return column;
 }
 
 } // namespace
@@ -138,6 +326,14 @@ Comparison Comparison::fromJson(const QJsonObject &object, QString *error)
     c.more = object["more"].toInteger();
     for (const QJsonValue &value : object["own"].toArray())
         c.own << value.toString();
+    for (const QJsonValue &value : object["folders"].toArray()) {
+        const QJsonObject one = value.toObject();
+        c.folders << FolderSize{one["path"].toString(), one["running_bytes"].toInteger(), one["other_bytes"].toInteger()};
+    }
+    if (c.folders.isEmpty()) {
+        *error = QObject::tr("recab did not say what the two systems hold, folder by folder, so they cannot be drawn.");
+        return c;
+    }
     static const QMap<QString, Difference::Change> changes{{"only-running", Difference::OnlyRunning},
                                                            {"only-other", Difference::OnlyOther},
                                                            {"content", Difference::Content},
@@ -240,6 +436,10 @@ QString Comparison::expected() const
 void SystemsPage::showStart(const QString &why)
 {
     QVBoxLayout *column = fresh();
+    here_ = there_ = nullptr;
+    pointed_ = nullptr;
+    list_ = nullptr;
+    blocks_.reset();
     column->addWidget(heading(tr("Compare the two systems")));
     column->addWidget(dim(text(tr("This computer holds its system twice: the one that is running, and another on its own "
                                   "partition. Comparing them shows how alike they are and what differs, file by file."),
@@ -295,26 +495,39 @@ void SystemsPage::show(const Comparison &c, const QString &said)
     header->addWidget(again, 0, Qt::AlignBottom);
     column->addLayout(header);
 
-    auto *sides = new QHBoxLayout;
-    sides->setSpacing(14);
-    sides->addWidget(sideCard(Card::On, tr("This system (%1)").arg(c.running.slot), tr("Running now."), c.running), 1);
+    // The two systems as blocks, side by side, with one layout for both.
+    blocks_ = Blocks::from(c);
+    here_ = new SideMap(true, blocks_);
+    there_ = new SideMap(false, blocks_);
     const QString otherIs = c.role == QLatin1String("before") ? tr("The system from before.")
                             : c.role == QLatin1String("next") ? tr("The next system, not started yet.")
                                                                 : tr("The second copy.");
-    sides->addWidget(sideCard(Card::Plain, tr("The other system (%1)").arg(c.other.slot), otherIs, c.other), 1);
-    column->addLayout(sides);
-
-    // How much is the same, as one bar with its legend.
-    QList<qint64> differing(changeKinds().size(), 0), files(changeKinds().size(), 0);
-    for (const Difference &difference : c.differences) {
-        differing[difference.change] += std::max(difference.runningBytes, difference.otherBytes);
-        ++files[difference.change];
+    auto *sides = new QHBoxLayout;
+    sides->setSpacing(14);
+    auto *left = new QVBoxLayout;
+    left->setSpacing(4);
+    left->addLayout(sideTitle(tr("This system (%1)").arg(c.running.slot), tr("Running now."), c.running));
+    left->addWidget(here_, 1);
+    auto *right = new QVBoxLayout;
+    right->setSpacing(4);
+    right->addLayout(sideTitle(tr("The other system (%1)").arg(c.other.slot), otherIs, c.other));
+    right->addWidget(there_, 1);
+    sides->addLayout(left, 1);
+    sides->addLayout(right, 1);
+    column->addLayout(sides, 5);
+    for (DiskMap *map : {here_, there_}) {
+        map->setMinimumSize(200, 150);
+        connect(map, &DiskMap::picked, this, [this](Node *node) { point(node); });
     }
-    column->addWidget(new AlikeBar(c.sameBytes, differing));
+    pointed_ = dim(text(QString(), true));
+    column->addWidget(pointed_);
+
+    QList<qint64> files(changeKinds().size(), 0);
+    for (const Difference &difference : c.differences)
+        ++files[difference.change];
     auto *legend = new QHBoxLayout;
     legend->setSpacing(18);
-    legend->addWidget(dim(text(tr("%1 the same (%2)")
-                                   .arg(counted(c.sameFiles, tr("%1 file"), tr("%1 files")), bytesText(c.sameBytes)))));
+    legend->addWidget(dim(text(tr("A coloured block holds files that differ; its number says how many:"))));
     for (int kind = 0; kind < changeKinds().size(); ++kind) {
         if (!files[kind])
             continue;
@@ -327,7 +540,10 @@ void SystemsPage::show(const Comparison &c, const QString &said)
         legend->addLayout(entry);
     }
     legend->addStretch();
-    column->addLayout(legend);
+    if (!c.identical())
+        column->addLayout(legend);
+    else
+        delete legend;
 
     if (!said.isEmpty()) {
         auto *panel = new Panel;
@@ -336,10 +552,9 @@ void SystemsPage::show(const Comparison &c, const QString &said)
         column->addWidget(panel);
     }
 
-    if (c.identical()) {
-        column->addStretch();
-    } else {
-        auto *list = new QTreeWidget;
+    list_ = nullptr;
+    if (!c.identical()) {
+        auto *list = list_ = new QTreeWidget;
         list->setHeaderLabels({tr("Where"), tr("Difference"), tr("Here"), tr("In the other")});
         list->setIndentation(14);
         list->setTextElideMode(Qt::ElideMiddle);
@@ -362,12 +577,15 @@ void SystemsPage::show(const Comparison &c, const QString &said)
             QFont bold = head->font(0);
             bold.setBold(true);
             head->setFont(0, bold);
+            head->setData(0, Qt::UserRole, QVariant::fromValue(static_cast<void *>(blocks_->folder.value(group.key()))));
             for (const Difference *difference : group.value()) {
                 const QString inside = group.key() == QLatin1String("/") ? difference->path.mid(1)
                                                                          : difference->path.mid(group.key().size() + 1);
                 auto *line = new QTreeWidgetItem(head, {inside, changeKinds().at(difference->change).words,
                                                         sized(difference->runningBytes), sized(difference->otherBytes)});
                 line->setIcon(1, swatch(changeKinds().at(difference->change).colour));
+                line->setData(0, Qt::UserRole,
+                              QVariant::fromValue(static_cast<void *>(blocks_->blockOf.value(difference->path))));
                 line->setToolTip(0, difference->path
                                         + (difference->detail.isEmpty() ? QString() : QLatin1Char('\n') + difference->detail));
                 if (!difference->detail.isEmpty())
@@ -376,8 +594,13 @@ void SystemsPage::show(const Comparison &c, const QString &said)
             // A long folder stays folded: its count says enough until it is opened.
             head->setExpanded(group.value().size() <= 8);
         }
-        column->addWidget(list, 1);
+        column->addWidget(list, 2);
+        connect(list, &QTreeWidget::currentItemChanged, this, [this](QTreeWidgetItem *line) {
+            if (line)
+                point(static_cast<Node *>(line->data(0, Qt::UserRole).value<void *>()), false);
+        });
     }
+    point(nullptr);
 
     auto *foot = new QHBoxLayout;
     QStringList notes;
@@ -395,4 +618,40 @@ void SystemsPage::show(const Comparison &c, const QString &said)
         foot->addWidget(hand);
     }
     column->addLayout(foot);
+}
+
+void SystemsPage::point(Node *node, bool inList)
+{
+    if (!blocks_ || !here_)
+        return;
+    if (node == blocks_->top.get())
+        node = nullptr;
+    here_->select(node);
+    there_->select(node);
+    if (!node) {
+        pointed_->setText(blocks_->info.value(blocks_->folder.value(QStringLiteral("/"))).differing()
+                              ? tr("Each block is a folder, in the same place on both sides. Click one to see "
+                                   "whether it is the same in both.")
+                              : tr("Each block is a folder, in the same place on both sides. No block differs."));
+        return;
+    }
+    const BlockInfo about = blocks_->info.value(node);
+    pointed_->setText(tr("%1: %2 here, %3 in the other; %4.")
+                          .arg(blocks_->nameOf(node), bytesText(about.running), bytesText(about.other),
+                               blocks_->differencesIn(node)));
+    if (!inList || !list_)
+        return;
+    // The first line of the list that is this block or lies in it.
+    const QSignalBlocker quiet(list_);
+    QTreeWidgetItem *found = nullptr;
+    for (QTreeWidgetItemIterator it(list_); *it && !found; ++it) {
+        if (!(*it)->parent())
+            continue;
+        for (Node *up = static_cast<Node *>((*it)->data(0, Qt::UserRole).value<void *>()); up && !found; up = up->parent)
+            if (up == node)
+                found = *it;
+    }
+    list_->setCurrentItem(found);
+    if (found)
+        list_->scrollToItem(found);
 }

@@ -8,6 +8,8 @@
 #include <QHash>
 #include <QWidget>
 
+class QPainter;
+
 #include <memory>
 #include <vector>
 
@@ -26,6 +28,16 @@ signals:
     void picked(Node *node);
 
 protected:
+    // What a map of something else than mess draws differently.
+    // Whether the block stands out: it is then named even when small.
+    virtual bool loud(const Node *node) const;
+    virtual QColor fillOf(const Node *node, int depth) const;
+    // The size written on a block; the block's area always follows node->bytes.
+    virtual qint64 sizeOf(const Node *node) const;
+    virtual QString tipOf(const Node *node) const;
+    // Drawn over a block after its fill and name.
+    virtual void decorate(QPainter &painter, const Node *node, const QRectF &rect) const;
+
     void paintEvent(QPaintEvent *event) override;
     void resizeEvent(QResizeEvent *event) override;
     void mousePressEvent(QMouseEvent *event) override;
