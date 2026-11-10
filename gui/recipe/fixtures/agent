@@ -1,0 +1,94 @@
+#!/usr/bin/env python3
+"""A stand-in for the agent, for running recipe-gui from a checkout.
+
+It is asked for software that has no recipe. It reads the prompt (one JSON
+line), asks one question when the request leaves the choice open, and "writes"
+a recipe: an entry in the stand-in recipe's state, which the stand-in then
+lists as coming from the person's own folder. No file is written and nothing
+is downloaded.
+
+Environment: RECIPE_STANDIN_STATE and RECIPE_STANDIN_SPEED, as for the
+stand-in recipe.
+"""
+import json
+import os
+import sys
+import time
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+CATALOG = json.load(open(os.path.join(HERE, "catalog.json")))
+STATE_DIR = os.environ.get("RECIPE_STANDIN_STATE") or "/tmp/recipe-standin-%d" % os.getuid()
+WRITTEN = os.path.join(STATE_DIR, "written.json")
+SPEED = float(os.environ.get("RECIPE_STANDIN_SPEED", "1"))
+
+KNOWN = {
+    "yazi": ("Yazi", "A fast file manager for the terminal", "26.1.22", "sxyazi/yazi"),
+    "ranger": ("ranger", "A file manager for the terminal with vi keys", "1.9.4", "ranger/ranger"),
+    "fd": ("fd", "Finds files by name, quickly", "10.3.0", "sharkdp/fd"),
+}
+
+
+def emit(**event):
+    sys.stderr.write(json.dumps(event) + "\n")
+    sys.stderr.flush()
+
+
+def pause(seconds):
+    if SPEED > 0:
+        time.sleep(seconds * SPEED)
+
+
+def step(name, status):
+    emit(event="step", step=name, status=status)
+
+
+def ask(number, text, choices):
+    emit(event="question", id=number, text=text, choices=choices)
+    try:
+        return json.loads(sys.stdin.readline())["answer"]
+    except (ValueError, KeyError):
+        return choices[0]
+
+
+def main():
+    prompt = json.loads(sys.stdin.readline())["prompt"]
+    request = prompt.split("The request:", 1)[-1].split("The issue:", 1)[0].strip().lower()
+    emit(event="plan", steps=[["find", "Find the software"], ["write", "Write the recipe"], ["check", "Check it"]])
+    step("find", "running")
+    pause(0.8)
+    name = next((known for known in KNOWN if known in request), None)
+    if not name:
+        # A wish in words: more than one thing fits, so it asks.
+        chosen = ask("1", "Two file managers for the terminal fit: Yazi (newer, shows pictures) and ranger (older, "
+                          "with vi keys). Which one?", ["Yazi", "ranger"])
+        name = "ranger" if chosen.lower().startswith("ranger") else "yazi"
+    title, description, version, project = KNOWN[name]
+    emit(event="output", line="found %s %s at github.com/%s" % (title, version, project))
+    step("find", "done")
+
+    step("write", "running")
+    pause(1.0)
+    made = dict(next(item for item in CATALOG["recipes"] if item["name"] == "tree"))
+    made.update(name=name, version=version, description=description)
+    made["about"] = dict(made.get("about") or {}, title=title, category="utilities", kind="tool",
+                         homepage="https://github.com/%s" % project, adds={"programs": [name], "menu": []},
+                         details="Written by the agent on request. Read it before installing.")
+    written = json.load(open(WRITTEN)) if os.path.exists(WRITTEN) else []
+    written = [item for item in written if item["name"] != name] + [made]
+    os.makedirs(STATE_DIR, exist_ok=True)
+    with open(WRITTEN, "w") as out:
+        json.dump(written, out, indent=1)
+    emit(event="output", line="wrote %s.rhai" % name)
+    step("write", "done")
+
+    step("check", "running")
+    pause(0.5)
+    emit(event="output", line="recipe info %s.rhai: no problems" % name)
+    step("check", "done")
+    emit(event="agent", recipe=name,
+         summary="it wrote a recipe for %s %s, pinned to the release with its checksum. Nothing is installed." % (title, version))
+    emit(event="done")
+
+
+if __name__ == "__main__":
+    main()

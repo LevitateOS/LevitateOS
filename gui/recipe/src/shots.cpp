@@ -11,6 +11,7 @@
 #include <QEventLoop>
 #include <QPalette>
 #include <QStyleFactory>
+#include <QTextStream>
 #include <QTimer>
 
 static void waitUntilIdle(Window &window, int seconds = 10)
@@ -30,6 +31,7 @@ int tryRecipe(Window &window, const QString &name, const QString &folder, bool k
         return widget.grab().save(QDir(folder).filePath(title + ".png"));
     };
     window.show();
+    waitUntilIdle(window, 60);
     bool ok = window.catalog().recipe(name) != nullptr;
     window.showBrowse();
     ok &= save(window, "real-1-browse");
@@ -68,7 +70,10 @@ int takeShots(Window &window, const QString &folder)
         return widget.grab().save(QDir(folder).filePath(name + ".png"));
     };
     window.show();
-    bool ok = true;
+    // Before recipe has answered: what a person sees while the catalog is read.
+    bool ok = window.grab().save(QDir(folder).filePath("0-reading.png"));
+    waitUntilIdle(window);
+    ok &= !window.catalog().recipes.isEmpty();
 
     window.showBrowse();
     ok &= save(window, "1-browse");
@@ -107,5 +112,48 @@ int takeShots(Window &window, const QString &folder)
     window.startInstall("element", "The issue:\nThe update stopped.\n\nThe expected result:\nElement updates.\n");
     waitUntilIdle(window);
     ok &= save(window, "8-agent-fixed");
+
+    // Sources: the page, a second source added, its list fetched again, only its recipes shown.
+    QTextStream out(stdout);
+    auto expect = [&](const QString &what, bool holds) {
+        if (!holds) {
+            out << "not as expected: " << what << "\n";
+            ok = false;
+        }
+    };
+    window.addSource("https://github.com/acme/recipes");
+    waitUntilIdle(window);
+    expect("an added source is listed", window.catalog().origin("acme") != nullptr);
+    expect("its recipes are offered", window.catalog().recipe("zellij") != nullptr);
+    window.fetchSources("acme");
+    waitUntilIdle(window);
+    window.showSources();
+    ok &= save(window, "9-sources");
+    window.chooseSource("acme");
+    window.showBrowse();
+    ok &= save(window, "10-one-source");
+    window.chooseSource(QString());
+
+    // Asking for software no source has: the agent asks back, then writes the recipe.
+    window.showWish("a file manager for the terminal");
+    ok &= save(window, "11-ask-for-software");
+    window.askAgent(QStringLiteral("The request:\na file manager for the terminal\n\nThe issue:\nNo recipe for it "
+                                   "exists.\n\nThe expected result:\nOne recipe that recipe info accepts.\n"));
+    for (int waited = 0; !window.agentAsks() && window.busy() && waited < 200; ++waited)
+        settle(50);
+    expect("the agent asks which one", window.agentAsks());
+    ok &= save(window, "12-the-agent-asks");
+    window.answerAgent(QStringLiteral("Yazi"));
+    waitUntilIdle(window);
+    expect("the recipe the agent wrote is listed", window.catalog().recipe("yazi") != nullptr);
+    expect("it is not installed", window.catalog().installedItem("yazi") == nullptr);
+    ok &= save(window, "13-the-recipe-it-wrote");
+
+    window.removeSource("acme", false);
+    waitUntilIdle(window);
+    expect("a removed source is gone", window.catalog().origin("acme") == nullptr);
+    window.refresh();
+    waitUntilIdle(window);
+    out << (ok ? "all flows ended where they should\n" : "some flows did not end where they should\n");
     return ok ? 0 : 1;
 }

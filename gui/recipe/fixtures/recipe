@@ -36,8 +36,104 @@ def save(items):
         json.dump(items, out, indent=1)
 
 
-def recipe(name):
+# ---------------------------------------------------------------- sources
+# Two to begin with: the catalog the image ships as a remote source, and the
+# person's own folder, which holds what an agent wrote for them.
+
+SOURCES = os.path.join(STATE_DIR, "sources.json")
+WRITTEN = os.path.join(STATE_DIR, "written.json")
+OWN = os.path.expanduser("~/.local/share/recipe/recipes")
+
+
+def read(path, default):
+    if not os.path.exists(path):
+        return default
+    return json.load(open(path))
+
+
+def write(path, value):
+    os.makedirs(STATE_DIR, exist_ok=True)
+    with open(path, "w") as out:
+        json.dump(value, out, indent=1)
+
+
+def sources():
+    first = [{"name": "levitate", "title": CATALOG["source"]["title"], "kind": "remote",
+              "address": "https://raw.githubusercontent.com/LevitateOS/recipes/{rev}/{path}", "branch": "main",
+              "commit": "4c1d9e07", "checked": int(time.time()) - 3 * 3600, "problem": None}]
+    return read(SOURCES, first)
+
+
+def listed_sources():
+    own = {"name": "local", "title": None, "kind": "folder", "path": OWN, "checked": None, "problem": None}
+    return [own] + sources()
+
+
+def sample(name, title, description, category, like):
+    """A recipe for a source added by hand: shaped like one of the catalog's."""
+    made = dict(next(item for item in CATALOG["recipes"] if item["name"] == like))
+    made.update(name=name, description=description)
+    made["about"] = dict(made.get("about") or {}, category=category, title=title, kind="tool")
+    return made
+
+
+def recipes():
+    found = []
     for item in CATALOG["recipes"]:
+        # `tree` is the one an agent wrote earlier: it lives in the person's own folder.
+        found.append(dict(item, source="local" if item["name"] == "tree" else "levitate"))
+    for item in read(WRITTEN, []):
+        found.append(dict(item, source="local"))
+    for source in sources():
+        if source["name"] == "levitate" or source.get("problem"):
+            continue
+        found.append(dict(sample("fastfetch", "Fastfetch", "Shows what this computer is, at a glance", "utilities",
+                                 "tree"), source=source["name"]))
+        found.append(dict(sample("zellij", "Zellij", "Several terminals in one window", "utilities", "htop"),
+                          source=source["name"]))
+    return found
+
+
+def source_add(args, words):
+    known = sources()
+    if "--path" in args:
+        folder = words[2]
+        name = os.path.basename(folder.rstrip("/"))
+        made = {"name": name, "title": None, "kind": "folder", "path": folder, "checked": None, "problem": None}
+    else:
+        address = words[2]
+        if not address.startswith("https://"):
+            fail("a source is fetched over https; %s is not such an address" % address)
+        name = address.rstrip("/").split("/")[-2] if address.rstrip("/").count("/") >= 4 else "source"
+        made = {"name": name, "title": "%s recipes" % name.capitalize(), "kind": "remote", "address": address,
+                "branch": "main", "commit": "9a02b7f1", "checked": int(time.time()), "problem": None}
+    if name in ("local", "image") or any(each["name"] == name for each in known):
+        fail("a source named %s exists already" % name)
+    pause(0.6)
+    write(SOURCES, known + [made])
+
+
+def source_remove(name):
+    known = sources()
+    if not any(each["name"] == name for each in known):
+        fail("no source named %s" % name)
+    write(SOURCES, [each for each in known if each["name"] != name])
+
+
+def refresh(name):
+    known = sources()
+    if name and not any(each["name"] == name for each in known):
+        fail("no source named %s" % name)
+    pause(0.8)
+    for each in known:
+        if each["kind"] == "remote" and name in ("", each["name"]):
+            each["checked"] = int(time.time())
+    write(SOURCES, known)
+
+
+def recipe(name):
+    name = name.split(":", 1)[-1]  # SOURCE:NAME; the stand-in's names are unique
+    for item in recipes():
         if item["name"] == name:
             return item
     fail("no recipe named %s" % name)
@@ -181,11 +277,21 @@ def main(args):
             skip = False
         elif arg in ("--recipes-path", "--package-root", "--autofix-prompt-file"):
             skip = True
+        elif arg == "--path":
+            pass  # `source add --path FOLDER`: the folder is the next word
         elif not arg.startswith("--"):
             words.append(arg)
     command = words[0] if words else ""
+    if command in ("install", "update", "remove", "go-back") and len(words) == 2:
+        words[1] = words[1].split(":", 1)[-1]  # SOURCE:NAME; the stand-in's names are unique
     if command == "list":
-        print(json.dumps({"schema_version": 1, "source": CATALOG["source"], "recipes": CATALOG["recipes"]}))
+        print(json.dumps({"schema_version": 1, "sources": listed_sources(), "recipes": recipes(), "problems": []}))
+    elif command == "refresh":
+        refresh(words[1] if len(words) > 1 else "")
+    elif command == "source" and words[1:2] == ["add"] and len(words) == 3:
+        source_add(args, words)
+    elif command == "source" and words[1:2] == ["remove"] and len(words) == 3:
+        source_remove(words[2])
     elif command == "installed":
         # The shape `recipe installed` has today, plus the fields the front end asks for.
         print(json.dumps({"packages": installed(), "profile": "/var/lib/recipe/profile"}))

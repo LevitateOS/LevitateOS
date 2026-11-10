@@ -1,5 +1,8 @@
 #include "model.h"
 
+#include <QDateTime>
+#include <QLocale>
+
 #include <QJsonArray>
 #include <QLocale>
 #include <QUrl>
@@ -67,6 +70,7 @@ Recipe Recipe::fromJson(const QJsonObject &object)
     r.needs.timeoutSecs = needs["timeout_secs"].toInteger();
     r.needs.networkMaxBytes = needs["network_max_bytes"].toInteger();
 
+    r.origin = object["source"].toString();
     r.deps = strings(object["deps"]);
     r.buildDeps = strings(object["build_deps"]);
     r.hooks = strings(object["hooks"]);
@@ -87,6 +91,67 @@ const Recipe *Catalog::recipe(const QString &name) const
         if (r.name == name)
             return &r;
     return nullptr;
+}
+
+const Origin *Catalog::origin(const QString &name) const
+{
+    for (const Origin &o : origins)
+        if (o.name == name)
+            return &o;
+    return nullptr;
+}
+
+QString Catalog::qualified(const QString &name) const
+{
+    const Recipe *found = recipe(name);
+    return found && !found->origin.isEmpty() ? found->origin + QLatin1Char(':') + name : name;
+}
+
+int Catalog::countFrom(const QString &origin) const
+{
+    int count = 0;
+    for (const Recipe &r : recipes)
+        count += r.listed() && r.origin == origin;
+    return count;
+}
+
+QString Catalog::originsWords() const
+{
+    QStringList named;
+    for (const Origin &o : origins)
+        if (countFrom(o.name) > 0)
+            named << o.shown();
+    if (named.isEmpty())
+        return QObject::tr("No source has recipes");
+    if (named.size() == 1)
+        return QObject::tr("Recipes from %1").arg(named.first());
+    return QObject::tr("Recipes from %1 sources").arg(named.size());
+}
+
+QString Origin::shown() const
+{
+    if (!title.isEmpty())
+        return title;
+    if (name == QLatin1String("local"))
+        return QObject::tr("your own recipes");
+    if (name == QLatin1String("image"))
+        return QObject::tr("the recipes shipped with the system");
+    return name;
+}
+
+QString Origin::state() const
+{
+    if (!problem.isEmpty())
+        return problem;
+    if (!remote())
+        return QObject::tr("A folder on this computer, read as it is");
+    if (checked <= 0)
+        return QObject::tr("Its list was never fetched");
+    const QDateTime when = QDateTime::fromSecsSinceEpoch(checked);
+    const QString time = QLocale().toString(when.time(), QLocale::ShortFormat);
+    if (when.date() == QDate::currentDate())
+        return QObject::tr("Its list was fetched today at %1").arg(time);
+    return QObject::tr("Its list was fetched on %1").arg(QLocale().toString(when.date(), QLocale::ShortFormat));
 }
 
 const InstalledItem *Catalog::installedItem(const QString &name) const

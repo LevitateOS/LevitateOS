@@ -23,7 +23,22 @@ struct Needs {
     qint64 memoryMib = 0, storageMaxBytes = 0, timeoutSecs = 0, networkMaxBytes = 0;
 };
 
+// Where recipes come from: a repository whose index was fetched, or a folder
+// on this computer. Recipe calls both a source.
+struct Origin {
+    QString name, title, kind, address, path, commit, problem;
+    qint64 checked = 0; // when a remote source's index was last fetched, in seconds
+    bool remote() const { return kind == QLatin1String("remote"); }
+    // Its title; the two folders Recipe always reads have none and are named here.
+    QString shown() const;
+    // The address or the folder.
+    QString where() const { return remote() ? address : path; }
+    // "fetched today at 09:12", or why it could not be.
+    QString state() const;
+};
+
 struct Recipe {
+    QString origin; // the name of the source it is from
     QString name, version, description;
     // From ABOUT: the author's words.
     QString kind, category, title, details, homepage, license, afterInstall;
@@ -60,13 +75,19 @@ struct UpdateItem {
 };
 
 struct Catalog {
-    QString sourceTitle, checked;
+    QList<Origin> origins;
     int unreadable = 0; // recipes in the collection that `recipe` could not read
     QList<Recipe> recipes;
     QList<InstalledItem> installed;
     QList<UpdateItem> updates;
 
     const Recipe *recipe(const QString &name) const;
+    const Origin *origin(const QString &name) const;
+    // The name `recipe` is given: SOURCE:NAME, so two sources with one name cannot be confused.
+    QString qualified(const QString &name) const;
+    // Where the recipes are from, in a few words.
+    QString originsWords() const;
+    int countFrom(const QString &origin) const;
     const InstalledItem *installedItem(const QString &name) const;
     const UpdateItem *update(const QString &name) const;
     QStringList categories() const;

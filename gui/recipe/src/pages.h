@@ -24,12 +24,15 @@ class BrowsePage : public Page {
     Q_OBJECT
 public:
     using Page::Page;
-    void show(const Catalog &catalog, const QString &category, const QString &search);
+    // `origin`: only the recipes of this source; empty for all.
+    void show(const Catalog &catalog, const QString &category, const QString &search, const QString &origin);
     void showProblem(const QString &problem);
 signals:
     void openRecipe(const QString &name);
     void install(const QString &name);
     void retry();
+    // Ask the agent to write a recipe for this.
+    void askFor(const QString &what);
 };
 
 class RecipePage : public Page {
@@ -101,6 +104,8 @@ signals:
     void update(const QString &name);
     void updateAll();
     void selected(const QString &name);
+    // Fetch every source's list again, to see whether anything is newer.
+    void check();
 };
 
 class RemoveDialog : public QDialog {

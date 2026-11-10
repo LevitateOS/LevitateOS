@@ -31,7 +31,8 @@ QPushButton *primary(const QString &words)
 
 // The top of a page about one recipe: its picture, name and one line, with
 // the page's buttons on the right.
-QHBoxLayout *recipeHeader(const Recipe &recipe, const QString &title, QLabel **titleOut = nullptr)
+QHBoxLayout *recipeHeader(const Recipe &recipe, const QString &title, QLabel **titleOut = nullptr,
+                          const QString &from = QString())
 {
     auto *row = new QHBoxLayout;
     row->setSpacing(16);
@@ -43,9 +44,11 @@ QHBoxLayout *recipeHeader(const Recipe &recipe, const QString &title, QLabel **t
         *titleOut = name;
     words->addWidget(name);
     words->addWidget(text(recipe.description));
-    words->addWidget(dim(text(recipe.category.isEmpty()
-                                  ? QObject::tr("Version %1").arg(recipe.version)
-                                  : QObject::tr("Version %1 · %2").arg(recipe.version, categoryTitle(recipe.category)))));
+    QString line = recipe.category.isEmpty() ? QObject::tr("Version %1").arg(recipe.version)
+                                             : QObject::tr("Version %1 · %2").arg(recipe.version, categoryTitle(recipe.category));
+    if (!from.isEmpty())
+        line += QObject::tr(" · from %1").arg(from);
+    words->addWidget(dim(text(line)));
     row->addLayout(words);
     row->addStretch();
     return row;
@@ -156,15 +159,21 @@ void clear(QLayout *layout)
 
 // ---------------------------------------------------------------- Browse
 
-void BrowsePage::show(const Catalog &catalog, const QString &category, const QString &search)
+void BrowsePage::show(const Catalog &catalog, const QString &category, const QString &search, const QString &origin)
 {
     QVBoxLayout *column = fresh();
     auto *top = new QVBoxLayout;
     top->setSpacing(1);
     top->addWidget(heading(!search.isEmpty() ? tr("Search: %1").arg(search)
                            : category.isEmpty() ? tr("All software") : categoryTitle(category)));
-    top->addWidget(dim(text(tr("Each one is installed from a recipe you can read."))));
+    const Origin *from = origin.isEmpty() ? nullptr : catalog.origin(origin);
+    top->addWidget(dim(text(from ? tr("Only what %1 has. Each one is installed from a recipe you can read.").arg(from->shown())
+                                 : tr("Each one is installed from a recipe you can read."))));
     column->addLayout(top);
+    // More than one source: say on every line which one it is from.
+    int sourcesWithRecipes = 0;
+    for (const Origin &o : catalog.origins)
+        sourcesWithRecipes += catalog.countFrom(o.name) > 0;
 
     auto *scroll = new QScrollArea;
     scroll->setWidgetResizable(true);
@@ -184,6 +193,8 @@ void BrowsePage::show(const Catalog &catalog, const QString &category, const QSt
     int row = 0;
     for (const Recipe &recipe : catalog.recipes) {
         if (!recipe.listed() || (!category.isEmpty() && recipe.category != category))
+            continue;
+        if (!origin.isEmpty() && recipe.origin != origin)
             continue;
         if (!search.isEmpty() && !recipe.name.contains(search, Qt::CaseInsensitive)
             && !recipe.title.contains(search, Qt::CaseInsensitive)
@@ -207,7 +218,11 @@ void BrowsePage::show(const Catalog &catalog, const QString &category, const QSt
         words->addWidget(dim(text(recipe.description)));
         words->addStretch();
         grid->addLayout(words, row, 1);
-        grid->addWidget(dim(text(categoryTitle(recipe.category))), row, 2);
+        const Origin *its = catalog.origin(recipe.origin);
+        grid->addWidget(dim(text(sourcesWithRecipes > 1 && its
+                                     ? tr("%1\nfrom %2").arg(categoryTitle(recipe.category), its->shown())
+                                     : categoryTitle(recipe.category))),
+                        row, 2);
         grid->addWidget(dim(text(recipe.version)), row, 3);
 
         const InstalledItem *installed = catalog.installedItem(name);
@@ -221,10 +236,23 @@ void BrowsePage::show(const Catalog &catalog, const QString &category, const QSt
         ++row;
     }
     if (!row)
-        grid->addWidget(dim(text(tr("Nothing here matches."))), row++, 0, 1, 5, Qt::AlignCenter);
+        grid->addWidget(dim(text(search.isEmpty() ? tr("Nothing here.") : tr("No recipe matches “%1”.").arg(search))),
+                        row++, 0, 1, 5, Qt::AlignCenter);
     grid->setRowStretch(row, 1);
     scroll->setWidget(inner);
     column->addWidget(scroll, 1);
+
+    // What no recipe exists for yet can be asked for: an agent writes one.
+    auto *foot = new QHBoxLayout;
+    foot->addWidget(dim(text(row && !search.isEmpty() ? tr("Not what you were looking for? An agent can write a recipe for it.")
+                             : !search.isEmpty() ? tr("An agent can write a recipe for it. You read it before anything is installed.")
+                                                 : tr("Missing something? An agent can write a recipe for it."),
+                             true)),
+                    1);
+    auto *ask = new QPushButton(search.isEmpty() ? tr("Ask for software…") : tr("Ask for “%1”…").arg(search));
+    connect(ask, &QPushButton::clicked, this, [this, search] { emit askFor(search); });
+    foot->addWidget(ask);
+    column->addLayout(foot);
 }
 
 void BrowsePage::showProblem(const QString &problem)
@@ -258,7 +286,8 @@ void RecipePage::show(const Catalog &catalog, const QString &name)
     connect(backLink, &ClickLabel::clicked, this, &RecipePage::back);
     column->addWidget(backLink, 0, Qt::AlignLeft);
 
-    QHBoxLayout *header = recipeHeader(recipe, recipe.shown());
+    const Origin *its = catalog.origin(recipe.origin);
+    QHBoxLayout *header = recipeHeader(recipe, recipe.shown(), nullptr, its ? its->shown() : QString());
     auto *actions = new QVBoxLayout;
     actions->setSpacing(6);
     auto *buttons = new QHBoxLayout;
@@ -744,6 +773,10 @@ void UpdatesPage::show(const Catalog &catalog, const QString &selectedName)
                                 : counted(catalog.updates.size(), tr("%1 recipe has a newer version."), tr("%1 recipes have a newer version.")))));
     header->addLayout(top);
     header->addStretch();
+    auto *check = new QPushButton(tr("Check for updates"));
+    check->setToolTip(tr("Fetches every source's list again"));
+    connect(check, &QPushButton::clicked, this, &UpdatesPage::check);
+    header->addWidget(check, 0, Qt::AlignBottom);
     if (catalog.updates.size() > 1) {
         auto *all = primary(tr("Update all"));
         connect(all, &QPushButton::clicked, this, &UpdatesPage::updateAll);
