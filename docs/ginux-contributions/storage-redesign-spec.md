@@ -1,5 +1,28 @@
 # Configured storage redesign (replaces G03b + G03c)
 
+This is the retained design/implementation brief. The
+[consolidated production-readiness queue](../ginux-contribution-task-list.md)
+owns current work: Codex now prepares and pre-reviews the contribution, and
+publishing requires user permission. Refresh the historical base/dependency
+SHAs below against current main before using them; preserve existing worktrees.
+
+## Current disposition — 2026-11-08
+
+PRD03 local preparation is complete on `9802ef036d53ae1ee5276fe59cc719389dda5879`
+in `/home/vince/levitate-development/ginux-storage-prd03`. The
+[exact-source review](prd03-storage-review.md) owns the final numbered-item
+resolutions, complete feature/prerequisite/main diffs, tests, findings, remaining
+integration dependencies and [unpublished PR draft](prd03-storage-pr-draft.md).
+The retained source and original worktrees remain intact. Current main is
+`53a54add`; the feature base `f1c3d3a7` composes open #232, latest #233, #238,
+#243, #236, separate zero-fill and explicit catalog-2 selection. Catalog 3
+explicitly adds storage's fchmodat without broadening catalogs 1/2. Exact-candidate
+checks pass; PRD04/PRD05, upstream prerequisite acceptance and publication remain
+open under the current queue. No new user decision is pending for preparation.
+
+The remainder is the retained original brief; its historical base, ownership
+and delivery paths do not override this disposition or the current queue.
+
 Owner and implementer: Claude (upstream PR work). Written 2026-11-07 after G03b failed independent review.
 
 ## Why

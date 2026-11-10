@@ -1,9 +1,626 @@
-# Ginux contribution task list
+# Recipe production readiness — consolidated remaining tasks
 
-Updated: 2026-11-07. Status: independent local verification complete; required clock/security acceptance pending.
-The authoritative ownership split below gives Claude all upstream PR work. Codex's earlier
-packet/publication queue remains historical; its current work is F03 and the local fixes Recipe
-needs. No Codex push, PR, upstream comment or security-agent dispatch is authorized.
+**2026-11-09 upstream update:** [local integration and caller migration](ginux-contributions/upstream-integration-2026-11-09.md)
+now select Ginux ef1b538f (upstream main 55b719db) and Recipe 2a786826 / CI-pin
+9f161138. These sources are local; earlier complete-suite/product/security
+receipts remain tied to their recorded tuples. #249 is now in upstream history.
+Required storage, final security, full acceptance and publication remain open.
+
+Updated: 2026-11-08. **Status: partial; production readiness is not established.**
+**PRD17 current audit (2026-11-09): incomplete.** The authoritative
+[acceptance checkpoint](ginux-contributions/prd17-production-acceptance.md)
+records public Ginux e4d95de1, new local Recipe 85a3fbcf (runtime c3a40a51/e3e28457) and docs-content
+bb3a1102, pending exact-source publication, and the complete new 155-case functional baseline.
+The user resolved dependent remove/cleanup as matching cached dependencies with
+no install hooks, and selected tracked public image producers for hosted CI.
+Those corrections and standalone docs CI are locally verified. The two older
+kernel fixtures now prepare their explicit cached prerequisite; the fresh
+c3a40a51 catalog passes all 155 cases with intact source/artifact/resource checks.
+Actual upstream merges, final authorized security results, corrected hosted CI,
+new product/source joins and final acceptance remain open. ISO byte-determinism
+scope and the new Recipe release version (existing 0.1.4 is already published)
+have been asked and remain pending. Final packaging waits for the version answer.
+Older source-bound passes below are
+historical evidence, not acceptance of this new combination.
+
+This is the single current remaining-work queue for Recipe and the Ginux
+capabilities it requires. It supersedes older task priorities, unchecked boxes,
+ownership statements and “next actions” in the historical records below.
+Those records remain evidence for their exact revisions. T01–T27 stay complete
+within their original implementation scope; this queue closes delivery and
+acceptance gaps rather than restarting that implementation.
+
+## Supported outcome and authority
+
+Production readiness means that a fresh supported Linux/x86-64 checkout can
+obtain and build the selected Recipe/Ginux/image combination, execute the
+documented API 2 lifecycle and real consumers, recover or fail without corrupting
+inputs/state/publications, and reproduce the release evidence from durable
+sources. Required runtime capabilities must be delivered through a maintained,
+pinned source, rather than a private executable or an unreferenced worktree.
+Release claims must match the tested limits and supported workflows.
+
+The user resolved release scope on 2026-11-08: the complete declared-`NEEDS`
+proposal and both distros' full product, boot/install/installer-PTY and A/B
+acceptance are required. PRD18/PRD19 below record the included claims,
+exclusions and remaining acceptance. Their completed scope decisions do not
+establish implementation, verification or production readiness.
+
+Codex owns local integration and Ginux PR preparation, review and creation.
+**Publishing PRs, pushing, and commenting upstream require explicit user
+authorization.** Prepare complete, reviewable diffs and evidence before asking
+for publication permission. Every proposed contribution needs full-diff and
+dependency review against current main, owner/failure/contract/Recipe tracing,
+concrete file/line findings, and checks on the actual candidate. Green CI alone
+is insufficient. Existing worktrees and unrelated staging/edits remain preserved.
+No recurring review schedule or security-agent dispatch is requested.
+
+The general engineering chat does not inherit the separate Daybreak chat's
+adversarial-execution authorization. Its findings and remaining acceptance
+criteria are dependencies to reconcile, not permission to run its probes here.
+There is no user-imposed G02 hold: configured local global clocks/sleeps were
+explicitly authorized and implemented; upstream policy is a separate question.
+
+## Baseline to preserve
+
+| Source/evidence | Current fact at consolidation |
+| --- | --- |
+| Superproject | `4de5e3b18f13e9f2c45a54f63c716e748918ab26`, with existing local edits/staging |
+| Recipe | Clean `d740fcfc6378e766dd767f8b1b28e869d55c695f`; working checkout ahead of its superproject pin |
+| Local Ginux | Clean `a7ce73cd0aae897f24333e34a7b4d12ec99a0368` at `/home/vince/levitate-development/ginux-recipe-integration` |
+| Checked-in Ginux pin | `tools/ginux` is still `2eac10bf`; it is not the tested integration and cannot be advertised as its replacement |
+| Upstream, read-only refresh | `gmkurtzer/ginux` main `53a54addea67969abaa240ea478def1b94130eee`; #232/#233/#234/#243 remain open; no configured-storage feature PR published |
+| Storage donor | `prep/configured-storage` at `545380dd49ea432d9e84e6b956f129f48c72822e`; unmerged, not final-source acceptance |
+| Latest Recipe evidence | 11 exact e2e cases pass on `d740fcf` + `a7ce73cd`, including all six formerly blocked sleep cases and target metadata/EROFS, lifecycle and dependency compilation |
+| Older broader evidence | 130/136 e2e selections and both mixed targets passed on Recipe `e37109c` + Ginux `3dae449a`; six real consumers have other exact-source receipts. These cannot be added to the latest 11 as a final-source full-suite pass |
+| Latest checks | Recipe fmt, bins Clippy with warnings denied, release/e2e compilation and Rust 1.93.0 **locked** checking pass. Ginux `make check`, release build and affected full task/thread/poll runners pass |
+| Evidence location | [F03](ginux-contributions/f03-review.md) and local integration `.artifacts/recipe-integration/general-20261108/summary.json`; retained historical manifests remain authoritative for their own runs |
+
+No runtime test was run merely to consolidate this queue. The GitHub refresh,
+source inspection and evidence reconciliation do not upgrade old acceptance.
+
+## Critical path: source, contract and storage
+
+- [ ] **PRD01 — Establish the distributable runtime source.** Reconcile the
+  separate tested integration with the actual `tools/ginux` gitlink, bootstrap
+  instructions, builder/xtask callers and release acquisition. Prefer the planned
+  upstream route; if a maintained fork is proposed before upstream closure,
+  present that delivery decision explicitly. Do not silently publish an old pin
+  or rely on `/tmp`, login-shell setup or private worktree paths. **Done when:**
+  the selected source contains every required capability and a fresh checkout
+  can reproduce the launcher/worker/image pair. Depends on PRD02–PRD08 for the
+  final source selection, not on an invented fixed number of PRs.
+  **Source decision resolved:** the user authorized maintained source in our
+  repositories, with current upstream leading, and explicitly included Gate 11
+  PR #249. [The selected delivery pair](ginux-contributions/delivery-sources.json)
+  is publicly obtainable: Ginux `28f4368f` and Recipe `e7bfc166`. The gitlinks and
+  HTTPS source URLs are pinned; a fresh Rocky VM has built both repositories,
+  the launcher and matching coordinator/worker, and both exact compiler images.
+  [PRD14](ginux-contributions/prd14-bootstrap-packaging.md) records the new
+  package/consumer verification. The earlier unapproved-fork/source-unavailable
+  hold is superseded; no further source-delivery decision is pending. Remaining
+  contract, consumer, security and wider product acceptance stays with its
+  named tasks and exact revision requirements.
+- [x] **PRD02 — Reconcile actual Ginux contract enforcement.** Completed local
+  reconciliation on Ginux `5300f5ef` + Recipe `b414438`; see the
+  [contract review](ginux-contributions/prd02-contract-review.md) for exact
+  revisions, file/line findings, decisions, source trace and evidence. Inspected
+  main `53a54add`, open #243 and #238; retained the existing signal-driven-I/O
+  guards and adapted enforcement to all local configured handlers. The user
+  explicitly approved a versioned local configured catalog while preserving
+  upstream catalog 1/native policy. Recipe now selects `configured-balanced-v2`
+  (then-local catalog 2); grants remain constrained by assignments, endpoints
+  and bounds. Gate 11 now owns upstream catalog 2; the maintained pair explicitly
+  migrates configured contracts to downstream catalog 1002 and rechecks denials.
+  Deny precedence, disabled audit, provenance and startup refusal of unenforceable
+  restrictions pass 47 controls, 14 runtime runners, ordinary checkpoint/restore,
+  50 Ginux units and eight focused Recipe cases. Local static/build checks pass.
+  **Limits remain explicit:** vDSO/proc/sys/cgroup absence alone is not complete
+  denial; legacy selector rule indexes remain 0. No upstream acceptance,
+  publication or full-suite/release claim is implied. PRD01/PRD06/PRD07 must
+  deliver the required catalog/source; PRD05 must revalidate after storage
+  integration. PRD18 must derive its later contracts against the selected
+  versioned catalog using the existing upstream contract syntax.
+- [x] **PRD03 — Finish and pre-review the storage redesign candidate.** Completed
+  local preparation on clean candidate `9802ef03`, feature base `f1c3d3a7`,
+  refreshed against main `53a54add`. The [storage review](ginux-contributions/prd03-storage-review.md)
+  records the complete feature/main/prerequisite patches, exact source stack,
+  numbered spec dispositions, file/line findings, four red controls, reproducible
+  commands and [local PR draft](ginux-contributions/prd03-storage-pr-draft.md).
+  Preserved all upstream tests/CI; fixed copy-up readers, enforced mode/search
+  behavior, directory operations/accounting, shared append and failed truncation
+  without data loss. Storage selects explicit catalog 3; catalogs 1/2 retain
+  their tables/digests. Exact-candidate static, 138-unit, catalog-doc, CI build
+  and every launch-integration command pass, including 40 storage launches.
+  **Remaining dependencies:** open #232, latest #233, #238 → #243, #236, separate
+  zero-fill and unpublished catalog-2 versioning. Standalone publication waits
+  for their disposition/merges, merged-source refresh/revalidation and explicit
+  authorization. This foundation is not yet the Recipe integration: PRD05 must
+  migrate its storage contracts from catalog 2 to 3 and reconcile all later
+  runtime owners. PRD04/PRD09 findings and final release acceptance remain open.
+  No push, publication, upstream comment or gitlink change occurred.
+- [x] **PRD04 — Close the recorded storage/descriptor failures (source-bound).** Resolve the
+  G03c/G12 high-bit public-FD alias report against an explicit contract: distinguish
+  Linux's 32-bit fd ABI narrowing from the virtual descriptor authority promised
+  by Ginux, and fix actual gaps with positive and negative regressions. Close
+  G17b's inherited-host-FD budget failure without raising public limits or
+  silently granting more host resources. Verify assignment prefixes through image
+  symlinks and private backing/transfer lifetimes. **Done when:** the retained
+  reproductions have an evidence-backed disposition and corrected-source checks
+  pass. Old B1–B3 labels are not automatically three live defects: current-source
+  assignment acceptance and mapped-array/small-stack results must be reconciled
+  individually. Depends on PRD02/PRD03; security execution stays in its authorized
+  context. **Scoped closure:** local candidate `5449e2a1` fixes read/readv policy
+  classification, undeclared inherited supervisor FDs, image-prefix validation
+  and backing-close error completion. See the [findings ledger](ginux-contributions/prd04-fd-review.md)
+  and [pinned Daybreak request](ginux-contributions/prd04-daybreak-request.md).
+  Returned Daybreak items 1–4 and selected item 6 pass on the frozen candidate.
+  **Item 5's backing-close symptom is corrected:** separate `2e88c9ad` passes
+  focused Daybreak red/green and affected export controls, preserving frozen
+  `5449e2a1`. See the [exact follow-up](ginux-contributions/prd04-export-followup.md).
+  The user approved link publication as commit point: late reference-close errors
+  may leave the intact archive but must report failure, and consumers must reject
+  non-success. No PRD04 decision remains pending. These source-bound closures do
+  not close PRD09 on the combined final source. **2026-11-09 revalidated:** the same separate 2e88c9ad/
+  576ee03c… candidate passes fresh static/unit/build, ordinary export/checkpoint/
+  restore checks and all 313 hashes from its actual already-returned focused
+  Daybreak retest. Frozen 5449e2a1/95bc570e… is unchanged. The latest request's
+  open-until-retest-passes condition is therefore met on this exact source;
+  an unnecessary duplicate-renewal hold was withdrawn. No no-op revision,
+  fresh security execution or publication is claimed. The [current reconciliation](ginux-contributions/prd04-export-followup.md)
+  preserves original failures, actual passes and final-source PRD09 limitations.
+- [ ] **PRD05 — Integrate the merged storage source semantically.** When the
+  actual upstream changes merge, compare their VFS/`launch_paths`/`launch_storage`
+  owners with local `fs_hooks`, `storage_memory`, descriptors/tasks, mappings,
+  exec and archive owners. Identify precisely which earlier fixes and tests are
+  replaced, which remain needed, and which conflict. Preserve later consumer
+  fixes; do not replay the old stack blindly or duplicate behavior. **Done when:**
+  one coherent integrated source builds, its replacement disposition is recorded,
+  and affected storage/FD/thread/path/exec/map/export/checkpoint/restore tests and
+  Recipe consumers pass on that exact revision. Depends on PRD02–PRD04 and the
+  real merge; unrelated checks cannot close this item.
+  **Waiting:** the 2026-11-08 07:10 UTC [actual merge check](ginux-contributions/prd05-integration.md)
+  finds main still `53a54add` and #232/#233/#234/#236/#238/#243 all open,
+  `merged=false`, with no merged storage source. No local fix/test was retired,
+  no integration or gitlink changed, and no substitute Ginux/Recipe checks ran.
+  PRD05 remains incomplete until the actual upstream source is available.
+
+## Remaining Ginux contributions and acceptance
+
+- [x] **PRD06 — Reconcile every local correction with upstream and the new
+  storage design.** Account for all donor-only hunks/commits, not only the old
+  37 packets. Include per-task/shared-thread state, 32-task admission/diagnostics,
+  musl clone flags, full blocking pipe writes, creation-mask ownership, argument
+  guards through exec/mapping/clone/signal use, image-index bounds/NUL rejection,
+  large image reads and virtual queries, signal-mask bootstrap, pinned-inode
+  export, sealed restore snapshots, close-error reporting, caller-thread SIGPIPE,
+  and configured clocks. Match already merged/equivalent upstream fixes before
+  extracting anything. **Done when:** each remaining change is retained in a
+  reviewed contribution, replaced by a verified owner, or explicitly downstream;
+  no unique useful tests disappear. Reconcile the old
+  [engine audit](history/recipe-engine-audit.md) too: absolute paths, unchecked
+  shell status/quoting, extraction, extends/import and shared state must be
+  either closed by current evidence or retained as concrete current tasks.
+  Completed against main `53a54add`, integration `5300f5ef`, storage `9802ef03`
+  and frozen PRD04 `5449e2a1`; see [complete reconciliation](ginux-contributions/prd06-reconciliation.md),
+  [every-source/hunk/test ledger](ginux-contributions/prd06-source-inventory.json)
+  and [test retention](ginux-contributions/prd06-test-retention.md). All 246 commit
+  entries, 47 packet entries, 7,036 overlapping hunks, 39 dirty files, two stashes,
+  218 Rust test names and 197 fixture versions have explicit dispositions. All
+  89 main unit cases survive; changed shared-offset assertions are explained.
+  Six focused current-pair Recipe CLI checks pass; all 13 old audit rows are
+  reconciled. **Current PRD17 disposition:** F-01 has source-bound closure in
+  PRD04; T-01/T-02/T-03 are retained in the tracked maintained source. R-01's old
+  rootfs shell-copy callers are replaced and included Fedora paths derive from
+  fixed domain roots; unescaped source-kernel/toolchain shell paths remain an
+  explicit limitation outside the included prebuilt-kernel release. R-02 uses
+  coordinator-owned leases with functional concurrent/death/recovery checks;
+  its security interleavings remain PRD09. R-03 has a dedicated passing stalled-
+  Git/teardown/lock-reuse control. N-01/N-02 native limits and final joined-source
+  security/upstream/delivery acceptance remain open with PRD05/07/09–17. The
+  [current audit](ginux-contributions/prd17-production-acceptance.md) distinguishes
+  those actual dispositions from historical failures. Source accounting does
+  not establish current final-suite, contribution or release acceptance.
+  No implementation, gitlink change or upstream publication occurred.
+- [ ] **PRD07 — Complete the dependency-ordered contribution waves.** Refresh
+  existing open PRs and every remaining capability in the coverage map below
+  against current main. For each actual candidate, perform R01–R04's engineering
+  work: complete source review, failing-base/passing-fix or feature controls,
+  exact standalone CI/runtime checks, independence and concise draft body.
+  Fix findings before presenting it. Preserve upstream compatibility and tests;
+  keep downstream policies out of Ginux. **Done when:** every capability has a
+  verified upstream/equivalent/disposition and no production requirement is
+  stranded in an unpublished stack. Obtain permission for each publication
+  wave, follow review feedback, then revalidate/integrate actual merges.
+  **Active:** [delivery waves and current checkpoint](ginux-contributions/prd07-delivery-waves.md)
+  distinguish current-main candidates, existing published PRs, actual merges and
+  policy/security dependencies. Main remains `53a54add`; required prerequisite
+  PRs are open and their maintainers request no further changes for now. The
+  user directs continued local extraction/integration, with no PR publication;
+  upstream Ginux takes precedence and every local candidate must be reassessed
+  when its foundation changes land. No push/comment is authorized. PRD07 stays
+  open; green local candidates alone do not establish upstream/equivalent delivery.
+- [x] **PRD08 — Resolve the remaining public contracts.**
+  Completed: the user approved the versioned downstream configured contract
+  separately from held upstream/native decisions, including per-process AS,
+  eligible real CPU IDs, numeric endpoint grants and bounded poll semantics.
+  [Supported contract and delivery impact](ginux-contributions/prd08-public-contracts.md)
+  records every choice, exclusion and maintainer hold. Candidate `4aa51c1d`
+  preserves the local clock source byte-for-byte, confines 64 MiB image reads to
+  configured launch and restores main's native bounds, and implements the user's
+  selected zero-filled configured sysinfo. Static/build/138 units, functional
+  positive/deny/red controls, ordinary poll/TCP/identity/resources and all six
+  Recipe clock consumers pass. A transient session-libvirt guest passes actual
+  300-second sleep, interruption, active realtime forward/backward steps and the
+  monotonic timeout cap. No required PRD08 decision or clock boundary is pending.
+  The supported contract states scheduler/poll tolerance, not hard realtime.
+  PRD01/05/07/09–19 still own packaging, composition, publication, security and
+  release acceptance. No native expansion, host clock change or publication.
+- [ ] **PRD09 — Close security acceptance on the final source.** Reconcile the
+  [Daybreak record](ginux-contributions/daybreakblue-handoff.md) against current
+  code and receipts. Request the remaining work/results through the authorized
+  context; do not execute or dispatch it from this consolidation. Carry forward
+  every material unverified criterion in the matrix below and the two recorded
+  failure reports in PRD04. **Done when:** no known blocking authority/cleanup
+  defect remains, relevant final-source controls pass, and limitations are
+  explicit. One stochastic negative schedule is not proof of all interleavings;
+  conversely, do not endlessly repeat equivalent probes without a defined gap.
+  **In progress:** [exact-source reconciliation](ginux-contributions/prd09-security-acceptance.md)
+  accounts for all eight material surfaces and the new NEEDS/sysinfo boundaries.
+  Separate local `fa8be950` composes all five PRD04 corrections with the NEEDS/
+  PRD08 donor; build/static checks pass, security verification has not run here.
+  Returned Daybreak receipts verify 562/562: selected checks/F-01 pass, S09-A–G
+  remain partial and H unverified at runtime. Subsequent PRD11 corrections need
+  affected security revalidation. No execution permission transfers here. PRD09
+  remains open for the explicit gaps and actual final-source integration.
+
+Every historical G packet remains accounted for; this map does not promise one
+PR per row or revive superseded implementations:
+
+| Capability family | Historical packets/subpackets | Remaining closure |
+| --- | --- | --- |
+| Console and clocks | G01, G02 | PRD08 local contract/clock acceptance complete; #207 native policy/race remains held and separate |
+| VFS/storage foundation | G05a, G03a, G03b, G03c | #232/#233, redesign, contract and zero-fill prerequisites; PRD03–PRD05 |
+| Null/public FDs/pipes | G04, G05 | Rejoin storage owners; alias/CLOEXEC/EOF/backpressure, full blocking writes |
+| Processes and threads | G06a, G06b, G07 | #234 overlap, per-task transactions, libc clone forms, birth/exec/wait/last-thread teardown |
+| Readiness and local packets | G08a, G08b | Registered owner/deadline behavior, bounded capacity, pins/reuse/cancellation, correct SIGPIPE target |
+| Files/directories and traversal | G09a–G09d, G13–G16 | Growth/accounting, directories/cwd, symlinks/hardlinks, unified assigned/image resolution |
+| Executables and mappings | G10–G12 | Owned ELF/scripts/interpreters, private descriptor transfer and protected argument/backing lifetime |
+| Capacity, positioned/vector I/O | G17a, G17b, G18, G25 | Inherited private-FD pressure, pwrite/offset/partial effects, namespace/data bounds, actual large I/O |
+| Export/checkpoint/restore | G19–G22, G31 | Quiescence, publication identity, transport/snapshot/alias integrity and CI wiring; G31 can stay with G20/G21 |
+| Locks and timestamps | G23, G24 | Real contending SQLite/Cargo; lock release/reuse, inode times and documented archive precision |
+| Resources, identity and ownership | G26a, G26b, G27, G30 | Process-local limits/queries/umask, configured identity, virtual root and target-metadata distinctions |
+| TCP and acquisition | G28, G29 | PRD08 configured endpoint contract resolved; final aliases/bytes/TLS/Git/revoke/cancel acceptance remains |
+
+Security evidence must cover the behavior actually shipped. The pending-work
+reconciliation includes these existing surfaces, not an unlimited new campaign:
+
+| Surface | Remaining acceptance to reconcile with exact receipts |
+| --- | --- |
+| Assignment and contract authority | Image/owned/device boundaries, indirect interpreter selection, deny precedence, high-bit FD report and private/native FD access |
+| Shared VM/tasks | Kernel-consumed paths/vectors/scratch/TID/signal actions, nonleader/leader death and exec, process versus caller-thread signal delivery, rollback/cancellation without deadlock |
+| Descriptor/channel/network lifetime | Alias/last-close/reuse, parked reads/writes, partial/copy faults, capacity and peer death, actual backend close-error lifetime and task-group signal targeting |
+| File data/namespace/limits | Malformed indexes, checked allocation arithmetic, mmap/mremap rollback, protected cross-page copies, modes/cwd/link identity, quota rollback and reclaim |
+| Owned exec/scripts/mapping transfer | Seals/backing copies, interpreter/argv/env bounds, private-FD collision/visibility, every meaningful failed stage and cleanup; unresolved guest private-close behavior needs an explicit disposition |
+| Export/checkpoint/restore | Immutable publication identity, concurrent namespace/archive mutation, short reads/writes/sync/close faults, control framing/peer failure, interrupted capture and state/files acknowledgment consistency |
+| Locks/timestamps/resource/identity | Protected copies, ownership/release/reuse, malformed fields, truthful per-process limits and permitted identity visibility |
+| Recipe boundary and transport | Private bootstrap/spoofing, protected inputs/source, archive/link redirects, snapshot tampering, cancellation and post-worker launcher failures, negative TLS/grants and protected autofix |
+
+## Final Recipe and consumer verification
+
+- [ ] **PRD10 — Run the complete current Recipe integration catalog on the
+  final pair.** Rebuild/pin the CLI, matching worker, e2e harness, Ginux and image;
+  enumerate the actual current catalog rather than hardcoding old counts.
+  Run every applicable case plus `library_backend` and `image_producer`, fix real
+  failures, and rerun affected cases after changes. **Done when:** all required
+  names have successful exact-source receipts, with zero missing/interrupted
+  cases and no arithmetic combining older revisions into a pass.
+  [Complete local catalog: 152/152 passed](ginux-contributions/prd10-complete-catalog.md)
+  on clean Recipe `8db564c`, CLI/matching worker `4cb2b900…`, Ginux `f7f0d14c`
+  (`0dd243fa…`), image `c089f95c…` and frozen harnesses: 150 e2e names plus
+  library_backend and image_producer, with zero failed/missing/ignored/interrupted
+  final cases and unchanged source/artifact hashes. Fixture corrections, the
+  dedicated stalled-Git oracle, 35,240 verified evidence files and resolved
+  temporary resources are recorded. Earlier passes are excluded. PRD10 remains
+  unchecked for PRD01/PRD05's actual maintained-source join; changed resulting
+  sources/artifacts require complete coverage on that combination. **Current
+  PRD17 baseline:** clean Recipe c3a40a51/e3e28457, Ginux e4d95de1/21a54e60 and
+  image ffe04d86 pass all 155 current names (153 e2e plus both library/image targets),
+  with zero missing/interrupted cases, unchanged sources/artifacts and no
+  observed process/scratch leak. The earlier failed 155 run is separate. New
+  release-version/source selection and final delivery/security/upstream acceptance
+  remain open; do not call this a different release revision's pass. Exact
+  receipts/manifest are in prd17/current-catalog-summary.json and the
+  [current checkpoint](ginux-contributions/prd17-production-acceptance.md).
+- [ ] **PRD11 — Rerun actual consumers, including concurrency.** Exercise
+  SQLite contention/data integrity; simultaneous GNU and musl Cargo clients,
+  shared cache locks and execution of the built threaded program; pinned Git
+  HTTP/HTTPS acquisition; RPM conversion/extraction; and APK acquisition,
+  non-root package-tool identity, execution and publication. Retain ordinary
+  linker threading, package modes/links/ownership and checked command failures.
+  **Done when:** all run on the final delivered launcher/Recipe/image; no disabled
+  lock, helper-output substitution or broader host fallback makes them pass. See
+  [exact consumer results and corrections](ginux-contributions/prd11-consumers.md):
+  all six pass locally on Ginux `f7f0d14c` / Recipe `8014c9b` / image `c089f95c…`.
+  Terminal events supersede obsolete held stops; Git uses coordinator-pinned
+  addresses with TLS/endpoint grants intact. Final delivery acceptance remains
+  open for PRD01/PRD05's actual source join and all-consumer revalidation.
+  **Current PRD17 functional baseline:** all six consumers pass on clean
+  c3a40a51/e3e28457 +e4d95de1/21a54e60 +ffe04d86. Receipt identities/log hashes
+  and unchanged before/after source/artifacts are independently verified in
+  prd17/current-six-consumer-summary.json. This does not accept a later release
+  version's different binaries or close final public-source/security acceptance.
+- [ ] **PRD12 — Close final lifecycle/storage/metadata acceptance.** Use real
+  CLI consumers for setup-once/import/extends/readiness/dependencies, install/
+  reuse/check/remove/cleanup, changed inputs/targets and output loss; cancellation,
+  deadlines, coordinator/launcher death and durable diagnostics; retention,
+  concurrent destinations and before/after-ack recovery. Verify >2 GiB payloads,
+  5,000 nonempty entries, hardlinks/symlinks/modes/timestamps, bounded resources,
+  and target metadata through publication, reimport, composition, EROFS and
+  recstrap mount/copy deployment (UID/GID, setid/sticky bits and capabilities).
+  **Done when:** final-source catalog/consumer evidence covers these outcomes,
+  failed work preserves previous valid state/products, and no resource/task
+  leak is left unaccounted for. Reuse PRD10/PRD11 receipts rather than rerun the
+  same scenario merely under another heading. [Current exact verification](ginux-contributions/prd12-lifecycle.md)
+  freezes the test source at Recipe `85f144f` with unchanged production code,
+  Ginux `f7f0d14c` and the ordinary `c089f95c…` image. All 57/57 final selected
+  cases pass; preparation, interrupted and unrun cases contribute no passes.
+  Actual recstrap deployment of the exact resulting zstd EROFS passes under
+  both existing product kernels in session-libvirt; failed production preserves
+  both valid images, with no observed owned process/scratch/mount/loop leak.
+  Final source delivery still waits for PRD01/PRD05; PRD12 remains unchecked.
+- [ ] **PRD13 — Finish actual CI coverage and portability claims.** Run the
+  selected Ginux source's `make check`, complete `make test-unit`, required
+  builds/fixtures and Linux launch/native/Gate 1 commands, plus required remote
+  Linux jobs on each authorized PR head. **User decision: macOS is indefinitely
+  deferred and is not a release acceptance requirement.** Preserve existing
+  upstream CI definitions. For Recipe,
+  verify clean standalone/package builds, fmt/Clippy, current stable and declared
+  Rust 1.93 MSRV, including the workflow's unlocked resolution in a disposable
+  export rather than deleting the workspace lock. Ensure CI actually runs the
+  meaningful managed integration/image/library regressions: Recipe's present
+  shared workflow builds/lints but does not run those acceptance cases. Pin its
+  launcher/image inputs and keep privileged runtime requirements explicit.
+  **Done when:** required jobs cover the shipped combination and pass, without
+  removing Ginux tests, adding prohibited Recipe units, or treating local Linux
+  checks as hosted evidence. [Local CI/portability checkpoint](ginux-contributions/prd13-ci-portability.md)
+  records the current stable/MSRV and Ginux results, exact older synthetic-merge
+  hosted receipts, and the managed-catalog/workflow correction. The user approved
+  opt-in release publication and then chose **keep local; wait for maintained
+  source** for the exact proposed CI push/run. No push or hosted dispatch is
+  authorized. Local Recipe `d4801b1` (production `bd3d851`) and Ginux `a498e4f6`
+  have successful build/lint/MSRV/package and Linux runtime evidence; the single
+  complete new Recipe combination passes 152/152, with unchanged runtime source
+  and artifacts. Final-source delivery and hosted Linux acceptance remain open.
+
+## Delivery, documentation and final acceptance
+
+- [ ] **PRD14 — Reproduce bootstrap and packaged artifacts from durable inputs.**
+  Acquire/verify the pinned OCI/toolchain/package closure and build the ordinary
+  compiler/acquisition images through their producers. Verify image composition,
+  hashes/provenance and failure preservation; exercise the release CLI, library
+  and image producer outside developer-only paths. Validate crate/binary/RPM
+  packaging without publishing, runtime/tool requirements and usable output
+  ownership for the documented operator. **Done when:** a fresh supported host
+  follows the documented setup and hello/build/restart path with the released
+  inputs, not migration-only executables, fixture trust or private caches.
+  **Earlier baseline complete:** [bootstrap/package/fresh-host evidence](ginux-contributions/prd14-bootstrap-packaging.md)
+  binds Recipe `e7bfc166`, Ginux `28f4368f` (all current upstream main plus Gate 11
+  PR #249), launcher/worker/producer hashes and the current images. Fresh public
+  source/input acquisition, signed publisher trust, locked builds, source crate/
+  binary/RPM installs, independently reproduced images/provenance, failure
+  preservation, real GNU/musl programs, public HTTPS/Git, restart/reuse, denied
+  network, matching-worker/library and ordinary-user export all pass. The
+  affected eleven NEEDS cases, library_backend/image_producer, 47 configured
+  allow/deny cases and four native dispatch controls pass on this exact pair.
+  All findings are disposed in the report; canonical VM archive SHA-256 is
+  `fb38051284e8a053f075f5628ec4ec4dafbe27863cb8125974f4ec45b1de3ca1`.
+  Our source repositories are published as authorized; no upstream PR/comment
+  or package release was published. Gate 11 remains unmerged upstream and partial
+  on performance. Full e2e/hosted Linux/security/distro acceptance is separate;
+  old 152-case/c089 receipts do not cover this pair. **Final-source verification
+  is reopened:** later Recipe corrections and the pending new release version
+  require actual final crate/binary/RPM and fresh selected-source execution
+  joins. Public image inputs/signatures and unchanged producer-source receipts
+  remain valid within their exact scope; baseline package/VM executions are not
+  renamed. Current packaging is stopped for the version decision. See the
+  [PRD17 checkpoint](ginux-contributions/prd17-production-acceptance.md).
+- [ ] **PRD15 — Align all callers and operator/author documentation.** Compile
+  and verify current builder/contract/xtask/variant callers against the chosen
+  source, rather than relying on old migration commits. Update README,
+  WRITING_RECIPES, helper audit, man pages, examples, bootstrap/interface and
+  target-metadata records. Specify exact launcher/image/worker selection, whole-
+  coordinator bootstrap privileges, supported platforms, state/log/pruning and
+  failure recovery, limits and troubleshooting. Keep API 2 as one interface;
+  no compatibility adapters or old-state conversion are needed for zero users.
+  Document global clocks/vDSO limits, per-process AS/affinity rather than aggregate
+  RSS/CPU guarantees, IP:port versus hostname isolation, seconds-only archive
+  timestamps and unsupported operations honestly. **Done when:** examples and
+  release setup commands run and documents/callers agree with the actual code.
+  [Current PRD15/19 reconciliation](ginux-contributions/prd15-product-contract.md)
+  records compiled callers, corrected/running documentation, real public preseeds,
+  managed tool compilation and matching metadata production/deployment receipts.
+  Full new ISO/guest installer/install/A/B and final maintained-source acceptance
+  remain open; earlier VM passes are not promoted to this combination.
+- [ ] **PRD16 — Record and wire the final delivery.** Commit coherent changes in
+  owning repositories, make required source commits durably available through
+  authorized delivery, then update intended superproject pins and tested product
+  provenance. Preserve unrelated staging, recovery worktrees and human-authored
+  public text. Reconcile old source paths, recovery notes and “current” evidence
+  pointers without rewriting historical results. **Done when:** the selected
+  checkout, releases and reproduction instructions resolve the same tested
+  sources; a submodule being ahead of its pin is acceptable during development,
+  but is not a reproducible release. [PRD16](ginux-contributions/prd16-delivery.md)
+  records the completed nine exact owning-source pushes, 16/16 anonymous public
+  acquisition and prior selected-parent reproduction. Current Recipe c3a40a51
+  and docs-content bb3a1102 corrections still require their exact new source
+  permissions, final version/replay, public availability and final parent
+  pins/provenance. The old 16141938/parent requests authorize no later head.
+- [ ] **PRD17 — Present production acceptance and obtain publication approval.**
+  Summarize PRD01–PRD16 evidence, unresolved defects/decisions, support limits,
+  dependency/release revisions and actual hosted checks. Present concrete
+  reviewed Ginux PR waves and release artifacts before requesting permission
+  to push/open/publish anything. After authorized upstream changes, resolve
+  review findings and refresh affected final-source checks. **Done when:** the
+  complete declared release scope passes and the user accepts the supported
+  production outcome; publishing and tagging remain separately authorized
+  consequential actions. Do not mark production ready because local builds or
+  selected checks are green. **Current: incomplete**, with the
+  [criterion-by-criterion audit](ginux-contributions/prd17-production-acceptance.md).
+  Dependent remove/cleanup and public-producer CI decisions are implemented and
+  source-bound controls pass. The new 155-case c3a40a51 functional replay and
+  all six real consumers pass on the same tuple, with no missing/interrupted
+  cases or source/artifact/resource discrepancy; no later release revision's
+  pass is claimed. Existing public Recipe 0.1.4 requires a new
+  version choice before final packaging, and ISO byte-determinism scope awaits
+  the user's answer. R17-REL-01's CI version-bump/tag-before-build mismatch is
+  corrected locally in 85a3fbcf: validation is read-only and exact-artifact
+  publication is separate; all compiled inputs match the executed c3a40a51.
+  Current 16 documented commands/three embedded examples, actual new image
+  production and both metadata deployments pass. Hosted/final-version acceptance
+  is not inferred from these candidate-specific results.
+  Actual upstream merges, authorized final-source security, corrected hosted
+  checks, final delivery references and production/publication acceptance remain
+  explicit dependencies. No push/tag/release or upstream write is inferred.
+
+## Agreed release scope — decisions resolved 2026-11-08
+
+Decision authority: the user's earlier instructions in **Locate Levitate and
+Acorn recipes** required separating live and installed systems, moving appropriate
+preparation into Recipe while keeping recstrap thin, preserving target metadata,
+fixing both distros' Ginux blockers, obtaining the released Acorn kernel and
+retrying both full ISO builds. Those decisions supersede the older T01–T27 ISO
+exclusion. In **Clarify PRD18/PRD19 release scope**, the user additionally chose
+"Include the complete NEEDS proposal in this release; implementation happens
+in a later task" and "Include boot/install/installer PTY and A/B acceptance for
+both distros under libvirt." This section governs release scope even where the
+linked design note still describes itself as an unapproved draft.
+
+- [x] **PRD18 — Decide the declared-needs proposal: included in full.**
+  The [declared-needs design](recipe-declared-needs.md) is a required release
+  deliverable, not a deferred follow-up. Include literal, statically readable
+  `NEEDS`; required and optional typed inputs; exact output names/kinds;
+  dependency-owned grants without inherited parent authority; caller narrowing
+  without widening; version-pinned derived Ginux contracts and recorded digests;
+  non-evaluating `validate`/`inspect`/`explain`/`diff`; denial provenance back to
+  recipe declarations; and direct migration of all recipes, builder, variants,
+  xtask, library/CLI callers, examples and documentation. Keep API 2 as the sole
+  interface, with no compatibility path for the old caller-owned grant model.
+  **Local implementation and verification are complete:** Recipe `4ee73d7`,
+  builder `cc403cf`, contract `1da4f83`; see the [implementation record](ginux-contributions/prd18-implementation.md).
+  The user resolved complete outputs at install/reuse, typed intermediate subsets,
+  and caller ceilings/intersections across the complete dependency graph. All 11
+  NEEDS cases and 13 production/example declarations have passing receipts. All
+  13 original regression failures have explicit corrected passing dispositions;
+  red historical runs remain recorded. Derived catalog-2 contracts, transport 9,
+  saved execution/denial explanations and all direct callers are migrated.
+  PRD01 maintained-source delivery, PRD05 upstream/storage joins, PRD09 security
+  and PRD19 product acceptance remain separate release dependencies. No upstream
+  publication or fork-delivery choice is implied.
+
+- [x] **PRD19 — Bound wider product claims: both distros through A/B acceptance.**
+  The supported runtime remains Linux/x86-64. The included products and evidence
+  below apply to **both LevitateOS and AcornOS** on the final delivered
+  Recipe/Ginux/image combination. Historical passes retain their exact-source
+  limits; none closes the new release acceptance merely by being listed here.
+
+| Included release claim | Required evidence; acceptance remains open |
+| --- | --- |
+| Real preseed/acquisition and rootfs production | Run the Fedora RPM and locked Alpine APK producer paths with real pinned assets, verified acquisition/cache recovery and full rootfs publication; small fixtures alone are insufficient. Retain PRD11's SQLite, concurrent GNU/musl Cargo, Git, RPM and APK consumers. |
+| Complete system preparation through Recipe; thin recstrap deployment | Verify separate installed-system and live-overlay products, recipe-owned system/tool preparation and the existing deployment boundary. Preserve target UID/GID, modes, links and capabilities/xattrs through publication, reimport, composition, EROFS and recstrap mount/copy. Reusable installed products exclude live autologin/test policy and per-machine secrets/identity. |
+| Real tool and kernel consumers | Exercise the selected distro install/live tools and existing QEMU preparation/host-consumer path; verify kernel recipe/caller lifecycle and the pinned published/prebuilt kernel bundles for each distro, including Acorn. Use existing producers and kernels. Version/help-only tool results do not prove installer interaction. |
+| Full distro ISO products | Produce and verify each distro's full live-tools ISO and required live-boot parent, with provenance and hashes; a rootfs-only or partial ISO attempt is insufficient. |
+| VM boot and interactive installer | Demonstrate live boot, SSH/readiness and the actual install UI's PTY operation in each distro's libvirt guest. Fix observed product blockers rather than treating successful ISO assembly or a version/help entry as runtime acceptance. |
+| Installation and installed-system operation | Exercise the public install path, installed boot, automated login and runtime scenarios, including the documented configuration/deployment boundary. |
+| A/B update and activation | Run each distro's existing `ab-update` scenario, including its update/activation/recovery checks. A/B operations remain owned by recab; this does not add live-system activation to Recipe. |
+
+Required scenario commands, after explicit product builds, are
+`cargo xtask test all levitate`, `cargo xtask test all acorn`,
+`cargo xtask test ab-update levitate` and `cargo xtask test ab-update acorn`.
+Use the named scenarios against existing artifacts and user-session libvirt
+(`qemu:///session`); every VM follows repository libvirt conventions. No direct
+QEMU launch. Installer PTY evidence must cover actual interaction even if an
+existing scenario does not yet establish it. PRD10–PRD16 retain implementation,
+consumer and delivery obligations; PRD15 also owns these included product paths
+and their evidence, and PRD17 cannot close while any included outcome is failed,
+blocked or unverified.
+
+**Explicit exclusions:** kernel recompilation as release-scope acceptance (use
+pinned prebuilt/released kernels); macOS or non-x86-64 Recipe runtime support;
+general Linux ABI compatibility or arbitrary Linux metadata fidelity beyond the
+declared product contract; live-system activation by Recipe; a new general
+package solver or global ownership database; and real external AI-provider
+interoperability. Existing RPM/APK package-tool use remains included. Controlled
+autofix/retry acceptance remains included but proves only retry mechanics, not
+external-provider support. The user's latest scope decision indefinitely defers
+all macOS work, including PRD13 macOS CI acceptance. Existing upstream macOS CI
+definitions remain preserved; their execution is not a release requirement. Neither scope
+decision authorizes publication, pushes, upstream comments, tags or security
+execution outside its separately authorized context.
+
+The **scope decisions** are complete. PRD18 records completed local NEEDS
+implementation; its maintained-source delivery remains open. PRD15 is executing
+the included PRD19 product/scenario verification. Required final product and
+delivery evidence remains open until the corresponding checks actually pass;
+the scope checkboxes do not mark PRD01–PRD17 complete.
+
+## Execution order and recovery
+
+PRD02's local contract reconciliation and PRD03's storage candidate preparation
+and PRD06's source reconciliation are complete. PRD08's supported configured
+contract and clock acceptance are complete at `4aa51c1d`; carry that correction
+into the eventual integration. Continue PRD04's export correction
+and PRD07's immediately reviewable material; external
+merge and publication decisions block only their dependents. PRD05 is the main
+integration dependency. PRD09 continues within its authorized security
+context; PRD08 does not waive its final-source findings. Complete final-source PRD10–PRD16 after the runtime
+owners settle, including PRD18's required NEEDS implementation and PRD19's
+included product/scenario acceptance, then present PRD17. PRD18/PRD19 scope
+decisions are resolved; their implementation and acceptance must finish before
+claiming a complete production release.
+
+Active skill: `hdae-development` at
+`.agents/skills/hdae-development/SKILL.md`. Reload the complete skill, required
+references, applicable repository instructions and this current queue after a
+context shift. F03 and the security handoff own detailed evidence, not competing
+current task orders. **Current task:** PRD14 on the authorized maintained source with upstream Gate 11 included. PRD15 / included PRD19 [caller/document/product reconciliation](ginux-contributions/prd15-product-contract.md) retains its separate outcomes. PRD14 is complete on the maintained public source pair, including the requested upstream Gate 11 integration and verified fresh-host/package/consumer outcomes. PRD13's [local CI and 152/152 catalog pass](ginux-contributions/prd13-ci-portability.md); maintained source is now available; hosted Linux acceptance remains pending. PRD10's [152/152 local catalog passed](ginux-contributions/prd10-complete-catalog.md); final delivery acceptance remains open. PRD12's local outcomes pass; final delivery acceptance remains open. PRD11's local consumers pass; final delivery acceptance remains open. PRD09 has returned partial receipts and remains open. PRD18's local implementation remains complete. PRD01 source delivery and PRD05 actual merges remain separate and open.
+The user authorized own-repository source delivery, upstream leading, and
+including upstream Gate 11 PR #249. Both exact source histories are obtainable;
+[delivery-sources.json](ginux-contributions/delivery-sources.json) and the HTTPS
+gitlinks pin the pair. No source-delivery decision remains pending. No upstream
+PR/comment, package release or hosted workflow dispatch is authorized here.
+PRD05
+remains [blocked on actual upstream merges](ginux-contributions/prd05-integration.md),
+and PRD07's local preparation remains preserved in its
+[delivery checkpoint](ginux-contributions/prd07-delivery-waves.md).
+Upstream Ginux always takes precedence; reassess local proposals against its
+actual foundation changes when they arrive.
+F-01's separate `2e88c9ad` backing-close correction now passes focused Daybreak
+verification; frozen `5449e2a1` is preserved. The user has approved link as the
+publication commit point, with late errors reported and consumers rejecting
+non-success. Scoped PRD04 failures are closed; final-source PRD09 is not.
+PRD06's source/test dispositions must be carried into later integration; ordinary
+local passes do not replace required authorized verification.
+Codex owns preparation and pre-review; publication requires permission. This consolidation creates
+no new execution batch, security authorization or external publication approval.
+
+---
+
+# Historical Ginux contribution plan and checkpoints
+
+Everything below is retained historical material. Use the consolidated queue
+above for current ownership, remaining work and production-readiness criteria.
+
+Updated: 2026-11-08. General engineering continuation: local clock contract authorized;
+The configured-storage merge remains the critical integration dependency.
+See [F03's current checkpoint](ginux-contributions/f03-review.md) before using historical results.
+The Daybreak-specific entries below record that separate chat's work and authority.
+The user's latest instruction returns upstream Ginux PR work to Codex, including
+preparation and rigorous pre-review. This supersedes the older Claude-exclusive
+PR ownership below. Publishing a PR still requires explicit user permission;
+pushes and upstream comments remain subject to the existing explicit-authorization
+requirement. F03 and local Recipe integration continue. No security dispatch or
+recurring review schedule is authorized.
 
 This is the remaining contribution queue for the completed local Ginux→Recipe
 implementation. [Local validation](recipe-local-validation.md) owns the previous
@@ -3729,3 +4346,48 @@ Ignored `ginux-current-g08b-park-write-reuse-020f969b/` under the local Daybreak
 On clean local Ginux integration `020f969b` and configured binary SHA-256 `eced4544afb18af9a9a3687aea64a5a219c61587d80f57cda1a38a7a51431c5f`, a disposable single-task packet guest filled its owned channel with sixteen 4000-byte packets, announced readiness, and attempted a 4096-byte atomic packet that could not fit. The host runner observed `ginux: park surface=lane-channel fd=3`, then sent SIGKILL to the identified tracee. Ginux exited 137 with result `signaled/9`, reaped the tracee, and audited `teardown tasks=0 owned-handles=0`; no packet-write success was counted after cancellation. A fresh configured launch on that same temporary image, using the separately retained packet identity fixture, exited 0/result `exited/0` with `g08b-packet-reuse: PASS` and another zero-handle teardown. The image marker and `/work` stayed unchanged.
 
 Ignored `ginux-current-g08b-packet-park-kill-020f969b/` under the local Daybreak evidence directory retains the exact runner, generated blocked-write fixture source/binary, fresh fixture binary, config, both full audits/stdout/results and receipt. Its verified twelve-file SHA-256 manifest digest is `0cbb42df1cb0cce8bf9a7c662093e32341afa348b10b0a380a15d1b6273d5b82`. This selected packet-capacity SIGKILL cancellation and clean next-launch schedule passes; it does not prove all peer-death/last-alias closes, signal targeting across a live shared thread group, simultaneous close/write, high-bit descriptor authority or complete G08b/G07 acceptance. No Ginux/Recipe source changed. G02 guest clock remains held; G17b and G03c/G12 storage failures await Claude; Daybreak/F03 remain partial. Exact next action: recheck upstream wave-one merge state, then inspect the remaining independent Daybreak criteria against current receipts and choose a concrete unverified control or resume the next Recipe consumer case; do not retest storage-dependent failures before corrected upstream source is integrated. No fork push, upstream PR/comment or packet preparation occurred. Active skill: `hdae-development` at `.agents/skills/hdae-development/SKILL.md`; reload the complete skill, required reference and authoritative checkpoint after context shift.
+
+### Current shared-thread SIGPIPE targeting correction — 2026-11-08
+
+A disposable two-thread configured-launch probe found a real G08b/G29 signal-targeting defect on local Ginux integration `020f969b`: a nonleader caller received `-EPIPE`, but the installed SIGPIPE handler ran on virtual task 1 instead of caller task 2. The packet baseline exited 17 and the controlled TCP reset baseline exited 157; both audited handler `gettid` on virtual task 1. `kill(pid, SIGPIPE)` was process-directed even when `pid` named the host thread ID. Local integration commit `e4a43468b6ea46212f33121a65596403695be152` (`fix(launch): direct owned SIGPIPE to the calling thread`) passes the existing host thread-group leader ID through descriptor dispatch and uses `tgkill(tgid, tid, SIGPIPE)` in the owned packet and TCP backends. It adds a tracked `P-packet-sigpipe` thread fixture. This local commit is for Claude to extract if appropriate; no fork push, PR, comment or upstream packet work occurred.
+
+The final configured binary SHA-256 is `995b7c4994f5b22beafe7fe305b0274e53539ea5f065fcfad307d00d67caa3df`. The same direct packet and controlled TCP probes now exit 0/result `exited/0`, audit the handler on virtual task 2, preserve the disposable image and end with `teardown tasks=0 owned-handles=0`. The focused tracked packet mode, full configured thread, pipe and eleven-mode TCP runners, `make check`, and the eight-package Ginux unit selection (134 tests, zero failures) pass on the committed source. These ordinary runners were used to verify this specific security fix; no Recipe e2e or unrelated CI work ran. The ignored `ginux-current-sigpipe-thread-e4a43468/` evidence bundle in the local integration source's `.artifacts/recipe-integration/daybreak-local-security-2026-11-07/` retains the baseline/final probes, exact binaries and fixtures, full audits, commands, commit patch, and ordinary verification logs. Its 38-file SHA-256 manifest was checked; manifest digest `19c189eee62af69eb0c5f47143d2db66c6821f199cc09ccba9990d0dcd28fb92`.
+
+This selected red/green result verifies thread-directed SIGPIPE for the controlled packet and TCP schedules, not all signal races, cancellation interleavings, high-bit descriptor authority, or complete G08b/G29/Daybreak acceptance. G17b inherited-FD budget and G03c/G12 storage authority remain failed pending Claude's storage redesign. Earlier wording that the user imposed a G02 clock-policy "hold" was inaccurate: the assistant framed that choice, and the user has clarified that they issued no such hold. G02 contract behavior remains unresolved; do not attribute a policy hold to the user or count its unrun cases as passes. This chat's active scope is exclusively Daybreak security work; general Recipe integration, routine e2e/CI and upstream PR work belong elsewhere. Exact next Daybreak action: inspect the current G08b copy-fault and cancellation owner paths against retained evidence, then select a distinct deterministic security control; retest storage-dependent failures only after corrected integration source is available. Active skill: `hdae-development` at `.agents/skills/hdae-development/SKILL.md`; reload the complete skill, required reference and checkpoint after context shift.
+
+
+### General Recipe engineering continuation — 2026-11-08
+
+This checkpoint records the general engineering chat, separate from Daybreak.
+The user explicitly authorized configured local realtime/monotonic clocks and
+bounded interruptible sleeps. Earlier assistant-framed “user G02 hold” wording
+is superseded; upstream public clock policy remains unresolved. Ginux local
+commit `a7ce73cd` implements the configured-only contract with a tracked red/green
+regression and no native grant. Recipe `d740fcf` restores fmt/Clippy checks;
+release/e2e builds and a Rust 1.93.0 locked check pass. All 11 selected final-pair
+Recipe cases pass, including all six formerly blocked clock cases and actual
+target metadata/EROFS, lifecycle and dependency consumers. Full Ginux static
+checks and affected task/thread/poll runners pass. Exact source/binary identities,
+original failures, selected evidence and limitations are in
+[F03's current checkpoint](ginux-contributions/f03-review.md); older 130-case
+receipts are not relabeled as current passes.
+
+Storage remains the critical external dependency: upstream main is `53a54add`,
+#232/#233/#243 are open, and the configured-storage candidate `545380dd` has no
+published feature PR. No storage correction/test is declared superseded before
+merged-source comparison. On merge, compare the actual new owners against the
+local storage/descriptor/task/map/exec/archive owners, integrate while retaining
+needed later consumer fixes/tests, and rerun affected Ginux and Recipe checks.
+G17b and G03c/G12 acceptance remain pending that source change.
+
+The user clarified that PR review means pre-review before contribution
+publication, with full diff/dependency/owner/failure/contract/Recipe/CI scrutiny
+and concrete file/line findings. No recurring review is requested or scheduled.
+Claude owns upstream creation and storage redesign. No push, PR, upstream
+comment, security dispatch, branch creation or edit to Claude/recovery worktrees
+occurred. Existing superproject staging and unrelated edits remain preserved.
+Active skill: `hdae-development` at `.agents/skills/hdae-development/SKILL.md`;
+reload it completely, its required references, applicable instructions and the
+current checkpoint after a context shift. Exact next critical action is merged
+storage integration once that dependency becomes available; overall work is
+partial, not complete.

@@ -164,4 +164,18 @@ packages = [
   "mesa-dri-drivers", "mesa-vulkan-drivers", "google-noto-sans-fonts",
   "google-noto-sans-mono-fonts", "google-noto-color-emoji-fonts", "NetworkManager-wifi",
   "wpa_supplicant", "firefox", "systemd-pam",
+  # Battery state and power profiles, mounting removable drives, and the
+  # wallet unlocked at login (pam_kwallet5, which Fedora's SDDM PAM file loads).
+  "upower", "power-profiles-daemon", "udisks2", "kwallet-pam",
+  # Bluetooth, printing (CUPS with driverless network and IPP-over-USB
+  # printers, found through Avahi), video decoding, Thunderbolt, exFAT and NTFS
+  # drives, OpenVPN, and the guest agents of the libvirt test VMs.
+  "bluez", "bluedevil", "cups", "cups-filters", "ipp-usb", "avahi", "print-manager",
+  "mesa-va-drivers", "intel-media-driver", "bolt", "plasma-thunderbolt", "exfatprogs", "ntfs-3g",
+  "NetworkManager-openvpn", "plasma-nm-openvpn", "spice-vdagent", "qemu-guest-agent",
+  # Fonts for documents and CJK text, file thumbnails, manual pages, the
+  # screen reader.
+  "google-noto-serif-fonts", "google-noto-sans-cjk-fonts", "liberation-sans-fonts",
+  "liberation-serif-fonts", "liberation-mono-fonts", "kdegraphics-thumbnailers", "ffmpegthumbs",
+  "man-db", "orca",
 ]

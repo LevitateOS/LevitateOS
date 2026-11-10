@@ -4,6 +4,74 @@ Requested by the user on 2026-11-06 as a written handoff for the monitored
 DaybreakBlue blue-team agent. No cloud agent has been contacted or dispatched.
 Keep this record in LevitateOS; it is not Ginux contribution text.
 
+## Returned PRD09 partial verification and PRD11 corrections — 2026-11-08
+
+The user returned the [562-file exact-source receipts](/home/vince/levitate-development/ginux-prd09/.artifacts/prd09/daybreak-2026-11-08/receipts.md)
+for frozen `fa8be950` / launcher `441de671…`. Read-only manifest verification
+passes 562/562. Selected checks, including joined-source F-01, pass; S09-A–G
+remain partial and S09-H unverified at runtime. T-01 tracked port, T-02/T-03,
+reserved-clone peer-death, remaining persistence races and paired consumer checks
+remain open. See the current [PRD09 record](prd09-security-acceptance.md).
+
+Subsequent ordinary [PRD11](prd11-consumers.md) checks exposed a terminal event
+superseding a held syscall stop and a Git/libcurl resolver eventfd dependency.
+Separate Ginux `f7f0d14c` and Recipe `8014c9b` correct those owners without changing
+frozen source, native policy or limits. All six ordinary consumers pass on that
+pair; affected task-hold and paired Recipe/Git security verification is still
+required. No PRD09 probes were executed or dispatched from the general chat.
+
+## PRD09 current reconciliation and user decisions — 2026-11-08
+
+The general engineering chat's [PRD09 reconciliation](prd09-security-acceptance.md)
+accounts for all material remaining criteria and exact source/receipt limits.
+Separate local `fa8be950` joins the five verified PRD04 corrections with the NEEDS
+and authorized PRD08 donor. Its build/static checks pass; no new security probe was run for
+PRD09 in that chat. The user explicitly chose to **return Daybreak results**, not
+authorize security execution there. App thread listings are empty and no
+send-to-chat tool exists; no dispatch or external message occurred.
+
+The user also approved **link publication as commit point; reject non-success**.
+Late inode/parent reference-close errors may leave the intact archive but still
+must report supervisor-error, including the existing cancellation-error policy.
+Pre-publication backing-close failure must leave no archive. The focused F-01
+receipts on `2e88c9ad` pass and both PRD04 manifests verify; scoped original
+failures are resolved. Neither these results nor the new composition close final
+source PRD09. Upstream's actual storage/source join is still absent. Historical
+clock-hold/ownership wording below is superseded by current user decisions;
+configured clocks are authorized, native upstream policy remains separate.
+
+## PRD08 configured contract successor — 2026-11-08
+
+User-approved configured contract and ordinary acceptance are recorded in
+[PRD08](prd08-public-contracts.md). Candidate `4aa51c1d` over `5300f5ef` confines
+configured large-read admission and adds zero-filled configured sysinfo using the
+strict copy owner. Clock source is unchanged; real duration/adjustment checks
+ran in an isolated libvirt VM. These are ordinary contract checks, not security
+closure. Final-source PRD09 must include the new sysinfo copyout/denial boundary
+and preserve existing G27 protected/shared-buffer criteria. This does not change
+the frozen PRD04 candidate/request or its failed item 5; no new security request
+was dispatched or executed from the general chat.
+
+## PRD04 pinned verification request — 2026-11-08
+
+The general engineering chat prepared isolated candidate
+`5449e2a184bb1147cf618b140a29196b74206b13` at
+`/home/vince/levitate-development/ginux-prd04`, based on PRD02 `5300f5ef`.
+The user explicitly chose to obtain Daybreak verification results rather than
+authorize a verifier in the general chat. Use the [six-item pinned request](prd04-daybreak-request.md)
+for exact binary/fixture identities, baseline controls, ABI-versus-authority
+adjudication, inherited-FD budget, assignment prefixes, stack accounting and
+private backing/transfer/close-error expectations. The [findings ledger](prd04-fd-review.md)
+is provisional; source corrections and ordinary passes are not security closure.
+Returned authorized Daybreak receipts on frozen `5449e2a1` pass items 1–4 and
+selected item 6, but **item 5 fails:** final backing-close error leaves a complete
+final export despite supervisor-error. PRD04 stays open for a separate corrected
+revision/binary hash and focused item-5/affected-export retest. The general chat
+has not run security probes. [PRD06 reconciliation](prd06-reconciliation.md)
+records all source/test/audit dispositions and current open joins. Preserve the
+old evidence below; its older ownership and native clock-hold wording does not
+override the consolidated current queue.
+
 ## Boundary and status
 
 On 2026-11-07 the user designated this chat as the Daybreak security model and
@@ -3172,3 +3240,11 @@ Ignored `ginux-current-g08b-park-write-reuse-020f969b/` under the local Daybreak
 On clean local Ginux integration `020f969b` and configured binary SHA-256 `eced4544afb18af9a9a3687aea64a5a219c61587d80f57cda1a38a7a51431c5f`, a disposable single-task packet guest filled its owned channel with sixteen 4000-byte packets, announced readiness, and attempted a 4096-byte atomic packet that could not fit. The host runner observed `ginux: park surface=lane-channel fd=3`, then sent SIGKILL to the identified tracee. Ginux exited 137 with result `signaled/9`, reaped the tracee, and audited `teardown tasks=0 owned-handles=0`; no packet-write success was counted after cancellation. A fresh configured launch on that same temporary image, using the separately retained packet identity fixture, exited 0/result `exited/0` with `g08b-packet-reuse: PASS` and another zero-handle teardown. The image marker and `/work` stayed unchanged.
 
 Ignored `ginux-current-g08b-packet-park-kill-020f969b/` under the local Daybreak evidence directory retains the exact runner, generated blocked-write fixture source/binary, fresh fixture binary, config, both full audits/stdout/results and receipt. Its verified twelve-file SHA-256 manifest digest is `0cbb42df1cb0cce8bf9a7c662093e32341afa348b10b0a380a15d1b6273d5b82`. This selected packet-capacity SIGKILL cancellation and clean next-launch schedule passes; it does not prove all peer-death/last-alias closes, signal targeting across a live shared thread group, simultaneous close/write, high-bit descriptor authority or complete G08b/G07 acceptance. No Ginux/Recipe source changed. G02 guest clock remains held; G17b and G03c/G12 storage failures await Claude; Daybreak/F03 remain partial. Exact next action: recheck upstream wave-one merge state, then inspect the remaining independent Daybreak criteria against current receipts and choose a concrete unverified control or resume the next Recipe consumer case; do not retest storage-dependent failures before corrected upstream source is integrated. No fork push, upstream PR/comment or packet preparation occurred. Active skill: `hdae-development` at `.agents/skills/hdae-development/SKILL.md`; reload the complete skill, required reference and authoritative checkpoint after context shift.
+
+### Current shared-thread SIGPIPE targeting correction — 2026-11-08
+
+A disposable two-thread configured-launch probe found a real G08b/G29 signal-targeting defect on local Ginux integration `020f969b`: a nonleader caller received `-EPIPE`, but the installed SIGPIPE handler ran on virtual task 1 instead of caller task 2. The packet baseline exited 17 and the controlled TCP reset baseline exited 157; both audited handler `gettid` on virtual task 1. `kill(pid, SIGPIPE)` was process-directed even when `pid` named the host thread ID. Local integration commit `e4a43468b6ea46212f33121a65596403695be152` (`fix(launch): direct owned SIGPIPE to the calling thread`) passes the existing host thread-group leader ID through descriptor dispatch and uses `tgkill(tgid, tid, SIGPIPE)` in the owned packet and TCP backends. It adds a tracked `P-packet-sigpipe` thread fixture. This local commit is for Claude to extract if appropriate; no fork push, PR, comment or upstream packet work occurred.
+
+The final configured binary SHA-256 is `995b7c4994f5b22beafe7fe305b0274e53539ea5f065fcfad307d00d67caa3df`. The same direct packet and controlled TCP probes now exit 0/result `exited/0`, audit the handler on virtual task 2, preserve the disposable image and end with `teardown tasks=0 owned-handles=0`. The focused tracked packet mode, full configured thread, pipe and eleven-mode TCP runners, `make check`, and the eight-package Ginux unit selection (134 tests, zero failures) pass on the committed source. These ordinary runners were used to verify this specific security fix; no Recipe e2e or unrelated CI work ran. The ignored `ginux-current-sigpipe-thread-e4a43468/` evidence bundle in the local integration source's `.artifacts/recipe-integration/daybreak-local-security-2026-11-07/` retains the baseline/final probes, exact binaries and fixtures, full audits, commands, commit patch, and ordinary verification logs. Its 38-file SHA-256 manifest was checked; manifest digest `19c189eee62af69eb0c5f47143d2db66c6821f199cc09ccba9990d0dcd28fb92`.
+
+This selected red/green result verifies thread-directed SIGPIPE for the controlled packet and TCP schedules, not all signal races, cancellation interleavings, high-bit descriptor authority, or complete G08b/G29/Daybreak acceptance. G17b inherited-FD budget and G03c/G12 storage authority remain failed pending Claude's storage redesign. Earlier wording that the user imposed a G02 clock-policy "hold" was inaccurate: the assistant framed that choice, and the user has clarified that they issued no such hold. G02 contract behavior remains unresolved; do not attribute a policy hold to the user or count its unrun cases as passes. This chat's active scope is exclusively Daybreak security work; general Recipe integration, routine e2e/CI and upstream PR work belong elsewhere. Exact next Daybreak action: inspect the current G08b copy-fault and cancellation owner paths against retained evidence, then select a distinct deterministic security control; retest storage-dependent failures only after corrected integration source is available. Active skill: `hdae-development` at `.agents/skills/hdae-development/SKILL.md`; reload the complete skill, required reference and checkpoint after context shift.

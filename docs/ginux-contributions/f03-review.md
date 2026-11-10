@@ -1,5 +1,201 @@
 # F03 — local Recipe consumer verification (partial)
 
+The [consolidated production-readiness queue](../ginux-contribution-task-list.md)
+owns all current remaining tasks, dependency order and ownership. This file
+records source-specific evidence. Its older “next actions” do not override that
+queue; Codex owns Ginux PR preparation and pre-review, with publication requiring
+explicit permission.
+
+## PRD08 configured contract and clock acceptance — 2026-11-08
+
+[PRD08](prd08-public-contracts.md) is complete. The user approved the supported
+configured downstream contract and its AS/CPU/network/poll limits, separately
+from held upstream/native policy, and selected zero-filled configured sysinfo.
+Clean isolated `4aa51c1d` over `5300f5ef` restores native read/pread bounds while
+preserving configured 64 MiB reads; clocks are byte-identical. Static/build/138
+units, sysinfo allowance/denial and failing-base controls, ordinary poll/TCP/
+identity/resources and all six clock-dependent Recipe CLI cases pass on Recipe
+`b4144388` plus this exact candidate. Real 300-second, interruption and active
+realtime-adjustment/cap checks pass in an isolated session-libvirt guest.
+
+Original integration `5300f5ef`, frozen PRD04 `5449e2a1`, storage `9802ef03` and
+runtime gitlinks remain unchanged. Carry `4aa51c1d` into PRD05. PRD04 export
+publication is still failed/open, and final-source security, full consumers/CI,
+source packaging and product acceptance remain required. No native expansion,
+workstation clock change, security dispatch or upstream publication occurred.
+
+## PRD06 reconciliation / PRD04 returned failure — 2026-11-08
+
+The isolated candidate `5449e2a1` at `/home/vince/levitate-development/ginux-prd04`
+contains local read/readv policy, inherited-FD cleanup, assignment-prefix and
+backing-close completion corrections. The [PRD04 ledger](prd04-fd-review.md)
+records the actual ABI/authority contract and remaining criteria. Static checks,
+138 units, ordinary FD bounds, growth/quota/mapping and checkpoint selections
+pass. Existing integration `5300f5ef`, PRD03 candidate `9802ef03`, Recipe and the
+checked-in Ginux pin were not replaced.
+
+Returned authorized Daybreak verification passes items 1–4 and selected item 6
+on frozen `5449e2a1`, but **item 5 fails:** backing-close error leaves a complete
+final export. PRD04 stays open for a separate corrected revision/binary hash and
+focused authorized export retest. No security probe ran in this chat.
+
+[PRD06 reconciliation](prd06-reconciliation.md) is complete as accounting: every
+local commit/hunk, historical test and all 13 Recipe audit findings have explicit
+dispositions. Six fresh ordinary Recipe CLI checks pass on `b4144388`/`5300f5ef`.
+Missing mapping/copy-up/orphan test joins, active shell quoting, inherited leases,
+stalled-Git coverage and native authority/behavior limits remain explicit tasks;
+no final-source or release acceptance is inferred.
+Active skill: `hdae-development` at `.agents/skills/hdae-development/SKILL.md`;
+reload the full skill, required reference, instructions and queue after a context
+shift. No push, PR or upstream comment occurred.
+
+## PRD03 storage preparation checkpoint — 2026-11-08
+
+PRD03 preparation is complete on isolated clean Ginux candidate `9802ef03`,
+feature base `f1c3d3a7` over current main `53a54add` and its explicit prerequisite
+stack. The [storage review](prd03-storage-review.md) records all exact revisions,
+full diffs, spec findings/resolutions, reproduction commands and the local PR
+draft. Static checks, 138 units, catalog-doc check, the full CI build and all
+launch-integration commands pass, including 40 storage launches. Four controls
+fail on preceding sources and pass on the candidate. No publication occurred.
+
+This is a configured-storage foundation, not replacement of F03's integration.
+Recipe remains `b414438`; its integration Ginux remains `5300f5ef`, and the gitlink
+remains unchanged. PRD05 must select explicit storage catalog 3 and reconcile
+all later handlers and lifecycle/export/checkpoint owners before consumer
+acceptance. Open #232/#233/#238/#243/#236, separate zero-fill and explicit
+catalog-2 versioning still need upstream disposition. PRD04/PRD09 findings remain
+open. No PRD03 human decision is pending. Exact next queued action: PRD04;
+external publication needs separate authorization.
+
+Active skill: `hdae-development` at
+`.agents/skills/hdae-development/SKILL.md`; reload the complete skill, required
+reference, applicable instructions and current queue after context shift.
+
+## PRD02 contract checkpoint — 2026-11-08
+
+PRD02 is complete for the approved local integration on Ginux
+`5300f5ef9a8281f4f10f5519d5eb761654e04829` and Recipe
+`b41443880fe585a27bc799d80382c9ff5b07047b`. The
+[contract review](prd02-contract-review.md) records the upstream refresh,
+findings, user-approved explicit catalog 2, unchanged catalog-1 authority/digest,
+actual enforcement/audit owners and limits. Both source changes are locally
+committed; no publication or gitlink replacement occurred. Old-source results
+below remain historical evidence for those revisions.
+
+Final local evidence: 47 contract controls, 14 runtime runners, ordinary
+checkpoint/restore, 50 Ginux units and eight exact Recipe e2e selections pass;
+Ginux static/release/catalog-doc and Recipe release/e2e/fmt/bins-Clippy checks
+pass. The post-commit launcher is byte-identical to the tested binary.
+Evidence and verified SHA-256 manifest are in the integration source's ignored
+`.artifacts/recipe-integration/prd02-contract/`. This is not the full current
+Recipe catalog, redesigned-storage acceptance or production readiness.
+
+No PRD02 user decision remains pending. Runtime-source delivery, upstream
+acceptance and storage integration/revalidation remain PRD01/PRD05/PRD06/PRD07;
+the existing security and clock-boundary criteria remain open under their
+owners. NEEDS remains a required later implementation. Next queued task is
+PRD03, with this contract change included in its dependency comparison.
+Active skill: `hdae-development` at
+`.agents/skills/hdae-development/SKILL.md`; complete reload, required reference,
+applicable instructions and current queue are required after a context shift.
+
+## Earlier general engineering checkpoint — 2026-11-08
+
+This continuation is general Ginux→Recipe engineering, outside the Daybreak chat.
+The user's latest instruction returns upstream Ginux PR work to Codex, including
+preparation and rigorous pre-review. Publishing a PR requires explicit user
+permission. Existing restrictions on pushes and upstream comments remain in
+place; no recurring review schedule is requested. Older Claude-exclusive PR
+ownership statements are superseded. The user's review request
+means pre-review proposed contributions before publication: inspect the complete
+diff and dependencies against current main, trace behavior through its owners,
+and report concrete contract, compatibility, failure-path, test, and CI findings
+with file/line references. Green checks alone do not establish approval.
+
+The user explicitly authorized the local clock contract in this chat:
+host `CLOCK_REALTIME`/`CLOCK_MONOTONIC` reads and bounded interruptible sleep;
+CPU, dynamic and fd clocks stay denied. Earlier assistant-framed “user hold”
+wording is superseded. Upstream #179's public contract is still undecided.
+
+Local Ginux commit `a7ce73cd` at
+`/home/vince/levitate-development/ginux-recipe-integration` implements that
+configured-only contract. The native contract is unchanged. Requests are copied
+once, with scalar poll waits up to 100 ms, relative monotonic time, absolute
+deadline rechecks, EINTR/remaining-time handling and a 300-second monotonic cap.
+README records rounding and ETIMEDOUT limits. The earlier G02 core-policy patch
+was not applied. Binary SHA-256:
+`15463d0178ad40edd987b0a18af85555dcd8e7e64857c6e3f94dc59cd9b9d37f`.
+
+The new tracked clock fixture fails on retained `e4a43468` at the first clock
+read (ENOSYS, guest exit 241), and passes on the new binary. It checks allowed
+and denied IDs, invalid requests, relative/absolute expiry, and interruption
+after multiple wait quanta with SA_RESTART, handler clock reads and relative
+remaining-time output. Full `make check`, release compilation, and full task,
+thread and poll integration runners pass. The first thread run used a stale
+fixture missing the existing SIGPIPE mode; its failure and binary are retained,
+and rebuilding the fixture gives a passing full runner.
+
+All **six formerly blocked Recipe sleep cases now pass** on Recipe `e37109c`
+and the new Ginux binary: silent-work frame timeout, execution deadline,
+interrupt cleanup, coordinator death, before/after checkpoint recovery and
+shared-destination serialization. Exact commands, binary hashes, full logs,
+timings and receipts are in the integration source's ignored
+`.artifacts/recipe-integration/general-20261108/clock-consumer-{0..5}.json`.
+The independent fresh debug build/deadline check also passes. These six passes
+are not combined with 130 passes on older Ginux revisions into a current
+136-case claim. The earlier mixed-target and actual-consumer receipts likewise
+remain evidence for their recorded sources only.
+
+Read-only GitHub refresh found main `53a54addea67969abaa240ea478def1b94130eee`;
+#232, #233 and #243 are open. No configured-storage PR is published.
+Local candidate `prep/configured-storage` is `545380dd`, still unmerged. The
+redesign spec intends to replace G03b/G03c, but no current storage fix or test
+has yet been declared redundant. Current integration uses `fs_hooks`,
+`storage_memory`, descriptor/task, mapping and archive owners; the candidate
+introduces `launch_paths`/`launch_storage` and reshapes VFS. Integration must
+compare those owners semantically, preserve later consumer fixes and useful
+tests, and rerun affected storage/descriptor/thread/exec/map/checkpoint/archive
+and Recipe consumers on the resulting exact revision. G17b and G03c/G12
+failures remain pending that work; unrelated checks do not close them.
+
+Recipe commit `d740fcfc6378e766dd767f8b1b28e869d55c695f` restores package
+formatting and Clippy checks. Nine files have changes beyond rustfmt: existing
+Clippy suggestions, grouped protocol pipes, and shared CLI engine options.
+Comparison with a separately formatted `e37109c` export isolates those changes;
+the other touched files match that formatted baseline. No unit suite is run,
+added or suppressed. Package fmt, Clippy for both bins with `-D warnings`,
+release-bin compilation, e2e compilation, and Rust **1.93.0** locked/offline
+bin checking pass. The MSRV check uses the current workspace lock; it is not a
+GitHub-hosted run or the workflow's unlocked dependency resolution. Original
+fmt/Clippy failures, the cargo-fix sandbox listener denial and corrected run,
+source provenance, diffs and build/check logs are retained in the same directory.
+The final Ginux `a7ce73cd` / Recipe `d740fcf` pair passes **11 exact e2e
+selections**: all six formerly blocked sleep cases, target metadata through
+publication/reimport/EROFS/deployment, CLI install/reuse/removal, transitive
+dependency compilation, and two static metadata queries. Exact receipts use
+`ci-consumer-{0..10}.json`. `summary.json` records source and binary identities;
+77 retained evidence files were hashed and the manifest verified from its
+correct base directory. Manifest SHA-256:
+`e1b9a3c7bc0deb7cd1193e41a7d3a2a53a9f7ed0861032b12e05a48f2bbe3fb0`.
+The standalone manifest command first used the wrong cwd and failed to locate
+relative entries; the correct-directory verification passes. No runtime result
+was inferred from that wrapper failure.
+
+Active skill: `hdae-development`, discovered at
+`.agents/skills/hdae-development/SKILL.md`; full reload, required references,
+applicable instructions and this checkpoint are required after a context shift.
+Next: when the upstream storage prerequisites and feature actually merge,
+compare the merged owners with this exact local integration, determine which
+older fixes/tests they replace, integrate locally, and rerun affected Ginux and
+Recipe checks. Keep prior 130-case/default/platform and storage acceptance
+claims revision-specific and incomplete. Both changed source repositories are
+clean and locally committed. Superproject documentation updates remain
+unstaged alongside the preserved earlier staging and unrelated edits. Overall
+integration remains partial.
+
+## Historical 436c4ae5 / 2ad833c checkpoint
+
 Current local Ginux source is `436c4ae5843e4d50f4833158d351523f35669909`, based on
 upstream `59e2f7aa`, at `/home/vince/levitate-development/ginux-recipe-integration`.
 Current Recipe checkout is `2ad833cc93f0e209fe205adb4186a822a13caaea`; its last

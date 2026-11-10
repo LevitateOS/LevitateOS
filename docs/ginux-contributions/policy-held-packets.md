@@ -1,4 +1,20 @@
-# G01/G02 preparation disposition
+# G01/G02 policy and preparation disposition
+
+[PRD08's supported contract](prd08-public-contracts.md) owns current release
+policy. The user explicitly approved the versioned configured downstream
+contract, including local clocks, while upstream/native holds remain separate.
+Candidate `4aa51c1d` preserves clock implementation `a7ce73cd` byte-for-byte;
+actual 300-second, interruption and guest-only realtime-adjustment acceptance
+passes under session libvirt, and all six Recipe clock consumers pass.
+
+There is no local user clock hold. #207's policy/shared-array report remains
+upstream work; its head is untouched and its kernel-array path is not the
+configured public-descriptor poll owner. #179/#163/#178/#219 still block their
+own upstream/native proposals. They do not remove the user's required configured
+behavior. PRD01 still selects the actual maintained source; publication remains
+separately authorized. See PRD08 for all supported limits and delivery impacts.
+
+## Historical review records
 
 These records preserve the active holds from P02; they do not turn pending policy
 into approval or remove these packets from the final package.

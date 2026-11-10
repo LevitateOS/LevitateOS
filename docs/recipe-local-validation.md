@@ -1,5 +1,10 @@
 # Local Recipe integration validation
 
+These results belong to the exact historical sources and artifacts named below.
+The [consolidated production-readiness queue](ginux-contribution-task-list.md)
+owns remaining work; [F03](ginux-contributions/f03-review.md) records later
+verification. This document is not a final-current-source production pass.
+
 This delivery implements the [ordered task queue](recipe-simplification-implementation-plan.md).
 The [interface record](ginux-recipe-interfaces.md) describes current behavior.
 All changes stay local: no Ginux PR, push, remote-text edit or maintainer message

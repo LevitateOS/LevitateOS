@@ -1,5 +1,77 @@
 # Ginux PR inventory — 2026-11-06
 
+Use the [consolidated production-readiness queue](../ginux-contribution-task-list.md)
+for current work and completion criteria. This inventory records candidate
+history and upstream/source facts; historical packet status is not final
+production acceptance.
+
+## PRD08 configured contract successor — 2026-11-08
+
+[PRD08](prd08-public-contracts.md) records the user-approved versioned downstream
+contract, all native/upstream delivery holds, and complete clock acceptance.
+Clean local `4aa51c1d` over `5300f5ef` confines configured large reads and adds
+zero-filled configured sysinfo. All six clock-dependent Recipe cases pass;
+actual five-minute and realtime-adjustment checks pass under session libvirt.
+Carry its four-file delta into PRD05; storage/PRD04 composition, source packaging,
+final security and publication remain separate. Original pinned candidates and
+upstream PRs were not changed.
+
+## PRD06 reconciliation — 2026-11-08
+
+The [complete reconciliation](prd06-reconciliation.md), [source ledger](prd06-source-inventory.json)
+and [test retention record](prd06-test-retention.md) supersede old inventory
+completion claims. They account for all 246 source commit entries, 47 packet
+entries and every useful hunk/test against current main `53a54add` and storage
+`9802ef03`, including native #241/#242/#244–248 and downstream boot scratch.
+PRD06 is complete as accounting. PRD04 remains failed/open for export publication
+after backing-close error; storage integration, test ports, Recipe callsite/lease
+joins and final security/product acceptance remain open. No publication occurred.
+
+## PRD03 storage candidate — 2026-11-08
+
+The current prepared candidate is clean local `9802ef036d53ae1ee5276fe59cc719389dda5879`
+at `/home/vince/levitate-development/ginux-storage-prd03`, feature base `f1c3d3a7`,
+main `53a54add`. See the [complete pre-review](prd03-storage-review.md) and
+[unpublished PR draft](prd03-storage-pr-draft.md) for the full patches, exact
+prerequisite/source chain, each storage-spec resolution, four red controls and
+final-source checks. All upstream unit tests and CI steps remain; 138 units,
+40 storage launches and every local launch-integration CI command pass.
+
+Publication remains blocked by open #232/#233/#238/#243/#236, separate zero-fill
+and the unpublished explicit catalog-2 prerequisite, followed by merged-source
+refresh and user authorization. Catalogs 1/2 keep authority/digests; storage
+selects catalog 3. PRD05 must reconcile this foundation with Recipe's catalog-2
+renderer and later runtime owners. Existing PRD04/PRD09 findings remain open.
+The donor `545380dd` and older facts below are history, not the current candidate.
+No push, PR, upstream comment, Recipe integration or gitlink replacement occurred.
+
+## General engineering continuation — 2026-11-08
+
+The user's latest instruction returns upstream Ginux PR preparation and creation
+to Codex, superseding older Claude-exclusive PR ownership. Publishing a PR
+requires explicit user permission; pushes and upstream comments also remain
+subject to explicit authorization. Codex must pre-review any proposed Ginux
+contribution before publication: inspect
+the complete diff and dependency chain against current main, trace behavior
+through its owners, check failure paths, contracts, Recipe compatibility,
+tests and CI, and report concrete file/line findings. Passing CI alone does
+not justify approval. The user clarified that this is a pre-publication
+review requirement, not a request for recurring review. No schedule was made.
+Pushes, PR creation and upstream comments still require explicit authorization.
+
+Read-only refresh found main `53a54addea67969abaa240ea478def1b94130eee` and
+storage prerequisites #232, #233 and #243 open. The local configured-storage
+candidate remains `545380dd49ea432d9e84e6b956f129f48c72822e`; no feature PR is
+published. Its replacement scope remains provisional until merged-source
+comparison and affected checks establish which local fixes/tests it replaces.
+The old preparation tables below are historical, not current readiness claims.
+
+The user authorized a configured-only local clock contract. Local integration
+commit `a7ce73cd` implements realtime/monotonic reads and bounded interruptible
+sleep without changing native policy or publishing upstream. Six formerly
+blocked Recipe sleep cases pass with exact-source receipts. See
+[F03](f03-review.md) for the current consumer/CI checkpoint and storage blocker.
+
 Starting point for review → fix → PR. Built from live git/GitHub state plus the
 earlier preparation record (`docs/ginux-contribution-task-list.md`,
 `.artifacts/ginux-contribution-preparation/upstream-contract-refresh-2026-11-06/current-inventory.json`).
@@ -94,6 +166,119 @@ returns ECHILD for adopted children because host `wait4` sees the real parent.
 - **SIGCHLD follow-up to #234 dropped.** `rt_sigaction` is ENOSYS in the native lane and the
   default disposition discards SIGCHLD, so a virtual SIGCHLD to init is unobservable today.
   It becomes relevant only once upstream mediates signal handlers.
+
+### Published 2026-11-07: #243 launch contract enforcement
+
+#237 (Gate 10.5: `[userspace.contract]` recipes, `ginux instance validate|inspect|explain|diff`,
+`[userspace.filesystem]`, pre-boot hooks, root drops to 65534) merged as `53a54add` from head
+`af8852cd`, later than the `e29a2130` we pre-stacked on. It still does not enforce the contract
+in `ginux launch`.
+
+The fix is `fix/launch-contract` on `53a54add` (pushed to our fork;
+the old main-based tip `2d70a97d` and `fix/launch-contract-on-237` are superseded):
+`b9b24355` (enforce the resolved instance contract) and `067d992f` (honor a disabled audit
+mode). Code identical to the e29a2130 version; only doc context and wording changed. All 7 CI
+steps pass, commit 1 passes on its own, and the new test-launch.py fails on `53a54add`.
+Four cold reviews; the fourth (after #237 merged) found no bug in the enforcement path. Since
+the main-based version it:
+- refuses explicit `InstanceDeny`/`RecipeDeny`/`ExactDeny` of what launch cannot enforce:
+  console input, `/proc`, `/sys`, cgroup and clock reads, plus vDSO-served clock syscalls;
+- treats operations the catalog never grants, and the network families, as enforced, so the
+  example recipes' `dev.mmio.direct`/`dev.dma.direct`/`network.packet.raw` denials launch. A
+  compile-time assertion keeps every socket and io_uring syscall out of launch;
+- writes `policy-rule=` in audit records, as native does;
+- lets an explicit syscall deny win over a family that is only not granted (shared
+  `runtime_rule`, so native too);
+- widens the shared families with mremap, madvise, rt_sigreturn, pidfd_send_signal,
+  setreuid and setregid. Every shipped profile/recipe grants each of these with its family;
+- documents what launch cannot enforce, that minimal-v1/strict-v1 give no console output,
+  fstat under a `filesystem.path.read` deny, the shared-mapping write residual, that launch's
+  own bootstrap (chroot, privilege drop, workdir creation, exec of init) precedes the
+  contract, and that legacy `[contract]` selectors audit `policy-rule=0`.
+
+The signal family relies on #238 closing the fcntl/ioctl signal-driven I/O path; the PR body
+says so. Published as [gmkurtzer/ginux#243](https://github.com/gmkurtzer/ginux/pull/243).
+
+Pre-existing on main, found by the fourth review, candidates for separate PRs:
+- `ginux launch` accepts and ignores `[hooks] pre_boot`, `[volumes]`, `[userspace.filesystem]`
+  and `[access]`; its workdir `mkdirat` runs as root before the drop and ignores `write_deny`.
+- README ("drops to UID/GID 1000") and the launch header (`tracee-uid=1000`) are wrong since
+  #237: root drops to 65534/65534.
+- Native classifies console read/write only on its protected console fd, so writes to fd 0-2
+  or a dup escape a `dev.console.write` deny in systemd mode.
+- Legacy `[contract]` instance allow/deny selectors always record `source_rule` 0
+  (`apply_selector` never sets it). Fixing it changes digests.
+
+### Published 2026-11-07: #236 chrooted stdio directories
+
+[gmkurtzer/ginux#236](https://github.com/gmkurtzer/ginux/pull/236), branch `fix/stdio-directories`
+(`1f43d7fa`: rebased onto `53a54add` after #237 conflicted on imports; its close_range setup
+failure moved from 133, now process-native's identity drop, to 127; force-pushed). `ginux launch` and `ginux native` refuse to start when stdin,
+stdout or stderr is a directory (or can't be checked), and `ginux native` now closes every
+other inherited descriptor (its loop stopped at 256). Found by the 4th storage review; on main
+a host directory as stdin let the workload read host files, and in native systemd mode
+`fchdir(0)` led to a full escape. Tests fail on main and pass; all 7 CI steps pass locally.
+
+Not in the PR, pre-existing and recorded only here:
+- A root with procfs mounted exposes host process roots via `/proc/<pid>/root`. The README
+  says so as a limit.
+- `fcntl` had no argument filter in balanced, so `F_SETOWN`/`F_SETSIG` on a stdio pipe let a
+  workload signal a host process that shares uid 1000 (reproduced: it killed a uid-1000
+  `sleep`). Reworked after a cold review as `fix/fcntl-signal-routing` (`efaeeca8`): new
+  `ginux_core::signal_driven_io` also covers ioctl FIOASYNC/FIOSETOWN/SIOCSPGRP, which native
+  systemd mode admits, and the terminal case where O_ASYNC alone signals the foreground group.
+  Core, launch and native tests fail on main and pass; all 7 CI steps pass; merges cleanly.
+  Published as [gmkurtzer/ginux#238](https://github.com/gmkurtzer/ginux/pull/238).
+
+
+### Prepared, not published (2026-11-07, on upstream main 59e2f7aa)
+
+Upstream merged #235 (Gate 10.25: the "domain" model is now "instance"; `make check` fails on
+the old word anywhere in product files). Everything below is rebased onto it and renamed. #233
+conflicted with the rename; it was rebased and force-pushed (`f751cd6f`), and CI is green again.
+#232 and #234 still merge cleanly.
+
+| Candidate | Branch | Base | State |
+| --- | --- | --- | --- |
+| Launch contract fix | `fix/launch-contract` (`b9b24355`, `067d992f`) | main `53a54add` | Published as #243 |
+| VFS zero-fill fix | `fix/vfs-truncate-gap` (`6f11d011`) | main | Ready: test reads `secretx` on main |
+| Configured storage | `prep/configured-storage` (`545380dd`) | #232, #233, contract, zero-fill | Review-3 findings fixed; all 8 CI steps green, 120 units |
+
+**Launch contract fix.**
+- Commit 1 checks the resolved contract at every syscall entry.
+  - It classifies path calls and console writes. Console reads are not classified, because
+    any fd may be read, so a dup of stdin would evade it.
+  - Descriptors and ioctl requests are compared as 32-bit values.
+  - Audit entry records, including those of lane-completed calls, carry the operation and
+    its policy source.
+- Commit 2 honors disabled audit.
+
+**Storage, after review 3:**
+- Resolution follows the kernel's bounds where it can: 40 links, EBADF for bad dirfds, and a
+  NULL path accepted with `AT_EMPTY_PATH`. The remaining limits (255-byte paths and link
+  targets, no `/proc` links, `..` not checked for search permission) are documented.
+- An assignment through an image link or file above its last component is rejected at
+  startup. That removes the precondition for B1.
+- A workdir held in memory is not created in the image.
+- The scratch area falls back from below the stack pointer to the live stack, saved and restored.
+- `writev` checks its whole iovec array before writing anything.
+- One table of path calls drives both launch classification and storage dispatch.
+- Linux errno and order fixes:
+  - `O_RDONLY|O_TRUNC` truncates;
+  - `x/` with `O_CREAT` gives EISDIR;
+  - `AT_REMOVEDIR` on a file gives ENOTDIR;
+  - `W_OK` on an unassigned ancestor gives EROFS;
+  - flags are validated before path lookup.
+- The zero-fill commit no longer drops #232's tests.
+
+**Publication order:**
+- #232 and #233 merge first.
+- The contract fix and the zero-fill fix are independent.
+- Storage opens after all four have merged.
+
+**Open item, not ours yet:** on #207, hafid-logic flagged that bounded poll validates the
+pollfd array from a PEEKDATA snapshot while the kernel reads the live array. The maintainer has
+paused review. Fix it when #207 work resumes.
 
 ### Outside the storage chain (checked 2026-11-07)
 
@@ -203,3 +388,88 @@ so the stack is internally inconsistent and needs rebuilding bottom-up.
    SQLite/Cargo, nonleader mappings) can't be validated end-to-end.
 5. The earlier prep process was very heavy (R01–R04/F01–F04 receipts per packet,
    DaybreakBlue handoffs). Its test evidence is useful; its ceremony isn't required here.
+
+
+### Codex PR #207 conflict update — 2026-11-07
+
+At the user's explicit request to resolve #207's merge conflicts, Codex pushed
+`5ae058f211905c6cb0c92a874e5bc97f333a23a3` to `codex/bounded-console-poll`.
+It merges upstream main `ff926d0c` into existing head `e7f5f552`, retaining both
+parents and history. The main.rs resolution preserves upstream native/systemd
+mediation and passes the currently traced `host_pid` to bounded polling validation
+in the balanced path. PR body/comments were unchanged. Both required GitHub CI
+jobs passed ([run](https://github.com/gmkurtzer/ginux/actions/runs/42314014072));
+this did not resolve the existing policy hold or reported shared-array race.
+Claude now owns all further upstream work. Codex will push nothing further to the
+fork and will only change its local Ginux integration source for Recipe consumers.
+
+
+### Codex local Recipe integration — 2026-11-07
+
+Codex's own integration source is
+`/home/vince/levitate-development/ginux-recipe-integration` (separate from the
+preserved F02 source and Claude's worktrees). Local commits for extraction:
+
+- `91e244c1`: per-task descriptor syscall results/arguments and poll snapshots.
+- `78f96df1`: bounded libc threads sharing process descriptor/cwd/executable
+  resources, blocked-IO handle pins, fork/wait ownership and last-thread teardown.
+  Ordinary thread/process/exec checks and the actual Recipe Bash reader pass.
+
+These are local consumer fixes, not refreshed upstream packets or a publication
+readiness claim. G07's shared-argument security hold remains pending. Known B1–B3
+storage defects are unchanged. No fork push, PR or upstream comment was made.
+
+
+Codex local integration update: `8981bf77` now descends from upstream main
+`59e2f7aa` (instance rename); shared-thread fixes rebase as12c176d4/4a8d50f7.
+Recipe's direct `[instance]` renderer isf70b35d. Ordinary local checks and the
+Bash consumer pass; actual Cargo linker EAGAIN is still under diagnosis.
+This changes no upstream packet, fork branch, PR or publication status.
+
+
+Codex local consumer fixes after the instance rebase: `12c4ea80` reports one
+bounded task-creation resource failure; `062fb5ef` uses32 configured task slots
+after the actual concurrent Cargo linker tree exhausted16. Exact-bound/reuse
+checks and the unchanged real Cargo/cache/compiled-program consumer pass.
+Both commits are local extraction material only; no upstream action was taken.
+
+
+Codex local extraction note: `e9a2f8a0` admits musl's exact native pthread clone
+flags0x7d0f00 alongside glibc0x3d0f00 through the existing shared-thread owner.
+The real static Rust Cargo/cache consumer now starts/joins its thread; default
+linker threading stays enabled. This is local consumer evidence only. No fork
+push, upstream PR/comment or storage redesign was performed.
+
+
+Codex local extraction note: `6a19a70a` completes blocking pipe writes across
+the unchanged64KiB buffer, retaining per-task vector/progress state and waking
+peer readers. Actual rpm2cpio previously delivered only4096 of170444 bytes; the
+unchanged RPM pipeline now passes strict payload/mode/ownership/link checks.
+The new write/writev regression fails on its parent and passes on this commit.
+Recipe0c4f0d4 separately fixes fixed-PATH/explicit-tool input collisions. Actual
+managed APK acquisition/execution also passes. No storage redesign, upstream
+publication or fork push occurred.
+
+
+Codex local extraction note: `436c4ae5` tracks configured process-group umask
+(shared by threads, copied on fork, preserved on exec) and applies it to owned
+creation. GCC otherwise interpreted ENOSYS as the prior mask and produced mode
+0645. The unchanged actual SQLite consumer now verifies0755, lock contention,
+sum33 and integrity; Git/RPM/APK/GNU/musl also pass this source. No native-lane
+change or upstream storage redesign/publication was made.
+
+
+Codex local verification note: G02 remains held by the user's explicit choice.
+The ordinary Recipe sleep/deadline case on436c4ae5 fails with realtime-clock
+ENOSYS; another ordinary shared-destination case needs the same guest sleep
+capability and is unrun. Independent verification continues. No clock grant,
+upstream implementation, PR/comment or fork push was made.
+
+
+Codex local review checkpoint: Ginux436c4ae5 / Recipe runtime0c4f0d4, fixture
+source2ad833c.100 independent e2e cases and six actual consumers pass; G02's
+failed sleep case and its unrun dependent case stay held by user choice, and
+33 monitored e2e cases plus mixed targets remain pending. Current upstream is
+still59e2f7aa; #232–#234 are open. Local corrections are committed for inspection;
+Claude retains all upstream extraction/review/publication ownership. No push,
+PR/comment or security dispatch occurred.

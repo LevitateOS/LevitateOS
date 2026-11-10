@@ -1,5 +1,11 @@
 # Recipe simplification implementation plan
 
+T01–T27 remain completed implementation history within their stated scope.
+The [consolidated production-readiness queue](ginux-contribution-task-list.md)
+now owns all remaining work and current ownership/publication rules. Older
+active-task, lane, permission and “next action” statements below are historical;
+they do not reopen completed tasks or override the current queue.
+
 Updated: 2026-11-06. Status: implementation active under the user’s “go and make a goal” authorization.
 
 This is the authoritative remaining-work queue for Recipe simplification and

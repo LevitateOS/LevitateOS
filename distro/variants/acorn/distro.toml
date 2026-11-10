@@ -130,4 +130,15 @@ packages = [
   "mesa-dri-gallium", "elogind", "polkit-elogind", "dbus", "dbus-x11", "pipewire",
   "wireplumber", "pipewire-pulse", "pipewire-alsa", "networkmanager", "networkmanager-wifi",
   "network-manager-applet", "breeze-icons", "font-noto", "firefox",
+  # Mounting removable drives, trash, phones and cameras (gvfs), the keyboard
+  # layout settings, monitor settings, portals for Firefox's file dialogs, and
+  # notify-send.
+  "udisks2", "gvfs", "gvfs-mtp", "gvfs-gphoto2", "setxkbmap", "xrandr", "xdg-desktop-portal",
+  "xdg-desktop-portal-lxqt", "libnotify",
+  # Video decoding, Vulkan, firmware updates, exFAT and NTFS drives, OpenVPN.
+  "mesa-va-gallium", "intel-media-driver", "vulkan-loader", "mesa-vulkan-intel", "mesa-vulkan-ati",
+  "fwupd", "exfatprogs", "ntfs-3g", "networkmanager-openvpn",
+  # Metric-compatible fonts for documents, file thumbnails, spelling, manual
+  # pages.
+  "font-liberation", "ffmpegthumbnailer", "hunspell-en", "mandoc", "man-pages",
 ]
