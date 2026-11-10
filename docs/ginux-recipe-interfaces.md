@@ -24,9 +24,10 @@ binds the tested runtime and remaining source-delivery/security acceptance.
 
 The builder uses the current Recipe library and its matching CLI (or explicit
 `RECIPE_BIN`), binds typed declaration inputs and consumes validated named
-outputs. It forwards `GINUX_BIN`, `GINUX_ROOT`, `GINUX_ROOTFS`,
-`RECIPE_WORKER_BIN` and `RECIPE_FRAME_TIMEOUT_SECS`; other ambient Recipe/Ginux
-controls are removed. Whole-coordinator bootstrap privileges and appropriately
+outputs. It builds the launcher from `tools/ginux` and sets `GINUX_BIN` to it and
+`RECIPE_WORKER_BIN` to the CLI it runs, whatever the environment says; it
+forwards `GINUX_ROOT`, `GINUX_ROOTFS` and `RECIPE_FRAME_TIMEOUT_SECS`; other
+ambient Recipe/Ginux controls are removed. Whole-coordinator bootstrap privileges and appropriately
 privileged consumers are required; launcher-only sudo wrappers lose channels.
 See [Linux setup](../tools/recipe/docs/setup-linux.md) and
 [runtime limits](../tools/recipe/docs/runtime-limits.md).
