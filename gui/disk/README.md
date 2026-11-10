@@ -21,12 +21,13 @@ disk). Nothing has been handed to a real agent: `fixtures/agent` stands in for
 it and removes only inside a sample tree. How a real Codex or Claude Code is
 started, and that it answers with the events below, is not built.
 
-**The two-systems tab runs against a stand-in only.** recab has no `compare`
-command: it has `inventory`, which reads one system, and
-`prepare` finds the differences in order to copy them, not to show them.
-`fixtures/recab`
-plays the answer this window needs; what it needs is written down under "What
-it asks of recab". No real pair of systems has been compared.
+**recab has the comparison now; no real pair of systems has been compared.**
+`recab compare` (tools/recab `760a60b`) answers in the shape written down
+under "What it asks of recab". It was run on two sample trees with its
+`--roots` form, and this window drew that answer; the two-slot form, which
+mounts the other partition, has never run on an A/B system. The stories still
+use `fixtures/recab`, which plays a system from before, a next system and two
+identical ones without a disk.
 
 ## What a person sees
 
@@ -178,19 +179,20 @@ And one command, run as root, that reads both systems and changes neither:
 recab compare --json --machine-events
 ```
 
-While it reads, it reports on its standard error with the events below
-(`plan`, `step`, `progress` with `unit: "bytes"`, `failed` with a `reason`).
+While it reads, it reports on its standard error with the events below. The
+real recab sends `plan`, `step` and `done`, and no `progress`: the bar moves
+without saying how far it is. A failure is recab's one JSON error object.
 When done it writes one JSON object on its standard output:
 
 | Field | What |
 |---|---|
 | `schema_version` | `1` |
-| `running`, `other` | each: `slot`, `device`, `files`, `bytes` |
+| `running`, `other` | each: `slot`, `device`, `files` (files and links, not folders), `bytes` (each hard-linked file once) |
 | `other.role` | `copy` (made as one, nothing changed since), `previous` (the system from before the last change) or `next` (holds a change that is not started) |
 | `same` | `files` and `bytes` that are the same in both |
-| `folders` | every folder down to the depth recab chooses, each with its whole size on both sides: `path`, `running_bytes`, `other_bytes`. The maps are drawn from this |
+| `folders` | every folder down to the depth recab chooses (three names below `/`), each with its whole size on both sides: `path`, `running_bytes`, `other_bytes`. The maps are drawn from this |
 | `own` | paths that differ by design, because each system names its own partition; not counted as differences |
-| `differences` | one per path: `path`, `change`, `running_bytes`, `other_bytes`, and `detail` for `metadata` |
+| `differences` | one per path: `path`, `change`, `running_bytes`, `other_bytes`, and `detail` for `metadata`. A folder that only one system has stands for all it holds |
 | `more` | how many differences were left out of the list, if it was cut |
 
 `change` is `only-running`, `only-other`, `content` (the content differs) or
@@ -227,8 +229,8 @@ on its input as `{"question": id, "answer": "..."}`. When asked what differs bet
 
 ## Not done
 
-- `recab compare` does not exist. With the real recab the second tab opens
-  with what the two systems are, and "Compare" ends with recab's refusal.
+- A comparison of a real pair of systems: `recab compare` has only run on
+  sample trees. It says no byte progress, so the bar cannot say how far it is.
 - The kept comparison is one file in the person's cache
   (`DISK_GUI_KEPT`); nothing checks that it belongs to this computer's disks
   beyond recab's revision number.
