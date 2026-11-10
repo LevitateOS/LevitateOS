@@ -1,7 +1,7 @@
-# Recipe sources: design (2026-11-10, accepted, steps 1 and 2 of 5 built)
+# Recipe sources: design (2026-11-10, accepted, steps 1 to 3 of 5 built)
 
 Where the recipes a person can browse and install come from, when they are not
-all on the computer. Steps 1 and 2 of the order of work are built.
+all on the computer. Steps 1 to 3 of the order of work are built.
 
 It fills the gap [the format design](recipe-front-end-format.md) left open
 ("several Git repositories as sources, and what happens when two hold the same
@@ -121,7 +121,9 @@ out of date.
   where that commit cannot be told.
 - `files` are the recipe file and the files beside it that share its name
   (`ripgrep.svg`, later `ripgrep.nl.toml`). A catalog stays one flat folder.
-  A recipe's `name` must equal its file name.
+  A recipe's `name` must equal its file name. A base the recipe `extends` is
+  listed among its files too, so it is fetched with it. Every `.rhai` file of
+  a source must be a recipe on its own.
 - An entry has no `path`; the client knows where it put the file.
 - `recipe index` writes nothing when a recipe does not compile. A published
   index has no `problems`.
@@ -219,30 +221,54 @@ without a new image.
 
 ## 5. Installing from a remote source
 
-`recipe install levitate:ripgrep`, as root:
+Naming a recipe of a remote source downloads it. This happens where a name
+becomes a file, so every command that takes a recipe works on it, and so does
+root's install on an image, which hands the file to recab.
 
-1. Fetch the source's index.
+`recipe install levitate:ripgrep`:
+
+1. Fetch the source's index. If the source cannot be reached, the index kept
+   from before is used, with a warning.
 2. Find the recipe and every recipe it needs (`deps`, `build_deps`, and
    theirs). A needed name is looked up in the recipe's own source first, then
-   in the sources its `repo.toml` lists under `uses`.
-3. With `--sha256 HASH`: stop if the index's checksum for the recipe file
-   differs. The message says the recipe changed since it was looked at.
-4. Download each file at the index's `commit` and check its SHA-256 and size.
-5. Put the recipe and the recipes it needs in one folder under
-   `/var/lib/recipe/fetched/` and run it from there as a local collection is
-   run today. The engine and Ginux see no difference.
+   in the remote sources its `repo.toml` lists under `uses`.
+3. Download each file at its index's `commit` and check its SHA-256 and size.
+   A file already there with the right checksum is not fetched again. A file
+   that differs stops everything before anything runs.
+4. Put the recipe and the recipes it needs in one folder,
+   `fetched/SOURCE/NAME-KEY/` under the package root, and run it from there
+   as a local recipe is run today. The engine and Ginux see no difference.
+   The key is made from every file in the folder, so a change to a needed
+   recipe gives a new folder and an installed one is never rewritten.
+5. With `--sha256 HASH`: stop unless the recipe file has that checksum. The
+   message says the recipe changed since it was looked at. This holds for a
+   recipe from a folder as well.
+
+`install` and `update` fetch the index first and keep the copy under the
+package root. Any other command (`info`, `validate`, `inspect`) uses the kept
+index and puts its copy in the cache.
 
 The receipt gains three fields beside `recipe`: `source`, `commit` and
-`sha256`. `recipe` points at the kept copy, so `remove` still needs neither
-the network nor the source.
+`sha256` (of the recipe file). `recipe` points at the kept copy, so `remove`
+still needs neither the network nor the source. A package from a folder has
+none of the three.
 
-`recipe update NAME` reads the source from the receipt, fetches that source's
-index and installs when the recipe file's checksum differs. A package
-installed from a folder updates as today.
+`recipe update NAME` reads the source from the receipt and names
+`SOURCE:NAME`. When the folder that comes back is the installed one, nothing
+is run and the result says `current`. Otherwise the new copy is run and the
+older copies are removed. `recipe remove NAME` removes every kept copy of that
+recipe.
 
-`recipe updates --json` (asked for by the front end, not built) compares each
-receipt with the kept index of its source and lists the ones that differ, with
-the old and new version.
+Not built with this step:
+
+- `recipe updates --json`: comparing each receipt with the kept index of its
+  source and listing the ones that differ. It comes with the front end.
+- `recipe fetch` for icons, the same.
+- The receipt recab keeps for root's software on an image
+  (`tools/recipe/src/system.rs`) does not record the source. Install and
+  update work there because the name is resolved before recab is called; what
+  is missing is the record.
+- A needed recipe from a source that is a folder on this computer.
 
 ## 6. Two sources, one name
 
@@ -293,6 +319,12 @@ holds regardless:
    served from this computer over HTTP; not against a forge, and not with a
    shipped source file.
 3. Install and update from a remote source, and the receipt fields.
+   Built 2026-11-10. Tried against a source served from this computer: the
+   download with a needed recipe, a changed file refused, `--sha256`, the
+   receipt, update when nothing changed and when the source changed, remove.
+   The package itself was activated from a stand-in tree: no recipe was run
+   to the end, because that needs root and a working Ginux. Not tried:
+   `uses`, a base, a forge, root's install on an image through recab.
 4. The `recipes` repository with its CI, and the builder writing the copy into
    the image in place of `/usr/share/recipe/recipes`.
 5. The front end: the source on every recipe, refresh, the sources page.
