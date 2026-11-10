@@ -22,7 +22,9 @@ class SystemPage : public Page {
 public:
     using Page::Page;
     void show(const Status &status);
-    void showProblem(const QString &problem);
+    // `asAdministrator`: the read failed for lack of rights, so offer to
+    // read with the administrator's password.
+    void showProblem(const QString &problem, bool asAdministrator = false);
 signals:
     void ask();
     void addUpdate();
@@ -35,6 +37,7 @@ signals:
     void fix(const QString &prompt);
     void retry();
     void readAgain();
+    void readAsAdministrator();
 };
 
 // Say the change in words; an agent works out how.

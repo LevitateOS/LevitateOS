@@ -5,6 +5,7 @@
 #include "scan.h"
 #include "words.h"
 
+#include <QFile>
 #include <QHash>
 #include <QHeaderView>
 #include <QJsonArray>
@@ -463,22 +464,65 @@ private:
     QString words_;
 };
 
-SystemsState SystemsState::fromJson(const QJsonObject &object)
+// One field of an os-release file, without its quotes.
+static QString osField(const QString &path, const QString &field)
+{
+    QFile file(path);
+    if (!file.open(QIODevice::ReadOnly))
+        return {};
+    for (const QByteArray &raw : file.readAll().split('\n')) {
+        const QString line = QString::fromUtf8(raw).trimmed();
+        if (line.startsWith(field + QLatin1Char('=')))
+            return line.mid(field.size() + 1).remove(QLatin1Char('"'));
+    }
+    return {};
+}
+
+SystemsState SystemsState::fromJson(const QJsonObject &object, const QString &osRelease)
 {
     SystemsState s;
-    // The same status the System window reads; an older recab describes slots
-    // and staging, which does not say what the other system is.
-    if (object["schema_version"].toInt() != 3) {
-        s.problem = QObject::tr("recab answered in a form this window does not know (schema %1; it reads schema 3).")
-                        .arg(object["schema_version"].toInt());
+    const int schema = object["schema_version"].toInt();
+    if (schema == 3) {
+        // The stand-in: it names both releases and counts its changes.
+        s.known = true;
+        s.distro = object["distro"].toString();
+        s.key = QString::number(object["revision"].toInt(-1));
+        s.runningRelease = object["running"].toObject()["release"].toString();
+        s.otherRelease = object["other"].toObject()["release"].toString();
+        s.otherRole = object["other"].toObject()["role"].toString();
         return s;
     }
+    if (schema != 6) {
+        s.problem = QObject::tr("recab answered in a form this window does not know (schema %1; it reads schema 6, "
+                                "recab's own, and schema 3, its stand-in's).")
+                        .arg(schema);
+        return s;
+    }
+    // The real recab: two slots, each with the generation it holds, and a
+    // preparation while the other one is being changed. It names no release.
     s.known = true;
-    s.distro = object["distro"].toString();
-    s.revision = object["revision"].toInt(-1);
-    s.runningRelease = object["running"].toObject()["release"].toString();
-    s.otherRelease = object["other"].toObject()["release"].toString();
-    s.otherRole = object["other"].toObject()["role"].toString();
+    s.distro = osField(osRelease, QStringLiteral("NAME"));
+    s.runningRelease = osField(osRelease, QStringLiteral("VERSION_ID"));
+    const QString running = object["active_slot"].toString(), other = object["inactive_slot"].toString();
+    QString runningGeneration, otherGeneration;
+    for (const QJsonValue &value : object["slots"].toArray()) {
+        const QJsonObject slot = value.toObject();
+        (slot["slot"].toString() == running ? runningGeneration : otherGeneration) =
+            slot["generation"].toObject()["id"].toString();
+    }
+    const QJsonObject preparation = object["preparation"].toObject();
+    if (!preparation.isEmpty() || object["trial_pending"].toBool()) {
+        s.otherRole = QStringLiteral("next");
+        s.otherRelease = s.runningRelease;
+    } else if (object["rollback_slot"].toString() == other) {
+        s.otherRole = QStringLiteral("previous");
+    } else if (!otherGeneration.isEmpty() && otherGeneration == runningGeneration) {
+        s.otherRole = QStringLiteral("copy");
+        s.otherRelease = s.runningRelease;
+    }
+    s.key = QStringLiteral("%1/%2/%3/%4")
+                .arg(running, runningGeneration, otherGeneration)
+                .arg(preparation["revision"].toInteger(0));
     return s;
 }
 

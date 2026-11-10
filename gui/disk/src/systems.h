@@ -71,9 +71,14 @@ struct SystemsState {
     bool known = false;
     QString problem; // why it is not known
     QString distro, runningRelease, otherRelease, otherRole;
-    int revision = -1; // goes up with every change to either system
+    // Changes whenever either system does: a comparison made under another
+    // key is out of date.
+    QString key;
 
-    static SystemsState fromJson(const QJsonObject &object);
+    // Reads `recab status --json`: the real recab's (schema 6: two slots and
+    // a preparation; the running system's name comes from `osRelease`) or
+    // its stand-in's (schema 3).
+    static SystemsState fromJson(const QJsonObject &object, const QString &osRelease);
     QString runningName() const;
     QString otherName() const;
     // "The system from before.", "The next system, not started yet."

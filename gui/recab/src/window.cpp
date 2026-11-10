@@ -74,6 +74,10 @@ Window::Window(QWidget *parent)
     connect(proposed_, &ProposedPage::byHand, this, &Window::decideByHand);
 
     connect(system_, &SystemPage::readAgain, this, [this] { reload([this] { showMain(); }); });
+    connect(system_, &SystemPage::readAsAdministrator, this, [this] {
+        asRoot_ = true;
+        reload([this] { showMain(); });
+    });
 
     // F5, and coming back to the window after a while: an agent or a terminal
     // may have changed the system in the meantime.
@@ -109,7 +113,7 @@ void Window::reload(std::function<void()> then)
 {
     if (reading_)
         return;
-    reading_ = client_.read();
+    reading_ = client_.read(asRoot_);
     if (!read_) {
         system_->showLoading(tr("Reading the system"),
                              tr("Asking recab what is running, what is beside it and what can be done."));
@@ -122,10 +126,12 @@ void Window::reload(std::function<void()> then)
         run->deleteLater();
         QString problem;
         Status status;
-        if (!client_.understand(run, ok, &status, &problem)) {
+        bool permission = false;
+        if (!client_.understand(run, ok, &status, &problem, &permission)) {
             source_->setText(tr("The system could not be read"));
-            system_->showProblem(problem);
+            system_->showProblem(problem, permission && !asRoot_);
             stack_->setCurrentWidget(system_);
+            asRoot_ = false; // a refused password is not asked for again unasked
             return;
         }
         status_ = status;
@@ -168,7 +174,8 @@ void Window::showClash()
 
 ConfirmDialog *Window::reuseQuestion()
 {
-    const QString before = status_.name(status_.otherRelease);
+    const QString before = status_.otherRelease.isEmpty() ? tr("the system from before")
+                                                          : status_.name(status_.otherRelease);
     return new ConfirmDialog(
         tr("The system is locked"), tr("This change goes into the next system"),
         {tr("The running system is locked, so it is not changed. The change is made in the next system and takes "
@@ -279,7 +286,8 @@ void Window::goBack(bool askFirst)
 {
     if (askFirst) {
         ConfirmDialog question(
-            tr("Go back"), tr("Go back to %1?").arg(status_.name(status_.otherRelease)),
+            tr("Go back"), tr("Go back to %1?").arg(status_.otherRelease.isEmpty() ? tr("the system from before")
+                                                                              : status_.name(status_.otherRelease)),
             {tr("The computer restarts into the system from before. The system you are running now is kept beside "
                 "it, so you can return.")},
             QString(), tr("Restart into it"), this);

@@ -149,6 +149,7 @@ hands nothing to anyone and compares nothing.
 | `DISK_GUI_ROOT_HELPER` | what runs it as root; empty: run it as the person | `pkexec` |
 | `DISK_GUI_SYSTEM_APP` | what "Open System…" starts | `recab-gui` |
 | `DISK_GUI_KEPT` | the file the last comparison is kept in | `comparison.json` in the person's cache |
+| `DISK_GUI_OS_RELEASE` | where the running system's name is read | `/etc/os-release` |
 
 The stand-in agent removes a place only when it lies inside
 `DISK_STANDIN_ROOT`; it leaves what is marked "Ask me first" and what belongs
@@ -161,11 +162,15 @@ default), `next` (the other holds a change not started yet), `identical`, or
 
 ## What it asks of recab
 
-`recab status --json`, as the System window reads it (schema 3), for what the
-two systems are: `distro`, `running.release`, `other.release`, `other.role`
-(`previous`, `next`, or `copy`) and `revision`, a number that goes up with
-every change to either system. A comparison made at another revision is shown
-as out of date.
+`recab status --json`, as the System window reads it, for what the two
+systems are. From the real recab (schema 6) it takes the two slots, the
+generation each holds, `rollback_slot` and the preparation: the other system
+is the next one while a preparation exists, the system from before when it is
+the rollback slot, and a copy when both hold the same generation; the running
+system's name comes from `/etc/os-release`. The slots, their generations and
+the preparation's revision together are the state a comparison was made under;
+under another state it is shown as out of date. The stand-in (schema 3) names
+the releases and the role itself and counts a `revision`.
 
 And one command, run as root, that reads both systems and changes neither:
 
@@ -222,9 +227,8 @@ on its input as `{"question": id, "answer": "..."}`. When asked what differs bet
 
 ## Not done
 
-- `recab compare` does not exist, and the real `recab status` answers with
-  schema 2. Until both are there, the second tab says on a real system that
-  the two systems could not be read.
+- `recab compare` does not exist. With the real recab the second tab opens
+  with what the two systems are, and "Compare" ends with recab's refusal.
 - The kept comparison is one file in the person's cache
   (`DISK_GUI_KEPT`); nothing checks that it belongs to this computer's disks
   beyond recab's revision number.

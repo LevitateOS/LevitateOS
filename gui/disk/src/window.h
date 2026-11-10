@@ -73,7 +73,7 @@ private:
     void openFolder(const QString &path);
 
     QStringList roots_;
-    QString home_, agent_, recab_, rootHelper_, systemApp_, kept_;
+    QString home_, agent_, recab_, rootHelper_, systemApp_, osRelease_, kept_;
     bool apparent_;
 
     Scanner *scanner_ = nullptr;
@@ -82,7 +82,7 @@ private:
     SystemsState state_;
     bool stateRead_ = false, stopped_ = false;
     QDateTime comparedWhen_;
-    int comparedRevision_ = -1;
+    QString comparedKey_; // recab's state of the two systems when they were compared
     QJsonObject comparedAnswer_;
     Refresher *refresher_;
     std::shared_ptr<Node> tree_;

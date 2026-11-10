@@ -63,6 +63,7 @@ private:
     Status status_;
     Run *run_ = nullptr, *reading_ = nullptr;
     bool read_ = false; // the system was read at least once
+    bool asRoot_ = false; // reading needs the administrator's rights here
     Refresher *refresher_;
     int quiet_ = 0;
     std::function<void(bool)> then_;

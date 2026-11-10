@@ -84,6 +84,12 @@ void Run::drain()
         }
         if (object["event"] == QLatin1String("failed"))
             failure_ = object;
+        // recab's own error: one JSON object with a class, a code and a message.
+        if (!object.contains("event") && object.contains("message")) {
+            failure_ = object;
+            failure_["reason"] = object["message"];
+            continue;
+        }
         if (object["event"] == QLatin1String("recipe-hook") && object["status"] == QLatin1String("failed")) {
             failure_["recipe"] = object["recipe"];
             failure_["hook"] = object["hook"];

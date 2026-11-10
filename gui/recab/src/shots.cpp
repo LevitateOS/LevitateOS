@@ -137,3 +137,76 @@ int takeShots(Window &window, const QString &folder)
     out << (ok ? "all flows ended where they should\n" : "some flows did not end where they should\n");
     return ok ? 0 : 1;
 }
+
+// The story the real recab offers today, against the stand-in that speaks its
+// shape (`fixtures/recab6`): two copies, a change by the agent, finishing,
+// the restart, going back, and discarding. No update, clash or proposal:
+// the real recab has none of those.
+int takeRealShots(Window &window, const QString &folder)
+{
+    QDir().mkpath(folder);
+    QTextStream out(stdout);
+    bool ok = true;
+    auto save = [&](QWidget &widget, const QString &name) {
+        settle(200);
+        ok &= widget.grab().save(QDir(folder).filePath(name + ".png"));
+    };
+    auto expect = [&](const QString &what, bool holds) {
+        if (!holds) {
+            out << "not as expected: " << what << " (state " << window.status().state << ", other "
+                << window.status().otherRole << ")\n";
+            ok = false;
+        }
+    };
+    window.show();
+    waitUntilIdle(window);
+    expect("the status is read as the real recab's", window.status().real);
+    if (!window.status().real) {
+        // Nothing was read: show why, and go no further. The story below
+        // hands requests to the agent, which must not happen on a system
+        // that is not the stand-in's.
+        save(window, "r0-not-read");
+        out << "the system could not be read; stopped before anything was asked of the agent\n";
+        return 1;
+    }
+    expect("it starts with two copies of one system",
+           window.status().state == "stable" && window.status().otherRole == "copy");
+    expect("the running system is named from os-release", window.status().name(window.status().runningRelease) == "LevitateOS 2026.11");
+    save(window, "r1-two-copies");
+
+    window.handOver(asked(sshd), false);
+    waitUntilIdle(window);
+    expect("the agent's change opens the next system",
+           window.status().state == "preparing" && !window.status().preparationId.isEmpty()
+               && window.status().changes.size() == 1);
+    save(window, "r2-the-next-system-is-open");
+
+    window.finish();
+    waitUntilIdle(window);
+    expect("finishing makes it ready", window.status().state == "ready");
+    save(window, "r3-ready");
+
+    window.restart();
+    waitUntilIdle(window);
+    expect("the restart lands on the other slot and is kept",
+           window.status().state == "stable" && window.status().runningSlot == "B"
+               && window.status().trialOutcome == "kept" && window.status().otherRole == "previous");
+    save(window, "r4-on-the-new-system");
+
+    window.goBack(false);
+    waitUntilIdle(window);
+    expect("going back lands on the first slot", window.status().runningSlot == "A");
+    save(window, "r5-back");
+
+    window.handOver(asked(nvidia), false);
+    waitUntilIdle(window);
+    expect("a second change opens a next system again", window.status().state == "preparing");
+    window.discard(false);
+    waitUntilIdle(window);
+    expect("discarding leaves no next system",
+           window.status().state == "stable" && window.status().preparationId.isEmpty());
+    save(window, "r6-discarded");
+
+    out << (ok ? "all flows ended where they should\n" : "some flows did not end where they should\n");
+    return ok ? 0 : 1;
+}

@@ -1,0 +1,248 @@
+#!/usr/bin/env python3
+"""A stand-in that speaks the real recab's own shape (status schema 6), for
+checking that recab-gui reads and drives the real thing correctly without an
+A/B system to run it on.
+
+It answers the commands the window uses, with the real names and arguments:
+
+  recab6 status --json
+  recab6 --json prepare [--preparation ID --revision N]
+  recab6 --json finalize --preparation ID --revision N
+  recab6 --json discard --preparation ID --revision N
+  recab6 --json set-next A|B
+  recab6 --json rollback
+  recab6 --json change install NAME --preparation ID --revision N
+  recab6 --json edit PATH --preparation ID --revision N
+
+It sends no events, as the real recab sends none, and a failure is one JSON
+object on stderr with a class, a code and a message. As `agent6` it plays an
+agent that uses these commands; as `reboot6` it plays the restart. The state
+is one file in RECAB_STANDIN_STATE (default: a folder in /tmp).
+"""
+import json
+import os
+import sys
+import time
+
+STATE_DIR = os.environ.get("RECAB_STANDIN_STATE") or "/tmp/recab6-standin-%d" % os.getuid()
+STATE = os.path.join(STATE_DIR, "recab6.json")
+SPEED = float(os.environ.get("RECAB_STANDIN_SPEED", "1"))
+
+
+def load():
+    if not os.path.exists(STATE):
+        # As recab's init leaves it: two copies of one system, A running.
+        return {"active": "A", "generations": {"A": "g1", "B": "g1"}, "preparation": None, "trial_pending": False,
+                "rollback": None, "last_trial": None, "go_back": False, "made": 1}
+    return json.load(open(STATE))
+
+
+def save(s):
+    os.makedirs(STATE_DIR, exist_ok=True)
+    with open(STATE, "w") as out:
+        json.dump(s, out, indent=1)
+
+
+def other(s):
+    return "B" if s["active"] == "A" else "A"
+
+
+def refuse(message, cls="state_or_detection", code=21):
+    sys.stderr.write(json.dumps({"schema_version": 1, "class": cls, "code": code, "message": message}) + "\n")
+    sys.exit(code)
+
+
+def pause(seconds):
+    if SPEED > 0:
+        time.sleep(seconds * SPEED)
+
+
+def status(s):
+    p = s["preparation"]
+    inactive = other(s)
+
+    def view(action, slot, verdict, reason=None):
+        return {"action": action, "slot": slot, "verdict": verdict, "reason": reason, "after": None}
+
+    def can(ready, reason):
+        return ("ready", None) if ready else ("refused", reason)
+
+    actions = [
+        view("prepare", inactive, *(("no_change", None) if p and p["phase"] == "prepared" else
+                                    can(not p and not s["trial_pending"], "a finished candidate or a trial is pending"))),
+        view("finalize", inactive, *can(bool(p) and p["phase"] == "prepared", "there is no prepared candidate to finalize")),
+        view("discard", inactive, *can(bool(p), "there is no preparation to discard")),
+        view("set_next", inactive, *(("no_change", None) if s["trial_pending"] else
+                                     can(bool(p) and p["phase"] == "ready", "slot %s holds no finalized candidate" % inactive))),
+        view("rollback", s["rollback"] or inactive, *can(bool(s["rollback"]), "no earlier known-good system is kept")),
+        view("commit", s["active"], "no_change", None),
+        view("stage", inactive, "refused", "a release medium is needed"),
+    ]
+
+    def slot(name):
+        generation = s["generations"][name]
+        ready = name == s["active"] or not p or p["phase"] == "ready"
+        return {"slot": name, "entry": "loader/entries/levitate-%s.conf" % name.lower(),
+                "boot_dir": "levitate/%s" % name.lower(), "root": "PARTUUID=0000000%s" % ("1" if name == "A" else "2"),
+                "device": "/dev/nvme0n1p%s" % ("2" if name == "A" else "3"), "bootable": ready, "trial": False,
+                "generation": {"id": generation, "inventory_digest": "d-" + generation, "kernel_digest": "k1",
+                               "initrd_digest": "i1"},
+                "readiness": "committed" if name == s["active"] else ("ready" if ready else "incomplete"),
+                "generation_ready": ready, "seal": None, "kernel": "vmlinuz", "initrd": "initramfs.img"}
+
+    return {
+        "schema_version": 6, "active_slot": s["active"], "inactive_slot": inactive,
+        "trial_pending": s["trial_pending"], "next_boot": inactive if s["trial_pending"] else s["active"],
+        "default_slot": s["active"], "known_good_slot": s["active"], "committed": True,
+        "rollback_slot": s["rollback"], "scheduled_trial": inactive if s["trial_pending"] else None,
+        "last_trial": s["last_trial"], "entry_prefix": "levitate", "slots": [slot("A"), slot("B")],
+        "actions": actions, "preparation": p, "recovery_reason": None,
+    }
+
+
+def matching(s, args):
+    """The preparation the command names, checked as recab checks it."""
+    p = s["preparation"]
+    if not p:
+        refuse("there is no preparation")
+    if "--preparation" in args:
+        named = args[args.index("--preparation") + 1]
+        revision = int(args[args.index("--revision") + 1])
+        if named != p["id"] or revision != p["revision"]:
+            refuse("the request names preparation %s revision %s; recab holds %s revision %s"
+                   % (named, revision, p["id"], p["revision"]))
+    return p
+
+
+def prepare(s):
+    if s["preparation"]:
+        return  # reopening: it is there
+    if s["trial_pending"]:
+        refuse("a trial boot is pending")
+    s["made"] += 1
+    pause(1.2)
+    s["preparation"] = {"id": "p%d" % s["made"], "slot": other(s), "source_slot": s["active"],
+                        "source_generation": s["generations"][s["active"]], "revision": 1,
+                        "operation": "synchronize", "phase": "prepared", "completed_steps": 3, "failure": None,
+                        "synchronized": True, "synchronization": None, "finalization": None, "change": None,
+                        "last_change": None}
+    # The old way back ends when the place is reused.
+    s["rollback"] = None
+    s["generations"][other(s)] = s["generations"][s["active"]] + "+%s" % s["preparation"]["id"]
+
+
+def change(s, action, package):
+    p = s["preparation"]
+    if not p or p["phase"] != "prepared":
+        refuse("changes go into a prepared candidate; run recab prepare")
+    pause(1.0)
+    p["revision"] += 1
+    p["last_change"] = {"id": "c%d" % p["revision"], "action": action, "package": package, "report": None,
+                        "producer_io": None, "invocation_io": None, "projection_bytes_written": 0}
+
+
+def reboot(s):
+    pause(0.5)
+    if s["trial_pending"]:
+        was = s["active"]
+        s["active"] = other(s)
+        s["trial_pending"] = False
+        s["preparation"] = None
+        s["rollback"] = was
+        s["last_trial"] = {"slot": s["active"], "committed": True, "detail": "startup finished: running",
+                           "unix_time": int(time.time())}
+    elif s["go_back"]:
+        was = s["active"]
+        s["active"] = s["rollback"]
+        s["rollback"] = was
+    s["go_back"] = False
+
+
+def emit(**event):
+    sys.stderr.write(json.dumps(event) + "\n")
+    sys.stderr.flush()
+
+
+def agent(s):
+    """An agent that makes the asked change with recab's own commands."""
+    prompt = json.loads(sys.stdin.readline())["prompt"].lower()
+    emit(event="plan", steps=[["prepare", "recab prepare"], ["change", "Make the change"], ["check", "recab status"]])
+    emit(event="step", step="prepare", status="running")
+    prepare(s)
+    save(s)
+    emit(event="step", step="prepare", status="done")
+    emit(event="step", step="change", status="running")
+    if "nvidia" in prompt:
+        change(s, "install", "nvidia-driver")
+        did = "it installed the recipe nvidia-driver into the next system"
+    else:
+        change(s, "edit", "/etc/ssh/sshd_config")
+        did = "it turned password logins off in /etc/ssh/sshd_config of the next system"
+    save(s)
+    emit(event="output", line="recab: preparation %s is at revision %d" % (s["preparation"]["id"], s["preparation"]["revision"]))
+    emit(event="step", step="change", status="done")
+    emit(event="step", step="check", status="done")
+    emit(event="agent", summary=did)
+    emit(event="done")
+
+
+def main(args):
+    role = os.path.basename(sys.argv[0])
+    s = load()
+    if role == "agent6":
+        return agent(s)
+    if role == "reboot6":
+        reboot(s)
+        return save(s)
+    words = [arg for arg in args if not arg.startswith("--")]
+    # The values of --preparation and --revision are not commands.
+    for flag in ("--preparation", "--revision"):
+        if flag in args and args[args.index(flag) + 1] in words:
+            words.remove(args[args.index(flag) + 1])
+    if "--machine-events" in args:
+        refuse("unexpected argument '--machine-events' found")
+    command = words[0] if words else ""
+    if command == "status":
+        print(json.dumps(status(s)))
+        return
+    if command == "prepare":
+        if s["preparation"]:
+            matching(s, args)
+        prepare(s)
+    elif command == "finalize":
+        p = matching(s, args)
+        if p["phase"] != "prepared":
+            refuse("the candidate is not prepared")
+        pause(1.0)
+        p["phase"] = "ready"
+        p["revision"] += 1
+    elif command == "discard":
+        matching(s, args)
+        if "--preparation" not in args:
+            refuse("the following required arguments were not provided: --preparation <PREPARATION> --revision <REVISION>")
+        s["preparation"] = None
+        s["trial_pending"] = False
+    elif command == "set-next" and len(words) == 2:
+        p = s["preparation"]
+        if words[1] != other(s) or not p or p["phase"] != "ready":
+            refuse("slot %s holds no finalized candidate" % words[1])
+        s["trial_pending"] = True
+    elif command == "rollback":
+        if not s["rollback"]:
+            refuse("no earlier known-good system is kept")
+        s["go_back"] = True
+    elif command == "change" and len(words) == 3:
+        matching(s, args)
+        change(s, words[1], words[2])
+    elif command == "edit" and len(words) == 2:
+        matching(s, args)
+        change(s, "edit", words[1])
+    else:
+        refuse("unrecognized subcommand '%s'" % " ".join(words), "state_or_detection", 2)
+    save(s)
+    if "--json" in args:
+        print(json.dumps({"ok": True}))
+
+
+if __name__ == "__main__":
+    main(sys.argv[1:])

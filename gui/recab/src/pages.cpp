@@ -75,15 +75,25 @@ Card *card(Card::Tone tone, Glyph::Kind picture, const QString &title, const QSt
 
 // ---------------------------------------------------------------- The system
 
-void SystemPage::showProblem(const QString &problem)
+void SystemPage::showProblem(const QString &problem, bool asAdministrator)
 {
     QVBoxLayout *column = fresh();
     column->addWidget(heading(tr("The system could not be read")));
     column->addWidget(text(problem, true));
+    auto *buttons = new QHBoxLayout;
     auto *again = new QPushButton(tr("Try again"));
-    again->setDefault(true);
     connect(again, &QPushButton::clicked, this, &SystemPage::readAgain);
-    column->addWidget(again, 0, Qt::AlignLeft);
+    buttons->addWidget(again);
+    if (asAdministrator) {
+        // recab reads the boot entries, which this person may not.
+        auto *root = primary(tr("Read it as administrator"));
+        connect(root, &QPushButton::clicked, this, &SystemPage::readAsAdministrator);
+        buttons->addWidget(root);
+    } else {
+        again->setDefault(true);
+    }
+    buttons->addStretch();
+    column->addLayout(buttons);
     column->addStretch();
 }
 
@@ -122,6 +132,11 @@ void SystemPage::show(const Status &s)
         } else if (next && !s.clashes.isEmpty()) {
             title = tr("The update clashes with one of your changes");
             under = tr("Nothing was chosen for you. The next system cannot be finished until that is settled.");
+        } else if (next && !s.changesKnown) {
+            // The real recab names the last change, not how many there are.
+            title = tr("The next system is open");
+            under = tr("What is changed in it takes effect when you restart into it. The running system is "
+                       "untouched until then.");
         } else if (next) {
             title = counted(s.changes.size(), tr("The next system has %1 change"), tr("The next system has %1 changes"));
             under = tr("They take effect when you restart into it. The running system is untouched until then.");
@@ -186,7 +201,9 @@ void SystemPage::show(const Status &s)
 
     if (next) {
         const bool plus = !titles.isEmpty();
-        const QString under = plus ? tr("%1, plus:").arg(s.name(s.otherRelease)) : s.name(s.otherRelease);
+        const QString under = !plus ? s.name(s.otherRelease)
+                              : s.changesKnown ? tr("%1, plus:").arg(s.name(s.otherRelease))
+                                               : tr("%1; the last change:").arg(s.name(s.otherRelease));
         if (s.state == QLatin1String("interrupted"))
             pair->addWidget(card(Card::Open, Glyph::Plus, tr("The next system"), under, titles,
                                  tr("Incomplete: cannot be started")), 1);
@@ -197,9 +214,15 @@ void SystemPage::show(const Status &s)
             pair->addWidget(card(Card::Open, Glyph::Plus, tr("The next system"), under, titles,
                                  tr("Open: not finished, cannot be started yet")), 1);
     } else if (s.otherRole == QLatin1String("previous")) {
-        pair->addWidget(card(Card::Plain, Glyph::Before, tr("The system from before"), s.name(s.otherRelease),
+        // The real recab does not name the release the other system holds.
+        pair->addWidget(card(Card::Plain, Glyph::Before, tr("The system from before"),
+                             s.otherRelease.isEmpty() ? tr("As it was before your last change") : s.name(s.otherRelease),
                              {tr("You can go back to it")},
                              tr("Its place becomes the next system when you make a change")), 1);
+    } else if (s.otherRole == QLatin1String("copy")) {
+        pair->addWidget(card(Card::Plain, Glyph::Check, tr("The second copy"), tr("Exactly the running system"),
+                             {tr("Nothing has been changed since it was made")},
+                             tr("It becomes the next system when you make a change")), 1);
     } else {
         pair->addWidget(card(Card::Plain, Glyph::Plus, tr("No other system yet"),
                              tr("The place beside the running system is free"), {},
@@ -266,7 +289,7 @@ void SystemPage::show(const Status &s)
                         tr("Add the update"), s.can("update")),
                     &QPushButton::clicked, this, &SystemPage::addUpdate);
         if (s.otherRole == QLatin1String("previous"))
-            connect(act(list, tr("Go back to %1").arg(s.name(s.otherRelease)), tr("Restart into the system from before."),
+            connect(act(list, tr("Go back to %1").arg(s.otherRelease.isEmpty() ? tr("the system from before") : s.name(s.otherRelease)), tr("Restart into the system from before."),
                         tr("Go back…"), s.can("go_back")),
                     &QPushButton::clicked, this, &SystemPage::goBack);
     }
@@ -313,6 +336,15 @@ void AskPage::show(const Status &s, const QString &request)
         facts << tr("The next system does not exist yet; it starts as a copy of the running one");
     if (!s.updateRelease.isEmpty())
         facts << tr("A newer release is available and not added: %1").arg(s.name(s.updateRelease));
+    if (s.real) {
+        // What this recab offers for it, so the agent need not guess.
+        facts << tr("The next system is made with `recab prepare`, changed with `recab change install|update|remove "
+                    "RECIPE` and `recab edit PATH`, and closed with `recab finalize`; `recab status --json` says "
+                    "where things stand");
+        if (!s.preparationId.isEmpty())
+            facts << tr("The open preparation is %1, revision %2").arg(s.preparationId).arg(s.preparationRevision);
+        facts << tr("This system runs from slot %1; the other is slot %2").arg(s.runningSlot, s.otherSlot);
+    }
     auto *prompt = new PromptPanel(
         tr("The person asks for the change written above."), facts,
         tr("After a restart the change is in effect and the system starts as before. Nothing else changes."));

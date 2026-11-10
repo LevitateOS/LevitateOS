@@ -31,6 +31,7 @@ Window::Window(QWidget *parent)
     , recab_(qEnvironmentVariable("DISK_GUI_RECAB", "recab"))
     , rootHelper_(qEnvironmentVariable("DISK_GUI_ROOT_HELPER", "pkexec"))
     , systemApp_(qEnvironmentVariable("DISK_GUI_SYSTEM_APP", "recab-gui"))
+    , osRelease_(qEnvironmentVariable("DISK_GUI_OS_RELEASE", "/etc/os-release"))
     , kept_(qEnvironmentVariable("DISK_GUI_KEPT",
                                  QStandardPaths::writableLocation(QStandardPaths::CacheLocation) + "/comparison.json"))
     , apparent_(qEnvironmentVariable("DISK_GUI_APPARENT") == QLatin1String("1"))
@@ -227,7 +228,7 @@ void Window::readState()
         reading_ = nullptr;
         run->deleteLater();
         if (ok) {
-            state_ = SystemsState::fromJson(QJsonDocument::fromJson(run->answer()).object());
+            state_ = SystemsState::fromJson(QJsonDocument::fromJson(run->answer()).object(), osRelease_);
         } else {
             state_ = SystemsState();
             state_.problem = tr("`%1 status --json` failed: %2").arg(recab_, run->problem());
@@ -244,7 +245,7 @@ void Window::readState()
 // The comparison is out of date when either system has changed since.
 bool Window::stale() const
 {
-    return compared_ && state_.known && comparedRevision_ >= 0 && state_.revision != comparedRevision_;
+    return compared_ && state_.known && !comparedKey_.isEmpty() && state_.key != comparedKey_;
 }
 
 // The systems page as things stand: the kept comparison when there is one,
@@ -308,7 +309,7 @@ void Window::compared(bool ok)
             comparison_ = comparison;
             compared_ = true;
             comparedWhen_ = QDateTime::currentDateTime();
-            comparedRevision_ = state_.known ? state_.revision : -1;
+            comparedKey_ = state_.known ? state_.key : QString();
             comparedAnswer_ = answer;
             keep();
         }
@@ -324,7 +325,7 @@ void Window::keep()
     if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate))
         return;
     file.write(QJsonDocument(QJsonObject{{"when", comparedWhen_.toSecsSinceEpoch()},
-                                         {"revision", comparedRevision_},
+                                         {"state", comparedKey_},
                                          {"answer", comparedAnswer_}})
                    .toJson(QJsonDocument::Compact));
 }
@@ -343,7 +344,7 @@ void Window::recall()
     compared_ = true;
     comparedAnswer_ = kept["answer"].toObject();
     comparedWhen_ = QDateTime::fromSecsSinceEpoch(kept["when"].toInteger());
-    comparedRevision_ = kept["revision"].toInt(-1);
+    comparedKey_ = kept["state"].toString();
 }
 
 void Window::showExplain()

@@ -24,7 +24,9 @@ int main(int argc, char **argv)
     const QCommandLineOption shots("shots", "From a checkout: walk the whole lifecycle against the stand-in, save a "
                                             "picture at each point into this folder, then quit.",
                                    "folder");
-    parser.addOptions({look, shots});
+    const QCommandLineOption real("real", "With --shots: the story the real recab offers, against the stand-in that "
+                                          "speaks its status and commands (fixtures/recab6).");
+    parser.addOptions({look, shots, real});
     parser.process(app);
     if (parser.isSet(look))
         applyLook(parser.value(look));
@@ -32,7 +34,7 @@ int main(int argc, char **argv)
     Window window;
     window.resize(900, 620);
     if (parser.isSet(shots))
-        return takeShots(window, parser.value(shots));
+        return parser.isSet(real) ? takeRealShots(window, parser.value(shots)) : takeShots(window, parser.value(shots));
     window.show();
     return QApplication::exec();
 }
