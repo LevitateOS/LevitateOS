@@ -162,10 +162,13 @@ There are no unit tests (project rule, `AGENTS.md`).
 
 ## Not done
 
-- **Never run against a real Codex.** Everything is checked against the
-  stand-in, whose shapes come from Codex's source. How `codex exec resume`
-  takes `-c sandbox_mode=...`, and what a real sign-in failure prints, are not
-  seen.
+- **One plain request has run against the real Codex, and nothing more.** On
+  2026-11-10, with Codex 0.167, "say hello" went through: Codex was started,
+  its message came back as `say` and `agent`, the run ended with `done` and
+  was recorded. Everything else is checked against the stand-in only:
+  resuming a session with an answer (and whether the real Codex takes
+  `-c sandbox_mode=...` on `exec resume`), a todo list, commands and file
+  changes, a turn that fails, and what a sign-in failure prints.
 - **No Claude Code adapter.**
 - **A run ends with the window that started it.** There is no background
   service; closing the window closes the run (the record says `stopped`).
