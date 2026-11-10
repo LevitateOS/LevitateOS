@@ -1548,6 +1548,7 @@ dependencies = [
  "anyhow",
  "clap",
  "flate2",
+ "sha2",
  "target-root",
  "tempfile",
  "walkdir",
