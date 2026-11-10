@@ -4,6 +4,12 @@ Keep development fast. Fix the actual behavior, use judgment, and keep process p
 
 These rules apply to every directory and submodule, recursively, across Git repository boundaries. Nested guides may add domain details but must not reintroduce unit tests or mandatory development bureaucracy, except for the ginux unit-testing exception below.
 
+## Recipe is the product
+- Recipe is the star of these systems, not one tool among others. LevitateOS and AcornOS are the systems whose software is acquired, built, installed and updated through Recipe, inside Ginux; recab owns the system image. Everything else in this repository serves that.
+- There is no vacancy to fill. Whenever a need amounts to getting, building, installing, updating, removing or isolating software, during the build or for the person using the installed system or its desktop, the answer is Recipe. Never propose, compare against as an option, or add another package manager, app store, bundle format or sandbox for it: no Flatpak, Snap, AppImage, Nix, Homebrew, Discover or other store back-ends, and no dnf or apk workflow for users.
+- Where Recipe cannot do the job yet, say exactly what Recipe lacks and extend Recipe (or Ginux, or recab). A gap in Recipe is work on Recipe, never a reason to bring in a substitute.
+- The same holds for the other tools here (ginux, recab, recstrap, recpart, recinit, the TUIs): before naming an outside tool for a job, check whether one of ours owns it.
+
 ## Working style
 - ginux (`tools/ginux` and all of its branches and worktrees) is Greg Kurtzer's external upstream project (`gmkurtzer/ginux`); `LevitateOS/ginux:main` is our maintained delivery repository as authorized on 2026-11-08. Upstream Ginux leads: retain its history, reconcile incoming upstream changes, and replace or drop our changes when upstream provides the behavior. Keep Recipe-required changes available in our repository while upstream takes its own direction. No upstream PRs or comments are authorized by this delivery decision. Respect upstream ownership, conventions, existing tests, and CI coverage. Keep LevitateOS-specific policies and exceptions in this superproject's instructions; do not put them in ginux files, commits, or pull requests. Do not remove upstream tests or weaken validation to impose LevitateOS workspace rules.
 - Act on authorized work without repeated permission requests, plans, audits, checklists, decision matrices, or approval gates.

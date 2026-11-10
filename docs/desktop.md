@@ -73,6 +73,15 @@ networkmanager-wifi network-manager-applet breeze-icons font-noto firefox`.
   sddm failed while the session runs. Acorn needs its own start_post for
   autologin, or the scenarios' `ERROR:` pattern will flag it.
 
+## Software on the desktop
+
+Apps come through Recipe, as on the base system; the desktop adds no other
+package manager, store or bundle format (see `AGENTS.md`, "Recipe is the
+product"). What the desktop still needs from Recipe: recipes for the apps
+people expect, installed apps showing up in the menu with their icons and file
+associations, a notice when something has an update, and, if wanted, a
+graphical front-end beside the command line.
+
 ## In the pipeline (2026-11-08, not built or booted yet)
 
 - `live-desktop` builds the **desktop system** (`REC_FLAVOUR=desktop` in its
