@@ -44,8 +44,8 @@ wpa_supplicant firefox systemd-pam`, resolved without weak dependencies.
   `dbus-broker.service` (the user bus, `dbus.service` alias; without it the
   PipeWire sockets fail and there is no audio), `pipewire.socket`,
   `pipewire-pulse.socket`, `wireplumber.service`; mask `unity-gtk-module.service`.
-- Branding: the tree shows Fedora's start-menu logo (the wallpaper is
-  LevitateOS's). Replace it with LevitateOS's; [desktop-theming.md](desktop-theming.md) lists every
+- Branding: the wallpaper, login background and start button are
+  LevitateOS's; the rest still shows Fedora's. [desktop-theming.md](desktop-theming.md) lists every
   piece for both desktops.
 
 ### AcornOS (LXQt)

@@ -110,6 +110,16 @@ falls back to hicolor). The distribution needs only:
 | `<distro>-logo-icon` | os-release `LOGO=` | same as above |
 | `<distro>-install` | the "Install <Distro>" launcher on the live desktop (opens a terminal running the installer) | mark plus a down-arrow-into-disk glyph, drawn as SVG |
 
+Done (unbuilt): `start_button()` in `installed-system.rhai` installs
+`distributor-logo-<os id>` (the standard mark in `hicolor/scalable/apps/`, the
+micro mark in `hicolor/16x16/apps/`) from `branding/logo-*.svg`, and puts it on
+the start button. Plasma gets the paper mark (the panel is dark under Fedora's
+look): Fedora's look-and-feel scripts that set a new launcher's icon to
+`start-here` set ours instead. LXQt gets the ink mark (the default theme's
+panel is light): `ownIcon` and `icon` in the `[fancymenu]` section of
+`/etc/xdg/lxqt/panel.conf`. One fixed colour per desktop until the own themes
+exist. `<distro>-logo-icon`, `LOGO=` and the install launcher are not done.
+
 Qt renders SVG icons itself (`qt6-qtsvg` is in both sets), so a scalable SVG in
 `hicolor/scalable/apps/` plus the micro SVG in `hicolor/16x16/apps/` is enough.
 Neither desktop needs PNG icons. The ink marks are the right colour on a light
