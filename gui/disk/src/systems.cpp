@@ -437,7 +437,7 @@ QString Comparison::expected() const
 // One system as a frame that fills while it is read, or stands empty.
 class SideFrame : public QWidget {
 public:
-    SideFrame() { setMinimumSize(200, 150); }
+    SideFrame() { setMinimumSize(200, 120); }
     void set(double done, const QString &words)
     {
         done_ = done;
@@ -679,6 +679,9 @@ void SystemsPage::show(const Comparison &c, const QString &said, const QDateTime
 {
     QVBoxLayout *column = fresh();
     forget();
+    // Closer than the other pages: with the agent's answer shown, the maps and
+    // the list must still fit in 700 pixels beside the frame's strip.
+    column->setSpacing(8);
 
     auto *header = new QHBoxLayout;
     auto *top = new QVBoxLayout;
@@ -746,7 +749,7 @@ void SystemsPage::show(const Comparison &c, const QString &said, const QDateTime
     sides->addLayout(right, 1);
     column->addLayout(sides, 5);
     for (DiskMap *map : {here_, there_}) {
-        map->setMinimumSize(200, 150);
+        map->setMinimumSize(200, 120);
         connect(map, &DiskMap::picked, this, [this](Node *node) { point(node); });
     }
     pointed_ = dim(text(QString(), true));
@@ -755,9 +758,11 @@ void SystemsPage::show(const Comparison &c, const QString &said, const QDateTime
     QList<qint64> files(changeKinds().size(), 0);
     for (const Difference &difference : c.differences)
         ++files[difference.change];
+    // In the frame the page has less room than one line for the sentence and
+    // the kinds together: the sentence over them, not beside them.
     auto *legend = new QHBoxLayout;
     legend->setSpacing(18);
-    legend->addWidget(dim(text(tr("A coloured block holds files that differ; its number says how many:"))));
+    auto *explain = dim(text(tr("A coloured block holds files that differ; its number says how many:"), true));
     for (int kind = 0; kind < changeKinds().size(); ++kind) {
         if (!files[kind])
             continue;
@@ -770,10 +775,13 @@ void SystemsPage::show(const Comparison &c, const QString &said, const QDateTime
         legend->addLayout(entry);
     }
     legend->addStretch();
-    if (!c.identical())
+    if (!c.identical()) {
+        column->addWidget(explain);
         column->addLayout(legend);
-    else
+    } else {
         delete legend;
+        delete explain;
+    }
 
     if (!said.isEmpty()) {
         auto *panel = new Panel;

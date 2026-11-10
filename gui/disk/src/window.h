@@ -12,11 +12,11 @@
 
 #include <memory>
 
+class Frame;
 class HandPage;
 class MessPage;
-class QLabel;
+class NextSystem;
 class QStackedWidget;
-class QTabBar;
 class QTimer;
 class Refresher;
 class Run;
@@ -59,6 +59,15 @@ public:
     // Null until the two systems were compared.
     const Comparison *comparison() const { return compared_ ? &comparison_ : nullptr; }
     QString said() const { return said_; }
+    Frame *frame() const { return frame_; }
+    // Which page shows, for a check.
+    bool showingWork() const;
+    bool showingMess() const;
+    bool showingSystems() const;
+    // The strip is read with the recab program the window has. For a check
+    // that must feed it a recab of another shape (the comparison stand-in
+    // answers `status` in an older shape), this reads it from another program.
+    void readStripFrom(const QString &recab);
 
 private:
     enum class Job { None, Clearing, Comparing, Explaining };
@@ -71,6 +80,11 @@ private:
     void keep();
     void recall();
     void openFolder(const QString &path);
+    // The System app: from the strip's button and from "Open System…".
+    void openSystem();
+    // The rail entry the page belongs to: a hand-over or work page belongs to
+    // the flow it came from.
+    QString entryOf(QWidget *page) const;
 
     QStringList roots_;
     QString home_, agent_, recab_, rootHelper_, systemApp_, osRelease_, kept_;
@@ -93,12 +107,12 @@ private:
     QString said_; // what the agent answered about the differences
     bool handingSystems_ = false;
 
-    QTabBar *tabs_;
+    Frame *frame_;
+    NextSystem *next_;
     QStackedWidget *stack_;
     MessPage *mess_;
     SystemsPage *systems_;
     HandPage *hand_;
     WorkPage *work_;
-    QLabel *activity_;
     QTimer *tick_;
 };

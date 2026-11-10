@@ -1,6 +1,9 @@
 # disk-gui
 
-The third desktop app, titled "Disk". It does two things, each on its own tab:
+The third desktop app, titled "Disk". It sits in the shared window frame
+(`gui/kit/frame.*`, see its README): the rail with the three apps, Disk's two
+entries and Activity; the pages; the strip about the next system; the status
+line. It does two things, each its own rail entry:
 
 - **Mess**: it finds where the mess on the disk is hiding and hands the list
   to the agent. A disk map in the manner of QDirStat with one job added.
@@ -49,13 +52,25 @@ identical ones without a disk.
    asks, and the question is answered in the window. Then the window reads
    the disk again and says what was really freed.
 
+The rail entry "Mess" carries a badge: how many places of mess are on the
+list. A hand-over and the agent's work are steps of the entry they came from
+and keep it marked; while the agent clears the mess, choosing "Mess" shows the
+work. Activity, from the frame, lists the agent's runs of all three apps; a
+run started here is listed as "Disk", under the first line of its issue, and
+"Go to it" brings the person back to the work page. The strip, "The next system
+holds N changes." with "Finish and restart…", is read from `recab status
+--json` (`DISK_GUI_RECAB`) and shown on every page; when recab cannot be read
+or answers in a shape the strip does not know, there is no strip and no error.
+The button and "Open System…" start the System app the same way
+(`DISK_GUI_SYSTEM_APP`, else `LEVITATE_APP_SYSTEM`, else `recab-gui`).
+
 "Open the folder" shows what is pointed at in the file manager. "Read again"
-in the status bar, F5 and Ctrl+R look at the disk again on the first tab and
-ask recab again on the second. Coming back to the window after a while asks
+in the status line, F5 and Ctrl+R look at the disk again on the Mess entry and
+ask recab again on the other, and read Activity and the strip again. Coming back to the window after a while asks
 recab again; the disk is only looked at again when asked, since that takes a
 while and drops what was ticked.
 
-On the second tab:
+On the second entry:
 
 1. **What is there.** On opening, recab is asked what the two systems are
    (quick, no password): the page names both and shows two empty frames. If a
@@ -64,7 +79,7 @@ On the second tab:
    compare again. "Open System…" starts the System window, where changing,
    updating and going back are done.
 2. **Compare.** Both systems are read from start to end, which takes minutes
-   and needs the administrator's password. The tab stays: each frame fills as
+   and needs the administrator's password. The page stays: each frame fills as
    its side is read, and Stop ends it.
 3. **How alike they are.** A headline ("The two systems are identical", or
    "99.9% the same", by room taken), how many files differ, and what the other
@@ -123,19 +138,51 @@ DISK_GUI_ROOTS=$A/sample DISK_GUI_HOME=$A/sample DISK_GUI_APPARENT=1 \
   $A/build/disk-gui --look levitate
 ```
 
-`--shots FOLDER` looks, picks the biggest unnamed folder by hand, opens the
+Window 1100 x 700 by default. `--shots FOLDER` looks, picks the biggest unnamed folder by hand, opens the
 hand-over, and saves a picture at each point; with `--hand-over` it also sends
 the list to the agent, waits for the second look, then compares the two
 systems and asks the agent what differs. It exits non-zero when nothing was
-freed, the systems could not be compared, or the agent said nothing. It needs
-no display:
+freed, the systems could not be compared, the agent said nothing, or an
+expectation failed (it says which: "not as expected: ..."); it ends with "all
+as expected". The expectations: the window is 1100 x 700 and stays so with the
+comparison and the agent's answer shown; the rail offers Mess, The two systems
+and Activity and nothing else; the Mess badge equals the number of places
+listed, also after the second look; the entry follows the page (hand-over,
+work, answer); the status line; the strip's sentence on the mess, the
+hand-over, the two systems and Activity; its button and "Open System…" both
+start the System app; no strip when recab cannot be started or answers in the
+Disk stand-in's older shape; Activity's runs and badge; "Go to it" on the live
+run. It needs no display, and no real agent, recab or administrator:
 
 ```sh
-QT_QPA_PLATFORM=offscreen DISK_GUI_ROOTS=$A/sample DISK_GUI_HOME=$A/sample DISK_GUI_APPARENT=1 \
+A=$PWD/.artifacts/disk-gui; F=$PWD/gui/disk/fixtures; R=$PWD/gui/recab/fixtures
+S=/tmp/disk-shots   # all state of the check lives here
+mkdir -p $S; $F/make-sample $S/sample
+printf '#!/bin/sh\ntouch "$DISK_STANDIN_SYSTEM_MARK"\n' > $S/system-app; chmod +x $S/system-app
+# The strip reads the real recab's shape: a next system with one change.
+export RECAB_STANDIN_STATE=$S/recab-state RECAB_STANDIN_SPEED=0
+$R/recab-real --json prepare
+$R/recab-real --json change install htop --preparation p2 --revision 1
+QT_QPA_PLATFORM=offscreen DISK_GUI_ROOTS=$S/sample DISK_GUI_HOME=$S/sample DISK_GUI_APPARENT=1 \
   DISK_GUI_AGENT=$F/agent DISK_GUI_RECAB=$F/recab DISK_GUI_ROOT_HELPER= \
-  DISK_STANDIN_ROOT=$A/sample DISK_STANDIN_SPEED=0 \
-  $A/build/disk-gui --look levitate --shots $A/shots-levitate --hand-over
+  DISK_STANDIN_ROOT=$S/sample DISK_STANDIN_SPEED=0 DISK_GUI_KEPT=$S/kept.json \
+  DISK_GUI_SYSTEM_APP=$S/system-app DISK_STANDIN_SYSTEM_MARK=$S/system-app-started \
+  DISK_STANDIN_STRIP_RECAB=$R/recab-real \
+  RECAB_GUI_RECORDS=$PWD/gui/agent/fixtures/records \
+  LEVITATE_ACTIVITY_AGENT=$PWD/.artifacts/agent/build/levitate-agent \
+  $A/build/disk-gui --look levitate --shots $S/pics --hand-over
 ```
+
+The comparison keeps using the Disk stand-in `$F/recab`, which answers `status`
+in the older shape the strip cannot read; that is also the check for "no strip".
+`DISK_STANDIN_STRIP_RECAB` is `recab-real`, used only for the strip
+(`prepare` printed `p2` as the preparation's id in a fresh state). Activity
+needs `RECAB_GUI_RECORDS` and `LEVITATE_ACTIVITY_AGENT` (build the agent first:
+`cmake --build .artifacts/agent/build`); without them, or without the strip's
+two variables, the story says what is missing and fails. Pictures: `1-mess` to
+`8-explained` are the pages in the frame, `s1`/`s2` the strip, `a1`/`a2`
+Activity (`a2` while the agent works, with the live run). Without `--hand-over`
+the story stops after the kept comparison, the strip and Activity.
 
 Without `--hand-over` and without the settings it reads the real home folder,
 hands nothing to anyone and compares nothing.
@@ -148,7 +195,7 @@ hands nothing to anyone and compares nothing.
 | `DISK_GUI_APPARENT` | `1`: count each file's length (the sample is made of empty-but-long files) | off |
 | `DISK_GUI_RECAB` | the program asked to compare the two systems | `recab` |
 | `DISK_GUI_ROOT_HELPER` | what runs it as root; empty: run it as the person | `pkexec` |
-| `DISK_GUI_SYSTEM_APP` | what "Open System…" starts | `recab-gui` |
+| `DISK_GUI_SYSTEM_APP` | what "Open System…" and the strip's "Finish and restart…" start | `LEVITATE_APP_SYSTEM`, else `recab-gui` |
 | `DISK_GUI_KEPT` | the file the last comparison is kept in | `comparison.json` in the person's cache |
 | `DISK_GUI_OS_RELEASE` | where the running system's name is read | `/etc/os-release` |
 
@@ -221,13 +268,22 @@ on its input as `{"question": id, "answer": "..."}`. When asked what differs bet
 | `src/map.*` | the map of blocks, used for the mess and for each of the two systems |
 | `src/pages.*` | the map with its list, and the hand-over |
 | `src/systems.*` | the comparison of the two systems: what recab answered, and its page |
-| `src/window.*` | the two tabs and the flows from each to the agent and back |
+| `src/window.*` | the frame, its two entries and the flows from each to the agent and back |
 | `src/shots.*` | the picture mode and flow check |
 | `fixtures/` | the stand-in agent, the stand-in `recab compare`, the sample home folder |
 | `data/` | the menu entry |
-| `../kit/` | shared widgets, the page base, the work page, the command runner |
+| `../kit/` | the frame (rail, strip, status line, Activity), shared widgets, the page base, the work page, the command runner |
 
 ## Not done
+
+- The frame's other pages are not here and so not shown: "The disk", "Browse",
+  Settings, Help. The strip is read at start, on refresh and after an agent run;
+  not while a change is made elsewhere until the window is entered again.
+- Choosing the other entry while a comparison reads is allowed (the page keeps
+  filling); the old tabs were disabled then. Activity does not list comparisons:
+  only agent runs are recorded.
+- Checked only offscreen, with stand-ins; not on a real desktop, and the rail's
+  app buttons and the System app were not started for real.
 
 - A comparison of a real pair of systems: `recab compare` has only run on
   sample trees. It says no byte progress, so the bar cannot say how far it is.

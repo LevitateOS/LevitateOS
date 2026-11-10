@@ -1,5 +1,7 @@
 #include "window.h"
 
+#include "frame.h"
+#include "nextsystem.h"
 #include "pages.h"
 #include "refresh.h"
 #include "run.h"
@@ -11,18 +13,25 @@
 #include <QFile>
 #include <QFileInfo>
 #include <QJsonDocument>
-#include <QLabel>
 #include <QProcess>
-#include <QSignalBlocker>
 #include <QStandardPaths>
 #include <QStackedWidget>
-#include <QStatusBar>
 #include <QStorageInfo>
-#include <QTabBar>
 #include <QTimer>
 #include <QToolButton>
 #include <QUrl>
 #include <QVBoxLayout>
+
+// What was asked, in one short line, for Activity: the first line of the issue.
+static QString requestTitle(const QString &prompt)
+{
+    const QString heading = QStringLiteral("The issue:");
+    const qsizetype at = prompt.indexOf(heading);
+    const QString line = (at < 0 ? prompt : prompt.mid(at + heading.size())).trimmed().section(QLatin1Char('\n'), 0, 0).trimmed();
+    if (line.isEmpty())
+        return QObject::tr("A request from Disk");
+    return line.size() > 90 ? line.left(89).trimmed() + QStringLiteral("…") : line;
+}
 
 Window::Window(QWidget *parent)
     : QMainWindow(parent)
@@ -30,7 +39,7 @@ Window::Window(QWidget *parent)
     , agent_(qEnvironmentVariable("DISK_GUI_AGENT", "levitate-agent"))
     , recab_(qEnvironmentVariable("DISK_GUI_RECAB", "recab"))
     , rootHelper_(qEnvironmentVariable("DISK_GUI_ROOT_HELPER", "pkexec"))
-    , systemApp_(qEnvironmentVariable("DISK_GUI_SYSTEM_APP", "recab-gui"))
+    , systemApp_(qEnvironmentVariable("DISK_GUI_SYSTEM_APP", qEnvironmentVariable("LEVITATE_APP_SYSTEM", "recab-gui")))
     , osRelease_(qEnvironmentVariable("DISK_GUI_OS_RELEASE", "/etc/os-release"))
     , kept_(qEnvironmentVariable("DISK_GUI_KEPT",
                                  QStandardPaths::writableLocation(QStandardPaths::CacheLocation) + "/comparison.json"))
@@ -45,12 +54,6 @@ Window::Window(QWidget *parent)
             roots_ << QStringLiteral("/var/lib/recipe");
     }
 
-    tabs_ = new QTabBar;
-    tabs_->setDocumentMode(true);
-    tabs_->setExpanding(false);
-    tabs_->setDrawBase(false);
-    tabs_->addTab(tr("Mess"));
-    tabs_->addTab(tr("The two systems"));
     stack_ = new QStackedWidget;
     mess_ = new MessPage;
     systems_ = new SystemsPage;
@@ -60,22 +63,20 @@ Window::Window(QWidget *parent)
     stack_->addWidget(systems_);
     stack_->addWidget(hand_);
     stack_->addWidget(work_);
-    auto *middle = new QWidget;
-    auto *column = new QVBoxLayout(middle);
-    column->setContentsMargins(0, 0, 0, 0);
-    column->setSpacing(0);
-    auto *top = new QHBoxLayout;
-    top->setContentsMargins(22, 8, 22, 0);
-    top->addWidget(tabs_);
-    top->addStretch();
-    column->addLayout(top);
-    column->addWidget(stack_, 1);
-    setCentralWidget(middle);
 
-    activity_ = new QLabel(tr("Agent: %1").arg(QFileInfo(agent_).fileName()));
-    statusBar()->addWidget(new QLabel(tr("This window only reads the disk")));
-    statusBar()->addPermanentWidget(activity_);
-    statusBar()->setSizeGripEnabled(false);
+    // The frame is the window: the rail, the pages, the strip, the status line.
+    // Only the two things to look at have entries; a hand-over and work in
+    // progress are steps of one of them.
+    frame_ = new Frame(Frame::Disk);
+    frame_->setContent(stack_);
+    frame_->addEntry(QStringLiteral("mess"), tr("Mess"));
+    frame_->addEntry(QStringLiteral("systems"), tr("The two systems"));
+    frame_->select(QStringLiteral("mess"));
+    frame_->setAgent(agent_);
+    frame_->setStatus(tr("This window only reads the disk"));
+    setCentralWidget(frame_);
+    next_ = new NextSystem(recab_, this);
+    connect(next_, &NextSystem::known, this, [this] { frame_->setNextSystem(next_->titles()); });
 
     tick_ = new QTimer(this);
     tick_->setInterval(200);
@@ -84,19 +85,31 @@ Window::Window(QWidget *parent)
             mess_->showCount(scanner_->files(), scanner_->bytes());
     });
 
-    connect(tabs_, &QTabBar::currentChanged, this, [this](int index) {
-        if (index == 0)
+    connect(frame_, &Frame::chosen, this, [this](const QString &key) {
+        if (key == Frame::activityKey())
+            return;
+        // While the agent works on what this entry is about, the entry shows
+        // the work, not a page that is about to change.
+        const bool working = run_ && job_ != Job::Comparing && job_ != Job::None;
+        const bool itsWork = (key == QLatin1String("mess")) == (job_ == Job::Clearing);
+        if (working && itsWork)
+            go(work_);
+        else if (key == QLatin1String("mess"))
             go(mess_);
         else
             showSystems();
     });
+    connect(frame_, &Frame::finishRequested, this, &Window::openSystem);
+    connect(frame_, &Frame::goToRun, this, [this] {
+        if (!run_)
+            return;
+        frame_->select(entryOf(work_));
+        go(work_);
+    });
     connect(mess_, &MessPage::openFolder, this, &Window::openFolder);
     connect(systems_, &SystemsPage::stop, this, &Window::stopComparing);
     connect(systems_, &SystemsPage::readAgain, this, &Window::readState);
-    connect(systems_, &SystemsPage::openSystem, this, [this] {
-        if (!QProcess::startDetached(systemApp_, {}))
-            statusBar()->showMessage(tr("%1 could not be started").arg(systemApp_), 6000);
-    });
+    connect(systems_, &SystemsPage::openSystem, this, &Window::openSystem);
 
     // F5 reads again what the tab shows. Coming back to the window reads the
     // state of the two systems again, which is quick; the disk is only looked
@@ -107,13 +120,15 @@ Window::Window(QWidget *parent)
             refresh();
         else if (!busy())
             readState();
+        next_->read();
     });
+    connect(refresher_, &Refresher::asked, frame_, &Frame::readAgain);
     auto *again = new QToolButton;
     again->setText(tr("Read again"));
     again->setToolTip(tr("On the mess: look at the disk again. On the two systems: ask recab again. (F5)"));
     again->setAutoRaise(true);
     connect(again, &QToolButton::clicked, this, &Window::refresh);
-    statusBar()->addWidget(again);
+    frame_->addStatusWidget(again);
     connect(mess_, &MessPage::rescan, this, [this] {
         before_ = 0;
         scan();
@@ -124,9 +139,7 @@ Window::Window(QWidget *parent)
     connect(hand_, &HandPage::back, this, [this] { go(handingSystems_ ? static_cast<QWidget *>(systems_) : mess_); });
     connect(hand_, &HandPage::send, this, &Window::send);
     connect(work_, &WorkPage::back, this, &Window::leaveWork);
-    connect(work_, &WorkPage::activity, this, [this](const QString &words) {
-        activity_->setText(words.isEmpty() ? tr("Agent: %1").arg(QFileInfo(agent_).fileName()) : words);
-    });
+    connect(work_, &WorkPage::activity, this, [this](const QString &words) { frame_->setAgentNote(words); });
     connect(work_, &WorkPage::done, this, &Window::finished);
 
     recall();
@@ -134,6 +147,7 @@ Window::Window(QWidget *parent)
     go(mess_);
     scan();
     readState();
+    next_->read();
 }
 
 void Window::refresh()
@@ -151,20 +165,45 @@ void Window::openFolder(const QString &path)
     const QFileInfo info(path);
     const QString folder = info.isDir() ? path : info.absolutePath();
     if (!QDesktopServices::openUrl(QUrl::fromLocalFile(folder)))
-        statusBar()->showMessage(tr("%1 could not be opened").arg(folder), 6000);
+        frame_->flash(tr("%1 could not be opened").arg(folder));
 }
 
-// Shows a page. The two things to look at have tabs; a hand-over and work
-// in progress are steps of one of them and hide the tabs.
+// The strip's button and "Open System…" are one thing: start the System app,
+// by the same variable the rail uses unless this window was told another.
+void Window::openSystem()
+{
+    if (!QProcess::startDetached(systemApp_, {}))
+        frame_->flash(tr("%1 could not be started").arg(systemApp_));
+}
+
+void Window::readStripFrom(const QString &recab)
+{
+    delete next_;
+    next_ = new NextSystem(recab, this);
+    connect(next_, &NextSystem::known, this, [this] { frame_->setNextSystem(next_->titles()); });
+    next_->read();
+}
+
+bool Window::showingWork() const { return stack_->currentWidget() == work_; }
+bool Window::showingMess() const { return stack_->currentWidget() == mess_; }
+bool Window::showingSystems() const { return stack_->currentWidget() == systems_; }
+
+QString Window::entryOf(QWidget *page) const
+{
+    if (page == mess_)
+        return QStringLiteral("mess");
+    if (page == systems_)
+        return QStringLiteral("systems");
+    // A hand-over and the work page: the flow they belong to.
+    const bool ofSystems = page == hand_ ? handingSystems_ : (job_ == Job::Comparing || job_ == Job::Explaining);
+    return ofSystems ? QStringLiteral("systems") : QStringLiteral("mess");
+}
+
+// Shows a page and marks the entry it belongs to.
 void Window::go(QWidget *page)
 {
     stack_->setCurrentWidget(page);
-    const bool top = page == mess_ || page == systems_;
-    tabs_->setVisible(top);
-    if (top) {
-        const QSignalBlocker quiet(tabs_);
-        tabs_->setCurrentIndex(page == mess_ ? 0 : 1);
-    }
+    frame_->follow(entryOf(page));
 }
 
 // ---------------------------------------------------------------- The mess
@@ -192,6 +231,7 @@ void Window::scanned()
         freed_ = qMax<qint64>(0, before_ - tree_->bytes);
     before_ = 0;
     mess_->show(tree_, found_, roots_, QStorageInfo(roots_.first()).bytesAvailable(), freed_, home_);
+    frame_->setBadge(QStringLiteral("mess"), int(found_.size()));
 }
 
 void Window::showHandOver()
@@ -272,8 +312,7 @@ void Window::compare()
     // It stays on the tab: the two sides fill as they are read.
     systems_->showComparing(state_);
     go(systems_);
-    tabs_->setEnabled(false);
-    activity_->setText(tr("Comparing the two systems"));
+    frame_->setAgentNote(tr("Comparing the two systems"));
     connect(run_, &Run::event, systems_, &SystemsPage::progress);
     connect(run_, &Run::finished, this, &Window::compared);
     run_->start();
@@ -293,8 +332,7 @@ void Window::compared(bool ok)
     run_ = nullptr;
     job_ = Job::None;
     run->deleteLater();
-    tabs_->setEnabled(true);
-    activity_->setText(tr("Agent: %1").arg(QFileInfo(agent_).fileName()));
+    frame_->setAgentNote(QString());
     QString why;
     if (stopped_) {
         // Nothing to say: the person stopped it.
@@ -380,7 +418,9 @@ void Window::send(const QString &prompt)
     if (run_)
         return;
     run_ = new Run(agent_, {}, this);
-    run_->setPrompt(prompt); // its questions are answered on the same input
+    // Its questions are answered on the same input; Activity lists the run
+    // under what was asked.
+    run_->setPrompt(prompt, QStringLiteral("Disk"), requestTitle(prompt));
     if (handingSystems_) {
         job_ = Job::Explaining;
         said_.clear();
@@ -399,12 +439,15 @@ void Window::send(const QString &prompt)
     }
     go(work_);
     run_->start();
+    frame_->setOwnRun(run_->pid());
 }
 
 void Window::finished(bool ok)
 {
     const Job job = job_;
     run_ = nullptr;
+    frame_->setOwnRun(0); // Activity reads the run's record again
+    next_->read();        // the agent may have changed the next system
     job_ = Job::None;
     if (!ok) {
         // A failure stays on the work page, which says why and offers the way

@@ -23,6 +23,9 @@ qt_add_executable(disk-gui
     ../kit/page.cpp
     ../kit/refresh.cpp
     ../kit/work.cpp
+    ../kit/frame.cpp
+    ../kit/activity.cpp
+    ../kit/nextsystem.cpp
 )
 target_include_directories(disk-gui PRIVATE ../kit)
 target_compile_options(disk-gui PRIVATE -Wall -Wextra)
