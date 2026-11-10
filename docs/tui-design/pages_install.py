@@ -1,4 +1,5 @@
-"""The install: the hub, disk-plan and base-system, page by page."""
+"""The install: the hub, disk-plan and base-system. Second pass: every page is laid out
+for the one thing it does, inside the frame all pages share."""
 from kit import *
 
 PAGES = []
@@ -14,11 +15,11 @@ CONFIRM_KEYS = [("y", "yes"), ("n", "no")]
 
 # ====================================================================== install hub
 HUB_STEPS = ["Preflight", "Disk", "Base system", "Configuration", "Boot", "Finish"]
-HUB_VALUES = ["UEFI", "vda · A/B", "48,213 files", "ann@studio", "A/B", ""]
+HUB_VALUES = ["UEFI", "nvme0n1", "copied", "ann", "A/B", ""]
 
 
 def hub(selected, done, cols=100, rows=28, distro="levitate", right="state in /run/install"):
-    p = Page(cols, rows, distro)
+    p = Deliberate(cols, rows, distro)
     p.band("Install", f"step {selected + 1} of 6")
     p.steps(6, done, selected)
     p.path([(label, "done" if i < done else "ready" if i == done else "todo", HUB_VALUES[i] if i < done else "")
@@ -27,204 +28,344 @@ def hub(selected, done, cols=100, rows=28, distro="levitate", right="state in /r
     return p
 
 
+def tile(p, x, w, tone, title, lines):
+    """A check as a tile: its verdict, what was found, why it matters."""
+    colour = TONES[tone]
+    top = p.y
+    p.card(x, top, w, 2 + len(lines), RAISED)
+    for r in range(top, top + 2 + len(lines)):
+        p.put(r, x, "█", colour)
+    p.put(top, x + 2, f"{TONE_MARK[tone] if tone != 'danger' else '✗'} {title}", colour, RAISED, bold=True)
+    for i, (text, tone_) in enumerate(lines):
+        p.put(top + 1 + i, x + 2, text, tone_, RAISED)
+
+
+def launch(p, hubpage=True):
+    """What the hub shows for the step you are at: what the app will do, on what, and one
+    bar to start it."""
+    p.heading(3, "Copy the system onto the disk", "The longest step: a few minutes of copying, then the mounts are written down.")
+    p.put(p.y, p.x, "WHAT IT DOES", GUTTER, bold=True)
+    p.y += 1
+    p.minipath([("Check the target", "ready"), ("Copy the system", "todo"), ("Write the fstab", "todo")])
+    p.gap()
+    half = (p.w - 5) // 2
+    top = p.y
+    p.card(p.x, top, half, 4)
+    p.put(top, p.x + 2, "FROM", GUTTER, INK, bold=True)
+    p.put(top + 1, p.x + 2, "The live image", PAPER, INK, bold=True)
+    p.put(top + 2, p.x + 2, "/run/live-rootfs.erofs", LICHEN, INK)
+    p.put(top + 3, p.x + 2, "1.4 GiB", LICHEN, INK)
+    p.put(top + 1, p.x + half + 1, "──▶", p.accent, bold=True)
+    p.card(p.x + half + 5, top, half, 4)
+    p.put(top, p.x + half + 7, "TO", GUTTER, INK, bold=True)
+    p.put(top + 1, p.x + half + 7, "/mnt", PAPER, INK, bold=True)
+    p.put(top + 2, p.x + half + 7, "/dev/nvme0n1p5, slot A", LICHEN, INK)
+    p.put(top + 3, p.x + half + 7, "30.0 GiB, empty", LICHEN, INK)
+    p.y = top + 5
+    p.button("Start base-system")
+    p.hint(["The guide beside this has every command: Base System, steps 6-9."])
+
+
 def hub_pages():
-    p = page("install-hub", "Preflight", "The first step: two checks, both passed. One key goes on.", hub(0, 0))
-    p.heading(1, "Can this machine take the install?", "Two things are checked before anything else.")
-    p.panel("success", "Ready to install", ["Both checks passed."])
-    p.steplist([("", [("done", "Booted in UEFI mode"), ("done", "Install media mounted  /run/live-rootfs.erofs")])])
-    p.gap().hint([("Enter",), " continues to the disk."])
+    p = page("install-hub", "1 Preflight", "The first page: each check is a tile that says what was found and why it matters, then the road ahead.", hub(0, 0))
+    p.heading(1, "Can this machine take the install?", "Two things must hold before anything is touched.")
+    half = (p.w - 2) // 2
+    tile(p, p.x, half, "success", "Booted in UEFI mode", [("found /sys/firmware/efi/efivars", PAPER), ("systemd-boot needs UEFI", LICHEN)])
+    tile(p, p.x + half + 2, half, "success", "Install media mounted", [("found /run/live-rootfs.erofs", PAPER), ("the system this installs", LICHEN)])
+    p.y += 5
+    p.put(p.y, p.x, "THE ROAD AHEAD", GUTTER, bold=True)
+    p.y += 1
+    p.minipath([("Disk", "ready"), ("Base system", "todo"), ("Configuration", "todo"), ("Boot", "todo"), ("Finish", "todo")])
+    p.text("Nothing on any disk changes before you type DESTROY in the Disk step.", LICHEN)
+    p.gap()
+    p.button("Continue to the disk")
 
-    p = page("install-hub", "Preflight, a check failed", "A failed check says what to do; the step cannot be passed.", hub(0, 0))
-    p.heading(1, "Can this machine take the install?", "Two things are checked before anything else.")
-    p.panel("danger", "Not booted in UEFI mode", ["Reboot and pick the UEFI entry for the install media in the firmware's boot menu."])
-    p.steplist([("", [("failed", "Booted in UEFI mode"), ("done", "Install media mounted  /run/live-rootfs.erofs")])])
-    p.gap().hint(["Fix it, then start the install screen again."])
+    p = page("install-hub", "1 Preflight, a check failed", "The failed tile takes the danger tone and carries the fix; there is no bar to press.", hub(0, 0))
+    p.heading("bang", "This boot cannot take the install", "One of the two things does not hold.", SALMON)
+    half = (p.w - 2) // 2
+    tile(p, p.x, half, "danger", "Not booted in UEFI mode", [("no /sys/firmware/efi/efivars", PAPER), ("systemd-boot needs UEFI", LICHEN)])
+    tile(p, p.x + half + 2, half, "success", "Install media mounted", [("found /run/live-rootfs.erofs", PAPER), ("the system this installs", LICHEN)])
+    p.y += 5
+    p.put(p.y, p.x, "WHAT TO DO", GUTTER, bold=True)
+    p.y += 1
+    p.text("Reboot, open the firmware's boot menu, and pick the UEFI entry for the install media.")
 
-    p = page("install-hub", "A step ready to start", "The current step names the app it opens and what that app will do.", hub(2, 2))
-    p.heading(3, "Copy the system onto the disk", "Check the target, copy the system, write its fstab.")
-    p.panel("info", "Next: base-system", ["It shows a progress bar while it copies and asks before it replaces anything in the fstab."])
-    p.section("Starts")
-    p.commands(["base-system --then hub"])
-    p.gap().hint([("Enter",), " starts it.   The guide beside this has it in full: Base System, steps 6-9."])
+    page("install-hub", "3 A step ready to start", "The step you are at is a launch pad: what the app does, from what onto what, and one bar.", (lambda p: (launch(p), p)[1])(hub(2, 2)))
 
-    p = page("install-hub", "A finished step", "A done step shows what it left, and warns that redoing it drops the steps after it.", hub(1, 3))
-    p.heading(2, "Choose a disk and a layout", "Partition, format and mount the disk.")
-    p.panel("success", "Done", facts=[("Disk", "/dev/vda"), ("Layout", "A/B"), ("Mounted at", "/mnt")])
-    p.panel("warning", "Doing it again drops the steps after it", ["The base system and everything after it build on this disk layout."])
-    p.section("Starts")
-    p.commands(["disk-plan --then hub"])
+    p = page("install-hub", "2 A finished step", "A done step is a receipt: when, and what it left, drawn. Doing it again is there, quietly, with its cost.", hub(1, 3))
+    p.heading(2, "The disk is laid out", "Done at 14:02. The steps after it build on this.")
+    p.diskbar([("", 4, MOSS), ("Windows", 300, GUTTER), ("A", 30, p.accent), ("B", 30, LEAF), ("state", 112, SAND)], 476)
+    p.gap()
+    p.table(["", "Device", "Size", "Mounted at"], [["EFI", "nvme0n1p1", "260 MiB", "/mnt/boot"], ["Slot A", "nvme0n1p5", "30.0 GiB", "/mnt"], ["Slot B", "nvme0n1p6", "30.0 GiB", "for updates"], ["State", "nvme0n1p7", "115.9 GiB", "/mnt/var"]])
+    p.gap()
+    p.hint([("Enter",), " opens disk-plan again. That drops the base system and every step after it."])
 
-    p = page("install-hub", "A step that waits", "A step ahead of the current one says what it waits for.", hub(4, 2))
-    p.heading(5, "Install the boot loader", "systemd-boot and the boot entries for the disk's layout.")
-    p.panel("info", "Waits for the steps before it", ["First: Base system."])
-    p.section("Will run")
-    p.commands(["recsetup apply --root /mnt --boot ab --slot-a /dev/vda2 --slot-b /dev/vda3 --machine-id"])
+    p = page("install-hub", "5 A step that waits", "A step ahead shows what it waits for, and already what it will write.", hub(4, 2))
+    p.heading(5, "Install the boot loader", "systemd-boot and one boot entry for each slot.")
+    p.put(p.y, p.x, "WAITS FOR", GUTTER, bold=True)
+    p.y += 1
+    p.minipath([("Base system", "ready"), ("Configuration", "todo"), ("Boot", "todo")])
+    p.gap()
+    p.put(p.y, p.x, "WHAT IT WILL WRITE", GUTTER, bold=True)
+    p.y += 1
+    p.card(p.x, p.y, p.w, 4)
+    p.put(p.y, p.x + 2, "/boot  the EFI partition", MOSS, INK, bold=True)
+    for i, (entry, note, colour) in enumerate([("LevitateOS (slot A)", "the default", p.accent), ("LevitateOS (slot B)", "empty until the first update", GUTTER)]):
+        p.put(p.y + 1 + i, p.x + 4, "▸", colour, INK)
+        p.put(p.y + 1 + i, p.x + 6, entry, PAPER, INK)
+        p.put(p.y + 1 + i, p.x + 30, note, LICHEN, INK)
+    p.put(p.y + 3, p.x + 4, "the kernel of slot A, and systemd-boot itself", LICHEN, INK)
+    p.y += 5
+    p.commands(["recsetup apply --root /mnt --boot ab --slot-a /dev/nvme0n1p5 --slot-b /dev/nvme0n1p6"])
 
-    p = page("install-hub", "Finish", "The last step: everything before it is ticked, one key reboots.", hub(5, 5))
-    p.heading(6, "Reboot into the new system", "Unmount it and restart. Remove the install media when the machine restarts.")
-    p.panel("success", "The install is complete", facts=[("System", "LevitateOS on /dev/vda"), ("Layout", "A/B, slot A"), ("Login", "ann, an administrator")])
-    p.section("Will run")
-    p.commands(["umount /mnt/var", "umount /mnt/boot", "umount /mnt", "reboot"])
-    p.gap().hint([("Enter",), " unmounts and reboots."])
+    p = page("install-hub", "6 Finish", "The last page is the machine you made, one reminder, and one bar.", hub(5, 5))
+    p.heading("check", "Ready to reboot", "The install is complete. This is the system it made.", LEAF)
+    p.card(p.x, p.y, p.w, 6)
+    p.fill(p.y, p.x, p.w, p.accent)
+    p.put(p.y, p.x + 2, "studio", NIGHT, p.accent, bold=True)
+    p.put(p.y, p.x + p.w - 16, "LevitateOS 1.0", NIGHT, p.accent)
+    top = p.y + 2
+    p.y = top
+    p.facts([("Logs in", "ann, an administrator"), ("Keyboard", "de"), ("Clock", "Europe/Amsterdam")], x=p.x + 2, bg=INK)
+    p.y = top
+    p.facts([("Disk", "nvme0n1, beside Windows"), ("Layout", "A/B, slot A"), ("Language", "en_US.UTF-8")], x=p.x + p.w // 2 + 3, bg=INK)
+    p.y = top + 5
+    p.panel("warning", "Remove the install media when the machine restarts", ["Otherwise it boots the installer again."])
+    p.button("Unmount and reboot")
 
 
 # ====================================================================== disk-plan
-DP = ["Overview", "Disk", "System", "Disk use", "Plan", "Commands", "Checks", "Confirm", "Apply", "Done"]
-DP_VALUES = ["", "vdz", "A/B", "erase", "4 parts", "11", "passed", "", "", ""]
+# One story through every page: a laptop with Windows on it, kept beside the new system.
+DISK = "/dev/nvme0n1"
+NOW = [("", 4, MOSS), ("Windows", 468, GUTTER), ("", 4, RULE)]
+DP = ["Overview", "Disk", "System", "Disk use", "Partitions", "Plan", "Commands", "Checks", "Confirm", "Apply", "Done"]
+DP_VALUES = ["", "nvme0n1", "A/B", "keep some", "5 edits", "4 change", "10", "passed", "", "", ""]
 
 
-def dp(selected, done, values=DP_VALUES, steps=DP, keys=STEP_KEYS, right="/dev/vdz"):
-    p = Page()
-    total = len(steps) - 1
+def after(p):
+    return [("", 4, MOSS), ("Windows", 300, GUTTER), ("A", 30, p.accent), ("B", 30, LEAF), ("state", 108, SAND), ("", 4, RULE)]
+
+
+def dp(selected, done, keys=STEP_KEYS, right=DISK, states=None):
+    p = Deliberate()
+    total = len(DP) - 1
     p.band("Disk", "Overview" if selected == 0 else f"step {selected} of {total}")
     p.steps(total, max(0, done - 1), selected - 1 if selected else None)
-    p.path([(label, "done" if i < done else "ready" if i == done else "todo", values[i] if i < done else "")
-            for i, label in enumerate(steps)], selected)
+    steps = [(label, "done" if i < done else "ready" if i == done else "todo", DP_VALUES[i] if i < done else "") for i, label in enumerate(DP)]
+    for i, state in (states or {}).items():
+        steps[i] = (steps[i][0], state, steps[i][2])
+    p.path(steps, selected)
     p.keys(keys, right)
     return p
 
 
-def disk_bar(p, parts, total):
-    """A disk as one bar: each partition a stretch of it, then what each stretch is."""
-    tints = [p.accent, LEAF, MOSS, p.highlight, GUTTER, SALMON]
-    col = p.x
-    for i, (name, size, _) in enumerate(parts):
-        width = max(1, round(p.w * size / total))
-        width = min(width, p.x + p.w - col)
-        p.put(p.y, col, "█" * width, tints[i % len(tints)])
-        col += width
-    p.y += 1
-    col = p.x
-    for i, (name, size, label) in enumerate(parts):
-        col = p.put(p.y, col, "■ ", tints[i % len(tints)])
-        col = p.put(p.y, col, f"{name} ", PAPER)
-        col = p.put(p.y, col, label, LICHEN) + 3
-    p.y += 2
+RUN = [
+    ("Resize", ["ntfsresize --size 300G /dev/nvme0n1p3", "sfdisk --no-reread -N 3 /dev/nvme0n1"]),
+    ("Partition", ["sfdisk --append /dev/nvme0n1", "udevadm settle --timeout=10"]),
+    ("Format", ["mkfs.ext4 -F -L ROOT_A /dev/nvme0n1p5", "mkfs.ext4 -F -L ROOT_B /dev/nvme0n1p6", "mkfs.ext4 -F -L STATE /dev/nvme0n1p7"]),
+    ("Mount", ["mount /dev/nvme0n1p5 /mnt", "mount /dev/nvme0n1p1 /mnt/boot", "mount /dev/nvme0n1p7 /mnt/var"]),
+]
 
 
-AB_PARTS = [("efi", 1, "1.0 GiB"), ("root_a", 20, "20.0 GiB"), ("root_b", 20, "20.0 GiB"), ("state", 23, "23.0 GiB")]
+def runsheet(p, upto=None, failed=None):
+    """The commands as a numbered run sheet, a phase to a gutter. `upto` commands are
+    done and the next is running; `failed` is the number that failed."""
+    n = 0
+    for phase, lines in RUN:
+        for i, line in enumerate(lines):
+            n += 1
+            state = "todo" if upto is None else "failed" if n == failed else "done" if n <= upto else "running" if n == upto + 1 and failed is None else "todo"
+            p.put(p.y, p.x, phase if i == 0 else "", MOSS if state != "todo" or upto is None else GUTTER, bold=True)
+            p.put(p.y, p.x + 10, "┃", HAIR)
+            p.put(p.y, p.x + 12, str(n).rjust(2), GUTTER)
+            mark, colour = MARKS[state]
+            here = state in ("running", "failed")
+            if here:
+                p.fill(p.y, p.x + 15, p.w - 15, RAISED)
+            p.put(p.y, p.x + 16, mark, colour or p.accent, RAISED if here else None, bold=here)
+            p.put(p.y, p.x + 19, line, PAPER if state != "todo" or upto is None else LICHEN, RAISED if here else None, bold=here)
+            p.y += 1
 
 
 def disk_plan_pages():
-    p = page("disk-plan", "Overview", "Where the step starts: what will happen, in three stretches, and what is chosen so far.", dp(0, 0, right="no disk yet"))
+    p = page("disk-plan", "Overview", "The app as a map: three stretches, and the one line that matters, where writing starts.", dp(0, 0, right="no disk yet"))
     p.heading("diamond", "Prepare the install disk", "Every command is shown before anything is written.")
-    p.section("How it goes")
-    for n, (title, pages_, what) in enumerate([
-        ("Choose", "Disk · System · Disk use", "the disk, the layout, and whether to erase it or keep some"),
-        ("Review", "Plan · Commands · Checks", "the plan, the exact commands, and whether recpart would refuse"),
-        ("Apply", "Confirm · Apply · Done", "type DESTROY, watch it run, get the next step"),
-    ]):
-        col = p.put(p.y, p.x, f"{n + 1}", p.accent, bold=True)
-        col = p.put(p.y, col + 2, title.ljust(8), PAPER, bold=True)
-        p.put(p.y, col, pages_, MOSS)
-        p.put(p.y + 1, p.x + 11, what, LICHEN)
-        p.y += 3
-    p.hint([("Enter",), " starts with the disk."])
+    w = (p.w - 6) // 3
+    for i, (title, steps_) in enumerate([("Choose", ["Disk", "System", "Disk use", "Partitions"]), ("Review", ["Plan", "Commands", "Checks"]), ("Apply", ["Confirm", "Apply", "Done"])]):
+        x = p.x + i * (w + 3)
+        p.card(x, p.y, w, 6)
+        p.put(p.y, x + 2, f"{i + 1}", p.accent, INK, bold=True)
+        p.put(p.y, x + 4, title, PAPER, INK, bold=True)
+        for j, step in enumerate(steps_):
+            p.put(p.y + 1 + j, x + 4, step, LICHEN, INK)
+        if i < 2:
+            p.put(p.y + 2, x + w + 1, "▶", GUTTER)
+    p.y += 7
+    safe = round(p.w * 8 / 10)
+    p.put(p.y, p.x, "━" * safe, LEAF)
+    p.put(p.y, p.x + safe, "┃", PAPER, bold=True)
+    p.put(p.y, p.x + safe + 1, "━" * (p.w - safe - 1), SALMON)
+    p.put(p.y + 1, p.x, "nothing is written", LEAF)
+    p.put(p.y + 1, p.x + safe - 14, "type DESTROY ▲", PAPER, bold=True)
+    p.put(p.y + 1, p.x + p.w - 7, "written", SALMON)
+    p.y += 3
+    p.button("Start: choose a disk")
 
-    p = page("disk-plan", "1 Disk", "Disks as a list with the selection bar; the chosen one's details beside it.", dp(1, 1, right="3 disks"))
+    p = page("disk-plan", "1 Disk", "Each disk shows what is on it as a bar, so the right one is recognised, not guessed. The install media cannot be chosen.", dp(1, 1, keys=[("↑/↓", "select"), ("Enter", "choose"), ("R", "read again"), ("q", "back")], right="3 disks"))
     p.heading(1, "Which disk?", "Nothing is written before the Confirm step.")
-    list_w = 34
-    top = p.y
-    p.rows_list([("", "/dev/nvme0n1", "1.8 TiB", "NVMe"), ("", "/dev/sda", "476.9 GiB", "SATA"), ("", "/dev/sdb", "28.6 GiB", "USB ")], 0, list_w)
-    p.y = top
-    card_x, card_w = p.x + list_w + 2, p.w - list_w - 2
-    for r in range(top, top + 9):
-        p.fill(r, card_x, card_w, INK)
-    p.put(top + 1, card_x + 2, "Samsung SSD 990 PRO", PAPER, INK, bold=True)
-    p.put(top + 2, card_x + 2, "serial S6Z2NJ0W501942", LICHEN, INK)
-    p.y = top + 4
-    p.facts([("Size", "1.8 TiB"), ("Table", "gpt"), ("On it now", "Windows, 3 parts"), ("Live medium", "no")], x=card_x + 2, bg=INK)
-    p.y = top + 11
-    p.hint([("Enter",), " chooses it.   ", ("R",), " reads the disks again."])
+    disks = [("/dev/nvme0n1", "Samsung SSD 990 PRO", "476.9 GiB", NOW, "Windows, 3 partitions", True, False),
+             ("/dev/sda", "WDC WD10EZEX", "931.5 GiB", [("data", 931, GUTTER)], "one ext4 partition, 512 GiB used", False, False),
+             ("/dev/sdb", "SanDisk Ultra", "28.6 GiB", [("LevitateOS live", 28, RULE)], "the install media: cannot be chosen", False, True)]
+    for name, model, size, parts, what, chosen, locked in disks:
+        bg = RAISED if chosen else None
+        if chosen:
+            p.card(p.x, p.y, p.w, 3, RAISED)
+            for r in range(3):
+                p.put(p.y + r, p.x, "█", p.accent)
+        p.put(p.y, p.x + 2, name, GUTTER if locked else PAPER, bg, bold=not locked)
+        p.put(p.y, p.x + 17, model, LICHEN if not locked else GUTTER, bg)
+        p.put(p.y, p.x + p.w - 2 - len(size), size, GUTTER if locked else PAPER, bg, bold=chosen)
+        p.diskbar(parts, sum(part[1] for part in parts), x=p.x + 2, width=p.w - 4, row=p.y + 1)
+        p.put(p.y + 2, p.x + 2, what, SALMON if locked else LICHEN, bg)
+        p.y += 4
 
-    p = page("disk-plan", "2 System", "A choice between two is two cards; the chosen one carries the accent.", dp(2, 2))
+    p = page("disk-plan", "2 System", "The choice that shapes the disk, shown as what each leaves on it: the slots, and the partitions.", dp(2, 2, keys=[("←/→", "choose"), ("Enter", "go on"), ("q", "back")]))
     p.heading(2, "How is the system updated?", "This decides which partitions the system needs.")
-    p.cards([
-        ("A/B: two system slots", "default", ["The system is read-only, in one of two slots. An update goes into the other slot and is tried once; if it does not start, the machine goes back to the working one.", "", "EFI · root A · root B · state"], True),
-        ("Mutable: one system", "", ["One root you change in place, as on most distributions. Updates cannot be tried first or rolled back.", "", "EFI · root"], False),
-    ], height=9)
-    p.hint([("←/→",), " chooses.   ", ("Enter",), " goes on.   A/B is what this live system was started with."])
+    w = (p.w - 3) // 2
+    for i, (title, tag, chosen, boxes, flow, text, parts) in enumerate([
+        ("A/B: two slots", "default", True, [("A", True), ("B", False)], "update ─▶ B, tried once",
+         "Read-only. An update that does not start is never kept.", [("EFI", 1, MOSS), ("root A", 20, None), ("root B", 20, LEAF), ("state", 23, SAND)]),
+        ("Mutable: one system", "", False, [("root", True)], "update in place",
+         "One root you change. An update cannot be undone.", [("EFI", 1, MOSS), ("root", 63, None)]),
+    ]):
+        x = p.x + i * (w + 3)
+        edge = p.accent if chosen else RULE
+        p.card(x, p.y, w, 11, RAISED)
+        for r in range(11):
+            p.put(p.y + r, x, "█", edge)
+        p.put(p.y, x + 2, ("● " if chosen else "○ ") + title, p.accent if chosen else PAPER, RAISED, bold=True)
+        if tag:
+            p.put(p.y, x + w - len(tag) - 4, f" {tag} ", NIGHT, p.accent, bold=True)
+        col = x + 2
+        for label, running in boxes:
+            bw = 13 if len(boxes) > 1 else 27
+            p.fill(p.y + 2, col, bw, (p.accent if chosen else MOSS) if running else RULE)
+            p.fill(p.y + 3, col, bw, (p.accent if chosen else MOSS) if running else RULE)
+            p.put(p.y + 2, col + 1, label, NIGHT if running else LICHEN, bold=True)
+            p.put(p.y + 3, col + 1, "running" if running else "spare", NIGHT if running else LICHEN)
+            col += bw + 1
+        p.put(p.y + 5, x + 2, flow, MOSS, RAISED)
+        for j, line in enumerate(wrap(text, w - 4)):
+            p.put(p.y + 6 + j, x + 2, line, LICHEN, RAISED)
+        p.diskbar([(n, s, c or (p.accent if chosen else MOSS)) for n, s, c in parts], 64, x=x + 2, width=w - 4, row=p.y + 9)
+    p.y += 12
+    p.hint(["A/B is what this live system was started with."])
 
-    p = page("disk-plan", "3 Disk use", "The same two cards, then what is on the disk now.", dp(3, 3))
-    p.heading(3, "What happens to the disk?", "Give it all to the new system, or keep some of what is on it.")
-    p.cards([
-        ("Erase the whole disk", "simplest", ["The A/B partitions take all of it. The disk is empty, so nothing is lost."], True),
-        ("Keep some of it", "", ["Keep, shrink or delete partitions and place the new ones: for dual boot, or keeping data."], False),
-    ], height=5)
-    p.section("On /dev/vdz now", "64.0 GiB · no partition table")
-    p.text("No partitions: the disk is empty.", LICHEN)
-
-    p = page("disk-plan", "4 Plan", "The disk as one bar, then the partitions as a table. Nothing written yet.", dp(4, 4))
-    p.heading(4, "The plan", "What recpart would do to the disk. Nothing has been written yet.")
-    p.section("/dev/vdz", "64.0 GiB · A/B")
-    disk_bar(p, AB_PARTS, 64)
-    p.section("Partitions", "the whole disk is erased")
-    p.table(["#", "Name", "Label", "Type", "Mount", "Size", "Change"],
-            [["1", "efi", "EFI", "vfat", "/boot", "1.0 GiB", "created"], ["2", "root_a", "ROOT_A", "ext4", "/", "20.0 GiB", "created"],
-             ["3", "root_b", "ROOT_B", "ext4", "none", "20.0 GiB", "created"], ["4", "state", "STATE", "ext4", "/var", "rest", "created"]],
-            aligns=["r", "l", "l", "l", "l", "r", "l"])
-
-    p = page("disk-plan", "5 Commands", "Every command of the apply, grouped, before any of them runs.", dp(5, 5))
-    p.heading(5, "The commands", "Exactly what the apply will run, from recpart's dry run.")
-    p.steplist([
-        ("Partition", [("todo", "wipefs -a /dev/vdz"), ("todo", "sfdisk /dev/vdz"), ("todo", "udevadm settle --timeout=10")]),
-        ("Format", [("todo", "mkfs.vfat -F 32 -n EFI /dev/vdz1"), ("todo", "mkfs.ext4 -F -L ROOT_A /dev/vdz2"), ("todo", "mkfs.ext4 -F -L ROOT_B /dev/vdz3"), ("todo", "mkfs.ext4 -F -L STATE /dev/vdz4")]),
-        ("Mount", [("todo", "mount /dev/vdz2 /mnt"), ("todo", "mount /dev/vdz1 /mnt/boot"), ("todo", "mount /dev/vdz4 /mnt/var")]),
-    ])
-
-    p = page("disk-plan", "6 Checks", "One verdict in a panel, and where it came from.", dp(6, 6))
-    p.heading(6, "Safety checks", "Whether recpart's dry run found a reason to refuse this disk.")
-    p.panel("success", "recpart would apply to this disk", ["Its dry run went through every step without a refusal."])
-    p.section("The dry run")
-    p.commands(["recpart apply --disk /dev/vdz --mode ab --expect plan-9c4b6673.json --dry-run"])
-    p.gap().hint([("Enter",), " goes on to the last step before anything is written."])
-
-    p = page("disk-plan", "7 Confirm", "The one destructive moment: a danger panel, what is lost, and a word to type.", dp(7, 7, keys=[("Enter", "apply, once unlocked"), ("Bksp", "erase"), ("q", "back")]))
-    p.heading(7, "Write to the disk?", "The last step before recpart writes anything.")
-    p.panel("danger", "This erases everything on /dev/vdz", facts=[("Disk", "Fixture Disk 64G, serial FIXTURE0001"), ("Size", "64.0 GiB"), ("Becomes", "A/B: efi, root_a, root_b, state")])
-    p.section("Type DESTROY to unlock")
-    p.field("›", "DEST", "locked", width=40)
-    p.gap().hint(["Backspace corrects a typo. Nothing is written until the word is whole and you press ", ("Enter",), "."])
-
-    p = page("disk-plan", "8 Apply, running", "A long job: a thick bar, then each command with how it went.", dp(8, 8, keys=[("q", "wait for it")], right="writing /dev/vdz"))
-    p.heading(8, "Writing the disk", "recpart is laying out /dev/vdz. Do not turn the machine off.")
-    p.bar(6 / 11)
+    p = page("disk-plan", "3 Disk use", "Two futures for the same disk, each drawn under what is on it now. What is lost is said in so many words.", dp(3, 3, keys=[("←/→", "choose"), ("Enter", "go on"), ("q", "back")]))
+    p.heading(3, "What happens to the disk?", "Keep what is on it, or give it all to the new system.")
+    p.diskbar(NOW, 476, label="Now")
     p.gap()
-    p.steplist([
-        ("Partition", [("done", "wipefs -a /dev/vdz"), ("done", "sfdisk /dev/vdz"), ("done", "udevadm settle --timeout=10")]),
-        ("Format", [("done", "mkfs.vfat -F 32 -n EFI /dev/vdz1"), ("done", "mkfs.ext4 -F -L ROOT_A /dev/vdz2"), ("running", "mkfs.ext4 -F -L ROOT_B /dev/vdz3"), ("todo", "mkfs.ext4 -F -L STATE /dev/vdz4")]),
-        ("Mount", [("todo", "mount /dev/vdz2 /mnt"), ("todo", "mount /dev/vdz1 /mnt/boot")]),
-    ])
+    w = (p.w - 3) // 2
+    for i, (title, tag, chosen, parts, lost, tone) in enumerate([
+        ("Keep some of it", "dual boot", True, after(p), "Windows stays, 175.9 GiB smaller", LEAF),
+        ("Erase the whole disk", "simplest", False, [("", 4, MOSS), ("A", 30, MOSS), ("B", 30, MOSS), ("state", 412, MOSS)], "Windows and its data are gone", SALMON),
+    ]):
+        x = p.x + i * (w + 3)
+        p.card(x, p.y, w, 6, RAISED)
+        for r in range(6):
+            p.put(p.y + r, x, "█", p.accent if chosen else RULE)
+        p.put(p.y, x + 2, ("● " if chosen else "○ ") + title, p.accent if chosen else PAPER, RAISED, bold=True)
+        p.put(p.y, x + w - len(tag) - 4, f" {tag} ", NIGHT if chosen else LICHEN, p.accent if chosen else RULE, bold=chosen)
+        p.put(p.y + 2, x + 2, "AFTER", GUTTER, RAISED, bold=True)
+        p.diskbar(parts, 476, x=x + 2, width=w - 4, row=p.y + 3)
+        p.put(p.y + 5, x + 2, lost, tone, RAISED)
+    p.y += 7
+    p.hint(["You place the new partitions on the next page."])
 
-    p = page("disk-plan", "8 Apply, failed", "A failure: the large mark turns to a warning, recpart's own message and fix, and where it stopped.", dp(8, 8, right="stopped"))
-    p.heading("bang", "The apply stopped", "recpart stopped at the first command that failed.", SALMON)
-    p.panel("danger", "mkfs.ext4 failed on /dev/vdz3 (E041)", ["What to do: check the disk for errors, then run the plan again from the Disk step."])
-    p.steplist([
-        ("Partition", [("done", "wipefs -a /dev/vdz"), ("done", "sfdisk /dev/vdz"), ("done", "udevadm settle --timeout=10")]),
-        ("Format", [("done", "mkfs.vfat -F 32 -n EFI /dev/vdz1"), ("done", "mkfs.ext4 -F -L ROOT_A /dev/vdz2"), ("failed", "mkfs.ext4 -F -L ROOT_B /dev/vdz3"), ("todo", "mkfs.ext4 -F -L STATE /dev/vdz4")]),
-    ])
+    p = page("disk-plan", "4 Partitions", "Editing is done on the picture: the selected stretch is marked on the bar, its actions are keys beside the table, and what A/B still needs is always in view.",
+             dp(4, 4, keys=[("↑/↓", "select"), ("m", "use as"), ("r", "resize"), ("f", "filesystem"), ("d", "remove"), ("u", "undo"), ("Enter", "go on")]))
+    p.heading(4, "Place the new system", "Shrink, keep or remove what is there, and make room for the four partitions A/B needs.")
+    p.diskbar(after(p), 476, selected=2)
+    left = p.w - 25
+    top = p.y
+    rows = [["nvme0n1p1", "260 MiB", "EFI", "kept"], ["nvme0n1p3", "300.0 GiB", "Windows", "shrunk"], ["(new)", "30.0 GiB", "Slot A", "new"],
+            ["(new)", "30.0 GiB", "Slot B", "new"], ["(new)", "115.9 GiB", "State", "new"], ["nvme0n1p4", "750 MiB", "", "kept"]]
+    p.table(["Partition", "Size", "Used as", "Change"], rows, aligns=["l", "r", "l", "l"], selected=2, colours=[None, SAND, LEAF, LEAF, LEAF, GUTTER])
+    nx = p.x + left + 2
+    p.card(nx, top, 23, 7)
+    p.put(top, nx + 2, "A/B NEEDS", GUTTER, INK, bold=True)
+    for i, (need, got) in enumerate([("EFI", "kept"), ("Slot A", "30.0 GiB"), ("Slot B", "30.0 GiB"), ("State", "115.9 GiB")]):
+        p.put(top + 2 + i, nx + 2, "✓", LEAF, INK)
+        p.put(top + 2 + i, nx + 4, need, PAPER, INK)
+        p.put(top + 2 + i, nx + 21 - len(got), got, LICHEN, INK)
+    # The selected row is cut to the table's width so the card stays clear of it.
+    for r in range(top, top + 8):
+        for c in range(p.x + left, nx):
+            p.grid[r][c].update(ch=" ", bg=NIGHT)
+    p.y += 1
+    p.panel("success", "recpart accepts this layout", ["Enter goes on to the plan."])
 
-    p = page("disk-plan", "9 Done", "Every finished app ends the same way: a large tick, what was done, and the next step.", dp(9, 9, right="/mnt"))
-    p.heading("check", "Disk ready", "Laid out and mounted, ready for the system.", LEAF)
-    p.panel("success", "Ready at /mnt", ["Installing into slot A; slot B stays unmounted for updates."])
-    p.section("Mounted")
-    p.table(["Path", "Device", "Use"], [["/mnt", "/dev/vdz2", "root, slot A"], ["/mnt/boot", "/dev/vdz1", "EFI"], ["/mnt/var", "/dev/vdz4", "state"]])
-    p.gap().section("Next: base system")
-    p.commands(["base-system"])
-    p.gap().hint([("Enter",), " goes back to the install steps."])
-
-    ed_steps = ["Overview", "Disk", "System", "Disk use", "Partitions", "Plan", "Commands", "Checks", "Confirm", "Apply", "Done"]
-    ed_values = ["", "vdy", "A/B", "keep", "", "", "", "", "", "", ""]
-    p = page("disk-plan", "4 Partitions, editing", "Keeping some of a disk: its bar, its partitions with one selected, what can be done to that one, and what A/B still needs.",
-             dp(4, 4, ed_values, ed_steps, keys=[("↑/↓", "select"), ("m", "use as"), ("r", "resize"), ("d", "remove"), ("u", "undo"), ("Enter", "go on")], right="/dev/vdy"))
-    p.heading(4, "Edit the partitions", "Nothing is written until the Confirm step.")
-    disk_bar(p, [("vdy1", 1, "EFI"), ("vdy3", 150, "Windows"), ("new", 30, "slot A"), ("new", 30, "slot B"), ("new", 45, "state")], 256)
-    p.table(["Partition", "Size", "Used as", "Change"],
-            [["vdy1", "512.0 MiB", "EFI partition", "kept"], ["vdy3", "150.0 GiB", "", "shrunk"], ["(new)", "30.0 GiB", "System slot A", "new"],
-             ["(new)", "30.0 GiB", "System slot B", "new"], ["(new)", "44.8 GiB", "State (/var)", "new"]],
-            aligns=["l", "r", "l", "l"], selected=4, colours=[None, SAND, LEAF, LEAF, LEAF])
+    p = page("disk-plan", "5 Plan", "Now against after, one bar over the other, then only the partitions that change.", dp(5, 5))
+    p.heading(5, "The plan", "What recpart would do to the disk. Nothing has been written yet.")
+    p.diskbar(NOW, 476, label="Now")
+    p.diskbar(after(p), 476, label="After")
     p.gap()
-    p.panel("success", "Ready: recpart accepts this layout", ["A/B has its EFI partition, both slots and the state partition."])
+    p.table(["Partition", "Change", "Before", "After", "Use"],
+            [["nvme0n1p3", "shrunk", "475.9 GiB ntfs", "300.0 GiB ntfs", "Windows"], ["nvme0n1p5", "created", "", "30.0 GiB ext4", "root_a  /"],
+             ["nvme0n1p6", "created", "", "30.0 GiB ext4", "root_b"], ["nvme0n1p7", "created", "", "115.9 GiB ext4", "state  /var"]],
+            colours=[SAND, LEAF, LEAF, LEAF])
+    p.gap()
+    p.put(p.y, p.x, "UNTOUCHED", GUTTER, bold=True)
+    p.put(p.y, p.x + 11, "nvme0n1p1 EFI · nvme0n1p2 · nvme0n1p4 recovery", LICHEN)
+    p.y += 2
+    p.hint([("Enter",), " shows the exact commands."])
+
+    p = page("disk-plan", "6 Commands", "A run sheet: numbered, a phase to a gutter, in the order they will run.", dp(6, 6))
+    p.heading(6, "The commands", "Exactly what the apply will run, from recpart's dry run. 10 commands in 4 phases.")
+    runsheet(p)
+
+    p = page("disk-plan", "7 Checks", "The rehearsal: what recpart tried without writing, and that nothing refused.", dp(7, 7))
+    p.heading(7, "The rehearsal", "recpart ran every step as a test, without writing.")
+    p.panel("success", "recpart would apply to this disk", ["All 10 commands rehearsed without a refusal."])
+    p.checks([("The disk", [("done", "not in use by anything"), ("done", "not the install media"), ("done", "room for A/B after shrinking")]),
+              ("Windows", [("done", "the volume is clean"), ("done", "not hibernated"), ("done", "can shrink to 300.0 GiB")])])
+    p.gap().hint([("Enter",), " goes on to the one step that writes."])
+
+    p = page("disk-plan", "8 Confirm", "The point of no return looks like one: what is lost in plain words, the disk before and after, and a word typed a letter a cell.",
+             dp(8, 8, keys=[("A-Z", "type the word"), ("Bksp", "erase"), ("Enter", "write, once unlocked"), ("q", "back")]))
+    p.heading(8, "Write to the disk?", "Everything before this was a rehearsal. This writes.", SALMON)
+    p.diskbar(NOW, 476, label="Now")
+    p.diskbar(after(p), 476, label="After")
+    p.gap()
+    p.panel("danger", "Windows shrinks by 175.9 GiB; three partitions are created", ["Nothing is erased. Have a backup of Windows anyway: a resize that is interrupted can lose it."])
+    p.put(p.y, p.x, "TYPE DESTROY", GUTTER, bold=True)
+    p.y += 1
+    p.wordslots("DESTROY", "DEST")
+
+    p = page("disk-plan", "9 Apply, running", "A long job shows how far, as a figure and a bar, and exactly which command is running now.", dp(9, 9, keys=[("q", "wait for it")], right="writing", states={9: "running"}))
+    p.heading(9, "Writing the disk", "Do not turn the machine off.")
+    width = p.figure("50%", row=p.y - 4, x=p.x + p.w - 17)
+    p.bar(5 / 10)
+    p.gap()
+    runsheet(p, upto=5)
+
+    p = page("disk-plan", "9 Apply, stopped", "A failure points at the command that failed, shows what it printed, and says what state the disk is in.", dp(9, 9, right="stopped", states={9: "failed"}))
+    p.heading("bang", "The apply stopped", "At command 6 of 10. The commands after it did not run.", SALMON)
+    runsheet(p, upto=5, failed=6)
+    p.gap()
+    p.panel("danger", "mkfs.ext4: /dev/nvme0n1p6: Input/output error", ["Now: Windows is shrunk and intact; slot A is formatted, slot B and state are not.",
+                                                                    "What to do: check the disk, then plan again from step 5."])
+
+    p = page("disk-plan", "10 Done", "The ending shows the disk you now have, with where each part is mounted, and one bar to the next step.", dp(10, 10, right="/mnt"))
+    p.heading("check", "The disk is ready", "Laid out and mounted. Windows is still there.", LEAF)
+    spans = p.diskbar(after(p), 476)
+    for (col, w), mount in zip(spans, ["/boot", "", "/mnt", "", "/var", ""]):
+        if mount:
+            p.put(p.y, col, mount, LICHEN)
+    p.y += 2
+    p.table(["", "Device", "Size", "Mounted at"], [["Slot A", "nvme0n1p5", "30.0 GiB", "/mnt"], ["EFI", "nvme0n1p1", "260 MiB", "/mnt/boot"], ["State", "nvme0n1p7", "115.9 GiB", "/mnt/var"], ["Slot B", "nvme0n1p6", "30.0 GiB", "kept for updates"]])
+    p.gap()
+    p.button("Continue: copy the system")
 
 
 # ====================================================================== base-system
@@ -233,69 +374,96 @@ BS_VALUES = ["", "12 passed", "48,213 files", "3 entries", ""]
 
 
 def bs(selected, done, keys=STEP_KEYS, right="/mnt", states=None):
-    p = Page()
+    p = Deliberate()
     p.band("Base system", "Overview" if selected == 0 else "Done" if selected == 4 else f"step {selected} of 3")
     p.steps(3, max(0, min(3, done - 1)), selected - 1 if 0 < selected < 4 else None)
     steps = [(label, "done" if i < done else "ready" if i == done else "todo", BS_VALUES[i] if i < done else "") for i, label in enumerate(BS)]
-    if states:
-        for i, state in states.items():
-            steps[i] = (steps[i][0], state, steps[i][2])
+    for i, state in (states or {}).items():
+        steps[i] = (steps[i][0], state, steps[i][2])
     p.path(steps, selected)
     p.keys(keys, right)
     return p
 
 
+CHECKS = [("The target", ["mounted", "empty", "writable", "room for the system"]), ("The image", ["found", "an EROFS image", "outside the target"]), ("This system", ["running as root", "kernel reads EROFS"])]
+
+
 def base_system_pages():
-    p = page("base-system", "Overview", "The same opening as every app: what it will do, and on what.", bs(0, 1))
-    p.heading("diamond", "Copy the system onto the disk", "Check the target, copy the system to it, write its fstab.")
-    p.section("Target")
-    p.facts([("Mounted at", "/mnt"), ("Disk", "/dev/vda, A/B layout")])
+    p = page("base-system", "Overview", "The step in one picture: the image, an arrow, the target.", bs(0, 1))
+    p.heading("diamond", "Copy the system onto the disk", "Check the target, copy the system to it, write down its mounts.")
+    half = (p.w - 5) // 2
+    top = p.y
+    for i, (label, title, lines) in enumerate([("FROM", "The live image", ["/run/live-rootfs.erofs", "1.4 GiB, read-only EROFS", "LevitateOS 1.0"]), ("TO", "/mnt", ["/dev/nvme0n1p5, slot A", "30.0 GiB ext4, empty", "with /boot and /var under it"])]):
+        x = p.x + i * (half + 5)
+        p.card(x, top, half, 6)
+        p.put(top, x + 2, label, GUTTER, INK, bold=True)
+        p.put(top + 1, x + 2, title, PAPER, INK, bold=True)
+        for j, line in enumerate(lines):
+            p.put(top + 2 + j, x + 2, line, LICHEN, INK)
+    p.put(top + 2, p.x + half + 1, "──▶", p.accent, bold=True)
+    p.y = top + 7
+    p.minipath([("Check the target", "ready"), ("Copy the system", "todo"), ("Write the fstab", "todo")])
     p.gap()
-    p.table(["Mount point", "Device"], [["/mnt", "/dev/vda2"], ["/mnt/boot", "/dev/vda1"], ["/mnt/var", "/dev/vda4"]])
-    p.gap().section("What happens")
-    p.steplist([("", [("ready", "Check that /mnt is empty and mounted, with room for the system"), ("todo", "Copy the system image onto it"), ("todo", "Describe its mounts in its /etc/fstab")])])
-    p.gap().hint([("Enter",), " starts with the check."])
+    p.button("Start with the check")
 
-    p = page("base-system", "1 Check", "A passed check: the verdict panel carries the figures.", bs(1, 2))
-    p.heading(1, "Can the target take it?", "It must be an empty, mounted filesystem with room for the system.")
-    p.panel("success", "Ready to copy", facts=[("Target", "/mnt"), ("System image", "/run/live-rootfs.erofs"), ("Image size", "1.4 GiB"), ("Free space", "40.0 GiB"), ("Checks", "12 passed")])
-    p.hint([("Enter",), " goes on to the copy."])
+    p = page("base-system", "1 Check", "Room is a gauge; the twelve checks are named, in three groups, each with its tick.", bs(1, 2))
+    p.heading(1, "Can the target take it?", "Twelve checks before a single file is copied.")
+    p.gauge(3.1, 29.2, "The system needs about 3.1 GiB of the 29.2 GiB free on /mnt.")
+    p.checks([(label, [("done", item) for item in items]) for label, items in CHECKS])
+    p.button("Copy the system")
 
-    p = page("base-system", "1 Check, refused", "A refusal uses the same panel in the danger tone, with recstrap's own fix.", bs(1, 1, states={1: "failed"}))
-    p.heading(1, "Can the target take it?", "It must be an empty, mounted filesystem with room for the system.")
-    p.panel("danger", "/mnt is not empty (E012)", ["What to do: unmount it and format it again in the disk step, or empty it by hand."])
-    p.section("What ran", "exit 12")
-    p.commands(["recstrap /mnt --check --json"])
-    p.gap().hint([("r",), " checks again once it is fixed."])
+    p = page("base-system", "1 Check, refused", "The check that failed is marked where it stands among the others, with recstrap's fix above them.", bs(1, 1, states={1: "failed"}, keys=[("r", "check again"), ("q", "back")]))
+    p.heading("bang", "The target cannot take it", "One of twelve checks failed. Nothing was copied.", SALMON)
+    p.panel("danger", "/mnt is not empty", ["It holds 3 entries: etc, usr, var. What to do: format it again in the disk step, or empty it by hand."])
+    p.checks([(label, [("failed" if item == "empty" else "done", item) for item in items]) for label, items in CHECKS])
+    p.hint([("r",), " checks again once it is fixed."])
 
-    p = page("base-system", "2 Copy, running", "The long step: a thick bar and four figures, nothing else.", bs(2, 2, keys=[("q", "wait for it")], right="copying", states={2: "running"}))
-    p.heading(2, "Copying the system", "Ownership, permissions, capabilities and extended attributes are kept.")
+    p = page("base-system", "2 Copy, running", "The one thing to watch is how far: a figure three rows tall, a bar, and four numbers.", bs(2, 2, keys=[("q", "wait for it")], right="copying", states={2: "running"}))
+    p.heading(2, "Copying the system", "From the live image to /mnt. It cannot be stopped half-way.")
+    p.figure("62%", x=p.x, row=p.y)
+    top = p.y
+    p.y = top
+    p.facts([("Files", "29,892 of 48,213"), ("Written", "1.9 of about 3.1 GiB"), ("Elapsed", "0:25"), ("Left", "about 0:16")], x=p.x + 24)
+    p.y = top + 5
     p.bar(0.62)
     p.gap()
-    p.facts([("Files", "29,892 of 48,213"), ("Written", "1.9 GiB of about 3.1 GiB"), ("Elapsed", "0:25"), ("Left", "about 0:16")])
-    p.gap().text("The copy cannot be stopped half-way.", LICHEN)
+    p.put(p.y, p.x, "KEPT AS THEY ARE", GUTTER, bold=True)
+    p.y += 1
+    col = p.x
+    for chip in ["ownership", "permissions", "capabilities", "extended attributes"]:
+        col = p.put(p.y, col, f" {chip} ", MOSS, RAISED) + 2
 
-    p = page("base-system", "3 fstab", "A table to review before it is written; rows that would be replaced are tinted.", bs(3, 3))
-    p.heading(3, "Write the fstab", "So the installed system mounts the same filesystems when it boots.")
-    p.section("Entries", "3")
-    p.table(["Mount point", "Device", "Type", "Boot check"], [["/", "UUID=5f1d2c3a-root", "ext4", "first"], ["/boot", "UUID=1C2B-3A4D", "vfat", "no"], ["/var", "UUID=9e8d7c6b-state", "ext4", "after /"]])
-    p.gap().section("Already in /mnt/etc/fstab", "3 lines")
-    p.table(["Line", "Mount point", "Device", "Type", ""], [["2", "/", "UUID=0b9c6f4e-old", "ext4", "replaced"], ["4", "/boot", "UUID=7A3E-OLD", "vfat", "replaced"], ["5", "/tmp", "tmpfs", "tmpfs", "kept"]],
-            aligns=["r", "l", "l", "l", "l"], colours=[SAND, SAND, None])
-    p.gap().hint([("Enter",), " writes the entries, replacing 2 lines."])
+    p = page("base-system", "3 fstab", "The file as it will be written: lines going out in salmon, lines coming in in green, the rest quiet.", bs(3, 3))
+    p.heading(3, "Write down the mounts", "So the installed system mounts the same filesystems when it boots.")
+    p.filediff("/mnt/etc/fstab", [(" ", 1, "# /etc/fstab: static file system information"), ("-", 2, "UUID=0b9c6f4e-old   /      ext4  defaults  0 1"),
+                                    ("+", 2, "UUID=5f1d2c3a-root  /      ext4  relatime  0 1"), (" ", 3, ""), ("-", 4, "UUID=7A3E-OLD       /boot  vfat  defaults  0 2"),
+                                    ("+", 4, "UUID=1C2B-3A4D      /boot  vfat  relatime,fmask=0022,dmask=0022  0 0"), (" ", 5, "tmpfs               /tmp   tmpfs defaults  0 0"),
+                                    ("+", 6, "UUID=9e8d7c6b-state /var   ext4  relatime  0 2")])
+    p.gap()
+    p.runs(p.y, p.x, [("+ 3 ", LEAF, True), ("written   ", LICHEN), ("− 2 ", SALMON, True), ("replaced   ", LICHEN), ("1 ", MOSS, True), ("kept", LICHEN)])
+    p.y += 2
+    p.button("Write the fstab")
 
-    p = page("base-system", "3 fstab, asking", "A yes-or-no is always a warning panel at the top of the page, with its two keys inside it.", bs(3, 3, keys=CONFIRM_KEYS))
-    p.heading(3, "Write the fstab", "So the installed system mounts the same filesystems when it boots.")
-    p.panel("warning", "Replace lines 2 and 4 of /mnt/etc/fstab?", ["They describe mount points the new entries describe too, most likely from an earlier run."], keys=[("y", "replace them"), ("n", "keep the file")])
-    p.section("Entries", "3")
-    p.table(["Mount point", "Device", "Type", "Boot check"], [["/", "UUID=5f1d2c3a-root", "ext4", "first"], ["/boot", "UUID=1C2B-3A4D", "vfat", "no"], ["/var", "UUID=9e8d7c6b-state", "ext4", "after /"]])
+    p = page("base-system", "3 fstab, asking", "Replacing lines asks first: the question on top, the same file under it.", bs(3, 3, keys=CONFIRM_KEYS))
+    p.heading(3, "Write down the mounts", "So the installed system mounts the same filesystems when it boots.")
+    p.panel("warning", "Replace lines 2 and 4?", ["They describe mount points the new lines describe too, most likely from an earlier run."], keys=[("y", "replace them"), ("n", "keep the file")])
+    p.filediff("/mnt/etc/fstab", [("-", 2, "UUID=0b9c6f4e-old   /      ext4  defaults  0 1"), ("+", 2, "UUID=5f1d2c3a-root  /      ext4  relatime  0 1"),
+                                    ("-", 4, "UUID=7A3E-OLD       /boot  vfat  defaults  0 2"), ("+", 4, "UUID=1C2B-3A4D      /boot  vfat  relatime,fmask=0022,dmask=0022  0 0")])
 
-    p = page("base-system", "Done", "The shared ending: tick, what was done, next step.", bs(4, 5))
-    p.heading("check", "Base system installed", "The system is on the disk and knows its mounts.", LEAF)
-    p.panel("success", "Next: configuration", ["Keyboard, time zone, language, hostname, root password and a user."])
-    p.section("What was done")
-    p.facts([("Target", "/mnt"), ("Files copied", "48,213"), ("Written", "3.1 GiB in 0:41"), ("fstab", "/mnt/etc/fstab, 3 entries")])
-    p.gap().hint([("Enter",), " goes back to the install steps."])
+    p = page("base-system", "Done", "The ending: what is on the disk now, in four figures, and one bar on.", bs(4, 5))
+    p.heading("check", "The system is on the disk", "Copied, and it knows its mounts.", LEAF)
+    w = (p.w - 6) // 4
+    for i, (figure, label) in enumerate([("48,213", "files"), ("3.1 GiB", "written"), ("0:41", "taken"), ("3", "fstab entries")]):
+        x = p.x + i * (w + 2)
+        p.card(x, p.y, w, 3)
+        p.put(p.y, x + 2, figure, PAPER, INK, bold=True)
+        p.put(p.y + 1, x + 2, label, LICHEN, INK)
+    p.y += 4
+    p.put(p.y, p.x, "NEXT", GUTTER, bold=True)
+    p.y += 1
+    p.text("Configuration: keyboard, time zone, language, hostname, root password and a user.", MOSS)
+    p.gap()
+    p.button("Continue: configure the system")
 
 
 hub_pages()

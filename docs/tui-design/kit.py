@@ -424,3 +424,188 @@ class Page:
                 if cell["bg"] not in (NIGHT, INK, RAISED):
                     cell["bg"] = mix(cell["bg"], INK, amount)
         return self
+
+
+# ====================================================================== second pass
+# Parts made for one kind of page: each page gets the picture of what it is doing.
+
+PIXELS["%"] = ["#...#", "...#.", "..#..", "..#..", ".#...", "#...#"]
+TINTS = [SAGE, LEAF, MOSS, SAND, GUTTER, SALMON]
+
+
+class Deliberate(Page):
+    """A page with the parts of the second pass."""
+
+    def card(self, x, y, w, h, bg=INK):
+        for r in range(y, y + h):
+            self.fill(r, x, w, bg)
+        return self
+
+    def button(self, label, key="Enter", width=None, x=None, colour=None):
+        """The page's one main action: a bar in the accent, its key at the end."""
+        x, width, colour = self.x if x is None else x, width or self.w, colour or self.accent
+        self.fill(self.y, x, width, colour)
+        self.put(self.y, x + 2, f"▶  {label}", NIGHT, colour, bold=True)
+        self.put(self.y, x + width - len(key) - 4, f" {key} ", colour, NIGHT, bold=True)
+        self.y += 2
+        return self
+
+    def minipath(self, items, x=None, row=None):
+        """A few steps on one line: where this page sits in a short run."""
+        col, row = self.x if x is None else x, self.y if row is None else row
+        for i, (label, state) in enumerate(items):
+            mark, colour = MARKS[state]
+            col = self.put(row, col, mark, colour or self.accent, bold=True)
+            col = self.put(row, col + 1, label, LICHEN if state == "todo" else PAPER, bold=state in ("here", "ready"))
+            if i < len(items) - 1:
+                col = self.put(row, col + 1, "──", LEAF if state == "done" else HAIR) + 1
+        if row == self.y:
+            self.y += 1
+        return self
+
+    def diskbar(self, parts, total, x=None, width=None, label="", selected=None, row=None):
+        """A disk as one bar. parts: (name, size, colour); names sit in their stretch
+        when it is wide enough. `selected` puts a caret under one."""
+        x, width = self.x if x is None else x, width or self.w
+        row = self.y if row is None else row
+        if label:
+            self.put(row, x, label.ljust(7), LICHEN)
+            x, width = x + 7, width - 7
+        col = x
+        spans = []
+        for i, (name, size, colour) in enumerate(parts):
+            w = max(2, round(width * size / total))
+            w = min(w, x + width - col - 2 * (len(parts) - 1 - i))
+            self.fill(row, col, w, colour)
+            if len(name) + 2 <= w:
+                self.put(row, col + 1, name, NIGHT, colour, bold=True)
+            spans.append((col, w))
+            col += w
+        if col < x + width:
+            self.fill(row, col, x + width - col, RULE)
+        if selected is not None:
+            start, w = spans[selected]
+            self.put(row + 1, start, "▀" * w, PAPER)
+        if row == self.y:
+            self.y += 2 if selected is not None else 1
+        return spans
+
+    def gauge(self, used, total, text, x=None, width=None):
+        """How much of something a thing takes: the taken part in the accent."""
+        x, width = self.x if x is None else x, width or self.w
+        taken = max(1, round(width * used / total))
+        self.fill(self.y, x, taken, self.accent)
+        self.fill(self.y, x + taken, width - taken, RULE)
+        self.put(self.y + 1, x, text, LICHEN)
+        self.y += 3
+        return self
+
+    def figure(self, text, colour=None, x=None, row=None):
+        """A number three rows tall."""
+        x, row = self.x if x is None else x, self.y if row is None else row
+        glyphs = [PIXELS[ch] for ch in text]
+        for r in range(3):
+            line = " ".join("".join("█" if px[r * 2][c] == "#" and px[r * 2 + 1][c] == "#" else "▀" if px[r * 2][c] == "#" else "▄" if px[r * 2 + 1][c] == "#" else " " for c in range(5)) for px in glyphs)
+            self.put(row + r, x, line, colour or self.accent)
+        return len(glyphs) * 6 - 1
+
+    def checks(self, columns, x=None, width=None):
+        """Checks in columns under a small label each: (label, [(state, text)])."""
+        x, width = self.x if x is None else x, width or self.w
+        w = width // len(columns)
+        top = self.y
+        for i, (label, items) in enumerate(columns):
+            self.put(top, x + i * w, label.upper(), GUTTER, bold=True)
+            for j, (state, text) in enumerate(items):
+                mark, colour = MARKS[state]
+                self.put(top + 1 + j, x + i * w, mark, colour or self.accent, bold=state == "failed")
+                self.put(top + 1 + j, x + i * w + 2, text, SALMON if state == "failed" else PAPER)
+        self.y = top + 1 + max(len(items) for _, items in columns) + 1
+        return self
+
+    def filediff(self, title, lines, x=None, width=None):
+        """A file as it will be written: line numbers, lines going out and coming in."""
+        x, width = self.x if x is None else x, width or self.w
+        self.fill(self.y, x, width, RAISED)
+        self.put(self.y, x + 2, title, MOSS, RAISED, bold=True)
+        self.y += 1
+        for kind, number, text in lines:
+            colour = {"+": LEAF, "-": SALMON, " ": LICHEN}[kind]
+            self.fill(self.y, x, width, INK)
+            self.put(self.y, x + 1, str(number).rjust(2), GUTTER, INK)
+            self.put(self.y, x + 5, kind, colour, INK, bold=True)
+            self.put(self.y, x + 7, text[: width - 9], colour if kind != " " else MOSS, INK)
+            self.y += 1
+        return self
+
+    def wordslots(self, word, typed, x=None):
+        """A word to type, a cell a letter: the destructive steps' last gate."""
+        x = self.x if x is None else x
+        done = typed == word
+        for i, ch in enumerate(word):
+            filled = i < len(typed)
+            bg = (LEAF if done else SALMON) if filled else RAISED
+            self.fill(self.y, x + i * 4, 3, bg)
+            self.put(self.y, x + i * 4 + 1, typed[i] if filled else "·", NIGHT if filled else GUTTER, bg, bold=True)
+        end = x + len(word) * 4 + 2
+        self.put(self.y, end, "unlocked" if done else "locked", LEAF if done else SALMON, bold=True)
+        self.y += 2
+        return self
+
+    def keyboard(self, rows, x, y):
+        """The letter rows of a keyboard, a cell a key."""
+        for r, keys in enumerate(rows):
+            col = x + r
+            for key in keys.split():
+                self.put(y + r, col, f" {key} ", PAPER, RAISED, bold=True)
+                col += 4
+        return self
+
+    def meter(self, fraction, text, x=None, width=20):
+        x = self.x if x is None else x
+        filled = round(width * fraction)
+        colour = SALMON if fraction < 0.4 else SAND if fraction < 0.7 else LEAF
+        self.put(self.y, x, "━" * filled, colour, bold=True)
+        self.put(self.y, x + filled, "━" * (width - filled), RULE)
+        self.put(self.y, x + width + 2, text, LICHEN)
+        self.y += 1
+        return self
+
+    def timeline(self, items, x=None):
+        """What happened, newest first, down a line: (time, state, title, detail)."""
+        x = self.x if x is None else x
+        for i, (when, state, title, detail) in enumerate(items):
+            mark, colour = MARKS[state]
+            self.put(self.y, x, when, GUTTER)
+            self.put(self.y, x + 10, mark, colour or self.accent, bold=True)
+            self.put(self.y, x + 13, title, PAPER, bold=True)
+            self.put(self.y + 1, x + 10, "│" if i < len(items) - 1 else " ", HAIR)
+            self.put(self.y + 1, x + 13, detail, LICHEN)
+            self.put(self.y + 2, x + 10, "│" if i < len(items) - 1 else " ", HAIR)
+            self.y += 3
+        return self
+
+    def scrollbar(self, start, size):
+        """Where in a long page you are, down the content's right edge."""
+        top, height = self.HEADER + 1, self.rows - 2 - self.HEADER - 2
+        for r in range(height):
+            on = start * height <= r < (start + size) * height
+            self.put(top + r, self.cols - 2, "█" if on else "│", GUTTER if on else HAIR)
+        return self
+
+    def slotbox(self, x, y, w, h, name, lines, tag="", state="idle"):
+        """A system slot as a block: its name, what it holds, and its part in the next boot."""
+        colour = {"running": self.accent, "next": self.highlight, "idle": RULE}[state]
+        self.card(x, y, w, h, RAISED)
+        self.fill(y, x, w, colour)
+        self.put(y, x + 2, name, NIGHT if state != "idle" else PAPER, colour, bold=True)
+        if tag:
+            self.put(y, x + w - len(tag) - 2, tag, NIGHT if state != "idle" else LICHEN, colour, bold=state != "idle")
+        for i, (text, tone) in enumerate(lines):
+            self.put(y + 2 + i, x + 2, text, tone, RAISED)
+        return self
+
+    def arrow(self, row, col, text="", length=4, colour=None):
+        colour = colour or GUTTER
+        col = self.put(row, col, "─" * length + "▶", colour)
+        return self.put(row, col + 1, text, PAPER) if text else col

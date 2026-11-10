@@ -13,6 +13,7 @@ APPS = [
     ("guide", "Guide", "The docs, beside the install steps or on their own."),
 ]
 RULES = [
+    ("Every page has its own picture", "Inside the shared frame, each page is laid out for the one thing it does: a disk is a bar, a choice between two futures is two bars, a copy is a figure three rows tall, a file about to be written is that file, a keyboard is its keys, a time zone is a place on a map, a trial boot is a fork you can follow."),
     ("One frame", "Every screen is the same five parts in the same places: the band (whose system, which app, where you are), the step line, the rail, the content, the keys. Nothing is boxed; parts are told apart by their surface."),
     ("One opening", "Every page opens with a large glyph, a title and one line. The glyph is the step's number on a step, a diamond on an overview, a tick when the app is done, a warning when something stopped."),
     ("One rail", "The rail is always the same rows: a mark, a name, and what was answered. Steps in order are joined by a line; things to choose from are grouped under a small label. The row you are on is a raised bar with the accent at its edge."),
@@ -75,7 +76,7 @@ open(sys.argv[1], "w").write(f"""<!doctype html>
   .term span {{ display: inline-block; white-space: pre; }}
 </style></head><body><main>
 <h1>Every screen, one design</h1>
-<p>{len(PAGES)} pages across the install screen and six apps, drawn as mock-ups from one set of parts, so that no page can drift from another. They are designs, not captures: every value in them is sample data, and nothing here is built beyond what system-setup already has.</p>
+<p>{len(PAGES)} pages across the install screen and six apps, drawn as mock-ups from one set of parts, so that no page can drift from another. This is the second pass: the frame and the rules are the first pass's; inside them every page now has a layout of its own. They are designs, not captures: every value in them is sample data, and nothing here is built beyond what system-setup already has.</p>
 <nav>{''.join(f'<a href="#{key.replace(" ", "-")}">{html.escape(title)}</a>' for key, title, _ in APPS)}</nav>
 <ol class="rules">{''.join(f'<li><b>{html.escape(name)}</b>{html.escape(text)}</li>' for name, text in RULES)}</ol>
 {''.join(body)}

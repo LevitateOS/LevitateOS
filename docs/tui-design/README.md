@@ -5,7 +5,7 @@ parts. The mock-ups are the design; this page is its rules and what building it 
 
 ```sh
 cd docs/tui-design
-python3 build.py /tmp/design-board.html   # the board: the rules, then all 51 pages
+python3 build.py /tmp/design-board.html   # the board: the rules, then all 54 pages
 python3 check.py all pages_system         # the same pages as plain text
 ```
 
@@ -39,6 +39,40 @@ mock-up is sample data.
    what the screen is working on at the bottom right.
 10. **Two brands.** Only the band, the accent and the second accent differ.
 
+## The second pass: every page has its own picture
+
+Inside the shared frame, each page is laid out for the one thing it does (`Deliberate`
+in `kit.py` holds the parts made for this):
+
+| Page | Its picture |
+|---|---|
+| Hub, the step you are at | a launch pad: what the app does, from what onto what, one bar |
+| Hub, a finished step | a receipt: what it left, drawn |
+| Hub, Finish | the machine you made, as a card |
+| Disk, Overview | the app as a map, with the line where writing starts |
+| Disk, choosing a disk | each disk as a bar of what is on it |
+| Disk, System and Disk use | each choice as the disk it leaves |
+| Disk, Partitions | the selected stretch marked on the bar; what A/B still needs beside the table |
+| Disk, Plan and Confirm | now over after |
+| Disk, Commands and Apply | a numbered run sheet, the running command raised |
+| Disk, Confirm | the word typed a letter a cell |
+| Base system, Overview | the image, an arrow, the target |
+| Base system, Check | room as a gauge; the twelve checks named |
+| Base system, Copy | the percentage three rows tall |
+| Base system, fstab | the file as it will be written, as a diff |
+| Configuration, Overview, Review, Done | the machine as one card: empty, filled, true |
+| Configuration, Keyboard | the keys of the layout, and a line to try it on |
+| Configuration, Time zone | the place on a map, its clock now |
+| Configuration, Language | today's date, a time and a number as it will write them |
+| Configuration, Hostname | the prompt and the login line with the name in them |
+| Configuration, passwords | both entries with their state, a strength line, the keyboard in use |
+| Configuration, User | the account as it will exist |
+| Updates, every page | the two slots as two blocks |
+| Updates, a trial | the next boot as a fork you can follow |
+| Updates, Write a system | a choice of release media, not three paths |
+| Updates, History | a line down the page |
+| Guide | a reading measure, numbered steps, where you are on the page |
+
 ## What building it needs
 
 In the kit (`tui/kit/core`), beyond what is there since the first restyle:
@@ -59,6 +93,19 @@ In the install screen (`distro/builder/install-split-pane`, Rust): no boxes arou
 panes, the pane without the keyboard drawn quieter, and its own keys as keycaps on one
 row. The guide needs a way to be told it is the second pane, so it draws its band flat
 and without the distro's name.
+
+What the second pass asks of the tools, beyond the apps:
+
+- `recstrap --check --json` reports only how many checks passed; the Check page names
+  them (the names are in `tools/recstrap/src/bin/recstrap/guards.rs`).
+- `recab stage` prints no progress; the Write page shows a bar. Choosing release media
+  needs a way to list them (`recab stage --from-media` takes one already).
+- recpart's dry run gives one verdict; the rehearsal page lists what it tested.
+- The keyboard picture needs each keymap's layout family (kbd keeps its maps in
+  `qwerty`, `qwertz`, `azerty`, `dvorak` directories); the language preview needs the
+  locale's formats (Intl has them).
+- The hub's launch pad and receipt need each step's app to say what it will do and what
+  it left; the install state file holds part of that today.
 
 ## Open
 
