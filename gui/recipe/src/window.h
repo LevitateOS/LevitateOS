@@ -32,7 +32,9 @@ public:
     void stopRun();
 
     const Catalog &catalog() const { return catalog_; }
-    bool busy() const { return run_ != nullptr; }
+    bool busy() const { return run_ != nullptr || quiet_ > 0; }
+    // From a checkout: remove without the question.
+    void removeNow(const QString &name);
 
 private:
     bool reload();
@@ -46,6 +48,7 @@ private:
     RecipeClient client_;
     Catalog catalog_;
     Run *run_ = nullptr;
+    int quiet_ = 0;
     QStringList queue_;
     std::function<void()> again_;
     QString installedChoice_, updateChoice_;

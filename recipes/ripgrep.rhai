@@ -9,6 +9,23 @@ const NEEDS = #{
     timeout_secs: 300,
 };
 
+// What a front end shows about this recipe: the author's words. Nothing here
+// is enforced; NEEDS is. See docs/recipe-front-end-format.md.
+const ABOUT = #{
+    kind: "tool",
+    category: "utilities",
+    details: "Searches the files under a folder for a text pattern, fast. It skips what .gitignore hides, and binary files, unless told otherwise.",
+    homepage: "https://github.com/BurntSushi/ripgrep",
+    license: "MIT OR Unlicense",
+    adds: #{ programs: ["rg"], menu: [] },
+    steps: #{
+        acquire: "Downloads upstream's static release archive and checks it against the digest published with the release.",
+        build: "Nothing is compiled: the archive is unpacked and each file is checked against its own digest.",
+        install: "Puts rg, its manual page and its licences in place.",
+    },
+    keeps: [],
+};
+
 let ctx = #{
     name: "ripgrep",
     version: "15.2.0",

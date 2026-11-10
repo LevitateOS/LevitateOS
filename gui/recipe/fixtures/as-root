@@ -1,0 +1,12 @@
+#!/bin/sh
+# Stands in for pkexec on a development machine with no desktop session: runs
+# the given `recipe` command as root with sudo and passes the Ginux selection
+# through, as the installed system's own configuration would. Set
+# RECIPE_STATE_DIR to keep Recipe's saved state out of root's home.
+#
+#   RECIPE_GUI_ROOT_HELPER=$PWD/gui/recipe/fixtures/as-root
+if [ -n "$RECIPE_STATE_DIR" ]; then
+    set -- "$@" --state-dir "$RECIPE_STATE_DIR"
+fi
+exec sudo -n env GINUX_BIN="$GINUX_BIN" GINUX_ROOTFS="$GINUX_ROOTFS" GINUX_ROOT="$GINUX_ROOT" \
+    RECIPE_WORKER_BIN="$RECIPE_WORKER_BIN" "$@"

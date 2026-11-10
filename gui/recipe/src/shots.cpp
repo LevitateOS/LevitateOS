@@ -70,13 +70,51 @@ static void settle(int milliseconds)
     loop.exec();
 }
 
-static void waitUntilIdle(Window &window)
+static void waitUntilIdle(Window &window, int seconds = 10)
 {
     QElapsedTimer clock;
     clock.start();
-    while (window.busy() && clock.elapsed() < 10000)
+    while (window.busy() && clock.elapsed() < seconds * 1000)
         settle(50);
     settle(150);
+}
+
+int tryRecipe(Window &window, const QString &name, const QString &folder, bool keep, bool readOnly)
+{
+    QDir().mkpath(folder);
+    auto save = [&folder](QWidget &widget, const QString &title) {
+        settle(200);
+        return widget.grab().save(QDir(folder).filePath(title + ".png"));
+    };
+    window.show();
+    bool ok = window.catalog().recipe(name) != nullptr;
+    window.showBrowse();
+    ok &= save(window, "real-1-browse");
+    window.showRecipe(name);
+    ok &= save(window, "real-2-recipe");
+    if (readOnly) {
+        window.showInstalled();
+        ok &= save(window, "real-5-installed");
+        return ok ? 0 : 1;
+    }
+
+    window.startInstall(name);
+    settle(20000);
+    if (window.busy())
+        ok &= save(window, "real-3-running");
+    waitUntilIdle(window, 900);
+    ok &= save(window, "real-4-after");
+    const bool installed = window.catalog().installedItem(name) != nullptr;
+    window.showInstalled(name);
+    ok &= save(window, "real-5-installed");
+    if (installed && !keep) {
+        window.removeNow(name);
+        waitUntilIdle(window, 120);
+        window.showInstalled();
+        ok &= save(window, "real-6-removed");
+        ok &= window.catalog().installedItem(name) == nullptr;
+    }
+    return ok && installed ? 0 : 1;
 }
 
 int takeShots(Window &window, const QString &folder)

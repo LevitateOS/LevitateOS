@@ -52,11 +52,14 @@ struct Change {
 struct UpdateItem {
     QString name, from, to;
     QList<Change> changes;
+    // False when `recipe` cannot say what changed in what the recipe may use.
+    bool changesKnown = true;
     bool asksMore() const;
 };
 
 struct Catalog {
     QString sourceTitle, checked;
+    int unreadable = 0; // recipes in the collection that `recipe` could not read
     QList<Recipe> recipes;
     QList<InstalledItem> installed;
     QList<UpdateItem> updates;

@@ -167,7 +167,15 @@ def updates():
 
 
 def main(args):
-    words = [arg for arg in args if not arg.startswith("--")]
+    # The front end names the collection and the store; the stand-in has one of each.
+    words, skip = [], False
+    for arg in args:
+        if skip:
+            skip = False
+        elif arg in ("--recipes-path", "--package-root"):
+            skip = True
+        elif not arg.startswith("--"):
+            words.append(arg)
     command = words[0] if words else ""
     if command == "list":
         print(json.dumps({"schema_version": 1, "source": CATALOG["source"], "recipes": CATALOG["recipes"]}))

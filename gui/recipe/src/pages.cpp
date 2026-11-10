@@ -43,7 +43,9 @@ QHBoxLayout *recipeHeader(const Recipe &recipe, const QString &title, QLabel **t
         *titleOut = name;
     words->addWidget(name);
     words->addWidget(text(recipe.description));
-    words->addWidget(dim(text(QObject::tr("Version %1 · %2").arg(recipe.version, categoryTitle(recipe.category)))));
+    words->addWidget(dim(text(recipe.category.isEmpty()
+                                  ? QObject::tr("Version %1").arg(recipe.version)
+                                  : QObject::tr("Version %1 · %2").arg(recipe.version, categoryTitle(recipe.category)))));
     row->addLayout(words);
     row->addStretch();
     return row;
@@ -68,7 +70,9 @@ QString endpointsText(const QStringList &endpoints)
 QString fetchSentence(const Recipe &recipe)
 {
     if (recipe.sources.isEmpty())
-        return QObject::tr("Nothing is fetched.");
+        return recipe.needs.network.isEmpty()
+                   ? QObject::tr("Nothing is fetched from the network.")
+                   : QObject::tr("Fetches over the network, from the hosts listed beside this and no others.");
     QStringList parts;
     for (const Source &source : recipe.sources)
         parts << QObject::tr("from %1, %2").arg(source.host(), source.pin());
@@ -78,8 +82,8 @@ QString fetchSentence(const Recipe &recipe)
 QString buildSentence(const Recipe &recipe)
 {
     if (!recipe.hooks.contains("build"))
-        return QObject::tr("Nothing is compiled: the project's own build is used.");
-    QString sentence = QObject::tr("Builds it on this computer, inside the sandbox. The build sees none of your files.");
+        return QObject::tr("The recipe has no build step.");
+    QString sentence = QObject::tr("Runs the recipe's build step on this computer, inside the sandbox. It sees none of your files.");
     if (!recipe.buildDeps.isEmpty())
         sentence += QObject::tr(" Builds first: %1.").arg(recipe.buildDeps.join(QObject::tr(", ")));
     return sentence;
@@ -349,6 +353,8 @@ void RecipePage::show(const Catalog &catalog, const QString &name)
     about->column()->addLayout(aboutTitle);
     if (!recipe.details.isEmpty())
         about->column()->addWidget(text(recipe.details, true));
+    if (recipe.details.isEmpty() && recipe.homepage.isEmpty() && recipe.license.isEmpty())
+        about->column()->addWidget(dim(text(tr("This recipe says nothing about itself yet."))));
     auto *facts = new QHBoxLayout;
     facts->setSpacing(24);
     if (!recipe.homepage.isEmpty()) {
@@ -484,6 +490,8 @@ void RunPage::onEvent(const QJsonObject &event)
     } else if (kind == QLatin1String("step") || kind == QLatin1String("recipe-hook")) {
         const QString hook = event["hook"].toString();
         const QString outcome = event["status"].toString();
+        if (hook != QLatin1String("acquire") && hook != QLatin1String("build") && hook != QLatin1String("install"))
+            return;
         StepMark *stepMark = mark(recipe, hook);
         if (!stepMark)
             return;
@@ -496,11 +504,11 @@ void RunPage::onEvent(const QJsonObject &event)
                                                                     : tr("Installing %1").arg(shown);
             state_->setText(doing);
             emit status(tr("%1, step %2 of %3").arg(doing).arg(stepsStarted_).arg(qMax(stepsTotal_, stepsStarted_)));
-        } else if (outcome.contains("skip")) {
+        } else if (outcome.contains("skip") || outcome == QLatin1String("satisfied")) {
             stepMark->setState(StepMark::Skipped);
         } else if (outcome.contains("fail")) {
             stepMark->setState(StepMark::Failed);
-        } else {
+        } else if (outcome == QLatin1String("done") || outcome == QLatin1String("success")) {
             stepMark->setState(StepMark::Done);
         }
     } else if (kind == QLatin1String("fetch")) {
@@ -621,14 +629,17 @@ void InstalledPage::show(const Catalog &catalog, const QString &selectedName)
     QTreeWidget *tree = table({tr("Name"), tr("Version"), tr("Newer"), tr("Installed"), tr("Size"),
                                tr("Earlier version kept")});
     auto shared = std::make_shared<Catalog>(catalog);
+    bool anyDate = false, anyKept = false;
     for (const InstalledItem &item : catalog.installed) {
         const Recipe *recipe = catalog.recipe(item.name);
         const UpdateItem *update = catalog.update(item.name);
         auto *line = new QTreeWidgetItem(tree, {recipe ? recipe->shown() : item.name, item.version,
                                                 update ? tr("%1 is ready").arg(update->to) : QString(),
                                                 QLocale().toString(item.installedOn, "d MMM yyyy"),
-                                                bytesText(item.sizeBytes),
+                                                item.sizeBytes ? bytesText(item.sizeBytes) : QString(),
                                                 item.kept.isEmpty() ? tr("none") : item.kept});
+        anyDate = anyDate || item.installedOn.isValid();
+        anyKept = anyKept || !item.kept.isEmpty();
         line->setData(0, Qt::UserRole, item.name);
         line->setSizeHint(0, QSize(0, 32));
         if (item.name == selectedName)
@@ -636,6 +647,9 @@ void InstalledPage::show(const Catalog &catalog, const QString &selectedName)
     }
     if (!tree->currentItem())
         tree->setCurrentItem(tree->topLevelItem(0));
+    // `recipe installed` does not yet say when, or what earlier version is kept.
+    tree->setColumnHidden(3, !anyDate);
+    tree->setColumnHidden(5, !anyKept);
     tree->setMaximumHeight(tree->header()->sizeHint().height() + 6
                            + tree->sizeHintForRow(0) * int(qMax<qsizetype>(catalog.installed.size(), 4)));
     column->addWidget(tree);
@@ -660,14 +674,18 @@ void InstalledPage::show(const Catalog &catalog, const QString &selectedName)
         words->setSpacing(1);
         words->addWidget(strong(tr("%1 %2").arg(recipe ? recipe->shown() : name, item->version)));
         QString about = recipe ? recipe->description + tr(".") : QString();
+        if (item->menu.isEmpty() && !item->programs.isEmpty())
+            about += tr(" Run it in a terminal as %1.").arg(item->programs.join(tr(", ")));
         if (!item->kept.isEmpty())
             about += tr(" Version %1 is kept, so you can go back to it.").arg(item->kept);
         words->addWidget(dim(text(about, true)));
         row->addLayout(words, 1);
-        auto *open = new QPushButton(tr("Open"));
-        open->setEnabled(!item->programs.isEmpty());
-        connect(open, &QPushButton::clicked, this, [this, name] { emit this->open(name); });
-        row->addWidget(open);
+        // A command-line tool has nothing to open; it is used from a terminal.
+        if (!item->menu.isEmpty()) {
+            auto *open = new QPushButton(tr("Open"));
+            connect(open, &QPushButton::clicked, this, [this, name] { emit this->open(name); });
+            row->addWidget(open);
+        }
         if (!item->kept.isEmpty()) {
             auto *older = new QPushButton(tr("Go back to %1").arg(item->kept));
             connect(older, &QPushButton::clicked, this, [this, name] { emit goBack(name); });
@@ -720,7 +738,8 @@ void UpdatesPage::show(const Catalog &catalog, const QString &selectedName)
         const Recipe *recipe = catalog.recipe(item.name);
         auto *line = new QTreeWidgetItem(tree, {recipe ? recipe->shown() : item.name,
                                                 tr("%1 → %2").arg(item.from, item.to),
-                                                item.asksMore() ? tr("More than before") : tr("Nothing new")});
+                                                !item.changesKnown ? tr("Not compared")
+                                                : item.asksMore() ? tr("More than before") : tr("Nothing new")});
         line->setData(0, Qt::UserRole, item.name);
         line->setSizeHint(0, QSize(0, 32));
         if (item.name == selectedName)
@@ -752,13 +771,36 @@ void UpdatesPage::show(const Catalog &catalog, const QString &selectedName)
         const QString shown = recipe ? recipe->shown() : name;
         auto *title = new QVBoxLayout;
         title->setSpacing(0);
-        title->addWidget(strong(tr("What changed in %1's recipe").arg(shown)));
-        title->addWidget(dim(text(tr("Compared with the recipe version %1 was installed from.").arg(item->from))));
-        inside->addLayout(title);
         auto *form = new QFormLayout;
         form->setHorizontalSpacing(16);
         form->setVerticalSpacing(7);
         form->addRow(dim(text(tr("Version"))), text(tr("%1 → %2").arg(item->from, item->to)));
+        if (!item->changesKnown) {
+            title->addWidget(strong(tr("What the newer recipe of %1 may use").arg(shown)));
+            title->addWidget(dim(text(tr("Recipe does not keep what version %1 was allowed, so the two cannot be compared yet.")
+                                          .arg(item->from), true)));
+            inside->addLayout(title);
+            if (recipe) {
+                form->addRow(dim(text(tr("Network"))),
+                             text(recipe->needs.network.isEmpty() ? tr("none") : endpointsText(recipe->needs.network), true));
+                if (recipe->needs.networkMaxBytes)
+                    form->addRow(dim(text(tr("Download"))), text(tr("up to %1").arg(bytesText(recipe->needs.networkMaxBytes))));
+                if (recipe->needs.memoryMib)
+                    form->addRow(dim(text(tr("Memory"))), text(tr("up to %1").arg(bytesText(recipe->needs.memoryMib * 1048576))));
+            }
+            inside->addLayout(form);
+            auto *onlyButton = new QHBoxLayout;
+            auto *goNow = new QPushButton(tr("Update %1").arg(shown));
+            connect(goNow, &QPushButton::clicked, this, [this, name] { emit update(name); });
+            onlyButton->addWidget(goNow);
+            onlyButton->addStretch();
+            inside->addLayout(onlyButton);
+            emit selected(name);
+            return;
+        }
+        title->addWidget(strong(tr("What changed in %1's recipe").arg(shown)));
+        title->addWidget(dim(text(tr("Compared with the recipe version %1 was installed from.").arg(item->from))));
+        inside->addLayout(title);
         bool more = false;
         for (const Change &change : item->changes) {
             QString words;

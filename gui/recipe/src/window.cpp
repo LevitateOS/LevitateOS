@@ -118,8 +118,12 @@ bool Window::reload()
         stack_->setCurrentWidget(browse_);
         return false;
     }
-    source_->setText(catalog_.checked.isEmpty() ? catalog_.sourceTitle
-                                                : tr("%1, checked %2").arg(catalog_.sourceTitle, catalog_.checked));
+    QString source = catalog_.checked.isEmpty() ? catalog_.sourceTitle
+                                                : tr("%1, checked %2").arg(catalog_.sourceTitle, catalog_.checked);
+    if (catalog_.unreadable)
+        source += tr(" · %1").arg(counted(catalog_.unreadable, tr("%1 recipe could not be read"),
+                                           tr("%1 recipes could not be read")));
+    source_->setText(source);
     fillSidebar();
     return true;
 }
@@ -238,6 +242,11 @@ void Window::askRemove(const QString &name)
         quietChange(client_.remove(name, dialog.clearKept()));
 }
 
+void Window::removeNow(const QString &name)
+{
+    quietChange(client_.remove(name, false));
+}
+
 void Window::goBack(const QString &name)
 {
     quietChange(client_.goBack(name));
@@ -247,8 +256,10 @@ void Window::goBack(const QString &name)
 void Window::quietChange(Run *run)
 {
     setEnabled(false);
+    ++quiet_;
     connect(run, &Run::finished, this, [this, run](bool ok) {
         setEnabled(true);
+        --quiet_;
         if (!ok) {
             const QString reason = run->failure()["reason"].toString();
             QMessageBox::warning(this, tr("Recipe"),

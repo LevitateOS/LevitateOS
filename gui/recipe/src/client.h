@@ -47,5 +47,7 @@ public:
 private:
     QJsonObject query(const QStringList &arguments, QString *error);
     Run *change(const QStringList &arguments);
-    QString program_, rootHelper_;
+    QStringList collection() const;
+    QStringList store() const;
+    QString program_, rootHelper_, recipesPath_, packageRoot_;
 };

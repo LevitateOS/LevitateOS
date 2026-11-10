@@ -11,10 +11,11 @@ beyond the red for "this went wrong", so it takes each desktop's own style.
 
 ## State (2026-11-10)
 
-Every page works against the stand-in in `fixtures/`. It has not been run
-against the real `recipe`, on a real desktop, or with `pkexec`. The real
-`recipe` installs, lists, updates and removes packages since `c815381`; the
-tables below say what the front end asks beyond that.
+Every page works against the stand-in in `fixtures/`. Against the real
+`recipe` it reads the collection (`list --json`) and the system's installed
+list, shown here with `recipes/ripgrep.rhai`. Installing through it with the
+real `recipe` has not been run yet, nor has it run on a real desktop or with
+`pkexec`. The tables below say what the front end asks that `recipe` lacks.
 
 ## Build and run from a checkout
 
@@ -32,6 +33,10 @@ Needs the Qt 6 base and SVG development files (`qt6-qtbase-devel`,
 - `RECIPE_GUI_RECIPE`: the `recipe` to run (default: `recipe` on `PATH`).
 - `RECIPE_GUI_ROOT_HELPER`: what changes are run through (default: `pkexec`;
   empty runs them directly, for the stand-in).
+- `RECIPE_GUI_RECIPES_PATH`: the collection to list and install from
+  (default: `recipe`'s own choice).
+- `RECIPE_GUI_PACKAGE_ROOT`: the store to show and change (default:
+  `/var/lib/recipe`, the system's software, which root owns).
 - `--look levitate|acorn`: a stand-in look for each desktop, for a machine
   that is neither.
 - `--shots FOLDER`: walk the pages, save a picture of each, quit. With
@@ -46,6 +51,23 @@ QT_QPA_PLATFORM=offscreen RECIPE_GUI_RECIPE=$PWD/gui/recipe/fixtures/recipe \
 The stand-in keeps what is "installed" in a state file
 (`RECIPE_STANDIN_STATE`, see the top of `fixtures/recipe`); delete it to start
 over.
+
+Against the real `recipe` from the checkout, into a test store, with the
+Ginux launcher and image selected as `tools/recipe/README.md` describes.
+`fixtures/as-root` stands in for `pkexec` with `sudo`. `--try NAME` shows the
+recipe, installs it, pictures each point and removes it again; `--read-only`
+installs nothing:
+
+```sh
+export GINUX_BIN=... GINUX_ROOTFS=... GINUX_ROOT=... RECIPE_WORKER_BIN=$PWD/target/debug/recipe
+export RECIPE_STATE_DIR=$PWD/.artifacts/recipe-gui/real/state
+QT_QPA_PLATFORM=offscreen RECIPE_GUI_RECIPE=$PWD/target/debug/recipe \
+  RECIPE_GUI_ROOT_HELPER=$PWD/gui/recipe/fixtures/as-root \
+  RECIPE_GUI_RECIPES_PATH=$PWD/recipes \
+  RECIPE_GUI_PACKAGE_ROOT=$PWD/.artifacts/recipe-gui/real/packages \
+  .artifacts/recipe-gui/build/recipe-gui --look levitate \
+  --shots $PWD/.artifacts/recipe-gui/shots-real --try ripgrep
+```
 
 ## The source
 
@@ -66,9 +88,9 @@ Reads, as the desktop user, JSON on stdout with `"schema_version": 1`:
 
 | Command | Answer | In `recipe` today |
 |---|---|---|
-| `recipe list --json` | the source's name and every recipe: `name`, `version`, `description`, `about`, `sources`, `needs`, `deps`, `build_deps`, `hooks` | `list` prints names as text; `ABOUT` and `SOURCES` are the design in `docs/recipe-front-end-format.md` |
+| `recipe list --json` | every recipe: `name`, `version`, `description`, `about`, `sources`, `needs`, `deps`, `build_deps`, `hooks`; and the source's name | exists, without `sources` and the source's name. `ABOUT` is passed through unchecked; `SOURCES` is still only the design in `docs/recipe-front-end-format.md` |
 | `recipe installed --json` | `packages`: each one's `name`, `version`, `recipe` and `files`, as today; and asked for: `installed_on`, `size_bytes`, `kept`, `kept_bytes` | exists with the first four fields. The front end takes programs from the `bin/` files and menu entries from `share/applications/` |
-| `recipe updates --json` | for each installed recipe with a newer version: from, to, and what changed in what it may use | no such command. `recipe update NAME` updates one; `recipe diff` compares two recipe files |
+| `recipe updates --json` | for each installed recipe with a newer version: from, to, and what changed in what it may use | no such command. Without it the front end counts an installed version that differs from the collection's as an update, and says the change in what the recipe may use is not known |
 
 Changes, through the root helper, with events on stderr:
 

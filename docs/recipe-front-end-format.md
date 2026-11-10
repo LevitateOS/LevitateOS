@@ -91,6 +91,7 @@ const ABOUT = #{
 
 | Field | Required | Meaning |
 |---|---|---|
+| `title` | no | the name as people write it (`OnlyOffice` for `onlyoffice`); absent means the recipe's name |
 | `kind` | yes | `app` (has a menu entry), `tool` (command line), `library` (only for other recipes; never listed to people), `system` (drivers, codecs, fonts) |
 | `category` | for `app`, `tool`, `system` | one name from a fixed list (open question 1) |
 | `details` | for `app` | one short paragraph, plain text, at most 600 characters |
@@ -362,6 +363,15 @@ fn remove(ctx) {
 - A source whose host is not in `NEEDS.network`.
 - `first-download` on a source of a `system` recipe (drivers and codecs need a
   checksum someone else vouches for).
+
+## Built so far
+
+- `ABOUT` is read and `recipe list --json` exists (`tools/recipe`
+  `src/catalog.rs`, 2026-11-10): the block is passed through as written, with
+  no check of its fields yet. `recipes/ripgrep.rhai` carries one.
+- `recipe installed` may be read by an ordinary user for a store root owns.
+
+Nothing else below is built.
 
 ## Order of work
 
