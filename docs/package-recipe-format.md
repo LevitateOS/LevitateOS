@@ -9,14 +9,15 @@ custom readiness and acquire/build/install behavior.
 | Collection | Consumer | Output lifecycle |
 | --- | --- | --- |
 | [`distro/builder/os-recipes/`](../distro/builder/os-recipes/) | OS builder | Produces system trees, kernels, tools and live overlays. The builder assembles images; `recab` owns system updates and A/B continuation, coordinating Recipe software operations. |
-| [`recipes/`](../recipes/) | User-managed software | Publishes a `package` directory for atomic profile activation. Recipe owns install, update and removal; ripgrep is the first package. |
+| [`recipes/`](../recipes/) (its own repository, the official [source](recipe-sources.md)) | User-managed software | Publishes a `package` directory for atomic profile activation. Recipe owns install, update and removal; ripgrep is the first package. |
 
 Both use the same engine in `tools/recipe`, the same API 2 declarations and the
 same Ginux execution rules. The directories express ownership and discovery;
 they introduce no recipe type, alternate interpreter or additional permissions.
 The builder passes its OS collection as `--recipes-path` with `--no-activate`.
 The CLI uses an explicitly selected catalog, or the user's XDG recipe directory
-followed by `/usr/share/recipe/recipes`. A path can select either kind
+followed by the sources, of which the image ships the official one under
+`/usr/share/recipe/sources`. A path can select either kind
 of producer explicitly. Engine examples and test fixtures stay with the engine.
 
 An app included in the desktop image belongs to the OS lifecycle. Being a

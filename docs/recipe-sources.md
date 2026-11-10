@@ -1,7 +1,8 @@
-# Recipe sources: design (2026-11-10, accepted, steps 1 to 3 of 5 built)
+# Recipe sources: design (2026-11-10, accepted, steps 1 to 4 of 5 built)
 
 Where the recipes a person can browse and install come from, when they are not
-all on the computer. Steps 1 to 3 of the order of work are built.
+all on the computer. Steps 1 to 4 of the order of work are built; the
+recipes repository is not pushed yet.
 
 It fills the gap [the format design](recipe-front-end-format.md) left open
 ("several Git repositories as sources, and what happens when two hold the same
@@ -9,6 +10,8 @@ name") and takes over its `repo.toml`. It does not change the `.rhai` file or
 the engine that runs it.
 
 ## The problem
+
+As it was before this design:
 
 1. New recipes reach an installed system only with a new OS image. The catalog
    is the `recipes/` folder of this repository, copied into the image at
@@ -18,7 +21,7 @@ the engine that runs it.
 3. A person who writes recipes has the whole repository checked out and wants
    Recipe to read it as it is, edits included.
 
-## What exists today
+## What existed before
 
 - `recipe` reads `.rhai` files from folders: `--recipes-path` or
   `$RECIPE_PATH` alone if given; otherwise the override folder
@@ -164,9 +167,8 @@ path = "/home/vince/recipes"
   change. Deleting that file brings the source back.
 - The file's name must equal the `name` the source gives itself. A folder
   without a `repo.toml` is named by `--name`, or by the folder's own name.
-  Adding a second source with a name already in use is refused. `local` and
-  `image` are taken: they name the folders Recipe reads without any source
-  file (the first folder, and the catalog the image ships as a folder).
+  Adding a second source with a name already in use is refused. `local` is
+  taken: it names the folder Recipe reads without any source file.
 
 Commands:
 
@@ -210,14 +212,22 @@ The official catalog becomes the first remote source, `levitate`, in its own
 repository. This is what lets a recipe change reach an installed system
 without a new image.
 
-- The image still carries a copy: the published index and all files as they
-  are at the pinned commit, at `/usr/share/recipe/sources/levitate/`. Recipe
-  uses it until a `refresh` brings a newer index, and whenever the network is
-  away.
-- `/usr/share/recipe/recipes` goes away. It would otherwise sit before the
-  remote source and hide every newer recipe.
-- `recipes/` leaves this repository. The builder takes the catalog from the
-  new repository at a pinned commit.
+- The image still carries a copy: the repository as it is at the pinned
+  commit, with its published index, at `/usr/share/recipe/sources/levitate/`,
+  beside `levitate.toml`. Recipe lists from the copy's index while it has
+  fetched none, and takes a file from the copy when the index in use lists
+  that very file, so the shipped recipes install without a network. An index
+  fetched once is used from then on. The copy is used only while the image's
+  own `levitate.toml` is the one in force: a source of the same name the owner
+  put in its place is another source.
+- `/usr/share/recipe/recipes` is gone, from the image and from Recipe's
+  lookup. It would otherwise sit before the remote source and hide every
+  newer recipe. Recipe reads one folder, the user's own, then the sources.
+- `recipes/` here is that repository as a submodule, so the pinned commit is
+  the submodule pin, and the builder's catalog input is unchanged. The
+  repository is `LevitateOS/recipes`, which existed, archived, with an older
+  catalog; the new content is two commits on top of its `master`.
+- Its Index check runs `recipe index --check` on every push.
 
 ## 5. Installing from a remote source
 
@@ -327,6 +337,13 @@ holds regardless:
    `uses`, a base, a forge, root's install on an image through recab.
 4. The `recipes` repository with its CI, and the builder writing the copy into
    the image in place of `/usr/share/recipe/recipes`.
+   Built 2026-11-10, unbuilt as an image. Tried with a folder standing in for
+   the image's `/usr/share/recipe/sources` (`$RECIPE_SHIPPED_SOURCES`): list,
+   info and install up to the engine with no reachable index, switching the
+   shipped source off and on. The builder's recipe compiles; no image was
+   built. The repository's commits are local: GitHub's `LevitateOS/recipes`
+   is still archived and has neither the index nor the check, which has
+   never run. The website's pages (`docs/content`) still name the old folder.
 5. The front end: the source on every recipe, refresh, the sources page.
 
 Steps 1 to 3 can be tried against a folder served over HTTPS before the

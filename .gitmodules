@@ -62,3 +62,7 @@
 	path = tools/ginux
 	url = https://github.com/LevitateOS/ginux.git
 	branch = main
+[submodule "recipes"]
+	path = recipes
+	url = https://github.com/LevitateOS/recipes
+	branch = master
