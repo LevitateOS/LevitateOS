@@ -1,7 +1,7 @@
-# Recipe sources: design (2026-11-10, accepted, step 1 of 5 built)
+# Recipe sources: design (2026-11-10, accepted, steps 1 and 2 of 5 built)
 
 Where the recipes a person can browse and install come from, when they are not
-all on the computer. Only step 1 of the order of work is built.
+all on the computer. Steps 1 and 2 of the order of work are built.
 
 It fills the gap [the format design](recipe-front-end-format.md) left open
 ("several Git repositories as sources, and what happens when two hold the same
@@ -131,12 +131,15 @@ out of date.
 One small file per source, in two folders:
 
 - `/usr/share/recipe/sources/NAME.toml`: what the image ships.
-- `/var/lib/recipe/sources/NAME.toml`: what the administrator added. A file
-  here with the same name replaces the shipped one.
+- `sources/NAME.toml` under the package root: what the owner of that software
+  added. A file here with the same name replaces the shipped one.
 
-Both are readable by everyone. An ordinary user's own
-`$XDG_CONFIG_HOME/recipe/sources/` applies to their own profile only; root
-never reads it.
+Sources belong to the package root, as installed software does. Root's are in
+`/var/lib/recipe/sources`, readable by everyone, so a front end run by a
+person with `--package-root /var/lib/recipe` lists them. A person's own
+(`$XDG_DATA_HOME/recipe/sources`) apply to their own profile only; root never
+reads them. An explicit `--recipes-path` or `$RECIPE_PATH` uses no sources,
+as it uses no other folder: the OS builder stays isolated.
 
 A remote source:
 
@@ -153,19 +156,23 @@ path = "/home/vince/recipes"
 
 - `files` is an address pattern. Recipe fetches the index with `{rev}` set to
   the branch and `{path}` to `index.json`, then each recipe file with `{rev}`
-  set to the index's `commit`. HTTPS only.
+  set to the index's `commit`. HTTPS only, except `http://` to this computer
+  (`127.0.0.1`, `localhost`, `::1`) for trying a source out.
 - A file with `enabled = false` switches a shipped source off without an image
-  change.
-- The file's name must equal the `name` the source gives itself. Adding a
-  second source with a name already in use is refused.
+  change. Deleting that file brings the source back.
+- The file's name must equal the `name` the source gives itself. A folder
+  without a `repo.toml` is named by `--name`, or by the folder's own name.
+  Adding a second source with a name already in use is refused. `local` and
+  `image` are taken: they name the folders Recipe reads without any source
+  file (the first folder, and the catalog the image ships as a folder).
 
 Commands:
 
 | Command | What it does |
 |---|---|
 | `recipe source list` | every source, its kind, its address or path, when its index was fetched |
-| `recipe source add ADDRESS` | fetches the index, shows the source's name and keeper, writes the file. Takes a `files` pattern, or a repository address on GitHub, GitLab or Forgejo, from which it derives the pattern |
-| `recipe source add --path FOLDER` | adds a checked-out source |
+| `recipe source add ADDRESS [--branch B]` | fetches the index, shows the source's name and keeper, writes the file. Takes a `files` pattern, or a repository address on github.com or gitlab.com, from which it derives the pattern. Forgejo is not derived yet: its address form for both a branch and a commit is not checked |
+| `recipe source add --path FOLDER [--name N]` | adds a checked-out source |
 | `recipe source remove NAME` | removes the file; for a shipped source, writes `enabled = false` |
 | `recipe refresh [NAME]` | fetches the index again |
 
@@ -180,14 +187,20 @@ the index kept from the last `refresh`; for a checked-out source it reads the
 files.
 
 - A person's `refresh` keeps the index in their own cache
-  (`$XDG_CACHE_HOME/recipe/sources/NAME/index.json`). Root keeps its own under
-  `/var/cache/recipe`. Listing needs no privilege.
-- The output gains `sources` (per source: `name`, `title`, `kind`, `address`
-  or `path`, `checked`, and `problem` when the last refresh failed) and each
-  recipe gains `source`. `collections` goes away.
+  (`$XDG_CACHE_HOME/recipe/sources/NAME-KEY/index.json`, the key made from
+  the address and branch, so two stores naming different sources alike do not
+  mix). Root keeps its own under `/var/cache/recipe`. Listing needs no
+  privilege. A failed refresh leaves the kept index in use and keeps the
+  reason beside it.
+- The output gains `sources` (per source: `name`, `title`, `kind` `remote` or
+  `folder`, `address`, `files` and `branch` or `path`, `commit`, `checked` in
+  seconds since 1970, and `problem` when the last refresh failed or no index
+  is kept) and each recipe gains `source`. A recipe of a remote source has
+  `files` and no `path`. `collections` stays until the front end reads
+  `sources` (step 5), then goes away.
 - Icons are files in the index. A front end fetches the ones it shows with
   `recipe fetch SOURCE:NAME --file NAME.svg`, which checks them like any other
-  file.
+  file. Not built; it comes with step 3's download.
 
 ## 4. The official catalog
 
@@ -237,8 +250,10 @@ the old and new version.
   Installing `bob:ripgrep` while `levitate:ripgrep` is installed is refused
   with the name of the source that holds it.
 - A bare `NAME` on the command line means the recipe in an override folder if
-  one is there; otherwise the one remote source that has it. When two have it,
-  Recipe lists them and asks for `SOURCE:NAME`.
+  one is there; otherwise the one source, remote or checked out, that has it.
+  When two have it, Recipe lists them and asks for `SOURCE:NAME`.
+- `update`, `remove` and the installed checks accept `SOURCE:NAME` and act on
+  the installed package of that name.
 - A front end always uses `SOURCE:NAME` and shows the source on every recipe.
 
 ## What a source can and cannot do
@@ -272,6 +287,11 @@ holds regardless:
    exists, no index is committed yet because nothing reads one.
 2. The source files, `source list|add|remove`, `refresh`, and `list --json`
    reading an index. `SOURCE:NAME`.
+   Built 2026-11-10 (`tools/recipe` `src/sources.rs`). A recipe of a
+   checked-out source runs as any local recipe does. Naming a recipe of a
+   remote source stops with a message until step 3. Tried against a source
+   served from this computer over HTTP; not against a forge, and not with a
+   shipped source file.
 3. Install and update from a remote source, and the receipt fields.
 4. The `recipes` repository with its CI, and the builder writing the copy into
    the image in place of `/usr/share/recipe/recipes`.
