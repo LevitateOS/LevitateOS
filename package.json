@@ -9,6 +9,7 @@
     "tui/apps/install/base-system",
     "tui/apps/install/disk-plan",
     "tui/apps/install/install-hub",
+    "tui/apps/install/system-setup",
     "tui/apps/live-tools/install-docs",
     "tui/apps/runtime/recab-tui"
   ],
