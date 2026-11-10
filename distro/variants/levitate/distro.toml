@@ -4,7 +4,7 @@
 # `distro_contract::registry`, the same for every variant, and every artifact
 # name (`<os_id>-x86_64-<product>.iso`, `<os_id>-live.efi`, ...) follows from
 # `os_id`.
-schema_version = 8
+schema_version = 9
 
 [identity]
 os_name = "LevitateOS"
@@ -156,6 +156,13 @@ packages = [
 [desktop]
 display_manager = "sddm"
 preseed_recipe_script = "distro/builder/os-recipes/fedora-rpm-desktop-preseed.rhai"
+# What compiling the desktop apps (gui/) needs: the C++ compiler, CMake with
+# make, and Qt's development files. Locked with the desktop, so the Qt they are
+# compiled against is the Qt the desktop ships. Only the root they are compiled
+# in has these; no image does.
+apps_build_packages = ["gcc-c++", "make", "cmake", "qt6-qtbase-devel", "qt6-qtsvg-devel"]
+apps_build_preseed_recipe_script = "distro/builder/os-recipes/fedora-rpm-apps-build-preseed.rhai"
+apps_build_root_recipe_script = "distro/builder/os-recipes/fedora-rpm-apps-build-root.rhai"
 packages = [
   "plasma-desktop", "plasma-workspace", "kwin", "sddm", "sddm-breeze", "sddm-wayland-plasma",
   "xorg-x11-server-Xwayland", "konsole", "dolphin", "kwrite", "ark", "spectacle",

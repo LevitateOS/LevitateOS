@@ -4,7 +4,7 @@
 # `distro_contract::registry`, the same for every variant, and every artifact
 # name (`<os_id>-x86_64-<product>.iso`, `<os_id>-live.efi`, ...) follows from
 # `os_id`.
-schema_version = 8
+schema_version = 9
 
 [identity]
 os_name = "AcornOS"
@@ -125,6 +125,13 @@ packages = [
 [desktop]
 display_manager = "sddm"
 preseed_recipe_script = "distro/builder/os-recipes/alpine-desktop-preseed.rhai"
+# What compiling the desktop apps (gui/) needs: the C++ compiler with the C
+# library's headers, CMake with make, and Qt's development files. Locked with
+# the desktop, so the Qt they are compiled against is the Qt the desktop ships.
+# Only the root they are compiled in has these; no image does.
+apps_build_packages = ["g++", "musl-dev", "make", "cmake", "qt6-qtbase-dev", "qt6-qtsvg-dev"]
+apps_build_preseed_recipe_script = "distro/builder/os-recipes/alpine-apps-build-preseed.rhai"
+apps_build_root_recipe_script = "distro/builder/os-recipes/alpine-apps-build-root.rhai"
 packages = [
   "lxqt-desktop", "lximage-qt", "pavucontrol-qt", "screengrab", "sddm", "xorg-server",
   "xf86-input-libinput", "eudev", "udev-init-scripts", "udev-init-scripts-openrc",

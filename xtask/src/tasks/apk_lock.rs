@@ -185,6 +185,10 @@ pub fn lock(root: &Path, distro: &Distro, bundle: &distro_contract::Variant, che
     let base_set = index.resolve(&base.packages, BTreeMap::new())?;
     let mut desktop_set = index.resolve(&bundle.contract.desktop.packages, base_set.clone())?;
     desktop_set.retain(|n, _| !base_set.contains_key(n));
+    // Resolved over the base alone, from the same index as the desktop: a
+    // package both need (Qt) is the same build in both locks.
+    let mut apps_build_set = index.resolve(&bundle.contract.desktop.apps_build_packages, base_set.clone())?;
+    apps_build_set.retain(|n, _| !base_set.contains_key(n));
     let apk_tools = index
         .by_name
         .get("apk-tools-static")
@@ -193,7 +197,9 @@ pub fn lock(root: &Path, distro: &Distro, bundle: &distro_contract::Variant, che
     let (tools_nv, tools_url) = row(&index.pkgs[apk_tools], &mirror)?;
 
     let mut stale = 0;
-    for (layer, set) in [(Layer::Base, &base_set), (Layer::Desktop, &desktop_set)] {
+    for (layer, set) in
+        [(Layer::Base, &base_set), (Layer::Desktop, &desktop_set), (Layer::AppsBuild, &apps_build_set)]
+    {
         let rows: Vec<(&str, String, String)> = set
             .iter()
             .map(|(name, &i)| row(&index.pkgs[i], &mirror).map(|(nv, url)| (name.as_str(), nv, url)))
@@ -349,10 +355,7 @@ fn render_lock(
          // [name, name-version, URL, SHA256]\n\
          fn packages() {{\n    [\n",
         id = distro.id(),
-        what = match layer {
-            Layer::Base => "the variant's packages and everything they need",
-            Layer::Desktop => "what the desktop packages need beyond the base lock",
-        },
+        what = layer.holds(),
         date = today.trim(),
         key_name = key.0,
         pem = key.1.replace('\n', "\\n"),

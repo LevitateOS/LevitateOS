@@ -7,8 +7,10 @@
 //! metadata, newest build of each name, no weak dependencies), checks every
 //! RPM against the repository checksum and the release's signing key; an APK
 //! variant goes through `apk_lock` (the same closure over Alpine's indexes).
-//! Either writes two locks the rootfs recipes import: the base, and the
-//! desktop layer (the desktop's closure minus what the base already has).
+//! Either writes three locks: the base and the desktop layer (the desktop's
+//! closure minus what the base already has), which the rootfs recipes import,
+//! and the apps-build layer (what compiling the desktop apps in `gui/` needs
+//! beyond the base), which only the root they are compiled in gets.
 //! Rerunning it is how a build takes the distribution's updates.
 
 use anyhow::{Context, Result, bail};
@@ -52,20 +54,32 @@ impl Rpm {
     }
 }
 
-/// Which lock: the base system's, or what the desktop layer adds to it.
+/// Which lock: the base system's, what the desktop layer adds to it, or what
+/// compiling the desktop apps adds to the base (never in an image).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Layer {
     Base,
     Desktop,
+    AppsBuild,
 }
 
 impl Layer {
-    pub const ALL: [Layer; 2] = [Layer::Base, Layer::Desktop];
+    pub const ALL: [Layer; 3] = [Layer::Base, Layer::Desktop, Layer::AppsBuild];
 
     pub fn name(self) -> &'static str {
         match self {
             Layer::Base => "base",
             Layer::Desktop => "desktop",
+            Layer::AppsBuild => "apps-build",
+        }
+    }
+
+    /// What the lock holds, for its heading.
+    pub fn holds(self) -> &'static str {
+        match self {
+            Layer::Base => "the variant's packages and everything they need",
+            Layer::Desktop => "what the desktop packages need beyond the base lock",
+            Layer::AppsBuild => "what compiling the desktop apps needs beyond the base lock",
         }
     }
 }
@@ -75,6 +89,7 @@ pub fn lock_path(root: &Path, distro: &Distro, backend: PackageBackend, layer: L
     let suffix = match layer {
         Layer::Base => "lock",
         Layer::Desktop => "desktop-lock",
+        Layer::AppsBuild => "apps-build-lock",
     };
     root.join("distro/builder/os-recipes/sources")
         .join(format!("{}-{backend}-{suffix}.rhai", distro.id()))
@@ -112,9 +127,16 @@ fn lock_rpm(root: &Path, distro: &Distro, bundle: &distro_contract::Variant, che
     let base_set = index.resolve(&base.packages, BTreeSet::new(), &assumed)?;
     let mut desktop_set = index.resolve(desktop_packages, base_set.clone(), &assumed)?;
     desktop_set.retain(|n| !base_set.contains(n));
+    // Resolved over the base alone, from the same index as the desktop: a
+    // package both need (Qt) is the same build in both locks.
+    let mut apps_build_set =
+        index.resolve(&bundle.contract.desktop.apps_build_packages, base_set.clone(), &assumed)?;
+    apps_build_set.retain(|n| !base_set.contains(n));
 
     let mut stale = 0;
-    for (layer, names) in [(Layer::Base, &base_set), (Layer::Desktop, &desktop_set)] {
+    for (layer, names) in
+        [(Layer::Base, &base_set), (Layer::Desktop, &desktop_set), (Layer::AppsBuild, &apps_build_set)]
+    {
         let set: BTreeMap<String, Rpm> = names.iter().map(|n| (n.clone(), index.pkgs[n].clone())).collect();
         let path = lock_path(root, distro, PackageBackend::Rpm, layer);
         let locked = read_locked(&path);
@@ -659,10 +681,7 @@ fn render_lock(distro: &Distro, release: u32, layer: Layer, rpms: &BTreeMap<Stri
          // [name, NEVRA, URL, SHA256]\n\
          fn packages() {{\n    [\n",
         id = distro.id(),
-        what = match layer {
-            Layer::Base => "the variant's packages and everything they need",
-            Layer::Desktop => "what the desktop packages need beyond the base lock",
-        },
+        what = layer.holds(),
         date = today.trim(),
     );
     for rpm in rpms.values() {

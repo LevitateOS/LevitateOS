@@ -137,18 +137,29 @@ is done and what is not, for getting them into both desktop images:
   6.11.2 on Fedora 45; `qt6-qtbase`, `qt6-qtbase-x11` and `qt6-qtsvg` 6.11.1
   on Alpine 3.24), and `pkexec` (`polkit`, `polkit-common`). The polkit actions
   name `/usr/bin/recipe` and `/usr/bin/recab`, where the builder puts both.
-- **Not done: the build itself, inside the image pipeline.** No recipe builds
-  them. The plan above still stands and its hard part is untouched: a recipe
-  runs in the pinned Rocky root, which has neither Qt nor either distro's C++
-  runtime, and it cannot enter another tree (the OS recipes run a tree's
-  programs one at a time through that tree's loader; a compiler that starts
-  other programs does not work that way). What a build needs beyond the
-  desktop lock: `gcc-c++`, `cmake`, `ninja-build`, `qt6-qtbase-devel`,
-  `qt6-qtsvg-devel` on Fedora; `g++`, `cmake`, `samurai`, `qt6-qtbase-dev`,
-  `qt6-qtsvg-dev` on Alpine.
-- **Not done:** the list of desktop apps in the contract, the builder step
-  that puts the built tree into the desktop system, and the `desktop-boot`
-  check.
+- **Written, never run: the build inside the image pipeline** (the route
+  chosen 2026-11-10: each distro's own root).
+  - `[desktop].apps_build_packages` in each `distro.toml` names what compiling
+    needs beyond the base; `cargo xtask base lock` writes it as a third lock,
+    `sources/*-apps-build-lock.rhai`, in the same run as the desktop lock, so
+    both name the same Qt (6.11.2 on Fedora 45, 6.11.1 on Alpine 3.24).
+  - The desktop flavour's preseed also downloads that lock.
+  - `fedora-rpm-apps-build-root.rhai` and `alpine-apps-build-root.rhai` unpack
+    the base lock and the apps-build lock into one tree, without firmware.
+  - The builder (`distro/builder/src/desktop_apps.rs`) makes one root image of
+    that tree and runs `desktop-apps.rhai` in it instead of Recipe's usual
+    root, with the static Recipe as the worker, since an Alpine root cannot
+    run the host's. The recipe runs `cmake` there and publishes the installed
+    tree, which is merged into the desktop system's rootfs.
+  - The contract lists the apps (`DESKTOP_APPS`), and a desktop rootfs without
+    them is refused.
+- **Not known until it runs:** whether the unpacked trees work as roots
+  (nothing ran the packages' scripts; only the linker's name on Fedora and the
+  shell's on Alpine are set by hand), whether CMake and the compiler run under
+  Ginux (the build uses make with one job, because parallel make and Ninja's
+  use of file times failed or were doubtful there before), and how long
+  copying a root of that size takes for each run.
+- **Not done:** the `desktop-boot` check that starts each app in the session.
 
 ## In the pipeline
 
