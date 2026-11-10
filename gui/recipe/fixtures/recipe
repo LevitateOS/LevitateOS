@@ -1,0 +1,188 @@
+#!/usr/bin/env python3
+"""A stand-in for the `recipe` command, for running recipe-gui from a checkout.
+
+It answers the commands the front end uses (see ../README.md, "What the front
+end asks of recipe") from catalog.json and a small state file, and plays an
+install as a stream of events. Nothing is downloaded, built or installed.
+
+Environment:
+  RECIPE_STANDIN_STATE    folder for the state file (default: a folder in /tmp)
+  RECIPE_STANDIN_SPEED    time factor for an install; 0 runs it at once (default 1)
+  RECIPE_STANDIN_STOP_AT  "name:hook": stay in the middle of that step forever
+"""
+import datetime
+import json
+import os
+import sys
+import time
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+CATALOG = json.load(open(os.path.join(HERE, "catalog.json")))
+STATE_DIR = os.environ.get("RECIPE_STANDIN_STATE") or "/tmp/recipe-standin-%d" % os.getuid()
+STATE = os.path.join(STATE_DIR, "installed.json")
+SPEED = float(os.environ.get("RECIPE_STANDIN_SPEED", "1"))
+STOP_AT = os.environ.get("RECIPE_STANDIN_STOP_AT", "")
+
+
+def installed():
+    if not os.path.exists(STATE):
+        os.makedirs(STATE_DIR, exist_ok=True)
+        save(CATALOG["installed"])
+    return json.load(open(STATE))
+
+
+def save(items):
+    with open(STATE, "w") as out:
+        json.dump(items, out, indent=1)
+
+
+def recipe(name):
+    for item in CATALOG["recipes"]:
+        if item["name"] == name:
+            return item
+    fail("no recipe named %s" % name)
+
+
+def fail(text):
+    sys.stderr.write(json.dumps({"event": "failed", "reason": text}) + "\n")
+    sys.exit(1)
+
+
+def emit(**event):
+    sys.stderr.write(json.dumps(event) + "\n")
+    sys.stderr.flush()
+
+
+def pause(seconds):
+    if SPEED > 0:
+        time.sleep(seconds * SPEED)
+
+
+def stop_here(name, hook):
+    if STOP_AT == "%s:%s" % (name, hook):
+        while True:
+            time.sleep(3600)
+
+
+def steps_of(item):
+    steps = ["acquire"] if item.get("sources") else []
+    steps += [hook for hook in ("build", "install") if hook in item["hooks"]]
+    return steps
+
+
+def play(item, refuse=None):
+    name = item["name"]
+    for hook in steps_of(item):
+        emit(event="step", recipe=name, hook=hook, status="running")
+        if hook == "acquire":
+            total = max(item["needs"]["network_max_bytes"] // 4, 1 << 20)
+            for part in range(1, 9):
+                if refuse and part == 3:
+                    emit(event="step", recipe=name, hook=hook, status="failed")
+                    emit(event="failed", recipe=name, hook=hook,
+                         reason="connection refused by the sandbox",
+                         refused={"endpoint": refuse, "declared": item["needs"]["network"]},
+                         changed="nothing")
+                    sys.exit(1)
+                emit(event="fetch", recipe=name, source=next(iter(item["sources"])),
+                     bytes=total * part // 8, total=total)
+                pause(0.25)
+        elif hook == "build":
+            count = 24 if item["about"]["kind"] == "library" else 60
+            for done in range(1, count + 1):
+                emit(event="output", recipe=name,
+                     line="[%d/%d] Compiling C object %s.p/src_part%03d.c.o" % (done, count, name, done))
+                emit(event="progress", recipe=name, done=done, total=count)
+                if done == count * 2 // 3:
+                    stop_here(name, hook)
+                pause(0.08)
+        else:
+            emit(event="say", recipe=name, text="Putting the files in place")
+            pause(0.5)
+        emit(event="step", recipe=name, hook=hook, status="done")
+
+
+def install(name):
+    item = recipe(name)
+    order = [recipe(dep) for dep in item["build_deps"]] + [item]
+    emit(event="plan", recipes=[{"name": each["name"], "steps": steps_of(each)} for each in order])
+    items = installed()
+    current = next((each for each in items if each["name"] == name), None)
+    # The sample story: the newer Element recipe reaches for a host it has not declared.
+    refuse = "cdn.example.net:443" if name == "element" and current else None
+    for each in order:
+        play(each, refuse if each is item else None)
+    about = item["about"].get("adds", {})
+    entry = {
+        "name": name, "version": item["version"],
+        "installed_on": datetime.date.today().isoformat(),
+        "size_bytes": 62914560, "kept": [],
+        "programs": about.get("programs", []), "menu": about.get("menu", []),
+    }
+    if current:
+        entry["kept"] = [current["version"]]
+        entry["kept_bytes"] = current["size_bytes"]
+        entry["size_bytes"] = current["size_bytes"]
+        items.remove(current)
+    items.append(entry)
+    save(sorted(items, key=lambda each: each["name"]))
+    emit(event="done", recipe=name)
+
+
+def remove(name, clear_kept):
+    items = installed()
+    current = next((each for each in items if each["name"] == name), None)
+    if not current:
+        fail("%s is not installed" % name)
+    emit(event="step", recipe=name, hook="remove", status="running")
+    pause(0.4)
+    items.remove(current)
+    save(items)
+    emit(event="step", recipe=name, hook="remove", status="done")
+    emit(event="done", recipe=name)
+
+
+def go_back(name):
+    items = installed()
+    current = next((each for each in items if each["name"] == name), None)
+    if not current or not current.get("kept"):
+        fail("no earlier version of %s is kept" % name)
+    older = current["kept"][0]
+    current["kept"] = [current["version"]]
+    current["version"] = older
+    save(items)
+    emit(event="done", recipe=name)
+
+
+def updates():
+    found = []
+    for each in installed():
+        newer = recipe(each["name"])["version"]
+        if newer != each["version"]:
+            found.append({"name": each["name"], "from": each["version"], "to": newer,
+                          "changes": CATALOG["changes"].get(each["name"], [])})
+    return found
+
+
+def main(args):
+    words = [arg for arg in args if not arg.startswith("--")]
+    command = words[0] if words else ""
+    if command == "list":
+        print(json.dumps({"schema_version": 1, "source": CATALOG["source"], "recipes": CATALOG["recipes"]}))
+    elif command == "installed":
+        print(json.dumps({"schema_version": 1, "installed": installed()}))
+    elif command == "updates":
+        print(json.dumps({"schema_version": 1, "updates": updates()}))
+    elif command == "install" and len(words) == 2:
+        install(words[1])
+    elif command == "remove" and len(words) == 2:
+        remove(words[1], "--clear-kept" in args)
+    elif command == "go-back" and len(words) == 2:
+        go_back(words[1])
+    else:
+        sys.stderr.write("stand-in recipe: unknown command: %s\n" % " ".join(args))
+        sys.exit(2)
+
+
+if __name__ == "__main__":
+    main(sys.argv[1:])

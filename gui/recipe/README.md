@@ -1,0 +1,106 @@
+# recipe-gui
+
+The graphical front end for Recipe on the desktop images: Plasma on LevitateOS,
+LXQt on AcornOS. One window to find software, see what its recipe will do and
+may use, install, update, go back a version and remove.
+
+It holds no package rules. It runs `recipe`, reads its JSON and shows it.
+
+Qt 6 Widgets, C++20, CMake. It uses no stylesheet and no colours of its own
+beyond the red for "this went wrong", so it takes each desktop's own style.
+
+## State (2026-11-10)
+
+Every page works against the stand-in in `fixtures/`. It has not been run
+against the real `recipe`, on a real desktop, or with `pkexec`. The real
+`recipe` cannot yet answer most of what is asked below.
+
+## Build and run from a checkout
+
+```sh
+cmake -S gui/recipe -B .artifacts/recipe-gui/build -G Ninja
+cmake --build .artifacts/recipe-gui/build
+
+RECIPE_GUI_RECIPE=$PWD/gui/recipe/fixtures/recipe RECIPE_GUI_ROOT_HELPER= \
+  .artifacts/recipe-gui/build/recipe-gui --look levitate
+```
+
+Needs the Qt 6 base and SVG development files (`qt6-qtbase-devel`,
+`qt6-qtsvg-devel` on Rocky and Fedora).
+
+- `RECIPE_GUI_RECIPE`: the `recipe` to run (default: `recipe` on `PATH`).
+- `RECIPE_GUI_ROOT_HELPER`: what changes are run through (default: `pkexec`;
+  empty runs them directly, for the stand-in).
+- `--look levitate|acorn`: a stand-in look for each desktop, for a machine
+  that is neither.
+- `--shots FOLDER`: walk the pages, save a picture of each, quit. With
+  `QT_QPA_PLATFORM=offscreen` it needs no display:
+
+```sh
+QT_QPA_PLATFORM=offscreen RECIPE_GUI_RECIPE=$PWD/gui/recipe/fixtures/recipe \
+  RECIPE_GUI_ROOT_HELPER= RECIPE_STANDIN_STATE=/tmp/recipe-shots-state \
+  .artifacts/recipe-gui/build/recipe-gui --look acorn --shots /tmp/recipe-shots
+```
+
+The stand-in keeps what is "installed" in a state file
+(`RECIPE_STANDIN_STATE`, see the top of `fixtures/recipe`); delete it to start
+over.
+
+## The source
+
+| File | What |
+|---|---|
+| `src/model.*` | the data: recipes, what is installed, updates, as read from JSON |
+| `src/client.*` | the only code that runs `recipe`; a `Run` reports one change as events |
+| `src/parts.*` | small widgets: the step mark, the letter tile, panels |
+| `src/pages.*` | Browse, a recipe's page, a run, Installed, Updates, the remove question |
+| `src/window.*` | the sidebar and the flows between pages |
+| `src/shots.*` | the stand-in looks and the picture mode |
+| `fixtures/` | the stand-in `recipe` and its sample catalog |
+| `data/` | the menu entry and the polkit action |
+
+## What the front end asks of `recipe`
+
+Reads, as the desktop user, JSON on stdout with `"schema_version": 1`:
+
+| Command | Answer | In `recipe` today |
+|---|---|---|
+| `recipe list --json` | the source's name and every recipe: `name`, `version`, `description`, `about`, `sources`, `needs`, `deps`, `build_deps`, `hooks` | `list` prints names as text; `ABOUT` and `SOURCES` are the design in `docs/recipe-front-end-format.md` |
+| `recipe installed --json` | what is on this system: version, date, size, the earlier version kept, programs and menu entries | no such list exists |
+| `recipe updates --json` | for each installed recipe with a newer version: from, to, and what changed in what it may use | `recipe diff` compares two recipe files; nothing keeps the installed one |
+
+Changes, through the root helper, with events on stderr:
+
+| Command | In `recipe` today |
+|---|---|
+| `recipe install NAME --machine-events` | builds into Recipe's own output folder; does not put it on the system |
+| `recipe remove NAME [--clear-kept] --machine-events` | removes from that folder only |
+| `recipe go-back NAME --machine-events` | no such command |
+
+Events are one JSON object per line. The front end reads these; any other
+line is shown as output.
+
+| Event | Fields |
+|---|---|
+| `plan` | `recipes`: each `name` and its `steps`, in the order they will run |
+| `step` | `recipe`, `hook`, `status` (`running`, `done`, `skipped`, `failed`). Today's `recipe-hook` event is read the same way |
+| `fetch` | `recipe`, `source`, `bytes`, `total` |
+| `progress` | `recipe`, `done`, `total` |
+| `say` | `recipe`, `text` |
+| `output` | `recipe`, `line` |
+| `failed` | `recipe`, `hook`, `reason`, and for a refused connection `refused`: `endpoint` and the `declared` list |
+| `done` | `recipe` |
+
+Without a `plan`, the front end adds a row of three steps for each recipe as
+its first step arrives.
+
+## Not done
+
+- Opening the recipe file itself, the list of sources (Git repositories) and
+  choosing between them, asking an agent for a recipe.
+- Icons: recipes show a letter until the catalog carries `<name>.svg`.
+- Translations: every string goes through `tr()`, no translation exists.
+- "Open" starts the first program a recipe installed, not its menu entry.
+- Clearing kept versions as its own action, and a notice when updates appear.
+- Building it for each distribution against that distribution's Qt, and
+  shipping it in the desktop product (the same gap `docs/recab-gui.md` lists).

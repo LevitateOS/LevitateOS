@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Recipe
+GenericName=Software
+Comment=Find, install and update software from recipes
+Exec=recipe-gui
+Icon=system-software-install
+Categories=Qt;System;PackageManager;
+Keywords=software;install;update;remove;program;app;

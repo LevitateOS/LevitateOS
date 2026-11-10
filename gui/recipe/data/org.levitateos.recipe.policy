@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE policyconfig PUBLIC "-//freedesktop//DTD PolicyKit Policy Configuration 1.0//EN"
+  "http://www.freedesktop.org/standards/PolicyKit/1/policyconfig.dtd">
+<policyconfig>
+  <vendor>LevitateOS</vendor>
+  <vendor_url>https://levitateos.org</vendor_url>
+  <action id="org.levitateos.recipe.change">
+    <description>Install, update or remove software with Recipe</description>
+    <message>The administrator password is needed to install, update or remove software</message>
+    <icon_name>system-software-install</icon_name>
+    <defaults>
+      <allow_any>auth_admin</allow_any>
+      <allow_inactive>auth_admin</allow_inactive>
+      <allow_active>auth_admin</allow_active>
+    </defaults>
+    <annotate key="org.freedesktop.policykit.exec.path">/usr/bin/recipe</annotate>
+  </action>
+</policyconfig>

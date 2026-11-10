@@ -1,0 +1,225 @@
+#include "parts.h"
+
+#include <QFileInfo>
+#include <QKeyEvent>
+#include <QPainter>
+#include <QSvgRenderer>
+#include <QVBoxLayout>
+
+QLabel *text(const QString &words, bool wrap)
+{
+    auto *label = new QLabel(words);
+    label->setWordWrap(wrap);
+    label->setTextInteractionFlags(Qt::TextSelectableByMouse);
+    return label;
+}
+
+QLabel *dim(QLabel *label)
+{
+    QPalette palette = label->palette();
+    QColor colour = palette.color(QPalette::WindowText);
+    colour.setAlphaF(0.66f);
+    palette.setColor(QPalette::WindowText, colour);
+    label->setPalette(palette);
+    return label;
+}
+
+QLabel *strong(const QString &words)
+{
+    auto *label = new QLabel(words);
+    QFont font = label->font();
+    font.setBold(true);
+    label->setFont(font);
+    return label;
+}
+
+QLabel *heading(const QString &words)
+{
+    auto *label = new QLabel(words);
+    QFont font = label->font();
+    font.setPointSizeF(font.pointSizeF() * 1.55);
+    font.setWeight(QFont::DemiBold);
+    label->setFont(font);
+    return label;
+}
+
+namespace {
+const QColor wrong(0xc2, 0x3b, 0x33);
+
+class Rule : public QWidget {
+public:
+    Rule() { setFixedHeight(1); }
+protected:
+    void paintEvent(QPaintEvent *) override
+    {
+        QColor colour = palette().color(QPalette::WindowText);
+        colour.setAlphaF(0.13f);
+        QPainter(this).fillRect(rect(), colour);
+    }
+};
+} // namespace
+
+QWidget *rule()
+{
+    return new Rule;
+}
+
+void Verdict::paintEvent(QPaintEvent *event)
+{
+    Panel::paintEvent(event);
+    QPainter painter(this);
+    painter.setRenderHint(QPainter::Antialiasing);
+    painter.setPen(QPen(wrong, 1.5));
+    painter.setBrush(Qt::NoBrush);
+    painter.drawRoundedRect(QRectF(rect()).adjusted(0.75, 0.75, -0.75, -0.75), 4, 4);
+}
+
+Panel::Panel(QWidget *parent)
+    : QFrame(parent)
+{
+    setFrameShape(QFrame::StyledPanel);
+    setBackgroundRole(QPalette::Base);
+    setAutoFillBackground(true);
+    auto *layout = new QVBoxLayout(this);
+    layout->setContentsMargins(18, 14, 18, 14);
+    layout->setSpacing(10);
+}
+
+QVBoxLayout *Panel::column()
+{
+    return static_cast<QVBoxLayout *>(layout());
+}
+
+ClickLabel::ClickLabel(const QString &words, QWidget *parent)
+    : QLabel(words, parent)
+{
+    setCursor(Qt::PointingHandCursor);
+    setFocusPolicy(Qt::TabFocus);
+}
+
+void ClickLabel::mouseReleaseEvent(QMouseEvent *event)
+{
+    if (event->button() == Qt::LeftButton && rect().contains(event->pos()))
+        emit clicked();
+}
+
+void ClickLabel::keyPressEvent(QKeyEvent *event)
+{
+    if (event->key() == Qt::Key_Return || event->key() == Qt::Key_Enter || event->key() == Qt::Key_Space)
+        emit clicked();
+    else
+        QLabel::keyPressEvent(event);
+}
+
+void ClickLabel::focusInEvent(QFocusEvent *event)
+{
+    QFont underlined = font();
+    underlined.setUnderline(true);
+    setFont(underlined);
+    QLabel::focusInEvent(event);
+}
+
+void ClickLabel::focusOutEvent(QFocusEvent *event)
+{
+    QFont plain = font();
+    plain.setUnderline(false);
+    setFont(plain);
+    QLabel::focusOutEvent(event);
+}
+
+Tile::Tile(const QString &name, const QString &iconPath, int size, QWidget *parent)
+    : QWidget(parent)
+    , letter_(name.left(1))
+    , iconPath_(QFileInfo::exists(iconPath) ? iconPath : QString())
+{
+    setFixedSize(size, size);
+}
+
+void Tile::paintEvent(QPaintEvent *)
+{
+    QPainter painter(this);
+    painter.setRenderHint(QPainter::Antialiasing);
+    if (!iconPath_.isEmpty()) {
+        QSvgRenderer(iconPath_).render(&painter, rect());
+        return;
+    }
+    QColor ground = palette().color(QPalette::WindowText);
+    ground.setAlphaF(0.09f);
+    painter.setPen(Qt::NoPen);
+    painter.setBrush(ground);
+    painter.drawRoundedRect(rect(), width() / 4.5, width() / 4.5);
+    QFont font = painter.font();
+    font.setPixelSize(width() * 0.44);
+    font.setWeight(QFont::DemiBold);
+    painter.setFont(font);
+    painter.setPen(palette().color(QPalette::Link));
+    painter.drawText(rect(), Qt::AlignCenter, letter_);
+}
+
+StepMark::StepMark(int number, QWidget *parent)
+    : QWidget(parent)
+    , number_(number)
+{
+    setFixedSize(26, 26);
+}
+
+void StepMark::setState(State state)
+{
+    state_ = state;
+    update();
+}
+
+void StepMark::paintEvent(QPaintEvent *)
+{
+    QPainter painter(this);
+    painter.setRenderHint(QPainter::Antialiasing);
+    const QRectF circle = QRectF(rect()).adjusted(1.5, 1.5, -1.5, -1.5);
+    const QColor accent = palette().color(QPalette::Highlight);
+    QColor quiet = palette().color(QPalette::WindowText);
+    quiet.setAlphaF(0.5f);
+
+    QColor line = quiet, fill = Qt::transparent, ink = quiet;
+    QString mark = QString::number(number_);
+    switch (state_) {
+    case Pending:
+        break;
+    case Running:
+        line = accent;
+        ink = palette().color(QPalette::WindowText);
+        break;
+    case Done:
+        line = fill = accent;
+        ink = palette().color(QPalette::HighlightedText);
+        mark.clear();
+        break;
+    case Skipped:
+        mark = QStringLiteral("–");
+        break;
+    case Failed:
+        line = fill = wrong;
+        ink = Qt::white;
+        mark.clear();
+        break;
+    }
+    painter.setPen(QPen(line, state_ == Running ? 2.0 : 1.2));
+    painter.setBrush(fill);
+    painter.drawEllipse(circle);
+    QFont font = painter.font();
+    font.setPixelSize(12);
+    font.setBold(true);
+    painter.setFont(font);
+    painter.setPen(ink);
+    if (!mark.isEmpty()) {
+        painter.drawText(rect(), Qt::AlignCenter, mark);
+        return;
+    }
+    // Drawn, not typed: the desktop's font may have no tick or cross.
+    painter.setPen(QPen(ink, 2, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+    const QPointF c = circle.center();
+    if (state_ == Done)
+        painter.drawPolyline(QPolygonF{c + QPointF(-5, 0.5), c + QPointF(-1.5, 4), c + QPointF(5, -3.5)});
+    else {
+        painter.drawLine(c + QPointF(-4, -4), c + QPointF(4, 4));
+        painter.drawLine(c + QPointF(4, -4), c + QPointF(-4, 4));
+    }
+}

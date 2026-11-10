@@ -1,0 +1,164 @@
+{
+  "schema_version": 1,
+  "source": { "name": "levitate", "title": "LevitateOS recipes", "checked": "today at 09:12" },
+  "recipes": [
+    {
+      "name": "onlyoffice", "version": "9.1.0", "description": "Documents, spreadsheets and presentations",
+      "about": { "kind": "app", "category": "office", "title": "OnlyOffice",
+        "details": "An office suite that opens and saves Word, Excel and PowerPoint files.",
+        "homepage": "https://www.onlyoffice.com", "license": "AGPL-3.0-only",
+        "adds": { "programs": ["onlyoffice-desktopeditors"], "menu": ["OnlyOffice"] },
+        "steps": { "install": "Unpacks the project's own build and adds it to the menu." },
+        "keeps": ["~/.local/share/onlyoffice"] },
+      "sources": { "onlyoffice": { "url": "https://download.onlyoffice.com/install/desktop/editors/linux/onlyoffice-desktopeditors-x64.tar.gz", "sha256": "5d0c1d4a9a1f0b6c7e8f90123456789abcdef0123456789abcdef0123456789a", "checksum_from": "publisher" } },
+      "needs": { "network": ["download.onlyoffice.com:443"], "memory_mib": 1024, "storage_max_bytes": 1610612736, "timeout_secs": 900, "network_max_bytes": 419430400 },
+      "deps": [], "build_deps": [], "hooks": ["install", "remove"]
+    },
+    {
+      "name": "thunderbird", "version": "140.4.0", "description": "Mail, calendar and contacts",
+      "about": { "kind": "app", "category": "mail", "title": "Thunderbird",
+        "details": "Reads and writes mail for several accounts, with a calendar and an address book.",
+        "homepage": "https://www.thunderbird.net", "license": "MPL-2.0",
+        "adds": { "programs": ["thunderbird"], "menu": ["Thunderbird"] }, "steps": {}, "keeps": ["~/.thunderbird"] },
+      "sources": { "thunderbird": { "url": "https://download.mozilla.org/thunderbird-{version}.tar.xz", "sha256": "0f1e2d3c4b5a69788796a5b4c3d2e1f00f1e2d3c4b5a69788796a5b4c3d2e1f0", "checksum_from": "publisher" } },
+      "needs": { "network": ["download.mozilla.org:443", "download-installer.cdn.mozilla.net:443"], "memory_mib": 1024, "storage_max_bytes": 1073741824, "timeout_secs": 900, "network_max_bytes": 157286400 },
+      "deps": [], "build_deps": [], "hooks": ["install", "remove"]
+    },
+    {
+      "name": "mpv", "version": "0.40.0", "description": "Plays video and music",
+      "about": { "kind": "app", "category": "media", "title": "mpv",
+        "details": "A small video and music player that plays almost every format and stays out of the way.",
+        "homepage": "https://mpv.io", "license": "GPL-2.0-or-later",
+        "adds": { "programs": ["mpv"], "menu": ["mpv Media Player"] },
+        "steps": { "build": "Compiles mpv against the FFmpeg built just before it.", "install": "Adds mpv to the menu and makes it open video and audio files." },
+        "keeps": ["~/.config/mpv"] },
+      "sources": { "mpv": { "git": "https://github.com/mpv-player/mpv", "commit": "e48ac7ce08462f5e33af6ef9deeac6fa87eef01e" } },
+      "needs": { "network": ["github.com:443"], "memory_mib": 2048, "storage_max_bytes": 1610612736, "timeout_secs": 3600, "network_max_bytes": 209715200 },
+      "deps": [], "build_deps": ["ffmpeg", "libass", "libplacebo"], "hooks": ["build", "install", "remove"]
+    },
+    {
+      "name": "krita", "version": "5.2.13", "description": "Digital painting",
+      "about": { "kind": "app", "category": "graphics", "title": "Krita",
+        "details": "A painting program for illustration, comics and concept art, with brushes, layers and a pen-tablet workflow.",
+        "homepage": "https://krita.org", "license": "GPL-3.0-or-later",
+        "adds": { "programs": ["krita"], "menu": ["Krita"] }, "steps": {}, "keeps": ["~/.local/share/krita"] },
+      "sources": { "krita": { "url": "https://download.kde.org/stable/krita/{version}/krita-{version}.tar.xz", "sha256": "9a8b7c6d5e4f30219a8b7c6d5e4f30219a8b7c6d5e4f30219a8b7c6d5e4f3021", "checksum_from": "signature" } },
+      "needs": { "network": ["download.kde.org:443"], "memory_mib": 4096, "storage_max_bytes": 6442450944, "timeout_secs": 7200, "network_max_bytes": 524288000 },
+      "deps": [], "build_deps": [], "hooks": ["build", "install", "remove"]
+    },
+    {
+      "name": "gimp", "version": "3.0.6", "description": "Photo and image editing",
+      "about": { "kind": "app", "category": "graphics", "title": "GIMP",
+        "details": "Edits photos and images: retouching, colour, layers, masks and many file formats.",
+        "homepage": "https://www.gimp.org", "license": "GPL-3.0-or-later",
+        "adds": { "programs": ["gimp"], "menu": ["GIMP"] }, "steps": {}, "keeps": ["~/.config/GIMP"] },
+      "sources": { "gimp": { "url": "https://download.gimp.org/gimp/v3.0/gimp-{version}.tar.xz", "sha256": "1234abcd5678ef901234abcd5678ef901234abcd5678ef901234abcd5678ef90", "checksum_from": "publisher" } },
+      "needs": { "network": ["download.gimp.org:443"], "memory_mib": 4096, "storage_max_bytes": 4294967296, "timeout_secs": 5400, "network_max_bytes": 104857600 },
+      "deps": [], "build_deps": [], "hooks": ["build", "install", "remove"]
+    },
+    {
+      "name": "element", "version": "1.12.4", "description": "Chat on Matrix",
+      "about": { "kind": "app", "category": "chat", "title": "Element",
+        "details": "Messages, rooms and calls on the Matrix network, with end-to-end encryption.",
+        "homepage": "https://element.io", "license": "AGPL-3.0-only",
+        "adds": { "programs": ["element-desktop"], "menu": ["Element"] }, "steps": {}, "keeps": ["~/.config/Element"] },
+      "sources": { "element": { "url": "https://packages.element.io/desktop/install/linux/glibc-x86-64/element-desktop-{version}.tar.gz", "sha256": "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789", "checksum_from": "first-download" } },
+      "needs": { "network": ["packages.element.io:443", "static.element.io:443"], "memory_mib": 1024, "storage_max_bytes": 1073741824, "timeout_secs": 900, "network_max_bytes": 419430400 },
+      "deps": [], "build_deps": [], "hooks": ["install", "remove"]
+    },
+    {
+      "name": "rust", "version": "1.95.0", "description": "The rustc compiler and cargo",
+      "about": { "kind": "tool", "category": "development", "title": "Rust",
+        "details": "The Rust compiler, its standard library and the cargo build tool.",
+        "homepage": "https://www.rust-lang.org", "license": "MIT OR Apache-2.0",
+        "adds": { "programs": ["rustc", "cargo"], "menu": [] }, "steps": {}, "keeps": ["~/.cargo"] },
+      "sources": { "rust": { "url": "https://static.rust-lang.org/dist/rust-{version}-x86_64-unknown-linux-gnu.tar.xz", "sha256": "fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210", "checksum_from": "publisher" } },
+      "needs": { "network": ["static.rust-lang.org:443"], "memory_mib": 1024, "storage_max_bytes": 2147483648, "timeout_secs": 900, "network_max_bytes": 419430400 },
+      "deps": [], "build_deps": [], "hooks": ["install", "remove"]
+    },
+    {
+      "name": "htop", "version": "3.5.3", "description": "Interactive process viewer",
+      "about": { "kind": "app", "category": "utilities", "title": "htop",
+        "details": "Shows the programs running on this computer and what they use, and lets you stop them.",
+        "homepage": "https://htop.dev", "license": "GPL-2.0-or-later",
+        "adds": { "programs": ["htop"], "menu": ["Htop"] },
+        "steps": { "build": "Compiles htop against the ncurses built just before it.", "install": "Adds htop to the applications menu, with its manual page and icon." },
+        "keeps": ["~/.config/htop"] },
+      "sources": { "htop": { "url": "https://github.com/htop-dev/htop/releases/download/{version}/htop-{version}.tar.xz", "sha256": "a8b164386494cb85bb255a415a3f5f80afe7a0c4491da5d113b3a0f951087e65", "checksum_from": "publisher" } },
+      "needs": { "network": ["github.com:443", "release-assets.githubusercontent.com:443"], "memory_mib": 2048, "storage_max_bytes": 0, "timeout_secs": 2400, "network_max_bytes": 8388608 },
+      "deps": [], "build_deps": ["ncurses"], "hooks": ["build", "install", "remove"]
+    },
+    {
+      "name": "tree", "version": "2.3.2", "description": "Lists a directory as a tree",
+      "about": { "kind": "tool", "category": "utilities", "title": "tree",
+        "details": "Prints the files and folders under a directory as an indented tree.",
+        "homepage": "https://oldmanprogrammer.net/source.php?dir=projects/tree", "license": "GPL-2.0-or-later",
+        "adds": { "programs": ["tree"], "menu": [] }, "steps": {}, "keeps": [] },
+      "sources": { "tree": { "git": "https://github.com/Old-Man-Programmer/tree", "commit": "1a41b51bea1cec4109eb9f726370449b384b4576" } },
+      "needs": { "network": ["github.com:443"], "memory_mib": 1024, "storage_max_bytes": 0, "timeout_secs": 900, "network_max_bytes": 33554432 },
+      "deps": [], "build_deps": [], "hooks": ["build", "install", "remove"]
+    },
+    {
+      "name": "nvidia-driver", "version": "580.95", "description": "The proprietary graphics driver, built for your kernel",
+      "about": { "kind": "system", "category": "drivers-codecs", "title": "NVIDIA driver",
+        "details": "NVIDIA's own driver for its graphics cards. The kernel part is built for the kernel this system runs.",
+        "homepage": "https://www.nvidia.com/en-us/drivers/unix/", "license": "proprietary",
+        "adds": { "programs": ["nvidia-smi"], "menu": [] }, "steps": {}, "keeps": [], "after_install": "restart" },
+      "sources": { "nvidia": { "url": "https://us.download.nvidia.com/XFree86/Linux-x86_64/{version}/NVIDIA-Linux-x86_64-{version}.run", "sha256": "0011223344556677889900112233445566778899001122334455667788990011", "checksum_from": "publisher" } },
+      "needs": { "network": ["us.download.nvidia.com:443"], "memory_mib": 2048, "storage_max_bytes": 2147483648, "timeout_secs": 1800, "network_max_bytes": 524288000 },
+      "deps": [], "build_deps": [], "hooks": ["build", "install", "remove"]
+    },
+    {
+      "name": "codecs", "version": "2.6.0", "description": "Plays and records the common video and audio formats",
+      "about": { "kind": "system", "category": "drivers-codecs", "title": "H.264 and AAC",
+        "details": "The H.264 video and AAC audio codecs, for the players and browsers on this system.",
+        "homepage": "https://www.openh264.org", "license": "BSD-2-Clause",
+        "adds": { "programs": [], "menu": [] }, "steps": {}, "keeps": [] },
+      "sources": { "openh264": { "git": "https://github.com/cisco/openh264", "commit": "652bdb7719f30b52b08e506645a7322ff1b2cc6f" } },
+      "needs": { "network": ["github.com:443"], "memory_mib": 2048, "storage_max_bytes": 1073741824, "timeout_secs": 1800, "network_max_bytes": 104857600 },
+      "deps": [], "build_deps": [], "hooks": ["build", "install", "remove"]
+    },
+    {
+      "name": "ncurses", "version": "6.6", "description": "Terminal screen library",
+      "about": { "kind": "library", "homepage": "https://invisible-island.net/ncurses/", "license": "X11", "steps": {} },
+      "sources": { "ncurses": { "url": "https://ftp.gnu.org/gnu/ncurses/ncurses-{version}.tar.gz", "sha256": "355b4cbbed880b0381a04c46617b7656e362585d52e9cf84a67e2009b749ff11", "checksum_from": "first-download" } },
+      "needs": { "network": ["ftp.gnu.org:443"], "memory_mib": 2048, "storage_max_bytes": 0, "timeout_secs": 2400, "network_max_bytes": 16777216 },
+      "deps": [], "build_deps": [], "hooks": ["build", "install", "remove"]
+    },
+    {
+      "name": "ffmpeg", "version": "8.0", "description": "Audio and video library",
+      "about": { "kind": "library", "homepage": "https://ffmpeg.org", "license": "LGPL-2.1-or-later", "steps": {} },
+      "sources": { "ffmpeg": { "url": "https://ffmpeg.org/releases/ffmpeg-{version}.tar.xz", "sha256": "aa11bb22cc33dd44ee55ff6600778899aa11bb22cc33dd44ee55ff6600778899", "checksum_from": "signature" } },
+      "needs": { "network": ["ffmpeg.org:443"], "memory_mib": 2048, "storage_max_bytes": 0, "timeout_secs": 3600, "network_max_bytes": 33554432 },
+      "deps": [], "build_deps": [], "hooks": ["build", "install", "remove"]
+    },
+    {
+      "name": "libass", "version": "0.17.4", "description": "Subtitle rendering library",
+      "about": { "kind": "library", "homepage": "https://github.com/libass/libass", "license": "ISC", "steps": {} },
+      "sources": { "libass": { "git": "https://github.com/libass/libass", "commit": "bbb3c7f1570a4a021e52683f3fbdf74fe492ae84" } },
+      "needs": { "network": ["github.com:443"], "memory_mib": 1024, "storage_max_bytes": 0, "timeout_secs": 1200, "network_max_bytes": 16777216 },
+      "deps": [], "build_deps": [], "hooks": ["build", "install", "remove"]
+    },
+    {
+      "name": "libplacebo", "version": "7.351.0", "description": "Video rendering library",
+      "about": { "kind": "library", "homepage": "https://libplacebo.org", "license": "LGPL-2.1-or-later", "steps": {} },
+      "sources": { "libplacebo": { "git": "https://github.com/haasn/libplacebo", "commit": "3188549fba13bbdf3a5a98de2a38c2e71f04e21e" } },
+      "needs": { "network": ["github.com:443"], "memory_mib": 1024, "storage_max_bytes": 0, "timeout_secs": 1200, "network_max_bytes": 33554432 },
+      "deps": [], "build_deps": [], "hooks": ["build", "install", "remove"]
+    }
+  ],
+  "installed": [
+    { "name": "element", "version": "1.12.3", "installed_on": "2026-10-28", "size_bytes": 429916160, "kept": [], "programs": ["element-desktop"], "menu": ["Element"] },
+    { "name": "gimp", "version": "3.0.4", "installed_on": "2026-11-02", "size_bytes": 545259520, "kept": ["3.0.2"], "kept_bytes": 220200960, "programs": ["gimp"], "menu": ["GIMP"] },
+    { "name": "rust", "version": "1.95.0", "installed_on": "2026-10-14", "size_bytes": 713031680, "kept": ["1.94.0"], "kept_bytes": 419430400, "programs": ["rustc", "cargo"], "menu": [] },
+    { "name": "thunderbird", "version": "140.4.0", "installed_on": "2026-10-12", "size_bytes": 304087040, "kept": [], "programs": ["thunderbird"], "menu": ["Thunderbird"] }
+  ],
+  "changes": {
+    "element": [
+      { "field": "Network", "before": "packages.element.io:443", "after": "packages.element.io:443", "kind": "same" },
+      { "field": "Network", "before": "", "after": "static.element.io:443", "kind": "added" },
+      { "field": "Download", "before": "up to 300 MiB", "after": "up to 400 MiB", "kind": "raised" }
+    ],
+    "gimp": []
+  }
+}
