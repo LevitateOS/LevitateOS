@@ -574,6 +574,7 @@ dependencies = [
  "distro-profile",
  "levitate-recipe",
  "libc",
+ "recab",
  "recinit",
  "reciso",
  "recqemu",
@@ -592,10 +593,18 @@ dependencies = [
 name = "distro-contract"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "distro-profile",
+ "hex",
+ "levitate-recipe",
+ "ring",
+ "semver",
  "serde",
  "serde_json",
+ "sha2",
+ "tar",
  "toml",
+ "url",
 ]
 
 [[package]]
@@ -1527,6 +1536,7 @@ version = "0.2.0"
 dependencies = [
  "anyhow",
  "clap",
+ "distro-contract",
  "distro-profile",
  "levitate-recipe",
  "libc",
@@ -1905,6 +1915,12 @@ dependencies = [
  "core-foundation-sys",
  "libc",
 ]
+
+[[package]]
+name = "semver"
+version = "1.0.28"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8a7852d02fc848982e0c167ef163aaff9cd91dc640ba85e263cb1ce46fae51cd"
 
 [[package]]
 name = "serde"

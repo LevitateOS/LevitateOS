@@ -163,3 +163,9 @@ packages = [
   # GTK look AcornOS takes; it had no cursor theme at all).
   "gvfs-smb", "gvfs-nfs", "adwaita-icon-theme",
 ]
+
+# Local development releases only. Publishing a newer release must advance sequence.
+# No production index or distribution signing key is configured.
+[release]
+channel = "development"
+sequence = 1

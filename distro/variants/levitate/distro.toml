@@ -194,3 +194,9 @@ packages = [
   "sane-backends", "sane-backends-drivers-scanners", "skanlite", "firewalld", "plasma-firewall",
   "plasma-firewall-firewalld",
 ]
+
+# Local development releases only. Publishing a newer release must advance sequence.
+# No production index or distribution signing key is configured.
+[release]
+channel = "development"
+sequence = 1
