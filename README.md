@@ -51,16 +51,17 @@ One Rhai format and one engine, [`tools/recipe`](tools/recipe), serve two consum
 | Collection | Owner and purpose |
 | --- | --- |
 | [`distro/builder/os-recipes/`](distro/builder/os-recipes/) | The OS builder: acquire base packages, build the kernel and tools, and assemble system images and live overlays. `recab` stages and activates system image updates. |
-| [`recipes/`](recipes/) | User-managed software: the application recipe catalog, separate from OS composition. This catalog has no packages yet. |
+| [`recipes/`](recipes/) | User-managed software: the application catalog, starting with ripgrep. Recipe activates packages and manages updates/removal independently of the OS image. |
 
 The split is about who consumes the output and manages its lifetime. Apps bundled
 into the desktop image are OS-owned too. Both collections use Recipe API 2 and
 Ginux; there is no separate recipe language or execution engine.
 
-Currently `recipe install` produces files in an isolated output tree and publishes
-them. Live-system activation and an independent user-package update/removal flow
-remain to be implemented in Recipe. Persistent recipe state alone does not make
-a published program available on the running system.
+`recipe install ripgrep` produces a verified package tree in Ginux and atomically
+activates it. `recipe update ripgrep` uses the current catalog's pinned version;
+`recipe remove ripgrep` deactivates it using the installed receipt. The OS builder
+uses `--no-activate` to consume outputs without changing its host. Package profiles
+and override recipes persist on `/var`; image updates remain recab's responsibility.
 
 See [`docs/package-recipe-format.md`](docs/package-recipe-format.md) for ownership
 and output semantics, and [`tools/recipe/WRITING_RECIPES.md`](tools/recipe/WRITING_RECIPES.md)
@@ -70,7 +71,7 @@ for the shared format.
 
 ```
 distro/      builder (products and ISOs), contract and variants (per-distro declarations)
-recipes/     user-managed software catalog (no packages yet)
+recipes/     user-managed software catalog (ripgrep)
 tools/       recipe, the rec* install and boot tools, ginux (upstream build domains)
 testing/     install-tests (boot/install scenarios)
 tui/         terminal apps for the live ISO and installer

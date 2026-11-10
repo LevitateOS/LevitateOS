@@ -9,23 +9,31 @@ custom readiness and acquire/build/install behavior.
 | Collection | Consumer | Output lifecycle |
 | --- | --- | --- |
 | [`distro/builder/os-recipes/`](../distro/builder/os-recipes/) | OS builder | Produces system trees, kernels, tools and live overlays. The builder assembles images; `recab` stages and activates system image updates. |
-| [`recipes/`](../recipes/) | User-managed software | The application catalog, currently empty. Making published software available on a running system and managing its updates/removal remain to be implemented in Recipe. |
+| [`recipes/`](../recipes/) | User-managed software | Publishes a `package` directory for atomic profile activation. Recipe owns install, update and removal; ripgrep is the first package. |
 
 Both use the same engine in `tools/recipe`, the same API 2 declarations and the
 same Ginux execution rules. The directories express ownership and discovery;
 they introduce no recipe type, alternate interpreter or additional permissions.
-The builder passes its OS collection as `--recipes-path`; the CLI otherwise uses
-`$RECIPE_PATH` or the user's XDG recipe directory. A path can select either kind
+The builder passes its OS collection as `--recipes-path` with `--no-activate`.
+The CLI uses an explicitly selected catalog, or the user's XDG recipe directory
+followed by `/usr/share/recipe/recipes`. A path can select either kind
 of producer explicitly. Engine examples and test fixtures stay with the engine.
 
 An app included in the desktop image belongs to the OS lifecycle. Being a
 graphical app does not automatically make it independently user-managed.
 Likewise, `deps` and `build_deps` describe dependency phases, not OS/user ownership.
 
-Today, `install` means installing into Recipe's owned output tree and publishing
-its named products. `remove` changes that tree, leaving previous publications
-intact. Neither command activates or removes software on the running system.
-`list` lists recipe declarations, not an inventory of installed applications.
+The engine's `install` hook populates an owned output tree. A directory output
+named `"package"` tells the CLI to activate its regular `bin/COMMAND` and
+`share/PATH` files, unless `--no-activate` is set. The package needs `ctx.name` and
+`ctx.version`. This uses the existing typed output contract, not a second format.
+
+`update` installs the selected recipe's pinned version before switching the
+profile; it does not fetch unpinned upstream releases. `remove` deactivates an
+installed package from its receipt without evaluating the recipe. Old inactive
+generations are retained. For output-only producers, `remove --no-activate`
+still runs the recipe hook on its isolated tree. `list` lists available recipes;
+`installed` lists active packages. See the [catalog guide](../recipes/README.md).
 
 ## Shared authoring contract
 
@@ -51,8 +59,9 @@ options, diagnostics and recovery, and the
 - Payload downloads require SHA256; Git acquisition requires a full commit and
   exact destination. Recipes declare endpoint permissions and resource bounds in
   `NEEDS`; callers may narrow them.
-- Removal changes the owned target; imported inputs and earlier publications
-  remain immutable. Current scope does not include live-system activation.
+- Recipe hooks change only their owned target; imported inputs and earlier
+  publications remain immutable. The CLI activates verified package publications
+  separately, without running host installation hooks.
 
 The [coordinator/launcher interface](ginux-recipe-interfaces.md) describes the
 execution boundary. Exact demonstrated workloads and remaining production/VM

@@ -83,12 +83,13 @@ package manager, store or bundle format (see `AGENTS.md`, "Recipe is the
 product"). Apps bundled by the variant's desktop package list are part of the
 OS image and its update lifecycle. Their producers live in
 `distro/builder/os-recipes/`. Independently user-managed software belongs in the
-top-level `recipes/` catalog, currently without packages. Both collections use
-the same Recipe format and engine.
+top-level `recipes/` catalog, starting with ripgrep. Both collections use
+the same Recipe format and engine. Recipe activates a published `package` tree
+in its persistent profile, updates it from the selected catalog's pin and removes
+it using the installed receipt. The current package layout supports commands and
+shared data files; it does not yet integrate desktop services or application menus.
 
-Recipe currently publishes isolated output trees; making those outputs available
-on the running system and managing independent updates/removal still need to be
-implemented. What the desktop also needs from Recipe: recipes for the apps
+What the desktop still needs from Recipe: recipes for the apps
 people expect, installed apps showing up in the menu with their icons and file
 associations, a notice when something has an update, and, if wanted, a
 graphical front-end beside the command line.

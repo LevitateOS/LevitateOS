@@ -23,9 +23,9 @@ Where things go:
   it needs any.
 - **Live session only**: `live-overlay.rhai`.
 - **Software the user adds later**: the top-level `recipes/` catalog, using the
-  same Recipe engine as `distro/builder/os-recipes/`. The catalog is currently
-  empty; activation and independent package updates/removal remain to be
-  implemented in Recipe (`AGENTS.md`, "Recipe is the product").
+  same Recipe engine as `distro/builder/os-recipes/`. Ripgrep is the first package
+  with activation and independent updates/removal. Desktop app catalog coverage
+  and menu/service integration remain Recipe work (`AGENTS.md`, "Recipe is the product").
 
 Marks: `[x]` done (committed, unbuilt), `[ ]` to do, **L** LevitateOS,
 **A** AcornOS, **decide** needs the user's choice first.
