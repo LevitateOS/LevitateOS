@@ -13,7 +13,8 @@ beyond the red for "this went wrong", so it takes each desktop's own style.
 
 Every page works against the stand-in in `fixtures/`. It has not been run
 against the real `recipe`, on a real desktop, or with `pkexec`. The real
-`recipe` cannot yet answer most of what is asked below.
+`recipe` installs, lists, updates and removes packages since `c815381`; the
+tables below say what the front end asks beyond that.
 
 ## Build and run from a checkout
 
@@ -66,16 +67,17 @@ Reads, as the desktop user, JSON on stdout with `"schema_version": 1`:
 | Command | Answer | In `recipe` today |
 |---|---|---|
 | `recipe list --json` | the source's name and every recipe: `name`, `version`, `description`, `about`, `sources`, `needs`, `deps`, `build_deps`, `hooks` | `list` prints names as text; `ABOUT` and `SOURCES` are the design in `docs/recipe-front-end-format.md` |
-| `recipe installed --json` | what is on this system: version, date, size, the earlier version kept, programs and menu entries | no such list exists |
-| `recipe updates --json` | for each installed recipe with a newer version: from, to, and what changed in what it may use | `recipe diff` compares two recipe files; nothing keeps the installed one |
+| `recipe installed --json` | `packages`: each one's `name`, `version`, `recipe` and `files`, as today; and asked for: `installed_on`, `size_bytes`, `kept`, `kept_bytes` | exists with the first four fields. The front end takes programs from the `bin/` files and menu entries from `share/applications/` |
+| `recipe updates --json` | for each installed recipe with a newer version: from, to, and what changed in what it may use | no such command. `recipe update NAME` updates one; `recipe diff` compares two recipe files |
 
 Changes, through the root helper, with events on stderr:
 
 | Command | In `recipe` today |
 |---|---|
-| `recipe install NAME --machine-events` | builds into Recipe's own output folder; does not put it on the system |
-| `recipe remove NAME [--clear-kept] --machine-events` | removes from that folder only |
-| `recipe go-back NAME --machine-events` | no such command |
+| `recipe install NAME --machine-events` | exists: runs the recipe in Ginux and activates its `package` output |
+| `recipe update NAME --machine-events` | exists |
+| `recipe remove NAME [--clear-kept] --machine-events` | exists, by the receipt; no `--clear-kept` |
+| `recipe go-back NAME --machine-events` | no such command; earlier profile generations are kept |
 
 Events are one JSON object per line. The front end reads these; any other
 line is shown as output.
@@ -83,7 +85,7 @@ line is shown as output.
 | Event | Fields |
 |---|---|
 | `plan` | `recipes`: each `name` and its `steps`, in the order they will run |
-| `step` | `recipe`, `hook`, `status` (`running`, `done`, `skipped`, `failed`). Today's `recipe-hook` event is read the same way |
+| `step` | `recipe`, `hook`, `status` (`running`, `done`, `skipped`, `failed`). Today's `recipe-hook` event is read the same way, and is the only event `recipe` sends today |
 | `fetch` | `recipe`, `source`, `bytes`, `total` |
 | `progress` | `recipe`, `done`, `total` |
 | `say` | `recipe`, `text` |

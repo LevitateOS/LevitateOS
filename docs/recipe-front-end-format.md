@@ -5,9 +5,14 @@ a recipe is, where it comes from, what it will do and how far it has got,
 without running it and without guessing. Nothing below is built.
 
 It covers the `.rhai` file, the few files beside it, and what `recipe` prints
-for a front end. It does not cover putting software onto the running system,
-running Recipe without root, or how an agent writes a recipe; each needs its
-own design (see "Not in this design").
+for a front end. It does not cover running Recipe without root or how an agent
+writes a recipe; each needs its own design (see "Not in this design").
+
+Corrected the same day: while this was being written, Recipe gained
+activation (`tools/recipe` `c815381`): `install` puts a recipe's `package`
+output onto the system, and `installed`, `update` and `remove` work from a
+receipt. Change 3 below now builds on that instead of proposing its own
+output shape.
 
 ## What a recipe can say today
 
@@ -24,6 +29,9 @@ While running, with `--machine-events`: one JSON line when a hook starts,
 finishes or is skipped (`recipe-hook`, with the recipe, the hook and a fixed
 sentence per hook). Nothing inside a hook is reported except the commands' own
 output.
+
+About what is installed, `recipe installed` gives each package's name,
+version, recipe path and list of files, and nothing else.
 
 Everything else the draft of the front end shows is absent: the category, the
 kind of thing it is, a longer text, the home page, the licence, an icon, where
@@ -152,36 +160,33 @@ const SOURCES = #{
 This removes the code where the trial recipes spent about a fifth of their lines
 and their one hack (calling `sha256sum` to compare a checksum in a check).
 
-## Change 3: one shape for what a recipe produces
+## Change 3: measure what a recipe produces
 
-In the first trial the recipe put the program at `usr/bin/tree` and declared it
-as an output named `program`. Recipe published a file called `program`: the
-path was lost.
-
-For `app`, `tool` and `system`:
+The shape exists (`recipes/README.md`): a public recipe publishes one directory
+output named `package`, holding `bin/COMMAND` and `share/PATH` files, and
+`install` activates it into the profile. Recipe already refuses symlinks,
+special files and setuid files in it, and records the files in the receipt.
 
 ```rhai
-const NEEDS = #{ outputs: #{ root: "directory" }, ... };
+const NEEDS = #{ outputs: #{ "package": "directory" }, ... };
 ```
 
-- `root` is a tree shaped like the system from `/`: `usr/bin`,
-  `usr/share/applications`, `usr/share/icons`, `usr/share/man`, `usr/lib`,
-  and `etc` for defaults. Nothing else at the top.
-- After a successful install Recipe measures `root` and puts the result in the
-  final JSON: the programs in `usr/bin`, each menu entry (name, icon, file
-  types, from the `.desktop` file), the size and the file count.
+What the front end still needs on top of that:
+
+- After a successful install Recipe measures `package` and keeps the result
+  in the receipt: each menu entry (name, icon and file types, from
+  `share/applications/*.desktop`), the size, and the date. Programs are
+  already there as the `bin/` files.
 - `ABOUT.adds` is checked against that. A recipe that promised `htop` and a
   menu entry `Htop` and produced something else fails.
-- `validate`-time and install-time refusals: a file outside the allowed tops, a
-  setuid file, a menu entry whose program is not in the tree.
+- A menu entry whose program is not in the tree is refused.
+- Desktop programs need more than `bin` and `share` on `PATH`: the profile's
+  `share` has to be where the menus, icon themes and file-type database look
+  (`XDG_DATA_DIRS`), and their caches refreshed after a change.
 
 For `library`: `sdk` (headers and libraries to build against, as the `ncurses`
-trial recipe does), and `root` as well if programs need its files when they
-run.
-
-How `root` reaches the running system is the activation design, not this one.
-This change only makes sure there is one thing to activate and that the front
-end can say what is in it.
+trial recipe does), never activated, and `package` as well if programs need
+its files when they run.
 
 ## Change 4: events while it runs
 
@@ -266,7 +271,7 @@ const SOURCES = #{
 };
 
 const NEEDS = #{
-    outputs: #{ root: "directory" },
+    outputs: #{ "package": "directory" },
     network: ["github.com:443", "release-assets.githubusercontent.com:443"],
     memory_mib: 2048,
     timeout_secs: 2400,
@@ -279,7 +284,7 @@ let ctx = #{
     name: "htop",
     version: "3.5.3",
     description: "Interactive process viewer",
-    root: join_path(RUNTIME.paths.output, "root"),
+    package: join_path(RUNTIME.paths.output, "package"),
 };
 
 fn is_built(ctx) {
@@ -305,21 +310,21 @@ fn build(ctx) {
 }
 
 fn is_installed(ctx) {
-    if !is_file(join_path(ctx.root, "usr/bin/htop")) {
+    if !is_file(join_path(ctx.package, "bin/htop")) {
         return needs_work(ctx, "the htop program is not in the output");
     }
-    ctx.outputs.root = ctx.root;
+    ctx.outputs.package = ctx.package;
     ready(ctx)
 }
 
 fn install(ctx) {
-    exec_checked("make", ["install", "DESTDIR=" + ctx.root], #{ cwd: unpack(ctx, "htop") });
-    ctx.outputs.root = ctx.root;
+    exec_checked("make", ["install", "prefix=" + ctx.package], #{ cwd: unpack(ctx, "htop") });
+    ctx.outputs.package = ctx.package;
     ctx
 }
 
 fn remove(ctx) {
-    exec_checked("rm", ["-rf", ctx.root]);
+    exec_checked("rm", ["-rf", ctx.package]);
     ctx.outputs = #{};
     ctx
 }
@@ -352,7 +357,7 @@ fn remove(ctx) {
   a `homepage` that is not `https`.
 - `details` longer than 600 characters or holding markup.
 - A note in `steps` for a hook the file does not define.
-- `kind` `app` without `<name>.svg`; `app` or `tool` without a `root` output.
+- `kind` `app` without `<name>.svg`; `app` or `tool` without a `package` output.
 - A download or checkout in a hook while `SOURCES` is absent.
 - A source whose host is not in `NEEDS.network`.
 - `first-download` on a source of a `system` recipe (drivers and codecs need a
@@ -362,8 +367,8 @@ fn remove(ctx) {
 
 1. `ABOUT`: the reader, `info --json`, `list --json`, the `validate` rules.
    Changes no behaviour; the front end can be built against it at once.
-2. The `root` shape, the measurement in the final JSON, the check of
-   `ABOUT.adds`.
+2. The measurement of `package` kept in the receipt, the check of
+   `ABOUT.adds`, and the profile's `share` where the desktop looks.
 3. `SOURCES`: Recipe's own fetch, `source` and `unpack`, the refusal of
    undeclared addresses, `{version}`.
 4. The events: `plan`, `fetch`, `say`, `progress`, the fuller final error.
@@ -390,8 +395,9 @@ Step 3 changes what a recipe may do; it is where the number would go to 3
 
 ## Not in this design
 
-- Putting `root` onto the running system, the list of what is installed, going
-  back a version (activation).
+- Going back a version. Activation, the installed list, update and remove
+  exist since `c815381`; profile generations are kept but no command returns
+  to one.
 - Running Recipe for a desktop user without handing them root.
 - Several Git repositories as sources, and what happens when two hold the same
   name.

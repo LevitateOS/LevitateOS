@@ -40,6 +40,7 @@ public:
     bool load(Catalog *into, QString *error);
 
     Run *install(const QString &name);
+    Run *update(const QString &name);
     Run *remove(const QString &name, bool clearKept);
     Run *goBack(const QString &name);
 

@@ -180,8 +180,9 @@ Found in the same trial, to be decided separately:
   build folder away, and reports a missing `acquire` or `build` hook only at
   run time. Every run costs about a minute and a half before the recipe
   starts (measured with a debug build of `recipe`).
-- Recipe needs root for every run and does not put anything onto the running
-  system.
+- Recipe needs root for every run. (Putting a package onto the running system
+  exists since `tools/recipe` `c815381`, the same day: `install` activates a
+  `package` output, with `installed`, `update` and `remove`.)
 - The design for what recipe files should declare for the front end is
   `docs/recipe-front-end-format.md` (not built, not committed when this was
   written).

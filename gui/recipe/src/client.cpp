@@ -73,7 +73,8 @@ QJsonObject RecipeClient::query(const QStringList &arguments, QString *error)
         return {};
     }
     const QJsonObject object = QJsonDocument::fromJson(process.readAllStandardOutput()).object();
-    if (object["schema_version"].toInt() != 1) {
+    // `installed` carries no version of its own yet; an answer that names one must name ours.
+    if (object.contains("schema_version") && object["schema_version"].toInt() != 1) {
         *error = tr("`%1 %2` answered in a form this program does not know (schema %3)")
                      .arg(program_, arguments.join(' '))
                      .arg(object["schema_version"].toInt());
@@ -96,7 +97,7 @@ bool RecipeClient::load(Catalog *into, QString *error)
     const QJsonObject installed = query({"installed", "--json"}, error);
     if (installed.isEmpty())
         return false;
-    for (const QJsonValue &value : installed["installed"].toArray()) {
+    for (const QJsonValue &value : installed["packages"].toArray()) {
         const QJsonObject o = value.toObject();
         InstalledItem item;
         item.name = o["name"].toString();
@@ -105,10 +106,14 @@ bool RecipeClient::load(Catalog *into, QString *error)
         item.installedOn = QDate::fromString(o["installed_on"].toString(), Qt::ISODate);
         item.sizeBytes = o["size_bytes"].toInteger();
         item.keptBytes = o["kept_bytes"].toInteger();
-        for (const QJsonValue &program : o["programs"].toArray())
-            item.programs << program.toString();
-        for (const QJsonValue &entry : o["menu"].toArray())
-            item.menu << entry.toString();
+        // What it put on the system, from the receipt's own list of files.
+        for (const QJsonValue &file : o["files"].toArray()) {
+            const QString path = file.toString();
+            if (path.startsWith("bin/"))
+                item.programs << path.mid(4);
+            else if (path.startsWith("share/applications/") && path.endsWith(".desktop"))
+                item.menu << path.mid(19).chopped(8);
+        }
         fresh.installed << item;
     }
 
@@ -139,6 +144,11 @@ Run *RecipeClient::change(const QStringList &arguments)
 Run *RecipeClient::install(const QString &name)
 {
     return change({"install", name, "--machine-events"});
+}
+
+Run *RecipeClient::update(const QString &name)
+{
+    return change({"update", name, "--machine-events"});
 }
 
 Run *RecipeClient::remove(const QString &name, bool clearKept)

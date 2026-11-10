@@ -201,7 +201,7 @@ void Window::startInstall(const QString &name)
         stack_->setCurrentWidget(runPage_);
         return;
     }
-    run_ = client_.install(name);
+    run_ = catalog_.installedItem(name) ? client_.update(name) : client_.install(name);
     runPage_->begin(catalog_, name, run_);
     stack_->setCurrentWidget(runPage_);
     run_->start();

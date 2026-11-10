@@ -115,9 +115,11 @@ def install(name):
     about = item["about"].get("adds", {})
     entry = {
         "name": name, "version": item["version"],
+        "recipe": "/usr/share/recipe/recipes/%s.rhai" % name,
+        "files": ["bin/" + program for program in about.get("programs", [])]
+                 + ["share/applications/%s.desktop" % name for _ in about.get("menu", [])[:1]],
         "installed_on": datetime.date.today().isoformat(),
         "size_bytes": 62914560, "kept": [],
-        "programs": about.get("programs", []), "menu": about.get("menu", []),
     }
     if current:
         entry["kept"] = [current["version"]]
@@ -170,10 +172,11 @@ def main(args):
     if command == "list":
         print(json.dumps({"schema_version": 1, "source": CATALOG["source"], "recipes": CATALOG["recipes"]}))
     elif command == "installed":
-        print(json.dumps({"schema_version": 1, "installed": installed()}))
+        # The shape `recipe installed` has today, plus the fields the front end asks for.
+        print(json.dumps({"packages": installed(), "profile": "/var/lib/recipe/profile"}))
     elif command == "updates":
         print(json.dumps({"schema_version": 1, "updates": updates()}))
-    elif command == "install" and len(words) == 2:
+    elif command in ("install", "update") and len(words) == 2:
         install(words[1])
     elif command == "remove" and len(words) == 2:
         remove(words[1], "--clear-kept" in args)
