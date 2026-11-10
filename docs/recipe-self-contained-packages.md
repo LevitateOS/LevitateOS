@@ -1,10 +1,11 @@
-# Self-contained packages: design (2026-11-10, accepted, first trial run)
+# Self-contained packages: design (2026-11-10, accepted, two trials run)
 
 How a program Recipe builds finds its shared libraries when it runs, so that
 libraries need no agreement between packages, one catalog serves both
 distributions, and keeping the catalog up is mechanical. The core was tried
-once on a terminal program ("The first trial"); the automatic form described
-here is not built, and "Open questions" says what is still to settle.
+twice on a terminal program ("The first trial", "The second trial"); the
+automatic form described here is not built, and "Open questions" says what
+is still to settle.
 
 It adds to [the format design](recipe-front-end-format.md), which defines the
 `package` output, and to [the sources design](recipe-sources.md), which
@@ -82,6 +83,13 @@ loader and libraries, as a path written into the program file. It then starts
 like any other program: no wrapper script, no environment variable, and it
 sees its own real path.
 
+The path is written in after the build, not at the link (the trials showed
+why). The link only reserves the room: every program and library is linked
+with one long stand-in for its library folder. Afterwards Recipe writes the
+real library folder and the real loader's path into that room. Nothing in a
+file has to move, so Recipe does it itself in a few lines and no tool is
+needed for it.
+
 ## 1. Where libraries come from at build time
 
 - **The build image is the base set.** What a program links against from the
@@ -109,6 +117,8 @@ sandbox, Recipe does this itself. No recipe writes code for it.
    copied files load in turn.
 4. Write into every program and library the paths it will have once
    activated: its loader, and `lib/` as the only place to look for libraries.
+   They go into the room the stand-in reserved at the link. A program that
+   was linked without it is refused, with the flags to use.
 5. Refuse a program that still needs something not found, naming it. The
    install fails; the active version stays.
 6. Record what was carried: each file, the recipe or image it came from, and
@@ -205,7 +215,6 @@ path is one known case), the image provides both paths.
 |---|---|
 | `tools/recipe` | `lib/` in the package tree; `RUNTIME.paths.prefix`; the carry step in the worker; `CARRY`; carried files in the receipt; the build key includes the prefix |
 | `tools/recipe` `src/system.rs`, `tools/recab` | a folder per package for `lib/` on a prepared system, and its receipt's record of what is carried |
-| the build image | a tool to rewrite a program's loader and library paths, if Recipe does not do it itself (open question 2) |
 | `recipes` | library recipes publishing `sdk`; toolchain recipes publishing `tools`; `kind` on both |
 | `distro/contract`, `distro/builder` | the host contract and what each image adds to meet it |
 | `gui/recipe` | hide libraries and toolchains; show what a package carries |
@@ -216,8 +225,9 @@ path is one known case), the image provides both paths.
    existing recipes. `lib/` is built; the prefix is not.
 2. The carry step, tried on a small C program with one library (`htop` and
    `ncurses`), run on both distributions. Tried as helpers a recipe calls;
-   see "The first trial". Still to do: the automatic step, writing the place
-   into files after the build, and a run on booted systems.
+   see the two trials. Writing the place into files after the build is
+   done. Still to do: Recipe adding the link flags and running the step
+   itself, and a run on booted systems.
 3. The receipt's record of what is carried, and update on a changed image.
 4. The host contract in `distro/contract`.
 5. `CARRY`, tried on one real desktop program with a toolkit. This is the
@@ -254,7 +264,7 @@ What was built is the trial's form of steps 1 and 2, not the design's:
 | `lib/` in the package tree | built (`tools/recipe` `src/packages.rs`) |
 | `RUNTIME.paths.prefix` | not built; the folder was given with `--define PREFIX=` |
 | Recipe runs the carry step itself after `install` | the recipe calls `carry_libraries(package, prefix, search)` |
-| Recipe tells every link the package's place | the recipe passes `carry_link_flags(prefix)` to the final link |
+| Recipe tells every link the package's place | first trial: the recipe passes flags to the final link only. Second trial: the recipe passes `carry_link_flags()` to every link, from `configure` on |
 | what was carried is in the receipt | only as files of the package |
 
 `RUNTIME` was left alone on purpose: it is part of what every kept build is
@@ -282,16 +292,57 @@ What it found:
    Whether that holds for name lookups and locales (open question 6) was not
    exercised.
 
+## The second trial (2026-11-11)
+
+The step the first trial showed to be missing: writing a program's place
+into its files after the build.
+
+The first form failed, and that settled how it has to work. Programs were
+linked for a stand-in folder inside the sandbox holding a copy of the loader,
+to be overwritten afterwards. `configure` stopped again. A probe recipe
+showed why: **the sandbox starts a program only with the build image's own
+loader.** A loader anywhere else (under `/work`, under `/out`, by any name,
+with any mode) gives "Operation not supported"; a symlink to the image's
+loader gives "required file not found". The same loader run as a command
+works.
+
+The form that works leaves the loader alone at the link:
+
+- Every link gets one addition, a 512-character stand-in library folder
+  (`carry_link_flags()`). The program keeps the image's loader, so it runs in
+  the sandbox like any other. `configure`'s test programs ran.
+- The carry step writes the real library folder at the end of the stand-in's
+  room and the real loader's path at its start, and points the program's two
+  references there. The room is in a part of the file that is loaded, which
+  the loader needs to read its own name.
+- A package's folder may be 220 characters at most, so both always fit.
+
+What it showed, with the same `htop` and shared `ncurses`:
+
+- Built from `configure` on with the stand-in, then settled: `htop` names the
+  loader and `lib/` of its own package folder.
+- It runs on this computer and inside the AcornOS root, loading all four
+  files from its own package; its full screen drew in the AcornOS root.
+- A two-line C program went the same way in nine seconds, which is how the
+  step was worked out (`.artifacts/recipe-carry-trial/quick`).
+
+What this form cannot do:
+
+- A program somebody else linked (a prebuilt release that is not static) has
+  no reserved room. It needs its files rebuilt around a longer path, which is
+  the larger job this form avoids; not designed.
+- A build that adds library folders of its own to a program is refused, not
+  repaired.
+
 ## Open questions
 
 1. **Does a toolkit program work this way on both distributions?** Not tried.
    Toolkits open plug-ins by name, read data from folders they work out from
    their own location, and talk to the desktop. Proposed: step 5 above, on a
    Qt program, before any more of the catalog is written.
-2. **Who rewrites the program files.** The trial showed it has to happen
-   after the build (finding 1). Proposed: a small existing tool added to the
-   build image and run by Recipe in the sandbox, where the files are already
-   untrusted input. The other choice is doing it in Recipe itself.
+2. **Who rewrites the program files.** Settled by the second trial: Recipe
+   itself, in the sandbox, into room reserved at the link. No tool is added
+   to the build image. Open again only for programs linked elsewhere.
 3. **Graphics drivers.** The open drivers are libraries like any other and
    can be carried. NVIDIA's own driver cannot: it must match the kernel
    module on the host, and it exists for glibc only. Proposed: carried
