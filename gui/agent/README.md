@@ -139,6 +139,29 @@ process left (killed hard) it is listed as `stopped`.
   is null when it could not be asked. A chosen program that is not `codex` is
   listed too.
 
+## Settings and sign-in
+
+The helper is the only writer of `agent.json`; the Settings page of the apps
+(`gui/kit/settings.*`) asks it.
+
+- `levitate-agent --settings` prints `{"agent": "...", "run_commands": "ask" |
+  "allowed", "file": "<path of agent.json>"}`: what is in force, defaults (and
+  `LEVITATE_AGENT`) included; `file` is where it would be written, whether or not
+  it exists yet.
+- `levitate-agent --set agent=codex`, `--set agent=/absolute/path` or `--set
+  run_commands=ask|allowed` checks the value (a path must be an existing
+  executable file), writes `agent.json` keeping its other keys, and prints the new
+  settings as `--settings` does. A refused value exits 1, writes nothing, and says
+  one sentence on standard error.
+- `levitate-agent --sign-in` and `--sign-out` run `codex login` and `codex logout`
+  (the program of `LEVITATE_AGENT_CODEX`, else `codex`) and pass what they print
+  through, line by line, on standard error (where the apps read progress; standard
+  output stays for answers). `codex login` prints an address to open and waits for
+  it. The exit code is Codex's. Stopping the helper (SIGTERM) stops Codex too (exit
+  143). Codex 0.167 has both commands (`codex login --help`, `codex logout --help`).
+  When the chosen agent is another program, both exit 1, saying that program
+  signs in by itself; when Codex cannot be started they say it is not installed.
+
 ## Build and check
 
 ```sh
@@ -150,12 +173,16 @@ gui/agent/fixtures/story
 It is also part of `gui/CMakeLists.txt`; `cmake --install` puts it in `bin`.
 
 `fixtures/codex` is a stand-in for `codex`: it answers `--version`, `login
-status`, `exec` and `exec resume`, and prints the JSON lines in the shapes of
+status`, `login` and `logout` (they keep whether it is signed in in
+`$HOME/.standin-codex-signed`, which `login status` follows; `login` prints two lines
+including an address and ends after `LEVITATE_STANDIN_LOGIN_SECONDS`, default 0.3;
+`LEVITATE_STANDIN_LOGIN_FAILS` makes it fail), `exec` and `exec resume`, and prints the JSON lines in the shapes of
 `codex-rs/exec/src/exec_events.rs`, by story (`LEVITATE_STANDIN_STORY`).
 `fixtures/story` runs levitate-agent through every story (plain, asks,
 administrator approved and refused, a plain command, a command with a pipe,
 failing, signed out, dying, stopping with SIGTERM, an agent that speaks the
-protocol itself), also `--list`, `--show` and `--status`, in a scratch
+protocol itself), also `--list`, `--show`, `--status`, `--settings`, each `--set` (accepted and
+refused), `--sign-in` and `--sign-out`, in a scratch
 folder, and prints a line for each expectation that does not hold. It ends with
 `all flows ended where they should` or the opposite, and the exit code agrees.
 `fixtures/records STATE-FOLDER` fills a state folder with four runs (done with

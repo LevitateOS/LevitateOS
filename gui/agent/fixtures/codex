@@ -8,6 +8,12 @@ LEVITATE_STANDIN_STORY (see the story list below); every call is appended to
 LEVITATE_STANDIN_LOG as one JSON line (arguments, prompt, which turn), so the
 check can see what levitate-agent really sent.
 
+`login` and `logout` keep whether it is signed in in `$HOME/.standin-codex-signed`
+("in" or "out"); `login status` follows that file, and without it the old
+rule holds (signed in unless LEVITATE_STANDIN_SIGNED_OUT is set). Like the real
+`codex login`, `login` prints an address and then ends. `LEVITATE_STANDIN_LOGIN_FAILS`
+makes it end without signing in.
+
 Stories: plain, asks, administrator, run, shell, fails, signed-out, dies, hang.
 The turn is counted in a file next to the log, one count for the session.
 """
@@ -121,13 +127,38 @@ def story(turn, prompt):
     end()
 
 
+def signed_file():
+    return os.path.join(os.path.expanduser("~"), ".standin-codex-signed")
+
+
+def signed_in():
+    try:
+        return open(signed_file()).read().strip() == "in"
+    except OSError:
+        return not os.environ.get("LEVITATE_STANDIN_SIGNED_OUT")
+
+
 def main():
     args = sys.argv[1:]
     if args[:1] == ["--version"]:
         print("codex-cli 0.0.0-standin")
         return
+    if args[:1] == ["login"] and args[1:2] != ["status"]:
+        print("Starting a local login server on http://localhost:1455.", flush=True)
+        print("If your browser did not open, go to https://auth.standin.invalid/oauth/authorize?state=standin", flush=True)
+        if os.environ.get("LEVITATE_STANDIN_LOGIN_FAILS"):
+            sys.stderr.write("Error logging in: the sign-in was not completed\n")
+            sys.exit(1)
+        time.sleep(float(os.environ.get("LEVITATE_STANDIN_LOGIN_SECONDS", "0.3")))
+        open(signed_file(), "w").write("in")
+        print("Successfully logged in")
+        return
+    if args[:1] == ["logout"]:
+        open(signed_file(), "w").write("out")
+        print("Successfully logged out")
+        return
     if args[:2] == ["login", "status"]:
-        if os.environ.get("LEVITATE_STANDIN_SIGNED_OUT"):
+        if not signed_in():
             print("Not logged in")
             sys.exit(1)
         print("Logged in using the stand-in")

@@ -12,14 +12,14 @@ what recab says may be done.
 Qt 6 Widgets, C++20, CMake. Widgets shared with `gui/recipe` and `gui/disk` are in `gui/kit`.
 
 The window is the shared frame from `gui/kit/README.md`: a rail (the three apps;
-"Overview"; "Activity" below), the pages, a strip, and a status line. The
+"Overview"; "Activity" and "Settings" below), the pages, a strip, and a status line. The
 Ask, clash, work and problem pages are shown in the same place and the rail
 keeps Overview marked. The strip ("The next system holds N changes." and
 "Finish and restart…", which goes to Overview) shows on every page but Overview,
 and on Activity, while the next system holds changes. Activity lists the agent's
 runs from all three apps. The status line has what was read and when, with "Read
 again", and the agent (`Agent: Codex, signed in` when `RECAB_GUI_AGENT` is
-`levitate-agent`; its file name for a stand-in). Default window size 1100 by 700.
+`levitate-agent`; its file name for a stand-in). Window size 1100 by 700 the first time, then the size it had when it closed (`rememberWindowSize` in `gui/kit`; the picture modes always use 1100 by 700).
 
 ## State (2026-11-10)
 
@@ -107,7 +107,7 @@ export RECAB_GUI_RECORDS=$PWD/gui/agent/fixtures/records
 export LEVITATE_ACTIVITY_AGENT=$PWD/.artifacts/agent/build/levitate-agent
 ```
 
-Without them the story says what is missing and fails. The pictures `a-*`
+Without them the story says what is missing and fails. The pictures `s0-*` to `s14-*` are Settings: as first read, "Allowed", signing out (and the question first), a sign in that fails, signing in (the address Codex printed), another program, back to Codex, a refused value, "Try it" and the run in Activity, a helper that cannot be asked. The story sets `HOME`, `XDG_CONFIG_HOME`, `XDG_STATE_HOME` and `LEVITATE_AGENT_CODEX` itself for that part and puts them back. The pictures `a-*`
 (`r2c-*` in the real story) are Activity: the list, a done run, a run that
 waits, this window's own run, the strip on Activity. The other pictures show
 Overview and the pages inside the frame.
@@ -250,7 +250,7 @@ allowed to run, and whether it runs as the person or as root are not decided.
   it; Activity says so and offers "Go to it" for this window's own run.
 - The frame, Activity and the strip were checked against stand-ins in the
   picture modes, offscreen; not on a real desktop, and not with a real Codex.
-- The rail has no Settings or Help: they would lead nowhere yet.
+- The rail has no Help: that page would lead nowhere yet. Settings is the frame's own page (`gui/kit/README.md`); the story checks it with the stand-in Codex, in a settings folder of its own under the picture folder, so the person's `agent.json` is never read or written.
 
 - A run on a real A/B system: the mapping above was written from recab's
   generated types and checked against a stand-in of the same shape, not

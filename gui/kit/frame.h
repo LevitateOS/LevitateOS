@@ -18,6 +18,7 @@ class QStackedWidget;
 class QTimer;
 class RailButton;
 class Run;
+class SettingsPage;
 class Strip;
 
 class Frame : public QWidget {
@@ -54,6 +55,10 @@ public:
     QString selected() const { return selected_; }
     bool activityShown() const;
     static QString activityKey() { return QStringLiteral("activity"); }
+    // Settings is the frame's too: the rail shows it under Activity, and choosing it
+    // does not emit `chosen`, since there is nothing for the app to switch to.
+    bool settingsShown() const;
+    static QString settingsKey() { return QStringLiteral("settings"); }
 
     // ---- The strip: "The next system holds N changes." with a button that
     // finishes it. The titles are the changes' own ("htop, installed"); an
@@ -90,6 +95,8 @@ public:
 
     // ---- Activity, which the frame owns.
     ActivityPage *activity() const { return activity_; }
+    // ---- Settings, which the frame owns as well.
+    SettingsPage *settings() const { return settings_; }
     // The agent process this window started and waits for, or 0. Activity
     // offers "Go to it" for that run; setting 0 (the run ended) reads again.
     void setOwnRun(qint64 pid);
@@ -118,6 +125,7 @@ private:
     QString selected_, followed_;
     QStackedWidget *stack_;
     ActivityPage *activity_;
+    SettingsPage *settings_;
     QWidget *appsRow_;
     QMap<QString, RailButton *> entries_;
     QList<RailButton *> order_;
@@ -129,6 +137,6 @@ private:
     QTimer *flashTimer_;
     QString statusWords_, flashWords_, agentName_, agentNote_, agentProgram_;
     Run *asking_ = nullptr;
-    bool stripAllowed_ = true;
+    bool stripAllowed_ = true, askAgain_ = false;
     qint64 ownRun_ = 0;
 };

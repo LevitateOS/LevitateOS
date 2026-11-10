@@ -3,6 +3,7 @@
 #include "activity.h"
 #include "parts.h"
 #include "run.h"
+#include "settings.h"
 
 #include <QAbstractButton>
 #include <QFileInfo>
@@ -32,6 +33,12 @@ QColor shade(const QPalette &palette, qreal by)
     return QColor::fromRgbF(ground.redF() + (ink.redF() - ground.redF()) * by,
                             ground.greenF() + (ink.greenF() - ground.greenF()) * by,
                             ground.blueF() + (ink.blueF() - ground.blueF()) * by);
+}
+
+// The pages the frame owns; the app's `follow` leaves them showing.
+bool sharedKey(const QString &key)
+{
+    return key == QLatin1String("activity") || key == QLatin1String("settings");
 }
 
 } // namespace
@@ -324,6 +331,13 @@ Frame::Frame(App app, QWidget *parent)
     railColumn->addWidget(activity);
     connect(activity, &QAbstractButton::clicked, this, [this] { choose(activityKey()); });
     connect(activity, &RailButton::stepped, this, [this, activity](int by) { step(activity, by); });
+    auto *settings = new RailButton(RailButton::Entry, tr("Settings"));
+    settings->setAccessibleDescription(tr("The agent and the windows, the same in all three apps"));
+    entries_.insert(settingsKey(), settings);
+    order_ << settings;
+    railColumn->addWidget(settings);
+    connect(settings, &QAbstractButton::clicked, this, [this] { choose(settingsKey()); });
+    connect(settings, &RailButton::stepped, this, [this, settings](int by) { step(settings, by); });
     shell->addWidget(left);
     shell->addWidget(new Divider);
 
@@ -334,6 +348,8 @@ Frame::Frame(App app, QWidget *parent)
     activity_ = new ActivityPage(QString::fromLatin1(apps[app].name));
     stack_->addWidget(new QWidget); // the app's content takes this place
     stack_->addWidget(activity_);
+    settings_ = new SettingsPage(QString::fromLatin1(apps[app].name));
+    stack_->addWidget(settings_);
     middle->addWidget(stack_, 1);
     strip_ = new Strip;
     strip_->hide();
@@ -377,6 +393,9 @@ Frame::Frame(App app, QWidget *parent)
         setBadge(activityKey(), active, waits);
     });
     connect(activity_, &ActivityPage::goToRun, this, &Frame::goToRun);
+    // A change in Settings shows in the status line at once; "Try it" is a run for Activity.
+    connect(settings_, &SettingsPage::changed, this, &Frame::readAgentStatus);
+    connect(settings_, &SettingsPage::ran, activity_, &ActivityPage::read);
     // The rail's badge is true from the start, not only once Activity was opened.
     QTimer::singleShot(0, activity_, &ActivityPage::read);
 }
@@ -387,7 +406,7 @@ void Frame::setContent(QWidget *content)
     stack_->removeWidget(old);
     old->deleteLater();
     stack_->insertWidget(0, content);
-    if (selected_ != activityKey())
+    if (!sharedKey(selected_))
         stack_->setCurrentIndex(0);
 }
 
@@ -395,8 +414,8 @@ void Frame::addEntry(const QString &key, const QString &title)
 {
     auto *button = new RailButton(RailButton::Entry, title);
     entries_.insert(key, button);
-    // Before Activity, which is last in the order.
-    order_.insert(order_.size() - 1, button);
+    // Before the shared entries (Activity, Settings), which are last in the order.
+    order_.insert(order_.size() - 2, button);
     static_cast<QVBoxLayout *>(appEntries_->layout())->addWidget(button);
     connect(button, &QAbstractButton::clicked, this, [this, key] { choose(key); });
     connect(button, &RailButton::stepped, this, [this, button](int by) { step(button, by); });
@@ -435,21 +454,26 @@ void Frame::select(const QString &key)
         return;
     followed_ = key;
     mark(key);
-    stack_->setCurrentIndex(key == activityKey() ? 1 : 0);
+    stack_->setCurrentIndex(key == activityKey() ? 1 : key == settingsKey() ? 2 : 0);
 }
 
 void Frame::follow(const QString &key)
 {
-    if (!entries_.contains(key) || key == activityKey())
+    if (!entries_.contains(key) || sharedKey(key))
         return;
     followed_ = key;
-    if (selected_ != activityKey())
+    if (!sharedKey(selected_))
         mark(key);
 }
 
 bool Frame::activityShown() const
 {
     return selected_ == activityKey();
+}
+
+bool Frame::settingsShown() const
+{
+    return selected_ == settingsKey();
 }
 
 // The person chose an entry: show what it stands for and say so.
@@ -459,6 +483,11 @@ void Frame::choose(const QString &key)
         mark(key);
         stack_->setCurrentIndex(1);
         activity_->read();
+    } else if (key == settingsKey()) {
+        mark(key);
+        stack_->setCurrentIndex(2);
+        settings_->read();
+        return; // the frame's own page: the app has nothing to switch to
     } else {
         select(key);
     }
@@ -609,8 +638,10 @@ void Frame::readAgentStatus()
         showAgent(tr("Agent: %1").arg(name));
         return;
     }
-    if (asking_)
+    if (asking_) {
+        askAgain_ = true; // what it reports may have changed since the question went out
         return;
+    }
     if (agentName_.isEmpty())
         showAgent(tr("Agent: asking…"));
     asking_ = new Run(agentProgram_, {"--status"}, this);
@@ -618,6 +649,11 @@ void Frame::readAgentStatus()
         Run *run = asking_;
         asking_ = nullptr;
         run->deleteLater();
+        if (askAgain_) {
+            askAgain_ = false;
+            readAgentStatus();
+            return;
+        }
         const QJsonObject answer = QJsonDocument::fromJson(run->answer()).object();
         if (!ok || !answer.contains("agents")) {
             showAgent(tr("Agent: %1 could not be asked").arg(name));
@@ -652,6 +688,8 @@ void Frame::setOwnRun(qint64 pid)
 void Frame::readAgain()
 {
     activity_->read();
+    if (settings_->started())
+        settings_->read();
     readAgentStatus();
 }
 

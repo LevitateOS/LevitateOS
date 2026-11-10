@@ -2,7 +2,7 @@
 
 The third desktop app, titled "Disk". It sits in the shared window frame
 (`gui/kit/frame.*`, see its README): the rail with the three apps, Disk's two
-entries and Activity; the pages; the strip about the next system; the status
+entries, Activity and Settings; the pages; the strip about the next system; the status
 line. It does two things, each its own rail entry:
 
 - **Mess**: it finds where the mess on the disk is hiding and hands the list
@@ -138,15 +138,17 @@ DISK_GUI_ROOTS=$A/sample DISK_GUI_HOME=$A/sample DISK_GUI_APPARENT=1 \
   $A/build/disk-gui --look levitate
 ```
 
-Window 1100 x 700 by default. `--shots FOLDER` looks, picks the biggest unnamed folder by hand, opens the
+Window 1100 x 700 the first time, then the size it had when it closed (`rememberWindowSize` in `gui/kit`; the picture modes always use 1100 x 700). `--shots FOLDER` looks, picks the biggest unnamed folder by hand, opens the
 hand-over, and saves a picture at each point; with `--hand-over` it also sends
 the list to the agent, waits for the second look, then compares the two
 systems and asks the agent what differs. It exits non-zero when nothing was
 freed, the systems could not be compared, the agent said nothing, or an
 expectation failed (it says which: "not as expected: ..."); it ends with "all
 as expected". The expectations: the window is 1100 x 700 and stays so with the
-comparison and the agent's answer shown; the rail offers Mess, The two systems
-and Activity and nothing else; the Mess badge equals the number of places
+comparison and the agent's answer shown; the rail offers Mess, The two systems,
+Activity and Settings and nothing else; Settings opens (picture `1b-settings`, read
+through the built levitate-agent with the stand-in Codex and a settings folder of
+its own); the Mess badge equals the number of places
 listed, also after the second look; the entry follows the page (hand-over,
 work, answer); the status line; the strip's sentence on the mess, the
 hand-over, the two systems and Activity; its button and "Open System…" both
@@ -276,7 +278,7 @@ on its input as `{"question": id, "answer": "..."}`. When asked what differs bet
 ## Not done
 
 - The frame's other pages are not here and so not shown: "The disk", "Browse",
-  Settings, Help. The strip is read at start, on refresh and after an agent run;
+  Help (Settings is the frame's own and is here). The strip is read at start, on refresh and after an agent run;
   not while a change is made elsewhere until the window is entered again.
 - Choosing the other entry while a comparison reads is allowed (the page keeps
   filling); the old tabs were disabled then. Activity does not list comparisons:

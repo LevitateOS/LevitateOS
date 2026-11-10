@@ -18,6 +18,7 @@ qt_add_executable(levitate-agent
     src/codex.cpp
     src/passthrough.cpp
     src/status.cpp
+    src/account.cpp
 )
 target_compile_options(levitate-agent PRIVATE -Wall -Wextra)
 target_link_libraries(levitate-agent PRIVATE Qt6::Core)

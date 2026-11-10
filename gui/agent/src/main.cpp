@@ -1,5 +1,6 @@
 // levitate-agent: what the desktop apps talk to instead of a coding agent.
 // The apps speak one small protocol (see README.md); each agent speaks its own.
+#include "account.h"
 #include "codex.h"
 #include "passthrough.h"
 #include "record.h"
@@ -9,12 +10,21 @@
 
 #include <QCoreApplication>
 #include <QJsonDocument>
+#include <QJsonObject>
 
 #include <cstdio>
 
 static void print(const QJsonDocument &document)
 {
     fputs(document.toJson(QJsonDocument::Indented).constData(), stdout);
+}
+
+// What is in force, defaults and the environment included.
+static QJsonObject settingsInForce(const Settings &settings)
+{
+    return {{"agent", settings.agent},
+            {"run_commands", settings.commandsAllowed ? "allowed" : "ask"},
+            {"file", settings.configFile}};
 }
 
 int main(int argc, char **argv)
@@ -41,9 +51,29 @@ int main(int argc, char **argv)
         print(QJsonDocument(agentStatus(settings)));
         return 0;
     }
+    if (args.value(0) == QLatin1String("--settings") && args.size() == 1) {
+        print(QJsonDocument(settingsInForce(settings)));
+        return 0;
+    }
+    if (args.value(0) == QLatin1String("--set") && (args.size() != 2 || !args[1].contains('='))) {
+        fputs("Say what to set as KEY=VALUE.\n", stderr);
+        return 1;
+    }
+    if (args.value(0) == QLatin1String("--set")) {
+        const QString refused = Settings::set(args[1].section('=', 0, 0), args[1].section('=', 1));
+        if (!refused.isEmpty()) {
+            fprintf(stderr, "%s\n", qPrintable(refused));
+            return 1;
+        }
+        print(QJsonDocument(settingsInForce(Settings::load())));
+        return 0;
+    }
+    if (args.size() == 1 && (args[0] == QLatin1String("--sign-in") || args[0] == QLatin1String("--sign-out")))
+        return account(settings, args[0] == QLatin1String("--sign-in"));
     if (!args.isEmpty()) {
         fputs("usage: levitate-agent             (reads a request on standard input)\n"
-              "       levitate-agent --list | --status | --show ID\n",
+              "       levitate-agent --list | --status | --show ID\n"
+              "       levitate-agent --settings | --set KEY=VALUE | --sign-in | --sign-out\n",
               stderr);
         return args.value(0) == QLatin1String("--help") ? 0 : 2;
     }

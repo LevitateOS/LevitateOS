@@ -25,6 +25,7 @@ qt_add_executable(disk-gui
     ../kit/work.cpp
     ../kit/frame.cpp
     ../kit/activity.cpp
+    ../kit/settings.cpp
     ../kit/nextsystem.cpp
 )
 target_include_directories(disk-gui PRIVATE ../kit)

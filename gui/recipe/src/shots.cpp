@@ -1,6 +1,7 @@
 #include "shots.h"
 
 #include "activity.h"
+#include "settings.h"
 #include "frame.h"
 #include "look.h"
 #include "nextsystem.h"
@@ -62,9 +63,11 @@ void clickButton(QWidget *inside, const QString &words)
 void frameShots(Window &window, const Save &save, const Expect &expect)
 {
     Frame *frame = window.frame();
-    for (const char *title : {"Browse", "Installed", "Updates", "Sources", "Activity"})
+    for (const char *title : {"Browse", "Installed", "Updates", "Sources", "Activity", "Settings"})
         expect(QStringLiteral("the rail has %1").arg(title), frame->entryTitles().contains(QString::fromLatin1(title)));
-    for (const char *title : {"Storage", "Settings", "Help"})
+    expect(QStringLiteral("Settings is under Activity, the frame's own"),
+           frame->entryTitles().mid(frame->entryTitles().size() - 2) == QStringList({"Activity", "Settings"}));
+    for (const char *title : {"Storage", "Help"})
         expect(QStringLiteral("the rail has no %1: that page does not exist").arg(title),
                !frame->entryTitles().contains(QString::fromLatin1(title)));
     expect(QStringLiteral("the window is 1100 by 700"), window.size() == QSize(1100, 700));
@@ -231,6 +234,43 @@ void activityShots(Window &window, const QString &folder, const Save &save, cons
     frame->setOwnRun(0);
     window.showBrowse();
     settle(100);
+}
+
+// The frame's Settings page: the entry under Activity, and the page opening.
+// It reads through the built levitate-agent with the stand-in Codex and a
+// settings folder of the story's own.
+void settingsShots(Window &window, const QString &folder, const Save &save, const Expect &expect)
+{
+    Frame *frame = window.frame();
+    const QString script = qEnvironmentVariable("RECIPE_GUI_RECORDS");
+    if (script.isEmpty() || qEnvironmentVariable("LEVITATE_ACTIVITY_AGENT").isEmpty()) {
+        expect(QStringLiteral("Settings needs RECIPE_GUI_RECORDS and LEVITATE_ACTIVITY_AGENT, see README.md"), false);
+        return;
+    }
+    const QString home = QDir(folder).filePath("settings-home");
+    QDir(home).removeRecursively();
+    QDir().mkpath(home);
+    const QByteArray config = qgetenv("XDG_CONFIG_HOME"), codex = qgetenv("LEVITATE_AGENT_CODEX");
+    qputenv("XDG_CONFIG_HOME", (home + "/config").toUtf8());
+    qputenv("LEVITATE_AGENT_CODEX", QDir(QFileInfo(script).absolutePath()).filePath("codex").toUtf8());
+    SettingsPage *page = frame->settings();
+    frame->choose(Frame::settingsKey());
+    waitFor([&] { return page->loaded() || !page->problem().isEmpty(); });
+    expect(QStringLiteral("Settings opens and is marked (%1)").arg(page->problem()),
+           frame->settingsShown() && frame->selected() == Frame::settingsKey() && page->loaded());
+    expect(QStringLiteral("it is the same page: the agent, what it may do, the windows"),
+           page->pageText().contains("The agent that does the work") && page->pageText().contains("Installed, and signed in")
+               && page->pageText().contains("What the agent may do without asking")
+               && page->pageText().contains("Each window opens at the size it had."));
+    save(window, "f-settings");
+    frame->choose(QStringLiteral("browse"));
+    expect(QStringLiteral("choosing Browse leaves Settings"), !frame->settingsShown() && frame->selected() == "browse");
+    for (auto [name, value] : {std::pair{"XDG_CONFIG_HOME", config}, std::pair{"LEVITATE_AGENT_CODEX", codex}}) {
+        if (value.isEmpty())
+            qunsetenv(name);
+        else
+            qputenv(name, value);
+    }
 }
 
 // The strip about the next system: read with the recab the story names, after
@@ -501,6 +541,7 @@ int takeShots(Window &window, const QString &folder)
     auto saved = [&](QWidget &widget, const QString &name) { ok &= save(widget, name); };
     auto held = [&](const QString &what, bool holds) { expect(what, holds); };
     frameShots(window, saved, held);
+    settingsShots(window, folder, saved, held);
     stripShots(window, folder, saved, held, out);
     out << (ok ? "all flows ended where they should\n" : "some flows did not end where they should\n");
     return ok ? 0 : 1;

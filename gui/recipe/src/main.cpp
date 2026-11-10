@@ -1,4 +1,5 @@
 #include "look.h"
+#include "settings.h"
 #include "shots.h"
 #include "window.h"
 
@@ -32,7 +33,8 @@ int main(int argc, char **argv)
         applyLook(parser.value(look));
 
     Window window;
-    window.resize(1100, 700);
+    // Opens at the size it had; the picture modes always use the first size.
+    rememberWindowSize(&window, "recipe", {1100, 700}, !parser.isSet(shots));
     if (parser.isSet(shots) && parser.isSet(real))
         return tryRecipe(window, parser.value(real), parser.value(shots), parser.isSet(keep), parser.isSet(readOnly));
     if (parser.isSet(shots))

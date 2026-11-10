@@ -3,6 +3,7 @@
 #include "activity.h"
 #include "frame.h"
 #include "look.h"
+#include "settings.h"
 #include "window.h"
 #include "words.h"
 
@@ -110,6 +111,44 @@ void noStripShots(Window &window, const QString &own, const Expect &expect)
     expect(QStringLiteral("no strip when recab answers in a shape the strip cannot read"), !frame->stripShown());
 }
 
+// The frame's Settings page: the entry under Activity, and the page opening.
+// It reads through the built levitate-agent with the stand-in Codex and a
+// settings folder of the story's own.
+void settingsShots(Window &window, const QString &folder, const Save &save, const Expect &expect)
+{
+    Frame *frame = window.frame();
+    const QString script = qEnvironmentVariable("RECAB_GUI_RECORDS");
+    if (script.isEmpty() || qEnvironmentVariable("LEVITATE_ACTIVITY_AGENT").isEmpty()) {
+        expect(QStringLiteral("Settings needs RECAB_GUI_RECORDS and LEVITATE_ACTIVITY_AGENT, see README.md"), false);
+        return;
+    }
+    const QString home = QDir(folder).filePath("settings-home");
+    QDir(home).removeRecursively();
+    QDir().mkpath(home);
+    const QByteArray config = qgetenv("XDG_CONFIG_HOME"), codex = qgetenv("LEVITATE_AGENT_CODEX");
+    qputenv("XDG_CONFIG_HOME", (home + "/config").toUtf8());
+    qputenv("LEVITATE_AGENT_CODEX", QDir(QFileInfo(script).absolutePath()).filePath("codex").toUtf8());
+    SettingsPage *page = frame->settings();
+    frame->choose(Frame::settingsKey());
+    waitFor([&] { return page->loaded() || !page->problem().isEmpty(); });
+    expect(QStringLiteral("Settings opens and is marked (%1)").arg(page->problem()),
+           frame->settingsShown() && frame->selected() == Frame::settingsKey() && page->loaded());
+    expect(QStringLiteral("it is the same page: the agent, what it may do, the windows"),
+           page->pageText().contains("The agent that does the work") && page->pageText().contains("Installed, and signed in")
+               && page->pageText().contains("What the agent may do without asking")
+               && page->pageText().contains("Each window opens at the size it had."));
+    save("1b-settings");
+    frame->choose(QStringLiteral("mess"));
+    expect(QStringLiteral("choosing Mess leaves Settings"),
+           !frame->settingsShown() && frame->selected() == "mess" && window.showingMess());
+    for (auto [name, value] : {std::pair{"XDG_CONFIG_HOME", config}, std::pair{"LEVITATE_AGENT_CODEX", codex}}) {
+        if (value.isEmpty())
+            qunsetenv(name);
+        else
+            qputenv(name, value);
+    }
+}
+
 // Activity with records of the agent's runs (gui/agent/fixtures/records, a
 // stand-in Codex, never a real agent), read through the built levitate-agent.
 // Disk has started none of these runs: they are Recipe's and System's.
@@ -202,9 +241,9 @@ int takeShots(Window &window, const QString &folder, bool handOver)
         out << "  " << bytesText(finding.bytes) << "  " << finding.what << "  " << finding.path << "\n";
     Frame *frame = window.frame();
     expect(QStringLiteral("the window is 1100 x 700"), window.width() == 1100 && window.height() == 700);
-    expect(QStringLiteral("the rail offers Mess, The two systems and Activity, nothing else (%1)")
+    expect(QStringLiteral("the rail offers Mess, The two systems, Activity and Settings, nothing else (%1)")
                .arg(frame->entryTitles().join(QStringLiteral(", "))),
-           frame->entryTitles() == QStringList({"Mess", "The two systems", "Activity"}));
+           frame->entryTitles() == QStringList({"Mess", "The two systems", "Activity", "Settings"}));
     expect(QStringLiteral("the Mess badge is the number of places listed (%1 and %2)")
                .arg(frame->badge("mess")).arg(window.found().size()),
            frame->badge("mess") == window.found().size() && window.found().size() > 0);
@@ -215,6 +254,7 @@ int takeShots(Window &window, const QString &folder, bool handOver)
            frame->agentText().contains(QFileInfo(qEnvironmentVariable("DISK_GUI_AGENT")).fileName()));
     expect(QStringLiteral("no strip while recab's status cannot be read as the real one"), !frame->stripShown());
     save("1-mess");
+    settingsShots(window, folder, save, expect);
 
     const QString picked = window.pickBiggestUnnamed();
     if (!picked.isEmpty())

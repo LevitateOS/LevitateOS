@@ -16,8 +16,11 @@ The window is `gui/kit/frame.*` (see `../kit/README.md`): the rail on the left
 its badge, Sources, then Activity, which the frame owns), the pages in the
 middle, a strip under them and a status line. There is no sidebar any more:
 the search, the box for the source and the box for the kind of software are
-the top of the Browse page. Storage, Settings and Help are not in the rail
-because those pages do not exist.
+the top of the Browse page. Settings is under Activity (the frame's own page, the
+same in all three apps; `gui/kit/README.md`); Storage and Help are not in the rail
+because those pages do not exist. The story opens Settings (picture `f-settings`),
+reading through the built levitate-agent with the stand-in Codex and a settings
+folder of its own.
 
 - The status line says where the recipes are from and when they were read (and
   what is being built); "Read again" sits beside it; the agent is the frame's
@@ -255,7 +258,7 @@ there is no step yet where the person approves the change before it is used.
 ## Not done
 
 - Not in the frame: the "For this computer / For me" choice, the licence and
-  sort boxes of the design (nothing behind them), the Storage, Settings and Help
+  sort boxes of the design (nothing behind them), the Storage and Help
   pages. The Installed page does not show its count in the rail any more.
 - The frame's checks were run offscreen against stand-ins; not on a real desktop.
 

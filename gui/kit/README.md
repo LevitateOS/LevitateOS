@@ -15,6 +15,7 @@ only: no stylesheet.
 | `refresh.*` | `Refresher`: F5, Ctrl+R and coming back to the window |
 | `frame.*` | the window frame (below) |
 | `activity.*` | the Activity page, owned by the frame |
+| `settings.*` | the Settings page, owned by the frame, and `rememberWindowSize` |
 | `nextsystem.*` | `NextSystem`: reads `recab status --json` for the strip |
 
 ## The frame
@@ -22,7 +23,8 @@ only: no stylesheet.
 One widget that an app's window sets as its central widget. It is the rail on
 the left (the three apps, then the app's own entries, then Activity), the app's
 pages in the middle, a strip under them about the next system, and a status
-line. Do not add entries that lead nowhere: only Activity is shared.
+line. Do not add entries that lead nowhere: only Activity and Settings are
+shared, and the frame adds both under the app's own entries.
 
 ```cpp
 Frame(Frame::App app)                    // Frame::Recipe, Frame::System, Frame::Disk
@@ -45,6 +47,9 @@ void setAgent(QString program);          // right of the status line (see below)
 void setAgentNote(QString);              // while the agent works; empty restores its name
 void setOwnRun(qint64 pid);              // the agent process this window waits for; 0 when it ended
 ActivityPage *activity() const;
+SettingsPage *settings() const;
+static QString settingsKey();            // "settings"
+bool settingsShown() const;
 slot readAgain();                        // connect Refresher::asked to it
 signals: chosen(key)  finishRequested()  goToRun()
 ```
@@ -52,6 +57,10 @@ signals: chosen(key)  finishRequested()  goToRun()
 - `chosen(key)` comes from the person's click or keyboard, for the app's entries
   and for Activity (`Frame::activityKey()`, "activity"). Switch your stack to
   the page of that key. For Activity the frame has shown its page already.
+- Settings (`Frame::settingsKey()`) is chosen by the person like Activity, but
+  the frame does not emit `chosen` for it: it is the frame's own page and the
+  app has nothing to switch to. `follow(key)` leaves it showing, as it does
+  Activity; the person leaving it for one of the app's entries does emit `chosen`.
 - `finishRequested()` is the strip's button, "Finish and restart…". Show the
   page where the next system is finished.
 - `goToRun()` is "Go to it" on Activity for this window's own live run: show
@@ -117,6 +126,58 @@ badge (runs waiting or running; amber while one waits), reads it on first show,
 on `readAgain()` and after `setOwnRun(0)`. A run waiting for an answer can only
 be answered in the window that started it; Activity says so and does not answer.
 Only agent runs are kept: installs and restarts are not recorded anywhere yet.
+
+## Settings
+
+One page, the same in all three apps, owned by the frame and listed under
+Activity in the rail. It reads `levitate-agent --status` and `--settings`
+(program: `LEVITATE_ACTIVITY_AGENT`, default `levitate-agent`, as Activity does)
+without holding the window up: it says it is asking, and a failed reading is
+said with "Try again". It reads when first chosen, and again on `readAgain()`
+once it has been read.
+
+Sections: the agent that does the work (one row per agent the helper lists, today
+Codex, and "Another program"), "Try it", what the agent may do without asking
+(read and look things up: always; run commands as you: "Ask each time" or
+"Allowed"; run a command as administrator: always asks), and the windows.
+
+- The page changes nothing itself. A choice runs `levitate-agent --set agent=...`
+  or `--set run_commands=...`; "Sign in…" runs `--sign-in` and shows what it prints
+  (an address to open) in the row until it ends; "Sign out…" asks in the row first,
+  then runs `--sign-out`. Afterwards the page reads again and shows what the
+  helper reports, not what was clicked. A refusal or a failure is the helper's
+  own sentence, shown under the row it belongs to, never a dialog.
+- "Choose…" opens a file dialog; the path goes through `--set agent=PATH`.
+  Claude Code is not offered: the helper cannot start it yet.
+- "Try it" runs `levitate-agent` with "Say hello in one sentence. Do not run any
+  command and do not change any file.", app = this window's app, title "Say hello",
+  and shows "It answered: ..." or why it failed. The run is Activity's like any
+  other: the frame reads Activity when it ends.
+- After every change the frame asks `--status` again, so "Agent: Codex, signed in"
+  follows at once (only when the window's agent is `levitate-agent`).
+- The windows: `rememberWindowSize(window, "recab", {1100, 700}, remember)`
+  gives a window the size it had when it was closed (QSettings, organisation
+  "LevitateOS", file `windows`, one key per app), 1100 by 700 the first time. Each
+  app's `main.cpp` calls it instead of `resize`. With `remember` false (the
+  picture modes) nothing is read or written.
+
+Checks use `SettingsPage::pageText()`, `press(words)`, `pickCommands(words)`,
+`chooseProgram(path)`, `notice()`, `checkedAgent()` and `busy()`; see
+`gui/recab/src/shots.cpp` (`settingsShots`) for the whole story, and the other
+two apps' shots for the entry and the page opening.
+
+### Not done
+
+Each of these is in the design and not shown, because nothing is behind it:
+
+- **Notices, also when no window is open**: no notifier exists; the apps only
+  show things while a window is open.
+- **Per-app settings** (Recipe's default for "this computer", System's "ask when to
+  restart", Disk's places and rules): no app keeps such a setting yet, and the helper's file holds only the agent's.
+- **Anything about updates** (checking daily, notices for them): there is no
+  update check to schedule.
+- **"Write a recipe into your own recipes" without asking**: nothing implements it.
+- **Claude Code as an agent**: the helper has no adapter for it.
 
 ## Checks
 

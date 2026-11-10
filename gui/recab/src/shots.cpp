@@ -4,14 +4,20 @@
 #include "frame.h"
 #include "look.h"
 #include "parts.h"
+#include "settings.h"
 #include "nextsystem.h"
 #include "pages.h"
 #include "window.h"
 
+#include <QCoreApplication>
 #include <QDir>
+#include <QFile>
+#include <QJsonDocument>
+#include <QJsonObject>
 #include <QElapsedTimer>
 #include <QFileInfo>
 #include <QProcess>
+#include <QSettings>
 #include <QPushButton>
 #include <QTextStream>
 
@@ -225,6 +231,262 @@ void activityShots(Window &window, const QString &folder, const QString &prefix,
     settle(100);
 }
 
+// ---------------------------------------------------------------- Settings
+//
+// The page the frame owns after Activity: the agent, what it may do without
+// asking, and the windows. Everything runs through the built levitate-agent
+// with the stand-in Codex, and HOME and the XDG folders point into a folder of
+// the story's own, so nothing of the person's is read or written.
+
+QString fileText(const QString &path)
+{
+    QFile file(path);
+    return file.open(QIODevice::ReadOnly) ? QString::fromUtf8(file.readAll()) : QString();
+}
+
+void settingsShots(Window &window, const QString &folder, const Save &save, const Expect &expect, QTextStream &out)
+{
+    Frame *frame = window.frame();
+    const QString script = qEnvironmentVariable("RECAB_GUI_RECORDS");
+    const QString agent = qEnvironmentVariable("LEVITATE_ACTIVITY_AGENT");
+    if (script.isEmpty() || agent.isEmpty()) {
+        out << "not as expected: Settings needs RECAB_GUI_RECORDS (gui/agent/fixtures/records) and "
+               "LEVITATE_ACTIVITY_AGENT (the built levitate-agent), see README.md\n";
+        expect(QStringLiteral("the helper for Settings could be named"), false);
+        return;
+    }
+    const QString fixtures = QFileInfo(script).absolutePath();
+    const QString other = QFileInfo(QDir(fixtures).filePath("../../disk/fixtures/agent")).canonicalFilePath();
+    const QString home = QDir(folder).filePath("settings-home");
+    QDir(home).removeRecursively();
+    QDir().mkpath(home);
+    const QString file = home + "/config/levitate/agent.json";
+    const QByteArrayList names{"HOME", "XDG_CONFIG_HOME", "XDG_STATE_HOME", "LEVITATE_AGENT_CODEX", "LEVITATE_AGENT_ROOT_HELPER",
+                               "LEVITATE_STANDIN_LOG", "LEVITATE_STANDIN_LOGIN_SECONDS", "LEVITATE_STANDIN_STORY"};
+    QMap<QByteArray, QByteArray> before;
+    for (const QByteArray &name : names)
+        if (qEnvironmentVariableIsSet(name.constData()))
+            before.insert(name, qgetenv(name.constData()));
+    // Where the size a window had is kept, here and not in the person's own folder.
+    QSettings::setPath(QSettings::NativeFormat, QSettings::UserScope, home + "/config");
+    qputenv("HOME", home.toUtf8());
+    qputenv("XDG_CONFIG_HOME", (home + "/config").toUtf8());
+    qputenv("XDG_STATE_HOME", (home + "/state").toUtf8());
+    qputenv("LEVITATE_AGENT_CODEX", QDir(fixtures).filePath("codex").toUtf8());
+    qputenv("LEVITATE_AGENT_ROOT_HELPER", "");
+    qputenv("LEVITATE_STANDIN_LOG", (home + "/standin.log").toUtf8());
+    qputenv("LEVITATE_STANDIN_STORY", "plain");
+    // Long enough to look at the page while the sign in waits.
+    qputenv("LEVITATE_STANDIN_LOGIN_SECONDS", "2");
+
+    SettingsPage *page = frame->settings();
+    auto idle = [&] {
+        waitFor([&] { return !page->busy(); }, 30);
+    };
+    auto agentSays = [&](const QString &words) {
+        waitFor([&] { return frame->agentText() == words; }, 10);
+        return frame->agentText() == words;
+    };
+    auto shows = [&](const QString &words) { return page->pageText().contains(words); };
+    // The status line asks levitate-agent only when the window's agent is that program.
+    const QString stand = qEnvironmentVariable("RECAB_GUI_AGENT");
+    frame->setAgent(agent);
+    expect(QStringLiteral("the status line starts as the stand-in Codex signed in (%1)").arg(frame->agentText()),
+           agentSays(QStringLiteral("Agent: Codex, signed in")));
+
+    // The rail: Settings under Activity, added by the frame.
+    const QStringList titles = frame->entryTitles();
+    expect(QStringLiteral("the rail has Settings under Activity (%1)").arg(titles.join(", ")),
+           titles.size() >= 2 && titles.mid(titles.size() - 2) == QStringList({"Activity", "Settings"}));
+
+    // Before the helper has answered: it says so.
+    frame->choose(Frame::settingsKey());
+    expect(QStringLiteral("Settings is showing and marked, and no app page was asked for"),
+           frame->settingsShown() && frame->selected() == Frame::settingsKey() && !frame->activityShown());
+    expect(QStringLiteral("it says it is asking while it waits"), !page->loaded() && shows("Asking levitate-agent"));
+    QCoreApplication::processEvents(); // the new page is shown once the loop has run
+    window.grab().save(QDir(folder).filePath("s0-reading.png"));
+    waitFor([&] { return page->loaded(); });
+
+    // As first read.
+    expect(QStringLiteral("the page was read (%1)").arg(page->problem()), page->loaded() && page->problem().isEmpty());
+    for (const char *words : {"Settings", "One set for Recipe, System and Disk. What is set here holds in all three.",
+                              "The agent that does the work", "Codex", "Installed, and signed in", "Sign out…",
+                              "Another program", "Any program that takes a request and reports back the same way", "Choose…",
+                              "Try it", "Asks the chosen agent to say hello.", "What the agent may do without asking",
+                              "Read files and look things up", "Always", "Run commands as you, in your own folders",
+                              "Ask each time", "Run a command as administrator", "Always asks. It cannot be switched off.",
+                              "The windows", "Each window opens at the size it had. Language follows the desktop.",
+                              "Settings are kept for you, not for everyone on this computer.",
+                              "With Allowed, the agent's own sandbox lets it write in your home folder."})
+        expect(QStringLiteral("the page says: %1").arg(words), shows(QString::fromUtf8(words)));
+    expect(QStringLiteral("Claude Code is not shown and nothing is offered that has nothing behind it"),
+           !shows("Claude") && !shows("Write a recipe") && !shows("Notices") && !shows("update"));
+    expect(QStringLiteral("Codex is the chosen one and commands are asked each time"),
+           page->checkedAgent() == "codex" && page->commandsInForce() == "ask" && page->agentInForce() == "codex");
+    save(window, "s1-as-first-read");
+
+    // "Allowed": the helper's file says so, and so does the page.
+    page->pickCommands(QStringLiteral("Allowed"));
+    idle();
+    expect(QStringLiteral("the helper's file says allowed (%1)").arg(fileText(file).simplified()),
+           QJsonDocument::fromJson(fileText(file).toUtf8()).object()["run_commands"] == "allowed");
+    expect(QStringLiteral("the page shows what the helper reports: Allowed"),
+           page->commandsInForce() == "allowed" && page->pageText().endsWith("Allowed"));
+    save(window, "s2-allowed");
+
+    // Signing out asks first; nothing has changed until it is said yes.
+    expect(QStringLiteral("Sign out… is offered"), page->press(QStringLiteral("Sign out…")));
+    expect(QStringLiteral("it asks first, in place"),
+           shows("Sign out of Codex? The apps cannot hand anything to it until you sign in again."));
+    save(window, "s3-sign-out-asks");
+    expect(QStringLiteral("nobody is signed out yet (%1)").arg(frame->agentText()), frame->agentText() == "Agent: Codex, signed in");
+    expect(QStringLiteral("Keep it leaves it as it was"), page->press(QStringLiteral("Keep it")) && !shows("Sign out of Codex?"));
+    page->press(QStringLiteral("Sign out…"));
+    expect(QStringLiteral("saying yes signs out"), page->press(QStringLiteral("Sign out")));
+    idle();
+    expect(QStringLiteral("the row says not signed in, and offers to sign in"),
+           shows("Installed, not signed in") && shows("Sign in…") && !shows("Sign out…"));
+    expect(QStringLiteral("the status line follows at once (%1)").arg(frame->agentText()),
+           agentSays(QStringLiteral("Agent: Codex, not signed in")));
+    expect(QStringLiteral("the stand-in's own state says so"), fileText(home + "/.standin-codex-signed") == "out");
+    save(window, "s4-signed-out");
+
+    // A sign in that fails says why, in the row.
+    qputenv("LEVITATE_STANDIN_LOGIN_FAILS", "1");
+    page->press(QStringLiteral("Sign in…"));
+    idle();
+    qunsetenv("LEVITATE_STANDIN_LOGIN_FAILS");
+    expect(QStringLiteral("a failed sign in shows the helper's sentence in place (%1)").arg(page->notice()),
+           page->notice().contains("was not completed") && shows("was not completed") && shows("Installed, not signed in"));
+    save(window, "s5-sign-in-failed");
+
+    // Sign in again: what Codex prints (an address) is shown while it waits.
+    expect(QStringLiteral("Sign in… is offered"), page->press(QStringLiteral("Sign in…")));
+    waitFor([&] { return shows("https://auth.standin.invalid"); }, 15);
+    expect(QStringLiteral("the address Codex printed is shown while it waits"),
+           shows("https://auth.standin.invalid") && shows("Signing in") && page->busy());
+    save(window, "s6-signing-in");
+    idle();
+    expect(QStringLiteral("signed in again: the row says so"), shows("Installed, and signed in") && shows("Sign out…")
+                                                                   && !shows("Signing in"));
+    expect(QStringLiteral("and so does the status line (%1)").arg(frame->agentText()),
+           agentSays(QStringLiteral("Agent: Codex, signed in")));
+    save(window, "s7-signed-in-again");
+
+    // Another program, by its path; then back to Codex.
+    page->chooseProgram(other);
+    idle();
+    expect(QStringLiteral("the other program is chosen, as the helper reports it (%1)").arg(page->agentInForce()),
+           page->agentInForce() == other && page->checkedAgent() == "other" && shows(other) && shows("Found, and it can be run"));
+    {
+        const QJsonObject kept = QJsonDocument::fromJson(fileText(file).toUtf8()).object();
+        expect(QStringLiteral("the file has the path and kept the other setting"),
+               kept["agent"] == other && kept["run_commands"] == "allowed");
+    }
+    expect(QStringLiteral("the status line names it (%1)").arg(frame->agentText()),
+           agentSays(QStringLiteral("Agent: agent")));
+    expect(QStringLiteral("the page says that only Codex reads the setting"), shows("Only Codex reads this setting."));
+    save(window, "s8-another-program");
+    expect(QStringLiteral("choosing Codex again"), page->press(QStringLiteral("Codex")));
+    idle();
+    expect(QStringLiteral("Codex is back, signed in (%1)").arg(page->agentInForce()),
+           page->agentInForce() == "codex" && page->checkedAgent() == "codex" && shows("Installed, and signed in"));
+    expect(QStringLiteral("the status line follows (%1)").arg(frame->agentText()),
+           agentSays(QStringLiteral("Agent: Codex, signed in")));
+    save(window, "s9-back-to-codex");
+
+    // A refused value is shown in place; nothing changes.
+    const QString kept = fileText(file);
+    page->chooseProgram(QStringLiteral("/nonexistent/agent"));
+    idle();
+    expect(QStringLiteral("the refusal is in the page (%1)").arg(page->notice()),
+           page->notice() == "/nonexistent/agent does not exist." && shows("/nonexistent/agent does not exist."));
+    expect(QStringLiteral("and nothing was written or changed"),
+           fileText(file) == kept && page->agentInForce() == "codex" && page->checkedAgent() == "codex");
+    save(window, "s10-refused");
+
+    // "Try it": the stand-in answers; the run is in Activity.
+    expect(QStringLiteral("Try it is offered"), page->press(QStringLiteral("Try it")));
+    expect(QStringLiteral("while it runs the button says so and cannot be pressed"),
+           shows("Asking…") && !page->press(QStringLiteral("Asking…")) && page->busy());
+    // Straight away: the stand-in answers within the time a picture takes.
+    QCoreApplication::processEvents();
+    window.grab().save(QDir(folder).filePath("s11-asking.png"));
+    idle();
+    expect(QStringLiteral("what came back is shown (%1)").arg(page->pageText().section("It answered", 1, 1).left(80)),
+           shows("It answered: I made the change. Everything checks out.") && shows("Try it"));
+    save(window, "s12-try-it-answered");
+    frame->choose(Frame::activityKey());
+    waitFor([&] { return frame->activity()->listedTitles().contains("Say hello"); }, 15);
+    frame->activity()->chooseTitle("Say hello");
+    waitFor([&] { return frame->activity()->detailText().contains("Say hello in one sentence"); }, 15);
+    expect(QStringLiteral("the run is listed in Activity under System (%1)").arg(frame->activity()->listedTitles().join(", ")),
+           frame->activity()->listedTitles() == QStringList({"Say hello"})
+               && frame->activity()->detailText().contains("Asked in System")
+               && frame->activity()->detailText().contains("Do not run any command and do not change any file."));
+    save(window, "s13-try-it-in-activity");
+
+    // Coming back to Settings reads it again, without the page being rebuilt from nothing.
+    frame->choose(Frame::settingsKey());
+    waitFor([&] { return page->loaded() && !page->busy(); });
+    expect(QStringLiteral("Settings shows again, with the last answer"), frame->settingsShown() && shows("It answered:"));
+
+    // A helper that cannot be asked: the page says so, with a way to try again.
+    qputenv("LEVITATE_ACTIVITY_AGENT", "/nonexistent/levitate-agent");
+    {
+        Window lonely;
+        lonely.show();
+        lonely.frame()->choose(Frame::settingsKey());
+        waitFor([&] { return !lonely.frame()->settings()->problem().isEmpty(); }, 10);
+        expect(QStringLiteral("a helper that does not exist is said so (%1)").arg(lonely.frame()->settings()->problem()),
+               lonely.frame()->settings()->problem().contains("levitate-agent")
+                   && lonely.frame()->settings()->pageText().contains("Settings could not be read")
+                   && lonely.frame()->settings()->pageText().contains("Try again"));
+        save(lonely, "s14-not-read");
+    }
+    qputenv("LEVITATE_ACTIVITY_AGENT", agent.toUtf8());
+
+    // The size a window had: kept when it closes, read when it opens, and
+    // neither in the picture modes.
+    {
+        const QString key = QStringLiteral("story-window");
+        QWidget first;
+        rememberWindowSize(&first, key, {1100, 700}, true);
+        expect(QStringLiteral("a window that was never closed opens at the first size"), first.size() == QSize(1100, 700));
+        first.resize(900, 600);
+        first.show();
+        first.close();
+        QSettings kept(QStringLiteral("LevitateOS"), QStringLiteral("windows"));
+        expect(QStringLiteral("closing keeps its size, under one key (%1)").arg(kept.value(key).toString()),
+               kept.value(key).toSize() == QSize(900, 600) && kept.allKeys() == QStringList({key}));
+        QWidget second;
+        rememberWindowSize(&second, key, {1100, 700}, true);
+        expect(QStringLiteral("the next one opens at the size it had"), second.size() == QSize(900, 600));
+        QWidget picture;
+        rememberWindowSize(&picture, key, {1100, 700}, false);
+        picture.resize(800, 500);
+        picture.show();
+        picture.close();
+        kept.sync();
+        expect(QStringLiteral("in picture mode nothing is read and nothing is written"),
+               picture.size() == QSize(800, 500) && kept.value(key).toSize() == QSize(900, 600));
+        QWidget third;
+        rememberWindowSize(&third, key, {1100, 700}, false);
+        expect(QStringLiteral("and the first size is used"), third.size() == QSize(1100, 700));
+    }
+
+    frame->setAgent(stand);
+    for (const QByteArray &name : names) {
+        if (before.contains(name))
+            qputenv(name.constData(), before.value(name));
+        else
+            qunsetenv(name.constData());
+    }
+    window.showMain();
+    settle(100);
+}
+
 } // namespace
 
 // The story needs the stand-in started with RECAB_STANDIN_FAIL_TRIALS=1, so
@@ -287,6 +549,7 @@ int takeShots(Window &window, const QString &folder)
     expect("a second change joins the same next system", window.status().changes.size() == 2);
     save(window, "06-next-system");
     activityShots(window, folder, "a", int(window.status().changes.size()), save, expect, out);
+    settingsShots(window, folder, save, expect, out);
 
     window.addUpdate(false);
     waitUntilIdle(window);

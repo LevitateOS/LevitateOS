@@ -419,6 +419,93 @@ def status():
           "status: a chosen program is named and found")
 
 
+def settings():
+    A = BINARY
+
+    def call(env, *args):
+        return subprocess.run([A, *args], env=env, capture_output=True, text=True, timeout=30)
+
+    env, _ = environment("settings")
+    cfg = env["XDG_CONFIG_HOME"]
+    file = os.path.join(cfg, "levitate/agent.json")
+    out = call(env, "--settings")
+    check(out.returncode == 0 and json.loads(out.stdout) == {"agent": "codex", "run_commands": "ask", "file": file},
+          "settings: the defaults, and the file it would use (%s)" % out.stdout)
+    check(not os.path.exists(file), "settings: reading writes nothing")
+
+    out = call(env, "--set", "run_commands=allowed")
+    check(out.returncode == 0 and json.loads(out.stdout)["run_commands"] == "allowed",
+          "set: run_commands=allowed is accepted and printed (%s)" % out.stderr)
+    check(json.load(open(file)) == {"run_commands": "allowed"}, "set: the file says so")
+    # Another key in the file stays.
+    json.dump({"run_commands": "allowed", "future": [1, 2]}, open(file, "w"))
+    out = call(env, "--set", "agent=" + DISK_AGENT)
+    check(out.returncode == 0 and json.loads(out.stdout)["agent"] == DISK_AGENT, "set: a program by its full path is accepted")
+    check(json.load(open(file)) == {"run_commands": "allowed", "future": [1, 2], "agent": DISK_AGENT},
+          "set: the other keys of the file are kept (%s)" % open(file).read())
+    check(json.loads(call(env, "--settings").stdout)["agent"] == DISK_AGENT, "settings: what was set is in force")
+    out = call(env, "--set", "agent=codex")
+    check(out.returncode == 0 and json.loads(out.stdout)["agent"] == "codex", "set: agent=codex is accepted")
+    out = call(env, "--set", "run_commands=ask")
+    check(out.returncode == 0 and json.loads(out.stdout)["run_commands"] == "ask", "set: run_commands=ask is accepted")
+
+    before = open(file).read()
+    for words, why in [("agent=nothing", "not a path"), ("agent=/nonexistent/agent", "does not exist"),
+                       ("agent=" + HOME, "a folder"), ("agent=" + os.path.join(HERE, "records.txt"), "a missing file"),
+                       ("run_commands=sometimes", "a value that is not one"), ("colour=blue", "a key that is not one"),
+                       ("agent", "no value")]:
+        out = call(env, "--set", words)
+        check(out.returncode != 0 and out.stdout == "" and len(out.stderr.strip().splitlines()) == 1
+              and out.stderr.strip().endswith("."), "set: %s (%s) is refused with one sentence (%r)" % (words, why, out.stderr))
+    plain = os.path.join(SCRATCH, "plain-file")
+    open(plain, "w").write("x")
+    out = call(env, "--set", "agent=" + plain)
+    check(out.returncode != 0 and "not a program" in out.stderr, "set: a file that cannot be run is refused (%r)" % out.stderr)
+    check(open(file).read() == before, "set: a refused value changes nothing")
+
+    # Sign in and out go through the stand-in; its `login status` follows.
+    def signed(env):
+        return json.loads(call(env, "--status").stdout)["agents"][0]["signed_in"]
+    env, _ = environment("settings")
+    check(signed(env) is True, "sign-in: the stand-in starts signed in")
+    out = call(env, "--sign-out")
+    check(out.returncode == 0 and "logged out" in out.stderr and out.stdout == "", "sign-out: runs codex logout (%r)" % out.stderr)
+    check(signed(env) is False, "sign-out: login status says so")
+    proc = subprocess.Popen([A, "--sign-in"], env=env, stderr=subprocess.PIPE, text=True)
+    first = proc.stderr.readline()
+    check("localhost" in first and proc.poll() is None, "sign-in: a line arrives while codex is still going (%r)" % first)
+    rest = proc.stderr.read()
+    proc.wait()
+    check(proc.returncode == 0 and "https://auth.standin.invalid" in rest and "logged in" in rest,
+          "sign-in: the address and the end are passed through (%r)" % rest)
+    check(signed(env) is True, "sign-in: login status says so")
+    env, _ = environment("settings", {"LEVITATE_STANDIN_LOGIN_FAILS": "1"})
+    out = call(env, "--sign-out")
+    out = call(env, "--sign-in")
+    check(out.returncode == 1 and "was not completed" in out.stderr, "sign-in: codex's exit code is ours (%d)" % out.returncode)
+    env, _ = environment("settings", {"LEVITATE_AGENT_CODEX": os.path.join(SCRATCH, "none")})
+    out = call(env, "--sign-in")
+    check(out.returncode != 0 and out.stderr.strip() == "Codex is not installed.", "sign-in: no Codex says so (%r)" % out.stderr)
+    # Stopped half way: the stand-in's login is still going and goes too.
+    env, _ = environment("settings", {"LEVITATE_STANDIN_LOGIN_SECONDS": "30"})
+    call(env, "--sign-out")
+    proc = subprocess.Popen([A, "--sign-in"], env=env, stderr=subprocess.PIPE, text=True)
+    proc.stderr.readline()
+    proc.send_signal(signal.SIGTERM)
+    try:
+        proc.wait(timeout=10)
+    except subprocess.TimeoutExpired:
+        proc.kill()
+        check(False, "sign-in: SIGTERM ends it")
+    check(proc.returncode == 143 and signed(env) is False, "sign-in: stopped, it ends with 143 and nobody is signed in")
+    # Another program than Codex signs in by itself.
+    env, _ = environment("settings", {"LEVITATE_AGENT": DISK_AGENT})
+    for flag in ("--sign-in", "--sign-out"):
+        out = call(env, flag)
+        check(out.returncode != 0 and out.stderr.strip() == "agent signs in by itself; there is nothing to do here.",
+              "%s: another program signs in by itself (%r)" % (flag, out.stderr))
+
+
 def main():
     if not os.access(BINARY, os.X_OK):
         print("story: %s is not built" % BINARY)
@@ -441,6 +528,7 @@ def main():
     story_config()
     listing(None)
     status()
+    settings()
     print("all flows ended where they should" if not failures else "some flows did not end where they should (%d)" % len(failures))
     return 0 if not failures else 1
 

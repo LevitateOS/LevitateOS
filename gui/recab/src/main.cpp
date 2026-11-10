@@ -1,4 +1,5 @@
 #include "look.h"
+#include "settings.h"
 #include "shots.h"
 #include "window.h"
 
@@ -32,7 +33,8 @@ int main(int argc, char **argv)
         applyLook(parser.value(look));
 
     Window window;
-    window.resize(1100, 700);
+    // Opens at the size it had; the picture modes always use the first size.
+    rememberWindowSize(&window, "recab", {1100, 700}, !parser.isSet(shots));
     if (parser.isSet(shots))
         return parser.isSet(real) ? takeRealShots(window, parser.value(shots)) : takeShots(window, parser.value(shots));
     window.show();
