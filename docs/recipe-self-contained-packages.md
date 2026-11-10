@@ -1,11 +1,11 @@
-# Self-contained packages: design (2026-11-10, accepted, two trials run)
+# Self-contained packages: design (2026-11-10, accepted, three trials run)
 
 How a program Recipe builds finds its shared libraries when it runs, so that
 libraries need no agreement between packages, one catalog serves both
 distributions, and keeping the catalog up is mechanical. The core was tried
-twice on a terminal program ("The first trial", "The second trial"); the
-automatic form described here is not built, and "Open questions" says what
-is still to settle.
+on a terminal program and on a Qt program ("The first trial" to "The third
+trial"); the automatic form described here is not built, and "Open
+questions" says what is still to settle.
 
 It adds to [the format design](recipe-front-end-format.md), which defines the
 `package` output, and to [the sources design](recipe-sources.md), which
@@ -127,14 +127,11 @@ sandbox, Recipe does this itself. No recipe writes code for it.
 A static program has nothing to list and is left as it is.
 
 Libraries a program opens by name while running (toolkit plug-ins, drivers)
-are not found by step 1. A recipe names those folders in a literal block:
-
-```rhai
-const CARRY = ["qt6/plugins/platforms", "qt6/plugins/imageformats"];
-```
-
-Each is a path under an `sdk` or the image, copied whole and treated as in
-steps 3 to 6.
+are not found by step 1. The recipe places those itself, under `lib/`, where
+the toolkit will look; the carry step treats every program and library it
+finds there as in steps 1 to 6. (An earlier draft named them in a `CARRY`
+block. The third trial showed the recipe has to choose the folder anyway,
+because where a toolkit looks is the toolkit's own rule.)
 
 ## 3. The package tree
 
@@ -147,6 +144,10 @@ package/
 
 `lib/` belongs to the package alone. Two packages never conflict over it, and
 nothing in it is on anyone's path.
+
+A program may live under `lib/` too, with a two-line starter in `bin/` that
+names it by its full path. A toolkit that looks for its plug-ins beside the
+program needs that: `bin/` is one flat folder shared by all packages.
 
 ## 4. The folder is known at build time
 
@@ -213,7 +214,7 @@ path is one known case), the image provides both paths.
 
 | Where | Change |
 |---|---|
-| `tools/recipe` | `lib/` in the package tree; `RUNTIME.paths.prefix`; the carry step in the worker; `CARRY`; carried files in the receipt; the build key includes the prefix |
+| `tools/recipe` | `lib/` in the package tree; `RUNTIME.paths.prefix`; the carry step in the worker; carried files in the receipt; the build key includes the prefix |
 | `tools/recipe` `src/system.rs`, `tools/recab` | a folder per package for `lib/` on a prepared system, and its receipt's record of what is carried |
 | `recipes` | library recipes publishing `sdk`; toolchain recipes publishing `tools`; `kind` on both |
 | `distro/contract`, `distro/builder` | the host contract and what each image adds to meet it |
@@ -230,8 +231,9 @@ path is one known case), the image provides both paths.
    itself, and a run on booted systems.
 3. The receipt's record of what is carried, and update on a changed image.
 4. The host contract in `distro/contract`.
-5. `CARRY`, tried on one real desktop program with a toolkit. This is the
-   trial that decides whether the design holds.
+5. Plug-ins, tried on a desktop program with a toolkit: done for loading,
+   plug-ins and fonts (the third trial). Still to do: the same on a running
+   desktop on both systems, which needs images built with this Recipe.
 
 ## The first trial (2026-11-10)
 
@@ -334,12 +336,83 @@ What this form cannot do:
 - A build that adds library folders of its own to a program is refused, not
   repaired.
 
+## The third trial (2026-11-11): a Qt program
+
+The trial meant to decide whether the design holds for a toolkit. A small Qt
+Widgets program (a window, a label, a button) with Qt 6.10.1 and everything
+it needs carried: 75 files, 91 MB, of which 65 are shared libraries and 9
+are Qt plug-ins. The recipe, inputs, logs, pictures and store are in
+`.artifacts/recipe-carry-trial/qt`.
+
+What it showed:
+
+- On this computer the program starts, loads 41 libraries and plug-ins, all
+  from its own package, draws its window and saves it as a picture.
+- Inside the AcornOS root it does the same, with the same Qt, the same glibc
+  and the same files. No library came from the system, which has none it
+  could have used.
+- With AcornOS's own font configuration and fonts in place (Alpine's
+  `fontconfig` and `font-noto` packages, as a desktop AcornOS has), the
+  carried Qt reads them and the picture is the same as on this computer.
+  Without them the window is drawn and the text is empty boxes.
+
+How far that goes:
+
+- No display. Qt drew into memory (its `offscreen` platform). Wayland, X11,
+  the graphics drivers, themes and input were not exercised; they need a
+  running desktop on both systems.
+- The AcornOS root was entered with `chroot`, as in the earlier trials.
+- **The program was compiled on this computer, not in the sandbox.** The
+  build image has no C++ compiler or headers. This computer has the same
+  distribution as the image (Rocky 10.2), so the result is what the image
+  would build if it could. Assembling the package and the carry step ran in
+  the sandbox, in thirteen seconds.
+- **Qt was not built by a recipe.** Its libraries and plug-ins were copied
+  from this computer's own Qt packages and given to the recipe as a folder,
+  standing in for the `sdk` of a Qt recipe.
+
+What it found:
+
+1. **A toolkit decides where its plug-ins are, and a distribution's build
+   decides it for good.** This Qt was built to look in
+   `/usr/lib64/qt6/plugins` and beside the program, nowhere else. The room Qt
+   keeps for that folder cannot be lengthened: a longer path written into it
+   is read back cut to the old length. So:
+   - The program and its plug-ins went together into the package's own part
+     (`lib/helloqt/`), with a two-line starter in `bin/`. That is Qt's
+     ordinary layout for a program shipped with its own Qt.
+   - The built-in folder had to be pointed at a folder that does not exist
+     (same length). Otherwise this Qt also loads plug-ins from a Qt the host
+     happens to have there, which is the leak the rule forbids. It did
+     exactly that before the change.
+   A Qt built by its own recipe can be built to find its plug-ins relative
+   to its libraries, and then needs neither. That is the form to aim for;
+   the two steps above are what carrying a distribution's Qt costs.
+2. **Plug-ins are placed by the recipe, not listed.** The carry step now
+   looks at everything under `lib/`, follows what plug-ins load, and treats a
+   program found there like one in `bin/`.
+3. **The carried C library has no UTF-8 locale on AcornOS.** Qt warned that
+   it could not switch to one and went on. glibc reads its locales from
+   `/usr/lib/locale`, which a musl system does not have. The data has to
+   travel with the package or be named to glibc when the program starts;
+   not solved here.
+4. **Fonts work across the two.** The host's font configuration and fonts
+   are enough for a carried Qt and fontconfig, which is what the host
+   contract assumes.
+5. **The build image cannot build C++.** No recipe can compile a Qt, GTK or
+   any C++ program in it today. That is a matter of what the image holds or
+   of a toolchain recipe, and it comes before any real desktop recipe.
+
+What it decides: the library side of the design holds for a toolkit program
+on both C libraries. What it leaves open is everything that needs a running
+desktop, and the locale.
+
 ## Open questions
 
-1. **Does a toolkit program work this way on both distributions?** Not tried.
-   Toolkits open plug-ins by name, read data from folders they work out from
-   their own location, and talk to the desktop. Proposed: step 5 above, on a
-   Qt program, before any more of the catalog is written.
+1. **Does a toolkit program work this way on both distributions?** For
+   loading, plug-ins and fonts: yes (the third trial). On a running desktop
+   (Wayland or X11, graphics drivers, themes, input): not tried, and it needs
+   both systems booted.
 2. **Who rewrites the program files.** Settled by the second trial: Recipe
    itself, in the sandbox, into room reserved at the link. No tool is added
    to the build image. Open again only for programs linked elsewhere.
@@ -359,8 +432,16 @@ What this form cannot do:
    `/etc/nsswitch.conf` and loads name-service modules by name; AcornOS, being
    musl, need not have either. Proposed: carry glibc's `files` and `dns` modules always, and let
    it fall back to them. To be confirmed in step 2.
-7. **`CARRY` as its own block or a field of `NEEDS`.** Proposed: its own
-   block, since it grants nothing.
+7. **`CARRY` as its own block or a field of `NEEDS`.** Dropped: the recipe
+   places plug-ins under `lib/` itself (the third trial).
+8. **The carried C library's locales.** glibc looks in `/usr/lib/locale`,
+   which AcornOS does not have. Proposed: carry the one UTF-8 locale every
+   program needs, and have the starter name its folder to glibc. This makes
+   a starter the rule for programs that need a locale, which is most
+   desktop programs.
+9. **A C++ compiler for recipes.** In the build image, or as a toolchain
+   recipe under `build_deps`. Proposed: a toolchain recipe, like any other
+   compiler, so the image stays the small base.
 
 ## Not in this design
 
