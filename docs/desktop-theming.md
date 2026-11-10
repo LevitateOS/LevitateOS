@@ -62,7 +62,7 @@ recipe), owned by root, mode 0644:
 | Default theme | `/etc/xdg/kdeglobals` | `[KDE] LookAndFeelPackage=org.levitateos.desktop`, `ColorScheme=LevitateOSDark`, Noto fonts |
 | Colour schemes | `/usr/share/color-schemes/LevitateOSLight.colors`, `LevitateOSDark.colors` | Breeze Light/Dark with the accent set to pine `#214438` / `#C7D9BA`; selection and focus follow the accent |
 | Wallpaper (done, unbuilt) | `/usr/share/wallpapers/LevitateOS/` | `metadata.json` (`Id: LevitateOS`), `contents/images/3840x2160.jpg` and `contents/images_dark/3840x2160.jpg`; Plasma scales the one size and shows the dark one under a dark colour scheme. `/usr/share/wallpapers/Default` links to `LevitateOS`, so Fedora's Global Theme (`Image=Fedora` → `Default`) already shows it; the Fedora background packages are still in the lock |
-| Login screen | `/usr/share/sddm/themes/levitateos/` + `/etc/sddm.conf.d/10-theme.conf` (`[Theme] Current=levitateos`) | copy of `sddm-breeze`'s QML with `theme.conf`: `showlogo=shown`, `logo=` the paper lockup, `background=` the dark wallpaper, `color=#14221A` |
+| Login screen (background done, unbuilt) | `/etc/sddm.conf.d/10-theme.conf` (`[Theme] Current=breeze`) + `/usr/share/sddm/themes/breeze/theme.conf.user` | KDE's Breeze theme (no logo) in place of `01-breeze-fedora`, with `background=` the dark wallpaper; SDDM reads `theme.conf.user` over `theme.conf`. Still to do: an own `levitateos` theme with `showlogo=shown`, `logo=` the paper lockup, `color=#14221A` |
 | Lock screen | — | follows the wallpaper; nothing extra |
 | Icons | `/usr/share/icons/hicolor/scalable/apps/distributor-logo-levitateos.svg`, `levitateos-logo-icon.svg`, `…/16x16/apps/…` (micro mark) | see "Icons" |
 | About page | `/etc/xdg/kcm-about-distrorc` | `LogoPath=/usr/share/pixmaps/levitateos-logo.svg`, `Website=https://levitateos.org`, `Variant=Desktop` |
@@ -92,7 +92,7 @@ Openbox "Clearlooks" window decoration. Alpine 3.24 also has `breeze`
 | Wallpaper (done, unbuilt) | `/usr/share/wallpapers/AcornOS/` (same layout as Plasma's) + `/etc/xdg/pcmanfm-qt/lxqt/settings.conf` | the packaged `/usr/share/pcmanfm-qt/lxqt/settings.conf` with `Wallpaper=` the dark Acorn wallpaper and `WallpaperMode=zoom`. pcmanfm-qt reads one whole settings file, the first on the configuration path, so the file is a full copy. LXQt does not switch wallpaper with the look; the light one waits for the `acornos-light` theme's `wallpaper.cfg` |
 | Window decoration | `/usr/share/themes/AcornOS/openbox-3/themerc` + `/etc/xdg/openbox/lxqt-rc.xml` (`<theme><name>AcornOS</name>`) | Openbox themes are plain text (colours, fonts, button bitmaps); start from `Clearlooks` |
 | GTK apps (Firefox) | `/etc/gtk-3.0/settings.ini` | `gtk-theme-name=Breeze`, `gtk-icon-theme-name=breeze` |
-| Login screen | `/usr/share/sddm/themes/acornos/` + `/etc/sddm.conf.d/10-theme.conf` | from `sddm-breeze` (add it to the Acorn desktop set), with the Acorn lockup and wallpaper |
+| Login screen (background done, unbuilt) | `/usr/share/sddm/themes/acornos/` + `/etc/sddm.conf.d/10-theme.conf` (`Current=acornos`) | SDDM's own Maldives theme (`Main.qml` and its two images, copied from the package) with `background=` the dark wallpaper and `QtVersion=6` in `metadata.desktop`: Alpine has only `sddm-greeter-qt6`, and its Maldives does not name a Qt version. Still to do: the Acorn lockup, and `sddm-breeze` if the look should match Plasma's |
 | Icons | hicolor `distributor-logo-acornos`, `acornos-logo-icon` | see "Icons" |
 | os-release | builder | `LOGO=acornos-logo-icon` |
 
