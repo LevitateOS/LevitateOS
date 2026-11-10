@@ -121,6 +121,35 @@ shipped. This is the largest piece of new work and should reuse whatever the
 Recipe and Ginux integration settles on for building in a distro's
 environment, not a second mechanism beside it.
 
+### State of the build (2026-11-10)
+
+Three apps exist in `gui/` now: `recipe-gui`, `recab-gui` and `disk-gui`. What
+is done and what is not, for getting them into both desktop images:
+
+- **Done: one build for all three.** `gui/CMakeLists.txt` builds them
+  together; `cmake --install` with a `DESTDIR` writes the three programs to
+  `usr/bin`, three menu entries to `usr/share/applications` and the two polkit
+  actions (Recipe's and recab's) to `usr/share/polkit-1/actions`. Run on the
+  development machine only.
+- **Done: nothing else has to be added to either image.** The programs link
+  Qt 6 Widgets, Gui, Core and Svg, the C++ runtime and OpenGL. Both desktop
+  locks carry them already (`qt6-qtbase`, `qt6-qtbase-gui` and `qt6-qtsvg`
+  6.11.2 on Fedora 45; `qt6-qtbase`, `qt6-qtbase-x11` and `qt6-qtsvg` 6.11.1
+  on Alpine 3.24), and `pkexec` (`polkit`, `polkit-common`). The polkit actions
+  name `/usr/bin/recipe` and `/usr/bin/recab`, where the builder puts both.
+- **Not done: the build itself, inside the image pipeline.** No recipe builds
+  them. The plan above still stands and its hard part is untouched: a recipe
+  runs in the pinned Rocky root, which has neither Qt nor either distro's C++
+  runtime, and it cannot enter another tree (the OS recipes run a tree's
+  programs one at a time through that tree's loader; a compiler that starts
+  other programs does not work that way). What a build needs beyond the
+  desktop lock: `gcc-c++`, `cmake`, `ninja-build`, `qt6-qtbase-devel`,
+  `qt6-qtsvg-devel` on Fedora; `g++`, `cmake`, `samurai`, `qt6-qtbase-dev`,
+  `qt6-qtsvg-dev` on Alpine.
+- **Not done:** the list of desktop apps in the contract, the builder step
+  that puts the built tree into the desktop system, and the `desktop-boot`
+  check.
+
 ## In the pipeline
 
 - Source: a `gui/` folder in this repository, beside `tui/` (decided
