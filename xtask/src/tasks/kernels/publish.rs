@@ -22,7 +22,7 @@ use crate::cli::PublishArgs;
 
 const STEPS: [&str; 6] = ["fetch", "config", "build", "package", "boot", "upload"];
 const TAG: &str = "0.0.0-pre-alpha";
-const RECIPE: &str = "distro/builder/recipes/linux-prebuilt.rhai";
+const RECIPE: &str = "distro/builder/os-recipes/linux-prebuilt.rhai";
 const HEARTBEAT: Duration = Duration::from_secs(60);
 const BUILD_STALL: Duration = Duration::from_secs(10 * 60);
 const BUILD_LIMIT: Duration = Duration::from_secs(120 * 60);
@@ -842,7 +842,7 @@ fn upload(ctx: &Ctx) -> Result<()> {
     eprintln!("  - tools/recipe/tests/e2e/kernel_acquisition.rs hard-codes the AcornOS digest; update it.");
     eprintln!("Commit (no branches; submodule first):");
     eprintln!(
-        "  git -C distro/builder commit -m 'Publish the {} {} kernel' -- recipes/linux-prebuilt.rhai && git -C distro/builder push origin main",
+        "  git -C distro/builder commit -m 'Publish the {} {} kernel' -- os-recipes/linux-prebuilt.rhai && git -C distro/builder push origin main",
         ctx.distro, ctx.pin.release
     );
     eprintln!("  git commit -m 'Point distro/builder at the {} {} kernel' -- distro/builder && git push origin master", ctx.distro, ctx.pin.release);

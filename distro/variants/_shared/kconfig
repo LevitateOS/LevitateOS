@@ -1,7 +1,7 @@
 # =============================================================================
 # Kernel configuration shared by every variant
 #
-# The kernel recipe (distro/builder/recipes/linux.rhai) starts from
+# The kernel recipe (distro/builder/os-recipes/linux.rhai) starts from
 # x86_64_defconfig, applies this file and then the variant's own `kconfig`
 # (only the options of its kernel line), sets CONFIG_LOCALVERSION from the
 # variant id, and runs olddefconfig. Every CONFIG_ line here must survive

@@ -80,7 +80,15 @@ networkmanager-wifi network-manager-applet breeze-icons font-noto firefox`.
 
 Apps come through Recipe, as on the base system; the desktop adds no other
 package manager, store or bundle format (see `AGENTS.md`, "Recipe is the
-product"). What the desktop still needs from Recipe: recipes for the apps
+product"). Apps bundled by the variant's desktop package list are part of the
+OS image and its update lifecycle. Their producers live in
+`distro/builder/os-recipes/`. Independently user-managed software belongs in the
+top-level `recipes/` catalog, currently without packages. Both collections use
+the same Recipe format and engine.
+
+Recipe currently publishes isolated output trees; making those outputs available
+on the running system and managing independent updates/removal still need to be
+implemented. What the desktop also needs from Recipe: recipes for the apps
 people expect, installed apps showing up in the menu with their icons and file
 associations, a notice when something has an update, and, if wanted, a
 graphical front-end beside the command line.

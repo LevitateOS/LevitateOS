@@ -17,7 +17,7 @@ os_version = "1.0"
 # default hostname (`os_id`), login prompt (`<os_id> login:`) and kernel
 # localversion (`-<variant id>`) follow from the identity, and the bun TUI binary
 # is built for the libc. `kernel_line` picks the kernel: its exact version is
-# pinned in distro/builder/recipes/kernel/metadata.rhai, its configuration is
+# pinned in distro/builder/os-recipes/kernel/metadata.rhai, its configuration is
 # ../_shared/kconfig plus `kconfig` beside this file.
 [profile]
 packages = "rpm"
@@ -28,8 +28,8 @@ desktop = "plasma"
 kernel_line = "latest"
 
 [sources.rootfs_source]
-recipe_script = "distro/builder/recipes/fedora-rpm-source-rootfs.rhai"
-preseed_recipe_script = "distro/builder/recipes/fedora-rpm-preseed.rhai"
+recipe_script = "distro/builder/os-recipes/fedora-rpm-source-rootfs.rhai"
+preseed_recipe_script = "distro/builder/os-recipes/fedora-rpm-preseed.rhai"
 
 # What the rootfs takes from Fedora 45; `cargo xtask base lock levitate` locks
 # it with every dependency.
@@ -154,7 +154,7 @@ packages = [
 # lock; the preseed downloads that desktop lock.
 [desktop]
 display_manager = "sddm"
-preseed_recipe_script = "distro/builder/recipes/fedora-rpm-desktop-preseed.rhai"
+preseed_recipe_script = "distro/builder/os-recipes/fedora-rpm-desktop-preseed.rhai"
 packages = [
   "plasma-desktop", "plasma-workspace", "kwin", "sddm", "sddm-breeze", "sddm-wayland-plasma",
   "xorg-x11-server-Xwayland", "konsole", "dolphin", "kwrite", "ark", "spectacle",

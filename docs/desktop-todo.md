@@ -9,7 +9,7 @@ built), [desktop-theming.md](desktop-theming.md) (the look),
 
 How it was made (2026-11-10): the two desktop package requests in
 `distro/variants/<id>/distro.toml`, the four lock files in
-`distro/builder/recipes/sources/`, `installed-system.rhai`, `live-overlay.rhai`
+`distro/builder/os-recipes/sources/`, `installed-system.rhai`, `live-overlay.rhai`
 and recsetup were read. "Not in the lock" means no package of that name is in
 the variant's base or desktop lock today. Nothing here was checked on a running
 desktop.
@@ -22,8 +22,10 @@ Where things go:
   the functions it calls), from files in `distro/variants/<id>/branding/` where
   it needs any.
 - **Live session only**: `live-overlay.rhai`.
-- **Software the user adds later**: Recipe, and nothing else (`AGENTS.md`,
-  "Recipe is the product").
+- **Software the user adds later**: the top-level `recipes/` catalog, using the
+  same Recipe engine as `distro/builder/os-recipes/`. The catalog is currently
+  empty; activation and independent package updates/removal remain to be
+  implemented in Recipe (`AGENTS.md`, "Recipe is the product").
 
 Marks: `[x]` done (committed, unbuilt), `[ ]` to do, **L** LevitateOS,
 **A** AcornOS, **decide** needs the user's choice first.

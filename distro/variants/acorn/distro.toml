@@ -17,7 +17,7 @@ os_version = "1.0"
 # default hostname (`os_id`), login prompt (`<os_id> login:`) and kernel
 # localversion (`-<variant id>`) follow from the identity, and the bun TUI binary
 # is built for the libc. `kernel_line` picks the kernel: its exact version is
-# pinned in distro/builder/recipes/kernel/metadata.rhai, its configuration is
+# pinned in distro/builder/os-recipes/kernel/metadata.rhai, its configuration is
 # ../_shared/kconfig plus `kconfig` beside this file.
 [profile]
 packages = "apk"
@@ -28,8 +28,8 @@ desktop = "lxqt"
 kernel_line = "lts"
 
 [sources.rootfs_source]
-recipe_script = "distro/builder/recipes/alpine-live-source-rootfs.rhai"
-preseed_recipe_script = "distro/builder/recipes/alpine-preseed-source-assets.rhai"
+recipe_script = "distro/builder/os-recipes/alpine-live-source-rootfs.rhai"
+preseed_recipe_script = "distro/builder/os-recipes/alpine-preseed-source-assets.rhai"
 
 # What the rootfs takes from Alpine's v3.24 branch; `cargo xtask base lock
 # acorn` locks it with every dependency.
@@ -124,7 +124,7 @@ packages = [
 # need beyond the base lock; the preseed downloads that desktop lock.
 [desktop]
 display_manager = "sddm"
-preseed_recipe_script = "distro/builder/recipes/alpine-desktop-preseed.rhai"
+preseed_recipe_script = "distro/builder/os-recipes/alpine-desktop-preseed.rhai"
 packages = [
   "lxqt-desktop", "lximage-qt", "pavucontrol-qt", "screengrab", "sddm", "xorg-server",
   "xf86-input-libinput", "eudev", "udev-init-scripts", "udev-init-scripts-openrc",

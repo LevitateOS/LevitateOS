@@ -46,13 +46,31 @@ The live ISO boots into the install screen: a guide beside a shell, using the
 
 ## Recipes
 
-See [`docs/package-recipe-format.md`](docs/package-recipe-format.md) and
-[`tools/recipe/WRITING_RECIPES.md`](tools/recipe/WRITING_RECIPES.md).
+One Rhai format and one engine, [`tools/recipe`](tools/recipe), serve two consumers:
+
+| Collection | Owner and purpose |
+| --- | --- |
+| [`distro/builder/os-recipes/`](distro/builder/os-recipes/) | The OS builder: acquire base packages, build the kernel and tools, and assemble system images and live overlays. `recab` stages and activates system image updates. |
+| [`recipes/`](recipes/) | User-managed software: the application recipe catalog, separate from OS composition. This catalog has no packages yet. |
+
+The split is about who consumes the output and manages its lifetime. Apps bundled
+into the desktop image are OS-owned too. Both collections use Recipe API 2 and
+Ginux; there is no separate recipe language or execution engine.
+
+Currently `recipe install` produces files in an isolated output tree and publishes
+them. Live-system activation and an independent user-package update/removal flow
+remain to be implemented in Recipe. Persistent recipe state alone does not make
+a published program available on the running system.
+
+See [`docs/package-recipe-format.md`](docs/package-recipe-format.md) for ownership
+and output semantics, and [`tools/recipe/WRITING_RECIPES.md`](tools/recipe/WRITING_RECIPES.md)
+for the shared format.
 
 ## Repository layout
 
 ```
 distro/      builder (products and ISOs), contract and variants (per-distro declarations)
+recipes/     user-managed software catalog (no packages yet)
 tools/       recipe, the rec* install and boot tools, ginux (upstream build domains)
 testing/     install-tests (boot/install scenarios)
 tui/         terminal apps for the live ISO and installer

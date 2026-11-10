@@ -76,7 +76,7 @@ pub fn lock_path(root: &Path, distro: &Distro, backend: PackageBackend, layer: L
         Layer::Base => "lock",
         Layer::Desktop => "desktop-lock",
     };
-    root.join("distro/builder/recipes/sources")
+    root.join("distro/builder/os-recipes/sources")
         .join(format!("{}-{backend}-{suffix}.rhai", distro.id()))
 }
 
