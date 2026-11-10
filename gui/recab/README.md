@@ -11,6 +11,16 @@ what recab says may be done.
 
 Qt 6 Widgets, C++20, CMake. Widgets shared with `gui/recipe` and `gui/disk` are in `gui/kit`.
 
+The window is the shared frame from `gui/kit/README.md`: a rail (the three apps;
+"Overview"; "Activity" below), the pages, a strip, and a status line. The
+Ask, clash, work and problem pages are shown in the same place and the rail
+keeps Overview marked. The strip ("The next system holds N changes." and
+"Finish and restart…", which goes to Overview) shows on every page but Overview,
+and on Activity, while the next system holds changes. Activity lists the agent's
+runs from all three apps. The status line has what was read and when, with "Read
+again", and the agent (`Agent: Codex, signed in` when `RECAB_GUI_AGENT` is
+`levitate-agent`; its file name for a stand-in). Default window size 1100 by 700.
+
 ## State (2026-11-10)
 
 **It reads and drives the real recab, and that has not run on a real A/B
@@ -86,6 +96,21 @@ QT_QPA_PLATFORM=offscreen RECAB_GUI_RECAB=$F/recab RECAB_GUI_AGENT=$F/agent \
   RECAB_STANDIN_STATE=/tmp/recab-shots-state RECAB_STANDIN_FAIL_TRIALS=1 RECAB_STANDIN_SPEED=0 \
   .artifacts/recab-gui/build/recab-gui --look levitate --shots /tmp/recab-shots
 ```
+
+Both stories also check the frame, Activity and the strip. For that they make
+runs with `gui/agent/fixtures/records` (stand-in Codex, never a real agent) and
+read them through the built `levitate-agent`, so two more variables name them
+(build the agent first: `cmake --build .artifacts/agent/build`):
+
+```sh
+export RECAB_GUI_RECORDS=$PWD/gui/agent/fixtures/records
+export LEVITATE_ACTIVITY_AGENT=$PWD/.artifacts/agent/build/levitate-agent
+```
+
+Without them the story says what is missing and fails. The pictures `a-*`
+(`r2c-*` in the real story) are Activity: the list, a done run, a run that
+waits, this window's own run, the strip on Activity. The other pictures show
+Overview and the pages inside the frame.
 
 The story the real recab offers (two copies, a change by the agent, a command
 running elsewhere, finishing, setting the restart and cancelling it, the
@@ -211,13 +236,21 @@ allowed to run, and whether it runs as the person or as root are not decided.
 | `src/model.*` | the status, as read from JSON |
 | `src/client.*` | the only code that runs `recab`, the agent and the restart |
 | `src/pages.*` | the system page, ask, work, a clash, what the agent did, the questions |
-| `src/window.*` | the flows between pages |
+| `src/window.*` | the flows between pages, inside the frame |
 | `src/shots.*` | the picture mode and flow check |
 | `fixtures/` | `recab-real`: a stand-in with the real recab's status and commands (with `agent-real`, `reboot-real`, `os-release`); `recab`: the older stand-in with updates, clashes and proposals (with `agent`, `reboot`) |
 | `data/` | the menu entry and the polkit action |
-| `../kit/` | shared with `gui/recipe` and `gui/disk`: widgets, the page base, the work page, the command runner, words, stand-in looks |
+| `../kit/` | shared with `gui/recipe` and `gui/disk`: the frame, Activity, the next-system reader, widgets, the page base, the work page, the command runner, words, stand-in looks (see `../kit/README.md`) |
 
 ## Not done
+
+- Activity lists only the agent's runs. Installs, updates and restarts are not
+  recorded anywhere yet, so they are not listed and nothing is made up for them.
+- A run waiting for an answer can be answered only in the window that started
+  it; Activity says so and offers "Go to it" for this window's own run.
+- The frame, Activity and the strip were checked against stand-ins in the
+  picture modes, offscreen; not on a real desktop, and not with a real Codex.
+- The rail has no Settings or Help: they would lead nowhere yet.
 
 - A run on a real A/B system: the mapping above was written from recab's
   generated types and checked against a stand-in of the same shape, not

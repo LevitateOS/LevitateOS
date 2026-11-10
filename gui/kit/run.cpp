@@ -24,9 +24,14 @@ Run::Run(const QString &program, const QStringList &arguments, QObject *parent)
     });
 }
 
-void Run::setPrompt(const QString &prompt)
+void Run::setPrompt(const QString &prompt, const QString &app, const QString &title)
 {
-    input_ = QJsonDocument(QJsonObject{{"prompt", prompt}}).toJson(QJsonDocument::Compact) + '\n';
+    QJsonObject line{{"prompt", prompt}};
+    if (!app.isEmpty())
+        line["app"] = app;
+    if (!title.isEmpty())
+        line["title"] = title;
+    input_ = QJsonDocument(line).toJson(QJsonDocument::Compact) + '\n';
     open_ = true;
 }
 

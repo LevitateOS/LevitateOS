@@ -11,9 +11,9 @@
 class AskPage;
 class ClashPage;
 class ConfirmDialog;
+class Frame;
 class ProposedPage;
 class Refresher;
-class QLabel;
 class QStackedWidget;
 class SystemPage;
 class WorkPage;
@@ -55,6 +55,7 @@ public:
     void answerAgent(const QString &words);
 
     const Status &status() const { return status_; }
+    Frame *frame() const { return frame_; }
     bool busy() const { return run_ != nullptr || quiet_ > 0 || reading_ != nullptr; }
 
 private:
@@ -64,6 +65,11 @@ private:
     void work(Run *run, const QString &title, const QString &subtitle, std::function<void(bool)> then);
     void chain(QList<Run *> runs);
     void decideByHand();
+    // Shows one of the pages. The rail marks Overview for all of them; when
+    // Activity is showing it stays, and the page changes beneath it.
+    void display(QWidget *page);
+    // The strip about the next system, on every page but Overview.
+    void updateStrip();
 
     RecabClient client_;
     Status status_;
@@ -74,11 +80,11 @@ private:
     int quiet_ = 0;
     std::function<void(bool)> then_;
 
+    Frame *frame_;
     QStackedWidget *stack_;
     SystemPage *system_;
     AskPage *ask_;
     WorkPage *work_;
     ClashPage *clash_;
     ProposedPage *proposed_;
-    QLabel *source_, *activity_;
 };

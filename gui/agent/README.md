@@ -28,9 +28,9 @@ The same as `gui/kit/run.cpp` and `gui/kit/work.cpp` read and write.
 | `question` | `id`, `text`, `choices` (empty: the person types an answer) |
 | `failed` | `reason` |
 | `done` | |
-| `did` | `kind` (`command`, `write` or `search`), `what`, `exit_code` (a number or null), `as_administrator`, `approved` |
+| `did` | `kind` (`command`, `write` or `search`), `what`, `exit_code` (a number or null), `as_administrator`, `asked` (whether the person was asked), `approved` (true or false when asked, null when not) |
 
-`did` is new and today's apps ignore it. It is one event for each thing the
+`did` is read by the Activity page in `gui/kit`; the other pages ignore it. It is one event for each thing the
 agent did, for a page that will list the activity. A `question` that asks to
 run a command also has `kind` (`administrator` or `command`) and `command`;
 today's apps show only `text` and `choices`, and `text` holds the command and
@@ -101,9 +101,9 @@ line, which is how the agent talks to the person:
 - `ASK: question | choice | choice`: a `question`; the answer is the next prompt.
 - `RUN-AS-ADMINISTRATOR: command`, then optionally `BECAUSE: one sentence`: a
   `question` with choices `Approve` and `Refuse`. Approve runs it through the
-  root helper, sends `output` and a `did` with `as_administrator` and
+  root helper, sends `output` and a `did` with `as_administrator`, `asked` true and
   `approved` true, and tells the agent the exit code and the output. Refuse
-  sends a `did` with `approved` false and tells the agent the person refused.
+  sends a `did` with `asked` true and `approved` false and tells the agent the person refused.
 - `RUN: command`: the same, run as the person.
 
 A command is split into arguments here and run without a shell. When it needs
@@ -158,6 +158,12 @@ failing, signed out, dying, stopping with SIGTERM, an agent that speaks the
 protocol itself), also `--list`, `--show` and `--status`, in a scratch
 folder, and prints a line for each expectation that does not hold. It ends with
 `all flows ended where they should` or the opposite, and the exit code agrees.
+`fixtures/records STATE-FOLDER` fills a state folder with four runs (done with
+commands and a file change, waiting on a question, failed, an administrator
+step refused; from Recipe and System) by driving the built `levitate-agent`
+with the stand-in, so that the Activity page of an app has something to show.
+The waiting run is kept alive (a record only says "waiting" while its process
+lives); `fixtures/records --stop STATE-FOLDER` ends it.
 There are no unit tests (project rule, `AGENTS.md`).
 
 ## Not done
@@ -171,10 +177,6 @@ There are no unit tests (project rule, `AGENTS.md`).
   `RUN-AS-ADMINISTRATOR:` with Approve and Refuse, the real `pkexec`, a todo
   list as steps, file changes, a turn that fails, and what a sign-in failure
   prints.
-- **A `did` for a command the agent ran itself in its sandbox says
-  `"approved": true`**, though nobody was asked. It should say that it was
-  not asked about; whoever builds the page that reads the record should
-  settle the field.
 - **No Claude Code adapter.**
 - **A run ends with the window that started it.** There is no background
   service; closing the window closes the run (the record says `stopped`).

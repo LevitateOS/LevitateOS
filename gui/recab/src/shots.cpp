@@ -1,12 +1,21 @@
 #include "shots.h"
 
+#include "activity.h"
+#include "frame.h"
 #include "look.h"
+#include "nextsystem.h"
 #include "pages.h"
 #include "window.h"
 
 #include <QDir>
 #include <QElapsedTimer>
+#include <QFileInfo>
+#include <QProcess>
+#include <QPushButton>
 #include <QTextStream>
+
+#include <csignal>
+#include <functional>
 
 namespace {
 
@@ -27,6 +36,172 @@ QString asked(const char *request)
     return QStringLiteral("The request:\n%1\n\nThe expected result:\nAfter a restart the change is in effect and the "
                           "system starts as before. Nothing else changes.\n")
         .arg(QLatin1String(request));
+}
+
+
+// ---------------------------------------------------------------- Activity
+//
+// The pages of the frame that are not recab's: Activity, and the strip about
+// the next system. They need runs to show, which `gui/agent/fixtures/records`
+// makes by driving the built levitate-agent with the stand-in Codex. Both
+// stories call this while the next system holds changes.
+
+using Save = std::function<void(QWidget &, const QString &)>;
+using Expect = std::function<void(const QString &, bool)>;
+
+void waitFor(const std::function<bool()> &holds, int seconds = 20)
+{
+    QElapsedTimer clock;
+    clock.start();
+    while (!holds() && clock.elapsed() < seconds * 1000)
+        settle(50);
+    settle(150);
+}
+
+void clickButton(QWidget *inside, const QString &words)
+{
+    for (QPushButton *button : inside->findChildren<QPushButton *>())
+        if (button->text() == words && button->isVisible())
+            button->click();
+}
+
+// `holds`: how many changes the next system holds now, as the window knows.
+void activityShots(Window &window, const QString &folder, const QString &prefix, int holds, const Save &save,
+                   const Expect &expect, QTextStream &out)
+{
+    Frame *frame = window.frame();
+    const QString script = qEnvironmentVariable("RECAB_GUI_RECORDS");
+    const QString agent = qEnvironmentVariable("LEVITATE_ACTIVITY_AGENT");
+    if (script.isEmpty() || agent.isEmpty()) {
+        out << "not as expected: Activity needs RECAB_GUI_RECORDS (gui/agent/fixtures/records) and "
+               "LEVITATE_ACTIVITY_AGENT (the built levitate-agent), see README.md\\n";
+        expect(QStringLiteral("the records for Activity could be made"), false);
+        return;
+    }
+    // The runs, in a folder of their own; the page reads them through levitate-agent.
+    const QString where = QDir(folder).filePath(prefix + "-records");
+    QProcess make;
+    make.start(script, {where, agent});
+    make.waitForFinished(60000);
+    const QString said = QString::fromUtf8(make.readAllStandardOutput()).trimmed();
+    expect(QStringLiteral("the records for Activity were made (%1)").arg(QString::fromUtf8(make.readAllStandardError()).trimmed()),
+           make.exitStatus() == QProcess::NormalExit && make.exitCode() == 0 && said.startsWith("state="));
+    if (!said.startsWith("state="))
+        return;
+    const QString state = said.section(' ', 0, 0).mid(6);
+    const qint64 waitingPid = said.section("waiting_pid=", 1).toLongLong();
+    qputenv("XDG_STATE_HOME", state.toUtf8());
+    ActivityPage *page = frame->activity();
+
+    // What the rail shows before Activity is opened: the badge is true from the start.
+    frame->readAgain();
+    waitFor([&] { return page->loaded() && frame->badge(Frame::activityKey()) > 0; });
+    expect(QStringLiteral("the Activity entry counts the one run that waits"),
+           frame->badge(Frame::activityKey()) == 1 && frame->badgeWarns(Frame::activityKey()));
+
+    frame->choose(Frame::activityKey());
+    waitFor([&] { return page->listedTitles().size() == 4 && !page->detailText().isEmpty(); });
+    expect(QStringLiteral("Activity is showing and marked"), frame->activityShown() && frame->selected() == Frame::activityKey());
+    expect(QStringLiteral("Activity lists the four runs, newest first"),
+           page->listedTitles()
+               == QStringList({"Install the NVIDIA driver", "Update Element", "Turn off password logins over ssh",
+                               "Install htop for this computer"}));
+    expect(QStringLiteral("the newest run is chosen and shows the administrator step the person refused"),
+           page->detailText().contains("you refused, so it was not run") && page->detailText().contains("id -u")
+               && page->detailText().contains("The whole prompt"));
+    expect(QStringLiteral("a run that is over is not offered as answerable"), !page->offersGoTo());
+    save(window, prefix + "-activity-list");
+
+    // A run that is done: what it ran and changed, and where.
+    page->chooseTitle("Install htop for this computer");
+    waitFor([&] { return page->detailText().contains("ls -l"); });
+    expect(QStringLiteral("a done run shows its commands, its files and the agent's last word"),
+           page->detailText().contains("ls -l") && page->detailText().contains("/home/x/a.txt")
+               && page->detailText().contains("in the agent's sandbox")
+               && page->detailText().contains("I made the change. Everything checks out."));
+    expect(QStringLiteral("a done run has no way to be answered"), !page->offersGoTo());
+    save(window, prefix + "-a-done-run");
+
+    page->chooseTitle("Turn off password logins over ssh");
+    waitFor([&] { return page->detailText().contains("It asks"); });
+    expect(QStringLiteral("a run that waits says that only its own window can answer it"),
+           page->detailText().contains("It asks") && page->detailText().contains("Which colour?")
+               && page->detailText().contains("Only the window that started it, in System, can answer")
+               && !page->offersGoTo());
+    save(window, prefix + "-a-run-that-waits");
+
+    // The same run is this window's own live run: it can be gone to.
+    page->setOwnRun(waitingPid);
+    waitFor([&] { return page->offersGoTo(); });
+    expect(QStringLiteral("this window's own live run offers Go to it"),
+           page->offersGoTo() && page->detailText().contains("It waits in this window"));
+    save(window, prefix + "-this-windows-own-run");
+    clickButton(page, QStringLiteral("Go to it"));
+    settle(200);
+    expect(QStringLiteral("Go to it leaves Activity for the app's own pages"),
+           !frame->activityShown() && frame->selected() == "overview");
+    frame->choose(Frame::activityKey());
+    page->setOwnRun(0);
+    waitFor([&] { return page->loaded() && !page->offersGoTo(); });
+
+    // The filter.
+    page->showOnlyThisApp(true);
+    expect(QStringLiteral("only this app's runs are listed"),
+           page->listedTitles() == QStringList({"Install the NVIDIA driver", "Turn off password logins over ssh"}));
+    page->showOnlyThisApp(false);
+    expect(QStringLiteral("all apps again"), page->listedTitles().size() == 4);
+
+    // The strip, here, while the next system holds changes.
+    expect(QStringLiteral("the strip shows on Activity while the next system holds changes"),
+           frame->stripShown()
+               && frame->stripText() == (holds == 1 ? QStringLiteral("The next system holds 1 change.")
+                                                    : QStringLiteral("The next system holds %1 changes.").arg(holds)));
+    save(window, prefix + "-activity-with-the-strip");
+
+    // And on the pages that are not Overview, but not on Overview.
+    frame->choose(QStringLiteral("overview"));
+    settle(200);
+    expect(QStringLiteral("Overview is marked and carries no strip"),
+           !frame->activityShown() && frame->selected() == "overview" && !frame->stripShown());
+    window.showAsk();
+    settle(100);
+    expect(QStringLiteral("the strip shows on the page where a change is asked for"), frame->stripShown());
+    window.showMain();
+    settle(100);
+    expect(QStringLiteral("and goes again on Overview"), !frame->stripShown());
+
+    // The agent in the status line, asked of levitate-agent with the stand-in Codex.
+    const QString codex = QDir(QFileInfo(script).absolutePath()).filePath("codex");
+    qputenv("LEVITATE_AGENT_CODEX", codex.toUtf8());
+    const QString stand = qEnvironmentVariable("RECAB_GUI_AGENT");
+    auto agentSays = [&](const QString &words) {
+        waitFor([&] { return frame->agentText() == words; }, 10);
+        return frame->agentText() == words;
+    };
+    frame->setAgent(agent);
+    expect(QStringLiteral("the status line names the agent and that it is signed in (%1)").arg(frame->agentText()),
+           agentSays(QStringLiteral("Agent: Codex, signed in")));
+    qputenv("LEVITATE_STANDIN_SIGNED_OUT", "1");
+    frame->readAgain();
+    expect(QStringLiteral("the status line says when it is not signed in (%1)").arg(frame->agentText()),
+           agentSays(QStringLiteral("Agent: Codex, not signed in")));
+    qunsetenv("LEVITATE_STANDIN_SIGNED_OUT");
+    qputenv("LEVITATE_AGENT_CODEX", "/nonexistent/codex");
+    frame->readAgain();
+    expect(QStringLiteral("the status line says when it is not installed (%1)").arg(frame->agentText()),
+           agentSays(QStringLiteral("Agent: Codex is not installed")));
+    save(window, prefix + "-agent-not-installed");
+    qunsetenv("LEVITATE_AGENT_CODEX");
+    frame->setAgent(stand);
+    expect(QStringLiteral("a stand-in agent is shown by its file name"),
+           frame->agentText() == QStringLiteral("Agent: %1").arg(QFileInfo(stand).fileName()));
+
+    // Over: the waiting agent is stopped, and the page forgets the records.
+    QProcess::execute(script, {"--stop", where});
+    qunsetenv("XDG_STATE_HOME");
+    page->setOwnRun(0);
+    window.showMain();
+    settle(100);
 }
 
 } // namespace
@@ -90,6 +265,7 @@ int takeShots(Window &window, const QString &folder)
     waitUntilIdle(window);
     expect("a second change joins the same next system", window.status().changes.size() == 2);
     save(window, "06-next-system");
+    activityShots(window, folder, "a", int(window.status().changes.size()), save, expect, out);
 
     window.addUpdate(false);
     waitUntilIdle(window);
@@ -195,6 +371,18 @@ int takeRealShots(Window &window, const QString &folder)
                && window.status().changes.size() == 1);
     expect("the change says the agent made it", window.status().changeTitles().value(0).contains("by the agent"));
     save(window, "r2-the-next-system-is-open");
+    activityShots(window, folder, "r2c", int(window.status().changes.size()), save, expect, out);
+    {
+        // The reader the other two apps use for their strip, against the same recab.
+        NextSystem next(qEnvironmentVariable("RECAB_GUI_RECAB"));
+        bool answered = false;
+        QObject::connect(&next, &NextSystem::known, [&] { answered = true; });
+        next.read();
+        waitFor([&] { return answered; });
+        expect("the next-system reader finds the one change the window knows",
+               answered && next.titles().size() == window.status().changes.size()
+                   && next.titles() == window.status().changeTitles());
+    }
 
     // A command started in a terminal is running: nothing can be started here.
     qputenv("RECAB_STANDIN_WORKING", "1");

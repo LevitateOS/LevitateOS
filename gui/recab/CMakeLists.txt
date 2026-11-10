@@ -21,6 +21,9 @@ qt_add_executable(recab-gui
     ../kit/page.cpp
     ../kit/refresh.cpp
     ../kit/work.cpp
+    ../kit/frame.cpp
+    ../kit/activity.cpp
+    ../kit/nextsystem.cpp
 )
 target_include_directories(recab-gui PRIVATE ../kit)
 target_compile_options(recab-gui PRIVATE -Wall -Wextra)

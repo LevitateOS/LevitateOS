@@ -226,8 +226,11 @@ void Codex::onItem(const QString &phase, const QJsonObject &item)
         for (const QString &line : cappedLines(item["aggregated_output"].toString(), 30))
             output(line);
         const QString status = item["status"].toString();
+        // Run by the agent in its own sandbox: nobody was asked, unless
+        // Codex itself asked and was refused.
+        const bool declined = status == QLatin1String("declined");
         did(QStringLiteral("command"), command, item["exit_code"].isNull() ? QJsonValue() : item["exit_code"], false,
-            status != QLatin1String("declined"));
+            declined, declined ? QJsonValue(false) : QJsonValue());
     } else if (kind == QLatin1String("file_change")) {
         if (!completed || finished_.contains(id) || item["status"].toString() == QLatin1String("failed"))
             return;
@@ -235,14 +238,14 @@ void Codex::onItem(const QString &phase, const QJsonObject &item)
         for (const QJsonValue &change : item["changes"].toArray()) {
             const QString path = change["path"].toString();
             output(QStringLiteral("%1 %2").arg(change["kind"].toString(QStringLiteral("changed")), path));
-            did(QStringLiteral("write"), path, QJsonValue(), false, true);
+            did(QStringLiteral("write"), path, QJsonValue(), false, false, QJsonValue());
         }
     } else if (kind == QLatin1String("todo_list")) {
         onTodo(item);
     } else if (kind == QLatin1String("web_search")) {
         if (completed && !finished_.contains(id)) {
             finished_ << id;
-            did(QStringLiteral("search"), item["query"].toString(), QJsonValue(), false, true);
+            did(QStringLiteral("search"), item["query"].toString(), QJsonValue(), false, false, QJsonValue());
         }
     } else if (kind == QLatin1String("agent_message")) {
         if (completed && !finished_.contains(id)) {
@@ -386,7 +389,7 @@ void Codex::answered(const QString &id, const QString &answer, const QByteArray 
         execute(pending);
         return;
     }
-    did(QStringLiteral("command"), pending.wish.text, QJsonValue(), admin, false);
+    did(QStringLiteral("command"), pending.wish.text, QJsonValue(), admin, true, false);
     turn(QStringLiteral("The person refused to let `%1` run. Do not try another way to get the same result. "
                         "Carry on without it, or finish and say what is left undone.")
              .arg(pending.wish.text));
@@ -420,7 +423,7 @@ void Codex::execute(const Pending &pending)
             output(line);
         if (!ran)
             output(problem);
-        did(QStringLiteral("command"), command, code, admin, true);
+        did(QStringLiteral("command"), command, code, admin, true, true);
         QString result = ran ? QStringLiteral("Exit code: %1").arg(child->exitCode()) : problem;
         turn(QStringLiteral("The person approved `%1`%2 and it was run. %3\nOutput:\n%4")
                  .arg(command, admin ? QStringLiteral(" as administrator") : QString(), result,
@@ -476,12 +479,14 @@ void Codex::output(const QString &text)
     session_->send({{"event", "output"}, {"line", text}});
 }
 
-void Codex::did(const QString &kind, const QString &what, const QJsonValue &exitCode, bool administrator, bool approved)
+void Codex::did(const QString &kind, const QString &what, const QJsonValue &exitCode, bool administrator, bool asked,
+                const QJsonValue &approved)
 {
     session_->send({{"event", "did"},
                     {"kind", kind},
                     {"what", what},
                     {"exit_code", exitCode},
                     {"as_administrator", administrator},
+                    {"asked", asked},
                     {"approved", approved}});
 }

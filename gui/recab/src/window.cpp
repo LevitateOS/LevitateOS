@@ -2,17 +2,36 @@
 
 #include "pages.h"
 
+#include "activity.h"
+#include "frame.h"
 #include "refresh.h"
 
 #include <QTimer>
-#include <QLabel>
 #include <QLocale>
 #include <QMessageBox>
 #include <QPushButton>
 #include <QStackedWidget>
-#include <QStatusBar>
 #include <QTime>
 #include <QToolButton>
+
+namespace {
+
+// What Activity calls a run: the first line under "The request:", else under
+// "The issue:", else the title of the page that shows it.
+QString requestTitle(const QString &prompt, const QString &fallback)
+{
+    for (const QString &heading : {QStringLiteral("The request:"), QStringLiteral("The issue:")}) {
+        const qsizetype at = prompt.indexOf(heading);
+        if (at < 0)
+            continue;
+        const QString line = prompt.mid(at + heading.size()).trimmed().section(QLatin1Char('\n'), 0, 0).trimmed();
+        if (!line.isEmpty())
+            return line.size() > 90 ? line.left(89).trimmed() + QStringLiteral("…") : line;
+    }
+    return fallback;
+}
+
+} // namespace
 
 Window::Window(QWidget *parent)
     : QMainWindow(parent)
@@ -28,13 +47,30 @@ Window::Window(QWidget *parent)
     for (QWidget *page : {static_cast<QWidget *>(system_), static_cast<QWidget *>(ask_), static_cast<QWidget *>(work_),
                           static_cast<QWidget *>(clash_), static_cast<QWidget *>(proposed_)})
         stack_->addWidget(page);
-    setCentralWidget(stack_);
 
-    source_ = new QLabel(tr("Read from recab on this machine"));
-    activity_ = new QLabel(tr("Agent: %1").arg(client_.agentName()));
-    statusBar()->addWidget(source_);
-    statusBar()->addPermanentWidget(activity_);
-    statusBar()->setSizeGripEnabled(false);
+    // The frame is the window: rail, the pages above, the strip, the status line.
+    frame_ = new Frame(Frame::System);
+    frame_->setContent(stack_);
+    frame_->addEntry(QStringLiteral("overview"), tr("Overview"));
+    frame_->select(QStringLiteral("overview"));
+    frame_->setAgent(client_.agentProgram());
+    frame_->setStatus(tr("Read from recab on this machine"));
+    setCentralWidget(frame_);
+    connect(frame_, &Frame::chosen, this, [this](const QString &key) {
+        if (key == Frame::activityKey())
+            updateStrip();
+        else
+            showMain();
+    });
+    // The strip's button goes where the next system is finished: Overview.
+    connect(frame_, &Frame::finishRequested, this, [this] {
+        frame_->select(QStringLiteral("overview"));
+        showMain();
+    });
+    connect(frame_, &Frame::goToRun, this, [this] {
+        frame_->select(QStringLiteral("overview"));
+        display(work_);
+    });
 
     connect(system_, &SystemPage::ask, this, [this] { showAsk(); });
     connect(system_, &SystemPage::addUpdate, this, [this] { addUpdate(); });
@@ -57,10 +93,11 @@ Window::Window(QWidget *parent)
 
     connect(work_, &WorkPage::back, this, &Window::showMain);
     connect(work_, &WorkPage::activity, this, [this](const QString &words) {
-        activity_->setText(words.isEmpty() ? tr("Agent: %1").arg(client_.agentName()) : words);
+        frame_->setAgentNote(words);
     });
     connect(work_, &WorkPage::done, this, [this](bool ok) {
         run_ = nullptr;
+        frame_->setOwnRun(0); // Activity reads the run's record again
         auto then = then_;
         then_ = nullptr;
         reload([then, ok] {
@@ -91,12 +128,13 @@ Window::Window(QWidget *parent)
         if (stack_->currentWidget() == system_ || byHand)
             refresh();
     });
+    connect(refresher_, &Refresher::asked, frame_, &Frame::readAgain);
     auto *again = new QToolButton;
     again->setText(tr("Read again"));
     again->setToolTip(tr("Read the system again (F5)"));
     again->setAutoRaise(true);
     connect(again, &QToolButton::clicked, this, &Window::refresh);
-    statusBar()->addWidget(again);
+    frame_->addStatusWidget(again);
 
     reload([this] { showMain(); });
 }
@@ -122,9 +160,9 @@ void Window::reload(std::function<void()> then)
     if (!read_) {
         system_->showLoading(tr("Reading the system"),
                              tr("Asking recab what is running, what is beside it and what can be done."));
-        stack_->setCurrentWidget(system_);
+        display(system_);
     }
-    source_->setText(tr("Reading the system…"));
+    frame_->setStatus(tr("Reading the system…"));
     connect(reading_, &Run::finished, this, [this, then](bool ok) {
         Run *run = reading_;
         reading_ = nullptr;
@@ -133,16 +171,17 @@ void Window::reload(std::function<void()> then)
         Status status;
         bool permission = false;
         if (!client_.understand(run, ok, &status, &problem, &permission)) {
-            source_->setText(tr("The system could not be read"));
+            frame_->setStatus(tr("The system could not be read"));
             system_->showProblem(problem, permission && !asRoot_);
-            stack_->setCurrentWidget(system_);
+            display(system_);
             asRoot_ = false; // a refused password is not asked for again unasked
             return;
         }
         status_ = status;
         read_ = true;
+        updateStrip();
         refresher_->fresh();
-        source_->setText(tr("Read from recab at %1").arg(QLocale().toString(QTime::currentTime(), QLocale::ShortFormat)));
+        frame_->setStatus(tr("Read from recab at %1").arg(QLocale().toString(QTime::currentTime(), QLocale::ShortFormat)));
         if (then)
             then();
         // A command started elsewhere is working: look again until it is done.
@@ -162,22 +201,36 @@ void Window::answerAgent(const QString &words)
     work_->answer(words);
 }
 
+void Window::display(QWidget *page)
+{
+    stack_->setCurrentWidget(page);
+    frame_->follow(QStringLiteral("overview"));
+    updateStrip();
+}
+
+void Window::updateStrip()
+{
+    // Overview says it itself; every other page, and Activity, gets the strip.
+    frame_->setStripAllowed(frame_->activityShown() || stack_->currentWidget() != system_);
+    frame_->setNextSystem(status_.otherRole == QLatin1String("next") ? status_.changeTitles() : QStringList());
+}
+
 void Window::showMain()
 {
     system_->show(status_);
-    stack_->setCurrentWidget(system_);
+    display(system_);
 }
 
 void Window::showAsk(const QString &request)
 {
     ask_->show(status_, request);
-    stack_->setCurrentWidget(ask_);
+    display(ask_);
 }
 
 void Window::showClash()
 {
     clash_->show(status_);
-    stack_->setCurrentWidget(clash_);
+    display(clash_);
 }
 
 ConfirmDialog *Window::reuseQuestion()
@@ -201,8 +254,9 @@ void Window::work(Run *run, const QString &title, const QString &subtitle, std::
     run_ = run;
     then_ = std::move(then);
     work_->begin(title, subtitle, run);
-    stack_->setCurrentWidget(work_);
+    display(work_);
     run->start();
+    frame_->setOwnRun(run->pid());
 }
 
 // Short changes with no page of their own, one after another.
@@ -240,17 +294,17 @@ void Window::handOver(const QString &prompt, bool askFirst)
         if (question->exec() != QDialog::Accepted)
             return;
     }
-    work(client_.agent(prompt), tr("Preparing the next system"),
+    work(client_.agent(prompt, requestTitle(prompt, tr("Preparing the next system"))), tr("Preparing the next system"),
          tr("The running system is not touched. You can keep working."), [this](bool) { showMain(); });
 }
 
 void Window::fixWithAgent(const QString &prompt, const QString &title)
 {
-    work(client_.agent(prompt), title, tr("It works in the next system only. The running system is not touched."),
+    work(client_.agent(prompt, requestTitle(prompt, title)), title, tr("It works in the next system only. The running system is not touched."),
          [this](bool ok) {
              if (ok && !status_.proposalPath.isEmpty()) {
                  proposed_->show(status_);
-                 stack_->setCurrentWidget(proposed_);
+                 display(proposed_);
              } else {
                  showMain();
              }

@@ -5,6 +5,7 @@
 
 #include <QFrame>
 #include <QLabel>
+#include <QPalette>
 #include <QWidget>
 
 class QVBoxLayout;
@@ -106,4 +107,32 @@ protected:
 private:
     int number_;
     State state_ = Pending;
+};
+
+// What a short piece of state says: "this needs you", "this went well", "this
+// went wrong". The colours follow the palette's lightness, so the words stay
+// readable on the dark Levitate look and on the light Acorn one.
+enum class Mood { Plain, Warn, Ok, Bad };
+QColor moodColour(const QPalette &palette, Mood mood);
+
+// A label that never makes its line wider than the room it is given: what
+// does not fit ends in an ellipsis, and the whole text is its tooltip.
+class ElidedLabel : public QLabel {
+public:
+    explicit ElidedLabel(const QString &words, QWidget *parent = nullptr);
+    void setMood(Mood mood);
+    QSize minimumSizeHint() const override { return {0, QLabel::minimumSizeHint().height()}; }
+protected:
+    void paintEvent(QPaintEvent *event) override;
+};
+
+// A small outlined count or state ("1 running"), in the colour of its mood.
+class Chip : public QLabel {
+public:
+    explicit Chip(const QString &words, Mood mood = Mood::Plain, QWidget *parent = nullptr);
+    QSize sizeHint() const override;
+protected:
+    void paintEvent(QPaintEvent *event) override;
+private:
+    Mood mood_;
 };

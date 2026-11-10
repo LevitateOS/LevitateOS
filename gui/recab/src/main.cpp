@@ -32,7 +32,7 @@ int main(int argc, char **argv)
         applyLook(parser.value(look));
 
     Window window;
-    window.resize(900, 620);
+    window.resize(1100, 700);
     if (parser.isSet(shots))
         return parser.isSet(real) ? takeRealShots(window, parser.value(shots)) : takeShots(window, parser.value(shots));
     window.show();

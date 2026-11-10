@@ -104,10 +104,10 @@ Run *RecabClient::change(const QStringList &arguments)
     return new Run(rootHelper_, QStringList{program_} + all, this);
 }
 
-Run *RecabClient::agent(const QString &prompt)
+Run *RecabClient::agent(const QString &prompt, const QString &title)
 {
     auto *run = new Run(agent_, {}, this);
-    run->setPrompt(prompt);
+    run->setPrompt(prompt, QStringLiteral("System"), title);
     return run;
 }
 

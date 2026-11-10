@@ -151,8 +151,10 @@ def story_plain():
     dids = run.of("did")
     check([d["kind"] for d in dids] == ["command", "command", "write", "write", "search"],
           "plain: one did for each thing done (%s)" % [d["kind"] for d in dids])
-    check(dids and dids[0]["exit_code"] == 0 and dids[0]["as_administrator"] is False and dids[0]["approved"] is True
-          and dids[0]["what"] == "ls -l", "plain: a command did has its fields")
+    check(dids and dids[0]["exit_code"] == 0 and dids[0]["as_administrator"] is False and dids[0]["asked"] is False
+          and dids[0]["approved"] is None and dids[0]["what"] == "ls -l",
+          "plain: a command run in the sandbox was not asked about, so approved is null")
+    check(all(d["asked"] is False and d["approved"] is None for d in dids), "plain: no did was asked about")
     check(dids[2]["what"] == "/home/x/a.txt" and dids[3]["what"] == "/home/x/b.txt", "plain: a did for each path")
     check([e["text"] for e in run.of("say")] == ["Working on it.", "I made the change. Everything checks out."],
           "plain: each message is said")
@@ -238,8 +240,9 @@ def story_administrator(approve):
     dids = run.of("did")
     calls = run.calls()
     check(run.code == 0 and run.kinds()[-1] == "done", name + ": ends with done")
-    check(len(dids) == 1 and dids[0]["as_administrator"] is True and dids[0]["approved"] is approve
-          and dids[0]["what"] == "id -u", name + ": one did with as_administrator and approved=%s" % approve)
+    check(len(dids) == 1 and dids[0]["as_administrator"] is True and dids[0]["asked"] is True
+          and dids[0]["approved"] is approve and dids[0]["what"] == "id -u",
+          name + ": one did, as administrator, asked, approved=%s" % approve)
     if approve:
         uid = str(os.getuid())
         check(dids and dids[0]["exit_code"] == 0 and uid in [e["line"] for e in run.of("output")],
@@ -261,8 +264,8 @@ def story_run():
     check(len(q) == 1 and q[0].get("kind") == "command" and q[0].get("command") == "echo hello from the person",
           "run: a command question")
     dids = run.of("did")
-    check(len(dids) == 1 and dids[0]["as_administrator"] is False and dids[0]["approved"] is True
-          and dids[0]["exit_code"] == 0, "run: one did, run as the person")
+    check(len(dids) == 1 and dids[0]["as_administrator"] is False and dids[0]["asked"] is True
+          and dids[0]["approved"] is True and dids[0]["exit_code"] == 0, "run: one did, asked, approved, run as the person")
     check("hello from the person" in [e["line"] for e in run.of("output")], "run: its output is sent")
     check(run.code == 0 and "hello from the person" in run.calls()[1]["prompt"], "run: the agent gets the output")
     ends_with(run, "done")

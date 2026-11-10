@@ -1,0 +1,148 @@
+#!/usr/bin/env python3
+"""Fills a state folder with a few runs of levitate-agent, so that the Activity
+page of an app has something to show in a picture or a story.
+
+    gui/agent/fixtures/records STATE-FOLDER [PATH-TO-levitate-agent]
+    gui/agent/fixtures/records --stop STATE-FOLDER
+
+It drives the built levitate-agent with the stand-in codex (fixtures/codex),
+never a real agent, and the root helper set to nothing. Four runs, from two
+apps:
+
+  Recipe  done, with commands, file changes and a search (story "plain")
+  System  waiting on a question, still alive (story "asks")
+  Recipe  failed (story "fails")
+  System  an administrator step the person refused (story "administrator")
+
+A record whose last line is a question is only "waiting" while its process
+lives, so the waiting run is left running: a small holder process keeps its
+input open. `--stop` ends it (its record then says stopped). Run `--stop`
+when the check is over.
+
+Prints one line: the folder to give the app as XDG_STATE_HOME, and the pid of
+the waiting agent, as `state=FOLDER/state waiting_pid=N`. Exits non-zero, with
+the reason on standard error, when a run did not end where it should.
+"""
+import json
+import os
+import shutil
+import signal
+import subprocess
+import sys
+import time
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+ROOT = os.path.abspath(os.path.join(HERE, "..", "..", ".."))
+STANDIN = os.path.join(HERE, "codex")
+
+
+def environment(folder, story):
+    env = dict(os.environ)
+    for key in [k for k in env if k.startswith(("LEVITATE_", "XDG_"))]:
+        del env[key]
+    log = os.path.join(folder, "standin-%s.log" % story)
+    for suffix in ("", ".turns"):
+        if os.path.exists(log + suffix):
+            os.remove(log + suffix)
+    env.update(HOME=os.path.join(folder, "home"), XDG_STATE_HOME=os.path.join(folder, "state"),
+               XDG_CONFIG_HOME=os.path.join(folder, "config"), LEVITATE_AGENT_CODEX=STANDIN,
+               LEVITATE_AGENT_ROOT_HELPER="", LEVITATE_STANDIN_LOG=log, LEVITATE_STANDIN_STORY=story)
+    return env
+
+
+def drive(binary, folder, story, app, title, prompt, answer=None, keep=False):
+    """One run. Returns the process when `keep`, which is then waiting."""
+    proc = subprocess.Popen([binary], stdin=subprocess.PIPE, stderr=subprocess.PIPE, stdout=subprocess.PIPE,
+                            env=environment(folder, story), start_new_session=True)
+    proc.stdin.write((json.dumps({"prompt": prompt, "app": app, "title": title}) + "\n").encode())
+    proc.stdin.flush()
+    while True:
+        line = proc.stderr.readline()
+        if not line:
+            break
+        try:
+            event = json.loads(line)
+        except ValueError:
+            continue
+        if event.get("event") == "question":
+            if keep:
+                return proc
+            proc.stdin.write((json.dumps({"question": event["id"], "answer": answer}) + "\n").encode())
+            proc.stdin.flush()
+    proc.wait(timeout=30)
+    return proc
+
+
+def hold(proc, folder):
+    """Keeps the waiting agent's pipes open after this script ends."""
+    pid = os.fork()
+    if pid:
+        return pid
+    os.setsid()
+    # The child owns the pipe ends it inherited; it only has to stay.
+    # Let go of the caller's output, or it would wait for this process to end.
+    null = os.open(os.devnull, os.O_RDWR)
+    for fd in (0, 1, 2):
+        os.dup2(null, fd)
+    while True:
+        time.sleep(3600)
+
+
+def stop(folder):
+    path = os.path.join(folder, "waiting.pids")
+    if not os.path.exists(path):
+        return
+    for pid in open(path).read().split():
+        try:
+            os.kill(int(pid), signal.SIGTERM)
+        except ProcessLookupError:
+            pass
+    os.remove(path)
+
+
+def main():
+    args = sys.argv[1:]
+    if args[:1] == ["--stop"] and len(args) == 2:
+        stop(os.path.abspath(args[1]))
+        return 0
+    if not args or len(args) > 2:
+        sys.stderr.write(__doc__)
+        return 2
+    folder = os.path.abspath(args[0])
+    binary = args[1] if len(args) > 1 else os.path.join(ROOT, ".artifacts/agent/build/levitate-agent")
+    stop(folder)
+    shutil.rmtree(folder, ignore_errors=True)
+    os.makedirs(os.path.join(folder, "home"))
+
+    done = drive(binary, folder, "plain", "Recipe", "Install htop for this computer",
+                 "The request:\nInstall htop for this computer.\n\nThe expected result:\nhtop starts from the menu "
+                 "and nothing else changes.\n")
+    time.sleep(1.1)  # the file name of a record has the time to the second
+    waiting = drive(binary, folder, "asks", "System", "Turn off password logins over ssh",
+                    "The request:\nTurn off password logins over ssh; I only use keys.\n\nThe expected result:\n"
+                    "After a restart the change is in effect and the system starts as before. Nothing else "
+                    "changes.\n",
+                    keep=True)
+    time.sleep(1.1)
+    failed = drive(binary, folder, "fails", "Recipe", "Update Element",
+                   "The request:\nUpdate Element to the newest version.\n")
+    time.sleep(1.1)
+    refused = drive(binary, folder, "administrator", "System", "Install the NVIDIA driver",
+                    "The request:\nMy graphics card is an NVIDIA RTX 4070. I want NVIDIA's own driver instead of the "
+                    "built-in one.\n\nThe facts:\nEvery recab command that changes something takes --actor agent.\n\n"
+                    "The expected result:\nAfter a restart the driver is in use.\n",
+                    answer="Refuse")
+
+    if done.returncode != 0 or refused.returncode != 0 or failed.returncode != 1:
+        sys.stderr.write("records: runs ended with %s, %s, %s (expected 0, 1, 0)\n"
+                         % (done.returncode, failed.returncode, refused.returncode))
+        waiting.kill()
+        return 1
+    holder = hold(waiting, folder)
+    open(os.path.join(folder, "waiting.pids"), "w").write("%d %d" % (waiting.pid, holder))
+    print("state=%s waiting_pid=%d" % (os.path.join(folder, "state"), waiting.pid))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

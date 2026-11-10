@@ -14,9 +14,13 @@ public:
     Run(const QString &program, const QStringList &arguments, QObject *parent);
     // Text the command reads on its standard input, then end of input.
     void setInput(const QByteArray &input) { input_ = input; }
-    // For an agent: the prompt as one JSON line, `{"prompt": "..."}`, with the
-    // input left open so its questions can be answered.
-    void setPrompt(const QString &prompt);
+    // For an agent: the prompt as one JSON line, `{"prompt": "...", "app":
+    // "...", "title": "..."}`, with the input left open so its questions can
+    // be answered. `app` and `title` are what the Activity page lists the run
+    // under; either may be left out.
+    void setPrompt(const QString &prompt, const QString &app = QString(), const QString &title = QString());
+    // The process id while it runs, else 0.
+    qint64 pid() const { return process_.processId(); }
     // Answers a `question` event: one JSON line, `{"question": id, "answer": "..."}`.
     void reply(const QString &question, const QString &answer);
     void start();

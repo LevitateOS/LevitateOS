@@ -47,7 +47,8 @@ private:
     void execute(const Pending &pending);
     void fail(const QString &reason);
     void say(const QString &text);
-    void did(const QString &kind, const QString &what, const QJsonValue &exitCode, bool administrator, bool approved);
+    void did(const QString &kind, const QString &what, const QJsonValue &exitCode, bool administrator, bool asked,
+             const QJsonValue &approved);
     void output(const QString &text);
 
     Child *child_ = nullptr;

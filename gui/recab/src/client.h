@@ -31,10 +31,13 @@ public:
     Run *change(const QStringList &arguments);
     // The agent, with the prompt (issue, facts, expected result) on its input
     // as one JSON line; its questions are answered on the same input.
-    Run *agent(const QString &prompt);
+    // `title` is what Activity lists the run under.
+    Run *agent(const QString &prompt, const QString &title = QString());
     Run *reboot();
 
     QString agentName() const;
+    // The program that is started as the agent, as the frame shows it.
+    QString agentProgram() const { return agent_; }
 
 private:
     QStringList realArguments(const QStringList &arguments) const;

@@ -1,6 +1,7 @@
 #include "parts.h"
 
 #include <QFileInfo>
+#include <QFontMetrics>
 #include <QFormLayout>
 #include <QKeyEvent>
 #include <QPainter>
@@ -339,4 +340,72 @@ void StepMark::paintEvent(QPaintEvent *)
         painter.drawLine(c + QPointF(-4, -4), c + QPointF(4, 4));
         painter.drawLine(c + QPointF(4, -4), c + QPointF(-4, 4));
     }
+}
+
+QColor moodColour(const QPalette &palette, Mood mood)
+{
+    const bool dark = palette.color(QPalette::Window).lightness() < 128;
+    switch (mood) {
+    case Mood::Warn:
+        return dark ? QColor(0xf0, 0xb8, 0x66) : QColor(0x8a, 0x5a, 0x00);
+    case Mood::Ok:
+        return dark ? QColor(0x9f, 0xd3, 0xa8) : QColor(0x2f, 0x6b, 0x3f);
+    case Mood::Bad:
+        return dark ? QColor(0xf0, 0xa4, 0x97) : QColor(0xb2, 0x2f, 0x27);
+    case Mood::Plain:
+        break;
+    }
+    QColor colour = palette.color(QPalette::WindowText);
+    colour.setAlphaF(0.66f);
+    return colour;
+}
+
+ElidedLabel::ElidedLabel(const QString &words, QWidget *parent)
+    : QLabel(words, parent)
+{
+    setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Preferred);
+    setToolTip(words);
+}
+
+void ElidedLabel::setMood(Mood mood)
+{
+    QPalette p = palette();
+    p.setColor(QPalette::WindowText, moodColour(p, mood));
+    setPalette(p);
+}
+
+void ElidedLabel::paintEvent(QPaintEvent *)
+{
+    QPainter painter(this);
+    painter.setPen(palette().color(QPalette::WindowText));
+    painter.setFont(font());
+    painter.drawText(rect(), Qt::AlignVCenter | Qt::AlignLeft,
+                     fontMetrics().elidedText(text(), Qt::ElideRight, width()));
+}
+
+Chip::Chip(const QString &words, Mood mood, QWidget *parent)
+    : QLabel(words, parent)
+    , mood_(mood)
+{
+    setAlignment(Qt::AlignCenter);
+}
+
+QSize Chip::sizeHint() const
+{
+    return {fontMetrics().horizontalAdvance(text()) + 18, fontMetrics().height() + 6};
+}
+
+void Chip::paintEvent(QPaintEvent *)
+{
+    QPainter painter(this);
+    painter.setRenderHint(QPainter::Antialiasing);
+    const QColor colour = moodColour(palette(), mood_);
+    QColor line = mood_ == Mood::Plain ? palette().color(QPalette::WindowText) : colour;
+    if (mood_ == Mood::Plain)
+        line.setAlphaF(0.25f);
+    painter.setPen(QPen(line, 1));
+    painter.setBrush(Qt::NoBrush);
+    painter.drawRoundedRect(QRectF(rect()).adjusted(0.5, 0.5, -0.5, -0.5), height() / 2.0, height() / 2.0);
+    painter.setPen(colour);
+    painter.drawText(rect(), Qt::AlignCenter, text());
 }
