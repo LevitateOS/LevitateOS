@@ -37,8 +37,9 @@ Marks: `[x]` done (committed, unbuilt), `[ ]` to do, **L** LevitateOS,
   `sof-firmware` on A). AcornOS leaves NVIDIA's firmware out on purpose.
 - [ ] **L A** CPU microcode is in neither image: nothing puts it in front of
   the initramfs yet (recinit / recuki).
-- [ ] **L A** recstrap's free-space check is 2 GiB; the desktop system is
-  larger. Take the needed size from the image instead of a constant.
+- [x] **L A** recstrap's free space: the 2 GiB floor stays as the check before
+  the image is mounted; once it is, recstrap refuses a target that cannot
+  take the image's own size plus a tenth and 64 MiB, before copying.
 - [ ] **L A** Lock generation needs an exclude list (`--exclude` for dnf), used
   below to drop Fedora's art packages.
 - [x] **A** The accounts Alpine's install scripts would add are read from
@@ -288,18 +289,21 @@ The desktop adds no other package manager, store or bundle format.
 - [ ] **L A** The installer inside a desktop terminal: check the TUI's size
   and colours in Konsole and QTerminal, and that it gets root (sudo / doas for
   the live user).
-- [ ] **L A** recsetup's user step for a desktop install: put the user in the
-  groups the session needs (`wheel video input audio netdev plugdev`, those
-  the image has), as the live overlay does for `live`.
-- [ ] **L A** recsetup sets the console keymap only. On a desktop install also
-  write the X11/Wayland layout: `/etc/X11/xorg.conf.d/00-keyboard.conf` (A,
-  and SDDM on both) and Plasma's default layout (L).
+- [x] **L A** recsetup's user step on a desktop system: every user also joins
+  `distro_profile::DESKTOP_SESSION_GROUPS` (video, input, audio, netdev,
+  plugdev, lpadmin, scanner, camera) where the system has them; the live
+  overlay's user takes the same list.
+- [x] **L A** recsetup's keymap on a desktop system also sets the X11 layout
+  that matches it (systemd's `kbd-model-map` on L, a short table checked
+  against XKB's layouts on A; a warning when none matches):
+  `/etc/X11/xorg.conf.d/00-keyboard.conf`, and `/etc/xdg/kxkbrc` on Plasma.
 - [ ] **L A** recsetup's locale step: Plasma and LXQt take the language from
   it; check both read `/etc/locale.conf` / the profile on their init.
-- [ ] **L A** Autologin choice at install (off by default), written to
-  `/etc/sddm.conf.d/`.
-- [ ] **L A** recsetup's service list shows SDDM without a `.wants` link
-  (it is enabled by alias); show it as enabled.
+- [x] **L A** Autologin choice at install, off by default: the system-setup
+  TUI asks after the user's password on a desktop system; `recsetup
+  --autologin USER` writes `/etc/sddm.conf.d/20-autologin.conf`.
+- [x] **L A** recsetup's service list shows SDDM as enabled (it already
+  followed the `display-manager.service` alias).
 - [ ] **L A** First login: a short welcome (what the system is, how to get
   software with Recipe, how updates work); wanted (decision 7).
 - [x] **L A** The live session must not sleep or lock during an install
@@ -363,6 +367,8 @@ The desktop adds no other package manager, store or bundle format.
 
 ## 12. Documentation and checks
 
+- [ ] **L A** recsetup's docs page (`docs/content`): `--autologin`, the desktop
+  groups and the X11 layout, once the user confirms them.
 - [ ] **L A** User docs: what the desktop ISO is, installing from it, getting
   software with Recipe, updating with recab, switching between light and dark.
 - [ ] **L A** Re-record the install docs stories that show the desktop

@@ -136,6 +136,13 @@ impl Libc {
 /// The group whose members become root through the privilege tool.
 pub const ADMIN_GROUP: &str = "wheel";
 
+/// The groups a desktop session's user is in besides [`ADMIN_GROUP`], for the
+/// devices and services it uses (graphics, input, sound, networks, printers,
+/// scanners, cameras); a user joins those the image has. The live desktop's
+/// user and every user recsetup makes on a desktop system get them.
+pub const DESKTOP_SESSION_GROUPS: &[&str] =
+    &["video", "input", "audio", "netdev", "plugdev", "lpadmin", "scanner", "camera"];
+
 impl PrivilegeTool {
     /// The file, relative to the root, that the system recipe writes the admin
     /// rule into.
