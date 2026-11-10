@@ -620,31 +620,14 @@ void RunPage::onFinished(bool ok)
         facts << tr("The output of the run: %1").arg(counted(lines, tr("%1 line"), tr("%1 lines")));
     facts << unchanged;
 
-    auto *prompt = new Panel;
-    auto *promptTitle = new QVBoxLayout;
-    promptTitle->setSpacing(0);
-    promptTitle->addWidget(strong(tr("What the agent is given")));
-    promptTitle->addWidget(dim(text(tr("You can change the expected result: it says what should be true afterwards."))));
-    prompt->column()->addLayout(promptTitle);
-    auto *form = new QFormLayout;
-    form->setHorizontalSpacing(16);
-    form->setVerticalSpacing(8);
-    form->addRow(strong(tr("The issue")), text(issue, true));
-    form->addRow(strong(tr("The facts")), text(QStringLiteral("• ") + facts.join(QStringLiteral("\n• ")), true));
-    auto *expected = new QPlainTextEdit(
+    auto *prompt = new PromptPanel(
+        issue, facts,
         tr("%1 %2 installs and its own check passes. What the recipe may use stays as it is; if that has to "
            "change, say what and why, and stop.")
             .arg(shown, version));
-    expected->setAccessibleName(tr("The expected result"));
-    expected->setFixedHeight(66);
-    form->addRow(strong(tr("The expected result")), expected);
-    prompt->column()->addLayout(form);
 
     auto *fixNow = primary(tr("Let the agent fix it"));
-    connect(fixNow, &QPushButton::clicked, this, [this, name, issue, facts, expected] {
-        emit fix(name, tr("The issue:\n%1\n\nThe facts:\n- %2\n\nThe expected result:\n%3\n")
-                           .arg(issue, facts.join(QStringLiteral("\n- ")), expected->toPlainText().trimmed()));
-    });
+    connect(fixNow, &QPushButton::clicked, this, [this, name, prompt] { emit fix(name, prompt->prompt()); });
     auto *showOutput = new QPushButton(tr("Show the output"));
     showOutput->setCheckable(true);
     connect(showOutput, &QPushButton::toggled, this, [this](bool on) {

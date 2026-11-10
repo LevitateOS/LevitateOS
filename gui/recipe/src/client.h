@@ -4,32 +4,10 @@
 #pragma once
 
 #include "model.h"
+#include "run.h"
 
 #include <QObject>
 #include <QProcess>
-
-// One running `recipe` command that changes something. It reports the JSON
-// events `recipe --machine-events` writes to stderr, one object per line; any
-// other line is passed on as output.
-class Run : public QObject {
-    Q_OBJECT
-public:
-    Run(const QString &program, const QStringList &arguments, QObject *parent);
-    void start();
-    void stop();
-    QJsonObject failure() const { return failure_; }
-
-signals:
-    void event(const QJsonObject &event);
-    void output(const QString &line);
-    void finished(bool ok);
-
-private:
-    void drain();
-    QProcess process_;
-    QByteArray pending_;
-    QJsonObject failure_;
-};
 
 class RecipeClient : public QObject {
     Q_OBJECT

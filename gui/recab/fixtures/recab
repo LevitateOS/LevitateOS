@@ -1,0 +1,442 @@
+#!/usr/bin/env python3
+"""A stand-in for `recab`, for running recab-gui from a checkout.
+
+It plays the lifecycle in recab's REQUIREMENTS 0.3.0 against a small state
+file: the running system stays as it is; the other place holds the system from
+before until a change is asked for, then becomes the next system, which
+collects changes and an update, is finished, and is restarted into. Nothing on
+this machine is read or changed.
+
+`agent` and `reboot` beside this file are the same program: an agent that
+turns a prompt into changes, and the restart that judges a trial.
+
+Environment:
+  RECAB_STANDIN_STATE        folder for the state file (default: a folder in /tmp)
+  RECAB_STANDIN_DISTRO       LevitateOS (default) or AcornOS
+  RECAB_STANDIN_SPEED        time factor for long steps; 0 runs them at once (default 1)
+  RECAB_STANDIN_STOP_AT      "change": stay in the middle of making a change forever
+  RECAB_STANDIN_FAIL_TRIALS  how many restarts into the next system fail, read
+                             when the state file is first written (default 0)
+"""
+import datetime
+import json
+import os
+import sys
+import time
+
+STATE_DIR = os.environ.get("RECAB_STANDIN_STATE") or "/tmp/recab-standin-%d" % os.getuid()
+STATE = os.path.join(STATE_DIR, "state.json")
+SPEED = float(os.environ.get("RECAB_STANDIN_SPEED", "1"))
+STOP_AT = os.environ.get("RECAB_STANDIN_STOP_AT", "")
+SSHD = "/etc/ssh/sshd_config"
+MIB = 1 << 20
+
+
+def fresh():
+    distro = os.environ.get("RECAB_STANDIN_DISTRO", "LevitateOS")
+    return {
+        "distro": distro,
+        "running": {"release": "2026.10", "holds": []},
+        "other": {"role": "previous", "release": "2026.09", "state": "kept", "holds": [], "changes": []},
+        "update": {"release": "2026.11", "size_bytes": 3328599654 if distro == "LevitateOS" else 1503238553,
+                   "applied": False},
+        "conflicts": [], "proposal": None, "last_trial": None, "interrupted": None,
+        "trial_pending": False, "next_boot_previous": False, "revision": 0,
+        "fail_trials": int(os.environ.get("RECAB_STANDIN_FAIL_TRIALS", "0")),
+    }
+
+
+def load():
+    if not os.path.exists(STATE):
+        os.makedirs(STATE_DIR, exist_ok=True)
+        save(fresh())
+    return json.load(open(STATE))
+
+
+def save(state):
+    state["revision"] = state.get("revision", 0) + 1
+    with open(STATE + ".new", "w") as out:
+        json.dump(state, out, indent=1)
+    os.replace(STATE + ".new", STATE)
+
+
+def emit(**event):
+    sys.stderr.write(json.dumps(event) + "\n")
+    sys.stderr.flush()
+
+
+def refuse(reason):
+    emit(event="failed", reason=reason)
+    sys.exit(21)
+
+
+def pause(seconds):
+    if SPEED > 0:
+        time.sleep(seconds * SPEED)
+
+
+def step(name, status):
+    emit(event="step", step=name, status=status)
+
+
+# ---------------------------------------------------------------- what status says
+
+def lifecycle(s):
+    if s["interrupted"]:
+        return "interrupted"
+    if s["other"]["role"] != "next":
+        return "stable"
+    if s["trial_pending"]:
+        return "trial_pending"
+    return {"open": "preparing", "ready": "ready", "failed": "failed"}[s["other"]["state"]]
+
+
+def actions(s):
+    other = s["other"]
+    nxt = other["role"] == "next"
+    update_open = bool(s["update"]) and not s["update"]["applied"]
+
+    def verdict(ready, reason=""):
+        return {"verdict": "ready" if ready else "refused", "reason": "" if ready else reason}
+
+    busy = "Finish or discard what was interrupted first." if s["interrupted"] else ""
+    clash = "The update and a change clash. Settle that first." if s["conflicts"] else ""
+    return {
+        "change": verdict(not busy and not clash and not s["trial_pending"], busy or clash or "A restart into the next system is set."),
+        "update": verdict(update_open and not busy and not clash, busy or clash or "No newer release is known."),
+        "finalize": verdict(nxt and other["state"] == "open" and not busy and not clash and bool(other["changes"]),
+                            busy or clash or "The next system has nothing to finish."),
+        "restart": verdict(nxt and other["state"] in ("ready", "failed") and not busy, busy or "The next system is not finished."),
+        "go_back": verdict(other["role"] == "previous", "No system from before is kept."),
+        "discard": verdict(nxt, "There is no next system."),
+        "recover": verdict(bool(s["interrupted"]), "Nothing was interrupted."),
+    }
+
+
+def status(s):
+    update = s["update"]
+    return {
+        "schema_version": 3,
+        "distro": s["distro"],
+        "state": lifecycle(s),
+        "revision": s["revision"],
+        "running": s["running"],
+        "other": s["other"],
+        "update": {"release": update["release"], "size_bytes": update["size_bytes"]}
+                  if update and not update["applied"] else None,
+        "conflicts": s["conflicts"],
+        "proposal": s["proposal"],
+        "last_trial": s["last_trial"],
+        "interrupted": s["interrupted"],
+        "actions": actions(s),
+    }
+
+
+# ---------------------------------------------------------------- the lifecycle
+
+def prepare(s, announce=True):
+    """Create the next system as a copy of the running one, or reopen it."""
+    other = s["other"]
+    if other["role"] == "next":
+        if other["state"] != "open":
+            other["state"] = "open"  # reopening a finished system takes its readiness away
+            save(s)
+        return
+    if announce:
+        step("level", "running")
+    total = 310 * MIB
+    for part in range(1, 11):
+        emit(event="progress", step="level", done=total * part // 10, total=total, unit="bytes")
+        pause(0.12)
+    emit(event="say", text="310 MiB differed from the running system and was copied. 5.6 GiB was already the same.")
+    s["other"] = {"role": "next", "release": s["running"]["release"], "state": "open",
+                  "holds": list(s["running"]["holds"]), "changes": []}
+    save(s)
+    if announce:
+        step("level", "done")
+
+
+def add_change(s, kind, title, **more):
+    changes = s["other"]["changes"]
+    change = dict({"id": "c%d" % (len(changes) + 1), "kind": kind, "title": title}, **more)
+    changes.append(change)
+    save(s)
+    return change
+
+
+def build(label, count):
+    for done in range(1, count + 1):
+        emit(event="output", line="[%d/%d] %s" % (done, count, label % done))
+        if done == count // 2 and STOP_AT == "change":
+            while True:
+                time.sleep(3600)
+        pause(0.05)
+
+
+def apply_update(s):
+    update = s["update"]
+    if not update or update["applied"]:
+        refuse("No newer release is known.")
+    if s["interrupted"]:
+        refuse("Finish or discard what was interrupted first.")
+    emit(event="plan", steps=[["level", "Make it level"], ["fetch", "Get the update"], ["merge", "Merge it in"]])
+    if s["other"]["role"] == "next":
+        step("level", "skipped")
+    prepare(s)
+    step("fetch", "running")
+    for part in range(1, 11):
+        emit(event="progress", step="fetch", done=update["size_bytes"] * part // 10, total=update["size_bytes"], unit="bytes")
+        pause(0.12)
+    step("fetch", "done")
+    step("merge", "running")
+    other = s["other"]
+    for change in other["changes"]:
+        if change["kind"] == "software":
+            emit(event="say", text="%s: rebuilt by Recipe for the update's kernel, and kept." % change["title"].split(",")[0])
+            pause(0.4)
+        if change["kind"] == "file" and change.get("path") == SSHD:
+            s["conflicts"] = [{
+                "path": SSHD,
+                "local": "your edit: password logins turned off",
+                "release": "the update's edit: one new setting, and the included folder moved",
+            }]
+    other["release"] = update["release"]
+    update["applied"] = True
+    add_change(s, "update", "Update to %s %s" % (s["distro"], update["release"]))
+    step("merge", "failed" if s["conflicts"] else "done")
+    if s["conflicts"]:
+        emit(event="say", text="One file was changed by you and by the update. Nothing was chosen for you.")
+    emit(event="done")
+
+
+def resolve(s, path, how):
+    s["conflicts"] = [c for c in s["conflicts"] if c["path"] != path]
+    words = {"--local": "your version", "--release": "the update's version", "--proposal": "merged by the agent"}[how]
+    for change in s["other"]["changes"]:
+        if change.get("path") == path:
+            change["title"] = "%s, %s" % (path, words)
+    s["proposal"] = None
+    save(s)
+    emit(event="done")
+
+
+def finalize(s):
+    verdict = actions(s)["finalize"]
+    if verdict["verdict"] != "ready":
+        refuse(verdict["reason"])
+    emit(event="plan", steps=[["check", "Check it"], ["close", "Close it"], ["boot", "Make it startable"]])
+    for name in ("check", "close", "boot"):
+        step(name, "running")
+        pause(0.5)
+        step(name, "done")
+    s["other"]["state"] = "ready"
+    save(s)
+    emit(event="done")
+
+
+def set_next(s):
+    if s["other"]["role"] != "next" or s["other"]["state"] not in ("ready", "failed"):
+        refuse("The next system is not finished.")
+    s["other"]["state"] = "ready"
+    s["trial_pending"] = True
+    save(s)
+    emit(event="done")
+
+
+def rollback(s):
+    if s["trial_pending"]:
+        s["trial_pending"] = False
+    elif s["other"]["role"] == "previous":
+        s["next_boot_previous"] = True
+    else:
+        refuse("No system from before is kept.")
+    save(s)
+    emit(event="done")
+
+
+def discard(s):
+    if s["other"]["role"] != "next":
+        refuse("There is no next system.")
+    # The place was already reused: discarding does not bring the older system back.
+    s["other"] = {"role": "none", "release": "", "state": "empty", "holds": [], "changes": []}
+    s["conflicts"], s["proposal"], s["interrupted"], s["trial_pending"] = [], None, None, False
+    if s["update"]:
+        s["update"]["applied"] = False
+    save(s)
+    emit(event="done")
+
+
+def recover(s):
+    if not s["interrupted"]:
+        refuse("Nothing was interrupted.")
+    emit(event="plan", steps=[["inspect", "See what is really there"], ["change", "Carry on"]])
+    step("inspect", "running")
+    pause(0.6)
+    step("inspect", "done")
+    step("change", "running")
+    pending = s["interrupted"]["change"]
+    build("Building object nvidia.p/part%03d.o", 20)
+    s["interrupted"] = None
+    add_change(s, pending["kind"], pending["title"])
+    step("change", "done")
+    emit(event="done")
+
+
+def reboot(s):
+    now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+    if s["next_boot_previous"]:
+        s["next_boot_previous"] = False
+        s["running"], old = {"release": s["other"]["release"], "holds": s["other"]["holds"]}, s["running"]
+        s["other"] = {"role": "previous", "release": old["release"], "state": "kept", "holds": old["holds"], "changes": []}
+        s["last_trial"] = None
+    elif s["trial_pending"]:
+        s["trial_pending"] = False
+        other = s["other"]
+        if s["fail_trials"] > 0:
+            s["fail_trials"] -= 1
+            other["state"] = "failed"
+            s["last_trial"] = {"outcome": "failed", "when": now, "log_lines": 212,
+                               "detail": "the login screen failed (sddm.service)"}
+        else:
+            old = s["running"]
+            holds = other["holds"] + [c["title"] for c in other["changes"] if c["kind"] != "update"]
+            s["running"] = {"release": other["release"], "holds": holds}
+            s["other"] = {"role": "previous", "release": old["release"], "state": "kept", "holds": old["holds"], "changes": []}
+            s["last_trial"] = {"outcome": "kept", "when": now, "log_lines": 0, "detail": "startup ended with nothing failed"}
+            if s["update"] and s["update"]["applied"]:
+                s["update"] = None
+    save(s)
+
+
+# ---------------------------------------------------------------- the agent
+
+def section(prompt, title):
+    """The text under one heading of the prompt."""
+    head = title + ":"
+    if head not in prompt:
+        return ""
+    rest = prompt.split(head, 1)[1]
+    for other in ("The request:", "The issue:", "The facts:", "The expected result:"):
+        if other != head and other in rest:
+            rest = rest.split(other, 1)[0]
+    return rest.strip()
+
+
+def agent(s):
+    prompt = sys.stdin.read()
+    issue, request = section(prompt, "The issue"), section(prompt, "The request")
+    expected = [part.strip() for part in section(prompt, "The expected result").replace("\n", " ").split(". ") if part.strip()]
+
+    if s["conflicts"] and "both altered" in issue:
+        clash = s["conflicts"][0]
+        emit(event="plan", steps=[["read", "Read both versions"], ["write", "Write one file"], ["check", "Check it"]])
+        for name in ("read", "write", "check"):
+            step(name, "running")
+            pause(0.6)
+            step(name, "done")
+        summary = ("It wrote one %s: your setting kept (password logins off), the update's new setting added, "
+                   "and the included folder moved as the update wanted." % clash["path"])
+        s["proposal"] = {
+            "path": clash["path"], "summary": summary, "scope": "It changed that one file and nothing else.",
+            "checks": [{"expected": part.rstrip("."), "verdict": "yes",
+                        "note": "sshd checked it" if "sshd accepts" in part else ""} for part in expected]
+                      + [{"expected": "The next system starts", "verdict": "unknown", "note": "known after the restart"}],
+        }
+        save(s)
+        emit(event="agent", summary=summary)
+        emit(event="done")
+        return
+
+    if s["other"]["role"] == "next" and s["other"]["state"] == "failed":
+        emit(event="plan", steps=[["read", "Read the failure"], ["change", "Change the next system"], ["record", "Record it"]])
+        step("read", "running")
+        pause(0.8)
+        step("read", "done")
+        step("change", "running")
+        build("Building object nvidia.p/part%03d.o", 24)
+        for change in s["other"]["changes"]:
+            if change["kind"] == "software":
+                change["title"] = "NVIDIA driver 580.105, installed"
+        s["other"]["state"] = "open"
+        s["fail_trials"] = 0
+        save(s)
+        step("change", "done")
+        step("record", "done")
+        emit(event="agent", summary="driver 580.95 does not support the update's kernel, so the next system now has 580.105")
+        emit(event="done")
+        return
+
+    words = (request or prompt).lower()
+    if "nvidia" in words:
+        change = {"kind": "software", "title": "NVIDIA driver 580.95, installed"}
+        chose = "it chose the recipe nvidia-driver 580.95"
+    elif "ssh" in words or "password" in words:
+        change = {"kind": "file", "title": "%s, edited" % SSHD, "path": SSHD}
+        chose = "it turned password logins off in %s" % SSHD
+    else:
+        change = {"kind": "other", "title": (request or "A change").splitlines()[0][:60]}
+        chose = "it made the change as asked"
+    emit(event="plan", steps=[["level", "Make it level"], ["change", "Make the change"], ["record", "Record it"]])
+    if s["other"]["role"] == "next":
+        step("level", "skipped")
+    prepare(s)
+    step("change", "running")
+    emit(event="say", text="The agent: %s." % chose)
+    if change["kind"] == "software":
+        # A long step: what is half done is marked, so a stop or a power cut can be recovered.
+        s["interrupted"] = {"during": "adding the NVIDIA driver", "change": change}
+        save(s)
+        build("Building object nvidia.p/part%03d.o", 40)
+        s["interrupted"] = None
+    else:
+        pause(0.8)
+    add_change(s, **change)
+    step("change", "done")
+    step("record", "running")
+    pause(0.3)
+    step("record", "done")
+    emit(event="agent", summary=chose)
+    emit(event="done")
+
+
+# ---------------------------------------------------------------- the command line
+
+def main(args):
+    role = os.path.basename(sys.argv[0])
+    words = [arg for arg in args if not arg.startswith("--")]
+    s = load()
+    if role == "agent":
+        return agent(s)
+    if role == "reboot":
+        return reboot(s)
+    command = words[0] if words else ""
+    if command == "status":
+        print(json.dumps(status(s)))
+    elif command == "prepare":
+        emit(event="plan", steps=[["level", "Make it level"]])
+        prepare(s)
+        emit(event="done")
+    elif command == "update" and words[1:2] == ["apply"]:
+        apply_update(s)
+    elif command == "resolve" and len(words) == 2:
+        how = next((arg for arg in args if arg in ("--local", "--release", "--proposal")), None)
+        if not how:
+            refuse("say --local, --release or --proposal")
+        resolve(s, words[1], how)
+    elif command == "finalize":
+        finalize(s)
+    elif command == "set-next":
+        set_next(s)
+    elif command == "rollback":
+        rollback(s)
+    elif command == "discard":
+        discard(s)
+    elif command == "recover":
+        recover(s)
+    else:
+        sys.stderr.write("stand-in recab: unknown command: %s\n" % " ".join(args))
+        sys.exit(2)
+
+
+if __name__ == "__main__":
+    main(sys.argv[1:])

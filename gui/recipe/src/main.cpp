@@ -1,3 +1,4 @@
+#include "look.h"
 #include "shots.h"
 #include "window.h"
 

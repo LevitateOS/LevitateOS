@@ -1,0 +1,66 @@
+// The one window: the pages and the flows between them.
+#pragma once
+
+#include "client.h"
+#include "model.h"
+
+#include <QMainWindow>
+
+#include <functional>
+
+class AskPage;
+class ClashPage;
+class ConfirmDialog;
+class ProposedPage;
+class QLabel;
+class QStackedWidget;
+class SystemPage;
+class WorkPage;
+
+class Window : public QMainWindow {
+    Q_OBJECT
+public:
+    explicit Window(QWidget *parent = nullptr);
+
+    void showMain();
+    void showAsk(const QString &request = QString());
+    void showClash();
+
+    // Each of these asks first unless told not to (the picture mode does not).
+    void handOver(const QString &prompt, bool askFirst = true);
+    void addUpdate(bool askFirst = true);
+    void goBack(bool askFirst = true);
+    void discard(bool askFirst = true);
+    void finish();
+    void restart();
+    void recover();
+    void fixWithAgent(const QString &prompt, const QString &title);
+    void acceptProposal();
+    void stopRun();
+
+    // The question shown before the place of the system from before is reused.
+    ConfirmDialog *reuseQuestion();
+
+    const Status &status() const { return status_; }
+    bool busy() const { return run_ != nullptr || quiet_ > 0; }
+
+private:
+    bool reload();
+    void work(Run *run, const QString &title, const QString &subtitle, std::function<void(bool)> then);
+    void chain(QList<Run *> runs);
+    void decideByHand();
+
+    RecabClient client_;
+    Status status_;
+    Run *run_ = nullptr;
+    int quiet_ = 0;
+    std::function<void(bool)> then_;
+
+    QStackedWidget *stack_;
+    SystemPage *system_;
+    AskPage *ask_;
+    WorkPage *work_;
+    ClashPage *clash_;
+    ProposedPage *proposed_;
+    QLabel *source_, *activity_;
+};

@@ -11,11 +11,15 @@ qt_add_executable(recipe-gui
     src/main.cpp
     src/model.cpp
     src/client.cpp
-    src/parts.cpp
+    ../kit/parts.cpp
+    ../kit/look.cpp
+    ../kit/run.cpp
+    ../kit/words.cpp
     src/pages.cpp
     src/window.cpp
     src/shots.cpp
 )
+target_include_directories(recipe-gui PRIVATE ../kit)
 target_compile_options(recipe-gui PRIVATE -Wall -Wextra)
 target_link_libraries(recipe-gui PRIVATE Qt6::Widgets Qt6::Svg)
 

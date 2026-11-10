@@ -2,6 +2,8 @@
 // No package rules live here; Recipe stays the only thing that knows them.
 #pragma once
 
+#include "words.h"
+
 #include <QDate>
 #include <QJsonObject>
 #include <QList>
@@ -71,7 +73,5 @@ struct Catalog {
 };
 
 QString categoryTitle(const QString &id);
-QString bytesText(qint64 bytes);
 QString hookTitle(const QString &hook);
-// "1 program" or "4 programs": the words for a count.
-QString counted(qsizetype count, const QString &one, const QString &many);
+

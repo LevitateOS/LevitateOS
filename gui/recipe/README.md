@@ -75,7 +75,7 @@ QT_QPA_PLATFORM=offscreen RECIPE_GUI_RECIPE=$PWD/target/debug/recipe \
 |---|---|
 | `src/model.*` | the data: recipes, what is installed, updates, as read from JSON |
 | `src/client.*` | the only code that runs `recipe`; a `Run` reports one change as events |
-| `src/parts.*` | small widgets: the step mark, the letter tile, panels |
+| `../kit/` | shared with `gui/recab`: small widgets (step mark, letter tile, panels, the prompt handed to an agent), the command runner, sizes and counts as words, the stand-in looks |
 | `src/pages.*` | Browse, a recipe's page, a run, Installed, Updates, the remove question |
 | `src/window.*` | the sidebar and the flows between pages |
 | `src/shots.*` | the stand-in looks and the picture mode |

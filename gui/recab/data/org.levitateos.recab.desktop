@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=System
+GenericName=System changes and updates
+Comment=Change and update the locked system
+Exec=recab-gui
+Icon=system-software-update
+Categories=Qt;System;Settings;
+Keywords=system;update;upgrade;change;rollback;restart;

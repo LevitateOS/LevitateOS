@@ -22,6 +22,31 @@ public:
     QVBoxLayout *column();
 };
 
+// A panel whose outline says what it holds: the thing in use, something
+// still open, something ready, something that went wrong.
+class Card : public Panel {
+public:
+    enum Tone { Plain, On, Open, Ready, Wrong };
+    explicit Card(Tone tone, QWidget *parent = nullptr);
+protected:
+    void paintEvent(QPaintEvent *event) override;
+private:
+    Tone tone_;
+};
+
+// A small drawn picture for a card. Drawn, not typed or loaded, so it needs
+// no icon theme and no font.
+class Glyph : public QWidget {
+public:
+    enum Kind { Lock, Plus, Before, Check, Cross };
+    Glyph(Kind kind, bool filled, QWidget *parent = nullptr);
+protected:
+    void paintEvent(QPaintEvent *event) override;
+private:
+    Kind kind_;
+    bool filled_;
+};
+
 // A panel outlined in the colour for "this went wrong".
 class Verdict : public Panel {
 public:
@@ -52,6 +77,21 @@ protected:
     void paintEvent(QPaintEvent *event) override;
 private:
     QString letter_, iconPath_;
+};
+
+// What an agent is handed when something needs fixing or changing: the issue,
+// the facts, and the expected result. The person may rewrite the last part;
+// it is the only part that is theirs to say.
+class QPlainTextEdit;
+class PromptPanel : public Panel {
+public:
+    PromptPanel(const QString &issue, const QStringList &facts, const QString &expected, QWidget *parent = nullptr);
+    // The three parts as the text an agent reads.
+    QString prompt() const;
+private:
+    QString issue_;
+    QStringList facts_;
+    QPlainTextEdit *expected_;
 };
 
 // The round mark in front of a step: its number, a tick, or a cross.
