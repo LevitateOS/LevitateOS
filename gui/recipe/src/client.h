@@ -17,7 +17,7 @@ class RecipeClient : public QObject {
 public:
     explicit RecipeClient(QObject *parent = nullptr);
 
-    // Reads the catalog from `list`, `installed` and `updates`, one after the
+    // Reads the catalog from `list`, `installed`, `updates` and `storage`, one after the
     // other, without holding the window up. `done` gets the catalog, or the
     // problem when it could not be read.
     using Loaded = std::function<void(bool ok, const Catalog &catalog, const QString &problem)>;
@@ -29,8 +29,11 @@ public:
     // The same install or update with Recipe's agent repair on, and the
     // prompt (issue, facts, expected result) handed to it.
     Run *fixWithAgent(const QString &name, const QString &prompt, bool installed);
-    Run *remove(const QString &name, bool clearKept);
+    Run *remove(const QString &name);
+    // Activates the newest earlier version Recipe still holds; no recipe runs.
     Run *goBack(const QString &name);
+    // Deletes every earlier version Recipe keeps. Nothing installed changes.
+    Run *clearEarlier();
 
     // Sources. Fetching a source's list again is a person's own business;
     // adding and removing one changes the system's list and needs root.

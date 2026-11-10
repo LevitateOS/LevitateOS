@@ -11,11 +11,15 @@ beyond the red for "this went wrong", so it takes each desktop's own style.
 
 ## State (2026-11-10)
 
-Every page works against the stand-in in `fixtures/`. Against the real
-`recipe` it reads the collection (`list --json`) and the system's installed
-list, shown here with `recipes/ripgrep.rhai`. Installing through it with the
-real `recipe` has not been run yet, nor has it run on a real desktop or with
-`pkexec`. The tables below say what the front end asks that `recipe` lacks.
+Every page works against the stand-in in `fixtures/`, which answers in the
+real `recipe`'s shapes. Against the real `recipe` (tools/recipe `971b9b6`) it
+reads the collection (`list --json`), the installed list with the earlier
+versions kept, the updates with what the newer recipe may use, and what the
+store takes; this was run read-only on a hand-made store with
+`recipes/ripgrep.rhai`. Installing, going back and clearing through the window
+with the real `recipe` have not been run, nor has it run on a real desktop or
+with `pkexec`. The tables below say what the front end asks that `recipe`
+lacks.
 
 ## Build and run from a checkout
 
@@ -90,8 +94,9 @@ Reads, as the desktop user, JSON on stdout with `"schema_version": 1`:
 | Command | Answer | In `recipe` today |
 |---|---|---|
 | `recipe list --json` | every recipe: `name`, `version`, `description`, `about`, `sources`, `needs`, `deps`, `build_deps`, `hooks`; and the source's name | exists, without `sources` and the source's name. `ABOUT` is passed through unchecked; `SOURCES` is still only the design in `docs/recipe-front-end-format.md` |
-| `recipe installed --json` | `packages`: each one's `name`, `version`, `recipe` and `files`, as today; and asked for: `installed_on`, `size_bytes`, `kept`, `kept_bytes` | exists with the first four fields. The front end takes programs from the `bin/` files and menu entries from `share/applications/` |
-| `recipe updates --json` | for each installed recipe with a newer version: from, to, and what changed in what it may use | no such command. Without it the front end counts an installed version that differs from the collection's as an update, and says the change in what the recipe may use is not known |
+| `recipe installed --json` | `packages`: each one's `name`, `version`, `recipe`, `files`, `installed_on` (seconds), `size_bytes` and `kept`: the earlier versions still held, newest first, each with `version`, `generation`, `installed_on`, `size_bytes` | exists. A receipt written before 2026-11-10 has no `installed_on` or `size_bytes`; the front end then measures the files. It takes programs from the `bin/` files and menu entries from `share/applications/` |
+| `recipe updates --json` | `updates`: for each installed recipe that `recipe update` would change: `name`, `source`, `from`, `to`, `reason` (`version`, or `recipe` when the source publishes another recipe file for the same version) and `changes`; `problems`: installed software it could not look up | exists. `changes` lists every field of NEEDS that differs from what was recorded at install (`field`, `before`, `after`, `kind`: `added`, `removed`, `raised`, `lowered`, `changed`), and is `null` for a receipt that recorded nothing; the page then says the two cannot be compared |
+| `recipe storage --json` | `active_bytes`, `earlier_generations`, `earlier_bytes` | exists. Shown on the Installed page |
 
 Changes, through the root helper, with events on stderr:
 
@@ -99,8 +104,9 @@ Changes, through the root helper, with events on stderr:
 |---|---|
 | `recipe install NAME --machine-events` | exists: runs the recipe in Ginux and activates its `package` output |
 | `recipe update NAME --machine-events` | exists |
-| `recipe remove NAME [--clear-kept] --machine-events` | exists, by the receipt; no `--clear-kept` |
-| `recipe go-back NAME --machine-events` | no such command; earlier profile generations are kept |
+| `recipe remove NAME --machine-events` | exists, by the receipt. What it removes stays among the earlier versions |
+| `recipe go-back NAME --machine-events` | exists: activates the newest earlier version again from the files a generation still holds; sends no events |
+| `recipe storage --clear-earlier` | exists: deletes every earlier version. The window asks first ("Clear earlier versions…" on the Installed page). Recipe cannot clear one program's earlier versions alone, so the remove question no longer offers that |
 | `recipe install NAME --autofix --autofix-prompt-file FILE --machine-events` | exists for `install`: Recipe's agent repair (Codex or Claude), with the front end's prompt appended to its own. Never run against a real agent |
 | `recipe update NAME --autofix --autofix-prompt-file FILE --machine-events` | `update` takes no such options yet |
 
@@ -132,6 +138,9 @@ after every change, on "Read again" in the status bar, on F5 or Ctrl+R, and
 when the person comes back to the window after 20 seconds or more. That reads
 what is on this computer; it fetches nothing. Fetching the sources' lists is
 "Check for updates" on the Updates page and "Fetch again" on the Sources page.
+A catalog is four commands now: `list`, `installed`, `updates`, `storage`. When
+`updates` fails the catalog is not shown and the page says why; when `storage`
+fails only the sizes are missing.
 
 ## Sources
 

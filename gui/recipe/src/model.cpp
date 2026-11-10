@@ -1,6 +1,9 @@
 #include "model.h"
 
+#include "words.h"
+
 #include <QDateTime>
+#include <QMap>
 #include <QLocale>
 
 #include <QJsonArray>
@@ -75,6 +78,76 @@ Recipe Recipe::fromJson(const QJsonObject &object)
     r.buildDeps = strings(object["build_deps"]);
     r.hooks = strings(object["hooks"]);
     return r;
+}
+
+QString Change::title() const
+{
+    static const QMap<QString, QString> titles{
+        {"network", QObject::tr("Network")},          {"network_max_bytes", QObject::tr("Download")},
+        {"inputs", QObject::tr("Reads")},             {"outputs", QObject::tr("Writes")},
+        {"memory_mib", QObject::tr("Memory")},        {"storage_max_objects", QObject::tr("Files while it runs")},
+        {"storage_max_bytes", QObject::tr("Disk while it runs")}, {"timeout_secs", QObject::tr("Time")}};
+    return titles.value(field, field);
+}
+
+bool Change::isList() const
+{
+    return field == QLatin1String("network") || field == QLatin1String("inputs") || field == QLatin1String("outputs");
+}
+
+static QStringList listOf(const QString &value)
+{
+    return value == QLatin1String("none") ? QStringList() : value.split(QStringLiteral(", "), Qt::SkipEmptyParts);
+}
+
+QStringList Change::added() const
+{
+    QStringList found;
+    const QStringList was = listOf(before);
+    for (const QString &name : listOf(after))
+        if (!was.contains(name))
+            found << name;
+    return found;
+}
+
+QStringList Change::removed() const
+{
+    QStringList found;
+    const QStringList is = listOf(after);
+    for (const QString &name : listOf(before))
+        if (!is.contains(name))
+            found << name;
+    return found;
+}
+
+QStringList Change::stays() const
+{
+    QStringList found;
+    const QStringList is = listOf(after);
+    for (const QString &name : listOf(before))
+        if (is.contains(name))
+            found << name;
+    return found;
+}
+
+QString Change::amount(const QString &value)
+{
+    const qsizetype space = value.indexOf(QLatin1Char(' '));
+    bool isNumber = false;
+    const qint64 number = value.left(space).toLongLong(&isNumber);
+    if (space < 0 || !isNumber)
+        return value;
+    const QString unit = value.mid(space + 1);
+    if (unit == QLatin1String("bytes"))
+        return bytesText(number);
+    if (unit == QLatin1String("MiB"))
+        return bytesText(number * 1048576);
+    if (unit == QLatin1String("s"))
+        return number >= 120 ? counted(int(number / 60), QObject::tr("%1 minute"), QObject::tr("%1 minutes"))
+                             : counted(int(number), QObject::tr("%1 second"), QObject::tr("%1 seconds"));
+    if (unit == QLatin1String("objects"))
+        return counted(int(number), QObject::tr("%1 file"), QObject::tr("%1 files"));
+    return value;
 }
 
 bool UpdateItem::asksMore() const

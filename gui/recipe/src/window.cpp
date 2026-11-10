@@ -148,6 +148,7 @@ Window::Window(QWidget *parent)
     });
     connect(installed_, &InstalledPage::open, this, &Window::open);
     connect(installed_, &InstalledPage::goBack, this, &Window::goBack);
+    connect(installed_, &InstalledPage::clearEarlier, this, [this] { clearEarlier(); });
     connect(installed_, &InstalledPage::remove, this, &Window::askRemove);
     connect(installed_, &InstalledPage::update, this, [this](const QString &name) { startInstall(name); });
     connect(installed_, &InstalledPage::selected, this, [this](const QString &name) { installedChoice_ = name; });
@@ -429,17 +430,31 @@ void Window::askRemove(const QString &name)
         return;
     RemoveDialog dialog(*recipe, *item, this);
     if (dialog.exec() == QDialog::Accepted)
-        quietChange(client_.remove(name, dialog.clearKept()));
+        quietChange(client_.remove(name));
 }
 
 void Window::removeNow(const QString &name)
 {
-    quietChange(client_.remove(name, false));
+    quietChange(client_.remove(name));
 }
 
 void Window::goBack(const QString &name)
 {
     quietChange(client_.goBack(name));
+}
+
+void Window::clearEarlier(bool askFirst)
+{
+    if (askFirst
+        && QMessageBox::question(this, tr("Clear earlier versions"),
+                                 tr("Delete every earlier version Recipe keeps (%1)?\n\nNothing that is installed "
+                                    "changes. Afterwards no program can be taken back to an earlier version until "
+                                    "it is updated again.")
+                                     .arg(bytesText(catalog_.earlierBytes)),
+                                 QMessageBox::Yes | QMessageBox::Cancel)
+               != QMessageBox::Yes)
+        return;
+    quietChange(client_.clearEarlier());
 }
 
 // A short change with no page of its own: run it, then show the page again.

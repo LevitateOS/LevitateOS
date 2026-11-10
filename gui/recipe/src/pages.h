@@ -90,6 +90,8 @@ public:
 signals:
     void open(const QString &name);
     void goBack(const QString &name);
+    // Delete every earlier version Recipe keeps.
+    void clearEarlier();
     void remove(const QString &name);
     void update(const QString &name);
     void selected(const QString &name);
@@ -111,7 +113,4 @@ signals:
 class RemoveDialog : public QDialog {
 public:
     RemoveDialog(const Recipe &recipe, const InstalledItem &item, QWidget *parent = nullptr);
-    bool clearKept() const;
-private:
-    QCheckBox *clear_ = nullptr;
 };

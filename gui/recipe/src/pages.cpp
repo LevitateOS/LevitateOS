@@ -660,21 +660,30 @@ void RunPage::onFinished(bool ok)
 void InstalledPage::show(const Catalog &catalog, const QString &selectedName)
 {
     QVBoxLayout *column = fresh();
-    qint64 size = 0, kept = 0;
-    for (const InstalledItem &item : catalog.installed) {
-        size += item.sizeBytes;
-        kept += item.keptBytes;
-    }
+    // What Recipe says the store takes; summed from the list for a store it
+    // could not measure.
+    qint64 size = catalog.activeBytes;
+    if (!size)
+        for (const InstalledItem &item : catalog.installed)
+            size += item.sizeBytes;
+    auto *header = new QHBoxLayout;
     auto *top = new QVBoxLayout;
     top->setSpacing(1);
     top->addWidget(heading(tr("Installed")));
     QString summary = catalog.installed.isEmpty()
                           ? tr("Nothing is installed from recipes yet.")
                           : tr("%1, %2.").arg(counted(catalog.installed.size(), tr("%1 program"), tr("%1 programs")), bytesText(size));
-    if (kept)
-        summary += tr(" The earlier versions kept beside them take %1.").arg(bytesText(kept));
+    if (catalog.earlierGenerations)
+        summary += tr(" Earlier versions kept beside them, to go back to, take %1 more.").arg(bytesText(catalog.earlierBytes));
     top->addWidget(dim(text(summary)));
-    column->addLayout(top);
+    header->addLayout(top, 1);
+    if (catalog.earlierGenerations) {
+        auto *clearThem = new QPushButton(tr("Clear earlier versions…"));
+        clearThem->setToolTip(tr("Deletes every earlier version Recipe keeps. Nothing that is installed changes."));
+        connect(clearThem, &QPushButton::clicked, this, &InstalledPage::clearEarlier);
+        header->addWidget(clearThem, 0, Qt::AlignBottom);
+    }
+    column->addLayout(header);
     if (catalog.installed.isEmpty()) {
         column->addStretch();
         return;
@@ -701,7 +710,7 @@ void InstalledPage::show(const Catalog &catalog, const QString &selectedName)
     }
     if (!tree->currentItem())
         tree->setCurrentItem(tree->topLevelItem(0));
-    // `recipe installed` does not yet say when, or what earlier version is kept.
+    // A receipt written before Recipe recorded it has no date.
     tree->setColumnHidden(3, !anyDate);
     tree->setColumnHidden(5, !anyKept);
     tree->setMaximumHeight(tree->header()->sizeHint().height() + 6
@@ -783,6 +792,8 @@ void UpdatesPage::show(const Catalog &catalog, const QString &selectedName)
         header->addWidget(all, 0, Qt::AlignBottom);
     }
     column->addLayout(header);
+    if (!catalog.updateProblems.isEmpty())
+        column->addWidget(dim(text(tr("Not looked up: %1.").arg(catalog.updateProblems.join(tr("; "))), true)));
     auto *system = dim(text(tr("The system itself is updated in System Updates.")));
     if (catalog.updates.isEmpty()) {
         column->addStretch();
@@ -795,7 +806,8 @@ void UpdatesPage::show(const Catalog &catalog, const QString &selectedName)
     for (const UpdateItem &item : catalog.updates) {
         const Recipe *recipe = catalog.recipe(item.name);
         auto *line = new QTreeWidgetItem(tree, {recipe ? recipe->shown() : item.name,
-                                                tr("%1 → %2").arg(item.from, item.to),
+                                                item.sameVersion ? tr("%1, another recipe").arg(item.from)
+                                                                 : tr("%1 → %2").arg(item.from, item.to),
                                                 !item.changesKnown ? tr("Not compared")
                                                 : item.asksMore() ? tr("More than before") : tr("Nothing new")});
         line->setData(0, Qt::UserRole, item.name);
@@ -832,10 +844,13 @@ void UpdatesPage::show(const Catalog &catalog, const QString &selectedName)
         auto *form = new QFormLayout;
         form->setHorizontalSpacing(16);
         form->setVerticalSpacing(7);
-        form->addRow(dim(text(tr("Version"))), text(tr("%1 → %2").arg(item->from, item->to)));
+        form->addRow(dim(text(tr("Version"))),
+                     text(item->sameVersion ? tr("%1 still; its source publishes another recipe for it").arg(item->from)
+                                            : tr("%1 → %2").arg(item->from, item->to)));
         if (!item->changesKnown) {
             title->addWidget(strong(tr("What the newer recipe of %1 may use").arg(shown)));
-            title->addWidget(dim(text(tr("Recipe does not keep what version %1 was allowed, so the two cannot be compared yet.")
+            title->addWidget(dim(text(tr("Version %1 was installed before Recipe recorded what a recipe may use, so the "
+                                         "two cannot be compared. From the next update on they can.")
                                           .arg(item->from), true)));
             inside->addLayout(title);
             if (recipe) {
@@ -859,21 +874,30 @@ void UpdatesPage::show(const Catalog &catalog, const QString &selectedName)
         title->addWidget(strong(tr("What changed in %1's recipe").arg(shown)));
         title->addWidget(dim(text(tr("Compared with the recipe version %1 was installed from.").arg(item->from))));
         inside->addLayout(title);
-        bool more = false;
+        // Only what differs is named; a list says what is new, what is gone and what stays.
         for (const Change &change : item->changes) {
-            QString words;
-            if (change.kind == QLatin1String("same"))
-                words = tr("%1, as before").arg(change.after);
-            else if (change.kind == QLatin1String("added"))
-                words = tr("%1  (new)").arg(change.after);
-            else
-                words = tr("%1 → %2  (%3)").arg(change.before, change.after, change.kind);
-            QLabel *value = change.kind == QLatin1String("same") ? text(words) : strong(words);
-            form->addRow(dim(text(change.field)), value);
-            more = more || change.kind != QLatin1String("same");
+            if (!change.isList()) {
+                const QString how = change.kind == QLatin1String("raised")    ? tr("more than before")
+                                    : change.kind == QLatin1String("lowered") ? tr("less than before")
+                                                                              : tr("changed");
+                form->addRow(dim(text(change.title())),
+                             strong(tr("%1 → %2  (%3)").arg(Change::amount(change.before), Change::amount(change.after), how)));
+                continue;
+            }
+            const bool network = change.field == QLatin1String("network");
+            auto shownList = [network](const QStringList &names) { return network ? endpointsText(names) : names.join(QObject::tr(", ")); };
+            auto *lines = new QVBoxLayout;
+            lines->setSpacing(1);
+            if (!change.added().isEmpty())
+                lines->addWidget(strong(tr("New: %1").arg(shownList(change.added()))));
+            if (!change.removed().isEmpty())
+                lines->addWidget(text(tr("No longer: %1").arg(shownList(change.removed())), true));
+            if (!change.stays().isEmpty())
+                lines->addWidget(dim(text(tr("As before: %1").arg(shownList(change.stays())), true)));
+            form->addRow(dim(text(change.title())), lines);
         }
-        form->addRow(dim(text(tr("Everything else"))),
-                     dim(text(more ? tr("as before") : tr("as before: it asks for nothing new"))));
+        form->addRow(dim(text(item->changes.isEmpty() ? tr("What it may use") : tr("Everything else"))),
+                     dim(text(item->changes.isEmpty() ? tr("the same as before: it asks for nothing new") : tr("as before"))));
         inside->addLayout(form);
         auto *buttons = new QHBoxLayout;
         auto *go = new QPushButton(tr("Update %1").arg(shown));
@@ -902,18 +926,17 @@ RemoveDialog::RemoveDialog(const Recipe &recipe, const InstalledItem &item, QWid
     question->setFont(larger);
     column->addWidget(question);
     QString words = recipe.menu.isEmpty()
-                        ? tr("Its files leave the system.")
-                        : tr("%1 leaves the applications menu and its files leave the system.").arg(recipe.shown());
+                        ? tr("It is no longer installed.")
+                        : tr("%1 leaves the applications menu and is no longer installed.").arg(recipe.shown());
+    // Recipe keeps what it removes among the earlier versions.
+    words += tr(" Recipe keeps its files among the earlier versions until those are cleared, on the Installed page.");
     words += recipe.keeps.isEmpty()
                  ? tr(" What it wrote in your home folder stays.")
                  : tr(" What it wrote in your home folder stays: %1.").arg(recipe.keeps.join(tr(", ")));
     QLabel *explained = text(words, true);
     explained->setMinimumWidth(420);
     column->addWidget(explained);
-    if (!item.kept.isEmpty()) {
-        clear_ = new QCheckBox(tr("Also clear the earlier version, %1 (%2)").arg(item.kept, bytesText(item.keptBytes)));
-        column->addWidget(clear_);
-    }
+    Q_UNUSED(item);
     column->addStretch();
     auto *buttons = new QDialogButtonBox(QDialogButtonBox::Cancel);
     buttons->addButton(tr("Remove"), QDialogButtonBox::AcceptRole);
@@ -923,7 +946,3 @@ RemoveDialog::RemoveDialog(const Recipe &recipe, const InstalledItem &item, QWid
     column->addWidget(buttons);
 }
 
-bool RemoveDialog::clearKept() const
-{
-    return clear_ && clear_->isChecked();
-}

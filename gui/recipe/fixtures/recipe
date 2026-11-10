@@ -221,12 +221,12 @@ def install(name, agent=False):
         "recipe": "/usr/share/recipe/recipes/%s.rhai" % name,
         "files": ["bin/" + program for program in about.get("programs", [])]
                  + ["share/applications/%s.desktop" % name for _ in about.get("menu", [])[:1]],
-        "installed_on": datetime.date.today().isoformat(),
+        "installed_on": int(time.time()),
         "size_bytes": 62914560, "kept": [],
     }
     if current:
-        entry["kept"] = [current["version"]]
-        entry["kept_bytes"] = current["size_bytes"]
+        # The version it replaces stays in the generation before, to go back to.
+        entry["kept"] = [kept_of(current)] + current.get("kept", [])
         entry["size_bytes"] = current["size_bytes"]
         items.remove(current)
     items.append(entry)
@@ -234,7 +234,29 @@ def install(name, agent=False):
     emit(event="done", recipe=name)
 
 
-def remove(name, clear_kept):
+def kept_of(item):
+    """An installed version as the earlier version it becomes."""
+    return {"version": item["version"], "generation": "g-%s-%s" % (item["name"], item["version"].replace(".", "")),
+            "installed_on": item.get("installed_on"), "size_bytes": item.get("size_bytes")}
+
+
+def storage(clear):
+    """What `recipe storage` says: what is installed, and the earlier versions beside it."""
+    items = installed()
+    earlier = [kept for each in items for kept in each.get("kept", [])]
+    answer = {"schema_version": 1, "active_bytes": sum(each.get("size_bytes") or 0 for each in items),
+              "earlier_generations": len(earlier), "earlier_bytes": sum(kept.get("size_bytes") or 0 for kept in earlier),
+              "profile": "/var/lib/recipe/profile"}
+    if clear:
+        answer.update(operation="clear-earlier", cleared_generations=answer["earlier_generations"],
+                      cleared_bytes=answer["earlier_bytes"], earlier_generations=0, earlier_bytes=0)
+        for each in items:
+            each["kept"] = []
+        save(items)
+    print(json.dumps(answer))
+
+
+def remove(name):
     items = installed()
     current = next((each for each in items if each["name"] == name), None)
     if not current:
@@ -252,9 +274,12 @@ def go_back(name):
     current = next((each for each in items if each["name"] == name), None)
     if not current or not current.get("kept"):
         fail("no earlier version of %s is kept" % name)
+    # The newest earlier version comes back; the one left behind stays kept.
     older = current["kept"][0]
-    current["kept"] = [current["version"]]
-    current["version"] = older
+    current["kept"] = [kept_of(current)] + current["kept"][1:]
+    current["version"] = older["version"]
+    current["size_bytes"] = older.get("size_bytes") or current["size_bytes"]
+    current["installed_on"] = int(time.time())
     save(items)
     emit(event="done", recipe=name)
 
@@ -264,8 +289,10 @@ def updates():
     for each in installed():
         newer = recipe(each["name"])["version"]
         if newer != each["version"]:
-            found.append({"name": each["name"], "from": each["version"], "to": newer,
-                          "changes": CATALOG["changes"].get(each["name"], [])})
+            # As the real `recipe updates`: only the fields of NEEDS that differ,
+            # and null where nothing was recorded at install.
+            found.append({"name": each["name"], "source": "levitate", "from": each["version"], "to": newer,
+                          "reason": "version", "changes": CATALOG["changes"].get(each["name"])})
     return found
 
 
@@ -296,11 +323,13 @@ def main(args):
         # The shape `recipe installed` has today, plus the fields the front end asks for.
         print(json.dumps({"packages": installed(), "profile": "/var/lib/recipe/profile"}))
     elif command == "updates":
-        print(json.dumps({"schema_version": 1, "updates": updates()}))
+        print(json.dumps({"schema_version": 1, "updates": updates(), "problems": []}))
+    elif command == "storage":
+        storage("--clear-earlier" in args)
     elif command in ("install", "update") and len(words) == 2:
         install(words[1], "--autofix" in args)
     elif command == "remove" and len(words) == 2:
-        remove(words[1], "--clear-kept" in args)
+        remove(words[1])
     elif command == "go-back" and len(words) == 2:
         go_back(words[1])
     else:

@@ -1,5 +1,6 @@
 #include "client.h"
 
+#include <QDateTime>
 #include <QFileInfo>
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -89,10 +90,11 @@ static void readInstalled(const QJsonObject &installed, Catalog &fresh)
         InstalledItem item;
         item.name = o["name"].toString();
         item.version = o["version"].toString();
-        item.kept = o["kept"].toArray().isEmpty() ? QString() : o["kept"].toArray().first().toString();
-        item.installedOn = QDate::fromString(o["installed_on"].toString(), Qt::ISODate);
+        // Earlier versions Recipe still holds, newest first.
+        item.kept = o["kept"].toArray().first().toObject()["version"].toString();
+        if (o.contains("installed_on"))
+            item.installedOn = QDateTime::fromSecsSinceEpoch(o["installed_on"].toInteger()).date();
         item.sizeBytes = o["size_bytes"].toInteger();
-        item.keptBytes = o["kept_bytes"].toInteger();
         // What it put on the system, from the receipt's own list of files.
         for (const QJsonValue &file : o["files"].toArray()) {
             const QString path = file.toString();
@@ -110,22 +112,12 @@ static void readInstalled(const QJsonObject &installed, Catalog &fresh)
 
 static void readUpdates(const QJsonObject &updates, Catalog &fresh)
 {
-    // `recipe updates` does not exist yet. Without it, an update is an
-    // installed version that differs from the collection's, which is exactly
-    // what `recipe update` acts on; what changed in the recipe stays unknown.
-    if (updates.isEmpty()) {
-        for (const InstalledItem &item : fresh.installed) {
-            const Recipe *recipe = fresh.recipe(item.name);
-            if (recipe && !recipe->version.isEmpty() && recipe->version != item.version) {
-                UpdateItem update{item.name, item.version, recipe->version, {}};
-                update.changesKnown = false;
-                fresh.updates << update;
-            }
-        }
-    }
     for (const QJsonValue &value : updates["updates"].toArray()) {
         const QJsonObject o = value.toObject();
         UpdateItem item{o["name"].toString(), o["from"].toString(), o["to"].toString(), {}};
+        // Null: nothing was recorded when the installed version was installed.
+        item.changesKnown = o["changes"].isArray();
+        item.sameVersion = o["reason"] == QLatin1String("recipe");
         for (const QJsonValue &change : o["changes"].toArray()) {
             const QJsonObject c = change.toObject();
             item.changes << Change{c["field"].toString(), c["before"].toString(), c["after"].toString(),
@@ -133,6 +125,9 @@ static void readUpdates(const QJsonObject &updates, Catalog &fresh)
         }
         fresh.updates << item;
     }
+    for (const QJsonValue &value : updates["problems"].toArray())
+        fresh.updateProblems << QStringLiteral("%1: %2").arg(value.toObject()["name"].toString(),
+                                                             value.toObject()["problem"].toString());
 }
 
 void RecipeClient::load(Loaded done)
@@ -151,9 +146,17 @@ void RecipeClient::load(Loaded done)
             if (!problem.isEmpty())
                 return finish(false, problem);
             readInstalled(installed, *fresh);
-            query(QStringList{"updates", "--json"} + collection() + store(), [fresh, finish](const QJsonObject &updates, const QString &) {
+            query(QStringList{"updates", "--json"} + collection() + store(), [this, fresh, finish](const QJsonObject &updates, const QString &problem) {
+                if (!problem.isEmpty())
+                    return finish(false, problem);
                 readUpdates(updates, *fresh);
-                finish(true, QString());
+                // What the store takes is said beside the list; the list does not wait on it failing.
+                query(QStringList{"storage", "--json"} + store(), [fresh, finish](const QJsonObject &storage, const QString &) {
+                    fresh->activeBytes = storage["active_bytes"].toInteger();
+                    fresh->earlierBytes = storage["earlier_bytes"].toInteger();
+                    fresh->earlierGenerations = storage["earlier_generations"].toInt();
+                    finish(true, QString());
+                });
             });
         });
     });
@@ -190,12 +193,14 @@ Run *RecipeClient::fixWithAgent(const QString &name, const QString &prompt, bool
     return run;
 }
 
-Run *RecipeClient::remove(const QString &name, bool clearKept)
+Run *RecipeClient::remove(const QString &name)
 {
-    QStringList arguments = QStringList{"remove", name, "--machine-events"} + collection() + store();
-    if (clearKept)
-        arguments << "--clear-kept";
-    return change(arguments);
+    return change(QStringList{"remove", name, "--machine-events"} + collection() + store());
+}
+
+Run *RecipeClient::clearEarlier()
+{
+    return change(QStringList{"storage", "--clear-earlier", "--json"} + store());
 }
 
 Run *RecipeClient::goBack(const QString &name)

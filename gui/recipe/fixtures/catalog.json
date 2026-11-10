@@ -669,7 +669,7 @@
   {
    "name": "element",
    "version": "1.12.3",
-   "installed_on": "2026-10-28",
+   "installed_on": 1793188800,
    "size_bytes": 429916160,
    "kept": [],
    "recipe": "/usr/share/recipe/recipes/element.rhai",
@@ -682,12 +682,16 @@
   {
    "name": "gimp",
    "version": "3.0.4",
-   "installed_on": "2026-11-02",
+   "installed_on": 1793620800,
    "size_bytes": 545259520,
    "kept": [
-    "3.0.2"
+    {
+     "version": "3.0.2",
+     "generation": "g-gimp-302",
+     "installed_on": 1791028800,
+     "size_bytes": 220200960
+    }
    ],
-   "kept_bytes": 220200960,
    "recipe": "/usr/share/recipe/recipes/gimp.rhai",
    "files": [
     "bin/gimp",
@@ -698,12 +702,16 @@
   {
    "name": "rust",
    "version": "1.95.0",
-   "installed_on": "2026-10-14",
+   "installed_on": 1791979200,
    "size_bytes": 713031680,
    "kept": [
-    "1.94.0"
+    {
+     "version": "1.94.0",
+     "generation": "g-rust-1940",
+     "installed_on": 1789387200,
+     "size_bytes": 419430400
+    }
    ],
-   "kept_bytes": 419430400,
    "recipe": "/usr/share/recipe/recipes/rust.rhai",
    "files": [
     "bin/rustc",
@@ -714,7 +722,7 @@
   {
    "name": "thunderbird",
    "version": "140.4.0",
-   "installed_on": "2026-10-12",
+   "installed_on": 1791806400,
    "size_bytes": 304087040,
    "kept": [],
    "recipe": "/usr/share/recipe/recipes/thunderbird.rhai",
@@ -727,21 +735,15 @@
  "changes": {
   "element": [
    {
-    "field": "Network",
+    "field": "network",
     "before": "packages.element.io:443",
-    "after": "packages.element.io:443",
-    "kind": "same"
-   },
-   {
-    "field": "Network",
-    "before": "",
-    "after": "static.element.io:443",
+    "after": "packages.element.io:443, static.element.io:443",
     "kind": "added"
    },
    {
-    "field": "Download",
-    "before": "up to 300 MiB",
-    "after": "up to 400 MiB",
+    "field": "network_max_bytes",
+    "before": "314572800 bytes",
+    "after": "419430400 bytes",
     "kind": "raised"
    }
   ],

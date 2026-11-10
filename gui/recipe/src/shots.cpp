@@ -38,8 +38,23 @@ int tryRecipe(Window &window, const QString &name, const QString &folder, bool k
     window.showRecipe(name);
     ok &= save(window, "real-2-recipe");
     if (readOnly) {
-        window.showInstalled();
+        window.showInstalled(name);
         ok &= save(window, "real-5-installed");
+        // What `recipe updates` and `recipe storage` said, for the one who runs this.
+        QTextStream out(stdout);
+        for (const UpdateItem &update : window.catalog().updates)
+            out << "update: " << update.name << " " << update.from << " -> " << update.to << ", "
+                << (update.changesKnown ? QString::number(update.changes.size()) + " changes in what it may use"
+                                        : QStringLiteral("not compared"))
+                << "\n";
+        for (const QString &problem : window.catalog().updateProblems)
+            out << "not looked up: " << problem << "\n";
+        out << "installed takes " << window.catalog().activeBytes << " bytes; earlier versions "
+            << window.catalog().earlierBytes << " bytes in " << window.catalog().earlierGenerations << "\n";
+        if (!window.catalog().updates.isEmpty()) {
+            window.showUpdates(name);
+            ok &= save(window, "real-7-updates");
+        }
         return ok ? 0 : 1;
     }
 
@@ -108,6 +123,34 @@ int takeShots(Window &window, const QString &folder)
 
     window.showUpdates("element");
     ok &= save(window, "7-updates");
+    {
+        QTextStream said(stdout);
+        auto hold = [&](const QString &what, bool holds) {
+            if (!holds) {
+                said << "not as expected: " << what << "\n";
+                ok = false;
+            }
+        };
+        const UpdateItem *update = window.catalog().update("element");
+        hold("the update of Element says what the newer recipe may use that the installed one may not",
+             update && update->changesKnown && update->asksMore() && !update->changes.isEmpty()
+                 && update->changes.first().added() == QStringList{"static.element.io:443"});
+
+        // An earlier version: gone back to, and the one left behind is kept instead.
+        const QString now = window.catalog().installedItem("gimp")->version;
+        const QString earlier = window.catalog().installedItem("gimp")->kept;
+        hold("an earlier version of GIMP is kept", !earlier.isEmpty() && window.catalog().earlierGenerations > 0);
+        window.showInstalled("gimp");
+        window.goBack("gimp");
+        waitUntilIdle(window);
+        hold("going back activates the earlier version and keeps the one left",
+             window.catalog().installedItem("gimp")->version == earlier
+                 && window.catalog().installedItem("gimp")->kept == now);
+        ok &= save(window, "7b-gone-back");
+        window.goBack("gimp");
+        waitUntilIdle(window);
+        hold("going back again returns", window.catalog().installedItem("gimp")->version == now);
+    }
 
     window.startInstall("element", "The issue:\nThe update stopped.\n\nThe expected result:\nElement updates.\n");
     waitUntilIdle(window);
@@ -154,6 +197,17 @@ int takeShots(Window &window, const QString &folder)
     expect("a removed source is gone", window.catalog().origin("acme") == nullptr);
     window.refresh();
     waitUntilIdle(window);
+
+    // The earlier versions are cleared; what is installed stays.
+    const qsizetype installedBefore = window.catalog().installed.size();
+    window.showInstalled("gimp");
+    expect("earlier versions take room before they are cleared", window.catalog().earlierBytes > 0);
+    window.clearEarlier(false);
+    waitUntilIdle(window);
+    expect("clearing leaves no earlier version and everything installed",
+           window.catalog().earlierGenerations == 0 && window.catalog().installed.size() == installedBefore
+               && window.catalog().installedItem("gimp")->kept.isEmpty());
+    ok &= save(window, "14-earlier-versions-cleared");
     out << (ok ? "all flows ended where they should\n" : "some flows did not end where they should\n");
     return ok ? 0 : 1;
 }

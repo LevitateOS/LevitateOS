@@ -56,21 +56,35 @@ struct Recipe {
 };
 
 struct InstalledItem {
+    // `kept`: the newest earlier version Recipe still holds, which "Go back" returns to.
     QString name, version, kept;
     QDate installedOn;
-    qint64 sizeBytes = 0, keptBytes = 0;
+    qint64 sizeBytes = 0;
     QStringList programs, menu;
 };
 
+// One field of what a recipe may use (NEEDS) that the newer recipe changes,
+// as `recipe updates` names it.
 struct Change {
-    QString field, before, after, kind; // kind: same, added, raised, lowered, changed
+    QString field, before, after, kind; // kind: added, removed, raised, lowered, changed
+    // The field in a person's words.
+    QString title() const;
+    // For a list (the network, what it reads and writes): what is new, what
+    // is gone and what stays.
+    QStringList added() const, removed() const, stays() const;
+    bool isList() const;
+    // An amount in a person's words: "8388608 bytes" as "8 MiB".
+    static QString amount(const QString &value);
 };
 
 struct UpdateItem {
     QString name, from, to;
     QList<Change> changes;
-    // False when `recipe` cannot say what changed in what the recipe may use.
+    // False when `recipe` cannot say what changed in what the recipe may use:
+    // nothing was recorded when the installed version was installed.
     bool changesKnown = true;
+    // The version is the same and the source publishes another recipe file.
+    bool sameVersion = false;
     bool asksMore() const;
 };
 
@@ -80,6 +94,12 @@ struct Catalog {
     QList<Recipe> recipes;
     QList<InstalledItem> installed;
     QList<UpdateItem> updates;
+    // Installed software `recipe updates` could not look up, each as "name: why".
+    QStringList updateProblems;
+    // What the store takes: what is installed, and the earlier versions kept
+    // beside it (with what only they hold).
+    qint64 activeBytes = 0, earlierBytes = 0;
+    int earlierGenerations = 0;
 
     const Recipe *recipe(const QString &name) const;
     const Origin *origin(const QString &name) const;

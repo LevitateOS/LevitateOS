@@ -54,6 +54,10 @@ public:
     bool busy() const { return run_ != nullptr || quiet_ > 0 || client_.loading(); }
     // From a checkout: remove without the question.
     void removeNow(const QString &name);
+    // Activates the newest earlier version Recipe keeps of an installed program.
+    void goBack(const QString &name);
+    // Deletes every earlier version Recipe keeps, after asking unless told not to.
+    void clearEarlier(bool askFirst = true);
 
 private:
     // Reads the catalog without holding the window up, then does `then`.
@@ -63,7 +67,6 @@ private:
     void fillSources();
     void mark(const QString &key);
     void open(const QString &name);
-    void goBack(const QString &name);
     void quietChange(Run *run);
     void runEnded(const QString &name, bool ok);
 
