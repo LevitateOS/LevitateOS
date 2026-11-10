@@ -1,2 +1,5 @@
 # Options of LevitateOS's kernel line (latest stable) only, applied after
-# ../_shared/kconfig. The kernel policy itself is shared. None at present.
+# ../_shared/kconfig. The kernel policy itself is shared.
+
+# Separate kmalloc caches (hardening). 6.18 names it RANDOM_KMALLOC_CACHES.
+CONFIG_KMALLOC_PARTITION_CACHES=y

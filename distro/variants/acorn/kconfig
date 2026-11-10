@@ -1,2 +1,5 @@
 # Options of AcornOS's kernel line (6.18 LTS) only, applied after
-# ../_shared/kconfig. The kernel policy itself is shared. None at present.
+# ../_shared/kconfig. The kernel policy itself is shared.
+
+# Separate kmalloc caches (hardening). 7.x names it KMALLOC_PARTITION_CACHES.
+CONFIG_RANDOM_KMALLOC_CACHES=y
