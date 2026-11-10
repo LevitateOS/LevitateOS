@@ -3,6 +3,9 @@
 Each variant gets a second ISO with a graphical desktop: it boots live into
 the desktop and installs a desktop system. The base ISO does not change.
 
+What is still to configure and implement, for both systems, is in
+[desktop-todo.md](desktop-todo.md).
+
 ## Status (2026-11-07)
 
 Both desktops were built on the host the way the recipes build a rootfs, then
