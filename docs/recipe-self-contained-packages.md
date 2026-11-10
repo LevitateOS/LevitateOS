@@ -1,10 +1,10 @@
-# Self-contained packages: design (2026-11-10, not built, awaiting verdict)
+# Self-contained packages: design (2026-11-10, accepted, first trial run)
 
 How a program Recipe builds finds its shared libraries when it runs, so that
 libraries need no agreement between packages, one catalog serves both
-distributions, and keeping the catalog up is mechanical. Nothing below is
-built, and the core of it has not been tried; "Open questions" says what a
-trial has to settle.
+distributions, and keeping the catalog up is mechanical. The core was tried
+once on a terminal program ("The first trial"); the automatic form described
+here is not built, and "Open questions" says what is still to settle.
 
 It adds to [the format design](recipe-front-end-format.md), which defines the
 `package` output, and to [the sources design](recipe-sources.md), which
@@ -173,6 +173,7 @@ nothing else:
 | Certificates | one bundle, reachable at the path each carried TLS library looks in |
 | Time zones | `/usr/share/zoneinfo`, `/etc/localtime` |
 | Fonts | `/usr/share/fonts`, `/etc/fonts` |
+| Terminal descriptions | `/usr/share/terminfo` or `/etc/terminfo` |
 | The session | the D-Bus, Wayland and audio sockets under `$XDG_RUNTIME_DIR` |
 | Graphics devices | `/dev/dri` |
 
@@ -212,14 +213,74 @@ path is one known case), the image provides both paths.
 ## Order of work
 
 1. `lib/` in the package tree and `RUNTIME.paths.prefix`. Changes nothing for
-   existing recipes.
-2. The carry step, tried on a small C program with one library (the `htop`
-   and `ncurses` trial recipes, kept in `.artifacts/recipe-agent-trial`), run
-   on both distributions.
+   existing recipes. `lib/` is built; the prefix is not.
+2. The carry step, tried on a small C program with one library (`htop` and
+   `ncurses`), run on both distributions. Tried as helpers a recipe calls;
+   see "The first trial". Still to do: the automatic step, writing the place
+   into files after the build, and a run on booted systems.
 3. The receipt's record of what is carried, and update on a changed image.
 4. The host contract in `distro/contract`.
 5. `CARRY`, tried on one real desktop program with a toolkit. This is the
    trial that decides whether the design holds.
+
+## The first trial (2026-11-10)
+
+`htop` 3.5.3 with `ncurses` 6.6 as a shared library, both built from source
+in the sandbox and installed into a store. The recipes, logs and store are in
+`.artifacts/recipe-carry-trial`.
+
+What it showed:
+
+- The install carried four files into the package's `lib/`: the loader, the C
+  library and the maths library from the build image, and ncurses from the
+  `ncurses` recipe's `sdk`. `lib/` is in the package and linked nowhere.
+- On this computer (glibc) the program runs and loads all four from its own
+  package, not from the system.
+- Inside an AcornOS root (Alpine 3.24.4, musl, no glibc anywhere) the same
+  files run: `htop --version`, and its full screen on a terminal, which found
+  the terminal descriptions in `/etc/terminfo`.
+
+How far that goes:
+
+- The AcornOS root was entered with `chroot` on this computer's kernel. It is
+  the tree an AcornOS image is made from, not a booted AcornOS.
+- One terminal program. No toolkit, no network name lookups, no plug-ins.
+- The whole run took ten and a half minutes, nine of them building ncurses.
+
+What was built is the trial's form of steps 1 and 2, not the design's:
+
+| Design | Trial |
+|---|---|
+| `lib/` in the package tree | built (`tools/recipe` `src/packages.rs`) |
+| `RUNTIME.paths.prefix` | not built; the folder was given with `--define PREFIX=` |
+| Recipe runs the carry step itself after `install` | the recipe calls `carry_libraries(package, prefix, search)` |
+| Recipe tells every link the package's place | the recipe passes `carry_link_flags(prefix)` to the final link |
+| what was carried is in the receipt | only as files of the package |
+
+`RUNTIME` was left alone on purpose: it is part of what every kept build is
+matched by, and changing it under builds other work depends on needs a
+decision of its own.
+
+What it found:
+
+1. **The place cannot be told at every link.** `configure` runs the small
+   programs it builds. Told a loader in a folder that does not exist inside
+   the sandbox, they cannot start, and `configure` stops. The trial gave the
+   flags to the final link only. A build that runs its own products needs
+   either the package's folder to exist in the sandbox while it builds, or
+   the place written into the files after the build. This decides open
+   question 2: writing it afterwards is not optional.
+2. **The sandbox refused a large link.** ncurses' own shared build links some
+   190 object files in one step and failed with "Too many open files". The
+   trial built the archive position-independent and made the shared library
+   from that one file. This is a limit of the sandbox, not of the design, and
+   belongs with the other sandbox gaps.
+3. **Terminal descriptions are host data.** AcornOS keeps them in
+   `/etc/terminfo`, LevitateOS in `/usr/share/terminfo`. They join the host
+   contract, and a carried ncurses must be built to look in both.
+4. **The carried C library needed nothing beside it for this program.**
+   Whether that holds for name lookups and locales (open question 6) was not
+   exercised.
 
 ## Open questions
 
@@ -227,9 +288,10 @@ path is one known case), the image provides both paths.
    Toolkits open plug-ins by name, read data from folders they work out from
    their own location, and talk to the desktop. Proposed: step 5 above, on a
    Qt program, before any more of the catalog is written.
-2. **Who rewrites the program files.** Proposed: a small existing tool added
-   to the build image and run by Recipe in the sandbox, where the files are
-   already untrusted input. The other choice is doing it in Recipe itself.
+2. **Who rewrites the program files.** The trial showed it has to happen
+   after the build (finding 1). Proposed: a small existing tool added to the
+   build image and run by Recipe in the sandbox, where the files are already
+   untrusted input. The other choice is doing it in Recipe itself.
 3. **Graphics drivers.** The open drivers are libraries like any other and
    can be carried. NVIDIA's own driver cannot: it must match the kernel
    module on the host, and it exists for glibc only. Proposed: carried
