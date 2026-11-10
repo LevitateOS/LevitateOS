@@ -166,10 +166,17 @@ def steps_of(item):
     return steps
 
 
+def hook_event(name, hook, status, msg):
+    """One lifecycle event as the real recipe sends it."""
+    emit(event="recipe-hook", recipe=name, hook=hook, status=status, msg=msg)
+
+
 def play(item, refuse=None, agent=False):
     name = item["name"]
+    # Each recipe says which of its steps it needs this time, once its checks have run.
+    emit(event="plan", recipe=name, steps=steps_of(item))
     for hook in steps_of(item):
-        emit(event="step", recipe=name, hook=hook, status="running")
+        hook_event(name, hook, "running", "executing recipe hook")
         if hook == "acquire":
             total = max(item["needs"]["network_max_bytes"] // 4, 1 << 20)
             for part in range(1, 9):
@@ -177,15 +184,16 @@ def play(item, refuse=None, agent=False):
                     # The sample repair: the agent reads the refusal and the prompt, and changes the recipe.
                     emit(event="say", recipe=name, text="The agent is reading the failure and the recipe")
                     pause(1.0)
-                    emit(event="agent", recipe=name, files=["%s.rhai" % name],
+                    emit(event="agent", recipe=name, hook=hook, attempt=1,
+                         files=["/usr/share/recipe/recipes/%s.rhai" % name],
                          summary="it now fetches the file from packages.element.io, which the recipe already allows")
                     refuse = None
                 if refuse and part == 3:
-                    emit(event="step", recipe=name, hook=hook, status="failed")
+                    hook_event(name, hook, "failed", "connection refused by the sandbox")
+                    # `refused` is asked for: the real recipe names the step and its own message only.
                     emit(event="failed", recipe=name, hook=hook,
                          reason="connection refused by the sandbox",
-                         refused={"endpoint": refuse, "declared": item["needs"]["network"]},
-                         changed="nothing")
+                         refused={"endpoint": refuse, "declared": item["needs"]["network"]})
                     sys.exit(1)
                 emit(event="fetch", recipe=name, source=next(iter(item["sources"])),
                      bytes=total * part // 8, total=total)
@@ -202,7 +210,7 @@ def play(item, refuse=None, agent=False):
         else:
             emit(event="say", recipe=name, text="Putting the files in place")
             pause(0.5)
-        emit(event="step", recipe=name, hook=hook, status="done")
+        hook_event(name, hook, "success", "step finished")
 
 
 def install(name, agent=False):
@@ -261,11 +269,9 @@ def remove(name):
     current = next((each for each in items if each["name"] == name), None)
     if not current:
         fail("%s is not installed" % name)
-    emit(event="step", recipe=name, hook="remove", status="running")
     pause(0.4)
     items.remove(current)
     save(items)
-    emit(event="step", recipe=name, hook="remove", status="done")
     emit(event="done", recipe=name)
 
 

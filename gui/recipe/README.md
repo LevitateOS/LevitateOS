@@ -111,19 +111,23 @@ Changes, through the root helper, with events on stderr:
 | `recipe update NAME --autofix --autofix-prompt-file FILE --machine-events` | `update` takes no such options yet |
 
 Events are one JSON object per line. The front end reads these; any other
-line is shown as output.
+line is shown as output. "Real" is what `recipe --machine-events` sends since
+tools/recipe `89d4753`; of those, only `done` and `failed` have been seen from
+the real `recipe` (the others need a Ginux run).
 
-| Event | Fields |
-|---|---|
-| `plan` | `recipes`: each `name` and its `steps`, in the order they will run |
-| `step` | `recipe`, `hook`, `status` (`running`, `done`, `skipped`, `failed`). Today's `recipe-hook` event is read the same way, and is the only event `recipe` sends today |
-| `fetch` | `recipe`, `source`, `bytes`, `total` |
-| `progress` | `recipe`, `done`, `total` |
-| `say` | `recipe`, `text` |
-| `output` | `recipe`, `line` |
-| `failed` | `recipe`, `hook`, `reason`, and for a refused connection `refused`: `endpoint` and the `declared` list |
-| `agent` | `recipe`, `summary`, `files`: the agent changed the recipe during this run. Asked for; `recipe` sends nothing like it today |
-| `done` | `recipe` |
+| Event | Fields | Real |
+|---|---|---|
+| `plan` | `recipes`: each `name` and its `steps`, in the order they will run | yes, for an install or update, before the first recipe runs |
+| `plan` | `recipe`, `steps`: the steps that recipe needs this time; the others are marked as not needed | yes, once that recipe's checks have run |
+| `recipe-hook` | `recipe`, `hook`, `status` (`running`, `success`, `failed`, `skipped`, and others the front end ignores), `msg` | yes; it is Recipe's own lifecycle event. `step` with `status` `done` is read the same way |
+| `fetch` | `recipe`, `source`, `bytes`, `total` (null when the server did not say) | yes |
+| `agent` | `recipe`, `hook`, `attempt`, `files`, `summary`: the agent changed the recipe during this run, which starts again | yes, from `--autofix` |
+| `done` | `recipe` | yes, the last event |
+| `failed` | `recipe`, `hook`, `reason` | yes, the last event; `hook` only where a step failed |
+| `failed` … `refused` | `endpoint` and the `declared` list, for a refused connection | no: Recipe does not name the endpoint. Only the stand-in sends it, and the page that names the endpoint depends on it |
+| `progress` | `recipe`, `done`, `total` | no: nothing inside a build step is counted |
+| `say` | `recipe`, `text` | no |
+| `output` | `recipe`, `line` | no: the real `recipe` prints plain lines, which are shown as output |
 
 Without a `plan`, the front end adds a row of three steps for each recipe as
 its first step arrives.

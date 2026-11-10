@@ -82,8 +82,13 @@ void Run::drain()
             }
             continue;
         }
-        if (object["event"] == QLatin1String("failed"))
-            failure_ = object;
+        // The last word on a failure. What an earlier event said of the recipe
+        // and the step stays where this one names none.
+        if (object["event"] == QLatin1String("failed")) {
+            for (auto field = object.begin(); field != object.end(); ++field)
+                if (!field.value().isNull() || !failure_.contains(field.key()))
+                    failure_[field.key()] = field.value();
+        }
         // recab's own error: one JSON object with a class, a code and a message.
         if (!object.contains("event") && object.contains("message")) {
             failure_ = object;

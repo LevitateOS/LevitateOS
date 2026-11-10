@@ -495,6 +495,18 @@ void RunPage::onEvent(const QJsonObject &event)
                 hooks << hook.toString();
             addPlanRow(value.toObject()["name"].toString(), hooks);
         }
+        // One recipe's own plan, once its checks have run: the steps it does
+        // not name are not needed this time.
+        if (!recipe.isEmpty() && event["steps"].isArray()) {
+            QStringList needed;
+            for (const QJsonValue &hook : event["steps"].toArray())
+                needed << hook.toString();
+            for (const QString &hook : {QStringLiteral("acquire"), QStringLiteral("build"), QStringLiteral("install")}) {
+                StepMark *stepMark = needed.contains(hook) ? nullptr : mark(recipe, hook);
+                if (stepMark)
+                    stepMark->setState(StepMark::Skipped);
+            }
+        }
     } else if (kind == QLatin1String("step") || kind == QLatin1String("recipe-hook")) {
         const QString hook = event["hook"].toString();
         const QString outcome = event["status"].toString();
