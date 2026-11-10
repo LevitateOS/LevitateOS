@@ -8,6 +8,6 @@
 class Window;
 
 int takeShots(Window &window, const QString &folder);
-// The same for the story the real recab offers, against `fixtures/recab6`,
+// The same for the story the real recab offers, against `fixtures/recab-real`,
 // the stand-in that speaks the real recab's own status and commands.
 int takeRealShots(Window &window, const QString &folder);

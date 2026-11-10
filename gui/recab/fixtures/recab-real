@@ -1,31 +1,37 @@
 #!/usr/bin/env python3
-"""A stand-in that speaks the real recab's own shape (status schema 6), for
+"""A stand-in that speaks the real recab's own shape (status schema 7), for
 checking that recab-gui reads and drives the real thing correctly without an
 A/B system to run it on.
 
 It answers the commands the window uses, with the real names and arguments:
 
-  recab6 status --json
-  recab6 --json prepare [--preparation ID --revision N]
-  recab6 --json finalize --preparation ID --revision N
-  recab6 --json discard --preparation ID --revision N
-  recab6 --json set-next A|B
-  recab6 --json rollback
-  recab6 --json change install NAME --preparation ID --revision N
-  recab6 --json edit PATH --preparation ID --revision N
+  recab-real status --json
+  recab-real --json prepare [--preparation ID --revision N]
+  recab-real --json finalize --preparation ID --revision N
+  recab-real --json discard --preparation ID --revision N
+  recab-real --json set-next A|B
+  recab-real --json rollback
+  recab-real --json commit
+  recab-real --json change install NAME --preparation ID --revision N
+  recab-real --json edit PATH --preparation ID --revision N
 
 It sends no events, as the real recab sends none, and a failure is one JSON
-object on stderr with a class, a code and a message. As `agent6` it plays an
-agent that uses these commands; as `reboot6` it plays the restart. The state
+object on stderr with a class, a code and a message. As `agent-real` it plays an
+agent that uses these commands; as `reboot-real` it plays the restart. The state
 is one file in RECAB_STANDIN_STATE (default: a folder in /tmp).
+
+Every command takes `--actor LABEL`, kept with each change it makes.
+RECAB_STANDIN_KEEP=hand leaves a restarted system on trial until `commit`,
+as it is before start-up has been judged; RECAB_STANDIN_WORKING=1 makes the
+status say that a command is running right now.
 """
 import json
 import os
 import sys
 import time
 
-STATE_DIR = os.environ.get("RECAB_STANDIN_STATE") or "/tmp/recab6-standin-%d" % os.getuid()
-STATE = os.path.join(STATE_DIR, "recab6.json")
+STATE_DIR = os.environ.get("RECAB_STANDIN_STATE") or "/tmp/recab-real-standin-%d" % os.getuid()
+STATE = os.path.join(STATE_DIR, "recab-real.json")
 SPEED = float(os.environ.get("RECAB_STANDIN_SPEED", "1"))
 
 
@@ -33,7 +39,7 @@ def load():
     if not os.path.exists(STATE):
         # As recab's init leaves it: two copies of one system, A running.
         return {"active": "A", "generations": {"A": "g1", "B": "g1"}, "preparation": None, "trial_pending": False,
-                "rollback": None, "last_trial": None, "go_back": False, "made": 1}
+                "rollback": None, "last_trial": None, "go_back": False, "made": 1, "on_trial": False}
     return json.load(open(STATE))
 
 
@@ -71,11 +77,12 @@ def status(s):
         view("prepare", inactive, *(("no_change", None) if p and p["phase"] == "prepared" else
                                     can(not p and not s["trial_pending"], "a finished candidate or a trial is pending"))),
         view("finalize", inactive, *can(bool(p) and p["phase"] == "prepared", "there is no prepared candidate to finalize")),
-        view("discard", inactive, *can(bool(p), "there is no preparation to discard")),
+        view("discard", inactive, *(can(not s["trial_pending"], "cannot discard while a trial is pending or uncommitted")
+                                    if p else ("refused", "there is no preparation to discard"))),
         view("set_next", inactive, *(("no_change", None) if s["trial_pending"] else
                                      can(bool(p) and p["phase"] == "ready", "slot %s holds no finalized candidate" % inactive))),
         view("rollback", s["rollback"] or inactive, *can(bool(s["rollback"]), "no earlier known-good system is kept")),
-        view("commit", s["active"], "no_change", None),
+        view("commit", s["active"], "ready" if s.get("on_trial") or s["trial_pending"] else "no_change", None),
         view("stage", inactive, "refused", "a release medium is needed"),
     ]
 
@@ -90,10 +97,32 @@ def status(s):
                 "readiness": "committed" if name == s["active"] else ("ready" if ready else "incomplete"),
                 "generation_ready": ready, "seal": None, "kernel": "vmlinuz", "initrd": "initramfs.img"}
 
+    # Where things stand in one word, as recab's status works it out.
+    working = os.environ.get("RECAB_STANDIN_WORKING") == "1"
+    failed = bool(s["last_trial"]) and not s["last_trial"]["committed"] and s["last_trial"]["slot"] == inactive
+    if s.get("on_trial"):
+        state = "on_trial"
+    elif p:
+        if working:
+            state = "working"
+        elif p["phase"] == "ready":
+            state = "restart_set" if s["trial_pending"] else "trial_failed" if failed else "ready"
+        else:
+            state = "open" if p["phase"] == "prepared" and not p["failure"] else "interrupted"
+    else:
+        state = "restart_set" if s["trial_pending"] else "stable"
+    if p or s["trial_pending"]:
+        role = "next"
+    elif s["rollback"] == inactive:
+        role = "previous"
+    else:
+        role = "copy" if s["generations"]["A"] == s["generations"]["B"] else "unknown"
+
     return {
-        "schema_version": 6, "active_slot": s["active"], "inactive_slot": inactive,
+        "schema_version": 7, "lifecycle": {"state": state, "other": role, "working": working},
+        "active_slot": s["active"], "inactive_slot": inactive,
         "trial_pending": s["trial_pending"], "next_boot": inactive if s["trial_pending"] else s["active"],
-        "default_slot": s["active"], "known_good_slot": s["active"], "committed": True,
+        "default_slot": s["active"], "known_good_slot": s["active"], "committed": not s.get("on_trial"),
         "rollback_slot": s["rollback"], "scheduled_trial": inactive if s["trial_pending"] else None,
         "last_trial": s["last_trial"], "entry_prefix": "levitate", "slots": [slot("A"), slot("B")],
         "actions": actions, "preparation": p, "recovery_reason": None,
@@ -125,13 +154,13 @@ def prepare(s):
                         "source_generation": s["generations"][s["active"]], "revision": 1,
                         "operation": "synchronize", "phase": "prepared", "completed_steps": 3, "failure": None,
                         "synchronized": True, "synchronization": None, "finalization": None, "change": None,
-                        "last_change": None}
+                        "last_change": None, "changes": []}
     # The old way back ends when the place is reused.
     s["rollback"] = None
     s["generations"][other(s)] = s["generations"][s["active"]] + "+%s" % s["preparation"]["id"]
 
 
-def change(s, action, package):
+def change(s, action, package, actor=None):
     p = s["preparation"]
     if not p or p["phase"] != "prepared":
         refuse("changes go into a prepared candidate; run recab prepare")
@@ -139,18 +168,31 @@ def change(s, action, package):
     p["revision"] += 1
     p["last_change"] = {"id": "c%d" % p["revision"], "action": action, "package": package, "report": None,
                         "producer_io": None, "invocation_io": None, "projection_bytes_written": 0}
+    p["changes"].append({"id": p["last_change"]["id"], "action": action, "package": package,
+                         "unix_time": int(time.time()), "actor": actor})
 
 
 def reboot(s):
     pause(0.5)
-    if s["trial_pending"]:
+    if s.get("on_trial"):
+        # Restarted before it was kept: the computer comes back.
+        tried = s["active"]
+        s["active"] = s["rollback"]
+        s["rollback"] = None
+        s["on_trial"] = False
+        s["last_trial"] = {"slot": tried, "committed": False, "detail": "restarted before the trial was kept",
+                           "unix_time": int(time.time())}
+    elif s["trial_pending"]:
         was = s["active"]
         s["active"] = other(s)
         s["trial_pending"] = False
         s["preparation"] = None
         s["rollback"] = was
-        s["last_trial"] = {"slot": s["active"], "committed": True, "detail": "startup finished: running",
-                           "unix_time": int(time.time())}
+        if os.environ.get("RECAB_STANDIN_KEEP") == "hand":
+            s["on_trial"] = True
+        else:
+            s["last_trial"] = {"slot": s["active"], "committed": True, "detail": "startup finished: running",
+                               "unix_time": int(time.time())}
     elif s["go_back"]:
         was = s["active"]
         s["active"] = s["rollback"]
@@ -173,10 +215,10 @@ def agent(s):
     emit(event="step", step="prepare", status="done")
     emit(event="step", step="change", status="running")
     if "nvidia" in prompt:
-        change(s, "install", "nvidia-driver")
+        change(s, "install", "nvidia-driver", "agent")
         did = "it installed the recipe nvidia-driver into the next system"
     else:
-        change(s, "edit", "/etc/ssh/sshd_config")
+        change(s, "edit", "/etc/ssh/sshd_config", "agent")
         did = "it turned password logins off in /etc/ssh/sshd_config of the next system"
     save(s)
     emit(event="output", line="recab: preparation %s is at revision %d" % (s["preparation"]["id"], s["preparation"]["revision"]))
@@ -189,14 +231,15 @@ def agent(s):
 def main(args):
     role = os.path.basename(sys.argv[0])
     s = load()
-    if role == "agent6":
+    if role == "agent-real":
         return agent(s)
-    if role == "reboot6":
+    if role == "reboot-real":
         reboot(s)
         return save(s)
     words = [arg for arg in args if not arg.startswith("--")]
-    # The values of --preparation and --revision are not commands.
-    for flag in ("--preparation", "--revision"):
+    actor = args[args.index("--actor") + 1] if "--actor" in args else None
+    # The values of --preparation, --revision and --actor are not commands.
+    for flag in ("--preparation", "--revision", "--actor"):
         if flag in args and args[args.index(flag) + 1] in words:
             words.remove(args[args.index(flag) + 1])
     if "--machine-events" in args:
@@ -220,6 +263,8 @@ def main(args):
         matching(s, args)
         if "--preparation" not in args:
             refuse("the following required arguments were not provided: --preparation <PREPARATION> --revision <REVISION>")
+        if s["trial_pending"]:
+            refuse("cannot discard while a trial is pending or uncommitted")
         s["preparation"] = None
         s["trial_pending"] = False
     elif command == "set-next" and len(words) == 2:
@@ -231,12 +276,19 @@ def main(args):
         if not s["rollback"]:
             refuse("no earlier known-good system is kept")
         s["go_back"] = True
+    elif command == "commit":
+        # Committing the running system takes a set restart back.
+        s["trial_pending"] = False
+        if s.get("on_trial"):
+            s["on_trial"] = False
+            s["last_trial"] = {"slot": s["active"], "committed": True, "detail": "kept by hand",
+                               "unix_time": int(time.time())}
     elif command == "change" and len(words) == 3:
         matching(s, args)
-        change(s, words[1], words[2])
+        change(s, words[1], words[2], actor)
     elif command == "edit" and len(words) == 2:
         matching(s, args)
-        change(s, "edit", words[1])
+        change(s, "edit", words[1], actor)
     else:
         refuse("unrecognized subcommand '%s'" % " ".join(words), "state_or_detection", 2)
     save(s)

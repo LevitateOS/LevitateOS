@@ -31,6 +31,10 @@ public:
     void handOver(const QString &prompt, bool askFirst = true);
     void addUpdate(bool askFirst = true);
     void goBack(bool askFirst = true);
+    void keep();
+    // Sets the next system for the next restart without restarting; and takes that back.
+    void restartLater();
+    void cancelRestart();
     void discard(bool askFirst = true);
     // Discards the next system, then makes it a copy of the running one again.
     void reset(bool askFirst = true);

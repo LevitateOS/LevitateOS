@@ -52,11 +52,16 @@ bool RecabClient::understand(Run *finished, bool ok, Status *into, QString *erro
     if (schema == 3) {
         // The stand-in: it reports the lifecycle directly.
         *into = Status::fromJson(object);
-    } else if (schema == 6) {
-        // The real recab: two slots and a preparation. It names no release.
+    } else if (schema == 7) {
+        // The real recab: two slots, a preparation and the state in one
+        // word. It names no release.
         *into = Status::fromReal(object, osField(osRelease_, "NAME"), osField(osRelease_, "VERSION_ID"));
+        if (!into->unusable.isEmpty()) {
+            *error = tr("recab says the system needs recovery before anything else: %1").arg(into->unusable);
+            return false;
+        }
     } else {
-        *error = tr("`%1 status --json` answered with schema %2. This window reads schema 6, recab's own, and "
+        *error = tr("`%1 status --json` answered with schema %2. This window reads schema 7, recab's own, and "
                     "schema 3, its stand-in's.")
                      .arg(program_)
                      .arg(schema);
@@ -73,20 +78,22 @@ bool RecabClient::understand(Run *finished, bool ok, Status *into, QString *erro
 QStringList RecabClient::realArguments(const QStringList &arguments) const
 {
     const QString verb = arguments.value(0);
+    // What this window asks for is asked by the person in front of it.
+    const QStringList asked{"--json", "--actor", "person"};
     QStringList which;
     if (!preparationId_.isEmpty() && preparationRevision_ >= 0)
         which = QStringList{"--preparation", preparationId_, "--revision", QString::number(preparationRevision_)};
     if (verb == QLatin1String("finalize"))
-        return QStringList{"--json", "finalize"} + which;
+        return asked + QStringList{"finalize"} + which;
     if (verb == QLatin1String("discard"))
-        return QStringList{"--json", "discard"} + which;
+        return asked + QStringList{"discard"} + which;
     // Continuing what stopped is preparing again: recab looks at what is really there.
     if (verb == QLatin1String("recover"))
-        return QStringList{"--json", "prepare"} + which;
+        return asked + QStringList{"prepare"} + which;
     if (verb == QLatin1String("set-next"))
-        return QStringList{"--json", "set-next", otherSlot_};
+        return asked + QStringList{"set-next", otherSlot_};
     // `--json` makes a failure one JSON object with recab's message.
-    return QStringList{"--json"} + arguments;
+    return asked + arguments;
 }
 
 Run *RecabClient::change(const QStringList &arguments)

@@ -72,7 +72,7 @@ Needed by the gaps above and not offered today.
 
 | Backend | Lacks |
 |---|---|
-| recab | the lifecycle state and next steps in `status` (S2, S4 to S6, S15); a mark that a command is running (S6); the next system's changes in `status` (S7); a ready copy in one command (S22); `compare` (D11, D53); each slot's size and use (D23, S28); the single-system mode in `status` (D10); live progress events (S29); who made a change in the audit log (S26); finding a new release (S9) |
+| recab | a ready copy in one command (S22); `compare` (D11, D53); each slot's size and use (D23, S28); the single-system mode in `status` (D10); live progress events (S29); finding a new release (S9); undoing one change of the next system. Added on 2026-11-10 (status schema 7, read by the System and Disk apps): the lifecycle state in `status` (S2, S4 to S6, S15), a mark that a command is running (S6), every change of the next system (S7) and who asked for it (S26, as a label the caller gives) |
 | Recipe | `updates --json` (R4, R35); `go-back` and `kept` (R38); `plan`, `fetch`, `progress` events and an `agent` event (R15, R52); a way to pass an agent's question on (R46); installing from a remote source (R11); a history command (R30); sizes of what it keeps and a command to clear it (R37, D25, D26); download and disk needs of a recipe (R51); a hold (R65) |
 | The agent | anything that lets Codex or Claude Code be started by the apps at all (X7); what it ran and changed, step by step (X8, D17); approval of a step (X10); honouring "use the trash" (D18) |
 
@@ -83,7 +83,7 @@ Not gaps in the design but things that are wrong as built.
 | # | What is wrong |
 |---|---|
 | S1 | A failed run's reason is replaced by the main page at once |
-| S4 | After the next start is set and the restart fails, the app is stuck and says "The change was not made" |
+| S4 | After the next start is set and the restart fails, the app is stuck and says "The change was not made". Fixed on 2026-11-10: a set restart is its own state, with "Restart now" and "Cancel the set restart" |
 | S5 | "Continue" runs the wrong command for an interrupted change |
 | R1 | "Remove…" does nothing for software whose recipe is gone |
 | R38 | "Go back to an earlier version" calls a command Recipe does not have |

@@ -35,12 +35,14 @@ struct Status {
     QString runningSlot, otherSlot;            // real: "A" or "B"
     QString preparationId;                     // real: the open preparation, if any
     qint64 preparationRevision = -1;
-    // False when recab names only the last change made in the next system.
-    bool changesKnown = true;
 
     QString distro;
-    // stable, preparing, ready, trial_pending, failed, interrupted
+    // stable, preparing, working (a command runs now), interrupted, ready,
+    // trial_pending (a restart is set), on_trial (running, not kept yet),
+    // failed (the trial came back)
     QString state;
+    // recab says the system needs recovery before anything else: its reason.
+    QString unusable;
 
     QString runningRelease;
     QStringList runningHolds; // changes in effect in the running system

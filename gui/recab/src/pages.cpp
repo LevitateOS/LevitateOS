@@ -126,17 +126,25 @@ void SystemPage::show(const Status &s)
         column->addWidget(verdict);
     } else {
         QString title, under;
-        if (s.state == QLatin1String("ready") || s.state == QLatin1String("trial_pending")) {
+        if (s.state == QLatin1String("trial_pending")) {
+            title = tr("The next system starts at the next restart");
+            under = tr("That is set: any restart starts it, whoever makes it. Until then you stay on the running "
+                       "system, and you can cancel.");
+        } else if (s.state == QLatin1String("ready")) {
             title = tr("The next system is ready");
             under = tr("It is checked and closed. Restart to start using it; until then you stay on the running system.");
         } else if (next && !s.clashes.isEmpty()) {
             title = tr("The update clashes with one of your changes");
             under = tr("Nothing was chosen for you. The next system cannot be finished until that is settled.");
-        } else if (next && !s.changesKnown) {
-            // The real recab names the last change, not how many there are.
-            title = tr("The next system is open");
-            under = tr("What is changed in it takes effect when you restart into it. The running system is "
-                       "untouched until then.");
+        } else if (s.state == QLatin1String("on_trial")) {
+            title = tr("This system is on trial");
+            under = tr("It started, and is not kept yet: a restart now goes back to the system from before. recab "
+                       "keeps it once start-up has finished properly.");
+        } else if (s.state == QLatin1String("working")) {
+            title = tr("The next system is being worked on");
+            under = tr("A recab command is %1 right now, started outside this window. This page reads again until "
+                       "it has finished.")
+                        .arg(s.interruptedDuring.isEmpty() ? tr("working on the next system") : s.interruptedDuring);
         } else if (next) {
             title = counted(s.changes.size(), tr("The next system has %1 change"), tr("The next system has %1 changes"));
             under = tr("They take effect when you restart into it. The running system is untouched until then.");
@@ -194,6 +202,8 @@ void SystemPage::show(const Status &s)
     QStringList runningLines{tr("Running now"), tr("Locked")};
     if (next)
         runningLines << (s.state == QLatin1String("interrupted") ? tr("Untouched") : tr("Your way back"));
+    else if (s.state == QLatin1String("on_trial"))
+        runningLines = QStringList{tr("Running now"), tr("On trial: not kept yet")};
     else if (!s.runningHolds.isEmpty())
         runningLines << tr("With: %1").arg(s.runningHolds.join(tr("; ")));
     else
@@ -203,8 +213,7 @@ void SystemPage::show(const Status &s)
     if (next) {
         const bool plus = !titles.isEmpty();
         const QString under = !plus ? s.name(s.otherRelease)
-                              : s.changesKnown ? tr("%1, plus:").arg(s.name(s.otherRelease))
-                                               : tr("%1; the last change:").arg(s.name(s.otherRelease));
+                                     : tr("%1, plus:").arg(s.name(s.otherRelease));
         if (s.state == QLatin1String("interrupted"))
             pair->addWidget(card(Card::Open, Glyph::Plus, tr("The next system"), under, titles,
                                  tr("Incomplete: cannot be started")), 1);
@@ -238,7 +247,21 @@ void SystemPage::show(const Status &s)
     list->addWidget(strong(tr("What you can do")));
     const QString updateName = s.updateRelease.isEmpty() ? QString() : s.name(s.updateRelease);
 
-    if (s.state == QLatin1String("interrupted")) {
+    if (s.state == QLatin1String("working")) {
+        list->addWidget(dim(text(tr("Nothing can be started here while that command runs. Two commands never work "
+                                    "on the next system at once."),
+                                 true)));
+    } else if (s.state == QLatin1String("on_trial")) {
+        connect(act(list, tr("Keep this system"),
+                    tr("Makes it the system that every restart starts, now, without waiting for start-up to be "
+                       "judged."),
+                    tr("Keep it"), s.can("keep"), true),
+                &QPushButton::clicked, this, &SystemPage::keep);
+        connect(act(list, tr("Go back to the system from before"),
+                    tr("Restarts into it. This system is left as it is, so its changes can be tried again."),
+                    tr("Go back…"), s.can("go_back")),
+                &QPushButton::clicked, this, &SystemPage::goBack);
+    } else if (s.state == QLatin1String("interrupted")) {
         connect(act(list, tr("Continue where it stopped"),
                     tr("recab looks at what is really there and carries on. Nothing that was finished is done again."),
                     tr("Continue"), s.can("recover"), true),
@@ -248,12 +271,27 @@ void SystemPage::show(const Status &s)
                        "already reused."),
                     tr("Discard…"), s.can("discard")),
                 &QPushButton::clicked, this, &SystemPage::discard);
-    } else if (s.state == QLatin1String("ready") || s.state == QLatin1String("trial_pending")) {
+    } else if (s.state == QLatin1String("trial_pending")) {
+        connect(act(list, tr("Restart now"),
+                    tr("If the next system does not start properly, the computer comes back to the running system "
+                       "by itself. Its changes are not lost."),
+                    tr("Restart"), s.can("restart"), true),
+                &QPushButton::clicked, this, &SystemPage::restart);
+        connect(act(list, tr("Cancel the set restart"),
+                    tr("The next restart starts the running system again. The next system stays ready."),
+                    tr("Cancel it"), s.can("keep")),
+                &QPushButton::clicked, this, &SystemPage::cancelRestart);
+    } else if (s.state == QLatin1String("ready")) {
         connect(act(list, tr("Restart into the next system"),
                     tr("If it does not start properly, the computer comes back to the running system by itself. Its "
                        "changes are not lost."),
                     tr("Restart into it"), s.can("restart"), true),
                 &QPushButton::clicked, this, &SystemPage::restart);
+        connect(act(list, tr("Start it at the next restart"),
+                    tr("Nothing restarts now. Whoever restarts the computer next starts the next system; until "
+                       "then you can cancel."),
+                    tr("Set it"), s.can("restart")),
+                &QPushButton::clicked, this, &SystemPage::restartLater);
         connect(act(list, tr("Change something else"),
                     tr("Opens the next system again. It must be finished again before a restart."),
                     tr("Make a change…"), s.can("change")),
@@ -297,7 +335,7 @@ void SystemPage::show(const Status &s)
     }
     // Whatever state the next system is in, it can be made the running
     // system again: every change given up, the partition an exact copy.
-    if (next)
+    if (next && s.state != QLatin1String("working") && s.state != QLatin1String("on_trial"))
         connect(act(list, tr("Reset to the running system"),
                     tr("Gives up every change in the next system and makes it an exact copy of the running system "
                        "again. The running system is not touched."),
@@ -344,6 +382,8 @@ void AskPage::show(const Status &s, const QString &request)
         facts << tr("The next system is made with `recab prepare`, changed with `recab change install|update|remove "
                     "RECIPE` and `recab edit PATH`, and closed with `recab finalize`; `recab status --json` says "
                     "where things stand");
+        facts << tr("Every recab command that changes something takes `--actor agent`, so the list of changes "
+                    "says who made each one");
         if (!s.preparationId.isEmpty())
             facts << tr("The open preparation is %1, revision %2").arg(s.preparationId).arg(s.preparationRevision);
         facts << tr("This system runs from slot %1; the other is slot %2").arg(s.runningSlot, s.otherSlot);

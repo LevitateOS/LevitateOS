@@ -25,7 +25,7 @@ int main(int argc, char **argv)
                                             "picture at each point into this folder, then quit.",
                                    "folder");
     const QCommandLineOption real("real", "With --shots: the story the real recab offers, against the stand-in that "
-                                          "speaks its status and commands (fixtures/recab6).");
+                                          "speaks its status and commands (fixtures/recab-real).");
     parser.addOptions({look, shots, real});
     parser.process(app);
     if (parser.isSet(look))

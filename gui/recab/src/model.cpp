@@ -111,19 +111,6 @@ Status Status::fromReal(const QJsonObject &o, const QString &distro, const QStri
     s.runningRelease = release;
     s.runningSlot = o["active_slot"].toString();
     s.otherSlot = o["inactive_slot"].toString();
-    const bool trialPending = o["trial_pending"].toBool();
-
-    QString runningGeneration, otherGeneration, otherReadiness;
-    for (const QJsonValue &value : o["slots"].toArray()) {
-        const QJsonObject slot = value.toObject();
-        const QString generation = slot["generation"].toObject()["id"].toString();
-        if (slot["slot"].toString() == s.runningSlot) {
-            runningGeneration = generation;
-        } else {
-            otherGeneration = generation;
-            otherReadiness = slot["readiness"].toString();
-        }
-    }
 
     const QJsonObject trial = o["last_trial"].toObject();
     if (!trial.isEmpty()) {
@@ -136,58 +123,54 @@ Status Status::fromReal(const QJsonObject &o, const QString &distro, const QStri
             s.trialOutcome = QStringLiteral("failed");
     }
 
+    // recab says where things stand itself (status schema 7); nothing here
+    // works it out again from slots and phases.
+    const QJsonObject lifecycle = o["lifecycle"].toObject();
+    static const QMap<QString, QString> states{
+        {"stable", "stable"},           {"open", "preparing"}, {"working", "working"},
+        {"interrupted", "interrupted"}, {"ready", "ready"},    {"restart_set", "trial_pending"},
+        {"on_trial", "on_trial"},       {"trial_failed", "failed"}};
+    const QString said = lifecycle["state"].toString();
+    s.state = states.value(said);
+    if (s.state.isEmpty()) {
+        const QString reason = o["recovery_reason"].toString();
+        s.unusable = said == QLatin1String("unusable") && !reason.isEmpty()
+                         ? reason
+                         : QObject::tr("recab reports the state \"%1\", which this window does not know").arg(said);
+    }
+    const QString other = lifecycle["other"].toString();
+    s.otherRole = other == QLatin1String("unknown") || other.isEmpty() ? QStringLiteral("none") : other;
+    // The next system continues the running one, and a copy is it.
+    if (s.otherRole == QLatin1String("next") || s.otherRole == QLatin1String("copy"))
+        s.otherRelease = release;
+
     const QJsonObject p = o["preparation"].toObject();
-    QString phase;
     if (!p.isEmpty()) {
-        phase = p["phase"].toString();
-        const QString failure = p["failure"].toString();
-        s.otherRole = QStringLiteral("next");
-        s.otherRelease = release; // the next system continues the running one
         s.preparationId = p["id"].toString();
         s.preparationRevision = p["revision"].toInteger(-1);
-        // recab's status names the change in flight and the last one finished, not all of them.
-        s.changesKnown = false;
-        for (const char *key : {"last_change", "change"}) {
-            const QJsonObject change = p[QLatin1String(key)].toObject();
-            if (!change.isEmpty())
-                s.changes << changeFrom(change);
+        s.otherState = p["phase"] == QLatin1String("ready") ? QStringLiteral("ready") : QStringLiteral("open");
+        // Every finished change, oldest first, with who asked for it.
+        for (const QJsonValue &value : p["changes"].toArray()) {
+            ChangeItem item = changeFrom(value.toObject());
+            if (value.toObject()["actor"].toString().startsWith(QLatin1String("agent")))
+                item.title = QObject::tr("%1, by the agent").arg(item.title);
+            s.changes << item;
         }
-        if (phase == QLatin1String("ready")) {
-            s.otherState = QStringLiteral("ready");
-            s.state = trialPending ? QStringLiteral("trial_pending") : QStringLiteral("ready");
-        } else if (phase == QLatin1String("prepared") && failure.isEmpty()) {
-            s.otherState = QStringLiteral("open");
-            s.state = QStringLiteral("preparing");
-        } else {
-            // Any other phase with no command running is where one stopped.
-            s.otherState = QStringLiteral("open");
-            s.state = QStringLiteral("interrupted");
-            s.interruptedDuring = during(phase, p["operation"].toString());
-            if (!failure.isEmpty())
+        // A command that runs between two steps has left no word of what it does.
+        const bool between = p["phase"] == QLatin1String("prepared") || p["phase"] == QLatin1String("ready");
+        if (s.state == QLatin1String("interrupted") || (s.state == QLatin1String("working") && !between)) {
+            s.interruptedDuring = during(p["phase"].toString(), p["operation"].toString());
+            const QString failure = p["failure"].toString();
+            if (!failure.isEmpty() && s.state == QLatin1String("interrupted"))
                 s.interruptedDuring += QObject::tr(": %1").arg(failure);
         }
-    } else if (trialPending) {
-        // A restart into the other system is set; it is finished and waits.
-        s.otherRole = QStringLiteral("next");
-        s.otherRelease = release;
+    } else if (s.otherRole == QLatin1String("next")) {
+        // A restart is set and no preparation is left: it is finished and waits.
         s.otherState = QStringLiteral("ready");
-        s.state = QStringLiteral("trial_pending");
-    } else {
-        s.state = QStringLiteral("stable");
-        if (o["rollback_slot"].toString() == s.otherSlot)
-            s.otherRole = QStringLiteral("previous");
-        else if (!otherGeneration.isEmpty() && otherGeneration == runningGeneration)
-            s.otherRole = QStringLiteral("copy");
-        else
-            s.otherRole = QStringLiteral("none");
     }
-    // The next system was tried and the computer came back: it is still
-    // there, finished, and not the way back.
-    if (s.trialOutcome == QLatin1String("failed") && trial["slot"].toString() == s.otherSlot
-        && s.otherRole == QLatin1String("next") && s.otherState == QLatin1String("ready") && !trialPending) {
-        s.state = QStringLiteral("failed");
+    // Tried, and the computer came back: still there, and not the way back.
+    if (s.state == QLatin1String("failed"))
         s.otherState = QStringLiteral("failed");
-    }
 
     // recab's verdict on each of its actions, under the names this window asks by.
     QMap<QString, QJsonObject> by;
@@ -207,7 +190,10 @@ Status Status::fromReal(const QJsonObject &o, const QString &distro, const QStri
     s.actions.insert("finalize", verdict("finalize"));
     s.actions.insert("discard", verdict("discard"));
     s.actions.insert("go_back", verdict("rollback"));
-    s.actions.insert("restart", verdict("set_next"));
+    s.actions.insert("keep", verdict("commit"));
+    // Once the restart is set, only the restart itself is left to do.
+    s.actions.insert("restart", s.state == QLatin1String("trial_pending") ? ActionVerdict{true, QString()}
+                                                                          : verdict("set_next"));
     // A change goes into an open next system: the one there is, or one recab can prepare.
     s.actions.insert("change", open ? ActionVerdict{true, QString()} : prepare);
     // Continuing is asking recab to prepare again; it carries on from what is really there.

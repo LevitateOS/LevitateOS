@@ -153,7 +153,7 @@ int takeShots(Window &window, const QString &folder)
 }
 
 // The story the real recab offers today, against the stand-in that speaks its
-// shape (`fixtures/recab6`): two copies, a change by the agent, finishing,
+// shape (`fixtures/recab-real`): two copies, a change by the agent, finishing,
 // the restart, going back, and discarding. No update, clash or proposal:
 // the real recab has none of those.
 int takeRealShots(Window &window, const QString &folder)
@@ -193,19 +193,53 @@ int takeRealShots(Window &window, const QString &folder)
     expect("the agent's change opens the next system",
            window.status().state == "preparing" && !window.status().preparationId.isEmpty()
                && window.status().changes.size() == 1);
+    expect("the change says the agent made it", window.status().changeTitles().value(0).contains("by the agent"));
     save(window, "r2-the-next-system-is-open");
+
+    // A command started in a terminal is running: nothing can be started here.
+    qputenv("RECAB_STANDIN_WORKING", "1");
+    window.refresh();
+    waitUntilIdle(window);
+    expect("a command running elsewhere is reported as working", window.status().state == "working");
+    save(window, "r2b-a-command-runs-elsewhere");
+    qunsetenv("RECAB_STANDIN_WORKING");
+    window.refresh();
+    waitUntilIdle(window);
+    expect("when it has finished the next system is open again", window.status().state == "preparing");
 
     window.finish();
     waitUntilIdle(window);
     expect("finishing makes it ready", window.status().state == "ready");
     save(window, "r3-ready");
 
+    // Set for the next restart without restarting, and taken back.
+    window.restartLater();
+    waitUntilIdle(window);
+    expect("the restart is set and nothing restarted",
+           window.status().state == "trial_pending" && window.status().runningSlot == "A"
+               && window.status().can("restart").ready);
+    save(window, "r3b-starts-at-the-next-restart");
+    window.cancelRestart();
+    waitUntilIdle(window);
+    expect("cancelling leaves the next system ready", window.status().state == "ready");
+    window.restartLater();
+    waitUntilIdle(window);
+
+    // Start-up has not been judged yet when the window opens after the restart.
+    qputenv("RECAB_STANDIN_KEEP", "hand");
     window.restart();
     waitUntilIdle(window);
-    expect("the restart lands on the other slot and is kept",
+    qunsetenv("RECAB_STANDIN_KEEP");
+    expect("the restart lands on the other slot, on trial",
+           window.status().state == "on_trial" && window.status().runningSlot == "B"
+               && window.status().can("keep").ready);
+    save(window, "r4-on-trial");
+    window.keep();
+    waitUntilIdle(window);
+    expect("keeping it makes it the kept system",
            window.status().state == "stable" && window.status().runningSlot == "B"
                && window.status().trialOutcome == "kept" && window.status().otherRole == "previous");
-    save(window, "r4-on-the-new-system");
+    save(window, "r4b-on-the-new-system");
 
     window.goBack(false);
     waitUntilIdle(window);

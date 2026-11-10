@@ -4,6 +4,7 @@
 
 #include "refresh.h"
 
+#include <QTimer>
 #include <QLabel>
 #include <QLocale>
 #include <QMessageBox>
@@ -38,6 +39,9 @@ Window::Window(QWidget *parent)
     connect(system_, &SystemPage::ask, this, [this] { showAsk(); });
     connect(system_, &SystemPage::addUpdate, this, [this] { addUpdate(); });
     connect(system_, &SystemPage::goBack, this, [this] { goBack(); });
+    connect(system_, &SystemPage::keep, this, &Window::keep);
+    connect(system_, &SystemPage::restartLater, this, &Window::restartLater);
+    connect(system_, &SystemPage::cancelRestart, this, &Window::cancelRestart);
     connect(system_, &SystemPage::discard, this, [this] { discard(); });
     connect(system_, &SystemPage::reset, this, [this] { reset(); });
     connect(system_, &SystemPage::finish, this, &Window::finish);
@@ -141,6 +145,9 @@ void Window::reload(std::function<void()> then)
         source_->setText(tr("Read from recab at %1").arg(QLocale().toString(QTime::currentTime(), QLocale::ShortFormat)));
         if (then)
             then();
+        // A command started elsewhere is working: look again until it is done.
+        if (status_.state == QLatin1String("working"))
+            QTimer::singleShot(2000, this, &Window::refresh);
     });
     reading_->start();
 }
@@ -280,7 +287,28 @@ void Window::recover()
 
 void Window::restart()
 {
-    chain({client_.change({"set-next"}), client_.reboot()});
+    // When the restart is set already, only the restart is left.
+    if (status_.state == QLatin1String("trial_pending"))
+        chain({client_.reboot()});
+    else
+        chain({client_.change({"set-next"}), client_.reboot()});
+}
+
+void Window::restartLater()
+{
+    chain({client_.change({"set-next"})});
+}
+
+// recab's commit of the running system takes a set restart back.
+void Window::cancelRestart()
+{
+    chain({client_.change({"commit"})});
+}
+
+void Window::keep()
+{
+    work(client_.change({"commit"}), tr("Keeping this system"),
+         tr("It becomes the system that every restart starts."), [this](bool) { showMain(); });
 }
 
 void Window::goBack(bool askFirst)

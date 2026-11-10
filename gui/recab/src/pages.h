@@ -29,6 +29,9 @@ signals:
     void ask();
     void addUpdate();
     void goBack();
+    void keep();
+    void restartLater();
+    void cancelRestart();
     void finish();
     void restart();
     void discard();

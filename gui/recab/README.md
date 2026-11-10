@@ -14,10 +14,12 @@ Qt 6 Widgets, C++20, CMake. Widgets shared with `gui/recipe` and `gui/disk` are 
 ## State (2026-11-10)
 
 **It reads and drives the real recab, and that has not run on a real A/B
-system.** The window reads recab's own status (schema 6: two slots and a
-preparation) and sends recab's own commands (`prepare`, `finalize`, `discard`
-with the preparation's id and revision, `set-next`, `rollback`). This was
-checked two ways: against `fixtures/recab6`, a stand-in that speaks exactly
+system.** The window reads recab's own status (schema 7: two slots, a
+preparation with every change made in it, and the state in one word that recab
+works out itself) and sends recab's own commands (`prepare`, `finalize`,
+`discard` with the preparation's id and revision, `set-next`, `commit`,
+`rollback`), each with `--actor person`. This was
+checked two ways: against `fixtures/recab-real`, a stand-in that speaks exactly
 the real recab's status and commands, where the whole story passes; and
 against the real `recab` binary on a development machine that is no A/B
 system, where the window shows recab's own refusal and offers to read as
@@ -85,17 +87,18 @@ QT_QPA_PLATFORM=offscreen RECAB_GUI_RECAB=$F/recab RECAB_GUI_AGENT=$F/agent \
   .artifacts/recab-gui/build/recab-gui --look levitate --shots /tmp/recab-shots
 ```
 
-The story the real recab offers (two copies, a change by the agent, finishing,
-the restart, going back, discarding) runs against `fixtures/recab6` with
+The story the real recab offers (two copies, a change by the agent, a command
+running elsewhere, finishing, setting the restart and cancelling it, the
+restart, the trial kept by hand, going back, the reset, discarding) runs against `fixtures/recab-real` with
 `--real`. It stops at once when the system cannot be read, before anything is
 asked of the agent. Always name a stand-in agent for it: the default agent is
 `codex`.
 
 ```sh
-QT_QPA_PLATFORM=offscreen RECAB_GUI_RECAB=$F/recab6 RECAB_GUI_AGENT=$F/agent6 \
-  RECAB_GUI_REBOOT=$F/reboot6 RECAB_GUI_ROOT_HELPER= RECAB_GUI_OS_RELEASE=$F/os-release \
-  RECAB_STANDIN_STATE=/tmp/recab6-shots-state RECAB_STANDIN_SPEED=0 \
-  .artifacts/recab-gui/build/recab-gui --look levitate --shots /tmp/recab6-shots --real
+QT_QPA_PLATFORM=offscreen RECAB_GUI_RECAB=$F/recab-real RECAB_GUI_AGENT=$F/agent-real \
+  RECAB_GUI_REBOOT=$F/reboot-real RECAB_GUI_ROOT_HELPER= RECAB_GUI_OS_RELEASE=$F/os-release \
+  RECAB_STANDIN_STATE=/tmp/recab-real-shots-state RECAB_STANDIN_SPEED=0 \
+  .artifacts/recab-gui/build/recab-gui --look levitate --shots /tmp/recab-real-shots --real
 ```
 
 ## What the front end asks of recab
@@ -152,19 +155,20 @@ Events, one JSON object per line on stderr:
 | This window | The real recab |
 |---|---|
 | the running system's name | `NAME` and `VERSION_ID` of `/etc/os-release` (recab names no release) |
-| "The second copy" | no preparation, and both slots hold the same generation |
-| "The system from before" | no preparation, and `rollback_slot` is the other slot |
-| "The next system", open | a preparation in phase `prepared` |
-| "The next system", ready | a preparation in phase `ready`; with `trial_pending`, the restart is set |
-| "interrupted" | a preparation in any other phase, or with a `failure` |
-| "did not start, so the computer came back" | `last_trial` names the other slot and was not committed, and it is still ready |
-| the next system's changes | only `preparation.last_change` and `change`: recab's status names the last one, not all |
+| where things stand | `lifecycle.state`, which recab works out: `stable`, `open`, `working`, `interrupted`, `ready`, `restart_set`, `on_trial`, `trial_failed`. The window works nothing out from slots and phases. `unusable`, or a state it does not know, is shown as a problem with recab's `recovery_reason` |
+| "The second copy", "The system from before", "The next system" | `lifecycle.other`: `copy`, `previous`, `next` (`unknown`: no other system is drawn) |
+| "is being worked on" | `working`: a recab command holds the run lock. Nothing can be started; the page reads again every two seconds |
+| "This system is on trial" | `on_trial`: the running system is not kept yet |
+| the next system's changes | `preparation.changes`: every finished change, oldest first, with its `actor`; one whose actor starts with `agent` is marked "by the agent" |
 | Make a change | allowed when a preparation is open, else by the verdict on `prepare` |
 | Finish | `recab finalize --preparation ID --revision N` |
 | Reset to the running system | `recab discard --preparation ID --revision N`, then `recab prepare`: discarding only forgets the next system and leaves its files; preparing again copies the running system over them. recab has no single command for it |
 | Discard (only after an interruption) | `recab discard --preparation ID --revision N` |
 | Continue (after an interruption) | `recab prepare --preparation ID --revision N` |
-| Restart into it | `recab set-next SLOT`, then the restart |
+| Restart into it | `recab set-next SLOT`, then the restart; when the restart is set already (`restart_set`), the restart alone |
+| Start it at the next restart | `recab set-next SLOT` |
+| Cancel the set restart | `recab commit`: committing the running system takes the set restart back and leaves the next system ready |
+| Keep this system (on trial) | `recab commit` |
 | Go back | `recab rollback`, then the restart |
 
 Each button follows recab's verdict in `actions` (`ready`, `no_change`,
@@ -209,7 +213,7 @@ allowed to run, and whether it runs as the person or as root are not decided.
 | `src/pages.*` | the system page, ask, work, a clash, what the agent did, the questions |
 | `src/window.*` | the flows between pages |
 | `src/shots.*` | the picture mode and flow check |
-| `fixtures/` | `recab6`: a stand-in with the real recab's status and commands (with `agent6`, `reboot6`, `os-release`); `recab`: the older stand-in with updates, clashes and proposals (with `agent`, `reboot`) |
+| `fixtures/` | `recab-real`: a stand-in with the real recab's status and commands (with `agent-real`, `reboot-real`, `os-release`); `recab`: the older stand-in with updates, clashes and proposals (with `agent`, `reboot`) |
 | `data/` | the menu entry and the polkit action |
 | `../kit/` | shared with `gui/recipe` and `gui/disk`: widgets, the page base, the work page, the command runner, words, stand-in looks |
 
@@ -218,8 +222,10 @@ allowed to run, and whether it runs as the person or as root are not decided.
 - A run on a real A/B system: the mapping above was written from recab's
   generated types and checked against a stand-in of the same shape, not
   against a booted LevitateOS or AcornOS.
-- Everything of the next system's changes: recab's status names the last one;
-  `recab change list` is not read.
+- Taking one change out of the next system: recab lists every change and has
+  no command that undoes one.
+- Who made a change is only as good as what the caller says: `--actor` is a
+  label recab records, not something it checks.
 - Updates from within the window: the real recab takes a release from media
   (`recab stage`), which the window does not offer.
 - A real agent, and the approval of what it may do. Codex and Claude Code do

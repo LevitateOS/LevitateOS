@@ -492,14 +492,14 @@ SystemsState SystemsState::fromJson(const QJsonObject &object, const QString &os
         s.otherRole = object["other"].toObject()["role"].toString();
         return s;
     }
-    if (schema != 6) {
-        s.problem = QObject::tr("recab answered in a form this window does not know (schema %1; it reads schema 6, "
+    if (schema != 7) {
+        s.problem = QObject::tr("recab answered in a form this window does not know (schema %1; it reads schema 7, "
                                 "recab's own, and schema 3, its stand-in's).")
                         .arg(schema);
         return s;
     }
-    // The real recab: two slots, each with the generation it holds, and a
-    // preparation while the other one is being changed. It names no release.
+    // The real recab: two slots, each with the generation it holds, and what
+    // the other one is to the running one. It names no release.
     s.known = true;
     s.distro = osField(osRelease, QStringLiteral("NAME"));
     s.runningRelease = osField(osRelease, QStringLiteral("VERSION_ID"));
@@ -511,15 +511,12 @@ SystemsState SystemsState::fromJson(const QJsonObject &object, const QString &os
             slot["generation"].toObject()["id"].toString();
     }
     const QJsonObject preparation = object["preparation"].toObject();
-    if (!preparation.isEmpty() || object["trial_pending"].toBool()) {
-        s.otherRole = QStringLiteral("next");
+    const QString role = object["lifecycle"].toObject()["other"].toString();
+    if (role != QLatin1String("unknown"))
+        s.otherRole = role;
+    // The next system continues the running one, and a copy is it.
+    if (role == QLatin1String("next") || role == QLatin1String("copy"))
         s.otherRelease = s.runningRelease;
-    } else if (object["rollback_slot"].toString() == other) {
-        s.otherRole = QStringLiteral("previous");
-    } else if (!otherGeneration.isEmpty() && otherGeneration == runningGeneration) {
-        s.otherRole = QStringLiteral("copy");
-        s.otherRelease = s.runningRelease;
-    }
     s.key = QStringLiteral("%1/%2/%3/%4")
                 .arg(running, runningGeneration, otherGeneration)
                 .arg(preparation["revision"].toInteger(0));

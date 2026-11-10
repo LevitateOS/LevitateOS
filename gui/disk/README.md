@@ -163,10 +163,10 @@ default), `next` (the other holds a change not started yet), `identical`, or
 ## What it asks of recab
 
 `recab status --json`, as the System window reads it, for what the two
-systems are. From the real recab (schema 6) it takes the two slots, the
-generation each holds, `rollback_slot` and the preparation: the other system
-is the next one while a preparation exists, the system from before when it is
-the rollback slot, and a copy when both hold the same generation; the running
+systems are. From the real recab (schema 7) it takes the two slots, the
+generation each holds, the preparation's revision and `lifecycle.other`, in
+which recab itself says what the other system is: the next one, the system
+from before, or a copy; the running
 system's name comes from `/etc/os-release`. The slots, their generations and
 the preparation's revision together are the state a comparison was made under;
 under another state it is shown as out of date. The stand-in (schema 3) names
