@@ -271,7 +271,13 @@ impl<'a> Solver<'a> {
         }
         let all = split_top(inner, " and ");
         if all.len() > 1 {
-            return all.iter().map(|a| self.sat(a)).fold(true, |x, y| x && y);
+            let mut satisfied = true;
+            for dependency in &all {
+                // Resolve every conjunct, including after an unsatisfied one.
+                let accepted = self.sat(dependency);
+                satisfied = satisfied && accepted;
+            }
+            return satisfied;
         }
         let first = split_top(inner, " with ").remove(0);
         let first = split_top(&first, " without ").remove(0);

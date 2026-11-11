@@ -236,9 +236,13 @@ pub fn lock(root: &Path, distro: &Distro, bundle: &distro_contract::Variant, che
         let pem = fs::read_to_string(&key).with_context(|| format!("reading {}", key.display()))?;
         let key_name = key.file_name().unwrap_or_default().to_string_lossy().into_owned();
         let sha_of = |url: &str| downloads.iter().find(|d| d.0 == url).map(|d| d.1.clone()).unwrap_or_default();
+        let rows = rows.into_iter().map(|(name, version, url)| {
+            let digest = sha_of(&url);
+            (name, version, url, digest)
+        }).collect::<Vec<_>>();
         fs::write(
             &path,
-            render_lock(distro, layer, release, &mirror, (&key_name, &pem), (&tools_nv, &tools_url, &sha_of(&tools_url)), &rows, &sha_of)?,
+            render_lock(distro, layer, release, &mirror, (&key_name, &pem), (&tools_nv, &tools_url, &sha_of(&tools_url)), &rows)?,
         )
         .with_context(|| format!("writing {}", path.display()))?;
         println!("wrote {} ({} packages, {changes} changed)", rel(root, &path), rows.len());
@@ -331,8 +335,7 @@ fn render_lock(
     mirror: &str,
     key: (&str, &str),
     tools: (&str, &str, &str),
-    rows: &[(&str, String, String)],
-    sha_of: &dyn Fn(&str) -> String,
+    rows: &[(&str, String, String, String)],
 ) -> Result<String> {
     let today = String::from_utf8(Command::new("date").arg("+%F").output()?.stdout)?;
     let mut text = format!(
@@ -363,8 +366,8 @@ fn render_lock(
         tools_url = tools.1,
         tools_sha = tools.2,
     );
-    for (name, nv, url) in rows {
-        text.push_str(&format!("        [\"{name}\", \"{nv}\", \"{url}\", \"{}\"],\n", sha_of(url)));
+    for (name, nv, url, sha) in rows {
+        text.push_str(&format!("        [\"{name}\", \"{nv}\", \"{url}\", \"{}\"],\n", sha));
     }
     text.push_str("    ]\n}\n");
     Ok(text)
