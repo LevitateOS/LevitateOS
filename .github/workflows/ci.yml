@@ -85,6 +85,11 @@ jobs:
           # shellcheck disable=SC2046 # one word per package
           sudo apt-get install -y $(cargo xtask doctor --packages apt)
 
+      # The offline vendor producer needs every locked source package,
+      # including Cargo's target-conditional dependencies.
+      - name: Acquire the locked Rust source closure
+        run: cargo fetch --locked
+
       - name: Prepare the pinned Recipe bootstrap root
         shell: bash
         run: |
