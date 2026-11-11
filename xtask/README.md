@@ -8,6 +8,12 @@ xtask composes the producers and sets up the environment: distro-builder builds 
 
 `src/cli.rs` defines every command (over the distros it finds under `distro/variants` and the product and scenario registry in `distro_contract::registry`); `src/app.rs` dispatches; each command group has one file under `src/tasks/`; shared helpers are in `src/util/`. `tests/cli.rs` checks the CLI contract.
 
+## Watching a build: `cargo xtask progress`
+
+`cargo xtask progress [<distro>] [--once]` shows where a running OS build is. It only reads files the builder and Recipe keep current (the builder runs as root, the view needs no privileges): `.artifacts/progress/<distro>.json` (product, run directory, the builder's pid, the step stack `part > step > recipe` and the active Recipe progress file) and that Recipe progress file (`done`, `total`, `what`). Per distro it prints the product, the step stack, `done/total what` with a percentage bar, the rate (items per minute over the last 5 minutes of samples; the average since the invocation started when there are too few, as with `--once`), the elapsed time of the step and of the build, and an ETA: from the rate when the step has a count, otherwise `~ from earlier runs`, the median duration of the same step in the `timeline.jsonl` of earlier runs under `.artifacts/out/<distro>/releases/*/*/`. The last finished steps follow, with their durations. Without `--once` it redraws every 2 s with plain ANSI (works over SSH); with it, one snapshot is printed and it exits.
+
+With no state file it says no build is running; a state still marked `running` whose builder pid is gone is reported as stopped. `cargo xtask status <distro>` adds a one-line summary while a build runs. The builder's side (`timeline.jsonl`, `timeline.txt`, the state file) is in `distro/builder/README.md`.
+
 ## Publishing a kernel
 
 `cargo xtask build <product> <distro>` is the one command that builds an ISO: as a normal user it runs the builder through `sudo -n` (passwordless sudo is required; the Ginux coordinator needs root) with the user's toolchain and a separate offline cargo target directory, the builder picks the compiler image pinned in `tools/recipe/bootstrap/product-ci.json` (failing with a pointer to `tools/recipe/docs/setup-linux.md` if it is not produced), and the build acquires its package locks itself.

@@ -160,6 +160,7 @@ fn after_help() -> String {
   cargo xtask build live-tools <distro>
   cargo xtask test all <distro>
   cargo xtask status <distro>
+  cargo xtask progress [<distro>]         while an OS build runs: step, count, rate, ETA
 
 Exit codes: 0 ok, 1 failed, 2 bad usage, 3 missing prerequisite (the message names the command that provides it).
 Nothing waits for input unless it needs a terminal; without one it stops and names the command that works without it.",
@@ -228,6 +229,16 @@ pub enum Cmd {
         /// Print the statuses as JSON.
         #[arg(long)]
         json: bool,
+    },
+
+    /// Show where a running OS build is: step, count, rate, ETA, finished steps (redraws every 2 s).
+    Progress {
+        /// Only this distro (default: every distro with a build state).
+        #[arg(value_parser = DistroParser)]
+        distro: Option<Distro>,
+        /// Print one snapshot and exit.
+        #[arg(long)]
+        once: bool,
     },
 
     /// Remove a distro's scenario runs (their results and disks).

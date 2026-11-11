@@ -204,6 +204,13 @@ pub fn status(distro: &Distro, json: bool) -> Result<()> {
     if !json {
         println!("{} Scenario Status", distro.name());
         println!();
+        let running = crate::tasks::progress::summary_lines(&root, distro.id());
+        for line in &running {
+            println!("{line}");
+        }
+        if !running.is_empty() {
+            println!();
+        }
         for (scenario, status) in &statuses {
             let label = match status {
                 ScenarioStatus::Stale => "[STALE]",

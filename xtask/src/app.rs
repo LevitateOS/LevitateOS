@@ -14,6 +14,7 @@ pub fn run(cli: crate::cli::Cli) -> Result<()> {
         Cmd::Run(args) => crate::tasks::scenarios::run(args),
         Cmd::Test(args) => crate::tasks::scenarios::test(args),
         Cmd::Status { distro, json } => crate::tasks::scenarios::status(&distro, json),
+        Cmd::Progress { distro, once } => crate::tasks::progress::run(distro.as_ref(), once),
         Cmd::Reset { distro } => crate::tasks::scenarios::reset(&distro),
         Cmd::Gen { check } => crate::tasks::generate::run(check),
         Cmd::Check { what: None } => crate::tasks::check::run(),
