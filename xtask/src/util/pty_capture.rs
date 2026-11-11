@@ -259,6 +259,10 @@ fn kill_process_group(master: &dyn MasterPty) {
 /// developer's shell don't reach the program, so a capture is the same everywhere.
 fn apply_terminal_env(cmd: &mut CommandBuilder) {
     cmd.env("TERM", distro_contract::install_ux::PANE_TERM);
+    // These children have an interactive PTY. Ink's CI mode buffers their
+    // final screen until exit, so a live capture would receive no frame.
+    cmd.env("CI", "false");
+    cmd.env("CONTINUOUS_INTEGRATION", "false");
     for inherited in ["COLORTERM", "FORCE_COLOR", "NO_COLOR"] {
         cmd.env_remove(inherited);
     }
