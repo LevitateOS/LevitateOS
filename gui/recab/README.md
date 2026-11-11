@@ -30,16 +30,18 @@ fetch, add, settle, carry on, take out), a History page (from the new
 `recab history --json`), the first view after a restart (on trial, kept, came
 back) and a Busy view as designed, all described under "The newer pages" below.
 `fixtures/recab-real` speaks schema 10 with `operations`, `updates` and
-`history`. None of it has run on a real A/B computer; `recab history` was run on
-sample files only.
+`history`, and its operations answer as `operations::views`
+(`tools/recab/src/operations.rs`) does, with switches for the states a story needs
+(see "The stand-in that answers as recab does" below). None of it has run on a real
+A/B computer; `recab history` was run on sample files only.
 
-**The real interface is recab status schema 10.** The existing pages read its
-lifecycle and offered operations, with concrete argument vectors and declared
-inputs. The software/update/recovery section supports Recipe changes, signed
-updates, merge decisions, reproduction and interrupted-work recovery. Every
-request retains the preparation revision/generation the person viewed; conflict
-choices refresh between submissions. Earlier schemas 7–9 keep their limited
-boot/preparation mapping, and schema 3 remains a drawing fixture.
+**The real interface is recab status schema 10.** The pages read its lifecycle and
+offered operations, with concrete argument vectors and declared inputs. Every
+request retains the preparation id and revision the person viewed (the operation's
+`argv` is sent as recab gave it); conflict choices refresh between submissions.
+Earlier schemas 7 to 9 keep their limited boot and preparation mapping (no
+`operations`, no `updates`), and schema 3 is the older stand-in's, a drawing
+fixture. What the window reads of each is in `src/model.*`.
 
 `fixtures/lifecycle` supplies schema-10 UI scenarios in either direction, or
 passes through a real status snapshot from `RECAB_STATUS_FILE`. Existing older
@@ -98,6 +100,42 @@ more before it is added. In the mock-up and not here, because recab gives none
 of it: a release medium that is noticed, kernel and package lists, how much
 room it needs, "what happens to your changes" per package, when it was last
 checked, and "Skip this release".
+
+**When a release merge stops.** recab's merge (`tools/recab/src/merge.rs`) lists
+each thing it cannot decide as a `Conflict`: an `id`, a `path` (for
+`package_rebuild` the package's name), a `kind` and a `resolution`. It says nothing
+of what either side holds, so neither does the window; the Release page, the clash
+page, Overview, "The next system" and the facts handed to the agent say, per kind,
+only what the source says: `content_or_metadata` (the next system and the release
+both changed it, differently), `type` (a different kind of thing on each side),
+`deletion` (removed on one side, changed on the other; recab does not say which),
+`directory_tree` (settled as a whole; `merge.rs` 520-540), `package_ownership` (a
+file of software added through Recipe that the release changes; only "local" is
+accepted, `merge.rs` 1533-1536), `package_rebuild` (the release changes system
+libraries or the kernel and the package has compiled files or kernel modules; it
+must be reproduced, `merge.rs` 1537-1540) and `missing_or_unsafe_baseline` (recab has
+no record of the original release; `merge.rs` 1133). The release named is
+`prepared_release` (the version of the selected release while one is selected,
+`status.rs`), the other is the running release. What recab offers for each is offered
+where the person is stopped, each through the Before page, with recab's own label and
+verdict: "Settle…"/"Decide by hand…" (`resolve:<id>`, choices worded; asks first for a
+file when "edited"), "Adopt it…" (`adopt_baseline`: asks for the original release's
+`release.json` with a file dialog, then the Before page), "Reproduce…"
+(`update_reproduce`: the package is the conflict's own, so no question) on the
+Release page and the clash page; and "Replace it…" (`replace_failed`, only when
+recab keeps no preparation for a failed system; so never on the clash page) on the
+Release page and on the Overview of a failed start. The agent is given the open
+conflicts that recab lets be settled, each with its sentence and recab's command
+(`recab update resolve ID --preparation P --revision N --choice ...`, `recab update
+reproduce ... PACKAGE`); a baseline needs a file only the person has, so it is
+not handed over.
+
+**When recab says the system needs recovery.** `lifecycle.state` `unusable` is
+not called an interruption: Overview and "The next system" say "recab says this
+system needs recovery" with `recovery_reason`, show no step of their own, and list
+every operation with its verdict (recab refuses all but `trial_recover` then,
+`operations.rs` 450-465). An interrupted preparation lists the same, and its
+`change_recover` is recab's own way on (`operations.rs` 420-429).
 
 **First view after a restart.** Overview, by state. *On trial* is the mock-up's
 page: what is judged, "Go back now…" and "Keep it now", the two systems, and why
@@ -193,7 +231,7 @@ outlive the window and can be found, followed, answered, approved and stopped fr
 Activity (`../kit/livestory.*`; pictures `a-live-*` and `r2c-live-*`: `-live-question`,
 `-live-approval`, `-live-follow`). The pictures `s0-*` to `s14-*` are Settings: as first read, "Allowed", signing out (and the question first), a sign in that fails, signing in (the address Codex printed), another program, back to Codex, a refused value, "Try it" and the run in Activity, a helper that cannot be asked. The pictures `s9b-claude-listed` and `s9c-claude-and-notices-off` show Claude Code as a row and the notices row. The story sets `HOME`, `XDG_CONFIG_HOME`, `XDG_STATE_HOME`, `LEVITATE_AGENT_CODEX` and `LEVITATE_AGENT_CLAUDE` itself for that part and puts them back. The pictures `a-*`
 (`r2c-*` in the real story) are Activity: the list, a done run, a run that
-waits, this window's own run, the strip on Activity. The pictures `r8` to `r12` (`--real`) are the release page from "none known" to "in the next system" (a failed check, nothing newer, available, downloaded, a clash, settled, added; `r10b` is Overview with the clash), `r4a` is the first view on trial, `r13` and `r14` the first views after a restart that came back and one that was kept, `r13b` and `r15*` are History (a restart that came back, all, restarts only); `p12` and `p13` (older stand-in) are the release page with a one-step update and History without a command. The pictures `p*` (older stand-in) and `rp*` (`--real`) are "The next system" and "Getting back" in the states each stand-in reaches; `p-steps-old.txt` and `rp-steps.txt` are the steps saved as a file. The other pictures show
+waits, this window's own run, the strip on Activity. The pictures `r8a` (no update source), `r16` (a command failed), `r17*` (the restart failed after `set-next`), `r18*` (a change cut off, the recovery list, recovered through `change_recover`), `r19*` (recovery needed), `r20*` (merge blocked on the baseline, adopted), `r21*` (blocked on a package, reproduced), `r22*` (six kinds, one decided by hand), `r23*` (a failed system with no preparation, replaced) are the paths added for the dead ends; `07b`, `07c`, `07d` (older stand-in) are a clash decided by hand, and `08` is the agent's result on the Proposed page. The pictures `r8` to `r12` (`--real`) are the release page from "none known" to "in the next system" (a failed check, nothing newer, available, downloaded, a clash, settled, added; `r10b` is Overview with the clash), `r4a` is the first view on trial, `r13` and `r14` the first views after a restart that came back and one that was kept, `r13b` and `r15*` are History (a restart that came back, all, restarts only); `p12` and `p13` (older stand-in) are the release page with a one-step update and History without a command. The pictures `p*` (older stand-in) and `rp*` (`--real`) are "The next system" and "Getting back" in the states each stand-in reaches; `p-steps-old.txt` and `rp-steps.txt` are the steps saved as a file. The other pictures show
 Overview and the pages inside the frame.
 
 The story the real recab offers (two copies, a change by the agent, a command
@@ -316,8 +354,38 @@ of that id, whose `argv` the window sends as it is (with `--json --actor person
 | the operations' shape | `Operation` and `Input` (`operations.rs` 9, 18): `id`, `label`, `argv`, `inputs`, `verdict`, `reason`, `destructive` |
 | "the restart is set" and "restart needed" | `lifecycle.reboot_needed`, `lifecycle.trial_current` (`status.rs` 110) |
 | "up to 15 minutes" | `TRIAL_TIMEOUT_SECS` = 900 (`init_system.rs` 35), the default of `recab trial --timeout` |
-| "No change can be made while on trial" | the refusal of `prepare`, `ensure_preparation_allowed` (`state.rs` 748), shown as recab words it |
+| "No change can be made while on trial" | the refusal of the operation `install`, as recab words it: while the trial's ticket exists (it is written by `set-next` and cleared by `commit`, `rollback` or when `recab trial` judges the start: `system.rs` 141-172, `trial.rs` 124) `operations.rs` 454-455 refuses everything but `trial_recover`, `commit` and `rollback` with "Reconcile the pending trial before changing either system", which replaces `ensure_preparation_allowed`'s own reason (`state.rs` 748) |
 | the History page | `recab history --json` (`history.rs`): `History` (76: `entries`, `records`, `unreadable`, `truncated`, `log_found`) and `HistoryEntry` (39: `time`, `kind`, `slot`, `preparation`, `change`, `action`, `package`, `actor`, `outcome`, `detail`), read from the audit log (`AuditEvent`, `store.rs` 32) and the state file's changes (`ChangeRecord`, `state.rs` 127) |
+
+## The stand-in that answers as recab does
+
+`fixtures/recab-real` builds its operations like `operations::views` does
+(`operations.rs`): the six base operations from the actions (finalize and discard are
+listed only while a preparation exists, else "No preparation is open", 126-136);
+prepare and finalize refused while a merge is pending (141-151); `replace_failed` and
+the refusal of prepare when no preparation is kept for a failed system (152-164);
+install, update, remove, edit and `update_media` by `writable` (165-239);
+`update_check` refused with "No usable update source is configured" (240-248);
+`update_download` ready when a release is known (249-261); `update_apply` (262-280);
+`update_recover` (297-308); `resolve:<id>` for conflicts that are neither
+`package_rebuild` nor `missing_or_unsafe_baseline`, with the choices of their kind
+(309-352); `update_reproduce` (353-374); `adopt_baseline` (392-413); `update_cancel`
+(414-419); `change_recover` ready when a change was cut off (420-429);
+`sync_recover` (430-441); `trial_recover` ready while the trial's ticket exists
+(442-449); and the last loop (450-465): another command running, a pending trial
+(refuses all but `trial_recover`, `commit`, `rollback`), recovery needed. The ticket
+exists from `set-next` until `commit`, `rollback` or the judged start. Switches, read
+when a command runs:
+
+| Variable | Makes |
+|---|---|
+| `RECAB_STANDIN_UPDATE_SOURCE=none` | no update source: `update_check` refused, `update check` fails as `update.rs` 158 |
+| `RECAB_STANDIN_MERGE=baseline\|rebuild\|ownership\|kinds` | what `update apply` stops on (unset: a `content_or_metadata` conflict on an edited file) |
+| `RECAB_STANDIN_TRIAL=fail-no-record` | the restart fails and recab keeps no preparation for it (`replace_failed`) |
+| `RECAB_STANDIN_STOP_AT=change` | the agent's change is cut off as `change.rs` 500-510 leaves it |
+| `RECAB_STANDIN_UNUSABLE=TEXT` | recab needs recovery, for this reason |
+| `RECAB_STANDIN_FAIL=COMMAND` | that command is refused with a message recab words (`finalize.rs` 112) |
+| `RECAB_STANDIN_REBOOT_FAILS=1` | `reboot-real` fails |
 
 ## Before it happens
 
@@ -344,6 +412,9 @@ nothing recab does not report (how long a command takes, how much it changes).
 | Continue after an interruption | Continue where it stopped? | Continue | `recab recover` (what recab's operation says) |
 | Add a release (also from a file) | Add LevitateOS 2026.12 to the next system? | Add it | `recab update apply` |
 | Take a release out, carry on adding it | Take the release out of the next system? / Carry on adding the release? | Take it out / Carry on | `recab update cancel` / `recab update recover` |
+| Adopt the original release's baseline (a file is chosen first) | Adopt the original release as the baseline? | Adopt it | `recab update adopt-baseline --manifest FILE` |
+| Reproduce a package for the release being added | Reproduce PACKAGE through Recipe? | Reproduce it | `recab update reproduce PACKAGE` |
+| Replace a failed system recab keeps no preparation for | recab's label, as a question | Replace it | `recab prepare` (recab's argv for `replace_failed`), says recab's reason and `destructive` mark |
 | A request that would reuse the place of the system from before | Make this change in the next system? | Prepare the next system | the agent |
 
 "What runs" says whether a password is asked from the root helper: with

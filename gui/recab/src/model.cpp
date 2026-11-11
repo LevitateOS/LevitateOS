@@ -5,6 +5,111 @@
 #include <QLocale>
 #include <QObject>
 
+// ---------------------------------------------------------------- What recab says of a merge
+
+bool MergeConflict::choosesASide() const
+{
+    return !isPackageRebuild() && !isBaseline();
+}
+
+QString MergeConflict::kindWords() const
+{
+    if (kind == QLatin1String("content_or_metadata"))
+        return QObject::tr("changed on both sides");
+    if (kind == QLatin1String("type"))
+        return QObject::tr("a different kind of thing on each side");
+    if (kind == QLatin1String("deletion"))
+        return QObject::tr("removed on one side, changed on the other");
+    if (kind == QLatin1String("directory_tree"))
+        return QObject::tr("a directory and what is in it");
+    if (kind == QLatin1String("package_ownership"))
+        return QObject::tr("a file of software added through Recipe");
+    if (isPackageRebuild())
+        return QObject::tr("software to reproduce through Recipe");
+    if (isBaseline())
+        return QObject::tr("the original release is not on record");
+    return kind; // a kind this window does not know: recab's own word
+}
+
+// What tools/recab/src/merge.rs says of each kind, and only that: it names the
+// path (the package, for package_rebuild) and the kind, and keeps what either
+// side holds to itself.
+QString MergeConflict::says(const QString &releaseName, const QString &runningName) const
+{
+    const QString release = releaseName.isEmpty() ? QObject::tr("the release") : releaseName;
+    const QString running = runningName.isEmpty() ? QObject::tr("the running system's release") : runningName;
+    if (kind == QLatin1String("content_or_metadata"))
+        return QObject::tr("The next system and %1 both changed %2 from what %3 shipped, each differently: its content "
+                           "or its metadata (owner, permissions). recab does not say what either version holds.")
+            .arg(release, path, running);
+    if (kind == QLatin1String("type"))
+        return QObject::tr("%1 is a different kind of thing (file, directory or link) in the next system than in %2, "
+                           "and both differ from what %3 shipped. recab does not say which is which.")
+            .arg(path, release, running);
+    if (kind == QLatin1String("deletion"))
+        return QObject::tr("%1 was removed on one side and changed on the other: removed in the next system and "
+                           "changed by %2, or the other way round. recab does not say which.")
+            .arg(path, release);
+    if (kind == QLatin1String("directory_tree"))
+        return QObject::tr("%1 is a directory that one side replaced or removed while the other side kept or changed "
+                           "things inside it. It is settled as a whole, by choosing the next system's side or %2's.")
+            .arg(path, release);
+    if (kind == QLatin1String("package_ownership"))
+        return QObject::tr("%1 is a file of software added to the next system through Recipe, and %2 has a different "
+                           "version of it. recab accepts only the next system's file: choosing the release's is "
+                           "refused. For the release's, recab says to cancel and remove that package through Recipe, "
+                           "or reproduce it with paths that do not collide.")
+            .arg(path, release);
+    if (isPackageRebuild())
+        return QObject::tr("%1 is software added to the next system through Recipe. recab found that %2 changes "
+                           "system libraries or the kernel and that this package has compiled files or kernel "
+                           "modules, so it has to be reproduced through Recipe against %2. Choosing a side does not "
+                           "settle it.")
+            .arg(path, release);
+    if (isBaseline())
+        return QObject::tr("recab has no usable record of the original release this next system began from (%1), so "
+                           "it cannot tell what was changed in it from what %2 changes. It never takes the changed "
+                           "system as the original: it asks for the verified original release.")
+            .arg(path, release);
+    return QObject::tr("recab lists %1 as \"%2\" and says no more.").arg(path, kind);
+}
+
+QString MergeConflict::standing() const
+{
+    if (resolution.isEmpty())
+        return QObject::tr("Not settled");
+    if (resolution == QLatin1String("local"))
+        return QObject::tr("Settled: the next system's version stays");
+    if (resolution == QLatin1String("release"))
+        return QObject::tr("Settled: the release's version is taken");
+    if (resolution == QLatin1String("edited"))
+        return QObject::tr("Settled: with the file you gave");
+    return QObject::tr("Settled: %1").arg(resolution);
+}
+
+QList<MergeConflict> UpdateInfo::open() const
+{
+    QList<MergeConflict> left;
+    for (const MergeConflict &c : conflicts)
+        if (c.resolution.isEmpty())
+            left << c;
+    return left;
+}
+
+QString Status::mergeHeading() const
+{
+    const QString release = mergeRelease();
+    return QObject::tr("Adding %1 needs you").arg(release.isEmpty() ? QObject::tr("the release") : release);
+}
+
+QString Status::mergeSentence() const
+{
+    const qsizetype n = update.open().size();
+    return counted(n, QObject::tr("recab stopped at %1 thing it cannot decide for you."),
+                   QObject::tr("recab stopped at %1 things it cannot decide for you."))
+           + QObject::tr(" Nothing was chosen for you, and the next system cannot be finished until each is settled.");
+}
+
 QStringList Status::changeTitles() const
 {
     QStringList titles;
@@ -184,7 +289,7 @@ Status Status::fromReal(const QJsonObject &o, const QString &distro, const QStri
         s.otherRole = QStringLiteral("previous");
     // The next system continues the running one, and a copy is it.
     if (s.otherRole == QLatin1String("next") || s.otherRole == QLatin1String("copy"))
-        s.otherRelease = o["prepared_release"].toString(release);
+        s.otherRelease = o["prepared_release"].toString(s.runningRelease);
 
     const QJsonObject p = o["preparation"].toObject();
     if (!p.isEmpty()) {
@@ -277,7 +382,9 @@ Status Status::fromReal(const QJsonObject &o, const QString &distro, const QStri
         }
         const QJsonObject download=update["download"].toObject();
         if(!download.isEmpty())s.downloadProgress=QObject::tr("%1 / %2 verified bytes%3").arg(download["verified_bytes"].toInteger()).arg(download["total_bytes"].toInteger()).arg(download["downloaded"].toBool()?QObject::tr(" — downloaded"):QString());
-        for(const QJsonValue &value:update["merge"].toObject()["conflicts"].toArray()) {const auto c=value.toObject();if(c["resolution"].isNull())s.clashes<<Clash{c["path"].toString()+" ("+c["kind"].toString()+")",QObject::tr("Prepared content (private)"),QObject::tr("Release content (private)")};}
+        // One entry for each conflict not settled; recab gives a path and a kind, no content.
+        for (const MergeConflict &c : u.open())
+            s.clashes << Clash{c.path, QString(), QString()};
         auto own=[&s](const QString &id){ for(const auto &v:s.operations){const auto op=v.toObject();if(op["id"]==id)return ActionVerdict{op["verdict"]=="ready",op["reason"].toString()};}return ActionVerdict{false,QObject::tr("recab did not offer this operation")};};
         s.actions["finalize"]=own("finalize");s.actions["discard"]=own("discard");s.actions["go_back"]=own("rollback");s.actions["keep"]=own("commit");s.actions["restart"]=s.state=="trial_pending"?ActionVerdict{true,QString()}:own("set_next");
         s.actions["change"]=own("install");s.actions["recover"]=own("update_recover");

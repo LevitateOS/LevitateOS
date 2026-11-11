@@ -49,6 +49,9 @@ signals:
     void openBack();
     // What recab says about a newer release.
     void openRelease();
+    // A failed system that recab keeps no preparation record for: its own
+    // `replace_failed` operation.
+    void replaceFailed();
 };
 
 // Everything about the next system in one place: what it holds, what will
@@ -98,6 +101,12 @@ signals:
     void addFromFile();
     void settle();
     void finish();
+    // What a merge stopped on that is not settled by choosing a side: the
+    // original release's baseline (`adopt_baseline`), a package to reproduce
+    // (`update_reproduce`), and a failed system to replace (`replace_failed`).
+    void adoptBaseline();
+    void reproduce(const QString &package);
+    void replaceFailed();
 };
 
 // What happened to this computer's systems, newest first, as recab's
@@ -146,7 +155,9 @@ signals:
     void handOver(const QString &prompt);
 };
 
-// An update and a change clash: what the agent is given to settle it.
+// A release and the next system disagree: what recab stopped at, what each
+// kind of conflict is, what recab offers for it, and what the agent is given
+// to settle what a side can settle.
 class ClashPage : public Page {
     Q_OBJECT
 public:
@@ -156,6 +167,11 @@ signals:
     void later();
     void byHand();
     void fix(const QString &prompt);
+    void adoptBaseline();
+    void reproduce(const QString &package);
+private:
+    // The real recab's merge: what it stopped at, kind by kind.
+    void showMerge(const Status &status);
 };
 
 // What the agent did about the clash, against each thing that was expected.

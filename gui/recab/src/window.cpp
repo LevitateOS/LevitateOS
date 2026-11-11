@@ -148,6 +148,12 @@ Window::Window(QWidget *parent)
     connect(release_, &ReleasePage::add, this, [this] { addUpdate(); });
     connect(release_, &ReleasePage::addFromFile, this, [this] { addFromFile(); });
     connect(release_, &ReleasePage::settle, this, &Window::showClash);
+    connect(release_, &ReleasePage::adoptBaseline, this, [this] { adoptBaseline(); });
+    connect(release_, &ReleasePage::reproduce, this, [this](const QString &package) { reproduce(package); });
+    connect(release_, &ReleasePage::replaceFailed, this, [this] { replaceFailed(); });
+    connect(system_, &SystemPage::replaceFailed, this, [this] { replaceFailed(); });
+    connect(clash_, &ClashPage::adoptBaseline, this, [this] { adoptBaseline(); });
+    connect(clash_, &ClashPage::reproduce, this, [this](const QString &package) { reproduce(package); });
     connect(release_, &ReleasePage::finish, this, [this] {
         frame_->select(QStringLiteral("next"));
         showNext();
@@ -473,7 +479,7 @@ void Window::work(Run *run, const QString &title, const QString &subtitle, std::
 }
 
 // Short changes with no page of their own, one after another.
-void Window::chain(QList<Run *> runs, bool first)
+void Window::chain(QList<Run *> runs, const QString &made, bool restartLast, bool first)
 {
     if (runs.isEmpty()) {
         reload([this] { showSection(); });
@@ -482,24 +488,32 @@ void Window::chain(QList<Run *> runs, bool first)
     Run *run = runs.takeFirst();
     setEnabled(false);
     ++quiet_;
-    connect(run, &Run::finished, this, [this, run, runs, first](bool ok) {
+    connect(run, &Run::finished, this, [this, run, runs, first, made, restartLast](bool ok) {
         setEnabled(true);
         --quiet_;
         const QString reason = run->failure()["reason"].toString();
+        const QString said = run->problem();
         run->deleteLater();
         if (!ok) {
             for (Run *left : runs)
                 left->deleteLater();
             // A later step is the restart (no JSON, no reason): what came before it was done.
-            QMessageBox::warning(this, tr("System"),
-                                 !reason.isEmpty() ? reason
-                                 : first           ? tr("The change was not made.")
-                                                   : tr("The computer did not restart. The step before the restart was "
-                                                        "made; the page shows where things stand now."));
+            const bool restart = restartLast && runs.isEmpty();
+            QString words;
+            if (restart)
+                words = tr("The computer did not restart. %1 The page shows where things stand now.")
+                            .arg(made.isEmpty() ? tr("The step before the restart was made.") : made)
+                        + (said.isEmpty() ? QString() : tr(" It said: %1").arg(said));
+            else
+                words = !reason.isEmpty() ? reason : first ? tr("The change was not made.")
+                                                           : tr("A step after the first was not made. The page shows "
+                                                                "where things stand now.");
+            QMessageBox box(QMessageBox::Warning, tr("System"), words, QMessageBox::Ok, this);
+            box.exec();
             reload([this] { showSection(); });
             return;
         }
-        chain(runs, false);
+        chain(runs, made, restartLast, false);
     });
     run->start();
 }
@@ -553,6 +567,8 @@ BeforePage::Content Window::beforeOperation(const QJsonObject &op) const
         return beforewords::releaseStep(client_, status_, id);
     if (id == QLatin1String("prepare") || id == QLatin1String("sync_recover"))
         return beforewords::recover(client_, status_);
+    if (id == QLatin1String("replace_failed"))
+        return beforewords::replaceFailed(client_, status_, op);
     // update_check and update_download only look and fetch.
     if (id == QLatin1String("update_check") || id == QLatin1String("update_download"))
         return {};
@@ -561,6 +577,26 @@ BeforePage::Content Window::beforeOperation(const QJsonObject &op) const
 
 void Window::runOperation(const QJsonObject &op, const QStringList &extra, std::function<void(bool)> after, bool askFirst) {
     if(busy() || op["verdict"]!="ready")return;
+    // The recovery list's own buttons: the two that ask for values go the way the pages go.
+    if (askFirst && op["id"] == "adopt_baseline") {
+        adoptBaseline();
+        return;
+    }
+    if (askFirst && op["id"] == "update_reproduce") {
+        QStringList packages;
+        for (const MergeConflict &c : status_.update.open())
+            if (c.isPackageRebuild())
+                packages << c.path;
+        QString package = packages.value(0);
+        if (packages.size() > 1) {
+            bool chosen = false;
+            package = QInputDialog::getItem(this, op["label"].toString(), tr("Which package?"), packages, 0, false, &chosen);
+            if (!chosen)
+                return;
+        }
+        reproduce(package);
+        return;
+    }
     if (askFirst && !beforeOperation(op).title.isEmpty()) {
         const QString id = op["id"].toString();
         askBefore(
@@ -571,7 +607,7 @@ void Window::runOperation(const QJsonObject &op, const QStringList &extra, std::
             [this, op, extra, after] { runOperation(op, extra, after, false); });
         return;
     }
-    if(op["id"]=="reboot"){chain({client_.reboot()});return;}
+    if(op["id"]=="reboot"){chain({client_.reboot()}, tr("Nothing else was changed."), true);return;}
     QStringList args{"catalog"};for(auto v:op["argv"].toArray())args<<v.toString();
     args<<extra;
     QString choice;
@@ -579,7 +615,15 @@ void Window::runOperation(const QJsonObject &op, const QStringList &extra, std::
         const auto field=v.toObject();if(field["name"]=="file" && !choice.isEmpty() && choice!="edited")continue;
         QString value;bool ok=false;QStringList choices;for(auto c:field["choices"].toArray())choices<<c.toString();
         if(choices.isEmpty())value=QInputDialog::getText(this,op["label"].toString(),field["label"].toString(),QLineEdit::Normal,QString(),&ok);
-        else value=QInputDialog::getItem(this,op["label"].toString(),field["label"].toString(),choices,0,false,&ok);
+        else {
+            // recab's own words for a choice are local, release and edited; a person is told what each does.
+            auto words=[](const QString &choice){
+                return choice=="local"?tr("Keep the next system's version (local)"):choice=="release"?tr("Take the release's version (release)")
+                       :choice=="edited"?tr("Use a file I give (edited)"):choice;};
+            QStringList shown;for(const QString &c:choices)shown<<words(c);
+            value=QInputDialog::getItem(this,op["label"].toString(),field["label"].toString(),shown,0,false,&ok);
+            if(ok)value=choices.value(shown.indexOf(value));
+        }
         if(!ok)return;
         value=value.trimmed();
         if((field["required"].toBool() || (field["name"]=="file" && choice=="edited")) && value.isEmpty()){QMessageBox::warning(this,tr("System"),tr("A value is required."));return;}
@@ -623,6 +667,57 @@ void Window::addFromFile(const QString &named)
         return;
     }
     runOperation(op, extra, after, false);
+}
+
+// One of recab's operations run with the values it asks for already in hand,
+// so no question comes before the Before page.
+void Window::adoptBaseline(const QString &named, bool askFirst)
+{
+    const QJsonObject op = status_.operationObject(QStringLiteral("adopt_baseline"));
+    if (busy() || op["verdict"] != "ready")
+        return;
+    const QString path = !named.isEmpty() ? named
+                                          : QFileDialog::getOpenFileName(this, tr("Choose the original release's release.json"),
+                                                                         QString(), tr("Release manifest (release.json);;All files (*)"));
+    if (path.isEmpty())
+        return;
+    if (askFirst) {
+        askBefore([this, path] { return beforewords::adoptBaseline(client_, status_, path); },
+                  [this, path] { adoptBaseline(path, false); });
+        return;
+    }
+    QJsonObject bare = op;
+    bare.remove(QStringLiteral("inputs"));
+    runOperation(bare, QStringList{QStringLiteral("--manifest"), path}, [this](bool ok) {
+        if (ok)
+            showRelease();
+    }, false);
+}
+
+void Window::reproduce(const QString &package, bool askFirst)
+{
+    const QJsonObject op = status_.operationObject(QStringLiteral("update_reproduce"));
+    if (busy() || op["verdict"] != "ready" || package.isEmpty())
+        return;
+    if (askFirst) {
+        askBefore([this, package] { return beforewords::reproduce(client_, status_, package); },
+                  [this, package] { reproduce(package, false); });
+        return;
+    }
+    QJsonObject bare = op;
+    bare.remove(QStringLiteral("inputs"));
+    runOperation(bare, QStringList{package}, [this](bool ok) {
+        if (ok)
+            showSection();
+    }, false);
+}
+
+void Window::replaceFailed(bool askFirst)
+{
+    const QJsonObject op = status_.operationObject(QStringLiteral("replace_failed"));
+    if (busy() || op["verdict"] != "ready")
+        return;
+    runOperation(op, QStringList(), nullptr, askFirst);
 }
 
 void Window::addUpdate(bool askFirst)
@@ -685,9 +780,10 @@ void Window::restart(bool askFirst)
     }
     // When the restart is set already, only the restart is left.
     if (status_.state == QLatin1String("trial_pending"))
-        chain({client_.reboot()});
+        chain({client_.reboot()}, tr("A restart into the next system was already set; nothing was changed."), true);
     else
-        chain({client_.change({"set-next"}), client_.reboot()});
+        chain({client_.change({"set-next"}), client_.reboot()},
+              tr("The step before it was made: recab set the next system to start at the next restart."), true);
 }
 
 void Window::restartLater(bool askFirst)
@@ -725,7 +821,8 @@ void Window::goBack(bool askFirst)
         askBefore([this] { return beforewords::goBack(client_, status_); }, [this] { goBack(false); });
         return;
     }
-    chain({client_.change({"rollback"}), client_.reboot()});
+    chain({client_.change({"rollback"}), client_.reboot()}, tr("The step before it was made: recab ran `recab rollback`."),
+          true);
 }
 
 void Window::discard(bool askFirst)
@@ -777,7 +874,11 @@ void Window::acceptProposal()
 // One question for each file that clashes, then all the answers at once.
 void Window::decideByHand()
 {
-    if(!status_.operations.isEmpty()){for(auto v:status_.operations){auto op=v.toObject();if(op["id"].toString().startsWith("resolve:") && op["verdict"]=="ready"){runOperation(op);return;}}return;}
+    if(!status_.operations.isEmpty()){for(auto v:status_.operations){auto op=v.toObject();if(op["id"].toString().startsWith("resolve:") && op["verdict"]=="ready"){
+        runOperation(op, QStringList(), [this](bool ok){
+            if(!ok)return;
+            if(!status_.clashes.isEmpty())showClash();else showRelease();
+        });return;}}return;}
     QList<Run *> runs;
     int number = 0;
     for (const Clash &clash : status_.clashes) {

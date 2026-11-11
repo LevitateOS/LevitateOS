@@ -18,8 +18,8 @@ public:
     // `asRoot`: through the root helper, when the person cannot read the
     // boot entries themselves.
     Run *read(bool asRoot = false);
-    // Reads the answer: the stand-in's lifecycle (schema 3) or the real
-    // recab's slots and preparation (schema 6). `permission` is set when the
+    // Reads the answer: the older stand-in's lifecycle (schema 3) or the real
+    // recab's slots, preparation and operations (schemas 7 to 10). `permission` is set when the
     // read failed for lack of rights.
     bool understand(Run *finished, bool ok, Status *into, QString *error, bool *permission = nullptr);
 

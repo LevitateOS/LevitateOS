@@ -11,7 +11,13 @@
 #include "pages.h"
 #include "window.h"
 
+#include <QAbstractButton>
+#include <QApplication>
 #include <QCoreApplication>
+#include <QGroupBox>
+#include <QInputDialog>
+#include <QMessageBox>
+#include <QTimer>
 #include <QDir>
 #include <QFile>
 #include <QJsonDocument>
@@ -195,6 +201,90 @@ void pressGo(Window &window, const QString &go)
 {
     clickButton(window.beforePage(), go);
     waitUntilIdle(window);
+}
+
+// ---------------------------------------------------------------- A message or question the window raises
+
+// What a modal message or question said while it was up.
+struct Raised {
+    bool seen = false;
+    QString title, text, informative;
+    QStringList buttons, items;
+};
+
+// Runs `trigger`, which makes the window raise a modal message (a failed step,
+// a decision by hand) or question and wait for the person. While it waits the
+// words are read, the picture is taken and the button named is pressed (the
+// first one when none is named); a question gets `choose` as its answer.
+Raised answering(const QString &folder, const QString &picture, const QString &button, const std::function<void()> &trigger,
+                 const QString &choose = QString())
+{
+    Raised raised;
+    QTimer timer;
+    timer.setInterval(50);
+    QObject::connect(&timer, &QTimer::timeout, [&] {
+        QWidget *modal = QApplication::activeModalWidget();
+        if (!modal || raised.seen)
+            return;
+        raised.seen = true;
+        raised.title = modal->windowTitle();
+        if (!picture.isEmpty())
+            modal->grab().save(QDir(folder).filePath(picture + ".png"));
+        if (auto *box = qobject_cast<QMessageBox *>(modal)) {
+            raised.text = box->text();
+            raised.informative = box->informativeText();
+            QAbstractButton *press = nullptr;
+            for (QAbstractButton *one : box->buttons()) {
+                raised.buttons << one->text();
+                if (!press && (button.isEmpty() || one->text() == button))
+                    press = one;
+            }
+            if (press)
+                press->click();
+            else
+                box->close();
+        } else if (auto *input = qobject_cast<QInputDialog *>(modal)) {
+            raised.text = input->labelText();
+            raised.items = input->comboBoxItems();
+            if (!choose.isEmpty())
+                input->setTextValue(choose);
+            input->accept();
+        } else {
+            modal->close();
+        }
+    });
+    timer.start();
+    trigger();
+    // A step that runs on its own (the restart) raises its message later: wait for it.
+    waitFor([&] { return raised.seen; }, 30);
+    return raised;
+}
+
+// Keeps the words a check judged, next to the pictures.
+void keepWords(const QString &folder, const QString &name, const QString &words)
+{
+    QFile file(QDir(folder).filePath(name));
+    if (file.open(QIODevice::WriteOnly | QIODevice::Truncate))
+        file.write(words.toUtf8());
+}
+
+// The prompt an agent is handed from the page's panel (empty when the page has none).
+QString promptOf(QWidget *page)
+{
+    for (QWidget *child : page->findChildren<QWidget *>())
+        if (auto *panel = dynamic_cast<PromptPanel *>(child))
+            return panel->prompt();
+    return {};
+}
+
+// The titles of the boxes a page holds (the recovery list is one).
+QStringList groupTitles(QWidget *page)
+{
+    QStringList titles;
+    for (QGroupBox *box : page->findChildren<QGroupBox *>())
+        if (box->isVisibleTo(page))
+            titles << box->title();
+    return titles;
 }
 
 // `holds`: how many changes the next system holds now, as the window knows.
@@ -926,12 +1016,48 @@ int takeShots(Window &window, const QString &folder)
         settle(100);
     }
 
+    // Decided by hand first: the window asks about the file, with both versions as the stand-in says them.
+    {
+        window.showClash();
+        settle(200);
+        const Raised said = answering(folder, "07b-decide-by-hand", "Keep mine",
+                                       [&] { clickButton(window.findChild<ClashPage *>(), "Decide by hand…"); });
+        waitUntilIdle(window);
+        expect("deciding by hand asks which file goes into the next system, with both versions in the stand-in's words",
+               said.seen && said.title == "Decide by hand" && said.text == "Which /etc/ssh/sshd_config goes into the next system?"
+                   && said.informative.contains("Mine: your edit: password logins turned off.")
+                   && said.informative.contains("The update's: the update's edit: one new setting, and the included folder moved.")
+                   && said.buttons.contains("Keep mine") && said.buttons.contains("Take the update's"));
+        expect("keeping mine settles the clash and records whose version it is",
+               window.status().clashes.isEmpty() && window.status().changeTitles().join("|").contains("your version"));
+        save(window, "07c-decided-by-hand");
+        // Give the update up with the next system, and make the clash again, for the agent's way.
+        window.discard(false);
+        waitUntilIdle(window);
+        window.handOver(asked(sshd), false);
+        for (int waited = 0; !window.agentAsks() && window.busy() && waited < 1800; ++waited)
+            settle(50);
+        window.answerAgent(QStringLiteral("Leave it"));
+        waitUntilIdle(window);
+        window.addUpdate(false);
+        waitUntilIdle(window);
+        expect("the update clashes with the edited file again", !window.status().clashes.isEmpty());
+        save(window, "07d-clash-again");
+    }
+
     window.fixWithAgent(QStringLiteral("The issue:\nThe update and a local change both altered /etc/ssh/sshd_config.\n\n"
                                        "The expected result:\nOne sshd_config that sshd accepts. Password logins stay "
                                        "off, as I set it. The update's own changes are kept.\n"),
                         QStringLiteral("The agent is settling the clash"));
     waitUntilIdle(window);
     expect("the agent leaves its result to be accepted", !window.status().proposalPath.isEmpty());
+    {
+        const QString proposed = wordsOn(window.findChild<ProposedPage *>());
+        expect("its page says what the agent did, against what was expected, and offers to accept, ask again or decide by hand",
+               window.findChild<ProposedPage *>()->isVisible() && proposed.contains("The agent resolved the clash")
+                   && proposed.contains("What it did") && proposed.contains("Against what you expected")
+                   && proposed.contains("[Accept]") && proposed.contains("[Ask again…]") && proposed.contains("[Decide by hand…]"));
+    }
     save(window, "08-what-the-agent-did");
 
     window.acceptProposal();
@@ -1125,6 +1251,28 @@ int takeRealShots(Window &window, const QString &folder)
         settle(100);
     }
 
+    // No update source is configured: recab refuses to look, and the release page says so in recab's words.
+    {
+        qputenv("RECAB_STANDIN_UPDATE_SOURCE", "none");
+        window.refresh();
+        waitUntilIdle(window);
+        const QString overview = overviewWords(window);
+        expect("with no update source Overview still leads to the release page, where recab's refusal is said",
+               overview.contains("Check for a new release"));
+        const QString release = releaseWords(window);
+        expect("the release page says recab cannot look, gives recab's own reason, keeps Check now off and a file possible",
+               release.contains("No new release is known") && release.contains("it cannot look for one now")
+                   && release.contains("It cannot be done now: No usable update source is configured")
+                   && release.contains("[Check now](off)") && release.contains("[Choose a file…]")
+                   && !release.contains("[Choose a file…](off)"));
+        save(window, "r8a-release-no-source");
+        qunsetenv("RECAB_STANDIN_UPDATE_SOURCE");
+        window.refresh();
+        waitUntilIdle(window);
+        window.showMain();
+        settle(100);
+    }
+
     // A new release: recab knows of none until it is asked.
     {
         const QString overview = overviewWords(window);
@@ -1254,15 +1402,15 @@ int takeRealShots(Window &window, const QString &folder)
                    && window.status().clashes.size() == 1 && window.status().state == "preparing");
         const QString release = releaseWords(window);
         expect("the release page says it needs you, lists the clash as recab names it, and offers to settle or take it out",
-               release.contains("Adding LevitateOS 2026.12 needs you: 1 thing clashes with your changes")
-                   && release.contains("etc/ssh/sshd_config (content): not settled") && release.contains("[Settle…]")
+               release.contains("Adding LevitateOS 2026.12 needs you: 1 thing to settle")
+                   && release.contains("etc/ssh/sshd_config (changed on both sides): Not settled") && release.contains("[Settle…]")
                    && release.contains("[Take it out]") && !release.contains("[Choose a file…]")
                    && !release.contains("[Check again]"));
         save(window, "r10-release-clash");
         const QString overview = overviewWords(window);
         save(window, "r10b-overview-clash");
         expect("Overview offers settling the clash as the one thing",
-               overview.contains("The update clashes with one of your changes") && overview.contains("[Settle…]")
+               overview.contains("Adding LevitateOS 2026.12 needs you") && overview.contains("[Settle…]")
                    && !overview.contains("[Finish…]") && !overview.contains("[Reboot]"));
         const QString next = nextWords(window);
         expect("the next system's page offers to settle and not to finish",
@@ -1280,6 +1428,192 @@ int takeRealShots(Window &window, const QString &folder)
                    && window.status().clashes.isEmpty());
         expect("and the release page offers to add it again",
                releaseWords(window).contains("LevitateOS 2026.12 is downloaded"));
+
+        // The merge stops on what no side can settle: the original release's baseline is not on record.
+        const QString original = QDir(folder).filePath("original-release/release.json");
+        qputenv("RECAB_STANDIN_MERGE", "baseline");
+        window.addUpdate(false);
+        waitUntilIdle(window);
+        {
+            const UpdateInfo &u = window.status().update;
+            expect("a merge blocked on a missing baseline is stopped, with one open conflict of that kind",
+                   u.stopped() && u.mergePhase == "blocked" && u.unresolved == 1 && u.conflicts.size() == 1
+                       && u.conflicts.first().isBaseline() && window.status().state == "preparing");
+            expect("recab offers to adopt a baseline, refuses finalizing with its reason, and has nothing to resolve or reproduce",
+                   window.status().operation("adopt_baseline").ready && !window.status().operation("finalize").ready
+                       && window.status().operation("finalize").reason
+                              == "Resolve or recover the selected release before preparing another change"
+                       && !window.status().operation("update_reproduce").ready
+                       && window.status().operation("update_reproduce").reason == "The merge has no blocked package reproduction"
+                       && window.status().operationObject("resolve:conflict1").isEmpty());
+            const QString blocked = releaseWords(window);
+            expect("the release page says what recab stopped at, in its words, and offers the baseline and not a side",
+                   blocked.contains("Adding LevitateOS 2026.12 needs you: 1 thing to settle")
+                       && blocked.contains("usr/lib/recab/release-baseline.json (the original release is not on record): Not settled")
+                       && blocked.contains("recab says: original release baseline unavailable; adopt the verified original release, "
+                                           "never capture the personalized system as O")
+                       && blocked.contains("[Adopt the original release…]")
+                       && blocked.contains("recab offers: Adopt the verified original release baseline.")
+                       && blocked.contains("[Adopt it…]") && !blocked.contains("[Settle…]") && blocked.contains("[Take it out]"));
+            save(window, "r20-release-blocked-baseline");
+            const QString overview = overviewWords(window);
+            expect("Overview says the same with the release's name and leads to the page",
+                   overview.contains("Adding LevitateOS 2026.12 needs you") && overview.contains("[Settle…]")
+                       && !overview.contains("The update clashes") && !overview.contains("[Finish…]"));
+            const QString next = nextWords(window);
+            expect("the next system's page says it, and offers to settle, not to finish",
+                   next.contains("Adding LevitateOS 2026.12 needs you") && next.contains("[Settle the clash…]")
+                       && !next.contains("[Finish…]"));
+            window.showClash();
+            settle(200);
+            const QString clash = wordsOn(window.findChild<ClashPage *>());
+            expect("the clash page says what recab says of it, offers the baseline with recab's label, and no agent for it",
+                   clash.contains("What recab stopped at")
+                       && clash.contains("recab has no usable record of the original release this next system began from "
+                                         "(usr/lib/recab/release-baseline.json)")
+                       && clash.contains("What recab offers") && clash.contains("[Adopt it…]") && clash.contains("[Later]")
+                       && !clash.contains("[Let the agent fix it]") && !clash.contains("(private)") && !clash.contains("was added"));
+            save(window, "r20b-clash-baseline");
+            window.showMain();
+            settle(100);
+        }
+        beforeCheck(window, save, expect, "br16-adopt-baseline", "adopting the original release's baseline",
+                    [&] { window.adoptBaseline(original); },
+                    {"Adopt the original release as the baseline?", "has no baseline of the original release", original,
+                     "exactly the release this system was installed from", "It does not add LevitateOS 2026.12",
+                     "recab update adopt-baseline", "password"},
+                    "Adopt it");
+        window.adoptBaseline(original, false);
+        waitUntilIdle(window);
+        expect("with the baseline adopted there is no merge, and adding the release is offered again",
+               !window.status().update.hasMerge && window.status().operation("update_apply").ready
+                   && window.status().operationObject("adopt_baseline").isEmpty()
+                   && releaseWords(window).contains("LevitateOS 2026.12 is downloaded"));
+        save(window, "r20c-baseline-adopted");
+
+        // The merge stops on a package no side can settle: it has to be reproduced through Recipe.
+        qputenv("RECAB_STANDIN_MERGE", "rebuild");
+        window.addUpdate(false);
+        waitUntilIdle(window);
+        {
+            const UpdateInfo &u = window.status().update;
+            expect("a merge that stops on a package has one open package_rebuild conflict, named by the package",
+                   u.stopped() && u.unresolved == 1 && u.conflicts.size() == 1 && u.conflicts.first().isPackageRebuild()
+                       && u.conflicts.first().path == "htop");
+            expect("recab offers to reproduce it, and no resolve for it",
+                   window.status().operation("update_reproduce").ready && window.status().operationObject("resolve:conflict1").isEmpty()
+                       && !window.status().operation("update_recover").ready
+                       && window.status().operation("update_recover").reason == "Resolve outstanding conflicts first");
+            const QString rebuild = releaseWords(window);
+            expect("the release page offers to reproduce the package, in recab's label, and says what recab found",
+                   rebuild.contains("[Reproduce htop…]") && rebuild.contains("htop (software to reproduce through Recipe): Not settled")
+                       && rebuild.contains("recab offers: Reproduce selected software for this release through Recipe.")
+                       && rebuild.contains("[Reproduce…]") && !rebuild.contains("[Settle…]"));
+            save(window, "r21-release-blocked-rebuild");
+            window.showClash();
+            settle(200);
+            auto *clashPage = window.findChild<ClashPage *>();
+            const QString clash = wordsOn(clashPage);
+            const QString prompt = promptOf(clashPage);
+            expect("the clash page says what recab found of the package and offers to reproduce it; Decide by hand is off",
+                   clash.contains("htop is software added to the next system through Recipe. recab found that LevitateOS 2026.12 "
+                                  "changes system libraries or the kernel")
+                       && clash.contains("[Reproduce…]") && clash.contains("[Decide by hand…](off)")
+                       && clash.contains("[Let the agent fix it]") && !clash.contains("(private)"));
+            expect("what the agent is given names the package, the release, and recab's own command with the open preparation",
+                   prompt.contains("htop (software to reproduce through Recipe)")
+                       && prompt.contains("recab update reproduce --preparation " + window.status().preparationId + " --revision "
+                                          + QString::number(window.status().preparationRevision) + " htop [--recipe RECIPE]")
+                       && prompt.contains("The release being added is LevitateOS 2026.12; the running system's release is LevitateOS 2026.11.")
+                       && !prompt.contains("(private)") && !prompt.contains("was added"));
+            save(window, "r21b-clash-rebuild");
+            window.showMain();
+            settle(100);
+        }
+        beforeCheck(window, save, expect, "br17-reproduce", "reproducing the package", [&] { window.reproduce("htop"); },
+                    {"Reproduce htop through Recipe?", "htop is software added to the next system through Recipe",
+                     "using the recipe the next system recorded for it", "recab update reproduce", "password"},
+                    "Reproduce it");
+        window.reproduce("htop", false);
+        waitUntilIdle(window);
+        expect("once reproduced recab no longer stops at the package: no conflict is left and carrying on is offered",
+               window.status().update.conflicts.isEmpty() && window.status().update.unresolved == 0
+                   && window.status().operation("update_recover").ready && !window.status().operation("update_reproduce").ready);
+        save(window, "r21c-package-reproduced");
+        window.runReleaseOperation("update_cancel", false);
+        waitUntilIdle(window);
+        expect("taken out again, the release is only downloaded", !window.status().update.hasMerge && window.status().update.downloaded);
+
+        // Every other kind of conflict, as recab names them: the page says what recab says of each, and hands the agent the same.
+        qputenv("RECAB_STANDIN_MERGE", "kinds");
+        window.addUpdate(false);
+        waitUntilIdle(window);
+        {
+            const UpdateInfo &u = window.status().update;
+            expect("a merge can stop on six things of six kinds at once", u.stopped() && u.unresolved == 6 && u.conflicts.size() == 6);
+            window.showClash();
+            settle(200);
+            auto *clashPage = window.findChild<ClashPage *>();
+            const QString clash = wordsOn(clashPage);
+            expect("the clash page names each as recab does, with the sentence for its kind and no word recab did not say",
+                   clash.contains("Adding LevitateOS 2026.12 needs you")
+                       && clash.contains("recab stopped at 6 things it cannot decide for you.")
+                       && clash.contains("etc/ssh/sshd_config") && clash.contains("changed on both sides")
+                       && clash.contains("The next system and LevitateOS 2026.12 both changed etc/ssh/sshd_config from what "
+                                         "LevitateOS 2026.11 shipped, each differently: its content or its metadata (owner, "
+                                         "permissions). recab does not say what either version holds.")
+                       && clash.contains("etc/motd") && clash.contains("a different kind of thing on each side")
+                       && clash.contains("etc/motd is a different kind of thing (file, directory or link) in the next system than "
+                                         "in LevitateOS 2026.12, and both differ from what LevitateOS 2026.11 shipped. recab "
+                                         "does not say which is which.")
+                       && clash.contains("removed on one side, changed on the other")
+                       && clash.contains("etc/issue was removed on one side and changed on the other: removed in the next system "
+                                         "and changed by LevitateOS 2026.12, or the other way round. recab does not say which.")
+                       && clash.contains("a directory and what is in it")
+                       && clash.contains("etc/profile.d is a directory that one side replaced or removed while the other side "
+                                         "kept or changed things inside it.")
+                       && clash.contains("a file of software added through Recipe")
+                       && clash.contains("usr/bin/nvidia-smi is a file of software added to the next system through Recipe, and "
+                                         "LevitateOS 2026.12 has a different version of it. recab accepts only the next system's "
+                                         "file")
+                       && clash.contains("software to reproduce through Recipe") && clash.contains("[Reproduce…]")
+                       && !clash.contains("(private)") && !clash.contains("was added to the next system"));
+            const QString prompt = promptOf(clashPage);
+            const QString cas = " --preparation " + window.status().preparationId + " --revision "
+                                + QString::number(window.status().preparationRevision);
+            keepWords(folder, "r22-prompt.txt", prompt);
+            expect("the agent is given each item with recab's sentence and the command recab offers for it",
+                   prompt.contains("etc/ssh/sshd_config (changed on both sides): The next system and LevitateOS 2026.12 both "
+                                   "changed")
+                       && prompt.contains("`recab update resolve conflict1" + cas + " --choice local|release|edited [--file FILE]`")
+                       && prompt.contains("`recab update resolve conflict4" + cas + " --choice local|release [--file FILE]`")
+                       && prompt.contains("`recab update resolve conflict5" + cas + " --choice local [--file FILE]`")
+                       && prompt.contains("`recab update reproduce" + cas + " htop [--recipe RECIPE]`")
+                       && !prompt.contains("(private)") && !prompt.contains("was added"));
+            save(window, "r22-clash-every-kind");
+            // Decided by hand: the question names what each choice does, in the words of the page.
+            const Raised asked = answering(folder, "r22b-decide-by-hand", QString(), [&] { clickButton(clashPage, "Decide by hand…"); },
+                                           QStringLiteral("Keep the next system's version (local)"));
+            waitUntilIdle(window);
+            expect("deciding by hand asks about the first file recab lets a side be chosen for, with each choice in words",
+                   asked.seen && asked.text == "Resolution"
+                       && asked.items == QStringList({"Keep the next system's version (local)", "Take the release's version (release)",
+                                                      "Use a file I give (edited)"}));
+            expect("the choice was sent to recab and the clash page is shown again with five left",
+                   window.status().update.unresolved == 5 && window.status().update.conflicts.first().resolution == "local"
+                       && clashPage->isVisible()
+                       && wordsOn(clashPage).contains("recab stopped at 5 things it cannot decide for you.")
+                       && wordsOn(clashPage).contains("Settled: the next system's version stays"));
+            save(window, "r22c-one-settled-by-hand");
+            window.showMain();
+            settle(100);
+        }
+        window.runReleaseOperation("update_cancel", false);
+        waitUntilIdle(window);
+        qunsetenv("RECAB_STANDIN_MERGE");
+        expect("taken out again the release is downloaded and the changes are in place",
+               !window.status().update.hasMerge && window.status().update.downloaded && window.status().changes.size() == 2);
+
         window.addUpdate(false);
         waitUntilIdle(window);
         expect("adding it again stops at the same clash", window.status().update.unresolved == 1);
@@ -1297,7 +1631,7 @@ int takeRealShots(Window &window, const QString &folder)
         const QString settled = releaseWords(window);
         expect("with the clash settled the page says so and offers to carry on",
                settled.contains("Every clash is settled") && settled.contains("[Continue adding it]")
-                   && settled.contains("etc/ssh/sshd_config (content): settled, local"));
+                   && settled.contains("etc/ssh/sshd_config (changed on both sides): Settled: the next system's version stays"));
         save(window, "r11-release-settled");
         beforeCheck(window, save, expect, "br07-carry-on", "carrying on adding the release", [&] { window.runReleaseOperation("update_recover"); },
                     {"Carry on adding the release?", "continues the merge", "recab update recover", "password"},
@@ -1346,6 +1680,29 @@ int takeRealShots(Window &window, const QString &folder)
     waitUntilIdle(window);
     expect("when it has finished the next system is open again", window.status().state == "preparing");
 
+    // A command that fails: its page stays up and says why, in recab's words, and nothing was changed.
+    qputenv("RECAB_STANDIN_FAIL", "finalize");
+    window.finish(false);
+    waitUntilIdle(window);
+    qunsetenv("RECAB_STANDIN_FAIL");
+    {
+        auto *work = window.findChild<WorkPage *>();
+        const QString words = wordsOn(work);
+        expect("a command that fails leaves its page up, says it stopped and why in recab's words, and offers Back",
+               work->isVisible() && work->saysWhy() && words.contains("It stopped")
+                   && words.contains("candidate or boot inputs changed since finalization began; reopen the preparation before "
+                                     "changing its revision")
+                   && words.contains("[Back]"));
+        expect("and nothing was changed: the next system is still open with its two changes",
+               window.status().state == "preparing" && window.status().changes.size() == 2);
+        save(window, "r16-a-command-failed");
+        clickButton(work, "Back");
+        settle(200);
+        expect("Back leaves for the page the person came from", !work->isVisible() && window.findChild<SystemPage *>()->isVisible());
+        window.showMain();
+        settle(100);
+    }
+
     beforeCheck(window, save, expect, "br01-finish", "finishing the next system", [&] { window.finish(); },
                 {"Finish the next system?", "The next system holds 2 changes", "checked and closed", "does not restart",
                  "recab finalize", "password"},
@@ -1361,6 +1718,30 @@ int takeRealShots(Window &window, const QString &folder)
                    && next.contains("[Start it at the next restart]") && next.contains("The agent")
                    && next.contains("You"));
         save(window, "rp5-next-ready");
+        window.showMain();
+        settle(100);
+    }
+
+    // The restart fails after the step before it was made: the window says the computer did not restart and what was made.
+    {
+        qputenv("RECAB_STANDIN_REBOOT_FAILS", "1");
+        const Raised said = answering(folder, "r17-restart-failed-sentence", QString(), [&] { window.restart(false); });
+        qunsetenv("RECAB_STANDIN_REBOOT_FAILS");
+        waitUntilIdle(window);
+        expect("a restart that fails says the computer did not restart, what was made, and what it said (" + said.text + ")",
+               said.seen && said.text.contains("The computer did not restart.")
+                   && said.text.contains("The step before it was made: recab set the next system to start at the next restart.")
+                   && said.text.contains("The page shows where things stand now.")
+                   && said.text.contains("It said: reboot: the restart was refused (stand-in)"));
+        expect("the step before the restart stays made: the restart is set, and nothing restarted",
+               window.status().state == "trial_pending" && window.status().runningSlot == "A");
+        const QString next = nextWords(window);
+        expect("the page shows where things stand: the restart is set",
+               next.contains("The next system starts at the next restart") && next.contains("[Cancel the set restart]"));
+        save(window, "r17-after-the-failed-restart");
+        window.cancelRestart(false);
+        waitUntilIdle(window);
+        expect("taking the set restart back leaves the next system ready", window.status().state == "ready");
         window.showMain();
         settle(100);
     }
@@ -1381,6 +1762,10 @@ int takeRealShots(Window &window, const QString &folder)
     expect("the restart is set and nothing restarted",
            window.status().state == "trial_pending" && window.status().runningSlot == "A"
                && window.status().can("restart").ready);
+    expect("while a restart is set recab offers to reconcile the trial, keeps commit, and refuses the rest with its reason",
+           window.status().operation("trial_recover").ready && window.status().operation("commit").ready
+               && !window.status().operation("finalize").ready && !window.status().operation("install").ready
+               && window.status().operation("finalize").reason == "Reconcile the pending trial before changing either system");
     save(window, "r3b-starts-at-the-next-restart");
     {
         const QString next = nextWords(window);
@@ -1437,7 +1822,7 @@ int takeRealShots(Window &window, const QString &folder)
                    && overview.contains("with 2 changes") && overview.contains("htop, installed")
                    && overview.contains("Not kept yet") && overview.contains("Untouched: it is what a restart returns to")
                    && overview.contains("While a system is on trial")
-                   && overview.contains("the running slot is uncommitted; its fallback cannot be prepared")
+                   && overview.contains("Reconcile the pending trial before changing either system")
                    && !overview.contains("What to do next") && !overview.contains("[Make a change…]"));
         expect("while on trial the other place is the system from before, and nothing is called next",
                window.status().otherRole == "previous" && window.frame()->badge("next") == 0 && !window.frame()->stripShown());
@@ -1539,6 +1924,85 @@ int takeRealShots(Window &window, const QString &folder)
     expect("discarding leaves no next system",
            window.status().state == "stable" && window.status().preparationId.isEmpty());
     save(window, "r7-discarded");
+
+    // recab says the system needs recovery: the page says so in recab's words and lists every step with its verdict.
+    {
+        const QString reason = "initial A/B installation is incomplete; resume recab init on the mounted installation target";
+        qputenv("RECAB_STANDIN_UNUSABLE", reason.toUtf8());
+        window.refresh();
+        waitUntilIdle(window);
+        const QString overview = overviewWords(window);
+        auto *page = window.findChild<SystemPage *>();
+        expect("an unusable system is not called interrupted: the page says recab says it needs recovery, with recab's reason",
+               overview.contains("recab says this system needs recovery") && overview.contains(reason)
+                   && !overview.contains("Preparing the next system was interrupted") && !overview.contains("[Make a change…]")
+                   && overview.contains("Nothing else is offered here while recab says this system needs recovery."));
+        expect("the recovery list is shown, every step recab offers with its own verdict: all off but the restart of the computer",
+               groupTitles(page).contains("Software, updates and recovery")
+                   && overview.contains("[Prepare or continue the other system](off)")
+                   && overview.contains("[Assess or reconcile trial recovery](off)") && overview.contains("[Reboot]")
+                   && overview.contains("[Check for system updates](off)"));
+        bool reasonShown = false;
+        for (QPushButton *button : page->findChildren<QPushButton *>())
+            if (button->text() == "Check for system updates")
+                reasonShown = button->toolTip().contains(reason);
+        expect("each refused step carries recab's reason", reasonShown);
+        save(window, "r19-unusable");
+        const QString next = nextWords(window);
+        expect("the next system's page says the same and shows no step of its own",
+               next.contains("recab says this system needs recovery") && next.contains(reason) && !next.contains("[Finish…]")
+                   && !next.contains("[Make a change…]"));
+        save(window, "r19b-unusable-next");
+        qunsetenv("RECAB_STANDIN_UNUSABLE");
+        window.refresh();
+        waitUntilIdle(window);
+        window.showMain();
+        settle(100);
+        expect("without it the system is stable again", window.status().state == "stable");
+    }
+
+    // A change cut off half way is left interrupted; recab offers its own operation to recover it.
+    {
+        qputenv("RECAB_STANDIN_STOP_AT", "change");
+        const QString marker = QDir(qEnvironmentVariable("RECAB_STANDIN_STATE")).filePath("stopped-at-change");
+        QFile::remove(marker);
+        window.handOver(asked(sshd), false);
+        waitFor([&] { return QFile::exists(marker); }, 30);
+        settle(300);
+        save(window, "r18-change-cut-off");
+        window.stopRun();
+        waitUntilIdle(window);
+        qunsetenv("RECAB_STANDIN_STOP_AT");
+        expect("a cut-off change is reported as interrupted, with recab's recover step ready and every new change refused",
+               window.status().state == "interrupted" && !window.status().preparationId.isEmpty()
+                   && window.status().changes.isEmpty() && window.status().operation("change_recover").ready
+                   && !window.status().operation("install").ready && !window.status().operation("prepare").ready
+                   && window.status().operation("prepare").reason == "the previous operation requires recovery before reopening");
+        const QString overview = overviewWords(window);
+        expect("Overview says it stopped and why, and the recovery list offers recab's own step, not the others",
+               overview.contains("Preparing the next system was interrupted") && overview.contains("system publication must finish")
+                   && groupTitles(window.findChild<SystemPage *>()).contains("Software, updates and recovery")
+                   && overview.contains("[Recover the interrupted software/configuration change]")
+                   && !overview.contains("[Recover the interrupted software/configuration change](off)")
+                   && overview.contains("[Assess or reconcile trial recovery](off)")
+                   && overview.contains("[Finalize the prepared system](off)"));
+        save(window, "r18b-interrupted-recovery-list");
+        auto press = [&] { clickButton(window.findChild<SystemPage *>(), "Recover the interrupted software/configuration change"); };
+        beforeCheck(window, save, expect, "br15-recover-change", "recovering the cut-off change", press,
+                    {"Recover the interrupted software/configuration change?", "This runs one operation of recab",
+                     "recab change recover", "password"},
+                    "Continue");
+        press();
+        waitFor([&] { return window.beforePage()->isVisible() && !window.busy(); }, 10);
+        pressGo(window, "Continue");
+        expect("recab's recover finishes the change: the next system is open again and holds it, by the person who asked",
+               window.status().state == "preparing" && window.status().changes.size() == 1
+                   && window.status().operation("change_recover").ready == false);
+        save(window, "r18c-change-recovered");
+        window.discard(false);
+        waitUntilIdle(window);
+        expect("discarding leaves no next system", window.status().state == "stable" && window.status().preparationId.isEmpty());
+    }
 
     // A restart that fails, and the computer comes back; then the same again, kept by recab itself.
     window.handOver(asked(sshd), false);
@@ -1650,6 +2114,56 @@ int takeRealShots(Window &window, const QString &folder)
         expect("a recab without the command says it keeps no history", history.contains("This recab keeps no history it can show."));
         window.showMain();
         settle(100);
+    }
+
+    // A restart that fails and leaves recab no preparation record for the failed system: it offers to replace it.
+    {
+        window.handOver(asked(nvidia), false);
+        waitUntilIdle(window);
+        window.finish(false);
+        waitUntilIdle(window);
+        qputenv("RECAB_STANDIN_TRIAL", "fail-no-record");
+        window.restart(false);
+        waitUntilIdle(window);
+        qunsetenv("RECAB_STANDIN_TRIAL");
+        expect("the restart failed, the computer came back, and recab keeps no preparation for the failed system",
+               window.status().state == "failed" && window.status().preparationId.isEmpty() && window.status().otherRole == "next");
+        const QJsonObject replace = window.status().operationObject("replace_failed");
+        expect("recab offers to replace it, marked destructive, in its own label, and refuses to prepare with its reason",
+               window.status().operation("replace_failed").ready && replace["destructive"].toBool()
+                   && replace["label"].toString() == "Replace failed slot A with the running system"
+                   && !window.status().operation("prepare").ready
+                   && window.status().operation("prepare").reason.startsWith("The failed generation has no preparation record."));
+        const QString overview = overviewWords(window);
+        keepWords(folder, "r23-overview.txt", overview);
+        expect("Overview offers it beside trying again and the agent, and says the next system starts nowhere meanwhile",
+               overview.contains("The next system did not start, so the computer came back")
+                   && overview.contains("[Replace it with the running system…]") && !overview.contains("[Replace it with the running system…](off)")
+                   && overview.contains("[Try the same again](off)"));
+        save(window, "r23-failed-no-record");
+        const QString release = releaseWords(window);
+        expect("the release page offers it as recab's step, with its destructive mark, and says adding a release is off",
+               release.contains("The failed system") && release.contains("recab offers: Replace failed slot A with the running system. "
+                                                                         "recab marks it destructive.")
+                   && release.contains("[Replace it…]"));
+        save(window, "r23b-failed-no-record-release");
+        window.showMain();
+        settle(100);
+        beforeCheck(window, save, expect, "br18-replace-failed", "replacing the failed system",
+                    [&] { window.replaceFailed(); },
+                    {"Replace failed slot A with the running system?", "Replace failed slot A with the running system.",
+                     "recab says: The failed generation has no preparation record. Retry its boot, or explicitly replace it; its "
+                     "changes are kept until then.",
+                     "recab marks it destructive.", "recab prepare", "password"},
+                    "Replace it");
+        window.replaceFailed(false);
+        waitUntilIdle(window);
+        expect("replacing it makes a new next system, as a copy of the running one, and the failed record no longer counts",
+               window.status().state == "preparing" && window.status().changes.isEmpty() && !window.status().preparationId.isEmpty()
+                   && window.status().operationObject("replace_failed").isEmpty());
+        save(window, "r23c-failed-replaced");
+        window.discard(false);
+        waitUntilIdle(window);
     }
 
     out << (ok ? "all flows ended where they should\n" : "some flows did not end where they should\n");

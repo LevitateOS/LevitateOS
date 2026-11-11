@@ -38,11 +38,25 @@ struct Check {
 };
 
 // A thing the selected release and the next system disagree about, as recab's
-// merge lists it (`kind`: content, package_ownership, directory_tree,
-// package_rebuild, missing_or_unsafe_baseline). `resolution` is empty until it
-// is settled.
+// merge lists it (`Conflict` in tools/recab/src/merge.rs). `kind` is one of
+// content_or_metadata, type, deletion, directory_tree, package_ownership,
+// package_rebuild, missing_or_unsafe_baseline. `path` is a path of the system
+// without its leading slash, except for package_rebuild, where it names the
+// package. recab says nothing about what either side holds. `resolution` is
+// empty until it is settled (local, release or edited).
 struct MergeConflict {
     QString id, path, kind, resolution;
+    // Whether recab settles it by choosing a side (`resolve`). The other two
+    // are not settled that way: a package is reproduced, a baseline adopted.
+    bool choosesASide() const;
+    bool isPackageRebuild() const { return kind == QLatin1String("package_rebuild"); }
+    bool isBaseline() const { return kind == QLatin1String("missing_or_unsafe_baseline"); }
+    // A few words for the kind, and a sentence of what recab says of it, for
+    // the release being added and the release the running system shipped.
+    QString kindWords() const;
+    QString says(const QString &release, const QString &running) const;
+    // How it stands: "Not settled" or what was chosen.
+    QString standing() const;
 };
 
 // What recab says about a new release: `updates` of its status
@@ -65,6 +79,11 @@ struct UpdateInfo {
     qint64 unresolved = 0;
     QList<MergeConflict> conflicts;
     bool available() const { return !version.isEmpty(); }
+    // The merge stopped on something that needs the person: conflicts left
+    // unresolved, or blocked before it began (phase "blocked").
+    bool stopped() const { return hasMerge && !mergeComplete && (unresolved > 0 || mergePhase == QLatin1String("blocked")); }
+    // The conflicts not settled yet.
+    QList<MergeConflict> open() const;
 };
 
 struct Status {
@@ -127,10 +146,20 @@ struct Status {
     QJsonObject operationObject(const QString &id) const;
     // The changes a person made, without the update (the release name says that).
     QStringList changeTitles() const;
-    // The stand-in's status (schema 3).
+    // The release the merge is about, as a name ("LevitateOS 2026.12"); empty
+    // when recab names none.
+    QString mergeRelease() const { return otherRelease.isEmpty() ? QString() : name(otherRelease); }
+    // What the next system's pages say when the merge stopped (the real
+    // recab): a heading and a sentence that hold for every kind of conflict.
+    QString mergeHeading() const;
+    QString mergeSentence() const;
+    // The older stand-in's status (schema 3): the lifecycle, spoken directly.
     static Status fromJson(const QJsonObject &object);
-    // The real recab's status (schema 6). It names no release, so the running
-    // system's name comes from its os-release.
+    // The real recab's status (schemas 7 to 10; `operations` and `updates` are
+    // read when the status has them, which schema 10 does, and the older
+    // schemas keep the limited boot and preparation mapping). It names no
+    // release for the running system, so its name comes from the os-release
+    // the window is told of.
     static Status fromReal(const QJsonObject &object, const QString &distro, const QString &release);
 };
 

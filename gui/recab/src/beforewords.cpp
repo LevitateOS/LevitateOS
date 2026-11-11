@@ -244,7 +244,10 @@ BeforePage::Content operation(const RecabClient &client, const Status &s, const 
         happens << QObject::tr("recab marks it destructive. The running system is kept. Prepared changes in the "
                                "other system cannot be recovered.");
     Q_UNUSED(s)
-    const QString command = argv.isEmpty() ? QObject::tr("recab") : QStringLiteral("recab ") + argv.first();
+    // The verb, and the second word of `update` and `change`, as recab's own commands read.
+    QString command = argv.isEmpty() ? QObject::tr("recab") : QStringLiteral("recab ") + argv.first();
+    if (argv.size() > 1 && (argv.first() == QLatin1String("update") || argv.first() == QLatin1String("change")))
+        command += QLatin1Char(' ') + argv.at(1);
     return make(label + QLatin1Char('?'), happens, client, {command}, QObject::tr("Continue"));
 }
 
@@ -265,6 +268,56 @@ BeforePage::Content releaseStep(const RecabClient &client, const Status &s, cons
                     client, {client.commandWords({"update", "recover"})}, QObject::tr("Carry on"));
     Q_UNUSED(s)
     return {};
+}
+
+BeforePage::Content adoptBaseline(const RecabClient &client, const Status &s, const QString &manifest)
+{
+    const QString release = s.mergeRelease().isEmpty() ? QObject::tr("the release") : s.mergeRelease();
+    QStringList happens{QObject::tr("recab has no baseline of the original release for the next system, so adding %1 "
+                                    "stopped. It never takes the changed system as the original.")
+                            .arg(release),
+                        QObject::tr("recab imports and verifies the release file %1, and refuses it unless it is "
+                                    "exactly the release this system was installed from.")
+                            .arg(manifest),
+                        QObject::tr("It writes that release as the baseline of the next system. It does not add %1; "
+                                    "that is a step of its own afterwards.")
+                            .arg(release),
+                        QObject::tr("The running system is not touched, and the computer does not restart.")};
+    return make(QObject::tr("Adopt the original release as the baseline?"), happens, client,
+                {client.commandWords({"update", "adopt-baseline"})}, QObject::tr("Adopt it"));
+}
+
+BeforePage::Content reproduce(const RecabClient &client, const Status &s, const QString &package)
+{
+    const QString release = s.mergeRelease().isEmpty() ? QObject::tr("the release") : s.mergeRelease();
+    QStringList happens{QObject::tr("%1 is software added to the next system through Recipe. recab runs its recipe "
+                                    "again for %2, through Recipe, using the recipe the next system recorded for it; "
+                                    "if that recipe has changed, recab refuses.")
+                            .arg(package, release),
+                        QObject::tr("Once it is reproduced, recab no longer stops at it. Adding %1 carries on when "
+                                    "nothing else is left to settle.")
+                            .arg(release),
+                        QObject::tr("The running system is not touched, and the computer does not restart.")};
+    return make(QObject::tr("Reproduce %1 through Recipe?").arg(package), happens, client,
+                {client.commandWords({"update", "reproduce"})}, QObject::tr("Reproduce it"));
+}
+
+BeforePage::Content replaceFailed(const RecabClient &client, const Status &s, const QJsonObject &op)
+{
+    QStringList happens{QObject::tr("%1.").arg(op["label"].toString())};
+    // recab's own words for why it did not just prepare again.
+    const QString why = s.operation(QStringLiteral("prepare")).reason;
+    if (!why.isEmpty())
+        happens << QObject::tr("recab says: %1.").arg(why);
+    if (op["destructive"].toBool())
+        happens << QObject::tr("recab marks it destructive.");
+    happens << QObject::tr("The running system is not touched, and the computer does not restart.");
+    QStringList argv;
+    for (const QJsonValue &word : op["argv"].toArray())
+        argv << word.toString();
+    return make(op["label"].toString() + QLatin1Char('?'), happens, client,
+                {QStringLiteral("recab ") + (argv.isEmpty() ? QStringLiteral("prepare") : argv.first())},
+                QObject::tr("Replace it"));
 }
 
 } // namespace beforewords

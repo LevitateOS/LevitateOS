@@ -30,6 +30,29 @@ restart into the next system fail and come back, RECAB_STANDIN_NO_HISTORY=1 make
 `history` unknown, as in a recab without it. RECAB_STANDIN_KEEP=hand leaves a restarted system on trial until `commit`,
 as it is before start-up has been judged; RECAB_STANDIN_WORKING=1 makes the
 status say that a command is running right now.
+
+Operations follow `operations::views` (tools/recab/src/operations.rs) line for
+line: its verdicts, reasons, `destructive` marks and the final loop that
+refuses everything while a command runs, a trial is pending or recovery is
+needed. Switches for the states a story needs (all read when the command runs):
+
+  RECAB_STANDIN_UPDATE_SOURCE=none  no update source is configured: `update_check` is refused
+                                    with recab's reason and `update check` fails as recab's does
+  RECAB_STANDIN_MERGE=KIND          what `update apply` stops on (read then): `baseline`
+                                    (missing_or_unsafe_baseline, phase blocked), `rebuild`
+                                    (package_rebuild for the installed package), `ownership`
+                                    (package_ownership), `kinds` (one conflict of each of
+                                    content_or_metadata, type, deletion, directory_tree,
+                                    package_ownership and package_rebuild); unset: a
+                                    content_or_metadata conflict on a file the person edited
+  RECAB_STANDIN_TRIAL=fail-no-record  as `fail`, and recab keeps no preparation for the failed
+                                    system (`failed_candidate` with no preparation: replace_failed)
+  RECAB_STANDIN_STOP_AT=change      the agent's change is cut off as recab's is (change.rs:
+                                    `change` set, operation "change", phase interrupted) and the
+                                    stand-in waits to be stopped
+  RECAB_STANDIN_UNUSABLE=TEXT       recab needs recovery: `recovery_reason` is TEXT
+  RECAB_STANDIN_FAIL=COMMAND        that command fails with a refusal recab words
+  RECAB_STANDIN_REBOOT_FAILS=1      `reboot-real` fails and nothing restarts
 """
 import json
 import os
@@ -94,7 +117,7 @@ def updates_view(s):
         view["merge"] = {"preparation": p["id"], "revision": p["revision"], "release": RELEASE_ID, "phase": m["phase"],
                          "conflicts": [dict(c, path_hex="") for c in m["conflicts"]],
                          "unresolved": sum(1 for c in m["conflicts"] if c["resolution"] is None),
-                         "report": None, "failure": None}
+                         "report": None, "failure": m.get("failure")}
         if m["phase"] != "complete":
             view["phase"] = m["phase"]
     elif u.get("pending"):
@@ -102,13 +125,33 @@ def updates_view(s):
     return view
 
 
+def merge_unresolved(m):
+    return sum(1 for c in m["conflicts"] if c["resolution"] is None)
+
+
+def failed_candidate(s):
+    """`failed_candidate` (status.rs 114): the last trial did not commit, it was of the
+    other slot and that slot still holds the generation that was tried."""
+    last = s["last_trial"]
+    inactive = other(s)
+    return bool(last) and not last["committed"] and last["slot"] == inactive \
+        and last.get("generation", s["generations"][inactive]) == s["generations"][inactive]
+
+
 def status(s):
     p = s["preparation"]
     inactive = other(s)
     working = os.environ.get("RECAB_STANDIN_WORKING") == "1"
     u = s["update"]
-    merge = u.get("merge")
-    unresolved = merge and merge["phase"] != "complete" and any(c["resolution"] is None for c in merge["conflicts"])
+    merge = u.get("merge") if p else None
+    # `operations.rs` 138-140: a merge that is not complete
+    merge_pending = bool(merge and merge["phase"] != "complete")
+    unresolved = bool(merge_pending and (merge_unresolved(merge) > 0 or merge["phase"] == "blocked"))
+    recovery = os.environ.get("RECAB_STANDIN_UNUSABLE") or None
+    # recab writes the trial ticket at `set-next` and clears it on commit, rollback or when
+    # `recab trial` judges the start (system.rs 141-172, trial.rs 124): while a restart is
+    # set, or the restarted system is not kept yet, it exists.
+    ticket = bool(s["trial_pending"] or s.get("on_trial"))
 
     def view(action, slot, verdict, reason=None):
         return {"action": action, "slot": slot, "verdict": verdict, "reason": reason, "after": None}
@@ -122,14 +165,35 @@ def status(s):
         blocked = "the running slot is uncommitted; its fallback cannot be prepared"
     elif s["trial_pending"]:
         blocked = "cancel the pending trial before preparing a system"
+
+    def prepare_verdict():
+        # state.rs 618-660 (`Request::Prepare`)
+        if blocked:
+            return "refused", blocked
+        if p:
+            if p["phase"] == "ready" or (p["operation"] == "finalize" and p["synchronized"]):
+                return "ready", None
+            if p["operation"] != "prepare":
+                return "refused", "the previous operation requires recovery before reopening"
+            return "no_change", None
+        return "ready", None
+
+    def finalize_verdict():
+        # state.rs 690-715 (`Request::Finalize`)
+        if blocked:
+            return "refused", blocked
+        if not p:
+            return "refused", "prepare the inactive system before finalization"
+        if not p["synchronized"] and p["phase"] != "ready":
+            return "refused", "synchronization must complete before finalization"
+        if p["operation"] not in ("prepare", "finalize", "stage"):
+            return "refused", "the previous operation requires recovery"
+        if p["phase"] == "ready":
+            return "no_change", None
+        return "ready", None
+
     actions = [
-        view("prepare", inactive, *(("no_change", None) if p and p["phase"] == "prepared" else
-                                    can(not p and not blocked, blocked or "a finished candidate is already there"))),
-        view("finalize", inactive, *can(bool(p) and p["phase"] == "prepared" and not blocked,
-                                        blocked or "there is no prepared candidate to finalize")),
-        view("discard", inactive, *(can(not s["trial_pending"] and not uncommitted,
-                                        "cannot discard while a trial is pending or uncommitted")
-                                    if p else ("refused", "there is no preparation to discard"))),
+        view("prepare", inactive, *prepare_verdict()),
         view("set_next", inactive, *(("no_change", None) if s["trial_pending"] else
                                      can(bool(p) and p["phase"] == "ready" and not uncommitted,
                                          "slot %s holds no finalized candidate" % inactive))),
@@ -137,6 +201,11 @@ def status(s):
         view("commit", s["active"], "ready" if s.get("on_trial") or s["trial_pending"] else "no_change", None),
         view("stage", inactive, "refused", "a release medium is needed"),
     ]
+    if p:
+        # status.rs 441-460: these two are listed only while a preparation exists
+        actions.insert(1, view("finalize", inactive, *finalize_verdict()))
+        actions.insert(2, view("discard", inactive, *can(not s["trial_pending"] and not uncommitted,
+                                                         "cannot discard while a trial is pending or uncommitted")))
 
     def slot(name):
         generation = s["generations"][name]
@@ -151,8 +220,10 @@ def status(s):
 
     # Where things stand in one word, as recab's status works it out
     # (`lifecycle` in tools/recab/src/status.rs).
-    failed = bool(s["last_trial"]) and not s["last_trial"]["committed"] and s["last_trial"]["slot"] == inactive
-    if working:
+    failed = failed_candidate(s)
+    if recovery:
+        state = "unusable"
+    elif working:
         state = "working"
     elif s.get("on_trial"):
         state = "on_trial"
@@ -183,6 +254,11 @@ def status(s):
         ops.append({"id": id, "label": label, "argv": argv, "inputs": list(inputs), "verdict": verdict,
                     "reason": reason, "destructive": destructive})
 
+    def add(id, label, argv, inputs, enabled, reason=None):
+        # `add` in operations.rs 171-194: refused carries the reason, or this default
+        op(id, label, argv, "ready" if enabled else "refused",
+           None if enabled else (reason or "Not available in the current state"), inputs)
+
     by = {a["action"]: a for a in actions}
     for id, label, action, command in (
             ("prepare", "Prepare or continue the other system", "prepare", "prepare"),
@@ -191,68 +267,111 @@ def status(s):
             ("set_next", "Try the prepared system on next reboot", "set_next", "set-next"),
             ("commit", "Keep the running system", "commit", "commit"),
             ("rollback", "Return to the protected system", "rollback", "rollback")):
-        a = by[action]
+        a = by.get(action)
         argv = [command] + ([inactive] if action == "set_next" else []) + cas
-        if action in ("set_next", "commit", "rollback"):
+        if a and action in ("set_next", "commit", "rollback"):
             argv += ["--generation", s["generations"][a["slot"]]]
-        op(id, label, argv, a["verdict"], a["reason"], destructive=action == "discard")
-    prep_ok = by["prepare"]["verdict"] != "refused" and not unresolved
-    writable = prep_ok and (not p or not p.get("change"))
-    why = by["prepare"]["reason"] or "Recover the interrupted operation before adding changes"
+        # operations.rs 126-136: a missing view is refused, "No preparation is open"
+        op(id, label, argv, a["verdict"] if a else "refused",
+           a["reason"] if a else "No preparation is open", destructive=action == "discard")
+    if merge_pending:
+        # operations.rs 141-151
+        for o in ops:
+            if o["id"] in ("prepare", "finalize"):
+                o["verdict"] = "refused"
+                o["reason"] = "Resolve or recover the selected release before preparing another change"
+    if not p and failed:
+        # operations.rs 152-164: the failed candidate has no preparation record
+        i = next(n for n, o in enumerate(ops) if o["id"] == "prepare")
+        replace = dict(ops[i], id="replace_failed", destructive=True,
+                       label="Replace failed slot %s with the running system" % inactive)
+        ops[i]["verdict"] = "refused"
+        ops[i]["reason"] = ("The failed generation has no preparation record. Retry its boot, or explicitly replace "
+                            "it; its changes are kept until then")
+        ops.append(replace)
+    prep = next(o for o in ops if o["id"] == "prepare")
+    writable = prep["verdict"] != "refused" and (not p or not p.get("change"))
+    why = prep["reason"] or "Recover the interrupted operation before adding changes"
     pkg = [{"name": "package", "label": "Recipe or selected package", "flag": None, "required": True, "choices": []}]
     for id, label, verb in (("install", "Install software in the prepared system", "install"),
                             ("change_update", "Update prepared software", "update"),
                             ("remove", "Remove prepared software", "remove")):
-        op(id, label, ["change", verb] + cas, "ready" if writable else "refused", None if writable else why, pkg)
-    op("edit", "Apply a configuration file to the prepared system", ["edit"] + cas, "ready" if writable else "refused",
-       None if writable else why,
-       [{"name": "path", "label": "System-relative path", "flag": None, "required": True, "choices": []},
-        {"name": "file", "label": "Local file containing the new contents", "flag": "--file", "required": True,
-         "choices": []}])
-    op("update_check", "Check for system updates", ["update", "check"], "ready")
+        add(id, label, ["change", verb] + cas, pkg, writable, why)
+    add("edit", "Apply a configuration file to the prepared system", ["edit"] + cas,
+        [{"name": "path", "label": "System-relative path", "flag": None, "required": True, "choices": []},
+         {"name": "file", "label": "Local file containing the new contents", "flag": "--file", "required": True,
+          "choices": []}], writable, why)
+    configured = os.environ.get("RECAB_STANDIN_UPDATE_SOURCE") != "none"
+    add("update_check", "Check for system updates", ["update", "check"], [], configured,
+        "No usable update source is configured")
     avail = u.get("available")
     dl = u.get("download")
-    op("update_download", "Download the available release through Recipe",
-       ["update", "download"] + ([avail["id"]] if avail else []), "ready" if avail and not (dl and dl["downloaded"]) else "refused",
-       None if avail and not (dl and dl["downloaded"]) else "Check for an available release first")
-    selected = u.get("pending") or (dl["release"] if dl and dl["downloaded"] else None)
-    op("update_apply", "Merge the selected release, preserving prepared changes",
-       ["update", "apply"] + ([selected] if selected else []) + cas,
-       "ready" if selected and writable and not merge else "refused",
-       None if selected and writable and not merge else "A verified release and a writable preparation are required")
-    op("update_media", "Merge a release manifest from disk", ["update", "apply"] + cas, "ready" if writable else "refused",
-       None if writable else why,
-       [{"name": "manifest", "label": "Verified release.json path", "flag": "--manifest", "required": True, "choices": []}])
-    pending_merge = merge and merge["phase"] != "complete"
-    op("update_recover", "Continue the captured release merge", ["update", "recover"] + cas,
-       "ready" if pending_merge and not unresolved else "refused", "Resolve outstanding conflicts first")
-    if pending_merge:
+    add("update_download", "Download the available release through Recipe",
+        ["update", "download"] + ([avail["id"]] if avail else []), [], bool(avail),
+        "Check for an available release first")
+    downloaded = dl if dl and dl["downloaded"] else None
+    selected = u.get("pending") or (downloaded["release"] if downloaded else None)
+    add("update_apply", "Merge the selected release, preserving prepared changes",
+        ["update", "apply"] + ([selected] if selected else []) + cas, [], bool(selected) and writable,
+        "A verified release and a writable preparation are required")
+    add("update_media", "Merge a release manifest from disk", ["update", "apply"] + cas,
+        [{"name": "manifest", "label": "Verified release.json path", "flag": "--manifest", "required": True,
+          "choices": []}], writable)
+    add("update_recover", "Continue the captured release merge", ["update", "recover"] + cas, [],
+        merge_pending and merge_unresolved(merge) == 0, "Resolve outstanding conflicts first")
+    if merge_pending:
+        merge_cas = ["--preparation", p["id"], "--revision", str(p["revision"])]
         for c in merge["conflicts"]:
-            if c["resolution"] is None:
-                op("resolve:" + c["id"], "Resolve %s (%s)" % (c["path"], c["kind"]),
-                   ["update", "resolve", c["id"], "--preparation", p["id"], "--revision", str(p["revision"])], "ready", None,
-                   [{"name": "choice", "label": "Resolution", "flag": "--choice", "required": True,
-                     "choices": ["local", "release", "edited"]},
-                    {"name": "file", "label": "File for an edited resolution (otherwise leave empty)", "flag": "--file",
-                     "required": False, "choices": []}])
-    cancelable = bool(pending_merge and p and p["phase"] != "ready")
-    op("update_cancel", "Detach the selected release and retain prepared changes", ["update", "cancel"] + cas,
-       "ready" if cancelable else "refused",
-       None if cancelable else "An applied merge must be recovered; cancellation cannot reconstruct its captured changes")
-    op("change_recover", "Recover the interrupted software/configuration change", ["change", "recover"] + cas,
-       "refused", "Not available in the current state")
-    if p and p["phase"] == "interrupted" and not merge:
-        op("sync_recover", "Continue incremental synchronization", ["prepare"] + cas, "ready")
-    op("trial_recover", "Assess or reconcile trial recovery", ["trial"], "refused", "Not available in the current state")
-    if working:
-        for o in ops:
-            o["verdict"], o["reason"] = "refused", "Another recab command is running"
+            if c["resolution"] is None and c["kind"] not in ("package_rebuild", "missing_or_unsafe_baseline"):
+                choices = (["local"] if c["kind"] == "package_ownership" else
+                           ["local", "release"] if c["kind"] == "directory_tree" else ["local", "release", "edited"])
+                add("resolve:" + c["id"], "Resolve %s (%s)" % (c["path"], c["kind"]),
+                    ["update", "resolve", c["id"]] + merge_cas,
+                    [{"name": "choice", "label": "Resolution", "flag": "--choice", "required": True, "choices": choices},
+                     {"name": "file", "label": "File for an edited resolution (otherwise leave empty)",
+                      "flag": "--file", "required": False, "choices": []}],
+                    True, "Recover merge publication before resolving conflicts")
+        add("update_reproduce", "Reproduce selected software for this release through Recipe",
+            ["update", "reproduce"] + merge_cas,
+            [{"name": "package", "label": "Selected package", "flag": None, "required": True, "choices": []},
+             {"name": "recipe", "label": "Recipe path (optional)", "flag": "--recipe", "required": False,
+              "choices": []}],
+            any(c["kind"] == "package_rebuild" and c["resolution"] is None for c in merge["conflicts"]),
+            "The merge has no blocked package reproduction")
+    if p and p["operation"] == "finalize" and p["phase"] != "ready":
+        add("finalize_recover", "Continue interrupted finalization", ["finalize"] + cas, [],
+            by["finalize"]["verdict"] != "refused")
+    if merge_pending and any(c["kind"] == "missing_or_unsafe_baseline" for c in merge["conflicts"]):
+        add("adopt_baseline", "Adopt the verified original release baseline", ["update", "adopt-baseline"] + cas,
+            [{"name": "manifest", "label": "Original release.json path", "flag": "--manifest", "required": True,
+              "choices": []}], True)
+    cancelable = bool(p and p["phase"] != "ready" and u.get("pending"))
+    add("update_cancel", "Detach the selected release and retain prepared changes", ["update", "cancel"] + cas, [],
+        cancelable, "An applied merge must be recovered; cancellation cannot reconstruct its captured changes")
+    add("change_recover", "Recover the interrupted software/configuration change", ["change", "recover"] + cas, [],
+        bool(p and p.get("change")))
+    if p and p["operation"] == "prepare" and not p["synchronized"]:
+        add("sync_recover", "Continue incremental synchronization", ["prepare"] + cas, [], True)
+    add("trial_recover", "Assess or reconcile trial recovery", ["trial"], [], ticket)
+    # operations.rs 450-465
+    for o in ops:
+        if working:
+            reason = "Another recab command is running"
+        elif ticket and o["id"] not in ("trial_recover", "commit", "rollback"):
+            reason = "Reconcile the pending trial before changing either system"
+        elif o["id"] != "trial_recover":
+            reason = recovery
+        else:
+            reason = None
+        if reason:
+            o["verdict"], o["reason"] = "refused", reason
 
     last = s["last_trial"]
     current = bool(last) and (last["committed"] or failed)
     release_prepared = None
     if p:
-        release_prepared = (release_summary()["version"] if merge and merge["phase"] == "complete"
+        # status.rs 508-520: the selected release's version while one is selected or merging
+        release_prepared = (release_summary()["version"] if u.get("pending") or merge
                             else s.get("running_release", "2026.11"))
     return {
         "schema_version": 10, "operations": ops, "running_release": s.get("running_release", "2026.11"), "prepared_release": release_prepared,
@@ -264,7 +383,7 @@ def status(s):
         "default_slot": s["active"], "known_good_slot": s["active"], "committed": not s.get("on_trial"),
         "rollback_slot": s["rollback"], "scheduled_trial": inactive if s["trial_pending"] else None,
         "last_trial": last, "entry_prefix": "levitate", "slots": [slot("A"), slot("B")],
-        "actions": actions, "preparation": p, "recovery_reason": None,
+        "actions": actions, "preparation": p, "recovery_reason": recovery,
     }
 
 
@@ -322,7 +441,7 @@ def prepare(s):
     pause(1.2)
     s["preparation"] = {"id": "p%d" % s["made"], "slot": other(s), "source_slot": s["active"],
                         "source_generation": s["generations"][s["active"]], "revision": 1,
-                        "operation": "synchronize", "phase": "prepared", "completed_steps": 3, "failure": None,
+                        "operation": "prepare", "phase": "prepared", "completed_steps": 3, "failure": None,
                         "synchronized": True, "synchronization": None, "finalization": None, "change": None,
                         "last_change": None, "changes": []}
     # The old way back ends when the place is reused.
@@ -337,12 +456,39 @@ def change(s, action, package, actor=None):
         refuse("changes go into a prepared candidate; run recab prepare")
     pause(1.0)
     p["revision"] += 1
+    if os.environ.get("RECAB_STANDIN_STOP_AT") == "change":
+        # change.rs 500-510: intent published, then cut off: `change` is set, the operation is
+        # "change", the phase interrupted and the failure says publication must finish.
+        p["change"] = {"id": "c%d" % p["revision"], "action": action, "package": package, "report": None,
+                       "producer_io": None, "invocation_io": None, "projection_bytes_written": 0}
+        p["operation"], p["phase"], p["failure"] = "change", "interrupted", "system publication must finish"
+        save(s)
+        os.makedirs(STATE_DIR, exist_ok=True)
+        open(os.path.join(STATE_DIR, "stopped-at-change"), "w").close()
+        while True:
+            time.sleep(3600)
     p["last_change"] = {"id": "c%d" % p["revision"], "action": action, "package": package, "report": None,
                         "producer_io": None, "invocation_io": None, "projection_bytes_written": 0}
     p["changes"].append({"id": p["last_change"]["id"], "action": action, "package": package,
                          "unix_time": int(time.time()), "actor": actor})
     record(s, "change", slot=p["slot"], preparation=p["id"], change=p["last_change"]["id"], action=action,
            package=package, actor=actor)
+
+
+def recover_change(s, actor=None):
+    """`change::recover` (change.rs 515-620): the cut-off change is finished and recorded."""
+    p = s["preparation"]
+    if not p or not p.get("change"):
+        refuse("no pending system change journal")
+    pause(1.0)
+    done = p["change"]
+    p["last_change"], p["change"] = done, None
+    p["changes"].append({"id": done["id"], "action": done["action"], "package": done["package"],
+                         "unix_time": int(time.time()), "actor": actor})
+    p["operation"], p["phase"], p["failure"] = "prepare", "prepared", None
+    p["revision"] += 1
+    record(s, "change", slot=p["slot"], preparation=p["id"], change=done["id"], action=done["action"],
+           package=done["package"], actor=actor)
 
 
 def reboot(s):
@@ -356,13 +502,16 @@ def reboot(s):
         s["last_trial"] = {"slot": tried, "committed": False, "detail": "restarted before the trial was kept",
                            "unix_time": int(time.time())}
         record(s, "trial-failed", slot=tried, detail=s["last_trial"]["detail"])
-    elif s["trial_pending"] and os.environ.get("RECAB_STANDIN_TRIAL") == "fail":
+    elif s["trial_pending"] and os.environ.get("RECAB_STANDIN_TRIAL") in ("fail", "fail-no-record"):
         # Start-up failed; recab's trial service restarted into the known-good
         # system, which is the one that was running. The preparation stays.
         s["trial_pending"] = False
-        s["last_trial"] = {"slot": other(s), "committed": False,
+        s["last_trial"] = {"slot": other(s), "committed": False, "generation": s["generations"][other(s)],
                            "detail": "startup ended with failed units: sddm.service", "unix_time": int(time.time())}
         record(s, "trial-failed", slot=other(s), detail=s["last_trial"]["detail"])
+        if os.environ.get("RECAB_STANDIN_TRIAL") == "fail-no-record":
+            # recab keeps the failed system's slot but no preparation record for it
+            s["preparation"] = None
     elif s["trial_pending"]:
         was = s["active"]
         s["active"] = other(s)
@@ -412,12 +561,46 @@ def agent(s):
     emit(event="done")
 
 
+def merge_conflicts(kind, edited, packages):
+    """The conflicts `merge.rs` lists, each as `Conflict` (id, path, kind, resolution). A
+    package_rebuild names the package; every other kind names a path of the system, relative
+    to its root (merge.rs 274-282, 1083, 1091)."""
+    package = packages[0] if packages else "nvidia-driver"
+    one = {
+        "content_or_metadata": ("etc/ssh/sshd_config", "content_or_metadata"),
+        "type": ("etc/motd", "type"),
+        "deletion": ("etc/issue", "deletion"),
+        "directory_tree": ("etc/profile.d", "directory_tree"),
+        "package_ownership": ("usr/bin/nvidia-smi", "package_ownership"),
+        "package_rebuild": (package, "package_rebuild"),
+        "missing_or_unsafe_baseline": ("usr/lib/recab/release-baseline.json", "missing_or_unsafe_baseline"),
+    }
+    if kind == "baseline":
+        wanted = ["missing_or_unsafe_baseline"]
+    elif kind == "rebuild":
+        wanted = ["package_rebuild"]
+    elif kind == "ownership":
+        wanted = ["package_ownership"]
+    elif kind == "kinds":
+        wanted = ["content_or_metadata", "type", "deletion", "directory_tree", "package_ownership", "package_rebuild"]
+    elif edited:
+        wanted = ["content_or_metadata"]
+    else:
+        wanted = []
+    return [{"id": "conflict%d" % (n + 1), "path": one[k][0], "kind": one[k][1], "resolution": None}
+            for n, k in enumerate(wanted)]
+
+
 def update(s, words, args):
     """`recab update check|download|apply|resolve|recover|cancel`, as
     tools/recab/src/update.rs and merge.rs make them."""
     u = s["update"]
     verb = words[1]
     if verb == "check":
+        if os.environ.get("RECAB_STANDIN_UPDATE_SOURCE") == "none":
+            # update.rs 158: the first thing `configuration` asks for
+            refuse("no update source configured; the image producer must supply release.source and distribution "
+                   "release trust")
         pause(0.5)
         if os.environ.get("RECAB_STANDIN_CHECK_FAILS") == "1":
             u["phase"], u["last_error"] = "check_failed", "Recipe acquisition failed; completed objects are retained for retry"
@@ -447,25 +630,63 @@ def update(s, words, args):
             prepare(s)
         p = s["preparation"]
         pause(1.0)
-        p["revision"] += 1
         u["pending"] = RELEASE_ID
         edited = [c for c in p["changes"] if c["action"] == "edit" and c["package"] == "/etc/ssh/sshd_config"]
-        if edited:
-            # The release also changes a file the person edited: nothing is chosen for them.
+        installed_packages = [c["package"] for c in p["changes"] if c["action"] == "install"]
+        conflicts = merge_conflicts(os.environ.get("RECAB_STANDIN_MERGE", ""), bool(edited), installed_packages)
+        if conflicts and conflicts[0]["kind"] == "missing_or_unsafe_baseline":
+            # merge.rs 1131-1142: blocked before anything is captured; the preparation is not touched
+            u["merge"] = {"phase": "blocked", "conflicts": conflicts,
+                          "failure": "original release baseline unavailable; adopt the verified original release, "
+                                     "never capture the personalized system as O"}
+        elif conflicts:
+            # The release also changes something the next system changed: nothing is chosen for them.
+            p["revision"] += 1
             p["operation"], p["phase"] = "update", "interrupted"
             p["failure"] = "release merge has unresolved conflicts"
-            u["merge"] = {"phase": "conflicted", "conflicts": [
-                {"id": "conflict1", "path": "etc/ssh/sshd_config", "kind": "content", "resolution": None}]}
+            u["merge"] = {"phase": "conflicted", "conflicts": conflicts}
         else:
+            p["revision"] += 1
             u["merge"] = {"phase": "complete", "conflicts": []}
             u["pending"] = None
         record(s, "update", slot=p["slot"], preparation=p["id"],
-               outcome="interrupted" if edited else "done",
-               detail="release merge has unresolved conflicts" if edited else None)
+               outcome="interrupted" if conflicts else "done",
+               detail="release merge has unresolved conflicts" if conflicts else None)
     elif verb == "resolve":
-        for c in u["merge"]["conflicts"]:
-            if c["id"] == words[2]:
-                c["resolution"] = args[args.index("--choice") + 1]
+        choice = args[args.index("--choice") + 1] if "--choice" in args else None
+        found = [c for c in (u.get("merge") or {"conflicts": []})["conflicts"] if c["id"] == words[2]]
+        if not found:
+            refuse("unknown merge conflict")
+        c = found[0]
+        # merge.rs 1533-1545
+        if c["kind"] == "package_ownership" and choice != "local":
+            refuse("keeping a release-owned collision requires cancelling and removing the conflicting package "
+                   "through Recipe, or reproducing it with noncolliding paths")
+        if c["kind"] == "package_rebuild":
+            refuse("this package must be reproduced through Recipe against the pinned release")
+        if choice not in ("local", "release", "edited"):
+            refuse("resolution must be local, release or edited")
+        c["resolution"] = choice
+        s["preparation"]["revision"] += 1
+    elif verb == "reproduce":
+        # merge.rs 1764-1830, 1974: a reproduced package is no longer a conflict
+        package = words[2] if len(words) > 2 else ""
+        m = u.get("merge")
+        left = [c for c in (m["conflicts"] if m else []) if not (c["kind"] == "package_rebuild" and c["path"] == package)]
+        if not m or len(left) == len(m["conflicts"]):
+            refuse("package is not selected")
+        pause(1.0)
+        m["conflicts"] = left
+        s["preparation"]["revision"] += 1
+    elif verb == "adopt-baseline":
+        # merge.rs 1608-1680: the baseline is written and the blocked record removed
+        m = u.get("merge")
+        if "--manifest" not in args:
+            refuse("the following required arguments were not provided: --manifest <MANIFEST>")
+        if not m or m["phase"] != "blocked":
+            refuse("a release baseline already exists")
+        pause(1.0)
+        u["merge"] = None
         s["preparation"]["revision"] += 1
     elif verb == "recover":
         m = u.get("merge")
@@ -495,6 +716,9 @@ def main(args):
     if role == "agent-real":
         return agent(s)
     if role == "reboot-real":
+        if os.environ.get("RECAB_STANDIN_REBOOT_FAILS") == "1":
+            sys.stderr.write("reboot: the restart was refused (stand-in)\n")
+            sys.exit(1)
         reboot(s)
         return save(s)
     # Flags that take a value, and flags that do not: what is left is the command.
@@ -510,6 +734,12 @@ def main(args):
             words.append(arg)
     events = "--machine-events" in args
     command = words[0] if words else ""
+    if command and command == os.environ.get("RECAB_STANDIN_FAIL"):
+        if events:
+            emit(schema_version=1, event="started", operation=command, message="Starting " + command, code=None)
+        # finalize.rs 112: a refusal recab words
+        refuse("candidate or boot inputs changed since finalization began; reopen the preparation before "
+               "changing its revision")
     if command == "status":
         print(json.dumps(status(s)))
         return
@@ -563,6 +793,9 @@ def main(args):
             s["preparation"] = None
             installed(s)
         record(s, "commit", slot=s["active"], outcome="restart_cancelled" if cancelled else None)
+    elif command == "change" and words[1:2] == ["recover"]:
+        matching(s, args)
+        recover_change(s, actor)
     elif command == "change" and len(words) == 3:
         matching(s, args)
         change(s, words[1], words[2], actor)

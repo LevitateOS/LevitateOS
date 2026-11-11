@@ -228,10 +228,17 @@ void SystemPage::show(const Status &s)
     }
 
     // What is true now, in one line and one sentence.
-    if (s.state == QLatin1String("failed") || s.state == QLatin1String("interrupted")) {
+    if (!s.unusable.isEmpty() || s.state == QLatin1String("failed") || s.state == QLatin1String("interrupted")) {
         auto *verdict = new Verdict;
         verdict->setFrameShape(QFrame::NoFrame);
-        if (s.state == QLatin1String("failed")) {
+        if (!s.unusable.isEmpty()) {
+            // recab's own state: it says the system needs recovery, and why.
+            verdict->column()->addWidget(heading(tr("recab says this system needs recovery")));
+            verdict->column()->addWidget(text(tr("recab says: %1. The steps it offers are listed above, each with its "
+                                                 "own verdict.")
+                                                  .arg(s.unusable),
+                                              true));
+        } else if (s.state == QLatin1String("failed")) {
             verdict->column()->addWidget(heading(tr("The next system did not start, so the computer came back")));
             verdict->column()->addWidget(text(
                 tr("You are on %1, exactly as it was. The next system still holds its changes; nothing in it was "
@@ -257,8 +264,9 @@ void SystemPage::show(const Status &s)
             title = tr("The next system is ready");
             under = tr("It is checked and closed. Restart to start using it; until then you stay on the running system.");
         } else if (next && !s.clashes.isEmpty()) {
-            title = tr("The update clashes with one of your changes");
-            under = tr("Nothing was chosen for you. The next system cannot be finished until that is settled.");
+            title = s.real ? s.mergeHeading() : tr("The update clashes with one of your changes");
+            under = s.real ? s.mergeSentence()
+                           : tr("Nothing was chosen for you. The next system cannot be finished until that is settled.");
         } else if (s.state == QLatin1String("on_trial")) {
             title = tr("This system is on trial");
             under = tr("It started, and is not kept yet: a restart now goes back to the system from before. recab "
@@ -305,10 +313,23 @@ void SystemPage::show(const Status &s)
                "work, say which and leave it out."));
         auto *buttons = new QHBoxLayout;
         auto *again = new QPushButton(tr("Try the same again"));
+        again->setEnabled(s.can("restart").ready);
+        if (!s.can("restart").ready)
+            again->setToolTip(s.can("restart").reason);
         auto *fixNow = primary(tr("Let the agent fix it"));
         connect(again, &QPushButton::clicked, this, &SystemPage::retry);
         connect(fixNow, &QPushButton::clicked, this, [this, prompt] { emit fix(prompt->prompt()); });
         buttons->addWidget(again);
+        // recab keeps no preparation for the failed system: it offers to replace it, with its own words.
+        const QJsonObject replace = s.operationObject(QStringLiteral("replace_failed"));
+        if (!replace.isEmpty()) {
+            auto *replaceIt = new QPushButton(tr("Replace it with the running system…"));
+            const ActionVerdict verdict = s.operation(QStringLiteral("replace_failed"));
+            replaceIt->setEnabled(verdict.ready);
+            replaceIt->setToolTip(verdict.ready ? replace["label"].toString() : verdict.reason);
+            connect(replaceIt, &QPushButton::clicked, this, &SystemPage::replaceFailed);
+            buttons->addWidget(replaceIt);
+        }
         buttons->addStretch();
         buttons->addWidget(fixNow);
         prompt->column()->addLayout(buttons);
@@ -329,7 +350,9 @@ void SystemPage::show(const Status &s)
     auto *pair = new QHBoxLayout;
     pair->setSpacing(14);
     QStringList runningLines{tr("Running now"), tr("Locked")};
-    if (next)
+    if (!s.unusable.isEmpty())
+        runningLines = QStringList{tr("Running now")};
+    else if (next)
         runningLines << (s.state == QLatin1String("interrupted") ? tr("Untouched") : tr("Your way back"));
     else if (s.state == QLatin1String("on_trial"))
         runningLines = QStringList{tr("Running now"), tr("On trial: not kept yet")};
@@ -340,7 +363,9 @@ void SystemPage::show(const Status &s)
                                                : tr("Kept: it started properly on %1").arg(s.trialWhen));
     pair->addWidget(card(Card::On, Glyph::Lock, tr("The running system"), running, runningLines), 1);
 
-    if (next) {
+    if (!s.unusable.isEmpty()) {
+        // recab says no more of the other place than that recovery comes first.
+    } else if (next) {
         const bool plus = !titles.isEmpty();
         const QString under = !plus ? s.name(s.otherRelease)
                                      : tr("%1, plus:").arg(s.name(s.otherRelease));
@@ -392,6 +417,9 @@ void SystemPage::show(const Status &s)
                        "judged."),
                     tr("Keep it"), s.can("keep"), true),
                 &QPushButton::clicked, this, &SystemPage::keep);
+    } else if (!s.unusable.isEmpty()) {
+        toNext = next;
+        list->addWidget(dim(text(tr("Nothing else is offered here while recab says this system needs recovery."), true)));
     } else if (s.state == QLatin1String("interrupted")) {
         connect(act(list, tr("Continue where it stopped"),
                     tr("recab looks at what is really there and carries on. Nothing that was finished is done again."),
@@ -410,9 +438,13 @@ void SystemPage::show(const Status &s)
                     tr("Restart into it"), s.can("restart"), true),
                 &QPushButton::clicked, this, &SystemPage::restart);
     } else if (next && !s.clashes.isEmpty()) {
-        connect(act(list, tr("Settle the clash"),
-                    tr("%1 was changed by you and by the update. An agent can settle it, or you decide.")
-                        .arg(s.clashes.first().path),
+        connect(act(list, s.real ? tr("Settle what recab stopped at") : tr("Settle the clash"),
+                    s.real ? counted(s.clashes.size(),
+                                     tr("recab stopped at %1 thing. Open it to see what it is and what recab offers."),
+                                     tr("recab stopped at %1 things. Open them to see what they are and what recab "
+                                        "offers."))
+                           : tr("%1 was changed by you and by the update. An agent can settle it, or you decide.")
+                                 .arg(s.clashes.first().path),
                     tr("Settle…"), ActionVerdict{true, QString()}, true),
                 &QPushButton::clicked, this, &SystemPage::settle);
     } else if (next) {
@@ -451,7 +483,8 @@ void SystemPage::show(const Status &s)
     more->addWidget(backLink);
     // recab only learns of a new release when asked; the way to ask is on the
     // release page, which is otherwise reached when one is known.
-    if (updateName.isEmpty() && s.operation(QStringLiteral("update_check")).ready && s.state != QLatin1String("working")) {
+    if (updateName.isEmpty() && !s.operationObject(QStringLiteral("update_check")).isEmpty()
+        && s.state != QLatin1String("working")) {
         auto *releaseLink = link(tr("Check for a new release"));
         connect(releaseLink, &ClickLabel::clicked, this, &SystemPage::openRelease);
         more->addWidget(releaseLink);
@@ -528,12 +561,172 @@ void AskPage::show(const Status &s, const QString &request)
 
 // ---------------------------------------------------------------- A clash
 
+namespace {
+
+// recab's command for one of its operations as a person would read it, for the
+// facts handed to the agent: its arguments as it gave them, then what it still
+// takes. `positional` fills the input that has no flag.
+QString commandOf(const QJsonObject &op, const QString &positional = QString())
+{
+    QStringList words{QStringLiteral("recab")};
+    for (const QJsonValue &word : op["argv"].toArray())
+        words << word.toString();
+    for (const QJsonValue &value : op["inputs"].toArray()) {
+        const QJsonObject input = value.toObject();
+        QStringList choices;
+        for (const QJsonValue &choice : input["choices"].toArray())
+            choices << choice.toString();
+        QString part;
+        if (input["flag"].isNull())
+            part = positional.isEmpty() ? input["name"].toString().toUpper() : positional;
+        else
+            part = input["flag"].toString() + QLatin1Char(' ')
+                   + (choices.isEmpty() ? input["name"].toString().toUpper() : choices.join(QLatin1Char('|')));
+        words << (input["required"].toBool() ? part : QStringLiteral("[%1]").arg(part));
+    }
+    return words.join(QLatin1Char(' '));
+}
+
+} // namespace
+
+void ClashPage::showMerge(const Status &s)
+{
+    QVBoxLayout *column = fresh();
+    column->setSpacing(12);
+    const UpdateInfo &u = s.update;
+    const QString release = s.mergeRelease();
+    const QString running = s.name(s.runningRelease);
+
+    auto *verdict = new Verdict;
+    verdict->setFrameShape(QFrame::NoFrame);
+    verdict->column()->addWidget(heading(s.mergeHeading()));
+    verdict->column()->addWidget(text(s.mergeSentence(), true));
+    if (!u.mergeFailure.isEmpty())
+        verdict->column()->addWidget(dim(text(tr("recab says: %1").arg(u.mergeFailure), true)));
+    column->addWidget(verdict);
+
+    // What recab stopped at, every conflict it lists as it names them.
+    auto *found = new Panel;
+    found->column()->setSpacing(8);
+    found->column()->addWidget(strong(tr("What recab stopped at")));
+    auto *inner = new QWidget;
+    auto *rows = new QVBoxLayout(inner);
+    rows->setContentsMargins(0, 0, 0, 0);
+    rows->setSpacing(10);
+    for (const MergeConflict &c : u.conflicts) {
+        auto *head = new QHBoxLayout;
+        head->setSpacing(14);
+        head->addWidget(strong(c.path));
+        head->addWidget(dim(text(c.kindWords())), 1);
+        head->addWidget(c.resolution.isEmpty() ? text(c.standing()) : dim(text(c.standing())));
+        rows->addLayout(head);
+        if (c.resolution.isEmpty())
+            rows->addWidget(dim(text(c.says(release, running), true)));
+    }
+    if (u.conflicts.size() > 3) {
+        auto *scroll = new QScrollArea;
+        scroll->setWidgetResizable(true);
+        scroll->setFrameShape(QFrame::NoFrame);
+        scroll->setFixedHeight(230);
+        scroll->setWidget(inner);
+        found->column()->addWidget(scroll);
+    } else {
+        found->column()->addWidget(inner);
+    }
+    column->addWidget(found);
+
+    // What recab offers for what no side can settle, each with its own verdict.
+    auto *offers = new Panel;
+    QVBoxLayout *list = offers->column();
+    list->setSpacing(8);
+    list->addWidget(strong(tr("What recab offers")));
+    bool offered = false;
+    bool baselineShown = false;
+    for (const MergeConflict &c : u.open()) {
+        if (c.isBaseline() && !baselineShown) {
+            baselineShown = true;
+            offered = true;
+            connect(act(list, tr("The original release"),
+                        tr("recab offers: %1. You give it the release file this system was installed from.")
+                            .arg(s.operationObject(QStringLiteral("adopt_baseline"))["label"].toString()),
+                        tr("Adopt it…"), s.operation(QStringLiteral("adopt_baseline")), true),
+                    &QPushButton::clicked, this, &ClashPage::adoptBaseline);
+        } else if (c.isPackageRebuild()) {
+            offered = true;
+            const QString package = c.path;
+            connect(act(list, tr("Reproduce %1").arg(package),
+                        tr("recab offers: %1.")
+                            .arg(s.operationObject(QStringLiteral("update_reproduce"))["label"].toString()),
+                        tr("Reproduce…"), s.operation(QStringLiteral("update_reproduce")), true),
+                    &QPushButton::clicked, this, [this, package] { emit reproduce(package); });
+        }
+    }
+    if (offered)
+        column->addWidget(offers);
+    else
+        delete offers;
+
+    // What the agent can settle: a side chosen for a file or directory, a package reproduced.
+    QStringList facts;
+    QList<MergeConflict> work;
+    bool byHandPossible = false;
+    for (const MergeConflict &c : u.open()) {
+        const QJsonObject resolve = s.operationObject(QStringLiteral("resolve:") + c.id);
+        if (c.choosesASide() && s.operation(QStringLiteral("resolve:") + c.id).ready) {
+            byHandPossible = true;
+            work << c;
+            facts << tr("%1 (%2): %3 Settle it with `%4`.")
+                         .arg(c.path, c.kindWords(), c.says(release, running), commandOf(resolve));
+        } else if (c.isPackageRebuild() && s.operation(QStringLiteral("update_reproduce")).ready) {
+            work << c;
+            facts << tr("%1 (%2): %3 Settle it with `%4`.")
+                         .arg(c.path, c.kindWords(), c.says(release, running),
+                              commandOf(s.operationObject(QStringLiteral("update_reproduce")), c.path));
+        }
+    }
+    auto *buttons = new QHBoxLayout;
+    auto *wait = new QPushButton(tr("Later"));
+    connect(wait, &QPushButton::clicked, this, &ClashPage::later);
+    if (!work.isEmpty()) {
+        facts << tr("The release being added is %1; the running system's release is %2.")
+                     .arg(release.isEmpty() ? tr("the one recab selected") : release, running);
+        auto *prompt = new PromptPanel(
+            counted(work.size(),
+                    tr("Adding %2 to the next system stopped, and recab cannot decide %1 thing for the person."),
+                    tr("Adding %2 to the next system stopped, and recab cannot decide %1 things for the person."))
+                .arg(release.isEmpty() ? tr("the release") : release),
+            facts,
+            tr("Every item above is settled. What I changed stays as I set it; the release's own changes are kept "
+               "where they do not undo that. Nothing else in the next system changes."));
+        auto *hand = new QPushButton(tr("Decide by hand…"));
+        hand->setEnabled(byHandPossible);
+        auto *fixNow = primary(tr("Let the agent fix it"));
+        connect(hand, &QPushButton::clicked, this, &ClashPage::byHand);
+        connect(fixNow, &QPushButton::clicked, this, [this, prompt] { emit fix(prompt->prompt()); });
+        buttons->addWidget(hand);
+        buttons->addStretch();
+        buttons->addWidget(wait);
+        buttons->addWidget(fixNow);
+        prompt->column()->addLayout(buttons);
+        column->addWidget(prompt);
+    } else {
+        buttons->addStretch();
+        buttons->addWidget(wait);
+        column->addLayout(buttons);
+    }
+    column->addStretch();
+}
+
 void ClashPage::show(const Status &s)
 {
     QVBoxLayout *column = fresh();
     if (s.clashes.isEmpty()) {
         column->addWidget(heading(tr("Nothing clashes")));
         column->addStretch();
+        return;
+    }
+    if (s.real) {
+        showMerge(s);
         return;
     }
     const Clash clash = s.clashes.first();
@@ -751,7 +944,10 @@ void NextPage::show(const Status &s)
 
     // What is true now, in a heading and a sentence: one for each state.
     QString title, under;
-    if (state == QLatin1String("on_trial")) {
+    if (!s.unusable.isEmpty()) {
+        title = tr("recab says this system needs recovery");
+        under = tr("recab says: %1. The steps it offers are listed above, each with its own verdict.").arg(s.unusable);
+    } else if (state == QLatin1String("on_trial")) {
         title = tr("You are on the next system, on trial");
         under = tr("It started, and is not kept yet: a restart now goes back to the system from before. recab keeps "
                    "it once start-up has finished properly.");
@@ -793,8 +989,9 @@ void NextPage::show(const Status &s)
                    "the computer restarts into it.")
                     .arg(holds);
     } else if (clash) {
-        title = tr("The update clashes with one of your changes");
-        under = tr("Nothing was chosen for you. The next system cannot be finished until that is settled.");
+        title = s.real ? s.mergeHeading() : tr("The update clashes with one of your changes");
+        under = s.real ? s.mergeSentence()
+                       : tr("Nothing was chosen for you. The next system cannot be finished until that is settled.");
     } else {
         title = held == 0 ? tr("The next system holds no changes yet")
                           : counted(held, tr("The next system holds %1 change"), tr("The next system holds %1 changes"));
@@ -823,6 +1020,11 @@ void NextPage::show(const Status &s)
         head->addWidget(drop, 0, Qt::AlignTop);
     }
     column->addLayout(head);
+    // recab says recovery comes first: what it offers is listed above, and it says no more of the rest.
+    if (!s.unusable.isEmpty()) {
+        column->addStretch();
+        return;
+    }
 
     // No next system: the one way to make it, and nothing else to say.
     if (!next && state != QLatin1String("on_trial")) {
@@ -1324,8 +1526,9 @@ void ReleasePage::show(const Status &s)
     else if (u.phase == QLatin1String("up_to_date"))
         step = Step::UpToDate;
 
-    QString title, under, mainWords, mainOp;
-    enum class Main { None, Operation, Add, Settle, Finish } main = Main::Operation;
+    QString title, under, mainWords, mainOp, mainPackage;
+    enum class Main { None, Operation, Add, Settle, Finish, Adopt, Reproduce } main = Main::Operation;
+    ActionVerdict settleVerdict{true, QString()};
     switch (step) {
     case Step::Known:
         title = tr("%1 is available").arg(name);
@@ -1342,9 +1545,12 @@ void ReleasePage::show(const Status &s)
             main = Main::None;
             break;
         }
-        under = tr("recab holds no answer yet about a newer release. It looks only when asked: it reads the release "
-                   "list of the update source its image names, and checks what it finds against the distribution's "
-                   "release key.");
+        under = s.operation(QStringLiteral("update_check")).ready
+                    ? tr("recab holds no answer yet about a newer release. It looks only when asked: it reads the "
+                         "release list of the update source its image names, and checks what it finds against the "
+                         "distribution's release key.")
+                    : tr("recab holds no answer about a newer release, and it cannot look for one now. A release can "
+                         "still come from a file, if recab allows it.");
         mainWords = tr("Check now");
         mainOp = QStringLiteral("update_check");
         break;
@@ -1391,13 +1597,43 @@ void ReleasePage::show(const Status &s)
         main = Main::Add;
         break;
     case Step::Settling:
-        if (u.unresolved > 0) {
-            title = counted(u.unresolved, tr("Adding %2 needs you: %1 thing clashes with your changes"),
-                            tr("Adding %2 needs you: %1 things clash with your changes"))
-                        .arg(name.isEmpty() ? tr("the release") : name);
+        if (u.unresolved > 0 || u.stopped()) {
+            const QString releaseName = s.mergeRelease().isEmpty() ? (name.isEmpty() ? tr("the release") : name)
+                                                                    : s.mergeRelease();
+            title = counted(u.open().size(), tr("Adding %2 needs you: %1 thing to settle"),
+                            tr("Adding %2 needs you: %1 things to settle"))
+                        .arg(releaseName);
             under = tr("Nothing was chosen for you. The next system cannot be finished until each is settled.");
-            mainWords = tr("Settle…");
-            main = Main::Settle;
+            if (!u.mergeFailure.isEmpty())
+                under += tr(" recab says: %1").arg(u.mergeFailure);
+            // The main step is the first thing recab offers for what is open: a side to choose, a package to
+            // reproduce, then the original release to adopt.
+            QString resolveId;
+            for (const MergeConflict &c : u.open())
+                if (c.choosesASide() && resolveId.isEmpty())
+                    resolveId = QStringLiteral("resolve:") + c.id;
+            QString rebuild;
+            bool baseline = false;
+            for (const MergeConflict &c : u.open()) {
+                if (c.isPackageRebuild() && rebuild.isEmpty())
+                    rebuild = c.path;
+                baseline |= c.isBaseline();
+            }
+            if (!resolveId.isEmpty()) {
+                mainWords = tr("Settle…");
+                main = Main::Settle;
+                settleVerdict = s.operation(resolveId);
+            } else if (!rebuild.isEmpty()) {
+                mainWords = tr("Reproduce %1…").arg(rebuild);
+                main = Main::Reproduce;
+                mainPackage = rebuild;
+            } else if (baseline) {
+                mainWords = tr("Adopt the original release…");
+                main = Main::Adopt;
+            } else {
+                mainWords = tr("Settle…");
+                main = Main::Settle;
+            }
         } else if (!u.conflicts.isEmpty() && u.mergeFailure.isEmpty()) {
             title = tr("Every clash is settled");
             under = tr("recab can carry on adding %1 to the next system.").arg(name.isEmpty() ? tr("the release") : name);
@@ -1437,6 +1673,12 @@ void ReleasePage::show(const Status &s)
             verdict = s.operation(QStringLiteral("update_apply"));
         else if (s.real && main == Main::Finish)
             verdict = s.can("finalize");
+        else if (s.real && main == Main::Settle)
+            verdict = settleVerdict;
+        else if (s.real && main == Main::Adopt)
+            verdict = s.operation(QStringLiteral("adopt_baseline"));
+        else if (s.real && main == Main::Reproduce)
+            verdict = s.operation(QStringLiteral("update_reproduce"));
         auto *button = primary(mainWords);
         button->setEnabled(verdict.ready);
         if (!verdict.ready) {
@@ -1444,11 +1686,15 @@ void ReleasePage::show(const Status &s)
             because = verdict.reason;
         }
         head->addWidget(button, 0, Qt::AlignTop);
-        connect(button, &QPushButton::clicked, this, [this, main, mainOp] {
+        connect(button, &QPushButton::clicked, this, [this, main, mainOp, mainPackage] {
             if (main == Main::Add)
                 emit add();
             else if (main == Main::Settle)
                 emit settle();
+            else if (main == Main::Adopt)
+                emit adoptBaseline();
+            else if (main == Main::Reproduce)
+                emit reproduce(mainPackage);
             else if (main == Main::Finish)
                 emit finish();
             else
@@ -1506,11 +1752,8 @@ void ReleasePage::show(const Status &s)
         right->column()->addWidget(strong(tr("What happens to your changes")));
         if (step == Step::Settling && !u.conflicts.isEmpty()) {
             for (const MergeConflict &c : u.conflicts)
-                right->column()->addWidget(text(
-                    QStringLiteral("• ")
-                        + (c.resolution.isEmpty() ? tr("%1 (%2): not settled").arg(c.path, c.kind)
-                                                  : tr("%1 (%2): settled, %3").arg(c.path, c.kind, c.resolution)),
-                    true));
+                right->column()->addWidget(
+                    text(QStringLiteral("• ") + tr("%1 (%2): %3").arg(c.path, c.kindWords(), c.standing()), true));
         } else {
             right->column()->addWidget(text(QStringLiteral("• ") + tr("The release is merged into the next system. What "
                                                                          "the next system already holds stays."),
@@ -1554,6 +1797,36 @@ void ReleasePage::show(const Status &s)
                            "before it uses it."),
                         tr("Choose a file…"), s.operation(QStringLiteral("update_media"))),
                     &QPushButton::clicked, this, &ReleasePage::addFromFile);
+        // What recab offers for what no side can settle, each with its own verdict.
+        if (step == Step::Settling) {
+            bool baselineShown = false;
+            for (const MergeConflict &c : u.open()) {
+                if (c.isBaseline() && !baselineShown) {
+                    baselineShown = true;
+                    connect(act(list, tr("The original release"),
+                                tr("recab offers: %1. You give it the release file this system was installed from.")
+                                    .arg(s.operationObject(QStringLiteral("adopt_baseline"))["label"].toString()),
+                                tr("Adopt it…"), s.operation(QStringLiteral("adopt_baseline"))),
+                            &QPushButton::clicked, this, &ReleasePage::adoptBaseline);
+                } else if (c.isPackageRebuild()) {
+                    const QString package = c.path;
+                    connect(act(list, tr("Reproduce %1").arg(package),
+                                tr("recab offers: %1.")
+                                    .arg(s.operationObject(QStringLiteral("update_reproduce"))["label"].toString()),
+                                tr("Reproduce…"), s.operation(QStringLiteral("update_reproduce"))),
+                            &QPushButton::clicked, this, [this, package] { emit reproduce(package); });
+                }
+            }
+        }
+        // A failed system recab keeps no preparation record for: it offers to replace it, in its own words.
+        const QJsonObject replace = s.operationObject(QStringLiteral("replace_failed"));
+        if (!replace.isEmpty())
+            connect(act(list, tr("The failed system"),
+                        replace["destructive"].toBool()
+                            ? tr("recab offers: %1. recab marks it destructive.").arg(replace["label"].toString())
+                            : tr("recab offers: %1.").arg(replace["label"].toString()),
+                        tr("Replace it…"), s.operation(QStringLiteral("replace_failed"))),
+                    &QPushButton::clicked, this, &ReleasePage::replaceFailed);
         if (step == Step::Settling)
             connect(act(list, tr("Take it out again"),
                         tr("recab detaches the release and keeps your changes in the next system."),

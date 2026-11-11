@@ -50,4 +50,14 @@ BeforePage::Content operation(const RecabClient &client, const Status &status, c
 // (`update_cancel`, `update_recover`). Empty title when the id is not one.
 BeforePage::Content releaseStep(const RecabClient &client, const Status &status, const QString &id);
 
+// Adopting the original release's baseline from the release file at `manifest`
+// (`adopt_baseline`), which a merge blocked on a missing baseline waits for.
+BeforePage::Content adoptBaseline(const RecabClient &client, const Status &status, const QString &manifest);
+// Reproducing one package through Recipe for the release being added
+// (`update_reproduce`), which a merge blocked on a package rebuild waits for.
+BeforePage::Content reproduce(const RecabClient &client, const Status &status, const QString &package);
+// Replacing a failed system that recab keeps no preparation record for
+// (`replace_failed`): recab's own label for it and its `destructive` mark.
+BeforePage::Content replaceFailed(const RecabClient &client, const Status &status, const QJsonObject &op);
+
 } // namespace beforewords

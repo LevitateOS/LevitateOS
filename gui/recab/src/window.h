@@ -82,6 +82,14 @@ public:
     // A release manifest from a file the person chooses (`update_media`);
     // `path` names it without asking, for the picture mode.
     void addFromFile(const QString &path = QString());
+    // What a merge blocked on waits for, each through the Before page. The
+    // original release's baseline from a file the person chooses (`path` names
+    // it without asking, for the picture mode); a package reproduced through
+    // Recipe for the release being added; a failed system that recab keeps no
+    // preparation record for, replaced by the running one.
+    void adoptBaseline(const QString &path = QString(), bool askFirst = true);
+    void reproduce(const QString &package, bool askFirst = true);
+    void replaceFailed(bool askFirst = true);
     // Writes the history as plain text.
     bool saveHistory(const QString &path);
     // Whether the agent has asked something; and answering it.
@@ -97,7 +105,10 @@ private:
     // it cannot be read, the page says why and `then` is not done.
     void reload(std::function<void()> then);
     void work(Run *run, const QString &title, const QString &subtitle, std::function<void(bool)> then);
-    void chain(QList<Run *> runs, bool first = true);
+    // `made` says what the steps before the restart did, `restartLast` that the
+    // last of `runs` is the restart: if it fails, the person is told the
+    // computer did not restart and what was made.
+    void chain(QList<Run *> runs, const QString &made = QString(), bool restartLast = false, bool first = true);
     void decideByHand();
     // Shows the Before page for `content` (drawn again when the system is read
     // again) and does `go` only when its button is pressed.
