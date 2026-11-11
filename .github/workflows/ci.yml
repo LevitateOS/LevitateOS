@@ -85,16 +85,34 @@ jobs:
           # shellcheck disable=SC2046 # one word per package
           sudo apt-get install -y $(cargo xtask doctor --packages apt)
 
+      - name: Prepare the pinned Recipe bootstrap root
+        shell: bash
+        run: |
+          set -euo pipefail
+          export GINUX_OCI_CACHE_DIR_OVERRIDE="$RUNNER_TEMP/recipe-oci"
+          export GINUX_OCI_WORK_DIR_OVERRIDE="$RUNNER_TEMP/recipe-oci-work"
+          (
+            cd tools/ginux
+            ./scripts/fetch-rocky-oci.sh
+            ./scripts/prepare-rocky-oci.sh
+          )
+          base=$(jq -er '.base.path' tools/recipe/bootstrap/ginux-build-image.json)
+          digest=$(jq -er '.base.sha256' tools/recipe/bootstrap/ginux-build-image.json)
+          rootfs="$GINUX_OCI_CACHE_DIR_OVERRIDE/${base#oci-cache/}"
+          printf '%s  %s\n' "$digest" "$rootfs" | sha256sum --check --strict
+          echo "GINUX_ROOTFS=$rootfs" >> "$GITHUB_ENV"
+          echo "GINUX_ROOT=oci:recipe-bootstrap@sha256:$digest" >> "$GITHUB_ENV"
+
       - name: Acquire the kernel and the rootfs source
         run: |
-          cargo xtask build kernel "$DISTRO" --prebuilt
-          cargo xtask build rootfs-source "$DISTRO"
+          sudo -n --preserve-env env HOME="$HOME" PATH="$PATH" cargo xtask build kernel "$DISTRO" --prebuilt
+          sudo -n --preserve-env env HOME="$HOME" PATH="$PATH" cargo xtask build rootfs-source "$DISTRO"
 
       - name: Build every release product
         run: |
           set -euo pipefail
           for product in $(cargo xtask status "$DISTRO" --json | jq -r '.artifacts | keys_unsorted[]'); do
-            cargo xtask build "$product" "$DISTRO"
+            sudo -n --preserve-env env HOME="$HOME" PATH="$PATH" cargo xtask build "$product" "$DISTRO"
           done
 
       - name: Run every scenario

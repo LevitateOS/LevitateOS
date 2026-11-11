@@ -79,7 +79,7 @@ tools, separate from commands activated into the host profile.
 
 The compiler image remains the one pinned in
 `.artifacts/recipe-htop-20261110/inputs.json`. Checks now use maintained Ginux
-`b6e9e15e`, including upstream `cfebfdab`, and Recipe `50423f3`. Logs and
+`cec0613f`, including upstream `cfebfdab`, and Recipe `bf2e57c`. Logs and
 consumer definitions are under `.artifacts/recipe-toolchain-fix/` and
 `.artifacts/recipe-toolchain-wave/proofs/`. No image or VM was built.
 
