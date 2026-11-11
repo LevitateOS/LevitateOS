@@ -1,0 +1,56 @@
+#!/usr/bin/env python3
+"""A stand-in for `lsblk --json --bytes -o ...`, for running disk-gui from a
+checkout. It answers in lsblk's real JSON shape (lower-case column names as
+keys, sizes as numbers, `mountpoints` an array with null for none, children
+nested under their disk), for two disks:
+
+  vda   64 GiB   ESP, the running system, the other system, the home
+                 folder's partition, an unnamed ext4 partition, swap
+  vdb   10 GiB   one partition of its own
+
+The home folder's partition is mounted where DISK_STANDIN_LSBLK_MOUNT says
+(the mount point of the filesystem the sample lives on, so statvfs has
+something real to measure) and is DISK_STANDIN_LSBLK_HOME_SIZE bytes (the size
+of that filesystem; default 20 GiB). Nothing else is mounted: a stand-in that
+named real mount points would make this computer's own disks look like these
+partitions. Only the swap partition shows lsblk's "[SWAP]".
+"""
+import json
+import os
+import sys
+
+GIB = 1 << 30
+MIB = 1 << 20
+ESP = "c12a7328-f81f-11d2-ba4b-00a0c93ec93b"
+LINUX = "0fc63daf-8483-4772-8e79-3d69d8477de4"
+
+
+def part(number, size, fstype, parttype, label=None, partlabel=None, mount=None, disk="vda"):
+    return {"name": "%s%d" % (disk, number), "path": "/dev/%s%d" % (disk, number), "type": "part", "size": size,
+            "fstype": fstype, "label": label, "partlabel": partlabel, "parttype": parttype, "mountpoints": [mount]}
+
+
+def main():
+    home = os.environ.get("DISK_STANDIN_LSBLK_MOUNT") or None
+    answer = {"blockdevices": [
+        {"name": "vda", "path": "/dev/vda", "type": "disk", "size": 64 * GIB, "fstype": None, "label": None,
+         "partlabel": None, "parttype": None, "mountpoints": [None], "children": [
+            part(1, 512 * MIB, "vfat", ESP, "EFI", "efi", None),
+            part(2, 20 * GIB, "xfs", LINUX, None, "root-a", None),
+            part(3, 20 * GIB, "xfs", LINUX, None, "root-b", None),
+            part(4, int(os.environ.get("DISK_STANDIN_LSBLK_HOME_SIZE", 20 * GIB)), "xfs", LINUX, None, "data", home),
+            part(5, 2 * GIB, "ext4", LINUX, "scratch", "scratch", None),
+            part(6, 1 * GIB, "swap", "0657fd6d-a4ab-43c4-84e5-0933c84b4f4f", None, None, "[SWAP]"),
+        ]},
+        {"name": "vdb", "path": "/dev/vdb", "type": "disk", "size": 10 * GIB, "fstype": None, "label": None,
+         "partlabel": None, "parttype": None, "mountpoints": [None], "children": [
+            part(1, 10 * GIB - MIB, "ext4", LINUX, "backup", "backup", None, "vdb"),
+        ]},
+    ]}
+    if os.environ.get("DISK_STANDIN_LSBLK_FAIL"):
+        sys.exit("lsblk: failed to access sysfs directory")
+    json.dump(answer, sys.stdout)
+
+
+if __name__ == "__main__":
+    main()

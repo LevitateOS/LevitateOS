@@ -1,19 +1,30 @@
-// The one window. Two things to look at, the mess and the two systems, and
-// one way out of both: hand what was found to the agent.
+// The one window. Four things to look at (the disk, Browse, the mess, the two
+// systems) and one way out of them: hand what was found to the agent, which
+// sets it aside; what is set aside is brought back or let go here.
 #pragma once
 
+#include "after.h"
+#include "disk.h"
 #include "mess.h"
 #include "scan.h"
+#include "setaside.h"
 #include "systems.h"
 
 #include <QDateTime>
 #include <QJsonObject>
 #include <QMainWindow>
+#include <QMap>
+#include <QPointer>
 
 #include <memory>
 
+class AfterPage;
+class BrowsePage;
+class DiskPage;
 class Frame;
 class HandPage;
+class HeldReader;
+class QMessageBox;
 class MessPage;
 class NextSystem;
 class QStackedWidget;
@@ -26,6 +37,7 @@ class Window : public QMainWindow {
     Q_OBJECT
 public:
     explicit Window(QWidget *parent = nullptr);
+    ~Window() override;
 
     void scan();
     void showHandOver();
@@ -35,6 +47,23 @@ public:
     QString pickBiggestUnnamed();
     // Send what the hand-over page shows now.
     void sendShown();
+    // The list of mess, changed by the person: the places Browse and Mess offer.
+    void addToList(Node *node);
+    void takeOffList(Node *node);
+    void neverSuggest(const QString &path);
+    void suggestAgain(const QString &path);
+    // Everything again: the scan, the partitions, Recipe's storage, what is set aside.
+    void lookAgain();
+
+    // What was set aside: the page, bringing places back, letting it all go.
+    void showAfter();
+    void bringBack(const QString &path);
+    void bringAllBack();
+    void askLetGo();
+    void letGoNow();
+    void tryAgain(const QString &path);
+    // The question "let it all go?" while it is asked, else null.
+    QMessageBox *letGoQuestion() const;
 
     // The two systems: the page, the comparison, the question to the agent.
     void showSystems();
@@ -49,19 +78,34 @@ public:
     bool agentAsks() const;
     void answerAgent(const QString &words);
 
-    bool busy() const { return scanner_ != nullptr || run_ != nullptr || reading_ != nullptr; }
+    bool busy() const;
     bool comparing() const { return job_ == Job::Comparing; }
     const SystemsState &state() const { return state_; }
     bool stale() const;
     const QList<Finding> &found() const { return found_; }
     qint64 scannedBytes() const { return tree_ ? tree_->bytes : 0; }
-    qint64 freed() const { return freed_; }
     // Null until the two systems were compared.
     const Comparison *comparison() const { return compared_ ? &comparison_ : nullptr; }
     QString said() const { return said_; }
+    const SetAside &held() const { return held_; }
+    const std::shared_ptr<Node> &tree() const { return tree_; }
+    // What the last request to the agent listed.
+    const QList<Finding> &requested() const { return requested_; }
+    const DiskLayout &layout() const { return layout_; }
+    const QStringList &never() const { return never_; }
+    // The room on the disk the home folder is on, measured now.
+    Space space() const { return spaceAt(home_); }
+    QString home() const { return home_; }
+    DiskPage *diskPage() const { return disk_; }
+    BrowsePage *browsePage() const { return browse_; }
+    MessPage *messPage() const { return mess_; }
+    AfterPage *afterPage() const { return after_; }
     Frame *frame() const { return frame_; }
     // Which page shows, for a check.
     bool showingWork() const;
+    bool showingDisk() const;
+    bool showingBrowse() const;
+    bool showingAfter() const;
     bool showingMess() const;
     bool showingSystems() const;
     // The strip is read with the recab program the window has. For a check
@@ -77,6 +121,14 @@ private:
     void leaveWork();
     void compared(bool ok);
     void drawSystems(const QString &why = QString());
+    void drawDisk();
+    void drawAfter();
+    void readHeld();
+    void readLayout();
+    void readEarlier();
+    void listChanged();
+    DiskInfo diskInfo() const;
+    QStringList zones() const;
     void keep();
     void recall();
     void openFolder(const QString &path);
@@ -87,12 +139,29 @@ private:
     QString entryOf(QWidget *page) const;
 
     QStringList roots_;
-    QString home_, agent_, recab_, rootHelper_, osRelease_, kept_;
+    QString home_, agent_, recab_, rootHelper_, osRelease_, kept_, lsblk_, recipe_, files_;
     bool apparent_;
 
     Scanner *scanner_ = nullptr;
     Run *run_ = nullptr, *reading_ = nullptr;
     Job job_ = Job::None;
+    HeldReader *heldReader_ = nullptr;
+    Run *layoutRun_ = nullptr, *recipeRun_ = nullptr;
+    bool heldAgain_ = false, pendingAfter_ = false, heldRead_ = false, layoutRead_ = false;
+    SetAside held_;
+    DiskLayout layout_;
+    QStringList never_;
+    qint64 earlierBytes_ = -1, earlierGenerations_ = 0;
+    int unreadable_ = 0;
+    qint64 scanFiles_ = 0, scanBytes_ = 0;
+    // The last request to the agent: what was handed over, what it said of each place.
+    QList<Finding> requested_;
+    QMap<QString, QJsonObject> placed_;
+    QString holding_;
+    qint64 freeBefore_ = -1;
+    bool ranHere_ = false, letGone_ = false;
+    QStringList notes_;
+    QPointer<QMessageBox> asking_;
     SystemsState state_;
     bool stateRead_ = false, stopped_ = false;
     QDateTime comparedWhen_;
@@ -101,7 +170,6 @@ private:
     Refresher *refresher_;
     std::shared_ptr<Node> tree_;
     QList<Finding> found_;
-    qint64 before_ = 0, freed_ = 0;
     Comparison comparison_;
     bool compared_ = false;
     QString said_; // what the agent answered about the differences
@@ -110,6 +178,9 @@ private:
     Frame *frame_;
     NextSystem *next_;
     QStackedWidget *stack_;
+    DiskPage *disk_;
+    BrowsePage *browse_;
+    AfterPage *after_;
     MessPage *mess_;
     SystemsPage *systems_;
     HandPage *hand_;

@@ -18,6 +18,9 @@ class DiskMap : public QWidget {
 public:
     explicit DiskMap(QWidget *parent = nullptr);
     void setTree(std::shared_ptr<Node> tree);
+    // Draws only this folder of the tree (null: the whole tree), as a map of its own.
+    void showFolder(Node *folder);
+    Node *folder() const { return top_; }
     // Any file or folder of the tree; it is outlined.
     void select(Node *node);
     Node *selected() const { return selected_; }
@@ -58,4 +61,5 @@ private:
     std::vector<Tile> titles_; // the name strips of the biggest folders
     QHash<Node *, QRectF> where_;
     Node *selected_ = nullptr;
+    Node *top_ = nullptr; // the folder drawn, when not the whole tree
 };

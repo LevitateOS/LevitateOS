@@ -71,6 +71,8 @@ struct SystemsState {
     bool known = false;
     QString problem; // why it is not known
     QString distro, runningRelease, otherRelease, otherRole;
+    // The partitions of the two systems, when recab says them.
+    QString runningDevice, otherDevice;
     // Changes whenever either system does: a comparison made under another
     // key is out of date.
     QString key;

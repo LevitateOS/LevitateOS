@@ -21,6 +21,15 @@ void DiskMap::setTree(std::shared_ptr<Node> tree)
 {
     tree_ = std::move(tree);
     selected_ = nullptr;
+    top_ = nullptr;
+    layOut();
+    update();
+}
+
+void DiskMap::showFolder(Node *folder)
+{
+    top_ = folder;
+    selected_ = nullptr;
     layOut();
     update();
 }
@@ -47,8 +56,9 @@ void DiskMap::layOut()
     tiles_.clear();
     titles_.clear();
     where_.clear();
-    if (tree_ && tree_->bytes > 0)
-        lay(tree_.get(), QRectF(rect()), 0);
+    Node *root = top_ ? top_ : tree_.get();
+    if (root && root->bytes > 0)
+        lay(root, QRectF(rect()), 0);
 }
 
 // A squarified layout: the children of a folder are placed in rows along the
@@ -58,7 +68,7 @@ void DiskMap::lay(Node *node, QRectF area, int depth)
     if (area.width() < 3 || area.height() < 3)
         return;
     where_.insert(node, area);
-    const bool whole = !node->dir || node->children.empty() || node->kind >= 0 || depth > 8
+    const bool whole = !node->dir || node->children.empty() || (depth > 0 && node->kind >= 0) || depth > 8
                        || area.width() * area.height() < 700;
     if (whole) {
         tiles_.push_back({area, node, depth});

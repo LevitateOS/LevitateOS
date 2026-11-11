@@ -4,6 +4,7 @@
 #include <QLocale>
 #include <QObject>
 
+#include "setaside.h"
 #include "words.h"
 
 #include <algorithm>
@@ -11,6 +12,8 @@
 namespace {
 
 enum Kind { Cache, Build, Recipe, Trash, OldDownload, Untouched, Picked };
+
+static_assert(Picked == kindPicked, "mess.h names the picked kind");
 
 const qint64 worthNaming = 20ll << 20; // smaller finds are not worth a line
 const qint64 large = 256ll << 20;
@@ -20,11 +23,20 @@ struct Search {
     QString home;
     qint64 now;
     QList<Finding> found;
+    QStringList never;
+
+    bool isNever(const QString &path) const
+    {
+        for (const QString &place : never)
+            if (path == place || path.startsWith(place + QLatin1Char('/')))
+                return true;
+        return false;
+    }
 
     void add(int kind, Node *node, const QString &path, const QString &what, const QString &why,
              const QString &how = QString(), bool sure = true)
     {
-        if (node->bytes < worthNaming)
+        if (node->bytes < worthNaming || isNever(path))
             return;
         node->kind = kind;
         found << Finding{kind, node, path, node->bytes, what, why, how, sure};
@@ -63,8 +75,13 @@ void look(Node *node, const QString &path, Search &s)
     const QString name = node->name;
     Node *parent = node->parent;
 
+    // What the agent set aside is held for the person to bring back or let go;
+    // it is not found as mess again.
+    if (path == holdingRoot(s.home))
+        return;
+
     if (!node->dir) {
-        if (node->files != 1)
+        if (node->aggregate || node->files != 1)
             return; // the small files of a folder, taken together
         const bool inDownloads = path.startsWith(s.home + QStringLiteral("/Downloads/"));
         if (inDownloads && looksLikeDownload(name) && s.now - node->lastUsed > 90 * day)
@@ -81,12 +98,6 @@ void look(Node *node, const QString &path, Search &s)
         s.add(Recipe, node, path, QObject::tr("Recipe's saved build steps"),
               QObject::tr("Kept so an interrupted or repeated build can continue. Recipe builds again what it needs."),
               QObject::tr("Clear it through Recipe, which knows what a running build still needs."));
-        return;
-    }
-    if (name == QLatin1String("package-generations") && parent && parent->name.endsWith(QLatin1String("recipe"))) {
-        s.add(Recipe, node, path, QObject::tr("Versions of installed software that Recipe keeps"),
-              QObject::tr("Every version Recipe installed, the one in use among them."),
-              QObject::tr("Ask Recipe which one is in use and clear only the others, through Recipe."), false);
         return;
     }
     if (path == s.home + QStringLiteral("/.cache/recipe")) {
@@ -108,8 +119,7 @@ void look(Node *node, const QString &path, Search &s)
         return;
     }
     if (path == s.home + QStringLiteral("/.local/share/Trash")) {
-        s.add(Trash, node, path, QObject::tr("The trash"), QObject::tr("Things you already threw away."),
-              QObject::tr("Empty the trash."));
+        s.add(Trash, node, path, QObject::tr("The trash"), QObject::tr("Things you already threw away."));
         return;
     }
     // What a program keeps for itself is not a leftover, even when it looks
@@ -168,9 +178,9 @@ const QList<MessKind> &messKinds()
     return kinds;
 }
 
-QList<Finding> findMess(Node *tree, const QString &home, qint64 now)
+QList<Finding> findMess(Node *tree, const QString &home, qint64 now, const QStringList &never)
 {
-    Search search{home, now, {}};
+    Search search{home, now, {}, never};
     for (auto &root : tree->children)
         look(root.get(), root->name, search);
     std::sort(search.found.begin(), search.found.end(),
@@ -209,4 +219,54 @@ Finding pickedByHand(Node *node, const QString &home, QList<Finding> &found)
     return Finding{Picked, node, path, node->bytes, shortPath(path, home), why,
                    QObject::tr("Find out what it is and what takes the room in it, and tell me before removing anything."),
                    false};
+}
+
+QString kindWords(int kind)
+{
+    switch (kind) {
+    case Cache:
+        return QObject::tr("kept by a program to be faster; it makes them again");
+    case Build:
+        return QObject::tr("made again by the next build");
+    case Recipe:
+        return QObject::tr("Recipe makes it again; it is cleared through Recipe");
+    case Trash:
+        return QObject::tr("things you already threw away");
+    case OldDownload:
+        return QObject::tr("not opened for 90 days");
+    case Untouched:
+        return QObject::tr("not opened or changed for a year");
+    case Picked:
+        return QObject::tr("you picked it; it is not known what it is");
+    }
+    return {};
+}
+
+QString lastUsedText(qint64 when, qint64 now)
+{
+    if (when <= 0)
+        return QObject::tr("not recorded");
+    const qint64 days = (now - when) / day;
+    if (days < 1)
+        return QObject::tr("today");
+    if (days < 2)
+        return QObject::tr("yesterday");
+    if (days < 14)
+        return QObject::tr("%1 days ago").arg(days);
+    if (days < 60)
+        return QObject::tr("%1 weeks ago").arg(days / 7);
+    if (days < 365)
+        return QObject::tr("%1 months ago").arg(days / 30);
+    const qint64 years = days / 365;
+    return years == 1 ? QObject::tr("a year ago") : QObject::tr("%1 years ago").arg(years);
+}
+
+const Finding *findingAround(const QList<Finding> &found, Node *node)
+{
+    for (Node *up = node; up; up = up->parent)
+        if (up->kind >= 0)
+            for (const Finding &finding : found)
+                if (finding.node == up)
+                    return &finding;
+    return nullptr;
 }

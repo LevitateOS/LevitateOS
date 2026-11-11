@@ -20,12 +20,17 @@ struct Node {
     qint64 files = 0;    // how many files this stands for
     qint64 lastUsed = 0; // a file: the later of last read and last change, in seconds
     bool dir = false;
+    // The small files of one folder taken together, not a file of its own.
+    bool aggregate = false;
     int markers = 0;
     int kind = -1; // which kind of mess this is, once the rules have looked; -1: none
     Node *parent = nullptr;
     std::vector<std::unique_ptr<Node>> children; // biggest first
 
     QString path() const;
+    // The latest time anything below this was read or changed, in seconds; 0
+    // when the scan recorded nothing with a time.
+    qint64 newest() const;
 };
 
 class Scanner : public QThread {

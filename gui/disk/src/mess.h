@@ -8,6 +8,10 @@
 #include <QColor>
 #include <QList>
 #include <QString>
+#include <QStringList>
+
+// The kind of a place the person picked by hand (the last of messKinds()).
+inline constexpr int kindPicked = 6;
 
 struct MessKind {
     QString title;
@@ -30,7 +34,18 @@ const QList<MessKind> &messKinds();
 // Looks through the tree, marks each found node with its kind, and returns
 // the findings, biggest first. `home` is the person's home folder; `now` is
 // the present time in seconds.
-QList<Finding> findMess(Node *tree, const QString &home, qint64 now);
+// `never` holds the places the person said never to suggest: a finding at or
+// inside one of them is not made.
+QList<Finding> findMess(Node *tree, const QString &home, qint64 now, const QStringList &never = {});
+
+// The finding that is this node or holds it, or null.
+const Finding *findingAround(const QList<Finding> &found, Node *node);
+
+// What a kind of mess is, in a few plain words, for the line over its places.
+QString kindWords(int kind);
+// When something was last used, as a person says it: "today", "3 weeks ago",
+// "a year ago". 0 (not recorded) says so.
+QString lastUsedText(qint64 when, qint64 now);
 
 // Something the person pointed at on the map themselves. The rules do not
 // know what it is, so the agent is told to find out and ask. Findings that

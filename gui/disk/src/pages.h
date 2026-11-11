@@ -1,6 +1,7 @@
-// The two pages: where the mess is, and what the agent is given about it.
+// The mess list, and what the agent is given about it.
 #pragma once
 
+#include "disk.h"
 #include "mess.h"
 #include "page.h"
 #include "scan.h"
@@ -9,51 +10,60 @@
 
 #include <memory>
 
-class DiskMap;
 class PromptPanel;
 class QLabel;
 class QPushButton;
 class QTreeWidget;
-class QTreeWidgetItem;
+class QVBoxLayout;
 
-// The scanned disk as a map and a list of what looks like mess.
+// What looks like mess, as a list to tick, and what is known about the place
+// chosen. The map is on the Browse page; this page is the list.
 class MessPage : public Page {
     Q_OBJECT
 public:
     using Page::Page;
     void showScanning(const QStringList &roots);
     void showCount(qint64 files, qint64 bytes);
-    // `freed` is what the last hand-over to the agent gave back, if any.
-    void show(std::shared_ptr<Node> tree, const QList<Finding> &found, const QStringList &roots, qint64 freeBytes,
-              qint64 freed, const QString &home);
+    // `space` is the room on the disk the home folder is on, measured.
+    void show(std::shared_ptr<Node> tree, const QList<Finding> &found, const QStringList &roots, const Space &space,
+              const QString &home, const QStringList &never, qint64 now);
+    // The list changed (a place was added, taken off or never suggested again).
+    void setFound(const QList<Finding> &found, const QStringList &never);
     // The findings that are ticked.
     QList<Finding> chosen() const;
-    // Points at a file or folder: on the map, in the line under it, in the list.
+    // Chooses a place of the list, if it is on it.
     void pick(Node *node);
-    // Puts what is pointed at on the list, as something the agent looks into.
-    void addPicked();
-    // The biggest folder the rules say nothing about, or null.
-    Node *biggestUnnamed() const;
+    // Unticks what the agent asks about first.
+    void tickOnlySure();
+    Node *pointed() const { return picked_; }
 
 signals:
     void rescan();
     void handOver();
-    // Show this folder (or the folder this file is in) in the file manager.
     void openFolder(const QString &path);
+    void showInBrowse(Node *node);
+    void takeOffRequested(Node *node);
+    void neverRequested(Node *node);
+    void suggestAgain(const QString &path);
 
 private:
     void fillList();
     void updateFoot();
-    const Finding *findingAround(Node *node) const;
+    void updatePanel();
+    void updateTold();
 
     std::shared_ptr<Node> tree_;
     QList<Finding> found_;
+    QStringList roots_, never_;
     QString home_;
+    qint64 now_ = 0;
+    Space space_;
     Node *picked_ = nullptr;
-    QLabel *progress_ = nullptr, *head_ = nullptr, *foot_ = nullptr, *where_ = nullptr;
-    QPushButton *add_ = nullptr, *hand_ = nullptr, *open_ = nullptr;
+    QLabel *progress_ = nullptr, *head_ = nullptr, *foot_ = nullptr, *what_ = nullptr, *why_ = nullptr;
+    QPushButton *show_ = nullptr, *open_ = nullptr, *takeOff_ = nullptr, *never_button_ = nullptr, *hand_ = nullptr;
+    QWidget *panel_ = nullptr;
+    QVBoxLayout *told_ = nullptr;
     QTreeWidget *list_ = nullptr;
-    DiskMap *map_ = nullptr;
 };
 
 // What the agent is given: the issue, the facts (the list), the expected result.
@@ -61,7 +71,8 @@ class HandPage : public Page {
     Q_OBJECT
 public:
     using Page::Page;
-    void show(const QList<Finding> &chosen, qint64 scannedBytes, const QStringList &roots);
+    // `holding` is the folder the agent sets what it clears aside in.
+    void show(const QList<Finding> &chosen, qint64 scannedBytes, const QStringList &roots, const QString &holding);
     // Any other hand-over: a title, a line under it, and the three parts.
     void show(const QString &title, const QString &subtitle, const QString &issue, const QStringList &facts,
               const QString &expected);

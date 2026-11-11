@@ -1,0 +1,23 @@
+#!/usr/bin/env python3
+"""A stand-in for `recipe storage --json`, for running disk-gui from a
+checkout: it answers in the shape the real one does and nothing else.
+DISK_STANDIN_EARLIER is the bytes of earlier versions it reports (default
+6 GiB); DISK_STANDIN_EARLIER=0 reports none.
+"""
+import json
+import os
+import sys
+
+GIB = 1 << 30
+
+
+def main():
+    if sys.argv[1:] != ["storage", "--json"]:
+        sys.exit("the stand-in recipe only knows `storage --json`")
+    earlier = int(os.environ.get("DISK_STANDIN_EARLIER", 6 * GIB))
+    print(json.dumps({"schema_version": 1, "active_bytes": 2 * GIB, "earlier_generations": 3 if earlier else 0,
+                      "earlier_bytes": earlier, "profile": "/var/lib/recipe/profile"}))
+
+
+if __name__ == "__main__":
+    main()

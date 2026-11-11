@@ -2,10 +2,17 @@
 """A stand-in for the agent, for running disk-gui from a checkout.
 
 It reads the prompt on its input, goes through the listed places and reports
-as an agent would. It removes a place only when that place is inside
-DISK_STANDIN_ROOT (the sample tree); anywhere else it says what it would have
-done and touches nothing. For a place marked "Ask me first" it asks, and
-removes it only on a yes. Places that belong to Recipe are left.
+as an agent would. What the request tells it, it does: it does not delete, it
+MOVES each cleared place into the holding folder the request names, keeping
+the place's full path beneath it, and writes the manifest there. It moves a
+place only when that place is inside DISK_STANDIN_ROOT (the sample tree);
+anywhere else it says what it would have done and touches nothing. For a place
+marked "Ask me first" it asks, and moves it only on a yes. Places that belong
+to Recipe are left. DISK_STANDIN_COULD_NOT=TEXT makes it fail, as a program
+holding files open would, on every place whose path contains TEXT.
+
+It says what it did with each place as {"event": "place", "path", "result",
+"reason"}, result being set-aside, kept, left or could-not.
 """
 import json
 import os
@@ -13,6 +20,7 @@ import re
 import shutil
 import sys
 import time
+import stat
 
 ROOT = os.environ.get("DISK_STANDIN_ROOT", "")
 SPEED = float(os.environ.get("DISK_STANDIN_SPEED", "1"))
@@ -61,49 +69,110 @@ def ask(number, text, choices):
         return choices[-1]
 
 
+def tree_bytes(path):
+    """The length of everything under `path`, links not followed."""
+    st = os.lstat(path)
+    if not stat.S_ISDIR(st.st_mode):
+        return st.st_size
+    total = 0
+    for base, folders, files in os.walk(path):
+        for name in files + [n for n in folders if os.path.islink(os.path.join(base, n))]:
+            try:
+                total += os.lstat(os.path.join(base, name)).st_size
+            except OSError:
+                pass
+    return total
+
+
+def write_manifest(holding, entries):
+    """Written after every move, so a run that stops still leaves a true record."""
+    temporary = os.path.join(holding, "manifest.json.part")
+    with open(temporary, "w") as out:
+        json.dump({"version": 1, "entries": entries}, out)
+    os.replace(temporary, os.path.join(holding, "manifest.json"))
+
+
+def set_aside(path, holding):
+    """Moves `path` under the holding folder. Returns (entry, None) or (None, why)."""
+    destination = os.path.join(holding, path.lstrip("/"))
+    if os.stat(os.path.dirname(path)).st_dev != os.stat(holding).st_dev:
+        return None, "it is on another disk than the holding folder, so it cannot be set aside by moving"
+    size = tree_bytes(path)
+    try:
+        os.makedirs(os.path.dirname(destination), exist_ok=True)
+        os.rename(path, destination)
+    except OSError as error:
+        return None, error.strerror or "it could not be moved"
+    return {"from": path, "held": path.lstrip("/"), "bytes": size}, None
+
+
 def main():
     # The prompt arrives as one JSON line; the input stays open for answers.
     prompt = json.loads(sys.stdin.readline())["prompt"]
     if "the other system" in prompt.split("The facts:", 1)[0]:
         explain(prompt)
         return
+    named = re.search(r'The holding folder is "(.+?)"', prompt)
+    if not named:
+        emit(event="failed", reason="The request names no holding folder, and this agent does not delete.")
+        sys.exit(1)
+    holding = named.group(1)
     facts = prompt.split("The facts:", 1)[-1].split("The expected result:", 1)[0]
     places = []
     for line in facts.splitlines():
-        found = re.match(r"^- (/.+?) \([\d.,]+ (?:MiB|GiB)\): (.*)$", line.strip())
+        found = re.match(r"^- (/.+?) \([\d.,]+ (?:KiB|MiB|GiB)\): (.*)$", line.strip())
         if found:
             places.append((found.group(1), found.group(2)))
 
-    emit(event="plan", steps=[["read", "Read the list"], ["clear", "Clear what is sure"], ["check", "Check the result"]])
+    emit(event="plan", steps=[["read", "Read the list"], ["clear", "Set aside what is sure"], ["check", "Check the result"]])
     emit(event="step", step="read", status="running")
     time.sleep(0.4 * SPEED)
     emit(event="step", step="read", status="done")
     emit(event="step", step="clear", status="running")
-    cleared = left = 0
+    entries = []
+    moved = left = 0
+    refuse = os.environ.get("DISK_STANDIN_COULD_NOT", "")
     for number, (path, why) in enumerate(places, 1):
         emit(event="progress", step="clear", done=number, total=len(places))
-        if "Ask me first" in why and ask(str(number), "Remove %s? %s" % (path, why.replace(" Ask me first.", "")),
-                                         ["Remove it", "Keep it"]) != "Remove it":
+        asked, answer = False, ""
+        if "Ask me first" in why:
+            asked = True
+            answer = ask(str(number), "Set %s aside? %s" % (path, why.replace(" Ask me first.", "")), ["Remove it", "Keep it"])
+        placed = {"event": "place", "path": path, "asked": asked, "answer": answer}
+        if asked and answer != "Remove it":
             emit(event="output", line="kept, as you said: %s" % path)
+            emit(**placed, result="kept", reason="you said to keep it")
             left += 1
         elif "Recipe" in why:
             emit(event="output", line="left for Recipe to clear: %s" % path)
+            emit(**placed, result="left", reason="it belongs to Recipe, which clears it")
             left += 1
+        elif refuse and refuse in path:
+            emit(event="output", line="could not: %s" % path)
+            emit(**placed, result="could-not", reason="a program had files open in it")
+        elif inside_sample(path) and os.path.lexists(path):
+            os.makedirs(holding, exist_ok=True)
+            entry, problem = set_aside(path, holding)
+            if entry:
+                entries.append(entry)
+                write_manifest(holding, entries)
+                emit(event="output", line="set aside: %s" % path)
+                emit(**placed, result="set-aside", reason="")
+                moved += 1
+            else:
+                emit(event="output", line="could not set aside %s: %s" % (path, problem))
+                emit(**placed, result="could-not", reason=problem)
         elif inside_sample(path):
-            if os.path.isdir(path) and not os.path.islink(path):
-                shutil.rmtree(path)
-            elif os.path.lexists(path):
-                os.remove(path)
-            emit(event="output", line="cleared: %s" % path)
-            cleared += 1
+            emit(**placed, result="could-not", reason="it is not there any more")
         else:
-            emit(event="output", line="would clear (the stand-in removes nothing outside its sample): %s" % path)
+            emit(event="output", line="would set aside (the stand-in moves nothing outside its sample): %s" % path)
+            emit(**placed, result="could-not", reason="this stand-in touches nothing outside its sample")
         time.sleep(0.15 * SPEED)
     emit(event="step", step="clear", status="done")
     emit(event="step", step="check", status="running")
     time.sleep(0.3 * SPEED)
     emit(event="step", step="check", status="done")
-    emit(event="agent", summary="it cleared %d places and left %d that you kept or that belong to Recipe" % (cleared, left))
+    emit(event="agent", summary="it set %d places aside and left %d that you kept or that belong to Recipe" % (moved, left))
     emit(event="done")
 
 

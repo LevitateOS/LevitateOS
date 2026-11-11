@@ -106,6 +106,7 @@ void walk(int fd, Node *node, const QString &path, Walk &w)
     if (smallFiles) {
         auto small = std::make_unique<Node>();
         small->name = QStringLiteral("(%1 small files)").arg(smallFiles);
+        small->aggregate = true;
         small->bytes = smallBytes;
         small->files = smallFiles;
         small->lastUsed = smallUsed;
@@ -123,6 +124,14 @@ QString Node::path() const
         return name;
     const QString above = parent->path();
     return above.isEmpty() ? name : above + QLatin1Char('/') + name;
+}
+
+qint64 Node::newest() const
+{
+    qint64 latest = lastUsed;
+    for (const auto &child : children)
+        latest = std::max(latest, child->newest());
+    return latest;
 }
 
 Scanner::Scanner(const QStringList &roots, bool apparent, QObject *parent)

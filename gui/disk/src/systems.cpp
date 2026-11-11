@@ -491,6 +491,8 @@ SystemsState SystemsState::fromJson(const QJsonObject &object, const QString &os
         s.runningRelease = object["running"].toObject()["release"].toString();
         s.otherRelease = object["other"].toObject()["release"].toString();
         s.otherRole = object["other"].toObject()["role"].toString();
+        s.runningDevice = object["running"].toObject()["device"].toString();
+        s.otherDevice = object["other"].toObject()["device"].toString();
         return s;
     }
     if (schema != 7 && schema != 8 && schema != 9 && schema != 10) {
@@ -508,8 +510,9 @@ SystemsState SystemsState::fromJson(const QJsonObject &object, const QString &os
     QString runningGeneration, otherGeneration;
     for (const QJsonValue &value : object["slots"].toArray()) {
         const QJsonObject slot = value.toObject();
-        (slot["slot"].toString() == running ? runningGeneration : otherGeneration) =
-            slot["generation"].toObject()["id"].toString();
+        const bool isRunning = slot["slot"].toString() == running;
+        (isRunning ? runningGeneration : otherGeneration) = slot["generation"].toObject()["id"].toString();
+        (isRunning ? s.runningDevice : s.otherDevice) = slot["device"].toString();
     }
     const QJsonObject preparation = object["preparation"].toObject();
     const QString role = object["lifecycle"].toObject()["other"].toString();

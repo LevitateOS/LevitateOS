@@ -13,6 +13,11 @@ qt_add_executable(disk-gui
     src/mess.cpp
     src/map.cpp
     src/pages.cpp
+    src/disk.cpp
+    src/browse.cpp
+    src/after.cpp
+    src/setaside.cpp
+    src/rules.cpp
     src/systems.cpp
     src/window.cpp
     src/shots.cpp

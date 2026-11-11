@@ -127,8 +127,9 @@ def status():
     print(json.dumps({
         "schema_version": 3, "distro": os.environ.get("DISK_STANDIN_DISTRO", "LevitateOS"), "state": "stable",
         "revision": int(os.environ.get("DISK_STANDIN_REVISION", "7")),
-        "running": {"release": "2026.10" if role == "next" else "2026.11"},
-        "other": {"role": role, "release": {"previous": "2026.10", "next": "2026.11"}.get(role, "2026.11")},
+        "running": {"release": "2026.10" if role == "next" else "2026.11", "device": "/dev/vda2"},
+        "other": {"role": role, "release": {"previous": "2026.10", "next": "2026.11"}.get(role, "2026.11"),
+                  "device": "/dev/vda3"},
     }))
 
 
@@ -141,8 +142,8 @@ def main():
         emit(event="failed", reason="This computer has one system only: recab was set up without a second one.")
         sys.exit(1)
 
-    running = {"slot": "A", "device": "/dev/nvme0n1p2", "files": 61204, "bytes": int(8.14 * GIB)}
-    other = {"slot": "B", "device": "/dev/nvme0n1p3", "files": 61204, "bytes": int(8.14 * GIB)}
+    running = {"slot": "A", "device": "/dev/vda2", "files": 61204, "bytes": int(8.14 * GIB)}
+    other = {"slot": "B", "device": "/dev/vda3", "files": 61204, "bytes": int(8.14 * GIB)}
     emit(event="plan", steps=[["running", "Read the running system"], ["other", "Read the other system"],
                                ["compare", "Compare them"]])
     read("running", running["bytes"])
