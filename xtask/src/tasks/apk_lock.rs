@@ -113,29 +113,51 @@ impl Index {
                     .values()
                     .any(|&i| self.pkgs[i].provides.iter().any(|p| name_of(p) == n))
         };
-        let add = |chosen: &mut BTreeMap<String, usize>, start: &str| -> Result<()> {
-            let mut stack = vec![start.to_string()];
-            while let Some(n) = stack.pop() {
+        // Plain package names first, so a name a later wanted package depends
+        // on directly (polkit-elogind-libs) is chosen before a virtual name
+        // (so:libpolkit-gobject-1.so.0) gets a provider picked for it. Virtual
+        // names wait until the by-name closure so far is complete.
+        let add = |chosen: &mut BTreeMap<String, usize>, starts: &[String]| -> Result<()> {
+            let mut stack: Vec<String> = Vec::new();
+            let mut deferred: std::collections::VecDeque<String> = Default::default();
+            let queue = |n: String, stack: &mut Vec<String>, deferred: &mut std::collections::VecDeque<String>| {
+                if self.by_name.contains_key(&n) {
+                    stack.push(n);
+                } else {
+                    deferred.push_back(n);
+                }
+            };
+            for s in starts.iter().rev() {
+                queue(s.clone(), &mut stack, &mut deferred);
+            }
+            loop {
+                while let Some(n) = stack.pop() {
+                    if n.starts_with('!') || satisfied(chosen, &n) {
+                        continue;
+                    }
+                    let pick = self.latest(&self.by_name[&n]);
+                    let p = &self.pkgs[pick];
+                    if chosen.insert(p.name.clone(), pick).is_none() {
+                        for d in p.depends.iter().filter(|d| !d.starts_with('!')) {
+                            queue(name_of(d).to_string(), &mut stack, &mut deferred);
+                        }
+                    }
+                }
+                let Some(n) = deferred.pop_front() else { return Ok(()) };
                 if n.starts_with('!') || satisfied(chosen, &n) {
                     continue;
                 }
-                let pick = match self.by_name.get(&n) {
-                    Some(c) => self.latest(c),
-                    None => {
-                        let c = self.provided.get(&n).with_context(|| format!("nothing provides {n}"))?;
-                        c.iter().copied().find(|&i| chosen.contains_key(&self.pkgs[i].name)).unwrap_or_else(|| self.latest(c))
-                    }
-                };
+                let c = self.provided.get(&n).with_context(|| format!("nothing provides {n}"))?;
+                let pick = c.iter().copied().find(|&i| chosen.contains_key(&self.pkgs[i].name)).unwrap_or_else(|| self.latest(c));
                 let p = &self.pkgs[pick];
                 if chosen.insert(p.name.clone(), pick).is_none() {
-                    stack.extend(p.depends.iter().filter(|d| !d.starts_with('!')).map(|d| name_of(d).to_string()));
+                    for d in p.depends.iter().filter(|d| !d.starts_with('!')) {
+                        queue(name_of(d).to_string(), &mut stack, &mut deferred);
+                    }
                 }
             }
-            Ok(())
         };
-        for w in wanted {
-            add(&mut chosen, w)?;
-        }
+        add(&mut chosen, wanted)?;
         // install_if packages join once all their conditions are installed.
         // Growth is counted by the chosen set, not by attempts: a package whose
         // name another chosen package already provides adds nothing, and
@@ -149,7 +171,7 @@ impl Index {
                     && self.latest(&self.by_name[&p.name]) == i
                 {
                     let before = chosen.len();
-                    add(&mut chosen, &p.name)?;
+                    add(&mut chosen, std::slice::from_ref(&p.name))?;
                     grew |= chosen.len() > before;
                 }
             }
@@ -157,6 +179,31 @@ impl Index {
                 return Ok(chosen);
             }
         }
+    }
+}
+
+impl Index {
+    /// apk refuses two different packages providing the same versioned name
+    /// (`so:libfoo.so.1=1.0`); unversioned provides may coexist.
+    fn check_conflicts(&self, what: &str, set: &BTreeMap<String, usize>) -> Result<()> {
+        let mut seen: HashMap<&str, usize> = HashMap::new();
+        for &i in set.values() {
+            for prov in self.pkgs[i].provides.iter().filter(|p| p.contains('=')) {
+                let n = name_of(prov);
+                if let Some(&j) = seen.get(n) {
+                    if j != i && self.pkgs[j].name != self.pkgs[i].name {
+                        bail!(
+                            "{what}: {} and {} both provide {prov}; apk would refuse to install them together",
+                            self.pkgs[j].name,
+                            self.pkgs[i].name
+                        );
+                    }
+                } else {
+                    seen.insert(n, i);
+                }
+            }
+        }
+        Ok(())
     }
 }
 
@@ -184,10 +231,13 @@ pub fn lock(root: &Path, distro: &Distro, bundle: &distro_contract::Variant, che
     let index = fetch_index(tmp.path(), &mirror)?;
     let base_set = index.resolve(&base.packages, BTreeMap::new())?;
     let mut desktop_set = index.resolve(&bundle.contract.desktop.packages, base_set.clone())?;
+    index.check_conflicts("base", &base_set)?;
+    index.check_conflicts("base + desktop", &desktop_set)?;
     desktop_set.retain(|n, _| !base_set.contains_key(n));
     // Resolved over the base alone, from the same index as the desktop: a
     // package both need (Qt) is the same build in both locks.
     let mut apps_build_set = index.resolve(&bundle.contract.desktop.apps_build_packages, base_set.clone())?;
+    index.check_conflicts("base + apps-build", &apps_build_set)?;
     apps_build_set.retain(|n, _| !base_set.contains_key(n));
     let apk_tools = index
         .by_name
