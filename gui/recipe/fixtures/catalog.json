@@ -170,6 +170,7 @@
     "license": "GPL-3.0-or-later",
     "adds": {
      "programs": [
+      "kritarunner",
       "krita"
      ],
      "menu": [
@@ -678,6 +679,27 @@
     "share/applications/element-desktop.desktop",
     "share/icons/hicolor/scalable/apps/element.svg"
    ]
+  },
+  {
+   "name": "fd",
+   "version": "10.2.0",
+   "installed_on": 1792152000,
+   "size_bytes": 6291456,
+   "kept": [
+    {
+     "version": "10.1.0",
+     "generation": "g-fd-1010",
+     "installed_on": 1790000000,
+     "size_bytes": 5242880
+    }
+   ],
+   "recipe": "/usr/share/recipe/recipes/fd.rhai",
+   "files": [
+    "bin/fd",
+    "share/man/man1/fd.1"
+   ],
+   "source": "oldmirror",
+   "commit": "e41c7a0"
   },
   {
    "name": "gimp",

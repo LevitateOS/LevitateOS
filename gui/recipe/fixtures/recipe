@@ -29,6 +29,17 @@ Environment:
   RECIPE_STANDIN_REFUSE_NEW  a recipe whose install (not yet installed) the sandbox refuses,
                           as it refuses Element's update; with --autofix the agent repairs it
   RECIPE_STANDIN_FIXED    "element": Element's update is no longer refused (its source fixed it)
+  RECIPE_STANDIN_STOP_AT  also "name:remove", "name:go-back", "name:hold" and "name:unhold": stay in the middle of
+                          that short change forever; so do "storage:clear", "refresh:refresh", "source:add"
+                          and "source:remove"
+  RECIPE_STANDIN_FAIL     "KIND:NAME" or "KIND": that short change (remove, go-back, hold, unhold, clear, refresh,
+                          source-add, source-remove) fails with plain output lines and recipe's own message, as
+                          a store that cannot be written to does
+
+It keeps a profile for each store (`profile` in its answers, `<store>/profile`; for the person's own store
+`<state>/me/profile`): `bin/NAME` for every program an installed package lists, and `share/applications/NAME.desktop`
+for every menu entry, each program a small script that notes "NAME started from PATH" in `started.log` in the
+state folder, so that a check can see what "Open" started and from where.
 
 It also keeps what the real `recipe` keeps beside a store (tools/recipe, packages.rs and
 packages/history.rs): the history of what was done to it (`recipe history --json`, one line
@@ -52,6 +63,9 @@ PREPARED_VISIBLE = os.environ.get("RECIPE_STANDIN_PREPARED") == "1" or os.getuid
 STORE_ROOT = "/var/lib/recipe"  # the profile named in answers
 SPEED = float(os.environ.get("RECIPE_STANDIN_SPEED", "1"))
 STOP_AT = os.environ.get("RECIPE_STANDIN_STOP_AT", "")
+FAIL = os.environ.get("RECIPE_STANDIN_FAIL", "")
+PROFILE = STORE_ROOT + "/profile"  # main() sets the profile of the store the arguments name
+MACHINE_EVENTS = False
 
 
 def installed():
@@ -60,7 +74,49 @@ def installed():
         # The person's own store starts with one program an agent wrote for them,
         # an older version of it; the others' store is the catalog's.
         save(ME_START if STATE == ME else CATALOG["installed"])
-    return json.load(open(STATE))
+    items = json.load(open(STATE))
+    sync_profile(items)
+    return items
+
+
+def main_program(item):
+    """The program a menu entry of the package starts: the one named like the entry, else like the package."""
+    programs = [path[4:] for path in item.get("files", []) if path.startswith("bin/")]
+    for path in item.get("files", []):
+        if path.startswith("share/applications/") and path.endswith(".desktop"):
+            wanted = os.path.basename(path)[:-8]
+            if wanted in programs:
+                return wanted
+    return item["name"] if item["name"] in programs else (programs[0] if programs else item["name"])
+
+
+def sync_profile(items):
+    """Makes the files the receipts list: a program is a script that notes it was started, from where."""
+    started = os.path.join(STATE_DIR, "started.log")
+    for item in items:
+        for path in item.get("files", []):
+            target = os.path.join(PROFILE, path)
+            if os.path.exists(target):
+                continue
+            if path.startswith("bin/"):
+                os.makedirs(os.path.dirname(target), exist_ok=True)
+                with open(target, "w") as out:
+                    out.write('#!/bin/sh\necho "$(basename "$0") started from $0, PATH begins with ${PATH%%%%:*}" >> "%s"\n' % started)
+                os.chmod(target, 0o755)
+            elif path.startswith("share/applications/") and path.endswith(".desktop"):
+                os.makedirs(os.path.dirname(target), exist_ok=True)
+                with open(target, "w") as out:
+                    out.write("[Desktop Entry]\nType=Application\nName=%s\nExec=%s %%U\nIcon=%s\n"
+                              % (item["name"], main_program(item), item["name"]))
+
+
+def unsync_profile(item):
+    for path in item.get("files", []):
+        if path.startswith("bin/") or path.startswith("share/applications/"):
+            try:
+                os.remove(os.path.join(PROFILE, path))
+            except OSError:
+                pass
 
 
 ME_START = [{
@@ -185,6 +241,8 @@ def source_add(args, words):
                 "branch": "main", "commit": "9a02b7f1", "checked": int(time.time()), "problem": None}
     if name in ("local", "image") or any(each["name"] == name for each in known):
         fail("a source named %s exists already" % name)
+    stop_here("source", "add")
+    breaks("source-add")
     pause(0.6)
     write(SOURCES, known + [made])
 
@@ -193,6 +251,8 @@ def source_remove(name):
     known = sources()
     if not any(each["name"] == name for each in known):
         fail("no source named %s" % name)
+    stop_here("source", "remove")
+    breaks("source-remove")
     write(SOURCES, [each for each in known if each["name"] != name])
 
 
@@ -200,6 +260,8 @@ def refresh(name):
     known = sources()
     if name and not any(each["name"] == name for each in known):
         fail("no source named %s" % name)
+    stop_here("refresh", "refresh")
+    breaks("refresh")
     pause(0.8)
     for each in known:
         if each["kind"] == "remote" and name in ("", each["name"]):
@@ -221,6 +283,21 @@ def recipe(name):
 
 def fail(text):
     sys.stderr.write(json.dumps({"event": "failed", "reason": text}) + "\n")
+    sys.exit(1)
+
+
+def breaks(kind, name=None):
+    """A short change that fails when the story asks it to: plain lines, then recipe's own message."""
+    if FAIL not in (kind, "%s:%s" % (kind, name)):
+        return
+    sys.stderr.write("recipe: %s%s\n" % (kind.replace("-", " "), " " + name if name else ""))
+    reason = ("cannot switch the active profile of %s: Permission denied (os error 13)" % os.path.dirname(PROFILE)
+              if name else "cannot delete the earlier generations of %s: Permission denied (os error 13)" % os.path.dirname(PROFILE)
+              if kind == "clear" else "could not fetch the list of levitate: connection timed out")
+    if MACHINE_EVENTS and name:
+        emit(event="failed", recipe=name, hook=None, reason=reason)
+    else:
+        sys.stderr.write("Error: %s\n" % reason)
     sys.exit(1)
 
 
@@ -258,6 +335,7 @@ def play(item, refuse=None, agent=False):
     for hook in steps_of(item):
         hook_event(name, hook, "running", "executing recipe hook")
         if hook == "acquire":
+            sys.stderr.write("recipe: fetching %s %s from %s\n" % (name, item["version"], next(iter(item["sources"]))))
             total = max(item["needs"]["network_max_bytes"] // 4, 1 << 20)
             for part in range(1, 9):
                 if refuse and part == 3 and agent:
@@ -303,6 +381,11 @@ def install(name, agent=False, update_only=False):
              reason="%s is held, so it is not updated. Release it with: recipe unhold %s" % (name, name))
         sys.exit(1)
     order = [recipe(dep) for dep in item["build_deps"]] + [item]
+    # The real recipe says where it keeps the run's log, in a plain line, as the run begins.
+    logs = os.path.join(STATE_DIR, "logs", "%s-%d" % (name, int(time.time() * 1000)))
+    os.makedirs(logs, exist_ok=True)
+    open(os.path.join(logs, "worker.log"), "w").write("the stand-in's worker log\n")
+    sys.stderr.write("recipe: diagnostics: %s\n" % logs)
     emit(event="plan", recipes=[{"name": each["name"], "steps": steps_of(each)} for each in order])
     # The sample story: the newer Element recipe reaches for a host it has not declared.
     # The real `recipe` reports the numeric address Ginux's audit names, never a host name.
@@ -321,6 +404,9 @@ def install(name, agent=False, update_only=False):
         "installed_on": int(time.time()),
         "size_bytes": 62914560, "kept": [],
     }
+    if remote_source(name):
+        entry["source"] = remote_source(name)
+        entry["commit"] = next(each["commit"] for each in listed_sources() if each["name"] == entry["source"])
     if current and current.get("held"):
         entry["held"] = True  # installing again keeps a package held
     if current:
@@ -329,6 +415,7 @@ def install(name, agent=False, update_only=False):
         entry["size_bytes"] = current["size_bytes"]
         items.remove(current)
     items.append(entry)
+    sync_profile([entry])
     save(sorted(items, key=lambda each: each["name"]))
     record("update" if update_only else "install", name, current["version"] if current else None, item["version"],
            remote_source(name))
@@ -347,8 +434,10 @@ def storage(clear):
     earlier = [kept for each in items for kept in each.get("kept", [])]
     answer = {"schema_version": 1, "active_bytes": sum(each.get("size_bytes") or 0 for each in items),
               "earlier_generations": len(earlier), "earlier_bytes": sum(kept.get("size_bytes") or 0 for kept in earlier),
-              "profile": STORE_ROOT + "/profile"}
+              "profile": PROFILE}
     if clear:
+        stop_here("storage", "clear")
+        breaks("clear")
         answer.update(operation="clear-earlier", cleared_generations=answer["earlier_generations"],
                       cleared_bytes=answer["earlier_bytes"], earlier_generations=0, earlier_bytes=0)
         for each in items:
@@ -363,8 +452,12 @@ def remove(name):
     current = next((each for each in items if each["name"] == name), None)
     if not current:
         fail("%s is not installed" % name)
+    sys.stderr.write("recipe: removing %s %s\n" % (name, current["version"]))
+    stop_here(name, "remove")
+    breaks("remove", name)
     pause(0.4)
     items.remove(current)
+    unsync_profile(current)
     save(items)
     record("remove", name, current["version"], None, remote_source(name))
     emit(event="done", recipe=name)
@@ -375,6 +468,8 @@ def go_back(name):
     current = next((each for each in items if each["name"] == name), None)
     if not current or not current.get("kept"):
         fail("no earlier version of %s is kept" % name)
+    stop_here(name, "go-back")
+    breaks("go-back", name)
     # The newest earlier version comes back; the one left behind stays kept.
     older = current["kept"][0]
     left = current["version"]
@@ -393,18 +488,22 @@ def hold(name, held):
     current = next((each for each in items if each["name"] == name), None)
     if not current:
         fail("package %s is not installed" % name)
+    stop_here(name, "hold" if held else "unhold")
+    breaks("hold" if held else "unhold", name)
     if bool(current.get("held")) != held:
         current["held"] = held
         save(items)
         record("hold" if held else "unhold", name, current["version"], current["version"], remote_source(name))
     print(json.dumps({"name": name, "version": current["version"], "operation": "hold" if held else "unhold",
-                      "held": held, "profile": STORE_ROOT + "/profile"}))
+                      "held": held, "profile": PROFILE}))
     emit(event="done", recipe=name)
 
 
 def updates():
     found = []
     for each in installed():
+        if not any(item["name"] == each["name"] for item in recipes()):
+            continue  # the problems list says so, as the real `recipe updates` does
         newer = recipe(each["name"])["version"]
         if newer != each["version"]:
             # As the real `recipe updates`: only the fields of NEEDS that differ,
@@ -509,12 +608,16 @@ def log(args, route):
 def main(args):
     # The real recipe tells the places apart by `--system`, and by whether a store is
     # named: without one it is the person's own.
-    global STATE
+    global STATE, PROFILE, MACHINE_EVENTS
     system = "--system" in args
     root = args[args.index("--package-root") + 1] if "--package-root" in args else None
+    MACHINE_EVENTS = "--machine-events" in args
     log(args, "system" if system else "me" if root is None else "store")
     if root is None and not system:
         STATE = ME
+        PROFILE = os.path.join(STATE_DIR, "me", "profile")
+    elif root is not None:
+        PROFILE = os.path.join(root, "profile")
     words, skip = [], False
     for arg in args:
         if skip:
@@ -556,9 +659,13 @@ def main(args):
         # The shape `recipe installed` has today, plus the fields the front end asks for.
         # `held` is always there, true or false (commands.rs, Commands::Installed).
         print(json.dumps({"packages": [dict(each, held=bool(each.get("held"))) for each in installed()],
-                          "profile": STORE_ROOT + "/profile"}))
+                          "profile": PROFILE}))
     elif command == "updates":
-        print(json.dumps({"schema_version": 1, "updates": updates(), "problems": []}))
+        print(json.dumps({"schema_version": 1, "updates": updates(),
+                          "problems": [{"name": each["name"],
+                                        "problem": "no recipe for it is in the collection or the sources any more"}
+                                       for each in installed()
+                                       if not any(item["name"] == each["name"] for item in recipes())]}))
     elif command == "storage":
         storage("--clear-earlier" in args)
     elif command == "history":
@@ -566,6 +673,12 @@ def main(args):
     elif command in ("hold", "unhold") and len(words) == 2:
         hold(words[1], command == "hold")
     elif command in ("install", "update") and len(words) == 2:
+        if "--autofix-prompt-file" in args:
+            # What the agent is handed, kept so that a check can read it.
+            os.makedirs(STATE_DIR, exist_ok=True)
+            with open(args[args.index("--autofix-prompt-file") + 1]) as given, \
+                    open(os.path.join(STATE_DIR, "last-autofix-prompt.txt"), "w") as kept:
+                kept.write(given.read())
         install(words[1], "--autofix" in args, command == "update")
     elif command == "remove" and len(words) == 2:
         remove(words[1])

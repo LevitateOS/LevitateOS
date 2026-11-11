@@ -39,6 +39,97 @@ stand-in Codex and a settings folder of its own, and Help and the first page (pi
   error. "Finish and restart…" starts System (`LEVITATE_APP_SYSTEM`, default
   `recab-gui`), as System's button in the rail does.
 
+## What the audit of 2026-11-11 changed
+
+An audit of the window found seven gaps; each is closed against the stand-in and
+none against the real `recipe` (see the end of this section).
+
+- **"Open" starts the program from the profile of the place the software is in.**
+  `installed --json` names the store's `profile`; the person's own store's `bin`
+  is usually not on `PATH`, and this computer's is another store. The window
+  reads the `Exec` line of the package's own menu entry
+  (`PROFILE/share/applications/NAME.desktop`, field codes dropped, a bare program
+  looked up in `PROFILE/bin` and then on `PATH`) and starts that, as the
+  applications menu would; only when no menu entry gives a program it starts the
+  first `bin/` file the receipt lists. The program is started with `PROFILE/bin`
+  first on its `PATH`. A menu entry with `Terminal=true` is not started: the
+  status line says to run it in a terminal. When it cannot be started the status line
+  says what is missing and where ("Krita could not be started: krita, which the
+  menu entry krita starts, in PROFILE/bin is not there."). Software only the next
+  system holds, and the running system of a locked computer (whose list names a
+  version and nothing else), has no "Open"; the program's page, Installed and the
+  status line say why ("It cannot be opened until then." / "This window cannot open
+  it: the running system's list names the software and its version, not its
+  programs.").
+- **Closing the window while something runs asks first.** An install or update
+  (not the agent's run, which the frame already lets go of and Activity follows),
+  or a short change, makes `closeEvent` ask "… is still running", with what stops
+  ("If you close the window now it is stopped"), what is kept (what is already
+  fetched and built), what is true of the software (nothing changed / `X 1.2 stays
+  installed and works as before`), that it can be started again, and, in an Update all,
+  how many updates still waiting are not started. "Stop it and close" asks the run to
+  end (`SIGTERM`, as Stop does) and closes when it has (eight seconds at most, then
+  the window's end ends it); "Keep the window open" is the default and the escape.
+  The question does not block: a check answers it (`Window::closeQuestion`).
+- **Short changes have a page** (`ChangePage` in `pages.*`, in the window's stack): remove, go
+  back, keep at a version and let it update again, add or remove a source, fetch
+  the lists, clear earlier versions. It shows what is being done, a Stop with what
+  stopping means, the command's own output, and the status line says what runs; the
+  window is no longer disabled, and a second change or an install asked meanwhile
+  is told "One thing at a time". When it works the page is left for the one the person
+  was on (drawn from a read made after the change) and the status line says what was
+  done; when it did not finish the page stays with Recipe's own message, what is true
+  (`fd 10.2.0 is still installed.`), the output, and "Try again" (the same command again)
+  and "Back". Recipe's agent repair is an option of `recipe install` only, so these
+  offer no "Let the agent fix it". The remove question is asked without blocking too
+  (`Window::removeQuestion`). A read asked for while another is going is now done as
+  soon as that one ends, so a page that waits for it is not left waiting.
+- **The agent is given the run's last lines, and where the log is.** The facts of a
+  stopped install carry the last 20 lines of the run's output (each cut at 240
+  characters, "N in all") and, when `recipe` printed it, the place of the run's log
+  and retained record: the plain line `recipe: diagnostics: DIRECTORY` it prints at
+  the start (`tools/recipe`, `invocation_log.rs`, one directory per invocation holding
+  `worker.log`, `supervisor-stderr.log`, `authority.json`, `result.json`). The page
+  scrolls the facts and keeps its buttons below them. A stopped update names the log
+  and keeps the output under "Show the output".
+- **The password prompt says what the action covers** (`data/org.levitateos.recipe.policy`):
+  install, update, remove, keeping at a version, going back, adding or removing a source,
+  and clearing earlier versions. Fetching the lists runs as the person and asks for nothing.
+- **A program with no recipe is not a dead end.** Where `recipe list` has no recipe for
+  an installed name, Installed says so and what the receipt lists and where it came from
+  ("It came from the source oldmirror, which is not among the sources any more"), and has
+  "Its receipt", which opens the program's page: name, version, date, size, source and
+  commit when recorded, the recipe file the receipt names and whether it is still there,
+  the files, "Where it is", and what works from a receipt: keep at the version and let it
+  update again, go back (where an earlier version is kept), remove. The Remove question
+  names the menu entry from the receipt too. A name nothing carries gets "No recipe named
+  X" with a sentence and a way back. `recipe updates` already says "no recipe for it is in
+  the collection or the sources any more", which Updates shows under "Not looked up".
+- **The story reaches them**: pictures `17a` (the remove question), `17b`–`17d` (the change
+  running, stopped, not finished), `17e` (fetching that did not finish), `18a`–`18d` (no
+  recipe: Installed, its page, "No recipe named", and going back with no recipe in the
+  open-computer window), `19a`/`19b` (closing during an install and during a remove), `8a`
+  (what the agent is given), `p8`/`p9` ("Open" for krita in the person's own store, and
+  when its program is gone). The stand-in's `krita` has two programs, `kritarunner` first and
+  `krita` in its menu entry, so a story can tell which one Open chose; its `fd` is installed
+  with no recipe, from a source that is gone, with an earlier version kept.
+
+Not verified: none of this ran against the real `recipe` (the changes ran only against the
+stand-in), nor on a real desktop with `pkexec` or a real polkit prompt. Whether the real
+`recipe` leaves a store as it was when it is stopped in the middle of `remove`, `go-back`,
+`hold`, `source add`, `refresh` or `--clear-earlier` is taken from `tools/recipe/README.md`
+("one atomic symlink switch… Failed acquisition or activation preserves the previous
+profile") for the first three and is not claimed for the others (their pages say what to look at
+instead). Whether the real `recipe` prints `recipe: diagnostics: DIR` into a pipe with
+`--machine-events` was read in the source, not run. A `.desktop` file's `DBusActivatable`,
+`TryExec` and `Path` are ignored.
+
+`gui/kit` is untouched. Two things it does that this work had to work around: the
+frame lets go of Activity's attached runs on every `Close` event of the window, even when
+the window then refuses to close (only an agent run or an attached client is let go, so
+a refused close can detach one); and `WorkPage` offers only "Back" on a failure and always
+reports its title as the agent's note, so short changes got a page of Recipe's own.
+
 ## State (2026-11-11)
 
 Since 2026-11-11 the window also has Storage, a program page in the redesign's
@@ -143,8 +234,10 @@ Sources in the frame; `s1`–`s3` the strip and a window with no recab; `a-*`
 Activity; `p1`–`p6` the two places (below); `15a`–`15c` the program page (not
 installed, installed, installed with an update and an earlier version kept),
 `15d`/`15e` Storage before and after clearing, `16a`–`16d` hold (Installed,
-Updates, the program page, the refused update of a held program). The refused
-connection is `4-stopped`.
+Updates, the program page, the refused update of a held program), `17*`–`19*`, `8a`,
+`p8`, `p9` the gaps the audit found (the section above). The refused
+connection is `4-stopped`. The story ends with `all flows ended where they should`; it
+needs `pgrep` (it checks that closing the window ended the stopped install).
 
 The last part of the story opens two more windows of its own, with a scratch
 command line, scratch stand-in state and a scratch system store under
@@ -170,7 +263,19 @@ package's `held`; `history`, `hold` and `unhold` answer in the real shapes, `ins
 and `updates` carry `held`, `update` refuses a held package in the real sentence, and the
 refused connection names `203.0.113.9:443`, a numeric address as the real one does.
 `list --json` reports one unreadable recipe once a second source exists, in the real
-`problems` shape (`path`, `problem`), so Sources has something to show. The stand-in agent writes the app name and title it was given to
+`problems` shape (`path`, `problem`), so Sources has something to show. Each store has a
+profile (`<store>/profile`; the person's own: `<state>/me/profile`), named as `profile` in
+`installed`, `storage` and `hold`, holding `bin/NAME` for every program and
+`share/applications/NAME.desktop` for every menu entry a receipt lists; each program is a
+script that notes `NAME started from PATH` in `started.log` in the state folder, so the story
+sees what "Open" started and from where. `RECIPE_STANDIN_STOP_AT` also takes `NAME:remove`,
+`NAME:go-back`, `NAME:hold`, `NAME:unhold`, `storage:clear`, `refresh:refresh`,
+`source:add` and `source:remove`, and `RECIPE_STANDIN_FAIL` (`remove:NAME`, `go-back:NAME`,
+`hold:NAME`, `unhold:NAME`, `clear`, `refresh`, `source-add`, `source-remove`) makes that
+short change fail with plain lines and recipe's own message. An install prints
+`recipe: diagnostics: DIR` first and hands the prompt file it was given to
+`last-autofix-prompt.txt`. `fd` is installed in every store's start state with no recipe in
+the catalog, from the source `oldmirror`, and `updates` lists it under `problems`. The stand-in agent writes the app name and title it was given to
 `last-prompt.json` there, which the story reads.
 
 Against the real `recipe` from the checkout, into a test store, with the
@@ -215,7 +320,7 @@ Reads, as the desktop user, JSON on stdout with `"schema_version": 1` (the same 
 | Command | Answer | In `recipe` today |
 |---|---|---|
 | `recipe list --json` | every recipe: `name`, `version`, `description`, `about`, `sources`, `needs`, `deps`, `build_deps`, `hooks`; and the source's name | exists, without `sources` and the source's name. `ABOUT` is passed through unchecked; `SOURCES` is still only the design in `docs/recipe-front-end-format.md` |
-| `recipe installed --json` | `packages`: each one's `name`, `version`, `recipe`, `files`, `installed_on` (seconds), `size_bytes` and `kept`: the earlier versions still held, newest first, each with `version`, `generation`, `installed_on`, `size_bytes` | exists. A receipt written before 2026-11-10 has no `installed_on` or `size_bytes`; the front end then measures the files. It takes programs from the `bin/` files and menu entries from `share/applications/` |
+| `recipe installed --json` | `packages`: each one's `name`, `version`, `recipe`, `files`, `installed_on` (seconds), `size_bytes` and `kept`: the earlier versions still held, newest first, each with `version`, `generation`, `installed_on`, `size_bytes`; and `profile`, the store's active profile, whose `bin` and `share/applications` "Open" starts programs from; `source` and `commit` where the receipt records them | exists. A receipt written before 2026-11-10 has no `installed_on` or `size_bytes`; the front end then measures the files. It takes programs from the `bin/` files and menu entries from `share/applications/` |
 | `recipe updates --json` | `updates`: for each installed recipe that `recipe update` would change: `name`, `source`, `from`, `to`, `reason` (`version`, or `recipe` when the source publishes another recipe file for the same version) and `changes`; `problems`: installed software it could not look up | exists. `changes` lists every field of NEEDS that differs from what was recorded at install (`field`, `before`, `after`, `kind`: `added`, `removed`, `raised`, `lowered`, `changed`), and is `null` for a receipt that recorded nothing; the page then says the two cannot be compared |
 | `recipe storage --json` | `active_bytes`, `earlier_generations`, `earlier_bytes` | exists (`commands.rs` `Commands::Storage`). Shown on the Storage page, per store; Installed says only what the earlier versions take |
 | `recipe history --json` | `{"schema_version": 1, "history": [...]}`, newest first, each entry `at` (seconds since 1970), `what` (`install`, `update`, `remove`, `go-back`, `clear-earlier`, `hold`, `unhold`), `package`, `from`, `to`, `source` (null where one does not apply; `source` is set only for a recipe of a remote source) | exists: `commands.rs` `Commands::History` prints it, `src/packages/history.rs` lines 22-35 define the entry, `packages.rs` records it after each change. Shown on the Storage page, as sentences with the time |
@@ -539,7 +644,8 @@ there is no step yet where the person approves the change before it is used.
 - Before: no download size or disk use (`recipe` does not report them); no
   "you can take it out again before the restart" (recab does not say it);
   Remove still asks in its own small window, not on the Before page; Go back
-  and Clear earlier versions act without it.
+  and Clear earlier versions act without it (Clear asks in a box first); all of them have a
+  page of their own while they run, since 2026-11-11.
 - On a locked computer: rows for the next system only when the reader may read
   `prepared` (root); no earlier versions, storage, sizes, dates or Open for the
   running system's software; nothing tells that an update exists but the
@@ -559,7 +665,8 @@ there is no step yet where the person approves the change before it is used.
 
 - Icons: recipes show a letter until the catalog carries `<name>.svg`.
 - Translations: every string goes through `tr()`, no translation exists.
-- "Open" starts the first program a recipe installed, not its menu entry.
+- "Open" ignores a menu entry's `DBusActivatable`, `TryExec` and `Path`, and does not start
+  `Terminal=true` entries (it says to use a terminal).
 - A notice when updates appear.
 - Building it for each distribution against that distribution's Qt, and
   shipping it in the desktop product (the same gap `docs/recab-gui.md` lists).

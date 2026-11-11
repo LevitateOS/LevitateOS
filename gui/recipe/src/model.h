@@ -72,6 +72,15 @@ struct InstalledItem {
     QDate installedOn;
     qint64 sizeBytes = 0;
     QStringList programs, menu;
+    // What the receipt says besides: every file it put in the profile, the
+    // source its recipe was fetched from and the commit (both only when
+    // recorded), and the recipe file it was installed from.
+    QStringList files;
+    QString source, commit, receiptRecipe;
+    // The profile of the store it is in, as `installed --json` names it: the
+    // programs and the menu entries are in its `bin` and `share/applications`.
+    // Empty where no store stands behind it.
+    QString profile;
     Place place = Place::Computer;
     // A store stands behind it: earlier versions, storage and going back apply.
     // False for what recab answers about a locked system, which says only

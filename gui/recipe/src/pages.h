@@ -61,6 +61,8 @@ public:
     void show(const Catalog &catalog, const QString &name);
 signals:
     void back();
+    // From the page of software whose recipe is gone: back to what is installed.
+    void backToInstalled();
     void install(const QString &name);
     void update(const QString &name, Place place);
     void remove(const QString &name, Place place);
@@ -70,6 +72,14 @@ signals:
     void hold(const QString &name, Place place, bool on);
     // Open the recipe's file.
     void readRecipe(const QString &name);
+private:
+    // Where the software is, in each place that holds it.
+    void whereItIs(QVBoxLayout *body, const Catalog &catalog, const QString &name);
+    // What can be done to what is installed: keep it, go back, remove. Nothing here needs a recipe.
+    void actionRows(QVBoxLayout *body, const Catalog &catalog, const QString &name,
+                    const QList<const InstalledItem *> &held);
+    // Installed software whose recipe is gone: what its receipt says, and what still works.
+    void showReceipt(const Catalog &catalog, const QString &name);
 };
 
 class RunPage : public Page {
@@ -107,6 +117,43 @@ private:
     QPushButton *stop_ = nullptr;
     QLabel *stopNote_ = nullptr;
     int stepsTotal_ = 0, stepsStarted_ = 0;
+    // The run's output as the agent can be given it, and where `recipe` said it keeps its log.
+    QStringList lines_;
+    QString log_;
+};
+
+// A short change that has no steps of its own: removing, going back, keeping at a
+// version, adding or removing a source, fetching the lists, clearing earlier versions.
+// It shows what is being done, lets it be stopped, shows the command's own output,
+// and when it did not finish says why and offers "Try again". The window drives it.
+class ChangePage : public Page {
+    Q_OBJECT
+public:
+    struct Words {
+        // "Removing GIMP", what it does, and the line under the bar.
+        QString title, subtitle, doing;
+        // What stopping it means (also asked when the window is closed meanwhile).
+        QString stopNote;
+        // When it did not finish: the headline, and what is true then.
+        QString failed, left;
+        // Said in the status line when it worked.
+        QString done;
+    };
+    using Page::Page;
+    void begin(const Words &words, Run *run);
+signals:
+    void retry();
+    void back();
+private:
+    void onFinished(bool ok);
+    Words words_;
+    Run *run_ = nullptr;
+    QVBoxLayout *column_ = nullptr;
+    QWidget *progress_ = nullptr;
+    QPlainTextEdit *output_ = nullptr;
+    QLabel *outputTitle_ = nullptr;
+    QPushButton *stop_ = nullptr;
+    QLabel *stopNote_ = nullptr;
 };
 
 class InstalledPage : public Page {
@@ -123,6 +170,8 @@ signals:
     void hold(const QString &name, Place place, bool on);
     void openStorage();
     void selected(const QString &name, Place place);
+    // The page of software whose recipe is gone: what its receipt says.
+    void openPage(const QString &name);
 };
 
 class UpdatesPage : public Page {

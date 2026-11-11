@@ -149,9 +149,14 @@ static void readInstalled(const QJsonObject &installed, Catalog &fresh, Place pl
         if (o.contains("installed_on"))
             item.installedOn = QDateTime::fromSecsSinceEpoch(o["installed_on"].toInteger()).date();
         item.sizeBytes = o["size_bytes"].toInteger();
+        item.profile = profile;
+        item.source = o["source"].toString();
+        item.commit = o["commit"].toString();
+        item.receiptRecipe = o["recipe"].toString();
         // What it put on the system, from the receipt's own list of files.
         for (const QJsonValue &file : o["files"].toArray()) {
             const QString path = file.toString();
+            item.files << path;
             if (path.startsWith("bin/"))
                 item.programs << path.mid(4);
             else if (path.startsWith("share/applications/") && path.endsWith(".desktop"))

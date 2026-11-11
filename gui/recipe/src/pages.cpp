@@ -19,6 +19,7 @@
 #include <QPlainTextEdit>
 #include <QProgressBar>
 #include <QPushButton>
+#include <QRegularExpression>
 #include <QScrollArea>
 #include <QTreeWidget>
 #include <QUrl>
@@ -386,7 +387,19 @@ void RecipePage::show(const Catalog &catalog, const QString &name)
     QVBoxLayout *column = fresh();
     const Recipe *found = catalog.recipe(name);
     if (!found) {
+        // Installed software outlives its recipe: what its receipt says is shown, and what still works.
+        if (!catalog.installedEverywhere(name).isEmpty()) {
+            showReceipt(catalog, name);
+            return;
+        }
+        auto *backLink = new ClickLabel(tr("‹ All software"));
+        dim(backLink);
+        connect(backLink, &ClickLabel::clicked, this, &RecipePage::back);
+        column->addWidget(backLink, 0, Qt::AlignLeft);
         column->addWidget(heading(tr("No recipe named %1").arg(name)));
+        column->addWidget(dim(text(tr("No source offers a recipe by that name, and nothing installed carries it. It may have "
+                                      "been removed from its source, or the source may have gone."),
+                                   true)));
         column->addStretch();
         return;
     }
@@ -435,9 +448,13 @@ void RecipePage::show(const Catalog &catalog, const QString &name)
     auto named = [&](const QString &text, Place place) {
         return several || (catalog.twoPlaces && place == Place::Next) ? tr("%1 %2").arg(text, where(place)) : text;
     };
+    bool openOffered = false;
     for (const InstalledItem *item : held) {
         const Place place = item->place;
-        if (place != Place::Next && !item->menu.isEmpty() && item == held.first()) {
+        // Software only the next system holds, or the running system of a locked computer, has nothing
+        // to open: the sentences under "Where it is" say why.
+        if (!openOffered && item->inStore && place != Place::Next && !item->menu.isEmpty()) {
+            openOffered = true;
             // The update is the page's main button when there is one to offer.
             bool offered = false;
             for (const InstalledItem *other : held) {
@@ -491,97 +508,10 @@ void RecipePage::show(const Catalog &catalog, const QString &name)
     if (!recipe.details.isEmpty())
         body->addWidget(text(recipe.details, true));
 
-    // Where it is: its state in each place, with the version.
-    {
-        auto *rooms = new Panel;
-        rooms->column()->addWidget(strong(tr("Where it is")));
-        auto *grid = new QGridLayout;
-        grid->setHorizontalSpacing(16);
-        grid->setVerticalSpacing(6);
-        grid->setColumnStretch(1, 1);
-        int row = 0;
-        for (Place place : {Place::Me, Place::Computer, Place::Next}) {
-            const InstalledItem *item = catalog.installedItem(name, place);
-            const bool waiting = place == Place::Next && !item && catalog.waitsForRestart(name);
-            if (place == Place::Next && !item && !waiting)
-                continue;
-            if (!catalog.twoPlaces && place != Place::Computer)
-                continue;
-            const QString label = catalog.twoPlaces ? placeTitle(place) : tr("In this store");
-            QString state;
-            if (waiting) {
-                state = tr("A change for it waits in the next system.");
-            } else if (!item) {
-                state = tr("Not installed");
-            } else {
-                QStringList parts{tr("Version %1").arg(item->version)};
-                if (item->installedOn.isValid())
-                    parts << tr("installed on %1").arg(QLocale().toString(item->installedOn, "d MMMM yyyy"));
-                if (item->sizeBytes)
-                    parts << bytesText(item->sizeBytes);
-                if (place == Place::Next)
-                    parts << tr("works after a restart");
-                state = parts.join(tr(" · "));
-                QStringList sentences;
-                if (item->leavesNext)
-                    sentences << tr("The next system no longer holds it.");
-                if (item->held)
-                    sentences << tr("Kept at this version.");
-                const UpdateItem *update = catalog.update(name, place);
-                if (update && place != Place::Next)
-                    sentences << (item->held ? tr("%1 is ready, and is not offered while it is kept.").arg(update->to)
-                                             : tr("%1 is ready.").arg(update->to));
-                if (!sentences.isEmpty())
-                    state += tr(". %1").arg(sentences.join(QLatin1Char(' ')));
-            }
-            grid->addWidget(dim(text(label)), row, 0, Qt::AlignTop);
-            QLabel *value = text(state, true);
-            if (!item && !waiting)
-                dim(value);
-            grid->addWidget(value, row, 1);
-            ++row;
-        }
-        rooms->column()->addLayout(grid);
-        body->addWidget(rooms);
-    }
+    whereItIs(body, catalog, name);
 
-    // What can be done to what is installed: keep it, go back, remove.
-    if (!held.isEmpty()) {
-        Rows rows;
-        for (const InstalledItem *item : held) {
-            const Place place = item->place;
-            const QString at = several ? tr(" (%1)").arg(where(place)) : QString();
-            // `recipe` holds software only where a store stands behind it.
-            if (item->inStore && place != Place::Next) {
-                if (item->held) {
-                    auto *release = new QPushButton(tr("Let it update again"));
-                    connect(release, &QPushButton::clicked, this, [this, name, place] { emit hold(name, place, false); });
-                    rows.add(tr("Kept at %1%2").arg(item->version, at),
-                             tr("Update and Update all leave it alone until you let it update again."), {release});
-                } else {
-                    auto *keep = new QPushButton(tr("Keep at this version"));
-                    connect(keep, &QPushButton::clicked, this, [this, name, place] { emit hold(name, place, true); });
-                    rows.add(tr("Keep it at %1%2").arg(item->version, at),
-                             tr("Update and Update all will leave it alone until you let it update again."), {keep});
-                }
-            }
-            if (item->inStore && !item->kept.isEmpty()) {
-                auto *older = new QPushButton(tr("Go back to %1").arg(item->kept));
-                connect(older, &QPushButton::clicked, this, [this, name, place] { emit goBack(name, place); });
-                rows.add(tr("Go back%1").arg(at), tr("Return to %1, which is still kept.").arg(item->kept), {older});
-            }
-            auto *remove = new QPushButton(tr("Remove…"));
-            connect(remove, &QPushButton::clicked, this, [this, name, place] { emit this->remove(name, place); });
-            QString removed;
-            if (!item->inStore)
-                removed = place == Place::Next ? tr("Taken out of the next system, which is the only one that holds it.")
-                                               : tr("Taken out of the next system. The running system keeps it until the restart.");
-            else
-                removed = tr("No longer installed. Its files stay among the earlier versions until those are cleared, in Storage.");
-            rows.add(tr("Remove%1").arg(at), removed, {remove});
-        }
-        body->addWidget(rows.panel);
-    }
+    actionRows(body, catalog, name, held);
+
     // What the recipe may use, and what comes with it.
     auto *pair = new QHBoxLayout;
     pair->setSpacing(14);
@@ -689,6 +619,214 @@ void RecipePage::show(const Catalog &catalog, const QString &name)
     column->addWidget(scroll, 1);
 }
 
+void RecipePage::whereItIs(QVBoxLayout *body, const Catalog &catalog, const QString &name)
+{
+    auto *rooms = new Panel;
+    rooms->column()->addWidget(strong(tr("Where it is")));
+    auto *grid = new QGridLayout;
+    grid->setHorizontalSpacing(16);
+    grid->setVerticalSpacing(6);
+    grid->setColumnStretch(1, 1);
+    int row = 0;
+    for (Place place : {Place::Me, Place::Computer, Place::Next}) {
+        const InstalledItem *item = catalog.installedItem(name, place);
+        const bool waiting = place == Place::Next && !item && catalog.waitsForRestart(name);
+        if (place == Place::Next && !item && !waiting)
+            continue;
+        if (!catalog.twoPlaces && place != Place::Computer)
+            continue;
+        const QString label = catalog.twoPlaces ? placeTitle(place) : tr("In this store");
+        QString state;
+        if (waiting) {
+            state = tr("A change for it waits in the next system.");
+        } else if (!item) {
+            state = tr("Not installed");
+        } else {
+            QStringList parts{tr("Version %1").arg(item->version)};
+            if (item->installedOn.isValid())
+                parts << tr("installed on %1").arg(QLocale().toString(item->installedOn, "d MMMM yyyy"));
+            if (item->sizeBytes)
+                parts << bytesText(item->sizeBytes);
+            if (place == Place::Next)
+                parts << tr("works after a restart");
+            state = parts.join(tr(" · "));
+            QStringList sentences;
+            if (item->leavesNext)
+                sentences << tr("The next system no longer holds it.");
+            if (place == Place::Next)
+                sentences << tr("It cannot be opened until then.");
+            else if (!item->inStore)
+                sentences << tr("This window cannot open it: the running system's list names the software and its version, "
+                                "not its programs.");
+            if (item->held)
+                sentences << tr("Kept at this version.");
+            const UpdateItem *update = catalog.update(name, place);
+            if (update && place != Place::Next)
+                sentences << (item->held ? tr("%1 is ready, and is not offered while it is kept.").arg(update->to)
+                                         : tr("%1 is ready.").arg(update->to));
+            if (!sentences.isEmpty())
+                state += tr(". %1").arg(sentences.join(QLatin1Char(' ')));
+        }
+        grid->addWidget(dim(text(label)), row, 0, Qt::AlignTop);
+        QLabel *value = text(state, true);
+        if (!item && !waiting)
+            dim(value);
+        grid->addWidget(value, row, 1);
+        ++row;
+    }
+    rooms->column()->addLayout(grid);
+    body->addWidget(rooms);
+}
+
+void RecipePage::actionRows(QVBoxLayout *body, const Catalog &catalog, const QString &name,
+                            const QList<const InstalledItem *> &held)
+{
+    const bool several = held.size() > 1;
+    auto where = [&catalog](Place place) {
+        if (!catalog.twoPlaces)
+            return QString();
+        return place == Place::Me ? tr("for me") : place == Place::Computer ? tr("for this computer") : tr("in the next system");
+    };
+    if (!held.isEmpty()) {
+        Rows rows;
+        for (const InstalledItem *item : held) {
+            const Place place = item->place;
+            const QString at = several ? tr(" (%1)").arg(where(place)) : QString();
+            // `recipe` holds software only where a store stands behind it.
+            if (item->inStore && place != Place::Next) {
+                if (item->held) {
+                    auto *release = new QPushButton(tr("Let it update again"));
+                    connect(release, &QPushButton::clicked, this, [this, name, place] { emit hold(name, place, false); });
+                    rows.add(tr("Kept at %1%2").arg(item->version, at),
+                             tr("Update and Update all leave it alone until you let it update again."), {release});
+                } else {
+                    auto *keep = new QPushButton(tr("Keep at this version"));
+                    connect(keep, &QPushButton::clicked, this, [this, name, place] { emit hold(name, place, true); });
+                    rows.add(tr("Keep it at %1%2").arg(item->version, at),
+                             tr("Update and Update all will leave it alone until you let it update again."), {keep});
+                }
+            }
+            if (item->inStore && !item->kept.isEmpty()) {
+                auto *older = new QPushButton(tr("Go back to %1").arg(item->kept));
+                connect(older, &QPushButton::clicked, this, [this, name, place] { emit goBack(name, place); });
+                rows.add(tr("Go back%1").arg(at), tr("Return to %1, which is still kept.").arg(item->kept), {older});
+            }
+            auto *remove = new QPushButton(tr("Remove…"));
+            connect(remove, &QPushButton::clicked, this, [this, name, place] { emit this->remove(name, place); });
+            QString removed;
+            if (!item->inStore)
+                removed = place == Place::Next ? tr("Taken out of the next system, which is the only one that holds it.")
+                                               : tr("Taken out of the next system. The running system keeps it until the restart.");
+            else
+                removed = tr("No longer installed. Its files stay among the earlier versions until those are cleared, in Storage.");
+            rows.add(tr("Remove%1").arg(at), removed, {remove});
+        }
+        body->addWidget(rows.panel);
+    }
+}
+
+void RecipePage::showReceipt(const Catalog &catalog, const QString &name)
+{
+    QVBoxLayout *column = fresh();
+    const QList<const InstalledItem *> held = catalog.installedEverywhere(name);
+    const bool several = held.size() > 1;
+
+    auto *backLink = new ClickLabel(tr("‹ Installed"));
+    dim(backLink);
+    connect(backLink, &ClickLabel::clicked, this, &RecipePage::backToInstalled);
+    column->addWidget(backLink, 0, Qt::AlignLeft);
+
+    auto *inner = new QWidget;
+    auto *body = new QVBoxLayout(inner);
+    body->setContentsMargins(0, 0, 2, 0);
+    body->setSpacing(14);
+
+    // The top: what the receipt calls it. There is no recipe to say more.
+    auto *header = new QHBoxLayout;
+    header->setSpacing(16);
+    header->addWidget(new Tile(name, QString(), 52), 0, Qt::AlignTop);
+    auto *words = new QVBoxLayout;
+    words->setSpacing(1);
+    words->addWidget(heading(name));
+    words->addWidget(text(tr("Its recipe is gone: no recipe for it is in the collection or in the sources any more. "
+                             "This page says what its receipt says."),
+                          true));
+    words->addWidget(dim(text(tr("Version %1").arg(held.first()->version))));
+    header->addLayout(words, 1);
+    auto *buttons = new QHBoxLayout;
+    for (const InstalledItem *item : held) {
+        if (item->inStore && item->place != Place::Next && !item->menu.isEmpty()) {
+            const Place place = item->place;
+            auto *open = primary(tr("Open"));
+            connect(open, &QPushButton::clicked, this, [this, name, place] { emit this->open(name, place); });
+            buttons->addWidget(open);
+            break;
+        }
+    }
+    header->addLayout(buttons);
+    body->addLayout(header);
+
+    whereItIs(body, catalog, name);
+
+    // What the receipt holds, for each place that has one.
+    for (const InstalledItem *item : held) {
+        auto *panel = new Panel;
+        QString title = tr("What its receipt says");
+        if (several)
+            title = tr("What its receipt says (%1)").arg(placeTitle(item->place).toLower());
+        panel->column()->addWidget(strong(title));
+        auto *form = new QFormLayout;
+        form->setHorizontalSpacing(16);
+        form->setVerticalSpacing(7);
+        auto fact = [form](const QString &label, QLabel *value) { form->addRow(dim(text(label)), value); };
+        fact(tr("Name"), text(item->name, true));
+        fact(tr("Version"), text(item->version, true));
+        if (item->installedOn.isValid())
+            fact(tr("Installed on"), text(QLocale().toString(item->installedOn, "d MMMM yyyy"), true));
+        if (item->sizeBytes)
+            fact(tr("Size"), text(bytesText(item->sizeBytes), true));
+        QString from;
+        if (item->source.isEmpty()) {
+            from = tr("The receipt names no source: Recipe records one only for a recipe fetched from a remote source.");
+        } else {
+            const Origin *origin = catalog.origin(item->source);
+            from = origin ? tr("The source %1").arg(origin->shown()) : tr("The source %1, which is not among the sources any more").arg(item->source);
+            if (!item->commit.isEmpty())
+                from += tr(", at commit %1").arg(item->commit);
+        }
+        fact(tr("It came from"), text(from, true));
+        if (!item->receiptRecipe.isEmpty()) {
+            QLabel *file = text(item->receiptRecipe, true);
+            file->setFont(QFontDatabase::systemFont(QFontDatabase::FixedFont));
+            form->addRow(dim(text(tr("Its recipe file"))), file);
+            form->addRow(QString(), dim(text(QFileInfo::exists(item->receiptRecipe)
+                                                 ? tr("The file is still there, but no source or recipe folder lists it.")
+                                                 : tr("The file is not there any more."),
+                                             true)));
+        }
+        QStringList shown = item->files.mid(0, 14);
+        QString fileWords = shown.join(QLatin1Char('\n'));
+        if (item->files.size() > shown.size())
+            fileWords += tr("\n… and %1 more").arg(item->files.size() - shown.size());
+        QLabel *files = text(item->files.isEmpty() ? tr("The receipt lists none.") : fileWords, true);
+        if (!item->files.isEmpty())
+            files->setFont(QFontDatabase::systemFont(QFontDatabase::FixedFont));
+        form->addRow(dim(text(counted(item->files.size(), tr("%1 file"), tr("%1 files")))), files);
+        panel->column()->addLayout(form);
+        body->addWidget(panel);
+    }
+
+    // Remove, and going back and keeping at a version where a store stands behind it, work from the receipt.
+    actionRows(body, catalog, name, held);
+    body->addStretch();
+
+    auto *scroll = new QScrollArea;
+    scroll->setWidgetResizable(true);
+    scroll->setFrameShape(QFrame::NoFrame);
+    scroll->setWidget(inner);
+    column->addWidget(scroll, 1);
+}
+
 // ---------------------------------------------------------------- A run
 
 void RunPage::begin(const Catalog &catalog, const QString &name, Run *run, Place place)
@@ -698,6 +836,8 @@ void RunPage::begin(const Catalog &catalog, const QString &name, Run *run, Place
     run_ = run;
     marks_.clear();
     agentNote_.clear();
+    lines_.clear();
+    log_.clear();
     stepsTotal_ = stepsStarted_ = 0;
     const Recipe *found = catalog_.recipe(name);
     const Recipe recipe = found ? *found : Recipe{};
@@ -752,8 +892,18 @@ void RunPage::begin(const Catalog &catalog, const QString &name, Run *run, Place
             onEvent(event);
     });
     connect(run, &Run::output, this, [this, run](const QString &line) {
-        if (run == run_)
-            output_->appendPlainText(line);
+        if (run != run_)
+            return;
+        output_->appendPlainText(line);
+        lines_ << line;
+        if (lines_.size() > 400)
+            lines_.removeFirst();
+        // `recipe` says where it keeps the log and the retained record of a run, in a plain line:
+        // "recipe: diagnostics: DIRECTORY" (tools/recipe, invocation_log.rs).
+        static const QRegularExpression where(QStringLiteral(R"(diagnostics:\s+(/\S.*?)\s*$)"));
+        const QRegularExpressionMatch found = where.match(line);
+        if (found.hasMatch())
+            log_ = found.captured(1);
     });
     connect(run, &Run::finished, this, [this, run](bool ok) {
         if (run == run_)
@@ -972,9 +1122,23 @@ void RunPage::onFinished(bool ok)
     }
     if (found && !found->path.isEmpty())
         facts << tr("The recipe: %1").arg(found->path);
-    const int lines = output_->toPlainText().isEmpty() ? 0 : output_->blockCount();
-    if (lines)
-        facts << tr("The output of the run: %1").arg(counted(lines, tr("%1 line"), tr("%1 lines")));
+    if (!log_.isEmpty())
+        facts << tr("Recipe keeps the log and the retained record of this run in %1").arg(log_);
+    // The last lines of what the run printed, so the agent need not ask for them: a bounded number,
+    // each cut short. The whole output is in the log when `recipe` named one.
+    QString outputFact;
+    if (!lines_.isEmpty()) {
+        constexpr int most = 20, widest = 240;
+        const QStringList last = lines_.mid(qMax<qsizetype>(0, lines_.size() - most));
+        QStringList shownLines;
+        for (const QString &each : last)
+            shownLines << QStringLiteral("    ") + (each.size() > widest ? each.left(widest - 1) + QStringLiteral("…") : each);
+        outputFact = tr("The last %1 of the run's output (%2 in all):\n%3")
+                         .arg(counted(last.size(), tr("%1 line"), tr("%1 lines")))
+                         .arg(lines_.size() >= 400 ? tr("more than 400 lines") : counted(lines_.size(), tr("%1 line"), tr("%1 lines")),
+                              shownLines.join(QLatin1Char('\n')));
+        facts << outputFact;
+    }
     facts << unchanged;
 
     auto *showOutput = new QPushButton(tr("Show the output"));
@@ -989,7 +1153,8 @@ void RunPage::onFinished(bool ok)
         // What stopped, and what Recipe recorded, are still said.
         verdict->column()->addWidget(text(issue, true));
         for (const QString &fact : facts.mid(0, facts.size() - 1)) // the last is `unchanged`, said above
-            verdict->column()->addWidget(dim(text(fact, true)));
+            if (fact != outputFact) // the output is one click away, under "Show the output"
+                verdict->column()->addWidget(dim(text(fact, true)));
         verdict->column()->addWidget(text(tr("Recipe lets its agent repair a recipe only while installing it; "
                                              "it cannot do that for an update yet."),
                                           true));
@@ -1018,14 +1183,119 @@ void RunPage::onFinished(bool ok)
     buttons->addWidget(leave);
     buttons->addStretch();
     buttons->addWidget(fixNow);
-    prompt->column()->addLayout(buttons);
-    column_->insertWidget(2, prompt);
+    // The facts can be long (the output's last lines): they scroll, and the buttons stay in reach below them.
+    auto *promptScroll = new QScrollArea;
+    promptScroll->setWidgetResizable(true);
+    promptScroll->setFrameShape(QFrame::NoFrame);
+    promptScroll->setWidget(prompt);
+    column_->insertWidget(2, promptScroll, 1);
+    auto *buttonRow = new QWidget;
+    buttonRow->setLayout(buttons);
+    buttons->setContentsMargins(0, 0, 0, 0);
+    column_->insertWidget(3, buttonRow);
 
     // The output stays one click away; the prompt already counts it among the facts.
     outputTitle_->hide();
     output_->hide();
     column_->addStretch();
     emit failed(name_);
+}
+
+// ---------------------------------------------------------------- A short change
+
+void ChangePage::begin(const Words &words, Run *run)
+{
+    words_ = words;
+    run_ = run;
+    column_ = fresh();
+
+    auto *header = new QHBoxLayout;
+    auto *top = new QVBoxLayout;
+    top->setSpacing(1);
+    top->addWidget(heading(words.title));
+    top->addWidget(dim(text(words.subtitle, true)));
+    header->addLayout(top, 1);
+    auto *side = new QVBoxLayout;
+    side->setSpacing(6);
+    stop_ = new QPushButton(tr("Stop"));
+    connect(stop_, &QPushButton::clicked, this, [this, run] {
+        stop_->setEnabled(false);
+        run->stop();
+    });
+    side->addWidget(stop_, 0, Qt::AlignRight);
+    stopNote_ = dim(text(words.stopNote, true));
+    stopNote_->setMaximumWidth(340);
+    side->addWidget(stopNote_);
+    header->addLayout(side);
+    column_->addLayout(header);
+
+    auto *panel = new Panel;
+    progress_ = panel;
+    auto *bar = new QProgressBar;
+    bar->setRange(0, 0);
+    bar->setTextVisible(false);
+    bar->setFixedHeight(8);
+    panel->column()->addWidget(bar);
+    panel->column()->addWidget(dim(text(words.doing, true)));
+    column_->addWidget(panel);
+
+    outputTitle_ = strong(tr("Output"));
+    column_->addWidget(outputTitle_);
+    output_ = new QPlainTextEdit;
+    output_->setReadOnly(true);
+    output_->setMaximumBlockCount(5000);
+    output_->setLineWrapMode(QPlainTextEdit::NoWrap);
+    output_->setFont(QFontDatabase::systemFont(QFontDatabase::FixedFont));
+    column_->addWidget(output_, 1);
+
+    connect(run, &Run::output, this, [this, run](const QString &line) {
+        if (run == run_)
+            output_->appendPlainText(line);
+    });
+    connect(run, &Run::finished, this, [this, run](bool ok) {
+        if (run == run_)
+            onFinished(ok);
+    });
+}
+
+void ChangePage::onFinished(bool ok)
+{
+    if (ok)
+        return; // the window leaves this page, and says in the status line that it worked
+    const QJsonObject failure = run_->failure();
+    const bool stoppedByUser = !stop_->isEnabled() && failure.isEmpty();
+    progress_->hide();
+    stop_->hide();
+    stopNote_->hide();
+
+    // Recipe's own words first; when it gave none, the output below ends with them.
+    const QString reason = failure["reason"].toString();
+    auto *verdict = new Verdict;
+    verdict->setFrameShape(QFrame::NoFrame);
+    verdict->column()->addWidget(strong(stoppedByUser ? tr("You stopped it") : words_.failed));
+    if (!stoppedByUser)
+        verdict->column()->addWidget(text(!reason.isEmpty() ? reason
+                                          : output_->toPlainText().isEmpty() ? tr("It gave no reason and printed nothing.")
+                                                                             : tr("The output below ends with the reason."),
+                                          true));
+    verdict->column()->addWidget(text(words_.left, true));
+    auto *buttons = new QHBoxLayout;
+    auto *again = primary(tr("Try again"));
+    auto *leave = new QPushButton(tr("Back"));
+    connect(again, &QPushButton::clicked, this, &ChangePage::retry);
+    connect(leave, &QPushButton::clicked, this, &ChangePage::back);
+    buttons->addWidget(again);
+    buttons->addWidget(leave);
+    buttons->addStretch();
+    verdict->column()->addLayout(buttons);
+    column_->insertWidget(1, verdict);
+
+    // What the command printed is shown as it is; nothing to show when it printed nothing.
+    const bool printed = !output_->toPlainText().isEmpty();
+    outputTitle_->setVisible(printed);
+    output_->setVisible(printed);
+    if (!printed)
+        column_->addStretch();
 }
 
 // ---------------------------------------------------------------- Installed
@@ -1041,13 +1311,15 @@ QString whereSentence(const InstalledItem &item)
         return QObject::tr("It is in your own store: only you have it.");
     case Place::Computer:
         if (!item.inStore) // recab's list of a locked computer: the running system
-            return item.leavesNext ? QObject::tr("It is in the running system, for everyone. The next system no longer holds it.")
-                                   : QObject::tr("It is in the running system, for everyone.");
+            return (item.leavesNext ? QObject::tr("It is in the running system, for everyone. The next system no longer holds it.")
+                                    : QObject::tr("It is in the running system, for everyone."))
+                   + QObject::tr(" This window cannot open it: the running system's list names the software and its "
+                                 "version, not its programs.");
         return QObject::tr("It is on this computer, for everyone.");
     case Place::Next:
         break;
     }
-    return QObject::tr("Only the next system holds it. It works after a restart.");
+    return QObject::tr("Only the next system holds it. It works after a restart, and cannot be opened until then.");
 }
 
 QLabel *tinted(QLabel *label, Mood mood)
@@ -1203,6 +1475,14 @@ void InstalledPage::show(const Catalog &catalog, const QString &selectedName, in
         words->setSpacing(1);
         words->addWidget(strong(tr("%1 %2").arg(recipe ? recipe->shown() : name, item->version)));
         QString about = recipe ? recipe->description + tr(".") : QString();
+        if (!recipe) {
+            // The recipe is gone from the collection and the sources: only the receipt speaks.
+            about = tr("Its recipe is gone: no recipe for it is in the collection or the sources any more.");
+            about += tr(" Its receipt lists %1.").arg(counted(item->files.size(), tr("%1 file"), tr("%1 files")));
+            if (!item->source.isEmpty())
+                about += tr(" It came from the source %1%2.")
+                             .arg(item->source, shared->origin(item->source) ? QString() : tr(", which is not among the sources any more"));
+        }
         if (shared->twoPlaces)
             about += (about.isEmpty() ? QString() : tr(" ")) + whereSentence(*item);
         if (item->menu.isEmpty() && !item->programs.isEmpty())
@@ -1213,8 +1493,14 @@ void InstalledPage::show(const Catalog &catalog, const QString &selectedName, in
             about += tr(" Version %1 is kept, so you can go back to it.").arg(item->kept);
         words->addWidget(dim(text(about, true)));
         row->addLayout(words, 1);
-        // A command-line tool has nothing to open; it is used from a terminal.
-        if (!item->menu.isEmpty()) {
+        if (!recipe) {
+            auto *receipt = new QPushButton(tr("Its receipt"));
+            connect(receipt, &QPushButton::clicked, this, [this, name] { emit openPage(name); });
+            row->addWidget(receipt);
+        }
+        // A command-line tool has nothing to open; it is used from a terminal. Only software in a
+        // store that is in effect has programs to start.
+        if (!item->menu.isEmpty() && item->inStore && place != Place::Next) {
             auto *open = new QPushButton(tr("Open"));
             connect(open, &QPushButton::clicked, this, [this, name, place] { emit this->open(name, place); });
             row->addWidget(open);
@@ -1507,7 +1793,7 @@ RemoveDialog::RemoveDialog(const Recipe &recipe, const InstalledItem &item, QWid
                     ? tr("It is taken out of the next system, which is the only one that holds it.")
                     : tr("It is taken out of the next system. The running system keeps it until the restart.");
     } else {
-        words = recipe.menu.isEmpty()
+        words = recipe.menu.isEmpty() && item.menu.isEmpty()
                     ? tr("It is no longer installed.")
                     : tr("%1 leaves the applications menu and is no longer installed.").arg(recipe.shown());
         // Recipe keeps what it removes among the earlier versions.

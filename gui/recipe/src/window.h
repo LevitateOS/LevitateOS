@@ -4,10 +4,15 @@
 #include "beforewords.h"
 #include "client.h"
 #include "model.h"
+#include "pages.h"
 
 #include <QMainWindow>
+#include <QMessageBox>
+#include <QPointer>
 
 #include <functional>
+
+
 
 class BeforePage;
 class BrowsePage;
@@ -64,7 +69,7 @@ public:
     BrowsePage *browsePage() const { return browse_; }
     BeforePage *beforePage() const { return before_; }
     Places places() const { return client_.places(); }
-    bool busy() const { return run_ != nullptr || quiet_ > 0 || client_.loading(); }
+    bool busy() const { return run_ != nullptr || changeRun_ != nullptr || client_.loading(); }
     // From a checkout: remove without the question.
     void removeNow(const QString &name, Place place = Place::Computer);
     // Activates the newest earlier version Recipe keeps of an installed program.
@@ -78,6 +83,16 @@ public:
     UpdatesPage *updatesPage() const { return updates_; }
     RecipePage *recipePage() const { return recipe_; }
     RunPage *runPage() const { return runPage_; }
+    ChangePage *changePage() const { return change_; }
+    // Starts the program of an installed piece of software, from the profile of the place it is in.
+    void open(const QString &name, Place place);
+    // The question asked when the window is closed while something runs, and the one that asks
+    // whether to remove: open until answered, else null. For a check.
+    QMessageBox *closeQuestion() const { return closeBox_; }
+    RemoveDialog *removeQuestion() const { return removeBox_; }
+
+protected:
+    void closeEvent(QCloseEvent *event) override;
 
 private:
     // Reads the catalog without holding the window up, then does `then`.
@@ -91,16 +106,38 @@ private:
     void updateStatus();
     // Takes a said-for-a-moment line away at once.
     void clearFlash();
-    void open(const QString &name, Place place);
     void showBefore();
     void startQueued();
-    void quietChange(Run *run);
+    // A short change has a page of its own: what is being done, Stop, the command's output, and
+    // when it did not finish, why. `make` starts the same command again for "Try again".
+    void change(const ChangePage::Words &words, std::function<Run *()> make);
+    void leaveChange();
+    void changeEnded(bool ok);
     void runEnded(const QString &name, bool ok);
+    // Closing while something runs: the question, what it says, and ending the run first.
+    void askClose();
+    void stopAndClose();
+    Run *runningRun() const;
+    QString closeWords() const;
+    ChangePage::Words removeWords(const QString &name, Place place) const;
+    QString shownName(const QString &name) const;
 
     RecipeClient client_;
     Catalog catalog_;
     Run *run_ = nullptr;
-    int quiet_ = 0;
+    // The short change that is running (remove, go back, hold, a source, clearing), if any.
+    Run *changeRun_ = nullptr;
+    std::function<Run *()> remake_;
+    ChangePage::Words changeWords_;
+    // What the install or update that runs is, for the question when the window closes.
+    QString runName_;
+    bool runUpdate_ = false;
+    QPointer<QMessageBox> closeBox_;
+    QPointer<RemoveDialog> removeBox_;
+    bool closing_ = false, closeAfterStop_ = false;
+    // A read asked for while another is going: done as soon as that one ends.
+    bool reloadQueued_ = false;
+    std::function<void()> queuedThen_;
     // Updates still to be asked about and made, one after another.
     QList<QPair<QString, Place>> queue_;
     Ask ask_;           // what the Before page is about
@@ -122,6 +159,7 @@ private:
     RecipePage *recipe_;
     BeforePage *before_;
     RunPage *runPage_;
+    ChangePage *change_;
     InstalledPage *installed_;
     UpdatesPage *updates_;
     SourcesPage *sources_;

@@ -10,6 +10,7 @@
 #include "nextsystem.h"
 
 #include "pages.h"
+#include "parts.h"
 #include "sources.h"
 #include "storage.h"
 #include "window.h"
@@ -58,8 +59,18 @@ using Expect = std::function<void(const QString &, bool)>;
 void clickButton(QWidget *inside, const QString &words)
 {
     for (QPushButton *button : inside->findChildren<QPushButton *>())
-        if (button->text() == words && button->isVisible())
+        if (QString(button->text()).remove(QLatin1Char('&')) == words && button->isVisible())
             button->click();
+}
+
+// The buttons a person can press in a window now.
+QStringList buttonTexts(QWidget &inside)
+{
+    QStringList buttons;
+    for (const QPushButton *button : inside.findChildren<QPushButton *>())
+        if (button->isVisible())
+            buttons << QString(button->text()).remove(QLatin1Char('&'));
+    return buttons;
 }
 
 // The Before step: press its one button ("Install", "Update"), as a click would.
@@ -131,6 +142,28 @@ QList<Asked> loggedCommands()
         found << asked;
     }
     return found;
+}
+
+// How many times `recipe` was run with all of these words among its arguments, from the stand-in's log.
+int timesAsked(const QStringList &words)
+{
+    int found = 0;
+    for (const Asked &each : loggedCommands()) {
+        bool all = true;
+        for (const QString &word : words)
+            all = all && each.arguments.contains(word);
+        found += all;
+    }
+    return found;
+}
+
+// How many processes run a command line with these words (the stand-in recipe, stopped in the middle).
+int processesRunning(const QString &pattern)
+{
+    QProcess pgrep;
+    pgrep.start(QStringLiteral("pgrep"), {QStringLiteral("-f"), pattern});
+    pgrep.waitForFinished(10000);
+    return pgrep.exitCode() == 0 ? 1 : 0;
 }
 
 // Everything a person can read in a window now: labels, buttons and the rows of lists.
@@ -262,6 +295,8 @@ void frameShots(Window &window, const Save &save, const Expect &expect)
     frame->choose(QStringLiteral("browse"));
     expect(QStringLiteral("choosing Browse shows the list"), frame->selected() == "browse" && !window.browsePage()->listed().isEmpty());
 
+    // A change just made says so for a few seconds; the line under it is where the recipes are from.
+    frame->flash(QString());
     const QString status = frame->statusText();
     expect(QStringLiteral("the status line says where the recipes are from and when (%1)").arg(status),
            status.contains(" read at ") && status.contains("source"));
@@ -723,6 +758,40 @@ void placesShots(const QString &folder, const Save &save, const Expect &expect)
         expect(QStringLiteral("for me goes through no root helper"), helperAfter == helperBefore);
         expect(QStringLiteral("it is there at once, in the person's store"),
                window.catalog().installedItem("krita", Place::Me) && window.catalog().installedItem("krita", Place::Me)->inStore);
+        // "Open" starts the program from the profile of the store it is in (the person's own: its bin is not
+        // on PATH), and the one its menu entry names, not the first program the package put in bin.
+        {
+            const QString meProfile = scratch + "/locked-state/me/profile";
+            const QString startedLog = scratch + "/locked-state/started.log";
+            auto started = [&] {
+                QFile file(startedLog);
+                return file.open(QIODevice::ReadOnly) ? QString::fromUtf8(file.readAll()) : QString();
+            };
+            QFile::remove(startedLog);
+            window.showRecipe("krita");
+            settle(150);
+            const InstalledItem *mine = window.catalog().installedItem("krita", Place::Me);
+            expect(QStringLiteral("recipe named the person's own profile for it, and the programs and menu entry it put there"),
+                   mine && mine->profile == meProfile && mine->programs == QStringList({"kritarunner", "krita"})
+                       && mine->menu == QStringList({"krita"}));
+            expect(QStringLiteral("the page offers Open"), buttonTexts(window).contains("Open"));
+            clickButton(window.recipePage(), "Open");
+            waitFor([&] { return started().contains("krita started from"); }, 10);
+            expect(QStringLiteral("Open started krita (the menu entry's program, not kritarunner) from the person's profile, with its bin first on PATH (%1)").arg(started().trimmed()),
+                   started().contains("krita started from " + meProfile + "/bin/krita, PATH begins with " + meProfile + "/bin")
+                       && !started().contains("kritarunner started"));
+            expect(QStringLiteral("the status line says it was started (%1)").arg(window.frame()->statusText()),
+                   window.frame()->statusText() == "Started Krita");
+            save(window, "p8-open-for-me");
+            // The program is not there any more: the window says what is true.
+            QFile::remove(meProfile + "/bin/krita");
+            QFile::remove(meProfile + "/bin/kritarunner");
+            clickButton(window.recipePage(), "Open");
+            settle(200);
+            expect(QStringLiteral("when it cannot be started the status line says which program is missing and where (%1)").arg(window.frame()->statusText()),
+                   window.frame()->statusText().contains("Krita could not be started: krita, which the menu entry krita starts, in " + meProfile + "/bin is not there."));
+            save(window, "p9-open-failed");
+        }
         before = changesAsked().size();
 
         // Update where the software is: no choice, only the statement.
@@ -747,6 +816,16 @@ void placesShots(const QString &folder, const Save &save, const Expect &expect)
         before = changesAsked().size();
         // The recipe's page for software in the running system and the next one: buttons that say where.
         window.showRecipe("gimp");
+        settle(100);
+        {
+            const QString there = wordsOn(window);
+            expect(QStringLiteral("what only the next system holds, and the running system's list, offer no Open and say why"),
+                   !buttonTexts(window).contains("Open") && there.contains("It cannot be opened until then.")
+                       && there.contains("This window cannot open it: the running system's list names the software and its version, not its programs."));
+            window.open("gimp", Place::Next);
+            expect(QStringLiteral("asking anyway says why (%1)").arg(window.frame()->statusText()),
+                   window.frame()->statusText().contains("only in the next system, so it cannot be opened until after the restart"));
+        }
         save(window, "p3b-recipe-two-places");
 
         // The person's own update, with what `recipe updates` said changed in the recipe.
@@ -846,6 +925,23 @@ void placesShots(const QString &folder, const Save &save, const Expect &expect)
         now = changesAsked().mid(before);
         expect(QStringLiteral("going back, where a store stands behind it: through the helper with that store"),
                now.size() == 1 && kinds(now[0].arguments, {"go-back", "gimp", "--machine-events", "--package-root", scratch + "/system-store"}));
+        // Software whose recipe is gone is taken back to the earlier version its store keeps: no recipe is needed.
+        before = changesAsked().size();
+        window.showInstalled("fd", int(Place::Computer));
+        settle(100);
+        expect(QStringLiteral("a program with no recipe, in a store that keeps an earlier version, offers going back (%1)").arg(buttonTexts(window).join("|")),
+               !window.catalog().recipe("fd") && buttonTexts(window).contains("Go back to 10.1.0") && buttonTexts(window).contains("Its receipt"));
+        clickButton(window.installedPage(), "Its receipt");
+        settle(150);
+        expect(QStringLiteral("its page offers it too"), window.recipePage()->isVisible() && buttonTexts(window).contains("Go back to 10.1.0"));
+        save(window, "18d-program-no-recipe-kept");
+        clickButton(window.recipePage(), "Go back to 10.1.0");
+        waitUntilIdle(window, 30);
+        now = changesAsked().mid(before);
+        expect(QStringLiteral("going back with no recipe: `recipe go-back fd` with that store, through the helper, and 10.1.0 is active"),
+               now.size() == 1 && kinds(now[0].arguments, {"go-back", "fd", "--machine-events", "--package-root", scratch + "/system-store"})
+                   && window.catalog().installedItem("fd", Place::Computer)->version == "10.1.0"
+                   && window.catalog().installedItem("fd", Place::Computer)->kept == "10.2.0");
         window.showInstalled("htop", int(Place::Computer));
         save(window, "p6-installed-not-locked");
     }
@@ -1069,6 +1165,229 @@ void holdShots(Window &window, const Save &save, const Expect &expect)
            lines.value(0) == "Let GIMP update again" && lines.contains("Kept GIMP at 3.0.4")
                && lines.indexOf("Kept GIMP at 3.0.4") > 0);
     window.showBrowse();
+}
+
+
+// What the audit of the window found and the stories did not reach: software whose recipe is gone,
+// the page for a name nothing carries, the remove question, a short change with a page of its own
+// (running, stopped, not finished, tried again), closing the window while something runs. Pictures
+// `17*` and `18*`, `19*`; "Open" for the person's own store is in the places pass (`p8`, `p9`).
+void gapShots(Window &window, const Save &save, const Expect &expect)
+{
+    // ---- Software whose recipe is gone: what its receipt says, and what still works without one.
+    expect(QStringLiteral("fd is installed and no recipe for it is in the collection or the sources"),
+           window.catalog().installedItem("fd") && !window.catalog().recipe("fd"));
+    window.showInstalled("fd");
+    settle(100);
+    QString words = wordsOn(window);
+    QStringList buttons = buttonTexts(window);
+    expect(QStringLiteral("Installed says its recipe is gone, what the receipt lists and where it came from, and offers what works (%1)").arg(buttons.join("|")),
+           words.contains("Its recipe is gone: no recipe for it is in the collection or the sources any more.")
+               && words.contains("Its receipt lists 2 files.")
+               && words.contains("It came from the source oldmirror, which is not among the sources any more.")
+               && buttons.contains("Its receipt") && buttons.contains("Remove…")
+               && buttons.contains("Keep at this version") && !buttons.contains("Open") && !buttons.contains("Install")
+               && !buttons.contains("Go back to 10.1.0")); // the story cleared the earlier versions before this
+    save(window, "18a-installed-no-recipe");
+    clickButton(window.installedPage(), "Its receipt");
+    settle(150);
+    words = wordsOn(window);
+    buttons = buttonTexts(window);
+    expect(QStringLiteral("its page shows the receipt: name, version, files, source and commit, the recipe file that is not there (%1)").arg(buttons.join("|")),
+           window.recipePage()->isVisible() && words.contains("Its recipe is gone") && words.contains("What its receipt says")
+               && words.contains("bin/fd") && words.contains("share/man/man1/fd.1") && words.contains("2 files")
+               && words.contains("The source oldmirror, which is not among the sources any more, at commit e41c7a0")
+               && words.contains("/usr/share/recipe/recipes/fd.rhai") && words.contains("The file is not there any more.")
+               && words.contains("Kept at ") == false);
+    expect(QStringLiteral("and offers remove and keeping at the version, never install or a recipe to read"),
+           buttons.contains("Remove…") && buttons.contains("Keep at this version")
+               && !buttons.contains("Install") && !buttons.contains("Read it"));
+    save(window, "18b-program-no-recipe");
+    // Keeping it at its version works from the receipt alone, through a page of its own, and the page is drawn again.
+    const int kept = timesAsked({"hold", "fd"});
+    clickButton(window.recipePage(), "Keep at this version");
+    waitUntilIdle(window, 30);
+    expect(QStringLiteral("keeping it ran `recipe hold fd`, fd is held, and the receipt's page is back with the way to let it go"),
+           timesAsked({"hold", "fd"}) == kept + 1 && window.catalog().installedItem("fd") && window.catalog().installedItem("fd")->held
+               && window.recipePage()->isVisible() && wordsOn(window).contains("Kept at 10.2.0")
+               && buttonTexts(window).contains("Let it update again"));
+    clickButton(window.recipePage(), "Let it update again");
+    waitUntilIdle(window, 30);
+    expect(QStringLiteral("and it can be let go again"),
+           timesAsked({"unhold", "fd"}) == 1 && !window.catalog().installedItem("fd")->held && window.recipePage()->isVisible());
+    // The back link leads to what is installed.
+    for (ClickLabel *label : window.recipePage()->findChildren<ClickLabel *>())
+        if (label->text() == QStringLiteral("‹ Installed"))
+            emit label->clicked();
+    settle(100);
+    expect(QStringLiteral("the page's back link returns to Installed"), window.installedPage()->isVisible());
+    expect(QStringLiteral("Updates says recipe could not look it up"),
+           window.catalog().updateProblems.join("|").contains("fd: no recipe for it is in the collection or the sources any more"));
+
+    // ---- A name no recipe has and nothing installed carries.
+    window.showRecipe("no-such-recipe");
+    settle(100);
+    words = wordsOn(window);
+    expect(QStringLiteral("its page says there is no recipe by that name, why it might be so, and leads back"),
+           words.contains("No recipe named no-such-recipe") && words.contains("No source offers a recipe by that name, and nothing installed carries it.")
+               && words.contains("‹ All software"));
+    save(window, "18c-no-recipe-named");
+
+    // ---- The remove question, then the change with a page of its own.
+    const int removed = timesAsked({"remove", "fd"});
+    window.showInstalled("fd");
+    settle(100);
+    clickButton(window.installedPage(), "Remove…");
+    settle(200);
+    QPointer<RemoveDialog> question = window.removeQuestion();
+    expect(QStringLiteral("Remove… asks first, in a window of its own; nothing has run"),
+           question && question->isVisible() && timesAsked({"remove", "fd"}) == removed);
+    if (question) {
+        const QString asked = wordsOn(*question);
+        expect(QStringLiteral("for software with no recipe it still says what happens (%1)").arg(asked.left(80)),
+               asked.contains("Remove fd 10.2.0?") && asked.contains("It is no longer installed.")
+                   && asked.contains("Recipe keeps its files among the earlier versions until those are cleared, in Storage.")
+                   && asked.contains("What it wrote in your home folder stays."));
+        save(*question, "17a-remove-question");
+        clickButton(question, "Cancel");
+    }
+    settle(200);
+    expect(QStringLiteral("Cancel removes nothing and closes the question"),
+           timesAsked({"remove", "fd"}) == removed && window.catalog().installedItem("fd") && (!question || !question->isVisible()));
+
+    qputenv("RECIPE_STANDIN_STOP_AT", "fd:remove");
+    clickButton(window.installedPage(), "Remove…");
+    settle(200);
+    clickButton(window.removeQuestion(), "Remove");
+    waitFor([&] { return timesAsked({"remove", "fd"}) > removed; }, 30);
+    settle(300);
+    expect(QStringLiteral("Remove ran `recipe remove fd`, and the change has a page: what it does, Stop, and the status line says what runs (%1; %2)")
+               .arg(buttonTexts(window).join("|"), window.frame()->statusText()),
+           timesAsked({"remove", "fd"}) == removed + 1 && window.changePage()->isVisible() && window.busy()
+               && wordsOn(window).contains("Removing fd") && buttonTexts(window).contains("Stop")
+               && wordsOn(window).contains("Stopping it before it ends leaves fd installed. You can remove it again from Installed.")
+               && window.frame()->statusText().contains("Removing fd"));
+    save(window, "17b-change-running");
+    clickButton(window.changePage(), "Stop");
+    waitUntilIdle(window, 30);
+    words = wordsOn(window);
+    buttons = buttonTexts(window);
+    expect(QStringLiteral("stopped: the page says so, that fd 10.2.0 is still installed, and offers Try again and Back (%1)").arg(buttons.join("|")),
+           words.contains("You stopped it") && words.contains("fd 10.2.0 is still installed.") && buttons.contains("Try again")
+               && buttons.contains("Back") && !buttons.contains("Stop") && window.catalog().installedItem("fd") && !window.busy());
+    save(window, "17c-change-stopped");
+
+    qunsetenv("RECIPE_STANDIN_STOP_AT");
+    qputenv("RECIPE_STANDIN_FAIL", "remove:fd");
+    clickButton(window.changePage(), "Try again");
+    waitUntilIdle(window, 30);
+    words = wordsOn(window);
+    buttons = buttonTexts(window);
+    expect(QStringLiteral("not finished: the headline, recipe's own message, the command's own output, what is true, and the way on (%1)").arg(buttons.join("|")),
+           timesAsked({"remove", "fd"}) == removed + 2 && window.changePage()->isVisible()
+               && words.contains("Removing fd did not finish")
+               && words.contains("cannot switch the active profile of") && words.contains("Permission denied")
+               && words.contains("fd 10.2.0 is still installed.")
+               && buttons.contains("Try again") && buttons.contains("Back") && window.catalog().installedItem("fd") && !window.busy());
+    save(window, "17d-change-failed");
+    qunsetenv("RECIPE_STANDIN_FAIL");
+    clickButton(window.changePage(), "Try again");
+    waitUntilIdle(window, 30);
+    expect(QStringLiteral("Try again ran the same command once more and it worked: fd is gone, Installed is drawn again, the status line says so"),
+           timesAsked({"remove", "fd"}) == removed + 3 && !window.catalog().installedItem("fd") && window.installedPage()->isVisible()
+               && window.frame()->statusText().contains("Removed fd"));
+    window.showStorage();
+    settle(100);
+    expect(QStringLiteral("and the history has it, on top"), window.storagePage()->historyLines().value(0) == "Removed fd 10.2.0");
+
+    // A failed change that is not a package's: the lists could not be fetched.
+    qputenv("RECIPE_STANDIN_FAIL", "refresh");
+    window.showUpdates();
+    settle(100);
+    clickButton(window.updatesPage(), "Check for updates");
+    waitUntilIdle(window, 30);
+    words = wordsOn(window);
+    expect(QStringLiteral("fetching that did not finish says so, with recipe's own words (%1)").arg(words.left(60)),
+           window.changePage()->isVisible() && words.contains("Fetching the lists did not finish")
+               && words.contains("could not fetch the list of levitate: connection timed out")
+               && words.contains("The recipes are as they were when they were last read."));
+    save(window, "17e-fetch-failed");
+    qunsetenv("RECIPE_STANDIN_FAIL");
+    clickButton(window.changePage(), "Back");
+    waitUntilIdle(window, 30);
+    expect(QStringLiteral("Back returns to the page the person was on"), window.updatesPage()->isVisible());
+
+    // ---- Closing the window while something runs: asked first, with what is true.
+    {
+        qputenv("RECIPE_STANDIN_STOP_AT", "htop:build");
+        const int installs = timesAsked({"install", "levitate:htop"});
+        Window other;
+        other.show();
+        waitUntilIdle(other, 30);
+        other.startInstall("htop", Place::Computer);
+        waitFor([&] { return timesAsked({"install", "levitate:htop"}) > installs; }, 30);
+        settle(500);
+        expect(QStringLiteral("an install runs, stopped in the middle of its build"),
+               processesRunning("install levitate:htop --machine-events") == 1 && other.busy());
+        other.close();
+        settle(300);
+        QPointer<QMessageBox> box = other.closeQuestion();
+        expect(QStringLiteral("closing the window asks first, and the window stays"), box && box->isVisible() && other.isVisible());
+        if (box) {
+            const QString asked = wordsOn(*box);
+            expect(QStringLiteral("it says what stops, what is kept, that nothing was changed and that it can be started again (%1)").arg(asked.left(60)),
+                   asked.contains("Installing htop is still running.") && asked.contains("If you close the window now it is stopped.")
+                       && asked.contains("What is already fetched and built is kept.") && asked.contains("Nothing on this computer is changed.")
+                       && asked.contains("You can start it again from htop's page whenever you like.")
+                       && buttonTexts(*box).contains("Stop it and close") && buttonTexts(*box).contains("Keep the window open"));
+            save(*box, "19a-close-install");
+            clickButton(box, "Keep the window open");
+        }
+        settle(300);
+        expect(QStringLiteral("keeping the window open leaves the install running"),
+               other.isVisible() && other.busy() && processesRunning("install levitate:htop --machine-events") == 1);
+        other.close();
+        settle(300);
+        box = other.closeQuestion();
+        expect(QStringLiteral("closing again asks again"), box && box->isVisible());
+        if (box)
+            clickButton(box, "Stop it and close");
+        waitFor([&] { return !other.isVisible(); }, 20);
+        settle(200);
+        expect(QStringLiteral("stopping it ended the install, and the window closed"),
+               !other.isVisible() && processesRunning("install levitate:htop --machine-events") == 0);
+    }
+    {
+        qputenv("RECIPE_STANDIN_STOP_AT", "thunderbird:remove");
+        const int removes = timesAsked({"remove", "thunderbird"});
+        Window other;
+        other.show();
+        waitUntilIdle(other, 30);
+        const QString shown = other.catalog().recipe("thunderbird") ? other.catalog().recipe("thunderbird")->shown() : QStringLiteral("thunderbird");
+        other.removeNow("thunderbird", Place::Computer);
+        waitFor([&] { return timesAsked({"remove", "thunderbird"}) > removes; }, 30);
+        settle(400);
+        other.close();
+        settle(300);
+        QPointer<QMessageBox> box = other.closeQuestion();
+        expect(QStringLiteral("closing during a remove asks too, and says what stopping it leaves"),
+               box && box->isVisible() && wordsOn(*box).contains(QStringLiteral("Removing %1 is still running.").arg(shown))
+                   && wordsOn(*box).contains(QStringLiteral("Stopping it before it ends leaves %1 installed. You can remove it again from Installed.").arg(shown)));
+        if (box) {
+            save(*box, "19b-close-remove");
+            clickButton(box, "Stop it and close");
+        }
+        waitFor([&] { return !other.isVisible(); }, 20);
+        settle(200);
+        bool still = false;
+        for (const QJsonValue &each : answerOf({"installed", "--json"})["packages"].toArray())
+            still = still || each.toObject()["name"] == "thunderbird";
+        expect(QStringLiteral("it stopped and the window closed; Thunderbird is still installed"),
+               !other.isVisible() && still && processesRunning("remove thunderbird --machine-events") == 0);
+        qunsetenv("RECIPE_STANDIN_STOP_AT");
+    }
+    window.showBrowse();
+    settle(100);
 }
 
 } // namespace
@@ -1295,6 +1614,12 @@ int takeShots(Window &window, const QString &folder)
             said << "not as expected: a stopped update offers no agent repair, and says why\n";
             ok = false;
         }
+        // Where recipe keeps the log is a fact of the stop; the output itself is under "Show the output".
+        if (!words.contains("Recipe keeps the log and the retained record of this run in ")
+            || words.contains("of the run's output")) {
+            said << "not as expected: a stopped update names the log and keeps the output behind its button\n";
+            ok = false;
+        }
     }
 
     window.showInstalled("gimp");
@@ -1351,9 +1676,28 @@ int takeShots(Window &window, const QString &folder)
         ok = false;
     }
     {
+        // The agent is given the last lines of the run's output and where recipe keeps its log, not a count.
+        const QString facts = wordsOn(window);
+        const bool given = facts.contains("The last 2 lines of the run's output (2 lines in all):")
+                           && facts.contains("recipe: fetching krita 5.2.13 from")
+                           && facts.contains("Recipe keeps the log and the retained record of this run in ")
+                           && !facts.contains("The output of the run: ");
+        if (!given) {
+            said << "not as expected: the facts for the agent carry the output's last lines and the log's place\n";
+            ok = false;
+        }
+        ok &= save(window, "8a-agent-facts");
         const qsizetype beforeFix = changesAsked().size();
-        window.startInstall("krita", Place::Computer, "The issue:\nThe install stopped.\n\nThe expected result:\nKrita installs.\n");
+        clickButton(window.runPage(), "Let the agent fix it");
         waitUntilIdle(window);
+        QFile handed(QDir(qEnvironmentVariable("RECIPE_STANDIN_STATE")).filePath("last-autofix-prompt.txt"));
+        const QString prompt = handed.open(QIODevice::ReadOnly) ? QString::fromUtf8(handed.readAll()) : QString();
+        if (!prompt.contains("The last 2 lines of the run's output (2 lines in all):\n    recipe: diagnostics: ")
+            || !prompt.contains("recipe: fetching krita 5.2.13 from")
+            || !prompt.contains("Recipe keeps the log and the retained record of this run in " + qEnvironmentVariable("RECIPE_STANDIN_STATE") + "/logs/")) {
+            said << "not as expected: the prompt file handed to recipe holds the last lines and the log's place\n";
+            ok = false;
+        }
         const QList<Asked> now = changesAsked().mid(beforeFix);
         if (now.size() != 1 || now[0].arguments.mid(0, 4) != QStringList{"install", "levitate:krita", "--machine-events", "--autofix"}
             || !window.catalog().installedItem("krita", Place::Computer)) {
@@ -1459,6 +1803,7 @@ int takeShots(Window &window, const QString &folder)
     auto held = [&](const QString &what, bool holds) { expect(what, holds); };
     frameShots(window, saved, held);
     holdShots(window, saved, held);
+    gapShots(window, saved, held);
     settingsShots(window, folder, saved, held);
     helpShots(window, folder, saved, held);
     stripShots(window, folder, saved, held, out);
