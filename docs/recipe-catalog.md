@@ -79,7 +79,7 @@ tools, separate from commands activated into the host profile.
 
 The compiler image remains the one pinned in
 `.artifacts/recipe-htop-20261110/inputs.json`. Checks now use maintained Ginux
-`cfb0c3bc`, including upstream `cfebfdab`, and Recipe `50423f3`. Logs and
+`b6e9e15e`, including upstream `cfebfdab`, and Recipe `50423f3`. Logs and
 consumer definitions are under `.artifacts/recipe-toolchain-fix/` and
 `.artifacts/recipe-toolchain-wave/proofs/`. No image or VM was built.
 
@@ -88,7 +88,7 @@ consumer definitions are under `.artifacts/recipe-toolchain-fix/` and
 | `gxx` | Actual `build_deps` consumer compiles and runs a C++20 program using vector, string and iostream. | Requires the matching Rocky GCC 14.3.1 compiler image; its launchers preserve the image's support-file search paths. |
 | `cmake` | A separate immutable SDK consumer configures a C project with the image GCC and Make, builds it and runs its executable. | Uses the pinned shared compiler image. |
 | `ninja` | Actual `build_deps` consumer executes a C compilation rule and runs the resulting program. | Uses the image C compiler. |
-| `go` | The final recipe verifies all 6,064 SDK files and publishes its tools. A separate immutable SDK consumer builds, links and runs a program importing fmt with CGO disabled. | Uses the pinned toolchain without automatic downloads; broader cgo compatibility is not claimed. |
+| `go` | The final recipe verifies all 6,064 SDK files and publishes its tools. Both an actual `build_deps` consumer and a separate immutable SDK consumer build, link and run a program importing fmt with CGO disabled. | Uses the pinned toolchain without automatic downloads; broader cgo compatibility is not claimed. |
 | `python` | A separate immutable SDK consumer executes a script using JSON, zlib/bz2/lzma round trips, SQLite, SSL and a subprocess. | Public CA PEMs are accepted; PEMs containing private-key markers remain refused. |
 
 Ginux now accepts checked GNU restore headers and long links, keeps Go thread
