@@ -105,14 +105,14 @@ jobs:
 
       - name: Acquire the kernel and the rootfs source
         run: |
-          sudo -n --preserve-env env HOME="$HOME" PATH="$PATH" cargo xtask build kernel "$DISTRO" --prebuilt
-          sudo -n --preserve-env env HOME="$HOME" PATH="$PATH" cargo xtask build rootfs-source "$DISTRO"
+          sudo -n env PATH="$PATH" CARGO_HOME="$CARGO_HOME" RUSTUP_HOME="$HOME/.rustup" GINUX_ROOT="$GINUX_ROOT" GINUX_ROOTFS="$GINUX_ROOTFS" cargo xtask build kernel "$DISTRO" --prebuilt
+          sudo -n env PATH="$PATH" CARGO_HOME="$CARGO_HOME" RUSTUP_HOME="$HOME/.rustup" GINUX_ROOT="$GINUX_ROOT" GINUX_ROOTFS="$GINUX_ROOTFS" cargo xtask build rootfs-source "$DISTRO"
 
       - name: Build every release product
         run: |
           set -euo pipefail
           for product in $(cargo xtask status "$DISTRO" --json | jq -r '.artifacts | keys_unsorted[]'); do
-            sudo -n --preserve-env env HOME="$HOME" PATH="$PATH" cargo xtask build "$product" "$DISTRO"
+            sudo -n env PATH="$PATH" CARGO_HOME="$CARGO_HOME" RUSTUP_HOME="$HOME/.rustup" GINUX_ROOT="$GINUX_ROOT" GINUX_ROOTFS="$GINUX_ROOTFS" cargo xtask build "$product" "$DISTRO"
           done
 
       - name: Run every scenario
