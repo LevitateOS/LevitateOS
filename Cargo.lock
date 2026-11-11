@@ -1036,6 +1036,7 @@ name = "install-tests"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "clap",
  "colored",
  "distro-builder",
  "distro-contract",
@@ -1046,7 +1047,9 @@ dependencies = [
  "recshuttle",
  "serde",
  "serde_json",
+ "sha2",
  "tempfile",
+ "url",
 ]
 
 [[package]]

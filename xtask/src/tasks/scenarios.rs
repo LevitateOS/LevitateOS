@@ -17,20 +17,30 @@ fn run_options(boot: &BootArgs, force: bool) -> Result<RunOptions> {
     if let Some(path) = &boot.inject_file {
         let text = std::fs::read_to_string(path)
             .with_context(|| format!("reading --inject-file {}", path.display()))?;
-        injection.extend(text.lines().map(str::trim).filter(|l| !l.is_empty()).map(str::to_string));
+        injection.extend(
+            text.lines()
+                .map(str::trim)
+                .filter(|l| !l.is_empty())
+                .map(str::to_string),
+        );
     }
     if let Some(raw) = &boot.inject {
-        injection.extend(install_tests::boot_injection::parse_pairs(raw).map_err(|e| usage(format!("--inject: {e:#}")))?);
+        injection.extend(
+            install_tests::boot_injection::parse_pairs(raw)
+                .map_err(|e| usage(format!("--inject: {e:#}")))?,
+        );
     }
     if let Some(key) = &boot.ssh_key
-        && !key.is_file() {
-            return Err(usage(format!("--ssh-key {} is not a file", key.display())));
-        }
+        && !key.is_file()
+    {
+        return Err(usage(format!("--ssh-key {} is not a file", key.display())));
+    }
     Ok(RunOptions {
         force,
         injection,
         login_key: boot.ssh_key.clone(),
         install_mode: Default::default(),
+        update_fixture: None,
     })
 }
 
@@ -54,13 +64,20 @@ pub fn run(args: RunArgs) -> Result<()> {
             distro.id()
         )));
     }
-    if installed && (args.boot.inject.is_some() || args.boot.inject_file.is_some() || args.boot.ssh_key.is_some()) {
+    if installed
+        && (args.boot.inject.is_some()
+            || args.boot.inject_file.is_some()
+            || args.boot.ssh_key.is_some())
+    {
         return Err(usage(format!(
             "{key} takes no boot injection: the live init reads it, the installed system does not",
         )));
     }
     let mode = match (args.ssh, args.no_shell) {
-        (true, no_shell) => Mode::Ssh { port: args.ssh_port, shell: !no_shell },
+        (true, no_shell) => Mode::Ssh {
+            port: args.ssh_port,
+            shell: !no_shell,
+        },
         (false, true) => Mode::Check,
         (false, false) => Mode::Console,
     };
@@ -68,7 +85,8 @@ pub fn run(args: RunArgs) -> Result<()> {
     // Some shells send cursor-position queries; their replies must not leak
     // into the guest's console or into the shell after it.
     flush_tty_input_queue();
-    let result = install_tests::interactive::open(&root, distro.id(), args.scenario, mode, &options);
+    let result =
+        install_tests::interactive::open(&root, distro.id(), args.scenario, mode, &options);
     flush_tty_input_queue();
     result
 }
@@ -84,9 +102,14 @@ pub fn test(args: TestArgs) -> Result<()> {
             .filter(|scenario| scenario.in_test_all())
             .filter(|scenario| {
                 // ab-update updates an A/B install; `all` leaves it out of other modes.
-                let skip = *scenario == ScenarioId::AbUpdate && args.mode != recpart::InstallMode::Ab;
+                let skip =
+                    *scenario == ScenarioId::AbUpdate && args.mode != recpart::InstallMode::Ab;
                 if skip {
-                    eprintln!("skipping {}: it needs --mode {}", scenario.key(), recpart::InstallMode::Ab);
+                    eprintln!(
+                        "skipping {}: it needs --mode {}",
+                        scenario.key(),
+                        recpart::InstallMode::Ab
+                    );
                 }
                 !skip
             })
@@ -95,6 +118,7 @@ pub fn test(args: TestArgs) -> Result<()> {
     };
     let options = RunOptions {
         install_mode: args.mode,
+        update_fixture: args.update_fixture.clone(),
         ..run_options(&args.boot, args.force)?
     };
     let outcomes = install_tests::scenarios::run(&root, distro.id(), &scenarios, &options)?;
@@ -110,7 +134,10 @@ pub fn test(args: TestArgs) -> Result<()> {
         Outcome::Passed(evidence) => Some(evidence.clone()),
         Outcome::Cached => None,
         Outcome::Failed(err) => Some(format!("{err:#}")),
-        Outcome::Missing(missing) => Some(format!("{missing}; fix: {}", crate::util::exit::fix_for(missing))),
+        Outcome::Missing(missing) => Some(format!(
+            "{missing}; fix: {}",
+            crate::util::exit::fix_for(missing)
+        )),
         Outcome::NotRun(why) => Some(why.clone()),
     };
     if args.json {
@@ -130,7 +157,12 @@ pub fn test(args: TestArgs) -> Result<()> {
         println!();
         for (scenario, outcome) in &outcomes {
             let line = detail(outcome).map(|d| d.lines().next().unwrap_or_default().to_string());
-            println!("  {:<8} {:<15} {}", label(outcome), scenario.key(), line.unwrap_or_default());
+            println!(
+                "  {:<8} {:<15} {}",
+                label(outcome),
+                scenario.key(),
+                line.unwrap_or_default()
+            );
         }
     }
 

@@ -61,14 +61,24 @@ struct DistroParser;
 impl TypedValueParser for DistroParser {
     type Value = Distro;
 
-    fn parse_ref(&self, cmd: &Command, arg: Option<&Arg>, value: &OsStr) -> Result<Distro, clap::Error> {
+    fn parse_ref(
+        &self,
+        cmd: &Command,
+        arg: Option<&Arg>,
+        value: &OsStr,
+    ) -> Result<Distro, clap::Error> {
         let id = PossibleValuesParser::new(self.possible_values().into_iter().flatten())
             .parse_ref(cmd, arg, value)?;
-        Distro::load(&id).map_err(|err| clap::Error::raw(ErrorKind::ValueValidation, format!("{err:#}\n")))
+        Distro::load(&id)
+            .map_err(|err| clap::Error::raw(ErrorKind::ValueValidation, format!("{err:#}\n")))
     }
 
     fn possible_values(&self) -> Option<Box<dyn Iterator<Item = PossibleValue> + '_>> {
-        Some(Box::new(distro_ids().into_iter().map(|id| PossibleValue::new(leak(id)))))
+        Some(Box::new(
+            distro_ids()
+                .into_iter()
+                .map(|id| PossibleValue::new(leak(id))),
+        ))
     }
 }
 
@@ -118,11 +128,13 @@ fn test_selections() -> Vec<(&'static str, &'static str, TestSelection)> {
         left_out.join(" and ")
     );
     std::iter::once(("all", &*all.leak(), TestSelection::All))
-        .chain(
-            ScenarioId::ALL
-                .into_iter()
-                .map(|scenario| (scenario.key(), scenario.summary(), TestSelection::One(scenario))),
-        )
+        .chain(ScenarioId::ALL.into_iter().map(|scenario| {
+            (
+                scenario.key(),
+                scenario.summary(),
+                TestSelection::One(scenario),
+            )
+        }))
         .collect()
 }
 
@@ -401,7 +413,9 @@ impl DistroSelection {
         match (&self.distro, self.all) {
             (_, true) => Distro::all(),
             (Some(distro), false) => Ok(vec![distro.clone()]),
-            (None, false) => Err(crate::util::exit::usage("name a distro, or --all for every distro")),
+            (None, false) => Err(crate::util::exit::usage(
+                "name a distro, or --all for every distro",
+            )),
         }
     }
 }
@@ -504,6 +518,10 @@ pub struct BootArgs {
 
 #[derive(Args)]
 pub struct TestArgs {
+    /// Existing RECAB_P13 ISO with signed feed, public source policy and native origin helper.
+    /// Install uses its policy before sealing; ab-update uses it as its newer update input.
+    #[arg(long, value_name = "ISO")]
+    pub update_fixture: Option<PathBuf>,
     /// A scenario, or all of them.
     #[arg(value_parser = Choices(test_selections))]
     pub scenario: TestSelection,
