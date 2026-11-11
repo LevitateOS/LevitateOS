@@ -1,19 +1,33 @@
-//! `prebuilt`: keys and publishing of our own prebuilt programs, through distro-builder.
+//! `prebuilt`: keys, listing, building and publishing of our own prebuilt programs,
+//! through distro-builder.
 
 use anyhow::Result;
 
-use crate::cli::PrebuiltArgs;
+use crate::cli::{PrebuiltArgs, PrebuiltCmd};
 use distro_builder::cli::Command;
 
-/// `prebuilt key` (`publish` false) or `prebuilt publish`. Neither needs root, and
-/// `publish` must use the user's own `gh` login, so the builder runs unprivileged.
-pub fn run((publish, args): (bool, PrebuiltArgs)) -> Result<()> {
-    let PrebuiltArgs { family, name, distro } = args;
-    let distro = distro.map(|distro| distro.id().to_string());
-    let command = if publish {
-        Command::PrebuiltPublish { family, name, distro }
-    } else {
-        Command::PrebuiltKey { family, name, distro }
+/// `prebuilt key`, `list` and `publish` need no root, and `publish` must use the user's
+/// own `gh` login, so the builder runs unprivileged for them. `build` compiles, which
+/// needs root like every compile, so it takes the elevated path.
+pub fn run(cmd: PrebuiltCmd) -> Result<()> {
+    let root = crate::util::repo::repo_root()?;
+    let command = |args: PrebuiltArgs, make: fn(String, String, Option<String>) -> Command| {
+        let PrebuiltArgs { family, name, distro } = args;
+        make(family, name, distro.map(|distro| distro.id().to_string()))
     };
-    crate::util::distro_builder::run_unprivileged(&crate::util::repo::repo_root()?, &command)
+    match cmd {
+        PrebuiltCmd::List => crate::util::distro_builder::run_unprivileged(&root, &Command::PrebuiltList),
+        PrebuiltCmd::Key(args) => crate::util::distro_builder::run_unprivileged(
+            &root,
+            &command(args, |family, name, distro| Command::PrebuiltKey { family, name, distro }),
+        ),
+        PrebuiltCmd::Publish(args) => crate::util::distro_builder::run_unprivileged(
+            &root,
+            &command(args, |family, name, distro| Command::PrebuiltPublish { family, name, distro }),
+        ),
+        PrebuiltCmd::Build(args) => crate::util::distro_builder::run(
+            &root,
+            &command(args, |family, name, distro| Command::PrebuiltBuild { family, name, distro }),
+        ),
+    }
 }

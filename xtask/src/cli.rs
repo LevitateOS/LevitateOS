@@ -210,7 +210,7 @@ pub enum Cmd {
         what: KernelCmd,
     },
 
-    /// Prebuilt programs of our own tools and the TUI binary: print a key, or publish a build.
+    /// Prebuilt programs of our own tools and the TUI binary: print a key, list the parts, compile one, or publish a build.
     Prebuilt {
         #[command(subcommand)]
         what: PrebuiltCmd,
@@ -474,6 +474,11 @@ impl DistroSelection {
 pub enum PrebuiltCmd {
     /// Print the key of a prebuilt program: what CI computes to find or publish it.
     Key(PrebuiltArgs),
+    /// Print every prebuilt part, one `<family> <name> [--distro <id>]` per line.
+    List,
+    /// Compile a prebuilt into the local cache (no download, no ISO) and print its key and
+    /// cache directory; what CI publishes. Needs root, like every compile.
+    Build(PrebuiltArgs),
     /// Upload the local cache entry of a prebuilt's current key to the prebuilt repository
     /// (LEVITATE_PREBUILT_REPO, default LevitateOS/prebuilt) with gh; never replaces an
     /// asset that differs. Build it first (an ISO build, or `build ... --no-prebuilt`).

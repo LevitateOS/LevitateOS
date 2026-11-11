@@ -184,6 +184,11 @@ release published, the repository not created:
   `cargo xtask prebuilt publish`. The repository `LevitateOS/prebuilt` must be created first.
 - **Release builds:** exact (and signed) builds never download and do not use the cache;
   `--no-prebuilt` is the same for non-exact builds, but still fills the cache.
+- **CI, written 2026-11-12, unverified:** `distro-builder prebuilt list|build` (also
+  `cargo xtask prebuilt list|build`) and `.github/workflows/publish.yml` in
+  `LevitateOS/prebuilt`: hourly and on demand, it builds what has no release yet on a
+  GitHub runner (compiler image produced from the pin, `sudo` for the compile) and
+  publishes it. It has never run: runner `sudo` and Ginux, the image production, disk
+  space and the token's right to create releases are all untested.
 - **Not done:** the Qt apps family, `install-tools.rhai` taking a `prebuilt` input (not
-  needed: the downloaded program enters through its existing `program` input), CI
-  (`prebuilt.yml`), retention.
+  needed: the downloaded program enters through its existing `program` input), retention.
