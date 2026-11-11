@@ -65,6 +65,11 @@ signals:
     void update(const QString &name, Place place);
     void remove(const QString &name, Place place);
     void open(const QString &name, Place place);
+    void goBack(const QString &name, Place place);
+    // Keep it at its version (`on`), or let it update again.
+    void hold(const QString &name, Place place, bool on);
+    // Open the recipe's file.
+    void readRecipe(const QString &name);
 };
 
 class RunPage : public Page {
@@ -89,9 +94,11 @@ private:
 
     Catalog catalog_;
     QString name_, updatingFrom_;
+    Place place_ = Place::Computer;
     Run *run_ = nullptr;
     QVBoxLayout *column_ = nullptr;
     QGridLayout *plan_ = nullptr;
+    QWidget *planBox_ = nullptr;
     QMap<QString, StepMark *> marks_;
     QLabel *title_ = nullptr, *state_ = nullptr, *outputTitle_ = nullptr;
     QString agentNote_;
@@ -111,10 +118,10 @@ public:
 signals:
     void open(const QString &name, Place place);
     void goBack(const QString &name, Place place);
-    // Delete every earlier version the store of that place keeps.
-    void clearEarlier(Place place);
     void remove(const QString &name, Place place);
     void update(const QString &name, Place place);
+    void hold(const QString &name, Place place, bool on);
+    void openStorage();
     void selected(const QString &name, Place place);
 };
 
@@ -125,6 +132,7 @@ public:
     void show(const Catalog &catalog, const QString &selected, int selectedPlace = -1);
 signals:
     void update(const QString &name, Place place);
+    void hold(const QString &name, Place place, bool on);
     void updateAll();
     void selected(const QString &name, Place place);
     // Fetch every source's list again, to see whether anything is newer.

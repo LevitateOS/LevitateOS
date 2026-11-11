@@ -2,6 +2,7 @@
 
 #include "pages.h"
 #include "sources.h"
+#include "storage.h"
 
 #include "before.h"
 #include "frame.h"
@@ -47,11 +48,12 @@ Window::Window(QWidget *parent)
     installed_ = new InstalledPage;
     updates_ = new UpdatesPage;
     sources_ = new SourcesPage;
+    storage_ = new StoragePage;
     wish_ = new WishPage;
     work_ = new WorkPage;
     for (QWidget *page : {static_cast<QWidget *>(browse_), static_cast<QWidget *>(recipe_), static_cast<QWidget *>(before_),
                           static_cast<QWidget *>(runPage_), static_cast<QWidget *>(installed_),
-                          static_cast<QWidget *>(updates_), static_cast<QWidget *>(sources_),
+                          static_cast<QWidget *>(updates_), static_cast<QWidget *>(sources_), static_cast<QWidget *>(storage_),
                           static_cast<QWidget *>(wish_), static_cast<QWidget *>(work_)})
         stack_->addWidget(page);
 
@@ -63,6 +65,7 @@ Window::Window(QWidget *parent)
     frame_->addEntry(QStringLiteral("installed"), tr("Installed"));
     frame_->addEntry(QStringLiteral("updates"), tr("Updates"));
     frame_->addEntry(QStringLiteral("sources"), tr("Sources"));
+    frame_->addEntry(QStringLiteral("storage"), tr("Storage"));
     frame_->select(QStringLiteral("browse"));
     frame_->setAgent(client_.agentProgram());
     updateStatus();
@@ -81,6 +84,8 @@ Window::Window(QWidget *parent)
             showUpdates(updateChoice_, updatePlace_);
         else if (key == QLatin1String("sources"))
             showSources();
+        else if (key == QLatin1String("storage"))
+            showStorage();
     });
     // The next system is finished in System, the way its button in the rail starts it.
     connect(frame_, &Frame::finishRequested, this, [this] { frame_->startApp(Frame::System); });
@@ -143,6 +148,13 @@ Window::Window(QWidget *parent)
     connect(recipe_, &RecipePage::update, this, [this](const QString &name, Place place) { askUpdate(name, place); });
     connect(recipe_, &RecipePage::remove, this, &Window::askRemove);
     connect(recipe_, &RecipePage::open, this, &Window::open);
+    connect(recipe_, &RecipePage::goBack, this, &Window::goBack);
+    connect(recipe_, &RecipePage::hold, this, &Window::hold);
+    connect(recipe_, &RecipePage::readRecipe, this, [this](const QString &name) {
+        const Recipe *recipe = catalog_.recipe(name);
+        if (recipe && !recipe->path.isEmpty())
+            QDesktopServices::openUrl(QUrl::fromLocalFile(recipe->path));
+    });
 
     // The Before step: what will happen, then Cancel or go on.
     connect(before_, &BeforePage::cancelled, this, [this] {
@@ -177,7 +189,11 @@ Window::Window(QWidget *parent)
     });
     connect(installed_, &InstalledPage::open, this, &Window::open);
     connect(installed_, &InstalledPage::goBack, this, &Window::goBack);
-    connect(installed_, &InstalledPage::clearEarlier, this, [this](Place place) { clearEarlier(place); });
+    connect(installed_, &InstalledPage::hold, this, &Window::hold);
+    connect(installed_, &InstalledPage::openStorage, this, [this] { showStorage(); });
+    connect(storage_, &StoragePage::clearEarlier, this, [this](Place place) { clearEarlier(place); });
+    connect(storage_, &StoragePage::openInstalled, this, [this] { showInstalled(installedChoice_, installedPlace_); });
+    connect(updates_, &UpdatesPage::hold, this, &Window::hold);
     connect(installed_, &InstalledPage::remove, this, &Window::askRemove);
     connect(installed_, &InstalledPage::update, this, [this](const QString &name, Place place) { askUpdate(name, place); });
     connect(installed_, &InstalledPage::selected, this, [this](const QString &name, Place place) {
@@ -193,7 +209,8 @@ Window::Window(QWidget *parent)
     connect(updates_, &UpdatesPage::updateAll, this, [this] {
         queue_.clear();
         for (const UpdateItem &item : catalog_.updates)
-            if (item.place != Place::Next)
+            // A program kept at its version is left alone.
+            if (item.place != Place::Next && !item.held)
                 queue_ << qMakePair(item.name, item.place);
         startQueued();
     });
@@ -304,7 +321,8 @@ void Window::fillCategories()
 
 void Window::fillRail()
 {
-    frame_->setBadge(QStringLiteral("updates"), int(catalog_.updates.size()));
+    // A held program's update is listed, not counted.
+    frame_->setBadge(QStringLiteral("updates"), catalog_.updatesToCount());
 }
 
 void Window::showBrowse(const QString &category)
@@ -357,6 +375,13 @@ void Window::askInstall(const QString &name)
 
 void Window::askUpdate(const QString &name, Place place)
 {
+    // A held program's Before step is not offered until it is released.
+    const InstalledItem *item = catalog_.installedItem(name, place);
+    if (item && item->held) {
+        queue_.clear();
+        frame_->flash(tr("%1 is kept at version %2. Let it update again first.").arg(catalog_.recipe(name) ? catalog_.recipe(name)->shown() : name, item->version));
+        return;
+    }
     ask_ = Ask{name, true, place, {place}};
     showBefore();
 }
@@ -458,6 +483,14 @@ void Window::removeSource(const QString &name, bool askFirst)
     quietChange(client_.removeSource(name));
 }
 
+void Window::showStorage()
+{
+    again_ = [this] { showStorage(); };
+    frame_->follow(QStringLiteral("storage"));
+    storage_->show(catalog_, client_.places());
+    stack_->setCurrentWidget(storage_);
+}
+
 // ---------------------------------------------------------------- Asking for a recipe
 
 void Window::showWish(const QString &wish)
@@ -531,6 +564,15 @@ void Window::clearEarlier(Place place, bool askFirst)
                != QMessageBox::Yes)
         return;
     quietChange(client_.clearEarlier(place));
+}
+
+void Window::hold(const QString &name, Place place, bool on)
+{
+    // `recipe` holds software only where a store stands behind it.
+    const InstalledItem *item = catalog_.installedItem(name, place);
+    if (!item || !item->inStore || place == Place::Next)
+        return;
+    quietChange(on ? client_.hold(name, place) : client_.unhold(name, place));
 }
 
 // A short change with no page of its own: run it, then show the page again.

@@ -121,6 +121,8 @@ static void readList(const QJsonObject &list, Catalog &fresh)
         fresh.origins << origin;
     }
     fresh.unreadable = list["problems"].toArray().size();
+    for (const QJsonValue &value : list["problems"].toArray())
+        fresh.unreadableRecipes << RecipeProblem{value.toObject()["path"].toString(), value.toObject()["problem"].toString()};
     for (const QJsonValue &value : list["recipes"].toArray()) {
         const Recipe recipe = Recipe::fromJson(value.toObject());
         // Two sources can hold one name; the first is the one Recipe uses.
@@ -140,6 +142,10 @@ static void readInstalled(const QJsonObject &installed, Catalog &fresh, Place pl
         item.version = o["version"].toString();
         // Earlier versions Recipe still holds, newest first.
         item.kept = o["kept"].toArray().first().toObject()["version"].toString();
+        for (const QJsonValue &earlier : o["kept"].toArray())
+            item.earlier << earlier.toObject()["version"].toString();
+        // `recipe installed --json` always carries `held` (commands.rs, Commands::Installed).
+        item.held = o["held"].toBool();
         if (o.contains("installed_on"))
             item.installedOn = QDateTime::fromSecsSinceEpoch(o["installed_on"].toInteger()).date();
         item.sizeBytes = o["size_bytes"].toInteger();
@@ -202,6 +208,7 @@ static void readUpdates(const QJsonObject &updates, Catalog &fresh, Place place)
         // Null: nothing was recorded when the installed version was installed.
         item.changesKnown = o["changes"].isArray();
         item.sameVersion = o["reason"] == QLatin1String("recipe");
+        item.held = o["held"].toBool();
         for (const QJsonValue &change : o["changes"].toArray()) {
             const QJsonObject c = change.toObject();
             item.changes << Change{c["field"].toString(), c["before"].toString(), c["after"].toString(),
@@ -221,6 +228,20 @@ static void readStorage(const QJsonObject &storage, Catalog &fresh, Place place)
     store.activeBytes = storage["active_bytes"].toInteger();
     store.earlierBytes = storage["earlier_bytes"].toInteger();
     store.earlierGenerations = storage["earlier_generations"].toInt();
+}
+
+// What `recipe history --json` answers: `{"schema_version": 1, "history": [...]}`,
+// each entry `at`, `what`, `package`, `from`, `to`, `source`, newest first
+// (tools/recipe src/packages/history.rs `HistoryEntry`).
+static void readHistory(const QJsonObject &answer, Catalog &fresh, Place place)
+{
+    Store &store = fresh.stores[int(place)];
+    store.historyKnown = true;
+    for (const QJsonValue &value : answer["history"].toArray()) {
+        const QJsonObject o = value.toObject();
+        store.history << HistoryEntry{o["at"].toInteger(), o["what"].toString(), o["package"].toString(),
+                                      o["from"].toString(), o["to"].toString(), o["source"].toString()};
+    }
 }
 
 namespace {
@@ -275,6 +296,9 @@ void RecipeClient::load(Loaded done)
         steps->append({QStringList{"updates", "--json"} + collection() + at(place), [fresh, place](const QJsonObject &a) { readUpdates(a, *fresh, place); }, nullptr});
         // What the store takes is said beside the list; the list does not wait on it failing.
         steps->append({QStringList{"storage", "--json"} + at(place), [fresh, place](const QJsonObject &a) { readStorage(a, *fresh, place); },
+                       [](const QString &) {}});
+        // What was done to the store; like storage, its absence only leaves the history out.
+        steps->append({QStringList{"history", "--json"} + at(place), [fresh, place](const QJsonObject &a) { readHistory(a, *fresh, place); },
                        [](const QString &) {}});
     };
     if (one) {
@@ -350,6 +374,16 @@ Run *RecipeClient::remove(const QString &name, Place place)
 Run *RecipeClient::clearEarlier(Place place)
 {
     return change(QStringList{"storage", "--clear-earlier", "--json"} + at(place), place);
+}
+
+Run *RecipeClient::hold(const QString &name, Place place)
+{
+    return change(QStringList{"hold", name, "--machine-events"} + at(place), place);
+}
+
+Run *RecipeClient::unhold(const QString &name, Place place)
+{
+    return change(QStringList{"unhold", name, "--machine-events"} + at(place), place);
 }
 
 Run *RecipeClient::goBack(const QString &name, Place place)

@@ -13,12 +13,12 @@ beyond the red for "this went wrong", so it takes each desktop's own style.
 
 The window is `gui/kit/frame.*` (see `../kit/README.md`): the rail on the left
 (the three apps, then Browse, Installed, Updates with the number of updates as
-its badge, Sources, then Activity, which the frame owns), the pages in the
+its badge, Sources, Storage, then Activity, which the frame owns), the pages in the
 middle, a strip under them and a status line. There is no sidebar any more:
 the search, the box for the source and the box for the kind of software are
 the top of the Browse page. Settings is under Activity (the frame's own page, the
-same in all three apps; `gui/kit/README.md`); Storage and Help are not in the rail
-because those pages do not exist. The story opens Settings (picture `f-settings`),
+same in all three apps; `gui/kit/README.md`); Help is not in the rail because that
+page does not exist. The story opens Settings (picture `f-settings`),
 reading through the built levitate-agent with the stand-in Codex and a settings
 folder of its own.
 
@@ -34,6 +34,18 @@ folder of its own.
   It shows on every page; when recab cannot be run there is no strip and no
   error. "Finish and restart…" starts System (`LEVITATE_APP_SYSTEM`, default
   `recab-gui`), as System's button in the rail does.
+
+## State (2026-11-11)
+
+Since 2026-11-11 the window also has Storage, a program page in the redesign's
+layout, hold, and the refused connection named by its numeric address; Installed,
+Updates and Sources follow the redesign as far as `recipe` carries what it shows
+(the sections below). The story covers each against the stand-in; Storage,
+Installed and the held flag were also read against the real `recipe` (tools/recipe
+`7f3e836`, the debug binary of 2026-11-11 02:06) on a store made by hand, see
+"Reading a hand-made store with the real recipe". Hold and going back through the
+window with the real `recipe`, and the refused connection, have not been run: the
+real events of the last are compiled, not run.
 
 ## State (2026-11-10)
 
@@ -114,7 +126,11 @@ Before page has no choice) and says so when it is missing. Pictures: `1-…` to
 `14-…` are the flows (`2b-before-install`, `4b-before-update` are the Before
 step); `f1`–`f4` Browse (also with a search and a kind), Installed, Updates and
 Sources in the frame; `s1`–`s3` the strip and a window with no recab; `a-*`
-Activity; `p1`–`p6` the two places (below).
+Activity; `p1`–`p6` the two places (below); `15a`–`15c` the program page (not
+installed, installed, installed with an update and an earlier version kept),
+`15d`/`15e` Storage before and after clearing, `16a`–`16d` hold (Installed,
+Updates, the program page, the refused update of a held program). The refused
+connection is `4-stopped`.
 
 The last part of the story opens two more windows of its own, with a scratch
 command line, scratch stand-in state and a scratch system store under
@@ -134,7 +150,13 @@ The stand-in keeps what is "installed" in state files
 an explicit `--package-root`, `installed-me.json` for no `--package-root` (the
 person's own store, which starts with `tree` 2.3.1), and `system.json` for
 `--system` (what the running system holds and what the next one will); delete
-the folder to start over. The stand-in agent writes the app name and title it was given to
+the folder to start over. Beside each store file it keeps the history of what was
+done to it (`installed.json.history.jsonl`, in `recipe history --json`'s fields) and a
+package's `held`; `history`, `hold` and `unhold` answer in the real shapes, `installed`
+and `updates` carry `held`, `update` refuses a held package in the real sentence, and the
+refused connection names `203.0.113.9:443`, a numeric address as the real one does.
+`list --json` reports one unreadable recipe once a second source exists, in the real
+`problems` shape (`path`, `problem`), so Sources has something to show. The stand-in agent writes the app name and title it was given to
 `last-prompt.json` there, which the story reads.
 
 Against the real `recipe` from the checkout, into a test store, with the
@@ -164,8 +186,9 @@ QT_QPA_PLATFORM=offscreen RECIPE_GUI_RECIPE=$PWD/target/debug/recipe \
 | `../kit/frame.*`, `activity.*`, `nextsystem.*` | the window frame, the Activity page it owns, and the strip's reader |
 | `../kit/before.*` | the Before page: a question, "Nothing has started...", sections the app fills, Cancel and one button |
 | `src/beforewords.*` | the words for it, from what `recipe` reported |
-| `src/pages.*` | Browse (with its search and boxes), a recipe's page, a run, Installed, Updates, the remove question |
+| `src/pages.*` | Browse (with its search and boxes), a program's page, a run, Installed, Updates, the remove question |
 | `src/sources.*` | the Sources page, and asking the agent for a recipe |
+| `src/storage.*` | the Storage page: what the earlier versions and what is installed take, per store, and what was done to the stores (the history as sentences) |
 | `src/window.*` | the frame, its rail and status, and the flows between pages |
 | `src/shots.*` | the stand-in looks and the picture mode |
 | `fixtures/` | the stand-in `recipe` with its sample catalog and sources, and the stand-in agent |
@@ -180,17 +203,20 @@ Reads, as the desktop user, JSON on stdout with `"schema_version": 1` (the same 
 | `recipe list --json` | every recipe: `name`, `version`, `description`, `about`, `sources`, `needs`, `deps`, `build_deps`, `hooks`; and the source's name | exists, without `sources` and the source's name. `ABOUT` is passed through unchecked; `SOURCES` is still only the design in `docs/recipe-front-end-format.md` |
 | `recipe installed --json` | `packages`: each one's `name`, `version`, `recipe`, `files`, `installed_on` (seconds), `size_bytes` and `kept`: the earlier versions still held, newest first, each with `version`, `generation`, `installed_on`, `size_bytes` | exists. A receipt written before 2026-11-10 has no `installed_on` or `size_bytes`; the front end then measures the files. It takes programs from the `bin/` files and menu entries from `share/applications/` |
 | `recipe updates --json` | `updates`: for each installed recipe that `recipe update` would change: `name`, `source`, `from`, `to`, `reason` (`version`, or `recipe` when the source publishes another recipe file for the same version) and `changes`; `problems`: installed software it could not look up | exists. `changes` lists every field of NEEDS that differs from what was recorded at install (`field`, `before`, `after`, `kind`: `added`, `removed`, `raised`, `lowered`, `changed`), and is `null` for a receipt that recorded nothing; the page then says the two cannot be compared |
-| `recipe storage --json` | `active_bytes`, `earlier_generations`, `earlier_bytes` | exists. Shown on the Installed page |
+| `recipe storage --json` | `active_bytes`, `earlier_generations`, `earlier_bytes` | exists (`commands.rs` `Commands::Storage`). Shown on the Storage page, per store; Installed says only what the earlier versions take |
+| `recipe history --json` | `{"schema_version": 1, "history": [...]}`, newest first, each entry `at` (seconds since 1970), `what` (`install`, `update`, `remove`, `go-back`, `clear-earlier`, `hold`, `unhold`), `package`, `from`, `to`, `source` (null where one does not apply; `source` is set only for a recipe of a remote source) | exists: `commands.rs` `Commands::History` prints it, `src/packages/history.rs` lines 22-35 define the entry, `packages.rs` records it after each change. Shown on the Storage page, as sentences with the time |
+| `held` in `installed --json` and `updates --json` | a boolean on every package / every listed update | exists: `commands.rs` `Commands::Installed` (`entry["held"] = package.held.into()`) and the `updates` function (`"held": installed.held`). `recipe updates` still lists a held package |
 
 Changes, through the root helper (as the person for software "for me"; with `--system` first and no `--package-root` for a locked computer; see "The two places"), with events on stderr:
 
 | Command | In `recipe` today |
 |---|---|
 | `recipe install NAME --machine-events` | exists: runs the recipe in Ginux and activates its `package` output |
-| `recipe update NAME --machine-events` | exists |
+| `recipe update NAME --machine-events` | exists. Refuses a held package before anything runs, in the sentence `NAME is held, so it is not updated. Release it with: recipe unhold NAME` (`commands.rs` lines 253-257), as the final `failed` event's `reason` |
 | `recipe remove NAME --machine-events` | exists, by the receipt. What it removes stays among the earlier versions |
-| `recipe go-back NAME --machine-events` | exists: activates the newest earlier version again from the files a generation still holds; sends no events |
-| `recipe storage --clear-earlier` | exists: deletes every earlier version. The window asks first ("Clear earlier versions…" on the Installed page). Recipe cannot clear one program's earlier versions alone, so the remove question no longer offers that |
+| `recipe go-back NAME --machine-events` | exists: activates the newest earlier version again from the files a generation still holds; the final event only (`changed_package` in `commands.rs` covers it) |
+| `recipe storage --clear-earlier` | exists: deletes every earlier version. The window asks first ("Clear earlier versions…" on the Storage page; Installed points there). Recipe cannot clear one program's earlier versions alone, so the remove question no longer offers that. It adds a `clear-earlier` line to the history |
+| `recipe hold NAME`, `recipe unhold NAME` (with `--machine-events`) | exists (`commands.rs` `Commands::Hold`/`Unhold`, `packages.rs` `set_held`): `held` on the receipt, a new generation; the final event is `done` or `failed`. Through the root helper where the place needs it. Not for software in a locked computer's system: `system_route()` (`commands.rs` line 1381) hands only install, update, remove, installed and isinstalled to recab, so the window does not offer it there |
 | `recipe install NAME --autofix --autofix-prompt-file FILE --machine-events` | exists for `install`: Recipe's agent repair (Codex or Claude), with the front end's prompt appended to its own. Never run against a real agent |
 | `recipe update NAME --autofix --autofix-prompt-file FILE --machine-events` | `update` takes no such options yet |
 
@@ -208,7 +234,7 @@ the real `recipe` (the others need a Ginux run).
 | `agent` | `recipe`, `hook`, `attempt`, `files`, `summary`: the agent changed the recipe during this run, which starts again | yes, from `--autofix` |
 | `done` | `recipe` | yes, the last event |
 | `failed` | `recipe`, `hook`, `reason` | yes, the last event; `hook` only where a step failed |
-| `failed` … `refused` | `endpoint` and the `declared` list, for a refused connection | no: Recipe does not name the endpoint. Only the stand-in sends it, and the page that names the endpoint depends on it |
+| `failed` … `refused` | `endpoint` and the `declared` list, for a refused connection | yes, since tools/recipe `7f3e836`, compiled and not run (it needs a failed install under Ginux): `src/lib.rs` lines 107-114 add `refused` to the final `failed` event, `src/needs/report.rs` `refused_connection` (line 270) builds it from the first denied `ginux: audit` line. `endpoint` is the **numeric address** the audit names (`203.0.113.9:443`, or `[2001:db8::1]:443`), never a host name; `declared` is the recipe's NEEDS.network. The page says "the address 203.0.113.9, port 443, which is not on the recipe's list" and that recipe reports an address, not a name; the stand-in sends `203.0.113.9:443` |
 | `progress` | `recipe`, `done`, `total` | no: nothing inside a build step is counted |
 | `say` | `recipe`, `text` | no |
 | `output` | `recipe`, `line` | no: the real `recipe` prints plain lines, which are shown as output |
@@ -269,6 +295,64 @@ lists it as "Not compared": `recipe updates` cannot look at a locked system,
 and what the installed version was allowed to use is not recorded), and "Remove".
 Nothing in `recab` says that an update exists, so that comes from `recipe list`.
 
+## Storage
+
+`src/storage.*`, in the rail after Sources. One section of numbers per store a
+place has (`recipe storage --json` for each, as the catalog reads it): what the
+earlier versions take and in how many generations, with the names of the newest
+ones (from `kept` in `installed --json`) and "Clear earlier versions…" (one button,
+or one per store when there are two); what is installed takes, per store;
+and what was done to the stores (`recipe history --json`, both stores merged,
+newest first, "today at 14:05", with "for me"/"for this computer" when there are
+two). Only numbers `recipe` reports: no build-cache or download sizes exist in
+`recipe`, so none are shown (the page says so). A locked computer's running
+system has no store behind it, so it has no row of numbers (it says recipe reports
+no size for it); the next system's software likewise.
+
+The sentence for each history entry is made in `historySentence`: "Installed Element
+1.12.3, from levitate", "Updated Element from 1.12.3 to 1.12.4", "Removed …", "Went
+back to GIMP 3.0.2, from 3.0.4", "Kept GIMP at 3.0.4", "Let GIMP update again",
+"Cleared the earlier versions". A kind of change the window does not know is
+shown as `recipe` named it. The count of generations is `recipe`'s own
+(`earlier_generations`): a hold also makes a generation, so it need not equal the
+number of earlier versions listed beside it.
+
+## A program's page
+
+From Browse, Installed or after a run: the name, what it is, the recipe's version,
+its kind and source; "Where it is" (its state and version in each place that holds
+it: for me, for this computer, in the next system; "Not installed" where it is
+not); what can be done to what is installed (keep it at its version or let it update
+again, go back, remove, each saying which place when two hold it); what it may
+use, and what comes with it (what it adds, what it needs and what only its build
+needs, what it keeps, licence, home page); the recipe (its file, its source, "Read
+it", and the three steps with the author's notes). Everything is from the catalog
+(`list --json`, `installed --json`, `updates --json`). Not on the page, because
+`recipe` carries nothing for it: "Repair", "Tell the agent it does not work",
+"Copy to your own recipes", "Needed by", and the limits that applied when this
+version was built (`installed --json` carries them as `needs`, which the window does
+not read yet).
+
+## Hold
+
+"Keep at this version" and "Let it update again" (`recipe hold NAME` / `unhold NAME`,
+through the root helper where the place needs it) on Installed and the program page,
+and "Let it update again" on Updates. Not offered for software in a locked computer's
+system or in the next system, where `recipe` does not support it. A held program:
+
+- is marked on Installed ("kept at this version") and Updates ("Kept at this version"),
+  and Browse says "Kept" in place of "Update";
+- is listed by `recipe updates` but not counted: the Updates badge and the heading
+  count the others, and "Update all" leaves it and says so ("Update all leaves GIMP
+  (kept at 3.0.4) alone");
+- has no Before step until it is released: the update buttons are not drawn, and
+  asking anyway (a stale page, "Try again") says so at the status line;
+- if its update is run anyway, `recipe` refuses it with its own sentence, which the
+  page shows as it is under "GIMP is kept at version 3.0.4", with only "Back" (there is
+  nothing for an agent to fix). The page tells this from the catalog (held when the run
+  began) or from the words " is held, so it is not updated" in the reason, which is
+  `recipe`'s own wording and would have to change here if `recipe`'s did.
+
 ## Before it happens
 
 An install or an update does not start at once: the window shows the shared
@@ -302,6 +386,26 @@ and is called "Most it may download".) Nor does it say that the running system
 can be put back before the restart, which the design had: recab says nothing
 of it to the window.
 
+## Reading a hand-made store with the real recipe
+
+The Storage, history and held checks of 2026-11-11 were run against the real
+`recipe` (tools/recipe `7f3e836`, `target/debug/recipe`) on a store made by hand in
+scratch space: two generations under `package-generations/` (`g-…` folders with
+`.installed.json` and `.packages/NAME/bin/NAME`), `profile` a symlink to the newer one,
+the receipt of the newer naming the older as `previous`. Then `recipe hold tree` and
+`recipe go-back ripgrep` with `--package-root` on it made the history and the held
+flag. `--try ripgrep --read-only` opens Installed and Storage and prints whether what
+they show equals what `recipe storage --json`, `recipe history --json` and `recipe
+installed --json` print for that store (`same:` or `DIFFERENT:` lines):
+
+```sh
+export HOME=$PWD/.artifacts/recipe-gui/real/home RECIPE_STATE_DIR=$PWD/.artifacts/recipe-gui/real/state
+QT_QPA_PLATFORM=offscreen RECIPE_GUI_RECIPE=$PWD/target/debug/recipe RECIPE_GUI_ROOT_HELPER= \
+  RECIPE_GUI_AGENT=$PWD/gui/recipe/fixtures/agent RECIPE_GUI_RECAB=/nonexistent/recab \
+  RECIPE_GUI_RECIPES_PATH=$PWD/recipes RECIPE_GUI_PACKAGE_ROOT=$PWD/.artifacts/recipe-gui/real/packages \
+  .artifacts/recipe-gui/build/recipe-gui --look levitate --shots $PWD/.artifacts/recipe-gui/shots-real --try ripgrep --read-only
+```
+
 ## Reading and reading again
 
 The catalog is read as three commands in a row (`list`, `installed`,
@@ -312,11 +416,11 @@ after every change, on "Read again" in the status line, on F5 or Ctrl+R, and
 when the person comes back to the window after 20 seconds or more. That reads
 what is on this computer; it fetches nothing. Fetching the sources' lists is
 "Check for updates" on the Updates page and "Fetch again" on the Sources page.
-A catalog is four commands now: `list`, `installed`, `updates`, `storage`, once
+A catalog is five commands now: `list`, `installed`, `updates`, `storage`, `history`, once
 for each place that has a store (for me; for this computer when it is not
 locked), and `--system installed --json` for a locked computer. `list` is asked
 of the computer's store (its sources). When `updates` fails the catalog is not
-shown and the page says why; when `storage` fails only the sizes are missing;
+shown and the page says why; when `storage` or `history` fails only the sizes or the history are missing;
 when the locked computer's own list cannot be read, the person's software is
 shown and Installed says so.
 
@@ -377,8 +481,18 @@ there is no step yet where the person approves the change before it is used.
 ## Not done
 
 - Not in the frame: the licence and sort boxes of the design (nothing behind
-  them), the Storage and Help pages. The Installed page does not show its count
-  in the rail any more.
+  them), the Help page. The Installed page does not show its count in the rail.
+- Not built from the redesign, because `recipe` does not carry it: the search and
+  sort of Installed, a library line ("4 libraries are installed because a program
+  needs them"), "Look…"/"Update…" buttons on each Updates row, "Newer releases no
+  recipe has yet", a source's "added by you on", "Switch off", "Hand to the agent…",
+  "Hand both to the agent…", "Repair", "Tell the agent…", "Copy to your own recipes…",
+  the sizes of downloads, builds, saved steps and run records on Storage, and
+  "which build is running" as the reason something cannot be cleared.
+- "Update all" updates every update that is not kept, each after its own Before step;
+  the redesign's button updates only those that ask for nothing more.
+- Hold, unhold, going back and clearing through the window with the real `recipe`,
+  and a real refused connection: not run.
 - The two places and the Before step ran against the stand-in only, never a
   real `recipe` install, a real `recab` or a real root helper. A real
   `--system` run's events (and whether `--machine-events` passes through
@@ -408,6 +522,6 @@ there is no step yet where the person approves the change before it is used.
 - Icons: recipes show a letter until the catalog carries `<name>.svg`.
 - Translations: every string goes through `tr()`, no translation exists.
 - "Open" starts the first program a recipe installed, not its menu entry.
-- Clearing kept versions as its own action, and a notice when updates appear.
+- A notice when updates appear.
 - Building it for each distribution against that distribution's Qt, and
   shipping it in the desktop product (the same gap `docs/recab-gui.md` lists).

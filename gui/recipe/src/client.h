@@ -50,6 +50,12 @@ public:
     // Activates the newest earlier version a store still holds; no recipe
     // runs. Only where a store stands behind the software.
     Run *goBack(const QString &name, Place place);
+    // Keeps a package at its version (`recipe hold`) or lets it update again
+    // (`recipe unhold`). Only where a store stands behind the software: `recipe`
+    // does not hold software in a locked computer's system (system_route takes
+    // install, update, remove, installed and isinstalled only).
+    Run *hold(const QString &name, Place place);
+    Run *unhold(const QString &name, Place place);
     // Deletes every earlier version a store keeps. Nothing installed changes.
     Run *clearEarlier(Place place);
 

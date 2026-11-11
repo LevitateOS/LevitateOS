@@ -2,11 +2,15 @@
 
 #include "parts.h"
 
+#include <QDesktopServices>
+#include <QFileInfo>
+#include <QFontDatabase>
 #include <QHBoxLayout>
 #include <QInputDialog>
 #include <QPlainTextEdit>
 #include <QPushButton>
 #include <QScrollArea>
+#include <QUrl>
 
 // ---------------------------------------------------------------- The sources
 
@@ -49,7 +53,12 @@ void SourcesPage::show(const Catalog &catalog)
         QString title = origin.shown();
         title[0] = title[0].toUpper();
         words->addWidget(strong(title == origin.name ? title : tr("%1 (%2)").arg(title, origin.name)));
-        words->addWidget(text(origin.where(), true));
+        // A folder's path is a path: shown as one.
+        QLabel *where = text(origin.where(), true);
+        if (!origin.remote())
+            where->setFont(QFontDatabase::systemFont(QFontDatabase::FixedFont));
+        dim(where);
+        words->addWidget(where);
         const int recipes = catalog.countFrom(origin.name);
         QLabel *state = text(tr("%1. %2.").arg(counted(recipes, tr("%1 recipe"), tr("%1 recipes")), origin.state()), true);
         if (origin.problem.isEmpty())
@@ -60,6 +69,12 @@ void SourcesPage::show(const Catalog &catalog)
             auto *look = new QPushButton(tr("Show its recipes"));
             connect(look, &QPushButton::clicked, this, [this, name] { emit browse(name); });
             row->addWidget(look, 0, Qt::AlignTop);
+        }
+        if (!origin.remote() && !origin.path.isEmpty()) {
+            auto *folder = new QPushButton(tr("Open the folder"));
+            const QString path = origin.path;
+            connect(folder, &QPushButton::clicked, this, [path] { QDesktopServices::openUrl(QUrl::fromLocalFile(path)); });
+            row->addWidget(folder, 0, Qt::AlignTop);
         }
         if (origin.remote()) {
             auto *again = new QPushButton(tr("Fetch again"));
@@ -77,6 +92,31 @@ void SourcesPage::show(const Catalog &catalog)
     }
     if (catalog.origins.isEmpty())
         list->addWidget(dim(text(tr("recipe named no source."))));
+    // Recipes `recipe list` could not read: named with its own reason, and not offered.
+    if (!catalog.unreadableRecipes.isEmpty()) {
+        auto *problems = new Panel;
+        auto *title = new QVBoxLayout;
+        title->setSpacing(0);
+        title->addWidget(strong(counted(catalog.unreadableRecipes.size(), tr("%1 recipe could not be read"),
+                                        tr("%1 recipes could not be read"))));
+        title->addWidget(dim(text(tr("They are not offered until they can be."))));
+        problems->column()->addLayout(title);
+        for (const RecipeProblem &problem : catalog.unreadableRecipes) {
+            auto *row = new QHBoxLayout;
+            row->setSpacing(14);
+            auto *file = new QLabel(QFileInfo(problem.path).fileName());
+            file->setFont(QFontDatabase::systemFont(QFontDatabase::FixedFont));
+            file->setMinimumWidth(130);
+            row->addWidget(file, 0, Qt::AlignTop);
+            row->addWidget(text(problem.problem, true), 1);
+            auto *read = new QPushButton(tr("Read the file"));
+            const QString path = problem.path;
+            connect(read, &QPushButton::clicked, this, [path] { QDesktopServices::openUrl(QUrl::fromLocalFile(path)); });
+            row->addWidget(read, 0, Qt::AlignTop);
+            problems->column()->addLayout(row);
+        }
+        list->addWidget(problems);
+    }
     list->addStretch();
     auto *scroll = new QScrollArea;
     scroll->setWidgetResizable(true);

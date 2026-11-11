@@ -26,6 +26,11 @@ Environment:
                           prepares and records the change in it, so the strip can be read
   RECIPE_STANDIN_SPEED    time factor for an install; 0 runs it at once (default 1)
   RECIPE_STANDIN_STOP_AT  "name:hook": stay in the middle of that step forever
+
+It also keeps what the real `recipe` keeps beside a store (tools/recipe, packages.rs and
+packages/history.rs): the history of what was done to it (`recipe history --json`, one line
+per change, newest first), and `held` on a package (`recipe hold` / `unhold`; `installed`
+and `updates` carry it, `update` refuses a held package in the real sentence).
 """
 import datetime
 import json
@@ -65,6 +70,33 @@ ME_START = [{
 def save(items):
     with open(STATE, "w") as out:
         json.dump(items, out, indent=1)
+
+
+def history_path():
+    return STATE + ".history.jsonl"
+
+
+def record(what, package=None, before=None, after=None, source=None):
+    """One line of the store's history, in the real fields (history.rs `HistoryEntry`)."""
+    os.makedirs(STATE_DIR, exist_ok=True)
+    with open(history_path(), "a") as out:
+        out.write(json.dumps({"at": int(time.time()), "what": what, "package": package, "from": before,
+                              "to": after, "source": source}) + "\n")
+
+
+def remote_source(name):
+    """The source's name for a recipe of a remote source; the real entry is null for a folder."""
+    for each in listed_sources():
+        if each["name"] == recipes_source(name) and each["kind"] == "remote":
+            return each["name"]
+    return None
+
+
+def history():
+    if not os.path.exists(history_path()):
+        return []
+    lines = [json.loads(line) for line in open(history_path()) if line.strip()]
+    return list(reversed(lines))
 
 
 # ---------------------------------------------------------------- sources
@@ -172,6 +204,10 @@ def refresh(name):
     write(SOURCES, known)
 
 
+def recipes_source(name):
+    return next((item["source"] for item in recipes() if item["name"] == name), None)
+
+
 def recipe(name):
     name = name.split(":", 1)[-1]  # SOURCE:NAME; the stand-in's names are unique
     for item in recipes():
@@ -254,14 +290,20 @@ def play(item, refuse=None, agent=False):
         hook_event(name, hook, "success", "step finished")
 
 
-def install(name, agent=False):
+def install(name, agent=False, update_only=False):
     item = recipe(name)
-    order = [recipe(dep) for dep in item["build_deps"]] + [item]
-    emit(event="plan", recipes=[{"name": each["name"], "steps": steps_of(each)} for each in order])
     items = installed()
     current = next((each for each in items if each["name"] == name), None)
+    if update_only and current and current.get("held"):
+        # `recipe update` refuses a held package before anything runs (commands.rs, Commands::Update).
+        emit(event="failed", recipe=name, hook=None,
+             reason="%s is held, so it is not updated. Release it with: recipe unhold %s" % (name, name))
+        sys.exit(1)
+    order = [recipe(dep) for dep in item["build_deps"]] + [item]
+    emit(event="plan", recipes=[{"name": each["name"], "steps": steps_of(each)} for each in order])
     # The sample story: the newer Element recipe reaches for a host it has not declared.
-    refuse = "cdn.example.net:443" if name == "element" and current else None
+    # The real `recipe` reports the numeric address Ginux's audit names, never a host name.
+    refuse = "203.0.113.9:443" if name == "element" and current else None
     for each in order:
         play(each, refuse if each is item else None, agent)
     about = item["about"].get("adds", {})
@@ -273,6 +315,8 @@ def install(name, agent=False):
         "installed_on": int(time.time()),
         "size_bytes": 62914560, "kept": [],
     }
+    if current and current.get("held"):
+        entry["held"] = True  # installing again keeps a package held
     if current:
         # The version it replaces stays in the generation before, to go back to.
         entry["kept"] = [kept_of(current)] + current.get("kept", [])
@@ -280,6 +324,8 @@ def install(name, agent=False):
         items.remove(current)
     items.append(entry)
     save(sorted(items, key=lambda each: each["name"]))
+    record("update" if update_only else "install", name, current["version"] if current else None, item["version"],
+           remote_source(name))
     emit(event="done", recipe=name)
 
 
@@ -302,6 +348,7 @@ def storage(clear):
         for each in items:
             each["kept"] = []
         save(items)
+        record("clear-earlier")
     print(json.dumps(answer))
 
 
@@ -313,6 +360,7 @@ def remove(name):
     pause(0.4)
     items.remove(current)
     save(items)
+    record("remove", name, current["version"], None, remote_source(name))
     emit(event="done", recipe=name)
 
 
@@ -323,11 +371,28 @@ def go_back(name):
         fail("no earlier version of %s is kept" % name)
     # The newest earlier version comes back; the one left behind stays kept.
     older = current["kept"][0]
+    left = current["version"]
     current["kept"] = [kept_of(current)] + current["kept"][1:]
     current["version"] = older["version"]
     current["size_bytes"] = older.get("size_bytes") or current["size_bytes"]
     current["installed_on"] = int(time.time())
     save(items)
+    record("go-back", name, left, current["version"], remote_source(name))
+    emit(event="done", recipe=name)
+
+
+def hold(name, held):
+    """`recipe hold` / `unhold`: `held` on the receipt; holding a held package changes nothing."""
+    items = installed()
+    current = next((each for each in items if each["name"] == name), None)
+    if not current:
+        fail("package %s is not installed" % name)
+    if bool(current.get("held")) != held:
+        current["held"] = held
+        save(items)
+        record("hold" if held else "unhold", name, current["version"], current["version"], remote_source(name))
+    print(json.dumps({"name": name, "version": current["version"], "operation": "hold" if held else "unhold",
+                      "held": held, "profile": STORE_ROOT + "/profile"}))
     emit(event="done", recipe=name)
 
 
@@ -339,7 +404,8 @@ def updates():
             # As the real `recipe updates`: only the fields of NEEDS that differ,
             # and null where nothing was recorded at install.
             found.append({"name": each["name"], "source": "levitate", "from": each["version"], "to": newer,
-                          "reason": "version", "changes": CATALOG["changes"].get(each["name"])})
+                          "reason": "version", "changes": CATALOG["changes"].get(each["name"]),
+                          "held": bool(each.get("held"))})
     return found
 
 
@@ -454,7 +520,7 @@ def main(args):
         elif not arg.startswith("--"):
             words.append(arg)
     command = words[0] if words else ""
-    if command in ("install", "update", "remove", "go-back") and len(words) == 2:
+    if command in ("install", "update", "remove", "go-back", "hold", "unhold") and len(words) == 2:
         words[1] = words[1].split(":", 1)[-1]  # SOURCE:NAME; the stand-in's names are unique
     if system:
         if command == "installed":
@@ -465,7 +531,11 @@ def main(args):
             fail("--system supports install, update, remove, installed and isinstalled")
         return
     if command == "list":
-        print(json.dumps({"schema_version": 1, "sources": listed_sources(), "recipes": recipes(), "problems": []}))
+        # A recipe that cannot be read is named as `list --json` does: its path and why. One appears
+        # once a second source is added, so the Sources page has something to show.
+        problems = [{"path": os.path.join(STATE_DIR, "recipes", "yazi.rhai"),
+                     "problem": "it names nothing to download"}] if len(sources()) > 1 else []
+        print(json.dumps({"schema_version": 1, "sources": listed_sources(), "recipes": recipes(), "problems": problems}))
     elif command == "refresh":
         refresh(words[1] if len(words) > 1 else "")
     elif command == "source" and words[1:2] == ["add"] and len(words) == 3:
@@ -474,13 +544,19 @@ def main(args):
         source_remove(words[2])
     elif command == "installed":
         # The shape `recipe installed` has today, plus the fields the front end asks for.
-        print(json.dumps({"packages": installed(), "profile": STORE_ROOT + "/profile"}))
+        # `held` is always there, true or false (commands.rs, Commands::Installed).
+        print(json.dumps({"packages": [dict(each, held=bool(each.get("held"))) for each in installed()],
+                          "profile": STORE_ROOT + "/profile"}))
     elif command == "updates":
         print(json.dumps({"schema_version": 1, "updates": updates(), "problems": []}))
     elif command == "storage":
         storage("--clear-earlier" in args)
+    elif command == "history":
+        print(json.dumps({"schema_version": 1, "history": history()}))
+    elif command in ("hold", "unhold") and len(words) == 2:
+        hold(words[1], command == "hold")
     elif command in ("install", "update") and len(words) == 2:
-        install(words[1], "--autofix" in args)
+        install(words[1], "--autofix" in args, command == "update")
     elif command == "remove" and len(words) == 2:
         remove(words[1])
     elif command == "go-back" and len(words) == 2:

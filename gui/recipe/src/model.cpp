@@ -158,6 +158,23 @@ bool UpdateItem::asksMore() const
     return false;
 }
 
+QString UpdateItem::asksMoreWords() const
+{
+    QStringList fields;
+    for (const Change &change : changes)
+        if (change.kind == QLatin1String("added") || change.kind == QLatin1String("raised"))
+            fields << change.title().toLower();
+    return fields.join(QObject::tr(", "));
+}
+
+int Catalog::updatesToCount() const
+{
+    int count = 0;
+    for (const UpdateItem &u : updates)
+        count += !u.held;
+    return count;
+}
+
 const Recipe *Catalog::recipe(const QString &name) const
 {
     for (const Recipe &r : recipes)

@@ -65,6 +65,10 @@ enum class Place { Me = 0, Computer = 1, Next = 2 };
 struct InstalledItem {
     // `kept`: the newest earlier version Recipe still holds, which "Go back" returns to.
     QString name, version, kept;
+    // Every earlier version Recipe still holds, newest first (`kept` is the first).
+    QStringList earlier;
+    // `recipe hold` was run on it: `recipe update` leaves it as it is.
+    bool held = false;
     QDate installedOn;
     qint64 sizeBytes = 0;
     QStringList programs, menu;
@@ -103,19 +107,43 @@ struct UpdateItem {
     bool changesKnown = true;
     // The version is the same and the source publishes another recipe file.
     bool sameVersion = false;
+    // `recipe updates` still lists a held package, marked held. It is not
+    // counted and "Update all" leaves it.
+    bool held = false;
     bool asksMore() const;
+    // What it asks for beyond what the installed version had, in a few words:
+    // "network, memory". Empty when nothing is more.
+    QString asksMoreWords() const;
 };
 
-// What one store takes, as `recipe storage` says.
+// One line of `recipe history`: what was done to a store. `from` and `to` are
+// versions; any field that does not apply is empty.
+struct HistoryEntry {
+    qint64 at = 0; // seconds since 1970
+    QString what;  // install, update, remove, go-back, clear-earlier, hold, unhold
+    QString package, from, to, source;
+};
+
+// What one store takes, as `recipe storage` says, and what was done to it, as
+// `recipe history` says (newest first).
 struct Store {
     bool has = false;
     qint64 activeBytes = 0, earlierBytes = 0;
     int earlierGenerations = 0;
+    QList<HistoryEntry> history;
+    // `recipe history` answered (an empty history is an answer).
+    bool historyKnown = false;
+};
+
+// A recipe `recipe list` could not read, and why.
+struct RecipeProblem {
+    QString path, problem;
 };
 
 struct Catalog {
     QList<Origin> origins;
     int unreadable = 0; // recipes in the collection that `recipe` could not read
+    QList<RecipeProblem> unreadableRecipes;
     QList<Recipe> recipes;
     QList<InstalledItem> installed;
     QList<UpdateItem> updates;
@@ -147,6 +175,8 @@ struct Catalog {
     const InstalledItem *installedItem(const QString &name, Place place) const;
     const UpdateItem *update(const QString &name) const;
     const UpdateItem *update(const QString &name, Place place) const;
+    // Updates that count: the held ones are listed but not counted.
+    int updatesToCount() const;
     // The next system holds a change that installs or updates it (recab says so).
     bool waitsForRestart(const QString &name) const;
     // The places it could still be installed in, the computer's first.

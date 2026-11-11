@@ -19,6 +19,7 @@ class RecipePage;
 class Refresher;
 class RunPage;
 class SourcesPage;
+class StoragePage;
 class UpdatesPage;
 class WishPage;
 class WorkPage;
@@ -43,6 +44,7 @@ public:
     void askRemove(const QString &name, Place place = Place::Computer);
     void stopRun();
     void showSources();
+    void showStorage();
     // Ask the agent for a recipe: the page, and handing its prompt over.
     void showWish(const QString &wish = QString());
     void askAgent(const QString &prompt);
@@ -69,6 +71,13 @@ public:
     void goBack(const QString &name, Place place = Place::Computer);
     // Deletes every earlier version the store of a place keeps, after asking unless told not to.
     void clearEarlier(Place place = Place::Computer, bool askFirst = true);
+    // Keeps an installed program at its version, or lets it update again.
+    void hold(const QString &name, Place place, bool on);
+    StoragePage *storagePage() const { return storage_; }
+    InstalledPage *installedPage() const { return installed_; }
+    UpdatesPage *updatesPage() const { return updates_; }
+    RecipePage *recipePage() const { return recipe_; }
+    RunPage *runPage() const { return runPage_; }
 
 private:
     // Reads the catalog without holding the window up, then does `then`.
@@ -116,6 +125,7 @@ private:
     InstalledPage *installed_;
     UpdatesPage *updates_;
     SourcesPage *sources_;
+    StoragePage *storage_;
     WishPage *wish_;
     WorkPage *work_;
 };

@@ -701,7 +701,7 @@
   },
   {
    "name": "rust",
-   "version": "1.95.0",
+   "version": "1.94.1",
    "installed_on": 1791979200,
    "size_bytes": 713031680,
    "kept": [
@@ -721,7 +721,7 @@
   },
   {
    "name": "thunderbird",
-   "version": "140.4.0",
+   "version": "140.3.0",
    "installed_on": 1791806400,
    "size_bytes": 304087040,
    "kept": [],

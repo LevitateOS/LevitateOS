@@ -26,6 +26,7 @@ qt_add_executable(recipe-gui
     src/beforewords.cpp
     src/pages.cpp
     src/sources.cpp
+    src/storage.cpp
     src/window.cpp
     src/shots.cpp
 )
