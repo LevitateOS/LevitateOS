@@ -260,6 +260,13 @@ class Publisher:
                     and report.get('target_name') == 'ab-update' and report.get('target_kind') == 'scenario'
                     and report.get('distro_id') == distro and report.get('install_mode') == 'ab'
                     and report.get('fingerprint') and report.get('finished_at_utc'), 'validation record does not bind a successful actual ab-update run')
+            observed = report.get('public_update_result') or {}
+            require(observed.get('release_id') == record['id'] and observed.get('source_commit') == record['source_commit']
+                    and observed.get('publication_sha256') == sha(candidate / 'releases' / record['id'] / 'publication.json')
+                    and observed.get('flavour') == record['entry']['release']['identity']['flavour']
+                    and observed.get('x86_64_lifecycle_passed') is True and observed.get('directions') == ['A->B', 'B->A']
+                    and observed.get('public_index') == self.config(distro)['release']['production']['metadata_base'] + distro + '/candidate/x86_64/index.json',
+                    'actual run lacks matching public-origin release/profile/transport lifecycle evidence')
             require(sha(candidate / 'releases' / record['id'] / 'publication.json') == os.environ.get('RECAB_EXPECTED_PUBLICATION_SHA256'), 'candidate differs from the publicly verified immutable publication')
             self.renew(distro, 'stable', candidate / 'releases' / record['id'])
         else:
@@ -280,6 +287,32 @@ class Publisher:
                         print(json.dumps({'distro': item, 'audience': audience, **value}))
                         if value['authority_expires_at'] <= int(time.time()) + 30 * 86400:
                             print(f'::warning::{item} root authorization expires within 30 days; renew offline')
+
+    def record_validation(self, directory):
+        report = load(directory / 'run-manifest.json')
+        observed = report.get('public_update_result') or {}
+        require(report.get('status') == 'success' and report.get('target_kind') == 'scenario'
+                and report.get('target_name') == 'ab-update' and report.get('install_mode') == 'ab'
+                and report.get('fingerprint') and report.get('finished_at_utc')
+                and observed.get('x86_64_lifecycle_passed') is True
+                and observed.get('directions') == ['A->B', 'B->A'],
+                'validation requires a completed actual public-origin ab-update run, not a local fixture or unexecuted scenario')
+        release_id = observed.get('release_id', '')
+        require(re.fullmatch('[0-9a-f]{64}', release_id), 'missing observed release ID')
+        target = self.repo / 'release/updates/validation'
+        target.mkdir(parents=True, exist_ok=True)
+        raw = (directory / 'run-manifest.json').read_bytes()
+        approval = {'release_id': release_id, 'source_commit': observed['source_commit'],
+                    'public_origin': True, 'x86_64_lifecycle_passed': True,
+                    'run_manifest_sha256': hashlib.sha256(raw).hexdigest()}
+        # No signing, pushing or service enablement. Preserve an existing record.
+        for path, body in [(target / (release_id + '.run.json'), raw),
+                           (target / (release_id + '.json'), json.dumps(approval, indent=2).encode())]:
+            if path.exists():
+                require(path.read_bytes() == body, 'validation record differs; preserve it and review the explicit replacement')
+            else:
+                with path.open('xb') as file:file.write(body)
+        print(json.dumps({'release_id': release_id, 'recorded_actual_public_run': True, 'production_enabled': False}))
 
     def export_site(self, output):
         require(not output.exists(), 'site export destination must be new')
@@ -334,6 +367,7 @@ def main():
     sub.add_parser('refresh')
     p = sub.add_parser('monitor');p.add_argument('--representative', action='store_true')
     sub.add_parser('commit-metadata')
+    p = sub.add_parser('record-validation');p.add_argument('run_directory', type=Path)
     p = sub.add_parser('export-site');p.add_argument('output', type=Path)
     args = parser.parse_args();publisher = Publisher(args)
     require(sys.platform == 'linux' and os.uname().machine == 'x86_64', 'Linux x86_64 release tooling required')
@@ -363,6 +397,7 @@ def main():
                             time.sleep(10)
                     count += 1
         require(count, 'no published feeds to monitor')
+    elif args.command == 'record-validation':publisher.record_validation(args.run_directory.resolve())
     elif args.command == 'export-site':publisher.export_site(args.output.resolve())
     else:publisher.commit_metadata()
 

@@ -40,7 +40,7 @@ fn run_options(boot: &BootArgs, force: bool) -> Result<RunOptions> {
         injection,
         login_key: boot.ssh_key.clone(),
         install_mode: Default::default(),
-        update_fixture: None,
+        ..Default::default()
     })
 }
 
@@ -81,7 +81,12 @@ pub fn run(args: RunArgs) -> Result<()> {
         (false, true) => Mode::Check,
         (false, false) => Mode::Console,
     };
-    let options = run_options(&args.boot, false)?;
+    let options = RunOptions {
+        flavour: args.artifacts.flavour,
+        release_run: args.artifacts.release_run,
+        install_run: args.artifacts.install_run,
+        ..run_options(&args.boot, false)?
+    };
     // Some shells send cursor-position queries; their replies must not leak
     // into the guest's console or into the shell after it.
     flush_tty_input_queue();
@@ -119,6 +124,10 @@ pub fn test(args: TestArgs) -> Result<()> {
     let options = RunOptions {
         install_mode: args.mode,
         update_fixture: args.update_fixture.clone(),
+        public_update: args.public_update.clone(),
+        flavour: args.artifacts.flavour,
+        release_run: args.artifacts.release_run.clone(),
+        install_run: args.artifacts.install_run.clone(),
         ..run_options(&args.boot, args.force)?
     };
     let outcomes = install_tests::scenarios::run(&root, distro.id(), &scenarios, &options)?;

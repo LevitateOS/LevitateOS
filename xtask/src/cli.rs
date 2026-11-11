@@ -489,6 +489,8 @@ pub struct KernelArgs {
 
 #[derive(Args)]
 pub struct RunArgs {
+    #[command(flatten)]
+    pub artifacts: ScenarioArtifacts,
     /// A scenario whose input it boots: its ISO, or the latest install's disk.
     #[arg(value_parser = Choices(runnable_scenarios))]
     pub scenario: ScenarioId,
@@ -523,7 +525,25 @@ pub struct BootArgs {
 }
 
 #[derive(Args)]
+pub struct ScenarioArtifacts {
+    /// Select the installed system profile and its existing installer artifacts.
+    #[arg(long, default_value = "base", value_parser = str::parse::<distro_contract::profile::Flavour>)]
+    pub flavour: distro_contract::profile::Flavour,
+    /// Exact existing successful release run directory (no build or newest-product substitution).
+    #[arg(long, value_name = "DIR")]
+    pub release_run: Option<PathBuf>,
+    /// Exact existing successful install run directory, booted through a disposable overlay.
+    #[arg(long, value_name = "DIR")]
+    pub install_run: Option<PathBuf>,
+}
+
+#[derive(Args)]
 pub struct TestArgs {
+    #[command(flatten)]
+    pub artifacts: ScenarioArtifacts,
+    /// Public candidate metadata descriptor; no local server, signing key or duplicate payload media.
+    #[arg(long, value_name = "JSON", conflicts_with = "update_fixture")]
+    pub public_update: Option<PathBuf>,
     /// Existing RECAB_P13 ISO with signed feed, public source policy and native origin helper.
     /// Install uses its policy before sealing; ab-update uses it as its newer update input.
     #[arg(long, value_name = "ISO")]
