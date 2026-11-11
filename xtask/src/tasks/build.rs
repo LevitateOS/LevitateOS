@@ -10,8 +10,8 @@ use distro_contract::ProductId;
 
 pub fn run(what: BuildCmd) -> Result<()> {
     match what {
-        BuildCmd::Product(ProductBuild { product, distros, exact }) => {
-            product_isos(product, &distros.distros()?, exact)
+        BuildCmd::Product(ProductBuild { product, distros, exact, no_prebuilt }) => {
+            product_isos(product, &distros.distros()?, exact, no_prebuilt)
         }
         BuildCmd::Kernel(args) => crate::tasks::kernels::build(args),
         BuildCmd::RootfsSource { distro, desktop, refresh } => crate::util::distro_builder::run(
@@ -32,7 +32,7 @@ pub fn latest_iso(distro: &Distro, product: ProductId) -> Result<Option<PathBuf>
     Ok(distro_contract::runs::latest_release_iso(&root, distro.id(), product)?)
 }
 
-fn product_isos(product: ProductId, distros: &[Distro], exact: bool) -> Result<()> {
+fn product_isos(product: ProductId, distros: &[Distro], exact: bool, no_prebuilt: bool) -> Result<()> {
     let root = crate::util::repo::repo_root()?;
     for distro in distros {
         if let Err(reason) = crate::tasks::kernels::status(distro)? {
@@ -45,7 +45,7 @@ fn product_isos(product: ProductId, distros: &[Distro], exact: bool) -> Result<(
     for distro in distros {
         crate::util::distro_builder::run(
             &root,
-            &Command::ReleaseBuild { product, distro: distro.id().to_string(), exact },
+            &Command::ReleaseBuild { product, distro: distro.id().to_string(), exact, no_prebuilt },
         )?;
         if let Some(iso) = latest_iso(distro, product)? {
             println!("built: {}", iso.display());

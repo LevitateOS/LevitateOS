@@ -1,6 +1,8 @@
 # Prebuilt downloads for our own programs
 
-Plan of 2026-11-11, not built. The goal: an ISO build downloads the programs we
+Plan of 2026-11-11. Status at the end of this file: steps 3 and 4 exist for the tools and TUI
+families (written 2026-11-11, never built or run; `LevitateOS/prebuilt` does not exist yet).
+The goal: an ISO build downloads the programs we
 write instead of compiling them, the way it already downloads the kernel, and
 compiles only when nothing matching has been published.
 
@@ -168,3 +170,20 @@ Worth doing first, whatever is decided about CI:
 2. **Leave Ginux and Recipe out of the key** for these prebuilts (the point of
    the plan), while extracted roots and images keep including them.
 3. **Release builds keep compiling** (`--no-prebuilt`), as above.
+
+## Status (2026-11-11)
+
+Written, checked with `cargo check`/`clippy` and `recipe info` only; nothing built, no
+release published, the repository not created:
+
+- **Step 3 for the tools and TUI families:** `distro/builder/src/prebuilt.rs` (keys, local
+  cache, download, publish), `os-recipes/prebuilt-fetch.rhai`, `distro-builder prebuilt key`,
+  `--no-prebuilt` on `release build` and `cargo xtask build`. The tools are compiled once
+  per crate, shared by init systems and distros, through the cache.
+- **Step 4 publishing from this machine:** `distro-builder prebuilt publish` and
+  `cargo xtask prebuilt publish`. The repository `LevitateOS/prebuilt` must be created first.
+- **Release builds:** exact (and signed) builds never download and do not use the cache;
+  `--no-prebuilt` is the same for non-exact builds, but still fills the cache.
+- **Not done:** the Qt apps family, `install-tools.rhai` taking a `prebuilt` input (not
+  needed: the downloaded program enters through its existing `program` input), CI
+  (`prebuilt.yml`), retention.

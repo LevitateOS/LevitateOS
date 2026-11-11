@@ -210,6 +210,12 @@ pub enum Cmd {
         what: KernelCmd,
     },
 
+    /// Prebuilt programs of our own tools and the TUI binary: print a key, or publish a build.
+    Prebuilt {
+        #[command(subcommand)]
+        what: PrebuiltCmd,
+    },
+
     /// Boot a scenario for interactive use (needs a terminal unless --no-shell).
     Run(RunArgs),
 
@@ -358,7 +364,7 @@ pub enum BuildCmd {
     },
 }
 
-/// `cargo xtask build <product> <distro> [--exact]`: a subcommand per release
+/// `cargo xtask build <product> <distro> [--exact] [--no-prebuilt]`: a subcommand per release
 /// product.
 pub struct ProductBuild {
     pub product: ProductId,
@@ -366,6 +372,9 @@ pub struct ProductBuild {
     /// `release build --exact`: reuse only what byte-identical Recipe and
     /// Ginux built (implied when the release is signed).
     pub exact: bool,
+    /// Compile our own tools and the TUI binary instead of reusing or downloading
+    /// prebuilts (an exact build does so anyway).
+    pub no_prebuilt: bool,
 }
 
 /// The `--exact` flag of every product build.
@@ -374,6 +383,14 @@ fn exact_arg() -> Arg {
         .long("exact")
         .action(clap::ArgAction::SetTrue)
         .help("Release build: reuse only what byte-identical Recipe and Ginux built (implied when signed)")
+}
+
+/// The `--no-prebuilt` flag of every product build.
+fn no_prebuilt_arg() -> Arg {
+    Arg::new("no_prebuilt")
+        .long("no-prebuilt")
+        .action(clap::ArgAction::SetTrue)
+        .help("Compile our own tools and the TUI binary instead of reusing or downloading prebuilts")
 }
 
 /// "The live-tools ISO (input of the live-tools, install and ab-update scenarios)".
@@ -399,6 +416,7 @@ impl FromArgMatches for ProductBuild {
             product,
             distros: DistroSelection::from_arg_matches(sub)?,
             exact: sub.get_flag("exact"),
+            no_prebuilt: sub.get_flag("no_prebuilt"),
         })
     }
 
@@ -414,6 +432,7 @@ impl Subcommand for ProductBuild {
             cmd.subcommand(
                 DistroSelection::augment_args(Command::new(product.name()))
                     .arg(exact_arg())
+                    .arg(no_prebuilt_arg())
                     .about(product_about(product))
                     .long_about(None),
             )
@@ -449,6 +468,28 @@ impl DistroSelection {
             )),
         }
     }
+}
+
+#[derive(Subcommand)]
+pub enum PrebuiltCmd {
+    /// Print the key of a prebuilt program: what CI computes to find or publish it.
+    Key(PrebuiltArgs),
+    /// Upload the local cache entry of a prebuilt's current key to the prebuilt repository
+    /// (LEVITATE_PREBUILT_REPO, default LevitateOS/prebuilt) with gh; never replaces an
+    /// asset that differs. Build it first (an ISO build, or `build ... --no-prebuilt`).
+    Publish(PrebuiltArgs),
+}
+
+#[derive(Args, Clone)]
+pub struct PrebuiltArgs {
+    /// `tools` (a tool package) or `tui` (`install-tui`, `system-tui`).
+    #[arg(value_parser = ["tools", "tui"])]
+    pub family: String,
+    /// A tool package (recpart, recstrap, recab, levitate-recipe, install-split-pane) or a TUI binary.
+    pub name: String,
+    /// The distro whose libc the TUI binary is built for (needed for `tui`).
+    #[arg(long, value_parser = DistroParser)]
+    pub distro: Option<Distro>,
 }
 
 #[derive(Subcommand)]

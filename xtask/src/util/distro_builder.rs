@@ -33,6 +33,22 @@ pub fn run(root: &Path, command: &Command) -> Result<()> {
     Ok(())
 }
 
+/// Run distro-builder as the current user, for commands that need no root (prebuilt keys
+/// and publishing, which uses the user's own `gh` login).
+pub fn run_unprivileged(root: &Path, command: &Command) -> Result<()> {
+    let bin = crate::util::repo::cargo_bin(root, "distro-builder", "distro-builder")?;
+    let args = command.to_args(root);
+    let status = std::process::Command::new(&bin)
+        .args(&args)
+        .status()
+        .with_context(|| format!("running {}", bin.display()))?;
+    if !status.success() {
+        let args: Vec<_> = args.iter().map(|arg| arg.to_string_lossy()).collect();
+        bail!("distro-builder {} failed ({status})", args.join(" "));
+    }
+    Ok(())
+}
+
 /// `sudo -n env ... <bin>`: the builder as root, with the user's toolchain and a
 /// target directory of its own (root's cargo builds of Recipe and the Ginux launcher
 /// then write no root-owned files into `target/` or the user's registry, and run

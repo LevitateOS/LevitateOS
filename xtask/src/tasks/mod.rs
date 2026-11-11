@@ -4,6 +4,7 @@ pub mod build;
 pub mod check;
 pub mod generate;
 pub mod kernels;
+pub mod prebuilt;
 pub mod progress;
 pub mod scenarios;
 pub mod setup;

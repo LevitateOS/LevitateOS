@@ -1,6 +1,6 @@
 use anyhow::Result;
 
-use crate::cli::{BaseCmd, CheckCmd, Cmd, KernelCmd, TuiCmd};
+use crate::cli::{BaseCmd, CheckCmd, Cmd, KernelCmd, PrebuiltCmd, TuiCmd};
 
 pub fn run(cli: crate::cli::Cli) -> Result<()> {
     match cli.cmd {
@@ -10,6 +10,10 @@ pub fn run(cli: crate::cli::Cli) -> Result<()> {
         Cmd::Doctor { packages: Some(family), .. } => crate::tasks::setup::packages(&family),
         Cmd::Build { what } => crate::tasks::build::run(what),
         Cmd::Kernel { what: KernelCmd::Publish(args) } => crate::tasks::kernels::publish(args),
+        Cmd::Prebuilt { what } => crate::tasks::prebuilt::run(match what {
+            PrebuiltCmd::Key(args) => (false, args),
+            PrebuiltCmd::Publish(args) => (true, args),
+        }),
         Cmd::Base { what: BaseCmd::Lock { distro, check } } => crate::tasks::base::lock(&distro, check),
         Cmd::Run(args) => crate::tasks::scenarios::run(args),
         Cmd::Test(args) => crate::tasks::scenarios::test(args),
