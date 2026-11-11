@@ -16,12 +16,12 @@ exec /usr/bin/systemd-nspawn --quiet --settings=no --register=no --as-pid2 \
     --bind-ro=/var/lib/recab-release/bin:/opt/recab/bin \
     --bind-ro=/var/lib/recab-release/toolchain:/opt/recab/toolchain \
     --bind-ro=/var/lib/recab-release/check:/opt/recab/check \
-    --bind-ro=/var/lib/recab-release/job-started:/opt/recab/job-started \
+    --bind-ro=/var/lib/recab-release/job-started.sh:/opt/recab/job-started.sh \
     --resolv-conf=copy-host --chdir=/opt/actions-runner \
     --setenv=PATH=/opt/recab/toolchain/bin:/opt/recab/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin \
     --setenv=HOME=/root --setenv=RUNNER_ALLOW_RUNASROOT=1 \
     --setenv=GINUX_BIN=/opt/recab/bin/ginux \
     --setenv=GINUX_ROOT="$(</var/lib/recab-release/runtime/root-reference)" \
     --setenv=GINUX_ROOTFS=/opt/recab/runtime/rootfs.tar \
-    --setenv=ACTIONS_RUNNER_HOOK_JOB_STARTED=/opt/recab/job-started \
+    --setenv=ACTIONS_RUNNER_HOOK_JOB_STARTED=/opt/recab/job-started.sh \
     "${extra[@]}" "$@"
