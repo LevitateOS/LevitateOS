@@ -213,6 +213,33 @@ distros (builder 9a18ad0), then prebuilt downloads keyed by source
 ([prebuilt-downloads.md](prebuilt-downloads.md)). The Qt app build root uses
 the same package store, so it stops unpacking its 130–280 packages.
 
+### 7. Progress you can see
+
+On 2026-11-11 the only way to know how far a build was, was to count
+`Extracting` lines in a log by hand: the builder hands each Recipe run the
+terminal and parses nothing, lines carry no time, LevitateOS's unpack prints
+no count, Alpine's prints `(n/970)` only, and nothing says how long a step
+took or will take. A build must answer, at any moment: **which step, how far,
+how fast, how long until done, and where the time went.**
+
+- **Timeline.** The builder records every step (each part ensure, each Recipe
+  invocation, EROFS writes, initramfs, ISO) with start, end and duration in
+  `timeline.jsonl` beside the run, and prints a "where the time went" table at
+  the end, also on failure. Every line it prints starts with the time.
+- **Counts from inside recipes.** Recipe gains a `progress(done, total, what)`
+  helper and a `--progress-file PATH` option: the coordinator keeps that file
+  current (atomically, at most once a second) with the invocation, phase,
+  what, done, total and timestamps. The builder passes a progress file to
+  every invocation. Long loops report through it: unpacking (package k of n),
+  the package effects, compiles where the count is known.
+- **A live view.** `cargo xtask progress [distro]` shows each running build:
+  the current part and step, `412/990 packages`, rate, elapsed, an ETA from
+  the rate, and for steps without a count an ETA from earlier runs' timelines.
+  The finished steps are listed with their durations. It refreshes in place,
+  and works over SSH: it is a terminal view, not a web page.
+- **Comparable runs.** Because every run leaves a timeline, the next redesign
+  step can be judged by numbers: the same table before and after.
+
 ## What a build would cost
 
 Rough, from tonight's measurements; to be confirmed by the first runs:
@@ -227,25 +254,27 @@ Rough, from tonight's measurements; to be confirmed by the first runs:
 
 ## Order of work
 
-1. **Measure what is left in Ginux** (the 430 µs image lookup, `rename`) with
+1. **Progress you can see** (section 7), first, so every later step is
+   measured instead of guessed.
+2. **Measure what is left in Ginux** (the 430 µs image lookup, `rename`) with
    the fixed launcher on an idle machine, so the remaining per-call costs are
    known before choosing section 3's route.
-2. **Parts and the combiner** (section 0): replace the parent-product chain
+3. **Parts and the combiner** (section 0; committed unbuilt 2026-11-11): replace the parent-product chain
    with parts the builder caches by their inputs, and a combiner that writes
    an ISO from parts. This is mostly re-plumbing what the builder already does
    (overlays, EROFS writer, `recinit`, `recuki`, `reciso`), and it sets the
    frame the next steps fill.
-3. **Package store for downloads**, keyed by SHA-256 (removes the 37-minute
+4. **Package store for downloads** (committed unbuilt 2026-11-11), keyed by SHA-256 (removes the 37-minute
    re-downloads at once).
-4. **Per-package unpack trees + composition**, base and desktop layers, with
+5. **Per-package unpack trees + composition**, base and desktop layers, with
    parallel workers.
-5. **Split effects and configuration** out of the rootfs recipe into their own
+6. **Split effects and configuration** out of the rootfs recipe into their own
    cached steps.
-6. **Cache identity** change (section 4) and shorter deadlines.
-7. **Bulk primitive in Ginux** (or coordinator unpacking), per decision 2.
-8. Prebuilt downloads for our programs, as planned.
+7. **Cache identity** change (section 4) and shorter deadlines.
+8. **Bulk primitive in Ginux** (or coordinator unpacking), per decision 2.
+9. Prebuilt downloads for our programs, as planned.
 
-Steps 2–5 are builder and Recipe recipe work; step 7 is Ginux or Recipe work.
+Steps 3–6 are builder and Recipe recipe work; step 8 is Ginux or Recipe work.
 
 ## Decisions for the user
 
