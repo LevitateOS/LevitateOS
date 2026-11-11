@@ -90,23 +90,20 @@ jobs:
       - name: Acquire the locked Rust source closure
         run: cargo fetch --locked
 
-      - name: Prepare the pinned Recipe bootstrap root
+      - name: Prepare the pinned Recipe compiler root
         shell: bash
         run: |
           set -euo pipefail
-          export GINUX_OCI_CACHE_DIR_OVERRIDE="$RUNNER_TEMP/recipe-oci"
-          export GINUX_OCI_WORK_DIR_OVERRIDE="$RUNNER_TEMP/recipe-oci-work"
-          (
-            cd tools/ginux
-            ./scripts/fetch-rocky-oci.sh
-            ./scripts/prepare-rocky-oci.sh
-          )
-          base=$(jq -er '.base.path' tools/recipe/bootstrap/ginux-build-image.json)
-          digest=$(jq -er '.base.sha256' tools/recipe/bootstrap/ginux-build-image.json)
-          rootfs="$GINUX_OCI_CACHE_DIR_OVERRIDE/${base#oci-cache/}"
-          printf '%s  %s\n' "$digest" "$rootfs" | sha256sum --check --strict
-          echo "GINUX_ROOTFS=$rootfs" >> "$GITHUB_ENV"
-          echo "GINUX_ROOT=oci:recipe-bootstrap@sha256:$digest" >> "$GITHUB_ENV"
+          cargo build --locked --release -p levitate-recipe --bin recipe-image
+          python3 tools/recipe/scripts/prepare-managed-image.py \
+            --spec tools/recipe/bootstrap/product-ci.json \
+            --ginux-source tools/ginux \
+            --producer target/release/recipe-image \
+            --input-root "$RUNNER_TEMP/recipe-inputs" \
+            --output "$RUNNER_TEMP/recipe-compiler"
+          digest=$(jq -er '.image_sha256' tools/recipe/bootstrap/product-ci.json)
+          echo "GINUX_ROOTFS=$RUNNER_TEMP/recipe-compiler/rootfs.tar" >> "$GITHUB_ENV"
+          echo "GINUX_ROOT=oci:recipe-compiler@sha256:$digest" >> "$GITHUB_ENV"
 
       # Ginux reserves one host descriptor per granted storage object plus
       # supervisor work. The largest product grant is 262144 objects.
