@@ -12,6 +12,12 @@ on:
 env:
   CARGO_TERM_COLOR: always
 
+# A newer push supersedes a run still going: only the latest commit's result matters,
+# and each run spends up to two three-hour product builds.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   changes:
     uses: ./.github/workflows/detect-changes.yml
