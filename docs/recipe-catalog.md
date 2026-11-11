@@ -54,15 +54,15 @@ hides them unless asked.
 
 | Recipe | What it gives a build | Note | Done |
 |---|---|---|---|
-| `gxx` | C++ compiler and its headers | 14.3.1-4.4.el10, matching the build image; consumer restore fails | blocked |
+| `gxx` | C++ compiler and its headers | 14.3.1-4.4.el10; matching image support paths, C++20 build/run verified | yes |
 | `rust` | rustc and cargo | in the build image today; as a recipe it moves without a new image | |
-| `go` | the Go toolchain | 1.27.4; sandbox version check segfaults before publication | blocked |
+| `go` | the Go toolchain | 1.27.4; standard-library compilation, linking and execution verified | yes |
 | `node` | Node.js and npm | | |
-| `python` | a self-contained Python | 3.14.10+20261026; imports pass, but consumer input rejects its public CA bundle | blocked |
+| `python` | a self-contained Python | 3.14.10+20261026; database, compression, SSL and subprocess script verified | yes |
 | `zig` | Zig, also a C and C++ compiler | a possible second route to C++ | |
 | `jdk` | Java (Temurin) | | |
-| `cmake` | build system | 4.4.5; compiler check reaches a link process that segfaults | blocked |
-| `ninja` | build runner | 1.13.2; executing a build rule fails in posix_spawn | blocked |
+| `cmake` | build system | 4.4.5; C configure, Make build and executable verified | yes |
+| `ninja` | build runner | 1.13.2; C build rule and executable verified | yes |
 | `meson` | build system | needs `python` | |
 | `perl` | needed by OpenSSL's and autotools' builds | the build image has none | |
 | `autotools` | autoconf, automake, libtool, m4 | needs `perl` | |
@@ -74,28 +74,37 @@ hides them unless asked.
 ### Sandbox checks of the first build tools (2026-11-11)
 
 All five recipes pin their archives and every regular payload file, declare
-only a `tools` output, and require no caller defines. `blocked` above means a
-recipe has been written but its consumer workload has not passed. These are build
-image tools, not commands activated into the host profile.
+only a `tools` output, and require no caller defines. These are build image
+tools, separate from commands activated into the host profile.
 
-The checks used the launcher and shared compiler image from
-`.artifacts/recipe-htop-20261110/inputs.json`, with the current Recipe worker.
-The scratch build/state, release checksums and logs are under
-`.artifacts/recipe-toolchain-wave/`. No image or VM was built, and this work
-changed no source under `tools/`.
+The compiler image remains the one pinned in
+`.artifacts/recipe-htop-20261110/inputs.json`. Checks now use maintained Ginux
+`cfb0c3bc`, including upstream `cfebfdab`, and Recipe `50423f3`. Logs and
+consumer definitions are under `.artifacts/recipe-toolchain-fix/` and
+`.artifacts/recipe-toolchain-wave/proofs/`. No image or VM was built.
 
-| Tool | Observed in the supplied sandbox | Blocker / work not verified |
+| Tool | Verified consumer workload | Remaining limitation |
 |---|---|---|
-| `gxx` | The matching Rocky C++ frontend, headers and runtime are acquired, checked and published. | The `build_deps` consumer aborts before worker startup: `ginux: launch startup failure: invalid restore header`. C++ compilation was not reached. |
-| `cmake` | The SDK is published and `cmake --version` reports 4.4.5. A separate consumer identifies the image GCC 14.3.1 and compiles its compiler-check object through Make. | The link process in the compiler check segfaults; configuration cannot complete. |
-| `ninja` | The SDK is published and its `build_deps` consumer reports version 1.13.2. | Its first build rule fails with `ninja: fatal: posix_spawn: Function not implemented`; the C program is not built. |
-| `go` | The 1.27.4 archive and all SDK payload checksums pass. | The bundled launcher executing `go version` terminates with signal 11. Readiness fails and no tools output is published; a Go compilation was not reached. |
-| `python` | The SDK is published; Python 3.14.10 and bundled JSON, SSL, SQLite, zlib, bz2, lzma and ctypes imports run successfully. | Importing the published SDK into a separate script consumer is refused as secret-bearing input at `pip/_vendor/certifi/cacert.pem`, a public CA bundle. The separate database/compression/subprocess script was not started. |
+| `gxx` | Actual `build_deps` consumer compiles and runs a C++20 program using vector, string and iostream. | Requires the matching Rocky GCC 14.3.1 compiler image; its launchers preserve the image's support-file search paths. |
+| `cmake` | A separate immutable SDK consumer configures a C project with the image GCC and Make, builds it and runs its executable. | Uses the pinned shared compiler image. |
+| `ninja` | Actual `build_deps` consumer executes a C compilation rule and runs the resulting program. | Uses the image C compiler. |
+| `go` | The final recipe verifies all 6,064 SDK files and publishes its tools. A separate immutable SDK consumer builds, links and runs a program importing fmt with CGO disabled. | Uses the pinned toolchain without automatic downloads; broader cgo compatibility is not claimed. |
+| `python` | A separate immutable SDK consumer executes a script using JSON, zlib/bz2/lzma round trips, SQLite, SSL and a subprocess. | Public CA PEMs are accepted; PEMs containing private-key markers remain refused. |
+
+Ginux now accepts checked GNU restore headers and long links, keeps Go thread
+signal state in the configured catalog, implements virtual process groups and
+masked ppoll through the existing signal completion owner, handles descriptor
+close-on-exec ioctls and real child wait resource counters, and permits 32 bounded
+channel objects for nested builds. Shared owned-file mappings support Go linking;
+executable pins reject live shared mappings, and checkpoints quiesce mapped writers.
+Upstream native privilege reduction, deferred SIGCHLD and catalog semantics are
+retained. Recipe emits upstream's normalized audit enablement form and pins the
+reviewed configured contract digests.
 
 CMake and Go have a 30-minute declared limit for complete SDK extraction and
-checking. CMake, Go and Python publish their verified owned work directory
-directly, avoiding a second SDK copy. Earlier ten-minute extraction/publication
-timeouts are retained in the local logs; they are not the runtime blockers above.
+checking. CMake, Go and Python publish verified owned work directories directly,
+avoiding a second SDK copy. The Go build SDK omits upstream test fixtures,
+including their published private keys; credential filtering remains enabled.
 
 ## 3. Libraries
 
