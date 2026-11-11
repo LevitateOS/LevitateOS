@@ -113,6 +113,12 @@ Dispatch `.github/workflows/recab-updates.yml` explicitly with `operation=publis
    Recipe when public monitoring is provisioned. These results are transport
    evidence, not an installed boot or update-service readiness claim.
 
+The tag input also accepts an explicit base tag and desktop tag separated by a
+space, for the same distro. Both immutable publications are fetched and every
+payload is verified before signing. The signing job binds the whole selected set
+to a deterministic digest, and the builder changes the discovery pointer once
+after checking both profiles. Single-tag invocations retain their existing digest.
+
 Daily `operation=refresh` authenticates the old signed index, including an
 expired one, and renews its freshness for at most 14 days, capped by authority
 expiry. It preserves every selected release ID, transport map and payload byte.
@@ -122,6 +128,22 @@ it is not extended with an index key. Renew authorization offline. Keep signing
 key overlap during routine rotation so existing selected releases remain
 verifiable; a revoked selected release stops refresh rather than being silently
 dropped or trusted. Root-authorized epoch increases reset index counters only.
+
+To replace releases signed by a newly revoked release key, first authorize the
+replacement signer through the offline root and prepare/upload genuinely newer
+signed payloads. Publish the complete affected base/desktop set together. The
+publisher authenticates old manifests under their original authority before using
+their sequences as floors, then requires current authority for replacements and
+every retained profile. An index signature alone cannot invent a release floor.
+Refresh, duplicate profiles, lower sequences and replacement sets that leave a
+revoked profile selected refuse without changing the reachable index. No entry
+is silently dropped. The same atomic operation is available locally:
+
+```sh
+distro-builder --repo-root /absolute/repo release publish levitate \
+  /absolute/base-publication /absolute/feed candidate --index-key /external/index.pk8 \
+  --publication /absolute/desktop-publication
+```
 Authority history prevents rollback and reactivation of known revoked signers.
 
 Publication, promotion, refresh, redeployment and the independent monitor share
@@ -151,6 +173,10 @@ artifact selection; its actual installed checks remain unrun. This workflow
 does not run those scenarios or enable installed defaults. Do not set the
 switch or manufacture a passing record from local native-fixture results.
 
+Promotion accepts the same explicit two-tag selection. Each profile must have
+its own matching actual public-origin lifecycle record before either selection
+changes in stable; the secret-free verification digest binds both publications.
+
 The existing local factory/updated artifact pairs and full P13 lifecycle evidence
 must cover both distros and advertised profiles before enabling stable updates.
 Additional CPU architectures remain deferred indefinitely.
@@ -164,6 +190,11 @@ expiry, exact default-branch metadata bytes, TLS grants and payload hashes throu
 Recipe. Normal GitHub workflow failure notifications retain diagnostics; no
 messages are sent to an external service. Metadata propagation retries are
 bounded and do not turn a stale/signed-but-old site into success.
+
+Recipe retries transient 429/502/503/504 responses at most twice, with short
+bounded delays. A numeric `Retry-After` over five seconds, an HTTP-date or an
+invalid delay defers automatic retry and reports that the operation should be
+retried later; it never substitutes the short default backoff for that header.
 
 Local builder operations are useful for a staged metadata tree:
 

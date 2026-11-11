@@ -14,7 +14,7 @@ on:
         options: [levitate, acorn]
         default: levitate
       tag:
-        description: Exact existing os-… payload tag for publish/promote; never an artifact build request
+        description: Exact existing os-… payload tag, or base and desktop tags separated by a space; no builds
         type: string
   schedule:
     - cron: '17 4 * * *'
@@ -133,8 +133,13 @@ jobs:
           test -n "$GINUX_ROOT"
           test -f "$GINUX_ROOTFS"
           PUB="$RUNNER_TEMP/recab-publication-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
-          python3 .github/scripts/recab_updates.py --builder "$PWD/target/debug/distro-builder" verify "$DISTRO" "$PUB"
-          echo "sha256=$(sha256sum "$PUB/publication.json" | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+          python3 .github/scripts/recab_updates.py --builder "$PWD/target/debug/distro-builder" verify "$DISTRO" "$PUB" > "$PUB-verification.json"
+          cat "$PUB-verification.json"
+          python3 - "$PUB-verification.json" "$GITHUB_OUTPUT" <<'PY'
+          import json, sys
+          with open(sys.argv[2], 'a') as output:
+              output.write('sha256=' + json.load(open(sys.argv[1]))['publication_sha256'] + '\n')
+          PY
 
   metadata:
     needs: [configuration, verify-payload, tools]

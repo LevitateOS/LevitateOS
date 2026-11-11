@@ -48,6 +48,28 @@ def load(path):
     return json.loads(path.read_bytes())
 
 
+def publications(directory):
+    # A batch is exactly two explicit profile publications, never a recursive
+    # search that could select stale outputs from a build workspace.
+    if (directory / 'publication.json').is_file():
+        return [directory]
+    paths = sorted(directory.iterdir())
+    require(len(paths) == 2 and all(p.is_dir() and not p.is_symlink() for p in paths),
+            'expected an explicit single publication or two-profile publication set')
+    records = [load(p / 'publication.json') for p in paths]
+    require(all(p.name == r['tag'] for p, r in zip(paths, records))
+            and {r['entry']['release']['identity']['flavour'] for r in records} == {'base', 'desktop'},
+            'publication set must contain distinct exact base/desktop tags')
+    return paths
+
+
+def publication_digest(paths):
+    if len(paths) == 1:
+        return sha(paths[0] / 'publication.json')
+    members = sorted((load(p / 'publication.json')['tag'], sha(p / 'publication.json')) for p in paths)
+    return hashlib.sha256(json.dumps(members, separators=(',', ':')).encode()).hexdigest()
+
+
 class Publisher:
     def __init__(self, args):
         self.args = args
@@ -184,12 +206,21 @@ class Publisher:
             require(path.stat().st_size == assets[name]['size']
                     and 'sha256:' + sha(path) == assets[name].get('digest'), 'downloaded metadata digest differs')
         record = self.inspect(distro, output)
-        expected = os.environ.get('RECAB_EXPECTED_PUBLICATION_SHA256')
-        if expected:
-            require(sha(output / 'publication.json') == expected, 'publication changed after secret-free public verification')
         require(record['tag'] == tag, 'downloaded publication tag differs')
         self.immutable_release(record)
         return record
+
+    def download_publications(self, distro, tags, output):
+        names = tags.split()
+        require(1 <= len(names) <= 2 and len(set(names)) == len(names),
+                'supply one tag or two distinct base/desktop tags for the same distro')
+        for tag in names:
+            self.download_metadata(distro, tag, output if len(names) == 1 else output / tag)
+        paths = publications(output)
+        expected = os.environ.get('RECAB_EXPECTED_PUBLICATION_SHA256')
+        if expected:
+            require(publication_digest(paths) == expected, 'publication changed after secret-free public verification')
+        return paths
 
     @contextlib.contextmanager
     def index_key(self, distro):
@@ -219,9 +250,11 @@ class Publisher:
 
     def renew(self, distro, audience, prepared=None):
         self.config(distro)
+        paths = prepared or []
+        extra = [item for p in paths[1:] for item in ('--publication', p)]
         with self.index_key(distro) as key:
-            value = self.build('publish', distro, prepared or 'refresh', self.feed(distro, audience),
-                               audience, '--index-key', key)
+            value = self.build('publish', distro, paths[0] if paths else 'refresh', self.feed(distro, audience),
+                               audience, '--index-key', key, *extra)
         if value['authority_expires_at'] <= int(time.time()) + 30 * 86400:
             print(f'::warning::{distro} root authorization expires within 30 days; renew offline')
         print(json.dumps({'distro': distro, 'audience': audience, **value}))
@@ -237,56 +270,68 @@ class Publisher:
             require(distro and tag, 'publish requires distro and immutable payload tag')
             with tempfile.TemporaryDirectory(prefix='recab-publication-') as tmp:
                 prepared = Path(tmp)
-                self.download_metadata(distro, tag, prepared)
-                self.renew(distro, 'candidate', prepared)
+                paths = self.download_publications(distro, tag, prepared)
+                self.renew(distro, 'candidate', paths)
         elif operation == 'promote':
             require(os.environ.get('RECAB_STABLE_VALIDATED') == 'true',
                     'stable promotion is disabled pending installed public-origin lifecycle validation')
             candidate = self.feed(distro, 'candidate')
             index = load(candidate / 'index.json')
-            entries = [e for e in index['releases'] if load(candidate / 'releases' / e['release']['manifest']['sha256'] / 'publication.json')['tag'] == tag]
-            require(len(entries) == 1, 'promote requires one exact current candidate ID')
-            record = load(candidate / 'releases' / entries[0]['release']['manifest']['sha256'] / 'publication.json')
-            evidence = self.repo / 'release/updates/validation' / (record['id'] + '.json')
-            # Evidence is an explicit operator record pointing to the actual named
-            # run; this guard is not itself runtime validation or a signature role.
-            approval = load(evidence)
-            require(approval.get('release_id') == record['id'] and approval.get('public_origin') is True
-                    and approval.get('x86_64_lifecycle_passed') is True and approval.get('run_manifest_sha256')
-                    and approval.get('source_commit') == record['source_commit'], 'missing matching installed validation record')
-            run_file = evidence.with_suffix('.run.json')
-            report = load(run_file)
-            require(sha(run_file) == approval['run_manifest_sha256'] and report.get('status') == 'success'
-                    and report.get('target_name') == 'ab-update' and report.get('target_kind') == 'scenario'
-                    and report.get('distro_id') == distro and report.get('install_mode') == 'ab'
-                    and report.get('fingerprint') and report.get('finished_at_utc'), 'validation record does not bind a successful actual ab-update run')
-            observed = report.get('public_update_result') or {}
-            require(observed.get('release_id') == record['id'] and observed.get('source_commit') == record['source_commit']
-                    and observed.get('publication_sha256') == sha(candidate / 'releases' / record['id'] / 'publication.json')
-                    and observed.get('flavour') == record['entry']['release']['identity']['flavour']
-                    and observed.get('x86_64_lifecycle_passed') is True and observed.get('directions') == ['A->B', 'B->A']
-                    and observed.get('public_index') == self.config(distro)['release']['production']['metadata_base'] + distro + '/candidate/x86_64/index.json',
-                    'actual run lacks matching public-origin release/profile/transport lifecycle evidence')
-            require(sha(candidate / 'releases' / record['id'] / 'publication.json') == os.environ.get('RECAB_EXPECTED_PUBLICATION_SHA256'), 'candidate differs from the publicly verified immutable publication')
-            self.renew(distro, 'stable', candidate / 'releases' / record['id'])
+            tags = tag.split()
+            require(1 <= len(tags) <= 2 and len(tags) == len(set(tags)), 'promote requires distinct explicit current candidate tags')
+            selected = []
+            for name in tags:
+                entries = [e for e in index['releases'] if load(candidate / 'releases' / e['release']['manifest']['sha256'] / 'publication.json')['tag'] == name]
+                require(len(entries) == 1, 'promote requires one exact current candidate ID per tag')
+                directory = candidate / 'releases' / entries[0]['release']['manifest']['sha256']
+                self.validation(distro, directory)
+                selected.append(directory)
+            require(publication_digest(selected) == os.environ.get('RECAB_EXPECTED_PUBLICATION_SHA256'), 'candidate differs from the publicly verified immutable publication set')
+            self.renew(distro, 'stable', selected)
         else:
-            targets = []
-            for item in ('levitate', 'acorn'):
-                for audience in ('candidate', 'stable'):
-                    if (self.feed(item, audience) / 'index.json').is_file():
-                        targets.append((item, audience))
-            require(targets, 'no current feeds to refresh; explicit candidate publication must bootstrap them')
-            for item in ('levitate', 'acorn'):
-                selected = [a for d, a in targets if d == item]
-                if not selected:
-                    continue
-                self.config(item)
-                with self.index_key(item) as key:
-                    for audience in selected:
-                        value = self.build('publish', item, 'refresh', self.feed(item, audience), audience, '--index-key', key)
-                        print(json.dumps({'distro': item, 'audience': audience, **value}))
-                        if value['authority_expires_at'] <= int(time.time()) + 30 * 86400:
-                            print(f'::warning::{item} root authorization expires within 30 days; renew offline')
+            self.refresh()
+
+    def validation(self, distro, directory):
+        record = load(directory / 'publication.json')
+        evidence = self.repo / 'release/updates/validation' / (record['id'] + '.json')
+        # Evidence is an explicit operator record pointing to the actual named
+        # run; this guard is not itself runtime validation or a signature role.
+        approval = load(evidence)
+        require(approval.get('release_id') == record['id'] and approval.get('public_origin') is True
+                and approval.get('x86_64_lifecycle_passed') is True and approval.get('run_manifest_sha256')
+                and approval.get('source_commit') == record['source_commit'], 'missing matching installed validation record')
+        run_file = evidence.with_suffix('.run.json')
+        report = load(run_file)
+        require(sha(run_file) == approval['run_manifest_sha256'] and report.get('status') == 'success'
+                and report.get('target_name') == 'ab-update' and report.get('target_kind') == 'scenario'
+                and report.get('distro_id') == distro and report.get('install_mode') == 'ab'
+                and report.get('fingerprint') and report.get('finished_at_utc'), 'validation record does not bind a successful actual ab-update run')
+        observed = report.get('public_update_result') or {}
+        require(observed.get('release_id') == record['id'] and observed.get('source_commit') == record['source_commit']
+                and observed.get('publication_sha256') == sha(directory / 'publication.json')
+                and observed.get('flavour') == record['entry']['release']['identity']['flavour']
+                and observed.get('x86_64_lifecycle_passed') is True and observed.get('directions') == ['A->B', 'B->A']
+                and observed.get('public_index') == self.config(distro)['release']['production']['metadata_base'] + distro + '/candidate/x86_64/index.json',
+                'actual run lacks matching public-origin release/profile/transport lifecycle evidence')
+
+    def refresh(self):
+        targets = []
+        for item in ('levitate', 'acorn'):
+            for audience in ('candidate', 'stable'):
+                if (self.feed(item, audience) / 'index.json').is_file():
+                    targets.append((item, audience))
+        require(targets, 'no current feeds to refresh; explicit candidate publication must bootstrap them')
+        for item in ('levitate', 'acorn'):
+            selected = [a for d, a in targets if d == item]
+            if not selected:
+                continue
+            self.config(item)
+            with self.index_key(item) as key:
+                for audience in selected:
+                    value = self.build('publish', item, 'refresh', self.feed(item, audience), audience, '--index-key', key)
+                    print(json.dumps({'distro': item, 'audience': audience, **value}))
+                    if value['authority_expires_at'] <= int(time.time()) + 30 * 86400:
+                        print(f'::warning::{item} root authorization expires within 30 days; renew offline')
 
     def record_validation(self, directory):
         report = load(directory / 'run-manifest.json')
@@ -376,8 +421,13 @@ def main():
         print(json.dumps(publisher.build('transport', args.distro, args.bundle.resolve(), args.root.resolve(),
                                         args.output.resolve(), args.source_commit, args.part_bytes)))
     elif args.command == 'upload':publisher.upload(args.distro, args.prepared.resolve())
-    elif args.command == 'fetch-publication':print(json.dumps(publisher.download_metadata(args.distro,args.tag,args.output.resolve())))
-    elif args.command == 'verify':print(json.dumps(publisher.remote(args.distro, args.prepared.resolve())))
+    elif args.command == 'fetch-publication':
+        paths = publisher.download_publications(args.distro, args.tag, args.output.resolve())
+        print(json.dumps({'publication_sha256': publication_digest(paths), 'publications': [str(p) for p in paths]}))
+    elif args.command == 'verify':
+        paths = publications(args.prepared.resolve())
+        results = [publisher.remote(args.distro, p) for p in paths]
+        print(json.dumps({'publication_sha256': publication_digest(paths), 'publications': results, 'production_enabled': False}))
     elif args.command in ('publish', 'promote', 'refresh'):
         publisher.signing_batch(args.command, getattr(args, 'distro', None), getattr(args, 'tag', None))
     elif args.command == 'monitor':
