@@ -880,7 +880,7 @@ void programPages(Window &window, const Save &save, const Expect &expect)
                && words.contains("from "));
     save(window, "15a-program-not-installed");
 
-    // Installed, nothing newer (Element, which the agent's repair updated earlier in the story).
+    // Installed, nothing newer (Element, updated earlier in the story).
     const InstalledItem *mail = catalog.installedItem("element");
     expect(QStringLiteral("element is installed and has no update"), mail && !catalog.update("element"));
     window.showRecipe("element");
@@ -929,9 +929,10 @@ void storageBefore(Window &window, const Save &save, const Expect &expect)
     expect(QStringLiteral("recipe's history has the story's changes (%1)").arg(history.size()), history.size() >= 3);
     const QStringList lines = window.storagePage()->historyLines();
     expect(QStringLiteral("the page lists as many as recipe reports (%1)").arg(lines.size()), lines.size() == history.size());
-    expect(QStringLiteral("newest first: the agent's update of Element, then the two goings back (%1)").arg(lines.join(" | ")),
-           lines.size() >= 3 && lines[0] == "Updated Element from 1.12.3 to 1.12.4, from levitate"
-               && lines[1] == "Went back to GIMP 3.0.4, from 3.0.2" && lines[2] == "Went back to GIMP 3.0.2, from 3.0.4");
+    expect(QStringLiteral("newest first: the update of Element, the agent's install of Krita, then the two goings back (%1)").arg(lines.join(" | ")),
+           lines.size() >= 4 && lines[0] == "Updated Element from 1.12.3 to 1.12.4, from levitate"
+               && lines[1] == "Installed Krita 5.2.13, from levitate"
+               && lines[2] == "Went back to GIMP 3.0.4, from 3.0.2" && lines[3] == "Went back to GIMP 3.0.2, from 3.0.4");
     save(window, "15d-storage");
     window.showInstalled("gimp");
     settle(100);
@@ -1288,6 +1289,12 @@ int takeShots(Window &window, const QString &folder)
             said << "not as expected: the facts say that the address is not a host name\n";
             ok = false;
         }
+        // `recipe update` takes no `--autofix` (cli.rs): a stopped update offers no repair, and says so.
+        if (words.contains("Let the agent fix it")
+            || !words.contains("Recipe lets its agent repair a recipe only while installing it")) {
+            said << "not as expected: a stopped update offers no agent repair, and says why\n";
+            ok = false;
+        }
     }
 
     window.showInstalled("gimp");
@@ -1334,9 +1341,32 @@ int takeShots(Window &window, const QString &folder)
         hold("going back again returns", window.catalog().installedItem("gimp")->version == now);
     }
 
-    window.startInstall("element", Place::Computer, "The issue:\nThe update stopped.\n\nThe expected result:\nElement updates.\n");
+    // Recipe's repair belongs to an install: a first install the sandbox refuses, handed to
+    // Recipe's agent with `recipe install --autofix`.
+    qputenv("RECIPE_STANDIN_REFUSE_NEW", "krita");
+    window.startInstall("krita", Place::Computer);
     waitUntilIdle(window);
+    if (!wordsOn(window).contains("Let the agent fix it")) {
+        said << "not as expected: a stopped install offers Let the agent fix it\n";
+        ok = false;
+    }
+    {
+        const qsizetype beforeFix = changesAsked().size();
+        window.startInstall("krita", Place::Computer, "The issue:\nThe install stopped.\n\nThe expected result:\nKrita installs.\n");
+        waitUntilIdle(window);
+        const QList<Asked> now = changesAsked().mid(beforeFix);
+        if (now.size() != 1 || now[0].arguments.mid(0, 4) != QStringList{"install", "levitate:krita", "--machine-events", "--autofix"}
+            || !window.catalog().installedItem("krita", Place::Computer)) {
+            said << "not as expected: the repair is `recipe install NAME --machine-events --autofix ...`, and it installs\n";
+            ok = false;
+        }
+    }
     ok &= save(window, "8-agent-fixed");
+    qunsetenv("RECIPE_STANDIN_REFUSE_NEW");
+    // Element's source has since published a recipe that stays on its list: the update goes through.
+    qputenv("RECIPE_STANDIN_FIXED", "element");
+    window.startInstall("element", Place::Computer);
+    waitUntilIdle(window);
 
     // Sources: the page, a second source added, its list fetched again, only its recipes shown.
     QTextStream out(stdout);

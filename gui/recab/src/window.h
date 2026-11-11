@@ -36,6 +36,9 @@ public:
     void showRelease();
     // The page the person was on before a flow took them elsewhere.
     void showSection();
+    // After a long run: the section, unless the run failed and its page says why (it stays,
+    // and its Back leads to the section).
+    void sectionUnlessStopped(bool ok);
     void showAsk(const QString &request = QString());
     void showClash();
 
@@ -94,7 +97,7 @@ private:
     // it cannot be read, the page says why and `then` is not done.
     void reload(std::function<void()> then);
     void work(Run *run, const QString &title, const QString &subtitle, std::function<void(bool)> then);
-    void chain(QList<Run *> runs);
+    void chain(QList<Run *> runs, bool first = true);
     void decideByHand();
     // Shows the Before page for `content` (drawn again when the system is read
     // again) and does `go` only when its button is pressed.

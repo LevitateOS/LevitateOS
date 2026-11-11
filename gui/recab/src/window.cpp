@@ -259,12 +259,13 @@ void Window::refresh()
     if (busy())
         return;
     // Only the pages drawn from the state alone are drawn again; a page being
-    // filled in is left as it is.
-    QWidget *shown = stack_->currentWidget();
-    const bool main = shown == system_ || shown == next_ || shown == back_ || shown == historyPage_;
-    const bool release = shown == release_;
-    const bool before = shown == before_;
-    reload([this, main, release, before] {
+    // filled in is left as it is. The page is the one shown when the answer
+    // comes, not when it was asked: the person may have gone on meanwhile.
+    reload([this] {
+        QWidget *shown = stack_->currentWidget();
+        const bool main = shown == system_ || shown == next_ || shown == back_ || shown == historyPage_;
+        const bool release = shown == release_;
+        const bool before = shown == before_;
         if (main)
             showSection();
         else if (release)
@@ -454,6 +455,12 @@ void Window::askBefore(std::function<BeforePage::Content()> content, std::functi
     display(before_);
 }
 
+void Window::sectionUnlessStopped(bool ok)
+{
+    if (ok || !work_->saysWhy())
+        showSection();
+}
+
 // Run one long thing on the work page, then read the system again.
 void Window::work(Run *run, const QString &title, const QString &subtitle, std::function<void(bool)> then)
 {
@@ -466,7 +473,7 @@ void Window::work(Run *run, const QString &title, const QString &subtitle, std::
 }
 
 // Short changes with no page of their own, one after another.
-void Window::chain(QList<Run *> runs)
+void Window::chain(QList<Run *> runs, bool first)
 {
     if (runs.isEmpty()) {
         reload([this] { showSection(); });
@@ -475,7 +482,7 @@ void Window::chain(QList<Run *> runs)
     Run *run = runs.takeFirst();
     setEnabled(false);
     ++quiet_;
-    connect(run, &Run::finished, this, [this, run, runs](bool ok) {
+    connect(run, &Run::finished, this, [this, run, runs, first](bool ok) {
         setEnabled(true);
         --quiet_;
         const QString reason = run->failure()["reason"].toString();
@@ -483,12 +490,16 @@ void Window::chain(QList<Run *> runs)
         if (!ok) {
             for (Run *left : runs)
                 left->deleteLater();
+            // A later step is the restart (no JSON, no reason): what came before it was done.
             QMessageBox::warning(this, tr("System"),
-                                 reason.isEmpty() ? tr("The change was not made.") : reason);
+                                 !reason.isEmpty() ? reason
+                                 : first           ? tr("The change was not made.")
+                                                   : tr("The computer did not restart. The step before the restart was "
+                                                        "made; the page shows where things stand now."));
             reload([this] { showSection(); });
             return;
         }
-        chain(runs);
+        chain(runs, false);
     });
     run->start();
 }
@@ -502,7 +513,7 @@ void Window::handOver(const QString &prompt, bool askFirst)
         return;
     }
     work(client_.agent(prompt, requestTitle(prompt, tr("Preparing the next system"))), tr("Preparing the next system"),
-         tr("The running system is not touched. You can keep working."), [this](bool) { showSection(); });
+         tr("The running system is not touched. You can keep working."), [this](bool ok) { sectionUnlessStopped(ok); });
 }
 
 void Window::fixWithAgent(const QString &prompt, const QString &title)
@@ -513,7 +524,7 @@ void Window::fixWithAgent(const QString &prompt, const QString &title)
                  proposed_->show(status_);
                  display(proposed_);
              } else {
-                 showSection();
+                 sectionUnlessStopped(ok);
              }
          });
 }
@@ -576,7 +587,7 @@ void Window::runOperation(const QJsonObject &op, const QStringList &extra, std::
         if(!value.isEmpty()){if(!field["flag"].isNull())args<<field["flag"].toString();args<<value;}
     }
     work(client_.change(args),workTitle(op),tr("Working on the inactive system. The running system is preserved."),
-         after ? after : [this](bool){showSection();});
+         after ? after : [this](bool ok) { sectionUnlessStopped(ok); });
 }
 
 // The release page's own steps: when one ends well the page is shown again
@@ -638,11 +649,11 @@ void Window::addUpdate(bool askFirst)
         return;
     }
     work(client_.change({"update", "apply"}), tr("Adding the update to the next system"),
-         tr("The running system is not touched. You can keep working."), [this](bool) {
+         tr("The running system is not touched. You can keep working."), [this](bool ok) {
              if (!status_.clashes.isEmpty())
                  showClash();
              else
-                 showSection();
+                 sectionUnlessStopped(ok);
          });
 }
 
@@ -653,7 +664,7 @@ void Window::finish(bool askFirst)
         return;
     }
     work(client_.change({"finalize"}), tr("Finishing the next system"),
-         tr("It is checked and closed, so it can be started."), [this](bool) { showSection(); });
+         tr("It is checked and closed, so it can be started."), [this](bool ok) { sectionUnlessStopped(ok); });
 }
 
 void Window::recover(bool askFirst)
@@ -663,7 +674,7 @@ void Window::recover(bool askFirst)
         return;
     }
     work(client_.change({"recover"}), tr("Continuing where it stopped"),
-         tr("recab looks at what is really there and carries on."), [this](bool) { showSection(); });
+         tr("recab looks at what is really there and carries on."), [this](bool ok) { sectionUnlessStopped(ok); });
 }
 
 void Window::restart(bool askFirst)
@@ -705,7 +716,7 @@ void Window::keep(bool askFirst)
         return;
     }
     work(client_.change({"commit"}), tr("Keeping this system"),
-         tr("It becomes the system that every restart starts."), [this](bool) { showSection(); });
+         tr("It becomes the system that every restart starts."), [this](bool ok) { sectionUnlessStopped(ok); });
 }
 
 void Window::goBack(bool askFirst)
@@ -752,7 +763,7 @@ void Window::reset(bool askFirst)
         // copy is the long part and gets the work page.
         reload([this] {
             work(client_.change({"prepare"}), tr("Making the next system a copy of the running one"),
-                 tr("Only what differs is copied. The running system is not touched."), [this](bool) { showSection(); });
+                 tr("Only what differs is copied. The running system is not touched."), [this](bool ok) { sectionUnlessStopped(ok); });
         });
     });
     drop->start();

@@ -5,8 +5,8 @@
   <vendor>LevitateOS</vendor>
   <vendor_url>https://levitateos.org</vendor_url>
   <action id="org.levitateos.recab.change">
-    <description>Prepare, finish or start the next system with recab</description>
-    <message>The administrator password is needed to change the next system or the system the computer starts</message>
+    <description>Read or change the two systems with recab</description>
+    <message>The administrator password is needed for recab to read the two systems, change the next system or choose the system the computer starts</message>
     <icon_name>system-software-update</icon_name>
     <defaults>
       <allow_any>auth_admin</allow_any>

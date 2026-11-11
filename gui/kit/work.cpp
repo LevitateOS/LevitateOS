@@ -26,6 +26,7 @@ void WorkPage::begin(const QString &title, const QString &subtitle, Run *run, co
     choices_.clear();
     asked_ = nullptr;
     stoppedElsewhere_ = false;
+    saysWhy_ = false;
     column_ = fresh();
 
     auto *header = new QHBoxLayout;
@@ -255,12 +256,13 @@ void WorkPage::onFinished(bool ok)
         return;
     }
     showVerdict(tr("It stopped"),
-                reason.isEmpty() ? tr("The output below ends with the reason. The running system was not touched.") : reason);
+                reason.isEmpty() ? tr("The output below ends with the reason.") : reason);
     emit done(false);
 }
 
 void WorkPage::showVerdict(const QString &title, const QString &words)
 {
+    saysWhy_ = true;
     bar_->hide();
     stop_->hide();
     stopNote_->hide();

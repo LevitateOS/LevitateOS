@@ -26,6 +26,9 @@ Environment:
                           prepares and records the change in it, so the strip can be read
   RECIPE_STANDIN_SPEED    time factor for an install; 0 runs it at once (default 1)
   RECIPE_STANDIN_STOP_AT  "name:hook": stay in the middle of that step forever
+  RECIPE_STANDIN_REFUSE_NEW  a recipe whose install (not yet installed) the sandbox refuses,
+                          as it refuses Element's update; with --autofix the agent repairs it
+  RECIPE_STANDIN_FIXED    "element": Element's update is no longer refused (its source fixed it)
 
 It also keeps what the real `recipe` keeps beside a store (tools/recipe, packages.rs and
 packages/history.rs): the history of what was done to it (`recipe history --json`, one line
@@ -303,7 +306,10 @@ def install(name, agent=False, update_only=False):
     emit(event="plan", recipes=[{"name": each["name"], "steps": steps_of(each)} for each in order])
     # The sample story: the newer Element recipe reaches for a host it has not declared.
     # The real `recipe` reports the numeric address Ginux's audit names, never a host name.
-    refuse = "203.0.113.9:443" if name == "element" and current else None
+    # RECIPE_STANDIN_REFUSE_NEW names a recipe whose first install is refused the same way.
+    # RECIPE_STANDIN_FIXED=element: its source has since published a recipe that does not.
+    refuse = ("203.0.113.9:443" if (name == "element" and current and os.environ.get("RECIPE_STANDIN_FIXED") != name)
+              or (not current and name == os.environ.get("RECIPE_STANDIN_REFUSE_NEW")) else None)
     for each in order:
         play(each, refuse if each is item else None, agent)
     about = item["about"].get("adds", {})
@@ -522,6 +528,10 @@ def main(args):
     command = words[0] if words else ""
     if command in ("install", "update", "remove", "go-back", "hold", "unhold") and len(words) == 2:
         words[1] = words[1].split(":", 1)[-1]  # SOURCE:NAME; the stand-in's names are unique
+    if command == "update" and any(arg.startswith("--autofix") for arg in args):
+        # As the real recipe: `--autofix` is an option of `install` only (cli.rs, Commands::Update).
+        sys.stderr.write("error: unexpected argument '--autofix' found\n\nUsage: recipe update <RECIPE>\n")
+        sys.exit(2)
     if system:
         if command == "installed":
             print(json.dumps(system_view()))

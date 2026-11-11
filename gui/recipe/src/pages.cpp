@@ -977,6 +977,34 @@ void RunPage::onFinished(bool ok)
         facts << tr("The output of the run: %1").arg(counted(lines, tr("%1 line"), tr("%1 lines")));
     facts << unchanged;
 
+    auto *showOutput = new QPushButton(tr("Show the output"));
+    showOutput->setCheckable(true);
+    connect(showOutput, &QPushButton::toggled, this, [this](bool on) {
+        outputTitle_->setVisible(on);
+        output_->setVisible(on);
+    });
+    if (!updatingFrom_.isEmpty()) {
+        // Recipe's own repair (`--autofix`) is an option of `recipe install` only; `recipe update`
+        // takes none (cli.rs, Commands::Update), so a stopped update has no repair to offer.
+        // What stopped, and what Recipe recorded, are still said.
+        verdict->column()->addWidget(text(issue, true));
+        for (const QString &fact : facts.mid(0, facts.size() - 1)) // the last is `unchanged`, said above
+            verdict->column()->addWidget(dim(text(fact, true)));
+        verdict->column()->addWidget(text(tr("Recipe lets its agent repair a recipe only while installing it; "
+                                             "it cannot do that for an update yet."),
+                                          true));
+        buttons->addWidget(showOutput);
+        buttons->addWidget(again);
+        buttons->addWidget(leave);
+        buttons->addStretch();
+        verdict->column()->addLayout(buttons);
+        outputTitle_->hide();
+        output_->hide();
+        column_->addStretch();
+        emit failed(name_);
+        return;
+    }
+
     auto *prompt = new PromptPanel(
         issue, facts,
         tr("%1 %2 installs and its own check passes. What the recipe may use stays as it is; if that has to "
@@ -985,12 +1013,6 @@ void RunPage::onFinished(bool ok)
 
     auto *fixNow = primary(tr("Let the agent fix it"));
     connect(fixNow, &QPushButton::clicked, this, [this, name, prompt] { emit fix(name, prompt->prompt()); });
-    auto *showOutput = new QPushButton(tr("Show the output"));
-    showOutput->setCheckable(true);
-    connect(showOutput, &QPushButton::toggled, this, [this](bool on) {
-        outputTitle_->setVisible(on);
-        output_->setVisible(on);
-    });
     buttons->addWidget(showOutput);
     buttons->addWidget(again);
     buttons->addWidget(leave);
@@ -1303,7 +1325,7 @@ void UpdatesPage::show(const Catalog &catalog, const QString &selectedName, int 
                                  Mood::Warn));
     if (!catalog.updateProblems.isEmpty())
         column->addWidget(dim(text(tr("Not looked up: %1.").arg(catalog.updateProblems.join(tr("; "))), true)));
-    auto *system = dim(text(tr("The system itself is updated in System Updates.")));
+    auto *system = dim(text(tr("The system itself is updated in the System app.")));
     if (catalog.updates.isEmpty()) {
         column->addStretch();
         column->addWidget(system);

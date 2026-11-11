@@ -467,7 +467,7 @@ void HandPage::show(const QList<Finding> &chosen, qint64 scannedBytes, const QSt
                            .arg(counted(asks.size(), tr("%1 place"), tr("%1 places")), named.join(tr(", ")),
                                 asks.size() > named.size() ? tr(" and %1 more").arg(asks.size() - named.size()) : QString());
     }
-    ask.happens << tr("It works as you, without administrator rights.");
+    ask.happens << tr("It works as you. A command as administrator runs only if you approve it.");
     if (freeNow >= 0)
         ask.happens << tr("Once you let it go, up to %1 is free: the disk would have up to %2 free instead of %3.")
                            .arg(bytesText(sum(chosen)), bytesText(freeNow + sum(chosen)), bytesText(freeNow));

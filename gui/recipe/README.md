@@ -232,7 +232,7 @@ Changes, through the root helper (as the person for software "for me"; with `--s
 | `recipe storage --clear-earlier` | exists: deletes every earlier version. The window asks first ("Clear earlier versions…" on the Storage page; Installed points there). Recipe cannot clear one program's earlier versions alone, so the remove question no longer offers that. It adds a `clear-earlier` line to the history |
 | `recipe hold NAME`, `recipe unhold NAME` (with `--machine-events`) | exists (`commands.rs` `Commands::Hold`/`Unhold`, `packages.rs` `set_held`): `held` on the receipt, a new generation; the final event is `done` or `failed`. Through the root helper where the place needs it. Not for software in a locked computer's system: `system_route()` (`commands.rs` line 1381) hands only install, update, remove, installed and isinstalled to recab, so the window does not offer it there |
 | `recipe install NAME --autofix --autofix-prompt-file FILE --machine-events` | exists for `install`: Recipe's agent repair (Codex or Claude), with the front end's prompt appended to its own. Never run against a real agent |
-| `recipe update NAME --autofix --autofix-prompt-file FILE --machine-events` | `update` takes no such options yet |
+| `recipe update NAME --autofix ...` | does not exist: `update` takes no such options, so the window never sends it. A stopped update offers no repair and says so (the stand-in refuses it as the real `recipe` does) |
 
 Events are one JSON object per line. The front end reads these; any other
 line is shown as output. "Real" is what `recipe --machine-events` sends since
@@ -471,7 +471,8 @@ where it is from, and has a Sources page:
 Installing and updating name the recipe as `SOURCE:NAME`. All of these exist in
 `recipe` (see `docs/recipe-sources.md`, steps 1 and 2); the window has run them
 against the stand-in only, and read the real `list --json`. Installing from a
-remote source is step 3 there and stops with a message until then. When two
+remote source is step 3 there, built in `recipe` since 2026-11-10; the window
+names it as `SOURCE:NAME` and has not run it against the real `recipe`. When two
 sources hold one name, the window shows the first and says nothing of the
 other.
 
@@ -503,9 +504,12 @@ is given, in three parts, and shows it:
 - **The expected result**: what should be true afterwards. The person can
   change this part; it is the only part that is theirs to say.
 
-"Let the agent fix it" runs the same install or update again with Recipe's
-agent repair on and that text as its extra prompt. "Try again" and "Show the
-output" stay beside it. What the agent changed is reported when the run ends;
+"Let the agent fix it" runs the same install again with Recipe's agent repair
+on (`recipe install NAME --autofix --autofix-prompt-file FILE`) and that text as
+its extra prompt. It is offered for a stopped install only: `recipe update` takes
+no `--autofix`, so a stopped update says that Recipe's agent repairs a recipe
+only while installing it, and offers "Try again" and "Show the output". "Try
+again" and "Show the output" stay beside the repair too. What the agent changed is reported when the run ends;
 there is no step yet where the person approves the change before it is used.
 
 ## Not done
@@ -514,8 +518,7 @@ there is no step yet where the person approves the change before it is used.
   them). The Installed page does not show its count in the rail.
 - Help says nothing of: Update all for programs that ask for nothing more, "Repair" or
   "Tell the agent…", "Copy to your own recipes…", download sizes, sizes of builds,
-  installing from a source at an address (the sources README says it stops with a
-  message). It names Remove's own small window and says only that "Clear earlier
+  installing from a source at an address. It names Remove's own small window and says only that "Clear earlier
   versions…" asks first.
 - Not built from the redesign, because `recipe` does not carry it: the search and
   sort of Installed, a library line ("4 libraries are installed because a program
@@ -545,15 +548,15 @@ there is no step yet where the person approves the change before it is used.
 - Not read: `recipe isinstalled` (the window never asks it).
 - The frame's checks were run offscreen against stand-ins; not on a real desktop.
 
-- A real agent for "Ask for software": Codex and Claude Code do not speak the
-  lines above as they are. The stand-in writes no file.
+- "Ask for software" against a real agent: `levitate-agent` stands between and
+  starts Codex, but no recipe request has been run through it against the real
+  Codex. The stand-in writes no file.
+- A repair of a stopped update: `recipe update` has no `--autofix`.
 - Answering the agent during "Let the agent fix it": that agent is started by
   Recipe itself, which has no way to pass a question on.
 - The source commands and `refresh` against the real `recipe`; a source's
   icons; two sources with one name.
 
-- Opening the recipe file itself, the list of sources (Git repositories) and
-  choosing between them, asking an agent for a recipe.
 - Icons: recipes show a letter until the catalog carries `<name>.svg`.
 - Translations: every string goes through `tr()`, no translation exists.
 - "Open" starts the first program a recipe installed, not its menu entry.

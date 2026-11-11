@@ -27,9 +27,13 @@ Qt 6 Widgets, C++20, CMake. Shared widgets are in `gui/kit`.
 have run on a real home folder (172 GiB read in about nine seconds, on a warm
 disk). Nothing has been handed to a real agent: `fixtures/agent` stands in for
 it and moves only inside a sample tree. **A real agent following the request
-(set aside by moving, a manifest, `place` events) has never been run**; how a
-real Codex or Claude Code is started, and that it answers with the events below
-and keeps the set-aside convention, is not built or checked. The pages for The
+(set aside by moving, a manifest, `place` events) has never been run**. The
+default agent is `levitate-agent`, which starts Codex, but its contract has no
+`place` event: the agent cannot send the lines the request asks for, only its
+questions, the commands it ran and its last word. And the window sends no
+`may_write`, so with Settings at "ask" Codex is read-only and every move is a
+command put to the person, whatever the page says about places that clear
+without asking. The pages for The
 disk, Browse, Mess and what was set aside were built against stand-ins for
 `lsblk`, `recipe storage` and the agent (below) and never on a real desktop.
 
@@ -467,7 +471,7 @@ The stand-ins, all in `fixtures/`:
 ## What it asks of recab
 
 `recab status --json`, as the System window reads it, for what the two
-systems are. From the real recab (schema 7) it takes the two slots, the
+systems are. From the real recab (schema 7 to 10; recab sends 10 today) it takes the two slots, the
 generation each holds, the preparation's revision and `lifecycle.other`, in
 which recab itself says what the other system is: the next one, the system
 from before, or a copy; the running
@@ -540,8 +544,9 @@ on its input as `{"question": id, "answer": "..."}`. When asked what differs bet
 
 - **A real agent following the request has never been run.** The set-aside
   convention (move into the holding folder, write the manifest, say what was done
-  with a `place` event) is asked of the agent in words; the stand-in does it, and
-  nothing checks that Codex or Claude Code would. A real agent may also set aside
+  with a `place` event) is asked of the agent in words; the stand-in does it, the
+  real helper cannot pass a `place` event on, and nothing checks that Codex or
+  Claude Code would move rather than delete. A real agent may also set aside
   something across a disk boundary or not write the manifest; the page then shows
   what the manifests and the holding folder really hold, and says when a place
   the agent claimed is not there, but nothing here can make an agent obey.
@@ -594,4 +599,5 @@ on its input as `{"question": id, "answer": "..."}`. When asked what differs bet
 - Mess inside the systems. The map reads only the home folder and
   `/var/lib/recipe`; the two systems are compared with each other, not searched
   for leftovers.
-- It is in no image: no recipe builds it and no desktop lists it yet.
+- In an image: `distro/builder/os-recipes/desktop-apps.rhai` builds and installs it with
+  the other two, and the contract's `DESKTOP_APPS` lists it; no image with it has been built.

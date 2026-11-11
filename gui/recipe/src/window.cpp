@@ -421,10 +421,15 @@ void Window::startInstall(const QString &name, Place place, const QString &agent
         return;
     }
     const bool installed = catalog_.installedItem(name, place) != nullptr;
+    if (installed && !agentPrompt.isEmpty()) {
+        // `recipe update` takes no `--autofix`; the stopped page offers no repair of an update.
+        frame_->flash(tr("Recipe's agent repairs a recipe only while installing it, not for an update."));
+        return;
+    }
     // `recipe` is given SOURCE:NAME, so two sources with one name cannot be confused.
     const QString named = catalog_.qualified(name);
     runPlace_ = place;
-    run_ = !agentPrompt.isEmpty() ? client_.fixWithAgent(named, agentPrompt, installed, place)
+    run_ = !agentPrompt.isEmpty() ? client_.fixWithAgent(named, agentPrompt, place)
            : installed ? client_.update(named, place) : client_.install(named, place);
     runPage_->begin(catalog_, name, run_, place);
     stack_->setCurrentWidget(runPage_);
@@ -546,11 +551,15 @@ void Window::answerAgent(const QString &words)
 
 void Window::askRemove(const QString &name, Place place)
 {
-    const Recipe *recipe = catalog_.recipe(name);
     const InstalledItem *item = catalog_.installedItem(name, place);
-    if (!recipe || !item)
+    if (!item)
         return;
-    RemoveDialog dialog(*recipe, *item, this);
+    // `recipe remove` works from the receipt alone, so a program whose recipe is
+    // gone (its source removed, the recipe deleted) can still be removed.
+    Recipe gone;
+    gone.name = name;
+    const Recipe *recipe = catalog_.recipe(name);
+    RemoveDialog dialog(recipe ? *recipe : gone, *item, this);
     if (dialog.exec() == QDialog::Accepted)
         quietChange(client_.remove(name, place));
 }

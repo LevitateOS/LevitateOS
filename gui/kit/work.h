@@ -24,6 +24,8 @@ public:
     void begin(const QString &title, const QString &subtitle, Run *run, const QString &stopNote = QString());
     // Whether the person pressed Stop on the run shown.
     bool stopped() const;
+    // Whether the run ended and the page says why (it stopped, or it carries on elsewhere).
+    bool saysWhy() const { return saysWhy_; }
     // Whether the agent has asked something and waits for the answer.
     bool asking() const { return !question_.isEmpty(); }
     QStringList choices() const { return choices_; }
@@ -56,4 +58,5 @@ private:
     QStringList choices_;
     QWidget *asked_ = nullptr;
     bool stoppedElsewhere_ = false; // the run ended with the helper's "stopped", not by our Stop
+    bool saysWhy_ = false;
 };

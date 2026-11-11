@@ -147,7 +147,7 @@ RECAB_GUI_RECAB=$F/recab RECAB_GUI_AGENT=$F/agent RECAB_GUI_REBOOT=$F/reboot \
 
 - `RECAB_GUI_RECAB`: the `recab` to run (default: `recab` on `PATH`).
 - `RECAB_GUI_AGENT`: the agent; it reads the prompt on its input (default:
-  `codex`, which will need its own arguments once this is real).
+  `levitate-agent`, which starts Codex or Claude Code; see `gui/agent/README.md`).
 - `RECAB_GUI_REBOOT`: the restart (default: `reboot`).
 - `RECAB_GUI_OS_RELEASE`: where the running system's name is read for the real
   recab (default: `/etc/os-release`).
@@ -283,7 +283,7 @@ Events, one JSON object per line on stderr:
 | Finish | `recab finalize --preparation ID --revision N` |
 | Reset to the running system | `recab discard --preparation ID --revision N`, then `recab prepare`: discarding only forgets the next system and leaves its files; preparing again copies the running system over them. recab has no single command for it |
 | Discard (only after an interruption) | `recab discard --preparation ID --revision N` |
-| Continue (after an interruption) | `recab prepare --preparation ID --revision N` |
+| Continue (after an interruption) | with the real recab, the first of recab's own `trial_recover`, `change_recover`, `update_recover`, `finalize_recover`, `sync_recover` operations that it reports ready; with the old stand-in, `recab prepare --preparation ID --revision N` |
 | Restart into it | `recab set-next SLOT`, then the restart; when the restart is set already (`restart_set`), the restart alone |
 | Start it at the next restart | `recab set-next SLOT` |
 | Cancel the set restart | `recab commit`: committing the running system takes the set restart back and leaves the next system ready |
@@ -407,8 +407,10 @@ headed parts: `The request:` (when the person asked for a change), `The
 issue:`, `The facts:`, `The expected result:`. It reports with the same
 events as above, and may ask: a `question` event with an `id`, a `text` and
 `choices` (a list, or none for a free answer) is shown on the work page, and
-the answer comes back on its input as `{"question": id, "answer": "..."}`. How a real Codex or Claude Code is started, what it is
-allowed to run, and whether it runs as the person or as root are not decided.
+the answer comes back on its input as `{"question": id, "answer": "..."}`. The
+default agent is `levitate-agent`: it starts Codex (or Claude Code) as the person
+and asks before any command outside the agent's sandbox and before every command
+as administrator (`gui/agent/README.md`).
 
 ## The source
 
@@ -473,8 +475,10 @@ allowed to run, and whether it runs as the person or as root are not decided.
   label recab records, not something it checks.
 - Production online updates still need a configured distribution origin and keys.
   The window exposes backend check/download/apply and signed media operations.
-- A real agent, and the approval of what it may do. Codex and Claude Code do
-  not speak the lines above as they are; something has to stand between.
+- A real agent doing a System request: `levitate-agent` stands between and asks
+  before administrator commands, but no System request has been run through it
+  against the real Codex, and recab changes need root, so each is an asked
+  `RUN-AS-ADMINISTRATOR` command.
 - Desktop conflict dialogs are compiled and use one revision at a time; actual
   booted-system GUI validation is still outstanding.
 - It does not notice a change made elsewhere while the window is in front and

@@ -43,9 +43,9 @@ public:
     // Each change names the place it is made in (see model.h, `Place`).
     Run *install(const QString &name, Place place);
     Run *update(const QString &name, Place place);
-    // The same install or update with Recipe's agent repair on, and the
-    // prompt (issue, facts, expected result) handed to it.
-    Run *fixWithAgent(const QString &name, const QString &prompt, bool installed, Place place);
+    // The same install with Recipe's agent repair on, and the prompt (issue,
+    // facts, expected result) handed to it. `recipe update` has no repair.
+    Run *fixWithAgent(const QString &name, const QString &prompt, Place place);
     Run *remove(const QString &name, Place place);
     // Activates the newest earlier version a store still holds; no recipe
     // runs. Only where a store stands behind the software.

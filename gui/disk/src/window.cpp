@@ -1002,7 +1002,7 @@ void Window::showExplain()
                        .arg(counted(comparison_.count(), tr("%1 difference"), tr("%1 differences")), comparison_.running.slot,
                             comparison_.other.slot);
     ask.happens << tr("It is asked to say what the differences are, and told to change nothing on either system.");
-    ask.happens << tr("It works as you, without administrator rights, so it reads only what you can read.");
+    ask.happens << tr("It works as you, so it reads only what you can read, unless you approve a command as administrator.");
     ask.happens << tr("What it answers is shown on the page for the two systems.");
     ask.issue = comparison_.issue();
     ask.facts = comparison_.facts();
@@ -1045,7 +1045,7 @@ void Window::send(const QString &prompt)
             if (event["event"] == QLatin1String("agent"))
                 said_ += (said_.isEmpty() ? QString() : QStringLiteral("\n")) + event["summary"].toString();
         });
-        work_->begin(tr("The agent is looking into the differences"), tr("It reads both systems. It changes nothing."),
+        work_->begin(tr("The agent is looking into the differences"), tr("It is given recab's list of the differences, and told to change nothing."),
                      run_, tr("Nothing is changed either way"));
     } else {
         job_ = Job::Clearing;
@@ -1061,7 +1061,8 @@ void Window::send(const QString &prompt)
                 placed_.insert(event["path"].toString(), event);
         });
         work_->begin(tr("The agent is setting the mess aside"),
-                     tr("It moves only what is on the list into the holding folder, and asks before anything marked for that."), run_);
+                     tr("It moves only what is on the list into the holding folder, and asks before anything marked for that."), run_,
+                     tr("What was set aside so far stays set aside; the next page shows it"));
     }
     go(work_);
     run_->start();

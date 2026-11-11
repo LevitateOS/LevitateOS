@@ -815,7 +815,7 @@ void handOverShots(Window &window, const Expect &expect)
            words.contains(QStringLiteral("Hand these %1 places to the agent?").arg(places)) && words.contains(QStringLiteral("Nothing has started.")));
     expect(QStringLiteral("it says what happens: what is asked, that nothing is deleted before the person lets go, who it works as, the room"),
            words.contains(QStringLiteral("What happens")) && words.contains(QStringLiteral("The agent is asked to clear"))
-               && words.contains(QStringLiteral("Nothing is gone until you let it go")) && words.contains(QStringLiteral("without administrator rights"))
+               && words.contains(QStringLiteral("Nothing is gone until you let it go")) && words.contains(QStringLiteral("A command as administrator runs only if you approve it."))
                && words.contains(QStringLiteral("is free")));
     expect(QStringLiteral("it says which places it asks about first"), words.contains(QStringLiteral("It asks you first about")));
     expect(QStringLiteral("the request is still there: the issue, the facts and the expected result"),

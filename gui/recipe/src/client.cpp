@@ -350,7 +350,9 @@ Run *RecipeClient::update(const QString &name, Place place)
     return change(lead(place) + QStringList{"update", name, "--machine-events"} + collection() + at(place), place);
 }
 
-Run *RecipeClient::fixWithAgent(const QString &name, const QString &prompt, bool installed, Place place)
+// Recipe's own repair: `--autofix` is an option of `recipe install` only (cli.rs,
+// Commands::Install); `recipe update` takes none, so there is no repair of an update.
+Run *RecipeClient::fixWithAgent(const QString &name, const QString &prompt, Place place)
 {
     auto *file = new QTemporaryFile(QDir::tempPath() + "/recipe-gui-prompt-XXXXXX.txt");
     if (file->open()) {
@@ -358,7 +360,7 @@ Run *RecipeClient::fixWithAgent(const QString &name, const QString &prompt, bool
         file->close();
     }
     Run *run = change(lead(place)
-                          + QStringList{installed ? "update" : "install", name, "--machine-events", "--autofix",
+                          + QStringList{"install", name, "--machine-events", "--autofix",
                                         "--autofix-prompt-file", file->fileName()}
                           + collection() + at(place),
                       place);

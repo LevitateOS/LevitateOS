@@ -544,7 +544,9 @@ QString SystemsState::otherIs() const
         return QObject::tr("The system from before.");
     if (otherRole == QLatin1String("next"))
         return QObject::tr("The next system, not started yet.");
-    return QObject::tr("The second copy.");
+    if (otherRole == QLatin1String("copy"))
+        return QObject::tr("The second copy.");
+    return QObject::tr("recab cannot say what it is."); // recab's "unknown"
 }
 
 void SystemsPage::forget()
@@ -749,7 +751,8 @@ void SystemsPage::show(const Comparison &c, const QString &said, const QDateTime
     there_ = new SideMap(false, blocks_);
     const QString otherIs = c.role == QLatin1String("previous") ? tr("The system from before.")
                             : c.role == QLatin1String("next") ? tr("The next system, not started yet.")
-                                                                : tr("The second copy.");
+                            : c.role == QLatin1String("copy") ? tr("The second copy.")
+                                                                : tr("recab cannot say what it is.");
     auto *sides = new QHBoxLayout;
     sides->setSpacing(14);
     auto *left = new QVBoxLayout;
