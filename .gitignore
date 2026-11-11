@@ -22,3 +22,6 @@ bun.lockb
 # Agent configs are local; the HDAE skill links are shared
 .claude/*
 !.claude/skills
+
+# Transient local publisher lock; signed history remains versioned.
+/release/updates/site/**/.index.lock

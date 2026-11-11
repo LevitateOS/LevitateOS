@@ -7,3 +7,5 @@ pub mod kernels;
 pub mod scenarios;
 pub mod setup;
 pub mod tui;
+
+pub mod releases;

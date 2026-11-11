@@ -1,0 +1,247 @@
+name: recab production metadata (x86_64)
+
+on:
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: Consume existing immutable payloads, renew references, or redeploy current metadata
+        required: true
+        type: choice
+        options: [publish, promote, refresh, deploy]
+      distro:
+        description: Distro for publish/promote (refresh covers all existing feeds)
+        type: choice
+        options: [levitate, acorn]
+        default: levitate
+      tag:
+        description: Exact existing os-… payload tag for publish/promote; never an artifact build request
+        type: string
+  schedule:
+    - cron: '17 4 * * *'
+
+permissions:
+  contents: read
+
+# This includes publication, promotion, refresh and independent redeployment.
+# Jobs reread the default branch after acquiring the workflow concurrency slot.
+concurrency:
+  group: recab-production-metadata
+  cancel-in-progress: false
+
+env:
+  RECAB_DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+  CARGO_TERM_COLOR: always
+
+jobs:
+  configuration:
+    if: github.event_name == 'workflow_dispatch' || vars.RECAB_PUBLISHING_READY == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Refuse unprovisioned or premature publication explicitly
+        env:
+          READY: ${{ vars.RECAB_PUBLISHING_READY }}
+          STABLE: ${{ vars.RECAB_STABLE_VALIDATED }}
+          OPERATION: ${{ inputs.operation || 'refresh' }}
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REPOSITORY" = LevitateOS/LevitateOS
+          test "$GITHUB_REF" = "refs/heads/$RECAB_DEFAULT_BRANCH"
+          if [[ "$READY" != true ]]; then
+            echo '::error::Production publishing is not provisioned; origins, public authority, environment and Recipe runtime must be configured first.'
+            exit 1
+          fi
+          if [[ "$OPERATION" == promote && "$STABLE" != true ]]; then
+            echo '::error::Stable promotion remains disabled pending installed public-origin lifecycle validation.'
+            exit 1
+          fi
+
+  tools:
+    needs: configuration
+    if: >-
+      vars.RECAB_PUBLISHING_READY == 'true' &&
+      github.ref == format('refs/heads/{0}', github.event.repository.default_branch) &&
+      inputs.operation != 'deploy'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    outputs:
+      source-commit: ${{ steps.source.outputs.sha }}
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          submodules: recursive
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@d1031067263f94b142dd6c0ce24c5eb9d02d52a0 # master, reviewed pin
+        with:
+          toolchain: 1.99.0
+      - name: Compile and package only the metadata tool in a secret-free job
+        id: source
+        run: |
+          set -euo pipefail
+          cargo build --locked -p distro-builder --bin distro-builder
+          mkdir "$RUNNER_TEMP/recab-tools"
+          cp target/debug/distro-builder "$RUNNER_TEMP/recab-tools/distro-builder"
+          strip "$RUNNER_TEMP/recab-tools/distro-builder"
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: recab-metadata-tool
+          path: ${{ runner.temp }}/recab-tools/distro-builder
+          retention-days: 1
+          if-no-files-found: error
+
+  verify-payload:
+    needs: configuration
+    if: >-
+      vars.RECAB_PUBLISHING_READY == 'true' &&
+      github.ref == format('refs/heads/{0}', github.event.repository.default_branch) &&
+      (inputs.operation == 'publish' || inputs.operation == 'promote')
+    # Existing release machine supplies the explicit, hash-pinned Recipe runtime.
+    # No rootfs/ISO/kernel build, VM run, signing secret or write token is involved.
+    runs-on: [self-hosted, linux, x64, recab-release]
+    timeout-minutes: 60
+    outputs:
+      publication-sha256: ${{ steps.verified.outputs.sha256 }}
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          submodules: recursive
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@d1031067263f94b142dd6c0ce24c5eb9d02d52a0 # master, reviewed pin
+        with:
+          toolchain: 1.99.0
+      - name: Compile release and Recipe tools only
+        run: cargo build --locked -p distro-builder --bin distro-builder -p levitate-recipe --bin recipe
+      - name: Fetch bounded public publication metadata
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DISTRO: ${{ inputs.distro }}
+          TAG: ${{ inputs.tag }}
+        run: >-
+          python3 .github/scripts/recab_updates.py --builder "$PWD/target/debug/distro-builder"
+          fetch-publication "$DISTRO" "$TAG" "$RUNNER_TEMP/recab-publication-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+      - name: Verify every public payload through Recipe/Ginux without credentials
+        id: verified
+        env:
+          DISTRO: ${{ inputs.distro }}
+          GINUX_ROOT: ${{ vars.RECAB_GINUX_ROOT }}
+          GINUX_ROOTFS: ${{ vars.RECAB_GINUX_ROOTFS }}
+        run: |
+          set -euo pipefail
+          test -n "$GINUX_ROOT"
+          test -f "$GINUX_ROOTFS"
+          PUB="$RUNNER_TEMP/recab-publication-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          python3 .github/scripts/recab_updates.py --builder "$PWD/target/debug/distro-builder" verify "$DISTRO" "$PUB"
+          echo "sha256=$(sha256sum "$PUB/publication.json" | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+
+  metadata:
+    needs: [configuration, verify-payload, tools]
+    if: >-
+      always() && !cancelled() && needs.configuration.result == 'success' && vars.RECAB_PUBLISHING_READY == 'true' &&
+      github.ref == format('refs/heads/{0}', github.event.repository.default_branch) &&
+      (needs.tools.result == 'success' || (inputs.operation == 'deploy' && needs.tools.result == 'skipped')) &&
+      (needs.verify-payload.result == 'success' ||
+       ((github.event_name == 'schedule' || inputs.operation == 'refresh' || inputs.operation == 'deploy') && needs.verify-payload.result == 'skipped'))
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    environment: recab-updates
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          submodules: recursive
+          fetch-depth: 0
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        if: inputs.operation != 'deploy'
+        with:
+          name: recab-metadata-tool
+          path: ${{ runner.temp }}/recab-tools
+      - name: Require current source and an executable metadata tool (no build processes in signing job)
+        if: inputs.operation != 'deploy'
+        env:
+          TOOL_SOURCE: ${{ needs.tools.outputs.source-commit }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$TOOL_SOURCE"
+          chmod 755 "$RUNNER_TEMP/recab-tools/distro-builder"
+      - name: Sign candidate publication, explicit promotion, or current-reference refresh
+        if: inputs.operation != 'deploy'
+        env:
+          OPERATION: ${{ inputs.operation || 'refresh' }}
+          DISTRO: ${{ inputs.distro }}
+          TAG: ${{ inputs.tag }}
+          GH_TOKEN: ${{ github.token }}
+          RECAB_EXPECTED_PUBLICATION_SHA256: ${{ needs.verify-payload.outputs.publication-sha256 }}
+          RECAB_STABLE_VALIDATED: ${{ vars.RECAB_STABLE_VALIDATED }}
+          RECAB_LEVITATE_INDEX_KEY_BASE64: ${{ secrets.RECAB_LEVITATE_INDEX_KEY_BASE64 }}
+          RECAB_ACORN_INDEX_KEY_BASE64: ${{ secrets.RECAB_ACORN_INDEX_KEY_BASE64 }}
+        run: |
+          set -euo pipefail
+          if [[ "$OPERATION" == refresh ]]; then
+            python3 .github/scripts/recab_updates.py --builder "$RUNNER_TEMP/recab-tools/distro-builder" refresh
+          else
+            python3 .github/scripts/recab_updates.py --builder "$RUNNER_TEMP/recab-tools/distro-builder" "$OPERATION" "$DISTRO" "$TAG"
+          fi
+      - name: Refuse a stale base and commit small public metadata on the default branch
+        if: inputs.operation != 'deploy'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 .github/scripts/recab_updates.py commit-metadata
+
+  deploy:
+    needs: metadata
+    if: needs.metadata.result == 'success'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      # Never deploy the triggering SHA or an artifact prepared by an older run.
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+      - name: Export the complete current metadata site with a 256 MiB bound
+        run: python3 .github/scripts/recab_updates.py export-site "$RUNNER_TEMP/recab-pages"
+      - uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3.0.1
+        with:
+          path: ${{ runner.temp }}/recab-pages
+          retention-days: 1
+      - name: Deploy current Pages metadata in this workflow
+        id: deployment
+        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4.0.5
+
+  monitor:
+    needs: deploy
+    if: needs.deploy.result == 'success' && vars.RECAB_PUBLIC_MONITORING_READY == 'true'
+    runs-on: [self-hosted, linux, x64, recab-release]
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          submodules: recursive
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@d1031067263f94b142dd6c0ce24c5eb9d02d52a0 # master, reviewed pin
+        with:
+          toolchain: 1.99.0
+      - name: Compile acquisition tools without signing credentials
+        run: cargo build --locked -p distro-builder --bin distro-builder -p levitate-recipe --bin recipe
+      - name: Verify public deployed metadata and representative payload parts through Recipe
+        env:
+          GINUX_ROOT: ${{ vars.RECAB_GINUX_ROOT }}
+          GINUX_ROOTFS: ${{ vars.RECAB_GINUX_ROOTFS }}
+        run: >-
+          python3 .github/scripts/recab_updates.py --builder "$PWD/target/debug/distro-builder"
+          monitor --representative

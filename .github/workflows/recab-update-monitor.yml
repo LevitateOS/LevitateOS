@@ -1,0 +1,55 @@
+name: Monitor public recab updates (x86_64)
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '47 6 * * *'
+permissions:
+  contents: read
+# Independent of the refresh result and its signing credentials. Read the latest
+# default branch after the same serialization slot; never a triggering snapshot.
+concurrency:
+  group: recab-production-metadata
+  cancel-in-progress: false
+jobs:
+  configuration:
+    if: github.event_name == 'workflow_dispatch' || vars.RECAB_PUBLIC_MONITORING_READY == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Refuse unconfigured monitoring explicitly
+        env:
+          READY: ${{ vars.RECAB_PUBLIC_MONITORING_READY }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REPOSITORY" = LevitateOS/LevitateOS
+          test "$GITHUB_REF" = "refs/heads/$DEFAULT_BRANCH"
+          if [[ "$READY" != true ]]; then
+            echo '::error::Public update monitoring is not provisioned; configure the existing Recipe runtime/runner and public feed first.'
+            exit 1
+          fi
+  monitor:
+    needs: configuration
+    if: >-
+      vars.RECAB_PUBLIC_MONITORING_READY == 'true' &&
+      github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    runs-on: [self-hosted, linux, x64, recab-release]
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          submodules: recursive
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@d1031067263f94b142dd6c0ce24c5eb9d02d52a0 # master, reviewed pin
+        with:
+          toolchain: 1.99.0
+      - name: Compile acquisition tools only, without signing credentials
+        run: cargo build --locked -p distro-builder --bin distro-builder -p levitate-recipe --bin recipe
+      - name: Check current public metadata and representative assets through Recipe
+        env:
+          GINUX_ROOT: ${{ vars.RECAB_GINUX_ROOT }}
+          GINUX_ROOTFS: ${{ vars.RECAB_GINUX_ROOTFS }}
+        run: >-
+          python3 .github/scripts/recab_updates.py --builder "$PWD/target/debug/distro-builder"
+          monitor --representative

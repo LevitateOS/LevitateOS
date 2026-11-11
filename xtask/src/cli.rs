@@ -178,6 +178,12 @@ pub struct Cli {
 
 #[derive(Subcommand)]
 pub enum Cmd {
+    /// Publish existing signed x86_64 releases, refresh metadata or verify delivery (no OS builds).
+    #[command(disable_help_flag = true)]
+    Release {
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
+        args: Vec<String>,
+    },
     /// Create the repo SSH key guests trust, then run doctor.
     Setup,
 

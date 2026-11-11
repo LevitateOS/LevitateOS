@@ -4,6 +4,7 @@ use crate::cli::{BaseCmd, CheckCmd, Cmd, KernelCmd, TuiCmd};
 
 pub fn run(cli: crate::cli::Cli) -> Result<()> {
     match cli.cmd {
+        Cmd::Release { args } => crate::tasks::releases::run(args),
         Cmd::Setup => crate::tasks::setup::setup(),
         Cmd::Doctor { json, packages: None } => crate::tasks::setup::doctor(json),
         Cmd::Doctor { packages: Some(family), .. } => crate::tasks::setup::packages(&family),
