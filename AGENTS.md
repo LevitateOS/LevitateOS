@@ -30,6 +30,7 @@ These rules apply to every directory and submodule, recursively, across Git repo
 - Report failures and unverified behavior honestly. Fix causes; do not fabricate success, suppress failures, or silently substitute outputs.
 
 ## Build and runtime
+- The supported execution target is native Linux x86_64. Work on additional CPU architectures is deferred indefinitely and must not be added as a requirement or delivery blocker for Recipe, recab, or the distros unless the user explicitly changes this scope.
 - Filesystem iteration uses the `live-tools` product. Named integration/e2e scenarios run independently against existing artifacts; do not reintroduce numbered composition, numeric aliases, or ordered test gates.
 - Recipes own source/package facts and acquisition/build/install behavior. Rust/TOML owns orchestration, output locations, and contracts. Normal public recipes run without required defines.
 - Build payload through its producers. Keep build commands explicit; scenario commands consume existing artifacts.

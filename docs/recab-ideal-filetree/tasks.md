@@ -47,7 +47,7 @@ then  T-A1 → T-X1 (needs D-3) → T-V1 → T-D2
 | T-X1 | join | T-A1, D-3 | `status.rs`, `state.rs` (plan dry-run), `contract.rs`, `docs/*.schema.json`, `tui/apps/runtime/recab-tui/src/**` | `status --json` carries each action's verdict and a `schema_version`; `health` gets one too; recab-tui renders recab's verdicts, uses generated `ERROR_CLASSES`, drops its EROFS check, offers `--from-media`/`--change-flavour`. | F-X1, F-C2 | `cargo xtask gen`; `cargo xtask check tui` |
 | T-V1 | join | T-S1, T-K1, T-K2 | `testing/install-tests/src/scenarios/ab_update.rs` | Scenario asserts: machine edit survives, untouched shipped file takes the new version, deletion stays deleted, added user survives, `/root` survives (per D-4), flavour or distro mismatch refused. | F-V1 | `cargo xtask test ab-update levitate` and `acorn` |
 | T-D2 | 5 | all above | `README.md`, `REQUIREMENTS.md`, `services/carried` header (if T-K3 did not) | Document the landed behaviour: refusal order, baseline and whiteouts, trial judging rule, code table (new files), test files, drop `chroot` from preconditions. | F-D4 | read-through |
-| — | builder | none | `distro/builder/recipes/install-tools.rhai` | Packaging for aarch64; readiness checks the service and carried list. Not recab's tree. | F-P1 | builder owner's checks |
+| — | builder | none | `distro/builder/recipes/install-tools.rhai` | Packaging readiness checks the service and carried list. Not recab's tree. | F-P1 | builder owner's checks |
 | — | owner | — | — | Decide D-1 (repo merge). No recab task depends on it. | F-G1 | — |
 
 ## Verification ladder
