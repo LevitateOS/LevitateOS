@@ -358,10 +358,22 @@ pub enum BuildCmd {
     },
 }
 
-/// `cargo xtask build <product> <distro>`: a subcommand per release product.
+/// `cargo xtask build <product> <distro> [--exact]`: a subcommand per release
+/// product.
 pub struct ProductBuild {
     pub product: ProductId,
     pub distros: DistroSelection,
+    /// `release build --exact`: reuse only what byte-identical Recipe and
+    /// Ginux built (implied when the release is signed).
+    pub exact: bool,
+}
+
+/// The `--exact` flag of every product build.
+fn exact_arg() -> Arg {
+    Arg::new("exact")
+        .long("exact")
+        .action(clap::ArgAction::SetTrue)
+        .help("Release build: reuse only what byte-identical Recipe and Ginux built (implied when signed)")
 }
 
 /// "The live-tools ISO (input of the live-tools, install and ab-update scenarios)".
@@ -386,6 +398,7 @@ impl FromArgMatches for ProductBuild {
         Ok(Self {
             product,
             distros: DistroSelection::from_arg_matches(sub)?,
+            exact: sub.get_flag("exact"),
         })
     }
 
@@ -400,6 +413,7 @@ impl Subcommand for ProductBuild {
         ProductId::releases().fold(cmd, |cmd, product| {
             cmd.subcommand(
                 DistroSelection::augment_args(Command::new(product.name()))
+                    .arg(exact_arg())
                     .about(product_about(product))
                     .long_about(None),
             )

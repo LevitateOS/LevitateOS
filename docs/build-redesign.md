@@ -200,6 +200,16 @@ hours for nothing:
 - **Release builds** ignore all caches and build everything from scratch with
   the exact launcher and Recipe, as release evidence requires.
 
+Built 2026-11-11 (unbuilt, unrun): Recipe names itself and Ginux by declared
+versions (`tools/recipe/src/identity.rs`: `ENGINE_BEHAVIOUR`, `GINUX_BEHAVIOUR`,
+plus the transport version and the pinned Ginux catalog and build-base digests
+it already checked); `--exact-identity` adds the worker's and launcher's
+bytes. The builder's system part key uses the declared versions instead of the
+Recipe CLI's bytes; `release build --exact` (and every signed build) is exact.
+The launcher's bytes stay in `system-sources` as content, because the system
+ships the launcher; a Ginux change therefore still builds the system part
+again, but its Recipe steps are reused.
+
 ### 5. Short steps with checkpoints
 
 No step should run for hours. With sections 1–2 the longest step is one

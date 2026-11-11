@@ -48,7 +48,8 @@ policy. The orchestration accepts the approved repository and origins only:
 - Explicit HTTPS CDN grants in the production policy, without wildcards.
 
 First produce the signed release using the existing Recipe/builder producer and
-external release key. Retain its prepared root, EROFS image-writer provenance,
+external release key. A signed build is always exact (`release build --exact`):
+it reuses only what byte-identical Recipe and Ginux binaries built. Retain its prepared root, EROFS image-writer provenance,
 intended inventory, kernel and installed initramfs. Then, on the release machine:
 
 ```sh
