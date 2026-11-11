@@ -265,6 +265,8 @@ The desktop adds no other package manager, store or bundle format.
 - [ ] **L A** Recipes for the apps people expect first (office suite, mail,
   chat, media, graphics, development tools); first set: OnlyOffice (not LibreOffice), mail, media and
   graphics, chat, developer tools (decision 13).
+  The recipes to write, in layers and in order, are in
+  [recipe-catalog.md](recipe-catalog.md).
 - [ ] **L A** Desktop integration of what Recipe installs: `.desktop` entries,
   icons, MIME types and D-Bus services must land where the menus look, and the
   caches (`update-desktop-database`, icon cache, MIME database) must be
