@@ -59,7 +59,7 @@ lives on the other two pages is not repeated there as rows.
 | State | Overview | The next system | Getting back |
 |---|---|---|---|
 | Stable, no next system | "Your system is locked"; Make a change | "There is no next system yet": Make a change, Install software | the way back (when there is a system from before), nothing to cancel |
-| A change is asked for | Say it in words; the page shows what the agent is given. A question first when the place of the system from before will be reused | | |
+| A change is asked for | Say it in words; the page shows what the agent is given. The Before page first when the place of the system from before will be reused (see "Before it happens") | | |
 | Preparing | The steps, how far, the output. Stop keeps what is done | | |
 | Open, holding changes | Finish; "A newer release is available" with "See it…" (the Release page) | Every change with who and when; what will differ; the three steps, step 1 current: Finish | the system from before is gone: its place holds the next system |
 | A clash | Settle the clash | Settle the clash (the Release page lists it too) | |
@@ -310,6 +310,61 @@ of that id, whose `argv` the window sends as it is (with `--json --actor person
 | "No change can be made while on trial" | the refusal of `prepare`, `ensure_preparation_allowed` (`state.rs` 748), shown as recab words it |
 | the History page | `recab history --json` (`history.rs`): `History` (76: `entries`, `records`, `unreadable`, `truncated`, `log_found`) and `HistoryEntry` (39: `time`, `kind`, `slot`, `preparation`, `change`, `action`, `package`, `actor`, `outcome`, `detail`), read from the audit log (`AuditEvent`, `store.rs` 32) and the state file's changes (`ChangeRecord`, `state.rs` 127) |
 
+## Before it happens
+
+Every action that changes something shows the shared "Before it happens" page
+(`../kit/before.*`) first, in the place of the dialogs there were: a title as a
+question, "Nothing has started. This is what will happen if you go on.", "What
+happens" in plain sentences for the state the system is in, "What runs" (the
+recab command, then the password), "Cancel" and one named button. Cancel, and
+Escape, return to the page the person came from and change nothing. The words
+are in `src/beforewords.*`; they are taken from the pages, from recab's own
+state and `destructive` mark and from the commands the window runs, and say
+nothing recab does not report (how long a command takes, how much it changes).
+
+| Action | Title | Button | Runs |
+|---|---|---|---|
+| Finish the next system | Finish the next system? | Finish | `recab finalize` |
+| Restart into it | Restart into the next system? (Restart now? when the restart is set) | Restart into it / Restart | `recab set-next`, then `reboot` (`reboot` only when set) |
+| Set it for the next restart | Start the next system at the next restart? | Set it | `recab set-next` |
+| Cancel a set restart | Cancel the set restart? | Cancel the restart | `recab commit` |
+| Keep the running system | Keep the running system? | Keep it | `recab commit` |
+| Go back | Go back to the system from before? | Restart into it | `recab rollback`, then `reboot` |
+| Reset the next system | Reset the next system to the running one? | Reset | `recab discard`, then `recab prepare` |
+| Discard it | Discard the next system? | Discard | `recab discard` |
+| Continue after an interruption | Continue where it stopped? | Continue | `recab recover` (what recab's operation says) |
+| Add a release (also from a file) | Add LevitateOS 2026.12 to the next system? | Add it | `recab update apply` |
+| Take a release out, carry on adding it | Take the release out of the next system? / Carry on adding the release? | Take it out / Carry on | `recab update cancel` / `recab update recover` |
+| A request that would reuse the place of the system from before | Make this change in the next system? | Prepare the next system | the agent |
+
+"What runs" says whether a password is asked from the root helper: with
+`pkexec` "The administrator password is asked for" (for each command, when two
+run: `pkexec` asks again for `reboot`); with `RECAB_GUI_ROOT_HELPER` empty (the
+stand-in) "This window runs it itself; no password is asked." When recab marks
+the discard operation destructive (the real recab does) the reset and discard
+pages say the changes cannot be recovered afterwards; without that mark they do
+not claim it. Operations of the recovery list that recab offers with their own
+label (`Reboot`, `finalize`, `discard`, ...) get the page with the matching
+words, or one built from the label and the `destructive` mark. Not given the
+page: handing a request to the agent (it has its own page: the request, the
+facts, the expected result), looking for a release and downloading it (they
+look and fetch, they change no system), the steps that ask for values first
+(install, edit, remove, update, a clash decided by hand: those dialogs are the
+question), and what the agent itself runs through recab (the page cannot say
+which commands, or whether a password is asked).
+
+The direct calls of the story (`finish(false)`, `restart(false)`,
+`goBack(false)`, ...) do the thing at once, without the page.
+
+The checks: both stories end with `all flows ended where they should` and, for
+each action in a state where it applies, take a picture (`03-goes-into-the-next-system`
+and `b02-*` to `b09-*` in the first story; `br01-*` to `br14-*` in `--real`),
+expect the page's words and press Cancel to see that nothing was started and
+the system reads the same. The restart set for later and its cancelling are
+also done through the page's own button (`br03`, `br04`). To see the password
+line as a root helper gives it, name a helper that only runs its arguments as
+`RECAB_GUI_ROOT_HELPER` for a run.
+
 ## Reading and reading again
 
 `recab status --json` is run without holding the window up. The first time, the
@@ -339,6 +394,7 @@ allowed to run, and whether it runs as the person or as root are not decided.
 | `src/model.*` | the status, as read from JSON |
 | `src/client.*` | the only code that runs `recab`, the agent and the restart |
 | `src/pages.*` | Overview, the next system, getting back, History, the release, ask, a clash, what the agent did, the questions |
+| `src/beforewords.*` | the words of the Before page for each action |
 | `src/window.*` | the flows between pages, inside the frame |
 | `src/shots.*` | the picture mode and flow check |
 | `fixtures/` | `recab-real`: a stand-in with the real recab's status (schema 10), `history` and commands (with `agent-real`, `reboot-real`, `os-release`; see its top for the variables that make a check fail, find nothing, make a restart fail, or hide `history`); `recab`: the older stand-in with updates, clashes and proposals (with `agent`, `reboot`) |

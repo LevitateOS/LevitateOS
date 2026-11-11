@@ -12,6 +12,7 @@ qt_add_executable(recab-gui
     src/model.cpp
     src/client.cpp
     src/pages.cpp
+    src/beforewords.cpp
     src/window.cpp
     src/shots.cpp
     ../kit/parts.cpp
@@ -19,6 +20,7 @@ qt_add_executable(recab-gui
     ../kit/run.cpp
     ../kit/words.cpp
     ../kit/page.cpp
+    ../kit/before.cpp
     ../kit/refresh.cpp
     ../kit/work.cpp
     ../kit/frame.cpp

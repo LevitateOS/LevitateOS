@@ -151,6 +151,53 @@ void clickButton(QWidget *inside, const QString &words)
             button->click();
 }
 
+// ---------------------------------------------------------------- The Before page
+
+// What of the system a Cancel must leave as it was.
+QString systemMark(Window &window)
+{
+    const Status &s = window.status();
+    return QStringLiteral("%1|%2|%3|%4|%5|%6")
+        .arg(s.state, s.otherRole, s.runningSlot, s.preparationId)
+        .arg(s.changes.size())
+        .arg(s.update.hasMerge);
+}
+
+// Opens the Before page of one action, says what it holds and takes its
+// picture. With `cancel` it then presses "Cancel" and checks that nothing was
+// started and the system reads as it did; without, the page stays open for
+// its button (`pressGo`).
+void beforeCheck(Window &window, const Save &save, const Expect &expect, const QString &picture, const QString &what,
+                 const std::function<void()> &open, const QStringList &words, const QString &go, bool cancel = true)
+{
+    const QString mark = systemMark(window);
+    open();
+    settle(300);
+    BeforePage *page = window.beforePage();
+    const QString text = page->pageText();
+    expect(what + ": the Before page is shown and says nothing has started",
+           page->isVisible() && text.contains("Nothing has started.") && !window.busy());
+    expect(what + ": it has the sections What happens and What runs, Cancel and \"" + go + "\"",
+           text.contains("What happens") && text.contains("What runs") && text.contains("Cancel") && text.contains(go));
+    for (const QString &word : words)
+        expect(what + ": it says \"" + word + "\"", text.contains(word));
+    if (!picture.isEmpty())
+        save(window, picture);
+    if (!cancel)
+        return;
+    clickButton(page, "Cancel");
+    settle(300);
+    expect(what + ": Cancel leaves everything as it was",
+           !page->isVisible() && !window.busy() && systemMark(window) == mark);
+}
+
+// Presses the one named button of the page that is open, and waits.
+void pressGo(Window &window, const QString &go)
+{
+    clickButton(window.beforePage(), go);
+    waitUntilIdle(window);
+}
+
 // `holds`: how many changes the next system holds now, as the window knows.
 void activityShots(Window &window, const QString &folder, const QString &prefix, int holds, const Save &save,
                    const Expect &expect, QTextStream &out)
@@ -626,11 +673,14 @@ int takeShots(Window &window, const QString &folder)
     window.showAsk(nvidia);
     save(window, "02-ask");
 
-    {
-        QScopedPointer<ConfirmDialog> question(window.reuseQuestion());
-        question->show();
-        save(*question, "03-goes-into-the-next-system");
-    }
+    // The system from before is there, and a change would take its place:
+    // the Before page says so, and Cancel leaves it where it is.
+    expect("the system from before is there to be reused", window.status().otherRole == "previous");
+    beforeCheck(window, save, expect, "03-goes-into-the-next-system", "a change that would reuse the place of the system from before",
+                [&] { window.handOver(asked(nvidia)); },
+                {"Make this change in the next system?", "The running system is locked, so it is not changed.",
+                 "The next system starts as an exact copy of the running one.", "no longer go back to"},
+                "Prepare the next system");
 
     // The change is stopped half way, which is also how an interruption looks.
     qputenv("RECAB_STANDIN_STOP_AT", "change");
@@ -655,7 +705,11 @@ int takeShots(Window &window, const QString &folder)
         settle(100);
     }
 
-    window.recover();
+    beforeCheck(window, save, expect, "b02-continue", "continuing after the interruption", [&] { window.recover(); },
+                {"Continue where it stopped?", "Nothing that was finished is done again.", "The running system is not touched",
+                 "recab recover", "password"},
+                "Continue");
+    window.recover(false);
     waitUntilIdle(window);
     expect("recovering finishes the change", window.status().changes.size() == 1);
 
@@ -701,6 +755,23 @@ int takeShots(Window &window, const QString &folder)
         window.showMain();
         settle(100);
     }
+    // The next system is open and holds two changes: each action that gives it
+    // up or closes it says so first, and Cancel changes nothing.
+    beforeCheck(window, save, expect, "b03-finish", "finishing the next system", [&] { window.finish(); },
+                {"Finish the next system?", "The next system holds 2 changes", "checked and closed", "does not restart",
+                 "recab finalize", "password"},
+                "Finish");
+    beforeCheck(window, save, expect, "b04-reset", "resetting the next system", [&] { window.reset(); },
+                {"Reset the next system to the running one?", "Every change in the next system is given up.",
+                 "exact copy of the running system", "A system from before does not come back.", "recab discard",
+                 "recab prepare", "password"},
+                "Reset");
+    beforeCheck(window, save, expect, "b05-discard", "discarding the next system", [&] { window.discard(); },
+                {"Discard the next system?", "Its changes are given up.", "its place was already reused",
+                 "stays exactly as it is", "recab discard", "password"},
+                "Discard");
+    window.showMain();
+    settle(100);
     activityShots(window, folder, "a", int(window.status().changes.size()), save, expect, out);
     settingsShots(window, folder, save, expect, out);
 
@@ -720,6 +791,10 @@ int takeShots(Window &window, const QString &folder)
         settle(100);
     }
 
+    beforeCheck(window, save, expect, "b06-add-release", "adding the release", [&] { window.addUpdate(); },
+                {"Add LevitateOS", "merged into the next system", "disagree about a file", "does not restart",
+                 "recab update apply", "password"},
+                "Add it");
     window.addUpdate(false);
     waitUntilIdle(window);
     expect("the update clashes with the edited file", !window.status().clashes.isEmpty());
@@ -744,7 +819,7 @@ int takeShots(Window &window, const QString &folder)
     window.acceptProposal();
     waitUntilIdle(window);
     expect("accepting settles the clash", window.status().clashes.isEmpty());
-    window.finish();
+    window.finish(false);
     waitUntilIdle(window);
     expect("finishing makes it ready", window.status().state == "ready");
     save(window, "09-ready");
@@ -762,7 +837,17 @@ int takeShots(Window &window, const QString &folder)
         settle(100);
     }
 
-    window.restart();
+    beforeCheck(window, save, expect, "b07-restart-now", "restarting into the next system", [&] { window.restart(); },
+                {"Restart into the next system?", "recab sets the next system to start at the next restart",
+                 "programs that are open are closed", "cannot stop it", "recab keeps the new system by itself",
+                 "up to 15 minutes", "comes back to the running system by itself", "recab set-next", "reboot",
+                 "password"},
+                "Restart into it");
+    beforeCheck(window, save, expect, "b08-restart-later", "setting the restart for later", [&] { window.restartLater(); },
+                {"Start the next system at the next restart?", "does not restart now", "Any restart starts the next system",
+                 "comes back to the running system by itself", "recab set-next", "password"},
+                "Set it");
+    window.restart(false);
     waitUntilIdle(window);
     expect("the first restart fails and falls back", window.status().state == "failed");
     save(window, "10-did-not-start");
@@ -789,9 +874,9 @@ int takeShots(Window &window, const QString &folder)
                         QStringLiteral("The agent is changing the next system"));
     waitUntilIdle(window);
     expect("the agent's fix opens the next system again", window.status().state == "preparing");
-    window.finish();
+    window.finish(false);
     waitUntilIdle(window);
-    window.restart();
+    window.restart(false);
     waitUntilIdle(window);
     expect("the second restart is kept", window.status().state == "stable" && window.status().trialOutcome == "kept");
     save(window, "11-on-the-new-system");
@@ -801,6 +886,10 @@ int takeShots(Window &window, const QString &folder)
                back.contains("Kept already: it started properly on") && back.contains("startup ended with nothing failed")
                    && back.contains("[Go back…]") && !back.contains("[Go back…](off)"));
         save(window, "p10-back-kept");
+        beforeCheck(window, save, expect, "b09-go-back", "going back", [&] { window.goBack(); },
+                    {"Go back to ", "The computer restarts into ", "is kept beside it, so you can return", "recab rollback",
+                     "reboot", "password"},
+                    "Restart into it");
         const QString path = QDir(folder).filePath("p-steps-old.txt");
         QFile::remove(path);
         expect("the steps are written as a file", window.saveSteps(path));
@@ -1035,6 +1124,10 @@ int takeRealShots(Window &window, const QString &folder)
 
     // The release goes into this next system, which holds a file the release also changes.
     {
+        beforeCheck(window, save, expect, "br05-add-release", "adding the release", [&] { window.addUpdate(); },
+                    {"Add LevitateOS 2026.12 to the next system?", "merged into the next system", "disagree about a file",
+                     "recab update apply", "password"},
+                    "Add it");
         window.addUpdate(false);
         waitUntilIdle(window);
         const UpdateInfo &u = window.status().update;
@@ -1057,7 +1150,11 @@ int takeRealShots(Window &window, const QString &folder)
                next.contains("[Settle the clash…]") && !next.contains("[Finish…]"));
 
         // Taken out again: recab keeps the changes and the release is only downloaded.
-        window.runReleaseOperation("update_cancel");
+        beforeCheck(window, save, expect, "br06-take-out", "taking the release out", [&] { window.runReleaseOperation("update_cancel"); },
+                    {"Take the release out of the next system?", "retains the changes prepared there", "recab update cancel",
+                     "password"},
+                    "Take it out");
+        window.runReleaseOperation("update_cancel", false);
         waitUntilIdle(window);
         expect("taking it out leaves the release downloaded and the changes in place",
                !window.status().update.hasMerge && window.status().update.downloaded && window.status().changes.size() == 2
@@ -1083,7 +1180,10 @@ int takeRealShots(Window &window, const QString &folder)
                settled.contains("Every clash is settled") && settled.contains("[Continue adding it]")
                    && settled.contains("etc/ssh/sshd_config (content): settled, local"));
         save(window, "r11-release-settled");
-        window.runReleaseOperation("update_recover");
+        beforeCheck(window, save, expect, "br07-carry-on", "carrying on adding the release", [&] { window.runReleaseOperation("update_recover"); },
+                    {"Carry on adding the release?", "continues the merge", "recab update recover", "password"},
+                    "Carry on");
+        window.runReleaseOperation("update_recover", false);
         waitUntilIdle(window);
         expect("the merge is complete and the next system can be finished",
                window.status().update.mergeComplete && window.status().state == "preparing"
@@ -1127,7 +1227,11 @@ int takeRealShots(Window &window, const QString &folder)
     waitUntilIdle(window);
     expect("when it has finished the next system is open again", window.status().state == "preparing");
 
-    window.finish();
+    beforeCheck(window, save, expect, "br01-finish", "finishing the next system", [&] { window.finish(); },
+                {"Finish the next system?", "The next system holds 2 changes", "checked and closed", "does not restart",
+                 "recab finalize", "password"},
+                "Finish");
+    window.finish(false);
     waitUntilIdle(window);
     expect("finishing makes it ready", window.status().state == "ready");
     save(window, "r3-ready");
@@ -1143,8 +1247,18 @@ int takeRealShots(Window &window, const QString &folder)
     }
 
     // Set for the next restart without restarting, and taken back.
-    window.restartLater();
-    waitUntilIdle(window);
+    beforeCheck(window, save, expect, "br02-restart-now", "restarting into the next system", [&] { window.restart(); },
+                {"Restart into the next system?", "recab sets the next system to start at the next restart",
+                 "programs that are open are closed", "up to 15 minutes", "comes back to the running system by itself",
+                 "recab set-next", "reboot", "password"},
+                "Restart into it");
+    beforeCheck(window, save, expect, "br03-restart-later", "setting the restart for later", [&] { window.restartLater(); },
+                {"Start the next system at the next restart?", "does not restart now", "Any restart starts the next system",
+                 "recab set-next", "password"},
+                "Set it", false);
+    pressGo(window, "Set it"); // the button itself, as a person would press it
+    expect("the page's button sets the restart and nothing restarts",
+           window.status().state == "trial_pending" && window.status().runningSlot == "A");
     expect("the restart is set and nothing restarted",
            window.status().state == "trial_pending" && window.status().runningSlot == "A"
                && window.status().can("restart").ready);
@@ -1163,8 +1277,14 @@ int takeRealShots(Window &window, const QString &folder)
         window.showMain();
         settle(100);
     }
+    beforeCheck(window, save, expect, "br04-cancel-restart", "cancelling the set restart", [&] { window.cancelRestart(); },
+                {"Cancel the set restart?", "keeps the running system", "does not restart", "You can set the restart again",
+                 "recab commit", "password"},
+                "Cancel the restart");
+    expect("after Cancel the restart is still set", window.status().state == "trial_pending");
     window.cancelRestart();
-    waitUntilIdle(window);
+    settle(300);
+    pressGo(window, "Cancel the restart");
     expect("cancelling leaves the next system ready", window.status().state == "ready");
     {
         const QString back = backWords(window);
@@ -1173,12 +1293,16 @@ int takeRealShots(Window &window, const QString &folder)
         window.showMain();
         settle(100);
     }
-    window.restartLater();
+    window.restartLater(false);
     waitUntilIdle(window);
 
     // Start-up has not been judged yet when the window opens after the restart.
+    beforeCheck(window, save, expect, "br08-restart-set", "restarting with the restart set", [&] { window.restart(); },
+                {"Restart now?", "A restart into the next system is set already", "only the restart is left",
+                 "programs that are open are closed", "reboot", "password"},
+                "Restart");
     qputenv("RECAB_STANDIN_KEEP", "hand");
-    window.restart();
+    window.restart(false);
     waitUntilIdle(window);
     qunsetenv("RECAB_STANDIN_KEEP");
     expect("the restart lands on the other slot, on trial",
@@ -1217,7 +1341,15 @@ int takeRealShots(Window &window, const QString &folder)
         window.showMain();
         settle(100);
     }
-    window.keep();
+    beforeCheck(window, save, expect, "br09-go-back-on-trial", "going back while on trial", [&] { window.goBack(); },
+                {"Go back to ", "The computer restarts into ", "left as it is, so its changes can be tried again",
+                 "recab rollback", "reboot", "password"},
+                "Restart into it");
+    beforeCheck(window, save, expect, "br10-keep", "keeping the running system", [&] { window.keep(); },
+                {"Keep the running system?", "becomes the system that every restart starts", "does not restart",
+                 "recab commit", "password"},
+                "Keep it");
+    window.keep(false);
     waitUntilIdle(window);
     // A commit by hand leaves recab's last judged trial as it was: none here.
     expect("keeping it makes it the kept system",
@@ -1234,6 +1366,9 @@ int takeRealShots(Window &window, const QString &folder)
         settle(100);
     }
 
+    beforeCheck(window, save, expect, "br11-go-back", "going back", [&] { window.goBack(); },
+                {"Go back to ", "is kept beside it, so you can return", "recab rollback", "reboot", "password"},
+                "Restart into it");
     window.goBack(false);
     waitUntilIdle(window);
     expect("going back lands on the first slot", window.status().runningSlot == "A");
@@ -1248,11 +1383,20 @@ int takeRealShots(Window &window, const QString &folder)
         settle(100);
     }
 
+    expect("after going back the system from before is there to be reused", window.status().otherRole == "previous");
+    beforeCheck(window, save, expect, "br12-reuse", "a change that would reuse the place of the system from before",
+                [&] { window.handOver(asked(nvidia)); },
+                {"Make this change in the next system?", "takes the place of", "no longer go back to"},
+                "Prepare the next system");
     window.handOver(asked(nvidia), false);
     waitUntilIdle(window);
     expect("a second change opens a next system again",
            window.status().state == "preparing" && window.status().changes.size() == 1);
     const QString before = window.status().preparationId;
+    beforeCheck(window, save, expect, "br13-reset", "resetting the next system", [&] { window.reset(); },
+                {"Reset the next system to the running one?", "The next system holds one change",
+                 "cannot be recovered afterwards", "recab discard", "recab prepare", "password"},
+                "Reset");
     window.reset(false);
     waitUntilIdle(window);
     expect("the reset leaves a new, empty next system",
@@ -1267,6 +1411,10 @@ int takeRealShots(Window &window, const QString &folder)
         window.showMain();
         settle(100);
     }
+    beforeCheck(window, save, expect, "br14-discard", "discarding the next system", [&] { window.discard(); },
+                {"Discard the next system?", "The next system holds no changes yet.", "cannot be recovered afterwards",
+                 "its place was already reused", "recab discard", "password"},
+                "Discard");
     window.discard(false);
     waitUntilIdle(window);
     expect("discarding leaves no next system",
@@ -1276,10 +1424,10 @@ int takeRealShots(Window &window, const QString &folder)
     // A restart that fails, and the computer comes back; then the same again, kept by recab itself.
     window.handOver(asked(sshd), false);
     waitUntilIdle(window);
-    window.finish();
+    window.finish(false);
     waitUntilIdle(window);
     qputenv("RECAB_STANDIN_TRIAL", "fail");
-    window.restart();
+    window.restart(false);
     waitUntilIdle(window);
     qunsetenv("RECAB_STANDIN_TRIAL");
     expect("the restart failed and the computer came back", window.status().state == "failed"
@@ -1303,7 +1451,7 @@ int takeRealShots(Window &window, const QString &folder)
         window.showMain();
         settle(100);
     }
-    window.restart();
+    window.restart(false);
     waitUntilIdle(window);
     expect("the same again starts, and recab keeps it itself",
            window.status().state == "stable" && window.status().runningSlot == "B" && window.status().trialOutcome == "kept");

@@ -1,5 +1,6 @@
 #include "pages.h"
 
+#include "beforewords.h"
 #include "parts.h"
 #include "run.h"
 
@@ -23,10 +24,6 @@
 
 namespace {
 
-// How long recab waits for start-up to finish before a trial fails: the
-// default of `recab trial --timeout`, TRIAL_TIMEOUT_SECS (900) in
-// tools/recab/src/init_system.rs.
-constexpr int recab_trial_minutes = 15;
 
 QPushButton *push(QHBoxLayout *row, const QString &words, const ActionVerdict &verdict, bool main = false,
                   QStringList *why = nullptr);
@@ -173,7 +170,7 @@ void SystemPage::show(const Status &s)
             tr("recab keeps the new system by itself as soon as start-up has finished with nothing failed. It waits "
                "up to %1 minutes for that; if start-up fails, the computer goes back to the system from before by "
                "itself.")
-                .arg(recab_trial_minutes),
+                .arg(recabTrialMinutes),
             true));
         auto *buttons = new QHBoxLayout;
         buttons->setSpacing(10);
@@ -636,35 +633,6 @@ void ProposedPage::show(const Status &s)
 }
 
 // ---------------------------------------------------------------- A question
-
-ConfirmDialog::ConfirmDialog(const QString &title, const QString &question, const QStringList &paragraphs,
-                             const QString &cost, const QString &yes, QWidget *parent)
-    : QDialog(parent)
-{
-    setWindowTitle(title);
-    auto *column = new QVBoxLayout(this);
-    column->setContentsMargins(22, 20, 22, 18);
-    column->setSpacing(12);
-    QLabel *asked = strong(question);
-    QFont larger = asked->font();
-    larger.setPointSizeF(larger.pointSizeF() * 1.2);
-    asked->setFont(larger);
-    column->addWidget(asked);
-    for (const QString &paragraph : paragraphs) {
-        QLabel *words = text(paragraph, true);
-        words->setMinimumWidth(460);
-        column->addWidget(words);
-    }
-    if (!cost.isEmpty())
-        column->addWidget(dim(text(cost, true)));
-    column->addStretch();
-    auto *buttons = new QDialogButtonBox(QDialogButtonBox::Cancel);
-    buttons->addButton(yes, QDialogButtonBox::AcceptRole);
-    buttons->button(QDialogButtonBox::Cancel)->setDefault(true);
-    connect(buttons, &QDialogButtonBox::accepted, this, &QDialog::accept);
-    connect(buttons, &QDialogButtonBox::rejected, this, &QDialog::reject);
-    column->addWidget(buttons);
-}
 
 // ---------------------------------------------------------------- Shared by the two pages
 

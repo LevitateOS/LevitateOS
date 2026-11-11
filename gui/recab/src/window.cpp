@@ -2,6 +2,8 @@
 
 #include "pages.h"
 
+#include "beforewords.h"
+
 #include "activity.h"
 #include "frame.h"
 #include "refresh.h"
@@ -71,10 +73,11 @@ Window::Window(QWidget *parent)
     work_ = new WorkPage;
     clash_ = new ClashPage;
     proposed_ = new ProposedPage;
+    before_ = new BeforePage;
     for (QWidget *page : {static_cast<QWidget *>(system_), static_cast<QWidget *>(next_), static_cast<QWidget *>(back_),
                           static_cast<QWidget *>(historyPage_), static_cast<QWidget *>(release_),
                           static_cast<QWidget *>(ask_), static_cast<QWidget *>(work_),
-                          static_cast<QWidget *>(clash_), static_cast<QWidget *>(proposed_)})
+                          static_cast<QWidget *>(clash_), static_cast<QWidget *>(proposed_), static_cast<QWidget *>(before_)})
         stack_->addWidget(page);
 
     // The frame is the window: rail, the pages above, the strip, the status line.
@@ -116,15 +119,15 @@ Window::Window(QWidget *parent)
     connect(next_, &NextPage::operation, this, [this](const QJsonObject &op) { runOperation(op); });
     connect(system_, &SystemPage::addUpdate, this, [this] { addUpdate(); });
     connect(system_, &SystemPage::goBack, this, [this] { goBack(); });
-    connect(system_, &SystemPage::keep, this, &Window::keep);
-    connect(system_, &SystemPage::restartLater, this, &Window::restartLater);
-    connect(system_, &SystemPage::cancelRestart, this, &Window::cancelRestart);
+    connect(system_, &SystemPage::keep, this, [this] { keep(); });
+    connect(system_, &SystemPage::restartLater, this, [this] { restartLater(); });
+    connect(system_, &SystemPage::cancelRestart, this, [this] { cancelRestart(); });
     connect(system_, &SystemPage::discard, this, [this] { discard(); });
     connect(system_, &SystemPage::reset, this, [this] { reset(); });
-    connect(system_, &SystemPage::finish, this, &Window::finish);
-    connect(system_, &SystemPage::restart, this, &Window::restart);
-    connect(system_, &SystemPage::retry, this, &Window::restart);
-    connect(system_, &SystemPage::recover, this, &Window::recover);
+    connect(system_, &SystemPage::finish, this, [this] { finish(); });
+    connect(system_, &SystemPage::restart, this, [this] { restart(); });
+    connect(system_, &SystemPage::retry, this, [this] { restart(); });
+    connect(system_, &SystemPage::recover, this, [this] { recover(); });
     connect(system_, &SystemPage::settle, this, &Window::showClash);
     connect(system_, &SystemPage::fix, this,
             [this](const QString &prompt) { fixWithAgent(prompt, tr("The agent is changing the next system")); });
@@ -141,7 +144,7 @@ Window::Window(QWidget *parent)
     connect(system_, &SystemPage::openRelease, this, &Window::showRelease);
     connect(next_, &NextPage::openRelease, this, &Window::showRelease);
     connect(release_, &ReleasePage::back, this, &Window::showSection);
-    connect(release_, &ReleasePage::operation, this, &Window::runReleaseOperation);
+    connect(release_, &ReleasePage::operation, this, [this](const QString &id) { runReleaseOperation(id); });
     connect(release_, &ReleasePage::add, this, [this] { addUpdate(); });
     connect(release_, &ReleasePage::addFromFile, this, [this] { addFromFile(); });
     connect(release_, &ReleasePage::settle, this, &Window::showClash);
@@ -161,13 +164,13 @@ Window::Window(QWidget *parent)
     connect(next_, &NextPage::installSoftware, this, &Window::installSoftware);
     connect(next_, &NextPage::reset, this, [this] { reset(); });
     connect(next_, &NextPage::settle, this, &Window::showClash);
-    connect(next_, &NextPage::finish, this, &Window::finish);
-    connect(next_, &NextPage::restart, this, &Window::restart);
-    connect(next_, &NextPage::restartLater, this, &Window::restartLater);
-    connect(next_, &NextPage::cancelRestart, this, &Window::cancelRestart);
-    connect(next_, &NextPage::recover, this, &Window::recover);
+    connect(next_, &NextPage::finish, this, [this] { finish(); });
+    connect(next_, &NextPage::restart, this, [this] { restart(); });
+    connect(next_, &NextPage::restartLater, this, [this] { restartLater(); });
+    connect(next_, &NextPage::cancelRestart, this, [this] { cancelRestart(); });
+    connect(next_, &NextPage::recover, this, [this] { recover(); });
     connect(next_, &NextPage::discard, this, [this] { discard(); });
-    connect(next_, &NextPage::keep, this, &Window::keep);
+    connect(next_, &NextPage::keep, this, [this] { keep(); });
     connect(next_, &NextPage::goBack, this, [this] { goBack(); });
     connect(next_, &NextPage::openDisk, this, [this] { frame_->startApp(Frame::Disk); });
     connect(next_, &NextPage::openOverview, this, [this] {
@@ -176,8 +179,8 @@ Window::Window(QWidget *parent)
     });
 
     connect(back_, &BackPage::goBack, this, [this] { goBack(); });
-    connect(back_, &BackPage::keep, this, &Window::keep);
-    connect(back_, &BackPage::cancelRestart, this, &Window::cancelRestart);
+    connect(back_, &BackPage::keep, this, [this] { keep(); });
+    connect(back_, &BackPage::cancelRestart, this, [this] { cancelRestart(); });
     connect(back_, &BackPage::saveSteps, this, [this] {
         const QString path = QFileDialog::getSaveFileName(this, tr("Save the steps"), QStringLiteral("start-up-steps.txt"),
                                                           tr("Text (*.txt)"));
@@ -207,6 +210,20 @@ Window::Window(QWidget *parent)
     connect(clash_, &ClashPage::byHand, this, &Window::decideByHand);
     connect(clash_, &ClashPage::fix, this,
             [this](const QString &prompt) { fixWithAgent(prompt, tr("The agent is settling the clash")); });
+
+    // The Before page: Cancel leaves everything as it was; the button does it.
+    connect(before_, &BeforePage::cancelled, this, [this] {
+        remake_ = nullptr;
+        go_ = nullptr;
+        showSection();
+    });
+    connect(before_, &BeforePage::confirmed, this, [this] {
+        const auto go = go_;
+        remake_ = nullptr;
+        go_ = nullptr;
+        if (go)
+            go();
+    });
 
     connect(proposed_, &ProposedPage::accept, this, &Window::acceptProposal);
     connect(proposed_, &ProposedPage::askAgain, this, &Window::showClash);
@@ -246,11 +263,14 @@ void Window::refresh()
     QWidget *shown = stack_->currentWidget();
     const bool main = shown == system_ || shown == next_ || shown == back_ || shown == historyPage_;
     const bool release = shown == release_;
-    reload([this, main, release] {
+    const bool before = shown == before_;
+    reload([this, main, release, before] {
         if (main)
             showSection();
         else if (release)
             showRelease();
+        else if (before && remake_)
+            before_->show(remake_()); // the words are for the state as read now
     });
 }
 
@@ -426,19 +446,12 @@ void Window::showClash()
     display(clash_);
 }
 
-ConfirmDialog *Window::reuseQuestion()
+void Window::askBefore(std::function<BeforePage::Content()> content, std::function<void()> go)
 {
-    const QString before = status_.otherRelease.isEmpty() ? tr("the system from before")
-                                                          : status_.name(status_.otherRelease);
-    return new ConfirmDialog(
-        tr("The system is locked"), tr("This change goes into the next system"),
-        {tr("The running system is locked, so it is not changed. The change is made in the next system and takes "
-            "effect when you restart."),
-         tr("The next system starts as an exact copy of the running one. Only what differs is copied.")},
-        tr("It takes the place of %1. After this you can no longer go back to %1; the running system stays your "
-           "way back.")
-            .arg(before),
-        tr("Prepare the next system"), this);
+    remake_ = content;
+    go_ = std::move(go);
+    before_->show(content());
+    display(before_);
 }
 
 // Run one long thing on the work page, then read the system again.
@@ -482,10 +495,11 @@ void Window::chain(QList<Run *> runs)
 
 void Window::handOver(const QString &prompt, bool askFirst)
 {
+    // Only the reuse of the system from before is asked: the request itself
+    // was read on the Ask page, and the agent's page says what it is given.
     if (askFirst && status_.otherRole == QLatin1String("previous")) {
-        QScopedPointer<ConfirmDialog> question(reuseQuestion());
-        if (question->exec() != QDialog::Accepted)
-            return;
+        askBefore([this] { return beforewords::reuse(client_, status_); }, [this, prompt] { handOver(prompt, false); });
+        return;
     }
     work(client_.agent(prompt, requestTitle(prompt, tr("Preparing the next system"))), tr("Preparing the next system"),
          tr("The running system is not touched. You can keep working."), [this](bool) { showSection(); });
@@ -504,8 +518,48 @@ void Window::fixWithAgent(const QString &prompt, const QString &title)
          });
 }
 
-void Window::runOperation(const QJsonObject &op, const QStringList &extra, std::function<void(bool)> after) {
+// What an operation says on the Before page, by the operation's id; the pages
+// above cover what the window names itself, the rest is recab's own label.
+BeforePage::Content Window::beforeOperation(const QJsonObject &op) const
+{
+    const QString id = op["id"].toString();
+    if (!op["inputs"].toArray().isEmpty())
+        return {}; // asks for values first; those dialogs are the question
+    if (id == QLatin1String("reboot"))
+        return beforewords::restartComputer(client_, status_);
+    if (id == QLatin1String("discard"))
+        return beforewords::discard(client_, status_);
+    if (id == QLatin1String("finalize"))
+        return beforewords::finish(client_, status_);
+    if (id == QLatin1String("set_next"))
+        return beforewords::restartLater(client_, status_);
+    if (id == QLatin1String("commit"))
+        return status_.state == QLatin1String("trial_pending") ? beforewords::cancelRestart(client_, status_)
+                                                               : beforewords::keep(client_, status_);
+    if (id == QLatin1String("update_apply"))
+        return beforewords::addRelease(client_, status_, false);
+    if (id == QLatin1String("update_cancel") || id == QLatin1String("update_recover"))
+        return beforewords::releaseStep(client_, status_, id);
+    if (id == QLatin1String("prepare") || id == QLatin1String("sync_recover"))
+        return beforewords::recover(client_, status_);
+    // update_check and update_download only look and fetch.
+    if (id == QLatin1String("update_check") || id == QLatin1String("update_download"))
+        return {};
+    return beforewords::operation(client_, status_, op);
+}
+
+void Window::runOperation(const QJsonObject &op, const QStringList &extra, std::function<void(bool)> after, bool askFirst) {
     if(busy() || op["verdict"]!="ready")return;
+    if (askFirst && !beforeOperation(op).title.isEmpty()) {
+        const QString id = op["id"].toString();
+        askBefore(
+            [this, op, id] {
+                const QJsonObject now = status_.operationObject(id);
+                return beforeOperation(now.isEmpty() ? op : now);
+            },
+            [this, op, extra, after] { runOperation(op, extra, after, false); });
+        return;
+    }
     if(op["id"]=="reboot"){chain({client_.reboot()});return;}
     QStringList args{"catalog"};for(auto v:op["argv"].toArray())args<<v.toString();
     args<<extra;
@@ -521,19 +575,18 @@ void Window::runOperation(const QJsonObject &op, const QStringList &extra, std::
         if(field["name"]=="choice")choice=value;
         if(!value.isEmpty()){if(!field["flag"].isNull())args<<field["flag"].toString();args<<value;}
     }
-    if(op["destructive"].toBool()){ConfirmDialog question(op["label"].toString(),op["label"].toString()+"?",{tr("The running system is kept. Prepared changes in the other system cannot be recovered.")},QString(),tr("Continue"),this);if(question.exec()!=QDialog::Accepted)return;}
     work(client_.change(args),workTitle(op),tr("Working on the inactive system. The running system is preserved."),
          after ? after : [this](bool){showSection();});
 }
 
 // The release page's own steps: when one ends well the page is shown again
 // with what recab says now; when it fails the work page keeps recab's reason.
-void Window::runReleaseOperation(const QString &id)
+void Window::runReleaseOperation(const QString &id, bool askFirst)
 {
     runOperation(status_.operationObject(id), QStringList(), [this](bool ok) {
         if (ok)
             showRelease();
-    });
+    }, askFirst);
 }
 
 void Window::addFromFile(const QString &named)
@@ -546,10 +599,19 @@ void Window::addFromFile(const QString &named)
                                                                          tr("Release manifest (release.json);;All files (*)"));
     if (path.isEmpty())
         return;
-    runOperation(op, QStringList{QStringLiteral("--manifest"), path}, [this](bool ok) {
+    const QStringList extra{QStringLiteral("--manifest"), path};
+    const auto after = [this](bool ok) {
         if (ok)
             showRelease();
-    });
+    };
+    // A file the person chose is asked about too; the picture mode names one
+    // and goes on at once.
+    if (named.isEmpty()) {
+        askBefore([this] { return beforewords::addRelease(client_, status_, true); },
+                  [this, op, extra, after] { runOperation(op, extra, after, false); });
+        return;
+    }
+    runOperation(op, extra, after, false);
 }
 
 void Window::addUpdate(bool askFirst)
@@ -560,21 +622,20 @@ void Window::addUpdate(bool askFirst)
         const QJsonObject op = status_.operationObject(QStringLiteral("update_apply"));
         if (op["verdict"] != "ready")
             return;
-        if (askFirst && status_.otherRole == QLatin1String("previous")) {
-            QScopedPointer<ConfirmDialog> question(reuseQuestion());
-            if (question->exec() != QDialog::Accepted)
-                return;
+        if (askFirst) {
+            askBefore([this] { return beforewords::addRelease(client_, status_, false); },
+                      [this] { addUpdate(false); });
+            return;
         }
         runOperation(op, QStringList(), [this](bool ok) {
             if (ok)
                 showRelease();
-        });
+        }, false);
         return;
     }
-    if (askFirst && status_.otherRole == QLatin1String("previous")) {
-        QScopedPointer<ConfirmDialog> question(reuseQuestion());
-        if (question->exec() != QDialog::Accepted)
-            return;
+    if (askFirst) {
+        askBefore([this] { return beforewords::addRelease(client_, status_, false); }, [this] { addUpdate(false); });
+        return;
     }
     work(client_.change({"update", "apply"}), tr("Adding the update to the next system"),
          tr("The running system is not touched. You can keep working."), [this](bool) {
@@ -585,20 +646,32 @@ void Window::addUpdate(bool askFirst)
          });
 }
 
-void Window::finish()
+void Window::finish(bool askFirst)
 {
+    if (askFirst) {
+        askBefore([this] { return beforewords::finish(client_, status_); }, [this] { finish(false); });
+        return;
+    }
     work(client_.change({"finalize"}), tr("Finishing the next system"),
          tr("It is checked and closed, so it can be started."), [this](bool) { showSection(); });
 }
 
-void Window::recover()
+void Window::recover(bool askFirst)
 {
+    if (askFirst) {
+        askBefore([this] { return beforewords::recover(client_, status_); }, [this] { recover(false); });
+        return;
+    }
     work(client_.change({"recover"}), tr("Continuing where it stopped"),
          tr("recab looks at what is really there and carries on."), [this](bool) { showSection(); });
 }
 
-void Window::restart()
+void Window::restart(bool askFirst)
 {
+    if (askFirst) {
+        askBefore([this] { return beforewords::restartNow(client_, status_); }, [this] { restart(false); });
+        return;
+    }
     // When the restart is set already, only the restart is left.
     if (status_.state == QLatin1String("trial_pending"))
         chain({client_.reboot()});
@@ -606,19 +679,31 @@ void Window::restart()
         chain({client_.change({"set-next"}), client_.reboot()});
 }
 
-void Window::restartLater()
+void Window::restartLater(bool askFirst)
 {
+    if (askFirst) {
+        askBefore([this] { return beforewords::restartLater(client_, status_); }, [this] { restartLater(false); });
+        return;
+    }
     chain({client_.change({"set-next"})});
 }
 
 // recab's commit of the running system takes a set restart back.
-void Window::cancelRestart()
+void Window::cancelRestart(bool askFirst)
 {
+    if (askFirst) {
+        askBefore([this] { return beforewords::cancelRestart(client_, status_); }, [this] { cancelRestart(false); });
+        return;
+    }
     chain({client_.change({"commit"})});
 }
 
-void Window::keep()
+void Window::keep(bool askFirst)
 {
+    if (askFirst) {
+        askBefore([this] { return beforewords::keep(client_, status_); }, [this] { keep(false); });
+        return;
+    }
     work(client_.change({"commit"}), tr("Keeping this system"),
          tr("It becomes the system that every restart starts."), [this](bool) { showSection(); });
 }
@@ -626,14 +711,8 @@ void Window::keep()
 void Window::goBack(bool askFirst)
 {
     if (askFirst) {
-        ConfirmDialog question(
-            tr("Go back"), tr("Go back to %1?").arg(status_.otherRelease.isEmpty() ? tr("the system from before")
-                                                                              : status_.name(status_.otherRelease)),
-            {tr("The computer restarts into the system from before. The system you are running now is kept beside "
-                "it, so you can return.")},
-            QString(), tr("Restart into it"), this);
-        if (question.exec() != QDialog::Accepted)
-            return;
+        askBefore([this] { return beforewords::goBack(client_, status_); }, [this] { goBack(false); });
+        return;
     }
     chain({client_.change({"rollback"}), client_.reboot()});
 }
@@ -641,12 +720,8 @@ void Window::goBack(bool askFirst)
 void Window::discard(bool askFirst)
 {
     if (askFirst) {
-        ConfirmDialog question(
-            tr("Discard"), tr("Discard the next system?"),
-            {tr("Its changes are given up. The running system stays exactly as it is.")},
-            tr("The system from before does not come back: its place was already reused."), tr("Discard"), this);
-        if (question.exec() != QDialog::Accepted)
-            return;
+        askBefore([this] { return beforewords::discard(client_, status_); }, [this] { discard(false); });
+        return;
     }
     chain({client_.change({"discard"})});
 }
@@ -657,13 +732,8 @@ void Window::discard(bool askFirst)
 void Window::reset(bool askFirst)
 {
     if (askFirst) {
-        ConfirmDialog question(
-            tr("Reset"), tr("Reset the next system to the running one?"),
-            {tr("Every change in the next system is given up."),
-             tr("It becomes an exact copy of the running system again. Only what differs is copied.")},
-            tr("The running system is not touched. A system from before does not come back."), tr("Reset"), this);
-        if (question.exec() != QDialog::Accepted)
-            return;
+        askBefore([this] { return beforewords::reset(client_, status_); }, [this] { reset(false); });
+        return;
     }
     Run *drop = client_.change({"discard"});
     setEnabled(false);

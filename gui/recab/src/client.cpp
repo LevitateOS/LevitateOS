@@ -157,6 +157,29 @@ Run *RecabClient::reboot()
     return new Run(rootHelper_, {reboot_}, this);
 }
 
+QString RecabClient::commandWords(const QStringList &arguments) const
+{
+    const QStringList all = real_ ? realArguments(arguments) : arguments;
+    QStringList words;
+    for (qsizetype i = 0; i < all.size(); ++i) {
+        const QString &word = all[i];
+        if (word == QLatin1String("--actor")) {
+            ++i; // its value
+            continue;
+        }
+        if (word.startsWith(QLatin1String("--"))) {
+            if (!words.isEmpty())
+                break; // the flags that pin it to a preparation
+            continue;  // the flags this window puts first
+        }
+        words << word;
+        const bool two = words.first() == QLatin1String("update") || words.first() == QLatin1String("change");
+        if (words.size() == (two ? 2 : 1))
+            break;
+    }
+    return QStringLiteral("recab ") + words.join(QLatin1Char(' '));
+}
+
 QString RecabClient::agentName() const
 {
     return QFileInfo(agent_).fileName();

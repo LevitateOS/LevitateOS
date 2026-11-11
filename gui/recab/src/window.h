@@ -1,6 +1,7 @@
 // The one window: the pages and the flows between them.
 #pragma once
 
+#include "before.h"
 #include "client.h"
 #include "model.h"
 
@@ -12,7 +13,6 @@ class AskPage;
 class ClashPage;
 class HistoryPage;
 class ReleasePage;
-class ConfirmDialog;
 class Frame;
 class NextPage;
 class BackPage;
@@ -39,20 +39,22 @@ public:
     void showAsk(const QString &request = QString());
     void showClash();
 
-    // Each of these asks first unless told not to (the picture mode does not).
+    // Each of these that changes something shows the Before page first, which
+    // says what will happen; "askFirst = false" does it at once (the picture
+    // mode's direct calls). Handing a request to the agent has its own page.
     void handOver(const QString &prompt, bool askFirst = true);
     void addUpdate(bool askFirst = true);
     void goBack(bool askFirst = true);
-    void keep();
+    void keep(bool askFirst = true);
     // Sets the next system for the next restart without restarting; and takes that back.
-    void restartLater();
-    void cancelRestart();
+    void restartLater(bool askFirst = true);
+    void cancelRestart(bool askFirst = true);
     void discard(bool askFirst = true);
     // Discards the next system, then makes it a copy of the running one again.
     void reset(bool askFirst = true);
-    void finish();
-    void restart();
-    void recover();
+    void finish(bool askFirst = true);
+    void restart(bool askFirst = true);
+    void recover(bool askFirst = true);
     void fixWithAgent(const QString &prompt, const QString &title);
     void acceptProposal();
     void stopRun();
@@ -61,17 +63,19 @@ public:
     // Writes the steps for a desktop that does not start, as plain text.
     bool saveSteps(const QString &path);
 
-    // The question shown before the place of the system from before is reused.
-    ConfirmDialog *reuseQuestion();
+    // The Before page, for the checks.
+    BeforePage *beforePage() const { return before_; }
 
     // Reads the system again, as F5 does.
     void refresh();
     // `extra` follows the operation's own arguments; `then` runs when it has ended
     // (default: back to the page the person came from).
+    // An operation that changes the system shows the Before page first, unless
+    // `askFirst` is false or it asks for values (those dialogs come first).
     void runOperation(const QJsonObject &operation, const QStringList &extra = QStringList(),
-                      std::function<void(bool)> then = nullptr);
+                      std::function<void(bool)> then = nullptr, bool askFirst = true);
     // One of recab's operations by its id, then the release page again.
-    void runReleaseOperation(const QString &id);
+    void runReleaseOperation(const QString &id, bool askFirst = true);
     // A release manifest from a file the person chooses (`update_media`);
     // `path` names it without asking, for the picture mode.
     void addFromFile(const QString &path = QString());
@@ -92,6 +96,11 @@ private:
     void work(Run *run, const QString &title, const QString &subtitle, std::function<void(bool)> then);
     void chain(QList<Run *> runs);
     void decideByHand();
+    // Shows the Before page for `content` (drawn again when the system is read
+    // again) and does `go` only when its button is pressed.
+    void askBefore(std::function<BeforePage::Content()> content, std::function<void()> go);
+    // The Before page of an operation, empty when it has none.
+    BeforePage::Content beforeOperation(const QJsonObject &op) const;
     // Shows one of the pages. The rail marks Overview for all of them; when
     // Activity is showing it stays, and the page changes beneath it.
     void display(QWidget *page);
@@ -121,4 +130,7 @@ private:
     WorkPage *work_;
     ClashPage *clash_;
     ProposedPage *proposed_;
+    BeforePage *before_;
+    std::function<BeforePage::Content()> remake_;
+    std::function<void()> go_;
 };

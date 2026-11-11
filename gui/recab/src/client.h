@@ -41,6 +41,16 @@ public:
     Run *agent(const QString &prompt, const QString &title = QString());
     Run *reboot();
 
+    // What a change runs, as a person reads it: "recab finalize", "recab
+    // update apply". Only the verb, and the second word of `update` and
+    // `change`; the preparation, slot and release it is pinned to are left
+    // out. For the stand-in it is the command itself.
+    QString commandWords(const QStringList &arguments) const;
+    // Whether changes go through a root helper (pkexec), which asks the
+    // desktop user for the administrator password. Without one (the stand-in)
+    // this window runs them itself.
+    bool asksPassword() const { return !rootHelper_.isEmpty(); }
+
     QString agentName() const;
     // The program that is started as the agent, as the frame shows it.
     QString agentProgram() const { return agent_; }

@@ -6,7 +6,6 @@
 #include "page.h"
 #include "work.h"
 
-#include <QDialog>
 #include <QMap>
 #include <QWidget>
 
@@ -169,11 +168,4 @@ signals:
     void accept();
     void askAgain();
     void byHand();
-};
-
-// A question with one sentence of what it costs.
-class ConfirmDialog : public QDialog {
-public:
-    ConfirmDialog(const QString &title, const QString &question, const QStringList &paragraphs, const QString &cost,
-                  const QString &yes, QWidget *parent = nullptr);
 };
