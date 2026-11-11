@@ -50,3 +50,8 @@ vt100 = "0.15"
 [profile.release]
 strip = true
 lto = true
+
+# The builder runs as a debug build and hashes gigabytes per build (parts,
+# release verification, the download store); unoptimized SHA-256 is too slow.
+[profile.dev.package.sha2]
+opt-level = 3
