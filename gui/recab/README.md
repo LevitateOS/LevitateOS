@@ -128,7 +128,23 @@ Release page and on the Overview of a failed start. The agent is given the open
 conflicts that recab lets be settled, each with its sentence and recab's command
 (`recab update resolve ID --preparation P --revision N --choice ...`, `recab update
 reproduce ... PACKAGE`); a baseline needs a file only the person has, so it is
-not handed over.
+not handed over. The clash page scrolls under its heading (at 700 pixels high the
+list of what recab stopped at, what it offers and the agent's panel do not fit), which the
+story checks by bringing "Let the agent fix it" into view.
+
+The commands this window sends were checked against `tools/recab/src/main.rs`
+(2026-11-11, read only). With the real recab every operation's arguments are recab's own
+`argv` (`operations.rs`), then the inputs recab names after it, so `update reproduce
+--preparation P --revision N PACKAGE`, `update resolve ID --preparation P --revision N
+--choice C [--file F]`, `update adopt-baseline --preparation P --revision N --manifest
+FILE`, `update apply --preparation P --revision N --manifest FILE` (the medium: there is
+no `update media`), `update recover`, `update cancel`, `update check` and `update download
+[RELEASE]` match what clap reads; flags and the one positional word may come in either
+order. What differed was the stand-in `recab-real`, which now refuses a missing
+`--preparation` or `--revision` for `reproduce`, `resolve` and `cancel`, one of the pair
+alone for `apply`, `recover` and `adopt-baseline`, a missing package or conflict, and an
+edited resolution without `--file` (or a file with another choice), as clap and
+`merge.rs` do.
 
 **When recab says the system needs recovery.** `lifecycle.state` `unusable` is
 not called an interruption: Overview and "The next system" say "recab says this

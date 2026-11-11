@@ -853,8 +853,16 @@ void Frame::showEvent(QShowEvent *event)
 
 bool Frame::eventFilter(QObject *watched, QEvent *event)
 {
-    if (watched == watched_ && event->type() == QEvent::Close)
-        letGoOfRuns();
+    if (watched == watched_ && event->type() == QEvent::Close) {
+        // This filter sees the close event before the window's own handler, which may
+        // refuse ("close anyway?" in Recipe). So the runs are let go of only once the
+        // event has been dealt with and the window really is gone.
+        QPointer<QWidget> top = watched_;
+        QTimer::singleShot(0, this, [this, top] {
+            if (!top || !top->isVisible())
+                letGoOfRuns();
+        });
+    }
     return false;
 }
 

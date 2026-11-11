@@ -94,7 +94,10 @@ signals: chosen(key)  finishRequested()  goToRun()  helpLink(key)
   frame lets go of the runs it follows (and the ones its pages and Activity
   started or attached to): the input is closed and the helper hung up (SIGHUP),
   never SIGTERM, which would stop the run; the status line says so, and the run
-  goes on. Stopping is `Run::stop()`: for a run whose id is known it is
+  goes on. The frame sees the close event before the window's own handler, which may
+  refuse ("close anyway?" in Recipe), so it lets go only once the event has been dealt
+  with and the window is no longer visible; the live story closes a window that refuses
+  and then one that does not. Stopping is `Run::stop()`: for a run whose id is known it is
   `levitate-agent --stop ID`, otherwise (a stand-in) SIGTERM to the program.
   The helper's exit code 75 ("the run still waits or works without me") is
   `Run::carriesOn`, not a failure and not an end.

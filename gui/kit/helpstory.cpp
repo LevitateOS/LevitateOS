@@ -99,7 +99,7 @@ void run(const Plan &plan, const Save &save, const Expect &expect, const QString
                && shown.contains(QStringLiteral("Open %1").arg(appWord(text.others[1].first)))
                && !shown.contains(QStringLiteral("Open %1").arg(name)));
     // No thing the app has not got: the words below are what the README lists as not done or not true.
-    for (const char *untrue : {"Search this page", "Ctrl+K", "recipe-gui --show", "disk-gui ~/", "Go to anything"})
+    for (const char *untrue : {"Search this page", "Ctrl+K", "recipe-gui --show", "disk-gui ~/", "Go to anything", "cleared through Recipe"})
         expect(QStringLiteral("the page does not say: %1").arg(QLatin1String(untrue)), !shown.contains(QLatin1String(untrue)));
     plan.idle();
     save(*plan.window, prefix + "-help");

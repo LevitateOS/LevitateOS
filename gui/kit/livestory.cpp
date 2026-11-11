@@ -3,9 +3,11 @@
 #include "activity.h"
 #include "frame.h"
 #include "look.h"
+#include "run.h"
 #include "work.h"
 
 #include <QApplication>
+#include <QCloseEvent>
 #include <QGuiApplication>
 #include <QDir>
 #include <QFile>
@@ -17,6 +19,7 @@
 #include <QPlainTextEdit>
 #include <QProcess>
 #include <QSet>
+#include <QVBoxLayout>
 
 #include <csignal>
 #include <sys/types.h>
@@ -222,7 +225,7 @@ void run(Frame &mine, QWidget &mineWindow, const Starter &start, const Save &sav
     Frame *firstFrame = first.frame;
     first.window->close();
     expect(QStringLiteral("live: closing the window says the run carries on (%1)").arg(firstFrame->statusText()),
-           firstFrame->statusText().contains(QStringLiteral("carries on without this window")));
+           waitFor([&] { return firstFrame->statusText().contains(QStringLiteral("carries on without this window")); }));
     first.window->deleteLater();
     first.window = nullptr;
     settle(500);
@@ -337,6 +340,44 @@ void run(Frame &mine, QWidget &mineWindow, const Starter &start, const Save &sav
            waitFor([&] { return pids.size() == 2 && !alive(pids[0].toLongLong()) && !alive(pids[1].toLongLong()); }, 30));
     expect(QStringLiteral("live: nothing waits or runs any more, and the badge says so"),
            waitFor([&] { return mine.badge(key) == 0; }));
+
+    // ---- A window that refuses to close keeps hold of its run; one that closes lets go.
+    {
+        // The window asks "close anyway?" like Recipe's does: its own handler refuses until allowed.
+        struct Stubborn : QWidget {
+            bool allowed = false;
+            void closeEvent(QCloseEvent *event) override { allowed ? event->accept() : event->ignore(); }
+        };
+        const QString title = QStringLiteral("Hold on while the window stays");
+        useStory(QStringLiteral("hang"));
+        Stubborn top;
+        auto *column = new QVBoxLayout(&top);
+        column->setContentsMargins(0, 0, 0, 0);
+        auto *frame = new Frame(Frame::Disk, &top);
+        frame->setContent(new QWidget);
+        column->addWidget(frame);
+        top.resize(1000, 640);
+        top.show();
+        auto *held = new Run(helper(), {}, frame);
+        held->setPrompt(QStringLiteral("The issue:\n%1\n").arg(title), QStringLiteral("Disk"), title);
+        held->start();
+        frame->setOwnRun(held);
+        expect(QStringLiteral("live: a run started in a window that will refuse to close is going and known by id"),
+               waitFor([&] { return held->running() && !frame->ownRun().isEmpty(); }));
+        top.close();
+        settle(500);
+        expect(QStringLiteral("live: a window that refuses to close keeps hold of its run: still held, nothing said (%1)").arg(frame->statusText()),
+               top.isVisible() && !held->released() && held->running() && !frame->statusText().contains(QStringLiteral("carries on")));
+        top.allowed = true;
+        top.close();
+        expect(QStringLiteral("live: closing it for real lets go of the run, which goes on without it (%1)").arg(frame->statusText()),
+               waitFor([&] { return !top.isVisible() && frame->statusText().contains(QStringLiteral("carries on without this window")); }));
+        QString state;
+        for (const QJsonValue &each : runs())
+            if (each["title"].toString() == title)
+                state = each["state"].toString();
+        expect(QStringLiteral("live: the helper's run is still working after its window is gone (%1)").arg(state), state == QLatin1String("running"));
+    }
 }
 
 void guardRefuses(const Expect &expect, const QString &folder, const QString &mustName)

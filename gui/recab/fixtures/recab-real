@@ -14,6 +14,7 @@ It answers the commands the window uses, with the real names and arguments:
   recab-real --json commit
   recab-real --json change install NAME --preparation ID --revision N
   recab-real --json edit PATH --preparation ID --revision N
+  recab-real --json update reproduce|resolve|cancel --preparation ID --revision N, with PACKAGE or CONFLICT [--choice C]
 
 A failure is one JSON
 object on stderr with a class, a code and a message. As `agent-real` it plays an
@@ -596,6 +597,18 @@ def update(s, words, args):
     tools/recab/src/update.rs and merge.rs make them."""
     u = s["update"]
     verb = words[1]
+    # main.rs UpdateCommand, as clap reads it: reproduce, resolve and cancel require both
+    # --preparation and --revision; apply, recover and adopt-baseline take both or neither;
+    # reproduce takes the package as its one positional word, resolve the conflict.
+    named, pinned = "--preparation" in args, "--revision" in args
+    if verb in ("reproduce", "resolve", "cancel") and not (named and pinned):
+        refuse("error: the following required arguments were not provided: --preparation <PREPARATION> --revision <REVISION>",
+               "state_or_detection", 2)
+    if named != pinned:
+        refuse("error: --preparation and --revision go together", "state_or_detection", 2)
+    if verb in ("reproduce", "resolve") and len(words) < 3:
+        refuse("error: the following required arguments were not provided: <%s>"
+               % ("PACKAGE" if verb == "reproduce" else "CONFLICT"), "state_or_detection", 2)
     if verb == "check":
         if os.environ.get("RECAB_STANDIN_UPDATE_SOURCE") == "none":
             # update.rs 158: the first thing `configuration` asks for
@@ -666,6 +679,9 @@ def update(s, words, args):
             refuse("this package must be reproduced through Recipe against the pinned release")
         if choice not in ("local", "release", "edited"):
             refuse("resolution must be local, release or edited")
+        # merge.rs 1545
+        if (choice == "edited") != ("--file" in args):
+            refuse("edited resolution requires --file; other resolutions do not")
         c["resolution"] = choice
         s["preparation"]["revision"] += 1
     elif verb == "reproduce":

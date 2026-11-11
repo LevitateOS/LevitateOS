@@ -26,6 +26,8 @@
 #include <QElapsedTimer>
 #include <QFileInfo>
 #include <QProcess>
+#include <QScrollArea>
+#include <QScrollBar>
 #include <QSettings>
 #include <QPushButton>
 #include <QTextStream>
@@ -266,6 +268,28 @@ void keepWords(const QString &folder, const QString &name, const QString &words)
     QFile file(QDir(folder).filePath(name));
     if (file.open(QIODevice::WriteOnly | QIODevice::Truncate))
         file.write(words.toUtf8());
+}
+
+// A page that is taller than the window scrolls, and its last button can be brought into view: true when
+// the page has a scroll area with something to scroll and "Let the agent fix it" is wholly in view at the end of it.
+bool scrollsToAgentButton(QWidget *page, const QString &button)
+{
+    QScrollArea *scroller = page->findChild<QScrollArea *>();
+    QPushButton *target = nullptr;
+    for (QPushButton *each : page->findChildren<QPushButton *>())
+        if (each->text() == button && each->isVisibleTo(page))
+            target = each;
+    if (!scroller || !target)
+        return false;
+    QScrollBar *bar = scroller->verticalScrollBar();
+    const bool tallerThanTheWindow = bar->maximum() > 0;
+    bar->setValue(bar->maximum());
+    settle(100);
+    const QPoint at = target->mapTo(scroller->viewport(), QPoint(0, 0));
+    const bool seen = scroller->viewport()->rect().contains(QRect(at, target->size()));
+    bar->setValue(0);
+    settle(50);
+    return tallerThanTheWindow && seen;
 }
 
 // The prompt an agent is handed from the page's panel (empty when the page has none).
@@ -1526,7 +1550,15 @@ int takeRealShots(Window &window, const QString &folder)
                                           + QString::number(window.status().preparationRevision) + " htop [--recipe RECIPE]")
                        && prompt.contains("The release being added is LevitateOS 2026.12; the running system's release is LevitateOS 2026.11.")
                        && !prompt.contains("(private)") && !prompt.contains("was added"));
+            expect("at 700 pixels high the clash page scrolls and the agent's panel with its button can be reached",
+                   window.height() == 700 && scrollsToAgentButton(clashPage, "Let the agent fix it"));
             save(window, "r21b-clash-rebuild");
+            QScrollArea *scrolled = clashPage->findChild<QScrollArea *>();
+            if (scrolled)
+                scrolled->verticalScrollBar()->setValue(scrolled->verticalScrollBar()->maximum());
+            save(window, "r21b2-clash-rebuild-scrolled");
+            if (scrolled)
+                scrolled->verticalScrollBar()->setValue(0);
             window.showMain();
             settle(100);
         }
@@ -1590,6 +1622,8 @@ int takeRealShots(Window &window, const QString &folder)
                        && prompt.contains("`recab update resolve conflict5" + cas + " --choice local [--file FILE]`")
                        && prompt.contains("`recab update reproduce" + cas + " htop [--recipe RECIPE]`")
                        && !prompt.contains("(private)") && !prompt.contains("was added"));
+            expect("with six conflicts too the page scrolls and the agent's button can be reached",
+                   scrollsToAgentButton(clashPage, "Let the agent fix it"));
             save(window, "r22-clash-every-kind");
             // Decided by hand: the question names what each choice does, in the words of the page.
             const Raised asked = answering(folder, "r22b-decide-by-hand", QString(), [&] { clickButton(clashPage, "Decide by hand…"); },

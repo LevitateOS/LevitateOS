@@ -292,15 +292,23 @@ PromptPanel::PromptPanel(const QString &issue, const QStringList &facts, const Q
     title->addWidget(strong(tr("What the agent is given")));
     title->addWidget(dim(text(tr("You can change the expected result: it says what should be true afterwards."))));
     column()->addLayout(title);
-    auto *form = new QFormLayout;
-    form->setHorizontalSpacing(16);
-    form->setVerticalSpacing(8);
-    form->addRow(strong(tr("The issue")), text(issue, true));
-    form->addRow(strong(tr("The facts")), text(QStringLiteral("• ") + facts.join(QStringLiteral("\n• ")), true));
+    // Each part has its name above it, so the text gets the whole width of the panel
+    // (a column of names beside it left the widest name's width empty under the others).
+    auto *parts = new QVBoxLayout;
+    parts->setSpacing(8);
+    auto part = [parts](const QString &name, QWidget *content) {
+        auto *one = new QVBoxLayout;
+        one->setSpacing(2);
+        one->addWidget(strong(name));
+        one->addWidget(content);
+        parts->addLayout(one);
+    };
+    part(tr("The issue"), text(issue, true));
+    part(tr("The facts"), text(QStringLiteral("• ") + facts.join(QStringLiteral("\n• ")), true));
     expected_->setAccessibleName(tr("The expected result"));
     expected_->setFixedHeight(66);
-    form->addRow(strong(tr("The expected result")), expected_);
-    column()->addLayout(form);
+    part(tr("The expected result"), expected_);
+    column()->addLayout(parts);
 }
 
 QString PromptPanel::prompt() const

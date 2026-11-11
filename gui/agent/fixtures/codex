@@ -21,7 +21,8 @@ the last one repeats: what a check uses to make the agent write SET-ASIDE, KEEP,
 CANNOT and ASK lines), disk (reads the list of places in the request of the Disk
 window and decides about each: SET-ASIDE, or CANNOT for a path containing
 DISK_STANDIN_COULD_NOT, and for a place marked "Ask me first" an ASK, then SET-ASIDE
-on "Remove it" and KEEP on anything else).
+on "Remove it" and KEEP on anything else; asked what differs between two systems, it
+answers in one message and changes nothing).
 The turn is counted in a file next to the log, one count for the session.
 """
 import json
@@ -93,6 +94,13 @@ def disk(turn, prompt):
     """What an agent does with the list the Disk window hands over: it only decides;
     the helper moves what it names."""
     import re
+    # Asked what differs between the two systems (the Disk window's second request): it reads, and says. A real
+    # agent would look at the files; this one answers from the facts it was handed.
+    if turn == 1 and "the other system" in prompt.split("The facts:", 1)[0]:
+        message("All but one difference belong to one change: htop was installed, which brought ncurses, and curl was "
+                "updated with it. One thing no change explains: /etc/ssh/sshd_config can be read by everyone in the "
+                "other system and only by root in this one. Nothing was changed.")
+        return
     # A resumed session remembers the first request; the stand-in does by a file.
     memory = LOG + ".places"
     if turn == 1:

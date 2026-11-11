@@ -401,8 +401,40 @@ void Window::showHandOver()
     // The list is read again later; only what was handed over is kept.
     for (Finding &finding : requested_)
         finding.node = nullptr;
-    hand_->show(requested_, scannedBytes(), roots_, holding_, spaceAt(home_).known ? spaceAt(home_).free : -1, home_);
-    go(hand_);
+    showHandPage();
+}
+
+// The page words itself for the agent the person chose, which only the helper knows
+// (`levitate-agent --settings`, as the Settings page asks it): ask, without holding the
+// window up, and draw when the answer is in.
+void Window::showHandPage()
+{
+    if (choiceRun_)
+        return; // the answer is awaited, and the page is drawn from what is requested then
+    choiceRun_ = new Run(agent_, {"--settings"}, this);
+    connect(choiceRun_, &Run::finished, this, [this](bool ok) {
+        Run *run = choiceRun_;
+        choiceRun_ = nullptr;
+        run->deleteLater();
+        const QJsonObject answer = QJsonDocument::fromJson(run->answer()).object();
+        choice_ = AgentChoice();
+        if (ok && answer.contains("run_commands")) {
+            const QString chosen = answer["agent"].toString();
+            choice_.commandsAllowed = answer["run_commands"].toString() == QLatin1String("allowed");
+            if (chosen == QLatin1String("codex") || chosen == QLatin1String("claude")) {
+                choice_.kind = AgentChoice::Helper;
+                choice_.name = chosen == QLatin1String("codex") ? tr("Codex") : tr("Claude Code");
+            } else {
+                choice_.kind = AgentChoice::Other;
+                choice_.name = QFileInfo(chosen).fileName();
+            }
+        } else {
+            choice_.problem = run->problem();
+        }
+        hand_->show(requested_, scannedBytes(), roots_, holding_, spaceAt(home_).known ? spaceAt(home_).free : -1, home_, choice_);
+        go(hand_);
+    });
+    choiceRun_->start();
 }
 
 QString Window::pickBiggestUnnamed()
@@ -825,8 +857,7 @@ void Window::tryAgain(const QString &path)
             handingSystems_ = false;
             holding_ = newHolding(home_);
             requested_ = {finding};
-            hand_->show(requested_, scannedBytes(), roots_, holding_, spaceAt(home_).known ? spaceAt(home_).free : -1, home_);
-            go(hand_);
+            showHandPage();
             return;
         }
 }
@@ -1093,7 +1124,12 @@ void Window::send(const QString &prompt)
             placed_.insert(event["path"].toString(), said);
         });
         work_->begin(tr("The agent is setting the mess aside"),
-                     tr("It moves only what is on the list into the holding folder, and asks before anything marked for that."), run_,
+                     choice_.kind == AgentChoice::Other
+                         ? tr("%1 moves the places itself and Disk shows what it reports; what was set aside is read back from the holding folder.")
+                               .arg(choice_.name)
+                         : tr("The agent decides, and the helper moves only what is on the list into the holding folder. Anything marked "
+                              "to ask first is asked about before it is moved."),
+                     run_,
                      tr("What was set aside so far stays set aside; the next page shows it"));
     }
     go(work_);

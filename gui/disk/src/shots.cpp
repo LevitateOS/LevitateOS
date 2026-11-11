@@ -84,6 +84,14 @@ QPushButton *buttonNamed(QWidget *inside, const QString &words)
     return nullptr;
 }
 
+// The hand-over page is drawn when the helper has said which agent is chosen: ask, and wait for the page.
+void showHandOverNow(Window &window)
+{
+    window.showHandOver();
+    waitFor([&] { return !window.askingAgent(); }, 30);
+    settle(150);
+}
+
 // The strip: it is read with a recab of the real shape, named by
 // DISK_STANDIN_STRIP_RECAB (gui/recab/fixtures/recab-real, with its own state,
 // after one `prepare` and one change). The comparison keeps using the
@@ -857,18 +865,25 @@ void handOverShots(Window &window, const Expect &expect)
 {
     HandPage *page = window.handPage();
     const QString words = pageText(page);
+    const bool other = window.agentChoice().kind == AgentChoice::Other;
     const int places = window.messPage()->chosen().size();
     expect(QStringLiteral("the hand-over is a question that counts the places (%1)").arg(places),
            words.contains(QStringLiteral("Hand these %1 places to the agent?").arg(places)) && words.contains(QStringLiteral("Nothing has started.")));
-    expect(QStringLiteral("it says what happens: what is asked, that nothing is deleted before the person lets go, who it works as, the room"),
-           words.contains(QStringLiteral("What happens")) && words.contains(QStringLiteral("The agent is asked to clear"))
-               && words.contains(QStringLiteral("Nothing is gone until you let it go")) && words.contains(QStringLiteral("A command as administrator runs only if you approve it."))
+    expect(QStringLiteral("it says what happens: what is asked, that nothing is deleted before the person lets go, who it works as, the room (%1)")
+               .arg(other ? QStringLiteral("another program") : QStringLiteral("the helper")),
+           words.contains(QStringLiteral("What happens")) && words.contains(QStringLiteral("to clear")) && words.contains(QStringLiteral("in all"))
+               && words.contains(QStringLiteral("Nothing is gone until you let it go"))
+               && (other ? words.contains(QStringLiteral("Whether it asks before a command as administrator is up to the program."))
+                         : words.contains(QStringLiteral("A command as administrator runs only if you approve it.")))
                && words.contains(QStringLiteral("is free")));
-    expect(QStringLiteral("it says which places it asks about first, and that the helper does not move one before"),
-           words.contains(QStringLiteral("It asks you first about")) && words.contains(QStringLiteral("does not move one of them before you were asked")));
-    expect(QStringLiteral("it says who moves the files: the helper, only places on the list, and that the agent is told to move nothing"),
-           words.contains(QStringLiteral("The helper that runs the agent moves what the agent names, and only places on this list"))
-               && words.contains(QStringLiteral("not to move or delete anything itself")));
+    expect(QStringLiteral("it says which places it asks about first, and who does not move one before"),
+           other ? words.contains(QStringLiteral("It is told to ask you first about")) && words.contains(QStringLiteral("is up to the program; Disk shows its question"))
+                 : words.contains(QStringLiteral("It asks you first about")) && words.contains(QStringLiteral("does not move one of them before you were asked")));
+    expect(QStringLiteral("it says who moves the files: for the helper, only places on the list and the agent told to move nothing; for another program, the program"),
+           other ? words.contains(QStringLiteral("is handed this request as it is")) && words.contains(QStringLiteral("moves the places itself; Disk only shows what it reports"))
+                       && !words.contains(QStringLiteral("The helper that runs the agent moves")) && !words.contains(QStringLiteral("not to move or delete anything itself"))
+                 : words.contains(QStringLiteral("The helper that runs the agent moves what the agent names, and only places on this list"))
+                       && words.contains(QStringLiteral("not to move or delete anything itself")) && !words.contains(QStringLiteral("moves the places itself")));
     expect(QStringLiteral("it no longer says Recipe clears anything through Recipe, nor that nothing is asked first"),
            !words.contains(QStringLiteral("through Recipe")) && !words.contains(QStringLiteral("asks you about nothing")));
     const QString request = page->prompt();
@@ -900,8 +915,7 @@ void handOverShots(Window &window, const Expect &expect)
         allThere = allThere && QFileInfo::exists(path);
     expect(QStringLiteral("Cancel hands nothing over: the mess page shows, no agent runs, nothing moved, no holding folder"),
            window.showingMess() && !window.busy() && allThere && !QFileInfo::exists(holdingBase));
-    window.showHandOver();
-    settle(200);
+    showHandOverNow(window);
 }
 
 
@@ -967,6 +981,62 @@ void explainShots(Window &window, const Save &save, const Expect &expect)
            window.showingSystems() && !window.busy() && window.said().isEmpty());
     window.showExplain();
     settle(200);
+}
+
+// The helper's records of runs Disk handed over (the first line of each says which app asked).
+QList<QList<QJsonObject>> diskRuns(const QString &state)
+{
+    QList<QList<QJsonObject>> found;
+    QDir runs(state + QStringLiteral("/levitate/agent/runs"));
+    for (const QString &name : runs.entryList({"*.jsonl"}, QDir::Files, QDir::Name)) {
+        QFile file(runs.filePath(name));
+        if (!file.open(QIODevice::ReadOnly))
+            continue;
+        QList<QJsonObject> lines;
+        for (const QByteArray &line : file.readAll().split('\n'))
+            if (!line.trimmed().isEmpty())
+                lines << QJsonDocument::fromJson(line).object();
+        if (!lines.isEmpty() && lines.first()["app"] == QLatin1String("Disk"))
+            found << lines;
+    }
+    return found;
+}
+
+int diskRecords(const QString &state)
+{
+    return int(diskRuns(state).size());
+}
+
+// Asking the agent what differs, through the helper: the request carried no list of places, the stand-in Codex
+// only read, and what it answered is what the page shows.
+void explainChecks(Window &window, const QString &state, const QString &standinLog, const Expect &expect)
+{
+    QJsonObject request;
+    for (const QList<QJsonObject> &lines : diskRuns(state))
+        if (!lines.first().contains("set_aside") && lines.first()["prompt"].toString().contains(QStringLiteral("the other system")))
+            request = lines.first();
+    expect(QStringLiteral("the helper kept a record of asking what differs, run by codex, with no list of places"),
+           !request.isEmpty() && request["agent"] == QLatin1String("codex"));
+    QFile log(standinLog);
+    bool readOnly = false, writeSandbox = false, facts = false;
+    int calls = 0;
+    if (log.open(QIODevice::ReadOnly))
+        for (const QByteArray &line : log.readAll().split('\n')) {
+            if (line.trimmed().isEmpty())
+                continue;
+            const QJsonObject call = QJsonDocument::fromJson(line).object();
+            ++calls;
+            QStringList args;
+            for (const QJsonValue &arg : call["args"].toArray())
+                args << arg.toString();
+            readOnly = readOnly || args.contains(QStringLiteral("read-only")) || args.contains(QStringLiteral("sandbox_mode=\"read-only\""));
+            writeSandbox = writeSandbox || args.join(QLatin1Char(' ')).contains(QStringLiteral("workspace-write"));
+            facts = facts || call["prompt"].toString().contains(QStringLiteral("The facts:"));
+        }
+    expect(QStringLiteral("the stand-in Codex was asked once, in its read-only sandbox, with the facts (%1 turns)").arg(calls),
+           calls == 1 && readOnly && !writeSandbox && facts);
+    expect(QStringLiteral("what it answered is what the page shows (%1)").arg(window.said().left(50)),
+           window.said().contains(QStringLiteral("One thing no change explains")));
 }
 
 // What the helper's record and the stand-in Codex's log say about the hand-over: the request carried
@@ -1050,8 +1120,7 @@ void otherProgramShots(Window &window, const QString &program, const Save &save,
     window.frame()->choose(QStringLiteral("mess"));
     waitUntilIdle(window, 300);
     const SetAside before = window.held();
-    window.showHandOver();
-    settle(100);
+    showHandOverNow(window);
     expect(QStringLiteral("something is left to hand over to the other program"), !window.messPage()->chosen().isEmpty());
     window.sendShown();
     int asked = 0;
@@ -1071,6 +1140,60 @@ void otherProgramShots(Window &window, const QString &program, const Save &save,
            asked > 0 && moved && after.places.size() > before.places.size());
     expect(QStringLiteral("the page for what was set aside shows after it"), window.showingAfter());
     save("4b-after-other-program");
+}
+
+// What the person's choice of agent does to the words of the hand-over page, asked of the real helper:
+// Settings that let the agent run commands, a program chosen by its path, and a helper that cannot be asked.
+void agentWordsShots(Window &window, const QString &folder, const QString &helper, const QString &program, const Save &save,
+                     const Expect &expect)
+{
+    HandPage *page = window.handPage();
+    {
+        const QString config = QDir(folder).filePath(QStringLiteral("allowed-config"));
+        QDir(config).removeRecursively();
+        QDir().mkpath(config + QStringLiteral("/levitate"));
+        QFile file(config + QStringLiteral("/levitate/agent.json"));
+        if (file.open(QIODevice::WriteOnly))
+            file.write("{\"run_commands\": \"allowed\"}");
+        file.close();
+        EnvScope env;
+        env.set("XDG_CONFIG_HOME", config);
+        showHandOverNow(window);
+        const QString words = pageText(page);
+        expect(QStringLiteral("with commands allowed in Settings the page says so and no longer says the agent moves nothing"),
+               window.agentChoice().kind == AgentChoice::Helper && window.agentChoice().commandsAllowed
+                   && words.contains(QStringLiteral("Your Settings let the agent run commands in your home folder without asking"))
+                   && words.contains(QStringLiteral("leave the moving to the helper")) && !words.contains(QStringLiteral("not to move or delete anything itself"))
+                   && words.contains(QStringLiteral("The helper that runs the agent moves what the agent names")));
+        save("3d-hand-over-commands-allowed");
+    }
+    {
+        EnvScope env;
+        env.set("LEVITATE_AGENT", program);
+        showHandOverNow(window);
+        const QString words = pageText(page);
+        const QString name = QFileInfo(program).fileName();
+        expect(QStringLiteral("with a program chosen by its path the page says that program moves the places and Disk shows what it reports (%1)").arg(name),
+               window.agentChoice().kind == AgentChoice::Other && window.agentChoice().name == name
+                   && words.contains(QStringLiteral("%1, the program you chose as the agent, is handed this request as it is").arg(name))
+                   && words.contains(QStringLiteral("moves the places itself; Disk only shows what it reports"))
+                   && words.contains(QStringLiteral("is up to the program")) && !words.contains(QStringLiteral("The helper that runs the agent moves"))
+                   && !words.contains(QStringLiteral("not to move or delete anything itself")) && !words.contains(QStringLiteral("The helper does not move one of them")));
+        const QString request = page->prompt();
+        expect(QStringLiteral("and the request it is handed does not say the places are moved for it"),
+               request.contains(QStringLiteral("Move the places that can go into the holding folder this request names")) && !request.contains(QStringLiteral("are moved for you")));
+        save("3e-hand-over-other-program");
+    }
+    {
+        window.useAgent(QStringLiteral("/nonexistent/levitate-agent"));
+        showHandOverNow(window);
+        const QString words = pageText(page);
+        expect(QStringLiteral("when the helper cannot be asked the page says so and does not claim who moves the places"),
+               window.agentChoice().kind == AgentChoice::Unknown && words.contains(QStringLiteral("Disk could not ask which agent is chosen"))
+                   && words.contains(QStringLiteral("a program chosen by its path would move the places itself")));
+        save("3f-hand-over-unknown-agent");
+        window.useAgent(helper);
+    }
 }
 
 } // namespace
@@ -1183,14 +1306,62 @@ int takeShots(Window &window, const QString &folder, bool handOver)
            pageText(window.messPage()).contains(QStringLiteral("Picked by you")) && listsPath(window, picked));
     save("3-picked");
 
-    window.showHandOver();
-    expect(QStringLiteral("the hand-over belongs to Mess"), frame->selected() == "mess");
-    const QString holding = window.held().root;
-    save("3-hand-over");
-    handOverShots(window, expect);
+    // The path a person takes: the built levitate-agent, with the stand-in Codex as the agent (it
+    // only decides; the helper moves). The stand-in is named in the environment; without it the
+    // helper would start the real codex, so nothing is handed over.
+    const QString helper = qEnvironmentVariable("LEVITATE_ACTIVITY_AGENT");
+    const QString standinCodex = qEnvironmentVariable("LEVITATE_AGENT_CODEX");
+    if (handOver && (helper.isEmpty() || standinCodex.isEmpty() || QFileInfo(standinCodex).fileName() != QStringLiteral("codex")
+                     || !QFileInfo(standinCodex).absoluteFilePath().contains(QStringLiteral("/fixtures/")))) {
+        out << "not as expected: the hand-over needs LEVITATE_ACTIVITY_AGENT (the built levitate-agent) and LEVITATE_AGENT_CODEX (gui/agent/fixtures/codex), see README.md\n";
+        return 1;
+    }
+    // The other program: what this story's window was started with as its agent, which speaks the protocol itself.
+    const QString oldAgent = qEnvironmentVariable("DISK_GUI_AGENT");
+    const QString standinLog = QDir(folder).filePath(QStringLiteral("codex-standin.log"));
+    const QString explainLog = QDir(folder).filePath(QStringLiteral("codex-standin-explain.log"));
+    // Where the helper keeps its records now: the Activity checks that follow move XDG_STATE_HOME for a while.
+    const QString stateHome = qEnvironmentVariable("XDG_STATE_HOME", QDir::homePath() + QStringLiteral("/.local/state"));
+    for (const QString &log : {standinLog, explainLog})
+        for (const char *suffix : {"", ".turns", ".pids", ".places"})
+            QFile::remove(log + QLatin1String(suffix));
+    // The helper with the stand-in Codex, for a while: HOME is the sample, which is the home folder of this story (places
+    // and the holding folder must lie inside it); the state and the sockets stay where the story put them (XDG_*).
+    auto helperRoute = [&](EnvScope &env, const QString &log) {
+        env.set("HOME", window.home());
+        env.set("LEVITATE_AGENT", QStringLiteral("codex"));
+        env.set("LEVITATE_STANDIN_STORY", QStringLiteral("disk"));
+        env.set("LEVITATE_STANDIN_LOG", log);
+        window.useAgent(helper);
+    };
+
+    // The hand-over page, in the words of the agent the person has: with the helper and Codex in the path a person
+    // takes, with the other program when this story was started with one.
+    QString holding;
+    {
+        EnvScope env;
+        if (handOver)
+            helperRoute(env, standinLog);
+        showHandOverNow(window);
+        expect(QStringLiteral("the hand-over belongs to Mess"), frame->selected() == "mess");
+        holding = window.held().root;
+        save("3-hand-over");
+        handOverShots(window, expect);
+        if (handOver) {
+            expect(QStringLiteral("the page was drawn for the agent the helper says is chosen: Codex"),
+                   window.agentChoice().kind == AgentChoice::Helper && window.agentChoice().name == QStringLiteral("Codex")
+                       && !window.agentChoice().commandsAllowed);
+            agentWordsShots(window, folder, helper, oldAgent, save, expect);
+            helperRoute(env, standinLog);
+            showHandOverNow(window);
+        } else {
+            expect(QStringLiteral("started with a program as the agent, the page says that program moves the places"),
+                   window.agentChoice().kind == AgentChoice::Other);
+        }
+        window.useAgent(oldAgent);
+    }
     stripShots(window, save, expect, out);
-    window.showHandOver();
-    settle(100);
+    showHandOverNow(window);
     expect(QStringLiteral("the strip shows on the hand-over too"), frame->stripShown());
     if (!handOver) {
         // What the entry opens with: the kept comparison when there is one,
@@ -1222,33 +1393,13 @@ int takeShots(Window &window, const QString &folder, bool handOver)
     const QString outside = QDir(folder).filePath(QStringLiteral("outside"));
     QDir().mkpath(outside);
     { QFile f(outside + QStringLiteral("/keep.txt")); if (f.open(QIODevice::WriteOnly)) f.write("outside the sample"); }
-    const qint64 freeBefore = statFree(window.home());
+    qint64 freeBefore = 0; // measured at the moment of handing over, below
 
-    // The path a person takes: the built levitate-agent, with the stand-in Codex as the agent (it
-    // only decides; the helper moves). The stand-in is named in the environment; without it the
-    // helper would start the real codex, so nothing is handed over.
-    const QString helper = qEnvironmentVariable("LEVITATE_ACTIVITY_AGENT");
-    const QString standinCodex = qEnvironmentVariable("LEVITATE_AGENT_CODEX");
-    if (helper.isEmpty() || standinCodex.isEmpty() || QFileInfo(standinCodex).fileName() != QStringLiteral("codex")
-        || !QFileInfo(standinCodex).absoluteFilePath().contains(QStringLiteral("/fixtures/"))) {
-        out << "not as expected: the hand-over needs LEVITATE_ACTIVITY_AGENT (the built levitate-agent) and LEVITATE_AGENT_CODEX (gui/agent/fixtures/codex), see README.md\n";
-        return 1;
-    }
-    const QString oldAgent = qEnvironmentVariable("DISK_GUI_AGENT");
-    const QString standinLog = QDir(folder).filePath(QStringLiteral("codex-standin.log"));
-    // Where the helper keeps its records now: the Activity checks that follow move XDG_STATE_HOME for a while.
-    const QString stateHome = qEnvironmentVariable("XDG_STATE_HOME", QDir::homePath() + QStringLiteral("/.local/state"));
-    for (const char *suffix : {"", ".turns", ".pids", ".places"})
-        QFile::remove(standinLog + QLatin1String(suffix));
     {
     EnvScope env;
-    // The helper's home is the sample, which is the home folder of this story: places and the holding
-    // folder must lie inside it. The state and the sockets stay where the story put them (XDG_*).
-    env.set("HOME", window.home());
-    env.set("LEVITATE_AGENT", QStringLiteral("codex"));
-    env.set("LEVITATE_STANDIN_STORY", QStringLiteral("disk"));
-    env.set("LEVITATE_STANDIN_LOG", standinLog);
-    window.useAgent(helper);
+    helperRoute(env, standinLog);
+    showHandOverNow(window); // asked again, under the helper route
+    freeBefore = statFree(window.home());
     window.sendShown();
     // The agent asks before it names what is marked for that: yes to the
     // first, no to the rest.
@@ -1322,12 +1473,30 @@ int takeShots(Window &window, const QString &folder, bool handOver)
     }
     frame->choose(QStringLiteral("systems"));
     explainShots(window, save, expect);
-    window.sendShown();
-    waitUntilIdle(window, 300);
+    // The path a person takes: the helper with the stand-in Codex, which only reads.
+    {
+        EnvScope env;
+        helperRoute(env, explainLog);
+        window.sendShown();
+        waitUntilIdle(window, 300);
+        window.useAgent(oldAgent);
+    }
     out << "the agent said: " << window.said() << "\n";
     ok &= !window.said().isEmpty();
     expect(QStringLiteral("after the answer The two systems shows"), frame->selected() == "systems" && window.showingSystems());
+    // The Activity checks may have moved the helper's state folder: its records are where it is now.
+    const QString stateNow = qEnvironmentVariable("XDG_STATE_HOME", QDir::homePath() + QStringLiteral("/.local/state"));
+    explainChecks(window, stateNow, explainLog, expect);
     save("8-explained");
+    // The other program, once: handed the same request as it is, and not run by the helper at all.
+    const int helperRecords = diskRecords(stateNow);
+    window.showExplain();
+    settle(200);
+    window.sendShown();
+    waitUntilIdle(window, 300);
+    expect(QStringLiteral("a program chosen by its path answers too, and the helper kept no record of that run (%1 records)").arg(helperRecords),
+           !window.said().isEmpty() && window.showingSystems() && diskRecords(stateNow) == helperRecords);
+    save("8b-explained-by-other-program");
     noStripShots(window, ownRecab, expect);
     if (!records.isEmpty())
         QProcess::execute(qEnvironmentVariable("RECAB_GUI_RECORDS"), {"--stop", records});

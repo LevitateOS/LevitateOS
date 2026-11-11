@@ -112,6 +112,11 @@ def set_aside(path, holding):
 
 
 def main():
+    # Asked what the helper is asked (`--settings`): it says what the helper says when a person
+    # chose a program by its path as the agent, so the window words its page for another program.
+    if sys.argv[1:] == ["--settings"]:
+        print(json.dumps({"agent": os.path.abspath(__file__), "run_commands": "ask", "notices": False, "file": ""}))
+        return
     # The request arrives as one JSON line; the input stays open for answers.
     request = json.loads(sys.stdin.readline())
     prompt = request["prompt"]

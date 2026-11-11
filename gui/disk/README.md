@@ -120,7 +120,17 @@ the list".
    ticked list and say what the agent is asked to do (decide; it is told to move
    nothing itself), that the helper moves what it names, only places on the list,
    into the holding folder (a place on another disk stays where it is) and
-   nothing is gone until the person lets it go, which places the agent has to ask
+   nothing is gone until the person lets it go. They depend on which agent is
+   chosen, which only the helper knows: the window asks it (`--settings`, as
+   Settings does, without holding the window up) and draws the page when the answer
+   is in (`AgentChoice`, `Window::showHandPage`). For Codex or Claude Code the
+   sentences are those above, and when Settings let the agent run commands they say
+   that only the instruction keeps it from changing files itself. For a program set
+   as the agent by its path they say that program is handed the request as it is,
+   moves the places itself and Disk only shows what it reports and then reads the
+   holding folder, that whether it asks first is its own matter, and the issue in
+   the request asks it to move the places itself. When the helper cannot be asked
+   the page says so and says what is so for Codex or Claude Code, which places the agent has to ask
    about first and that the helper does not move one of them before it did (or
    that no place is asked about, the hand-over being the approval), that it works
    as the person and a command as administrator runs only if approved, and how much
@@ -217,8 +227,9 @@ On the fourth entry:
 6. **Ask the agent what differs.** The same page as the hand-over says first
    what the agent is given and that it is told to change nothing, with the
    request below it; Cancel asks nothing. The differences go to the agent as issue,
-   facts and expected result. The agent changes nothing; what it answers is
-   shown above the list.
+   facts and expected result (through the helper, with the agent the person chose;
+   the request carries no list of places). The agent changes nothing; what it
+   answers is shown above the list.
 
 ## Help and the first page
 
@@ -454,7 +465,11 @@ through `XDG_RUNTIME_DIR` itself); without them, or without the
 strip's two variables, the story says what is missing and fails. Pictures with
 `--hand-over`: `4-after` (what was set aside), `4a-disk-with-set-aside`,
 `4b-after-refused`, `4c-after-one-back`, `4c2-before-bring-back`, `4d0-before-let-go`, `4d-after-let-go`, `4e-disk-after-let-go`,
-then `5-systems` to `8-explained`.
+then `5-systems` to `8-explained` (asking what differs goes through the helper with the
+stand-in Codex, which only reads; `8b-explained-by-other-program` is the same request handed
+to the `agent` stand-in as another program). The hand-over page in the other three
+cases: `3d-hand-over-commands-allowed`, `3e-hand-over-other-program`,
+`3f-hand-over-unknown-agent`.
 
 Without `--hand-over` and without the settings it reads the real home folder,
 hands nothing to anyone and compares nothing.
@@ -481,8 +496,12 @@ The stand-ins, all in `fixtures/`:
   request's `set_aside` names, and writes the manifest; it leaves what is marked
   "Ask me first" when the answer is "Keep it". `DISK_STANDIN_COULD_NOT=TEXT` makes
   it fail, as a program holding files open would, on every place whose path
-  contains TEXT. It refuses a request that names no holding folder. The hand-over
-  story runs it once, after the main run, as "the other program also works".
+  contains TEXT. It refuses a request that names no holding folder, and answers
+  `--settings` as the helper does when a program is chosen by its path (its own path
+  as the agent), so that the window words its page for another program. The hand-over
+  story runs it once after the main run, and once after the explanation, as "the other
+  program also works"; with it as the agent the window is started in the story without
+  `--hand-over` too, and the hand-over page then says the program moves the places.
   The main hand-over of the stories goes through the built `levitate-agent`
   (`LEVITATE_ACTIVITY_AGENT`) with `gui/agent/fixtures/codex` as Codex
   (`LEVITATE_AGENT_CODEX`; the story sets `LEVITATE_STANDIN_STORY=disk` and the
@@ -584,10 +603,11 @@ on its input as `{"question": id, "answer": "..."}`. When asked what differs bet
   checked against stand-ins (`gui/agent/fixtures/codex` and `claude`). A place the
   agent names that is on another disk than the holding folder is not moved (the
   page says so as "Could not"). A program set as the agent by its path moves the
-  places itself, and then "The helper that runs the agent moves what the agent
-  names" on the hand-over page is not true of it; Disk does not know which kind of
-  agent is behind the helper. With `run_commands` at "allowed" the agent may write
-  in the home folder itself; the page says only that it is told to move nothing.
+  places itself: the hand-over page then says so (it asks the helper which agent is
+  chosen), and says that only the instruction keeps the agent from changing files
+  itself when `run_commands` is at "allowed". The story checks the words for each
+  case (the default, commands allowed, a program by its path, a helper that cannot
+  be asked), asked of the real helper.
 - "Free once you let it go" is free now plus what the holding folder takes as
   this window counts it (room on disk, or the file lengths under
   `DISK_GUI_APPARENT`); on the sample, whose files are empty but long, nothing is

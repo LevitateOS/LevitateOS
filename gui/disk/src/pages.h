@@ -67,6 +67,20 @@ private:
     QTreeWidget *list_ = nullptr;
 };
 
+// Which agent the person chose, as the helper says it (`levitate-agent --settings`): the
+// hand-over page words itself for it, because who moves the places depends on it.
+struct AgentChoice {
+    enum Kind {
+        Unknown, // the helper could not be asked
+        Helper,  // Codex or Claude Code, run by the helper, which moves what the agent names
+        Other    // a program chosen by its path: it is given the request as it is and moves the places itself
+    };
+    Kind kind = Unknown;
+    bool commandsAllowed = false; // Settings let the agent run commands in the home folder without asking
+    QString name;                 // "Codex", "Claude Code", or the program's file name
+    QString problem;              // why it could not be asked
+};
+
 // What the agent is given: the issue, the facts (the list), the expected result.
 class HandPage : public Page {
     Q_OBJECT
@@ -84,7 +98,7 @@ public:
     // The mess: `holding` is the folder the agent sets what it clears aside in;
     // `freeNow` is the room on the disk now (-1 when it could not be read).
     void show(const QList<Finding> &chosen, qint64 scannedBytes, const QStringList &roots, const QString &holding,
-              qint64 freeNow, const QString &home);
+              qint64 freeNow, const QString &home, const AgentChoice &agent);
     // Any other hand-over.
     void show(const Ask &ask);
     // Every label and button, for a check.

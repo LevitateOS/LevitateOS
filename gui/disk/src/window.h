@@ -7,6 +7,7 @@
 #include "before.h"
 #include "disk.h"
 #include "mess.h"
+#include "pages.h"
 #include "scan.h"
 #include "setaside.h"
 #include "systems.h"
@@ -42,6 +43,10 @@ public:
 
     void scan();
     void showHandOver();
+    // Which agent the person chose, as the helper last said it, and whether it is being asked now
+    // (the hand-over page is drawn when the answer is in).
+    const AgentChoice &agentChoice() const { return choice_; }
+    bool askingAgent() const { return choiceRun_ != nullptr; }
     void send(const QString &prompt);
     // Adds the biggest folder the rules did not name to the list, as a person
     // would by clicking it. Says which, or nothing when there is none.
@@ -67,6 +72,8 @@ public:
     void askBringAllBack();
     void askLetGo();
     void tryAgain(const QString &path);
+    // Asks the helper which agent is chosen without holding the window up, then draws the hand-over page.
+    void showHandPage();
     // The page that says what will happen before it does.
     BeforePage *beforePage() const { return before_; }
     // The hand-over page: the same layout, with the request in it.
@@ -175,6 +182,8 @@ private:
     QList<Finding> requested_;
     QMap<QString, QJsonObject> placed_;
     QString holding_;
+    AgentChoice choice_;
+    Run *choiceRun_ = nullptr;
     qint64 freeBefore_ = -1;
     bool ranHere_ = false, letGone_ = false;
     QStringList notes_;

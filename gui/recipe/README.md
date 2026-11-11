@@ -124,11 +124,11 @@ instead). Whether the real `recipe` prints `recipe: diagnostics: DIR` into a pip
 `--machine-events` was read in the source, not run. A `.desktop` file's `DBusActivatable`,
 `TryExec` and `Path` are ignored.
 
-`gui/kit` is untouched. Two things it does that this work had to work around: the
-frame lets go of Activity's attached runs on every `Close` event of the window, even when
-the window then refuses to close (only an agent run or an attached client is let go, so
-a refused close can detach one); and `WorkPage` offers only "Back" on a failure and always
-reports its title as the agent's note, so short changes got a page of Recipe's own.
+`gui/kit` was left alone by this work. `WorkPage` offers only "Back" on a failure and always
+reports its title as the agent's note, so short changes got a page of Recipe's own. (The
+frame used to let go of Activity's attached runs on every `Close` event of the window, even
+when the window then refused to close; it now does so only when the window really closed,
+and the live story checks it with a window that refuses.)
 
 ## State (2026-11-11)
 

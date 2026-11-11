@@ -605,6 +605,19 @@ void ClashPage::showMerge(const Status &s)
         verdict->column()->addWidget(dim(text(tr("recab says: %1").arg(u.mergeFailure), true)));
     column->addWidget(verdict);
 
+    // Only what is under the heading scrolls (as Disk's comparison does): the page is
+    // too tall for 700 pixels when recab lists a conflict and offers a repair.
+    auto *scroll = new QScrollArea;
+    scroll->setWidgetResizable(true);
+    scroll->setFrameShape(QFrame::NoFrame);
+    scroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    auto *scrolled = new QWidget;
+    auto *body = new QVBoxLayout(scrolled);
+    body->setContentsMargins(0, 0, 8, 0);
+    body->setSpacing(12);
+    scroll->setWidget(scrolled);
+    column->addWidget(scroll, 1);
+
     // What recab stopped at, every conflict it lists as it names them.
     auto *found = new Panel;
     found->column()->setSpacing(8);
@@ -624,16 +637,16 @@ void ClashPage::showMerge(const Status &s)
             rows->addWidget(dim(text(c.says(release, running), true)));
     }
     if (u.conflicts.size() > 3) {
-        auto *scroll = new QScrollArea;
-        scroll->setWidgetResizable(true);
-        scroll->setFrameShape(QFrame::NoFrame);
-        scroll->setFixedHeight(230);
-        scroll->setWidget(inner);
-        found->column()->addWidget(scroll);
+        auto *list = new QScrollArea;
+        list->setWidgetResizable(true);
+        list->setFrameShape(QFrame::NoFrame);
+        list->setFixedHeight(230);
+        list->setWidget(inner);
+        found->column()->addWidget(list);
     } else {
         found->column()->addWidget(inner);
     }
-    column->addWidget(found);
+    body->addWidget(found);
 
     // What recab offers for what no side can settle, each with its own verdict.
     auto *offers = new Panel;
@@ -662,7 +675,7 @@ void ClashPage::showMerge(const Status &s)
         }
     }
     if (offered)
-        column->addWidget(offers);
+        body->addWidget(offers);
     else
         delete offers;
 
@@ -708,13 +721,13 @@ void ClashPage::showMerge(const Status &s)
         buttons->addWidget(wait);
         buttons->addWidget(fixNow);
         prompt->column()->addLayout(buttons);
-        column->addWidget(prompt);
+        body->addWidget(prompt);
     } else {
         buttons->addStretch();
         buttons->addWidget(wait);
-        column->addLayout(buttons);
+        body->addLayout(buttons);
     }
-    column->addStretch();
+    body->addStretch();
 }
 
 void ClashPage::show(const Status &s)

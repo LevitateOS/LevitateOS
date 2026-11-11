@@ -423,8 +423,9 @@ void MessPage::updateFoot()
 // ---------------------------------------------------------------- The hand-over
 
 void HandPage::show(const QList<Finding> &chosen, qint64 scannedBytes, const QStringList &roots, const QString &holding,
-                    qint64 freeNow, const QString &home)
+                    qint64 freeNow, const QString &home, const AgentChoice &agent)
 {
+    const bool other = agent.kind == AgentChoice::Other;
     qint64 certain = 0;
     QStringList facts;
     QStringList asks;
@@ -444,32 +445,62 @@ void HandPage::show(const QList<Finding> &chosen, qint64 scannedBytes, const QSt
     // give up on, and which places to ask about) is told to the agent by the
     // helper that runs it, together with the holding folder and the list this
     // request carries; the issue says only what the person wants.
+    // What the program that is not the helper is told differs: nothing moves the places for it.
     const QString issue =
-        tr("%1 of %2 in %3 is taken by things that look like leftovers. Decide for each place below whether it can go, "
-           "and say so for each one: the person has approved this list, and the places you name to be set aside are moved "
-           "for you into a holding folder, not deleted.")
+        (other ? tr("%1 of %2 in %3 is taken by things that look like leftovers. Decide for each place below whether it can go, "
+                    "and say so for each one: the person has approved this list. Move the places that can go into the holding "
+                    "folder this request names, and delete nothing.")
+               : tr("%1 of %2 in %3 is taken by things that look like leftovers. Decide for each place below whether it can go, "
+                    "and say so for each one: the person has approved this list, and the places you name to be set aside are moved "
+                    "for you into a holding folder, not deleted."))
             .arg(bytesText(sum(chosen)), bytesText(scannedBytes), roots.join(tr(", ")));
 
     // What happens, in sentences that are true of this list: each depends on
     // what was ticked, never on a fixed picture of it.
     Ask ask;
     ask.title = tr("Hand these %1 to the agent?").arg(counted(chosen.size(), tr("%1 place"), tr("%1 places")));
-    ask.happens << tr("The agent is asked to clear %1, %2 in all. It is told to decide about each place and not to move or delete anything itself.")
-                       .arg(counted(chosen.size(), tr("%1 place"), tr("%1 places")), bytesText(sum(chosen)));
-    ask.happens << tr("The helper that runs the agent moves what the agent names, and only places on this list, into the holding folder %1. "
-                      "A place on another disk than your home folder cannot be moved there and stays where it is. Nothing is gone "
-                      "until you let it go, and you can bring each place back before that.")
-                       .arg(shortPath(holding, home));
+    const QString count = counted(chosen.size(), tr("%1 place"), tr("%1 places"));
+    if (other) {
+        ask.happens << tr("%1, the program you chose as the agent, is handed this request as it is, to clear %2, %3 in all. It decides about "
+                          "each place and moves the places itself; Disk only shows what it reports.")
+                           .arg(agent.name, count, bytesText(sum(chosen)));
+        ask.happens << tr("What it sets aside goes into the holding folder %1, on the same disk as your files, and Disk then reads that "
+                          "folder, so what the next page shows as set aside is what is really there. A place on another disk than your "
+                          "home folder cannot be set aside by moving. Nothing is gone until you let it go, and you can bring each place "
+                          "back before that.")
+                           .arg(shortPath(holding, home));
+    } else {
+        ask.happens << tr("The agent is asked to clear %1, %2 in all.").arg(count, bytesText(sum(chosen)))
+                           + QLatin1Char(' ')
+                           + (agent.commandsAllowed
+                                  ? tr("It is told to decide about each place and to leave the moving to the helper. Your Settings let the agent run "
+                                       "commands in your home folder without asking, so only that instruction keeps it from changing your files itself.")
+                                  : tr("It is told to decide about each place and not to move or delete anything itself."))
+                           + (agent.kind == AgentChoice::Unknown
+                                  ? QLatin1Char(' ') + tr("Disk could not ask which agent is chosen (%1). This is what happens with Codex or Claude Code; "
+                                                          "a program chosen by its path would move the places itself.")
+                                                           .arg(agent.problem.isEmpty() ? tr("it did not answer") : agent.problem)
+                                  : QString());
+        ask.happens << tr("The helper that runs the agent moves what the agent names, and only places on this list, into the holding folder %1. "
+                          "A place on another disk than your home folder cannot be moved there and stays where it is. Nothing is gone "
+                          "until you let it go, and you can bring each place back before that.")
+                           .arg(shortPath(holding, home));
+    }
     if (asks.isEmpty()) {
         ask.happens << tr("You are asked about no place first: handing this list over is your approval of every place on it.");
     } else {
         const QStringList named = asks.mid(0, 3);
-        ask.happens << tr("It asks you first about %1: %2%3. The helper does not move one of them before you were asked. "
-                          "For every other place, handing this list over is your approval.")
-                           .arg(counted(asks.size(), tr("%1 place"), tr("%1 places")), named.join(tr(", ")),
-                                asks.size() > named.size() ? tr(" and %1 more").arg(asks.size() - named.size()) : QString());
+        const QString about = counted(asks.size(), tr("%1 place"), tr("%1 places"));
+        const QString names = named.join(tr(", ")) + (asks.size() > named.size() ? tr(" and %1 more").arg(asks.size() - named.size()) : QString());
+        ask.happens << (other ? tr("It is told to ask you first about %1: %2. Whether it asks before it moves one of them is up to the program; "
+                                   "Disk shows its question. For every other place, handing this list over is your approval.")
+                                    .arg(about, names)
+                              : tr("It asks you first about %1: %2. The helper does not move one of them before you were asked. "
+                                   "For every other place, handing this list over is your approval.")
+                                    .arg(about, names));
     }
-    ask.happens << tr("It works as you. A command as administrator runs only if you approve it.");
+    ask.happens << (other ? tr("It works as you. Whether it asks before a command as administrator is up to the program.")
+                          : tr("It works as you. A command as administrator runs only if you approve it."));
     if (freeNow >= 0)
         ask.happens << tr("Once you let it go, up to %1 is free: the disk would have up to %2 free instead of %3.")
                            .arg(bytesText(sum(chosen)), bytesText(freeNow + sum(chosen)), bytesText(freeNow));
