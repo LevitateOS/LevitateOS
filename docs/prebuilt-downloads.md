@@ -190,5 +190,17 @@ release published, the repository not created:
   GitHub runner (compiler image produced from the pin, `sudo` for the compile) and
   publishes it. It has never run: runner `sudo` and Ginux, the image production, disk
   space and the token's right to create releases are all untested.
-- **Not done:** the Qt apps family, `install-tools.rhai` taking a `prebuilt` input (not
+- **Qt apps family (`desktop-apps`), written 2026-11-12, complete and unbuilt:** one entry per
+  distro (`name` = distro id), the whole output tree of `desktop-apps.rhai` with exact modes,
+  links and Recipe's target metadata; `prebuilt.json` lists every entry and verification
+  compares the tree both ways. Key: `gui/` (git-tracked and untracked files, mode and worktree
+  content), the base and apps-build lock files, the apps-build root recipe, both preseed
+  recipes and `desktop-apps.rhai` with their imports, the compiler image, Recipe's declared
+  versions, the distro and its libc. `desktop_apps::install_system` looks up first and skips
+  the apps-build root and the compile on a hit; `prebuilt key|build|publish desktop-apps
+  <distro>` and `prebuilt list` (so the hourly CI publishes it) work. Never run: no tree
+  compiled, cached, published or downloaded; the tree archive extraction in
+  `prebuilt-fetch.rhai` (modes kept, setuid/setgid/sticky bits and absolute symlinks not) is
+  checked by reading only.
+- **Not done:** `install-tools.rhai` taking a `prebuilt` input (not
   needed: the downloaded program enters through its existing `program` input), retention.

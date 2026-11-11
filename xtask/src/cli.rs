@@ -210,7 +210,7 @@ pub enum Cmd {
         what: KernelCmd,
     },
 
-    /// Prebuilt programs of our own tools and the TUI binary: print a key, list the parts, compile one, or publish a build.
+    /// Prebuilt programs of our own tools, the TUI binary and the Qt desktop apps: print a key, list the parts, compile one, or publish a build.
     Prebuilt {
         #[command(subcommand)]
         what: PrebuiltCmd,
@@ -487,10 +487,10 @@ pub enum PrebuiltCmd {
 
 #[derive(Args, Clone)]
 pub struct PrebuiltArgs {
-    /// `tools` (a tool package) or `tui` (`install-tui`, `system-tui`).
-    #[arg(value_parser = ["tools", "tui"])]
+    /// `tools` (a tool package), `tui` (`install-tui`, `system-tui`) or `desktop-apps` (the Qt apps; the name is the distro).
+    #[arg(value_parser = ["tools", "tui", "desktop-apps"])]
     pub family: String,
-    /// A tool package (recpart, recstrap, recab, levitate-recipe, install-split-pane) or a TUI binary.
+    /// A tool package (recpart, recstrap, recab, levitate-recipe, install-split-pane), a TUI binary, or for `desktop-apps` the distro id.
     pub name: String,
     /// The distro whose libc the TUI binary is built for (needed for `tui`).
     #[arg(long, value_parser = DistroParser)]
