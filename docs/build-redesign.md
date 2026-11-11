@@ -282,6 +282,7 @@ Steps 3–6 are builder and Recipe recipe work; step 8 is Ginux or Recipe work.
    code-running steps by a declared Ginux ABI version instead of the launcher's
    bytes, with release builds still building from scratch. This reverses the
    current "any Ginux change rebuilds everything" for development builds.
+   **Decided (the user, 2026-11-11): yes, content keys.**
 2. **Where bulk unpacking runs:** a new Ginux bulk-write primitive (keeps
    everything in the sandbox, more work, upstream-worthy), or unpacking verified
    archives in Recipe's coordinator (faster to build, parsing moves outside
