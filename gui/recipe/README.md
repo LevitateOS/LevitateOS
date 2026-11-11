@@ -27,7 +27,11 @@ folder of its own.
   (`Agent: agent` for a stand-in, by its file name).
 - "Ask for software" hands the agent the app name "Recipe" and the first line of
   the request as the run's title, so Activity lists it; "Go to it" on Activity
-  comes back to the run's page. "Let the agent fix it" is run by `recipe
+  comes back to the run's page. It also names the person's own recipe folder (the
+  "local" source's, made first if it is missing) as `may_write`, so the agent can write
+  the recipe although its commands are asked each time; the page says that the agent
+  may write in the person's own recipe folder only, unless Settings allowed it more. If the folder
+  cannot be made the agent is not started and the status line says so. "Let the agent fix it" is run by `recipe
   --autofix`, not by this window's agent, so it is not in Activity.
 - The strip ("The next system holds N changes.") is read with `recab status
   --json` (`RECIPE_GUI_RECAB`, default `recab`) after every read of the recipes.
@@ -91,35 +95,45 @@ Needs the Qt 6 base and SVG development files (`qt6-qtbase-devel`,
 - `--look levitate|acorn`: a stand-in look for each desktop, for a machine
   that is neither.
 - `--shots FOLDER`: walk the pages, save a picture of each, quit. With
-  `QT_QPA_PLATFORM=offscreen` it needs no display:
-
-```sh
-QT_QPA_PLATFORM=offscreen RECIPE_GUI_RECIPE=$PWD/gui/recipe/fixtures/recipe \
-  RECIPE_GUI_ROOT_HELPER= RECIPE_GUI_PACKAGE_ROOT=/tmp/recipe-shots-store \
-  RECIPE_STANDIN_STATE=/tmp/recipe-shots-state \
-  .artifacts/recipe-gui/build/recipe-gui --look acorn --shots /tmp/recipe-shots
-```
+  `QT_QPA_PLATFORM=offscreen` it needs no display. **It refuses to start (exit code 2,
+  and a sentence naming what is missing) unless every program it could run and every
+  folder it could write is named in the environment**: `RECIPE_GUI_RECIPE`,
+  `RECIPE_GUI_AGENT`, `RECIPE_GUI_RECAB`, `RECIPE_GUI_PACKAGE_ROOT`,
+  `RECIPE_GUI_ROOT_HELPER` (empty is a name), the helper (`LEVITATE_ACTIVITY_AGENT`)
+  with its Codex and Claude Code (`LEVITATE_AGENT_CODEX`, `LEVITATE_AGENT_CLAUDE`) and
+  its root helper (`LEVITATE_AGENT_ROOT_HELPER`), and `HOME` (not your own) and the XDG
+  folders in scratch space. The desktop notifier is off unless `LEVITATE_AGENT_NOTIFIER`
+  names one, and the rail starts no app that `LEVITATE_APP_*` does not name. The story
+  runs itself bare to check that.
 
 The story also checks the frame, Activity and the strip, so it needs the
 stand-in agent, a recab that speaks the real shape with a scratch state of its
 own, and the records Activity shows (stand-in Codex, never a real agent; build
-the agent first with `cmake --build .artifacts/agent/build`). Always name the
-stand-ins: the default agent starts Codex.
+the agent first with `cmake --build .artifacts/agent/build`):
 
 ```sh
-F=$PWD/gui/recipe/fixtures
-QT_QPA_PLATFORM=offscreen HOME=/tmp/recipe-shots-home \
+F=$PWD/gui/recipe/fixtures; A=$PWD/gui/agent/fixtures; S=/tmp/recipe-shots   # all state of the check lives here
+rm -rf $S; mkdir -p $S/home $S/store $S/run; chmod 700 $S/run
+QT_QPA_PLATFORM=offscreen HOME=$S/home XDG_CONFIG_HOME=$S/home/config XDG_STATE_HOME=$S/home/state \
+  XDG_DATA_HOME=$S/home/data XDG_RUNTIME_DIR=$S/run LEVITATE_AGENT_NOTIFIER= \
+  LEVITATE_AGENT_CODEX=$A/codex LEVITATE_AGENT_CLAUDE=$A/claude LEVITATE_AGENT_ROOT_HELPER= \
+  LEVITATE_ACTIVITY_AGENT=$PWD/.artifacts/agent/build/levitate-agent RECIPE_GUI_RECORDS=$A/records \
   RECIPE_GUI_RECIPE=$F/recipe RECIPE_GUI_AGENT=$F/agent RECIPE_GUI_ROOT_HELPER= \
-  RECIPE_GUI_PACKAGE_ROOT=/tmp/recipe-shots-store \
-  RECIPE_STANDIN_STATE=/tmp/recipe-shots-state RECIPE_STANDIN_SPEED=0 \
-  RECIPE_GUI_RECAB=$PWD/gui/recab/fixtures/recab-real RECAB_STANDIN_STATE=/tmp/recipe-shots-recab \
-  RECAB_STANDIN_SPEED=0 RECIPE_GUI_RECORDS=$PWD/gui/agent/fixtures/records \
-  LEVITATE_ACTIVITY_AGENT=$PWD/.artifacts/agent/build/levitate-agent \
-  .artifacts/recipe-gui/build/recipe-gui --look levitate --shots /tmp/recipe-shots
+  RECIPE_GUI_PACKAGE_ROOT=$S/store RECIPE_STANDIN_STATE=$S/state RECIPE_STANDIN_SPEED=0 \
+  RECIPE_GUI_RECAB=$PWD/gui/recab/fixtures/recab-real RECAB_STANDIN_STATE=$S/recab RECAB_STANDIN_SPEED=0 \
+  .artifacts/recipe-gui/build/recipe-gui --look levitate --shots $S/shots
 ```
 
-Delete both state folders first (`/tmp/recipe-shots-state`,
-`/tmp/recipe-shots-recab`): the story expects no next system at the start, then
+The runs the records fixture leaves going are stopped when the story ends, also when it
+fails. After the records, the story starts runs of its own through a second window's
+"Ask for software" with the helper as its agent, and checks that they outlive the window
+and are found, followed, answered, approved and stopped from Activity (`../kit/livestory.*`;
+pictures `a-live-question`, `a-live-approval`, `a-live-follow`), and that the helper was
+started with a sandbox that may write in the person's own recipe folder (`may_write`).
+After the strip checks it puts the stand-in recab's running system on trial, where recab
+still calls the other system "next", and checks that no strip is shown (`s4-no-strip-on-trial`).
+
+The state folders must be new (the `rm -rf` above): the story expects no next system at the start, then
 makes one with one `prepare` and one `change`. The story needs
 `RECIPE_GUI_PACKAGE_ROOT` (its first window is on one explicit store, so the
 Before page has no choice) and says so when it is missing. Pictures: `1-…` to

@@ -1,6 +1,7 @@
 #include "frame.h"
 
 #include "activity.h"
+#include "look.h"
 #include "parts.h"
 #include "run.h"
 #include "settings.h"
@@ -11,6 +12,7 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QCloseEvent>
 #include <QKeyEvent>
 #include <QLabel>
 #include <QPainter>
@@ -479,6 +481,11 @@ bool Frame::settingsShown() const
 // The person chose an entry: show what it stands for and say so.
 void Frame::choose(const QString &key)
 {
+    // Away from the page of a run that works: it carries on, and Activity has it.
+    if (!ownRun_.isEmpty() && !ownNoted_ && key != activityKey()) {
+        ownNoted_ = true;
+        flash(tr("The agent carries on with its run. You can find it in Activity."));
+    }
     if (key == activityKey()) {
         mark(key);
         stack_->setCurrentIndex(1);
@@ -591,6 +598,12 @@ void Frame::startApp(App app)
 {
     if (app == app_)
         return;
+    // A picture run does not start the person's real apps: one it was not told of is not started.
+    if (pictureMode() && !qEnvironmentVariableIsSet(apps[app].variable)) {
+        flash(tr("%1 is not started in a picture run: its program is not named in the environment (%2).")
+                  .arg(tr(apps[app].name), QString::fromLatin1(apps[app].variable)));
+        return;
+    }
     const QString program = qEnvironmentVariable(apps[app].variable, QString::fromLatin1(apps[app].program));
     if (program.isEmpty() || !QProcess::startDetached(program, {}))
         flash(tr("%1 could not be started: %2 was not found or would not run.")
@@ -677,12 +690,92 @@ void Frame::readAgentStatus()
 
 // ---- Activity
 
-void Frame::setOwnRun(qint64 pid)
+void Frame::setOwnRun(Run *run)
 {
-    ownRun_ = pid;
-    activity_->setOwnRun(pid);
-    if (pid == 0)
+    if (!run || !run->isAgent())
+        return;
+    ownRuns_ << run;
+    if (!run->id().isEmpty())
+        setOwnRun(run->id());
+    else
+        connect(run, &Run::idKnown, this, [this, run](const QString &id) {
+            // Not for a run that ended before the helper named it.
+            if (run->exitCode() < 0)
+                setOwnRun(id);
+        });
+}
+
+void Frame::setOwnRun(const QString &id)
+{
+    if (id != ownRun_)
+        ownNoted_ = false;
+    ownRun_ = id;
+    activity_->setOwnRun(id);
+    if (id.isEmpty())
         activity_->read();
+}
+
+// A window that closes, or the person leaving for another page: the run does
+// not end, and Activity is where it is found.
+void Frame::letGoOfRuns()
+{
+    // The runs this window follows and the ones its pages started (Settings' "Try it"),
+    // and what Activity attached to: all of them let go of, none stopped. Only a run
+    // the helper has named (so that Activity has it) is worth saying.
+    QList<Run *> all;
+    for (const QPointer<Run> &run : std::as_const(ownRuns_))
+        if (run)
+            all << run;
+    for (Run *run : findChildren<Run *>())
+        if (!all.contains(run))
+            all << run;
+    int carried = 0;
+    for (Run *run : all) {
+        if (run->released() || !run->running())
+            continue;
+        const bool said = run->isAgent() && !run->id().isEmpty();
+        if (run->isAgent() ? !run->id().isEmpty() : run->isAttach()) {
+            run->release();
+            carried += said;
+        }
+    }
+    if (carried > 0)
+        flash(tr("The agent's run carries on without this window. You can find it in Activity."));
+}
+
+void Frame::watchWindow()
+{
+    QWidget *top = window();
+    if (!top || top == this || top == watched_)
+        return;
+    top->installEventFilter(this);
+    watched_ = top;
+}
+
+bool Frame::event(QEvent *event)
+{
+    if (event->type() == QEvent::ParentChange)
+        watchWindow();
+    return QWidget::event(event);
+}
+
+void Frame::showEvent(QShowEvent *event)
+{
+    watchWindow();
+    QWidget::showEvent(event);
+}
+
+bool Frame::eventFilter(QObject *watched, QEvent *event)
+{
+    if (watched == watched_ && event->type() == QEvent::Close)
+        letGoOfRuns();
+    return false;
+}
+
+void Frame::closeEvent(QCloseEvent *event)
+{
+    letGoOfRuns();
+    QWidget::closeEvent(event);
 }
 
 void Frame::readAgain()

@@ -33,6 +33,7 @@ qt_add_executable(disk-gui
     ../kit/activity.cpp
     ../kit/settings.cpp
     ../kit/nextsystem.cpp
+    ../kit/livestory.cpp
 )
 target_include_directories(disk-gui PRIVATE ../kit)
 target_compile_options(disk-gui PRIVATE -Wall -Wextra)

@@ -10,7 +10,7 @@ only: no stylesheet.
 | `look.*` | a stand-in look from a checkout (`--look`), and `settle` for the picture modes |
 | `parts.*` | small widgets: text, `Card`, `Panel`, `Chip`, `ElidedLabel`, `ClickLabel`, `Mood` colours |
 | `page.*` | `Page`, the base of every page (it rebuilds itself; says "loading") |
-| `run.*` | `Run`, one command and its JSON events; an agent run takes `setPrompt(prompt, app, title)` |
+| `run.*` | `Run`, one command and its JSON events; an agent run takes `setPrompt(prompt, app, title, mayWrite)`, knows its id, is stopped with `--stop` and let go of with `release()` (below) |
 | `work.*` | `WorkPage`, a long run with its steps, output and the agent's questions |
 | `refresh.*` | `Refresher`: F5, Ctrl+R and coming back to the window |
 | `frame.*` | the window frame (below) |
@@ -18,6 +18,7 @@ only: no stylesheet.
 | `settings.*` | the Settings page, owned by the frame, and `rememberWindowSize` |
 | `nextsystem.*` | `NextSystem`: reads `recab status --json` for the strip |
 | `before.*` | `BeforePage`: what will happen, shown before anything starts (below) |
+| `livestory.*` | the checks of the stories about runs that outlive their window (below); only the picture modes use it |
 
 ## The frame
 
@@ -43,10 +44,11 @@ void addStatusWidget(QWidget *);         // beside it, e.g. "Read again"
 void flash(QString);                     // said for a few seconds in place of the status; empty ends it at once
 void startApp(App);                      // starts another app as the rail does; says so when it cannot
 QStringList entryTitles() const;         // the rail's entries in order, without the three apps
-qint64 ownRun() const;                   // what setOwnRun was given
+QString ownRun() const;                  // the id setOwnRun was given
 void setAgent(QString program);          // right of the status line (see below)
 void setAgentNote(QString);              // while the agent works; empty restores its name
-void setOwnRun(qint64 pid);              // the agent process this window waits for; 0 when it ended
+void setOwnRun(Run *run);                // the agent run this window follows: its id is known a moment after the start
+void setOwnRun(QString id);              // empty when it ended
 ActivityPage *activity() const;
 SettingsPage *settings() const;
 static QString settingsKey();            // "settings"
@@ -66,6 +68,17 @@ signals: chosen(key)  finishRequested()  goToRun()
   page where the next system is finished.
 - `goToRun()` is "Go to it" on Activity for this window's own live run: show
   the page of that run (the work page).
+- **A run outlives its window.** The window knows its run by the id the helper
+  names in its first line (`Run::idKnown`), not by a process id. When the person
+  leaves for another entry of the rail while the run works, the status line says
+  once that the agent carries on and is in Activity. When the window closes, the
+  frame lets go of the runs it follows (and the ones its pages and Activity
+  started or attached to): the input is closed and the helper hung up (SIGHUP),
+  never SIGTERM, which would stop the run; the status line says so, and the run
+  goes on. Stopping is `Run::stop()`: for a run whose id is known it is
+  `levitate-agent --stop ID`, otherwise (a stand-in) SIGTERM to the program.
+  The helper's exit code 75 ("the run still waits or works without me") is
+  `Run::carriesOn`, not a failure and not an end.
 - Choosing another app in the rail starts its program detached
   (`recipe-gui`, `recab-gui`, `disk-gui`; override with `LEVITATE_APP_RECIPE`,
   `LEVITATE_APP_SYSTEM`, `LEVITATE_APP_DISK`). If that fails the status line
@@ -86,7 +99,11 @@ connect(next, &NextSystem::known, this, [this, next] { frame_->setNextSystem(nex
 next->read();   // again after what changes it, and when Refresher asks
 ```
 
-It reports nothing when there is no next system or the status cannot be read.
+It reports nothing when there is no next system or the status cannot be read, and
+nothing while the running system is on trial: recab still calls the other system
+"next" then (the preparation that made the running system is kept until the trial
+is kept), but it is the system from before, so there is nothing to finish and the
+strip would say what is not so (System's own model reads it the same way).
 
 ### An app adopting the frame
 
@@ -110,8 +127,8 @@ connect(frame_, &Frame::goToRun, this, [this] { stack_->setCurrentWidget(work_);
 connect(refresher_, &Refresher::asked, frame_, &Frame::readAgain);
 
 // when an agent run starts:  run->setPrompt(prompt, "Disk", title);  run->start();
-//                            frame_->setOwnRun(run->pid());
-// when it ends:              frame_->setOwnRun(0);   // Activity reads the record again
+//                            frame_->setOwnRun(run);
+// when it ends:              frame_->setOwnRun(QString());   // Activity reads the record again
 ```
 
 Titles of runs should be what the person asked, in a short line: Activity lists
@@ -168,11 +185,38 @@ connect(before_, &BeforePage::linkClicked, ...);
 
 The agent's runs from all three apps, read from `levitate-agent --list` and
 `--show ID` (program: `LEVITATE_ACTIVITY_AGENT`, default `levitate-agent`),
-without holding the window up. The frame owns the page, gives its rail entry a
-badge (runs waiting or running; amber while one waits), reads it on first show,
-on `readAgain()` and after `setOwnRun(0)`. A run waiting for an answer can only
-be answered in the window that started it; Activity says so and does not answer.
-Only agent runs are kept: installs and restarts are not recorded anywhere yet.
+without holding the window up. The frame owns the page and gives its rail entry a
+badge (runs waiting or running; amber while one waits). It reads on first show, on
+`readAgain()`, after `setOwnRun("")`, and **by itself every two seconds while the
+page is on screen** (a timer that runs only between its show and hide events; the
+list is drawn again only when it changed, so what the person is typing stays). The
+badge and the counts therefore follow runs of other windows without anyone pressing
+anything while Activity is shown; while it is not shown they are as of the last
+reading.
+
+A run that is going and has its socket (`attachable`) is **followed live**: the page
+runs `levitate-agent --attach ID`, takes the replay of what the run has done, and then
+what it does as it does it. The detail shows the request, "What it does now" (the
+step, and the last lines the run printed), "What it did" (a row for each command, file
+and search), and, when the run waits, the question:
+
+- a question with choices is answered with a button for each choice, as the work page
+  does; one without is a line to type in and "Answer";
+- an administrator step or a command outside the sandbox shows the command, why, and
+  "Approve" and "Refuse";
+- a click is sent through the attached client; the card says the answer was sent until
+  the helper reports it, and then the page shows "Answered: ..." for everyone, so two
+  windows that show the same run both see that it was answered and by what. The helper
+  counts an answer once;
+- "Stop" for a running or waiting run is `levitate-agent --stop ID`; what the run did
+  stays done, and the page then shows how it ended.
+
+The page lets go of the run (the input closed and a hang-up, never SIGTERM) when
+another run is chosen or the page is hidden; the run goes on. A run that has ended
+shows its record, as before. "Go to it" stays for this window's own live run, and the
+question can be answered on either page: the work page learns that it was answered
+from Activity when the agent says anything after it. Only agent runs are kept:
+installs and restarts are not recorded anywhere yet.
 
 ## Settings
 
@@ -184,18 +228,25 @@ said with "Try again". It reads when first chosen, and again on `readAgain()`
 once it has been read.
 
 Sections: the agent that does the work (one row per agent the helper lists, today
-Codex, and "Another program"), "Try it", what the agent may do without asking
-(read and look things up: always; run commands as you: "Ask each time" or
-"Allowed"; run a command as administrator: always asks), and the windows.
+Codex and Claude Code, and "Another program"), "Try it", what the agent may do without
+asking (read and look things up: always; run commands as you: "Ask each time" or
+"Allowed"; run a command as administrator: always asks), Notices (one row: "Tell me
+when the agent needs an answer or has finished, and no window is watching", Yes or
+No), and the windows.
 
-- The page changes nothing itself. A choice runs `levitate-agent --set agent=...`
-  or `--set run_commands=...`; "Sign in…" runs `--sign-in` and shows what it prints
-  (an address to open) in the row until it ends; "Sign out…" asks in the row first,
-  then runs `--sign-out`. Afterwards the page reads again and shows what the
+- The page changes nothing itself. A choice runs `levitate-agent --set agent=...`,
+  `--set run_commands=...` or `--set notices=...`; "Sign in…" runs `--sign-in` and
+  shows what it prints (an address to open) in the row until it ends; "Sign out…"
+  asks in the row first, then runs `--sign-out`. The helper signs in and out the agent
+  that is chosen, so only that row has the buttons; the other says "Choose it to sign
+  in or out here.". Afterwards the page reads again and shows what the
   helper reports, not what was clicked. A refusal or a failure is the helper's
   own sentence, shown under the row it belongs to, never a dialog.
 - "Choose…" opens a file dialog; the path goes through `--set agent=PATH`.
-  Claude Code is not offered: the helper cannot start it yet.
+- Claude Code is a row like Codex (installed or not, signed in or not, chosen, sign in
+  and out through the helper), with one line that says what is true of it: this side
+  has not been tried with a real Claude Code yet (the helper's adapter was written
+  from the documentation and has run only against a stand-in).
 - "Try it" runs `levitate-agent` with "Say hello in one sentence. Do not run any
   command and do not change any file.", app = this window's app, title "Say hello",
   and shows "It answered: ..." or why it failed. The run is Activity's like any
@@ -209,7 +260,8 @@ Codex, and "Another program"), "Try it", what the agent may do without asking
   picture modes) nothing is read or written.
 
 Checks use `SettingsPage::pageText()`, `press(words)`, `pickCommands(words)`,
-`chooseProgram(path)`, `notice()`, `checkedAgent()` and `busy()`; see
+`pickNotices(on)`, `chooseProgram(path)`, `notice()`, `checkedAgent()` (the agent's
+id, or "other"), `noticesInForce()` and `busy()`; see
 `gui/recab/src/shots.cpp` (`settingsShots`) for the whole story, and the other
 two apps' shots for the entry and the page opening.
 
@@ -217,17 +269,50 @@ two apps' shots for the entry and the page opening.
 
 Each of these is in the design and not shown, because nothing is behind it:
 
-- **Notices, also when no window is open**: no notifier exists; the apps only
-  show things while a window is open.
+- **Notices have never been shown on a desktop.** The helper shows them (the row
+  above switches them) through `gdbus call`; Plasma's and LXQt's notification servers
+  have not been seen showing one, and a click on it does nothing.
 - **Per-app settings** (Recipe's default for "this computer", System's "ask when to
   restart", Disk's places and rules): no app keeps such a setting yet, and the helper's file holds only the agent's.
 - **Anything about updates** (checking daily, notices for them): there is no
   update check to schedule.
-- **"Write a recipe into your own recipes" without asking**: nothing implements it.
-- **Claude Code as an agent**: the helper has no adapter for it.
+- **"Write a recipe into your own recipes" without asking**: only partly. Recipe's
+  "Ask for software" lets the agent write in the person's own recipe folder (`may_write`)
+  and the page says so; there is no setting to go further.
+- **Claude Code has never run against a real one** (see the row above).
 
 ## Checks
 
 There are no unit tests. Each app's picture mode (`--shots`) is the check; the
-frame, Activity and the strip are checked in `gui/recab/src/shots.cpp`. Runs for
+frame, Activity and the strip are checked in `gui/recab/src/shots.cpp`, and runs for
 Activity to show come from `gui/agent/fixtures/records`.
+
+**The guard.** A picture run starts the app's backend programs, the agent, the
+helper's own agents and a root helper, and writes settings and records: run bare it
+would do that to the person's real computer. `guardPictureMode` (`look.*`, called by
+each app's `main.cpp` before the window is made, since the window starts reading at
+once) makes `--shots` refuse to start, with a sentence that names what is missing and
+exit code 2, unless these are named in the environment: the app's own programs (see
+its README), `LEVITATE_ACTIVITY_AGENT`, `LEVITATE_AGENT_CODEX`,
+`LEVITATE_AGENT_CLAUDE`, `HOME` (not the person's own home folder),
+`XDG_CONFIG_HOME`, `XDG_STATE_HOME`, `XDG_DATA_HOME`, `XDG_RUNTIME_DIR`, and the root
+helpers (`LEVITATE_AGENT_ROOT_HELPER` and the app's; set and empty counts as named,
+and runs the command directly). The notifier defaults to off in a picture run
+(`LEVITATE_AGENT_NOTIFIER` set to a stand-in is respected), and the rail does not start
+an app that `LEVITATE_APP_*` does not name. Each app's story runs itself bare and checks
+that it refuses.
+
+**Live runs.** `livestory.*` has the checks that the three stories share about runs
+that outlive their window; each app only says how its window hands a request to the
+agent (`Starter`). With the helper and the stand-in Codex, in a state folder of the
+story's own, it checks: a window learns the id of its run; Activity of another window
+lists it and counts it without a press; leaving a page says once that the run carries
+on; closing the window says so and the run goes on waiting; another window follows it
+and shows its choices as buttons; a second window shows the same run; an answer from
+one window is seen by the other (and counted once in the record); an own window's page
+learns that its question was answered from Activity; an administrator step is approved
+from Activity; a working run is followed live and stopped from Activity (the agent and
+what it started are gone); nothing is left. `waitFor` (`look.*`) is what the stories
+wait with: for the thing itself, never a number of seconds; its limit is three times
+what the thing normally takes and never less than a minute, because a busy machine
+answers slowly.

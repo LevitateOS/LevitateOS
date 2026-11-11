@@ -2,6 +2,7 @@
 
 #include "activity.h"
 #include "frame.h"
+#include "livestory.h"
 #include "look.h"
 #include "settings.h"
 #include "window.h"
@@ -49,15 +50,6 @@ namespace {
 
 using Save = std::function<void(const QString &)>;
 using Expect = std::function<void(const QString &, bool)>;
-
-void waitFor(const std::function<bool()> &holds, int seconds = 20)
-{
-    QElapsedTimer clock;
-    clock.start();
-    while (!holds() && clock.elapsed() < seconds * 1000)
-        settle(50);
-    settle(150);
-}
 
 QPushButton *buttonNamed(QWidget *inside, const QString &words)
 {
@@ -185,14 +177,16 @@ void activityShots(Window &window, const QString &folder, bool own, const Save &
     *where = QDir(folder).filePath(own ? QStringLiteral("records-own") : QStringLiteral("records"));
     QProcess make;
     make.start(script, {*where, agent});
-    make.waitForFinished(60000);
+    make.waitForFinished(300000);
     const QString said = QString::fromUtf8(make.readAllStandardOutput()).trimmed();
     expect(QStringLiteral("the records for Activity were made (%1)").arg(QString::fromUtf8(make.readAllStandardError()).trimmed()),
            make.exitStatus() == QProcess::NormalExit && make.exitCode() == 0 && said.startsWith("state="));
     if (!said.startsWith("state="))
         return;
     qputenv("XDG_STATE_HOME", said.section(' ', 0, 0).mid(6).toUtf8());
-    const qint64 waitingPid = said.section("waiting_pid=", 1).toLongLong();
+    const QString waitingId = said.section("waiting_id=", 1).section(' ', 0, 0);
+    // The sockets of the runs it left going: attaching needs them.
+    qputenv("XDG_RUNTIME_DIR", said.section("runtime=", 1).section(' ', 0, 0).toUtf8());
     ActivityPage *page = frame->activity();
 
     frame->readAgain();
@@ -216,16 +210,18 @@ void activityShots(Window &window, const QString &folder, bool own, const Save &
     // The agent this window waits for: Activity offers to go to it.
     page->chooseTitle("Turn off password logins over ssh");
     waitFor([&] { return page->detailText().contains("It asks"); });
-    frame->setOwnRun(waitingPid);
-    expect(QStringLiteral("the frame knows the pid of this window's own run"), frame->ownRun() == waitingPid && waitingPid > 0);
+    frame->setOwnRun(waitingId);
+    expect(QStringLiteral("the frame knows the id of this window's own run"), frame->ownRun() == waitingId && !waitingId.isEmpty());
     waitFor([&] { return page->offersGoTo(); });
-    expect(QStringLiteral("this window's own live run offers Go to it"), page->offersGoTo());
+    expect(QStringLiteral("this window's own live run offers Go to it, and its question can be answered here too"),
+           page->offersGoTo() && waitFor([&] { return page->answerButtons() == QStringList({"Red", "Blue"}); })
+               && !page->detailText().contains("Only the window that started it"));
     if (QPushButton *go = buttonNamed(page, QStringLiteral("Go to it")))
         go->click();
     settle(200);
     expect(QStringLiteral("Go to it leaves Activity for the work page, under the Mess entry"),
            !frame->activityShown() && frame->selected() == "mess" && window.showingWork());
-    frame->setOwnRun(0);
+    frame->setOwnRun(QString());
 }
 
 } // namespace
@@ -872,6 +868,39 @@ void explainShots(Window &window, const Save &save, const Expect &expect)
 
 } // namespace
 
+namespace {
+
+// Runs that outlive their window: found, followed, answered and stopped from
+// Activity. Each one is started by a window of Disk's own (the hand-over of the
+// mess, with the helper as its agent) that then closes.
+void liveShots(Window &window, const QString &folder, const Save &save, const Expect &expect)
+{
+    const QString script = qEnvironmentVariable("RECAB_GUI_RECORDS");
+    const QString agent = qEnvironmentVariable("LEVITATE_ACTIVITY_AGENT");
+    if (script.isEmpty() || agent.isEmpty()) {
+        expect(QStringLiteral("the live checks need RECAB_GUI_RECORDS and LEVITATE_ACTIVITY_AGENT, see README.md"), false);
+        return;
+    }
+    livestory::prepare(QDir(folder).filePath("live-disk"), QFileInfo(script).absolutePath());
+    auto start = [&](const QString &story, const QString &request) {
+        livestory::useStory(story);
+        const QByteArray before = qgetenv("DISK_GUI_AGENT");
+        qputenv("DISK_GUI_AGENT", agent.toUtf8());
+        auto *started = new Window;
+        qputenv("DISK_GUI_AGENT", before);
+        started->show();
+        waitUntilIdle(*started, 600);
+        started->send(QStringLiteral("The issue:\n%1\n").arg(request));
+        return livestory::Started{started, started->frame()};
+    };
+    livestory::run(*window.frame(), window, start, [&](QWidget &, const QString &name) { save(name); }, expect, "a3");
+    livestory::finish();
+    window.frame()->choose(QStringLiteral("mess"));
+    settle(100);
+}
+
+} // namespace
+
 int takeShots(Window &window, const QString &folder, bool handOver)
 {
     QDir().mkpath(folder);
@@ -892,7 +921,18 @@ int takeShots(Window &window, const QString &folder, bool handOver)
     };
     const QString ownRecab = qEnvironmentVariable("DISK_GUI_RECAB", "recab");
     QString records;
+    // The runs the records fixture leaves going are stopped when this ends, whichever way it ends.
+    struct Stopper {
+        const QString &records;
+        ~Stopper()
+        {
+            if (!records.isEmpty())
+                QProcess::execute(qEnvironmentVariable("RECAB_GUI_RECORDS"), {"--stop", records});
+        }
+    } stopper{records};
     window.show();
+    // A picture run that is not told of its stand-ins refuses to start.
+    livestory::guardRefuses(expect, folder, "DISK_GUI_RECAB");
     waitUntilIdle(window, 600);
     qint64 mess = 0;
     for (const Finding &finding : window.found())
@@ -960,6 +1000,7 @@ int takeShots(Window &window, const QString &folder, bool handOver)
         noStripShots(window, ownRecab, expect);
         if (!records.isEmpty())
             QProcess::execute(qEnvironmentVariable("RECAB_GUI_RECORDS"), {"--stop", records});
+        liveShots(window, folder, save, expect);
         out << (ok ? "all as expected\n" : "some things were not as expected\n");
         return ok ? 0 : 1;
     }

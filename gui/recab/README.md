@@ -162,26 +162,36 @@ restart into the next system fail.
 
 `--shots FOLDER` walks the whole story and saves a picture at each point. It is
 also the check that every flow works: it exits non-zero when a step does not
-lead where it should. It needs no display:
+lead where it should. It needs no display. **It refuses to start (exit code 2, and
+a sentence naming what is missing) unless every program it could run and every
+folder it could write is named in the environment**: the stand-ins below, the
+helper (`LEVITATE_ACTIVITY_AGENT`) with its Codex and Claude Code
+(`LEVITATE_AGENT_CODEX`, `LEVITATE_AGENT_CLAUDE`), the root helpers (empty is a name),
+and `HOME` and the XDG folders in scratch space. It also turns the desktop notifier off
+unless `LEVITATE_AGENT_NOTIFIER` names one. The story runs itself bare to check that.
+Two variables below (`RECAB_GUI_RECORDS`, and the helper) are for Activity:
 
 ```sh
-QT_QPA_PLATFORM=offscreen RECAB_GUI_RECAB=$F/recab RECAB_GUI_AGENT=$F/agent \
-  RECAB_GUI_REBOOT=$F/reboot RECAB_GUI_ROOT_HELPER= \
-  RECAB_STANDIN_STATE=/tmp/recab-shots-state RECAB_STANDIN_FAIL_TRIALS=1 RECAB_STANDIN_SPEED=0 \
-  .artifacts/recab-gui/build/recab-gui --look levitate --shots /tmp/recab-shots
+F=$PWD/gui/recab/fixtures; A=$PWD/gui/agent/fixtures; S=/tmp/recab-shots   # all state of the check lives here
+rm -rf $S; mkdir -p $S/home $S/run; chmod 700 $S/run
+QT_QPA_PLATFORM=offscreen HOME=$S/home XDG_CONFIG_HOME=$S/home/config XDG_STATE_HOME=$S/home/state \
+  XDG_DATA_HOME=$S/home/data XDG_RUNTIME_DIR=$S/run LEVITATE_AGENT_NOTIFIER= \
+  LEVITATE_AGENT_CODEX=$A/codex LEVITATE_AGENT_CLAUDE=$A/claude LEVITATE_AGENT_ROOT_HELPER= \
+  LEVITATE_ACTIVITY_AGENT=$PWD/.artifacts/agent/build/levitate-agent RECAB_GUI_RECORDS=$A/records \
+  RECAB_GUI_RECAB=$F/recab RECAB_GUI_AGENT=$F/agent RECAB_GUI_REBOOT=$F/reboot RECAB_GUI_ROOT_HELPER= \
+  RECAB_STANDIN_STATE=$S/standin RECAB_STANDIN_FAIL_TRIALS=1 RECAB_STANDIN_SPEED=0 \
+  .artifacts/recab-gui/build/recab-gui --look levitate --shots $S/shots
 ```
 
 Both stories also check the frame, Activity and the strip. For that they make
 runs with `gui/agent/fixtures/records` (stand-in Codex, never a real agent) and
-read them through the built `levitate-agent`, so two more variables name them
-(build the agent first: `cmake --build .artifacts/agent/build`):
-
-```sh
-export RECAB_GUI_RECORDS=$PWD/gui/agent/fixtures/records
-export LEVITATE_ACTIVITY_AGENT=$PWD/.artifacts/agent/build/levitate-agent
-```
-
-Without them the story says what is missing and fails. The pictures `s0-*` to `s14-*` are Settings: as first read, "Allowed", signing out (and the question first), a sign in that fails, signing in (the address Codex printed), another program, back to Codex, a refused value, "Try it" and the run in Activity, a helper that cannot be asked. The story sets `HOME`, `XDG_CONFIG_HOME`, `XDG_STATE_HOME` and `LEVITATE_AGENT_CODEX` itself for that part and puts them back. The pictures `a-*`
+read them through the built `levitate-agent` (build the agent first:
+`cmake --build .artifacts/agent/build`). The runs the fixture leaves going are
+stopped when the story ends, also when it fails. Then each story starts runs of its
+own through a second System window with the helper as its agent, and checks that they
+outlive the window and can be found, followed, answered, approved and stopped from
+Activity (`../kit/livestory.*`; pictures `a-live-*` and `r2c-live-*`: `-live-question`,
+`-live-approval`, `-live-follow`). The pictures `s0-*` to `s14-*` are Settings: as first read, "Allowed", signing out (and the question first), a sign in that fails, signing in (the address Codex printed), another program, back to Codex, a refused value, "Try it" and the run in Activity, a helper that cannot be asked. The pictures `s9b-claude-listed` and `s9c-claude-and-notices-off` show Claude Code as a row and the notices row. The story sets `HOME`, `XDG_CONFIG_HOME`, `XDG_STATE_HOME`, `LEVITATE_AGENT_CODEX` and `LEVITATE_AGENT_CLAUDE` itself for that part and puts them back. The pictures `a-*`
 (`r2c-*` in the real story) are Activity: the list, a done run, a run that
 waits, this window's own run, the strip on Activity. The pictures `r8` to `r12` (`--real`) are the release page from "none known" to "in the next system" (a failed check, nothing newer, available, downloaded, a clash, settled, added; `r10b` is Overview with the clash), `r4a` is the first view on trial, `r13` and `r14` the first views after a restart that came back and one that was kept, `r13b` and `r15*` are History (a restart that came back, all, restarts only); `p12` and `p13` (older stand-in) are the release page with a one-step update and History without a command. The pictures `p*` (older stand-in) and `rp*` (`--real`) are "The next system" and "Getting back" in the states each stand-in reaches; `p-steps-old.txt` and `rp-steps.txt` are the steps saved as a file. The other pictures show
 Overview and the pages inside the frame.
@@ -190,14 +200,13 @@ The story the real recab offers (two copies, a change by the agent, a command
 running elsewhere, finishing, setting the restart and cancelling it, the
 restart, the trial kept by hand, going back, the reset, discarding) runs against `fixtures/recab-real` with
 `--real`. It stops at once when the system cannot be read, before anything is
-asked of the agent. Always name a stand-in agent for it: the default agent is
-`levitate-agent`, which starts Codex (see `gui/agent/README.md`).
+asked of the agent. The same variables as above, with the real-shaped stand-ins:
 
 ```sh
-QT_QPA_PLATFORM=offscreen RECAB_GUI_RECAB=$F/recab-real RECAB_GUI_AGENT=$F/agent-real \
-  RECAB_GUI_REBOOT=$F/reboot-real RECAB_GUI_ROOT_HELPER= RECAB_GUI_OS_RELEASE=$F/os-release \
-  RECAB_STANDIN_STATE=/tmp/recab-real-shots-state RECAB_STANDIN_SPEED=0 \
-  .artifacts/recab-gui/build/recab-gui --look levitate --shots /tmp/recab-real-shots --real
+rm -rf $S; mkdir -p $S/home $S/run; chmod 700 $S/run     # the rest of the environment as above
+RECAB_GUI_RECAB=$F/recab-real RECAB_GUI_AGENT=$F/agent-real RECAB_GUI_REBOOT=$F/reboot-real \
+  RECAB_GUI_ROOT_HELPER= RECAB_GUI_OS_RELEASE=$F/os-release RECAB_STANDIN_STATE=$S/standin RECAB_STANDIN_SPEED=0 \
+  .artifacts/recab-gui/build/recab-gui --look levitate --shots $S/shots --real
 ```
 
 ## What the front end asks of recab
@@ -432,8 +441,10 @@ allowed to run, and whether it runs as the person or as root are not decided.
 
 - Activity lists only the agent's runs. Installs, updates and restarts are not
   recorded anywhere yet, so they are not listed and nothing is made up for them.
-- A run waiting for an answer can be answered only in the window that started
-  it; Activity says so and offers "Go to it" for this window's own run.
+- A run waiting for an answer can be answered in any window's Activity, with its
+  choices as buttons (and Approve or Refuse for a command); "Go to it" stays for this
+  window's own run. A window that closes lets go of its run, which goes on and is found
+  in Activity; "Stop" ends it for real (`levitate-agent --stop`).
 - The frame, Activity and the strip were checked against stand-ins in the
   picture modes, offscreen; not on a real desktop, and not with a real Codex.
 - The rail has no Help: that page would lead nowhere yet. Settings is the frame's own page (`gui/kit/README.md`); the story checks it with the stand-in Codex, in a settings folder of its own under the picture folder, so the person's `agent.json` is never read or written.

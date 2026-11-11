@@ -2,6 +2,7 @@
 
 #include "activity.h"
 #include "frame.h"
+#include "livestory.h"
 #include "look.h"
 #include "parts.h"
 #include "settings.h"
@@ -104,7 +105,7 @@ QString historyWords(Window &window, QStringList *rows = nullptr)
 {
     window.frame()->select(QStringLiteral("history"));
     window.showHistory();
-    for (int waited = 0; window.busy() && waited < 200; ++waited)
+    for (int waited = 0; window.busy() && waited < 1800; ++waited)
         settle(50);
     settle(200);
     auto *page = window.findChild<HistoryPage *>();
@@ -135,15 +136,6 @@ QString backWords(Window &window) { return showWords(window, 2); }
 using Save = std::function<void(QWidget &, const QString &)>;
 using Expect = std::function<void(const QString &, bool)>;
 
-void waitFor(const std::function<bool()> &holds, int seconds = 20)
-{
-    QElapsedTimer clock;
-    clock.start();
-    while (!holds() && clock.elapsed() < seconds * 1000)
-        settle(50);
-    settle(150);
-}
-
 void clickButton(QWidget *inside, const QString &words)
 {
     for (QPushButton *button : inside->findChildren<QPushButton *>())
@@ -172,8 +164,13 @@ void beforeCheck(Window &window, const Save &save, const Expect &expect, const Q
 {
     const QString mark = systemMark(window);
     open();
-    settle(300);
+    // The page is what the window shows once it has read the system: wait for that, not for a moment.
     BeforePage *page = window.beforePage();
+    waitFor([&] { return page->isVisible() && page->pageText().contains("Nothing has started.") && !window.busy(); }, 10);
+    settle(300);
+    // The window may read the system again (coming back to it does) while the page stands; judge it when it does not.
+    for (int waited = 0; window.busy() && waited < 1200; ++waited)
+        settle(50);
     const QString text = page->pageText();
     expect(what + ": the Before page is shown and says nothing has started",
            page->isVisible() && text.contains("Nothing has started.") && !window.busy());
@@ -186,6 +183,7 @@ void beforeCheck(Window &window, const Save &save, const Expect &expect, const Q
     if (!cancel)
         return;
     clickButton(page, "Cancel");
+    waitFor([&] { return !window.busy(); }, 10);
     settle(300);
     expect(what + ": Cancel leaves everything as it was",
            !page->isVisible() && !window.busy() && systemMark(window) == mark);
@@ -213,17 +211,26 @@ void activityShots(Window &window, const QString &folder, const QString &prefix,
     }
     // The runs, in a folder of their own; the page reads them through levitate-agent.
     const QString where = QDir(folder).filePath(prefix + "-records");
+    // The runs it leaves going are stopped when this ends, whichever way it ends.
+    struct Stopper {
+        QString script, where;
+        ~Stopper() { QProcess::execute(script, {"--stop", where}); }
+    } stopper{script, where};
     QProcess make;
     make.start(script, {where, agent});
-    make.waitForFinished(60000);
+    make.waitForFinished(300000);
     const QString said = QString::fromUtf8(make.readAllStandardOutput()).trimmed();
     expect(QStringLiteral("the records for Activity were made (%1)").arg(QString::fromUtf8(make.readAllStandardError()).trimmed()),
            make.exitStatus() == QProcess::NormalExit && make.exitCode() == 0 && said.startsWith("state="));
     if (!said.startsWith("state="))
         return;
     const QString state = said.section(' ', 0, 0).mid(6);
-    const qint64 waitingPid = said.section("waiting_pid=", 1).toLongLong();
+    const QString waitingId = said.section("waiting_id=", 1).section(' ', 0, 0);
+    const QString runtime = said.section("runtime=", 1).section(' ', 0, 0);
+    const QByteArray stateBefore = qgetenv("XDG_STATE_HOME"), runtimeBefore = qgetenv("XDG_RUNTIME_DIR");
     qputenv("XDG_STATE_HOME", state.toUtf8());
+    // The sockets of the runs it left going: attaching needs them.
+    qputenv("XDG_RUNTIME_DIR", runtime.toUtf8());
     ActivityPage *page = frame->activity();
 
     // What the rail shows before Activity is opened: the badge is true from the start.
@@ -258,10 +265,11 @@ void activityShots(Window &window, const QString &folder, const QString &prefix,
 
     page->chooseTitle("Turn off password logins over ssh");
     waitFor([&] { return page->detailText().contains("It asks"); });
-    expect(QStringLiteral("a run that waits says that only its own window can answer it"),
-           page->detailText().contains("It asks") && page->detailText().contains("Which colour?")
-               && page->detailText().contains("Only the window that started it, in System, can answer")
-               && !page->offersGoTo());
+    expect(QStringLiteral("a run that waits is followed and offers its choices as buttons, from any window (%1)")
+               .arg(page->answerButtons().join(", ")),
+           waitFor([&] { return page->following() && page->answerButtons() == QStringList({"Red", "Blue"}); })
+               && page->detailText().contains("It asks") && page->detailText().contains("Which colour?")
+               && !page->detailText().contains("Only the window that started it") && page->offersStop() && !page->offersGoTo());
     save(window, prefix + "-a-run-that-waits");
 
     // A run that is going, not waiting: counted as running, listed as such, and badged.
@@ -273,9 +281,9 @@ void activityShots(Window &window, const QString &folder, const QString &prefix,
     waitFor([&] { return page->detailText().contains("is working on it"); });
     expect(QStringLiteral("the page counts one run that waits and one that runs (%1)").arg(chips.join(", ")),
            chips == QStringList({"1 waits for an answer", "1 running"}));
-    expect(QStringLiteral("a running run is described as working, with what it ran so far, and cannot be answered"),
+    expect(QStringLiteral("a running run is described as working, with what it ran so far, can be stopped and not answered"),
            page->detailText().contains("Codex is working on it") && page->detailText().contains("sleep 300")
-               && !page->detailText().contains("It asks") && !page->offersGoTo());
+               && !page->detailText().contains("It asks") && !page->offersGoTo() && page->offersStop());
     expect(QStringLiteral("the badge counts the waiting and the running run"),
            frame->badge(Frame::activityKey()) == 2 && frame->badgeWarns(Frame::activityKey()));
     expect(QStringLiteral("the list says it is running (%1)").arg(page->listedStates().join(" | ")),
@@ -285,17 +293,18 @@ void activityShots(Window &window, const QString &folder, const QString &prefix,
     waitFor([&] { return page->detailText().contains("It asks"); });
 
     // The same run is this window's own live run: it can be gone to.
-    page->setOwnRun(waitingPid);
+    page->setOwnRun(waitingId);
     waitFor([&] { return page->offersGoTo(); });
-    expect(QStringLiteral("this window's own live run offers Go to it"),
-           page->offersGoTo() && page->detailText().contains("It waits in this window"));
+    expect(QStringLiteral("this window's own live run offers Go to it, and can be answered here as well"),
+           page->offersGoTo() && page->answerButtons() == QStringList({"Red", "Blue"})
+               && !page->detailText().contains("It waits in this window"));
     save(window, prefix + "-this-windows-own-run");
     clickButton(page, QStringLiteral("Go to it"));
     settle(200);
     expect(QStringLiteral("Go to it leaves Activity for the app's own pages"),
            !frame->activityShown() && frame->selected() == "overview");
     frame->choose(Frame::activityKey());
-    page->setOwnRun(0);
+    page->setOwnRun(QString());
     waitFor([&] { return page->loaded() && !page->offersGoTo(); });
 
     // The filter.
@@ -329,7 +338,7 @@ void activityShots(Window &window, const QString &folder, const QString &prefix,
     qputenv("LEVITATE_AGENT_CODEX", codex.toUtf8());
     const QString stand = qEnvironmentVariable("RECAB_GUI_AGENT");
     auto agentSays = [&](const QString &words) {
-        waitFor([&] { return frame->agentText() == words; }, 10);
+        waitFor([&] { return frame->agentText() == words; }, 20);
         return frame->agentText() == words;
     };
     frame->setAgent(agent);
@@ -350,10 +359,37 @@ void activityShots(Window &window, const QString &folder, const QString &prefix,
     expect(QStringLiteral("a stand-in agent is shown by its file name"),
            frame->agentText() == QStringLiteral("Agent: %1").arg(QFileInfo(stand).fileName()));
 
-    // Over: the waiting agent is stopped, and the page forgets the records.
+    // Over: the waiting agent is stopped (the stopper above), and the page forgets the records.
     QProcess::execute(script, {"--stop", where});
-    qunsetenv("XDG_STATE_HOME");
-    page->setOwnRun(0);
+    if (stateBefore.isEmpty())
+        qunsetenv("XDG_STATE_HOME");
+    else
+        qputenv("XDG_STATE_HOME", stateBefore);
+    if (runtimeBefore.isEmpty())
+        qunsetenv("XDG_RUNTIME_DIR");
+    else
+        qputenv("XDG_RUNTIME_DIR", runtimeBefore);
+    page->setOwnRun(QString());
+    window.showMain();
+    settle(100);
+
+    // Runs that outlive their window: found, followed, answered and stopped from Activity.
+    // Each one is started by a window of its own that then closes.
+    livestory::prepare(QDir(folder).filePath(prefix), QFileInfo(script).absolutePath());
+    auto start = [&](const QString &story, const QString &request) {
+        livestory::useStory(story);
+        const QByteArray before = qgetenv("RECAB_GUI_AGENT");
+        qputenv("RECAB_GUI_AGENT", agent.toUtf8());
+        auto *started = new Window;
+        qputenv("RECAB_GUI_AGENT", before);
+        started->show();
+        waitUntilIdle(*started);
+        started->handOver(asked(qPrintable(request)), false);
+        return livestory::Started{started, started->frame()};
+    };
+    livestory::run(*frame, window, start, save, expect, prefix);
+    livestory::finish();
+    frame->choose(QStringLiteral("overview"));
     window.showMain();
     settle(100);
 }
@@ -388,7 +424,8 @@ void settingsShots(Window &window, const QString &folder, const Save &save, cons
     QDir(home).removeRecursively();
     QDir().mkpath(home);
     const QString file = home + "/config/levitate/agent.json";
-    const QByteArrayList names{"HOME", "XDG_CONFIG_HOME", "XDG_STATE_HOME", "LEVITATE_AGENT_CODEX", "LEVITATE_AGENT_ROOT_HELPER",
+    const QByteArrayList names{"HOME", "XDG_CONFIG_HOME", "XDG_STATE_HOME", "LEVITATE_AGENT_CODEX", "LEVITATE_AGENT_CLAUDE",
+                               "LEVITATE_AGENT_ROOT_HELPER",
                                "LEVITATE_STANDIN_LOG", "LEVITATE_STANDIN_LOGIN_SECONDS", "LEVITATE_STANDIN_STORY"};
     QMap<QByteArray, QByteArray> before;
     for (const QByteArray &name : names)
@@ -400,6 +437,7 @@ void settingsShots(Window &window, const QString &folder, const Save &save, cons
     qputenv("XDG_CONFIG_HOME", (home + "/config").toUtf8());
     qputenv("XDG_STATE_HOME", (home + "/state").toUtf8());
     qputenv("LEVITATE_AGENT_CODEX", QDir(fixtures).filePath("codex").toUtf8());
+    qputenv("LEVITATE_AGENT_CLAUDE", QDir(fixtures).filePath("claude").toUtf8());
     qputenv("LEVITATE_AGENT_ROOT_HELPER", "");
     qputenv("LEVITATE_STANDIN_LOG", (home + "/standin.log").toUtf8());
     qputenv("LEVITATE_STANDIN_STORY", "plain");
@@ -411,7 +449,7 @@ void settingsShots(Window &window, const QString &folder, const Save &save, cons
         waitFor([&] { return !page->busy(); }, 30);
     };
     auto agentSays = [&](const QString &words) {
-        waitFor([&] { return frame->agentText() == words; }, 10);
+        waitFor([&] { return frame->agentText() == words; }, 20);
         return frame->agentText() == words;
     };
     auto shows = [&](const QString &words) { return page->pageText().contains(words); };
@@ -445,12 +483,14 @@ void settingsShots(Window &window, const QString &folder, const Save &save, cons
                               "Ask each time", "Run a command as administrator", "Always asks. It cannot be switched off.",
                               "The windows", "Each window opens at the size it had. Language follows the desktop.",
                               "Settings are kept for you, not for everyone on this computer.",
-                              "With Allowed, the agent's own sandbox lets it write in your home folder."})
+                              "Notices", "Tell me when the agent needs an answer or has finished, and no window is watching",
+                              "Claude Code", "This side has not been tried with a real Claude Code yet.",
+                              "Choose it to sign in or out here.",
+                              "With Allowed, the agent may change files in your home folder itself."})
         expect(QStringLiteral("the page says: %1").arg(words), shows(QString::fromUtf8(words)));
-    // levitate-agent lists Claude Code too now (as "Not installed"); what has
-    // nothing behind it is still not offered.
-    expect(QStringLiteral("nothing is offered that has nothing behind it"),
-           !shows("Write a recipe") && !shows("Notices") && !shows("update"));
+    // What has nothing behind it is still not offered.
+    expect(QStringLiteral("nothing is offered that has nothing behind it"), !shows("Write a recipe") && !shows("update"));
+    expect(QStringLiteral("notices are on, as the helper reports"), page->noticesInForce() && shows("Yes"));
     expect(QStringLiteral("Codex is the chosen one and commands are asked each time"),
            page->checkedAgent() == "codex" && page->commandsInForce() == "ask" && page->agentInForce() == "codex");
     save(window, "s1-as-first-read");
@@ -461,7 +501,7 @@ void settingsShots(Window &window, const QString &folder, const Save &save, cons
     expect(QStringLiteral("the helper's file says allowed (%1)").arg(fileText(file).simplified()),
            QJsonDocument::fromJson(fileText(file).toUtf8()).object()["run_commands"] == "allowed");
     expect(QStringLiteral("the page shows what the helper reports: Allowed"),
-           page->commandsInForce() == "allowed" && page->pageText().endsWith("Allowed"));
+           page->commandsInForce() == "allowed" && page->pageText().contains("\nAllowed\n"));
     save(window, "s2-allowed");
 
     // Signing out asks first; nothing has changed until it is said yes.
@@ -515,7 +555,7 @@ void settingsShots(Window &window, const QString &folder, const Save &save, cons
     }
     expect(QStringLiteral("the status line names it (%1)").arg(frame->agentText()),
            agentSays(QStringLiteral("Agent: agent")));
-    expect(QStringLiteral("the page says that only Codex reads the setting"), shows("Only Codex reads this setting."));
+    expect(QStringLiteral("the page says that only Codex and Claude Code read the setting"), shows("Only Codex and Claude Code read this setting."));
     save(window, "s8-another-program");
     expect(QStringLiteral("choosing Codex again"), page->press(QStringLiteral("Codex")));
     idle();
@@ -524,6 +564,42 @@ void settingsShots(Window &window, const QString &folder, const Save &save, cons
     expect(QStringLiteral("the status line follows (%1)").arg(frame->agentText()),
            agentSays(QStringLiteral("Agent: Codex, signed in")));
     save(window, "s9-back-to-codex");
+
+    // Claude Code is a row like Codex: chosen, signed out and in through the helper.
+    const QString claudeFile = home + "/.standin-claude-signed";
+    save(window, "s9b-claude-listed");
+    expect(QStringLiteral("choosing Claude Code"), page->press(QStringLiteral("Claude Code")));
+    idle();
+    expect(QStringLiteral("Claude Code is the chosen one, as the helper reports it (%1)").arg(page->agentInForce()),
+           page->agentInForce() == "claude" && page->checkedAgent() == "claude"
+               && QJsonDocument::fromJson(fileText(file).toUtf8()).object()["agent"] == "claude");
+    expect(QStringLiteral("the status line names it (%1)").arg(frame->agentText()),
+           agentSays(QStringLiteral("Agent: Claude Code, signed in")));
+    expect(QStringLiteral("Sign out… is offered for it, and asks first"),
+           page->press(QStringLiteral("Sign out…")) && shows("Sign out of Claude Code?"));
+    expect(QStringLiteral("saying yes signs out of Claude Code"), page->press(QStringLiteral("Sign out")));
+    idle();
+    expect(QStringLiteral("the stand-in Claude Code is signed out, and the row says so"),
+           fileText(claudeFile) == "out" && shows("Installed, not signed in") && shows("Sign in…")
+               && agentSays(QStringLiteral("Agent: Claude Code, not signed in")));
+    expect(QStringLiteral("Sign in… signs in again"), page->press(QStringLiteral("Sign in…")));
+    idle();
+    expect(QStringLiteral("the stand-in Claude Code is signed in again"),
+           fileText(claudeFile) == "in" && agentSays(QStringLiteral("Agent: Claude Code, signed in")));
+    // The notices row: off and on again, written by the helper.
+    page->pickNotices(false);
+    idle();
+    expect(QStringLiteral("notices are off in the helper's file and on the page (%1)").arg(fileText(file).simplified()),
+           QJsonDocument::fromJson(fileText(file).toUtf8()).object()["notices"] == false && !page->noticesInForce()
+               && page->pageText().contains("No"));
+    save(window, "s9c-claude-and-notices-off");
+    page->pickNotices(true);
+    idle();
+    expect(QStringLiteral("and on again"),
+           QJsonDocument::fromJson(fileText(file).toUtf8()).object()["notices"] == true && page->noticesInForce());
+    expect(QStringLiteral("choosing Codex again"), page->press(QStringLiteral("Codex")));
+    idle();
+    expect(QStringLiteral("Codex is back"), page->agentInForce() == "codex" && agentSays(QStringLiteral("Agent: Codex, signed in")));
 
     // A refused value is shown in place; nothing changes.
     const QString kept = fileText(file);
@@ -636,6 +712,8 @@ int takeShots(Window &window, const QString &folder)
         }
     };
     window.show();
+    // A picture run that is not told of its stand-ins refuses to start.
+    livestory::guardRefuses(expect, folder, "RECAB_GUI_RECAB");
     // Before recab has answered: what a person sees while the state is read.
     ok &= window.grab().save(QDir(folder).filePath("00-reading.png"));
     waitUntilIdle(window);
@@ -684,8 +762,11 @@ int takeShots(Window &window, const QString &folder)
 
     // The change is stopped half way, which is also how an interruption looks.
     qputenv("RECAB_STANDIN_STOP_AT", "change");
+    QFile::remove(QDir(qEnvironmentVariable("RECAB_STANDIN_STATE")).filePath("stopped-at-change"));
     window.handOver(asked(nvidia), false);
-    settle(2500);
+    // The stand-in says when it is half way; the picture follows what it printed up to there.
+    waitFor([&] { return QFile::exists(QDir(qEnvironmentVariable("RECAB_STANDIN_STATE")).filePath("stopped-at-change")); }, 30);
+    settle(300);
     save(window, "04-preparing");
     window.stopRun();
     waitUntilIdle(window);
@@ -715,7 +796,7 @@ int takeShots(Window &window, const QString &folder)
 
     window.handOver(asked(sshd), false);
     // The agent asks something on the way, and waits.
-    for (int waited = 0; !window.agentAsks() && window.busy() && waited < 200; ++waited)
+    for (int waited = 0; !window.agentAsks() && window.busy() && waited < 1800; ++waited)
         settle(50);
     expect("the agent asks about root logins", window.agentAsks());
     save(window, "05b-the-agent-asks");
@@ -909,7 +990,7 @@ int takeShots(Window &window, const QString &folder)
 
     // A change, then the reset: the next system is the running one again.
     window.handOver(asked(sshd), false);
-    for (int waited = 0; !window.agentAsks() && window.busy() && waited < 200; ++waited)
+    for (int waited = 0; !window.agentAsks() && window.busy() && waited < 1800; ++waited)
         settle(50);
     window.answerAgent(QStringLiteral("Leave it"));
     waitUntilIdle(window);
@@ -1101,7 +1182,7 @@ int takeRealShots(Window &window, const QString &folder)
         QProcess person;
         person.start(recab, {"--json", "change", "install", "htop", "--preparation", window.status().preparationId,
                              "--revision", QString::number(window.status().preparationRevision), "--actor", "person"});
-        person.waitForFinished(20000);
+        person.waitForFinished(120000);
         expect("the stand-in took a change from the person",
                person.exitStatus() == QProcess::NormalExit && person.exitCode() == 0);
         window.refresh();
@@ -1171,7 +1252,7 @@ int takeRealShots(Window &window, const QString &folder)
                        {"--json", "update", "resolve", "conflict1", "--choice", "local", "--preparation",
                         window.status().preparationId, "--revision", QString::number(window.status().preparationRevision),
                         "--actor", "person"});
-        settleIt.waitForFinished(20000);
+        settleIt.waitForFinished(120000);
         expect("the stand-in took the choice", settleIt.exitStatus() == QProcess::NormalExit && settleIt.exitCode() == 0);
         window.refresh();
         waitUntilIdle(window);

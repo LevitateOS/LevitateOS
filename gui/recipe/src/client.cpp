@@ -414,9 +414,9 @@ Run *RecipeClient::removeSource(const QString &name)
     return change(QStringList{"source", "remove", name} + store(), Place::Computer);
 }
 
-Run *RecipeClient::agent(const QString &prompt, const QString &title)
+Run *RecipeClient::agent(const QString &prompt, const QString &title, const QStringList &mayWrite)
 {
     auto *run = new Run(agent_, {}, this);
-    run->setPrompt(prompt, QStringLiteral("Recipe"), title);
+    run->setPrompt(prompt, QStringLiteral("Recipe"), title, mayWrite);
     return run;
 }

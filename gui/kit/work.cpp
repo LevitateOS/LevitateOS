@@ -14,7 +14,7 @@
 
 bool WorkPage::stopped() const
 {
-    return stop_ && !stop_->isEnabled();
+    return (stop_ && !stop_->isEnabled()) || stoppedElsewhere_;
 }
 
 void WorkPage::begin(const QString &title, const QString &subtitle, Run *run, const QString &stopNote)
@@ -25,6 +25,7 @@ void WorkPage::begin(const QString &title, const QString &subtitle, Run *run, co
     question_.clear();
     choices_.clear();
     asked_ = nullptr;
+    stoppedElsewhere_ = false;
     column_ = fresh();
 
     auto *header = new QHBoxLayout;
@@ -72,8 +73,17 @@ void WorkPage::begin(const QString &title, const QString &subtitle, Run *run, co
             onEvent(event);
     });
     connect(run, &Run::output, this, [this, run](const QString &line) {
+        if (run != run_)
+            return;
+        // Output only comes once the agent has its answer.
+        if (!question_.isEmpty())
+            answeredElsewhere();
+        output_->appendPlainText(line);
+    });
+    connect(run, &Run::carriesOn, this, [this, run] {
         if (run == run_)
-            output_->appendPlainText(line);
+            onCarriesOn();
+        run->deleteLater();
     });
     connect(run, &Run::finished, this, [this, run](bool ok) {
         if (run == run_)
@@ -86,6 +96,10 @@ void WorkPage::begin(const QString &title, const QString &subtitle, Run *run, co
 void WorkPage::onEvent(const QJsonObject &event)
 {
     const QString kind = event["event"].toString();
+    // The agent says nothing while it waits: anything but a new question means
+    // an answer came, and it did not come from this page.
+    if (!question_.isEmpty() && kind != QLatin1String("question"))
+        answeredElsewhere();
     if (kind == QLatin1String("plan")) {
         // A plan sent again replaces the steps shown, it does not add to them.
         while (QLayoutItem *old = steps_->takeAt(0)) {
@@ -199,6 +213,32 @@ void WorkPage::answer(const QString &words)
     emit activity(tr("The agent carries on"));
 }
 
+void WorkPage::answeredElsewhere()
+{
+    question_.clear();
+    choices_.clear();
+    if (asked_)
+        asked_->deleteLater();
+    asked_ = nullptr;
+    bar_->setRange(0, 0);
+    state_->setText(tr("It was answered from Activity. The agent carries on"));
+    output_->appendPlainText(tr("the question was answered from Activity"));
+    emit activity(tr("The agent carries on"));
+}
+
+void WorkPage::onCarriesOn()
+{
+    emit activity(QString());
+    question_.clear();
+    choices_.clear();
+    if (asked_)
+        asked_->deleteLater();
+    asked_ = nullptr;
+    showVerdict(tr("The agent carries on without this window"),
+                tr("This window cannot reach it any more. Nothing was stopped; you can find it in Activity."));
+    emit done(false);
+}
+
 void WorkPage::onFinished(bool ok)
 {
     emit activity(QString());
@@ -207,21 +247,27 @@ void WorkPage::onFinished(bool ok)
     if (asked_)
         asked_->deleteLater();
     asked_ = nullptr;
-    const bool stoppedByUser = !stop_->isEnabled();
+    stoppedElsewhere_ = run_->wasStopped();
+    const bool stoppedByUser = !stop_->isEnabled() || stoppedElsewhere_;
     const QString reason = run_->failure()["reason"].toString();
     if (ok || stoppedByUser) {
         emit done(ok);
         return;
     }
+    showVerdict(tr("It stopped"),
+                reason.isEmpty() ? tr("The output below ends with the reason. The running system was not touched.") : reason);
+    emit done(false);
+}
+
+void WorkPage::showVerdict(const QString &title, const QString &words)
+{
     bar_->hide();
     stop_->hide();
     stopNote_->hide();
     auto *verdict = new Verdict;
     verdict->setFrameShape(QFrame::NoFrame);
-    verdict->column()->addWidget(strong(tr("It stopped")));
-    verdict->column()->addWidget(
-        text(reason.isEmpty() ? tr("The output below ends with the reason. The running system was not touched.") : reason,
-             true));
+    verdict->column()->addWidget(strong(title));
+    verdict->column()->addWidget(text(words, true));
     auto *buttons = new QHBoxLayout;
     auto *leave = new QPushButton(tr("Back"));
     connect(leave, &QPushButton::clicked, this, &WorkPage::back);
@@ -229,5 +275,4 @@ void WorkPage::onFinished(bool ok)
     buttons->addStretch();
     verdict->column()->addLayout(buttons);
     column_->insertWidget(1, verdict);
-    emit done(false);
 }

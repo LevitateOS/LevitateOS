@@ -23,7 +23,8 @@ public:
     QStringList titles() const { return titles_; }
 
     // recab's status (the real one: `lifecycle.other` is "next" and
-    // `preparation.changes` lists the changes). Returns false when the text is
+    // `preparation.changes` lists the changes; none while the running system is on
+    // trial: the other one is the system from before). Returns false when the text is
     // not a status this reads. Public so that a check can feed it a status.
     static bool parse(const QByteArray &json, QStringList *titles);
 

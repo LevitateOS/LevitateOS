@@ -178,6 +178,9 @@ void Client::startRun(const QByteArray &requestLine)
         failed(QStringLiteral("The run could not be started"));
         return;
     }
+    // The window learns the run's id at once, before the host has made its
+    // record: it needs the id to find its own run in Activity and to stop it.
+    toWindow(2, QJsonDocument(QJsonObject{{"event", "run"}, {"id", id_}}).toJson(QJsonDocument::Compact) + '\n');
     // The host makes its record and its socket within a moment.
     retry_ = new QTimer(this);
     connect(retry_, &QTimer::timeout, this, &Client::tryConnect);

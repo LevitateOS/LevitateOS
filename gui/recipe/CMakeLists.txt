@@ -22,6 +22,7 @@ qt_add_executable(recipe-gui
     ../kit/activity.cpp
     ../kit/settings.cpp
     ../kit/nextsystem.cpp
+    ../kit/livestory.cpp
     ../kit/before.cpp
     src/beforewords.cpp
     src/pages.cpp

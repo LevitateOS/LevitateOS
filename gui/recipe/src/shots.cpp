@@ -4,10 +4,12 @@
 #include "settings.h"
 #include "before.h"
 #include "frame.h"
+#include "livestory.h"
 #include "look.h"
 #include "nextsystem.h"
 
 #include "pages.h"
+#include "sources.h"
 #include "storage.h"
 #include "window.h"
 
@@ -51,15 +53,6 @@ namespace {
 
 using Save = std::function<void(QWidget &, const QString &)>;
 using Expect = std::function<void(const QString &, bool)>;
-
-void waitFor(const std::function<bool()> &holds, int seconds = 20)
-{
-    QElapsedTimer clock;
-    clock.start();
-    while (!holds() && clock.elapsed() < seconds * 1000)
-        settle(50);
-    settle(150);
-}
 
 void clickButton(QWidget *inside, const QString &words)
 {
@@ -115,7 +108,7 @@ QJsonObject answerOf(const QStringList &arguments)
     QProcess run;
     run.start(qEnvironmentVariable("RECIPE_GUI_RECIPE"),
               arguments + QStringList{"--package-root", qEnvironmentVariable("RECIPE_GUI_PACKAGE_ROOT")});
-    run.waitForFinished(20000);
+    run.waitForFinished(120000);
     return QJsonDocument::fromJson(run.readAllStandardOutput()).object();
 }
 
@@ -291,17 +284,26 @@ void activityShots(Window &window, const QString &folder, const Save &save, cons
         return;
     }
     const QString where = QDir(folder).filePath("a-records");
+    // The runs it leaves going are stopped when this ends, whichever way it ends.
+    struct Stopper {
+        QString script, where;
+        ~Stopper() { QProcess::execute(script, {"--stop", where}); }
+    } stopper{script, where};
     QProcess make;
     make.start(script, {where, agent});
-    make.waitForFinished(60000);
+    make.waitForFinished(300000);
     const QString said = QString::fromUtf8(make.readAllStandardOutput()).trimmed();
     expect(QStringLiteral("the records for Activity were made (%1)").arg(QString::fromUtf8(make.readAllStandardError()).trimmed()),
            make.exitStatus() == QProcess::NormalExit && make.exitCode() == 0 && said.startsWith("state="));
     if (!said.startsWith("state="))
         return;
     const QString state = said.section(' ', 0, 0).mid(6);
-    const qint64 waitingPid = said.section("waiting_pid=", 1).toLongLong();
+    const QString waitingId = said.section("waiting_id=", 1).section(' ', 0, 0);
+    const QString runtime = said.section("runtime=", 1).section(' ', 0, 0);
+    const QByteArray stateBefore = qgetenv("XDG_STATE_HOME"), runtimeBefore = qgetenv("XDG_RUNTIME_DIR");
     qputenv("XDG_STATE_HOME", state.toUtf8());
+    // The sockets of the runs it left going: attaching needs them.
+    qputenv("XDG_RUNTIME_DIR", runtime.toUtf8());
     ActivityPage *page = frame->activity();
 
     frame->readAgain();
@@ -327,18 +329,21 @@ void activityShots(Window &window, const QString &folder, const Save &save, cons
     // The run that waits is this window's own: Go to it leaves Activity for the work page.
     page->chooseTitle("Turn off password logins over ssh");
     waitFor([&] { return page->detailText().contains("It asks"); });
-    frame->setOwnRun(waitingPid);
-    expect(QStringLiteral("the frame knows the pid of this window's own run"), frame->ownRun() == waitingPid && waitingPid > 0);
+    frame->setOwnRun(waitingId);
+    expect(QStringLiteral("the frame knows the id of this window's own run"), frame->ownRun() == waitingId && !waitingId.isEmpty());
     waitFor([&] { return page->offersGoTo(); });
-    expect(QStringLiteral("this window's own live run offers Go to it"),
-           page->offersGoTo() && page->detailText().contains("It waits in this window"));
+    expect(QStringLiteral("this window's own live run offers Go to it, and its question can be answered here too (%1)")
+               .arg(page->answerButtons().join(", ")),
+           waitFor([&] { return page->answerButtons() == QStringList({"Red", "Blue"}); }) && page->offersGoTo()
+               && !page->detailText().contains("It waits in this window")
+               && !page->detailText().contains("Only the window that started it"));
     save(window, "a-this-windows-own-run");
     clickButton(page, QStringLiteral("Go to it"));
     settle(200);
     expect(QStringLiteral("Go to it leaves Activity for Recipe's own pages"),
            !frame->activityShown() && frame->selected() == "browse");
     frame->choose(Frame::activityKey());
-    frame->setOwnRun(0);
+    frame->setOwnRun(QString());
     waitFor([&] { return page->loaded() && !page->offersGoTo(); });
 
     page->showOnlyThisApp(true);
@@ -356,15 +361,57 @@ void activityShots(Window &window, const QString &folder, const Save &save, cons
     qputenv("LEVITATE_AGENT_CODEX", codex.toUtf8());
     const QString stand = qEnvironmentVariable("RECIPE_GUI_AGENT");
     frame->setAgent(agent);
-    waitFor([&] { return frame->agentText() == "Agent: Codex, signed in"; }, 10);
+    waitFor([&] { return frame->agentText() == "Agent: Codex, signed in"; }, 20);
     expect(QStringLiteral("the status line names the agent and that it is signed in (%1)").arg(frame->agentText()),
            frame->agentText() == "Agent: Codex, signed in");
     qunsetenv("LEVITATE_AGENT_CODEX");
     frame->setAgent(stand);
 
     QProcess::execute(script, {"--stop", where});
-    qunsetenv("XDG_STATE_HOME");
-    frame->setOwnRun(0);
+    if (stateBefore.isEmpty())
+        qunsetenv("XDG_STATE_HOME");
+    else
+        qputenv("XDG_STATE_HOME", stateBefore);
+    if (runtimeBefore.isEmpty())
+        qunsetenv("XDG_RUNTIME_DIR");
+    else
+        qputenv("XDG_RUNTIME_DIR", runtimeBefore);
+    frame->setOwnRun(QString());
+    window.showBrowse();
+    settle(100);
+
+    // Runs that outlive their window: found, followed, answered and stopped from Activity.
+    // Each one is started by a window of its own, through "Ask for software", that then closes.
+    livestory::prepare(QDir(folder).filePath("a"), QFileInfo(script).absolutePath());
+    auto start = [&](const QString &story, const QString &request) {
+        livestory::useStory(story);
+        const QByteArray before = qgetenv("RECIPE_GUI_AGENT");
+        qputenv("RECIPE_GUI_AGENT", agent.toUtf8());
+        auto *started = new Window;
+        qputenv("RECIPE_GUI_AGENT", before);
+        started->show();
+        waitFor([&] { return !started->busy(); });
+        started->askAgent(QStringLiteral("The request:\n%1\n").arg(request));
+        return livestory::Started{started, started->frame()};
+    };
+    livestory::run(*frame, window, start, save, expect, "a");
+    // What the helper was given for the first of them: it may write in the person's own recipe folder.
+    {
+        QFile log(livestory::codexLog());
+        QString first;
+        if (log.open(QIODevice::ReadOnly))
+            first = QString::fromUtf8(log.readAll()).section('\n', 0, 0);
+        const QJsonObject call = QJsonDocument::fromJson(first.toUtf8()).object();
+        QStringList args;
+        for (const QJsonValue &arg : call["args"].toArray())
+            args << arg.toString();
+        const QString own = QDir::homePath() + "/.local/share/recipe/recipes";
+        expect(QStringLiteral("the agent was started with a sandbox that may write, in the person's own recipe folder (%1)")
+                   .arg(args.join(' ')),
+               args.contains("workspace-write") && args.contains("-C") && args.value(args.indexOf("-C") + 1) == own
+                   && call["cwd"].toString() == own && QDir(own).exists());
+    }
+    livestory::finish();
     window.showBrowse();
     settle(100);
 }
@@ -422,7 +469,7 @@ void stripShots(Window &window, const QString &folder, const Save &save, const E
     auto recabRuns = [&](const QStringList &arguments) {
         QProcess run;
         run.start(recab, arguments);
-        run.waitForFinished(20000);
+        run.waitForFinished(120000);
         return run.exitStatus() == QProcess::NormalExit && run.exitCode() == 0;
     };
     expect(QStringLiteral("the next system could be prepared"), recabRuns({"--json", "prepare"}));
@@ -455,6 +502,56 @@ void stripShots(Window &window, const QString &folder, const Save &save, const E
     qunsetenv("LEVITATE_APP_SYSTEM");
 
     activityShots(window, folder, save, expect, out);
+
+    // The running system on trial: recab still calls the other system "next" (the preparation
+    // that made the running system is kept until the trial is kept), but it is the system from
+    // before, so there is no next system to finish and the strip goes.
+    {
+        const QString trial = QDir(folder).filePath("trial-recab");
+        QDir(trial).removeRecursively();
+        QDir().mkpath(trial);
+        const QByteArray stateBefore = qgetenv("RECAB_STANDIN_STATE");
+        const QString reboot = QFileInfo(recab).absolutePath() + "/reboot-real";
+        QProcessEnvironment trialEnv = QProcessEnvironment::systemEnvironment();
+        trialEnv.insert("RECAB_STANDIN_STATE", trial);
+        trialEnv.insert("RECAB_STANDIN_KEEP", "hand"); // the restarted system stays on trial until it is kept
+        auto standIn = [&](const QString &program, const QStringList &arguments) {
+            QProcess run;
+            run.setProcessEnvironment(trialEnv);
+            run.start(program, arguments);
+            run.waitForFinished(60000);
+            return run.exitStatus() == QProcess::NormalExit && run.exitCode() == 0 ? QString::fromUtf8(run.readAllStandardOutput())
+                                                                                    : QString();
+        };
+        const bool made = !standIn(recab, {"--json", "prepare"}).isEmpty()
+                          && !standIn(recab, {"--json", "change", "install", "htop", "--preparation", "p2", "--revision", "1"}).isEmpty()
+                          && !standIn(recab, {"--json", "finalize", "--preparation", "p2", "--revision", "2"}).isEmpty()
+                          && !standIn(recab, {"--json", "set-next", "B"}).isEmpty();
+        standIn(reboot, {}); // plays the restart: the computer comes up on the next system, not yet kept
+        const QByteArray status = standIn(recab, {"status", "--json"}).toUtf8();
+        const QJsonObject lifecycle = QJsonDocument::fromJson(status).object()["lifecycle"].toObject();
+        expect(QStringLiteral("the stand-in recab has the running system on trial and still calls the other one next (%1)")
+                   .arg(QString::fromUtf8(QJsonDocument(lifecycle).toJson(QJsonDocument::Compact))),
+               made && lifecycle["state"] == "on_trial" && lifecycle["other"] == "next"
+                   && QJsonDocument::fromJson(status).object()["preparation"].toObject()["changes"].toArray().size() == 1);
+        QStringList titles;
+        expect(QStringLiteral("the reader of the strip finds no change to finish then"),
+               NextSystem::parse(status, &titles) && titles.isEmpty());
+        qputenv("RECAB_STANDIN_STATE", trial.toUtf8());
+        window.refresh();
+        waitUntilIdle(window);
+        settle(300);
+        expect(QStringLiteral("no strip while the running system is on trial (%1)").arg(frame->stripText()),
+               !frame->stripShown() && frame->stripText().isEmpty());
+        window.showUpdates();
+        expect(QStringLiteral("not on any other page either"), !frame->stripShown());
+        save(window, "s4-no-strip-on-trial");
+        if (stateBefore.isEmpty())
+            qunsetenv("RECAB_STANDIN_STATE");
+        else
+            qputenv("RECAB_STANDIN_STATE", stateBefore);
+        window.showBrowse();
+    }
 
     // A recab that does not exist: no strip, and no complaint in the window.
     qputenv("RECIPE_GUI_RECAB", "/nonexistent/recab");
@@ -1039,14 +1136,25 @@ int tryRecipe(Window &window, const QString &name, const QString &folder, bool k
 
 int takeShots(Window &window, const QString &folder)
 {
+    bool ok_ = true; // the guard's check, before the first picture
     QDir().mkpath(folder);
     auto save = [&folder](QWidget &widget, const QString &name) {
         settle(200);
         return widget.grab().save(QDir(folder).filePath(name + ".png"));
     };
     window.show();
+    // A picture run that is not told of its stand-ins refuses to start.
+    {
+        auto refused = [&](const QString &what, bool holds) {
+            if (!holds) {
+                QTextStream(stdout) << "not as expected: " << what << "\n";
+                ok_ = false;
+            }
+        };
+        livestory::guardRefuses(refused, folder, "RECIPE_GUI_RECIPE");
+    }
     // Before recipe has answered: what a person sees while the catalog is read.
-    bool ok = window.grab().save(QDir(folder).filePath("0-reading.png"));
+    bool ok = ok_ && window.grab().save(QDir(folder).filePath("0-reading.png"));
     waitUntilIdle(window);
     ok &= !window.catalog().recipes.isEmpty();
 
@@ -1100,7 +1208,9 @@ int takeShots(Window &window, const QString &folder)
     const qsizetype beforeInstall = changesAsked().size();
     window.askInstall("htop");
     goOn(window, QStringLiteral("Install"));
-    settle(1500);
+    // Until the stand-in recipe has been asked, and has stopped where it was told to.
+    waitFor([&] { return changesAsked().size() > beforeInstall; }, 30);
+    settle(300);
     {
         const QList<Asked> now = changesAsked().mid(beforeInstall);
         QStringList want{"install", "levitate:htop", "--machine-events", "--package-root", qEnvironmentVariable("RECIPE_GUI_PACKAGE_ROOT")};
@@ -1220,9 +1330,19 @@ int takeShots(Window &window, const QString &folder)
     // Asking for software no source has: the agent asks back, then writes the recipe.
     window.showWish("a file manager for the terminal");
     ok &= save(window, "11-ask-for-software");
+    const Origin *ownFolder = window.catalog().origin("local");
+    {
+        QStringList words;
+        if (auto *page = window.findChild<WishPage *>())
+            for (QLabel *label : page->findChildren<QLabel *>())
+                words << label->text();
+        expect(QStringLiteral("the ask page says the agent may write in the person's own recipe folder only (%1)")
+                   .arg(ownFolder ? ownFolder->path : QString()),
+               ownFolder && words.join('\n').contains("may write in your own recipe folder only (" + ownFolder->path + ")."));
+    }
     window.askAgent(QStringLiteral("The request:\na file manager for the terminal\n\nThe issue:\nNo recipe for it "
                                    "exists.\n\nThe expected result:\nOne recipe that recipe info accepts.\n"));
-    for (int waited = 0; !window.agentAsks() && window.busy() && waited < 200; ++waited)
+    for (int waited = 0; !window.agentAsks() && window.busy() && waited < 1800; ++waited)
         settle(50);
     expect("the agent asks which one", window.agentAsks());
     ok &= save(window, "12-the-agent-asks");
@@ -1232,6 +1352,8 @@ int takeShots(Window &window, const QString &folder)
         const QJsonObject said = sent.open(QIODevice::ReadOnly) ? QJsonDocument::fromJson(sent.readAll()).object() : QJsonObject();
         expect("the agent is told this is Recipe, and the first line of the request as the title",
                said["app"].toString() == "Recipe" && said["title"].toString() == "a file manager for the terminal");
+        expect("the agent is allowed to write in the person's own recipe folder, which was made first",
+               ownFolder && said["may_write"].toArray() == QJsonArray{ownFolder->path} && QDir(ownFolder->path).exists());
         // "Go to it" on Activity returns to this run's page.
         window.showBrowse();
         emit window.frame()->goToRun();

@@ -27,6 +27,7 @@ qt_add_executable(recab-gui
     ../kit/activity.cpp
     ../kit/settings.cpp
     ../kit/nextsystem.cpp
+    ../kit/livestory.cpp
 )
 target_include_directories(recab-gui PRIVATE ../kit)
 target_compile_options(recab-gui PRIVATE -Wall -Wextra)

@@ -289,6 +289,20 @@ Window 1100 x 700 the first time, then the size it had when it closed
 aside and the comparison of the two systems. Both end with "all as expected" or
 say "not as expected: ..." for each thing that failed, and exit non-zero.
 They need no display, and no real agent, recab, recipe, lsblk or administrator.
+**`--shots` refuses to start (exit code 2, and a sentence naming what is missing)
+unless every program it could run and every folder it could write is named in the
+environment**: `DISK_GUI_AGENT`, `DISK_GUI_RECAB`, `DISK_GUI_RECIPE`, `DISK_GUI_FILES`,
+`DISK_GUI_LSBLK`, `DISK_GUI_ROOTS`, `DISK_GUI_HOME`, `DISK_GUI_ROOT_HELPER` (empty is a
+name), the helper (`LEVITATE_ACTIVITY_AGENT`) with its Codex and Claude Code
+(`LEVITATE_AGENT_CODEX`, `LEVITATE_AGENT_CLAUDE`) and its root helper
+(`LEVITATE_AGENT_ROOT_HELPER`), and `HOME` (not your own) and the XDG folders in scratch
+space (the command below names them all). The desktop notifier is off unless
+`LEVITATE_AGENT_NOTIFIER` names one. The story runs itself bare to check that. The runs
+the records fixture leaves going are stopped when the story ends, also when it fails.
+Without `--hand-over` it then starts runs of its own through a second window's hand-over
+with the helper as its agent, and checks that they outlive the window and are found,
+followed, answered, approved and stopped from Activity (`../kit/livestory.*`; pictures
+`a3-live-question`, `a3-live-approval`, `a3-live-follow`).
 
 Both stories also check every Before page in the shared layout (the hand-over,
 comparing, and, with `--hand-over`, bringing everything back, letting it all go
@@ -367,8 +381,12 @@ printf '#!/bin/sh\nprintf %%s "$1" > "$DISK_STANDIN_FILES_MARK"\n' > $S/files-ap
 export RECAB_STANDIN_STATE=$S/recab-state RECAB_STANDIN_SPEED=0
 $R/recab-real --json prepare
 $R/recab-real --json change install htop --preparation p2 --revision 1
+mkdir -p $S/run; chmod 700 $S/run
+A_=$PWD/gui/agent/fixtures
 export HOME=$S/home XDG_CONFIG_HOME=$S/home/config XDG_STATE_HOME=$S/home/state \
-  XDG_CACHE_HOME=$S/home/cache XDG_DATA_HOME=$S/home/share
+  XDG_CACHE_HOME=$S/home/cache XDG_DATA_HOME=$S/home/share XDG_RUNTIME_DIR=$S/run \
+  LEVITATE_AGENT_NOTIFIER= LEVITATE_AGENT_CODEX=$A_/codex LEVITATE_AGENT_CLAUDE=$A_/claude \
+  LEVITATE_AGENT_ROOT_HELPER=
 QT_QPA_PLATFORM=offscreen DISK_GUI_ROOTS=$S/sample DISK_GUI_HOME=$S/sample DISK_GUI_APPARENT=1 \
   DISK_GUI_AGENT=$F/agent DISK_GUI_RECAB=$F/recab DISK_GUI_ROOT_HELPER= \
   DISK_STANDIN_ROOT=$S/sample DISK_STANDIN_SPEED=0 DISK_GUI_KEPT=$S/kept.json \
@@ -390,7 +408,8 @@ in the older shape the strip cannot read (schema 3, with the partitions
 for "no strip". `DISK_STANDIN_STRIP_RECAB` is `recab-real`, used only for the
 strip (`prepare` printed `p2` as the preparation's id in a fresh state).
 Activity needs `RECAB_GUI_RECORDS` and `LEVITATE_ACTIVITY_AGENT` (build the agent
-first: `cmake --build .artifacts/agent/build`); without them, or without the
+first: `cmake --build .artifacts/agent/build`; the story gives the helper the runs' sockets
+through `XDG_RUNTIME_DIR` itself); without them, or without the
 strip's two variables, the story says what is missing and fails. Pictures with
 `--hand-over`: `4-after` (what was set aside), `4a-disk-with-set-aside`,
 `4b-after-refused`, `4c-after-one-back`, `4c2-before-bring-back`, `4d0-before-let-go`, `4d-after-let-go`, `4e-disk-after-let-go`,

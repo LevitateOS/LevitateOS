@@ -195,7 +195,8 @@ void SettingsPage::account(bool signIn)
         return;
     notice_.clear();
     confirmingOut_ = false;
-    accountOf_ = QStringLiteral("codex");
+    // The helper signs the chosen agent in and out, whichever that is.
+    accountOf_ = settings_["agent"].toString();
     accountVerb_ = signIn ? QStringLiteral("--sign-in") : QStringLiteral("--sign-out");
     accountLines_.clear();
     stopped_ = false;
@@ -259,6 +260,11 @@ void SettingsPage::tryIt()
     render();
 }
 
+void SettingsPage::pickNotices(bool on)
+{
+    set(QStringLiteral("notices=%1").arg(on ? "true" : "false"), QStringLiteral("notices"));
+}
+
 void SettingsPage::pickCommands(const QString &words)
 {
     set(QStringLiteral("run_commands=%1").arg(words == tr("Allowed") ? "allowed" : "ask"), QStringLiteral("commands"));
@@ -281,6 +287,7 @@ QWidget *SettingsPage::agentRow(const QJsonObject &agent, QButtonGroup *group)
     bold.setBold(true);
     radio->setFont(bold);
     group->addButton(radio);
+    radio->setProperty("agent", id);
     radio->setChecked(settings_["agent"].toString() == id);
     radio->setEnabled(!op_ && agent["installed"].toBool());
     connect(radio, &QRadioButton::clicked, this, [this, id] { set(QStringLiteral("agent=%1").arg(id), id); });
@@ -318,7 +325,7 @@ QWidget *SettingsPage::agentRow(const QJsonObject &agent, QButtonGroup *group)
         Mood how;
         const QString words = truth(agent, &how);
         const bool signedIn = agent["signed_in"].isBool() && agent["signed_in"].toBool();
-        if (confirmingOut_ && id == QLatin1String("codex") && signedIn) {
+        if (confirmingOut_ && chosen(id) && signedIn) {
             under->addWidget(mood(tr("Sign out of %1? The apps cannot hand anything to it until you sign in again.")
                                       .arg(agentWords(agent)),
                                   Mood::Warn));
@@ -335,11 +342,18 @@ QWidget *SettingsPage::agentRow(const QJsonObject &agent, QButtonGroup *group)
             return row;
         }
         under->addWidget(mood(words, how, false));
+        if (id == QLatin1String("claude"))
+            under->addWidget(dim(text(tr("This side has not been tried with a real Claude Code yet."), true)));
         if (noticeWhere_ == id && !notice_.isEmpty())
             under->addWidget(mood(notice_, Mood::Bad));
         if (!agent["installed"].toBool()) {
             delete button;
             button = nullptr;
+        } else if (!chosen(id)) {
+            // The helper signs in and out the agent that is chosen, so this row can only say how it stands.
+            delete button;
+            button = nullptr;
+            under->addWidget(dim(text(tr("Choose it to sign in or out here."), true)));
         } else if (signedIn) {
             button->setText(tr("Sign out…"));
             connect(button, &QPushButton::clicked, this, [this] {
@@ -522,18 +536,42 @@ void SettingsPage::render()
         underWidget->setLayout(under);
         under->setContentsMargins(0, 0, 0, 0);
         under->setSpacing(2);
-        under->addWidget(dim(text(tr("With Allowed, the agent's own sandbox lets it write in your home folder. A command "
-                                     "it wants run outside its sandbox is still asked each time."),
+        under->addWidget(dim(text(tr("With Allowed, the agent may change files in your home folder itself. A command "
+                                     "it wants run for it is still asked each time."),
                                   true)));
         const QString agent = settings_["agent"].toString();
         if (agent.contains(QLatin1Char('/')))
-            under->addWidget(dim(text(tr("Only Codex reads this setting. The program chosen above does not."), true)));
+            under->addWidget(dim(text(tr("Only Codex and Claude Code read this setting. The program chosen above does not."), true)));
         if (noticeWhere_ == QLatin1String("commands") && !notice_.isEmpty())
             under->addWidget(mood(notice_, Mood::Bad));
         panel->column()->addWidget(row(tr("Run commands as you, in your own folders"), choice, underWidget));
         panel->column()->addWidget(rule());
         panel->column()->addWidget(row(tr("Run a command as administrator"),
                                        mood(tr("Always asks. It cannot be switched off."), Mood::Warn, false)));
+        inside->addWidget(panel);
+    }
+
+    // ---- Notices
+    {
+        QVBoxLayout *inside = section(page, tr("Notices"));
+        auto *panel = rowsBox();
+        auto *widget = new QWidget;
+        auto *grid = new QGridLayout(widget);
+        grid->setContentsMargins(12, 8, 12, 8);
+        grid->setHorizontalSpacing(16);
+        grid->setColumnStretch(0, 1);
+        grid->addWidget(text(tr("Tell me when the agent needs an answer or has finished, and no window is watching"), true), 0, 0,
+                        Qt::AlignVCenter);
+        auto *choice = new QComboBox;
+        choice->setAccessibleName(tr("Tell me when the agent needs an answer or has finished, and no window is watching"));
+        choice->addItems({tr("Yes"), tr("No")});
+        choice->setCurrentIndex(noticesInForce() ? 0 : 1);
+        choice->setEnabled(!op_);
+        connect(choice, &QComboBox::activated, this, [this](int index) { pickNotices(index == 0); });
+        grid->addWidget(choice, 0, 1, Qt::AlignVCenter | Qt::AlignRight);
+        if (noticeWhere_ == QLatin1String("notices") && !notice_.isEmpty())
+            grid->addWidget(mood(notice_, Mood::Bad), 1, 0, 1, 2);
+        panel->column()->addWidget(widget);
         inside->addWidget(panel);
     }
 
@@ -571,7 +609,7 @@ QString SettingsPage::checkedAgent() const
 {
     for (QRadioButton *radio : findChildren<QRadioButton *>())
         if (onPage(radio, this) && radio->isChecked())
-            return radio->text() == tr("Another program") ? QStringLiteral("other") : radio->text().toLower();
+            return radio->text() == tr("Another program") ? QStringLiteral("other") : radio->property("agent").toString();
     return QString();
 }
 

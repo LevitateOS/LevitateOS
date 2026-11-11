@@ -75,6 +75,7 @@ class Run:
                  argv=None):
         self.env, self.log = env, log
         self.events, self.lines = [], []
+        self.announced = None  # the id the client names first, in {"event": "run"}
         self.code = None
         self.known = set(os.listdir(RUNS)) if os.path.isdir(RUNS) else set()
         self.proc = subprocess.Popen(argv or [BINARY], stdin=subprocess.PIPE, stderr=subprocess.PIPE,
@@ -131,6 +132,9 @@ class Run:
                     event = json.loads(line)
                 except ValueError:
                     continue
+                if event.get("event") == "run":
+                    self.announced = event.get("id")
+                    continue
                 self.events.append(event)
                 if event.get("event") == "question" and on_question:
                     self.answer(event, on_question(event))
@@ -175,6 +179,8 @@ def story_plain():
     env, log = environment("plain")
     run = Run(env, log, prompt="Install the thing", app="recipe", title="Install it").finish()
     check(run.code == 0, "plain: exits 0 (got %s)" % run.code)
+    check(run.announced and run.announced == run.run_id(), "plain: the client names the run's id before anything else (%s)" % run.announced)
+    check(run.lines and json.loads(run.lines[0]).get("event") == "run", "plain: the id is the first line the window gets")
     check(run.kinds()[-1] == "done" and "failed" not in run.kinds(), "plain: ends with done")
     plan = run.of("plan")
     check(len(plan) == 1 and plan[0]["steps"][0] == ["1", "Look around"] and len(plan[0]["steps"]) == 3,

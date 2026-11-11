@@ -19,7 +19,10 @@
 #include <QScrollArea>
 #include <QScrollBar>
 #include <QStyledItemDelegate>
+#include <QTimer>
 #include <QVBoxLayout>
+#include <QLineEdit>
+#include <QShowEvent>
 
 namespace {
 
@@ -65,6 +68,8 @@ QString agentWords(const QString &agent)
 {
     if (agent == QLatin1String("codex"))
         return QStringLiteral("Codex");
+    if (agent == QLatin1String("claude"))
+        return QStringLiteral("Claude Code");
     return agent.isEmpty() ? QObject::tr("The agent") : QFileInfo(agent).fileName();
 }
 
@@ -184,11 +189,45 @@ ActivityPage::ActivityPage(const QString &app, QWidget *parent)
     , app_(app)
     , program_(qEnvironmentVariable("LEVITATE_ACTIVITY_AGENT", "levitate-agent"))
 {
+    // The list is read again at a modest pace, and only while the page is on
+    // screen, so the counts and the states follow runs of other windows.
+    poll_ = new QTimer(this);
+    poll_->setInterval(2000);
+    connect(poll_, &QTimer::timeout, this, [this] {
+        if (isVisible())
+            read();
+    });
+    // Many events can come in one breath (the replay of a run that has been
+    // going): the detail is drawn once for them.
+    redraw_ = new QTimer(this);
+    redraw_->setSingleShot(true);
+    redraw_->setInterval(60);
+    connect(redraw_, &QTimer::timeout, this, [this] {
+        if (attached_ && live_)
+            showDetail();
+    });
 }
 
-void ActivityPage::setOwnRun(qint64 pid)
+void ActivityPage::showEvent(QShowEvent *event)
 {
-    own_ = pid;
+    Page::showEvent(event);
+    poll_->start();
+    read();
+    if (loaded_ && !chosen_.isEmpty() && !attached_)
+        fetchDetail();
+}
+
+void ActivityPage::hideEvent(QHideEvent *event)
+{
+    Page::hideEvent(event);
+    poll_->stop();
+    // Nobody looks: the run is let go of, and goes on.
+    detach();
+}
+
+void ActivityPage::setOwnRun(const QString &id)
+{
+    own_ = id;
     if (loaded_ && !lines_.isEmpty())
         showDetail();
 }
@@ -216,6 +255,7 @@ void ActivityPage::read()
             render();
             return;
         }
+        const bool same = loaded_ && problem_.isEmpty() && runs_ == answer["runs"].toArray();
         problem_.clear();
         loaded_ = true;
         runs_ = answer["runs"].toArray();
@@ -226,7 +266,10 @@ void ActivityPage::read()
             running_ += state == QLatin1String("running");
         }
         emit counts(waiting_ + running_, waiting_ > 0);
-        render();
+        // A list that reads as before changes nothing on screen (and leaves a
+        // half-typed answer alone).
+        if (!same)
+            render();
     });
     listing_->start();
 }
@@ -270,8 +313,11 @@ void ActivityPage::render()
 {
     if (list_)
         listScroll_ = list_->verticalScrollBar()->value();
+    rememberTyping();
     list_ = nullptr;
     detail_ = nullptr;
+    stepLabel_ = tailLabel_ = nullptr;
+    typing_ = nullptr;
     QVBoxLayout *column = fresh();
 
     if (!problem_.isEmpty()) {
@@ -294,6 +340,8 @@ void ActivityPage::render()
         present |= run["id"].toString() == chosen_;
     if (!present)
         chosen_ = shown.isEmpty() ? QString() : shown.first()["id"].toString();
+    if (attachedId_ != chosen_)
+        detach();
 
     auto *both = new QHBoxLayout;
     both->setSpacing(16);
@@ -305,7 +353,7 @@ void ActivityPage::render()
     auto *top = new QVBoxLayout;
     top->setSpacing(1);
     top->addWidget(heading(tr("Activity")));
-    top->addWidget(dim(text(tr("From all three apps. Kept when a window closes."), true)));
+    top->addWidget(dim(text(tr("From all three apps. A run goes on when its window closes."), true)));
     side->addLayout(top);
 
     int waits = 0, runs = 0;
@@ -362,6 +410,8 @@ void ActivityPage::render()
             return;
         chosen_ = now->data(IdRole).toString();
         lines_ = {};
+        typed_.clear();
+        detach();
         fetchDetail();
     });
     if (shown.isEmpty()) {
@@ -384,7 +434,11 @@ void ActivityPage::render()
     detail_->setFrameShape(QFrame::NoFrame);
     both->addWidget(detail_, 1);
     column->addLayout(both, 1);
-    fetchDetail();
+    // A run that is being followed has more than the record knows.
+    if (attached_ && live_ && attachedId_ == chosen_)
+        showDetail();
+    else
+        fetchDetail();
 }
 
 void ActivityPage::fetchDetail()
@@ -416,7 +470,15 @@ void ActivityPage::fetchDetail()
         detailBroken_ = !ok || !document.isArray() || document.array().isEmpty();
         lines_ = detailBroken_ ? QJsonArray() : document.array();
         detailId_ = id;
-        showDetail();
+        // Followed already (an event came while the record was read): that is the fuller picture.
+        if (!(attached_ && live_ && attachedId_ == id))
+            showDetail();
+        QJsonObject summary;
+        for (const QJsonValue &listed : runs_)
+            if (listed["id"].toString() == id)
+                summary = listed.toObject();
+        if (!detailBroken_)
+            follow(summary);
     });
     showing_->start();
 }
@@ -485,22 +547,211 @@ QWidget *didRow(const QJsonObject &did)
 
 } // namespace
 
+// A run that is going and can be reached is followed: attached to, with what
+// it said so far replayed from its record. One that is not shown or not going
+// is let go of (the run itself is never touched by that).
+void ActivityPage::follow(const QJsonObject &summary)
+{
+    const QString state = summary["state"].toString();
+    const bool going = state == QLatin1String("running") || state == QLatin1String("waiting");
+    if (!going || !summary["attachable"].toBool() || !isVisible() || endedIds_.contains(chosen_)) {
+        if (attachedId_ != chosen_)
+            detach();
+        return;
+    }
+    if (attached_ && attachedId_ == chosen_)
+        return;
+    detach();
+    attachedId_ = chosen_;
+    liveLines_ = QJsonArray{lines_.first()};
+    tail_.clear();
+    stepNow_.clear();
+    stepTitles_.clear();
+    asked_.clear();
+    sentFor_.clear();
+    answeredWords_.clear();
+    stopProblem_.clear();
+    live_ = true;
+    const QString id = chosen_;
+    attached_ = Run::attach(program_, id, this);
+    connect(attached_, &Run::event, this, &ActivityPage::onLive);
+    connect(attached_, &Run::output, this, [this](const QString &line) {
+        if (line.isEmpty())
+            return;
+        tail_ << line;
+        while (tail_.size() > 3)
+            tail_.removeFirst();
+        if (tailLabel_)
+            tailLabel_->setText(tail_.join(QLatin1Char('\n')));
+    });
+    connect(attached_, &Run::finished, this, [this, id](bool) {
+        if (attached_ && attachedId_ == id)
+            liveEnded();
+    });
+    attached_->start();
+    showDetail();
+}
+
+void ActivityPage::detach()
+{
+    live_ = false;
+    attachedId_.clear();
+    asked_.clear();
+    if (!attached_)
+        return;
+    Run *run = attached_;
+    attached_ = nullptr;
+    // The run goes on; only this page stops listening.
+    run->release();
+}
+
+void ActivityPage::liveEnded()
+{
+    const QString id = attachedId_;
+    endedIds_ << id;
+    Run *run = attached_;
+    attached_ = nullptr;
+    attachedId_.clear();
+    live_ = false;
+    asked_.clear();
+    run->deleteLater();
+    // Its record is complete now: read it and the list again.
+    lines_ = {};
+    read();
+    if (id == chosen_)
+        fetchDetail();
+}
+
+void ActivityPage::onLive(const QJsonObject &event)
+{
+    const QString kind = event["event"].toString();
+    if (kind == QLatin1String("plan")) {
+        stepTitles_.clear();
+        for (const QJsonValue &pair : event["steps"].toArray())
+            stepTitles_.insert(pair.toArray().at(0).toString(), pair.toArray().at(1).toString());
+        return;
+    }
+    if (kind == QLatin1String("step")) {
+        if (event["status"].toString() == QLatin1String("running")) {
+            stepNow_ = stepTitles_.value(event["step"].toString());
+            if (stepLabel_)
+                stepLabel_->setText(stepNow_);
+        }
+        return;
+    }
+    liveLines_ << event;
+    if (kind == QLatin1String("question")) {
+        asked_ = event["id"].toVariant().toString();
+        sentFor_.clear();
+        answeredWords_.clear();
+        read(); // the list says "waits" now
+    } else if (kind == QLatin1String("answer")) {
+        asked_.clear();
+        sentFor_.clear();
+        typed_.clear();
+        answeredWords_ = tr("Answered: %1.").arg(event["answer"].toString());
+        read();
+    }
+    redraw_->start();
+}
+
+void ActivityPage::rememberTyping()
+{
+    typingFocused_ = typing_ && typing_->hasFocus();
+    if (typing_)
+        typed_ = typing_->text();
+}
+
+QStringList ActivityPage::answerButtons() const
+{
+    QStringList words;
+    if (detail_ && detail_->widget())
+        if (QWidget *card = detail_->widget()->findChild<QWidget *>(QStringLiteral("question")))
+            for (QPushButton *button : card->findChildren<QPushButton *>())
+                words << button->text();
+    return words;
+}
+
+bool ActivityPage::answer(const QString &words)
+{
+    if (!attached_ || asked_.isEmpty() || !detail_ || !detail_->widget() || sentFor_ == asked_)
+        return false;
+    QWidget *card = detail_->widget()->findChild<QWidget *>(QStringLiteral("question"));
+    if (!card)
+        return false;
+    for (QPushButton *button : card->findChildren<QPushButton *>()) {
+        if (button->text() == words && button->isEnabled()) {
+            button->click();
+            return true;
+        }
+    }
+    if (QLineEdit *line = card->findChild<QLineEdit *>()) {
+        line->setText(words);
+        for (QPushButton *button : card->findChildren<QPushButton *>())
+            if (button->isEnabled()) {
+                button->click();
+                return true;
+            }
+    }
+    return false;
+}
+
+bool ActivityPage::offersStop() const
+{
+    if (!detail_ || !detail_->widget())
+        return false;
+    for (QPushButton *button : detail_->widget()->findChildren<QPushButton *>())
+        if (button->text() == tr("Stop") && button->isEnabled())
+            return true;
+    return false;
+}
+
+bool ActivityPage::stopChosen()
+{
+    if (stopping_ || chosen_.isEmpty() || !offersStop())
+        return false;
+    stopProblem_.clear();
+    stopping_ = new Run(program_, {"--stop", chosen_}, this);
+    connect(stopping_, &Run::finished, this, [this](bool ok) {
+        Run *run = stopping_;
+        stopping_ = nullptr;
+        if (!ok)
+            stopProblem_ = tr("It could not be stopped: %1").arg(run->problem().isEmpty() ? tr("the helper did not say why") : run->problem());
+        run->deleteLater();
+        read(); // an attached page learns of the end by itself; one that is not, here
+        if (!ok && detail_)
+            showDetail();
+    });
+    stopping_->start();
+    showDetail();
+    return true;
+}
+
 void ActivityPage::showDetail()
 {
     if (!detail_)
         return;
+    rememberTyping();
+    detailScroll_ = detail_->verticalScrollBar()->value();
+    stepLabel_ = tailLabel_ = nullptr;
+    typing_ = nullptr;
     auto *page = new QWidget;
     auto *column = new QVBoxLayout(page);
     column->setContentsMargins(0, 0, 4, 0);
     column->setSpacing(12);
     detail_->setWidget(page);
+    // The scroll range exists only after layout.
+    QMetaObject::invokeMethod(detail_, [this] { if (detail_) detail_->verticalScrollBar()->setValue(detailScroll_); },
+                              Qt::QueuedConnection);
 
     if (chosen_.isEmpty()) {
         column->addWidget(dim(text(tr("Choose a run to see what was asked and what it did."), true)));
         column->addStretch();
         return;
     }
-    if (detailBroken_ || lines_.isEmpty()) {
+    const bool following = attached_ && live_ && attachedId_ == chosen_;
+    const QJsonArray &lines = following ? liveLines_ : lines_;
+    if (!following && (detailBroken_ || lines_.isEmpty())) {
         column->addWidget(strong(tr("This run could not be read")));
         column->addWidget(dim(text(tr("%1 --show did not give its record.").arg(QFileInfo(program_).fileName()), true)));
         column->addStretch();
@@ -511,18 +762,19 @@ void ActivityPage::showDetail()
     for (const QJsonValue &run : runs_)
         if (run["id"].toString() == chosen_)
             summary = run.toObject();
-    const QJsonObject request = lines_.first().toObject();
-    const QString state = summary["state"].toString();
-    const bool waiting = state == QLatin1String("waiting"), running = state == QLatin1String("running");
-    const bool mine = (waiting || running) && own_ > 0 && request["pid"].toInteger() == own_;
+    const QJsonObject request = lines.first().toObject();
 
     // Walk the record once.
     QList<QJsonObject> dids;
-    QString said, failure;
+    QString said, failure, endState, endTime;
     QJsonObject question;
-    for (int at = 1; at < lines_.size(); ++at) {
-        const QJsonObject line = lines_[at].toObject();
+    for (int at = 1; at < lines.size(); ++at) {
+        const QJsonObject line = lines[at].toObject();
         const QString event = line["event"].toString();
+        if (line["record"].toString() == QLatin1String("end")) {
+            endState = line["state"].toString();
+            endTime = line["t"].toString();
+        }
         if (event == QLatin1String("did"))
             dids << line;
         else if (event == QLatin1String("say") && !line["text"].toString().isEmpty())
@@ -537,9 +789,20 @@ void ActivityPage::showDetail()
             question = QJsonObject();
     }
 
+    // Where it stands. The record's own end beats a list that is a moment old;
+    // a run that is followed knows from what it said whether it waits.
+    QString state = summary["state"].toString();
+    if (!endState.isEmpty())
+        state = endState;
+    else if (following)
+        state = question.isEmpty() ? QStringLiteral("running") : QStringLiteral("waiting");
+    const bool waiting = state == QLatin1String("waiting"), running = state == QLatin1String("running");
+    const bool mine = (waiting || running) && !own_.isEmpty() && request["id"].toString() == own_;
+    const bool canStop = (waiting || running) && (following || summary["attachable"].toBool());
+
     // Who, when, and where it stands.
     const QString agent = agentWords(request["agent"].toString());
-    const QString ended = whenText(summary["ended"].toString());
+    const QString ended = whenText(endTime.isEmpty() ? summary["ended"].toString() : endTime);
     QString standing;
     if (waiting)
         standing = tr("%1 waits for an answer").arg(agent);
@@ -565,13 +828,30 @@ void ActivityPage::showDetail()
                                               : tr("Asked in %1 %2 · %3").arg(appText(request["app"].toString()), asked, standing),
                               true)));
     head->addLayout(names, 1);
+    auto *buttons = new QVBoxLayout;
+    buttons->setSpacing(6);
     if (mine) {
         auto *go = new QPushButton(tr("Go to it"));
         go->setDefault(true);
         connect(go, &QPushButton::clicked, this, &ActivityPage::goToRun);
-        head->addWidget(go, 0, Qt::AlignTop);
+        buttons->addWidget(go);
     }
+    if (canStop) {
+        auto *stop = new QPushButton(stopping_ ? tr("Stopping…") : tr("Stop"));
+        stop->setEnabled(!stopping_);
+        stop->setAccessibleDescription(tr("Ends this run. What it already did stays done."));
+        connect(stop, &QPushButton::clicked, this, [this] { stopChosen(); });
+        buttons->addWidget(stop);
+    }
+    head->addLayout(buttons);
     column->addLayout(head);
+    if (!stopProblem_.isEmpty()) {
+        QLabel *problem = text(stopProblem_, true);
+        QPalette p = problem->palette();
+        p.setColor(QPalette::WindowText, moodColour(p, Mood::Bad));
+        problem->setPalette(p);
+        column->addWidget(problem);
+    }
 
     // What was asked.
     {
@@ -628,6 +908,18 @@ void ActivityPage::showDetail()
         }
     }
 
+    // What it does now: only for a run that is followed and is not waiting.
+    if (following && running) {
+        QVBoxLayout *inside;
+        column->addWidget(group(tr("What it does now"), &inside));
+        if (!answeredWords_.isEmpty())
+            inside->addWidget(dim(text(answeredWords_, true)));
+        stepLabel_ = text(stepNow_.isEmpty() ? tr("Working on it.") : stepNow_, true);
+        inside->addWidget(stepLabel_);
+        tailLabel_ = mono(tail_.join(QLatin1Char('\n')));
+        inside->addWidget(tailLabel_);
+    }
+
     // What it did.
     {
         QVBoxLayout *inside;
@@ -648,17 +940,19 @@ void ActivityPage::showDetail()
             inside->addWidget(dim(text(tr("and %1 more").arg(dids.size() - most))));
     }
 
-    // What it waits for.
+    // What it waits for, and the way to answer it.
     if (waiting && !question.isEmpty()) {
         auto *card = new Card(Card::Open);
+        card->setObjectName(QStringLiteral("question"));
         column->addWidget(card);
         const QString kind = question["kind"].toString();
         const QString words = question["text"].toString();
+        const bool command = kind == QLatin1String("administrator") || kind == QLatin1String("command");
         card->column()->setSpacing(6);
-        if (kind == QLatin1String("administrator") || kind == QLatin1String("command")) {
+        if (command) {
             card->column()->addWidget(strong(kind == QLatin1String("administrator")
                                                  ? tr("It wants to run this as administrator")
-                                                 : tr("It wants to run this as you")));
+                                                 : tr("It wants to run this as you, outside its sandbox")));
             card->column()->addWidget(mono(question["command"].toString()));
             const int why = words.indexOf(QLatin1String("\n\nWhy: "));
             if (why >= 0)
@@ -666,23 +960,58 @@ void ActivityPage::showDetail()
         } else {
             card->column()->addWidget(strong(tr("It asks")));
             card->column()->addWidget(text(words, true));
-            QStringList choices;
-            for (const QJsonValue &choice : question["choices"].toArray())
-                choices << choice.toString();
-            if (!choices.isEmpty())
-                card->column()->addWidget(dim(text(tr("It offers: %1").arg(choices.join(QStringLiteral(", "))), true)));
         }
-        if (mine) {
-            card->column()->addWidget(text(tr("It waits in this window. Answer it there."), true));
+        QStringList choices;
+        for (const QJsonValue &choice : question["choices"].toArray())
+            choices << choice.toString();
+        const QString id = question["id"].toVariant().toString();
+        if (!following) {
+            card->column()->addWidget(dim(text(tr("It waits for an answer. This page cannot reach it at the moment."), true)));
+        } else if (sentFor_ == id) {
+            card->column()->addWidget(dim(text(tr("Your answer was sent. Waiting for the agent to take it."), true)));
         } else {
-            const QString app = request["app"].toString();
-            card->column()->addWidget(dim(text(
-                app.isEmpty() ? tr("Only the window that started it can answer, because a run ends when its window "
-                                   "closes. It cannot be answered from here.")
-                              : tr("Only the window that started it, in %1, can answer, because a run ends when its "
-                                   "window closes. It cannot be answered from here.")
-                                    .arg(app),
-                true)));
+            auto *row = new QHBoxLayout;
+            if (choices.isEmpty()) {
+                auto *line = new QLineEdit;
+                line->setAccessibleName(tr("Your answer"));
+                typing_ = line;
+                if (typedFor_ == id)
+                    line->setText(typed_);
+                typedFor_ = id;
+                auto *send = new QPushButton(tr("Answer"));
+                send->setDefault(true);
+                auto give = [this, line, id] {
+                    const QString answer = line->text().trimmed();
+                    if (answer.isEmpty() || !attached_)
+                        return;
+                    attached_->reply(id, answer);
+                    sentFor_ = id;
+                    typed_.clear();
+                    showDetail();
+                };
+                connect(send, &QPushButton::clicked, this, give);
+                connect(line, &QLineEdit::returnPressed, send, &QPushButton::click);
+                row->addWidget(line, 1);
+                row->addWidget(send);
+                if (typingFocused_)
+                    line->setFocus();
+            } else {
+                for (const QString &choice : choices) {
+                    auto *button = new QPushButton(choice);
+                    connect(button, &QPushButton::clicked, this, [this, id, choice] {
+                        if (!attached_ || sentFor_ == id)
+                            return;
+                        attached_->reply(id, choice);
+                        sentFor_ = id;
+                        showDetail();
+                    });
+                    row->addWidget(button);
+                }
+                row->addStretch();
+            }
+            card->column()->addLayout(row);
+            if (command)
+                card->column()->addWidget(dim(text(tr("Approve runs it now. Refuse tells the agent you did not allow it."), true)));
         }
     }
 
@@ -702,8 +1031,8 @@ void ActivityPage::showDetail()
     } else if (state == QLatin1String("stopped")) {
         QVBoxLayout *inside;
         column->addWidget(group(tr("How it ended"), &inside));
-        inside->addWidget(text(tr("It was stopped before it finished, for example because the window that started it "
-                                  "closed. What it had already done stays done."),
+        inside->addWidget(text(tr("It was stopped before it finished: someone pressed Stop, or the computer restarted. "
+                                  "What it had already done stays done."),
                                true));
     }
     column->addStretch();

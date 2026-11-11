@@ -197,7 +197,7 @@ Window::Window(QWidget *parent)
     });
     connect(work_, &WorkPage::done, this, [this](bool ok) {
         run_ = nullptr;
-        frame_->setOwnRun(0); // Activity reads the run's record again
+        frame_->setOwnRun(QString()); // Activity reads the run's record again
         auto then = then_;
         then_ = nullptr;
         reload([then, ok] {
@@ -462,7 +462,7 @@ void Window::work(Run *run, const QString &title, const QString &subtitle, std::
     work_->begin(title, subtitle, run);
     display(work_);
     run->start();
-    frame_->setOwnRun(run->pid());
+    frame_->setOwnRun(run);
 }
 
 // Short changes with no page of their own, one after another.

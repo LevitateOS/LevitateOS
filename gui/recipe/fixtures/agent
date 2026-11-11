@@ -56,7 +56,7 @@ def main():
     # What the window said Activity should list this run under, for the story to read.
     os.makedirs(STATE_DIR, exist_ok=True)
     with open(os.path.join(STATE_DIR, "last-prompt.json"), "w") as out:
-        json.dump({"app": first.get("app"), "title": first.get("title")}, out)
+        json.dump({"app": first.get("app"), "title": first.get("title"), "may_write": first.get("may_write")}, out)
     request = prompt.split("The request:", 1)[-1].split("The issue:", 1)[0].strip().lower()
     emit(event="plan", steps=[["find", "Find the software"], ["write", "Write the recipe"], ["check", "Check it"]])
     step("find", "running")

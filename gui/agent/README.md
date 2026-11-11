@@ -38,6 +38,14 @@ A run does not belong to the window that started it.
 | a run waits for an answer and no client is attached | waits, for as long as it takes |
 | the host process is killed hard | is over (`--list` says `stopped`; what the agent started may still run) |
 
+- **What the apps do** (`gui/kit/run.*`): a window that closes lets go of its run
+  by closing the input and hanging up (SIGHUP), never SIGTERM, and its status line
+  says the run carries on; "Stop" in a window is `--stop ID` (the id is the one in
+  the client's first line, `run`; a client that never named one, a stand-in, is
+  asked to end with SIGTERM instead); an exit code 75 is not shown as a failure.
+  Activity attaches to every run that is going (`attachable`), answers its
+  questions through the attached client, and lets go (SIGHUP) when the run is not
+  shown any more.
 - `levitate-agent --attach ID` is a client of a run that is still going. It
   first replays the events so far from the record, then follows the run, and
   takes answers on standard input like the usual client. It reads the events
@@ -105,6 +113,7 @@ The same as `gui/kit/run.cpp` and `gui/kit/work.cpp` read and write.
 
 | Event | Fields |
 |---|---|
+| `run` | `id`: the run's id. The client sends it first of all, before the run has a record, so that the window can recognise its run in `--list` and stop it with `--stop ID`. Not in the record, and never sent by an attached client (it knows the id) |
 | `plan` | `steps`: pairs of id and title |
 | `step` | `step` (an id of the plan), `status` (`running` or `done`) |
 | `say` | `text` |
@@ -351,9 +360,9 @@ process):
 
 1. `{"record": "request", "id", "t", "app", "title", "prompt", "agent", "pid",
    "host"}` and `"may_write"` when the request had it. `pid` is the process
-   that asked, the client the window started (the apps match it against their
-   own process to know which run is theirs); `host` is the process the run
-   lives in.
+   that asked, the client the window started (it may be gone long before the
+   run ends, so nothing matches it any more: a window knows its run by the `id`
+   the client named in its first line); `host` is the process the run lives in.
 2. each event sent to the app, with `"t"`; when the person answered a question,
    `{"event": "answer", "id", "answer", "t"}` as well (not sent to the app that
    started the run);
@@ -451,7 +460,11 @@ step refused; from Recipe and System) and one that is still working, by driving
 the built `levitate-agent` with the stand-in, so that the Activity page of an app
 has something to show. The waiting run and the working one keep going without the
 helpers that started them (the script lets those go); `fixtures/records --stop
-STATE-FOLDER` ends them with `levitate-agent --stop`.
+STATE-FOLDER` ends them with `levitate-agent --stop`. It prints
+`state=FOLDER/state waiting_id=ID runtime=FOLDER/run`: an app's story gives the
+first as `XDG_STATE_HOME` and the last as `XDG_RUNTIME_DIR` (the runs' sockets are
+there, which `--attach` needs), and stops the runs when it ends, also when it
+fails.
 There are no unit tests (project rule, `AGENTS.md`).
 
 ## Not done
@@ -481,11 +494,6 @@ There are no unit tests (project rule, `AGENTS.md`).
 - **A run's agent children outlive a host that is killed hard.** The host ends
   the agent and everything it started when it stops or finishes; `SIGKILL` on the
   host leaves them (`--list` then says `stopped`).
-- **No app attaches yet.** `--attach`, `--stop`, `may_write` and `attachable` are
-  only exercised by `fixtures/story`; the Activity page and Recipe's "Ask for
-  software" still have to be wired to them.
-- **A client that leaves a waiting run exits 75**, a code no app knows. An app
-  that closes the input while a question is open will read it as a failure.
 - **"Ask each time" for the agent's own commands depends on the agent
   following the `RUN` convention.** In the read-only sandbox it cannot run
   them itself, but nothing here makes it ask rather than give up.

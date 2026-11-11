@@ -21,6 +21,10 @@ signals:
     void browse(const QString &name);
 };
 
+// The folder an agent writes a person's own recipes into: the "local"
+// source's folder, else Recipe's own place for them under the data folder.
+QString ownRecipesFolder(const Catalog &catalog);
+
 // Say what software is wanted; an agent writes the recipe.
 class WishPage : public Page {
     Q_OBJECT

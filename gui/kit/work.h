@@ -37,6 +37,10 @@ private:
     void onEvent(const QJsonObject &event);
     void ask(const QJsonObject &event);
     void onFinished(bool ok);
+    void onCarriesOn();
+    // The question was answered from somewhere else (Activity): nothing is waiting any more.
+    void answeredElsewhere();
+    void showVerdict(const QString &title, const QString &words);
 
     Run *run_ = nullptr;
     QVBoxLayout *column_ = nullptr;
@@ -51,4 +55,5 @@ private:
     QString question_; // the id of what the agent asked, while it waits
     QStringList choices_;
     QWidget *asked_ = nullptr;
+    bool stoppedElsewhere_ = false; // the run ended with the helper's "stopped", not by our Stop
 };

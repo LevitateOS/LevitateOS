@@ -22,12 +22,12 @@ simply letting go of the helpers that started them (they are killed; the runs
 do not mind). `--stop` ends the two runs with `levitate-agent --stop` (their
 records then say stopped). Run `--stop` when the check is over.
 
-Prints one line: the folder to give the app as XDG_STATE_HOME, and the pid of
-the helper that started the waiting run (the running one is the oldest run), as
-`state=FOLDER/state waiting_pid=N`. That is the number the record names as
-`pid`, which is what an app matches against its own helper; the helper itself is
-gone by then. Exits non-zero, with the reason on standard error, when a run did
-not end where it should.
+Prints one line: the folder to give the app as XDG_STATE_HOME, the id of the
+waiting run (the running one is the oldest run), and the folder to give as
+XDG_RUNTIME_DIR (where the runs' sockets are, which `--attach` needs), as
+`state=FOLDER/state waiting_id=ID runtime=FOLDER/run`. The id is what the app
+matches against the one its own helper named. Exits non-zero, with the reason on
+standard error, when a run did not end where it should.
 """
 import json
 import os
@@ -64,6 +64,7 @@ def drive(binary, folder, story, app, title, prompt, answer=None, keep=False, un
                             env=environment(folder, story), start_new_session=True)
     proc.stdin.write((json.dumps({"prompt": prompt, "app": app, "title": title}) + "\n").encode())
     proc.stdin.flush()
+    proc.run_id = None
     while True:
         line = proc.stderr.readline()
         if not line:
@@ -71,6 +72,9 @@ def drive(binary, folder, story, app, title, prompt, answer=None, keep=False, un
         try:
             event = json.loads(line)
         except ValueError:
+            continue
+        if event.get("event") == "run":
+            proc.run_id = event.get("id")  # the helper names the run first
             continue
         if keep and event.get("event") == until:
             return proc
@@ -146,7 +150,7 @@ def main():
         stop_after(binary, folder)
         return 1
     # Let go of the helpers; the runs are theirs no more.
-    pids = (waiting.pid, running.pid)
+    waiting_id = waiting.run_id
     for proc in (waiting, running):
         proc.kill()
         proc.wait()
@@ -156,7 +160,7 @@ def main():
         sys.stderr.write("records: %d runs are going (expected 2)\n" % len(ids))
         stop(folder)
         return 1
-    print("state=%s waiting_pid=%d" % (os.path.join(folder, "state"), pids[0]))
+    print("state=%s waiting_id=%s runtime=%s" % (os.path.join(folder, "state"), waiting_id, os.path.join(folder, "run")))
     return 0
 
 

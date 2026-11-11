@@ -31,6 +31,12 @@ int main(int argc, char **argv)
     parser.process(app);
     if (parser.isSet(look))
         applyLook(parser.value(look));
+    // A picture run must not reach the person's real system: it needs every stand-in named.
+    if (parser.isSet(shots)) {
+        const int refused = guardPictureMode("recab-gui", {"RECAB_GUI_RECAB", "RECAB_GUI_AGENT", "RECAB_GUI_REBOOT"}, {"RECAB_GUI_ROOT_HELPER"});
+        if (refused)
+            return refused;
+    }
 
     Window window;
     // Opens at the size it had; the picture modes always use the first size.

@@ -6,6 +6,7 @@
 #pragma once
 
 #include <QMap>
+#include <QPointer>
 #include <QStringList>
 #include <QWidget>
 
@@ -97,10 +98,14 @@ public:
     ActivityPage *activity() const { return activity_; }
     // ---- Settings, which the frame owns as well.
     SettingsPage *settings() const { return settings_; }
-    // The agent process this window started and waits for, or 0. Activity
-    // offers "Go to it" for that run; setting 0 (the run ended) reads again.
-    void setOwnRun(qint64 pid);
-    qint64 ownRun() const { return ownRun_; }
+    // The id of the agent run this window started and follows, or empty.
+    // Activity offers "Go to it" for that run; setting empty (the run ended)
+    // reads Activity again. A run that is not an agent's is ignored. The
+    // helper names the run's id a moment after the start, so this waits for
+    // it.
+    void setOwnRun(Run *run);
+    void setOwnRun(const QString &id);
+    QString ownRun() const { return ownRun_; }
 
 public slots:
     // Reads Activity and the agent's status again. Connect the app's
@@ -115,7 +120,16 @@ signals:
     // "Go to it" on this window's own live run: show the app's work page.
     void goToRun();
 
+protected:
+    bool eventFilter(QObject *watched, QEvent *event) override;
+    bool event(QEvent *event) override;
+    void showEvent(QShowEvent *event) override;
+    void closeEvent(QCloseEvent *event) override;
+
 private:
+    // A window that closes lets go of the agent runs it follows; they go on.
+    void watchWindow();
+    void letGoOfRuns();
     void mark(const QString &key);
     void step(RailButton *from, int by);
     void showAgent(const QString &words);
@@ -138,5 +152,8 @@ private:
     QString statusWords_, flashWords_, agentName_, agentNote_, agentProgram_;
     Run *asking_ = nullptr;
     bool stripAllowed_ = true, askAgain_ = false;
-    qint64 ownRun_ = 0;
+    QString ownRun_;
+    bool ownNoted_ = false; // "carries on" was said for this run
+    QList<QPointer<Run>> ownRuns_;
+    QPointer<QWidget> watched_;
 };

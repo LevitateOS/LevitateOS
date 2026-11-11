@@ -67,8 +67,10 @@ public:
 
     // The agent, asked to write a recipe: the prompt on its input as one JSON
     // line, its questions answered on the same input. `title` is what the
-    // Activity page lists the run under.
-    Run *agent(const QString &prompt, const QString &title);
+    // Activity page lists the run under. `mayWrite` names the folders the
+    // agent may write in although its commands are asked each time: the
+    // person's own recipe folder, for the recipe it writes.
+    Run *agent(const QString &prompt, const QString &title, const QStringList &mayWrite = QStringList());
     // The program the window starts as its agent; the frame shows it.
     QString agentProgram() const { return agent_; }
 

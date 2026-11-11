@@ -12,6 +12,7 @@
 #include "work.h"
 
 #include <QComboBox>
+#include <QDir>
 #include <QDesktopServices>
 #include <QLineEdit>
 #include <QMessageBox>
@@ -119,7 +120,7 @@ Window::Window(QWidget *parent)
     connect(work_, &WorkPage::activity, this, [this](const QString &words) { frame_->setAgentNote(words); });
     connect(work_, &WorkPage::done, this, [this](bool ok) {
         run_ = nullptr;
-        frame_->setOwnRun(0); // Activity reads the run's record again
+        frame_->setOwnRun(QString()); // Activity reads the run's record again
         if (!ok && !work_->stopped())
             return; // the work page says why, and offers the way back
         // The recipe it wrote is there to be read; nothing was installed.
@@ -507,7 +508,14 @@ void Window::askAgent(const QString &prompt)
         return;
     }
     written_.clear();
-    run_ = client_.agent(prompt, requestTitle(prompt));
+    // The agent writes the recipe into the person's own folder, and may write
+    // nowhere else on its own: the folder is made first, so that it can.
+    const QString folder = ownRecipesFolder(catalog_);
+    if (!QDir().mkpath(folder)) {
+        frame_->flash(tr("The folder for your own recipes could not be made (%1), so the agent was not started.").arg(folder));
+        return;
+    }
+    run_ = client_.agent(prompt, requestTitle(prompt), {folder});
     // The agent names the recipe it wrote, so the window can open it.
     connect(run_, &Run::event, this, [this](const QJsonObject &event) {
         if (event["event"] == QLatin1String("agent") && !event["recipe"].toString().isEmpty())
@@ -517,7 +525,7 @@ void Window::askAgent(const QString &prompt)
                  tr("A half-written recipe is left in the folder"));
     stack_->setCurrentWidget(work_);
     run_->start();
-    frame_->setOwnRun(run_->pid());
+    frame_->setOwnRun(run_);
 }
 
 bool Window::agentAsks() const

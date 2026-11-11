@@ -60,7 +60,11 @@ bool NextSystem::parse(const QByteArray &json, QStringList *titles)
     const QJsonObject lifecycle = object["lifecycle"].toObject();
     if (lifecycle.isEmpty())
         return false;
-    if (lifecycle["other"].toString() != QLatin1String("next"))
+    // On trial recab still calls the other system "next" (the preparation that
+    // made the running system is kept until the trial is kept), but it is the
+    // system from before then: there is no next system to finish, so no strip.
+    // System's own model reads it the same way.
+    if (lifecycle["state"].toString() == QLatin1String("on_trial") || lifecycle["other"].toString() != QLatin1String("next"))
         return true; // read, and there is no next system
     for (const QJsonValue &change : object["preparation"].toObject()["changes"].toArray())
         *titles << titleOf(change.toObject());

@@ -1065,14 +1065,14 @@ void Window::send(const QString &prompt)
     }
     go(work_);
     run_->start();
-    frame_->setOwnRun(run_->pid());
+    frame_->setOwnRun(run_);
 }
 
 void Window::finished(bool ok)
 {
     const Job job = job_;
     run_ = nullptr;
-    frame_->setOwnRun(0); // Activity reads the run's record again
+    frame_->setOwnRun(QString()); // Activity reads the run's record again
     next_->read();        // the agent may have changed the next system
     job_ = Job::None;
     if (!ok) {

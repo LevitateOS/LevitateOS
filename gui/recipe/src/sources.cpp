@@ -3,6 +3,7 @@
 #include "parts.h"
 
 #include <QDesktopServices>
+#include <QDir>
 #include <QFileInfo>
 #include <QFontDatabase>
 #include <QHBoxLayout>
@@ -127,6 +128,15 @@ void SourcesPage::show(const Catalog &catalog)
 
 // ---------------------------------------------------------------- Asking for a recipe
 
+QString ownRecipesFolder(const Catalog &catalog)
+{
+    const Origin *own = catalog.origin(QStringLiteral("local"));
+    if (own && !own->path.isEmpty())
+        return own->path;
+    const QString data = qEnvironmentVariable("XDG_DATA_HOME", QDir::homePath() + QStringLiteral("/.local/share"));
+    return data + QStringLiteral("/recipe/recipes");
+}
+
 void WishPage::show(const Catalog &catalog, const QString &wish)
 {
     QVBoxLayout *column = fresh();
@@ -151,6 +161,11 @@ void WishPage::show(const Catalog &catalog, const QString &wish)
 
     // Where a person's own recipes live: the folder Recipe reads first.
     const Origin *own = catalog.origin(QStringLiteral("local"));
+    // The folder is what the agent is allowed to write in, and the page says so.
+    top->addWidget(dim(text(tr("The agent may write in your own recipe folder only (%1). Anything else it wants done, it asks "
+                               "you first, unless you allowed it more in Settings.")
+                                .arg(ownRecipesFolder(catalog)),
+                            true)));
     QStringList facts;
     facts << (own ? tr("Recipes written for this person go into %1, as NAME.rhai").arg(own->path)
                   : tr("Recipes written for this person go into Recipe's own folder for them, as NAME.rhai"));

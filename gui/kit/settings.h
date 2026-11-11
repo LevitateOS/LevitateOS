@@ -37,7 +37,7 @@ public:
     QString commandsInForce() const { return settings_["run_commands"].toString(); }
     // The words on the page: labels, buttons, the choice and the radio buttons.
     QString pageText() const;
-    // The checked radio button's agent, "codex" or "other".
+    // The checked radio button's agent: its id ("codex", "claude") or "other".
     QString checkedAgent() const;
     // The sentence shown in place of a refusal or a failure, or empty.
     QString notice() const { return notice_; }
@@ -45,6 +45,10 @@ public:
     bool press(const QString &words);
     // As choosing in the list would: "Ask each time" or "Allowed".
     void pickCommands(const QString &words);
+    // As choosing in the list would: the notices row, "Yes" or "No".
+    void pickNotices(bool on);
+    // What the helper last reported about notices.
+    bool noticesInForce() const { return settings_["notices"].toBool(true); }
     // What the file dialog hands over: written with `--set agent=PATH`.
     void chooseProgram(const QString &path);
 
@@ -60,6 +64,7 @@ private:
     void readDone();
     void set(const QString &assignment, const QString &where);
     void account(bool signIn);
+    bool chosen(const QString &id) const { return settings_["agent"].toString() == id; }
     void tryIt();
     QWidget *agentRow(const QJsonObject &agent, QButtonGroup *group);
     QWidget *otherRow(QButtonGroup *group);
