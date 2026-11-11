@@ -53,6 +53,68 @@ all of these are keyed by everything at once, so everything is redone at once.
 
 ## The design
 
+### 0. Parts and a combiner
+
+Today an ISO comes out of a chain of whole products
+(`ProductId::parent`, `distro/contract/src/registry.rs`): live-tools unpacks
+live-boot's finished EROFS image, which unpacked base-rootfs's. Each product
+is its parent's tree unchanged plus an overlay (`distro/builder/src/product.rs`),
+so to get live-tools the builder first produces two complete ISOs nobody
+asked for, and any change near the bottom rebuilds the whole chain.
+
+Instead, the build makes **parts**, each built and cached on its own, and a
+**combiner** that only assembles them:
+
+| Part | Made from | Shared by |
+|---|---|---|
+| **Kernel bundle** | already a prebuilt download (`linux-prebuilt.rhai`) | every ISO, installed systems |
+| **Package store** entries | one per locked package (section 1) | every system tree, the Qt app build root |
+| **Base system image** | base packages composed, effects, configuration, EROFS (sections 2, 4) | base-rootfs, live-boot, live-tools; also the installed system and recab's update payload |
+| **Desktop system image** | base tree + desktop layer, effects, desktop configuration, EROFS | live-desktop; installed desktop; update payload |
+| **Our programs** | tools per crate, TUI binary per libc, Qt apps per distro (section 6) | install overlay, system images |
+| **Live overlay** | the live session's configuration (`live-overlay.rhai`) | live-boot, live-tools, live-desktop |
+| **Install overlay** | install tools, install screen | live-tools, live-desktop |
+| **Initramfs** (live, installed) | `recinit` from the kernel's modules and busybox | every ISO, installed systems |
+| **Boot files** | `recuki`, systemd-boot | every ISO |
+
+The **combiner** takes a list of parts and writes the ISO with `reciso`: no
+unpacking, no Recipe run, no Ginux. It takes seconds to minutes. The products
+become recipes of parts:
+
+```mermaid
+flowchart LR
+    K[kernel] --> C1 & C2 & C3
+    IR[initramfs] --> C1 & C2 & C3
+    BF[boot files] --> C1 & C2 & C3
+    BS[base system image] --> C1[live-boot ISO] & C2[live-tools ISO]
+    DS[desktop system image] --> C3[live-desktop ISO]
+    LO[live overlay] --> C1 & C2 & C3
+    IO[install overlay] --> C2 & C3
+```
+
+What this changes:
+
+- **No intermediate ISOs.** Building live-desktop builds its parts and
+  combines them; base-rootfs and live-boot are built only when asked for.
+- **Parts build in parallel.** The kernel, initramfs, our programs and the two
+  system images do not depend on each other until the combiner.
+- **Each part has its own identity and its own check.** A part is rebuilt only
+  when its own inputs change. It can be tested on its own: the kernel and
+  initramfs boot without a system image, and a system image can be checked
+  without an ISO.
+- **The system image is the update payload.** recab's releases ship
+  `live/filesystem.erofs`, the kernel and the installed initramfs
+  (`distro/contract/docs/releases.md`): exactly these parts. A release
+  publishes parts, and the ISO is one more combination of the same bytes.
+- **CI can build parts.** With the prebuilt download pattern
+  ([prebuilt-downloads.md](prebuilt-downloads.md)), a local build fetches
+  any part CI already built and only combines.
+- **Release builds** build every part from scratch with the exact tools and
+  record each part's digest in the ISO's provenance.
+
+Sections 1–6 below are how the expensive parts, the system images, get
+cheap.
+
 ### 1. A package store: one unpacked tree per package
 
 - **Downloads** go into a store keyed by SHA-256 (they already carry it in the
@@ -168,17 +230,22 @@ Rough, from tonight's measurements; to be confirmed by the first runs:
 1. **Measure what is left in Ginux** (the 430 µs image lookup, `rename`) with
    the fixed launcher on an idle machine, so the remaining per-call costs are
    known before choosing section 3's route.
-2. **Package store for downloads**, keyed by SHA-256 (removes the 37-minute
+2. **Parts and the combiner** (section 0): replace the parent-product chain
+   with parts the builder caches by their inputs, and a combiner that writes
+   an ISO from parts. This is mostly re-plumbing what the builder already does
+   (overlays, EROFS writer, `recinit`, `recuki`, `reciso`), and it sets the
+   frame the next steps fill.
+3. **Package store for downloads**, keyed by SHA-256 (removes the 37-minute
    re-downloads at once).
-3. **Per-package unpack trees + composition**, base and desktop layers, with
+4. **Per-package unpack trees + composition**, base and desktop layers, with
    parallel workers.
-4. **Split effects and configuration** out of the rootfs recipe into their own
+5. **Split effects and configuration** out of the rootfs recipe into their own
    cached steps.
-5. **Cache identity** change (section 4) and shorter deadlines.
-6. **Bulk primitive in Ginux** (or coordinator unpacking), per decision 2.
-7. Prebuilt downloads for our programs, as planned.
+6. **Cache identity** change (section 4) and shorter deadlines.
+7. **Bulk primitive in Ginux** (or coordinator unpacking), per decision 2.
+8. Prebuilt downloads for our programs, as planned.
 
-Steps 2–4 are builder and Recipe recipe work; step 6 is Ginux or Recipe work.
+Steps 2–5 are builder and Recipe recipe work; step 7 is Ginux or Recipe work.
 
 ## Decisions for the user
 
@@ -190,5 +257,5 @@ Steps 2–4 are builder and Recipe recipe work; step 6 is Ginux or Recipe work.
    everything in the sandbox, more work, upstream-worthy), or unpacking verified
    archives in Recipe's coordinator (faster to build, parsing moves outside
    the sandbox).
-3. **Order:** start with the download store and the layer split (biggest
-   effect for the least risk), or with the Ginux measurements first.
+3. **Order:** start with parts and the combiner plus the download store
+   (biggest effect for the least risk), or with the Ginux measurements first.
