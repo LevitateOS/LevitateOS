@@ -1,0 +1,66 @@
+#!/usr/bin/env python3
+"""Lifecycle UI fixture, never a disk/firmware implementation or boot evidence.
+RECAB_STATUS_FILE can supply an unmodified status captured from real recab.
+"""
+import json,os,sys
+from pathlib import Path
+args=sys.argv[1:]
+if os.environ.get('RECAB_STATUS_FILE') and 'status' in args:
+ print(Path(os.environ['RECAB_STATUS_FILE']).read_text());raise SystemExit(0)
+mode=os.environ.get('RECAB_FIXTURE','stable');active=os.environ.get('RECAB_FIXTURE_SLOT','B' if mode=='reverse' else 'A');other='B' if active=='A' else 'A'
+path=Path(os.environ.get('RECAB_FIXTURE_STATE',f'/tmp/recab-p11-fixture-{os.getppid()}.json'))
+def initial():
+ return dict(active=active,phase='prepared' if mode in ['preparing','open'] else 'ready' if mode in ['ready','failed','trial'] else 'interrupted' if mode=='interrupted' else 'update' if mode=='conflicted' else None,revision=1,pending=mode=='trial',update='conflicted' if mode=='conflicted' else 'available',changes=[],failed=mode=='failed')
+s=json.loads(path.read_text()) if path.exists() else initial();active=s['active'];other='B' if active=='A' else 'A'
+pid='1'*64;gid='a'*64;candidate='b'*64;release='c'*64
+p=None if s['phase'] is None else dict(id=pid,slot=other,source_slot=active,source_generation=gid,revision=s['revision'],operation='update' if s['phase']=='update' else 'prepare',phase='interrupted' if s['phase']=='update' else s['phase'],failure='operation interrupted' if s['phase']=='interrupted' else None,synchronized=True,synchronization=None,finalization=None,change=None,last_change=None,changes=s['changes'],completed_steps=0)
+def field(name,label,flag=None,required=True,choices=[]):return dict(name=name,label=label,flag=flag,required=required,choices=choices)
+ops=[];cas=['--preparation',pid,'--revision',str(s['revision'])] if p else []
+def op(id,label,argv,ready=True,inputs=[],destructive=False):ops.append(dict(id=id,label=label,argv=argv,inputs=inputs,destructive=destructive,verdict='ready' if ready else 'refused',reason=None if ready else 'Not available in this fixture state'))
+op('prepare','Prepare or continue the other system',['prepare']+cas,not s['pending'] and s['phase']!='update')
+op('install','Install software in the prepared system',['change','install']+cas,not s['pending'] and s['phase']!='update',[field('package','Recipe or selected package')])
+op('edit','Apply a configuration file to the prepared system',['edit']+cas,not s['pending'] and s['phase']!='update',[field('path','System-relative path'),field('file','Contents file','--file')])
+op('update_check','Check for system updates',['update','check'])
+op('update_download','Download available release through Recipe',['update','download',release],s['update']=='available')
+op('update_apply','Merge release, preserving prepared changes',['update','apply',release]+cas,s['update']=='downloaded' and not s['pending'])
+if s['update']=='conflicted':op('resolve:conflict','Resolve etc/config (content)',['update','resolve','conflict']+cas,True,[field('choice','Resolution','--choice',True,['local','release','edited']),field('file','Edited contents (optional)','--file',False)])
+op('update_recover','Continue captured merge',['update','recover']+cas,s['update']=='resolved')
+op('finalize','Finalize the prepared system',['finalize']+cas,bool(p) and s['phase']=='prepared')
+op('set_next','Try the prepared system on next reboot',['set-next',other]+cas+['--generation',candidate],s['phase']=='ready' and not s['pending'])
+op('rollback','Return to the protected system',['rollback','--generation',gid],s['pending'])
+op('commit','Keep the running system',['commit','--generation',gid],s['pending'])
+op('discard','Discard all prepared changes',['discard']+cas,bool(p) and not s['pending'],[],True)
+state='restart_set' if s['pending'] else 'conflicted' if s['update']=='conflicted' else 'trial_failed' if s['failed'] else 'interrupted' if s['phase']=='interrupted' else 'ready' if s['phase']=='ready' else 'open' if p else 'stable'
+trial=dict(slot=other,generation=candidate,fallback_generation=gid,attempt='d'*64,committed=False,detail='assessment failed; returned to protected generation',unix_time=1794350000) if s['failed'] else None
+update=dict(phase=s['update'],highest_index=2,available=dict(id=release,version='2.0',sequence=2,channel='development',total_bytes=4096),download=dict(release=release,verified_files=4,total_files=4,verified_bytes=4096,total_bytes=4096,reused_files=0,producer_write_bytes=0,producer_cancelled_write_bytes=0,downloaded=True,accounting_complete=True) if s['update']!='available' else None,pending_release=release if s['update'] in ['conflicted','resolved','complete'] else None,pending_preparation=pid if s['update'] in ['conflicted','resolved'] else None,last_error=None,merge_complete=s['update']=='complete',merge=dict(preparation=pid,revision=s['revision'],release=release,phase=s['update'],unresolved=1 if s['update']=='conflicted' else 0,conflicts=[dict(id='conflict',path='etc/config',path_hex='6574632f636f6e666967',kind='content',resolution=None)] if s['update']=='conflicted' else [],report=None,failure=None) if s['phase']=='update' else None)
+status=dict(schema_version=10,running_release='1.0',prepared_release='2.0' if s['update']=='complete' else '1.0' if p else None,operations=ops,lifecycle=dict(state=state,other='next' if p else 'copy',working=False,reboot_needed=s['pending'],trial_current=bool(trial)),updates=update,active_slot=active,inactive_slot=other,trial_pending=s['pending'],next_boot=other if s['pending'] else active,default_slot=active,known_good_slot=active,committed=True,rollback_slot=None,scheduled_trial=other if s['pending'] else None,last_trial=trial,entry_prefix='levitateos',preparation=p,recovery_reason=None,actions=[],slots=[dict(slot=slot,entry=f'loader/entries/levitateos-{slot.lower()}.conf',boot_dir='recab/objects',root='PARTUUID=fixture-'+slot,device='/dev/fixture'+slot,bootable=True,trial=False,generation=dict(id=gid if slot==active or not p else candidate,inventory_digest=gid,kernel_digest=gid,initrd_digest=gid),readiness='committed' if slot==active else 'ready' if s['phase']=='ready' or not p else 'incomplete',generation_ready=slot==active or s['phase']=='ready' or not p,seal=None,kernel='recab/objects/kernel',initrd='recab/objects/initrd') for slot in ['A','B']])
+if 'status' in args:print(json.dumps(status));raise SystemExit(0)
+# Recognize only concrete commands that this status actually offered.
+words=args[:]
+for flag in ['--actor']:
+ if flag in words:i=words.index(flag);del words[i:i+2]
+words=[w for w in words if w not in ['--json','--machine-events']]
+def fail(message):
+ print(json.dumps(dict(schema_version=1,event='failed',operation='fixture',message=message,code=21)),file=sys.stderr);raise SystemExit(21)
+if '--revision' in words and int(words[words.index('--revision')+1])!=s['revision']:fail('stale preparation revision')
+if not words:fail('no operation')
+command=words[0]
+if '--machine-events' in args:print(json.dumps(dict(schema_version=1,event='started',operation=command,message='UI fixture operation',code=None)),file=sys.stderr)
+if command=='prepare':s['phase']='prepared'
+elif command=='change' or command=='edit':
+ s['phase']='prepared';s['changes'].append(dict(id=str(s['revision']),action=words[1] if command=='change' else 'edit',package=words[-1],actor='person',unix_time=1794350000))
+elif command=='finalize':s['phase']='ready';s['failed']=False
+elif command=='set-next':s['pending']=True
+elif command in ['commit','rollback']:s['pending']=False
+elif command=='discard':s['phase']=None;s['changes']=[]
+elif command=='update':
+ verb=words[1]
+ if verb=='check':s['update']='available'
+ elif verb=='download':s['update']='downloaded'
+ elif verb=='apply':s['update']='conflicted';s['phase']='update'
+ elif verb=='resolve':s['update']='resolved'
+ elif verb=='recover':s['update']='complete';s['phase']='prepared'
+ else:fail('unsupported update fixture operation')
+else:fail('unsupported fixture operation')
+s['revision']+=1;path.write_text(json.dumps(s));print(json.dumps(dict(completed=True)))
+if '--machine-events' in args:print(json.dumps(dict(schema_version=1,event='finished',operation=command,message='UI fixture completed',code=0)),file=sys.stderr)

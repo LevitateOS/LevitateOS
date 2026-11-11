@@ -493,8 +493,8 @@ SystemsState SystemsState::fromJson(const QJsonObject &object, const QString &os
         s.otherRole = object["other"].toObject()["role"].toString();
         return s;
     }
-    if (schema != 7 && schema != 8 && schema != 9) {
-        s.problem = QObject::tr("recab answered in a form this window does not know (schema %1; it reads schemas 7, 8 and 9, "
+    if (schema != 7 && schema != 8 && schema != 9 && schema != 10) {
+        s.problem = QObject::tr("recab answered in a form this window does not know (schema %1; it reads schemas 7 through 10, "
                                 "recab's own, and schema 3, its stand-in's).")
                         .arg(schema);
         return s;
@@ -515,9 +515,10 @@ SystemsState SystemsState::fromJson(const QJsonObject &object, const QString &os
     const QString role = object["lifecycle"].toObject()["other"].toString();
     if (role != QLatin1String("unknown"))
         s.otherRole = role;
+    s.runningRelease=object["running_release"].toString(s.runningRelease);
     // The next system continues the running one, and a copy is it.
     if (role == QLatin1String("next") || role == QLatin1String("copy"))
-        s.otherRelease = s.runningRelease;
+        s.otherRelease = object["prepared_release"].toString(s.runningRelease);
     s.key = QStringLiteral("%1/%2/%3/%4")
                 .arg(running, runningGeneration, otherGeneration)
                 .arg(preparation["revision"].toInteger(0));

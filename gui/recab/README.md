@@ -25,24 +25,21 @@ again", and the agent (`Agent: Codex, signed in` when `RECAB_GUI_AGENT` is
 
 ## State (2026-11-10)
 
-**It reads and drives the real recab, and that has not run on a real A/B
-system.** The window reads recab's own status (schema 7: two slots, a
-preparation with every change made in it, and the state in one word that recab
-works out itself) and sends recab's own commands (`prepare`, `finalize`,
-`discard` with the preparation's id and revision, `set-next`, `commit`,
-`rollback`), each with `--actor person`. This was
-checked two ways: against `fixtures/recab-real`, a stand-in that speaks exactly
-the real recab's status and commands, where the whole story passes; and
-against the real `recab` binary on a development machine that is no A/B
-system, where the window shows recab's own refusal and offers to read as
-administrator.
+**The real interface is recab status schema 10.** The existing pages read its
+lifecycle and offered operations, with concrete argument vectors and declared
+inputs. The software/update/recovery section supports Recipe changes, signed
+updates, merge decisions, reproduction and interrupted-work recovery. Every
+request retains the preparation revision/generation the person viewed; conflict
+choices refresh between submissions. Earlier schemas 7–9 keep their limited
+boot/preparation mapping, and schema 3 remains a drawing fixture.
 
-What the real recab does not have, the window does not show with it: an
-update from within the window, a clash between an update and a change, and an
-agent's proposal waiting to be accepted. Those exist only in the older
-stand-in (`fixtures/recab`, schema 3), which stays for drawing those pages.
-
-Still a stand-in everywhere: the agent, the restart and `pkexec`.
+`fixtures/lifecycle` supplies schema-10 UI scenarios in either direction, or
+passes through a real status snapshot from `RECAB_STATUS_FILE`. Existing older
+fixtures remain available. Focused command integration uses real GPT/ext4/vfat
+and signed release inputs. Changed Qt objects compile independently; a full Qt
+application build and booted-system GUI behavior are not established by those
+checks. The default integrations use installed recab, pkexec and reboot;
+inspection substitutes fixtures.
 
 ## What a person sees
 
@@ -303,12 +300,12 @@ allowed to run, and whether it runs as the person or as root are not decided.
   no command that undoes one.
 - Who made a change is only as good as what the caller says: `--actor` is a
   label recab records, not something it checks.
-- Updates from within the window: the real recab takes a release from media
-  (`recab stage`), which the window does not offer.
+- Production online updates still need a configured distribution origin and keys.
+  The window exposes backend check/download/apply and signed media operations.
 - A real agent, and the approval of what it may do. Codex and Claude Code do
   not speak the lines above as they are; something has to stand between.
-- Deciding several clashes by hand was written but never run: the stand-in
-  only ever makes one clash.
+- Desktop conflict dialogs are compiled and use one revision at a time; actual
+  booted-system GUI validation is still outstanding.
 - It does not notice a change made elsewhere while the window is in front and
   nobody presses anything; it reads again on coming back to it.
 - Going back when no restart is wanted yet; a notice when an update appears or

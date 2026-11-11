@@ -49,24 +49,28 @@ bool RecabClient::understand(Run *finished, bool ok, Status *into, QString *erro
     }
     const QJsonObject object = QJsonDocument::fromJson(finished->answer()).object();
     const int schema = object["schema_version"].toInt();
+    if(schema==10 && object["updates"].toObject()["phase"]=="unavailable" && object["updates"].toObject()["last_error"].toString().contains("Permission denied")){
+        *error=tr("Administrator access is needed to read the prepared release and update records.");if(permission)*permission=true;return false;
+    }
     if (schema == 3) {
         // The stand-in: it reports the lifecycle directly.
         *into = Status::fromJson(object);
-    } else if (schema == 7 || schema == 8 || schema == 9) {
+    } else if (schema == 7 || schema == 8 || schema == 9 || schema == 10) {
         // The real recab: two slots, a preparation and the state in one
         // word. It names no release.
         *into = Status::fromReal(object, osField(osRelease_, "NAME"), osField(osRelease_, "VERSION_ID"));
-        if (!into->unusable.isEmpty()) {
+        if (!into->unusable.isEmpty() && into->operations.isEmpty()) {
             *error = tr("recab says the system needs recovery before anything else: %1").arg(into->unusable);
             return false;
         }
     } else {
-        *error = tr("`%1 status --json` answered with schema %2. This window reads schemas 7, 8 and 9, recab's own, and "
+        *error = tr("`%1 status --json` answered with schema %2. This window reads schemas 7 through 10, recab's own, and "
                     "schema 3, its stand-in's.")
                      .arg(program_)
                      .arg(schema);
         return false;
     }
+    operations_ = into->operations;
     real_ = into->real;
     preparationId_ = into->preparationId;
     preparationRevision_ = into->preparationRevision;
@@ -79,7 +83,14 @@ QStringList RecabClient::realArguments(const QStringList &arguments) const
 {
     const QString verb = arguments.value(0);
     // What this window asks for is asked by the person in front of it.
-    const QStringList asked{"--json", "--actor", "person"};
+    QStringList asked{"--json", "--actor", "person"};
+    if(!operations_.isEmpty())asked<<"--machine-events";
+    if(verb=="catalog")return asked+arguments.mid(1);
+    if(!operations_.isEmpty()){
+        QString id=verb=="set-next"?QStringLiteral("set_next"):verb;
+        if(verb=="recover"){for(const auto &candidate:{"trial_recover","change_recover","update_recover","finalize_recover","sync_recover"})for(const auto &v:operations_){auto op=v.toObject();if(op["id"]==candidate && op["verdict"]=="ready"){QStringList args;for(auto a:op["argv"].toArray())args<<a.toString();return asked+args;}}}
+        for(const auto &v:operations_){auto op=v.toObject();if(op["id"]==id){QStringList args;for(auto a:op["argv"].toArray())args<<a.toString();return asked+args;}}
+    }
     QStringList which;
     if (!preparationId_.isEmpty() && preparationRevision_ >= 0)
         which = QStringList{"--preparation", preparationId_, "--revision", QString::number(preparationRevision_)};

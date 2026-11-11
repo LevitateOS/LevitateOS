@@ -45,6 +45,7 @@ private:
     // From the last status understood: which recab answers, and what its
     // commands need to be told.
     bool real_ = false;
+    QJsonArray operations_;
     QString preparationId_, otherSlot_;
     qint64 preparationRevision_ = -1;
 };

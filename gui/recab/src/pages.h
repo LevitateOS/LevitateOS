@@ -26,6 +26,7 @@ public:
     // read with the administrator's password.
     void showProblem(const QString &problem, bool asAdministrator = false);
 signals:
+    void operation(const QJsonObject &operation);
     void ask();
     void addUpdate();
     void goBack();
@@ -57,6 +58,7 @@ public:
     using Page::Page;
     void show(const Status &status);
 signals:
+    void operation(const QJsonObject &operation);
     void ask();
     void installSoftware();
     void reset();

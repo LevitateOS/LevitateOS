@@ -7,6 +7,9 @@
 #include "refresh.h"
 
 #include <QFile>
+#include <QInputDialog>
+#include <QLineEdit>
+#include <QJsonArray>
 #include <QFileDialog>
 #include <QTimer>
 #include <QLocale>
@@ -85,6 +88,8 @@ Window::Window(QWidget *parent)
     });
 
     connect(system_, &SystemPage::ask, this, [this] { showAsk(); });
+    connect(system_, &SystemPage::operation,this,&Window::runOperation);
+    connect(next_, &NextPage::operation,this,&Window::runOperation);
     connect(system_, &SystemPage::addUpdate, this, [this] { addUpdate(); });
     connect(system_, &SystemPage::goBack, this, [this] { goBack(); });
     connect(system_, &SystemPage::keep, this, &Window::keep);
@@ -410,8 +415,30 @@ void Window::fixWithAgent(const QString &prompt, const QString &title)
          });
 }
 
+void Window::runOperation(const QJsonObject &op) {
+    if(busy() || op["verdict"]!="ready")return;
+    if(op["id"]=="reboot"){chain({client_.reboot()});return;}
+    QStringList args{"catalog"};for(auto v:op["argv"].toArray())args<<v.toString();
+    QString choice;
+    for(const auto &v:op["inputs"].toArray()){
+        const auto field=v.toObject();if(field["name"]=="file" && !choice.isEmpty() && choice!="edited")continue;
+        QString value;bool ok=false;QStringList choices;for(auto c:field["choices"].toArray())choices<<c.toString();
+        if(choices.isEmpty())value=QInputDialog::getText(this,op["label"].toString(),field["label"].toString(),QLineEdit::Normal,QString(),&ok);
+        else value=QInputDialog::getItem(this,op["label"].toString(),field["label"].toString(),choices,0,false,&ok);
+        if(!ok)return;
+        value=value.trimmed();
+        if((field["required"].toBool() || (field["name"]=="file" && choice=="edited")) && value.isEmpty()){QMessageBox::warning(this,tr("System"),tr("A value is required."));return;}
+        if(field["name"]=="choice")choice=value;
+        if(!value.isEmpty()){if(!field["flag"].isNull())args<<field["flag"].toString();args<<value;}
+    }
+    if(op["destructive"].toBool()){ConfirmDialog question(op["label"].toString(),op["label"].toString()+"?",{tr("The running system is kept. Prepared changes in the other system cannot be recovered.")},QString(),tr("Continue"),this);if(question.exec()!=QDialog::Accepted)return;}
+    work(client_.change(args),op["label"].toString(),tr("Working on the inactive system. The running system is preserved."),
+         [this](bool){showSection();});
+}
+
 void Window::addUpdate(bool askFirst)
 {
+    if(!status_.operations.isEmpty()){for(auto id:{"update_apply","update_download","update_check"})for(auto v:status_.operations){auto op=v.toObject();if(op["id"]==id && op["verdict"]=="ready"){runOperation(op);return;}}return;}
     if (askFirst && status_.otherRole == QLatin1String("previous")) {
         QScopedPointer<ConfirmDialog> question(reuseQuestion());
         if (question->exec() != QDialog::Accepted)
@@ -537,6 +564,7 @@ void Window::acceptProposal()
 // One question for each file that clashes, then all the answers at once.
 void Window::decideByHand()
 {
+    if(!status_.operations.isEmpty()){for(auto v:status_.operations){auto op=v.toObject();if(op["id"].toString().startsWith("resolve:") && op["verdict"]=="ready"){runOperation(op);return;}}return;}
     QList<Run *> runs;
     int number = 0;
     for (const Clash &clash : status_.clashes) {

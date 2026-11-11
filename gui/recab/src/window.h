@@ -61,6 +61,7 @@ public:
 
     // Reads the system again, as F5 does.
     void refresh();
+    void runOperation(const QJsonObject &operation);
     // Whether the agent has asked something; and answering it.
     bool agentAsks() const;
     void answerAgent(const QString &words);

@@ -6,6 +6,7 @@
 #include "words.h"
 
 #include <QJsonObject>
+#include <QJsonArray>
 #include <QList>
 #include <QMap>
 #include <QString>
@@ -37,6 +38,9 @@ struct Check {
 };
 
 struct Status {
+    QJsonArray operations;
+    QString updatePhase, updateError, downloadProgress;
+    bool rebootNeeded = false;
     // Read from the real recab, which speaks of two slots and a preparation,
     // not from the stand-in, which speaks of the lifecycle directly.
     bool real = false;

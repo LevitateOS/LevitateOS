@@ -4,10 +4,12 @@
 #include "run.h"
 
 #include <QDialogButtonBox>
+#include <functional>
 #include <QFontDatabase>
 #include <QDateTime>
 #include <QFormLayout>
 #include <QGridLayout>
+#include <QGroupBox>
 #include <QLocale>
 #include <QScrollArea>
 #include <QJsonArray>
@@ -114,9 +116,24 @@ void SystemPage::showProblem(const QString &problem, bool asAdministrator)
     column->addStretch();
 }
 
+static void lifecyclePage(QVBoxLayout *column,const Status &s,QObject *owner,std::function<void(const QJsonObject&)> request) {
+    auto *group=new QGroupBox(QObject::tr("Software, updates and recovery"));
+    group->setCheckable(true);
+    auto *outer=new QVBoxLayout(group);auto *body=new QWidget;auto *actions=new QVBoxLayout(body);outer->addWidget(body);
+    if(!s.unusable.isEmpty())actions->addWidget(text(s.unusable,true));
+    if(!s.updatePhase.isEmpty())actions->addWidget(text(QObject::tr("Update: %1 %2").arg(s.updatePhase,s.downloadProgress),true));
+    if(!s.updateError.isEmpty())actions->addWidget(text(s.updateError,true));
+    for(const auto &v:s.operations){const auto op=v.toObject();auto *button=new QPushButton(QFontMetrics(group->font()).elidedText(op["label"].toString(),Qt::ElideMiddle,600));button->setEnabled(op["verdict"]=="ready");button->setToolTip(op["label"].toString()+"\n"+op["reason"].toString());actions->addWidget(button);QObject::connect(button,&QPushButton::clicked,owner,[request,op]{request(op);});}
+    auto *start=new QPushButton(QObject::tr("Reboot"));actions->addWidget(start);QObject::connect(start,&QPushButton::clicked,owner,[request]{request(QJsonObject{{"id","reboot"},{"verdict","ready"}});});
+    const bool expanded=!s.unusable.isEmpty() || !s.clashes.isEmpty() || s.state=="interrupted";
+    group->setChecked(expanded);body->setVisible(expanded);QObject::connect(group,&QGroupBox::toggled,body,&QWidget::setVisible);
+    column->addWidget(group);
+}
+
 void SystemPage::show(const Status &s)
 {
     QVBoxLayout *column = fresh();
+    if(!s.operations.isEmpty())lifecyclePage(column,s,this,[this](const QJsonObject &op){emit operation(op);});
     const bool next = s.otherRole == QLatin1String("next");
     const QString running = s.name(s.runningRelease);
     const QStringList titles = s.changeTitles();
@@ -654,6 +671,7 @@ QWidget *changeList(const Status &s)
 void NextPage::show(const Status &s)
 {
     QVBoxLayout *column = fresh();
+    if(!s.operations.isEmpty())lifecyclePage(column,s,this,[this](const QJsonObject &op){emit operation(op);});
     column->setSpacing(12);
     const bool next = s.otherRole == QLatin1String("next");
     const QString state = s.state;

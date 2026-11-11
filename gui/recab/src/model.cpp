@@ -130,13 +130,15 @@ Status Status::fromReal(const QJsonObject &o, const QString &distro, const QStri
 {
     Status s;
     s.real = true;
+    s.operations=o["operations"].toArray();
+    s.rebootNeeded=o["lifecycle"].toObject()["reboot_needed"].toBool();
     s.distro = distro;
-    s.runningRelease = release;
+    s.runningRelease = o["running_release"].toString(release);
     s.runningSlot = o["active_slot"].toString();
     s.otherSlot = o["inactive_slot"].toString();
 
     const QJsonObject trial = o["last_trial"].toObject();
-    if (!trial.isEmpty()) {
+    if (!trial.isEmpty() && (o["schema_version"].toInt()<10 || o["lifecycle"].toObject()["trial_current"].toBool())) {
         s.trialDetail = trial["detail"].toString();
         s.trialWhen = QLocale().toString(QDateTime::fromSecsSinceEpoch(trial["unix_time"].toInteger()), QLocale::ShortFormat);
         // Kept: the running system is the one that was tried.
@@ -161,7 +163,7 @@ Status Status::fromReal(const QJsonObject &o, const QString &distro, const QStri
     static const QMap<QString, QString> states{
         {"stable", "stable"},           {"open", "preparing"}, {"working", "working"},
         {"interrupted", "interrupted"}, {"ready", "ready"},    {"restart_set", "trial_pending"},
-        {"on_trial", "on_trial"},       {"trial_failed", "failed"}};
+        {"conflicted", "preparing"}, {"on_trial", "on_trial"},       {"trial_failed", "failed"}};
     const QString said = lifecycle["state"].toString();
     s.state = states.value(said);
     if (s.state.isEmpty()) {
@@ -170,17 +172,19 @@ Status Status::fromReal(const QJsonObject &o, const QString &distro, const QStri
                          ? reason
                          : QObject::tr("recab reports the state \"%1\", which this window does not know").arg(said);
     }
+    if(said=="unusable"){s.state="interrupted";s.unusable=o["recovery_reason"].toString();s.interruptedDuring=s.unusable;}
     const QString other = lifecycle["other"].toString();
     s.otherRole = other == QLatin1String("unknown") || other.isEmpty() ? QStringLiteral("none") : other;
     // The next system continues the running one, and a copy is it.
     if (s.otherRole == QLatin1String("next") || s.otherRole == QLatin1String("copy"))
-        s.otherRelease = release;
+        s.otherRelease = o["prepared_release"].toString(release);
 
     const QJsonObject p = o["preparation"].toObject();
     if (!p.isEmpty()) {
         s.preparationId = p["id"].toString();
         s.preparationRevision = p["revision"].toInteger(-1);
-        s.otherState = p["phase"] == QLatin1String("ready") ? QStringLiteral("ready") : QStringLiteral("open");
+        if(p["slot"].toString()==s.otherSlot)
+            s.otherState = p["phase"] == QLatin1String("ready") ? QStringLiteral("ready") : QStringLiteral("open");
         // Every finished change, oldest first, with who asked for it.
         for (const QJsonValue &value : p["changes"].toArray()) {
             ChangeItem item = changeFrom(value.toObject());
@@ -234,5 +238,19 @@ Status Status::fromReal(const QJsonObject &o, const QString &distro, const QStri
                                     : ActionVerdict{false, QObject::tr("Nothing was interrupted.")});
     s.actions.insert("update", ActionVerdict{false, QObject::tr("recab takes a new release from release media; "
                                                                 "this window cannot add one yet.")});
+    if (!s.operations.isEmpty()) {
+        const QJsonObject update=o["updates"].toObject();
+        s.updatePhase=update["phase"].toString();s.updateError=update["last_error"].toString();
+        s.updateRelease=update["available"].toObject()["version"].toString();
+        s.updateBytes=update["available"].toObject()["total_bytes"].toInteger();
+        const QJsonObject download=update["download"].toObject();
+        if(!download.isEmpty())s.downloadProgress=QObject::tr("%1 / %2 verified bytes%3").arg(download["verified_bytes"].toInteger()).arg(download["total_bytes"].toInteger()).arg(download["downloaded"].toBool()?QObject::tr(" — downloaded"):QString());
+        for(const QJsonValue &value:update["merge"].toObject()["conflicts"].toArray()) {const auto c=value.toObject();if(c["resolution"].isNull())s.clashes<<Clash{c["path"].toString()+" ("+c["kind"].toString()+")",QObject::tr("Prepared content (private)"),QObject::tr("Release content (private)")};}
+        auto own=[&s](const QString &id){ for(const auto &v:s.operations){const auto op=v.toObject();if(op["id"]==id)return ActionVerdict{op["verdict"]=="ready",op["reason"].toString()};}return ActionVerdict{false,QObject::tr("recab did not offer this operation")};};
+        s.actions["finalize"]=own("finalize");s.actions["discard"]=own("discard");s.actions["go_back"]=own("rollback");s.actions["keep"]=own("commit");s.actions["restart"]=s.state=="trial_pending"?ActionVerdict{true,QString()}:own("set_next");
+        s.actions["change"]=own("install");s.actions["recover"]=own("update_recover");
+        for(const auto &id:{"trial_recover","change_recover","finalize_recover","sync_recover"})if(own(id).ready)s.actions["recover"]=own(id);
+        s.actions["update"]=own("update_apply");if(!s.actions["update"].ready)s.actions["update"]=own("update_download");if(!s.actions["update"].ready)s.actions["update"]=own("update_check");
+    }
     return s;
 }
