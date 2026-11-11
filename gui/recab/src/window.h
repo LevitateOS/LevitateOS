@@ -10,6 +10,8 @@
 
 class AskPage;
 class ClashPage;
+class HistoryPage;
+class ReleasePage;
 class ConfirmDialog;
 class Frame;
 class NextPage;
@@ -29,6 +31,9 @@ public:
     void showMain();
     void showNext();
     void showBack();
+    // What happened to the systems (read from recab each time), and a new release.
+    void showHistory();
+    void showRelease();
     // The page the person was on before a flow took them elsewhere.
     void showSection();
     void showAsk(const QString &request = QString());
@@ -61,14 +66,24 @@ public:
 
     // Reads the system again, as F5 does.
     void refresh();
-    void runOperation(const QJsonObject &operation);
+    // `extra` follows the operation's own arguments; `then` runs when it has ended
+    // (default: back to the page the person came from).
+    void runOperation(const QJsonObject &operation, const QStringList &extra = QStringList(),
+                      std::function<void(bool)> then = nullptr);
+    // One of recab's operations by its id, then the release page again.
+    void runReleaseOperation(const QString &id);
+    // A release manifest from a file the person chooses (`update_media`);
+    // `path` names it without asking, for the picture mode.
+    void addFromFile(const QString &path = QString());
+    // Writes the history as plain text.
+    bool saveHistory(const QString &path);
     // Whether the agent has asked something; and answering it.
     bool agentAsks() const;
     void answerAgent(const QString &words);
 
     const Status &status() const { return status_; }
     Frame *frame() const { return frame_; }
-    bool busy() const { return run_ != nullptr || quiet_ > 0 || reading_ != nullptr; }
+    bool busy() const { return run_ != nullptr || quiet_ > 0 || reading_ != nullptr || readingHistory_ != nullptr; }
 
 private:
     // Reads the system without holding the window up, then does `then`. When
@@ -85,7 +100,8 @@ private:
 
     RecabClient client_;
     Status status_;
-    Run *run_ = nullptr, *reading_ = nullptr;
+    Run *run_ = nullptr, *reading_ = nullptr, *readingHistory_ = nullptr;
+    History history_;
     bool read_ = false; // the system was read at least once
     bool asRoot_ = false; // reading needs the administrator's rights here
     Refresher *refresher_;
@@ -97,6 +113,8 @@ private:
     SystemPage *system_;
     NextPage *next_;
     BackPage *back_;
+    HistoryPage *historyPage_;
+    ReleasePage *release_;
     // The rail entry the pages in between (ask, work, clash) belong to.
     QString section_;
     AskPage *ask_;

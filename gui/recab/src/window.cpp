@@ -36,6 +36,24 @@ QString requestTitle(const QString &prompt, const QString &fallback)
     return fallback;
 }
 
+// What the work page is titled for one of recab's operations: its label is
+// written for a list of buttons, and is long for a heading.
+QString workTitle(const QJsonObject &op)
+{
+    const QString id = op["id"].toString();
+    if (id == QLatin1String("update_check"))
+        return QObject::tr("Looking for a new release");
+    if (id == QLatin1String("update_download"))
+        return QObject::tr("Downloading the release");
+    if (id == QLatin1String("update_apply") || id == QLatin1String("update_media"))
+        return QObject::tr("Adding the release to the next system");
+    if (id == QLatin1String("update_recover"))
+        return QObject::tr("Carrying on adding the release");
+    if (id == QLatin1String("update_cancel"))
+        return QObject::tr("Taking the release out of the next system");
+    return op["label"].toString();
+}
+
 } // namespace
 
 Window::Window(QWidget *parent)
@@ -47,11 +65,14 @@ Window::Window(QWidget *parent)
     system_ = new SystemPage;
     next_ = new NextPage;
     back_ = new BackPage;
+    historyPage_ = new HistoryPage;
+    release_ = new ReleasePage;
     ask_ = new AskPage;
     work_ = new WorkPage;
     clash_ = new ClashPage;
     proposed_ = new ProposedPage;
     for (QWidget *page : {static_cast<QWidget *>(system_), static_cast<QWidget *>(next_), static_cast<QWidget *>(back_),
+                          static_cast<QWidget *>(historyPage_), static_cast<QWidget *>(release_),
                           static_cast<QWidget *>(ask_), static_cast<QWidget *>(work_),
                           static_cast<QWidget *>(clash_), static_cast<QWidget *>(proposed_)})
         stack_->addWidget(page);
@@ -61,6 +82,7 @@ Window::Window(QWidget *parent)
     frame_->setContent(stack_);
     frame_->addEntry(QStringLiteral("overview"), tr("Overview"));
     frame_->addEntry(QStringLiteral("next"), tr("The next system"));
+    frame_->addEntry(QStringLiteral("history"), tr("History"));
     frame_->addEntry(QStringLiteral("back"), tr("Getting back"));
     frame_->select(QStringLiteral("overview"));
     section_ = QStringLiteral("overview");
@@ -72,6 +94,8 @@ Window::Window(QWidget *parent)
             updateStrip();
         else if (key == QLatin1String("next"))
             showNext();
+        else if (key == QLatin1String("history"))
+            showHistory();
         else if (key == QLatin1String("back"))
             showBack();
         else
@@ -88,8 +112,8 @@ Window::Window(QWidget *parent)
     });
 
     connect(system_, &SystemPage::ask, this, [this] { showAsk(); });
-    connect(system_, &SystemPage::operation,this,&Window::runOperation);
-    connect(next_, &NextPage::operation,this,&Window::runOperation);
+    connect(system_, &SystemPage::operation, this, [this](const QJsonObject &op) { runOperation(op); });
+    connect(next_, &NextPage::operation, this, [this](const QJsonObject &op) { runOperation(op); });
     connect(system_, &SystemPage::addUpdate, this, [this] { addUpdate(); });
     connect(system_, &SystemPage::goBack, this, [this] { goBack(); });
     connect(system_, &SystemPage::keep, this, &Window::keep);
@@ -112,6 +136,25 @@ Window::Window(QWidget *parent)
     connect(system_, &SystemPage::openBack, this, [this] {
         frame_->select(QStringLiteral("back"));
         showBack();
+    });
+
+    connect(system_, &SystemPage::openRelease, this, &Window::showRelease);
+    connect(next_, &NextPage::openRelease, this, &Window::showRelease);
+    connect(release_, &ReleasePage::back, this, &Window::showSection);
+    connect(release_, &ReleasePage::operation, this, &Window::runReleaseOperation);
+    connect(release_, &ReleasePage::add, this, [this] { addUpdate(); });
+    connect(release_, &ReleasePage::addFromFile, this, [this] { addFromFile(); });
+    connect(release_, &ReleasePage::settle, this, &Window::showClash);
+    connect(release_, &ReleasePage::finish, this, [this] {
+        frame_->select(QStringLiteral("next"));
+        showNext();
+    });
+    connect(historyPage_, &HistoryPage::readAgain, this, &Window::showHistory);
+    connect(historyPage_, &HistoryPage::saveAsFile, this, [this] {
+        const QString path = QFileDialog::getSaveFileName(this, tr("Save the history"), QStringLiteral("history.txt"),
+                                                          tr("Text (*.txt)"));
+        if (!path.isEmpty() && !saveHistory(path))
+            QMessageBox::warning(this, tr("System"), tr("The history could not be saved to %1.").arg(path));
     });
 
     connect(next_, &NextPage::ask, this, [this] { showAsk(); });
@@ -180,7 +223,7 @@ Window::Window(QWidget *parent)
     refresher_ = new Refresher(this, 20);
     connect(refresher_, &Refresher::asked, this, [this](bool byHand) {
         if (stack_->currentWidget() == system_ || stack_->currentWidget() == next_ || stack_->currentWidget() == back_
-            || byHand)
+            || stack_->currentWidget() == historyPage_ || stack_->currentWidget() == release_ || byHand)
             refresh();
     });
     connect(refresher_, &Refresher::asked, frame_, &Frame::readAgain);
@@ -201,10 +244,13 @@ void Window::refresh()
     // Only the pages drawn from the state alone are drawn again; a page being
     // filled in is left as it is.
     QWidget *shown = stack_->currentWidget();
-    const bool main = shown == system_ || shown == next_ || shown == back_;
-    reload([this, main] {
+    const bool main = shown == system_ || shown == next_ || shown == back_ || shown == historyPage_;
+    const bool release = shown == release_;
+    reload([this, main, release] {
         if (main)
             showSection();
+        else if (release)
+            showRelease();
     });
 }
 
@@ -240,7 +286,10 @@ void Window::reload(std::function<void()> then)
                          status_.otherRole == QLatin1String("next") ? int(status_.changes.size()) : 0);
         updateStrip();
         refresher_->fresh();
-        frame_->setStatus(tr("Read from recab at %1").arg(QLocale().toString(QTime::currentTime(), QLocale::ShortFormat)));
+        const QString at = QLocale().toString(QTime::currentTime(), QLocale::ShortFormat);
+        frame_->setStatus(status_.state == QLatin1String("working")
+                              ? tr("Read from recab at %1, and again every two seconds while a command runs").arg(at)
+                              : tr("Read from recab at %1").arg(at));
         if (then)
             then();
         // A command started elsewhere is working: look again until it is done.
@@ -271,6 +320,8 @@ void Window::display(QWidget *page)
         section_ = QStringLiteral("next");
     else if (page == back_)
         section_ = QStringLiteral("back");
+    else if (page == historyPage_)
+        section_ = QStringLiteral("history");
     frame_->follow(section_);
     updateStrip();
 }
@@ -302,10 +353,48 @@ void Window::showBack()
     display(back_);
 }
 
+void Window::showHistory()
+{
+    if (readingHistory_)
+        return;
+    historyPage_->showLoading(tr("Reading the history"), tr("Asking recab what it has recorded."));
+    display(historyPage_);
+    readingHistory_ = client_.readHistory();
+    connect(readingHistory_, &Run::finished, this, [this](bool ok) {
+        Run *run = readingHistory_;
+        History history;
+        const bool read = client_.understandHistory(run, ok, &history, status_.preparationId);
+        history_ = history;
+        readingHistory_ = nullptr;
+        run->deleteLater();
+        if (read)
+            historyPage_->show(history);
+        else
+            historyPage_->showUnavailable(history);
+    });
+    readingHistory_->start();
+}
+
+void Window::showRelease()
+{
+    release_->show(status_);
+    display(release_);
+}
+
+bool Window::saveHistory(const QString &path)
+{
+    QFile file(path);
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate))
+        return false;
+    return file.write(history_.text().toUtf8()) >= 0;
+}
+
 void Window::showSection()
 {
     if (section_ == QLatin1String("next"))
         showNext();
+    else if (section_ == QLatin1String("history"))
+        showHistory();
     else if (section_ == QLatin1String("back"))
         showBack();
     else
@@ -415,10 +504,11 @@ void Window::fixWithAgent(const QString &prompt, const QString &title)
          });
 }
 
-void Window::runOperation(const QJsonObject &op) {
+void Window::runOperation(const QJsonObject &op, const QStringList &extra, std::function<void(bool)> after) {
     if(busy() || op["verdict"]!="ready")return;
     if(op["id"]=="reboot"){chain({client_.reboot()});return;}
     QStringList args{"catalog"};for(auto v:op["argv"].toArray())args<<v.toString();
+    args<<extra;
     QString choice;
     for(const auto &v:op["inputs"].toArray()){
         const auto field=v.toObject();if(field["name"]=="file" && !choice.isEmpty() && choice!="edited")continue;
@@ -432,13 +522,55 @@ void Window::runOperation(const QJsonObject &op) {
         if(!value.isEmpty()){if(!field["flag"].isNull())args<<field["flag"].toString();args<<value;}
     }
     if(op["destructive"].toBool()){ConfirmDialog question(op["label"].toString(),op["label"].toString()+"?",{tr("The running system is kept. Prepared changes in the other system cannot be recovered.")},QString(),tr("Continue"),this);if(question.exec()!=QDialog::Accepted)return;}
-    work(client_.change(args),op["label"].toString(),tr("Working on the inactive system. The running system is preserved."),
-         [this](bool){showSection();});
+    work(client_.change(args),workTitle(op),tr("Working on the inactive system. The running system is preserved."),
+         after ? after : [this](bool){showSection();});
+}
+
+// The release page's own steps: when one ends well the page is shown again
+// with what recab says now; when it fails the work page keeps recab's reason.
+void Window::runReleaseOperation(const QString &id)
+{
+    runOperation(status_.operationObject(id), QStringList(), [this](bool ok) {
+        if (ok)
+            showRelease();
+    });
+}
+
+void Window::addFromFile(const QString &named)
+{
+    const QJsonObject op = status_.operationObject(QStringLiteral("update_media"));
+    if (busy() || op["verdict"] != "ready")
+        return;
+    const QString path = !named.isEmpty() ? named
+                                          : QFileDialog::getOpenFileName(this, tr("Choose a release manifest"), QString(),
+                                                                         tr("Release manifest (release.json);;All files (*)"));
+    if (path.isEmpty())
+        return;
+    runOperation(op, QStringList{QStringLiteral("--manifest"), path}, [this](bool ok) {
+        if (ok)
+            showRelease();
+    });
 }
 
 void Window::addUpdate(bool askFirst)
 {
-    if(!status_.operations.isEmpty()){for(auto id:{"update_apply","update_download","update_check"})for(auto v:status_.operations){auto op=v.toObject();if(op["id"]==id && op["verdict"]=="ready"){runOperation(op);return;}}return;}
+    if (!status_.operations.isEmpty()) {
+        // recab's own merge of the release into the next system; the release
+        // page is where it came from, and where it returns.
+        const QJsonObject op = status_.operationObject(QStringLiteral("update_apply"));
+        if (op["verdict"] != "ready")
+            return;
+        if (askFirst && status_.otherRole == QLatin1String("previous")) {
+            QScopedPointer<ConfirmDialog> question(reuseQuestion());
+            if (question->exec() != QDialog::Accepted)
+                return;
+        }
+        runOperation(op, QStringList(), [this](bool ok) {
+            if (ok)
+                showRelease();
+        });
+        return;
+    }
     if (askFirst && status_.otherRole == QLatin1String("previous")) {
         QScopedPointer<ConfirmDialog> question(reuseQuestion());
         if (question->exec() != QDialog::Accepted)

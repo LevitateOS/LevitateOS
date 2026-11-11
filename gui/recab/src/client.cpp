@@ -36,6 +36,34 @@ Run *RecabClient::read(bool asRoot)
     return new Run(program_, arguments, this);
 }
 
+Run *RecabClient::readHistory()
+{
+    return new Run(program_, QStringList{"history", "--json"}, this);
+}
+
+bool RecabClient::understandHistory(Run *finished, bool ok, History *into, const QString &openPreparation)
+{
+    *into = History();
+    if (!ok) {
+        const QString said = finished->problem();
+        // A recab from before the command: clap's own words for an unknown
+        // one, or the older stand-in's.
+        into->unknown = said.contains(QLatin1String("unrecognized subcommand"))
+                        || said.contains(QLatin1String("unknown command"));
+        into->problem = said;
+        return false;
+    }
+    const QJsonObject object = QJsonDocument::fromJson(finished->answer()).object();
+    if (object["schema_version"].toInt() != 1) {
+        into->problem = tr("`%1 history --json` answered with schema %2; this window reads schema 1.")
+                            .arg(program_)
+                            .arg(object["schema_version"].toInt());
+        return false;
+    }
+    *into = History::fromJson(object, QString(), openPreparation);
+    return true;
+}
+
 bool RecabClient::understand(Run *finished, bool ok, Status *into, QString *error, bool *permission)
 {
     if (permission)

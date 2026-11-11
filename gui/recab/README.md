@@ -12,7 +12,7 @@ what recab says may be done.
 Qt 6 Widgets, C++20, CMake. Widgets shared with `gui/recipe` and `gui/disk` are in `gui/kit`.
 
 The window is the shared frame from `gui/kit/README.md`: a rail (the three apps;
-"Overview", "The next system" and "Getting back"; "Activity" and "Settings" below), the pages, a strip, and a status line.
+"Overview", "The next system", "History" and "Getting back"; "Activity" and "Settings" below), the pages, a strip, and a status line.
 The Ask, clash and work pages are shown in the same place and the rail keeps
 marked the page the person came from. "The next system" has a badge: the number of
 changes it holds, when it exists. The strip ("The next system holds N changes." and
@@ -23,7 +23,15 @@ runs from all three apps. The status line has what was read and when, with "Read
 again", and the agent (`Agent: Codex, signed in` when `RECAB_GUI_AGENT` is
 `levitate-agent`; its file name for a stand-in). Window size 1100 by 700 the first time, then the size it had when it closed (`rememberWindowSize` in `gui/kit`; the picture modes always use 1100 by 700).
 
-## State (2026-11-10)
+## State (2026-11-11)
+
+Since 2026-11-11 the window also has a Release page (a newer release: look,
+fetch, add, settle, carry on, take out), a History page (from the new
+`recab history --json`), the first view after a restart (on trial, kept, came
+back) and a Busy view as designed, all described under "The newer pages" below.
+`fixtures/recab-real` speaks schema 10 with `operations`, `updates` and
+`history`. None of it has run on a real A/B computer; `recab history` was run on
+sample files only.
 
 **The real interface is recab status schema 10.** The existing pages read its
 lifecycle and offered operations, with concrete argument vectors and declared
@@ -53,12 +61,12 @@ lives on the other two pages is not repeated there as rows.
 | Stable, no next system | "Your system is locked"; Make a change | "There is no next system yet": Make a change, Install software | the way back (when there is a system from before), nothing to cancel |
 | A change is asked for | Say it in words; the page shows what the agent is given. A question first when the place of the system from before will be reused | | |
 | Preparing | The steps, how far, the output. Stop keeps what is done | | |
-| Open, holding changes | Finish; add the update (older stand-in) | Every change with who and when; what will differ; the three steps, step 1 current: Finish | the system from before is gone: its place holds the next system |
-| A clash (older stand-in) | Settle the clash | Settle the clash | |
+| Open, holding changes | Finish; "A newer release is available" with "See it…" (the Release page) | Every change with who and when; what will differ; the three steps, step 1 current: Finish | the system from before is gone: its place holds the next system |
+| A clash | Settle the clash | Settle the clash (the Release page lists it too) | |
 | Ready | Restart into it | Step 2 current: Restart now, Start it at the next restart | |
 | Restart set | Restart now | Restart now, Cancel the set restart | Cancel it |
-| On trial | Keep this system | "You are on the next system, on trial": Keep it, Go back | Keep it; Go back |
-| Being worked on elsewhere | one sentence | the list, and one sentence: nothing can be started | |
+| On trial | "You are trying the new system": what is judged, Go back now…, Keep it now | "You are on the next system, on trial": Keep it, Go back | Keep it; Go back |
+| Being worked on elsewhere | "not an interruption", a "Change, finish, reset" row that is off with why | the list, and one sentence: nothing can be started | |
 | Interrupted | Continue where it stopped | Continue where it stopped, Discard | |
 | Tried, and the computer came back | the prompt for the agent, try again | step 3 marked failed: Try the same again, Hand it to the agent (leads to Overview) | "Kept already: the computer came back to it on …" |
 | After a kept restart | "You are on the new system" | "There is no next system yet" | "Kept already: it started properly on …"; the way back |
@@ -71,6 +79,60 @@ started" (from `last_trial`).
 There are no slot letters on Overview. "The next system" says which slot starts
 (and its device), and "Getting back" names the two systems as the start-up list
 does, because that is the one place where a person has to tell them apart.
+
+### The newer pages
+
+**Release.** Reached from Overview and "The next system" when recab knows of a
+newer release ("A newer release is available: ..."), and, when none is known,
+from the link "Check for a new release" on Overview (recab learns of a release
+only when asked, so without that link nothing could ask). The page follows where
+`updates.phase` and `updates.merge` stand: none known, nothing newer, the check
+failed (recab's error), available, being downloaded, downloaded, download
+stopped, adding it stopped on a clash or needs carrying on, and "in the next
+system". Its one main button is the next step recab offers (`update_check`,
+`update_download`, `update_apply`, `update_recover`, "Settle…", then "Finish and
+restart…"); "Take it out" is `update_cancel`; "Choose a file…" is `update_media`
+with `--manifest PATH`. It says what recab says about the release (version,
+channel, the size of all its files, how much is verified) and that recab says no
+more before it is added. In the mock-up and not here, because recab gives none
+of it: a release medium that is noticed, kernel and package lists, how much
+room it needs, "what happens to your changes" per package, when it was last
+checked, and "Skip this release".
+
+**First view after a restart.** Overview, by state. *On trial* is the mock-up's
+page: what is judged, "Go back now…" and "Keep it now", the two systems, and why
+nothing can be changed meanwhile in recab's own words (the refusal of
+`prepare`). *Kept* is "You are on the new system" with the time recab recorded.
+*Came back* is the failed-start page with the prompt for the agent. Each says its
+one thing to do once; the catalogue of recab's operations is shown only when the
+system needs recovery. Not shown, because recab reports neither: the start-up
+progress ("so far the login screen and the network started"), and "4 minutes
+ago". recab does say that `recab trial` waits up to 15 minutes for start-up
+(`TRIAL_TIMEOUT_SECS`), and the page says that. On trial recab still calls the
+other system "next" (the preparation that made the running system is kept until
+it is kept); the window shows it as the system from before, which is what
+`rollback` leads to. A system kept by hand with "Keep it now" leaves recab's last judged trial as it was (recab's `commit` records none), so Getting back then says it holds no record of one.
+
+**Busy.** A command running elsewhere (`lifecycle.working`): a heading that says
+it is not an interruption, the cards, a "Change, finish, reset" row that is off
+with why, and a status line that says it reads again every two seconds. There is
+no "Stop" and no "if it stands still" detection: recab reports no process and no
+progress for work started elsewhere.
+
+**Single system.** Not built. A computer installed with one system has no recab
+state; `recab status` then fails while reading the boot selection and says
+nothing that tells it from another failure, so the window shows its ordinary
+"The system could not be read". Telling them apart needs a new field in recab's
+status, which is not a small addition.
+
+**History.** A rail entry, from `recab history --json` (`tools/recab/README.md`).
+A table of when, what, who and how it ended, "All / Restarts / By the agent", the
+entry's detail under it ("recab recorded: ..."), and "Save as a file…". Only a
+change has a "made by" (recab keeps `--actor` only with a change). How a change
+ended is worked out from the other entries of its preparation (given up,
+finished, the restarts after it, the last counting). With a recab that has no
+such command (the older stand-in, or a recab from before it) the page says "This
+recab keeps no history it can show."
 
 ## Build and run from a checkout
 
@@ -121,7 +183,7 @@ export LEVITATE_ACTIVITY_AGENT=$PWD/.artifacts/agent/build/levitate-agent
 
 Without them the story says what is missing and fails. The pictures `s0-*` to `s14-*` are Settings: as first read, "Allowed", signing out (and the question first), a sign in that fails, signing in (the address Codex printed), another program, back to Codex, a refused value, "Try it" and the run in Activity, a helper that cannot be asked. The story sets `HOME`, `XDG_CONFIG_HOME`, `XDG_STATE_HOME` and `LEVITATE_AGENT_CODEX` itself for that part and puts them back. The pictures `a-*`
 (`r2c-*` in the real story) are Activity: the list, a done run, a run that
-waits, this window's own run, the strip on Activity. The pictures `p*` (older stand-in) and `rp*` (`--real`) are "The next system" and "Getting back" in the states each stand-in reaches; `p-steps-old.txt` and `rp-steps.txt` are the steps saved as a file. The other pictures show
+waits, this window's own run, the strip on Activity. The pictures `r8` to `r12` (`--real`) are the release page from "none known" to "in the next system" (a failed check, nothing newer, available, downloaded, a clash, settled, added; `r10b` is Overview with the clash), `r4a` is the first view on trial, `r13` and `r14` the first views after a restart that came back and one that was kept, `r13b` and `r15*` are History (a restart that came back, all, restarts only); `p12` and `p13` (older stand-in) are the release page with a one-step update and History without a command. The pictures `p*` (older stand-in) and `rp*` (`--real`) are "The next system" and "Getting back" in the states each stand-in reaches; `p-steps-old.txt` and `rp-steps.txt` are the steps saved as a file. The other pictures show
 Overview and the pages inside the frame.
 
 The story the real recab offers (two copies, a change by the agent, a command
@@ -161,7 +223,7 @@ Changes, through the root helper, each with `--machine-events`:
 
 | Command | For |
 |---|---|
-| `recab update apply` | add the newer release to the next system, creating it when needed |
+| `recab update apply` | add the newer release to the next system, creating it when needed (older stand-in; the real recab's is below) |
 | `recab resolve PATH --local\|--release\|--proposal` | settle a clash |
 | `recab finalize` | check and close the next system |
 | `recab set-next`, then the restart | start it once |
@@ -230,6 +292,24 @@ The agent is told what this recab offers (`recab prepare`, `recab change
 install|update|remove RECIPE`, `recab edit PATH`, `recab finalize`), the open
 preparation's id and revision, and the two slots.
 
+### Releases and history, from the real recab
+
+Each is read from `status --json` (schema 10) and driven through the operation
+of that id, whose `argv` the window sends as it is (with `--json --actor person
+--machine-events`). Source: `tools/recab/src`.
+
+| This window | The real recab |
+|---|---|
+| what is known of a release | `updates` (`UpdateStatus`, `update.rs` 43): `phase` (`idle`, `checking`, `up_to_date`, `available`, `check_failed`, `downloading`, `downloaded`, `interrupted`, `awaiting_merge`, or the merge's phase), `available` (`ReleaseSummary`, `update.rs` 19: `id`, `sequence`, `version`, `channel`, `total_bytes`), `download` (`DownloadProgress`, `update.rs` 28: `verified_bytes`, `total_bytes`, `downloaded`), `pending_release`, `last_error`, `merge_complete`, `merge` |
+| the merge and its clashes | `updates.merge` (`MergeStatus`, `merge.rs` 37: `phase`, `unresolved`, `failure`, `conflicts`) with each `Conflict` (`merge.rs` 28: `id`, `path`, `kind`, `resolution`) |
+| the running and the prepared release | `running_release` and `prepared_release` (`status.rs` 271) |
+| "Check now", "Download it", "Add it to the next system…", "Continue adding it", "Take it out", "Choose a file…", "Settle…" | operations `update_check`, `update_download`, `update_apply`, `update_recover`, `update_cancel`, `update_media` (+ `--manifest PATH`), `resolve:<id>` (`operations.rs` 242, 255, 274, 300, 419, 284, 324), each with its `verdict` and `reason` |
+| the operations' shape | `Operation` and `Input` (`operations.rs` 9, 18): `id`, `label`, `argv`, `inputs`, `verdict`, `reason`, `destructive` |
+| "the restart is set" and "restart needed" | `lifecycle.reboot_needed`, `lifecycle.trial_current` (`status.rs` 110) |
+| "up to 15 minutes" | `TRIAL_TIMEOUT_SECS` = 900 (`init_system.rs` 35), the default of `recab trial --timeout` |
+| "No change can be made while on trial" | the refusal of `prepare`, `ensure_preparation_allowed` (`state.rs` 748), shown as recab words it |
+| the History page | `recab history --json` (`history.rs`): `History` (76: `entries`, `records`, `unreadable`, `truncated`, `log_found`) and `HistoryEntry` (39: `time`, `kind`, `slot`, `preparation`, `change`, `action`, `package`, `actor`, `outcome`, `detail`), read from the audit log (`AuditEvent`, `store.rs` 32) and the state file's changes (`ChangeRecord`, `state.rs` 127) |
+
 ## Reading and reading again
 
 `recab status --json` is run without holding the window up. The first time, the
@@ -258,22 +338,31 @@ allowed to run, and whether it runs as the person or as root are not decided.
 |---|---|
 | `src/model.*` | the status, as read from JSON |
 | `src/client.*` | the only code that runs `recab`, the agent and the restart |
-| `src/pages.*` | Overview, the next system, getting back, ask, a clash, what the agent did, the questions |
+| `src/pages.*` | Overview, the next system, getting back, History, the release, ask, a clash, what the agent did, the questions |
 | `src/window.*` | the flows between pages, inside the frame |
 | `src/shots.*` | the picture mode and flow check |
-| `fixtures/` | `recab-real`: a stand-in with the real recab's status and commands (with `agent-real`, `reboot-real`, `os-release`); `recab`: the older stand-in with updates, clashes and proposals (with `agent`, `reboot`) |
+| `fixtures/` | `recab-real`: a stand-in with the real recab's status (schema 10), `history` and commands (with `agent-real`, `reboot-real`, `os-release`; see its top for the variables that make a check fail, find nothing, make a restart fail, or hide `history`); `recab`: the older stand-in with updates, clashes and proposals (with `agent`, `reboot`) |
 | `data/` | the menu entry and the polkit action |
 | `../kit/` | shared with `gui/recipe` and `gui/disk`: the frame, Activity, the next-system reader, widgets, the page base, the work page, the command runner, words, stand-in looks (see `../kit/README.md`) |
 
 ## Not done
 
-- History: the design has a page that lists past changes. recab has no command
-  that lists them (`status` holds only the open preparation's changes and the last
-  trial), so there is no page and no rail entry for it.
+- History: lists what recab's audit log and state hold (`tools/recab/README.md`,
+  `history`). Not in it, because recab does not record it: who asked for anything
+  but a change, when a `prepare` ended, the end of a `recab change`'s own
+  audit record (changes are read from the preparations the log holds), a changelog
+  of the release, the log of a start (the mock-up's "Read that start's log, 212
+  lines") and "Hand to the agent" from a past entry. Entries are in UTC order of
+  recab's clock; the page shows local time.
+- Release: no release medium noticed and offered, no package or kernel lists, no
+  room needed, no last-checked time, no "Skip this release" (see "The newer
+  pages"). "Choose a file…" asks for a path with a file dialog; it was only run
+  in the stand-in (never in a dialog).
+- Single system, and "Stop" or stand-still detection for work started elsewhere:
+  recab reports neither (see "The newer pages").
 - On "The next system": no size column and no "Take out" (recab gives no sizes and
   has no command that undoes one change), no "Edit a file…" (recab has `edit PATH`,
-  but a person would need a file picker and an editor, not designed), no adding a
-  release (see below), no kernel line (status names none), no "waits for your
+  but a person would need a file picker and an editor, not designed), no kernel line (status names none), no "waits for your
   approval" row (the agent's questions are in Activity).
 - On "Getting back": "hold Space" is left out, because nothing in recab's source says
   which key shows the start-up list (only `timeout 5`, which keeps it up for 5

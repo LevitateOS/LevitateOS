@@ -23,6 +23,12 @@ public:
     // read failed for lack of rights.
     bool understand(Run *finished, bool ok, Status *into, QString *error, bool *permission = nullptr);
 
+    // `recab history --json`, read as the desktop user. `openPreparation` is
+    // the preparation the last status held. An older recab has no such command;
+    // `into->unknown` says so.
+    Run *readHistory();
+    bool understandHistory(Run *finished, bool ok, History *into, const QString &openPreparation);
+
     // One change, named as this window names it (`finalize`, `discard`,
     // `recover`, `prepare`, `set-next`, `rollback`, and the stand-in's
     // `update apply` and `resolve`). For the stand-in that is the command

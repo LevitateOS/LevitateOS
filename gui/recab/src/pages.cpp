@@ -15,10 +15,21 @@
 #include <QJsonArray>
 #include <QPlainTextEdit>
 #include <QProgressBar>
+#include <QButtonGroup>
+#include <QHeaderView>
+#include <QTreeWidget>
 #include <QPushButton>
 #include <QVBoxLayout>
 
 namespace {
+
+// How long recab waits for start-up to finish before a trial fails: the
+// default of `recab trial --timeout`, TRIAL_TIMEOUT_SECS (900) in
+// tools/recab/src/init_system.rs.
+constexpr int recab_trial_minutes = 15;
+
+QPushButton *push(QHBoxLayout *row, const QString &words, const ActionVerdict &verdict, bool main = false,
+                  QStringList *why = nullptr);
 
 QPushButton *primary(const QString &words)
 {
@@ -116,7 +127,13 @@ void SystemPage::showProblem(const QString &problem, bool asAdministrator)
     column->addStretch();
 }
 
+// The real backend supplies the whole operation catalog. Values and commands
+// are captured together, so a refresh cannot silently retarget an open question.
 static void lifecyclePage(QVBoxLayout *column,const Status &s,QObject *owner,std::function<void(const QJsonObject&)> request) {
+    // The pages offer what recab offers, each in its place. This list is for
+    // the states they do not cover: a system that needs recovery, work that
+    // stopped.
+    if(s.unusable.isEmpty() && s.state!="interrupted")return;
     auto *group=new QGroupBox(QObject::tr("Software, updates and recovery"));
     group->setCheckable(true);
     auto *outer=new QVBoxLayout(group);auto *body=new QWidget;auto *actions=new QVBoxLayout(body);outer->addWidget(body);
@@ -125,7 +142,7 @@ static void lifecyclePage(QVBoxLayout *column,const Status &s,QObject *owner,std
     if(!s.updateError.isEmpty())actions->addWidget(text(s.updateError,true));
     for(const auto &v:s.operations){const auto op=v.toObject();auto *button=new QPushButton(QFontMetrics(group->font()).elidedText(op["label"].toString(),Qt::ElideMiddle,600));button->setEnabled(op["verdict"]=="ready");button->setToolTip(op["label"].toString()+"\n"+op["reason"].toString());actions->addWidget(button);QObject::connect(button,&QPushButton::clicked,owner,[request,op]{request(op);});}
     auto *start=new QPushButton(QObject::tr("Reboot"));actions->addWidget(start);QObject::connect(start,&QPushButton::clicked,owner,[request]{request(QJsonObject{{"id","reboot"},{"verdict","ready"}});});
-    const bool expanded=!s.unusable.isEmpty() || !s.clashes.isEmpty() || s.state=="interrupted";
+    const bool expanded=true;
     group->setChecked(expanded);body->setVisible(expanded);QObject::connect(group,&QGroupBox::toggled,body,&QWidget::setVisible);
     column->addWidget(group);
 }
@@ -137,6 +154,81 @@ void SystemPage::show(const Status &s)
     const bool next = s.otherRole == QLatin1String("next");
     const QString running = s.name(s.runningRelease);
     const QStringList titles = s.changeTitles();
+
+    // Just restarted into a new system that is not kept yet: what is being
+    // judged, the two things to do, and what the two systems are.
+    if (s.state == QLatin1String("on_trial")) {
+        auto *top = new QVBoxLayout;
+        top->setSpacing(1);
+        top->addWidget(heading(tr("You are trying the new system")));
+        top->addWidget(dim(text(tr("It is not kept yet. Until it is, any restart goes back to the system from "
+                                   "before."),
+                                true)));
+        column->addLayout(top);
+
+        auto *judged = new Card(Card::Open);
+        judged->column()->setSpacing(8);
+        judged->column()->addWidget(strong(tr("Start-up is being judged")));
+        judged->column()->addWidget(text(
+            tr("recab keeps the new system by itself as soon as start-up has finished with nothing failed. It waits "
+               "up to %1 minutes for that; if start-up fails, the computer goes back to the system from before by "
+               "itself.")
+                .arg(recab_trial_minutes),
+            true));
+        auto *buttons = new QHBoxLayout;
+        buttons->setSpacing(10);
+        buttons->addWidget(dim(text(tr("Does everything work for you? Then you need not wait."), true)), 1);
+        QStringList why;
+        connect(push(buttons, tr("Go back now…"), s.can("go_back"), false, &why), &QPushButton::clicked, this,
+                &SystemPage::goBack);
+        connect(push(buttons, tr("Keep it now"), s.can("keep"), true, &why), &QPushButton::clicked, this,
+                &SystemPage::keep);
+        judged->column()->addLayout(buttons);
+        if (!why.isEmpty())
+            judged->column()->addWidget(dim(text(why.first(), true)));
+        column->addWidget(judged);
+
+        auto *pair = new QHBoxLayout;
+        pair->setSpacing(14);
+        QStringList now = titles;
+        now << tr("Not kept yet");
+        pair->addWidget(card(Card::On, Glyph::Lock, tr("The new system, running on trial"),
+                             titles.isEmpty() ? running
+                                              : tr("%1, %2").arg(running, counted(titles.size(), tr("with %1 change"),
+                                                                                  tr("with %1 changes"))),
+                             now),
+                        1);
+        pair->addWidget(card(Card::Plain, Glyph::Before, tr("The system from before"),
+                             s.otherRelease.isEmpty() ? tr("As it was before this change") : s.name(s.otherRelease),
+                             {tr("Untouched: it is what a restart returns to")},
+                             tr("It stays your way back after the new one is kept, until you make the next change")),
+                  1);
+        column->addLayout(pair);
+
+        // recab's own refusal is why nothing can be changed meanwhile.
+        const ActionVerdict change = s.can("change");
+        if (!change.ready) {
+            auto *rules = new Panel;
+            rules->column()->setSpacing(6);
+            rules->column()->addWidget(strong(tr("While a system is on trial")));
+            rules->column()->addWidget(text(
+                tr("No change can be made to either system: the one before must stay as it is, and the new one is "
+                   "not settled. recab says: \"%1\"")
+                    .arg(change.reason),
+                true));
+            column->addWidget(rules);
+        }
+        auto *more = new QHBoxLayout;
+        more->setSpacing(18);
+        more->addWidget(dim(new QLabel(tr("The rest is on:"))));
+        auto *backLink = link(tr("Getting back"));
+        connect(backLink, &ClickLabel::clicked, this, &SystemPage::openBack);
+        more->addWidget(backLink);
+        more->addStretch();
+        column->addLayout(more);
+        column->addStretch();
+        return;
+    }
 
     // What is true now, in one line and one sentence.
     if (s.state == QLatin1String("failed") || s.state == QLatin1String("interrupted")) {
@@ -176,8 +268,8 @@ void SystemPage::show(const Status &s)
                        "keeps it once start-up has finished properly.");
         } else if (s.state == QLatin1String("working")) {
             title = tr("The next system is being worked on");
-            under = tr("A recab command is %1 right now, started outside this window. This page reads again until "
-                       "it has finished.")
+            under = tr("A recab command is %1 right now, started outside this window. This is not an interruption: "
+                       "wait for it. This page reads again every two seconds until it has finished.")
                         .arg(s.interruptedDuring.isEmpty() ? tr("working on the next system") : s.interruptedDuring);
         } else if (next) {
             title = counted(s.changes.size(), tr("The next system has %1 change"), tr("The next system has %1 changes"));
@@ -247,7 +339,8 @@ void SystemPage::show(const Status &s)
     else if (!s.runningHolds.isEmpty())
         runningLines << tr("With: %1").arg(s.runningHolds.join(tr("; ")));
     else
-        runningLines << tr("Kept: it started properly");
+        runningLines << (s.trialWhen.isEmpty() ? tr("Kept: it started properly")
+                                               : tr("Kept: it started properly on %1").arg(s.trialWhen));
     pair->addWidget(card(Card::On, Glyph::Lock, tr("The running system"), running, runningLines), 1);
 
     if (next) {
@@ -290,9 +383,11 @@ void SystemPage::show(const Status &s)
     bool toNext = true;
 
     if (s.state == QLatin1String("working")) {
-        list->addWidget(dim(text(tr("Nothing can be started while that command runs. Two commands never work on the "
-                                    "next system at once."),
-                                 true)));
+        // The row is shown as the mock-up has it: off, with why. recab runs one
+        // command at a time on the next system.
+        act(list, tr("Change, finish, reset"), QString(), tr("Make a change…"),
+            ActionVerdict{false, tr("Not while this runs: two recab commands never work on the next system at once. "
+                                    "They come back when it has ended.")});
     } else if (s.state == QLatin1String("on_trial")) {
         toNext = false;
         connect(act(list, tr("Keep this system"),
@@ -329,11 +424,10 @@ void SystemPage::show(const Status &s)
                     s.can("finalize"), true),
                 &QPushButton::clicked, this, &SystemPage::finish);
         if (!updateName.isEmpty())
-            connect(act(list, tr("Add the update to %1").arg(updateName),
-                        tr("It is merged into this same next system. Your changes are kept, or you are asked where "
-                           "they clash."),
-                        tr("Add the update"), s.can("update")),
-                    &QPushButton::clicked, this, &SystemPage::addUpdate);
+            connect(act(list, tr("A newer release is available: %1").arg(updateName),
+                        tr("It can be merged into this same next system. See what recab says about it first."),
+                        tr("See it…"), ActionVerdict{true, QString()}),
+                    &QPushButton::clicked, this, &SystemPage::openRelease);
     } else {
         toNext = false;
         connect(act(list, tr("Change the system"),
@@ -341,11 +435,10 @@ void SystemPage::show(const Status &s)
                     tr("Make a change…"), s.can("change"), true),
                 &QPushButton::clicked, this, &SystemPage::ask);
         if (!updateName.isEmpty())
-            connect(act(list, tr("Update to %1").arg(updateName),
-                        tr("A newer %1 is available, %2. It goes into the next system like any other change.")
-                            .arg(s.distro, bytesText(s.updateBytes)),
-                        tr("Add the update"), s.can("update")),
-                    &QPushButton::clicked, this, &SystemPage::addUpdate);
+            connect(act(list, tr("A newer release is available: %1").arg(updateName),
+                        tr("It goes into the next system like any other change. See what recab says about it first."),
+                        tr("See it…"), ActionVerdict{true, QString()}),
+                    &QPushButton::clicked, this, &SystemPage::openRelease);
     }
     // The way to the pages that hold the rest.
     auto *more = new QHBoxLayout;
@@ -359,6 +452,13 @@ void SystemPage::show(const Status &s)
     auto *backLink = link(tr("Getting back"));
     connect(backLink, &ClickLabel::clicked, this, &SystemPage::openBack);
     more->addWidget(backLink);
+    // recab only learns of a new release when asked; the way to ask is on the
+    // release page, which is otherwise reached when one is known.
+    if (updateName.isEmpty() && s.operation(QStringLiteral("update_check")).ready && s.state != QLatin1String("working")) {
+        auto *releaseLink = link(tr("Check for a new release"));
+        connect(releaseLink, &ClickLabel::clicked, this, &SystemPage::openRelease);
+        more->addWidget(releaseLink);
+    }
     more->addStretch();
     list->addLayout(more);
     column->addWidget(group);
@@ -597,8 +697,8 @@ void colour(QLabel *label, Mood mood)
 
 // A button that follows recab's verdict; a refusal is its tooltip and, when
 // `why` is given, one more line for the page to show under the buttons.
-QPushButton *push(QHBoxLayout *row, const QString &words, const ActionVerdict &verdict, bool main = false,
-                  QStringList *why = nullptr)
+QPushButton *push(QHBoxLayout *row, const QString &words, const ActionVerdict &verdict, bool main,
+                  QStringList *why)
 {
     QPushButton *button = main && verdict.ready ? primary(words) : new QPushButton(words);
     button->setEnabled(verdict.ready);
@@ -769,6 +869,11 @@ void NextPage::show(const Status &s)
         panel->column()->addLayout(buttons);
         if (!why.isEmpty())
             panel->column()->addWidget(dim(text(why.first(), true)));
+        if (s.update.available()) {
+            auto *release = link(tr("A newer release is available: %1").arg(s.name(s.update.version)));
+            connect(release, &ClickLabel::clicked, this, &NextPage::openRelease);
+            panel->column()->addWidget(release, 0, Qt::AlignLeft);
+        }
         column->addWidget(panel);
         column->addStretch();
         return;
@@ -800,6 +905,11 @@ void NextPage::show(const Status &s)
                     &NextPage::installSoftware);
             buttons->addStretch();
             left->addLayout(buttons);
+            if (s.update.available()) {
+                auto *release = link(tr("A newer release is available: %1").arg(s.name(s.update.version)));
+                connect(release, &ClickLabel::clicked, this, &NextPage::openRelease);
+                left->addWidget(release, 0, Qt::AlignLeft);
+            }
         }
         left->addStretch();
         both->addLayout(left, 3);
@@ -1211,4 +1321,421 @@ void BackPage::show(const Status &s)
     right->addStretch();
     both->addLayout(right, 2);
     column->addLayout(both, 1);
+}
+
+// ---------------------------------------------------------------- A new release
+
+void ReleasePage::show(const Status &s)
+{
+    const UpdateInfo &u = s.update;
+    const QString name = u.available() ? s.name(u.version) : QString();
+    QVBoxLayout *column = fresh();
+    column->setSpacing(12);
+    auto *backLink = new ClickLabel(tr("‹ Back"));
+    dim(backLink);
+    connect(backLink, &ClickLabel::clicked, this, &ReleasePage::back);
+    column->addWidget(backLink, 0, Qt::AlignLeft);
+
+    // Where the release stands, from recab's own words for it. The older
+    // stand-in adds a release at once, so it only has "known" and "added".
+    enum class Step { Unknown, Known, UpToDate, CheckFailed, Available, Downloading, DownloadStopped, Downloaded, Settling, Added };
+    Step step = Step::Unknown;
+    if (!s.real)
+        step = u.available() ? Step::Known : Step::Unknown;
+    else if (u.hasMerge && !u.mergeComplete)
+        step = Step::Settling;
+    else if (u.hasMerge)
+        step = Step::Added;
+    else if (u.available())
+        step = u.phase == QLatin1String("downloading") ? Step::Downloading
+               : u.downloaded                          ? Step::Downloaded
+               : u.phase == QLatin1String("interrupted") ? Step::DownloadStopped
+                                                         : Step::Available;
+    else if (u.phase == QLatin1String("check_failed"))
+        step = Step::CheckFailed;
+    else if (u.phase == QLatin1String("up_to_date"))
+        step = Step::UpToDate;
+
+    QString title, under, mainWords, mainOp;
+    enum class Main { None, Operation, Add, Settle, Finish } main = Main::Operation;
+    switch (step) {
+    case Step::Known:
+        title = tr("%1 is available").arg(name);
+        under = tr("It goes into the next system like any other change: nothing is in effect until you restart, and "
+                   "the running system stays as your way back.");
+        mainWords = tr("Add it to the next system…");
+        main = Main::Add;
+        break;
+    case Step::Unknown:
+        title = tr("No new release is known");
+        if (!s.real) {
+            under = tr("This recab does not say whether a newer release exists.");
+            mainWords = tr("Check now");
+            main = Main::None;
+            break;
+        }
+        under = tr("recab holds no answer yet about a newer release. It looks only when asked: it reads the release "
+                   "list of the update source its image names, and checks what it finds against the distribution's "
+                   "release key.");
+        mainWords = tr("Check now");
+        mainOp = QStringLiteral("update_check");
+        break;
+    case Step::UpToDate:
+        title = tr("This is the newest release");
+        under = tr("recab compared this system with the update source's release list and found nothing newer. It looks "
+                   "only when asked.");
+        mainWords = tr("Check again");
+        mainOp = QStringLiteral("update_check");
+        break;
+    case Step::CheckFailed:
+        title = tr("The release list could not be checked");
+        under = u.lastError.isEmpty() ? tr("recab did not say why.") : tr("recab says: %1").arg(u.lastError);
+        mainWords = tr("Try again");
+        mainOp = QStringLiteral("update_check");
+        break;
+    case Step::Available:
+        title = tr("%1 is available").arg(name);
+        under = tr("It is not downloaded yet. It goes into the next system like any other change: nothing is in effect "
+                   "until you restart, and the running system stays as your way back.");
+        mainWords = tr("Download it");
+        mainOp = QStringLiteral("update_download");
+        break;
+    case Step::Downloading:
+        title = tr("%1 is being downloaded").arg(name);
+        under = tr("recab fetches it through Recipe and verifies each file. This page reads again every two seconds "
+                   "while that runs.");
+        mainWords = tr("Downloading…");
+        main = Main::None;
+        break;
+    case Step::DownloadStopped:
+        title = tr("Downloading %1 stopped").arg(name);
+        under = u.lastError.isEmpty() ? tr("recab did not say why. What was verified is kept for another try.")
+                                      : tr("recab says: %1").arg(u.lastError);
+        mainWords = tr("Download again");
+        mainOp = QStringLiteral("update_download");
+        break;
+    case Step::Downloaded:
+        title = tr("%1 is downloaded").arg(name);
+        under = tr("recab verified every file. Adding it merges it into the next system, which recab makes first when "
+                   "there is none. Nothing is in effect until you restart, and the running system stays as your way "
+                   "back.");
+        mainWords = tr("Add it to the next system…");
+        main = Main::Add;
+        break;
+    case Step::Settling:
+        if (u.unresolved > 0) {
+            title = counted(u.unresolved, tr("Adding %2 needs you: %1 thing clashes with your changes"),
+                            tr("Adding %2 needs you: %1 things clash with your changes"))
+                        .arg(name.isEmpty() ? tr("the release") : name);
+            under = tr("Nothing was chosen for you. The next system cannot be finished until each is settled.");
+            mainWords = tr("Settle…");
+            main = Main::Settle;
+        } else if (!u.conflicts.isEmpty() && u.mergeFailure.isEmpty()) {
+            title = tr("Every clash is settled");
+            under = tr("recab can carry on adding %1 to the next system.").arg(name.isEmpty() ? tr("the release") : name);
+            mainWords = tr("Continue adding it");
+            mainOp = QStringLiteral("update_recover");
+        } else {
+            title = tr("Adding %1 stopped").arg(name.isEmpty() ? tr("the release") : name);
+            under = u.mergeFailure.isEmpty() ? tr("recab keeps what it did; it can carry on from there.")
+                                             : tr("recab says: %1").arg(u.mergeFailure);
+            mainWords = tr("Continue adding it");
+            mainOp = QStringLiteral("update_recover");
+        }
+        break;
+    case Step::Added:
+        title = tr("%1 is in the next system").arg(name.isEmpty() ? tr("The release") : name);
+        under = tr("Nothing is in effect until you restart into the next system. Your changes are in it too.");
+        mainWords = tr("Finish and restart…");
+        main = Main::Finish;
+        break;
+    }
+
+    auto *head = new QHBoxLayout;
+    head->setSpacing(20);
+    auto *top = new QVBoxLayout;
+    top->setSpacing(1);
+    QLabel *headline = heading(title);
+    headline->setWordWrap(true); // a long release name must not widen the window
+    top->addWidget(headline);
+    top->addWidget(dim(text(under, true)));
+    head->addLayout(top, 1);
+    QString because;
+    if (main != Main::None) {
+        ActionVerdict verdict{true, QString()};
+        if (s.real && main == Main::Operation)
+            verdict = s.operation(mainOp);
+        else if (s.real && main == Main::Add)
+            verdict = s.operation(QStringLiteral("update_apply"));
+        else if (s.real && main == Main::Finish)
+            verdict = s.can("finalize");
+        auto *button = primary(mainWords);
+        button->setEnabled(verdict.ready);
+        if (!verdict.ready) {
+            button->setToolTip(verdict.reason);
+            because = verdict.reason;
+        }
+        head->addWidget(button, 0, Qt::AlignTop);
+        connect(button, &QPushButton::clicked, this, [this, main, mainOp] {
+            if (main == Main::Add)
+                emit add();
+            else if (main == Main::Settle)
+                emit settle();
+            else if (main == Main::Finish)
+                emit finish();
+            else
+                emit operation(mainOp);
+        });
+    } else {
+        auto *waiting = new QPushButton(mainWords);
+        waiting->setEnabled(false);
+        head->addWidget(waiting, 0, Qt::AlignTop);
+    }
+    column->addLayout(head);
+    if (!because.isEmpty())
+        column->addWidget(dim(text(tr("It cannot be done now: %1").arg(because), true)));
+
+    // What recab says about the release, and what it does to what is there.
+    if (u.available() || step == Step::Settling || step == Step::Added) {
+        auto *both = new QHBoxLayout;
+        both->setSpacing(14);
+
+        auto *left = new Panel;
+        left->column()->setSpacing(8);
+        left->column()->addWidget(strong(tr("What recab says about it")));
+        auto *facts = new QGridLayout;
+        facts->setHorizontalSpacing(14);
+        facts->setVerticalSpacing(6);
+        facts->setColumnMinimumWidth(0, 90);
+        facts->setColumnStretch(1, 1);
+        int row = 0;
+        auto fact = [&](const QString &key, const QString &words) {
+            facts->addWidget(dim(text(key)), row, 0, Qt::AlignTop);
+            facts->addWidget(text(words, true), row, 1);
+            ++row;
+        };
+        if (u.available()) {
+            fact(tr("Release"), name);
+            if (!u.channel.isEmpty())
+                fact(tr("Channel"), u.channel);
+            if (u.totalBytes > 0)
+                fact(tr("Size"), tr("%1, all its files").arg(bytesText(u.totalBytes)));
+            if (u.hasDownload)
+                fact(tr("Fetched"), u.downloaded ? tr("%1 of %2 verified, complete").arg(bytesText(u.verifiedBytes), bytesText(u.downloadBytes))
+                                                 : tr("%1 of %2 verified so far").arg(bytesText(u.verifiedBytes), bytesText(u.downloadBytes)));
+        }
+        if (step == Step::Added)
+            fact(tr("Merge"), tr("complete"));
+        left->column()->addLayout(facts);
+        left->column()->addWidget(dim(text(tr("recab says no more about what is in a release before it is added: no "
+                                              "kernel, no package list."),
+                                           true)));
+        left->column()->addStretch();
+        both->addWidget(left, 1);
+
+        auto *right = new Panel;
+        right->column()->setSpacing(6);
+        right->column()->addWidget(strong(tr("What happens to your changes")));
+        if (step == Step::Settling && !u.conflicts.isEmpty()) {
+            for (const MergeConflict &c : u.conflicts)
+                right->column()->addWidget(text(
+                    QStringLiteral("• ")
+                        + (c.resolution.isEmpty() ? tr("%1 (%2): not settled").arg(c.path, c.kind)
+                                                  : tr("%1 (%2): settled, %3").arg(c.path, c.kind, c.resolution)),
+                    true));
+        } else {
+            right->column()->addWidget(text(QStringLiteral("• ") + tr("The release is merged into the next system. What "
+                                                                         "the next system already holds stays."),
+                                            true));
+            right->column()->addWidget(text(QStringLiteral("• ") + tr("Where the release and one of your changes touch "
+                                                                         "the same thing, recab stops and lists it. "
+                                                                         "Nothing is chosen for you."),
+                                            true));
+            if (s.otherRole == QLatin1String("next") && step != Step::Added)
+                right->column()->addWidget(text(
+                    QStringLiteral("• ")
+                        + (s.changes.isEmpty() ? tr("The next system holds no change yet.")
+                                               : counted(s.changes.size(), tr("The next system holds %1 change now."),
+                                                         tr("The next system holds %1 changes now."))),
+                    true));
+            else if (step != Step::Added)
+                right->column()->addWidget(text(QStringLiteral("• ") + tr("There is no next system yet; adding the "
+                                                                             "release makes one."),
+                                                true));
+        }
+        right->column()->addStretch();
+        both->addWidget(right, 1);
+        column->addLayout(both);
+    }
+
+    // The ways to ask, and to undo, that recab offers.
+    if (s.real) {
+        auto *rows = new Panel;
+        QVBoxLayout *list = rows->column();
+        list->setSpacing(8);
+        const bool checking = step == Step::Unknown || step == Step::UpToDate || step == Step::CheckFailed;
+        if (!checking && step != Step::Settling && step != Step::Added)
+            connect(act(list, tr("Where it comes from"),
+                        tr("The release list of the update source this system's image names, checked against the "
+                           "distribution's release key."),
+                        tr("Check again"), s.operation(QStringLiteral("update_check"))),
+                    &QPushButton::clicked, this, [this] { emit operation(QStringLiteral("update_check")); });
+        if (step != Step::Settling && step != Step::Added)
+            connect(act(list, tr("From a file instead"),
+                        tr("A release manifest (release.json) from a medium that is plugged in. recab verifies it "
+                           "before it uses it."),
+                        tr("Choose a file…"), s.operation(QStringLiteral("update_media"))),
+                    &QPushButton::clicked, this, &ReleasePage::addFromFile);
+        if (step == Step::Settling)
+            connect(act(list, tr("Take it out again"),
+                        tr("recab detaches the release and keeps your changes in the next system."),
+                        tr("Take it out"), s.operation(QStringLiteral("update_cancel"))),
+                    &QPushButton::clicked, this, [this] { emit operation(QStringLiteral("update_cancel")); });
+        if (list->count() > 0)
+            column->addWidget(rows);
+        else
+            delete rows;
+    }
+    column->addStretch();
+}
+
+// ---------------------------------------------------------------- History
+
+namespace {
+
+Mood moodOf(HistoryRow::Mood mood)
+{
+    switch (mood) {
+    case HistoryRow::Warn:
+        return Mood::Warn;
+    case HistoryRow::Ok:
+        return Mood::Ok;
+    case HistoryRow::Bad:
+        return Mood::Bad;
+    case HistoryRow::Plain:
+        break;
+    }
+    return Mood::Plain;
+}
+
+} // namespace
+
+void HistoryPage::showUnavailable(const History &h)
+{
+    QVBoxLayout *column = fresh();
+    column->addWidget(heading(tr("History")));
+    if (h.unknown) {
+        column->addWidget(text(tr("This recab keeps no history it can show."), true));
+        column->addWidget(dim(text(tr("It has no `recab history` command, so there is nothing to list here."), true)));
+    } else {
+        column->addWidget(text(tr("The history could not be read."), true));
+        column->addWidget(dim(text(h.problem, true)));
+        auto *buttons = new QHBoxLayout;
+        auto *again = primary(tr("Try again"));
+        connect(again, &QPushButton::clicked, this, &HistoryPage::readAgain);
+        buttons->addWidget(again);
+        buttons->addStretch();
+        column->addLayout(buttons);
+    }
+    column->addStretch();
+}
+
+void HistoryPage::show(const History &h)
+{
+    last_ = h;
+    QVBoxLayout *column = fresh();
+    column->setSpacing(12);
+
+    auto *head = new QHBoxLayout;
+    head->setSpacing(14);
+    auto *top = new QVBoxLayout;
+    top->setSpacing(1);
+    top->addWidget(heading(tr("History")));
+    top->addWidget(dim(text(tr("What recab recorded about this computer's systems: changes finished, restarts tried, "
+                               "kept or come back, going back. Newest first."),
+                            true)));
+    head->addLayout(top, 1);
+    auto *group = new QButtonGroup(this);
+    const QStringList filters{tr("All"), tr("Restarts"), tr("By the agent")};
+    for (int i = 0; i < filters.size(); ++i) {
+        auto *button = new QPushButton(filters[i]);
+        button->setCheckable(true);
+        button->setChecked(i == filter_);
+        group->addButton(button, i);
+        head->addWidget(button, 0, Qt::AlignTop);
+    }
+    connect(group, &QButtonGroup::idClicked, this, [this](int id) {
+        filter_ = id;
+        show(last_);
+    });
+    auto *save = new QPushButton(tr("Save as a file…"));
+    connect(save, &QPushButton::clicked, this, &HistoryPage::saveAsFile);
+    head->addSpacing(8);
+    head->addWidget(save, 0, Qt::AlignTop);
+    column->addLayout(head);
+
+    QList<HistoryRow> rows;
+    for (const HistoryRow &row : h.rows)
+        if (filter_ == 0 || (filter_ == 1 && row.restart) || (filter_ == 2 && row.byAgent))
+            rows << row;
+
+    auto *tree = new QTreeWidget;
+    tree->setRootIsDecorated(false);
+    tree->setUniformRowHeights(true);
+    tree->setColumnCount(4);
+    tree->setHeaderLabels({tr("When"), tr("What"), tr("Made by"), tr("How it ended")});
+    tree->setAccessibleName(tr("What happened, newest first"));
+    tree->header()->setStretchLastSection(false);
+    tree->header()->setSectionResizeMode(1, QHeaderView::Stretch);
+    tree->setColumnWidth(0, 120);
+    tree->setColumnWidth(2, 150);
+    tree->setColumnWidth(3, 270);
+    for (int i = 0; i < rows.size(); ++i) {
+        const HistoryRow &row = rows[i];
+        auto *item = new QTreeWidgetItem({whenWords(row.when), row.what, row.carriesActor ? row.who : QString(), row.ended});
+        item->setData(0, Qt::UserRole, i);
+        item->setForeground(0, tree->palette().brush(QPalette::Disabled, QPalette::Text));
+        if (row.mood != HistoryRow::Plain)
+            item->setForeground(3, moodColour(tree->palette(), moodOf(row.mood)));
+        tree->addTopLevelItem(item);
+    }
+    column->addWidget(tree, 1);
+
+    // What recab recorded about the chosen entry, and what it did not.
+    auto *detail = new Panel;
+    detail->column()->setSpacing(4);
+    QLabel *detailTitle = strong(tr("Choose an entry for what recab recorded about it."));
+    QLabel *detailBody = text(QString(), true);
+    detail->column()->addWidget(detailTitle);
+    detail->column()->addWidget(detailBody);
+    column->addWidget(detail);
+    connect(tree, &QTreeWidget::currentItemChanged, this, [rows, detailTitle, detailBody](QTreeWidgetItem *item) {
+        if (!item)
+            return;
+        const HistoryRow &row = rows[item->data(0, Qt::UserRole).toInt()];
+        detailTitle->setText(QLocale().toString(QDateTime::fromSecsSinceEpoch(row.when), QStringLiteral("d MMMM yyyy, HH:mm:ss")) + QLatin1String(": ")
+                             + row.what);
+        QStringList lines;
+        lines << (row.carriesActor ? (row.actor.isEmpty() ? tr("recab names nobody for this change.")
+                                                           : tr("Asked by: %1 (a label the caller gave, not a checked identity).").arg(row.actor))
+                                   : tr("recab records who asked only for a change; this entry names nobody."));
+        lines << (row.detail.isEmpty() ? tr("recab recorded no more about it.") : tr("recab recorded: %1").arg(row.detail));
+        detailBody->setText(lines.join(QLatin1Char('\n')));
+    });
+    if (tree->topLevelItemCount() > 0)
+        tree->setCurrentItem(tree->topLevelItem(0));
+
+    QStringList notes;
+    if (h.rows.isEmpty())
+        notes << tr("recab has recorded nothing yet.");
+    else if (rows.isEmpty())
+        notes << tr("Nothing in this view.");
+    if (!h.logFound)
+        notes << tr("recab has no audit log here yet, so only the changes in the open next system are listed.");
+    if (h.unreadable > 0)
+        notes << counted(h.unreadable, tr("%1 line of recab's log could not be read."), tr("%1 lines of recab's log could not be read."));
+    if (h.truncated)
+        notes << tr("The log is long: its oldest records are left out.");
+    if (!notes.isEmpty())
+        column->addWidget(dim(text(notes.join(QLatin1Char(' ')), true)));
 }

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""A stand-in that speaks the real recab's own shape (status schema 7), for
+"""A stand-in that speaks the real recab's own shape (status schema 10, as tools/recab's working tree writes it), for
 checking that recab-gui reads and drives the real thing correctly without an
 A/B system to run it on.
 
@@ -15,13 +15,19 @@ It answers the commands the window uses, with the real names and arguments:
   recab-real --json change install NAME --preparation ID --revision N
   recab-real --json edit PATH --preparation ID --revision N
 
-It sends no events, as the real recab sends none, and a failure is one JSON
+A failure is one JSON
 object on stderr with a class, a code and a message. As `agent-real` it plays an
 agent that uses these commands; as `reboot-real` it plays the restart. The state
 is one file in RECAB_STANDIN_STATE (default: a folder in /tmp).
 
-Every command takes `--actor LABEL`, kept with each change it makes.
-RECAB_STANDIN_KEEP=hand leaves a restarted system on trial until `commit`,
+Every command takes `--actor LABEL`, kept with each change it makes, and
+`--json` and `--machine-events` (events go to stderr as recab's operation
+events). It also answers `history --json`, and `update check|download|apply|
+resolve|recover|cancel` with the status's `updates` and `operations` shapes.
+RECAB_STANDIN_RELEASE=none makes `update check` find nothing newer,
+RECAB_STANDIN_CHECK_FAILS=1 makes it fail, RECAB_STANDIN_TRIAL=fail makes the
+restart into the next system fail and come back, RECAB_STANDIN_NO_HISTORY=1 makes
+`history` unknown, as in a recab without it. RECAB_STANDIN_KEEP=hand leaves a restarted system on trial until `commit`,
 as it is before start-up has been judged; RECAB_STANDIN_WORKING=1 makes the
 status say that a command is running right now.
 """
@@ -39,7 +45,8 @@ def load():
     if not os.path.exists(STATE):
         # As recab's init leaves it: two copies of one system, A running.
         return {"active": "A", "generations": {"A": "g1", "B": "g1"}, "preparation": None, "trial_pending": False,
-                "rollback": None, "last_trial": None, "go_back": False, "made": 1, "on_trial": False}
+                "rollback": None, "last_trial": None, "go_back": False, "made": 1, "on_trial": False,
+                "update": {"phase": "idle"}, "log": []}
     return json.load(open(STATE))
 
 
@@ -63,9 +70,45 @@ def pause(seconds):
         time.sleep(seconds * SPEED)
 
 
+RELEASE_ID = "7" * 64
+
+
+def release_summary():
+    """The newer release the stand-in knows of, as recab's update check
+    summarizes it (`ReleaseSummary` in tools/recab/src/update.rs)."""
+    version = os.environ.get("RECAB_STANDIN_RELEASE_VERSION", "2026.12")
+    return {"id": RELEASE_ID, "sequence": 2, "version": version, "channel": "stable", "total_bytes": 3328599654}
+
+
+def updates_view(s):
+    """`updates` of the status: `UpdateStatus` in tools/recab/src/update.rs."""
+    u = s["update"]
+    m = u.get("merge") if s["preparation"] else None
+    view = {"phase": u["phase"], "highest_index": 2 if u["phase"] != "idle" else 0, "available": u.get("available"),
+            "download": u.get("download"), "pending_release": u.get("pending"),
+            "pending_preparation": s["preparation"]["id"] if u.get("pending") and s["preparation"] else None,
+            "last_error": u.get("last_error"), "merge_complete": bool(m and m["phase"] == "complete"),
+            "merge": None}
+    if m:
+        p = s["preparation"]
+        view["merge"] = {"preparation": p["id"], "revision": p["revision"], "release": RELEASE_ID, "phase": m["phase"],
+                         "conflicts": [dict(c, path_hex="") for c in m["conflicts"]],
+                         "unresolved": sum(1 for c in m["conflicts"] if c["resolution"] is None),
+                         "report": None, "failure": None}
+        if m["phase"] != "complete":
+            view["phase"] = m["phase"]
+    elif u.get("pending"):
+        view["phase"] = "awaiting_merge"
+    return view
+
+
 def status(s):
     p = s["preparation"]
     inactive = other(s)
+    working = os.environ.get("RECAB_STANDIN_WORKING") == "1"
+    u = s["update"]
+    merge = u.get("merge")
+    unresolved = merge and merge["phase"] != "complete" and any(c["resolution"] is None for c in merge["conflicts"])
 
     def view(action, slot, verdict, reason=None):
         return {"action": action, "slot": slot, "verdict": verdict, "reason": reason, "after": None}
@@ -73,14 +116,23 @@ def status(s):
     def can(ready, reason):
         return ("ready", None) if ready else ("refused", reason)
 
+    uncommitted = bool(s.get("on_trial"))
+    blocked = None
+    if uncommitted:
+        blocked = "the running slot is uncommitted; its fallback cannot be prepared"
+    elif s["trial_pending"]:
+        blocked = "cancel the pending trial before preparing a system"
     actions = [
         view("prepare", inactive, *(("no_change", None) if p and p["phase"] == "prepared" else
-                                    can(not p and not s["trial_pending"], "a finished candidate or a trial is pending"))),
-        view("finalize", inactive, *can(bool(p) and p["phase"] == "prepared", "there is no prepared candidate to finalize")),
-        view("discard", inactive, *(can(not s["trial_pending"], "cannot discard while a trial is pending or uncommitted")
+                                    can(not p and not blocked, blocked or "a finished candidate is already there"))),
+        view("finalize", inactive, *can(bool(p) and p["phase"] == "prepared" and not blocked,
+                                        blocked or "there is no prepared candidate to finalize")),
+        view("discard", inactive, *(can(not s["trial_pending"] and not uncommitted,
+                                        "cannot discard while a trial is pending or uncommitted")
                                     if p else ("refused", "there is no preparation to discard"))),
         view("set_next", inactive, *(("no_change", None) if s["trial_pending"] else
-                                     can(bool(p) and p["phase"] == "ready", "slot %s holds no finalized candidate" % inactive))),
+                                     can(bool(p) and p["phase"] == "ready" and not uncommitted,
+                                         "slot %s holds no finalized candidate" % inactive))),
         view("rollback", s["rollback"] or inactive, *can(bool(s["rollback"]), "no earlier known-good system is kept")),
         view("commit", s["active"], "ready" if s.get("on_trial") or s["trial_pending"] else "no_change", None),
         view("stage", inactive, "refused", "a release medium is needed"),
@@ -97,36 +149,154 @@ def status(s):
                 "readiness": "committed" if name == s["active"] else ("ready" if ready else "incomplete"),
                 "generation_ready": ready, "seal": None, "kernel": "vmlinuz", "initrd": "initramfs.img"}
 
-    # Where things stand in one word, as recab's status works it out.
-    working = os.environ.get("RECAB_STANDIN_WORKING") == "1"
+    # Where things stand in one word, as recab's status works it out
+    # (`lifecycle` in tools/recab/src/status.rs).
     failed = bool(s["last_trial"]) and not s["last_trial"]["committed"] and s["last_trial"]["slot"] == inactive
-    if s.get("on_trial"):
+    if working:
+        state = "working"
+    elif s.get("on_trial"):
         state = "on_trial"
+    elif unresolved:
+        state = "conflicted"
     elif p:
-        if working:
-            state = "working"
-        elif p["phase"] == "ready":
+        if p["phase"] == "ready":
             state = "restart_set" if s["trial_pending"] else "trial_failed" if failed else "ready"
         else:
             state = "open" if p["phase"] == "prepared" and not p["failure"] else "interrupted"
     else:
-        state = "restart_set" if s["trial_pending"] else "stable"
-    if p or s["trial_pending"]:
+        state = "restart_set" if s["trial_pending"] else "trial_failed" if failed else "stable"
+    # recab calls the other system "next" whenever a preparation exists, also
+    # while the preparation's own slot is the one running on trial.
+    if p or s["trial_pending"] or failed:
         role = "next"
     elif s["rollback"] == inactive:
         role = "previous"
     else:
         role = "copy" if s["generations"]["A"] == s["generations"]["B"] else "unknown"
 
+    # The operations, as `operations::views` offers them: concrete argv pinned
+    # to the status being read.
+    cas = ["--preparation", p["id"], "--revision", str(p["revision"])] if p else ["--preparation", "none", "--revision", "0"]
+    ops = []
+
+    def op(id, label, argv, verdict, reason=None, inputs=(), destructive=False):
+        ops.append({"id": id, "label": label, "argv": argv, "inputs": list(inputs), "verdict": verdict,
+                    "reason": reason, "destructive": destructive})
+
+    by = {a["action"]: a for a in actions}
+    for id, label, action, command in (
+            ("prepare", "Prepare or continue the other system", "prepare", "prepare"),
+            ("finalize", "Finalize the prepared system", "finalize", "finalize"),
+            ("discard", "Discard all prepared changes", "discard", "discard"),
+            ("set_next", "Try the prepared system on next reboot", "set_next", "set-next"),
+            ("commit", "Keep the running system", "commit", "commit"),
+            ("rollback", "Return to the protected system", "rollback", "rollback")):
+        a = by[action]
+        argv = [command] + ([inactive] if action == "set_next" else []) + cas
+        if action in ("set_next", "commit", "rollback"):
+            argv += ["--generation", s["generations"][a["slot"]]]
+        op(id, label, argv, a["verdict"], a["reason"], destructive=action == "discard")
+    prep_ok = by["prepare"]["verdict"] != "refused" and not unresolved
+    writable = prep_ok and (not p or not p.get("change"))
+    why = by["prepare"]["reason"] or "Recover the interrupted operation before adding changes"
+    pkg = [{"name": "package", "label": "Recipe or selected package", "flag": None, "required": True, "choices": []}]
+    for id, label, verb in (("install", "Install software in the prepared system", "install"),
+                            ("change_update", "Update prepared software", "update"),
+                            ("remove", "Remove prepared software", "remove")):
+        op(id, label, ["change", verb] + cas, "ready" if writable else "refused", None if writable else why, pkg)
+    op("edit", "Apply a configuration file to the prepared system", ["edit"] + cas, "ready" if writable else "refused",
+       None if writable else why,
+       [{"name": "path", "label": "System-relative path", "flag": None, "required": True, "choices": []},
+        {"name": "file", "label": "Local file containing the new contents", "flag": "--file", "required": True,
+         "choices": []}])
+    op("update_check", "Check for system updates", ["update", "check"], "ready")
+    avail = u.get("available")
+    dl = u.get("download")
+    op("update_download", "Download the available release through Recipe",
+       ["update", "download"] + ([avail["id"]] if avail else []), "ready" if avail and not (dl and dl["downloaded"]) else "refused",
+       None if avail and not (dl and dl["downloaded"]) else "Check for an available release first")
+    selected = u.get("pending") or (dl["release"] if dl and dl["downloaded"] else None)
+    op("update_apply", "Merge the selected release, preserving prepared changes",
+       ["update", "apply"] + ([selected] if selected else []) + cas,
+       "ready" if selected and writable and not merge else "refused",
+       None if selected and writable and not merge else "A verified release and a writable preparation are required")
+    op("update_media", "Merge a release manifest from disk", ["update", "apply"] + cas, "ready" if writable else "refused",
+       None if writable else why,
+       [{"name": "manifest", "label": "Verified release.json path", "flag": "--manifest", "required": True, "choices": []}])
+    pending_merge = merge and merge["phase"] != "complete"
+    op("update_recover", "Continue the captured release merge", ["update", "recover"] + cas,
+       "ready" if pending_merge and not unresolved else "refused", "Resolve outstanding conflicts first")
+    if pending_merge:
+        for c in merge["conflicts"]:
+            if c["resolution"] is None:
+                op("resolve:" + c["id"], "Resolve %s (%s)" % (c["path"], c["kind"]),
+                   ["update", "resolve", c["id"], "--preparation", p["id"], "--revision", str(p["revision"])], "ready", None,
+                   [{"name": "choice", "label": "Resolution", "flag": "--choice", "required": True,
+                     "choices": ["local", "release", "edited"]},
+                    {"name": "file", "label": "File for an edited resolution (otherwise leave empty)", "flag": "--file",
+                     "required": False, "choices": []}])
+    cancelable = bool(pending_merge and p and p["phase"] != "ready")
+    op("update_cancel", "Detach the selected release and retain prepared changes", ["update", "cancel"] + cas,
+       "ready" if cancelable else "refused",
+       None if cancelable else "An applied merge must be recovered; cancellation cannot reconstruct its captured changes")
+    op("change_recover", "Recover the interrupted software/configuration change", ["change", "recover"] + cas,
+       "refused", "Not available in the current state")
+    if p and p["phase"] == "interrupted" and not merge:
+        op("sync_recover", "Continue incremental synchronization", ["prepare"] + cas, "ready")
+    op("trial_recover", "Assess or reconcile trial recovery", ["trial"], "refused", "Not available in the current state")
+    if working:
+        for o in ops:
+            o["verdict"], o["reason"] = "refused", "Another recab command is running"
+
+    last = s["last_trial"]
+    current = bool(last) and (last["committed"] or failed)
+    release_prepared = None
+    if p:
+        release_prepared = (release_summary()["version"] if merge and merge["phase"] == "complete"
+                            else s.get("running_release", "2026.11"))
     return {
-        "schema_version": 7, "lifecycle": {"state": state, "other": role, "working": working},
+        "schema_version": 10, "operations": ops, "running_release": s.get("running_release", "2026.11"), "prepared_release": release_prepared,
+        "updates": updates_view(s),
+        "lifecycle": {"state": state, "other": role, "working": working,
+                      "reboot_needed": s["trial_pending"], "trial_current": current},
         "active_slot": s["active"], "inactive_slot": inactive,
         "trial_pending": s["trial_pending"], "next_boot": inactive if s["trial_pending"] else s["active"],
         "default_slot": s["active"], "known_good_slot": s["active"], "committed": not s.get("on_trial"),
         "rollback_slot": s["rollback"], "scheduled_trial": inactive if s["trial_pending"] else None,
-        "last_trial": s["last_trial"], "entry_prefix": "levitate", "slots": [slot("A"), slot("B")],
+        "last_trial": last, "entry_prefix": "levitate", "slots": [slot("A"), slot("B")],
         "actions": actions, "preparation": p, "recovery_reason": None,
     }
+
+
+def drop_merge(s):
+    """A preparation that goes away takes its merge with it; the release stays downloaded."""
+    u = s["update"]
+    if u.get("merge") or u.get("pending"):
+        u["merge"], u["pending"] = None, None
+        u["phase"] = "downloaded" if u.get("download") else "idle"
+
+
+def installed(s):
+    """The preparation was kept: a merged release is the running system's now, and no longer new."""
+    u = s["update"]
+    if u.get("merge") and u["merge"]["phase"] == "complete":
+        s["running_release"] = release_summary()["version"]
+        u["available"], u["download"] = None, None
+    drop_merge(s)
+
+
+def record(s, kind, **fields):
+    """One line of what `recab history` prints, kept as the audit log would."""
+    entry = {"time": int(time.time()), "kind": kind}
+    entry.update({k: v for k, v in fields.items() if v is not None})
+    s.setdefault("log", []).append(entry)
+
+
+def history(s):
+    """`recab history --json`: newest first (`History` in tools/recab/src/history.rs)."""
+    entries = list(reversed(s.get("log", [])))
+    return {"schema_version": 1, "entries": entries, "records": len(entries), "unreadable": 0, "truncated": False,
+            "log_found": True}
 
 
 def matching(s, args):
@@ -157,6 +327,7 @@ def prepare(s):
                         "last_change": None, "changes": []}
     # The old way back ends when the place is reused.
     s["rollback"] = None
+    record(s, "prepare", slot=other(s), preparation=s["preparation"]["id"], outcome="started")
     s["generations"][other(s)] = s["generations"][s["active"]] + "+%s" % s["preparation"]["id"]
 
 
@@ -170,6 +341,8 @@ def change(s, action, package, actor=None):
                         "producer_io": None, "invocation_io": None, "projection_bytes_written": 0}
     p["changes"].append({"id": p["last_change"]["id"], "action": action, "package": package,
                          "unix_time": int(time.time()), "actor": actor})
+    record(s, "change", slot=p["slot"], preparation=p["id"], change=p["last_change"]["id"], action=action,
+           package=package, actor=actor)
 
 
 def reboot(s):
@@ -182,17 +355,28 @@ def reboot(s):
         s["on_trial"] = False
         s["last_trial"] = {"slot": tried, "committed": False, "detail": "restarted before the trial was kept",
                            "unix_time": int(time.time())}
+        record(s, "trial-failed", slot=tried, detail=s["last_trial"]["detail"])
+    elif s["trial_pending"] and os.environ.get("RECAB_STANDIN_TRIAL") == "fail":
+        # Start-up failed; recab's trial service restarted into the known-good
+        # system, which is the one that was running. The preparation stays.
+        s["trial_pending"] = False
+        s["last_trial"] = {"slot": other(s), "committed": False,
+                           "detail": "startup ended with failed units: sddm.service", "unix_time": int(time.time())}
+        record(s, "trial-failed", slot=other(s), detail=s["last_trial"]["detail"])
     elif s["trial_pending"]:
         was = s["active"]
         s["active"] = other(s)
         s["trial_pending"] = False
-        s["preparation"] = None
+        # The preparation stays until the trial is kept, as recab keeps it.
         s["rollback"] = was
         if os.environ.get("RECAB_STANDIN_KEEP") == "hand":
             s["on_trial"] = True
         else:
+            s["preparation"] = None
+            installed(s)
             s["last_trial"] = {"slot": s["active"], "committed": True, "detail": "startup finished: running",
                                "unix_time": int(time.time())}
+            record(s, "trial-kept", slot=s["active"], detail=s["last_trial"]["detail"])
     elif s["go_back"]:
         was = s["active"]
         s["active"] = s["rollback"]
@@ -228,6 +412,83 @@ def agent(s):
     emit(event="done")
 
 
+def update(s, words, args):
+    """`recab update check|download|apply|resolve|recover|cancel`, as
+    tools/recab/src/update.rs and merge.rs make them."""
+    u = s["update"]
+    verb = words[1]
+    if verb == "check":
+        pause(0.5)
+        if os.environ.get("RECAB_STANDIN_CHECK_FAILS") == "1":
+            u["phase"], u["last_error"] = "check_failed", "Recipe acquisition failed; completed objects are retained for retry"
+        elif os.environ.get("RECAB_STANDIN_RELEASE") == "none":
+            u["phase"], u["last_error"] = "up_to_date", None
+        else:
+            u["phase"], u["available"], u["last_error"] = "available", release_summary(), None
+    elif verb == "download":
+        if not u.get("available"):
+            refuse("no checked release selected; run recab update check")
+        pause(1.0)
+        total = u["available"]["total_bytes"]
+        u["phase"] = "downloaded"
+        u["download"] = {"release": RELEASE_ID, "verified_files": 4, "total_files": 4, "verified_bytes": total,
+                         "total_bytes": total, "reused_files": 0, "producer_write_bytes": total,
+                         "producer_cancelled_write_bytes": 0, "downloaded": True, "accounting_complete": True}
+    elif verb == "apply":
+        if "--manifest" in args:
+            # A release from a file: what recab imports and selects.
+            u["available"], u["download"] = release_summary(), None
+            u["download"] = {"release": RELEASE_ID, "verified_files": 1, "total_files": 1, "verified_bytes": 1,
+                             "total_bytes": 1, "reused_files": 0, "producer_write_bytes": 0,
+                             "producer_cancelled_write_bytes": 0, "downloaded": True, "accounting_complete": True}
+        elif not (u.get("download") and u["download"]["downloaded"]):
+            refuse("apply requires a cached release id or --manifest")
+        if not s["preparation"]:
+            prepare(s)
+        p = s["preparation"]
+        pause(1.0)
+        p["revision"] += 1
+        u["pending"] = RELEASE_ID
+        edited = [c for c in p["changes"] if c["action"] == "edit" and c["package"] == "/etc/ssh/sshd_config"]
+        if edited:
+            # The release also changes a file the person edited: nothing is chosen for them.
+            p["operation"], p["phase"] = "update", "interrupted"
+            p["failure"] = "release merge has unresolved conflicts"
+            u["merge"] = {"phase": "conflicted", "conflicts": [
+                {"id": "conflict1", "path": "etc/ssh/sshd_config", "kind": "content", "resolution": None}]}
+        else:
+            u["merge"] = {"phase": "complete", "conflicts": []}
+            u["pending"] = None
+        record(s, "update", slot=p["slot"], preparation=p["id"],
+               outcome="interrupted" if edited else "done",
+               detail="release merge has unresolved conflicts" if edited else None)
+    elif verb == "resolve":
+        for c in u["merge"]["conflicts"]:
+            if c["id"] == words[2]:
+                c["resolution"] = args[args.index("--choice") + 1]
+        s["preparation"]["revision"] += 1
+    elif verb == "recover":
+        m = u.get("merge")
+        if not m or any(c["resolution"] is None for c in m["conflicts"]):
+            refuse("release merge has unresolved conflicts")
+        pause(0.5)
+        m["phase"] = "complete"
+        u["pending"] = None
+        p = s["preparation"]
+        p["operation"], p["phase"], p["failure"] = "prepare", "prepared", None
+        p["revision"] += 1
+        record(s, "update", slot=p["slot"], preparation=p["id"], outcome="done")
+    elif verb == "cancel":
+        if not u.get("pending"):
+            refuse("no selected update")
+        u["merge"], u["pending"], u["phase"] = None, None, "downloaded"
+        p = s["preparation"]
+        p["operation"], p["phase"], p["failure"] = "prepare", "prepared", None
+        p["revision"] += 1
+    else:
+        refuse("unsupported update operation '%s'" % verb)
+
+
 def main(args):
     role = os.path.basename(sys.argv[0])
     s = load()
@@ -236,18 +497,29 @@ def main(args):
     if role == "reboot-real":
         reboot(s)
         return save(s)
-    words = [arg for arg in args if not arg.startswith("--")]
+    # Flags that take a value, and flags that do not: what is left is the command.
+    valued = ("--actor", "--preparation", "--revision", "--generation", "--manifest", "--file", "--choice", "--recipe")
     actor = args[args.index("--actor") + 1] if "--actor" in args else None
-    # The values of --preparation, --revision and --actor are not commands.
-    for flag in ("--preparation", "--revision", "--actor"):
-        if flag in args and args[args.index(flag) + 1] in words:
-            words.remove(args[args.index(flag) + 1])
-    if "--machine-events" in args:
-        refuse("unexpected argument '--machine-events' found")
+    words, skip = [], False
+    for arg in args:
+        if skip:
+            skip = False
+        elif arg in valued:
+            skip = True
+        elif not arg.startswith("--"):
+            words.append(arg)
+    events = "--machine-events" in args
     command = words[0] if words else ""
     if command == "status":
         print(json.dumps(status(s)))
         return
+    if command == "history":
+        if os.environ.get("RECAB_STANDIN_NO_HISTORY") == "1":
+            refuse("unrecognized subcommand 'history'", "state_or_detection", 2)
+        print(json.dumps(history(s)))
+        return
+    if events:
+        emit(schema_version=1, event="started", operation=command, message="Starting " + command, code=None)
     if command == "prepare":
         if s["preparation"]:
             matching(s, args)
@@ -259,41 +531,53 @@ def main(args):
         pause(1.0)
         p["phase"] = "ready"
         p["revision"] += 1
+        record(s, "finalize", slot=p["slot"], preparation=p["id"], outcome="done")
     elif command == "discard":
-        matching(s, args)
+        p = matching(s, args)
         if "--preparation" not in args:
             refuse("the following required arguments were not provided: --preparation <PREPARATION> --revision <REVISION>")
         if s["trial_pending"]:
             refuse("cannot discard while a trial is pending or uncommitted")
+        record(s, "discard", slot=p["slot"], preparation=p["id"], outcome="done")
         s["preparation"] = None
         s["trial_pending"] = False
+        drop_merge(s)
     elif command == "set-next" and len(words) == 2:
         p = s["preparation"]
         if words[1] != other(s) or not p or p["phase"] != "ready":
             refuse("slot %s holds no finalized candidate" % words[1])
         s["trial_pending"] = True
+        record(s, "set-next", slot=words[1])
     elif command == "rollback":
         if not s["rollback"]:
             refuse("no earlier known-good system is kept")
         s["go_back"] = True
+        record(s, "rollback", slot=s["rollback"])
     elif command == "commit":
-        # Committing the running system takes a set restart back.
+        # Committing the running system takes a set restart back, and ends a
+        # trial; a commit by hand leaves `last_trial` as it was, as recab's does.
+        cancelled = s["trial_pending"]
         s["trial_pending"] = False
         if s.get("on_trial"):
             s["on_trial"] = False
-            s["last_trial"] = {"slot": s["active"], "committed": True, "detail": "kept by hand",
-                               "unix_time": int(time.time())}
+            s["preparation"] = None
+            installed(s)
+        record(s, "commit", slot=s["active"], outcome="restart_cancelled" if cancelled else None)
     elif command == "change" and len(words) == 3:
         matching(s, args)
         change(s, words[1], words[2], actor)
     elif command == "edit" and len(words) == 2:
         matching(s, args)
         change(s, "edit", words[1], actor)
+    elif command == "update" and len(words) >= 2:
+        update(s, words, args)
     else:
         refuse("unrecognized subcommand '%s'" % " ".join(words), "state_or_detection", 2)
     save(s)
+    if events:
+        emit(schema_version=1, event="finished", operation=command, message="Completed " + command, code=0)
     if "--json" in args:
-        print(json.dumps({"ok": True}))
+        print(json.dumps({"operation": command, "completed": True}))
 
 
 if __name__ == "__main__":

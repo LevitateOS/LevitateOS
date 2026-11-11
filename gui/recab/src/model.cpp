@@ -51,6 +51,8 @@ Status Status::fromJson(const QJsonObject &object)
     const QJsonObject update = object["update"].toObject();
     s.updateRelease = update["release"].toString();
     s.updateBytes = update["size_bytes"].toInteger();
+    s.update.version = s.updateRelease;
+    s.update.totalBytes = s.updateBytes;
 
     for (const QJsonValue &value : object["conflicts"].toArray()) {
         const QJsonObject clash = value.toObject();
@@ -175,6 +177,11 @@ Status Status::fromReal(const QJsonObject &o, const QString &distro, const QStri
     if(said=="unusable"){s.state="interrupted";s.unusable=o["recovery_reason"].toString();s.interruptedDuring=s.unusable;}
     const QString other = lifecycle["other"].toString();
     s.otherRole = other == QLatin1String("unknown") || other.isEmpty() ? QStringLiteral("none") : other;
+    // On trial, the other place holds the system from before: that is what
+    // `rollback` leads to. recab still calls it "next" then, because the
+    // preparation that made the running system is kept until it is kept.
+    if (s.state == QLatin1String("on_trial"))
+        s.otherRole = QStringLiteral("previous");
     // The next system continues the running one, and a copy is it.
     if (s.otherRole == QLatin1String("next") || s.otherRole == QLatin1String("copy"))
         s.otherRelease = o["prepared_release"].toString(release);
@@ -243,6 +250,31 @@ Status Status::fromReal(const QJsonObject &o, const QString &distro, const QStri
         s.updatePhase=update["phase"].toString();s.updateError=update["last_error"].toString();
         s.updateRelease=update["available"].toObject()["version"].toString();
         s.updateBytes=update["available"].toObject()["total_bytes"].toInteger();
+        UpdateInfo &u = s.update;
+        u.phase = s.updatePhase;
+        u.lastError = s.updateError;
+        const QJsonObject available = update["available"].toObject();
+        u.version = available["version"].toString();
+        u.channel = available["channel"].toString();
+        u.id = available["id"].toString();
+        u.sequence = available["sequence"].toInteger();
+        u.totalBytes = available["total_bytes"].toInteger();
+        const QJsonObject fetched = update["download"].toObject();
+        u.hasDownload = !fetched.isEmpty();
+        u.downloaded = fetched["downloaded"].toBool();
+        u.verifiedBytes = fetched["verified_bytes"].toInteger();
+        u.downloadBytes = fetched["total_bytes"].toInteger();
+        u.pendingRelease = update["pending_release"].toString();
+        const QJsonObject merge = update["merge"].toObject();
+        u.hasMerge = !merge.isEmpty();
+        u.mergePhase = merge["phase"].toString();
+        u.mergeComplete = update["merge_complete"].toBool();
+        u.mergeFailure = merge["failure"].toString();
+        u.unresolved = merge["unresolved"].toInteger();
+        for (const QJsonValue &value : merge["conflicts"].toArray()) {
+            const QJsonObject c = value.toObject();
+            u.conflicts << MergeConflict{c["id"].toString(), c["path"].toString(), c["kind"].toString(), c["resolution"].toString()};
+        }
         const QJsonObject download=update["download"].toObject();
         if(!download.isEmpty())s.downloadProgress=QObject::tr("%1 / %2 verified bytes%3").arg(download["verified_bytes"].toInteger()).arg(download["total_bytes"].toInteger()).arg(download["downloaded"].toBool()?QObject::tr(" — downloaded"):QString());
         for(const QJsonValue &value:update["merge"].toObject()["conflicts"].toArray()) {const auto c=value.toObject();if(c["resolution"].isNull())s.clashes<<Clash{c["path"].toString()+" ("+c["kind"].toString()+")",QObject::tr("Prepared content (private)"),QObject::tr("Release content (private)")};}
@@ -253,4 +285,208 @@ Status Status::fromReal(const QJsonObject &o, const QString &distro, const QStri
         s.actions["update"]=own("update_apply");if(!s.actions["update"].ready)s.actions["update"]=own("update_download");if(!s.actions["update"].ready)s.actions["update"]=own("update_check");
     }
     return s;
+}
+
+ActionVerdict Status::operation(const QString &id) const
+{
+    const QJsonObject op = operationObject(id);
+    if (op.isEmpty())
+        return ActionVerdict{false, QObject::tr("This recab does not offer it.")};
+    return ActionVerdict{op["verdict"] == QLatin1String("ready"), op["reason"].toString()};
+}
+
+QJsonObject Status::operationObject(const QString &id) const
+{
+    for (const QJsonValue &value : operations)
+        if (value.toObject()["id"] == id)
+            return value.toObject();
+    return {};
+}
+
+// ---------------------------------------------------------------- History
+
+QString whenWords(qint64 unixTime)
+{
+    const QDateTime time = QDateTime::fromSecsSinceEpoch(unixTime);
+    const QLocale locale;
+    if (time.date() == QDate::currentDate())
+        return QObject::tr("Today %1").arg(locale.toString(time.time(), QLocale::ShortFormat));
+    return QObject::tr("%1 %2").arg(locale.toString(time.date(), QStringLiteral("d MMM")),
+                                    locale.toString(time.time(), QLocale::ShortFormat));
+}
+
+namespace {
+
+QString slotWords(const QString &slot)
+{
+    return slot.isEmpty() ? QString() : QObject::tr(" (Slot %1)").arg(slot);
+}
+
+QString changeWords(const QString &action, const QString &package)
+{
+    if (action == QLatin1String("install"))
+        return QObject::tr("%1, installed").arg(package);
+    if (action == QLatin1String("update"))
+        return QObject::tr("%1, updated").arg(package);
+    if (action == QLatin1String("remove"))
+        return QObject::tr("%1, removed").arg(package);
+    if (action == QLatin1String("edit"))
+        return QObject::tr("%1, edited").arg(package);
+    return QObject::tr("%1 (%2)").arg(package, action);
+}
+
+QString whoWords(const QString &actor)
+{
+    if (actor.isEmpty())
+        return QObject::tr("recab names nobody");
+    if (actor == QLatin1String("person"))
+        return QObject::tr("You");
+    if (actor.startsWith(QLatin1String("agent")))
+        return QObject::tr("The agent");
+    return actor;
+}
+
+} // namespace
+
+History History::fromJson(const QJsonObject &o, const QString &distro, const QString &openPreparation)
+{
+    History h;
+    h.read = true;
+    h.unreadable = o["unreadable"].toInteger();
+    h.truncated = o["truncated"].toBool();
+    h.logFound = o["log_found"].toBool(true);
+    Q_UNUSED(distro)
+    const QJsonArray entries = o["entries"].toArray();
+    auto at = [&entries](int i) { return entries.at(i).toObject(); };
+    const int n = entries.size();
+    for (int i = 0; i < n; ++i) {
+        const QJsonObject e = at(i);
+        HistoryRow row;
+        row.when = e["time"].toInteger();
+        row.kind = e["kind"].toString();
+        row.slot = e["slot"].toString();
+        row.preparation = e["preparation"].toString();
+        row.actor = e["actor"].toString();
+        row.detail = e["detail"].toString();
+        const QString outcome = e["outcome"].toString();
+        const QString kind = row.kind;
+        row.restart = kind == QLatin1String("set-next") || kind.startsWith(QLatin1String("trial-"))
+                      || kind == QLatin1String("rollback") || kind == QLatin1String("commit");
+        if (kind == QLatin1String("change")) {
+            row.carriesActor = true;
+            row.byAgent = row.actor.startsWith(QLatin1String("agent"));
+            row.what = changeWords(e["action"].toString(), e["package"].toString());
+            row.who = whoWords(row.actor);
+            // How it ended: what happened to the next system it went into,
+            // as far as the log shows it.
+            const QString slot = row.slot, preparation = row.preparation;
+            int finished = -1;
+            bool discarded = false;
+            for (int j = 0; j < n; ++j) {
+                const QJsonObject other = at(j);
+                if (other["preparation"].toString() != preparation)
+                    continue;
+                if (other["kind"] == QLatin1String("discard") && other["outcome"] == QLatin1String("done"))
+                    discarded = true;
+                if (other["kind"] == QLatin1String("finalize") && other["outcome"] == QLatin1String("done") && finished < 0)
+                    finished = j;
+            }
+            if (discarded) {
+                row.ended = QObject::tr("Given up with that next system");
+            } else if (finished >= 0) {
+                // How the restarts into that place went after it was finished,
+                // the last one counting, until it was begun again.
+                QString verdict;
+                for (int j = finished - 1; j >= 0; --j) {
+                    const QJsonObject later = at(j);
+                    if (later["slot"].toString() != slot)
+                        continue;
+                    const QString k = later["kind"].toString();
+                    // A commit of that place, once it runs, is the system kept by
+                    // hand; one that cancelled a set restart is not.
+                    if (k == QLatin1String("commit") && later["outcome"] != QLatin1String("restart_cancelled"))
+                        verdict = QStringLiteral("trial-kept");
+                    else if (k == QLatin1String("trial-kept") || k == QLatin1String("trial-failed"))
+                        verdict = k;
+                    else if (k == QLatin1String("prepare") || k == QLatin1String("discard"))
+                        break;
+                }
+                if (verdict == QLatin1String("trial-kept")) {
+                    row.ended = QObject::tr("Went into a restart that was kept");
+                    row.mood = HistoryRow::Ok;
+                } else if (verdict == QLatin1String("trial-failed")) {
+                    row.ended = QObject::tr("Went into a restart that came back");
+                    row.mood = HistoryRow::Bad;
+                } else {
+                    row.ended = QObject::tr("In the finished next system, not started");
+                    row.mood = HistoryRow::Warn;
+                }
+            } else if (preparation == openPreparation) {
+                row.ended = QObject::tr("In the next system, not finished");
+                row.mood = HistoryRow::Warn;
+            } else {
+                row.ended = QObject::tr("recab records no end for it");
+            }
+        } else if (kind == QLatin1String("init")) {
+            row.what = QObject::tr("recab was set up here%1").arg(slotWords(row.slot));
+            row.ended = QObject::tr("Done");
+        } else if (kind == QLatin1String("prepare")) {
+            row.what = QObject::tr("The next system was begun as a copy of the running one%1").arg(slotWords(row.slot));
+            row.ended = outcome == QLatin1String("interrupted") ? QObject::tr("Stopped") : QObject::tr("Begun; recab does not log its end");
+            row.mood = outcome == QLatin1String("interrupted") ? HistoryRow::Bad : HistoryRow::Plain;
+        } else if (kind == QLatin1String("update")) {
+            row.what = QObject::tr("A release was merged into the next system%1").arg(slotWords(row.slot));
+            row.ended = outcome == QLatin1String("interrupted") ? QObject::tr("Stopped, waiting to be settled") : QObject::tr("Merged");
+            row.mood = outcome == QLatin1String("interrupted") ? HistoryRow::Warn : HistoryRow::Plain;
+        } else if (kind == QLatin1String("finalize")) {
+            row.what = QObject::tr("The next system was finished: checked and closed%1").arg(slotWords(row.slot));
+            row.ended = outcome == QLatin1String("done") ? QObject::tr("Done") : QObject::tr("Begun; recab does not log its end");
+        } else if (kind == QLatin1String("discard")) {
+            row.what = QObject::tr("The next system was given up%1").arg(slotWords(row.slot));
+            row.ended = outcome == QLatin1String("done") ? QObject::tr("Done") : QObject::tr("Stopped");
+            row.mood = outcome == QLatin1String("done") ? HistoryRow::Plain : HistoryRow::Bad;
+        } else if (kind == QLatin1String("set-next")) {
+            row.what = QObject::tr("A restart into the next system was set%1").arg(slotWords(row.slot));
+            row.ended = QObject::tr("Set");
+        } else if (kind == QLatin1String("trial-kept")) {
+            row.what = QObject::tr("Restart into the next system%1").arg(slotWords(row.slot));
+            row.ended = QObject::tr("Kept: start-up finished with nothing failed");
+            row.mood = HistoryRow::Ok;
+        } else if (kind == QLatin1String("trial-failed")) {
+            row.what = QObject::tr("Restart into the next system%1").arg(slotWords(row.slot));
+            row.ended = QObject::tr("Came back: it did not start properly");
+            row.mood = HistoryRow::Bad;
+        } else if (kind == QLatin1String("trial-missed")) {
+            row.what = QObject::tr("A set restart was used up by another start%1").arg(slotWords(row.slot));
+            row.ended = QObject::tr("Not a trial");
+        } else if (kind == QLatin1String("commit")) {
+            const bool cancelled = outcome == QLatin1String("restart_cancelled");
+            row.what = cancelled ? QObject::tr("The set restart was cancelled by keeping the running system")
+                                 : QObject::tr("The running system was kept%1").arg(slotWords(row.slot));
+            row.ended = cancelled ? QObject::tr("The next system stays ready") : QObject::tr("Kept");
+            row.mood = HistoryRow::Ok;
+        } else if (kind == QLatin1String("rollback")) {
+            row.what = QObject::tr("Going back to the system from before was set%1").arg(slotWords(row.slot));
+            row.ended = QObject::tr("Set");
+        } else {
+            row.what = QObject::tr("%1%2").arg(kind, slotWords(row.slot));
+        }
+        h.rows << row;
+    }
+    return h;
+}
+
+QString History::text() const
+{
+    QString out = QObject::tr("History of this computer's systems, newest first\n\n");
+    for (const HistoryRow &row : rows) {
+        out += QStringLiteral("%1  %2").arg(QLocale().toString(QDateTime::fromSecsSinceEpoch(row.when), QLocale::ShortFormat), row.what);
+        if (row.carriesActor)
+            out += QObject::tr("  (%1)").arg(row.who);
+        out += QObject::tr("  -  %1").arg(row.ended);
+        if (!row.detail.isEmpty())
+            out += QObject::tr(": %1").arg(row.detail);
+        out += QLatin1Char('\n');
+    }
+    return out;
 }

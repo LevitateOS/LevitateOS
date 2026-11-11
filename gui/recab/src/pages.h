@@ -48,6 +48,8 @@ signals:
     // The ways to the two pages that hold the rest.
     void openNext();
     void openBack();
+    // What recab says about a newer release.
+    void openRelease();
 };
 
 // Everything about the next system in one place: what it holds, what will
@@ -74,6 +76,46 @@ signals:
     void openDisk();
     // What to do about a next system that did not start is on Overview.
     void openOverview();
+    void openRelease();
+};
+
+// A new release of the system: what recab says about it, and the steps it
+// offers (look, fetch, add to the next system, take out again). Every button
+// follows one of recab's own operations; this page works nothing out.
+class ReleasePage : public Page {
+    Q_OBJECT
+public:
+    using Page::Page;
+    void show(const Status &status);
+signals:
+    void back();
+    // One of recab's operations by its id (`update_check`, `update_download`,
+    // `update_recover`, `update_cancel`).
+    void operation(const QString &id);
+    // Merge the release into the next system, as recab's `update_apply` or,
+    // with the older stand-in, its `update apply`.
+    void add();
+    // A release manifest from a file (`update_media`).
+    void addFromFile();
+    void settle();
+    void finish();
+};
+
+// What happened to this computer's systems, newest first, as recab's
+// `history` lists it. With a recab that has none, it says so.
+class HistoryPage : public Page {
+    Q_OBJECT
+public:
+    using Page::Page;
+    void show(const History &history);
+    // The history could not be read, or this recab has none.
+    void showUnavailable(const History &history);
+signals:
+    void saveAsFile();
+    void readAgain();
+private:
+    History last_;
+    int filter_ = 0; // 0 all, 1 restarts, 2 by the agent
 };
 
 // What can be turned back from here, and what to do when the desktop does not
