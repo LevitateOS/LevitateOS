@@ -103,6 +103,9 @@ The provisioned Linux x86_64 runner has labels `self-hosted, Linux, X64,
 recab-release`. Its enabled host service is `recab-release-runner.service` and
 its private state lives under `/var/lib/recab-release/`. The tracked service,
 namespace launcher and job hook are in `release/updates/runner/`.
+The service uses the vendor `bin/runsvc.sh` entrypoint and graceful signal
+forwarding, so a restart closes its GitHub session rather than leaving a stale
+interactive-agent session behind.
 
 The launcher gives the runner a separate filesystem, PID namespace and private
 65536-entry UID/GID range through systemd-nspawn. Namespace root maps to an
@@ -132,11 +135,16 @@ with the host home absent and the private UID/GID map verified. Dispatch
 runner without tool builds, signing, publication, VM tests or stable enablement.
 This job receives no signing environment or index secrets and reports its
 metadata transport result separately from installed lifecycle validation.
+The [registered-runner check](https://github.com/LevitateOS/LevitateOS/actions/runs/43062654582)
+passed: the job hook, checkout and Recipe/Ginux verification of all nine public
+files succeeded on this runner. A normal service restart also completed without
+timeout after correcting shutdown delivery to the vendor wrapper directly.
 
-`RECAB_METADATA_DEPLOY_READY=true` permits only explicit `operation=deploy`,
-including bootstrap of the public authority before any release is advertised.
-It requires no tool/system build, Recipe runtime, signing secret or release
-runner. The metadata-only deployment still uses the master-restricted Pages
+`RECAB_METADATA_DEPLOY_READY=true` permits explicit `operation=deploy` and
+`operation=runner-check`, including bootstrap of the public authority before any
+release is advertised. Deployment requires no tool/system build, Recipe runtime,
+signing secret or release runner; the runner check requires the provisioned
+runtime/service. The metadata-only deployment still uses the master-restricted Pages
 environment and the existing serialized workflow. Its signing steps are skipped.
 
 After release configuration/runtime provisioning, `RECAB_PUBLISHING_READY=true` permits the publication/refresh workflow.
