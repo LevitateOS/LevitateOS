@@ -5,8 +5,8 @@ basics, every toolchain a build needs, and the desktop programs the images
 leave to Recipe. About fifty recipes in four layers. Each layer needs the one
 before it, so the order of the layers is the order of work.
 
-Only `ripgrep` exists. The "how" of each recipe is what is expected of the
-project's releases and has not been checked recipe by recipe.
+Layer 1 is written. The "how" of the later recipes is what is expected of
+the project's releases and has not been checked recipe by recipe.
 
 This plan is kept here, not in `recipes/`: an image carries that repository
 as it is, and any change to it moves the commit its index names.
@@ -32,18 +32,18 @@ Static releases. Nothing new is needed in Recipe.
 | Recipe | What it is | Done |
 |---|---|---|
 | `ripgrep` | text search | yes |
-| `fd` | file finder | |
-| `bat` | file viewer with highlighting | |
-| `fzf` | fuzzy picker | |
-| `jq` | JSON on the command line | |
-| `eza` | directory listing | |
-| `zoxide` | directory jumping | |
-| `delta` | readable diffs for git | |
-| `btop` | system monitor | |
-| `micro` | terminal text editor | |
-| `gh` | GitHub from the terminal | |
-| `rclone` | cloud storage sync | |
-| `uv` | Python and its packages, self-contained | |
+| `fd` | file finder | yes |
+| `bat` | file viewer with highlighting | yes |
+| `fzf` | fuzzy picker | yes |
+| `jq` | JSON on the command line | yes |
+| `eza` | directory listing | yes |
+| `zoxide` | directory jumping | yes |
+| `delta` | readable diffs for git | yes |
+| `btop` | system monitor | yes |
+| `micro` | terminal text editor | yes |
+| `gh` | GitHub from the terminal | yes |
+| `rclone` | cloud storage sync | yes |
+| `uv` | Python and its packages, self-contained | yes |
 
 ## 2. Toolchains and build tools
 
