@@ -206,7 +206,7 @@ jobs:
 
   deploy:
     needs: metadata
-    if: needs.metadata.result == 'success'
+    if: always() && !cancelled() && needs.metadata.result == 'success'
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     permissions:
@@ -234,7 +234,7 @@ jobs:
 
   monitor:
     needs: deploy
-    if: needs.deploy.result == 'success' && vars.RECAB_PUBLIC_MONITORING_READY == 'true'
+    if: always() && !cancelled() && needs.deploy.result == 'success' && vars.RECAB_PUBLIC_MONITORING_READY == 'true'
     runs-on: [self-hosted, linux, x64, recab-release]
     timeout-minutes: 45
     permissions:
