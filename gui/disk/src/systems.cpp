@@ -620,8 +620,10 @@ void SystemsPage::showState(const SystemsState &state, const QString &why)
     frames[1]->set(0, tr("Not read yet"));
 
     auto *foot = new QHBoxLayout;
-    foot->addWidget(dim(text(tr("Both systems are read from start to end, which takes a few minutes and needs the "
-                                "administrator's password. Nothing is changed on either."),
+    foot->addWidget(dim(text(passwordAsked_ ? tr("Both systems are read from start to end, which takes a few minutes and needs the "
+                                                 "administrator's password. Nothing is changed on either.")
+                                            : tr("Both systems are read from start to end, which takes a few minutes. It runs as you, so no "
+                                                 "password is asked. Nothing is changed on either."),
                              true)),
                     1);
     auto *go = new QPushButton(why.isEmpty() ? tr("Compare") : tr("Try again"));
@@ -650,7 +652,7 @@ void SystemsPage::showComparing(const SystemsState &state)
     column->addLayout(header);
 
     column->addLayout(twoFrames(state, reading_), 1);
-    reading_[0]->set(0, tr("Waiting for the administrator's password"));
+    reading_[0]->set(0, passwordAsked_ ? tr("Waiting for the administrator's password") : tr("Waiting"));
     reading_[1]->set(0, tr("Waiting"));
     step_ = dim(text(tr("Starting"), true));
     column->addWidget(step_);

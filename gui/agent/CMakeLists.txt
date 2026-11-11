@@ -20,6 +20,7 @@ qt_add_executable(levitate-agent
     src/notify.cpp
     src/child.cpp
     src/conversation.cpp
+    src/holding.cpp
     src/codex.cpp
     src/claude.cpp
     src/passthrough.cpp
@@ -27,6 +28,7 @@ qt_add_executable(levitate-agent
     src/account.cpp
 )
 target_compile_options(levitate-agent PRIVATE -Wall -Wextra)
+target_compile_definitions(levitate-agent PRIVATE LEVITATE_AGENT_VERSION="${PROJECT_VERSION}")
 target_link_libraries(levitate-agent PRIVATE Qt6::Core)
 
 include(GNUInstallDirs)

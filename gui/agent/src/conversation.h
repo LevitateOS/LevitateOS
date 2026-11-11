@@ -7,7 +7,9 @@
 
 #include "adapter.h"
 
+#include <QHash>
 #include <QMap>
+#include <QSet>
 #include <QStringList>
 
 class Child;
@@ -18,6 +20,12 @@ public:
     void answered(const QString &id, const QString &answer, const QByteArray &line) override;
     void stop() override;
 
+    // A line of the set-aside convention: what the agent decided about a place.
+    struct Claim {
+        enum Kind { SetAside, Keep, Cannot } kind = SetAside;
+        QString path, why;
+    };
+
     // What the agent's last message asks for, if anything.
     struct Wish {
         enum Kind { Nothing, Ask, Run, Administrator } kind = Nothing;
@@ -25,14 +33,15 @@ public:
         QStringList choices;
         QString because;
         QString rest;          // the message without the convention lines
+        QList<Claim> claims;   // SET-ASIDE, KEEP and CANNOT lines, only when the request has `set_aside`
     };
-    static Wish readWish(const QString &message);
+    Wish readWish(const QString &message) const;
 
 protected:
     explicit Conversation(Session *session);
 
     // The text the agent is given once: how to ask the person for anything.
-    static QString contract();
+    QString contract() const;
     // The first prompt of the run. `who` says which window it comes from.
     virtual QString firstPrompt(const QString &who, const QString &prompt) const = 0;
     // Starts the agent for one turn. It later calls `turnEnded` or `fail`.
@@ -66,6 +75,10 @@ private:
     };
 
     void turn(const QString &prompt);
+    // Carries out what the agent decided about places, and writes down what
+    // happened for the agent's next turn.
+    void settle(const QList<Claim> &claims);
+    void place(const QString &path, const QString &outcome, const QString &why, qint64 bytes);
     void ask(const Wish &wish, const QStringList &words);
     void execute(const Pending &pending);
 
@@ -75,4 +88,9 @@ private:
     Pending pending_;
     QStringList planned_;
     QMap<int, QString> stepState_;
+    // What the helper did for the agent since its last turn, said to it at the next one.
+    QString report_;
+    // Places of `ask_first` the person was asked about in this run, with the last answer.
+    QHash<QString, QString> asked_;
+    QSet<QString> dealtWith_;
 };

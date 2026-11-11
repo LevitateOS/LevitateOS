@@ -43,6 +43,8 @@ qint64 sum(const QList<Finding> &found)
 
 QString agentWords(const Finding &finding)
 {
+    if (finding.kind == kindRecipe)
+        return QObject::tr("left alone");
     if (finding.kind == kindPicked)
         return QObject::tr("finds out, asks");
     return finding.sure ? QObject::tr("clears") : QObject::tr("asks first");
@@ -248,7 +250,8 @@ void MessPage::fillList()
         group->setFont(0, bold);
         group->setTextAlignment(1, Qt::AlignRight | Qt::AlignVCenter);
         // Ticking the kind ticks everything of that kind.
-        group->setFlags(Qt::ItemIsEnabled | Qt::ItemIsUserCheckable | Qt::ItemIsAutoTristate);
+        // Recipe's own folders are listed but never handed over, so there is nothing to tick.
+        group->setFlags(kind == kindRecipe ? Qt::ItemIsEnabled : Qt::ItemIsEnabled | Qt::ItemIsUserCheckable | Qt::ItemIsAutoTristate);
         for (int index : members) {
             const Finding &finding = found_[index];
             const QString shown = shortPath(finding.path, home_);
@@ -257,8 +260,12 @@ void MessPage::fillList()
                                                      agentWords(finding)});
             line->setData(0, nodeRole, QVariant::fromValue(static_cast<void *>(finding.node)));
             line->setTextAlignment(1, Qt::AlignRight | Qt::AlignVCenter);
-            line->setFlags(Qt::ItemIsEnabled | Qt::ItemIsSelectable | Qt::ItemIsUserCheckable);
-            line->setCheckState(0, unticked.contains(finding.node) ? Qt::Unchecked : Qt::Checked);
+            if (finding.kind == kindRecipe) {
+                line->setFlags(Qt::ItemIsEnabled | Qt::ItemIsSelectable);
+            } else {
+                line->setFlags(Qt::ItemIsEnabled | Qt::ItemIsSelectable | Qt::ItemIsUserCheckable);
+                line->setCheckState(0, unticked.contains(finding.node) ? Qt::Unchecked : Qt::Checked);
+            }
             line->setToolTip(0, finding.path + QLatin1Char('\n') + finding.why
                                     + (finding.sure ? QString() : QLatin1Char('\n') + tr("The agent asks you first.")));
             if (finding.node == picked_)
@@ -302,12 +309,14 @@ void MessPage::tickOnlySure()
             continue;
         const Node *node = static_cast<Node *>((*it)->data(0, nodeRole).value<void *>());
         for (const Finding &finding : found_)
-            if (finding.node == node)
+            if (finding.node == node && finding.kind != kindRecipe)
                 (*it)->setCheckState(0, finding.sure ? Qt::Checked : Qt::Unchecked);
     }
     // The kinds' own boxes follow their places.
     for (int index = 0; index < list_->topLevelItemCount(); ++index) {
         QTreeWidgetItem *group = list_->topLevelItem(index);
+        if (!(group->flags() & Qt::ItemIsUserCheckable))
+            continue;
         int on = 0;
         for (int child = 0; child < group->childCount(); ++child)
             on += group->child(child)->checkState(0) == Qt::Checked;
@@ -419,13 +428,11 @@ void HandPage::show(const QList<Finding> &chosen, qint64 scannedBytes, const QSt
     qint64 certain = 0;
     QStringList facts;
     QStringList asks;
-    int recipes = 0;
     for (const Finding &finding : chosen) {
         if (finding.sure)
             certain += finding.bytes;
         else
             asks << shortPath(finding.path, home);
-        recipes += !finding.how.isEmpty();
         QString line = tr("%1 (%2): %3").arg(finding.path, bytesText(finding.bytes), finding.why);
         if (!finding.how.isEmpty())
             line += QLatin1Char(' ') + finding.how;
@@ -433,37 +440,32 @@ void HandPage::show(const QList<Finding> &chosen, qint64 scannedBytes, const QSt
             line += tr(" Ask me first.");
         facts << line;
     }
-    // The convention is in the issue, the part the person cannot rewrite: the
-    // agent must always know where to put things and how to say what it did.
+    // The convention itself (how to name a place to set aside, to keep or to
+    // give up on, and which places to ask about) is told to the agent by the
+    // helper that runs it, together with the holding folder and the list this
+    // request carries; the issue says only what the person wants.
     const QString issue =
-        tr("%1 of %2 in %3 is taken by things that look like leftovers.")
-            .arg(bytesText(sum(chosen)), bytesText(scannedBytes), roots.join(tr(", ")))
-        + QStringLiteral("\n\n")
-        + tr("Clear them by moving, not deleting. The holding folder is \"%1\". Move each place you clear to the holding "
-             "folder plus the place's full path (a place /home/me/.cache/x goes to %1/home/me/.cache/x), on this same disk, "
-             "and write %1/manifest.json as {\"version\": 1, \"entries\": [{\"from\": \"the place\", \"held\": \"its path "
-             "beneath the holding folder, without the first /\", \"bytes\": its size in bytes}]}. Say what you did with each "
-             "place as one event: {\"event\": \"place\", \"path\": the place, \"result\": \"set-aside\", \"kept\", \"left\" or "
-             "\"could-not\", \"reason\": a sentence}.")
-              .arg(holding);
+        tr("%1 of %2 in %3 is taken by things that look like leftovers. Decide for each place below whether it can go, "
+           "and say so for each one: the person has approved this list, and the places you name to be set aside are moved "
+           "for you into a holding folder, not deleted.")
+            .arg(bytesText(sum(chosen)), bytesText(scannedBytes), roots.join(tr(", ")));
 
     // What happens, in sentences that are true of this list: each depends on
     // what was ticked, never on a fixed picture of it.
     Ask ask;
     ask.title = tr("Hand these %1 to the agent?").arg(counted(chosen.size(), tr("%1 place"), tr("%1 places")));
-    ask.happens << tr("The agent is asked to clear %1, %2 in all.")
+    ask.happens << tr("The agent is asked to clear %1, %2 in all. It is told to decide about each place and not to move or delete anything itself.")
                        .arg(counted(chosen.size(), tr("%1 place"), tr("%1 places")), bytesText(sum(chosen)));
-    ask.happens << tr("What it clears by moving is set aside in the holding folder %1, on the same disk as your files. Nothing is "
-                      "gone until you let it go, and you can bring each place back before that.")
+    ask.happens << tr("The helper that runs the agent moves what the agent names, and only places on this list, into the holding folder %1. "
+                      "A place on another disk than your home folder cannot be moved there and stays where it is. Nothing is gone "
+                      "until you let it go, and you can bring each place back before that.")
                        .arg(shortPath(holding, home));
-    if (recipes)
-        ask.happens << tr("%1 of them belong to Recipe: the agent clears those through Recipe, so they are not moved and not held.")
-                           .arg(recipes);
     if (asks.isEmpty()) {
-        ask.happens << tr("It asks you about nothing first: every place on this list clears without asking.");
+        ask.happens << tr("You are asked about no place first: handing this list over is your approval of every place on it.");
     } else {
         const QStringList named = asks.mid(0, 3);
-        ask.happens << tr("It asks you first about %1: %2%3.")
+        ask.happens << tr("It asks you first about %1: %2%3. The helper does not move one of them before you were asked. "
+                          "For every other place, handing this list over is your approval.")
                            .arg(counted(asks.size(), tr("%1 place"), tr("%1 places")), named.join(tr(", ")),
                                 asks.size() > named.size() ? tr(" and %1 more").arg(asks.size() - named.size()) : QString());
     }
@@ -477,10 +479,11 @@ void HandPage::show(const QList<Finding> &chosen, qint64 scannedBytes, const QSt
     ask.issue = issue;
     ask.facts = facts;
     ask.expected =
-        tr("At least %1 is moved into the holding folder; nothing is deleted. Only the things listed are touched. Anything "
-           "marked \"ask me first\" is asked about before it is moved. What belongs to Recipe is cleared through Recipe, "
-           "not by moving its files. The holding folder is the person's to let go later: do not delete it.")
-            .arg(bytesText(certain));
+        tr("Each place on the list is answered for: set aside, kept, or could not, with a reason for the last two. Nothing "
+           "is deleted. Only the things listed are touched. Anything marked \"ask me first\" is asked about before you "
+           "name it to be set aside.")
+        + (certain > 0 ? QLatin1Char(' ') + tr("At least %1 is expected to be set aside, since that much goes without asking.").arg(bytesText(certain))
+                       : QString());
     ask.go = tr("Hand it over");
     show(ask);
 }

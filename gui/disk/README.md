@@ -25,15 +25,18 @@ Qt 6 Widgets, C++20, CMake. Shared widgets are in `gui/kit`.
 
 **The finding is real; the agent is a stand-in.** The scanner and the rules
 have run on a real home folder (172 GiB read in about nine seconds, on a warm
-disk). Nothing has been handed to a real agent: `fixtures/agent` stands in for
-it and moves only inside a sample tree. **A real agent following the request
-(set aside by moving, a manifest, `place` events) has never been run**. The
-default agent is `levitate-agent`, which starts Codex, but its contract has no
-`place` event: the agent cannot send the lines the request asks for, only its
-questions, the commands it ran and its last word. And the window sends no
-`may_write`, so with Settings at "ask" Codex is read-only and every move is a
-command put to the person, whatever the page says about places that clear
-without asking. The pages for The
+disk). **Nothing has been handed to a real agent.** The hand-over goes through
+`levitate-agent`, which starts the agent and moves the places itself: the agent
+only decides (`SET-ASIDE:`, `KEEP:`, `CANNOT:` lines, `ASK:` for the places
+marked to ask first), the request carries `set_aside` (the holding folder, the
+places, the ones to ask about first), and the helper moves only places on that
+list, so the agent needs no right to write and nobody is asked about a move. The
+stories run that path with the helper and the stand-in Codex
+(`gui/agent/fixtures/codex`, story `disk`); `fixtures/agent` stays as a stand-in
+for another program set as the agent by its path, which gets the same request and
+must move the places itself. Neither a real Codex nor a real Claude Code has
+followed the convention: whether one writes the lines as asked, and asks about
+the marked places by naming their full path, is unchecked. The pages for The
 disk, Browse, Mess and what was set aside were built against stand-ins for
 `lsblk`, `recipe storage` and the agent (below) and never on a real desktop.
 
@@ -114,28 +117,34 @@ the list".
    (`gui/kit/before.*`, as Recipe uses it): the title as a question ("Hand these
    12 places to the agent?"), "Nothing has started...", "What happens" in plain
    sentences, "Cancel" and "Hand it over". The sentences are built from the
-   ticked list and say what the agent is asked to do, that what it moves is set
-   aside in the holding folder and nothing is gone until the person lets it go,
-   which places it asks about first (or that it asks about none), how many belong
-   to Recipe (cleared through Recipe, not moved), that it works as the person
-   without administrator rights, and how much room is free once everything is let
-   go (against what the disk has free now). Under them is the request the agent is
-   given: the issue, the facts (one per ticked place: path, size, why it can go,
-   how it should be cleared) and the expected result, which the person can
-   change. The issue also carries the convention the agent must follow (below);
-   it is the part the person cannot rewrite. The shared page has no part a
+   ticked list and say what the agent is asked to do (decide; it is told to move
+   nothing itself), that the helper moves what it names, only places on the list,
+   into the holding folder (a place on another disk stays where it is) and
+   nothing is gone until the person lets it go, which places the agent has to ask
+   about first and that the helper does not move one of them before it did (or
+   that no place is asked about, the hand-over being the approval), that it works
+   as the person and a command as administrator runs only if approved, and how much
+   room is free once everything is let go (against what the disk has free now).
+   Recipe's own folders are never handed over (they cannot be ticked; see
+   "What counts as mess"). Under the sentences is the request the agent is given:
+   the issue, the facts (one per ticked place: path, size, why it can go, and
+   "Ask me first." where it applies) and the expected result, which the person
+   can change. The convention itself (the lines, the ask-first places, the list
+   of approved places) is not in the request: the helper tells the agent. The shared page has no part a
    person can edit, so this page (`HandPage`) is that layout with the request in
    it, instead of a Before page followed by a second page. Escape and Cancel
    hand nothing over. "Ask the agent what differs" (below) uses the same page.
-2. **The agent works.** Before it moves anything marked "asks first" it asks,
-   and the question is answered in the window.
+2. **The agent works.** Before it names anything marked "asks first" it asks,
+   and the question is answered in the window; the helper refuses to move such a
+   place that was not asked about in the run. Nothing else is asked: the list was
+   approved on the hand-over page.
 3. **What was set aside** (the page after the run, under Mess; also from The
    disk): a heading with how much is held; "Free before" (measured when the
    request was handed over), "Free now" (measured now) and "Free once you let it
    go" (free now plus what the holding folder takes), all `statvfs` and a
    measurement of the folder, not counted from the list; one row per place:
    *Set aside* (and, when it asked, what the person answered), *Kept* (and why),
-   *Left alone* (Recipe's), *Could not* (and why, with "Try again", which hands
+   *Left alone* (only for a program that says `left` itself), *Could not* (and why, with "Try again", which hands
    just that place over again), *Brought back*, *Let go*; a place held that was
    not on the list is flagged; a place the agent said it set aside that is not
    in the holding folder is flagged. A place the person said to keep offers
@@ -185,8 +194,10 @@ On the fourth entry:
    read from start to end, neither is changed, it takes a few minutes, whether the
    administrator's password is asked (it follows the root helper this window
    really uses) and the command that will run. Cancel compares nothing. Then both
-   systems are read from start to end, which takes minutes
-   and needs the administrator's password. The page stays: each frame fills as
+   systems are read from start to end, which takes minutes, and with a root
+   helper the administrator's password is asked; without one it runs as the person
+   and the pages say so (the page before comparing says "no password is asked",
+   the frame while it waits says "Waiting"). The page stays: each frame fills as
    its side is read, and Stop ends it.
 3. **How alike they are.** A headline ("The two systems are identical", or
    "99.9% the same", by room taken), how many files differ, and what the other
@@ -233,14 +244,21 @@ folder per request, on the same disk as the home folder:
     home/me/.cache/x   the place itself, moved here under its own full path
 ```
 
-The request names the holding folder (`The holding folder is "..."`), says to
-move, not delete, and to say what was done with each place as an event
-`{"event": "place", "path", "result": "set-aside" | "kept" | "left" | "could-not",
-"reason"}` (and `asked`, `answer` when it asked). A place marked "Ask me first"
-is asked about, as before; a yes means set aside. What belongs to Recipe is
-cleared through Recipe and is not moved. What the page shows as set aside is
-what the manifests say and the holding folder really holds, measured; the
-events only say what happened to the places that are not held.
+The request's first line carries `"set_aside": {"holding": "/abs/holding/folder",
+"places": [...], "ask_first": [...]}` (the places the person ticked, and those of
+them marked "Ask me first"; `Window::send` writes the line, since the shared `Run`
+has no field for it). `levitate-agent` then does what a program speaking the
+protocol itself would do: the agent only decides, with `SET-ASIDE: path`, `KEEP:
+path | why` and `CANNOT: path | why` lines (and `ASK:` for the marked places), and
+the helper moves each place it names, only if it is on the list, into the holding
+folder keeping its full path beneath it, writes the manifest above, and sends
+`{"event": "place", "path", "outcome": "set-aside" | "kept" | "could-not", "why",
+"bytes"}` (and `asked`, `answer` for a place the person was asked about). The
+window also reads `result` and `reason` in a `place` event, which is what a
+program speaking the protocol itself (`fixtures/agent`) says. Recipe's own folders
+are not in the list. What the page shows as set aside is what the manifests say
+and the holding folder really holds, measured; the events only say what happened
+to the places that are not held.
 
 **Moving and deleting are confined.** The window moves a place only from a
 holding folder (a direct child of `set-aside` whose name is a time) to the
@@ -263,7 +281,7 @@ The rules are in `src/mess.cpp`. A place smaller than 20 MiB is not named. A pla
 |---|---|---|
 | Caches | each folder in `~/.cache`; any folder with a `CACHEDIR.TAG` | clears (sets aside) |
 | Build leftovers | `target` beside a `Cargo.toml`, and any tagged folder that looks like Rust output; a folder with a `CMakeCache.txt`; `node_modules` beside a `package.json` | clears |
-| Recipe's own | `~/.cache/recipe`, `~/.local/state/recipe`, `/var/lib/recipe/state` | clears through Recipe |
+| Recipe's own | `~/.cache/recipe`, `~/.local/state/recipe`, `/var/lib/recipe/state` | left alone: listed, nothing to tick, never handed over; they belong to Recipe, which has no command to clear them yet |
 | The trash | `~/.local/share/Trash` | clears |
 | Old downloads | archives, images and packages in `~/Downloads` not opened for 90 days | asks first |
 | Large and untouched | a file of 256 MiB or more, not opened or changed for a year | asks first |
@@ -295,6 +313,12 @@ DISK_GUI_ROOTS=$A/sample DISK_GUI_HOME=$A/sample DISK_GUI_APPARENT=1 \
   DISK_GUI_LSBLK=$F/lsblk DISK_GUI_RECIPE=$F/recipe \
   $A/build/disk-gui --look levitate
 ```
+
+For `--shots ... --hand-over` the hand-over goes through the built helper, so the run
+must also name `LEVITATE_ACTIVITY_AGENT=<the built levitate-agent>` and
+`LEVITATE_AGENT_CODEX=gui/agent/fixtures/codex` (with the notifier and root helper
+emptied, as `gui/agent/fixtures/story` does); without them the run stops before handing
+anything over, since the helper would start the real `codex`.
 
 Window 1100 x 700 the first time, then the size it had when it closed
 (`rememberWindowSize` in `gui/kit`; the picture modes always use 1100 x 700).
@@ -451,12 +475,23 @@ hands nothing to anyone and compares nothing.
 
 The stand-ins, all in `fixtures/`:
 
-- `agent` moves a place only when it lies inside `DISK_STANDIN_ROOT`, into the
-  holding folder the request names, and writes the manifest; it leaves what is
-  marked "Ask me first" when the answer is "Keep it", and what belongs to Recipe.
-  `DISK_STANDIN_COULD_NOT=TEXT` makes it fail, as a program holding files open
-  would, on every place whose path contains TEXT. It refuses a request that names
-  no holding folder.
+- `agent` stands for another program that speaks the protocol itself (the helper,
+  `levitate-agent`, is the route a person takes; see `gui/agent`). It moves a place
+  only when it lies inside `DISK_STANDIN_ROOT`, into the holding folder the
+  request's `set_aside` names, and writes the manifest; it leaves what is marked
+  "Ask me first" when the answer is "Keep it". `DISK_STANDIN_COULD_NOT=TEXT` makes
+  it fail, as a program holding files open would, on every place whose path
+  contains TEXT. It refuses a request that names no holding folder. The hand-over
+  story runs it once, after the main run, as "the other program also works".
+  The main hand-over of the stories goes through the built `levitate-agent`
+  (`LEVITATE_ACTIVITY_AGENT`) with `gui/agent/fixtures/codex` as Codex
+  (`LEVITATE_AGENT_CODEX`; the story sets `LEVITATE_STANDIN_STORY=disk` and the
+  helper's `HOME` to the sample for that run only): the stand-in decides about each
+  place (`SET-ASIDE:`, `CANNOT:` for a path containing `DISK_STANDIN_COULD_NOT`,
+  an `ASK:` for each place marked to ask first, then `SET-ASIDE:` on "Remove it"
+  and `KEEP:` otherwise) and the helper moves. The story checks the helper's
+  record (the request carried the list), that Codex ran read-only and was told the
+  convention, and that the only questions were those about the marked places.
 - `lsblk` answers in lsblk's real JSON shape for two disks. The home folder's
   partition is mounted at `DISK_STANDIN_LSBLK_MOUNT` with
   `DISK_STANDIN_LSBLK_HOME_SIZE` bytes; nothing else is mounted, so no real disk
@@ -542,14 +577,17 @@ on its input as `{"question": id, "answer": "..."}`. When asked what differs bet
 
 ## Not done
 
-- **A real agent following the request has never been run.** The set-aside
-  convention (move into the holding folder, write the manifest, say what was done
-  with a `place` event) is asked of the agent in words; the stand-in does it, the
-  real helper cannot pass a `place` event on, and nothing checks that Codex or
-  Claude Code would move rather than delete. A real agent may also set aside
-  something across a disk boundary or not write the manifest; the page then shows
-  what the manifests and the holding folder really hold, and says when a place
-  the agent claimed is not there, but nothing here can make an agent obey.
+- **A real agent following the convention has never been run.** The helper moves
+  and writes the manifest, so what is held is always as recorded, but whether
+  Codex or Claude Code writes the `SET-ASIDE:`, `KEEP:` and `CANNOT:` lines as
+  asked, and names the full path of a marked place in its question, was only
+  checked against stand-ins (`gui/agent/fixtures/codex` and `claude`). A place the
+  agent names that is on another disk than the holding folder is not moved (the
+  page says so as "Could not"). A program set as the agent by its path moves the
+  places itself, and then "The helper that runs the agent moves what the agent
+  names" on the hand-over page is not true of it; Disk does not know which kind of
+  agent is behind the helper. With `run_commands` at "allowed" the agent may write
+  in the home folder itself; the page says only that it is told to move nothing.
 - "Free once you let it go" is free now plus what the holding folder takes as
   this window counts it (room on disk, or the file lengths under
   `DISK_GUI_APPARENT`); on the sample, whose files are empty but long, nothing is
@@ -576,8 +614,10 @@ on its input as `{"question": id, "answer": "..."}`. When asked what differs bet
 - Help and the first page (the frame's own, `gui/kit/README.md`) say nothing of the kinds of
   file in Browse, a rule language for "Never suggest", logs and crash records, mess
   inside the systems, or a real agent following the set-aside convention; they say
-  the page for what was set aside reads the holding folder back, and that what
-  belongs to Recipe is cleared through Recipe and not moved.
+  the page for what was set aside reads the holding folder back. Help
+  (`gui/kit/help.cpp`, not changed from here) still says that what belongs to
+  Recipe is "cleared through Recipe", and that comparing "asks for the
+  administrator's password" whether or not a root helper is set; neither is true now.
 - Choosing the other entry while a comparison reads is allowed (the page keeps
   filling). Activity does not list comparisons: only agent runs are recorded.
 - Checked only offscreen, with stand-ins; not on a real desktop, and the rail's
@@ -591,10 +631,10 @@ on its input as `{"question": id, "answer": "..."}`. When asked what differs bet
   beyond recab's revision number.
 - Seeing what changed inside a file whose content differs; searching or
   copying the list of differences.
-- Clearing Recipe's own folders "through Recipe": the prompt says so. Recipe
-  has `recipe cleanup NAME` for one recipe's build files; whether anything
-  clears its whole cache or its saved build steps was not checked. The real
-  `recipe storage --json` was not run here: the shape (`earlier_bytes`,
+- Recipe's own folders are left alone because Recipe has no command that clears
+  them (`recipe cleanup NAME` is for one recipe's build files, `recipe storage
+  --clear-earlier` for earlier versions). When it has one, Disk can hand them to
+  Recipe. The real `recipe storage --json` was not run here: the shape (`earlier_bytes`,
   `earlier_generations`) was read from `tools/recipe` and `gui/recipe`.
 - Mess inside the systems. The map reads only the home folder and
   `/var/lib/recipe`; the two systems are compared with each other, not searched

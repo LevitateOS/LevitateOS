@@ -5,6 +5,7 @@
 // last window leaves.
 #pragma once
 
+#include "holding.h"
 #include "record.h"
 #include "settings.h"
 
@@ -20,6 +21,10 @@ struct Request {
     // Folders the agent may write in, beyond what the settings give it: made
     // absolute and checked to lie in the person's home folder.
     QStringList mayWrite;
+    // Places the person approved for setting aside, with the holding folder
+    // the helper moves them into (the agent only decides); `given` is false
+    // when the request has none.
+    SetAsidePlan setAside;
 };
 
 class Adapter;

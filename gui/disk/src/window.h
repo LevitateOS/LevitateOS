@@ -71,6 +71,7 @@ public:
     BeforePage *beforePage() const { return before_; }
     // The hand-over page: the same layout, with the request in it.
     HandPage *handPage() const { return hand_; }
+    SystemsPage *systemsPage() const { return systems_; }
     bool showingBefore() const;
 
     // The two systems: the page, the comparison, the question to the agent.
@@ -101,6 +102,9 @@ public:
     const std::shared_ptr<Node> &tree() const { return tree_; }
     // What the last request to the agent listed.
     const QList<Finding> &requested() const { return requested_; }
+    // The program that is the agent from now on (the picture runs use the helper for the hand-over
+    // and a stand-in program for the check of another one).
+    void useAgent(const QString &program);
     const DiskLayout &layout() const { return layout_; }
     const QStringList &never() const { return never_; }
     // The room on the disk the home folder is on, measured now.

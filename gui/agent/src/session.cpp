@@ -105,7 +105,7 @@ void Session::begin(const QByteArray &line)
 {
     const QJsonObject object = QJsonDocument::fromJson(line).object();
     started_ = true;
-    request_ = {object["prompt"].toString(), object["app"].toString(), object["title"].toString(), line, {}};
+    request_ = {object["prompt"].toString(), object["app"].toString(), object["title"].toString(), line, {}, {}};
 
     QJsonObject extra;
     QStringList given;
@@ -115,6 +115,8 @@ void Session::begin(const QByteArray &line)
         for (const QJsonValue &folder : object["may_write"].toArray())
             given << folder.toString();
     }
+    if (object.contains("set_aside"))
+        extra["set_aside"] = object["set_aside"];
     record_.open(id_, request_.app, request_.title, request_.prompt, starter_, extra);
 
     // Windows may connect from here on; the record is there for them to read.
@@ -134,6 +136,11 @@ void Session::begin(const QByteArray &line)
         return;
     }
     if (!given.isEmpty() && !checkFolders(given, settings_.home, &request_.mayWrite, &problem)) {
+        send({{"event", "failed"}, {"reason", problem}});
+        finish(QStringLiteral("failed"), 1);
+        return;
+    }
+    if (object.contains("set_aside") && !readSetAside(object["set_aside"], settings_.home, &request_.setAside, &problem)) {
         send({{"event", "failed"}, {"reason", problem}});
         finish(QStringLiteral("failed"), 1);
         return;

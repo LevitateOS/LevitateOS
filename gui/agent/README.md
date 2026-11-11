@@ -109,6 +109,19 @@ The same as `gui/kit/run.cpp` and `gui/kit/work.cpp` read and write.
   with a plain reason (`The folder /etc is outside your home folder, so the agent
   is not allowed to write there.`), exit code 1, a record, and the agent is not
   started. The list as given is recorded in the first line of the record.
+- **`set_aside`** (optional, in the first line) hands the helper a list of places to
+  move, so that the agent never needs the right to write in the home folder for it:
+  `"set_aside": {"holding": "/abs/holding/folder", "places": ["/abs/path", ...],
+  "ask_first": ["/abs/path", ...]}` (`ask_first` may be missing; each must also be in
+  `places`). The holding folder and every place must lie inside the person's home
+  folder with the links of their folders resolved (a place may itself be a link; one
+  that leads out is refused later, below), the holding folder and a place may not lie
+  one inside the other, and the home folder itself is no place. Anything else, or a
+  `set_aside` of the wrong shape, fails the whole run at once with a plain reason
+  (`The holding folder /tmp/h is outside your home folder, so nothing may be set aside
+  there.`), exit code 1, a record, and the agent is not started. The request is
+  recorded in the first line of the record. With a program as the agent (the
+  pass-through) the line goes through as it is and nothing is moved here.
 - **Standard error**, one JSON object per line:
 
 | Event | Fields |
@@ -122,6 +135,7 @@ The same as `gui/kit/run.cpp` and `gui/kit/work.cpp` read and write.
 | `question` | `id`, `text`, `choices` (empty: the person types an answer) |
 | `failed` | `reason` |
 | `done` | |
+| `place` | `path` (as given in `places`), `outcome` (`set-aside`, `kept` or `could-not`), `why`, `bytes` (the size moved, else 0), and `asked` and `answer` when the person was asked about it in this run. Only with `set_aside` (below) |
 | `did` | `kind` (`command`, `write` or `search`), `what`, `exit_code` (a number or null), `as_administrator`, `asked` (whether the person was asked), `approved` (true or false when asked, null when not) |
 
 `did` is read by the Activity page in `gui/kit`; the other pages ignore it. It is one event for each thing the
@@ -198,6 +212,44 @@ What Codex prints becomes events:
 | `turn.failed` | `failed` |
 | `error` | remembered; `failed` if the turn then ends without `turn.completed` (Codex also reports trouble it gets over) |
 | child ends without `turn.completed` | `failed` with the tail of its error output; a sign-in problem says so and names `codex login` |
+
+## Setting places aside: the agent decides, the helper moves
+
+With `set_aside` in the request, the contract the agent gets (`src/conversation.cpp`,
+for both adapters) adds three lines, on lines of their own, as many as it likes in one
+message, and lists the approved places and the ones to ask about first:
+
+- `SET-ASIDE: /path`: move this place into the holding folder.
+- `KEEP: /path | why in a few words`: the agent decided to leave it.
+- `CANNOT: /path | why`: it should go but something stops it.
+
+For each `SET-ASIDE:` the **helper** moves the place (`src/holding.*`), nobody being
+asked per move, because the person approved the list before the run: only when the path
+is exactly one of `places` (after resolving the links of its folders; a trailing slash
+or `..` is cleaned first), into the holding folder keeping its path beneath it
+(`/home/me/.cache/x` goes to `<holding>/home/me/.cache/x`), by `renameat2` with
+`RENAME_NOREPLACE` relative to descriptors it checked (`/proc/self/fd`) to be the
+folders it resolved, so a link swapped in meanwhile is not followed, without a shell
+and without a copy: a place on another disk is `could-not`. A place that is a link
+leading out of the home folder (or to nothing) is `could-not` and not moved. The holding
+folder is made when it is missing (mode 0700). The manifest `gui/disk` reads
+(`{"version": 1, "entries": [{"from", "held", "bytes"}]}`, `bytes` the length of what
+was moved) is written after every move, and a move whose record cannot be written is put
+back. Then it sends `place` and a `did` (`write`, nobody asked) and tells the agent at
+the next turn, for each line: `done`, `not done, <why>`, or `refused`. `KEEP:` and
+`CANNOT:` only send `place` (`kept`, `could-not`) and are `noted`.
+
+Refused with nothing moved and no `place` event, the agent being told so (it may try
+again): a path that is not on the list; a place of `ask_first` that the person was not
+asked about in this run. A place counts as asked about when the agent's `ASK:` named
+its full path (or the path with `~` for the home folder) and the person answered; the
+`place` event then carries `asked` and the `answer`. What the person answered is not
+read: the agent decides what a "yes" is. A place answered for once is not moved again
+(`ignored`). A message with `SET-ASIDE:` lines and nothing else is followed by one more
+turn with the results (`Carry on with any place you have not answered for, or finish
+now`); with `ASK:` or `RUN:` the results come first in the turn that follows the answer.
+Without `set_aside` these lines mean nothing and are left in the agent's text. Moving a
+big folder blocks the helper's event loop while its size is counted.
 
 ## What both adapters share
 
@@ -384,6 +436,9 @@ process left (the host killed hard) it is listed as `stopped`.
   always, in that order; `signed_in` is null when it could not be asked. A chosen
   program that is neither is listed too.
 
+`levitate-agent --version` prints `levitate-agent 0.1` (the project version in
+`CMakeLists.txt`, passed in as `LEVITATE_AGENT_VERSION`) and exits 0; it starts nothing.
+
 ## Settings and sign-in
 
 The helper is the only writer of `agent.json`; the Settings page of the apps
@@ -435,6 +490,21 @@ asks, administrator approved and refused, a plain command, a command with a pipe
 failing, signed out, dying, stopping with SIGTERM, a refused call, writing with
 `may_write`, an agent that speaks the protocol itself), and:
 
+- **setting places aside**, with the `script` story of both stand-ins (turn N says
+  message N of a JSON list) and the `disk` story of the Codex stand-in (reads the
+  Disk window's list): a run that sets aside two approved places (one a folder with
+  files in it), keeps one, cannot do one, asks about an `ask_first` place and sets it
+  aside after "yes" (files really moved under the holding folder, the manifest exactly
+  as Disk reads it, the `place` and `did` events, the agent never given a sandbox that
+  writes, one question and none about a move, and what the next turn told the agent),
+  for Codex and for Claude Code; a path not on the list, an `ask_first` place not
+  asked about and a link leading out of home (each refused, nothing moved, the agent
+  told); and the runs that fail at once (a holding folder outside home, behind a link,
+  the home folder itself or not a full path; a place outside home, behind a linked
+  folder or inside the holding folder; `ask_first` not on the list; a wrong shape),
+  none of which starts the agent;
+- `--version`;
+
 - a run that survives its client and is finished by an answer from an attached
   client; two clients at once, whose answers count once; a client that leaves by
   closed input, SIGHUP and SIGKILL (the run goes on); SIGTERM to a client and
@@ -468,6 +538,12 @@ fails.
 There are no unit tests (project rule, `AGENTS.md`).
 
 ## Not done
+
+- **The set-aside convention has never run against a real Codex or Claude Code.**
+  Whether an agent writes the `SET-ASIDE:`, `KEEP:` and `CANNOT:` lines as the
+  contract asks, and names the full path of an `ask_first` place in its `ASK:` (the
+  only way the helper knows it was asked), is checked against stand-ins only. An agent
+  that asks without the path is refused its `SET-ASIDE:` and told to ask again.
 
 - **Two requests have run against the real Codex (0.167, 2026-11-10).**
   "Say hello" went through as `say`, `agent` and `done`. A second one made

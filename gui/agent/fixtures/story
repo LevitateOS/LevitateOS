@@ -57,7 +57,7 @@ def environment(name, extra=None, config=None, story=None, tag=""):
         os.makedirs(os.path.join(cfg, "levitate"))
         json.dump(config, open(os.path.join(cfg, "levitate/agent.json"), "w"))
     log = os.path.join(SCRATCH, name + tag + ".log")
-    for suffix in ("", ".turns", ".pids"):
+    for suffix in ("", ".turns", ".pids", ".places"):
         if os.path.exists(log + suffix):
             os.remove(log + suffix)
     env.update(HOME=HOME, XDG_STATE_HOME=STATE, XDG_CONFIG_HOME=cfg, XDG_RUNTIME_DIR=os.path.join(SCRATCH, "run"),
@@ -370,6 +370,205 @@ def story_stop():
     check(all(gone(p) for p in pids), "stop: the agent and what it started are gone")
     ends_with(run, "stopped")
     return run
+
+
+def made(path, size, make_parent=True):
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "wb") as out:
+        out.write(b"x" * size)
+    return path
+
+
+def script_environment(name, messages, adapter="codex", tag=""):
+    """An environment whose stand-in agent says `messages`, one for each turn."""
+    config = {"agent": "claude"} if adapter == "claude" else None
+    env, log = environment(name + tag, config=config, story="script")
+    script = os.path.join(SCRATCH, name + tag + ".script.json")
+    json.dump(messages, open(script, "w"))
+    env["LEVITATE_STANDIN_SCRIPT"] = script
+    return env, log
+
+
+def manifest_of(holding):
+    try:
+        return json.load(open(os.path.join(holding, "manifest.json")))
+    except (OSError, ValueError):
+        return None
+
+
+def places_of(run):
+    return {e["path"]: e for e in run.of("place")}
+
+
+def story_set_aside(adapter):
+    """The helper moves, the agent only decides: two places set aside, one kept,
+    one that cannot, one asked about first and set aside after a yes."""
+    name = "setaside-" + adapter
+    base = os.path.join(HOME, "aside-" + adapter)
+    shutil.rmtree(base, ignore_errors=True)
+    a = made(os.path.join(base, "cache/a/one.bin"), 1000)
+    made(os.path.join(base, "cache/a/deep/two.bin"), 500)
+    a = os.path.join(base, "cache/a")
+    b = made(os.path.join(base, "cache/b.bin"), 2000)
+    c = made(os.path.join(base, "keep/c.bin"), 300)
+    d = made(os.path.join(base, "stuck/d.bin"), 400)
+    e = made(os.path.join(base, "Downloads/e.iso"), 5000)
+    holding = os.path.join(base, ".local/share/levitate/set-aside/20261111-140500")
+    ask = "Set %s aside? It was not opened for a year. | Remove it | Keep it" % e
+    env, log = script_environment(name, [
+        "Going through the list.\nSET-ASIDE: %s\nSET-ASIDE: %s\nKEEP: %s | still in use\nCANNOT: %s | files are open\nASK: %s" % (a, b, c, d, ask),
+        "SET-ASIDE: " + e,
+        "Everything on the list is decided."], adapter)
+    asked = []
+    request = {"holding": holding, "places": [a, b, c, d, e], "ask_first": [e]}
+    run = Run(env, log, prompt="Clear these places", app="disk", title="Set the mess aside", extra={"set_aside": request}).finish(
+        on_question=lambda q: asked.append(q) or "Remove it")
+    check(run.code == 0 and run.kinds()[-1] == "done" and "failed" not in run.kinds(),
+          "%s: the run is done (exit %s, %s)" % (name, run.code, run.kinds()[-3:]))
+    check(len(asked) == 1 and run.of("question")[0]["text"].startswith("Set %s aside?" % e),
+          "%s: the person is asked once, about the ask-first place, and about no move (%s questions)" % (name, len(asked)))
+    for path in (a, b, e):
+        check(not os.path.lexists(path), "%s: %s is no longer where it was" % (name, path))
+        check(os.path.exists(os.path.join(holding, path.lstrip("/"))), "%s: %s is in the holding folder under its own path" % (name, path))
+    check(os.path.exists(os.path.join(holding, a.lstrip("/"), "deep/two.bin")), "%s: a folder is moved whole" % name)
+    for path in (c, d):
+        check(os.path.exists(path) and not os.path.exists(os.path.join(holding, path.lstrip("/"))), "%s: %s was not moved" % (name, path))
+    manifest = manifest_of(holding)
+    want = [{"from": a, "held": a.lstrip("/"), "bytes": 1500}, {"from": b, "held": b.lstrip("/"), "bytes": 2000},
+            {"from": e, "held": e.lstrip("/"), "bytes": 5000}]
+    check(manifest == {"version": 1, "entries": want}, "%s: the manifest says exactly what was moved (%s)" % (name, manifest))
+    said = places_of(run)
+    check(said.get(a, {}).get("outcome") == "set-aside" and said[a]["bytes"] == 1500 and said[b]["outcome"] == "set-aside"
+          and said[b]["bytes"] == 2000, "%s: set-aside place events carry the size (%s)" % (name, said.get(a)))
+    check(said.get(c, {}).get("outcome") == "kept" and said[c]["why"] == "still in use", "%s: KEEP gives a kept event with its reason" % name)
+    check(said.get(d, {}).get("outcome") == "could-not" and said[d]["why"] == "files are open", "%s: CANNOT gives a could-not event with its reason" % name)
+    check(said.get(e, {}).get("outcome") == "set-aside" and said[e].get("asked") is True and said[e].get("answer") == "Remove it",
+          "%s: the asked place says it was asked and what the person answered (%s)" % (name, said.get(e)))
+    check(len(run.of("place")) == 5, "%s: one place event for each place (%s)" % (name, len(run.of("place"))))
+    check(sorted(d_["what"] for d_ in run.of("did") if d_["kind"] == "write") == sorted([a, b, e])
+          and all(d_["asked"] is False for d_ in run.of("did")), "%s: a did for each move, none asked about" % name)
+    calls = run.calls()
+    check(len(calls) == 3, "%s: three turns (%s)" % (name, len(calls)))
+    if len(calls) == 3:
+        check("SET-ASIDE: /full/path" in calls[0]["prompt"] or "SET-ASIDE: /full/path" in " ".join(calls[0]["args"]),
+              "%s: the agent is told the convention" % name)
+        every = calls[0]["prompt"] + " ".join(calls[0]["args"])
+        check(e in every and "Ask first" in every, "%s: the agent is told which place to ask about first" % name)
+        check("SET-ASIDE %s: done" % a in calls[1]["prompt"] and "KEEP %s: noted" % c in calls[1]["prompt"]
+              and "The person answered: Remove it" in calls[1]["prompt"], "%s: the next turn tells what the helper did and the answer (%s)" % (name, calls[1]["prompt"][:200]))
+        check("SET-ASIDE %s: done" % e in calls[2]["prompt"], "%s: the turn after tells the result for the asked place" % name)
+        if adapter == "codex":
+            check(all(c_["args"][c_["args"].index("-s") + 1] == "read-only" for c_ in calls[:1]) and
+                  all("workspace-write" not in " ".join(c_["args"]) for c_ in calls),
+                  "%s: the agent never got the right to write" % name)
+        else:
+            check(all("dontAsk" in c_["args"] and "acceptEdits" not in c_["args"] for c_ in calls),
+                  "%s: the agent never got the right to write" % name)
+    record = ends_with(run, "done")
+    check(record and record[0].get("set_aside") == request, "%s: the record has the request's set_aside" % name)
+
+
+def story_set_aside_refused(adapter="codex"):
+    """A path not on the list, an ask-first place not asked about, a link that
+    leads out of home: refused, nothing moved."""
+    name = "setaside-refused-" + adapter
+    base = os.path.join(HOME, "refused-" + adapter)
+    shutil.rmtree(base, ignore_errors=True)
+    outside = os.path.join(SCRATCH, "outside-" + adapter)
+    shutil.rmtree(outside, ignore_errors=True)
+    secret = made(os.path.join(outside, "secret.txt"), 77)
+    listed = made(os.path.join(base, "cache/listed.bin"), 100)
+    other = made(os.path.join(base, "cache/not-on-the-list.bin"), 200)
+    asked = made(os.path.join(base, "Downloads/asked.iso"), 300)
+    link = os.path.join(base, "cache/link-out")
+    os.symlink(outside, link)
+    holding = os.path.join(base, "holding")
+    env, log = script_environment(name, [
+        "SET-ASIDE: %s\nSET-ASIDE: %s\nSET-ASIDE: %s/\nSET-ASIDE: %s/../Downloads/asked.iso" % (other, asked, link, os.path.join(base, "cache")),
+        "I will leave them."], adapter)
+    request = {"holding": holding, "places": [listed, asked, link], "ask_first": [asked]}
+    run = Run(env, log, extra={"set_aside": request}).finish()
+    check(run.code == 0 and run.kinds()[-1] == "done", "%s: the run ends done (%s)" % (name, run.code))
+    check(os.path.exists(other) and os.path.exists(asked) and os.path.exists(listed), "%s: nothing was moved" % name)
+    check(os.path.islink(link) and os.path.exists(secret), "%s: the link and what it leads to are untouched" % name)
+    manifest = manifest_of(holding)
+    check(manifest is None or manifest.get("entries") == [], "%s: nothing was recorded as held (%s)" % (name, manifest))
+    check(not os.path.exists(os.path.join(holding, outside.lstrip("/"))), "%s: nothing of the outside folder is in the holding folder" % name)
+    said = places_of(run)
+    check(other not in said, "%s: a path not on the list gets no place event" % name)
+    check(asked not in said, "%s: an ask-first place that was not asked about gets no place event" % name)
+    check(said.get(link, {}).get("outcome") == "could-not" and "link" in said[link]["why"] and "home folder" in said[link]["why"],
+          "%s: the link that leads out is could-not, and says so (%s)" % (name, said.get(link)))
+    check(len(run.of("question")) == 0, "%s: nobody was asked" % name)
+    calls = run.calls()
+    if len(calls) == 2:
+        told = calls[1]["prompt"]
+        check("%s: refused. It is not on the list" % other in told, "%s: the agent is told the other path is not on the list" % name)
+        check("%s: refused. The person has to be asked" % asked in told, "%s: the agent is told to ask first (%s)" % (name, told[:400]))
+        check("%s: not done, it is a link that leads out of your home folder" % link in told, "%s: the agent is told about the link" % name)
+        check(told.count("Nothing was moved") >= 2, "%s: the agent is told nothing was moved" % name)
+    else:
+        check(False, "%s: two turns (%s)" % (name, len(calls)))
+    ends_with(run, "done")
+
+
+def story_set_aside_fails():
+    """A holding folder or a place outside the home folder fails the run at once."""
+    base = os.path.join(HOME, "fails")
+    shutil.rmtree(base, ignore_errors=True)
+    inside = made(os.path.join(base, "cache/x.bin"), 10)
+    outside = os.path.join(SCRATCH, "outside-fails")
+    os.makedirs(outside, exist_ok=True)
+    os.symlink(outside, os.path.join(base, "way-out"))
+    cases = {
+        "holding outside home": ({"holding": os.path.join(outside, "h"), "places": [inside]}, "outside your home folder"),
+        "holding behind a link": ({"holding": os.path.join(base, "way-out/h"), "places": [inside]}, "outside your home folder"),
+        "holding the home folder itself": ({"holding": HOME, "places": [inside]}, "outside your home folder"),
+        "holding not a full path": ({"holding": "holding", "places": [inside]}, "not a full path"),
+        "a place outside home": ({"holding": os.path.join(base, "h"), "places": [inside, "/etc/hostname"]}, "outside your home folder"),
+        "a place behind a linked folder": ({"holding": os.path.join(base, "h"), "places": [os.path.join(base, "way-out/secret")]}, "outside your home folder"),
+        "a place inside the holding folder": ({"holding": os.path.join(base, "cache"), "places": [inside]}, "one inside the other"),
+        "ask_first not on the list": ({"holding": os.path.join(base, "h"), "places": [inside], "ask_first": [os.path.join(base, "other")]}, "not on the list"),
+        "places not a list": ({"holding": os.path.join(base, "h"), "places": "x"}, "must name the holding folder"),
+        "not an object": ("everything", "must name the holding folder"),
+    }
+    for words, (request, expect) in cases.items():
+        env, log = script_environment("setaside-fails", ["never said"], tag=str(abs(hash(words)) % 10000))
+        run = Run(env, log, extra={"set_aside": request}).finish()
+        failed = run.of("failed")
+        check(run.code == 1 and len(failed) == 1 and expect in failed[0]["reason"],
+              "set_aside %s: the run fails at once with a reason (exit %s, %s)" % (words, run.code, failed))
+        check(run.calls() == [], "set_aside %s: the agent was not started" % words)
+        check(os.path.exists(inside) and not os.path.exists(os.path.join(base, "h")), "set_aside %s: nothing was moved or made" % words)
+        ends_with(run, "failed")
+
+
+def story_version():
+    out = subprocess.run([BINARY, "--version"], capture_output=True, text=True, env=environment("version")[0])
+    check(out.returncode == 0 and out.stdout == "levitate-agent 0.1\n", "version: --version says levitate-agent 0.1 (%r)" % out.stdout)
+
+
+def story_disk_standin():
+    """What the Disk window hands over, decided by the stand-in the Disk story uses."""
+    name = "disk"
+    base = os.path.join(HOME, "diskstory")
+    shutil.rmtree(base, ignore_errors=True)
+    paths = {k: made(os.path.join(base, v), 10) for k, v in {"cache": ".cache/x/f.bin", "stuck": "proj/build/f.bin", "iso": "Downloads/a.iso", "rpm": "Downloads/b.rpm"}.items()}
+    cache, stuck = os.path.dirname(paths["cache"]), os.path.dirname(paths["stuck"])
+    holding = os.path.join(base, "held")
+    facts = ["%s (30.0 MiB): Kept by a program." % cache, "%s (30.0 MiB): Made again." % stuck,
+             "%s (3.0 GiB): Not opened. Ask me first." % paths["iso"], "%s (64.0 MiB): Old. Ask me first." % paths["rpm"]]
+    prompt = "The issue:\nx\n\nThe facts:\n- %s\n\nThe expected result:\ny\n" % "\n- ".join(facts)
+    env, log = environment("disk", extra={"DISK_STANDIN_COULD_NOT": "/proj/build"})
+    answers = iter(["Remove it", "Keep it"])
+    request = {"holding": holding, "places": [cache, stuck, paths["iso"], paths["rpm"]], "ask_first": [paths["iso"], paths["rpm"]]}
+    run = Run(env, log, prompt=prompt, app="disk", extra={"set_aside": request}).finish(on_question=lambda q: next(answers))
+    said = places_of(run)
+    check(run.code == 0 and [said[p]["outcome"] for p in (cache, stuck, paths["iso"], paths["rpm"])] == ["set-aside", "could-not", "set-aside", "kept"],
+          "disk stand-in: decides about each place of a Disk request (%s)" % {k: v["outcome"] for k, v in said.items()})
+    check(os.path.exists(os.path.join(holding, cache.lstrip("/"))) and os.path.exists(stuck) and os.path.exists(paths["rpm"]),
+          "disk stand-in: what it set aside is held, what it kept or could not is where it was")
+    ends_with(run, "done")
 
 
 def story_passthrough():
@@ -1164,6 +1363,13 @@ def main():
     story_claude_denied()
     story_claude_may_write()
     story_claude_stop()
+    story_set_aside("codex")
+    story_set_aside("claude")
+    story_set_aside_refused("codex")
+    story_set_aside_refused("claude")
+    story_set_aside_fails()
+    story_disk_standin()
+    story_version()
     story_passthrough()
     story_config()
     listing(None)

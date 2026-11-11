@@ -1,8 +1,13 @@
 #!/usr/bin/env python3
-"""A stand-in for the agent, for running disk-gui from a checkout.
+"""A stand-in for another program that speaks the apps' protocol itself, for
+running disk-gui from a checkout. (The real route is levitate-agent with an
+agent that only decides and a helper that moves; see gui/agent. This one stands
+for a program set as the agent by its path: it gets the request as it is and
+must move the places itself.)
 
-It reads the prompt on its input, goes through the listed places and reports
-as an agent would. What the request tells it, it does: it does not delete, it
+It reads the request on its input, goes through the listed places and reports
+as a program would. The holding folder and the list come from the request's
+"set_aside" (older requests named the holding folder in the prompt). What the request tells it, it does: it does not delete, it
 MOVES each cleared place into the holding folder the request names, keeping
 the place's full path beneath it, and writes the manifest there. It moves a
 place only when that place is inside DISK_STANDIN_ROOT (the sample tree);
@@ -107,21 +112,26 @@ def set_aside(path, holding):
 
 
 def main():
-    # The prompt arrives as one JSON line; the input stays open for answers.
-    prompt = json.loads(sys.stdin.readline())["prompt"]
+    # The request arrives as one JSON line; the input stays open for answers.
+    request = json.loads(sys.stdin.readline())
+    prompt = request["prompt"]
+    given = request.get("set_aside")
     if "the other system" in prompt.split("The facts:", 1)[0]:
         explain(prompt)
         return
-    named = re.search(r'The holding folder is "(.+?)"', prompt)
-    if not named:
-        emit(event="failed", reason="The request names no holding folder, and this agent does not delete.")
-        sys.exit(1)
-    holding = named.group(1)
+    if given:
+        holding = given["holding"]
+    else:
+        named = re.search(r'The holding folder is "(.+?)"', prompt)
+        if not named:
+            emit(event="failed", reason="The request names no holding folder, and this agent does not delete.")
+            sys.exit(1)
+        holding = named.group(1)
     facts = prompt.split("The facts:", 1)[-1].split("The expected result:", 1)[0]
     places = []
     for line in facts.splitlines():
-        found = re.match(r"^- (/.+?) \([\d.,]+ (?:KiB|MiB|GiB)\): (.*)$", line.strip())
-        if found:
+        found = re.match(r"^- (/.+?) \([\d.,]+ (?:B|KiB|MiB|GiB|TiB)\): (.*)$", line.strip())
+        if found and (not given or found.group(1) in given["places"]):
             places.append((found.group(1), found.group(2)))
 
     emit(event="plan", steps=[["read", "Read the list"], ["clear", "Set aside what is sure"], ["check", "Check the result"]])

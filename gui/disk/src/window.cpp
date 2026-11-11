@@ -17,7 +17,9 @@
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
+#include <QJsonArray>
 #include <QJsonDocument>
+#include <QJsonObject>
 #include <QProcess>
 #include <QSet>
 #include <QPushButton>
@@ -90,6 +92,7 @@ Window::Window(QWidget *parent)
     browse_ = new BrowsePage;
     mess_ = new MessPage;
     systems_ = new SystemsPage;
+    systems_->setPasswordAsked(!rootHelper_.isEmpty());
     hand_ = new HandPage;
     work_ = new WorkPage;
     after_ = new AfterPage;
@@ -382,6 +385,12 @@ void Window::scanned()
     frame_->setStatus(tr("Looked at the disk at %1 · only “Let it all go” deletes anything from here")
                           .arg(QLocale().toString(QTime::currentTime(), QLocale::ShortFormat)));
     drawDisk();
+}
+
+void Window::useAgent(const QString &program)
+{
+    agent_ = program;
+    frame_->setAgent(agent_);
 }
 
 void Window::showHandOver()
@@ -1037,6 +1046,22 @@ void Window::send(const QString &prompt)
     // Its questions are answered on the same input; Activity lists the run
     // under what was asked.
     run_->setPrompt(prompt, QStringLiteral("Disk"), requestTitle(prompt));
+    // The places the person approved, and where they are moved to: the helper moves
+    // what the agent names from this list; the agent only decides. (The shared Run
+    // has no extra fields for a request, so its input line is written here.)
+    if (!handingSystems_ && !requested_.isEmpty() && !holding_.isEmpty()) {
+        QJsonArray places, askFirst;
+        for (const Finding &finding : std::as_const(requested_)) {
+            places << finding.path;
+            if (!finding.sure)
+                askFirst << finding.path;
+        }
+        const QJsonObject line{{"prompt", prompt},
+                               {"app", QStringLiteral("Disk")},
+                               {"title", requestTitle(prompt)},
+                               {"set_aside", QJsonObject{{"holding", holding_}, {"places", places}, {"ask_first", askFirst}}}};
+        run_->setInput(QJsonDocument(line).toJson(QJsonDocument::Compact) + '\n');
+    }
     if (handingSystems_) {
         job_ = Job::Explaining;
         said_.clear();
@@ -1057,8 +1082,15 @@ void Window::send(const QString &prompt)
         const Space space = spaceAt(home_);
         freeBefore_ = space.known ? space.free : -1;
         connect(run_, &Run::event, this, [this](const QJsonObject &event) {
-            if (event["event"] == QLatin1String("place"))
-                placed_.insert(event["path"].toString(), event);
+            if (event["event"] != QLatin1String("place"))
+                return;
+            // The helper says outcome and why; a program speaking the protocol itself may say result and reason.
+            QJsonObject said = event;
+            if (!said.contains("result"))
+                said["result"] = event["outcome"];
+            if (!said.contains("reason"))
+                said["reason"] = event["why"];
+            placed_.insert(event["path"].toString(), said);
         });
         work_->begin(tr("The agent is setting the mess aside"),
                      tr("It moves only what is on the list into the holding folder, and asks before anything marked for that."), run_,

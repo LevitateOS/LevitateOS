@@ -17,7 +17,8 @@ and exits 0 when signed in, 1 when not (as the CLI reference says), and without
 the file signed in unless LEVITATE_STANDIN_SIGNED_OUT is set.
 
 Stories: plain, asks, administrator, run, fails, signed-out, dies, hang, slow,
-writes, denied. The turn is counted in a file next to the log.
+writes, denied, script (turn N says message N of the JSON list in the file
+LEVITATE_STANDIN_SCRIPT; the last one repeats). The turn is counted in a file next to the log.
 """
 import json
 import os
@@ -90,7 +91,12 @@ def value(args, flag):
 def story(turn, prompt, args):
     mode = value(args, "--permission-mode")
     init(mode)
-    if STORY == "plain":
+    if STORY == "script":
+        messages = json.load(open(os.environ["LEVITATE_STANDIN_SCRIPT"]))
+        words = messages[min(turn, len(messages)) - 1]
+        assistant(text(words))
+        result(words)
+    elif STORY == "plain":
         todos = lambda a, b, c: [{"content": "Look around", "status": a, "activeForm": "Looking around"},
                                  {"content": "Make the change", "status": b, "activeForm": "Making the change"},
                                  {"content": "Check it", "status": c, "activeForm": "Checking it"}]

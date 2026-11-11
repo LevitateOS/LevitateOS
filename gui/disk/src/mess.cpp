@@ -12,6 +12,7 @@
 namespace {
 
 enum Kind { Cache, Build, Recipe, Trash, OldDownload, Untouched, Picked };
+static_assert(Recipe == kindRecipe && Picked == kindPicked, "mess.h names these two kinds by number");
 
 static_assert(Picked == kindPicked, "mess.h names the picked kind");
 
@@ -93,17 +94,19 @@ void look(Node *node, const QString &path, Search &s)
         return;
     }
 
-    // Recipe's own folders are named first: they are cleared through Recipe.
+    // Recipe's own folders are named first: they belong to Recipe, so they are listed and
+    // never handed over. Recipe has no command to clear them yet (`recipe cleanup NAME`
+    // is for one recipe's build files, `recipe storage --clear-earlier` for earlier versions).
     if (path == s.home + QStringLiteral("/.local/state/recipe") || path == QStringLiteral("/var/lib/recipe/state")) {
         s.add(Recipe, node, path, QObject::tr("Recipe's saved build steps"),
               QObject::tr("Kept so an interrupted or repeated build can continue. Recipe builds again what it needs."),
-              QObject::tr("Clear it through Recipe, which knows what a running build still needs."));
+              QObject::tr("It belongs to Recipe: Disk leaves it alone, and Recipe has no command to clear it yet."));
         return;
     }
     if (path == s.home + QStringLiteral("/.cache/recipe")) {
         s.add(Recipe, node, path, QObject::tr("Recipe's build images"),
               QObject::tr("The system images Recipe builds in. It downloads them again when a build needs one."),
-              QObject::tr("Clear it through Recipe."));
+              QObject::tr("It belongs to Recipe: Disk leaves it alone, and Recipe has no command to clear it yet."));
         return;
     }
 
@@ -229,7 +232,7 @@ QString kindWords(int kind)
     case Build:
         return QObject::tr("made again by the next build");
     case Recipe:
-        return QObject::tr("Recipe makes it again; it is cleared through Recipe");
+        return QObject::tr("belongs to Recipe, which makes it again; Disk leaves it alone");
     case Trash:
         return QObject::tr("things you already threw away");
     case OldDownload:

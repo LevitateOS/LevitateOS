@@ -15,7 +15,13 @@ rule holds (signed in unless LEVITATE_STANDIN_SIGNED_OUT is set). Like the real
 makes it end without signing in.
 
 Stories: plain, asks, administrator, run, shell, fails, signed-out, dies, hang, slow,
-writes (writes a file in the working folder when the sandbox is workspace-write).
+writes (writes a file in the working folder when the sandbox is workspace-write),
+script (turn N says message N of the JSON list in the file LEVITATE_STANDIN_SCRIPT;
+the last one repeats: what a check uses to make the agent write SET-ASIDE, KEEP,
+CANNOT and ASK lines), disk (reads the list of places in the request of the Disk
+window and decides about each: SET-ASIDE, or CANNOT for a path containing
+DISK_STANDIN_COULD_NOT, and for a place marked "Ask me first" an ASK, then SET-ASIDE
+on "Remove it" and KEEP on anything else).
 The turn is counted in a file next to the log, one count for the session.
 """
 import json
@@ -83,9 +89,56 @@ def sandbox_mode():
     return None
 
 
+def disk(turn, prompt):
+    """What an agent does with the list the Disk window hands over: it only decides;
+    the helper moves what it names."""
+    import re
+    # A resumed session remembers the first request; the stand-in does by a file.
+    memory = LOG + ".places"
+    if turn == 1:
+        facts = prompt.split("The facts:", 1)[-1].split("The expected result:", 1)[0]
+        places = []
+        for line in facts.splitlines():
+            found = re.match(r"^- (/.+?) \([\d.,]+ (?:B|KiB|MiB|GiB|TiB)\): (.*)$", line.strip())
+            if found:
+                places.append((found.group(1), found.group(2)))
+        json.dump(places, open(memory, "w"))
+    places = json.load(open(memory))
+    asking = [(p, w) for p, w in places if "Ask me first" in w]
+    sure = [(p, w) for p, w in places if "Ask me first" not in w]
+    refuse = os.environ.get("DISK_STANDIN_COULD_NOT", "")
+    lines = []
+    if turn == 1:
+        for path, _ in sure:
+            if refuse and refuse in path:
+                lines.append("CANNOT: %s | a program has files open in it" % path)
+            else:
+                lines.append("SET-ASIDE: %s" % path)
+    else:
+        index = turn - 2  # the question of the turn before
+        if 0 <= index < len(asking):
+            path = asking[index][0]
+            answer = prompt.split("The person answered:", 1)[-1].strip()
+            lines.append(("SET-ASIDE: %s" % path) if "Remove it" in answer else "KEEP: %s | you said to keep it" % path)
+    next_one = turn - 1
+    if next_one < len(asking):
+        path, why = asking[next_one]
+        lines.append("ASK: Set %s aside? %s | Remove it | Keep it" % (path, why.replace(" Ask me first.", "")))
+    elif turn == 1 and not lines:
+        lines.append("There was nothing to set aside.")
+    elif turn > 1 or not lines:
+        lines.append("I went through the list: what is sure is set aside, and the rest was decided with you.")
+    message("\n".join(lines))
+
+
 def story(turn, prompt):
     begin()
-    if STORY == "plain":
+    if STORY == "disk":
+        disk(turn, prompt)
+    elif STORY == "script":
+        messages = json.load(open(os.environ["LEVITATE_STANDIN_SCRIPT"]))
+        message(messages[min(turn, len(messages)) - 1])
+    elif STORY == "plain":
         steps = ["Look around", "Make the change", "Check it"]
         todo(steps, 0)
         item("completed", "reasoning", id="r1", text="thinking about it")

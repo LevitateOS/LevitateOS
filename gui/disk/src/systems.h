@@ -93,6 +93,9 @@ class SystemsPage : public Page {
     Q_OBJECT
 public:
     using Page::Page;
+    // Whether comparing runs through a root helper, which asks for the administrator's
+    // password; without one it runs as the person and nothing is asked.
+    void setPasswordAsked(bool asked) { passwordAsked_ = asked; }
     // What is there, before anything was compared. `why` is why the last
     // comparison failed, if one did.
     void showState(const SystemsState &state, const QString &why = QString());
@@ -113,6 +116,7 @@ signals:
     void openSystem();
 
 private:
+    bool passwordAsked_ = true;
     // Points at one block: on both maps, in the line under them, in the list.
     void point(Node *node, bool inList = true);
 

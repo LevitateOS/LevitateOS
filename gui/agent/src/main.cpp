@@ -40,6 +40,10 @@ int main(int argc, char **argv)
     const QStringList args = app.arguments().mid(1);
     const Settings settings = Settings::load();
 
+    if (args.size() == 1 && args[0] == QLatin1String("--version")) {
+        printf("levitate-agent %s\n", LEVITATE_AGENT_VERSION);
+        return 0;
+    }
     if (args.value(0) == QLatin1String("--list")) {
         print(QJsonDocument(listRuns(settings)));
         return 0;
@@ -103,7 +107,7 @@ int main(int argc, char **argv)
 
     if (!args.isEmpty()) {
         fputs("usage: levitate-agent             (reads a request on standard input)\n"
-              "       levitate-agent --list | --status | --show ID\n"
+              "       levitate-agent --list | --status | --show ID | --version\n"
               "       levitate-agent --attach ID | --stop ID\n"
               "       levitate-agent --settings | --set KEY=VALUE | --sign-in | --sign-out\n",
               stderr);

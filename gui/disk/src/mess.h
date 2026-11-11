@@ -12,6 +12,8 @@
 
 // The kind of a place the person picked by hand (the last of messKinds()).
 inline constexpr int kindPicked = 6;
+// Recipe's own folders: listed, never handed over (Recipe has no command to clear them yet).
+inline constexpr int kindRecipe = 2;
 
 struct MessKind {
     QString title;

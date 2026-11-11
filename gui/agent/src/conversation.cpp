@@ -1,6 +1,7 @@
 #include "conversation.h"
 
 #include "child.h"
+#include "holding.h"
 
 #include <QJsonArray>
 #include <QRegularExpression>
@@ -48,14 +49,46 @@ Conversation::Conversation(Session *session)
 {
 }
 
-QString Conversation::contract()
+QString Conversation::contract() const
 {
-    return QString::fromUtf8(preamble);
+    QString text = QString::fromUtf8(preamble);
+    const SetAsidePlan &plan = request_.setAside;
+    if (!plan.given)
+        return text;
+    // Given only when the request carries a list to set aside: the agent decides, the helper moves.
+    text += QStringLiteral(R"(
+
+
+Setting places aside
+The request names places the person has already approved for clearing. You do not delete, move or write anything there yourself, and nobody is asked about each move: you decide, and the helper that runs this moves the places for you into a holding folder, where the person can bring them back. Write these lines on lines of their own in your message, as many as you need:
+
+SET-ASIDE: /full/path
+  Move this place into the holding folder. Only a place on the approved list can be moved; anything else is refused and you are told so.
+
+KEEP: /full/path | why, in a few words
+  You decided to leave this place as it is.
+
+CANNOT: /full/path | why, in a few words
+  The place should go but you cannot decide, or something stops it.
+
+After a message with SET-ASIDE lines you are started again and told, for each place, what the helper did. Do not name a place twice. Answer for each place on the list: SET-ASIDE, KEEP or CANNOT.
+)");
+    if (!plan.askFirst.isEmpty()) {
+        text += QStringLiteral("\nAsk first. For each of these places you must ask the person with the ASK line, naming the full path of the place in your question, and name it in SET-ASIDE only after they said yes. The helper refuses a SET-ASIDE for one of them that was not asked about in this run:\n");
+        for (const QString &path : plan.askFirst)
+            text += QStringLiteral("- %1\n").arg(path);
+    }
+    text += QStringLiteral("\nThe approved places:\n");
+    for (const QString &path : plan.places)
+        text += QStringLiteral("- %1\n").arg(path);
+    return text.trimmed();
 }
 
-Conversation::Wish Conversation::readWish(const QString &message)
+Conversation::Wish Conversation::readWish(const QString &message) const
 {
+    const bool claiming = request_.setAside.given;
     Wish wish;
+    QList<Claim> claims; // kept apart: a later ASK or RUN line starts the wish over
     QStringList rest;
     for (const QString &raw : message.split('\n')) {
         const QString line = raw.trimmed();
@@ -78,6 +111,15 @@ Conversation::Wish Conversation::readWish(const QString &message)
             wish.text = after("RUN:");
         } else if (line.startsWith(QLatin1String("BECAUSE:"))) {
             wish.because = after("BECAUSE:");
+        } else if (claiming && (line.startsWith(QLatin1String("SET-ASIDE:")) || line.startsWith(QLatin1String("KEEP:"))
+                                || line.startsWith(QLatin1String("CANNOT:")))) {
+            Claim claim;
+            const char *key = line.startsWith(QLatin1String("SET-ASIDE:")) ? "SET-ASIDE:" : line.startsWith(QLatin1String("KEEP:")) ? "KEEP:" : "CANNOT:";
+            claim.kind = key[0] == 'S' ? Claim::SetAside : key[0] == 'K' ? Claim::Keep : Claim::Cannot;
+            const QString body = after(key);
+            claim.path = body.section('|', 0, 0).trimmed();
+            claim.why = body.section('|', 1).trimmed();
+            claims << claim;
         } else {
             rest << raw;
         }
@@ -86,6 +128,7 @@ Conversation::Wish Conversation::readWish(const QString &message)
     if (wish.text.isEmpty())
         wish.kind = Wish::Nothing;
     wish.rest = rest.join('\n').trimmed();
+    wish.claims = claims;
     return wish;
 }
 
@@ -134,7 +177,13 @@ void Conversation::turn(const QString &prompt)
         fail(QStringLiteral("The agent kept going back and forth without finishing, so it was stopped"));
         return;
     }
-    launch(prompt, turns_ == 1);
+    // What the helper did for the agent since it last spoke comes first.
+    QString full = prompt;
+    if (!report_.isEmpty()) {
+        full = report_ + QStringLiteral("\n\n") + prompt;
+        report_.clear();
+    }
+    launch(full, turns_ == 1);
 }
 
 void Conversation::turnEnded(const QString &message)
@@ -142,6 +191,16 @@ void Conversation::turnEnded(const QString &message)
     if (over_)
         return;
     const Wish wish = readWish(message);
+    settle(wish.claims);
+    bool moved = false;
+    for (const Claim &claim : wish.claims)
+        moved = moved || claim.kind == Claim::SetAside;
+    // A message that set places aside is answered with what the helper did,
+    // so that the agent knows what was refused, even when it has nothing else to ask.
+    if (wish.kind == Wish::Nothing && moved) {
+        turn(QStringLiteral("Carry on with any place you have not answered for, or finish now with your final message."));
+        return;
+    }
     if (wish.kind == Wish::Nothing) {
         session_->send({{"event", "agent"},
                         {"summary", wish.rest.isEmpty() ? QStringLiteral("The agent finished without a message.") : wish.rest}});
@@ -223,7 +282,15 @@ void Conversation::answered(const QString &id, const QString &answer, const QByt
     waiting_ = false;
     const Pending pending = pending_;
     if (pending.wish.kind == Wish::Ask) {
-        turn(answer);
+        // The places this question names are now asked about; only these may be set aside.
+        for (const QString &path : request_.setAside.askFirst) {
+            const QString short_ = path.startsWith(session_->settings().home + QLatin1Char('/'))
+                                       ? QLatin1Char('~') + path.mid(session_->settings().home.size())
+                                       : path;
+            if (pending.wish.text.contains(path) || pending.wish.text.contains(short_))
+                asked_.insert(path, answer);
+        }
+        turn(report_.isEmpty() ? answer : QStringLiteral("The person answered: %1").arg(answer));
         return;
     }
     const bool admin = pending.wish.kind == Wish::Administrator;
@@ -279,6 +346,73 @@ void Conversation::execute(const Pending &pending)
     });
     child->startInGroup();
     child->closeWriteChannel();
+}
+
+// The place event: what became of one place of the list.
+void Conversation::place(const QString &path, const QString &outcome, const QString &why, qint64 bytes)
+{
+    QJsonObject event{{"event", "place"}, {"path", path}, {"outcome", outcome}, {"why", why}, {"bytes", bytes}};
+    if (asked_.contains(path)) {
+        event["asked"] = true;
+        event["answer"] = asked_.value(path);
+    }
+    session_->send(event);
+}
+
+void Conversation::settle(const QList<Claim> &claims)
+{
+    const SetAsidePlan &plan = request_.setAside;
+    QStringList said;
+    for (const Claim &claim : claims) {
+        const QString given = approvedPlace(plan, claim.path);
+        const char *word = claim.kind == Claim::SetAside ? "SET-ASIDE" : claim.kind == Claim::Keep ? "KEEP" : "CANNOT";
+        if (given.isEmpty()) {
+            output(QStringLiteral("not set aside: %1 is not on the list the person approved").arg(claim.path));
+            said << QStringLiteral("%1 %2: refused. It is not on the list of approved places, so nothing was done with it.").arg(QLatin1String(word), claim.path);
+            continue;
+        }
+        if (dealtWith_.contains(given)) {
+            said << QStringLiteral("%1 %2: ignored. You already answered for this place.").arg(QLatin1String(word), given);
+            continue;
+        }
+        if (claim.kind == Claim::Keep) {
+            dealtWith_ << given;
+            output(QStringLiteral("kept: %1").arg(given));
+            place(given, QStringLiteral("kept"), claim.why, 0);
+            said << QStringLiteral("KEEP %1: noted.").arg(given);
+            continue;
+        }
+        if (claim.kind == Claim::Cannot) {
+            dealtWith_ << given;
+            output(QStringLiteral("could not: %1").arg(given));
+            place(given, QStringLiteral("could-not"), claim.why, 0);
+            said << QStringLiteral("CANNOT %1: noted.").arg(given);
+            continue;
+        }
+        // A place the person is to be asked about is moved only after they were.
+        if (plan.askFirst.contains(given) && !asked_.contains(given)) {
+            output(QStringLiteral("not set aside: %1 must be asked about first").arg(given));
+            said << QStringLiteral("SET-ASIDE %1: refused. The person has to be asked about this place first. End your turn with an ASK line that names its full path, "
+                                   "and name it in SET-ASIDE again only after they said yes. Nothing was moved.").arg(given);
+            continue;
+        }
+        const Moved moved = moveIntoHolding(plan, given);
+        if (moved.ok) {
+            dealtWith_ << given;
+            output(QStringLiteral("set aside: %1").arg(given));
+            did(QStringLiteral("write"), given, QJsonValue(), false, false, QJsonValue());
+            place(given, QStringLiteral("set-aside"), QString(), moved.bytes);
+            said << QStringLiteral("SET-ASIDE %1: done. It is in the holding folder.").arg(given);
+        } else {
+            dealtWith_ << given;
+            output(QStringLiteral("could not set aside %1: %2").arg(given, moved.why));
+            place(given, QStringLiteral("could-not"), moved.why, 0);
+            said << QStringLiteral("SET-ASIDE %1: not done, %2. Nothing was moved.").arg(given, moved.why);
+        }
+    }
+    if (!said.isEmpty())
+        report_ += (report_.isEmpty() ? QString() : QStringLiteral("\n")) + QStringLiteral("What the helper did with the places you named (the person approved the list beforehand):\n")
+                   + said.join('\n');
 }
 
 void Conversation::stop()
