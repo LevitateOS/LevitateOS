@@ -1,0 +1,25 @@
+{
+  "channel": "stable",
+  "sequence": 1,
+  "source": {
+    "index": "https://levitateos.github.io/LevitateOS/updates/levitate/stable/x86_64/index.json",
+    "recipe": "distro/builder/os-recipes/update-acquire.rhai"
+  },
+  "trust": null,
+  "production": {
+    "schema_version": 2,
+    "root": {
+      "lineage": "fe1c7401b99668f183ebee3b301f611387fdd7e1e27448a320df5e1b19e8f149",
+      "version": 1,
+      "key": {
+        "ed25519": "49773eccc39ad0a8eb7433b0a68bb56f6a7eb935ad964563e132d6e477ba159e"
+      }
+    },
+    "audience": "stable",
+    "metadata_base": "https://levitateos.github.io/LevitateOS/updates/",
+    "asset_prefix": "https://github.com/LevitateOS/LevitateOS/releases/download/",
+    "redirect_origins": [
+      "https://release-assets.githubusercontent.com"
+    ]
+  }
+}

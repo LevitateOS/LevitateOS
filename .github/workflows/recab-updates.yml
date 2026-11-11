@@ -41,13 +41,19 @@ jobs:
       - name: Refuse unprovisioned or premature publication explicitly
         env:
           READY: ${{ vars.RECAB_PUBLISHING_READY }}
+          DEPLOY_READY: ${{ vars.RECAB_METADATA_DEPLOY_READY }}
           STABLE: ${{ vars.RECAB_STABLE_VALIDATED }}
           OPERATION: ${{ inputs.operation || 'refresh' }}
         run: |
           set -euo pipefail
           test "$GITHUB_REPOSITORY" = LevitateOS/LevitateOS
           test "$GITHUB_REF" = "refs/heads/$RECAB_DEFAULT_BRANCH"
-          if [[ "$READY" != true ]]; then
+          if [[ "$OPERATION" == deploy ]]; then
+            if [[ "$DEPLOY_READY" != true ]]; then
+              echo '::error::Public metadata deployment is not provisioned.'
+              exit 1
+            fi
+          elif [[ "$READY" != true ]]; then
             echo '::error::Production publishing is not provisioned; origins, public authority, environment and Recipe runtime must be configured first.'
             exit 1
           fi
@@ -144,7 +150,8 @@ jobs:
   metadata:
     needs: [configuration, verify-payload, tools]
     if: >-
-      always() && !cancelled() && needs.configuration.result == 'success' && vars.RECAB_PUBLISHING_READY == 'true' &&
+      always() && !cancelled() && needs.configuration.result == 'success' &&
+      (vars.RECAB_PUBLISHING_READY == 'true' || (inputs.operation == 'deploy' && vars.RECAB_METADATA_DEPLOY_READY == 'true')) &&
       github.ref == format('refs/heads/{0}', github.event.repository.default_branch) &&
       (needs.tools.result == 'success' || (inputs.operation == 'deploy' && needs.tools.result == 'skipped')) &&
       (needs.verify-payload.result == 'success' ||

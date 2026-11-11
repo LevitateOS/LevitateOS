@@ -1,10 +1,26 @@
 # Production update publication (x86_64)
 
-Implementation is available; production enablement is **pending validation**.
-No production origin, root/delegation, index secrets, runner runtime or installed
-public-origin lifecycle evidence has been configured by this change. Current
-LevitateOS/AcornOS installed defaults stay disabled. The approved design is
+The Pages service, immutable-release setting, master-only deployment environments
+and per-distro signing authority are provisioned. Production enablement is
+**pending validation**. Current LevitateOS/AcornOS installed defaults stay
+development-only. The approved design is
 [the recab release engineering document](../../tools/recab/RELEASE-ENGINEERING.md).
+
+Public production policies and root-signed delegations are staged under
+`release/updates/production/<distro>/`. They are not loaded as installed defaults.
+The Pages tree exposes the same public delegations for candidate and stable,
+plus `updates/provisioning.json`; it advertises no system releases or update index.
+The repository has no registered release runner yet. Runner registration, matching
+baseline/new release artifacts and actual installed public-origin validation
+remain rollout work, rather than a reason to enable unvalidated updates.
+
+Private PKCS#8 working files are in
+`~/.local/share/levitateos/release-keys/<distro>/{root,release,index}.pk8`, with
+0700 directories and 0600 files, outside the checkout. Only each index key is
+installed as a secret in the `recab-updates` environment. Root/release keys stay
+local. Additional offline backup setup is deferred; it does not block this
+provisioning step. No private key bytes belong in commits, logs, Recipe inputs
+or workflow artifacts.
 
 The builder owns transport and signing. `cargo xtask release` runs the same
 orchestration as the GitHub workflows. Recipe inside Ginux performs every public
@@ -84,10 +100,17 @@ and `RECAB_GINUX_ROOT`. Its current Recipe binary must run in that runtime;
 the builder compiles the checkout's matching Ginux launcher. Workflows do not
 fetch, fabricate or build a runtime image as a substitute for this input.
 
-After provisioning, `RECAB_PUBLISHING_READY=true` permits the metadata workflow.
+`RECAB_METADATA_DEPLOY_READY=true` permits only explicit `operation=deploy`,
+including bootstrap of the public authority before any release is advertised.
+It requires no tool/system build, Recipe runtime, signing secret or release
+runner. The metadata-only deployment still uses the master-restricted Pages
+environment and the existing serialized workflow. Its signing steps are skipped.
+
+After release configuration/runtime provisioning, `RECAB_PUBLISHING_READY=true` permits the publication/refresh workflow.
 This is a service-provisioning switch, not installed-system production enablement.
 Keep `RECAB_STABLE_VALIDATED` unset until the required installed validation.
-Set `RECAB_PUBLIC_MONITORING_READY=true` when the secret-free release runner is
+Publishing and public monitoring currently remain false; `RECAB_STABLE_VALIDATED`
+is unset. Set `RECAB_PUBLIC_MONITORING_READY=true` when the secret-free release runner is
 ready. Configure Pages to deploy through GitHub Actions, with the `github-pages`
 environment restricted to the default branch. No `gh-pages` branch is used.
 No paid runner, monitoring subscription or second hosting backend is required.

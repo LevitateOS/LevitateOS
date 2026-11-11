@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "architecture": "x86_64",
+  "status": "provisioned_pending_validation",
+  "production_enabled": false,
+  "distributions": [
+    {
+      "distro": "levitate",
+      "root_fingerprint": "fe1c7401b99668f183ebee3b301f611387fdd7e1e27448a320df5e1b19e8f149",
+      "release_fingerprint": "98d6a6dd8172719d50de67d2f7271c4e93dcce4cb41d269002ed3bd349d3f5dd",
+      "index_fingerprint": "7c80ac30390288000e06b02c175b118a0ce387c1758d142781cec572933f6103",
+      "authority_expires_at": 1825947388
+    },
+    {
+      "distro": "acorn",
+      "root_fingerprint": "f95d19c77f025d89b263a63b0708365b092b5e9e25231bb697f0799a3056ecaf",
+      "release_fingerprint": "b3e46ebf2975fa1179e3dcf7429d1c59c42c725d8018d4fff6f6b830afc42f8c",
+      "index_fingerprint": "a5cc259adb4f8b361406678a6133754aabe4cebf05b1aa23b029842136e8ccfd",
+      "authority_expires_at": 1825947388
+    }
+  ]
+}
