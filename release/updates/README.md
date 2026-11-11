@@ -10,8 +10,12 @@ Public production policies and root-signed delegations are staged under
 `release/updates/production/<distro>/`. They are not loaded as installed defaults.
 The Pages tree exposes the same public delegations for candidate and stable,
 plus `updates/provisioning.json`; it advertises no system releases or update index.
-These public files are committed locally; their first remote deployment is still
-pending. Configuring Pages alone does not establish a reachable update feed.
+The [metadata-only bootstrap deployment](https://github.com/LevitateOS/LevitateOS/actions/runs/43052973585)
+succeeded on 2026-11-11. Recipe/Ginux fetched all nine public files over HTTPS
+and verified their exact sizes and SHA-256 hashes. The public
+[provisioning status](https://levitateos.github.io/LevitateOS/updates/provisioning.json)
+still declares production disabled. This proves public metadata transport, not
+an installed system update, release payload or trial boot.
 The repository has no registered release runner yet. Runner registration, matching
 baseline/new release artifacts and actual installed public-origin validation
 remain rollout work, rather than a reason to enable unvalidated updates.
@@ -244,8 +248,10 @@ The GitHub integration follows the documented [immutable release
 API](https://docs.github.com/en/rest/repos/repos#check-if-immutable-releases-are-enabled-for-a-repository),
 [release asset digests](https://docs.github.com/en/rest/releases/assets), and
 [Pages custom workflow](https://docs.github.com/en/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages)
-contracts. The checked-in actions use full reviewed commit pins. Actual GitHub
-upload/deployment execution has not been exercised against production resources.
+contracts. The checked-in actions use full reviewed commit pins. Metadata-only
+Pages deployment has been exercised and its public files verified through Recipe.
+Immutable system-payload upload and installed public-origin lifecycle validation
+remain unverified.
 
 
 Public-origin inputs and the independent install/ab-update invocations are
