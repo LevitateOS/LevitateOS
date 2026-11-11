@@ -1,0 +1,27 @@
+#!/usr/bin/bash
+set -euo pipefail
+# One namespace definition for registration, service operation and setup checks.
+# No host home, signing directory, operator credentials or daemon socket is bound.
+extra=()
+if [[ -v ACTIONS_RUNNER_INPUT_TOKEN ]]; then
+    extra+=(--setenv=ACTIONS_RUNNER_INPUT_TOKEN)
+fi
+exec /usr/bin/systemd-nspawn --quiet --settings=no --register=no --as-pid2 \
+    --machine=recab-release --directory=/var/lib/recab-release/root \
+    --private-users=pick --private-users-ownership=chown \
+    --drop-capability=CAP_SYS_ADMIN,CAP_NET_ADMIN,CAP_SYS_BOOT \
+    --capability=CAP_SYS_PTRACE \
+    --bind-ro=/usr \
+    --bind-ro=/var/lib/recab-release/runtime:/opt/recab/runtime \
+    --bind-ro=/var/lib/recab-release/bin:/opt/recab/bin \
+    --bind-ro=/var/lib/recab-release/toolchain:/opt/recab/toolchain \
+    --bind-ro=/var/lib/recab-release/check:/opt/recab/check \
+    --bind-ro=/var/lib/recab-release/job-started:/opt/recab/job-started \
+    --resolv-conf=copy-host --chdir=/opt/actions-runner \
+    --setenv=PATH=/opt/recab/toolchain/bin:/opt/recab/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin \
+    --setenv=HOME=/root --setenv=RUNNER_ALLOW_RUNASROOT=1 \
+    --setenv=GINUX_BIN=/opt/recab/bin/ginux \
+    --setenv=GINUX_ROOT="$(</var/lib/recab-release/runtime/root-reference)" \
+    --setenv=GINUX_ROOTFS=/opt/recab/runtime/rootfs.tar \
+    --setenv=ACTIONS_RUNNER_HOOK_JOB_STARTED=/opt/recab/job-started \
+    "${extra[@]}" "$@"

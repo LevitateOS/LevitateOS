@@ -16,9 +16,9 @@ and verified their exact sizes and SHA-256 hashes. The public
 [provisioning status](https://levitateos.github.io/LevitateOS/updates/provisioning.json)
 still declares production disabled. This proves public metadata transport, not
 an installed system update, release payload or trial boot.
-The repository has no registered release runner yet. Runner registration, matching
-baseline/new release artifacts and actual installed public-origin validation
-remain rollout work, rather than a reason to enable unvalidated updates.
+The x86_64 release runner `recab-release-levitate-dev-x86_64` is registered and
+online. Matching baseline/new release artifacts and actual installed public-origin
+validation remain rollout work, rather than a reason to enable unvalidated updates.
 
 Private PKCS#8 working files are in
 `~/.local/share/levitateos/release-keys/<distro>/{root,release,index}.pk8`, with
@@ -99,12 +99,39 @@ separate read-only job and transferred as a short-lived tool artifact; the
 signing job runs no builds or Recipe workloads. It refuses a changed source
 head before using that tool. The job has no root/release keys.
 
-Configure the existing Linux x86_64 release runner with labels
-`self-hosted, linux, x64, recab-release`. It supplies a pre-existing glibc runtime
-tar and exact content reference through repository variables `RECAB_GINUX_ROOTFS`
-and `RECAB_GINUX_ROOT`. Its current Recipe binary must run in that runtime;
-the builder compiles the checkout's matching Ginux launcher. Workflows do not
-fetch, fabricate or build a runtime image as a substitute for this input.
+The provisioned Linux x86_64 runner has labels `self-hosted, Linux, X64,
+recab-release`. Its enabled host service is `recab-release-runner.service` and
+its private state lives under `/var/lib/recab-release/`. The tracked service,
+namespace launcher and job hook are in `release/updates/runner/`.
+
+The launcher gives the runner a separate filesystem, PID namespace and private
+65536-entry UID/GID range through systemd-nspawn. Namespace root maps to an
+unprivileged host UID, so Ginux can chroot/drop credentials without becoming
+host root or the signing-key owner. No host home, signing directory, operator
+credential store or daemon socket is mounted. Host `/usr`, the exact existing
+compiler tree, runtime and bootstrap programs are read-only inputs. The job hook
+accepts only default-branch P14 publication/monitoring workflow dispatches or
+schedules before checkout/commands run. This is the runner's host-service
+boundary; Recipe continues to execute acquisitions inside Ginux.
+
+Recipe acquired and extracted the checksum-pinned official x86_64 runner
+2.338.2 through `distro/builder/os-recipes/release-runner.rhai`. Its updater is
+disabled; change that Recipe's pin and deploy its verified output for upgrades.
+Registration credentials remain private in the namespace filesystem, outside Git
+and the signing configuration. The existing compiler is 1.99.0 and its runtime
+is the already-produced glibc image
+`8bd12066024f731a796a6fc1734011837d02873d86ffb325999796712134da3d`.
+Repository variables select `/opt/recab/runtime/rootfs.tar` and its exact OCI
+content reference. No compiler, runtime, system image or VM was built to provision
+this runner. The builder still compiles the checkout's matching Recipe/Ginux
+tools only when an explicit publication/monitoring operation calls for them.
+
+The focused namespace check passed actual public acquisition through Recipe/Ginux,
+with the host home absent and the private UID/GID map verified. Dispatch
+`recab-updates.yml` with `operation=runner-check` to exercise the real registered
+runner without tool builds, signing, publication, VM tests or stable enablement.
+This job receives no signing environment or index secrets and reports its
+metadata transport result separately from installed lifecycle validation.
 
 `RECAB_METADATA_DEPLOY_READY=true` permits only explicit `operation=deploy`,
 including bootstrap of the public authority before any release is advertised.

@@ -359,6 +359,44 @@ class Publisher:
                 with path.open('xb') as file:file.write(body)
         print(json.dumps({'release_id': release_id, 'recorded_actual_public_run': True, 'production_enabled': False}))
 
+    def runner_check(self, recipe):
+        # Ginux gets chroot privileges only in this non-identity user namespace.
+        # Namespace root and its UID-1000 worker cannot become host root/signers.
+        uid_map = [list(map(int, row.split())) for row in Path('/proc/self/uid_map').read_text().splitlines()]
+        gid_map = [list(map(int, row.split())) for row in Path('/proc/self/gid_map').read_text().splitlines()]
+        require(os.geteuid() == 0 and len(uid_map) == 1 and uid_map == gid_map
+                and uid_map[0][0] == 0 and uid_map[0][1] >= 65536 and uid_map[0][2] == 65536,
+                'release runner must use a private, non-identity UID/GID range')
+        require(not list(Path('/home').iterdir()), 'host home directories must not be exposed to the release runner')
+        require(all(not os.environ.get(k) for k in SECRET_ENV if 'INDEX_KEY' in k),
+                'release acquisition runner must not receive signing secrets')
+        members = []
+        for path in sorted((self.repo / METADATA).rglob('*')):
+            if path.is_file() and path.suffix in ('.json', '.sig') and not any(p.startswith('.') for p in path.relative_to(self.repo / METADATA).parts):
+                require(not path.is_symlink() and path.stat().st_size <= 1024 * 1024, 'unsafe public metadata')
+                members.append({'name': f'object-{len(members)}',
+                                'url': 'https://levitateos.github.io/LevitateOS/' + path.relative_to(self.repo / METADATA).as_posix(),
+                                'size': path.stat().st_size, 'sha256': sha(path)})
+        require(members and sum(m['size'] for m in members) <= 4 * 1024 * 1024, 'missing or oversized runner-check metadata set')
+        env = {k: v for k, v in os.environ.items() if k not in SECRET_ENV
+               and not k.startswith(('GITHUB_', 'ACTIONS_', 'RUNNER_'))}
+        with tempfile.TemporaryDirectory(prefix='recab-runner-check-') as directory:
+            work = Path(directory);request = work / 'request.json';result = work / 'result.json'
+            request.write_text(json.dumps({'members': members}))
+            run(recipe, 'install', self.repo / 'distro/builder/os-recipes/public-metadata-check.rhai',
+                '--no-activate', '--no-persist-state', '--force-install', '--network-host', 'levitateos.github.io:443',
+                '--network-max-bytes', '4194304', '--state-dir', work / 'state', '--build-dir', work / 'build',
+                '--input', 'request=' + str(request), '--json-output', result,
+                cwd=work, env=env, stdout=sys.stderr)
+            output = Path(load(result)['outputs']['metadata'])
+            for member in members:
+                path = output / member['name']
+                require(path.stat().st_size == member['size'] and sha(path) == member['sha256'], 'public runner-check output differs')
+        print(json.dumps({'runner_ready': True, 'architecture': 'x86_64', 'uid_map': uid_map,
+                          'verified_public_metadata_files': len(members), 'recipe_sha256': sha(recipe),
+                          'installed_lifecycle_validated': False, 'production_enabled': False,
+                          'full_build': False, 'vm_test': False}))
+
     def export_site(self, output):
         require(not output.exists(), 'site export destination must be new')
         source = self.repo / METADATA
@@ -413,6 +451,7 @@ def main():
     p = sub.add_parser('monitor');p.add_argument('--representative', action='store_true')
     sub.add_parser('commit-metadata')
     p = sub.add_parser('record-validation');p.add_argument('run_directory', type=Path)
+    p = sub.add_parser('runner-check');p.add_argument('--recipe', type=Path, default=Path('/opt/recab/bin/recipe'))
     p = sub.add_parser('export-site');p.add_argument('output', type=Path)
     args = parser.parse_args();publisher = Publisher(args)
     require(sys.platform == 'linux' and os.uname().machine == 'x86_64', 'Linux x86_64 release tooling required')
@@ -448,6 +487,7 @@ def main():
                     count += 1
         require(count, 'no published feeds to monitor')
     elif args.command == 'record-validation':publisher.record_validation(args.run_directory.resolve())
+    elif args.command == 'runner-check':publisher.runner_check(args.recipe.resolve(strict=True))
     elif args.command == 'export-site':publisher.export_site(args.output.resolve())
     else:publisher.commit_metadata()
 

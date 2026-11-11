@@ -4,10 +4,10 @@ on:
   workflow_dispatch:
     inputs:
       operation:
-        description: Consume existing immutable payloads, renew references, or redeploy current metadata
+        description: Publish existing payloads, refresh/deploy metadata, or check the isolated runner without builds
         required: true
         type: choice
-        options: [publish, promote, refresh, deploy]
+        options: [publish, promote, refresh, deploy, runner-check]
       distro:
         description: Distro for publish/promote (refresh covers all existing feeds)
         type: choice
@@ -48,7 +48,7 @@ jobs:
           set -euo pipefail
           test "$GITHUB_REPOSITORY" = LevitateOS/LevitateOS
           test "$GITHUB_REF" = "refs/heads/$RECAB_DEFAULT_BRANCH"
-          if [[ "$OPERATION" == deploy ]]; then
+          if [[ "$OPERATION" == deploy || "$OPERATION" == runner-check ]]; then
             if [[ "$DEPLOY_READY" != true ]]; then
               echo '::error::Public metadata deployment is not provisioned.'
               exit 1
@@ -67,7 +67,7 @@ jobs:
     if: >-
       vars.RECAB_PUBLISHING_READY == 'true' &&
       github.ref == format('refs/heads/{0}', github.event.repository.default_branch) &&
-      inputs.operation != 'deploy'
+      inputs.operation != 'deploy' && inputs.operation != 'runner-check'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     outputs:
@@ -115,9 +115,10 @@ jobs:
           ref: ${{ github.event.repository.default_branch }}
           submodules: recursive
           persist-credentials: false
-      - uses: dtolnay/rust-toolchain@d1031067263f94b142dd6c0ce24c5eb9d02d52a0 # master, reviewed pin
-        with:
-          toolchain: 1.99.0
+      - name: Require the provisioned x86_64 compiler (no toolchain installation)
+        run: |
+          test "$(uname -m)" = x86_64
+          test "$(rustc --version | cut -d' ' -f2)" = 1.99.0
       - name: Compile release and Recipe tools only
         run: cargo build --locked -p distro-builder --bin distro-builder -p levitate-recipe --bin recipe
       - name: Fetch bounded public publication metadata
@@ -150,7 +151,7 @@ jobs:
   metadata:
     needs: [configuration, verify-payload, tools]
     if: >-
-      always() && !cancelled() && needs.configuration.result == 'success' &&
+      always() && !cancelled() && inputs.operation != 'runner-check' && needs.configuration.result == 'success' &&
       (vars.RECAB_PUBLISHING_READY == 'true' || (inputs.operation == 'deploy' && vars.RECAB_METADATA_DEPLOY_READY == 'true')) &&
       github.ref == format('refs/heads/{0}', github.event.repository.default_branch) &&
       (needs.tools.result == 'success' || (inputs.operation == 'deploy' && needs.tools.result == 'skipped')) &&
@@ -232,6 +233,25 @@ jobs:
         id: deployment
         uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4.0.5
 
+  runner-check:
+    needs: configuration
+    if: inputs.operation == 'runner-check' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    runs-on: [self-hosted, linux, x64, recab-release]
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          submodules: recursive
+          persist-credentials: false
+      - name: Check the isolated runner through actual public Recipe acquisition (no builds or VMs)
+        env:
+          GINUX_ROOT: ${{ vars.RECAB_GINUX_ROOT }}
+          GINUX_ROOTFS: ${{ vars.RECAB_GINUX_ROOTFS }}
+        run: python3 .github/scripts/recab_updates.py runner-check
+
   monitor:
     needs: deploy
     if: always() && !cancelled() && needs.deploy.result == 'success' && vars.RECAB_PUBLIC_MONITORING_READY == 'true'
@@ -245,9 +265,10 @@ jobs:
           ref: ${{ github.event.repository.default_branch }}
           submodules: recursive
           persist-credentials: false
-      - uses: dtolnay/rust-toolchain@d1031067263f94b142dd6c0ce24c5eb9d02d52a0 # master, reviewed pin
-        with:
-          toolchain: 1.99.0
+      - name: Require the provisioned x86_64 compiler (no toolchain installation)
+        run: |
+          test "$(uname -m)" = x86_64
+          test "$(rustc --version | cut -d' ' -f2)" = 1.99.0
       - name: Compile acquisition tools without signing credentials
         run: cargo build --locked -p distro-builder --bin distro-builder -p levitate-recipe --bin recipe
       - name: Verify public deployed metadata and representative payload parts through Recipe

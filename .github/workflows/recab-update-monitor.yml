@@ -41,9 +41,10 @@ jobs:
           ref: ${{ github.event.repository.default_branch }}
           submodules: recursive
           persist-credentials: false
-      - uses: dtolnay/rust-toolchain@d1031067263f94b142dd6c0ce24c5eb9d02d52a0 # master, reviewed pin
-        with:
-          toolchain: 1.99.0
+      - name: Require the provisioned x86_64 compiler (no toolchain installation)
+        run: |
+          test "$(uname -m)" = x86_64
+          test "$(rustc --version | cut -d' ' -f2)" = 1.99.0
       - name: Compile acquisition tools only, without signing credentials
         run: cargo build --locked -p distro-builder --bin distro-builder -p levitate-recipe --bin recipe
       - name: Check current public metadata and representative assets through Recipe

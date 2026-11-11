@@ -1,0 +1,17 @@
+[Unit]
+Description=Isolated x86_64 recab release acquisition runner
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/libexec/recab-runner-enter /opt/actions-runner/run.sh
+Restart=on-failure
+RestartSec=10
+KillMode=mixed
+TimeoutStopSec=30
+Delegate=yes
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target
