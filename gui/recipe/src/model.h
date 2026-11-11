@@ -55,12 +55,26 @@ struct Recipe {
     static Recipe fromJson(const QJsonObject &object);
 };
 
+// Where software is. `Me` is the person's own store, in effect at once for
+// them only. `Computer` is the system's: its store when the system is not
+// locked, the running system's selection (through recab) when it is. `Next`
+// is software that only the next system holds, after a restart. The one store
+// a check names (RECIPE_GUI_PACKAGE_ROOT) is `Computer`, the only place there is.
+enum class Place { Me = 0, Computer = 1, Next = 2 };
+
 struct InstalledItem {
     // `kept`: the newest earlier version Recipe still holds, which "Go back" returns to.
     QString name, version, kept;
     QDate installedOn;
     qint64 sizeBytes = 0;
     QStringList programs, menu;
+    Place place = Place::Computer;
+    // A store stands behind it: earlier versions, storage and going back apply.
+    // False for what recab answers about a locked system, which says only
+    // name and version.
+    bool inStore = true;
+    // On a locked system: the next system no longer holds it.
+    bool leavesNext = false;
 };
 
 // One field of what a recipe may use (NEEDS) that the newer recipe changes,
@@ -79,6 +93,10 @@ struct Change {
 
 struct UpdateItem {
     QString name, from, to;
+    Place place = Place::Computer;
+    // Made from the collection's version, not by `recipe updates` (which
+    // cannot look at a locked system's software).
+    bool fromCollection = false;
     QList<Change> changes;
     // False when `recipe` cannot say what changed in what the recipe may use:
     // nothing was recorded when the installed version was installed.
@@ -86,6 +104,13 @@ struct UpdateItem {
     // The version is the same and the source publishes another recipe file.
     bool sameVersion = false;
     bool asksMore() const;
+};
+
+// What one store takes, as `recipe storage` says.
+struct Store {
+    bool has = false;
+    qint64 activeBytes = 0, earlierBytes = 0;
+    int earlierGenerations = 0;
 };
 
 struct Catalog {
@@ -98,8 +123,17 @@ struct Catalog {
     QStringList updateProblems;
     // What the store takes: what is installed, and the earlier versions kept
     // beside it (with what only they hold).
+    // Summed over the stores there are; `stores` has each, by `Place`.
     qint64 activeBytes = 0, earlierBytes = 0;
     int earlierGenerations = 0;
+    Store stores[2];
+    // More than one place holds software (or can): rows say where they are.
+    bool twoPlaces = false;
+    // The computer's own software could not be read; why. Empty otherwise.
+    QString computerProblem;
+    // On a locked system, what the next system's changes name (`recab`'s
+    // `preparation.changes`, readable by a person): package -> last action.
+    QMap<QString, QString> nextChanges;
 
     const Recipe *recipe(const QString &name) const;
     const Origin *origin(const QString &name) const;
@@ -108,11 +142,23 @@ struct Catalog {
     // Where the recipes are from, in a few words.
     QString originsWords() const;
     int countFrom(const QString &origin) const;
+    // The first place that holds it (Me before Computer before Next), or the given one.
     const InstalledItem *installedItem(const QString &name) const;
+    const InstalledItem *installedItem(const QString &name, Place place) const;
     const UpdateItem *update(const QString &name) const;
+    const UpdateItem *update(const QString &name, Place place) const;
+    // The next system holds a change that installs or updates it (recab says so).
+    bool waitsForRestart(const QString &name) const;
+    // The places it could still be installed in, the computer's first.
+    QList<Place> installPlaces(const QString &name) const;
+    // Every place that holds it.
+    QList<const InstalledItem *> installedEverywhere(const QString &name) const;
     QStringList categories() const;
 };
 
 QString categoryTitle(const QString &id);
 QString hookTitle(const QString &hook);
 
+
+// "For me", "For this computer", "In the next system, after a restart".
+QString placeTitle(Place place);

@@ -1,0 +1,6 @@
+#!/bin/sh
+# Stands in for pkexec in the story's two-places pass: notes that it was asked
+# to run something (in $HELPER_LOG), then runs it as it is. A change that
+# is only the person's own never reaches it.
+echo "$@" >> "${HELPER_LOG:-/dev/null}"
+exec "$@"

@@ -1,6 +1,7 @@
 // The one window: the shared frame, the pages in it, and the flows between them.
 #pragma once
 
+#include "beforewords.h"
 #include "client.h"
 #include "model.h"
 
@@ -8,6 +9,7 @@
 
 #include <functional>
 
+class BeforePage;
 class BrowsePage;
 class Frame;
 class InstalledPage;
@@ -28,10 +30,17 @@ public:
 
     void showBrowse(const QString &category = QString());
     void showRecipe(const QString &name);
-    void showInstalled(const QString &selected = QString());
-    void showUpdates(const QString &selected = QString());
-    void startInstall(const QString &name, const QString &agentPrompt = QString());
-    void askRemove(const QString &name);
+    void showInstalled(const QString &selected = QString(), int place = -1);
+    void showUpdates(const QString &selected = QString(), int place = -1);
+    // The Before step: what will happen, shown before anything starts. An
+    // install asks where; an update acts where the software is. The page's
+    // button goes on to `startInstall`.
+    void askInstall(const QString &name);
+    void askUpdate(const QString &name, Place place);
+    // Starts the install or update at once, with no Before step: for the run
+    // the person has just agreed to, and for "Try again".
+    void startInstall(const QString &name, Place place = Place::Computer, const QString &agentPrompt = QString());
+    void askRemove(const QString &name, Place place = Place::Computer);
     void stopRun();
     void showSources();
     // Ask the agent for a recipe: the page, and handing its prompt over.
@@ -51,13 +60,15 @@ public:
     const Catalog &catalog() const { return catalog_; }
     Frame *frame() const { return frame_; }
     BrowsePage *browsePage() const { return browse_; }
+    BeforePage *beforePage() const { return before_; }
+    Places places() const { return client_.places(); }
     bool busy() const { return run_ != nullptr || quiet_ > 0 || client_.loading(); }
     // From a checkout: remove without the question.
-    void removeNow(const QString &name);
+    void removeNow(const QString &name, Place place = Place::Computer);
     // Activates the newest earlier version Recipe keeps of an installed program.
-    void goBack(const QString &name);
-    // Deletes every earlier version Recipe keeps, after asking unless told not to.
-    void clearEarlier(bool askFirst = true);
+    void goBack(const QString &name, Place place = Place::Computer);
+    // Deletes every earlier version the store of a place keeps, after asking unless told not to.
+    void clearEarlier(Place place = Place::Computer, bool askFirst = true);
 
 private:
     // Reads the catalog without holding the window up, then does `then`.
@@ -71,7 +82,9 @@ private:
     void updateStatus();
     // Takes a said-for-a-moment line away at once.
     void clearFlash();
-    void open(const QString &name);
+    void open(const QString &name, Place place);
+    void showBefore();
+    void startQueued();
     void quietChange(Run *run);
     void runEnded(const QString &name, bool ok);
 
@@ -79,9 +92,13 @@ private:
     Catalog catalog_;
     Run *run_ = nullptr;
     int quiet_ = 0;
-    QStringList queue_;
+    // Updates still to be asked about and made, one after another.
+    QList<QPair<QString, Place>> queue_;
+    Ask ask_;           // what the Before page is about
+    Place runPlace_ = Place::Computer; // where the running (or last) run acts
     std::function<void()> again_;
     QString installedChoice_, updateChoice_;
+    int installedPlace_ = -1, updatePlace_ = -1;
     QString origin_;    // the source chosen on the Browse page; empty: all
     QString category_;  // the category last browsed
     bool read_ = false; // the catalog was read at least once
@@ -94,6 +111,7 @@ private:
     QStackedWidget *stack_;
     BrowsePage *browse_;
     RecipePage *recipe_;
+    BeforePage *before_;
     RunPage *runPage_;
     InstalledPage *installed_;
     UpdatesPage *updates_;

@@ -3,6 +3,7 @@
 #include "pages.h"
 #include "sources.h"
 
+#include "before.h"
 #include "frame.h"
 #include "nextsystem.h"
 #include "parts.h"
@@ -10,12 +11,14 @@
 #include "work.h"
 
 #include <QComboBox>
+#include <QDesktopServices>
 #include <QLineEdit>
 #include <QMessageBox>
 #include <QProcess>
 #include <QStackedWidget>
 #include <QTime>
 #include <QToolButton>
+#include <QUrl>
 
 namespace {
 
@@ -39,13 +42,14 @@ Window::Window(QWidget *parent)
     stack_ = new QStackedWidget;
     browse_ = new BrowsePage;
     recipe_ = new RecipePage;
+    before_ = new BeforePage;
     runPage_ = new RunPage;
     installed_ = new InstalledPage;
     updates_ = new UpdatesPage;
     sources_ = new SourcesPage;
     wish_ = new WishPage;
     work_ = new WorkPage;
-    for (QWidget *page : {static_cast<QWidget *>(browse_), static_cast<QWidget *>(recipe_),
+    for (QWidget *page : {static_cast<QWidget *>(browse_), static_cast<QWidget *>(recipe_), static_cast<QWidget *>(before_),
                           static_cast<QWidget *>(runPage_), static_cast<QWidget *>(installed_),
                           static_cast<QWidget *>(updates_), static_cast<QWidget *>(sources_),
                           static_cast<QWidget *>(wish_), static_cast<QWidget *>(work_)})
@@ -72,9 +76,9 @@ Window::Window(QWidget *parent)
         if (key == QLatin1String("browse"))
             showBrowse(category_);
         else if (key == QLatin1String("installed"))
-            showInstalled(installedChoice_);
+            showInstalled(installedChoice_, installedPlace_);
         else if (key == QLatin1String("updates"))
-            showUpdates(updateChoice_);
+            showUpdates(updateChoice_, updatePlace_);
         else if (key == QLatin1String("sources"))
             showSources();
     });
@@ -92,7 +96,8 @@ Window::Window(QWidget *parent)
             [this](int index) { chooseSource(browse_->fromBox()->itemData(index).toString()); });
 
     connect(browse_, &BrowsePage::openRecipe, this, &Window::showRecipe);
-    connect(browse_, &BrowsePage::install, this, [this](const QString &name) { startInstall(name); });
+    connect(browse_, &BrowsePage::install, this, [this](const QString &name) { askInstall(name); });
+    connect(browse_, &BrowsePage::update, this, [this](const QString &name, Place place) { askUpdate(name, place); });
     connect(browse_, &BrowsePage::retry, this, [this] { reload([this] { showBrowse(); }); });
     connect(browse_, &BrowsePage::askFor, this, &Window::showWish);
     connect(updates_, &UpdatesPage::check, this, [this] { fetchSources(); });
@@ -134,12 +139,35 @@ Window::Window(QWidget *parent)
     connect(again, &QToolButton::clicked, this, &Window::refresh);
     frame_->addStatusWidget(again);
     connect(recipe_, &RecipePage::back, this, [this] { showBrowse(); });
-    connect(recipe_, &RecipePage::install, this, [this](const QString &name) { startInstall(name); });
+    connect(recipe_, &RecipePage::install, this, [this](const QString &name) { askInstall(name); });
+    connect(recipe_, &RecipePage::update, this, [this](const QString &name, Place place) { askUpdate(name, place); });
     connect(recipe_, &RecipePage::remove, this, &Window::askRemove);
     connect(recipe_, &RecipePage::open, this, &Window::open);
+
+    // The Before step: what will happen, then Cancel or go on.
+    connect(before_, &BeforePage::cancelled, this, [this] {
+        queue_.clear();
+        if (const auto draw = again_)
+            draw();
+        else
+            showBrowse(category_);
+    });
+    connect(before_, &BeforePage::choiceChanged, this, [this](const QString &key) {
+        // The sentences depend on the place: say them again for the one picked.
+        before_->show(beforeContent(catalog_, client_.places(), ask_, placeFromKey(key)));
+    });
+    connect(before_, &BeforePage::confirmed, this, [this](const QString &key) {
+        startInstall(ask_.name, ask_.update ? ask_.place : placeFromKey(key));
+    });
+    connect(before_, &BeforePage::linkClicked, this, [this] {
+        const Recipe *recipe = catalog_.recipe(ask_.name);
+        if (recipe && !recipe->path.isEmpty())
+            QDesktopServices::openUrl(QUrl::fromLocalFile(recipe->path));
+    });
     connect(runPage_, &RunPage::back, this, [this] { showBrowse(); });
-    connect(runPage_, &RunPage::retry, this, [this](const QString &name) { startInstall(name); });
-    connect(runPage_, &RunPage::fix, this, &Window::startInstall);
+    connect(runPage_, &RunPage::retry, this, [this](const QString &name) { startInstall(name, runPlace_); });
+    connect(runPage_, &RunPage::fix, this,
+            [this](const QString &name, const QString &prompt) { startInstall(name, runPlace_, prompt); });
     connect(runPage_, &RunPage::note, this, [this](const QString &words) { frame_->flash(words); });
     connect(runPage_, &RunPage::succeeded, this, [this](const QString &name) { runEnded(name, true); });
     connect(runPage_, &RunPage::failed, this, [this](const QString &name) { runEnded(name, false); });
@@ -149,18 +177,25 @@ Window::Window(QWidget *parent)
     });
     connect(installed_, &InstalledPage::open, this, &Window::open);
     connect(installed_, &InstalledPage::goBack, this, &Window::goBack);
-    connect(installed_, &InstalledPage::clearEarlier, this, [this] { clearEarlier(); });
+    connect(installed_, &InstalledPage::clearEarlier, this, [this](Place place) { clearEarlier(place); });
     connect(installed_, &InstalledPage::remove, this, &Window::askRemove);
-    connect(installed_, &InstalledPage::update, this, [this](const QString &name) { startInstall(name); });
-    connect(installed_, &InstalledPage::selected, this, [this](const QString &name) { installedChoice_ = name; });
-    connect(updates_, &UpdatesPage::update, this, [this](const QString &name) { startInstall(name); });
-    connect(updates_, &UpdatesPage::selected, this, [this](const QString &name) { updateChoice_ = name; });
+    connect(installed_, &InstalledPage::update, this, [this](const QString &name, Place place) { askUpdate(name, place); });
+    connect(installed_, &InstalledPage::selected, this, [this](const QString &name, Place place) {
+        installedChoice_ = name;
+        installedPlace_ = int(place);
+    });
+    connect(updates_, &UpdatesPage::update, this, [this](const QString &name, Place place) { askUpdate(name, place); });
+    connect(updates_, &UpdatesPage::selected, this, [this](const QString &name, Place place) {
+        updateChoice_ = name;
+        updatePlace_ = int(place);
+    });
+    // Each update is asked about in turn, with its own Before page.
     connect(updates_, &UpdatesPage::updateAll, this, [this] {
         queue_.clear();
         for (const UpdateItem &item : catalog_.updates)
-            queue_ << item.name;
-        if (!queue_.isEmpty())
-            startInstall(queue_.takeFirst());
+            if (item.place != Place::Next)
+                queue_ << qMakePair(item.name, item.place);
+        startQueued();
     });
 
     reload([this] { showBrowse(); });
@@ -224,7 +259,7 @@ void Window::refresh()
     if (busy())
         return;
     QWidget *shown = stack_->currentWidget();
-    const bool drawn = shown != runPage_ && shown != work_ && shown != wish_;
+    const bool drawn = shown != runPage_ && shown != work_ && shown != wish_ && shown != before_;
     reload([this, drawn] {
         // A copy: drawing the page sets `again_` anew, and the one running must outlive that.
         if (const auto draw = again_; drawn && draw)
@@ -293,35 +328,73 @@ void Window::showRecipe(const QString &name)
     stack_->setCurrentWidget(recipe_);
 }
 
-void Window::showInstalled(const QString &selected)
+void Window::showInstalled(const QString &selected, int place)
 {
-    again_ = [this] { showInstalled(installedChoice_); };
+    again_ = [this] { showInstalled(installedChoice_, installedPlace_); };
     frame_->follow(QStringLiteral("installed"));
-    installed_->show(catalog_, selected);
+    installed_->show(catalog_, selected, place);
     stack_->setCurrentWidget(installed_);
 }
 
-void Window::showUpdates(const QString &selected)
+void Window::showUpdates(const QString &selected, int place)
 {
-    again_ = [this] { showUpdates(updateChoice_); };
+    again_ = [this] { showUpdates(updateChoice_, updatePlace_); };
     frame_->follow(QStringLiteral("updates"));
-    updates_->show(catalog_, selected);
+    updates_->show(catalog_, selected, place);
     stack_->setCurrentWidget(updates_);
 }
 
-void Window::startInstall(const QString &name, const QString &agentPrompt)
+// What will happen, before it does. An install is asked where; the places
+// offered are the ones that do not hold the software yet.
+void Window::askInstall(const QString &name)
+{
+    QList<Place> choices = catalog_.installPlaces(name);
+    if (choices.isEmpty())
+        return;
+    ask_ = Ask{name, false, choices.first(), choices};
+    showBefore();
+}
+
+void Window::askUpdate(const QString &name, Place place)
+{
+    ask_ = Ask{name, true, place, {place}};
+    showBefore();
+}
+
+void Window::showBefore()
 {
     if (run_) {
         frame_->flash(tr("One thing at a time: wait for the running one, or stop it."));
         stack_->setCurrentWidget(runPage_);
         return;
     }
-    const bool installed = catalog_.installedItem(name) != nullptr;
+    // The Cancel button comes back to the page the person was on: `again_` is still its.
+    before_->show(beforeContent(catalog_, client_.places(), ask_, ask_.update ? ask_.place : ask_.choices.first()));
+    stack_->setCurrentWidget(before_);
+}
+
+void Window::startQueued()
+{
+    if (!queue_.isEmpty()) {
+        const auto next = queue_.takeFirst();
+        askUpdate(next.first, next.second);
+    }
+}
+
+void Window::startInstall(const QString &name, Place place, const QString &agentPrompt)
+{
+    if (run_) {
+        frame_->flash(tr("One thing at a time: wait for the running one, or stop it."));
+        stack_->setCurrentWidget(runPage_);
+        return;
+    }
+    const bool installed = catalog_.installedItem(name, place) != nullptr;
     // `recipe` is given SOURCE:NAME, so two sources with one name cannot be confused.
     const QString named = catalog_.qualified(name);
-    run_ = !agentPrompt.isEmpty() ? client_.fixWithAgent(named, agentPrompt, installed)
-           : installed ? client_.update(named) : client_.install(named);
-    runPage_->begin(catalog_, name, run_);
+    runPlace_ = place;
+    run_ = !agentPrompt.isEmpty() ? client_.fixWithAgent(named, agentPrompt, installed, place)
+           : installed ? client_.update(named, place) : client_.install(named, place);
+    runPage_->begin(catalog_, name, run_, place);
     stack_->setCurrentWidget(runPage_);
     run_->start();
 }
@@ -341,7 +414,7 @@ void Window::runEnded(const QString &name, bool ok)
             return;
         }
         if (!queue_.isEmpty())
-            startInstall(queue_.takeFirst());
+            startQueued();
         else
             showRecipe(name);
     });
@@ -424,39 +497,40 @@ void Window::answerAgent(const QString &words)
     work_->answer(words);
 }
 
-void Window::askRemove(const QString &name)
+void Window::askRemove(const QString &name, Place place)
 {
     const Recipe *recipe = catalog_.recipe(name);
-    const InstalledItem *item = catalog_.installedItem(name);
+    const InstalledItem *item = catalog_.installedItem(name, place);
     if (!recipe || !item)
         return;
     RemoveDialog dialog(*recipe, *item, this);
     if (dialog.exec() == QDialog::Accepted)
-        quietChange(client_.remove(name));
+        quietChange(client_.remove(name, place));
 }
 
-void Window::removeNow(const QString &name)
+void Window::removeNow(const QString &name, Place place)
 {
-    quietChange(client_.remove(name));
+    quietChange(client_.remove(name, place));
 }
 
-void Window::goBack(const QString &name)
+void Window::goBack(const QString &name, Place place)
 {
-    quietChange(client_.goBack(name));
+    quietChange(client_.goBack(name, place));
 }
 
-void Window::clearEarlier(bool askFirst)
+void Window::clearEarlier(Place place, bool askFirst)
 {
     if (askFirst
         && QMessageBox::question(this, tr("Clear earlier versions"),
-                                 tr("Delete every earlier version Recipe keeps (%1)?\n\nNothing that is installed "
-                                    "changes. Afterwards no program can be taken back to an earlier version until "
-                                    "it is updated again.")
-                                     .arg(bytesText(catalog_.earlierBytes)),
+                                 tr("Delete every earlier version Recipe keeps%1 (%2)?\n\nNothing that is installed "
+                                    "changes. Afterwards no program there can be taken back to an earlier version "
+                                    "until it is updated again.")
+                                     .arg(catalog_.twoPlaces ? (place == Place::Me ? tr(" for you") : tr(" for this computer")) : QString(),
+                                          bytesText(catalog_.stores[int(place)].earlierBytes)),
                                  QMessageBox::Yes | QMessageBox::Cancel)
                != QMessageBox::Yes)
         return;
-    quietChange(client_.clearEarlier());
+    quietChange(client_.clearEarlier(place));
 }
 
 // A short change with no page of its own: run it, then show the page again.
@@ -482,9 +556,9 @@ void Window::quietChange(Run *run)
     run->start();
 }
 
-void Window::open(const QString &name)
+void Window::open(const QString &name, Place place)
 {
-    const InstalledItem *item = catalog_.installedItem(name);
+    const InstalledItem *item = catalog_.installedItem(name, place);
     if (!item || item->programs.isEmpty())
         return;
     if (!QProcess::startDetached(item->programs.first(), {}))

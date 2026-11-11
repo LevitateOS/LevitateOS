@@ -229,10 +229,27 @@ QString Origin::state() const
 
 const InstalledItem *Catalog::installedItem(const QString &name) const
 {
+    for (Place place : {Place::Me, Place::Computer, Place::Next})
+        if (const InstalledItem *found = installedItem(name, place))
+            return found;
+    return nullptr;
+}
+
+const InstalledItem *Catalog::installedItem(const QString &name, Place place) const
+{
     for (const InstalledItem &i : installed)
-        if (i.name == name)
+        if (i.name == name && i.place == place)
             return &i;
     return nullptr;
+}
+
+QList<const InstalledItem *> Catalog::installedEverywhere(const QString &name) const
+{
+    QList<const InstalledItem *> found;
+    for (Place place : {Place::Me, Place::Computer, Place::Next})
+        if (const InstalledItem *item = installedItem(name, place))
+            found << item;
+    return found;
 }
 
 const UpdateItem *Catalog::update(const QString &name) const
@@ -241,6 +258,44 @@ const UpdateItem *Catalog::update(const QString &name) const
         if (u.name == name)
             return &u;
     return nullptr;
+}
+
+const UpdateItem *Catalog::update(const QString &name, Place place) const
+{
+    for (const UpdateItem &u : updates)
+        if (u.name == name && u.place == place)
+            return &u;
+    return nullptr;
+}
+
+bool Catalog::waitsForRestart(const QString &name) const
+{
+    const QString action = nextChanges.value(name);
+    return action == QLatin1String("install") || action == QLatin1String("update");
+}
+
+QList<Place> Catalog::installPlaces(const QString &name) const
+{
+    QList<Place> free;
+    // Next counts as held: installing again would repeat what is already waiting.
+    if (!installedItem(name, Place::Computer) && !installedItem(name, Place::Next) && !waitsForRestart(name))
+        free << Place::Computer;
+    if (twoPlaces && !installedItem(name, Place::Me))
+        free << Place::Me;
+    return free;
+}
+
+QString placeTitle(Place place)
+{
+    switch (place) {
+    case Place::Me:
+        return QObject::tr("For me");
+    case Place::Computer:
+        return QObject::tr("For this computer");
+    case Place::Next:
+        break;
+    }
+    return QObject::tr("In the next system, after a restart");
 }
 
 static const QList<QPair<QString, const char *>> &categoryTable()

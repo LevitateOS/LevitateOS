@@ -5,21 +5,43 @@ It answers the commands the front end uses (see ../README.md, "What the front
 end asks of recipe") from catalog.json and a small state file, and plays an
 install as a stream of events. Nothing is downloaded, built or installed.
 
+It tells the places software can be in apart the way the real `recipe` does
+(tools/recipe, `system_route` and `default_package_root`):
+
+  recipe --system install|update|remove NAME   the system route: the change goes
+                                               into the next system (recab); the
+                                               running system is not touched
+  recipe --system installed --json             what recab's `change list` answers:
+                                               {active, prepared, preparation, activation}
+  recipe ... --package-root DIR                one explicit store (installed.json)
+  recipe ...                                   the person's own store (installed-me.json)
+
 Environment:
   RECIPE_STANDIN_STATE    folder for the state file (default: a folder in /tmp)
+  RECIPE_STANDIN_LOG      file each invocation's arguments are appended to, one JSON
+                          line each (default: invocations.log in the state folder)
+  RECIPE_STANDIN_PREPARED 1: the reader may read `prepared` (real recipe: only root can);
+                          otherwise it is null, as for a person
+  RECIPE_RECAB_BIN        as the real recipe: the recab the system route runs; the stand-in
+                          prepares and records the change in it, so the strip can be read
   RECIPE_STANDIN_SPEED    time factor for an install; 0 runs it at once (default 1)
   RECIPE_STANDIN_STOP_AT  "name:hook": stay in the middle of that step forever
 """
 import datetime
 import json
 import os
+import subprocess
 import sys
 import time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 CATALOG = json.load(open(os.path.join(HERE, "catalog.json")))
 STATE_DIR = os.environ.get("RECIPE_STANDIN_STATE") or "/tmp/recipe-standin-%d" % os.getuid()
-STATE = os.path.join(STATE_DIR, "installed.json")
+STATE = os.path.join(STATE_DIR, "installed.json")  # main() picks the store the arguments name
+SYSTEM = os.path.join(STATE_DIR, "system.json")
+ME = os.path.join(STATE_DIR, "installed-me.json")
+PREPARED_VISIBLE = os.environ.get("RECIPE_STANDIN_PREPARED") == "1" or os.getuid() == 0
+STORE_ROOT = "/var/lib/recipe"  # the profile named in answers
 SPEED = float(os.environ.get("RECIPE_STANDIN_SPEED", "1"))
 STOP_AT = os.environ.get("RECIPE_STANDIN_STOP_AT", "")
 
@@ -27,8 +49,17 @@ STOP_AT = os.environ.get("RECIPE_STANDIN_STOP_AT", "")
 def installed():
     if not os.path.exists(STATE):
         os.makedirs(STATE_DIR, exist_ok=True)
-        save(CATALOG["installed"])
+        # The person's own store starts with one program an agent wrote for them,
+        # an older version of it; the others' store is the catalog's.
+        save(ME_START if STATE == ME else CATALOG["installed"])
     return json.load(open(STATE))
+
+
+ME_START = [{
+    "name": "tree", "version": "2.3.1", "installed_on": 1793275200, "size_bytes": 3145728, "kept": [],
+    "recipe": os.path.expanduser("~/.local/share/recipe/recipes/tree.rhai"),
+    "files": ["bin/tree"],
+}]
 
 
 def save(items):
@@ -81,7 +112,7 @@ def recipes():
     found = []
     for item in CATALOG["recipes"]:
         # `tree` is the one an agent wrote earlier: it lives in the person's own folder.
-        found.append(dict(item, source="local" if item["name"] == "tree" else "levitate"))
+        found.append(dict(item, source="local" if item["name"] == "tree" else "levitate", path=recipe_file(item["name"])))
     for item in read(WRITTEN, []):
         found.append(dict(item, source="local"))
     for source in sources():
@@ -92,6 +123,16 @@ def recipes():
         found.append(dict(sample("zellij", "Zellij", "Several terminals in one window", "utilities", "htop"),
                           source=source["name"]))
     return found
+
+
+def recipe_file(name):
+    """The recipe's file, as the real `list --json` names it: made here so there is one to open."""
+    path = os.path.join(STATE_DIR, "recipes", name + ".rhai")
+    if not os.path.exists(path):
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w") as out:
+            out.write("// the stand-in's recipe for %s\n" % name)
+    return path
 
 
 def source_add(args, words):
@@ -254,7 +295,7 @@ def storage(clear):
     earlier = [kept for each in items for kept in each.get("kept", [])]
     answer = {"schema_version": 1, "active_bytes": sum(each.get("size_bytes") or 0 for each in items),
               "earlier_generations": len(earlier), "earlier_bytes": sum(kept.get("size_bytes") or 0 for kept in earlier),
-              "profile": "/var/lib/recipe/profile"}
+              "profile": STORE_ROOT + "/profile"}
     if clear:
         answer.update(operation="clear-earlier", cleared_generations=answer["earlier_generations"],
                       cleared_bytes=answer["earlier_bytes"], earlier_generations=0, earlier_bytes=0)
@@ -302,8 +343,106 @@ def updates():
     return found
 
 
+# ---------------------------------------------------------------- the system route
+# `recipe --system ...` hands the change to recab, which puts it into the next
+# system. State: what the running system holds (`active`), what the next one will
+# (`prepared`, null until a change is made) and the changes made in it.
+
+def system_state():
+    if not os.path.exists(SYSTEM):
+        # Two programs the running system came with, at the versions it was built with.
+        write(SYSTEM, {"active": {"gimp": "3.0.4", "element": "1.12.3"}, "prepared": None, "changes": []})
+    return read(SYSTEM, None)
+
+
+def receipt(packages):
+    """The selection as recipe's `system::Receipt` has it (tools/recipe/src/system.rs)."""
+    return {"schema_version": 1, "packages": {
+        name: {"name": name, "version": version, "recipe": "/usr/share/recipe/recipes/%s.rhai" % name,
+               "recipe_digest": "sha256:" + "0" * 64, "architecture": "x86_64", "target": "linux",
+               "dependencies": [], "files": {}}
+        for name, version in sorted(packages.items())}}
+
+
+def system_view():
+    """What `recab change list` answers (tools/recab/src/change.rs `changes()`): the running
+    system's selection, the next system's only for a reader that may read it (root), the next
+    system's state with its changes, and a fixed sentence."""
+    state = system_state()
+    preparation = None
+    if state["changes"]:
+        preparation = {"id": "p2", "slot": "B", "source_slot": "A", "source_generation": "g1",
+                       "revision": 1 + len(state["changes"]), "operation": "synchronize", "phase": "prepared",
+                       "completed_steps": 3, "failure": None, "synchronized": True, "synchronization": None,
+                       "finalization": None, "change": None, "last_change": None, "changes": state["changes"]}
+    prepared = receipt(state["prepared"]) if state["prepared"] is not None and PREPARED_VISIBLE else None
+    return {"active": receipt(state["active"]), "prepared": prepared, "preparation": preparation,
+            "activation": "pending reboot for prepared changes"}
+
+
+def recab_record(action, name):
+    """The change is made in recab too when the story names one, so the strip can be read."""
+    binary = os.environ.get("RECIPE_RECAB_BIN")
+    if not binary:
+        return
+
+    def run(*args):
+        done = subprocess.run([binary, *args], capture_output=True, text=True)
+        if done.returncode:
+            fail("recab: " + (done.stderr.strip() or "failed"))
+        return done.stdout
+
+    preparation = json.loads(run("status", "--json")).get("preparation")
+    if not preparation:
+        run("--json", "prepare")
+        preparation = json.loads(run("status", "--json"))["preparation"]
+    run("--json", "change", action, name, "--preparation", preparation["id"], "--revision", str(preparation["revision"]))
+
+
+def system_change(action, name):
+    state = system_state()
+    held = state["prepared"] if state["prepared"] is not None else state["active"]
+    if action in ("update", "remove") and name not in held:
+        fail("package is not selected in that system")
+    if action == "install" and name in held:
+        fail("%s is already selected in the next system" % name)
+    if action != "remove":
+        item = recipe(name)
+        order = [recipe(dep) for dep in item["build_deps"]] + [item]
+        emit(event="plan", recipes=[{"name": each["name"], "steps": steps_of(each)} for each in order])
+        for each in order:
+            play(each)
+    pause(0.4)
+    recab_record(action, name)
+    prepared = dict(held)
+    if action == "remove":
+        del prepared[name]
+    else:
+        prepared[name] = item["version"]
+    state["prepared"] = prepared
+    state["changes"].append({"id": "c%d" % (len(state["changes"]) + 2), "action": action, "package": name,
+                             "unix_time": int(time.time()), "actor": None})
+    write(SYSTEM, state)
+    emit(event="done", recipe=name)
+
+
+def log(args, route):
+    """Each invocation's arguments, for a check that the window asked the right thing."""
+    path = os.environ.get("RECIPE_STANDIN_LOG") or os.path.join(STATE_DIR, "invocations.log")
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "a") as out:
+        out.write(json.dumps({"route": route, "args": args}) + "\n")
+
+
 def main(args):
-    # The front end names the collection and the store; the stand-in has one of each.
+    # The real recipe tells the places apart by `--system`, and by whether a store is
+    # named: without one it is the person's own.
+    global STATE
+    system = "--system" in args
+    root = args[args.index("--package-root") + 1] if "--package-root" in args else None
+    log(args, "system" if system else "me" if root is None else "store")
+    if root is None and not system:
+        STATE = ME
     words, skip = [], False
     for arg in args:
         if skip:
@@ -317,6 +456,14 @@ def main(args):
     command = words[0] if words else ""
     if command in ("install", "update", "remove", "go-back") and len(words) == 2:
         words[1] = words[1].split(":", 1)[-1]  # SOURCE:NAME; the stand-in's names are unique
+    if system:
+        if command == "installed":
+            print(json.dumps(system_view()))
+        elif command in ("install", "update", "remove") and len(words) == 2:
+            system_change(command, words[1])
+        else:
+            fail("--system supports install, update, remove, installed and isinstalled")
+        return
     if command == "list":
         print(json.dumps({"schema_version": 1, "sources": listed_sources(), "recipes": recipes(), "problems": []}))
     elif command == "refresh":
@@ -327,7 +474,7 @@ def main(args):
         source_remove(words[2])
     elif command == "installed":
         # The shape `recipe installed` has today, plus the fields the front end asks for.
-        print(json.dumps({"packages": installed(), "profile": "/var/lib/recipe/profile"}))
+        print(json.dumps({"packages": installed(), "profile": STORE_ROOT + "/profile"}))
     elif command == "updates":
         print(json.dumps({"schema_version": 1, "updates": updates(), "problems": []}))
     elif command == "storage":

@@ -40,7 +40,9 @@ public:
     QStringList listed() const { return listed_; }
 signals:
     void openRecipe(const QString &name);
+    // Install asks where; update acts where the software is.
     void install(const QString &name);
+    void update(const QString &name, Place place);
     void retry();
     // Ask the agent to write a recipe for this.
     void askFor(const QString &what);
@@ -60,15 +62,16 @@ public:
 signals:
     void back();
     void install(const QString &name);
-    void remove(const QString &name);
-    void open(const QString &name);
+    void update(const QString &name, Place place);
+    void remove(const QString &name, Place place);
+    void open(const QString &name, Place place);
 };
 
 class RunPage : public Page {
     Q_OBJECT
 public:
     using Page::Page;
-    void begin(const Catalog &catalog, const QString &name, Run *run);
+    void begin(const Catalog &catalog, const QString &name, Run *run, Place place = Place::Computer);
 signals:
     void back();
     void retry(const QString &name);
@@ -103,26 +106,27 @@ class InstalledPage : public Page {
     Q_OBJECT
 public:
     using Page::Page;
-    void show(const Catalog &catalog, const QString &selected);
+    // `selectedPlace`: which place's row when a name is in two; -1 for the first.
+    void show(const Catalog &catalog, const QString &selected, int selectedPlace = -1);
 signals:
-    void open(const QString &name);
-    void goBack(const QString &name);
-    // Delete every earlier version Recipe keeps.
-    void clearEarlier();
-    void remove(const QString &name);
-    void update(const QString &name);
-    void selected(const QString &name);
+    void open(const QString &name, Place place);
+    void goBack(const QString &name, Place place);
+    // Delete every earlier version the store of that place keeps.
+    void clearEarlier(Place place);
+    void remove(const QString &name, Place place);
+    void update(const QString &name, Place place);
+    void selected(const QString &name, Place place);
 };
 
 class UpdatesPage : public Page {
     Q_OBJECT
 public:
     using Page::Page;
-    void show(const Catalog &catalog, const QString &selected);
+    void show(const Catalog &catalog, const QString &selected, int selectedPlace = -1);
 signals:
-    void update(const QString &name);
+    void update(const QString &name, Place place);
     void updateAll();
-    void selected(const QString &name);
+    void selected(const QString &name, Place place);
     // Fetch every source's list again, to see whether anything is newer.
     void check();
 };

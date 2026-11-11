@@ -17,6 +17,7 @@ only: no stylesheet.
 | `activity.*` | the Activity page, owned by the frame |
 | `settings.*` | the Settings page, owned by the frame, and `rememberWindowSize` |
 | `nextsystem.*` | `NextSystem`: reads `recab status --json` for the strip |
+| `before.*` | `BeforePage`: what will happen, shown before anything starts (below) |
 
 ## The frame
 
@@ -116,6 +117,52 @@ connect(refresher_, &Refresher::asked, frame_, &Frame::readAgain);
 Titles of runs should be what the person asked, in a short line: Activity lists
 a run under it. Pass `app` as the name Activity shows ("Recipe", "System",
 "Disk").
+
+## Before
+
+`BeforePage` is the page an app shows before it starts something that changes
+the computer. It says nothing about recipes, disks or systems: the app puts the
+words in. From the top: the title as a question, the line "Nothing has started.
+This is what will happen if you go on.", then the sections that were filled
+(left empty, a section is not shown), then the foot with "Cancel" and one named
+button. It is a `Page`: add it to your stack and give it content when you need it.
+
+```cpp
+before_ = new BeforePage;                       // once, into the stack
+BeforePage::Content c;
+c.title = tr("Install Krita?");
+c.whereTitle = tr("Where it goes");             // a choice between places: two or more are
+c.choices = {{"pc", tr("For this computer"), tr("Into the next system."), tr("Asks for the password.")},
+             {"me", tr("For me"), tr("Into your own folder."), tr("No password.")}};
+c.chosen = "pc";                                // ...one is a statement, none is no section
+c.happensTitle = tr("What happens");            // plain sentences, one line each
+c.happens = {tr("Krita 5.3.1 is fetched and built.")};
+c.tableTitle = tr("What it may use");           // two columns, then a line under them
+c.table = {{tr("Network"), tr("download.kde.org")}, {tr("Memory"), tr("up to 4 GiB")}};
+c.tableNote = tr("Anything else is refused.");
+c.foot = tr("From the main source."); c.linkWords = tr("Read the recipe");   // link only with words
+c.go = tr("Install");
+before_->show(c);                               // draws it; call again to draw it anew
+stack_->setCurrentWidget(before_);
+
+connect(before_, &BeforePage::cancelled, ...);          // Cancel, and Escape
+connect(before_, &BeforePage::confirmed, this, [](const QString &choice) { /* start it */ });
+connect(before_, &BeforePage::choiceChanged, this, [](const QString &choice) { /* show(...) again if the words depend on it */ });
+connect(before_, &BeforePage::linkClicked, ...);
+```
+
+- Picking a card draws the page again with the new choice at once and emits
+  `choiceChanged(key)`; an app whose sentences depend on the choice answers with
+  `show()` of new content (the scroll position stays).
+- `confirmed(key)` carries the key picked (the only choice's key when there is
+  one, empty when there are none).
+- The sections scroll; Cancel and the button do not. The cards use the
+  palette's highlight for the one picked; nothing else is coloured.
+- For a check: `pageText()` (every label and button of the current page),
+  `choiceNames()`, `chosen()`, `choose(key)`. A page drawn just now is shown
+  once the event loop has run, so a check settles before clicking its button.
+- The Recipe app is the first user (`gui/recipe/src/beforewords.*` has its
+  words); System and Disk list `before.cpp` in their `CMakeLists.txt` to use it.
 
 ## Activity
 

@@ -68,8 +68,14 @@ Needs the Qt 6 base and SVG development files (`qt6-qtbase-devel`,
   empty runs them directly, for the stand-in).
 - `RECIPE_GUI_RECIPES_PATH`: the collection to list and install from
   (default: `recipe`'s own choice).
-- `RECIPE_GUI_PACKAGE_ROOT`: the store to show and change (default:
-  `/var/lib/recipe`, the system's software, which root owns).
+- `RECIPE_GUI_PACKAGE_ROOT`: when set (even to nothing), one explicit store and
+  nothing else: one place, no choice (see "The two places"). The stories and the
+  real-recipe check below use it. Unset: the two places.
+- `RECIPE_GUI_SYSTEM_ROOT`: the computer's store when the computer is not locked
+  (default `/var/lib/recipe`). It exists for checks, which cannot write there.
+- `RECIPE_GUI_CMDLINE`: the file read to tell whether the computer is locked
+  (default `/proc/cmdline`); locked means `recab.immutable` is one of its words.
+  For checks.
 - `--look levitate|acorn`: a stand-in look for each desktop, for a machine
   that is neither.
 - `--shots FOLDER`: walk the pages, save a picture of each, quit. With
@@ -77,7 +83,8 @@ Needs the Qt 6 base and SVG development files (`qt6-qtbase-devel`,
 
 ```sh
 QT_QPA_PLATFORM=offscreen RECIPE_GUI_RECIPE=$PWD/gui/recipe/fixtures/recipe \
-  RECIPE_GUI_ROOT_HELPER= RECIPE_STANDIN_STATE=/tmp/recipe-shots-state \
+  RECIPE_GUI_ROOT_HELPER= RECIPE_GUI_PACKAGE_ROOT=/tmp/recipe-shots-store \
+  RECIPE_STANDIN_STATE=/tmp/recipe-shots-state \
   .artifacts/recipe-gui/build/recipe-gui --look acorn --shots /tmp/recipe-shots
 ```
 
@@ -91,6 +98,7 @@ stand-ins: the default agent starts Codex.
 F=$PWD/gui/recipe/fixtures
 QT_QPA_PLATFORM=offscreen HOME=/tmp/recipe-shots-home \
   RECIPE_GUI_RECIPE=$F/recipe RECIPE_GUI_AGENT=$F/agent RECIPE_GUI_ROOT_HELPER= \
+  RECIPE_GUI_PACKAGE_ROOT=/tmp/recipe-shots-store \
   RECIPE_STANDIN_STATE=/tmp/recipe-shots-state RECIPE_STANDIN_SPEED=0 \
   RECIPE_GUI_RECAB=$PWD/gui/recab/fixtures/recab-real RECAB_STANDIN_STATE=/tmp/recipe-shots-recab \
   RECAB_STANDIN_SPEED=0 RECIPE_GUI_RECORDS=$PWD/gui/agent/fixtures/records \
@@ -100,14 +108,33 @@ QT_QPA_PLATFORM=offscreen HOME=/tmp/recipe-shots-home \
 
 Delete both state folders first (`/tmp/recipe-shots-state`,
 `/tmp/recipe-shots-recab`): the story expects no next system at the start, then
-makes one with one `prepare` and one `change`. Pictures: `1-…` to `14-…` are the
-flows; `f1`–`f4` Browse (also with a search and a kind), Installed, Updates and
+makes one with one `prepare` and one `change`. The story needs
+`RECIPE_GUI_PACKAGE_ROOT` (its first window is on one explicit store, so the
+Before page has no choice) and says so when it is missing. Pictures: `1-…` to
+`14-…` are the flows (`2b-before-install`, `4b-before-update` are the Before
+step); `f1`–`f4` Browse (also with a search and a kind), Installed, Updates and
 Sources in the frame; `s1`–`s3` the strip and a window with no recab; `a-*`
-Activity.
+Activity; `p1`–`p6` the two places (below).
 
-The stand-in keeps what is "installed" in a state file
-(`RECIPE_STANDIN_STATE`, see the top of `fixtures/recipe`); delete it to start
-over. The stand-in agent writes the app name and title it was given to
+The last part of the story opens two more windows of its own, with a scratch
+command line, scratch stand-in state and a scratch system store under
+`FOLDER/places`: a locked computer (`recab.immutable`) and one that is not.
+The stand-in logs the arguments of every `recipe` it is run with
+(`RECIPE_STANDIN_LOG`, default `invocations.log` in its state folder), and the
+story checks the exact arguments of every change, which route the stand-in
+told apart (`system`, `store` or `me`), and that "for me" never reaches the
+root helper (`fixtures/helper-log` notes what it is given and runs it). The
+locked window is run with `RECIPE_STANDIN_PREPARED=1`, which makes the stand-in
+answer `prepared` as it does to root, and with `RECIPE_RECAB_BIN` set, so that
+`--system` changes are also made in the recab stand-in and the strip can be
+read.
+
+The stand-in keeps what is "installed" in state files
+(`RECIPE_STANDIN_STATE`, see the top of `fixtures/recipe`): `installed.json` for
+an explicit `--package-root`, `installed-me.json` for no `--package-root` (the
+person's own store, which starts with `tree` 2.3.1), and `system.json` for
+`--system` (what the running system holds and what the next one will); delete
+the folder to start over. The stand-in agent writes the app name and title it was given to
 `last-prompt.json` there, which the story reads.
 
 Against the real `recipe` from the checkout, into a test store, with the
@@ -135,6 +162,8 @@ QT_QPA_PLATFORM=offscreen RECIPE_GUI_RECIPE=$PWD/target/debug/recipe \
 | `src/client.*` | the only code that runs `recipe`; a `Run` reports one change as events |
 | `../kit/` | shared with `gui/recab` and `gui/disk`: small widgets (step mark, letter tile, panels, the prompt handed to an agent), the page base, the work page, the command runner, sizes and counts as words, the stand-in looks |
 | `../kit/frame.*`, `activity.*`, `nextsystem.*` | the window frame, the Activity page it owns, and the strip's reader |
+| `../kit/before.*` | the Before page: a question, "Nothing has started...", sections the app fills, Cancel and one button |
+| `src/beforewords.*` | the words for it, from what `recipe` reported |
 | `src/pages.*` | Browse (with its search and boxes), a recipe's page, a run, Installed, Updates, the remove question |
 | `src/sources.*` | the Sources page, and asking the agent for a recipe |
 | `src/window.*` | the frame, its rail and status, and the flows between pages |
@@ -144,7 +173,7 @@ QT_QPA_PLATFORM=offscreen RECIPE_GUI_RECIPE=$PWD/target/debug/recipe \
 
 ## What the front end asks of `recipe`
 
-Reads, as the desktop user, JSON on stdout with `"schema_version": 1`:
+Reads, as the desktop user, JSON on stdout with `"schema_version": 1` (the same commands without `--package-root` read the person's own store; `recipe --system installed --json` reads a locked computer, in recab's own shape, see "The two places"):
 
 | Command | Answer | In `recipe` today |
 |---|---|---|
@@ -153,7 +182,7 @@ Reads, as the desktop user, JSON on stdout with `"schema_version": 1`:
 | `recipe updates --json` | `updates`: for each installed recipe that `recipe update` would change: `name`, `source`, `from`, `to`, `reason` (`version`, or `recipe` when the source publishes another recipe file for the same version) and `changes`; `problems`: installed software it could not look up | exists. `changes` lists every field of NEEDS that differs from what was recorded at install (`field`, `before`, `after`, `kind`: `added`, `removed`, `raised`, `lowered`, `changed`), and is `null` for a receipt that recorded nothing; the page then says the two cannot be compared |
 | `recipe storage --json` | `active_bytes`, `earlier_generations`, `earlier_bytes` | exists. Shown on the Installed page |
 
-Changes, through the root helper, with events on stderr:
+Changes, through the root helper (as the person for software "for me"; with `--system` first and no `--package-root` for a locked computer; see "The two places"), with events on stderr:
 
 | Command | In `recipe` today |
 |---|---|
@@ -187,6 +216,92 @@ the real `recipe` (the others need a Ginux run).
 Without a `plan`, the front end adds a row of three steps for each recipe as
 its first step arrives.
 
+## The two places
+
+Software goes to one of two places, and the window says which, in words, on
+the Before page, on every row of Installed and Updates, and on the recipe's page.
+
+| Place | Where | What `recipe` is run with |
+|---|---|---|
+| For me | the person's own store (`~/.local/share/recipe`); in effect at once, for them only | no `--package-root`, no root helper: `recipe install NAME`, `update`, `remove`, `go-back`, `storage`, as the person |
+| For this computer, not locked | the system's store (`/var/lib/recipe`, or `RECIPE_GUI_SYSTEM_ROOT`); in effect at once, for everyone | through the root helper: `recipe install NAME --package-root /var/lib/recipe` (and the same for the others) |
+| For this computer, locked | the next system; in effect after a restart, for everyone; the running system is not touched | through the root helper: `recipe --system install\|update\|remove NAME`, which `recipe` hands to `recab change`. What is installed: `recipe --system installed --json`, as the person |
+| In the next system, after a restart | software only the next system holds | shown only when the answer carries it (below); removed with `recipe --system remove NAME` |
+| One explicit store (`RECIPE_GUI_PACKAGE_ROOT`) | that store; the only place, so no column, no choice | as before: the root helper with `--package-root` that store |
+
+The tells, from `tools/recipe` and `tools/recab` (what the window relies on, with
+the lines where each is decided):
+
+- `commands.rs` `system_route()` (line 1381): the system route is taken when
+  `--system` is given, or when root runs `install|update|remove|installed|isinstalled`
+  with no `--package-root` on a kernel whose command line has the word
+  `recab.immutable` (lines 1390-1399). Giving `--package-root` turns the second
+  condition off, which is why the window used to install around the lock; now
+  it names no store for the person's own software and none on a locked computer.
+- `metadata.rs` `default_package_root()` (line 71): root's store is
+  `/var/lib/recipe`, a person's is `~/.local/share/recipe`.
+- `recipe --system installed --json` is `recab change list`, which prints
+  `recab::changes()` (`recab/src/main.rs` line 543, `recab/src/change.rs` lines
+  628-647): `{"active": Receipt, "prepared": Receipt or null, "preparation":
+  Preparation or null, "activation": "pending reboot for prepared changes"}`.
+  `Receipt` is `{schema_version, packages: {name: Package}}` and `Package` is
+  `{name, version, recipe, recipe_digest, architecture, target, dependencies,
+  files}` (`recipe/src/system.rs` lines 15-30). `prepared` is null unless root
+  reads it (and no change is in progress; `change.rs` line 632); `preparation`
+  (`recab/src/state.rs` lines 140-165) is not hidden, and its `changes` is
+  `[{id, action, package, unix_time, actor}]` (`state.rs` lines 127-137).
+
+What the window shows from it: the running system's packages by name and
+version ("For this computer"); the next system's packages when `prepared` is
+there ("In the next system, after a restart" for what only it holds, "goes in
+the next system" on a running row it no longer holds); and, from `preparation.changes`,
+which package has an install or update waiting, so that the recipe page and the
+Browse row say "after a restart" instead of offering to install it again. Read
+as the person, `prepared` is null: the strip says the next system holds N
+changes, but the rows of what it holds appear only for a reader that may read
+`prepared`.
+
+For software in the running system of a locked computer the window shows only
+what recab answers: no size, no date, no earlier versions, no programs and so no
+"Open", no "Go back", nothing to clear (no store stands behind it). It offers
+"Update" when the collection's recipe has another version (the Updates page
+lists it as "Not compared": `recipe updates` cannot look at a locked system,
+and what the installed version was allowed to use is not recorded), and "Remove".
+Nothing in `recab` says that an update exists, so that comes from `recipe list`.
+
+## Before it happens
+
+An install or an update does not start at once: the window shows the shared
+Before page (`../kit/before.*`, words in `src/beforewords.*`), from the recipe's
+page, the Browse list, Installed and Updates ("Update all" asks about each
+update in turn). Its button ("Install", "Update") starts the run as before;
+"Cancel" and Escape come back to the page the person was on, and nothing was run.
+"Try again" and "Let the agent fix it" start at once: they repeat what was
+agreed to.
+
+- **Where it goes**: for an install, the places that do not hold the software
+  yet, "For this computer" first and picked, with two true lines each. Update
+  acts where the software is, so it is only the statement ("Where it is").
+  One explicit store, or a place that is already taken, leaves nothing to choose.
+- **What happens**: only what the catalog says. Which version of what; that it
+  is fetched from the hosts of the recipe's declared network endpoints (not
+  from `SOURCES`) and built, inside the sandbox; the recipes it needs (`deps`,
+  `build_deps`) that are not installed in that place yet, with the ones only
+  the build needs said apart; on a locked computer, "The running system is not
+  touched."; for an update, from which version to which.
+- **What the recipe may use**: network, the most it may download, memory, disk
+  while it builds, time, and "The sandbox refuses anything else." For an update
+  what `recipe updates` reported as changed, as the Updates page shows it, and
+  where nothing can be compared, the recipe's limits now with the reason.
+- **Foot**: which source the recipe is from, and "Read the recipe", which opens
+  its file with the desktop's default program when `list --json` gives a `path`.
+
+The page does not say how much is downloaded or how much disk is used:
+`recipe` reports neither before it has run. (`network_max_bytes` is a limit,
+and is called "Most it may download".) Nor does it say that the running system
+can be put back before the restart, which the design had: recab says nothing
+of it to the window.
+
 ## Reading and reading again
 
 The catalog is read as three commands in a row (`list`, `installed`,
@@ -197,9 +312,13 @@ after every change, on "Read again" in the status line, on F5 or Ctrl+R, and
 when the person comes back to the window after 20 seconds or more. That reads
 what is on this computer; it fetches nothing. Fetching the sources' lists is
 "Check for updates" on the Updates page and "Fetch again" on the Sources page.
-A catalog is four commands now: `list`, `installed`, `updates`, `storage`. When
-`updates` fails the catalog is not shown and the page says why; when `storage`
-fails only the sizes are missing.
+A catalog is four commands now: `list`, `installed`, `updates`, `storage`, once
+for each place that has a store (for me; for this computer when it is not
+locked), and `--system installed --json` for a locked computer. `list` is asked
+of the computer's store (its sources). When `updates` fails the catalog is not
+shown and the page says why; when `storage` fails only the sizes are missing;
+when the locked computer's own list cannot be read, the person's software is
+shown and Installed says so.
 
 ## Sources
 
@@ -257,9 +376,24 @@ there is no step yet where the person approves the change before it is used.
 
 ## Not done
 
-- Not in the frame: the "For this computer / For me" choice, the licence and
-  sort boxes of the design (nothing behind them), the Storage and Help
-  pages. The Installed page does not show its count in the rail any more.
+- Not in the frame: the licence and sort boxes of the design (nothing behind
+  them), the Storage and Help pages. The Installed page does not show its count
+  in the rail any more.
+- The two places and the Before step ran against the stand-in only, never a
+  real `recipe` install, a real `recab` or a real root helper. A real
+  `--system` run's events (and whether `--machine-events` passes through
+  `recab change` as `plan`, `fetch` and `done`) are unknown; the run page
+  plays what arrives.
+- Before: no download size or disk use (`recipe` does not report them); no
+  "you can take it out again before the restart" (recab does not say it);
+  Remove still asks in its own small window, not on the Before page; Go back
+  and Clear earlier versions act without it.
+- On a locked computer: rows for the next system only when the reader may read
+  `prepared` (root); no earlier versions, storage, sizes, dates or Open for the
+  running system's software; nothing tells that an update exists but the
+  collection's version; "Update" is not offered for software only the next
+  system holds.
+- Not read: `recipe isinstalled` (the window never asks it).
 - The frame's checks were run offscreen against stand-ins; not on a real desktop.
 
 - A real agent for "Ask for software": Codex and Claude Code do not speak the

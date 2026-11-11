@@ -2,6 +2,7 @@
 
 #include "activity.h"
 #include "settings.h"
+#include "before.h"
 #include "frame.h"
 #include "look.h"
 #include "nextsystem.h"
@@ -17,15 +18,21 @@
 #include <QEventLoop>
 #include <QFile>
 #include <QFileInfo>
+#include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QLabel>
 #include <QLineEdit>
+#include <QMap>
 #include <QProcess>
 #include <QPushButton>
 #include <QPalette>
 #include <QStyleFactory>
 #include <QTextStream>
 #include <QTimer>
+#include <QTreeWidget>
+
+#include <optional>
 
 static void waitUntilIdle(Window &window, int seconds = 10)
 {
@@ -57,6 +64,98 @@ void clickButton(QWidget *inside, const QString &words)
         if (button->text() == words && button->isVisible())
             button->click();
 }
+
+// The Before step: press its one button ("Install", "Update"), as a click would.
+void goOn(Window &window, const QString &button)
+{
+    settle(100); // a page drawn just now is shown once the event loop has run
+    clickButton(window.beforePage(), button);
+}
+
+// What `recipe` was asked to change, each as the arguments it got, from the
+// stand-in's log (RECIPE_STANDIN_LOG, else invocations.log in its state
+// folder). Reads (list, installed, updates, storage) are left out.
+struct Asked {
+    QString route; // "system", "store" or "me", as the stand-in told them apart
+    QStringList arguments;
+};
+
+QList<Asked> changesAsked()
+{
+    QString path = qEnvironmentVariable("RECIPE_STANDIN_LOG");
+    if (path.isEmpty())
+        path = QDir(qEnvironmentVariable("RECIPE_STANDIN_STATE")).filePath("invocations.log");
+    QFile file(path);
+    QList<Asked> found;
+    if (!file.open(QIODevice::ReadOnly))
+        return found;
+    for (const QByteArray &line : file.readAll().split('\n')) {
+        const QJsonObject object = QJsonDocument::fromJson(line).object();
+        Asked asked{object["route"].toString(), {}};
+        for (const QJsonValue &argument : object["args"].toArray())
+            asked.arguments << argument.toString();
+        for (const QString &argument : asked.arguments) {
+            if (argument.startsWith("--"))
+                continue;
+            if (argument == "install" || argument == "update" || argument == "remove" || argument == "go-back")
+                found << asked;
+            break;
+        }
+    }
+    return found;
+}
+
+// Everything a person can read in a window now: labels, buttons and the rows of lists.
+QString wordsOn(QWidget &window)
+{
+    QStringList words;
+    for (const QLabel *label : window.findChildren<QLabel *>())
+        if (label->isVisible())
+            words << label->text();
+    for (const QAbstractButton *button : window.findChildren<QAbstractButton *>())
+        if (button->isVisible())
+            words << button->text();
+    for (const QTreeWidget *tree : window.findChildren<QTreeWidget *>()) {
+        if (!tree->isVisible())
+            continue;
+        for (int row = 0; row < tree->topLevelItemCount(); ++row)
+            for (int column = 0; column < tree->columnCount(); ++column)
+                if (!tree->isColumnHidden(column))
+                    words << tree->topLevelItem(row)->text(column);
+    }
+    return words.join(QLatin1Char('\n'));
+}
+
+// Environment a pass changes and puts back afterwards.
+class Environment {
+public:
+    void set(const char *name, const QString &value)
+    {
+        keep(name);
+        qputenv(name, value.toUtf8());
+    }
+    void unset(const char *name)
+    {
+        keep(name);
+        qunsetenv(name);
+    }
+    ~Environment()
+    {
+        for (auto it = was_.begin(); it != was_.end(); ++it) {
+            if (!it.value())
+                qunsetenv(it.key().constData());
+            else
+                qputenv(it.key().constData(), *it.value());
+        }
+    }
+private:
+    void keep(const char *name)
+    {
+        if (!was_.contains(name))
+            was_.insert(name, qEnvironmentVariableIsSet(name) ? std::optional<QByteArray>(qgetenv(name)) : std::nullopt);
+    }
+    QMap<QByteArray, std::optional<QByteArray>> was_;
+};
 
 // What the window is as a frame: the rail, the pages in it and what the
 // Browse page's search and kinds still do. Pictures `f*`.
@@ -338,6 +437,256 @@ void stripShots(Window &window, const QString &folder, const Save &save, const E
     qputenv("RECIPE_GUI_RECAB", recab.toUtf8());
 }
 
+
+// The two places software can go, in two windows of their own: a locked
+// computer (`recab.immutable` on a scratch command line), where "for this
+// computer" is the next system, and a computer that is not locked, where it is
+// the system's store (a scratch folder). Each has its own stand-in state, and
+// the stand-in logs every command's arguments, which are checked here.
+void placesShots(const QString &folder, const Save &save, const Expect &expect)
+{
+    const QString recab = qEnvironmentVariable("RECIPE_GUI_RECAB");
+    const QString recipe = qEnvironmentVariable("RECIPE_GUI_RECIPE");
+    if (recab.isEmpty() || recipe.isEmpty()) {
+        expect(QStringLiteral("the two places need RECIPE_GUI_RECAB and RECIPE_GUI_RECIPE, see README.md"), false);
+        return;
+    }
+    const QString scratch = QDir(folder).filePath("places");
+    QDir(scratch).removeRecursively();
+    QDir().mkpath(scratch);
+    auto write = [](const QString &path, const QByteArray &bytes) {
+        QFile file(path);
+        return file.open(QIODevice::WriteOnly) && file.write(bytes) >= 0;
+    };
+    write(scratch + "/locked-cmdline", "BOOT_IMAGE=/vmlinuz root=/dev/vda1 ro recab.immutable quiet\n");
+    write(scratch + "/open-cmdline", "BOOT_IMAGE=/vmlinuz root=/dev/vda1 ro quiet\n");
+    auto kinds = [](const QStringList &arguments, const QStringList &want) { return arguments == want; };
+    auto asked = [](qsizetype from) { return changesAsked().mid(from); };
+
+    // ---- A locked computer.
+    {
+        Environment env;
+        env.unset("RECIPE_GUI_PACKAGE_ROOT");
+        env.set("RECIPE_GUI_CMDLINE", scratch + "/locked-cmdline");
+        env.set("RECIPE_STANDIN_STATE", scratch + "/locked-state");
+        env.unset("RECIPE_STANDIN_LOG");
+        env.unset("RECIPE_GUI_SYSTEM_ROOT");
+        // The stand-in answers `prepared` as it does to root, so the next system's list can be shown.
+        env.set("RECIPE_STANDIN_PREPARED", "1");
+        env.set("RECIPE_RECAB_BIN", recab);
+        env.set("RECAB_STANDIN_STATE", scratch + "/locked-recab");
+        // A helper that notes what it was given and runs it: only changes for the computer go through it.
+        env.set("RECIPE_GUI_ROOT_HELPER", QFileInfo(recipe).absolutePath() + "/helper-log");
+        env.set("HELPER_LOG", scratch + "/locked-helper.log");
+
+        Window window;
+        window.resize(1100, 700);
+        window.show();
+        waitUntilIdle(window, 30);
+        const Catalog &catalog = window.catalog();
+        const Places places = window.places();
+        expect(QStringLiteral("a locked computer is told from its command line"), places.locked && !places.one && catalog.twoPlaces);
+        expect(QStringLiteral("it holds the person's own software and the running system's, which says only name and version"),
+               catalog.installedItem("tree", Place::Me) && catalog.installedItem("gimp", Place::Computer)
+                   && !catalog.installedItem("gimp", Place::Computer)->inStore
+                   && catalog.installedItem("gimp", Place::Computer)->version == "3.0.4"
+                   && !catalog.installedItem("gimp", Place::Computer)->sizeBytes
+                   && catalog.installedItem("gimp", Place::Computer)->kept.isEmpty());
+        expect(QStringLiteral("updates: the person's store by `recipe updates`, the system's from the collection's versions"),
+               catalog.update("tree", Place::Me) && !catalog.update("tree", Place::Me)->fromCollection
+                   && catalog.update("gimp", Place::Computer) && catalog.update("gimp", Place::Computer)->fromCollection);
+        expect(QStringLiteral("only the person's store has storage figures"),
+               catalog.stores[int(Place::Me)].has && !catalog.stores[int(Place::Computer)].has);
+        qsizetype before = changesAsked().size();
+
+        // Install: where it goes, with the sentences for the place picked.
+        window.showBrowse();
+        window.askInstall("htop");
+        BeforePage *page = window.beforePage();
+        expect(QStringLiteral("Before: a question, and nothing has started (%1)").arg(page->pageText().left(60)),
+               page->isVisible() && page->pageText().contains("Install htop for this computer?")
+                   && page->pageText().contains("Nothing has started. This is what will happen if you go on."));
+        expect(QStringLiteral("it offers both places, the computer first and picked"),
+               page->choiceNames() == QStringList({"For this computer", "For me"}) && page->chosen() == placeKey(Place::Computer));
+        expect(QStringLiteral("for this computer on a locked one: into the next system, after a restart, for everyone"),
+               page->pageText().contains("Into the next system. It works after a restart, for everyone.")
+                   && page->pageText().contains("Asks for the administrator password.")
+                   && page->pageText().contains("The running system is not touched."));
+        expect(QStringLiteral("it says what the catalog says: where it is fetched from and the sandbox"),
+               page->pageText().contains("is fetched from") && page->pageText().contains("inside the sandbox")
+                   && page->pageText().contains("The sandbox refuses anything else."));
+        expect(QStringLiteral("it does not say how much is downloaded or used; recipe does not report that"),
+               !page->pageText().contains("is downloaded") && !page->pageText().contains("is used"));
+        expect(QStringLiteral("the foot names the source and offers the recipe"),
+               page->pageText().contains("From ") && page->pageText().contains("Read the recipe"));
+        save(window, "p1-before-install-choice");
+        page->choose(placeKey(Place::Me));
+        expect(QStringLiteral("choosing For me changes the sentences: your own folder, at once, and the system is not mentioned"),
+               page->chosen() == placeKey(Place::Me) && page->pageText().contains("Install htop for me?")
+                   && page->pageText().contains("Into your own folder. It works at once, for you only.")
+                   && !page->pageText().contains("The running system is not touched."));
+        save(window, "p2-before-install-for-me");
+        page->choose(placeKey(Place::Computer));
+        goOn(window, "Install");
+        waitUntilIdle(window, 30);
+        waitFor([&] { return window.frame()->stripShown(); });
+        QList<Asked> now = asked(before);
+        expect(QStringLiteral("for this computer, locked: `recipe --system install NAME` through the root helper"),
+               now.size() == 1 && now[0].route == "system"
+                   && kinds(now[0].arguments, {"--system", "install", "levitate:htop", "--machine-events"}));
+        expect(QStringLiteral("the root helper was given that command"),
+               QFile(scratch + "/locked-helper.log").exists());
+        expect(QStringLiteral("it shows as in the next system, after a restart, not in the running system"),
+               window.catalog().installedItem("htop", Place::Next) && !window.catalog().installedItem("htop", Place::Computer));
+        expect(QStringLiteral("the strip was read again after the change (%1)").arg(window.frame()->stripText()),
+               window.frame()->stripShown() && window.frame()->stripText() == QStringLiteral("The next system holds 1 change."));
+        before = changesAsked().size();
+
+        // For me: the person's own store, no root helper, no --system, no --package-root.
+        auto helperLines = [&] {
+            QFile helper(scratch + "/locked-helper.log");
+            return helper.open(QIODevice::ReadOnly) ? helper.readAll().count('\n') : 0;
+        };
+        const qsizetype helperBefore = helperLines();
+        window.askInstall("krita");
+        page->choose(placeKey(Place::Me));
+        goOn(window, "Install");
+        waitUntilIdle(window, 30);
+        now = asked(before);
+        const qsizetype helperAfter = helperLines();
+        expect(QStringLiteral("for me: `recipe install NAME` with no store named and no --system"),
+               now.size() == 1 && now[0].route == "me" && kinds(now[0].arguments, {"install", "levitate:krita", "--machine-events"}));
+        expect(QStringLiteral("for me goes through no root helper"), helperAfter == helperBefore);
+        expect(QStringLiteral("it is there at once, in the person's store"),
+               window.catalog().installedItem("krita", Place::Me) && window.catalog().installedItem("krita", Place::Me)->inStore);
+        before = changesAsked().size();
+
+        // Update where the software is: no choice, only the statement.
+        window.showUpdates("gimp", int(Place::Computer));
+        window.askUpdate("gimp", Place::Computer);
+        expect(QStringLiteral("an update has no choice, only the statement of where it is"),
+               page->choiceNames() == QStringList({"For this computer"}) && page->pageText().contains("Where it is")
+                   && page->pageText().contains("Update GIMP to 3.0.6?")
+                   && page->pageText().contains("GIMP goes from version 3.0.4 to 3.0.6."));
+        expect(QStringLiteral("what the system's version was allowed to use is not known, and the page says so"),
+               page->pageText().contains("is not known here, so the two cannot be compared"));
+        save(window, "p3-before-update-locked");
+        goOn(window, "Update");
+        waitUntilIdle(window, 30);
+        now = asked(before);
+        expect(QStringLiteral("updating system software: `recipe --system update NAME`"),
+               now.size() == 1 && now[0].route == "system"
+                   && kinds(now[0].arguments, {"--system", "update", "levitate:gimp", "--machine-events"}));
+        expect(QStringLiteral("the next system holds the new version beside the running one"),
+               window.catalog().installedItem("gimp", Place::Next) && window.catalog().installedItem("gimp", Place::Next)->version == "3.0.6"
+                   && window.catalog().installedItem("gimp", Place::Computer)->version == "3.0.4");
+        before = changesAsked().size();
+        // The recipe's page for software in the running system and the next one: buttons that say where.
+        window.showRecipe("gimp");
+        save(window, "p3b-recipe-two-places");
+
+        // The person's own update, with what `recipe updates` said changed in the recipe.
+        window.askUpdate("tree", Place::Me);
+        expect(QStringLiteral("an update for me names where and compares nothing it cannot: tree was recorded without needs"),
+               page->pageText().contains("Update tree to 2.3.2?") && page->pageText().contains("For me"));
+        goOn(window, "Update");
+        waitUntilIdle(window, 30);
+        now = asked(before);
+        expect(QStringLiteral("updating for me: `recipe update NAME`, nothing else"),
+               now.size() == 1 && now[0].route == "me" && kinds(now[0].arguments, {"update", "local:tree", "--machine-events"}));
+        before = changesAsked().size();
+
+        // What is installed, from both places; what a store cannot do is not offered for the system's.
+        window.showInstalled("gimp", int(Place::Computer));
+        settle(100);
+        QStringList buttons;
+        for (QPushButton *button : window.findChildren<QPushButton *>())
+            if (button->isVisible())
+                buttons << button->text();
+        expect(QStringLiteral("a running-system row offers Remove but not Go back (%1)").arg(buttons.join("|")),
+               buttons.contains("Remove…") && !buttons.filter("Go back").size());
+        expect(QStringLiteral("no store stands behind the system's software, so nothing to clear for it"),
+               !buttons.filter("Clear earlier versions, for this computer").size());
+        const QString installed = wordsOn(window);
+        for (const char *where : {"For me", "For this computer", "In the next system, after a restart"})
+            expect(QStringLiteral("Installed says %1").arg(where), installed.contains(QString::fromLatin1(where)));
+        expect(QStringLiteral("no page made the window wider than it was (%1)").arg(window.width()), window.width() == 1100);
+        save(window, "p4-installed-both-places");
+        window.showUpdates();
+        save(window, "p5-updates-both-places");
+        expect(QStringLiteral("what the next system holds already is not offered as an update again (%1)").arg(window.catalog().updates.size()),
+               !window.catalog().update("gimp", Place::Computer) && window.catalog().update("element", Place::Computer));
+        window.showBrowse();
+        settle(100);
+        expect(QStringLiteral("Browse says software that waits for the restart waits for it"), wordsOn(window).contains("After a restart"));
+        save(window, "p7-browse-both-places");
+
+        // Remove for me, and from the system.
+        window.removeNow("krita", Place::Me);
+        waitUntilIdle(window, 30);
+        now = asked(before);
+        expect(QStringLiteral("removing for me: `recipe remove NAME` and no store, no --system"),
+               now.size() == 1 && now[0].route == "me" && kinds(now[0].arguments, {"remove", "krita", "--machine-events"}));
+        before = changesAsked().size();
+        window.removeNow("element", Place::Computer);
+        waitUntilIdle(window, 30);
+        now = asked(before);
+        expect(QStringLiteral("removing system software: `recipe --system remove NAME`"),
+               now.size() == 1 && now[0].route == "system"
+                   && kinds(now[0].arguments, {"--system", "remove", "element", "--machine-events"}));
+        expect(QStringLiteral("the running system still holds it, and says it goes in the next system"),
+               window.catalog().installedItem("element", Place::Computer) && window.catalog().installedItem("element", Place::Computer)->leavesNext);
+    }
+
+    // ---- A computer that is not locked.
+    {
+        Environment env;
+        env.unset("RECIPE_GUI_PACKAGE_ROOT");
+        env.set("RECIPE_GUI_CMDLINE", scratch + "/open-cmdline");
+        env.set("RECIPE_STANDIN_STATE", scratch + "/open-state");
+        env.unset("RECIPE_STANDIN_LOG");
+        env.set("RECIPE_GUI_SYSTEM_ROOT", scratch + "/system-store");
+        env.unset("RECIPE_STANDIN_PREPARED");
+        env.set("RECIPE_GUI_ROOT_HELPER", QFileInfo(recipe).absolutePath() + "/helper-log");
+        env.set("HELPER_LOG", scratch + "/open-helper.log");
+        env.set("RECAB_STANDIN_STATE", scratch + "/open-recab");
+
+        Window window;
+        window.resize(1100, 700);
+        window.show();
+        waitUntilIdle(window, 30);
+        expect(QStringLiteral("a computer that is not locked holds the person's store and the system's store"),
+               !window.places().locked && window.catalog().twoPlaces && window.catalog().installedItem("gimp", Place::Computer)
+                   && window.catalog().installedItem("gimp", Place::Computer)->inStore
+                   && window.catalog().stores[int(Place::Computer)].has && window.catalog().installedItem("tree", Place::Me));
+        qsizetype before = changesAsked().size();
+        window.askInstall("htop");
+        BeforePage *page = window.beforePage();
+        expect(QStringLiteral("for this computer, not locked: into the system's folder, at once, for everyone, and no restart"),
+               page->pageText().contains("Into this computer's software folder, " + scratch + "/system-store. It works at once, for everyone.")
+                   && !page->pageText().contains("The running system is not touched.")
+                   && !page->pageText().contains("next system"));
+        goOn(window, "Install");
+        waitUntilIdle(window, 30);
+        QList<Asked> now = changesAsked().mid(before);
+        expect(QStringLiteral("not locked: `recipe install NAME --package-root` the system's store, through the helper"),
+               now.size() == 1 && now[0].route == "store"
+                   && kinds(now[0].arguments, {"install", "levitate:htop", "--machine-events", "--package-root", scratch + "/system-store"})
+                   && QFile(scratch + "/open-helper.log").exists());
+        expect(QStringLiteral("it is in effect at once for everyone: it shows as for this computer"),
+               window.catalog().installedItem("htop", Place::Computer) && !window.catalog().installedItem("htop", Place::Next));
+        expect(QStringLiteral("there is no next system to read: no strip"), !window.frame()->stripShown());
+        before = changesAsked().size();
+        window.goBack("gimp", Place::Computer);
+        waitUntilIdle(window, 30);
+        now = changesAsked().mid(before);
+        expect(QStringLiteral("going back, where a store stands behind it: through the helper with that store"),
+               now.size() == 1 && kinds(now[0].arguments, {"go-back", "gimp", "--machine-events", "--package-root", scratch + "/system-store"}));
+        window.showInstalled("htop", int(Place::Computer));
+        save(window, "p6-installed-not-locked");
+    }
+}
+
 } // namespace
 
 int tryRecipe(Window &window, const QString &name, const QString &folder, bool keep, bool readOnly)
@@ -354,6 +703,9 @@ int tryRecipe(Window &window, const QString &name, const QString &folder, bool k
     ok &= save(window, "real-1-browse");
     window.showRecipe(name);
     ok &= save(window, "real-2-recipe");
+    // The Before step reads nothing and starts nothing; it is shown in both modes.
+    window.askInstall(name);
+    ok &= save(window, "real-2b-before");
     if (readOnly) {
         window.showInstalled(name);
         ok &= save(window, "real-5-installed");
@@ -375,7 +727,7 @@ int tryRecipe(Window &window, const QString &name, const QString &folder, bool k
         return ok ? 0 : 1;
     }
 
-    window.startInstall(name);
+    goOn(window, QStringLiteral("Install"));
     settle(20000);
     if (window.busy())
         ok &= save(window, "real-3-running");
@@ -407,22 +759,86 @@ int takeShots(Window &window, const QString &folder)
     waitUntilIdle(window);
     ok &= !window.catalog().recipes.isEmpty();
 
+    QTextStream said(stdout);
+    // This window is on one explicit store (RECIPE_GUI_PACKAGE_ROOT): one place, no choice.
+    if (!window.places().one) {
+        said << "not as expected: this pass needs RECIPE_GUI_PACKAGE_ROOT, see README.md\n";
+        ok = false;
+    }
+
     window.showBrowse();
     ok &= save(window, "1-browse");
 
     window.showRecipe("htop");
     ok &= save(window, "2-recipe");
 
+    // Before an install: what will happen, with no choice because there is one place.
+    window.askInstall("htop");
+    {
+        BeforePage *page = window.beforePage();
+        auto hold = [&](const QString &what, bool holds) {
+            if (!holds) {
+                said << "not as expected: " << what << "\n";
+                said.flush();
+                ok = false;
+            }
+        };
+        hold("the Before page says nothing has started", page->isVisible()
+                 && page->pageText().contains("Nothing has started. This is what will happen if you go on."));
+        hold("one explicit store is one place, so no choice: a statement", page->choiceNames().size() == 1
+                 && !page->pageText().contains("For me") && page->pageText().contains("It is the only place this window changes."));
+        hold("it says what happens from the catalog: fetched from, built, in the sandbox, what it needs",
+             page->pageText().contains("htop 3.5.3 is fetched from github.com and release-assets.githubusercontent.com and built on this computer, inside the sandbox.")
+                 && page->pageText().contains("Needed only to build it: ncurses."));
+        hold("it lists what the recipe may use and that the sandbox refuses the rest",
+             page->pageText().contains("github.com (port 443), release-assets.githubusercontent.com (port 443). Nothing else.")
+                 && page->pageText().contains("Memory") && page->pageText().contains("Time")
+                 && page->pageText().contains("The sandbox refuses anything else."));
+        hold("it does not say how much is downloaded or how much disk is used: recipe does not report either",
+             !page->pageText().contains("is downloaded") && !page->pageText().contains("is used"));
+        hold("no running system to mention: this is not a locked computer", !page->pageText().contains("The running system is not touched."));
+        ok &= save(window, "2b-before-install");
+        // Cancel comes back to where the person was; nothing was run.
+        const qsizetype asked = changesAsked().size();
+        clickButton(page, "Cancel");
+        hold("Cancel starts nothing and comes back to the recipe", changesAsked().size() == asked && !page->isVisible()
+                 && window.frame()->selected() == "browse");
+    }
     qputenv("RECIPE_STANDIN_SPEED", "0");
     qputenv("RECIPE_STANDIN_STOP_AT", "htop:build");
-    window.startInstall("htop");
+    const qsizetype beforeInstall = changesAsked().size();
+    window.askInstall("htop");
+    goOn(window, QStringLiteral("Install"));
     settle(1500);
+    {
+        const QList<Asked> now = changesAsked().mid(beforeInstall);
+        QStringList want{"install", "levitate:htop", "--machine-events", "--package-root", qEnvironmentVariable("RECIPE_GUI_PACKAGE_ROOT")};
+        if (now.size() != 1 || now[0].arguments != want || now[0].route != "store") {
+            said << "not as expected: the install asked recipe for " << (now.isEmpty() ? QString() : now[0].arguments.join(' ')) << "\n";
+            said.flush();
+            ok = false;
+        }
+    }
     ok &= save(window, "3-installing");
     window.stopRun();
     waitUntilIdle(window);
 
     qunsetenv("RECIPE_STANDIN_STOP_AT");
-    window.startInstall("element");
+    // Before an update: where the software is, and what the newer recipe may use that the old one could not.
+    window.askUpdate("element", Place::Computer);
+    ok &= save(window, "4b-before-update");
+    {
+        BeforePage *page = window.beforePage();
+        const bool holds = page->pageText().contains("Update Element to 1.12.4?")
+                           && page->pageText().contains("Element goes from version 1.12.3 to 1.12.4.")
+                           && page->pageText().contains("New: static.element.io (port 443).")
+                           && page->pageText().contains("Download") && page->choiceNames().size() == 1;
+        if (!holds) {
+            said << "not as expected: the update's Before page names the version change and what the recipe may use now\n";
+            ok = false;
+        }
+    }
+    goOn(window, QStringLiteral("Update"));
     waitUntilIdle(window);
     ok &= save(window, "4-stopped");
 
@@ -445,6 +861,7 @@ int takeShots(Window &window, const QString &folder)
         auto hold = [&](const QString &what, bool holds) {
             if (!holds) {
                 said << "not as expected: " << what << "\n";
+                said.flush();
                 ok = false;
             }
         };
@@ -469,7 +886,7 @@ int takeShots(Window &window, const QString &folder)
         hold("going back again returns", window.catalog().installedItem("gimp")->version == now);
     }
 
-    window.startInstall("element", "The issue:\nThe update stopped.\n\nThe expected result:\nElement updates.\n");
+    window.startInstall("element", Place::Computer, "The issue:\nThe update stopped.\n\nThe expected result:\nElement updates.\n");
     waitUntilIdle(window);
     ok &= save(window, "8-agent-fixed");
 
@@ -478,6 +895,7 @@ int takeShots(Window &window, const QString &folder)
     auto expect = [&](const QString &what, bool holds) {
         if (!holds) {
             out << "not as expected: " << what << "\n";
+            out.flush();
             ok = false;
         }
     };
@@ -530,7 +948,7 @@ int takeShots(Window &window, const QString &folder)
     const qsizetype installedBefore = window.catalog().installed.size();
     window.showInstalled("gimp");
     expect("earlier versions take room before they are cleared", window.catalog().earlierBytes > 0);
-    window.clearEarlier(false);
+    window.clearEarlier(Place::Computer, false);
     waitUntilIdle(window);
     expect("clearing leaves no earlier version and everything installed",
            window.catalog().earlierGenerations == 0 && window.catalog().installed.size() == installedBefore
@@ -543,6 +961,7 @@ int takeShots(Window &window, const QString &folder)
     frameShots(window, saved, held);
     settingsShots(window, folder, saved, held);
     stripShots(window, folder, saved, held, out);
+    placesShots(folder, saved, held);
     out << (ok ? "all flows ended where they should\n" : "some flows did not end where they should\n");
     return ok ? 0 : 1;
 }
