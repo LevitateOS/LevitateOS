@@ -196,8 +196,9 @@ ever come out of the pipeline. Its five stages are the completion
 requirements here, and each needs the one before:
 
 1. **It boots.** Both desktop ISOs built from today's locks; `desktop-boot`
-   passes; install from the desktop ISO in a VM and log in; both added to
-   what CI runs; CI green. (Also `desktop-todo.md` section 12.)
+   passes; install from the desktop ISO in a VM and log in; both in the local
+   release run (CI runs only the quick checks); CI green. (Also
+   `desktop-todo.md` section 12.)
 2. **It works on a real laptop.** CPU microcode loaded early. One Intel and
    one AMD laptop per system: Wi-Fi, sound, Bluetooth, suspend, lid,
    brightness, external screen. This also produces the hardware statement the
@@ -299,9 +300,9 @@ it only where it says so.
 3. **First build of everything from current code:** both distros' base,
    live-boot, live-tools and live-desktop. Fix until `test all`,
    `ab-update` and `desktop-boot` pass on both, plus an install from the
-   desktop ISO that logs in. Put `desktop-boot` and the desktop install in CI;
-   get CI green (A2, B stage 1). Builds only when the user asks, within the
-   10:00–01:00 window.
+   desktop ISO that logs in. Products and scenarios run locally, never in CI;
+   get CI's quick checks green (A2, B stage 1). Builds only when the user
+   asks, within the 10:00–01:00 window.
 4. **Real laptops** with the built desktop images (B stage 2), once step 3
    passes. It also produces the download page's hardware statement.
 5. **A week on it:** the step 2 state design built and run; AcornOS's session

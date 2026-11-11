@@ -258,8 +258,8 @@ Each stage ends in something observable. The order matters: every later stage
 needs the image of the first.
 
 1. **It boots.** Build both desktop ISOs from today's locks, run
-   `desktop-boot`, install from the desktop ISO in a VM and log in. Add
-   `desktop-boot` and that install to what CI runs. Get CI green.
+   `desktop-boot`, install from the desktop ISO in a VM and log in. These run
+   locally (CI runs only the quick checks). Get CI green.
 2. **It works on a real laptop.** Microcode. One Intel and one AMD laptop each:
    Wi-Fi, sound, Bluetooth, suspend, lid, brightness, an external screen.
 3. **It survives a week.** Decide and build where computer state lives so

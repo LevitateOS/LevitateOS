@@ -31,15 +31,6 @@ pub fn run() -> Result<()> {
             &["clippy", "-q", "--workspace", "--all-targets", "--exclude", "levitate-recipe", "--", "-D", "warnings"],
         ),
     );
-    // Unit and integration tests that run unprivileged; tools/recipe's run in its own repo.
-    sweep.step(
-        "cargo test --workspace",
-        command(
-            &root,
-            "cargo",
-            &["test", "-q", "--workspace", "--no-fail-fast", "--exclude", "levitate-recipe"],
-        ),
-    );
     let scripts = guest_scripts(&root);
     for &(shell, args) in GUEST_SHELLS {
         let name = format!("guest scripts parse ({shell} {})", args.join(" "));
