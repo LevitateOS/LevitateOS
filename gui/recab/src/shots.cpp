@@ -2,6 +2,7 @@
 
 #include "activity.h"
 #include "frame.h"
+#include "helpstory.h"
 #include "livestory.h"
 #include "look.h"
 #include "parts.h"
@@ -461,8 +462,8 @@ void settingsShots(Window &window, const QString &folder, const Save &save, cons
 
     // The rail: Settings under Activity, added by the frame.
     const QStringList titles = frame->entryTitles();
-    expect(QStringLiteral("the rail has Settings under Activity (%1)").arg(titles.join(", ")),
-           titles.size() >= 2 && titles.mid(titles.size() - 2) == QStringList({"Activity", "Settings"}));
+    expect(QStringLiteral("the rail has Settings under Activity, and Help under Settings (%1)").arg(titles.join(", ")),
+           titles.size() >= 3 && titles.mid(titles.size() - 3) == QStringList({"Activity", "Settings", "Help"}));
 
     // Before the helper has answered: it says so.
     frame->choose(Frame::settingsKey());
@@ -692,6 +693,41 @@ void settingsShots(Window &window, const QString &folder, const Save &save, cons
     settle(100);
 }
 
+// ---------------------------------------------------------------- Help and the first page
+//
+// The pages the frame owns after Settings: Help for System, and the page a
+// person sees the first time. The checks are `../kit/helpstory.*`; this says
+// which page of System each target is.
+
+void helpShots(Window &window, const QString &folder, const Save &save, const Expect &expect, const QString &prefix)
+{
+    const QString script = qEnvironmentVariable("RECAB_GUI_RECORDS");
+    if (script.isEmpty()) {
+        expect(QStringLiteral("Help needs RECAB_GUI_RECORDS (gui/agent/fixtures/records) to find the stand-in Codex"), false);
+        return;
+    }
+    helpstory::Plan plan;
+    plan.app = Frame::System;
+    plan.window = &window;
+    plan.frame = window.frame();
+    plan.firstEntry = QStringLiteral("overview");
+    plan.idle = [&] { waitUntilIdle(window); };
+    plan.folder = folder;
+    plan.fixtures = QFileInfo(script).absolutePath();
+    plan.pageShown = [&](const QString &key) {
+        QWidget *page = key == QLatin1String("overview")  ? static_cast<QWidget *>(window.findChild<SystemPage *>())
+                        : key == QLatin1String("next")    ? static_cast<QWidget *>(window.findChild<NextPage *>())
+                        : key == QLatin1String("history") ? static_cast<QWidget *>(window.findChild<HistoryPage *>())
+                        : key == QLatin1String("back")    ? static_cast<QWidget *>(window.findChild<BackPage *>())
+                                                          : nullptr;
+        return page && page->isVisible();
+    };
+    helpstory::run(plan, save, expect, prefix);
+    window.frame()->choose(QStringLiteral("overview"));
+    window.showMain();
+    settle(100);
+}
+
 } // namespace
 
 // The story needs the stand-in started with RECAB_STANDIN_FAIL_TRIALS=1, so
@@ -855,6 +891,7 @@ int takeShots(Window &window, const QString &folder)
     settle(100);
     activityShots(window, folder, "a", int(window.status().changes.size()), save, expect, out);
     settingsShots(window, folder, save, expect, out);
+    helpShots(window, folder, save, expect, "h");
 
     {
         // The older stand-in knows a release and adds it at once.
@@ -1164,6 +1201,7 @@ int takeRealShots(Window &window, const QString &folder)
         settle(100);
     }
     activityShots(window, folder, "r2c", int(window.status().changes.size()), save, expect, out);
+    helpShots(window, folder, save, expect, "rh");
     {
         // The reader the other two apps use for their strip, against the same recab.
         NextSystem next(qEnvironmentVariable("RECAB_GUI_RECAB"));

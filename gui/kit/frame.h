@@ -12,6 +12,8 @@
 
 class ActivityPage;
 class ElidedLabel;
+class FirstRunPage;
+class HelpPage;
 class QHBoxLayout;
 class QLabel;
 class QPushButton;
@@ -60,6 +62,26 @@ public:
     // does not emit `chosen`, since there is nothing for the app to switch to.
     bool settingsShown() const;
     static QString settingsKey() { return QStringLiteral("settings"); }
+    // Help is the frame's as well, under Settings. One page for each app (the
+    // frame knows which it is). Its links go to the app's rail entries, to
+    // Activity and Settings through `choose`, and to pages the app offered with
+    // `addHelpTarget` through `helpLink`.
+    bool helpShown() const;
+    static QString helpKey() { return QStringLiteral("help"); }
+    // A page of the app that is not on the rail and that Help may lead to
+    // ("ask"). Help has no entry for a page that is not a rail entry, Activity,
+    // Settings or one of these. When it is followed, the frame has already left
+    // Help for the app's content and says `helpLink(key)`: the app shows the page.
+    void addHelpTarget(const QString &key);
+
+    // ---- The first time. The page before the app's own, shown once per person
+    // and per app (QSettings, never in a picture run, where a story asks for it
+    // with `showFirstRun`). The rail marks nothing while it shows. Its button
+    // goes on to the app's own page; choosing anything in the rail leaves it too.
+    void showFirstRun();
+    bool firstRunShown() const;
+    FirstRunPage *firstRun() const { return firstRun_; }
+    HelpPage *help() const { return help_; }
 
     // ---- The strip: "The next system holds N changes." with a button that
     // finishes it. The titles are the changes' own ("htop, installed"); an
@@ -90,8 +112,8 @@ public:
     // Starts an app's program detached, exactly as choosing it in the rail
     // does (the same variables); the status line says when it cannot be started.
     void startApp(App app);
-    // The titles of the rail's entries in order, the app's own and Activity,
-    // without the three apps.
+    // The titles of the rail's entries in order, the app's own and then Activity,
+    // Settings and Help, without the three apps.
     QStringList entryTitles() const;
 
     // ---- Activity, which the frame owns.
@@ -119,6 +141,8 @@ signals:
     void finishRequested();
     // "Go to it" on this window's own live run: show the app's work page.
     void goToRun();
+    // A link of Help to a page the app offered (`addHelpTarget`). Help has been left.
+    void helpLink(const QString &key);
 
 protected:
     bool eventFilter(QObject *watched, QEvent *event) override;
@@ -134,12 +158,20 @@ private:
     void step(RailButton *from, int by);
     void showAgent(const QString &words);
     void readAgentStatus();
+    // The shared pages the frame shows itself, and how a key finds its place in the stack.
+    int indexOf(const QString &key) const;
+    void helpGo(const QString &target);
+    void leaveShared();
 
     App app_;
     QString selected_, followed_;
     QStackedWidget *stack_;
     ActivityPage *activity_;
     SettingsPage *settings_;
+    HelpPage *help_;
+    FirstRunPage *firstRun_;
+    QStringList helpTargets_;
+    bool firstRunChecked_ = false;
     QWidget *appsRow_;
     QMap<QString, RailButton *> entries_;
     QList<RailButton *> order_;

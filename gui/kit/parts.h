@@ -61,6 +61,9 @@ class ClickLabel : public QLabel {
     Q_OBJECT
 public:
     explicit ClickLabel(const QString &words, QWidget *parent = nullptr);
+    // Looks like a link: underlined, in the palette's link colour, and a
+    // focus frame when Tab reaches it (the underline then stays).
+    void setLinkLook();
 signals:
     void clicked();
 protected:
@@ -68,7 +71,13 @@ protected:
     void keyPressEvent(QKeyEvent *event) override;
     void focusInEvent(QFocusEvent *event) override;
     void focusOutEvent(QFocusEvent *event) override;
+    void paintEvent(QPaintEvent *event) override;
+private:
+    bool link_ = false;
 };
+
+// A ClickLabel with the link look: a way to another page.
+ClickLabel *linkLabel(const QString &words);
 
 // A program's picture: its icon when the recipe has one, else its first letter.
 class Tile : public QWidget {

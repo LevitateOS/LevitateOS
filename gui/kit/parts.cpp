@@ -7,6 +7,8 @@
 #include <QPainter>
 #include <QPainterPath>
 #include <QPlainTextEdit>
+#include <QStyle>
+#include <QStyleOptionFocusRect>
 #include <QSvgRenderer>
 #include <QVBoxLayout>
 
@@ -211,10 +213,43 @@ void ClickLabel::focusInEvent(QFocusEvent *event)
 
 void ClickLabel::focusOutEvent(QFocusEvent *event)
 {
+    // A link keeps the underline that makes it one.
     QFont plain = font();
-    plain.setUnderline(false);
+    plain.setUnderline(link_);
     setFont(plain);
     QLabel::focusOutEvent(event);
+}
+
+void ClickLabel::setLinkLook()
+{
+    link_ = true;
+    QFont font = this->font();
+    font.setUnderline(true);
+    setFont(font);
+    QPalette palette = this->palette();
+    palette.setColor(QPalette::WindowText, palette.color(QPalette::Link));
+    setPalette(palette);
+}
+
+void ClickLabel::paintEvent(QPaintEvent *event)
+{
+    QLabel::paintEvent(event);
+    // Without a frame the underline would be all that tells where Tab is.
+    if (link_ && hasFocus()) {
+        QPainter painter(this);
+        QStyleOptionFocusRect focus;
+        focus.initFrom(this);
+        focus.rect = rect();
+        focus.backgroundColor = palette().color(QPalette::Window);
+        style()->drawPrimitive(QStyle::PE_FrameFocusRect, &focus, &painter, this);
+    }
+}
+
+ClickLabel *linkLabel(const QString &words)
+{
+    auto *label = new ClickLabel(words);
+    label->setLinkLook();
+    return label;
 }
 
 Tile::Tile(const QString &name, const QString &iconPath, int size, QWidget *parent)

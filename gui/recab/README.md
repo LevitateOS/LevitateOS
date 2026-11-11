@@ -12,7 +12,7 @@ what recab says may be done.
 Qt 6 Widgets, C++20, CMake. Widgets shared with `gui/recipe` and `gui/disk` are in `gui/kit`.
 
 The window is the shared frame from `gui/kit/README.md`: a rail (the three apps;
-"Overview", "The next system", "History" and "Getting back"; "Activity" and "Settings" below), the pages, a strip, and a status line.
+"Overview", "The next system", "History" and "Getting back"; "Activity", "Settings" and "Help" below), the pages, a strip, and a status line.
 The Ask, clash and work pages are shown in the same place and the rail keeps
 marked the page the person came from. "The next system" has a badge: the number of
 changes it holds, when it exists. The strip ("The next system holds N changes." and
@@ -374,6 +374,20 @@ also done through the page's own button (`br03`, `br04`). To see the password
 line as a root helper gives it, name a helper that only runs its arguments as
 `RECAB_GUI_ROOT_HELPER` for a run.
 
+## Help and the first page
+
+Both are the frame's (`gui/kit/README.md`, "Help" and "The first time"); the window adds
+nothing for them. Help for System has the ideas (the running system and the next
+system, finishing, the restart on trial, coming back), what it can do with a link to
+Overview, "The next system", "Getting back" or History where it is done, the agent, and
+what to do when a run stopped, the agent does not answer, or the desktop does not start
+(a link to Getting back). Its links to the rail entries are chosen as a click on the rail
+is, so `Frame::chosen` already shows the page; the window has no extra page to offer
+(`addHelpTarget`). The first page, shown once per person the first time System opens
+(never in a picture run), is Help's first sentences and the agent's state, with "Go on
+to System". Both stories check them with `../kit/helpstory.*`: pictures `h-help*`,
+`h-help-went`, `h-firstrun-*` (`rh-*` in `--real`).
+
 ## Reading and reading again
 
 `recab status --json` is run without holding the window up. The first time, the
@@ -447,7 +461,8 @@ allowed to run, and whether it runs as the person or as root are not decided.
   in Activity; "Stop" ends it for real (`levitate-agent --stop`).
 - The frame, Activity and the strip were checked against stand-ins in the
   picture modes, offscreen; not on a real desktop, and not with a real Codex.
-- The rail has no Help: that page would lead nowhere yet. Settings is the frame's own page (`gui/kit/README.md`); the story checks it with the stand-in Codex, in a settings folder of its own under the picture folder, so the person's `agent.json` is never read or written.
+- Settings and Help are the frame's own pages (`gui/kit/README.md`); the story checks Settings with the stand-in Codex, in a settings folder of its own under the picture folder, so the person's `agent.json` is never read or written.
+- Help and the first page say nothing about: the single system (not built), "Stop" or stand-still detection for work started elsewhere, a release medium noticed and offered, "Skip this release", the log of a start, the kernel line, "Edit a file…" and "Take out" on the next system, and "hold Space" at start-up. They say that a newer release can be found only when recab has a place to get releases from, and say of the start-up steps only what Getting back itself says (they have not been tried on a real A/B computer's start-up list).
 
 - A run on a real A/B system: the mapping above was written from recab's
   generated types and checked against a stand-in of the same shape, not

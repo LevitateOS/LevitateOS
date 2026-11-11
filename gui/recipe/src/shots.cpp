@@ -4,6 +4,7 @@
 #include "settings.h"
 #include "before.h"
 #include "frame.h"
+#include "helpstory.h"
 #include "livestory.h"
 #include "look.h"
 #include "nextsystem.h"
@@ -189,13 +190,12 @@ private:
 void frameShots(Window &window, const Save &save, const Expect &expect)
 {
     Frame *frame = window.frame();
-    for (const char *title : {"Browse", "Installed", "Updates", "Sources", "Storage", "Activity", "Settings"})
+    for (const char *title : {"Browse", "Installed", "Updates", "Sources", "Storage", "Activity", "Settings", "Help"})
         expect(QStringLiteral("the rail has %1").arg(title), frame->entryTitles().contains(QString::fromLatin1(title)));
     expect(QStringLiteral("Storage follows Sources in the rail"),
            frame->entryTitles().mid(0, 5) == QStringList({"Browse", "Installed", "Updates", "Sources", "Storage"}));
-    expect(QStringLiteral("Settings is under Activity, the frame's own"),
-           frame->entryTitles().mid(frame->entryTitles().size() - 2) == QStringList({"Activity", "Settings"}));
-    expect(QStringLiteral("the rail has no Help: that page does not exist"), !frame->entryTitles().contains(QStringLiteral("Help")));
+    expect(QStringLiteral("Settings is under Activity and Help under Settings, the frame's own"),
+           frame->entryTitles().mid(frame->entryTitles().size() - 3) == QStringList({"Activity", "Settings", "Help"}));
     expect(QStringLiteral("the window is 1100 by 700"), window.size() == QSize(1100, 700));
 
     window.chooseSource(QString());
@@ -456,6 +456,39 @@ void settingsShots(Window &window, const QString &folder, const Save &save, cons
 // The strip about the next system: read with the recab the story names, after
 // one prepare and one change in its own scratch state; and no strip when the
 // program does not exist.
+// The pages the frame owns after Settings: Help for Recipe, and the page a person
+// sees the first time. The checks are `../kit/helpstory.*`; this says which page
+// of Recipe each target is.
+void helpShots(Window &window, const QString &folder, const Save &save, const Expect &expect)
+{
+    const QString script = qEnvironmentVariable("RECIPE_GUI_RECORDS");
+    if (script.isEmpty()) {
+        expect(QStringLiteral("Help needs RECIPE_GUI_RECORDS (gui/agent/fixtures/records) to find the stand-in Codex"), false);
+        return;
+    }
+    helpstory::Plan plan;
+    plan.app = Frame::Recipe;
+    plan.window = &window;
+    plan.frame = window.frame();
+    plan.firstEntry = QStringLiteral("browse");
+    plan.idle = [&] { waitUntilIdle(window, 30); };
+    plan.folder = folder;
+    plan.fixtures = QFileInfo(script).absolutePath();
+    plan.pageShown = [&](const QString &key) {
+        QWidget *page = key == QLatin1String("browse")      ? static_cast<QWidget *>(window.findChild<BrowsePage *>())
+                        : key == QLatin1String("installed") ? static_cast<QWidget *>(window.findChild<InstalledPage *>())
+                        : key == QLatin1String("updates")   ? static_cast<QWidget *>(window.findChild<UpdatesPage *>())
+                        : key == QLatin1String("sources")   ? static_cast<QWidget *>(window.findChild<SourcesPage *>())
+                        : key == QLatin1String("storage")   ? static_cast<QWidget *>(window.findChild<StoragePage *>())
+                        : key == QLatin1String("ask")       ? static_cast<QWidget *>(window.findChild<WishPage *>())
+                                                            : nullptr;
+        return page && page->isVisible();
+    };
+    helpstory::run(plan, save, expect, "h");
+    window.showBrowse();
+    settle(100);
+}
+
 void stripShots(Window &window, const QString &folder, const Save &save, const Expect &expect, QTextStream &out)
 {
     Frame *frame = window.frame();
@@ -1397,6 +1430,7 @@ int takeShots(Window &window, const QString &folder)
     frameShots(window, saved, held);
     holdShots(window, saved, held);
     settingsShots(window, folder, saved, held);
+    helpShots(window, folder, saved, held);
     stripShots(window, folder, saved, held, out);
     placesShots(folder, saved, held);
     out << (ok ? "all flows ended where they should\n" : "some flows did not end where they should\n");

@@ -1,6 +1,8 @@
 #include "frame.h"
 
 #include "activity.h"
+#include "firstrun.h"
+#include "help.h"
 #include "look.h"
 #include "parts.h"
 #include "run.h"
@@ -37,10 +39,12 @@ QColor shade(const QPalette &palette, qreal by)
                             ground.blueF() + (ink.blueF() - ground.blueF()) * by);
 }
 
-// The pages the frame owns; the app's `follow` leaves them showing.
+// The pages the frame owns; the app's `follow` leaves them showing. "firstrun" has
+// no rail entry: it is marked while the page before the app's own shows.
 bool sharedKey(const QString &key)
 {
-    return key == QLatin1String("activity") || key == QLatin1String("settings");
+    return key == QLatin1String("activity") || key == QLatin1String("settings") || key == QLatin1String("help")
+        || key == QLatin1String("firstrun");
 }
 
 } // namespace
@@ -340,6 +344,13 @@ Frame::Frame(App app, QWidget *parent)
     railColumn->addWidget(settings);
     connect(settings, &QAbstractButton::clicked, this, [this] { choose(settingsKey()); });
     connect(settings, &RailButton::stepped, this, [this, settings](int by) { step(settings, by); });
+    auto *help = new RailButton(RailButton::Entry, tr("Help"));
+    help->setAccessibleDescription(tr("How %1 works and where to look when something is wrong").arg(tr(apps[app].name)));
+    entries_.insert(helpKey(), help);
+    order_ << help;
+    railColumn->addWidget(help);
+    connect(help, &QAbstractButton::clicked, this, [this] { choose(helpKey()); });
+    connect(help, &RailButton::stepped, this, [this, help](int by) { step(help, by); });
     shell->addWidget(left);
     shell->addWidget(new Divider);
 
@@ -352,6 +363,10 @@ Frame::Frame(App app, QWidget *parent)
     stack_->addWidget(activity_);
     settings_ = new SettingsPage(QString::fromLatin1(apps[app].name));
     stack_->addWidget(settings_);
+    help_ = new HelpPage(app);
+    stack_->addWidget(help_);
+    firstRun_ = new FirstRunPage(app);
+    stack_->addWidget(firstRun_);
     middle->addWidget(stack_, 1);
     strip_ = new Strip;
     strip_->hide();
@@ -398,6 +413,13 @@ Frame::Frame(App app, QWidget *parent)
     // A change in Settings shows in the status line at once; "Try it" is a run for Activity.
     connect(settings_, &SettingsPage::changed, this, &Frame::readAgentStatus);
     connect(settings_, &SettingsPage::ran, activity_, &ActivityPage::read);
+    connect(help_, &HelpPage::go, this, &Frame::helpGo);
+    connect(help_, &HelpPage::startApp, this, &Frame::startApp);
+    connect(help_, &HelpPage::firstPageAgain, this, &Frame::showFirstRun);
+    // "Go on" is the person's step to the app; the rail's entries leave the page as well.
+    connect(firstRun_, &FirstRunPage::goOn, this, &Frame::leaveShared);
+    connect(firstRun_, &FirstRunPage::openSettings, this, [this] { choose(settingsKey()); });
+    connect(firstRun_, &FirstRunPage::openHelp, this, [this] { choose(helpKey()); });
     // The rail's badge is true from the start, not only once Activity was opened.
     QTimer::singleShot(0, activity_, &ActivityPage::read);
 }
@@ -416,8 +438,8 @@ void Frame::addEntry(const QString &key, const QString &title)
 {
     auto *button = new RailButton(RailButton::Entry, title);
     entries_.insert(key, button);
-    // Before the shared entries (Activity, Settings), which are last in the order.
-    order_.insert(order_.size() - 2, button);
+    // Before the shared entries (Activity, Settings, Help), which are last in the order.
+    order_.insert(order_.size() - 3, button);
     static_cast<QVBoxLayout *>(appEntries_->layout())->addWidget(button);
     connect(button, &QAbstractButton::clicked, this, [this, key] { choose(key); });
     connect(button, &RailButton::stepped, this, [this, button](int by) { step(button, by); });
@@ -456,7 +478,13 @@ void Frame::select(const QString &key)
         return;
     followed_ = key;
     mark(key);
-    stack_->setCurrentIndex(key == activityKey() ? 1 : key == settingsKey() ? 2 : 0);
+    stack_->setCurrentIndex(indexOf(key));
+}
+
+// Where a page is in the stack: the app's content first, then the frame's own.
+int Frame::indexOf(const QString &key) const
+{
+    return key == activityKey() ? 1 : key == settingsKey() ? 2 : key == helpKey() ? 3 : 0;
 }
 
 void Frame::follow(const QString &key)
@@ -478,6 +506,51 @@ bool Frame::settingsShown() const
     return selected_ == settingsKey();
 }
 
+bool Frame::helpShown() const
+{
+    return selected_ == helpKey();
+}
+
+bool Frame::firstRunShown() const
+{
+    return selected_ == QLatin1String("firstrun");
+}
+
+void Frame::addHelpTarget(const QString &key)
+{
+    if (!helpTargets_.contains(key))
+        helpTargets_ << key;
+}
+
+// The page before the app's own: nothing in the rail is marked, and the page asks
+// the helper about the agent each time it is shown.
+void Frame::showFirstRun()
+{
+    mark(QStringLiteral("firstrun"));
+    stack_->setCurrentIndex(4);
+    firstRun_->read();
+    FirstRunPage::markSeen(app_);
+}
+
+// Back to the app's own page, the one it is on: from Help, from the first page.
+void Frame::leaveShared()
+{
+    mark(followed_);
+    stack_->setCurrentIndex(0);
+}
+
+// A link of Help: a rail entry, Activity and Settings are chosen as a click would;
+// a page the app offered is shown by the app, once Help has been left.
+void Frame::helpGo(const QString &target)
+{
+    if (target == activityKey() || target == settingsKey() || entries_.contains(target)) {
+        choose(target);
+    } else if (helpTargets_.contains(target)) {
+        leaveShared();
+        emit helpLink(target);
+    }
+}
+
 // The person chose an entry: show what it stands for and say so.
 void Frame::choose(const QString &key)
 {
@@ -495,6 +568,12 @@ void Frame::choose(const QString &key)
         stack_->setCurrentIndex(2);
         settings_->read();
         return; // the frame's own page: the app has nothing to switch to
+    } else if (key == helpKey()) {
+        mark(key);
+        // Drawn for the pages the app has now: no link leads to a page that is not there.
+        help_->draw(entries_.keys() + helpTargets_);
+        stack_->setCurrentIndex(indexOf(key));
+        return; // the frame's own page as well
     } else {
         select(key);
     }
@@ -763,6 +842,13 @@ void Frame::showEvent(QShowEvent *event)
 {
     watchWindow();
     QWidget::showEvent(event);
+    // The first time this person opens this app: the page before the app's own.
+    // The app has been reading since it was made; nothing here waits for it.
+    if (!firstRunChecked_) {
+        firstRunChecked_ = true;
+        if (FirstRunPage::wanted(app_))
+            showFirstRun();
+    }
 }
 
 bool Frame::eventFilter(QObject *watched, QEvent *event)
@@ -783,6 +869,8 @@ void Frame::readAgain()
     activity_->read();
     if (settings_->started())
         settings_->read();
+    if (firstRunShown())
+        firstRun_->read();
     readAgentStatus();
 }
 

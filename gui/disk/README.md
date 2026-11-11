@@ -2,7 +2,7 @@
 
 The third desktop app, titled "Disk". It sits in the shared window frame
 (`gui/kit/frame.*`, see its README): the rail with the three apps, Disk's four
-entries, Activity and Settings; the pages; the strip about the next system; the
+entries, Activity, Settings and Help; the pages; the strip about the next system; the
 status line. It does these things, each its own rail entry (it opens on the first):
 
 - **The disk**: how full the place for the person's files is, what could be
@@ -205,6 +205,19 @@ On the fourth entry:
    facts and expected result. The agent changes nothing; what it answers is
    shown above the list.
 
+## Help and the first page
+
+Both are the frame's (`gui/kit/README.md`, "Help" and "The first time"); the window
+adds nothing for them: every link of Help goes to a rail entry (The disk, Browse, Mess,
+The two systems), Activity or Settings. Help for Disk has the ideas (mess, setting
+aside, the two systems), what it can do (see how full the disk is, find what takes the
+room, clear mess, bring a place back or let it all go through "Set aside by the agent"
+on The disk, compare the two systems), the agent (asked to set aside by moving, what
+the page shows read back from the holding folder), and what to do when a place could
+not be set aside or the agent does not answer. The first page comes once per person
+the first time Disk opens (never in a picture run). Both stories check them
+(`../kit/helpstory.*`; pictures `h-help*`, `h-help-went`, `h-firstrun-*`).
+
 ## The set-aside convention
 
 What the request tells the agent, and what the window reads back. One holding
@@ -319,7 +332,7 @@ Activity):
 
 - the window is 1100 x 700, and **every picture** is taken at that size (no page
   may make the window wider or taller); the rail offers The disk, Browse, Mess,
-  The two systems, Activity and Settings and nothing else; the window opens on
+  The two systems, Activity, Settings and Help and nothing else; the window opens on
   The disk; the Mess badge equals the number of places listed, also after a
   second look; the status line says when the disk was looked at and that only
   "Let it all go" deletes; the strip; "Go to it"; Settings opens.
@@ -555,7 +568,11 @@ on its input as `{"question": id, "answer": "..."}`. When asked what differs bet
   (util-linux 2.37 or later) and a failing lsblk were not run against a real one.
 - The strip is read at start, on refresh and after an agent run; not while a
   change is made elsewhere until the window is entered again.
-- The frame's Help is not here (Settings is the frame's own and is).
+- Help and the first page (the frame's own, `gui/kit/README.md`) say nothing of the kinds of
+  file in Browse, a rule language for "Never suggest", logs and crash records, mess
+  inside the systems, or a real agent following the set-aside convention; they say
+  the page for what was set aside reads the holding folder back, and that what
+  belongs to Recipe is cleared through Recipe and not moved.
 - Choosing the other entry while a comparison reads is allowed (the page keeps
   filling). Activity does not list comparisons: only agent runs are recorded.
 - Checked only offscreen, with stand-ins; not on a real desktop, and the rail's

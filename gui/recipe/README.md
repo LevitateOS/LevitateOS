@@ -16,11 +16,11 @@ The window is `gui/kit/frame.*` (see `../kit/README.md`): the rail on the left
 its badge, Sources, Storage, then Activity, which the frame owns), the pages in the
 middle, a strip under them and a status line. There is no sidebar any more:
 the search, the box for the source and the box for the kind of software are
-the top of the Browse page. Settings is under Activity (the frame's own page, the
-same in all three apps; `gui/kit/README.md`); Help is not in the rail because that
-page does not exist. The story opens Settings (picture `f-settings`),
-reading through the built levitate-agent with the stand-in Codex and a settings
-folder of its own.
+the top of the Browse page. Settings is under Activity and Help under Settings (the
+frame's own pages, the same in all three apps; `gui/kit/README.md`). The story opens
+Settings (picture `f-settings`), reading through the built levitate-agent with the
+stand-in Codex and a settings folder of its own, and Help and the first page (pictures
+`h-help*`, `h-firstrun-*`, below).
 
 - The status line says where the recipes are from and when they were read (and
   what is being built); "Read again" sits beside it; the agent is the frame's
@@ -420,6 +420,22 @@ QT_QPA_PLATFORM=offscreen RECIPE_GUI_RECIPE=$PWD/target/debug/recipe RECIPE_GUI_
   .artifacts/recipe-gui/build/recipe-gui --look levitate --shots $PWD/.artifacts/recipe-gui/shots-real --try ripgrep --read-only
 ```
 
+## Help and the first page
+
+Both are the frame's (`gui/kit/README.md`, "Help" and "The first time"). Help for
+Recipe has the ideas (recipes, the sandbox and what a recipe may use, the two places
+software goes), what it can do with a link to Browse, Installed, Updates, Sources,
+Storage or "Ask for software", the agent, and what to do when an install or update
+stopped or the agent does not answer. Its links to the rail's entries need nothing
+from the window; "Ask for software" is not an entry, so the window calls
+`frame_->addHelpTarget("ask")` and shows `WishPage` on `Frame::helpLink("ask")`.
+Help says what the "When a run stops" section above says and no more: "Let the
+agent fix it" is named only for an install (`recipe update` takes no `--autofix`
+yet), the repair is not approved first, and Activity does not list it. The first
+page is shown once per person the first time Recipe opens (never in a picture
+run). The story checks both (`../kit/helpstory.*`; pictures `h-help*`, `h-help-went`,
+`h-firstrun-*`).
+
 ## Reading and reading again
 
 The catalog is read as three commands in a row (`list`, `installed`,
@@ -495,7 +511,12 @@ there is no step yet where the person approves the change before it is used.
 ## Not done
 
 - Not in the frame: the licence and sort boxes of the design (nothing behind
-  them), the Help page. The Installed page does not show its count in the rail.
+  them). The Installed page does not show its count in the rail.
+- Help says nothing of: Update all for programs that ask for nothing more, "Repair" or
+  "Tell the agent…", "Copy to your own recipes…", download sizes, sizes of builds,
+  installing from a source at an address (the sources README says it stops with a
+  message). It names Remove's own small window and says only that "Clear earlier
+  versions…" asks first.
 - Not built from the redesign, because `recipe` does not carry it: the search and
   sort of Installed, a library line ("4 libraries are installed because a program
   needs them"), "Look…"/"Update…" buttons on each Updates row, "Newer releases no

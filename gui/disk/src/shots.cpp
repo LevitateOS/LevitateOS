@@ -2,6 +2,7 @@
 
 #include "activity.h"
 #include "frame.h"
+#include "helpstory.h"
 #include "livestory.h"
 #include "look.h"
 #include "settings.h"
@@ -30,6 +31,7 @@
 #include "pages.h"
 #include "rules.h"
 #include "setaside.h"
+#include "systems.h"
 
 #include <functional>
 #include <limits>
@@ -118,6 +120,37 @@ void noStripShots(Window &window, const QString &own, const Expect &expect)
     window.readStripFrom(own);
     settle(600);
     expect(QStringLiteral("no strip when recab answers in a shape the strip cannot read"), !frame->stripShown());
+}
+
+// The pages the frame owns after Settings: Help for Disk, and the page a person
+// sees the first time. The checks are `../kit/helpstory.*`; this says which page
+// of Disk each target is.
+void helpShots(Window &window, const QString &folder, const Save &save, const Expect &expect)
+{
+    const QString script = qEnvironmentVariable("RECAB_GUI_RECORDS");
+    if (script.isEmpty()) {
+        expect(QStringLiteral("Help needs RECAB_GUI_RECORDS (gui/agent/fixtures/records) to find the stand-in Codex"), false);
+        return;
+    }
+    helpstory::Plan plan;
+    plan.app = Frame::Disk;
+    plan.window = &window;
+    plan.frame = window.frame();
+    plan.firstEntry = QStringLiteral("disk");
+    plan.idle = [&] { waitUntilIdle(window, 300); };
+    plan.folder = folder;
+    plan.fixtures = QFileInfo(script).absolutePath();
+    plan.pageShown = [&](const QString &key) {
+        QWidget *page = key == QLatin1String("disk")      ? static_cast<QWidget *>(window.diskPage())
+                        : key == QLatin1String("browse")  ? static_cast<QWidget *>(window.browsePage())
+                        : key == QLatin1String("mess")    ? static_cast<QWidget *>(window.messPage())
+                        : key == QLatin1String("systems") ? static_cast<QWidget *>(window.findChild<SystemsPage *>())
+                                                          : nullptr;
+        return page && page->isVisible();
+    };
+    helpstory::run(plan, [&](QWidget &, const QString &name) { save(name); }, expect, "h");
+    window.frame()->choose(QStringLiteral("disk"));
+    waitUntilIdle(window, 300);
 }
 
 // The frame's Settings page: the entry under Activity, and the page opening.
@@ -943,9 +976,9 @@ int takeShots(Window &window, const QString &folder, bool handOver)
         out << "  " << bytesText(finding.bytes) << "  " << finding.what << "  " << finding.path << "\n";
     Frame *frame = window.frame();
     expect(QStringLiteral("the window is 1100 x 700"), window.width() == 1100 && window.height() == 700);
-    expect(QStringLiteral("the rail offers The disk, Browse, Mess, The two systems, Activity and Settings, nothing else (%1)")
+    expect(QStringLiteral("the rail offers The disk, Browse, Mess, The two systems, Activity, Settings and Help, nothing else (%1)")
                .arg(frame->entryTitles().join(QStringLiteral(", "))),
-           frame->entryTitles() == QStringList({"The disk", "Browse", "Mess", "The two systems", "Activity", "Settings"}));
+           frame->entryTitles() == QStringList({"The disk", "Browse", "Mess", "The two systems", "Activity", "Settings", "Help"}));
     expect(QStringLiteral("the Mess badge is the number of places listed (%1 and %2)")
                .arg(frame->badge("mess")).arg(window.found().size()),
            frame->badge("mess") == window.found().size() && window.found().size() > 0);
@@ -964,6 +997,7 @@ int takeShots(Window &window, const QString &folder, bool handOver)
     expect(QStringLiteral("Look again reads again and the page shows the same leftovers"),
            pageText(window.diskPage()).contains(bytesText(sumOf(window.found()))) && window.layout().found);
     settingsShots(window, folder, save, expect);
+    helpShots(window, folder, save, expect);
     browseShots(window, folder, save, expect, out);
     messShots(window, save, expect);
 

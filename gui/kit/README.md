@@ -16,6 +16,9 @@ only: no stylesheet.
 | `frame.*` | the window frame (below) |
 | `activity.*` | the Activity page, owned by the frame |
 | `settings.*` | the Settings page, owned by the frame, and `rememberWindowSize` |
+| `help.*` | the Help page, owned by the frame, and `helpText(app)`: the words of Help for each app (below) |
+| `firstrun.*` | the page before the app's own the first time, owned by the frame (below) |
+| `helpstory.*` | the checks of the stories about Help and the first page, the same in the three apps; only the picture modes use it |
 | `nextsystem.*` | `NextSystem`: reads `recab status --json` for the strip |
 | `before.*` | `BeforePage`: what will happen, shown before anything starts (below) |
 | `livestory.*` | the checks of the stories about runs that outlive their window (below); only the picture modes use it |
@@ -23,10 +26,11 @@ only: no stylesheet.
 ## The frame
 
 One widget that an app's window sets as its central widget. It is the rail on
-the left (the three apps, then the app's own entries, then Activity), the app's
-pages in the middle, a strip under them about the next system, and a status
-line. Do not add entries that lead nowhere: only Activity and Settings are
-shared, and the frame adds both under the app's own entries.
+the left (the three apps, then the app's own entries, then Activity, Settings
+and Help), the app's pages in the middle, a strip under them about the next
+system, and a status line. Do not add entries that lead nowhere: only Activity,
+Settings and Help are shared, and the frame adds all three under the app's own
+entries.
 
 ```cpp
 Frame(Frame::App app)                    // Frame::Recipe, Frame::System, Frame::Disk
@@ -51,15 +55,30 @@ void setOwnRun(Run *run);                // the agent run this window follows: i
 void setOwnRun(QString id);              // empty when it ended
 ActivityPage *activity() const;
 SettingsPage *settings() const;
+HelpPage *help() const;
+FirstRunPage *firstRun() const;
 static QString settingsKey();            // "settings"
+static QString helpKey();                // "help"
 bool settingsShown() const;
+bool helpShown() const;
+void addHelpTarget(key);                 // a page of the app that is not on the rail, which Help may lead to
+void showFirstRun();                     // the page before the app's own (below)
+bool firstRunShown() const;
 slot readAgain();                        // connect Refresher::asked to it
-signals: chosen(key)  finishRequested()  goToRun()
+signals: chosen(key)  finishRequested()  goToRun()  helpLink(key)
 ```
 
 - `chosen(key)` comes from the person's click or keyboard, for the app's entries
   and for Activity (`Frame::activityKey()`, "activity"). Switch your stack to
   the page of that key. For Activity the frame has shown its page already.
+- Help (`Frame::helpKey()`) is the frame's own page like Settings: no `chosen`.
+  Its links to the app's rail entries, to Activity and to Settings are chosen as
+  a click on the rail would be, so an app's `chosen` handler already shows the
+  page. Only a page that is not on the rail needs the app: it calls
+  `addHelpTarget(key)` once and connects `helpLink(key)`, which the frame says
+  after it has left Help for the app's own page (Recipe does it for "Ask for
+  software"). Help draws a thing to do only when its page exists (a rail entry,
+  Activity, Settings or an offered target), so no link leads nowhere.
 - Settings (`Frame::settingsKey()`) is chosen by the person like Activity, but
   the frame does not emit `chosen` for it: it is the frame's own page and the
   app has nothing to switch to. `follow(key)` leaves it showing, as it does
@@ -281,11 +300,88 @@ Each of these is in the design and not shown, because nothing is behind it:
   and the page says so; there is no setting to go further.
 - **Claude Code has never run against a real one** (see the row above).
 
+## Help
+
+`HelpPage` (`help.*`), the rail's last entry, one page for each app (the frame
+knows which it is; the app adds nothing). `helpText(app)` holds every word of it,
+so the first page can take Help's ideas. In order:
+
+1. What the app is for in a few sentences, and what it never does by itself.
+2. "The ideas you need": a short heading and two or three sentences each. System:
+   the running system and the next system, finishing, the restart on trial,
+   coming back. Recipe: recipes, the sandbox and what a recipe may use, the two
+   places software goes. Disk: mess, setting aside, the two systems.
+3. "How do I…": what the app can do, each row ending in "Go to PAGE", a link
+   (underlined, in the palette's link colour) to the page where it is done.
+4. "The agent": what it is, what it may do without asking (read files and look
+   things up), what it asks about (commands as the person, unless Settings says
+   "Allowed"; commands as administrator, always), where questions appear
+   (the page of the run and Activity), a sentence about the agent in this app,
+   that Claude Code has not been tried with a real one, and links to Settings
+   and Activity.
+5. "When something is wrong": System: a run stopped, the agent does not answer,
+   the desktop does not start (a link to Getting back); Recipe: an install or
+   update stopped, the agent does not answer; Disk: a place could not be set
+   aside, the agent does not answer.
+6. "The other two apps", one line each with "Open APP" (`Frame::startApp`), and
+   "Show the first page again".
+
+The page scrolls and its text column is at most 720 pixels wide. It has no
+search. A sentence goes in only when a README or the code makes it true of the
+app today, and it is read against the app's "Not done" list before it stays.
+Things the design drew and nothing is behind are not on it: a menu bar and the
+keys of its menus (the apps have none; the only shortcuts in the code are F5 and
+Ctrl+R to read again, and Escape on the Before and hand-over pages), Ctrl+K "Go to
+anything", F1, search in a page, opening an app at a place from the command line
+(`--show ...`), and "About".
+
+For a check: `HelpPage::pageText()`, `links()` and `press(words)`.
+
+## The first time
+
+`FirstRunPage` (`firstrun.*`): the first time a person opens an app, the frame
+shows it in the content area in place of the app's own page, and the rail marks
+nothing. It has: "Welcome to APP", what the app is for and never does (Help's),
+"Worth knowing first" (the first sentence of the Help ideas that are marked
+`forFirstRun`), whether an agent is ready, and "Go on to APP" with a link "Read
+Help first". The agent line comes from `levitate-agent --status`
+(`LEVITATE_ACTIVITY_AGENT`, as Settings and Activity), asked without holding
+anything up each time the page is shown: "An agent is ready: Codex is installed
+and signed in.", "No agent is ready yet: Codex is installed, but not signed in."
+with "Sign in in Settings", "No agent is ready yet: Codex is not installed." with
+"Choose an agent in Settings", and sentences for a sign-in that could not be
+asked and for a helper that could not be asked. Where no agent is ready it says
+that the app can be used now and the agent is needed only when something is
+handed to it.
+
+- Whether it is wanted is kept per person and per app with `QSettings`
+  (organisation "LevitateOS", file `firstrun`, one key per app), written when
+  the page is first shown, so it comes once. In a picture run (`pictureMode()`)
+  nothing is read or written and the page is never shown by itself; a story
+  asks for it with `Frame::showFirstRun()`.
+- The frame decides in its first `showEvent`, after the app has made its pages
+  and started reading: the page is a widget of the frame's own stack, and the
+  helper is a separate process, so the app's first read waits for neither. Any
+  rail entry, a link of the page or the button leaves it; the button returns to
+  the page the app is on.
+- Help has "Show the first page again" (`Frame::showFirstRun`). It does not change
+  what was remembered.
+- Never exercised: the remembering itself (the stories run in picture mode, where
+  it is off), and the page on a real desktop.
+
 ## Checks
 
 There are no unit tests. Each app's picture mode (`--shots`) is the check; the
 frame, Activity and the strip are checked in `gui/recab/src/shots.cpp`, and runs for
-Activity to show come from `gui/agent/fixtures/records`.
+Activity to show come from `gui/agent/fixtures/records`. Help and the first page are
+checked by `helpstory.*` in all three stories: the rail has Help under Settings; the
+Help page of the app (picture `h-help`) with every idea, row and link of
+`helpText`; every link goes where it says (the rail marks that entry and the
+app's page is the one showing; `h-help-went` after two); "Open APP" asks the
+frame to start the app; the first page in the three states with the stand-in Codex
+(`h-firstrun-ready`, `-not-signed-in`, `-not-installed`), its links, "Read Help
+first", and going on to the app (`h-firstrun-went-on`); a picture run wants no first
+page and keeps no setting. The real-recab story of System uses the prefix `rh`.
 
 **The guard.** A picture run starts the app's backend programs, the agent, the
 helper's own agents and a root helper, and writes settings and records: run bare it

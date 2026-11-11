@@ -106,6 +106,12 @@ Window::Window(QWidget *parent)
     connect(browse_, &BrowsePage::update, this, [this](const QString &name, Place place) { askUpdate(name, place); });
     connect(browse_, &BrowsePage::retry, this, [this] { reload([this] { showBrowse(); }); });
     connect(browse_, &BrowsePage::askFor, this, &Window::showWish);
+    // Help leads to "Ask for software" too; it is not a rail entry, so the frame is told of it.
+    frame_->addHelpTarget(QStringLiteral("ask"));
+    connect(frame_, &Frame::helpLink, this, [this](const QString &key) {
+        if (key == QLatin1String("ask"))
+            showWish();
+    });
     connect(updates_, &UpdatesPage::check, this, [this] { fetchSources(); });
     connect(sources_, &SourcesPage::refresh, this, &Window::fetchSources);
     connect(sources_, &SourcesPage::add, this, &Window::addSource);
