@@ -78,10 +78,15 @@ only a `tools` output, and require no caller defines. These are build image
 tools, separate from commands activated into the host profile.
 
 The compiler image remains the one pinned in
-`.artifacts/recipe-htop-20261110/inputs.json`. Checks now use maintained Ginux
-`cec0613f`, including upstream `cfebfdab`, and Recipe `68b17a5`. Logs and
+`.artifacts/recipe-htop-20261110/inputs.json`. Those initial checks used maintained
+Ginux `cec0613f`, including upstream `cfebfdab`, and Recipe `68b17a5`. Logs and
 consumer definitions are under `.artifacts/recipe-toolchain-fix/` and
 `.artifacts/recipe-toolchain-wave/proofs/`. No image or VM was built.
+
+The pin refresh to Ginux `fbf8e1f9` (upstream `e16946a1`) passed all 146 standalone
+managed cases and five immutable SDK consumers. Recipe `ee8c6f4` records the new
+runtime pins and the formatting correction. Receipts are under
+`.artifacts/recipe-pin-refresh-fbf8e1f9/`.
 
 | Tool | Verified consumer workload | Remaining limitation |
 |---|---|---|
