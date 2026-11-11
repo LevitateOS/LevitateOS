@@ -38,8 +38,12 @@ jobs:
           bun-version-file: package.json
 
       # The guest-script check parses every script in AcornOS's shell too.
-      - name: Install busybox
-        run: sudo apt-get update && sudo apt-get install -y busybox
+      - name: Ensure busybox is available
+        run: |
+          if ! command -v busybox >/dev/null; then
+            sudo apt-get update
+            sudo apt-get install -y busybox
+          fi
 
       - run: cargo xtask check
 
