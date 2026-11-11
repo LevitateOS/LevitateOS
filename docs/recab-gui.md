@@ -121,22 +121,44 @@ shipped. This is the largest piece of new work and should reuse whatever the
 Recipe and Ginux integration settles on for building in a distro's
 environment, not a second mechanism beside it.
 
-### State of the build (2026-11-10)
+### State of the build (2026-11-11)
 
-Three apps exist in `gui/` now: `recipe-gui`, `recab-gui` and `disk-gui`. What
-is done and what is not, for getting them into both desktop images:
+Four programs exist in `gui/` now: the apps `recipe-gui`, `recab-gui` and
+`disk-gui`, and the helper `levitate-agent`. None of this has been built or
+run: no image carries any of it yet. What is done and what is not, for getting
+them into both desktop images:
 
-- **Done: one build for all three.** `gui/CMakeLists.txt` builds them
-  together; `cmake --install` with a `DESTDIR` writes the three programs to
-  `usr/bin`, three menu entries to `usr/share/applications` and the two polkit
-  actions (Recipe's and recab's) to `usr/share/polkit-1/actions`. Run on the
-  development machine only.
-- **Done: nothing else has to be added to either image.** The programs link
-  Qt 6 Widgets, Gui, Core and Svg, the C++ runtime and OpenGL. Both desktop
-  locks carry them already (`qt6-qtbase`, `qt6-qtbase-gui` and `qt6-qtsvg`
-  6.11.2 on Fedora 45; `qt6-qtbase`, `qt6-qtbase-x11` and `qt6-qtsvg` 6.11.1
-  on Alpine 3.24), and `pkexec` (`polkit`, `polkit-common`). The polkit actions
-  name `/usr/bin/recipe` and `/usr/bin/recab`, where the builder puts both.
+- **Done: one build for all four.** `gui/CMakeLists.txt` builds them together;
+  `cmake --install` with a `DESTDIR` writes the four programs to `usr/bin`,
+  three menu entries (the apps', not the helper's) to `usr/share/applications`
+  and the two polkit actions (Recipe's and recab's) to
+  `usr/share/polkit-1/actions`. Run on the development machine only.
+- **The helper.** `levitate-agent` has no window and no menu entry. It is built
+  at `agent/levitate-agent` in the build tree and installed as
+  `usr/bin/levitate-agent`. `levitate-agent --version` prints
+  `levitate-agent 0.1`.
+- **What the helper needs at run time:** `gdbus` (GLib's tool, for desktop
+  notices) and one agent program, `codex` or `claude`. Disk also runs `lsblk`.
+- **No agent program is in either image, and no recipe for one exists.** For a
+  person this means the apps start and their own pages work, but everything
+  that hands work to the agent fails until they install `codex` or `claude`
+  themselves.
+- **What the images carry of that** (from the package locks; the files inside
+  the packages were not opened): Fedora has `gdbus` in `glib2` and `lsblk` in
+  `util-linux-core`, both in the base lock. Alpine has `lsblk` in the base
+  lock; its `gdbus` is in `glib-bin`, which neither Alpine lock has, so Acorn
+  lacks `gdbus` until `glib-bin` is added to `[packages]` in
+  `distro/variants/acorn/distro.toml` and the lock is made again. A polkit
+  agent for `pkexec` is in the desktop lock of each desktop: `polkit-kde`
+  (Plasma) and `lxqt-policykit` (LXQt, through `lxqt-desktop`). Whether each
+  one starts in the session has not been seen.
+- **Done: the apps need nothing else added to either image.** The programs
+  link Qt 6 Widgets, Gui, Core and Svg, the C++ runtime and OpenGL. Both
+  desktop locks carry them already (`qt6-qtbase`, `qt6-qtbase-gui` and
+  `qt6-qtsvg` 6.11.2 on Fedora 45; `qt6-qtbase`, `qt6-qtbase-x11` and
+  `qt6-qtsvg` 6.11.1 on Alpine 3.24), and `pkexec` (`polkit`, `polkit-common`).
+  The polkit actions name `/usr/bin/recipe` and `/usr/bin/recab`, where the
+  builder puts both.
 - **Written, never run: the build inside the image pipeline** (the route
   chosen 2026-11-10: each distro's own root).
   - `[desktop].apps_build_packages` in each `distro.toml` names what compiling
@@ -151,15 +173,19 @@ is done and what is not, for getting them into both desktop images:
     root, with the static Recipe as the worker, since an Alpine root cannot
     run the host's. The recipe runs `cmake` there and publishes the installed
     tree, which is merged into the desktop system's rootfs.
-  - The contract lists the apps (`DESKTOP_APPS`), and a desktop rootfs without
-    them is refused.
+  - The contract lists the apps (`DESKTOP_APPS`, with `DESKTOP_APP_ENTRIES`)
+    and the helper (`DESKTOP_HELPERS`, no menu entry), and a desktop rootfs
+    without any of them is refused.
+- **Written, never run: the `desktop-boot` check** (`desktop-boot.sh`). In the
+  booted desktop each app is on PATH, has its menu entry and answers
+  `--version` with Qt's offscreen platform; the helper is on PATH and answers
+  `--version`.
 - **Not known until it runs:** whether the unpacked trees work as roots
   (nothing ran the packages' scripts; only the linker's name on Fedora and the
   shell's on Alpine are set by hand), whether CMake and the compiler run under
   Ginux (the build uses make with one job, because parallel make and Ninja's
   use of file times failed or were doubtful there before), and how long
   copying a root of that size takes for each run.
-- **Not done:** the `desktop-boot` check that starts each app in the session.
 
 ## In the pipeline
 
