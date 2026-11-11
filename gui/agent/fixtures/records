@@ -15,14 +15,19 @@ apps:
   Recipe  failed (story "fails")
   System  an administrator step the person refused (story "administrator")
 
-A record with no last line is only "waiting" or "running" while its process
-lives, so those two runs are left running: a small holder process keeps its
-input open. `--stop` ends them (their records then say stopped). Run `--stop`
-when the check is over.
+A record with no last line is only "waiting" or "running" while the process
+the run lives in does. A run lives in a process of its own, which goes on
+without the window that started it, so those two runs are left running by
+simply letting go of the helpers that started them (they are killed; the runs
+do not mind). `--stop` ends the two runs with `levitate-agent --stop` (their
+records then say stopped). Run `--stop` when the check is over.
 
 Prints one line: the folder to give the app as XDG_STATE_HOME, and the pid of
-the waiting agent (the running one is the oldest run), as `state=FOLDER/state waiting_pid=N`. Exits non-zero, with
-the reason on standard error, when a run did not end where it should.
+the helper that started the waiting run (the running one is the oldest run), as
+`state=FOLDER/state waiting_pid=N`. That is the number the record names as
+`pid`, which is what an app matches against its own helper; the helper itself is
+gone by then. Exits non-zero, with the reason on standard error, when a run did
+not end where it should.
 """
 import json
 import os
@@ -47,7 +52,8 @@ def environment(folder, story):
             os.remove(log + suffix)
     env.update(HOME=os.path.join(folder, "home"), XDG_STATE_HOME=os.path.join(folder, "state"),
                XDG_CONFIG_HOME=os.path.join(folder, "config"), LEVITATE_AGENT_CODEX=STANDIN,
-               LEVITATE_AGENT_ROOT_HELPER="", LEVITATE_STANDIN_LOG=log, LEVITATE_STANDIN_STORY=story)
+               XDG_RUNTIME_DIR=os.path.join(folder, "run"), LEVITATE_AGENT_ROOT_HELPER="", LEVITATE_AGENT_NOTIFIER="",
+               LEVITATE_STANDIN_LOG=log, LEVITATE_STANDIN_STORY=story)
     return env
 
 
@@ -75,31 +81,25 @@ def drive(binary, folder, story, app, title, prompt, answer=None, keep=False, un
     return proc
 
 
-def hold(proc, folder):
-    """Keeps the waiting agent's pipes open after this script ends."""
-    pid = os.fork()
-    if pid:
-        return pid
-    os.setsid()
-    # The child owns the pipe ends it inherited; it only has to stay.
-    # Let go of the caller's output, or it would wait for this process to end.
-    null = os.open(os.devnull, os.O_RDWR)
-    for fd in (0, 1, 2):
-        os.dup2(null, fd)
-    while True:
-        time.sleep(3600)
-
-
 def stop(folder):
-    path = os.path.join(folder, "waiting.pids")
+    """Ends the runs that were left going."""
+    path = os.path.join(folder, "going.json")
     if not os.path.exists(path):
         return
-    for pid in open(path).read().split():
-        try:
-            os.kill(int(pid), signal.SIGTERM)
-        except ProcessLookupError:
-            pass
+    going = json.load(open(path))
+    for run_id in going["ids"]:
+        subprocess.run([going["binary"], "--stop", run_id], env=environment(folder, "plain"), capture_output=True, timeout=60)
     os.remove(path)
+
+
+def running_ids(binary, folder):
+    listing = json.loads(subprocess.check_output([binary, "--list"], env=environment(folder, "plain")))
+    return [r["id"] for r in listing["runs"] if r["state"] in ("running", "waiting")]
+
+
+def stop_after(binary, folder):
+    json.dump({"binary": binary, "ids": running_ids(binary, folder)}, open(os.path.join(folder, "going.json"), "w"))
+    stop(folder)
 
 
 def main():
@@ -143,10 +143,20 @@ def main():
                          % (done.returncode, failed.returncode, refused.returncode))
         waiting.kill()
         running.kill()
+        stop_after(binary, folder)
         return 1
-    holders = [hold(waiting, folder), hold(running, folder)]
-    open(os.path.join(folder, "waiting.pids"), "w").write(" ".join(str(p) for p in [waiting.pid, running.pid] + holders))
-    print("state=%s waiting_pid=%d" % (os.path.join(folder, "state"), waiting.pid))
+    # Let go of the helpers; the runs are theirs no more.
+    pids = (waiting.pid, running.pid)
+    for proc in (waiting, running):
+        proc.kill()
+        proc.wait()
+    ids = running_ids(binary, folder)
+    json.dump({"binary": binary, "ids": ids}, open(os.path.join(folder, "going.json"), "w"))
+    if len(ids) != 2:
+        sys.stderr.write("records: %d runs are going (expected 2)\n" % len(ids))
+        stop(folder)
+        return 1
+    print("state=%s waiting_pid=%d" % (os.path.join(folder, "state"), pids[0]))
     return 0
 
 

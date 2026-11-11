@@ -11,7 +11,6 @@ public:
     Passthrough(Session *session, const QString &program);
     void begin(const Request &request) override;
     void answered(const QString &id, const QString &answer, const QByteArray &line) override;
-    void inputClosed() override;
     void stop() override;
 
 private:

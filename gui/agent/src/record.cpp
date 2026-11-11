@@ -1,5 +1,7 @@
 #include "record.h"
 
+#include "link.h"
+
 #include <QDateTime>
 #include <QDir>
 #include <QJsonDocument>
@@ -15,9 +17,20 @@ QString now()
     return QDateTime::currentDateTimeUtc().toString(Qt::ISODateWithMs);
 }
 
-void Record::open(const QString &app, const QString &title, const QString &prompt)
+QString Record::newId()
 {
-    id_ = QString::number(QRandomGenerator::global()->generate(), 16).rightJustified(8, QLatin1Char('0'));
+    return QString::number(QRandomGenerator::global()->generate(), 16).rightJustified(8, QLatin1Char('0'));
+}
+
+QString socketName(const QString &id)
+{
+    return id + QStringLiteral(".sock");
+}
+
+void Record::open(const QString &id, const QString &app, const QString &title, const QString &prompt, qint64 starter,
+                  const QJsonObject &extra)
+{
+    id_ = id;
     QDir().mkpath(settings_.runsDir);
     const QString stamp = QDateTime::currentDateTimeUtc().toString(QStringLiteral("yyyyMMdd'T'HHmmss'Z'"));
     file_.setFileName(settings_.runsDir + "/" + stamp + "-" + id_ + ".jsonl");
@@ -25,17 +38,22 @@ void Record::open(const QString &app, const QString &title, const QString &promp
     // asked for the work, not for the record.
     if (!file_.open(QIODevice::WriteOnly | QIODevice::Append))
         qWarning("levitate-agent: cannot write the record %s", qPrintable(file_.fileName()));
-    // The pid lets a later --list tell a run that is still going from one
-    // that was killed before it could write its last line.
-    line({{"record", "request"}, {"id", id_}, {"t", now()}, {"app", app}, {"title", title}, {"prompt", prompt},
-          {"agent", settings_.agent}, {"pid", qint64(getpid())}});
+    // `pid` is the process that asked, as it always was; `host` is the process
+    // the run lives in, which lets a later --list tell a run that is still
+    // going from one that was killed before it could write its last line.
+    QJsonObject request{{"record", "request"}, {"id", id_}, {"t", now()}, {"app", app}, {"title", title},
+                        {"prompt", prompt}, {"agent", settings_.agent}, {"pid", starter}, {"host", qint64(getpid())}};
+    for (auto field = extra.begin(); field != extra.end(); ++field)
+        request[field.key()] = field.value();
+    line(request);
 }
 
-void Record::event(const QJsonObject &event)
+QJsonObject Record::event(const QJsonObject &event)
 {
     QJsonObject stamped = event;
     stamped["t"] = now();
     line(stamped);
+    return stamped;
 }
 
 void Record::end(const QString &state)
@@ -54,7 +72,7 @@ void Record::line(const QJsonObject &object)
     file_.flush();
 }
 
-static QList<QJsonObject> readLines(const QString &path)
+QList<QJsonObject> readRecord(const QString &path)
 {
     QList<QJsonObject> lines;
     QFile file(path);
@@ -70,10 +88,36 @@ static QList<QJsonObject> readLines(const QString &path)
 
 static bool alive(qint64 pid)
 {
-    return pid > 0 && (::kill(pid_t(pid), 0) == 0 || errno == EPERM);
+    if (pid <= 0 || (::kill(pid_t(pid), 0) != 0 && errno != EPERM))
+        return false;
+    // A process that has ended but not been collected is not there any more.
+    QFile stat(QStringLiteral("/proc/%1/stat").arg(pid));
+    if (stat.open(QIODevice::ReadOnly)) {
+        const QByteArray text = stat.readAll();
+        const qsizetype close = text.lastIndexOf(')');
+        if (close > 0 && text.mid(close + 2, 1) == "Z")
+            return false;
+    }
+    return true;
 }
 
-static QJsonObject summarise(const QList<QJsonObject> &lines)
+// The pid of a run's own process, if that is what it still is: the number may
+// have been given to some other program since.
+static bool hostIsAlive(const QJsonObject &request)
+{
+    // Records from before runs had a process of their own name only `pid`.
+    const qint64 pid = request.contains("host") ? request["host"].toInteger() : request["pid"].toInteger();
+    if (!alive(pid))
+        return false;
+    if (!request.contains("host"))
+        return true;
+    QFile cmdline(QStringLiteral("/proc/%1/cmdline").arg(pid));
+    if (!cmdline.open(QIODevice::ReadOnly))
+        return true; // cannot be looked at (not ours): trust the pid
+    return cmdline.readAll().contains(request["id"].toString().toUtf8());
+}
+
+static QJsonObject summarise(const Settings &settings, const QList<QJsonObject> &lines)
 {
     const QJsonObject request = lines.value(0);
     QString state = QStringLiteral("running");
@@ -92,7 +136,7 @@ static QJsonObject summarise(const QList<QJsonObject> &lines)
         }
     }
     if (ended.isEmpty()) {
-        if (!alive(request["pid"].toInteger())) {
+        if (!hostIsAlive(request)) {
             // Killed without a last line: it is over, and not by finishing.
             state = QStringLiteral("stopped");
             ended = lines.last()["t"].toString();
@@ -100,9 +144,11 @@ static QJsonObject summarise(const QList<QJsonObject> &lines)
             state = QStringLiteral("waiting");
         }
     }
+    // A window can attach only to a run that is going and has its socket.
+    const bool attachable = ended.isEmpty() && sockets::exists(settings.socketsDir, socketName(request["id"].toString()));
     return {{"id", request["id"]},   {"app", request["app"]},         {"title", request["title"]},
             {"state", state},        {"started", request["t"]},       {"ended", ended.isEmpty() ? QJsonValue() : ended},
-            {"summary", summary}};
+            {"summary", summary},    {"attachable", attachable}};
 }
 
 QJsonObject listRuns(const Settings &settings)
@@ -112,9 +158,9 @@ QJsonObject listRuns(const Settings &settings)
     QList<QJsonObject> runs;
     const QStringList names = QDir(settings.runsDir).entryList({"*.jsonl"}, QDir::Files, QDir::Name | QDir::Reversed);
     for (const QString &name : names.mid(0, 200)) {
-        const QList<QJsonObject> lines = readLines(settings.runsDir + "/" + name);
+        const QList<QJsonObject> lines = readRecord(settings.runsDir + "/" + name);
         if (!lines.isEmpty() && lines.first()["record"] == QLatin1String("request"))
-            runs << summarise(lines);
+            runs << summarise(settings, lines);
     }
     std::stable_sort(runs.begin(), runs.end(),
                      [](const QJsonObject &a, const QJsonObject &b) { return a["started"].toString() > b["started"].toString(); });
@@ -134,8 +180,30 @@ QJsonArray showRun(const Settings &settings, const QString &id, bool *found)
         if (id.isEmpty() || !name.endsWith("-" + id + ".jsonl"))
             continue;
         *found = true;
-        for (const QJsonObject &line : readLines(settings.runsDir + "/" + name))
+        for (const QJsonObject &line : readRecord(settings.runsDir + "/" + name))
             all << line;
     }
     return all;
+}
+
+QString recordPath(const Settings &settings, const QString &id)
+{
+    if (id.isEmpty())
+        return QString();
+    const QStringList names = QDir(settings.runsDir).entryList({"*.jsonl"}, QDir::Files);
+    for (const QString &name : names)
+        if (name.endsWith("-" + id + ".jsonl"))
+            return settings.runsDir + "/" + name;
+    return QString();
+}
+
+qint64 liveHost(const Settings &settings, const QString &id)
+{
+    const QList<QJsonObject> lines = readRecord(recordPath(settings, id));
+    if (lines.isEmpty() || lines.first()["record"] != QLatin1String("request"))
+        return 0;
+    for (const QJsonObject &line : lines)
+        if (line["record"] == QLatin1String("end"))
+            return 0;
+    return hostIsAlive(lines.first()) ? lines.first()["host"].toInteger() : 0;
 }

@@ -1,0 +1,13 @@
+#!/usr/bin/env python3
+"""A stand-in for what shows a desktop notice (LEVITATE_AGENT_NOTIFIER).
+
+levitate-agent runs it with the title and the text as its two arguments. It
+shows nothing; it appends them as one JSON line to LEVITATE_STANDIN_NOTICES,
+so that a check can see what would have been shown.
+"""
+import json
+import os
+import sys
+
+with open(os.environ["LEVITATE_STANDIN_NOTICES"], "a") as notices:
+    notices.write(json.dumps({"title": sys.argv[1], "body": sys.argv[2]}) + "\n")

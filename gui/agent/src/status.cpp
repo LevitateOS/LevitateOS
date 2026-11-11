@@ -38,30 +38,41 @@ Ran ask(const QString &program, const QStringList &arguments)
 
 } // namespace
 
-QJsonObject agentStatus(const Settings &settings)
+// One agent's line of the status: is it there, which version, is the person
+// signed in. `signInArguments` is how that agent says whether the person is
+// signed in (exit code 0 when they are).
+static QJsonObject describe(const QString &id, const QString &name, const QString &programName, const QStringList &signInArguments)
 {
-    QJsonArray agents;
-
-    const QString found = QStandardPaths::findExecutable(settings.codexProgram);
-    const bool installed = !found.isEmpty() || (settings.codexProgram.contains('/') && QFileInfo(settings.codexProgram).isExecutable());
+    const QString found = QStandardPaths::findExecutable(programName);
+    const bool installed = !found.isEmpty() || (programName.contains('/') && QFileInfo(programName).isExecutable());
     QString version;
     QJsonValue signedIn;
     if (installed) {
-        const QString program = found.isEmpty() ? settings.codexProgram : found;
+        const QString program = found.isEmpty() ? programName : found;
         const Ran asked = ask(program, {"--version"});
         // "codex-cli 0.167.0": the number is what matters.
         static const QRegularExpression number(QStringLiteral("\\d+(\\.\\d+)+\\S*"));
         const QRegularExpressionMatch match = number.match(asked.text);
         version = match.hasMatch() ? match.captured() : asked.text;
-        // Prints "Logged in using ..." and exits 0 when signed in; anything
-        // else is not signed in. A program that could not be asked says nothing.
-        const Ran login = ask(program, {"login", "status"});
+        // Exits 0 when signed in; anything else is not signed in. A program
+        // that could not be asked says nothing.
+        const Ran login = ask(program, signInArguments);
         if (login.started)
             signedIn = login.code == 0;
     }
-    agents << QJsonObject{{"id", "codex"}, {"name", "Codex"}, {"installed", installed}, {"version", version}, {"signed_in", signedIn}};
+    return {{"id", id}, {"name", name}, {"installed", installed}, {"version", version}, {"signed_in", signedIn}};
+}
 
-    if (settings.agent != QLatin1String("codex")) {
+QJsonObject agentStatus(const Settings &settings)
+{
+    QJsonArray agents;
+    // `codex login status` prints "Logged in using ..." and exits 0 when
+    // signed in. `claude auth status` "exits with code 0 if logged in, 1 if
+    // not" (Claude Code's CLI reference).
+    agents << describe(QStringLiteral("codex"), QStringLiteral("Codex"), settings.codexProgram, {"login", "status"});
+    agents << describe(QStringLiteral("claude"), QStringLiteral("Claude Code"), settings.claudeProgram, {"auth", "status"});
+
+    if (settings.agent != QLatin1String("codex") && settings.agent != QLatin1String("claude")) {
         const bool usable = QFileInfo(settings.agent).isExecutable() || !QStandardPaths::findExecutable(settings.agent).isEmpty();
         agents << QJsonObject{{"id", settings.agent}, {"name", QFileInfo(settings.agent).fileName()}, {"installed", usable},
                               {"version", ""}, {"signed_in", QJsonValue()}};

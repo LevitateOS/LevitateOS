@@ -1,6 +1,12 @@
 // levitate-agent: what the desktop apps talk to instead of a coding agent.
 // The apps speak one small protocol (see README.md); each agent speaks its own.
+//
+// Started the usual way (the request on standard input) it is only a relay:
+// the run itself lives in a process of its own, `levitate-agent --host`, that
+// the relay starts and that goes on when the relay ends.
 #include "account.h"
+#include "claude.h"
+#include "client.h"
 #include "codex.h"
 #include "passthrough.h"
 #include "record.h"
@@ -24,6 +30,7 @@ static QJsonObject settingsInForce(const Settings &settings)
 {
     return {{"agent", settings.agent},
             {"run_commands", settings.commandsAllowed ? "allowed" : "ask"},
+            {"notices", settings.notices},
             {"file", settings.configFile}};
 }
 
@@ -70,20 +77,40 @@ int main(int argc, char **argv)
     }
     if (args.size() == 1 && (args[0] == QLatin1String("--sign-in") || args[0] == QLatin1String("--sign-out")))
         return account(settings, args[0] == QLatin1String("--sign-in"));
+    if (args.size() == 2 && args[0] == QLatin1String("--stop"))
+        return stopRun(settings, args[1]);
+
+    if (args.size() == 2 && args[0] == QLatin1String("--attach")) {
+        Client client(settings, Client::Attach, args[1]);
+        client.run();
+        return app.exec();
+    }
+
+    // The process a run lives in. Only the relay starts it, with the request
+    // on its standard input; it is not for people to run.
+    if (args.size() == 4 && args[0] == QLatin1String("--host") && args[2] == QLatin1String("--starter")) {
+        Session session(settings, args[1], args[3].toLongLong());
+        // The agent is named in one place. Another agent is another branch here.
+        if (settings.agent == QLatin1String("codex"))
+            session.setAdapter(new Codex(&session));
+        else if (settings.agent == QLatin1String("claude"))
+            session.setAdapter(new Claude(&session));
+        else
+            session.setAdapter(new Passthrough(&session, settings.agent));
+        session.run();
+        return app.exec();
+    }
+
     if (!args.isEmpty()) {
         fputs("usage: levitate-agent             (reads a request on standard input)\n"
               "       levitate-agent --list | --status | --show ID\n"
+              "       levitate-agent --attach ID | --stop ID\n"
               "       levitate-agent --settings | --set KEY=VALUE | --sign-in | --sign-out\n",
               stderr);
         return args.value(0) == QLatin1String("--help") ? 0 : 2;
     }
 
-    Session session(settings);
-    // The agent is named in one place. Another agent is another branch here.
-    if (settings.agent == QLatin1String("codex"))
-        session.setAdapter(new Codex(&session));
-    else
-        session.setAdapter(new Passthrough(&session, settings.agent));
-    session.run();
+    Client client(settings, Client::Relay, Record::newId());
+    client.run();
     return app.exec();
 }

@@ -13,8 +13,8 @@ void Passthrough::begin(const Request &request)
     child_ = new Child(this);
     child_->setProgram(program_);
     // What it writes on standard output is its answer, and belongs to the app
-    // as it would without us.
-    child_->setProcessChannelMode(QProcess::ForwardedOutputChannel);
+    // as it would without us: the window that started the run is sent it.
+    connect(child_, &QProcess::readyReadStandardOutput, this, [this] { session_->forwardOutput(child_->readAllStandardOutput()); });
     connect(child_, &QProcess::readyReadStandardError, this, [this] {
         buffer_ += child_->readAllStandardError();
         qsizetype end;
@@ -25,6 +25,9 @@ void Passthrough::begin(const Request &request)
         }
     });
     connect(child_, &QProcess::finished, this, [this](int code, QProcess::ExitStatus status) {
+        const QByteArray rest = child_->readAllStandardOutput();
+        if (!rest.isEmpty())
+            session_->forwardOutput(rest);
         if (!buffer_.isEmpty())
             session_->forward(buffer_);
         buffer_.clear();
@@ -46,12 +49,6 @@ void Passthrough::answered(const QString &, const QString &, const QByteArray &l
 {
     if (child_)
         child_->write(line + '\n');
-}
-
-void Passthrough::inputClosed()
-{
-    if (child_)
-        child_->closeWriteChannel();
 }
 
 void Passthrough::stop()

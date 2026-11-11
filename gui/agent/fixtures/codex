@@ -14,7 +14,8 @@ rule holds (signed in unless LEVITATE_STANDIN_SIGNED_OUT is set). Like the real
 `codex login`, `login` prints an address and then ends. `LEVITATE_STANDIN_LOGIN_FAILS`
 makes it end without signing in.
 
-Stories: plain, asks, administrator, run, shell, fails, signed-out, dies, hang.
+Stories: plain, asks, administrator, run, shell, fails, signed-out, dies, hang, slow,
+writes (writes a file in the working folder when the sandbox is workspace-write).
 The turn is counted in a file next to the log, one count for the session.
 """
 import json
@@ -72,6 +73,16 @@ def end():
     out(type="turn.completed", usage={"input_tokens": 1, "cached_input_tokens": 0, "output_tokens": 1})
 
 
+def sandbox_mode():
+    args = sys.argv[1:]
+    if "-s" in args:
+        return args[args.index("-s") + 1]
+    for a in args:
+        if a.startswith("sandbox_mode="):
+            return a.split("=", 1)[1].strip('"')
+    return None
+
+
 def story(turn, prompt):
     begin()
     if STORY == "plain":
@@ -112,6 +123,20 @@ def story(turn, prompt):
             message("RUN: echo plain" if "plain command" in prompt else "RUN: false")
         else:
             message("Done with the plain command.")
+    elif STORY == "slow":
+        command("c1", "true", "", 0)  # something to read, so that a window has been connected
+        time.sleep(float(os.environ.get("LEVITATE_STANDIN_SLOW", "1.5")))
+        message("Done, slowly.")
+    elif STORY == "writes":
+        # The sandbox is `-s MODE` on a first turn, `-c sandbox_mode="MODE"` on a resume.
+        mode = sandbox_mode()
+        if mode == "workspace-write":
+            path = os.path.join(os.getcwd(), "made-by-standin.txt")
+            open(path, "w").write("made")
+            item("completed", "file_change", id="f1", status="completed", changes=[{"path": path, "kind": "add"}])
+            message("I wrote the file.")
+        else:
+            message("I could not write the file.")
     elif STORY == "fails":
         out(type="turn.failed", error={"message": "The model is overloaded"})
         sys.exit(1)

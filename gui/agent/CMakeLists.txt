@@ -14,8 +14,14 @@ qt_add_executable(levitate-agent
     src/settings.cpp
     src/record.cpp
     src/session.cpp
+    src/client.cpp
+    src/link.cpp
+    src/sigwatch.cpp
+    src/notify.cpp
     src/child.cpp
+    src/conversation.cpp
     src/codex.cpp
+    src/claude.cpp
     src/passthrough.cpp
     src/status.cpp
     src/account.cpp

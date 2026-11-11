@@ -1,0 +1,231 @@
+#!/usr/bin/env python3
+"""A stand-in for `claude`, for checking levitate-agent without a real one.
+
+It answers `--version`, `auth status|login|logout` and print mode
+(`-p --output-format stream-json --verbose ...`, the prompt on standard input)
+and prints JSON lines in exactly the shapes of Anthropic's documentation:
+system/init, assistant messages with text and tool_use blocks, user messages
+with tool_result blocks, and the final result line (code.claude.com/docs/en/
+headless, cli-reference, and agent-sdk/typescript for SDKSystemMessage,
+SDKAssistantMessage, SDKUserMessage, SDKResultMessage). What it does is chosen
+by LEVITATE_STANDIN_STORY; every call is appended to LEVITATE_STANDIN_LOG as
+one JSON line (arguments, prompt, which turn, working folder).
+
+`auth login` and `auth logout` keep whether it is signed in in
+`$HOME/.standin-claude-signed` ("in" or "out"); `auth status` follows that file
+and exits 0 when signed in, 1 when not (as the CLI reference says), and without
+the file signed in unless LEVITATE_STANDIN_SIGNED_OUT is set.
+
+Stories: plain, asks, administrator, run, fails, signed-out, dies, hang, slow,
+writes, denied. The turn is counted in a file next to the log.
+"""
+import json
+import os
+import subprocess
+import sys
+import time
+import uuid
+
+STORY = os.environ.get("LEVITATE_STANDIN_STORY", "plain")
+LOG = os.environ.get("LEVITATE_STANDIN_LOG", "/tmp/levitate-standin.log")
+SESSION = "11111111-2222-3333-4444-555555555555"
+_ids = [0]
+
+
+def out(**message):
+    message.setdefault("uuid", str(uuid.uuid4()))
+    message.setdefault("session_id", SESSION)
+    sys.stdout.write(json.dumps(message) + "\n")
+    sys.stdout.flush()
+
+
+def init(mode):
+    out(type="system", subtype="init", apiKeySource="none", claude_code_version="0.0.0-standin", cwd=os.getcwd(),
+        tools=["Bash", "Edit", "Read", "Write", "TodoWrite", "WebSearch"], mcp_servers=[], model="standin",
+        permissionMode=mode, slash_commands=[], output_style="default", skills=[], plugins=[])
+
+
+def assistant(*blocks, **extra):
+    _ids[0] += 1
+    out(type="assistant", parent_tool_use_id=None,
+        message={"id": "msg_%d" % _ids[0], "type": "message", "role": "assistant", "model": "standin",
+                 "content": list(blocks), "stop_reason": None, "usage": {"input_tokens": 1, "output_tokens": 1}}, **extra)
+
+
+def text(words):
+    return {"type": "text", "text": words}
+
+
+def tool(tool_id, name, **input):
+    return {"type": "tool_use", "id": tool_id, "name": name, "input": input}
+
+
+def tool_result(tool_id, content, error=False):
+    out(type="user", parent_tool_use_id=None,
+        message={"role": "user", "content": [{"type": "tool_result", "tool_use_id": tool_id, "content": content,
+                                              "is_error": error}]})
+
+
+def result(words, error=False, subtype="success", errors=None):
+    fields = dict(type="result", subtype=subtype, is_error=error, duration_ms=1, duration_api_ms=1, num_turns=1,
+                  stop_reason="end_turn", total_cost_usd=0, usage={}, modelUsage={}, permission_denials=[])
+    if subtype == "success":
+        fields["result"] = words
+    else:
+        fields["errors"] = errors or []
+    out(**fields)
+
+
+def turn_number():
+    path = LOG + ".turns"
+    count = int(open(path).read()) + 1 if os.path.exists(path) else 1
+    open(path, "w").write(str(count))
+    return count
+
+
+def value(args, flag):
+    return args[args.index(flag) + 1] if flag in args else None
+
+
+def story(turn, prompt, args):
+    mode = value(args, "--permission-mode")
+    init(mode)
+    if STORY == "plain":
+        todos = lambda a, b, c: [{"content": "Look around", "status": a, "activeForm": "Looking around"},
+                                 {"content": "Make the change", "status": b, "activeForm": "Making the change"},
+                                 {"content": "Check it", "status": c, "activeForm": "Checking it"}]
+        assistant(tool("t1", "TodoWrite", todos=todos("in_progress", "pending", "pending")))
+        tool_result("t1", "Todos have been modified successfully")
+        assistant({"type": "thinking", "thinking": "thinking about it", "signature": "x"})
+        assistant(tool("t2", "Bash", command="ls -l", description="List"))
+        tool_result("t2", "total 0")
+        assistant(tool("t3", "TodoWrite", todos=todos("completed", "in_progress", "pending")))
+        tool_result("t3", "ok")
+        assistant(tool("t4", "Bash", command="seq 1 100"))
+        tool_result("t4", "\n".join(str(n) for n in range(1, 101)))
+        assistant(tool("t5", "Write", file_path="/home/x/a.txt", content="a"))
+        tool_result("t5", "File created successfully at: /home/x/a.txt")
+        assistant(tool("t6", "Edit", file_path="/home/x/b.txt", old_string="a", new_string="b"))
+        tool_result("t6", "The file /home/x/b.txt has been updated.")
+        assistant(tool("t7", "WebSearch", query="levitate recipe format"))
+        tool_result("t7", [{"type": "text", "text": "results"}])
+        assistant(tool("t8", "Read", file_path="/home/x/b.txt"))
+        tool_result("t8", "b")
+        assistant(tool("t9", "TodoWrite", todos=todos("completed", "completed", "completed")))
+        tool_result("t9", "ok")
+        assistant(text("Working on it."))
+        assistant(text("I made the change. Everything checks out."))
+        result("I made the change. Everything checks out.")
+    elif STORY == "asks":
+        if turn == 1:
+            assistant(text("I need to know one thing.\nASK: Which colour? | Red | Blue"))
+            result("I need to know one thing.\nASK: Which colour? | Red | Blue")
+        else:
+            assistant(text("I used the colour you chose: %s." % prompt.strip()))
+            result("I used the colour you chose: %s." % prompt.strip())
+    elif STORY == "administrator":
+        if turn == 1:
+            words = "This needs the administrator.\nRUN-AS-ADMINISTRATOR: id -u\nBECAUSE: It shows which user the command ran as."
+        elif "refused" in prompt:
+            words = "Understood, I left it alone."
+        else:
+            words = "It ran. The prompt said: " + " ".join(prompt.split())
+        assistant(text(words))
+        result(words)
+    elif STORY == "run":
+        words = "RUN: echo hello from the person" if turn == 1 else "It ran. " + " ".join(prompt.split())
+        assistant(text(words))
+        result(words)
+    elif STORY == "fails":
+        result("", error=True, subtype="error_during_execution", errors=["The model is overloaded"])
+        sys.exit(1)
+    elif STORY == "signed-out":
+        assistant(text("Not logged in · Please run /login"), error="authentication_failed")
+        result("Not logged in · Please run /login", error=True)
+        sys.exit(1)
+    elif STORY == "dies":
+        sys.stderr.write("stream closed\n")
+        sys.exit(1)
+    elif STORY == "hang":
+        child = subprocess.Popen(["sleep", "300"])
+        open(LOG + ".pids", "w").write("%d %d" % (os.getpid(), child.pid))
+        assistant(tool("t1", "Bash", command="sleep 300"))
+        time.sleep(300)
+    elif STORY == "slow":
+        assistant(tool("t1", "Bash", command="true"))  # something to read, so that a window has been connected
+        tool_result("t1", "")
+        time.sleep(float(os.environ.get("LEVITATE_STANDIN_SLOW", "1.5")))
+        assistant(text("Done, slowly."))
+        result("Done, slowly.")
+    elif STORY == "writes":
+        if mode == "acceptEdits":
+            path = os.path.join(os.getcwd(), "made-by-standin.txt")
+            open(path, "w").write("made")
+            assistant(tool("t1", "Write", file_path=path, content="made"))
+            tool_result("t1", "File created successfully at: " + path)
+            words = "I wrote the file."
+        else:
+            words = "I could not write the file."
+        assistant(text(words))
+        result(words)
+    elif STORY == "denied":
+        assistant(tool("t1", "Bash", command="touch /usr/nope"))
+        out(type="system", subtype="permission_denied", tool_name="Bash", tool_use_id="t1", message="denied",
+            decision_reason_type="mode")
+        tool_result("t1", "Permission to use Bash with command touch /usr/nope has been denied.", error=True)
+        assistant(text("I was not allowed to run it."))
+        result("I was not allowed to run it.")
+
+
+def signed_file():
+    return os.path.join(os.path.expanduser("~"), ".standin-claude-signed")
+
+
+def signed_in():
+    try:
+        return open(signed_file()).read().strip() == "in"
+    except OSError:
+        return not os.environ.get("LEVITATE_STANDIN_SIGNED_OUT")
+
+
+def main():
+    args = sys.argv[1:]
+    if args[:1] == ["--version"]:
+        print("0.0.0-standin (Claude Code)")
+        return
+    if args[:2] == ["auth", "login"]:
+        print("Opening browser to sign in...", flush=True)
+        print("If the browser did not open, visit: https://auth.standin.invalid/oauth/authorize?state=standin", flush=True)
+        if os.environ.get("LEVITATE_STANDIN_LOGIN_FAILS"):
+            sys.stderr.write("Login failed: the sign-in was not completed\n")
+            sys.exit(1)
+        time.sleep(float(os.environ.get("LEVITATE_STANDIN_LOGIN_SECONDS", "0.3")))
+        open(signed_file(), "w").write("in")
+        print("Login successful")
+        return
+    if args[:2] == ["auth", "logout"]:
+        open(signed_file(), "w").write("out")
+        print("Successfully logged out")
+        return
+    if args[:2] == ["auth", "status"]:
+        if not signed_in():
+            print(json.dumps({"loggedIn": False, "authMethod": "none"}))
+            sys.exit(1)
+        print(json.dumps({"loggedIn": True, "authMethod": "claude.ai"}))
+        return
+    if "-p" not in args and "--print" not in args:
+        sys.stderr.write("stand-in: only print mode and auth are here\n")
+        sys.exit(2)
+    # Every stream-json example in the documentation has --verbose; check we pass it.
+    if value(args, "--output-format") == "stream-json" and "--verbose" not in args:
+        sys.stderr.write("stand-in: the documentation uses --output-format stream-json together with --verbose\n")
+        sys.exit(1)
+    prompt = sys.stdin.read()
+    turn = turn_number()
+    with open(LOG, "a") as log:
+        log.write(json.dumps({"args": args, "prompt": prompt, "turn": turn, "cwd": os.getcwd()}) + "\n")
+    story(turn, prompt, args)
+
+
+if __name__ == "__main__":
+    main()

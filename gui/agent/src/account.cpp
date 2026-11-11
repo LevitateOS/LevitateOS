@@ -31,13 +31,16 @@ void say(const QByteArray &line)
 
 int account(const Settings &settings, bool signIn)
 {
-    if (settings.agent != QLatin1String("codex")) {
+    const bool claude = settings.agent == QLatin1String("claude");
+    if (settings.agent != QLatin1String("codex") && !claude) {
         say(QFileInfo(settings.agent).fileName().toUtf8() + " signs in by itself; there is nothing to do here.");
         return 1;
     }
-    Child codex;
-    codex.setProgram(settings.codexProgram);
-    codex.setArguments({signIn ? "login" : "logout"});
+    Child codex; // the agent's own program, Codex or Claude Code
+    // `codex login` and `codex logout`; Claude Code has `claude auth login`
+    // and `claude auth logout` (its CLI reference).
+    codex.setProgram(claude ? settings.claudeProgram : settings.codexProgram);
+    codex.setArguments(claude ? QStringList{"auth", signIn ? "login" : "logout"} : QStringList{signIn ? "login" : "logout"});
     codex.setProcessChannelMode(QProcess::MergedChannels);
     codex.setStandardInputFile(QProcess::nullDevice());
     int code = 1;
@@ -65,7 +68,7 @@ int account(const Settings &settings, bool signIn)
         if (error != QProcess::FailedToStart)
             return;
         started = false;
-        say("Codex is not installed.");
+        say(claude ? "Claude Code is not installed." : "Codex is not installed.");
         QCoreApplication::quit();
     });
     // Stopped (the window closed, the person cancelled): Codex goes too.

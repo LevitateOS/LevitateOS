@@ -28,25 +28,43 @@ Settings Settings::load()
         if (!object["agent"].toString().isEmpty())
             settings.agent = object["agent"].toString();
         settings.commandsAllowed = object["run_commands"].toString() == QLatin1String("allowed");
+        // A boolean in the file; a word is read too, so a hand-written file works.
+        const QJsonValue notices = object["notices"];
+        if (notices.isBool())
+            settings.notices = notices.toBool();
+        else if (notices.isString())
+            settings.notices = notices.toString() != QLatin1String("false");
     }
     if (!qEnvironmentVariable("LEVITATE_AGENT").isEmpty())
         settings.agent = qEnvironmentVariable("LEVITATE_AGENT");
     if (!qEnvironmentVariable("LEVITATE_AGENT_CODEX").isEmpty())
         settings.codexProgram = qEnvironmentVariable("LEVITATE_AGENT_CODEX");
+    if (!qEnvironmentVariable("LEVITATE_AGENT_CLAUDE").isEmpty())
+        settings.claudeProgram = qEnvironmentVariable("LEVITATE_AGENT_CLAUDE");
+    if (qEnvironmentVariableIsSet("LEVITATE_AGENT_NOTIFIER")) {
+        settings.notifierSet = true;
+        settings.notifier = qEnvironmentVariable("LEVITATE_AGENT_NOTIFIER");
+    }
     // Set but empty is a choice (checks run the command directly).
     if (qEnvironmentVariableIsSet("LEVITATE_AGENT_ROOT_HELPER"))
         settings.rootHelper = qEnvironmentVariable("LEVITATE_AGENT_ROOT_HELPER");
 
-    settings.runsDir = xdgDir("XDG_STATE_HOME", settings.home + "/.local/state") + "/levitate/agent/runs";
+    const QString state = xdgDir("XDG_STATE_HOME", settings.home + "/.local/state") + "/levitate/agent";
+    settings.runsDir = state + "/runs";
+    // The runtime folder is the right place for sockets: it is the person's
+    // own, goes away at logout, and is never backed up. Without one (a bare
+    // console, a check) the state folder holds them instead.
+    const QString runtime = qEnvironmentVariable("XDG_RUNTIME_DIR");
+    settings.socketsDir = runtime.isEmpty() ? state + "/sockets" : runtime + "/levitate-agent";
     return settings;
 }
 
 QString Settings::set(const QString &key, const QString &value)
 {
     if (key == QLatin1String("agent")) {
-        if (value != QLatin1String("codex")) {
+        if (value != QLatin1String("codex") && value != QLatin1String("claude")) {
             if (!QDir::isAbsolutePath(value))
-                return QStringLiteral("The agent is codex, or the full path of a program.");
+                return QStringLiteral("The agent is codex, claude, or the full path of a program.");
             const QFileInfo info(value);
             if (!info.exists())
                 return QStringLiteral("%1 does not exist.").arg(value);
@@ -56,6 +74,9 @@ QString Settings::set(const QString &key, const QString &value)
     } else if (key == QLatin1String("run_commands")) {
         if (value != QLatin1String("ask") && value != QLatin1String("allowed"))
             return QStringLiteral("Running commands is either ask or allowed.");
+    } else if (key == QLatin1String("notices")) {
+        if (value != QLatin1String("true") && value != QLatin1String("false"))
+            return QStringLiteral("Notices are either true or false.");
     } else {
         return QStringLiteral("There is no setting called %1.").arg(key);
     }
@@ -67,7 +88,10 @@ QString Settings::set(const QString &key, const QString &value)
     if (old.open(QIODevice::ReadOnly))
         object = QJsonDocument::fromJson(old.readAll()).object();
     old.close();
-    object[key] = value;
+    if (key == QLatin1String("notices"))
+        object[key] = value == QLatin1String("true");
+    else
+        object[key] = value;
     if (!QDir().mkpath(QFileInfo(path).absolutePath()))
         return QStringLiteral("The folder for %1 could not be made.").arg(path);
     QSaveFile out(path);
