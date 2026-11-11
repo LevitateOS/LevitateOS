@@ -6,6 +6,8 @@
 #include "frame.h"
 #include "refresh.h"
 
+#include <QFile>
+#include <QFileDialog>
 #include <QTimer>
 #include <QLocale>
 #include <QMessageBox>
@@ -40,11 +42,14 @@ Window::Window(QWidget *parent)
 
     stack_ = new QStackedWidget;
     system_ = new SystemPage;
+    next_ = new NextPage;
+    back_ = new BackPage;
     ask_ = new AskPage;
     work_ = new WorkPage;
     clash_ = new ClashPage;
     proposed_ = new ProposedPage;
-    for (QWidget *page : {static_cast<QWidget *>(system_), static_cast<QWidget *>(ask_), static_cast<QWidget *>(work_),
+    for (QWidget *page : {static_cast<QWidget *>(system_), static_cast<QWidget *>(next_), static_cast<QWidget *>(back_),
+                          static_cast<QWidget *>(ask_), static_cast<QWidget *>(work_),
                           static_cast<QWidget *>(clash_), static_cast<QWidget *>(proposed_)})
         stack_->addWidget(page);
 
@@ -52,23 +57,30 @@ Window::Window(QWidget *parent)
     frame_ = new Frame(Frame::System);
     frame_->setContent(stack_);
     frame_->addEntry(QStringLiteral("overview"), tr("Overview"));
+    frame_->addEntry(QStringLiteral("next"), tr("The next system"));
+    frame_->addEntry(QStringLiteral("back"), tr("Getting back"));
     frame_->select(QStringLiteral("overview"));
+    section_ = QStringLiteral("overview");
     frame_->setAgent(client_.agentProgram());
     frame_->setStatus(tr("Read from recab on this machine"));
     setCentralWidget(frame_);
     connect(frame_, &Frame::chosen, this, [this](const QString &key) {
         if (key == Frame::activityKey())
             updateStrip();
+        else if (key == QLatin1String("next"))
+            showNext();
+        else if (key == QLatin1String("back"))
+            showBack();
         else
             showMain();
     });
-    // The strip's button goes where the next system is finished: Overview.
+    // The strip's button goes where the next system is finished.
     connect(frame_, &Frame::finishRequested, this, [this] {
-        frame_->select(QStringLiteral("overview"));
-        showMain();
+        frame_->select(QStringLiteral("next"));
+        showNext();
     });
     connect(frame_, &Frame::goToRun, this, [this] {
-        frame_->select(QStringLiteral("overview"));
+        frame_->select(section_);
         display(work_);
     });
 
@@ -88,10 +100,47 @@ Window::Window(QWidget *parent)
     connect(system_, &SystemPage::fix, this,
             [this](const QString &prompt) { fixWithAgent(prompt, tr("The agent is changing the next system")); });
 
-    connect(ask_, &AskPage::back, this, &Window::showMain);
+    connect(system_, &SystemPage::openNext, this, [this] {
+        frame_->select(QStringLiteral("next"));
+        showNext();
+    });
+    connect(system_, &SystemPage::openBack, this, [this] {
+        frame_->select(QStringLiteral("back"));
+        showBack();
+    });
+
+    connect(next_, &NextPage::ask, this, [this] { showAsk(); });
+    connect(next_, &NextPage::installSoftware, this, &Window::installSoftware);
+    connect(next_, &NextPage::reset, this, [this] { reset(); });
+    connect(next_, &NextPage::settle, this, &Window::showClash);
+    connect(next_, &NextPage::finish, this, &Window::finish);
+    connect(next_, &NextPage::restart, this, &Window::restart);
+    connect(next_, &NextPage::restartLater, this, &Window::restartLater);
+    connect(next_, &NextPage::cancelRestart, this, &Window::cancelRestart);
+    connect(next_, &NextPage::recover, this, &Window::recover);
+    connect(next_, &NextPage::discard, this, [this] { discard(); });
+    connect(next_, &NextPage::keep, this, &Window::keep);
+    connect(next_, &NextPage::goBack, this, [this] { goBack(); });
+    connect(next_, &NextPage::openDisk, this, [this] { frame_->startApp(Frame::Disk); });
+    connect(next_, &NextPage::openOverview, this, [this] {
+        frame_->select(QStringLiteral("overview"));
+        showMain();
+    });
+
+    connect(back_, &BackPage::goBack, this, [this] { goBack(); });
+    connect(back_, &BackPage::keep, this, &Window::keep);
+    connect(back_, &BackPage::cancelRestart, this, &Window::cancelRestart);
+    connect(back_, &BackPage::saveSteps, this, [this] {
+        const QString path = QFileDialog::getSaveFileName(this, tr("Save the steps"), QStringLiteral("start-up-steps.txt"),
+                                                          tr("Text (*.txt)"));
+        if (!path.isEmpty() && !saveSteps(path))
+            QMessageBox::warning(this, tr("System"), tr("The steps could not be saved to %1.").arg(path));
+    });
+
+    connect(ask_, &AskPage::back, this, &Window::showSection);
     connect(ask_, &AskPage::handOver, this, [this](const QString &prompt) { handOver(prompt); });
 
-    connect(work_, &WorkPage::back, this, &Window::showMain);
+    connect(work_, &WorkPage::back, this, &Window::showSection);
     connect(work_, &WorkPage::activity, this, [this](const QString &words) {
         frame_->setAgentNote(words);
     });
@@ -106,7 +155,7 @@ Window::Window(QWidget *parent)
         });
     });
 
-    connect(clash_, &ClashPage::later, this, &Window::showMain);
+    connect(clash_, &ClashPage::later, this, &Window::showSection);
     connect(clash_, &ClashPage::byHand, this, &Window::decideByHand);
     connect(clash_, &ClashPage::fix, this,
             [this](const QString &prompt) { fixWithAgent(prompt, tr("The agent is settling the clash")); });
@@ -115,17 +164,18 @@ Window::Window(QWidget *parent)
     connect(proposed_, &ProposedPage::askAgain, this, &Window::showClash);
     connect(proposed_, &ProposedPage::byHand, this, &Window::decideByHand);
 
-    connect(system_, &SystemPage::readAgain, this, [this] { reload([this] { showMain(); }); });
+    connect(system_, &SystemPage::readAgain, this, [this] { reload([this] { showSection(); }); });
     connect(system_, &SystemPage::readAsAdministrator, this, [this] {
         asRoot_ = true;
-        reload([this] { showMain(); });
+        reload([this] { showSection(); });
     });
 
     // F5, and coming back to the window after a while: an agent or a terminal
     // may have changed the system in the meantime.
     refresher_ = new Refresher(this, 20);
     connect(refresher_, &Refresher::asked, this, [this](bool byHand) {
-        if (stack_->currentWidget() == system_ || byHand)
+        if (stack_->currentWidget() == system_ || stack_->currentWidget() == next_ || stack_->currentWidget() == back_
+            || byHand)
             refresh();
     });
     connect(refresher_, &Refresher::asked, frame_, &Frame::readAgain);
@@ -136,19 +186,20 @@ Window::Window(QWidget *parent)
     connect(again, &QToolButton::clicked, this, &Window::refresh);
     frame_->addStatusWidget(again);
 
-    reload([this] { showMain(); });
+    reload([this] { showSection(); });
 }
 
 void Window::refresh()
 {
     if (busy())
         return;
-    // Only the main page is drawn from the state alone; a page being filled
-    // in is left as it is.
-    const bool main = stack_->currentWidget() == system_;
+    // Only the pages drawn from the state alone are drawn again; a page being
+    // filled in is left as it is.
+    QWidget *shown = stack_->currentWidget();
+    const bool main = shown == system_ || shown == next_ || shown == back_;
     reload([this, main] {
         if (main)
-            showMain();
+            showSection();
     });
 }
 
@@ -179,6 +230,9 @@ void Window::reload(std::function<void()> then)
         }
         status_ = status;
         read_ = true;
+        // The number of changes the next system holds, when it exists.
+        frame_->setBadge(QStringLiteral("next"),
+                         status_.otherRole == QLatin1String("next") ? int(status_.changes.size()) : 0);
         updateStrip();
         refresher_->fresh();
         frame_->setStatus(tr("Read from recab at %1").arg(QLocale().toString(QTime::currentTime(), QLocale::ShortFormat)));
@@ -204,14 +258,24 @@ void Window::answerAgent(const QString &words)
 void Window::display(QWidget *page)
 {
     stack_->setCurrentWidget(page);
-    frame_->follow(QStringLiteral("overview"));
+    // The three pages are their own entries; the pages in between belong to
+    // the one the person came from.
+    if (page == system_)
+        section_ = QStringLiteral("overview");
+    else if (page == next_)
+        section_ = QStringLiteral("next");
+    else if (page == back_)
+        section_ = QStringLiteral("back");
+    frame_->follow(section_);
     updateStrip();
 }
 
 void Window::updateStrip()
 {
-    // Overview says it itself; every other page, and Activity, gets the strip.
-    frame_->setStripAllowed(frame_->activityShown() || stack_->currentWidget() != system_);
+    // The next system's page and Overview say it themselves; every other
+    // page, and Activity, gets the strip.
+    frame_->setStripAllowed(frame_->activityShown()
+                            || (stack_->currentWidget() != system_ && stack_->currentWidget() != next_));
     frame_->setNextSystem(status_.otherRole == QLatin1String("next") ? status_.changeTitles() : QStringList());
 }
 
@@ -219,6 +283,41 @@ void Window::showMain()
 {
     system_->show(status_);
     display(system_);
+}
+
+void Window::showNext()
+{
+    next_->show(status_);
+    display(next_);
+}
+
+void Window::showBack()
+{
+    back_->show(status_);
+    display(back_);
+}
+
+void Window::showSection()
+{
+    if (section_ == QLatin1String("next"))
+        showNext();
+    else if (section_ == QLatin1String("back"))
+        showBack();
+    else
+        showMain();
+}
+
+void Window::installSoftware()
+{
+    frame_->startApp(Frame::Recipe);
+}
+
+bool Window::saveSteps(const QString &path)
+{
+    QFile file(path);
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate))
+        return false;
+    return file.write(backStepsText(status_).toUtf8()) >= 0;
 }
 
 void Window::showAsk(const QString &request)
@@ -263,7 +362,7 @@ void Window::work(Run *run, const QString &title, const QString &subtitle, std::
 void Window::chain(QList<Run *> runs)
 {
     if (runs.isEmpty()) {
-        reload([this] { showMain(); });
+        reload([this] { showSection(); });
         return;
     }
     Run *run = runs.takeFirst();
@@ -279,7 +378,7 @@ void Window::chain(QList<Run *> runs)
                 left->deleteLater();
             QMessageBox::warning(this, tr("System"),
                                  reason.isEmpty() ? tr("The change was not made.") : reason);
-            reload([this] { showMain(); });
+            reload([this] { showSection(); });
             return;
         }
         chain(runs);
@@ -295,7 +394,7 @@ void Window::handOver(const QString &prompt, bool askFirst)
             return;
     }
     work(client_.agent(prompt, requestTitle(prompt, tr("Preparing the next system"))), tr("Preparing the next system"),
-         tr("The running system is not touched. You can keep working."), [this](bool) { showMain(); });
+         tr("The running system is not touched. You can keep working."), [this](bool) { showSection(); });
 }
 
 void Window::fixWithAgent(const QString &prompt, const QString &title)
@@ -306,7 +405,7 @@ void Window::fixWithAgent(const QString &prompt, const QString &title)
                  proposed_->show(status_);
                  display(proposed_);
              } else {
-                 showMain();
+                 showSection();
              }
          });
 }
@@ -323,20 +422,20 @@ void Window::addUpdate(bool askFirst)
              if (!status_.clashes.isEmpty())
                  showClash();
              else
-                 showMain();
+                 showSection();
          });
 }
 
 void Window::finish()
 {
     work(client_.change({"finalize"}), tr("Finishing the next system"),
-         tr("It is checked and closed, so it can be started."), [this](bool) { showMain(); });
+         tr("It is checked and closed, so it can be started."), [this](bool) { showSection(); });
 }
 
 void Window::recover()
 {
     work(client_.change({"recover"}), tr("Continuing where it stopped"),
-         tr("recab looks at what is really there and carries on."), [this](bool) { showMain(); });
+         tr("recab looks at what is really there and carries on."), [this](bool) { showSection(); });
 }
 
 void Window::restart()
@@ -362,7 +461,7 @@ void Window::cancelRestart()
 void Window::keep()
 {
     work(client_.change({"commit"}), tr("Keeping this system"),
-         tr("It becomes the system that every restart starts."), [this](bool) { showMain(); });
+         tr("It becomes the system that every restart starts."), [this](bool) { showSection(); });
 }
 
 void Window::goBack(bool askFirst)
@@ -417,14 +516,14 @@ void Window::reset(bool askFirst)
         drop->deleteLater();
         if (!ok) {
             QMessageBox::warning(this, tr("System"), reason.isEmpty() ? tr("The next system was not reset.") : reason);
-            reload([this] { showMain(); });
+            reload([this] { showSection(); });
             return;
         }
         // Read first, so the copy is asked for as a new preparation. The
         // copy is the long part and gets the work page.
         reload([this] {
             work(client_.change({"prepare"}), tr("Making the next system a copy of the running one"),
-                 tr("Only what differs is copied. The running system is not touched."), [this](bool) { showMain(); });
+                 tr("Only what differs is copied. The running system is not touched."), [this](bool) { showSection(); });
         });
     });
     drop->start();

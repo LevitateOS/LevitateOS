@@ -14,6 +14,7 @@
 #include <QFile>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QLabel>
 #include <QElapsedTimer>
 #include <QFileInfo>
 #include <QProcess>
@@ -45,6 +46,52 @@ QString asked(const char *request)
         .arg(QLatin1String(request));
 }
 
+
+
+// ---------------------------------------------------------------- The next system and Getting back
+//
+// What a page says, for the checks: every label as written, every button as
+// "[Words]" or "[Words](off)" when recab's verdict leaves it off.
+
+QString wordsOn(QWidget *page)
+{
+    QStringList words;
+    for (QWidget *child : page->findChildren<QWidget *>()) {
+        if (!child->isVisibleTo(page))
+            continue;
+        if (auto *button = qobject_cast<QPushButton *>(child))
+            words << QStringLiteral("[%1]%2").arg(button->text(), button->isEnabled() ? QString() : QStringLiteral("(off)"));
+        else if (auto *label = qobject_cast<QLabel *>(child))
+            words << label->text();
+    }
+    return words.join(QLatin1Char('\n'));
+}
+
+// Shows one of the three pages and says what it holds; Overview again after.
+QString showWords(Window &window, int which)
+{
+    // As a click on the rail does: leaves Activity or Settings if they were showing.
+    window.frame()->select(which == 0 ? QStringLiteral("overview") : which == 1 ? QStringLiteral("next")
+                                                                                : QStringLiteral("back"));
+    if (which == 0)
+        window.showMain();
+    else if (which == 1)
+        window.showNext();
+    else
+        window.showBack();
+    settle(200);
+    switch (which) {
+    case 0:
+        return wordsOn(window.findChild<SystemPage *>());
+    case 1:
+        return wordsOn(window.findChild<NextPage *>());
+    }
+    return wordsOn(window.findChild<BackPage *>());
+}
+
+QString overviewWords(Window &window) { return showWords(window, 0); }
+QString nextWords(Window &window) { return showWords(window, 1); }
+QString backWords(Window &window) { return showWords(window, 2); }
 
 // ---------------------------------------------------------------- Activity
 //
@@ -514,6 +561,33 @@ int takeShots(Window &window, const QString &folder)
     expect("starts stable", window.status().state == "stable");
     save(window, "01-stable");
 
+    // The two pages beside Overview, with no next system.
+    {
+        const QString overview = overviewWords(window);
+        expect("Overview names the one thing to do, and sends to the two pages",
+               overview.contains("What to do next") && overview.contains("[Make a change…]")
+                   && overview.contains("The rest is on:") && overview.contains("Getting back")
+                   && !overview.contains("[Go back…]"));
+        const QString next = nextWords(window);
+        expect("the next system's page says there is none, and offers to make one",
+               next.contains("There is no next system yet") && next.contains("[Make a change…]")
+                   && next.contains("[Install software…]") && window.frame()->badge("next") == 0
+                   && window.frame()->selected() == "next");
+        save(window, "p01-next-none");
+        const QString back = backWords(window);
+        expect("Getting back offers the way back, and says no restart is set",
+               back.contains("[Go back…]") && back.contains("None is set.") && back.contains("[Cancel it](off)")
+                   && back.contains("[Keep it](off)") && back.contains("Kept already.")
+                   && back.contains("Pick the running system, the one that is kept.")
+                   && !back.contains("Slot A") && !back.contains("recab commit(off)"));
+        expect("the steps for a desktop that does not start say how to make the choice stay, without names",
+               back.contains("recab commit") && back.contains("pick the system from before instead"));
+        save(window, "p02-back");
+        expect("the strip is not on Overview, nor on the next system's page", !window.frame()->stripShown());
+        window.showMain();
+        settle(100);
+    }
+
     window.showAsk(nvidia);
     save(window, "02-ask");
 
@@ -533,6 +607,18 @@ int takeShots(Window &window, const QString &folder)
     qunsetenv("RECAB_STANDIN_STOP_AT");
     expect("a stopped change is reported as interrupted", window.status().state == "interrupted");
     save(window, "05-interrupted");
+    {
+        const QString next = nextWords(window);
+        expect("the next system's page says it was interrupted, and offers to continue or discard",
+               next.contains("Preparing the next system was interrupted") && next.contains("[Continue where it stopped]")
+                   && next.contains("[Discard…]") && !next.contains("[Finish…]"));
+        save(window, "p03-next-interrupted");
+        const QString back = backWords(window);
+        expect("Getting back says the system from before is gone while the next one holds its place",
+               back.contains("There is none now: its place holds the next system.") && back.contains("[Go back…](off)"));
+        window.showMain();
+        settle(100);
+    }
 
     window.recover();
     waitUntilIdle(window);
@@ -548,6 +634,38 @@ int takeShots(Window &window, const QString &folder)
     waitUntilIdle(window);
     expect("a second change joins the same next system", window.status().changes.size() == 2);
     save(window, "06-next-system");
+    {
+        const QStringList titles = window.status().changeTitles();
+        const QString next = nextWords(window);
+        expect("the badge on the rail is the number of changes",
+               window.frame()->badge("next") == window.status().changes.size() && window.status().changes.size() == 2);
+        expect("the next system's page says it holds two changes, open",
+               next.contains("The next system holds 2 changes") && next.contains("It is open: not finished"));
+        expect("it lists every change by its title and no more than recab says",
+               next.contains(titles.value(0)) && next.contains(titles.value(1)) && !next.contains("Made by")
+                   && !next.contains("Take out") && !next.contains("Edit a file") && !next.contains(" MiB"));
+        expect("it offers what recab offers",
+               next.contains("[Make a change…]") && next.contains("[Install software…]") && next.contains("[Finish…]")
+                   && next.contains("[Reset to the running system…]") && next.contains("2. Choose when"));
+        expect("it says what will differ, from the changes",
+               next.contains("What will differ after the restart") && next.contains("Starts")
+                   && next.contains("the next system, when you restart into it") && next.contains("Your files")
+                   && next.contains("the same: home is shared by both systems")
+                   && next.contains("comes back to the running system by itself")
+                   && next.contains("See the two systems as blocks in Disk"));
+        save(window, "p04-next-open");
+        expect("the strip is not on the next system's page", !window.frame()->stripShown());
+        backWords(window);
+        expect("the strip is on Getting back", window.frame()->stripShown());
+        save(window, "p05-back-with-a-next-system");
+        const QString overview = overviewWords(window);
+        expect("Overview offers finishing as the one thing and not the rest of the next system's page",
+               overview.contains("[Finish…]") && !overview.contains("[Make a change…]")
+                   && !overview.contains("[Reset") && !window.frame()->stripShown());
+        save(window, "p06-overview-open");
+        window.showMain();
+        settle(100);
+    }
     activityShots(window, folder, "a", int(window.status().changes.size()), save, expect, out);
     settingsShots(window, folder, save, expect, out);
 
@@ -555,6 +673,14 @@ int takeShots(Window &window, const QString &folder)
     waitUntilIdle(window);
     expect("the update clashes with the edited file", !window.status().clashes.isEmpty());
     save(window, "07-clash");
+    {
+        const QString next = nextWords(window);
+        expect("the next system's page offers to settle the clash and not to finish",
+               next.contains("The update clashes with one of your changes") && next.contains("[Settle the clash…]")
+                   && !next.contains("[Finish…]") && next.contains("Release"));
+        window.showMain();
+        settle(100);
+    }
 
     window.fixWithAgent(QStringLiteral("The issue:\nThe update and a local change both altered /etc/ssh/sshd_config.\n\n"
                                        "The expected result:\nOne sshd_config that sshd accepts. Password logins stay "
@@ -571,11 +697,41 @@ int takeShots(Window &window, const QString &folder)
     waitUntilIdle(window);
     expect("finishing makes it ready", window.status().state == "ready");
     save(window, "09-ready");
+    {
+        const QString next = nextWords(window);
+        expect("the next system's page says it is ready, and offers the restart now or later",
+               next.contains("The next system is ready") && next.contains("[Restart now]")
+                   && next.contains("[Start it at the next restart]") && !next.contains("[Finish…]"));
+        save(window, "p07-next-ready");
+        const QString back = backWords(window);
+        expect("Getting back has nothing to cancel", back.contains("None is set.") && back.contains("[Cancel it](off)"));
+        const QString overview = overviewWords(window);
+        expect("Overview offers the restart as the one thing", overview.contains("[Restart into it]"));
+        window.showMain();
+        settle(100);
+    }
 
     window.restart();
     waitUntilIdle(window);
     expect("the first restart fails and falls back", window.status().state == "failed");
     save(window, "10-did-not-start");
+    {
+        const QString next = nextWords(window);
+        expect("the next system's page says it did not start, and offers to try again or hand it to the agent",
+               next.contains("The next system did not start, so the computer came back")
+                   && next.contains("[Try the same again]") && next.contains("[Hand it to the agent…]"));
+        save(window, "p08-next-came-back");
+        const QString back = backWords(window);
+        expect("Getting back says the computer came back, with the time recab gave",
+               back.contains("Kept already: the computer came back to it on") && back.contains("did not start properly")
+                   && back.contains("recab says"));
+        save(window, "p09-back-came-back");
+        const QString overview = overviewWords(window);
+        expect("Overview hands it to the agent and does not offer the reset",
+               overview.contains("[Let the agent fix it]") && !overview.contains("[Reset"));
+        window.showMain();
+        settle(100);
+    }
 
     window.fixWithAgent(QStringLiteral("The issue:\nThe next system stopped during start-up.\n\nThe expected result:\n"
                                        "The next system starts.\n"),
@@ -588,6 +744,23 @@ int takeShots(Window &window, const QString &folder)
     waitUntilIdle(window);
     expect("the second restart is kept", window.status().state == "stable" && window.status().trialOutcome == "kept");
     save(window, "11-on-the-new-system");
+    {
+        const QString back = backWords(window);
+        expect("Getting back says the new system is kept, and when it started properly",
+               back.contains("Kept already: it started properly on") && back.contains("startup ended with nothing failed")
+                   && back.contains("[Go back…]") && !back.contains("[Go back…](off)"));
+        save(window, "p10-back-kept");
+        const QString path = QDir(folder).filePath("p-steps-old.txt");
+        QFile::remove(path);
+        expect("the steps are written as a file", window.saveSteps(path));
+        QFile file(path);
+        const QString text = file.open(QIODevice::ReadOnly) ? QString::fromUtf8(file.readAll()) : QString();
+        expect("the file names the steps, and no system by a name recab did not give",
+               text.contains("1. Restart the computer") && text.contains("2. Pick the running system")
+                   && text.contains("3. To make that choice stay, run \"recab commit\"") && !text.contains("Slot "));
+        window.showMain();
+        settle(100);
+    }
 
     // Reading again by hand, as F5 does, leaves the page where it was.
     window.refresh();
@@ -607,6 +780,15 @@ int takeShots(Window &window, const QString &folder)
            window.status().otherRole == "next" && window.status().changes.isEmpty()
                && window.status().state == "preparing");
     save(window, "12-reset");
+    {
+        const QString next = nextWords(window);
+        expect("after the reset the next system holds nothing",
+               next.contains("The next system holds no changes yet") && next.contains("Nothing yet")
+                   && window.frame()->badge("next") == 0);
+        save(window, "p11-next-reset");
+        window.showMain();
+        settle(100);
+    }
 
     out << (ok ? "all flows ended where they should\n" : "some flows did not end where they should\n");
     return ok ? 0 : 1;
@@ -647,6 +829,31 @@ int takeRealShots(Window &window, const QString &folder)
            window.status().state == "stable" && window.status().otherRole == "copy");
     expect("the running system is named from os-release", window.status().name(window.status().runningRelease) == "LevitateOS 2026.11");
     save(window, "r1-two-copies");
+    {
+        const QString next = nextWords(window);
+        expect("the next system's page says there is none, and that the other place holds a copy",
+               next.contains("There is no next system yet") && next.contains("holds a copy of it"));
+        const QString back = backWords(window);
+        expect("Getting back says why there is nothing to go back to",
+               back.contains("There is none: the other place holds a copy of the running system.")
+                   && back.contains("[Go back…](off)") && back.contains("recab holds no record of one"));
+        expect("the steps name the two systems as recab titles them, and the running one",
+               back.contains("Pick \"LevitateOS (Slot A)\". That is the running system today, and it is kept.")
+                   && back.contains("\"LevitateOS (Slot B)\" holds a copy of it.")
+                   && back.contains("loader/entries/levitate-a.conf") && back.contains("loader/entries/levitate-b.conf"));
+        save(window, "rp1-back-two-copies");
+        const QString path = QDir(folder).filePath("rp-steps.txt");
+        QFile::remove(path);
+        expect("the steps are written as a file", window.saveSteps(path));
+        QFile file(path);
+        const QString text = file.open(QIODevice::ReadOnly) ? QString::fromUtf8(file.readAll()) : QString();
+        expect("the file names the steps and the systems",
+               text.contains("1. Restart the computer") && text.contains("2. Pick \"LevitateOS (Slot A)\"")
+                   && text.contains("3. To make that choice stay, run \"recab commit\" as administrator")
+                   && text.contains("\"LevitateOS (Slot B)\" holds a copy of it."));
+        window.showMain();
+        settle(100);
+    }
 
     window.handOver(asked(sshd), false);
     waitUntilIdle(window);
@@ -655,6 +862,14 @@ int takeRealShots(Window &window, const QString &folder)
                && window.status().changes.size() == 1);
     expect("the change says the agent made it", window.status().changeTitles().value(0).contains("by the agent"));
     save(window, "r2-the-next-system-is-open");
+    {
+        const QString next = nextWords(window);
+        expect("the next system's page shows who made the change, and when",
+               next.contains("Made by") && next.contains("The agent") && next.contains("When")
+                   && next.contains("edited: /etc/ssh/sshd_config") && window.frame()->badge("next") == 1);
+        window.showMain();
+        settle(100);
+    }
     activityShots(window, folder, "r2c", int(window.status().changes.size()), save, expect, out);
     {
         // The reader the other two apps use for their strip, against the same recab.
@@ -668,12 +883,51 @@ int takeRealShots(Window &window, const QString &folder)
                    && next.titles() == window.status().changeTitles());
     }
 
+    // A change made by the person, as Recipe would make it, with the stand-in's own command.
+    {
+        const QString recab = qEnvironmentVariable("RECAB_GUI_RECAB");
+        QProcess person;
+        person.start(recab, {"--json", "change", "install", "htop", "--preparation", window.status().preparationId,
+                             "--revision", QString::number(window.status().preparationRevision), "--actor", "person"});
+        person.waitForFinished(20000);
+        expect("the stand-in took a change from the person",
+               person.exitStatus() == QProcess::NormalExit && person.exitCode() == 0);
+        window.refresh();
+        waitUntilIdle(window);
+        const QString next = nextWords(window);
+        expect("the badge counts both changes", window.frame()->badge("next") == 2 && window.status().changes.size() == 2);
+        expect("the page says who made each, and when: the agent, and you",
+               next.contains("The next system holds 2 changes") && next.contains("The agent") && next.contains("You")
+                   && next.contains("htop, installed") && next.contains("added: htop") && next.contains("edited: /etc/ssh/sshd_config")
+                   && !next.contains("Take out") && !next.contains(" MiB"));
+        save(window, "rp2-next-open-with-who-and-when");
+        const QString overview = overviewWords(window);
+        expect("Overview offers finishing as the one thing, and sends to the two pages",
+               overview.contains("[Finish…]") && !overview.contains("[Make a change…]") && !overview.contains("[Reset")
+                   && overview.contains("The rest is on:"));
+        save(window, "rp3-overview-open");
+        window.showMain();
+        settle(100);
+    }
+
     // A command started in a terminal is running: nothing can be started here.
     qputenv("RECAB_STANDIN_WORKING", "1");
     window.refresh();
     waitUntilIdle(window);
     expect("a command running elsewhere is reported as working", window.status().state == "working");
     save(window, "r2b-a-command-runs-elsewhere");
+    {
+        const QString next = nextWords(window);
+        expect("while a command runs elsewhere the next system's page offers nothing, and says so once",
+               next.contains("The next system is being worked on") && !next.contains("[Make a change…]")
+                   && !next.contains("[Finish…]") && !next.contains("[Reset")
+                   && next.count("Nothing can be started while that command runs.") == 1);
+        save(window, "rp4-next-working");
+        const QString back = backWords(window);
+        expect("Getting back offers nothing then", back.contains("[Go back…](off)") && back.contains("[Cancel it](off)"));
+        window.showMain();
+        settle(100);
+    }
     qunsetenv("RECAB_STANDIN_WORKING");
     window.refresh();
     waitUntilIdle(window);
@@ -683,6 +937,16 @@ int takeRealShots(Window &window, const QString &folder)
     waitUntilIdle(window);
     expect("finishing makes it ready", window.status().state == "ready");
     save(window, "r3-ready");
+    {
+        const QString next = nextWords(window);
+        expect("the next system's page says it is ready, and offers the restart now or later",
+               next.contains("The next system is ready") && next.contains("[Restart now]")
+                   && next.contains("[Start it at the next restart]") && next.contains("The agent")
+                   && next.contains("You"));
+        save(window, "rp5-next-ready");
+        window.showMain();
+        settle(100);
+    }
 
     // Set for the next restart without restarting, and taken back.
     window.restartLater();
@@ -691,9 +955,30 @@ int takeRealShots(Window &window, const QString &folder)
            window.status().state == "trial_pending" && window.status().runningSlot == "A"
                && window.status().can("restart").ready);
     save(window, "r3b-starts-at-the-next-restart");
+    {
+        const QString next = nextWords(window);
+        expect("the next system's page says the restart is set, and offers to restart or cancel it",
+               next.contains("The next system starts at the next restart") && next.contains("[Restart now]")
+                   && next.contains("[Cancel the set restart]") && next.contains("that restart is set"));
+        save(window, "rp6-next-restart-set");
+        const QString back = backWords(window);
+        expect("Getting back offers to cancel the set restart",
+               back.contains("A restart into the next system is set") && back.contains("[Cancel it]")
+                   && !back.contains("[Cancel it](off)") && back.contains("[Go back…](off)"));
+        save(window, "rp7-back-restart-set");
+        window.showMain();
+        settle(100);
+    }
     window.cancelRestart();
     waitUntilIdle(window);
     expect("cancelling leaves the next system ready", window.status().state == "ready");
+    {
+        const QString back = backWords(window);
+        expect("after cancelling, Getting back says none is set", back.contains("None is set.") && back.contains("[Cancel it](off)"));
+        save(window, "rp8-back-restart-cancelled");
+        window.showMain();
+        settle(100);
+    }
     window.restartLater();
     waitUntilIdle(window);
 
@@ -706,17 +991,50 @@ int takeRealShots(Window &window, const QString &folder)
            window.status().state == "on_trial" && window.status().runningSlot == "B"
                && window.status().can("keep").ready);
     save(window, "r4-on-trial");
+    {
+        const QString next = nextWords(window);
+        expect("the next system's page says this is the trial, and offers to keep it or go back",
+               next.contains("You are on the next system, on trial") && next.contains("[Keep it]")
+                   && next.contains("[Go back…]") && !next.contains("Everything in it"));
+        save(window, "rp9-next-on-trial");
+        const QString back = backWords(window);
+        expect("Getting back offers keeping it, and names the system to pick if it does not start",
+               back.contains("It started, and is not kept yet.") && back.contains("[Keep it]") && !back.contains("[Keep it](off)")
+                   && back.contains("Pick \"LevitateOS (Slot A)\". That is the system from before. The running system, "
+                                    "\"LevitateOS (Slot B)\", is on trial and is not kept."));
+        save(window, "rp10-back-on-trial");
+        window.showMain();
+        settle(100);
+    }
     window.keep();
     waitUntilIdle(window);
     expect("keeping it makes it the kept system",
            window.status().state == "stable" && window.status().runningSlot == "B"
                && window.status().trialOutcome == "kept" && window.status().otherRole == "previous");
     save(window, "r4b-on-the-new-system");
+    {
+        const QString back = backWords(window);
+        expect("Getting back says it is kept, and when it started properly, in recab's words",
+               back.contains("Kept already: it started properly on") && back.contains("kept by hand")
+                   && back.contains("[Keep it](off)") && back.contains("[Go back…]") && !back.contains("[Go back…](off)"));
+        save(window, "rp11-back-kept");
+        window.showMain();
+        settle(100);
+    }
 
     window.goBack(false);
     waitUntilIdle(window);
     expect("going back lands on the first slot", window.status().runningSlot == "A");
     save(window, "r5-back");
+    {
+        const QString back = backWords(window);
+        expect("after going back, the system kept is the one before, and the trial was of the other",
+               back.contains("Kept already.") && back.contains("kept, but it was the other system that was tried")
+                   && back.contains("Pick \"LevitateOS (Slot A)\". That is the running system today"));
+        save(window, "rp12-back-after-going-back");
+        window.showMain();
+        settle(100);
+    }
 
     window.handOver(asked(nvidia), false);
     waitUntilIdle(window);
@@ -729,6 +1047,14 @@ int takeRealShots(Window &window, const QString &folder)
            window.status().state == "preparing" && window.status().changes.isEmpty()
                && !window.status().preparationId.isEmpty() && window.status().preparationId != before);
     save(window, "r6-reset");
+    {
+        const QString next = nextWords(window);
+        expect("after the reset the next system holds nothing", next.contains("The next system holds no changes yet")
+                                                                    && next.contains("Nothing yet") && window.frame()->badge("next") == 0);
+        save(window, "rp13-next-reset");
+        window.showMain();
+        settle(100);
+    }
     window.discard(false);
     waitUntilIdle(window);
     expect("discarding leaves no next system",

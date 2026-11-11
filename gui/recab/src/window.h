@@ -12,6 +12,8 @@ class AskPage;
 class ClashPage;
 class ConfirmDialog;
 class Frame;
+class NextPage;
+class BackPage;
 class ProposedPage;
 class Refresher;
 class QStackedWidget;
@@ -23,7 +25,12 @@ class Window : public QMainWindow {
 public:
     explicit Window(QWidget *parent = nullptr);
 
+    // Overview; the next system's page; Getting back.
     void showMain();
+    void showNext();
+    void showBack();
+    // The page the person was on before a flow took them elsewhere.
+    void showSection();
     void showAsk(const QString &request = QString());
     void showClash();
 
@@ -44,6 +51,10 @@ public:
     void fixWithAgent(const QString &prompt, const QString &title);
     void acceptProposal();
     void stopRun();
+    // Starts Recipe, where software is installed into this same next system.
+    void installSoftware();
+    // Writes the steps for a desktop that does not start, as plain text.
+    bool saveSteps(const QString &path);
 
     // The question shown before the place of the system from before is reused.
     ConfirmDialog *reuseQuestion();
@@ -83,6 +94,10 @@ private:
     Frame *frame_;
     QStackedWidget *stack_;
     SystemPage *system_;
+    NextPage *next_;
+    BackPage *back_;
+    // The rail entry the pages in between (ask, work, clash) belong to.
+    QString section_;
     AskPage *ask_;
     WorkPage *work_;
     ClashPage *clash_;

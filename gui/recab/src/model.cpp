@@ -14,6 +14,14 @@ QStringList Status::changeTitles() const
     return titles;
 }
 
+// recab titles each entry "<NAME of the system's os-release> (Slot A)"
+// (tools/recab/src/systemd_boot.rs, where it publishes a slot). Status does
+// not carry the title, so the name is put together from the same parts.
+QString Status::menuName(const QString &slot) const
+{
+    return real && !slot.isEmpty() && !distro.isEmpty() ? QObject::tr("%1 (Slot %2)").arg(distro, slot) : QString();
+}
+
 Status Status::fromJson(const QJsonObject &object)
 {
     Status s;
@@ -31,7 +39,13 @@ Status Status::fromJson(const QJsonObject &object)
     s.otherState = other["state"].toString();
     for (const QJsonValue &value : other["changes"].toArray()) {
         const QJsonObject change = value.toObject();
-        s.changes << ChangeItem{change["id"].toString(), change["kind"].toString(), change["title"].toString()};
+        ChangeItem item;
+        item.id = change["id"].toString();
+        item.kind = change["kind"].toString();
+        item.title = change["title"].toString();
+        item.what = item.title;
+        item.package = item.title;
+        s.changes << item;
     }
 
     const QJsonObject update = object["update"].toObject();
@@ -100,7 +114,16 @@ static ChangeItem changeFrom(const QJsonObject &change)
         title = QObject::tr("%1, edited").arg(package);
     else
         title = QObject::tr("%1 (%2)").arg(package, action);
-    return ChangeItem{change["id"].toString(), action == QLatin1String("edit") ? "file" : "software", title};
+    ChangeItem item;
+    item.id = change["id"].toString();
+    item.kind = action == QLatin1String("edit") ? "file" : "software";
+    item.title = title;
+    item.what = title;
+    item.action = action;
+    item.package = package;
+    item.actor = change["actor"].toString();
+    item.when = change["unix_time"].toInteger();
+    return item;
 }
 
 Status Status::fromReal(const QJsonObject &o, const QString &distro, const QString &release)
@@ -121,10 +144,19 @@ Status Status::fromReal(const QJsonObject &o, const QString &distro, const QStri
             s.trialOutcome = QStringLiteral("kept");
         else if (!trial["committed"].toBool())
             s.trialOutcome = QStringLiteral("failed");
+        else
+            s.trialOutcome = QStringLiteral("other");
     }
 
     // recab says where things stand itself (status schema 7); nothing here
     // works it out again from slots and phases.
+    s.entryPrefix = o["entry_prefix"].toString();
+    for (const QJsonValue &value : o["slots"].toArray()) {
+        const QJsonObject slot = value.toObject();
+        const bool running = slot["slot"].toString() == s.runningSlot;
+        (running ? s.runningEntry : s.otherEntry) = slot["entry"].toString();
+        (running ? s.runningDevice : s.otherDevice) = slot["device"].toString();
+    }
     const QJsonObject lifecycle = o["lifecycle"].toObject();
     static const QMap<QString, QString> states{
         {"stable", "stable"},           {"open", "preparing"}, {"working", "working"},
@@ -152,7 +184,7 @@ Status Status::fromReal(const QJsonObject &o, const QString &distro, const QStri
         // Every finished change, oldest first, with who asked for it.
         for (const QJsonValue &value : p["changes"].toArray()) {
             ChangeItem item = changeFrom(value.toObject());
-            if (value.toObject()["actor"].toString().startsWith(QLatin1String("agent")))
+            if (item.actor.startsWith(QLatin1String("agent")))
                 item.title = QObject::tr("%1, by the agent").arg(item.title);
             s.changes << item;
         }

@@ -12,11 +12,13 @@ what recab says may be done.
 Qt 6 Widgets, C++20, CMake. Widgets shared with `gui/recipe` and `gui/disk` are in `gui/kit`.
 
 The window is the shared frame from `gui/kit/README.md`: a rail (the three apps;
-"Overview"; "Activity" and "Settings" below), the pages, a strip, and a status line. The
-Ask, clash, work and problem pages are shown in the same place and the rail
-keeps Overview marked. The strip ("The next system holds N changes." and
-"Finish and restart…", which goes to Overview) shows on every page but Overview,
-and on Activity, while the next system holds changes. Activity lists the agent's
+"Overview", "The next system" and "Getting back"; "Activity" and "Settings" below), the pages, a strip, and a status line.
+The Ask, clash and work pages are shown in the same place and the rail keeps
+marked the page the person came from. "The next system" has a badge: the number of
+changes it holds, when it exists. The strip ("The next system holds N changes." and
+"Finish and restart…", which goes to "The next system") shows on every page but
+Overview and "The next system", which say it themselves, and on Activity, while the
+next system holds changes. Activity lists the agent's
 runs from all three apps. The status line has what was read and when, with "Read
 again", and the agent (`Agent: Codex, signed in` when `RECAB_GUI_AGENT` is
 `levitate-agent`; its file name for a stand-in). Window size 1100 by 700 the first time, then the size it had when it closed (`rememberWindowSize` in `gui/kit`; the picture modes always use 1100 by 700).
@@ -44,21 +46,34 @@ Still a stand-in everywhere: the agent, the restart and `pkexec`.
 
 ## What a person sees
 
-There are no slot letters anywhere, so the window is the same in both
-directions.
+Three pages in the rail, and the pages a flow passes through. Overview says in one
+heading and sentence what is true now, shows the two systems side by side, and
+offers the one thing to do next with a way to the pages that hold the rest; what
+lives on the other two pages is not repeated there as rows.
 
-| State | The window |
-|---|---|
-| Stable | "Your system is locked": the running system, and beside it the system from before. Make a change, add an available update, go back |
-| A change is asked for | Say it in words; the page shows what the agent is given. A question first when the place of the system from before will be reused |
-| Preparing | The steps (make it level, make the change, record it), how far, the output. Stop keeps what is done |
-| The next system holds changes | Its changes listed. Finish, add the update to this same system, change something else, discard |
-| A clash | The update and a change altered the same file: the prompt for the agent, or decide by hand |
-| What the agent did | Its result against each thing that was expected; accept, ask again, or decide by hand |
-| Ready | Restart into it; it comes back by itself if it does not start |
-| It did not start | Back on the untouched running system; the prompt for the agent, try again, or discard |
-| Interrupted | Continue where it stopped, or discard |
-| After a kept restart | "You are on the new system" |
+| State | Overview | The next system | Getting back |
+|---|---|---|---|
+| Stable, no next system | "Your system is locked"; Make a change | "There is no next system yet": Make a change, Install software | the way back (when there is a system from before), nothing to cancel |
+| A change is asked for | Say it in words; the page shows what the agent is given. A question first when the place of the system from before will be reused | | |
+| Preparing | The steps, how far, the output. Stop keeps what is done | | |
+| Open, holding changes | Finish; add the update (older stand-in) | Every change with who and when; what will differ; the three steps, step 1 current: Finish | the system from before is gone: its place holds the next system |
+| A clash (older stand-in) | Settle the clash | Settle the clash | |
+| Ready | Restart into it | Step 2 current: Restart now, Start it at the next restart | |
+| Restart set | Restart now | Restart now, Cancel the set restart | Cancel it |
+| On trial | Keep this system | "You are on the next system, on trial": Keep it, Go back | Keep it; Go back |
+| Being worked on elsewhere | one sentence | the list, and one sentence: nothing can be started | |
+| Interrupted | Continue where it stopped | Continue where it stopped, Discard | |
+| Tried, and the computer came back | the prompt for the agent, try again | step 3 marked failed: Try the same again, Hand it to the agent (leads to Overview) | "Kept already: the computer came back to it on …" |
+| After a kept restart | "You are on the new system" | "There is no next system yet" | "Kept already: it started properly on …"; the way back |
+
+Getting back always has the same three rows (go back, keep the running system,
+cancel a set restart), "If the desktop does not start" (steps that can be saved as a
+text file), "What going back does not turn back" and "How the running system
+started" (from `last_trial`).
+
+There are no slot letters on Overview. "The next system" says which slot starts
+(and its device), and "Getting back" names the two systems as the start-up list
+does, because that is the one place where a person has to tell them apart.
 
 ## Build and run from a checkout
 
@@ -109,7 +124,7 @@ export LEVITATE_ACTIVITY_AGENT=$PWD/.artifacts/agent/build/levitate-agent
 
 Without them the story says what is missing and fails. The pictures `s0-*` to `s14-*` are Settings: as first read, "Allowed", signing out (and the question first), a sign in that fails, signing in (the address Codex printed), another program, back to Codex, a refused value, "Try it" and the run in Activity, a helper that cannot be asked. The story sets `HOME`, `XDG_CONFIG_HOME`, `XDG_STATE_HOME` and `LEVITATE_AGENT_CODEX` itself for that part and puts them back. The pictures `a-*`
 (`r2c-*` in the real story) are Activity: the list, a done run, a run that
-waits, this window's own run, the strip on Activity. The other pictures show
+waits, this window's own run, the strip on Activity. The pictures `p*` (older stand-in) and `rp*` (`--real`) are "The next system" and "Getting back" in the states each stand-in reaches; `p-steps-old.txt` and `rp-steps.txt` are the steps saved as a file. The other pictures show
 Overview and the pages inside the frame.
 
 The story the real recab offers (two copies, a change by the agent, a command
@@ -184,7 +199,18 @@ Events, one JSON object per line on stderr:
 | "The second copy", "The system from before", "The next system" | `lifecycle.other`: `copy`, `previous`, `next` (`unknown`: no other system is drawn) |
 | "is being worked on" | `working`: a recab command holds the run lock. Nothing can be started; the page reads again every two seconds |
 | "This system is on trial" | `on_trial`: the running system is not kept yet |
-| the next system's changes | `preparation.changes`: every finished change, oldest first, with its `actor`; one whose actor starts with `agent` is marked "by the agent" |
+| the next system's changes | `preparation.changes`: every finished change, oldest first. Overview and the strip title them with `action` and `package` ("htop, installed"), and mark one whose `actor` starts with `agent` "by the agent". "The next system" has a row for each: its title, who (`actor`: `person` is "You", `agent…` is "The agent", another label as given, nothing when recab names none) and when (`unix_time`) |
+| the badge on "The next system" | the number of `preparation.changes`, when the other system is `next` |
+| "Starts" (The next system) | `inactive_slot` and that slot's `device` from `slots[]` |
+| "Software", "Files" (The next system) | the `action` and `package` of the changes: install, update, remove (software), edit (a path) |
+| "Your files: the same: home is shared by both systems" | `tools/recab/README.md` ("Shared homes/state ... are excluded" from the copy, "User data and caches may be shared on /var") |
+| the three steps of the next system | where the lifecycle stands (`lifecycle.state`) and the verdicts below; the sentence about start-up is `recab trial` in `tools/recab/README.md` (a healthy boot is committed, a failed one reboots into the known-good slot) |
+| "Go back to the system from before" | `actions[rollback]`, offered only when the other system is `previous` (or the running one is on trial): with a restart set recab's rollback would only cancel it |
+| "Keep the running system" | `commit` verdict on trial; otherwise "Kept already", with `last_trial` (time, committed or not, `detail`) when it is about the running system |
+| names in the start-up list | `"<NAME of os-release> (Slot A)"`, as `publish_installed` and the candidate publishing write them (`tools/recab/src/systemd_boot.rs`, "(Slot {slot})"); `status` does not carry the title, so the window puts it together from `distro` and the slot. The entry files come from `slots[].entry` (`loader/entries/<entry_prefix>-a.conf`) |
+| "make that choice stay" | `recab commit`: "makes the running slot known-good and the default" (README, `commit`), and it needs root (README, "Every operation that writes … requires root"). Not `recab rollback`: from an uncommitted slot that selects the known-good slot, the opposite |
+| "the list stays 5 seconds" | `loader_with_default` writes `timeout 5` in a loader.conf it creates (`tools/recab/src/entry.rs`) |
+| what going back does not turn back | REQ-PERSIST-006 (`REQUIREMENTS.md`): `/var` is shared and a rollback does not reverse it, including application data migrations |
 | Make a change | allowed when a preparation is open, else by the verdict on `prepare` |
 | Finish | `recab finalize --preparation ID --revision N` |
 | Reset to the running system | `recab discard --preparation ID --revision N`, then `recab prepare`: discarding only forgets the next system and leaves its files; preparing again copies the running system over them. recab has no single command for it |
@@ -235,7 +261,7 @@ allowed to run, and whether it runs as the person or as root are not decided.
 |---|---|
 | `src/model.*` | the status, as read from JSON |
 | `src/client.*` | the only code that runs `recab`, the agent and the restart |
-| `src/pages.*` | the system page, ask, work, a clash, what the agent did, the questions |
+| `src/pages.*` | Overview, the next system, getting back, ask, a clash, what the agent did, the questions |
 | `src/window.*` | the flows between pages, inside the frame |
 | `src/shots.*` | the picture mode and flow check |
 | `fixtures/` | `recab-real`: a stand-in with the real recab's status and commands (with `agent-real`, `reboot-real`, `os-release`); `recab`: the older stand-in with updates, clashes and proposals (with `agent`, `reboot`) |
@@ -243,6 +269,24 @@ allowed to run, and whether it runs as the person or as root are not decided.
 | `../kit/` | shared with `gui/recipe` and `gui/disk`: the frame, Activity, the next-system reader, widgets, the page base, the work page, the command runner, words, stand-in looks (see `../kit/README.md`) |
 
 ## Not done
+
+- History: the design has a page that lists past changes. recab has no command
+  that lists them (`status` holds only the open preparation's changes and the last
+  trial), so there is no page and no rail entry for it.
+- On "The next system": no size column and no "Take out" (recab gives no sizes and
+  has no command that undoes one change), no "Edit a file…" (recab has `edit PATH`,
+  but a person would need a file picker and an editor, not designed), no adding a
+  release (see below), no kernel line (status names none), no "waits for your
+  approval" row (the agent's questions are in Activity).
+- On "Getting back": "hold Space" is left out, because nothing in recab's source says
+  which key shows the start-up list (only `timeout 5`, which keeps it up for 5
+  seconds where recab wrote loader.conf: an existing loader.conf keeps its owner's
+  settings). Two of the design's four "does not turn back" lines are left out:
+  software installed for yourself only, and settings of the computer itself such as
+  the start-up order; recab's text confirms neither. The names in the start-up list
+  are put together from the os-release `NAME`, not read from the entry file.
+- The start-up steps are written for today's state; they were not tried on a real
+  A/B computer's start-up list.
 
 - Activity lists only the agent's runs. Installs, updates and restarts are not
   recorded anywhere yet, so they are not listed and nothing is made up for them.

@@ -13,6 +13,14 @@
 
 struct ChangeItem {
     QString id, kind, title; // kind: software, file, update, other
+    // What the next system's page lists. Only the real recab says more than
+    // a title: `what` is the title without "by the agent" (the page has a
+    // column for who), `action` and `package` are recab's own words for it
+    // (install, update, remove, edit; the package or the edited path), `actor`
+    // is the label the caller gave (empty when none) and `when` the unix time
+    // (0 when recab gives none).
+    QString what, action, package, actor;
+    qint64 when = 0;
 };
 
 struct ActionVerdict {
@@ -60,11 +68,21 @@ struct Status {
     QString proposalPath, proposalSummary, proposalScope; // what an agent did about a clash
     QList<Check> checks;
 
-    QString trialOutcome, trialDetail, trialWhen; // the last restart into a next system
+    // The last restart into a next system. Outcome: "kept" (the running
+    // system is the one tried), "failed" (the computer came back), "other"
+    // (kept, but it was the other system that was tried).
+    QString trialOutcome, trialDetail, trialWhen;
     int trialLogLines = 0;
     QString interruptedDuring;
 
     QMap<QString, ActionVerdict> actions;
+
+    // What recab says of the two places (real recab only): the entry file
+    // each one starts from, relative to the ESP, and its block device.
+    QString entryPrefix, runningEntry, otherEntry, runningDevice, otherDevice;
+    // How the start-up menu lists a system, as recab writes it. Empty when
+    // recab does not say.
+    QString menuName(const QString &slot) const;
 
     QString name(const QString &release) const { return (distro + QLatin1Char(' ') + release).trimmed(); }
     ActionVerdict can(const QString &action) const { return actions.value(action); }

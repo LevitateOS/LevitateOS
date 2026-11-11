@@ -44,7 +44,53 @@ signals:
     void retry();
     void readAgain();
     void readAsAdministrator();
+    // The ways to the two pages that hold the rest.
+    void openNext();
+    void openBack();
 };
+
+// Everything about the next system in one place: what it holds, what will
+// differ after the restart, and the three steps to get it started.
+class NextPage : public Page {
+    Q_OBJECT
+public:
+    using Page::Page;
+    void show(const Status &status);
+signals:
+    void ask();
+    void installSoftware();
+    void reset();
+    void settle();
+    void finish();
+    void restart();
+    void restartLater();
+    void cancelRestart();
+    void recover();
+    void discard();
+    void keep();
+    void goBack();
+    void openDisk();
+    // What to do about a next system that did not start is on Overview.
+    void openOverview();
+};
+
+// What can be turned back from here, and what to do when the desktop does not
+// start. The steps for the second are also given as plain text, to be saved.
+class BackPage : public Page {
+    Q_OBJECT
+public:
+    using Page::Page;
+    void show(const Status &status);
+signals:
+    void goBack();
+    void keep();
+    void cancelRestart();
+    void saveSteps();
+};
+
+// The steps for a desktop that does not start, as plain text with one step to
+// a paragraph; only what recab's own source and status confirm.
+QString backStepsText(const Status &status);
 
 // Say the change in words; an agent works out how.
 class AskPage : public Page {
