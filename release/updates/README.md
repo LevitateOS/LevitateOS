@@ -10,6 +10,8 @@ Public production policies and root-signed delegations are staged under
 `release/updates/production/<distro>/`. They are not loaded as installed defaults.
 The Pages tree exposes the same public delegations for candidate and stable,
 plus `updates/provisioning.json`; it advertises no system releases or update index.
+These public files are committed locally; their first remote deployment is still
+pending. Configuring Pages alone does not establish a reachable update feed.
 The repository has no registered release runner yet. Runner registration, matching
 baseline/new release artifacts and actual installed public-origin validation
 remain rollout work, rather than a reason to enable unvalidated updates.
