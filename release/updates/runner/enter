@@ -6,7 +6,8 @@ extra=()
 if [[ -v ACTIONS_RUNNER_INPUT_TOKEN ]]; then
     extra+=(--setenv=ACTIONS_RUNNER_INPUT_TOKEN)
 fi
-exec /usr/bin/systemd-nspawn --quiet --settings=no --register=no --as-pid2 \
+exec /usr/bin/systemd-nspawn --quiet --settings=no --register=no --as-pid2 --keep-unit \
+    --kill-signal=SIGTERM \
     --machine=recab-release --directory=/var/lib/recab-release/root \
     --private-users=pick --private-users-ownership=chown \
     --drop-capability=CAP_SYS_ADMIN,CAP_NET_ADMIN,CAP_SYS_BOOT \

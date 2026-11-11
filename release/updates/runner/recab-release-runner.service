@@ -5,11 +5,11 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-ExecStart=/usr/local/libexec/recab-runner-enter /opt/actions-runner/run.sh
+ExecStart=/usr/local/libexec/recab-runner-enter /opt/actions-runner/bin/runsvc.sh
 Restart=on-failure
 RestartSec=10
 KillMode=mixed
-TimeoutStopSec=30
+TimeoutStopSec=90
 Delegate=yes
 UMask=0077
 
