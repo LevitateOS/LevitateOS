@@ -15,7 +15,7 @@
 #include <QFile>
 #include <QFileInfo>
 #include <QLabel>
-#include <QMessageBox>
+#include <QPlainTextEdit>
 #include <QProcess>
 #include <QPushButton>
 #include <QTabBar>
@@ -717,27 +717,42 @@ void afterShots(Window &window, const QString &folder, const Save &save, const E
                && pageText(page).contains(QStringLiteral("Let it all go")));
     save("4c-after-one-back");
 
-    // Let it all go: asked first, says how much it frees; "Keep it" keeps everything.
+    // Bring everything back says first what it moves; Cancel moves nothing.
     const qint64 heldNow = window.held().bytes;
+    const int heldPlaces = window.held().places.size();
+    buttonNamed(page, QStringLiteral("Bring everything back"))->click();
+    settle(250);
+    QString said = pageText(window.beforePage());
+    expect(QStringLiteral("bringing everything back asks first, says how much moves and that nothing is deleted"),
+           window.showingBefore() && frame->selected() == "mess" && said.contains(QStringLiteral("Bring everything back?"))
+               && said.contains(bytesText(heldNow)) && said.contains(QStringLiteral("Nothing is deleted"))
+               && said.contains(QStringLiteral("something is at its old place")));
+    save("4c2-before-bring-back");
+    buttonNamed(window.beforePage(), QStringLiteral("Cancel"))->click();
+    settle(200);
+    expect(QStringLiteral("Cancel brings nothing back: the page shows, the holding folder is as it was"),
+           window.showingAfter() && QFileInfo::exists(held.root) && window.held().bytes == heldNow && window.held().places.size() == heldPlaces);
+
+    // Let it all go: asked first on the Before page, says how much it frees and
+    // that it cannot be undone; Cancel keeps everything.
     const qint64 freeThen = statFree(home);
     buttonNamed(page, QStringLiteral("Let it all go, free %1").arg(bytesText(heldNow)))->click();
+    settle(250);
+    said = pageText(window.beforePage());
+    expect(QStringLiteral("letting go asks first and says how much it deletes, that it cannot be undone and what it frees"),
+           window.showingBefore() && frame->selected() == "mess" && said.contains(QStringLiteral("Let it all go, and free %1?").arg(bytesText(heldNow)))
+               && said.contains(QStringLiteral("cannot be undone")) && said.contains(QStringLiteral("is deleted, with everything in it"))
+               && said.contains(QStringLiteral("instead of")));
+    save("4d0-before-let-go");
+    buttonNamed(window.beforePage(), QStringLiteral("Cancel"))->click();
     settle(200);
-    QMessageBox *question = window.letGoQuestion();
-    expect(QStringLiteral("letting go asks first and says how much it frees (%1)").arg(question ? question->text() : QString()),
-           question && question->text().contains(bytesText(heldNow)) && question->informativeText().contains(QStringLiteral("cannot be undone")));
-    if (question)
-        for (QAbstractButton *button : question->buttons())
-            if (button->text() == QStringLiteral("Keep it"))
-                button->click();
-    settle(200);
-    expect(QStringLiteral("\"Keep it\" deletes nothing"), QFileInfo::exists(held.root) && window.letGoQuestion() == nullptr && !window.held().empty());
+    expect(QStringLiteral("Cancel deletes nothing"), window.showingAfter() && QFileInfo::exists(held.root) && !window.held().empty());
     buttonNamed(page, QStringLiteral("Let it all go, free %1").arg(bytesText(heldNow)))->click();
-    settle(200);
-    question = window.letGoQuestion();
-    if (question)
-        for (QAbstractButton *button : question->buttons())
-            if (button->text() == QStringLiteral("Let it all go"))
-                button->click();
+    settle(250);
+    if (QPushButton *go = buttonNamed(window.beforePage(), QStringLiteral("Let it all go")))
+        go->click();
+    else
+        expect(QStringLiteral("the Before page has a \"Let it all go\" button"), false);
     waitUntilIdle(window, 300);
     expect(QStringLiteral("the holding folder is gone"), !QFileInfo::exists(held.root) && window.held().empty());
     expect(QStringLiteral("what is beside it was not touched: the sentinel and a file of the home folder"),
@@ -756,6 +771,103 @@ void afterShots(Window &window, const QString &folder, const Save &save, const E
            !pageText(window.diskPage()).contains(QStringLiteral("Set aside by the agent")) && !pageText(window.diskPage()).contains(QStringLiteral("See what is set aside")));
     save("4e-disk-after-let-go");
     Q_UNUSED(folder)
+}
+
+
+// The hand-over page says what will happen before the agent is given anything,
+// shows the request and lets the person edit its expected result, and Cancel
+// leaves everything as it was.
+void handOverShots(Window &window, const Expect &expect)
+{
+    HandPage *page = window.handPage();
+    const QString words = pageText(page);
+    const int places = window.messPage()->chosen().size();
+    expect(QStringLiteral("the hand-over is a question that counts the places (%1)").arg(places),
+           words.contains(QStringLiteral("Hand these %1 places to the agent?").arg(places)) && words.contains(QStringLiteral("Nothing has started.")));
+    expect(QStringLiteral("it says what happens: what is asked, that nothing is deleted before the person lets go, who it works as, the room"),
+           words.contains(QStringLiteral("What happens")) && words.contains(QStringLiteral("The agent is asked to clear"))
+               && words.contains(QStringLiteral("Nothing is gone until you let it go")) && words.contains(QStringLiteral("without administrator rights"))
+               && words.contains(QStringLiteral("is free")));
+    expect(QStringLiteral("it says which places it asks about first"), words.contains(QStringLiteral("It asks you first about")));
+    expect(QStringLiteral("the request is still there: the issue, the facts and the expected result"),
+           words.contains(QStringLiteral("The issue")) && words.contains(QStringLiteral("The facts")) && words.contains(QStringLiteral("The expected result")));
+    expect(QStringLiteral("it has Cancel and \"Hand it over\""), buttonNamed(page, QStringLiteral("Cancel")) && buttonNamed(page, QStringLiteral("Hand it over")));
+    // The expected result is the person's to change, and the change goes into the request.
+    QPlainTextEdit *expected = page->findChild<QPlainTextEdit *>();
+    expect(QStringLiteral("the expected result can be edited, and the request carries the edit"), expected && [&] {
+        expected->appendPlainText(QStringLiteral("The person's own line."));
+        return page->prompt().contains(QStringLiteral("The person's own line."));
+    }());
+    if (expected)
+        expected->undo();
+    // Cancel hands nothing over and moves nothing.
+    QStringList there;
+    for (const Finding &finding : window.messPage()->chosen())
+        there << finding.path;
+    const QString holdingBase = window.home() + QStringLiteral("/.local/share/levitate/set-aside");
+    QPushButton *cancel = buttonNamed(page, QStringLiteral("Cancel"));
+    if (cancel)
+        cancel->click();
+    settle(200);
+    bool allThere = true;
+    for (const QString &path : there)
+        allThere = allThere && QFileInfo::exists(path);
+    expect(QStringLiteral("Cancel hands nothing over: the mess page shows, no agent runs, nothing moved, no holding folder"),
+           window.showingMess() && !window.busy() && allThere && !QFileInfo::exists(holdingBase));
+    window.showHandOver();
+    settle(200);
+}
+
+
+// Comparing says what it does first; Cancel changes nothing; the button starts it.
+void compareShots(Window &window, const Save &save, const Expect &expect)
+{
+    const bool had = window.comparison() != nullptr;
+    window.askCompare();
+    settle(250);
+    const QString words = pageText(window.beforePage());
+    expect(QStringLiteral("comparing asks first, on the Before page, under The two systems"),
+           window.showingBefore() && window.frame()->selected() == "systems" && words.contains(QStringLiteral("Nothing has started."))
+               && !window.comparing());
+    expect(QStringLiteral("it says both systems are read from start to end, neither is changed, it takes a few minutes, and the command that runs"),
+           words.contains(QStringLiteral("read from start to end")) && words.contains(QStringLiteral("Neither system is changed"))
+               && words.contains(QStringLiteral("a few minutes")) && words.contains(QStringLiteral("compare --json --machine-events")));
+    // The stories run as the person, so no password is asked, and the page says so.
+    expect(QStringLiteral("it says the truth about the password (%1)").arg(qEnvironmentVariable("DISK_GUI_ROOT_HELPER").isEmpty() ? "none asked" : "asked"),
+           qEnvironmentVariable("DISK_GUI_ROOT_HELPER").isEmpty() ? words.contains(QStringLiteral("no password is asked"))
+                                                                  : words.contains(QStringLiteral("administrator password")));
+    save("5a-before-compare");
+    if (QPushButton *cancel = buttonNamed(window.beforePage(), QStringLiteral("Cancel")))
+        cancel->click();
+    settle(200);
+    expect(QStringLiteral("Cancel compares nothing: The two systems shows, nothing runs, the kept comparison is as it was"),
+           window.showingSystems() && !window.comparing() && !window.busy() && (window.comparison() != nullptr) == had);
+    window.askCompare();
+    settle(250);
+    if (QPushButton *go = buttonNamed(window.beforePage(), QStringLiteral("Compare")))
+        go->click();
+    else
+        expect(QStringLiteral("the Before page has a \"Compare\" button"), false);
+}
+
+// What the agent is asked about the two systems: said first, Cancel asks nothing.
+void explainShots(Window &window, const Save &save, const Expect &expect)
+{
+    window.showExplain();
+    settle(250);
+    const QString words = pageText(window.handPage());
+    expect(QStringLiteral("asking the agent what differs says first what it is given and that it changes nothing"),
+           words.contains(QStringLiteral("Ask the agent what differs?")) && words.contains(QStringLiteral("Nothing has started."))
+               && words.contains(QStringLiteral("told to change nothing")) && words.contains(QStringLiteral("The expected result"))
+               && words.contains(QStringLiteral("Ask the agent")));
+    save("7-ask");
+    if (QPushButton *cancel = buttonNamed(window.handPage(), QStringLiteral("Cancel")))
+        cancel->click();
+    settle(200);
+    expect(QStringLiteral("Cancel asks the agent nothing: The two systems shows, nothing runs, no answer"),
+           window.showingSystems() && !window.busy() && window.said().isEmpty());
+    window.showExplain();
+    settle(200);
 }
 
 } // namespace
@@ -827,6 +939,7 @@ int takeShots(Window &window, const QString &folder, bool handOver)
     expect(QStringLiteral("the hand-over belongs to Mess"), frame->selected() == "mess");
     const QString holding = window.held().root;
     save("3-hand-over");
+    handOverShots(window, expect);
     stripShots(window, save, expect, out);
     window.showHandOver();
     settle(100);
@@ -894,7 +1007,7 @@ int takeShots(Window &window, const QString &folder, bool handOver)
     // Slowly once, to see the two sides fill while they are read.
     const QByteArray speed = qgetenv("DISK_STANDIN_SPEED");
     qputenv("DISK_STANDIN_SPEED", "1");
-    window.compare();
+    compareShots(window, save, expect);
     settle(3200);
     ok &= window.comparing();
     expect(QStringLiteral("while comparing, the agent's place says so (%1)").arg(frame->agentText()),
@@ -928,8 +1041,7 @@ int takeShots(Window &window, const QString &folder, bool handOver)
         return ok ? 0 : 1;
     }
     frame->choose(QStringLiteral("systems"));
-    window.showExplain();
-    save("7-ask");
+    explainShots(window, save, expect);
     window.sendShown();
     waitUntilIdle(window, 300);
     out << "the agent said: " << window.said() << "\n";

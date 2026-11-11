@@ -106,10 +106,23 @@ the list".
 
 ### The hand-over, the work, and what was set aside
 
-1. **The hand-over**: the issue, the facts (one per ticked place: path, size,
-   why it can go, how it should be cleared) and the expected result, which the
-   person can change. The issue also carries the convention the agent must
-   follow (below); it is the part the person cannot rewrite.
+1. **The hand-over** is the layout of the shared "Before it happens" page
+   (`gui/kit/before.*`, as Recipe uses it): the title as a question ("Hand these
+   12 places to the agent?"), "Nothing has started...", "What happens" in plain
+   sentences, "Cancel" and "Hand it over". The sentences are built from the
+   ticked list and say what the agent is asked to do, that what it moves is set
+   aside in the holding folder and nothing is gone until the person lets it go,
+   which places it asks about first (or that it asks about none), how many belong
+   to Recipe (cleared through Recipe, not moved), that it works as the person
+   without administrator rights, and how much room is free once everything is let
+   go (against what the disk has free now). Under them is the request the agent is
+   given: the issue, the facts (one per ticked place: path, size, why it can go,
+   how it should be cleared) and the expected result, which the person can
+   change. The issue also carries the convention the agent must follow (below);
+   it is the part the person cannot rewrite. The shared page has no part a
+   person can edit, so this page (`HandPage`) is that layout with the request in
+   it, instead of a Before page followed by a second page. Escape and Cancel
+   hand nothing over. "Ask the agent what differs" (below) uses the same page.
 2. **The agent works.** Before it moves anything marked "asks first" it asks,
    and the question is answered in the window.
 3. **What was set aside** (the page after the run, under Mess; also from The
@@ -125,9 +138,15 @@ the list".
    "Never suggest".
 4. **"Bring back"** (one place) and **"Bring everything back"**: the window moves
    them back to where they were, and refuses, saying why, when something is
-   there now.
-5. **"Let it all go, free X"**: asks first (the question says how much and that
-   it cannot be undone), then deletes the holding folder. Nothing lets it go by
+   there now. "Bring everything back" first shows the shared Before page: how
+   many places and how much move, that nothing is deleted, that a place with
+   something at its old place stays held, that the room does not change (when
+   the holding folder is on the same disk). Cancel moves nothing.
+5. **"Let it all go, free X"**: first shows the shared Before page (it replaces
+   the question dialog): the holding folder that is deleted, how many places and
+   how much, that it cannot be undone and the places cannot be brought back, how
+   much room the disk then has, and that nothing outside the holding folder is
+   deleted. "Let it all go" deletes the holding folder; Cancel keeps everything. Nothing lets it go by
    itself: not after some days, not at all unless the person presses it.
 
 The rail entry "Mess" carries a badge: how many places of mess are on the list.
@@ -158,7 +177,11 @@ On the fourth entry:
    made; when either system has changed since, it says so and offers to
    compare again. "Open System…" starts the System window, where changing,
    updating and going back are done.
-2. **Compare.** Both systems are read from start to end, which takes minutes
+2. **Compare.** "Compare" first shows the shared Before page: both systems are
+   read from start to end, neither is changed, it takes a few minutes, whether the
+   administrator's password is asked (it follows the root helper this window
+   really uses) and the command that will run. Cancel compares nothing. Then both
+   systems are read from start to end, which takes minutes
    and needs the administrator's password. The page stays: each frame fills as
    its side is read, and Stop ends it.
 3. **How alike they are.** A headline ("The two systems are identical", or
@@ -176,7 +199,9 @@ On the fourth entry:
    both sides and says whether it is the same in both.
 5. **The list** shows every difference by folder. Files that differ by design
    (each system names its own partition) are counted apart.
-6. **Ask the agent what differs.** The differences go to the agent as issue,
+6. **Ask the agent what differs.** The same page as the hand-over says first
+   what the agent is given and that it is told to change nothing, with the
+   request below it; Cancel asks nothing. The differences go to the agent as issue,
    facts and expected result. The agent changes nothing; what it answers is
    shown above the list.
 
@@ -265,6 +290,15 @@ aside and the comparison of the two systems. Both end with "all as expected" or
 say "not as expected: ..." for each thing that failed, and exit non-zero.
 They need no display, and no real agent, recab, recipe, lsblk or administrator.
 
+Both stories also check every Before page in the shared layout (the hand-over,
+comparing, and, with `--hand-over`, bringing everything back, letting it all go
+and asking what differs): what it says, that Cancel leaves everything as it was
+(nothing handed over or moved, no folder made, nothing compared or deleted), and
+that its button does it. The hand-over also checks that the expected result can be
+edited and the edit reaches the request. Pictures `3-hand-over` (also in the story
+without `--hand-over`), `5a-before-compare`, `4c2-before-bring-back`,
+`4d0-before-let-go` and `7-ask`.
+
 Both stories (pictures `1-disk`, `2a`..`2f` Browse, `3a-mess`, `3c-mess-told`,
 `3-picked`, `3-hand-over`, `1b-settings`, `s1`/`s2` the strip, `a1`/`a2`
 Activity):
@@ -311,8 +345,8 @@ outside the folders looked at, a held path that climbs out, a record whose held
 path is not under the path it came from, a folder on the way that is a link: all
 refused with their reason, nothing outside touched); bringing back refuses when
 something is there now and leaves what is there; one place brought back is there
-again and no longer held; "Let it all go" asks first (and says how much), "Keep
-it" deletes nothing, then the holding folder is gone and **a sentinel file beside
+again and no longer held; "Let it all go" asks first on the Before page (and says
+how much), Cancel deletes nothing, then the holding folder is gone and **a sentinel file beside
 it, a file of the home folder, and a file in a folder outside the sample are all
 still there**; the page says what was let go; The disk lists no holding folder
 any more; then the two systems are compared and the agent is asked what differs.
@@ -359,7 +393,7 @@ Activity needs `RECAB_GUI_RECORDS` and `LEVITATE_ACTIVITY_AGENT` (build the agen
 first: `cmake --build .artifacts/agent/build`); without them, or without the
 strip's two variables, the story says what is missing and fails. Pictures with
 `--hand-over`: `4-after` (what was set aside), `4a-disk-with-set-aside`,
-`4b-after-refused`, `4c-after-one-back`, `4d-after-let-go`, `4e-disk-after-let-go`,
+`4b-after-refused`, `4c-after-one-back`, `4c2-before-bring-back`, `4d0-before-let-go`, `4d-after-let-go`, `4e-disk-after-let-go`,
 then `5-systems` to `8-explained`.
 
 Without `--hand-over` and without the settings it reads the real home folder,

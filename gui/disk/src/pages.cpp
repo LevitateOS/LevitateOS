@@ -3,12 +3,15 @@
 #include "parts.h"
 #include "words.h"
 
+#include <QAbstractButton>
 #include <QHBoxLayout>
+#include <QLabel>
 #include <QHeaderView>
 #include <QProgressBar>
 #include <QPushButton>
 #include <QScrollArea>
 #include <QSet>
+#include <QShortcut>
 #include <QSignalBlocker>
 #include <QTreeWidget>
 #include <QTreeWidgetItemIterator>
@@ -410,13 +413,19 @@ void MessPage::updateFoot()
 
 // ---------------------------------------------------------------- The hand-over
 
-void HandPage::show(const QList<Finding> &chosen, qint64 scannedBytes, const QStringList &roots, const QString &holding)
+void HandPage::show(const QList<Finding> &chosen, qint64 scannedBytes, const QStringList &roots, const QString &holding,
+                    qint64 freeNow, const QString &home)
 {
     qint64 certain = 0;
     QStringList facts;
+    QStringList asks;
+    int recipes = 0;
     for (const Finding &finding : chosen) {
         if (finding.sure)
             certain += finding.bytes;
+        else
+            asks << shortPath(finding.path, home);
+        recipes += !finding.how.isEmpty();
         QString line = tr("%1 (%2): %3").arg(finding.path, bytesText(finding.bytes), finding.why);
         if (!finding.how.isEmpty())
             line += QLatin1Char(' ') + finding.how;
@@ -437,46 +446,113 @@ void HandPage::show(const QList<Finding> &chosen, qint64 scannedBytes, const QSt
              "place as one event: {\"event\": \"place\", \"path\": the place, \"result\": \"set-aside\", \"kept\", \"left\" or "
              "\"could-not\", \"reason\": a sentence}.")
               .arg(holding);
-    show(tr("Hand the mess to the agent"),
-         tr("The agent is asked to set it aside in a holding folder on this disk. Nothing is deleted until you let it go."), issue, facts,
-         tr("At least %1 is moved into the holding folder; nothing is deleted. Only the things listed are touched. Anything "
-            "marked \"ask me first\" is asked about before it is moved. What belongs to Recipe is cleared through Recipe, "
-            "not by moving its files. The holding folder is the person's to let go later: do not delete it.")
-             .arg(bytesText(certain)));
+
+    // What happens, in sentences that are true of this list: each depends on
+    // what was ticked, never on a fixed picture of it.
+    Ask ask;
+    ask.title = tr("Hand these %1 to the agent?").arg(counted(chosen.size(), tr("%1 place"), tr("%1 places")));
+    ask.happens << tr("The agent is asked to clear %1, %2 in all.")
+                       .arg(counted(chosen.size(), tr("%1 place"), tr("%1 places")), bytesText(sum(chosen)));
+    ask.happens << tr("What it clears by moving is set aside in the holding folder %1, on the same disk as your files. Nothing is "
+                      "gone until you let it go, and you can bring each place back before that.")
+                       .arg(shortPath(holding, home));
+    if (recipes)
+        ask.happens << tr("%1 of them belong to Recipe: the agent clears those through Recipe, so they are not moved and not held.")
+                           .arg(recipes);
+    if (asks.isEmpty()) {
+        ask.happens << tr("It asks you about nothing first: every place on this list clears without asking.");
+    } else {
+        const QStringList named = asks.mid(0, 3);
+        ask.happens << tr("It asks you first about %1: %2%3.")
+                           .arg(counted(asks.size(), tr("%1 place"), tr("%1 places")), named.join(tr(", ")),
+                                asks.size() > named.size() ? tr(" and %1 more").arg(asks.size() - named.size()) : QString());
+    }
+    ask.happens << tr("It works as you, without administrator rights.");
+    if (freeNow >= 0)
+        ask.happens << tr("Once you let it go, up to %1 is free: the disk would have up to %2 free instead of %3.")
+                           .arg(bytesText(sum(chosen)), bytesText(freeNow + sum(chosen)), bytesText(freeNow));
+    else
+        ask.happens << tr("Once you let it go, up to %1 is free. How much the disk has free now could not be read.")
+                           .arg(bytesText(sum(chosen)));
+    ask.issue = issue;
+    ask.facts = facts;
+    ask.expected =
+        tr("At least %1 is moved into the holding folder; nothing is deleted. Only the things listed are touched. Anything "
+           "marked \"ask me first\" is asked about before it is moved. What belongs to Recipe is cleared through Recipe, "
+           "not by moving its files. The holding folder is the person's to let go later: do not delete it.")
+            .arg(bytesText(certain));
+    ask.go = tr("Hand it over");
+    show(ask);
 }
 
-void HandPage::show(const QString &title, const QString &subtitle, const QString &issue, const QStringList &facts,
-                    const QString &expected)
+// The layout of the shared "Before it happens" page (kit/before.*): the
+// question, the line that nothing has started, what happens, then Cancel and
+// the one button. The shared page has no part the person can edit, and the
+// request the agent is given has one (the expected result), so this page is
+// that layout with the request in it, not a BeforePage followed by another page.
+void HandPage::show(const Ask &ask)
 {
     QVBoxLayout *column = fresh();
-    auto *backLink = new ClickLabel(tr("‹ Back"));
-    dim(backLink);
-    connect(backLink, &ClickLabel::clicked, this, &HandPage::back);
-    column->addWidget(backLink, 0, Qt::AlignLeft);
+    column->setContentsMargins(28, 20, 28, 16);
+    if (!escape_) {
+        escape_ = new QShortcut(Qt::Key_Escape, this);
+        escape_->setContext(Qt::WidgetWithChildrenShortcut);
+        connect(escape_, &QShortcut::activated, this, &HandPage::back);
+    }
 
     auto *top = new QVBoxLayout;
     top->setSpacing(1);
-    top->addWidget(heading(title));
-    top->addWidget(dim(text(subtitle, true)));
+    top->addWidget(heading(ask.title));
+    top->addWidget(dim(text(tr("Nothing has started. This is what will happen if you go on."))));
     column->addLayout(top);
 
-    auto *prompt = prompt_ = new PromptPanel(issue, facts, expected);
-    // The list of facts can be long: let it scroll.
+    // The sections scroll; Cancel and the button under them do not.
     auto *scroll = new QScrollArea;
     scroll->setWidgetResizable(true);
     scroll->setFrameShape(QFrame::NoFrame);
-    scroll->setWidget(prompt);
+    auto *inner = new QWidget;
+    auto *sections = new QVBoxLayout(inner);
+    sections->setContentsMargins(0, 0, 4, 0);
+    sections->setSpacing(14);
+
+    auto *panel = new Panel;
+    panel->column()->addWidget(strong(tr("What happens")));
+    for (const QString &sentence : ask.happens) {
+        auto *row = new QHBoxLayout;
+        row->setSpacing(8);
+        row->addWidget(dim(text(QStringLiteral("•"))), 0, Qt::AlignTop);
+        row->addWidget(text(sentence, true), 1);
+        panel->column()->addLayout(row);
+    }
+    sections->addWidget(panel);
+    auto *request = prompt_ = new PromptPanel(ask.issue, ask.facts, ask.expected);
+    sections->addWidget(request);
+    sections->addStretch();
+    scroll->setWidget(inner);
     column->addWidget(scroll, 1);
 
     auto *buttons = new QHBoxLayout;
+    buttons->setSpacing(8);
+    buttons->addWidget(dim(text(tr("Only the expected result is yours to change."), true)), 1);
     auto *cancel = new QPushButton(tr("Cancel"));
-    auto *go = primary(tr("Hand it to the agent"));
+    auto *go = new QPushButton(ask.go);
+    go->setDefault(true);
     connect(cancel, &QPushButton::clicked, this, &HandPage::back);
-    connect(go, &QPushButton::clicked, this, [this, prompt] { emit send(prompt->prompt()); });
-    buttons->addStretch();
+    connect(go, &QPushButton::clicked, this, [this, request] { emit send(request->prompt()); });
     buttons->addWidget(cancel);
     buttons->addWidget(go);
     column->addLayout(buttons);
+    go->setFocus();
+}
+
+QString HandPage::pageText() const
+{
+    QStringList words;
+    for (const QLabel *label : findChildren<QLabel *>())
+        words << label->text();
+    for (const QAbstractButton *button : findChildren<QAbstractButton *>())
+        words << button->text();
+    return words.join(QLatin1Char('\n'));
 }
 
 QString HandPage::prompt() const

@@ -11,6 +11,7 @@
 #include <memory>
 
 class PromptPanel;
+class QShortcut;
 class QLabel;
 class QPushButton;
 class QTreeWidget;
@@ -71,11 +72,23 @@ class HandPage : public Page {
     Q_OBJECT
 public:
     using Page::Page;
-    // `holding` is the folder the agent sets what it clears aside in.
-    void show(const QList<Finding> &chosen, qint64 scannedBytes, const QStringList &roots, const QString &holding);
-    // Any other hand-over: a title, a line under it, and the three parts.
-    void show(const QString &title, const QString &subtitle, const QString &issue, const QStringList &facts,
-              const QString &expected);
+    // What this page says before anything starts, and what the agent is given.
+    struct Ask {
+        QString title;       // a question
+        QStringList happens; // plain sentences
+        QString issue;
+        QStringList facts;
+        QString expected;    // the person may change it
+        QString go;          // the one button that hands it over
+    };
+    // The mess: `holding` is the folder the agent sets what it clears aside in;
+    // `freeNow` is the room on the disk now (-1 when it could not be read).
+    void show(const QList<Finding> &chosen, qint64 scannedBytes, const QStringList &roots, const QString &holding,
+              qint64 freeNow, const QString &home);
+    // Any other hand-over.
+    void show(const Ask &ask);
+    // Every label and button, for a check.
+    QString pageText() const;
     // The text as it would be sent now, with the person's edits.
     QString prompt() const;
 signals:
@@ -83,4 +96,5 @@ signals:
     void send(const QString &prompt);
 private:
     PromptPanel *prompt_ = nullptr;
+    QShortcut *escape_ = nullptr;
 };

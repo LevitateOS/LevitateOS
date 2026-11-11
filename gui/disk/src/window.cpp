@@ -18,7 +18,6 @@
 #include <QFile>
 #include <QFileInfo>
 #include <QJsonDocument>
-#include <QMessageBox>
 #include <QProcess>
 #include <QSet>
 #include <QPushButton>
@@ -94,7 +93,8 @@ Window::Window(QWidget *parent)
     hand_ = new HandPage;
     work_ = new WorkPage;
     after_ = new AfterPage;
-    for (QWidget *page : std::initializer_list<QWidget *>{disk_, browse_, mess_, systems_, hand_, work_, after_})
+    before_ = new BeforePage;
+    for (QWidget *page : std::initializer_list<QWidget *>{disk_, browse_, mess_, systems_, hand_, work_, after_, before_})
         stack_->addWidget(page);
 
     // The frame is the window: the rail, the pages, the strip, the status line.
@@ -179,7 +179,7 @@ Window::Window(QWidget *parent)
 
     connect(after_, &AfterPage::back, this, [this] { frame_->choose(QStringLiteral("mess")); });
     connect(after_, &AfterPage::bringBack, this, &Window::bringBack);
-    connect(after_, &AfterPage::bringAllBack, this, &Window::bringAllBack);
+    connect(after_, &AfterPage::bringAllBack, this, &Window::askBringAllBack);
     connect(after_, &AfterPage::letGo, this, &Window::askLetGo);
     connect(after_, &AfterPage::neverSuggest, this, &Window::neverSuggest);
     connect(after_, &AfterPage::tryAgain, this, &Window::tryAgain);
@@ -205,10 +205,22 @@ Window::Window(QWidget *parent)
     frame_->addStatusWidget(again);
     connect(mess_, &MessPage::rescan, this, &Window::lookAgain);
     connect(mess_, &MessPage::handOver, this, &Window::showHandOver);
-    connect(systems_, &SystemsPage::compare, this, &Window::compare);
+    connect(systems_, &SystemsPage::compare, this, &Window::askCompare);
     connect(systems_, &SystemsPage::handOver, this, &Window::showExplain);
     connect(hand_, &HandPage::back, this, [this] { go(handingSystems_ ? static_cast<QWidget *>(systems_) : mess_); });
     connect(hand_, &HandPage::send, this, &Window::send);
+    // Cancel on a Before page leaves everything as it was and shows the page the person came from.
+    connect(before_, &BeforePage::cancelled, this, [this] {
+        beforeGo_ = nullptr;
+        if (beforeBack_)
+            go(beforeBack_);
+    });
+    connect(before_, &BeforePage::confirmed, this, [this] {
+        const auto doIt = std::move(beforeGo_);
+        beforeGo_ = nullptr;
+        if (doIt)
+            doIt();
+    });
     connect(work_, &WorkPage::back, this, &Window::leaveWork);
     connect(work_, &WorkPage::activity, this, [this](const QString &words) { frame_->setAgentNote(words); });
     connect(work_, &WorkPage::done, this, &Window::finished);
@@ -245,7 +257,9 @@ bool Window::busy() const
 
 void Window::refresh()
 {
-    if (busy())
+    // The sentences of a Before page are true of what was read when it was
+    // shown; reading again under it would make them say what is no longer so.
+    if (busy() || stack_->currentWidget() == before_)
         return;
     if (stack_->currentWidget() == systems_)
         readState();
@@ -301,6 +315,7 @@ bool Window::showingBrowse() const { return stack_->currentWidget() == browse_; 
 bool Window::showingAfter() const { return stack_->currentWidget() == after_; }
 bool Window::showingMess() const { return stack_->currentWidget() == mess_; }
 bool Window::showingSystems() const { return stack_->currentWidget() == systems_; }
+bool Window::showingBefore() const { return stack_->currentWidget() == before_; }
 
 QString Window::entryOf(QWidget *page) const
 {
@@ -312,6 +327,8 @@ QString Window::entryOf(QWidget *page) const
         return QStringLiteral("mess");
     if (page == systems_)
         return QStringLiteral("systems");
+    if (page == before_)
+        return beforeEntry_;
     // A hand-over and the work page: the flow they belong to.
     const bool ofSystems = page == hand_ ? handingSystems_ : (job_ == Job::Comparing || job_ == Job::Explaining);
     return ofSystems ? QStringLiteral("systems") : QStringLiteral("mess");
@@ -375,7 +392,7 @@ void Window::showHandOver()
     // The list is read again later; only what was handed over is kept.
     for (Finding &finding : requested_)
         finding.node = nullptr;
-    hand_->show(requested_, scannedBytes(), roots_, holding_);
+    hand_->show(requested_, scannedBytes(), roots_, holding_, spaceAt(home_).known ? spaceAt(home_).free : -1, home_);
     go(hand_);
 }
 
@@ -715,35 +732,63 @@ void Window::bringAllBack()
     scan();
 }
 
-QMessageBox *Window::letGoQuestion() const
+// How many places the holding folder really holds now.
+static int placesHeld(const SetAside &held)
 {
-    return asking_;
+    int places = 0;
+    for (const HeldPlace &place : held.places)
+        places += place.present;
+    return places;
 }
 
 void Window::askLetGo()
 {
-    if (asking_ || held_.empty())
+    if (held_.empty())
         return;
-    auto *box = new QMessageBox(this);
-    asking_ = box;
-    box->setAttribute(Qt::WA_DeleteOnClose);
-    box->setIcon(QMessageBox::Warning);
-    box->setWindowTitle(tr("Let it all go?"));
-    box->setText(tr("Let everything the agent set aside go, and free %1?").arg(bytesText(held_.bytes)));
-    int places = 0;
-    for (const HeldPlace &place : held_.places)
-        places += place.present;
-    box->setInformativeText(tr("This deletes the holding folder %1 and everything in it: %2. It cannot be undone, and the places "
-                               "cannot be brought back afterwards.")
-                                .arg(shortPath(held_.root, home_), counted(places, tr("%1 place"), tr("%1 places"))));
-    QPushButton *go = box->addButton(tr("Let it all go"), QMessageBox::YesRole);
-    QPushButton *keep = box->addButton(tr("Keep it"), QMessageBox::NoRole);
-    box->setDefaultButton(keep);
-    connect(box, &QMessageBox::buttonClicked, this, [this, go](QAbstractButton *button) {
-        if (button == go)
-            letGoNow();
+    const int places = placesHeld(held_);
+    const Space space = spaceAt(home_);
+    BeforePage::Content content;
+    content.title = tr("Let it all go, and free %1?").arg(bytesText(held_.bytes));
+    content.happensTitle = tr("What happens");
+    content.happens << tr("The holding folder %1 is deleted, with everything in it: %2, %3.")
+                           .arg(shortPath(held_.root, home_), counted(places, tr("%1 place"), tr("%1 places")), bytesText(held_.bytes));
+    content.happens << tr("This cannot be undone. Afterwards the places cannot be brought back.");
+    if (held_.sameDisk && space.known)
+        content.happens << tr("The disk then has about %1 free instead of %2.").arg(bytesText(space.free + held_.bytes), bytesText(space.free));
+    else if (!held_.sameDisk)
+        content.happens << tr("The holding folder is not on the disk your home folder is on, so that disk gets no room from this.");
+    content.happens << tr("Nothing outside the holding folder is deleted.");
+    content.foot = tr("If you are not sure, bring places back first.");
+    content.go = tr("Let it all go");
+    openBefore(QStringLiteral("mess"), after_, content, [this] {
+        // The page for what was set aside, while the folder is deleted and read again.
+        after_->showReading();
+        go(after_);
+        letGoNow();
     });
-    box->open();
+}
+
+void Window::askBringAllBack()
+{
+    if (held_.empty())
+        return;
+    const int places = placesHeld(held_);
+    BeforePage::Content content;
+    content.title = tr("Bring everything back?");
+    content.happensTitle = tr("What happens");
+    content.happens << tr("%1, %2, are moved out of the holding folder to where they were.")
+                           .arg(counted(places, tr("%1 place"), tr("%1 places")), bytesText(held_.bytes));
+    content.happens << tr("Nothing is deleted. A place is not brought back when something is at its old place now: it stays in the "
+                          "holding folder, and the page says which and why.");
+    if (held_.sameDisk)
+        content.happens << tr("The room on the disk does not change: the places are on the same disk either way.");
+    content.foot = tr("What is not brought back can still be let go later.");
+    content.go = tr("Bring everything back");
+    openBefore(QStringLiteral("mess"), after_, content, [this] {
+        after_->showReading();
+        go(after_);
+        bringAllBack();
+    });
 }
 
 void Window::letGoNow()
@@ -771,7 +816,7 @@ void Window::tryAgain(const QString &path)
             handingSystems_ = false;
             holding_ = newHolding(home_);
             requested_ = {finding};
-            hand_->show(requested_, scannedBytes(), roots_, holding_);
+            hand_->show(requested_, scannedBytes(), roots_, holding_, spaceAt(home_).known ? spaceAt(home_).free : -1, home_);
             go(hand_);
             return;
         }
@@ -823,6 +868,39 @@ void Window::drawSystems(const QString &why)
         systems_->show(comparison_, said_, comparedWhen_, stale());
     else
         systems_->showState(state_, why);
+}
+
+void Window::openBefore(const QString &entry, QWidget *back, const BeforePage::Content &content, std::function<void()> go)
+{
+    beforeEntry_ = entry;
+    beforeBack_ = back;
+    beforeGo_ = std::move(go);
+    before_->show(content);
+    this->go(before_);
+}
+
+// What comparing does, said before it starts. The sentences follow how this
+// window will really run it: whether it asks for the password depends on the
+// helper it was started with.
+void Window::askCompare()
+{
+    if (run_ || reading_)
+        return;
+    const QStringList arguments{"compare", "--json", "--machine-events"};
+    const QStringList command = rootHelper_.isEmpty() ? QStringList{recab_} + arguments : QStringList{rootHelper_, recab_} + arguments;
+    BeforePage::Content content;
+    content.title = state_.known ? tr("Compare %1 with %2?").arg(state_.runningName(), state_.otherName()) : tr("Compare the two systems?");
+    content.happensTitle = tr("What happens");
+    content.happens << tr("Both systems are read from start to end: every file of the running system and of the other one.");
+    content.happens << tr("Neither system is changed. Only what was found is kept, so this window can show it again next time.");
+    content.happens << tr("It takes a few minutes. You can stop it while it reads.");
+    content.happens << (rootHelper_.isEmpty()
+                            ? tr("It runs as you, so no password is asked.")
+                            : tr("The other system can only be read by the administrator, so you are asked for the administrator password."));
+    content.tableTitle = tr("The command that runs");
+    content.table = {{tr("Command"), command.join(QLatin1Char(' '))}};
+    content.go = tr("Compare");
+    openBefore(QStringLiteral("systems"), systems_, content, [this] { compare(); });
 }
 
 void Window::compare()
@@ -918,9 +996,19 @@ void Window::showExplain()
     if (!compared_)
         return;
     handingSystems_ = true;
-    hand_->show(tr("Ask the agent what differs"),
-                tr("The agent looks into the differences and says what they are. It changes nothing."),
-                comparison_.issue(), comparison_.facts(), comparison_.expected());
+    HandPage::Ask ask;
+    ask.title = tr("Ask the agent what differs?");
+    ask.happens << tr("The agent is given the %1 between %2 and %3, as the issue, the facts and the expected result below.")
+                       .arg(counted(comparison_.count(), tr("%1 difference"), tr("%1 differences")), comparison_.running.slot,
+                            comparison_.other.slot);
+    ask.happens << tr("It is asked to say what the differences are, and told to change nothing on either system.");
+    ask.happens << tr("It works as you, without administrator rights, so it reads only what you can read.");
+    ask.happens << tr("What it answers is shown on the page for the two systems.");
+    ask.issue = comparison_.issue();
+    ask.facts = comparison_.facts();
+    ask.expected = comparison_.expected();
+    ask.go = tr("Ask the agent");
+    hand_->show(ask);
     go(hand_);
 }
 

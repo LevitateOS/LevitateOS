@@ -4,6 +4,7 @@
 #pragma once
 
 #include "after.h"
+#include "before.h"
 #include "disk.h"
 #include "mess.h"
 #include "scan.h"
@@ -16,6 +17,7 @@
 #include <QMap>
 #include <QPointer>
 
+#include <functional>
 #include <memory>
 
 class AfterPage;
@@ -24,7 +26,6 @@ class DiskPage;
 class Frame;
 class HandPage;
 class HeldReader;
-class QMessageBox;
 class MessPage;
 class NextSystem;
 class QStackedWidget;
@@ -58,18 +59,27 @@ public:
     // What was set aside: the page, bringing places back, letting it all go.
     void showAfter();
     void bringBack(const QString &path);
+    // Do it at once (what the Before page's button does).
     void bringAllBack();
-    void askLetGo();
     void letGoNow();
+    // Say first what each will do, on the Before page; the buttons of the page
+    // for what was set aside come here, and the page's button does it.
+    void askBringAllBack();
+    void askLetGo();
     void tryAgain(const QString &path);
-    // The question "let it all go?" while it is asked, else null.
-    QMessageBox *letGoQuestion() const;
+    // The page that says what will happen before it does.
+    BeforePage *beforePage() const { return before_; }
+    // The hand-over page: the same layout, with the request in it.
+    HandPage *handPage() const { return hand_; }
+    bool showingBefore() const;
 
     // The two systems: the page, the comparison, the question to the agent.
     void showSystems();
     // Asks recab what the two systems are; quick, and changes nothing.
     void readState();
     void compare();
+    // Say first what comparing does (the Before page), or do it at once.
+    void askCompare();
     void stopComparing();
     void showExplain();
     // What F5 does: on the mess, look again; on the systems, read their state again.
@@ -120,6 +130,9 @@ private:
     void finished(bool ok);
     void leaveWork();
     void compared(bool ok);
+    // Shows the Before page: its button runs `go`, Cancel shows `back`, and
+    // `entry` is the rail entry it belongs to.
+    void openBefore(const QString &entry, QWidget *back, const BeforePage::Content &content, std::function<void()> go);
     void drawSystems(const QString &why = QString());
     void drawDisk();
     void drawAfter();
@@ -161,7 +174,10 @@ private:
     qint64 freeBefore_ = -1;
     bool ranHere_ = false, letGone_ = false;
     QStringList notes_;
-    QPointer<QMessageBox> asking_;
+    // The Before page: what its button does, where Cancel and the rail entry go.
+    std::function<void()> beforeGo_;
+    QWidget *beforeBack_ = nullptr;
+    QString beforeEntry_;
     SystemsState state_;
     bool stateRead_ = false, stopped_ = false;
     QDateTime comparedWhen_;
@@ -181,6 +197,7 @@ private:
     DiskPage *disk_;
     BrowsePage *browse_;
     AfterPage *after_;
+    BeforePage *before_;
     MessPage *mess_;
     SystemsPage *systems_;
     HandPage *hand_;
