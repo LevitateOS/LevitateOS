@@ -1142,6 +1142,7 @@ dependencies = [
  "tempfile",
  "toml",
  "ureq",
+ "url",
  "walkdir",
  "xz2",
  "zip",
