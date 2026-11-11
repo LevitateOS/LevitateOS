@@ -297,5 +297,6 @@ Steps 3–6 are builder and Recipe recipe work; step 8 is Ginux or Recipe work.
    everything in the sandbox, more work, upstream-worthy), or unpacking verified
    archives in Recipe's coordinator (faster to build, parsing moves outside
    the sandbox).
+   **Decided (the user, 2026-11-11): the Ginux bulk-write primitive.**
 3. **Order:** start with parts and the combiner plus the download store
    (biggest effect for the least risk), or with the Ginux measurements first.
