@@ -32,9 +32,13 @@ production-readiness gates", was opened in April 2026 and never filled in. It
 points at paths that no longer exist (`distro-variants/`, `BACKLOG.md`,
 `docs/manual-install-plan.md`).
 
-So the first thing needed is a decision, not work: **is the first public
-release the text-mode system, or the desktop?** Everything below is split so
-that either answer works:
+So the first thing needed was a decision, not work: is the first public
+release the text-mode system, or the desktop?
+
+**Decided (the user, 2026-11-11): desktop first.** The first public release of
+each distro includes its desktop ISO, so it needs Gates A, B and C. The agreed
+PRD19 text-mode scope stays as a prerequisite inside Gate A; it is no longer the
+whole of the first release. The gates:
 
 - **Gate A — publishable.** A download can sit on the website without lying.
   This is roughly the agreed release scope plus the update channel, legal and
@@ -249,11 +253,19 @@ small press section (logos, one-liner, links); uptime monitoring.
 The screenshots depend on Gate B stage 1: no real desktop screenshot can exist
 before a desktop image does.
 
-## Decisions waiting on the user
+## Decisions
 
-1. **What is the first public release:** the text-mode system (Gate A only,
-   marketed to tinkerers as a preview), or the desktop (Gates A and B)?
-2. **Its version:** keep `1.0`, or a preview number.
+Made:
+
+1. **What is the first public release:** the desktop (Gates A, B and C), not
+   the text-mode system on its own. The user, 2026-11-11.
+
+Waiting on the user:
+
+2. **Its version and label:** keep `1.0`, or a preview number. With the
+   desktop first, this also decides how far into Gate B the first release
+   goes: stages 1–3 make an honest *preview*; calling it a *daily driver*
+   needs stage 5.
 3. **The new Recipe version number** (0.1.4 is taken). Final packaging waits on it.
 4. **ISO byte-determinism scope** (asked earlier, unanswered).
 5. **Ship without upstream Ginux merges?** If upstream does not merge PRD05/07,
@@ -262,22 +274,46 @@ before a desktop image does.
 7. **Analytics on the website:** yes (which) or none.
 8. **Support channel:** issues only, or Discussions or a forum.
 9. **Key backup** before the first public install (currently deferred).
+10. **Which of stage 5 the first release needs:** disk encryption and
+    Secure Boot signing are each weeks of work. Required for the first
+    desktop release, or listed as known limits in its release notes?
+11. **Real hardware for stage 2:** which Intel and AMD laptops are
+    available to test on, and whether AcornOS is tested on both or one.
 
-## The shortest honest path
+## The path, desktop first
 
-If the answer to decision 1 is "text-mode first":
+Steps on the same line can run side by side; each line needs the ones before
+it only where it says so.
 
-1. Answer decisions 2–4.
-2. Build both distros' base, live-boot and live-tools from current code; fix
-   until the four scenario commands pass; get CI green (A2).
-3. Strip Fedora branding and decide source provision (A5).
-4. Build the first signed release pair, register the runner, update an
-   installed VM from the public origin, promote (A3).
-5. Finish PRD09/13/15/16 on that source and present PRD17 (A1).
-6. Website P0, release notes, `SECURITY.md`, tag, publish (A4, A6, Gate C).
-
-The desktop then follows the audit's stages as releases of their own,
-delivered through the channel step 4 set up.
-
-If the answer is "desktop first", steps 1–6 still have to happen, and Gate B
-stages 1–3 (at least) come before step 6.
+1. **Decisions 2–4 and 10.** They set the target; nothing tagged before them.
+2. **Declaration work that needs no build**, in parallel with step 3:
+   - strip Fedora branding: the dnf `--exclude` list, replacement packages,
+     own theme pieces (A5, `desktop-todo.md` sections 1–2);
+   - decide where computer state lives on an A/B install, then write it into
+     recab and the image (B stage 3). This is the largest design gap and
+     blocks every everyday setting, so it should start first;
+   - microcode in recinit/recuki (B stage 2);
+   - Recipe menu, icon and file-type integration, the codec recipes, the
+     first desktop recipes (B stage 4);
+   - decide GPL source provision; write `SECURITY.md` (A5, A6).
+3. **First build of everything from current code:** both distros' base,
+   live-boot, live-tools and live-desktop. Fix until `test all`,
+   `ab-update` and `desktop-boot` pass on both, plus an install from the
+   desktop ISO that logs in. Put `desktop-boot` and the desktop install in CI;
+   get CI green (A2, B stage 1). Builds only when the user asks, within the
+   10:00–01:00 window.
+4. **Real laptops** with the built desktop images (B stage 2), once step 3
+   passes. It also produces the download page's hardware statement.
+5. **A week on it:** the step 2 state design built and run; AcornOS's session
+   gaps closed; the three maintenance apps run against the real `recipe` and
+   `recab` (B stage 3).
+6. **The update channel live:** keys backed up, runner registered, a signed
+   baseline and newer *desktop* release, an installed desktop updated from the
+   public origin with trial and fallback, promoted to stable (A3). Then the
+   re-lock and rebuild cadence that keeps Firefox current (B stage 5).
+7. **Recipe/Ginux acceptance on the final source:** PRD09, 13, 15, 16 and
+   PRD17 presented (A1). PRD05/07 wait on upstream; decision 5 covers the case
+   where they do not arrive.
+8. **Launch:** website P0, screenshots of both desktops light and dark from
+   the step 3 images, release notes with the known limits, legal pages, tag,
+   publish, announce (A4, A6, Gate C).
