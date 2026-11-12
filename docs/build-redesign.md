@@ -210,6 +210,23 @@ The launcher's bytes stay in `system-sources` as content, because the system
 ships the launcher; a Ginux change therefore still builds the system part
 again, but its Recipe steps are reused.
 
+That last part did not hold. Recipe's declared identity also carries Ginux's
+catalog digests, and Recipe throws a work directory's saved state away when
+its identity changes, so on 2026-11-12 the Ginux catalog change (new syscalls)
+re-ran package effects and system configuration: about 1.5 hours of the
+LevitateOS desktop build, 1 hour of AcornOS's. Fixed the same day, unbuilt:
+the builder keeps the tree those two steps make in a store of its own,
+`.artifacts/store/configured/<key>/tree` (`distro/builder/src/pipeline/configured.rs`).
+Its key is what steps 1 to 4 read: the package locks, the unpack, base-tree,
+effects and system recipes with their imports, the texts and branding the
+system recipe is given, the unpack and compose formats, `ENGINE_BEHAVIOUR`
+and `GINUX_BEHAVIOUR`, and the compiler image. Not Ginux's catalog digests,
+and not Recipe's or Ginux's sources: what the system ships of those is added
+after this tree, in the system part, which still builds again on any Recipe
+or Ginux change but now starts from the stored tree. A hit also skips unpack,
+compose and AcornOS's base-tree step. Exact mode adds the declared identity
+and the bytes of the Recipe CLI and launcher to the key.
+
 ### 5. Short steps with checkpoints
 
 No step should run for hours. With sections 1–2 the longest step is one
