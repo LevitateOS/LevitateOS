@@ -1,6 +1,6 @@
 [Desktop Entry]
 Type=Application
-Name=Disk
+Name=Recdirstat
 GenericName=Disk space
 Comment=See where the mess on the disk is, and how alike the two systems are
 Exec=disk-gui

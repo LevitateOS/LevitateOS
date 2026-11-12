@@ -1,6 +1,6 @@
 [Desktop Entry]
 Type=Application
-Name=System
+Name=Recab
 GenericName=System changes and updates
 Comment=Change and update the locked system
 Exec=recab-gui

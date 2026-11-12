@@ -549,7 +549,7 @@ def story_version():
 
 
 def story_disk_standin():
-    """What the Disk window hands over, decided by the stand-in the Disk story uses."""
+    """What the Recdirstat window hands over, decided by the stand-in the Disk story uses."""
     name = "disk"
     base = os.path.join(HOME, "diskstory")
     shutil.rmtree(base, ignore_errors=True)
@@ -565,7 +565,7 @@ def story_disk_standin():
     run = Run(env, log, prompt=prompt, app="disk", extra={"set_aside": request}).finish(on_question=lambda q: next(answers))
     said = places_of(run)
     check(run.code == 0 and [said[p]["outcome"] for p in (cache, stuck, paths["iso"], paths["rpm"])] == ["set-aside", "could-not", "set-aside", "kept"],
-          "disk stand-in: decides about each place of a Disk request (%s)" % {k: v["outcome"] for k, v in said.items()})
+          "disk stand-in: decides about each place of a Recdirstat request (%s)" % {k: v["outcome"] for k, v in said.items()})
     check(os.path.exists(os.path.join(holding, cache.lstrip("/"))) and os.path.exists(stuck) and os.path.exists(paths["rpm"]),
           "disk stand-in: what it set aside is held, what it kept or could not is where it was")
     ends_with(run, "done")

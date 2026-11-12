@@ -32,8 +32,8 @@ void NextSystem::read()
     running_->start();
 }
 
-// The same words as the System app uses for a change, so the strip and the
-// System page never differ.
+// The same words as the Recab app uses for a change, so the strip and the
+// Recab page never differ.
 static QString titleOf(const QJsonObject &change)
 {
     const QString action = change["action"].toString(), package = change["package"].toString();
@@ -63,7 +63,7 @@ bool NextSystem::parse(const QByteArray &json, QStringList *titles)
     // On trial recab still calls the other system "next" (the preparation that
     // made the running system is kept until the trial is kept), but it is the
     // system from before then: there is no next system to finish, so no strip.
-    // System's own model reads it the same way.
+    // Recab's own model reads it the same way.
     if (lifecycle["state"].toString() == QLatin1String("on_trial") || lifecycle["other"].toString() != QLatin1String("next"))
         return true; // read, and there is no next system
     for (const QJsonValue &change : object["preparation"].toObject()["changes"].toArray())

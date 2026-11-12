@@ -11,7 +11,7 @@ int main(int argc, char **argv)
 {
     QApplication app(argc, argv);
     QApplication::setApplicationName("recab-gui");
-    QApplication::setApplicationDisplayName(QObject::tr("System"));
+    QApplication::setApplicationDisplayName(QObject::tr("Recab"));
     QApplication::setApplicationVersion("0.1");
     QApplication::setDesktopFileName("org.levitateos.recab");
     QApplication::setWindowIcon(QIcon::fromTheme("system-software-update"));

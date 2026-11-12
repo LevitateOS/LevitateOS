@@ -25,7 +25,7 @@ class Run;
 class ActivityPage : public Page {
     Q_OBJECT
 public:
-    // `app`: this window's app as the runs name it ("System"); "This app"
+    // `app`: this window's app as the runs name it ("Recab"); "This app"
     // in the filter means the runs of that app.
     explicit ActivityPage(const QString &app, QWidget *parent = nullptr);
 

@@ -605,7 +605,7 @@ void ClashPage::showMerge(const Status &s)
         verdict->column()->addWidget(dim(text(tr("recab says: %1").arg(u.mergeFailure), true)));
     column->addWidget(verdict);
 
-    // Only what is under the heading scrolls (as Disk's comparison does): the page is
+    // Only what is under the heading scrolls (as Recdirstat's comparison does): the page is
     // too tall for 700 pixels when recab lists a conflict and offers a repair.
     auto *scroll = new QScrollArea;
     scroll->setWidgetResizable(true);
@@ -1160,7 +1160,7 @@ void NextPage::show(const Status &s)
                                                    "running system by itself, and the changes are kept for another "
                                                    "try."),
                                                 true)));
-            auto *disk = link(tr("See the two systems as blocks in Disk"));
+            auto *disk = link(tr("See the two systems as blocks in Recdirstat"));
             connect(disk, &ClickLabel::clicked, this, &NextPage::openDisk);
             right->column()->addWidget(disk, 0, Qt::AlignLeft);
             right->column()->addStretch();

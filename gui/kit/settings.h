@@ -18,7 +18,7 @@ class Run;
 class SettingsPage : public Page {
     Q_OBJECT
 public:
-    // `app`: this window's app as Activity names it ("System"); "Try it"
+    // `app`: this window's app as Activity names it ("Recab"); "Try it"
     // asks the agent as that app.
     explicit SettingsPage(const QString &app, QWidget *parent = nullptr);
 

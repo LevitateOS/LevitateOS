@@ -138,7 +138,7 @@ them into both desktop images:
   `usr/bin/levitate-agent`. `levitate-agent --version` prints
   `levitate-agent 0.1`.
 - **What the helper needs at run time:** `gdbus` (GLib's tool, for desktop
-  notices) and one agent program, `codex` or `claude`. Disk also runs `lsblk`.
+  notices) and one agent program, `codex` or `claude`. Recdirstat also runs `lsblk`.
 - **No agent program is in either image, and no recipe for one exists.** For a
   person this means the apps start and their own pages work, but everything
   that hands work to the agent fails until they install `codex` or `claude`

@@ -11,9 +11,9 @@ apps:
 
   Recipe  still running, not waiting (story "hang": a command it started)
   Recipe  done, with commands, file changes and a search (story "plain")
-  System  waiting on a question, still alive (story "asks")
+  Recab   waiting on a question, still alive (story "asks")
   Recipe  failed (story "fails")
-  System  an administrator step the person refused (story "administrator")
+  Recab   an administrator step the person refused (story "administrator")
 
 A record with no last line is only "waiting" or "running" while the process
 the run lives in does. A run lives in a process of its own, which goes on
@@ -127,7 +127,7 @@ def main():
                  "The request:\nInstall htop for this computer.\n\nThe expected result:\nhtop starts from the menu "
                  "and nothing else changes.\n")
     time.sleep(1.1)  # the file name of a record has the time to the second
-    waiting = drive(binary, folder, "asks", "System", "Turn off password logins over ssh",
+    waiting = drive(binary, folder, "asks", "Recab", "Turn off password logins over ssh",
                     "The request:\nTurn off password logins over ssh; I only use keys.\n\nThe expected result:\n"
                     "After a restart the change is in effect and the system starts as before. Nothing else "
                     "changes.\n",
@@ -136,7 +136,7 @@ def main():
     failed = drive(binary, folder, "fails", "Recipe", "Update Element",
                    "The request:\nUpdate Element to the newest version.\n")
     time.sleep(1.1)
-    refused = drive(binary, folder, "administrator", "System", "Install the NVIDIA driver",
+    refused = drive(binary, folder, "administrator", "Recab", "Install the NVIDIA driver",
                     "The request:\nMy graphics card is an NVIDIA RTX 4070. I want NVIDIA's own driver instead of the "
                     "built-in one.\n\nThe facts:\nEvery recab command that changes something takes --actor agent.\n\n"
                     "The expected result:\nAfter a restart the driver is in use.\n",

@@ -1,6 +1,6 @@
 // Whether a next system is being prepared and what it holds, for the strip
-// under every page of every app ("The next system holds 2 changes."). System
-// has the whole status already and feeds the strip itself; Recipe and Disk
+// under every page of every app ("The next system holds 2 changes."). Recab
+// has the whole status already and feeds the strip itself; Recipe and Recdirstat
 // ask recab with this.
 #pragma once
 

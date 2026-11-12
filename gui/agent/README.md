@@ -492,10 +492,10 @@ failing, signed out, dying, stopping with SIGTERM, a refused call, writing with
 
 - **setting places aside**, with the `script` story of both stand-ins (turn N says
   message N of a JSON list) and the `disk` story of the Codex stand-in (reads the
-  Disk window's list): a run that sets aside two approved places (one a folder with
+  Recdirstat window's list): a run that sets aside two approved places (one a folder with
   files in it), keeps one, cannot do one, asks about an `ask_first` place and sets it
   aside after "yes" (files really moved under the holding folder, the manifest exactly
-  as Disk reads it, the `place` and `did` events, the agent never given a sandbox that
+  as Recdirstat reads it, the `place` and `did` events, the agent never given a sandbox that
   writes, one question and none about a move, and what the next turn told the agent),
   for Codex and for Claude Code; a path not on the list, an `ask_first` place not
   asked about and a link leading out of home (each refused, nothing moved, the agent
@@ -526,7 +526,7 @@ they should` or the opposite, and the exit code agrees.
 
 `fixtures/records STATE-FOLDER` fills a state folder with four runs (done with
 commands and a file change, waiting on a question, failed, an administrator
-step refused; from Recipe and System) and one that is still working, by driving
+step refused; from Recipe and Recab) and one that is still working, by driving
 the built `levitate-agent` with the stand-in, so that the Activity page of an app
 has something to show. The waiting run and the working one keep going without the
 helpers that started them (the script lets those go); `fixtures/records --stop

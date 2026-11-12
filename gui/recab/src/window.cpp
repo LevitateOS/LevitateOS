@@ -61,7 +61,7 @@ QString workTitle(const QJsonObject &op)
 Window::Window(QWidget *parent)
     : QMainWindow(parent)
 {
-    setWindowTitle(tr("System"));
+    setWindowTitle(tr("Recab"));
 
     stack_ = new QStackedWidget;
     system_ = new SystemPage;
@@ -81,7 +81,7 @@ Window::Window(QWidget *parent)
         stack_->addWidget(page);
 
     // The frame is the window: rail, the pages above, the strip, the status line.
-    frame_ = new Frame(Frame::System);
+    frame_ = new Frame(Frame::Recab);
     frame_->setContent(stack_);
     frame_->addEntry(QStringLiteral("overview"), tr("Overview"));
     frame_->addEntry(QStringLiteral("next"), tr("The next system"));
@@ -163,7 +163,7 @@ Window::Window(QWidget *parent)
         const QString path = QFileDialog::getSaveFileName(this, tr("Save the history"), QStringLiteral("history.txt"),
                                                           tr("Text (*.txt)"));
         if (!path.isEmpty() && !saveHistory(path))
-            QMessageBox::warning(this, tr("System"), tr("The history could not be saved to %1.").arg(path));
+            QMessageBox::warning(this, tr("Recab"), tr("The history could not be saved to %1.").arg(path));
     });
 
     connect(next_, &NextPage::ask, this, [this] { showAsk(); });
@@ -178,7 +178,7 @@ Window::Window(QWidget *parent)
     connect(next_, &NextPage::discard, this, [this] { discard(); });
     connect(next_, &NextPage::keep, this, [this] { keep(); });
     connect(next_, &NextPage::goBack, this, [this] { goBack(); });
-    connect(next_, &NextPage::openDisk, this, [this] { frame_->startApp(Frame::Disk); });
+    connect(next_, &NextPage::openDisk, this, [this] { frame_->startApp(Frame::Recdirstat); });
     connect(next_, &NextPage::openOverview, this, [this] {
         frame_->select(QStringLiteral("overview"));
         showMain();
@@ -191,7 +191,7 @@ Window::Window(QWidget *parent)
         const QString path = QFileDialog::getSaveFileName(this, tr("Save the steps"), QStringLiteral("start-up-steps.txt"),
                                                           tr("Text (*.txt)"));
         if (!path.isEmpty() && !saveSteps(path))
-            QMessageBox::warning(this, tr("System"), tr("The steps could not be saved to %1.").arg(path));
+            QMessageBox::warning(this, tr("Recab"), tr("The steps could not be saved to %1.").arg(path));
     });
 
     connect(ask_, &AskPage::back, this, &Window::showSection);
@@ -508,7 +508,7 @@ void Window::chain(QList<Run *> runs, const QString &made, bool restartLast, boo
                 words = !reason.isEmpty() ? reason : first ? tr("The change was not made.")
                                                            : tr("A step after the first was not made. The page shows "
                                                                 "where things stand now.");
-            QMessageBox box(QMessageBox::Warning, tr("System"), words, QMessageBox::Ok, this);
+            QMessageBox box(QMessageBox::Warning, tr("Recab"), words, QMessageBox::Ok, this);
             box.exec();
             reload([this] { showSection(); });
             return;
@@ -626,7 +626,7 @@ void Window::runOperation(const QJsonObject &op, const QStringList &extra, std::
         }
         if(!ok)return;
         value=value.trimmed();
-        if((field["required"].toBool() || (field["name"]=="file" && choice=="edited")) && value.isEmpty()){QMessageBox::warning(this,tr("System"),tr("A value is required."));return;}
+        if((field["required"].toBool() || (field["name"]=="file" && choice=="edited")) && value.isEmpty()){QMessageBox::warning(this,tr("Recab"),tr("A value is required."));return;}
         if(field["name"]=="choice")choice=value;
         if(!value.isEmpty()){if(!field["flag"].isNull())args<<field["flag"].toString();args<<value;}
     }
@@ -852,7 +852,7 @@ void Window::reset(bool askFirst)
         const QString reason = drop->problem();
         drop->deleteLater();
         if (!ok) {
-            QMessageBox::warning(this, tr("System"), reason.isEmpty() ? tr("The next system was not reset.") : reason);
+            QMessageBox::warning(this, tr("Recab"), reason.isEmpty() ? tr("The next system was not reset.") : reason);
             reload([this] { showSection(); });
             return;
         }

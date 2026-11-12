@@ -146,7 +146,7 @@ Run *RecabClient::change(const QStringList &arguments)
 Run *RecabClient::agent(const QString &prompt, const QString &title)
 {
     auto *run = new Run(agent_, {}, this);
-    run->setPrompt(prompt, QStringLiteral("System"), title);
+    run->setPrompt(prompt, QStringLiteral("Recab"), title);
     return run;
 }
 

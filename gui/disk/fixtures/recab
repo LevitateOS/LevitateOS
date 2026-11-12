@@ -4,7 +4,7 @@
   recab status --json
   recab compare --json --machine-events
 
-It plays reading both systems and answers as the Disk window expects (see
+It plays reading both systems and answers as the Recdirstat window expects (see
 the README: "What it asks of recab"). It reads no disk.
 
 DISK_STANDIN_SYSTEMS picks the story:
@@ -120,7 +120,7 @@ def folders(found):
 
 
 def status():
-    """What the System window's stand-in answers too, as far as this window reads it."""
+    """What the Recab window's stand-in answers too, as far as this window reads it."""
     if STORY == "none":
         sys.exit("Error: this computer has one system only: recab was set up without a second one")
     role = {"before": "previous", "next": "next"}.get(STORY, "copy")

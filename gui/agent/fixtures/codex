@@ -91,10 +91,10 @@ def sandbox_mode():
 
 
 def disk(turn, prompt):
-    """What an agent does with the list the Disk window hands over: it only decides;
+    """What an agent does with the list the Recdirstat window hands over: it only decides;
     the helper moves what it names."""
     import re
-    # Asked what differs between the two systems (the Disk window's second request): it reads, and says. A real
+    # Asked what differs between the two systems (the Recdirstat window's second request): it reads, and says. A real
     # agent would look at the files; this one answers from the facts it was handed.
     if turn == 1 and "the other system" in prompt.split("The facts:", 1)[0]:
         message("All but one difference belong to one change: htop was installed, which brought ncurses, and curl was "

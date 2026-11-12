@@ -602,7 +602,7 @@ void SystemsPage::showState(const SystemsState &state, const QString &why)
                                "partition. Comparing them shows whether they are the same, block by block."),
                             true)));
     header->addLayout(top, 1);
-    auto *system = new QPushButton(tr("Open System…"));
+    auto *system = new QPushButton(tr("Open Recab…"));
     system->setToolTip(tr("Changing, updating and going back are done there"));
     connect(system, &QPushButton::clicked, this, &SystemsPage::openSystem);
     header->addWidget(system, 0, Qt::AlignBottom);
@@ -717,7 +717,7 @@ void SystemsPage::show(const Comparison &c, const QString &said, const QDateTime
     }
     top->addWidget(dim(text(under, true)));
     header->addLayout(top, 1);
-    auto *system = new QPushButton(tr("Open System…"));
+    auto *system = new QPushButton(tr("Open Recab…"));
     system->setToolTip(tr("Changing, updating and going back are done there"));
     connect(system, &QPushButton::clicked, this, &SystemsPage::openSystem);
     header->addWidget(system, 0, Qt::AlignBottom);

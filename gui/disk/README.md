@@ -1,7 +1,7 @@
 # disk-gui
 
-The third desktop app, titled "Disk". It sits in the shared window frame
-(`gui/kit/frame.*`, see its README): the rail with the three apps, Disk's four
+The third desktop app, titled "Recdirstat". It sits in the shared window frame
+(`gui/kit/frame.*`, see its README): the rail with the app name, Recdirstat's four
 entries, Activity, Settings and Help; the pages; the strip about the next system; the
 status line. It does these things, each its own rail entry (it opens on the first):
 
@@ -127,7 +127,7 @@ the list".
    sentences are those above, and when Settings let the agent run commands they say
    that only the instruction keeps it from changing files itself. For a program set
    as the agent by its path they say that program is handed the request as it is,
-   moves the places itself and Disk only shows what it reports and then reads the
+   moves the places itself and Recdirstat only shows what it reports and then reads the
    holding folder, that whether it asks first is its own matter, and the issue in
    the request asks it to move the places itself. When the helper cannot be asked
    the page says so and says what is so for Codex or Claude Code, which places the agent has to ask
@@ -176,13 +176,13 @@ The rail entry "Mess" carries a badge: how many places of mess are on the list.
 A hand-over, the agent's work and the page for what was set aside are steps of
 the entry they came from and keep it marked; while the agent works, choosing
 "Mess" shows the work. Activity, from the frame, lists the agent's runs of all
-three apps; a run started here is listed as "Disk", under the first line of its
+three apps; a run started here is listed as "Recdirstat", under the first line of its
 issue, and "Go to it" brings the person back to the work page. The strip, "The
 next system holds N changes." with "Finish and restart…", is read from `recab
 status --json` (`DISK_GUI_RECAB`) and shown on every page; when recab cannot be
 read or answers in a shape the strip does not know, there is no strip and no
-error. The button and "Open System…" start the System app the same way
-(`LEVITATE_APP_SYSTEM`, else `recab-gui`; the frame starts it, as the rail does).
+error. The button and "Open Recab…" start the Recab app the same way
+(`LEVITATE_APP_SYSTEM`, else `recab-gui`; the frame starts it).
 
 The status line says when the disk was looked at and that only "Let it all go"
 deletes anything from here. "Read again" in the status line, F5 and Ctrl+R look
@@ -198,7 +198,7 @@ On the fourth entry:
    (quick, no password): the page names both and shows two empty frames. If a
    comparison was kept from before, it is shown instead, with when it was
    made; when either system has changed since, it says so and offers to
-   compare again. "Open System…" starts the System window, where changing,
+   compare again. "Open Recab…" starts the Recab window, where changing,
    updating and going back are done.
 2. **Compare.** "Compare" first shows the shared Before page: both systems are
    read from start to end, neither is changed, it takes a few minutes, whether the
@@ -235,13 +235,13 @@ On the fourth entry:
 
 Both are the frame's (`gui/kit/README.md`, "Help" and "The first time"); the window
 adds nothing for them: every link of Help goes to a rail entry (The disk, Browse, Mess,
-The two systems), Activity or Settings. Help for Disk has the ideas (mess, setting
+The two systems), Activity or Settings. Help for Recdirstat has the ideas (mess, setting
 aside, the two systems), what it can do (see how full the disk is, find what takes the
 room, clear mess, bring a place back or let it all go through "Set aside by the agent"
 on The disk, compare the two systems), the agent (asked to set aside by moving, what
 the page shows read back from the holding folder), and what to do when a place could
 not be set aside or the agent does not answer. The first page comes once per person
-the first time Disk opens (never in a picture run). Both stories check them
+the first time Recdirstat opens (never in a picture run). Both stories check them
 (`../kit/helpstory.*`; pictures `h-help*`, `h-help-went`, `h-firstrun-*`).
 
 ## The set-aside convention
@@ -454,7 +454,7 @@ QT_QPA_PLATFORM=offscreen DISK_GUI_ROOTS=$S/sample DISK_GUI_HOME=$S/sample DISK_
   $A/build/disk-gui --look levitate --shots $S/pics --hand-over
 ```
 
-The comparison keeps using the Disk stand-in `$F/recab`, which answers `status`
+The comparison keeps using the Recdirstat stand-in `$F/recab`, which answers `status`
 in the older shape the strip cannot read (schema 3, with the partitions
 `/dev/vda2` and `/dev/vda3` the `lsblk` stand-in knows); that is also the check
 for "no strip". `DISK_STANDIN_STRIP_RECAB` is `recab-real`, used only for the
@@ -524,7 +524,7 @@ The stand-ins, all in `fixtures/`:
 
 ## What it asks of recab
 
-`recab status --json`, as the System window reads it, for what the two
+`recab status --json`, as the Recab window reads it, for what the two
 systems are. From the real recab (schema 7 to 10; recab sends 10 today) it takes the two slots, the
 generation each holds, the preparation's revision and `lifecycle.other`, in
 which recab itself says what the other system is: the next one, the system
@@ -640,8 +640,8 @@ on its input as `{"question": id, "answer": "..."}`. When asked what differs bet
   administrator's password" whether or not a root helper is set; neither is true now.
 - Choosing the other entry while a comparison reads is allowed (the page keeps
   filling). Activity does not list comparisons: only agent runs are recorded.
-- Checked only offscreen, with stand-ins; not on a real desktop, and the rail's
-  app buttons, the Recipe app and the System app were not started for real. The
+- Checked only offscreen, with stand-ins; not on a real desktop, and 
+  link buttons, the Recipe app and the Recab app were not started for real. The
   holding folder was never measured on a folder of real size (it is read off the
   window's thread, but a very big one takes as long to read as a scan does).
 - A comparison of a real pair of systems: `recab compare` has only run on
@@ -653,7 +653,7 @@ on its input as `{"question": id, "answer": "..."}`. When asked what differs bet
   copying the list of differences.
 - Recipe's own folders are left alone because Recipe has no command that clears
   them (`recipe cleanup NAME` is for one recipe's build files, `recipe storage
-  --clear-earlier` for earlier versions). When it has one, Disk can hand them to
+  --clear-earlier` for earlier versions). When it has one, Recdirstat can hand them to
   Recipe. The real `recipe storage --json` was not run here: the shape (`earlier_bytes`,
   `earlier_generations`) was read from `tools/recipe` and `gui/recipe`.
 - Mess inside the systems. The map reads only the home folder and

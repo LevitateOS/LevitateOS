@@ -1,5 +1,5 @@
-// The window every app of the three shares: a rail on the left (the three
-// apps, then the app's own entries, then Activity), the app's pages in the
+// The window every app of the three shares: a rail on the left (the app's
+// name, then the app's own entries, then Activity), the app's pages in the
 // middle, a strip under them about the next system, and a status line. An
 // app's window uses it as its central widget and keeps its own pages in one
 // widget it hands over with `setContent`. See README.md for an example.
@@ -27,16 +27,16 @@ class Strip;
 class Frame : public QWidget {
     Q_OBJECT
 public:
-    enum App { Recipe, System, Disk };
+    enum App { Recipe, Recab, Recdirstat };
 
-    // `app` is the app this window is: its button in the rail is the marked one.
+    // `app` is the app this window is: its name heads the rail.
     explicit Frame(App app, QWidget *parent = nullptr);
 
     // ---- The middle. The widget (usually a QStackedWidget of the app's pages)
     // is shown whenever Activity is not.
     void setContent(QWidget *content);
 
-    // ---- The rail. Entries are the app's own: they come after the three apps
+    // ---- The rail. Entries are the app's own: they come under the app name
     // and before Activity, in the order added. Only Activity is shared.
     void addEntry(const QString &key, const QString &title);
     // The number on an entry (0 shows none); `warn` makes it amber, for
@@ -109,11 +109,11 @@ public:
     QString agentText() const;
     QString statusText() const;
 
-    // Starts an app's program detached, exactly as choosing it in the rail
-    // does (the same variables); the status line says when it cannot be started.
+    // Starts an app's program detached, as a labelled button for it does
+    // (LEVITATE_APP_* name the programs); the status line says when it cannot be started.
     void startApp(App app);
     // The titles of the rail's entries in order, the app's own and then Activity,
-    // Settings and Help, without the three apps.
+    // Settings and Help.
     QStringList entryTitles() const;
 
     // ---- Activity, which the frame owns.
@@ -172,7 +172,6 @@ private:
     FirstRunPage *firstRun_;
     QStringList helpTargets_;
     bool firstRunChecked_ = false;
-    QWidget *appsRow_;
     QMap<QString, RailButton *> entries_;
     QList<RailButton *> order_;
     QWidget *appEntries_;

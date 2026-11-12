@@ -19,17 +19,17 @@ const int readingWidth = 720;
 
 QString appName(Frame::App app)
 {
-    return app == Frame::Recipe ? QObject::tr("Recipe") : app == Frame::System ? QObject::tr("System") : QObject::tr("Disk");
+    return app == Frame::Recipe ? QObject::tr("Recipe") : app == Frame::Recab ? QObject::tr("Recab") : QObject::tr("Recdirstat");
 }
 
-// ---- System
+// ---- Recab
 
 HelpText systemText()
 {
     HelpText t;
-    t.name = QObject::tr("System");
+    t.name = QObject::tr("Recab");
     t.purpose = QObject::tr(
-        "System is where you change and update this computer's locked system. The running system cannot be "
+        "Recab is where you change and update this computer's locked system. The running system cannot be "
         "changed while it runs, so a change is made in a second system beside it, and takes effect when you "
         "restart into it. You say what you want, and an agent makes the change there.");
     t.never = QObject::tr(
@@ -87,7 +87,7 @@ HelpText systemText()
                      "as text."),
          QStringLiteral("history"), QObject::tr("History")}};
     t.agentInThisApp = QObject::tr(
-        "In System it works through recab: its changes go into the next system and take effect after you restart into "
+        "In Recab it works through recab: its changes go into the next system and take effect after you restart into "
         "it.");
     t.wrong = {
         {QObject::tr("A run stopped"),
@@ -111,7 +111,7 @@ HelpText systemText()
                      "failed says which step had been made before it."),
          QStringLiteral("overview"), QObject::tr("Overview")}};
     t.others = {{Frame::Recipe, QObject::tr("Find, install, update and remove software.")},
-                {Frame::Disk, QObject::tr("See how full the disk is, find mess and set it aside, and compare the two "
+                {Frame::Recdirstat, QObject::tr("See how full the disk is, find mess and set it aside, and compare the two "
                                           "systems.")}};
     return t;
 }
@@ -196,23 +196,23 @@ HelpText recipeText()
                      "say hello. The line at the bottom of the window names the agent on its right and says whether it is "
                      "signed in."),
          Frame::settingsKey(), QObject::tr("Settings")}};
-    t.others = {{Frame::System, QObject::tr("Change and update the locked system, finish and restart into it, and go "
+    t.others = {{Frame::Recab, QObject::tr("Change and update the locked system, finish and restart into it, and go "
                                             "back.")},
-                {Frame::Disk, QObject::tr("See how full the disk is, find mess and set it aside, and compare the two "
+                {Frame::Recdirstat, QObject::tr("See how full the disk is, find mess and set it aside, and compare the two "
                                           "systems.")}};
     return t;
 }
 
-// ---- Disk
+// ---- Recdirstat
 
 HelpText diskText()
 {
     HelpText t;
-    t.name = QObject::tr("Disk");
+    t.name = QObject::tr("Recdirstat");
     t.purpose = QObject::tr(
-        "Disk shows how full the place for your files is, where the mess is hiding, and how alike the two systems are. "
+        "Recdirstat shows how full the place for your files is, where the mess is hiding, and how alike the two systems are. "
         "The agent clears mess for you by setting places aside, not by deleting them; what belongs to Recipe is listed, "
-        "but Disk leaves it alone.");
+        "but Recdirstat leaves it alone.");
     t.never = QObject::tr(
         "It changes nothing by itself. The window itself deletes only one thing, the holding folder of places set aside, "
         "and only when you press “Let it all go” and agree on the page that says what goes.");
@@ -240,7 +240,7 @@ HelpText diskText()
                      "If the other system can only be read by the administrator, it asks for the administrator's "
                      "password first. It says how alike they are and which folders "
                      "differ, and you can ask the agent what differs. Changing, updating and going back are done in "
-                     "System."),
+                     "Recab."),
          true}};
     t.how = {
         {QObject::tr("See how full the disk is"),
@@ -263,7 +263,7 @@ HelpText diskText()
          QObject::tr("Choose “Compare”. A page says first that both systems are read and that it takes minutes."),
          QStringLiteral("systems"), QObject::tr("The two systems")}};
     t.agentInThisApp = QObject::tr(
-        "In Disk it is asked which of the places you hand over to set aside, and is told to move nothing itself; the "
+        "In Recdirstat it is asked which of the places you hand over to set aside, and is told to move nothing itself; the "
         "helper moves them into a holding folder. What the page shows as set aside is read back from that folder, not "
         "taken from what the agent says.");
     t.wrong = {
@@ -278,7 +278,7 @@ HelpText diskText()
                      "signed in."),
          Frame::settingsKey(), QObject::tr("Settings")}};
     t.others = {{Frame::Recipe, QObject::tr("Find, install, update and remove software.")},
-                {Frame::System, QObject::tr("Change and update the locked system, finish and restart into it, and go "
+                {Frame::Recab, QObject::tr("Change and update the locked system, finish and restart into it, and go "
                                             "back.")}};
     return t;
 }
@@ -307,7 +307,7 @@ QLabel *sectionHead(const QString &words)
 
 HelpText helpText(Frame::App app)
 {
-    return app == Frame::Recipe ? recipeText() : app == Frame::System ? systemText() : diskText();
+    return app == Frame::Recipe ? recipeText() : app == Frame::Recab ? systemText() : diskText();
 }
 
 HelpPage::HelpPage(Frame::App app, QWidget *parent)

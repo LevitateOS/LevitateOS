@@ -19,7 +19,7 @@ namespace {
 
 QString keyOf(Frame::App app)
 {
-    return app == Frame::Recipe ? QStringLiteral("recipe") : app == Frame::System ? QStringLiteral("system")
+    return app == Frame::Recipe ? QStringLiteral("recipe") : app == Frame::Recab ? QStringLiteral("system")
                                                                                  : QStringLiteral("disk");
 }
 

@@ -1,7 +1,7 @@
 # The three desktop apps: what the UX lacks
 
 Every gap found on 2026-11-10 in `gui/recipe` ("Recipe"), `gui/recab`
-("System") and `gui/disk` ("Disk"): missing actions, pages, tabs, states and
+("Recab") and `gui/disk` ("Recdirstat"): missing actions, pages, tabs, states and
 feedback. It is a list of findings and of what they say about a redesign. It
 is not a plan, and nothing here has been decided.
 
@@ -15,8 +15,8 @@ checked again by hand; the rest stand on the evidence given with each.
 |---|---|---|---|---|---|---|---|
 | Across all three (X) | 27 | 8 | 14 | 5 | 7 | 12 | 8 |
 | Recipe (R) | 65 | 16 | 36 | 13 | 15 | 19 | 31 |
-| System (S) | 58 | 14 | 28 | 16 | 22 | 24 | 12 |
-| Disk (D) | 81 | 19 | 44 | 18 | 17 | 36 | 28 |
+| Recab (S) | 58 | 14 | 28 | 16 | 22 | 24 | 12 |
+| Recdirstat (D) | 81 | 19 | 44 | 18 | 17 | 36 | 28 |
 | **All** | **231** | **57** | **122** | **52** | **61** | **91** | **79** |
 
 **Core** blocks a main job, **hurts** makes it worse, **polish** is finish.
@@ -153,7 +153,7 @@ makes it worse, **polish** is finish.
 | X1 | page | Install software for the whole system the way the locked system really takes it. On an A/B system root's `recipe install` goes into the next system and takes effect after finishing and a restart. The Recipe app installs with `--package-root /var/lib/recipe`, a separate profile, and then says "installed" and offers "Open" | exists (`recipe --system install`, `recab change install`) | core | `tools/recipe/README.md` "System software on immutable A/B installations"; `gui/recipe/src/client.cpp:29` | **done**: Before page "For this computer" on a locked computer runs `recipe --system install`; stories p1-p3 (never run against a real recab) |
 | X2 | state | See that an install or removal is pending until the restart. `recipe installed` reports active and prepared receipts; the Recipe app shows one flat "Installed" list | exists (`recipe --system installed`, `isinstalled --prepared`) | core | `tools/recipe/README.md:53`; `gui/recipe/src/pages.cpp` InstalledPage | **partly**: preparation.changes gives "after a restart" on Browse/program page; next-system rows only when root reads `prepared` |
 | X3 | action | Choose "for me" or "for everyone on this computer" when installing. For me is immediate and needs no password; for everyone is a system change | exists (the person's own store, and `--system`) | core | `gui/recipe/src/client.cpp` (one store, from an environment variable) | **done**: Before page choice "For me" / "For this computer"; p1, p2 check route and no root helper |
-| X4 | navigation | Get from the Recipe app to the System app when what was asked for is a system change, and back from a change in the System app to the recipe it installed | possible today | hurts | `gui/recipe/src/pages.cpp:786` (a sentence, no link) | **partly**: strip "Finish and restart…" and the rail start System; nothing leads from a System change back to its recipe |
+| X4 | navigation | Get from the Recipe app to the System app when what was asked for is a system change, and back from a change in the System app to the recipe it installed | possible today | hurts | `gui/recipe/src/pages.cpp:786` (a sentence, no link) | **partly**: strip "Finish and restart…" starts Recab (the rail has no app buttons); nothing leads from a System change back to its recipe |
 | X5 | page | See in the System app which software the next system gains or loses. Only the last change is named | partly (`recab change list`, `recipe --system installed`) | hurts | `gui/recab/README.md` "Not done" | **done**: System "The next system" lists every change (recab status schema 7+) |
 
 ### The agent has no home

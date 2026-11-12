@@ -95,7 +95,7 @@ void showHandOverNow(Window &window)
 // The strip: it is read with a recab of the real shape, named by
 // DISK_STANDIN_STRIP_RECAB (gui/recab/fixtures/recab-real, with its own state,
 // after one `prepare` and one change). The comparison keeps using the
-// window's own recab, the Disk stand-in, which answers `status` in an older
+// window's own recab, the Recdirstat stand-in, which answers `status` in an older
 // shape the strip cannot read.
 void stripShots(Window &window, const Save &save, const Expect &expect, QTextStream &out)
 {
@@ -104,7 +104,7 @@ void stripShots(Window &window, const Save &save, const Expect &expect, QTextStr
     const QString mark = qEnvironmentVariable("DISK_STANDIN_SYSTEM_MARK");
     if (real.isEmpty() || mark.isEmpty()) {
         out << "not as expected: the strip needs DISK_STANDIN_STRIP_RECAB (gui/recab/fixtures/recab-real after one "
-               "prepare and one change) and DISK_STANDIN_SYSTEM_MARK (a file the stand-in System app makes), see README.md\n";
+               "prepare and one change) and DISK_STANDIN_SYSTEM_MARK (a file the stand-in Recab app makes), see README.md\n";
         expect(QStringLiteral("the strip could be checked"), false);
         return;
     }
@@ -122,22 +122,22 @@ void stripShots(Window &window, const Save &save, const Expect &expect, QTextStr
     expect(QStringLiteral("the strip shows on the two systems too"), frame->stripShown());
     save("s2-strip-systems");
 
-    // "Finish and restart…" and "Open System…" start the System app the same way.
+    // "Finish and restart…" and "Open Recab…" start the Recab app the same way.
     QFile::remove(mark);
     if (QPushButton *finish = buttonNamed(frame, QStringLiteral("Finish and restart…")))
         finish->click();
     waitFor([&] { return QFileInfo::exists(mark); }, 10);
-    expect(QStringLiteral("the strip's button starts the System app"), QFileInfo::exists(mark));
+    expect(QStringLiteral("the strip's button starts the Recab app"), QFileInfo::exists(mark));
     QFile::remove(mark);
-    if (QPushButton *open = buttonNamed(&window, QStringLiteral("Open System…")))
+    if (QPushButton *open = buttonNamed(&window, QStringLiteral("Open Recab…")))
         open->click();
     waitFor([&] { return QFileInfo::exists(mark); }, 10);
-    expect(QStringLiteral("\"Open System…\" starts it the same way"), QFileInfo::exists(mark));
+    expect(QStringLiteral("\"Open Recab…\" starts it the same way"), QFileInfo::exists(mark));
     QFile::remove(mark);
 }
 
 // Where the strip must not be: a recab that cannot be read, and the older
-// shape of the Disk stand-in. Neither says anything about it.
+// shape of the Recdirstat stand-in. Neither says anything about it.
 void noStripShots(Window &window, const QString &own, const Expect &expect)
 {
     Frame *frame = window.frame();
@@ -153,9 +153,9 @@ void noStripShots(Window &window, const QString &own, const Expect &expect)
     expect(QStringLiteral("no strip when recab answers in a shape the strip cannot read"), !frame->stripShown());
 }
 
-// The pages the frame owns after Settings: Help for Disk, and the page a person
+// The pages the frame owns after Settings: Help for Recdirstat, and the page a person
 // sees the first time. The checks are `../kit/helpstory.*`; this says which page
-// of Disk each target is.
+// of Recdirstat each target is.
 void helpShots(Window &window, const QString &folder, const Save &save, const Expect &expect)
 {
     const QString script = qEnvironmentVariable("RECAB_GUI_RECORDS");
@@ -164,7 +164,7 @@ void helpShots(Window &window, const QString &folder, const Save &save, const Ex
         return;
     }
     helpstory::Plan plan;
-    plan.app = Frame::Disk;
+    plan.app = Frame::Recdirstat;
     plan.window = &window;
     plan.frame = window.frame();
     plan.firstEntry = QStringLiteral("disk");
@@ -224,7 +224,7 @@ void settingsShots(Window &window, const QString &folder, const Save &save, cons
 
 // Activity with records of the agent's runs (gui/agent/fixtures/records, a
 // stand-in Codex, never a real agent), read through the built levitate-agent.
-// Disk has started none of these runs: they are Recipe's and System's.
+// Recdirstat has started none of these runs: they are Recipe's and Recab's.
 // `own`: the work page shows the live run, which is then this window's own.
 void activityShots(Window &window, const QString &folder, bool own, const Save &save, const Expect &expect,
                    QTextStream &out, QString *where)
@@ -266,7 +266,7 @@ void activityShots(Window &window, const QString &folder, bool own, const Save &
     save(own ? QStringLiteral("a2-activity-while-the-agent-works") : QStringLiteral("a1-activity"));
 
     page->showOnlyThisApp(true);
-    expect(QStringLiteral("Disk started none of the runs, so its own filter lists none"), page->listedTitles().isEmpty());
+    expect(QStringLiteral("Recdirstat started none of the runs, so its own filter lists none"), page->listedTitles().isEmpty());
     page->showOnlyThisApp(false);
 
     if (!own)
@@ -661,8 +661,8 @@ void messShots(Window &window, const Save &save, const Expect &expect)
             break;
         }
     const QString recipePanel = pageText(page);
-    expect(QStringLiteral("Recipe's folder says it belongs to Recipe, that Disk leaves it alone and that Recipe has no command for it yet"),
-           recipePanel.contains(QStringLiteral("belongs to Recipe")) && recipePanel.contains(QStringLiteral("Disk leaves it alone"))
+    expect(QStringLiteral("Recipe's folder says it belongs to Recipe, that Recdirstat leaves it alone and that Recipe has no command for it yet"),
+           recipePanel.contains(QStringLiteral("belongs to Recipe")) && recipePanel.contains(QStringLiteral("Recdirstat leaves it alone"))
                && recipePanel.contains(QStringLiteral("Recipe has no command to clear it yet")) && !recipePanel.contains(QStringLiteral("through Recipe")));
 }
 
@@ -877,10 +877,10 @@ void handOverShots(Window &window, const Expect &expect)
                          : words.contains(QStringLiteral("A command as administrator runs only if you approve it.")))
                && words.contains(QStringLiteral("is free")));
     expect(QStringLiteral("it says which places it asks about first, and who does not move one before"),
-           other ? words.contains(QStringLiteral("It is told to ask you first about")) && words.contains(QStringLiteral("is up to the program; Disk shows its question"))
+           other ? words.contains(QStringLiteral("It is told to ask you first about")) && words.contains(QStringLiteral("is up to the program; Recdirstat shows its question"))
                  : words.contains(QStringLiteral("It asks you first about")) && words.contains(QStringLiteral("does not move one of them before you were asked")));
     expect(QStringLiteral("it says who moves the files: for the helper, only places on the list and the agent told to move nothing; for another program, the program"),
-           other ? words.contains(QStringLiteral("is handed this request as it is")) && words.contains(QStringLiteral("moves the places itself; Disk only shows what it reports"))
+           other ? words.contains(QStringLiteral("is handed this request as it is")) && words.contains(QStringLiteral("moves the places itself; Recdirstat only shows what it reports"))
                        && !words.contains(QStringLiteral("The helper that runs the agent moves")) && !words.contains(QStringLiteral("not to move or delete anything itself"))
                  : words.contains(QStringLiteral("The helper that runs the agent moves what the agent names, and only places on this list"))
                        && words.contains(QStringLiteral("not to move or delete anything itself")) && !words.contains(QStringLiteral("moves the places itself")));
@@ -983,7 +983,7 @@ void explainShots(Window &window, const Save &save, const Expect &expect)
     settle(200);
 }
 
-// The helper's records of runs Disk handed over (the first line of each says which app asked).
+// The helper's records of runs Recdirstat handed over (the first line of each says which app asked).
 QList<QList<QJsonObject>> diskRuns(const QString &state)
 {
     QList<QList<QJsonObject>> found;
@@ -996,7 +996,7 @@ QList<QList<QJsonObject>> diskRuns(const QString &state)
         for (const QByteArray &line : file.readAll().split('\n'))
             if (!line.trimmed().isEmpty())
                 lines << QJsonDocument::fromJson(line).object();
-        if (!lines.isEmpty() && lines.first()["app"] == QLatin1String("Disk"))
+        if (!lines.isEmpty() && lines.first()["app"] == QLatin1String("Recdirstat"))
             found << lines;
     }
     return found;
@@ -1054,7 +1054,7 @@ void helperRunChecks(Window &window, const QString &state, const QString &standi
         for (const QByteArray &line : file.readAll().split('\n'))
             if (!line.trimmed().isEmpty())
                 mine << QJsonDocument::fromJson(line).object();
-        if (!mine.isEmpty() && mine.first()["app"] == QLatin1String("Disk") && mine.first().contains("set_aside")) {
+        if (!mine.isEmpty() && mine.first()["app"] == QLatin1String("Recdirstat") && mine.first().contains("set_aside")) {
             request = mine.first();
             lines = mine;
             break;
@@ -1173,10 +1173,10 @@ void agentWordsShots(Window &window, const QString &folder, const QString &helpe
         showHandOverNow(window);
         const QString words = pageText(page);
         const QString name = QFileInfo(program).fileName();
-        expect(QStringLiteral("with a program chosen by its path the page says that program moves the places and Disk shows what it reports (%1)").arg(name),
+        expect(QStringLiteral("with a program chosen by its path the page says that program moves the places and Recdirstat shows what it reports (%1)").arg(name),
                window.agentChoice().kind == AgentChoice::Other && window.agentChoice().name == name
                    && words.contains(QStringLiteral("%1, the program you chose as the agent, is handed this request as it is").arg(name))
-                   && words.contains(QStringLiteral("moves the places itself; Disk only shows what it reports"))
+                   && words.contains(QStringLiteral("moves the places itself; Recdirstat only shows what it reports"))
                    && words.contains(QStringLiteral("is up to the program")) && !words.contains(QStringLiteral("The helper that runs the agent moves"))
                    && !words.contains(QStringLiteral("not to move or delete anything itself")) && !words.contains(QStringLiteral("The helper does not move one of them")));
         const QString request = page->prompt();
@@ -1189,7 +1189,7 @@ void agentWordsShots(Window &window, const QString &folder, const QString &helpe
         showHandOverNow(window);
         const QString words = pageText(page);
         expect(QStringLiteral("when the helper cannot be asked the page says so and does not claim who moves the places"),
-               window.agentChoice().kind == AgentChoice::Unknown && words.contains(QStringLiteral("Disk could not ask which agent is chosen"))
+               window.agentChoice().kind == AgentChoice::Unknown && words.contains(QStringLiteral("Recdirstat could not ask which agent is chosen"))
                    && words.contains(QStringLiteral("a program chosen by its path would move the places itself")));
         save("3f-hand-over-unknown-agent");
         window.useAgent(helper);
@@ -1201,7 +1201,7 @@ void agentWordsShots(Window &window, const QString &folder, const QString &helpe
 namespace {
 
 // Runs that outlive their window: found, followed, answered and stopped from
-// Activity. Each one is started by a window of Disk's own (the hand-over of the
+// Activity. Each one is started by a window of Recdirstat's own (the hand-over of the
 // mess, with the helper as its agent) that then closes.
 void liveShots(Window &window, const QString &folder, const Save &save, const Expect &expect)
 {

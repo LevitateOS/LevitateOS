@@ -49,30 +49,22 @@ bool sharedKey(const QString &key)
 
 } // namespace
 
-// The rail has the three apps and the entries in it; each is one of these.
+// The rail's entries are each one of these.
 // Up and Down move between the entries, Tab and Shift+Tab as everywhere else.
 class RailButton : public QAbstractButton {
     Q_OBJECT
 public:
-    enum Kind { AppSwitch, Entry };
-    RailButton(Kind kind, const QString &title, QWidget *parent = nullptr)
+    RailButton(const QString &title, QWidget *parent = nullptr)
         : QAbstractButton(parent)
-        , kind_(kind)
     {
         setText(title);
-        setCheckable(kind == Entry);
+        setCheckable(true);
         setFocusPolicy(Qt::StrongFocus);
         setCursor(Qt::PointingHandCursor);
         setAttribute(Qt::WA_Hover);
         setAccessibleName(title);
-        setFixedHeight(kind == AppSwitch ? 28 : 32);
+        setFixedHeight(32);
         setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
-    }
-    // The app this window is: marked, and it does nothing when chosen.
-    void setCurrent(bool current)
-    {
-        current_ = current;
-        update();
     }
     void setBadge(int count, bool warn)
     {
@@ -108,28 +100,7 @@ protected:
         const QPalette &p = palette();
         const QRectF box = QRectF(rect()).adjusted(0.5, 0.5, -0.5, -0.5);
         QColor ink = p.color(QPalette::WindowText);
-        if (kind_ == AppSwitch) {
-            // The current app is a raised button, the others are words.
-            if (current_) {
-                painter.setPen(QPen(p.color(QPalette::Mid).lighter(150), 1));
-                painter.setBrush(p.color(QPalette::Button));
-                painter.drawRoundedRect(box, 5, 5);
-            } else if (underMouse()) {
-                QColor tint = ink;
-                tint.setAlphaF(0.07f);
-                painter.setPen(Qt::NoPen);
-                painter.setBrush(tint);
-                painter.drawRoundedRect(box, 5, 5);
-            }
-            QFont font = this->font();
-            font.setPointSizeF(font.pointSizeF() * 0.95);
-            font.setBold(current_);
-            painter.setFont(font);
-            if (!current_)
-                ink.setAlphaF(0.7f);
-            painter.setPen(ink);
-            painter.drawText(rect(), Qt::AlignCenter, text());
-        } else {
+        {
             if (isChecked()) {
                 QColor tint = p.color(QPalette::Highlight);
                 tint.setAlphaF(0.16f);
@@ -180,8 +151,7 @@ protected:
     }
 
 private:
-    Kind kind_;
-    bool current_ = false, warn_ = false;
+    bool warn_ = false;
     int count_ = 0;
 };
 
@@ -272,8 +242,8 @@ struct AppInfo {
     const char *name, *program, *variable;
 };
 const AppInfo apps[] = {{"Recipe", "recipe-gui", "LEVITATE_APP_RECIPE"},
-                        {"System", "recab-gui", "LEVITATE_APP_SYSTEM"},
-                        {"Disk", "disk-gui", "LEVITATE_APP_DISK"}};
+                        {"Recab", "recab-gui", "LEVITATE_APP_SYSTEM"},
+                        {"Recdirstat", "disk-gui", "LEVITATE_APP_DISK"}};
 
 QWidget *rail(QWidget *parent)
 {
@@ -305,20 +275,15 @@ Frame::Frame(App app, QWidget *parent)
     railColumn->setSpacing(2);
     left->setAccessibleName(tr("%1 sections").arg(QString::fromLatin1(apps[app].name)));
 
-    appsRow_ = new QWidget;
-    auto *three = new QHBoxLayout(appsRow_);
-    three->setContentsMargins(0, 0, 0, 0);
-    three->setSpacing(4);
-    for (int at = 0; at < 3; ++at) {
-        auto *button = new RailButton(RailButton::AppSwitch, tr(apps[at].name));
-        button->setCurrent(at == app);
-        button->setAccessibleDescription(at == app ? tr("This window") : tr("Opens %1").arg(tr(apps[at].name)));
-        connect(button, &QAbstractButton::clicked, this, [this, at] { startApp(App(at)); });
-        three->addWidget(button);
-        order_ << button;
-        connect(button, &RailButton::stepped, this, [this, button](int by) { step(button, by); });
+    auto *title = new QLabel(tr(apps[app].name));
+    {
+        QFont f = title->font();
+        f.setBold(true);
+        f.setPointSizeF(f.pointSizeF() * 1.25);
+        title->setFont(f);
+        title->setContentsMargins(10, 4, 10, 2);
     }
-    railColumn->addWidget(appsRow_);
+    railColumn->addWidget(title);
     railColumn->addSpacing(4);
     railColumn->addWidget(rule());
     railColumn->addSpacing(4);
@@ -330,21 +295,21 @@ Frame::Frame(App app, QWidget *parent)
     railColumn->addWidget(appEntries_);
     railColumn->addStretch();
     // The shared entries, below the gap.
-    auto *activity = new RailButton(RailButton::Entry, tr("Activity"));
-    activity->setAccessibleDescription(tr("What the agent was asked, from all three apps"));
+    auto *activity = new RailButton(tr("Activity"));
+    activity->setAccessibleDescription(tr("What the agent was asked, from all the apps"));
     entries_.insert(activityKey(), activity);
     order_ << activity;
     railColumn->addWidget(activity);
     connect(activity, &QAbstractButton::clicked, this, [this] { choose(activityKey()); });
     connect(activity, &RailButton::stepped, this, [this, activity](int by) { step(activity, by); });
-    auto *settings = new RailButton(RailButton::Entry, tr("Settings"));
-    settings->setAccessibleDescription(tr("The agent and the windows, the same in all three apps"));
+    auto *settings = new RailButton(tr("Settings"));
+    settings->setAccessibleDescription(tr("The agent and the windows, the same in all the apps"));
     entries_.insert(settingsKey(), settings);
     order_ << settings;
     railColumn->addWidget(settings);
     connect(settings, &QAbstractButton::clicked, this, [this] { choose(settingsKey()); });
     connect(settings, &RailButton::stepped, this, [this, settings](int by) { step(settings, by); });
-    auto *help = new RailButton(RailButton::Entry, tr("Help"));
+    auto *help = new RailButton(tr("Help"));
     help->setAccessibleDescription(tr("How %1 works and where to look when something is wrong").arg(tr(apps[app].name)));
     entries_.insert(helpKey(), help);
     order_ << help;
@@ -436,7 +401,7 @@ void Frame::setContent(QWidget *content)
 
 void Frame::addEntry(const QString &key, const QString &title)
 {
-    auto *button = new RailButton(RailButton::Entry, title);
+    auto *button = new RailButton(title);
     entries_.insert(key, button);
     // Before the shared entries (Activity, Settings, Help), which are last in the order.
     order_.insert(order_.size() - 3, button);
@@ -585,11 +550,7 @@ void Frame::step(RailButton *from, int by)
     const int at = order_.indexOf(from);
     if (at < 0)
         return;
-    // The three apps are one stop each; Up and Down stay among the entries.
-    QList<RailButton *> entries;
-    for (RailButton *button : order_)
-        if (button->parent() != appsRow_)
-            entries << button;
+    const QList<RailButton *> entries = order_;
     const int index = entries.indexOf(from);
     if (index < 0)
         return;
@@ -693,8 +654,7 @@ QStringList Frame::entryTitles() const
 {
     QStringList titles;
     for (RailButton *button : order_)
-        if (button->parent() != appsRow_)
-            titles << button->text();
+        titles << button->text();
     return titles;
 }
 

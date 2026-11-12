@@ -45,14 +45,14 @@ private:
 
 QString appWord(Frame::App app)
 {
-    return app == Frame::Recipe ? QStringLiteral("Recipe") : app == Frame::System ? QStringLiteral("System")
-                                                                                 : QStringLiteral("Disk");
+    return app == Frame::Recipe ? QStringLiteral("Recipe") : app == Frame::Recab ? QStringLiteral("Recab")
+                                                                                 : QStringLiteral("Recdirstat");
 }
 
 QString appVariable(Frame::App app)
 {
     return app == Frame::Recipe ? QStringLiteral("LEVITATE_APP_RECIPE")
-           : app == Frame::System ? QStringLiteral("LEVITATE_APP_SYSTEM")
+           : app == Frame::Recab ? QStringLiteral("LEVITATE_APP_SYSTEM")
                                    : QStringLiteral("LEVITATE_APP_DISK");
 }
 

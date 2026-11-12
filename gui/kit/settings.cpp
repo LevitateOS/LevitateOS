@@ -469,7 +469,7 @@ void SettingsPage::render()
     auto *top = new QVBoxLayout;
     top->setSpacing(1);
     top->addWidget(heading(tr("Settings")));
-    top->addWidget(dim(text(tr("One set for Recipe, System and Disk. What is set here holds in all three."), true)));
+    top->addWidget(dim(text(tr("One set for Recipe, Recab and Recdirstat. What is set here holds in all three."), true)));
     page->addLayout(top);
 
     // ---- The agent

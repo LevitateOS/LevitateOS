@@ -462,9 +462,9 @@ void HandPage::show(const QList<Finding> &chosen, qint64 scannedBytes, const QSt
     const QString count = counted(chosen.size(), tr("%1 place"), tr("%1 places"));
     if (other) {
         ask.happens << tr("%1, the program you chose as the agent, is handed this request as it is, to clear %2, %3 in all. It decides about "
-                          "each place and moves the places itself; Disk only shows what it reports.")
+                          "each place and moves the places itself; Recdirstat only shows what it reports.")
                            .arg(agent.name, count, bytesText(sum(chosen)));
-        ask.happens << tr("What it sets aside goes into the holding folder %1, on the same disk as your files, and Disk then reads that "
+        ask.happens << tr("What it sets aside goes into the holding folder %1, on the same disk as your files, and Recdirstat then reads that "
                           "folder, so what the next page shows as set aside is what is really there. A place on another disk than your "
                           "home folder cannot be set aside by moving. Nothing is gone until you let it go, and you can bring each place "
                           "back before that.")
@@ -477,7 +477,7 @@ void HandPage::show(const QList<Finding> &chosen, qint64 scannedBytes, const QSt
                                        "commands in your home folder without asking, so only that instruction keeps it from changing your files itself.")
                                   : tr("It is told to decide about each place and not to move or delete anything itself."))
                            + (agent.kind == AgentChoice::Unknown
-                                  ? QLatin1Char(' ') + tr("Disk could not ask which agent is chosen (%1). This is what happens with Codex or Claude Code; "
+                                  ? QLatin1Char(' ') + tr("Recdirstat could not ask which agent is chosen (%1). This is what happens with Codex or Claude Code; "
                                                           "a program chosen by its path would move the places itself.")
                                                            .arg(agent.problem.isEmpty() ? tr("it did not answer") : agent.problem)
                                   : QString());
@@ -493,7 +493,7 @@ void HandPage::show(const QList<Finding> &chosen, qint64 scannedBytes, const QSt
         const QString about = counted(asks.size(), tr("%1 place"), tr("%1 places"));
         const QString names = named.join(tr(", ")) + (asks.size() > named.size() ? tr(" and %1 more").arg(asks.size() - named.size()) : QString());
         ask.happens << (other ? tr("It is told to ask you first about %1: %2. Whether it asks before it moves one of them is up to the program; "
-                                   "Disk shows its question. For every other place, handing this list over is your approval.")
+                                   "Recdirstat shows its question. For every other place, handing this list over is your approval.")
                                     .arg(about, names)
                               : tr("It asks you first about %1: %2. The helper does not move one of them before you were asked. "
                                    "For every other place, handing this list over is your approval.")

@@ -26,14 +26,14 @@ only: no stylesheet.
 ## The frame
 
 One widget that an app's window sets as its central widget. It is the rail on
-the left (the three apps, then the app's own entries, then Activity, Settings
+the left (the app's name, then the app's own entries, then Activity, Settings
 and Help), the app's pages in the middle, a strip under them about the next
 system, and a status line. Do not add entries that lead nowhere: only Activity,
 Settings and Help are shared, and the frame adds all three under the app's own
 entries.
 
 ```cpp
-Frame(Frame::App app)                    // Frame::Recipe, Frame::System, Frame::Disk
+Frame(Frame::App app)                    // Frame::Recipe, Frame::Recab, Frame::Recdirstat
 void setContent(QWidget *content);       // your page stack; shown whenever Activity is not
 void addEntry(key, title);               // the app's own rail entries, in order
 void setBadge(key, count, warn = false); // 0 shows none; warn = amber (something waits for the person)
@@ -46,8 +46,8 @@ void setStripAllowed(bool);              // keep the strip away from the page th
 void setStatus(QString);                 // left of the status line: what was read and when
 void addStatusWidget(QWidget *);         // beside it, e.g. "Read again"
 void flash(QString);                     // said for a few seconds in place of the status; empty ends it at once
-void startApp(App);                      // starts another app as the rail does; says so when it cannot
-QStringList entryTitles() const;         // the rail's entries in order, without the three apps
+void startApp(App);                      // starts another app, for a labelled button or link; says so when it cannot
+QStringList entryTitles() const;         // the rail's entries in order
 QString ownRun() const;                  // the id setOwnRun was given
 void setAgent(QString program);          // right of the status line (see below)
 void setAgentNote(QString);              // while the agent works; empty restores its name
@@ -101,8 +101,9 @@ signals: chosen(key)  finishRequested()  goToRun()  helpLink(key)
   `levitate-agent --stop ID`, otherwise (a stand-in) SIGTERM to the program.
   The helper's exit code 75 ("the run still waits or works without me") is
   `Run::carriesOn`, not a failure and not an end.
-- Choosing another app in the rail starts its program detached
-  (`recipe-gui`, `recab-gui`, `disk-gui`; override with `LEVITATE_APP_RECIPE`,
+- The rail has no switcher: each window is one app. `startApp` starts another
+  app's program detached for a labelled button or link only (Help's "Open …", Recab's
+  "Finish and restart…" and Recdirstat's "Open Recab…"; `recipe-gui`, `recab-gui`, `disk-gui`; override with `LEVITATE_APP_RECIPE`,
   `LEVITATE_APP_SYSTEM`, `LEVITATE_APP_DISK`). If that fails the status line
   says so.
 - `setAgent(program)`: when the file name is `levitate-agent` the frame runs
@@ -113,7 +114,7 @@ signals: chosen(key)  finishRequested()  goToRun()  helpLink(key)
   Return chooses. Every entry has an accessible name, with its badge.
 
 The strip says "The next system holds N changes." with the changes in a few
-words and the button. Recipe and Disk do not hold the status, so they ask:
+words and the button. Recipe and Recdirstat do not hold the status, so they ask:
 
 ```cpp
 auto *next = new NextSystem(recabProgram, this);   // runs `recab status --json`
@@ -125,13 +126,13 @@ It reports nothing when there is no next system or the status cannot be read, an
 nothing while the running system is on trial: recab still calls the other system
 "next" then (the preparation that made the running system is kept until the trial
 is kept), but it is the system from before, so there is nothing to finish and the
-strip would say what is not so (System's own model reads it the same way).
+strip would say what is not so (Recab's own model reads it the same way).
 
 ### An app adopting the frame
 
 ```cpp
 // window.cpp
-frame_ = new Frame(Frame::Disk);
+frame_ = new Frame(Frame::Recdirstat);
 frame_->setContent(stack_);                       // the pages the window already had
 frame_->addEntry("map", tr("Mess"));
 frame_->addEntry("compare", tr("Compare"));
@@ -144,18 +145,18 @@ connect(frame_, &Frame::chosen, this, [this](const QString &key) {
     if (key != Frame::activityKey())
         stack_->setCurrentWidget(pageFor(key));
 });
-connect(frame_, &Frame::finishRequested, this, [this] { /* open Overview of System, or show a note */ });
+connect(frame_, &Frame::finishRequested, this, [this] { /* open Overview of Recab, or show a note */ });
 connect(frame_, &Frame::goToRun, this, [this] { stack_->setCurrentWidget(work_); });
 connect(refresher_, &Refresher::asked, frame_, &Frame::readAgain);
 
-// when an agent run starts:  run->setPrompt(prompt, "Disk", title);  run->start();
+// when an agent run starts:  run->setPrompt(prompt, "Recdirstat", title);  run->start();
 //                            frame_->setOwnRun(run);
 // when it ends:              frame_->setOwnRun(QString());   // Activity reads the record again
 ```
 
 Titles of runs should be what the person asked, in a short line: Activity lists
-a run under it. Pass `app` as the name Activity shows ("Recipe", "System",
-"Disk").
+a run under it. Pass `app` as the name Activity shows ("Recipe", "Recab",
+"Recdirstat").
 
 ## Before
 
@@ -201,7 +202,7 @@ connect(before_, &BeforePage::linkClicked, ...);
   `choiceNames()`, `chosen()`, `choose(key)`. A page drawn just now is shown
   once the event loop has run, so a check settles before clicking its button.
 - The Recipe app is the first user (`gui/recipe/src/beforewords.*` has its
-  words); System and Disk list `before.cpp` in their `CMakeLists.txt` to use it.
+  words); Recab and Recdirstat list `before.cpp` in their `CMakeLists.txt` to use it.
 
 ## Activity
 
@@ -294,8 +295,8 @@ Each of these is in the design and not shown, because nothing is behind it:
 - **Notices have never been shown on a desktop.** The helper shows them (the row
   above switches them) through `gdbus call`; Plasma's and LXQt's notification servers
   have not been seen showing one, and a click on it does nothing.
-- **Per-app settings** (Recipe's default for "this computer", System's "ask when to
-  restart", Disk's places and rules): no app keeps such a setting yet, and the helper's file holds only the agent's.
+- **Per-app settings** (Recipe's default for "this computer", Recab's "ask when to
+  restart", Recdirstat's places and rules): no app keeps such a setting yet, and the helper's file holds only the agent's.
 - **Anything about updates** (checking daily, notices for them): there is no
   update check to schedule.
 - **"Write a recipe into your own recipes" without asking**: only partly. Recipe's
@@ -310,10 +311,10 @@ knows which it is; the app adds nothing). `helpText(app)` holds every word of it
 so the first page can take Help's ideas. In order:
 
 1. What the app is for in a few sentences, and what it never does by itself.
-2. "The ideas you need": a short heading and two or three sentences each. System:
+2. "The ideas you need": a short heading and two or three sentences each. Recab:
    the running system and the next system, finishing, the restart on trial,
    coming back. Recipe: recipes, the sandbox and what a recipe may use, the two
-   places software goes. Disk: mess, setting aside, the two systems.
+   places software goes. Recdirstat: mess, setting aside, the two systems.
 3. "How do I…": what the app can do, each row ending in "Go to PAGE", a link
    (underlined, in the palette's link colour) to the page where it is done.
 4. "The agent": what it is, what it may do without asking (read files and look
@@ -322,9 +323,9 @@ so the first page can take Help's ideas. In order:
    (the page of the run and Activity), a sentence about the agent in this app,
    that Claude Code has not been tried with a real one, and links to Settings
    and Activity.
-5. "When something is wrong": System: a run stopped, the agent does not answer,
+5. "When something is wrong": Recab: a run stopped, the agent does not answer,
    the desktop does not start (a link to Getting back); Recipe: an install or
-   update stopped, the agent does not answer; Disk: a place could not be set
+   update stopped, the agent does not answer; Recdirstat: a place could not be set
    aside, the agent does not answer.
 6. "The other two apps", one line each with "Open APP" (`Frame::startApp`), and
    "Show the first page again".
@@ -384,7 +385,7 @@ app's page is the one showing; `h-help-went` after two); "Open APP" asks the
 frame to start the app; the first page in the three states with the stand-in Codex
 (`h-firstrun-ready`, `-not-signed-in`, `-not-installed`), its links, "Read Help
 first", and going on to the app (`h-firstrun-went-on`); a picture run wants no first
-page and keeps no setting. The real-recab story of System uses the prefix `rh`.
+page and keeps no setting. The real-recab story of Recab uses the prefix `rh`.
 
 **The guard.** A picture run starts the app's backend programs, the agent, the
 helper's own agents and a root helper, and writes settings and records: run bare it
@@ -397,7 +398,7 @@ its README), `LEVITATE_ACTIVITY_AGENT`, `LEVITATE_AGENT_CODEX`,
 `XDG_CONFIG_HOME`, `XDG_STATE_HOME`, `XDG_DATA_HOME`, `XDG_RUNTIME_DIR`, and the root
 helpers (`LEVITATE_AGENT_ROOT_HELPER` and the app's; set and empty counts as named,
 and runs the command directly). The notifier defaults to off in a picture run
-(`LEVITATE_AGENT_NOTIFIER` set to a stand-in is respected), and the rail does not start
+(`LEVITATE_AGENT_NOTIFIER` set to a stand-in is respected), and `startApp` does not start
 an app that `LEVITATE_APP_*` does not name. Each app's story runs itself bare and checks
 that it refuses.
 

@@ -1611,7 +1611,7 @@ void UpdatesPage::show(const Catalog &catalog, const QString &selectedName, int 
                                  Mood::Warn));
     if (!catalog.updateProblems.isEmpty())
         column->addWidget(dim(text(tr("Not looked up: %1.").arg(catalog.updateProblems.join(tr("; "))), true)));
-    auto *system = dim(text(tr("The system itself is updated in the System app.")));
+    auto *system = dim(text(tr("The system itself is updated in the Recab app.")));
     if (catalog.updates.isEmpty()) {
         column->addStretch();
         column->addWidget(system);

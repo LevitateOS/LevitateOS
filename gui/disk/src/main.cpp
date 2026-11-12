@@ -11,7 +11,7 @@ int main(int argc, char **argv)
 {
     QApplication app(argc, argv);
     QApplication::setApplicationName("disk-gui");
-    QApplication::setApplicationDisplayName(QObject::tr("Disk"));
+    QApplication::setApplicationDisplayName(QObject::tr("Recdirstat"));
     QApplication::setApplicationVersion("0.1");
     QApplication::setDesktopFileName("org.levitateos.disk");
     QApplication::setWindowIcon(QIcon::fromTheme("drive-harddisk"));

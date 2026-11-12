@@ -562,11 +562,11 @@ void stripShots(Window &window, const QString &folder, const Save &save, const E
     expect(QStringLiteral("including the page that asks for software"), frame->stripShown());
     window.showBrowse();
 
-    // Its button starts System; here no System exists, and the status line says so.
+    // Its button starts Recab; here no Recab exists, and the status line says so.
     qputenv("LEVITATE_APP_SYSTEM", "/nonexistent/recab-gui");
     emit frame->finishRequested();
-    expect(QStringLiteral("Finish and restart starts System, and says when it cannot (%1)").arg(frame->statusText()),
-           frame->statusText().contains("System could not be started"));
+    expect(QStringLiteral("Finish and restart starts Recab, and says when it cannot (%1)").arg(frame->statusText()),
+           frame->statusText().contains("Recab could not be started"));
     qunsetenv("LEVITATE_APP_SYSTEM");
 
     activityShots(window, folder, save, expect, out);

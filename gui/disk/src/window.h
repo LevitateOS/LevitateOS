@@ -156,7 +156,7 @@ private:
     void keep();
     void recall();
     void openFolder(const QString &path);
-    // The System app: from the strip's button and from "Open System…".
+    // The Recab app: from the strip's button and from "Open Recab…".
     void openSystem();
     // The rail entry the page belongs to: a hand-over or work page belongs to
     // the flow it came from.

@@ -250,7 +250,7 @@ void run(Frame &mine, QWidget &mineWindow, const Starter &start, const Save &sav
     save(mineWindow, prefix + "-live-question");
 
     // A second window shows the same run.
-    Frame other(Frame::Disk);
+    Frame other(Frame::Recdirstat);
     other.setContent(new QWidget);
     other.resize(1000, 640);
     other.show();
@@ -353,13 +353,13 @@ void run(Frame &mine, QWidget &mineWindow, const Starter &start, const Save &sav
         Stubborn top;
         auto *column = new QVBoxLayout(&top);
         column->setContentsMargins(0, 0, 0, 0);
-        auto *frame = new Frame(Frame::Disk, &top);
+        auto *frame = new Frame(Frame::Recdirstat, &top);
         frame->setContent(new QWidget);
         column->addWidget(frame);
         top.resize(1000, 640);
         top.show();
         auto *held = new Run(helper(), {}, frame);
-        held->setPrompt(QStringLiteral("The issue:\n%1\n").arg(title), QStringLiteral("Disk"), title);
+        held->setPrompt(QStringLiteral("The issue:\n%1\n").arg(title), QStringLiteral("Recdirstat"), title);
         held->start();
         frame->setOwnRun(held);
         expect(QStringLiteral("live: a run started in a window that will refuse to close is going and known by id"),

@@ -418,7 +418,7 @@ void ActivityPage::render()
         list_->hide();
         side->addWidget(dim(text(onlyThis_ ? tr("This app has asked the agent for nothing yet.")
                                            : tr("Nothing has been asked of the agent yet. What you ask it to do in "
-                                                "Recipe, System or Disk is listed here."),
+                                                "Recipe, Recab or Recdirstat is listed here."),
                                  true)));
     } else {
         side->addWidget(list_, 1);

@@ -1,7 +1,7 @@
 # recab-gui
 
 The graphical front end for recab on the desktop images: one window, titled
-"System", for changing and updating a locked system. It follows the lifecycle
+"Recab", for changing and updating a locked system. It follows the lifecycle
 in `tools/recab/REQUIREMENTS.md` 0.3.0 and the premise that an agent does the
 work: the person says what they want, or what went wrong is put together for
 them, and an agent is handed the issue, the facts and the expected result.
@@ -11,7 +11,7 @@ what recab says may be done.
 
 Qt 6 Widgets, C++20, CMake. Widgets shared with `gui/recipe` and `gui/disk` are in `gui/kit`.
 
-The window is the shared frame from `gui/kit/README.md`: a rail (the three apps;
+The window is the shared frame from `gui/kit/README.md`: a rail (the name "Recab";
 "Overview", "The next system", "History" and "Getting back"; "Activity", "Settings" and "Help" below), the pages, a strip, and a status line.
 The Ask, clash and work pages are shown in the same place and the rail keeps
 marked the page the person came from. "The next system" has a badge: the number of
@@ -242,7 +242,7 @@ runs with `gui/agent/fixtures/records` (stand-in Codex, never a real agent) and
 read them through the built `levitate-agent` (build the agent first:
 `cmake --build .artifacts/agent/build`). The runs the fixture leaves going are
 stopped when the story ends, also when it fails. Then each story starts runs of its
-own through a second System window with the helper as its agent, and checks that they
+own through a second Recab window with the helper as its agent, and checks that they
 outlive the window and can be found, followed, answered, approved and stopped from
 Activity (`../kit/livestory.*`; pictures `a-live-*` and `r2c-live-*`: `-live-question`,
 `-live-approval`, `-live-follow`). The pictures `s0-*` to `s14-*` are Settings: as first read, "Allowed", signing out (and the question first), a sign in that fails, signing in (the address Codex printed), another program, back to Codex, a refused value, "Try it" and the run in Activity, a helper that cannot be asked. The pictures `s9b-claude-listed` and `s9c-claude-and-notices-off` show Claude Code as a row and the notices row. The story sets `HOME`, `XDG_CONFIG_HOME`, `XDG_STATE_HOME`, `LEVITATE_AGENT_CODEX` and `LEVITATE_AGENT_CLAUDE` itself for that part and puts them back. The pictures `a-*`
@@ -464,15 +464,15 @@ line as a root helper gives it, name a helper that only runs its arguments as
 ## Help and the first page
 
 Both are the frame's (`gui/kit/README.md`, "Help" and "The first time"); the window adds
-nothing for them. Help for System has the ideas (the running system and the next
+nothing for them. Help for Recab has the ideas (the running system and the next
 system, finishing, the restart on trial, coming back), what it can do with a link to
 Overview, "The next system", "Getting back" or History where it is done, the agent, and
 what to do when a run stopped, the agent does not answer, or the desktop does not start
 (a link to Getting back). Its links to the rail entries are chosen as a click on the rail
 is, so `Frame::chosen` already shows the page; the window has no extra page to offer
-(`addHelpTarget`). The first page, shown once per person the first time System opens
+(`addHelpTarget`). The first page, shown once per person the first time Recab opens
 (never in a picture run), is Help's first sentences and the agent's state, with "Go on
-to System". Both stories check them with `../kit/helpstory.*`: pictures `h-help*`,
+to Recab". Both stories check them with `../kit/helpstory.*`: pictures `h-help*`,
 `h-help-went`, `h-firstrun-*` (`rh-*` in `--real`).
 
 ## Reading and reading again

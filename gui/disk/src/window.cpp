@@ -59,7 +59,7 @@ static QString requestTitle(const QString &prompt)
     const qsizetype at = prompt.indexOf(heading);
     const QString line = (at < 0 ? prompt : prompt.mid(at + heading.size())).trimmed().section(QLatin1Char('\n'), 0, 0).trimmed();
     if (line.isEmpty())
-        return QObject::tr("A request from Disk");
+        return QObject::tr("A request from Recdirstat");
     return line.size() > 90 ? line.left(89).trimmed() + QStringLiteral("…") : line;
 }
 
@@ -77,7 +77,7 @@ Window::Window(QWidget *parent)
     , files_(qEnvironmentVariable("DISK_GUI_FILES"))
     , apparent_(qEnvironmentVariable("DISK_GUI_APPARENT") == QLatin1String("1"))
 {
-    setWindowTitle(tr("Disk"));
+    setWindowTitle(tr("Recdirstat"));
     // What is the person's to clear: their home, and what Recipe keeps for the system.
     roots_ = qEnvironmentVariable("DISK_GUI_ROOTS").split(QLatin1Char(':'), Qt::SkipEmptyParts);
     if (roots_.isEmpty()) {
@@ -103,7 +103,7 @@ Window::Window(QWidget *parent)
     // The frame is the window: the rail, the pages, the strip, the status line.
     // Only the four things to look at have entries; a hand-over, work in
     // progress and what the agent set aside are steps of the mess.
-    frame_ = new Frame(Frame::Disk);
+    frame_ = new Frame(Frame::Recdirstat);
     frame_->setContent(stack_);
     frame_->addEntry(QStringLiteral("disk"), tr("The disk"));
     frame_->addEntry(QStringLiteral("browse"), tr("Browse"));
@@ -297,11 +297,11 @@ void Window::openFolder(const QString &path)
         frame_->flash(tr("%1 could not be opened").arg(folder));
 }
 
-// The strip's button and "Open System…" are one thing: start the System app,
+// The strip's button and "Open Recab…" are one thing: start the Recab app,
 // as the rail does.
 void Window::openSystem()
 {
-    frame_->startApp(Frame::System);
+    frame_->startApp(Frame::Recab);
 }
 
 void Window::readStripFrom(const QString &recab)
@@ -1076,7 +1076,7 @@ void Window::send(const QString &prompt)
     run_ = new Run(agent_, {}, this);
     // Its questions are answered on the same input; Activity lists the run
     // under what was asked.
-    run_->setPrompt(prompt, QStringLiteral("Disk"), requestTitle(prompt));
+    run_->setPrompt(prompt, QStringLiteral("Recdirstat"), requestTitle(prompt));
     // The places the person approved, and where they are moved to: the helper moves
     // what the agent names from this list; the agent only decides. (The shared Run
     // has no extra fields for a request, so its input line is written here.)
@@ -1088,7 +1088,7 @@ void Window::send(const QString &prompt)
                 askFirst << finding.path;
         }
         const QJsonObject line{{"prompt", prompt},
-                               {"app", QStringLiteral("Disk")},
+                               {"app", QStringLiteral("Recdirstat")},
                                {"title", requestTitle(prompt)},
                                {"set_aside", QJsonObject{{"holding", holding_}, {"places", places}, {"ask_first", askFirst}}}};
         run_->setInput(QJsonDocument(line).toJson(QJsonDocument::Compact) + '\n');
@@ -1125,7 +1125,7 @@ void Window::send(const QString &prompt)
         });
         work_->begin(tr("The agent is setting the mess aside"),
                      choice_.kind == AgentChoice::Other
-                         ? tr("%1 moves the places itself and Disk shows what it reports; what was set aside is read back from the holding folder.")
+                         ? tr("%1 moves the places itself and Recdirstat shows what it reports; what was set aside is read back from the holding folder.")
                                .arg(choice_.name)
                          : tr("The agent decides, and the helper moves only what is on the list into the holding folder. Anything marked "
                               "to ask first is asked about before it is moved."),

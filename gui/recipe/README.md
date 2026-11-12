@@ -36,8 +36,8 @@ stand-in Codex and a settings folder of its own, and Help and the first page (pi
 - The strip ("The next system holds N changes.") is read with `recab status
   --json` (`RECIPE_GUI_RECAB`, default `recab`) after every read of the recipes.
   It shows on every page; when recab cannot be run there is no strip and no
-  error. "Finish and restart…" starts System (`LEVITATE_APP_SYSTEM`, default
-  `recab-gui`), as System's button in the rail does.
+  error. "Finish and restart…" starts Recab (`LEVITATE_APP_SYSTEM`, default
+  `recab-gui`).
 
 ## What the audit of 2026-11-11 changed
 
@@ -194,7 +194,7 @@ Needs the Qt 6 base and SVG development files (`qt6-qtbase-devel`,
   with its Codex and Claude Code (`LEVITATE_AGENT_CODEX`, `LEVITATE_AGENT_CLAUDE`) and
   its root helper (`LEVITATE_AGENT_ROOT_HELPER`), and `HOME` (not your own) and the XDG
   folders in scratch space. The desktop notifier is off unless `LEVITATE_AGENT_NOTIFIER`
-  names one, and the rail starts no app that `LEVITATE_APP_*` does not name. The story
+  names one, and no app is started that `LEVITATE_APP_*` does not name. The story
   runs itself bare to check that.
 
 The story also checks the frame, Activity and the strip, so it needs the

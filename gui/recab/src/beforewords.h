@@ -1,4 +1,4 @@
-// What the Before page says for each thing System does to the computer. The
+// What the Before page says for each thing Recab does to the computer. The
 // words come from the pages and from what recab reported (its state, its
 // verdicts and reasons, the `destructive` mark on an operation); nothing here
 // is worked out about the lifecycle. It does not say how long a command takes

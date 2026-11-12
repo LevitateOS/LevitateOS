@@ -97,8 +97,8 @@ Window::Window(QWidget *parent)
         else if (key == QLatin1String("storage"))
             showStorage();
     });
-    // The next system is finished in System, the way its button in the rail starts it.
-    connect(frame_, &Frame::finishRequested, this, [this] { frame_->startApp(Frame::System); });
+    // The next system is finished in Recab, the way its button starts it.
+    connect(frame_, &Frame::finishRequested, this, [this] { frame_->startApp(Frame::Recab); });
     connect(frame_, &Frame::goToRun, this, [this] {
         frame_->select(QStringLiteral("browse"));
         stack_->setCurrentWidget(work_);

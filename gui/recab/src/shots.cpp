@@ -590,7 +590,7 @@ void settingsShots(Window &window, const QString &folder, const Save &save, cons
 
     // As first read.
     expect(QStringLiteral("the page was read (%1)").arg(page->problem()), page->loaded() && page->problem().isEmpty());
-    for (const char *words : {"Settings", "One set for Recipe, System and Disk. What is set here holds in all three.",
+    for (const char *words : {"Settings", "One set for Recipe, Recab and Recdirstat. What is set here holds in all three.",
                               "The agent that does the work", "Codex", "Installed, and signed in", "Sign out…",
                               "Another program", "Any program that takes a request and reports back the same way", "Choose…",
                               "Try it", "Asks the chosen agent to say hello.", "What the agent may do without asking",
@@ -741,9 +741,9 @@ void settingsShots(Window &window, const QString &folder, const Save &save, cons
     waitFor([&] { return frame->activity()->listedTitles().contains("Say hello"); }, 15);
     frame->activity()->chooseTitle("Say hello");
     waitFor([&] { return frame->activity()->detailText().contains("Say hello in one sentence"); }, 15);
-    expect(QStringLiteral("the run is listed in Activity under System (%1)").arg(frame->activity()->listedTitles().join(", ")),
+    expect(QStringLiteral("the run is listed in Activity under Recab (%1)").arg(frame->activity()->listedTitles().join(", ")),
            frame->activity()->listedTitles() == QStringList({"Say hello"})
-               && frame->activity()->detailText().contains("Asked in System")
+               && frame->activity()->detailText().contains("Asked in Recab")
                && frame->activity()->detailText().contains("Do not run any command and do not change any file."));
     save(window, "s13-try-it-in-activity");
 
@@ -809,9 +809,9 @@ void settingsShots(Window &window, const QString &folder, const Save &save, cons
 
 // ---------------------------------------------------------------- Help and the first page
 //
-// The pages the frame owns after Settings: Help for System, and the page a
+// The pages the frame owns after Settings: Help for Recab, and the page a
 // person sees the first time. The checks are `../kit/helpstory.*`; this says
-// which page of System each target is.
+// which page of Recab each target is.
 
 void helpShots(Window &window, const QString &folder, const Save &save, const Expect &expect, const QString &prefix)
 {
@@ -821,7 +821,7 @@ void helpShots(Window &window, const QString &folder, const Save &save, const Ex
         return;
     }
     helpstory::Plan plan;
-    plan.app = Frame::System;
+    plan.app = Frame::Recab;
     plan.window = &window;
     plan.frame = window.frame();
     plan.firstEntry = QStringLiteral("overview");
@@ -972,7 +972,7 @@ int takeShots(Window &window, const QString &folder)
                    && next.contains("the next system, when you restart into it") && next.contains("Your files")
                    && next.contains("the same: home is shared by both systems")
                    && next.contains("comes back to the running system by itself")
-                   && next.contains("See the two systems as blocks in Disk"));
+                   && next.contains("See the two systems as blocks in Recdirstat"));
         save(window, "p04-next-open");
         expect("the strip is not on the next system's page", !window.frame()->stripShown());
         backWords(window);
