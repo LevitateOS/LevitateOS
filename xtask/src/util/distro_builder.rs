@@ -79,7 +79,7 @@ fn sudo_command(root: &Path, bin: &Path) -> std::process::Command {
         "CARGO_TARGET_DIR",
         root.join(".artifacts/work/iso-runtime-fixes/cargo-host").as_os_str(),
     );
-    for name in ["RUSTUP_TOOLCHAIN", "GINUX_ROOT", "GINUX_ROOTFS", "RECIPE_BIN"] {
+    for name in ["RUSTUP_TOOLCHAIN", "GINUX_ROOT", "GINUX_ROOTFS", "RECIPE_BIN", "RECIPE_FRAME_TIMEOUT_SECS"] {
         if let Some(value) = std::env::var_os(name) {
             set(name, &value);
         }
