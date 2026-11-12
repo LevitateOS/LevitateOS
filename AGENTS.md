@@ -17,7 +17,7 @@ These rules apply to every directory and submodule, recursively, across Git repo
 - Use the existing owner of a behavior. Prefer a small direct change over a new framework or parallel implementation.
 - Preserve unrelated edits. Do not commit secrets, caches, or generated junk.
 - No branches. Every repository, the superproject and each submodule, has exactly one branch: `master` or `main`, as `.gitmodules` names it. Do not create, push, check out or rename any other branch, for features, experiments, pull requests, agents or anything else; there are no pull-request or review-branch workflows. Commit and push straight to that branch. Work that is not ready stays uncommitted. The one exception is `tools/ginux`: contributions to the upstream project go as pull requests from branches of our fork, as upstream requires.
-- A submodule checkout ahead of the superproject pin is normal, not a development failure. Require exact pins only when reproducing or preparing a release.
+- A submodule checkout ahead of the superproject pin is normal while nothing in the superproject needs the newer code. A superproject commit that uses new code from a submodule (xtask calling a new builder command, say) must carry that submodule's pointer: push the submodule first, then include its path in the same commit's pathspec. Local checks cannot catch a missing pointer, because cargo builds the checked-out submodule; CI checks out the pins and fails. Look at CI after pushing.
 - Commit early and often. Commit each coherent, working step as it lands rather than batching a session's work into one large commit at the end.
 
 ## Validation
@@ -44,7 +44,7 @@ These rules apply to every directory and submodule, recursively, across Git repo
 - Active work lives in `distro/*` (builder, contract, variants), `gui`, `testing/*`, `tools/*`, `tui`, and `xtask`.
 - Keep JavaScript/TypeScript ESM-only.
 - Run workflows through `cargo xtask` (`cargo xtask --help` lists them; `just` has short aliases). Direct commands are fine.
-- When asked to commit everything, commit changed submodules first, then the superproject pointers.
+- When asked to commit everything, commit and push changed submodules first, then the superproject pointers.
 
 <!-- hdae:context-recovery:start -->
 ## HDAE context recovery
