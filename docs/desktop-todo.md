@@ -285,12 +285,9 @@ The desktop adds no other package manager, store or bundle format.
 - [x] **L A** "Install LevitateOS / AcornOS" in the live desktop's menu
   (`<id>-install.desktop`, live overlay only): Konsole or QTerminal runs the
   install screen through sudo or doas.
-- [ ] **L A** The launcher on the desktop itself, and its own icon
-  `<id>-install` (mark plus an arrow into a disk, as SVG; the theme's
-  installer icon stands in).
-- [ ] **L A** The installer inside a desktop terminal: check the TUI's size
-  and colours in Konsole and QTerminal, and that it gets root (sudo / doas for
-  the live user).
+- [x] ~~The launcher on the desktop itself~~ and ~~the installer inside a
+  desktop terminal~~: dropped 2026-11-12. The desktop ISO boots into the
+  install screen on tty1 like every live ISO; there is no live desktop.
 - [x] **L A** recsetup's user step on a desktop system: every user also joins
   `distro_profile::DESKTOP_SESSION_GROUPS` (video, input, audio, netdev,
   plugdev, lpadmin, scanner, camera) where the system has them; the live
@@ -308,10 +305,9 @@ The desktop adds no other package manager, store or bundle format.
   followed the `display-manager.service` alias).
 - [ ] **L A** First login: a short welcome (what the system is, how to get
   software with Recipe, how updates work); wanted (decision 7).
-- [x] **L A** The live session must not sleep or lock during an install
-  (`stay_awake` in `live-overlay.rhai`; lid close still follows logind).
-- [ ] **L A** Live user's password `live`: the Install entry's description
-  shows it; also put it in the welcome or on the lock screen hint.
+- [x] ~~The live session must not sleep or lock during an install~~ and
+  ~~the live user's password~~: no live desktop session since 2026-11-12, so
+  no live user and nothing to keep awake.
 
 ## 8. System updates on the desktop
 

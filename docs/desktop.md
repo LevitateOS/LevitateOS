@@ -1,7 +1,9 @@
 # Optional desktop: KDE Plasma (LevitateOS), LXQt (AcornOS)
 
-Each variant gets a second ISO with a graphical desktop: it boots live into
-the desktop and installs a desktop system. The base ISO does not change.
+Each variant gets a second ISO that installs a desktop system. It boots like
+every live ISO, into the install screen on tty1 (decided 2026-11-12: the live
+session is the installer, not a desktop); the desktop starts once installed.
+The base ISO does not change.
 
 What is still to configure and implement, for both systems, is in
 [desktop-todo.md](desktop-todo.md).
@@ -103,11 +105,13 @@ graphical front-end beside the command line.
   `installed-system.rhai`'s desktop policy does the packages' setup (caches,
   accounts, user units), enables the display manager and boots to it. That
   tree is the ISO's `filesystem.erofs`, so a desktop install is that system.
-  The overlay adds the live user `live` (password `live`) and SDDM's autologin
-  (`/etc/sddm.conf.d/live-autologin.conf`, the same on both inits); tty1 is
-  the display manager's on both, so the install screen runs on ttyS0 and from
-  a terminal. On OpenRC the sddm service's conf.d makes its start_post wait
-  for the greeter succeed, so an autologin boot leaves no failed service.
+  The live overlay keeps the display manager off and gives tty1 to the install
+  screen, as on every live ISO: systemd boots `multi-user.target`, OpenRC a
+  `live` runlevel holding the installed system's `default` runlevel without
+  the display manager (which `rc-service sddm start` still starts by hand).
+  There is no live user. On OpenRC the sddm service's conf.d makes its
+  start_post wait for the greeter succeed, so an autologin boot of the
+  installed system leaves no failed service.
 - `recab stage` refuses an image of the other flavour unless `--change-flavour`.
 - `cargo xtask test desktop-boot <id>` boots it in 6 GiB (it is not in
   `test all`: its ISO is a build of its own).
@@ -118,7 +122,8 @@ The plan below is what the prototypes taught.
 
 - **Product**: a `live-desktop` product per variant (it builds its own rootfs, the desktop system, rather than extending `live-tools`).
   Desktop packages go into `filesystem.erofs` (the installer copies only that),
-  live-session policy (autologin, live user) into the overlay.
+  live-session policy (the display manager kept off, the install screen on
+  tty1) into the overlay.
 - **Locks**: desktop packages declared beside `rpm_base`; `cargo xtask base lock
   levitate` solves the closure with dnf. Acorn needs a lock in the same shape
   (it pins `extra_apks` by hand today).
@@ -126,9 +131,10 @@ The plan below is what the prototypes taught.
   about 150,000 (LevitateOS) and 80,000 (AcornOS); the default is 16,384. The
   `memory_mib` budget holds the whole tree and its inputs: about 6 GiB for
   Plasma (2.6 GB tree, 0.8 GB RPMs).
-- **Live overlay**: on the desktop ISO, tty1 belongs to the display manager;
-  the install screen stays on ttyS0 and in a terminal. The overlay's OpenRC
-  service list (`live-overlay.rhai`) only allows sshd/networking/dhcpcd.
+- **Live overlay**: on the desktop ISO, as on the others, the install screen
+  holds tty1 and ttyS0; the display manager does not start in the live
+  session. The overlay's OpenRC service list (`live-overlay.rhai`) only allows
+  sshd/networking/dhcpcd.
 - **A/B**: current `recab stage` checks the flavour and requires
   `--change-flavour` to switch deliberately. It still replaces the inactive
   system. The required update lifecycle must preserve local changes and updates
