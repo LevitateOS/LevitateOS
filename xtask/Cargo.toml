@@ -32,3 +32,11 @@ recab = { path = "../tools/recab", features = ["contracts"] }
 install_tools = { package = "recstrap", path = "../tools/recstrap", features = ["contracts"] }
 tool-contract = { path = "../tools/recstrap/tool-contract" }
 recqemu = { path = "../tools/recqemu" }
+# `release recipe` packs the standalone Recipe release in-process (no rpmbuild, dpkg or abuild here).
+tar = "0.4"
+zstd = "0.13"
+xz2 = "0.1"
+flate2 = { workspace = true }
+sha1 = "0.10"
+md-5 = "0.10"
+rpm = { version = "0.30", default-features = false, features = ["payload", "gzip-compression"] }

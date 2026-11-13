@@ -6,6 +6,7 @@ pub mod generate;
 pub mod kernels;
 pub mod prebuilt;
 pub mod progress;
+pub mod recipe_release;
 pub mod scenarios;
 pub mod setup;
 pub mod tui;

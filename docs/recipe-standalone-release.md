@@ -49,7 +49,17 @@ run under Ginux or published:
     superproject pin waits for the ISO builds running on 2026-11-13).
   - **Kernel floor:** kernels older than 6.10 need the `/proc/self/fd` path;
     5.x is untried.
-- Next: the release command (step 6); the
+- Release command written 2026-11-13 (`cargo xtask release recipe`, xtask
+  `recipe_release.rs`; compile-checked and run with a glibc recipe, which marks the
+  release unofficial; never run with the static recipe, never published). Its
+  RPM installed with `dnf` on Fedora 44 (`rpm -V` clean), and its `.deb` installed
+  with `apt` on Ubuntu 24.04, where `postinst` loaded the AppArmor profile. On both,
+  an ordinary user then installed ripgrep. Each first install took 18 minutes,
+  with the host at load 18–21 from two ISO builds; Fedora also warned "cannot clone the
+  cached image, unpacking it instead", which still needs a look. The APK (no
+  Alpine run; needs the static recipe), the AUR files and the Void template are
+  checked by reading them only.
+- Next: the
   rename to `recipe-pm`; the window's packaging; mark OS-only recipes.
 
 The goal is to release Recipe for other Linux systems, not only as part of

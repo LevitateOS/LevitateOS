@@ -179,7 +179,7 @@ pub struct Cli {
 
 #[derive(Subcommand)]
 pub enum Cmd {
-    /// Publish existing signed x86_64 releases, refresh metadata or verify delivery (no OS builds).
+    /// Publish existing signed x86_64 releases, refresh metadata or verify delivery (no OS builds). `release recipe` builds the standalone Recipe release (see `release recipe --help`).
     #[command(disable_help_flag = true)]
     Release {
         #[arg(trailing_var_arg = true, allow_hyphen_values = true)]

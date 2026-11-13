@@ -1,6 +1,9 @@
 //! Release orchestration consumes explicit artifacts; no system builds or VM runs.
 use anyhow::{Result, ensure};
 pub fn run(args: Vec<String>) -> Result<()> {
+    if args.first().map(String::as_str) == Some("recipe") {
+        return super::recipe_release::run(args[1..].to_vec());
+    }
     let root = crate::util::repo::repo_root()?;
     let help = args.is_empty() || args.iter().any(|a| a == "--help" || a == "-h");
     let mut command = std::process::Command::new("python3");
