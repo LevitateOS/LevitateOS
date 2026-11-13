@@ -18,7 +18,14 @@ run under Ginux or published:
   it back and the result had that digest. A standalone package must ship
   `root-reference` naming this image: the built-in default reference in
   `runtime.rs` (the bare Rocky base `b93bfd0f…`) is not published.
-- Next: settle root on a foreign host (step 3); the release command (step 6); the
+- Tried on Fedora 44 (2026-11-13; kernel 6.19, glibc 2.43, SELinux
+  enforcing). This was a plain cloud VM under libvirt session
+  (`fedora-recipe-standalone`; disk in
+  `~/.local/share/libvirt/images/recipe-standalone`). Recipe was installed
+  from a 5.6 MB `/usr/local` tarball made with `recipe runtime stage`, plus a
+  glibc release `recipe` and Ginux at `d777b0ad`. See "Step 3: what the
+  Fedora run showed" below.
+- Next: the fixes that run calls for; the release command (step 6); the
   rename to `recipe-pm`; the window's packaging; mark OS-only recipes.
 
 The goal is to release Recipe for other Linux systems, not only as part of
@@ -136,6 +143,44 @@ writing its own.
 distro. Such recipes must say they are OS-only, and the standalone window and
 `recipe list` must not offer them. Every other recipe in the catalog is a
 self-contained program and fits a standalone release.
+
+## Step 3: what the Fedora run showed
+
+- **What works.** The prefix lookup found the launcher, reference and
+  sources under `/usr/local`, and `recipe list` listed the catalog.
+  `recipe runtime fetch` downloaded the image from GitHub in 33 s.
+- **Root works.** `sudo -i recipe install ripgrep` installed and activated
+  ripgrep 15.2.0 in 47 s, with the image download included, and root's
+  `rg` runs.
+- **An ordinary user does not.** Ginux stops with "launch bootstrap
+  unavailable: chroot failed (host privilege required)". The launch uses
+  plain `chroot(2)` (`tools/ginux/crates/ginux-init/src/launch.rs`), which
+  needs `CAP_SYS_CHROOT`. "For me" installs therefore fail for every
+  ordinary user, on LevitateOS as well. The window's "For me" has only ever
+  run against a stand-in. A way that needs no root is for the launcher to
+  enter its own user namespace (`CLONE_NEWUSER | CLONE_NEWNS`, with the
+  caller's uid mapped to 0) before the chroot. Fedora allows that. Ubuntu
+  24.04 restricts unprivileged user namespaces through AppArmor unless a
+  profile allows the program.
+- **`/tmp` on tmpfs.** Recipe's scratch pool is `$TMPDIR/recipe-scratch-<uid>`
+  (`src/temporary.rs`), and each run unpacks the 1.3 GB root there.
+  Fedora's `/tmp` is a tmpfs of half the RAM with per-user quotas, so the
+  user's run failed first with "Disk quota exceeded". Root is exempt from
+  the quota, but the unpacked root still occupies RAM; a machine with 4 GB
+  has a 2 GB `/tmp`. The pool belongs on disk, under the cache directory. On
+  btrfs (Fedora's `/home`) the reflink root cache then works too.
+- **Root's software is not on users' `PATH`.** `profile.d/recipe.sh` gives a
+  non-root user only their own store, so `rg`, installed by root into
+  `/var/lib/recipe`, is not found by `tester`. This is fine on LevitateOS,
+  where the locked system has its own path, but on a standalone host
+  "for this computer" must also add `/var/lib/recipe/profile/bin`.
+- **A stray `.artifacts`.** Publication writes
+  `<current directory>/.artifacts/ginux-export` (`src/publication.rs`
+  line 58), so `recipe install` leaves that folder in whatever directory it
+  runs from. It belongs under the state or cache directory.
+- **Static musl.** A static musl `recipe` cannot be built on this host: the C
+  parts of zstd, xz and bzip2 need `x86_64-linux-musl-gcc`. The OS builder
+  compiles it inside Ginux. The release command needs one of those two.
 
 ## Decisions (user, 2026-11-13)
 
