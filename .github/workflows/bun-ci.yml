@@ -15,6 +15,23 @@ on:
         required: false
         default: 'typecheck'
         type: string
+      workspace-path:
+        description: >-
+          For a member of the superproject's JavaScript workspace (root package.json and
+          bun.lock): its path there, e.g. 'docs/website'. Such a package cannot install
+          alone, so the job checks out the superproject, the submodules holding the other
+          members at their branch heads, and the caller at this path, then installs the
+          workspace from the root lock and runs the scripts in the caller's directory.
+        required: false
+        default: ''
+        type: string
+      workspace-needs:
+        description: >-
+          Space-separated workspace members whose `build` script must run before the
+          caller's scripts (a member whose generated files the caller imports).
+        required: false
+        default: ''
+        type: string
       run-build:
         description: 'Run bun run build'
         required: false
@@ -29,23 +46,68 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ${{ inputs.working-directory }}
+    env:
+      # Where the caller's package is, and where the install runs.
+      PACKAGE_DIR: ${{ inputs.workspace-path || inputs.working-directory }}
+      INSTALL_DIR: ${{ inputs.workspace-path && '.' || inputs.working-directory }}
     steps:
       - uses: actions/checkout@v4
+        if: inputs.workspace-path == ''
+
+      - name: Check out the superproject
+        if: inputs.workspace-path != ''
+        uses: actions/checkout@v4
+        with:
+          repository: LevitateOS/LevitateOS
+
+      # The members are the root package.json's `workspaces`; a submodule is fetched when
+      # one of them lives in it. Branch heads, as a working checkout has them: a member
+      # is pushed before the superproject's pin moves.
+      - name: Check out the other workspace members
+        if: inputs.workspace-path != ''
+        env:
+          CALLER: ${{ inputs.workspace-path }}
+        run: |
+          set -eu
+          members=$(jq -r '.workspaces[]' package.json)
+          for submodule in $(git config -f .gitmodules --get-regexp '\.path$' | cut -d' ' -f2); do
+            [ "$submodule" = "$CALLER" ] && continue
+            for member in $members; do
+              case "$member/" in
+                "$submodule"/*) git submodule update --init --remote --depth 1 -- "$submodule"; break ;;
+              esac
+            done
+          done
+
+      - name: Check out the caller at its workspace path
+        if: inputs.workspace-path != ''
+        uses: actions/checkout@v4
+        with:
+          path: ${{ inputs.workspace-path }}
 
       # The bun version is package.json's `packageManager`, as for a local install.
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
         with:
-          bun-version-file: ${{ inputs.working-directory }}/package.json
+          bun-version-file: ${{ env.INSTALL_DIR }}/package.json
 
       # Exactly the dependencies bun.lock records, as `cargo xtask check` installs them.
       - name: Install dependencies
+        working-directory: ${{ env.INSTALL_DIR }}
         run: bun install --frozen-lockfile
 
+      - name: Build the workspace members the caller needs
+        if: inputs.workspace-needs != ''
+        env:
+          NEEDS: ${{ inputs.workspace-needs }}
+        run: |
+          set -eu
+          for member in $NEEDS; do
+            (cd "$member" && bun run build)
+          done
+
       - name: Run scripts
+        working-directory: ${{ env.PACKAGE_DIR }}
         env:
           SCRIPTS: ${{ inputs.scripts }}
         run: |
@@ -56,6 +118,7 @@ jobs:
 
       - name: Build
         if: inputs.run-build
+        working-directory: ${{ env.PACKAGE_DIR }}
         run: bun run build
 
       - name: Upload build artifact
@@ -63,5 +126,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: dist
-          path: ${{ inputs.working-directory }}/dist/
+          path: ${{ env.PACKAGE_DIR }}/dist/
           retention-days: 7
