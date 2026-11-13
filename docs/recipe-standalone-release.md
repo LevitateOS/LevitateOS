@@ -25,7 +25,14 @@ run under Ginux or published:
   from a 5.6 MB `/usr/local` tarball made with `recipe runtime stage`, plus a
   glibc release `recipe` and Ginux at `d777b0ad`. See "Step 3: what the
   Fedora run showed" below.
-- Next: the fixes that run calls for; the release command (step 6); the
+- Fixed and checked on the same Fedora VM (2026-11-13). Ginux `ccc492a2`
+  gives ordinary users a user-namespace launch with no capabilities left
+  (root path unchanged). Recipe `9b36fd4` puts scratch on disk, exports
+  under state, and root's software on everyone's `PATH`. An ordinary user
+  installed ripgrep (30 s) and root installed fd (17 s); each was found on
+  `PATH`, and no `.artifacts` was left behind. Ubuntu 24.04's AppArmor
+  restriction (exit 134) has not been tried.
+- Next: the release command (step 6); the
   rename to `recipe-pm`; the window's packaging; mark OS-only recipes.
 
 The goal is to release Recipe for other Linux systems, not only as part of
