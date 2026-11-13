@@ -1,6 +1,6 @@
 # Recipe as a standalone release
 
-Plan of 2026-11-13. Nothing in it is built yet.
+Plan of 2026-11-13; decisions taken the same day (end of file). Nothing in it is built yet.
 
 The goal is to release Recipe for other Linux systems, not only as part of
 LevitateOS and AcornOS. Each release comes in two forms:
@@ -82,12 +82,15 @@ writing its own.
 4. **The profile snippet covers both cases.** The snippet that is shipped now
    already handles a system without recab. It moves into Recipe's runtime
    tree unchanged.
-5. **Name and wording.** The crate is `levitate-recipe`, "Rhai-based package
-   recipe executor for LevitateOS". This may change (decision 4).
+5. **Name and wording.** Rename the crate `levitate-recipe` to `recipe-pm`
+   and change its description so it no longer says "for LevitateOS"
+   (decision 4). The `generate-rpm` metadata and the doc paths under
+   `/usr/share/doc` follow the rename.
 6. **A local release command.** `cargo xtask release recipe <version>` builds
    static `recipe` and `recipe-image` and the launcher at the Ginux pin, stages
-   the runtime tree, packs the formats chosen in decision 2, and publishes the
-   GitHub release of `LevitateOS/recipe`. Products are built locally, not in CI
+   the runtime tree, packs the formats of decision 2 (tarball, RPM, APK,
+   `.deb`; the AUR and Void build files get the new checksums), and publishes
+   the GitHub release of `LevitateOS/recipe`. Products are built locally, not in CI
    (CI is for quick checks only). It must be reproducible and record its source
    pins, following the release rules in `AGENTS.md`.
 
@@ -99,8 +102,9 @@ writing its own.
 2. **Without an agent.** When `levitate-agent` is missing, "Ask for software"
    and repair say so in one sentence and point to the way forward. Check this;
    it has not been seen yet.
-3. **Qt comes from the host or is bundled** (decision 5). The window needs
-   Qt 6.5 or newer, with Widgets and Svg.
+3. **Qt comes from the host** (decision 5). Build the window once per distro
+   family against that family's Qt. Check whether the 6.5 floor can drop to
+   6.4.
 4. **"For this computer" needs a polkit agent** on the desktop. Most desktops
    run one. Without one, the window says why the change did not start.
 5. **The window has never run against the real `recipe`** (see "Not done" in
@@ -114,16 +118,30 @@ distro. Such recipes must say they are OS-only, and the standalone window and
 `recipe list` must not offer them. Every other recipe in the catalog is a
 self-contained program and fits a standalone release.
 
-## Decisions
+## Decisions (user, 2026-11-13)
 
-1. **Target hosts**: any x86_64 Linux with a kernel of at least N, or a named
-   list (Rocky/Fedora, Debian/Ubuntu, Arch, Alpine). The static `recipe` and
-   the downloaded image make "any" realistic for the command line. Qt makes it
-   harder for the window.
-2. **Formats**: a tarball with `install.sh` is enough for every host. RPM and
-   APK already exist. `.deb` is new.
-3. **Runtime image**: downloaded on first use (recommended above) or packed
-   into the package (offline, hundreds of MB per package).
-4. **Name**: keep `levitate-recipe` or release as `recipe`.
-5. **Qt for the window**: host Qt with one build per distro family, or Qt
-   bundled into the window's package.
+1. **Target hosts: any x86_64 Linux.** The command line is static `recipe`
+   plus the launcher plus the downloaded image, so it depends on no
+   distribution. Still to establish: the oldest kernel the Ginux launcher
+   accepts. The release states it.
+2. **Formats: a tarball with `install.sh`, RPM, APK, `.deb`, an AUR package
+   and a Void Linux template.** The tarball is the reference layout; every
+   other format packs the same staged tree. RPM and APK exist (0.1.4). `.deb`,
+   the AUR `PKGBUILD` and the Void `xbps-src` template are new. The AUR and
+   Void ones are recipes for those systems' own build tools, published to the
+   AUR and proposed to void-packages, not files on the GitHub release.
+3. **Runtime image: downloaded on first use**, by digest from
+   `LevitateOS/prebuilt`, verified and cached in
+   `$XDG_CACHE_HOME/recipe/images`. No package contains it. The OS images
+   keep shipping the tar.
+4. **Name: `recipe-pm`.** This is the package name in every format, and the
+   tarball is named `recipe-pm-<version>-x86_64.tar.zst`. The command stays
+   `recipe`. The window's package is `recipe-pm-gui`, with the command
+   `recipe-gui`. The crate `levitate-recipe` is renamed with the first
+   release, and its description loses "for LevitateOS".
+5. **Qt for the window: the host's Qt, one build per distro family** (RPM,
+   `.deb`, APK, AUR, Void). There is no window in the tarball. The window
+   requires Qt 6.5 (`gui/recipe/CMakeLists.txt`), but Debian 12 and
+   Ubuntu 24.04 LTS ship Qt 6.4. Find out whether anything really needs 6.5.
+   If nothing does, lower the floor to 6.4. Otherwise those two get the
+   command line only.
