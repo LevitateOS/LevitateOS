@@ -198,9 +198,23 @@ release published, the repository not created:
   recipes and `desktop-apps.rhai` with their imports, the compiler image, Recipe's declared
   versions, the distro and its libc. `desktop_apps::install_system` looks up first and skips
   the apps-build root and the compile on a hit; `prebuilt key|build|publish desktop-apps
-  <distro>` and `prebuilt list` (so the hourly CI publishes it) work. Never run: no tree
-  compiled, cached, published or downloaded; the tree archive extraction in
-  `prebuilt-fetch.rhai` (modes kept, setuid/setgid/sticky bits and absolute symlinks not) is
-  checked by reading only.
+  <distro>` and `prebuilt list` (so the hourly CI publishes it) work. Run on 2026-11-12: both
+  distros' trees were compiled, published to `LevitateOS/prebuilt` from this machine (their
+  `prebuilt.json` records no CI run) and downloaded back into the local cache
+  (`origin: downloaded`), Recipe's target metadata file included, for the desktop ISOs built
+  that day. The tree archive extraction in `prebuilt-fetch.rhai` keeps permission bits but not
+  setuid/setgid/sticky bits or absolute symlinks, so a special mode must travel in the target
+  metadata (`target_mode`), with the file itself at an ordinary mode: a setuid bit on disk
+  would make the downloaded tree fail verification against `prebuilt.json`.
+- **Display server family (`display-server`), written 2026-11-13, never compiled:** the same
+  kind of tree as `desktop-apps`, one entry per distro whose contract names
+  `desktop.display_server_recipe_script` (AcornOS: XLibre, `os-recipes/xlibre.rhai`). Key:
+  that recipe with its imports (it holds the source commit pins), the base and apps-build
+  locks, both preseed recipes and the apps-build root recipe, the compiler image, Recipe's
+  declared versions, the distro and its libc. `display_server::install_system` merges it into
+  the desktop system and refuses a rootfs without the server, the setuid wrapper (by its
+  target metadata), `/usr/bin/X` and the modesetting and libinput drivers;
+  `prebuilt key|build|publish display-server <distro>` and `prebuilt list` know it. The
+  wrapper's setuid bit is in the target metadata only, so it survives the download.
 - **Not done:** `install-tools.rhai` taking a `prebuilt` input (not
   needed: the downloaded program enters through its existing `program` input), retention.

@@ -19,6 +19,7 @@ currently builds, because Recipe fails to extract the Fedora RPMs inside Ginux
 | | LevitateOS | AcornOS |
 |---|---|---|
 | Desktop | Plasma on Wayland, SDDM | LXQt on X11 (Alpine has no `lxqt-wayland-session`), SDDM |
+| X server | Xwayland only (`xorg-x11-server-Xwayland`) | XLibre 25.1, compiled from source (since 2026-11-13; booted desktops above ran Alpine's `xorg-server`) |
 | Result | No failed units; logind session type `wayland` | Desktop up; OpenRC marks sddm failed (see below) |
 
 ## What the desktop recipes must do
@@ -56,10 +57,32 @@ wpa_supplicant firefox systemd-pam`, resolved without weak dependencies.
 ### AcornOS (LXQt)
 
 Packages: the base set plus `lxqt-desktop lximage-qt pavucontrol-qt screengrab
-sddm xorg-server xf86-input-libinput eudev udev-init-scripts
-udev-init-scripts-openrc mesa-dri-gallium elogind polkit-elogind dbus dbus-x11
-pipewire wireplumber pipewire-pulse pipewire-alsa networkmanager
-networkmanager-wifi network-manager-applet breeze-icons font-noto firefox`.
+sddm eudev udev-init-scripts udev-init-scripts-openrc mesa-dri-gallium elogind
+polkit-elogind dbus dbus-x11 pipewire wireplumber pipewire-pulse pipewire-alsa
+networkmanager networkmanager-wifi network-manager-applet breeze-icons
+font-noto firefox` and the rest `[desktop].packages` lists, among them the X
+server's run-time libraries, `xkbcomp`, `xkeyboard-config` and the cursor and
+misc fonts.
+
+- The X server is XLibre, the fork of the X.Org server, not Alpine's
+  `xorg-server` (desktop-todo.md, decision 14). Alpine has no package for it,
+  so `distro/builder/os-recipes/xlibre.rhai` compiles the server (tag
+  `xlibre-xserver-25.1.11`) and XLibre's `xf86-input-libinput` (tag
+  `xlibre-xf86-input-libinput-25.0.1`), each pinned by commit, with meson in
+  the Alpine apps-build root, with Alpine's own `xorg-server` options, and
+  publishes a tree laid out like Alpine's package: `/usr/bin/X` → `Xorg` (a sh
+  script) → `/usr/libexec/Xorg.wrap` (setuid root through the target
+  metadata) → `/usr/libexec/Xorg`, modules in
+  `/usr/lib/xorg/modules/xlibre-25` (modesetting is built in),
+  `/usr/share/X11/xorg.conf.d/{10-quirks,40-libinput}.conf`. The builder
+  (`distro/builder/src/display_server.rs`) caches it as the prebuilt family
+  `display-server` and merges it into the desktop system, which it refuses
+  without the server, the setuid wrapper, `/usr/bin/X` and both drivers.
+  SDDM starts `/usr/bin/X` by its compiled-in default, unchanged. Keeping
+  XLibre current is this project's job: its fixes are announced only in its
+  release notes, so each 25.1 point release is a security release, and the
+  pins are at the top of `xlibre.rhai`. X.Org-built drivers (`xf86-video-*`,
+  `xf86-input-*` packages) do not load in XLibre and must not be added.
 
 - apk solves dependencies and runs package scripts and triggers even in
   usermode. Owners and special modes, however, live only in
@@ -67,7 +90,7 @@ networkmanager-wifi network-manager-applet breeze-icons font-noto firefox`.
   symlinks); the recipe's target metadata must carry them (setuid
   `dbus-daemon-launch-helper`, `polkit-agent-helper-1`, `doas`, …).
 - Runlevels: sysinit `devfs dmesg udev udev-trigger udev-settle` (libinput and
-  Xorg need udev, not mdev); boot `modules sysctl hostname bootmisc syslog
+  the X server, XLibre built with `-Dudev=true`, need udev, not mdev); boot `modules sysctl hostname bootmisc syslog
   hwclock localmount root`; default `dbus elogind polkit networkmanager sddm`.
   NetworkManager replaces dhcpcd/networking on the desktop.
 - The live user needs groups `wheel video input audio netdev plugdev`.

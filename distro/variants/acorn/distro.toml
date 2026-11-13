@@ -4,7 +4,7 @@
 # `distro_contract::registry`, the same for every variant, and every artifact
 # name (`<os_id>-x86_64-<product>.iso`, `<os_id>-live.efi`, ...) follows from
 # `os_id`.
-schema_version = 10
+schema_version = 11
 
 [identity]
 os_name = "AcornOS"
@@ -158,22 +158,51 @@ packages = [
 ]
 
 # The desktop system, the rootfs of the live-desktop product (docs/desktop.md):
-# the base packages plus these, LXQt on X11 with SDDM (decision D16: Alpine 3.24
-# has no lxqt-wayland-session). `cargo xtask base lock acorn` locks what they
-# need beyond the base lock; the preseed downloads that desktop lock.
+# the base packages plus these, LXQt on X11 with SDDM (LXQt runs on X11 because
+# Alpine 3.24 packages no LXQt Wayland session, lxqt-wayland-session).
+# `cargo xtask base lock acorn` locks what they need beyond the base lock; the
+# preseed downloads that desktop lock.
 [desktop]
 display_manager = "sddm"
 preseed_recipe_script = "distro/builder/os-recipes/alpine-desktop-preseed.rhai"
-# What compiling the desktop apps (gui/) needs: the C++ compiler with the C
-# library's headers, CMake with make, and Qt's development files. Locked with
-# the desktop, so the Qt they are compiled against is the Qt the desktop ships.
-# Only the root they are compiled in has these; no image does.
-apps_build_packages = ["g++", "musl-dev", "make", "cmake", "qt6-qtbase-dev", "qt6-qtsvg-dev"]
+# AcornOS runs XLibre, the fork of the X.Org server (github.com/X11Libre), not
+# Alpine's xorg-server. Alpine has no XLibre package, so this recipe builds the
+# server and XLibre's libinput input driver from pinned source in the
+# apps-build root below, and the builder merges their tree into the desktop
+# system (distro/builder/src/display_server.rs). What follows from it: the
+# packages `xorg-server` and `xf86-input-libinput` are not in the desktop
+# lock, the server's run-time libraries are listed in `packages` by hand,
+# X.Org-built driver packages (xf86-video-*, xf86-input-*) cannot be added
+# (XLibre loads only modules built for its own ABI), and keeping XLibre
+# current is this project's job: the source pins in the recipe are bumped for
+# every XLibre point release, each treated as a security release.
+display_server_recipe_script = "distro/builder/os-recipes/xlibre.rhai"
+# What compiling the desktop apps (gui/) and the display server needs: the C++
+# compiler with the C library's headers, CMake with make, Qt's development
+# files; for XLibre also meson with samurai, git to fetch its pinned source,
+# and the development files of the libraries it links. Locked with the
+# desktop, so what they are compiled against is what the desktop ships. Only
+# the root they are compiled in has these; no image does.
+apps_build_packages = [
+  "g++", "musl-dev", "make", "cmake", "qt6-qtbase-dev", "qt6-qtsvg-dev",
+  "meson", "samurai", "git", "xorgproto", "xtrans", "pixman-dev", "libxfont2-dev",
+  "libxkbfile-dev", "libxcvt-dev", "libepoxy-dev", "mesa-dev", "libdrm-dev",
+  "libpciaccess-dev", "libxshmfence-dev", "nettle-dev", "eudev-dev", "libx11-dev",
+  "libxau-dev", "libxdmcp-dev", "libinput-dev",
+]
 apps_build_preseed_recipe_script = "distro/builder/os-recipes/alpine-apps-build-preseed.rhai"
 apps_build_root_recipe_script = "distro/builder/os-recipes/alpine-apps-build-root.rhai"
 packages = [
-  "lxqt-desktop", "lximage-qt", "pavucontrol-qt", "screengrab", "sddm", "xorg-server",
-  "xf86-input-libinput", "eudev", "udev-init-scripts", "udev-init-scripts-openrc",
+  "lxqt-desktop", "lximage-qt", "pavucontrol-qt", "screengrab", "sddm",
+  # What the XLibre server and its libinput driver (display_server_recipe_script)
+  # need at run time, since no package depends on them for it: the libraries
+  # they link, the keymap compiler and keymaps, the fonts the server itself
+  # needs (the cursor font and "fixed"), and Mesa's EGL and GBM for glamor.
+  "xkbcomp", "xkeyboard-config", "font-cursor-misc", "font-misc-misc", "mesa-egl",
+  "mesa-gbm", "mesa-gl", "libepoxy", "libxfont2", "libxcvt", "pixman", "libdrm",
+  "libpciaccess", "libxshmfence", "nettle", "libxau", "libxdmcp", "libinput-libs",
+  "eudev-libs",
+  "eudev", "udev-init-scripts", "udev-init-scripts-openrc",
   "mesa-dri-gallium", "elogind", "polkit-elogind", "dbus", "dbus-x11", "pipewire",
   "wireplumber", "pipewire-pulse", "pipewire-alsa", "networkmanager", "networkmanager-wifi",
   "network-manager-applet", "breeze-icons", "font-noto", "firefox",

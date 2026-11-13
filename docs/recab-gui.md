@@ -159,8 +159,11 @@ them into both desktop images:
   `qt6-qtsvg` 6.11.1 on Alpine 3.24), and `pkexec` (`polkit`, `polkit-common`).
   The polkit actions name `/usr/bin/recipe` and `/usr/bin/recab`, where the
   builder puts both.
-- **Written, never run: the build inside the image pipeline** (the route
-  chosen 2026-11-10: each distro's own root).
+- **Written 2026-11-10, run 2026-11-12: the build inside the image pipeline**
+  (the route chosen 2026-11-10: each distro's own root). Both distros' app
+  trees were compiled this way, published as prebuilts and taken into the
+  desktop ISOs built on 2026-11-12. The same root now also compiles AcornOS's
+  X server (XLibre, `os-recipes/xlibre.rhai`).
   - `[desktop].apps_build_packages` in each `distro.toml` names what compiling
     needs beyond the base; `cargo xtask base lock` writes it as a third lock,
     `sources/*-apps-build-lock.rhai`, in the same run as the desktop lock, so
@@ -180,12 +183,13 @@ them into both desktop images:
   booted desktop each app is on PATH, has its menu entry and answers
   `--version` with Qt's offscreen platform; the helper is on PATH and answers
   `--version`.
-- **Not known until it runs:** whether the unpacked trees work as roots
+- **Answered by the 2026-11-12 build:** the unpacked trees work as roots
   (nothing ran the packages' scripts; only the linker's name on Fedora and the
-  shell's on Alpine are set by hand), whether CMake and the compiler run under
-  Ginux (the build uses make with one job, because parallel make and Ninja's
-  use of file times failed or were doubtful there before), and how long
-  copying a root of that size takes for each run.
+  shell's on Alpine are set by hand) and CMake and the compiler run under
+  Ginux there, with make and one job (parallel make and Ninja's use of file
+  times failed or were doubtful under Ginux before; meson with samurai, which
+  XLibre needs, has not run there yet). Not measured: how long copying a root
+  of that size takes for each run.
 
 ## In the pipeline
 

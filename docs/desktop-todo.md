@@ -162,6 +162,11 @@ Details and paths are in [desktop-theming.md](desktop-theming.md).
 
 ### AcornOS (LXQt on X11)
 
+- [x] The X server is XLibre compiled from source (decision 14), in place of
+  Alpine's `xorg-server` and `xf86-input-libinput`; its run-time libraries,
+  `xkbcomp`, the keymaps and the cursor and misc fonts are listed in the
+  desktop packages by hand. Not yet started on a running desktop.
+
 - [x] `udisks2` and `gvfs` are in the lock: the removable-media button and
   pcmanfm-qt mount drives, with trash. (`gvfs-smb` / `gvfs-nfs` for network
   browsing are left out; see section 4.)
@@ -424,7 +429,8 @@ is carried out.
    light palette for those who switch.) Declared in each `distro.toml` as
    `profile.appearance` and the `[look.light]` / `[look.dark]` palettes.
 2. **Same features on both desktops:** AcornOS's desktop does everything
-   LevitateOS's does, on its own stack (musl, OpenRC, LXQt, X11); only the
+   LevitateOS's does, on its own stack (musl, OpenRC, LXQt, X11 served by
+   XLibre, decision 14); only the
    parts differ. So AcornOS also gets Bluetooth, printing, scanning, Orca,
    CJK fonts, an on-screen keyboard, a compositor, Thunderbolt, the VM guest
    agents, NVIDIA's firmware and a calculator. `gvfs` stays, with the GTK 4
@@ -458,12 +464,23 @@ is carried out.
 13. **First recipes:** office (OnlyOffice, not LibreOffice), mail, media and
     graphics, chat, developer tools. These are what a person can install,
     and what the Recipe front-end lists.
+14. **XLibre on AcornOS** (2026-11-13): AcornOS's X server is XLibre, the
+    fork of the X.Org server (github.com/X11Libre), not Alpine's
+    `xorg-server`. Alpine has no XLibre package, so the builder compiles it
+    from pinned source in the Alpine apps-build root, with XLibre's own
+    `xf86-input-libinput` built against it, and merges the tree into the
+    desktop system (`distro/builder/os-recipes/xlibre.rhai`, named by
+    `desktop.display_server_recipe_script` in AcornOS's `distro.toml`;
+    prebuilt family `display-server`). The modesetting video driver is
+    built into the server; X.Org-built driver packages (`xf86-video-*`,
+    `xf86-input-*`) cannot be added, since XLibre loads only modules built
+    for its own ABI. Keeping XLibre current is now this project's job: XLibre
+    announces fixes only in its release notes, so every point release of its
+    25.1 line is treated as a security release and the two commit pins at
+    the top of `xlibre.rhai` move with it. LevitateOS is unaffected
+    (Wayland; Xwayland is a separate program).
 
 Still open:
 
 - Whether the LevitateOS light and dark wallpapers are right, or the
   original half-and-half picture should be one of them.
-- XLibre in place of the X.Org server on AcornOS (the user's idea). Alpine
-  has no XLibre package in 3.24 or edge, so it would be a Recipe-built X
-  server, with `xf86-input-libinput` and any video driver rebuilt against
-  it. LevitateOS is unaffected (Wayland; Xwayland is a separate program).
