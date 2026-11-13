@@ -11,8 +11,14 @@ run under Ginux or published:
   `cargo xtask prebuilt publish-runtime` uploads the image (distro/builder
   `dac0f8f`). The window's Qt floor is 6.4 (desktop-apps `b21ce94`; source
   audit, not built against 6.4).
-- Next: publish the runtime image (needs a yes, since it writes to GitHub);
-  settle root on a foreign host (step 3); the release command (step 6); the
+- Published 2026-11-13: the pinned compiler image
+  `oci:recipe-compiler@sha256:4ec20be0…` (product-ci.json) is the release
+  `recipe-runtime-4ec20be0f93bdd65` of `LevitateOS/prebuilt`. That is
+  1 289 105 408 bytes compressed to 332 MB. `recipe runtime fetch` downloaded
+  it back and the result had that digest. A standalone package must ship
+  `root-reference` naming this image: the built-in default reference in
+  `runtime.rs` (the bare Rocky base `b93bfd0f…`) is not published.
+- Next: settle root on a foreign host (step 3); the release command (step 6); the
   rename to `recipe-pm`; the window's packaging; mark OS-only recipes.
 
 The goal is to release Recipe for other Linux systems, not only as part of
