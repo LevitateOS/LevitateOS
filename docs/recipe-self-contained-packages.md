@@ -452,6 +452,25 @@ upstream binary has no room reserved for the package's paths. The plan:
 Trial order: the runtime recipe and the Recipe changes (independent), then
 one Electron program (the Antigravity app, a plain tarball), then the rest.
 
+Built 2026-11-13:
+
+- `desktop-runtime` (recipes a5f8f91): 111 pinned Fedora 45 packages, 137 MB
+  sdk, its data reached through `share/desktop-runtime/environment`; 231 ELF
+  files, none with an unresolved need; `generators/desktop-runtime-pins.py`
+  writes the pins. No graphics drivers yet (Mesa DRI/GBM backends, Vulkan
+  ICDs), no X11 compose data, no xkeyboard-config.
+- Recipe 811fee7: `RUNTIME.paths.prefix` (part of a kept build's identity
+  when set); `carry_libraries` rewrites files without reserved room (one
+  appended PT_LOAD with the moved program headers, the interpreter, a grown
+  `.dynstr` and, when it has no free slot, a grown `.dynamic`; one `DT_RPATH`
+  of `$ORIGIN` paths); a closure check that also checks every symbol version
+  a file asks for; the C library taken whole from the first search folder
+  holding a loader. Probed on Zed and the Antigravity tree (98 libraries
+  carried from the runtime) with readelf and the host loader's listing;
+  a sandboxed run rewrote a program that then ran from its profile. No
+  upstream program has run yet; the receipt record and Recipe running the
+  carry step itself are still open.
+
 ## Open questions
 
 1. **Does a toolkit program work this way on both distributions?** For
