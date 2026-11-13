@@ -14,7 +14,18 @@ and file that sets it, then lists what LevitateOS and AcornOS ship in its place.
 - **Colours** come from `docs/website/src/styles/field-notes/tokens.json`:
   paper `#F2EEE4`, ink `#14221A`, pine `#214438` (Levitate), acorn brown
   `#644532`, red `#B22F27` (one primary action), night surface `#14221A`, night
-  Levitate `#C7D9BA`, night Acorn `#E4CBA6`.
+  Levitate `#C7D9BA`, night Acorn `#E4CBA6`. Each variant's `distro.toml`
+  carries them as two palettes, `[look.light]` and `[look.dark]` (surface,
+  raised and sunken surface, text in three strengths, rule, hairline, accent,
+  highlight, band and its text, ok, warn, bad).
+- **Mode** (decision 1 in [desktop-todo.md](desktop-todo.md), 2026-11-13):
+  LevitateOS starts light, AcornOS starts dark (`profile.appearance`, which
+  reaches the image as `REC_APPEARANCE` in os-release). The builder gives the
+  desktop system recipe both palettes as its `look` input (one
+  `<mode>.<role>=#RRGGBB` line each, part of the configured tree's key), and
+  `installed-system.rhai` keys every look choice on the mode, never on the
+  desktop. All of it is written and unbuilt: no image with it has been built
+  or booted.
 - **Art** that has to be made: wallpapers only (see
   [desktop-art-brief.md](desktop-art-brief.md)). Everything else is
   configuration, QML/QSS edited from upstream themes, or the existing SVG marks.
@@ -59,13 +70,14 @@ recipe), owned by root, mode 0644:
 | Item | Path | Content |
 |---|---|---|
 | Global Theme | `/usr/share/plasma/look-and-feel/org.levitateos.desktop/` | `metadata.json`; `contents/defaults` (colour scheme, icons `breeze`, cursor `breeze_cursors`, Plasma style `default`, window decoration Breeze, `[Wallpaper] Image=LevitateOS`, `[ksplashrc] Theme=org.levitateos.desktop`); `contents/layouts/org.kde.plasma.desktop-layout.js` (bottom panel, Kickoff with `icon=distributor-logo-levitateos`); `contents/splash/Splash.qml` (Breeze splash with our mark); `contents/previews/*` |
-| Default theme | `/etc/xdg/kdeglobals` | `[KDE] LookAndFeelPackage=org.levitateos.desktop`, `ColorScheme=LevitateOSDark`, Noto fonts |
-| Colour schemes | `/usr/share/color-schemes/LevitateOSLight.colors`, `LevitateOSDark.colors` | Breeze Light/Dark with the accent set to pine `#214438` / `#C7D9BA`; selection and focus follow the accent |
-| Wallpaper (done, unbuilt) | `/usr/share/wallpapers/LevitateOS/` | `metadata.json` (`Id: LevitateOS`), `contents/images/3840x2160.jpg` and `contents/images_dark/3840x2160.jpg`; Plasma scales the one size and shows the dark one under a dark colour scheme. `/usr/share/wallpapers/Default` links to `LevitateOS`, so Fedora's Global Theme (`Image=Fedora` → `Default`) already shows it; the Fedora background packages are still in the lock |
-| Login screen (background done, unbuilt) | `/etc/sddm.conf.d/10-theme.conf` (`[Theme] Current=breeze`) + `/usr/share/sddm/themes/breeze/theme.conf.user` | KDE's Breeze theme (no logo) in place of `01-breeze-fedora`, with `background=` the dark wallpaper; SDDM reads `theme.conf.user` over `theme.conf`. Still to do: an own `levitateos` theme with `showlogo=shown`, `logo=` the paper lockup, `color=#14221A` |
+| Default theme (done, unbuilt) | `/etc/xdg/kdeglobals` | today: `[KDE] LookAndFeelPackage=org.fedoraproject.fedoralight.desktop` (`fedoradark` when the mode is dark), `[General] ColorScheme=LevitateOSLight`, `accentColorFromWallpaper=false`, `[Icons] Theme=breeze` (`breeze-dark` on dark), and the scheme's colour groups. Fedora's `fedora`, `fedoralight` and `fedoradark` Global Themes name `LevitateOSLight`/`LevitateOSDark` in their `contents/defaults` in place of Breeze's, because Plasma copies the Global Theme's defaults into each user's `~/.config/kdedefaults`, which is read ahead of `/etc/xdg`. Later: `org.levitateos.desktop`, Noto fonts |
+| Colour schemes (done, unbuilt) | `/usr/share/color-schemes/LevitateOSLight.colors`, `LevitateOSDark.colors` | generated from the two palettes, with every group of Breeze's schemes: window = surface, view and button and tooltip = raised surface, alternate rows = sunken surface, text = text, inactive text = muted text, selection = accent with surface text, focus, hover and links = accent, visited = highlight, positive/neutral/negative = ok/warn/bad, header, complementary and active title bar = band with on_band text (pine `#214438` on both modes), inactive header and title bar = sunken surface; effects as Breeze's. The scheme carries the brand accent itself; no `AccentColor` is set |
+| Konsole (done, unbuilt) | `/usr/share/konsole/LevitateOSLight.colorscheme`, `LevitateOSDark.colorscheme`, `LevitateOS.profile`, `/etc/xdg/konsolerc` (`[Desktop Entry] DefaultProfile=LevitateOS.profile`) | surface background, text foreground; ANSI black = text on light (on dark, the muted text dimmed towards the surface), bright black = muted text, white = secondary text, bright white = text, red/green/yellow = bad/ok/warn, and blue, magenta, cyan fixed per mode for both distros (`terminal_hues`: light `#2A5C8A`, `#7A3F6E`, `#1F6F6B`; dark `#9BB8D9`, `#D4A5C9`, `#9ACFC4`), since the palette's accent and highlight are too close to green and yellow; bright leans to the text, faint to the surface. Every normal and bright colour is at least 3:1 on the background in all four distro and mode combinations (lowest: bright black on AcornOS light, 3.45:1). The profile uses the starting mode's scheme |
+| Wallpaper (done, unbuilt) | `/usr/share/wallpapers/LevitateOS/` | `metadata.json` (`Id: LevitateOS`), `contents/images/3840x2160.jpg` and `contents/images_dark/3840x2160.jpg`; Plasma scales the one size and shows the dark one under a dark colour scheme, the light one under a light one, so LevitateOS starts on the light one. `/usr/share/wallpapers/Default` links to `LevitateOS`, so Fedora's Global Theme (`Image=Fedora` → `Default`) already shows it; the Fedora background packages are still in the lock |
+| Login screen (background done, unbuilt) | `/etc/sddm.conf.d/10-theme.conf` (`[Theme] Current=breeze`) + `/usr/share/sddm/themes/breeze/theme.conf.user` | KDE's Breeze theme (no logo) in place of `01-breeze-fedora`, with `background=` the starting mode's wallpaper (light on LevitateOS) and `color=` that mode's surface; SDDM reads `theme.conf.user` over `theme.conf`. The greeter draws in the scheme of `/etc/xdg/kdeglobals` (its complementary group, the band). Still to do: an own `levitateos` theme with `showlogo=shown` and `logo=` the lockup in the tone of the mode |
 | Lock screen | — | follows the wallpaper; nothing extra |
 | Icons | `/usr/share/icons/hicolor/scalable/apps/distributor-logo-levitateos.svg`, `levitateos-logo-icon.svg`, `…/16x16/apps/…` (micro mark) | see "Icons" |
-| About page | `/etc/xdg/kcm-about-distrorc` | `LogoPath=/usr/share/pixmaps/levitateos-logo.svg`, `Website=https://levitateos.org`, `Variant=Desktop` |
+| About page (done, unbuilt) | `/etc/xdg/kcm-about-distrorc` | `LogoPath=` the start button's icon (`distributor-logo-levitateos.svg`, ink on light, paper on dark), `Website=https://levitateos.org`, `Variant=Desktop` |
 | os-release | builder (`distro/builder/src/pipeline/plan.rs`) | add `LOGO=levitateos-logo-icon` (and `HOME_URL`); KInfoCenter and some apps read it |
 | Firefox | `/usr/lib64/firefox/browser/defaults/preferences/levitateos-prefs.js` | homepage `https://levitateos.org` (or blank); remove the Fedora prefs file |
 
@@ -87,12 +99,13 @@ Openbox "Clearlooks" window decoration. Alpine 3.24 also has `breeze`
 | Item | Path | Content |
 |---|---|---|
 | LXQt themes | `/usr/share/lxqt/themes/acornos-light/`, `acornos-dark/` | panel, runner, notification and leave-dialog QSS edited from LXQt's `light`/`dark` to the Acorn colours; `mainmenu.svg` = acorn mark (this is the menu button icon); `wallpaper.cfg` naming that theme's light or dark wallpaper, so switching the LXQt theme switches the wallpaper too; `preview.png` |
-| Defaults | `/etc/xdg/lxqt/lxqt.conf` | `theme=acornos-dark`, `icon_theme=breeze`, `[Qt] style=Breeze`, font Noto Sans |
-| Palette | `/usr/share/lxqt/palettes/AcornOS` | Qt palette in Acorn browns and paper (LXQt applies it with `palette_override`) |
-| Wallpaper (done, unbuilt) | `/usr/share/wallpapers/AcornOS/` (same layout as Plasma's) + `/etc/xdg/pcmanfm-qt/lxqt/settings.conf` | the packaged `/usr/share/pcmanfm-qt/lxqt/settings.conf` with `Wallpaper=` the dark Acorn wallpaper and `WallpaperMode=zoom`. pcmanfm-qt reads one whole settings file, the first on the configuration path, so the file is a full copy. LXQt does not switch wallpaper with the look; the light one waits for the `acornos-light` theme's `wallpaper.cfg` |
-| Window decoration | `/usr/share/themes/AcornOS/openbox-3/themerc` + `/etc/xdg/openbox/lxqt-rc.xml` (`<theme><name>AcornOS</name>`) | Openbox themes are plain text (colours, fonts, button bitmaps); start from `Clearlooks` |
-| GTK apps (Firefox) | `/etc/gtk-3.0/settings.ini` | `gtk-theme-name=Breeze`, `gtk-icon-theme-name=breeze` |
-| Login screen (background done, unbuilt) | `/usr/share/sddm/themes/acornos/` + `/etc/sddm.conf.d/10-theme.conf` (`Current=acornos`) | SDDM's own Maldives theme (`Main.qml` and its two images, copied from the package) with `background=` the dark wallpaper and `QtVersion=6` in `metadata.desktop`: Alpine has only `sddm-greeter-qt6`, and its Maldives does not name a Qt version. Still to do: the Acorn lockup, and `sddm-breeze` if the look should match Plasma's |
+| Defaults (done, unbuilt) | `/etc/xdg/lxqt/lxqt.conf` | the packaged `/usr/share/lxqt/lxqt.conf` with `theme=dark` (LXQt's packaged `light`/`dark` theme, named after the mode), `icon_theme=breeze-dark` (`breeze` on light), `[Qt] style=Fusion`, and `[Palette]` from the mode's colours: `window_color` surface, `window_text_color` and `text_color` text, `base_color` and `tooltip_base_color` raised surface, `highlight_color` and `link_color` accent, `highlighted_text_color` surface, `link_visited_color` highlight, `tooltip_text_color` text (the keys LXQt's Qt platform plugin reads). Later: `theme=acornos-dark`, font Noto Sans |
+| Palette | `/usr/share/lxqt/palettes/AcornOS` | still to do: the same palette as a file the appearance settings can offer |
+| Wallpaper (done, unbuilt) | `/usr/share/wallpapers/AcornOS/` (same layout as Plasma's) + `/etc/xdg/pcmanfm-qt/lxqt/settings.conf` | the packaged `/usr/share/pcmanfm-qt/lxqt/settings.conf` with `Wallpaper=` the starting mode's wallpaper (dark on AcornOS), `WallpaperMode=zoom`, desktop icon text `FgColor=` the mode's text with `ShadowColor=` and `BgColor=` its surface, and `IconThemeName=` the mode's Breeze. pcmanfm-qt reads one whole settings file, the first on the configuration path, so the file is a full copy. LXQt does not switch wallpaper with the look; the other one waits for our themes' `wallpaper.cfg` |
+| Window decoration (packaged theme, unbuilt) | `/etc/xdg/openbox/rc.xml` | Openbox reads it when the user has none (nothing in this LXQt passes `lxqt-rc.xml`). `<theme><name>` is `Onyx` on dark (dark active title bars and menus; its inactive title bars are light) and `Clearlooks` on light, the packaged themes nearest the mode. Still to do: an `AcornOS` theme (`/usr/share/themes/AcornOS/openbox-3/themerc`) from the palette |
+| GTK apps (Firefox) (done, unbuilt) | `/etc/gtk-3.0/settings.ini`, `/etc/gtk-4.0/settings.ini` | `gtk-theme-name=Adwaita`, `gtk-application-prefer-dark-theme=true` on dark (`false` on light), `gtk-icon-theme-name=` the mode's Breeze, Adwaita cursor, Sans 11 |
+| QTerminal (done, unbuilt) | `/usr/share/qtermwidget6/color-schemes/AcornOSLight.colorscheme`, `AcornOSDark.colorscheme`, `/etc/xdg/qterminal.org/qterminal.ini` (`colorScheme=AcornOSDark`) | the same terminal scheme as Konsole's on LevitateOS, from the AcornOS palettes |
+| Login screen (background done, unbuilt) | `/usr/share/sddm/themes/acornos/` + `/etc/sddm.conf.d/10-theme.conf` (`Current=acornos`) | SDDM's own Maldives theme (`Main.qml` and its two images, copied from the package) with `background=` the starting mode's wallpaper (dark on AcornOS) and `QtVersion=6` in `metadata.desktop`: Alpine has only `sddm-greeter-qt6`, and its Maldives does not name a Qt version. Its `theme.conf` has no colour settings (the QML's own white, black and red stay). Still to do: the Acorn lockup, and `sddm-breeze` if the look should match Plasma's |
 | Icons | hicolor `distributor-logo-acornos`, `acornos-logo-icon` | see "Icons" |
 | os-release | builder | `LOGO=acornos-logo-icon` |
 
@@ -113,12 +126,12 @@ falls back to hicolor). The distribution needs only:
 Done (unbuilt): `start_button()` in `installed-system.rhai` installs
 `distributor-logo-<os id>` (the standard mark in `hicolor/scalable/apps/`, the
 micro mark in `hicolor/16x16/apps/`) from `branding/logo-*.svg`, and puts it on
-the start button. Plasma gets the paper mark (the panel is dark under Fedora's
-look): Fedora's look-and-feel scripts that set a new launcher's icon to
-`start-here` set ours instead. LXQt gets the ink mark (the default theme's
-panel is light): `ownIcon` and `icon` in the `[fancymenu]` section of
-`/etc/xdg/lxqt/panel.conf`. One fixed colour per desktop until the own themes
-exist. `<distro>-logo-icon`, `LOGO=` and the install launcher are not done.
+the start button. The panel follows the starting mode, so the mark is ink in
+light mode (LevitateOS) and paper in dark mode (AcornOS), on either desktop.
+On Plasma, Fedora's look-and-feel scripts that set a new launcher's icon to
+`start-here` set ours instead; on LXQt, `ownIcon` and `icon` in the
+`[fancymenu]` section of `/etc/xdg/lxqt/panel.conf`. A user who switches mode
+keeps the starting mode's mark until the symbolic icon exists. `<distro>-logo-icon`, `LOGO=` and the install launcher are not done.
 
 Qt renders SVG icons itself (`qt6-qtsvg` is in both sets), so a scalable SVG in
 `hicolor/scalable/apps/` plus the micro SVG in `hicolor/16x16/apps/` is enough.

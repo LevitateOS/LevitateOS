@@ -56,17 +56,33 @@ Marks: `[x]` done (committed, unbuilt), `[ ]` to do, **L** LevitateOS,
 
 Details and paths are in [desktop-theming.md](desktop-theming.md).
 
-- [x] **L A** Wallpapers, light and dark, as the default.
-- [x] **L A** Login screen background.
-- [x] **L A** Start button shows the leaf / the acorn.
+- [x] **L A** Wallpapers, light and dark; the starting mode's is the default
+  (Plasma picks it from the scheme; pcmanfm-qt is set to it).
+- [x] **L A** Login screen background: the starting mode's wallpaper.
+- [x] **L A** Start button shows the leaf / the acorn, ink on a light panel and
+  paper on a dark one (by the starting mode; 2026-11-13, unbuilt).
 - [ ] **L** Own Global Theme `org.levitateos.desktop`: defaults (colour scheme,
   icons, cursor, Plasma style, window decoration, wallpaper, splash), panel
   layout, splash screen with the leaf, previews.
-- [ ] **L** Colour schemes `LevitateOSLight` and `LevitateOSDark` (Breeze with
-  the pine accent).
-- [x] **L** `/etc/xdg/kdeglobals`: dark by default (decision 1) through
-  Fedora's dark Global Theme (Breeze Dark colours and icons, our wallpaper)
-  until our own Global Theme replaces it.
+- [x] **L A** The look is keyed on the starting mode (decision 1:
+  `profile.appearance` in `distro.toml`, `REC_APPEARANCE` in os-release), never
+  on the desktop, and its colours come from the variant's `[look.light]` /
+  `[look.dark]` palettes (the builder's `look` input). Written 2026-11-13;
+  never built or booted.
+- [x] **L** Colour schemes `LevitateOSLight` and `LevitateOSDark`, generated
+  from the two palettes (window, view, button, selection, tooltip,
+  complementary, header, title bar groups; the band for headers and title
+  bars). Written, unbuilt.
+- [x] **L** `/etc/xdg/kdeglobals`: the starting mode's scheme (light on
+  LevitateOS) with its colours, Fedora's Global Theme of that mode
+  (`org.fedoraproject.fedoralight.desktop` / `fedoradark`), Breeze icons of
+  that mode, no accent from the wallpaper. Fedora's light and dark Global
+  Themes name our schemes in their defaults, since Plasma copies those into
+  each user's `kdedefaults` ahead of `/etc/xdg`. Until our own Global Theme
+  replaces them. Written, unbuilt.
+- [x] **L** Konsole: `LevitateOSLight` / `LevitateOSDark` terminal schemes and a
+  default profile (`/etc/xdg/konsolerc`) in the starting mode's. Written,
+  unbuilt.
 - [ ] **L** A launcher icon that follows a light or dark panel
   (`distributor-logo-levitateos-symbolic`); approved, to be drawn and
   reviewed (decision 12).
@@ -79,20 +95,30 @@ Details and paths are in [desktop-theming.md](desktop-theming.md).
 - [x] **L** Remove the two Fedora files inside packages we keep:
   `usr/share/sddm/themes/01-breeze-fedora` (removed) and Firefox's
   `firefox-redhat-default-prefs.js` (rewritten without Fedora's start page).
-- [ ] **L** Own SDDM theme `levitateos` (Breeze's QML with the lockup,
-  `color=#14221A`), replacing the override of Breeze.
+- [ ] **L** Own SDDM theme `levitateos` (Breeze's QML with the lockup),
+  replacing the override of Breeze (which now has `color=` the starting
+  mode's surface and draws in the scheme from `/etc/xdg/kdeglobals`).
 - [x] **L** About page: `/etc/xdg/kcm-about-distrorc` (the mark, the website,
   "Desktop").
 - [ ] **A** LXQt themes `acornos-light` and `acornos-dark` (panel, runner,
   notification and leave-dialog QSS; `mainmenu.svg`; `wallpaper.cfg` so the
   wallpaper follows the theme; preview).
-- [x] **A** LXQt's settings: its packaged `lxqt.conf` already is the decided
-  look (light theme, Fusion widgets, Breeze icons, Sans 11); left as packaged
-  until our LXQt themes exist.
-- [ ] **A** Qt palette `/usr/share/lxqt/palettes/AcornOS`.
-- [ ] **A** Openbox window decoration `AcornOS` and `/etc/xdg/openbox/lxqt-rc.xml`.
+- [x] **A** LXQt's settings: `/etc/xdg/lxqt/lxqt.conf` is the packaged one
+  with LXQt's packaged theme of the starting mode (`dark` on AcornOS), Breeze
+  icons of that mode, Fusion widgets and the Qt palette (`[Palette]`) from the
+  mode's colours. Written, unbuilt; our own LXQt themes are still to do.
+- [ ] **A** A selectable Qt palette file `/usr/share/lxqt/palettes/AcornOS`
+  (the palette itself is now in `lxqt.conf`).
+- [x] **A** Openbox: `/etc/xdg/openbox/rc.xml` names the packaged theme that
+  fits the mode (Onyx on dark, Clearlooks on light). Onyx's inactive title
+  bars are light. Written, unbuilt.
+- [ ] **A** Openbox window decoration `AcornOS` of our own.
 - [x] **A** GTK settings (`/etc/gtk-3.0/` and `gtk-4.0/settings.ini`):
-  Adwaita with Breeze icons, the Adwaita cursor and Sans 11.
+  Adwaita, dark (`gtk-application-prefer-dark-theme`) when the mode is,
+  Breeze icons of the mode, the Adwaita cursor and Sans 11. Written, unbuilt.
+- [x] **A** QTerminal: `AcornOSLight` / `AcornOSDark` schemes and the default
+  (`/etc/xdg/qterminal.org/qterminal.ini`) in the starting mode's. Written,
+  unbuilt.
 - [ ] **A** Login screen: add the acorn lockup to the Maldives-based
   theme that is there now (decision 9).
 - [x] **L A** `LOGO=distributor-logo-<id>` in os-release (the icon the desktop
@@ -389,7 +415,10 @@ The desktop adds no other package manager, store or bundle format.
 The items above that needed a decision follow these; the marks are updated as each
 is carried out.
 
-1. **Look:** LevitateOS starts dark, AcornOS starts light.
+1. **Look** (2026-11-13, replaces "LevitateOS starts dark, AcornOS starts
+   light"): LevitateOS starts in light mode, AcornOS in dark mode, each in its
+   own brand colours everywhere. Declared in each `distro.toml` as
+   `profile.appearance` and the `[look.light]` / `[look.dark]` palettes.
 2. **Same features on both desktops:** AcornOS's desktop does everything
    LevitateOS's does, on its own stack (musl, OpenRC, LXQt, X11); only the
    parts differ. So AcornOS also gets Bluetooth, printing, scanning, Orca,
