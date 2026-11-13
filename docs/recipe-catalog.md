@@ -155,6 +155,37 @@ Gwenview and Okular, named in the desktop notes, come after `qview` and
 `qpdfview`: they need the KDE libraries as `sdk` recipes, which is a layer of
 its own.
 
+## 5. AI tools, editors and browsers (requested 2026-11-13)
+
+Research with every source URL: the session's research notes (CLI agents and
+desktop apps, 2026-11-13). Every recipe here is upstream's build, pinned.
+
+| Program | Recipe | Upstream build | Done |
+|---|---|---|---|
+| OpenAI Codex CLI | `codex` | 0.167.2, static musl: both variants | yes |
+| opencode CLI | `opencode` | 1.19.5, glibc (musl build recorded) | yes |
+| pi (Mario Zechner) | `pi` | 1.5.2, glibc only upstream | yes |
+| Claude Code | `claude-code` | 2.1.323, glibc (musl build recorded); proprietary | yes |
+| Muse (Meta) | `muse` | 1.4.18-R8587.1, static; Meta's channel only serves the current version | yes |
+| Gemini CLI | `gemini-cli` | 0.68.0, Node package only: needs `node` first | |
+| Zed | `zed` | 1.28.1 tarball, glibc; loads Vulkan and Wayland at run time | |
+| Delta (Zed Industries) | `delta-zed` | public beta since 2026-09-16; exact download not found yet | |
+| Antigravity App | `antigravity` | 2.31.2 Electron tarball (the user's "ADE") | |
+| Antigravity IDE | `antigravity-ide` | 2.7.0, VS Code fork | |
+| opencode desktop | `opencode-desktop` | 1.19.5 AppImage/deb/rpm, Electron | |
+| Claude desktop | `claude-desktop` | 5.11492.0 deb (Debian/Ubuntu only), Electron; proprietary | |
+| Codex desktop (ChatGPT app) | `chatgpt` | 26.1106 Linux preview deb/rpm, only "latest" URLs | |
+| Grok Bot | `grok-bot` | 1.0.3 rpm from Cursor's feed, Electron, unsigned, setuid sandbox | |
+| Google Chrome | `chrome` | 157 deb; redistribution terms to check | |
+| Chromium | `chromium` | Google's snapshot zip only, md5 only | |
+| VLC | `vlc` | 3.0.24 source only: build from source | |
+| Gemini desktop | none | Windows and macOS only | |
+
+The Electron and Chromium programs need GTK 3, NSS, X11/xcb, CUPS, ALSA and
+(some) libsecret. Open decision: those libraries carried by Recipe (one shared
+runtime from pinned Fedora packages, so they run on both variants) or shipped
+in the desktop image (LevitateOS only).
+
 ## What blocks what
 
 - **Layer 1:** nothing.
