@@ -4,7 +4,7 @@
 # `distro_contract::registry`, the same for every variant, and every artifact
 # name (`<os_id>-x86_64-<product>.iso`, `<os_id>-live.efi`, ...) follows from
 # `os_id`.
-schema_version = 9
+schema_version = 10
 
 [identity]
 os_name = "AcornOS"
@@ -16,8 +16,9 @@ os_version = "1.0"
 # the install tools read on the target. The ISO label (`os_id` in capitals),
 # default hostname (`os_id`), login prompt (`<os_id> login:`) and kernel
 # localversion (`-<variant id>`) follow from the identity, and the bun TUI binary
-# is built for the libc. `kernel_line` picks the kernel: its exact version is
-# pinned in distro/builder/os-recipes/kernel/metadata.rhai, its configuration is
+# is built for the libc. `appearance` is the mode the distro starts in.
+# `kernel_line` picks the kernel: its exact version is pinned in
+# distro/builder/os-recipes/kernel/metadata.rhai, its configuration is
 # ../_shared/kconfig plus `kconfig` beside this file.
 [profile]
 packages = "apk"
@@ -26,6 +27,44 @@ libc = "musl"
 privilege = "doas"
 desktop = "lxqt"
 kernel_line = "lts"
+appearance = "dark"
+
+# The mode the distro starts in is `profile.appearance`; these are its colours in
+# each mode. The terminal apps, the desktop look and the website all take them
+# from here.
+[look.light]
+surface = "#F2EEE4"
+surface_raised = "#FCFAF5"
+surface_sunken = "#E9E1D3"
+text = "#241A12"
+text_secondary = "#6A5D50"
+text_muted = "#8A7D70"
+rule = "#CFC3B2"
+hairline = "#DED5C6"
+accent = "#644532"
+highlight = "#214438"
+band = "#644532"
+on_band = "#F2EEE4"
+ok = "#2F6B3F"
+warn = "#8A5A00"
+bad = "#B22F27"
+
+[look.dark]
+surface = "#1F1711"
+surface_raised = "#2B2019"
+surface_sunken = "#150F0A"
+text = "#F2EEE4"
+text_secondary = "#CDBFAE"
+text_muted = "#A89886"
+rule = "#4D3D30"
+hairline = "#382B21"
+accent = "#E4CBA6"
+highlight = "#C7D9BA"
+band = "#644532"
+on_band = "#F2EEE4"
+ok = "#A9CF9A"
+warn = "#F0B866"
+bad = "#F0A497"
 
 [sources.rootfs_source]
 recipe_script = "distro/builder/os-recipes/alpine-live-source-rootfs.rhai"

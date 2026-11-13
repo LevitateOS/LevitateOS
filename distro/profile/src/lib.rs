@@ -85,6 +85,12 @@ fact! {
 }
 
 fact! {
+    /// The mode the variant starts in: its desktop, terminal apps and website
+    /// open light or dark. Its colours in both modes are `[look]` in `distro.toml`.
+    Appearance { Light => "light", Dark => "dark" }
+}
+
+fact! {
     /// Which system an image is: the base system, or the base system with
     /// the variant's desktop. Unlike the profile, it is a fact of the image,
     /// not of the variant: a variant builds both.
@@ -178,6 +184,7 @@ pub const REC_LIBC: &str = "REC_LIBC";
 pub const REC_PRIVILEGE: &str = "REC_PRIVILEGE";
 pub const REC_DESKTOP: &str = "REC_DESKTOP";
 pub const REC_KERNEL_LINE: &str = "REC_KERNEL_LINE";
+pub const REC_APPEARANCE: &str = "REC_APPEARANCE";
 /// The image's [`Flavour`]; written beside the profile's fields.
 pub const REC_FLAVOUR: &str = "REC_FLAVOUR";
 
@@ -191,6 +198,7 @@ pub struct Profile {
     pub privilege: PrivilegeTool,
     pub desktop: Desktop,
     pub kernel_line: KernelLine,
+    pub appearance: Appearance,
 }
 
 impl Profile {
@@ -203,6 +211,7 @@ impl Profile {
             (REC_PRIVILEGE, self.privilege.as_str()),
             (REC_DESKTOP, self.desktop.as_str()),
             (REC_KERNEL_LINE, self.kernel_line.as_str()),
+            (REC_APPEARANCE, self.appearance.as_str()),
         ]
         .iter()
         .map(|(key, value)| format!("{key}={value}\n"))
@@ -218,6 +227,7 @@ impl Profile {
             privilege: os_release_fact(os_release, REC_PRIVILEGE)?,
             desktop: os_release_fact(os_release, REC_DESKTOP)?,
             kernel_line: os_release_fact(os_release, REC_KERNEL_LINE)?,
+            appearance: os_release_fact(os_release, REC_APPEARANCE)?,
         })
     }
 }

@@ -4,7 +4,7 @@
 # `distro_contract::registry`, the same for every variant, and every artifact
 # name (`<os_id>-x86_64-<product>.iso`, `<os_id>-live.efi`, ...) follows from
 # `os_id`.
-schema_version = 9
+schema_version = 10
 
 [identity]
 os_name = "LevitateOS"
@@ -17,8 +17,9 @@ home_url = "https://levitateos.org"
 # the install tools read on the target. The ISO label (`os_id` in capitals),
 # default hostname (`os_id`), login prompt (`<os_id> login:`) and kernel
 # localversion (`-<variant id>`) follow from the identity, and the bun TUI binary
-# is built for the libc. `kernel_line` picks the kernel: its exact version is
-# pinned in distro/builder/os-recipes/kernel/metadata.rhai, its configuration is
+# is built for the libc. `appearance` is the mode the distro starts in.
+# `kernel_line` picks the kernel: its exact version is pinned in
+# distro/builder/os-recipes/kernel/metadata.rhai, its configuration is
 # ../_shared/kconfig plus `kconfig` beside this file.
 [profile]
 packages = "rpm"
@@ -27,6 +28,44 @@ libc = "glibc"
 privilege = "sudo"
 desktop = "plasma"
 kernel_line = "latest"
+appearance = "light"
+
+# The mode the distro starts in is `profile.appearance`; these are its colours in
+# each mode. The terminal apps, the desktop look and the website all take them
+# from here.
+[look.light]
+surface = "#F2EEE4"
+surface_raised = "#FCFAF5"
+surface_sunken = "#E7E2D5"
+text = "#14221A"
+text_secondary = "#59645B"
+text_muted = "#7A8075"
+rule = "#BFC6B8"
+hairline = "#D9DCCF"
+accent = "#214438"
+highlight = "#644532"
+band = "#214438"
+on_band = "#F2EEE4"
+ok = "#2F6B3F"
+warn = "#8A5A00"
+bad = "#B22F27"
+
+[look.dark]
+surface = "#14221A"
+surface_raised = "#1D2D24"
+surface_sunken = "#0D1711"
+text = "#F2EEE4"
+text_secondary = "#BAC5B7"
+text_muted = "#9AA89D"
+rule = "#3A4B40"
+hairline = "#2A3B31"
+accent = "#C7D9BA"
+highlight = "#E4CBA6"
+band = "#214438"
+on_band = "#F2EEE4"
+ok = "#A9CF9A"
+warn = "#F0B866"
+bad = "#F0A497"
 
 [sources.rootfs_source]
 recipe_script = "distro/builder/os-recipes/fedora-rpm-source-rootfs.rhai"
