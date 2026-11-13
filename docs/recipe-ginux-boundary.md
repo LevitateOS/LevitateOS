@@ -1,6 +1,7 @@
 # Where Ginux belongs in Recipe
 
-Design of 2026-11-13. Nothing in it is built. It answers this question:
+Design of 2026-11-13. Stages 1 and 2 were built the same day (status at the
+end). It answers this question:
 should Ginux wrap the whole recipe run, as it does today, or only the
 third-party code a recipe runs?
 
@@ -259,3 +260,32 @@ boundary correctly.
 4. Whether host-side "for this computer" installs need extra rules beyond
    openat2 confinement, such as refusing to follow symlinks anywhere under
    `/var/lib/recipe`.
+
+## Status (2026-11-13)
+
+- **Stage 1, partly.** `target_extract_rpm` reads RPMs natively (Recipe
+  `59673e7`, identical to `rpm2archive` on 11 RPMs). It still maps owner
+  names through the running root's `/etc/passwd`, so it stays on the list
+  that keeps a recipe in Ginux, and so does `target_extract_tar`. ninja's
+  check uses `verify_sha256` (recipes `ee989ac`), but ninja still extracts an
+  RPM, so it runs in Ginux.
+  - Still to do: the remaining `sha256sum` calls; antigravity's `shell` and
+    `carry_libraries`; image-independent owner mapping; Git (decision 3).
+- **Stage 2, built** (Recipe `8c591ff`; the builder passes `--execution
+  ginux`, distro/builder commit of 2026-11-13). Eighteen catalog recipes run
+  on the host in 2–5 s, with no image. Section 5.1 is implemented, with
+  these additions from three adversarial reviews:
+  - `..` is refused in host paths;
+  - file operations go through directory descriptors;
+  - seccomp also refuses fork;
+  - root runs use a uid/gid per run (`0x70000000` plus slot) with a gate
+    around the run folder;
+  - root's own walks go through descriptors;
+  - special address ranges are refused unless the recipe declares the
+    literal address.
+
+  Checked on Fedora 44 (user and root, SELinux enforcing) and on Ubuntu
+  24.04 without an AppArmor profile. The e2e suites, which need Ginux, have
+  not been run.
+- **Decision 4 is answered in code:** root host runs never run as root.
+  Landlock as a second wall is not added; that is the user's call.
