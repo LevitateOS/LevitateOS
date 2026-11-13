@@ -66,3 +66,7 @@
 	path = recipes
 	url = https://github.com/LevitateOS/recipes
 	branch = master
+[submodule "desktop-apps"]
+	path = gui
+	url = https://github.com/LevitateOS/desktop-apps.git
+	branch = main
