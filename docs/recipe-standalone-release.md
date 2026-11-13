@@ -1,6 +1,19 @@
 # Recipe as a standalone release
 
-Plan of 2026-11-13; decisions taken the same day (end of file). Nothing in it is built yet.
+Plan of 2026-11-13; decisions taken the same day (end of file).
+
+Status (2026-11-13), all compile-checked, none of it built into an image,
+run under Ginux or published:
+- Done: Recipe step 1 and step 2 (tools/recipe `540e9c1`). `recipe runtime
+  stage|fetch|status` exist, runtime paths resolve against the install
+  prefix, and the image downloads on first use (checked against a local
+  server). The builder stages through `recipe runtime stage`, and
+  `cargo xtask prebuilt publish-runtime` uploads the image (distro/builder
+  `dac0f8f`). The window's Qt floor is 6.4 (desktop-apps `b21ce94`; source
+  audit, not built against 6.4).
+- Next: publish the runtime image (needs a yes, since it writes to GitHub);
+  settle root on a foreign host (step 3); the release command (step 6); the
+  rename to `recipe-pm`; the window's packaging; mark OS-only recipes.
 
 The goal is to release Recipe for other Linux systems, not only as part of
 LevitateOS and AcornOS. Each release comes in two forms:

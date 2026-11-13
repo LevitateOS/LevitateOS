@@ -135,6 +135,24 @@ AGENTS.md). Release builds therefore keep compiling: the release path passes
 (same key → same bytes), release builds could download and verify against a
 rebuild or against signed provenance instead. That is not part of this plan.
 
+### 6. The Recipe runtime image
+
+Recipe's runtime image (the root filesystem tar its Ginux domains run in) is not a
+prebuilt of the key family above. It is identified by the SHA-256 digest of the
+uncompressed tar, which the reference `oci:NAME@sha256:<digest>` already pins.
+`cargo xtask prebuilt publish-runtime` (`distro-builder prebuilt publish-runtime`,
+run as the user with a `gh` login) takes the image the installed Recipe ships,
+checks the tar against that digest, compresses it with `zstd -T0 -19` (default
+window, so any decoder reads it) and uploads `rootfs.tar.zst` and `runtime.json`
+(`format`, `reference`, `digest`, `tar_bytes`, `zst_sha256`, `zst_bytes`) to the
+release `recipe-runtime-<first 16 hex digits of the digest>` of
+`LevitateOS/prebuilt` (`LEVITATE_PREBUILT_REPO` overrides). Recipe downloads
+`https://github.com/LevitateOS/prebuilt/releases/download/recipe-runtime-<short>/rootfs.tar.zst`
+on first use and verifies the decompressed bytes against the digest, so the
+compressed bytes need no fixed form. The tag is named by the uncompressed
+digest: a release that already has `rootfs.tar.zst` is reported as published and
+left alone. See `docs/recipe-standalone-release.md`.
+
 ## Cheap wins that need no CI
 
 Worth doing first, whatever is decided about CI:

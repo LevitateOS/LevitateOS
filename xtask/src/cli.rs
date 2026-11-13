@@ -483,6 +483,10 @@ pub enum PrebuiltCmd {
     /// (LEVITATE_PREBUILT_REPO, default LevitateOS/prebuilt) with gh; never replaces an
     /// asset that differs. Build it first (an ISO build, or `build ... --no-prebuilt`).
     Publish(PrebuiltArgs),
+    /// Compress the Recipe runtime image the installed Recipe ships and upload it to the
+    /// release recipe-runtime-<digest16> of the prebuilt repository with gh; Recipe downloads
+    /// it on first use.
+    PublishRuntime,
 }
 
 #[derive(Args, Clone)]
