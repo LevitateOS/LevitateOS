@@ -414,6 +414,16 @@ The user chose that Recipe carries the libraries of upstream desktop builds
 them, so they run on both variants. The second trial left this case open: an
 upstream binary has no room reserved for the package's paths. The plan:
 
+**Narrowed the same day (user):** never force a program onto AcornOS when its
+maker does not build it for that kind of system. An upstream build linked
+against glibc (every Electron and Chromium program, Zed, glibc-only prebuilt
+command-line tools) is a LevitateOS-only recipe. Recipe carries its libraries
+there so the desktop image does not have to ship them, but it never carries
+glibc into AcornOS to make it run. On AcornOS a recipe offers only what
+upstream supports there: musl or static builds, or a build from source. So
+"both variants" and "both booted desktops" below mean LevitateOS only for
+these programs.
+
 1. **The runtime is a library recipe.** `desktop-runtime` publishes `sdk`: the
    shared libraries of a pinned Fedora package set (glibc and its loader, GTK
    3 with GLib, Pango, Cairo, HarfBuzz, fontconfig and FreeType, NSS and NSPR,
