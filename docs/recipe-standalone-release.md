@@ -30,8 +30,25 @@ run under Ginux or published:
   (root path unchanged). Recipe `9b36fd4` puts scratch on disk, exports
   under state, and root's software on everyone's `PATH`. An ordinary user
   installed ripgrep (30 s) and root installed fd (17 s); each was found on
-  `PATH`, and no `.artifacts` was left behind. Ubuntu 24.04's AppArmor
-  restriction (exit 134) has not been tried.
+  `PATH`, and no `.artifacts` was left behind.
+- Ubuntu 24.04.5 (kernel 6.8, AppArmor userns restriction on), 2026-11-13:
+  - **Ordinary user, no profile:** Ginux stops with exit 133 "user
+    namespace refused" and names the Ubuntu setting. AppArmor moves the
+    namespace into `unprivileged_userns` and denies `sys_admin`.
+  - **With an AppArmor profile** allowing `userns` for the launcher, two more
+    faults surfaced, both fixed:
+    - Ginux published exports with `linkat(AT_EMPTY_PATH)`, which needs
+      `CAP_DAC_READ_SEARCH` before kernel 6.10. It now falls back to
+      `/proc/self/fd` (Ginux `7b9dec91`).
+    - Ubuntu's umask 002 made the store group-writable, which activation
+      refused. Recipe now tightens its own store (`10c6875`).
+  - **After both fixes**, ordinary-user installs of ripgrep, fd (fresh store)
+    and jq succeed, and root installs work without the profile.
+    `recipe runtime stage --apparmor` writes that profile, and packages and
+    `install.sh` must load it on AppArmor hosts (Recipe `edee1b9`; the
+    superproject pin waits for the ISO builds running on 2026-11-13).
+  - **Kernel floor:** kernels older than 6.10 need the `/proc/self/fd` path;
+    5.x is untried.
 - Next: the release command (step 6); the
   rename to `recipe-pm`; the window's packaging; mark OS-only recipes.
 
