@@ -47,9 +47,9 @@ def world(p, x, y, cols, rows, pin, lit=()):
                     if (c * 2 + dx + r * 4 + dy) % 2 == 0 and is_land(lat, lon):
                         bits |= bits_of[dy][dx]
             if (r, c) == pinned:
-                p.put(y + r, x + c, "●", p.highlight, INK, bold=True)
+                p.put(y + r, x + c, "●", p.highlight, SURFACE, bold=True)
             elif bits:
-                p.put(y + r, x + c, chr(0x2800 + bits), p.accent if (r, c) in marked else LICHEN, INK, bold=(r, c) in marked)
+                p.put(y + r, x + c, chr(0x2800 + bits), p.accent if (r, c) in marked else MUTED, SURFACE, bold=(r, c) in marked)
 
 
 # ====================================================================== system-setup
@@ -75,17 +75,17 @@ def machine_card(p, filled, numbered=False):
     overview, the review and the ending are this one card."""
     p.card(p.x, p.y, p.w, 9)
     p.fill(p.y, p.x, p.w, p.accent if filled == 6 else RULE)
-    p.put(p.y, p.x + 2, "studio" if filled >= 4 else "this machine", NIGHT if filled == 6 else PAPER, bold=True)
-    p.put(p.y, p.x + p.w - 16, "LevitateOS 1.0", NIGHT if filled == 6 else LICHEN)
+    p.put(p.y, p.x + 2, "studio" if filled >= 4 else "this machine", ON_FILL if filled == 6 else TEXT, bold=True)
+    p.put(p.y, p.x + p.w - 16, "LevitateOS 1.0", ON_FILL if filled == 6 else MUTED)
     for i, (label, value) in enumerate(FIELDS):
         x = p.x + 2 + (i // 3) * (p.w // 2)
         row = p.y + 2 + (i % 3) * 2
         done = i < filled
         if numbered:
-            p.put(row, x, str(i + 1), GUTTER, INK)
+            p.put(row, x, str(i + 1), MUTED, SURFACE)
             x += 3
-        p.put(row, x, label, LICHEN, INK)
-        p.put(row + 1, x, value if done else "·" * 12, PAPER if done else HAIR, INK, bold=done)
+        p.put(row, x, label, MUTED, SURFACE)
+        p.put(row + 1, x, value if done else "·" * 12, TEXT if done else HAIRLINE, SURFACE, bold=done)
     p.y += 10
 
 
@@ -113,10 +113,10 @@ def zone_page(distro="levitate"):
     p.gap()
     p.rows_list([("Europe/", city, clock, "") for city, clock, *_ in EUROPE], 0, LIST_W, match="eu")
     x, w = side(p, top)
-    p.put(top + 1, x + 2, "Amsterdam", PAPER, INK, bold=True)
-    p.put(top + 1, x + w - 8, "+01:00", LICHEN, INK)
+    p.put(top + 1, x + 2, "Amsterdam", TEXT, SURFACE, bold=True)
+    p.put(top + 1, x + w - 8, "+01:00", MUTED, SURFACE)
     world(p, x + 2, top + 3, w - 4, 9, (52.4, 4.9), [(lat, lon) for *_, lat, lon in EUROPE])
-    p.put(top + 12, x + 2, "02:20 there now", MOSS, INK)
+    p.put(top + 12, x + 2, "02:20 there now", SECONDARY, SURFACE)
     return p
 
 
@@ -133,17 +133,17 @@ def system_setup_pages():
     p.gap()
     p.rows_list([("", "de", "", ""), ("", "de-latin1", "", ""), ("", "de-latin1-nodeadkeys", "", ""), ("", "de_CH-latin1", "", "")], 0, LIST_W, match="de")
     x, w = side(p, top)
-    p.put(top + 1, x + 2, "German", PAPER, INK, bold=True)
-    p.put(top + 1, x + w - 8, "QWERTZ", LICHEN, INK)
+    p.put(top + 1, x + 2, "German", TEXT, SURFACE, bold=True)
+    p.put(top + 1, x + w - 8, "QWERTZ", MUTED, SURFACE)
     for r, keys in enumerate(["q w e r t z u", "a s d f g h j", "y x c v b n m"]):
         col = x + 2 + r
         for key in keys.split():
             odd = key in "zy"
-            p.put(top + 3 + r * 2, col, f" {key} ", NIGHT if odd else PAPER, p.highlight if odd else RAISED, bold=True)
+            p.put(top + 3 + r * 2, col, f" {key} ", ON_FILL if odd else TEXT, p.highlight if odd else RAISED, bold=True)
             col += 4
     p.fill(top + 11, x + 2, w - 4, RAISED)
-    p.put(top + 11, x + 3, "zwölf yaks", PAPER, RAISED, bold=True)
-    p.grid[top + 11][x + 13]["bg"] = p.accent
+    p.put(top + 11, x + 3, "zwölf yaks", TEXT, RAISED, bold=True)
+    p.grid[top + 11][x + 13]["bg"] = p.c(p.accent)
 
     page("system-setup", "2 Time zone", "The list with each zone's clock, and the place on the map.", zone_page())
 
@@ -154,32 +154,32 @@ def system_setup_pages():
     p.gap()
     p.rows_list([("", "en_GB.UTF-8", "", ""), ("", "en_US.UTF-8", "", "")], 1, LIST_W, match="en")
     x, w = side(p, top)
-    p.put(top + 1, x + 2, "English", PAPER, INK, bold=True)
-    p.put(top + 1, x + w - 15, "United States", LICHEN, INK)
+    p.put(top + 1, x + 2, "English", TEXT, SURFACE, bold=True)
+    p.put(top + 1, x + w - 15, "United States", MUTED, SURFACE)
     for i, value in enumerate(["Tuesday, November 10, 2026", "2:20 AM", "1,234,567.89", "the week starts on Sunday"]):
-        p.put(top + 3 + i * 2, x + 2, value, MOSS if i == 3 else PAPER, INK)
+        p.put(top + 3 + i * 2, x + 2, value, SECONDARY if i == 3 else TEXT, SURFACE)
 
     p = page("system-setup", "4 Hostname", "The field, and the name where it will appear.", ss(4, 4, TEXT_KEYS))
     p.heading(4, "What is this machine called?", "Its name on the prompt and on the network.")
     top = p.y
     p.field("Hostname", "studio", width=LIST_W)
     x, w = side(p, top)
-    p.runs(top + 2, x + 2, [("studio", p.accent, True), (" login:", MOSS)], INK)
-    p.runs(top + 5, x + 2, [("ann@", MOSS), ("studio", p.accent, True), (" ~ $", MOSS)], INK)
-    p.runs(top + 8, x + 2, [("studio", p.accent, True), (".local", MOSS)], INK)
-    p.put(top + 9, x + 2, "on the network", GUTTER, INK)
+    p.runs(top + 2, x + 2, [("studio", p.accent, True), (" login:", SECONDARY)], SURFACE)
+    p.runs(top + 5, x + 2, [("ann@", SECONDARY), ("studio", p.accent, True), (" ~ $", SECONDARY)], SURFACE)
+    p.runs(top + 8, x + 2, [("studio", p.accent, True), (".local", SECONDARY)], SURFACE)
+    p.put(top + 9, x + 2, "on the network", MUTED, SURFACE)
 
     p = page("system-setup", "4 Hostname, refused", "The character that breaks the rule is marked in the field; recsetup's reason is under it. The preview stays empty.", ss(4, 4, TEXT_KEYS))
     p.heading(4, "What is this machine called?", "Its name on the prompt and on the network.")
     top = p.y
     p.field("Hostname", "studio_pc", width=LIST_W)
-    p.put(p.y - 1, p.x + 17, "_", NIGHT, SALMON, bold=True)
+    p.put(p.y - 1, p.x + 17, "_", ON_FILL, BAD, bold=True)
     p.gap()
     for line in wrap("An underscore is not allowed: letters, digits and hyphens only.", LIST_W):
-        p.put(p.y, p.x, line, SALMON)
+        p.put(p.y, p.x, line, BAD)
         p.y += 1
     x, w = side(p, top)
-    p.runs(top + 2, x + 2, [("············", HAIR), (" login:", GUTTER)], INK)
+    p.runs(top + 2, x + 2, [("············", HAIRLINE), (" login:", MUTED)], SURFACE)
 
     p = page("system-setup", "5 Root password", "Two entries, a strength line, and what the choice means.", ss(5, 5, TEXT_KEYS))
     p.heading(5, "A password for root?", "The system's own administrator account.")
@@ -189,14 +189,14 @@ def system_setup_pages():
     p.gap()
     p.field("Once more", "••••••", width=LIST_W)
     p.gap()
-    p.put(p.y, p.x, "Typed on the de keyboard.", GUTTER)
+    p.put(p.y, p.x, "Typed on the de keyboard.", MUTED)
     x, w = side(p, top)
-    p.put(top + 1, x + 2, "With a password", PAPER, INK, bold=True)
+    p.put(top + 1, x + 2, "With a password", TEXT, SURFACE, bold=True)
     for i, line in enumerate(wrap("You can log in as root on the console, and repair the system when nothing else works.", w - 4)):
-        p.put(top + 2 + i, x + 2, line, MOSS, INK)
-    p.put(top + 7, x + 2, "Left empty", PAPER, INK, bold=True)
+        p.put(top + 2 + i, x + 2, line, SECONDARY, SURFACE)
+    p.put(top + 7, x + 2, "Left empty", TEXT, SURFACE, bold=True)
     for i, line in enumerate(wrap("Root cannot log in. Only your own user administers, with sudo.", w - 4)):
-        p.put(top + 8 + i, x + 2, line, MOSS, INK)
+        p.put(top + 8 + i, x + 2, line, SECONDARY, SURFACE)
 
     p = page("system-setup", "6 User", "The field, and the account as it will exist.", ss(6, 6, TEXT_KEYS))
     p.heading(6, "Who uses this machine?", "Your own account. Leave the name empty to create none.")
@@ -205,13 +205,13 @@ def system_setup_pages():
     x, w = side(p, top)
     for r in range(3):
         p.fill(top + 1 + r, x + 2, 7, p.accent)
-    p.put(top + 2, x + 5, "A", NIGHT, p.accent, bold=True)
-    p.put(top + 1, x + 11, "ann", PAPER, INK, bold=True)
-    p.put(top + 2, x + 11, "administrator", MOSS, INK)
-    p.put(top + 3, x + 11, "may use sudo", LICHEN, INK)
+    p.put(top + 2, x + 5, "A", ON_FILL, p.accent, bold=True)
+    p.put(top + 1, x + 11, "ann", TEXT, SURFACE, bold=True)
+    p.put(top + 2, x + 11, "administrator", SECONDARY, SURFACE)
+    p.put(top + 3, x + 11, "may use sudo", MUTED, SURFACE)
     for i, (label, value) in enumerate([("Home", "/home/ann"), ("Shell", "/bin/bash"), ("Groups", "ann, wheel")]):
-        p.put(top + 6 + i * 2, x + 2, label, LICHEN, INK)
-        p.put(top + 6 + i * 2, x + 11, value, PAPER, INK)
+        p.put(top + 6 + i * 2, x + 2, label, MUTED, SURFACE)
+        p.put(top + 6 + i * 2, x + 11, value, TEXT, SURFACE)
 
     p = page("system-setup", "7 Apply, reviewing", "The card, filled. A number before each line: that key changes it.", ss(7, 7, keys=[("1-6", "change an answer"), ("space", "the commands"), ("Enter", "apply"), ("q", "back")]))
     p.heading(7, "Is this right?", "Nothing has changed yet.")
@@ -222,9 +222,9 @@ def system_setup_pages():
     p.heading(7, "Is this right?", "Nothing has changed yet. Six commands, each inside the new system.")
     for what, command in [("Time zone", "recipe-system-setup timezone Europe/Amsterdam"), ("Language", "recipe-system-setup locale en_US.UTF-8"), ("Keyboard", "recipe-system-setup keymap de"),
                           ("Hostname", "recipe-system-setup hostname studio"), ("User", "recipe-system-setup user ann /bin/bash wheel"), ("Passwords", "chpasswd")]:
-        p.put(p.y, p.x, what, MOSS)
-        p.put(p.y, p.x + 12, "○", GUTTER)
-        p.put(p.y, p.x + 15, command, PAPER)
+        p.put(p.y, p.x, what, SECONDARY)
+        p.put(p.y, p.x + 12, "○", MUTED)
+        p.put(p.y, p.x + 15, command, TEXT)
         p.y += 1
     p.button("Apply to /mnt")
 
@@ -234,24 +234,24 @@ def system_setup_pages():
     machine_card(p, 6)
 
     p = page("system-setup", "7 Apply, stopped", "The commands with the failed one raised, what it printed, and the bar to try again.", ss(7, 7, right="stopped", states={7: "failed"}))
-    p.heading("bang", "The configuration stopped", "At command 5 of 6.", SALMON)
+    p.heading("bang", "The configuration stopped", "At command 5 of 6.", BAD)
     for what, command, state in [("Time zone", "timezone Europe/Amsterdam", "done"), ("Language", "locale en_US.UTF-8", "done"), ("Keyboard", "keymap de", "done"),
                                  ("Hostname", "hostname studio", "done"), ("User", "user ann /bin/bash wheel", "failed"), ("Passwords", "chpasswd", "todo")]:
         here = state == "failed"
         if here:
             p.fill(p.y, p.x + 11, p.w - 11, RAISED)
-        p.put(p.y, p.x, what, GUTTER if state == "todo" else MOSS)
+        p.put(p.y, p.x, what, MUTED if state == "todo" else SECONDARY)
         mark, colour = MARKS[state]
         p.put(p.y, p.x + 12, mark, colour, RAISED if here else None, bold=here)
-        p.put(p.y, p.x + 15, command, LICHEN if state == "todo" else PAPER, RAISED if here else None, bold=here)
+        p.put(p.y, p.x + 15, command, MUTED if state == "todo" else TEXT, RAISED if here else None, bold=here)
         p.y += 1
     p.gap()
-    p.text("useradd: cannot lock /etc/passwd; try again later", SALMON)
-    p.text("The four commands before it are done and are safe to run again.", MOSS)
+    p.text("useradd: cannot lock /etc/passwd; try again later", BAD)
+    p.text("The four commands before it are done and are safe to run again.", SECONDARY)
     p.button("Apply again")
 
     p = page("system-setup", "Done", "The card once more, now true.", ss(8, 9))
-    p.heading("check", "This machine is yours", "It knows its keyboard, clock, language and name, and who may log in.", LEAF)
+    p.heading("check", "This machine is yours", "It knows its keyboard, clock, language and name, and who may log in.", OK)
     machine_card(p, 6)
     p.button("Make it boot")
 
@@ -267,7 +267,7 @@ def recab(selected, trial=False, keys=None, right=None, history=""):
     for i, (name, state) in enumerate([("Slot A", "running"), ("Slot B", "next" if trial else "idle")]):
         colour = {"running": p.accent, "next": p.highlight, "idle": RULE}[state]
         p.fill(2, 1 + i * (seg + 1), seg, colour)
-        p.put(2, 3 + i * (seg + 1), name, NIGHT if state != "idle" else LICHEN, bold=state != "idle")
+        p.put(2, 3 + i * (seg + 1), name, ON_FILL if state != "idle" else MUTED, bold=state != "idle")
     p.menu([
         (None, [("Overview", "none", "o")]),
         ("Changes", [("Try slot B", "ready", "t"), ("Commit slot A", "todo", "c"), ("Roll back to B", "ready", "x"), ("Write to slot B", "ready", "s"), ("Reboot", "ready", "R")]),
@@ -287,24 +287,24 @@ def two_slots(p, a, b, h=5):
 
 def fork(p, bg=None):
     """A trial boot as a fork: one line in, two ways out."""
-    p.put(p.y, p.x, "reboot ─▶", LICHEN, bg)
-    p.put(p.y, p.x + 10, " slot B, once ", NIGHT, p.highlight, bold=True)
-    p.put(p.y, p.x + 25, "─┬─ starts healthy ─▶", GUTTER, bg)
-    p.put(p.y, p.x + 47, "B is kept", LEAF, bg, bold=True)
-    p.put(p.y + 1, p.x + 26, "└─ does not ──────▶", GUTTER, bg)
-    p.put(p.y + 1, p.x + 47, "back to slot A", PAPER, bg, bold=True)
+    p.put(p.y, p.x, "reboot ─▶", MUTED, bg)
+    p.put(p.y, p.x + 10, " slot B, once ", ON_FILL, p.highlight, bold=True)
+    p.put(p.y, p.x + 25, "─┬─ starts healthy ─▶", MUTED, bg)
+    p.put(p.y, p.x + 47, "B is kept", OK, bg, bold=True)
+    p.put(p.y + 1, p.x + 26, "└─ does not ──────▶", MUTED, bg)
+    p.put(p.y + 1, p.x + 47, "back to slot A", TEXT, bg, bold=True)
     p.y += 3
 
 
 def recab_pages():
     p = page("recab", "Overview", "The two slots, and one line: what boots next.", recab(0))
     p.heading(None, "Two systems, one running", "An update is written to the other slot and tried once before it is kept.")
-    two_slots(p, ("running", [("LevitateOS 1.0", PAPER), ("known-good", MOSS)], "running"), ("idle", [("the previous system", PAPER), ("last trial failed, 5 Nov", MOSS)], ""))
-    p.runs(p.y, p.x, [("Next boot  ", LICHEN), ("slot A", PAPER, True), ("      Roll back goes to  ", LICHEN), ("slot B", PAPER, True)])
+    two_slots(p, ("running", [("LevitateOS 1.0", TEXT), ("known-good", SECONDARY)], "running"), ("idle", [("the previous system", TEXT), ("last trial failed, 5 Nov", SECONDARY)], ""))
+    p.runs(p.y, p.x, [("Next boot  ", MUTED), ("slot A", TEXT, True), ("      Roll back goes to  ", MUTED), ("slot B", TEXT, True)])
 
     p = page("recab", "Overview, a trial pending", "Slot B takes the second accent everywhere at once, and the one line becomes the fork.", recab(0, trial=True))
     p.heading(None, "Slot B boots next, once", "A trial: kept if it starts healthy, undone if it does not.")
-    two_slots(p, ("running", [("LevitateOS 1.0", PAPER), ("known-good", MOSS)], "running"), ("next", [("LevitateOS 1.1", PAPER), ("written today, never booted", MOSS)], "next boot"))
+    two_slots(p, ("running", [("LevitateOS 1.0", TEXT), ("known-good", SECONDARY)], "running"), ("next", [("LevitateOS 1.1", TEXT), ("written today, never booted", SECONDARY)], "next boot"))
     fork(p)
     p.button("Reboot into the trial", key="R")
 
@@ -322,14 +322,14 @@ def recab_pages():
     fork(p)
 
     p = page("recab", "Try slot B, done", "After a change: the slots as they now are, and the bar to act on it.", recab(1, trial=True, history=" · 1"))
-    p.heading("check", "Slot B boots next, once", "Reboot to start the trial.", LEAF)
-    two_slots(p, ("running", [("stays the default", MOSS), ("stays known-good", MOSS)], "running"), ("next", [("boots once", PAPER), ("kept only if healthy", MOSS)], "next boot"))
+    p.heading("check", "Slot B boots next, once", "Reboot to start the trial.", OK)
+    two_slots(p, ("running", [("stays the default", SECONDARY), ("stays known-good", SECONDARY)], "running"), ("next", [("boots once", TEXT), ("kept only if healthy", SECONDARY)], "next boot"))
     p.button("Reboot into the trial", key="R")
 
     p = page("recab", "Roll back, refused", "A change recab would refuse says so before you press anything, with the reason on the slot it is about.", recab(3))
-    p.heading("bang", "Nothing to roll back to", "recab would refuse this now.", SALMON)
-    two_slots(p, ("running", [("committed", MOSS), ("the only known-good system", MOSS)], "running"), ("idle", [("written today, never booted", PAPER), ("not known-good", SALMON)], ""))
-    p.text("A roll back goes to a system that has already run well. Try slot B first.", MOSS)
+    p.heading("bang", "Nothing to roll back to", "recab would refuse this now.", BAD)
+    two_slots(p, ("running", [("committed", SECONDARY), ("the only known-good system", SECONDARY)], "running"), ("idle", [("written today, never booted", TEXT), ("not known-good", BAD)], ""))
+    p.text("A roll back goes to a system that has already run well. Try slot B first.", SECONDARY)
 
     p = page("recab", "Write a system, choosing", "Where the new system comes from is a choice from what is plugged in.", recab(4, keys=[("↑/↓", "select"), ("Enter", "choose"), ("Esc", "cancel")]))
     p.heading(None, "Write a new system to slot B", "Your accounts, hostname, network and services are carried over.")
@@ -340,15 +340,15 @@ def recab_pages():
             p.put(p.y, p.x, "▌", p.accent, RAISED)
             p.put(p.y + 1, p.x, "▌", p.accent, RAISED)
         bg = RAISED if chosen else None
-        p.put(p.y, p.x + 2, title, PAPER, bg, bold=chosen)
-        p.put(p.y, p.x + p.w - 2 - len(where), where, LICHEN, bg)
-        p.put(p.y + 1, p.x + 2, parts, MOSS if chosen else LICHEN, bg)
+        p.put(p.y, p.x + 2, title, TEXT, bg, bold=chosen)
+        p.put(p.y, p.x + p.w - 2 - len(where), where, MUTED, bg)
+        p.put(p.y + 1, p.x + 2, parts, SECONDARY if chosen else MUTED, bg)
         p.y += 3
 
     p = page("recab", "Write a system, the last word", "Formatting a slot asks for a typed word like every destructive step: here, the slot's letter.",
              recab(4, keys=[("B", "type it"), ("Enter", "write, once unlocked"), ("Esc", "cancel")]))
-    p.heading(None, "Write over slot B?", "The previous system in it is gone, and with it the roll back.", SALMON)
-    two_slots(p, ("running", [("untouched", MOSS), ("keeps running", MOSS)], "running"), ("idle", [("erased", SALMON), ("then LevitateOS 1.1", PAPER)], "formatted"))
+    p.heading(None, "Write over slot B?", "The previous system in it is gone, and with it the roll back.", BAD)
+    two_slots(p, ("running", [("untouched", SECONDARY), ("keeps running", SECONDARY)], "running"), ("idle", [("erased", BAD), ("then LevitateOS 1.1", TEXT)], "formatted"))
     p.wordslots("B", "")
 
     p = page("recab", "Write a system, running", "The same figure and bar as the install's copy.", recab(4, keys=[("q", "wait for it")], right="writing slot B"))
@@ -367,8 +367,8 @@ def recab_pages():
                 ("14:01:48", "failed", "Roll back refused", "slot B had never been known-good")])
 
     p = page("recab", "No A/B here", "A system with one root has no slots: one block instead of two, and why.", recab(0, right="no slots"))
-    p.heading("bang", "This system has one root", "It was installed as mutable: there are no slots to manage.", SALMON)
-    p.slotbox(p.x, p.y, p.w, 5, "root", [("one system, changed in place", PAPER), ("updates cannot be tried first or rolled back", MOSS)], "running", "idle")
+    p.heading("bang", "This system has one root", "It was installed as mutable: there are no slots to manage.", BAD)
+    p.slotbox(p.x, p.y, p.w, 5, "root", [("one system, changed in place", TEXT), ("updates cannot be tried first or rolled back", SECONDARY)], "running", "idle")
     p.note("Installed as A/B? Then /boot may not be mounted.")
 
 
@@ -388,16 +388,16 @@ def guide(selected, cols=100, rows=28, distro="levitate", brand=True, rail=30):
 
 def numbered(p, n, title):
     p.put(p.y, p.x, str(n), p.accent, bold=True)
-    p.put(p.y, p.x + len(str(n)) + 2, title, PAPER, bold=True)
+    p.put(p.y, p.x + len(str(n)) + 2, title, TEXT, bold=True)
     p.y += 1
 
 
 def command(p, text, selected=False, width=None):
     width = width or p.w
-    bg = p.accent if selected else INK
+    bg = p.accent if selected else SURFACE
     p.fill(p.y, p.x, width, bg)
-    p.put(p.y, p.x + 2, "$", NIGHT if selected else p.accent, bg, bold=True)
-    p.put(p.y, p.x + 4, text, NIGHT if selected else p.highlight, bg, bold=selected)
+    p.put(p.y, p.x + 2, "$", ON_FILL if selected else p.accent, bg, bold=True)
+    p.put(p.y, p.x + 4, text, ON_FILL if selected else p.highlight, bg, bold=selected)
     p.y += 1
 
 
@@ -405,10 +405,10 @@ def guide_pages():
     p = page("guide", "A guide page", "A page for reading: a narrow measure and numbered steps. The selected command is the bar; one key copies it.", guide(2))
     p.heading(3, "Disk Preparation", "Installation steps 1-5.")
     saved, p.w = p.w, 52
-    p.text("disk-plan does these five steps for you and shows every command first. This page is the same steps by hand.", MOSS)
+    p.text("disk-plan does these five steps for you and shows every command first. This page is the same steps by hand.", SECONDARY)
     p.gap()
     numbered(p, 2, "Identify Target Disk")
-    p.text("List the disks and find the one to install on.", MOSS)
+    p.text("List the disks and find the one to install on.", SECONDARY)
     p.gap()
     command(p, "lsblk -o NAME,SIZE,MODEL,TRAN", selected=True)
     p.gap()
@@ -436,12 +436,12 @@ def install_screen(distro="levitate"):
     right = guide(3, half, rows - 1, distro, brand=False, rail=28)
     right.heading(4, "Base System", "Installation steps 6-9.")
     numbered(right, 6, "Verify Installation Media")
-    right.text("The live media is already mounted. Check the system image is there:", MOSS)
+    right.text("The live media is already mounted. Check the system image is there:", SECONDARY)
     right.gap()
     command(right, "ls -la /run/live-rootfs.erofs")
     right.gap()
     numbered(right, 7, "Extract Base System")
-    right.text("Use recstrap to extract the system image to your mounted root:", MOSS)
+    right.text("Use recstrap to extract the system image to your mounted root:", SECONDARY)
     right.gap()
     command(right, "recstrap /mnt")
     right.gap()
@@ -451,11 +451,11 @@ def install_screen(distro="levitate"):
     whole = Page(cols, rows, distro, rail=0)
     for r in range(rows - 1):
         whole.grid[r] = left.grid[r] + right.grid[r]
-    whole.fill(rows - 1, 0, cols, INK)
+    whole.fill(rows - 1, 0, cols, SURFACE)
     col = cols - 40
     for key, label in [("Ctrl-]", "other pane"), ("Ctrl-q", "quit")]:
-        col = whole.put(rows - 1, col, f" {key} ", PAPER, RULE, bold=True)
-        col = whole.put(rows - 1, col + 1, label, LICHEN, INK) + 3
+        col = whole.put(rows - 1, col, f" {key} ", TEXT, RULE, bold=True)
+        col = whole.put(rows - 1, col + 1, label, MUTED, SURFACE) + 3
     return whole
 
 

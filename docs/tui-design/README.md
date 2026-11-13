@@ -9,9 +9,10 @@ python3 build.py /tmp/design-board.html   # the board: the rules, then all 54 pa
 python3 check.py all pages_system         # the same pages as plain text
 ```
 
-`kit.py` is the parts, `pages_install.py` and `pages_system.py` are the pages. A page is
-built only from the kit's parts, which is what keeps the pages alike. Every value in a
-mock-up is sample data.
+`kit.py` is the parts (and the palettes, read from the variants' `distro.toml`),
+`pages_install.py` and `pages_system.py` are the pages. A page is built only from the
+kit's parts, which is what keeps the pages alike. Every value in a mock-up is sample data.
+The pages are LevitateOS's (light), except the two marked AcornOS (dark).
 
 ## The rules
 
@@ -30,7 +31,12 @@ mock-up is sample data.
 8. **Few labels, short sentences.** A title and one line; small capitals only as table
    headers.
 9. **One ending.** The tick, the thing made, the bar to the next step.
-10. **Two brands.** Only the band, the accent and the second accent differ.
+10. **Two brands.** LevitateOS starts in light mode, AcornOS in dark, each in its own whole
+    palette: the mode (`profile.appearance`) and the colours of that mode (`[look.light]`,
+    `[look.dark]`) come from the variant's `distro/variants/<id>/distro.toml`, and `kit.py` reads
+    them from there. A page is drawn in roles (surface, text, accent, ...), never in colours,
+    so the two brands differ in mode and every colour but in no part. Text on a filled
+    accent, second accent or status colour is the surface colour, which contrasts in both modes.
 
 The design went through three passes: one frame for everything, then a picture for each
 page, then balance: taking out what competed with the picture.

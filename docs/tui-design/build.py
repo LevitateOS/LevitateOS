@@ -22,7 +22,7 @@ RULES = [
     ("Destructive steps ask for a word", "Writing a disk asks for DESTROY, formatting a slot for its letter, a cell a letter."),
     ("Few labels, short sentences", "A page has a title and one line under it. Small capitals are used where a table needs a header, not to announce each block."),
     ("One ending", "Every app ends the same way: the tick, the thing it made, and the bar to the next step."),
-    ("Two brands", "LevitateOS is pine and sage, AcornOS acorn brown and sand. Only the band, the accent and the second accent change."),
+    ("Two brands", "LevitateOS starts in light mode, in paper and pine; AcornOS in dark mode, in acorn brown and sand. Each variant declares its mode and its whole palette in its distro.toml, and the mock-ups read them from there: the brands differ in mode and every colour, never in a part."),
 ]
 
 
