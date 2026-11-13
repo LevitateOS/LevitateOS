@@ -81,7 +81,8 @@ Details and paths are in [desktop-theming.md](desktop-theming.md).
   each user's `kdedefaults` ahead of `/etc/xdg`. Until our own Global Theme
   replaces them. Written, unbuilt.
 - [x] **L** Konsole: `LevitateOSLight` / `LevitateOSDark` terminal schemes and a
-  default profile (`/etc/xdg/konsolerc`) in the starting mode's. Written,
+  default profile (`/etc/xdg/konsolerc`) in the dark one (a terminal is dark
+  on both distros, whatever the desktop's mode). Written,
   unbuilt.
 - [ ] **L** A launcher icon that follows a light or dark panel
   (`distributor-logo-levitateos-symbolic`); approved, to be drawn and
@@ -117,7 +118,8 @@ Details and paths are in [desktop-theming.md](desktop-theming.md).
   Adwaita, dark (`gtk-application-prefer-dark-theme`) when the mode is,
   Breeze icons of the mode, the Adwaita cursor and Sans 11. Written, unbuilt.
 - [x] **A** QTerminal: `AcornOSLight` / `AcornOSDark` schemes and the default
-  (`/etc/xdg/qterminal.org/qterminal.ini`) in the starting mode's. Written,
+  (`/etc/xdg/qterminal.org/qterminal.ini`) in the dark one (a terminal is
+  dark on both distros, whatever the desktop's mode). Written,
   unbuilt.
 - [ ] **A** Login screen: add the acorn lockup to the Maldives-based
   theme that is there now (decision 9).
