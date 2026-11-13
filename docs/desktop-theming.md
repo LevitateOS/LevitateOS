@@ -11,11 +11,14 @@ and file that sets it, then lists what LevitateOS and AcornOS ship in its place.
   `-paper` for dark). The identity kit (`docs/website/design/field-notes-v3/`)
   says to use them as supplied: never generate a new mark, and never add
   texture, glow or a wordmark to a small launcher icon.
-- **Colours** come from `docs/website/src/styles/field-notes/tokens.json`:
-  paper `#F2EEE4`, ink `#14221A`, pine `#214438` (Levitate), acorn brown
-  `#644532`, red `#B22F27` (one primary action), night surface `#14221A`, night
-  Levitate `#C7D9BA`, night Acorn `#E4CBA6`. Each variant's `distro.toml`
-  carries them as two palettes, `[look.light]` and `[look.dark]` (surface,
+- **Colours** are declared in each variant's `distro.toml`: ink `#14221A`,
+  pine `#214438` (Levitate), acorn brown `#644532`, night surface `#14221A`,
+  night Levitate `#C7D9BA`, night Acorn `#E4CBA6`. The light surfaces are sage
+  paper `#DDE2D2` on LevitateOS and parchment `#E6DFCF` on AcornOS (2026-11-13:
+  the earlier near-white paper `#F2EEE4` was rejected as too white; it remains
+  only as the colour of text on dark bands and on the red action). The site
+  keeps its own red `#B22F27` for the one primary action. Each `distro.toml`
+  carries the colours as two palettes, `[look.light]` and `[look.dark]` (surface,
   raised and sunken surface, text in three strengths, rule, hairline, accent,
   highlight, band and its text, ok, warn, bad).
 - **Mode** (decision 1 in [desktop-todo.md](desktop-todo.md), 2026-11-13):

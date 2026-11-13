@@ -334,7 +334,7 @@ Only the outer ring of this image is used on the page: a band about 154 px wide 
 - The material fills the whole band on every side, with the lit inner lip (where the surround steps down to the opening) about 130 to 150 px in from each edge.
 - The four corner squares carry the richest detail.
 - Along each side, between the corners, the material runs uniform lengthwise: straight lines, grain or layers parallel to the edge, with no single leaf, knot, object or spot there (it would be smeared when stretched).
-- The opening is one flat, even, plain warm off-white (#F2EEE4), with nothing in it. A live web page panel covers it.
+- The opening is one flat, even, plain pale sage (#DDE2D2), with nothing in it. A live web page panel covers it.
 
 No text, no logo, no controls anywhere.
 ```
@@ -370,7 +370,7 @@ Only the outer ring of this image is used on the page: a band about 154 px wide 
 - The material fills the whole band on every side, with the lit inner lip (where the surround steps down to the opening) about 130 to 150 px in from each edge.
 - The four corner squares carry the richest detail.
 - Along each side, between the corners, the material runs uniform lengthwise: straight lines, grain or layers parallel to the edge, with no single leaf, knot, object or spot there (it would be smeared when stretched).
-- The opening is one flat, even, plain warm off-white (#F2EEE4), with nothing in it. A live web page panel covers it.
+- The opening is one flat, even, plain pale sage (#DDE2D2), with nothing in it. A live web page panel covers it.
 
 No text, no logo, no controls anywhere.
 ```
@@ -406,7 +406,7 @@ Only the outer ring of this image is used on the page: a band about 154 px wide 
 - The material fills the whole band on every side, with the lit inner lip (where the surround steps down to the opening) about 130 to 150 px in from each edge.
 - The four corner squares carry the richest detail.
 - Along each side, between the corners, the material runs uniform lengthwise: straight lines, grain or layers parallel to the edge, with no single leaf, knot, object or spot there (it would be smeared when stretched).
-- The opening is one flat, even, plain warm off-white (#F2EEE4), with nothing in it. A live web page panel covers it.
+- The opening is one flat, even, plain pale sage (#DDE2D2), with nothing in it. A live web page panel covers it.
 
 No text, no logo, no controls anywhere.
 ```
@@ -442,7 +442,7 @@ Only the outer ring of this image is used on the page: a band about 154 px wide 
 - The material fills the whole band on every side, with the lit inner lip (where the surround steps down to the opening) about 130 to 150 px in from each edge.
 - The four corner squares carry the richest detail.
 - Along each side, between the corners, the material runs uniform lengthwise: straight lines, grain or layers parallel to the edge, with no single leaf, knot, object or spot there (it would be smeared when stretched).
-- The opening is one flat, even, plain warm off-white (#F2EEE4), with nothing in it. A live web page panel covers it.
+- The opening is one flat, even, plain pale sage (#DDE2D2), with nothing in it. A live web page panel covers it.
 
 No text, no logo, no controls anywhere.
 ```
@@ -478,7 +478,7 @@ Only the outer ring of this image is used on the page: a band about 154 px wide 
 - The material fills the whole band on every side, with the lit inner lip (where the surround steps down to the opening) about 130 to 150 px in from each edge.
 - The four corner squares carry the richest detail.
 - Along each side, between the corners, the material runs uniform lengthwise: straight lines, grain or layers parallel to the edge, with no single leaf, knot, object or spot there (it would be smeared when stretched).
-- The opening is one flat, even, plain warm off-white (#F2EEE4), with nothing in it. A live web page panel covers it.
+- The opening is one flat, even, plain pale sage (#DDE2D2), with nothing in it. A live web page panel covers it.
 
 No text, no logo, no controls anywhere.
 ```
@@ -514,7 +514,7 @@ Only the outer ring of this image is used on the page: a band about 154 px wide 
 - The material fills the whole band on every side, with the lit inner lip (where the surround steps down to the opening) about 130 to 150 px in from each edge.
 - The four corner squares carry the richest detail.
 - Along each side, between the corners, the material runs uniform lengthwise: straight lines, grain or layers parallel to the edge, with no single leaf, knot, object or spot there (it would be smeared when stretched).
-- The opening is one flat, even, plain warm off-white (#F2EEE4), with nothing in it. A live web page panel covers it.
+- The opening is one flat, even, plain pale sage (#DDE2D2), with nothing in it. A live web page panel covers it.
 
 No text, no logo, no controls anywhere.
 ```
@@ -544,7 +544,7 @@ Feel: intimidating competence expressed through warmth, weight and exactness. Su
 
 Colour: a narrow range of greens from near-black pine through pine (#214438) to pale sage (#C7D9BA) on the lit edges, plus warm amber light and one small lacquer red (#B22F27) detail. Nothing else.
 
-Format: a wide landscape image, exactly 1536 x 806 (it is cropped to 1200 x 630 for link previews). A flat, straight-on, front-facing rectangular surround with a plain rectangular opening in the middle, seen head-on, filling the image to all four edges. The surround is about 110 px thick at top and bottom and about 130 px at left and right; its richest detail is in the corners. The opening is one flat, even, plain warm off-white (#F2EEE4) with nothing in it: the wordmark and one line of text are added there afterwards, so it must stay completely empty and evenly coloured.
+Format: a wide landscape image, exactly 1536 x 806 (it is cropped to 1200 x 630 for link previews). A flat, straight-on, front-facing rectangular surround with a plain rectangular opening in the middle, seen head-on, filling the image to all four edges. The surround is about 110 px thick at top and bottom and about 130 px at left and right; its richest detail is in the corners. The opening is one flat, even, plain pale sage (#DDE2D2) with nothing in it: the wordmark and one line of text are added there afterwards, so it must stay completely empty and evenly coloured.
 
 No text, no logo, no controls anywhere.
 ```

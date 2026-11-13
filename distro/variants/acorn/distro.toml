@@ -33,20 +33,20 @@ appearance = "dark"
 # each mode. The terminal apps, the desktop look and the website all take them
 # from here.
 [look.light]
-surface = "#F2EEE4"
-surface_raised = "#FCFAF5"
-surface_sunken = "#E9E1D3"
+surface = "#E6DFCF"
+surface_raised = "#EFE9DB"
+surface_sunken = "#D9D1BE"
 text = "#241A12"
-text_secondary = "#6A5D50"
-text_muted = "#766859"
-rule = "#CFC3B2"
-hairline = "#DED5C6"
+text_secondary = "#54483C"
+text_muted = "#6B5D4F"
+rule = "#C2B8A2"
+hairline = "#D0C7B3"
 accent = "#644532"
 highlight = "#214438"
 band = "#644532"
 on_band = "#F2EEE4"
 ok = "#2F6B3F"
-warn = "#8A5A00"
+warn = "#7F5200"
 bad = "#B22F27"
 
 [look.dark]
