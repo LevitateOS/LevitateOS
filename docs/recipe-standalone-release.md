@@ -59,6 +59,8 @@ run under Ginux or published:
   cached image, unpacking it instead", which still needs a look. The APK (no
   Alpine run; needs the static recipe), the AUR files and the Void template are
   checked by reading them only.
+- 2026-11-13: whether Ginux should wrap whole recipe runs is open; see
+  `docs/recipe-ginux-boundary.md`.
 - Next: the
   rename to `recipe-pm`; the window's packaging; mark OS-only recipes.
 
