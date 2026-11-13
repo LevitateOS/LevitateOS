@@ -22,7 +22,9 @@ and file that sets it, then lists what LevitateOS and AcornOS ship in its place.
   raised and sunken surface, text in three strengths, rule, hairline, accent,
   highlight, band and its text, ok, warn, bad).
 - **Mode** (decision 1 in [desktop-todo.md](desktop-todo.md), 2026-11-13):
-  LevitateOS starts light, AcornOS starts dark (`profile.appearance`, which
+  both distros start dark, LevitateOS in its green and AcornOS in its brown
+  (the light LevitateOS start of earlier that day was withdrawn the same
+  day; a light palette stays for those who switch) (`profile.appearance`, which
   reaches the image as `REC_APPEARANCE` in os-release). The builder gives the
   desktop system recipe both palettes as its `look` input (one
   `<mode>.<role>=#RRGGBB` line each, part of the configured tree's key), and

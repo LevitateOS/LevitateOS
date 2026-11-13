@@ -2,13 +2,14 @@
 
 Fourteen images for the website: six frames and one link preview background
 for AcornOS, and the same seven for LevitateOS. The site shows LevitateOS pages
-light (paper and pine green) and AcornOS pages dark (deep brown and sand), so
-each distro needs its own set. Today both use the one green set in
-`docs/website/public/art/`, which is why AcornOS pages still show green frames.
+dark green (pine and sage) and AcornOS pages dark brown (walnut and sand), so
+each distro has its own set: LevitateOS's in `docs/website/public/art/`,
+AcornOS's in `docs/website/public/art/acorn/`.
 
-**AcornOS comes first: its seven are the ones that are missing.** LevitateOS
-already has six frames that fit its light pages; its prompts are here so you
-can regenerate a matching set if you want one, and for its link preview.
+**AcornOS comes first.** Its seven were generated from these prompts on
+2026-11-13 and are in use. LevitateOS already has six frames and a link
+preview; its prompts are here so you can regenerate a matching set if you want
+one.
 
 Each assignment is **standalone** and comes in two parts, as in
 `docs/desktop-art-brief.md`:
@@ -324,7 +325,7 @@ Material: dark pine-green stone and blackened green metal.
 
 Light: Warm amber light grazes the inner left and lower edges of the opening, as if the page inside were lit from the upper right.
 
-Feel: intimidating competence expressed through warmth, weight and exactness. Substantial material planes, precise asymmetric bevels, deep shadow cuts. The page it surrounds is light paper, so the surround is dark and heavy against it.
+Feel: intimidating competence expressed through warmth, weight and exactness. Substantial material planes, precise asymmetric bevels, deep shadow cuts. The page around and inside it is a very dark pine green (#14221A), so the surround must stand out from it: lit edges, visible relief and mid-tone greens, never a near-black frame that disappears into the page.
 
 Colour: a narrow range of greens from near-black pine through pine (#214438) to pale sage (#C7D9BA) on the lit edges, plus warm amber light and one small lacquer red (#B22F27) detail. Nothing else.
 
@@ -334,7 +335,7 @@ Only the outer ring of this image is used on the page: a band about 154 px wide 
 - The material fills the whole band on every side, with the lit inner lip (where the surround steps down to the opening) about 130 to 150 px in from each edge.
 - The four corner squares carry the richest detail.
 - Along each side, between the corners, the material runs uniform lengthwise: straight lines, grain or layers parallel to the edge, with no single leaf, knot, object or spot there (it would be smeared when stretched).
-- The opening is one flat, even, plain pale sage (#DDE2D2), with nothing in it. A live web page panel covers it.
+- The opening is one flat, even, plain very dark pine green (#14221A), with nothing in it. A live web page panel covers it.
 
 No text, no logo, no controls anywhere.
 ```
@@ -360,7 +361,7 @@ Material: dark pine-green stone and blackened green metal.
 
 Light: Warm amber light grazes the inner left and lower edges of the opening, as if the page inside were lit from the upper right.
 
-Feel: intimidating competence expressed through warmth, weight and exactness. Substantial material planes, precise asymmetric bevels, deep shadow cuts. The page it surrounds is light paper, so the surround is dark and heavy against it.
+Feel: intimidating competence expressed through warmth, weight and exactness. Substantial material planes, precise asymmetric bevels, deep shadow cuts. The page around and inside it is a very dark pine green (#14221A), so the surround must stand out from it: lit edges, visible relief and mid-tone greens, never a near-black frame that disappears into the page.
 
 Colour: a narrow range of greens from near-black pine through pine (#214438) to pale sage (#C7D9BA) on the lit edges, plus warm amber light and one small lacquer red (#B22F27) detail. Nothing else.
 
@@ -370,7 +371,7 @@ Only the outer ring of this image is used on the page: a band about 154 px wide 
 - The material fills the whole band on every side, with the lit inner lip (where the surround steps down to the opening) about 130 to 150 px in from each edge.
 - The four corner squares carry the richest detail.
 - Along each side, between the corners, the material runs uniform lengthwise: straight lines, grain or layers parallel to the edge, with no single leaf, knot, object or spot there (it would be smeared when stretched).
-- The opening is one flat, even, plain pale sage (#DDE2D2), with nothing in it. A live web page panel covers it.
+- The opening is one flat, even, plain very dark pine green (#14221A), with nothing in it. A live web page panel covers it.
 
 No text, no logo, no controls anywhere.
 ```
@@ -396,7 +397,7 @@ Material: dark pine-green stone and blackened green metal.
 
 Light: Warm amber light grazes the inner left and lower edges of the opening, as if the page inside were lit from the upper right.
 
-Feel: intimidating competence expressed through warmth, weight and exactness. Substantial material planes, precise asymmetric bevels, deep shadow cuts. The page it surrounds is light paper, so the surround is dark and heavy against it.
+Feel: intimidating competence expressed through warmth, weight and exactness. Substantial material planes, precise asymmetric bevels, deep shadow cuts. The page around and inside it is a very dark pine green (#14221A), so the surround must stand out from it: lit edges, visible relief and mid-tone greens, never a near-black frame that disappears into the page.
 
 Colour: a narrow range of greens from near-black pine through pine (#214438) to pale sage (#C7D9BA) on the lit edges, plus warm amber light and one small lacquer red (#B22F27) detail. Nothing else.
 
@@ -406,7 +407,7 @@ Only the outer ring of this image is used on the page: a band about 154 px wide 
 - The material fills the whole band on every side, with the lit inner lip (where the surround steps down to the opening) about 130 to 150 px in from each edge.
 - The four corner squares carry the richest detail.
 - Along each side, between the corners, the material runs uniform lengthwise: straight lines, grain or layers parallel to the edge, with no single leaf, knot, object or spot there (it would be smeared when stretched).
-- The opening is one flat, even, plain pale sage (#DDE2D2), with nothing in it. A live web page panel covers it.
+- The opening is one flat, even, plain very dark pine green (#14221A), with nothing in it. A live web page panel covers it.
 
 No text, no logo, no controls anywhere.
 ```
@@ -432,7 +433,7 @@ Material: dark pine-green stone and blackened green metal.
 
 Light: Warm amber light grazes the inner left and lower edges of the opening, as if the page inside were lit from the upper right.
 
-Feel: intimidating competence expressed through warmth, weight and exactness. Substantial material planes, precise asymmetric bevels, deep shadow cuts. The page it surrounds is light paper, so the surround is dark and heavy against it.
+Feel: intimidating competence expressed through warmth, weight and exactness. Substantial material planes, precise asymmetric bevels, deep shadow cuts. The page around and inside it is a very dark pine green (#14221A), so the surround must stand out from it: lit edges, visible relief and mid-tone greens, never a near-black frame that disappears into the page.
 
 Colour: a narrow range of greens from near-black pine through pine (#214438) to pale sage (#C7D9BA) on the lit edges, plus warm amber light and one small lacquer red (#B22F27) detail. Nothing else.
 
@@ -442,7 +443,7 @@ Only the outer ring of this image is used on the page: a band about 154 px wide 
 - The material fills the whole band on every side, with the lit inner lip (where the surround steps down to the opening) about 130 to 150 px in from each edge.
 - The four corner squares carry the richest detail.
 - Along each side, between the corners, the material runs uniform lengthwise: straight lines, grain or layers parallel to the edge, with no single leaf, knot, object or spot there (it would be smeared when stretched).
-- The opening is one flat, even, plain pale sage (#DDE2D2), with nothing in it. A live web page panel covers it.
+- The opening is one flat, even, plain very dark pine green (#14221A), with nothing in it. A live web page panel covers it.
 
 No text, no logo, no controls anywhere.
 ```
@@ -468,7 +469,7 @@ Material: dark pine-green stone and blackened green metal.
 
 Light: Warm amber light grazes the inner left and lower edges of the opening, as if the page inside were lit from the upper right.
 
-Feel: intimidating competence expressed through warmth, weight and exactness. Substantial material planes, precise asymmetric bevels, deep shadow cuts. The page it surrounds is light paper, so the surround is dark and heavy against it.
+Feel: intimidating competence expressed through warmth, weight and exactness. Substantial material planes, precise asymmetric bevels, deep shadow cuts. The page around and inside it is a very dark pine green (#14221A), so the surround must stand out from it: lit edges, visible relief and mid-tone greens, never a near-black frame that disappears into the page.
 
 Colour: a narrow range of greens from near-black pine through pine (#214438) to pale sage (#C7D9BA) on the lit edges, plus warm amber light and one small lacquer red (#B22F27) detail. Nothing else.
 
@@ -478,7 +479,7 @@ Only the outer ring of this image is used on the page: a band about 154 px wide 
 - The material fills the whole band on every side, with the lit inner lip (where the surround steps down to the opening) about 130 to 150 px in from each edge.
 - The four corner squares carry the richest detail.
 - Along each side, between the corners, the material runs uniform lengthwise: straight lines, grain or layers parallel to the edge, with no single leaf, knot, object or spot there (it would be smeared when stretched).
-- The opening is one flat, even, plain pale sage (#DDE2D2), with nothing in it. A live web page panel covers it.
+- The opening is one flat, even, plain very dark pine green (#14221A), with nothing in it. A live web page panel covers it.
 
 No text, no logo, no controls anywhere.
 ```
@@ -504,7 +505,7 @@ Material: dark pine-green stone and blackened green metal.
 
 Light: Warm amber light grazes the inner left and lower edges of the opening, as if the page inside were lit from the upper right.
 
-Feel: intimidating competence expressed through warmth, weight and exactness. Substantial material planes, precise asymmetric bevels, deep shadow cuts. The page it surrounds is light paper, so the surround is dark and heavy against it.
+Feel: intimidating competence expressed through warmth, weight and exactness. Substantial material planes, precise asymmetric bevels, deep shadow cuts. The page around and inside it is a very dark pine green (#14221A), so the surround must stand out from it: lit edges, visible relief and mid-tone greens, never a near-black frame that disappears into the page.
 
 Colour: a narrow range of greens from near-black pine through pine (#214438) to pale sage (#C7D9BA) on the lit edges, plus warm amber light and one small lacquer red (#B22F27) detail. Nothing else.
 
@@ -514,7 +515,7 @@ Only the outer ring of this image is used on the page: a band about 154 px wide 
 - The material fills the whole band on every side, with the lit inner lip (where the surround steps down to the opening) about 130 to 150 px in from each edge.
 - The four corner squares carry the richest detail.
 - Along each side, between the corners, the material runs uniform lengthwise: straight lines, grain or layers parallel to the edge, with no single leaf, knot, object or spot there (it would be smeared when stretched).
-- The opening is one flat, even, plain pale sage (#DDE2D2), with nothing in it. A live web page panel covers it.
+- The opening is one flat, even, plain very dark pine green (#14221A), with nothing in it. A live web page panel covers it.
 
 No text, no logo, no controls anywhere.
 ```
@@ -540,11 +541,11 @@ Material: dark pine-green stone and blackened green metal.
 
 Light: Warm amber light grazes the inner left and lower edges of the opening, as if the page inside were lit from the upper right.
 
-Feel: intimidating competence expressed through warmth, weight and exactness. Substantial material planes, precise asymmetric bevels, deep shadow cuts. The page it surrounds is light paper, so the surround is dark and heavy against it.
+Feel: intimidating competence expressed through warmth, weight and exactness. Substantial material planes, precise asymmetric bevels, deep shadow cuts. The page around and inside it is a very dark pine green (#14221A), so the surround must stand out from it: lit edges, visible relief and mid-tone greens, never a near-black frame that disappears into the page.
 
 Colour: a narrow range of greens from near-black pine through pine (#214438) to pale sage (#C7D9BA) on the lit edges, plus warm amber light and one small lacquer red (#B22F27) detail. Nothing else.
 
-Format: a wide landscape image, exactly 1536 x 806 (it is cropped to 1200 x 630 for link previews). A flat, straight-on, front-facing rectangular surround with a plain rectangular opening in the middle, seen head-on, filling the image to all four edges. The surround is about 110 px thick at top and bottom and about 130 px at left and right; its richest detail is in the corners. The opening is one flat, even, plain pale sage (#DDE2D2) with nothing in it: the wordmark and one line of text are added there afterwards, so it must stay completely empty and evenly coloured.
+Format: a wide landscape image, exactly 1536 x 806 (it is cropped to 1200 x 630 for link previews). A flat, straight-on, front-facing rectangular surround with a plain rectangular opening in the middle, seen head-on, filling the image to all four edges. The surround is about 110 px thick at top and bottom and about 130 px at left and right; its richest detail is in the corners. The opening is one flat, even, plain very dark pine green (#14221A) with nothing in it: the wordmark and one line of text are added there afterwards, so it must stay completely empty and evenly coloured.
 
 No text, no logo, no controls anywhere.
 ```

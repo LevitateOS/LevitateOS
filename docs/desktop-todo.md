@@ -73,7 +73,7 @@ Details and paths are in [desktop-theming.md](desktop-theming.md).
   from the two palettes (window, view, button, selection, tooltip,
   complementary, header, title bar groups; the band for headers and title
   bars). Written, unbuilt.
-- [x] **L** `/etc/xdg/kdeglobals`: the starting mode's scheme (light on
+- [x] **L** `/etc/xdg/kdeglobals`: the starting mode's scheme (dark on
   LevitateOS) with its colours, Fedora's Global Theme of that mode
   (`org.fedoraproject.fedoralight.desktop` / `fedoradark`), Breeze icons of
   that mode, no accent from the wallpaper. Fedora's light and dark Global
@@ -418,8 +418,10 @@ The items above that needed a decision follow these; the marks are updated as ea
 is carried out.
 
 1. **Look** (2026-11-13, replaces "LevitateOS starts dark, AcornOS starts
-   light"): LevitateOS starts in light mode, AcornOS in dark mode, each in its
-   own brand colours everywhere. Declared in each `distro.toml` as
+   light"): both distros start in dark mode, each in its own brand colours
+   everywhere: LevitateOS in dark green, AcornOS in dark brown. (A light
+   LevitateOS start was tried the same day and withdrawn; each distro keeps a
+   light palette for those who switch.) Declared in each `distro.toml` as
    `profile.appearance` and the `[look.light]` / `[look.dark]` palettes.
 2. **Same features on both desktops:** AcornOS's desktop does everything
    LevitateOS's does, on its own stack (musl, OpenRC, LXQt, X11); only the

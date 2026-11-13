@@ -28,7 +28,7 @@ libc = "glibc"
 privilege = "sudo"
 desktop = "plasma"
 kernel_line = "latest"
-appearance = "light"
+appearance = "dark"
 
 # The mode the distro starts in is `profile.appearance`; these are its colours in
 # each mode. The terminal apps, the desktop look and the website all take them
