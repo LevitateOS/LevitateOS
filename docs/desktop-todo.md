@@ -165,7 +165,12 @@ Details and paths are in [desktop-theming.md](desktop-theming.md).
 - [x] The X server is XLibre compiled from source (decision 14), in place of
   Alpine's `xorg-server` and `xf86-input-libinput`; its run-time libraries,
   `xkbcomp`, the keymaps and the cursor and misc fonts are listed in the
-  desktop packages by hand. Not yet started on a running desktop.
+  desktop packages by hand. Compiled on 2026-11-13 (`cargo xtask prebuilt
+  build display-server acorn`, about 20 minutes with the build root, one
+  compile job): the tree has the server, the setuid wrapper, the modesetting
+  and libinput drivers under `xlibre-25`, and every library they need is in
+  the desktop lock. Not yet started on a running desktop. SDDM passes
+  `-noreset`, which XLibre no longer has: it logs a line and carries on.
 
 - [x] `udisks2` and `gvfs` are in the lock: the removable-media button and
   pcmanfm-qt mount drives, with trash. (`gvfs-smb` / `gvfs-nfs` for network
