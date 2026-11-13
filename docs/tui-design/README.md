@@ -31,12 +31,13 @@ The pages are LevitateOS's (light), except the two marked AcornOS (dark).
 8. **Few labels, short sentences.** A title and one line; small capitals only as table
    headers.
 9. **One ending.** The tick, the thing made, the bar to the next step.
-10. **Two brands.** LevitateOS starts in light mode, AcornOS in dark, each in its own whole
-    palette: the mode (`profile.appearance`) and the colours of that mode (`[look.light]`,
-    `[look.dark]`) come from the variant's `distro/variants/<id>/distro.toml`, and `kit.py` reads
-    them from there. A page is drawn in roles (surface, text, accent, ...), never in colours,
-    so the two brands differ in mode and every colour but in no part. Text on a filled
-    accent, second accent or status colour is the surface colour, which contrasts in both modes.
+10. **Two brands.** LevitateOS and AcornOS differ in their whole dark palette, taken from
+    the `[look.dark]` table of the variant's `distro/variants/<id>/distro.toml`, which
+    `kit.py` reads. Terminal apps are dark on both distros (a light terminal app is
+    unnatural); the mode a distro starts in is for its desktop and website. A page is drawn
+    in roles (surface, text, accent, ...), never in colours, so the two brands differ in
+    every colour but in no part. Text on a filled accent, second accent or status colour is
+    the surface colour, which contrasts with each of them.
 
 The design went through three passes: one frame for everything, then a picture for each
 page, then balance: taking out what competed with the picture.

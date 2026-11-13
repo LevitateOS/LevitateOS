@@ -6,17 +6,16 @@ import re
 import tomllib
 
 # ---- Colours: roles, not colours. A page is drawn in roles (SURFACE, TEXT, ACCENT, ...) and
-# takes the colours of its distro's palette: the mode the variant starts in
-# (`profile.appearance`) and that mode's `[look.<mode>]` table, both read from
-# distro/variants/<id>/distro.toml, the same declaration the terminal apps use. The
-# distros differ in mode and in every colour, never in a role.
+# takes the colours of its distro's dark palette: the `[look.dark]` table read from
+# distro/variants/<id>/distro.toml, the same declaration the terminal apps use (terminal
+# apps are dark on both distros). The distros differ in every colour, never in a role.
 SURFACE, RAISED, SUNKEN = "@surface", "@surface_raised", "@surface_sunken"
 TEXT, SECONDARY, MUTED = "@text", "@text_secondary", "@text_muted"
 RULE, HAIRLINE = "@rule", "@hairline"
 ACCENT, HIGHLIGHT, BAND, ON_BAND = "@accent", "@highlight", "@band", "@on_band"
 OK, WARN, BAD = "@ok", "@warn", "@bad"
 # Text on a filled accent, second accent or status colour: the surface colour, which
-# contrasts with each of them in both modes.
+# contrasts with each of them.
 ON_FILL = SURFACE
 ROLES = [r[1:] for r in (SURFACE, RAISED, SUNKEN, TEXT, SECONDARY, MUTED, RULE, HAIRLINE, ACCENT, HIGHLIGHT, BAND, ON_BAND, OK, WARN, BAD)]
 
@@ -24,15 +23,14 @@ VARIANTS = pathlib.Path(__file__).resolve().parents[2] / "distro" / "variants"
 
 
 def load_brand(distro):
-    """A distro's name, starting mode and palette, from its distro.toml."""
+    """A distro's name and dark palette, from its distro.toml."""
     with open(VARIANTS / distro / "distro.toml", "rb") as f:
         spec = tomllib.load(f)
-    mode = spec["profile"]["appearance"]
-    palette = spec["look"][mode]
+    palette = spec["look"]["dark"]
     missing = [r for r in ROLES if r not in palette]
     if missing:
-        raise SystemExit(f"{distro}/distro.toml [look.{mode}] lacks {', '.join(missing)}")
-    return {"name": spec["identity"]["os_name"], "appearance": mode,
+        raise SystemExit(f"{distro}/distro.toml [look.dark] lacks {', '.join(missing)}")
+    return {"name": spec["identity"]["os_name"],
             "palette": {"@" + r: palette[r].lower() for r in ROLES}}
 
 
