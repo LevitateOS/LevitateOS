@@ -407,6 +407,51 @@ What it decides: the library side of the design holds for a toolkit program
 on both C libraries. What it leaves open is everything that needs a running
 desktop, and the locale.
 
+## Programs somebody else linked (2026-11-13, decided, not built)
+
+The user chose that Recipe carries the libraries of upstream desktop builds
+(Electron and Chromium programs, Zed) rather than the desktop image shipping
+them, so they run on both variants. The second trial left this case open: an
+upstream binary has no room reserved for the package's paths. The plan:
+
+1. **The runtime is a library recipe.** `desktop-runtime` publishes `sdk`: the
+   shared libraries of a pinned Fedora package set (glibc and its loader, GTK
+   3 with GLib, Pango, Cairo, HarfBuzz, fontconfig and FreeType, NSS and NSPR,
+   X11/xcb and their extensions, xkbcommon, Mesa's GBM and DRM, CUPS, ALSA,
+   AT-SPI, D-Bus, libsecret, libnotify), from the same Fedora release as the
+   LevitateOS locks, each RPM pinned by SHA-256. The libraries come with the
+   glibc they were built against, never the build image's. Its data goes with
+   it: gdk-pixbuf loaders and their cache, GIO modules, compiled GSettings
+   schemas, glibc's `files` and `dns` NSS modules and one UTF-8 locale
+   (open questions 6 and 8 settle this way). The pin list is generated from
+   the package names by the builder's existing Fedora lock solver, not by hand.
+2. **Recipe rewrites the upstream files.** Where a file has no reserved room,
+   Recipe adds a new loadable segment at the end of the file holding the new
+   interpreter path and library search path, and points the program header
+   and `.dynamic` entries at it (what `patchelf` does), in its own ELF code
+   beside the carry step, with no tool added to the build image. The program's
+   interpreter becomes `PREFIX/lib/` + the loader; every carried library and
+   the program get `$ORIGIN`-relative search paths where that is enough, so
+   only the interpreter needs the absolute folder.
+3. **`RUNTIME.paths.prefix` is built** (section 4): a public recipe cannot ask
+   for a define.
+4. **A starter in `bin/`** sets what the runtime's data needs (`LOCPATH`,
+   `GDK_PIXBUF_MODULE_FILE`, `GIO_MODULE_DIR`, `GSETTINGS_SCHEMA_DIR`) and
+   execs the program under `lib/`, whose own interpreter is the carried loader.
+   It does not run the loader as a command: Chromium starts its helpers
+   through `/proc/self/exe`, which must be the program, not the loader.
+5. **Chromium's sandbox** uses unprivileged user namespaces; the setuid
+   `chrome-sandbox` helper is left out (packages hold no setuid files). Both
+   kernels allow user namespaces; a host that does not gets a clear error.
+6. **Checks.** In the sandbox a rewritten program cannot run (it starts only
+   with the image's loader), so the install checks the ELF closure instead:
+   every file under `lib/` and every program has all it loads inside
+   `lib/`, or the install fails naming what is missing. Running the program is
+   proved on both booted desktops.
+
+Trial order: the runtime recipe and the Recipe changes (independent), then
+one Electron program (the Antigravity app, a plain tarball), then the rest.
+
 ## Open questions
 
 1. **Does a toolkit program work this way on both distributions?** For
