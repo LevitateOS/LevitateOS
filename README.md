@@ -177,7 +177,7 @@ In source, unbuilt:
   account, automatic login, an on-screen keyboard. Designed in
   [`docs/reclogin.md`](docs/reclogin.md) and
   [`docs/reclogin-technical.md`](docs/reclogin-technical.md). Three
-  independent reads of the code found and fixed 58 defects; none of it has
+  independent reads of the code led to 47 fixes; none of it has
   run on a console or display.
 - recab and the Recab app reach only an A/B installation, the Updater app
   only a mutable one.
