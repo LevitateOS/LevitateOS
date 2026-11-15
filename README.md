@@ -160,6 +160,7 @@ In source, unbuilt:
   26; Recipe's acceptance suite passed on it before the rework above.
 - The LevitateOS image generates its CA trust bundles; Firefox ships one
   bookmark; the Plasma panel has the Recipe app where Discover was.
+- Recipe, Recab and Recdirstat have their own icons.
 - The agent app is removed from the desktop apps; they keep only a "Copy for
   agent" button. The Recab app is one page. The install hub is gone; the
   install screen is the terminal plus the guide.
@@ -169,9 +170,9 @@ source:
 
 - Recipe-installed shipped software, the desktop included. Plasma and LXQt are
   still built into the images.
-- An updater, for A/B and for mutable installations. Its release engineering
-  is not designed yet.
-- Purpose-made icons for the three apps.
+- An updater, for A/B and for mutable installations. Its design is approved
+  ([`docs/release-engineering.md`](docs/release-engineering.md)); none of it is
+  written.
 - Steam on LevitateOS.
 - The login screen (`tools/reclogin`).
 
