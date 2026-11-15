@@ -229,7 +229,10 @@ not lower than the installed one.
 - `recupdate check [--json]`: no privileges. JSON:
   `{"schema":1,"os":"levitateos","installed":{"version":"1.0","serial":3},
   "available":null | {"version":"1.1","serial":4,"date":"2026-12-01","notes":"<url>","download_bytes":123},
-  "checked_at":"<RFC 3339>"}`. Exit 0 whether or not something is available;
+  "interrupted":null | {"version":"1.1","serial":4},
+  "checked_at":"<RFC 3339>"}`. `interrupted` names a release whose `apply`
+  on a mutable install did not finish; running `apply` again finishes it.
+  Exit 0 whether or not something is available;
   non-zero with the reason on stderr when the check itself failed.
 - `recupdate fetch [--json]`: root. Downloads and verifies into the cache
   folder; resumes partial files. With `--json`, JSON lines (below).
