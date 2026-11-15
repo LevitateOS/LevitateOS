@@ -128,13 +128,13 @@ Then fix what that reconciliation breaks downstream, in this order:
 
 1. Fetch upstream into `tools/ginux` and reconcile (upstream's history and direction win on conflicts).
 2. Fix **Recipe** against the reconciled Ginux (Recipe builds/runs in Ginux domains; upstream descriptor/init changes are exactly the kind of thing that breaks it).
-3. Fix **both OSes** (LevitateOS and AcornOS builds and boots) against the reconciled Ginux and fixed Recipe.
+3. Fix **both OSes** against the reconciled Ginux and fixed Recipe: change whatever in their build or boot code the reconciliation broke. This is a fixing step, not a build-and-boot run; builds happen only when the user asks for one.
 
 Status 2026-11-15:
 
 - **Step 1 done.** Upstream `main` (`285d025b`, PRs #273–#289, Gates 25–26) is merged into `LevitateOS/ginux:main` as `f9bef00a`; the fork is 0 commits behind upstream. Six conflict hunks, all resolved with upstream's text plus the configured-launch pieces upstream does not carry. The fork's CI ran the root launch suite on the merge and it passed.
 - **Step 2 done, no Recipe code change needed.** Recipe `b215942` pins `f9bef00a`, and Recipe's full acceptance catalogs pass on it as root (146 of 146). Getting there took two fixes outside the product code: the acceptance job now builds only the launcher (Ginux's `make build` also builds upstream's operator CLI), and three acceptance cases that had been stale since host execution landed were brought up to date. The instance schema and the configured catalog digests are unchanged, `instance-validate`/`instance-explain` answer as before, and a `bat` install ran to completion inside a Ginux domain through the merged launcher as an ordinary user. The launcher binary is still `ginux` with the `launch` command (upstream's operator CLI is a separate binary, `ginux-cli`).
-- **Step 3 open: unbuilt.** The superproject pins both. The builder compiles the launcher from the `tools/ginux` checkout with the same command as before, and that command builds; no ISO has been built or booted on the reconciled Ginux yet. Until a LevitateOS and an AcornOS build and boot pass, step 3 is not done.
+- **Step 3 done: nothing in either OS needed fixing.** The superproject pins both. The builder compiles the launcher from the `tools/ginux` checkout with the same command as before and that command builds; nothing in the builder, the variants or the OS recipes refers to anything upstream renamed or removed. Unbuilt, like every other change: no ISO was built for this, and none is needed for it.
 
 Nothing else in this document is started until Recipe and both OSes are working on the fetched upstream. Do not “fix” Recipe or an OS by pinning, reverting, or working around the upstream Ginux changes — upstream is leading, we adapt. (The installed `.hdae` skills bundle also comes from this owner — `gmkurtzer/hdae`, recorded in `AGENTS.md` — and was verified current on 2026-11-15; it is not part of this fetch.)
 
