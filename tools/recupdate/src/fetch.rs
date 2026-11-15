@@ -4,29 +4,20 @@ use anyhow::{ensure, Context, Result};
 use serde_json::json;
 use std::fs;
 use std::os::unix::fs::PermissionsExt;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
-use crate::release::Archive;
+use crate::release::{Archive, Verified};
 
 pub const DEFAULT_CACHE_DIR: &str = "/var/cache/recupdate";
 
-struct Out {
-    json: bool,
+pub fn cache_dir() -> PathBuf {
+    crate::util::env_path("RECUPDATE_CACHE_DIR", DEFAULT_CACHE_DIR)
 }
 
-impl Out {
-    fn step(&self, n: u32, of: u32, text: &str) {
-        if self.json {
-            println!("{}", json!({"event":"step","n":n,"of":of,"text":text}));
-        } else {
-            eprintln!("[{n}/{of}] {text}");
-        }
-    }
-    fn progress(&self, done: u64, total: u64) {
-        if self.json {
-            println!("{}", json!({"event":"progress","done":done,"total":total}));
-        }
-    }
+/// How a fetch reports: each archive as it starts (`step`), and its bytes (`progress`).
+pub struct Report<'a> {
+    pub step: &'a dyn Fn(u32, &str),
+    pub progress: &'a dyn Fn(u64, u64),
 }
 
 pub fn run(json: bool) -> Result<()> {
@@ -47,37 +38,26 @@ pub fn run(json: bool) -> Result<()> {
 }
 
 fn fetch(json: bool) -> Result<()> {
-    let out = Out { json };
-    out.step(1, 4, "Checking the release channel");
-    let channel = crate::release::load_channel()?;
-    let m = &channel.manifest;
-    let cache = crate::util::env_path("RECUPDATE_CACHE_DIR", DEFAULT_CACHE_DIR);
-    let dir = cache.join(m.serial.to_string());
-    fs::create_dir_all(&dir).with_context(|| format!("creating {}", dir.display()))?;
-    fs::set_permissions(&cache, fs::Permissions::from_mode(0o755))?;
-    fs::set_permissions(&dir, fs::Permissions::from_mode(0o755))?;
-
-    let parts: [(&str, &Archive, &str); 3] = [
-        ("base.tar.zst", &m.base, "Downloading the base"),
-        ("boot.tar.zst", &m.boot, "Downloading the boot files"),
-        ("recipes.tar.zst", &m.recipes, "Downloading the recipes"),
-    ];
-    for (i, (name, archive, text)) in parts.iter().enumerate() {
-        out.step(i as u32 + 2, 4, text);
-        get_archive(&dir, name, archive, &out)?;
-    }
-
-    // The verified manifest and its signature go last: their presence marks a complete fetch.
-    crate::util::write_atomic(&dir.join("release.json"), &channel.bytes, 0o644)?;
-    crate::util::write_atomic(&dir.join("release.json.sig"), &channel.sig, 0o644)?;
-
-    for entry in fs::read_dir(&cache)?.flatten() {
-        let name = entry.file_name();
-        let is_serial = name.to_string_lossy().chars().all(|c| c.is_ascii_digit());
-        if is_serial && entry.path() != dir && entry.path().is_dir() {
-            let _ = fs::remove_dir_all(entry.path());
+    let step = |n: u32, text: &str| {
+        if json {
+            println!("{}", json!({"event":"step","n":n,"of":4,"text":text}));
+        } else {
+            eprintln!("[{n}/4] {text}");
         }
-    }
+    };
+    let progress = |done: u64, total: u64| {
+        if json {
+            println!("{}", json!({"event":"progress","done":done,"total":total}));
+        }
+    };
+    step(1, "Checking the release channel");
+    let channel = crate::release::load_channel()?;
+    let report = Report {
+        step: &|n, text| step(n + 1, text),
+        progress: &progress,
+    };
+    let dir = into_cache(&channel, &report)?;
+    let m = &channel.manifest;
     if json {
         println!(
             "{}",
@@ -95,7 +75,47 @@ fn fetch(json: bool) -> Result<()> {
     Ok(())
 }
 
-fn get_archive(dir: &Path, name: &str, archive: &Archive, out: &Out) -> Result<()> {
+/// Download and verify the verified channel's release into `<cache>/<serial>/`; return that
+/// folder. `report.step` is called with 1, 2, 3 for the three archives. Other serial folders
+/// are removed afterwards, except the one an interrupted `apply` still needs.
+pub fn into_cache(channel: &Verified, report: &Report) -> Result<PathBuf> {
+    let m = &channel.manifest;
+    let cache = cache_dir();
+    let dir = cache.join(m.serial.to_string());
+    fs::create_dir_all(&dir).with_context(|| format!("creating {}", dir.display()))?;
+    fs::set_permissions(&cache, fs::Permissions::from_mode(0o755))?;
+    fs::set_permissions(&dir, fs::Permissions::from_mode(0o755))?;
+
+    let parts: [(&str, &Archive, &str); 3] = [
+        ("base.tar.zst", &m.base, "Downloading the base"),
+        ("boot.tar.zst", &m.boot, "Downloading the boot files"),
+        ("recipes.tar.zst", &m.recipes, "Downloading the recipes"),
+    ];
+    for (i, (name, archive, text)) in parts.iter().enumerate() {
+        (report.step)(i as u32 + 1, text);
+        get_archive(&dir, name, archive, report)?;
+    }
+
+    // The verified manifest and its signature go last: their presence marks a complete fetch.
+    crate::util::write_atomic(&dir.join("release.json"), &channel.bytes, 0o644)?;
+    crate::util::write_atomic(&dir.join("release.json.sig"), &channel.sig, 0o644)?;
+
+    let keep = crate::apply::read_intent()
+        .ok()
+        .flatten()
+        .map(|intent| intent.folder);
+    for entry in fs::read_dir(&cache)?.flatten() {
+        let name = entry.file_name();
+        let is_serial = name.to_string_lossy().chars().all(|c| c.is_ascii_digit());
+        let path = entry.path();
+        if is_serial && path != dir && keep.as_deref() != Some(path.as_path()) && path.is_dir() {
+            let _ = fs::remove_dir_all(&path);
+        }
+    }
+    Ok(dir)
+}
+
+fn get_archive(dir: &Path, name: &str, archive: &Archive, report: &Report) -> Result<()> {
     ensure!(
         archive.url.starts_with("https://"),
         "the manifest's address for {name} is not https: {}",
@@ -112,12 +132,12 @@ fn get_archive(dir: &Path, name: &str, archive: &Archive, out: &Out) -> Result<(
         .unwrap_or(false)
         && crate::net::sha256_file(&file)? == want
     {
-        out.progress(archive.size, archive.size);
+        (report.progress)(archive.size, archive.size);
         return Ok(());
     }
     let part = dir.join(format!("{name}.part"));
     crate::net::download(&archive.url, &part, archive.size, &mut |done| {
-        out.progress(done, archive.size)
+        (report.progress)(done, archive.size)
     })?;
     let got = crate::net::sha256_file(&part)?;
     if got != want {

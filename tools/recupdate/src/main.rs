@@ -2,6 +2,7 @@
 //! Design: docs/release-engineering.md (sections 5 and 10).
 
 mod apply;
+mod boot;
 mod check;
 mod fetch;
 mod net;
@@ -38,7 +39,8 @@ enum Cmd {
     Notice,
     /// Send one desktop notification per new serial (run at session start for each user).
     NotifyUser,
-    /// Apply the release to / (mutable installs only; not written yet).
+    /// Install the release on this mutable installation and make its kernel the default boot
+    /// entry (root; A/B installations use `recab update`).
     Apply {
         #[arg(long)]
         json: bool,

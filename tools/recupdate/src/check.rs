@@ -27,11 +27,19 @@ pub fn report() -> Result<Value> {
     } else {
         Value::Null
     };
+    // An apply that began changing the system and did not finish (`recupdate apply` finishes
+    // it). An unreadable record counts as one: apply reports what is wrong with it.
+    let interrupted = match crate::apply::read_intent() {
+        Ok(Some(intent)) => json!({ "version": intent.version, "serial": intent.serial }),
+        Ok(None) => Value::Null,
+        Err(_) => json!({ "version": "", "serial": 0 }),
+    };
     Ok(json!({
         "schema": 1,
         "os": os.id,
         "installed": { "version": installed.version, "serial": installed.serial },
         "available": available,
+        "interrupted": interrupted,
         "checked_at": crate::util::now_rfc3339(),
     }))
 }
@@ -42,6 +50,13 @@ pub fn check(json: bool) -> Result<()> {
         println!("{}", serde_json::to_string(&report)?);
     } else {
         let installed = &report["installed"];
+        if let Some(i) = report["interrupted"].as_object() {
+            println!(
+                "an update to {} (serial {}) was interrupted; run `recupdate apply` as root to finish it",
+                i["version"].as_str().unwrap_or(""),
+                i["serial"].as_u64().unwrap_or(0)
+            );
+        }
         match report["available"].as_object() {
             Some(a) => println!(
                 "{} {} is available (installed: {}); download {} MiB",

@@ -5,7 +5,7 @@ use base64::Engine;
 use ed25519_dalek::{Signature, Verifier, VerifyingKey};
 use serde::Deserialize;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 pub const DEFAULT_KEYS_DIR: &str = "/usr/share/levitate/release-keys";
 pub const DEFAULT_RELEASE_FILE: &str = "/usr/lib/levitate/release.json";
@@ -147,31 +147,7 @@ pub fn load_channel() -> Result<Verified> {
     let bytes = crate::net::get_bounded(&url, CHANNEL_FILE_LIMIT)?;
     let sig_url = format!("{url}.sig");
     let sig_text = crate::net::get_bounded(&sig_url, CHANNEL_FILE_LIMIT)?;
-    let sig = decode_b64(&sig_text).with_context(|| format!("signature {sig_url}"))?;
-    let sig_array: [u8; 64] = sig
-        .clone()
-        .try_into()
-        .map_err(|_| anyhow::anyhow!("signature {sig_url} is not 64 bytes"))?;
-    let signature = Signature::from_bytes(&sig_array);
-    if !keys
-        .iter()
-        .any(|key| key.verify(&bytes, &signature).is_ok())
-    {
-        bail!("the signature of {url} matches none of the release keys; refusing it");
-    }
-    let manifest: Manifest = serde_json::from_slice(&bytes)
-        .with_context(|| format!("{url} is not a release manifest"))?;
-    ensure!(
-        manifest.schema == 1,
-        "{url} has schema {}, this recupdate understands schema 1",
-        manifest.schema
-    );
-    ensure!(
-        manifest.os == os.id,
-        "the release is for {}, this system is {}",
-        manifest.os,
-        os.id
-    );
+    let manifest = verify(&keys, &os, &bytes, &sig_text, &url, &sig_url)?;
     ensure!(
         manifest.serial >= installed.serial,
         "the channel's serial {} is lower than the installed serial {}; refusing it",
@@ -183,4 +159,59 @@ pub fn load_channel() -> Result<Verified> {
         bytes,
         sig: sig_text,
     })
+}
+
+/// Check a manifest's signature over its exact bytes against the keys, then parse it and check
+/// its schema and OS. `what` and `sig_what` name the two files in messages.
+fn verify(
+    keys: &[VerifyingKey],
+    os: &OsRelease,
+    bytes: &[u8],
+    sig_text: &[u8],
+    what: &str,
+    sig_what: &str,
+) -> Result<Manifest> {
+    let sig = decode_b64(sig_text).with_context(|| format!("signature {sig_what}"))?;
+    let sig_array: [u8; 64] = sig
+        .try_into()
+        .map_err(|_| anyhow::anyhow!("signature {sig_what} is not 64 bytes"))?;
+    let signature = Signature::from_bytes(&sig_array);
+    if !keys.iter().any(|key| key.verify(bytes, &signature).is_ok()) {
+        bail!("the signature of {what} matches none of the release keys; refusing it");
+    }
+    let manifest: Manifest = serde_json::from_slice(bytes)
+        .with_context(|| format!("{what} is not a release manifest"))?;
+    ensure!(
+        manifest.schema == 1,
+        "{what} has schema {}, this recupdate understands schema 1",
+        manifest.schema
+    );
+    ensure!(
+        manifest.os == os.id,
+        "the release is for {}, this system is {}",
+        manifest.os,
+        os.id
+    );
+    Ok(manifest)
+}
+
+/// The manifest of a release `fetch` left in `dir`, its signature checked again against the
+/// keys (an interrupted `apply` resumes from such a folder). No serial check: by then Recipe
+/// may already have written this release as the installed one.
+pub fn verify_fetched(dir: &Path) -> Result<Manifest> {
+    let os = os_release()?;
+    let keys = keys()?;
+    let path = dir.join("release.json");
+    let sig_path = dir.join("release.json.sig");
+    let bytes = fs::read(&path).with_context(|| format!("reading {}", path.display()))?;
+    let sig_text =
+        fs::read(&sig_path).with_context(|| format!("reading {}", sig_path.display()))?;
+    verify(
+        &keys,
+        &os,
+        &bytes,
+        &sig_text,
+        &path.display().to_string(),
+        &sig_path.display().to_string(),
+    )
 }

@@ -22,3 +22,11 @@ sha2 = { workspace = true }
 # The same HTTP client and TLS stack Recipe uses.
 ureq = { version = "2", features = ["native-certs"] }
 libc = { workspace = true }
+# boot.tar.zst of a release (`apply`); the same versions recab and Recipe use.
+tar = "0.4"
+zstd = "0.13"
+# The install tools' shared mount table and durable writes, the ESP and /var mount points,
+# and the A/B facts (to refuse an A/B installation).
+target-root = { path = "../recstrap/target-root" }
+recpart = { path = "../recpart" }
+recinit = { path = "../recinit", default-features = false }
