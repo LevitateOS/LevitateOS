@@ -1,9 +1,9 @@
-# Releases and updates: proposal
+# Releases and updates
 
-Status: proposal, 2026-11-15. Nothing here is built. It answers
-`docs/product-handoff.md` §2.10 ("one release-engineering track for all
-updates") and waits for the owner's verdict. No updater is written before this
-is approved.
+Status: approved by the owner on 2026-11-15 (the decisions are in section 8).
+Nothing here is built. It answers `docs/product-handoff.md` §2.10 ("one
+release-engineering track for all updates"). Building starts after the §2.4
+work (shipped software installed through Recipe) is finished.
 
 ## 1. What a release is
 
@@ -95,9 +95,9 @@ A new small tool, `recupdate`, is the only code that talks to the channel:
 It has no window and decides nothing. recab, the mutable updater and the three
 apps all call it, so there is one updater, not five.
 
-By default nothing checks by itself. A check happens when the user presses
-"Check for updates". (Decision 4 offers a daily check that only shows a
-notice.)
+A check happens when the user presses "Check for updates", and once a day by
+a timer. The daily check only shows a notice that a release exists. It never
+downloads or installs anything.
 
 ## 6. Applying an update: the base is a Recipe package
 
@@ -170,26 +170,23 @@ Recipe alone and Recipe replaces its own files.
 - Downloading only what changed. The first version downloads the whole base
   archive. Fetching only the changed packages is possible later without
   changing the manifest's meaning.
-- Automatic installation. Nothing is ever applied without the user asking.
+- Automatic installation. Nothing is ever downloaded or applied without the
+  user asking.
 - Channels other than `stable`, and downgrades.
 
-## 8. Decisions for the owner
+## 8. Decisions (the owner, 2026-11-15)
 
-1. **The base as a Recipe package** (section 6): yes, or keep the base outside
-   Recipe and write a separate mechanism that replaces it.
-2. **Where releases live:** a new public repository `LevitateOS/releases`
-   (recommended), or files served from levitateos.org.
-3. **Version names:** `1.0`, `1.1`, ... chosen by the owner per release, with
-   the serial doing the comparing (recommended), or dates such as `2026.12`.
-4. **Checking:** only on the button (recommended), or also once a day with a
-   notice and nothing more.
-5. **The signing key:** one Ed25519 key kept on the owner's machine
-   (recommended), or on a hardware key.
-6. **App buttons** (section 6c): the button shows the release that carries the
-   newer app (recommended), or each app is published and updated on its own
-   between releases.
+1. **The base is a Recipe package** (section 6). One engine updates the base
+   and the shipped software on A/B and on mutable installs.
+2. **Releases live in a new public repository, `LevitateOS/releases`.**
+3. **Version names are `1.0`, `1.1`, ...**, chosen by the owner per release.
+   The serial does the comparing.
+4. **Checking: on the button, and once a day with a notice and nothing more.**
+5. **The signing key is one Ed25519 key in a file on the owner's machine.**
+6. **App buttons show the system release** that carries the newer app. Apps
+   are not published or updated on their own.
 
-## 9. Order of work once approved
+## 9. Order of work
 
 1. Manifest, signing and `release publish` in xtask; the public key in the base.
 2. `recupdate` (check, fetch).
