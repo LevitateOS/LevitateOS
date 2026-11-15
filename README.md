@@ -187,7 +187,9 @@ Not there yet:
 - A release signing key. Until `cargo xtask release keygen` has been run and
   its public key committed to `distro/keys/release/`, an image trusts no
   release.
-- The repository `LevitateOS/releases` that releases are published to.
+- A published release. The repository
+  [`LevitateOS/releases`](https://github.com/LevitateOS/releases) exists and is
+  empty.
 - A recipe for NVIDIA's proprietary driver.
 - The login screen (`tools/reclogin`).
 
