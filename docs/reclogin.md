@@ -2,7 +2,7 @@
 
 > 2026-11-15: the desktop (Plasma, LXQt) is now a Recipe group, so sessions come and go with Recipe installs and removals, and a system whose last desktop was removed has a text login. This fits "sessions are data" below and changes nothing else here. See docs/product-handoff.md §2.4 / docs/release-engineering.md.
 
-Status: **designed, not started.** The owner settled the decisions on 2026-11-15 (see "Decisions" below) and a visual draft exists (a design canvas, four artboards, both OSes in the website's style; it awaits the owner's verdict). No programming or porting is authorized by this document alone.
+Status: **designed, not started.** The owner settled the decisions on 2026-11-15 (see "Decisions" below) and a visual draft exists (a design canvas, four artboards, both OSes in the website's style; it awaits the owner's verdict). No programming or porting is authorized by this document alone. How it is built is in `docs/reclogin-technical.md` (awaiting the owner's verdict); the guest account is in `docs/reclogin-guest.md`.
 
 ## The requirement
 
