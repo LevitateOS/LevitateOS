@@ -56,10 +56,10 @@ all of these are keyed by everything at once, so everything is redone at once.
 ### 0. Parts and a combiner
 
 Today an ISO comes out of a chain of whole products
-(`ProductId::parent`, `distro/contract/src/registry.rs`): live-tools unpacks
-live-boot's finished EROFS image, which unpacked base-rootfs's. Each product
+(`ProductId::parent`, `distro/contract/src/registry.rs`): test-install-base unpacks
+test-live-ssh's finished EROFS image, which unpacked test-base-rootfs's. Each product
 is its parent's tree unchanged plus an overlay (`distro/builder/src/product.rs`),
-so to get live-tools the builder first produces two complete ISOs nobody
+so to get test-install-base the builder first produces two complete ISOs nobody
 asked for, and any change near the bottom rebuilds the whole chain.
 
 Instead, the build makes **parts**, each built and cached on its own, and a
@@ -69,11 +69,11 @@ Instead, the build makes **parts**, each built and cached on its own, and a
 |---|---|---|
 | **Kernel bundle** | already a prebuilt download (`linux-prebuilt.rhai`) | every ISO, installed systems |
 | **Package store** entries | one per locked package (section 1) | every system tree, the Qt app build root |
-| **Base system image** | base packages composed, effects, configuration, EROFS (sections 2, 4) | base-rootfs, live-boot, live-tools; also the installed system and recab's update payload |
-| **Desktop system image** | base tree + desktop layer, effects, desktop configuration, EROFS | live-desktop; installed desktop; update payload |
+| **Base system image** | base packages composed, effects, configuration, EROFS (sections 2, 4) | test-base-rootfs, test-live-ssh, test-install-base; also the installed system and recab's update payload |
+| **Desktop system image** | base tree + desktop layer, effects, desktop configuration, EROFS | release; installed desktop; update payload |
 | **Our programs** | tools per crate, TUI binary per libc, Qt apps per distro (section 6) | install overlay, system images |
-| **Live overlay** | the live session's configuration (`live-overlay.rhai`) | live-boot, live-tools, live-desktop |
-| **Install overlay** | install tools, install screen | live-tools, live-desktop |
+| **Live overlay** | the live session's configuration (`live-overlay.rhai`) | test-live-ssh, test-install-base, release |
+| **Install overlay** | install tools, install screen | test-install-base, release |
 | **Initramfs** (live, installed) | `recinit` from the kernel's modules and busybox | every ISO, installed systems |
 | **Boot files** | `recuki`, systemd-boot | every ISO |
 
@@ -86,16 +86,16 @@ flowchart LR
     K[kernel] --> C1 & C2 & C3
     IR[initramfs] --> C1 & C2 & C3
     BF[boot files] --> C1 & C2 & C3
-    BS[base system image] --> C1[live-boot ISO] & C2[live-tools ISO]
-    DS[desktop system image] --> C3[live-desktop ISO]
+    BS[base system image] --> C1[test-live-ssh ISO] & C2[test-install-base ISO]
+    DS[desktop system image] --> C3[release ISO]
     LO[live overlay] --> C1 & C2 & C3
     IO[install overlay] --> C2 & C3
 ```
 
 What this changes:
 
-- **No intermediate ISOs.** Building live-desktop builds its parts and
-  combines them; base-rootfs and live-boot are built only when asked for.
+- **No intermediate ISOs.** Building release builds its parts and
+  combines them; test-base-rootfs and test-live-ssh are built only when asked for.
 - **Parts build in parallel.** The kernel, initramfs, our programs and the two
   system images do not depend on each other until the combiner.
 - **Each part has its own identity and its own check.** A part is rebuilt only
@@ -151,8 +151,8 @@ flowchart LR
     C --> I[images, initramfs, ISO]
 ```
 
-- **Base tree** = compose(base packages). Shared by base-rootfs, live-boot,
-  live-tools and as the bottom of the desktop.
+- **Base tree** = compose(base packages). Shared by test-base-rootfs, test-live-ssh,
+  test-install-base and as the bottom of the desktop.
 - **Desktop layer** = compose(desktop-only packages) on top of the base tree:
   the base packages are never unpacked twice.
 - **Package effects** (accounts from `sysusers.d` / Alpine scripts, library and

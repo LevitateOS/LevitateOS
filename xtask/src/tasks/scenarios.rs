@@ -235,7 +235,7 @@ pub fn status(distro: &Distro, json: bool) -> Result<()> {
         .collect();
     // The latest ISO of each release product, for scripts (CI uploads them).
     let mut artifacts = serde_json::Map::new();
-    for product in distro_contract::ProductId::releases() {
+    for product in distro_contract::ProductId::iso_products() {
         let iso = distro_contract::runs::latest_release_iso(&root, distro.id(), product)?;
         artifacts.insert(product.name().to_string(), serde_json::json!(iso));
     }

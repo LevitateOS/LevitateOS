@@ -11,7 +11,7 @@ systems, prepare the inactive continuation, apply changes and downloaded updates
 without losing pending work, finalize, trial-boot, commit, roll back and reboot.
 A and B have identical capabilities. Today's TUI only exposes release-image
 staging and boot operations; that limited surface is not the GUI's final scope.
-It ships only in the desktop system (`live-desktop`); the base system keeps the
+It ships only in the desktop system (`release`); the base system keeps the
 command line, and on LevitateOS the TUI.
 
 It is not a second implementation of recab. recab stays the only thing that

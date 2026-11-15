@@ -187,7 +187,7 @@ packages = [
   "cirrus-audio-firmware",
 ]
 
-# The desktop system, the rootfs of the live-desktop product (docs/desktop.md):
+# The desktop system, the rootfs of the release product (docs/desktop.md):
 # the base packages plus these, KDE Plasma on Wayland with SDDM. systemd-pam is
 # required: without pam_systemd.so logind registers no session and Wayland gets
 # no seat. `cargo xtask base lock levitate` locks what they need beyond the base
@@ -220,7 +220,7 @@ packages = [
   # drives, OpenVPN, and the guest agents of the libvirt test VMs.
   "bluez", "bluedevil", "cups", "cups-filters", "ipp-usb", "avahi", "plasma-print-manager",
   "libva-intel-media-driver", "bolt", "plasma-thunderbolt", "exfatprogs", "ntfs-3g",
-  "NetworkManager-openvpn", "plasma-nm-openvpn", "spice-vdagent", "qemu-guest-agent",
+  "NetworkManager-openvpn", "plasma-nm-openvpn", "spice-vdagent",
   # Fonts for documents and CJK text, file thumbnails, manual pages, the
   # screen reader.
   "google-noto-serif-fonts", "google-noto-sans-cjk-fonts", "liberation-sans-fonts",

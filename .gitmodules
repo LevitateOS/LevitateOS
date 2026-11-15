@@ -70,3 +70,11 @@
 	path = gui
 	url = https://github.com/LevitateOS/desktop-apps.git
 	branch = main
+[submodule "tools/recguest"]
+	path = tools/recguest
+	url = https://github.com/LevitateOS/recguest.git
+	branch = main
+[submodule "tools/reclogin"]
+	path = tools/reclogin
+	url = https://github.com/LevitateOS/reclogin.git
+	branch = main

@@ -106,6 +106,176 @@ pub fn lock(distro: &Distro, check: bool) -> Result<()> {
     }
 }
 
+/// The Rocky 10 repositories the compiler image is built from, and so the
+/// ones its kernel build dependencies come from.
+const ROCKY: &str = "https://download.rockylinux.org/pub/rocky/10";
+
+/// The packages `linux-deps.rhai` installs for a kernel build (its list
+/// before it read the lock this writes).
+const KERNEL_DEPS: &[&str] = &[
+    "flex",
+    "bison",
+    "m4",
+    "bc",
+    "gcc",
+    "cpp",
+    "gcc-c++",
+    "make",
+    "binutils",
+    "perl",
+    "elfutils-libelf",
+    "elfutils-libelf-devel",
+    "openssl",
+    "openssl-libs",
+    "openssl-devel",
+    "zlib-ng-compat",
+    "diffutils",
+    "findutils",
+];
+
+/// `base kernel-deps`: resolve [`KERNEL_DEPS`] and their closure from the
+/// Rocky 10 BaseOS and AppStream primary indexes (newest build of each
+/// name, no weak dependencies), check every RPM against its repository
+/// checksum and the Rocky 10 signing key, and write the lock
+/// `linux-deps.rhai` downloads from. Like the base locks, rerunning it is
+/// how a build takes Rocky's updates.
+pub fn kernel_deps_lock(check: bool) -> Result<()> {
+    let root = crate::util::repo::repo_root()?;
+    distro_builder::process::check_host_tools(distro_builder::process::HostNeed::BaseLock)
+        .map_err(|e| crate::util::exit::missing(format!("{e:#}"), "cargo xtask doctor"))?;
+
+    let mut newest: BTreeMap<String, Rpm> = BTreeMap::new();
+    for repo in [format!("{ROCKY}/BaseOS/x86_64/os/"), format!("{ROCKY}/AppStream/x86_64/os/")] {
+        eprintln!("[step] Read {repo}");
+        primary_index(&repo, &mut newest)?;
+    }
+    let index = Index::new(newest);
+    // What the compiler image already has, from its own rpmdb in the pinned
+    // rootfs tar: only what those packages do not provide is locked, as
+    // `dnf download --resolve` against that rpmdb used to download only
+    // what was missing.
+    let tar = root.join(".artifacts/ginux-env/prepared-image-build-tools/rootfs.tar");
+    if !tar.is_file() {
+        bail!(
+            "the pinned compiler image {} is not produced; run any OS build first so Recipe stages it",
+            tar.display()
+        );
+    }
+    let db = tempfile::tempdir()?;
+    let status = Command::new("tar")
+        .args(["-xf"])
+        .arg(&tar)
+        .arg("-C")
+        .arg(db.path())
+        .arg("usr/lib/sysimage/rpm")
+        .status()
+        .context("running tar")?;
+    if !status.success() {
+        bail!("extracting the image rpmdb from {} failed ({status})", tar.display());
+    }
+    let out = Command::new("rpm")
+        .arg("--dbpath")
+        .arg(db.path().join("usr/lib/sysimage/rpm"))
+        .args(["-qa", "--queryformat", "%{NAME}\n"])
+        .output()
+        .context("running rpm -qa on the image rpmdb")?;
+    if !out.status.success() {
+        bail!("rpm -qa on the image rpmdb failed: {}", String::from_utf8_lossy(&out.stderr).trim());
+    }
+    let image_names: Vec<String> = String::from_utf8_lossy(&out.stdout)
+        .lines()
+        .filter(|name| index.pkgs.contains_key(*name))
+        .map(str::to_string)
+        .collect();
+    let installed = index.resolve(&image_names, BTreeSet::new(), &HashSet::new())?;
+    let wanted: Vec<String> = KERNEL_DEPS.iter().map(|name| name.to_string()).collect();
+    let mut names = index.resolve(&wanted, installed.clone(), &HashSet::new())?;
+    names.retain(|n| !installed.contains(n));
+    // A kept package whose requirement only an image package provides
+    // still needs that provider's files in the tools tree: openssl-devel's
+    // libcrypto.so is a symlink whose target only openssl-libs ships, and
+    // a dangling symlink is worse than none to the linker (likewise
+    // elfutils-libelf-devel's -lelf). Add those providers back, to a
+    // fixpoint over requires.
+    loop {
+        let mut provided: HashSet<&str> = HashSet::new();
+        for name in &names {
+            provided.insert(name.as_str());
+            provided.extend(index.pkgs[name].provides.iter().map(String::as_str));
+        }
+        let mut additions: Vec<String> = Vec::new();
+        for name in names.clone() {
+            for req in &index.pkgs[&name].requires {
+                let cap = req.split_whitespace().next().unwrap_or(req);
+                if provided.contains(cap) || cap.starts_with('/') {
+                    continue;
+                }
+                let Some(cands) = index.providers.get(cap) else { continue };
+                let Some(pick) = cands.iter().find(|p| {
+                    installed.contains(*p)
+                        && !names.contains(*p)
+                        // Only library and package-name requirements can
+                        // dangle across the image boundary; the rest (a
+                        // `passwd` capability, a shell) the image serves
+                        // at run time as it served dnf.
+                        && (cap.contains(".so") || cap == p.as_str() || cap.starts_with(&format!("{p}(")))
+                }) else {
+                    continue;
+                };
+                additions.push(pick.clone());
+            }
+        }
+        if additions.is_empty() {
+            break;
+        }
+        names.extend(additions);
+    }
+    let set: BTreeMap<String, Rpm> = names.iter().map(|n| (n.clone(), index.pkgs[n].clone())).collect();
+
+    let path = root.join("distro/builder/os-recipes/sources/kernel-deps-lock.rhai");
+    let locked = read_locked(&path);
+    let changes = report_changes(&locked, &set);
+    if check {
+        if changes == 0 {
+            println!("{} is current with Rocky 10 updates", rel(&root, &path));
+            return Ok(());
+        }
+        bail!("{changes} package(s) differ from the kernel-deps lock; run cargo xtask base kernel-deps");
+    }
+    let cache = root.join(".artifacts/rpm-cache").join("rocky-10");
+    let files = download_verified(&cache, set.values())?;
+    check_signatures(&path.with_file_name("RPM-GPG-KEY-Rocky-10"), &files)?;
+    fs::write(&path, render_kernel_deps_lock(&set)?).with_context(|| format!("writing {}", path.display()))?;
+    println!("wrote {} ({} packages, {changes} changed)", rel(&root, &path), set.len());
+    Ok(())
+}
+
+fn render_kernel_deps_lock(rpms: &BTreeMap<String, Rpm>) -> Result<String> {
+    let today = String::from_utf8(Command::new("date").arg("+%F").output()?.stdout)?;
+    let mut text = format!(
+        "// Generated by `cargo xtask base kernel-deps` from the Rocky 10 BaseOS and\n\
+         // AppStream repositories: the kernel build dependencies and everything they\n\
+         // need, as their requires and provides resolve (no weak dependencies). Every\n\
+         // RPM was checked against its repository checksum and the Rocky 10 signing\n\
+         // key (`RPM-GPG-KEY-Rocky-10` beside this file, pinned by SHA-256 in Recipe's\n\
+         // `tools/recipe/bootstrap/product-ci.json`). Do not edit: rerun the command.\n\
+         \n\
+         fn locked_on() {{ \"{date}\" }}\n\
+         \n\
+         // [name, NEVRA, URL, SHA256]\n\
+         fn packages() {{\n    [\n",
+        date = today.trim(),
+    );
+    for rpm in rpms.values() {
+        text.push_str(&format!(
+            "        [\"{}\", \"{}\", \"{}\", \"{}\"],\n",
+            rpm.name, rpm.nevra(), rpm.url, rpm.sha256
+        ));
+    }
+    text.push_str("    ]\n}\n");
+    Ok(text)
+}
+
 fn lock_rpm(root: &Path, distro: &Distro, bundle: &distro_contract::Variant, check: bool) -> Result<()> {
     let base = &bundle.contract.sources.rootfs_source.base;
     let release: u32 = base

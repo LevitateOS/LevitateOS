@@ -147,7 +147,7 @@ fn runnable_scenarios() -> Vec<(&'static str, &'static str, ScenarioId)> {
 }
 
 fn release_products() -> Vec<(&'static str, &'static str, ProductId)> {
-    ProductId::releases()
+    ProductId::iso_products()
         .map(|product| (product.name(), product.title(), product))
         .collect()
 }
@@ -157,7 +157,7 @@ fn after_help() -> String {
         "Typical loop, for a distro (<distro>: {}):
   cargo xtask setup                       once: QEMU tools, firmware, SSH key
   cargo xtask build kernel <distro> --prebuilt
-  cargo xtask build live-tools <distro>
+  cargo xtask build release <distro>
   cargo xtask test all <distro>
   cargo xtask status <distro>
   cargo xtask progress [<distro>]         while an OS build runs: step, count, rate, ETA
@@ -333,6 +333,12 @@ pub enum BaseCmd {
         #[arg(long)]
         check: bool,
     },
+    /// Resolve the kernel build dependencies from Rocky 10 and write their lock.
+    KernelDeps {
+        /// Only report packages with newer builds (exit 1 if any).
+        #[arg(long)]
+        check: bool,
+    },
 }
 
 #[derive(Subcommand)]
@@ -347,7 +353,7 @@ pub enum BuildCmd {
     RootfsSource {
         #[arg(value_parser = DistroParser)]
         distro: Distro,
-        /// The desktop lock's packages instead, which live-desktop builds
+        /// The desktop lock's packages instead, which release builds
         /// the desktop system from (beside the base lock's).
         #[arg(long)]
         desktop: bool,
@@ -393,7 +399,7 @@ fn no_prebuilt_arg() -> Arg {
         .help("Compile our own tools and the TUI binary instead of reusing or downloading prebuilts")
 }
 
-/// "The live-tools ISO (input of the live-tools, install and ab-update scenarios)".
+/// "The test-install-base ISO (input of the test-install-base, install and ab-update scenarios)".
 fn product_about(product: ProductId) -> String {
     let scenarios: Vec<&str> = product.scenarios().map(ScenarioId::key).collect();
     let list = match scenarios.split_last() {
@@ -410,7 +416,7 @@ impl FromArgMatches for ProductBuild {
             .subcommand()
             .ok_or_else(|| clap::Error::new(ErrorKind::MissingSubcommand))?;
         let product = ProductId::from_name(name)
-            .filter(|product| product.is_release())
+            .filter(|product| product.is_iso())
             .ok_or_else(|| clap::Error::new(ErrorKind::InvalidSubcommand))?;
         Ok(Self {
             product,
@@ -428,7 +434,7 @@ impl FromArgMatches for ProductBuild {
 
 impl Subcommand for ProductBuild {
     fn augment_subcommands(cmd: Command) -> Command {
-        ProductId::releases().fold(cmd, |cmd, product| {
+        ProductId::iso_products().fold(cmd, |cmd, product| {
             cmd.subcommand(
                 DistroSelection::augment_args(Command::new(product.name()))
                     .arg(exact_arg())
@@ -444,7 +450,7 @@ impl Subcommand for ProductBuild {
     }
 
     fn has_subcommand(name: &str) -> bool {
-        ProductId::from_name(name).is_some_and(ProductId::is_release)
+        ProductId::from_name(name).is_some_and(ProductId::is_iso)
     }
 }
 

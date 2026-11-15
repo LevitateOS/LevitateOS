@@ -21,7 +21,7 @@ and they do not agree on what the first release contains:
 
 | Source | What it calls done | Desktop included? |
 |---|---|---|
-| Agreed release scope, PRD17–PRD19 (user, 2026-11-08) | Recipe/Ginux production acceptance, plus both distros' base and live-tools products through build, boot, installer PTY, install and A/B update under libvirt | **No.** "Desktop products … are outside that agreed verification scope" (README) |
+| Agreed release scope, PRD17–PRD19 (user, 2026-11-08) | Recipe/Ginux production acceptance, plus both distros' base and test-install-base products through build, boot, installer PTY, install and A/B update under libvirt | **No.** "Desktop products … are outside that agreed verification scope" (README) |
 | P14 release engineering (approved 2026-11-11) | A signed public update channel that installed systems of both distros check, download and apply from, with trial and fallback | Yes: "base and desktop systems" |
 | Positioning (README, website) | LevitateOS is "the daily-driver workstation"; each ships "a live ISO with and without a desktop"; website: "Planned for 2027" | Yes, by implication |
 
@@ -92,7 +92,7 @@ combination:
 - separate installed-system and live-overlay products, metadata kept through
   EROFS and recstrap;
 - the pinned prebuilt kernels (7.3.3 for LevitateOS, 6.18.62 for AcornOS);
-- the full live-tools ISO and its live-boot parent, with provenance and hashes;
+- the full test-install-base ISO and its test-live-ssh parent, with provenance and hashes;
 - live boot, SSH readiness, and real interaction with the installer in a PTY;
 - the public install path, installed boot, login and runtime scenarios;
 - A/B update, activation and recovery.
@@ -298,7 +298,7 @@ it only where it says so.
      first desktop recipes (B stage 4);
    - decide GPL source provision; write `SECURITY.md` (A5, A6).
 3. **First build of everything from current code:** both distros' base,
-   live-boot, live-tools and live-desktop. Fix until `test all`,
+   test-live-ssh, test-install-base and release. Fix until `test all`,
    `ab-update` and `desktop-boot` pass on both, plus an install from the
    desktop ISO that logs in. Products and scenarios run locally, never in CI;
    get CI's quick checks green (A2, B stage 1). Builds only when the user

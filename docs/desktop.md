@@ -1,9 +1,8 @@
 # Optional desktop: KDE Plasma (LevitateOS), LXQt (AcornOS)
 
-Each variant gets a second ISO that installs a desktop system. It boots like
-every live ISO, into the install screen on tty1 (decided 2026-11-12: the live
-session is the installer, not a desktop); the desktop starts once installed.
-The base ISO does not change.
+Each OS ships one release ISO, and it installs a desktop system. It boots
+into the install screen on tty1 (decided 2026-11-12: the live session is
+the installer, not a desktop); the desktop starts once installed.
 
 What is still to configure and implement, for both systems, is in
 [desktop-todo.md](desktop-todo.md).
@@ -121,7 +120,7 @@ graphical front-end beside the command line.
 
 ## In the pipeline (2026-11-08, not built or booted yet)
 
-- `live-desktop` builds the **desktop system** (`REC_FLAVOUR=desktop` in its
+- `release` builds the **desktop system** (`REC_FLAVOUR=desktop` in its
   os-release): the variant's rootfs recipe installs the base lock and the
   desktop lock (`sources/<id>-<backend>-desktop-lock.rhai`, downloaded by
   `cargo xtask build rootfs-source <id> --desktop`) into one tree, and
@@ -143,7 +142,7 @@ The plan below is what the prototypes taught.
 
 ## Fitting it into the pipeline
 
-- **Product**: a `live-desktop` product per variant (it builds its own rootfs, the desktop system, rather than extending `live-tools`).
+- **Product**: a `release` product per variant (it builds its own rootfs, the desktop system, rather than extending `test-install-base`).
   Desktop packages go into `filesystem.erofs` (the installer copies only that),
   live-session policy (the display manager kept off, the install screen on
   tty1) into the overlay.

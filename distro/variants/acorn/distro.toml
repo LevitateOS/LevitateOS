@@ -157,7 +157,7 @@ packages = [
   "sof-firmware",
 ]
 
-# The desktop system, the rootfs of the live-desktop product (docs/desktop.md):
+# The desktop system, the rootfs of the release product (docs/desktop.md):
 # the base packages plus these, LXQt on X11 with SDDM (LXQt runs on X11 because
 # Alpine 3.24 packages no LXQt Wayland session, lxqt-wayland-session).
 # `cargo xtask base lock acorn` locks what they need beyond the base lock; the
@@ -225,7 +225,7 @@ packages = [
   # text editor, a task manager and the archive tools lxqt-archiver uses.
   "bluez", "blueman", "cups", "cups-filters", "avahi", "system-config-printer", "sane-backends",
   "simple-scan", "bolt", "orca", "speech-dispatcher", "espeak-ng", "onboard", "font-noto-cjk",
-  "spice-vdagent", "qemu-guest-agent", "firewalld", "firewalld-gui", "picom", "qalculate-qt",
+  "spice-vdagent", "firewalld", "firewalld-gui", "picom", "qalculate-qt",
   "mousepad", "qps", "unzip", "7zip",
   # Windows and NFS shares in pcmanfm-qt, and the Adwaita cursor theme (the
   # GTK look AcornOS takes; it had no cursor theme at all).

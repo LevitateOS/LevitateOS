@@ -108,7 +108,7 @@ fn write_distros(out: &mut Out, root: &Path) -> Result<()> {
             "loginPrompt": c.identity.login_prompt,
             "isoFile": c.artifacts.release_iso,
             "desktop": {
-                "isoFile": c.artifacts.iso(distro_contract::ProductId::LiveDesktop),
+                "isoFile": c.artifacts.iso(distro_contract::ProductId::Release),
                 "displayManager": c.desktop.display_manager,
                 "installScreen": format!("/{}", distro_contract::install_ux::LAUNCHER),
             },

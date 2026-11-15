@@ -10,11 +10,11 @@ setup:
 doctor *args:
     cargo xtask doctor {{args}}
 
-# e.g. `just build live-tools levitate`, `just build kernel levitate --prebuilt`
+# e.g. `just build test-install-base levitate`, `just build kernel levitate --prebuilt`
 build *args:
     cargo xtask build {{args}}
 
-# e.g. `just run live-tools levitate`, `just run live-boot levitate --ssh`
+# e.g. `just run test-install-base levitate`, `just run test-live-ssh levitate --ssh`
 run *args:
     cargo xtask run {{args}}
 

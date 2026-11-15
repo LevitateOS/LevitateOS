@@ -54,8 +54,8 @@ then  T-A1 → T-X1 (needs D-3) → T-V1 → T-D2
 
 1. Each task: `cargo check` of recab and its Rust consumers; `cargo test -p recab`.
 2. Contract tasks (T-R0, T-X1): `cargo xtask gen --check`, `cargo xtask check tui`.
-3. Stage, carry, trial and init tasks: rebuild the live-tools ISO (rootfs
-   recipe changes need live-boot rebuilt first), then
+3. Stage, carry, trial and init tasks: rebuild the test-install-base ISO (rootfs
+   recipe changes need test-live-ssh rebuilt first), then
    `cargo xtask test ab-update levitate` and `cargo xtask test ab-update acorn`.
    VM and ISO builds run 10:00–23:00 only.
 4. Before calling the plan done: `cargo xtask test all levitate`,

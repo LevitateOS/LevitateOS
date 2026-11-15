@@ -16,8 +16,8 @@ testing/ginux-boot/ginux-boot.sh acorn --rootfs ROOTFS --ginux GINUX_CHECKOUT
 testing/ginux-boot/ginux-boot.sh levitate --rootfs ROOTFS --ginux GINUX_CHECKOUT
 ```
 
-- `--rootfs`: the product's `rootfs-source`, from a live-tools release
-  (`.artifacts/out/<distro>/releases/live-tools/<run>/rootfs-source`), which
+- `--rootfs`: the product's `rootfs-source`, from a test-install-base release
+  (`.artifacts/out/<distro>/releases/test-install-base/<run>/rootfs-source`), which
   carries recab. It is copied and never changed.
 - `--ginux`: a Ginux checkout that contains the revision `ginux-boot.sh` names
   (`ginux_rev`). The script builds it.

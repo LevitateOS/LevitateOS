@@ -33,7 +33,7 @@ scenarios, outputs).
 
 The current Recipe/Ginux release integration remains provisional. Its
 [release scope and acceptance queue](docs/ginux-contribution-task-list.md)
-requires both distros' base/live-tools products through guest installer,
+requires both distros' base/test-install-base products through guest installer,
 installation and A/B verification on the delivered combination. Maintained
 runtime delivery and final acceptance remain open; desktop products and
 external AI-provider interoperability are outside that agreed verification scope.

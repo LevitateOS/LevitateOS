@@ -30,7 +30,7 @@ fn status_json_reports_every_scenario_and_the_latest_isos_for_both_distros() {
             assert!(["not-run", "pass", "fail", "stale", "error"].contains(&status), "{json}");
             assert_eq!(status == "error", scenario["error"].is_string(), "{json}");
         }
-        for product in ["base-rootfs", "live-boot", "live-tools"] {
+        for product in ["test-base-rootfs", "test-live-ssh", "test-install-base", "release"] {
             let iso = &json["artifacts"][product];
             assert!(iso.is_null() || iso.is_string(), "{json}");
         }
@@ -44,10 +44,10 @@ fn bad_usage_exits_2() {
         vec!["status", "levitate", "--force"],
         vec!["reset", "../other"],
         vec!["build", "kernel"],
-        vec!["run", "live-boot", "levitate", "--no-such-option", "--no-shell"],
-        vec!["run", "live-boot", "acorn", "--ssh-port", "2222", "--no-shell"],
-        vec!["test", "live-boot", "levitate", "--inject", "NOEQUALS"],
-        vec!["test", "live-boot", "acorn", "--ssh-key", "/nonexistent/key"],
+        vec!["run", "test-live-ssh", "levitate", "--no-such-option", "--no-shell"],
+        vec!["run", "test-live-ssh", "acorn", "--ssh-port", "2222", "--no-shell"],
+        vec!["test", "test-live-ssh", "levitate", "--inject", "NOEQUALS"],
+        vec!["test", "test-live-ssh", "acorn", "--ssh-key", "/nonexistent/key"],
     ] {
         let output = xtask().args(&args).output().unwrap();
         assert_eq!(output.status.code(), Some(2), "{args:?}\n{}", diagnostic(&output));
@@ -57,8 +57,8 @@ fn bad_usage_exits_2() {
 #[test]
 fn interactive_commands_without_a_terminal_exit_2_and_name_the_alternative() {
     for args in [
-        vec!["run", "live-tools", "acorn"],
-        vec!["run", "live-boot", "levitate"],
+        vec!["run", "test-install-base", "acorn"],
+        vec!["run", "test-live-ssh", "levitate"],
         vec!["tui", "install-docs"],
     ] {
         let output = xtask()

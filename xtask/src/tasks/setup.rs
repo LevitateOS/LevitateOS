@@ -149,7 +149,7 @@ fn checks(root: &Path) -> Vec<Check> {
             false,
             kernel.map_err(|reason| (reason, crate::tasks::kernels::fix(distro))),
         ));
-        for product in ProductId::releases() {
+        for product in ProductId::iso_products() {
             checks.push(Check::new(
                 format!("{} {product} ISO", distro.id()),
                 false,

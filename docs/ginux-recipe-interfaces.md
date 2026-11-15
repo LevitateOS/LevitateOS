@@ -33,7 +33,7 @@ See [Linux setup](../tools/recipe/docs/setup-linux.md) and
 [runtime limits](../tools/recipe/docs/runtime-limits.md).
 
 The included product contract is the queue's PRD19 table, for both distros.
-Build a fresh base-rootfs → live-boot → live-tools chain explicitly; existing
+Build a fresh test-base-rootfs → test-live-ssh → test-install-base chain explicitly; existing
 parent artifacts are consumed as they stand. Installed-system policy belongs
 to the recipe, live/test policy to its overlay, deployment to recstrap and A/B
 activation to recab. Metadata EROFS production and actual deployment need their

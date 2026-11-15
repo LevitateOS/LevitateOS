@@ -31,7 +31,10 @@ These rules apply to every directory and submodule, recursively, across Git repo
 
 ## Build and runtime
 - The supported execution target is native Linux x86_64. Work on additional CPU architectures is deferred indefinitely and must not be added as a requirement or delivery blocker for Recipe, recab, or the distros unless the user explicitly changes this scope.
-- Filesystem iteration uses the `live-tools` product. Named integration/e2e scenarios run independently against existing artifacts; do not reintroduce numbered composition, numeric aliases, or ordered test gates.
+- Filesystem iteration uses the `test-install-base` product. Named integration/e2e scenarios run independently against existing artifacts; do not reintroduce numbered composition, numeric aliases, or ordered test gates.
+- Before changing installer UX or Acorn installation/boot behavior, read `docs/installer-ux-handoff.md`. It records explicit user decisions (no install hub; terminal left, docs right; readability/selection rules) and a known Acorn Boot-step blocker.
+- Long builds (OS image/EROFS/ISO builds, kernel compiles, full workspace builds, image rebuilds, anything expected to run for many minutes) only on the user's explicit permission: never start one on a whim or merely because it is the next step. Name the build and wait for the user to say they want it built.
+- Never plan long rebuilds as the way to prove or deliver a change when it can be installed into an existing environment instead (running VMs, installed systems, staged trees already on the machine). Install into the existing environment first; a rebuild belongs in a plan only when no existing environment can take the change.
 - Recipes own source/package facts and acquisition/build/install behavior. Rust/TOML owns orchestration, output locations, and contracts. Normal public recipes run without required defines.
 - Build payload through its producers. Keep build commands explicit; scenario commands consume existing artifacts.
 - Use `.artifacts` for current outputs and tooling.

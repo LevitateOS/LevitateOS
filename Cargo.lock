@@ -1704,6 +1704,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "recguest"
+version = "0.2.0"
+dependencies = [
+ "libc",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "recinit"
 version = "0.2.0"
 dependencies = [
@@ -1726,6 +1735,10 @@ dependencies = [
  "recuki",
  "tempfile",
 ]
+
+[[package]]
+name = "reclogin"
+version = "0.2.0"
 
 [[package]]
 name = "recpart"
