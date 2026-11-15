@@ -1,5 +1,7 @@
 # Build redesign: making an ISO build take minutes, not an evening
 
+> 2026-11-15: the "desktop system image" (base tree + desktop layer in one EROFS) and "the system image is the update payload" are superseded. The image is the minimal base; the desktop and the rest are group recipes installed during installation, and a release's payload is the base archive plus the group recipes' revision (docs/release-engineering.md section 1). See docs/product-handoff.md §2.4 / docs/release-engineering.md. The part/combiner and download-store parts of this note are not affected.
+
 Proposal of 2026-11-11, after the first desktop ISO builds. Nothing here is
 built. The decisions at the end are the user's.
 

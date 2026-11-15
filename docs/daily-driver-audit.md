@@ -1,5 +1,7 @@
 # Daily-driver audit: how far are the two desktops?
 
+> 2026-11-15: blocker 6 ("no update can reach an installed computer"), the update rows of the tables and the picture of the desktop as image contents are superseded: updates are designed in docs/release-engineering.md and exist in source (`recupdate`, `recab update`, Updater app, daily notice), and the desktop, Firefox and the rest are Recipe group recipes (docs/product-handoff.md §2.4). Steam is a LevitateOS-only recipe, written and never run. Nothing here was built or run, so the audit's other findings stand.
+
 Audit of 2026-11-11, superproject `4e1c0c8`. The question: how far are
 LevitateOS (Plasma) and AcornOS (LXQt) from a desktop a person can install on
 their own computer and live on for months.

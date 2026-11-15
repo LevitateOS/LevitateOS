@@ -1,5 +1,7 @@
 # The recipes to write: plan (2026-11-11)
 
+> 2026-11-15: where this plan says the images carry the desktop programs, or that groups are planned, it is superseded: the desktop, Firefox, audio, network, Bluetooth, printing, firewall and fonts are group recipes in `recipes/`, installed by `recsetup apply` from the medium's package cache, each with a receipt. System groups change only with a system release; apps and tools update from the catalog. See docs/product-handoff.md §2.4 / docs/release-engineering.md. Unbuilt, not run.
+
 What the official source, [`recipes/`](../recipes/), should hold first: the
 basics, every toolchain a build needs, and the desktop programs the images
 leave to Recipe. About fifty recipes in four layers. Each layer needs the one

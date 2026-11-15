@@ -1,5 +1,7 @@
 # recab findings
 
+> 2026-11-15: recab's "update/carry/stage" machinery these findings describe is superseded: recab was rebuilt around the locked/unlocked contract, its old lifecycle and updater are removed, and updates are `recab update` (A/B) and `recupdate apply` plus the Updater app (mutable), with the base as an entry Recipe owns. See docs/product-handoff.md §2.4 / docs/release-engineering.md. Historical evidence only.
+
 > Superseded scope, 2026-11-10: this is a historical refactoring snapshot, not the current recab product plan. Recab owns system updates and symmetric A/B continuation, including equivalent initial systems and incremental preparation that preserves pending changes through updates. Follow [the current requirements](../../tools/recab/REQUIREMENTS.md); retain the old findings below as historical evidence only.
 
 One shared queue, most severe first within each group. Each finding says what

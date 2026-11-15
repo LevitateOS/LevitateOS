@@ -1,5 +1,7 @@
 # Release readiness: when can LevitateOS and AcornOS be published and marketed?
 
+> 2026-11-15: section A3 (the P14 "public update channel" with Pages, per-distro keys, trial and fallback) and "base and desktop systems" as image contents are superseded by docs/release-engineering.md: signed releases named 1.0, 1.1, ... published at github.com/LevitateOS/releases (repository not created yet), `recupdate`, `recab update`, `recupdate apply` and the Updater app, one Ed25519 key on the owner's machine, and the desktop as Recipe group recipes (docs/product-handoff.md §2.4). All of it is in source, never built or run.
+
 Research of 2026-11-11. The question: what has to be true before the two
 systems can be offered for download, and before they can be marketed.
 

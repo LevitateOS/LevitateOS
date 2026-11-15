@@ -1,5 +1,7 @@
 # reclogin: One Login Screen for LevitateOS and AcornOS
 
+> 2026-11-15: the desktop (Plasma, LXQt) is now a Recipe group, so sessions come and go with Recipe installs and removals, and a system whose last desktop was removed has a text login. This fits "sessions are data" below and changes nothing else here. See docs/product-handoff.md §2.4 / docs/release-engineering.md.
+
 Status: **documented, not started.** This file records the requirement and the design constraints for a future `reclogin`. Do not treat it as an implementation; no programming or porting is authorized by this document alone.
 
 ## The requirement

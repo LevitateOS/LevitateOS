@@ -1,5 +1,7 @@
 # Research Plan: What to Port to rec\* Rust
 
+> 2026-11-15: "what is burned into the image" is superseded. The services inventoried here (NetworkManager, BlueZ, PipeWire, CUPS, firewalld, the desktop and so on) now arrive as Recipe group recipes with receipts, not as image contents; only the minimal base stays in the image. Steam is a LevitateOS-only recipe. See docs/product-handoff.md §2.4 / docs/release-engineering.md. The inventory still names the right software. Unbuilt, not run.
+
 Last updated: 2026-11-15
 
 This is a research plan only. Nothing in it authorizes implementation; its job is to decide, with evidence, what is even worth porting.

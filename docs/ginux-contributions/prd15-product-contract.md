@@ -1,5 +1,7 @@
 # PRD15 / PRD19 — callers, documentation and included products
 
+> 2026-11-15: statements here about recab's trial/degraded-trial lifecycle and about desktop products being outside scope describe the state when this was written. The trial lifecycle is removed (docs/product-handoff.md §2.2) and the desktop is now a set of Recipe group recipes installed by `recsetup apply` (§2.4); updates are designed in docs/release-engineering.md. Unbuilt, not run.
+
 **In progress; release acceptance remains open.** The included scope is the
 PRD19 table in the contribution queue: both x86-64 Linux distros, real package
 acquisition/rootfs, separate installed and live products, prebuilt kernels,

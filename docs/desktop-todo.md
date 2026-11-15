@@ -1,5 +1,7 @@
 # Desktop: what is left to configure and implement
 
+> 2026-11-15: "a package in the image" and "apps that come in the image" (section 5) are superseded. Shipped software above the minimal base is installed through Recipe by group recipes, from the install medium's package cache, each with a receipt; the default set is `[desktop].recipes` in `distro.toml`. "The built-in updater" and the update notice items now mean the designed `recupdate` / `recab update` / Updater app. See docs/product-handoff.md §2.4 / docs/release-engineering.md. Unbuilt, not run.
+
 Everything still needed for a full desktop on LevitateOS (Plasma, Fedora 45
 packages, systemd) and AcornOS (LXQt, Alpine 3.24 packages, OpenRC). Building
 and booting are left out: this list is only what has to be written, declared
