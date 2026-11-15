@@ -184,9 +184,6 @@ In source, unbuilt:
 
 Not there yet:
 
-- A release signing key. Until `cargo xtask release keygen` has been run and
-  its public key committed to `distro/keys/release/`, an image trusts no
-  release.
 - A published release. The repository
   [`LevitateOS/releases`](https://github.com/LevitateOS/releases) exists and is
   empty.
