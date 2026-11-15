@@ -200,14 +200,13 @@ The requirement is in §2.2 (mutable ⇒ no recab on the installed OS). Checked 
 
 The defect: **recab is baked into every installed rootfs regardless of mode.** In `distro/builder/src/pipeline/live_tools.rs` recab is `ToolLayer::Rootfs` (“on every product and every system an ISO installs”), and its packaged tree includes the trial service (`os-recipes/install-tools.rhai`). The mode is only chosen later, at install time in `disk-plan`, and nothing in `recsetup`/the install flow removes recab or its trial service for a mutable install. Because the rootfs is built before the mode is known, the fix belongs at install time: the mutable install flow (`recsetup --boot mutable` path) must leave the recab pieces out of the target entirely — recab is never installed on a mutable system in the first place, not copied in and cleaned up afterwards. Verify after fixing: a mutable install's root contains no `usr/bin/recab`, no recab-trial unit, and boots its single root without recab state.
 
-### 5.6 `recqemu` and `reclogin` must join prebuilt
+### 5.6 `reclogin` must join prebuilt
 
-The prebuilt tool set (`TOOLS` in `distro/builder/src/recipe/tools.rs`, published by the prebuilt workflow) currently covers `recpart`, `recstrap`, `recab`, `recguest`, `levitate-recipe`, and `install-split-pane`. Two tools are missing and must be added the same way (table entry, publish, ISO builds download instead of compiling):
+The prebuilt tool set (`TOOLS` in `distro/builder/src/recipe/tools.rs`, published by the prebuilt workflow) covers `recpart`, `recstrap`, `recab`, `recguest`, `levitate-recipe`, and `install-split-pane`. One tool is missing and must be added the same way (table entry, publish, ISO builds download instead of compiling):
 
-- **`recqemu`** — exists today but is not in prebuilt. Add it so image builds fetch it like the other tools.
-- **`reclogin`** — the repo exists but the program does not exist yet (design only, see `docs/reclogin.md`). When its implementation lands, it must be added to prebuilt the same way before it ships in any image; do not put reclogin in an ISO until it is in prebuilt.
+- **`reclogin`** — the repo exists but the program does not exist yet (design only, see `docs/reclogin.md`). When its implementation lands, it must be added to prebuilt the same way before it ships in any image; do not put reclogin in an ISO until it is in prebuilt. Do not invent a separate distribution path for it.
 
-“Eventually” means exactly that: `recqemu` when someone next works on prebuilt, `reclogin` only once there is a program to publish. Do not invent a separate distribution path for either.
+`recqemu` was listed here and was dropped on 2026-11-15 (the user's decision): it is a library that the builder, xtask, the install tests and recshuttle link, with no program of its own, so there is nothing to publish.
 
 ### 5.7 All comms about recab still describe the rejected lifecycle
 
