@@ -5,7 +5,7 @@
 //! variant's release key, which also checks the repository indexes.
 
 use anyhow::{Context, Result, bail};
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -19,14 +19,14 @@ const REPOS: [&str; 2] = ["main", "community"];
 
 /// One package as an APKINDEX stanza lists it.
 #[derive(Debug, Default)]
-struct Pkg {
-    name: String,
-    version: String,
-    repo: &'static str,
-    provides: Vec<String>,
-    depends: Vec<String>,
-    install_if: Vec<String>,
-    priority: u32,
+pub(super) struct Pkg {
+    pub(super) name: String,
+    pub(super) version: String,
+    pub(super) repo: &'static str,
+    pub(super) provides: Vec<String>,
+    pub(super) depends: Vec<String>,
+    pub(super) install_if: Vec<String>,
+    pub(super) priority: u32,
 }
 
 /// `name` out of `name`, `name=1`, `name>=1`, `so:libc.musl-x86_64.so.1`.
@@ -80,14 +80,14 @@ fn parse_index(text: &str, repo: &'static str, out: &mut Vec<Pkg>) {
     }
 }
 
-struct Index {
+pub(super) struct Index {
     pkgs: Vec<Pkg>,
-    by_name: HashMap<String, Vec<usize>>,
+    pub(super) by_name: HashMap<String, Vec<usize>>,
     provided: HashMap<String, Vec<usize>>,
 }
 
 impl Index {
-    fn new(pkgs: Vec<Pkg>) -> Self {
+    pub(super) fn new(pkgs: Vec<Pkg>) -> Self {
         let (mut by_name, mut provided): (HashMap<_, Vec<usize>>, HashMap<_, Vec<usize>>) = Default::default();
         for (i, p) in pkgs.iter().enumerate() {
             by_name.entry(p.name.clone()).or_default().push(i);
@@ -106,18 +106,28 @@ impl Index {
     }
 
     /// The closure of `wanted` over `chosen`, as package indexes by name.
-    fn resolve(&self, wanted: &[String], mut chosen: BTreeMap<String, usize>) -> Result<BTreeMap<String, usize>> {
-        let satisfied = |chosen: &BTreeMap<String, usize>, n: &str| {
-            chosen.contains_key(n)
-                || chosen
-                    .values()
-                    .any(|&i| self.pkgs[i].provides.iter().any(|p| name_of(p) == n))
+    pub(super) fn resolve(&self, wanted: &[String], mut chosen: BTreeMap<String, usize>) -> Result<BTreeMap<String, usize>> {
+        // Every name the chosen packages provide, kept beside `chosen`.
+        let mut provided: HashSet<String> = HashSet::new();
+        for &i in chosen.values() {
+            provided.extend(self.pkgs[i].provides.iter().map(|p| name_of(p).to_string()));
+        }
+        let satisfied =
+            |chosen: &BTreeMap<String, usize>, provided: &HashSet<String>, n: &str| chosen.contains_key(n) || provided.contains(n);
+        let choose = |chosen: &mut BTreeMap<String, usize>, provided: &mut HashSet<String>, pick: usize| -> bool {
+            let p = &self.pkgs[pick];
+            if chosen.insert(p.name.clone(), pick).is_none() {
+                provided.extend(p.provides.iter().map(|q| name_of(q).to_string()));
+                true
+            } else {
+                false
+            }
         };
         // Plain package names first, so a name a later wanted package depends
         // on directly (polkit-elogind-libs) is chosen before a virtual name
         // (so:libpolkit-gobject-1.so.0) gets a provider picked for it. Virtual
         // names wait until the by-name closure so far is complete.
-        let add = |chosen: &mut BTreeMap<String, usize>, starts: &[String]| -> Result<()> {
+        let add = |chosen: &mut BTreeMap<String, usize>, provided: &mut HashSet<String>, starts: &[String]| -> Result<()> {
             let mut stack: Vec<String> = Vec::new();
             let mut deferred: std::collections::VecDeque<String> = Default::default();
             let queue = |n: String, stack: &mut Vec<String>, deferred: &mut std::collections::VecDeque<String>| {
@@ -132,32 +142,30 @@ impl Index {
             }
             loop {
                 while let Some(n) = stack.pop() {
-                    if n.starts_with('!') || satisfied(chosen, &n) {
+                    if n.starts_with('!') || satisfied(chosen, provided, &n) {
                         continue;
                     }
                     let pick = self.latest(&self.by_name[&n]);
-                    let p = &self.pkgs[pick];
-                    if chosen.insert(p.name.clone(), pick).is_none() {
-                        for d in p.depends.iter().filter(|d| !d.starts_with('!')) {
+                    if choose(chosen, provided, pick) {
+                        for d in self.pkgs[pick].depends.iter().filter(|d| !d.starts_with('!')) {
                             queue(name_of(d).to_string(), &mut stack, &mut deferred);
                         }
                     }
                 }
                 let Some(n) = deferred.pop_front() else { return Ok(()) };
-                if n.starts_with('!') || satisfied(chosen, &n) {
+                if n.starts_with('!') || satisfied(chosen, provided, &n) {
                     continue;
                 }
                 let c = self.provided.get(&n).with_context(|| format!("nothing provides {n}"))?;
                 let pick = c.iter().copied().find(|&i| chosen.contains_key(&self.pkgs[i].name)).unwrap_or_else(|| self.latest(c));
-                let p = &self.pkgs[pick];
-                if chosen.insert(p.name.clone(), pick).is_none() {
-                    for d in p.depends.iter().filter(|d| !d.starts_with('!')) {
+                if choose(chosen, provided, pick) {
+                    for d in self.pkgs[pick].depends.iter().filter(|d| !d.starts_with('!')) {
                         queue(name_of(d).to_string(), &mut stack, &mut deferred);
                     }
                 }
             }
         };
-        add(&mut chosen, wanted)?;
+        add(&mut chosen, &mut provided, wanted)?;
         // install_if packages join once all their conditions are installed.
         // Growth is counted by the chosen set, not by attempts: a package whose
         // name another chosen package already provides adds nothing, and
@@ -167,11 +175,11 @@ impl Index {
             for (i, p) in self.pkgs.iter().enumerate() {
                 if !p.install_if.is_empty()
                     && !chosen.contains_key(&p.name)
-                    && p.install_if.iter().all(|t| satisfied(&chosen, name_of(t)))
+                    && p.install_if.iter().all(|t| satisfied(&chosen, &provided, name_of(t)))
                     && self.latest(&self.by_name[&p.name]) == i
                 {
                     let before = chosen.len();
-                    add(&mut chosen, std::slice::from_ref(&p.name))?;
+                    add(&mut chosen, &mut provided, std::slice::from_ref(&p.name))?;
                     grew |= chosen.len() > before;
                 }
             }
@@ -185,7 +193,7 @@ impl Index {
 impl Index {
     /// apk refuses two different packages providing the same versioned name
     /// (`so:libfoo.so.1=1.0`); unversioned provides may coexist.
-    fn check_conflicts(&self, what: &str, set: &BTreeMap<String, usize>) -> Result<()> {
+    pub(super) fn check_conflicts(&self, what: &str, set: &BTreeMap<String, usize>) -> Result<()> {
         let mut seen: HashMap<&str, usize> = HashMap::new();
         for &i in set.values() {
             for prov in self.pkgs[i].provides.iter().filter(|p| p.contains('=')) {

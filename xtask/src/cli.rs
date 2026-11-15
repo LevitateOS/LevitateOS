@@ -333,6 +333,15 @@ pub enum BaseCmd {
         #[arg(long)]
         check: bool,
     },
+    /// Share the base and desktop locks out among the group recipes in recipes/ and write their pins.
+    Groups {
+        #[arg(value_parser = DistroParser)]
+        distro: Distro,
+        /// Write nothing; fail if a pin block is stale, a group's dependencies
+        /// are undeclared, or the base and groups differ from today's locks.
+        #[arg(long)]
+        check: bool,
+    },
     /// Resolve the kernel build dependencies from Rocky 10 and write their lock.
     KernelDeps {
         /// Only report packages with newer builds (exit 1 if any).

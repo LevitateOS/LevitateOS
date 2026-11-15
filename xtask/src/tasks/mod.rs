@@ -3,6 +3,7 @@ pub mod base;
 pub mod build;
 pub mod check;
 pub mod generate;
+pub mod groups;
 pub mod kernels;
 pub mod prebuilt;
 pub mod progress;

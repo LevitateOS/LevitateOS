@@ -29,23 +29,23 @@ const MIRROR: &str = "https://dl.fedoraproject.org/pub/fedora/linux";
 
 /// One RPM build as a repository's primary index lists it.
 #[derive(Clone, Debug)]
-struct Rpm {
-    name: String,
-    epoch: String,
-    version: String,
-    release: String,
-    arch: String,
-    url: String,
-    sha256: String,
+pub(super) struct Rpm {
+    pub(super) name: String,
+    pub(super) epoch: String,
+    pub(super) version: String,
+    pub(super) release: String,
+    pub(super) arch: String,
+    pub(super) url: String,
+    pub(super) sha256: String,
     /// Everything the package provides: capabilities, sonames and the files
     /// the index lists.
-    provides: Vec<String>,
+    pub(super) provides: Vec<String>,
     /// What it requires (strong dependencies only), rich expressions as written.
-    requires: Vec<String>,
+    pub(super) requires: Vec<String>,
 }
 
 impl Rpm {
-    fn nevra(&self) -> String {
+    pub(super) fn nevra(&self) -> String {
         format!("{}-{}-{}.{}", self.name, self.version, self.release, self.arch)
     }
 
@@ -333,14 +333,14 @@ fn lock_rpm(root: &Path, distro: &Distro, bundle: &distro_contract::Variant, che
 
 /// Every x86_64/noarch package of the release and updates repositories (the
 /// newest build of each name) with what it provides and requires.
-struct Index {
+pub(super) struct Index {
     pkgs: BTreeMap<String, Rpm>,
     /// capability -> names of the packages providing it
     providers: HashMap<String, Vec<String>>,
 }
 
 impl Index {
-    fn new(pkgs: BTreeMap<String, Rpm>) -> Self {
+    pub(super) fn new(pkgs: BTreeMap<String, Rpm>) -> Self {
         let mut providers: HashMap<String, Vec<String>> = HashMap::new();
         for rpm in pkgs.values() {
             for cap in rpm.provides.iter().chain(std::iter::once(&rpm.name)) {
@@ -356,7 +356,7 @@ impl Index {
     /// The closure of `wanted` over `chosen`: strong requires only, each
     /// resolved against what is already chosen first, else the newest build
     /// of the package that provides it.
-    fn resolve(&self, wanted: &[String], chosen: BTreeSet<String>, assumed: &HashSet<&str>) -> Result<BTreeSet<String>> {
+    pub(super) fn resolve(&self, wanted: &[String], chosen: BTreeSet<String>, assumed: &HashSet<&str>) -> Result<BTreeSet<String>> {
         let mut st = Solver {
             index: self,
             assumed,

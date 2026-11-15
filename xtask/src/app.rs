@@ -12,6 +12,7 @@ pub fn run(cli: crate::cli::Cli) -> Result<()> {
         Cmd::Kernel { what: KernelCmd::Publish(args) } => crate::tasks::kernels::publish(args),
         Cmd::Prebuilt { what } => crate::tasks::prebuilt::run(what),
         Cmd::Base { what: BaseCmd::Lock { distro, check } } => crate::tasks::base::lock(&distro, check),
+        Cmd::Base { what: BaseCmd::Groups { distro, check } } => crate::tasks::groups::groups(&distro, check),
         Cmd::Base { what: BaseCmd::KernelDeps { check } } => crate::tasks::base::kernel_deps_lock(check),
         Cmd::Run(args) => crate::tasks::scenarios::run(args),
         Cmd::Test(args) => crate::tasks::scenarios::test(args),
