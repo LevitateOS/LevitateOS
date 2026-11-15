@@ -36,7 +36,7 @@
         "wrangler": "^4.22.0",
       },
     },
-    "tui/apps/install/base-system": {
+    "tools/tui/apps/install/base-system": {
       "name": "@levitate/base-system",
       "version": "0.1.0",
       "bin": {
@@ -55,7 +55,7 @@
         "typescript": "^5.9.2",
       },
     },
-    "tui/apps/install/disk-plan": {
+    "tools/tui/apps/install/disk-plan": {
       "name": "@levitate/disk-plan",
       "version": "0.1.0",
       "bin": {
@@ -74,7 +74,7 @@
         "typescript": "^5.9.2",
       },
     },
-    "tui/apps/install/install-hub": {
+    "tools/tui/apps/install/install-hub": {
       "name": "@levitate/install-hub",
       "version": "0.1.0",
       "bin": {
@@ -93,7 +93,7 @@
         "typescript": "^5.9.2",
       },
     },
-    "tui/apps/install/system-setup": {
+    "tools/tui/apps/install/system-setup": {
       "name": "@levitate/system-setup",
       "version": "0.1.0",
       "bin": {
@@ -112,11 +112,11 @@
         "typescript": "^5.9.2",
       },
     },
-    "tui/apps/live-tools/install-docs": {
+    "tools/tui/apps/live-tools/install-docs": {
       "name": "@levitate/install-docs",
       "version": "0.2.0",
       "bin": {
-        "install-docs": "./src/main.ts",
+        "install-docs": "./src/main.tsx",
       },
       "dependencies": {
         "@levitate/docs-content": "workspace:*",
@@ -130,7 +130,7 @@
         "typescript": "^5.9.2",
       },
     },
-    "tui/apps/runtime/recab-tui": {
+    "tools/tui/apps/runtime/recab-tui": {
       "name": "@levitate/recab-tui",
       "version": "0.1.0",
       "bin": {
@@ -148,7 +148,7 @@
         "typescript": "^5.9.2",
       },
     },
-    "tui/kit/core": {
+    "tools/tui/kit/core": {
       "name": "@levitate/tui-kit",
       "version": "0.3.0",
       "dependencies": {
@@ -167,7 +167,7 @@
         "react": "^19.2.0",
       },
     },
-    "tui/kit/install-state": {
+    "tools/tui/kit/install-state": {
       "name": "@levitate/install-state",
       "version": "0.1.0",
       "dependencies": {
@@ -364,23 +364,23 @@
 
     "@jridgewell/trace-mapping": ["@jridgewell/trace-mapping@0.3.9", "", { "dependencies": { "@jridgewell/resolve-uri": "^3.0.3", "@jridgewell/sourcemap-codec": "^1.4.10" } }, "sha512-3Belt6tdc8bPgAtbcmdtNJlirVoTmEb5e2gC94PnkwEW9jI6CAHUeoG85tjWP5WquqfavoMtMwiG4P926ZKKuQ=="],
 
-    "@levitate/base-system": ["@levitate/base-system@workspace:tui/apps/install/base-system"],
+    "@levitate/base-system": ["@levitate/base-system@workspace:tools/tui/apps/install/base-system"],
 
-    "@levitate/disk-plan": ["@levitate/disk-plan@workspace:tui/apps/install/disk-plan"],
+    "@levitate/disk-plan": ["@levitate/disk-plan@workspace:tools/tui/apps/install/disk-plan"],
 
     "@levitate/docs-content": ["@levitate/docs-content@workspace:docs/content"],
 
-    "@levitate/install-docs": ["@levitate/install-docs@workspace:tui/apps/live-tools/install-docs"],
+    "@levitate/install-docs": ["@levitate/install-docs@workspace:tools/tui/apps/live-tools/install-docs"],
 
-    "@levitate/install-hub": ["@levitate/install-hub@workspace:tui/apps/install/install-hub"],
+    "@levitate/install-hub": ["@levitate/install-hub@workspace:tools/tui/apps/install/install-hub"],
 
-    "@levitate/install-state": ["@levitate/install-state@workspace:tui/kit/install-state"],
+    "@levitate/install-state": ["@levitate/install-state@workspace:tools/tui/kit/install-state"],
 
-    "@levitate/recab-tui": ["@levitate/recab-tui@workspace:tui/apps/runtime/recab-tui"],
+    "@levitate/recab-tui": ["@levitate/recab-tui@workspace:tools/tui/apps/runtime/recab-tui"],
 
-    "@levitate/system-setup": ["@levitate/system-setup@workspace:tui/apps/install/system-setup"],
+    "@levitate/system-setup": ["@levitate/system-setup@workspace:tools/tui/apps/install/system-setup"],
 
-    "@levitate/tui-kit": ["@levitate/tui-kit@workspace:tui/kit/core"],
+    "@levitate/tui-kit": ["@levitate/tui-kit@workspace:tools/tui/kit/core"],
 
     "@napi-rs/wasm-runtime": ["@napi-rs/wasm-runtime@1.2.4", "", { "dependencies": { "@tybys/wasm-util": "^0.10.3" }, "peerDependencies": { "@emnapi/core": "^1.7.1 || ^2.0.0-alpha.4", "@emnapi/runtime": "^1.7.1 || ^2.0.0-alpha.4" } }, "sha512-AJxoUD2/15ESHbvpcyjU274nsAPLuOtPHCk0vKJM5pj//Fg/B1FXNWjPnXTT9PymCYYiHo4zPj0ZomXBKhoy7g=="],
 
