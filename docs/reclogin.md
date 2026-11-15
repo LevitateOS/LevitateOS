@@ -2,13 +2,13 @@
 
 > 2026-11-15: the desktop (Plasma, LXQt) is now a Recipe group, so sessions come and go with Recipe installs and removals, and a system whose last desktop was removed has a text login. This fits "sessions are data" below and changes nothing else here. See docs/product-handoff.md §2.4 / docs/release-engineering.md.
 
-Status: **documented, not started.** This file records the requirement and the design constraints for a future `reclogin`. Do not treat it as an implementation; no programming or porting is authorized by this document alone.
+Status: **designed, not started.** The owner settled the decisions on 2026-11-15 (see "Decisions" below) and a visual draft exists (a design canvas, four artboards, both OSes in the website's style; it awaits the owner's verdict). No programming or porting is authorized by this document alone.
 
 ## The requirement
 
 LevitateOS and AcornOS must have **the same login screen**. Today both use SDDM with different themes and behavior. `reclogin` replaces SDDM on both systems with one Levitate-owned login manager, written in Rust, presenting the same greeter, interaction model, and behavior on both OSes. Only branding differs, driven by the distro profile (LevitateOS: leaf/pine identity; AcornOS: acorn/brown identity).
 
-Out of scope, explicitly: no agent integration, no embedded agent workflows, no extra account/recovery machinery, and no attempt to replace PAM, logind/elogind, or the desktop sessions themselves. `reclogin` is a login manager and greeter, nothing more.
+Out of scope, explicitly: no agent integration, no embedded agent workflows, no account recovery machinery, and no attempt to replace PAM, logind/elogind, or the desktop sessions themselves. `reclogin` is a login manager and greeter, nothing more. The one exception the owner chose on 2026-11-15 is a guest session (a temporary account wiped at logout).
 
 ## What it must do
 
@@ -28,12 +28,9 @@ Out of scope, explicitly: no agent integration, no embedded agent workflows, no 
 - **No agent anything.** Per the product rule recorded in the installer/recab handoff: no “ask an agent,” no picker, no embedded agent workflow in any product GUI, including this one.
 - **Security is the design center.** Password handling, PAM conversation, VT switching, and session handover are the parts that must be reviewed hardest; visual polish must never weaken them.
 
-## Open questions to settle before implementation
+## Questions that were open before implementation
 
-- Rendering stack: the greeter needs a UI toolkit that runs before any user session on both systems (Qt is the natural candidate — both desktops are Qt-based — but the choice, and how the greeter process hosts it pre-login, is undecided).
-- How much theming is profile data vs. fixed design (backgrounds, accent color, logo placement, user-list style).
-- Exact failure/fallback semantics: how many greeter crashes trigger what fallback, and how that is surfaced to the user.
-- Whether multi-seat and remote (VNC/RDP-style) logins are in scope at all; assume not until the user says otherwise.
+All four are settled under "Decisions" below: the rendering stack (Rust, straight to the screen), how much is profile data (name, mark, colours, background art; nothing else), the crash fallback (three crashes in a minute), and multi-seat and remote logins (out of scope).
 
 ## What the user sees (design research, 2026-11-15)
 
@@ -83,24 +80,33 @@ May differ (profile/branding only): distro name/logo, colours, wallpaper, backgr
 
 Must be identical: the greeter binary and interaction model; avatar list + last-user preselection + always-available manual entry (Acorn gains the list; Levitate must not degrade to typed-only); session enumeration/validation; wrong-password, locked, and expired-password UX; layout indicator + Caps warning; power gating including hibernate-never; autologin and live-ISO DM-off behavior; getty fallback. Parity items still to settle honestly: on-screen keyboard (Levitate only today), battery indicator, hostname welcome placement, show-password toggle.
 
-### Decisions still open for the user
+### Decisions (the owner, 2026-11-15)
 
-1. Graphical root: forbidden vs typed-name-only (and faillock root policy).
-2. Greeter crash threshold/window and how failure is surfaced, on each supervisor.
-3. Empty-submit confirmation and exact generic error wording / attempts-remaining display.
-4. Last-session memory: per-user vs global; same-stem session-file collision priority.
-5. Autologin: keep reading the SDDM drop-in vs new reclogin config (+migration), countdown/cancel, failed-autologin fallback, relogin-on-logout.
-6. On-screen keyboard required on both distros vs profile-gated (Acorn would be an addition, not parity).
-7. Cursor theme as profile branding.
-8. Clock: date shown?, 12/24h source, timezone/NTP indication.
-9. Multi-monitor behavior, DPMS wake, brightness keys, preserving Levitate's 60s auto-fade.
-10. Accessibility scope beyond OSK + Caps + announcements (a11y menu, persistence into the session).
-11. Greeter/session language picker and localized PAM text.
-12. Running-session list / switch-user entries vs fresh login only; power warnings with other users logged in.
-13. Guest session (assumed off — confirm) and network/LDAP manual entry.
-14. Non-password PAM factors (fingerprint/smartcard/FIDO2/OTP) explicitly in or out of scope.
-15. NumLock initial state; single-user flow details (auto-focus, default avatar, duplicate names); busy/cancel during slow PAM; idle password clearing.
-16. Toolkit choice (from §Open questions) — it decides whether Caps/OSK behaviors are inherited or hand-built; elogind parity of every `Can*`/lock call must be runtime-verified, not assumed.
+1. **What draws the screen: reclogin itself, in Rust, straight to the display.** No X server, no Wayland compositor and no Qt under the login screen, so it depends on nothing a user can remove through Recipe and is one program on both OSes. Not tried on either OS yet; the first piece of work is to show that it draws, takes keyboard and pointer input and hands the display to a session on both.
+2. **Automatic login: reclogin's own setting**, written by the installer. Nothing of SDDM stays, its configuration included.
+3. **Crashes: give up after three within a minute.** reclogin then stops, frees the screen and a text login appears there with one line saying the login screen failed.
+4. **Root: only by typing the name.** Root is never in the list; "Other user…" accepts it.
+5. **On-screen keyboard: on both OSes.** It is part of reclogin (nothing ready-made exists without a toolkit).
+6. **Clock: follows the system** (12- or 24-hour by language and region), with the date under it.
+7. **Last session: remembered per user.**
+8. **Switch user: logged-in users are marked in the list.** Choosing one returns to their running session, where their desktop's own lock screen asks for the password. reclogin never draws an unlock prompt.
+9. **Sign-in: password only in the first version.** Whatever PAM asks is still shown, so a method an administrator sets up gets its prompts; only the password is shipped and checked.
+10. **Guest session: yes.** A "Guest" entry starts a temporary account that is wiped at logout. How that account is made and removed is to be designed (it is the one piece of account machinery here).
+11. **Several monitors: the login on the primary one;** the others show the same background without controls.
+12. **Language: no picker.** The screen uses the system's language; each person's desktop uses their own after login.
+
+### Smaller points, decided by default (the owner may change any)
+
+- An empty password is refused on the spot with a shake and a line; PAM is not called.
+- The wrong-password line is "Authentication failed." Attempts left are shown only when PAM says them.
+- Two session files with the same name: the Wayland one is offered.
+- Automatic login has no countdown. If it fails, the login screen appears. After a logout the login screen appears; it does not log in again.
+- The cursor theme is profile branding, like the colours.
+- The screen blanks when idle as the system is set to; a key or the pointer wakes it. A typed password is cleared after a minute without input.
+- NumLock is left as the firmware set it.
+- Network accounts (LDAP and the like) work through "Other user…" if PAM is set up for them; nothing is built for them.
+- Multi-seat and remote logins are out of scope. Hibernate is never offered.
+- Accessibility in the first version: the on-screen keyboard, the Caps Lock warning and readable contrast. A screen reader is not in the first version.
 
 ## Acceptance sketch (for when this is picked up)
 
