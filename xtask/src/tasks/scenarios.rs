@@ -136,6 +136,7 @@ pub fn test(args: TestArgs) -> Result<()> {
         Outcome::Failed(_) => "fail",
         Outcome::Missing(_) => "missing",
         Outcome::NotRun(_) => "not-run",
+        Outcome::Skipped(_) => "skipped",
     };
     let detail = |outcome: &Outcome| match outcome {
         Outcome::Passed(evidence) => Some(evidence.clone()),
@@ -145,7 +146,7 @@ pub fn test(args: TestArgs) -> Result<()> {
             "{missing}; fix: {}",
             crate::util::exit::fix_for(missing)
         )),
-        Outcome::NotRun(why) => Some(why.clone()),
+        Outcome::NotRun(why) | Outcome::Skipped(why) => Some(why.clone()),
     };
     if args.json {
         let summary: Vec<_> = outcomes
@@ -155,6 +156,7 @@ pub fn test(args: TestArgs) -> Result<()> {
                     "scenario": scenario.key(),
                     "result": label(outcome),
                     "passed": matches!(outcome, Outcome::Passed(_) | Outcome::Cached),
+                    "skipped": matches!(outcome, Outcome::Skipped(_)),
                     "detail": detail(outcome),
                 })
             })
@@ -175,13 +177,13 @@ pub fn test(args: TestArgs) -> Result<()> {
 
     let failed: Vec<&str> = outcomes
         .iter()
-        .filter(|(_, outcome)| !matches!(outcome, Outcome::Passed(_) | Outcome::Cached))
+        .filter(|(_, outcome)| !matches!(outcome, Outcome::Passed(_) | Outcome::Cached | Outcome::Skipped(_)))
         .map(|(scenario, _)| scenario.key())
         .collect();
     let count = failed.len();
     let names = failed.join(", ");
     let first = outcomes.into_iter().find_map(|(_, outcome)| match outcome {
-        Outcome::Passed(_) | Outcome::Cached => None,
+        Outcome::Passed(_) | Outcome::Cached | Outcome::Skipped(_) => None,
         Outcome::Failed(err) => Some(err),
         Outcome::Missing(missing) => Some(anyhow::Error::new(missing)),
         Outcome::NotRun(why) => Some(anyhow::anyhow!(why)),

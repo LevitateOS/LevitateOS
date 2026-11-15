@@ -194,18 +194,21 @@ preseed_recipe_script = "distro/builder/os-recipes/alpine-desktop-preseed.rhai"
 # source pins in the recipe are bumped for every XLibre point release, each
 # treated as a security release.
 display_server_recipe_script = "distro/builder/os-recipes/xlibre.rhai"
-# What compiling the desktop apps (tools/gui/) and the display server needs: the C++
-# compiler with the C library's headers, CMake with make, Qt's development
-# files; for XLibre also meson with samurai, git to fetch its pinned source,
-# and the development files of the libraries it links. Locked with the
-# desktop, so what they are compiled against is what the desktop ships. Only
-# the root they are compiled in has these; no image does.
+# What compiling the desktop apps (tools/gui/), the display server and the login
+# screen (tools/reclogin) needs: the C++ compiler with the C library's headers,
+# CMake with make, Qt's development files; for XLibre also meson with samurai,
+# git to fetch its pinned source, and the development files of the libraries it
+# links; for reclogin Alpine's Rust toolchain and the development files of
+# linux-pam, libinput and libxkbcommon. Locked with the desktop, so what they
+# are compiled against is what the desktop ships. Only the root they are
+# compiled in has these; no image does.
 apps_build_packages = [
   "g++", "musl-dev", "make", "cmake", "qt6-qtbase-dev", "qt6-qtsvg-dev",
   "meson", "samurai", "git", "xorgproto", "xtrans", "pixman-dev", "libxfont2-dev",
   "libxkbfile-dev", "libxcvt-dev", "libepoxy-dev", "mesa-dev", "libdrm-dev",
   "libpciaccess-dev", "libxshmfence-dev", "nettle-dev", "eudev-dev", "libx11-dev",
   "libxau-dev", "libxdmcp-dev", "libinput-dev",
+  "rust", "cargo", "linux-pam-dev", "libxkbcommon-dev",
 ]
 apps_build_preseed_recipe_script = "distro/builder/os-recipes/alpine-apps-build-preseed.rhai"
 apps_build_root_recipe_script = "distro/builder/os-recipes/alpine-apps-build-root.rhai"
