@@ -266,7 +266,7 @@ pub enum Cmd {
         what: Option<CheckCmd>,
     },
 
-    /// Run a terminal app from tui/ in this terminal, or list them.
+    /// Run a terminal app from tools/tui/ in this terminal, or list them.
     ///
     /// `cargo xtask tui <APP> [ARGS]...` runs the app in this terminal (it needs one). First
     /// it installs the root JavaScript workspace and builds the Rust tools the app's manifest
@@ -313,7 +313,7 @@ pub enum Cmd {
 
 #[derive(Subcommand)]
 pub enum TuiCmd {
-    /// List the apps under tui/apps, or one app's stories in detail.
+    /// List the apps under tools/tui/apps, or one app's stories in detail.
     List {
         /// An app: list its stories (what each shows, how it starts, its steps).
         app: Option<String>,

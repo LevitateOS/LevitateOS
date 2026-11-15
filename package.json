@@ -4,14 +4,14 @@
   "workspaces": [
     "docs/website",
     "docs/content",
-    "tui/kit/core",
-    "tui/kit/install-state",
-    "tui/apps/install/base-system",
-    "tui/apps/install/disk-plan",
-    "tui/apps/install/install-hub",
-    "tui/apps/install/system-setup",
-    "tui/apps/live-tools/install-docs",
-    "tui/apps/runtime/recab-tui"
+    "tools/tui/kit/core",
+    "tools/tui/kit/install-state",
+    "tools/tui/apps/install/base-system",
+    "tools/tui/apps/install/disk-plan",
+    "tools/tui/apps/install/install-hub",
+    "tools/tui/apps/install/system-setup",
+    "tools/tui/apps/live-tools/install-docs",
+    "tools/tui/apps/runtime/recab-tui"
   ],
   "devDependencies": {
     "oxfmt": "0.34.0",

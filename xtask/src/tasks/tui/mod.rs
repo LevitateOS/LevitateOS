@@ -1,4 +1,4 @@
-//! The TUI harness: `tui <app>` runs a terminal app from tui/ in this terminal, `tui list`
+//! The TUI harness: `tui <app>` runs a terminal app from tools/tui/ in this terminal, `tui list`
 //! lists them, `inspect` renders one headlessly and `check tui` checks them all.
 //!
 //! All three start an app the one way [`Launch`] defines: the same environment (PATH
@@ -184,14 +184,14 @@ pub fn run(name: String, line: Vec<String>) -> Result<()> {
     Ok(())
 }
 
-/// Every app under tui/apps, as its manifest describes it.
+/// Every app under tools/tui/apps, as its manifest describes it.
 pub fn list() -> Result<()> {
     let root = crate::util::repo::repo_root()?;
     let workspace = Workspace::load(&root)?;
     let apps = &workspace.apps;
     let width = apps.iter().map(|app| app.name.len()).max().unwrap_or(0) + 3;
     let indent = " ".repeat(2 + width);
-    println!("Apps under tui/apps; run one with `cargo xtask tui <NAME> [ARGS]`:\n");
+    println!("Apps under tools/tui/apps; run one with `cargo xtask tui <NAME> [ARGS]`:\n");
     for app in apps {
         println!("  {:<width$}{}", app.name, app.description);
         let dir = app.dir.strip_prefix(&root).unwrap_or(&app.dir);

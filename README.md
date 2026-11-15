@@ -77,9 +77,9 @@ for the shared format.
 ```
 distro/      builder (products and ISOs), contract and variants (per-distro declarations)
 recipes/     user-managed software catalog (ripgrep)
-tools/       recipe, the rec* install and boot tools, ginux (upstream build domains)
+tools/       recipe, the rec* install and boot tools, ginux (upstream build domains),
+             gui (Qt desktop apps) and tui (terminal apps for the live ISO and installer)
 testing/     install-tests (boot/install scenarios)
-tui/         terminal apps for the live ISO and installer
 docs/        content (site and live docs), website, design notes, history
 xtask/       the cargo xtask front door
 ```

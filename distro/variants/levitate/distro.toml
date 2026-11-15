@@ -195,7 +195,7 @@ packages = [
 [desktop]
 display_manager = "sddm"
 preseed_recipe_script = "distro/builder/os-recipes/fedora-rpm-desktop-preseed.rhai"
-# What compiling the desktop apps (gui/) needs: the C++ compiler, CMake with
+# What compiling the desktop apps (tools/gui/) needs: the C++ compiler, CMake with
 # make, and Qt's development files. Locked with the desktop, so the Qt they are
 # compiled against is the Qt the desktop ships. Only the root they are compiled
 # in has these; no image does.

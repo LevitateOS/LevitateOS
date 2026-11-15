@@ -177,7 +177,7 @@ preseed_recipe_script = "distro/builder/os-recipes/alpine-desktop-preseed.rhai"
 # current is this project's job: the source pins in the recipe are bumped for
 # every XLibre point release, each treated as a security release.
 display_server_recipe_script = "distro/builder/os-recipes/xlibre.rhai"
-# What compiling the desktop apps (gui/) and the display server needs: the C++
+# What compiling the desktop apps (tools/gui/) and the display server needs: the C++
 # compiler with the C library's headers, CMake with make, Qt's development
 # files; for XLibre also meson with samurai, git to fetch its pinned source,
 # and the development files of the libraries it links. Locked with the

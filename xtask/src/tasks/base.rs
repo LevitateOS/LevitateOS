@@ -9,7 +9,7 @@
 //! variant goes through `apk_lock` (the same closure over Alpine's indexes).
 //! Either writes three locks: the base and the desktop layer (the desktop's
 //! closure minus what the base already has), which the rootfs recipes import,
-//! and the apps-build layer (what compiling the desktop apps in `gui/` needs
+//! and the apps-build layer (what compiling the desktop apps in `tools/gui/` needs
 //! beyond the base), which only the root they are compiled in gets.
 //! Rerunning it is how a build takes the distribution's updates.
 

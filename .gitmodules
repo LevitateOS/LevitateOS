@@ -51,7 +51,7 @@
 	url = https://github.com/LevitateOS/recpart.git
 	branch = main
 [submodule "tui"]
-	path = tui
+	path = tools/tui
 	url = https://github.com/LevitateOS/tui-root.git
 	branch = master
 [submodule "tools/recshuttle"]
@@ -67,7 +67,7 @@
 	url = https://github.com/LevitateOS/recipes
 	branch = master
 [submodule "desktop-apps"]
-	path = gui
+	path = tools/gui
 	url = https://github.com/LevitateOS/desktop-apps.git
 	branch = main
 [submodule "tools/recguest"]
