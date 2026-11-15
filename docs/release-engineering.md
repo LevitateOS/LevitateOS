@@ -198,3 +198,65 @@ Recipe alone and Recipe replaces its own files.
 None of these steps needs an image build to be written. The first real proof
 is two releases of one OS and an update from the first to the second, which
 needs the owner's build go.
+
+## 10. Interfaces (fixed, so the parts can be written side by side)
+
+Files:
+
+| What | Where |
+| --- | --- |
+| The release an installed system runs | `/usr/lib/levitate/release.json` (the manifest it was built from) |
+| Public keys | `/usr/share/levitate/release-keys/*.pub` |
+| Channel pointer | `https://raw.githubusercontent.com/LevitateOS/releases/main/channels/<os>/stable.json` and `.sig` |
+| Fetched release | `/var/cache/recupdate/<serial>/` holding `release.json`, `release.json.sig`, `base.tar.zst`, `boot.tar.zst`, `recipes.tar.zst` |
+| Last daily check | `/var/lib/recupdate/available.json` (world-readable; the answer of the last `check`) |
+
+Manifest additions to section 2: `"schema": 1`, and `recipes` is an archive
+like the others: `{ "url", "sha256", "size", "revision" }`. It holds the group
+recipes of this release.
+
+Signatures: Ed25519 over the exact bytes of the file. A `.sig` file is the
+64-byte signature in base64 and a newline. A `.pub` file is the 32-byte public
+key in base64 and a newline. The private key file is the 32-byte seed in
+base64; `cargo xtask release` reads its path from `--key` or
+`LEVITATE_RELEASE_KEY`. A manifest is accepted when any key in the keys folder
+verifies it, its `os` is this system's os-release `ID`, and its `serial` is
+not lower than the installed one.
+
+`recupdate` (test overrides: `RECUPDATE_CHANNEL_URL`, `RECUPDATE_KEYS_DIR`,
+`RECUPDATE_RELEASE_FILE`, `RECUPDATE_CACHE_DIR`, `RECUPDATE_STATE_DIR`):
+
+- `recupdate check [--json]`: no privileges. JSON:
+  `{"schema":1,"os":"levitateos","installed":{"version":"1.0","serial":3},
+  "available":null | {"version":"1.1","serial":4,"date":"2026-12-01","notes":"<url>","download_bytes":123},
+  "checked_at":"<RFC 3339>"}`. Exit 0 whether or not something is available;
+  non-zero with the reason on stderr when the check itself failed.
+- `recupdate fetch [--json]`: root. Downloads and verifies into the cache
+  folder; resumes partial files. With `--json`, JSON lines (below).
+- `recupdate notice`: root, run once a day by a timer (systemd) or a periodic
+  job (OpenRC): runs the check and writes `available.json`. Nothing else.
+- `recupdate notify-user`: run at session start for each user: reads
+  `available.json` and sends one desktop notification per new serial.
+- `recupdate apply [--json]`: root, mutable installs only (refuses on A/B and
+  names `recab update`): fetch if needed, then Recipe applies the release to
+  `/`, then the new kernel becomes the default boot entry and the previous one
+  stays as the second entry.
+
+`recab update [--json]`: root, A/B only: `recupdate fetch`, `recab copy`,
+Recipe applies the release to the other root, boot files for the other root's
+entry, `recab boot-other`.
+
+Recipe: `recipe --system [--root DIR] apply-release <fetched release folder>`.
+It replaces the entry `base` from `base.tar.zst`, installs the release's
+revision of every group recipe the root holds from `recipes.tar.zst`, runs the
+effects once, and writes the root's `usr/lib/levitate/release.json`. It checks
+each archive against the manifest's SHA-256 itself; it does not check the
+signature (the callers above did, and the folder is root-owned).
+
+JSON lines, the same for `recupdate fetch|apply --json` and
+`recab update --json`, one object per line on stdout:
+
+- `{"event":"step","n":2,"of":5,"text":"Copying the booted root"}`
+- `{"event":"progress","done":123,"total":456}` (bytes of the current step)
+- `{"event":"done","restart_needed":true,"version":"1.1","serial":4}`
+- `{"event":"failed","error":"<one line>"}` followed by a non-zero exit
