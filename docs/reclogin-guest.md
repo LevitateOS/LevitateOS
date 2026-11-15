@@ -281,7 +281,7 @@ It does not:
 
 Risks that remain:
 
-- **R1. AcornOS homes may be readable by everyone.** busybox `adduser -D` (used by `system-setup.sh`) makes homes 0755 as far as I know; Fedora's `useradd` makes them 0700. If so, the guest (and every other user) can read people's homes on AcornOS today. The setup program must make every home 0700 before the guest ships. This is a fix outside this document, to confirm on an AcornOS system.
+- **R1. AcornOS homes may be readable by everyone.** busybox `adduser -D` (used by `system-setup.sh`) makes homes 0755 as far as I know; Fedora's `useradd` makes them 0700. If so, the guest (and every other user) can read people's homes on AcornOS today. Since 2026-11-15 the setup program makes every new home 0700 on both systems (builder `14339e6`, written and not run). Homes on systems installed before that stay as they are.
 - **R2. Swap.** tmpfs pages can be written to swap. If the machine swaps to an unencrypted disk partition or file, pieces of a guest's files can stay on the disk after power loss until overwritten. Memory-only swap (zram) or encrypted swap avoids it. What the systems use for swap is not decided here.
 - **R3. Logs and crash dumps.** On LevitateOS journald keeps a per-user journal for uid 60600, and systemd-coredump may store a crashed guest program's memory. Both stay after logout, readable by root. AcornOS's syslog records the logins. "Nothing is kept" is about the guest's files and settings, not the system's own records.
 - **R4. Shared memory filesystems.** `/tmp` (if tmpfs), `/dev/shm` and `/run/user/60600` are memory the guest can fill outside its home's cap until logout. The home cap and `nproc` limit do not cover them.
