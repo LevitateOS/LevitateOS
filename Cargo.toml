@@ -17,6 +17,7 @@ members = [
     "tools/recqemu",
     "tools/recshuttle",
     "tools/recguest",
+    "tools/recupdate",
     "tools/reclogin",
     "testing/install-tests",
 ]

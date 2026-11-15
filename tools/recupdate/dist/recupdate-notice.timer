@@ -1,0 +1,10 @@
+[Unit]
+Description=Daily check for a new system release
+
+[Timer]
+OnCalendar=daily
+RandomizedDelaySec=1h
+Persistent=true
+
+[Install]
+WantedBy=timers.target

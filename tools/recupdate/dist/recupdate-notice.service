@@ -1,0 +1,8 @@
+[Unit]
+Description=Check for a new system release (notice only)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/recupdate notice

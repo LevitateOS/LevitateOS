@@ -1,0 +1,24 @@
+[package]
+name = "recupdate"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+description = "Checks the signed release channel and fetches releases for LevitateOS and AcornOS"
+
+[[bin]]
+name = "recupdate"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = { workspace = true }
+base64 = "0.22"
+clap = { workspace = true }
+ed25519-dalek = "2"
+serde = { workspace = true }
+serde_json = { workspace = true }
+sha2 = { workspace = true }
+# The same HTTP client and TLS stack Recipe uses.
+ureq = { version = "2", features = ["native-certs"] }
+libc = { workspace = true }

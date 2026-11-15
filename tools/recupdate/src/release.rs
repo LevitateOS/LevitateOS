@@ -1,0 +1,186 @@
+//! The manifest, the keys, the signature and the installed release.
+
+use anyhow::{bail, ensure, Context, Result};
+use base64::Engine;
+use ed25519_dalek::{Signature, Verifier, VerifyingKey};
+use serde::Deserialize;
+use std::fs;
+use std::path::PathBuf;
+
+pub const DEFAULT_KEYS_DIR: &str = "/usr/share/levitate/release-keys";
+pub const DEFAULT_RELEASE_FILE: &str = "/usr/lib/levitate/release.json";
+pub const CHANNEL_FILE_LIMIT: u64 = 64 * 1024;
+
+#[derive(Deserialize, Clone)]
+pub struct Archive {
+    pub url: String,
+    pub sha256: String,
+    pub size: u64,
+}
+
+#[derive(Deserialize, Clone)]
+pub struct Manifest {
+    pub schema: u32,
+    pub os: String,
+    pub version: String,
+    pub serial: u64,
+    #[serde(default)]
+    pub date: String,
+    pub base: Archive,
+    pub boot: Archive,
+    pub recipes: Archive,
+    #[serde(default)]
+    pub notes: String,
+}
+
+impl Manifest {
+    pub fn download_bytes(&self) -> u64 {
+        self.base.size + self.boot.size + self.recipes.size
+    }
+}
+
+/// A channel file whose signature, schema, OS and serial have been checked.
+pub struct Verified {
+    pub manifest: Manifest,
+    pub bytes: Vec<u8>,
+    pub sig: Vec<u8>,
+}
+
+pub struct OsRelease {
+    pub id: String,
+    pub name: String,
+}
+
+pub fn os_release() -> Result<OsRelease> {
+    let text = fs::read_to_string("/etc/os-release")
+        .or_else(|_| fs::read_to_string("/usr/lib/os-release"))
+        .context("cannot read /etc/os-release or /usr/lib/os-release")?;
+    let field = |key: &str| {
+        text.lines().find_map(|line| {
+            let value = line.strip_prefix(key)?.strip_prefix('=')?;
+            Some(
+                value
+                    .trim()
+                    .trim_matches(|c| c == '"' || c == '\'')
+                    .to_owned(),
+            )
+        })
+    };
+    let id = field("ID").context("os-release has no ID")?;
+    let name = field("NAME").unwrap_or_else(|| id.clone());
+    Ok(OsRelease { id, name })
+}
+
+pub struct Installed {
+    pub version: String,
+    pub serial: u64,
+}
+
+pub fn installed() -> Result<Installed> {
+    let path = crate::util::env_path("RECUPDATE_RELEASE_FILE", DEFAULT_RELEASE_FILE);
+    let text = fs::read_to_string(&path).with_context(|| {
+        format!(
+            "cannot read the installed release record {}",
+            path.display()
+        )
+    })?;
+    #[derive(Deserialize)]
+    struct Record {
+        version: String,
+        serial: u64,
+    }
+    let record: Record = serde_json::from_str(&text)
+        .with_context(|| format!("{} is not a release manifest", path.display()))?;
+    Ok(Installed {
+        version: record.version,
+        serial: record.serial,
+    })
+}
+
+pub fn channel_url(os_id: &str) -> String {
+    std::env::var("RECUPDATE_CHANNEL_URL").ok().filter(|v| !v.is_empty()).unwrap_or_else(|| {
+        format!("https://raw.githubusercontent.com/LevitateOS/releases/main/channels/{os_id}/stable.json")
+    })
+}
+
+fn decode_b64(text: &[u8]) -> Result<Vec<u8>> {
+    let text = std::str::from_utf8(text).context("not text")?;
+    base64::engine::general_purpose::STANDARD
+        .decode(text.trim())
+        .context("not valid base64")
+}
+
+fn keys() -> Result<Vec<VerifyingKey>> {
+    let dir = crate::util::env_path("RECUPDATE_KEYS_DIR", DEFAULT_KEYS_DIR);
+    let mut paths: Vec<PathBuf> = fs::read_dir(&dir)
+        .with_context(|| format!("cannot read the key folder {}", dir.display()))?
+        .filter_map(|e| e.ok().map(|e| e.path()))
+        .filter(|p| p.extension().is_some_and(|x| x == "pub"))
+        .collect();
+    paths.sort();
+    let mut keys = Vec::new();
+    for path in &paths {
+        let raw =
+            decode_b64(&fs::read(path)?).with_context(|| format!("key {}", path.display()))?;
+        let array: [u8; 32] = raw
+            .try_into()
+            .map_err(|_| anyhow::anyhow!("key {} is not 32 bytes", path.display()))?;
+        keys.push(
+            VerifyingKey::from_bytes(&array).with_context(|| format!("key {}", path.display()))?,
+        );
+    }
+    ensure!(
+        !keys.is_empty(),
+        "no release key (*.pub) in {}; refusing to trust any release",
+        dir.display()
+    );
+    Ok(keys)
+}
+
+/// Download the channel file and its `.sig`, verify the signature over the exact bytes, then
+/// parse and check schema, OS and serial.
+pub fn load_channel() -> Result<Verified> {
+    let os = os_release()?;
+    let installed = installed()?;
+    let keys = keys()?;
+    let url = channel_url(&os.id);
+    let bytes = crate::net::get_bounded(&url, CHANNEL_FILE_LIMIT)?;
+    let sig_url = format!("{url}.sig");
+    let sig_text = crate::net::get_bounded(&sig_url, CHANNEL_FILE_LIMIT)?;
+    let sig = decode_b64(&sig_text).with_context(|| format!("signature {sig_url}"))?;
+    let sig_array: [u8; 64] = sig
+        .clone()
+        .try_into()
+        .map_err(|_| anyhow::anyhow!("signature {sig_url} is not 64 bytes"))?;
+    let signature = Signature::from_bytes(&sig_array);
+    if !keys
+        .iter()
+        .any(|key| key.verify(&bytes, &signature).is_ok())
+    {
+        bail!("the signature of {url} matches none of the release keys; refusing it");
+    }
+    let manifest: Manifest = serde_json::from_slice(&bytes)
+        .with_context(|| format!("{url} is not a release manifest"))?;
+    ensure!(
+        manifest.schema == 1,
+        "{url} has schema {}, this recupdate understands schema 1",
+        manifest.schema
+    );
+    ensure!(
+        manifest.os == os.id,
+        "the release is for {}, this system is {}",
+        manifest.os,
+        os.id
+    );
+    ensure!(
+        manifest.serial >= installed.serial,
+        "the channel's serial {} is lower than the installed serial {}; refusing it",
+        manifest.serial,
+        installed.serial
+    );
+    Ok(Verified {
+        manifest,
+        bytes,
+        sig: sig_text,
+    })
+}

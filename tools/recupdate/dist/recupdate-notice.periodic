@@ -1,0 +1,5 @@
+#!/bin/sh
+# Installed as /etc/periodic/daily/recupdate-notice. Writes the notice only; never downloads a release.
+# Spread the load: wait a random time of up to one hour.
+sleep "$(( $(od -An -N2 -tu2 /dev/urandom | tr -d ' ') % 3600 ))"
+exec /usr/bin/recupdate notice

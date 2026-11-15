@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Release notice
+Comment=Tell the user when a new system release exists
+Exec=recupdate notify-user
+Icon=system-software-update
+NoDisplay=true
+X-GNOME-Autostart-Phase=Applications
