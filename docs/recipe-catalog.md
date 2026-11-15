@@ -150,6 +150,22 @@ chat, graphics and developer tools.
 | Chat | `element` | upstream's build | | |
 | Code editor | `vscodium` | upstream's build | | |
 | Drawing | `krita` | upstream's build, later from source | | |
+| Games | `steam` | upstream's launcher from Valve, with Fedora packages and the `lib32` group | LevitateOS only; proprietary | written 2026-11-15, never run |
+
+Steam (written 2026-11-15) is a system recipe, not a carried package: it
+puts Valve's launcher, menu entry, icons and controller rules into the system
+root, fetched from Valve's own server by SHA-256 and never redistributed, and
+needs the hidden `lib32` group, the 32-bit libraries Steam and its runtime
+load, taken from Fedora 45 at the versions of the system's own 64-bit builds.
+The lists follow Fedora's own Steam package (RPM Fusion) and Valve's
+requirements; each recipe says where each entry comes from. AcornOS gets no
+Steam recipe and no workaround: its musl base cannot run a glibc program
+(product handoff, section 2.5). The Steam client updates itself in the home
+folder and cannot be set to manual; Recipe updates the launcher, the rules and
+the libraries. With the image's Mesa drivers it is meant for AMD and Intel;
+NVIDIA's proprietary driver is a recipe still to write, and it must bring its
+32-bit libraries. Whether Steam starts, logs in and runs Counter-Strike 2 is
+to be tried on real hardware.
 
 Gwenview and Okular, named in the desktop notes, come after `qview` and
 `qpdfview`: they need the KDE libraries as `sdk` recipes, which is a layer of
